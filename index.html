@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ivalis - Le JDR</title>
+  <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <audio id="musique-ambiance" loop>
+    <source src="https://res.cloudinary.com/dlkjq4kvg/video/upload/q_auto,f_auto/v1781370167/Ivalis_song_final_otst2c.mp3" type="audio/mpeg">
+  </audio>
+  <audio id="son-clic">
+    <source src="https://res.cloudinary.com/dlkjq4kvg/video/upload/q_auto,f_auto/v1781420565/clik_bouton_aniy88.mp3" type="audio/mpeg">
+  </audio>
+
+  <div class="preload-images">
+    <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781375437/nouvelle_partie_brillle_hpnomi.png" alt="preload">
+    <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781375437/charger_partie_brille_owinuh.png" alt="preload">
+  </div>
+
+  <!-- =========================================================
+       SCENE 1 : ACCUEIL
+       ========================================================= -->
+  <div id="ecran-accueil" onclick="entrerDansLeJeu()"></div>
+
+  <!-- =========================================================
+       SCENE 2 : IDENTIFICATION
+       ========================================================= -->
+  <div id="ecran-identification">
+    <h1 class="titre-etranger">QUI ES-TU, ÉTRANGER ?</h1>
+    <div class="conteneur-noms" id="liste-noms-joueurs"></div>
+  </div>
+
+  <!-- =========================================================
+       SCENE 3 : MENU PRINCIPAL
+       ========================================================= -->
+  <div id="ecran-menu">
+    <div class="layer bg-menu"></div>
+    <div class="layer brume-lointaine"></div>
+    <div class="layer brume-proche"></div>
+    <div class="conteneur-boutons">
+      <button class="btn-jeu btn-nouvelle" onclick="jouerSonClic(); ouvrirModalNouvellePartie()"></button>
+      <button class="btn-jeu btn-charger" onclick="jouerSonClic(); ouvrirModalChargerPartie()"></button>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODALES : NOUVELLE PARTIE / CHARGEMENT
+       ========================================================= -->
+  <div id="overlay-modale"></div>
+
+  <div id="modale-cle" class="modale-parchemin">
+    <h2>Clé de Rune</h2>
+    <p>Veuillez inscrire la clé pour déverrouiller le Grimoire.</p>
+    <input type="password" id="saisie-cle" class="input-parchemin" placeholder="Mot de passe...">
+    <br>
+    <button class="btn-modale" onclick="jouerSonClic(); validerCle(event)">Ouvrir</button>
+    <button class="btn-modale" onclick="jouerSonClic(); fermerModales()">Annuler</button>
+    <p id="msg-erreur" style="color: darkred; display: none; font-weight: bold;">Clé incorrecte.</p>
+  </div>
+
+  <div id="modale-groupe" class="modale-parchemin">
+    <h2>Fondation du Groupe</h2>
+    <input type="text" id="saisie-nom-groupe" class="input-parchemin" placeholder="Nom du Groupe">
+    <input type="password" id="saisie-mdp-groupe" class="input-parchemin" placeholder="Mot de passe de l'équipe">
+    <div class="groupe-boutons">
+      <button class="btn-modale" id="btn-creer-groupe" onclick="jouerSonClic(); validerCreationGroupe()">Créer</button>
+      <button class="btn-modale" onclick="jouerSonClic(); fermerModales()">Annuler</button>
+    </div>
+  </div>
+
+  <div id="modale-charger" class="modale-parchemin">
+    <h2>Archives d'Ivalis</h2>
+    <p>Sélectionnez la session à réveiller :</p>
+    <div id="chargement-parties" style="font-style: italic; margin-bottom: 20px;">Recherche dans les grimoires...</div>
+    <ul id="liste-parties" class="liste-choix-partie" style="display:none;"></ul>
+    <div class="groupe-boutons">
+      <button class="btn-modale" onclick="jouerSonClic(); fermerModales()">Annuler</button>
+    </div>
+  </div>
+
+  <div id="modale-mdp-partie" class="modale-parchemin">
+    <h2>Sceau de sécurité</h2>
+    <p>Le Grimoire est scellé. Entrez le mot de passe de ce groupe :</p>
+    <input type="password" id="saisie-mdp-partie" class="input-parchemin" placeholder="Mot de passe...">
+    <br>
+    <button class="btn-modale" id="btn-valider-mdp-partie" onclick="jouerSonClic(); validerMdpPartie()">Déverrouiller</button>
+    <button class="btn-modale" onclick="jouerSonClic(); fermerModales()">Annuler</button>
+    <p id="msg-erreur-partie" style="color: darkred; display: none; font-weight: bold;">Mot de passe incorrect.</p>
+  </div>
+
+  <!-- =========================================================
+       ECRAN DE JEU
+       ========================================================= -->
+  <div id="ecran-jeu">
+
+    <div id="menu-lateral">
+
+      <!-- Bouton Geant Date -->
+      <div class="icone-menu" onclick="jouerSonClic()">
+        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/parchemin_u9fib7.png" alt="Parchemin">
+        <div class="texte-sur-parchemin">
+          Jour <span id="affichage-jour">...</span><br>
+          De l'an <span id="affichage-an">...</span>
+        </div>
+      </div>
+
+      <!-- BOUTON CHAT : NARRATION -->
+      <div class="conteneur-bouton-lateral" onmouseenter="jouerSonSurvolParchemin()">
+        <div class="masque-banniere">
+          <div class="banniere-glissante">
+            <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781548169/banniere_okbe27.png" alt="Bannière">
+            <span class="texte-banniere">Narration</span>
+          </div>
+        </div>
+        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/chat_vk0zac.png" class="icone-menu" alt="Chat" onclick="jouerSonClic()">
+      </div>
+
+      <div class="conteneur-bouton-lateral" onmouseenter="jouerSonSurvolParchemin()">
+        <div class="masque-banniere">
+          <div class="banniere-glissante">
+            <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781548169/banniere_okbe27.png" alt="Bannière">
+            <span class="texte-banniere">Héros</span>
+          </div>
+        </div>
+        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/personnages_qhidpu.png" class="icone-menu" alt="Personnages" onclick="jouerSonClic(); ouvrirMenuPersonnages()">
+      </div>
+
+      <div class="conteneur-bouton-lateral" onmouseenter="jouerSonSurvolParchemin()">
+        <div class="masque-banniere">
+          <div class="banniere-glissante">
+            <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781548169/banniere_okbe27.png" alt="Bannière">
+            <span class="texte-banniere">Paramètres</span>
+          </div>
+        </div>
+        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/param%C3%A8tres_gttwna.png" class="icone-menu" alt="Paramètres" onclick="jouerSonClic(); ouvrirParametres()">
+      </div>
+
+      <!-- BOUTON COMBAT : RENCONTRE -->
+      <div class="conteneur-bouton-lateral" onmouseenter="jouerSonSurvolParchemin()">
+        <div class="masque-banniere">
+          <div class="banniere-glissante">
+            <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781548169/banniere_okbe27.png" alt="Bannière">
+            <span class="texte-banniere">Rencontre</span>
+          </div>
+        </div>
+        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/combat_syxo0p.png" class="icone-menu" alt="Combat" onclick="jouerSonClic()">
+      </div>
+
+      <!-- BOUTON MISSIONS : JOURNAL -->
+      <div class="conteneur-bouton-lateral" onmouseenter="jouerSonSurvolParchemin()">
+        <div class="masque-banniere">
+          <div class="banniere-glissante">
+            <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781548169/banniere_okbe27.png" alt="Bannière">
+            <span class="texte-banniere">Journal</span>
+          </div>
+        </div>
+        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/missions_wo5tws.png" class="icone-menu" alt="Missions" onclick="jouerSonClic()">
+      </div>
+
+    </div>
+
+    <div id="menu-navigation-bas">
+      <div class="conteneur-volume-nav">
+        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781548169/volume_c53qqq.png" class="icone-nav" alt="Volume" onclick="jouerSonClic(); toggleBulleVolume(event)">
+        <div id="bulle-volume">
+          <input type="range" id="curseur-volume" min="0" max="1" step="0.01" value="0.40" oninput="ajusterVolume(this.value)" style="accent-color: #4a2e1b; width: 6vw; cursor: pointer;">
+        </div>
+      </div>
+      <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781472665/home_gsoldf.png" class="icone-nav" alt="Retour Menu" onclick="jouerSonClic(); demanderRetourMenu()">
+      <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781472665/exit_rkpaeh.png" class="icone-nav" alt="Quitter" onclick="jouerSonClic(); demanderQuitterJeu()">
+    </div>
+
+    <!-- Petit indicateur de session (present dans l'ancienne logique) -->
+    <div id="affichage-id-courant" style="position:absolute; top:1vh; left:1vw; color:#2c1e16; font-size:14px; opacity:0.6; z-index:30;"></div>
+
+    <div id="overlay-jeu-modale"></div>
+
+    <div id="modale-retour-menu" class="modale-parchemin-jeu">
+      <h2>Retour au menu</h2>
+      <p>Êtes-vous sûr de vouloir fermer ce grimoire et revenir au menu principal ?</p>
+      <div class="groupe-boutons-jeu">
+        <button class="btn-modale-jeu" onclick="jouerSonClic(); confirmerRetourMenu()">Oui</button>
+        <button class="btn-modale-jeu" onclick="jouerSonClic(); fermerModalesJeu()">Non</button>
+      </div>
+    </div>
+
+    <div id="modale-quitter-jeu" class="modale-parchemin-jeu">
+      <h2>Quitter Ivalis</h2>
+      <p>Êtes-vous sûr de vouloir quitter le jeu ?</p>
+      <div class="groupe-boutons-jeu">
+        <button class="btn-modale-jeu" onclick="jouerSonClic(); confirmerQuitterJeu()">Oui</button>
+        <button class="btn-modale-jeu" onclick="jouerSonClic(); fermerModalesJeu()">Non</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- LE SON DU PARCHEMIN AU SURVOL (remplacer le src par ton lien Cloudinary) -->
+  <audio id="audio-survol-parchemin" src="TON_LIEN_AUDIO_ICI.mp3" preload="auto"></audio>
+
+  <!-- =========================================================
+       PARAMETRES / CERVEAU IA
+       ========================================================= -->
+  <div id="overlay-parametres"></div>
+
+  <div id="conteneur-parametres">
+
+    <div id="etape-mdp-parametres" class="fenetre-volante-parchemin fondu-interne">
+      <h2>Accès Réservé</h2>
+      <p>Le Savoir d'Ivalis est protégé.</p>
+      <input type="password" id="input-secret-parametres" class="input-texte-parchemin" placeholder="Mot de passe" style="text-align: center;">
+      <p id="erreur-mdp-parametres" style="color: #ff4c4c; font-weight: bold; font-size: 16px; margin-top: -10px; margin-bottom: 10px; opacity: 0; transition: opacity 0.3s;">Mot de passe incorrect.</p>
+      <div style="display: flex; justify-content: center; gap: 10px;">
+        <button id="btn-valider-mdp" class="btn-parametres" onclick="jouerSonClic(); validerMdpParametres()">Déverrouiller</button>
+        <button class="btn-parametres" onclick="jouerSonClic(); fermerParametres()">Annuler</button>
+      </div>
+    </div>
+
+    <div id="etape-menu-parametres" class="fenetre-volante-parchemin fondu-interne" style="display: none; opacity: 0;">
+      <h2>Paramètres</h2>
+      <p>Outils d'administration</p>
+      <button class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); ouvrirListeInstructions('etape-menu-parametres')">
+        Instructions IA
+      </button>
+      <br><br>
+      <button class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); ouvrirClesApi('etape-menu-parametres')">
+        Clés API
+      </button>
+      <br><br>
+      <button class="btn-parametres" onclick="jouerSonClic(); fermerParametres()">Fermer</button>
+    </div>
+
+    <div id="etape-cles-api" class="fenetre-volante-parchemin fondu-interne" style="display: none; opacity: 0;">
+      <h2>Clés API</h2>
+      <p style="font-size: 14px; margin-top: -10px; color: #5c3a21;">Stockées uniquement dans ce navigateur (localStorage).</p>
+
+      <div class="champ-cle-api">
+        <label for="cle-openai">OPENAI_API_KEY</label>
+        <input type="password" id="cle-openai" class="input-texte-parchemin" placeholder="sk-..." autocomplete="off">
+      </div>
+      <div class="champ-cle-api">
+        <label for="cle-cloud-name">CLOUDINARY_CLOUD_NAME</label>
+        <input type="password" id="cle-cloud-name" class="input-texte-parchemin" placeholder="ex : dlkjq4kvg" autocomplete="off">
+      </div>
+      <div class="champ-cle-api">
+        <label for="cle-cloud-key">CLOUDINARY_API_KEY</label>
+        <input type="password" id="cle-cloud-key" class="input-texte-parchemin" placeholder="ex : 9393271..." autocomplete="off">
+      </div>
+      <div class="champ-cle-api">
+        <label for="cle-cloud-secret">CLOUDINARY_API_SECRET</label>
+        <input type="password" id="cle-cloud-secret" class="input-texte-parchemin" placeholder="••••••••" autocomplete="off">
+      </div>
+
+      <label class="afficher-cles">
+        <input type="checkbox" id="toggle-affichage-cles" onchange="basculerAffichageCles(this.checked)"> Afficher les clés
+      </label>
+
+      <p id="msg-cles-api" style="font-weight: bold; font-size: 15px; opacity: 0; transition: opacity 0.3s; min-height: 18px;"></p>
+
+      <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
+        <button id="btn-sauvegarder-cles" class="btn-parametres" onclick="jouerSonClic(); sauvegarderClesApi()">Sauvegarder</button>
+        <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-cles-api', 'etape-menu-parametres')">Retour</button>
+      </div>
+    </div>
+
+    <div id="etape-liste-instructions" class="fenetre-volante-parchemin fondu-interne" style="display: none; opacity: 0;">
+      <h2>
+        Cerveau IA
+        <button class="btn-rond-plus" title="Créer une instruction" onclick="jouerSonClic(); ouvrirEditeurInstruction(null, '', '')">+</button>
+      </h2>
+      <p style="font-size: 14px; margin-top: -15px; color: #5c3a21;">Double-cliquez pour éditer</p>
+      <div id="chargement-instructions">Recherche dans les archives...</div>
+      <div class="liste-instructions" id="conteneur-liste-ia" style="display:none;"></div>
+      <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-liste-instructions', 'etape-menu-parametres')">Retour</button>
+    </div>
+
+    <div id="etape-editeur-instruction" class="fenetre-volante-parchemin fondu-interne" style="display: none; opacity: 0;">
+      <h2 id="titre-fenetre-editeur">Nouvelle Instruction</h2>
+      <input type="hidden" id="editeur-id-instruction">
+      <input type="text" id="editeur-titre" class="input-texte-parchemin" placeholder="Titre de l'instruction">
+      <textarea id="editeur-contenu" class="input-texte-parchemin" placeholder="Contenu de la règle ou de la mémoire pour l'IA..."></textarea>
+      <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
+        <button id="btn-sauvegarder-inst" class="btn-parametres" onclick="jouerSonClic(); sauvegarderInstruction()">Sauvegarder</button>
+        <button id="btn-supprimer-inst" class="btn-parametres btn-supprimer" style="display: none;" onclick="jouerSonClic(); demanderSuppression()">Supprimer</button>
+        <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-editeur-instruction', 'etape-liste-instructions')">Annuler</button>
+      </div>
+    </div>
+
+    <div id="etape-confirmation-suppression" class="fenetre-volante-parchemin fondu-interne" style="display: none; opacity: 0;">
+      <h2>Destruction</h2>
+      <p>Es-tu sûr de vouloir détruire cette instruction dans la base de données ?<br><br><span style="font-size: 15px; color: #5c1e16; font-weight: bold;">Cette action est irréversible.</span></p>
+      <div style="display: flex; justify-content: center; gap: 10px; margin-top: 25px;">
+        <button id="btn-confirmer-destruction" class="btn-parametres btn-supprimer" onclick="jouerSonClic(); validerSuppression()">Oui, détruire</button>
+        <button class="btn-parametres" onclick="jouerSonClic(); annulerSuppression()">Annuler</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- =========================================================
+       PERSONNAGES / FICHE PERSO
+       ========================================================= -->
+  <div id="ecran-chargement-ia">
+    <div id="titre-chargement-ia">Création de personnage en cours ...</div>
+    <img id="image-chargement-ia" src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781698939/ecran_chergement_personnage_nwimhq.png" alt="Incantation du portrait...">
+  </div>
+
+  <!-- ALERTE UI : cles API manquantes -->
+  <div id="overlay-alerte-cles"></div>
+  <div id="modale-alerte-cles" class="modale-parchemin">
+    <h2>Grimoire scellé</h2>
+    <p id="texte-alerte-cles">Veuillez renseigner vos clés API dans les paramètres.</p>
+    <div class="groupe-boutons">
+      <button class="btn-modale" onclick="jouerSonClic(); ouvrirParametresDepuisAlerte()">Aller aux paramètres</button>
+      <button class="btn-modale" onclick="jouerSonClic(); fermerAlerteCles()">Fermer</button>
+    </div>
+  </div>
+
+  <div id="overlay-personnages"></div>
+  <div id="conteneur-liste-personnages" class="fenetre-volante-parchemin">
+    <h2>Héros d'Ivalis<button class="btn-rond-plus" title="Créer un nouveau Héros" onclick="jouerSonClic(); ouvrirFichePerso(null, '', '', '')">+</button></h2>
+    <p style="font-size: 14px; margin-top: -15px; color: #5c3a21;">Double-cliquez pour ouvrir la fiche</p>
+    <div id="chargement-persos">Lecture des âmes...</div>
+    <div class="liste-persos" id="liste-html-persos" style="display:none;"></div>
+    <button class="btn-parametres" onclick="jouerSonClic(); fermerMenuPersonnages()">Fermer</button>
+  </div>
+
+  <div id="fenetre-fiche-perso" style="display:none;">
+
+    <div id="voile-suppression-perso">
+      <h2 style="color: #ff4c4c; margin-bottom: 10px; text-shadow: 0px 0px 15px red; font-size: 32px;">Sacrifice</h2>
+      <p style="color: #e8d5a5; font-size: 18px; text-align: center; max-width: 80%;">Es-tu sûr de vouloir effacer l'existence de ce héros ?<br>Cette action est définitive.</p>
+      <div style="display: flex; gap: 20px; margin-top: 30px;">
+        <button id="btn-confirmer-suppression-perso" class="btn-parametres btn-supprimer" onclick="jouerSonClic(); validerSuppressionPerso()">Oui, détruire</button>
+        <button class="btn-parametres" onclick="jouerSonClic(); annulerSuppressionPerso()">Annuler</button>
+      </div>
+    </div>
+
+    <div id="encart-portrait-perso">
+      <span id="texte-aucun-portrait">Portrait</span>
+      <img id="image-portrait-perso" src="" alt="Portrait du Héros">
+    </div>
+
+    <button id="btn-supprimer-perso" class="btn-parametres btn-supprimer" style="position: absolute; top: 565px; left: -250px; width: 200px; display: none;" onclick="jouerSonClic(); ouvrirConfirmationSuppressionPerso()">Supprimer</button>
+
+    <div id="fiche-perso-header">
+      <span class="titre-fiche-header" id="titre-nom-personnage">Nouveau Personnage</span>
+      <button class="btn-fermer-fiche" title="Fermer la fiche" onclick="jouerSonClic(); fermerFichePerso()">X</button>
+    </div>
+
+    <div class="conteneur-onglets">
+      <button class="onglet-btn actif" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-descriptif')">Descriptif</button>
+      <button class="onglet-btn" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-caracs')">Caractéristiques</button>
+      <button class="onglet-btn" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-cartes')">Cartes</button>
+      <button class="onglet-btn" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-inventaire')">Inventaire</button>
+      <button class="onglet-btn" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-biographie')">Biographie</button>
+    </div>
+
+    <div id="onglet-descriptif" class="contenu-onglet actif">
+      <input type="hidden" id="champ-id-personnage" value="">
+      <input type="hidden" id="champ-statut-personnage" value="">
+
+      <div class="grille-descriptif">
+        <div>
+          <div class="bloc-formulaire">
+            <h4>Identité</h4>
+            <div class="champ-formulaire"><label>Prénom du héros</label><input type="text" class="input-perso" id="champ-prenom"></div>
+            <div class="champ-formulaire"><label>Nom du héros</label><input type="text" class="input-perso" id="champ-nom"></div>
+            <div class="champ-formulaire"><label>Âge apparent</label><input type="text" class="input-perso" id="champ-age"></div>
+            <div class="champ-formulaire">
+              <label>Race</label>
+              <select class="input-perso" id="champ-race">
+                <option value="">-- Choisir --</option>
+                <option value="Humain">Humain</option>
+              </select>
+            </div>
+            <div class="champ-formulaire">
+              <label>Genre</label>
+              <select class="input-perso" id="champ-genre">
+                <option value="">-- Choisir --</option><option value="Male">Mâle</option><option value="Femelle">Femelle</option><option value="Se cherche">Se cherche</option>
+              </select>
+            </div>
+          </div>
+          <div class="bloc-formulaire">
+            <h4>Visage</h4>
+            <div class="champ-formulaire"><label>Couleur et coupe de cheveux</label><input type="text" class="input-perso" id="champ-cheveux"></div>
+            <div class="champ-formulaire"><label>Yeux</label><input type="text" class="input-perso" id="champ-yeux"></div>
+            <div class="champ-formulaire"><label>Pilosité faciale</label><input type="text" class="input-perso" id="champ-pilosite"></div>
+          </div>
+          <div class="bloc-formulaire">
+            <h4>Détails</h4>
+            <div class="champ-formulaire"><label>Signes distinctifs</label><input type="text" class="input-perso" id="champ-signes"></div>
+            <div class="champ-formulaire"><label>Expression du visage</label><input type="text" class="input-perso" id="champ-expression"></div>
+          </div>
+        </div>
+        <div>
+          <div class="bloc-formulaire">
+            <h4>Physique</h4>
+            <div class="champ-formulaire">
+              <label>Corpulence</label>
+              <select class="input-perso" id="champ-corpulence">
+                <option value="">-- Choisir --</option><option value="Tres maigre">Très maigre</option><option value="Maigre">Maigre</option><option value="Normal">Normal</option><option value="Athletique">Athlétique</option><option value="Obese">Obèse</option>
+              </select>
+            </div>
+            <div class="champ-formulaire">
+              <label>Taille</label>
+              <select class="input-perso" id="champ-taille">
+                <option value="">-- Choisir --</option><option value="Tres petit">Très petit</option><option value="Petit">Petit</option><option value="Normal">Normal</option><option value="Grand">Grand</option>
+              </select>
+            </div>
+            <div class="champ-formulaire"><label>Teint / Peau</label><input type="text" class="input-perso" id="champ-peau"></div>
+          </div>
+          <div class="bloc-formulaire">
+            <h4>Apparence</h4>
+            <div class="champ-formulaire"><label>Style vestimentaire</label><input type="text" class="input-perso" id="champ-style"></div>
+            <div class="champ-formulaire"><label>Couleurs dominantes</label><input type="text" class="input-perso" id="champ-couleurs"></div>
+            <div class="champ-formulaire"><label>Équipement visible</label><input type="text" class="input-perso" id="champ-equipement"></div>
+          </div>
+          <div class="bloc-formulaire">
+            <h4>Autres</h4>
+            <div class="champ-formulaire">
+              <label>Couleur du Token</label>
+              <input type="color" class="input-perso input-couleur" id="champ-couleur-token" value="#2a1a0f" oninput="appliquerCouleurTheme(this.value)">
+            </div>
+            <div class="champ-formulaire">
+              <label>Faction</label>
+              <select class="input-perso" id="champ-faction"><option value="">-- Chargement... --</option></select>
+            </div>
+          </div>
+        </div>
+
+        <div class="actions-formulaire">
+          <button id="btn-sauvegarder-perso" class="btn-parametres" onclick="jouerSonClic(); sauvegarderDescriptifPerso()">Enregistrer</button>
+          <button class="btn-parametres" onclick="jouerSonClic(); fermerFichePerso()">Annuler</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="onglet-caracs" class="contenu-onglet"><h3 style="margin-top: 0;">Attributs &amp; Compétences</h3><p><i>Tableau des statistiques...</i></p></div>
+    <div id="onglet-cartes" class="contenu-onglet"><h3 style="margin-top: 0;">Deck de Combat</h3><p><i>Système de cartes...</i></p></div>
+    <div id="onglet-inventaire" class="contenu-onglet"><h3 style="margin-top: 0;">Sac à dos &amp; Équipement</h3><p><i>Armes, armures...</i></p></div>
+    <div id="onglet-biographie" class="contenu-onglet"><h3 style="margin-top: 0;">Histoire &amp; Réputation</h3><p><i>Le passé du héros...</i></p></div>
+  </div>
+
+  <!-- Logique applicative (Firestore temps reel). Module ES => imports CDN v9 -->
+  <script type="module" src="app.js"></script>
+
+</body>
+</html>

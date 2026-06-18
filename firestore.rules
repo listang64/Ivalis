@@ -1,0 +1,22 @@
+rules_version = '2';
+
+// =========================================================================
+//  IVALIS - Regles de securite Firestore
+// =========================================================================
+//  ETAT ACTUEL (phase de developpement / tests entre amis) :
+//  - Lecture publique : tout le monde peut lire (necessaire pour l'affichage
+//    temps reel sur GitHub Pages, sans authentification).
+//  - Ecriture publique : autorisee POUR L'INSTANT, afin que l'application
+//    puisse creer des parties / personnages sans systeme de connexion.
+//
+//  >>> A DURCIR plus tard <<< : quand on ajoutera Firebase Auth, remplacer
+//  "allow write: if true;" par des conditions basees sur request.auth.
+// =========================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}

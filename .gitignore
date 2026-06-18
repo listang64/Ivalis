@@ -1,0 +1,10 @@
+# Secrets : NE JAMAIS pousser ces fichiers en ligne
+.env
+.env.local
+
+# Dependances et logs Firebase / Node
+node_modules/
+firebase-debug.log
+firebase-debug.*.log
+.firebase/
+*.local
