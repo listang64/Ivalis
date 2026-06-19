@@ -15,6 +15,7 @@
 // =========================================================================
 
 import { db } from "./firebase-config.js";
+import { playlist } from "./playlist.js";
 import {
   collection,
   doc,
@@ -606,12 +607,49 @@ function jouerSonClic() {
   son.play().catch(() => {});
 }
 
+let fileAttenteMusique = [];
+
+function melangerPlaylist(tableau) {
+  const copie = [...tableau];
+  for (let i = copie.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copie[i], copie[j]] = [copie[j], copie[i]];
+  }
+  return copie;
+}
+
+function jouerProchaineMusique() {
+  const musique = document.getElementById("musique-ambiance");
+  if (!musique) return;
+
+  if (fileAttenteMusique.length === 0) {
+    if (!playlist || playlist.length === 0) {
+      console.warn("La playlist est vide.");
+      return;
+    }
+    fileAttenteMusique = melangerPlaylist(playlist);
+  }
+
+  const prochainTitre = fileAttenteMusique.shift();
+  musique.src = prochainTitre;
+  musique.load();
+  musique.play().catch((e) => {
+    console.error("Impossible de lire la musique d'ambiance :", e);
+    jouerProchaineMusique();
+  });
+}
+
 function entrerDansLeJeu() {
   const accueil = document.getElementById("ecran-accueil");
   const musique = document.getElementById("musique-ambiance");
 
-  musique.volume = 0.20;
-  musique.play().catch(() => {});
+  if (musique) {
+    musique.volume = 0.20;
+    // Événement pour jouer automatiquement la musique suivante quand la piste se termine
+    musique.addEventListener("ended", jouerProchaineMusique);
+    // Lance la première musique de la playlist
+    jouerProchaineMusique();
+  }
 
   const page = document.documentElement;
   if (page.requestFullscreen) { page.requestFullscreen().catch(() => {}); }
