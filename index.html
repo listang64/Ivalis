@@ -174,9 +174,6 @@
       <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781472665/exit_rkpaeh.png" class="icone-nav" alt="Quitter" onclick="jouerSonClic(); demanderQuitterJeu()">
     </div>
 
-    <!-- Petit indicateur de session (present dans l'ancienne logique) -->
-    <div id="affichage-id-courant" style="position:absolute; top:1vh; left:1vw; color:#2c1e16; font-size:14px; opacity:0.6; z-index:30;"></div>
-
     <div id="overlay-jeu-modale"></div>
 
     <div id="modale-retour-menu" class="modale-parchemin-jeu">
@@ -196,8 +193,6 @@
         <button class="btn-modale-jeu" onclick="jouerSonClic(); fermerModalesJeu()">Non</button>
       </div>
     </div>
-
-  </div>
 
   <!-- LE SON DU PARCHEMIN AU SURVOL (remplacer le src par ton lien Cloudinary) -->
   <audio id="audio-survol-parchemin" src="TON_LIEN_AUDIO_ICI.mp3" preload="auto"></audio>
@@ -444,6 +439,8 @@
     <div id="onglet-cartes" class="contenu-onglet"><h3 style="margin-top: 0;">Deck de Combat</h3><p><i>Système de cartes...</i></p></div>
     <div id="onglet-inventaire" class="contenu-onglet"><h3 style="margin-top: 0;">Sac à dos &amp; Équipement</h3><p><i>Armes, armures...</i></p></div>
     <div id="onglet-biographie" class="contenu-onglet"><h3 style="margin-top: 0;">Histoire &amp; Réputation</h3><p><i>Le passé du héros...</i></p></div>
+  </div>
+
   </div>
 
   <!-- Logique applicative (Firestore temps reel). Module ES => imports CDN v9 -->

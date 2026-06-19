@@ -346,7 +346,7 @@ body, html {
   flex-direction: column;
   align-items: flex-end;
   gap: 1.5vh;
-  z-index: 30;
+  z-index: 60;
 }
 
 /* --- LES ICONES GLOBALES --- */
@@ -455,7 +455,7 @@ body, html {
   display: flex;
   flex-direction: row;
   gap: 0.8vw;
-  z-index: 30;
+  z-index: 60;
 }
 
 .icone-nav {
@@ -551,13 +551,13 @@ body, html {
 #overlay-parametres {
   display: none; position: fixed; top: 0; left: 0;
   width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.5);
-  z-index: 25; backdrop-filter: blur(2px); opacity: 0;
+  z-index: 28; backdrop-filter: blur(4px); opacity: 0;
   transition: opacity 0.6s ease;
 }
 
 #conteneur-parametres {
   display: none; position: fixed; top: 50%; left: 50%;
-  transform: translate(-50%, -40%); z-index: 26; opacity: 0;
+  transform: translate(-50%, -40%); z-index: 40; opacity: 0;
   transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.6s ease;
 }
 
@@ -658,11 +658,11 @@ textarea.input-texte-parchemin {
 /* =========================================================================
    PERSONNAGES / FICHE PERSO
    ========================================================================= */
-#overlay-personnages { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.5); z-index: 25; backdrop-filter: blur(2px); opacity: 0; transition: opacity 0.6s ease; }
-#conteneur-liste-personnages { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -40%); z-index: 26; opacity: 0; transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.6s ease; }
+#overlay-personnages { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.5); z-index: 28; backdrop-filter: blur(4px); opacity: 0; transition: opacity 0.6s ease; }
+#conteneur-liste-personnages { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -40%); z-index: 40; opacity: 0; transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.6s ease; }
 #conteneur-liste-personnages.ouvert { transform: translate(-50%, -50%); opacity: 1; }
 
-#fenetre-fiche-perso { display: none; position: fixed; width: 55vw; height: 75vh; background-color: #e8d5a5; border: 4px solid #2a1a0f; border-radius: 15px; box-shadow: 0px 20px 40px rgba(0, 0, 0, 0.9); z-index: 60; color: #2c1e16; flex-direction: column; transition: border-color 0.3s; }
+#fenetre-fiche-perso { display: none; position: fixed; width: 55vw; height: 75vh; background-color: #e8d5a5; border: 4px solid #2a1a0f; border-radius: 15px; box-shadow: 0px 20px 40px rgba(0, 0, 0, 0.9); z-index: 50; color: #2c1e16; flex-direction: column; transition: border-color 0.3s; }
 
 #encart-portrait-perso { position: absolute; top: 25px; left: -300px; width: 300px; height: 525px; background-color: #1a0f08; border: 4px solid #2a1a0f; border-right: none; border-radius: 12px 0 0 12px; box-shadow: -15px 10px 20px rgba(0, 0, 0, 0.7); z-index: -1; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #5c3a21; font-size: 18px; font-style: italic; text-align: center; transition: border-color 0.3s; }
 #image-portrait-perso { width: 100%; height: 100%; object-fit: cover; display: none; }

@@ -356,6 +356,8 @@ function fermerAlerteCles() {
 
 function ouvrirParametresDepuisAlerte() {
   fermerAlerteCles();
+  if (estPanneauParametresOuvert()) return;
+  fermerToutPersonnages(true);
   ouvrirParametres();
 }
 
@@ -684,7 +686,6 @@ async function validerCreationGroupe() {
 
     document.getElementById("ecran-menu").style.display = "none";
     document.getElementById("ecran-jeu").style.display = "block";
-    document.getElementById("affichage-id-courant").innerText = "Session active : " + window.ID_PARTIE_COURANTE;
   } catch (e) {
     console.error(e);
     alert("Une erreur est survenue lors de la fondation du groupe.");
@@ -759,7 +760,6 @@ function lancerPartieChargee(idChoisi) {
   fermerModales();
   document.getElementById("ecran-menu").style.display = "none";
   document.getElementById("ecran-jeu").style.display = "block";
-  document.getElementById("affichage-id-courant").innerText = "Session active : " + window.ID_PARTIE_COURANTE;
 }
 
 // =========================================================================
@@ -827,15 +827,66 @@ function confirmerQuitterJeu() {
 }
 
 // =========================================================================
+//  GESTION DES PANNEAUX LATERAUX (parametres, personnages, futurs boutons)
+//  - Le menu lateral reste toujours visible et net (au-dessus de l'overlay)
+//  - L'arriere-plan est assombri/floute via l'overlay du panneau
+//  - Recliquer sur le meme bouton ferme le panneau en cours
+//  - Ouvrir un autre panneau ferme d'abord celui qui est actif
+// =========================================================================
+function estPanneauParametresOuvert() {
+  const conteneur = document.getElementById("conteneur-parametres");
+  return conteneur && conteneur.classList.contains("ouvert");
+}
+
+function estPanneauPersonnagesOuvert() {
+  const liste = document.getElementById("conteneur-liste-personnages");
+  const fiche = document.getElementById("fenetre-fiche-perso");
+  const listeOuverte = liste && liste.classList.contains("ouvert");
+  const ficheOuverte = fiche && window.getComputedStyle(fiche).display !== "none";
+  return listeOuverte || ficheOuverte;
+}
+
+function fermerToutPersonnages(immediat) {
+  document.getElementById("fenetre-fiche-perso").style.display = "none";
+  document.getElementById("voile-suppression-perso").style.display = "none";
+
+  const overlay = document.getElementById("overlay-personnages");
+  const liste = document.getElementById("conteneur-liste-personnages");
+  if (!liste) return;
+
+  const fermer = () => {
+    overlay.style.opacity = "0";
+    overlay.style.display = "none";
+    liste.classList.remove("ouvert");
+    liste.style.display = "none";
+  };
+
+  if (liste.classList.contains("ouvert")) {
+    if (immediat) { fermer(); return; }
+    overlay.style.opacity = "0";
+    liste.classList.remove("ouvert");
+    setTimeout(fermer, 600);
+  }
+}
+
+function fermerTousPanneaux() {
+  if (estPanneauParametresOuvert()) fermerParametres(true);
+  fermerToutPersonnages(true);
+}
+
+// =========================================================================
 //  PARAMETRES / CERVEAU IA
 // =========================================================================
 function ouvrirParametres() {
-  if (typeof fermerMenuPersonnages === "function") fermerMenuPersonnages();
+  if (estPanneauParametresOuvert()) {
+    fermerParametres();
+    return;
+  }
+
+  fermerToutPersonnages(true);
 
   const overlay = document.getElementById("overlay-parametres");
   const conteneur = document.getElementById("conteneur-parametres");
-
-  if (conteneur.classList.contains("ouvert")) { fermerParametres(); return; }
 
   document.getElementById("etape-menu-parametres").style.display = "none";
   document.getElementById("etape-liste-instructions").style.display = "none";
@@ -858,17 +909,22 @@ function ouvrirParametres() {
   }, 10);
 }
 
-function fermerParametres() {
+function fermerParametres(immediat) {
   const overlay = document.getElementById("overlay-parametres");
   const conteneur = document.getElementById("conteneur-parametres");
 
+  const fermer = () => {
+    overlay.style.opacity = "0";
+    overlay.style.display = "none";
+    conteneur.classList.remove("ouvert");
+    conteneur.style.display = "none";
+  };
+
+  if (immediat) { fermer(); return; }
+
   overlay.style.opacity = "0";
   conteneur.classList.remove("ouvert");
-
-  setTimeout(() => {
-    overlay.style.display = "none";
-    conteneur.style.display = "none";
-  }, 600);
+  setTimeout(fermer, 600);
 }
 
 function naviguerFenetre(idFenetreSortante, idFenetreEntrante) {
@@ -1020,28 +1076,31 @@ function remplirSelectFactions(factions) {
 }
 
 function ouvrirMenuPersonnages() {
-  if (typeof fermerParametres === "function") fermerParametres();
+  if (estPanneauPersonnagesOuvert()) {
+    fermerToutPersonnages();
+    return;
+  }
+
+  if (estPanneauParametresOuvert()) fermerParametres(true);
+
   const overlay = document.getElementById("overlay-personnages");
   const liste = document.getElementById("conteneur-liste-personnages");
-  if (liste.classList.contains("ouvert")) { fermerMenuPersonnages(); return; }
 
   overlay.style.display = "block";
   liste.style.display = "block";
-  setTimeout(() => { overlay.style.opacity = "1"; liste.classList.add("ouvert"); }, 10);
+  setTimeout(() => {
+    overlay.style.opacity = "1";
+    liste.classList.add("ouvert");
+  }, 10);
 
   document.getElementById("chargement-persos").style.display = "block";
   document.getElementById("liste-html-persos").style.display = "none";
 
-  // TEMPS REEL : on ecoute la liste des heros de la partie en cours.
   ecouterPersonnagesDeLaPartie(window.ID_PARTIE_COURANTE);
 }
 
 function fermerMenuPersonnages() {
-  const overlay = document.getElementById("overlay-personnages");
-  const liste = document.getElementById("conteneur-liste-personnages");
-  overlay.style.opacity = "0";
-  liste.classList.remove("ouvert");
-  setTimeout(() => { overlay.style.display = "none"; liste.style.display = "none"; }, 600);
+  fermerToutPersonnages();
 }
 
 function afficherListePersonnages(persos) {
