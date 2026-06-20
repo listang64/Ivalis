@@ -556,14 +556,69 @@ function ecouterJoueurs() {
 // Personnages de la partie en cours, en temps reel (vus par tous les joueurs)
 function ecouterPersonnagesDeLaPartie(idPartie) {
   if (unsubscribePersonnages) { unsubscribePersonnages(); unsubscribePersonnages = null; }
-  if (!idPartie) { afficherListePersonnages([]); return; }
+  
+  // Si aucune partie, on vide la liste ET les bulles
+  if (!idPartie) { 
+    afficherListePersonnages([]); 
+    afficherBullesPersonnages([]); 
+    return; 
+  }
 
   const q = query(collection(db, COL.PERSONNAGES), where("ID_Partie", "==", idPartie));
   unsubscribePersonnages = onSnapshot(q, (snap) => {
     const persos = [];
     snap.forEach((document) => persos.push(persoDocVersFront(document.id, document.data())));
-    afficherListePersonnages(persos);
+    
+    afficherListePersonnages(persos); // Met à jour le menu de droite
+    afficherBullesPersonnages(persos); // Met à jour les bulles du chat
   }, (err) => console.error("onSnapshot Personnages :", err));
+}
+
+// Génération des bulles de personnages pour le chat
+function afficherBullesPersonnages(persos) {
+  const conteneur = document.getElementById("zone-noms-bulles");
+  if (!conteneur) return;
+  
+  conteneur.innerHTML = ""; // Nettoyer l'ancienne liste
+
+  persos.forEach((p) => {
+    const bulle = document.createElement("div");
+    bulle.className = "bulle-personnage";
+    bulle.innerText = p.prenom; // On affiche juste le prénom
+
+    // --- NOUVEAU : On injecte la couleur du personnage en variable CSS ---
+    if (p.couleur) {
+      bulle.style.setProperty('--couleur-perso', p.couleur);
+    }
+
+    // Ajout du portrait caché qui s'affichera au survol
+    if (p.urlCloudinary && p.urlCloudinary !== "") {
+      const imgHover = document.createElement("img");
+      imgHover.className = "bulle-portrait-hover";
+      imgHover.src = p.urlCloudinary;
+      bulle.appendChild(imgHover);
+    }
+
+    // Double clic : Ouvrir la fiche sur l'onglet caractéristiques par-dessus le chat
+    bulle.ondblclick = function() {
+      if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+      
+      if (typeof window.ouvrirFichePerso === "function") {
+        window.ouvrirFichePerso(p.idPersonnage, p.prenom, p.nom, p.couleur);
+      }
+      
+      // CORRECTION FORCE BRUTE : On passe la fiche au tout premier plan en JS
+      const fiche = document.getElementById('fenetre-fiche-perso');
+      if (fiche) fiche.style.zIndex = "1500";
+      
+      setTimeout(() => {
+        const btnCaracs = document.querySelector("button[onclick*='onglet-caracs']");
+        if (btnCaracs) btnCaracs.click();
+      }, 10);
+    };
+
+    conteneur.appendChild(bulle);
+  });
 }
 
 // =========================================================================
@@ -838,16 +893,25 @@ function fermerModalesJeu() {
 }
 
 function demanderRetourMenu() {
+  if (typeof window.fermerToutesLesFenetres === "function") {
+    window.fermerToutesLesFenetres();
+  }
   document.getElementById("overlay-jeu-modale").style.display = "block";
   document.getElementById("modale-retour-menu").style.display = "block";
 }
 
 function demanderQuitterJeu() {
+  if (typeof window.fermerToutesLesFenetres === "function") {
+    window.fermerToutesLesFenetres();
+  }
   document.getElementById("overlay-jeu-modale").style.display = "block";
   document.getElementById("modale-quitter-jeu").style.display = "block";
 }
 
 function confirmerRetourMenu() {
+  if (typeof window.fermerToutesLesFenetres === "function") {
+    window.fermerToutesLesFenetres();
+  }
   fermerModalesJeu();
   document.getElementById("ecran-jeu").style.display = "none";
   document.getElementById("ecran-menu").style.display = "block";
@@ -856,6 +920,9 @@ function confirmerRetourMenu() {
 }
 
 function confirmerQuitterJeu() {
+  if (typeof window.fermerToutesLesFenetres === "function") {
+    window.fermerToutesLesFenetres();
+  }
   fermerModalesJeu();
   window.close();
   try { window.top.close(); } catch (e) {}
@@ -866,8 +933,6 @@ function confirmerQuitterJeu() {
 
 // =========================================================================
 //  GESTION DES PANNEAUX LATERAUX (parametres, personnages, futurs boutons)
-//  - Le menu lateral reste toujours visible et net (au-dessus de l'overlay)
-//  - L'arriere-plan est assombri/floute via l'overlay du panneau
 //  - Recliquer sur le meme bouton ferme le panneau en cours
 //  - Ouvrir un autre panneau ferme d'abord celui qui est actif
 // =========================================================================
@@ -888,79 +953,34 @@ function fermerToutPersonnages(immediat) {
   document.getElementById("fenetre-fiche-perso").style.display = "none";
   document.getElementById("voile-suppression-perso").style.display = "none";
 
-  const overlay = document.getElementById("overlay-personnages");
   const liste = document.getElementById("conteneur-liste-personnages");
   if (!liste) return;
 
   const fermer = () => {
-    overlay.style.opacity = "0";
-    overlay.style.display = "none";
     liste.classList.remove("ouvert");
     liste.style.display = "none";
   };
 
   if (liste.classList.contains("ouvert")) {
     if (immediat) { fermer(); return; }
-    overlay.style.opacity = "0";
     liste.classList.remove("ouvert");
     setTimeout(fermer, 600);
   }
 }
 
-function fermerTousPanneaux() {
-  if (estPanneauParametresOuvert()) fermerParametres(true);
-  fermerToutPersonnages(true);
-}
-
 // =========================================================================
 //  PARAMETRES / CERVEAU IA
 // =========================================================================
-function ouvrirParametres() {
-  if (estPanneauParametresOuvert()) {
-    fermerParametres();
-    return;
-  }
-
-  fermerToutPersonnages(true);
-
-  const overlay = document.getElementById("overlay-parametres");
-  const conteneur = document.getElementById("conteneur-parametres");
-
-  document.getElementById("etape-menu-parametres").style.display = "none";
-  document.getElementById("etape-liste-instructions").style.display = "none";
-  document.getElementById("etape-editeur-instruction").style.display = "none";
-  document.getElementById("etape-confirmation-suppression").style.display = "none";
-  document.getElementById("etape-cles-api").style.display = "none";
-
-  document.getElementById("input-secret-parametres").value = "";
-  document.getElementById("erreur-mdp-parametres").style.opacity = "0";
-
-  document.getElementById("etape-mdp-parametres").style.display = "block";
-  document.getElementById("etape-mdp-parametres").style.opacity = "1";
-
-  overlay.style.display = "block";
-  conteneur.style.display = "block";
-
-  setTimeout(() => {
-    overlay.style.opacity = "1";
-    conteneur.classList.add("ouvert");
-  }, 10);
-}
-
 function fermerParametres(immediat) {
-  const overlay = document.getElementById("overlay-parametres");
   const conteneur = document.getElementById("conteneur-parametres");
 
   const fermer = () => {
-    overlay.style.opacity = "0";
-    overlay.style.display = "none";
     conteneur.classList.remove("ouvert");
     conteneur.style.display = "none";
   };
 
   if (immediat) { fermer(); return; }
 
-  overlay.style.opacity = "0";
   conteneur.classList.remove("ouvert");
   setTimeout(fermer, 600);
 }
@@ -1113,30 +1133,6 @@ function remplirSelectFactions(factions) {
   });
 }
 
-function ouvrirMenuPersonnages() {
-  if (estPanneauPersonnagesOuvert()) {
-    fermerToutPersonnages();
-    return;
-  }
-
-  if (estPanneauParametresOuvert()) fermerParametres(true);
-
-  const overlay = document.getElementById("overlay-personnages");
-  const liste = document.getElementById("conteneur-liste-personnages");
-
-  overlay.style.display = "block";
-  liste.style.display = "block";
-  setTimeout(() => {
-    overlay.style.opacity = "1";
-    liste.classList.add("ouvert");
-  }, 10);
-
-  document.getElementById("chargement-persos").style.display = "block";
-  document.getElementById("liste-html-persos").style.display = "none";
-
-  ecouterPersonnagesDeLaPartie(window.ID_PARTIE_COURANTE);
-}
-
 function fermerMenuPersonnages() {
   fermerToutPersonnages();
 }
@@ -1220,6 +1216,12 @@ async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPers
     btnSupprimer.style.display = "none";
     btnSauvegarder.innerText = "Enregistrer";
     btnSauvegarder.style.pointerEvents = "auto";
+  }
+
+  // --- NOUVEAU : On force l'ouverture sur l'onglet Caractéristiques ---
+  const btnCaracs = document.querySelector("button[onclick*='onglet-caracs']");
+  if (btnCaracs) {
+    changerOngletPerso({ currentTarget: btnCaracs }, 'onglet-caracs');
   }
 
   fiche.style.display = "flex";
@@ -1384,8 +1386,22 @@ function changerOngletPerso(evt, nomOnglet) {
   for (let i = 0; i < contenus.length; i++) { contenus[i].classList.remove("actif"); }
   const boutons = document.getElementsByClassName("onglet-btn");
   for (let i = 0; i < boutons.length; i++) { boutons[i].classList.remove("actif"); }
+  
   document.getElementById(nomOnglet).classList.add("actif");
-  evt.currentTarget.classList.add("actif");
+  if (evt && evt.currentTarget) {
+    evt.currentTarget.classList.add("actif");
+  }
+
+  // --- NOUVEAU : Masquer/Afficher le bouton Supprimer ---
+  const btnSupprimer = document.getElementById("btn-supprimer-perso");
+  const idPersonnage = document.getElementById("champ-id-personnage").value;
+
+  // On affiche le bouton SEULEMENT si on est sur le Descriptif ET que le perso existe déjà
+  if (nomOnglet === 'onglet-descriptif' && idPersonnage !== "") {
+    btnSupprimer.style.display = "block";
+  } else {
+    btnSupprimer.style.display = "none";
+  }
 }
 
 function rendreFenetreDeplacable(element) {
@@ -1442,6 +1458,98 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 // =========================================================================
+// LOGIQUE DE NAVIGATION (INTERRUPTEURS SANS OVERLAY)
+// =========================================================================
+
+// 1. Fonction centrale pour tout fermer et nettoyer l'écran instantanément
+window.fermerToutesLesFenetres = function() {
+  // Fermer le chat
+  const chatbox = document.getElementById('fenetre-chatbox');
+  if (chatbox) chatbox.style.display = 'none';
+
+  // Fermer les personnages
+  const menuPerso = document.getElementById('conteneur-liste-personnages');
+  if (menuPerso) {
+    menuPerso.classList.remove('ouvert');
+    menuPerso.style.display = 'none';
+  }
+  const fichePerso = document.getElementById('fenetre-fiche-perso');
+  if (fichePerso) fichePerso.style.display = 'none';
+  const voileSuppr = document.getElementById('voile-suppression-perso');
+  if (voileSuppr) voileSuppr.style.display = 'none';
+
+  // Fermer les paramètres
+  const menuParam = document.getElementById('conteneur-parametres');
+  if (menuParam) {
+    menuParam.classList.remove('ouvert');
+    menuParam.style.display = 'none';
+  }
+};
+
+// 2. Boutons Chatbox
+window.ouvrirChatbox = function() {
+  const chatbox = document.getElementById('fenetre-chatbox');
+  const estDejaOuvert = (chatbox.style.display === 'flex');
+  
+  window.fermerToutesLesFenetres();
+
+  if (!estDejaOuvert) {
+    chatbox.style.display = 'flex';
+    // CORRECTION : On demande à l'application de récupérer les personnages pour les bulles !
+    if (window.ID_PARTIE_COURANTE) {
+      ecouterPersonnagesDeLaPartie(window.ID_PARTIE_COURANTE);
+    }
+  }
+};
+
+window.fermerChatbox = function() {
+  const chatbox = document.getElementById('fenetre-chatbox');
+  if (chatbox) chatbox.style.display = 'none';
+};
+
+// 3. Bouton Personnages
+window.ouvrirMenuPersonnages = function() {
+  const menuPerso = document.getElementById('conteneur-liste-personnages');
+  const estDejaOuvert = (menuPerso.style.display === 'block' || menuPerso.classList.contains('ouvert'));
+  
+  window.fermerToutesLesFenetres();
+
+  if (!estDejaOuvert) {
+    menuPerso.style.display = 'block';
+    setTimeout(() => { menuPerso.classList.add('ouvert'); }, 10);
+
+    document.getElementById("chargement-persos").style.display = "block";
+    document.getElementById("liste-html-persos").style.display = "none";
+    ecouterPersonnagesDeLaPartie(window.ID_PARTIE_COURANTE);
+  }
+};
+
+// 4. Bouton Paramètres
+window.ouvrirParametres = function() {
+  const menuParam = document.getElementById('conteneur-parametres');
+  const estDejaOuvert = (menuParam.style.display === 'block' || menuParam.classList.contains('ouvert'));
+  
+  window.fermerToutesLesFenetres();
+
+  if (!estDejaOuvert) {
+    document.getElementById("etape-menu-parametres").style.display = "none";
+    document.getElementById("etape-liste-instructions").style.display = "none";
+    document.getElementById("etape-editeur-instruction").style.display = "none";
+    document.getElementById("etape-confirmation-suppression").style.display = "none";
+    document.getElementById("etape-cles-api").style.display = "none";
+
+    document.getElementById("input-secret-parametres").value = "";
+    document.getElementById("erreur-mdp-parametres").style.opacity = "0";
+
+    document.getElementById("etape-mdp-parametres").style.display = "block";
+    document.getElementById("etape-mdp-parametres").style.opacity = "1";
+
+    menuParam.style.display = 'block';
+    setTimeout(() => { menuParam.classList.add('ouvert'); }, 10);
+  }
+};
+
+// =========================================================================
 //  EXPOSITION DES FONCTIONS AU SCOPE GLOBAL
 //  (necessaire car index.html utilise des handlers inline onclick="...",
 //   or un <script type="module"> a sa propre portee.)
@@ -1457,11 +1565,11 @@ Object.assign(window, {
   fermerModalesJeu, demanderRetourMenu, demanderQuitterJeu,
   confirmerRetourMenu, confirmerQuitterJeu,
   // Parametres / Cerveau IA
-  ouvrirParametres, fermerParametres, naviguerFenetre, validerMdpParametres,
+  fermerParametres, naviguerFenetre, validerMdpParametres,
   ouvrirListeInstructions, basculerPoussoirIA, ouvrirEditeurInstruction,
   sauvegarderInstruction, demanderSuppression, annulerSuppression, validerSuppression,
   // Personnages / fiche perso
-  ouvrirMenuPersonnages, fermerMenuPersonnages, ouvrirFichePerso, fermerFichePerso,
+  fermerMenuPersonnages, ouvrirFichePerso, fermerFichePerso,
   sauvegarderDescriptifPerso, ouvrirConfirmationSuppressionPerso,
   annulerSuppressionPerso, validerSuppressionPerso, appliquerCouleurTheme, changerOngletPerso,
   // Cles API + generation d'image (front-end)

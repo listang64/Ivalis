@@ -114,7 +114,7 @@
             <span class="texte-banniere">Narration</span>
           </div>
         </div>
-        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/chat_vk0zac.png" class="icone-menu" alt="Chat" onclick="jouerSonClic()">
+        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/chat_vk0zac.png" class="icone-menu" alt="Chat" onclick="jouerSonClic(); ouvrirChatbox()">
       </div>
 
       <div class="conteneur-bouton-lateral" onmouseenter="jouerSonSurvolParchemin()">
@@ -198,7 +198,6 @@
   <!-- =========================================================
        PARAMETRES / CERVEAU IA
        ========================================================= -->
-  <div id="overlay-parametres"></div>
 
   <div id="conteneur-parametres">
 
@@ -313,7 +312,6 @@
     </div>
   </div>
 
-  <div id="overlay-personnages"></div>
   <div id="conteneur-liste-personnages" class="fenetre-volante-parchemin">
     <h2>Héros d'Ivalis<button class="btn-rond-plus" title="Créer un nouveau Héros" onclick="jouerSonClic(); ouvrirFichePerso(null, '', '', '')">+</button></h2>
     <p style="font-size: 14px; margin-top: -15px; color: #5c3a21;">Double-cliquez pour ouvrir la fiche</p>
@@ -350,7 +348,6 @@
       <button class="onglet-btn" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-caracs')">Caractéristiques</button>
       <button class="onglet-btn" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-cartes')">Cartes</button>
       <button class="onglet-btn" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-inventaire')">Inventaire</button>
-      <button class="onglet-btn" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-biographie')">Biographie</button>
     </div>
 
     <div id="onglet-descriptif" class="contenu-onglet actif">
@@ -436,13 +433,16 @@
     <div id="onglet-caracs" class="contenu-onglet"><h3 style="margin-top: 0;">Attributs &amp; Compétences</h3><p><i>Tableau des statistiques...</i></p></div>
     <div id="onglet-cartes" class="contenu-onglet"><h3 style="margin-top: 0;">Deck de Combat</h3><p><i>Système de cartes...</i></p></div>
     <div id="onglet-inventaire" class="contenu-onglet"><h3 style="margin-top: 0;">Sac à dos &amp; Équipement</h3><p><i>Armes, armures...</i></p></div>
-    <div id="onglet-biographie" class="contenu-onglet"><h3 style="margin-top: 0;">Histoire &amp; Réputation</h3><p><i>Le passé du héros...</i></p></div>
+  </div> <div id="fenetre-chatbox">
+    <div id="zone-messages-chat"></div>
+    <div id="zone-noms-bulles"></div>
+    <div id="zone-saisie-chat">
+      <input type="text" id="input-chat" placeholder="Écrivez votre message...">
+      <button id="btn-envoyer-chat" onclick="jouerSonClic()">Envoyer</button>
+    </div>
   </div>
 
-  </div>
-
-  <!-- Logique applicative (Firestore temps reel). Module ES => imports CDN v9 -->
-  <script type="module" src="app.js"></script>
+</div> <script type="module" src="app.js"></script>
 
 </body>
 </html>
