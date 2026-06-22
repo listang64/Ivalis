@@ -655,10 +655,16 @@ function afficherBullesPersonnages(persos) {
     conteneur.appendChild(bulle);
   });
 
-  // Bulle MJ
+  // --- Bulle MJ ---
   const bulleMJ = document.createElement("div");
   bulleMJ.className = "bulle-personnage bulle-mj";
   bulleMJ.innerText = "MJ";
+
+  // NOUVEAU : Ajout de l'image au survol pour le MJ
+  const imgHoverMJ = document.createElement("img");
+  imgHoverMJ.className = "bulle-portrait-hover";
+  imgHoverMJ.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782164835/maitre_du_jeu_kemkf2.png";
+  bulleMJ.appendChild(imgHoverMJ);
 
   if (indexTour === 999 || indexTour >= ordre.length) {
       bulleMJ.classList.add("tour-actif");
@@ -666,24 +672,25 @@ function afficherBullesPersonnages(persos) {
   }
 
   bulleMJ.onclick = function() {
-      jouerSonClic();
+      if (typeof window.jouerSonClic === "function") window.jouerSonClic();
       window.relancerInitiativeChat(); 
   };
   conteneur.appendChild(bulleMJ);
 
+  // --- Mise à jour de la barre de saisie ---
   const inputChat = document.getElementById("input-chat");
   const btnEnvoyer = document.getElementById("btn-envoyer-chat");
 
   if (inputChat && btnEnvoyer) {
       if (nomActif === "MJ") {
           inputChat.placeholder = "Le MJ prépare sa réponse...";
-          inputChat.disabled = true;  // Verrouille la barre de saisie
-          btnEnvoyer.disabled = true; // Verrouille le bouton
+          inputChat.disabled = true;  
+          btnEnvoyer.disabled = true; 
           inputChat.style.opacity = "0.5";
           btnEnvoyer.style.opacity = "0.5";
       } else {
           inputChat.placeholder = "C'est au tour de " + nomActif + " de parler...";
-          inputChat.disabled = false; // Déverrouille
+          inputChat.disabled = false; 
           btnEnvoyer.disabled = false;
           inputChat.style.opacity = "1";
           btnEnvoyer.style.opacity = "1";
