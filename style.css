@@ -846,3 +846,104 @@ textarea.input-texte-parchemin {
 .bulle-personnage:hover .bulle-portrait-hover {
   display: block;
 }
+
+/* =========================================
+   DESIGN DES MESSAGES DE CHAT & TOURS
+   ========================================= */
+
+/* --- Le message dans le chat --- */
+.message-chat {
+  display: flex;
+  position: relative; /* Nécessaire pour la croix et le biseau */
+  background-color: rgba(0, 0, 0, 0.5);
+  border-radius: 8px;
+  margin-bottom: 15px;
+  overflow: hidden;
+  min-height: 60px;
+}
+
+/* Le liseret du bas avec la découpe en biseau */
+.message-chat::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 50%; /* S'arrête à la moitié du message */
+  height: 0;
+  border-bottom: 4px solid var(--couleur-perso, #5c3a21);
+  border-right: 25px solid transparent; /* C'est ce qui crée l'angle du biseau */
+  pointer-events: none;
+}
+
+/* Le nom écrit à la verticale à l'endroit (J A D E) */
+.message-nom-vertical {
+  writing-mode: vertical-rl;
+  text-orientation: upright; /* Met les lettres droites ! */
+  text-transform: uppercase;
+  text-align: center;
+  padding: 10px 5px 15px 5px; /* Un peu d'espace en bas pour le liseret */
+  font-weight: bold;
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: white;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* --- La croix de suppression --- */
+.btn-supprimer-msg {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: transparent;
+  color: rgba(255, 76, 76, 0.4);
+  border: none;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.2s;
+  padding: 5px;
+  z-index: 10;
+}
+
+.btn-supprimer-msg:hover {
+  color: #ff4c4c;
+  transform: scale(1.2);
+}
+
+/* Le liseret de couleur (qui servira de séparation) */
+.message-separateur {
+  width: 4px;
+  background-color: var(--couleur-perso, #5c3a21);
+}
+
+/* Le texte du message */
+.message-contenu {
+  flex-grow: 1;
+  padding: 10px 15px;
+  color: #e8d5a5;
+  font-size: 17px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* --- La bulle spéciale MJ --- */
+.bulle-mj {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  border-bottom: 3px solid #ffffff !important;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+/* --- Le tour actif (Fond Vert) --- */
+.tour-actif {
+  background-color: rgba(46, 139, 87, 0.6) !important; /* Vert foncé transparent */
+  border-color: #00ff00 !important;
+  box-shadow: 0 0 10px rgba(0, 255, 0, 0.4);
+  animation: pulsation-tour 2s infinite alternate;
+}
+
+@keyframes pulsation-tour {
+  from { box-shadow: 0 0 5px rgba(0, 255, 0, 0.3); }
+  to { box-shadow: 0 0 15px rgba(0, 255, 0, 0.7); }
+}

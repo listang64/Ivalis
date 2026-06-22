@@ -437,8 +437,8 @@
     <div id="zone-messages-chat"></div>
     <div id="zone-noms-bulles"></div>
     <div id="zone-saisie-chat">
-      <input type="text" id="input-chat" placeholder="Écrivez votre message...">
-      <button id="btn-envoyer-chat" onclick="jouerSonClic()">Envoyer</button>
+      <input type="text" id="input-chat" placeholder="Écrivez votre message..." onkeydown="if(event.key==='Enter') { window.envoyerMessageChat(); }">
+      <button id="btn-envoyer-chat" onclick="jouerSonClic(); window.envoyerMessageChat()">Envoyer</button>
     </div>
   </div>
 

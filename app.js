@@ -24,28 +24,24 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  addDoc,
   query,
   where,
   onSnapshot
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // =========================================================================
-//  NOMS DES COLLECTIONS FIRESTORE (issus de l'analyse des CSV)
+//  NOMS DES COLLECTIONS FIRESTORE
 // =========================================================================
 const COL = {
-  PARTIES: "Systeme_Parties",        // ID_Partie, Mot_De_Passe, Liste_ID_Personnage, Nom_Du_Groupe, Statut
-  JOUEURS: "Joueurs",                // ID_Joueur, Nom
-  DATE: "Date_En_Jeu",               // doc "actuelle" : { Jour, Annee }
-  MDP: "MDP_Nouvelle_Partie",        // doc "config"   : { mdp_nouvelle_partie, mdp_parametres }
-  CERVEAU_IA: "Cerveau_IA",          // ID_Instruction, Titre_Menu, Contenu_Direct, Statut_Actif
-  FACTIONS: "Monde_Factions",        // ID_Faction, Nom_Faction, ...
-  PERSONNAGES: "Personnages"         // = ancienne feuille Descriptif_Personnage
-  // --- Autres collections de l'univers (creees a partir des CSV, exploitables plus tard) ---
-  // "Monde_Lieux", "Monde_Batiments", "Monde_Monstre", "Monde_PNJ",
-  // "Chroniques_Aventures", "Etat_Partie"
-  //
-  // NOTE : aucune donnee "Boutique" n'existe dans les CSV ni dans l'ancien code.
-  // La collection "Boutique" pourra etre ajoutee ici quand son modele sera defini.
+  PARTIES: "Systeme_Parties",
+  JOUEURS: "Joueurs",
+  DATE: "Date_En_Jeu",
+  MDP: "MDP_Nouvelle_Partie",
+  CERVEAU_IA: "Cerveau_IA",
+  FACTIONS: "Monde_Factions",
+  PERSONNAGES: "Personnages",
+  MESSAGES: "Messages_Chat"
 };
 
 // Identifiants des documents uniques (anciennes cellules fixes des Sheets)
@@ -527,12 +523,19 @@ async function genererEtStockerPortrait(donnees) {
 //  ECOUTEURS TEMPS REEL (onSnapshot)
 // =========================================================================
 
-// Date en jeu : mise a jour live du parchemin
+// Date en jeu : mise à jour live et sauvegarde globale
+window.DATE_EN_JEU_ACTUELLE = { jour: "", annee: "" };
+
 function ecouterDateEnJeu() {
   if (unsubscribeDate) unsubscribeDate();
   unsubscribeDate = onSnapshot(doc(db, COL.DATE, DOC_DATE), (snap) => {
     if (!snap.exists()) return;
     const d = snap.data();
+    
+    // On garde la vérité de la Base de Données en mémoire pour le Chat
+    window.DATE_EN_JEU_ACTUELLE.jour = d.Jour ?? "";
+    window.DATE_EN_JEU_ACTUELLE.annee = d.Annee ?? "";
+
     const elJour = document.getElementById("affichage-jour");
     const elAn = document.getElementById("affichage-an");
     if (elJour) elJour.innerText = d.Jour ?? "...";
@@ -553,45 +556,84 @@ function ecouterJoueurs() {
   }, (err) => console.error("onSnapshot Joueurs :", err));
 }
 
-// Personnages de la partie en cours, en temps reel (vus par tous les joueurs)
+// =========================================================================
+//  MÉCANIQUES DE CHAT ET INITIATIVE (Temps Réel)
+// =========================================================================
+
+let unsubscribePartie = null;
+window.unsubscribeMessages = null;
+window.PARTIE_DATA = null;
+window.PERSOS_PARTIE = null;
+
+// 1. Écoute globale (Personnages + Tour + Historique du Chat)
 function ecouterPersonnagesDeLaPartie(idPartie) {
   if (unsubscribePersonnages) { unsubscribePersonnages(); unsubscribePersonnages = null; }
-  
-  // Si aucune partie, on vide la liste ET les bulles
-  if (!idPartie) { 
-    afficherListePersonnages([]); 
-    afficherBullesPersonnages([]); 
-    return; 
+  if (unsubscribePartie) { unsubscribePartie(); unsubscribePartie = null; }
+  if (window.unsubscribeMessages) { window.unsubscribeMessages(); window.unsubscribeMessages = null; }
+
+  if (!idPartie) {
+    afficherListePersonnages([]);
+    afficherBullesPersonnages([]);
+    return;
   }
 
+  // A. Écoute du Tour de Parole
+  unsubscribePartie = onSnapshot(doc(db, COL.PARTIES, idPartie), (snap) => {
+     if(snap.exists()) {
+         window.PARTIE_DATA = snap.data();
+         if (window.PERSOS_PARTIE) afficherBullesPersonnages(window.PERSOS_PARTIE);
+     }
+  });
+
+  // B. Écoute de l'historique du Chat
+  const qMsg = query(collection(db, COL.MESSAGES), where("ID_Partie", "==", idPartie));
+  window.unsubscribeMessages = onSnapshot(qMsg, (snap) => {
+      let msgs = [];
+      snap.forEach(document => {
+          let data = document.data();
+          data.idDoc = document.id; // On sauvegarde l'identifiant unique du document
+          msgs.push(data);
+      });
+      msgs.sort((a, b) => a.Timestamp - b.Timestamp);
+      dessinerMessagesChat(msgs);
+  });
+
+  // C. Écoute des Personnages
   const q = query(collection(db, COL.PERSONNAGES), where("ID_Partie", "==", idPartie));
   unsubscribePersonnages = onSnapshot(q, (snap) => {
     const persos = [];
     snap.forEach((document) => persos.push(persoDocVersFront(document.id, document.data())));
-    
-    afficherListePersonnages(persos); // Met à jour le menu de droite
-    afficherBullesPersonnages(persos); // Met à jour les bulles du chat
+
+    window.PERSOS_PARTIE = persos; 
+    afficherListePersonnages(persos);
+    afficherBullesPersonnages(persos);
   }, (err) => console.error("onSnapshot Personnages :", err));
 }
 
-// Génération des bulles de personnages pour le chat
+// 2. Affichage des bulles
 function afficherBullesPersonnages(persos) {
   const conteneur = document.getElementById("zone-noms-bulles");
   if (!conteneur) return;
-  
-  conteneur.innerHTML = ""; // Nettoyer l'ancienne liste
+  conteneur.innerHTML = "";
+
+  const partie = window.PARTIE_DATA || {};
+  const ordre = partie.Ordre_Initiative || [];
+  const indexTour = partie.Index_Initiative !== undefined ? partie.Index_Initiative : 999;
+  const idPersoActif = ordre[indexTour];
+
+  let nomActif = "MJ";
 
   persos.forEach((p) => {
     const bulle = document.createElement("div");
     bulle.className = "bulle-personnage";
-    bulle.innerText = p.prenom; // On affiche juste le prénom
+    bulle.innerText = p.prenom;
+    if (p.couleur) bulle.style.setProperty('--couleur-perso', p.couleur);
 
-    // --- NOUVEAU : On injecte la couleur du personnage en variable CSS ---
-    if (p.couleur) {
-      bulle.style.setProperty('--couleur-perso', p.couleur);
+    if (p.idPersonnage === idPersoActif) {
+        bulle.classList.add("tour-actif");
+        nomActif = p.prenom;
     }
 
-    // Ajout du portrait caché qui s'affichera au survol
     if (p.urlCloudinary && p.urlCloudinary !== "") {
       const imgHover = document.createElement("img");
       imgHover.className = "bulle-portrait-hover";
@@ -599,18 +641,11 @@ function afficherBullesPersonnages(persos) {
       bulle.appendChild(imgHover);
     }
 
-    // Double clic : Ouvrir la fiche sur l'onglet caractéristiques par-dessus le chat
     bulle.ondblclick = function() {
       if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-      
-      if (typeof window.ouvrirFichePerso === "function") {
-        window.ouvrirFichePerso(p.idPersonnage, p.prenom, p.nom, p.couleur);
-      }
-      
-      // CORRECTION FORCE BRUTE : On passe la fiche au tout premier plan en JS
+      if (typeof window.ouvrirFichePerso === "function") window.ouvrirFichePerso(p.idPersonnage, p.prenom, p.nom, p.couleur);
       const fiche = document.getElementById('fenetre-fiche-perso');
       if (fiche) fiche.style.zIndex = "1500";
-      
       setTimeout(() => {
         const btnCaracs = document.querySelector("button[onclick*='onglet-caracs']");
         if (btnCaracs) btnCaracs.click();
@@ -619,7 +654,146 @@ function afficherBullesPersonnages(persos) {
 
     conteneur.appendChild(bulle);
   });
+
+  // Bulle MJ
+  const bulleMJ = document.createElement("div");
+  bulleMJ.className = "bulle-personnage bulle-mj";
+  bulleMJ.innerText = "MJ";
+
+  if (indexTour === 999 || indexTour >= ordre.length) {
+      bulleMJ.classList.add("tour-actif");
+      nomActif = "MJ";
+  }
+
+  bulleMJ.onclick = function() {
+      jouerSonClic();
+      window.relancerInitiativeChat(); 
+  };
+  conteneur.appendChild(bulleMJ);
+
+  const inputChat = document.getElementById("input-chat");
+  const btnEnvoyer = document.getElementById("btn-envoyer-chat");
+
+  if (inputChat && btnEnvoyer) {
+      if (nomActif === "MJ") {
+          inputChat.placeholder = "Le MJ prépare sa réponse...";
+          inputChat.disabled = true;  // Verrouille la barre de saisie
+          btnEnvoyer.disabled = true; // Verrouille le bouton
+          inputChat.style.opacity = "0.5";
+          btnEnvoyer.style.opacity = "0.5";
+      } else {
+          inputChat.placeholder = "C'est au tour de " + nomActif + " de parler...";
+          inputChat.disabled = false; // Déverrouille
+          btnEnvoyer.disabled = false;
+          inputChat.style.opacity = "1";
+          btnEnvoyer.style.opacity = "1";
+      }
+  }
 }
+
+// 3. Rendu visuel dans le chat (avec injection de couleur pour le biseau)
+function dessinerMessagesChat(msgs) {
+   const zone = document.getElementById("zone-messages-chat");
+   if (!zone) return;
+   zone.innerHTML = "";
+
+   msgs.forEach(m => {
+       const div = document.createElement("div");
+       div.className = "message-chat";
+       
+       // On donne la couleur du perso au bloc entier pour que le biseau (CSS ::after) l'utilise
+       div.style.setProperty("--couleur-perso", m.Auteur_Couleur);
+
+       const nom = document.createElement("div");
+       nom.className = "message-nom-vertical";
+       nom.innerText = m.Auteur_Nom;
+
+       const ligne = document.createElement("div");
+       ligne.className = "message-separateur";
+
+       const texte = document.createElement("div");
+       texte.className = "message-contenu";
+       texte.innerText = m.Texte;
+
+       // La petite croix de suppression rouge
+       const btnSuppr = document.createElement("button");
+       btnSuppr.className = "btn-supprimer-msg";
+       btnSuppr.innerText = "✖";
+       btnSuppr.onclick = async function() {
+           if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+           await deleteDoc(doc(db, COL.MESSAGES, m.idDoc)); // Destruction en BDD !
+       };
+
+       div.appendChild(nom);
+       div.appendChild(ligne);
+       div.appendChild(texte);
+       div.appendChild(btnSuppr);
+       zone.appendChild(div);
+   });
+   zone.scrollTop = zone.scrollHeight;
+}
+
+// 4. Mélange aléatoire
+window.relancerInitiativeChat = async function() {
+  if (!window.ID_PARTIE_COURANTE || !window.PERSOS_PARTIE || window.PERSOS_PARTIE.length === 0) return;
+  let ids = window.PERSOS_PARTIE.map(p => p.idPersonnage);
+  ids = ids.sort(() => Math.random() - 0.5);
+  await updateDoc(doc(db, COL.PARTIES, window.ID_PARTIE_COURANTE), {
+    Ordre_Initiative: ids,
+    Index_Initiative: 0
+  });
+};
+
+// 5. Envoi du message (avec ajout de la Date issue de Firestore)
+window.envoyerMessageChat = async function() {
+   const input = document.getElementById("input-chat");
+   const texte = input.value.trim();
+   if(texte === "" || !window.ID_PARTIE_COURANTE) return;
+
+   const partie = window.PARTIE_DATA || {};
+   const ordre = partie.Ordre_Initiative || [];
+   const indexTour = partie.Index_Initiative !== undefined ? partie.Index_Initiative : 999;
+
+   let auteurNom = "MJ";
+   let auteurCouleur = "#ffffff";
+   let idAuteur = "MJ";
+
+   if (indexTour !== 999 && indexTour < ordre.length && window.PERSOS_PARTIE) {
+       const idActif = ordre[indexTour];
+       const persoActif = window.PERSOS_PARTIE.find(p => p.idPersonnage === idActif);
+       if (persoActif) {
+           auteurNom = persoActif.prenom;
+           auteurCouleur = persoActif.couleur;
+           idAuteur = persoActif.idPersonnage;
+       }
+   }
+
+   // On récupère la date fraîche depuis notre mémoire globale (Issue de Firebase)
+   const jourEnJeu = window.DATE_EN_JEU_ACTUELLE ? window.DATE_EN_JEU_ACTUELLE.jour : "";
+   const anEnJeu = window.DATE_EN_JEU_ACTUELLE ? window.DATE_EN_JEU_ACTUELLE.annee : "";
+
+   const nouveauMsg = {
+       ID_Partie: window.ID_PARTIE_COURANTE,
+       Auteur_ID: idAuteur,
+       Auteur_Nom: auteurNom,
+       Auteur_Couleur: auteurCouleur,
+       Texte: texte,
+       Date_Jour: jourEnJeu, // Ajouté dans le payload
+       Date_An: anEnJeu,     // Ajouté dans le payload
+       Timestamp: new Date().getTime()
+   };
+
+   await addDoc(collection(db, COL.MESSAGES), nouveauMsg);
+   input.value = ""; 
+
+   if (indexTour !== 999) {
+       let nouvelIndex = indexTour + 1;
+       if (nouvelIndex >= ordre.length) nouvelIndex = 999; 
+       await updateDoc(doc(db, COL.PARTIES, window.ID_PARTIE_COURANTE), {
+           Index_Initiative: nouvelIndex
+       });
+   }
+};
 
 // =========================================================================
 //  SCENE 1/2 : ACCUEIL + IDENTIFICATION
