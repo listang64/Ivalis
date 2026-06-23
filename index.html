@@ -231,6 +231,10 @@
       <p style="font-size: 14px; margin-top: -10px; color: #5c3a21;">Stockées uniquement dans ce navigateur (localStorage).</p>
 
       <div class="champ-cle-api">
+        <label for="cle-gemini">GEMINI_API_KEY (Google AI Studio)</label>
+        <input type="password" id="cle-gemini" class="input-texte-parchemin" placeholder="AIzaSy..." autocomplete="off">
+      </div>
+      <div class="champ-cle-api">
         <label for="cle-openai">OPENAI_API_KEY</label>
         <input type="password" id="cle-openai" class="input-texte-parchemin" placeholder="sk-..." autocomplete="off">
       </div>
@@ -439,10 +443,15 @@
     <div id="zone-saisie-chat">
       <input type="text" id="input-chat" placeholder="Écrivez votre message..." onkeydown="if(event.key==='Enter') { window.envoyerMessageChat(); }">
       <button id="btn-envoyer-chat" onclick="jouerSonClic(); window.envoyerMessageChat()">Envoyer</button>
+      
     </div>
   </div>
 
-</div> <script type="module" src="app.js"></script>
+</div> 
+
+<!-- NOUVEAU : On charge le cerveau IA ici -->
+<script type="module" src="ia_master.js"></script>
+<script type="module" src="app.js"></script>
 
 </body>
 </html>

@@ -287,6 +287,7 @@ async function supprimerPersonnageBDD(idPersonnage) {
 //  CLES API (stockees dans le localStorage du navigateur - projet prive)
 // =========================================================================
 const CLES_LS = {
+  gemini: "ivalis_GEMINI_API_KEY", // <-- Ajout de Gemini
   openai: "ivalis_OPENAI_API_KEY",
   cloudName: "ivalis_CLOUDINARY_CLOUD_NAME",
   cloudKey: "ivalis_CLOUDINARY_API_KEY",
@@ -295,6 +296,7 @@ const CLES_LS = {
 
 function lireClesApi() {
   return {
+    gemini: (localStorage.getItem(CLES_LS.gemini) || "").trim(),
     openai: (localStorage.getItem(CLES_LS.openai) || "").trim(),
     cloudName: (localStorage.getItem(CLES_LS.cloudName) || "").trim(),
     cloudKey: (localStorage.getItem(CLES_LS.cloudKey) || "").trim(),
@@ -302,9 +304,9 @@ function lireClesApi() {
   };
 }
 
-// Pre-remplit les champs avec les valeurs deja enregistrees
 function prefillClesApi() {
   const cles = lireClesApi();
+  document.getElementById("cle-gemini").value = cles.gemini;
   document.getElementById("cle-openai").value = cles.openai;
   document.getElementById("cle-cloud-name").value = cles.cloudName;
   document.getElementById("cle-cloud-key").value = cles.cloudKey;
@@ -319,6 +321,7 @@ function ouvrirClesApi(idFenetreSortante) {
 }
 
 function sauvegarderClesApi() {
+  localStorage.setItem(CLES_LS.gemini, document.getElementById("cle-gemini").value.trim());
   localStorage.setItem(CLES_LS.openai, document.getElementById("cle-openai").value.trim());
   localStorage.setItem(CLES_LS.cloudName, document.getElementById("cle-cloud-name").value.trim());
   localStorage.setItem(CLES_LS.cloudKey, document.getElementById("cle-cloud-key").value.trim());
@@ -333,7 +336,7 @@ function sauvegarderClesApi() {
 
 function basculerAffichageCles(afficher) {
   const type = afficher ? "text" : "password";
-  ["cle-openai", "cle-cloud-name", "cle-cloud-key", "cle-cloud-secret"].forEach((id) => {
+  ["cle-gemini", "cle-openai", "cle-cloud-name", "cle-cloud-key", "cle-cloud-secret"].forEach((id) => {
     document.getElementById(id).type = type;
   });
 }
@@ -672,9 +675,18 @@ function afficherBullesPersonnages(persos) {
   }
 
   bulleMJ.onclick = function() {
-      if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-      window.relancerInitiativeChat(); 
-  };
+        if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+        
+        // On affiche un placeholder pour faire patienter les joueurs
+        const inputChat = document.getElementById("input-chat");
+        if (inputChat) {
+            inputChat.placeholder = "Le MJ écrit l'histoire...";
+            inputChat.disabled = true;
+        }
+
+        // On déclenche le flux IA
+        window.declencherTourIA(); 
+    };
   conteneur.appendChild(bulleMJ);
 
   // --- Mise à jour de la barre de saisie ---
