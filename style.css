@@ -973,14 +973,16 @@ textarea.input-texte-parchemin {
 }
 
 /* Image cachée par défaut, s'affiche au survol */
+/* Image cachée par défaut, s'affiche au survol */
 #image-lieu-actuel {
     position: absolute;
     bottom: 45px; 
-    right: 0;      /* NOUVEAU : L'image s'aligne sur la droite pour s'étendre vers l'intérieur du chat */
-    left: auto;    /* Sécurité */
-    width: 500px; 
+    right: 0;      
+    left: auto;    
+    width: 1000px; /* NOUVEAU : Taille doublée (1000px au lieu de 500) */
+    max-width: 90vw; /* Sécurité pour ne pas déborder de l'écran */
     height: auto;
-    max-height: 65vh; 
+    max-height: 75vh; /* NOUVEAU : Laisse plus de place en hauteur */
     object-fit: contain; 
     border-radius: 8px;
     border: 3px solid #8c6a45;
@@ -988,7 +990,7 @@ textarea.input-texte-parchemin {
     opacity: 0;
     pointer-events: none;
     transform: translateY(15px) scale(0.95);
-    transform-origin: bottom right; /* NOUVEAU : L'animation de zoom partira proprement du coin inférieur droit */
+    transform-origin: bottom right; 
     transition: all 0.3s ease-out;
     z-index: 1001;
 }

@@ -569,7 +569,7 @@ window.PARTIE_DATA = null;
 window.PERSOS_PARTIE = null;
 
 // --- NOUVEAU : Récupération et affichage du lieu actuel ---
-async function mettreAJourBulleLieu(idLieu) {
+window.mettreAJourBulleLieu = async function(idLieu) {
     const bulle = document.getElementById("bulle-lieu-actuel");
     const spanNom = document.getElementById("nom-lieu-actuel");
     const imgLieu = document.getElementById("image-lieu-actuel");
