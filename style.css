@@ -1072,3 +1072,93 @@ textarea.input-texte-parchemin {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
 }
+
+/* =========================================
+   CARACTÉRISTIQUES & ACHAT DE POINTS
+   ========================================= */
+.ligne-creation-carac {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: rgba(92, 58, 33, 0.1);
+  padding: 8px 15px;
+  border-radius: 8px;
+  border: 1px solid #c2a878;
+}
+
+.nom-carac-creation {
+  font-weight: bold;
+  font-size: 18px;
+  width: 120px;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.controle-carac {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.btn-plus-moins {
+  background-color: #4a2e1b;
+  color: white;
+  border: 2px solid #2a1a0f;
+  border-radius: 5px;
+  width: 30px;
+  height: 30px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.btn-plus-moins:hover:not(:disabled) {
+  background-color: #8c6a45;
+  border-color: #00ffff;
+}
+
+.btn-plus-moins:disabled {
+  background-color: #ccc;
+  border-color: #999;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.valeur-carac-creation {
+  font-size: 22px;
+  font-weight: bold;
+  width: 30px;
+  text-align: center;
+}
+
+.modif-carac-creation {
+  font-size: 18px;
+  width: 40px;
+  text-align: right;
+  color: #5c3a21;
+}
+
+/* Affichage Final */
+.bloc-stat-final {
+  margin-bottom: 20px;
+  padding: 10px;
+  background-color: rgba(255, 255, 255, 0.4);
+  border-left: 4px solid #5c3a21;
+  border-radius: 4px;
+}
+
+.titre-stat-final {
+  font-size: 18px;
+  font-weight: bold;
+  color: #2c1e16;
+  margin-bottom: 5px;
+}
+
+.comp-stat-final {
+  font-size: 16px;
+  color: #5c3a21;
+  font-style: italic;
+}

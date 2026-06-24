@@ -41,7 +41,8 @@ const COL = {
   CERVEAU_IA: "Cerveau_IA",
   FACTIONS: "Monde_Factions",
   PERSONNAGES: "Personnages",
-  MESSAGES: "Messages_Chat"
+  MESSAGES: "Messages_Chat",
+  CARACTERISTIQUES: "Caracteristiques" // <-- NOUVEAU
 };
 
 // Identifiants des documents uniques (anciennes cellules fixes des Sheets)
@@ -1475,6 +1476,9 @@ async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPers
     changerOngletPerso({ currentTarget: btnCaracs }, 'onglet-caracs');
   }
 
+  // --- NOUVEAU : Charger les caractéristiques ---
+  window.chargerCaracteristiques(idPersonnage);
+
   fiche.style.display = "flex";
   const fenetreLargeur = fiche.offsetWidth;
   const fenetreHauteur = fiche.offsetHeight;
@@ -1853,6 +1857,177 @@ window.ajouterTokens = function(montant) {
 };
 
 // =========================================================================
+//  MOTEUR DE CARACTÉRISTIQUES (ACHAT DE POINTS 5E)
+// =========================================================================
+
+const NOMS_CARACS = [
+  { id: "force", nom: "FORCE", desc: "Mesure la puissance physique.", comp: "Athlétisme" },
+  { id: "dex", nom: "DEXTÉRITÉ", desc: "Mesure l'agilité, les réflexes et l'équilibre.", comp: "Acrobaties / Escamotage / Discrétion" },
+  { id: "con", nom: "CONSTITUTION", desc: "Mesure la santé, l'endurance et la force vitale.", comp: "" },
+  { id: "int", nom: "INTELLIGENCE", desc: "Mesure la mémoire et le raisonnement.", comp: "Arcanes / Histoire / Investigation / Nature / Religion" },
+  { id: "sag", nom: "SAGESSE", desc: "Mesure l'intuition, la perception et la connexion avec le monde.", comp: "Dressage / Intuition / Médecine / Perception / Survie" },
+  { id: "cha", nom: "CHARISME", desc: "Mesure la force de personnalité et l'éloquence.", comp: "Duperie / Intimidation / Performance / Persuasion" }
+];
+
+window.statsCreation = { force: 8, dex: 8, con: 8, int: 8, sag: 8, cha: 8 };
+
+function getCoutStat(valeur) {
+  const couts = { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 };
+  return couts[valeur] || 0;
+}
+
+function getModificateur(valeur) {
+  const mod = Math.floor((valeur - 10) / 2);
+  return mod >= 0 ? "+" + mod : mod;
+}
+
+function calculerPointsRestants() {
+  let depenses = 0;
+  for (let key in window.statsCreation) {
+    depenses += getCoutStat(window.statsCreation[key]);
+  }
+  return 27 - depenses;
+}
+
+// 1. Chargement depuis Firebase
+window.chargerCaracteristiques = async function(idPersonnage) {
+  const divVide = document.getElementById("caracs-vide");
+  const divAffiche = document.getElementById("caracs-affiche");
+  const btnCreer = document.getElementById("btn-creer-caracs");
+  const msgErreur = document.getElementById("msg-sauvegarde-requise");
+
+  divVide.style.display = "none";
+  divAffiche.style.display = "none";
+  msgErreur.style.display = "none";
+
+  if (!idPersonnage || idPersonnage === "") {
+    divVide.style.display = "block";
+    btnCreer.style.display = "none";
+    msgErreur.style.display = "block";
+    return;
+  }
+
+  try {
+    const snap = await getDoc(doc(db, COL.CARACTERISTIQUES, idPersonnage));
+    if (snap.exists()) {
+      afficherStatsFinales(snap.data());
+      divAffiche.style.display = "block";
+    } else {
+      divVide.style.display = "block";
+      btnCreer.style.display = "inline-block";
+    }
+  } catch (e) {
+    console.error("Erreur lecture caracs:", e);
+  }
+};
+
+// 2. Interface de la Modale de Création
+window.ouvrirModaleCreationCaracs = function() {
+  window.statsCreation = { force: 8, dex: 8, con: 8, int: 8, sag: 8, cha: 8 };
+  actualiserModaleCaracs();
+  document.getElementById("modale-creation-caracs").style.display = "block";
+};
+
+window.fermerModaleCreationCaracs = function() {
+  document.getElementById("modale-creation-caracs").style.display = "none";
+};
+
+window.actualiserModaleCaracs = function() {
+  const conteneur = document.getElementById("grille-creation-caracs");
+  conteneur.innerHTML = "";
+  
+  const pointsRestants = calculerPointsRestants();
+  const spanPoints = document.getElementById("points-restants");
+  spanPoints.innerText = pointsRestants;
+  spanPoints.style.color = pointsRestants === 0 ? "#1b6e3a" : (pointsRestants < 0 ? "#ff4c4c" : "#5c3a21");
+
+  NOMS_CARACS.forEach(c => {
+    const val = window.statsCreation[c.id];
+    const mod = getModificateur(val);
+    const coutSuivant = getCoutStat(val + 1) - getCoutStat(val);
+    
+    // Logique de blocage des boutons
+    const btnMoinsDisabled = val <= 8 ? "disabled" : "";
+    const btnPlusDisabled = (val >= 15 || pointsRestants < coutSuivant) ? "disabled" : "";
+
+    const html = `
+      <div class="ligne-creation-carac">
+        <div class="nom-carac-creation">${c.nom}</div>
+        <div class="controle-carac">
+          <button class="btn-plus-moins" ${btnMoinsDisabled} onclick="modifierStat('${c.id}', -1)">-</button>
+          <div class="valeur-carac-creation">${val}</div>
+          <button class="btn-plus-moins" ${btnPlusDisabled} onclick="modifierStat('${c.id}', 1)">+</button>
+          <div class="modif-carac-creation">(${mod})</div>
+        </div>
+      </div>
+    `;
+    conteneur.insertAdjacentHTML('beforeend', html);
+  });
+
+  const btnValider = document.getElementById("btn-valider-caracs");
+  if (pointsRestants === 0) {
+    btnValider.style.opacity = "1";
+    btnValider.style.pointerEvents = "auto";
+  } else {
+    btnValider.style.opacity = "0.5";
+    btnValider.style.pointerEvents = "none";
+  }
+};
+
+window.modifierStat = function(idStat, delta) {
+  if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+  window.statsCreation[idStat] += delta;
+  actualiserModaleCaracs();
+};
+
+window.validerCreationCaracs = async function() {
+  const pointsRestants = calculerPointsRestants();
+  if (pointsRestants !== 0) return;
+
+  const idPersonnage = document.getElementById("champ-id-personnage").value;
+  if (!idPersonnage) return;
+
+  const btnValider = document.getElementById("btn-valider-caracs");
+  btnValider.innerText = "Création...";
+  btnValider.style.pointerEvents = "none";
+
+  try {
+    await setDoc(doc(db, COL.CARACTERISTIQUES, idPersonnage), window.statsCreation);
+    window.fermerModaleCreationCaracs();
+    window.chargerCaracteristiques(idPersonnage);
+  } catch (e) {
+    console.error(e);
+    alert("Erreur lors de la création des caractéristiques.");
+  }
+
+  btnValider.innerText = "Valider";
+  btnValider.style.pointerEvents = "auto";
+};
+
+// 3. Rendu Final (Texte exact demandé)
+window.afficherStatsFinales = function(dataStats) {
+  const conteneur = document.getElementById("conteneur-stats-affichage");
+  conteneur.innerHTML = "";
+
+  NOMS_CARACS.forEach(c => {
+    const val = dataStats[c.id] || 8;
+    const mod = getModificateur(val);
+    
+    let html = `
+      <div class="bloc-stat-final">
+        <div class="titre-stat-final">${c.nom} (${val}) - (${mod}) : <span style="font-weight: normal; color: #4a2e1b;">${c.desc}</span></div>
+    `;
+    
+    if (c.comp !== "") {
+      html += `<div class="comp-stat-final">${c.comp}</div>`;
+    }
+    
+    html += `</div>`;
+    conteneur.insertAdjacentHTML('beforeend', html);
+  });
+};
+
+// =========================================================================
 //  EXPOSITION DES FONCTIONS AU SCOPE GLOBAL
 //  (necessaire car index.html utilise des handlers inline onclick="...",
 //   or un <script type="module"> a sa propre portee.)
@@ -1875,6 +2050,9 @@ Object.assign(window, {
   fermerMenuPersonnages, ouvrirFichePerso, fermerFichePerso,
   sauvegarderDescriptifPerso, ouvrirConfirmationSuppressionPerso,
   annulerSuppressionPerso, validerSuppressionPerso, appliquerCouleurTheme, changerOngletPerso,
+  // Caracteristiques
+  chargerCaracteristiques, ouvrirModaleCreationCaracs, fermerModaleCreationCaracs,
+  modifierStat, validerCreationCaracs,
   // Cles API + generation d'image (front-end)
   ouvrirClesApi, sauvegarderClesApi, basculerAffichageCles,
   fermerAlerteCles, ouvrirParametresDepuisAlerte,

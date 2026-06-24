@@ -478,7 +478,33 @@
       </div>
     </div>
 
-    <div id="onglet-caracs" class="contenu-onglet"><h3 style="margin-top: 0;">Attributs &amp; Compétences</h3><p><i>Tableau des statistiques...</i></p></div>
+    <div id="onglet-caracs" class="contenu-onglet">
+      <div id="caracs-vide" style="display: none; text-align: center; margin-top: 50px;">
+        <p style="font-size: 18px; color: #4a2e1b;">Ce héros n'a pas encore éveillé son potentiel.</p>
+        <button class="btn-parametres" id="btn-creer-caracs" onclick="jouerSonClic(); ouvrirModaleCreationCaracs()">Créer caractéristiques</button>
+        <p id="msg-sauvegarde-requise" style="display: none; color: #ff4c4c;">Veuillez d'abord enregistrer le personnage (onglet Descriptif) pour lui attribuer des caractéristiques.</p>
+      </div>
+
+      <div id="caracs-affiche" style="display: none; text-align: left;">
+        <h3 style="margin-top: 0; border-bottom: 2px solid #5c3a21; padding-bottom: 5px; color: #2a1a0f;">Attributs &amp; Compétences</h3>
+        <div id="conteneur-stats-affichage" style="margin-top: 20px;"></div>
+      </div>
+    </div>
+    
+    <div id="modale-creation-caracs" class="modale-parchemin" style="display: none; z-index: 160; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 450px;">
+      <h2 style="font-size: 24px; margin-bottom: 10px;">Répartition</h2>
+      <div style="font-size: 20px; font-weight: bold; margin-bottom: 20px; color: #5c3a21;">
+        Points disponibles : <span id="points-restants" style="color: #1b6e3a; font-size: 26px;">27</span>
+      </div>
+      
+      <div id="grille-creation-caracs" style="display: flex; flex-direction: column; gap: 15px; margin-bottom: 25px;">
+        </div>
+      
+      <div class="groupe-boutons" style="margin-top: 20px;">
+        <button id="btn-valider-caracs" class="btn-modale" onclick="jouerSonClic(); validerCreationCaracs()">Valider</button>
+        <button class="btn-modale" onclick="jouerSonClic(); fermerModaleCreationCaracs()">Annuler</button>
+      </div>
+    </div>
     <div id="onglet-cartes" class="contenu-onglet"><h3 style="margin-top: 0;">Deck de Combat</h3><p><i>Système de cartes...</i></p></div>
     <div id="onglet-inventaire" class="contenu-onglet"><h3 style="margin-top: 0;">Sac à dos &amp; Équipement</h3><p><i>Armes, armures...</i></p></div>
   </div>  <div id="fenetre-chatbox">
