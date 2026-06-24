@@ -426,6 +426,100 @@ RÈGLES STRICTES ET ABSOLUES :
 }
 
 // =========================================================================
+//  NOUVEAU : MIA_DEPLACEMENT_PNJ (Suivi de la position des PNJ)
+// =========================================================================
+
+async function analyserDeplacementPNJ(idLieuActuel, nomsHeros, texteMJ) {
+    const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
+    if (!cleGemini || !idLieuActuel) return;
+
+    const promptSysteme = `Tu es MIA_DEPLACEMENT, l'IA logistique.
+Voici les HÉROS (Personnages des joueurs) de la partie : ${JSON.stringify(nomsHeros)}.
+
+Ta mission : Lis la dernière narration du Maître du Jeu. Identifie TOUS les personnages (PNJ) qui se trouvent physiquement dans la MÊME ZONE que les héros à la fin du texte.
+- Si un héros sort d'une auberge et qu'un PNJ le suit à l'extérieur, ce PNJ is avec eux.
+- Si un PNJ vient d'arriver dans la pièce, il est avec eux.
+- Si un PNJ est resté à l'intérieur pendant que les héros sortent, IL N'EST PLUS avec eux.
+
+Utilise l'outil 'deplacerPNJ' pour lister les noms exacts de ces PNJ présents.
+Règle 1 : NE LISTE JAMAIS LES HÉROS.
+Règle 2 : Ne liste que les vrais noms propres (ignore "le garde", "le tavernier").`;
+
+    const outils = [{
+        functionDeclarations: [{
+            name: "deplacerPNJ",
+            description: "Liste les PNJ présents dans la même zone que les joueurs.",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    noms_presents: { 
+                        type: "ARRAY", 
+                        items: { type: "STRING" },
+                        description: "Liste des noms exacts des PNJ présents avec les joueurs."
+                    }
+                },
+                required: ["noms_presents"]
+            }
+        }]
+    }];
+
+    try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                systemInstruction: { parts: [{ text: promptSysteme }] },
+                contents: [{ role: "user", parts: [{ text: texteMJ }] }],
+                tools: outils, 
+                toolConfig: { functionCallingConfig: { mode: "AUTO" } }
+            })
+        });
+
+        const data = await res.json();
+        const appelsOutils = data.candidates?.[0]?.content?.parts?.filter(p => p.functionCall).map(p => p.functionCall);
+        
+        if (appelsOutils && appelsOutils.length > 0 && appelsOutils[0].name === "deplacerPNJ") {
+            const pnjPresents = appelsOutils[0].args.noms_presents || [];
+            if (pnjPresents.length === 0) return;
+
+            // 1. Déterminer les ID de la zone où se trouvent les joueurs
+            let idLieuCible = "";
+            let idBatimentCible = "";
+
+            if (idLieuActuel.startsWith("L")) {
+                idLieuCible = idLieuActuel;
+            } else if (idLieuActuel.startsWith("B")) {
+                idBatimentCible = idLieuActuel;
+                // Trouver le lieu parent du bâtiment pour le PNJ
+                const bSnap = await getDoc(doc(db, "Monde_Batiment", idLieuActuel));
+                if (bSnap.exists()) idLieuCible = bSnap.data().ID_Lieu;
+            }
+
+            // 2. Mettre à jour chaque PNJ
+            for (const nom of pnjPresents) {
+                if (nomsHeros.includes(nom)) continue; // Sécurité anti-héros
+
+                // Chercher le PNJ par son nom dans la BDD
+                const qPnj = query(collection(db, "Monde_PNJ"), where("Nom_PNJ", "==", nom));
+                const snapPnj = await getDocs(qPnj);
+
+                snapPnj.forEach(async (docPnj) => {
+                    const dataPnj = docPnj.data();
+                    
+                    // Si sa position est déjà la bonne, on ne fait rien pour économiser Firebase
+                    if (dataPnj.ID_Lieu === idLieuCible && dataPnj.ID_Batiment === idBatimentCible) return;
+
+                    console.log(`[MIA_DEPLACEMENT] 🚶 Le PNJ ${nom} suit les joueurs -> Lieu: ${idLieuCible}, Bat: ${idBatimentCible}`);
+                    await updateDoc(doc(db, "Monde_PNJ", docPnj.id), {
+                        ID_Lieu: idLieuCible,
+                        ID_Batiment: idBatimentCible
+                    });
+                });
+            }
+        }
+    } catch (e) { console.error("[MIA_DEPLACEMENT] Erreur silencieuse :", e); }
+}
+
+// =========================================================================
 //  INTERFACE & CERVEAU DU NARRATEUR
 // =========================================================================
 
@@ -593,6 +687,9 @@ window.declencherTourIA = async function() {
                 // 3. MIA_PNJ analyse les nouveaux personnages dans cette zone définitive
                 if (lieuFinal) {
                     await analyserNouveauxPNJ(lieuFinal, nomsPnjPresents, nomsHeros, reponseTexte);
+                    
+                    // 4. MIA_DEPLACEMENT_PNJ met à jour la position des PNJ existants
+                    await analyserDeplacementPNJ(lieuFinal, nomsHeros, reponseTexte);
                 }
             }, 0);
         }
