@@ -675,17 +675,20 @@ function afficherBullesPersonnages(persos) {
   }
 
   bulleMJ.onclick = function() {
-        if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-        
-        // On affiche un placeholder pour faire patienter les joueurs
-        const inputChat = document.getElementById("input-chat");
+      if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+      
+      const inputChat = document.getElementById("input-chat");
         if (inputChat) {
             inputChat.placeholder = "Le MJ écrit l'histoire...";
             inputChat.disabled = true;
         }
 
-        // On déclenche le flux IA
-        window.declencherTourIA(); 
+        // C'EST CETTE LIGNE QUI EST CAPITALE :
+        if (typeof window.declencherTourIA === "function") {
+            window.declencherTourIA(); 
+        } else {
+            console.error("La fonction declencherTourIA est introuvable !");
+        }
     };
   conteneur.appendChild(bulleMJ);
 

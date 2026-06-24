@@ -1,219 +1,163 @@
 // =========================================================================
-//  IVALIS - Cerveau IA (Mia l'Architecte / Routeur)
+//  IVALIS - MOTEUR IA (Pré-chargement Backend + Mia + Narrateur)
 // =========================================================================
 
 import { db } from "./firebase-config.js";
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
-// --- 1. FONCTIONS DE RECHERCHE FIRESTORE (Les Outils de Mia) ---
+// --- 1. LE BACKEND (Le radar qui scanne la zone avant l'IA) ---
 
-async function chercherLieu(nomLieu) {
-    console.log(`[Mia] 🌍 Recherche du lieu : ${nomLieu}`);
-    const q = query(collection(db, "Monde_Lieux"), where("Nom_Du_Lieu", "==", nomLieu));
-    const snap = await getDocs(q);
-    if (snap.empty) return { erreur: "Lieu introuvable" };
-    return { id: snap.docs[0].id, ...snap.docs[0].data() };
-}
-
-async function chercherBatiment(nomBatiment) {
-    console.log(`[Mia] 🏠 Recherche du bâtiment : ${nomBatiment}`);
+async function preparerEnvironnement(lieuActuelId) {
+    console.log(`[Backend] 📡 Scan de la zone en cours pour l'ID : ${lieuActuelId}`);
     
-    // 1. On cherche le bâtiment
-    const qBatiment = query(collection(db, "Monde_Batiment"), where("Nom_Batiment", "==", nomBatiment));
-    const snapBatiment = await getDocs(qBatiment);
-    if (snapBatiment.empty) return { erreur: "Bâtiment introuvable" };
-    
-    const batimentData = snapBatiment.docs[0].data();
-    const batimentId = snapBatiment.docs[0].id; // Ex: "B-01"
-
-    // 2. NOUVEAU : On cherche automatiquement les PNJ présents à l'intérieur
-    console.log(`[Backend] 🔍 Recherche auto des PNJ dans le bâtiment ID: ${batimentId}`);
-    const qPnj = query(collection(db, "Monde_PNJ"), where("ID_Batiment", "==", batimentId));
-    const snapPnj = await getDocs(qPnj);
-    
-    let pnjPresents = [];
-    snapPnj.forEach(doc => {
-        pnjPresents.push({ id: doc.id, ...doc.data() });
-    });
-
-    // 3. On renvoie le tout (Bâtiment + Liste des PNJ) au Narrateur
-    return { 
-        id: batimentId, 
-        ...batimentData,
-        PNJ_Presents_Ici: pnjPresents.length > 0 ? pnjPresents : "Aucun PNJ connu n'est présent dans ce bâtiment."
+    let env = {
+        type: "Inconnu",
+        details: null,
+        listeBatiments: [], // Noms des bâtiments (Uniquement pour les Lieux)
+        pnjsPresents: {}    // Dictionnaire { "Nom_PNJ": { Fiche complète } }
     };
-}
 
-async function chercherPNJ(nomPNJ) {
-    console.log(`[Mia] 👤 Recherche du PNJ : ${nomPNJ}`);
-    const q = query(collection(db, "Monde_PNJ"), where("Nom_PNJ", "==", nomPNJ));
-    const snap = await getDocs(q);
-    if (snap.empty) return { erreur: "PNJ introuvable" };
-    return { id: snap.docs[0].id, ...snap.docs[0].data() };
-}
+    if (!lieuActuelId) return env;
 
-// --- 2. LE CERVEAU DE MIA (Appel Gemini avec Tool Calling) ---
+    // CAS A : LES JOUEURS SONT DANS UN LIEU GLOBAL (Commence par "L")
+    if (lieuActuelId.startsWith("L")) {
+        env.type = "Lieu";
+        
+        // 1. Infos du Lieu
+        const snapLieu = await getDoc(doc(db, "Monde_Lieux", lieuActuelId));
+        if (snapLieu.exists()) env.details = snapLieu.data();
 
-async function analyserSituationEtAppelerOutils(historiqueTexte, lieuActuel) {
-    const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
-    if (!cleGemini) {
-        console.error("[Mia] ❌ Clé Gemini manquante !");
-        alert("Veuillez renseigner votre clé Gemini dans les paramètres.");
-        return null;
+        // 2. Liste des Bâtiments dans ce Lieu
+        const qBat = query(collection(db, "Monde_Batiment"), where("ID_Lieu", "==", lieuActuelId));
+        const snapBat = await getDocs(qBat);
+        snapBat.forEach(doc => { env.listeBatiments.push(doc.data().Nom_Batiment); });
+
+        // 3. PNJ présents en extérieur dans ce Lieu
+        const qPnj = query(collection(db, "Monde_PNJ"), where("ID_Lieu", "==", lieuActuelId));
+        const snapPnj = await getDocs(qPnj);
+        snapPnj.forEach(doc => { env.pnjsPresents[doc.data().Nom_PNJ] = doc.data(); });
+    }
+    
+    // CAS B : LES JOUEURS SONT DANS UN BÂTIMENT (Commence par "B")
+    else if (lieuActuelId.startsWith("B")) {
+        env.type = "Bâtiment";
+
+        // 1. Infos du Bâtiment
+        const snapBat = await getDoc(doc(db, "Monde_Batiment", lieuActuelId));
+        if (snapBat.exists()) env.details = snapBat.data();
+
+        // 2. PNJ présents à l'intérieur
+        const qPnj = query(collection(db, "Monde_PNJ"), where("ID_Batiment", "==", lieuActuelId));
+        const snapPnj = await getDocs(qPnj);
+        snapPnj.forEach(doc => { env.pnjsPresents[doc.data().Nom_PNJ] = doc.data(); });
     }
 
-    console.log("[Mia] 🧠 Analyse de la situation en cours via Gemini...");
+    return env;
+}
 
-    const promptSysteme = `Tu es Mia, l'intelligence artificielle de routage d'un jeu de rôle. 
-Ton but n'est PAS de répondre aux joueurs. Ton but est de lire l'action en cours et de déterminer si le Maître du Jeu aura besoin d'informations spécifiques depuis la base de données (un lieu, un bâtiment, ou un PNJ) pour narrer la suite.
-Lieu actuel du groupe : ${lieuActuel}.
-Si les joueurs interagissent avec un élément ou y font référence, utilise l'outil approprié. Sinon, ne fais rien.`;
+// --- 2. LE CERVEAU DE MIA (Filtre les interactions avec les PNJ) ---
 
-    // Format strict de déclaration des outils pour Gemini
+async function filtrerPNJAvecMia(historique4Messages, listeNomsPNJ) {
+    const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
+    if (!cleGemini) return [];
+
+    console.log(`[Mia] 🧠 Analyse des 4 derniers messages pour trouver : ${listeNomsPNJ.join(", ")}`);
+
+    const promptSysteme = `Tu es Mia, l'IA d'analyse.
+Voici les PNJ présents dans la zone : ${listeNomsPNJ.join(", ")}.
+Lis les 4 derniers messages. Ton seul rôle est d'identifier si les joueurs s'adressent, interagissent ou font référence à un ou plusieurs PNJ de cette liste.
+Si oui, utilise l'outil 'selectionnerPNJ' et donne leurs noms exacts. S'ils ne parlent à aucun PNJ de la liste, ne fais rien.`;
+
     const outils = [{
-        functionDeclarations: [
-            {
-                name: "chercherLieu",
-                description: "Récupère les détails d'un lieu global (ex: un village, une forêt).",
-                parameters: { type: "OBJECT", properties: { nomLieu: { type: "STRING" } }, required: ["nomLieu"] }
-            },
-            {
-                name: "chercherBatiment",
-                description: "Récupère les détails d'un bâtiment spécifique (ex: Taverne, Forge).",
-                parameters: { type: "OBJECT", properties: { nomBatiment: { type: "STRING" } }, required: ["nomBatiment"] }
-            },
-            {
-                name: "chercherPNJ",
-                description: "Récupère la fiche technique et le secret d'un PNJ.",
-                parameters: { type: "OBJECT", properties: { nomPNJ: { type: "STRING" } }, required: ["nomPNJ"] }
+        functionDeclarations: [{
+            name: "selectionnerPNJ",
+            description: "Sélectionne les PNJ sollicités par les joueurs.",
+            parameters: { 
+                type: "OBJECT", 
+                properties: { noms: { type: "ARRAY", items: { type: "STRING" } } }, 
+                required: ["noms"] 
             }
-        ]
+        }]
     }];
 
     const bodyRequete = {
         systemInstruction: { parts: [{ text: promptSysteme }] },
-        contents: [{ role: "user", parts: [{ text: historiqueTexte }] }],
+        contents: [{ role: "user", parts: [{ text: historique4Messages }] }],
         tools: outils,
         toolConfig: { functionCallingConfig: { mode: "AUTO" } }
     };
 
     try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${cleGemini}`;
-        const reponse = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(bodyRequete)
+        const reponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(bodyRequete)
         });
 
         const data = await reponse.json();
+        const candidat = data.candidates?.[0];
+        if (!candidat) return [];
 
-        if (!reponse.ok || data.error) {
-            console.error("[Mia] ❌ Erreur Gemini détaillée :", data.error);
-            alert("Erreur Gemini : " + (data.error?.message || "Accès refusé"));
-            return null;
+        const appelsOutils = candidat.content.parts.filter(p => p.functionCall).map(p => p.functionCall);
+        
+        if (appelsOutils.length > 0 && appelsOutils[0].name === "selectionnerPNJ") {
+            return appelsOutils[0].args.noms; // Renvoie ["Rose", "Gajar"] par exemple
         }
-
-        // Gemini place les appels de fonctions dans la réponse ("functionCall")
-        const candidat = data.candidates[0];
-        const parties = candidat.content.parts;
-        const appelsOutils = parties.filter(p => p.functionCall).map(p => p.functionCall);
-
-        return appelsOutils.length > 0 ? appelsOutils : null;
-
+        return [];
     } catch (erreur) {
-        console.error("[Mia] ❌ Erreur réseau ou plantage :", erreur);
-        return null;
+        console.error("[Mia] ❌ Erreur :", erreur);
+        return [];
     }
 }
 
-// --- 3. LA FONCTION DE TEST PRINCIPALE ---
-
-window.testerArchitecteIA = async function() {
-    if (!window.ID_PARTIE_COURANTE) {
-        alert("Vous devez d'abord charger ou créer une partie.");
-        return;
-    }
-
-    console.log("=====================================");
-    console.log("🚀 DEMARRAGE DU TEST ARCHITECTE (MIA - GEMINI)");
-    console.log("=====================================");
-
-    const snapPartie = await getDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE));
-    const lieuActuel = snapPartie.exists() ? snapPartie.data().Lieu_Actuel : "Inconnu";
-
-    const qMsg = query(
-        collection(db, "Messages_Chat"), 
-        where("ID_Partie", "==", window.ID_PARTIE_COURANTE), 
-        orderBy("Timestamp", "desc"), 
-        limit(3)
-    );
-    const snapMsg = await getDocs(qMsg);
-    let messages = [];
-    snapMsg.forEach(document => messages.unshift(document.data()));
-
-    const historiqueTexte = messages.map(m => `${m.Auteur_Nom} : ${m.Texte}`).join("\n");
-    console.log("📜 Historique envoyé à Mia :\n", historiqueTexte);
-
-    const appelsOutils = await analyserSituationEtAppelerOutils(historiqueTexte, lieuActuel);
-
-    if (appelsOutils && appelsOutils.length > 0) {
-        console.log(`[Mia] 🛠️ A décidé d'utiliser ${appelsOutils.length} outil(s).`);
-        
-        let donneesRecuperees = [];
-
-        for (const call of appelsOutils) {
-            const nomFonction = call.name;
-            const argumentsFonction = call.args;
-            let resultatBdd = null;
-
-            if (nomFonction === "chercherLieu") resultatBdd = await chercherLieu(argumentsFonction.nomLieu);
-            if (nomFonction === "chercherBatiment") resultatBdd = await chercherBatiment(argumentsFonction.nomBatiment);
-            if (nomFonction === "chercherPNJ") resultatBdd = await chercherPNJ(argumentsFonction.nomPNJ);
-
-            donneesRecuperees.push({
-                entite: nomFonction,
-                donnees: resultatBdd
-            });
-        }
-
-        console.log("✅ DONNEES FINALES RECUPEREES POUR LE NARRATEUR :", donneesRecuperees);
-        alert("Regarde la console ! Mia a récupéré les données avec succès via Gemini.");
-
-    } else {
-        console.log("[Mia] 🛑 Aucune donnée supplémentaire n'est requise pour cette action.");
-        alert("Mia a décidé qu'il n'y avait pas besoin d'interroger la base de données.");
-    }
-};
-
 // =========================================================================
-//  4. LE CERVEAU DU NARRATEUR (Le Maître du Jeu)
+//  GESTION DE L'INTERFACE VISUELLE (Écran d'attente IA)
 // =========================================================================
 
-async function genererReponseNarrateur(contexteBdd, historiqueComplet) {
+function afficherEcranAttente() {
+    // S'il existe déjà, on ne fait rien
+    if (document.getElementById("ecran-attente-ia")) return;
+
+    const overlay = document.createElement("div");
+    overlay.id = "ecran-attente-ia";
+    // Style CSS pour forcer l'affichage en plein écran, par-dessus tout le reste
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(0, 0, 0, 0.85); display: flex; flex-direction: column;
+        align-items: center; justify-content: center; z-index: 9999;
+        backdrop-filter: blur(5px);
+    `;
+
+    const texte = document.createElement("h2");
+    texte.innerText = "En attente du maitre du jeu ...";
+    texte.style.cssText = "color: white; font-family: serif; font-size: 2rem; margin-bottom: 20px; letter-spacing: 2px; text-shadow: 2px 2px 4px #000;";
+
+    const image = document.createElement("img");
+    image.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782291884/attente_mj_rtmpv1.png";
+    image.style.cssText = "max-width: 80%; max-height: 60vh; border-radius: 10px; box-shadow: 0 0 30px rgba(255, 255, 255, 0.1);";
+
+    overlay.appendChild(texte);
+    overlay.appendChild(image);
+    document.body.appendChild(overlay);
+}
+
+function masquerEcranAttente() {
+    const overlay = document.getElementById("ecran-attente-ia");
+    if (overlay) overlay.remove();
+}
+
+// --- 3. LE CERVEAU DU NARRATEUR ---
+
+async function genererReponseNarrateur(contexteFormate, historiqueComplet, maxTentatives = 3) {
     const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
     if (!cleGemini) return null;
 
-    console.log("✍️ [Narrateur] Écriture de la réponse en cours...");
-
-    // 1. Récupération des instructions du MJ (INST_10895)
-    let instructionMJ = "Tu es le Maître du Jeu d'Ivalis. Réponds à l'action des joueurs de manière immersive.";
+    let instructionMJ = "Tu es le Maître du Jeu.";
     const snapInst = await getDoc(doc(db, "Cerveau_IA", "INST_10895"));
     if (snapInst.exists() && snapInst.data().Contenu_Direct) {
         instructionMJ = snapInst.data().Contenu_Direct;
     }
 
-    // 2. Construction du cerveau (Instructions fixes + Données de Mia)
-    let promptSysteme = instructionMJ + "\n\n--- CONTEXTE ACTUEL DU JEU ---\n";
-    if (contexteBdd.length === 0) {
-        promptSysteme += "Aucune information de la base de données n'a été jugée nécessaire pour cette action.\n";
-    } else {
-        contexteBdd.forEach(info => {
-            promptSysteme += `[Données sur ${info.entite}] : ${JSON.stringify(info.donnees)}\n`;
-        });
-    }
-    promptSysteme += "\nTu dois continuer l'histoire en répondant à la dernière action des joueurs présente dans l'historique.";
+    const promptSysteme = instructionMJ + "\n\n" + contexteFormate + "\n\nContinue l'histoire en répondant à la dernière action.";
 
-    // 3. Configuration de Gemini 3.5 Flash (Mode Brut / Sans Filtres)
     const bodyRequete = {
         systemInstruction: { parts: [{ text: promptSysteme }] },
         contents: [{ role: "user", parts: [{ text: historiqueComplet }] }],
@@ -225,86 +169,128 @@ async function genererReponseNarrateur(contexteBdd, historiqueComplet) {
         ]
     };
 
-    try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${cleGemini}`;
-        const reponse = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(bodyRequete)
-        });
+    // BOUCLE DE TENTATIVES AUTOMATIQUES
+    for (let tentative = 1; tentative <= maxTentatives; tentative++) {
+        try {
+            console.log(`✍️ [Narrateur] Génération en cours... (Tentative ${tentative}/${maxTentatives})`);
+            
+            // CORRECTION ICI : Utilisation propre et unique de gemini-flash-lite-latest
+            const reponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(bodyRequete)
+            });
 
-        const data = await reponse.json();
-        if (!reponse.ok || data.error) throw new Error(data.error?.message);
+            const data = await reponse.json();
 
-        return data.candidates[0].content.parts[0].text;
+            if (!reponse.ok || data.error) {
+                throw new Error(data.error?.message || `Erreur serveur API: ${reponse.status}`);
+            }
 
-    } catch (erreur) {
-        console.error("❌ [Narrateur] Erreur de génération :", erreur);
-        return "*Le temps s'est figé. Le Grimoire ne parvient pas à décrire la suite... (Erreur API)*";
+            // Si tout marche bien, on renvoie le texte et on casse la boucle
+            return data.candidates[0].content.parts[0].text;
+
+        } catch (erreur) {
+            console.warn(`⚠️ [Narrateur] Échec de la tentative ${tentative} :`, erreur.message);
+            
+            if (tentative < maxTentatives) {
+                console.log("⏳ Relance automatique dans 4 secondes...");
+                // Pause invisible de 4000 millisecondes
+                await new Promise(resolve => setTimeout(resolve, 4000));
+            } else {
+                console.error("❌ [Narrateur] Échec définitif après plusieurs essais.");
+                return `*Le grimoire refuse de s'ouvrir... Les énergies arcaniques sont instables (${erreur.message}).*`;
+            }
+        }
     }
 }
 
-// =========================================================================
-//  5. LA BOUCLE GLOBALE (Déclenchée par le bouton MJ)
-// =========================================================================
+// --- 4. LA BOUCLE GLOBALE (Bouton MJ) ---
 
 window.declencherTourIA = async function() {
-    if (!window.ID_PARTIE_COURANTE) return;
-
-    // A. Récupération des données globales
-    const snapPartie = await getDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE));
-    const lieuActuel = snapPartie.exists() ? snapPartie.data().Lieu_Actuel : "Inconnu";
-
-    const qMsg = query(collection(db, "Messages_Chat"), where("ID_Partie", "==", window.ID_PARTIE_COURANTE), orderBy("Timestamp", "asc"));
-    const snapMsg = await getDocs(qMsg);
+    console.log("🟢 Le bouton MJ a bien été détecté !");
     
-    let messages = [];
-    snapMsg.forEach(document => messages.push(document.data()));
-    if (messages.length === 0) return;
-
-    // Formatage : "Nom (Jour X, An Y): Message"
-    const historiqueComplet = messages.map(m => `${m.Auteur_Nom} (Jour ${m.Date_Jour || '?'}, An ${m.Date_An || '?'}): ${m.Texte}`).join("\n");
-    const dernierMessage = messages[messages.length - 1];
-    const texteDerniereAction = `${dernierMessage.Auteur_Nom} : ${dernierMessage.Texte}`;
-
-    // B. Phase 1 : Mia (Routage avec le dernier message)
-    let donneesRecuperees = [];
-    const appelsOutils = await analyserSituationEtAppelerOutils(texteDerniereAction, lieuActuel);
-
-    if (appelsOutils && appelsOutils.length > 0) {
-        for (const call of appelsOutils) {
-            let res = null;
-            if (call.name === "chercherLieu") res = await chercherLieu(call.args.nomLieu);
-            if (call.name === "chercherBatiment") res = await chercherBatiment(call.args.nomBatiment);
-            if (call.name === "chercherPNJ") res = await chercherPNJ(call.args.nomPNJ);
-            donneesRecuperees.push({ entite: call.name, donnees: res });
-        }
+    if (!window.ID_PARTIE_COURANTE) {
+        console.error("🔴 Erreur : L'ID de la partie est introuvable.");
+        return;
     }
 
-    // C. Phase 2 : Le Narrateur (Génération)
-    const reponseTexte = await genererReponseNarrateur(donneesRecuperees, historiqueComplet);
+    afficherEcranAttente();
 
-    // D. Phase 3 : Poster la réponse dans le Chat
-    if (reponseTexte) {
-        const jourEnJeu = window.DATE_EN_JEU_ACTUELLE ? window.DATE_EN_JEU_ACTUELLE.jour : "";
-        const anEnJeu = window.DATE_EN_JEU_ACTUELLE ? window.DATE_EN_JEU_ACTUELLE.annee : "";
+    try {
+        // A. Infos de base
+        const snapPartie = await getDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE));
+        const lieuActuel = snapPartie.exists() ? snapPartie.data().Lieu_Actuel : null;
 
-        await addDoc(collection(db, "Messages_Chat"), {
-            ID_Partie: window.ID_PARTIE_COURANTE,
-            Auteur_ID: "MJ",
-            Auteur_Nom: "MJ",
-            Auteur_Couleur: "#ffffff",
-            Texte: reponseTexte,
-            Date_Jour: jourEnJeu,
-            Date_An: anEnJeu,
-            Timestamp: new Date().getTime()
-        });
+        // B. Récupération des historiques
+        const qMsgAll = query(collection(db, "Messages_Chat"), where("ID_Partie", "==", window.ID_PARTIE_COURANTE), orderBy("Timestamp", "asc"));
+        const snapMsgAll = await getDocs(qMsgAll);
+        let messages = [];
+        snapMsgAll.forEach(d => messages.push(d.data()));
+        if (messages.length === 0) return;
 
-        // Fait passer l'initiative au joueur suivant
-        const partie = window.PARTIE_DATA || {};
-        const ordre = partie.Ordre_Initiative || [];
-        if (ordre.length > 0) {
+        const historiqueComplet = messages.map(m => `${m.Auteur_Nom} : ${m.Texte}`).join("\n");
+        const historique4 = messages.slice(-4).map(m => `${m.Auteur_Nom} : ${m.Texte}`).join("\n");
+
+        // C. Scan de la zone (Backend)
+        const env = await preparerEnvironnement(lieuActuel);
+        const nomsPnjPresents = Object.keys(env.pnjsPresents);
+
+        // D. Filtre de Mia (Seulement s'il y a des PNJ dans la zone)
+        let pnjCibles = [];
+        if (nomsPnjPresents.length > 0) {
+            pnjCibles = await filtrerPNJAvecMia(historique4, nomsPnjPresents);
+            console.log(`[Mia] 🎯 A ciblé les PNJ suivants :`, pnjCibles);
+        } else {
+            console.log(`[Mia] 💤 Aucun PNJ dans la zone, Mia se repose.`);
+        }
+
+        // E. Formatage du Contexte pour le Narrateur
+        let contexte = `--- CONTEXTE DE LA ZONE ACTUELLE ---\n`;
+        contexte += `Type : ${env.type}\n`;
+        contexte += `Description de la zone : ${JSON.stringify(env.details)}\n`;
+        
+        if (env.type === "Lieu" && env.listeBatiments.length > 0) {
+            contexte += `Bâtiments visibles ici : ${env.listeBatiments.join(", ")}\n`;
+        }
+
+        // NOUVEAU : Liste de présence globale (Nom + Occupation + Physique) envoyée dans tous les cas
+        if (nomsPnjPresents.length > 0) {
+            contexte += `\n--- PNJ PRÉSENTS DANS LA ZONE ---\n`;
+            nomsPnjPresents.forEach(nom => {
+                const pnj = env.pnjsPresents[nom];
+                
+                // Récupération des champs (avec une valeur par défaut si tu oublies de les remplir en BDD)
+                const occupation = pnj.Occupation || "Occupation inconnue"; 
+                const physique = pnj.Description_Physique || "Apparence inconnue";
+                
+                contexte += `- ${nom} (${occupation}) - Apparence : ${physique}\n`;
+            });
+        }
+
+        // Les fiches complètes uniquement pour les PNJ ciblés par Mia
+        if (pnjCibles.length > 0) {
+            contexte += `\n--- FICHES DÉTAILLÉES DES PNJ SOLLICITÉS ---\n`;
+            pnjCibles.forEach(nom => {
+                if (env.pnjsPresents[nom]) {
+                    contexte += `Fiche complète de ${nom} : ${JSON.stringify(env.pnjsPresents[nom])}\n`;
+                }
+            });
+        }
+
+        // F. Génération et Envoi
+        const reponseTexte = await genererReponseNarrateur(contexte, historiqueComplet);
+
+        if (reponseTexte) {
+            await addDoc(collection(db, "Messages_Chat"), {
+                ID_Partie: window.ID_PARTIE_COURANTE,
+                Auteur_ID: "MJ", Auteur_Nom: "MJ", Auteur_Couleur: "#ffffff",
+                Texte: reponseTexte,
+                Timestamp: new Date().getTime()
+            });
             await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), { Index_Initiative: 0 });
         }
+    } catch (erreurFatale) {
+        console.error("❌ [Tour IA] Erreur fatale :", erreurFatale);
+    } finally {
+        masquerEcranAttente();
     }
 };
