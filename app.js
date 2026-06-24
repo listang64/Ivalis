@@ -790,7 +790,7 @@ function dessinerMessagesChat(msgs) {
 
        const texte = document.createElement("div");
        texte.className = "message-contenu";
-       texte.innerText = m.Texte;
+       texte.innerHTML = m.Texte;
 
        // La petite croix de suppression rouge
        const btnSuppr = document.createElement("button");

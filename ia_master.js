@@ -1,8 +1,7 @@
 // =========================================================================
-//  IVALIS - MOTEUR IA (Pré-chargement Backend + Mia + Narrateur)
+//  IVALIS - MOTEUR IA (Pré-chargement Backend + Mia + Narrateur + Batiment + PNJ)
 // =========================================================================
 
-// NOUVEAU : Ajout de "setDoc" dans les imports pour la création de bâtiments
 import { db } from "./firebase-config.js";
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
@@ -14,8 +13,8 @@ async function preparerEnvironnement(lieuActuelId) {
     let env = {
         type: "Inconnu",
         details: null,
-        listeBatiments: [], // Noms des bâtiments
-        pnjsPresents: {}
+        listeBatiments: [], 
+        pnjsPresents: {}    
     };
 
     if (!lieuActuelId) return env;
@@ -87,17 +86,19 @@ Si oui, utilise l'outil 'selectionnerPNJ'. Sinon, ne fais rien.`;
 }
 
 // =========================================================================
-//  NOUVEAU : MIA_BATIMENT (Générateur de lieux procédural & Fantôme)
+//  OUTILS D'IMAGE (Utilisés par Bâtiments et PNJ)
 // =========================================================================
 
-// Outil Cryptographique pour signer l'upload Cloudinary
-async function sha1HexBatiment(message) {
+async function genererSignatureCloudinary(message) {
     const data = new TextEncoder().encode(message);
     const buffer = await crypto.subtle.digest("SHA-1", data);
     return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-// Générateur d'Image Spécifique Bâtiment (Horizontal)
+// =========================================================================
+//  MIA_BATIMENT (Générateur de lieux procédural)
+// =========================================================================
+
 async function genererEtStockerImageBatiment(promptBatiment) {
     const cles = {
         openai: localStorage.getItem("ivalis_OPENAI_API_KEY")?.trim(),
@@ -109,22 +110,13 @@ async function genererEtStockerImageBatiment(promptBatiment) {
 
     console.log("🎨 [MIA_Batiment] Démarrage de la toile pour le bâtiment...");
     
-    // Prompt d'ambiance forcé
     const promptOpenAI = "Crée un digital painting croquis d'un lieu ou bâtiment de jeu de rôle dark fantasy. L'esthétique globale doit être avec un éclairage dramatique, des coups de pinceau gestuels et des textures très tactiles, comme un concept art préparatoire de jeu vidéo. Ne dessine absolument aucun texte ou lettrage.\n\nDescription du lieu : " + promptBatiment;
 
-    const payloadOpenAI = {
-        model: "gpt-image-2", // Aligné sur ta configuration actuelle
-        prompt: promptOpenAI,
-        output_format: "webp",
-        n: 1,
-        size: "1792x1024", // HORIZONTAL POUR LES BÂTIMENTS
-        quality: "low"
-    };
+    const payloadOpenAI = { model: "gpt-image-2", prompt: promptOpenAI, output_format: "webp", n: 1, size: "1792x1024", quality: "low" };
 
     let tentative = 0, succes = false, texteReponseOpenAI = "";
     const delais = [5000, 15000, 30000];
 
-    // Boucle anti-spam (Cloudflare 1015)
     while (tentative < 3 && !succes) {
         try {
             const res = await fetch("https://api.openai.com/v1/images/generations", {
@@ -134,8 +126,7 @@ async function genererEtStockerImageBatiment(promptBatiment) {
         } catch (e) { texteReponseOpenAI = "error code: 1015"; }
 
         if (texteReponseOpenAI.includes("error code: 1015") || texteReponseOpenAI.includes("Rate Limited")) {
-            await new Promise(r => setTimeout(r, delais[tentative]));
-            tentative++;
+            await new Promise(r => setTimeout(r, delais[tentative])); tentative++;
         } else { succes = true; }
     }
 
@@ -145,16 +136,13 @@ async function genererEtStockerImageBatiment(promptBatiment) {
 
     let imageSource = jsonOpenAI.data[0].url || ("data:image/png;base64," + jsonOpenAI.data[0].b64_json);
 
-    // Envoi sur Cloudinary dans le dossier "Batiments"
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const dossier = "Batiments";
-    const signature = await sha1HexBatiment(`folder=${dossier}&timestamp=${timestamp}${cles.cloudSecret}`);
+    const signature = await genererSignatureCloudinary(`folder=${dossier}&timestamp=${timestamp}${cles.cloudSecret}`);
 
     const formCloudinary = new FormData();
-    formCloudinary.append("file", imageSource);
-    formCloudinary.append("api_key", cles.cloudKey);
-    formCloudinary.append("timestamp", timestamp);
-    formCloudinary.append("signature", signature);
+    formCloudinary.append("file", imageSource); formCloudinary.append("api_key", cles.cloudKey);
+    formCloudinary.append("timestamp", timestamp); formCloudinary.append("signature", signature);
     formCloudinary.append("folder", dossier);
 
     try {
@@ -168,32 +156,24 @@ async function genererEtStockerImageBatiment(promptBatiment) {
     return "";
 }
 
-// Le Cerveau d'analyse du décor
 async function analyserDeplacementBatiment(idPartie, idLieuActuel, texteMJ) {
     const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
-    if (!cleGemini || !idLieuActuel) return;
+    if (!cleGemini || !idLieuActuel) return idLieuActuel;
 
-    // 1. Trouver le "Lieu Parent" et ses bâtiments
     let idLieuParent = idLieuActuel;
     let estDansBatiment = false;
 
     if (idLieuActuel.startsWith("B")) {
         const bSnap = await getDoc(doc(db, "Monde_Batiment", idLieuActuel));
-        if (bSnap.exists()) {
-            idLieuParent = bSnap.data().ID_Lieu;
-            estDansBatiment = true;
-        }
+        if (bSnap.exists()) { idLieuParent = bSnap.data().ID_Lieu; estDansBatiment = true; }
     }
+    if (!idLieuParent || !idLieuParent.startsWith("L")) return idLieuActuel;
 
-    if (!idLieuParent || !idLieuParent.startsWith("L")) return;
-
-    // Liste des bâtiments existants
     const qBat = query(collection(db, "Monde_Batiment"), where("ID_Lieu", "==", idLieuParent));
     const bDocs = await getDocs(qBat);
     const batimentsExistants = [];
     bDocs.forEach(d => batimentsExistants.push({ id: d.id, nom: d.data().Nom_Batiment }));
 
-    // 2. Interroger MIA
     const promptSysteme = `Tu es MIA_Batiment, l'IA architecte. 
 Bâtiments connus ici : ${JSON.stringify(batimentsExistants)}.
 État actuel : ${estDansBatiment ? "À L'INTÉRIEUR d'un bâtiment." : "À L'EXTÉRIEUR (Rue, forêt, etc.)."}
@@ -211,14 +191,13 @@ Analyse la dernière réponse du Narrateur.
             parameters: {
                 type: "OBJECT",
                 properties: {
-                    action: { type: "STRING", description: "Choisis parmi: 'aucun', 'existant', 'nouveau', 'sortie'" },
-                    id_existant: { type: "STRING", description: "L'ID du bâtiment (si 'existant')" },
+                    action: { type: "STRING", description: "Choisis: 'aucun', 'existant', 'nouveau', 'sortie'" },
+                    id_existant: { type: "STRING", description: "ID existant (si 'existant')" },
                     nouveau_nom: { type: "STRING", description: "Nom du lieu (si 'nouveau')" },
-                    nouvelle_description: { type: "STRING", description: "Description de l'intérieur ou de l'ambiance (si 'nouveau')" },
-                    nouveaux_stigmates: { type: "STRING", description: "Atmosphère courte (ex: Sombre et humide) (si 'nouveau')" },
-                    prompt_image: { type: "STRING", description: "Description physique courte en anglais pour le générateur d'image (si 'nouveau')" }
-                },
-                required: ["action"]
+                    nouvelle_description: { type: "STRING", description: "Description de l'intérieur (si 'nouveau')" },
+                    nouveaux_stigmates: { type: "STRING", description: "Atmosphère courte (si 'nouveau')" },
+                    prompt_image: { type: "STRING", description: "Prompt visuel en anglais (si 'nouveau')" }
+                }, required: ["action"]
             }
         }]
     }];
@@ -235,48 +214,215 @@ Analyse la dernière réponse du Narrateur.
 
         const data = await res.json();
         const args = data.candidates?.[0]?.content?.parts?.[0]?.functionCall?.args;
-        if (!args) return;
+        if (!args) return idLieuActuel;
 
-        // 3. Application des conséquences en Base de Données
         if (args.action === "existant" && args.id_existant && args.id_existant !== idLieuActuel) {
             console.log(`[MIA_Batiment] 🚪 Entrée dans bâtiment existant : ${args.id_existant}`);
             await updateDoc(doc(db, "Systeme_Parties", idPartie), { Lieu_Actuel: args.id_existant });
+            return args.id_existant;
             
         } else if (args.action === "sortie" && estDansBatiment) {
             console.log(`[MIA_Batiment] 🌲 Sortie à l'extérieur : retour à ${idLieuParent}`);
             await updateDoc(doc(db, "Systeme_Parties", idPartie), { Lieu_Actuel: idLieuParent });
+            return idLieuParent;
             
         } else if (args.action === "nouveau" && args.nouveau_nom) {
-            console.log(`[MIA_Batiment] 🏗️ Création d'un nouveau bâtiment : ${args.nouveau_nom}`);
-            
+            console.log(`[MIA_Batiment] 🏗️ Création nouveau bâtiment : ${args.nouveau_nom}`);
             const nouvelID = "B-" + Math.floor(Math.random() * 1000000);
             
-            // On déplace les joueurs instantanément
             await updateDoc(doc(db, "Systeme_Parties", idPartie), { Lieu_Actuel: nouvelID });
-            
-            // On sauvegarde la coquille vide en BDD instantanément
             await setDoc(doc(db, "Monde_Batiment", nouvelID), {
-                ID_Batiment: nouvelID,
-                ID_Lieu: idLieuParent,
-                Nom_Batiment: args.nouveau_nom,
-                Description_Details: args.nouvelle_description || "",
-                Stigmates: args.nouveaux_stigmates || "",
-                URL_Cloudinary: ""
+                ID_Batiment: nouvelID, ID_Lieu: idLieuParent, Nom_Batiment: args.nouveau_nom,
+                Description_Details: args.nouvelle_description || "", Stigmates: args.nouveaux_stigmates || "", URL_Cloudinary: ""
             });
 
-            // En arrière-plan (sans bloquer), on lance le dessin. Quand il est prêt, on l'ajoute.
-            genererEtStockerImageBatiment(args.prompt_image || args.nouveau_nom).then(async (urlImage) => {
-                if (urlImage) {
-                    await updateDoc(doc(db, "Monde_Batiment", nouvelID), { URL_Cloudinary: urlImage });
-                    
-                    // NOUVEAU : On prévient l'interface que l'image est prête pour forcer l'affichage !
-                    if (typeof window.mettreAJourBulleLieu === "function") {
-                        window.mettreAJourBulleLieu(nouvelID);
-                    }
+            genererEtStockerImageBatiment(args.prompt_image || args.nouveau_nom).then(async (url) => {
+                if (url) {
+                    await updateDoc(doc(db, "Monde_Batiment", nouvelID), { URL_Cloudinary: url });
+                    if (typeof window.mettreAJourBulleLieu === "function") window.mettreAJourBulleLieu(nouvelID);
                 }
             });
+            return nouvelID;
         }
-    } catch (e) { console.error("[MIA_Batiment] Erreur silencieuse :", e); }
+    } catch (e) { console.error("[MIA_Batiment] Erreur :", e); }
+    return idLieuActuel;
+}
+
+// =========================================================================
+//  NOUVEAU : MIA_PNJ (Création procédurale de PNJ nommés)
+// =========================================================================
+
+async function genererEtStockerImagePNJ(descriptionPhysique) {
+    const cles = {
+        openai: localStorage.getItem("ivalis_OPENAI_API_KEY")?.trim(),
+        cloudName: localStorage.getItem("ivalis_CLOUDINARY_CLOUD_NAME")?.trim(),
+        cloudKey: localStorage.getItem("ivalis_CLOUDINARY_API_KEY")?.trim(),
+        cloudSecret: localStorage.getItem("ivalis_CLOUDINARY_API_SECRET")?.trim()
+    };
+    if (!cles.openai || !cles.cloudName || !cles.cloudKey || !cles.cloudSecret) return "";
+
+    console.log("🎨 [MIA_PNJ] Incantation du portrait pour le nouveau PNJ...");
+    
+    // FORMAT VERTICAL POUR LES PORTRAITS
+    const promptOpenAI = "Crée un digital painting croquis pour un portrait de personnage de jeu de rôle heroic fantasy. L'esthétique globale doit être avec un éclairage dramatique mais lumineux, des coups de pinceau gestuels et des textures très tactiles sur les matériaux, comme un dessin préparatoire. Ne dessine absolument aucun texte ou lettrage sur l'image.\n\nDescription du personnage : " + descriptionPhysique;
+
+    const payloadOpenAI = { model: "gpt-image-2", prompt: promptOpenAI, output_format: "webp", n: 1, size: "1024x1792", quality: "low" };
+
+    let tentative = 0, succes = false, texteReponseOpenAI = "";
+    const delais = [5000, 15000, 30000];
+
+    while (tentative < 3 && !succes) {
+        try {
+            const res = await fetch("https://api.openai.com/v1/images/generations", {
+                method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + cles.openai }, body: JSON.stringify(payloadOpenAI)
+            });
+            texteReponseOpenAI = await res.text();
+        } catch (e) { texteReponseOpenAI = "error code: 1015"; }
+        if (texteReponseOpenAI.includes("error code: 1015") || texteReponseOpenAI.includes("Rate Limited")) {
+            await new Promise(r => setTimeout(r, delais[tentative])); tentative++;
+        } else { succes = true; }
+    }
+
+    let jsonOpenAI;
+    try { jsonOpenAI = JSON.parse(texteReponseOpenAI); } catch (e) { return ""; }
+    if (!jsonOpenAI.data || jsonOpenAI.data.length === 0) return "";
+
+    let imageSource = jsonOpenAI.data[0].url || ("data:image/png;base64," + jsonOpenAI.data[0].b64_json);
+
+    // Envoi sur Cloudinary dans le dossier "PNJ"
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const dossier = "PNJ";
+    const signature = await genererSignatureCloudinary(`folder=${dossier}&timestamp=${timestamp}${cles.cloudSecret}`);
+
+    const formCloudinary = new FormData();
+    formCloudinary.append("file", imageSource); formCloudinary.append("api_key", cles.cloudKey);
+    formCloudinary.append("timestamp", timestamp); formCloudinary.append("signature", signature);
+    formCloudinary.append("folder", dossier);
+
+    try {
+        const resCloud = await fetch(`https://api.cloudinary.com/v1_1/${cles.cloudName}/image/upload`, { method: "POST", body: formCloudinary });
+        const jsonCloud = await resCloud.json();
+        if (jsonCloud.secure_url) {
+            console.log("✅ [MIA_PNJ] Portrait généré avec succès !");
+            return jsonCloud.secure_url.replace("/upload/", "/upload/q_auto,f_auto/");
+        }
+    } catch (e) { return ""; }
+    return "";
+}
+
+async function analyserNouveauxPNJ(idLieuActuel, nomsPnjExistants, nomsHeros, texteMJ) {
+    const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
+    if (!cleGemini || !idLieuActuel) return;
+
+    const promptSysteme = `Tu es MIA_PNJ, l'IA de casting.
+Voici les PNJ que nous connaissons DÉJÀ ici : ${JSON.stringify(nomsPnjExistants)}.
+Voici les HÉROS (Personnages des joueurs) de l'histoire : ${JSON.stringify(nomsHeros)}.
+
+Ta mission : Y a-t-il de NOUVEAUX personnages expressément NOMMÉS (qui possèdent un VRAI prénom propre, comme 'Gédéon', 'Rose', 'Thorne') qui viennent d'apparaître, qui ne sont pas dans la liste des connus, ET QUI NE SONT PAS DES HÉROS ?
+Si oui, utilise l'outil 'creerNouveauxPNJ' pour générer leurs fiches.
+
+RÈGLES STRICTES ET ABSOLUES :
+1. IGNORE TOUS LES PERSONNAGES désignés par un titre, une profession, une description ou un surnom générique (ex: "un garde", "le tavernier", "le colosse", "le vieux", "l'homme").
+2. S'il n'a pas de VRAI PRÉNOM avec une majuscule explicite, TU NE CRÉES RIEN.
+3. NE CRÉE ABSOLUMENT JAMAIS de fiche pour les Héros de la partie.`;
+
+    const outils = [{
+        functionDeclarations: [{
+            name: "creerNouveauxPNJ",
+            description: "Créer les fiches des NOUVEAUX PNJ nommés dans la narration.",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    pnjs: {
+                        type: "ARRAY",
+                        items: {
+                            type: "OBJECT",
+                            properties: {
+                                nom: { type: "STRING", description: "Le nom exact utilisé par le MJ" },
+                                physique: { type: "STRING", description: "Description physique pour générer le portrait" },
+                                occupation: { type: "STRING", description: "Son métier ou occupation" },
+                                race: { type: "STRING", description: "Sa race (Humain, Nain, etc.)" },
+                                secret: { type: "STRING", description: "Un secret inavouable ou motivation cachée" },
+                                style_parole: { type: "STRING", description: "Son accent ou sa manière de parler" }
+                            },
+                            required: ["nom", "physique", "occupation", "race", "secret", "style_parole"]
+                        }
+                    }
+                },
+                required: ["pnjs"]
+            }
+        }]
+    }];
+
+    try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                systemInstruction: { parts: [{ text: promptSysteme }] },
+                contents: [{ role: "user", parts: [{ text: texteMJ }] }],
+                tools: outils, 
+                toolConfig: { functionCallingConfig: { mode: "AUTO" } }
+            })
+        });
+
+        const data = await res.json();
+        const appelsOutils = data.candidates?.[0]?.content?.parts?.filter(p => p.functionCall).map(p => p.functionCall);
+        
+        if (appelsOutils && appelsOutils.length > 0 && appelsOutils[0].name === "creerNouveauxPNJ") {
+            const nouveauxPNJs = appelsOutils[0].args.pnjs || [];
+            
+            for (const pnj of nouveauxPNJs) {
+                // Sécurité Ultime : on vérifie en Javascript si l'IA n'a pas quand même essayé de créer un Héros
+                if (nomsHeros.includes(pnj.nom)) {
+                    console.log(`[MIA_PNJ] 🛡️ Rejet : Tentative de création du héros ${pnj.nom} bloquée.`);
+                    continue; 
+                }
+
+                console.log(`[MIA_PNJ] 👤 Création d'un nouveau PNJ en base : ${pnj.nom}`);
+                
+                const numAleatoire = Math.floor(Math.random() * 10000).toString().padStart(4, "0");
+                const nomFormate = pnj.nom.replace(/[^a-zA-Z0-9]/g, "_");
+                const docId = `PNJ_${numAleatoire}_${nomFormate}`;
+
+                let idLieuGlobal = "";
+                let idBatimentGlobal = "";
+                if (idLieuActuel.startsWith("L")) idLieuGlobal = idLieuActuel;
+                else if (idLieuActuel.startsWith("B")) idBatimentGlobal = idLieuActuel;
+
+                await updateDoc(doc(db, "Monde_PNJ", docId), {
+                    Description_Physique: pnj.physique,
+                    ID_Batiment: idBatimentGlobal,
+                    ID_Lieu: idLieuGlobal,
+                    Nom_PNJ: pnj.nom,
+                    Occupation: pnj.occupation,
+                    Race: pnj.race,
+                    Secret_Mental: pnj.secret,
+                    Statut: "Vivant",
+                    Style_De_Parole: pnj.style_parole,
+                    URL_Cloudinary: ""
+                }).catch(async (e) => {
+                     await setDoc(doc(db, "Monde_PNJ", docId), {
+                        Description_Physique: pnj.physique,
+                        ID_Batiment: idBatimentGlobal,
+                        ID_Lieu: idLieuGlobal,
+                        Nom_PNJ: pnj.nom,
+                        Occupation: pnj.occupation,
+                        Race: pnj.race,
+                        Secret_Mental: pnj.secret,
+                        Statut: "Vivant",
+                        Style_De_Parole: pnj.style_parole,
+                        URL_Cloudinary: ""
+                    });
+                });
+
+                genererEtStockerImagePNJ(pnj.physique).then(async (urlImage) => {
+                    if (urlImage) {
+                        await updateDoc(doc(db, "Monde_PNJ", docId), { URL_Cloudinary: urlImage });
+                    }
+                });
+            }
+        }
+    } catch (e) { console.error("[MIA_PNJ] Erreur silencieuse :", e); }
 }
 
 // =========================================================================
@@ -405,18 +551,49 @@ window.declencherTourIA = async function() {
         const reponseTexte = await genererReponseNarrateur(contexte, historiqueComplet);
 
         if (reponseTexte) {
+            // NOUVEAU : Formatage du texte pour mettre les PNJ en gras avec leur image
+            let texteAffiche = reponseTexte;
+            
+            nomsPnjPresents.forEach(nom => {
+                const pnj = env.pnjsPresents[nom];
+                if (pnj) {
+                    // Regex pour chercher le nom exact (mot entier)
+                    const regex = new RegExp(`\\b${nom}\\b`, 'g');
+                    
+                    if (pnj.URL_Cloudinary && pnj.URL_Cloudinary !== "") {
+                        // Si le PNJ a une image, on met du gras et une balise spéciale
+                        const remplacement = `<span class="pnj-chat-hover"><strong>${nom}</strong><img src="${pnj.URL_Cloudinary}" class="pnj-hover-img"></span>`;
+                        texteAffiche = texteAffiche.replace(regex, remplacement);
+                    } else {
+                        // Sinon, juste du gras coloré
+                        texteAffiche = texteAffiche.replace(regex, `<strong style="color: #e8d5a5;">${nom}</strong>`);
+                    }
+                }
+            });
+
+            // NOUVEAU : On convertit les sauts de ligne invisibles en sauts de ligne HTML !
+            texteAffiche = texteAffiche.replace(/\n/g, "<br>");
+
             await addDoc(collection(db, "Messages_Chat"), {
                 ID_Partie: window.ID_PARTIE_COURANTE,
                 Auteur_ID: "MJ", Auteur_Nom: "MJ", Auteur_Couleur: "#ffffff",
-                Texte: reponseTexte,
+                Texte: texteAffiche, // <- On sauvegarde le texte modifié !
                 Timestamp: new Date().getTime()
             });
             await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), { Index_Initiative: 0 });
 
-            // NOUVEAU : On réveille MIA_Batiment en mode "Fantôme" (sans await) !
-            // Elle analyse le texte que le MJ vient de générer.
-            setTimeout(() => {
-                analyserDeplacementBatiment(window.ID_PARTIE_COURANTE, lieuActuel, reponseTexte);
+            // NOUVEAU : La file d'attente asynchrone (Fantômes)
+            setTimeout(async () => {
+                // 1. MIA_Batiment analyse le déplacement et renvoie la zone DÉFINITIVE
+                const lieuFinal = await analyserDeplacementBatiment(window.ID_PARTIE_COURANTE, lieuActuel, reponseTexte);
+                
+                // 2. Récupération des noms des joueurs pour protéger leurs identités
+                const nomsHeros = window.PERSOS_PARTIE ? window.PERSOS_PARTIE.map(p => p.prenom) : [];
+
+                // 3. MIA_PNJ analyse les nouveaux personnages dans cette zone définitive
+                if (lieuFinal) {
+                    await analyserNouveauxPNJ(lieuFinal, nomsPnjPresents, nomsHeros, reponseTexte);
+                }
             }, 0);
         }
     } catch (erreurFatale) {

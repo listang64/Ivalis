@@ -858,7 +858,7 @@ textarea.input-texte-parchemin {
   background-color: rgba(0, 0, 0, 0.5);
   border-radius: 8px;
   margin-bottom: 15px;
-  overflow: hidden;
+  overflow: visible;
   min-height: 60px;
 }
 
@@ -1036,4 +1036,39 @@ textarea.input-texte-parchemin {
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.6); /* Ajoute une belle ombre en dessous */
     z-index: 10; /* Assure que la bulle zoomée passe par-dessus ses voisines */
     cursor: pointer;
+}
+
+/* ========================================================================= */
+/*  EFFET SURVOL DES NOMS PNJ DANS LE CHAT                                   */
+/* ========================================================================= */
+
+.pnj-chat-hover {
+    position: relative;
+    cursor: pointer;
+    color: #e8d5a5; /* Couleur Ivalis pour faire ressortir le nom */
+    display: inline-block;
+}
+
+/* L'image est cachée par défaut */
+.pnj-chat-hover .pnj-hover-img {
+    position: absolute;
+    bottom: 130%; /* L'image apparaît juste au-dessus du texte */
+    left: 50%;
+    transform: translateX(-50%) translateY(15px);
+    width: 220px; /* NOUVEAU : Beaucoup plus grand pour voir les détails */
+    height: auto; /* NOUVEAU : Respecte les proportions du portrait vertical */
+    border-radius: 8px; /* NOUVEAU : Format rectangulaire avec coins style "carte" */
+    border: 3px solid #8c6a45; /* Bordure plus épaisse, style cadre d'Ivalis */
+    box-shadow: 0 10px 30px rgba(0,0,0,0.9); /* Ombre plus forte pour la profondeur */
+    object-fit: cover;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.2s ease-out;
+    z-index: 1000;
+}
+
+/* Au survol, la bulle apparaît et monte légèrement */
+.pnj-chat-hover:hover .pnj-hover-img {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
 }
