@@ -150,6 +150,9 @@ async function genererReponseNarrateur(contexteFormate, historiqueComplet, maxTe
     const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
     if (!cleGemini) return null;
 
+    // NOUVEAU : Récupération de la température (Par défaut 1.0)
+    const temperatureIA = parseFloat(localStorage.getItem("ivalis_IA_TEMPERATURE")) || 1.0;
+
     let instructionMJ = "Tu es le Maître du Jeu.";
     const snapInst = await getDoc(doc(db, "Cerveau_IA", "INST_10895"));
     if (snapInst.exists() && snapInst.data().Contenu_Direct) {
@@ -161,6 +164,7 @@ async function genererReponseNarrateur(contexteFormate, historiqueComplet, maxTe
     const bodyRequete = {
         systemInstruction: { parts: [{ text: promptSysteme }] },
         contents: [{ role: "user", parts: [{ text: historiqueComplet }] }],
+        generationConfig: { temperature: temperatureIA }, // NOUVEAU : Injection de la température
         safetySettings: [
             { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
             { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
@@ -183,6 +187,12 @@ async function genererReponseNarrateur(contexteFormate, historiqueComplet, maxTe
 
             if (!reponse.ok || data.error) {
                 throw new Error(data.error?.message || `Erreur serveur API: ${reponse.status}`);
+            }
+
+            // NOUVEAU : On récupère les tokens de cette requête et on les ajoute au compteur
+            const tokensUtilises = data.usageMetadata?.totalTokenCount || 0;
+            if (typeof window.ajouterTokens === "function") {
+                window.ajouterTokens(tokensUtilises);
             }
 
             // Si tout marche bien, on renvoie le texte et on casse la boucle

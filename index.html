@@ -95,6 +95,10 @@
        ========================================================= -->
   <div id="ecran-jeu">
 
+    <div id="affichage-tokens" style="display:none; position:absolute; top:15px; right:20px; color:white; font-family: sans-serif; font-size:14px; font-weight:bold; text-shadow:2px 2px 4px black, 0px 0px 10px #4a2e1b; z-index:9000;">
+      Tokens : <span id="valeur-tokens">0</span>
+    </div>
+
     <div id="menu-lateral">
 
       <!-- Bouton Geant Date -->
@@ -223,6 +227,10 @@
         Clés API
       </button>
       <br><br>
+      <button class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); naviguerFenetre('etape-menu-parametres', 'etape-menu-outils')">
+        Outils
+      </button>
+      <br><br>
       <button class="btn-parametres" onclick="jouerSonClic(); fermerParametres()">Fermer</button>
     </div>
 
@@ -292,6 +300,42 @@
       <div style="display: flex; justify-content: center; gap: 10px; margin-top: 25px;">
         <button id="btn-confirmer-destruction" class="btn-parametres btn-supprimer" onclick="jouerSonClic(); validerSuppression()">Oui, détruire</button>
         <button class="btn-parametres" onclick="jouerSonClic(); annulerSuppression()">Annuler</button>
+      </div>
+    </div>
+
+    <!-- NOUVEAU : Menu Outils -->
+    <div id="etape-menu-outils" class="fenetre-volante-parchemin fondu-interne" style="display: none; opacity: 0;">
+      <h2>Outils IA</h2>
+      <p style="font-size: 14px; margin-top: -10px; color: #5c3a21;">Configuration avancée du cerveau d'Ivalis</p>
+      
+      <button class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); naviguerFenetre('etape-menu-outils', 'etape-ia-parametre')">
+        Température de l'IA
+      </button>
+      <br><br>
+      
+      <label class="afficher-cles" style="margin: 20px 0; display: block; font-family: 'Almendra', serif; font-size: 16px;">
+        <input type="checkbox" id="toggle-tokens" onchange="basculerAffichageTokens(this.checked)"> Afficher les Tokens
+      </label>
+      
+      <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-menu-outils', 'etape-menu-parametres')">Retour</button>
+    </div>
+
+    <!-- NOUVEAU : Paramètre Température -->
+    <div id="etape-ia-parametre" class="fenetre-volante-parchemin fondu-interne" style="display: none; opacity: 0;">
+      <h2>Température de l'IA</h2>
+      <p style="font-size: 14px; margin-top: -10px; color: #5c3a21;">Règle la créativité et l'imprévisibilité du narrateur.</p>
+      
+      <div class="champ-cle-api" style="margin: 30px 0;">
+        <label for="temp-range" style="display: block; margin-bottom: 10px; font-family: 'Almendra', serif; font-size: 16px;">Température (0.0 = Précis, 2.0 = Créatif)</label>
+        <div style="display: flex; align-items: center; gap: 15px;">
+          <input type="range" id="temp-range" min="0" max="2" step="0.1" value="1.0" style="flex-grow: 1; accent-color: #8c6a45;" oninput="syncTemperature('range')">
+          <input type="number" id="temp-input" min="0" max="2" step="0.1" value="1.0" style="width: 60px; text-align: center; padding: 5px; border-radius: 5px;" class="input-texte-parchemin" oninput="syncTemperature('input')">
+        </div>
+      </div>
+      
+      <div style="display: flex; justify-content: center; gap: 10px;">
+        <button class="btn-parametres" onclick="jouerSonClic(); sauvegarderTemperature()">Sauvegarder</button>
+        <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-ia-parametre', 'etape-menu-outils')">Retour</button>
       </div>
     </div>
 
