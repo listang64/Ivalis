@@ -568,6 +568,52 @@ window.unsubscribeMessages = null;
 window.PARTIE_DATA = null;
 window.PERSOS_PARTIE = null;
 
+// --- NOUVEAU : Récupération et affichage du lieu actuel ---
+async function mettreAJourBulleLieu(idLieu) {
+    const bulle = document.getElementById("bulle-lieu-actuel");
+    const spanNom = document.getElementById("nom-lieu-actuel");
+    const imgLieu = document.getElementById("image-lieu-actuel");
+
+    if (!bulle || !spanNom || !imgLieu) return;
+
+    if (!idLieu || idLieu === "") {
+        bulle.style.display = "none";
+        return;
+    }
+
+    bulle.style.display = "flex";
+    let nom = "Lieu Inconnu";
+    let urlImage = "";
+
+    try {
+        if (idLieu.startsWith("L")) {
+            const snap = await getDoc(doc(db, "Monde_Lieux", idLieu));
+            if (snap.exists()) {
+                nom = snap.data().Nom_Du_Lieu || "Lieu sans nom";
+                urlImage = snap.data().URL_Cloudinary || "";
+            }
+        } else if (idLieu.startsWith("B")) {
+            const snap = await getDoc(doc(db, "Monde_Batiment", idLieu));
+            if (snap.exists()) {
+                nom = snap.data().Nom_Batiment || "Bâtiment sans nom";
+                urlImage = snap.data().URL_Cloudinary || "";
+            }
+        }
+    } catch (e) {
+        console.error("Erreur récupération lieu :", e);
+    }
+
+    spanNom.innerText = nom;
+    
+    if (urlImage && urlImage !== "") {
+        imgLieu.src = urlImage;
+        imgLieu.style.display = "block";
+    } else {
+        imgLieu.src = "";
+        imgLieu.style.display = "none";
+    }
+}
+
 // 1. Écoute globale (Personnages + Tour + Historique du Chat)
 function ecouterPersonnagesDeLaPartie(idPartie) {
   if (unsubscribePersonnages) { unsubscribePersonnages(); unsubscribePersonnages = null; }
@@ -580,10 +626,19 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
     return;
   }
 
-  // A. Écoute du Tour de Parole
+  // A. Écoute du Tour de Parole et du Lieu
   unsubscribePartie = onSnapshot(doc(db, COL.PARTIES, idPartie), (snap) => {
      if(snap.exists()) {
-         window.PARTIE_DATA = snap.data();
+         const dataPartie = snap.data();
+         
+         // 1. Mise à jour de la bulle lieu UNIQUEMENT si le lieu a changé
+         const ancienLieu = window.PARTIE_DATA ? window.PARTIE_DATA.Lieu_Actuel : null;
+         if (dataPartie.Lieu_Actuel !== ancienLieu) {
+             mettreAJourBulleLieu(dataPartie.Lieu_Actuel);
+         }
+
+         // 2. Mise à jour globale
+         window.PARTIE_DATA = dataPartie;
          if (window.PERSOS_PARTIE) afficherBullesPersonnages(window.PERSOS_PARTIE);
      }
   });

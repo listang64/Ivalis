@@ -947,3 +947,91 @@ textarea.input-texte-parchemin {
   from { box-shadow: 0 0 5px rgba(0, 255, 0, 0.3); }
   to { box-shadow: 0 0 15px rgba(0, 255, 0, 0.7); }
 }
+
+/* ========================================================================= */
+/*  BULLE DU LIEU ACTUEL (En bas à droite du chat)                           */
+/* ========================================================================= */
+
+#bulle-lieu-actuel {
+    position: absolute;
+    bottom: 58px; /* LIGNE MODIFIÉE : on descend la bulle pour l'aligner */
+    right: 20px;  /* NOUVEAU : On l'ancre fermement à droite */
+    left: auto;   /* Sécurité pour annuler l'ancienne position */
+    background: linear-gradient(135deg, #4a2e1b, #2a1a0f);
+    color: #e8d5a5;
+    padding: 6px 15px;
+    border-radius: 20px;
+    font-family: 'Almendra', serif;
+    font-size: 14px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    border: 1px solid #8c6a45;
+    cursor: help;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Image cachée par défaut, s'affiche au survol */
+#image-lieu-actuel {
+    position: absolute;
+    bottom: 45px; 
+    right: 0;      /* NOUVEAU : L'image s'aligne sur la droite pour s'étendre vers l'intérieur du chat */
+    left: auto;    /* Sécurité */
+    width: 500px; 
+    height: auto;
+    max-height: 65vh; 
+    object-fit: contain; 
+    border-radius: 8px;
+    border: 3px solid #8c6a45;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.9); 
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(15px) scale(0.95);
+    transform-origin: bottom right; /* NOUVEAU : L'animation de zoom partira proprement du coin inférieur droit */
+    transition: all 0.3s ease-out;
+    z-index: 1001;
+}
+
+#bulle-lieu-actuel:hover #image-lieu-actuel {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+/* ========================================================================= */
+/*  SCROLLBAR DU CHAT (Design Ivalis Marron/Beige)                           */
+/* ========================================================================= */
+
+#zone-messages-chat::-webkit-scrollbar {
+    width: 8px; /* Garde ta proportion actuelle */
+}
+
+#zone-messages-chat::-webkit-scrollbar-track {
+    background: rgba(42, 26, 15, 0.4); /* Fond du rail marron sombre transparent */
+    border-radius: 10px;
+}
+
+#zone-messages-chat::-webkit-scrollbar-thumb {
+    background: #8c6a45; /* Curseur marron clair / cuir */
+    border-radius: 10px;
+    border: 1px solid #2a1a0f;
+}
+
+#zone-messages-chat::-webkit-scrollbar-thumb:hover {
+    background: #e8d5a5; /* Devient beige clair quand on le survole/clique */
+}
+
+/* ========================================================================= */
+/*  EFFET DE ZOOM SUR LES BULLES (Joueurs + MJ)                              */
+/* ========================================================================= */
+
+.bulle-personnage {
+    transition: all 0.2s ease-out; /* Rend l'animation d'agrandissement fluide */
+}
+
+.bulle-personnage:hover {
+    transform: scale(1.15) translateY(-2px); /* Grossit de 15% et monte un tout petit peu */
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.6); /* Ajoute une belle ombre en dessous */
+    z-index: 10; /* Assure que la bulle zoomée passe par-dessus ses voisines */
+    cursor: pointer;
+}
