@@ -1706,6 +1706,12 @@ document.addEventListener("DOMContentLoaded", function () {
   recupererFactionsPourSelect()
     .then(remplirSelectFactions)
     .catch((e) => console.error("Chargement des factions :", e));
+
+  // Initialisation Outils IA
+  document.getElementById("temp-range").value = localStorage.getItem("ivalis_IA_TEMPERATURE") || "1.0";
+  document.getElementById("temp-input").value = localStorage.getItem("ivalis_IA_TEMPERATURE") || "1.0";
+  document.getElementById("toggle-tokens").checked = localStorage.getItem("ivalis_SHOW_TOKENS") === "on";
+  window.actualiserAffichageTokens();
 });
 
 // =========================================================================
@@ -1788,6 +1794,8 @@ window.ouvrirParametres = function() {
     document.getElementById("etape-editeur-instruction").style.display = "none";
     document.getElementById("etape-confirmation-suppression").style.display = "none";
     document.getElementById("etape-cles-api").style.display = "none";
+    document.getElementById("etape-menu-outils").style.display = "none";
+    document.getElementById("etape-ia-parametre").style.display = "none";
 
     document.getElementById("input-secret-parametres").value = "";
     document.getElementById("erreur-mdp-parametres").style.opacity = "0";
@@ -1798,6 +1806,50 @@ window.ouvrirParametres = function() {
     menuParam.style.display = 'block';
     setTimeout(() => { menuParam.classList.add('ouvert'); }, 10);
   }
+};
+
+// =========================================================================
+//  OUTILS (Température & Tokens)
+// =========================================================================
+
+window.syncTemperature = function(source) {
+    const range = document.getElementById("temp-range");
+    const input = document.getElementById("temp-input");
+    if (source === 'range') input.value = range.value;
+    if (source === 'input') range.value = input.value;
+};
+
+window.sauvegarderTemperature = function() {
+    const val = document.getElementById("temp-input").value;
+    localStorage.setItem("ivalis_IA_TEMPERATURE", val);
+    naviguerFenetre('etape-ia-parametre', 'etape-menu-outils');
+};
+
+window.basculerAffichageTokens = function(estActive) {
+    localStorage.setItem("ivalis_SHOW_TOKENS", estActive ? "on" : "off");
+    window.actualiserAffichageTokens();
+};
+
+window.actualiserAffichageTokens = function() {
+    const affichage = document.getElementById("affichage-tokens");
+    const spanTokens = document.getElementById("valeur-tokens");
+    if (!affichage || !spanTokens) return;
+
+    const show = localStorage.getItem("ivalis_SHOW_TOKENS") === "on";
+    if (show) {
+        affichage.style.display = "block";
+        const total = parseInt(localStorage.getItem("ivalis_TOTAL_TOKENS") || "0");
+        spanTokens.innerText = total.toLocaleString(); // Met des espaces pour les milliers
+    } else {
+        affichage.style.display = "none";
+    }
+};
+
+window.ajouterTokens = function(montant) {
+    let total = parseInt(localStorage.getItem("ivalis_TOTAL_TOKENS") || "0");
+    total += montant;
+    localStorage.setItem("ivalis_TOTAL_TOKENS", total);
+    window.actualiserAffichageTokens();
 };
 
 // =========================================================================
@@ -1825,5 +1877,7 @@ Object.assign(window, {
   annulerSuppressionPerso, validerSuppressionPerso, appliquerCouleurTheme, changerOngletPerso,
   // Cles API + generation d'image (front-end)
   ouvrirClesApi, sauvegarderClesApi, basculerAffichageCles,
-  fermerAlerteCles, ouvrirParametresDepuisAlerte
+  fermerAlerteCles, ouvrirParametresDepuisAlerte,
+  // Outils
+  syncTemperature, sauvegarderTemperature, basculerAffichageTokens
 });
