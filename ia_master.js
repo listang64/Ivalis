@@ -520,6 +520,91 @@ Règle 2 : Ne liste que les vrais noms propres (ignore "le garde", "le tavernier
 }
 
 // =========================================================================
+//  NOUVEAU : MIA_STIGMATE (Persistance de l'environnement)
+// =========================================================================
+
+async function analyserStigmates(idLieuActuel, texteMJ) {
+    const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
+    if (!cleGemini || !idLieuActuel) return;
+
+    let collectionCible = "";
+    let stigmatesActuels = "";
+
+    // 1. Identifier la cible et récupérer les stigmates actuels
+    if (idLieuActuel.startsWith("L")) {
+        collectionCible = "Monde_Lieux";
+    } else if (idLieuActuel.startsWith("B")) {
+        collectionCible = "Monde_Batiment";
+    } else {
+        return; // ID non reconnu
+    }
+
+    try {
+        const snapDecor = await getDoc(doc(db, collectionCible, idLieuActuel));
+        if (snapDecor.exists()) {
+            stigmatesActuels = snapDecor.data().Stigmates || "Aucun stigmate.";
+        }
+
+        // 2. Le prompt de l'architecte
+        const promptSysteme = `Tu es MIA_STIGMATE, l'IA en charge de la mémoire de l'environnement.
+Voici l'état ACTUEL des stigmates de cet endroit : "${stigmatesActuels}"
+
+Ta mission : Lis le dernier texte du Maître du Jeu. Y a-t-il eu des altérations DURABLES apportées au décor (destruction, construction, incendie, statue érigée, réparation d'un ancien stigmate, etc.) ?
+Attention : Ignore les choses éphémères (un verre renversé, des traces de pas, un cadavre qui sera enlevé). Ne retiens que ce qui marque les murs ou l'endroit dans le temps.
+
+Si l'environnement a subi un changement durable, utilise l'outil 'mettreAJourStigmates' pour réécrire la description.
+Règle Absolue : Tu dois LISSER la description (intégrer les nouveaux éléments, garder les anciens toujours valables, et enlever ceux qui auraient été réparés par l'action du MJ). Rédige une phrase ou un paragraphe propre et naturel.
+Si rien n'a changé de manière durable, ne fais rien.`;
+
+        const outils = [{
+            functionDeclarations: [{
+                name: "mettreAJourStigmates",
+                description: "Met à jour la description lissée des stigmates du lieu.",
+                parameters: {
+                    type: "OBJECT",
+                    properties: {
+                        nouveaux_stigmates: { 
+                            type: "STRING", 
+                            description: "La nouvelle description complète, propre et lissée des stigmates de l'endroit."
+                        }
+                    },
+                    required: ["nouveaux_stigmates"]
+                }
+            }]
+        }];
+
+        // 3. Interrogation de Gemini Flash-Lite
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                systemInstruction: { parts: [{ text: promptSysteme }] },
+                contents: [{ role: "user", parts: [{ text: texteMJ }] }],
+                tools: outils, 
+                toolConfig: { functionCallingConfig: { mode: "AUTO" } }
+            })
+        });
+
+        const data = await res.json();
+        const appelsOutils = data.candidates?.[0]?.content?.parts?.filter(p => p.functionCall).map(p => p.functionCall);
+        
+        // 4. Inscription dans la Base de Données
+        if (appelsOutils && appelsOutils.length > 0 && appelsOutils[0].name === "mettreAJourStigmates") {
+            const stigmatesLisses = appelsOutils[0].args.nouveaux_stigmates || "";
+            
+            // On ne met à jour que si l'IA a vraiment changé quelque chose
+            if (stigmatesLisses && stigmatesLisses !== stigmatesActuels) {
+                console.log(`[MIA_STIGMATE] 🏚️ Décor altéré ! Nouveaux stigmates : ${stigmatesLisses}`);
+                await updateDoc(doc(db, collectionCible, idLieuActuel), {
+                    Stigmates: stigmatesLisses
+                });
+            }
+        }
+    } catch (e) {
+        console.error("[MIA_STIGMATE] Erreur silencieuse :", e);
+    }
+}
+
+// =========================================================================
 //  INTERFACE & CERVEAU DU NARRATEUR
 // =========================================================================
 
@@ -595,6 +680,15 @@ window.declencherTourIA = async function() {
     console.log("🟢 Le bouton MJ a bien été détecté !");
     if (!window.ID_PARTIE_COURANTE) return;
 
+    // =========================================================================
+    // NOUVEAU : Reset du compteur de tokens à chaque clic !
+    // =========================================================================
+    localStorage.setItem("ivalis_TOTAL_TOKENS", "0");
+    if (typeof window.actualiserAffichageTokens === "function") {
+        window.actualiserAffichageTokens();
+    }
+    // =========================================================================
+
     afficherEcranAttente();
 
     try {
@@ -607,8 +701,32 @@ window.declencherTourIA = async function() {
         snapMsgAll.forEach(d => messages.push(d.data()));
         if (messages.length === 0) return;
 
-        const historiqueComplet = messages.map(m => `${m.Auteur_Nom} : ${m.Texte}`).join("\n");
-        const historique4 = messages.slice(-4).map(m => `${m.Auteur_Nom} : ${m.Texte}`).join("\n");
+        // =========================================================================
+        //  FILTRAGE ET BRIDAGE DES TOKENS (Seulement les 30 derniers messages)
+        // =========================================================================
+        const messagesFiltres = messages.filter(m => {
+            const nomAuteur = m.Auteur_Nom || "";
+            const texteMsg = m.Texte || "";
+
+            // 1. On ignore complètement les messages de type "Système" ou "Date"
+            if (nomAuteur === "Date" || nomAuteur === "Système" || nomAuteur === "Date_En_Jeu" || m.Auteur_ID === "Date") {
+                return false;
+            }
+
+            // 2. On ignore les messages dont le texte ressemble à la date du parchemin
+            if (texteMsg.includes("De l'an") || (texteMsg.includes("Jour") && !isNaN(texteMsg.split("Jour")[1]?.trim()?.split(" ")[0]))) {
+                return false;
+            }
+
+            return true;
+        });
+
+        // On ne garde que les 30 dernières répliques pour ne pas exploser la facture
+        const historiqueReduit = messagesFiltres.slice(-30);
+
+        const historiqueComplet = historiqueReduit.map(m => `${m.Auteur_Nom} : ${m.Texte}`).join("\n");
+        const historique4 = historiqueReduit.slice(-4).map(m => `${m.Auteur_Nom} : ${m.Texte}`).join("\n");
+        // =========================================================================
 
         const env = await preparerEnvironnement(lieuActuel);
         const nomsPnjPresents = Object.keys(env.pnjsPresents);
@@ -645,51 +763,44 @@ window.declencherTourIA = async function() {
         const reponseTexte = await genererReponseNarrateur(contexte, historiqueComplet);
 
         if (reponseTexte) {
-            // NOUVEAU : Formatage du texte pour mettre les PNJ en gras avec leur image
+            // Formatage du texte pour mettre les PNJ en gras avec leur image
             let texteAffiche = reponseTexte;
             
             nomsPnjPresents.forEach(nom => {
                 const pnj = env.pnjsPresents[nom];
                 if (pnj) {
-                    // Regex pour chercher le nom exact (mot entier)
                     const regex = new RegExp(`\\b${nom}\\b`, 'g');
-                    
                     if (pnj.URL_Cloudinary && pnj.URL_Cloudinary !== "") {
-                        // Si le PNJ a une image, on met du gras et une balise spéciale
                         const remplacement = `<span class="pnj-chat-hover"><strong>${nom}</strong><img src="${pnj.URL_Cloudinary}" class="pnj-hover-img"></span>`;
                         texteAffiche = texteAffiche.replace(regex, remplacement);
                     } else {
-                        // Sinon, juste du gras coloré
                         texteAffiche = texteAffiche.replace(regex, `<strong style="color: #e8d5a5;">${nom}</strong>`);
                     }
                 }
             });
 
-            // NOUVEAU : On convertit les sauts de ligne invisibles en sauts de ligne HTML !
+            // Conversion des sauts de ligne invisibles en sauts de ligne HTML
             texteAffiche = texteAffiche.replace(/\n/g, "<br>");
 
             await addDoc(collection(db, "Messages_Chat"), {
                 ID_Partie: window.ID_PARTIE_COURANTE,
                 Auteur_ID: "MJ", Auteur_Nom: "MJ", Auteur_Couleur: "#ffffff",
-                Texte: texteAffiche, // <- On sauvegarde le texte modifié !
+                Texte: texteAffiche,
                 Timestamp: new Date().getTime()
             });
             await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), { Index_Initiative: 0 });
 
-            // NOUVEAU : La file d'attente asynchrone (Fantômes)
+            // La file d'attente asynchrone (Fantômes)
             setTimeout(async () => {
-                // 1. MIA_Batiment analyse le déplacement et renvoie la zone DÉFINITIVE
                 const lieuFinal = await analyserDeplacementBatiment(window.ID_PARTIE_COURANTE, lieuActuel, reponseTexte);
-                
-                // 2. Récupération des noms des joueurs pour protéger leurs identités
                 const nomsHeros = window.PERSOS_PARTIE ? window.PERSOS_PARTIE.map(p => p.prenom) : [];
 
-                // 3. MIA_PNJ analyse les nouveaux personnages dans cette zone définitive
                 if (lieuFinal) {
                     await analyserNouveauxPNJ(lieuFinal, nomsPnjPresents, nomsHeros, reponseTexte);
-                    
-                    // 4. MIA_DEPLACEMENT_PNJ met à jour la position des PNJ existants
                     await analyserDeplacementPNJ(lieuFinal, nomsHeros, reponseTexte);
+                    
+                    // NOUVEAU : MIA_STIGMATE met à jour la mémoire des murs
+                    await analyserStigmates(lieuFinal, reponseTexte);
                 }
             }, 0);
         }
