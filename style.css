@@ -1162,3 +1162,23 @@ textarea.input-texte-parchemin {
   color: #5c3a21;
   font-style: italic;
 }
+
+/* ========================================================================= */
+/* ICÔNES DE DÉS DANS LES CARACTÉRISTIQUES                                  */
+/* ========================================================================= */
+
+.icone-d20-stat {
+    width: 38px;
+    height: 38px;
+    object-fit: contain;
+    cursor: pointer;
+    transition: transform 0.2s ease, filter 0.2s ease;
+    filter: drop-shadow(0px 3px 4px rgba(0,0,0,0.6));
+    flex-shrink: 0; /* Empêche le dé de se déformer si le texte est très long */
+}
+
+/* Effet 3D au survol pour donner envie de cliquer */
+.icone-d20-stat:hover {
+    transform: scale(1.15) rotate(15deg);
+    filter: drop-shadow(0px 6px 8px rgba(0,0,0,0.8)) brightness(1.2);
+}

@@ -2013,16 +2013,21 @@ window.afficherStatsFinales = function(dataStats) {
     const val = dataStats[c.id] || 8;
     const mod = getModificateur(val);
     
+    // NOUVEAU : Structure avec l'image du D20 à gauche
     let html = `
-      <div class="bloc-stat-final">
-        <div class="titre-stat-final">${c.nom} (${val}) - (${mod}) : <span style="font-weight: normal; color: #4a2e1b;">${c.desc}</span></div>
+      <div class="bloc-stat-final" style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px;">
+        
+        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782422251/IMG_1714_l0bco5.png" class="icone-d20-stat" alt="D20">
+        
+        <div>
+            <div class="titre-stat-final" style="margin-bottom: 4px;">${c.nom} (${val}) - (${mod}) : <span style="font-weight: normal; color: #4a2e1b;">${c.desc}</span></div>
     `;
     
     if (c.comp !== "") {
       html += `<div class="comp-stat-final">${c.comp}</div>`;
     }
     
-    html += `</div>`;
+    html += `</div></div>`; // Fermeture du bloc texte et du bloc flex parent
     conteneur.insertAdjacentHTML('beforeend', html);
   });
 };
