@@ -14,15 +14,23 @@ async function preparerEnvironnement(lieuActuelId) {
         type: "Inconnu",
         details: null,
         listeBatiments: [], 
-        pnjsPresents: {}    
+        pnjsPresents: {},
+        reputationScore: 0,
+        reputationTags: []
     };
 
     if (!lieuActuelId) return env;
 
+    let idLieuParent = lieuActuelId;
+
     if (lieuActuelId.startsWith("L")) {
         env.type = "Lieu";
         const snapLieu = await getDoc(doc(db, "Monde_Lieux", lieuActuelId));
-        if (snapLieu.exists()) env.details = snapLieu.data();
+        if (snapLieu.exists()) {
+            env.details = snapLieu.data();
+            env.reputationScore = env.details.Reputation_Score || 0;
+            env.reputationTags = env.details.Reputation_Tags || [];
+        }
 
         const qBat = query(collection(db, "Monde_Batiment"), where("ID_Lieu", "==", lieuActuelId));
         const snapBat = await getDocs(qBat);
@@ -35,7 +43,19 @@ async function preparerEnvironnement(lieuActuelId) {
     else if (lieuActuelId.startsWith("B")) {
         env.type = "Bâtiment";
         const snapBat = await getDoc(doc(db, "Monde_Batiment", lieuActuelId));
-        if (snapBat.exists()) env.details = snapBat.data();
+        if (snapBat.exists()) {
+            env.details = snapBat.data();
+            idLieuParent = env.details.ID_Lieu; // On récupère l'ID du lieu parent
+        }
+
+        // 🔍 On récupère la réputation sur le Lieu Global
+        if (idLieuParent) {
+            const snapLieu = await getDoc(doc(db, "Monde_Lieux", idLieuParent));
+            if (snapLieu.exists()) {
+                env.reputationScore = snapLieu.data().Reputation_Score || 0;
+                env.reputationTags = snapLieu.data().Reputation_Tags || [];
+            }
+        }
 
         const qPnj = query(collection(db, "Monde_PNJ"), where("ID_Batiment", "==", lieuActuelId));
         const snapPnj = await getDocs(qPnj);
@@ -605,6 +625,87 @@ Si rien n'a changé de manière durable, ne fais rien.`;
 }
 
 // =========================================================================
+//  NOUVEAU : MIA_REPUTATION (Analyse des actes et rumeurs)
+// =========================================================================
+
+async function analyserReputation(idLieuActuel, texteMJ) {
+    const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
+    if (!cleGemini || !idLieuActuel) return;
+
+    // La réputation est toujours gérée au niveau du Lieu (Région), même si on est dans une auberge
+    let idLieuCible = idLieuActuel;
+    if (idLieuActuel.startsWith("B")) {
+        const bSnap = await getDoc(doc(db, "Monde_Batiment", idLieuActuel));
+        if (bSnap.exists()) idLieuCible = bSnap.data().ID_Lieu;
+    }
+    
+    if (!idLieuCible || !idLieuCible.startsWith("L")) return;
+
+    try {
+        const snapLieu = await getDoc(doc(db, "Monde_Lieux", idLieuCible));
+        if (!snapLieu.exists()) return;
+        
+        const scoreActuel = snapLieu.data().Reputation_Score || 0;
+        const tagsActuels = snapLieu.data().Reputation_Tags || [];
+
+        const promptSysteme = `Tu es MIA_REPUTATION, l'IA qui gère la renommée du groupe.
+Score actuel du groupe : ${scoreActuel} (sur une jauge de -10 à +10).
+Tags de rumeur actuels : ${JSON.stringify(tagsActuels)}.
+
+Lis la dernière scène racontée par le Narrateur. Y a-t-il eu une action NOTABLE du groupe (ex: sauver quelqu'un, voler, tuer, payer généreusement, saccager, aider la milice) qui mérite de changer leur réputation dans toute cette région ?
+
+Si oui :
+1. Ajuste le score de réputation (ne dépasse pas -10 ou +10).
+2. Ajoute de nouveaux mots-clés pertinents (ex: "Héroïques", "Voleurs", "Généreux", "Meurtriers").
+3. SUPPRIME obligatoirement les anciens tags qui sont contredits par la nouvelle action (ex: si "Honnêtes" était présent, mais qu'ils viennent de voler, supprime "Honnêtes" et ajoute "Voleurs").
+
+Si l'action est banale ou privée sans témoin, utilise l'outil avec les valeurs actuelles pour ne rien changer.`;
+
+        const outils = [{
+            functionDeclarations: [{
+                name: "mettreAJourReputation",
+                description: "Modifie la jauge et les tags comportementaux du groupe.",
+                parameters: {
+                    type: "OBJECT",
+                    properties: {
+                        nouveau_score: { type: "INTEGER", description: "Le nouveau score de -10 à +10" },
+                        nouveaux_tags: { type: "ARRAY", items: { type: "STRING" }, description: "Liste à jour des mots-clés" }
+                    },
+                    required: ["nouveau_score", "nouveaux_tags"]
+                }
+            }]
+        }];
+
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                systemInstruction: { parts: [{ text: promptSysteme }] },
+                contents: [{ role: "user", parts: [{ text: texteMJ }] }],
+                tools: outils, 
+                toolConfig: { functionCallingConfig: { mode: "AUTO" } }
+            })
+        });
+
+        const data = await res.json();
+        const appelsOutils = data.candidates?.[0]?.content?.parts?.filter(p => p.functionCall).map(p => p.functionCall);
+        
+        if (appelsOutils && appelsOutils.length > 0 && appelsOutils[0].name === "mettreAJourReputation") {
+            const nouveauScore = appelsOutils[0].args.nouveau_score;
+            const nouveauxTags = appelsOutils[0].args.nouveaux_tags || [];
+            
+            // On ne met à jour que si les valeurs ont réellement changé
+            if (nouveauScore !== scoreActuel || JSON.stringify(nouveauxTags) !== JSON.stringify(tagsActuels)) {
+                console.log(`[MIA_REPUTATION] 📢 Réputation mise à jour ! Score: ${nouveauScore}, Tags: ${nouveauxTags}`);
+                await updateDoc(doc(db, "Monde_Lieux", idLieuCible), {
+                    Reputation_Score: nouveauScore,
+                    Reputation_Tags: nouveauxTags
+                });
+            }
+        }
+    } catch (e) { console.error("[MIA_REPUTATION] Erreur :", e); }
+}
+
+// =========================================================================
 //  INTERFACE & CERVEAU DU NARRATEUR
 // =========================================================================
 
@@ -743,6 +844,12 @@ window.declencherTourIA = async function() {
             contexte += `Bâtiments visibles ici : ${env.listeBatiments.join(", ")}\n`;
         }
 
+        // NOUVEAU : Injection des tags et de la jauge
+        contexte += `\n--- RÉPUTATION DU GROUPE DANS CETTE RÉGION ---\n`;
+        contexte += `Score : ${env.reputationScore}/10 (-10 = Hostile, 0 = Neutre, +10 = Adulés).\n`;
+        contexte += `Tags de rumeur : ${env.reputationTags.length > 0 ? env.reputationTags.join(", ") : "Inconnus (Nouveaux venus)"}.\n`;
+        contexte += `CONSIGNE ABSOLUE : Adapte obligatoirement le comportement des PNJ de cette zone en fonction de cette réputation (crainte, respect, agressivité, arnaque, etc.).\n`;
+
         if (nomsPnjPresents.length > 0) {
             contexte += `\n--- PNJ PRÉSENTS DANS LA ZONE ---\n`;
             nomsPnjPresents.forEach(nom => {
@@ -798,9 +905,10 @@ window.declencherTourIA = async function() {
                 if (lieuFinal) {
                     await analyserNouveauxPNJ(lieuFinal, nomsPnjPresents, nomsHeros, reponseTexte);
                     await analyserDeplacementPNJ(lieuFinal, nomsHeros, reponseTexte);
-                    
-                    // NOUVEAU : MIA_STIGMATE met à jour la mémoire des murs
                     await analyserStigmates(lieuFinal, reponseTexte);
+                    
+                    // NOUVEAU : MIA_REPUTATION met à jour la renommée du groupe
+                    await analyserReputation(lieuFinal, reponseTexte);
                 }
             }, 0);
         }
