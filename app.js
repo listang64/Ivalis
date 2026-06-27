@@ -625,6 +625,9 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
     return;
   }
 
+  // NOUVEAU : Un petit marqueur pour ignorer la première lecture (la sauvegarde historique)
+  let estPremierScanPartie = true;
+
   // A. Écoute du Tour de Parole, du Lieu ET DU VERROU IA
   unsubscribePartie = onSnapshot(doc(db, COL.PARTIES, idPartie), (snap) => {
      if(snap.exists()) {
@@ -636,7 +639,7 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
              mettreAJourBulleLieu(dataPartie.Lieu_Actuel);
          }
 
-         // NOUVEAU : 1.5 Gestion de l'écran d'attente Global
+         // 1.5 Gestion de l'écran d'attente Global
          if (dataPartie.IA_En_Cours === true) {
              if (typeof window.afficherEcranAttente === "function") window.afficherEcranAttente();
          } else {
@@ -646,6 +649,19 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
          // 2. Mise à jour globale
          window.PARTIE_DATA = dataPartie;
          if (window.PERSOS_PARTIE) afficherBullesPersonnages(window.PERSOS_PARTIE);
+
+         // CORRECTION : 3. Détection d'un jet de dés synchronisé sans l'effet fantôme
+         if (estPremierScanPartie) {
+             // Au premier chargement, on mémorise la date du dernier jet silencieusement
+             if (dataPartie.Action_Des) window.DERNIER_JET_DES = dataPartie.Action_Des.timestamp;
+             estPremierScanPartie = false;
+         } else {
+             // Aux changements suivants, on lance l'animation !
+             if (dataPartie.Action_Des && dataPartie.Action_Des.timestamp !== window.DERNIER_JET_DES) {
+                 window.DERNIER_JET_DES = dataPartie.Action_Des.timestamp;
+                 jouerAnimationDesGlobal(dataPartie.Action_Des);
+             }
+         }
      }
   });
 
@@ -2033,7 +2049,7 @@ window.afficherStatsFinales = function(dataStats) {
     let html = `
       <div class="bloc-stat-final" style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px;">
         
-        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782422251/IMG_1714_l0bco5.png" class="icone-d20-stat" alt="D20">
+        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782422251/IMG_1714_l0bco5.png" class="icone-d20-stat" alt="D20" onclick="jouerSonClic(); lancerJetDeCaracteristique('${c.id}', '${c.nom}', ${val}, ${mod})">
         
         <div>
             <div class="titre-stat-final" style="margin-bottom: 4px;">${c.nom} (${val}) - (${mod}) : <span style="font-weight: normal; color: #4a2e1b;">${c.desc}</span></div>
@@ -2163,6 +2179,221 @@ window.validerChangementDate = async function() {
 };
 
 // =========================================================================
+//  MÉCANIQUE DE JET DE DÉS (SYNCHRONISÉE)
+// =========================================================================
+
+window.DERNIER_JET_DES = 0;
+window.ID_MON_LANCER = "";
+
+window.lancerJetDeCaracteristique = async function(idCarac, nomCarac, valeurCarac, modCarac) {
+    if (!window.ID_PARTIE_COURANTE) return;
+
+    // =========================================================
+    //  SÉCURITÉ ANTI-TRICHE (TOUR DE PAROLE)
+    // =========================================================
+    const partie = window.PARTIE_DATA || {};
+    const ordre = partie.Ordre_Initiative || [];
+    const indexTour = partie.Index_Initiative !== undefined ? partie.Index_Initiative : 999;
+    
+    const idPersoActif = ordre[indexTour]; 
+    const idPersonnageFiche = document.getElementById("champ-id-personnage").value; 
+
+    if (idPersonnageFiche !== idPersoActif) {
+        let nomActif = "au Maître du Jeu";
+        
+        if (idPersoActif && window.PERSOS_PARTIE) {
+            const persoInfo = window.PERSOS_PARTIE.find(p => p.idPersonnage === idPersoActif);
+            if (persoInfo) nomActif = `à ${persoInfo.prenom}`;
+        }
+        
+        // --- NOUVEAU : Le message immersif au lieu du alert() ---
+        const fiche = document.getElementById("fenetre-fiche-perso");
+        let msgErreur = document.getElementById("erreur-jet-immersif");
+
+        // Si le bloc n'existe pas encore, on le crée
+        if (!msgErreur) {
+            msgErreur = document.createElement("div");
+            msgErreur.id = "erreur-jet-immersif";
+            msgErreur.style.cssText = "position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(40, 10, 10, 0.95); color: #ff4c4c; padding: 20px 40px; border: 2px solid #ff4c4c; border-radius: 12px; font-weight: bold; font-size: 24px; text-shadow: 0 0 10px red; box-shadow: 0 0 40px rgba(255, 0, 0, 0.9); z-index: 2000; text-align: center; pointer-events: none; opacity: 0; transition: opacity 0.3s ease;";
+            fiche.appendChild(msgErreur);
+        }
+
+        // On injecte le texte et on l'affiche
+        if (typeof window.jouerSonClic === "function") window.jouerSonClic(); // Petit bruit d'erreur optionnel
+        msgErreur.innerHTML = `Action impossible<br><span style="font-size: 18px; color: #e8d5a5;">C'est ${nomActif} de parler.</span>`;
+        msgErreur.style.opacity = "1";
+
+        // On le fait disparaître en fondu 2.5 secondes plus tard
+        setTimeout(() => { 
+            if (msgErreur) msgErreur.style.opacity = "0"; 
+        }, 2500);
+
+        return; // On bloque le jet de dé
+    }
+    // =========================================================
+
+    // Si la sécurité est passée, on lance le dé normalement
+    const nomPersonnage = document.getElementById("titre-nom-personnage").innerText;
+    
+    const resultatD20 = Math.floor(Math.random() * 20) + 1;
+    const total = resultatD20 + modCarac;
+    
+    window.ID_MON_LANCER = Math.random().toString(36).substring(2, 10);
+
+    await updateDoc(doc(db, COL.PARTIES, window.ID_PARTIE_COURANTE), {
+        Action_Des: {
+            idLancer: window.ID_MON_LANCER,
+            nomPerso: nomPersonnage,
+            caract: nomCarac,
+            resultatBrut: resultatD20,
+            modificateur: modCarac,
+            totalFinal: total,
+            timestamp: new Date().getTime()
+        }
+    });
+    
+    fermerFichePerso();
+};
+
+window.jouerAnimationDesGlobal = function(donnees) {
+    const overlay = document.getElementById("overlay-jet-des");
+    const rouleau = document.getElementById("rouleau-parchemin");
+    const titre = document.getElementById("titre-jet-des");
+    const flash = document.getElementById("flash-resultat-des");
+    const audio = document.getElementById("audio-roulette");
+    
+    titre.innerText = `Jet de ${donnees.caract} pour ${donnees.nomPerso}`;
+    flash.classList.remove("flash-des-actif");
+    rouleau.innerHTML = "";
+    
+    // 1. CRÉATION DU PARCHEMIN PHYSIQUE
+    let sequence = [];
+    
+    for (let i = 0; i < 4; i++) { sequence.push(""); }
+    for (let i = 20; i >= 1; i--) { sequence.push(i); }
+    for (let i = 0; i < 2; i++) { sequence.push(""); }
+    
+    // On dessine tout ça dans le HTML
+    sequence.forEach((num) => {
+        if (num === "") {
+            // Espace vierge
+            rouleau.insertAdjacentHTML('beforeend', `<div class="chiffre-roulette"></div>`);
+        } else if (num === 20) {
+            // NOUVEAU : Le 20 en doré avec un bel effet de brillance
+            rouleau.insertAdjacentHTML('beforeend', `<div class="chiffre-roulette" style="color: #ffd700; text-shadow: 0 0 10px rgba(255, 215, 0, 0.8), 1px 1px 2px #5c3a21;">${num}</div>`);
+        } else if (num === 1) {
+            // NOUVEAU : Le 1 en rouge sang
+            rouleau.insertAdjacentHTML('beforeend', `<div class="chiffre-roulette" style="color: #d32f2f; text-shadow: 0 0 5px rgba(211, 47, 47, 0.5);">${num}</div>`);
+        } else {
+            // Les autres chiffres normaux
+            rouleau.insertAdjacentHTML('beforeend', `<div class="chiffre-roulette">${num}</div>`);
+        }
+    });
+
+    // 2. MATHÉMATIQUES D'ALIGNEMENT
+    const hauteurChiffre = 70;
+    const offsetFleche = 110; 
+    
+    const indexDepart = sequence.length - 2; 
+    const positionDepart = offsetFleche - (indexDepart * hauteurChiffre);
+    
+    const indexFin = sequence.indexOf(donnees.resultatBrut);
+    const positionFin = offsetFleche - (indexFin * hauteurChiffre);
+
+    const distanceParcourue = indexDepart - indexFin;
+    const dureeAnimation = 1.5 + (distanceParcourue * 0.18); 
+
+    // 3. INITIALISATION VISUELLE
+    rouleau.style.transition = "none";
+    rouleau.style.transform = `translateY(${positionDepart}px)`;
+    
+    overlay.style.display = "flex";
+    
+    // Lancement de l'audio en boucle
+    if (audio) { 
+        audio.currentTime = 0; 
+        audio.play().catch(()=>{}); 
+    }
+
+    void rouleau.offsetWidth;
+
+    // 4. L'ANIMATION À VITESSE CONSTANTE ("linear")
+    rouleau.style.transition = `transform ${dureeAnimation}s linear`;
+    rouleau.style.transform = `translateY(${positionFin}px)`;
+
+    // 5. LA FIN DU SPECTACLE
+    setTimeout(() => {
+        // Coupure de l'audio
+        if (audio) {
+            audio.pause();
+            audio.currentTime = 0;
+        }
+        
+        // NOUVEAU : Application des couleurs sur l'explosion du résultat
+        if (donnees.resultatBrut === 20) {
+            flash.style.color = "#ffd700"; // Doré
+            flash.style.textShadow = "0 0 20px #ffd700, 0 0 40px #ffaa00, 2px 2px 10px black";
+        } else if (donnees.resultatBrut === 1) {
+            flash.style.color = "#ff4c4c"; // Rouge vif
+            flash.style.textShadow = "0 0 20px #ff4c4c, 0 0 40px #8b0000, 2px 2px 10px black";
+        } else {
+            flash.style.color = "white"; // Normal
+            flash.style.textShadow = "0 0 20px white, 0 0 40px #00ffff, 2px 2px 10px black";
+        }
+
+        flash.innerText = donnees.resultatBrut;
+        flash.classList.add("flash-des-actif");
+
+        setTimeout(() => {
+            overlay.style.display = "none";
+            
+            if (donnees.idLancer === window.ID_MON_LANCER) {
+                const chatInput = document.getElementById("input-chat");
+                const modTexte = donnees.modificateur >= 0 ? `+${donnees.modificateur}` : donnees.modificateur;
+                
+                // Le message dans le chat
+                const texteFormatte = `🎲 Jet de **${donnees.caract}** pour **${donnees.nomPerso}** : Résultat : ${donnees.resultatBrut} ${modTexte} = **${donnees.totalFinal}**`;
+                
+                const jourEnJeu = window.DATE_EN_JEU_ACTUELLE ? window.DATE_EN_JEU_ACTUELLE.jour : "";
+                const anEnJeu = window.DATE_EN_JEU_ACTUELLE ? window.DATE_EN_JEU_ACTUELLE.annee : "";
+                
+                let auteurCouleur = "#ffffff";
+                let idAuteur = "MJ";
+                
+                if (window.PERSOS_PARTIE) {
+                    const persoTrouve = window.PERSOS_PARTIE.find(p => `${p.prenom} ${p.nom}`.trim() === donnees.nomPerso.trim() || p.prenom === donnees.nomPerso);
+                    if (persoTrouve) {
+                        auteurCouleur = persoTrouve.couleur;
+                        idAuteur = persoTrouve.idPersonnage;
+                    }
+                }
+
+                const nouveauMsgDes = {
+                    ID_Partie: window.ID_PARTIE_COURANTE,
+                    Auteur_ID: idAuteur,
+                    Auteur_Nom: donnees.nomPerso,
+                    Auteur_Couleur: auteurCouleur,
+                    Texte: texteFormatte,
+                    Date_Jour: jourEnJeu,
+                    Date_An: anEnJeu,
+                    Timestamp: new Date().getTime()
+                };
+
+                try {
+                    addDoc(collection(db, COL.MESSAGES), nouveauMsgDes);
+                } catch (e) {
+                    console.error("Erreur lors de l'envoi automatique du dé :", e);
+                }
+                
+                window.ID_MON_LANCER = ""; 
+                if (chatInput) chatInput.focus();
+            }
+        }, 2500);
+
+    }, dureeAnimation * 1000);
+};
+
+// =========================================================================
 //  EXPOSITION DES FONCTIONS AU SCOPE GLOBAL
 //  (necessaire car index.html utilise des handlers inline onclick="...",
 //   or un <script type="module"> a sa propre portee.)
@@ -2187,7 +2418,7 @@ Object.assign(window, {
   annulerSuppressionPerso, validerSuppressionPerso, appliquerCouleurTheme, changerOngletPerso,
   // Caracteristiques
   chargerCaracteristiques, ouvrirModaleCreationCaracs, fermerModaleCreationCaracs,
-  modifierStat, validerCreationCaracs,
+  modifierStat, validerCreationCaracs, lancerJetDeCaracteristique,
   // Cles API + generation d'image (front-end)
   ouvrirClesApi, sauvegarderClesApi, basculerAffichageCles,
   fermerAlerteCles, ouvrirParametresDepuisAlerte,

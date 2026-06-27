@@ -1198,3 +1198,25 @@ textarea.input-texte-parchemin {
     transform: scale(1.15) rotate(15deg);
     filter: drop-shadow(0px 6px 8px rgba(0,0,0,0.8)) brightness(1.2);
 }
+
+/* ========================================================================= */
+/* ANIMATION JET DE DÉS                                                      */
+/* ========================================================================= */
+
+.chiffre-roulette {
+    font-size: 45px;
+    font-weight: bold;
+    color: #5c3a21;
+    height: 70px; /* Chaque chiffre prend 70px de haut */
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-bottom: 1px dashed rgba(92, 58, 33, 0.2);
+}
+
+.flash-des-actif {
+    display: block !important;
+    opacity: 1 !important;
+    transform: translate(-50%, -50%) scale(1) !important;
+}
