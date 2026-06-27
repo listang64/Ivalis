@@ -400,20 +400,18 @@ async function genererEtStockerPortrait(donnees) {
   // 2. Instruction de style additionnelle (Firestore)
   const instructionSupplementaire = await recupererInstructionStyle();
 
-  // 3. Construction du prompt (identique a l'original)
+  // 3. Construction du prompt (Épuré pour laisser place au style personnalisé)
   const promptOpenAI =
-    "Crée un portrait de personnage de jeu de rôle heroic fantasy. " +
-    "L'esthétique globale doit être avec un éclairage dramatique mais lumineux, des coups de pinceau gestuels et des textures très tactiles sur les matériaux. " +
-    "Ne dessine absolument aucun texte ou lettrage sur l'image.\n\n" +
-    "Description du personnage :\n" +
+    "Ne dessine absolument aucun texte, symbole ou lettrage sur l'image.\\n\\n" +
+    "Description du personnage :\\n" +
     "Il s'agit d'un héros de genre " + donnees.genre + ", ayant environ " + donnees.age + " ans. " +
     "Sa corpulence est " + donnees.corpulence + " et sa taille est " + donnees.taille + ". " +
     "Son teint de peau est " + donnees.peau + ". Ses cheveux sont " + donnees.cheveux + " et il a les yeux " + donnees.yeux + ". " +
     "Pilosité faciale : " + donnees.pilosite + ". " +
-    "Son visage porte l'expression suivante : " + donnees.expression + ", et on remarque ces signes distinctifs : " + donnees.signes + ".\n" +
+    "Son visage porte l'expression suivante : " + donnees.expression + ", et on remarque ces signes distinctifs : " + donnees.signes + ".\\n" +
     "Il est vêtu ainsi : " + donnees.style + " avec une palette de couleurs dominantes " + donnees.couleursDom + ". " +
-    "Il porte l'équipement visible suivant : " + donnees.equipement + ".\n\n" +
-    "Directives de lore et de style additionnelles : " + instructionSupplementaire;
+    "Il porte l'équipement visible suivant : " + donnees.equipement + ".\\n\\n" +
+    "Directives de style artistique obligatoires : " + instructionSupplementaire;
 
   // 4. Appel a l'API OpenAI
   const urlOpenAI = "https://api.openai.com/v1/images/generations";
@@ -2060,7 +2058,7 @@ window.ouvrirGestionDate = function() {
     const menuDate = document.getElementById('conteneur-gestion-date');
     const estDejaOuvert = (menuDate.style.display === 'block' || menuDate.classList.contains('ouvert'));
     
-    window.fermerToutesLesFenetres();
+    // La commande de fermeture globale a été retirée d'ici pour laisser le chat ouvert !
 
     if (!estDejaOuvert) {
         // Mise à jour de l'affichage local avec les données de Firebase

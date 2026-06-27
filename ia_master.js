@@ -126,6 +126,17 @@ async function genererSignatureCloudinary(message) {
     return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
+// NOUVEAU : Récupération du style graphique personnalisé depuis Firebase
+async function recupererInstructionStyleBackend() {
+    try {
+        const snap = await getDoc(doc(db, "Cerveau_IA", "INST_76839"));
+        if (snap.exists()) return snap.data().Contenu_Direct || "";
+    } catch (e) {
+        console.error("Lecture du style INST_76839 impossible :", e);
+    }
+    return "";
+}
+
 // =========================================================================
 //  MIA_BATIMENT (Générateur de lieux procédural)
 // =========================================================================
@@ -141,7 +152,8 @@ async function genererEtStockerImageBatiment(promptBatiment) {
 
     console.log("🎨 [MIA_Batiment] Démarrage de la toile pour le bâtiment...");
     
-    const promptOpenAI = "Crée un digital painting croquis d'un lieu ou bâtiment de jeu de rôle dark fantasy. L'esthétique globale doit être avec un éclairage dramatique, des coups de pinceau gestuels et des textures très tactiles, comme un concept art préparatoire de jeu vidéo. Ne dessine absolument aucun texte ou lettrage.\n\nDescription du lieu : " + promptBatiment;
+    const instructionStyle = await recupererInstructionStyleBackend();
+    const promptOpenAI = "Ne dessine absolument aucun texte ou lettrage sur l'image.\\n\\nDescription du lieu : " + promptBatiment + "\\n\\nDirectives de style artistique obligatoires : " + instructionStyle;
 
     const payloadOpenAI = { model: "gpt-image-2", prompt: promptOpenAI, output_format: "webp", n: 1, size: "1792x1024", quality: "low" };
 
@@ -294,8 +306,8 @@ async function genererEtStockerImagePNJ(descriptionPhysique) {
 
     console.log("🎨 [MIA_PNJ] Incantation du portrait pour le nouveau PNJ...");
     
-    // FORMAT VERTICAL POUR LES PORTRAITS
-    const promptOpenAI = "Crée un digital painting croquis pour un portrait de personnage de jeu de rôle heroic fantasy. L'esthétique globale doit être avec un éclairage dramatique mais lumineux, des coups de pinceau gestuels et des textures très tactiles sur les matériaux, comme un dessin préparatoire. Ne dessine absolument aucun texte ou lettrage sur l'image.\n\nDescription du personnage : " + descriptionPhysique;
+    const instructionStyle = await recupererInstructionStyleBackend();
+    const promptOpenAI = "Ne dessine absolument aucun texte ou lettrage sur l'image.\\n\\nDescription du personnage : " + descriptionPhysique + "\\n\\nDirectives de style artistique obligatoires : " + instructionStyle;
 
     const payloadOpenAI = { model: "gpt-image-2", prompt: promptOpenAI, output_format: "webp", n: 1, size: "1024x1792", quality: "low" };
 
