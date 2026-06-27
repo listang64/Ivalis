@@ -627,7 +627,7 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
     return;
   }
 
-  // A. Écoute du Tour de Parole et du Lieu
+  // A. Écoute du Tour de Parole, du Lieu ET DU VERROU IA
   unsubscribePartie = onSnapshot(doc(db, COL.PARTIES, idPartie), (snap) => {
      if(snap.exists()) {
          const dataPartie = snap.data();
@@ -636,6 +636,13 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
          const ancienLieu = window.PARTIE_DATA ? window.PARTIE_DATA.Lieu_Actuel : null;
          if (dataPartie.Lieu_Actuel !== ancienLieu) {
              mettreAJourBulleLieu(dataPartie.Lieu_Actuel);
+         }
+
+         // NOUVEAU : 1.5 Gestion de l'écran d'attente Global
+         if (dataPartie.IA_En_Cours === true) {
+             if (typeof window.afficherEcranAttente === "function") window.afficherEcranAttente();
+         } else {
+             if (typeof window.masquerEcranAttente === "function") window.masquerEcranAttente();
          }
 
          // 2. Mise à jour globale
@@ -719,7 +726,7 @@ function afficherBullesPersonnages(persos) {
   bulleMJ.className = "bulle-personnage bulle-mj";
   bulleMJ.innerText = "MJ";
 
-  // NOUVEAU : Ajout de l'image au survol pour le MJ
+  // Ajout de l'image au survol pour le MJ
   const imgHoverMJ = document.createElement("img");
   imgHoverMJ.className = "bulle-portrait-hover";
   imgHoverMJ.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782164835/maitre_du_jeu_kemkf2.png";
@@ -730,22 +737,26 @@ function afficherBullesPersonnages(persos) {
       nomActif = "MJ";
   }
 
-  bulleMJ.onclick = function() {
-      if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-      
-      const inputChat = document.getElementById("input-chat");
-        if (inputChat) {
-            inputChat.placeholder = "Le MJ écrit l'histoire...";
-            inputChat.disabled = true;
-        }
+  // NOUVEAU : On grise et on désactive le bouton si l'IA réfléchit pour éviter les doubles clics
+  if (partie.IA_En_Cours === true) {
+      bulleMJ.style.opacity = "0.4";
+      bulleMJ.style.pointerEvents = "none";
+      bulleMJ.style.filter = "grayscale(100%)";
+  } else {
+      bulleMJ.onclick = function() {
+          if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+          
+          const inputChat = document.getElementById("input-chat");
+          if (inputChat) {
+              inputChat.placeholder = "Le MJ écrit l'histoire...";
+              inputChat.disabled = true;
+          }
 
-        // C'EST CETTE LIGNE QUI EST CAPITALE :
-        if (typeof window.declencherTourIA === "function") {
-            window.declencherTourIA(); 
-        } else {
-            console.error("La fonction declencherTourIA est introuvable !");
-        }
-    };
+          if (typeof window.declencherTourIA === "function") {
+              window.declencherTourIA(); 
+          }
+      };
+  }
   conteneur.appendChild(bulleMJ);
 
   // --- Mise à jour de la barre de saisie ---

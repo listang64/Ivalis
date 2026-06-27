@@ -38,17 +38,22 @@ async function preparerEnvironnement(lieuActuelId) {
 
         const qPnj = query(collection(db, "Monde_PNJ"), where("ID_Lieu", "==", lieuActuelId));
         const snapPnj = await getDocs(qPnj);
-        snapPnj.forEach(doc => { env.pnjsPresents[doc.data().Nom_PNJ] = doc.data(); });
+        snapPnj.forEach(doc => { 
+            const pnjData = doc.data();
+            // NOUVEAU : On ignore les morts pour qu'ils n'agissent plus
+            if (pnjData.Statut !== "Mort") {
+                env.pnjsPresents[pnjData.Nom_PNJ] = pnjData; 
+            }
+        });
     }
     else if (lieuActuelId.startsWith("B")) {
         env.type = "Bâtiment";
         const snapBat = await getDoc(doc(db, "Monde_Batiment", lieuActuelId));
         if (snapBat.exists()) {
             env.details = snapBat.data();
-            idLieuParent = env.details.ID_Lieu; // On récupère l'ID du lieu parent
+            idLieuParent = env.details.ID_Lieu; 
         }
 
-        // 🔍 On récupère la réputation sur le Lieu Global
         if (idLieuParent) {
             const snapLieu = await getDoc(doc(db, "Monde_Lieux", idLieuParent));
             if (snapLieu.exists()) {
@@ -59,7 +64,13 @@ async function preparerEnvironnement(lieuActuelId) {
 
         const qPnj = query(collection(db, "Monde_PNJ"), where("ID_Batiment", "==", lieuActuelId));
         const snapPnj = await getDocs(qPnj);
-        snapPnj.forEach(doc => { env.pnjsPresents[doc.data().Nom_PNJ] = doc.data(); });
+        snapPnj.forEach(doc => { 
+            const pnjData = doc.data();
+            // NOUVEAU : On ignore les morts ici aussi
+            if (pnjData.Statut !== "Mort") {
+                env.pnjsPresents[pnjData.Nom_PNJ] = pnjData; 
+            }
+        });
     }
 
     return env;
@@ -798,24 +809,19 @@ Sinon, ne fais rien.`;
             const nomsMorts = appelsOutils[0].args.noms_morts || [];
             
             for (const nom of nomsMorts) {
-                if (!nomsPnjPresents.includes(nom)) continue; // Sécurité anti-hallucination
+                if (!nomsPnjPresents.includes(nom)) continue; 
 
-                console.log(`[MIA_MORT] ☠️ Le PNJ '${nom}' a passé l'arme à gauche. Début du nettoyage...`);
+                console.log(`[MIA_MORT] ☠️ Le PNJ '${nom}' a passé l'arme à gauche. Changement de statut...`);
                 
                 const qPnj = query(collection(db, "Monde_PNJ"), where("Nom_PNJ", "==", nom));
                 const snapPnj = await getDocs(qPnj);
 
                 snapPnj.forEach(async (docPnj) => {
-                    const dataPnj = docPnj.data();
-                    
-                    // 1. Incinération de la photo
-                    if (dataPnj.URL_Cloudinary && dataPnj.URL_Cloudinary !== "") {
-                        await supprimerImageCloudinary(dataPnj.URL_Cloudinary);
-                    }
-                    
-                    // 2. Destruction de l'âme dans Firebase
-                    await deleteDoc(doc(db, "Monde_PNJ", docPnj.id));
-                    console.log(`[MIA_MORT] 🗑️ Fiche de '${nom}' totalement effacée de la base de données.`);
+                    // NOUVEAU : On se contente de modifier le statut en "Mort"
+                    await updateDoc(doc(db, "Monde_PNJ", docPnj.id), {
+                        Statut: "Mort"
+                    });
+                    console.log(`[MIA_MORT] 🪦 Statut de '${nom}' passé sur "Mort". Il n'agira plus.`);
                 });
             }
         }
@@ -826,7 +832,8 @@ Sinon, ne fais rien.`;
 //  INTERFACE & CERVEAU DU NARRATEUR
 // =========================================================================
 
-function afficherEcranAttente() {
+// NOUVEAU : On attache ces fonctions à "window" pour qu'elles soient accessibles partout
+window.afficherEcranAttente = function() {
     if (document.getElementById("ecran-attente-ia")) return;
     const overlay = document.createElement("div");
     overlay.id = "ecran-attente-ia";
@@ -840,12 +847,12 @@ function afficherEcranAttente() {
     overlay.appendChild(texte);
     overlay.appendChild(image);
     document.body.appendChild(overlay);
-}
+};
 
-function masquerEcranAttente() {
+window.masquerEcranAttente = function() {
     const overlay = document.getElementById("ecran-attente-ia");
     if (overlay) overlay.remove();
-}
+};
 
 async function genererReponseNarrateur(contexteFormate, historiqueComplet, maxTentatives = 3) {
     const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
@@ -898,16 +905,21 @@ window.declencherTourIA = async function() {
     console.log("🟢 Le bouton MJ a bien été détecté !");
     if (!window.ID_PARTIE_COURANTE) return;
 
-    // =========================================================================
-    // NOUVEAU : Reset du compteur de tokens à chaque clic !
-    // =========================================================================
+    // 1. SÉCURITÉ LOCALE : Vérifie si le verrou est déjà actif
+    const snapVerrou = await getDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE));
+    if (snapVerrou.exists() && snapVerrou.data().IA_En_Cours === true) {
+        console.log("⏳ L'IA réfléchit déjà, clic ignoré.");
+        return;
+    }
+
+    // 2. VERROUILLAGE GLOBAL : On dit à Firebase de bloquer tous les joueurs
+    await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), { IA_En_Cours: true });
+
+    // Reset du compteur de tokens local
     localStorage.setItem("ivalis_TOTAL_TOKENS", "0");
     if (typeof window.actualiserAffichageTokens === "function") {
         window.actualiserAffichageTokens();
     }
-    // =========================================================================
-
-    afficherEcranAttente();
 
     try {
         const snapPartie = await getDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE));
@@ -1039,6 +1051,9 @@ window.declencherTourIA = async function() {
     } catch (erreurFatale) {
         console.error("❌ [Tour IA] Erreur fatale :", erreurFatale);
     } finally {
-        masquerEcranAttente();
+        // 3. DÉVERROUILLAGE GLOBAL : On libère la partie pour tout le monde
+        if (window.ID_PARTIE_COURANTE) {
+            await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), { IA_En_Cours: false });
+        }
     }
 };
