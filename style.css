@@ -559,6 +559,23 @@ body, html {
   transform: translate(-50%, -50%); opacity: 1;
 }
 
+/* --- GESTION DU TEMPS --- */
+#conteneur-gestion-date {
+  display: none; 
+  position: fixed; 
+  top: 50%; 
+  left: 50%;
+  transform: translate(-50%, -40%); 
+  z-index: 150; /* Z-index très haut pour passer par-dessus les autres fenêtres */
+  opacity: 0;
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.6s ease;
+}
+
+#conteneur-gestion-date.ouvert {
+  transform: translate(-50%, -50%); 
+  opacity: 1;
+}
+
 .fondu-interne { transition: opacity 0.4s ease; }
 
 /* --- DESIGN PARCHEMIN --- */

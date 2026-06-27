@@ -402,8 +402,8 @@ async function genererEtStockerPortrait(donnees) {
 
   // 3. Construction du prompt (identique a l'original)
   const promptOpenAI =
-    "Crée un digital painting croquis pour un portrait de personnage de jeu de rôle heroic fantasy. " +
-    "L'esthétique globale doit être avec un éclairage dramatique mais lumineux, des coups de pinceau gestuels et des textures très tactiles sur les matériaux, comme un dessin préparatoire. " +
+    "Crée un portrait de personnage de jeu de rôle heroic fantasy. " +
+    "L'esthétique globale doit être avec un éclairage dramatique mais lumineux, des coups de pinceau gestuels et des textures très tactiles sur les matériaux. " +
     "Ne dessine absolument aucun texte ou lettrage sur l'image.\n\n" +
     "Description du personnage :\n" +
     "Il s'agit d'un héros de genre " + donnees.genre + ", ayant environ " + donnees.age + " ans. " +
@@ -1756,6 +1756,13 @@ window.fermerToutesLesFenetres = function() {
     menuParam.classList.remove('ouvert');
     menuParam.style.display = 'none';
   }
+
+  // Fermer le gestionnaire de temps
+  const menuDate = document.getElementById('conteneur-gestion-date');
+  if (menuDate) {
+    menuDate.classList.remove('ouvert');
+    menuDate.style.display = 'none';
+  }
 };
 
 // 2. Boutons Chatbox
@@ -2044,6 +2051,120 @@ window.afficherStatsFinales = function(dataStats) {
 };
 
 // =========================================================================
+//  GESTION DE LA DATE EN JEU (AVANCER LE TEMPS)
+// =========================================================================
+
+window.joursAAjouter = 0;
+
+window.ouvrirGestionDate = function() {
+    const menuDate = document.getElementById('conteneur-gestion-date');
+    const estDejaOuvert = (menuDate.style.display === 'block' || menuDate.classList.contains('ouvert'));
+    
+    window.fermerToutesLesFenetres();
+
+    if (!estDejaOuvert) {
+        // Mise à jour de l'affichage local avec les données de Firebase
+        document.getElementById('gestion-date-jour').innerText = window.DATE_EN_JEU_ACTUELLE.jour || "...";
+        document.getElementById('gestion-date-an').innerText = window.DATE_EN_JEU_ACTUELLE.annee || "...";
+        
+        window.joursAAjouter = 0;
+        document.getElementById('affichage-jours-plus').innerText = "0";
+
+        menuDate.style.display = 'block';
+        setTimeout(() => { menuDate.classList.add('ouvert'); }, 10);
+    }
+};
+
+window.fermerGestionDate = function() {
+    const menuDate = document.getElementById('conteneur-gestion-date');
+    menuDate.classList.remove('ouvert');
+    setTimeout(() => { menuDate.style.display = 'none'; }, 600);
+};
+
+window.modifierJoursAAjouter = function(delta) {
+    window.joursAAjouter += delta;
+    if (window.joursAAjouter < 0) window.joursAAjouter = 0; // Bloque en dessous de 0
+    document.getElementById('affichage-jours-plus').innerText = window.joursAAjouter;
+};
+
+// =========================================================================
+//  NOUVEAU : ACCÉLÉRATION DU DÉFILEMENT (Clic prolongé)
+// =========================================================================
+
+window.timerDefilementJours = null;
+window.vitesseDefilement = 300; // Vitesse de départ (en millisecondes)
+
+window.demarrerDefilementJours = function(delta) {
+    // 1. On fait l'action une première fois immédiatement (pour un clic normal)
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    window.modifierJoursAAjouter(delta);
+
+    // 2. On réinitialise la vitesse au cas où on avait cliqué frénétiquement avant
+    window.vitesseDefilement = 300;
+
+    // 3. La boucle qui va s'accélérer
+    const boucleDefilement = () => {
+        window.modifierJoursAAjouter(delta);
+        
+        // On réduit le délai de 20% à chaque tour (sans descendre en dessous de 30ms pour ne pas crasher)
+        if (window.vitesseDefilement > 30) {
+            window.vitesseDefilement = Math.floor(window.vitesseDefilement * 0.8);
+        }
+        
+        window.timerDefilementJours = setTimeout(boucleDefilement, window.vitesseDefilement);
+    };
+
+    // On attend 500ms avant de déclencher le mode "défilement continu"
+    window.timerDefilementJours = setTimeout(boucleDefilement, 500);
+};
+
+window.arreterDefilementJours = function() {
+    if (window.timerDefilementJours) {
+        clearTimeout(window.timerDefilementJours);
+        window.timerDefilementJours = null;
+    }
+};
+
+window.validerChangementDate = async function() {
+    if (window.joursAAjouter === 0) {
+        window.fermerGestionDate();
+        return;
+    }
+
+    const btnValider = document.getElementById("btn-valider-temps");
+    btnValider.innerText = "Calcul...";
+    btnValider.style.pointerEvents = "none";
+
+    let jourActuel = parseInt(window.DATE_EN_JEU_ACTUELLE.jour) || 1;
+    let anneeActuelle = parseInt(window.DATE_EN_JEU_ACTUELLE.annee) || 1;
+
+    jourActuel += window.joursAAjouter;
+
+    // --- LOGIQUE DE CALENDRIER ---
+    // Si l'année dans Ivalis fait plus ou moins de 365 jours, change le chiffre ci-dessous :
+    const JOURS_PAR_AN = 365; 
+
+    while (jourActuel > JOURS_PAR_AN) {
+        jourActuel -= JOURS_PAR_AN;
+        anneeActuelle += 1;
+    }
+
+    try {
+        await updateDoc(doc(db, COL.DATE, DOC_DATE), {
+            Jour: jourActuel.toString(),
+            Annee: anneeActuelle.toString()
+        });
+        window.fermerGestionDate();
+    } catch (e) {
+        console.error("Erreur lors du changement de date :", e);
+        alert("Le parchemin refuse de se réécrire (Erreur réseau).");
+    } finally {
+        btnValider.innerText = "Avancer le temps";
+        btnValider.style.pointerEvents = "auto";
+    }
+};
+
+// =========================================================================
 //  EXPOSITION DES FONCTIONS AU SCOPE GLOBAL
 //  (necessaire car index.html utilise des handlers inline onclick="...",
 //   or un <script type="module"> a sa propre portee.)
@@ -2073,5 +2194,7 @@ Object.assign(window, {
   ouvrirClesApi, sauvegarderClesApi, basculerAffichageCles,
   fermerAlerteCles, ouvrirParametresDepuisAlerte,
   // Outils
-  syncTemperature, sauvegarderTemperature, basculerAffichageTokens
+  syncTemperature, sauvegarderTemperature, basculerAffichageTokens,
+  // Gestion de la Date
+  ouvrirGestionDate, fermerGestionDate, modifierJoursAAjouter, validerChangementDate, demarrerDefilementJours, arreterDefilementJours
 });

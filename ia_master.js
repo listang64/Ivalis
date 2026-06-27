@@ -417,8 +417,14 @@ RÈGLES STRICTES ET ABSOLUES :
 
                 let idLieuGlobal = "";
                 let idBatimentGlobal = "";
-                if (idLieuActuel.startsWith("L")) idLieuGlobal = idLieuActuel;
-                else if (idLieuActuel.startsWith("B")) idBatimentGlobal = idLieuActuel;
+                if (idLieuActuel.startsWith("L")) {
+                    idLieuGlobal = idLieuActuel;
+                } else if (idLieuActuel.startsWith("B")) {
+                    idBatimentGlobal = idLieuActuel;
+                    // CORRECTION : On va chercher la région parente pour que la fiche du PNJ soit parfaite dès sa naissance
+                    const bSnap = await getDoc(doc(db, "Monde_Batiment", idLieuActuel));
+                    if (bSnap.exists()) idLieuGlobal = bSnap.data().ID_Lieu;
+                }
 
                 await updateDoc(doc(db, "Monde_PNJ", docId), {
                     Description_Physique: pnj.physique,
@@ -467,14 +473,15 @@ async function analyserDeplacementPNJ(idLieuActuel, nomsHeros, texteMJ) {
     const promptSysteme = `Tu es MIA_DEPLACEMENT, l'IA logistique.
 Voici les HÉROS (Personnages des joueurs) de la partie : ${JSON.stringify(nomsHeros)}.
 
-Ta mission : Lis la dernière narration du Maître du Jeu. Identifie TOUS les personnages (PNJ) qui se trouvent physiquement dans la MÊME ZONE que les héros à la fin du texte.
-- Si un héros sort d'une auberge et qu'un PNJ le suit à l'extérieur, ce PNJ is avec eux.
-- Si un PNJ vient d'arriver dans la pièce, il est avec eux.
-- Si un PNJ est resté à l'intérieur pendant que les héros sortent, IL N'EST PLUS avec eux.
+Ta mission : Lis la dernière narration du Maître du Jeu. Identifie TOUS les personnages (PNJ) qui se trouvent PHYSIQUEMENT DANS LA MÊME ZONE que les héros à la fin stricte du texte.
 
-Utilise l'outil 'deplacerPNJ' pour lister les noms exacts de ces PNJ présents.
-Règle 1 : NE LISTE JAMAIS LES HÉROS.
-Règle 2 : Ne liste que les vrais noms propres (ignore "le garde", "le tavernier").`;
+RÈGLES ABSOLUES ET STRICTES :
+1. NE LISTE JAMAIS LES HÉROS.
+2. ATTENTION AUX SÉPARATIONS : Si les héros quittent un lieu (sortent d'une pièce, s'enfuient, voyagent) et que le texte ne dit pas EXPLICITEMENT que le PNJ les accompagne, le PNJ est considéré comme RESTÉ SUR PLACE. Ne le liste SURTOUT PAS !
+3. Si le texte dit qu'un PNJ "regarde partir", "reste en arrière", "soupire en les voyant s'éloigner", IL N'EST PLUS AVEC EUX. Ne le liste pas.
+4. En cas de doute, ou si le PNJ n'a fait que parler avant que les héros ne bougent, ne le liste pas.
+
+Utilise l'outil 'deplacerPNJ' pour lister les noms exacts de ceux qui partagent encore le même espace physique à la seconde où le texte se termine.`;
 
     const outils = [{
         functionDeclarations: [{
@@ -580,18 +587,18 @@ async function analyserStigmates(idLieuActuel, texteMJ) {
             stigmatesActuels = snapDecor.data().Stigmates || "Aucun stigmate.";
         }
 
-        // NOUVEAU PROMPT : Consigne stricte sur la date et le temps qui passe
-        const promptSysteme = `Tu es MIA_STIGMATE, l'IA en charge de la mémoire de l'environnement.
+        const promptSysteme = `Tu es MIA_STIGMATE, un inspecteur des bâtiments froid, objectif et purement matériel.
 DATE ACTUELLE EN JEU : ${dateInGame}.
-Voici l'état ACTUEL des stigmates de cet endroit : "${stigmatesActuels}"
+Voici l'état ACTUEL des stigmates matériels de cet endroit : "${stigmatesActuels}"
 
-Ta mission : Lis le dernier texte du Maître du Jeu. Y a-t-il eu des altérations DURABLES apportées au décor ?
-Si un environnement a subi un changement durable, utilise l'outil 'mettreAJourStigmates' pour réécrire la description.
+Ta mission : Lis le dernier texte du Maître du Jeu. Y a-t-il eu des dégradations ou altérations DURABLES et MATÉRIELLES apportées à l'architecture (murs, portes, structures) ?
 
-RÈGLES ABSOLUES :
-1. Précède toujours chaque stigmate ou événement de sa date succincte (ex: "[Jour 56] La taverne a brûlé.").
-2. GESTION DU TEMPS : Prends en compte la DATE ACTUELLE. Si un ancien stigmate dit "[Jour 55] Le bâtiment est en flammes", tu DOIS le modifier aujourd'hui pour écrire "[Jour 56] Il ne reste que des cendres du bâtiment". 
-3. Lisse le tout pour que ça reste un résumé naturel de l'état des lieux.`;
+RÈGLES ABSOLUES (SOUS PEINE D'ERREUR CRITIQUE) :
+1. MATÉRIEL LOURD UNIQUEMENT : Tu ne décris QUE l'architecture détruite ou modifiée (ex: mur effondré, cratère, cendres, porte dégondée).
+2. IGNORE LES OBJETS ET OUTILS : Ne note JAMAIS un objet posé, planté, lâché ou manipulé par un personnage (ex: "un marteau planté dans un billot", "une chaise renversée", "une chope brisée"). Ce ne sont pas des stigmates architecturaux.
+3. INTERDICTION DES ÉMOTIONS : Il t'est STRICTEMENT INTERDIT de décrire l'atmosphère ou les actions des gens.
+4. Précède toujours chaque dommage matériel de sa date (ex: "[Jour 56] La porte principale est dégondée.").
+5. GESTION DU TEMPS : Actualise la date si un vieux stigmate évolue.`;
 
         const outils = [{
             functionDeclarations: [{
