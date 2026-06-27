@@ -3,7 +3,7 @@
 // =========================================================================
 
 import { db } from "./firebase-config.js";
-import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // --- 1. LE BACKEND (Le radar qui scanne la zone avant l'IA) ---
 
@@ -547,16 +547,20 @@ async function analyserStigmates(idLieuActuel, texteMJ) {
     const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
     if (!cleGemini || !idLieuActuel) return;
 
+    // NOUVEAU : On récupère la date actuelle du jeu
+    const jourActuel = window.DATE_EN_JEU_ACTUELLE?.jour || "?";
+    const anActuel = window.DATE_EN_JEU_ACTUELLE?.annee || "?";
+    const dateInGame = `Jour ${jourActuel} de l'an ${anActuel}`;
+
     let collectionCible = "";
     let stigmatesActuels = "";
 
-    // 1. Identifier la cible et récupérer les stigmates actuels
     if (idLieuActuel.startsWith("L")) {
         collectionCible = "Monde_Lieux";
     } else if (idLieuActuel.startsWith("B")) {
         collectionCible = "Monde_Batiment";
     } else {
-        return; // ID non reconnu
+        return; 
     }
 
     try {
@@ -565,27 +569,29 @@ async function analyserStigmates(idLieuActuel, texteMJ) {
             stigmatesActuels = snapDecor.data().Stigmates || "Aucun stigmate.";
         }
 
-        // 2. Le prompt de l'architecte
+        // NOUVEAU PROMPT : Consigne stricte sur la date et le temps qui passe
         const promptSysteme = `Tu es MIA_STIGMATE, l'IA en charge de la mémoire de l'environnement.
+DATE ACTUELLE EN JEU : ${dateInGame}.
 Voici l'état ACTUEL des stigmates de cet endroit : "${stigmatesActuels}"
 
-Ta mission : Lis le dernier texte du Maître du Jeu. Y a-t-il eu des altérations DURABLES apportées au décor (destruction, construction, incendie, statue érigée, réparation d'un ancien stigmate, etc.) ?
-Attention : Ignore les choses éphémères (un verre renversé, des traces de pas, un cadavre qui sera enlevé). Ne retiens que ce qui marque les murs ou l'endroit dans le temps.
+Ta mission : Lis le dernier texte du Maître du Jeu. Y a-t-il eu des altérations DURABLES apportées au décor ?
+Si un environnement a subi un changement durable, utilise l'outil 'mettreAJourStigmates' pour réécrire la description.
 
-Si l'environnement a subi un changement durable, utilise l'outil 'mettreAJourStigmates' pour réécrire la description.
-Règle Absolue : Tu dois LISSER la description (intégrer les nouveaux éléments, garder les anciens toujours valables, et enlever ceux qui auraient été réparés par l'action du MJ). Rédige une phrase ou un paragraphe propre et naturel.
-Si rien n'a changé de manière durable, ne fais rien.`;
+RÈGLES ABSOLUES :
+1. Précède toujours chaque stigmate ou événement de sa date succincte (ex: "[Jour 56] La taverne a brûlé.").
+2. GESTION DU TEMPS : Prends en compte la DATE ACTUELLE. Si un ancien stigmate dit "[Jour 55] Le bâtiment est en flammes", tu DOIS le modifier aujourd'hui pour écrire "[Jour 56] Il ne reste que des cendres du bâtiment". 
+3. Lisse le tout pour que ça reste un résumé naturel de l'état des lieux.`;
 
         const outils = [{
             functionDeclarations: [{
                 name: "mettreAJourStigmates",
-                description: "Met à jour la description lissée des stigmates du lieu.",
+                description: "Met à jour la description lissée et datée des stigmates du lieu.",
                 parameters: {
                     type: "OBJECT",
                     properties: {
                         nouveaux_stigmates: { 
                             type: "STRING", 
-                            description: "La nouvelle description complète, propre et lissée des stigmates de l'endroit."
+                            description: "La nouvelle description complète, propre, lissée et horodatée des stigmates."
                         }
                     },
                     required: ["nouveaux_stigmates"]
@@ -593,7 +599,6 @@ Si rien n'a changé de manière durable, ne fais rien.`;
             }]
         }];
 
-        // 3. Interrogation de Gemini Flash-Lite
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -607,21 +612,15 @@ Si rien n'a changé de manière durable, ne fais rien.`;
         const data = await res.json();
         const appelsOutils = data.candidates?.[0]?.content?.parts?.filter(p => p.functionCall).map(p => p.functionCall);
         
-        // 4. Inscription dans la Base de Données
         if (appelsOutils && appelsOutils.length > 0 && appelsOutils[0].name === "mettreAJourStigmates") {
             const stigmatesLisses = appelsOutils[0].args.nouveaux_stigmates || "";
             
-            // On ne met à jour que si l'IA a vraiment changé quelque chose
             if (stigmatesLisses && stigmatesLisses !== stigmatesActuels) {
                 console.log(`[MIA_STIGMATE] 🏚️ Décor altéré ! Nouveaux stigmates : ${stigmatesLisses}`);
-                await updateDoc(doc(db, collectionCible, idLieuActuel), {
-                    Stigmates: stigmatesLisses
-                });
+                await updateDoc(doc(db, collectionCible, idLieuActuel), { Stigmates: stigmatesLisses });
             }
         }
-    } catch (e) {
-        console.error("[MIA_STIGMATE] Erreur silencieuse :", e);
-    }
+    } catch (e) { console.error("[MIA_STIGMATE] Erreur silencieuse :", e); }
 }
 
 // =========================================================================
@@ -632,13 +631,11 @@ async function analyserReputation(idLieuActuel, texteMJ) {
     const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
     if (!cleGemini || !idLieuActuel) return;
 
-    // La réputation est toujours gérée au niveau du Lieu (Région), même si on est dans une auberge
     let idLieuCible = idLieuActuel;
     if (idLieuActuel.startsWith("B")) {
         const bSnap = await getDoc(doc(db, "Monde_Batiment", idLieuActuel));
         if (bSnap.exists()) idLieuCible = bSnap.data().ID_Lieu;
     }
-    
     if (!idLieuCible || !idLieuCible.startsWith("L")) return;
 
     try {
@@ -648,30 +645,31 @@ async function analyserReputation(idLieuActuel, texteMJ) {
         const scoreActuel = snapLieu.data().Reputation_Score || 0;
         const tagsActuels = snapLieu.data().Reputation_Tags || [];
 
+        // NOUVEAU PROMPT : On sépare les ajouts des suppressions pour protéger les anciens tags
         const promptSysteme = `Tu es MIA_REPUTATION, l'IA qui gère la renommée du groupe.
-Score actuel du groupe : ${scoreActuel} (sur une jauge de -10 à +10).
+Score actuel du groupe : ${scoreActuel} (-10 à +10).
 Tags de rumeur actuels : ${JSON.stringify(tagsActuels)}.
 
-Lis la dernière scène racontée par le Narrateur. Y a-t-il eu une action NOTABLE du groupe (ex: sauver quelqu'un, voler, tuer, payer généreusement, saccager, aider la milice) qui mérite de changer leur réputation dans toute cette région ?
-
+Lis la dernière scène racontée. Y a-t-il eu une action NOTABLE du groupe justifiant de modifier leur réputation ?
 Si oui :
-1. Ajuste le score de réputation (ne dépasse pas -10 ou +10).
-2. Ajoute de nouveaux mots-clés pertinents (ex: "Héroïques", "Voleurs", "Généreux", "Meurtriers").
-3. SUPPRIME obligatoirement les anciens tags qui sont contredits par la nouvelle action (ex: si "Honnêtes" était présent, mais qu'ils viennent de voler, supprime "Honnêtes" et ajoute "Voleurs").
+1. Ajuste le score de réputation.
+2. S'il y a de nouveaux traits de réputation justifiés par l'action, mets-les dans 'tags_a_ajouter' (ex: "Voleurs", "Généreux").
+3. IMPORTANT : Tu ne dois mettre un ancien tag dans 'tags_a_supprimer' QUE s'il est formellement contredit par la nouvelle action (ex: supprime "Honnêtes" s'ils viennent de voler). Ne supprime JAMAIS un tag comme "Incendiaires" juste parce qu'ils viennent de sauver un chat. La mémoire des crimes et des actes héroïques reste.
 
-Si l'action est banale ou privée sans témoin, utilise l'outil avec les valeurs actuelles pour ne rien changer.`;
+Si l'action est banale, ne fais rien.`;
 
         const outils = [{
             functionDeclarations: [{
                 name: "mettreAJourReputation",
-                description: "Modifie la jauge et les tags comportementaux du groupe.",
+                description: "Modifie le score et indique quels tags ajouter ou retirer.",
                 parameters: {
                     type: "OBJECT",
                     properties: {
                         nouveau_score: { type: "INTEGER", description: "Le nouveau score de -10 à +10" },
-                        nouveaux_tags: { type: "ARRAY", items: { type: "STRING" }, description: "Liste à jour des mots-clés" }
+                        tags_a_ajouter: { type: "ARRAY", items: { type: "STRING" }, description: "Nouveaux tags à AJOUTER au groupe" },
+                        tags_a_supprimer: { type: "ARRAY", items: { type: "STRING" }, description: "Anciens tags à SUPPRIMER car formellement contredits" }
                     },
-                    required: ["nouveau_score", "nouveaux_tags"]
+                    required: ["nouveau_score"]
                 }
             }]
         }];
@@ -691,18 +689,137 @@ Si l'action est banale ou privée sans témoin, utilise l'outil avec les valeurs
         
         if (appelsOutils && appelsOutils.length > 0 && appelsOutils[0].name === "mettreAJourReputation") {
             const nouveauScore = appelsOutils[0].args.nouveau_score;
-            const nouveauxTags = appelsOutils[0].args.nouveaux_tags || [];
+            const tagsAjout = appelsOutils[0].args.tags_a_ajouter || [];
+            const tagsSuppr = appelsOutils[0].args.tags_a_supprimer || [];
             
-            // On ne met à jour que si les valeurs ont réellement changé
-            if (nouveauScore !== scoreActuel || JSON.stringify(nouveauxTags) !== JSON.stringify(tagsActuels)) {
-                console.log(`[MIA_REPUTATION] 📢 Réputation mise à jour ! Score: ${nouveauScore}, Tags: ${nouveauxTags}`);
+            // LOGIQUE JAVASCRIPT : On manipule les anciens tags sans les écraser
+            let setTags = new Set(tagsActuels);
+            tagsSuppr.forEach(tag => setTags.delete(tag)); // On efface ceux que l'IA a réfutés
+            tagsAjout.forEach(tag => setTags.add(tag));    // On ajoute les nouveaux
+            let nouveauxTagsArray = Array.from(setTags);
+            
+            if (nouveauScore !== scoreActuel || JSON.stringify(nouveauxTagsArray) !== JSON.stringify(tagsActuels)) {
+                console.log(`[MIA_REPUTATION] 📢 Score: ${nouveauScore}, Tags finaux: ${nouveauxTagsArray}`);
                 await updateDoc(doc(db, "Monde_Lieux", idLieuCible), {
                     Reputation_Score: nouveauScore,
-                    Reputation_Tags: nouveauxTags
+                    Reputation_Tags: nouveauxTagsArray
                 });
             }
         }
     } catch (e) { console.error("[MIA_REPUTATION] Erreur :", e); }
+}
+
+// =========================================================================
+//  NOUVEAU : MIA_MORT (La Faucheuse de PNJ et d'images)
+// =========================================================================
+
+async function supprimerImageCloudinary(urlImage) {
+    if (!urlImage) return;
+    const cles = {
+        cloudName: localStorage.getItem("ivalis_CLOUDINARY_CLOUD_NAME")?.trim(),
+        cloudKey: localStorage.getItem("ivalis_CLOUDINARY_API_KEY")?.trim(),
+        cloudSecret: localStorage.getItem("ivalis_CLOUDINARY_API_SECRET")?.trim()
+    };
+    if (!cles.cloudName || !cles.cloudKey || !cles.cloudSecret) return;
+
+    try {
+        // 1. Isoler l'ID public depuis l'URL Cloudinary (extrêmement robuste)
+        const parts = urlImage.split('/upload/');
+        if (parts.length < 2) return;
+        
+        // On filtre les balises de transformation (q_auto, etc.) et les numéros de version (v178...)
+        const segmentsNettoyes = parts[1].split('/').filter(seg => !seg.includes(',') && !/^v\d+$/.test(seg));
+        const cheminComplet = segmentsNettoyes.join('/'); // Ex: "PNJ/mon_image.webp"
+        const publicId = cheminComplet.substring(0, cheminComplet.lastIndexOf('.')); // Ex: "PNJ/mon_image"
+
+        // 2. Préparer la signature de destruction
+        const timestamp = Math.floor(Date.now() / 1000).toString();
+        const signature = await genererSignatureCloudinary(`public_id=${publicId}&timestamp=${timestamp}${cles.cloudSecret}`);
+
+        // 3. Envoyer la roquette de destruction
+        const formData = new FormData();
+        formData.append("public_id", publicId);
+        formData.append("api_key", cles.cloudKey);
+        formData.append("timestamp", timestamp);
+        formData.append("signature", signature);
+
+        await fetch(`https://api.cloudinary.com/v1_1/${cles.cloudName}/image/destroy`, {
+            method: "POST",
+            body: formData
+        });
+        console.log(`[Cloudinary] 🧹 Image supprimée des serveurs : ${publicId}`);
+    } catch (e) {
+        console.error("[Cloudinary] Erreur lors de la suppression de l'image :", e);
+    }
+}
+
+async function analyserMortsPNJ(nomsPnjPresents, texteMJ) {
+    const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
+    if (!cleGemini || !nomsPnjPresents || nomsPnjPresents.length === 0) return;
+
+    const promptSysteme = `Tu es MIA_MORT, l'IA en charge de la faucheuse.
+Voici les PNJ de l'histoire actuellement présents dans la scène : ${JSON.stringify(nomsPnjPresents)}.
+
+Ta mission : Lis la dernière narration du Maître du Jeu. Y a-t-il un ou plusieurs PNJ de cette liste qui viennent EXPLICITEMENT de MOURIR (tués, assassinés, désintégrés, décapités, etc.) ?
+Attention : S'ils sont juste blessés, assommés, qu'ils fuient, ou qu'ils sont "aux portes de la mort", ils NE SONT PAS morts.
+
+Si un ou plusieurs PNJ sont définitivement morts, utilise l'outil 'declarerMorts' avec leurs noms exacts.
+Sinon, ne fais rien.`;
+
+    const outils = [{
+        functionDeclarations: [{
+            name: "declarerMorts",
+            description: "Déclare le décès définitif et incontestable des PNJ présents.",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    noms_morts: { type: "ARRAY", items: { type: "STRING" }, description: "Liste des noms exacts des PNJ décédés." }
+                },
+                required: ["noms_morts"]
+            }
+        }]
+    }];
+
+    try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                systemInstruction: { parts: [{ text: promptSysteme }] },
+                contents: [{ role: "user", parts: [{ text: texteMJ }] }],
+                tools: outils, 
+                toolConfig: { functionCallingConfig: { mode: "AUTO" } }
+            })
+        });
+
+        const data = await res.json();
+        const appelsOutils = data.candidates?.[0]?.content?.parts?.filter(p => p.functionCall).map(p => p.functionCall);
+        
+        if (appelsOutils && appelsOutils.length > 0 && appelsOutils[0].name === "declarerMorts") {
+            const nomsMorts = appelsOutils[0].args.noms_morts || [];
+            
+            for (const nom of nomsMorts) {
+                if (!nomsPnjPresents.includes(nom)) continue; // Sécurité anti-hallucination
+
+                console.log(`[MIA_MORT] ☠️ Le PNJ '${nom}' a passé l'arme à gauche. Début du nettoyage...`);
+                
+                const qPnj = query(collection(db, "Monde_PNJ"), where("Nom_PNJ", "==", nom));
+                const snapPnj = await getDocs(qPnj);
+
+                snapPnj.forEach(async (docPnj) => {
+                    const dataPnj = docPnj.data();
+                    
+                    // 1. Incinération de la photo
+                    if (dataPnj.URL_Cloudinary && dataPnj.URL_Cloudinary !== "") {
+                        await supprimerImageCloudinary(dataPnj.URL_Cloudinary);
+                    }
+                    
+                    // 2. Destruction de l'âme dans Firebase
+                    await deleteDoc(doc(db, "Monde_PNJ", docPnj.id));
+                    console.log(`[MIA_MORT] 🗑️ Fiche de '${nom}' totalement effacée de la base de données.`);
+                });
+            }
+        }
+    } catch (e) { console.error("[MIA_MORT] Erreur silencieuse :", e); }
 }
 
 // =========================================================================
@@ -837,7 +954,12 @@ window.declencherTourIA = async function() {
             pnjCibles = await filtrerPNJAvecMia(historique4, nomsPnjPresents);
         }
 
-        let contexte = `--- CONTEXTE DE LA ZONE ACTUELLE ---\n`;
+        // NOUVEAU : Récupération de la date in-game
+        const jourActuel = window.DATE_EN_JEU_ACTUELLE?.jour || "?";
+        const anActuel = window.DATE_EN_JEU_ACTUELLE?.annee || "?";
+
+        let contexte = `--- CONTEXTE TEMPOREL ET SPATIAL ---\n`;
+        contexte += `DATE ACTUELLE EN JEU : Nous sommes le Jour ${jourActuel} de l'an ${anActuel}.\n`;
         contexte += `Type : ${env.type}\n`;
         contexte += `Description de la zone : ${JSON.stringify(env.details)}\n`;
         if (env.type === "Lieu" && env.listeBatiments.length > 0) {
@@ -905,9 +1027,11 @@ window.declencherTourIA = async function() {
                 if (lieuFinal) {
                     await analyserNouveauxPNJ(lieuFinal, nomsPnjPresents, nomsHeros, reponseTexte);
                     await analyserDeplacementPNJ(lieuFinal, nomsHeros, reponseTexte);
-                    await analyserStigmates(lieuFinal, reponseTexte);
                     
-                    // NOUVEAU : MIA_REPUTATION met à jour la renommée du groupe
+                    // NOUVEAU : MIA_MORT nettoie les cadavres
+                    await analyserMortsPNJ(nomsPnjPresents, reponseTexte);
+
+                    await analyserStigmates(lieuFinal, reponseTexte);
                     await analyserReputation(lieuFinal, reponseTexte);
                 }
             }, 0);
