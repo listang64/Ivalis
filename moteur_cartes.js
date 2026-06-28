@@ -349,7 +349,7 @@ async function analyserStyleCombatRP(texteRP) {
 Tu dois impérativement respecter le schéma JSON ci-dessous. Ne génère aucun texte en dehors du JSON.
 
 RÈGLES DE RÉPARTITION :
-1. Répartis exactement 100 points dans l'objet "Poids_Actions" en fonction du texte du joueur. Si un aspect n'est pas mentionné, mets 0.
+1. Répartis exactement 100 points dans l'objet "Poids_Actions" en fonction du texte du joueur. Si un aspect n'est pas mentionné, mets 0. IL EST INUTILE ET INTERDIT de mettre plus de 30 points dans "Invocations" (30 points donne déjà le maximum d'invocations possible).
 2. Dans "Alterations_Dominantes", choisis un maximum de 2 altérations parmi : [Poison, Blessure, Malediction, Confusion]. Sinon laisse [].
 3. Dans "Elements", identifie un maximum de 2 éléments parmi : [Feu, Glace, Terre, Air, Lumiere, Tenebres]. Sinon laisse [].
 
