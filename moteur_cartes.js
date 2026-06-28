@@ -18,7 +18,7 @@ const DICTIONNAIRE_CARTES = {
     "Degats_Melee":    { nom: "Attaque", baseCost: 1 },       
     "Degats_Distance": { nom: "Attaque", baseCost: 1, porteeBase: 3 }, 
     "Degats_Zone":     { nom: "Attaque", baseCost: 1 },
-    "Degats_Purs":     { nom: "Subit des dégâts (Ignore Bouclier)", baseCost: 1.5 },
+    "Degats_Purs":     { nom: "Dégâts Directs", baseCost: 1.5 },
     "Mobilite":        { nom: "Déplacement", baseCost: 1 },   
     "Furtivite_Esquive":{ nom: "Déplacement", baseCost: 1 },
     "Defense_Lourde":  { nom: "Bouclier", baseCost: 1.5 },    
@@ -150,6 +150,7 @@ function forgerAction(categorieForcee, profilJson, compteurs, isBurnForce, elemD
     }
     else if (cat === "Degats_Purs") {
         action.portee = 3;
+        action.effets.push("L'adversaire cible subit ces dégâts. Ignore les boucliers.");
         coutEffets += 1; 
     }
     else if (cat === "Invocations") {
@@ -505,13 +506,18 @@ window.genererProfilDeck = async function() {
         // ---> AJOUTE CETTE LIGNE ICI POUR TRIER LE NOUVEAU DECK <---
         deckProcedural.sort((a, b) => a.initiative - b.initiative);
 
+        // NOUVEAU : On stocke le deck et la couleur en variables globales pour le survol
+        window.DECK_COURANT = deckProcedural;
+        window.COULEUR_PERSO_COURANT = couleurPerso;
+
         let htmlDeck = `<div class="deck-visuel-container">`;
         
-        deckProcedural.forEach(carte => {
+        deckProcedural.forEach((carte, index) => {
             let titre = carte.titre || "Action Inconnue";
             
+            // On ajoute 'event' en paramètre pour récupérer les coordonnées
             htmlDeck += `
-                <div class="banniere-carte">
+                <div class="banniere-carte" onmouseenter="window.afficherCarteZoom(${index}, event)" onmouseleave="window.masquerCarteZoom()">
                     <div class="fond-couleur" style="background-color: ${couleurPerso};"></div>
                     <div class="image-cadre"></div>
                     <div class="initiative-bulle">${carte.initiative}</div>
@@ -571,13 +577,18 @@ window.chargerDeckExistant = async function(idPersonnage) {
             deckProcedural.sort((a, b) => a.initiative - b.initiative);
 
             // 3. On construit l'affichage visuel directement
+            // NOUVEAU : On stocke le deck et la couleur en variables globales pour le survol
+            window.DECK_COURANT = deckProcedural;
+            window.COULEUR_PERSO_COURANT = couleurPerso;
+
             let htmlDeck = `<div class="deck-visuel-container">`;
         
-            deckProcedural.forEach(carte => {
+            deckProcedural.forEach((carte, index) => {
                 let titre = carte.titre || "Action Inconnue";
                 
+                // On ajoute 'event' en paramètre pour récupérer les coordonnées
                 htmlDeck += `
-                    <div class="banniere-carte">
+                    <div class="banniere-carte" onmouseenter="window.afficherCarteZoom(${index}, event)" onmouseleave="window.masquerCarteZoom()">
                         <div class="fond-couleur" style="background-color: ${couleurPerso};"></div>
                         <div class="image-cadre"></div>
                         <div class="initiative-bulle">${carte.initiative}</div>
@@ -600,5 +611,89 @@ window.chargerDeckExistant = async function(idPersonnage) {
         }
     } catch (erreur) {
         console.error("Erreur lors du chargement du deck existant :", erreur);
+    }
+};
+
+// =========================================================================
+//  AFFICHAGE DE LA CARTE AU SURVOL (POP-UP FLOTTANT)
+// =========================================================================
+
+window.afficherCarteZoom = function(indexCarte, evenement) {
+    const carte = window.DECK_COURANT[indexCarte];
+    const couleur = window.COULEUR_PERSO_COURANT;
+    if (!carte) return;
+
+    let apercu = document.getElementById("apercu-carte-zoom");
+    if (!apercu) {
+        apercu = document.createElement("div");
+        apercu.id = "apercu-carte-zoom";
+        document.body.appendChild(apercu);
+    }
+
+    // 2. Formatage de l'action HAUT
+    let effetsHaut = carte.haut.effets.length > 0 ? carte.haut.effets.join("<br>") : "";
+    let texteElementHaut = carte.haut.element ? `<br><span style="color:#00ffff">${carte.haut.element}</span>` : "";
+    
+    // NOUVEAU : On prépare la croix rouge si l'action du haut brûle la carte
+    let croixHaut = carte.haut.isBurn ? `<div class="icone-carte-perdue">✖</div>` : "";
+    
+    let htmlHaut = `
+        <div class="carte-action-titre">${carte.haut.nom} ${carte.haut.valeur > 0 ? carte.haut.valeur : ''}</div>
+        <div class="carte-action-effets">
+            ${carte.haut.portee > 0 ? `Portée : ${carte.haut.portee}<br>` : ''}
+            ${effetsHaut}
+            ${texteElementHaut}
+        </div>
+        ${croixHaut}
+    `;
+
+    // 3. Formatage de l'action BAS
+    let effetsBas = carte.bas.effets.length > 0 ? carte.bas.effets.join("<br>") : "";
+    let texteElementBas = carte.bas.element ? `<br><span style="color:#00ffff">${carte.bas.element}</span>` : "";
+    
+    // NOUVEAU : On prépare la croix rouge si l'action du bas brûle la carte
+    let croixBas = carte.bas.isBurn ? `<div class="icone-carte-perdue">✖</div>` : "";
+
+    let htmlBas = `
+        <div class="carte-action-titre">${carte.bas.nom} ${carte.bas.valeur > 0 ? carte.bas.valeur : ''}</div>
+        <div class="carte-action-effets">
+            ${carte.bas.portee > 0 ? `Portée : ${carte.bas.portee}<br>` : ''}
+            ${effetsBas}
+            ${texteElementBas}
+        </div>
+        ${croixBas}
+    `;
+
+    let titrePopUp = carte.titre || "Action Inconnue";
+
+    apercu.innerHTML = `
+        <div class="carte-zoom-fond-couleur" style="background-color: ${couleur};"></div>
+        <div class="carte-zoom-image"></div>
+        
+        <div class="carte-zoom-niveau">1</div>
+        <div class="carte-zoom-titre">${titrePopUp}</div>
+        <div class="carte-zoom-initiative">${carte.initiative}</div>
+        
+        <div class="carte-zoom-haut">${htmlHaut}</div>
+        <div class="carte-zoom-bas">${htmlBas}</div>
+    `;
+
+    const rectangleBanniere = evenement.currentTarget.getBoundingClientRect();
+    
+    let posX = rectangleBanniere.left - 320; 
+    let posY = rectangleBanniere.top + (rectangleBanniere.height / 2) - (418 / 2);
+
+    if (posY < 10) posY = 10;
+    if (posY + 418 > window.innerHeight) posY = window.innerHeight - 428;
+
+    apercu.style.left = posX + "px";
+    apercu.style.top = posY + "px";
+    apercu.style.display = "block";
+};
+
+window.masquerCarteZoom = function() {
+    const apercu = document.getElementById("apercu-carte-zoom");
+    if (apercu) {
+        apercu.style.display = "none";
     }
 };
