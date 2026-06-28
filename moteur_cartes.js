@@ -183,9 +183,24 @@ function forgerAction(categorieForcee, profilJson, compteurs, isBurnForce, elemD
     else if (cat === "Soutien_Tactique") {
         let soutiensDispos = ["Benediction", "Renforcement", "Aura_Attaque", "Recup_Carte"];
         let buffChoisi = soutiensDispos[Math.floor(Math.random() * soutiensDispos.length)];
-        action.effets.push(DICTIONNAIRE_CARTES[buffChoisi].nom);
-        coutEffets += DICTIONNAIRE_CARTES[buffChoisi].cout;
-        if (buffChoisi === "Recup_Carte") action.isBurn = true;
+        
+        // 1. On supprime le mot générique "Soutien" et le chiffre qui porte à confusion
+        action.valeur = 0;
+        coutEffets += budget; // On vide le budget pour empêcher l'algorithme d'ajouter un chiffre
+        
+        // 2. On utilise la vraie syntaxe Gloomhaven
+        if (buffChoisi === "Aura_Attaque") {
+            action.nom = "Aura de Puissance";
+            action.effets.push("Tous les alliés à portée 2 gagnent +1 Attaque ce round.");
+        } else if (buffChoisi === "Benediction" || buffChoisi === "Renforcement") {
+            action.nom = DICTIONNAIRE_CARTES[buffChoisi].nom; // "Bénédiction" ou "Renforcement"
+            action.portee = 3;
+            action.effets.push("Cible : Un allié");
+        } else if (buffChoisi === "Recup_Carte") {
+            action.nom = "Récupération tactique";
+            action.effets.push("Un allié adjacent récupère 1 carte défaussée.");
+            action.isBurn = true;
+        }
     }
     else if (cat === "Manipulation") {
         action.nom = Math.random() < 0.5 ? "Attaque" : "Déplacement"; 
@@ -268,7 +283,7 @@ function forgerAction(categorieForcee, profilJson, compteurs, isBurnForce, elemD
 
     if (cat === "Pillage") {
         action.valeur = isBurnForce ? 2 : 1;
-    } else if (cat !== "Degats_Purs") {
+    } else if (cat !== "Degats_Purs" && cat !== "Soutien_Tactique") {
         if (action.valeur < 2 && !isBurnForce && cat !== "Degats_Zone") action.valeur = 2; 
         if (action.valeur < 1) action.valeur = 1; // Un effet coûteux comme la Boule de feu baisse les dégâts à 1 minimum
 
