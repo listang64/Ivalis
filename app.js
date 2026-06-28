@@ -1504,6 +1504,11 @@ async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPers
   // --- NOUVEAU : Charger les caractéristiques ---
   window.chargerCaracteristiques(idPersonnage);
 
+  // --- NOUVEAU : Charger le deck de cartes existant ---
+  if (typeof window.chargerDeckExistant === "function") {
+      window.chargerDeckExistant(idPersonnage);
+  }
+
   fiche.style.display = "flex";
   const fenetreLargeur = fiche.offsetWidth;
   const fenetreHauteur = fiche.offsetHeight;

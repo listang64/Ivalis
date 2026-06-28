@@ -3,7 +3,7 @@
 // =========================================================================
 
 import { db } from "./firebase-config.js";
-import { doc, setDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // =========================================================================
 //  DICTIONNAIRE DES COÛTS ET EFFETS (Le Grand Dictionnaire Étendu)
@@ -478,7 +478,7 @@ window.genererProfilDeck = async function() {
             return carte;
         });
 
-        // --- ÉTAPE 4 : SAUVEGARDE ET AFFICHAGE ---
+        // --- ÉTAPE 4 : SAUVEGARDE ET AFFICHAGE VISUEL ---
         await setDoc(doc(db, "Cartes_Profils", idPersonnage), {
             ID_Personnage: idPersonnage,
             Texte_RP_Original: texteRP,
@@ -488,14 +488,42 @@ window.genererProfilDeck = async function() {
         });
 
         document.getElementById("titre-theme-deck").innerText = profilJson.Theme_Identifie || "Deck Généré";
+
+        // --- NOUVEAU : Récupération de la vraie couleur dans la BDD ---
+        let couleurPerso = "#4a1c1c"; // Couleur de secours
+        try {
+            const persoRef = doc(db, "Personnages", idPersonnage);
+            const persoSnap = await getDoc(persoRef);
+            if (persoSnap.exists() && persoSnap.data().Couleur) {
+                couleurPerso = persoSnap.data().Couleur;
+            }
+        } catch (e) {
+            console.warn("Impossible de récupérer la couleur du personnage :", e);
+        }
+        // --------------------------------------------------------------
+
+        // ---> AJOUTE CETTE LIGNE ICI POUR TRIER LE NOUVEAU DECK <---
+        deckProcedural.sort((a, b) => a.initiative - b.initiative);
+
+        let htmlDeck = `<div class="deck-visuel-container">`;
         
-        let texteAffichage = "=== ADN DU HÉROS ===\n";
-        texteAffichage += JSON.stringify(profilJson, null, 2) + "\n\n";
-        texteAffichage += "=== 11 CARTES GÉNÉRÉES & NOMMÉES ===\n";
-        texteAffichage += JSON.stringify(deckProcedural, null, 2);
+        deckProcedural.forEach(carte => {
+            let titre = carte.titre || "Action Inconnue";
+            
+            htmlDeck += `
+                <div class="banniere-carte">
+                    <div class="fond-couleur" style="background-color: ${couleurPerso};"></div>
+                    <div class="image-cadre"></div>
+                    <div class="initiative-bulle">${carte.initiative}</div>
+                    <div class="titre-carte">${titre}</div>
+                </div>
+            `;
+        });
         
-        document.getElementById("json-affichage-deck").innerText = texteAffichage;
-        
+        htmlDeck += `</div>`;
+
+        document.getElementById("json-affichage-deck").innerHTML = htmlDeck;
+
         divResultat.style.display = "block";
         document.getElementById("champ-rp-deck").value = ""; 
 
@@ -505,5 +533,72 @@ window.genererProfilDeck = async function() {
     } finally {
         btn.innerText = "Générer les Cartes";
         btn.style.pointerEvents = "auto";
+    }
+};
+
+// =========================================================================
+// CHARGEMENT D'UN DECK EXISTANT (Affichage Direct)
+// =========================================================================
+
+window.chargerDeckExistant = async function(idPersonnage) {
+    const divResultat = document.getElementById("resultat-profil-deck");
+    const conteneurAffichage = document.getElementById("json-affichage-deck");
+    const titreTheme = document.getElementById("titre-theme-deck");
+
+    if (!idPersonnage) return;
+
+    try {
+        // 1. On interroge la collection Cartes_Profils
+        const deckRef = doc(db, "Cartes_Profils", idPersonnage);
+        const deckSnap = await getDoc(deckRef);
+
+        if (deckSnap.exists()) {
+            const donneesDeck = deckSnap.data();
+            const deckProcedural = donneesDeck.Deck_Mathematique;
+            
+            // On remet le titre (ex: "Gardien de Pierre Immuable")
+            titreTheme.innerText = donneesDeck.Donnees_IA?.Theme_Identifie || "Deck du Héros";
+
+            // 2. On récupère la vraie couleur du personnage
+            let couleurPerso = "#4a1c1c";
+            const persoRef = doc(db, "Personnages", idPersonnage);
+            const persoSnap = await getDoc(persoRef);
+            if (persoSnap.exists() && persoSnap.data().Couleur) {
+                couleurPerso = persoSnap.data().Couleur;
+            }
+
+            // ---> AJOUTE CETTE LIGNE ICI POUR TRIER LES VIEUX DECKS <---
+            deckProcedural.sort((a, b) => a.initiative - b.initiative);
+
+            // 3. On construit l'affichage visuel directement
+            let htmlDeck = `<div class="deck-visuel-container">`;
+        
+            deckProcedural.forEach(carte => {
+                let titre = carte.titre || "Action Inconnue";
+                
+                htmlDeck += `
+                    <div class="banniere-carte">
+                        <div class="fond-couleur" style="background-color: ${couleurPerso};"></div>
+                        <div class="image-cadre"></div>
+                        <div class="initiative-bulle">${carte.initiative}</div>
+                        <div class="titre-carte">${titre}</div>
+                    </div>
+                `;
+            });
+            
+            htmlDeck += `</div>`;
+            
+            // On injecte et on affiche !
+            conteneurAffichage.innerHTML = htmlDeck;
+            divResultat.style.display = "block";
+            
+        } else {
+            // S'il n'y a pas de deck sauvegardé, on cache la zone pour laisser place au formulaire de génération
+            divResultat.style.display = "none";
+            conteneurAffichage.innerHTML = "";
+            titreTheme.innerText = "";
+        }
+    } catch (erreur) {
+        console.error("Erreur lors du chargement du deck existant :", erreur);
     }
 };
