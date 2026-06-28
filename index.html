@@ -532,7 +532,21 @@
         <button class="btn-modale" onclick="jouerSonClic(); fermerModaleCreationCaracs()">Annuler</button>
       </div>
     </div>
-    <div id="onglet-cartes" class="contenu-onglet"><h3 style="margin-top: 0;">Deck de Combat</h3><p><i>Système de cartes...</i></p></div>
+    <div id="onglet-cartes" class="contenu-onglet">
+      <h3 style="margin-top: 0; border-bottom: 2px solid #5c3a21; padding-bottom: 5px; color: #2a1a0f;">Profil de Combat (Générateur)</h3>
+      
+      <div id="cartes-vide" style="text-align: center; margin-top: 20px;">
+        <p style="font-size: 16px; color: #4a2e1b; margin-bottom: 15px;">Décris le style de combat, l'arme, et l'attitude de ton héros en quelques phrases. L'IA traduira cela en statistiques de deck.</p>
+        <textarea id="champ-rp-deck" class="input-texte-parchemin" style="height: 100px; width: 90%; margin-bottom: 15px;" placeholder="Ex: C'est un chevalier lourd armé d'une masse qui encaisse les coups et utilise la magie de la terre..."></textarea>
+        <br>
+        <button id="btn-generer-profil-deck" class="btn-parametres" onclick="jouerSonClic(); window.genererProfilDeck()">Analyser le style</button>
+      </div>
+
+      <div id="resultat-profil-deck" style="display: none; text-align: left; margin-top: 20px; padding: 15px; background-color: rgba(255, 255, 255, 0.4); border-left: 4px solid #5c3a21; border-radius: 4px;">
+        <h4 id="titre-theme-deck" style="margin-top: 0; color: #2c1e16; border-bottom: 1px dashed #c2a878; padding-bottom: 5px;">Thème</h4>
+        <pre id="json-affichage-deck" style="font-size: 14px; color: #5c3a21; font-family: monospace; white-space: pre-wrap; margin: 0;"></pre>
+      </div>
+    </div>
     <div id="onglet-inventaire" class="contenu-onglet"><h3 style="margin-top: 0;">Sac à dos &amp; Équipement</h3><p><i>Armes, armures...</i></p></div>
   </div>  <div id="fenetre-chatbox">
     
@@ -553,8 +567,9 @@
 
 </div> 
 
-<!-- NOUVEAU : On charge le cerveau IA ici -->
+<!-- NOUVEAU : On charge le cerveau IA et le Moteur de cartes ici -->
 <script type="module" src="ia_master.js?v=2"></script>
+<script type="module" src="moteur_cartes.js?v=1"></script>
 <script type="module" src="app.js?v=2"></script>
 
 <div id="overlay-jet-des" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 5000; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
