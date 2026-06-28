@@ -74,16 +74,25 @@ const ELEMENTS_LISTE = ["Feu", "Glace", "Terre", "Air", "Lumière", "Ténèbres"
 // =========================================================================
 
 function choisirCategoriePonderee(poidsActions) {
+    // 1. Filtrer les catégories qui ont un poids de 0 pour éviter les erreurs de thématique
+    let poidsFiltrés = {};
+    for (let key in poidsActions) {
+        if (poidsActions[key] > 0) poidsFiltrés[key] = poidsActions[key];
+    }
+
     let total = 0;
-    for (let key in poidsActions) total += poidsActions[key];
+    for (let key in poidsFiltrés) total += poidsFiltrés[key];
+    
+    // Si malgré tout on est bloqué, on prend une valeur sûre (Attaque)
     if (total === 0) return "Degats_Melee";
     
     let rand = Math.random() * total;
-    for (let key in poidsActions) {
-        if (rand < poidsActions[key]) return key;
-        rand -= poidsActions[key];
+    for (let key in poidsFiltrés) {
+        if (rand < poidsFiltrés[key]) return key;
+        rand -= poidsFiltrés[key];
     }
-    return "Degats_Melee";
+    // Fallback sécurisé sur la première catégorie valide
+    return Object.keys(poidsFiltrés)[0]; 
 }
 
 // NOUVEAU PARAMÈTRE : elementInterdit (pour empêcher les clones Haut/Bas)
@@ -377,6 +386,57 @@ SCHÉMA JSON ATTENDU :
     return JSON.parse(jsonTexte);
 }
 
+async function nommerCartesDeck(deckProcedural, texteRP, theme) {
+    const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
+    if (!cleGemini) throw new Error("Clé Gemini manquante.");
+
+    // On prépare un résumé simplifié du deck pour l'IA pour économiser des tokens et la garder focus
+    const deckSimplifie = deckProcedural.map(c => ({
+        id: c.id,
+        haut: `${c.haut.nom} (Valeur: ${c.haut.valeur}, Effets: ${c.haut.effets.join(", ")}, Burn: ${c.haut.isBurn})`,
+        bas: `${c.bas.nom} (Valeur: ${c.bas.valeur}, Effets: ${c.bas.effets.join(", ")}, Burn: ${c.bas.isBurn})`
+    }));
+
+    const promptSysteme = `Tu es le Concepteur Narratif du jeu de plateau tactique Ivalis. 
+Ta mission est de donner un Titre épique et thématique à chacune des 11 cartes d'un deck de joueur.
+
+CONTEXTE DU HÉROS :
+Thème : ${theme}
+Description RP : "${texteRP}"
+
+RÈGLES STRICTES :
+1. Chaque carte doit avoir un nom unique (aucun doublon, évite les répétitions de mots comme "Frappe" ou "Ombre" à outrance).
+2. Le nom doit refléter ce que fait mécaniquement la carte. Par exemple, si le Haut est une "Attaque de Zone Perdue" et le Bas un "Saut", le nom doit évoquer une explosion ou un plongeon destructeur.
+3. Tu dois impérativement respecter le format JSON ci-dessous, sans aucun texte avant ou après.
+
+FORMAT JSON ATTENDU :
+{
+  "noms_cartes": [
+    { "id": "CARTE_1", "titre": "Nom Épique 1" },
+    { "id": "CARTE_2", "titre": "Nom Épique 2" }
+    // ... jusqu'à CARTE_11
+  ]
+}`;
+
+    const bodyRequete = {
+        systemInstruction: { parts: [{ text: promptSysteme }] },
+        contents: [{ role: "user", parts: [{ text: JSON.stringify(deckSimplifie) }] }],
+        generationConfig: { 
+            temperature: 0.7, // Température un peu plus haute pour la créativité littéraire
+            responseMimeType: "application/json" 
+        }
+    };
+
+    const reponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(bodyRequete)
+    });
+
+    const data = await reponse.json();
+    if (data.error) throw new Error(data.error.message);
+
+    return JSON.parse(data.candidates[0].content.parts[0].text);
+}
+
 window.genererProfilDeck = async function() {
     const idPersonnage = document.getElementById("champ-id-personnage").value;
     const texteRP = document.getElementById("champ-rp-deck").value.trim();
@@ -384,7 +444,7 @@ window.genererProfilDeck = async function() {
     const divResultat = document.getElementById("resultat-profil-deck");
 
     if (!idPersonnage || idPersonnage === "") {
-        alert("Il faut d'abord enregistrer le personnage (onglet Descriptif) avant d'analyser son style.");
+        alert("Il faut d'abord enregistrer le personnage (onglet Descriptif).");
         return;
     }
     if (texteRP === "") {
@@ -392,14 +452,33 @@ window.genererProfilDeck = async function() {
         return;
     }
 
-    btn.innerText = "Création du Deck en cours...";
+    btn.innerText = "Étape 1 : Analyse mathématique...";
     btn.style.pointerEvents = "none";
     divResultat.style.display = "none";
 
     try {
+        // --- ÉTAPE 1 : ADN MATHÉMATIQUE ---
         const profilJson = await analyserStyleCombatRP(texteRP);
-        const deckProcedural = window.genererDeckComplet(profilJson);
+        
+        // --- ÉTAPE 2 : FORGE DES CARTES ---
+        let deckProcedural = window.genererDeckComplet(profilJson);
 
+        // --- ÉTAPE 3 : BAPTÊME NARRATIF (NOUVEAU) ---
+        btn.innerText = "Étape 2 : Nommage thématique des cartes...";
+        const baptemeIA = await nommerCartesDeck(deckProcedural, texteRP, profilJson.Theme_Identifie);
+
+        // Injection des noms générés dans notre deck mathématique
+        deckProcedural = deckProcedural.map(carte => {
+            let infoNom = baptemeIA.noms_cartes.find(n => n.id === carte.id);
+            if (infoNom) {
+                carte.titre = infoNom.titre; // Ajout de l'attribut titre à la carte
+            } else {
+                carte.titre = "Action Inconnue";
+            }
+            return carte;
+        });
+
+        // --- ÉTAPE 4 : SAUVEGARDE ET AFFICHAGE ---
         await setDoc(doc(db, "Cartes_Profils", idPersonnage), {
             ID_Personnage: idPersonnage,
             Texte_RP_Original: texteRP,
@@ -410,9 +489,9 @@ window.genererProfilDeck = async function() {
 
         document.getElementById("titre-theme-deck").innerText = profilJson.Theme_Identifie || "Deck Généré";
         
-        let texteAffichage = "=== ADN DU HÉROS (Répartition IA) ===\n";
+        let texteAffichage = "=== ADN DU HÉROS ===\n";
         texteAffichage += JSON.stringify(profilJson, null, 2) + "\n\n";
-        texteAffichage += "=== 11 CARTES GÉNÉRÉES (Deck Mathématique) ===\n";
+        texteAffichage += "=== 11 CARTES GÉNÉRÉES & NOMMÉES ===\n";
         texteAffichage += JSON.stringify(deckProcedural, null, 2);
         
         document.getElementById("json-affichage-deck").innerText = texteAffichage;
@@ -422,9 +501,9 @@ window.genererProfilDeck = async function() {
 
     } catch (erreur) {
         console.error("Erreur lors de la génération du profil :", erreur);
-        alert("L'analyse a échoué. Vérifiez vos clés d'API.");
+        alert("L'analyse a échoué. Vérifiez la console pour plus de détails.");
     } finally {
-        btn.innerText = "Analyser le style";
+        btn.innerText = "Générer les Cartes";
         btn.style.pointerEvents = "auto";
     }
 };
