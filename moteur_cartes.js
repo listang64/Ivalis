@@ -93,9 +93,28 @@ function forgerAction(categorieForcee, profilJson, compteurs, isBurnForce, elemD
     // Fallback sécurisé : Si la catégorie n'est pas forcée, on pioche en ignorant les poids à 0
     let cat = categorieForcee || choisirCategoriePonderee(profilJson.Poids_Actions);
     
-    // LIMITES STRICTES (Max 1 Invo, Max 1 Exécution par deck)
-    if (cat === "Invocations" && compteurs.invocations >= 1) { cat = "Degats_Melee"; }
-    if (cat === "Execution" && compteurs.executions >= 1) { cat = "Degats_Distance"; }
+    // =================================================================
+    // NOUVEAU : LIMITES DYNAMIQUES & STRICTES
+    // =================================================================
+    
+    // 1. Calcul du quota d'Invocations (10 pts = 1, 20 pts = 2, 30+ pts = 3)
+    let pointsInvoc = profilJson.Poids_Actions?.Invocations || 0;
+    let maxInvocations = 0;
+    
+    if (pointsInvoc >= 30) maxInvocations = 3;
+    else if (pointsInvoc >= 20) maxInvocations = 2;
+    else if (pointsInvoc > 0) maxInvocations = 1; // Au moins 1 si la stat est présente (ex: 10)
+
+    // Censure si le quota d'invocations est atteint
+    if (cat === "Invocations" && compteurs.invocations >= maxInvocations) { 
+        // Si l'invocateur a trop de sbires, on le force à attaquer à distance (sortilège) plutôt qu'au corps-à-corps
+        cat = "Degats_Distance"; 
+    }
+
+    // 2. Censure des Exécutions (Toujours limité à 1 maximum par deck pour l'équilibrage Niveau 1)
+    if (cat === "Execution" && compteurs.executions >= 1) { 
+        cat = "Degats_Distance"; 
+    }
     
     let dictBase = DICTIONNAIRE_CARTES[cat] || DICTIONNAIRE_CARTES["Degats_Melee"];
     action.nom = dictBase.nom;
