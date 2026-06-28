@@ -17,41 +17,43 @@ const DICTIONNAIRE_CARTES = {
     // --- CATEGORIES PRINCIPALES ---
     "Degats_Melee":    { nom: "Attaque", baseCost: 1 },       
     "Degats_Distance": { nom: "Attaque", baseCost: 1, porteeBase: 3 }, 
-    "Degats_Zone":     { nom: "Attaque", baseCost: 1, porteeBase: 3 },
-    "Degats_Purs":     { nom: "Subit des dégâts (Ignore Bouclier)", baseCost: 1.5 }, // NOUVEAU
+    "Degats_Zone":     { nom: "Attaque", baseCost: 1 },
+    "Degats_Purs":     { nom: "Subit des dégâts (Ignore Bouclier)", baseCost: 1.5 },
     "Mobilite":        { nom: "Déplacement", baseCost: 1 },   
     "Furtivite_Esquive":{ nom: "Déplacement", baseCost: 1 },
     "Defense_Lourde":  { nom: "Bouclier", baseCost: 1.5 },    
     "Soin":            { nom: "Soin", baseCost: 1 },          
     "Soutien_Tactique":{ nom: "Soutien", baseCost: 1.5 }, 
     "Manipulation":    { nom: "Terrain", baseCost: 1.5 },
-    "Controle_Mental": { nom: "Ordre", baseCost: 2 }, // NOUVEAU : Commandement Allié/Ennemi
+    "Controle_Mental": { nom: "Ordre", baseCost: 2 },
     "Pillage":         { nom: "Pillage", baseCost: 2 },
     "Invocations":     { nom: "Invocation", baseCost: 5 },
-    "Execution":       { nom: "Éliminez une cible normale", baseCost: 6 }, // NOUVEAU : Insta-kill (Burn garanti)
+    "Execution":       { nom: "Éliminez une cible normale", baseCost: 6 }, 
 
-    // --- EFFETS DE DÉGÂTS & ZONES ---
+    // --- EFFETS DE DÉGÂTS & ZONES (Nouveau !) ---
     "Zone_Ligne":      { nom: "Zone : Ligne de 3", cout: 2 },
     "Zone_Cible2":     { nom: "Cible : 2 adversaires", cout: 1.5 },
+    "Zone_Chemin":     { nom: "Ciblez tous les adversaires sur le chemin", cout: 2.5 },
+    "Zone_Explosion":  { nom: "Zone : L'hexagone cible et tous les adjacents", cout: 3 }, // La Boule de Feu !
     "Perforation":     { nom: "Perforation 2", cout: 1 },
-    "Avantage":        { nom: "Gagnez Avantage", cout: 1 }, // NOUVEAU
+    "Avantage":        { nom: "Gagnez Avantage", cout: 1 },
 
     // --- EFFETS DÉFENSIFS & AURAS ---
     "Invisibilite":    { nom: "Invisibilité", cout: 2.5 }, 
     "Riposte":         { nom: "Riposte 2", cout: 1.5 },
-    "Aura_Attaque":    { nom: "Aura : +1 Attaque ce round", cout: 2 }, // NOUVEAU
+    "Aura_Attaque":    { nom: "Aura : +1 Attaque ce round", cout: 2 }, 
 
     // --- SOUTIEN & ALLIÉS ---
     "Benediction":     { nom: "Bénédiction", cout: 1.5 },
     "Renforcement":    { nom: "Renforcement", cout: 1.5 },
     "Recup_Carte":     { nom: "Récupérez 1 carte défaussée", cout: 3 },
-    "Action_Allie":    { nom: "Un allié adjacent effectue Attaque 2", cout: 2 }, // NOUVEAU
+    "Action_Allie":    { nom: "Un allié adjacent effectue Attaque 2", cout: 2 }, 
 
     // --- MANIPULATION TERRAIN & POSITION ---
     "Piege_Cree":      { nom: "Créez un Piège (3 Dégâts)", cout: 1.5 },
-    "Piege_Desamorce": { nom: "Désamorcez un piège", cout: 1 }, // NOUVEAU
-    "Obstacle_Cree":   { nom: "Créez 1 Obstacle", cout: 1 }, // NOUVEAU
-    "Obstacle_Detruit":{ nom: "Détruisez 1 Obstacle", cout: 1 }, // NOUVEAU
+    "Piege_Desamorce": { nom: "Désamorcez un piège", cout: 1 }, 
+    "Obstacle_Cree":   { nom: "Créez 1 Obstacle", cout: 1 }, 
+    "Obstacle_Detruit":{ nom: "Détruisez 1 Obstacle", cout: 1 }, 
     "Poussee":         { nom: "Poussée 1", cout: 1 },
     "Traction":        { nom: "Traction 1", cout: 1 },
     "Condition_Allie": { nom: "+2 Attaque si la cible est adjacente à un allié", cout: -1.5 },
@@ -61,7 +63,7 @@ const DICTIONNAIRE_CARTES = {
     "Blessure":        { nom: "Blessure", cout: 1 },
     "Malediction":     { nom: "Malédiction", cout: 1 },
     "Confusion":       { nom: "Confusion", cout: 1 },
-    "Desavantage":     { nom: "Imposez Désavantage", cout: 1 }, // NOUVEAU
+    "Desavantage":     { nom: "Imposez Désavantage", cout: 1 }, 
     "Etourdissement":  { nom: "Étourdissement", cout: 3 } 
 };
 
@@ -87,14 +89,15 @@ function choisirCategoriePonderee(poidsActions) {
 // NOUVEAU PARAMÈTRE : elementInterdit (pour empêcher les clones Haut/Bas)
 function forgerAction(categorieForcee, profilJson, compteurs, isBurnForce, elemDeck, elementInterdit = "") {
     let action = { nom: "", valeur: 0, effets: [], portee: 0, xp: 0, isBurn: isBurnForce, element: "" };
+    
+    // Fallback sécurisé : Si la catégorie n'est pas forcée, on pioche en ignorant les poids à 0
     let cat = categorieForcee || choisirCategoriePonderee(profilJson.Poids_Actions);
     
-    // Limitation stricte des Invocations ET des Exécutions (Max 1 par deck)
+    // LIMITES STRICTES (Max 1 Invo, Max 1 Exécution par deck)
     if (cat === "Invocations" && compteurs.invocations >= 1) { cat = "Degats_Melee"; }
     if (cat === "Execution" && compteurs.executions >= 1) { cat = "Degats_Distance"; }
     
     let dictBase = DICTIONNAIRE_CARTES[cat] || DICTIONNAIRE_CARTES["Degats_Melee"];
-
     action.nom = dictBase.nom;
     if (dictBase.porteeBase) action.portee = dictBase.porteeBase;
 
@@ -102,16 +105,14 @@ function forgerAction(categorieForcee, profilJson, compteurs, isBurnForce, elemD
     let coutEffets = 0;
 
     // =================================================================
-    // 1. LES MÉCANIQUES AVANCÉES (Classes expertes)
+    // 1. LES MÉCANIQUES AVANCÉES (Toutes connectées au dictionnaire !)
     // =================================================================
-
     if (cat === "Execution") {
-        action.nom = DICTIONNAIRE_CARTES["Execution"].nom;
-        action.valeur = 0; // Pas de dégâts chiffrés, c'est un One-Shot
+        action.valeur = 0; 
         action.isBurn = true;
-        action.xp = 2; // Grosse récompense pour une exécution
-        compteurs.executions++; // NOUVEAU : On incrémente le compteur
-        return action; // On s'arrête là, la carte est complète
+        action.xp = 2; 
+        compteurs.executions++;
+        return action;
     }
     else if (cat === "Controle_Mental") {
         action.nom = "Domination";
@@ -120,9 +121,8 @@ function forgerAction(categorieForcee, profilJson, compteurs, isBurnForce, elemD
         coutEffets += 2.5; 
     }
     else if (cat === "Degats_Purs") {
-        action.nom = DICTIONNAIRE_CARTES["Degats_Purs"].nom;
         action.portee = 3;
-        coutEffets += 1; // Un peu de portée pour compenser le fait que la valeur de base sera faible
+        coutEffets += 1; 
     }
     else if (cat === "Invocations") {
         let pv = Math.floor(Math.random() * 4) + 2;
@@ -135,31 +135,28 @@ function forgerAction(categorieForcee, profilJson, compteurs, isBurnForce, elemD
         return action;
     }
     else if (cat === "Degats_Zone") {
-        let aoe = Math.random() < 0.5 ? "Zone_Ligne" : "Zone_Cible2";
-        action.effets.push(DICTIONNAIRE_CARTES[aoe].nom);
-        coutEffets += DICTIONNAIRE_CARTES[aoe].cout;
+        // NOUVEAU : On tire parmi les 4 zones disponibles (Ligne, Cible2, Chemin, Explosion)
+        let zonesDispos = ["Zone_Ligne", "Zone_Cible2", "Zone_Chemin", "Zone_Explosion"];
+        let aoeChoisie = zonesDispos[Math.floor(Math.random() * zonesDispos.length)];
+        
+        action.effets.push(DICTIONNAIRE_CARTES[aoeChoisie].nom);
+        coutEffets += DICTIONNAIRE_CARTES[aoeChoisie].cout;
+        
+        // Forcer de la portée pour les sorts qui en ont logiquement besoin
+        if (aoeChoisie === "Zone_Chemin" || aoeChoisie === "Zone_Explosion") {
+            action.portee = Math.max(3, action.portee);
+        }
     } 
     else if (cat === "Furtivite_Esquive") {
         action.effets.push(DICTIONNAIRE_CARTES["Invisibilite"].nom);
         coutEffets += DICTIONNAIRE_CARTES["Invisibilite"].cout;
     }
     else if (cat === "Soutien_Tactique") {
-        // Ajout de la mécanique d'Amplification (Aura)
-        let buffRnd = Math.random();
-        if (buffRnd < 0.30) {
-            action.effets.push(DICTIONNAIRE_CARTES["Benediction"].nom);
-            coutEffets += DICTIONNAIRE_CARTES["Benediction"].cout;
-        } else if (buffRnd < 0.60) {
-            action.effets.push(DICTIONNAIRE_CARTES["Renforcement"].nom);
-            coutEffets += DICTIONNAIRE_CARTES["Renforcement"].cout;
-        } else if (buffRnd < 0.85) {
-            action.effets.push(DICTIONNAIRE_CARTES["Aura_Attaque"].nom);
-            coutEffets += DICTIONNAIRE_CARTES["Aura_Attaque"].cout;
-        } else {
-            action.effets.push(DICTIONNAIRE_CARTES["Recup_Carte"].nom);
-            coutEffets += DICTIONNAIRE_CARTES["Recup_Carte"].cout;
-            action.isBurn = true; // Récupérer des cartes coûte cher
-        }
+        let soutiensDispos = ["Benediction", "Renforcement", "Aura_Attaque", "Recup_Carte"];
+        let buffChoisi = soutiensDispos[Math.floor(Math.random() * soutiensDispos.length)];
+        action.effets.push(DICTIONNAIRE_CARTES[buffChoisi].nom);
+        coutEffets += DICTIONNAIRE_CARTES[buffChoisi].cout;
+        if (buffChoisi === "Recup_Carte") action.isBurn = true;
     }
     else if (cat === "Manipulation") {
         action.nom = Math.random() < 0.5 ? "Attaque" : "Déplacement"; 
@@ -174,24 +171,16 @@ function forgerAction(categorieForcee, profilJson, compteurs, isBurnForce, elemD
             action.valeur = 2; 
             coutEffets += DICTIONNAIRE_CARTES["Riposte"].cout;
         } else {
-            let soutienRnd = Math.random();
-            if (soutienRnd < 0.70) { 
-                action.portee = 3; 
-                coutEffets += 1; 
-            } else if (soutienRnd < 0.90) {
-                action.effets.push("Affecte tous les alliés adjacents");
-                coutEffets += 1.5; 
-            } else {
-                action.effets.push("Sur vous-même");
-            }
+            action.nom = "Bouclier";
+            action.valeur = 1;
         }
     }
     else if (cat === "Soin") {
-        let soutienRnd = Math.random();
-        if (soutienRnd < 0.70) { 
+        // Soin d'équipe forcé avec de la portée pour éviter l'égoïsme
+        if (Math.random() < 0.70) { 
             action.portee = 3; 
             coutEffets += 1; 
-        } else if (soutienRnd < 0.90) {
+        } else if (Math.random() < 0.90) {
             action.effets.push("Affecte tous les alliés adjacents");
             coutEffets += 1.5; 
         } else {
@@ -200,9 +189,8 @@ function forgerAction(categorieForcee, profilJson, compteurs, isBurnForce, elemD
     }
 
     // =================================================================
-    // 2. GESTION DES ÉLÉMENTS (Anti-Clone)
+    // 2. GESTION DES ÉLÉMENTS (Anti-Clone Strict)
     // =================================================================
-    
     if (Math.random() < 0.25 || (isBurnForce && Math.random() < 0.5)) {
         if (compteurs.elementsCrees > compteurs.elementsConsommes && Math.random() < 0.6) {
             let texteBonus = (cat === "Degats_Melee" || cat === "Degats_Distance" || cat === "Degats_Zone") ? "+1 Dégât" : `+1 ${dictBase.nom}`;
@@ -220,34 +208,32 @@ function forgerAction(categorieForcee, profilJson, compteurs, isBurnForce, elemD
     }
 
     // =================================================================
-    // 3. EFFETS TACTIQUES SECONDAIRES
+    // 3. EFFETS SECONDAIRES ALÉATOIRES
     // =================================================================
-    
     if (cat === "Degats_Melee" || cat === "Degats_Distance") {
         let alt = profilJson.Alterations_Dominantes?.[0];
+        // 25% de chance d'appliquer l'altération de la classe
         if (alt && DICTIONNAIRE_CARTES[alt] && Math.random() < 0.25) {
             action.effets.push(DICTIONNAIRE_CARTES[alt].nom);
             coutEffets += DICTIONNAIRE_CARTES[alt].cout;
         } 
         else if (Math.random() < 0.20) {
-            if (cat === "Degats_Melee" && Math.random() < 0.4) {
-                action.effets.push(DICTIONNAIRE_CARTES["Condition_Allie"].nom);
-                coutEffets += DICTIONNAIRE_CARTES["Condition_Allie"].cout; 
-            } else if (Math.random() < 0.3) {
-                action.effets.push(DICTIONNAIRE_CARTES["Avantage"].nom);
-                coutEffets += DICTIONNAIRE_CARTES["Avantage"].cout;
-            } else {
-                let eff = ["Poussee", "Traction", "Perforation"][Math.floor(Math.random()*3)];
-                action.effets.push(DICTIONNAIRE_CARTES[eff].nom);
-                coutEffets += DICTIONNAIRE_CARTES[eff].cout;
+            // Piocher dans le reste des effets de position/contrôle
+            let effetsSupDispos = ["Poussee", "Traction", "Perforation", "Avantage", "Condition_Allie"];
+            let effChoisi = effetsSupDispos[Math.floor(Math.random() * effetsSupDispos.length)];
+            
+            // Sécurité : On ne met pas Condition_Allie sur du tir à distance
+            if (effChoisi === "Condition_Allie" && cat !== "Degats_Melee") {
+                effChoisi = "Avantage";
             }
+            action.effets.push(DICTIONNAIRE_CARTES[effChoisi].nom);
+            coutEffets += DICTIONNAIRE_CARTES[effChoisi].cout;
         }
     }
 
     // =================================================================
     // 4. LE COUPERET DU BUDGET ET CORRECTIONS
     // =================================================================
-    
     let budgetRestant = budget - coutEffets;
     action.valeur = Math.floor(budgetRestant / dictBase.baseCost);
 
@@ -255,49 +241,32 @@ function forgerAction(categorieForcee, profilJson, compteurs, isBurnForce, elemD
         action.valeur = isBurnForce ? 2 : 1;
     } else if (cat !== "Degats_Purs") {
         if (action.valeur < 2 && !isBurnForce && cat !== "Degats_Zone") action.valeur = 2; 
-        if (action.valeur < 1) action.valeur = 1;
+        if (action.valeur < 1) action.valeur = 1; // Un effet coûteux comme la Boule de feu baisse les dégâts à 1 minimum
 
         // ANTI-VANILLA : Interdiction des cartes génériques
         if (action.effets.length === 0 && action.element === "") {
             if (action.valeur > 2) action.valeur -= 1; 
-
-            let bonusRnd = Math.random();
-            let alt = profilJson.Alterations_Dominantes?.[0];
-
-            if (bonusRnd < 0.25 && `Génère : ${elemDeck}` !== elementInterdit) {
-                action.element = `Génère : ${elemDeck}`;
-                compteurs.elementsCrees++;
-            } 
-            else if (action.nom === "Attaque") {
-                if (bonusRnd < 0.60 && alt && DICTIONNAIRE_CARTES[alt]) {
-                    action.effets.push(DICTIONNAIRE_CARTES[alt].nom);
-                } else {
-                    let eff = ["Poussee", "Traction", "Perforation"][Math.floor(Math.random()*3)];
-                    action.effets.push(DICTIONNAIRE_CARTES[eff].nom);
-                }
-            } 
-            else if (action.nom === "Déplacement") {
-                if (bonusRnd < 0.66) action.effets.push("Saut");
-                else action.effets.push("Poussée 1"); 
-            }
-            else if (action.nom === "Soin" || action.nom === "Bouclier") {
+            if (action.nom === "Attaque") {
+                action.effets.push(DICTIONNAIRE_CARTES["Perforation"].nom);
+            } else if (action.nom === "Déplacement") {
+                action.effets.push("Saut");
+            } else if (action.nom === "Soin" || action.nom === "Bouclier") {
                 action.valeur += 1; 
             }
         }
     }
 
-    // BURN SECURITY
+    // BURN SECURITY & PLAFOND NIVEAU 1
     if (action.isBurn) {
         if (action.xp === 0) action.xp = 1;
-        // Si c'est un Burn pur dégâts, il tape fort. Sinon, on laisse tel quel.
         if (action.valeur < 4 && ["Degats_Melee", "Degats_Distance"].includes(cat)) {
             action.valeur = 4;
         }
-    }
-
-    // SÉCURITÉ PLAFOND : Une carte non-perdue ne peut pas dépasser 3 en Attaque, Déplacement ou Soin (sauf cas très précis).
-    if (!action.isBurn && action.valeur > 3 && cat !== "Defense_Lourde") {
-        action.valeur = 3;
+    } else {
+        // PLAFOND NIVEAU 1 : Pas d'attaque de base surpuissante non-perdue
+        if (action.valeur > 3 && cat !== "Defense_Lourde") {
+            action.valeur = 3;
+        }
     }
 
     return action;
