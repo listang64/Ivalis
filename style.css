@@ -1244,6 +1244,9 @@ textarea.input-texte-parchemin {
     align-items: center;
     cursor: pointer;
     transition: transform 0.2s ease;
+    
+    /* LA MAGIE POUR RÉDUIRE L'ÉCART : On remonte la carte suivante dans l'espace transparent */
+    margin-bottom: -15px; 
 }
 
 .banniere-carte:hover {
@@ -1292,7 +1295,7 @@ textarea.input-texte-parchemin {
 .initiative-bulle {
     position: absolute;
     /* CENTRAGE VERTICAL ABSOLU */
-    top: 50%;
+    top: 46%;
     transform: translateY(-50%);
     
     /* CENTRAGE HORIZONTAL DANS LE ROND */
@@ -1312,7 +1315,7 @@ textarea.input-texte-parchemin {
 .titre-carte {
     position: absolute;
     /* CENTRAGE VERTICAL ABSOLU */
-    top: 50%;
+    top: 46%;
     transform: translateY(-50%);
     
     /* CENTRAGE HORIZONTAL DANS LE RECTANGLE */
