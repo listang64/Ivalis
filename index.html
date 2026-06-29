@@ -560,8 +560,11 @@
     <div id="zone-noms-bulles"></div>
     <div id="zone-saisie-chat">
       <input type="text" id="input-chat" placeholder="Écrivez votre message..." onkeydown="if(event.key==='Enter') { window.envoyerMessageChat(); }">
-      <button id="btn-envoyer-chat" onclick="jouerSonClic(); window.envoyerMessageChat()">Envoyer</button>
       
+      <!-- NOUVEAU : Bouton Microphone -->
+      <button id="btn-micro" onclick="window.toggleMicro()" style="background: transparent; border: none; font-size: 22px; cursor: pointer; transition: 0.3s; padding: 0 10px; color: white;" title="Dicter à voix haute">🎤</button>
+      
+      <button id="btn-envoyer-chat" onclick="jouerSonClic(); window.envoyerMessageChat()">Envoyer</button>
     </div>
   </div>
 

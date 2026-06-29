@@ -849,6 +849,12 @@ window.relancerInitiativeChat = async function() {
 
 // 5. Envoi du message (avec ajout de la Date issue de Firestore)
 window.envoyerMessageChat = async function() {
+   // NOUVEAU : On coupe le micro de force si on envoie le message et on vide sa mémoire
+   if (window.estEnTrainEcouter && window.recognition) {
+       window.recognition.stop();
+   }
+   window.texteAvantEcoute = "";
+
    const input = document.getElementById("input-chat");
    const texte = input.value.trim();
    if(texte === "" || !window.ID_PARTIE_COURANTE) return;
@@ -2399,6 +2405,66 @@ window.jouerAnimationDesGlobal = function(donnees) {
 };
 
 // =========================================================================
+//  DICTÉE VOCALE (MICROPHONE)
+// =========================================================================
+window.recognition = null;
+window.estEnTrainEcouter = false;
+window.texteAvantEcoute = "";
+
+window.toggleMicro = function() {
+    const btn = document.getElementById("btn-micro");
+    const input = document.getElementById("input-chat");
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+        const zone = document.getElementById("zone-messages-chat");
+        zone.insertAdjacentHTML('beforeend', `<div style="color: #ff4c4c; text-align: center; margin: 10px; font-weight: bold;">Ton navigateur ne supporte pas la magie de la voix (Utilise Google Chrome ou Microsoft Edge).</div>`);
+        zone.scrollTop = zone.scrollHeight;
+        return;
+    }
+
+    if (!window.estEnTrainEcouter) {
+        if (!window.recognition) {
+            window.recognition = new SpeechRecognition();
+            window.recognition.lang = 'fr-FR';
+            window.recognition.interimResults = true;
+            window.recognition.continuous = true;
+
+            window.recognition.onresult = (event) => {
+                let transcriptTemp = "";
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    transcriptTemp += event.results[i][0].transcript;
+                }
+                
+                let separateur = (window.texteAvantEcoute.length > 0 && !window.texteAvantEcoute.endsWith(" ")) ? " " : "";
+                input.value = window.texteAvantEcoute + separateur + transcriptTemp;
+            };
+
+            window.recognition.onend = () => {
+                window.estEnTrainEcouter = false;
+                if(btn) {
+                    btn.style.color = "white"; 
+                    btn.innerHTML = "🎤";
+                    btn.style.textShadow = "none";
+                }
+            };
+        }
+
+        window.texteAvantEcoute = input.value; 
+        window.estEnTrainEcouter = true;
+        window.recognition.start();
+        
+        btn.style.color = "#ff4c4c"; 
+        btn.innerHTML = "🔴";
+        btn.style.textShadow = "0 0 10px red";
+        
+    } else {
+        window.recognition.stop();
+    }
+};
+
+// =========================================================================
 //  EXPOSITION DES FONCTIONS AU SCOPE GLOBAL
 //  (necessaire car index.html utilise des handlers inline onclick="...",
 //   or un <script type="module"> a sa propre portee.)
@@ -2428,7 +2494,7 @@ Object.assign(window, {
   ouvrirClesApi, sauvegarderClesApi, basculerAffichageCles,
   fermerAlerteCles, ouvrirParametresDepuisAlerte,
   // Outils
-  syncTemperature, sauvegarderTemperature, basculerAffichageTokens,
+  syncTemperature, sauvegarderTemperature, basculerAffichageTokens, toggleMicro,
   // Gestion de la Date
   ouvrirGestionDate, fermerGestionDate, modifierJoursAAjouter, validerChangementDate, demarrerDefilementJours, arreterDefilementJours
 });
