@@ -1732,12 +1732,70 @@ document.addEventListener("click", function (event) {
 });
 
 // =========================================================================
+//  MOTEUR DE LA CARTE INTERACTIVE (ZOOM & DÉPLACEMENT)
+// =========================================================================
+let carteZoom = 1;
+let cartePanX = 0;
+let cartePanY = 0;
+let isDraggingCarte = false;
+let startDragX = 0;
+let startDragY = 0;
+
+function initialiserCarteInteractive() {
+  const conteneur = document.getElementById("conteneur-carte-fond");
+  const carte = document.getElementById("carte-fond-jeu");
+  if (!conteneur || !carte) return;
+
+  // 1. Gérer le Zoom avec la molette
+  conteneur.addEventListener("wheel", function (e) {
+    e.preventDefault();
+
+    // Vitesse du zoom (0.1 = doux)
+    const delta = Math.sign(e.deltaY) * -0.1;
+    carteZoom += delta;
+
+    // Limites : pas plus petit que la moitié (0.5), pas plus grand que 4x (4)
+    carteZoom = Math.min(Math.max(0.5, carteZoom), 4);
+
+    appliquerTransformationCarte();
+  }, { passive: false });
+
+  // 2. Attraper la carte (Clic gauche)
+  conteneur.addEventListener("mousedown", function (e) {
+    if (e.button !== 0) return;
+    isDraggingCarte = true;
+    startDragX = e.clientX - cartePanX;
+    startDragY = e.clientY - cartePanY;
+  });
+
+  // 3. Déplacer la carte
+  window.addEventListener("mousemove", function (e) {
+    if (!isDraggingCarte) return;
+    e.preventDefault();
+    cartePanX = e.clientX - startDragX;
+    cartePanY = e.clientY - startDragY;
+    appliquerTransformationCarte();
+  });
+
+  // 4. Lâcher la carte
+  window.addEventListener("mouseup", function () { isDraggingCarte = false; });
+  window.addEventListener("mouseleave", function () { isDraggingCarte = false; });
+
+  function appliquerTransformationCarte() {
+    carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
+  }
+}
+
+// =========================================================================
 //  INITIALISATION (DOMContentLoaded)
 // =========================================================================
 document.addEventListener("DOMContentLoaded", function () {
   // TEMPS REEL : liste des joueurs (identification) + date en jeu (parchemin)
   ecouterJoueurs();
   ecouterDateEnJeu();
+
+  // NOUVEAU : On active la carte interactive !
+  initialiserCarteInteractive();
 
   // Rendre la fiche de personnage deplacable
   rendreFenetreDeplacable(document.getElementById("fenetre-fiche-perso"));
