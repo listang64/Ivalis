@@ -2221,10 +2221,11 @@ window.validerChangementDate = async function() {
     let jourActuel = parseInt(window.DATE_EN_JEU_ACTUELLE.jour) || 1;
     let anneeActuelle = parseInt(window.DATE_EN_JEU_ACTUELLE.annee) || 1;
 
+    // On mémorise le nombre de jours passés avant de l'ajouter
+    const joursEcoules = window.joursAAjouter; 
     jourActuel += window.joursAAjouter;
 
     // --- LOGIQUE DE CALENDRIER ---
-    // Si l'année dans Ivalis fait plus ou moins de 365 jours, change le chiffre ci-dessous :
     const JOURS_PAR_AN = 365; 
 
     while (jourActuel > JOURS_PAR_AN) {
@@ -2233,10 +2234,37 @@ window.validerChangementDate = async function() {
     }
 
     try {
+        // 1. Mise à jour de la date dans la base de données
         await updateDoc(doc(db, COL.DATE, DOC_DATE), {
             Jour: jourActuel.toString(),
             Annee: anneeActuelle.toString()
         });
+
+        // =========================================================
+        // NOUVEAU : Message automatique du Maître du Temps
+        // =========================================================
+        if (window.ID_PARTIE_COURANTE) {
+            // Petite condition pour le singulier / pluriel
+            let texteAnnonce = joursEcoules > 1 
+                ? `${joursEcoules} jours se sont écoulés...` 
+                : `1 jour s'est écoulé...`;
+            
+            const msgTemps = {
+                ID_Partie: window.ID_PARTIE_COURANTE,
+                Auteur_ID: "SYSTEME_TEMPS", 
+                Auteur_Nom: "Maître du Temps",
+                Auteur_Couleur: "#c2a878", // Un joli doré/sable pour le liseret du message
+                Texte: `⏳ *${texteAnnonce}*`, // En italique avec un petit sablier
+                Date_Jour: jourActuel.toString(), // On utilise la nouvelle date pour l'entête
+                Date_An: anneeActuelle.toString(),
+                Timestamp: new Date().getTime()
+            };
+            
+            // Envoi furtif dans l'historique du chat
+            await addDoc(collection(db, COL.MESSAGES), msgTemps);
+        }
+        // =========================================================
+
         window.fermerGestionDate();
     } catch (e) {
         console.error("Erreur lors du changement de date :", e);
