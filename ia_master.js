@@ -848,6 +848,145 @@ Sinon, ne fais rien.`;
 }
 
 // =========================================================================
+//  NOUVEAU : MIA_CARTO (Création procédurale de régions inexplorées)
+// =========================================================================
+
+async function genererEtStockerImageLieu(promptLieu) {
+    const cles = {
+        openai: localStorage.getItem("ivalis_OPENAI_API_KEY")?.trim(),
+        cloudName: localStorage.getItem("ivalis_CLOUDINARY_CLOUD_NAME")?.trim(),
+        cloudKey: localStorage.getItem("ivalis_CLOUDINARY_API_KEY")?.trim(),
+        cloudSecret: localStorage.getItem("ivalis_CLOUDINARY_API_SECRET")?.trim()
+    };
+    if (!cles.openai || !cles.cloudName || !cles.cloudKey || !cles.cloudSecret) return "";
+
+    console.log("🎨 [MIA_Carto] Peinture de la nouvelle région...");
+    
+    let instructionStyle = await recupererInstructionStyleBackend();
+    
+    // NOUVEAU : On nettoie si tu as mis des phrases de discussion au début
+    instructionStyle = instructionStyle.replace(/Tu fera ce dessin dans ce style :/gi, "").trim();
+
+    // NOUVEAU : Un prompt traduit structurellement pour ne laisser aucune chance à l'IA d'esquiver
+    const promptOpenAI = `A scenic landscape of a dark fantasy world. ${promptLieu}. 
+    CRUCIAL STYLE DIRECTIVE: You MUST perfectly apply the following art style: ${instructionStyle}. 
+    Do NOT add any text, letters, UI, or borders.`;
+
+    const payloadOpenAI = { model: "gpt-image-2", prompt: promptOpenAI, output_format: "webp", n: 1, size: "1792x1024", quality: "low" };
+
+    let tentative = 0, succes = false, texteReponseOpenAI = "";
+    const delais = [5000, 15000, 30000];
+
+    while (tentative < 3 && !succes) {
+        try {
+            const res = await fetch("https://api.openai.com/v1/images/generations", {
+                method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + cles.openai }, body: JSON.stringify(payloadOpenAI)
+            });
+            texteReponseOpenAI = await res.text();
+        } catch (e) { texteReponseOpenAI = "error code: 1015"; }
+
+        if (texteReponseOpenAI.includes("error code: 1015") || texteReponseOpenAI.includes("Rate Limited")) {
+            await new Promise(r => setTimeout(r, delais[tentative])); tentative++;
+        } else { succes = true; }
+    }
+
+    let jsonOpenAI;
+    try { jsonOpenAI = JSON.parse(texteReponseOpenAI); } catch (e) { return ""; }
+    if (!jsonOpenAI.data || jsonOpenAI.data.length === 0) return "";
+
+    let imageSource = jsonOpenAI.data[0].url || ("data:image/png;base64," + jsonOpenAI.data[0].b64_json);
+
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const dossier = "Lieux"; // NOUVEAU DOSSIER CLOUDINARY
+    const signature = await genererSignatureCloudinary(`folder=${dossier}&timestamp=${timestamp}${cles.cloudSecret}`);
+
+    const formCloudinary = new FormData();
+    formCloudinary.append("file", imageSource); formCloudinary.append("api_key", cles.cloudKey);
+    formCloudinary.append("timestamp", timestamp); formCloudinary.append("signature", signature);
+    formCloudinary.append("folder", dossier);
+
+    try {
+        const resCloud = await fetch(`https://api.cloudinary.com/v1_1/${cles.cloudName}/image/upload`, { method: "POST", body: formCloudinary });
+        const jsonCloud = await resCloud.json();
+        if (jsonCloud.secure_url) {
+            console.log("✅ [MIA_Carto] Paysage généré avec succès !");
+            return jsonCloud.secure_url.replace("/upload/", "/upload/q_auto,f_auto/");
+        }
+    } catch (e) { return ""; }
+    return "";
+}
+
+window.creerNouveauLieu = async function(idHex) {
+    const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
+    if (!cleGemini) {
+        alert("Clé Gemini manquante pour cartographier !");
+        return null;
+    }
+
+    const promptSysteme = `Tu es MIA_CARTO, l'IA architecte du monde d'Ivalis. 
+Le Maître du Jeu vient d'envoyer les joueurs sur une zone inexplorée de la carte.
+Invente une NOUVELLE RÉGION d'un monde fantasy originale.
+
+Réponds OBLIGATOIREMENT avec un JSON valide respectant ce format exact :
+{
+    "nom": "Le Nom du Lieu",
+    "description": "Une description globale de l'atmosphère et du paysage (2 phrases max).",
+    "securite": "Faible", // Choisir parmi: Inconnue, Faible, Moyenne, Élevée, Cauchemar
+    "prompt_image": "Description visuelle très courte en ANGLAIS du paysage (UNIQUEMENT les éléments physiques. N'ajoute AUCUN mot lié à un style comme 'concept art', 'painting', 'realistic', car le style est géré ailleurs)."
+}`;
+
+    const bodyRequete = {
+        systemInstruction: { parts: [{ text: promptSysteme }] },
+        contents: [{ role: "user", parts: [{ text: "Déploie ton imagination et crée un nouveau lieu original pour cette tuile vide." }] }],
+        generationConfig: { 
+            temperature: 0.9, // Température haute pour garantir des lieux très variés
+            responseMimeType: "application/json"
+        }
+    };
+
+    try {
+        const reponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(bodyRequete)
+        });
+        const data = await reponse.json();
+        const contenu = JSON.parse(data.candidates[0].content.parts[0].text);
+
+        // NOUVEAU : Création de l'ID obligatoire commençant par "L"
+        const numAleatoire = Math.floor(Math.random() * 100000).toString().padStart(5, "0");
+        const nomFormate = contenu.nom.replace(/[^a-zA-Z0-9]/g, "_");
+        const docId = `L_${numAleatoire}_${nomFormate}`;
+
+        console.log(`[MIA_Carto] 🌍 Nouveau lieu imaginé : ${contenu.nom}`);
+
+        // 1. Sauvegarde en BDD de la structure vierge
+        await setDoc(doc(db, "Monde_Lieux", docId), {
+            Description_Global: contenu.description,
+            Niveau_De_Securite: contenu.securite,
+            Nom_Du_Lieu: contenu.nom,
+            Reputation_Score: 0,
+            Reputation_Tags: [],
+            Stigmates: "",
+            Tuile_ID: idHex,
+            URL_Cloudinary: ""
+        });
+
+        // 2. Création de l'image (Prend 10 à 20 secondes)
+        const urlImage = await genererEtStockerImageLieu(contenu.prompt_image || contenu.nom);
+        if (urlImage) {
+            await updateDoc(doc(db, "Monde_Lieux", docId), {
+                URL_Cloudinary: urlImage
+            });
+        }
+
+        return docId;
+
+    } catch (e) {
+        console.error("[MIA_Carto] Échec de l'exploration :", e);
+        return null;
+    }
+};
+
+// =========================================================================
 //  INTERFACE & CERVEAU DU NARRATEUR
 // =========================================================================
 

@@ -633,6 +633,9 @@ window.mettreAJourBulleLieu = async function(idLieu) {
         imgLieu.style.display = "none";
     }
 
+    // NOUVEAU : On mémorise la tuile actuelle pour le calcul du voyage !
+    window.TUILE_ACTUELLE = idTuile;
+
     // On ordonne au pion de se placer, qu'il ait trouvé une tuile directe ou indirecte !
     window.placerPionSurHex(idTuile);
 }
@@ -1088,6 +1091,8 @@ async function validerCreationGroupe() {
     document.getElementById("ecran-jeu").style.display = "block";
     // NOUVEAU : On trace la grille à la seconde où l'écran s'affiche
     window.dessinerGrilleHexagonale();
+    // CORRECTION BUG DRAPEAU : On charge immédiatement les données de la partie pour placer le pion !
+    ecouterPersonnagesDeLaPartie(window.ID_PARTIE_COURANTE);
   } catch (e) {
     console.error(e);
     alert("Une erreur est survenue lors de la fondation du groupe.");
@@ -1164,6 +1169,8 @@ function lancerPartieChargee(idChoisi) {
   document.getElementById("ecran-jeu").style.display = "block";
   // NOUVEAU : On trace la grille à la seconde où l'écran s'affiche
   window.dessinerGrilleHexagonale();
+  // CORRECTION BUG DRAPEAU : On charge immédiatement les données de la partie pour placer le pion !
+  ecouterPersonnagesDeLaPartie(window.ID_PARTIE_COURANTE);
 }
 
 // =========================================================================
@@ -1201,6 +1208,9 @@ function fermerModalesJeu() {
   document.getElementById("overlay-jeu-modale").style.display = "none";
   document.getElementById("modale-retour-menu").style.display = "none";
   document.getElementById("modale-quitter-jeu").style.display = "none";
+  // NOUVEAU : Fermer la modale de voyage
+  const modaleVoyage = document.getElementById("modale-voyage");
+  if (modaleVoyage) modaleVoyage.style.display = "none";
 }
 
 function demanderRetourMenu() {
@@ -2725,16 +2735,143 @@ window.toggleGrille = function() {
 };
 
 // =========================================================================
-//  MOUVEMENT DU PION (VISUEL UNIQUEMENT)
+//  MOUVEMENT DU PION ET DÉCOUVERTE DU MONDE (BDD + IA + DISTANCE)
 // =========================================================================
-window.deplacerPionVers = function(idHex) {
+
+// 1. Mathématiques : Convertit la grille pour calculer la distance exacte
+window.calculerDistanceHex = function(hexA, hexB) {
+    if (!hexA || !hexB || hexA === "" || hexB === "") return 0;
+    
+    const parseHex = (id) => {
+        const parts = id.split('-');
+        if (parts.length !== 3) return null;
+        return { col: parseInt(parts[1]), row: parseInt(parts[2]) };
+    };
+    
+    const a = parseHex(hexA);
+    const b = parseHex(hexB);
+    if (!a || !b) return 0;
+    
+    // Algorithme de conversion vers "Cube Coordinates" pour calculer la distance
+    const toCube = (hex) => {
+        let q = hex.col - Math.floor(hex.row / 2);
+        let r = hex.row;
+        return { q: q, r: r, s: -q - r };
+    };
+    
+    const cA = toCube(a);
+    const cB = toCube(b);
+    
+    return Math.max(Math.abs(cA.q - cB.q), Math.abs(cA.r - cB.r), Math.abs(cA.s - cB.s));
+};
+
+// 2. Outil automatisé pour avancer la date d'un coup
+window.avancerTempsAuto = async function(joursDeVoyage) {
+    if (joursDeVoyage <= 0) return;
+    
+    let jourActuel = parseInt(window.DATE_EN_JEU_ACTUELLE.jour) || 1;
+    let anneeActuelle = parseInt(window.DATE_EN_JEU_ACTUELLE.annee) || 1;
+    
+    jourActuel += joursDeVoyage;
+    const JOURS_PAR_AN = 365; 
+    while (jourActuel > JOURS_PAR_AN) {
+        jourActuel -= JOURS_PAR_AN;
+        anneeActuelle += 1;
+    }
+    
+    await updateDoc(doc(db, "Date_En_Jeu", "actuelle"), {
+        Jour: jourActuel.toString(),
+        Annee: anneeActuelle.toString()
+    });
+
+    if (window.ID_PARTIE_COURANTE) {
+        let texteAnnonce = joursDeVoyage > 1 ? `${joursDeVoyage} jours de voyage se sont écoulés...` : `1 jour de voyage s'est écoulé...`;
+        await addDoc(collection(db, "Messages_Chat"), {
+            ID_Partie: window.ID_PARTIE_COURANTE,
+            Auteur_ID: "SYSTEME_TEMPS", 
+            Auteur_Nom: "Maître du Temps",
+            Auteur_Couleur: "#c2a878",
+            Texte: `⏳ *${texteAnnonce}*`,
+            Date_Jour: jourActuel.toString(),
+            Date_An: anneeActuelle.toString(),
+            Timestamp: new Date().getTime()
+        });
+    }
+};
+
+// 3. Le déclencheur au clic sur la carte
+window.deplacerPionVers = async function(idHex) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    
-    // On donne les nouvelles coordonnées au drapeau (l'animation CSS s'occupe du reste !)
-    window.placerPionSurHex(idHex);
-    
-    // On masque la grille pour une finition propre après le déplacement
     window.toggleGrille();
+
+    let distance = window.calculerDistanceHex(window.TUILE_ACTUELLE, idHex);
+    let joursDeVoyage = distance * 3;
+
+    if (joursDeVoyage > 0) {
+        // Le joueur voyage loin : on ouvre la fenêtre
+        document.getElementById("texte-modale-voyage").innerHTML = `Il vous faudra <strong style="color: #ff4c4c; font-size: 24px;">${joursDeVoyage} jours</strong> pour atteindre votre destination.<br>Êtes-vous prêts à partir ?`;
+        document.getElementById("overlay-jeu-modale").style.display = "block";
+        
+        const modaleVoyage = document.getElementById("modale-voyage");
+        if (modaleVoyage) modaleVoyage.style.display = "block";
+        
+        const btnConfirmer = document.getElementById("btn-confirmer-voyage");
+        btnConfirmer.onclick = () => {
+            if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+            fermerModalesJeu();
+            window.executerVoyage(idHex, joursDeVoyage);
+        };
+    } else {
+        // Clic sur la même case ou première initialisation (0 jours)
+        window.executerVoyage(idHex, 0);
+    }
+};
+
+// 4. L'exécution finale (Gestion du temps, IA, BDD)
+window.executerVoyage = async function(idHex, joursDeVoyage) {
+    // A. Avancer le calendrier
+    if (joursDeVoyage > 0) {
+        await window.avancerTempsAuto(joursDeVoyage);
+    }
+
+    // B. Vérifier le terrain
+    const qLieu = query(collection(db, "Monde_Lieux"), where("Tuile_ID", "==", idHex));
+    const snapLieux = await getDocs(qLieu);
+
+    let idLieuCible = null;
+
+    if (!snapLieux.empty) {
+        idLieuCible = snapLieux.docs[0].id;
+        console.log("🗺️ Lieu connu détecté :", idLieuCible);
+    } else {
+        console.log("🌫️ Zone vierge ! Invocation de MIA_CARTO...");
+        const ecranCharge = document.getElementById("ecran-chargement-ia");
+        const titreCharge = document.getElementById("titre-chargement-ia");
+        const imageCharge = document.getElementById("image-chargement-ia");
+
+        if (ecranCharge && titreCharge && imageCharge) {
+            titreCharge.innerText = "Voyage en cours ...";
+            imageCharge.dataset.oldSrc = imageCharge.src;
+            imageCharge.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782857488/voyage_yhokpd.png";
+            ecranCharge.style.display = "flex";
+        }
+
+        if (typeof window.creerNouveauLieu === "function") {
+            idLieuCible = await window.creerNouveauLieu(idHex);
+        }
+
+        // Nettoyage après la génération
+        if (ecranCharge) ecranCharge.style.display = "none";
+        if (titreCharge) titreCharge.innerText = "Création de personnage en cours ...";
+        if (imageCharge && imageCharge.dataset.oldSrc) imageCharge.src = imageCharge.dataset.oldSrc;
+    }
+
+    // C. Téléporter les joueurs
+    if (idLieuCible && window.ID_PARTIE_COURANTE) {
+        await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
+            Lieu_Actuel: idLieuCible
+        });
+    }
 };
 
 // =========================================================================
@@ -2774,5 +2911,8 @@ Object.assign(window, {
   dessinerGrilleHexagonale: window.dessinerGrilleHexagonale,
   placerPionSurHex: window.placerPionSurHex,
   toggleGrille: window.toggleGrille,
-  deplacerPionVers: window.deplacerPionVers
+  deplacerPionVers: window.deplacerPionVers,
+  calculerDistanceHex: window.calculerDistanceHex,
+  avancerTempsAuto: window.avancerTempsAuto,
+  executerVoyage: window.executerVoyage
 });
