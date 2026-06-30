@@ -867,10 +867,8 @@ async function genererEtStockerImageLieu(promptLieu) {
     // NOUVEAU : On nettoie si tu as mis des phrases de discussion au début
     instructionStyle = instructionStyle.replace(/Tu fera ce dessin dans ce style :/gi, "").trim();
 
-    // NOUVEAU : Un prompt traduit structurellement pour ne laisser aucune chance à l'IA d'esquiver
-    const promptOpenAI = `A scenic landscape of a dark fantasy world. ${promptLieu}. 
-    CRUCIAL STYLE DIRECTIVE: You MUST perfectly apply the following art style: ${instructionStyle}. 
-    Do NOT add any text, letters, UI, or borders.`;
+    // NOUVEAU : On interdit formellement les êtres vivants pour avoir un paysage pur
+    const promptOpenAI = `DIRECTIVE DE STYLE VISUEL OBLIGATOIRE : ${instructionStyle}\n\n---\nSujet à dessiner : Un paysage de fantasy. ABSOLUMENT AUCUN PERSONNAGE, aucun humain, aucune créature, aucun animal. Uniquement de l'environnement, du paysage et de l'architecture. Ne dessine aucun texte. Description de la région : ${promptLieu}`;
 
     const payloadOpenAI = { model: "gpt-image-2", prompt: promptOpenAI, output_format: "webp", n: 1, size: "1792x1024", quality: "low" };
 
@@ -912,6 +910,62 @@ async function genererEtStockerImageLieu(promptLieu) {
             console.log("✅ [MIA_Carto] Paysage généré avec succès !");
             return jsonCloud.secure_url.replace("/upload/", "/upload/q_auto,f_auto/");
         }
+    } catch (e) { return ""; }
+    return "";
+}
+
+async function genererEtStockerIconeCarte(nomLieu, descriptionLieu) {
+    const cles = {
+        openai: localStorage.getItem("ivalis_OPENAI_API_KEY")?.trim(),
+        cloudName: localStorage.getItem("ivalis_CLOUDINARY_CLOUD_NAME")?.trim(),
+        cloudKey: localStorage.getItem("ivalis_CLOUDINARY_API_KEY")?.trim(),
+        cloudSecret: localStorage.getItem("ivalis_CLOUDINARY_API_SECRET")?.trim()
+    };
+    if (!cles.openai) return "";
+
+    console.log("✒️ [MIA_Carto] Dessin de l'icône sur la carte avec gpt-image-1.5...");
+    
+    const promptOpenAI = `A highly stylized, extremely minimalist map icon for a tabletop RPG. Subject: ${descriptionLieu}. 
+    STYLE OBLIGATOIRE: Thick, bold, solid black ink lines only. No shading, no grayscale, no colors. Extremely simple and clean outlines, like a stylized river drawn on an old parchment map. 
+    The name "${nomLieu}" MUST be written below the drawing in elegant black cursive calligraphy.`;
+
+    const payloadOpenAI = { 
+        model: "gpt-image-1.5", 
+        prompt: promptOpenAI, 
+        size: "1024x1024",
+        background: "transparent",
+        output_format: "png",
+        n: 1
+    };
+
+    let texteReponseOpenAI = "";
+    try {
+        const res = await fetch("https://api.openai.com/v1/images/generations", {
+            method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + cles.openai }, body: JSON.stringify(payloadOpenAI)
+        });
+        texteReponseOpenAI = await res.text();
+    } catch (e) { return ""; }
+
+    let jsonOpenAI;
+    try { jsonOpenAI = JSON.parse(texteReponseOpenAI); } catch (e) { return ""; }
+    if (!jsonOpenAI.data || jsonOpenAI.data.length === 0) return "";
+
+    let imageSource = jsonOpenAI.data[0].url || ("data:image/png;base64," + jsonOpenAI.data[0].b64_json);
+
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const signature = await genererSignatureCloudinary(`folder=Icones_Cartes&timestamp=${timestamp}${cles.cloudSecret}`);
+
+    const formCloudinary = new FormData();
+    formCloudinary.append("file", imageSource); 
+    formCloudinary.append("api_key", cles.cloudKey);
+    formCloudinary.append("timestamp", timestamp); 
+    formCloudinary.append("signature", signature);
+    formCloudinary.append("folder", "Icones_Cartes");
+
+    try {
+        const resCloud = await fetch(`https://api.cloudinary.com/v1_1/${cles.cloudName}/image/upload`, { method: "POST", body: formCloudinary });
+        const jsonCloud = await resCloud.json();
+        if (jsonCloud.secure_url) return jsonCloud.secure_url; 
     } catch (e) { return ""; }
     return "";
 }
@@ -970,13 +1024,21 @@ Réponds OBLIGATOIREMENT avec un JSON valide respectant ce format exact :
             URL_Cloudinary: ""
         });
 
-        // 2. Création de l'image (Prend 10 à 20 secondes)
-        const urlImage = await genererEtStockerImageLieu(contenu.prompt_image || contenu.nom);
-        if (urlImage) {
-            await updateDoc(doc(db, "Monde_Lieux", docId), {
-                URL_Cloudinary: urlImage
-            });
+        // 2. Création des deux images en parallèle (Paysage + Icône de carte)
+        const [urlImage, urlIcone] = await Promise.all([
+            genererEtStockerImageLieu(contenu.prompt_image || contenu.nom),
+            genererEtStockerIconeCarte(contenu.nom, contenu.description)
+        ]);
+
+        let maj = {};
+        if (urlImage) maj.URL_Cloudinary = urlImage;
+        if (urlIcone) maj.URL_Icone_Carte = urlIcone;
+
+        if (Object.keys(maj).length > 0) {
+            await updateDoc(doc(db, "Monde_Lieux", docId), maj);
         }
+        
+        if (typeof window.dessinerIconesCarte === "function") window.dessinerIconesCarte();
 
         return docId;
 

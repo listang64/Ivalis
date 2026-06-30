@@ -27,7 +27,8 @@ import {
   addDoc,
   query,
   where,
-  onSnapshot
+  onSnapshot,
+  deleteField
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // =========================================================================
@@ -655,35 +656,56 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
   // NOUVEAU : Un petit marqueur pour ignorer la première lecture (la sauvegarde historique)
   let estPremierScanPartie = true;
 
-  // A. Écoute du Tour de Parole, du Lieu ET DU VERROU IA
+  // A. Écoute du Tour de Parole, du Lieu, DU VERROU IA ET DES VOYAGES
   unsubscribePartie = onSnapshot(doc(db, COL.PARTIES, idPartie), (snap) => {
      if(snap.exists()) {
          const dataPartie = snap.data();
          
-         // 1. Mise à jour de la bulle lieu UNIQUEMENT si le lieu a changé
          const ancienLieu = window.PARTIE_DATA ? window.PARTIE_DATA.Lieu_Actuel : null;
          if (dataPartie.Lieu_Actuel !== ancienLieu) {
              mettreAJourBulleLieu(dataPartie.Lieu_Actuel);
          }
 
-         // 1.5 Gestion de l'écran d'attente Global
          if (dataPartie.IA_En_Cours === true) {
              if (typeof window.afficherEcranAttente === "function") window.afficherEcranAttente();
          } else {
              if (typeof window.masquerEcranAttente === "function") window.masquerEcranAttente();
          }
 
-         // 2. Mise à jour globale
+         // =========================================================
+         // NOUVEAU : MULTIJOUEUR - POP-UP DE VOYAGE SYNCHRONISÉ
+         // =========================================================
+         const modaleVoyage = document.getElementById("modale-voyage");
+         if (dataPartie.Proposition_Voyage) {
+             const prop = dataPartie.Proposition_Voyage;
+             document.getElementById("texte-modale-voyage").innerHTML = `Il vous faudra <strong style="color: #ff4c4c; font-size: 24px;">${prop.Jours} jours</strong> pour atteindre votre destination.<br>Êtes-vous prêts à partir ?`;
+             document.getElementById("overlay-jeu-modale").style.display = "block";
+             if (modaleVoyage) modaleVoyage.style.display = "block";
+
+             document.getElementById("btn-confirmer-voyage").onclick = () => {
+                 if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+                 updateDoc(doc(db, COL.PARTIES, window.ID_PARTIE_COURANTE), { Proposition_Voyage: deleteField() });
+                 window.executerVoyage(prop.Tuile_ID, prop.Jours);
+             };
+             
+             document.getElementById("btn-annuler-voyage").onclick = () => {
+                 if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+                 updateDoc(doc(db, COL.PARTIES, window.ID_PARTIE_COURANTE), { Proposition_Voyage: deleteField() });
+             };
+         } else {
+             if (modaleVoyage && modaleVoyage.style.display === "block") {
+                 fermerModalesJeu();
+             }
+         }
+         // =========================================================
+
          window.PARTIE_DATA = dataPartie;
          if (window.PERSOS_PARTIE) afficherBullesPersonnages(window.PERSOS_PARTIE);
 
-         // CORRECTION : 3. Détection d'un jet de dés synchronisé sans l'effet fantôme
          if (estPremierScanPartie) {
-             // Au premier chargement, on mémorise la date du dernier jet silencieusement
              if (dataPartie.Action_Des) window.DERNIER_JET_DES = dataPartie.Action_Des.timestamp;
              estPremierScanPartie = false;
          } else {
-             // Aux changements suivants, on lance l'animation !
              if (dataPartie.Action_Des && dataPartie.Action_Des.timestamp !== window.DERNIER_JET_DES) {
                  window.DERNIER_JET_DES = dataPartie.Action_Des.timestamp;
                  jouerAnimationDesGlobal(dataPartie.Action_Des);
@@ -1835,6 +1857,8 @@ function initialiserCarteInteractive() {
   // 4. Lâcher la carte
   window.addEventListener("mouseup", function() { isDraggingCarte = false; });
   window.addEventListener("mouseleave", function() { isDraggingCarte = false; });
+
+  window.dessinerIconesCarte();
 }
 
 // --- CORRECTION DU BUG PLEIN ÉCRAN ---
@@ -2799,7 +2823,58 @@ window.avancerTempsAuto = async function(joursDeVoyage) {
     }
 };
 
-// 3. Le déclencheur au clic sur la carte
+// =========================================================================
+//  DESSINATEUR D'ICÔNES DE CARTE
+// =========================================================================
+window.dessinerIconesCarte = async function() {
+    const conteneur = document.getElementById("conteneur-icones-carte");
+    if (!conteneur) return;
+    conteneur.innerHTML = "";
+
+    const q = query(collection(db, "Monde_Lieux"));
+    const snap = await getDocs(q);
+
+    const size = window.tailleHexActuelle;
+    const hexWidth = Math.sqrt(3) * size;
+    const hexHeight = 2 * size;
+    const xOffset = hexWidth;
+    const yOffset = (3/4) * hexHeight;
+
+    // =====================================================
+    // PARAMÈTRES DE DÉCALAGE MANUEL DES ICÔNES
+    // Modifie ces valeurs en pixels pour affiner la position
+    // =====================================================
+    const decalageX_icone = 0;  // Positif = Droite | Négatif = Gauche
+    const decalageY_icone = -100;  // Positif = Bas    | Négatif = Haut
+    // =====================================================
+
+    snap.forEach(doc => {
+        const data = doc.data();
+        if (data.URL_Icone_Carte && data.Tuile_ID) {
+            const parts = data.Tuile_ID.split('-');
+            if (parts.length === 3) {
+                const col = parseInt(parts[1]);
+                const row = parseInt(parts[2]);
+                
+                // Calcul du centre absolu de l'hexagone
+                let x = col * xOffset + (row % 2 === 1 ? hexWidth / 2 : 0);
+                let y = row * yOffset + size; 
+
+                const img = document.createElement("img");
+                img.src = data.URL_Icone_Carte;
+                img.className = "icone-carte-lieu";
+                
+                // Application de la position avec ton décalage manuel
+                img.style.left = `${x + decalageX_icone}px`;
+                img.style.top = `${y + decalageY_icone}px`;
+                
+                conteneur.appendChild(img);
+            }
+        }
+    });
+};
+
+// 3. Le déclencheur au clic sur la carte (POUSSE VERS FIREBASE)
 window.deplacerPionVers = async function(idHex) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     window.toggleGrille();
@@ -2808,33 +2883,24 @@ window.deplacerPionVers = async function(idHex) {
     let joursDeVoyage = distance * 3;
 
     if (joursDeVoyage > 0) {
-        // Le joueur voyage loin : on ouvre la fenêtre
-        document.getElementById("texte-modale-voyage").innerHTML = `Il vous faudra <strong style="color: #ff4c4c; font-size: 24px;">${joursDeVoyage} jours</strong> pour atteindre votre destination.<br>Êtes-vous prêts à partir ?`;
-        document.getElementById("overlay-jeu-modale").style.display = "block";
-        
-        const modaleVoyage = document.getElementById("modale-voyage");
-        if (modaleVoyage) modaleVoyage.style.display = "block";
-        
-        const btnConfirmer = document.getElementById("btn-confirmer-voyage");
-        btnConfirmer.onclick = () => {
-            if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-            fermerModalesJeu();
-            window.executerVoyage(idHex, joursDeVoyage);
-        };
+        await updateDoc(doc(db, COL.PARTIES, window.ID_PARTIE_COURANTE), {
+            Proposition_Voyage: {
+                Tuile_ID: idHex,
+                Jours: joursDeVoyage,
+                Timestamp: new Date().getTime()
+            }
+        });
     } else {
-        // Clic sur la même case ou première initialisation (0 jours)
         window.executerVoyage(idHex, 0);
     }
 };
 
-// 4. L'exécution finale (Gestion du temps, IA, BDD)
+// 4. L'exécution finale 
 window.executerVoyage = async function(idHex, joursDeVoyage) {
-    // A. Avancer le calendrier
     if (joursDeVoyage > 0) {
         await window.avancerTempsAuto(joursDeVoyage);
     }
 
-    // B. Vérifier le terrain
     const qLieu = query(collection(db, "Monde_Lieux"), where("Tuile_ID", "==", idHex));
     const snapLieux = await getDocs(qLieu);
 
@@ -2860,15 +2926,13 @@ window.executerVoyage = async function(idHex, joursDeVoyage) {
             idLieuCible = await window.creerNouveauLieu(idHex);
         }
 
-        // Nettoyage après la génération
         if (ecranCharge) ecranCharge.style.display = "none";
         if (titreCharge) titreCharge.innerText = "Création de personnage en cours ...";
         if (imageCharge && imageCharge.dataset.oldSrc) imageCharge.src = imageCharge.dataset.oldSrc;
     }
 
-    // C. Téléporter les joueurs
     if (idLieuCible && window.ID_PARTIE_COURANTE) {
-        await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
+        await updateDoc(doc(db, COL.PARTIES, window.ID_PARTIE_COURANTE), {
             Lieu_Actuel: idLieuCible
         });
     }
@@ -2914,5 +2978,6 @@ Object.assign(window, {
   deplacerPionVers: window.deplacerPionVers,
   calculerDistanceHex: window.calculerDistanceHex,
   avancerTempsAuto: window.avancerTempsAuto,
-  executerVoyage: window.executerVoyage
+  executerVoyage: window.executerVoyage,
+  dessinerIconesCarte: window.dessinerIconesCarte
 });

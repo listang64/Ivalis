@@ -1540,3 +1540,19 @@ textarea.input-texte-parchemin {
 #pion-groupe:hover {
     filter: drop-shadow(0px 12px 10px rgba(0,0,0,0.9)) brightness(1.2);
 }
+
+/* =========================================================================
+   ICÔNES DESSINÉES SUR LA CARTE
+   ========================================================================= */
+.icone-carte-lieu {
+    position: absolute;
+    transform: translate(-50%, -50%); 
+    width: 140px; 
+    height: auto;
+    pointer-events: none; 
+    
+    /* On a retiré le mix-blend-mode ici ! */
+    
+    filter: contrast(1.2) drop-shadow(0px 2px 2px rgba(0,0,0,0.3));
+    z-index: 10;
+}
