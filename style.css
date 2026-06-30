@@ -1509,7 +1509,34 @@ textarea.input-texte-parchemin {
    ========================================================================= */
 .tuile-hex {
     fill: transparent;
-    stroke: rgba(255, 255, 255, 0.2); /* Bordure blanche très discrète */
+    stroke: rgba(255, 255, 255, 0.2); 
     stroke-width: 1;
-    pointer-events: none; /* La grille est figée, la souris passe à travers pour drag & drop la carte */
+    /* La souris par défaut est désactivée (gérée par le JS au clic du drapeau) */
+    transition: fill 0.2s, stroke 0.2s, stroke-width 0.2s;
+}
+
+/* Effet de ciblage quand on s'apprête à déplacer le pion */
+.tuile-hex:hover {
+    stroke: #00ffff;
+    stroke-width: 3;
+    fill: rgba(0, 255, 255, 0.2);
+    cursor: crosshair; /* Curseur en forme de cible */
+}
+
+/* =========================================================================
+   PION DU GROUPE (FANION)
+   ========================================================================= */
+#pion-groupe {
+    display: none; 
+    position: absolute;
+    pointer-events: auto; 
+    cursor: pointer;
+    z-index: 100; 
+    filter: drop-shadow(0px 8px 6px rgba(0,0,0,0.7));
+    transition: left 0.4s ease-out, top 0.4s ease-out; /* Transition plus sèche */
+}
+
+/* Effet visuel quand le MJ s'apprête à cliquer dessus */
+#pion-groupe:hover {
+    filter: drop-shadow(0px 12px 10px rgba(0,0,0,0.9)) brightness(1.2);
 }

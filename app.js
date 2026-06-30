@@ -567,7 +567,7 @@ window.unsubscribeMessages = null;
 window.PARTIE_DATA = null;
 window.PERSOS_PARTIE = null;
 
-// --- NOUVEAU : Récupération et affichage du lieu actuel ---
+// --- Mise à jour de la Bulle Lieu ET du Pion ---
 window.mettreAJourBulleLieu = async function(idLieu) {
     const bulle = document.getElementById("bulle-lieu-actuel");
     const spanNom = document.getElementById("nom-lieu-actuel");
@@ -577,25 +577,46 @@ window.mettreAJourBulleLieu = async function(idLieu) {
 
     if (!idLieu || idLieu === "") {
         bulle.style.display = "none";
+        window.placerPionSurHex(""); // On cache le pion
         return;
     }
 
     bulle.style.display = "flex";
     let nom = "Lieu Inconnu";
     let urlImage = "";
+    let idTuile = "";
 
     try {
         if (idLieu.startsWith("L")) {
+            // CAS 1 : Les joueurs sont directement sur un "Lieu" (en extérieur)
             const snap = await getDoc(doc(db, "Monde_Lieux", idLieu));
             if (snap.exists()) {
-                nom = snap.data().Nom_Du_Lieu || "Lieu sans nom";
-                urlImage = snap.data().URL_Cloudinary || "";
+                const data = snap.data();
+                nom = data.Nom_Du_Lieu || "Lieu sans nom";
+                urlImage = data.URL_Cloudinary || "";
+                idTuile = data.Tuile_ID || ""; 
             }
         } else if (idLieu.startsWith("B")) {
-            const snap = await getDoc(doc(db, "Monde_Batiment", idLieu));
-            if (snap.exists()) {
-                nom = snap.data().Nom_Batiment || "Bâtiment sans nom";
-                urlImage = snap.data().URL_Cloudinary || "";
+            // CAS 2 : Les joueurs sont dans un "Bâtiment"
+            const snapBat = await getDoc(doc(db, "Monde_Batiment", idLieu));
+            if (snapBat.exists()) {
+                const dataBat = snapBat.data();
+                
+                // On garde l'esthétique du Bâtiment pour l'interface du joueur
+                nom = dataBat.Nom_Batiment || "Bâtiment sans nom";
+                urlImage = dataBat.URL_Cloudinary || "";
+                
+                // 1. On regarde si le bâtiment a sa propre tuile (pour les donjons isolés)
+                idTuile = dataBat.Tuile_ID || "";
+                
+                // 2. Si aucune tuile n'est trouvée, on cherche la ville parente !
+                if (idTuile === "" && dataBat.ID_Lieu) {
+                    const snapLieu = await getDoc(doc(db, "Monde_Lieux", dataBat.ID_Lieu));
+                    if (snapLieu.exists()) {
+                        // On "vole" la tuile de la ville pour placer le pion
+                        idTuile = snapLieu.data().Tuile_ID || "";
+                    }
+                }
             }
         }
     } catch (e) {
@@ -611,6 +632,9 @@ window.mettreAJourBulleLieu = async function(idLieu) {
         imgLieu.src = "";
         imgLieu.style.display = "none";
     }
+
+    // On ordonne au pion de se placer, qu'il ait trouvé une tuile directe ou indirecte !
+    window.placerPionSurHex(idTuile);
 }
 
 // 1. Écoute globale (Personnages + Tour + Historique du Chat)
@@ -1862,11 +1886,56 @@ window.dessinerGrilleHexagonale = function() {
                 points += `${px},${py} `;
             }
 
-            htmlPolygons += `<polygon id="${idHex}" points="${points.trim()}" class="tuile-hex"></polygon>`;
+            htmlPolygons += `<polygon id="${idHex}" points="${points.trim()}" class="tuile-hex" onclick="window.deplacerPionVers('${idHex}')"></polygon>`;
         }
     }
 
     svg.innerHTML = htmlPolygons;
+};
+
+// =========================================================================
+//  PLACEMENT DU PION SUR LA GRILLE
+// =========================================================================
+window.placerPionSurHex = function(idHex) {
+    const pion = document.getElementById("pion-groupe");
+    if (!pion) return;
+
+    if (!idHex || idHex === "") {
+        pion.style.display = "none";
+        return;
+    }
+
+    const parts = idHex.split('-');
+    if (parts.length !== 3) return;
+    const col = parseInt(parts[1]);
+    const row = parseInt(parts[2]);
+
+    const size = window.tailleHexActuelle;
+    const hexWidth = Math.sqrt(3) * size;
+    const hexHeight = 2 * size;
+    const xOffset = hexWidth;
+    const yOffset = (3/4) * hexHeight;
+
+    // =====================================================
+    // PARAMÈTRES DE DÉCALAGE MANUEL DU DRAPEAU
+    // Modifie ces valeurs en pixels pour affiner la position
+    // =====================================================
+    const decalageX = 65;  // Positif = Droite | Négatif = Gauche (ex: -10)
+    const decalageY = -160;  // Positif = Bas    | Négatif = Haut   (ex: -5)
+    // =====================================================
+
+    let x = col * xOffset + (row % 2 === 1 ? hexWidth / 2 : 0);
+    let y = row * yOffset;
+
+    const largeurPion = (hexWidth / 3) * 2.5; 
+    pion.style.width = `${largeurPion}px`;
+
+    // On ajoute tes décalages manuels au calcul final
+    pion.style.left = `${x + decalageX}px`;
+    pion.style.top = `${y + size + decalageY}px`;
+    
+    pion.style.transform = `translate(-50%, -100%)`;
+    pion.style.display = "block";
 };
 
 // =========================================================================
@@ -2634,6 +2703,41 @@ window.toggleMicro = function() {
 };
 
 // =========================================================================
+//  INTERRUPTEUR GRILLE TACTIQUE (Lié au Fanion)
+// =========================================================================
+window.grilleEstVisible = false;
+
+window.toggleGrille = function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    
+    const svg = document.getElementById("grille-hexagonale");
+    if (!svg) return;
+    
+    window.grilleEstVisible = !window.grilleEstVisible;
+    
+    if (window.grilleEstVisible) {
+        svg.style.opacity = "1"; 
+        svg.style.pointerEvents = "auto"; // Révèle et rend les tuiles cliquables
+    } else {
+        svg.style.opacity = "0"; 
+        svg.style.pointerEvents = "none"; // Masque et laisse passer la souris au travers
+    }
+};
+
+// =========================================================================
+//  MOUVEMENT DU PION (VISUEL UNIQUEMENT)
+// =========================================================================
+window.deplacerPionVers = function(idHex) {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    
+    // On donne les nouvelles coordonnées au drapeau (l'animation CSS s'occupe du reste !)
+    window.placerPionSurHex(idHex);
+    
+    // On masque la grille pour une finition propre après le déplacement
+    window.toggleGrille();
+};
+
+// =========================================================================
 //  EXPOSITION DES FONCTIONS AU SCOPE GLOBAL
 //  (necessaire car index.html utilise des handlers inline onclick="...",
 //   or un <script type="module"> a sa propre portee.)
@@ -2666,6 +2770,9 @@ Object.assign(window, {
   syncTemperature, sauvegarderTemperature, basculerAffichageTokens, toggleMicro,
   // Gestion de la Date
   ouvrirGestionDate, fermerGestionDate, modifierJoursAAjouter, validerChangementDate, demarrerDefilementJours, arreterDefilementJours,
-  // Grille Hexagonale
-  dessinerGrilleHexagonale: window.dessinerGrilleHexagonale
+  // Grille Hexagonale & Pion
+  dessinerGrilleHexagonale: window.dessinerGrilleHexagonale,
+  placerPionSurHex: window.placerPionSurHex,
+  toggleGrille: window.toggleGrille,
+  deplacerPionVers: window.deplacerPionVers
 });

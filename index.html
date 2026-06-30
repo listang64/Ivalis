@@ -97,7 +97,9 @@
 
     <div id="conteneur-carte-fond">
       <div id="carte-fond-jeu">
-        <svg id="grille-hexagonale" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></svg>
+        <svg id="grille-hexagonale" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 0.5s ease; pointer-events: none;"></svg>
+        
+        <img id="pion-groupe" src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782846500/fanion_2_sm8cnv.png" alt="Position du Groupe" onclick="window.toggleGrille()" title="Afficher/Masquer la grille tactique">
       </div>
     </div>
 
