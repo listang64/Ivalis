@@ -1501,3 +1501,13 @@ textarea.input-texte-parchemin {
     line-height: 1;
     pointer-events: none;
 }
+
+/* =========================================================================
+   GRILLE HEXAGONALE
+   ========================================================================= */
+.tuile-hex {
+    fill: transparent;
+    stroke: rgba(255, 255, 255, 0.2); /* Bordure blanche très discrète */
+    stroke-width: 1;
+    pointer-events: none; /* Grille purement visuelle et figée */
+}
