@@ -675,16 +675,18 @@ async function analyserReputation(idLieuActuel, texteMJ) {
         const scoreActuel = snapLieu.data().Reputation_Score || 0;
         const tagsActuels = snapLieu.data().Reputation_Tags || [];
 
-        // NOUVEAU PROMPT : On sépare les ajouts des suppressions pour protéger les anciens tags
+        // NOUVEAU PROMPT : Bridé uniquement sur le lieu actuel
         const promptSysteme = `Tu es MIA_REPUTATION, l'IA qui gère la renommée du groupe.
-Score actuel du groupe : ${scoreActuel} (-10 à +10).
-Tags de rumeur actuels : ${JSON.stringify(tagsActuels)}.
+Score actuel du groupe DANS CE LIEU : ${scoreActuel} (-10 à +10).
+Tags de rumeur actuels DANS CE LIEU : ${JSON.stringify(tagsActuels)}.
 
-Lis la dernière scène racontée. Y a-t-il eu une action NOTABLE du groupe justifiant de modifier leur réputation ?
+RÈGLE ABSOLUE : La réputation est strictement INDÉPENDANTE d'un lieu à l'autre. Ne juge que les actes commis DANS CE LIEU PRÉCIS.
+
+Lis la dernière scène racontée. Y a-t-il eu une action NOTABLE du groupe ICI justifiant de modifier leur réputation LOCALE ?
 Si oui :
-1. Ajuste le score de réputation.
+1. Ajuste le score de réputation local.
 2. S'il y a de nouveaux traits de réputation justifiés par l'action, mets-les dans 'tags_a_ajouter' (ex: "Voleurs", "Généreux").
-3. IMPORTANT : Tu ne dois mettre un ancien tag dans 'tags_a_supprimer' QUE s'il est formellement contredit par la nouvelle action (ex: supprime "Honnêtes" s'ils viennent de voler). Ne supprime JAMAIS un tag comme "Incendiaires" juste parce qu'ils viennent de sauver un chat. La mémoire des crimes et des actes héroïques reste.
+3. IMPORTANT : Tu ne dois mettre un ancien tag dans 'tags_a_supprimer' QUE s'il est formellement contredit par la nouvelle action. La mémoire locale reste.
 
 Si l'action est banale, ne fais rien.`;
 
@@ -867,8 +869,8 @@ async function genererEtStockerImageLieu(promptLieu) {
     // NOUVEAU : On nettoie si tu as mis des phrases de discussion au début
     instructionStyle = instructionStyle.replace(/Tu fera ce dessin dans ce style :/gi, "").trim();
 
-    // NOUVEAU : On interdit formellement les êtres vivants pour avoir un paysage pur
-    const promptOpenAI = `DIRECTIVE DE STYLE VISUEL OBLIGATOIRE : ${instructionStyle}\n\n---\nSujet à dessiner : Un paysage de fantasy. ABSOLUMENT AUCUN PERSONNAGE, aucun humain, aucune créature, aucun animal. Uniquement de l'environnement, du paysage et de l'architecture. Ne dessine aucun texte. Description de la région : ${promptLieu}`;
+    // NOUVEAU : On passe à l'heroic fantasy et on ajoute des exemples architecturaux
+    const promptOpenAI = `DIRECTIVE DE STYLE VISUEL OBLIGATOIRE : ${instructionStyle}\n\n---\nSujet à dessiner : Un paysage d'heroic fantasy. ABSOLUMENT AUCUN PERSONNAGE, aucun humain, aucune créature, aucun animal. Uniquement de l'environnement, du paysage et de l'architecture (ville, village, grotte, nature, etc.). Ne dessine aucun texte. Description de la région : ${promptLieu}`;
 
     const payloadOpenAI = { model: "gpt-image-2", prompt: promptOpenAI, output_format: "webp", n: 1, size: "1792x1024", quality: "low" };
 
@@ -925,16 +927,19 @@ async function genererEtStockerIconeCarte(nomLieu, descriptionLieu) {
 
     console.log("✒️ [MIA_Carto] Dessin de l'icône sur la carte avec gpt-image-1.5...");
     
+    // NOUVEAU PROMPT : Minimalisme total, traits noirs épais, et INTERDICTION formelle d'écrire du texte.
     const promptOpenAI = `A highly stylized, extremely minimalist map icon for a tabletop RPG. Subject: ${descriptionLieu}. 
     STYLE OBLIGATOIRE: Thick, bold, solid black ink lines only. No shading, no grayscale, no colors. Extremely simple and clean outlines, like a stylized river drawn on an old parchment map. 
-    The name "${nomLieu}" MUST be written below the drawing in elegant black cursive calligraphy.`;
+    DO NOT write any text, letters, words, or names on the image. Just the drawing.`;
 
+    // LE PAYLOAD MAGIQUE (gpt-image-1.5 avec fond transparent)
     const payloadOpenAI = { 
         model: "gpt-image-1.5", 
         prompt: promptOpenAI, 
         size: "1024x1024",
         background: "transparent",
         output_format: "png",
+        quality: "low", // <-- ON AJOUTE BIEN LA QUALITÉ LOW ICI !
         n: 1
     };
 
@@ -977,14 +982,38 @@ window.creerNouveauLieu = async function(idHex) {
         return null;
     }
 
+    // =========================================================
+    // NOUVEAU : On récupère tous les lieux déjà existants en BDD
+    // =========================================================
+    let nomsLieuxExistants = [];
+    try {
+        const qLieux = query(collection(db, "Monde_Lieux"));
+        const snapLieux = await getDocs(qLieux);
+        snapLieux.forEach(doc => {
+            if (doc.data().Nom_Du_Lieu) nomsLieuxExistants.push(doc.data().Nom_Du_Lieu);
+        });
+    } catch (e) {
+        console.warn("[MIA_Carto] Impossible de lire la mémoire des lieux :", e);
+    }
+
+    // =========================================================
+    // NOUVEAU PROMPT : Mémoire du monde + Descriptions riches
+    // =========================================================
     const promptSysteme = `Tu es MIA_CARTO, l'IA architecte du monde d'Ivalis. 
 Le Maître du Jeu vient d'envoyer les joueurs sur une zone inexplorée de la carte.
-Invente une NOUVELLE RÉGION d'un monde fantasy originale.
+Voici la liste des lieux qui existent DÉJÀ dans le monde : ${JSON.stringify(nomsLieuxExistants)}.
+
+Ta mission : Invente une NOUVELLE RÉGION d'heroic fantasy originale.
+
+RÈGLES DE CRÉATION :
+1. ORIGINALITÉ : Le nouveau lieu doit être un concept différent de ceux déjà existants. S'il y a déjà "La Grotte de Cristal", n'invente pas une autre grotte de cristal.
+2. EXCEPTION URBAINE : Les villes, bourgades, camps et villages sont la base d'un monde vivant. Tu peux (et tu dois souvent) créer de nouveaux villages ou cités, même s'il y en a déjà beaucoup.
+3. VARIÉTÉ : Varie les atmosphères (joyeux, mystique, dangereux, paisible, abandonné, très peuplé).
 
 Réponds OBLIGATOIREMENT avec un JSON valide respectant ce format exact :
 {
     "nom": "Le Nom du Lieu",
-    "description": "Une description globale de l'atmosphère et du paysage (2 phrases max).",
+    "description": "Une description complète, riche et détaillée du lieu. Décris son atmosphère, son architecture, ses spécificités (géographie, culture, rumeur locale, bizarrerie). Sois exhaustif.",
     "securite": "Faible", // Choisir parmi: Inconnue, Faible, Moyenne, Élevée, Cauchemar
     "prompt_image": "Description visuelle très courte en ANGLAIS du paysage (UNIQUEMENT les éléments physiques. N'ajoute AUCUN mot lié à un style comme 'concept art', 'painting', 'realistic', car le style est géré ailleurs)."
 }`;
@@ -993,7 +1022,7 @@ Réponds OBLIGATOIREMENT avec un JSON valide respectant ce format exact :
         systemInstruction: { parts: [{ text: promptSysteme }] },
         contents: [{ role: "user", parts: [{ text: "Déploie ton imagination et crée un nouveau lieu original pour cette tuile vide." }] }],
         generationConfig: { 
-            temperature: 0.9, // Température haute pour garantir des lieux très variés
+            temperature: 0.9, 
             responseMimeType: "application/json"
         }
     };
@@ -1005,7 +1034,6 @@ Réponds OBLIGATOIREMENT avec un JSON valide respectant ce format exact :
         const data = await reponse.json();
         const contenu = JSON.parse(data.candidates[0].content.parts[0].text);
 
-        // NOUVEAU : Création de l'ID obligatoire commençant par "L"
         const numAleatoire = Math.floor(Math.random() * 100000).toString().padStart(5, "0");
         const nomFormate = contenu.nom.replace(/[^a-zA-Z0-9]/g, "_");
         const docId = `L_${numAleatoire}_${nomFormate}`;
@@ -1040,11 +1068,83 @@ Réponds OBLIGATOIREMENT avec un JSON valide respectant ce format exact :
         
         if (typeof window.dessinerIconesCarte === "function") window.dessinerIconesCarte();
 
-        return docId;
+        // NOUVEAU : On retourne l'ID et le Nom pour que le Narrateur sache où on est !
+        return { id: docId, nom: contenu.nom }; 
 
     } catch (e) {
         console.error("[MIA_Carto] Échec de l'exploration :", e);
         return null;
+    }
+};
+
+window.regenererImagesLieuActuel = async function() {
+    if (!window.ID_PARTIE_COURANTE) return alert("Aucune partie en cours.");
+    
+    // 1. On récupère le lieu actuel depuis Firebase
+    const snapPartie = await getDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE));
+    if (!snapPartie.exists() || !snapPartie.data().Lieu_Actuel) return alert("Lieu actuel introuvable.");
+    
+    let idLieu = snapPartie.data().Lieu_Actuel;
+    
+    // Si les joueurs sont dans un bâtiment, on cible la région parente
+    if (idLieu.startsWith("B")) {
+        const snapBat = await getDoc(doc(db, "Monde_Batiment", idLieu));
+        if (snapBat.exists() && snapBat.data().ID_Lieu) {
+            idLieu = snapBat.data().ID_Lieu;
+        } else {
+            return alert("Impossible de trouver la région de ce bâtiment.");
+        }
+    }
+
+    if (!idLieu.startsWith("L")) return alert("Ce n'est pas un lieu valide pour la carte.");
+
+    const snapLieu = await getDoc(doc(db, "Monde_Lieux", idLieu));
+    if (!snapLieu.exists()) return;
+    
+    const dataLieu = snapLieu.data();
+
+    // 2. On ferme les fenêtres et on lance l'écran de voyage (sablier)
+    if (typeof window.fermerParametres === "function") window.fermerParametres(true);
+
+    const ecranCharge = document.getElementById("ecran-chargement-ia");
+    const titreCharge = document.getElementById("titre-chargement-ia");
+    const imageCharge = document.getElementById("image-chargement-ia");
+
+    if (ecranCharge && titreCharge && imageCharge) {
+        titreCharge.innerText = "Régénération de la région en cours...";
+        imageCharge.dataset.oldSrc = imageCharge.src;
+        imageCharge.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782857488/voyage_yhokpd.png"; 
+        ecranCharge.style.display = "flex";
+    }
+
+    try {
+        console.log(`[Régénération] Lancement pour ${dataLieu.Nom_Du_Lieu}...`);
+        
+        // 3. On relance les deux requêtes API avec les données existantes
+        const [urlImage, urlIcone] = await Promise.all([
+            genererEtStockerImageLieu(dataLieu.Nom_Du_Lieu + " - " + dataLieu.Description_Global),
+            genererEtStockerIconeCarte(dataLieu.Nom_Du_Lieu, dataLieu.Description_Global)
+        ]);
+
+        let maj = {};
+        if (urlImage) maj.URL_Cloudinary = urlImage;
+        if (urlIcone) maj.URL_Icone_Carte = urlIcone;
+
+        // 4. On écrase les anciennes images dans la BDD
+        if (Object.keys(maj).length > 0) {
+            await updateDoc(doc(db, "Monde_Lieux", idLieu), maj);
+            
+            // On force le rafraîchissement visuel pour les joueurs !
+            if (typeof window.dessinerIconesCarte === "function") window.dessinerIconesCarte();
+            if (typeof window.mettreAJourBulleLieu === "function") window.mettreAJourBulleLieu(snapPartie.data().Lieu_Actuel);
+        }
+    } catch (e) {
+        console.error("Erreur lors de la régénération :", e);
+        alert("Une interférence magique a fait échouer la peinture.");
+    } finally {
+        if (ecranCharge) ecranCharge.style.display = "none";
+        if (titreCharge) titreCharge.innerText = "Création de personnage en cours ...";
+        if (imageCharge && imageCharge.dataset.oldSrc) imageCharge.src = imageCharge.dataset.oldSrc;
     }
 };
 
@@ -1198,10 +1298,11 @@ window.declencherTourIA = async function() {
             contexte += `Bâtiments visibles ici : ${env.listeBatiments.join(", ")}\n`;
         }
 
-        // NOUVEAU : Injection des tags et de la jauge
-        contexte += `\n--- RÉPUTATION DU GROUPE DANS CETTE RÉGION ---\n`;
-        contexte += `Score : ${env.reputationScore}/10 (-10 = Hostile, 0 = Neutre, +10 = Adulés).\n`;
-        contexte += `Tags de rumeur : ${env.reputationTags.length > 0 ? env.reputationTags.join(", ") : "Inconnus (Nouveaux venus)"}.\n`;
+        // NOUVEAU : Injection des tags et de la jauge (ISOLATION STRICTE)
+        contexte += `\n--- RÉPUTATION DU GROUPE DANS CE LIEU PRÉCIS ---\n`;
+        contexte += `RÈGLE ABSOLUE : Cette réputation est strictement LOCALE et indépendante des autres lieux. Les PNJ d'ici ignorent tout des actes commis par le groupe ailleurs.\n`;
+        contexte += `Score local : ${env.reputationScore}/10 (-10 = Hostile, 0 = Neutre, +10 = Adulés).\n`;
+        contexte += `Tags de rumeur locaux : ${env.reputationTags.length > 0 ? env.reputationTags.join(", ") : "Inconnus (Nouveaux venus ici)"}.\n`;
         contexte += `CONSIGNE ABSOLUE : Adapte obligatoirement le comportement des PNJ de cette zone en fonction de cette réputation (crainte, respect, agressivité, arnaque, etc.).\n`;
 
         if (nomsPnjPresents.length > 0) {

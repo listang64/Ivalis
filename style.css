@@ -1547,7 +1547,7 @@ textarea.input-texte-parchemin {
 .icone-carte-lieu {
     position: absolute;
     transform: translate(-50%, -50%); 
-    width: 140px; 
+    width: 180px; /* NOUVEAU : Taille augmentée de 50% */
     height: auto;
     pointer-events: none; 
     

@@ -2895,7 +2895,7 @@ window.deplacerPionVers = async function(idHex) {
     }
 };
 
-// 4. L'exécution finale 
+// 4. L'exécution finale (Gestion du temps, IA, BDD)
 window.executerVoyage = async function(idHex, joursDeVoyage) {
     if (joursDeVoyage > 0) {
         await window.avancerTempsAuto(joursDeVoyage);
@@ -2905,9 +2905,12 @@ window.executerVoyage = async function(idHex, joursDeVoyage) {
     const snapLieux = await getDocs(qLieu);
 
     let idLieuCible = null;
+    let nomDuLieu = "leur destination";
 
     if (!snapLieux.empty) {
+        // Le lieu existe déjà, on récupère son ID et son Nom
         idLieuCible = snapLieux.docs[0].id;
+        nomDuLieu = snapLieux.docs[0].data().Nom_Du_Lieu || "ce lieu";
         console.log("🗺️ Lieu connu détecté :", idLieuCible);
     } else {
         console.log("🌫️ Zone vierge ! Invocation de MIA_CARTO...");
@@ -2923,7 +2926,12 @@ window.executerVoyage = async function(idHex, joursDeVoyage) {
         }
 
         if (typeof window.creerNouveauLieu === "function") {
-            idLieuCible = await window.creerNouveauLieu(idHex);
+            const resultatCarto = await window.creerNouveauLieu(idHex);
+            if (resultatCarto) {
+                // On récupère les données renvoyées par MIA_CARTO
+                idLieuCible = resultatCarto.id;
+                nomDuLieu = resultatCarto.nom;
+            }
         }
 
         if (ecranCharge) ecranCharge.style.display = "none";
@@ -2932,9 +2940,39 @@ window.executerVoyage = async function(idHex, joursDeVoyage) {
     }
 
     if (idLieuCible && window.ID_PARTIE_COURANTE) {
-        await updateDoc(doc(db, COL.PARTIES, window.ID_PARTIE_COURANTE), {
+        // 1. On met à jour la position des joueurs en Base de Données
+        await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
             Lieu_Actuel: idLieuCible
         });
+
+        // 2. On rédige le message d'arrivée avec une consigne silencieuse pour MIA
+        let texteArrivee = joursDeVoyage > 0 
+            ? `*Après ${joursDeVoyage} jour(s) de voyage, le groupe arrive à ${nomDuLieu}.* (Narrateur, décris de manière immersive notre arrivée, l'atmosphère des lieux et ce que l'on voit en premier)`
+            : `*Le groupe observe ${nomDuLieu}.* (Narrateur, décris de manière immersive l'atmosphère de ce lieu et ce que l'on y voit en premier)`;
+
+        const jourEnJeu = window.DATE_EN_JEU_ACTUELLE ? window.DATE_EN_JEU_ACTUELLE.jour : "";
+        const anEnJeu = window.DATE_EN_JEU_ACTUELLE ? window.DATE_EN_JEU_ACTUELLE.annee : "";
+
+        // 3. On pousse le message dans l'historique du Chat
+        await addDoc(collection(db, "Messages_Chat"), {
+            ID_Partie: window.ID_PARTIE_COURANTE,
+            Auteur_ID: "DESTIN", 
+            Auteur_Nom: "Destin",
+            Auteur_Couleur: "#c2a878", // Couleur or/sable
+            Texte: texteArrivee,
+            Date_Jour: jourEnJeu,
+            Date_An: anEnJeu,
+            Timestamp: new Date().getTime()
+        });
+
+        // 4. On réveille le MJ (MIA) automatiquement !
+        if (typeof window.declencherTourIA === "function") {
+            // On attend 1.5 secondes pour s'assurer que Firebase a bien eu le temps 
+            // d'actualiser la position des joueurs et les données du nouveau lieu.
+            setTimeout(() => {
+                window.declencherTourIA();
+            }, 1500); 
+        }
     }
 };
 
