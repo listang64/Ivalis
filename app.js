@@ -1745,27 +1745,42 @@ let isDraggingCarte = false;
 let startDragX = 0;
 let startDragY = 0;
 
+// NOUVEAU : Fonction de recadrage isolée pour pouvoir être appelée lors des changements d'écran
+window.recadrerCarte = function() {
+  const carte = document.getElementById("carte-fond-jeu");
+  if (!carte) return;
+
+  const ratioX = window.innerWidth / 3840;
+  const ratioY = window.innerHeight / 2160;
+
+  carteZoom = Math.max(ratioX, ratioY);
+
+  cartePanX = (window.innerWidth - 3840) / 2;
+  cartePanY = (window.innerHeight - 2160) / 2;
+
+  carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
+};
+
 function initialiserCarteInteractive() {
   const conteneur = document.getElementById("conteneur-carte-fond");
-  const carte = document.getElementById("carte-fond-jeu");
-  if (!conteneur || !carte) return;
+  if (!conteneur) return;
+
+  // Auto-cadrage au lancement
+  window.recadrerCarte();
 
   // 1. Gérer le Zoom avec la molette
-  conteneur.addEventListener("wheel", function (e) {
+  conteneur.addEventListener("wheel", function(e) {
     e.preventDefault();
-
-    // Vitesse du zoom (0.1 = doux)
     const delta = Math.sign(e.deltaY) * -0.1;
     carteZoom += delta;
+    carteZoom = Math.min(Math.max(0.1, carteZoom), 4);
 
-    // Limites : pas plus petit que la moitié (0.5), pas plus grand que 4x (4)
-    carteZoom = Math.min(Math.max(0.5, carteZoom), 4);
-
-    appliquerTransformationCarte();
+    const carte = document.getElementById("carte-fond-jeu");
+    if (carte) carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
   }, { passive: false });
 
-  // 2. Attraper la carte (Clic gauche)
-  conteneur.addEventListener("mousedown", function (e) {
+  // 2. Attraper la carte
+  conteneur.addEventListener("mousedown", function(e) {
     if (e.button !== 0) return;
     isDraggingCarte = true;
     startDragX = e.clientX - cartePanX;
@@ -1773,47 +1788,47 @@ function initialiserCarteInteractive() {
   });
 
   // 3. Déplacer la carte
-  window.addEventListener("mousemove", function (e) {
+  window.addEventListener("mousemove", function(e) {
     if (!isDraggingCarte) return;
     e.preventDefault();
     cartePanX = e.clientX - startDragX;
     cartePanY = e.clientY - startDragY;
-    appliquerTransformationCarte();
+
+    const carte = document.getElementById("carte-fond-jeu");
+    if (carte) carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
   });
 
   // 4. Lâcher la carte
-  window.addEventListener("mouseup", function () { isDraggingCarte = false; });
-  window.addEventListener("mouseleave", function () { isDraggingCarte = false; });
-
-  function appliquerTransformationCarte() {
-    carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
-  }
-
-  window.dessinerGrilleHexagonale();
+  window.addEventListener("mouseup", function() { isDraggingCarte = false; });
+  window.addEventListener("mouseleave", function() { isDraggingCarte = false; });
 }
+
+// --- CORRECTION DU BUG PLEIN ÉCRAN ---
+// Si l'écran change de taille (ex: passage en plein écran), on attend 200ms
+// pour laisser l'animation du navigateur se terminer, puis on recadre la carte !
+window.addEventListener("resize", () => {
+  if (document.getElementById("ecran-jeu").style.display !== "none") {
+    setTimeout(window.recadrerCarte, 200);
+  }
+});
 
 // =========================================================================
 //  GÉNÉRATEUR DE GRILLE HEXAGONALE (TUILES)
 // =========================================================================
-window.tailleHexActuelle = 47;
+window.tailleHexActuelle = 102; // Taille gravée
 
-// La liste des tuiles "invisibles" qui modèlent les bords de la carte
 window.TUILES_EXCLUES = [
-    "hex-0-0", "hex-1-0", "hex-2-0", "hex-3-0", "hex-4-0", "hex-5-0", "hex-6-0", "hex-7-0", "hex-8-0", "hex-9-0", "hex-10-0", "hex-11-0", "hex-12-0", "hex-13-0", "hex-14-0", "hex-15-0", "hex-16-0", "hex-17-0", "hex-18-0", "hex-19-0", "hex-20-0", "hex-21-0", "hex-22-0", "hex-23-0", "hex-0-1", "hex-1-1", "hex-2-1", "hex-20-1", "hex-21-1", "hex-22-1", "hex-23-1", "hex-0-2", "hex-1-2", "hex-2-2", "hex-9-2", "hex-10-2", "hex-21-2", "hex-22-2", "hex-23-2", "hex-0-3", "hex-1-3", "hex-8-3", "hex-9-3", "hex-22-3", "hex-23-3", "hex-0-4", "hex-1-4", "hex-2-4", "hex-8-4", "hex-9-4", "hex-22-4", "hex-23-4", "hex-0-5", "hex-1-5", "hex-7-5", "hex-8-5", "hex-9-5", "hex-23-5", "hex-0-6", "hex-1-6", "hex-2-6", "hex-8-6", "hex-9-6", "hex-10-6", "hex-23-6", "hex-0-7", "hex-1-7", "hex-2-7", "hex-8-7", "hex-9-7", "hex-22-7", "hex-23-7", "hex-0-8", "hex-1-8", "hex-2-8", "hex-3-8", "hex-8-8", "hex-9-8", "hex-23-8", "hex-0-9", "hex-1-9", "hex-2-9", "hex-8-9", "hex-9-9", "hex-10-9", "hex-22-9", "hex-23-9", "hex-0-10", "hex-1-10", "hex-2-10", "hex-23-10", "hex-0-11", "hex-1-11", "hex-2-11", "hex-22-11", "hex-23-11", "hex-0-12", "hex-1-12", "hex-21-12", "hex-22-12", "hex-23-12", "hex-0-13", "hex-1-13", "hex-2-13", "hex-3-13", "hex-4-13", "hex-5-13", "hex-6-13", "hex-7-13", "hex-8-13", "hex-9-13", "hex-10-13", "hex-11-13", "hex-12-13", "hex-13-13", "hex-14-13", "hex-15-13", "hex-16-13", "hex-17-13", "hex-18-13", "hex-19-13", "hex-20-13", "hex-21-13", "hex-22-13", "hex-23-13"
+    "hex-0-0", "hex-1-0", "hex-2-0", "hex-3-0", "hex-4-0", "hex-5-0", "hex-6-0", "hex-7-0", "hex-8-0", "hex-9-0", "hex-10-0", "hex-11-0", "hex-12-0", "hex-13-0", "hex-14-0", "hex-15-0", "hex-16-0", "hex-17-0", "hex-18-0", "hex-19-0", "hex-20-0", "hex-21-0", "hex-22-0", "hex-0-1", "hex-1-1", "hex-2-1", "hex-3-1", "hex-4-1", "hex-5-1", "hex-17-1", "hex-18-1", "hex-19-1", "hex-20-1", "hex-21-1", "hex-0-2", "hex-1-2", "hex-2-2", "hex-19-2", "hex-20-2", "hex-21-2", "hex-22-2", "hex-0-3", "hex-1-3", "hex-7-3", "hex-8-3", "hex-9-3", "hex-19-3", "hex-20-3", "hex-21-3", "hex-0-4", "hex-1-4", "hex-7-4", "hex-8-4", "hex-9-4", "hex-20-4", "hex-21-4", "hex-22-4", "hex-0-5", "hex-1-5", "hex-7-5", "hex-8-5", "hex-20-5", "hex-21-5", "hex-0-6", "hex-1-6", "hex-2-6", "hex-7-6", "hex-8-6", "hex-9-6", "hex-21-6", "hex-22-6", "hex-0-7", "hex-1-7", "hex-2-7", "hex-7-7", "hex-8-7", "hex-21-7", "hex-0-8", "hex-1-8", "hex-2-8", "hex-3-8", "hex-8-8", "hex-22-8", "hex-0-9", "hex-1-9", "hex-2-9", "hex-7-9", "hex-9-9", "hex-21-9", "hex-0-10", "hex-1-10", "hex-2-10", "hex-9-10", "hex-21-10", "hex-22-10", "hex-0-11", "hex-1-11", "hex-10-11", "hex-20-11", "hex-21-11", "hex-0-12", "hex-1-12", "hex-3-12", "hex-10-12", "hex-11-12", "hex-19-12", "hex-20-12", "hex-21-12", "hex-22-12", "hex-0-13", "hex-1-13", "hex-2-13", "hex-3-13", "hex-4-13", "hex-6-13", "hex-17-13", "hex-18-13", "hex-19-13", "hex-20-13", "hex-21-13", "hex-0-14", "hex-1-14", "hex-2-14", "hex-3-14", "hex-4-14", "hex-5-14", "hex-6-14", "hex-7-14", "hex-8-14", "hex-9-14", "hex-10-14", "hex-11-14", "hex-12-14", "hex-13-14", "hex-14-14", "hex-15-14", "hex-16-14", "hex-17-14", "hex-18-14", "hex-19-14", "hex-20-14", "hex-21-14", "hex-22-14"
 ];
 
 window.dessinerGrilleHexagonale = function() {
     const svg = document.getElementById("grille-hexagonale");
-    const conteneur = document.getElementById("carte-fond-jeu");
-    if (!svg || !conteneur) return;
+    if (!svg) return;
 
-    const width = conteneur.clientWidth;
-    const height = conteneur.clientHeight;
-    
-    // SÉCURITÉ : On bloque le dessin si l'écran est caché
-    if (width === 0 || height === 0) return;
+    const width = 3840;
+    const height = 2160;
 
-    svg.innerHTML = ""; 
+    svg.innerHTML = "";
     svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
 
     const size = window.tailleHexActuelle;
@@ -1830,10 +1845,9 @@ window.dessinerGrilleHexagonale = function() {
     for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
             const idHex = `hex-${col}-${row}`;
-            
-            // On ignore purement et simplement les hexagones exclus
+
             if (window.TUILES_EXCLUES.includes(idHex)) {
-                continue; 
+                continue;
             }
 
             let x = col * xOffset + (row % 2 === 1 ? hexWidth / 2 : 0);
@@ -1851,15 +1865,9 @@ window.dessinerGrilleHexagonale = function() {
             htmlPolygons += `<polygon id="${idHex}" points="${points.trim()}" class="tuile-hex"></polygon>`;
         }
     }
-    
+
     svg.innerHTML = htmlPolygons;
 };
-
-window.addEventListener("resize", () => {
-    if (document.getElementById("ecran-jeu").style.display !== "none") {
-        window.dessinerGrilleHexagonale();
-    }
-});
 
 // =========================================================================
 //  INITIALISATION (DOMContentLoaded)
@@ -2639,7 +2647,7 @@ Object.assign(window, {
   // Ecran de jeu
   jouerSonSurvolParchemin, toggleBulleVolume, ajusterVolume,
   fermerModalesJeu, demanderRetourMenu, demanderQuitterJeu,
-  confirmerRetourMenu, confirmerQuitterJeu,
+  confirmerRetourMenu, confirmerQuitterJeu, recadrerCarte,
   // Parametres / Cerveau IA
   fermerParametres, naviguerFenetre, validerMdpParametres,
   ouvrirListeInstructions, basculerPoussoirIA, ouvrirEditeurInstruction,

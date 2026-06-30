@@ -338,13 +338,15 @@ body, html {
 }
 
 #carte-fond-jeu {
-  width: 100%; height: 100%;
+  /* NOUVEAU : Dimensions fixes 4K gravées dans le marbre */
+  width: 3840px; 
+  height: 2160px;
   
-  /* Le chemin relatif universel qui correspond à ton C:\Users\lista\Desktop\Ivalis\images\fond_jeu.png */
   background-image: url('./images/fond_jeu.png'); 
   
-  background-size: cover;
-  background-position: center;
+  /* On force l'image à épouser exactement ces 3840x2160 pixels */
+  background-size: 100% 100%; 
+  background-position: top left;
   background-repeat: no-repeat;
   
   cursor: grab;
@@ -1509,5 +1511,5 @@ textarea.input-texte-parchemin {
     fill: transparent;
     stroke: rgba(255, 255, 255, 0.2); /* Bordure blanche très discrète */
     stroke-width: 1;
-    pointer-events: none; /* Grille purement visuelle et figée */
+    pointer-events: none; /* La grille est figée, la souris passe à travers pour drag & drop la carte */
 }
