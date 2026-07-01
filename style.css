@@ -1566,12 +1566,69 @@ textarea.input-texte-parchemin {
 .icone-carte-lieu {
     position: absolute;
     transform: translate(-50%, -50%); 
-    width: 180px; /* NOUVEAU : Taille augmentée de 50% */
+    width: 180px; 
     height: auto;
-    pointer-events: none; 
     
-    /* On a retiré le mix-blend-mode ici ! */
+    /* 🔻 ON RÉACTIVE LA SOURIS ICI */
+    pointer-events: auto; 
+    cursor: pointer;
     
     filter: contrast(1.2) drop-shadow(0px 2px 2px rgba(0,0,0,0.3));
     z-index: 10;
+    transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+/* NOUVEAU : Petit effet de grossissement quand on la survole */
+.icone-carte-lieu:hover {
+    transform: translate(-50%, -50%) scale(1.1);
+    filter: contrast(1.3) drop-shadow(0px 5px 10px rgba(0,0,0,0.6));
+}
+
+/* =========================================================================
+   POP-UP INFOBULLE DES LIEUX (SURVOL CARTE)
+   ========================================================================= */
+#tooltip-lieu-map {
+    position: fixed;
+    width: 300px;
+    height: 180px;
+    z-index: 10000;
+    border: 3px solid #8c6a45;
+    border-radius: 12px;
+    box-shadow: 0px 15px 30px rgba(0,0,0,0.9);
+    pointer-events: none; /* Empêche la bulle de bloquer la souris */
+    display: none;
+    background-color: #1a0f08;
+    overflow: hidden;
+}
+
+#tooltip-lieu-image {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+}
+
+.voile-assombrissant {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 50%;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%);
+    z-index: 2;
+}
+
+#tooltip-lieu-nom {
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    text-align: center;
+    color: #e8d5a5;
+    font-family: 'Cinzel', serif !important;
+    font-size: 22px;
+    font-weight: bold;
+    text-transform: uppercase;
+    text-shadow: 2px 2px 5px black, 0px 0px 10px rgba(0,0,0,0.9);
+    letter-spacing: 1px;
+    z-index: 3;
 }

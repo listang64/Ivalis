@@ -692,6 +692,14 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
              document.getElementById("btn-annuler-voyage").onclick = () => {
                  if (typeof window.jouerSonClic === "function") window.jouerSonClic();
                  updateDoc(doc(db, COL.PARTIES, window.ID_PARTIE_COURANTE), { Proposition_Voyage: deleteField() });
+                 
+                 // NOUVEAU : On s'assure que la grille disparaît bien à l'annulation
+                 window.grilleEstVisible = false;
+                 const svg = document.getElementById("grille-hexagonale");
+                 if (svg) {
+                     svg.style.opacity = "0";
+                     svg.style.pointerEvents = "none";
+                 }
              };
          } else {
              if (modaleVoyage && modaleVoyage.style.display === "block") {
@@ -2873,7 +2881,7 @@ window.avancerTempsAuto = async function(joursDeVoyage) {
 };
 
 // =========================================================================
-//  DESSINATEUR D'ICÔNES DE CARTE
+//  DESSINATEUR D'ICÔNES DE CARTE & INFOBULLES
 // =========================================================================
 window.dessinerIconesCarte = async function() {
     const conteneur = document.getElementById("conteneur-icones-carte");
@@ -2889,13 +2897,8 @@ window.dessinerIconesCarte = async function() {
     const xOffset = hexWidth;
     const yOffset = (3/4) * hexHeight;
 
-    // =====================================================
-    // PARAMÈTRES DE DÉCALAGE MANUEL DES ICÔNES
-    // Modifie ces valeurs en pixels pour affiner la position
-    // =====================================================
-    const decalageX_icone = 0;  // Positif = Droite | Négatif = Gauche
-    const decalageY_icone = -100;  // Positif = Bas    | Négatif = Haut
-    // =====================================================
+    const decalageX_icone = 0;  
+    const decalageY_icone = -100;  
 
     snap.forEach(doc => {
         const data = doc.data();
@@ -2905,34 +2908,121 @@ window.dessinerIconesCarte = async function() {
                 const col = parseInt(parts[1]);
                 const row = parseInt(parts[2]);
                 
-                // Calcul du centre absolu de l'hexagone
                 let x = col * xOffset + (row % 2 === 1 ? hexWidth / 2 : 0);
                 let y = row * yOffset + size; 
 
                 const img = document.createElement("img");
                 img.src = data.URL_Icone_Carte;
                 img.className = "icone-carte-lieu";
+                img.draggable = false; // Empêche l'image de rester "collée" si on drag la carte
                 
-                // Application de la position avec ton décalage manuel
                 img.style.left = `${x + decalageX_icone}px`;
                 img.style.top = `${y + decalageY_icone}px`;
                 
+                // --- NOUVEAU : LA GESTION DE LA SOURIS ---
+                
+                // Si on clique sur l'icône, on voyage directement
+                img.onclick = function(e) {
+                    e.stopPropagation(); 
+                    window.masquerTooltipLieu();
+                    window.deplacerPionVers(data.Tuile_ID);
+                };
+
+                // Si on entre sur l'icône
+                img.onmouseenter = function(e) {
+                    window.afficherTooltipLieu(data.Nom_Du_Lieu, data.URL_Cloudinary, e);
+                };
+                
+                // Si on bouge la souris SUR l'icône, la bulle suit le curseur
+                img.onmousemove = function(e) {
+                    window.deplacerTooltipLieu(e);
+                };
+                
+                // Si on quitte l'icône
+                img.onmouseleave = function() {
+                    window.masquerTooltipLieu();
+                };
+
                 conteneur.appendChild(img);
             }
         }
     });
 };
 
+// --- FONCTIONS DE L'INFOBULLE ---
+
+window.afficherTooltipLieu = function(nom, urlImage, evenement) {
+    let tooltip = document.getElementById("tooltip-lieu-map");
+    if (!tooltip) {
+        tooltip = document.createElement("div");
+        tooltip.id = "tooltip-lieu-map";
+        tooltip.innerHTML = `
+            <img id="tooltip-lieu-image" src="" alt="Lieu">
+            <div class="voile-assombrissant"></div>
+            <div id="tooltip-lieu-nom"></div>
+        `;
+        document.body.appendChild(tooltip);
+    }
+    
+    document.getElementById("tooltip-lieu-nom").innerText = nom;
+    
+    const imgEl = document.getElementById("tooltip-lieu-image");
+    if (urlImage && urlImage !== "") {
+        imgEl.src = urlImage;
+        imgEl.style.display = "block";
+    } else {
+        imgEl.style.display = "none";
+    }
+    
+    tooltip.style.display = "block";
+    window.deplacerTooltipLieu(evenement);
+};
+
+window.deplacerTooltipLieu = function(evenement) {
+    const tooltip = document.getElementById("tooltip-lieu-map");
+    if (!tooltip || tooltip.style.display === "none") return;
+    
+    // Décalage pour que la bulle soit en bas à droite du curseur
+    let x = evenement.clientX + 20;
+    let y = evenement.clientY + 20;
+    
+    // Système anti-débordement d'écran (pour les icônes très à droite/en bas)
+    if (x + 300 > window.innerWidth) x = evenement.clientX - 320;
+    if (y + 180 > window.innerHeight) y = evenement.clientY - 200;
+    
+    tooltip.style.left = x + "px";
+    tooltip.style.top = y + "px";
+};
+
+window.masquerTooltipLieu = function() {
+    const tooltip = document.getElementById("tooltip-lieu-map");
+    if (tooltip) tooltip.style.display = "none";
+};
+
 // 3. Le déclencheur au clic sur la carte (POUSSE VERS FIREBASE)
 window.deplacerPionVers = async function(idHex) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    window.toggleGrille();
+    
+    // 1. On FORCE la désactivation de la grille (au lieu d'inverser son état)
+    window.grilleEstVisible = false;
+    const svg = document.getElementById("grille-hexagonale");
+    if (svg) {
+        svg.style.opacity = "0"; 
+        svg.style.pointerEvents = "none"; 
+    }
+
+    // 2. SÉCURITÉ : Interdiction de voyager sur la tuile où l'on se trouve déjà
+    if (idHex === window.TUILE_ACTUELLE) {
+        return; // On annule l'action silencieusement
+    }
 
     let distance = window.calculerDistanceHex(window.TUILE_ACTUELLE, idHex);
     let joursDeVoyage = distance * 3;
 
     if (joursDeVoyage > 0) {
-        await updateDoc(doc(db, COL.PARTIES, window.ID_PARTIE_COURANTE), {
+        // Enregistrement de la proposition de voyage dans Firebase
+        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+        await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
             Proposition_Voyage: {
                 Tuile_ID: idHex,
                 Jours: joursDeVoyage,
