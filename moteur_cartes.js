@@ -476,6 +476,11 @@ window.genererProfilDeck = async function() {
         // --- ÉTAPE 1 : ADN MATHÉMATIQUE ---
         const profilJson = await analyserStyleCombatRP(texteRP);
         
+        // --- NOUVEAU : AFFICHAGE DE LA BALANCE DANS LA CONSOLE ---
+        console.log("⚖️ --- BALANCE DE L'IA (100 Points) ---");
+        console.log("Thème :", profilJson.Theme_Identifie);
+        console.table(profilJson.Poids_Actions);
+
         // --- ÉTAPE 2 : FORGE DES CARTES ---
         let deckProcedural = window.genererDeckComplet(profilJson);
 

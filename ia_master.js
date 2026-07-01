@@ -1495,6 +1495,34 @@ Si un PNJ n'a absolument pas interagi ou n'a pas du tout été concerné par les
         for (const m of messages) {
             await deleteDoc(doc(db, "Messages_Chat", m.id));
         }
+
+        // =========================================================================
+        // --- NOUVEAU : 6. LE CIMETIÈRE (Nettoyage des PNJ morts) ---
+        // =========================================================================
+        console.log("💀 [Cimetière] Recherche des corps à incinérer...");
+        
+        // On récupère tous les PNJ de la base de données
+        const qTousLesPnj = query(collection(db, "Monde_PNJ"));
+        const snapTousLesPnj = await getDocs(qTousLesPnj);
+        
+        for (const docPnj of snapTousLesPnj.docs) {
+            const dataPnj = docPnj.data();
+            
+            // Si le PNJ n'est pas "Vivant" (Mort, Disparu, etc.)
+            if (dataPnj.Statut !== "Vivant") {
+                console.log(`[Cimetière] Effacement total de : ${dataPnj.Nom_PNJ}`);
+                
+                // 1. Suppression de l'image sur Cloudinary (la fonction existe déjà !)
+                if (dataPnj.URL_Cloudinary && dataPnj.URL_Cloudinary !== "") {
+                    await supprimerImageCloudinary(dataPnj.URL_Cloudinary);
+                }
+                
+                // 2. Effacement définitif du PNJ de la base Firestore
+                await deleteDoc(doc(db, "Monde_PNJ", docPnj.id));
+            }
+        }
+        // =========================================================================
+
         return true;
     } catch (e) {
         console.error("Erreur critique lors de l'archivage silencieux :", e);
