@@ -751,6 +751,10 @@ function afficherBullesPersonnages(persos) {
   const indexTour = partie.Index_Initiative !== undefined ? partie.Index_Initiative : 999;
   const idPersoActif = ordre[indexTour];
 
+  // NOUVEAU : Identification du joueur
+  const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
+  let estMonTour = false;
+
   let nomActif = "MJ";
 
   persos.forEach((p) => {
@@ -762,6 +766,8 @@ function afficherBullesPersonnages(persos) {
     if (p.idPersonnage === idPersoActif) {
         bulle.classList.add("tour-actif");
         nomActif = p.prenom;
+        // NOUVEAU : On vérifie si ce personnage m'appartient
+        if (p.idJoueur === currentUserId) estMonTour = true;
     }
 
     if (p.urlCloudinary && p.urlCloudinary !== "") {
@@ -790,7 +796,6 @@ function afficherBullesPersonnages(persos) {
   bulleMJ.className = "bulle-personnage bulle-mj";
   bulleMJ.innerText = "MJ";
 
-  // Ajout de l'image au survol pour le MJ
   const imgHoverMJ = document.createElement("img");
   imgHoverMJ.className = "bulle-portrait-hover";
   imgHoverMJ.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782164835/maitre_du_jeu_kemkf2.png";
@@ -801,7 +806,6 @@ function afficherBullesPersonnages(persos) {
       nomActif = "MJ";
   }
 
-  // NOUVEAU : On grise et on désactive le bouton si l'IA réfléchit pour éviter les doubles clics
   if (partie.IA_En_Cours === true) {
       bulleMJ.style.opacity = "0.4";
       bulleMJ.style.pointerEvents = "none";
@@ -809,13 +813,6 @@ function afficherBullesPersonnages(persos) {
   } else {
       bulleMJ.onclick = function() {
           if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-          
-          const inputChat = document.getElementById("input-chat");
-          if (inputChat) {
-              inputChat.placeholder = "Le MJ écrit l'histoire...";
-              inputChat.disabled = true;
-          }
-
           if (typeof window.declencherTourIA === "function") {
               window.declencherTourIA(); 
           }
@@ -823,23 +820,30 @@ function afficherBullesPersonnages(persos) {
   }
   conteneur.appendChild(bulleMJ);
 
-  // --- Mise à jour de la barre de saisie ---
+  // --- NOUVEAU : Mise à jour de la barre de saisie (Préparation autorisée) ---
   const inputChat = document.getElementById("input-chat");
   const btnEnvoyer = document.getElementById("btn-envoyer-chat");
 
   if (inputChat && btnEnvoyer) {
+      // On laisse TOUJOURS l'input actif pour que le joueur puisse taper son texte à l'avance
+      inputChat.disabled = false;
+      inputChat.style.opacity = "1";
+
       if (nomActif === "MJ") {
-          inputChat.placeholder = "Le MJ prépare sa réponse...";
-          inputChat.disabled = true;  
-          btnEnvoyer.disabled = true; 
-          inputChat.style.opacity = "0.5";
+          inputChat.placeholder = "Le MJ écrit... (Préparez votre texte)";
+          btnEnvoyer.disabled = true;  
           btnEnvoyer.style.opacity = "0.5";
+          btnEnvoyer.style.cursor = "not-allowed";
+      } else if (!estMonTour) {
+          inputChat.placeholder = "Au tour de " + nomActif + "... (Préparez votre texte)";
+          btnEnvoyer.disabled = true; 
+          btnEnvoyer.style.opacity = "0.5";
+          btnEnvoyer.style.cursor = "not-allowed";
       } else {
-          inputChat.placeholder = "C'est au tour de " + nomActif + " de parler...";
-          inputChat.disabled = false; 
+          inputChat.placeholder = "C'est à votre tour, " + nomActif + " !";
           btnEnvoyer.disabled = false;
-          inputChat.style.opacity = "1";
           btnEnvoyer.style.opacity = "1";
+          btnEnvoyer.style.cursor = "pointer";
       }
   }
 }
@@ -897,9 +901,8 @@ window.relancerInitiativeChat = async function() {
   });
 };
 
-// 5. Envoi du message (avec ajout de la Date issue de Firestore)
+// 5. Envoi du message (avec ajout de la Date issue de Firestore et sécurité)
 window.envoyerMessageChat = async function() {
-   // NOUVEAU : On coupe le micro de force si on envoie le message et on vide sa mémoire
    if (window.estEnTrainEcouter && window.recognition) {
        window.recognition.stop();
    }
@@ -913,6 +916,10 @@ window.envoyerMessageChat = async function() {
    const ordre = partie.Ordre_Initiative || [];
    const indexTour = partie.Index_Initiative !== undefined ? partie.Index_Initiative : 999;
 
+   // NOUVEAU : On identifie si c'est bien à moi de parler
+   const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
+   let estMonTour = false;
+
    let auteurNom = "MJ";
    let auteurCouleur = "#ffffff";
    let idAuteur = "MJ";
@@ -924,10 +931,25 @@ window.envoyerMessageChat = async function() {
            auteurNom = persoActif.prenom;
            auteurCouleur = persoActif.couleur;
            idAuteur = persoActif.idPersonnage;
+           
+           // Si c'est mon personnage, j'ai le droit de parler
+           if (persoActif.idJoueur === currentUserId) estMonTour = true;
        }
    }
 
-   // On récupère la date fraîche depuis notre mémoire globale (Issue de Firebase)
+   // --- SÉCURITÉ ANTI-TRICHE CHAT ---
+   // Si c'est le tour de l'IA (999) ou si ce n'est pas mon tour, je ne peux rien envoyer !
+   if (indexTour === 999 || !estMonTour) {
+        const btn = document.getElementById("btn-envoyer-chat");
+        if(btn) {
+            // Petit effet de tremblement pour indiquer que l'action est refusée
+            btn.style.transform = "translateX(5px)";
+            setTimeout(() => btn.style.transform = "translateX(-5px)", 50);
+            setTimeout(() => btn.style.transform = "translateX(0)", 100);
+        }
+        return; 
+   }
+
    const jourEnJeu = window.DATE_EN_JEU_ACTUELLE ? window.DATE_EN_JEU_ACTUELLE.jour : "";
    const anEnJeu = window.DATE_EN_JEU_ACTUELLE ? window.DATE_EN_JEU_ACTUELLE.annee : "";
 
@@ -937,8 +959,8 @@ window.envoyerMessageChat = async function() {
        Auteur_Nom: auteurNom,
        Auteur_Couleur: auteurCouleur,
        Texte: texte,
-       Date_Jour: jourEnJeu, // Ajouté dans le payload
-       Date_An: anEnJeu,     // Ajouté dans le payload
+       Date_Jour: jourEnJeu, 
+       Date_An: anEnJeu,     
        Timestamp: new Date().getTime()
    };
 
@@ -1516,7 +1538,12 @@ async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPers
   document.getElementById("texte-aucun-portrait").style.display = "block";
 
   const inputs = fiche.querySelectorAll(".input-perso");
-  inputs.forEach((input) => { if (input.type === "text") input.value = ""; });
+  inputs.forEach((input) => {
+    if (input.type === "text") input.value = "";
+    input.disabled = false;
+  });
+
+  document.getElementById("champ-id-joueur-perso").value = localStorage.getItem("ID_JOUEUR_COURANT");
 
   document.getElementById("champ-race").value = "";
   document.getElementById("champ-genre").value = "";
@@ -1558,6 +1585,9 @@ async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPers
   } else {
     document.getElementById("titre-nom-personnage").innerText = "Nouveau Personnage";
     btnSupprimer.style.display = "none";
+    
+    // CORRECTION DU BUG : On force le bouton Enregistrer à réapparaître pour les nouveaux !
+    btnSauvegarder.style.display = "inline-block";
     btnSauvegarder.innerText = "Enregistrer";
     btnSauvegarder.style.pointerEvents = "auto";
   }
@@ -1585,6 +1615,23 @@ async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPers
 
 function remplirFormulairePerso(donnees) {
   if (!donnees) return;
+
+  const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
+  const idProprio = donnees.idJoueur || "";
+  document.getElementById("champ-id-joueur-perso").value = idProprio;
+
+  const estProprietaire = (idProprio === currentUserId) || (idProprio === "");
+
+  const btnSauvegarder = document.getElementById("btn-sauvegarder-perso");
+  if (estProprietaire) {
+    btnSauvegarder.style.display = "inline-block";
+    btnSauvegarder.innerText = "Enregistrer";
+    btnSauvegarder.style.pointerEvents = "auto";
+    document.querySelectorAll("#onglet-descriptif .input-perso").forEach(el => el.disabled = false);
+  } else {
+    btnSauvegarder.style.display = "none";
+    document.querySelectorAll("#onglet-descriptif .input-perso").forEach(el => el.disabled = true);
+  }
 
   const imgPortrait = document.getElementById("image-portrait-perso");
   const txtPortrait = document.getElementById("texte-aucun-portrait");
@@ -1618,10 +1665,6 @@ function remplirFormulairePerso(donnees) {
   document.getElementById("champ-couleurs").value = donnees.couleursDom || "";
   document.getElementById("champ-equipement").value = donnees.equipement || "";
   document.getElementById("champ-faction").value = donnees.idFaction || "";
-
-  const btnSauvegarder = document.getElementById("btn-sauvegarder-perso");
-  btnSauvegarder.innerText = "Enregistrer";
-  btnSauvegarder.style.pointerEvents = "auto";
 }
 
 function fermerFichePerso() {
@@ -1643,7 +1686,7 @@ async function sauvegarderDescriptifPerso() {
 
   const donnees = {
     idPartie: window.ID_PARTIE_COURANTE,
-    idJoueur: localStorage.getItem("ID_JOUEUR_COURANT"),
+    idJoueur: document.getElementById("champ-id-joueur-perso").value || localStorage.getItem("ID_JOUEUR_COURANT"),
     idPersonnage: document.getElementById("champ-id-personnage").value,
     statut: document.getElementById("champ-statut-personnage").value,
     urlCloudinary: urlExistante,
@@ -1744,12 +1787,13 @@ function changerOngletPerso(evt, nomOnglet) {
     evt.currentTarget.classList.add("actif");
   }
 
-  // --- NOUVEAU : Masquer/Afficher le bouton Supprimer ---
   const btnSupprimer = document.getElementById("btn-supprimer-perso");
   const idPersonnage = document.getElementById("champ-id-personnage").value;
+  const proprioId = document.getElementById("champ-id-joueur-perso").value;
+  const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
+  const estProprietaire = (proprioId === currentUserId) || (proprioId === "");
 
-  // On affiche le bouton SEULEMENT si on est sur le Descriptif ET que le perso existe déjà
-  if (nomOnglet === 'onglet-descriptif' && idPersonnage !== "") {
+  if (nomOnglet === "onglet-descriptif" && idPersonnage !== "" && estProprietaire) {
     btnSupprimer.style.display = "block";
   } else {
     btnSupprimer.style.display = "none";
@@ -2195,6 +2239,10 @@ window.chargerCaracteristiques = async function(idPersonnage) {
     return;
   }
 
+  const proprioId = document.getElementById("champ-id-joueur-perso").value;
+  const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
+  const estProprietaire = (proprioId === currentUserId) || (proprioId === "");
+
   try {
     const snap = await getDoc(doc(db, COL.CARACTERISTIQUES, idPersonnage));
     if (snap.exists()) {
@@ -2202,7 +2250,7 @@ window.chargerCaracteristiques = async function(idPersonnage) {
       divAffiche.style.display = "block";
     } else {
       divVide.style.display = "block";
-      btnCreer.style.display = "inline-block";
+      btnCreer.style.display = estProprietaire ? "inline-block" : "none";
     }
   } catch (e) {
     console.error("Erreur lecture caracs:", e);

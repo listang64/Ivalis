@@ -565,11 +565,19 @@ window.chargerDeckExistant = async function(idPersonnage) {
     const divResultat = document.getElementById("resultat-profil-deck");
     const conteneurAffichage = document.getElementById("json-affichage-deck");
     const titreTheme = document.getElementById("titre-theme-deck");
+    const divCartesVide = document.getElementById("cartes-vide");
 
-    if (!idPersonnage) return;
+    const proprioId = document.getElementById("champ-id-joueur-perso").value;
+    const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
+    const estProprietaire = (proprioId === currentUserId) || (proprioId === "");
+
+    if (!idPersonnage) {
+        divCartesVide.style.display = "block";
+        divResultat.style.display = "none";
+        return;
+    }
 
     try {
-        // 1. On interroge la collection Cartes_Profils
         const deckRef = doc(db, "Cartes_Profils", idPersonnage);
         const deckSnap = await getDoc(deckRef);
 
@@ -577,10 +585,9 @@ window.chargerDeckExistant = async function(idPersonnage) {
             const donneesDeck = deckSnap.data();
             const deckProcedural = donneesDeck.Deck_Mathematique;
             
-            // On remet le titre (ex: "Gardien de Pierre Immuable")
             titreTheme.innerText = donneesDeck.Donnees_IA?.Theme_Identifie || "Deck du Héros";
+            divCartesVide.style.display = "none";
 
-            // 2. On récupère la vraie couleur du personnage
             let couleurPerso = "#4a1c1c";
             const persoRef = doc(db, "Personnages", idPersonnage);
             const persoSnap = await getDoc(persoRef);
@@ -588,11 +595,8 @@ window.chargerDeckExistant = async function(idPersonnage) {
                 couleurPerso = persoSnap.data().Couleur;
             }
 
-            // ---> AJOUTE CETTE LIGNE ICI POUR TRIER LES VIEUX DECKS <---
             deckProcedural.sort((a, b) => a.initiative - b.initiative);
 
-            // 3. On construit l'affichage visuel directement
-            // NOUVEAU : On stocke le deck et la couleur en variables globales pour le survol
             window.DECK_COURANT = deckProcedural;
             window.COULEUR_PERSO_COURANT = couleurPerso;
 
@@ -601,7 +605,6 @@ window.chargerDeckExistant = async function(idPersonnage) {
             deckProcedural.forEach((carte, index) => {
                 let titre = carte.titre || "Action Inconnue";
                 
-                // On ajoute 'event' en paramètre pour récupérer les coordonnées
                 htmlDeck += `
                     <div class="banniere-carte" onmouseenter="window.afficherCarteZoom(${index}, event)" onmouseleave="window.masquerCarteZoom()">
                         <div class="fond-couleur" style="background-color: ${couleurPerso};"></div>
@@ -614,15 +617,14 @@ window.chargerDeckExistant = async function(idPersonnage) {
             
             htmlDeck += `</div>`;
             
-            // On injecte et on affiche !
             conteneurAffichage.innerHTML = htmlDeck;
             divResultat.style.display = "block";
             
         } else {
-            // S'il n'y a pas de deck sauvegardé, on cache la zone pour laisser place au formulaire de génération
             divResultat.style.display = "none";
             conteneurAffichage.innerHTML = "";
             titreTheme.innerText = "";
+            divCartesVide.style.display = estProprietaire ? "block" : "none";
         }
     } catch (erreur) {
         console.error("Erreur lors du chargement du deck existant :", erreur);

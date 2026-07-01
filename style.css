@@ -144,8 +144,8 @@ body, html {
     position: absolute;
     top: 3vh;
     right: 2vw;
-    width: 2.5vw;
-    min-width: 40px; 
+    width: 2vw;
+    min-width: 30px; 
     height: auto;
     cursor: pointer;
     z-index: 50;
