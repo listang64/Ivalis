@@ -928,23 +928,23 @@ textarea.input-texte-parchemin {
 
 /* --- La croix de suppression --- */
 .btn-supprimer-msg {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  background: transparent;
-  color: rgba(255, 76, 76, 0.4);
-  border: none;
-  font-size: 14px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: 0.2s;
-  padding: 5px;
-  z-index: 10;
+    position: absolute;
+    top: 8px;       /* Ajuste pour monter ou descendre la croix dans le coin */
+    right: 12px;    /* Ajuste pour la décaler plus ou moins vers le bord droit */
+    background: transparent;
+    color: rgba(255, 76, 76, 0.4);
+    border: none;
+    font-size: 16px; /* Légèrement agrandie pour un clic plus confortable */
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 10;
 }
 
 .btn-supprimer-msg:hover {
-  color: #ff4c4c;
-  transform: scale(1.2);
+    color: #ff4c4c;
+    transform: scale(1.2);
+    text-shadow: 0px 0px 8px rgba(255, 76, 76, 0.6);
 }
 
 /* Le liseret de couleur (qui servira de séparation) */
@@ -955,12 +955,12 @@ textarea.input-texte-parchemin {
 
 /* Le texte du message */
 .message-contenu {
-  flex-grow: 1;
-  padding: 10px 15px;
-  color: #e8d5a5;
-  font-size: 17px;
-  line-height: 1.4;
-  word-break: break-word;
+    flex-grow: 1;
+    padding: 10px 35px 15px 15px; /* Augmentation du padding à droite (35px) pour bloquer le texte avant la croix */
+    color: #e8d5a5;
+    font-size: 17px;
+    line-height: 1.4;
+    word-break: break-word;
 }
 
 /* --- La bulle spéciale MJ --- */

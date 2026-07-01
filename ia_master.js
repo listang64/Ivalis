@@ -22,14 +22,17 @@ async function preparerEnvironnement(lieuActuelId) {
     if (!lieuActuelId) return env;
 
     let idLieuParent = lieuActuelId;
+    const idPartieCourante = window.ID_PARTIE_COURANTE;
 
     if (lieuActuelId.startsWith("L")) {
         env.type = "Lieu";
         const snapLieu = await getDoc(doc(db, "Monde_Lieux", lieuActuelId));
         if (snapLieu.exists()) {
             env.details = snapLieu.data();
-            env.reputationScore = env.details.Reputation_Score || 0;
-            env.reputationTags = env.details.Reputation_Tags || [];
+            const repMap = env.details.Reputations || {};
+            const repGroupe = repMap[idPartieCourante] || {};
+            env.reputationScore = repGroupe.Score || 0;
+            env.reputationTags = repGroupe.Tags || [];
         }
 
         const qBat = query(collection(db, "Monde_Batiment"), where("ID_Lieu", "==", lieuActuelId));
@@ -40,7 +43,7 @@ async function preparerEnvironnement(lieuActuelId) {
         const snapPnj = await getDocs(qPnj);
         snapPnj.forEach(doc => { 
             const pnjData = doc.data();
-            // NOUVEAU : On ignore les morts pour qu'ils n'agissent plus
+            pnjData.idDoc = doc.id;
             if (pnjData.Statut !== "Mort") {
                 env.pnjsPresents[pnjData.Nom_PNJ] = pnjData; 
             }
@@ -57,8 +60,10 @@ async function preparerEnvironnement(lieuActuelId) {
         if (idLieuParent) {
             const snapLieu = await getDoc(doc(db, "Monde_Lieux", idLieuParent));
             if (snapLieu.exists()) {
-                env.reputationScore = snapLieu.data().Reputation_Score || 0;
-                env.reputationTags = snapLieu.data().Reputation_Tags || [];
+                const repMap = snapLieu.data().Reputations || {};
+                const repGroupe = repMap[idPartieCourante] || {};
+                env.reputationScore = repGroupe.Score || 0;
+                env.reputationTags = repGroupe.Tags || [];
             }
         }
 
@@ -66,7 +71,7 @@ async function preparerEnvironnement(lieuActuelId) {
         const snapPnj = await getDocs(qPnj);
         snapPnj.forEach(doc => { 
             const pnjData = doc.data();
-            // NOUVEAU : On ignore les morts ici aussi
+            pnjData.idDoc = doc.id;
             if (pnjData.Statut !== "Mort") {
                 env.pnjsPresents[pnjData.Nom_PNJ] = pnjData; 
             }
@@ -155,7 +160,7 @@ async function genererEtStockerImageBatiment(promptBatiment) {
     const instructionStyle = await recupererInstructionStyleBackend();
     const promptOpenAI = "Ne dessine absolument aucun texte ou lettrage sur l'image.\\n\\nDescription du lieu : " + promptBatiment + "\\n\\nDirectives de style artistique obligatoires : " + instructionStyle;
 
-    const payloadOpenAI = { model: "gpt-image-2", prompt: promptOpenAI, output_format: "webp", n: 1, size: "1792x1024", quality: "low" };
+    const payloadOpenAI = { model: "gpt-image-2", prompt: promptOpenAI, output_format: "webp", n: 1, size: "1792x1024", quality: "low", moderation: "low" };
 
     let tentative = 0, succes = false, texteReponseOpenAI = "";
     const delais = [5000, 15000, 30000];
@@ -222,10 +227,12 @@ Bâtiments connus ici : ${JSON.stringify(batimentsExistants)}.
 État actuel : ${estDansBatiment ? "À L'INTÉRIEUR d'un bâtiment." : "À L'EXTÉRIEUR (Rue, forêt, etc.)."}
 
 Analyse la dernière réponse du Narrateur.
-1. Les joueurs viennent-ils d'entrer dans un bâtiment/lieu existant de la liste ? -> "existant" + ID.
-2. Les joueurs viennent-ils de pénétrer dans un bâtiment/point d'intérêt INCONNU ? -> "nouveau" + invente les détails.
+ATTENTION - RÈGLE ABSOLUE ANTI-ANTICIPATION : Voir un lieu de loin, en entendre parler, ou se voir indiquer un chemin NE VEUT PAS DIRE y entrer. Si le texte dit "là bas se trouve...", ou si le Narrateur finit par demander "Que faites-vous ?" / "Y allez-vous ?", c'est que le déplacement n'a PAS encore eu lieu ! Tu ne dois créer un bâtiment que si les joueurs y sont physiquement entrés à l'instant t.
+
+1. Les joueurs viennent-ils EXPLICITEMENT de FRANCHIR LE SEUIL ou PÉNÉTRER physiquement dans un bâtiment/boutique/taverne existant de la liste ? -> "existant" + ID.
+2. Les joueurs viennent-ils EXPLICITEMENT de PÉNÉTRER physiquement dans un bâtiment/point d'intérêt fermé INCONNU ? -> "nouveau" + invente les détails.
 3. Les joueurs viennent-ils de SORTIR d'un bâtiment pour retourner à l'extérieur ? -> "sortie".
-4. Sinon (pas de mouvement notable) -> "aucun".`;
+4. Sinon (simple discussion, observation de loin, choix laissé aux joueurs, ou déplacement en plein air) -> "aucun".`;
 
     const outils = [{
         functionDeclarations: [{
@@ -309,7 +316,7 @@ async function genererEtStockerImagePNJ(descriptionPhysique) {
     const instructionStyle = await recupererInstructionStyleBackend();
     const promptOpenAI = "Ne dessine absolument aucun texte ou lettrage sur l'image.\\n\\nDescription du personnage : " + descriptionPhysique + "\\n\\nDirectives de style artistique obligatoires : " + instructionStyle;
 
-    const payloadOpenAI = { model: "gpt-image-2", prompt: promptOpenAI, output_format: "webp", n: 1, size: "1024x1792", quality: "low" };
+    const payloadOpenAI = { model: "gpt-image-2", prompt: promptOpenAI, output_format: "webp", n: 1, size: "1024x1792", quality: "low", moderation: "low" };
 
     let tentative = 0, succes = false, texteReponseOpenAI = "";
     const delais = [5000, 15000, 30000];
@@ -657,7 +664,7 @@ RÈGLES ABSOLUES (SOUS PEINE D'ERREUR CRITIQUE) :
 //  NOUVEAU : MIA_REPUTATION (Analyse des actes et rumeurs)
 // =========================================================================
 
-async function analyserReputation(idLieuActuel, texteMJ) {
+async function analyserReputation(idPartie, idLieuActuel, texteMJ) {
     const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
     if (!cleGemini || !idLieuActuel) return;
 
@@ -672,10 +679,11 @@ async function analyserReputation(idLieuActuel, texteMJ) {
         const snapLieu = await getDoc(doc(db, "Monde_Lieux", idLieuCible));
         if (!snapLieu.exists()) return;
         
-        const scoreActuel = snapLieu.data().Reputation_Score || 0;
-        const tagsActuels = snapLieu.data().Reputation_Tags || [];
+        const repMap = snapLieu.data().Reputations || {};
+        const repGroupe = repMap[idPartie] || {};
+        const scoreActuel = repGroupe.Score || 0;
+        const tagsActuels = repGroupe.Tags || [];
 
-        // NOUVEAU PROMPT : Bridé uniquement sur le lieu actuel
         const promptSysteme = `Tu es MIA_REPUTATION, l'IA qui gère la renommée du groupe.
 Score actuel du groupe DANS CE LIEU : ${scoreActuel} (-10 à +10).
 Tags de rumeur actuels DANS CE LIEU : ${JSON.stringify(tagsActuels)}.
@@ -724,17 +732,17 @@ Si l'action est banale, ne fais rien.`;
             const tagsAjout = appelsOutils[0].args.tags_a_ajouter || [];
             const tagsSuppr = appelsOutils[0].args.tags_a_supprimer || [];
             
-            // LOGIQUE JAVASCRIPT : On manipule les anciens tags sans les écraser
             let setTags = new Set(tagsActuels);
-            tagsSuppr.forEach(tag => setTags.delete(tag)); // On efface ceux que l'IA a réfutés
-            tagsAjout.forEach(tag => setTags.add(tag));    // On ajoute les nouveaux
+            tagsSuppr.forEach(tag => setTags.delete(tag)); 
+            tagsAjout.forEach(tag => setTags.add(tag));    
             let nouveauxTagsArray = Array.from(setTags);
             
             if (nouveauScore !== scoreActuel || JSON.stringify(nouveauxTagsArray) !== JSON.stringify(tagsActuels)) {
-                console.log(`[MIA_REPUTATION] 📢 Score: ${nouveauScore}, Tags finaux: ${nouveauxTagsArray}`);
+                console.log(`[MIA_REPUTATION] 📢 Nouveau Score: ${nouveauScore}, Tags: ${nouveauxTagsArray}`);
+                
+                repMap[idPartie] = { Score: nouveauScore, Tags: nouveauxTagsArray };
                 await updateDoc(doc(db, "Monde_Lieux", idLieuCible), {
-                    Reputation_Score: nouveauScore,
-                    Reputation_Tags: nouveauxTagsArray
+                    Reputations: repMap
                 });
             }
         }
@@ -872,7 +880,7 @@ async function genererEtStockerImageLieu(promptLieu) {
     // NOUVEAU : On passe à l'heroic fantasy et on ajoute des exemples architecturaux
     const promptOpenAI = `DIRECTIVE DE STYLE VISUEL OBLIGATOIRE : ${instructionStyle}\n\n---\nSujet à dessiner : Un paysage d'heroic fantasy. ABSOLUMENT AUCUN PERSONNAGE, aucun humain, aucune créature, aucun animal. Uniquement de l'environnement, du paysage et de l'architecture (ville, village, grotte, nature, etc.). Ne dessine aucun texte. Description de la région : ${promptLieu}`;
 
-    const payloadOpenAI = { model: "gpt-image-2", prompt: promptOpenAI, output_format: "webp", n: 1, size: "1792x1024", quality: "low" };
+    const payloadOpenAI = { model: "gpt-image-2", prompt: promptOpenAI, output_format: "webp", n: 1, size: "1792x1024", quality: "low", moderation: "low" };
 
     let tentative = 0, succes = false, texteReponseOpenAI = "";
     const delais = [5000, 15000, 30000];
@@ -939,7 +947,8 @@ async function genererEtStockerIconeCarte(nomLieu, descriptionLieu) {
         size: "1024x1024",
         background: "transparent",
         output_format: "png",
-        quality: "low", // <-- ON AJOUTE BIEN LA QUALITÉ LOW ICI !
+        quality: "low",
+        moderation: "low",
         n: 1
     };
 
@@ -1045,8 +1054,7 @@ Réponds OBLIGATOIREMENT avec un JSON valide respectant ce format exact :
             Description_Global: contenu.description,
             Niveau_De_Securite: contenu.securite,
             Nom_Du_Lieu: contenu.nom,
-            Reputation_Score: 0,
-            Reputation_Tags: [],
+            Reputations: {},
             Stigmates: "",
             Tuile_ID: idHex,
             URL_Cloudinary: ""
@@ -1153,14 +1161,14 @@ window.regenererImagesLieuActuel = async function() {
 // =========================================================================
 
 // NOUVEAU : On attache ces fonctions à "window" pour qu'elles soient accessibles partout
-window.afficherEcranAttente = function() {
+window.afficherEcranAttente = function(textePersonnalise) {
     if (document.getElementById("ecran-attente-ia")) return;
     const overlay = document.createElement("div");
     overlay.id = "ecran-attente-ia";
     overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; backdrop-filter: blur(5px);`;
     const texte = document.createElement("h2");
-    texte.innerText = "En attente du maitre du jeu ...";
-    texte.style.cssText = "color: white; font-family: serif; font-size: 2rem; margin-bottom: 20px; letter-spacing: 2px; text-shadow: 2px 2px 4px #000;";
+    texte.innerText = textePersonnalise || "En attente du maitre du jeu ...";
+    texte.style.cssText = "color: white; font-family: serif; font-size: 2rem; margin-bottom: 20px; letter-spacing: 2px; text-shadow: 2px 2px 4px #000; text-align: center;";
     const image = document.createElement("img");
     image.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782291884/attente_mj_rtmpv1.png";
     image.style.cssText = "max-width: 80%; max-height: 60vh; border-radius: 10px; box-shadow: 0 0 30px rgba(255, 255, 255, 0.1);";
@@ -1325,9 +1333,12 @@ window.declencherTourIA = async function() {
         const reponseTexte = await genererReponseNarrateur(contexte, historiqueComplet);
 
         if (reponseTexte) {
-            // Formatage du texte pour mettre les PNJ en gras avec leur image
-            let texteAffiche = reponseTexte;
+            // NOUVEAU : On supprime totalement les doubles astérisques Markdown (**)
+            // que l'IA utilise pour mettre des mots en gras (Lieux, objets, etc.).
+            // On conserve uniquement les simples astérisques (*) utilisés pour la narration/les actions.
+            let texteAffiche = reponseTexte.replace(/\*\*/g, "");
             
+            // Ensuite, on applique NOTRE propre mise en gras (et l'image) uniquement sur les PNJ !
             nomsPnjPresents.forEach(nom => {
                 const pnj = env.pnjsPresents[nom];
                 if (pnj) {
@@ -1350,7 +1361,13 @@ window.declencherTourIA = async function() {
                 Texte: texteAffiche,
                 Timestamp: new Date().getTime()
             });
-            await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), { Index_Initiative: 0 });
+            
+            // CORRECTION BUG INITIATIVE : On mélange les joueurs au lieu de juste remettre à 0 !
+            if (typeof window.relancerInitiativeChat === "function") {
+                await window.relancerInitiativeChat();
+            } else {
+                await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), { Index_Initiative: 0 });
+            }
 
             // La file d'attente asynchrone (Fantômes)
             setTimeout(async () => {
@@ -1360,12 +1377,9 @@ window.declencherTourIA = async function() {
                 if (lieuFinal) {
                     await analyserNouveauxPNJ(lieuFinal, nomsPnjPresents, nomsHeros, reponseTexte);
                     await analyserDeplacementPNJ(lieuFinal, nomsHeros, reponseTexte);
-                    
-                    // NOUVEAU : MIA_MORT nettoie les cadavres
                     await analyserMortsPNJ(nomsPnjPresents, reponseTexte);
-
                     await analyserStigmates(lieuFinal, reponseTexte);
-                    await analyserReputation(lieuFinal, reponseTexte);
+                    await analyserReputation(window.ID_PARTIE_COURANTE, lieuFinal, reponseTexte);
                 }
             }, 0);
         }
@@ -1377,4 +1391,129 @@ window.declencherTourIA = async function() {
             await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), { IA_En_Cours: false });
         }
     }
+};
+
+// =========================================================================
+//  NOUVEAU : MIA_SOUVENIR (Archivage et nettoyage de fin de session)
+// =========================================================================
+
+// Moteur silencieux : Effectue le travail sans aucune alerte (utilisé pour les voyages)
+window.processusArchivageChat = async function() {
+    if (!window.ID_PARTIE_COURANTE) return false;
+
+    try {
+        // 1. Récupération de tous les messages
+        const qMsg = query(collection(db, "Messages_Chat"), where("ID_Partie", "==", window.ID_PARTIE_COURANTE), orderBy("Timestamp", "asc"));
+        const snapMsg = await getDocs(qMsg);
+        let messages = [];
+        snapMsg.forEach(d => messages.push({ id: d.id, ...d.data() }));
+
+        if (messages.length === 0) return true; // Le chat est déjà vide, c'est bon.
+
+        // On ignore les messages système du Destin pour l'analyse
+        const historiqueFiltre = messages.filter(m => m.Auteur_ID !== "SYSTEME_TEMPS" && m.Auteur_ID !== "DESTIN");
+        const historiqueComplet = historiqueFiltre.map(m => `${m.Auteur_Nom} : ${m.Texte}`).join("\n");
+
+        if (historiqueFiltre.length > 0) {
+            // 2. Détection des PNJ présents (Cible le lieu que l'on quitte !)
+            const snapPartie = await getDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE));
+            const lieuActuel = snapPartie.exists() ? snapPartie.data().Lieu_Actuel : null;
+            const env = await preparerEnvironnement(lieuActuel); 
+            const nomsPnj = Object.keys(env.pnjsPresents);
+
+            // 3. Invocation de MIA_SOUVENIR s'il y a des PNJ dans la zone
+            if (nomsPnj.length > 0) {
+                const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
+                const jourEnJeu = window.DATE_EN_JEU_ACTUELLE?.jour || "?";
+                const anEnJeu = window.DATE_EN_JEU_ACTUELLE?.annee || "?";
+                const dateTag = `[Jour ${jourEnJeu} de l'an ${anEnJeu}]`;
+
+                const promptSysteme = `Tu es MIA_SOUVENIR, l'IA qui gère la mémoire des habitants d'Ivalis.
+Voici l'historique complet du chat d'aujourd'hui.
+Voici les PNJ qui se trouvaient dans la même zone que les joueurs : ${nomsPnj.join(", ")}.
+
+Ta mission : Lis le chat. Pour CHAQUE PNJ de cette liste, génère UN SEUL SOUVENIR marquant (une ou deux phrases maximum, écrites à la PREMIÈRE PERSONNE). Ce souvenir doit résumer l'interaction ou l'impression qu'ont laissée les joueurs au PNJ aujourd'hui.
+Si un PNJ n'a absolument pas interagi ou n'a pas du tout été concerné par les actes des joueurs aujourd'hui, ne lui crée pas de souvenir.`;
+
+                const outils = [{
+                    functionDeclarations: [{
+                        name: "archiverSouvenirs",
+                        description: "Enregistre les souvenirs dans le cerveau des PNJ.",
+                        parameters: {
+                            type: "OBJECT",
+                            properties: {
+                                souvenirs: {
+                                    type: "ARRAY",
+                                    items: {
+                                        type: "OBJECT",
+                                        properties: {
+                                            nom_pnj: { type: "STRING", description: "Le nom exact du PNJ." },
+                                            texte_souvenir: { type: "STRING", description: "La phrase de souvenir à la 1ere personne." }
+                                        }
+                                    }
+                                }
+                            }, required: ["souvenirs"]
+                        }
+                    }]
+                }];
+
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        systemInstruction: { parts: [{ text: promptSysteme }] },
+                        contents: [{ role: "user", parts: [{ text: historiqueComplet }] }],
+                        tools: outils, 
+                        toolConfig: { functionCallingConfig: { mode: "AUTO" } }
+                    })
+                });
+
+                const data = await res.json();
+                const appelsOutils = data.candidates?.[0]?.content?.parts?.filter(p => p.functionCall).map(p => p.functionCall);
+                
+                // 4. Écriture dans les cerveaux des PNJ
+                if (appelsOutils && appelsOutils.length > 0 && appelsOutils[0].name === "archiverSouvenirs") {
+                    const souvenirsCrees = appelsOutils[0].args.souvenirs || [];
+                    
+                    for (const souv of souvenirsCrees) {
+                        const pnjData = env.pnjsPresents[souv.nom_pnj];
+                        if (!pnjData || !pnjData.idDoc) continue;
+
+                        console.log(`🧠 [MIA_Souvenir] Mémoire implantée pour ${souv.nom_pnj}`);
+                        const ancienneMemoire = pnjData.Memoires || "";
+                        const nouvelleMemoire = ancienneMemoire ? `${ancienneMemoire}\n${dateTag} ${souv.texte_souvenir}` : `${dateTag} ${souv.texte_souvenir}`;
+
+                        await updateDoc(doc(db, "Monde_PNJ", pnjData.idDoc), {
+                            Memoires: nouvelleMemoire
+                        });
+                    }
+                }
+            }
+        }
+
+        // 5. Autodestruction du chat
+        console.log("🧹 [Nettoyage] Suppression de l'historique du chat...");
+        for (const m of messages) {
+            await deleteDoc(doc(db, "Messages_Chat", m.id));
+        }
+        return true;
+    } catch (e) {
+        console.error("Erreur critique lors de l'archivage silencieux :", e);
+        return false;
+    }
+};
+
+// La fonction liée au Bouton UI
+window.archiverSessionEtViderChat = async function() {
+    if (!window.ID_PARTIE_COURANTE) return alert("Aucune partie en cours.");
+    
+    if (!confirm("Voulez-vous vraiment clôturer cette session ? \n\nMIA va lire l'historique, graver les souvenirs dans le cerveau des PNJ impliqués, puis vider intégralement le chat. Cette action est irréversible.")) {
+        return;
+    }
+
+    window.afficherEcranAttente("Les Parques gravent les souvenirs de cette session dans le marbre d'Ivalis...");
+
+    await window.processusArchivageChat();
+
+    window.masquerEcranAttente();
+    if (typeof window.fermerParametres === "function") window.fermerParametres(true);
 };

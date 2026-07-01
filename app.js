@@ -422,7 +422,8 @@ async function genererEtStockerPortrait(donnees) {
     output_format: "webp",
     n: 1,
     size: "1024x1792",
-    quality: "low"
+    quality: "low",
+    moderation: "low"
   };
   const optionsOpenAI = {
     method: "POST",
@@ -2897,10 +2898,20 @@ window.deplacerPionVers = async function(idHex) {
 
 // 4. L'exécution finale (Gestion du temps, IA, BDD)
 window.executerVoyage = async function(idHex, joursDeVoyage) {
+    
+    // A. LE GRAND NETTOYAGE (Pour TOUS les voyages)
+    if (joursDeVoyage > 0 && typeof window.processusArchivageChat === "function") {
+        console.log("🧹 [Voyage] Départ imminent : Archivage et nettoyage du chat...");
+        // On archive les PNJ du lieu qu'on est en train de QUITTER avant même de commencer
+        await window.processusArchivageChat();
+    }
+
+    // B. Avancer le calendrier (S'affiche dans le chat propre)
     if (joursDeVoyage > 0) {
         await window.avancerTempsAuto(joursDeVoyage);
     }
 
+    // C. Vérifier le terrain et invoquer la magie
     const qLieu = query(collection(db, "Monde_Lieux"), where("Tuile_ID", "==", idHex));
     const snapLieux = await getDocs(qLieu);
 
@@ -2908,7 +2919,6 @@ window.executerVoyage = async function(idHex, joursDeVoyage) {
     let nomDuLieu = "leur destination";
 
     if (!snapLieux.empty) {
-        // Le lieu existe déjà, on récupère son ID et son Nom
         idLieuCible = snapLieux.docs[0].id;
         nomDuLieu = snapLieux.docs[0].data().Nom_Du_Lieu || "ce lieu";
         console.log("🗺️ Lieu connu détecté :", idLieuCible);
@@ -2928,7 +2938,6 @@ window.executerVoyage = async function(idHex, joursDeVoyage) {
         if (typeof window.creerNouveauLieu === "function") {
             const resultatCarto = await window.creerNouveauLieu(idHex);
             if (resultatCarto) {
-                // On récupère les données renvoyées par MIA_CARTO
                 idLieuCible = resultatCarto.id;
                 nomDuLieu = resultatCarto.nom;
             }
@@ -2939,13 +2948,14 @@ window.executerVoyage = async function(idHex, joursDeVoyage) {
         if (imageCharge && imageCharge.dataset.oldSrc) imageCharge.src = imageCharge.dataset.oldSrc;
     }
 
+    // D. Téléporter les joueurs et écrire le message final
     if (idLieuCible && window.ID_PARTIE_COURANTE) {
-        // 1. On met à jour la position des joueurs en Base de Données
+        // Mise à jour de la position dans la base de données
         await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
             Lieu_Actuel: idLieuCible
         });
 
-        // 2. On rédige le message d'arrivée avec une consigne silencieuse pour MIA
+        // Le message d'arrivée silencieux pour le MJ
         let texteArrivee = joursDeVoyage > 0 
             ? `*Après ${joursDeVoyage} jour(s) de voyage, le groupe arrive à ${nomDuLieu}.* (Narrateur, décris de manière immersive notre arrivée, l'atmosphère des lieux et ce que l'on voit en premier)`
             : `*Le groupe observe ${nomDuLieu}.* (Narrateur, décris de manière immersive l'atmosphère de ce lieu et ce que l'on y voit en premier)`;
@@ -2953,22 +2963,20 @@ window.executerVoyage = async function(idHex, joursDeVoyage) {
         const jourEnJeu = window.DATE_EN_JEU_ACTUELLE ? window.DATE_EN_JEU_ACTUELLE.jour : "";
         const anEnJeu = window.DATE_EN_JEU_ACTUELLE ? window.DATE_EN_JEU_ACTUELLE.annee : "";
 
-        // 3. On pousse le message dans l'historique du Chat
+        // Envoi dans la chatbox
         await addDoc(collection(db, "Messages_Chat"), {
             ID_Partie: window.ID_PARTIE_COURANTE,
             Auteur_ID: "DESTIN", 
             Auteur_Nom: "Destin",
-            Auteur_Couleur: "#c2a878", // Couleur or/sable
+            Auteur_Couleur: "#c2a878", 
             Texte: texteArrivee,
             Date_Jour: jourEnJeu,
             Date_An: anEnJeu,
             Timestamp: new Date().getTime()
         });
 
-        // 4. On réveille le MJ (MIA) automatiquement !
+        // E. Réveil du Narrateur
         if (typeof window.declencherTourIA === "function") {
-            // On attend 1.5 secondes pour s'assurer que Firebase a bien eu le temps 
-            // d'actualiser la position des joueurs et les données du nouveau lieu.
             setTimeout(() => {
                 window.declencherTourIA();
             }, 1500); 
