@@ -45,6 +45,11 @@ async function preparerEnvironnement(lieuActuelId) {
             const pnjData = doc.data();
             pnjData.idDoc = doc.id;
             if (pnjData.Statut !== "Mort") {
+                // NOUVEAU : On filtre la mémoire en fonction du groupe actuel
+                const mapMemoires = pnjData.Memoires_Groupes || {};
+                pnjData.Memoires = mapMemoires[idPartieCourante] || "Aucun souvenir de ce groupe.";
+                delete pnjData.Memoires_Groupes; // On cache les autres groupes à Gemini !
+                
                 env.pnjsPresents[pnjData.Nom_PNJ] = pnjData; 
             }
         });
@@ -73,6 +78,11 @@ async function preparerEnvironnement(lieuActuelId) {
             const pnjData = doc.data();
             pnjData.idDoc = doc.id;
             if (pnjData.Statut !== "Mort") {
+                // NOUVEAU : Pareil pour les bâtiments
+                const mapMemoires = pnjData.Memoires_Groupes || {};
+                pnjData.Memoires = mapMemoires[idPartieCourante] || "Aucun souvenir de ce groupe.";
+                delete pnjData.Memoires_Groupes;
+                
                 env.pnjsPresents[pnjData.Nom_PNJ] = pnjData; 
             }
         });
@@ -1415,6 +1425,51 @@ window.processusArchivageChat = async function() {
         const historiqueComplet = historiqueFiltre.map(m => `${m.Auteur_Nom} : ${m.Texte}`).join("\n");
 
         if (historiqueFiltre.length > 0) {
+            
+            // =========================================================================
+            // --- NOUVEAU : MIA_CHRONIQUE (Le journal de bord secret) ---
+            // =========================================================================
+            console.log("📜 [MIA_Chronique] Rédaction du résumé de la session...");
+            const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
+            const jourEnJeu = window.DATE_EN_JEU_ACTUELLE?.jour || "?";
+            const anEnJeu = window.DATE_EN_JEU_ACTUELLE?.annee || "?";
+
+            const promptChronique = `Tu es MIA_CHRONIQUE, l'archiviste silencieuse d'Ivalis.
+Voici la transcription exacte des événements récents vécus par ce groupe d'aventuriers.
+
+Ta mission : Rédige un résumé très concis (2 ou 3 phrases maximum) des faits les plus importants. 
+Concentre-toi uniquement sur les actes majeurs : morts, découvertes, batailles gagnées ou perdues, choix moraux, crimes ou actes héroïques. 
+Ne mentionne JAMAIS les mécaniques de jeu (jets de dés, tours de parole). Écris cela comme un chroniqueur factuel préparant les mémoires posthumes du groupe.`;
+
+            try {
+                const resChronique = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        systemInstruction: { parts: [{ text: promptChronique }] },
+                        contents: [{ role: "user", parts: [{ text: historiqueComplet }] }],
+                        generationConfig: { temperature: 0.7 } 
+                    })
+                });
+
+                const dataChronique = await resChronique.json();
+                const texteResume = dataChronique.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (texteResume) {
+                    console.log(`📜 [MIA_Chronique] Résumé enregistré : ${texteResume}`);
+                    // On enregistre ce fait marquant dans la base de données
+                    await addDoc(collection(db, "Chroniques_Partie"), {
+                        ID_Partie: window.ID_PARTIE_COURANTE,
+                        Date_Jour: jourEnJeu,
+                        Date_An: anEnJeu,
+                        Timestamp_Reel: new Date().getTime(),
+                        Resume: texteResume.trim()
+                    });
+                }
+            } catch (e) {
+                console.error("Erreur lors de la rédaction de la chronique :", e);
+            }
+            // =========================================================================
+
             // 2. Détection des PNJ présents (Cible le lieu que l'on quitte !)
             const snapPartie = await getDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE));
             const lieuActuel = snapPartie.exists() ? snapPartie.data().Lieu_Actuel : null;
@@ -1479,12 +1534,18 @@ Si un PNJ n'a absolument pas interagi ou n'a pas du tout été concerné par les
                         if (!pnjData || !pnjData.idDoc) continue;
 
                         console.log(`🧠 [MIA_Souvenir] Mémoire implantée pour ${souv.nom_pnj}`);
-                        const ancienneMemoire = pnjData.Memoires || "";
+                        
+                        // On récupère la mémoire qu'on a filtrée à l'étape 1
+                        const ancienneMemoire = (pnjData.Memoires === "Aucun souvenir de ce groupe.") ? "" : pnjData.Memoires;
                         const nouvelleMemoire = ancienneMemoire ? `${ancienneMemoire}\n${dateTag} ${souv.texte_souvenir}` : `${dateTag} ${souv.texte_souvenir}`;
 
-                        await updateDoc(doc(db, "Monde_PNJ", pnjData.idDoc), {
-                            Memoires: nouvelleMemoire
-                        });
+                        // NOUVEAU : On utilise setDoc avec merge: true pour mettre à jour
+                        // UNIQUEMENT la case du groupe actuel sans écraser les autres !
+                        await setDoc(doc(db, "Monde_PNJ", pnjData.idDoc), {
+                            Memoires_Groupes: {
+                                [window.ID_PARTIE_COURANTE]: nouvelleMemoire
+                            }
+                        }, { merge: true });
                     }
                 }
             }
