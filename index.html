@@ -39,6 +39,8 @@
     <div class="layer bg-menu"></div>
     <div class="layer brume-lointaine"></div>
     <div class="layer brume-proche"></div>
+    <!-- NOUVEAU : BOUTON QUITTER EN HAUT À DROITE -->
+    <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781472665/exit_rkpaeh.png" id="btn-quitter-accueil" title="Quitter Ivalis" onclick="jouerSonClic(); demanderQuitterJeu()">
     <div class="conteneur-boutons">
       <button class="btn-jeu btn-nouvelle" onclick="jouerSonClic(); ouvrirModalNouvellePartie()"></button>
       <button class="btn-jeu btn-charger" onclick="jouerSonClic(); ouvrirModalChargerPartie()"></button>
@@ -184,35 +186,6 @@
       </div>
       <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781472665/home_gsoldf.png" class="icone-nav" alt="Retour Menu" onclick="jouerSonClic(); demanderRetourMenu()">
       <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781472665/exit_rkpaeh.png" class="icone-nav" alt="Quitter" onclick="jouerSonClic(); demanderQuitterJeu()">
-    </div>
-
-    <div id="overlay-jeu-modale"></div>
-
-    <div id="modale-retour-menu" class="modale-parchemin-jeu">
-      <h2>Retour au menu</h2>
-      <p>Êtes-vous sûr de vouloir fermer ce grimoire et revenir au menu principal ?</p>
-      <div class="groupe-boutons-jeu">
-        <button class="btn-modale-jeu" onclick="jouerSonClic(); confirmerRetourMenu()">Oui</button>
-        <button class="btn-modale-jeu" onclick="jouerSonClic(); fermerModalesJeu()">Non</button>
-      </div>
-    </div>
-
-    <div id="modale-quitter-jeu" class="modale-parchemin-jeu">
-      <h2>Quitter Ivalis</h2>
-      <p>Êtes-vous sûr de vouloir quitter le jeu ?</p>
-      <div class="groupe-boutons-jeu">
-        <button class="btn-modale-jeu" onclick="jouerSonClic(); confirmerQuitterJeu()">Oui</button>
-        <button class="btn-modale-jeu" onclick="jouerSonClic(); fermerModalesJeu()">Non</button>
-      </div>
-    </div>
-
-    <div id="modale-voyage" class="modale-parchemin-jeu">
-      <h2>Long Périple</h2>
-      <p id="texte-modale-voyage" style="font-size: 20px; margin-bottom: 25px; line-height: 1.4;"></p>
-      <div class="groupe-boutons-jeu">
-        <button class="btn-modale-jeu" id="btn-confirmer-voyage">Oui, partir</button>
-        <button class="btn-modale-jeu" id="btn-annuler-voyage">Annuler</button>
-      </div>
     </div>
 
   <!-- LE SON DU PARCHEMIN AU SURVOL (remplacer le src par ton lien Cloudinary) -->
@@ -630,6 +603,35 @@
     </div>
 
     <audio id="audio-roulette" src="https://res.cloudinary.com/dlkjq4kvg/video/upload/q_auto,f_auto/v1781420565/clik_bouton_aniy88.mp3" loop></audio>
+  </div>
+
+  <div id="overlay-jeu-modale"></div>
+
+  <div id="modale-retour-menu" class="modale-parchemin-jeu">
+    <h2>Retour au menu</h2>
+    <p>Êtes-vous sûr de vouloir fermer ce grimoire et revenir au menu principal ?</p>
+    <div class="groupe-boutons-jeu">
+      <button class="btn-modale-jeu" onclick="jouerSonClic(); confirmerRetourMenu()">Oui</button>
+      <button class="btn-modale-jeu" onclick="jouerSonClic(); fermerModalesJeu()">Non</button>
+    </div>
+  </div>
+
+  <div id="modale-quitter-jeu" class="modale-parchemin-jeu">
+    <h2>Quitter Ivalis</h2>
+    <p>Êtes-vous sûr de vouloir quitter le jeu ?</p>
+    <div class="groupe-boutons-jeu">
+      <button class="btn-modale-jeu" onclick="jouerSonClic(); confirmerQuitterJeu()">Oui</button>
+      <button class="btn-modale-jeu" onclick="jouerSonClic(); fermerModalesJeu()">Non</button>
+    </div>
+  </div>
+
+  <div id="modale-voyage" class="modale-parchemin-jeu">
+    <h2>Long Périple</h2>
+    <p id="texte-modale-voyage" style="font-size: 20px; margin-bottom: 25px; line-height: 1.4;"></p>
+    <div class="groupe-boutons-jeu">
+      <button class="btn-modale-jeu" id="btn-confirmer-voyage">Oui, partir</button>
+      <button class="btn-modale-jeu" id="btn-annuler-voyage">Annuler</button>
+    </div>
   </div>
 
 </body>
