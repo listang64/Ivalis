@@ -181,7 +181,18 @@
       <div class="conteneur-volume-nav">
         <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781548169/volume_c53qqq.png" class="icone-nav" alt="Volume" onclick="jouerSonClic(); toggleBulleVolume(event)">
         <div id="bulle-volume">
-          <input type="range" id="curseur-volume" min="0" max="1" step="0.01" value="0.40" oninput="ajusterVolume(this.value)" style="accent-color: #4a2e1b; width: 6vw; cursor: pointer;">
+          <div class="ligne-volume">
+             <label>Général</label>
+             <input type="range" id="vol-general" min="0" max="1" step="0.01" oninput="changerVolume('general', this.value)" style="accent-color: #5c3a21;">
+          </div>
+          <div class="ligne-volume">
+             <label>Musique</label>
+             <input type="range" id="vol-musique" min="0" max="1" step="0.01" oninput="changerVolume('musique', this.value)" style="accent-color: #8c6a45;">
+          </div>
+          <div class="ligne-volume">
+             <label>Interface</label>
+             <input type="range" id="vol-interface" min="0" max="1" step="0.01" oninput="changerVolume('interface', this.value)" style="accent-color: #8c6a45;">
+          </div>
         </div>
       </div>
       <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781472665/home_gsoldf.png" class="icone-nav" alt="Retour Menu" onclick="jouerSonClic(); demanderRetourMenu()">

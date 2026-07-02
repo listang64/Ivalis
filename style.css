@@ -495,7 +495,9 @@ body, html {
   display: flex;
   flex-direction: row;
   gap: 0.8vw;
-  z-index: 60;
+  
+  /* C'EST ICI LA CORRECTION : On le force à passer au-dessus des autres menus */
+  z-index: 2000; 
 }
 
 .icone-nav {
@@ -524,9 +526,36 @@ body, html {
   background-color: #e8d5a5;
   border: 2px solid #2a1a0f;
   border-radius: 8px;
-  padding: 10px 15px;
+  padding: 15px 20px; /* Un peu plus d'espace pour respirer */
   box-shadow: 0px 8px 15px rgba(0, 0, 0, 0.8);
   z-index: 100;
+  width: 140px; /* On force une largeur pour que les barres soient alignées */
+}
+
+/* NOUVEAU : Alignement des jauges */
+.ligne-volume {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.ligne-volume:last-child {
+  margin-bottom: 0;
+}
+
+.ligne-volume label {
+  font-family: 'Almendra', serif;
+  color: #2a1a0f;
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+
+.ligne-volume input[type=range] {
+  width: 100%;
+  cursor: pointer;
 }
 
 #bulle-volume::after {

@@ -62,6 +62,38 @@ let unsubscribeDate = null;
 let unsubscribeJoueurs = null;
 
 // =========================================================================
+//  MIXEUR AUDIO GLOBAL
+// =========================================================================
+window.PARAMETRES_AUDIO = {
+    general: parseFloat(localStorage.getItem("ivalis_vol_general") !== null ? localStorage.getItem("ivalis_vol_general") : "1.0"),
+    musique: parseFloat(localStorage.getItem("ivalis_vol_musique") !== null ? localStorage.getItem("ivalis_vol_musique") : "0.30"),
+    interface: parseFloat(localStorage.getItem("ivalis_vol_interface") !== null ? localStorage.getItem("ivalis_vol_interface") : "0.80")
+};
+
+window.appliquerVolumesAudio = function() {
+    // 1. Appliquer à la musique d'ambiance
+    const musique = document.getElementById("musique-ambiance");
+    if (musique) {
+        musique.volume = window.PARAMETRES_AUDIO.musique * window.PARAMETRES_AUDIO.general;
+    }
+
+    // 2. Mettre à jour visuellement les curseurs
+    const inputGen = document.getElementById("vol-general");
+    const inputMus = document.getElementById("vol-musique");
+    const inputInt = document.getElementById("vol-interface");
+
+    if (inputGen) inputGen.value = window.PARAMETRES_AUDIO.general;
+    if (inputMus) inputMus.value = window.PARAMETRES_AUDIO.musique;
+    if (inputInt) inputInt.value = window.PARAMETRES_AUDIO.interface;
+};
+
+window.changerVolume = function(canal, valeur) {
+    window.PARAMETRES_AUDIO[canal] = parseFloat(valeur);
+    localStorage.setItem("ivalis_vol_" + canal, valeur);
+    window.appliquerVolumesAudio();
+};
+
+// =========================================================================
 //  HELPERS
 // =========================================================================
 function nettoyer(valeur) {
@@ -1021,6 +1053,7 @@ function validerIdentification(idJoueur) {
 function jouerSonClic() {
   const son = document.getElementById("son-clic");
   if (!son) return;
+  son.volume = window.PARAMETRES_AUDIO.interface * window.PARAMETRES_AUDIO.general;
   son.currentTime = 0;
   son.play().catch(() => {});
 }
@@ -1062,7 +1095,7 @@ function entrerDansLeJeu() {
   const musique = document.getElementById("musique-ambiance");
 
   if (musique) {
-    musique.volume = 0.20;
+    window.appliquerVolumesAudio();
     // Événement pour jouer automatiquement la musique suivante quand la piste se termine
     musique.addEventListener("ended", jouerProchaineMusique);
     // Lance la première musique de la playlist
@@ -1232,7 +1265,8 @@ function lancerPartieChargee(idChoisi) {
 function jouerSonSurvolParchemin() {
   const sonParchemin = document.getElementById("audio-survol-parchemin");
   if (sonParchemin && sonParchemin.src.includes("http")) {
-    sonParchemin.volume = 0.5;
+    // On garde le multiplicateur 0.5 car ce son spécifique tape très fort
+    sonParchemin.volume = (window.PARAMETRES_AUDIO.interface * window.PARAMETRES_AUDIO.general) * 0.5;
     sonParchemin.currentTime = 0;
     sonParchemin.play().catch(() => {});
   }
@@ -1241,20 +1275,13 @@ function jouerSonSurvolParchemin() {
 function toggleBulleVolume(evenement) {
   evenement.stopPropagation();
   const bulle = document.getElementById("bulle-volume");
-  const curseur = document.getElementById("curseur-volume");
-  const musique = document.getElementById("musique-ambiance");
 
   if (bulle.style.display === "block") {
     bulle.style.display = "none";
   } else {
     bulle.style.display = "block";
-    if (musique) curseur.value = musique.volume;
+    window.appliquerVolumesAudio(); // Force l'actualisation visuelle des curseurs
   }
-}
-
-function ajusterVolume(valeur) {
-  const musique = document.getElementById("musique-ambiance");
-  if (musique) musique.volume = valeur;
 }
 
 function fermerModalesJeu() {
@@ -2033,6 +2060,9 @@ document.addEventListener("DOMContentLoaded", function () {
   ecouterJoueurs();
   ecouterDateEnJeu();
 
+  // NOUVEAU : Application des volumes sauvegardés au lancement
+  window.appliquerVolumesAudio();
+
   // NOUVEAU : On active la carte interactive !
   initialiserCarteInteractive();
 
@@ -2651,6 +2681,7 @@ window.jouerAnimationDesGlobal = function(donnees) {
     
     // Lancement de l'audio en boucle
     if (audio) { 
+        audio.volume = window.PARAMETRES_AUDIO.interface * window.PARAMETRES_AUDIO.general;
         audio.currentTime = 0; 
         audio.play().catch(()=>{}); 
     }
@@ -3134,7 +3165,7 @@ Object.assign(window, {
   ouvrirModalNouvellePartie, fermerModales, validerCle, validerCreationGroupe,
   ouvrirModalChargerPartie, demanderMdpPartie, validerMdpPartie,
   // Ecran de jeu
-  jouerSonSurvolParchemin, toggleBulleVolume, ajusterVolume,
+  jouerSonSurvolParchemin, toggleBulleVolume,
   fermerModalesJeu, demanderRetourMenu, demanderQuitterJeu,
   confirmerRetourMenu, confirmerQuitterJeu, recadrerCarte,
   // Parametres / Cerveau IA

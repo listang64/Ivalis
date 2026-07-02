@@ -1420,8 +1420,9 @@ window.processusArchivageChat = async function() {
 
         if (messages.length === 0) return true; // Le chat est déjà vide, c'est bon.
 
-        // On ignore les messages système du Destin pour l'analyse
-        const historiqueFiltre = messages.filter(m => m.Auteur_ID !== "SYSTEME_TEMPS" && m.Auteur_ID !== "DESTIN");
+        // NOUVEAU FILTRE : On ignore SEULEMENT le compteur de temps pur (SYSTEME_TEMPS). 
+        // On GARDE le Destin (pour les voyages) et le MJ (pour la narration) !
+        const historiqueFiltre = messages.filter(m => m.Auteur_ID !== "SYSTEME_TEMPS");
         const historiqueComplet = historiqueFiltre.map(m => `${m.Auteur_Nom} : ${m.Texte}`).join("\n");
 
         if (historiqueFiltre.length > 0) {
@@ -1434,12 +1435,14 @@ window.processusArchivageChat = async function() {
             const jourEnJeu = window.DATE_EN_JEU_ACTUELLE?.jour || "?";
             const anEnJeu = window.DATE_EN_JEU_ACTUELLE?.annee || "?";
 
+            // NOUVEAU PROMPT : On force l'IA à utiliser le MJ et le Destin
             const promptChronique = `Tu es MIA_CHRONIQUE, l'archiviste silencieuse d'Ivalis.
-Voici la transcription exacte des événements récents vécus par ce groupe d'aventuriers.
+Voici la transcription exacte des événements récents. Tu y trouveras les actions des héros, mais aussi la narration du Maître du Jeu (MJ) et du Destin.
 
 Ta mission : Rédige un résumé très concis (2 ou 3 phrases maximum) des faits les plus importants. 
-Concentre-toi uniquement sur les actes majeurs : morts, découvertes, batailles gagnées ou perdues, choix moraux, crimes ou actes héroïques. 
-Ne mentionne JAMAIS les mécaniques de jeu (jets de dés, tours de parole). Écris cela comme un chroniqueur factuel préparant les mémoires posthumes du groupe.`;
+Concentre-toi uniquement sur les actes majeurs et l'évolution de l'histoire (découvertes de lieux racontées par le Destin ou le MJ, batailles, choix moraux). 
+Utilise impérativement les descriptions du 'MJ' et du 'Destin' pour comprendre le contexte, le décor, et les conséquences de ce qu'ont accompli les joueurs.
+Ne mentionne JAMAIS les mécaniques de jeu (jets de dés, tours de parole). Écris cela comme un chroniqueur factuel préparant les mémoires posthumes de ce groupe.`;
 
             try {
                 const resChronique = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
