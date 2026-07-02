@@ -404,7 +404,8 @@ body, html {
 
 /* --- LE PREMIER BOUTON GEANT (Le parchemin de Date) --- */
 .icone-menu:first-child {
-  width: 20vw;
+  /* Taille intermédiaire pour un bon compromis */
+  width: 15vw; 
   position: relative;
 }
 
@@ -422,7 +423,10 @@ body, html {
   transform: translate(-50%, -50%);
   text-align: center;
   color: #2c1e16;
-  font-size: 1.8vw;
+  
+  /* Police intermédiaire */
+  font-size: 1.35vw; 
+  
   font-weight: bold;
   width: 80%;
   pointer-events: none;
@@ -430,7 +434,8 @@ body, html {
 }
 
 .texte-sur-parchemin span {
-  font-size: 2.2vw;
+  /* Chiffres intermédiaires */
+  font-size: 1.65vw; 
   font-weight: 900;
 }
 
