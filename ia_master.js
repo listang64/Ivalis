@@ -945,10 +945,10 @@ async function genererEtStockerIconeCarte(nomLieu, descriptionLieu) {
 
     console.log("✒️ [MIA_Carto] Dessin de l'icône sur la carte avec gpt-image-1.5...");
     
-    // NOUVEAU PROMPT : Minimalisme total, traits noirs épais, et INTERDICTION formelle d'écrire du texte.
-    const promptOpenAI = `A highly stylized, extremely minimalist map icon for a tabletop RPG. Subject: ${descriptionLieu}. 
-    STYLE OBLIGATOIRE: Thick, bold, solid black ink lines only. No shading, no grayscale, no colors. Extremely simple and clean outlines, like a stylized river drawn on an old parchment map. 
-    DO NOT write any text, letters, words, or names on the image. Just the drawing.`;
+    // NOUVEAU PROMPT : Force un symbole ultra-minimaliste, isolé au centre, sans fond ni cadre.
+    const promptOpenAI = `A single, tiny, extremely minimalist map symbol representing: ${nomLieu}. 
+    STYLE OBLIGATOIRE: Crude ink doodle, stencil style. Only 3 or 4 thick black lines. 
+    CRITICAL: The symbol MUST be completely isolated in the exact center of the image. Leave massive empty transparent space around it. DO NOT draw any background. DO NOT draw a square or a frame. DO NOT draw a full landscape. Just a single floating abstract sketch. No shading, no small details.`;
 
     // LE PAYLOAD MAGIQUE (gpt-image-1.5 avec fond transparent)
     const payloadOpenAI = { 
