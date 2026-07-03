@@ -945,15 +945,19 @@ textarea.input-texte-parchemin {
   box-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
 }
 
-/* Le portrait au survol (Position Fixe Globale) */
-.bulle-portrait-hover {
+/* =========================================
+   PORTRAITS AU SURVOL (CHAT)
+   ========================================= */
+
+/* 1. Le portrait des Joueurs (Géant, en bas à droite, par-dessus le menu) */
+.bulle-portrait-hover-joueur {
   display: none;
   position: fixed; 
   bottom: 0;   
   right: 0;       
   left: auto;
   width: auto;  
-  height: 85vh; /* Même taille que dans la fiche perso */
+  height: 85vh; 
   object-fit: contain;
   border: none;
   border-radius: 0;
@@ -961,11 +965,23 @@ textarea.input-texte-parchemin {
   box-shadow: none;
   filter: drop-shadow(-5px 5px 15px rgba(0,0,0,0.8));
   pointer-events: none;
-  z-index: 2000; /* Passe au-dessus du chatbox */
+  z-index: 9999; /* Force le passage par-dessus le menu latéral */
 }
 
-.bulle-personnage:hover .bulle-portrait-hover {
-  display: block;
+/* 2. Le portrait du MJ (Petite carte à côté du chat) */
+.bulle-portrait-hover-mj {
+  display: none;
+  position: fixed;
+  bottom: 130px;   
+  left: 6vw;       
+  width: 240px;  
+  height: auto;
+  object-fit: cover;
+  border: 3px solid #c2a878;
+  border-radius: 8px;
+  box-shadow: 0px 15px 30px rgba(0,0,0,1);
+  pointer-events: none;
+  z-index: 200;
 }
 
 /* =========================================

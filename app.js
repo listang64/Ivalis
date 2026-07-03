@@ -557,9 +557,9 @@ async function genererEtStockerPortrait(donnees) {
   // 2. Instruction de style additionnelle (Firestore)
   const instructionSupplementaire = await recupererInstructionStyle();
 
-  // 3. Construction du prompt (Vue de 3/4, fond MAGENTA FLUO)
+  // 3. Construction du prompt (Vue de 3/4 gauche, Plan américain, fond MAGENTA FLUO)
   const promptOpenAI =
-    "Le personnage doit impérativement être dessiné en vue de trois quart, regardant vers sa droite. Le personnage doit être placé sur un fond TOTALEMENT MAGENTA FLUO UNI (#FF00FF), SANS AUCUNE OMBRE AU SOL, ni décor, ni dégradé. Ne dessine absolument aucun texte, symbole ou lettrage sur l'image.\\n\\n" +
+    "Le personnage doit impérativement être dessiné en vue de trois quart, regardant vers la gauche. Le cadrage doit être un plan américain (coupé au niveau des genoux) : on ne doit absolument pas voir le bas de ses jambes ni ses pieds. Le personnage doit être placé sur un fond TOTALEMENT MAGENTA FLUO UNI (#FF00FF), SANS AUCUNE OMBRE AU SOL, ni décor, ni dégradé. Ne dessine absolument aucun texte, symbole ou lettrage sur l'image.\\n\\n" +
     "Description du personnage :\\n" +
     "Il s'agit d'un héros de genre " + donnees.genre + ", ayant environ " + donnees.age + " ans. " +
     "Sa corpulence est " + donnees.corpulence + " et sa taille est " + donnees.taille + ". " +
@@ -942,12 +942,14 @@ function afficherBullesPersonnages(persos) {
   if (!conteneur) return;
   conteneur.innerHTML = "";
 
+  // 🔻 NOUVEAU : Nettoyage des anciennes images pour éviter les clones
+  document.querySelectorAll('.bulle-portrait-hover-joueur, .bulle-portrait-hover-mj').forEach(el => el.remove());
+
   const partie = window.PARTIE_DATA || {};
   const ordre = partie.Ordre_Initiative || [];
   const indexTour = partie.Index_Initiative !== undefined ? partie.Index_Initiative : 999;
   const idPersoActif = ordre[indexTour];
 
-  // NOUVEAU : Identification du joueur
   const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
   let estMonTour = false;
 
@@ -962,15 +964,20 @@ function afficherBullesPersonnages(persos) {
     if (p.idPersonnage === idPersoActif) {
         bulle.classList.add("tour-actif");
         nomActif = p.prenom;
-        // NOUVEAU : On vérifie si ce personnage m'appartient
         if (p.idJoueur === currentUserId) estMonTour = true;
     }
 
     if (p.urlCloudinary && p.urlCloudinary !== "") {
       const imgHover = document.createElement("img");
-      imgHover.className = "bulle-portrait-hover";
+      imgHover.className = "bulle-portrait-hover-joueur";
       imgHover.src = p.urlCloudinary;
-      bulle.appendChild(imgHover);
+      
+      // 🔻 NOUVEAU : On sort l'image de la bulle pour la coller au fond de la page
+      document.body.appendChild(imgHover);
+
+      // 🔻 NOUVEAU : C'est le JS qui gère l'apparition au survol
+      bulle.addEventListener("mouseenter", () => { imgHover.style.display = "block"; });
+      bulle.addEventListener("mouseleave", () => { imgHover.style.display = "none"; });
     }
 
     bulle.ondblclick = function() {
@@ -993,9 +1000,14 @@ function afficherBullesPersonnages(persos) {
   bulleMJ.innerText = "MJ";
 
   const imgHoverMJ = document.createElement("img");
-  imgHoverMJ.className = "bulle-portrait-hover";
+  imgHoverMJ.className = "bulle-portrait-hover-mj";
   imgHoverMJ.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782164835/maitre_du_jeu_kemkf2.png";
-  bulleMJ.appendChild(imgHoverMJ);
+  
+  // 🔻 NOUVEAU : On sort aussi le MJ
+  document.body.appendChild(imgHoverMJ);
+
+  bulleMJ.addEventListener("mouseenter", () => { imgHoverMJ.style.display = "block"; });
+  bulleMJ.addEventListener("mouseleave", () => { imgHoverMJ.style.display = "none"; });
 
   if (indexTour === 999 || indexTour >= ordre.length) {
       bulleMJ.classList.add("tour-actif");
@@ -1010,18 +1022,17 @@ function afficherBullesPersonnages(persos) {
       bulleMJ.onclick = function() {
           if (typeof window.jouerSonClic === "function") window.jouerSonClic();
           if (typeof window.declencherTourIA === "function") {
-              window.declencherTourIA(); 
+              window.declencherTourIA();
           }
       };
   }
   conteneur.appendChild(bulleMJ);
 
-  // --- NOUVEAU : Mise à jour de la barre de saisie (Préparation autorisée) ---
+  // --- Mise à jour de la barre de saisie (Préparation autorisée) ---
   const inputChat = document.getElementById("input-chat");
   const btnEnvoyer = document.getElementById("btn-envoyer-chat");
 
   if (inputChat && btnEnvoyer) {
-      // On laisse TOUJOURS l'input actif pour que le joueur puisse taper son texte à l'avance
       inputChat.disabled = false;
       inputChat.style.opacity = "1";
 
