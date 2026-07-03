@@ -748,8 +748,36 @@ textarea.input-texte-parchemin {
 
 #fenetre-fiche-perso { display: none; position: fixed; width: 55vw; height: 75vh; background-color: #e8d5a5; border: 4px solid #2a1a0f; border-radius: 15px; box-shadow: 0px 20px 40px rgba(0, 0, 0, 0.9); z-index: 50; color: #2c1e16; flex-direction: column; transition: border-color 0.3s; }
 
-#encart-portrait-perso { position: absolute; top: 25px; left: -300px; width: 300px; height: 525px; background-color: #1a0f08; border: 4px solid #2a1a0f; border-right: none; border-radius: 12px 0 0 12px; box-shadow: -15px 10px 20px rgba(0, 0, 0, 0.7); z-index: -1; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #5c3a21; font-size: 18px; font-style: italic; text-align: center; transition: border-color 0.3s; }
-#image-portrait-perso { width: 100%; height: 100%; object-fit: cover; display: none; }
+#encart-portrait-perso { 
+    position: fixed; 
+    bottom: 0; 
+    right: 0; 
+    left: auto;
+    top: auto;
+    width: auto; 
+    height: 85vh; /* Le personnage prend 85% de la hauteur de l'écran */
+    background: transparent; 
+    border: none !important; 
+    box-shadow: none; 
+    z-index: 1000; /* Au-dessus de la carte */
+    pointer-events: none; /* Ne bloque pas les clics de la souris */
+    display: flex; 
+    flex-direction: column; 
+    justify-content: flex-end; 
+    align-items: flex-end; 
+}
+
+#image-portrait-perso { 
+    height: 100%; 
+    width: auto; 
+    object-fit: contain; 
+    display: none; 
+    filter: drop-shadow(-5px 5px 15px rgba(0,0,0,0.8)); /* Belle ombre portée pour le sprite */
+}
+
+#texte-aucun-portrait {
+    display: none !important; /* On cache définitivement le texte "Portrait" */
+}
 
 #fiche-perso-header { background-color: #1a0f08; padding: 2px 15px; cursor: grab; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2a1a0f; border-radius: 11px 11px 0 0; transition: background-color 0.3s, border-bottom-color 0.3s; }
 #fiche-perso-header:active { cursor: grabbing; }
@@ -920,17 +948,20 @@ textarea.input-texte-parchemin {
 /* Le portrait au survol (Position Fixe Globale) */
 .bulle-portrait-hover {
   display: none;
-  position: fixed; /* Magie : l'image se repère par rapport à l'écran, plus à la bulle */
-  bottom: 130px;   /* Place l'image juste au-dessus de la zone de texte du chat */
-  left: 6vw;       /* Place l'image sur la gauche, confortablement décollée du bord */
-  width: 240px;  
-  height: auto;
-  object-fit: cover;
-  border: 3px solid #c2a878;
-  border-radius: 8px;
-  box-shadow: 0px 15px 30px rgba(0,0,0,1);
+  position: fixed; 
+  bottom: 0;   
+  right: 0;       
+  left: auto;
+  width: auto;  
+  height: 85vh; /* Même taille que dans la fiche perso */
+  object-fit: contain;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  filter: drop-shadow(-5px 5px 15px rgba(0,0,0,0.8));
   pointer-events: none;
-  z-index: 200;
+  z-index: 2000; /* Passe au-dessus du chatbox */
 }
 
 .bulle-personnage:hover .bulle-portrait-hover {

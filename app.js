@@ -420,6 +420,130 @@ async function recupererInstructionStyle() {
   return "";
 }
 
+// =========================================================================
+//  OUTIL : DÉTOURAGE MAGIQUE SUR FOND MAGENTA (L'ULTIME COMBO 3 ÉTAPES)
+// =========================================================================
+async function detourerFondMagenta(imageSource) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "Anonymous"; // Permet de manipuler l'image
+        img.onload = () => {
+            try {
+                const canvas = document.createElement("canvas");
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext("2d", { willReadFrequently: true });
+                ctx.drawImage(img, 0, 0);
+                
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageData.data;
+                const w = canvas.width;
+                const h = canvas.height;
+                
+                const isBg = new Uint8Array(w * h);
+                
+                // ===============================================================
+                // ÉTAPE 1 : LE POT DE PEINTURE CLASSIQUE (Depuis les bords)
+                // ===============================================================
+                // Il ronge tout le décor massif en s'arrêtant aux contours du personnage.
+                const stack = [];
+                for (let x = 0; x < w; x++) { stack.push(x); stack.push((h - 1) * w + x); }
+                for (let y = 0; y < h; y++) { stack.push(y * w); stack.push(y * w + (w - 1)); }
+                
+                while (stack.length > 0) {
+                    const idx = stack.pop();
+                    if (isBg[idx] === 1) continue;
+                    
+                    const p = idx * 4;
+                    const r = data[p], g = data[p+1], b = data[p+2];
+                    
+                    // Assez tolérant car on est sûr d'être à l'extérieur du héros
+                    if (r > 120 && b > 120 && r > g * 1.2 && b > g * 1.2) {
+                        data[p+3] = 0; 
+                        isBg[idx] = 1; 
+                        
+                        const x = idx % w;
+                        const y = Math.floor(idx / w);
+                        if (x > 0 && isBg[idx - 1] === 0) stack.push(idx - 1);
+                        if (x < w - 1 && isBg[idx + 1] === 0) stack.push(idx + 1);
+                        if (y > 0 && isBg[idx - w] === 0) stack.push(idx - w);
+                        if (y < h - 1 && isBg[idx + w] === 0) stack.push(idx + w);
+                    }
+                }
+                
+                // ===============================================================
+                // ÉTAPE 2 : LE POT DE PEINTURE INTERNE (Pour les trous dans les cheveux)
+                // ===============================================================
+                // C'est ton idée : on scanne l'intérieur et on est très strict.
+                for (let idx = 0; idx < w * h; idx++) {
+                    if (isBg[idx] === 0) { // On ne regarde que ce que l'étape 1 a laissé
+                        const p = idx * 4;
+                        const r = data[p], g = data[p+1], b = data[p+2];
+                        
+                        // Ratio ultra-strict pour protéger la veste violette
+                        if (r > 150 && b > 150 && g < 90 && r > g * 1.6 && b > g * 1.6) {
+                            data[p+3] = 0;
+                            isBg[idx] = 1;
+                        }
+                    }
+                }
+                
+                // ===============================================================
+                // ÉTAPE 3 : ÉROSION ET LISSAGE (Les 4 vagues)
+                // ===============================================================
+                const alphas = [0, 15, 60, 140, 220];
+                
+                for (let passe = 1; passe <= 4; passe++) {
+                    const nextBg = new Uint8Array(isBg);
+                    
+                    for (let idx = 0; idx < w * h; idx++) {
+                        if (isBg[idx] === 0) { // Si c'est un pixel du personnage
+                            const x = idx % w;
+                            const y = Math.floor(idx / w);
+                            let toucheVide = false;
+                            
+                            // On cherche si un de ses voisins directs a été effacé
+                            if (x > 0 && isBg[idx - 1] === 1) toucheVide = true;
+                            else if (x < w - 1 && isBg[idx + 1] === 1) toucheVide = true;
+                            else if (y > 0 && isBg[idx - w] === 1) toucheVide = true;
+                            else if (y < h - 1 && isBg[idx + w] === 1) toucheVide = true;
+                            
+                            if (toucheVide) {
+                                nextBg[idx] = 2; // Ce pixel servira de frontière à la vague suivante
+                                const p = idx * 4;
+                                const r = data[p], g = data[p+1], b = data[p+2];
+                                
+                                // Lissage colorimétrique (on grise le reflet rose)
+                                if (r > g * 1.05 && b > g * 1.05) {
+                                    data[p] = g;
+                                    data[p+2] = g;
+                                }
+                                
+                                // Application de la transparence de la vague en cours
+                                data[p+3] = Math.min(data[p+3], alphas[passe]);
+                            }
+                        }
+                    }
+                    
+                    // La vague avance d'un pixel vers l'intérieur
+                    for (let idx = 0; idx < w * h; idx++) {
+                        if (nextBg[idx] === 2) isBg[idx] = 1;
+                    }
+                }
+                
+                ctx.putImageData(imageData, 0, 0);
+                resolve(canvas.toDataURL("image/png"));
+                
+            } catch (e) {
+                console.warn("⚠️ Détourage annulé (blocage de sécurité CORS).");
+                resolve(imageSource); 
+            }
+        };
+        img.onerror = () => resolve(imageSource);
+        img.src = imageSource;
+    });
+}
+
 async function genererEtStockerPortrait(donnees) {
   // 1. Lecture des cles dans le localStorage
   const cles = lireClesApi();
@@ -433,9 +557,9 @@ async function genererEtStockerPortrait(donnees) {
   // 2. Instruction de style additionnelle (Firestore)
   const instructionSupplementaire = await recupererInstructionStyle();
 
-  // 3. Construction du prompt (Épuré pour laisser place au style personnalisé)
+  // 3. Construction du prompt (Vue de 3/4, fond MAGENTA FLUO)
   const promptOpenAI =
-    "Ne dessine absolument aucun texte, symbole ou lettrage sur l'image.\\n\\n" +
+    "Le personnage doit impérativement être dessiné en vue de trois quart, regardant vers sa droite. Le personnage doit être placé sur un fond TOTALEMENT MAGENTA FLUO UNI (#FF00FF), SANS AUCUNE OMBRE AU SOL, ni décor, ni dégradé. Ne dessine absolument aucun texte, symbole ou lettrage sur l'image.\\n\\n" +
     "Description du personnage :\\n" +
     "Il s'agit d'un héros de genre " + donnees.genre + ", ayant environ " + donnees.age + " ans. " +
     "Sa corpulence est " + donnees.corpulence + " et sa taille est " + donnees.taille + ". " +
@@ -446,17 +570,18 @@ async function genererEtStockerPortrait(donnees) {
     "Il porte l'équipement visible suivant : " + donnees.equipement + ".\\n\\n" +
     "Directives de style artistique obligatoires : " + instructionSupplementaire;
 
-  // 4. Appel a l'API OpenAI
+  // 4. Appel a l'API OpenAI (Retour sur gpt-image-2 sans base64)
   const urlOpenAI = "https://api.openai.com/v1/images/generations";
   const payloadOpenAI = {
     model: "gpt-image-2",
     prompt: promptOpenAI,
-    output_format: "webp",
+    output_format: "png", // On demande du PNG pour la transparence
     n: 1,
     size: "1024x1792",
     quality: "low",
     moderation: "low"
   };
+
   const optionsOpenAI = {
     method: "POST",
     headers: {
@@ -482,7 +607,7 @@ async function genererEtStockerPortrait(donnees) {
 
     if (texteReponseOpenAI.includes("error code: 1015") || texteReponseOpenAI.includes("Rate Limited")) {
       console.log("Bloque par Cloudflare (Tentative " + (tentative + 1) + "/3). Attente " + (delais[tentative] / 1000) + "s...");
-      await dormir(delais[tentative]);
+      await new Promise(r => setTimeout(r, delais[tentative])); // Remplacement du sleep
       tentative++;
     } else {
       succes = true;
@@ -511,48 +636,79 @@ async function genererEtStockerPortrait(donnees) {
   if (!imageSource && jsonOpenAI.data[0].b64_json) {
     imageSource = "data:image/png;base64," + jsonOpenAI.data[0].b64_json;
   }
-  console.log("Image generee par OpenAI.");
+  console.log("Image générée par l'IA. Transfert vers Cloudinary pour débloquer la sécurité...");
 
-  // 5. Envoi sur Cloudinary (upload signe)
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const dossier = "Accueil/Heros";
-  const stringToSign = "folder=" + dossier + "&timestamp=" + timestamp + cles.cloudSecret;
-  const signature = await sha1Hex(stringToSign);
 
-  const formCloudinary = new FormData();
-  formCloudinary.append("file", imageSource);
-  formCloudinary.append("api_key", cles.cloudKey);
-  formCloudinary.append("timestamp", timestamp);
-  formCloudinary.append("signature", signature);
-  formCloudinary.append("folder", dossier);
+  // =========================================================================
+  // ÉTAPE 1 : PONT CLOUDINARY (Contourner le blocage de sécurité CORS)
+  // =========================================================================
+  // Le serveur de l'IA bloque la lecture des pixels. On demande au serveur de 
+  // Cloudinary d'aspirer l'image pour nous fournir une version manipulable !
+  let signature1 = await sha1Hex("folder=" + dossier + "&timestamp=" + timestamp + cles.cloudSecret);
+  
+  let form1 = new FormData();
+  form1.append("file", imageSource);
+  form1.append("api_key", cles.cloudKey);
+  form1.append("timestamp", timestamp);
+  form1.append("signature", signature1);
+  form1.append("folder", dossier);
 
-  let texteReponseCloudinary = "";
+  let urlSecurisee = imageSource;
+  let publicIdAecraser = null;
+
   try {
-    const responseCloudinary = await fetch(
-      "https://api.cloudinary.com/v1_1/" + cles.cloudName + "/image/upload",
-      { method: "POST", body: formCloudinary }
-    );
-    texteReponseCloudinary = await responseCloudinary.text();
-  } catch (erreur) {
-    console.error("ERREUR RESEAU CLOUDINARY :", erreur);
-    return donnees.urlCloudinary || "";
+    const res1 = await fetch("https://api.cloudinary.com/v1_1/" + cles.cloudName + "/image/upload", { method: "POST", body: form1 });
+    const json1 = await res1.json();
+    if (json1.secure_url) {
+        urlSecurisee = json1.secure_url;
+        publicIdAecraser = json1.public_id; // On mémorise l'ID pour écraser cette image ensuite
+        console.log("Image sécurisée récupérée. Découpage du fond Magenta...");
+    }
+  } catch (e) {
+    console.error("Échec du pont Cloudinary :", e);
   }
 
-  let jsonCloudinary;
+  // =========================================================================
+  // ÉTAPE 2 : LE DÉTOURAGE MAGIQUE SUR L'IMAGE SÉCURISÉE
+  // =========================================================================
+  let imageDetoureeBase64 = await detourerFondMagenta(urlSecurisee);
+
+  // =========================================================================
+  // ÉTAPE 3 : UPLOAD FINAL (On écrase l'image temporaire Magenta)
+  // =========================================================================
+  let stringToSign2 = publicIdAecraser 
+      ? "public_id=" + publicIdAecraser + "&timestamp=" + timestamp + cles.cloudSecret
+      : "folder=" + dossier + "&timestamp=" + timestamp + cles.cloudSecret;
+      
+  let signature2 = await sha1Hex(stringToSign2);
+  
+  let form2 = new FormData();
+  form2.append("file", imageDetoureeBase64);
+  form2.append("api_key", cles.cloudKey);
+  form2.append("timestamp", timestamp);
+  form2.append("signature", signature2);
+  
+  if (publicIdAecraser) {
+      form2.append("public_id", publicIdAecraser);
+  } else {
+      form2.append("folder", dossier);
+  }
+
   try {
-    jsonCloudinary = JSON.parse(texteReponseCloudinary);
-  } catch (erreur) {
-    console.error("ERREUR LECTURE CLOUDINARY :", texteReponseCloudinary);
-    return donnees.urlCloudinary || "";
+    const res2 = await fetch("https://api.cloudinary.com/v1_1/" + cles.cloudName + "/image/upload", { method: "POST", body: form2 });
+    const json2 = await res2.json();
+    
+    if (json2.secure_url) {
+        console.log("SUCCES ! Portrait détouré et sauvegardé :", json2.secure_url);
+        return json2.secure_url.replace("/upload/", "/upload/q_auto,f_auto/");
+    }
+  } catch (e) {
+      console.error("ERREUR RESEAU CLOUDINARY FINAL :", e);
   }
 
-  if (jsonCloudinary.secure_url) {
-    console.log("SUCCES ! Image Cloudinary :", jsonCloudinary.secure_url);
-    return jsonCloudinary.secure_url.replace("/upload/", "/upload/q_auto,f_auto/");
-  }
-
-  console.error("ERREUR CLOUDINARY :", texteReponseCloudinary);
-  return donnees.urlCloudinary || "";
+  return urlSecurisee || "";
 }
 
 // =========================================================================
