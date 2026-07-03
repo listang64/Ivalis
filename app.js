@@ -557,18 +557,24 @@ async function genererEtStockerPortrait(donnees) {
   // 2. Instruction de style additionnelle (Firestore)
   const instructionSupplementaire = await recupererInstructionStyle();
 
-  // 3. Construction du prompt (Vue de 3/4 gauche, Plan américain, fond MAGENTA FLUO)
+  // 3. Construction du prompt (Contexte Heroic Fantasy, Vue de 3/4 gauche, Plan américain, fond MAGENTA FLUO à la fin)
   const promptOpenAI =
-    "Le personnage doit impérativement être dessiné en vue de trois quart, regardant vers la gauche. Le cadrage doit être un plan américain (coupé au niveau des genoux) : on ne doit absolument pas voir le bas de ses jambes ni ses pieds. Le personnage doit être placé sur un fond TOTALEMENT MAGENTA FLUO UNI (#FF00FF), SANS AUCUNE OMBRE AU SOL, ni décor, ni dégradé. Ne dessine absolument aucun texte, symbole ou lettrage sur l'image.\\n\\n" +
-    "Description du personnage :\\n" +
+    "Contexte de l'univers : Médiéval Héroïque Fantastique (Heroic Fantasy).\n\n" +
+    "Description du personnage :\n" +
     "Il s'agit d'un héros de genre " + donnees.genre + ", ayant environ " + donnees.age + " ans. " +
     "Sa corpulence est " + donnees.corpulence + " et sa taille est " + donnees.taille + ". " +
     "Son teint de peau est " + donnees.peau + ". Ses cheveux sont " + donnees.cheveux + " et il a les yeux " + donnees.yeux + ". " +
     "Pilosité faciale : " + donnees.pilosite + ". " +
-    "Son visage porte l'expression suivante : " + donnees.expression + ", et on remarque ces signes distinctifs : " + donnees.signes + ".\\n" +
+    "Son visage porte l'expression suivante : " + donnees.expression + ", et on remarque ces signes distinctifs : " + donnees.signes + ".\n" +
     "Il est vêtu ainsi : " + donnees.style + " avec une palette de couleurs dominantes " + donnees.couleursDom + ". " +
-    "Il porte l'équipement visible suivant : " + donnees.equipement + ".\\n\\n" +
-    "Directives de style artistique obligatoires : " + instructionSupplementaire;
+    "Il porte l'équipement visible suivant : " + donnees.equipement + ".\n\n" +
+    "Directives de style artistique obligatoires : " + instructionSupplementaire + "\n\n" +
+    "🛑 RÈGLE TECHNIQUE DÉFINITIVE (PRIORITAIRE SUR TOUT LE RESTE) : " +
+    "Le personnage DOIT ÊTRE PLACÉ SUR UN FOND TOTALEMENT MAGENTA FLUO UNI (#FF00FF). " +
+    "Il est STRICTEMENT INTERDIT de dessiner un décor, un paysage, un intérieur, une ombre au sol ou un dégradé. " +
+    "Même si la description du personnage mentionne un lieu ou des objets environnants, IGNORE LE DÉCOR. " +
+    "Remplis tout l'espace vide autour et derrière le personnage avec du magenta fluo pur. " +
+    "Le personnage doit être vu de trois quart, regardant vers la gauche, cadré en plan américain (coupé aux genoux). Ne dessine aucun texte.";
 
   // 4. Appel a l'API OpenAI (Retour sur gpt-image-2 sans base64)
   const urlOpenAI = "https://api.openai.com/v1/images/generations";

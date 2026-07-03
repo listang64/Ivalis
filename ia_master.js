@@ -417,8 +417,9 @@ async function genererEtStockerImagePNJ(descriptionPhysique) {
     
     const instructionStyle = await recupererInstructionStyleBackend();
     
-    // NOUVEAU PROMPT : La règle du fond Magenta est placée TOUT À LA FIN en priorité absolue
+    // NOUVEAU PROMPT : Le contexte Médiéval Fantastique ouvre le bal !
     const promptOpenAI = 
+        "Contexte de l'univers : Médiéval Héroïque Fantastique (Heroic Fantasy).\n\n" +
         "Description du personnage : " + descriptionPhysique + "\n\n" +
         "Directives de style artistique : " + instructionStyle + "\n\n" +
         "🛑 RÈGLE TECHNIQUE DÉFINITIVE (PRIORITAIRE SUR TOUT LE RESTE) : " +
@@ -532,7 +533,7 @@ RÈGLES STRICTES ET ABSOLUES :
                             type: "OBJECT",
                             properties: {
                                 nom: { type: "STRING", description: "Le nom exact utilisé par le MJ" },
-                                physique: { type: "STRING", description: "Description physique pour générer le portrait" },
+                                physique: { type: "STRING", description: "Description visuelle EXTRÊMEMENT détaillée (destinée à un dessinateur). Tu DOIS obligatoirement décrire ces 5 points : 1. Sexe et Âge approximatif. 2. Morphologie (taille, corpulence, posture). 3. Visage (traits, yeux, coupe et couleur de cheveux, pilosité, expression faciale). 4. Tenue vestimentaire très détaillée (style, usure, couleurs dominantes, armes ou équipement visible). 5. Signes distinctifs évidents (tatouages, cicatrices, accessoires, ou écrire explicitement 'Aucun signe distinctif')." },
                                 occupation: { type: "STRING", description: "Son métier ou occupation" },
                                 race: { type: "STRING", description: "Sa race (Humain, Nain, etc.)" },
                                 secret: { type: "STRING", description: "Un secret inavouable ou motivation cachée" },
@@ -583,7 +584,6 @@ RÈGLES STRICTES ET ABSOLUES :
                     idLieuGlobal = idLieuActuel;
                 } else if (idLieuActuel.startsWith("B")) {
                     idBatimentGlobal = idLieuActuel;
-                    // CORRECTION : On va chercher la région parente pour que la fiche du PNJ soit parfaite dès sa naissance
                     const bSnap = await getDoc(doc(db, "Monde_Batiment", idLieuActuel));
                     if (bSnap.exists()) idLieuGlobal = bSnap.data().ID_Lieu;
                 }
@@ -614,11 +614,14 @@ RÈGLES STRICTES ET ABSOLUES :
                     });
                 });
 
-                genererEtStockerImagePNJ(pnj.physique).then(async (urlImage) => {
-                    if (urlImage) {
-                        await updateDoc(doc(db, "Monde_PNJ", docId), { URL_Cloudinary: urlImage });
-                    }
-                });
+                // 🔻 NOUVEAU : On AWAIT la génération pour les traiter un par un !
+                console.log(`[MIA_PNJ] ⏳ Début peinture pour ${pnj.nom}...`);
+                const urlImage = await genererEtStockerImagePNJ(pnj.physique);
+                
+                if (urlImage) {
+                    await updateDoc(doc(db, "Monde_PNJ", docId), { URL_Cloudinary: urlImage });
+                    console.log(`[MIA_PNJ] 🖼️ Peinture terminée pour ${pnj.nom} !`);
+                }
             }
         }
     } catch (e) { console.error("[MIA_PNJ] Erreur silencieuse :", e); }
@@ -1476,21 +1479,38 @@ window.declencherTourIA = async function() {
         const reponseTexte = await genererReponseNarrateur(contexte, historiqueComplet);
 
         if (reponseTexte) {
-            // NOUVEAU : On supprime totalement les doubles astérisques Markdown (**)
-            // que l'IA utilise pour mettre des mots en gras (Lieux, objets, etc.).
-            // On conserve uniquement les simples astérisques (*) utilisés pour la narration/les actions.
+            // On supprime totalement les doubles astérisques Markdown (**)
             let texteAffiche = reponseTexte.replace(/\*\*/g, "");
             
-            // Ensuite, on applique NOTRE propre mise en gras (et l'image) uniquement sur les PNJ !
-            nomsPnjPresents.forEach(nom => {
+            // 1. On trie les noms du plus long au plus court (pour éviter les conflits)
+            const nomsTries = [...nomsPnjPresents].sort((a, b) => b.length - a.length);
+
+            // 2. Fonction pour créer une Regex tolérante aux accents
+            const regexSansAccent = (texte) => {
+                return texte.replace(/[aAàâäÀÂÄ]/g, '[aAàâäÀÂÄ]')
+                            .replace(/[eEéèêëÉÈÊË]/g, '[eEéèêëÉÈÊË]')
+                            .replace(/[iIîïÎÏ]/g, '[iIîïÎÏ]')
+                            .replace(/[oOôöÔÖ]/g, '[oOôöÔÖ]')
+                            .replace(/[uUùûüÙÛÜ]/g, '[uUùûüÙÛÜ]')
+                            .replace(/[cCçÇ]/g, '[cCçÇ]');
+            };
+
+            // 3. On applique NOTRE propre mise en gras et l'image !
+            nomsTries.forEach(nom => {
                 const pnj = env.pnjsPresents[nom];
                 if (pnj) {
-                    const regex = new RegExp(`\\b${nom}\\b`, 'g');
+                    // On échappe les caractères spéciaux, PUIS on ajoute la tolérance d'accents
+                    let safeNom = nom.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    safeNom = regexSansAccent(safeNom);
+                    
+                    // 🔻 NOUVELLE FORMULE ULTRA-ROBUSTE (Anti-crash) 🔻
+                    const regex = new RegExp("(?<=^|[^a-zA-ZÀ-ÿ])" + safeNom + "(?=[^a-zA-ZÀ-ÿ]|$)(?![^<]*>)", "gi");
+                    
                     if (pnj.URL_Cloudinary && pnj.URL_Cloudinary !== "") {
-                        const remplacement = `<span class="pnj-chat-hover"><strong>${nom}</strong><img src="${pnj.URL_Cloudinary}" class="pnj-hover-img"></span>`;
+                        const remplacement = `<span class="pnj-chat-hover"><strong>$&</strong><img src="${pnj.URL_Cloudinary}" class="pnj-hover-img"></span>`;
                         texteAffiche = texteAffiche.replace(regex, remplacement);
                     } else {
-                        texteAffiche = texteAffiche.replace(regex, `<strong style="color: #e8d5a5;">${nom}</strong>`);
+                        texteAffiche = texteAffiche.replace(regex, `<strong style="color: #e8d5a5;">$&</strong>`);
                     }
                 }
             });
@@ -1518,7 +1538,10 @@ window.declencherTourIA = async function() {
                 const nomsHeros = window.PERSOS_PARTIE ? window.PERSOS_PARTIE.map(p => p.prenom) : [];
 
                 if (lieuFinal) {
-                    await analyserNouveauxPNJ(lieuFinal, nomsPnjPresents, nomsHeros, reponseTexte);
+                    // NOUVEAU : On fusionne les 4 derniers messages + la réponse du MJ
+                    const contexteEtNarration = historique4 + "\n\n--- SUITE DE L'HISTOIRE (MJ) ---\n" + reponseTexte;
+                    
+                    await analyserNouveauxPNJ(lieuFinal, nomsPnjPresents, nomsHeros, contexteEtNarration);
                     await analyserDeplacementPNJ(lieuFinal, nomsHeros, reponseTexte);
                     await analyserMortsPNJ(nomsPnjPresents, reponseTexte);
                     await analyserStigmates(lieuFinal, reponseTexte);
