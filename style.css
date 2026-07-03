@@ -1176,7 +1176,7 @@ textarea.input-texte-parchemin {
 }
 
 /* ========================================================================= */
-/*  EFFET SURVOL DES NOMS PNJ DANS LE CHAT                                   */
+/* EFFET SURVOL DES NOMS PNJ DANS LE CHAT (Format Visual Novel)             */
 /* ========================================================================= */
 
 .pnj-chat-hover {
@@ -1186,28 +1186,32 @@ textarea.input-texte-parchemin {
     display: inline-block;
 }
 
-/* L'image est cachée par défaut */
+/* L'image est un portrait géant en bas à droite, comme les héros ! */
 .pnj-chat-hover .pnj-hover-img {
-    position: absolute;
-    bottom: 130%; /* L'image apparaît juste au-dessus du texte */
-    left: 50%;
-    transform: translateX(-50%) translateY(15px);
-    width: 220px; /* NOUVEAU : Beaucoup plus grand pour voir les détails */
-    height: auto; /* NOUVEAU : Respecte les proportions du portrait vertical */
-    border-radius: 8px; /* NOUVEAU : Format rectangulaire avec coins style "carte" */
-    border: 3px solid #8c6a45; /* Bordure plus épaisse, style cadre d'Ivalis */
-    box-shadow: 0 10px 30px rgba(0,0,0,0.9); /* Ombre plus forte pour la profondeur */
-    object-fit: cover;
-    opacity: 0;
+    display: none;
+    position: fixed; 
+    bottom: 0;   
+    right: 0;       
+    left: auto;
+    top: auto;
+    width: auto;  
+    height: 85vh; 
+    object-fit: contain;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    filter: drop-shadow(-5px 5px 15px rgba(0,0,0,0.8));
     pointer-events: none;
-    transition: all 0.2s ease-out;
-    z-index: 1000;
+    z-index: 9999; /* Par-dessus l'interface */
+    transform: none; /* Annule les anciens effets */
+    opacity: 1;
 }
 
-/* Au survol, la bulle apparaît et monte légèrement */
+/* Au survol du nom, on affiche le PNJ géant */
 .pnj-chat-hover:hover .pnj-hover-img {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
+    display: block;
+    transform: none;
 }
 
 /* =========================================

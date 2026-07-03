@@ -309,9 +309,101 @@ ATTENTION - RÈGLE ABSOLUE ANTI-ANTICIPATION : Voir un lieu de loin, en entendre
 }
 
 // =========================================================================
-//  NOUVEAU : MIA_PNJ (Création procédurale de PNJ nommés)
+//  OUTIL : DÉTOURAGE MAGIQUE SUR FOND MAGENTA (POUR LES PNJ)
 // =========================================================================
+async function detourerFondMagentaPNJ(imageSource) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.onload = () => {
+            try {
+                const canvas = document.createElement("canvas");
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext("2d", { willReadFrequently: true });
+                ctx.drawImage(img, 0, 0);
+                
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageData.data;
+                const w = canvas.width;
+                const h = canvas.height;
+                const isBg = new Uint8Array(w * h);
+                
+                // Étape 1 : Pot de peinture extérieur
+                const stack = [];
+                for (let x = 0; x < w; x++) { stack.push(x); stack.push((h - 1) * w + x); }
+                for (let y = 0; y < h; y++) { stack.push(y * w); stack.push(y * w + (w - 1)); }
+                
+                while (stack.length > 0) {
+                    const idx = stack.pop();
+                    if (isBg[idx] === 1) continue;
+                    const p = idx * 4;
+                    const r = data[p], g = data[p+1], b = data[p+2];
+                    
+                    if (r > 120 && b > 120 && r > g * 1.2 && b > g * 1.2) {
+                        data[p+3] = 0; isBg[idx] = 1;
+                        const x = idx % w; const y = Math.floor(idx / w);
+                        if (x > 0 && isBg[idx - 1] === 0) stack.push(idx - 1);
+                        if (x < w - 1 && isBg[idx + 1] === 0) stack.push(idx + 1);
+                        if (y > 0 && isBg[idx - w] === 0) stack.push(idx - w);
+                        if (y < h - 1 && isBg[idx + w] === 0) stack.push(idx + w);
+                    }
+                }
+                
+                // Étape 2 : Sniper interne
+                for (let idx = 0; idx < w * h; idx++) {
+                    if (isBg[idx] === 0) {
+                        const p = idx * 4;
+                        const r = data[p], g = data[p+1], b = data[p+2];
+                        if (r > 150 && b > 150 && g < 90 && r > g * 1.6 && b > g * 1.6) {
+                            data[p+3] = 0; isBg[idx] = 1;
+                        }
+                    }
+                }
+                
+                // Étape 3 : Érosion & Lissage
+                const alphas = [0, 15, 60, 140, 220];
+                for (let passe = 1; passe <= 4; passe++) {
+                    const nextBg = new Uint8Array(isBg);
+                    for (let idx = 0; idx < w * h; idx++) {
+                        if (isBg[idx] === 0) {
+                            const x = idx % w; const y = Math.floor(idx / w);
+                            let toucheVide = false;
+                            
+                            if (x > 0 && isBg[idx - 1] === 1) toucheVide = true;
+                            else if (x < w - 1 && isBg[idx + 1] === 1) toucheVide = true;
+                            else if (y > 0 && isBg[idx - w] === 1) toucheVide = true;
+                            else if (y < h - 1 && isBg[idx + w] === 1) toucheVide = true;
+                            
+                            if (toucheVide) {
+                                nextBg[idx] = 2;
+                                const p = idx * 4;
+                                const r = data[p], g = data[p+1], b = data[p+2];
+                                
+                                if (r > g * 1.05 && b > g * 1.05) {
+                                    data[p] = g; data[p+2] = g;
+                                }
+                                data[p+3] = Math.min(data[p+3], alphas[passe]);
+                            }
+                        }
+                    }
+                    for (let idx = 0; idx < w * h; idx++) {
+                        if (nextBg[idx] === 2) isBg[idx] = 1;
+                    }
+                }
+                ctx.putImageData(imageData, 0, 0);
+                resolve(canvas.toDataURL("image/png"));
+                
+            } catch (e) { resolve(imageSource); }
+        };
+        img.onerror = () => resolve(imageSource);
+        img.src = imageSource;
+    });
+}
 
+// =========================================================================
+//  NOUVEAU : MIA_PNJ (Création procédurale de PNJ nommés avec Détourage)
+// =========================================================================
 async function genererEtStockerImagePNJ(descriptionPhysique) {
     const cles = {
         openai: localStorage.getItem("ivalis_OPENAI_API_KEY")?.trim(),
@@ -324,9 +416,20 @@ async function genererEtStockerImagePNJ(descriptionPhysique) {
     console.log("🎨 [MIA_PNJ] Incantation du portrait pour le nouveau PNJ...");
     
     const instructionStyle = await recupererInstructionStyleBackend();
-    const promptOpenAI = "Ne dessine absolument aucun texte ou lettrage sur l'image.\\n\\nDescription du personnage : " + descriptionPhysique + "\\n\\nDirectives de style artistique obligatoires : " + instructionStyle;
+    
+    // NOUVEAU PROMPT : La règle du fond Magenta est placée TOUT À LA FIN en priorité absolue
+    const promptOpenAI = 
+        "Description du personnage : " + descriptionPhysique + "\n\n" +
+        "Directives de style artistique : " + instructionStyle + "\n\n" +
+        "🛑 RÈGLE TECHNIQUE DÉFINITIVE (PRIORITAIRE SUR TOUT LE RESTE) : " +
+        "Le personnage DOIT ÊTRE PLACÉ SUR UN FOND TOTALEMENT MAGENTA FLUO UNI (#FF00FF). " +
+        "Il est STRICTEMENT INTERDIT de dessiner un décor, un paysage, un intérieur, une ombre au sol ou un dégradé. " +
+        "Même si la description du personnage mentionne un lieu ou des objets environnants, IGNORE LE DÉCOR. " +
+        "Remplis tout l'espace vide autour et derrière le personnage avec du magenta fluo pur. " +
+        "Le personnage doit être vu de trois quart, regardant vers la gauche, cadré en plan américain (coupé aux genoux). Ne dessine aucun texte.";
 
-    const payloadOpenAI = { model: "gpt-image-2", prompt: promptOpenAI, output_format: "webp", n: 1, size: "1024x1792", quality: "low", moderation: "low" };
+    // LE PAYLOAD (gpt-image-2 + PNG)
+    const payloadOpenAI = { model: "gpt-image-2", prompt: promptOpenAI, output_format: "png", n: 1, size: "1024x1792", quality: "low", moderation: "low" };
 
     let tentative = 0, succes = false, texteReponseOpenAI = "";
     const delais = [5000, 15000, 30000];
@@ -349,25 +452,55 @@ async function genererEtStockerImagePNJ(descriptionPhysique) {
 
     let imageSource = jsonOpenAI.data[0].url || ("data:image/png;base64," + jsonOpenAI.data[0].b64_json);
 
-    // Envoi sur Cloudinary dans le dossier "PNJ"
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const dossier = "PNJ";
-    const signature = await genererSignatureCloudinary(`folder=${dossier}&timestamp=${timestamp}${cles.cloudSecret}`);
 
-    const formCloudinary = new FormData();
-    formCloudinary.append("file", imageSource); formCloudinary.append("api_key", cles.cloudKey);
-    formCloudinary.append("timestamp", timestamp); formCloudinary.append("signature", signature);
-    formCloudinary.append("folder", dossier);
+    // ÉTAPE 1 : PONT CLOUDINARY (Contourner CORS)
+    const signature1 = await genererSignatureCloudinary(`folder=${dossier}&timestamp=${timestamp}${cles.cloudSecret}`);
+    const form1 = new FormData();
+    form1.append("file", imageSource); form1.append("api_key", cles.cloudKey);
+    form1.append("timestamp", timestamp); form1.append("signature", signature1);
+    form1.append("folder", dossier);
+
+    let urlSecurisee = imageSource;
+    let publicIdAecraser = null;
 
     try {
-        const resCloud = await fetch(`https://api.cloudinary.com/v1_1/${cles.cloudName}/image/upload`, { method: "POST", body: formCloudinary });
+        const res1 = await fetch(`https://api.cloudinary.com/v1_1/${cles.cloudName}/image/upload`, { method: "POST", body: form1 });
+        const json1 = await res1.json();
+        if (json1.secure_url) {
+            urlSecurisee = json1.secure_url;
+            publicIdAecraser = json1.public_id;
+        }
+    } catch (e) { }
+
+    // ÉTAPE 2 : DÉTOURAGE MAGIQUE SUR L'IMAGE SÉCURISÉE
+    let imageDetoureeBase64 = await detourerFondMagentaPNJ(urlSecurisee);
+
+    // ÉTAPE 3 : UPLOAD FINAL
+    let stringToSign2 = publicIdAecraser
+        ? "public_id=" + publicIdAecraser + "&timestamp=" + timestamp + cles.cloudSecret
+        : "folder=" + dossier + "&timestamp=" + timestamp + cles.cloudSecret;
+
+    const signature2 = await genererSignatureCloudinary(stringToSign2);
+
+    const form2 = new FormData();
+    form2.append("file", imageDetoureeBase64);
+    form2.append("api_key", cles.cloudKey);
+    form2.append("timestamp", timestamp);
+    form2.append("signature", signature2);
+    if (publicIdAecraser) form2.append("public_id", publicIdAecraser);
+    else form2.append("folder", dossier);
+
+    try {
+        const resCloud = await fetch(`https://api.cloudinary.com/v1_1/${cles.cloudName}/image/upload`, { method: "POST", body: form2 });
         const jsonCloud = await resCloud.json();
         if (jsonCloud.secure_url) {
-            console.log("✅ [MIA_PNJ] Portrait généré avec succès !");
+            console.log("✅ [MIA_PNJ] Portrait détouré avec succès !");
             return jsonCloud.secure_url.replace("/upload/", "/upload/q_auto,f_auto/");
         }
-    } catch (e) { return ""; }
-    return "";
+    } catch (e) { }
+    return urlSecurisee || "";
 }
 
 async function analyserNouveauxPNJ(idLieuActuel, nomsPnjExistants, nomsHeros, texteMJ) {
