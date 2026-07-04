@@ -2417,6 +2417,152 @@ window.ajouterTokens = function(montant) {
 };
 
 // =========================================================================
+//  GESTION DES DECKS (DEBUG & EXTRACTION)
+// =========================================================================
+
+window.ouvrirGestionDecks = async function() {
+    naviguerFenetre('etape-menu-outils', 'etape-gestion-decks');
+    document.getElementById("chargement-gestion-decks").style.display = "block";
+    document.getElementById("liste-gestion-decks").style.display = "none";
+    document.getElementById("liste-gestion-decks").innerHTML = "";
+
+    try {
+        if (!window.ID_PARTIE_COURANTE) {
+            document.getElementById("chargement-gestion-decks").innerHTML = "<span style='color:red;'>Aucune partie en cours.</span>";
+            return;
+        }
+
+        const qPersos = query(collection(db, "Personnages"), where("ID_Partie", "==", window.ID_PARTIE_COURANTE));
+        const snapPersos = await getDocs(qPersos);
+        
+        let htmlListe = "";
+
+        for (const docPerso of snapPersos.docs) {
+            const data = docPerso.data();
+            const nomComplet = (data.Prenom_Personnage + " " + data.Nom_Personnage).trim();
+            const idPerso = docPerso.id;
+
+            // Vérifie si le deck existe en BDD
+            const snapDeck = await getDoc(doc(db, "Cartes_Profils", idPerso));
+            const aUnDeck = snapDeck.exists();
+
+            htmlListe += `
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #c2a878; padding: 10px 0;">
+                <strong style="color: #2c1e16; font-size: 16px;">${nomComplet}</strong>
+                <div style="display: flex; gap: 5px;">
+                    <button class="btn-parametres" style="padding: 6px 12px; font-size: 13px; margin: 0; opacity: ${aUnDeck ? '1' : '0.4'}; pointer-events: ${aUnDeck ? 'auto' : 'none'};" onclick="jouerSonClic(); window.extraireDeckDebug('${idPerso}')">Extraire</button>
+                    <button class="btn-parametres btn-supprimer" style="padding: 6px 12px; font-size: 13px; margin: 0; opacity: ${aUnDeck ? '1' : '0.4'}; pointer-events: ${aUnDeck ? 'auto' : 'none'};" onclick="jouerSonClic(); window.supprimerDeckDebug('${idPerso}', this)">Supprimer</button>
+                </div>
+            </div>`;
+        }
+
+        if (htmlListe === "") htmlListe = "<p style='text-align:center;'>Aucun héros trouvé dans cette partie.</p>";
+
+        document.getElementById("liste-gestion-decks").innerHTML = htmlListe;
+        document.getElementById("chargement-gestion-decks").style.display = "none";
+        document.getElementById("liste-gestion-decks").style.display = "block";
+
+    } catch (e) {
+        console.error("Erreur lecture decks:", e);
+        document.getElementById("chargement-gestion-decks").innerText = "Erreur de lecture des âmes.";
+    }
+};
+
+window.extraireDeckDebug = async function(idPersonnage) {
+    try {
+        // 1. On récupère le Deck
+        const snapDeck = await getDoc(doc(db, "Cartes_Profils", idPersonnage));
+        
+        // 2. On récupère les Caractéristiques pour les inclure dans l'extraction
+        const snapCaracs = await getDoc(doc(db, "Caracteristiques", idPersonnage));
+        let caracs = { force: 8, dex: 8, con: 8, int: 8, sag: 8, cha: 8 };
+        if (snapCaracs.exists()) {
+            caracs = snapCaracs.data();
+        }
+
+        // Petite fonction interne pour calculer et formater le modificateur (ex: "+2")
+        const calcMod = (val) => {
+            const mod = Math.floor(((val || 8) - 10) / 2);
+            return mod > 0 ? "+" + mod : mod; 
+        };
+
+        if (snapDeck.exists()) {
+            const donnees = snapDeck.data();
+            
+            // Formatage ultra-compact et lisible pour l'analyse
+            const deckFormate = {
+                Theme: donnees.Donnees_IA?.Theme_Identifie || "Inconnu",
+                
+                // NOUVEAU : Ajout des caractéristiques avec leurs modificateurs
+                Caracteristiques: {
+                    Force: `${caracs.force || 8} (${calcMod(caracs.force)})`,
+                    Dexterite: `${caracs.dex || 8} (${calcMod(caracs.dex)})`,
+                    Constitution: `${caracs.con || 8} (${calcMod(caracs.con)})`,
+                    Intelligence: `${caracs.int || 8} (${calcMod(caracs.int)})`,
+                    Sagesse: `${caracs.sag || 8} (${calcMod(caracs.sag)})`,
+                    Charisme: `${caracs.cha || 8} (${calcMod(caracs.cha)})`
+                },
+                
+                // NOUVEAU : Ajout bien visible de la répartition des points
+                Repartition_IA: donnees.Donnees_IA?.Poids_Actions || {},
+                
+                Cartes: donnees.Deck_Mathematique.map(c => ({
+                    Init: c.initiative,
+                    Titre: c.titre,
+                    Haut: `[${c.haut.nom} ${c.haut.valeur > 0 ? c.haut.valeur : ''}] Portée:${c.haut.portee} | Effets: ${c.haut.effets.length ? c.haut.effets.join(', ') : 'Aucun'} | Burn: ${c.haut.isBurn ? 'OUI' : 'NON'} ${c.haut.element ? ' | '+c.haut.element : ''}`,
+                    Bas:  `[${c.bas.nom} ${c.bas.valeur > 0 ? c.bas.valeur : ''}] Portée:${c.bas.portee} | Effets: ${c.bas.effets.length ? c.bas.effets.join(', ') : 'Aucun'} | Burn: ${c.bas.isBurn ? 'OUI' : 'NON'} ${c.bas.element ? ' | '+c.bas.element : ''}`
+                }))
+            };
+
+            const jsonAffiche = JSON.stringify(deckFormate, null, 2);
+
+            document.getElementById('texte-extraction-deck').value = jsonAffiche;
+            document.getElementById('overlay-jeu-modale').style.display = 'block';
+            document.getElementById('modale-extraction-deck').style.display = 'block';
+        }
+    } catch (e) {
+        console.error("Erreur extraction:", e);
+        alert("Le grimoire résiste à l'extraction.");
+    }
+};
+
+window.copierExtractionDeck = function(event) {
+    const textarea = document.getElementById('texte-extraction-deck');
+    textarea.select();
+    document.execCommand('copy');
+    
+    // Petit feedback visuel sur le bouton
+    const btn = event.target;
+    const txtOrigin = btn.innerText;
+    btn.innerText = "Copié ! ✔️";
+    btn.style.color = "#00ffff";
+    setTimeout(() => {
+        btn.innerText = txtOrigin;
+        btn.style.color = "white";
+    }, 2000);
+};
+
+window.supprimerDeckDebug = async function(idPersonnage, btnElement) {
+    if (!confirm("Effacer définitivement le deck de ce personnage ?\nVous devrez le regénérer depuis sa fiche.")) return;
+    
+    try {
+        await deleteDoc(doc(db, "Cartes_Profils", idPersonnage));
+        
+        // Retirer l'interactivité des deux boutons instantanément
+        btnElement.style.opacity = "0.4";
+        btnElement.style.pointerEvents = "none";
+        btnElement.previousElementSibling.style.opacity = "0.4";
+        btnElement.previousElementSibling.style.pointerEvents = "none";
+        
+        btnElement.innerText = "Effacé";
+        btnElement.style.backgroundColor = "darkred";
+    } catch (e) {
+        console.error("Erreur suppression deck:", e);
+        alert("Une interférence empêche la suppression.");
+    }
+};
+
+// =========================================================================
 //  MOTEUR DE CARACTÉRISTIQUES (ACHAT DE POINTS 5E)
 // =========================================================================
 
@@ -3452,5 +3598,10 @@ Object.assign(window, {
   calculerDistanceHex: window.calculerDistanceHex,
   avancerTempsAuto: window.avancerTempsAuto,
   executerVoyage: window.executerVoyage,
-  dessinerIconesCarte: window.dessinerIconesCarte
+  dessinerIconesCarte: window.dessinerIconesCarte,
+  // Gestion Decks Debug
+  ouvrirGestionDecks: window.ouvrirGestionDecks,
+  extraireDeckDebug: window.extraireDeckDebug,
+  copierExtractionDeck: window.copierExtractionDeck,
+  supprimerDeckDebug: window.supprimerDeckDebug,
 });

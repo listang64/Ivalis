@@ -349,6 +349,12 @@
       </button>
       <br><br>
 
+      <!-- NOUVEAU : BOUTON GESTION DES DECKS -->
+      <button class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); window.ouvrirGestionDecks()">
+        Gestion des Decks (Debug)
+      </button>
+      <br><br>
+
       <!-- NOUVEAU : BOUTON ARCHIVAGE -->
       <button class="btn-parametres btn-supprimer" style="width: 80%; padding: 15px; border-color: #ff4c4c;" onclick="jouerSonClic(); window.archiverSessionEtViderChat()">
         Clôturer & Vider le Chat
@@ -379,6 +385,20 @@
         <button class="btn-parametres" onclick="jouerSonClic(); sauvegarderTemperature()">Sauvegarder</button>
         <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-ia-parametre', 'etape-menu-outils')">Retour</button>
       </div>
+    </div>
+
+    <!-- ======================================================= -->
+    <!-- NOUVEAU : FENÊTRE GESTION DES DECKS                     -->
+    <!-- ======================================================= -->
+    <div id="etape-gestion-decks" class="fenetre-volante-parchemin fondu-interne" style="display: none; opacity: 0; width: 500px;">
+      <h2>Gestion des Decks</h2>
+      <p style="font-size: 14px; margin-top: -10px; color: #5c3a21;">Extraction et suppression des grimoires de combat</p>
+      
+      <div id="chargement-gestion-decks" style="margin: 20px 0; font-style: italic;">Analyse des âmes...</div>
+      
+      <div class="liste-instructions" id="liste-gestion-decks" style="display:none; max-height: 300px; overflow-y: auto; text-align: left; padding: 10px;"></div>
+      
+      <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-gestion-decks', 'etape-menu-outils')">Retour</button>
     </div>
 
   </div>
@@ -707,6 +727,21 @@
     <div class="groupe-boutons-jeu">
       <button class="btn-modale-jeu" onclick="jouerSonClic(); confirmerQuitterJeu()">Oui</button>
       <button class="btn-modale-jeu" onclick="jouerSonClic(); fermerModalesJeu()">Non</button>
+    </div>
+  </div>
+
+  <!-- ======================================================= -->
+  <!-- NOUVEAU : MODALE EXTRACTION DECK (COPIER/COLLER)        -->
+  <!-- ======================================================= -->
+  <div id="modale-extraction-deck" class="modale-parchemin-jeu" style="width: 650px; max-width: 90vw;">
+    <h2>Extraction du Deck</h2>
+    <p style="font-size: 14px; margin-top: -15px;">Copiez ce code pour l'envoyer à l'analyse.</p>
+    
+    <textarea id="texte-extraction-deck" class="input-texte-parchemin" style="height: 350px; width: 95%; font-family: monospace; font-size: 13px; white-space: pre; background-color: #2a1a0f; color: #00ffff;" readonly></textarea>
+    
+    <div class="groupe-boutons-jeu">
+      <button class="btn-modale-jeu" onclick="jouerSonClic(); window.copierExtractionDeck(event)">Copier le code</button>
+      <button class="btn-modale-jeu" onclick="jouerSonClic(); document.getElementById('modale-extraction-deck').style.display='none'; document.getElementById('overlay-jeu-modale').style.display='none';">Fermer</button>
     </div>
   </div>
 
