@@ -584,7 +584,7 @@ async function genererEtStockerPortrait(donnees) {
     output_format: "png", // On demande du PNG pour la transparence
     n: 1,
     size: "1024x1792",
-    quality: "low",
+    quality: "medium",
     moderation: "low"
   };
 
