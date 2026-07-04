@@ -313,7 +313,14 @@ async function sauvegarderFichePersonnage(donnees) {
 
 async function supprimerPersonnageBDD(idPersonnage) {
   if (!idPersonnage) return false;
+  
+  // Suppression du héros
   await deleteDoc(doc(db, COL.PERSONNAGES, idPersonnage));
+  
+  // NOUVEAU : Nettoyage des bases annexes (Cartes & Caractéristiques)
+  await deleteDoc(doc(db, COL.CARACTERISTIQUES, idPersonnage)).catch(()=>{});
+  await deleteDoc(doc(db, "Cartes_Profils", idPersonnage)).catch(()=>{});
+  
   return true;
 }
 
@@ -1966,6 +1973,16 @@ async function validerSuppressionPerso() {
   btnConfirmer.innerText = "Destruction...";
   btnConfirmer.style.pointerEvents = "none";
 
+  // =========================================================
+  // NOUVEAU : SUPPRESSION DE L'IMAGE SUR CLOUDINARY
+  // =========================================================
+  const urlImage = document.getElementById("champ-id-personnage").getAttribute("data-url");
+  if (urlImage && urlImage !== "" && typeof window.supprimerImageCloudinary === "function") {
+      console.log("🔥 Incinération du portrait Cloudinary...");
+      await window.supprimerImageCloudinary(urlImage);
+  }
+  // =========================================================
+
   await supprimerPersonnageBDD(id);
 
   btnConfirmer.innerText = "Oui, détruire";
@@ -1974,7 +1991,7 @@ async function validerSuppressionPerso() {
 
   localStorage.removeItem("ivalis_perso_" + id);
   fermerFichePerso();
-  // La liste se met a jour automatiquement via onSnapshot (temps reel).
+  // La liste se met à jour automatiquement via onSnapshot (temps réel).
 }
 
 function appliquerCouleurTheme(couleurCode) {

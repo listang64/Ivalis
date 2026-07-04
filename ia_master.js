@@ -939,6 +939,9 @@ async function supprimerImageCloudinary(urlImage) {
     }
 }
 
+// NOUVEAU : On exporte la fonction pour que la Fiche Personnage puisse s'en servir !
+window.supprimerImageCloudinary = supprimerImageCloudinary;
+
 async function analyserMortsPNJ(nomsPnjPresents, texteMJ) {
     const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
     if (!cleGemini || !nomsPnjPresents || nomsPnjPresents.length === 0) return;

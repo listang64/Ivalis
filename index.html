@@ -426,8 +426,6 @@
       <img id="image-portrait-perso" src="" alt="Portrait du Héros">
     </div>
 
-    <button id="btn-supprimer-perso" class="btn-parametres btn-supprimer" style="position: absolute; top: 565px; left: -250px; width: 200px; display: none;" onclick="jouerSonClic(); ouvrirConfirmationSuppressionPerso()">Supprimer</button>
-
     <div id="fiche-perso-header">
       <span class="titre-fiche-header" id="titre-nom-personnage">Nouveau Personnage</span>
       <button class="btn-fermer-fiche" title="Fermer la fiche" onclick="jouerSonClic(); fermerFichePerso()">X</button>
@@ -517,6 +515,10 @@
 
         <div class="actions-formulaire">
           <button id="btn-sauvegarder-perso" class="btn-parametres" onclick="jouerSonClic(); sauvegarderDescriptifPerso()">Enregistrer</button>
+          
+          <!-- Le bouton Supprimer est maintenant naturellement intégré ! -->
+          <button id="btn-supprimer-perso" class="btn-parametres btn-supprimer" style="display: none;" onclick="jouerSonClic(); ouvrirConfirmationSuppressionPerso()">Supprimer</button>
+          
           <button class="btn-parametres" onclick="jouerSonClic(); fermerFichePerso()">Annuler</button>
         </div>
       </div>
