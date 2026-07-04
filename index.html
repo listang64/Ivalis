@@ -530,6 +530,35 @@
       </div>
 
       <div id="caracs-affiche" style="display: none; text-align: left;">
+        
+        <div id="bandeau-vital-perso" style="display: flex; flex-direction: column; justify-content: center; background: linear-gradient(135deg, rgba(92, 58, 33, 0.15), rgba(42, 26, 15, 0.05)); border: 2px solid #c2a878; border-radius: 10px; padding: 15px; margin-bottom: 25px; box-shadow: 0 4px 8px rgba(0,0,0,0.2), inset 0 0 10px rgba(255,255,255,0.4);">
+          
+          <div style="display: flex; justify-content: space-around; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+              <div style="font-size: 40px; filter: drop-shadow(2px 3px 3px rgba(0,0,0,0.5));">❤️</div>
+              <div style="display: flex; flex-direction: column;">
+                <span style="font-size: 14px; font-weight: bold; color: #5c3a21; text-transform: uppercase; letter-spacing: 1px;">Points de Vie</span>
+                <span style="font-size: 34px; font-weight: bold; color: #2a1a0f; font-family: 'Cinzel', serif; line-height: 1;" id="affichage-pv-max">8</span>
+              </div>
+            </div>
+
+            <div style="width: 2px; height: 50px; background-color: #c2a878; opacity: 0.6; border-radius: 2px;"></div>
+
+            <div style="display: flex; align-items: center; gap: 15px;">
+              <div style="position: relative; width: 40px; height: 45px;">
+                  <div style="position: absolute; top: 2px; left: 0; width: 26px; height: 38px; background: #c2a878; border: 2px solid #2a1a0f; border-radius: 4px; transform: rotate(-15deg); box-shadow: 2px 2px 5px rgba(0,0,0,0.5);"></div>
+                  <div style="position: absolute; top: 6px; left: 12px; width: 26px; height: 38px; background: #f6ebd1; border: 2px solid #2a1a0f; border-radius: 4px; transform: rotate(12deg); box-shadow: 2px 2px 5px rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center;">
+                    <span style="color: #8c6a45; font-size: 14px;">✦</span>
+                  </div>
+              </div>
+              <div style="display: flex; flex-direction: column;">
+                <span style="font-size: 14px; font-weight: bold; color: #5c3a21; text-transform: uppercase; letter-spacing: 1px;">Cartes en main</span>
+                <span style="font-size: 34px; font-weight: bold; color: #2a1a0f; font-family: 'Cinzel', serif; line-height: 1;" id="affichage-cartes-max">9</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
         <h3 style="margin-top: 0; border-bottom: 2px solid #5c3a21; padding-bottom: 5px; color: #2a1a0f;">Attributs &amp; Compétences</h3>
         <div id="conteneur-stats-affichage" style="margin-top: 20px;"></div>
       </div>
@@ -537,10 +566,51 @@
     
     <div id="modale-creation-caracs" class="modale-parchemin" style="display: none; z-index: 160; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 450px;">
       <h2 style="font-size: 24px; margin-bottom: 10px;">Répartition</h2>
-      <div style="font-size: 20px; font-weight: bold; margin-bottom: 20px; color: #5c3a21;">
-        Points disponibles : <span id="points-restants" style="color: #1b6e3a; font-size: 26px;">27</span>
+      <div style="font-size: 20px; font-weight: bold; margin-bottom: 15px; color: #5c3a21;">
+        Points disponibles : <span id="points-restants" style="color: #1b6e3a; font-size: 26px;">20</span>
       </div>
       
+      <!-- ======================================================= -->
+      <!-- BANDEAU PRÉVISUALISATION DANS LA MODALE                 -->
+      <!-- ======================================================= -->
+      <div style="display: flex; flex-direction: column; background: rgba(255,255,255,0.4); border: 2px dashed #c2a878; border-radius: 8px; padding: 10px; margin-bottom: 20px;">
+        
+        <!-- LIGNE 1 : PV et Cartes -->
+        <div style="display: flex; justify-content: space-around; align-items: center; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 24px; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.5));">❤️</span>
+            <span style="font-size: 16px; font-weight: bold; color: #5c3a21;">PV :</span>
+            <span style="font-size: 24px; font-weight: bold; color: #2a1a0f; font-family: 'Cinzel', serif;" id="creation-pv-max">8</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="position: relative; width: 24px; height: 28px;">
+                <div style="position: absolute; top: 0; left: 0; width: 16px; height: 24px; background: #c2a878; border: 1px solid #2a1a0f; border-radius: 2px; transform: rotate(-15deg);"></div>
+                <div style="position: absolute; top: 3px; left: 6px; width: 16px; height: 24px; background: #f6ebd1; border: 1px solid #2a1a0f; border-radius: 2px; transform: rotate(12deg);"></div>
+            </div>
+            <span style="font-size: 16px; font-weight: bold; color: #5c3a21;">Cartes :</span>
+            <span style="font-size: 24px; font-weight: bold; color: #2a1a0f; font-family: 'Cinzel', serif;" id="creation-cartes-max">9</span>
+          </div>
+        </div>
+
+        <!-- LIGNE 2 : Icônes secondaires -->
+        <div style="display: flex; justify-content: center; gap: 20px; border-top: 1px dashed rgba(194, 168, 120, 0.5); padding-top: 8px;">
+          <div style="display: flex; align-items: center; gap: 3px; font-size: 20px;" title="Agilité">
+            🥾 <span id="creation-fleche-dex"></span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 3px; font-size: 20px;" title="Force">
+            💪 <span id="creation-fleche-force"></span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 3px; font-size: 20px;" title="Sagesse">
+            <span style="color: #1b6e3a; text-shadow: 0 0 2px black;">✚</span> <span id="creation-fleche-sag"></span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 3px; font-size: 20px;" title="Charisme">
+            🗣️ <span id="creation-fleche-cha"></span>
+          </div>
+        </div>
+
+      </div>
+      <!-- ======================================================= -->
+
       <div id="grille-creation-caracs" style="display: flex; flex-direction: column; gap: 15px; margin-bottom: 25px;">
         </div>
       

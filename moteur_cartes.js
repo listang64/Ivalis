@@ -96,7 +96,7 @@ function choisirCategoriePonderee(poidsActions) {
 }
 
 // NOUVEAU PARAMÈTRE : elementInterdit (pour empêcher les clones Haut/Bas)
-function forgerAction(categorieForcee, profilJson, compteurs, isBurnForce, elemDeck, elementInterdit = "") {
+function forgerAction(categorieForcee, profilJson, compteurs, isBurnForce, elemDeck, elementInterdit = "", statsPerso = null) {
     let action = { nom: "", valeur: 0, effets: [], portee: 0, xp: 0, isBurn: isBurnForce, element: "" };
     
     // Fallback sécurisé : Si la catégorie n'est pas forcée, on pioche en ignorant les poids à 0
@@ -131,6 +131,16 @@ function forgerAction(categorieForcee, profilJson, compteurs, isBurnForce, elemD
 
     let budget = isBurnForce ? BUDGET_BURN : BUDGET_STANDARD;
     let coutEffets = 0;
+
+    const calcMod = (val) => Math.floor((val - 10) / 2);
+    const modForce = statsPerso && statsPerso.force ? calcMod(statsPerso.force) : -1;
+    const modDex   = statsPerso && statsPerso.dex ? calcMod(statsPerso.dex) : -1;
+    const modSag   = statsPerso && statsPerso.sag ? calcMod(statsPerso.sag) : -1;
+    const modCha   = statsPerso && statsPerso.cha ? calcMod(statsPerso.cha) : -1;
+
+    if (cat === "Mobilite" || cat === "Furtivite_Esquive") coutEffets -= (modDex * 0.5);
+    if (cat === "Soin") coutEffets -= (modSag * 0.5);
+    if (cat === "Controle_Mental") coutEffets -= (modCha * 0.5);
 
     // =================================================================
     // 1. LES MÉCANIQUES AVANCÉES (Toutes connectées au dictionnaire !)
@@ -256,22 +266,29 @@ function forgerAction(categorieForcee, profilJson, compteurs, isBurnForce, elemD
     // =================================================================
     if (cat === "Degats_Melee" || cat === "Degats_Distance") {
         let alt = profilJson.Alterations_Dominantes?.[0];
-        // 25% de chance d'appliquer l'altération de la classe
+        
         if (alt && DICTIONNAIRE_CARTES[alt] && Math.random() < 0.25) {
             action.effets.push(DICTIONNAIRE_CARTES[alt].nom);
-            coutEffets += DICTIONNAIRE_CARTES[alt].cout;
+            let coutAlt = DICTIONNAIRE_CARTES[alt].cout;
+            
+            if (["Confusion", "Desavantage", "Etourdissement", "Malediction"].includes(alt)) {
+                coutAlt -= (modCha * 0.5);
+            }
+            coutEffets += coutAlt;
         } 
         else if (Math.random() < 0.20) {
-            // Piocher dans le reste des effets de position/contrôle
             let effetsSupDispos = ["Poussee", "Traction", "Perforation", "Avantage", "Condition_Allie"];
             let effChoisi = effetsSupDispos[Math.floor(Math.random() * effetsSupDispos.length)];
             
-            // Sécurité : On ne met pas Condition_Allie sur du tir à distance
-            if (effChoisi === "Condition_Allie" && cat !== "Degats_Melee") {
-                effChoisi = "Avantage";
-            }
+            if (effChoisi === "Condition_Allie" && cat !== "Degats_Melee") effChoisi = "Avantage";
+            
             action.effets.push(DICTIONNAIRE_CARTES[effChoisi].nom);
-            coutEffets += DICTIONNAIRE_CARTES[effChoisi].cout;
+            let coutSec = DICTIONNAIRE_CARTES[effChoisi].cout;
+            
+            if (["Poussee", "Traction"].includes(effChoisi)) coutSec -= (modForce * 0.5);
+            if (["Confusion", "Desavantage", "Etourdissement"].includes(effChoisi)) coutSec -= (modCha * 0.5);
+            
+            coutEffets += coutSec;
         }
     }
 
@@ -320,7 +337,7 @@ function forgerAction(categorieForcee, profilJson, compteurs, isBurnForce, elemD
 //  CONSTRUCTEUR DU DECK COMPLET
 // =========================================================================
 
-window.genererDeckComplet = function(profilJson) {
+window.genererDeckComplet = function(profilJson, statsPerso = null) {
     let deck = [];
     let compteurs = { burns: 0, elementsCrees: 0, elementsConsommes: 0, invocations: 0, executions: 0, actionsCrees: 0 };
     let elemDeck = profilJson.Elements?.Genere?.[0] || ELEMENTS_LISTE[Math.floor(Math.random() * ELEMENTS_LISTE.length)];
@@ -336,19 +353,19 @@ window.genererDeckComplet = function(profilJson) {
 
     // --- CONSTRUCTION DU BAS (Bottoms) ---
     // On génère le Bas en premier sans interdiction d'élément.
-    deck[0].bas = forgerAction("Pillage", profilJson, compteurs, false, elemDeck, ""); 
-    deck[1].bas = forgerAction("Pillage", profilJson, compteurs, false, elemDeck, ""); 
-    for (let i = 2; i < 8; i++) deck[i].bas = forgerAction("Mobilite", profilJson, compteurs, false, elemDeck, ""); 
-    for (let i = 8; i < 11; i++) deck[i].bas = forgerAction(null, profilJson, compteurs, false, elemDeck, ""); 
+    deck[0].bas = forgerAction("Pillage", profilJson, compteurs, false, elemDeck, "", statsPerso); 
+    deck[1].bas = forgerAction("Pillage", profilJson, compteurs, false, elemDeck, "", statsPerso); 
+    for (let i = 2; i < 8; i++) deck[i].bas = forgerAction("Mobilite", profilJson, compteurs, false, elemDeck, "", statsPerso); 
+    for (let i = 8; i < 11; i++) deck[i].bas = forgerAction(null, profilJson, compteurs, false, elemDeck, "", statsPerso); 
 
     // --- CONSTRUCTION DU HAUT (Tops) ---
     // SÉCURITÉ ANTI-CLONE : On passe l'élément créé en Bas comme 'elementInterdit' pour le Haut !
-    deck[0].haut = forgerAction("Soin", profilJson, compteurs, false, elemDeck, deck[0].bas.element); 
+    deck[0].haut = forgerAction("Soin", profilJson, compteurs, false, elemDeck, deck[0].bas.element, statsPerso); 
     
     for (let i = 1; i < 11; i++) {
         let forcerEpique = (i === 1 || i === 2 || i === 3); 
         let elementInterditDuBas = deck[i].bas.element; // On regarde ce qu'a généré l'action du bas de cette carte
-        deck[i].haut = forgerAction(null, profilJson, compteurs, forcerEpique, elemDeck, elementInterditDuBas); 
+        deck[i].haut = forgerAction(null, profilJson, compteurs, forcerEpique, elemDeck, elementInterditDuBas, statsPerso); 
     }
 
     return deck;
@@ -481,8 +498,17 @@ window.genererProfilDeck = async function() {
         console.log("Thème :", profilJson.Theme_Identifie);
         console.table(profilJson.Poids_Actions);
 
+        // --- ÉTAPE 1.5 : LECTURE DES CARACTÉRISTIQUES ---
+        let statsPerso = { force: 8, dex: 8, con: 8, int: 8, sag: 8, cha: 8 };
+        try {
+            const statsSnap = await getDoc(doc(db, "Caracteristiques", idPersonnage));
+            if (statsSnap.exists()) statsPerso = statsSnap.data();
+        } catch (e) {
+            console.warn("Caracs non trouvées pour le deck, valeurs par défaut utilisées.");
+        }
+
         // --- ÉTAPE 2 : FORGE DES CARTES ---
-        let deckProcedural = window.genererDeckComplet(profilJson);
+        let deckProcedural = window.genererDeckComplet(profilJson, statsPerso);
 
         // --- ÉTAPE 3 : BAPTÊME NARRATIF (NOUVEAU) ---
         btn.innerText = "Étape 2 : Nommage thématique des cartes...";

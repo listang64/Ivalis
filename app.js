@@ -2403,6 +2403,9 @@ window.ajouterTokens = function(montant) {
 //  MOTEUR DE CARACTÉRISTIQUES (ACHAT DE POINTS 5E)
 // =========================================================================
 
+// 🔻 C'EST ICI QUE TU POURRAS CHANGER LE NOMBRE DE POINTS POUR TES TESTS 🔻
+window.TOTAL_POINTS_CREATION = 20;
+
 const NOMS_CARACS = [
   { id: "force", nom: "FORCE", desc: "Mesure la puissance physique.", comp: "Athlétisme" },
   { id: "dex", nom: "DEXTÉRITÉ", desc: "Mesure l'agilité, les réflexes et l'équilibre.", comp: "Acrobaties / Escamotage / Discrétion" },
@@ -2421,7 +2424,7 @@ function getCoutStat(valeur) {
 
 function getModificateur(valeur) {
   const mod = Math.floor((valeur - 10) / 2);
-  return mod >= 0 ? "+" + mod : mod;
+  return mod; // Sécurisé (renvoie un chiffre pur)
 }
 
 function calculerPointsRestants() {
@@ -2429,7 +2432,8 @@ function calculerPointsRestants() {
   for (let key in window.statsCreation) {
     depenses += getCoutStat(window.statsCreation[key]);
   }
-  return 27 - depenses;
+  // 🔻 On utilise notre nouvelle variable ici !
+  return window.TOTAL_POINTS_CREATION - depenses;
 }
 
 // 1. Chargement depuis Firebase
@@ -2488,9 +2492,41 @@ window.actualiserModaleCaracs = function() {
   spanPoints.innerText = pointsRestants;
   spanPoints.style.color = pointsRestants === 0 ? "#1b6e3a" : (pointsRestants < 0 ? "#ff4c4c" : "#5c3a21");
 
+  // =========================================================
+  // MISE À JOUR EN TEMPS RÉEL DE LA PRÉVISUALISATION
+  // =========================================================
+  const rawModCon = Math.floor((window.statsCreation.con - 10) / 2);
+  const rawModInt = Math.floor((window.statsCreation.int - 10) / 2);
+  const rawModForce = Math.floor((window.statsCreation.force - 10) / 2);
+  const rawModDex = Math.floor((window.statsCreation.dex - 10) / 2);
+  const rawModSag = Math.floor((window.statsCreation.sag - 10) / 2);
+  const rawModCha = Math.floor((window.statsCreation.cha - 10) / 2);
+
+  const obtenirFlecheHTML = (mod, size) => {
+      if (mod < 0) return `<span style="color: #ff4c4c; font-size: ${size}px; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">▼</span>`;
+      if (mod > 0) return `<span style="color: #1b6e3a; font-size: ${size}px; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">▲</span>`;
+      return '';
+  };
+
+  const spanPv = document.getElementById("creation-pv-max");
+  const spanCartes = document.getElementById("creation-cartes-max");
+  const spanFlecheDex = document.getElementById("creation-fleche-dex");
+  const spanFlecheForce = document.getElementById("creation-fleche-force");
+  const spanFlecheSag = document.getElementById("creation-fleche-sag");
+  const spanFlecheCha = document.getElementById("creation-fleche-cha");
+
+  if (spanPv) spanPv.innerText = 9 + rawModCon;
+  if (spanCartes) spanCartes.innerText = 10 + rawModInt;
+  if (spanFlecheDex) spanFlecheDex.innerHTML = obtenirFlecheHTML(rawModDex, 16);
+  if (spanFlecheForce) spanFlecheForce.innerHTML = obtenirFlecheHTML(rawModForce, 16);
+  if (spanFlecheSag) spanFlecheSag.innerHTML = obtenirFlecheHTML(rawModSag, 16);
+  if (spanFlecheCha) spanFlecheCha.innerHTML = obtenirFlecheHTML(rawModCha, 16);
+  // =========================================================
+
   NOMS_CARACS.forEach(c => {
     const val = window.statsCreation[c.id];
     const mod = getModificateur(val);
+    const modAff = mod >= 0 ? "+" + mod : mod;
     const coutSuivant = getCoutStat(val + 1) - getCoutStat(val);
     
     // Logique de blocage des boutons
@@ -2504,7 +2540,7 @@ window.actualiserModaleCaracs = function() {
           <button class="btn-plus-moins" ${btnMoinsDisabled} onclick="modifierStat('${c.id}', -1)">-</button>
           <div class="valeur-carac-creation">${val}</div>
           <button class="btn-plus-moins" ${btnPlusDisabled} onclick="modifierStat('${c.id}', 1)">+</button>
-          <div class="modif-carac-creation">(${mod})</div>
+          <div class="modif-carac-creation">(${modAff})</div>
         </div>
       </div>
     `;
@@ -2539,7 +2575,25 @@ window.validerCreationCaracs = async function() {
   btnValider.style.pointerEvents = "none";
 
   try {
+    // =========================================================
+    // CALCUL ET SAUVEGARDE SÉCURISÉE SUR LA FICHE PERSONNAGE
+    // =========================================================
+    const rawModCon = Math.floor((window.statsCreation.con - 10) / 2);
+    const rawModInt = Math.floor((window.statsCreation.int - 10) / 2);
+    const rawModForce = Math.floor((window.statsCreation.force - 10) / 2);
+
+    const pvMax = 9 + rawModCon;
+    const cartesMax = 10 + rawModInt;
+    const objetsMax = 3 + rawModForce;
+
+    await updateDoc(doc(db, "Personnages", idPersonnage), {
+        PV_Max: pvMax,
+        Cartes_Max: cartesMax,
+        Objets_Max: objetsMax
+    });
+
     await setDoc(doc(db, COL.CARACTERISTIQUES, idPersonnage), window.statsCreation);
+    
     window.fermerModaleCreationCaracs();
     window.chargerCaracteristiques(idPersonnage);
   } catch (e) {
@@ -2556,9 +2610,23 @@ window.afficherStatsFinales = function(dataStats) {
   const conteneur = document.getElementById("conteneur-stats-affichage");
   conteneur.innerHTML = "";
 
+  // =========================================================
+  // MISE À JOUR DU BANDEAU FINAL SUR LA FICHE
+  // =========================================================
+  const rawModConFiche = Math.floor(((dataStats.con || 8) - 10) / 2);
+  const rawModIntFiche = Math.floor(((dataStats.int || 8) - 10) / 2);
+
+  const affPv = document.getElementById("affichage-pv-max");
+  const affCartes = document.getElementById("affichage-cartes-max");
+
+  if (affPv) affPv.innerText = 9 + rawModConFiche;
+  if (affCartes) affCartes.innerText = 10 + rawModIntFiche;
+  // =========================================================
+
   NOMS_CARACS.forEach(c => {
     const val = dataStats[c.id] || 8;
     const mod = getModificateur(val);
+    const modAff = mod >= 0 ? "+" + mod : mod;
     
     // NOUVEAU : Structure avec l'image du D20 à gauche
     let html = `
@@ -2567,7 +2635,7 @@ window.afficherStatsFinales = function(dataStats) {
         <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782422251/IMG_1714_l0bco5.png" class="icone-d20-stat" alt="D20" onclick="jouerSonClic(); lancerJetDeCaracteristique('${c.id}', '${c.nom}', ${val}, ${mod})">
         
         <div>
-            <div class="titre-stat-final" style="margin-bottom: 4px;">${c.nom} (${val}) - (${mod}) : <span style="font-weight: normal; color: #4a2e1b;">${c.desc}</span></div>
+            <div class="titre-stat-final" style="margin-bottom: 4px;">${c.nom} (${val}) - (${modAff}) : <span style="font-weight: normal; color: #4a2e1b;">${c.desc}</span></div>
     `;
     
     if (c.comp !== "") {
