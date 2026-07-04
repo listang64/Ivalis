@@ -2353,6 +2353,7 @@ window.ouvrirParametres = function() {
   window.fermerToutesLesFenetres();
 
   if (!estDejaOuvert) {
+    // --- ON CACHE TOUTES LES FENÊTRES POSSIBLES ---
     document.getElementById("etape-menu-parametres").style.display = "none";
     document.getElementById("etape-liste-instructions").style.display = "none";
     document.getElementById("etape-editeur-instruction").style.display = "none";
@@ -2360,7 +2361,12 @@ window.ouvrirParametres = function() {
     document.getElementById("etape-cles-api").style.display = "none";
     document.getElementById("etape-menu-outils").style.display = "none";
     document.getElementById("etape-ia-parametre").style.display = "none";
+    
+    // 🔻 LA CORRECTION EST ICI : On cache la nouvelle fenêtre de gestion des decks ! 🔻
+    const fenetreDecks = document.getElementById("etape-gestion-decks");
+    if (fenetreDecks) fenetreDecks.style.display = "none";
 
+    // --- ON N'AFFICHE QUE LE MOT DE PASSE ---
     document.getElementById("input-secret-parametres").value = "";
     document.getElementById("erreur-mdp-parametres").style.opacity = "0";
 
