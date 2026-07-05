@@ -22,23 +22,24 @@ function initInterfaceRecit() {
         z-index: 9000; opacity: 0; transition: opacity 1.5s ease-in-out; cursor: pointer;
     `;
 
-    const texteContainer = document.createElement("div");
-    texteContainer.id = "texte-recit-dynamique";
-    texteContainer.style.cssText = `
-        position: absolute; top: 50%; transform: translate(-50%, -50%);
-        display: flex; flex-direction: column; gap: 15px;
-        color: #1a0f08; font-family: 'Almendra', serif; font-size: 2.2vw; line-height: 1.6;
-        text-shadow: 0px 0px 1px rgba(0,0,0,0.3); transition: opacity 0.4s ease-in-out;
-    `;
-
-    // Taille fixe à 55px pour éviter qu'il ne déborde
     const nomContainer = document.createElement("div");
     nomContainer.id = "nom-recit-dynamique";
     nomContainer.style.cssText = `
-        font-family: 'Cinzel', serif; font-size: 55px; font-weight: bold; color: #5c3a21;
-        text-shadow: 1px 1px 3px rgba(0,0,0,0.3); opacity: 0; transition: opacity 0.8s ease-in-out;
-        border-bottom: 2px solid rgba(194, 168, 120, 0.4); padding-bottom: 5px; width: max-content;
-        display: none;
+        position: absolute; top: 8vh; left: 50%; transform: translateX(-50%);
+        font-family: 'Cinzel', serif; font-size: 140px; font-weight: bold; color: #4a2511;
+        text-shadow: 5px 15px 15px rgba(0,0,0,0.8), 0px 0px 25px rgba(194, 168, 120, 0.4);
+        opacity: 0; transition: opacity 0.8s ease-in-out;
+        border-bottom: 3px solid rgba(194, 168, 120, 0.5); padding-bottom: 5px; width: max-content;
+        display: none; z-index: 10;
+    `;
+
+    const texteContainer = document.createElement("div");
+    texteContainer.id = "texte-recit-dynamique";
+    texteContainer.style.cssText = `
+        position: absolute; top: 55%; transform: translate(-50%, -50%);
+        display: flex; flex-direction: column; gap: 15px;
+        color: #1a0f08; font-family: 'Almendra', serif; font-size: 2.2vw; line-height: 1.6;
+        text-shadow: 0px 0px 1px rgba(0,0,0,0.3); transition: opacity 0.4s ease-in-out;
     `;
 
     const contenuTexte = document.createElement("div");
@@ -52,7 +53,7 @@ function initInterfaceRecit() {
         pointer-events: none;
     `;
 
-    texteContainer.appendChild(nomContainer);
+    overlay.appendChild(nomContainer);
     texteContainer.appendChild(contenuTexte);
     overlay.appendChild(texteContainer);
     overlay.appendChild(portrait);
@@ -91,11 +92,11 @@ function jouerParagrapheCourant() {
     tempDiv.innerHTML = texteBrut;
 
     const imgNode = tempDiv.querySelector("img.pnj-hover-img");
-    // CORRECTION : On ne cherche les guillemets que dans le texte pur, pas dans le code HTML !
     const isDialogue = /["«»]/.test(tempDiv.textContent); 
 
     if (imgNode && isDialogue) {
-        imageUrl = imgNode.src;
+        // CORRECTION : On utilise getAttribute pour être certain de la correspondance parfaite du texte de l'URL
+        imageUrl = imgNode.getAttribute("src");
         const parentSpan = imgNode.closest("span.pnj-chat-hover");
         if (parentSpan) {
             const strongNode = parentSpan.querySelector("strong");
@@ -131,8 +132,9 @@ function jouerParagrapheCourant() {
     let delaiAvantTyping = 0;
 
     if (imageUrl) {
-        if (imgElement.src !== imageUrl || imgElement.style.opacity === "0") {
-            imgElement.src = imageUrl;
+        // CORRECTION : Comparaison stricte avec getAttribute
+        if (imgElement.getAttribute("src") !== imageUrl || imgElement.style.opacity === "0") {
+            imgElement.setAttribute("src", imageUrl);
             imgElement.style.opacity = "1";
             delaiAvantTyping = 800; 
         }
@@ -213,7 +215,7 @@ function lancerTypingEffet() {
     }
 }
 
-// 6. Gestionnaire de clic
+// 6. Gestionnaire de clic (CORRECTION DU FONDU DE TRANSITION)
 function gererClicRecit() {
     if (isTyping) {
         skipTyping = true;
@@ -221,22 +223,39 @@ function gererClicRecit() {
         lancerTypingEffet(); 
     } else {
         const contenuTexte = document.getElementById("contenu-texte-recit");
-        contenuTexte.style.opacity = "0"; 
+        const nomContainer = document.getElementById("nom-recit-dynamique");
+        const imgElement = document.getElementById("portrait-recit-dynamique");
         
+        contenuTexte.style.opacity = "0"; 
+        let delaiTransition = 400; // Vitesse de passage par défaut (si c'est le même PNJ)
+        
+        // On anticipe le prochain paragraphe !
         if (indexParagraphe + 1 < paragraphesRecit.length) {
             let prochainTexte = paragraphesRecit[indexParagraphe + 1];
-            // CORRECTION : On vérifie le texte pur aussi ici pour la disparition du nom
+            
             const tempCheck = document.createElement("div");
             tempCheck.innerHTML = prochainTexte;
-            if (!/["«»]/.test(tempCheck.textContent)) {
-                document.getElementById("nom-recit-dynamique").style.opacity = "0";
+            const nextIsDialogue = /["«»]/.test(tempCheck.textContent);
+            const nextImgNode = tempCheck.querySelector("img.pnj-hover-img");
+            
+            let nextImageUrl = (nextIsDialogue && nextImgNode) ? nextImgNode.getAttribute("src") : null;
+            let currentImageUrl = imgElement.getAttribute("src");
+
+            // Si c'est de la narration, OU un PNJ différent : on déclenche le fondu de l'image !
+            if (!nextImageUrl || currentImageUrl !== nextImageUrl) {
+                nomContainer.style.opacity = "0";
+                
+                if (imgElement.style.opacity !== "0") {
+                    imgElement.style.opacity = "0"; // Fait disparaître l'ancien PNJ
+                    delaiTransition = 800; // On laisse 800ms au CSS pour finir le fondu au noir avant de changer l'image
+                }
             }
         }
 
         setTimeout(() => {
             indexParagraphe++;
             jouerParagrapheCourant();
-        }, 400); 
+        }, delaiTransition); 
     }
 }
 
@@ -248,6 +267,6 @@ function fermerRecitDynamique() {
         overlay.style.display = "none";
         document.getElementById("contenu-texte-recit").innerHTML = "";
         document.getElementById("nom-recit-dynamique").innerHTML = "";
-        document.getElementById("portrait-recit-dynamique").src = "";
+        document.getElementById("portrait-recit-dynamique").removeAttribute("src"); // On nettoie proprement la source
     }, 1500);
 }
