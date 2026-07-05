@@ -587,8 +587,11 @@ window.chargerDeckExistant = async function(idPersonnage) {
         } else {
             divResultat.style.display = "none";
             conteneurAffichage.innerHTML = "";
-            titreTheme.innerText = "";
             divCartesVide.style.display = estProprietaire ? "block" : "none";
+            
+            // 🔻 NOUVEAU : Réapparition du titre si le deck est vide 🔻
+            const titreGenerateur = document.getElementById("titre-generateur-deck");
+            if (titreGenerateur) titreGenerateur.style.display = "block";
         }
     } catch (erreur) {
         console.error("Erreur lors du chargement du deck existant :", erreur);

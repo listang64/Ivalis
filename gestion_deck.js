@@ -23,51 +23,55 @@ const IMAGE_CADRE_SELECTIONNE = "https://res.cloudinary.com/dlkjq4kvg/image/uplo
 window.afficherDeckInteractif = async function(idPersonnage, deckProcedural, couleurPerso, themeDeck) {
     const divResultat = document.getElementById("resultat-profil-deck");
     const conteneurAffichage = document.getElementById("json-affichage-deck");
-    const titreTheme = document.getElementById("titre-theme-deck");
     const divCartesVide = document.getElementById("cartes-vide");
+
+    // 🔻 MASQUAGE DU TITRE "GÉNÉRATEUR" 🔻
+    const titreGenerateur = document.getElementById("titre-generateur-deck");
+    if (titreGenerateur) titreGenerateur.style.display = "none";
 
     window.DECK_COURANT = deckProcedural;
     window.COULEUR_PERSO_COURANT = couleurPerso;
     window.ID_PERSONNAGE_DECK = idPersonnage;
 
-    titreTheme.innerText = themeDeck;
     divCartesVide.style.display = "none";
     divResultat.style.display = "block";
 
-    // 1. Récupération des informations du personnage depuis Firebase
     window.CARTES_SELECTIONNEES = [];
-    window.CARTES_MAX_PERSO = 9; // Valeur de secours par défaut absolue
+    window.CARTES_MAX_PERSO = 9; 
 
     try {
-        // A. On récupère le Deck mémorisé (Les cartes déjà cliquées)
         const persoRef = doc(db, "Personnages", idPersonnage);
         const persoSnap = await getDoc(persoRef);
         if (persoSnap.exists()) {
             window.CARTES_SELECTIONNEES = persoSnap.data().Deck_Equipe || [];
         }
 
-        // B. On calcule la Limite de Cartes EXACTE depuis la vraie base de caractéristiques
         const caracsRef = doc(db, "Caracteristiques", idPersonnage);
         const caracsSnap = await getDoc(caracsRef);
         if (caracsSnap.exists()) {
-            const intValue = caracsSnap.data().int || 8; // 8 par défaut si non renseigné
+            const intValue = caracsSnap.data().int || 8;
             const modInt = Math.floor((intValue - 10) / 2);
-            window.CARTES_MAX_PERSO = 10 + modInt; // Formule absolue (Ex: 10 + 0 = 10)
+            window.CARTES_MAX_PERSO = 10 + modInt;
         }
     } catch (e) {
         console.warn("Impossible de récupérer la fiche du personnage pour le deck :", e);
     }
 
-    // 2. Construction de l'en-tête collant (Sticky Header)
+    // 🔻 NOUVELLE HIÉRARCHIE VISUELLE (Compteur > Titre Géant > Boîte) 🔻
     let htmlDeck = `
         <div id="compteur-deck-sticky">
             <span>Grimoire de Combat</span>
             <span>Cartes mémorisées : <span id="compteur-cartes-actuel" style="color: ${window.CARTES_SELECTIONNEES.length === window.CARTES_MAX_PERSO ? '#1b6e3a' : '#2c1e16'}">${window.CARTES_SELECTIONNEES.length}</span> / ${window.CARTES_MAX_PERSO}</span>
         </div>
+        
+        <h2 style="text-align: center; color: #2a1a0f; font-family: 'Cinzel', serif !important; font-size: 34px; font-weight: bold; margin: 25px 0 10px 0; text-shadow: 3px 5px 8px rgba(0, 0, 0, 0.6);">
+            ${themeDeck}
+        </h2>
+
         <div class="deck-visuel-container">
     `;
     
-    // 3. Dessin des cartes
+    // La boucle de dessin des cartes commence ici...
     deckProcedural.forEach((carte, index) => {
         let titre = carte.titre || "Action Inconnue";
         let estSelectionnee = window.CARTES_SELECTIONNEES.includes(carte.id);

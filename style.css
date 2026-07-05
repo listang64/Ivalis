@@ -1379,11 +1379,20 @@ textarea.input-texte-parchemin {
 .deck-visuel-container {
     display: flex;
     flex-direction: column;
-    /* C'EST ICI : On passe de 12px à 0px pour qu'elles se touchent */
     gap: 0px; 
-    width: 100%; 
-    max-width: 580px; 
-    margin: 15px 0;
+    
+    /* 🔻 1. On fige la zone de contenu à 580px pour ne SURTOUT PAS déformer tes cartes 🔻 */
+    width: 580px; 
+    max-width: 100%; 
+    box-sizing: content-box; /* Le secret : autorise la boîte à grandir sans étirer les cartes dedans */
+    
+    /* 🔻 2. On ajoute 100px de vide à droite pour laisser la place aux cartes de glisser 🔻 */
+    padding: 40px 100px 40px 20px; 
+    
+    margin: 0 auto 30px auto; 
+    background-color: rgba(255, 255, 255, 0.4); 
+    border: 4px solid #5c3a21; 
+    border-radius: 15px; 
 }
 
 /* --- MODIFIE CES LIGNES POUR AJUSTER LA TAILLE --- */
