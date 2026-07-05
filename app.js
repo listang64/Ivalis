@@ -981,7 +981,6 @@ function afficherBullesPersonnages(persos) {
   if (!conteneur) return;
   conteneur.innerHTML = "";
 
-  // 🔻 NOUVEAU : Nettoyage des anciennes images pour éviter les clones
   document.querySelectorAll('.bulle-portrait-hover-joueur, .bulle-portrait-hover-mj').forEach(el => el.remove());
 
   const partie = window.PARTIE_DATA || {};
@@ -991,8 +990,11 @@ function afficherBullesPersonnages(persos) {
 
   const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
   let estMonTour = false;
-
   let nomActif = "MJ";
+
+  let imageActive = null;
+  // 🔻 NOUVEAU : On vérifie si la fenêtre de chat est bien ouverte avant d'afficher quiconque !
+  const isChatOpen = document.getElementById("fenetre-chatbox")?.style.display === "flex";
 
   persos.forEach((p) => {
     const bulle = document.createElement("div");
@@ -1000,9 +1002,12 @@ function afficherBullesPersonnages(persos) {
     bulle.innerText = p.prenom;
     if (p.couleur) bulle.style.setProperty('--couleur-perso', p.couleur);
 
+    let estPersoActif = false; 
+
     if (p.idPersonnage === idPersoActif) {
         bulle.classList.add("tour-actif");
         nomActif = p.prenom;
+        estPersoActif = true;
         if (p.idJoueur === currentUserId) estMonTour = true;
     }
 
@@ -1011,12 +1016,23 @@ function afficherBullesPersonnages(persos) {
       imgHover.className = "bulle-portrait-hover-joueur";
       imgHover.src = p.urlCloudinary;
       
-      // 🔻 NOUVEAU : On sort l'image de la bulle pour la coller au fond de la page
-      document.body.appendChild(imgHover);
+      document.getElementById("ecran-jeu").appendChild(imgHover);
 
-      // 🔻 NOUVEAU : C'est le JS qui gère l'apparition au survol
-      bulle.addEventListener("mouseenter", () => { imgHover.style.display = "block"; });
-      bulle.addEventListener("mouseleave", () => { imgHover.style.display = "none"; });
+      if (estPersoActif) {
+          imageActive = imgHover;
+          // L'image n'est affichée que si le chat est ouvert !
+          if (isChatOpen) imgHover.style.display = "block";
+      }
+
+      bulle.addEventListener("mouseenter", () => { 
+          if (imageActive && imageActive !== imgHover) imageActive.style.display = "none";
+          imgHover.style.display = "block"; 
+      });
+      
+      bulle.addEventListener("mouseleave", () => { 
+          if (imgHover !== imageActive) imgHover.style.display = "none"; 
+          if (imageActive && isChatOpen) imageActive.style.display = "block"; 
+      });
     }
 
     bulle.ondblclick = function() {
@@ -1042,16 +1058,29 @@ function afficherBullesPersonnages(persos) {
   imgHoverMJ.className = "bulle-portrait-hover-mj";
   imgHoverMJ.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782164835/maitre_du_jeu_kemkf2.png";
   
-  // 🔻 NOUVEAU : On sort aussi le MJ
-  document.body.appendChild(imgHoverMJ);
+  document.getElementById("ecran-jeu").appendChild(imgHoverMJ);
 
-  bulleMJ.addEventListener("mouseenter", () => { imgHoverMJ.style.display = "block"; });
-  bulleMJ.addEventListener("mouseleave", () => { imgHoverMJ.style.display = "none"; });
-
+  let estMjActif = false;
   if (indexTour === 999 || indexTour >= ordre.length) {
       bulleMJ.classList.add("tour-actif");
       nomActif = "MJ";
+      estMjActif = true;
   }
+
+  if (estMjActif) {
+      imageActive = imgHoverMJ;
+      if (isChatOpen) imgHoverMJ.style.display = "block";
+  }
+
+  bulleMJ.addEventListener("mouseenter", () => { 
+      if (imageActive && imageActive !== imgHoverMJ) imageActive.style.display = "none";
+      imgHoverMJ.style.display = "block"; 
+  });
+  
+  bulleMJ.addEventListener("mouseleave", () => { 
+      if (imgHoverMJ !== imageActive) imgHoverMJ.style.display = "none"; 
+      if (imageActive && isChatOpen) imageActive.style.display = "block";
+  });
 
   if (partie.IA_En_Cours === true) {
       bulleMJ.style.opacity = "0.4";
@@ -1067,7 +1096,7 @@ function afficherBullesPersonnages(persos) {
   }
   conteneur.appendChild(bulleMJ);
 
-  // --- Mise à jour de la barre de saisie (Préparation autorisée) ---
+  // --- Mise à jour de la barre de saisie ---
   const inputChat = document.getElementById("input-chat");
   const btnEnvoyer = document.getElementById("btn-envoyer-chat");
 
@@ -1092,6 +1121,8 @@ function afficherBullesPersonnages(persos) {
           btnEnvoyer.style.cursor = "pointer";
       }
   }
+
+  window.imageTourActive = imageActive;
 }
 
 // 3. Rendu visuel dans le chat (avec injection de couleur pour le biseau)
@@ -1132,6 +1163,22 @@ function dessinerMessagesChat(msgs) {
        div.appendChild(texte);
        div.appendChild(btnSuppr);
        zone.appendChild(div);
+
+       // =======================================================
+       // NOUVEAU : DÉTECTION DU SURVOL DES PNJ DANS LE TEXTE
+       // =======================================================
+       const spansPnj = div.querySelectorAll(".pnj-chat-hover");
+       spansPnj.forEach(span => {
+           span.addEventListener("mouseenter", () => {
+               // Si un PNJ est survolé, on cache le joueur dont c'est le tour !
+               if (window.imageTourActive) window.imageTourActive.style.display = "none";
+           });
+           span.addEventListener("mouseleave", () => {
+               // Quand la souris quitte le PNJ, on remet le joueur actif (si le chat est bien ouvert)
+               const isChatOpen = document.getElementById("fenetre-chatbox")?.style.display === "flex";
+               if (window.imageTourActive && isChatOpen) window.imageTourActive.style.display = "block";
+           });
+       });
    });
    zone.scrollTop = zone.scrollHeight;
 }
@@ -2307,6 +2354,9 @@ window.fermerToutesLesFenetres = function() {
   const chatbox = document.getElementById('fenetre-chatbox');
   if (chatbox) chatbox.style.display = 'none';
 
+  // 🔻 NOUVELLE LIGNE : On détruit visuellement les portraits dès que le chat se ferme 🔻
+  document.querySelectorAll('.bulle-portrait-hover-joueur, .bulle-portrait-hover-mj').forEach(img => img.style.display = 'none');
+
   // Fermer les personnages
   const menuPerso = document.getElementById('conteneur-liste-personnages');
   if (menuPerso) {
@@ -2352,6 +2402,9 @@ window.ouvrirChatbox = function() {
 window.fermerChatbox = function() {
   const chatbox = document.getElementById('fenetre-chatbox');
   if (chatbox) chatbox.style.display = 'none';
+
+  // 🔻 NOUVELLE LIGNE : On détruit visuellement les portraits dès que le chat se ferme 🔻
+  document.querySelectorAll('.bulle-portrait-hover-joueur, .bulle-portrait-hover-mj').forEach(img => img.style.display = 'none');
 };
 
 // 3. Bouton Personnages

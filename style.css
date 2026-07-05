@@ -386,7 +386,7 @@ body, html {
   flex-direction: column;
   align-items: flex-end;
   gap: 1.5vh;
-  z-index: 1000; /* Forcé à 1000 pour passer par-dessus TOUS les overlays */
+  z-index: 9999; /* 🔻 CORRECTION : Assure le passage au-dessus des images 🔻 */
 }
 
 /* --- LES ICONES GLOBALES --- */
@@ -500,9 +500,7 @@ body, html {
   display: flex;
   flex-direction: row;
   gap: 0.8vw;
-  
-  /* C'EST ICI LA CORRECTION : On le force à passer au-dessus des autres menus */
-  z-index: 2000; 
+  z-index: 9999; /* 🔻 CORRECTION : Assure le passage au-dessus des images 🔻 */
 }
 
 .icone-nav {
@@ -873,6 +871,7 @@ textarea.input-texte-parchemin {
   display: flex;
   gap: 10px;
   height: 50px;
+  width: 70%; /* 🔻 CORRECTION : On raccourcit la zone pour libérer la droite 🔻 */
 }
 
 #input-chat {
@@ -893,6 +892,36 @@ textarea.input-texte-parchemin {
   border-radius: 10px;
   padding: 0 20px;
   cursor: pointer;
+}
+
+/* --- Le bouton Micro --- */
+#btn-micro {
+  background-color: #4a2e1b;
+  color: white;
+  border: 1px solid #5c3a21;
+  border-radius: 10px;
+  padding: 0 15px; /* Un peu plus carré car c'est une icône */
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#btn-micro:hover {
+  background-color: #5c3a21;
+  border-color: #00ffff;
+  box-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+  transform: scale(1.05); /* Petit effet de zoom sympa au survol */
+}
+
+/* On ajoute aussi le même effet de zoom au bouton Envoyer pour être raccord ! */
+#btn-envoyer-chat:hover {
+  background-color: #5c3a21;
+  border-color: #00ffff;
+  box-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+  transform: scale(1.05);
 }
 
 .btn-fermer-chat {
@@ -965,7 +994,7 @@ textarea.input-texte-parchemin {
   box-shadow: none;
   filter: drop-shadow(-5px 5px 15px rgba(0,0,0,0.8));
   pointer-events: none;
-  z-index: 9999; /* Force le passage par-dessus le menu latéral */
+  z-index: 80; /* 🔻 CORRECTION : z-index descendu à 80 🔻 */
 }
 
 /* 2. Le portrait du MJ (Petite carte à côté du chat) */
@@ -981,7 +1010,7 @@ textarea.input-texte-parchemin {
   border-radius: 8px;
   box-shadow: 0px 15px 30px rgba(0,0,0,1);
   pointer-events: none;
-  z-index: 200;
+  z-index: 80; /* 🔻 CORRECTION : z-index descendu à 80 🔻 */
 }
 
 /* =========================================
@@ -1091,9 +1120,9 @@ textarea.input-texte-parchemin {
 
 #bulle-lieu-actuel {
     position: absolute;
-    bottom: 58px; /* LIGNE MODIFIÉE : on descend la bulle pour l'aligner */
-    right: 20px;  /* NOUVEAU : On l'ancre fermement à droite */
-    left: auto;   /* Sécurité pour annuler l'ancienne position */
+    bottom: 75px; /* 🔻 CORRECTION : Flotte juste au-dessus de la zone de texte (50px + marge) 🔻 */
+    left: 65%;    /* 🔻 CORRECTION : Aligné au-dessus du micro (la zone texte fait 70%) 🔻 */
+    transform: translateX(-50%);
     background: linear-gradient(135deg, #4a2e1b, #2a1a0f);
     color: #e8d5a5;
     padding: 6px 15px;
@@ -1109,32 +1138,29 @@ textarea.input-texte-parchemin {
     justify-content: center;
 }
 
-/* Image cachée par défaut, s'affiche au survol */
-/* Image cachée par défaut, s'affiche au survol */
 #image-lieu-actuel {
     position: absolute;
     bottom: 45px; 
-    right: 0;      
-    left: auto;    
-    width: 1000px; /* NOUVEAU : Taille doublée (1000px au lieu de 500) */
-    max-width: 90vw; /* Sécurité pour ne pas déborder de l'écran */
+    left: 50%; /* 🔻 CORRECTION : L'image se centre par rapport à sa bulle 🔻 */
+    width: 1000px; 
+    max-width: 90vw; 
     height: auto;
-    max-height: 75vh; /* NOUVEAU : Laisse plus de place en hauteur */
+    max-height: 75vh; 
     object-fit: contain; 
     border-radius: 8px;
     border: 3px solid #8c6a45;
     box-shadow: 0 10px 40px rgba(0,0,0,0.9); 
     opacity: 0;
     pointer-events: none;
-    transform: translateY(15px) scale(0.95);
-    transform-origin: bottom right; 
+    transform: translateX(-50%) translateY(15px) scale(0.95);
+    transform-origin: bottom center; 
     transition: all 0.3s ease-out;
     z-index: 1001;
 }
 
 #bulle-lieu-actuel:hover #image-lieu-actuel {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateX(-50%) translateY(0) scale(1); /* 🔻 Suit le centrage au survol 🔻 */
 }
 
 /* ========================================================================= */
@@ -1203,8 +1229,8 @@ textarea.input-texte-parchemin {
     box-shadow: none;
     filter: drop-shadow(-5px 5px 15px rgba(0,0,0,0.8));
     pointer-events: none;
-    z-index: 9999; /* Par-dessus l'interface */
-    transform: none; /* Annule les anciens effets */
+    z-index: 80; /* 🔻 CORRECTION : z-index descendu à 80 🔻 */
+    transform: none; 
     opacity: 1;
 }
 
