@@ -1742,3 +1742,60 @@ textarea.input-texte-parchemin {
     letter-spacing: 1px;
     z-index: 3;
 }
+
+/* ========================================================================= */
+/* GESTION DU DECK (INTERFACE DE SÉLECTION)                                 */
+/* ========================================================================= */
+
+/* Le compteur collé en haut de l'onglet Cartes */
+#compteur-deck-sticky {
+    position: sticky;
+    top: -20px; /* Compense le padding de l'onglet */
+    z-index: 50;
+    background: rgba(232, 213, 165, 0.95); /* Couleur parchemin Ivalis */
+    backdrop-filter: blur(5px);
+    border-bottom: 3px solid #5c3a21;
+    padding: 12px 20px;
+    margin: -20px -20px 20px -20px; /* S'étire sur les bords de l'onglet */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+    font-family: 'Cinzel', serif !important;
+    font-size: 20px;
+    color: #2c1e16;
+    font-weight: bold;
+}
+
+/* L'effet de déplacement quand la carte est dans le deck */
+.banniere-carte.selectionnee {
+    transform: translateX(80px); /* 🔻 CORRECTION : Poussé à 80px au lieu de 45px 🔻 */
+}
+
+/* On s'assure que le survol d'une carte sélectionnée s'ajoute au décalage */
+.banniere-carte.selectionnee:hover {
+    transform: translateX(95px); /* 🔻 CORRECTION : Poussé à 95px au lieu de 60px 🔻 */
+    z-index: 100 !important;
+}
+
+/* Le petit message immersif d'erreur (trop de cartes) */
+#erreur-deck-immersif {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(40, 10, 10, 0.95);
+    color: #e8d5a5;
+    padding: 20px 40px;
+    border: 2px solid #ff4c4c;
+    border-radius: 12px;
+    font-weight: bold;
+    font-size: 22px;
+    text-shadow: 0 0 10px red;
+    box-shadow: 0 0 40px rgba(255, 0, 0, 0.9);
+    z-index: 2000;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    white-space: nowrap;
+}
