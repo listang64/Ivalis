@@ -338,7 +338,7 @@ body, html {
   position: fixed;
   top: 0; left: 0;
   width: 100vw; height: 100vh;
-  background-color: #F5F5DC;
+  /* background-color: #F5F5DC; 🔻 CORRECTION : On supprime cette ligne qui cachait la carte 🔻 */
   z-index: 20;
   overflow: hidden;
 }
@@ -351,7 +351,7 @@ body, html {
   top: 0; left: 0;
   width: 100vw; height: 100vh;
   overflow: hidden; 
-  z-index: -1; 
+  z-index: 0; /* 🔻 CORRECTION : On passe de -1 à 0 pour qu'il reste au niveau du sol 🔻 */
   /* NOUVEAU : Le fond crème fidèle au thème d'Ivalis */
   background-color: #F5F5DC;
 }
