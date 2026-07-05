@@ -2359,8 +2359,15 @@ window.fermerToutesLesFenetres = function() {
   const chatbox = document.getElementById('fenetre-chatbox');
   if (chatbox) chatbox.style.display = 'none';
 
-  // 🔻 NOUVELLE LIGNE : On détruit visuellement les portraits dès que le chat se ferme 🔻
   document.querySelectorAll('.bulle-portrait-hover-joueur, .bulle-portrait-hover-mj').forEach(img => img.style.display = 'none');
+
+  // 🔻 NOUVEAU : Restaurer les menus par défaut quand on ferme le chat 🔻
+  const menuLat = document.getElementById('menu-lateral');
+  const menuNav = document.getElementById('menu-navigation-bas');
+  const btnFermerChat = document.getElementById('btn-fermer-chat-nouveau');
+  if (menuLat) menuLat.style.display = 'flex';
+  if (menuNav) menuNav.style.display = 'flex';
+  if (btnFermerChat) btnFermerChat.style.display = 'none';
 
   // Fermer les personnages
   const menuPerso = document.getElementById('conteneur-liste-personnages');
@@ -2397,7 +2404,15 @@ window.ouvrirChatbox = function() {
 
   if (!estDejaOuvert) {
     chatbox.style.display = 'flex';
-    // CORRECTION : On demande à l'application de récupérer les personnages pour les bulles !
+
+    // 🔻 NOUVEAU : Cacher les menus pour libérer l'écran et afficher le bouton de retour 🔻
+    const menuLat = document.getElementById('menu-lateral');
+    const menuNav = document.getElementById('menu-navigation-bas');
+    const btnFermerChat = document.getElementById('btn-fermer-chat-nouveau');
+    if (menuLat) menuLat.style.display = 'none';
+    if (menuNav) menuNav.style.display = 'none';
+    if (btnFermerChat) btnFermerChat.style.display = 'block';
+
     if (window.ID_PARTIE_COURANTE) {
       ecouterPersonnagesDeLaPartie(window.ID_PARTIE_COURANTE);
     }
@@ -2405,11 +2420,30 @@ window.ouvrirChatbox = function() {
 };
 
 window.fermerChatbox = function() {
-  const chatbox = document.getElementById('fenetre-chatbox');
-  if (chatbox) chatbox.style.display = 'none';
+  // On joue le bruit du parchemin avant de fermer
+  if (typeof window.jouerSonSurvolParchemin === "function") {
+      window.jouerSonSurvolParchemin();
+  }
+  
+  // Puis on ferme l'interface du chat pour restaurer la carte
+  window.fermerToutesLesFenetres();
+};
 
-  // 🔻 NOUVELLE LIGNE : On détruit visuellement les portraits dès que le chat se ferme 🔻
-  document.querySelectorAll('.bulle-portrait-hover-joueur, .bulle-portrait-hover-mj').forEach(img => img.style.display = 'none');
+window.afficherMenusDansChat = function() {
+  // 1. On joue le bruit du parchemin
+  if (typeof window.jouerSonSurvolParchemin === "function") {
+      window.jouerSonSurvolParchemin();
+  }
+  
+  // 2. On fait réapparaître les menus sans toucher au chat
+  const menuLat = document.getElementById('menu-lateral');
+  const menuNav = document.getElementById('menu-navigation-bas');
+  if (menuLat) menuLat.style.display = 'flex';
+  if (menuNav) menuNav.style.display = 'flex';
+  
+  // 3. On cache ce bouton puisqu'il a fait son travail
+  const btnActuel = document.getElementById('btn-fermer-chat-nouveau');
+  if (btnActuel) btnActuel.style.display = 'none';
 };
 
 // 3. Bouton Personnages
@@ -3660,6 +3694,7 @@ Object.assign(window, {
   ouvrirModalChargerPartie, demanderMdpPartie, validerMdpPartie,
   // Ecran de jeu
   jouerSonSurvolParchemin, toggleBulleVolume,
+  afficherMenusDansChat: window.afficherMenusDansChat,
   fermerModalesJeu, demanderRetourMenu, demanderQuitterJeu,
   confirmerRetourMenu, confirmerQuitterJeu, recadrerCarte,
   // Parametres / Cerveau IA
