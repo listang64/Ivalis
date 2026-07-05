@@ -520,7 +520,9 @@ Si oui, utilise l'outil 'creerNouveauxPNJ' pour générer leurs fiches.
 RÈGLES STRICTES ET ABSOLUES :
 1. IGNORE TOUS LES PERSONNAGES désignés par un titre, une profession, une description ou un surnom générique (ex: "un garde", "le tavernier", "le colosse", "le vieux", "l'homme").
 2. S'il n'a pas de VRAI PRÉNOM avec une majuscule explicite, TU NE CRÉES RIEN.
-3. NE CRÉE ABSOLUMENT JAMAIS de fiche pour les Héros de la partie.`;
+3. NE CRÉE ABSOLUMENT JAMAIS de fiche pour les Héros de la partie.
+
+Assure-toi que tous les éléments de la fiche sont cohérents entre eux et adaptés à l'univers.`;
 
     const outils = [{
         functionDeclarations: [{
@@ -551,13 +553,18 @@ RÈGLES STRICTES ET ABSOLUES :
         }]
     }];
 
+    // 🔻 NOUVEAU : Température dynamique et indépendante pour MIA_PNJ
+    const temperatureAleatoire = parseFloat((Math.random() * (1.20 - 0.80) + 0.80).toFixed(2));
+    console.log(`[MIA_PNJ] 🎲 Température créative du casting : ${temperatureAleatoire}`);
+
     try {
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 systemInstruction: { parts: [{ text: promptSysteme }] },
                 contents: [{ role: "user", parts: [{ text: texteMJ }] }],
-                tools: outils, toolConfig: { functionCallingConfig: { mode: "AUTO" } }
+                tools: outils, toolConfig: { functionCallingConfig: { mode: "AUTO" } },
+                generationConfig: { temperature: temperatureAleatoire } // 🔻 INJECTION DE LA TEMPÉRATURE ICI 🔻
             })
         });
 
