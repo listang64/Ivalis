@@ -504,30 +504,84 @@ async function genererEtStockerImagePNJ(descriptionPhysique) {
     return urlSecurisee || "";
 }
 
+// =========================================================================
+//  MIA_PNJ (Création procédurale de PNJ nommés avec Détourage)
+// =========================================================================
+
 async function analyserNouveauxPNJ(idLieuActuel, nomsPnjExistants, nomsHeros, texteMJ) {
     const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
-    let listePNJCrees = []; // 🔻 NOUVEAU
+    let listePNJCrees = []; 
     
     if (!cleGemini || !idLieuActuel) return listePNJCrees;
 
-    const promptSysteme = `Tu es MIA_PNJ, l'IA de casting.
-Voici les PNJ que nous connaissons DÉJÀ ici : ${JSON.stringify(nomsPnjExistants)}.
-Voici les HÉROS (Personnages des joueurs) de l'histoire : ${JSON.stringify(nomsHeros)}.
+    // =========================================================
+    // ÉTAPE 1 : LE DÉTECTEUR (Froid, Rapide et Précis à 0.0)
+    // =========================================================
+    const promptDetection = `Tu es l'IA de casting d'Ivalis.
+Voici les personnages DEJA connus : ${JSON.stringify(nomsPnjExistants)}.
+Voici les Héros : ${JSON.stringify(nomsHeros)}.
 
-Ta mission : Y a-t-il de NOUVEAUX personnages expressément NOMMÉS (qui possèdent un VRAI prénom propre, comme 'Gédéon', 'Rose', 'Thorne') qui viennent d'apparaître, qui ne sont pas dans la liste des connus, ET QUI NE SONT PAS DES HÉROS ?
-Si oui, utilise l'outil 'creerNouveauxPNJ' pour générer leurs fiches.
+Lis le texte du Maître du Jeu. Y a-t-il de NOUVEAUX personnages expressément NOMMÉS (VRAI prénom) qui viennent d'apparaître ?
+Règles : Ignore les descriptions génériques ("un garde", "le tavernier"). Ne liste JAMAIS les Héros.
+Si oui, utilise l'outil 'signalerNoms' pour lister leurs prénoms. Sinon, liste vide.`;
 
-RÈGLES STRICTES ET ABSOLUES :
-1. IGNORE TOUS LES PERSONNAGES désignés par un titre, une profession, une description ou un surnom générique (ex: "un garde", "le tavernier", "le colosse", "le vieux", "l'homme").
-2. S'il n'a pas de VRAI PRÉNOM avec une majuscule explicite, TU NE CRÉES RIEN.
-3. NE CRÉE ABSOLUMENT JAMAIS de fiche pour les Héros de la partie.
+    const outilsDetection = [{
+        functionDeclarations: [{
+            name: "signalerNoms",
+            description: "Liste les prénoms des nouveaux PNJ détectés.",
+            parameters: {
+                type: "OBJECT",
+                properties: { noms: { type: "ARRAY", items: { type: "STRING" } } },
+                required: ["noms"]
+            }
+        }]
+    }];
 
-Assure-toi que tous les éléments de la fiche sont cohérents entre eux et adaptés à l'univers.`;
+    let nouveauxNomsDetectes = [];
 
-    const outils = [{
+    try {
+        const resDet = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                systemInstruction: { parts: [{ text: promptDetection }] },
+                contents: [{ role: "user", parts: [{ text: texteMJ }] }],
+                tools: outilsDetection, 
+                toolConfig: { functionCallingConfig: { mode: "AUTO" } },
+                generationConfig: { temperature: 0.0 } // 🔻 Température FROIDE pour la détection
+            })
+        });
+
+        const dataDet = await resDet.json();
+        const appelsDet = dataDet.candidates?.[0]?.content?.parts?.filter(p => p.functionCall).map(p => p.functionCall);
+        
+        if (appelsDet && appelsDet.length > 0 && appelsDet[0].name === "signalerNoms") {
+            nouveauxNomsDetectes = appelsDet[0].args.noms || [];
+        }
+    } catch (e) { console.error("Erreur Détection PNJ:", e); return listePNJCrees; }
+
+    // Filtrage de sécurité (au cas où il remet un héros ou un PNJ déjà connu)
+    nouveauxNomsDetectes = nouveauxNomsDetectes.filter(nom => !nomsHeros.includes(nom) && !nomsPnjExistants.includes(nom));
+
+    // 🛑 SI AUCUN NOUVEAU PNJ N'EST DÉTECTÉ, ON S'ARRÊTE ICI ! 🛑
+    if (nouveauxNomsDetectes.length === 0) {
+        return listePNJCrees;
+    }
+
+    // =========================================================
+    // ÉTAPE 2 : LE CRÉATEUR (Chaud, Aléatoire et Créatif)
+    // =========================================================
+    const temperatureAleatoire = parseFloat((Math.random() * (1.20 - 0.80) + 0.80).toFixed(2));
+    console.log(`[MIA_PNJ] 🎲 ${nouveauxNomsDetectes.length} nouveau(x) PNJ détecté(s) ! Forge créative à ${temperatureAleatoire}°C...`);
+
+    const promptCreation = `Tu es MIA_PNJ, le forgeron d'âmes.
+Tu dois inventer les fiches détaillées de ces nouveaux personnages : ${JSON.stringify(nouveauxNomsDetectes)}.
+Assure-toi que tous les éléments de la fiche sont cohérents entre eux et adaptés à l'univers Heroic Fantasy.
+Utilise l'outil 'creerNouveauxPNJ' pour générer leurs fiches.`;
+
+    const outilsCreation = [{
         functionDeclarations: [{
             name: "creerNouveauxPNJ",
-            description: "Créer les fiches des NOUVEAUX PNJ nommés dans la narration.",
+            description: "Créer les fiches des NOUVEAUX PNJ.",
             parameters: {
                 type: "OBJECT",
                 properties: {
@@ -553,26 +607,23 @@ Assure-toi que tous les éléments de la fiche sont cohérents entre eux et adap
         }]
     }];
 
-    // 🔻 NOUVEAU : Température dynamique et indépendante pour MIA_PNJ
-    const temperatureAleatoire = parseFloat((Math.random() * (1.20 - 0.80) + 0.80).toFixed(2));
-    console.log(`[MIA_PNJ] 🎲 Température créative du casting : ${temperatureAleatoire}`);
-
     try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
+        const resCrea = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                systemInstruction: { parts: [{ text: promptSysteme }] },
+                systemInstruction: { parts: [{ text: promptCreation }] },
                 contents: [{ role: "user", parts: [{ text: texteMJ }] }],
-                tools: outils, toolConfig: { functionCallingConfig: { mode: "AUTO" } },
-                generationConfig: { temperature: temperatureAleatoire } // 🔻 INJECTION DE LA TEMPÉRATURE ICI 🔻
+                tools: outilsCreation, 
+                toolConfig: { functionCallingConfig: { mode: "ANY" } }, // ANY force l'IA à utiliser l'outil
+                generationConfig: { temperature: temperatureAleatoire } // 🔻 Température ALÉATOIRE
             })
         });
 
-        const data = await res.json();
-        const appelsOutils = data.candidates?.[0]?.content?.parts?.filter(p => p.functionCall).map(p => p.functionCall);
+        const dataCrea = await resCrea.json();
+        const appelsCrea = dataCrea.candidates?.[0]?.content?.parts?.filter(p => p.functionCall).map(p => p.functionCall);
         
-        if (appelsOutils && appelsOutils.length > 0 && appelsOutils[0].name === "creerNouveauxPNJ") {
-            const nouveauxPNJs = appelsOutils[0].args.pnjs || [];
+        if (appelsCrea && appelsCrea.length > 0 && appelsCrea[0].name === "creerNouveauxPNJ") {
+            const nouveauxPNJs = appelsCrea[0].args.pnjs || [];
             
             for (const pnj of nouveauxPNJs) {
                 if (nomsHeros.includes(pnj.nom)) continue; 
@@ -581,6 +632,7 @@ Assure-toi que tous les éléments de la fiche sont cohérents entre eux et adap
                 const nomFormate = pnj.nom.replace(/[^a-zA-Z0-9]/g, "_");
                 const docId = `PNJ_${numAleatoire}_${nomFormate}`;
                 let idLieuGlobal = ""; let idBatimentGlobal = "";
+                
                 if (idLieuActuel.startsWith("L")) idLieuGlobal = idLieuActuel;
                 else if (idLieuActuel.startsWith("B")) {
                     idBatimentGlobal = idLieuActuel;
@@ -605,13 +657,12 @@ Assure-toi que tous les éléments de la fiche sont cohérents entre eux et adap
                     await updateDoc(doc(db, "Monde_PNJ", docId), { URL_Cloudinary: urlImage });
                 }
                 
-                // 🔻 NOUVEAU : On sauvegarde ce PNJ pour pouvoir afficher son visage tout de suite !
                 listePNJCrees.push({ Nom_PNJ: pnj.nom, URL_Cloudinary: urlImage });
             }
         }
-    } catch (e) {}
+    } catch (e) { console.error("Erreur Création PNJ:", e); }
     
-    return listePNJCrees; // 🔻 NOUVEAU
+    return listePNJCrees; 
 }
 
 // =========================================================================
