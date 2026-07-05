@@ -1880,10 +1880,15 @@ async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPers
     btnSauvegarder.style.pointerEvents = "auto";
   }
 
-  // --- NOUVEAU : On force l'ouverture sur l'onglet Caractéristiques ---
-  const btnCaracs = document.querySelector("button[onclick*='onglet-caracs']");
-  if (btnCaracs) {
-    changerOngletPerso({ currentTarget: btnCaracs }, 'onglet-caracs');
+  // --- CORRECTION : Ouverture intelligente de l'onglet par défaut ---
+  if (idPersonnage) {
+    // Personnage existant : on ouvre direct sur les Caractéristiques pour le jeu
+    const btnCaracs = document.querySelector("button[onclick*='onglet-caracs']");
+    if (btnCaracs) changerOngletPerso({ currentTarget: btnCaracs }, 'onglet-caracs');
+  } else {
+    // Nouveau Personnage : on force l'ouverture sur le Descriptif pour la création
+    const btnDescriptif = document.querySelector("button[onclick*='onglet-descriptif']");
+    if (btnDescriptif) changerOngletPerso({ currentTarget: btnDescriptif }, 'onglet-descriptif');
   }
 
   // --- NOUVEAU : Charger les caractéristiques ---

@@ -317,7 +317,8 @@ window.genererDeckComplet = function(profilJson, statsPerso = null) {
     let compteurs = { burns: 0, elementsCrees: 0, elementsConsommes: 0, invocations: 0, executions: 0, actionsCrees: 0 };
     let elemDeck = profilJson.Elements?.Genere?.[0] || ELEMENTS_LISTE[Math.floor(Math.random() * ELEMENTS_LISTE.length)];
 
-    for (let i = 0; i < 11; i++) {
+    // 🔻 MODIFICATION : On crée 12 squelettes au lieu de 11
+    for (let i = 0; i < 12; i++) {
         deck.push({
             id: "CARTE_" + (i + 1),
             initiative: Math.floor(Math.random() * 85) + 10,
@@ -327,19 +328,20 @@ window.genererDeckComplet = function(profilJson, statsPerso = null) {
     }
 
     // --- CONSTRUCTION DU BAS (Bottoms) ---
-    // On génère le Bas en premier sans interdiction d'élément.
     deck[0].bas = forgerAction("Pillage", profilJson, compteurs, false, elemDeck, "", statsPerso); 
     deck[1].bas = forgerAction("Pillage", profilJson, compteurs, false, elemDeck, "", statsPerso); 
     for (let i = 2; i < 8; i++) deck[i].bas = forgerAction("Mobilite", profilJson, compteurs, false, elemDeck, "", statsPerso); 
-    for (let i = 8; i < 11; i++) deck[i].bas = forgerAction(null, profilJson, compteurs, false, elemDeck, "", statsPerso); 
+    
+    // 🔻 MODIFICATION : La boucle va jusqu'à 12 (ce qui ajoute une action basique de plus)
+    for (let i = 8; i < 12; i++) deck[i].bas = forgerAction(null, profilJson, compteurs, false, elemDeck, "", statsPerso); 
 
     // --- CONSTRUCTION DU HAUT (Tops) ---
-    // SÉCURITÉ ANTI-CLONE : On passe l'élément créé en Bas comme 'elementInterdit' pour le Haut !
     deck[0].haut = forgerAction("Soin", profilJson, compteurs, false, elemDeck, deck[0].bas.element, statsPerso); 
     
-    for (let i = 1; i < 11; i++) {
+    // 🔻 MODIFICATION : La boucle de forge du haut va jusqu'à 12
+    for (let i = 1; i < 12; i++) {
         let forcerEpique = (i === 1 || i === 2 || i === 3); 
-        let elementInterditDuBas = deck[i].bas.element; // On regarde ce qu'a généré l'action du bas de cette carte
+        let elementInterditDuBas = deck[i].bas.element; 
         deck[i].haut = forgerAction(null, profilJson, compteurs, forcerEpique, elemDeck, elementInterditDuBas, statsPerso); 
     }
 
@@ -406,7 +408,7 @@ async function nommerCartesDeck(deckProcedural, texteRP, theme) {
     }));
 
     const promptSysteme = `Tu es le Concepteur Narratif du jeu de plateau tactique Ivalis. 
-Ta mission est de donner un Titre épique et thématique à chacune des 11 cartes d'un deck de joueur.
+Ta mission est de donner un Titre épique et thématique à chacune des 12 cartes d'un deck de joueur.
 
 CONTEXTE DU HÉROS :
 Thème : ${theme}
@@ -422,7 +424,7 @@ FORMAT JSON ATTENDU :
   "noms_cartes": [
     { "id": "CARTE_1", "titre": "Nom Épique 1" },
     { "id": "CARTE_2", "titre": "Nom Épique 2" }
-    // ... jusqu'à CARTE_11
+    // ... jusqu'à CARTE_12
   ]
 }`;
 
