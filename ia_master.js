@@ -3,7 +3,7 @@
 // =========================================================================
 
 import { db } from "./firebase-config.js";
-import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // --- 1. LE BACKEND (Le radar qui scanne la zone avant l'IA) ---
 
@@ -1702,36 +1702,43 @@ Si un PNJ n'a absolument pas interagi ou n'a pas du tout été concerné par les
             }
         }
 
-        // 5. Autodestruction du chat
-        console.log("🧹 [Nettoyage] Suppression de l'historique du chat...");
+        // 5. Autodestruction du chat (EN LOT)
+        console.log("🧹 [Nettoyage] Suppression de l'historique du chat en lot...");
+        const batchChat = writeBatch(db); // On prépare le lot
         for (const m of messages) {
-            await deleteDoc(doc(db, "Messages_Chat", m.id));
+            batchChat.delete(doc(db, "Messages_Chat", m.id)); // On empile les suppressions
         }
+        await batchChat.commit(); // On envoie le lot en une seule fois !
 
         // =========================================================================
-        // --- NOUVEAU : 6. LE CIMETIÈRE (Nettoyage des PNJ morts) ---
+        // --- 6. LE CIMETIÈRE (Nettoyage des PNJ morts EN LOT) ---
         // =========================================================================
         console.log("💀 [Cimetière] Recherche des corps à incinérer...");
         
-        // On récupère tous les PNJ de la base de données
         const qTousLesPnj = query(collection(db, "Monde_PNJ"));
         const snapTousLesPnj = await getDocs(qTousLesPnj);
+        const batchCimetiere = writeBatch(db);
+        let aIncinere = false;
         
         for (const docPnj of snapTousLesPnj.docs) {
             const dataPnj = docPnj.data();
             
-            // Si le PNJ n'est pas "Vivant" (Mort, Disparu, etc.)
             if (dataPnj.Statut !== "Vivant") {
                 console.log(`[Cimetière] Effacement total de : ${dataPnj.Nom_PNJ}`);
                 
-                // 1. Suppression de l'image sur Cloudinary (la fonction existe déjà !)
+                // L'image doit toujours être supprimée une par une car Cloudinary ne prend pas de lot
                 if (dataPnj.URL_Cloudinary && dataPnj.URL_Cloudinary !== "") {
                     await supprimerImageCloudinary(dataPnj.URL_Cloudinary);
                 }
                 
-                // 2. Effacement définitif du PNJ de la base Firestore
-                await deleteDoc(doc(db, "Monde_PNJ", docPnj.id));
+                batchCimetiere.delete(doc(db, "Monde_PNJ", docPnj.id)); // On ajoute au lot
+                aIncinere = true;
             }
+        }
+        
+        if (aIncinere) {
+            await batchCimetiere.commit(); // On purge toute la base d'un coup
+            console.log("💀 [Cimetière] Incinération terminée.");
         }
         // =========================================================================
 

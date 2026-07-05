@@ -27,8 +27,10 @@ import {
   addDoc,
   query,
   where,
+  orderBy,
   onSnapshot,
-  deleteField
+  deleteField,
+  writeBatch
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // =========================================================================
@@ -925,39 +927,43 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
   });
 
   // B. Écoute de l'historique du Chat
-  const qMsg = query(collection(db, COL.MESSAGES), where("ID_Partie", "==", idPartie));
+  const qMsg = query(collection(db, COL.MESSAGES), where("ID_Partie", "==", idPartie), orderBy("Timestamp", "asc"));
   
-  // NOUVEAU : Variables pour empêcher le déclenchement du récit au chargement initial
   window.INITIAL_CHAT_LOADED = false;
   let timestampChargement = new Date().getTime();
 
-  window.unsubscribeMessages = onSnapshot(qMsg, (snap) => {
-      let msgs = [];
-      let recitDeclenche = null; // Contiendra le texte si on doit lancer le Visual Novel
+  // 🔻 NOUVEAU : On vide le chat au premier chargement de la partie
+  const zoneChat = document.getElementById("zone-messages-chat");
+  if (zoneChat) zoneChat.innerHTML = "";
 
-      // 1. On analyse les changements pour détecter un NOUVEAU message du MJ
+  window.unsubscribeMessages = onSnapshot(qMsg, (snap) => {
+      let recitDeclenche = null; 
+
+      // On analyse chirurgicalement chaque changement (Ajout ou Suppression)
       snap.docChanges().forEach(change => {
+          let data = change.doc.data();
+          data.idDoc = change.doc.id; // On récupère l'ID exact de Firebase
+
           if (change.type === "added") {
-              let data = change.doc.data();
-              // Si le chat est déjà chargé ET que c'est un message très récent ET qu'il est marqué comme Narration IA
               if (window.INITIAL_CHAT_LOADED && data.Est_Narration_IA && data.Timestamp >= (timestampChargement - 1000)) {
                   recitDeclenche = data.Texte;
               }
+              // 🔻 NOUVEAU : On injecte uniquement ce nouveau message !
+              ajouterUnSeulMessageChat(data);
+          }
+          
+          if (change.type === "removed") {
+              // 🔻 NOUVEAU : On détruit uniquement le message effacé !
+              const msgDiv = document.getElementById("msg-" + data.idDoc);
+              if (msgDiv) msgDiv.remove();
           }
       });
 
-      // 2. On reconstruit l'affichage du chat normal
-      snap.forEach(document => {
-          let data = document.data();
-          data.idDoc = document.id;
-          msgs.push(data);
-      });
-      
-      msgs.sort((a, b) => a.Timestamp - b.Timestamp);
-      dessinerMessagesChat(msgs);
       window.INITIAL_CHAT_LOADED = true;
 
-      // 3. SI un récit a été détecté, on lance l'écran géant pour le joueur !
+      // On descend l'ascenseur du chat s'il y a eu une modification
+      if (zoneChat) zoneChat.scrollTop = zoneChat.scrollHeight;
+
       if (recitDeclenche && typeof window.lancerRecitDynamique === "function") {
           window.lancerRecitDynamique(recitDeclenche);
       }
@@ -1125,62 +1131,56 @@ function afficherBullesPersonnages(persos) {
   window.imageTourActive = imageActive;
 }
 
-// 3. Rendu visuel dans le chat (avec injection de couleur pour le biseau)
-function dessinerMessagesChat(msgs) {
+// 3. Rendu visuel dans le chat (Injection chirurgicale optimisée)
+function ajouterUnSeulMessageChat(m) {
    const zone = document.getElementById("zone-messages-chat");
    if (!zone) return;
-   zone.innerHTML = "";
+   
+   // Sécurité anti-doublon (au cas où)
+   if (document.getElementById("msg-" + m.idDoc)) return;
 
-   msgs.forEach(m => {
-       const div = document.createElement("div");
-       div.className = "message-chat";
-       
-       // On donne la couleur du perso au bloc entier pour que le biseau (CSS ::after) l'utilise
-       div.style.setProperty("--couleur-perso", m.Auteur_Couleur);
+   const div = document.createElement("div");
+   div.id = "msg-" + m.idDoc; // 🔻 INDISPENSABLE pour pouvoir le supprimer plus tard 🔻
+   div.className = "message-chat";
+   div.style.setProperty("--couleur-perso", m.Auteur_Couleur);
 
-       const nom = document.createElement("div");
-       nom.className = "message-nom-vertical";
-       nom.innerText = m.Auteur_Nom;
+   const nom = document.createElement("div");
+   nom.className = "message-nom-vertical";
+   nom.innerText = m.Auteur_Nom;
 
-       const ligne = document.createElement("div");
-       ligne.className = "message-separateur";
+   const ligne = document.createElement("div");
+   ligne.className = "message-separateur";
 
-       const texte = document.createElement("div");
-       texte.className = "message-contenu";
-       texte.innerHTML = m.Texte;
+   const texte = document.createElement("div");
+   texte.className = "message-contenu";
+   texte.innerHTML = m.Texte;
 
-       // La petite croix de suppression rouge
-       const btnSuppr = document.createElement("button");
-       btnSuppr.className = "btn-supprimer-msg";
-       btnSuppr.innerText = "✖";
-       btnSuppr.onclick = async function() {
-           if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-           await deleteDoc(doc(db, COL.MESSAGES, m.idDoc)); // Destruction en BDD !
-       };
+   const btnSuppr = document.createElement("button");
+   btnSuppr.className = "btn-supprimer-msg";
+   btnSuppr.innerText = "✖";
+   btnSuppr.onclick = async function() {
+       if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+       // Cela déclenchera le change.type === "removed" chez tous les joueurs instantanément !
+       await deleteDoc(doc(db, COL.MESSAGES, m.idDoc)); 
+   };
 
-       div.appendChild(nom);
-       div.appendChild(ligne);
-       div.appendChild(texte);
-       div.appendChild(btnSuppr);
-       zone.appendChild(div);
+   div.appendChild(nom);
+   div.appendChild(ligne);
+   div.appendChild(texte);
+   div.appendChild(btnSuppr);
+   zone.appendChild(div);
 
-       // =======================================================
-       // NOUVEAU : DÉTECTION DU SURVOL DES PNJ DANS LE TEXTE
-       // =======================================================
-       const spansPnj = div.querySelectorAll(".pnj-chat-hover");
-       spansPnj.forEach(span => {
-           span.addEventListener("mouseenter", () => {
-               // Si un PNJ est survolé, on cache le joueur dont c'est le tour !
-               if (window.imageTourActive) window.imageTourActive.style.display = "none";
-           });
-           span.addEventListener("mouseleave", () => {
-               // Quand la souris quitte le PNJ, on remet le joueur actif (si le chat est bien ouvert)
-               const isChatOpen = document.getElementById("fenetre-chatbox")?.style.display === "flex";
-               if (window.imageTourActive && isChatOpen) window.imageTourActive.style.display = "block";
-           });
+   // DÉTECTION DU SURVOL DES PNJ
+   const spansPnj = div.querySelectorAll(".pnj-chat-hover");
+   spansPnj.forEach(span => {
+       span.addEventListener("mouseenter", () => {
+           if (window.imageTourActive) window.imageTourActive.style.display = "none";
+       });
+       span.addEventListener("mouseleave", () => {
+           const isChatOpen = document.getElementById("fenetre-chatbox")?.style.display === "flex";
+           if (window.imageTourActive && isChatOpen) window.imageTourActive.style.display = "block";
        });
    });
-   zone.scrollTop = zone.scrollHeight;
 }
 
 // 4. Mélange aléatoire
