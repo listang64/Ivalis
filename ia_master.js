@@ -430,7 +430,7 @@ async function genererEtStockerImagePNJ(descriptionPhysique) {
         "Le personnage doit être vu de trois quart, regardant vers la gauche, cadré en plan américain (coupé aux genoux). Ne dessine aucun texte.";
 
     // LE PAYLOAD (gpt-image-2 + PNG)
-    const payloadOpenAI = { model: "gpt-image-2", prompt: promptOpenAI, output_format: "png", n: 1, size: "1024x1792", quality: "low", moderation: "low" };
+    const payloadOpenAI = { model: "gpt-image-2", prompt: promptOpenAI, output_format: "png", n: 1, size: "1024x1792", quality: "medium", moderation: "low" };
 
     let tentative = 0, succes = false, texteReponseOpenAI = "";
     const delais = [5000, 15000, 30000];
@@ -535,7 +535,10 @@ RÈGLES STRICTES ET ABSOLUES :
                             type: "OBJECT",
                             properties: {
                                 nom: { type: "STRING" },
-                                physique: { type: "STRING", description: "Sexe, Âge, Morphologie, Visage, Tenue, Signes distinctifs" },
+                                physique: { 
+                                    type: "STRING", 
+                                    description: "Description focalisée sur le haut du corps : Sexe, Âge, Visage détaillé, Coiffure, Expression, Haut de la tenue (textures et couleurs), Armes ou objets portés à la ceinture ou dans le dos. Expression, Vêtements (préciser les matières comme le cuir ou l'acier et les couleurs dominantes), Accessoires, Signes distinctifs (cicatrices, tatouages, bijoux, accessoires)." 
+                                },
                                 occupation: { type: "STRING" },
                                 race: { type: "STRING" },
                                 secret: { type: "STRING" },
