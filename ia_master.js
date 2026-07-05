@@ -506,7 +506,9 @@ async function genererEtStockerImagePNJ(descriptionPhysique) {
 
 async function analyserNouveauxPNJ(idLieuActuel, nomsPnjExistants, nomsHeros, texteMJ) {
     const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
-    if (!cleGemini || !idLieuActuel) return;
+    let listePNJCrees = []; // 🔻 NOUVEAU
+    
+    if (!cleGemini || !idLieuActuel) return listePNJCrees;
 
     const promptSysteme = `Tu es MIA_PNJ, l'IA de casting.
 Voici les PNJ que nous connaissons DÉJÀ ici : ${JSON.stringify(nomsPnjExistants)}.
@@ -532,18 +534,16 @@ RÈGLES STRICTES ET ABSOLUES :
                         items: {
                             type: "OBJECT",
                             properties: {
-                                nom: { type: "STRING", description: "Le nom exact utilisé par le MJ" },
-                                physique: { type: "STRING", description: "Description visuelle EXTRÊMEMENT détaillée (destinée à un dessinateur). Tu DOIS obligatoirement décrire ces 5 points : 1. Sexe et Âge approximatif. 2. Morphologie (taille, corpulence, posture). 3. Visage (traits, yeux, coupe et couleur de cheveux, pilosité, expression faciale). 4. Tenue vestimentaire très détaillée (style, usure, couleurs dominantes, armes ou équipement visible). 5. Signes distinctifs évidents (tatouages, cicatrices, accessoires, ou écrire explicitement 'Aucun signe distinctif')." },
-                                occupation: { type: "STRING", description: "Son métier ou occupation" },
-                                race: { type: "STRING", description: "Sa race (Humain, Nain, etc.)" },
-                                secret: { type: "STRING", description: "Un secret inavouable ou motivation cachée" },
-                                style_parole: { type: "STRING", description: "Son accent ou sa manière de parler" }
-                            },
-                            required: ["nom", "physique", "occupation", "race", "secret", "style_parole"]
+                                nom: { type: "STRING" },
+                                physique: { type: "STRING", description: "Sexe, Âge, Morphologie, Visage, Tenue, Signes distinctifs" },
+                                occupation: { type: "STRING" },
+                                race: { type: "STRING" },
+                                secret: { type: "STRING" },
+                                style_parole: { type: "STRING" }
+                            }, required: ["nom", "physique", "occupation", "race", "secret", "style_parole"]
                         }
                     }
-                },
-                required: ["pnjs"]
+                }, required: ["pnjs"]
             }
         }]
     }];
@@ -554,8 +554,7 @@ RÈGLES STRICTES ET ABSOLUES :
             body: JSON.stringify({
                 systemInstruction: { parts: [{ text: promptSysteme }] },
                 contents: [{ role: "user", parts: [{ text: texteMJ }] }],
-                tools: outils, 
-                toolConfig: { functionCallingConfig: { mode: "AUTO" } }
+                tools: outils, toolConfig: { functionCallingConfig: { mode: "AUTO" } }
             })
         });
 
@@ -566,65 +565,43 @@ RÈGLES STRICTES ET ABSOLUES :
             const nouveauxPNJs = appelsOutils[0].args.pnjs || [];
             
             for (const pnj of nouveauxPNJs) {
-                // Sécurité Ultime : on vérifie en Javascript si l'IA n'a pas quand même essayé de créer un Héros
-                if (nomsHeros.includes(pnj.nom)) {
-                    console.log(`[MIA_PNJ] 🛡️ Rejet : Tentative de création du héros ${pnj.nom} bloquée.`);
-                    continue; 
-                }
+                if (nomsHeros.includes(pnj.nom)) continue; 
 
-                console.log(`[MIA_PNJ] 👤 Création d'un nouveau PNJ en base : ${pnj.nom}`);
-                
                 const numAleatoire = Math.floor(Math.random() * 10000).toString().padStart(4, "0");
                 const nomFormate = pnj.nom.replace(/[^a-zA-Z0-9]/g, "_");
                 const docId = `PNJ_${numAleatoire}_${nomFormate}`;
-
-                let idLieuGlobal = "";
-                let idBatimentGlobal = "";
-                if (idLieuActuel.startsWith("L")) {
-                    idLieuGlobal = idLieuActuel;
-                } else if (idLieuActuel.startsWith("B")) {
+                let idLieuGlobal = ""; let idBatimentGlobal = "";
+                if (idLieuActuel.startsWith("L")) idLieuGlobal = idLieuActuel;
+                else if (idLieuActuel.startsWith("B")) {
                     idBatimentGlobal = idLieuActuel;
                     const bSnap = await getDoc(doc(db, "Monde_Batiment", idLieuActuel));
                     if (bSnap.exists()) idLieuGlobal = bSnap.data().ID_Lieu;
                 }
 
                 await updateDoc(doc(db, "Monde_PNJ", docId), {
-                    Description_Physique: pnj.physique,
-                    ID_Batiment: idBatimentGlobal,
-                    ID_Lieu: idLieuGlobal,
-                    Nom_PNJ: pnj.nom,
-                    Occupation: pnj.occupation,
-                    Race: pnj.race,
-                    Secret_Mental: pnj.secret,
-                    Statut: "Vivant",
-                    Style_De_Parole: pnj.style_parole,
-                    URL_Cloudinary: ""
-                }).catch(async (e) => {
+                    Description_Physique: pnj.physique, ID_Batiment: idBatimentGlobal, ID_Lieu: idLieuGlobal,
+                    Nom_PNJ: pnj.nom, Occupation: pnj.occupation, Race: pnj.race, Secret_Mental: pnj.secret,
+                    Statut: "Vivant", Style_De_Parole: pnj.style_parole, URL_Cloudinary: ""
+                }).catch(async () => {
                      await setDoc(doc(db, "Monde_PNJ", docId), {
-                        Description_Physique: pnj.physique,
-                        ID_Batiment: idBatimentGlobal,
-                        ID_Lieu: idLieuGlobal,
-                        Nom_PNJ: pnj.nom,
-                        Occupation: pnj.occupation,
-                        Race: pnj.race,
-                        Secret_Mental: pnj.secret,
-                        Statut: "Vivant",
-                        Style_De_Parole: pnj.style_parole,
-                        URL_Cloudinary: ""
+                        Description_Physique: pnj.physique, ID_Batiment: idBatimentGlobal, ID_Lieu: idLieuGlobal,
+                        Nom_PNJ: pnj.nom, Occupation: pnj.occupation, Race: pnj.race, Secret_Mental: pnj.secret,
+                        Statut: "Vivant", Style_De_Parole: pnj.style_parole, URL_Cloudinary: ""
                     });
                 });
 
-                // 🔻 NOUVEAU : On AWAIT la génération pour les traiter un par un !
-                console.log(`[MIA_PNJ] ⏳ Début peinture pour ${pnj.nom}...`);
                 const urlImage = await genererEtStockerImagePNJ(pnj.physique);
-                
                 if (urlImage) {
                     await updateDoc(doc(db, "Monde_PNJ", docId), { URL_Cloudinary: urlImage });
-                    console.log(`[MIA_PNJ] 🖼️ Peinture terminée pour ${pnj.nom} !`);
                 }
+                
+                // 🔻 NOUVEAU : On sauvegarde ce PNJ pour pouvoir afficher son visage tout de suite !
+                listePNJCrees.push({ Nom_PNJ: pnj.nom, URL_Cloudinary: urlImage });
             }
         }
-    } catch (e) { console.error("[MIA_PNJ] Erreur silencieuse :", e); }
+    } catch (e) {}
+    
+    return listePNJCrees; // 🔻 NOUVEAU
 }
 
 // =========================================================================
@@ -1482,31 +1459,43 @@ window.declencherTourIA = async function() {
         const reponseTexte = await genererReponseNarrateur(contexte, historiqueComplet);
 
         if (reponseTexte) {
-            // On supprime totalement les doubles astérisques Markdown (**)
-            let texteAffiche = reponseTexte.replace(/\*\*/g, "");
             
-            // 1. On trie les noms du plus long au plus court (pour éviter les conflits)
+            // =====================================================================
+            // 1. ON ATTEND QUE L'IA SCULPTE LE DÉCOR ET PEIGNE LES NOUVEAUX VISAGES
+            // =====================================================================
+            const lieuFinal = await analyserDeplacementBatiment(window.ID_PARTIE_COURANTE, lieuActuel, reponseTexte);
+            const nomsHeros = window.PERSOS_PARTIE ? window.PERSOS_PARTIE.map(p => p.prenom) : [];
+            let nouveauxPnj = [];
+
+            if (lieuFinal) {
+                const contexteEtNarration = historique4 + "\n\n--- SUITE DE L'HISTOIRE (MJ) ---\n" + reponseTexte;
+                // On met l'application en pause TOTALE tant que les images ne sont pas créées !
+                nouveauxPnj = await analyserNouveauxPNJ(lieuFinal, nomsPnjPresents, nomsHeros, contexteEtNarration) || [];
+            }
+
+            // On ajoute virtuellement les nouveaux venus pour que le code ci-dessous puisse trouver leurs images
+            nouveauxPnj.forEach(p => {
+                nomsPnjPresents.push(p.Nom_PNJ);
+                env.pnjsPresents[p.Nom_PNJ] = p;
+            });
+
+            // =====================================================================
+            // 2. ON FORMATTE LE TEXTE (Insertion des images)
+            // =====================================================================
+            let texteAffiche = reponseTexte.replace(/\*\*/g, "");
             const nomsTries = [...nomsPnjPresents].sort((a, b) => b.length - a.length);
 
-            // 2. Fonction pour créer une Regex tolérante aux accents
             const regexSansAccent = (texte) => {
-                return texte.replace(/[aAàâäÀÂÄ]/g, '[aAàâäÀÂÄ]')
-                            .replace(/[eEéèêëÉÈÊË]/g, '[eEéèêëÉÈÊË]')
-                            .replace(/[iIîïÎÏ]/g, '[iIîïÎÏ]')
-                            .replace(/[oOôöÔÖ]/g, '[oOôöÔÖ]')
-                            .replace(/[uUùûüÙÛÜ]/g, '[uUùûüÙÛÜ]')
-                            .replace(/[cCçÇ]/g, '[cCçÇ]');
+                return texte.replace(/[aAàâäÀÂÄ]/g, '[aAàâäÀÂÄ]').replace(/[eEéèêëÉÈÊË]/g, '[eEéèêëÉÈÊË]')
+                            .replace(/[iIîïÎÏ]/g, '[iIîïÎÏ]').replace(/[oOôöÔÖ]/g, '[oOôöÔÖ]')
+                            .replace(/[uUùûüÙÛÜ]/g, '[uUùûüÙÛÜ]').replace(/[cCçÇ]/g, '[cCçÇ]');
             };
 
-            // 3. On applique NOTRE propre mise en gras et l'image !
             nomsTries.forEach(nom => {
                 const pnj = env.pnjsPresents[nom];
                 if (pnj) {
-                    // On échappe les caractères spéciaux, PUIS on ajoute la tolérance d'accents
                     let safeNom = nom.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                     safeNom = regexSansAccent(safeNom);
-                    
-                    // 🔻 NOUVELLE FORMULE ULTRA-ROBUSTE (Anti-crash) 🔻
                     const regex = new RegExp("(?<=^|[^a-zA-ZÀ-ÿ])" + safeNom + "(?=[^a-zA-ZÀ-ÿ]|$)(?![^<]*>)", "gi");
                     
                     if (pnj.URL_Cloudinary && pnj.URL_Cloudinary !== "") {
@@ -1518,33 +1507,30 @@ window.declencherTourIA = async function() {
                 }
             });
 
-            // Conversion des sauts de ligne invisibles en sauts de ligne HTML
             texteAffiche = texteAffiche.replace(/\n/g, "<br>");
 
+            // =====================================================================
+            // 3. ENVOI DU MESSAGE (CE QUI VA DÉCLENCHER LE RÉCIT DYNAMIQUE CHEZ TOUT LE MONDE)
+            // =====================================================================
             await addDoc(collection(db, "Messages_Chat"), {
                 ID_Partie: window.ID_PARTIE_COURANTE,
                 Auteur_ID: "MJ", Auteur_Nom: "MJ", Auteur_Couleur: "#ffffff",
                 Texte: texteAffiche,
+                Est_Narration_IA: true, // 🔻 C'EST CETTE LIGNE QUI DÉCLENCHE LE VISUAL NOVEL 🔻
                 Timestamp: new Date().getTime()
             });
             
-            // CORRECTION BUG INITIATIVE : On mélange les joueurs au lieu de juste remettre à 0 !
             if (typeof window.relancerInitiativeChat === "function") {
                 await window.relancerInitiativeChat();
             } else {
                 await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), { Index_Initiative: 0 });
             }
 
-            // La file d'attente asynchrone (Fantômes)
+            // =====================================================================
+            // 4. LE RESTE TOURNE EN ARRIÈRE-PLAN PENDANT QUE LES JOUEURS LISENT
+            // =====================================================================
             setTimeout(async () => {
-                const lieuFinal = await analyserDeplacementBatiment(window.ID_PARTIE_COURANTE, lieuActuel, reponseTexte);
-                const nomsHeros = window.PERSOS_PARTIE ? window.PERSOS_PARTIE.map(p => p.prenom) : [];
-
                 if (lieuFinal) {
-                    // NOUVEAU : On fusionne les 4 derniers messages + la réponse du MJ
-                    const contexteEtNarration = historique4 + "\n\n--- SUITE DE L'HISTOIRE (MJ) ---\n" + reponseTexte;
-                    
-                    await analyserNouveauxPNJ(lieuFinal, nomsPnjPresents, nomsHeros, contexteEtNarration);
                     await analyserDeplacementPNJ(lieuFinal, nomsHeros, reponseTexte);
                     await analyserMortsPNJ(nomsPnjPresents, reponseTexte);
                     await analyserStigmates(lieuFinal, reponseTexte);

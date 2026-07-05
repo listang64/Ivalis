@@ -926,15 +926,41 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
 
   // B. Écoute de l'historique du Chat
   const qMsg = query(collection(db, COL.MESSAGES), where("ID_Partie", "==", idPartie));
+  
+  // NOUVEAU : Variables pour empêcher le déclenchement du récit au chargement initial
+  window.INITIAL_CHAT_LOADED = false;
+  let timestampChargement = new Date().getTime();
+
   window.unsubscribeMessages = onSnapshot(qMsg, (snap) => {
       let msgs = [];
+      let recitDeclenche = null; // Contiendra le texte si on doit lancer le Visual Novel
+
+      // 1. On analyse les changements pour détecter un NOUVEAU message du MJ
+      snap.docChanges().forEach(change => {
+          if (change.type === "added") {
+              let data = change.doc.data();
+              // Si le chat est déjà chargé ET que c'est un message très récent ET qu'il est marqué comme Narration IA
+              if (window.INITIAL_CHAT_LOADED && data.Est_Narration_IA && data.Timestamp >= (timestampChargement - 1000)) {
+                  recitDeclenche = data.Texte;
+              }
+          }
+      });
+
+      // 2. On reconstruit l'affichage du chat normal
       snap.forEach(document => {
           let data = document.data();
-          data.idDoc = document.id; // On sauvegarde l'identifiant unique du document
+          data.idDoc = document.id;
           msgs.push(data);
       });
+      
       msgs.sort((a, b) => a.Timestamp - b.Timestamp);
       dessinerMessagesChat(msgs);
+      window.INITIAL_CHAT_LOADED = true;
+
+      // 3. SI un récit a été détecté, on lance l'écran géant pour le joueur !
+      if (recitDeclenche && typeof window.lancerRecitDynamique === "function") {
+          window.lancerRecitDynamique(recitDeclenche);
+      }
   });
 
   // C. Écoute des Personnages
