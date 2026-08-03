@@ -13,12 +13,14 @@ body, html {
   margin: 0;
   padding: 0;
   width: 100%;
-  height: 100vh; /* Fallback classique */
-  height: 100dvh; /* S'adapte dynamiquement aux barres Safari */
-  position: fixed; /* Fixe la page pour éviter le scroll élastique */
+  height: 100vh;
+  /* Le hack ultime Safari pour combler la zone de sécurité (bande noire) */
+  height: -webkit-fill-available;
+  position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
   overflow: hidden;
-  background-color: #000;
+  /* On remplace le fond noir par ta couleur de carte pour camoufler toute marge restante */
+  background-color: #F5F5DC; 
   touch-action: none;
 }
 
@@ -342,7 +344,8 @@ body, html {
 #ecran-jeu {
   display: none;
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0; /* Remplace width/height par un ancrage absolu */
+  top: 0; left: 0; right: 0; bottom: 0;
+  height: -webkit-fill-available;
   z-index: 20;
   overflow: hidden;
 }
@@ -352,7 +355,8 @@ body, html {
    ========================================================================= */
 #conteneur-carte-fond {
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0; /* Ancrage absolu sans faille */
+  top: 0; left: 0; right: 0; bottom: 0;
+  height: -webkit-fill-available;
   overflow: hidden; 
   z-index: 0;
   background-color: #F5F5DC;
