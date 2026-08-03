@@ -1930,7 +1930,9 @@ async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPers
   fiche.style.display = "flex";
   const fenetreHauteur = fiche.offsetHeight;
   fiche.style.left = "2vw";
-  fiche.style.top = (window.innerHeight / 2 - fenetreHauteur / 2) + "px";
+  
+  // NOUVEAU : On décale la fenêtre de 60 pixels vers le haut
+  fiche.style.top = (window.innerHeight / 2 - fenetreHauteur / 2 - 60) + "px";
 
   // 🔻 2. ON LANCE LES AUTRES CHARGEMENTS SANS ATTENDRE 🔻
   window.chargerCaracteristiques(idPersonnage);

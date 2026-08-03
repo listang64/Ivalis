@@ -451,25 +451,25 @@ body, html {
 }
 
 /* =========================================
-   ADAPTATION SPECIALE IPAD / TACTILE (Taille augmentée !)
+   ADAPTATION SPECIALE IPAD / TACTILE (Taille encore augmentée !)
    ========================================= */
 @media (hover: none) and (pointer: coarse) {
   #menu-lateral { gap: 25px; right: 30px; top: 30px; }
   
   .icone-menu { 
-     width: 20vw; /* Élargi ! */
-     max-width: 140px; 
-     min-width: 95px; 
+     width: 25vw; /* Encore plus gros (+0.5x) */
+     max-width: 160px; 
+     min-width: 110px; 
   }
   
   .icone-menu:first-child { 
-     width: 30vw; /* Élargi ! */
-     max-width: 240px;
-     min-width: 180px; 
+     width: 37.5vw; /* Parchemin encore plus gros */
+     max-width: 280px;
+     min-width: 200px; 
   }
   
-  .texte-sur-parchemin { font-size: clamp(16px, 2.5vw, 20px); }
-  .texte-sur-parchemin span { font-size: clamp(20px, 3vw, 28px); }
+  .texte-sur-parchemin { font-size: clamp(16px, 3vw, 22px); }
+  .texte-sur-parchemin span { font-size: clamp(22px, 3.5vw, 30px); }
 }
 
 .masque-banniere {
