@@ -1887,7 +1887,8 @@ window.chargerTableauEffets = async function() {
     tbody.innerHTML = "";
     
     try {
-        const q = query(collection(db, "Combat_Effets"), orderBy("Modificateur", "asc"), orderBy("Nom", "asc"));
+        // Requête simple sans double tri pour éviter l'erreur d'index Firebase
+        const q = query(collection(db, "Combat_Effets"));
         const snap = await getDocs(q);
         
         // Si la base de données est vide, on affiche le bouton d'injection
@@ -1895,11 +1896,26 @@ window.chargerTableauEffets = async function() {
             document.getElementById("btn-injecter-effets").style.display = "inline-block";
         } else {
             document.getElementById("btn-injecter-effets").style.display = "none";
-        }
+            
+            // On trie manuellement en Javascript
+            let effetsList = [];
+            snap.forEach(docSnap => {
+                effetsList.push({ id: docSnap.id, data: docSnap.data() });
+            });
+            
+            effetsList.sort((a, b) => {
+                let modA = a.data.Modificateur || "";
+                let modB = b.data.Modificateur || "";
+                if (modA !== modB) return modA.localeCompare(modB);
+                let nomA = a.data.Nom || "";
+                let nomB = b.data.Nom || "";
+                return nomA.localeCompare(nomB);
+            });
 
-        snap.forEach(docSnap => {
-            window.ajouterLigneEffetHTML(docSnap.id, docSnap.data());
-        });
+            effetsList.forEach(item => {
+                window.ajouterLigneEffetHTML(item.id, item.data);
+            });
+        }
 
         document.getElementById("chargement-effets").style.display = "none";
         document.getElementById("conteneur-table-effets").style.display = "block";
