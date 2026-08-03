@@ -358,12 +358,6 @@
       </button>
       <br><br>
 
-      <!-- NOUVEAU : BOUTON GESTION DES DECKS -->
-      <button class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); window.ouvrirGestionDecks()">
-        Gestion des Decks (Debug)
-      </button>
-      <br><br>
-
       <!-- NOUVEAU : BOUTON ARCHIVAGE -->
       <button class="btn-parametres btn-supprimer" style="width: 80%; padding: 15px; border-color: #ff4c4c;" onclick="jouerSonClic(); window.archiverSessionEtViderChat()">
         Clôturer & Vider le Chat
@@ -394,20 +388,6 @@
         <button class="btn-parametres" onclick="jouerSonClic(); sauvegarderTemperature()">Sauvegarder</button>
         <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-ia-parametre', 'etape-menu-outils')">Retour</button>
       </div>
-    </div>
-
-    <!-- ======================================================= -->
-    <!-- NOUVEAU : FENÊTRE GESTION DES DECKS                     -->
-    <!-- ======================================================= -->
-    <div id="etape-gestion-decks" class="fenetre-volante-parchemin fondu-interne" style="display: none; opacity: 0; width: 500px;">
-      <h2>Gestion des Decks</h2>
-      <p style="font-size: 14px; margin-top: -10px; color: #5c3a21;">Extraction et suppression des grimoires de combat</p>
-      
-      <div id="chargement-gestion-decks" style="margin: 20px 0; font-style: italic;">Analyse des âmes...</div>
-      
-      <div class="liste-instructions" id="liste-gestion-decks" style="display:none; max-height: 300px; overflow-y: auto; text-align: left; padding: 10px;"></div>
-      
-      <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-gestion-decks', 'etape-menu-outils')">Retour</button>
     </div>
 
   </div>
@@ -463,7 +443,7 @@
     <div class="conteneur-onglets">
       <button class="onglet-btn actif" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-descriptif')">Descriptif</button>
       <button class="onglet-btn" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-caracs')">Caractéristiques</button>
-      <button class="onglet-btn" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-cartes')">Cartes</button>
+      <button class="onglet-btn" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-competences')">Compétences</button>
       <button class="onglet-btn" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-inventaire')">Inventaire</button>
     </div>
 
@@ -563,32 +543,15 @@
       <div id="caracs-affiche" style="display: none; text-align: left;">
         
         <div id="bandeau-vital-perso" style="display: flex; flex-direction: column; justify-content: center; background: linear-gradient(135deg, rgba(92, 58, 33, 0.15), rgba(42, 26, 15, 0.05)); border: 2px solid #c2a878; border-radius: 10px; padding: 15px; margin-bottom: 25px; box-shadow: 0 4px 8px rgba(0,0,0,0.2), inset 0 0 10px rgba(255,255,255,0.4);">
-          
-          <div style="display: flex; justify-content: space-around; align-items: center;">
+          <div style="display: flex; justify-content: center; align-items: center;">
             <div style="display: flex; align-items: center; gap: 15px;">
               <div style="font-size: 40px; filter: drop-shadow(2px 3px 3px rgba(0,0,0,0.5));">❤️</div>
-              <div style="display: flex; flex-direction: column;">
-                <span style="font-size: 14px; font-weight: bold; color: #5c3a21; text-transform: uppercase; letter-spacing: 1px;">Points de Vie</span>
+              <div style="display: flex; flex-direction: column; align-items: center;">
+                <span style="font-size: 14px; font-weight: bold; color: #5c3a21; text-transform: uppercase; letter-spacing: 1px;">Points de Vie Max</span>
                 <span style="font-size: 34px; font-weight: bold; color: #2a1a0f; font-family: 'Cinzel', serif; line-height: 1;" id="affichage-pv-max">8</span>
               </div>
             </div>
-
-            <div style="width: 2px; height: 50px; background-color: #c2a878; opacity: 0.6; border-radius: 2px;"></div>
-
-            <div style="display: flex; align-items: center; gap: 15px;">
-              <div style="position: relative; width: 40px; height: 45px;">
-                  <div style="position: absolute; top: 2px; left: 0; width: 26px; height: 38px; background: #c2a878; border: 2px solid #2a1a0f; border-radius: 4px; transform: rotate(-15deg); box-shadow: 2px 2px 5px rgba(0,0,0,0.5);"></div>
-                  <div style="position: absolute; top: 6px; left: 12px; width: 26px; height: 38px; background: #f6ebd1; border: 2px solid #2a1a0f; border-radius: 4px; transform: rotate(12deg); box-shadow: 2px 2px 5px rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center;">
-                    <span style="color: #8c6a45; font-size: 14px;">✦</span>
-                  </div>
-              </div>
-              <div style="display: flex; flex-direction: column;">
-                <span style="font-size: 14px; font-weight: bold; color: #5c3a21; text-transform: uppercase; letter-spacing: 1px;">Cartes en main</span>
-                <span style="font-size: 34px; font-weight: bold; color: #2a1a0f; font-family: 'Cinzel', serif; line-height: 1;" id="affichage-cartes-max">9</span>
-              </div>
-            </div>
           </div>
-
         </div>
         <h3 style="margin-top: 0; border-bottom: 2px solid #5c3a21; padding-bottom: 5px; color: #2a1a0f;">Attributs &amp; Compétences</h3>
         <div id="conteneur-stats-affichage" style="margin-top: 20px;"></div>
@@ -606,20 +569,12 @@
       <!-- ======================================================= -->
       <div style="display: flex; flex-direction: column; background: rgba(255,255,255,0.4); border: 2px dashed #c2a878; border-radius: 8px; padding: 10px; margin-bottom: 20px;">
         
-        <!-- LIGNE 1 : PV et Cartes -->
-        <div style="display: flex; justify-content: space-around; align-items: center; margin-bottom: 8px;">
+        <!-- LIGNE 1 : PV -->
+        <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 8px;">
           <div style="display: flex; align-items: center; gap: 10px;">
             <span style="font-size: 24px; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.5));">❤️</span>
-            <span style="font-size: 16px; font-weight: bold; color: #5c3a21;">PV :</span>
+            <span style="font-size: 16px; font-weight: bold; color: #5c3a21;">PV Max :</span>
             <span style="font-size: 24px; font-weight: bold; color: #2a1a0f; font-family: 'Cinzel', serif;" id="creation-pv-max">8</span>
-          </div>
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <div style="position: relative; width: 24px; height: 28px;">
-                <div style="position: absolute; top: 0; left: 0; width: 16px; height: 24px; background: #c2a878; border: 1px solid #2a1a0f; border-radius: 2px; transform: rotate(-15deg);"></div>
-                <div style="position: absolute; top: 3px; left: 6px; width: 16px; height: 24px; background: #f6ebd1; border: 1px solid #2a1a0f; border-radius: 2px; transform: rotate(12deg);"></div>
-            </div>
-            <span style="font-size: 16px; font-weight: bold; color: #5c3a21;">Cartes :</span>
-            <span style="font-size: 24px; font-weight: bold; color: #2a1a0f; font-family: 'Cinzel', serif;" id="creation-cartes-max">9</span>
           </div>
         </div>
 
@@ -650,24 +605,9 @@
         <button class="btn-modale" onclick="jouerSonClic(); fermerModaleCreationCaracs()">Annuler</button>
       </div>
     </div>
-    <div id="onglet-cartes" class="contenu-onglet">
-      <!-- 1. Ajout de l'ID au titre pour pouvoir le masquer -->
-      <h3 id="titre-generateur-deck" style="margin-top: 0; border-bottom: 2px solid #5c3a21; padding-bottom: 5px; color: #2a1a0f;">Profil de Combat (Générateur)</h3>
-      
-      <div id="cartes-vide" style="text-align: center; margin-top: 20px;">
-        <p style="font-size: 16px; color: #4a2e1b; margin-bottom: 15px;">Décris le style de combat, l'arme, et l'attitude de ton héros en quelques phrases. L'IA traduira cela en statistiques de deck.</p>
-        <textarea id="champ-rp-deck" class="input-texte-parchemin" style="height: 100px; width: 90%; margin-bottom: 15px;" placeholder="Ex: C'est un chevalier lourd armé d'une masse qui encaisse les coups et utilise la magie de la terre..."></textarea>
-        <br>
-        <button id="btn-generer-profil-deck" class="btn-parametres" onclick="jouerSonClic(); window.genererProfilDeck()">Analyser le style</button>
-      </div>
-
-      <!-- 2. Suppression des bordures et des fonds "en dur" -->
-      <div id="resultat-profil-deck" style="display: none;">
-        <!-- Élément fantôme pour ne pas faire planter tes anciens scripts -->
-        <span id="titre-theme-deck" style="display:none;"></span>
-        
-        <div id="json-affichage-deck"></div>
-      </div>
+    <div id="onglet-competences" class="contenu-onglet">
+      <h3 style="margin-top: 0; border-bottom: 2px solid #5c3a21; padding-bottom: 5px; color: #2a1a0f;">Compétences</h3>
+      <!-- Vide pour l'instant -->
     </div>
     <div id="onglet-inventaire" class="contenu-onglet"><h3 style="margin-top: 0;">Sac à dos &amp; Équipement</h3><p><i>Armes, armures...</i></p></div>
   </div>  <div id="fenetre-chatbox">
@@ -686,10 +626,8 @@
 
 </div> 
 
-<!-- NOUVEAU : On charge le cerveau IA et le Moteur de cartes ici -->
+<!-- NOUVEAU : On charge le cerveau IA ici -->
 <script type="module" src="ia_master.js?v=2"></script>
-<script type="module" src="moteur_cartes.js?v=2"></script>
-<script type="module" src="gestion_deck.js?v=1"></script>
 <script type="module" src="app.js?v=2"></script>
 <script type="module" src="recit_dynamique.js"></script>
 
@@ -736,21 +674,6 @@
     <div class="groupe-boutons-jeu">
       <button class="btn-modale-jeu" onclick="jouerSonClic(); confirmerQuitterJeu()">Oui</button>
       <button class="btn-modale-jeu" onclick="jouerSonClic(); fermerModalesJeu()">Non</button>
-    </div>
-  </div>
-
-  <!-- ======================================================= -->
-  <!-- NOUVEAU : MODALE EXTRACTION DECK (COPIER/COLLER)        -->
-  <!-- ======================================================= -->
-  <div id="modale-extraction-deck" class="modale-parchemin-jeu" style="width: 650px; max-width: 90vw;">
-    <h2>Extraction du Deck</h2>
-    <p style="font-size: 14px; margin-top: -15px;">Copiez ce code pour l'envoyer à l'analyse.</p>
-    
-    <textarea id="texte-extraction-deck" class="input-texte-parchemin" style="height: 350px; width: 95%; font-family: monospace; font-size: 13px; white-space: pre; background-color: #2a1a0f; color: #00ffff;" readonly></textarea>
-    
-    <div class="groupe-boutons-jeu">
-      <button class="btn-modale-jeu" onclick="jouerSonClic(); window.copierExtractionDeck(event)">Copier le code</button>
-      <button class="btn-modale-jeu" onclick="jouerSonClic(); document.getElementById('modale-extraction-deck').style.display='none'; document.getElementById('overlay-jeu-modale').style.display='none';">Fermer</button>
     </div>
   </div>
 
