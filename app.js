@@ -1067,7 +1067,10 @@ function afficherBullesPersonnages(persos) {
       }
 
       bulle.addEventListener("mouseenter", () => { 
-          if (window.matchMedia("(hover: none)").matches) return; // Censure de l'affichage sur iPad pour ne pas bloquer le clic
+          if (window.matchMedia("(hover: none)").matches) return; 
+          // 🔻 NOUVEAU : On bloque le survol si la fiche perso est ouverte
+          if (document.getElementById("fenetre-fiche-perso")?.style.display === "flex") return; 
+
           if (window.imageTourActive && window.imageTourActive !== imgHover) window.imageTourActive.style.display = "none";
           imgHover.style.display = "block"; 
       });
@@ -1076,7 +1079,12 @@ function afficherBullesPersonnages(persos) {
           if (window.matchMedia("(hover: none)").matches) return; 
           imgHover.style.display = "none"; 
           const isChatOuvert = document.getElementById("fenetre-chatbox")?.style.display === "flex";
-          if (window.imageTourActive && isChatOuvert) window.imageTourActive.style.display = "block"; 
+          const isFicheOuverte = document.getElementById("fenetre-fiche-perso")?.style.display === "flex";
+          
+          // 🔻 NOUVEAU : On ne restaure l'image QUE si la fiche est fermée !
+          if (window.imageTourActive && isChatOuvert && !isFicheOuverte) {
+              window.imageTourActive.style.display = "block"; 
+          }
       });
     }
 
@@ -1121,7 +1129,10 @@ function afficherBullesPersonnages(persos) {
   }
 
   bulleMJ.addEventListener("mouseenter", () => { 
-      if (window.matchMedia("(hover: none)").matches) return; // Censure de l'affichage sur iPad
+      if (window.matchMedia("(hover: none)").matches) return; 
+      // 🔻 NOUVEAU : On bloque le survol si la fiche perso est ouverte
+      if (document.getElementById("fenetre-fiche-perso")?.style.display === "flex") return;
+
       if (window.imageTourActive && window.imageTourActive !== imgHoverMJ) window.imageTourActive.style.display = "none";
       imgHoverMJ.style.display = "block"; 
   });
@@ -1130,7 +1141,12 @@ function afficherBullesPersonnages(persos) {
       if (window.matchMedia("(hover: none)").matches) return; 
       imgHoverMJ.style.display = "none"; 
       const isChatOuvert = document.getElementById("fenetre-chatbox")?.style.display === "flex";
-      if (window.imageTourActive && isChatOuvert) window.imageTourActive.style.display = "block";
+      const isFicheOuverte = document.getElementById("fenetre-fiche-perso")?.style.display === "flex";
+      
+      // 🔻 NOUVEAU : On ne restaure l'image QUE si la fiche est fermée !
+      if (window.imageTourActive && isChatOuvert && !isFicheOuverte) {
+          window.imageTourActive.style.display = "block";
+      }
   });
 
   if (partie.IA_En_Cours === true) {
@@ -1223,11 +1239,18 @@ function ajouterUnSeulMessageChat(m) {
    const spansPnj = div.querySelectorAll(".pnj-chat-hover");
    spansPnj.forEach(span => {
        span.addEventListener("mouseenter", () => {
+           // 🔻 NOUVEAU : On bloque le survol si la fiche perso est ouverte
+           if (document.getElementById("fenetre-fiche-perso")?.style.display === "flex") return;
            if (window.imageTourActive) window.imageTourActive.style.display = "none";
        });
        span.addEventListener("mouseleave", () => {
            const isChatOpen = document.getElementById("fenetre-chatbox")?.style.display === "flex";
-           if (window.imageTourActive && isChatOpen) window.imageTourActive.style.display = "block";
+           const isFicheOuverte = document.getElementById("fenetre-fiche-perso")?.style.display === "flex";
+           
+           // 🔻 NOUVEAU : On ne restaure l'image QUE si la fiche est fermée !
+           if (window.imageTourActive && isChatOpen && !isFicheOuverte) {
+               window.imageTourActive.style.display = "block";
+           }
        });
    });
 }
