@@ -490,8 +490,11 @@ body, html {
   pointer-events: none;
 }
 
-.conteneur-bouton-lateral:hover .banniere-glissante {
-  right: 0vw;
+/* MAGIE CSS : N'active l'animation de survol QUE sur les appareils avec une vraie souris (PC) */
+@media (hover: hover) {
+  .conteneur-bouton-lateral:hover .banniere-glissante {
+    right: 0vw;
+  }
 }
 
 /* --- LE MENU DE NAVIGATION (BAS DROITE) --- */
