@@ -1892,6 +1892,19 @@ async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPers
   const btnSupprimer = document.getElementById("btn-supprimer-perso");
   const btnSauvegarder = document.getElementById("btn-sauvegarder-perso");
 
+  // 🔻 1. LA CORRECTION IPAD : ON AFFICHE LA FICHE INSTANTANÉMENT 🔻
+  fiche.style.display = "flex";
+  const fenetreHauteur = fiche.offsetHeight;
+  fiche.style.left = "2vw";
+  fiche.style.top = (window.innerHeight / 2 - fenetreHauteur / 2) + "px";
+
+  // 🔻 2. ON LANCE LES AUTRES CHARGEMENTS SANS ATTENDRE 🔻
+  window.chargerCaracteristiques(idPersonnage);
+  if (typeof window.chargerDeckExistant === "function") {
+      window.chargerDeckExistant(idPersonnage);
+  }
+
+  // 🔻 3. NETTOYAGE VISUEL DES CHAMPS 🔻
   document.getElementById("champ-id-personnage").value = "";
   document.getElementById("champ-statut-personnage").value = "Vivant";
   document.getElementById("champ-id-personnage").setAttribute("data-url", "");
@@ -1918,6 +1931,16 @@ async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPers
   document.getElementById("champ-couleur-token").value = couleurParDefaut;
   appliquerCouleurTheme(couleurParDefaut);
 
+  // --- Ouverture intelligente de l'onglet par défaut ---
+  if (idPersonnage) {
+    const btnCaracs = document.querySelector("button[onclick*='onglet-caracs']");
+    if (btnCaracs) changerOngletPerso({ currentTarget: btnCaracs }, 'onglet-caracs');
+  } else {
+    const btnDescriptif = document.querySelector("button[onclick*='onglet-descriptif']");
+    if (btnDescriptif) changerOngletPerso({ currentTarget: btnDescriptif }, 'onglet-descriptif');
+  }
+
+  // 🔻 4. ON LAISSE FIREBASE CHARGER EN ARRIÈRE-PLAN 🔻
   if (idPersonnage) {
     document.getElementById("titre-nom-personnage").innerText = prenomPerso + " " + nomPerso;
     btnSupprimer.style.display = "block";
@@ -1940,6 +1963,7 @@ async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPers
       btnSauvegarder.style.pointerEvents = "none";
     }
 
+    // Le fameux "await" ne bloque plus l'écran puisqu'on l'a déjà affiché plus haut !
     const donneesServeur = await recupererDetailsPersonnage(idPersonnage);
     if (donneesServeur) {
       localStorage.setItem(cleCache, JSON.stringify(donneesServeur));
@@ -1948,38 +1972,10 @@ async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPers
   } else {
     document.getElementById("titre-nom-personnage").innerText = "Nouveau Personnage";
     btnSupprimer.style.display = "none";
-    
-    // CORRECTION DU BUG : On force le bouton Enregistrer à réapparaître pour les nouveaux !
     btnSauvegarder.style.display = "inline-block";
     btnSauvegarder.innerText = "Enregistrer";
     btnSauvegarder.style.pointerEvents = "auto";
   }
-
-  // --- CORRECTION : Ouverture intelligente de l'onglet par défaut ---
-  if (idPersonnage) {
-    // Personnage existant : on ouvre direct sur les Caractéristiques pour le jeu
-    const btnCaracs = document.querySelector("button[onclick*='onglet-caracs']");
-    if (btnCaracs) changerOngletPerso({ currentTarget: btnCaracs }, 'onglet-caracs');
-  } else {
-    // Nouveau Personnage : on force l'ouverture sur le Descriptif pour la création
-    const btnDescriptif = document.querySelector("button[onclick*='onglet-descriptif']");
-    if (btnDescriptif) changerOngletPerso({ currentTarget: btnDescriptif }, 'onglet-descriptif');
-  }
-
-  // --- NOUVEAU : Charger les caractéristiques ---
-  window.chargerCaracteristiques(idPersonnage);
-
-  // --- NOUVEAU : Charger le deck de cartes existant ---
-  if (typeof window.chargerDeckExistant === "function") {
-      window.chargerDeckExistant(idPersonnage);
-  }
-
-  fiche.style.display = "flex";
-  const fenetreHauteur = fiche.offsetHeight;
-  
-  // POSITIONNEMENT À GAUCHE
-  fiche.style.left = "2vw"; // Colle la fiche à gauche (avec une marge de 2% de l'écran)
-  fiche.style.top = (window.innerHeight / 2 - fenetreHauteur / 2) + "px"; // Centre la fiche en hauteur
 }
 
 function remplirFormulairePerso(donnees) {
