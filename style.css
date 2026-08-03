@@ -12,15 +12,13 @@
 body, html {
   margin: 0;
   padding: 0;
-  width: 100%;
+  width: 100vw;
   height: 100vh;
-  /* Le hack ultime Safari pour combler la zone de sécurité (bande noire) */
-  height: -webkit-fill-available;
+  height: 100dvh; /* Le remède miracle contre la barre Safari */
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
   overflow: hidden;
-  /* On remplace le fond noir par ta couleur de carte pour camoufler toute marge restante */
-  background-color: #F5F5DC; 
+  background-color: #000; /* Retour au noir pur pour éviter les fuites beiges */
   touch-action: none;
 }
 
@@ -343,9 +341,11 @@ body, html {
    ========================================================================= */
 #ecran-jeu {
   display: none;
-  position: absolute;
+  position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  height: -webkit-fill-available;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
   z-index: 20;
   overflow: hidden;
 }
@@ -354,9 +354,11 @@ body, html {
    CARTE INTERACTIVE DU MONDE
    ========================================================================= */
 #conteneur-carte-fond {
-  position: absolute;
+  position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  height: -webkit-fill-available;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
   overflow: hidden; 
   z-index: 0;
   background-color: #F5F5DC;
@@ -386,39 +388,40 @@ body, html {
 /* --- LE MENU LATERAL FIXE --- */
 #menu-lateral {
   position: fixed;
-  right: 25px; /* On le décolle du bord pour l'élégance */
-  top: 2vh;
+  right: 20px;
+  top: 20px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 2vh; /* Espace adaptatif selon la hauteur */
+  gap: 20px; /* Espacement fixe parfait */
   z-index: 9999;
+  padding: 15px; /* Rajoute de l'espace interne pour ne pas couper l'ombre ! */
+  margin-right: -15px; /* Compense le padding pour garder l'alignement à l'écran */
 }
 
 /* --- LES ICONES GLOBALES --- */
 .icone-menu {
-  width: 6vw; /* Taille basée sur l'écran */
-  min-width: 65px; /* Plus gros minimum pour iPad */
-  max-width: 85px; /* Limite maximale pour très grands écrans PC */
+  width: 8vw; /* Plus gros ! */
+  min-width: 75px; /* Taille minimale augmentée pour l'iPad */
+  max-width: 95px; /* Sécurité maximale pour PC */
   height: auto;
   cursor: pointer;
-  /* L'astuce : Ombre décalée vers la GAUCHE (-5px) et le BAS (8px) pour éviter la coupure ! */
-  filter: drop-shadow(-5px 8px 12px rgba(0, 0, 0, 0.7));
+  filter: drop-shadow(-6px 8px 10px rgba(0, 0, 0, 0.6));
   transition: filter 0.3s ease, transform 0.2s ease;
+  display: block;
 }
 
 .icone-menu:hover {
-  filter: drop-shadow(-8px 12px 18px rgba(0, 0, 0, 0.9)) brightness(1.15);
-  transform: scale(1.05); /* Petit effet de zoom au clic */
+  filter: drop-shadow(-8px 12px 15px rgba(0, 0, 0, 0.8)) brightness(1.15);
+  transform: scale(1.05);
 }
 
 /* --- LE PREMIER BOUTON GEANT (Le parchemin de Date) --- */
 .icone-menu:first-child {
-  width: 14vw;
-  min-width: 130px;
-  max-width: 190px;
+  width: 16vw;
+  min-width: 145px;
+  max-width: 195px;
   position: relative;
-  filter: drop-shadow(-5px 10px 15px rgba(0, 0, 0, 0.7)); /* Même logique d'ombre */
 }
 
 .icone-menu:first-child img {
@@ -435,7 +438,7 @@ body, html {
   transform: translate(-50%, -50%);
   text-align: center;
   color: #2c1e16;
-  font-size: clamp(12px, 1.2vw, 16px); /* Taille dynamique magique (Min, Idéal, Max) */
+  font-size: clamp(14px, 1.4vw, 18px); /* Texte adaptatif parfait */
   font-weight: bold;
   width: 90%;
   pointer-events: none;
@@ -443,7 +446,7 @@ body, html {
 }
 
 .texte-sur-parchemin span {
-  font-size: clamp(16px, 1.6vw, 22px);
+  font-size: clamp(18px, 1.8vw, 24px);
   font-weight: 900;
 }
 
@@ -452,9 +455,7 @@ body, html {
    ========================================= */
 .conteneur-bouton-lateral {
   position: relative;
-  width: 6vw;
-  min-width: 65px;
-  max-width: 85px;
+  width: auto; /* Laisse le conteneur s'adapter à l'image : Empêche la guillotine de l'ombre ! */
   display: flex;
   justify-content: flex-end;
 }
