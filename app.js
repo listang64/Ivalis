@@ -1079,38 +1079,18 @@ function afficherBullesPersonnages(persos) {
       });
     }
 
-    const ouvrirFicheBulle = function() {
+    // NOUVEAU : Un simple clic ouvre la fiche perso directement (Ultra robuste sur iPad)
+    bulle.onclick = function() {
       if (typeof window.jouerSonClic === "function") window.jouerSonClic();
       if (typeof window.ouvrirFichePerso === "function") window.ouvrirFichePerso(p.idPersonnage, p.prenom, p.nom, p.couleur);
       const fiche = document.getElementById('fenetre-fiche-perso');
       if (fiche) fiche.style.zIndex = "1500";
+      
+      // Force l'onglet caractéristiques par défaut
       setTimeout(() => {
         const btnCaracs = document.querySelector("button[onclick*='onglet-caracs']");
         if (btnCaracs) btnCaracs.click();
       }, 10);
-    };
-
-    bulle.ondblclick = ouvrirFicheBulle; // Reste valide pour PC
-
-    // MAGIE IPAD : Double-Tap ET Simple-Tap pour afficher l'image (Corrigé)
-    let dernierTouchBulle = 0;
-    bulle.ontouchstart = function(e) {
-        const maintenant = new Date().getTime();
-        if (maintenant - dernierTouchBulle < 400) {
-            e.preventDefault();
-            ouvrirFicheBulle(); // Double Tap : Ouvre la fiche
-        } else {
-            // Simple Tap : Fait office de survol (hover) pour afficher l'image sur iPad
-            if (p.urlCloudinary && p.urlCloudinary !== "") {
-                const imgHoverElement = document.querySelector(`.bulle-portrait-hover-joueur[src="${p.urlCloudinary}"]`);
-                if (imgHoverElement) {
-                    if (imageActive && imageActive !== imgHoverElement) imageActive.style.display = "none";
-                    imgHoverElement.style.display = "block";
-                    imageActive = imgHoverElement;
-                }
-            }
-        }
-        dernierTouchBulle = maintenant;
     };
 
     conteneur.appendChild(bulle);
@@ -1889,20 +1869,12 @@ function afficherListePersonnages(persos) {
       const div = document.createElement("div");
       div.className = "item-perso";
       
-      const ouvrirFiche = function () { jouerSonClic(); ouvrirFichePerso(p.idPersonnage, p.prenom, p.nom, p.couleur); };
-      div.ondblclick = ouvrirFiche; // Reste valide pour PC
-      
-      // MAGIE IPAD : Double-Tap (Corrigé)
-      let dernierTouch = 0;
-      div.ontouchstart = function(e) {
-          const maintenant = new Date().getTime();
-          if (maintenant - dernierTouch < 400) {
-              e.preventDefault(); // Empêche le zoom d'iOS
-              ouvrirFiche();
-          }
-          dernierTouch = maintenant;
+      // NOUVEAU : Un simple clic ouvre la fiche !
+      div.onclick = function () { 
+          if (typeof window.jouerSonClic === "function") window.jouerSonClic(); 
+          if (typeof window.ouvrirFichePerso === "function") window.ouvrirFichePerso(p.idPersonnage, p.prenom, p.nom, p.couleur); 
       };
-
+      
       div.innerHTML = `<span>${p.prenom} ${p.nom}</span>`;
       conteneur.appendChild(div);
     });
