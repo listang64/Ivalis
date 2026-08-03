@@ -12,13 +12,12 @@
 body, html {
   margin: 0;
   padding: 0;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh; /* Le remède miracle contre la barre Safari */
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
+  width: 100%;
+  height: 100%; /* On supprime les vh, vw et dvh qui rendent l'iPad fou */
+  position: fixed; /* Bloque l'écran */
+  top: 0; left: 0; right: 0; bottom: 0; /* Étirement absolu aux 4 coins */
   overflow: hidden;
-  background-color: #000; /* Retour au noir pur pour éviter les fuites beiges */
+  background-color: #000;
   touch-action: none;
 }
 
@@ -343,9 +342,8 @@ body, html {
   display: none;
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
+  width: 100%;
+  height: 100%;
   z-index: 20;
   overflow: hidden;
 }
@@ -354,11 +352,10 @@ body, html {
    CARTE INTERACTIVE DU MONDE
    ========================================================================= */
 #conteneur-carte-fond {
-  position: fixed;
+  position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
+  width: 100%;
+  height: 100%;
   overflow: hidden; 
   z-index: 0;
   background-color: #F5F5DC;
@@ -387,41 +384,41 @@ body, html {
 
 /* --- LE MENU LATERAL FIXE --- */
 #menu-lateral {
-  position: fixed;
-  right: 20px;
-  top: 20px;
+  position: absolute;
+  right: 30px; /* On décolle massivement du bord droit pour laisser respirer l'ombre */
+  top: 30px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 20px; /* Espacement fixe parfait */
+  gap: 25px; /* Plus d'espace entre les boutons */
   z-index: 9999;
-  padding: 15px; /* Rajoute de l'espace interne pour ne pas couper l'ombre ! */
-  margin-right: -15px; /* Compense le padding pour garder l'alignement à l'écran */
 }
 
 /* --- LES ICONES GLOBALES --- */
 .icone-menu {
-  width: 8vw; /* Plus gros ! */
-  min-width: 75px; /* Taille minimale augmentée pour l'iPad */
-  max-width: 95px; /* Sécurité maximale pour PC */
+  width: 9vw; /* Boutons beaucoup plus gros */
+  min-width: 80px; /* Minimum garanti pour iPad */
+  max-width: 110px; /* Maximum pour PC */
   height: auto;
   cursor: pointer;
-  filter: drop-shadow(-6px 8px 10px rgba(0, 0, 0, 0.6));
+  /* L'OMBRE MAGIQUE : -10px en X la projette à GAUCHE, loin de la coupure de l'écran ! */
+  filter: drop-shadow(-10px 10px 12px rgba(0, 0, 0, 0.7));
   transition: filter 0.3s ease, transform 0.2s ease;
   display: block;
 }
 
 .icone-menu:hover {
-  filter: drop-shadow(-8px 12px 15px rgba(0, 0, 0, 0.8)) brightness(1.15);
+  filter: drop-shadow(-12px 14px 18px rgba(0, 0, 0, 0.9)) brightness(1.15);
   transform: scale(1.05);
 }
 
 /* --- LE PREMIER BOUTON GEANT (Le parchemin de Date) --- */
 .icone-menu:first-child {
-  width: 16vw;
-  min-width: 145px;
-  max-width: 195px;
+  width: 18vw; /* Parchemin plus grand */
+  min-width: 160px;
+  max-width: 220px;
   position: relative;
+  filter: drop-shadow(-10px 10px 12px rgba(0, 0, 0, 0.7));
 }
 
 .icone-menu:first-child img {
@@ -438,7 +435,7 @@ body, html {
   transform: translate(-50%, -50%);
   text-align: center;
   color: #2c1e16;
-  font-size: clamp(14px, 1.4vw, 18px); /* Texte adaptatif parfait */
+  font-size: clamp(14px, 1.5vw, 18px);
   font-weight: bold;
   width: 90%;
   pointer-events: none;
@@ -446,7 +443,7 @@ body, html {
 }
 
 .texte-sur-parchemin span {
-  font-size: clamp(18px, 1.8vw, 24px);
+  font-size: clamp(18px, 2vw, 24px);
   font-weight: 900;
 }
 
@@ -455,7 +452,7 @@ body, html {
    ========================================= */
 .conteneur-bouton-lateral {
   position: relative;
-  width: auto; /* Laisse le conteneur s'adapter à l'image : Empêche la guillotine de l'ombre ! */
+  /* Plus de width forcé, le conteneur s'adapte à l'image */
   display: flex;
   justify-content: flex-end;
 }
