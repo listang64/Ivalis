@@ -689,6 +689,84 @@ body, html {
   display: flex; justify-content: space-between; align-items: center;
 }
 
+/* --- FENETRE LARGE POUR LES EFFETS --- */
+.fenetre-volante-parchemin-large {
+  width: 90vw;
+  max-width: 1400px;
+  background-color: #e8d5a5;
+  border: 3px solid #1a1a1a;
+  border-radius: 12px;
+  box-shadow: 0px 15px 30px rgba(0, 0, 0, 0.8);
+  padding: 30px;
+  text-align: center;
+  color: #2c1e16;
+}
+
+.table-effets-ivalis {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.table-effets-ivalis th {
+  background-color: #5c3a21;
+  color: #e8d5a5;
+  padding: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  font-size: 18px;
+  border-bottom: 2px solid #2a1a0f;
+}
+
+.table-effets-ivalis td {
+  padding: 5px;
+  border-bottom: 1px solid #c2a878;
+  vertical-align: top;
+}
+
+.table-effets-ivalis input, .table-effets-ivalis textarea {
+  width: 100%;
+  background-color: rgba(255,255,255,0.4);
+  border: 1px solid transparent;
+  padding: 8px;
+  font-family: 'Almendra', serif;
+  font-size: 16px;
+  color: #2c1e16;
+  border-radius: 4px;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.table-effets-ivalis textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.table-effets-ivalis input:focus, .table-effets-ivalis textarea:focus {
+  background-color: #f5eedc;
+  border-color: #00ffff;
+  outline: none;
+  box-shadow: inset 0 0 5px rgba(0,255,255,0.3);
+}
+
+.btn-sauver-ligne {
+  background-color: #1b6e3a;
+  color: white;
+  border: 2px solid #0f4021;
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.2s ease;
+}
+
+.btn-sauver-ligne:hover { 
+  background-color: #00ffff; 
+  color: black;
+  border-color: #00ffff;
+}
+
 .input-texte-parchemin {
   width: 90%; padding: 10px; font-size: 18px; text-align: left;
   background-color: #f5eedc; border: 2px solid #5c3a21;

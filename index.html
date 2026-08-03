@@ -358,6 +358,12 @@
       </button>
       <br><br>
 
+      <!-- NOUVEAU : BOUTON EFFETS DE COMBAT -->
+      <button class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); window.ouvrirGestionEffets()">
+        Effets de Combat
+      </button>
+      <br><br>
+
       <!-- NOUVEAU : BOUTON ARCHIVAGE -->
       <button class="btn-parametres btn-supprimer" style="width: 80%; padding: 15px; border-color: #ff4c4c;" onclick="jouerSonClic(); window.archiverSessionEtViderChat()">
         Clôturer & Vider le Chat
@@ -387,6 +393,39 @@
       <div style="display: flex; justify-content: center; gap: 10px;">
         <button class="btn-parametres" onclick="jouerSonClic(); sauvegarderTemperature()">Sauvegarder</button>
         <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-ia-parametre', 'etape-menu-outils')">Retour</button>
+      </div>
+    </div>
+
+    <!-- ======================================================= -->
+    <!-- NOUVEAU : FENÊTRE EFFETS DE COMBAT                      -->
+    <!-- ======================================================= -->
+    <div id="etape-gestion-effets" class="fenetre-volante-parchemin-large fondu-interne" style="display: none; opacity: 0;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #5c3a21; margin-bottom: 20px; padding-bottom: 10px;">
+        <h2 style="margin: 0; border: none; padding: 0;">Grimoire des Effets</h2>
+        <div style="display: flex; gap: 10px;">
+          <!-- Bouton temporaire d'injection -->
+          <button class="btn-parametres btn-supprimer" id="btn-injecter-effets" style="display: none;" onclick="jouerSonClic(); window.injecterEffetsDefaut()">Injecter le fichier Excel</button>
+          <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-gestion-effets', 'etape-menu-outils')">Retour</button>
+        </div>
+      </div>
+      
+      <div id="chargement-effets" style="font-style: italic;">Lecture des anciens parchemins...</div>
+      
+      <div id="conteneur-table-effets" style="display: none; max-height: 65vh; overflow-y: auto;">
+        <table class="table-effets-ivalis">
+          <thead>
+            <tr>
+              <th style="width: 15%;">Nom de l'Effet</th>
+              <th style="width: 10%;">Coût (PT)</th>
+              <th style="width: 15%;">Modificateur</th>
+              <th style="width: 30%;">Description de l'Effet</th>
+              <th style="width: 25%;">Notes / Règles</th>
+              <th style="width: 5%;">Sauver</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-effets"></tbody>
+        </table>
+        <button class="btn-parametres" style="margin-top: 20px;" onclick="jouerSonClic(); window.ajouterLigneEffetVide()">+ Nouvel Effet Vierge</button>
       </div>
     </div>
 

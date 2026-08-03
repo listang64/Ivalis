@@ -1872,6 +1872,162 @@ async function validerSuppression() {
 }
 
 // =========================================================================
+//  GESTION DES EFFETS DE COMBAT (BDD)
+// =========================================================================
+
+window.ouvrirGestionEffets = async function() {
+    naviguerFenetre('etape-menu-outils', 'etape-gestion-effets');
+    document.getElementById("chargement-effets").style.display = "block";
+    document.getElementById("conteneur-table-effets").style.display = "none";
+    await window.chargerTableauEffets();
+};
+
+window.chargerTableauEffets = async function() {
+    const tbody = document.getElementById("tbody-effets");
+    tbody.innerHTML = "";
+    
+    try {
+        const q = query(collection(db, "Combat_Effets"), orderBy("Modificateur", "asc"), orderBy("Nom", "asc"));
+        const snap = await getDocs(q);
+        
+        // Si la base de données est vide, on affiche le bouton d'injection
+        if (snap.empty) {
+            document.getElementById("btn-injecter-effets").style.display = "inline-block";
+        } else {
+            document.getElementById("btn-injecter-effets").style.display = "none";
+        }
+
+        snap.forEach(docSnap => {
+            window.ajouterLigneEffetHTML(docSnap.id, docSnap.data());
+        });
+
+        document.getElementById("chargement-effets").style.display = "none";
+        document.getElementById("conteneur-table-effets").style.display = "block";
+
+    } catch (e) {
+        console.error("Erreur chargement effets :", e);
+        document.getElementById("chargement-effets").innerText = "Interférence magique lors de la lecture.";
+    }
+};
+
+window.ajouterLigneEffetHTML = function(id, data = {Nom: "", Cout_PT: "", Modificateur: "", Effet_Base: "", Notes: ""}) {
+    const tbody = document.getElementById("tbody-effets");
+    const tr = document.createElement("tr");
+    tr.id = `ligne-effet-${id}`;
+
+    tr.innerHTML = `
+        <td><input type="text" id="nom-${id}" value="${data.Nom || ''}"></td>
+        <td><input type="text" id="cout-${id}" value="${data.Cout_PT || ''}" style="text-align: center;"></td>
+        <td><input type="text" id="mod-${id}" value="${data.Modificateur || ''}"></td>
+        <td><textarea id="effet-${id}">${data.Effet_Base || ''}</textarea></td>
+        <td><textarea id="notes-${id}">${data.Notes || ''}</textarea></td>
+        <td style="text-align: center; vertical-align: middle;">
+            <button class="btn-sauver-ligne" onclick="jouerSonClic(); window.sauvegarderEffetLigne('${id}')">💾</button>
+        </td>
+    `;
+    tbody.appendChild(tr);
+};
+
+window.sauvegarderEffetLigne = async function(id) {
+    const btn = document.querySelector(`#ligne-effet-${id} .btn-sauver-ligne`);
+    if (btn) btn.innerText = "⏳";
+
+    const newData = {
+        Nom: document.getElementById(`nom-${id}`).value,
+        Cout_PT: document.getElementById(`cout-${id}`).value,
+        Modificateur: document.getElementById(`mod-${id}`).value,
+        Effet_Base: document.getElementById(`effet-${id}`).value,
+        Notes: document.getElementById(`notes-${id}`).value
+    };
+
+    try {
+        await setDoc(doc(db, "Combat_Effets", id), newData, { merge: true });
+        if (btn) {
+            btn.innerText = "✔️";
+            btn.style.backgroundColor = "#00ffff";
+            btn.style.color = "#000";
+            setTimeout(() => {
+                btn.innerText = "💾";
+                btn.style.backgroundColor = "#1b6e3a";
+                btn.style.color = "white";
+            }, 1500);
+        }
+    } catch (e) {
+        console.error("Erreur sauvegarde effet :", e);
+        if (btn) btn.innerText = "✖️";
+    }
+};
+
+window.ajouterLigneEffetVide = function() {
+    const nouvelId = "EFFET_" + Math.random().toString(36).substring(2, 9);
+    window.ajouterLigneEffetHTML(nouvelId);
+    
+    // Scrolle tout en bas du tableau pour voir la nouvelle ligne
+    const conteneur = document.getElementById("conteneur-table-effets");
+    conteneur.scrollTop = conteneur.scrollHeight;
+};
+
+// SCRIPT TEMPORAIRE D'INJECTION (Traduction exacte de ton fichier Excel)
+window.injecterEffetsDefaut = async function() {
+    if (!confirm("Attention, cette action va créer les effets d'origine. Confirmer ?")) return;
+    
+    document.getElementById("btn-injecter-effets").innerText = "Injection...";
+    document.getElementById("btn-injecter-effets").disabled = true;
+
+    const effetsBase = [
+        { Nom: "Attaque lourde", Cout_PT: "1", Modificateur: "FORCE", Effet_Base: "2 dégats physique", Notes: "" },
+        { Nom: "Étourdit", Cout_PT: "1", Modificateur: "FORCE", Effet_Base: "10% chance d'étourdir sur 2 tours (Max 50%)", Notes: "EFFET ETAT ÉTOURDIT = - 20% de chance d'esquive / Parade ET 10% de chance de louper sa technique" },
+        { Nom: "Poussée", Cout_PT: "1", Modificateur: "FORCE", Effet_Base: "10% chance de poussée la cible de 2 hexagones en ligne droite. Max 50% (peut effectuer son déplacement ensuite)", Notes: "Ne génère pas d'attaque d'opportunité" },
+        { Nom: "Attaque légère", Cout_PT: "1", Modificateur: "DEXTÉRITÉ", Effet_Base: "2 dégats physique", Notes: "" },
+        { Nom: "Distance", Cout_PT: "1", Modificateur: "DEXTÉRITÉ", Effet_Base: "1 hexagone", Notes: "" },
+        { Nom: "Empoisonnement", Cout_PT: "1", Modificateur: "DEXTÉRITÉ", Effet_Base: "10% chance d'empoisonner (Max70%) Dure 2 tours(fixe)", Notes: "Baisse la fatigue de la cible de 15 Fatigue et enlève 8% PV max/ Sur 2 tours. Pas de cumul d'empoisonnement. Durée et effet prédéterminée et fixe = 2 tours —— Doit etre lié a une source de dégât (ce qui détermine le type de dégât de l'empoisonnement. Effet immédiat et Début de tour" },
+        { Nom: "Bond", Cout_PT: "6", Modificateur: "DEXTÉRITÉ", Effet_Base: "Saute de 2 cases.", Notes: "Pas d'attaque d'opportunité" },
+        { Nom: "Attaque Magique", Cout_PT: "1", Modificateur: "INTELLIGENCE", Effet_Base: "2 dégâts magique", Notes: "ÉLÉMENT(s) ou ARCANIQUE Au CHOIX" },
+        { Nom: "Glacé", Cout_PT: "1", Modificateur: "INTELLIGENCE", Effet_Base: "10% chance de gelée sur 2 tour (Max 60%)", Notes: "EFFET ÉTAT GLACÉ = Mouvement Coût doublé" },
+        { Nom: "Brûlé", Cout_PT: "1", Modificateur: "INTELLIGENCE", Effet_Base: "10% chance de brûlure sur 2 tour (Max 60%)", Notes: "EFFET ÉTAT BRÛLÉ = - 50% de soins reçus" },
+        { Nom: "Électrifié", Cout_PT: "1", Modificateur: "INTELLIGENCE", Effet_Base: "10% chance de baisser Initiative de 35 (max 60)", Notes: "" },
+        { Nom: "Traction magique", Cout_PT: "1", Modificateur: "INTELLIGENCE", Effet_Base: "15% chance de faire sur 3 hexagone (max 60%)", Notes: "" },
+        { Nom: "Soin", Cout_PT: "1", Modificateur: "SAGESSE", Effet_Base: "2 soins", Notes: "" },
+        { Nom: "Purification", Cout_PT: "6", Modificateur: "SAGESSE", Effet_Base: "50% chance d'enlever tous les effets négatifs. (Max 100%)", Notes: "" },
+        { Nom: "Bouclier magique", Cout_PT: "10", Modificateur: "SAGESSE", Effet_Base: "Créer un bouclier de 30% des pv restants de la cible. (Max 20PV) Ne se crée pas si la cible a moins de 30PV", Notes: "" },
+        { Nom: "Absorption", Cout_PT: "4", Modificateur: "SAGESSE", Effet_Base: "Annule 20% des dégats et 10% des dégats de l'attaque sont convertis en soin (max 100% calcul avant armure)", Notes: "" },
+        { Nom: "Contre", Cout_PT: "4", Modificateur: "SAGESSE", Effet_Base: "Annule 20% des dégats et 10% des dégats de l'attaque sont convertis en dégats à l'ennemi lanceur. (max 100% calcul avant armure)", Notes: "" },
+        { Nom: "Mots de pouvoirs", Cout_PT: "1", Modificateur: "CHARISME", Effet_Base: "1 dégat brut", Notes: "" },
+        { Nom: "Confusion", Cout_PT: "1", Modificateur: "CHARISME", Effet_Base: "4% chance d'appliquer confusion (Max 40%) Dure 2 tours", Notes: "" },
+        { Nom: "Peur", Cout_PT: "1", Modificateur: "CHARISME", Effet_Base: "6% chance de faire Peur (Max 60%)", Notes: "" },
+        { Nom: "Immobilisation", Cout_PT: "1", Modificateur: "CHARISME", Effet_Base: "8% chance d'immobilité (Max 40%) Dure 2 tours", Notes: "" },
+        { Nom: "Provocations", Cout_PT: "1", Modificateur: "CHARISME", Effet_Base: "20% chance de provoquer la cible (Max 60%) Dure 2 Tours", Notes: "" },
+        { Nom: "Illusion", Cout_PT: "9", Modificateur: "CHARISME", Effet_Base: "Créer une seule illusion de 1PV", Notes: "" },
+        { Nom: "Paralysie", Cout_PT: "12", Modificateur: "CHARISME", Effet_Base: "L'ennemi perd la fatigue prévue de sa compétence. Pas de bonus d'impossibilité de compétence.", Notes: "" },
+        { Nom: "Zone", Cout_PT: "1,5", Modificateur: "AUCUN", Effet_Base: "1 hexagone", Notes: "" },
+        { Nom: "Initiative +", Cout_PT: "1", Modificateur: "AUCUN", Effet_Base: "Gain de 8 Initiative (max48 Init+)", Notes: "" },
+        { Nom: "Durée +", Cout_PT: "5", Modificateur: "AUCUN", Effet_Base: "+1 tour (max 1 Tours en +)", Notes: "" },
+        { Nom: "Persistance terrain", Cout_PT: "5", Modificateur: "AUCUN", Effet_Base: "+3 tours (max 3)", Notes: "" },
+        { Nom: "Durée étalement dégâts", Cout_PT: "Gain : / 1,2", Modificateur: "AUCUN", Effet_Base: "Degats divisés par 2 sur 2 tours", Notes: "" }
+    ];
+
+    const batch = writeBatch(db);
+    
+    effetsBase.forEach(eff => {
+        // Crée un ID propre (ex: "ATTR_ATTAQUE_LOURDE")
+        const cleanId = "EFF_" + eff.Nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "_").toUpperCase();
+        const docRef = doc(db, "Combat_Effets", cleanId);
+        batch.set(docRef, eff);
+    });
+
+    try {
+        await batch.commit();
+        await window.chargerTableauEffets();
+        alert("Les manuscrits antiques ont été intégrés avec succès !");
+    } catch(e) {
+        console.error(e);
+        alert("Échec de l'injection.");
+        document.getElementById("btn-injecter-effets").innerText = "Injecter le fichier Excel";
+        document.getElementById("btn-injecter-effets").disabled = false;
+    }
+};
+
+// =========================================================================
 //  PERSONNAGES / FICHE PERSO
 // =========================================================================
 function remplirSelectFactions(factions) {
@@ -3696,6 +3852,13 @@ Object.assign(window, {
   fermerAlerteCles, ouvrirParametresDepuisAlerte,
   // Outils
   syncTemperature, sauvegarderTemperature, basculerAffichageTokens, toggleMicro,
+  // Gestion Effets de Combat
+  ouvrirGestionEffets: window.ouvrirGestionEffets,
+  chargerTableauEffets: window.chargerTableauEffets,
+  ajouterLigneEffetHTML: window.ajouterLigneEffetHTML,
+  sauvegarderEffetLigne: window.sauvegarderEffetLigne,
+  ajouterLigneEffetVide: window.ajouterLigneEffetVide,
+  injecterEffetsDefaut: window.injecterEffetsDefaut,
   // Gestion de la Date
   ouvrirGestionDate, fermerGestionDate, modifierJoursAAjouter, validerChangementDate, demarrerDefilementJours, arreterDefilementJours,
   // Grille Hexagonale & Pion
