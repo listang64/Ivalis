@@ -13,11 +13,11 @@ body, html {
   margin: 0;
   padding: 0;
   width: 100%;
-  height: 100vh; /* Fallback pour les vieux navigateurs */
-  height: 100dvh; /* S'adapte dynamiquement si le clavier iPad s'ouvre ! */
+  height: 100%; /* 100% au lieu de vh/dvh */
+  position: fixed; /* L'astuce ultime pour bloquer l'écran sur iPad */
   overflow: hidden;
   background-color: #000;
-  touch-action: none; /* Empêche l'écran de "rebondir" quand tu glisses le doigt */
+  touch-action: none;
 }
 
 /* --- SCENE 1 : L'ACCUEIL --- */
@@ -341,8 +341,7 @@ body, html {
   display: none;
   position: fixed;
   top: 0; left: 0;
-  width: 100vw; height: 100vh;
-  /* background-color: #F5F5DC; 🔻 CORRECTION : On supprime cette ligne qui cachait la carte 🔻 */
+  width: 100%; height: 100%; /* % au lieu de vw/vh */
   z-index: 20;
   overflow: hidden;
 }
@@ -353,10 +352,9 @@ body, html {
 #conteneur-carte-fond {
   position: absolute;
   top: 0; left: 0;
-  width: 100vw; height: 100vh;
+  width: 100%; height: 100%; /* % au lieu de vw/vh */
   overflow: hidden; 
-  z-index: 0; /* 🔻 CORRECTION : On passe de -1 à 0 pour qu'il reste au niveau du sol 🔻 */
-  /* NOUVEAU : Le fond crème fidèle au thème d'Ivalis */
+  z-index: 0;
   background-color: #F5F5DC;
 }
 
@@ -384,18 +382,20 @@ body, html {
 /* --- LE MENU LATERAL FIXE --- */
 #menu-lateral {
   position: fixed;
-  right: 0;
-  top: 2vh;
+  right: 15px; /* On décolle du bord ! */
+  top: 15px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 1.5vh;
-  z-index: 9999; /* 🔻 CORRECTION : Assure le passage au-dessus des images 🔻 */
+  gap: 15px;
+  z-index: 9999;
 }
 
 /* --- LES ICONES GLOBALES --- */
 .icone-menu {
-  width: 10vw;
+  width: 7vw;
+  min-width: 50px; /* Sécurité iPad */
+  max-width: 70px; /* Sécurité PC */
   height: auto;
   cursor: pointer;
   filter: drop-shadow(0px 10px 15px rgba(0, 0, 0, 0.8));
@@ -408,8 +408,9 @@ body, html {
 
 /* --- LE PREMIER BOUTON GEANT (Le parchemin de Date) --- */
 .icone-menu:first-child {
-  /* Taille intermédiaire pour un bon compromis */
-  width: 15vw; 
+  width: 12vw;
+  min-width: 110px;
+  max-width: 160px;
   position: relative;
 }
 
@@ -427,19 +428,15 @@ body, html {
   transform: translate(-50%, -50%);
   text-align: center;
   color: #2c1e16;
-  
-  /* Police intermédiaire */
-  font-size: 1.35vw; 
-  
+  font-size: 14px; /* Taille fixe pour éviter que ça déborde du parchemin */
   font-weight: bold;
-  width: 80%;
+  width: 90%;
   pointer-events: none;
   line-height: 1.4;
 }
 
 .texte-sur-parchemin span {
-  /* Chiffres intermédiaires */
-  font-size: 1.65vw; 
+  font-size: 18px; /* Taille fixe */
   font-weight: 900;
 }
 
@@ -448,7 +445,9 @@ body, html {
    ========================================= */
 .conteneur-bouton-lateral {
   position: relative;
-  width: 10vw;
+  width: 7vw;
+  min-width: 50px;
+  max-width: 70px;
   display: flex;
   justify-content: flex-end;
 }
@@ -499,16 +498,16 @@ body, html {
 /* --- LE MENU DE NAVIGATION (BAS DROITE) --- */
 #menu-navigation-bas {
   position: absolute;
-  bottom: 2vh;
-  right: 1.5vw;
+  bottom: 15px; /* On décolle du bas */
+  right: 15px;  /* On décolle de la droite */
   display: flex;
   flex-direction: row;
-  gap: 0.8vw;
-  z-index: 9999; /* 🔻 CORRECTION : Assure le passage au-dessus des images 🔻 */
+  gap: 15px;
+  z-index: 9999;
 }
 
 .icone-nav {
-  width: 1.8vw;
+  width: 40px; /* Taille robuste pour le tactile */
   height: auto;
   cursor: pointer;
   filter: drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.6));
@@ -1134,7 +1133,7 @@ textarea.input-texte-parchemin {
 .bulle-lieu {
     background: linear-gradient(135deg, #5c3a21, #2a1a0f) !important;
     border-bottom: 3px solid #c2a878 !important;
-    margin-left: auto; /* Magie Flexbox : pousse la bulle tout à droite ! */
+    margin-left: 20px; /* Sépare légèrement la bulle du MJ, sans l'envoyer au fond à droite ! */
 }
 
 .bulle-lieu:hover {
