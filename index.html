@@ -397,35 +397,41 @@
     </div>
 
     <!-- ======================================================= -->
-    <!-- NOUVEAU : FENÊTRE EFFETS DE COMBAT                      -->
+    <!-- NOUVEAU : FENÊTRE EFFETS DE COMBAT (MOTEUR)             -->
     <!-- ======================================================= -->
     <div id="etape-gestion-effets" class="fenetre-volante-parchemin-large fondu-interne" style="display: none; opacity: 0;">
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #5c3a21; margin-bottom: 20px; padding-bottom: 10px;">
-        <h2 style="margin: 0; border: none; padding: 0;">Grimoire des Effets</h2>
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #5c3a21; margin-bottom: 10px; padding-bottom: 10px;">
+        <h2 style="margin: 0; border: none; padding: 0;">Grimoire du Moteur (Effets)</h2>
         <div style="display: flex; gap: 10px;">
-          <!-- Bouton temporaire d'injection -->
-          <button class="btn-parametres btn-supprimer" id="btn-injecter-effets" style="display: none;" onclick="jouerSonClic(); window.injecterEffetsDefaut()">Injecter le fichier Excel</button>
+          <!-- Bouton d'écrasement de la base -->
+          <button class="btn-parametres btn-supprimer" id="btn-injecter-effets" onclick="jouerSonClic(); window.purgerEtInjecterEffets()">⚠️ Réinitialiser la BDD</button>
           <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-gestion-effets', 'etape-menu-outils')">Retour</button>
         </div>
       </div>
       
-      <div id="chargement-effets" style="font-style: italic;">Lecture des anciens parchemins...</div>
+      <div id="chargement-effets" style="font-style: italic;">Lecture du cœur algorithmique...</div>
       
-      <div id="conteneur-table-effets" style="display: none; max-height: 65vh; overflow-y: auto;">
+      <div id="conteneur-table-effets" style="display: none; max-height: 70vh; overflow-y: auto;">
         <table class="table-effets-ivalis">
           <thead>
             <tr>
-              <th style="width: 15%;">Nom de l'Effet</th>
-              <th style="width: 10%;">Coût (PT)</th>
-              <th style="width: 15%;">Modificateur</th>
-              <th style="width: 30%;">Description de l'Effet</th>
-              <th style="width: 25%;">Notes / Règles</th>
-              <th style="width: 5%;">Sauver</th>
+              <th style="width: 10%;">Nom</th>
+              <th style="width: 5%;">PT</th>
+              <th style="width: 8%;">Mod.</th>
+              <th style="width: 9%;">Type Méc.</th>
+              <th style="width: 8%;">Cible/État</th>
+              <th style="width: 4%;">Val.</th>
+              <th style="width: 5%;">%Base</th>
+              <th style="width: 5%;">%Max</th>
+              <th style="width: 4%;">Trs</th>
+              <th style="width: 17%;">Description (Joueur)</th>
+              <th style="width: 15%;">Notes (MJ)</th>
+              <th style="width: 6%; text-align: center;">Action</th>
             </tr>
           </thead>
           <tbody id="tbody-effets"></tbody>
         </table>
-        <button class="btn-parametres" style="margin-top: 20px;" onclick="jouerSonClic(); window.ajouterLigneEffetVide()">+ Nouvel Effet Vierge</button>
+        <button class="btn-parametres" style="margin-top: 15px;" onclick="jouerSonClic(); window.ajouterLigneEffetVide()">+ Nouvel Effet Vierge</button>
       </div>
     </div>
 

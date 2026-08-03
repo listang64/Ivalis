@@ -1872,7 +1872,7 @@ async function validerSuppression() {
 }
 
 // =========================================================================
-//  GESTION DES EFFETS DE COMBAT (BDD)
+//  GESTION DES EFFETS DE COMBAT (MOTEUR ALGORITHMIQUE)
 // =========================================================================
 
 window.ouvrirGestionEffets = async function() {
@@ -1887,35 +1887,27 @@ window.chargerTableauEffets = async function() {
     tbody.innerHTML = "";
     
     try {
-        // Requête simple sans double tri pour éviter l'erreur d'index Firebase
         const q = query(collection(db, "Combat_Effets"));
         const snap = await getDocs(q);
         
-        // Si la base de données est vide, on affiche le bouton d'injection
-        if (snap.empty) {
-            document.getElementById("btn-injecter-effets").style.display = "inline-block";
-        } else {
-            document.getElementById("btn-injecter-effets").style.display = "none";
-            
-            // On trie manuellement en Javascript
-            let effetsList = [];
-            snap.forEach(docSnap => {
-                effetsList.push({ id: docSnap.id, data: docSnap.data() });
-            });
-            
-            effetsList.sort((a, b) => {
-                let modA = a.data.Modificateur || "";
-                let modB = b.data.Modificateur || "";
-                if (modA !== modB) return modA.localeCompare(modB);
-                let nomA = a.data.Nom || "";
-                let nomB = b.data.Nom || "";
-                return nomA.localeCompare(nomB);
-            });
+        let effetsList = [];
+        snap.forEach(docSnap => {
+            effetsList.push({ id: docSnap.id, data: docSnap.data() });
+        });
+        
+        // Tri intelligent (Modificateur PUIS Nom)
+        effetsList.sort((a, b) => {
+            let modA = a.data.Modificateur || "";
+            let modB = b.data.Modificateur || "";
+            if (modA !== modB) return modA.localeCompare(modB);
+            let nomA = a.data.Nom || "";
+            let nomB = b.data.Nom || "";
+            return nomA.localeCompare(nomB);
+        });
 
-            effetsList.forEach(item => {
-                window.ajouterLigneEffetHTML(item.id, item.data);
-            });
-        }
+        effetsList.forEach(item => {
+            window.ajouterLigneEffetHTML(item.id, item.data);
+        });
 
         document.getElementById("chargement-effets").style.display = "none";
         document.getElementById("conteneur-table-effets").style.display = "block";
@@ -1926,19 +1918,38 @@ window.chargerTableauEffets = async function() {
     }
 };
 
-window.ajouterLigneEffetHTML = function(id, data = {Nom: "", Cout_PT: "", Modificateur: "", Effet_Base: "", Notes: ""}) {
+window.ajouterLigneEffetHTML = function(id, data = {}) {
+    const d = {
+        Nom: data.Nom || "", Cout_PT: data.Cout_PT || "", Modificateur: data.Modificateur || "AUCUN",
+        Type_Mecanique: data.Type_Mecanique || "Degats", Cible_Etat: data.Cible_Etat || "",
+        Valeur: data.Valeur || 0, Pourcent_Base: data.Pourcent_Base || 0,
+        Pourcent_Max: data.Pourcent_Max || 0, Tours: data.Tours || 0,
+        Effet_Base: data.Effet_Base || "", Notes: data.Notes || ""
+    };
+
     const tbody = document.getElementById("tbody-effets");
     const tr = document.createElement("tr");
     tr.id = `ligne-effet-${id}`;
 
+    // Options du dropdown
+    const typesDispos = ["Degats", "Alteration", "Deplacement", "Soin", "Defense", "Portee", "Bonus", "Special"];
+    let optionsType = typesDispos.map(t => `<option value="${t}" ${d.Type_Mecanique === t ? 'selected' : ''}>${t}</option>`).join("");
+
     tr.innerHTML = `
-        <td><input type="text" id="nom-${id}" value="${data.Nom || ''}"></td>
-        <td><input type="text" id="cout-${id}" value="${data.Cout_PT || ''}" style="text-align: center;"></td>
-        <td><input type="text" id="mod-${id}" value="${data.Modificateur || ''}"></td>
-        <td><textarea id="effet-${id}">${data.Effet_Base || ''}</textarea></td>
-        <td><textarea id="notes-${id}">${data.Notes || ''}</textarea></td>
+        <td><input type="text" id="nom-${id}" value="${d.Nom}"></td>
+        <td><input type="text" id="cout-${id}" value="${d.Cout_PT}" style="text-align: center;"></td>
+        <td><input type="text" id="mod-${id}" value="${d.Modificateur}" style="text-align: center;"></td>
+        <td><select id="type-${id}">${optionsType}</select></td>
+        <td><input type="text" id="cible-${id}" value="${d.Cible_Etat}" placeholder="ex: poison"></td>
+        <td><input type="number" id="val-${id}" value="${d.Valeur}" style="text-align: center;"></td>
+        <td><input type="number" id="base-${id}" value="${d.Pourcent_Base}" style="text-align: center;"></td>
+        <td><input type="number" id="max-${id}" value="${d.Pourcent_Max}" style="text-align: center;"></td>
+        <td><input type="number" id="trs-${id}" value="${d.Tours}" style="text-align: center;"></td>
+        <td><textarea id="effet-${id}">${d.Effet_Base}</textarea></td>
+        <td><textarea id="notes-${id}">${d.Notes}</textarea></td>
         <td style="text-align: center; vertical-align: middle;">
             <button class="btn-sauver-ligne" onclick="jouerSonClic(); window.sauvegarderEffetLigne('${id}')">💾</button>
+            <button class="btn-sauver-ligne" style="background-color: darkred; margin-top:5px; padding:2px;" onclick="jouerSonClic(); window.supprimerEffetLigne('${id}')">🗑️</button>
         </td>
     `;
     tbody.appendChild(tr);
@@ -1949,24 +1960,24 @@ window.sauvegarderEffetLigne = async function(id) {
     if (btn) btn.innerText = "⏳";
 
     const newData = {
-        Nom: document.getElementById(`nom-${id}`).value,
-        Cout_PT: document.getElementById(`cout-${id}`).value,
-        Modificateur: document.getElementById(`mod-${id}`).value,
-        Effet_Base: document.getElementById(`effet-${id}`).value,
-        Notes: document.getElementById(`notes-${id}`).value
+        Nom: document.getElementById(`nom-${id}`).value.trim(),
+        Cout_PT: document.getElementById(`cout-${id}`).value.trim(),
+        Modificateur: document.getElementById(`mod-${id}`).value.trim(),
+        Type_Mecanique: document.getElementById(`type-${id}`).value,
+        Cible_Etat: document.getElementById(`cible-${id}`).value.trim(),
+        Valeur: parseFloat(document.getElementById(`val-${id}`).value) || 0,
+        Pourcent_Base: parseFloat(document.getElementById(`base-${id}`).value) || 0,
+        Pourcent_Max: parseFloat(document.getElementById(`max-${id}`).value) || 0,
+        Tours: parseFloat(document.getElementById(`trs-${id}`).value) || 0,
+        Effet_Base: document.getElementById(`effet-${id}`).value.trim(),
+        Notes: document.getElementById(`notes-${id}`).value.trim()
     };
 
     try {
         await setDoc(doc(db, "Combat_Effets", id), newData, { merge: true });
         if (btn) {
-            btn.innerText = "✔️";
-            btn.style.backgroundColor = "#00ffff";
-            btn.style.color = "#000";
-            setTimeout(() => {
-                btn.innerText = "💾";
-                btn.style.backgroundColor = "#1b6e3a";
-                btn.style.color = "white";
-            }, 1500);
+            btn.innerText = "✔️"; btn.style.backgroundColor = "#00ffff"; btn.style.color = "#000";
+            setTimeout(() => { btn.innerText = "💾"; btn.style.backgroundColor = "#1b6e3a"; btn.style.color = "white"; }, 1500);
         }
     } catch (e) {
         console.error("Erreur sauvegarde effet :", e);
@@ -1974,72 +1985,89 @@ window.sauvegarderEffetLigne = async function(id) {
     }
 };
 
+window.supprimerEffetLigne = async function(id) {
+    if(!confirm("Détruire définitivement cette compétence ?")) return;
+    try {
+        await deleteDoc(doc(db, "Combat_Effets", id));
+        document.getElementById(`ligne-effet-${id}`).remove();
+    } catch(e) { alert("Échec de la suppression."); }
+};
+
 window.ajouterLigneEffetVide = function() {
     const nouvelId = "EFFET_" + Math.random().toString(36).substring(2, 9);
     window.ajouterLigneEffetHTML(nouvelId);
-    
-    // Scrolle tout en bas du tableau pour voir la nouvelle ligne
     const conteneur = document.getElementById("conteneur-table-effets");
     conteneur.scrollTop = conteneur.scrollHeight;
 };
 
-// SCRIPT TEMPORAIRE D'INJECTION (Traduction exacte de ton fichier Excel)
-window.injecterEffetsDefaut = async function() {
-    if (!confirm("Attention, cette action va créer les effets d'origine. Confirmer ?")) return;
+// =========================================================================
+// SCRIPT DE RÉINITIALISATION ET D'ÉCRASEMENT TOTAL DE LA BDD
+// =========================================================================
+window.purgerEtInjecterEffets = async function() {
+    if (!confirm("⚠️ DANGER : Cela va effacer TOUS vos réglages actuels pour injecter la base de données brute d'origine. Confirmer ?")) return;
     
-    document.getElementById("btn-injecter-effets").innerText = "Injection...";
-    document.getElementById("btn-injecter-effets").disabled = true;
+    const btn = document.getElementById("btn-injecter-effets");
+    btn.innerText = "Écrasement en cours...";
+    btn.disabled = true;
 
+    // Matrice de données avec tes colonnes algorithmiques pré-remplies
     const effetsBase = [
-        { Nom: "Attaque lourde", Cout_PT: "1", Modificateur: "FORCE", Effet_Base: "2 dégats physique", Notes: "" },
-        { Nom: "Étourdit", Cout_PT: "1", Modificateur: "FORCE", Effet_Base: "10% chance d'étourdir sur 2 tours (Max 50%)", Notes: "EFFET ETAT ÉTOURDIT = - 20% de chance d'esquive / Parade ET 10% de chance de louper sa technique" },
-        { Nom: "Poussée", Cout_PT: "1", Modificateur: "FORCE", Effet_Base: "10% chance de poussée la cible de 2 hexagones en ligne droite. Max 50% (peut effectuer son déplacement ensuite)", Notes: "Ne génère pas d'attaque d'opportunité" },
-        { Nom: "Attaque légère", Cout_PT: "1", Modificateur: "DEXTÉRITÉ", Effet_Base: "2 dégats physique", Notes: "" },
-        { Nom: "Distance", Cout_PT: "1", Modificateur: "DEXTÉRITÉ", Effet_Base: "1 hexagone", Notes: "" },
-        { Nom: "Empoisonnement", Cout_PT: "1", Modificateur: "DEXTÉRITÉ", Effet_Base: "10% chance d'empoisonner (Max70%) Dure 2 tours(fixe)", Notes: "Baisse la fatigue de la cible de 15 Fatigue et enlève 8% PV max/ Sur 2 tours. Pas de cumul d'empoisonnement. Durée et effet prédéterminée et fixe = 2 tours —— Doit etre lié a une source de dégât (ce qui détermine le type de dégât de l'empoisonnement. Effet immédiat et Début de tour" },
-        { Nom: "Bond", Cout_PT: "6", Modificateur: "DEXTÉRITÉ", Effet_Base: "Saute de 2 cases.", Notes: "Pas d'attaque d'opportunité" },
-        { Nom: "Attaque Magique", Cout_PT: "1", Modificateur: "INTELLIGENCE", Effet_Base: "2 dégâts magique", Notes: "ÉLÉMENT(s) ou ARCANIQUE Au CHOIX" },
-        { Nom: "Glacé", Cout_PT: "1", Modificateur: "INTELLIGENCE", Effet_Base: "10% chance de gelée sur 2 tour (Max 60%)", Notes: "EFFET ÉTAT GLACÉ = Mouvement Coût doublé" },
-        { Nom: "Brûlé", Cout_PT: "1", Modificateur: "INTELLIGENCE", Effet_Base: "10% chance de brûlure sur 2 tour (Max 60%)", Notes: "EFFET ÉTAT BRÛLÉ = - 50% de soins reçus" },
-        { Nom: "Électrifié", Cout_PT: "1", Modificateur: "INTELLIGENCE", Effet_Base: "10% chance de baisser Initiative de 35 (max 60)", Notes: "" },
-        { Nom: "Traction magique", Cout_PT: "1", Modificateur: "INTELLIGENCE", Effet_Base: "15% chance de faire sur 3 hexagone (max 60%)", Notes: "" },
-        { Nom: "Soin", Cout_PT: "1", Modificateur: "SAGESSE", Effet_Base: "2 soins", Notes: "" },
-        { Nom: "Purification", Cout_PT: "6", Modificateur: "SAGESSE", Effet_Base: "50% chance d'enlever tous les effets négatifs. (Max 100%)", Notes: "" },
-        { Nom: "Bouclier magique", Cout_PT: "10", Modificateur: "SAGESSE", Effet_Base: "Créer un bouclier de 30% des pv restants de la cible. (Max 20PV) Ne se crée pas si la cible a moins de 30PV", Notes: "" },
-        { Nom: "Absorption", Cout_PT: "4", Modificateur: "SAGESSE", Effet_Base: "Annule 20% des dégats et 10% des dégats de l'attaque sont convertis en soin (max 100% calcul avant armure)", Notes: "" },
-        { Nom: "Contre", Cout_PT: "4", Modificateur: "SAGESSE", Effet_Base: "Annule 20% des dégats et 10% des dégats de l'attaque sont convertis en dégats à l'ennemi lanceur. (max 100% calcul avant armure)", Notes: "" },
-        { Nom: "Mots de pouvoirs", Cout_PT: "1", Modificateur: "CHARISME", Effet_Base: "1 dégat brut", Notes: "" },
-        { Nom: "Confusion", Cout_PT: "1", Modificateur: "CHARISME", Effet_Base: "4% chance d'appliquer confusion (Max 40%) Dure 2 tours", Notes: "" },
-        { Nom: "Peur", Cout_PT: "1", Modificateur: "CHARISME", Effet_Base: "6% chance de faire Peur (Max 60%)", Notes: "" },
-        { Nom: "Immobilisation", Cout_PT: "1", Modificateur: "CHARISME", Effet_Base: "8% chance d'immobilité (Max 40%) Dure 2 tours", Notes: "" },
-        { Nom: "Provocations", Cout_PT: "1", Modificateur: "CHARISME", Effet_Base: "20% chance de provoquer la cible (Max 60%) Dure 2 Tours", Notes: "" },
-        { Nom: "Illusion", Cout_PT: "9", Modificateur: "CHARISME", Effet_Base: "Créer une seule illusion de 1PV", Notes: "" },
-        { Nom: "Paralysie", Cout_PT: "12", Modificateur: "CHARISME", Effet_Base: "L'ennemi perd la fatigue prévue de sa compétence. Pas de bonus d'impossibilité de compétence.", Notes: "" },
-        { Nom: "Zone", Cout_PT: "1,5", Modificateur: "AUCUN", Effet_Base: "1 hexagone", Notes: "" },
-        { Nom: "Initiative +", Cout_PT: "1", Modificateur: "AUCUN", Effet_Base: "Gain de 8 Initiative (max48 Init+)", Notes: "" },
-        { Nom: "Durée +", Cout_PT: "5", Modificateur: "AUCUN", Effet_Base: "+1 tour (max 1 Tours en +)", Notes: "" },
-        { Nom: "Persistance terrain", Cout_PT: "5", Modificateur: "AUCUN", Effet_Base: "+3 tours (max 3)", Notes: "" },
-        { Nom: "Durée étalement dégâts", Cout_PT: "Gain : / 1,2", Modificateur: "AUCUN", Effet_Base: "Degats divisés par 2 sur 2 tours", Notes: "" }
+        { Nom: "Attaque lourde", Cout_PT: "1", Modificateur: "FORCE", Type_Mecanique: "Degats", Cible_Etat: "physique", Valeur: 2, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "2 dégats physique", Notes: "" },
+        { Nom: "Étourdit", Cout_PT: "1", Modificateur: "FORCE", Type_Mecanique: "Alteration", Cible_Etat: "etourdi", Valeur: 0, Pourcent_Base: 10, Pourcent_Max: 50, Tours: 2, Effet_Base: "10% chance d'étourdir sur 2 tours (Max 50%)", Notes: "EFFET ETAT ÉTOURDIT = - 20% de chance d'esquive / Parade ET 10% de chance de louper sa technique" },
+        { Nom: "Poussée", Cout_PT: "1", Modificateur: "FORCE", Type_Mecanique: "Deplacement", Cible_Etat: "poussee", Valeur: 2, Pourcent_Base: 10, Pourcent_Max: 50, Tours: 0, Effet_Base: "10% chance de poussée la cible de 2 hexagones en ligne droite.", Notes: "Ne génère pas d'attaque d'opportunité" },
+        { Nom: "Attaque légère", Cout_PT: "1", Modificateur: "DEXTÉRITÉ", Type_Mecanique: "Degats", Cible_Etat: "physique", Valeur: 2, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "2 dégats physique", Notes: "" },
+        { Nom: "Distance", Cout_PT: "1", Modificateur: "DEXTÉRITÉ", Type_Mecanique: "Portee", Cible_Etat: "distance", Valeur: 1, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "1 hexagone", Notes: "" },
+        { Nom: "Empoisonnement", Cout_PT: "1", Modificateur: "DEXTÉRITÉ", Type_Mecanique: "Alteration", Cible_Etat: "poison", Valeur: 0, Pourcent_Base: 10, Pourcent_Max: 70, Tours: 2, Effet_Base: "10% chance d'empoisonner (Max70%) Dure 2 tours(fixe)", Notes: "Baisse la fatigue de la cible de 15 Fatigue et enlève 8% PV max." },
+        { Nom: "Bond", Cout_PT: "6", Modificateur: "DEXTÉRITÉ", Type_Mecanique: "Deplacement", Cible_Etat: "bond", Valeur: 2, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "Saute de 2 cases.", Notes: "Pas d'attaque d'opportunité" },
+        { Nom: "Attaque Magique", Cout_PT: "1", Modificateur: "INTELLIGENCE", Type_Mecanique: "Degats", Cible_Etat: "magique", Valeur: 2, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "2 dégâts magique", Notes: "ÉLÉMENT(s) ou ARCANIQUE Au CHOIX" },
+        { Nom: "Glacé", Cout_PT: "1", Modificateur: "INTELLIGENCE", Type_Mecanique: "Alteration", Cible_Etat: "glace", Valeur: 0, Pourcent_Base: 10, Pourcent_Max: 60, Tours: 2, Effet_Base: "10% chance de gelée sur 2 tour (Max 60%)", Notes: "Mouvement Coût doublé" },
+        { Nom: "Brûlé", Cout_PT: "1", Modificateur: "INTELLIGENCE", Type_Mecanique: "Alteration", Cible_Etat: "brule", Valeur: 0, Pourcent_Base: 10, Pourcent_Max: 60, Tours: 2, Effet_Base: "10% chance de brûlure sur 2 tour (Max 60%)", Notes: "- 50% de soins reçus" },
+        { Nom: "Électrifié", Cout_PT: "1", Modificateur: "INTELLIGENCE", Type_Mecanique: "Alteration", Cible_Etat: "electrifie", Valeur: 35, Pourcent_Base: 10, Pourcent_Max: 60, Tours: 0, Effet_Base: "10% chance de baisser Initiative de 35 (max 60)", Notes: "" },
+        { Nom: "Traction magique", Cout_PT: "1", Modificateur: "INTELLIGENCE", Type_Mecanique: "Deplacement", Cible_Etat: "traction", Valeur: 3, Pourcent_Base: 15, Pourcent_Max: 60, Tours: 0, Effet_Base: "15% chance de faire sur 3 hexagone (max 60%)", Notes: "" },
+        { Nom: "Soin", Cout_PT: "1", Modificateur: "SAGESSE", Type_Mecanique: "Soin", Cible_Etat: "pv", Valeur: 2, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "2 soins", Notes: "" },
+        { Nom: "Purification", Cout_PT: "6", Modificateur: "SAGESSE", Type_Mecanique: "Defense", Cible_Etat: "purification", Valeur: 0, Pourcent_Base: 50, Pourcent_Max: 100, Tours: 0, Effet_Base: "50% chance d'enlever tous les effets négatifs.", Notes: "" },
+        { Nom: "Bouclier magique", Cout_PT: "10", Modificateur: "SAGESSE", Type_Mecanique: "Defense", Cible_Etat: "bouclier", Valeur: 30, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "Créer un bouclier de 30% des pv restants.", Notes: "" },
+        { Nom: "Absorption", Cout_PT: "4", Modificateur: "SAGESSE", Type_Mecanique: "Defense", Cible_Etat: "absorption", Valeur: 20, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "Annule 20% des dégats et 10% convertis en soin", Notes: "" },
+        { Nom: "Contre", Cout_PT: "4", Modificateur: "SAGESSE", Type_Mecanique: "Defense", Cible_Etat: "contre", Valeur: 20, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "Annule 20% des dégats et 10% convertis en dégats", Notes: "" },
+        { Nom: "Mots de pouvoirs", Cout_PT: "1", Modificateur: "CHARISME", Type_Mecanique: "Degats", Cible_Etat: "brut", Valeur: 1, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "1 dégat brut", Notes: "" },
+        { Nom: "Confusion", Cout_PT: "1", Modificateur: "CHARISME", Type_Mecanique: "Alteration", Cible_Etat: "confusion", Valeur: 0, Pourcent_Base: 4, Pourcent_Max: 40, Tours: 2, Effet_Base: "4% chance d'appliquer confusion (Max 40%)", Notes: "" },
+        { Nom: "Peur", Cout_PT: "1", Modificateur: "CHARISME", Type_Mecanique: "Alteration", Cible_Etat: "peur", Valeur: 0, Pourcent_Base: 6, Pourcent_Max: 60, Tours: 0, Effet_Base: "6% chance de faire Peur (Max 60%)", Notes: "" },
+        { Nom: "Immobilisation", Cout_PT: "1", Modificateur: "CHARISME", Type_Mecanique: "Alteration", Cible_Etat: "immobilisation", Valeur: 0, Pourcent_Base: 8, Pourcent_Max: 40, Tours: 2, Effet_Base: "8% chance d'immobilité (Max 40%)", Notes: "" },
+        { Nom: "Provocations", Cout_PT: "1", Modificateur: "CHARISME", Type_Mecanique: "Alteration", Cible_Etat: "provocation", Valeur: 0, Pourcent_Base: 20, Pourcent_Max: 60, Tours: 2, Effet_Base: "20% chance de provoquer la cible (Max 60%)", Notes: "" },
+        { Nom: "Illusion", Cout_PT: "9", Modificateur: "CHARISME", Type_Mecanique: "Special", Cible_Etat: "illusion", Valeur: 1, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "Créer une seule illusion de 1PV", Notes: "" },
+        { Nom: "Paralysie", Cout_PT: "12", Modificateur: "CHARISME", Type_Mecanique: "Alteration", Cible_Etat: "paralysie", Valeur: 0, Pourcent_Base: 100, Pourcent_Max: 100, Tours: 1, Effet_Base: "L'ennemi perd la fatigue prévue de sa compétence.", Notes: "" },
+        { Nom: "Zone", Cout_PT: "1.5", Modificateur: "AUCUN", Type_Mecanique: "Portee", Cible_Etat: "zone", Valeur: 1, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "1 hexagone", Notes: "" },
+        { Nom: "Initiative +", Cout_PT: "1", Modificateur: "AUCUN", Type_Mecanique: "Bonus", Cible_Etat: "initiative", Valeur: 8, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "Gain de 8 Initiative", Notes: "" },
+        { Nom: "Durée +", Cout_PT: "5", Modificateur: "AUCUN", Type_Mecanique: "Bonus", Cible_Etat: "duree", Valeur: 1, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "+1 tour", Notes: "" },
+        { Nom: "Persistance terrain", Cout_PT: "5", Modificateur: "AUCUN", Type_Mecanique: "Bonus", Cible_Etat: "persistance", Valeur: 3, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "+3 tours (max 3)", Notes: "" },
+        { Nom: "Durée étalement dégâts", Cout_PT: "Cout / 1.2", Modificateur: "AUCUN", Type_Mecanique: "Special", Cible_Etat: "etalement", Valeur: 2, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 2, Effet_Base: "Degats divisés par 2 sur 2 tours", Notes: "" }
     ];
 
-    const batch = writeBatch(db);
-    
-    effetsBase.forEach(eff => {
-        // Crée un ID propre (ex: "ATTR_ATTAQUE_LOURDE")
-        const cleanId = "EFF_" + eff.Nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "_").toUpperCase();
-        const docRef = doc(db, "Combat_Effets", cleanId);
-        batch.set(docRef, eff);
-    });
-
     try {
-        await batch.commit();
+        // 1. Purge (Suppression de l'ancienne collection)
+        const q = query(collection(db, "Combat_Effets"));
+        const snap = await getDocs(q);
+        const batchDelete = writeBatch(db);
+        snap.forEach(docSnap => batchDelete.delete(docSnap.ref));
+        await batchDelete.commit();
+
+        // 2. Injection de la nouvelle matrice mathématique
+        const batchInsert = writeBatch(db);
+        effetsBase.forEach(eff => {
+            const cleanId = "EFF_" + eff.Nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "_").toUpperCase();
+            const docRef = doc(db, "Combat_Effets", cleanId);
+            batchInsert.set(docRef, eff);
+        });
+        await batchInsert.commit();
+        
         await window.chargerTableauEffets();
-        alert("Les manuscrits antiques ont été intégrés avec succès !");
+        alert("La base de données a été purgée et réinitialisée avec succès !");
     } catch(e) {
         console.error(e);
-        alert("Échec de l'injection.");
-        document.getElementById("btn-injecter-effets").innerText = "Injecter le fichier Excel";
-        document.getElementById("btn-injecter-effets").disabled = false;
+        alert("Échec de l'écrasement de la base.");
+    } finally {
+        btn.innerText = "⚠️ Réinitialiser la BDD";
+        btn.disabled = false;
     }
 };
 
@@ -3874,7 +3902,8 @@ Object.assign(window, {
   ajouterLigneEffetHTML: window.ajouterLigneEffetHTML,
   sauvegarderEffetLigne: window.sauvegarderEffetLigne,
   ajouterLigneEffetVide: window.ajouterLigneEffetVide,
-  injecterEffetsDefaut: window.injecterEffetsDefaut,
+  supprimerEffetLigne: window.supprimerEffetLigne,
+  purgerEtInjecterEffets: window.purgerEtInjecterEffets,
   // Gestion de la Date
   ouvrirGestionDate, fermerGestionDate, modifierJoursAAjouter, validerChangementDate, demarrerDefilementJours, arreterDefilementJours,
   // Grille Hexagonale & Pion
