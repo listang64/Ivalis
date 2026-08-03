@@ -384,41 +384,35 @@ body, html {
 
 /* --- LE MENU LATERAL FIXE --- */
 #menu-lateral {
-  position: absolute;
-  right: 30px; /* On décolle massivement du bord droit pour laisser respirer l'ombre */
-  top: 30px;
+  position: fixed;
+  right: 20px; /* NOUVEAU : On décolle du bord pour éviter de couper l'ombre */
+  top: 2vh;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 25px; /* Plus d'espace entre les boutons */
+  gap: 1.5vh;
   z-index: 9999;
 }
 
 /* --- LES ICONES GLOBALES --- */
 .icone-menu {
-  width: 9vw; /* Boutons beaucoup plus gros */
-  min-width: 80px; /* Minimum garanti pour iPad */
-  max-width: 110px; /* Maximum pour PC */
+  width: 15vw; /* ANCIEN: 10vw -> x1.5 = 15vw */
   height: auto;
   cursor: pointer;
-  /* L'OMBRE MAGIQUE : -10px en X la projette à GAUCHE, loin de la coupure de l'écran ! */
-  filter: drop-shadow(-10px 10px 12px rgba(0, 0, 0, 0.7));
+  /* NOUVEAU : On jette l'ombre vers la gauche (-10px) pour éviter la bordure de l'écran */
+  filter: drop-shadow(-10px 10px 15px rgba(0, 0, 0, 0.8));
   transition: filter 0.3s ease, transform 0.2s ease;
-  display: block;
 }
 
 .icone-menu:hover {
-  filter: drop-shadow(-12px 14px 18px rgba(0, 0, 0, 0.9)) brightness(1.15);
+  filter: drop-shadow(-12px 15px 25px rgba(0, 0, 0, 1)) brightness(1.15);
   transform: scale(1.05);
 }
 
 /* --- LE PREMIER BOUTON GEANT (Le parchemin de Date) --- */
 .icone-menu:first-child {
-  width: 18vw; /* Parchemin plus grand */
-  min-width: 160px;
-  max-width: 220px;
+  width: 22.5vw; /* ANCIEN: 15vw -> x1.5 = 22.5vw */
   position: relative;
-  filter: drop-shadow(-10px 10px 12px rgba(0, 0, 0, 0.7));
 }
 
 .icone-menu:first-child img {
@@ -435,15 +429,15 @@ body, html {
   transform: translate(-50%, -50%);
   text-align: center;
   color: #2c1e16;
-  font-size: clamp(14px, 1.5vw, 18px);
+  font-size: 2vw; /* ANCIEN: 1.35vw -> x1.5 */
   font-weight: bold;
-  width: 90%;
+  width: 80%;
   pointer-events: none;
   line-height: 1.4;
 }
 
 .texte-sur-parchemin span {
-  font-size: clamp(18px, 2vw, 24px);
+  font-size: 2.5vw; /* ANCIEN: 1.65vw -> x1.5 */
   font-weight: 900;
 }
 
@@ -452,7 +446,7 @@ body, html {
    ========================================= */
 .conteneur-bouton-lateral {
   position: relative;
-  /* Plus de width forcé, le conteneur s'adapte à l'image */
+  width: 15vw; /* ANCIEN: 10vw -> x1.5 = 15vw */
   display: flex;
   justify-content: flex-end;
 }

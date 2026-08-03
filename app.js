@@ -1079,7 +1079,7 @@ function afficherBullesPersonnages(persos) {
       });
     }
 
-    bulle.ondblclick = function() {
+    const ouvrirFicheBulle = function() {
       if (typeof window.jouerSonClic === "function") window.jouerSonClic();
       if (typeof window.ouvrirFichePerso === "function") window.ouvrirFichePerso(p.idPersonnage, p.prenom, p.nom, p.couleur);
       const fiche = document.getElementById('fenetre-fiche-perso');
@@ -1088,6 +1088,29 @@ function afficherBullesPersonnages(persos) {
         const btnCaracs = document.querySelector("button[onclick*='onglet-caracs']");
         if (btnCaracs) btnCaracs.click();
       }, 10);
+    };
+
+    bulle.ondblclick = ouvrirFicheBulle; // Reste valide pour PC
+
+    // MAGIE IPAD : Double-Tap ET Simple-Tap pour afficher l'image
+    let dernierTouchBulle = 0;
+    bulle.ontouchend = function(e) {
+        const maintenant = new Date().getTime();
+        if (maintenant - dernierTouchBulle < 400) {
+            e.preventDefault();
+            ouvrirFicheBulle(); // Double Tap : Ouvre la fiche
+        } else {
+            // Simple Tap : Fait office de survol (hover) pour afficher l'image sur iPad
+            if (p.urlCloudinary && p.urlCloudinary !== "") {
+                const imgHoverElement = document.querySelector(`.bulle-portrait-hover-joueur[src="${p.urlCloudinary}"]`);
+                if (imgHoverElement) {
+                    if (imageActive && imageActive !== imgHoverElement) imageActive.style.display = "none";
+                    imgHoverElement.style.display = "block";
+                    imageActive = imgHoverElement;
+                }
+            }
+        }
+        dernierTouchBulle = maintenant;
     };
 
     conteneur.appendChild(bulle);
@@ -1846,7 +1869,21 @@ function afficherListePersonnages(persos) {
     persos.forEach((p) => {
       const div = document.createElement("div");
       div.className = "item-perso";
-      div.ondblclick = function () { jouerSonClic(); ouvrirFichePerso(p.idPersonnage, p.prenom, p.nom, p.couleur); };
+      
+      const ouvrirFiche = function () { jouerSonClic(); ouvrirFichePerso(p.idPersonnage, p.prenom, p.nom, p.couleur); };
+      div.ondblclick = ouvrirFiche; // Reste valide pour PC
+      
+      // MAGIE IPAD : Double-Tap
+      let dernierTouch = 0;
+      div.ontouchend = function(e) {
+          const maintenant = new Date().getTime();
+          if (maintenant - dernierTouch < 400) {
+              e.preventDefault(); // Empêche le zoom d'iOS
+              ouvrirFiche();
+          }
+          dernierTouch = maintenant;
+      };
+
       div.innerHTML = `<span>${p.prenom} ${p.nom}</span>`;
       conteneur.appendChild(div);
     });
@@ -2499,12 +2536,12 @@ window.ouvrirMenuPersonnages = function() {
   window.fermerToutesLesFenetres();
 
   if (!estDejaOuvert) {
+    // La liste est déjà chargée en arrière-plan, on supprime juste le message de chargement !
+    document.getElementById("chargement-persos").style.display = "none";
+    document.getElementById("liste-html-persos").style.display = "block";
+    
     menuPerso.style.display = 'block';
     setTimeout(() => { menuPerso.classList.add('ouvert'); }, 10);
-
-    document.getElementById("chargement-persos").style.display = "block";
-    document.getElementById("liste-html-persos").style.display = "none";
-    ecouterPersonnagesDeLaPartie(window.ID_PARTIE_COURANTE);
   }
 };
 
