@@ -26,10 +26,9 @@ body, html {
   top: 0; left: 0;
   width: 100%; height: 100%;
   background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781371669/ivalis_index_dxdzaq.jpg');
-  background-size: contain; /* L'image s'adapte sans se couper */
-  background-repeat: no-repeat; /* Empêche la répétition de l'image */
+  background-size: 100% 100%; /* Force l'étirement total sur les deux axes */
+  background-repeat: no-repeat;
   background-position: center;
-  background-color: #000; /* Ajoute des bandes noires propres */
   cursor: pointer;
   z-index: 100;
   transition: opacity 1.5s ease;
@@ -112,10 +111,9 @@ body, html {
 
 .bg-menu {
   background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781364922/ivalis_background_be8iur.jpg');
-  background-size: contain; /* L'image s'adapte sans se couper */
+  background-size: 100% 100%; /* Force l'étirement total sur les deux axes */
   background-repeat: no-repeat;
   background-position: center;
-  background-color: #000; /* Bandes noires */
   z-index: 1;
 }
 
@@ -1130,52 +1128,36 @@ textarea.input-texte-parchemin {
 }
 
 /* ========================================================================= */
-/*  BULLE DU LIEU ACTUEL (En bas à droite du chat)                           */
+/*  BULLE DU LIEU ACTUEL (Dans les bulles de chat)                           */
 /* ========================================================================= */
 
-#bulle-lieu-actuel {
-    position: absolute;
-    bottom: 75px; /* 🔻 CORRECTION : Flotte juste au-dessus de la zone de texte (50px + marge) 🔻 */
-    left: 65%;    /* 🔻 CORRECTION : Aligné au-dessus du micro (la zone texte fait 70%) 🔻 */
-    transform: translateX(-50%);
-    background: linear-gradient(135deg, #4a2e1b, #2a1a0f);
-    color: #e8d5a5;
-    padding: 6px 15px;
-    border-radius: 20px;
-    font-family: 'Almendra', serif;
-    font-size: 14px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
-    border: 1px solid #8c6a45;
-    cursor: help;
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.bulle-lieu {
+    background: linear-gradient(135deg, #5c3a21, #2a1a0f) !important;
+    border-bottom: 3px solid #c2a878 !important;
+    margin-left: auto; /* Magie Flexbox : pousse la bulle tout à droite ! */
 }
 
-#image-lieu-actuel {
-    position: absolute;
-    bottom: 45px; 
-    left: 50%; /* 🔻 CORRECTION : L'image se centre par rapport à sa bulle 🔻 */
-    width: 1000px; 
-    max-width: 90vw; 
+.bulle-lieu:hover {
+    background: linear-gradient(135deg, #8c6a45, #4a2e1b) !important;
+    border-color: #00ffff !important;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.6) !important;
+}
+
+.bulle-image-hover-lieu {
+    display: none;
+    position: fixed;
+    bottom: 120px;   
+    right: 3vw;       
+    width: auto;  
+    max-width: 60vw;
     height: auto;
-    max-height: 75vh; 
-    object-fit: contain; 
+    max-height: 60vh;
+    object-fit: contain;
+    border: 3px solid #c2a878;
     border-radius: 8px;
-    border: 3px solid #8c6a45;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.9); 
-    opacity: 0;
+    box-shadow: 0px 15px 30px rgba(0,0,0,1);
     pointer-events: none;
-    transform: translateX(-50%) translateY(15px) scale(0.95);
-    transform-origin: bottom center; 
-    transition: all 0.3s ease-out;
-    z-index: 1001;
-}
-
-#bulle-lieu-actuel:hover #image-lieu-actuel {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(1); /* 🔻 Suit le centrage au survol 🔻 */
+    z-index: 1000;
 }
 
 /* ========================================================================= */

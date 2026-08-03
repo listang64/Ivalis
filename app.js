@@ -787,27 +787,67 @@ window.PARTIE_DATA = null;
 window.PERSOS_PARTIE = null;
 
 // --- Mise à jour de la Bulle Lieu ET du Pion ---
+window.LIEU_ACTUEL_NOM = "";
+window.LIEU_ACTUEL_IMAGE = "";
+
+window.afficherBulleLieuChat = function() {
+    const conteneur = document.getElementById("zone-noms-bulles");
+    if (!conteneur) return;
+
+    // On nettoie l'ancienne bulle si elle existe
+    const existing = document.getElementById("bulle-lieu-chat");
+    if (existing) existing.remove();
+    const existingImg = document.getElementById("img-hover-lieu-chat");
+    if (existingImg) existingImg.remove();
+
+    if (!window.LIEU_ACTUEL_NOM || window.LIEU_ACTUEL_NOM === "") return;
+
+    // Création de la bulle
+    const bulle = document.createElement("div");
+    bulle.id = "bulle-lieu-chat";
+    bulle.className = "bulle-personnage bulle-lieu";
+    bulle.innerText = "📍 " + window.LIEU_ACTUEL_NOM;
+    
+    // Si une image existe, on gère le survol
+    if (window.LIEU_ACTUEL_IMAGE && window.LIEU_ACTUEL_IMAGE !== "") {
+        const imgHover = document.createElement("img");
+        imgHover.id = "img-hover-lieu-chat";
+        imgHover.className = "bulle-image-hover-lieu";
+        imgHover.src = window.LIEU_ACTUEL_IMAGE;
+        document.getElementById("ecran-jeu").appendChild(imgHover);
+
+        bulle.addEventListener("mouseenter", () => {
+            imgHover.style.display = "block";
+            if (window.imageTourActive && window.imageTourActive !== imgHover) {
+                window.imageTourActive.style.display = "none";
+            }
+        });
+        bulle.addEventListener("mouseleave", () => {
+            imgHover.style.display = "none";
+            const isChatOpen = document.getElementById("fenetre-chatbox")?.style.display === "flex";
+            if (window.imageTourActive && isChatOpen) {
+                window.imageTourActive.style.display = "block";
+            }
+        });
+    }
+    conteneur.appendChild(bulle);
+};
+
 window.mettreAJourBulleLieu = async function(idLieu) {
-    const bulle = document.getElementById("bulle-lieu-actuel");
-    const spanNom = document.getElementById("nom-lieu-actuel");
-    const imgLieu = document.getElementById("image-lieu-actuel");
-
-    if (!bulle || !spanNom || !imgLieu) return;
-
     if (!idLieu || idLieu === "") {
-        bulle.style.display = "none";
+        window.LIEU_ACTUEL_NOM = "";
+        window.LIEU_ACTUEL_IMAGE = "";
+        if (typeof window.afficherBulleLieuChat === "function") window.afficherBulleLieuChat();
         window.placerPionSurHex(""); // On cache le pion
         return;
     }
 
-    bulle.style.display = "flex";
     let nom = "Lieu Inconnu";
     let urlImage = "";
     let idTuile = "";
 
     try {
         if (idLieu.startsWith("L")) {
-            // CAS 1 : Les joueurs sont directement sur un "Lieu" (en extérieur)
             const snap = await getDoc(doc(db, "Monde_Lieux", idLieu));
             if (snap.exists()) {
                 const data = snap.data();
@@ -816,23 +856,16 @@ window.mettreAJourBulleLieu = async function(idLieu) {
                 idTuile = data.Tuile_ID || ""; 
             }
         } else if (idLieu.startsWith("B")) {
-            // CAS 2 : Les joueurs sont dans un "Bâtiment"
             const snapBat = await getDoc(doc(db, "Monde_Batiment", idLieu));
             if (snapBat.exists()) {
                 const dataBat = snapBat.data();
-                
-                // On garde l'esthétique du Bâtiment pour l'interface du joueur
                 nom = dataBat.Nom_Batiment || "Bâtiment sans nom";
                 urlImage = dataBat.URL_Cloudinary || "";
-                
-                // 1. On regarde si le bâtiment a sa propre tuile (pour les donjons isolés)
                 idTuile = dataBat.Tuile_ID || "";
                 
-                // 2. Si aucune tuile n'est trouvée, on cherche la ville parente !
                 if (idTuile === "" && dataBat.ID_Lieu) {
                     const snapLieu = await getDoc(doc(db, "Monde_Lieux", dataBat.ID_Lieu));
                     if (snapLieu.exists()) {
-                        // On "vole" la tuile de la ville pour placer le pion
                         idTuile = snapLieu.data().Tuile_ID || "";
                     }
                 }
@@ -842,20 +875,11 @@ window.mettreAJourBulleLieu = async function(idLieu) {
         console.error("Erreur récupération lieu :", e);
     }
 
-    spanNom.innerText = nom;
-    
-    if (urlImage && urlImage !== "") {
-        imgLieu.src = urlImage;
-        imgLieu.style.display = "block";
-    } else {
-        imgLieu.src = "";
-        imgLieu.style.display = "none";
-    }
-
-    // NOUVEAU : On mémorise la tuile actuelle pour le calcul du voyage !
+    window.LIEU_ACTUEL_NOM = nom;
+    window.LIEU_ACTUEL_IMAGE = urlImage;
     window.TUILE_ACTUELLE = idTuile;
 
-    // On ordonne au pion de se placer, qu'il ait trouvé une tuile directe ou indirecte !
+    if (typeof window.afficherBulleLieuChat === "function") window.afficherBulleLieuChat();
     window.placerPionSurHex(idTuile);
 }
 
@@ -1115,6 +1139,11 @@ function afficherBullesPersonnages(persos) {
       };
   }
   conteneur.appendChild(bulleMJ);
+
+  // NOUVEAU : On rajoute la bulle du lieu tout à droite !
+  if (typeof window.afficherBulleLieuChat === "function") {
+      window.afficherBulleLieuChat();
+  }
 
   // --- Mise à jour de la barre de saisie ---
   const inputChat = document.getElementById("input-chat");
@@ -3329,31 +3358,43 @@ window.toggleMicro = function() {
     }
 
     if (!window.estEnTrainEcouter) {
-        if (!window.recognition) {
-            window.recognition = new SpeechRecognition();
-            window.recognition.lang = 'fr-FR';
-            window.recognition.interimResults = true;
-            window.recognition.continuous = true;
-
-            window.recognition.onresult = (event) => {
-                let transcriptTemp = "";
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    transcriptTemp += event.results[i][0].transcript;
-                }
-                
-                let separateur = (window.texteAvantEcoute.length > 0 && !window.texteAvantEcoute.endsWith(" ")) ? " " : "";
-                input.value = window.texteAvantEcoute + separateur + transcriptTemp;
-            };
-
-            window.recognition.onend = () => {
-                window.estEnTrainEcouter = false;
-                if(btn) {
-                    btn.style.color = "white"; 
-                    btn.innerHTML = "🎤";
-                    btn.style.textShadow = "none";
-                }
-            };
+        // NOUVEAU : On recrée l'objet à chaque fois pour forcer l'iPad à ouvrir/fermer le canal proprement
+        if (window.recognition) {
+            window.recognition.abort();
+            window.recognition = null;
         }
+
+        window.recognition = new SpeechRecognition();
+        window.recognition.lang = 'fr-FR';
+        window.recognition.interimResults = true;
+        window.recognition.continuous = true;
+
+        window.recognition.onresult = (event) => {
+            let transcriptTemp = "";
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                transcriptTemp += event.results[i][0].transcript;
+            }
+            
+            let separateur = (window.texteAvantEcoute.length > 0 && !window.texteAvantEcoute.endsWith(" ")) ? " " : "";
+            input.value = window.texteAvantEcoute + separateur + transcriptTemp;
+        };
+
+        window.recognition.onend = () => {
+            window.estEnTrainEcouter = false;
+            if(btn) {
+                btn.style.color = "white"; 
+                btn.innerHTML = "🎤";
+                btn.style.textShadow = "none";
+            }
+            
+            // NOUVEAU : On force l'application à recharger le volume du jeu 0.5s après la fermeture du micro
+            // pour dire à l'iPad "La communication est finie, remets la musique fort"
+            setTimeout(() => {
+                if (typeof window.appliquerVolumesAudio === "function") {
+                    window.appliquerVolumesAudio();
+                }
+            }, 500);
+        };
 
         window.texteAvantEcoute = input.value; 
         window.estEnTrainEcouter = true;
@@ -3364,7 +3405,10 @@ window.toggleMicro = function() {
         btn.style.textShadow = "0 0 10px red";
         
     } else {
-        window.recognition.stop();
+        // NOUVEAU : On utilise abort() au lieu de stop() pour forcer la coupure matérielle
+        if (window.recognition) {
+            window.recognition.abort();
+        }
     }
 };
 
