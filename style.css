@@ -13,9 +13,11 @@ body, html {
   margin: 0;
   padding: 0;
   width: 100%;
-  height: 100vh;
+  height: 100vh; /* Fallback pour les vieux navigateurs */
+  height: 100dvh; /* S'adapte dynamiquement si le clavier iPad s'ouvre ! */
   overflow: hidden;
   background-color: #000;
+  touch-action: none; /* Empêche l'écran de "rebondir" quand tu glisses le doigt */
 }
 
 /* --- SCENE 1 : L'ACCUEIL --- */
@@ -809,7 +811,16 @@ textarea.input-texte-parchemin {
 .bloc-formulaire h4 { margin-top: 0; margin-bottom: 15px; color: #4a2e1b; font-size: 18px; border-bottom: 1px dashed #c2a878; padding-bottom: 5px; }
 .champ-formulaire { display: flex; flex-direction: column; margin-bottom: 12px; }
 .champ-formulaire label { font-weight: bold; font-size: 14px; color: #2a1a0f; margin-bottom: 4px; }
-.input-perso { padding: 8px; font-size: 15px; background-color: #f5eedc; border: 1px solid #5c3a21; border-radius: 4px; font-family: 'Almendra', serif; color: #2c1e16; transition: 0.3s; }
+.input-perso {
+  padding: 8px;
+  font-size: 16px; /* 16px minimum pour éviter le zoom automatique sur iPad */
+  background-color: #f5eedc;
+  border: 1px solid #5c3a21;
+  border-radius: 4px;
+  font-family: 'Almendra', serif;
+  color: #2c1e16;
+  transition: 0.3s;
+}
 .input-perso:focus { outline: none; border-color: #00ffff; box-shadow: 0 0 5px rgba(0, 255, 255, 0.3); }
 .input-couleur { height: 35px; padding: 2px; cursor: pointer; }
 .actions-formulaire { grid-column: span 2; display: flex; justify-content: center; gap: 20px; margin-top: 15px; }
