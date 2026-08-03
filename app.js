@@ -1657,6 +1657,12 @@ function fermerToutPersonnages(immediat) {
   document.getElementById("fenetre-fiche-perso").style.display = "none";
   document.getElementById("voile-suppression-perso").style.display = "none";
 
+  // 🔻 NOUVEAU : On restaure l'image du tour actif
+  const isChatOuvert = document.getElementById("fenetre-chatbox")?.style.display === "flex";
+  if (window.imageTourActive && isChatOuvert) {
+      window.imageTourActive.style.display = "block";
+  }
+
   const liste = document.getElementById("conteneur-liste-personnages");
   if (!liste) return;
 
@@ -1892,6 +1898,11 @@ async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPers
   const btnSupprimer = document.getElementById("btn-supprimer-perso");
   const btnSauvegarder = document.getElementById("btn-sauvegarder-perso");
 
+  // 🔻 NOUVEAU : On masque temporairement l'image du personnage dont c'est le tour
+  if (window.imageTourActive) {
+      window.imageTourActive.style.display = "none";
+  }
+
   // 🔻 1. LA CORRECTION IPAD : ON AFFICHE LA FICHE INSTANTANÉMENT 🔻
   fiche.style.display = "flex";
   const fenetreHauteur = fiche.offsetHeight;
@@ -2035,6 +2046,12 @@ function remplirFormulairePerso(donnees) {
 function fermerFichePerso() {
   document.getElementById("fenetre-fiche-perso").style.display = "none";
   document.getElementById("voile-suppression-perso").style.display = "none";
+
+  // 🔻 NOUVEAU : On restaure l'image du tour actif si le chat est ouvert
+  const isChatOuvert = document.getElementById("fenetre-chatbox")?.style.display === "flex";
+  if (window.imageTourActive && isChatOuvert) {
+      window.imageTourActive.style.display = "block";
+  }
 }
 
 async function sauvegarderDescriptifPerso() {
@@ -2796,7 +2813,7 @@ function calculerPointsRestants() {
   return window.TOTAL_POINTS_CREATION - depenses;
 }
 
-// 1. Chargement depuis Firebase
+// 1. Chargement depuis Firebase (et Cache)
 window.chargerCaracteristiques = async function(idPersonnage) {
   const divVide = document.getElementById("caracs-vide");
   const divAffiche = document.getElementById("caracs-affiche");
@@ -2818,12 +2835,24 @@ window.chargerCaracteristiques = async function(idPersonnage) {
   const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
   const estProprietaire = (proprioId === currentUserId) || (proprioId === "");
 
+  // 🔻 NOUVEAU : 1. LECTURE DU CACHE IMMÉDIATE 🔻
+  const cleCacheCaracs = "ivalis_caracs_" + idPersonnage;
+  const memoireCaracs = localStorage.getItem(cleCacheCaracs);
+  
+  if (memoireCaracs) {
+      afficherStatsFinales(JSON.parse(memoireCaracs));
+      divAffiche.style.display = "block";
+  }
+
+  // 🔻 NOUVEAU : 2. REQUÊTE SILENCIEUSE EN ARRIÈRE-PLAN 🔻
   try {
     const snap = await getDoc(doc(db, COL.CARACTERISTIQUES, idPersonnage));
     if (snap.exists()) {
-      afficherStatsFinales(snap.data());
+      const data = snap.data();
+      localStorage.setItem(cleCacheCaracs, JSON.stringify(data)); // Mise à jour du cache
+      afficherStatsFinales(data);
       divAffiche.style.display = "block";
-    } else {
+    } else if (!memoireCaracs) {
       divVide.style.display = "block";
       btnCreer.style.display = estProprietaire ? "inline-block" : "none";
     }
@@ -2953,6 +2982,9 @@ window.validerCreationCaracs = async function() {
     });
 
     await setDoc(doc(db, COL.CARACTERISTIQUES, idPersonnage), window.statsCreation);
+    
+    // 🔻 NOUVEAU : Sauvegarde immédiate dans le cache local 🔻
+    localStorage.setItem("ivalis_caracs_" + idPersonnage, JSON.stringify(window.statsCreation));
     
     window.fermerModaleCreationCaracs();
     window.chargerCaracteristiques(idPersonnage);
