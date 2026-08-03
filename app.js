@@ -1710,6 +1710,10 @@ function fermerParametres(immediat) {
   const fermer = () => {
     conteneur.classList.remove("ouvert");
     conteneur.style.display = "none";
+    
+    // NOUVEAU : Sécurité pour restaurer le menu latéral quoiqu'il arrive
+    const menuLat = document.getElementById('menu-lateral');
+    if (menuLat) menuLat.style.display = 'flex';
   };
 
   if (immediat) { fermer(); return; }
@@ -1876,10 +1880,21 @@ async function validerSuppression() {
 // =========================================================================
 
 window.ouvrirGestionEffets = async function() {
+    // NOUVEAU : Masque complètement le menu de droite
+    const menuLat = document.getElementById('menu-lateral');
+    if (menuLat) menuLat.style.display = 'none';
+
     naviguerFenetre('etape-menu-outils', 'etape-gestion-effets');
     document.getElementById("chargement-effets").style.display = "block";
     document.getElementById("conteneur-table-effets").style.display = "none";
     await window.chargerTableauEffets();
+};
+
+// NOUVEAU : Fonction dédiée pour fermer proprement et restaurer le menu
+window.fermerGestionEffets = function() {
+    const menuLat = document.getElementById('menu-lateral');
+    if (menuLat) menuLat.style.display = 'flex';
+    naviguerFenetre('etape-gestion-effets', 'etape-menu-outils');
 };
 
 window.chargerTableauEffets = async function() {
@@ -3898,6 +3913,7 @@ Object.assign(window, {
   syncTemperature, sauvegarderTemperature, basculerAffichageTokens, toggleMicro,
   // Gestion Effets de Combat
   ouvrirGestionEffets: window.ouvrirGestionEffets,
+  fermerGestionEffets: window.fermerGestionEffets,
   chargerTableauEffets: window.chargerTableauEffets,
   ajouterLigneEffetHTML: window.ajouterLigneEffetHTML,
   sauvegarderEffetLigne: window.sauvegarderEffetLigne,
