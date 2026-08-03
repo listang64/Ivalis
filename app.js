@@ -1092,9 +1092,9 @@ function afficherBullesPersonnages(persos) {
 
     bulle.ondblclick = ouvrirFicheBulle; // Reste valide pour PC
 
-    // MAGIE IPAD : Double-Tap ET Simple-Tap pour afficher l'image
+    // MAGIE IPAD : Double-Tap ET Simple-Tap pour afficher l'image (Corrigé)
     let dernierTouchBulle = 0;
-    bulle.ontouchend = function(e) {
+    bulle.ontouchstart = function(e) {
         const maintenant = new Date().getTime();
         if (maintenant - dernierTouchBulle < 400) {
             e.preventDefault();
@@ -1770,9 +1770,9 @@ function afficherListeIA(instructions) {
     
     div.ondblclick = ouvrirInst; // Reste valide pour PC
 
-    // MAGIE IPAD : Double-Tap
+    // MAGIE IPAD : Double-Tap (Corrigé)
     let dernierTouch = 0;
-    div.ontouchend = function(e) {
+    div.ontouchstart = function(e) {
         // On sécurise l'interrupteur pour ne pas bloquer le clic dessus
         if (e.target.tagName.toLowerCase() === 'input' || e.target.className.includes('curseur-poussoir')) return;
         
@@ -1892,9 +1892,9 @@ function afficherListePersonnages(persos) {
       const ouvrirFiche = function () { jouerSonClic(); ouvrirFichePerso(p.idPersonnage, p.prenom, p.nom, p.couleur); };
       div.ondblclick = ouvrirFiche; // Reste valide pour PC
       
-      // MAGIE IPAD : Double-Tap
+      // MAGIE IPAD : Double-Tap (Corrigé)
       let dernierTouch = 0;
-      div.ontouchend = function(e) {
+      div.ontouchstart = function(e) {
           const maintenant = new Date().getTime();
           if (maintenant - dernierTouch < 400) {
               e.preventDefault(); // Empêche le zoom d'iOS
