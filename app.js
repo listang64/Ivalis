@@ -1761,10 +1761,29 @@ function afficherListeIA(instructions) {
 
     const div = document.createElement("div");
     div.className = "item-instruction";
-    div.ondblclick = function () {
+    
+    // Fonction d'ouverture isolée
+    const ouvrirInst = function () {
       jouerSonClic();
       ouvrirEditeurInstruction(inst.id, inst.titre, inst.contenu);
     };
+    
+    div.ondblclick = ouvrirInst; // Reste valide pour PC
+
+    // MAGIE IPAD : Double-Tap
+    let dernierTouch = 0;
+    div.ontouchend = function(e) {
+        // On sécurise l'interrupteur pour ne pas bloquer le clic dessus
+        if (e.target.tagName.toLowerCase() === 'input' || e.target.className.includes('curseur-poussoir')) return;
+        
+        const maintenant = new Date().getTime();
+        if (maintenant - dernierTouch < 400) {
+            e.preventDefault();
+            ouvrirInst();
+        }
+        dernierTouch = maintenant;
+    };
+
     div.innerHTML = `
       <span class="item-titre">${inst.titre}</span>
       <label class="interrupteur" onclick="event.stopPropagation()">
@@ -1981,10 +2000,11 @@ async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPers
   }
 
   fiche.style.display = "flex";
-  const fenetreLargeur = fiche.offsetWidth;
   const fenetreHauteur = fiche.offsetHeight;
-  fiche.style.left = (window.innerWidth / 2 - fenetreLargeur / 2) + "px";
-  fiche.style.top = (window.innerHeight / 2 - fenetreHauteur / 2) + "px";
+  
+  // POSITIONNEMENT À GAUCHE
+  fiche.style.left = "2vw"; // Colle la fiche à gauche (avec une marge de 2% de l'écran)
+  fiche.style.top = (window.innerHeight / 2 - fenetreHauteur / 2) + "px"; // Centre la fiche en hauteur
 }
 
 function remplirFormulairePerso(donnees) {
