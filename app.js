@@ -2016,77 +2016,6 @@ window.ajouterLigneEffetVide = function() {
 };
 
 // =========================================================================
-// SCRIPT DE RÉINITIALISATION ET D'ÉCRASEMENT TOTAL DE LA BDD
-// =========================================================================
-window.purgerEtInjecterEffets = async function() {
-    if (!confirm("⚠️ DANGER : Cela va effacer TOUS vos réglages actuels pour injecter la base de données brute d'origine. Confirmer ?")) return;
-    
-    const btn = document.getElementById("btn-injecter-effets");
-    btn.innerText = "Écrasement en cours...";
-    btn.disabled = true;
-
-    // Matrice de données avec tes colonnes algorithmiques pré-remplies
-    const effetsBase = [
-        { Nom: "Attaque lourde", Cout_PT: "1", Modificateur: "FORCE", Type_Mecanique: "Degats", Cible_Etat: "physique", Valeur: 2, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "2 dégats physique", Notes: "" },
-        { Nom: "Étourdit", Cout_PT: "1", Modificateur: "FORCE", Type_Mecanique: "Alteration", Cible_Etat: "etourdi", Valeur: 0, Pourcent_Base: 10, Pourcent_Max: 50, Tours: 2, Effet_Base: "10% chance d'étourdir sur 2 tours (Max 50%)", Notes: "EFFET ETAT ÉTOURDIT = - 20% de chance d'esquive / Parade ET 10% de chance de louper sa technique" },
-        { Nom: "Poussée", Cout_PT: "1", Modificateur: "FORCE", Type_Mecanique: "Deplacement", Cible_Etat: "poussee", Valeur: 2, Pourcent_Base: 10, Pourcent_Max: 50, Tours: 0, Effet_Base: "10% chance de poussée la cible de 2 hexagones en ligne droite.", Notes: "Ne génère pas d'attaque d'opportunité" },
-        { Nom: "Attaque légère", Cout_PT: "1", Modificateur: "DEXTÉRITÉ", Type_Mecanique: "Degats", Cible_Etat: "physique", Valeur: 2, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "2 dégats physique", Notes: "" },
-        { Nom: "Distance", Cout_PT: "1", Modificateur: "DEXTÉRITÉ", Type_Mecanique: "Portee", Cible_Etat: "distance", Valeur: 1, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "1 hexagone", Notes: "" },
-        { Nom: "Empoisonnement", Cout_PT: "1", Modificateur: "DEXTÉRITÉ", Type_Mecanique: "Alteration", Cible_Etat: "poison", Valeur: 0, Pourcent_Base: 10, Pourcent_Max: 70, Tours: 2, Effet_Base: "10% chance d'empoisonner (Max70%) Dure 2 tours(fixe)", Notes: "Baisse la fatigue de la cible de 15 Fatigue et enlève 8% PV max." },
-        { Nom: "Bond", Cout_PT: "6", Modificateur: "DEXTÉRITÉ", Type_Mecanique: "Deplacement", Cible_Etat: "bond", Valeur: 2, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "Saute de 2 cases.", Notes: "Pas d'attaque d'opportunité" },
-        { Nom: "Attaque Magique", Cout_PT: "1", Modificateur: "INTELLIGENCE", Type_Mecanique: "Degats", Cible_Etat: "magique", Valeur: 2, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "2 dégâts magique", Notes: "ÉLÉMENT(s) ou ARCANIQUE Au CHOIX" },
-        { Nom: "Glacé", Cout_PT: "1", Modificateur: "INTELLIGENCE", Type_Mecanique: "Alteration", Cible_Etat: "glace", Valeur: 0, Pourcent_Base: 10, Pourcent_Max: 60, Tours: 2, Effet_Base: "10% chance de gelée sur 2 tour (Max 60%)", Notes: "Mouvement Coût doublé" },
-        { Nom: "Brûlé", Cout_PT: "1", Modificateur: "INTELLIGENCE", Type_Mecanique: "Alteration", Cible_Etat: "brule", Valeur: 0, Pourcent_Base: 10, Pourcent_Max: 60, Tours: 2, Effet_Base: "10% chance de brûlure sur 2 tour (Max 60%)", Notes: "- 50% de soins reçus" },
-        { Nom: "Électrifié", Cout_PT: "1", Modificateur: "INTELLIGENCE", Type_Mecanique: "Alteration", Cible_Etat: "electrifie", Valeur: 35, Pourcent_Base: 10, Pourcent_Max: 60, Tours: 0, Effet_Base: "10% chance de baisser Initiative de 35 (max 60)", Notes: "" },
-        { Nom: "Traction magique", Cout_PT: "1", Modificateur: "INTELLIGENCE", Type_Mecanique: "Deplacement", Cible_Etat: "traction", Valeur: 3, Pourcent_Base: 15, Pourcent_Max: 60, Tours: 0, Effet_Base: "15% chance de faire sur 3 hexagone (max 60%)", Notes: "" },
-        { Nom: "Soin", Cout_PT: "1", Modificateur: "SAGESSE", Type_Mecanique: "Soin", Cible_Etat: "pv", Valeur: 2, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "2 soins", Notes: "" },
-        { Nom: "Purification", Cout_PT: "6", Modificateur: "SAGESSE", Type_Mecanique: "Defense", Cible_Etat: "purification", Valeur: 0, Pourcent_Base: 50, Pourcent_Max: 100, Tours: 0, Effet_Base: "50% chance d'enlever tous les effets négatifs.", Notes: "" },
-        { Nom: "Bouclier magique", Cout_PT: "10", Modificateur: "SAGESSE", Type_Mecanique: "Defense", Cible_Etat: "bouclier", Valeur: 30, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "Créer un bouclier de 30% des pv restants.", Notes: "" },
-        { Nom: "Absorption", Cout_PT: "4", Modificateur: "SAGESSE", Type_Mecanique: "Defense", Cible_Etat: "absorption", Valeur: 20, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "Annule 20% des dégats et 10% convertis en soin", Notes: "" },
-        { Nom: "Contre", Cout_PT: "4", Modificateur: "SAGESSE", Type_Mecanique: "Defense", Cible_Etat: "contre", Valeur: 20, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "Annule 20% des dégats et 10% convertis en dégats", Notes: "" },
-        { Nom: "Mots de pouvoirs", Cout_PT: "1", Modificateur: "CHARISME", Type_Mecanique: "Degats", Cible_Etat: "brut", Valeur: 1, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "1 dégat brut", Notes: "" },
-        { Nom: "Confusion", Cout_PT: "1", Modificateur: "CHARISME", Type_Mecanique: "Alteration", Cible_Etat: "confusion", Valeur: 0, Pourcent_Base: 4, Pourcent_Max: 40, Tours: 2, Effet_Base: "4% chance d'appliquer confusion (Max 40%)", Notes: "" },
-        { Nom: "Peur", Cout_PT: "1", Modificateur: "CHARISME", Type_Mecanique: "Alteration", Cible_Etat: "peur", Valeur: 0, Pourcent_Base: 6, Pourcent_Max: 60, Tours: 0, Effet_Base: "6% chance de faire Peur (Max 60%)", Notes: "" },
-        { Nom: "Immobilisation", Cout_PT: "1", Modificateur: "CHARISME", Type_Mecanique: "Alteration", Cible_Etat: "immobilisation", Valeur: 0, Pourcent_Base: 8, Pourcent_Max: 40, Tours: 2, Effet_Base: "8% chance d'immobilité (Max 40%)", Notes: "" },
-        { Nom: "Provocations", Cout_PT: "1", Modificateur: "CHARISME", Type_Mecanique: "Alteration", Cible_Etat: "provocation", Valeur: 0, Pourcent_Base: 20, Pourcent_Max: 60, Tours: 2, Effet_Base: "20% chance de provoquer la cible (Max 60%)", Notes: "" },
-        { Nom: "Illusion", Cout_PT: "9", Modificateur: "CHARISME", Type_Mecanique: "Special", Cible_Etat: "illusion", Valeur: 1, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "Créer une seule illusion de 1PV", Notes: "" },
-        { Nom: "Paralysie", Cout_PT: "12", Modificateur: "CHARISME", Type_Mecanique: "Alteration", Cible_Etat: "paralysie", Valeur: 0, Pourcent_Base: 100, Pourcent_Max: 100, Tours: 1, Effet_Base: "L'ennemi perd la fatigue prévue de sa compétence.", Notes: "" },
-        { Nom: "Zone", Cout_PT: "1.5", Modificateur: "AUCUN", Type_Mecanique: "Portee", Cible_Etat: "zone", Valeur: 1, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "1 hexagone", Notes: "" },
-        { Nom: "Initiative +", Cout_PT: "1", Modificateur: "AUCUN", Type_Mecanique: "Bonus", Cible_Etat: "initiative", Valeur: 8, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "Gain de 8 Initiative", Notes: "" },
-        { Nom: "Durée +", Cout_PT: "5", Modificateur: "AUCUN", Type_Mecanique: "Bonus", Cible_Etat: "duree", Valeur: 1, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "+1 tour", Notes: "" },
-        { Nom: "Persistance terrain", Cout_PT: "5", Modificateur: "AUCUN", Type_Mecanique: "Bonus", Cible_Etat: "persistance", Valeur: 3, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Effet_Base: "+3 tours (max 3)", Notes: "" },
-        { Nom: "Durée étalement dégâts", Cout_PT: "Cout / 1.2", Modificateur: "AUCUN", Type_Mecanique: "Special", Cible_Etat: "etalement", Valeur: 2, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 2, Effet_Base: "Degats divisés par 2 sur 2 tours", Notes: "" }
-    ];
-
-    try {
-        // 1. Purge (Suppression de l'ancienne collection)
-        const q = query(collection(db, "Combat_Effets"));
-        const snap = await getDocs(q);
-        const batchDelete = writeBatch(db);
-        snap.forEach(docSnap => batchDelete.delete(docSnap.ref));
-        await batchDelete.commit();
-
-        // 2. Injection de la nouvelle matrice mathématique
-        const batchInsert = writeBatch(db);
-        effetsBase.forEach(eff => {
-            const cleanId = "EFF_" + eff.Nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "_").toUpperCase();
-            const docRef = doc(db, "Combat_Effets", cleanId);
-            batchInsert.set(docRef, eff);
-        });
-        await batchInsert.commit();
-        
-        await window.chargerTableauEffets();
-        alert("La base de données a été purgée et réinitialisée avec succès !");
-    } catch(e) {
-        console.error(e);
-        alert("Échec de l'écrasement de la base.");
-    } finally {
-        btn.innerText = "⚠️ Réinitialiser la BDD";
-        btn.disabled = false;
-    }
-};
-
-// =========================================================================
 //  PERSONNAGES / FICHE PERSO
 // =========================================================================
 function remplirSelectFactions(factions) {
@@ -3919,7 +3848,6 @@ Object.assign(window, {
   sauvegarderEffetLigne: window.sauvegarderEffetLigne,
   ajouterLigneEffetVide: window.ajouterLigneEffetVide,
   supprimerEffetLigne: window.supprimerEffetLigne,
-  purgerEtInjecterEffets: window.purgerEtInjecterEffets,
   // Gestion de la Date
   ouvrirGestionDate, fermerGestionDate, modifierJoursAAjouter, validerChangementDate, demarrerDefilementJours, arreterDefilementJours,
   // Grille Hexagonale & Pion
