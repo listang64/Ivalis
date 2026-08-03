@@ -26,8 +26,10 @@ body, html {
   top: 0; left: 0;
   width: 100%; height: 100%;
   background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781371669/ivalis_index_dxdzaq.jpg');
-  background-size: cover;
+  background-size: contain; /* L'image s'adapte sans se couper */
+  background-repeat: no-repeat; /* Empêche la répétition de l'image */
   background-position: center;
+  background-color: #000; /* Ajoute des bandes noires propres */
   cursor: pointer;
   z-index: 100;
   transition: opacity 1.5s ease;
@@ -110,8 +112,10 @@ body, html {
 
 .bg-menu {
   background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781364922/ivalis_background_be8iur.jpg');
-  background-size: cover;
+  background-size: contain; /* L'image s'adapte sans se couper */
+  background-repeat: no-repeat;
   background-position: center;
+  background-color: #000; /* Bandes noires */
   z-index: 1;
 }
 

@@ -57,6 +57,7 @@ const DOC_CONFIG_MDP = "config";
 // =========================================================================
 window.ID_PARTIE_COURANTE = null;
 window.ID_PARTIE_EN_ATTENTE = null;
+window.LISTE_PARTIES_CACHE = [];
 
 // References de desabonnement pour les ecouteurs temps reel
 let unsubscribePersonnages = null;
@@ -763,6 +764,19 @@ function ecouterJoueurs() {
   }, (err) => console.error("onSnapshot Joueurs :", err));
 }
 
+// Liste des parties pré-chargée en temps réel (pour éviter le temps d'attente)
+function ecouterPartiesEnCours() {
+  const q = query(collection(db, COL.PARTIES), where("Statut", "==", "En_cours"));
+  onSnapshot(q, (snap) => {
+    const parties = [];
+    snap.forEach((document) => {
+      const d = document.data();
+      parties.push({ id: d.ID_Partie || document.id, nom: d.Nom_Du_Groupe || "" });
+    });
+    window.LISTE_PARTIES_CACHE = parties;
+  }, (err) => console.error("onSnapshot Parties :", err));
+}
+
 // =========================================================================
 //  MÉCANIQUES DE CHAT ET INITIATIVE (Temps Réel)
 // =========================================================================
@@ -1440,16 +1454,17 @@ async function validerCreationGroupe() {
   }
 }
 
-async function ouvrirModalChargerPartie() {
+function ouvrirModalChargerPartie() {
   document.getElementById("overlay-modale").style.display = "block";
   document.getElementById("modale-charger").style.display = "block";
 
-  document.getElementById("chargement-parties").style.display = "block";
+  // Plus besoin de message de chargement, c'est instantané
+  document.getElementById("chargement-parties").style.display = "none";
   document.getElementById("liste-parties").style.display = "none";
   document.getElementById("liste-parties").innerHTML = "";
 
-  const partiesActives = await recupererPartiesEnCours();
-  afficherListeParties(partiesActives);
+  // On utilise directement le cache prêt en mémoire
+  afficherListeParties(window.LISTE_PARTIES_CACHE);
 }
 
 function afficherListeParties(partiesActives) {
@@ -2327,6 +2342,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // TEMPS REEL : liste des joueurs (identification) + date en jeu (parchemin)
   ecouterJoueurs();
   ecouterDateEnJeu();
+  ecouterPartiesEnCours();
 
   // NOUVEAU : Application des volumes sauvegardés au lancement
   window.appliquerVolumesAudio();
