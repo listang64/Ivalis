@@ -1067,11 +1067,13 @@ function afficherBullesPersonnages(persos) {
       }
 
       bulle.addEventListener("mouseenter", () => { 
+          if (window.matchMedia("(hover: none)").matches) return; // Censure de l'affichage sur iPad pour ne pas bloquer le clic
           if (window.imageTourActive && window.imageTourActive !== imgHover) window.imageTourActive.style.display = "none";
           imgHover.style.display = "block"; 
       });
       
       bulle.addEventListener("mouseleave", () => { 
+          if (window.matchMedia("(hover: none)").matches) return; 
           imgHover.style.display = "none"; 
           const isChatOuvert = document.getElementById("fenetre-chatbox")?.style.display === "flex";
           if (window.imageTourActive && isChatOuvert) window.imageTourActive.style.display = "block"; 
@@ -1119,11 +1121,13 @@ function afficherBullesPersonnages(persos) {
   }
 
   bulleMJ.addEventListener("mouseenter", () => { 
+      if (window.matchMedia("(hover: none)").matches) return; // Censure de l'affichage sur iPad
       if (window.imageTourActive && window.imageTourActive !== imgHoverMJ) window.imageTourActive.style.display = "none";
       imgHoverMJ.style.display = "block"; 
   });
   
   bulleMJ.addEventListener("mouseleave", () => { 
+      if (window.matchMedia("(hover: none)").matches) return; 
       imgHoverMJ.style.display = "none"; 
       const isChatOuvert = document.getElementById("fenetre-chatbox")?.style.display === "flex";
       if (window.imageTourActive && isChatOuvert) window.imageTourActive.style.display = "block";

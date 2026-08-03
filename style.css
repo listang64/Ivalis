@@ -382,22 +382,22 @@ body, html {
   cursor: grabbing;
 }
 
-/* --- LE MENU LATERAL FIXE (PC par défaut) --- */
+/* --- LE MENU LATERAL FIXE (PC par défaut : x2 par rapport à l'original) --- */
 #menu-lateral {
   position: absolute;
-  right: 20px; 
-  top: 20px;
+  right: 30px; 
+  top: 30px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 15px; 
+  gap: 20px; 
   z-index: 9999;
 }
 
-/* --- LES ICONES GLOBALES (Taille PC) --- */
+/* --- LES ICONES GLOBALES (Taille PC doublée) --- */
 .icone-menu {
-  width: 10vw; /* Taille originale PC */
-  max-width: 80px; 
+  width: 20vw; /* 2x plus grand (était 10vw) */
+  max-width: 160px; /* Limite repoussée pour PC */
   height: auto;
   cursor: pointer;
   filter: drop-shadow(-8px 8px 10px rgba(0, 0, 0, 0.7));
@@ -410,10 +410,10 @@ body, html {
   transform: scale(1.05);
 }
 
-/* --- LE PREMIER BOUTON GEANT (Taille PC) --- */
+/* --- LE PREMIER BOUTON GEANT (Taille PC doublée) --- */
 .icone-menu:first-child {
-  width: 15vw; /* Taille originale PC */
-  max-width: 160px;
+  width: 30vw; /* 2x plus grand (était 15vw) */
+  max-width: 320px;
   position: relative;
 }
 
@@ -431,7 +431,7 @@ body, html {
   transform: translate(-50%, -50%);
   text-align: center;
   color: #2c1e16;
-  font-size: clamp(12px, 1.2vw, 15px);
+  font-size: clamp(16px, 1.8vw, 24px);
   font-weight: bold;
   width: 90%;
   pointer-events: none;
@@ -439,7 +439,7 @@ body, html {
 }
 
 .texte-sur-parchemin span {
-  font-size: clamp(15px, 1.6vw, 20px);
+  font-size: clamp(20px, 2.5vw, 32px);
   font-weight: 900;
 }
 
@@ -451,12 +451,20 @@ body, html {
 }
 
 /* =========================================
-   ADAPTATION SPECIALE IPAD / TABLETTES (x1.5)
+   ADAPTATION SPECIALE IPAD / TACTILE (Taille x1.5 restaurée)
    ========================================= */
-@media (max-width: 1180px) {
+@media (hover: none) and (pointer: coarse) {
   #menu-lateral { gap: 25px; right: 30px; top: 30px; }
-  .icone-menu { width: 15vw; min-width: 80px; }
-  .icone-menu:first-child { width: 22.5vw; min-width: 160px; }
+  .icone-menu { 
+     width: 15vw; 
+     max-width: 120px; 
+     min-width: 80px; 
+  }
+  .icone-menu:first-child { 
+     width: 22.5vw; 
+     max-width: 200px;
+     min-width: 160px; 
+  }
   .texte-sur-parchemin { font-size: clamp(14px, 2vw, 18px); }
   .texte-sur-parchemin span { font-size: clamp(18px, 2.5vw, 24px); }
 }
