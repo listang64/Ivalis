@@ -13,8 +13,10 @@ body, html {
   margin: 0;
   padding: 0;
   width: 100%;
-  height: 100%; /* 100% au lieu de vh/dvh */
-  position: fixed; /* L'astuce ultime pour bloquer l'écran sur iPad */
+  height: 100vh; /* Fallback classique */
+  height: 100dvh; /* S'adapte dynamiquement aux barres Safari */
+  position: fixed; /* Fixe la page pour éviter le scroll élastique */
+  top: 0; left: 0; right: 0; bottom: 0;
   overflow: hidden;
   background-color: #000;
   touch-action: none;
@@ -339,9 +341,8 @@ body, html {
    ========================================================================= */
 #ecran-jeu {
   display: none;
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%; /* % au lieu de vw/vh */
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0; /* Remplace width/height par un ancrage absolu */
   z-index: 20;
   overflow: hidden;
 }
@@ -351,8 +352,7 @@ body, html {
    ========================================================================= */
 #conteneur-carte-fond {
   position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%; /* % au lieu de vw/vh */
+  top: 0; left: 0; right: 0; bottom: 0; /* Ancrage absolu sans faille */
   overflow: hidden; 
   z-index: 0;
   background-color: #F5F5DC;
@@ -382,36 +382,39 @@ body, html {
 /* --- LE MENU LATERAL FIXE --- */
 #menu-lateral {
   position: fixed;
-  right: 15px; /* On décolle du bord ! */
-  top: 15px;
+  right: 25px; /* On le décolle du bord pour l'élégance */
+  top: 2vh;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 15px;
+  gap: 2vh; /* Espace adaptatif selon la hauteur */
   z-index: 9999;
 }
 
 /* --- LES ICONES GLOBALES --- */
 .icone-menu {
-  width: 7vw;
-  min-width: 50px; /* Sécurité iPad */
-  max-width: 70px; /* Sécurité PC */
+  width: 6vw; /* Taille basée sur l'écran */
+  min-width: 65px; /* Plus gros minimum pour iPad */
+  max-width: 85px; /* Limite maximale pour très grands écrans PC */
   height: auto;
   cursor: pointer;
-  filter: drop-shadow(0px 10px 15px rgba(0, 0, 0, 0.8));
-  transition: filter 0.3s ease;
+  /* L'astuce : Ombre décalée vers la GAUCHE (-5px) et le BAS (8px) pour éviter la coupure ! */
+  filter: drop-shadow(-5px 8px 12px rgba(0, 0, 0, 0.7));
+  transition: filter 0.3s ease, transform 0.2s ease;
 }
 
 .icone-menu:hover {
-  filter: drop-shadow(0px 15px 25px rgba(0, 0, 0, 1)) brightness(1.15);
+  filter: drop-shadow(-8px 12px 18px rgba(0, 0, 0, 0.9)) brightness(1.15);
+  transform: scale(1.05); /* Petit effet de zoom au clic */
 }
 
 /* --- LE PREMIER BOUTON GEANT (Le parchemin de Date) --- */
 .icone-menu:first-child {
-  width: 12vw;
-  min-width: 110px;
-  max-width: 160px;
+  width: 14vw;
+  min-width: 130px;
+  max-width: 190px;
   position: relative;
+  filter: drop-shadow(-5px 10px 15px rgba(0, 0, 0, 0.7)); /* Même logique d'ombre */
 }
 
 .icone-menu:first-child img {
@@ -428,7 +431,7 @@ body, html {
   transform: translate(-50%, -50%);
   text-align: center;
   color: #2c1e16;
-  font-size: 14px; /* Taille fixe pour éviter que ça déborde du parchemin */
+  font-size: clamp(12px, 1.2vw, 16px); /* Taille dynamique magique (Min, Idéal, Max) */
   font-weight: bold;
   width: 90%;
   pointer-events: none;
@@ -436,7 +439,7 @@ body, html {
 }
 
 .texte-sur-parchemin span {
-  font-size: 18px; /* Taille fixe */
+  font-size: clamp(16px, 1.6vw, 22px);
   font-weight: 900;
 }
 
@@ -445,9 +448,9 @@ body, html {
    ========================================= */
 .conteneur-bouton-lateral {
   position: relative;
-  width: 7vw;
-  min-width: 50px;
-  max-width: 70px;
+  width: 6vw;
+  min-width: 65px;
+  max-width: 85px;
   display: flex;
   justify-content: flex-end;
 }
