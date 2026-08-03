@@ -382,36 +382,38 @@ body, html {
   cursor: grabbing;
 }
 
-/* --- LE MENU LATERAL FIXE --- */
+/* --- LE MENU LATERAL FIXE (PC par défaut) --- */
 #menu-lateral {
-  position: fixed;
-  right: 20px; /* NOUVEAU : On décolle du bord pour éviter de couper l'ombre */
-  top: 2vh;
+  position: absolute;
+  right: 20px; 
+  top: 20px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 1.5vh;
+  gap: 15px; 
   z-index: 9999;
 }
 
-/* --- LES ICONES GLOBALES --- */
+/* --- LES ICONES GLOBALES (Taille PC) --- */
 .icone-menu {
-  width: 15vw; /* ANCIEN: 10vw -> x1.5 = 15vw */
+  width: 10vw; /* Taille originale PC */
+  max-width: 80px; 
   height: auto;
   cursor: pointer;
-  /* NOUVEAU : On jette l'ombre vers la gauche (-10px) pour éviter la bordure de l'écran */
-  filter: drop-shadow(-10px 10px 15px rgba(0, 0, 0, 0.8));
+  filter: drop-shadow(-8px 8px 10px rgba(0, 0, 0, 0.7));
   transition: filter 0.3s ease, transform 0.2s ease;
+  display: block;
 }
 
 .icone-menu:hover {
-  filter: drop-shadow(-12px 15px 25px rgba(0, 0, 0, 1)) brightness(1.15);
+  filter: drop-shadow(-10px 10px 15px rgba(0, 0, 0, 0.9)) brightness(1.15);
   transform: scale(1.05);
 }
 
-/* --- LE PREMIER BOUTON GEANT (Le parchemin de Date) --- */
+/* --- LE PREMIER BOUTON GEANT (Taille PC) --- */
 .icone-menu:first-child {
-  width: 22.5vw; /* ANCIEN: 15vw -> x1.5 = 22.5vw */
+  width: 15vw; /* Taille originale PC */
+  max-width: 160px;
   position: relative;
 }
 
@@ -429,26 +431,34 @@ body, html {
   transform: translate(-50%, -50%);
   text-align: center;
   color: #2c1e16;
-  font-size: 2vw; /* ANCIEN: 1.35vw -> x1.5 */
+  font-size: clamp(12px, 1.2vw, 15px);
   font-weight: bold;
-  width: 80%;
+  width: 90%;
   pointer-events: none;
   line-height: 1.4;
 }
 
 .texte-sur-parchemin span {
-  font-size: 2.5vw; /* ANCIEN: 1.65vw -> x1.5 */
+  font-size: clamp(15px, 1.6vw, 20px);
   font-weight: 900;
 }
 
-/* =========================================
-   ANIMATION DES BANNIERES LATERALES
-   ========================================= */
+/* --- ANIMATION DES BANNIERES LATERALES --- */
 .conteneur-bouton-lateral {
   position: relative;
-  width: 15vw; /* ANCIEN: 10vw -> x1.5 = 15vw */
   display: flex;
   justify-content: flex-end;
+}
+
+/* =========================================
+   ADAPTATION SPECIALE IPAD / TABLETTES (x1.5)
+   ========================================= */
+@media (max-width: 1180px) {
+  #menu-lateral { gap: 25px; right: 30px; top: 30px; }
+  .icone-menu { width: 15vw; min-width: 80px; }
+  .icone-menu:first-child { width: 22.5vw; min-width: 160px; }
+  .texte-sur-parchemin { font-size: clamp(14px, 2vw, 18px); }
+  .texte-sur-parchemin span { font-size: clamp(18px, 2.5vw, 24px); }
 }
 
 .masque-banniere {
@@ -807,7 +817,9 @@ textarea.input-texte-parchemin {
 
 .liste-persos { max-height: 250px; overflow-y: auto; text-align: left; margin-bottom: 20px; border: 1px solid #c2a878; border-radius: 5px; background-color: rgba(255,255,255,0.2); }
 .item-perso { display: flex; padding: 12px 15px; border-bottom: 1px solid #c2a878; cursor: pointer; transition: 0.2s; font-size: 18px; font-weight: bold; color: #2c1e16; }
-.item-perso:hover { background-color: rgba(92, 58, 33, 0.1); }
+@media (hover: hover) {
+  .item-perso:hover { background-color: rgba(92, 58, 33, 0.1); }
+}
 
 .grille-descriptif { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .bloc-formulaire { background-color: rgba(92, 58, 33, 0.1); border: 1px solid #c2a878; border-radius: 8px; padding: 15px; }
@@ -982,10 +994,15 @@ textarea.input-texte-parchemin {
   user-select: none;
 }
 
-.bulle-personnage:hover {
-  background-color: rgba(92, 58, 33, 0.8);
-  border-color: #00ffff;
-  box-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+/* Désactive le hover sur tactile pour réparer le bug du clic bloqué */
+@media (hover: hover) {
+  .bulle-personnage:hover {
+    background-color: rgba(92, 58, 33, 0.8);
+    border-color: #00ffff;
+    box-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+    transform: scale(1.15) translateY(-2px);
+    z-index: 10;
+  }
 }
 
 /* =========================================
@@ -1190,13 +1207,6 @@ textarea.input-texte-parchemin {
 
 .bulle-personnage {
     transition: all 0.2s ease-out; /* Rend l'animation d'agrandissement fluide */
-}
-
-.bulle-personnage:hover {
-    transform: scale(1.15) translateY(-2px); /* Grossit de 15% et monte un tout petit peu */
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.6); /* Ajoute une belle ombre en dessous */
-    z-index: 10; /* Assure que la bulle zoomée passe par-dessus ses voisines */
-    cursor: pointer;
 }
 
 /* ========================================================================= */

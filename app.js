@@ -1036,7 +1036,6 @@ function afficherBullesPersonnages(persos) {
   let estMonTour = false;
   let nomActif = "MJ";
 
-  let imageActive = null;
   // 🔻 NOUVEAU : On vérifie si la fenêtre de chat est bien ouverte avant d'afficher quiconque !
   const isChatOpen = document.getElementById("fenetre-chatbox")?.style.display === "flex";
 
@@ -1063,19 +1062,19 @@ function afficherBullesPersonnages(persos) {
       document.getElementById("ecran-jeu").appendChild(imgHover);
 
       if (estPersoActif) {
-          imageActive = imgHover;
-          // L'image n'est affichée que si le chat est ouvert !
+          window.imageTourActive = imgHover;
           if (isChatOpen) imgHover.style.display = "block";
       }
 
       bulle.addEventListener("mouseenter", () => { 
-          if (imageActive && imageActive !== imgHover) imageActive.style.display = "none";
+          if (window.imageTourActive && window.imageTourActive !== imgHover) window.imageTourActive.style.display = "none";
           imgHover.style.display = "block"; 
       });
       
       bulle.addEventListener("mouseleave", () => { 
-          if (imgHover !== imageActive) imgHover.style.display = "none"; 
-          if (imageActive && isChatOpen) imageActive.style.display = "block"; 
+          imgHover.style.display = "none"; 
+          const isChatOuvert = document.getElementById("fenetre-chatbox")?.style.display === "flex";
+          if (window.imageTourActive && isChatOuvert) window.imageTourActive.style.display = "block"; 
       });
     }
 
@@ -1115,18 +1114,19 @@ function afficherBullesPersonnages(persos) {
   }
 
   if (estMjActif) {
-      imageActive = imgHoverMJ;
+      window.imageTourActive = imgHoverMJ;
       if (isChatOpen) imgHoverMJ.style.display = "block";
   }
 
   bulleMJ.addEventListener("mouseenter", () => { 
-      if (imageActive && imageActive !== imgHoverMJ) imageActive.style.display = "none";
+      if (window.imageTourActive && window.imageTourActive !== imgHoverMJ) window.imageTourActive.style.display = "none";
       imgHoverMJ.style.display = "block"; 
   });
   
   bulleMJ.addEventListener("mouseleave", () => { 
-      if (imgHoverMJ !== imageActive) imgHoverMJ.style.display = "none"; 
-      if (imageActive && isChatOpen) imageActive.style.display = "block";
+      imgHoverMJ.style.display = "none"; 
+      const isChatOuvert = document.getElementById("fenetre-chatbox")?.style.display === "flex";
+      if (window.imageTourActive && isChatOuvert) window.imageTourActive.style.display = "block";
   });
 
   if (partie.IA_En_Cours === true) {
@@ -1174,7 +1174,6 @@ function afficherBullesPersonnages(persos) {
       }
   }
 
-  window.imageTourActive = imageActive;
 }
 
 // 3. Rendu visuel dans le chat (Injection chirurgicale optimisée)
