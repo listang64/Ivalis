@@ -490,6 +490,7 @@
 
     <div class="conteneur-onglets">
       <button class="onglet-btn actif" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-caracs')">Caractéristiques</button>
+      <button class="onglet-btn" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-stats')">Statistiques</button>
       <button class="onglet-btn" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-competences')">Compétences</button>
       <button class="onglet-btn" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-inventaire')">Inventaire</button>
       <button class="onglet-btn" id="onglet-btn-dev" style="display: none; background-color: #5c1e16; color: #ff4c4c;" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-dev')">DEV</button>
@@ -519,6 +520,83 @@
         <div id="conteneur-stats-affichage" style="margin-top: 20px;"></div>
       </div>
     </div>
+
+    <!-- ======================================================= -->
+    <!-- ONGLET STATISTIQUES (COMBAT)                            -->
+    <!-- ======================================================= -->
+    <div id="onglet-stats" class="contenu-onglet">
+      <h2 id="stats-nom-perso" style="font-family: 'Cinzel', serif; font-size: 34px; color: #2a1a0f; text-align: center; text-shadow: 2px 2px 4px rgba(0,0,0,0.2); margin-bottom: 25px; border-bottom: 2px solid #5c3a21; padding-bottom: 10px;">
+        Nom du Héros
+      </h2>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        
+        <div style="background: rgba(255,255,255,0.5); border: 2px solid #c2a878; border-radius: 8px; padding: 15px; display: flex; align-items: center; gap: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="font-size: 32px; filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.4));">❤️</div>
+            <div style="display: flex; flex-direction: column;">
+                <span style="font-size: 14px; font-weight: bold; color: #5c3a21; text-transform: uppercase;">Points de vie</span>
+                <span style="font-size: 26px; font-weight: bold; color: #2a1a0f;" id="stat-pv">0</span>
+            </div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.5); border: 2px solid #c2a878; border-radius: 8px; padding: 15px; display: flex; align-items: center; gap: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="font-size: 32px; filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.4));">⚡</div>
+            <div style="display: flex; flex-direction: column;">
+                <span style="font-size: 14px; font-weight: bold; color: #5c3a21; text-transform: uppercase;">Fatigue Max</span>
+                <span style="font-size: 26px; font-weight: bold; color: #2a1a0f;" id="stat-fatigue">100</span>
+            </div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.5); border: 2px solid #c2a878; border-radius: 8px; padding: 15px; display: flex; align-items: center; gap: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="font-size: 32px; filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.4));">🌿</div>
+            <div style="display: flex; flex-direction: column;">
+                <span style="font-size: 14px; font-weight: bold; color: #5c3a21; text-transform: uppercase;">Régénération</span>
+                <span style="font-size: 26px; font-weight: bold; color: #2a1a0f;" id="stat-regen">30%</span>
+            </div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.5); border: 2px solid #c2a878; border-radius: 8px; padding: 15px; display: flex; align-items: center; gap: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="font-size: 32px; filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.4));">💨</div>
+            <div style="display: flex; flex-direction: column;">
+                <span style="font-size: 14px; font-weight: bold; color: #5c3a21; text-transform: uppercase;">Esquive</span>
+                <span style="font-size: 26px; font-weight: bold; color: #2a1a0f;" id="stat-esquive">15%</span>
+            </div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.5); border: 2px solid #c2a878; border-radius: 8px; padding: 15px; display: flex; align-items: center; gap: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="font-size: 32px; filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.4));">🛡️</div>
+            <div style="display: flex; flex-direction: column;">
+                <span style="font-size: 14px; font-weight: bold; color: #5c3a21; text-transform: uppercase;">Parade</span>
+                <span style="font-size: 26px; font-weight: bold; color: #2a1a0f;" id="stat-parade">0%</span>
+            </div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.5); border: 2px solid #c2a878; border-radius: 8px; padding: 15px; display: flex; align-items: center; gap: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="font-size: 32px; filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.4));">🎯</div>
+            <div style="display: flex; flex-direction: column;">
+                <span style="font-size: 14px; font-weight: bold; color: #5c3a21; text-transform: uppercase;">Coups Critiques</span>
+                <span style="font-size: 26px; font-weight: bold; color: #2a1a0f;" id="stat-critique">10%</span>
+            </div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.5); border: 2px solid #c2a878; border-radius: 8px; padding: 15px; display: flex; align-items: center; gap: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="font-size: 32px; filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.4));">🪨</div>
+            <div style="display: flex; flex-direction: column;">
+                <span style="font-size: 14px; font-weight: bold; color: #5c3a21; text-transform: uppercase;">Défense Physique</span>
+                <span style="font-size: 26px; font-weight: bold; color: #2a1a0f;" id="stat-defphys">0%</span>
+            </div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.5); border: 2px solid #c2a878; border-radius: 8px; padding: 15px; display: flex; align-items: center; gap: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="font-size: 32px; filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.4));">✨</div>
+            <div style="display: flex; flex-direction: column;">
+                <span style="font-size: 14px; font-weight: bold; color: #5c3a21; text-transform: uppercase;">Défense Magique</span>
+                <span style="font-size: 26px; font-weight: bold; color: #2a1a0f;" id="stat-defmag">0%</span>
+            </div>
+        </div>
+
+      </div>
+    </div>
     
     <div id="modale-creation-caracs" class="modale-parchemin" style="display: none; z-index: 160; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 450px;">
       <h2 style="font-size: 24px; margin-bottom: 10px;">Répartition</h2>
@@ -546,16 +624,66 @@
         <button class="btn-modale" onclick="jouerSonClic(); fermerModaleCreationCaracs()">Annuler</button>
       </div>
     </div>
+    <!-- ======================================================= -->
+    <!-- ONGLET COMPÉTENCES                                      -->
+    <!-- ======================================================= -->
     <div id="onglet-competences" class="contenu-onglet">
-      <h3 style="margin-top: 0; border-bottom: 2px solid #5c3a21; padding-bottom: 5px; color: #2a1a0f;">Compétences</h3>
-      <!-- Vide pour l'instant -->
+      
+      <!-- En-tête avec le compteur Max -->
+      <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #5c3a21; padding-bottom: 5px; margin-bottom: 20px;">
+        <h3 style="margin: 0; color: #2a1a0f; font-family: 'Cinzel', serif; font-size: 24px;">Compétences</h3>
+        <span style="font-family: 'Almendra', serif; font-size: 18px; color: #5c3a21; font-weight: bold;">
+          En combat : <span id="affichage-competences-max" style="font-size: 22px;">6</span>
+        </span>
+      </div>
+
+      <!-- Encadré des créations restantes -->
+      <div style="background: linear-gradient(135deg, rgba(92, 58, 33, 0.1), rgba(42, 26, 15, 0.05)); border: 1px solid #c2a878; border-radius: 8px; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; box-shadow: inset 0 0 10px rgba(255,255,255,0.4);">
+        <span style="font-size: 18px; font-weight: bold; color: #4a2e1b;">
+          Compétences restantes à créer : 
+          <span id="affichage-competences-restantes" style="font-size: 24px; color: #1b6e3a; margin-left: 10px;">X</span>
+        </span>
+        
+        <!-- Le fameux bouton + -->
+        <button id="btn-creer-competence" class="btn-rond-plus" style="width: 45px; height: 45px; font-size: 30px; line-height: 45px; margin: 0; transition: all 0.3s ease;" onclick="jouerSonClic(); window.ouvrirCreationCompetence()" disabled>+</button>
+      </div>
+
+      <!-- Conteneur qui accueillera les futures compétences -->
+      <div id="liste-competences-perso" style="display: flex; flex-direction: column; gap: 15px;">
+        <!-- Les compétences s'afficheront ici -->
+      </div>
+      
     </div>
     <div id="onglet-inventaire" class="contenu-onglet"><h3 style="margin-top: 0;">Sac à dos &amp; Équipement</h3><p><i>Armes, armures...</i></p></div>
 
     <div id="onglet-dev" class="contenu-onglet">
       <h3 style="margin-top: 0; border-bottom: 2px solid #5c1e16; padding-bottom: 5px; color: #ff4c4c;">Zone Développeur</h3>
-      <p style="color: #4a2e1b; margin-bottom: 30px;">Ces actions agissent directement sur la base de données. Prudence.</p>
+      <p style="color: #4a2e1b; margin-bottom: 20px;">Ces actions agissent directement sur la base de données. Prudence.</p>
       
+      <!-- ======================================================= -->
+      <!-- NOUVEAU : ALTÉRATION DES STATISTIQUES (MODE ADDITIF)    -->
+      <!-- ======================================================= -->
+      <div style="background-color: rgba(92, 30, 22, 0.1); border: 2px dashed #ff4c4c; padding: 15px; border-radius: 8px; margin-bottom: 30px; text-align: left;">
+          <h4 style="margin-top: 0; color: #5c1e16;">Altération des Statistiques</h4>
+          <p style="font-size: 14px; margin-bottom: 15px; color: #4a2e1b;">Saisissez des valeurs pour <b>ajouter</b> ou <b>soustraire</b> (avec un "-") aux stats actuelles du héros.</p>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+              <div class="champ-formulaire"><label style="color: #5c1e16;">❤️ PV Max</label><input type="number" id="dev-mod-pv" class="input-perso" placeholder="Ex: 10 ou -5"></div>
+              <div class="champ-formulaire"><label style="color: #5c1e16;">⚡ Fatigue Max</label><input type="number" id="dev-mod-fatigue" class="input-perso" placeholder="Ex: 20 ou -10"></div>
+              <div class="champ-formulaire"><label style="color: #5c1e16;">🌿 Régénération (%)</label><input type="number" id="dev-mod-regen" class="input-perso" placeholder="Ex: 5 ou -2"></div>
+              <div class="champ-formulaire"><label style="color: #5c1e16;">💨 Esquive (%)</label><input type="number" id="dev-mod-esquive" class="input-perso" placeholder="Ex: 2 ou -2"></div>
+              <div class="champ-formulaire"><label style="color: #5c1e16;">🛡️ Parade (%)</label><input type="number" id="dev-mod-parade" class="input-perso" placeholder="Ex: 5"></div>
+              <div class="champ-formulaire"><label style="color: #5c1e16;">🎯 Critique (%)</label><input type="number" id="dev-mod-critique" class="input-perso" placeholder="Ex: 3"></div>
+              <div class="champ-formulaire"><label style="color: #5c1e16;">🪨 Déf. Physique (%)</label><input type="number" id="dev-mod-defphys" class="input-perso" placeholder="Ex: 10"></div>
+              <div class="champ-formulaire"><label style="color: #5c1e16;">✨ Déf. Magique (%)</label><input type="number" id="dev-mod-defmag" class="input-perso" placeholder="Ex: 15"></div>
+          </div>
+          
+          <div style="text-align: center; margin-top: 20px;">
+              <button class="btn-parametres" style="background-color: #5c1e16; border-color: #ff4c4c;" onclick="jouerSonClic(); window.appliquerModificateursDev()">Appliquer les Altérations</button>
+          </div>
+      </div>
+      <!-- ======================================================= -->
+
       <button id="btn-supprimer-perso" class="btn-parametres btn-supprimer" style="padding: 15px 30px; font-size: 18px;" onclick="jouerSonClic(); ouvrirConfirmationSuppressionPerso()">Détruire le Héros</button>
     </div>
   </div>  <div id="fenetre-chatbox">
@@ -579,6 +707,7 @@
 <script type="module" src="app.js?v=2"></script>
 <script type="module" src="creation_personnage.js"></script>
 <script type="module" src="recit_dynamique.js"></script>
+<script type="module" src="competences.js"></script>
 
 <div id="overlay-jet-des" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 5000; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
     

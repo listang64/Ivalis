@@ -2,6 +2,9 @@
 //  IVALIS - MODULE DE CRÉATION DE HÉROS (WIZARD ÉTAPE 1)
 // =========================================================================
 
+import { db } from "./firebase-config.js";
+import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
 window.ouvrirCreationHero = function() {
     // Nettoyage de la modale
     const modale = document.getElementById("modale-creation-hero");
@@ -120,6 +123,121 @@ window.validerEtapeDescriptifRapide = async function() {
         alert("Une interférence a bloqué la création rapide.");
     } finally {
         btn.innerText = "[DEV] Création Rapide (Sans IA)";
+        btn.style.pointerEvents = "auto";
+    }
+};
+
+window.afficherStatsCombat = function(donnees) {
+    const prenom = donnees.prenom || donnees.Prenom_Personnage || "";
+    const nom = donnees.nom || donnees.Nom_Personnage || "";
+
+    const nomElement = document.getElementById("stats-nom-perso");
+    if (nomElement) {
+        nomElement.innerText = (prenom + " " + nom).trim();
+    }
+
+    const modPv = donnees.Dev_Mod_PV || 0;
+    const modFatigue = donnees.Dev_Mod_Fatigue || 0;
+    const modRegen = donnees.Dev_Mod_Regen || 0;
+    const modEsquive = donnees.Dev_Mod_Esquive || 0;
+    const modParade = donnees.Dev_Mod_Parade || 0;
+    const modCritique = donnees.Dev_Mod_Critique || 0;
+    const modDefPhys = donnees.Dev_Mod_DefPhys || 0;
+    const modDefMag = donnees.Dev_Mod_DefMag || 0;
+
+    const basePv = donnees.PV_Max || 0;
+    const baseFatigue = donnees.Fatigue_Max !== undefined ? donnees.Fatigue_Max : 100;
+    const baseRegen = donnees.Regeneration !== undefined ? donnees.Regeneration : 30;
+    const baseEsquive = donnees.Esquive !== undefined ? donnees.Esquive : 15;
+    const baseParade = donnees.Parade !== undefined ? donnees.Parade : 0;
+    const baseCritique = donnees.Critique !== undefined ? donnees.Critique : 10;
+    const baseDefPhys = donnees.Def_Physique !== undefined ? donnees.Def_Physique : 0;
+    const baseDefMag = donnees.Def_Magique !== undefined ? donnees.Def_Magique : 0;
+
+    const finalPv = basePv + modPv;
+    const finalFatigue = baseFatigue + modFatigue;
+    const finalRegen = baseRegen + modRegen;
+    const finalEsquive = baseEsquive + modEsquive;
+    const finalParade = baseParade + modParade;
+    const finalCritique = baseCritique + modCritique;
+    const finalDefPhys = baseDefPhys + modDefPhys;
+    const finalDefMag = baseDefMag + modDefMag;
+
+    document.getElementById("stat-pv").innerText = finalPv;
+    document.getElementById("stat-fatigue").innerText = finalFatigue;
+    document.getElementById("stat-regen").innerText = finalRegen + "%";
+    document.getElementById("stat-esquive").innerText = finalEsquive + "%";
+    document.getElementById("stat-parade").innerText = finalParade + "%";
+    document.getElementById("stat-critique").innerText = finalCritique + "%";
+    document.getElementById("stat-defphys").innerText = finalDefPhys + "%";
+    document.getElementById("stat-defmag").innerText = finalDefMag + "%";
+
+    const affPv = document.getElementById("affichage-pv-max");
+    if (affPv) affPv.innerText = finalPv;
+
+    const setDevMod = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.value = val || "";
+    };
+    setDevMod("dev-mod-pv", modPv);
+    setDevMod("dev-mod-fatigue", modFatigue);
+    setDevMod("dev-mod-regen", modRegen);
+    setDevMod("dev-mod-esquive", modEsquive);
+    setDevMod("dev-mod-parade", modParade);
+    setDevMod("dev-mod-critique", modCritique);
+    setDevMod("dev-mod-defphys", modDefPhys);
+    setDevMod("dev-mod-defmag", modDefMag);
+};
+
+window.appliquerModificateursDev = async function() {
+    const idPersonnage = document.getElementById("champ-id-personnage").value;
+    if (!idPersonnage || idPersonnage === "") {
+        alert("Ouvrez d'abord la fiche d'un héros existant.");
+        return;
+    }
+
+    const btn = document.querySelector("#onglet-dev button[onclick*='appliquerModificateursDev']");
+    const txtOriginal = btn.innerText;
+    btn.innerText = "Altération en cours...";
+    btn.style.pointerEvents = "none";
+
+    try {
+        const modPv = parseInt(document.getElementById("dev-mod-pv").value) || 0;
+        const modFatigue = parseInt(document.getElementById("dev-mod-fatigue").value) || 0;
+        const modRegen = parseInt(document.getElementById("dev-mod-regen").value) || 0;
+        const modEsquive = parseInt(document.getElementById("dev-mod-esquive").value) || 0;
+        const modParade = parseInt(document.getElementById("dev-mod-parade").value) || 0;
+        const modCritique = parseInt(document.getElementById("dev-mod-critique").value) || 0;
+        const modDefPhys = parseInt(document.getElementById("dev-mod-defphys").value) || 0;
+        const modDefMag = parseInt(document.getElementById("dev-mod-defmag").value) || 0;
+
+        const refPerso = doc(db, "Personnages", idPersonnage);
+        await updateDoc(refPerso, {
+            Dev_Mod_PV: modPv,
+            Dev_Mod_Fatigue: modFatigue,
+            Dev_Mod_Regen: modRegen,
+            Dev_Mod_Esquive: modEsquive,
+            Dev_Mod_Parade: modParade,
+            Dev_Mod_Critique: modCritique,
+            Dev_Mod_DefPhys: modDefPhys,
+            Dev_Mod_DefMag: modDefMag
+        });
+
+        const snapPerso = await getDoc(refPerso);
+        if (snapPerso.exists()) {
+            window.afficherStatsCombat(snapPerso.data());
+        }
+
+        btn.innerText = "Altérations Appliquées ! ✔️";
+        setTimeout(() => {
+            btn.innerText = txtOriginal;
+            btn.style.pointerEvents = "auto";
+        }, 2000);
+
+    } catch (e) {
+        console.error(e);
+        alert("Échec de l'altération des stats.");
+        btn.innerText = txtOriginal;
         btn.style.pointerEvents = "auto";
     }
 };

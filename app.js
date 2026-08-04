@@ -128,7 +128,24 @@ function persoDocVersFront(id, d) {
     equipement: d.Equipement_Visible || "",
     signes: d.Signes_Distinctif || "",
     expression: d.Expression_Du_Visage || "",
-    idFaction: d.ID_Faction || ""
+    idFaction: d.ID_Faction || "",
+    PV_Max: d.PV_Max || 0,
+    Fatigue_Max: d.Fatigue_Max !== undefined ? d.Fatigue_Max : 100,
+    Regeneration: d.Regeneration !== undefined ? d.Regeneration : 30,
+    Esquive: d.Esquive !== undefined ? d.Esquive : 15,
+    Parade: d.Parade !== undefined ? d.Parade : 0,
+    Critique: d.Critique !== undefined ? d.Critique : 10,
+    Def_Physique: d.Def_Physique !== undefined ? d.Def_Physique : 0,
+    Def_Magique: d.Def_Magique !== undefined ? d.Def_Magique : 0,
+    Dev_Mod_PV: d.Dev_Mod_PV || 0,
+    Dev_Mod_Fatigue: d.Dev_Mod_Fatigue || 0,
+    Dev_Mod_Regen: d.Dev_Mod_Regen || 0,
+    Dev_Mod_Esquive: d.Dev_Mod_Esquive || 0,
+    Dev_Mod_Parade: d.Dev_Mod_Parade || 0,
+    Dev_Mod_Critique: d.Dev_Mod_Critique || 0,
+    Dev_Mod_DefPhys: d.Dev_Mod_DefPhys || 0,
+    Dev_Mod_DefMag: d.Dev_Mod_DefMag || 0,
+    Competences_Max: d.Competences_Max !== undefined ? d.Competences_Max : 6
   };
 }
 
@@ -2094,10 +2111,20 @@ async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPers
 
   // On récupère le portrait sur Firebase en arrière-plan
   const donneesServeur = await recupererDetailsPersonnage(idPersonnage);
-  if (donneesServeur && donneesServeur.urlCloudinary !== "") {
-      document.getElementById("image-portrait-perso").src = donneesServeur.urlCloudinary;
-      document.getElementById("image-portrait-perso").style.display = "block";
-      document.getElementById("texte-aucun-portrait").style.display = "none";
+  if (donneesServeur) {
+      if (donneesServeur.urlCloudinary !== "") {
+          document.getElementById("image-portrait-perso").src = donneesServeur.urlCloudinary;
+          document.getElementById("image-portrait-perso").style.display = "block";
+          document.getElementById("texte-aucun-portrait").style.display = "none";
+      }
+
+      if (typeof window.afficherStatsCombat === "function") {
+          window.afficherStatsCombat(donneesServeur);
+      }
+
+      if (typeof window.chargerOngletCompetences === "function") {
+          window.chargerOngletCompetences(idPersonnage, donneesServeur.Competences_Max);
+      }
   }
 }
 
@@ -2822,8 +2849,15 @@ window.validerCreationCaracs = async function() {
 
     await updateDoc(doc(db, "Personnages", idPersonnage), {
         PV_Max: pvMax,
-        Objets_Max: objetsMax
-        // (Cartes_Max a été supprimé)
+        Objets_Max: objetsMax,
+        Fatigue_Max: 100,
+        Regeneration: 30,
+        Esquive: 15,
+        Parade: 0,
+        Critique: 10,
+        Def_Physique: 0,
+        Def_Magique: 0,
+        Competences_Max: 6
     });
 
     await setDoc(doc(db, COL.CARACTERISTIQUES, idPersonnage), window.statsCreation);
