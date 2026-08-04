@@ -1955,10 +1955,15 @@ window.chargerTableauEffets = async function() {
     }
 };
 
+const LEGACY_TYPE_MAP = {
+    Degats: "Action", Soin: "Action", Defense: "Action", Special: "Action",
+    Alteration: "Magique", Deplacement: "Spatial", Portee: "Spatial", Bonus: "Global"
+};
+
 window.ajouterLigneEffetHTML = function(id, data = {}) {
     const d = {
         Nom: data.Nom || "", Cout_PT: data.Cout_PT || "", Modificateur: data.Modificateur || "AUCUN",
-        Type_Mecanique: data.Type_Mecanique || "Degats", Cible_Etat: data.Cible_Etat || "",
+        Type_Mecanique: LEGACY_TYPE_MAP[data.Type_Mecanique] || data.Type_Mecanique || "Action", Cible_Etat: data.Cible_Etat || "",
         Valeur: data.Valeur || 0, Pourcent_Base: data.Pourcent_Base || 0,
         Pourcent_Max: data.Pourcent_Max || 0, Tours: data.Tours || 0,
         Effet_Base: data.Effet_Base || "", Notes: data.Notes || ""
@@ -1969,7 +1974,7 @@ window.ajouterLigneEffetHTML = function(id, data = {}) {
     tr.id = `ligne-effet-${id}`;
 
     // Options du dropdown
-    const typesDispos = ["Degats", "Alteration", "Deplacement", "Soin", "Defense", "Portee", "Bonus", "Special"];
+    const typesDispos = ["Action", "Global", "Spatial", "Physique", "Magique", "Duree"];
     let optionsType = typesDispos.map(t => `<option value="${t}" ${d.Type_Mecanique === t ? 'selected' : ''}>${t}</option>`).join("");
 
     tr.innerHTML = `

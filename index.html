@@ -853,5 +853,94 @@
     </div>
   </div>
 
+  <!-- ======================================================= -->
+  <!-- 1. CARTE INTERACTIVE DE LA COMPÉTENCE (STYLE SWIFT APP) -->
+  <!-- ======================================================= -->
+  <div id="modale-creation-competence" class="modale-parchemin-jeu" style="display: none; z-index: 210; width: 850px; max-width: 95vw; max-height: 90vh; overflow-y: auto; overflow-x: hidden; padding: 0; background-color: #f4ece1;">
+    
+    <!-- BANDEAU SUPÉRIEUR -->
+    <div style="background-color: #ede0ce; padding: 15px 20px; border-bottom: 2px solid #d1c1a3; display: flex; flex-direction: column; gap: 15px; position: sticky; top: 0; z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 16px; font-weight: bold; color: #d97706;">⏳ Fatigue Max : <span id="forge-cap-fatigue">30</span></div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-parametres" style="padding: 5px 15px; background: rgba(92, 58, 33, 0.1); color: #5c3a21; border-color: #5c3a21;" onclick="jouerSonClic(); window.ouvrirMenuAjoutForge()">+ Ouvrir Grimoire</button>
+                <button class="btn-parametres" style="padding: 5px 15px;" onclick="jouerSonClic(); window.fermerForgeCompetence()">Fermer</button>
+            </div>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <select id="forge-arme" class="input-perso" style="width: auto; background-color: rgba(59, 130, 246, 0.1); border: none;" onchange="window.rafraichirForge()">
+                <option value="Armes légères">Armes légères</option>
+                <option value="Armes lourdes">Armes lourdes</option>
+                <option value="Mains nues">Mains nues</option>
+                <option value="Dague">Dague</option>
+            </select>
+            <div style="font-size: 18px; font-weight: bold; color: #d97706;">⚡ <span id="forge-fatigue-val">0</span></div>
+            <div style="font-size: 18px; font-weight: bold; color: #9333ea;">⏱ <span id="forge-initiative-val">100</span></div>
+        </div>
+    </div>
+
+    <!-- CARTE PRINCIPALE -->
+    <div style="padding: 20px;">
+        <div style="background: white; border-radius: 16px; border: 2px solid rgba(0,0,0,0.1); box-shadow: 0 10px 20px rgba(0,0,0,0.1); overflow: hidden;">
+            
+            <div style="padding: 15px 20px; border-bottom: 1px solid rgba(0,0,0,0.1); text-align: center;">
+                <input type="text" id="forge-nom" class="input-perso" placeholder="NOUVELLE COMPÉTENCE" style="text-align: center; font-size: 18px; font-weight: bold; border: none; background: transparent;" oninput="window.rafraichirForge()">
+                <div id="forge-element-affichage" style="font-size: 14px; color: gray; margin-top: 5px;">Aucun Élément</div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; padding: 12px 20px; background-color: rgba(0,0,0,0.02); border-bottom: 1px solid rgba(0,0,0,0.1); font-size: 14px;">
+                <span>Coût : <b id="forge-cout-pc" style="color: #2563eb;">0 PC</b></span>
+            </div>
+
+            <!-- Arbre des Actions et Globaux -->
+            <div id="forge-contenu-carte" style="padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+                <!-- Injecté par JS -->
+            </div>
+            
+            <div style="text-align: center; padding: 20px;">
+                <button onclick="window.ouvrirMenuAjoutForge()" style="background: none; border: none; font-size: 44px; color: #3b82f6; cursor: pointer; text-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);">⊕</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bouton Valider -->
+    <div style="padding: 20px; text-align: center;">
+        <button id="btn-valider-forge" class="btn-parametres" style="width: 100%; padding: 15px; font-size: 18px; background-color: #2563eb; color: white; border-radius: 12px; border: none; box-shadow: 0 5px 10px rgba(37, 99, 235, 0.4);" onclick="jouerSonClic(); window.sauvegarderCompetence()">✔️ VALIDER LA COMPÉTENCE</button>
+    </div>
+  </div>
+
+  <!-- ======================================================= -->
+  <!-- 2. MENU D'AJOUT (LE GRIMOIRE TRIÉ PAR CARAC)            -->
+  <!-- ======================================================= -->
+  <div id="modale-menu-ajout" class="modale-parchemin-jeu" style="display: none; z-index: 220; width: 600px; max-width: 90vw; max-height: 85vh; overflow-y: auto; background-color: #f4ece1;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #d1c1a3; padding-bottom: 10px; margin-bottom: 20px;">
+          <h3 style="margin: 0;">Grimoire</h3>
+          <button class="btn-parametres" style="padding: 5px 10px;" onclick="window.fermerMenuAjoutForge()">Fermer</button>
+      </div>
+
+      <div style="margin-bottom: 20px;">
+          <label style="font-size: 12px; font-weight: bold; color: gray;">ÉLÉMENT MAGIQUE (1 MAX)</label>
+          <select id="forge-element" class="input-perso" onchange="window.rafraichirForge(); window.fermerMenuAjoutForge()">
+              <option value="Aucun">Aucun</option>
+              <option value="Feu">Feu</option>
+              <option value="Air">Air</option>
+              <option value="Eau">Eau</option>
+              <option value="Terre">Terre</option>
+              <option value="Glace">Glace</option>
+              <option value="Arcanique">Arcanique</option>
+          </select>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; color: gray; margin-bottom: 10px;">
+          <span>ACTIONS & EFFETS GLOBAUX</span>
+          <span id="forge-tags-count">0/2 Tags</span>
+      </div>
+
+      <div id="forge-menu-caracs" style="display: flex; flex-direction: column; gap: 15px;">
+          <!-- Les listes triées par caractéristiques s'injectent ici -->
+      </div>
+  </div>
+
 </body>
 </html>
