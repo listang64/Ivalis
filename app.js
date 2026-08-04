@@ -1956,14 +1956,21 @@ window.chargerTableauEffets = async function() {
 };
 
 const LEGACY_TYPE_MAP = {
-    Degats: "Action", Soin: "Action", Defense: "Action", Special: "Action",
-    Alteration: "Magique", Deplacement: "Spatial", Portee: "Spatial", Bonus: "Global"
+    Degats: "Action/Global", Soin: "Action/Global", Defense: "Action/Global", Special: "Action/Global",
+    Action: "Action/Global", Global: "Action/Global",
+    Alteration: "Magique", Deplacement: "Spatial", Portee: "Spatial", Bonus: "Action/Global"
 };
+
+function normalizeTypeForEditor(type) {
+    return LEGACY_TYPE_MAP[type] || type || "Action/Global";
+}
 
 window.ajouterLigneEffetHTML = function(id, data = {}) {
     const d = {
         Nom: data.Nom || "", Cout_PT: data.Cout_PT || "", Modificateur: data.Modificateur || "AUCUN",
-        Type_Mecanique: LEGACY_TYPE_MAP[data.Type_Mecanique] || data.Type_Mecanique || "Action", Cible_Etat: data.Cible_Etat || "",
+        Type_Mecanique: normalizeTypeForEditor(data.Type_Mecanique),
+        Type_Mecanique_2: data.Type_Mecanique_2 ? normalizeTypeForEditor(data.Type_Mecanique_2) : "Aucun",
+        Cible_Etat: data.Cible_Etat || "",
         Valeur: data.Valeur || 0, Pourcent_Base: data.Pourcent_Base || 0,
         Pourcent_Max: data.Pourcent_Max || 0, Tours: data.Tours || 0,
         Effet_Base: data.Effet_Base || "", Notes: data.Notes || ""
@@ -1973,15 +1980,17 @@ window.ajouterLigneEffetHTML = function(id, data = {}) {
     const tr = document.createElement("tr");
     tr.id = `ligne-effet-${id}`;
 
-    // Options du dropdown
-    const typesDispos = ["Action", "Global", "Spatial", "Physique", "Magique", "Duree"];
-    let optionsType = typesDispos.map(t => `<option value="${t}" ${d.Type_Mecanique === t ? 'selected' : ''}>${t}</option>`).join("");
+    const typesDispos = ["Action/Global", "Spatial", "Physique", "Magique", "Duree", "Aucun"];
+
+    let optionsType1 = typesDispos.map(t => `<option value="${t}" ${d.Type_Mecanique === t ? 'selected' : ''}>${t}</option>`).join("");
+    let optionsType2 = typesDispos.map(t => `<option value="${t}" ${d.Type_Mecanique_2 === t ? 'selected' : (t === 'Aucun' && !d.Type_Mecanique_2 ? 'selected' : '')}>${t}</option>`).join("");
 
     tr.innerHTML = `
         <td><input type="text" id="nom-${id}" value="${d.Nom}"></td>
         <td><input type="text" id="cout-${id}" value="${d.Cout_PT}" style="text-align: center;"></td>
         <td><input type="text" id="mod-${id}" value="${d.Modificateur}" style="text-align: center;"></td>
-        <td><select id="type-${id}">${optionsType}</select></td>
+        <td><select id="type1-${id}">${optionsType1}</select></td>
+        <td><select id="type2-${id}">${optionsType2}</select></td>
         <td><input type="text" id="cible-${id}" value="${d.Cible_Etat}" placeholder="ex: poison"></td>
         <td><input type="number" id="val-${id}" value="${d.Valeur}" style="text-align: center;"></td>
         <td><input type="number" id="base-${id}" value="${d.Pourcent_Base}" style="text-align: center;"></td>
@@ -2005,7 +2014,8 @@ window.sauvegarderEffetLigne = async function(id) {
         Nom: document.getElementById(`nom-${id}`).value.trim(),
         Cout_PT: document.getElementById(`cout-${id}`).value.trim(),
         Modificateur: document.getElementById(`mod-${id}`).value.trim(),
-        Type_Mecanique: document.getElementById(`type-${id}`).value,
+        Type_Mecanique: document.getElementById(`type1-${id}`).value,
+        Type_Mecanique_2: document.getElementById(`type2-${id}`).value,
         Cible_Etat: document.getElementById(`cible-${id}`).value.trim(),
         Valeur: parseFloat(document.getElementById(`val-${id}`).value) || 0,
         Pourcent_Base: parseFloat(document.getElementById(`base-${id}`).value) || 0,

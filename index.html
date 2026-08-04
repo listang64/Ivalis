@@ -421,14 +421,15 @@
               <th style="width: 10%;">Nom</th>
               <th style="width: 5%;">PT</th>
               <th style="width: 8%;">Mod.</th>
-              <th style="width: 9%;">Type Méc.</th>
+              <th style="width: 9%;">Type Méc. 1</th>
+              <th style="width: 9%;">Type Méc. 2</th>
               <th style="width: 8%;">Cible/État</th>
               <th style="width: 4%;">Val.</th>
-              <th style="width: 5%;">%Base</th>
-              <th style="width: 5%;">%Max</th>
+              <th style="width: 4%;">%Base</th>
+              <th style="width: 4%;">%Max</th>
               <th style="width: 4%;">Trs</th>
-              <th style="width: 17%;">Description (Joueur)</th>
-              <th style="width: 15%;">Notes (MJ)</th>
+              <th style="width: 15%;">Description (Joueur)</th>
+              <th style="width: 14%;">Notes (MJ)</th>
               <th style="width: 6%; text-align: center;">Action</th>
             </tr>
           </thead>
@@ -861,15 +862,12 @@
     <!-- BANDEAU SUPÉRIEUR -->
     <div style="background-color: #ede0ce; padding: 15px 20px; border-bottom: 2px solid #d1c1a3; display: flex; flex-direction: column; gap: 15px; position: sticky; top: 0; z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-size: 16px; font-weight: bold; color: #d97706;">⏳ Fatigue Max : <span id="forge-cap-fatigue">30</span></div>
-            <div style="display: flex; gap: 10px;">
-                <button class="btn-parametres" style="padding: 5px 15px; background: rgba(92, 58, 33, 0.1); color: #5c3a21; border-color: #5c3a21;" onclick="jouerSonClic(); window.ouvrirMenuAjoutForge()">+ Ouvrir Grimoire</button>
-                <button class="btn-parametres" style="padding: 5px 15px;" onclick="jouerSonClic(); window.fermerForgeCompetence()">Fermer</button>
-            </div>
+            <div style="font-size: 16px; font-weight: bold; color: #d97706;">⏳ Cap de Fatigue : <span id="forge-cap-fatigue">30</span></div>
+            <button class="btn-parametres" style="padding: 5px 15px;" onclick="jouerSonClic(); window.fermerForgeCompetence()">Fermer</button>
         </div>
         
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <select id="forge-arme" class="input-perso" style="width: auto; background-color: rgba(59, 130, 246, 0.1); border: none;" onchange="window.rafraichirForge()">
+            <select id="forge-arme" class="input-perso" style="width: auto; background-color: rgba(59, 130, 246, 0.1); border: none; font-weight: bold;" onchange="window.rafraichirForge()">
                 <option value="Armes légères">Armes légères</option>
                 <option value="Armes lourdes">Armes lourdes</option>
                 <option value="Mains nues">Mains nues</option>
@@ -885,12 +883,17 @@
         <div style="background: white; border-radius: 16px; border: 2px solid rgba(0,0,0,0.1); box-shadow: 0 10px 20px rgba(0,0,0,0.1); overflow: hidden;">
             
             <div style="padding: 15px 20px; border-bottom: 1px solid rgba(0,0,0,0.1); text-align: center;">
-                <input type="text" id="forge-nom" class="input-perso" placeholder="NOUVELLE COMPÉTENCE" style="text-align: center; font-size: 18px; font-weight: bold; border: none; background: transparent;" oninput="window.rafraichirForge()">
-                <div id="forge-element-affichage" style="font-size: 14px; color: gray; margin-top: 5px;">Aucun Élément</div>
+                <label style="font-size: 12px; font-weight: bold; color: gray; display: block; margin-bottom: 5px;">NOM DE LA TECHNIQUE</label>
+                <input type="text" id="forge-nom" class="input-perso" placeholder="Saisissez un nom..." style="text-align: center; font-size: 20px; font-weight: bold; border-bottom: 2px solid #3b82f6; background: transparent; width: 80%; border-radius: 0; box-shadow: none;" oninput="window.rafraichirForge()">
+                
+                <div id="forge-element-affichage" style="font-size: 14px; font-weight: bold; color: gray; margin-top: 8px;"></div>
+                
+                <!-- Les Tags Carac s'afficheront ici -->
+                <div id="forge-active-tags" style="display: flex; justify-content: center; gap: 8px; margin-top: 10px; min-height: 24px;"></div>
             </div>
 
             <div style="display: flex; justify-content: space-between; padding: 12px 20px; background-color: rgba(0,0,0,0.02); border-bottom: 1px solid rgba(0,0,0,0.1); font-size: 14px;">
-                <span>Coût : <b id="forge-cout-pc" style="color: #2563eb;">0 PC</b></span>
+                <span>Coût Total : <b id="forge-cout-pc" style="color: #2563eb;">0 PC</b></span>
             </div>
 
             <!-- Arbre des Actions et Globaux -->
