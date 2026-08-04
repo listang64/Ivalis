@@ -70,6 +70,7 @@ window.forgeState = {
 };
 
 const ORDRE_CARACS = ["FORCE", "DEXTÉRITÉ", "CONSTITUTION", "INTELLIGENCE", "SAGESSE", "CHARISME", "AUCUN"];
+const ORDRE_MODS = ["FORCE", "DEXTÉRITÉ", "CONSTITUTION", "INTELLIGENCE", "SAGESSE", "CHARISME", "GÉNÉRAL"];
 
 const LEGACY_TYPE_MAP = {
     Degats: "Action/Global", Soin: "Action/Global", Defense: "Action/Global", Special: "Action/Global",
@@ -99,6 +100,29 @@ function formatterTexteEffet(effet, stacks) {
         texte += ` (x${stacks})`;
     }
     return texte;
+}
+
+// INTELLIGENCE DE FILTRAGE DES ARMES
+function estIncompatibleAvecArme(nomEffet, arme) {
+    if (!arme || !nomEffet) return false;
+    
+    const nom = nomEffet.toLowerCase();
+    
+    if (arme === "Sans arme / Arme rp") {
+        if (nom.includes("attaque magique") || nom.includes("mot de pouvoir") || nom.includes("mots de pouvoir") || nom.includes("attaque légère") || nom.includes("attaque legere")) return true;
+    } else if (arme === "Arme légère CAC") {
+        if (nom.includes("attaque lourde")) return true;
+    } else if (arme === "Arme lourde CAC") {
+        if (nom.includes("attaque légère") || nom.includes("attaque legere")) return true;
+    } else if (arme === "Arme polyvalente") {
+        if (nom.includes("attaque légère") || nom.includes("attaque legere")) return true;
+    } else if (arme === "Arme légère Distance") {
+        if (nom.includes("attaque lourde")) return true;
+    } else if (arme === "Magie") {
+        if (nom.includes("attaque lourde") || nom.includes("attaque légère") || nom.includes("attaque legere")) return true;
+    }
+    
+    return false;
 }
 
 window.ouvrirCreationCompetence = async function() {
@@ -174,8 +198,9 @@ window.ouvrirMenuAjoutForge = function() {
             let htmlLignes = "";
             effets.forEach(eff => {
                 const isLocked = (activeTags.size >= 2 && eff.Modificateur !== "AUCUN" && !activeTags.has(eff.Modificateur.toUpperCase()));
-                const isAttaqueLourdeEtMagie = (eff.Nom === "Attaque lourde" && window.forgeState.armePrincipale === "Magie");
-                const isDisabled = isLocked || capAtteint || isAttaqueLourdeEtMagie;
+                const isArmeIncompatible = estIncompatibleAvecArme(eff.Nom, window.forgeState.armePrincipale);
+                
+                const isDisabled = isLocked || capAtteint || isArmeIncompatible;
                 const bgColor = isDisabled ? 'gray' : '#3b82f6';
 
                 htmlLignes += `
@@ -193,11 +218,13 @@ window.ouvrirMenuAjoutForge = function() {
                 `;
             });
 
-            conteneurMenu.innerHTML += `
-                <div style="background: white; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); overflow: hidden; margin-bottom: 10px;">
-                    ${htmlLignes}
-                </div>
-            `;
+            if (htmlLignes !== "") {
+                conteneurMenu.innerHTML += `
+                    <div style="background: white; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); overflow: hidden; margin-bottom: 10px;">
+                        ${htmlLignes}
+                    </div>
+                `;
+            }
         }
     });
 
@@ -213,18 +240,20 @@ function isEffetPhysique(effet) {
 }
 
 function purgerIncompatibilitesArme() {
-    if (window.forgeState.armePrincipale !== "Magie") return;
+    if (!window.forgeState.armePrincipale) return;
 
     window.forgeState.actions = window.forgeState.actions.filter(
-        act => act.baseEffet.Nom !== "Attaque lourde"
+        act => !estIncompatibleAvecArme(act.baseEffet.Nom, window.forgeState.armePrincipale)
     );
 
-    window.forgeState.actions.forEach(act => {
-        Object.keys(act.mods).forEach(modId => {
-            const modEff = window.forgeState.effetsBDD.find(e => e.id === modId);
-            if (isEffetPhysique(modEff)) delete act.mods[modId];
+    if (window.forgeState.armePrincipale === "Magie") {
+        window.forgeState.actions.forEach(act => {
+            Object.keys(act.mods).forEach(modId => {
+                const modEff = window.forgeState.effetsBDD.find(e => e.id === modId);
+                if (isEffetPhysique(modEff)) delete act.mods[modId];
+            });
         });
-    });
+    }
 }
 
 window.selectionnerArme = function(arme) {
@@ -408,14 +437,37 @@ window.rafraichirForge = function() {
 
         let modsDispos = window.forgeState.effetsBDD.filter(e => e.Type_Mecanique === type || e.Type_Mecanique_2 === type);
         let options = `<option value="">+ ${label}</option>`;
-
+        
+        // Regroupement par Caractéristique (GÉNÉRAL si aucune)
+        let groupesMods = {};
         modsDispos.forEach(mod => {
             const isLocked = activeTags.size >= 2 && mod.Modificateur !== "AUCUN" && !activeTags.has(mod.Modificateur.toUpperCase());
             if (!isLocked) {
-                options += `<option value="${mod.id}">${mod.Nom} ${mod.Modificateur !== "AUCUN" ? `[${mod.Modificateur}]` : ""}</option>`;
+                const carac = (mod.Modificateur && mod.Modificateur !== "AUCUN") ? mod.Modificateur.toUpperCase() : "GÉNÉRAL";
+                if (!groupesMods[carac]) groupesMods[carac] = [];
+                groupesMods[carac].push(`<option value="${mod.id}">${mod.Nom}</option>`);
             }
         });
-        return `<select ${capDepasse ? "disabled" : ""} style="font-size: 11px; font-weight: bold; color: ${color}; background: transparent; border: none; outline: none; cursor: ${capDepasse ? "not-allowed" : "pointer"}; max-width: 80px; opacity: ${capDepasse ? 0.4 : 1};" onchange="window.attacherModificateur(this, '${actionId}')">${options}</select>`;
+
+        // Construction du menu avec des sections ordonnées (<optgroup>)
+        ORDRE_MODS.forEach(carac => {
+            if (groupesMods[carac] && groupesMods[carac].length > 0) {
+                options += `<optgroup label="-- ${carac} --">`;
+                options += groupesMods[carac].join("");
+                options += `</optgroup>`;
+            }
+        });
+
+        // Cas de sécurité s'il y a des tags non prévus
+        Object.keys(groupesMods).forEach(carac => {
+            if (!ORDRE_MODS.includes(carac)) {
+                options += `<optgroup label="-- ${carac} --">`;
+                options += groupesMods[carac].join("");
+                options += `</optgroup>`;
+            }
+        });
+
+        return `<select ${capDepasse ? "disabled" : ""} style="font-size: 11px; font-weight: bold; color: ${color}; background: transparent; border: none; outline: none; cursor: ${capDepasse ? "not-allowed" : "pointer"}; max-width: 90px; opacity: ${capDepasse ? 0.4 : 1};" onchange="window.attacherModificateur(this, '${actionId}')">${options}</select>`;
     };
 
     if (window.forgeState.actions.length > 0) {

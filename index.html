@@ -859,7 +859,7 @@
   <!-- ======================================================= -->
   <div id="modale-creation-competence" class="modale-parchemin-jeu" style="display: none; z-index: 210; width: 850px; max-width: 95vw; max-height: 90vh; overflow-y: auto; overflow-x: hidden; padding: 0; background-color: #f4ece1;">
     
-    <!-- BANDEAU SUPÉRIEUR -->
+    <!-- BANDEAU SUPÉRIEUR (Centré et Grossi) -->
     <div style="background-color: #ede0ce; padding: 15px 20px; border-bottom: 2px solid #d1c1a3; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
         
         <div style="font-size: 16px; font-weight: bold; color: #d97706; flex: 1;">⏳ Cap : <span id="forge-cap-fatigue">30</span></div>
@@ -890,10 +890,10 @@
                 
                 <div id="forge-element-affichage" style="font-size: 14px; font-weight: bold; color: gray; margin-top: 8px;"></div>
                 
-                <!-- NOUVEAU : Le Tag de l'arme s'affichera ici -->
+                <!-- Le Tag de l'arme (cliquable) s'affichera ici -->
                 <div id="forge-weapon-tag-container" style="margin-top: 15px; margin-bottom: 5px;"></div>
                 
-                <!-- Les Tags Carac s'afficheront en dessous -->
+                <!-- Les Tags Carac -->
                 <div id="forge-active-tags" style="display: flex; justify-content: center; gap: 8px; margin-top: 5px; min-height: 24px;"></div>
             </div>
 
@@ -958,11 +958,12 @@
       <p style="font-size: 14px; color: #5c3a21; margin-bottom: 20px;">Sélectionnez le type d'arme ou de magie pour forger cette technique.</p>
       
       <div style="display: flex; flex-direction: column; gap: 12px;">
-          <button class="btn-parametres" style="width: 100%; font-size: 16px;" onclick="jouerSonClic(); window.selectionnerArme('Arme légère CAC')">⚔️ Arme légère CAC</button>
+          <button class="btn-parametres" style="width: 100%; font-size: 16px;" onclick="jouerSonClic(); window.selectionnerArme('Arme légère CAC')">🗡️ Arme légère CAC</button>
           <button class="btn-parametres" style="width: 100%; font-size: 16px;" onclick="jouerSonClic(); window.selectionnerArme('Arme lourde CAC')">🪓 Arme lourde CAC</button>
-          <button class="btn-parametres" style="width: 100%; font-size: 16px;" onclick="jouerSonClic(); window.selectionnerArme('Arme polyvalente')">🗡️ Arme polyvalente</button>
+          <button class="btn-parametres" style="width: 100%; font-size: 16px;" onclick="jouerSonClic(); window.selectionnerArme('Arme polyvalente')">⚔️ Arme polyvalente</button>
           <button class="btn-parametres" style="width: 100%; font-size: 16px;" onclick="jouerSonClic(); window.selectionnerArme('Arme légère Distance')">🏹 Arme légère Distance</button>
           <button class="btn-parametres" style="width: 100%; font-size: 16px; background-color: #5c1e16; color: white;" onclick="jouerSonClic(); window.selectionnerArme('Magie')">✨ Magie</button>
+          <button class="btn-parametres" style="width: 100%; font-size: 16px; background-color: #4a5568; color: white;" onclick="jouerSonClic(); window.selectionnerArme('Sans arme / Arme rp')">✊ Sans arme / Arme rp</button>
       </div>
       
       <div style="margin-top: 25px;">
