@@ -860,21 +860,23 @@
   <div id="modale-creation-competence" class="modale-parchemin-jeu" style="display: none; z-index: 210; width: 850px; max-width: 95vw; max-height: 90vh; overflow-y: auto; overflow-x: hidden; padding: 0; background-color: #f4ece1;">
     
     <!-- BANDEAU SUPÉRIEUR -->
-    <div style="background-color: #ede0ce; padding: 15px 20px; border-bottom: 2px solid #d1c1a3; display: flex; flex-direction: column; gap: 15px; position: sticky; top: 0; z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-size: 16px; font-weight: bold; color: #d97706;">⏳ Cap de Fatigue : <span id="forge-cap-fatigue">30</span></div>
-            <button class="btn-parametres" style="padding: 5px 15px;" onclick="jouerSonClic(); window.fermerForgeCompetence()">Fermer</button>
-        </div>
+    <div style="background-color: #ede0ce; padding: 15px 20px; border-bottom: 2px solid #d1c1a3; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
         
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <select id="forge-arme" class="input-perso" style="width: auto; background-color: rgba(59, 130, 246, 0.1); border: none; font-weight: bold;" onchange="window.rafraichirForge()">
-                <option value="Armes légères">Armes légères</option>
-                <option value="Armes lourdes">Armes lourdes</option>
-                <option value="Mains nues">Mains nues</option>
-                <option value="Dague">Dague</option>
-            </select>
-            <div style="font-size: 18px; font-weight: bold; color: #d97706;">⚡ <span id="forge-fatigue-val">0</span></div>
-            <div style="font-size: 18px; font-weight: bold; color: #9333ea;">⏱ <span id="forge-initiative-val">100</span></div>
+        <div style="font-size: 16px; font-weight: bold; color: #d97706; flex: 1;">⏳ Cap : <span id="forge-cap-fatigue">30</span></div>
+        
+        <div style="display: flex; gap: 40px; justify-content: center; flex: 1;">
+            <div style="display: flex; flex-direction: column; align-items: center;">
+                <div style="font-size: 26px; font-weight: bold; color: #d97706; line-height: 1;">⚡ <span id="forge-fatigue-val">0</span></div>
+                <div style="font-size: 11px; font-weight: bold; color: #5c3a21; margin-top: 4px; letter-spacing: 1px;">FATIGUE</div>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: center;">
+                <div style="font-size: 26px; font-weight: bold; color: #9333ea; line-height: 1;">⏱ <span id="forge-initiative-val">100</span></div>
+                <div style="font-size: 11px; font-weight: bold; color: #5c3a21; margin-top: 4px; letter-spacing: 1px;">INITIATIVE</div>
+            </div>
+        </div>
+
+        <div style="flex: 1; text-align: right;">
+            <button class="btn-parametres" style="padding: 5px 15px;" onclick="jouerSonClic(); window.fermerForgeCompetence()">Fermer</button>
         </div>
     </div>
 
@@ -888,8 +890,11 @@
                 
                 <div id="forge-element-affichage" style="font-size: 14px; font-weight: bold; color: gray; margin-top: 8px;"></div>
                 
-                <!-- Les Tags Carac s'afficheront ici -->
-                <div id="forge-active-tags" style="display: flex; justify-content: center; gap: 8px; margin-top: 10px; min-height: 24px;"></div>
+                <!-- NOUVEAU : Le Tag de l'arme s'affichera ici -->
+                <div id="forge-weapon-tag-container" style="margin-top: 15px; margin-bottom: 5px;"></div>
+                
+                <!-- Les Tags Carac s'afficheront en dessous -->
+                <div id="forge-active-tags" style="display: flex; justify-content: center; gap: 8px; margin-top: 5px; min-height: 24px;"></div>
             </div>
 
             <div style="display: flex; justify-content: space-between; padding: 12px 20px; background-color: rgba(0,0,0,0.02); border-bottom: 1px solid rgba(0,0,0,0.1); font-size: 14px;">
@@ -942,6 +947,26 @@
 
       <div id="forge-menu-caracs" style="display: flex; flex-direction: column; gap: 15px;">
           <!-- Les listes triées par caractéristiques s'injectent ici -->
+      </div>
+  </div>
+
+  <!-- ======================================================= -->
+  <!-- 3. MENU SÉLECTION D'ARME (MINI POP-UP)                  -->
+  <!-- ======================================================= -->
+  <div id="modale-menu-arme" class="modale-parchemin-jeu" style="display: none; z-index: 230; width: 400px; max-width: 90vw; background-color: #f4ece1; text-align: center; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+      <h3 style="margin-top: 0; color: #2a1a0f; font-family: 'Cinzel', serif;">Type d'Attaque</h3>
+      <p style="font-size: 14px; color: #5c3a21; margin-bottom: 20px;">Sélectionnez le type d'arme ou de magie pour forger cette technique.</p>
+      
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+          <button class="btn-parametres" style="width: 100%; font-size: 16px;" onclick="jouerSonClic(); window.selectionnerArme('Arme légère CAC')">⚔️ Arme légère CAC</button>
+          <button class="btn-parametres" style="width: 100%; font-size: 16px;" onclick="jouerSonClic(); window.selectionnerArme('Arme lourde CAC')">🪓 Arme lourde CAC</button>
+          <button class="btn-parametres" style="width: 100%; font-size: 16px;" onclick="jouerSonClic(); window.selectionnerArme('Arme polyvalente')">🗡️ Arme polyvalente</button>
+          <button class="btn-parametres" style="width: 100%; font-size: 16px;" onclick="jouerSonClic(); window.selectionnerArme('Arme légère Distance')">🏹 Arme légère Distance</button>
+          <button class="btn-parametres" style="width: 100%; font-size: 16px; background-color: #5c1e16; color: white;" onclick="jouerSonClic(); window.selectionnerArme('Magie')">✨ Magie</button>
+      </div>
+      
+      <div style="margin-top: 25px;">
+          <button class="btn-parametres" style="background-color: transparent; border: none; color: #ff4c4c; text-decoration: underline;" onclick="jouerSonClic(); document.getElementById('modale-menu-arme').style.display='none'">Annuler</button>
       </div>
   </div>
 

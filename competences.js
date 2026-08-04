@@ -56,7 +56,7 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
 };
 
 // =========================================================================
-//  MOTEUR ALGORITHMIQUE : FORGE DE COMPÉTENCES (ARCHI APP SWIFT)
+//  MOTEUR ALGORITHMIQUE : FORGE DE COMPÉTENCES
 // =========================================================================
 
 window.forgeState = {
@@ -65,7 +65,8 @@ window.forgeState = {
     caracs: {},
     effetsBDD: [],
     actions: [],
-    isCapReached: false
+    isCapReached: false,
+    armePrincipale: null
 };
 
 const ORDRE_CARACS = ["FORCE", "DEXTÉRITÉ", "CONSTITUTION", "INTELLIGENCE", "SAGESSE", "CHARISME", "AUCUN"];
@@ -103,8 +104,11 @@ function formatterTexteEffet(effet, stacks) {
 window.ouvrirCreationCompetence = async function() {
     window.forgeState.actions = [];
     window.forgeState.isCapReached = false;
+    window.forgeState.armePrincipale = null;
+
     document.getElementById("forge-nom").value = "";
-    document.getElementById("forge-element").value = "Aucun";
+    const selectElement = document.getElementById("forge-element");
+    if (selectElement) selectElement.value = "Aucun";
 
     const idPerso = document.getElementById("champ-id-personnage").value;
     window.forgeState.idPersonnage = idPerso;
@@ -136,10 +140,20 @@ window.ouvrirCreationCompetence = async function() {
 window.fermerForgeCompetence = function() {
     document.getElementById("modale-creation-competence").style.display = "none";
     document.getElementById("modale-menu-ajout").style.display = "none";
+    document.getElementById("modale-menu-arme").style.display = "none";
     document.getElementById("overlay-jeu-modale").style.display = "none";
 };
 
+window.ouvrirMenuArme = function() {
+    document.getElementById("modale-menu-arme").style.display = "block";
+};
+
 window.ouvrirMenuAjoutForge = function() {
+    if (!window.forgeState.armePrincipale) {
+        window.ouvrirMenuArme();
+        return;
+    }
+
     const conteneurMenu = document.getElementById("forge-menu-caracs");
     conteneurMenu.innerHTML = "";
 
@@ -160,7 +174,8 @@ window.ouvrirMenuAjoutForge = function() {
             let htmlLignes = "";
             effets.forEach(eff => {
                 const isLocked = (activeTags.size >= 2 && eff.Modificateur !== "AUCUN" && !activeTags.has(eff.Modificateur.toUpperCase()));
-                const isDisabled = isLocked || capAtteint;
+                const isAttaqueLourdeEtMagie = (eff.Nom === "Attaque lourde" && window.forgeState.armePrincipale === "Magie");
+                const isDisabled = isLocked || capAtteint || isAttaqueLourdeEtMagie;
                 const bgColor = isDisabled ? 'gray' : '#3b82f6';
 
                 htmlLignes += `
@@ -191,6 +206,36 @@ window.ouvrirMenuAjoutForge = function() {
 
 window.fermerMenuAjoutForge = function() {
     document.getElementById("modale-menu-ajout").style.display = "none";
+};
+
+function isEffetPhysique(effet) {
+    return effet && (effet.Type_Mecanique === "Physique" || effet.Type_Mecanique_2 === "Physique");
+}
+
+function purgerIncompatibilitesArme() {
+    if (window.forgeState.armePrincipale !== "Magie") return;
+
+    window.forgeState.actions = window.forgeState.actions.filter(
+        act => act.baseEffet.Nom !== "Attaque lourde"
+    );
+
+    window.forgeState.actions.forEach(act => {
+        Object.keys(act.mods).forEach(modId => {
+            const modEff = window.forgeState.effetsBDD.find(e => e.id === modId);
+            if (isEffetPhysique(modEff)) delete act.mods[modId];
+        });
+    });
+}
+
+window.selectionnerArme = function(arme) {
+    window.forgeState.armePrincipale = arme;
+    document.getElementById("modale-menu-arme").style.display = "none";
+    purgerIncompatibilitesArme();
+    window.rafraichirForge();
+
+    if (window.forgeState.actions.length === 0) {
+        window.ouvrirMenuAjoutForge();
+    }
 };
 
 window.ajouterComposantPrincipal = function(effetId) {
@@ -231,10 +276,7 @@ window.modifierModCount = function(idInst, modId, delta) {
 window.attacherModificateur = function(selectElement, idInst) {
     const modId = selectElement.value;
     if (!modId) return;
-    if (window.forgeState.isCapReached) {
-        selectElement.value = "";
-        return;
-    }
+    if (window.forgeState.isCapReached) { selectElement.value = ""; return; }
     window.modifierModCount(idInst, modId, 1);
     selectElement.value = "";
 };
@@ -264,7 +306,6 @@ function compilerEffetsTexte() {
 }
 
 window.rafraichirForge = function() {
-    // === ETAPE 1 : CALCUL MATHÉMATIQUE (PC, FATIGUE, INITIATIVE) ===
     let totalPC = 0;
     let initBonusNet = 0;
     const activeTags = getActiveTags();
@@ -326,7 +367,14 @@ window.rafraichirForge = function() {
     const capErreur = fatigueConsommee > capFatigue;
     window.forgeState.isCapReached = capDepasse;
 
-    // === ETAPE 2 : MISES À JOUR VISUELLES ===
+    const armeContainer = document.getElementById("forge-weapon-tag-container");
+    if (armeContainer) {
+        if (window.forgeState.armePrincipale) {
+            armeContainer.innerHTML = `<span onclick="jouerSonClic(); window.ouvrirMenuArme()" style="background: #2563eb; color: white; padding: 6px 16px; border-radius: 12px; font-size: 13px; font-weight: bold; letter-spacing: 1px; display: inline-block; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: transform 0.1s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'" title="Changer l'arme de la technique">${window.forgeState.armePrincipale.toUpperCase()} 🔄</span>`;
+        } else {
+            armeContainer.innerHTML = ``;
+        }
+    }
 
     const tagsDiv = document.getElementById("forge-active-tags");
     if (tagsDiv) {
@@ -337,8 +385,12 @@ window.rafraichirForge = function() {
         }
     }
 
-    const element = document.getElementById("forge-element").value;
-    document.getElementById("forge-element-affichage").innerText = element === "Aucun" ? "" : "• " + element.toUpperCase();
+    const selectElement = document.getElementById("forge-element");
+    if (selectElement) {
+        const element = selectElement.value;
+        document.getElementById("forge-element-affichage").innerText = element === "Aucun" ? "" : "• " + element.toUpperCase();
+    }
+
     document.getElementById("forge-cout-pc").innerText = totalPC.toFixed(1) + " PC";
     document.getElementById("forge-fatigue-val").innerText = fatigueConsommee;
 
@@ -346,11 +398,14 @@ window.rafraichirForge = function() {
     document.getElementById("forge-cap-fatigue").innerText = capFatigue;
     document.getElementById("forge-initiative-val").innerText = initiative;
 
-    // === ETAPE 3 : GÉNÉRATION DE L'ARBRE (HTML) ===
     const conteneurCarte = document.getElementById("forge-contenu-carte");
     conteneurCarte.innerHTML = "";
 
     const renderSelectMenu = (type, label, color, actionId) => {
+        if (type === "Physique" && window.forgeState.armePrincipale === "Magie") {
+            return "";
+        }
+
         let modsDispos = window.forgeState.effetsBDD.filter(e => e.Type_Mecanique === type || e.Type_Mecanique_2 === type);
         let options = `<option value="">+ ${label}</option>`;
 
@@ -422,13 +477,16 @@ window.rafraichirForge = function() {
     const btnValider = document.getElementById("btn-valider-forge");
     const nomSaisi = document.getElementById("forge-nom").value.trim();
 
-    btnValider.disabled = capErreur || fatigueConsommee === 0 || nomSaisi === "";
+    btnValider.disabled = capErreur || fatigueConsommee === 0 || nomSaisi === "" || !window.forgeState.armePrincipale;
 };
 
 window.sauvegarderCompetence = async function() {
     const nomCompetence = document.getElementById("forge-nom").value.trim();
-    const arme = document.getElementById("forge-arme").value;
-    const element = document.getElementById("forge-element").value;
+    const arme = window.forgeState.armePrincipale || "Non spécifié";
+
+    const selectElement = document.getElementById("forge-element");
+    const element = selectElement ? selectElement.value : "Aucun";
+
     const fatigue = parseInt(document.getElementById("forge-fatigue-val").innerText);
     const initiative = parseInt(document.getElementById("forge-initiative-val").innerText);
     const coutPc = parseFloat(document.getElementById("forge-cout-pc").innerText.replace(" PC", "")) || 0;
