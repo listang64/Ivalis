@@ -66,7 +66,11 @@ window.forgeState = {
     effetsBDD: [],
     actions: [],
     isCapReached: false,
-    armePrincipale: null
+    armePrincipale: null,
+    
+    // Pour l'éditeur de Zone
+    zoneActionIdEnCours: null,
+    selectedZoneHexes: [] // Array of {q, r}
 };
 
 const ORDRE_CARACS = ["FORCE", "DEXTÉRITÉ", "CONSTITUTION", "INTELLIGENCE", "SAGESSE", "CHARISME", "AUCUN"];
@@ -87,6 +91,7 @@ function getMaxStacks(effet) {
     if (effet.Pourcent_Base > 0 && effet.Pourcent_Max > 0) return Math.floor(effet.Pourcent_Max / effet.Pourcent_Base);
     if (["Persistance terrain", "Durée +", "Durée étalement dégâts", "DOT", "Illusion"].includes(effet.Nom)) return 1;
     if (effet.Nom === "Initiative +") return 6;
+    if (effet.Nom === "Zone") return 15; // Max arbitraire élevé pour la Zone
     return 25;
 }
 
@@ -102,10 +107,8 @@ function formatterTexteEffet(effet, stacks) {
     return texte;
 }
 
-// INTELLIGENCE DE FILTRAGE DES ARMES
 function estIncompatibleAvecArme(nomEffet, arme) {
     if (!arme || !nomEffet) return false;
-    
     const nom = nomEffet.toLowerCase();
     
     if (arme === "Sans arme / Arme rp") {
@@ -121,9 +124,68 @@ function estIncompatibleAvecArme(nomEffet, arme) {
     } else if (arme === "Magie") {
         if (nom.includes("attaque lourde") || nom.includes("attaque légère") || nom.includes("attaque legere")) return true;
     }
-    
     return false;
 }
+
+// === OUTILS POUR LA ZONE ===
+function actionHasDistance(act) {
+    if (act.baseEffet.Nom === "Distance") return true;
+    let hasDist = false;
+    Object.keys(act.mods).forEach(modId => {
+        const modEff = window.forgeState.effetsBDD.find(e => e.id === modId);
+        if (modEff && modEff.Nom === "Distance") hasDist = true;
+    });
+    return hasDist;
+}
+
+function hexDistance(h1, h2) {
+    return (Math.abs(h1.q - h2.q) + Math.abs(h1.q + h1.r - h2.q - h2.r) + Math.abs(h1.r - h2.r)) / 2;
+}
+
+function isConnectedToCenter(hexes, targetHex, hasDistance) {
+    if (hasDistance) return true; // Les attaques à distance peuvent s'étendre n'importe où
+    if (targetHex.q === 0 && targetHex.r === 0) return true;
+
+    // L'hexagone doit toucher le centre ou un autre hexagone sélectionné
+    const neighbors = [
+        {q: targetHex.q + 1, r: targetHex.r}, {q: targetHex.q + 1, r: targetHex.r - 1},
+        {q: targetHex.q, r: targetHex.r - 1}, {q: targetHex.q - 1, r: targetHex.r},
+        {q: targetHex.q - 1, r: targetHex.r + 1}, {q: targetHex.q, r: targetHex.r + 1}
+    ];
+
+    return neighbors.some(n => 
+        (n.q === 0 && n.r === 0) || hexes.some(h => h.q === n.q && h.r === n.r)
+    );
+}
+
+function purgeDisconnectedZoneHexes(hexes, hasDistance) {
+    if (hasDistance) return hexes;
+    
+    let connected = [];
+    let queue = [{q: 0, r: 0}];
+    let visited = new Set(["0,0"]);
+
+    while (queue.length > 0) {
+        let current = queue.shift();
+        const neighbors = [
+            {q: current.q + 1, r: current.r}, {q: current.q + 1, r: current.r - 1},
+            {q: current.q, r: current.r - 1}, {q: current.q - 1, r: current.r},
+            {q: current.q - 1, r: current.r + 1}, {q: current.q, r: current.r + 1}
+        ];
+
+        neighbors.forEach(n => {
+            const key = `${n.q},${n.r}`;
+            if (hexes.some(h => h.q === n.q && h.r === n.r) && !visited.has(key)) {
+                visited.add(key);
+                connected.push(n);
+                queue.push(n);
+            }
+        });
+    }
+    return connected;
+}
+
+// =========================================================================
 
 window.ouvrirCreationCompetence = async function() {
     window.forgeState.actions = [];
@@ -165,6 +227,7 @@ window.fermerForgeCompetence = function() {
     document.getElementById("modale-creation-competence").style.display = "none";
     document.getElementById("modale-menu-ajout").style.display = "none";
     document.getElementById("modale-menu-arme").style.display = "none";
+    document.getElementById("modale-editeur-zone").style.display = "none";
     document.getElementById("overlay-jeu-modale").style.display = "none";
 };
 
@@ -271,7 +334,8 @@ window.ajouterComposantPrincipal = function(effetId) {
     const eff = window.forgeState.effetsBDD.find(e => e.id === effetId);
     window.forgeState.actions.push({
         idInst: "ACT_" + Math.random().toString(36).substring(2, 9),
-        baseEffet: eff, count: 1, mods: {}
+        baseEffet: eff, count: 1, mods: {},
+        zoneHexes: [] // Array customisé pour cet arbre
     });
 
     window.fermerMenuAjoutForge();
@@ -295,10 +359,22 @@ window.modifierModCount = function(idInst, modId, delta) {
 
     if (act.mods[modId] <= 0) {
         delete act.mods[modId];
+        // Si on supprime "Zone", on purge les hexes
+        const modEffet = window.forgeState.effetsBDD.find(e => e.id === modId);
+        if (modEffet && modEffet.Nom === "Zone") act.zoneHexes = [];
     } else {
         const modEffet = window.forgeState.effetsBDD.find(e => e.id === modId);
         if (act.mods[modId] > getMaxStacks(modEffet)) act.mods[modId] = getMaxStacks(modEffet);
     }
+    
+    // Synchronisation spéciale avec l'éditeur de Zone
+    const modEffet = window.forgeState.effetsBDD.find(e => e.id === modId);
+    if (modEffet && modEffet.Nom === "Zone") {
+        const diff = delta > 0 ? 1 : -1;
+        // On ne gère pas ça en auto, on laisse le joueur éditer manuellement, mais on force au moins 1 si ajouté
+        if (act.zoneHexes.length === 0 && act.mods[modId] > 0) act.zoneHexes = [];
+    }
+
     window.rafraichirForge();
 };
 
@@ -334,6 +410,134 @@ function compilerEffetsTexte() {
     return descriptions;
 }
 
+// === ÉDITEUR DE ZONE ===
+window.ouvrirEditeurZone = function(idInst) {
+    window.forgeState.zoneActionIdEnCours = idInst;
+    const act = window.forgeState.actions.find(a => a.idInst === idInst);
+    window.forgeState.selectedZoneHexes = [...(act.zoneHexes || [])];
+    
+    document.getElementById("modale-editeur-zone").style.display = "block";
+    window.dessinerGrilleZone();
+};
+
+window.fermerEditeurZone = function(valider) {
+    if (valider && window.forgeState.zoneActionIdEnCours) {
+        const act = window.forgeState.actions.find(a => a.idInst === window.forgeState.zoneActionIdEnCours);
+        act.zoneHexes = [...window.forgeState.selectedZoneHexes];
+        
+        // Met à jour la quantité du modificateur "Zone" pour que le prix match
+        const modZone = window.forgeState.effetsBDD.find(e => e.Nom === "Zone");
+        if (modZone) {
+            act.mods[modZone.id] = act.zoneHexes.length > 0 ? act.zoneHexes.length : 1;
+        }
+    }
+    document.getElementById("modale-editeur-zone").style.display = "none";
+    window.forgeState.zoneActionIdEnCours = null;
+    window.rafraichirForge();
+};
+
+window.clicHexagoneZone = function(q, r) {
+    const act = window.forgeState.actions.find(a => a.idInst === window.forgeState.zoneActionIdEnCours);
+    const hasDist = actionHasDistance(act);
+    const isPlayer = (q === 0 && r === 0 && !hasDist);
+
+    if (isPlayer) return; // Impossible de désélectionner le joueur au cac
+
+    const isSelected = window.forgeState.selectedZoneHexes.some(h => h.q === q && h.r === r);
+
+    if (isSelected) {
+        window.forgeState.selectedZoneHexes = window.forgeState.selectedZoneHexes.filter(h => h.q !== q || h.r !== r);
+        window.forgeState.selectedZoneHexes = purgeDisconnectedZoneHexes(window.forgeState.selectedZoneHexes, hasDist);
+    } else {
+        const target = {q, r};
+        if (isConnectedToCenter(window.forgeState.selectedZoneHexes, target, hasDist)) {
+            // Check Cap Limite (15)
+            if (window.forgeState.selectedZoneHexes.length < 15) {
+                window.forgeState.selectedZoneHexes.push(target);
+            }
+        }
+    }
+
+    window.dessinerGrilleZone();
+};
+
+window.dessinerGrilleZone = function() {
+    const svg = document.getElementById("zone-hex-grid");
+    svg.innerHTML = "";
+
+    const act = window.forgeState.actions.find(a => a.idInst === window.forgeState.zoneActionIdEnCours);
+    const hasDist = actionHasDistance(act);
+
+    document.getElementById("zone-description-texte").innerText = hasDist ? 
+        "Cible à distance. N'importe quel hexagone est cliquable." : 
+        "Sort au corps-à-corps. Les hexagones doivent toucher le lanceur (centre).";
+
+    const modZone = window.forgeState.effetsBDD.find(e => e.Nom === "Zone");
+    const costPC = modZone ? parseFloat(modZone.Cout_PT) : 1.5;
+
+    const currentZoneCount = window.forgeState.selectedZoneHexes.length;
+    // Le premier est gratuit (-1)
+    const finalCost = Math.max(0, (currentZoneCount - 1) * costPC);
+    
+    const affichage = document.getElementById("zone-cout-affichage");
+    affichage.innerText = finalCost === 0 ? "Gratuit" : `${finalCost} PC`;
+    affichage.style.color = finalCost === 0 ? "#1b6e3a" : "#ff4c4c";
+
+    const hexRadius = 25;
+    const cx = 150;
+    const cy = 150;
+
+    for (let q = -2; q <= 2; q++) {
+        let r1 = Math.max(-2, -q - 2);
+        let r2 = Math.min(2, -q + 2);
+
+        for (let r = r1; r <= r2; r++) {
+            const isCenter = (q === 0 && r === 0);
+            const isPlayer = isCenter && !hasDist;
+            const isSelected = window.forgeState.selectedZoneHexes.some(h => h.q === q && h.r === r);
+
+            const x = cx + hexRadius * Math.sqrt(3) * (q + r / 2.0);
+            const y = cy + hexRadius * 3.0 / 2.0 * r;
+
+            let fillColor = "transparent";
+            if (isPlayer) fillColor = "gray";
+            else if (isSelected) fillColor = "rgba(255, 76, 76, 0.8)";
+            else fillColor = "rgba(59, 130, 246, 0.1)";
+
+            const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+            
+            // Calcul des 6 coins
+            let points = "";
+            for(let i=0; i<6; i++) {
+                let angle = Math.PI / 3 * i - Math.PI / 6;
+                points += `${x + hexRadius * Math.cos(angle)},${y + hexRadius * Math.sin(angle)} `;
+            }
+            
+            polygon.setAttribute("points", points.trim());
+            polygon.setAttribute("fill", fillColor);
+            polygon.setAttribute("stroke", "rgba(0,0,0,0.2)");
+            polygon.setAttribute("stroke-width", "1");
+            polygon.style.cursor = isPlayer ? "default" : "pointer";
+            
+            polygon.onclick = () => window.clicHexagoneZone(q, r);
+
+            svg.appendChild(polygon);
+
+            if (isPlayer) {
+                const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                text.setAttribute("x", x);
+                text.setAttribute("y", y + 4);
+                text.setAttribute("text-anchor", "middle");
+                text.setAttribute("fill", "white");
+                text.setAttribute("font-size", "12");
+                text.textContent = "⚔️";
+                text.style.pointerEvents = "none";
+                svg.appendChild(text);
+            }
+        }
+    }
+};
+
 window.rafraichirForge = function() {
     let totalPC = 0;
     let initBonusNet = 0;
@@ -361,7 +565,9 @@ window.rafraichirForge = function() {
                 if (modEff.Nom === "Durée +" || modEff.Nom === "Persistance terrain") {
                     dureeMult *= Math.pow(1.5, modCount);
                 } else if (modEff.Nom === "Zone") {
-                    coutMods += (parseFloat(modEff.Cout_PT) || 0) * Math.max(0, modCount - 1);
+                    // Le premier hexagone est gratuit, les suivants coûtent 1.5 PC chacun
+                    let zoneLen = (act.zoneHexes && act.zoneHexes.length > 0) ? act.zoneHexes.length : modCount;
+                    coutMods += (parseFloat(modEff.Cout_PT) || 1.5) * Math.max(0, zoneLen - 1);
                 } else if (modEff.Nom === "DOT" || modEff.Nom === "Durée étalement dégâts") {
                     aDOT = true;
                 } else {
@@ -438,7 +644,6 @@ window.rafraichirForge = function() {
         let modsDispos = window.forgeState.effetsBDD.filter(e => e.Type_Mecanique === type || e.Type_Mecanique_2 === type);
         let options = `<option value="">+ ${label}</option>`;
         
-        // Regroupement par Caractéristique (GÉNÉRAL si aucune)
         let groupesMods = {};
         modsDispos.forEach(mod => {
             const isLocked = activeTags.size >= 2 && mod.Modificateur !== "AUCUN" && !activeTags.has(mod.Modificateur.toUpperCase());
@@ -449,7 +654,6 @@ window.rafraichirForge = function() {
             }
         });
 
-        // Construction du menu avec des sections ordonnées (<optgroup>)
         ORDRE_MODS.forEach(carac => {
             if (groupesMods[carac] && groupesMods[carac].length > 0) {
                 options += `<optgroup label="-- ${carac} --">`;
@@ -458,7 +662,6 @@ window.rafraichirForge = function() {
             }
         });
 
-        // Cas de sécurité s'il y a des tags non prévus
         Object.keys(groupesMods).forEach(carac => {
             if (!ORDRE_MODS.includes(carac)) {
                 options += `<optgroup label="-- ${carac} --">`;
@@ -484,6 +687,12 @@ window.rafraichirForge = function() {
                 const isModMaxed = modCount >= getMaxStacks(modEff);
                 const btnPlusModDisabled = (isModMaxed || capDepasse) ? `disabled style="opacity: 0.3; cursor: not-allowed; border:none; background:none; font-weight:bold;"` : `style="color: green; cursor: pointer; border:none; background:none; font-weight:bold;"`;
 
+                // NOUVEAU : Bouton "Éditer" pour la Zone
+                let boutonEditerZone = "";
+                if (modEff.Nom === "Zone") {
+                    boutonEditerZone = `<button class="btn-parametres" style="padding: 2px 6px; font-size: 10px; margin-right: 5px; background: #3b82f6; color: white;" onclick="window.ouvrirEditeurZone('${act.idInst}')">Éditer</button>`;
+                }
+
                 htmlMods += `
                     <div style="display: flex; justify-content: space-between; margin-left: 20px; padding: 4px 0;">
                         <div>
@@ -492,6 +701,7 @@ window.rafraichirForge = function() {
                             <div style="font-size: 11px; color: gray; margin-left: 15px;">${formatterTexteEffet(modEff, modCount)}</div>
                         </div>
                         <div style="display: flex; gap: 5px; align-items: flex-start;">
+                            ${boutonEditerZone}
                             <button onclick="window.modifierModCount('${act.idInst}', '${modId}', -1)" style="border:none; background:none; color:red; cursor:pointer; font-weight:bold;">-</button>
                             <b>${modCount}</b>
                             <button onclick="window.modifierModCount('${act.idInst}', '${modId}', 1)" ${btnPlusModDisabled}>+</button>
@@ -552,7 +762,8 @@ window.sauvegarderCompetence = async function() {
             idInst: a.idInst,
             baseEffetId: a.baseEffet.id,
             count: a.count,
-            mods: { ...a.mods }
+            mods: { ...a.mods },
+            zoneHexes: a.zoneHexes || [] // On sauvegarde la forme de la zone
         }))
     };
 

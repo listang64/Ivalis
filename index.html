@@ -705,6 +705,33 @@
 
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <script type="module" src="ia_master.js?v=2"></script>
+<!-- ======================================================= -->
+  <!-- 4. MODALE ÉDITEUR DE ZONE (HEXAGONES)                   -->
+  <!-- ======================================================= -->
+  <div id="modale-editeur-zone" class="modale-parchemin-jeu" style="display: none; z-index: 240; width: 450px; max-width: 95vw; background-color: #f4ece1; text-align: center; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+      <h3 style="margin-top: 0; color: #2a1a0f; font-family: 'Cinzel', serif;">Dessiner la Zone</h3>
+      
+      <p id="zone-description-texte" style="font-size: 14px; color: #5c3a21; margin-bottom: 20px;">
+          <!-- Sera rempli par JS (Distance vs CAC) -->
+      </p>
+
+      <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 20px;">
+          <!-- SVG pour dessiner la grille d'hexagones -->
+          <svg id="zone-hex-grid" width="300" height="300" style="background: rgba(255,255,255,0.5); border: 2px solid #d1c1a3; border-radius: 8px; cursor: pointer;">
+              <!-- Injecté par JS -->
+          </svg>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 16px; margin-bottom: 20px; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px;">
+          <span style="font-weight: bold; color: #5c3a21;">Coût de la zone :</span>
+          <span id="zone-cout-affichage" style="font-weight: bold; color: #1b6e3a;">Gratuit</span>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; gap: 15px;">
+          <button class="btn-parametres" style="background-color: transparent; border: 1px solid #ff4c4c; color: #ff4c4c; width: 40%;" onclick="jouerSonClic(); window.fermerEditeurZone(false)">Annuler</button>
+          <button class="btn-parametres" style="background-color: #2563eb; color: white; width: 60%;" onclick="jouerSonClic(); window.fermerEditeurZone(true)">Valider la Zone</button>
+      </div>
+  </div>
 <script type="module" src="app.js?v=2"></script>
 <script type="module" src="creation_personnage.js"></script>
 <script type="module" src="recit_dynamique.js"></script>
