@@ -567,9 +567,9 @@ async function genererEtStockerPortrait(donnees) {
   // 2. Instruction de style additionnelle (Firestore)
   const instructionSupplementaire = await recupererInstructionStyle();
 
-  // 3. Construction du prompt (Contexte Heroic Fantasy, Vue de 3/4 gauche, Plan américain, fond MAGENTA FLUO à la fin)
+  // 3. Construction du prompt (Contexte Antique Fantastique, Vue de 3/4 gauche, Plan américain, fond MAGENTA FLUO à la fin)
   const promptOpenAI =
-    "Contexte de l'univers : Médiéval Héroïque Fantastique (Heroic Fantasy).\n\n" +
+    "Contexte de l'univers : Antique Fantastique (Mythic Ancient Fantasy, Antiquité Magique).\n\n" +
     "Description du personnage :\n" +
     "Il s'agit d'un héros de genre " + donnees.genre + ", ayant environ " + donnees.age + " ans. " +
     "Sa corpulence est " + donnees.corpulence + " et sa taille est " + donnees.taille + ". " +
@@ -2797,7 +2797,7 @@ window.ajouterTokens = function(montant) {
 // =========================================================================
 
 // 🔻 C'EST ICI QUE TU POURRAS CHANGER LE NOMBRE DE POINTS POUR TES TESTS 🔻
-window.TOTAL_POINTS_CREATION = 20;
+window.TOTAL_POINTS_CREATION = 22;
 
 const NOMS_CARACS = [
   { id: "force", nom: "FORCE", desc: "Mesure la puissance physique.", comp: "Athlétisme" },
@@ -2811,7 +2811,7 @@ const NOMS_CARACS = [
 window.statsCreation = { force: 8, dex: 8, con: 8, int: 8, sag: 8, cha: 8 };
 
 function getCoutStat(valeur) {
-  const couts = { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 };
+  const couts = { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9, 16: 12 };
   return couts[valeur] || 0;
 }
 
@@ -2901,29 +2901,13 @@ window.actualiserModaleCaracs = function() {
   // MISE À JOUR EN TEMPS RÉEL DE LA PRÉVISUALISATION
   // =========================================================
   const rawModCon = Math.floor((window.statsCreation.con - 10) / 2);
-  const rawModForce = Math.floor((window.statsCreation.force - 10) / 2);
-  const rawModDex = Math.floor((window.statsCreation.dex - 10) / 2);
-  const rawModSag = Math.floor((window.statsCreation.sag - 10) / 2);
-  const rawModCha = Math.floor((window.statsCreation.cha - 10) / 2);
-
-  const obtenirFlecheHTML = (mod, size) => {
-      if (mod < 0) return `<span style="color: #ff4c4c; font-size: ${size}px; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">▼</span>`;
-      if (mod > 0) return `<span style="color: #1b6e3a; font-size: ${size}px; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">▲</span>`;
-      return '';
-  };
 
   const spanPv = document.getElementById("creation-pv-max");
-  const spanFlecheDex = document.getElementById("creation-fleche-dex");
-  const spanFlecheForce = document.getElementById("creation-fleche-force");
-  const spanFlecheSag = document.getElementById("creation-fleche-sag");
-  const spanFlecheCha = document.getElementById("creation-fleche-cha");
-
-  if (spanPv) spanPv.innerText = 9 + rawModCon;
-  if (spanFlecheDex) spanFlecheDex.innerHTML = obtenirFlecheHTML(rawModDex, 16);
-  if (spanFlecheForce) spanFlecheForce.innerHTML = obtenirFlecheHTML(rawModForce, 16);
-  if (spanFlecheSag) spanFlecheSag.innerHTML = obtenirFlecheHTML(rawModSag, 16);
-  if (spanFlecheCha) spanFlecheCha.innerHTML = obtenirFlecheHTML(rawModCha, 16);
+  if (spanPv) spanPv.innerText = 50 + (8 * rawModCon);
   // =========================================================
+
+  // NOUVEAU : On scanne si le joueur a déjà une stat à 16
+  const aUneStatA16 = Object.values(window.statsCreation).some(val => val >= 16);
 
   NOMS_CARACS.forEach(c => {
     const val = window.statsCreation[c.id];
@@ -2931,9 +2915,13 @@ window.actualiserModaleCaracs = function() {
     const modAff = mod >= 0 ? "+" + mod : mod;
     const coutSuivant = getCoutStat(val + 1) - getCoutStat(val);
     
-    // Logique de blocage des boutons
+    // Logique de blocage du bouton "-"
     const btnMoinsDisabled = val <= 8 ? "disabled" : "";
-    const btnPlusDisabled = (val >= 15 || pointsRestants < coutSuivant) ? "disabled" : "";
+    
+    // Logique de blocage du bouton "+" avec la nouvelle règle stricte
+    // Bloqué si : on est déjà à 16, OU (quelqu'un est à 16 et on est à 15), OU pas assez de points.
+    const limiteAtteinte = (val >= 16) || (aUneStatA16 && val >= 15);
+    const btnPlusDisabled = (limiteAtteinte || pointsRestants < coutSuivant) ? "disabled" : "";
 
     const html = `
       <div class="ligne-creation-carac">
@@ -2983,7 +2971,8 @@ window.validerCreationCaracs = async function() {
     const rawModCon = Math.floor((window.statsCreation.con - 10) / 2);
     const rawModForce = Math.floor((window.statsCreation.force - 10) / 2);
 
-    const pvMax = 9 + rawModCon;
+    // NOUVELLE FORMULE :
+    const pvMax = 50 + (8 * rawModCon);
     const objetsMax = 3 + rawModForce;
 
     await updateDoc(doc(db, "Personnages", idPersonnage), {
@@ -3019,7 +3008,8 @@ window.afficherStatsFinales = function(dataStats) {
   const rawModConFiche = Math.floor(((dataStats.con || 8) - 10) / 2);
 
   const affPv = document.getElementById("affichage-pv-max");
-  if (affPv) affPv.innerText = 9 + rawModConFiche;
+  // NOUVELLE FORMULE :
+  if (affPv) affPv.innerText = 50 + (8 * rawModConFiche);
   // =========================================================
 
   NOMS_CARACS.forEach(c => {

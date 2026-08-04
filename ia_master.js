@@ -419,7 +419,7 @@ async function genererEtStockerImagePNJ(descriptionPhysique) {
     
     // NOUVEAU PROMPT : Le contexte Médiéval Fantastique ouvre le bal !
     const promptOpenAI = 
-        "Contexte de l'univers : Médiéval Héroïque Fantastique (Heroic Fantasy).\n\n" +
+        "Contexte de l'univers : Antique Fantastique (Mythic Ancient Fantasy, Antiquité Magique).\n\n" +
         "Description du personnage : " + descriptionPhysique + "\n\n" +
         "Directives de style artistique : " + instructionStyle + "\n\n" +
         "🛑 RÈGLE TECHNIQUE DÉFINITIVE (PRIORITAIRE SUR TOUT LE RESTE) : " +
@@ -575,7 +575,7 @@ Si oui, utilise l'outil 'signalerNoms' pour lister leurs prénoms. Sinon, liste 
 
     const promptCreation = `Tu es MIA_PNJ, le forgeron d'âmes.
 Tu dois inventer les fiches détaillées de ces nouveaux personnages : ${JSON.stringify(nouveauxNomsDetectes)}.
-Assure-toi que tous les éléments de la fiche sont cohérents entre eux et adaptés à l'univers Heroic Fantasy.
+Assure-toi que tous les éléments de la fiche sont cohérents entre eux et adaptés à l'univers Antique Fantastique (Antiquité magique, mythologie).
 Utilise l'outil 'creerNouveauxPNJ' pour générer leurs fiches.`;
 
     const outilsCreation = [{
@@ -1064,8 +1064,8 @@ async function genererEtStockerImageLieu(promptLieu) {
     // NOUVEAU : On nettoie si tu as mis des phrases de discussion au début
     instructionStyle = instructionStyle.replace(/Tu fera ce dessin dans ce style :/gi, "").trim();
 
-    // NOUVEAU : On passe à l'heroic fantasy et on ajoute des exemples architecturaux
-    const promptOpenAI = `DIRECTIVE DE STYLE VISUEL OBLIGATOIRE : ${instructionStyle}\n\n---\nSujet à dessiner : Un paysage d'heroic fantasy. ABSOLUMENT AUCUN PERSONNAGE, aucun humain, aucune créature, aucun animal. Uniquement de l'environnement, du paysage et de l'architecture (ville, village, grotte, nature, etc.). Ne dessine aucun texte. Description de la région : ${promptLieu}`;
+    // NOUVEAU : On passe à l'Antique Fantastique et on ajoute des exemples architecturaux
+    const promptOpenAI = `DIRECTIVE DE STYLE VISUEL OBLIGATOIRE : ${instructionStyle}\n\n---\nSujet à dessiner : Un paysage d'Antique Fantastique (Mythic Ancient Fantasy, architecture antique, temples de marbre, ruines mythologiques). ABSOLUMENT AUCUN PERSONNAGE, aucun humain, aucune créature, aucun animal. Uniquement de l'environnement, du paysage et de l'architecture (cité antique, village, grotte, nature, etc.). Ne dessine aucun texte. Description de la région : ${promptLieu}`;
 
     const payloadOpenAI = { model: "gpt-image-2", prompt: promptOpenAI, output_format: "webp", n: 1, size: "1792x1024", quality: "low", moderation: "low" };
 
@@ -1199,7 +1199,7 @@ window.creerNouveauLieu = async function(idHex) {
 Le Maître du Jeu vient d'envoyer les joueurs sur une zone inexplorée de la carte.
 Voici la liste des lieux qui existent DÉJÀ dans le monde : ${JSON.stringify(nomsLieuxExistants)}.
 
-Ta mission : Invente une NOUVELLE RÉGION d'heroic fantasy originale.
+Ta mission : Invente une NOUVELLE RÉGION d'Antique Fantastique (Mythologie, Antiquité magique) originale.
 
 RÈGLES DE CRÉATION :
 1. ORIGINALITÉ : Le nouveau lieu doit être un concept différent de ceux déjà existants. S'il y a déjà "La Grotte de Cristal", n'invente pas une autre grotte de cristal.
