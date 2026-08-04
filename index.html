@@ -373,6 +373,10 @@
       <label class="afficher-cles" style="margin: 20px 0; display: block; font-family: 'Almendra', serif; font-size: 16px;">
         <input type="checkbox" id="toggle-tokens" onchange="basculerAffichageTokens(this.checked)"> Afficher les Tokens
       </label>
+
+      <label class="afficher-cles" style="margin: 20px 0; display: block; font-family: 'Almendra', serif; font-size: 16px; color: #ff4c4c;">
+        <input type="checkbox" id="toggle-dev-mode" onchange="window.basculerDevMode(this.checked)"> 🛠️ Mode Développeur (DEV)
+      </label>
       
       <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-menu-outils', 'etape-menu-parametres')">Retour</button>
     </div>
@@ -456,7 +460,7 @@
   </div>
 
   <div id="conteneur-liste-personnages" class="fenetre-volante-parchemin">
-    <h2>Héros d'Ivalis<button class="btn-rond-plus" title="Créer un nouveau Héros" onclick="jouerSonClic(); ouvrirFichePerso(null, '', '', '')">+</button></h2>
+    <h2>Héros d'Ivalis<button class="btn-rond-plus" title="Créer un nouveau Héros" onclick="jouerSonClic(); window.ouvrirCreationHero()">+</button></h2>
     <p style="font-size: 14px; margin-top: -15px; color: #5c3a21;">Double-cliquez pour ouvrir la fiche</p>
     <div id="chargement-persos">Lecture des âmes...</div>
     <div class="liste-persos" id="liste-html-persos" style="display:none;"></div>
@@ -485,103 +489,17 @@
     </div>
 
     <div class="conteneur-onglets">
-      <button class="onglet-btn actif" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-descriptif')">Descriptif</button>
-      <button class="onglet-btn" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-caracs')">Caractéristiques</button>
+      <button class="onglet-btn actif" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-caracs')">Caractéristiques</button>
       <button class="onglet-btn" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-competences')">Compétences</button>
       <button class="onglet-btn" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-inventaire')">Inventaire</button>
+      <button class="onglet-btn" id="onglet-btn-dev" style="display: none; background-color: #5c1e16; color: #ff4c4c;" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-dev')">DEV</button>
     </div>
 
-    <div id="onglet-descriptif" class="contenu-onglet actif">
-      <input type="hidden" id="champ-id-personnage" value="">
-      <input type="hidden" id="champ-statut-personnage" value="">
-      <!-- NOUVEAU : Mémoire du propriétaire du personnage -->
-      <input type="hidden" id="champ-id-joueur-perso" value="">
-
-      <div class="grille-descriptif">
-        <div>
-          <div class="bloc-formulaire">
-            <h4>Identité</h4>
-            <div class="champ-formulaire"><label>Prénom du héros</label><input type="text" class="input-perso" id="champ-prenom"></div>
-            <div class="champ-formulaire"><label>Nom du héros</label><input type="text" class="input-perso" id="champ-nom"></div>
-            <div class="champ-formulaire"><label>Âge apparent</label><input type="text" class="input-perso" id="champ-age"></div>
-            <div class="champ-formulaire">
-              <label>Race</label>
-              <select class="input-perso" id="champ-race">
-                <option value="">-- Choisir --</option>
-                <option value="Humain">Humain</option>
-              </select>
-            </div>
-            <div class="champ-formulaire">
-              <label>Genre</label>
-              <select class="input-perso" id="champ-genre">
-                <option value="">-- Choisir --</option><option value="Male">Mâle</option><option value="Femelle">Femelle</option><option value="Se cherche">Se cherche</option>
-              </select>
-            </div>
-          </div>
-          <div class="bloc-formulaire">
-            <h4>Visage</h4>
-            <div class="champ-formulaire"><label>Couleur et coupe de cheveux</label><input type="text" class="input-perso" id="champ-cheveux"></div>
-            <div class="champ-formulaire"><label>Yeux</label><input type="text" class="input-perso" id="champ-yeux"></div>
-            <div class="champ-formulaire"><label>Pilosité faciale</label><input type="text" class="input-perso" id="champ-pilosite"></div>
-          </div>
-          <div class="bloc-formulaire">
-            <h4>Détails</h4>
-            <div class="champ-formulaire"><label>Signes distinctifs</label><input type="text" class="input-perso" id="champ-signes"></div>
-            <div class="champ-formulaire"><label>Expression du visage</label><input type="text" class="input-perso" id="champ-expression"></div>
-          </div>
-        </div>
-        <div>
-          <div class="bloc-formulaire">
-            <h4>Physique</h4>
-            <div class="champ-formulaire">
-              <label>Corpulence</label>
-              <select class="input-perso" id="champ-corpulence">
-                <option value="">-- Choisir --</option><option value="Tres maigre">Très maigre</option><option value="Maigre">Maigre</option><option value="Normal">Normal</option><option value="Athletique">Athlétique</option><option value="Obese">Obèse</option>
-              </select>
-            </div>
-            <div class="champ-formulaire">
-              <label>Taille</label>
-              <select class="input-perso" id="champ-taille">
-                <option value="">-- Choisir --</option><option value="Tres petit">Très petit</option><option value="Petit">Petit</option><option value="Normal">Normal</option><option value="Grand">Grand</option>
-              </select>
-            </div>
-            <div class="champ-formulaire"><label>Teint / Peau</label><input type="text" class="input-perso" id="champ-peau"></div>
-          </div>
-          <div class="bloc-formulaire">
-            <h4>Apparence</h4>
-            <div class="champ-formulaire"><label>Style vestimentaire</label><input type="text" class="input-perso" id="champ-style"></div>
-            <div class="champ-formulaire"><label>Couleurs dominantes</label><input type="text" class="input-perso" id="champ-couleurs"></div>
-            <div class="champ-formulaire"><label>Équipement visible</label><input type="text" class="input-perso" id="champ-equipement"></div>
-          </div>
-          <div class="bloc-formulaire">
-            <h4>Autres</h4>
-            <div class="champ-formulaire">
-              <label>Couleur du Token</label>
-              <input type="color" class="input-perso input-couleur" id="champ-couleur-token" value="#2a1a0f" oninput="appliquerCouleurTheme(this.value)">
-            </div>
-            <div class="champ-formulaire">
-              <label>Faction</label>
-              <select class="input-perso" id="champ-faction"><option value="">-- Chargement... --</option></select>
-            </div>
-          </div>
-        </div>
-
-        <div class="actions-formulaire">
-          <button id="btn-sauvegarder-perso" class="btn-parametres" onclick="jouerSonClic(); sauvegarderDescriptifPerso()">Enregistrer</button>
-          
-          <!-- Le bouton Supprimer est maintenant naturellement intégré ! -->
-          <button id="btn-supprimer-perso" class="btn-parametres btn-supprimer" style="display: none;" onclick="jouerSonClic(); ouvrirConfirmationSuppressionPerso()">Supprimer</button>
-          
-          <button class="btn-parametres" onclick="jouerSonClic(); fermerFichePerso()">Annuler</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="onglet-caracs" class="contenu-onglet">
+    <div id="onglet-caracs" class="contenu-onglet actif">
       <div id="caracs-vide" style="display: none; text-align: center; margin-top: 50px;">
         <p style="font-size: 18px; color: #4a2e1b;">Ce héros n'a pas encore éveillé son potentiel.</p>
         <button class="btn-parametres" id="btn-creer-caracs" onclick="jouerSonClic(); ouvrirModaleCreationCaracs()">Créer caractéristiques</button>
-        <p id="msg-sauvegarde-requise" style="display: none; color: #ff4c4c;">Veuillez d'abord enregistrer le personnage (onglet Descriptif) pour lui attribuer des caractéristiques.</p>
+        <p id="msg-sauvegarde-requise" style="display: none; color: #ff4c4c;">Créez d'abord un héros via le bouton + pour lui attribuer des caractéristiques.</p>
       </div>
 
       <div id="caracs-affiche" style="display: none; text-align: left;">
@@ -633,6 +551,13 @@
       <!-- Vide pour l'instant -->
     </div>
     <div id="onglet-inventaire" class="contenu-onglet"><h3 style="margin-top: 0;">Sac à dos &amp; Équipement</h3><p><i>Armes, armures...</i></p></div>
+
+    <div id="onglet-dev" class="contenu-onglet">
+      <h3 style="margin-top: 0; border-bottom: 2px solid #5c1e16; padding-bottom: 5px; color: #ff4c4c;">Zone Développeur</h3>
+      <p style="color: #4a2e1b; margin-bottom: 30px;">Ces actions agissent directement sur la base de données. Prudence.</p>
+      
+      <button id="btn-supprimer-perso" class="btn-parametres btn-supprimer" style="padding: 15px 30px; font-size: 18px;" onclick="jouerSonClic(); ouvrirConfirmationSuppressionPerso()">Détruire le Héros</button>
+    </div>
   </div>  <div id="fenetre-chatbox">
 
     <div id="zone-messages-chat"></div>
@@ -652,6 +577,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <script type="module" src="ia_master.js?v=2"></script>
 <script type="module" src="app.js?v=2"></script>
+<script type="module" src="creation_personnage.js"></script>
 <script type="module" src="recit_dynamique.js"></script>
 
 <div id="overlay-jet-des" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 5000; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
@@ -706,6 +632,95 @@
     <div class="groupe-boutons-jeu">
       <button class="btn-modale-jeu" id="btn-confirmer-voyage">Oui, partir</button>
       <button class="btn-modale-jeu" id="btn-annuler-voyage">Annuler</button>
+    </div>
+  </div>
+
+  <!-- ======================================================= -->
+  <!-- NOUVEAU : WIZARD CREATION ETAPE 1 (DESCRIPTIF)          -->
+  <!-- ======================================================= -->
+  <div id="modale-creation-hero" class="modale-parchemin-jeu" style="display: none; z-index: 200; width: 850px; max-width: 95vw; max-height: 85vh; overflow-y: auto; overflow-x: hidden;">
+    <h2 style="margin-bottom: 25px;">Apparence & Identité</h2>
+
+    <input type="hidden" id="champ-id-personnage" value="">
+    <input type="hidden" id="champ-statut-personnage" value="">
+    <input type="hidden" id="champ-id-joueur-perso" value="">
+
+    <div class="grille-descriptif">
+      <div>
+        <div class="bloc-formulaire">
+          <h4>Identité</h4>
+          <div class="champ-formulaire"><label>Prénom du héros</label><input type="text" class="input-perso" id="champ-prenom"></div>
+          <div class="champ-formulaire"><label>Nom du héros</label><input type="text" class="input-perso" id="champ-nom"></div>
+          <div class="champ-formulaire"><label>Âge apparent</label><input type="text" class="input-perso" id="champ-age"></div>
+          <div class="champ-formulaire">
+            <label>Race</label>
+            <select class="input-perso" id="champ-race">
+              <option value="">-- Choisir --</option>
+              <option value="Humain">Humain</option>
+            </select>
+          </div>
+          <div class="champ-formulaire">
+            <label>Genre</label>
+            <select class="input-perso" id="champ-genre">
+              <option value="">-- Choisir --</option><option value="Male">Mâle</option><option value="Femelle">Femelle</option><option value="Se cherche">Se cherche</option>
+            </select>
+          </div>
+        </div>
+        <div class="bloc-formulaire">
+          <h4>Visage</h4>
+          <div class="champ-formulaire"><label>Couleur et coupe de cheveux</label><input type="text" class="input-perso" id="champ-cheveux"></div>
+          <div class="champ-formulaire"><label>Yeux</label><input type="text" class="input-perso" id="champ-yeux"></div>
+          <div class="champ-formulaire"><label>Pilosité faciale</label><input type="text" class="input-perso" id="champ-pilosite"></div>
+        </div>
+        <div class="bloc-formulaire">
+          <h4>Détails</h4>
+          <div class="champ-formulaire"><label>Signes distinctifs</label><input type="text" class="input-perso" id="champ-signes"></div>
+          <div class="champ-formulaire"><label>Expression du visage</label><input type="text" class="input-perso" id="champ-expression"></div>
+        </div>
+      </div>
+      <div>
+        <div class="bloc-formulaire">
+          <h4>Physique</h4>
+          <div class="champ-formulaire">
+            <label>Corpulence</label>
+            <select class="input-perso" id="champ-corpulence">
+              <option value="">-- Choisir --</option><option value="Tres maigre">Très maigre</option><option value="Maigre">Maigre</option><option value="Normal">Normal</option><option value="Athletique">Athlétique</option><option value="Obese">Obèse</option>
+            </select>
+          </div>
+          <div class="champ-formulaire">
+            <label>Taille</label>
+            <select class="input-perso" id="champ-taille">
+              <option value="">-- Choisir --</option><option value="Tres petit">Très petit</option><option value="Petit">Petit</option><option value="Normal">Normal</option><option value="Grand">Grand</option>
+            </select>
+          </div>
+          <div class="champ-formulaire"><label>Teint / Peau</label><input type="text" class="input-perso" id="champ-peau"></div>
+        </div>
+        <div class="bloc-formulaire">
+          <h4>Apparence</h4>
+          <div class="champ-formulaire"><label>Style vestimentaire</label><input type="text" class="input-perso" id="champ-style"></div>
+          <div class="champ-formulaire"><label>Couleurs dominantes</label><input type="text" class="input-perso" id="champ-couleurs"></div>
+          <div class="champ-formulaire"><label>Équipement visible</label><input type="text" class="input-perso" id="champ-equipement"></div>
+        </div>
+        <div class="bloc-formulaire">
+          <h4>Autres</h4>
+          <div class="champ-formulaire">
+            <label>Couleur du Token</label>
+            <input type="color" class="input-perso input-couleur" id="champ-couleur-token" value="#2a1a0f" oninput="appliquerCouleurTheme(this.value)">
+          </div>
+          <div class="champ-formulaire">
+            <label>Faction</label>
+            <select class="input-perso" id="champ-faction"><option value="">-- Chargement... --</option></select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions-formulaire" style="margin-top: 20px; display: flex; flex-wrap: wrap; justify-content: center; gap: 15px;">
+      <button id="btn-suivant-creation" class="btn-parametres" onclick="jouerSonClic(); window.validerEtapeDescriptif()">Étape Suivante : Caractéristiques</button>
+      
+      <button id="btn-dev-skip-creation" class="btn-parametres" style="display: none; background-color: #ff4c4c; border-color: darkred;" onclick="jouerSonClic(); window.validerEtapeDescriptifRapide()">[DEV] Création Rapide (Sans IA)</button>
+      
+      <button class="btn-parametres" onclick="jouerSonClic(); window.fermerCreationHero()">Annuler</button>
     </div>
   </div>
 

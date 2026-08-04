@@ -290,7 +290,7 @@ async function recupererDetailsPersonnage(idPersonnage) {
   return persoDocVersFront(snap.id, snap.data());
 }
 
-async function sauvegarderFichePersonnage(donnees) {
+async function sauvegarderFichePersonnage(donnees, skipImage = false) {
   let idPersonnage = donnees.idPersonnage;
   const estNouveau = (!idPersonnage || idPersonnage === "");
 
@@ -299,14 +299,19 @@ async function sauvegarderFichePersonnage(donnees) {
     donnees.statut = "Vivant";
   }
 
-  // -----------------------------------------------------------------
-  //  GENERATION D'IMAGE 100% FRONT-END (projet prive) :
-  //  on genere TOUJOURS un nouveau portrait a chaque enregistrement, comme
-  //  dans l'ancienne logique. Les cles sont lues dans le localStorage.
-  //  Si une cle manque, genererEtStockerPortrait affiche l'alerte UI et
-  //  renvoie l'URL existante (le heros est tout de meme sauvegarde).
-  // -----------------------------------------------------------------
-  donnees.urlCloudinary = await genererEtStockerPortrait(donnees);
+  if (!skipImage) {
+    // -----------------------------------------------------------------
+    //  GENERATION D'IMAGE 100% FRONT-END (projet prive) :
+    //  on genere TOUJOURS un nouveau portrait a chaque enregistrement, comme
+    //  dans l'ancienne logique. Les cles sont lues dans le localStorage.
+    //  Si une cle manque, genererEtStockerPortrait affiche l'alerte UI et
+    //  renvoie l'URL existante (le heros est tout de meme sauvegarde).
+    // -----------------------------------------------------------------
+    donnees.urlCloudinary = await genererEtStockerPortrait(donnees);
+  } else {
+    donnees.urlCloudinary = "";
+    console.log("🛠️ [DEV] Génération d'image ignorée avec succès.");
+  }
 
   const docData = frontVersPersoDoc(donnees, idPersonnage);
   await setDoc(doc(db, COL.PERSONNAGES, idPersonnage), docData);
@@ -2062,151 +2067,38 @@ function afficherListePersonnages(persos) {
 
 async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPerso) {
   const fiche = document.getElementById("fenetre-fiche-perso");
-  const btnSupprimer = document.getElementById("btn-supprimer-perso");
-  const btnSauvegarder = document.getElementById("btn-sauvegarder-perso");
 
-  // 🔻 NOUVEAU : On masque temporairement l'image du personnage dont c'est le tour
-  if (window.imageTourActive) {
-      window.imageTourActive.style.display = "none";
-  }
+  if (window.imageTourActive) window.imageTourActive.style.display = "none";
 
-  // 🔻 1. LA CORRECTION IPAD : ON AFFICHE LA FICHE INSTANTANÉMENT 🔻
   fiche.style.display = "flex";
   const fenetreHauteur = fiche.offsetHeight;
   fiche.style.left = "2vw";
-  
-  // NOUVEAU : On décale la fenêtre de 60 pixels vers le haut
   fiche.style.top = (window.innerHeight / 2 - fenetreHauteur / 2 - 60) + "px";
 
-  // 🔻 2. ON LANCE LES AUTRES CHARGEMENTS SANS ATTENDRE 🔻
   window.chargerCaracteristiques(idPersonnage);
 
-  // 🔻 3. NETTOYAGE VISUEL DES CHAMPS 🔻
-  document.getElementById("champ-id-personnage").value = "";
-  document.getElementById("champ-statut-personnage").value = "Vivant";
-  document.getElementById("champ-id-personnage").setAttribute("data-url", "");
-
+  // Nettoyage minimal
+  document.getElementById("champ-id-personnage").value = idPersonnage;
+  document.getElementById("champ-id-joueur-perso").value = localStorage.getItem("ID_JOUEUR_COURANT");
   document.getElementById("image-portrait-perso").src = "";
   document.getElementById("image-portrait-perso").style.display = "none";
   document.getElementById("texte-aucun-portrait").style.display = "block";
 
-  const inputs = fiche.querySelectorAll(".input-perso");
-  inputs.forEach((input) => {
-    if (input.type === "text") input.value = "";
-    input.disabled = false;
-  });
+  if (couleurPerso) appliquerCouleurTheme(couleurPerso);
 
-  document.getElementById("champ-id-joueur-perso").value = localStorage.getItem("ID_JOUEUR_COURANT");
+  // Ouverture par défaut sur les Caractéristiques
+  const btnCaracs = document.querySelector("button[onclick*='onglet-caracs']");
+  if (btnCaracs) changerOngletPerso({ currentTarget: btnCaracs }, 'onglet-caracs');
 
-  document.getElementById("champ-race").value = "";
-  document.getElementById("champ-genre").value = "";
-  document.getElementById("champ-corpulence").value = "";
-  document.getElementById("champ-taille").value = "";
-  document.getElementById("champ-faction").value = "";
+  document.getElementById("titre-nom-personnage").innerText = prenomPerso + " " + nomPerso;
 
-  const couleurParDefaut = "#2a1a0f";
-  document.getElementById("champ-couleur-token").value = couleurParDefaut;
-  appliquerCouleurTheme(couleurParDefaut);
-
-  // --- Ouverture intelligente de l'onglet par défaut ---
-  if (idPersonnage) {
-    const btnCaracs = document.querySelector("button[onclick*='onglet-caracs']");
-    if (btnCaracs) changerOngletPerso({ currentTarget: btnCaracs }, 'onglet-caracs');
-  } else {
-    const btnDescriptif = document.querySelector("button[onclick*='onglet-descriptif']");
-    if (btnDescriptif) changerOngletPerso({ currentTarget: btnDescriptif }, 'onglet-descriptif');
+  // On récupère le portrait sur Firebase en arrière-plan
+  const donneesServeur = await recupererDetailsPersonnage(idPersonnage);
+  if (donneesServeur && donneesServeur.urlCloudinary !== "") {
+      document.getElementById("image-portrait-perso").src = donneesServeur.urlCloudinary;
+      document.getElementById("image-portrait-perso").style.display = "block";
+      document.getElementById("texte-aucun-portrait").style.display = "none";
   }
-
-  // 🔻 4. ON LAISSE FIREBASE CHARGER EN ARRIÈRE-PLAN 🔻
-  if (idPersonnage) {
-    document.getElementById("titre-nom-personnage").innerText = prenomPerso + " " + nomPerso;
-    btnSupprimer.style.display = "block";
-    document.getElementById("champ-id-personnage").value = idPersonnage;
-
-    if (couleurPerso) {
-      document.getElementById("champ-couleur-token").value = couleurPerso;
-      appliquerCouleurTheme(couleurPerso);
-    }
-
-    const cleCache = "ivalis_perso_" + idPersonnage;
-    const memoireLocale = localStorage.getItem(cleCache);
-
-    if (memoireLocale) {
-      remplirFormulairePerso(JSON.parse(memoireLocale));
-      btnSauvegarder.innerText = "Synchronisation...";
-      btnSauvegarder.style.pointerEvents = "none";
-    } else {
-      btnSauvegarder.innerText = "Chargement...";
-      btnSauvegarder.style.pointerEvents = "none";
-    }
-
-    // Le fameux "await" ne bloque plus l'écran puisqu'on l'a déjà affiché plus haut !
-    const donneesServeur = await recupererDetailsPersonnage(idPersonnage);
-    if (donneesServeur) {
-      localStorage.setItem(cleCache, JSON.stringify(donneesServeur));
-      remplirFormulairePerso(donneesServeur);
-    }
-  } else {
-    document.getElementById("titre-nom-personnage").innerText = "Nouveau Personnage";
-    btnSupprimer.style.display = "none";
-    btnSauvegarder.style.display = "inline-block";
-    btnSauvegarder.innerText = "Enregistrer";
-    btnSauvegarder.style.pointerEvents = "auto";
-  }
-}
-
-function remplirFormulairePerso(donnees) {
-  if (!donnees) return;
-
-  const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
-  const idProprio = donnees.idJoueur || "";
-  document.getElementById("champ-id-joueur-perso").value = idProprio;
-
-  const estProprietaire = (idProprio === currentUserId) || (idProprio === "");
-
-  const btnSauvegarder = document.getElementById("btn-sauvegarder-perso");
-  if (estProprietaire) {
-    btnSauvegarder.style.display = "inline-block";
-    btnSauvegarder.innerText = "Enregistrer";
-    btnSauvegarder.style.pointerEvents = "auto";
-    document.querySelectorAll("#onglet-descriptif .input-perso").forEach(el => el.disabled = false);
-  } else {
-    btnSauvegarder.style.display = "none";
-    document.querySelectorAll("#onglet-descriptif .input-perso").forEach(el => el.disabled = true);
-  }
-
-  const imgPortrait = document.getElementById("image-portrait-perso");
-  const txtPortrait = document.getElementById("texte-aucun-portrait");
-  document.getElementById("champ-id-personnage").setAttribute("data-url", donnees.urlCloudinary || "");
-
-  if (donnees.urlCloudinary && donnees.urlCloudinary !== "") {
-    imgPortrait.src = donnees.urlCloudinary;
-    imgPortrait.style.display = "block";
-    txtPortrait.style.display = "none";
-  } else {
-    imgPortrait.src = "";
-    imgPortrait.style.display = "none";
-    txtPortrait.style.display = "block";
-  }
-
-  document.getElementById("champ-statut-personnage").value = donnees.statut || "Vivant";
-  document.getElementById("champ-prenom").value = donnees.prenom || "";
-  document.getElementById("champ-nom").value = donnees.nom || "";
-  document.getElementById("champ-age").value = donnees.age || "";
-  document.getElementById("champ-race").value = donnees.race || "";
-  document.getElementById("champ-genre").value = donnees.genre || "";
-  document.getElementById("champ-cheveux").value = donnees.cheveux || "";
-  document.getElementById("champ-yeux").value = donnees.yeux || "";
-  document.getElementById("champ-pilosite").value = donnees.pilosite || "";
-  document.getElementById("champ-signes").value = donnees.signes || "";
-  document.getElementById("champ-expression").value = donnees.expression || "";
-  document.getElementById("champ-corpulence").value = donnees.corpulence || "";
-  document.getElementById("champ-taille").value = donnees.taille || "";
-  document.getElementById("champ-peau").value = donnees.peau || "";
-  document.getElementById("champ-style").value = donnees.style || "";
-  document.getElementById("champ-couleurs").value = donnees.couleursDom || "";
-  document.getElementById("champ-equipement").value = donnees.equipement || "";
-  document.getElementById("champ-faction").value = donnees.idFaction || "";
 }
 
 function fermerFichePerso() {
@@ -2220,75 +2112,6 @@ function fermerFichePerso() {
   }
 }
 
-async function sauvegarderDescriptifPerso() {
-  const prenom = document.getElementById("champ-prenom").value.trim();
-  if (prenom === "") { alert("Le héros doit au moins posséder un prénom."); return; }
-
-  document.getElementById("ecran-chargement-ia").style.display = "flex";
-
-  const btn = document.getElementById("btn-sauvegarder-perso");
-  btn.innerText = "Génération...";
-  btn.style.pointerEvents = "none";
-
-  const urlExistante = document.getElementById("champ-id-personnage").getAttribute("data-url") || "";
-
-  const donnees = {
-    idPartie: window.ID_PARTIE_COURANTE,
-    idJoueur: document.getElementById("champ-id-joueur-perso").value || localStorage.getItem("ID_JOUEUR_COURANT"),
-    idPersonnage: document.getElementById("champ-id-personnage").value,
-    statut: document.getElementById("champ-statut-personnage").value,
-    urlCloudinary: urlExistante,
-    prenom: prenom,
-    nom: document.getElementById("champ-nom").value.trim(),
-    age: document.getElementById("champ-age").value.trim(),
-    race: document.getElementById("champ-race").value,
-    genre: document.getElementById("champ-genre").value,
-    cheveux: document.getElementById("champ-cheveux").value.trim(),
-    yeux: document.getElementById("champ-yeux").value.trim(),
-    pilosite: document.getElementById("champ-pilosite").value.trim(),
-    signes: document.getElementById("champ-signes").value.trim(),
-    expression: document.getElementById("champ-expression").value.trim(),
-    corpulence: document.getElementById("champ-corpulence").value,
-    taille: document.getElementById("champ-taille").value,
-    peau: document.getElementById("champ-peau").value.trim(),
-    style: document.getElementById("champ-style").value.trim(),
-    couleursDom: document.getElementById("champ-couleurs").value.trim(),
-    equipement: document.getElementById("champ-equipement").value.trim(),
-    couleur: document.getElementById("champ-couleur-token").value,
-    idFaction: document.getElementById("champ-faction").value
-  };
-
-  try {
-    const resultatServeur = await sauvegarderFichePersonnage(donnees);
-
-    document.getElementById("ecran-chargement-ia").style.display = "none";
-    btn.innerText = "Enregistrer";
-    btn.style.pointerEvents = "auto";
-
-    document.getElementById("champ-id-personnage").value = resultatServeur.id;
-    document.getElementById("champ-id-personnage").setAttribute("data-url", resultatServeur.url);
-    donnees.idPersonnage = resultatServeur.id;
-    donnees.urlCloudinary = resultatServeur.url;
-
-    if (resultatServeur.url !== "") {
-      document.getElementById("image-portrait-perso").src = resultatServeur.url;
-      document.getElementById("image-portrait-perso").style.display = "block";
-      document.getElementById("texte-aucun-portrait").style.display = "none";
-    }
-
-    document.getElementById("titre-nom-personnage").innerText = donnees.prenom + " " + donnees.nom;
-    document.getElementById("btn-supprimer-perso").style.display = "block";
-
-    localStorage.setItem("ivalis_perso_" + resultatServeur.id, JSON.stringify(donnees));
-    // La liste se met a jour automatiquement via onSnapshot (temps reel).
-  } catch (e) {
-    console.error(e);
-    document.getElementById("ecran-chargement-ia").style.display = "none";
-    btn.innerText = "Enregistrer";
-    btn.style.pointerEvents = "auto";
-    alert("Une erreur est survenue lors de l'enregistrement du héros.");
-  }
-}
 
 function ouvrirConfirmationSuppressionPerso() {
   document.getElementById("voile-suppression-perso").style.display = "flex";
@@ -2343,18 +2166,6 @@ function changerOngletPerso(evt, nomOnglet) {
   document.getElementById(nomOnglet).classList.add("actif");
   if (evt && evt.currentTarget) {
     evt.currentTarget.classList.add("actif");
-  }
-
-  const btnSupprimer = document.getElementById("btn-supprimer-perso");
-  const idPersonnage = document.getElementById("champ-id-personnage").value;
-  const proprioId = document.getElementById("champ-id-joueur-perso").value;
-  const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
-  const estProprietaire = (proprioId === currentUserId) || (proprioId === "");
-
-  if (nomOnglet === "onglet-descriptif" && idPersonnage !== "" && estProprietaire) {
-    btnSupprimer.style.display = "block";
-  } else {
-    btnSupprimer.style.display = "none";
   }
 }
 
@@ -2603,6 +2414,11 @@ document.addEventListener("DOMContentLoaded", function () {
   document.getElementById("temp-input").value = localStorage.getItem("ivalis_IA_TEMPERATURE") || "1.0";
   document.getElementById("toggle-tokens").checked = localStorage.getItem("ivalis_SHOW_TOKENS") === "on";
   window.actualiserAffichageTokens();
+
+  // Initialisation du Mode DEV
+  const checkboxDev = document.getElementById("toggle-dev-mode");
+  if (checkboxDev) checkboxDev.checked = localStorage.getItem("ivalis_DEV_MODE") === "on";
+  window.actualiserDevMode();
 });
 
 // =========================================================================
@@ -2768,6 +2584,35 @@ window.sauvegarderTemperature = function() {
 window.basculerAffichageTokens = function(estActive) {
     localStorage.setItem("ivalis_SHOW_TOKENS", estActive ? "on" : "off");
     window.actualiserAffichageTokens();
+};
+
+window.basculerDevMode = function(estActive) {
+    localStorage.setItem("ivalis_DEV_MODE", estActive ? "on" : "off");
+    window.actualiserDevMode();
+};
+
+window.actualiserDevMode = function() {
+    const isDev = localStorage.getItem("ivalis_DEV_MODE") === "on";
+    
+    const btnDevSkip = document.getElementById("btn-dev-skip-creation");
+    if (btnDevSkip) btnDevSkip.style.display = isDev ? "inline-block" : "none";
+    
+    const ongletDev = document.getElementById("onglet-btn-dev");
+    if (ongletDev) {
+        if (isDev) {
+            ongletDev.style.display = "block";
+        } else {
+            ongletDev.style.display = "none";
+            const contenuDev = document.getElementById("onglet-dev");
+            if (contenuDev && contenuDev.classList.contains("actif")) {
+                const btnCaracs = document.querySelector("button[onclick*='onglet-caracs']");
+                if (btnCaracs) changerOngletPerso({ currentTarget: btnCaracs }, 'onglet-caracs');
+            }
+        }
+    }
+    
+    if (isDev) { console.log("🛠️ Mode Développeur : ACTIVÉ"); } 
+    else { console.log("🛠️ Mode Développeur : DÉSACTIVÉ"); }
 };
 
 window.actualiserAffichageTokens = function() {
@@ -2988,6 +2833,20 @@ window.validerCreationCaracs = async function() {
     
     window.fermerModaleCreationCaracs();
     window.chargerCaracteristiques(idPersonnage);
+
+    // =========================================================
+    // NOUVEAU : PASSAGE À L'ÉTAPE 3 (OUVERTURE DE LA FICHE)
+    // Si la fiche n'est pas déjà ouverte, on l'ouvre !
+    // =========================================================
+    const fiche = document.getElementById("fenetre-fiche-perso");
+    if (fiche.style.display === "none" || fiche.style.display === "") {
+        const prenomNom = document.getElementById("titre-nom-personnage").innerText;
+        const prenom = prenomNom.split(" ")[0] || "";
+        const nom = prenomNom.substring(prenom.length).trim() || "";
+        const couleur = document.getElementById("champ-couleur-token").value || "#2a1a0f";
+        
+        window.ouvrirFichePerso(idPersonnage, prenom, nom, couleur);
+    }
   } catch (e) {
     console.error(e);
     alert("Erreur lors de la création des caractéristiques.");
@@ -3820,7 +3679,8 @@ Object.assign(window, {
   sauvegarderInstruction, demanderSuppression, annulerSuppression, validerSuppression,
   // Personnages / fiche perso
   fermerMenuPersonnages, ouvrirFichePerso, fermerFichePerso,
-  sauvegarderDescriptifPerso, ouvrirConfirmationSuppressionPerso,
+  sauvegarderFichePersonnage: sauvegarderFichePersonnage, // Expose pour creation_personnage.js
+  ouvrirConfirmationSuppressionPerso,
   annulerSuppressionPerso, validerSuppressionPerso, appliquerCouleurTheme, changerOngletPerso,
   // Caracteristiques
   chargerCaracteristiques, ouvrirModaleCreationCaracs, fermerModaleCreationCaracs,
@@ -3829,7 +3689,7 @@ Object.assign(window, {
   ouvrirClesApi, sauvegarderClesApi, basculerAffichageCles,
   fermerAlerteCles, ouvrirParametresDepuisAlerte,
   // Outils
-  syncTemperature, sauvegarderTemperature, basculerAffichageTokens, toggleMicro,
+  syncTemperature, sauvegarderTemperature, basculerAffichageTokens, basculerDevMode: window.basculerDevMode, toggleMicro,
   // Gestion Effets de Combat
   ouvrirGestionEffets: window.ouvrirGestionEffets,
   fermerGestionEffets: window.fermerGestionEffets,
