@@ -2147,6 +2147,8 @@ function fermerFichePerso() {
   document.getElementById("fenetre-fiche-perso").style.display = "none";
   document.getElementById("voile-suppression-perso").style.display = "none";
 
+  if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD();
+
   // 🔻 NOUVEAU : On restaure l'image du tour actif si le chat est ouvert
   const isChatOuvert = document.getElementById("fenetre-chatbox")?.style.display === "flex";
   if (window.imageTourActive && isChatOuvert) {

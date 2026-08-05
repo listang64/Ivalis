@@ -5,6 +5,7 @@ import { db } from "./firebase-config.js";
 import { collection, getDocs, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // Variables globales pour le Deck interactif
+window.COMPETENCES_CACHE = {};
 window.CARTES_SELECTIONNEES = [];
 window.COULEUR_PERSO_COURANT = "#4a1c1c";
 window.ID_PERSONNAGE_DECK = null;
@@ -83,9 +84,12 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
             <div style="display: flex; flex-direction: column; gap: 0px; width: 100%; max-width: 580px; margin: 15px 0; padding-bottom: 80px;">
         `;
 
+        window.COMPETENCES_CACHE = {}; // On vide le cache à l'ouverture
         snap.forEach(docSnap => {
             const data = docSnap.data();
             const idCarte = docSnap.id;
+            // On sauvegarde toutes les infos de la carte pour l'aperçu HD !
+            window.COMPETENCES_CACHE[idCarte] = data;
             const titre = data.Nom || "Technique Inconnue";
             const initiative = data.Initiative || 0;
             
@@ -135,24 +139,109 @@ window.gererClicCarte = function(idCarte) {
         // --- 1ER CLIC : FOCUS & APERÇU ---
         window.CARTE_EN_APERCU = idCarte;
 
-        // On nettoie le surlignage des autres cartes
+        // Nettoyage du surlignage des autres bannières
         document.querySelectorAll('.banniere-carte').forEach(el => {
             el.style.filter = "none";
         });
         
-        // On illumine la carte sélectionnée pour indiquer qu'on la regarde
+        // Surlignage de la bannière cliquée
         const carteDiv = document.getElementById(`ui-carte-${idCarte}`);
         if (carteDiv) {
             carteDiv.style.filter = "drop-shadow(0px 0px 8px rgba(0, 255, 255, 0.8)) brightness(1.1)";
         }
         
-        // (L'affichage visuel de l'aperçu HD sur le côté se fera ici plus tard)
-        console.log("Focus sur la carte :", idCarte);
+        // Affichage de la carte HD sur le côté
+        window.afficherApercuCarteHD(idCarte);
         
     } else {
         // --- 2ÈME CLIC : ÉQUIPER / DÉSÉQUIPER ---
         window.basculerSelectionCarte(idCarte);
     }
+};
+
+window.afficherApercuCarteHD = function(idCarte) {
+    let conteneurCarte = document.getElementById("apercu-carte-hd-competence");
+    
+    // Si le conteneur n'existe pas encore dans le HTML, on le crée
+    if (!conteneurCarte) {
+        conteneurCarte = document.createElement("div");
+        conteneurCarte.id = "apercu-carte-hd-competence";
+        // On le positionne fixement sur la droite de l'écran
+        conteneurCarte.style.cssText = "position: fixed; top: 50%; right: 8vw; transform: translateY(-50%); width: 340px; height: 476px; z-index: 9999; display: none; border-radius: 12px; box-shadow: 0px 20px 40px rgba(0,0,0,0.9); transition: opacity 0.2s ease;";
+        document.body.appendChild(conteneurCarte);
+
+        // Petit script CSS injecté pour styliser la scrollbar des effets
+        const style = document.createElement("style");
+        style.innerHTML = `
+            #apercu-carte-hd-competence .zone-effets::-webkit-scrollbar { width: 6px; }
+            #apercu-carte-hd-competence .zone-effets::-webkit-scrollbar-track { background: rgba(0,0,0,0.4); border-radius: 4px; }
+            #apercu-carte-hd-competence .zone-effets::-webkit-scrollbar-thumb { background: #5c3a21; border-radius: 4px; border: 1px solid #1a1a1a; }
+        `;
+        document.head.appendChild(style);
+    }
+
+    const data = window.COMPETENCES_CACHE[idCarte];
+    if (!data) return;
+
+    // Récupération des données
+    const titre = data.Nom || "Inconnue";
+    const initiative = data.Initiative || 0;
+    const fatigue = data.Fatigue || 0;
+    const effets = data.Effets_Compiles || [];
+
+    // Formatage stylisé de la liste des effets
+    let htmlEffets = "";
+    effets.forEach(eff => {
+        if (eff.startsWith("  ↳")) {
+            // Sous-effet (retrait, texte plus petit, couleur grisée)
+            htmlEffets += `<div style="margin-left: 20px; color: #a89f91; font-size: 14px; padding: 2px 0;">${eff}</div>`;
+        } else {
+            // Effet Principal (en gras, séparateur)
+            htmlEffets += `<div style="margin-top: 8px; color: #e8d5a5; font-size: 15px; font-weight: bold; border-bottom: 1px solid rgba(194, 168, 120, 0.2); padding-bottom: 3px;">${eff}</div>`;
+        }
+    });
+
+    // Construction visuelle de la carte
+    conteneurCarte.innerHTML = `
+        <!-- COUCHE 1 : FOND DE COULEUR DU PERSONNAGE -->
+        <div style="position: absolute; top: 12px; left: 12px; right: 12px; bottom: 12px; background-color: ${window.COULEUR_PERSO_COURANT}; border-radius: 8px; z-index: 1;"></div>
+        
+        <!-- COUCHE 2 : L'IMAGE DU CADRE -->
+        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1785866318/competance_carte_vy8omh.png" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none;">
+        
+        <!-- COUCHE 3 : LES DONNÉES (Textes) -->
+        <!-- Titre -->
+        <div style="position: absolute; top: 4%; left: 8%; width: 62%; text-align: center; font-family: 'Cinzel', serif; font-size: 17px; font-weight: bold; color: #e0d0b0; text-transform: uppercase; text-shadow: 2px 2px 4px black; z-index: 3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-top: 5px;">
+            ${titre}
+        </div>
+
+        <!-- Initiative (Le Rond) -->
+        <div style="position: absolute; top: 3.5%; right: 2%; width: 65px; height: 65px; display: flex; justify-content: center; align-items: center; font-family: 'Cinzel', serif; font-size: 28px; font-weight: bold; color: white; text-shadow: 2px 2px 6px black; z-index: 3;">
+            ${initiative}
+        </div>
+
+        <!-- Fatigue (L'encart du milieu) -->
+        <div style="position: absolute; top: 50.5%; left: 50%; transform: translate(-50%, -50%); font-family: 'Cinzel', serif; font-size: 20px; font-weight: bold; color: #ff4c4c; text-shadow: 1px 1px 4px black; z-index: 3;">
+            ${fatigue}
+        </div>
+
+        <!-- Section des Effets (Rectangle du bas) -->
+        <div class="zone-effets" style="position: absolute; top: 54%; left: 8%; width: 84%; height: 38%; z-index: 3; overflow-y: auto; padding-right: 5px; font-family: 'Almendra', serif;">
+            ${htmlEffets}
+        </div>
+    `;
+
+    conteneurCarte.style.display = "block";
+    conteneurCarte.style.opacity = "1";
+};
+
+// Fonction utile pour cacher la carte (lorsqu'on ferme la fiche perso)
+window.masquerApercuCarteHD = function() {
+    const conteneurCarte = document.getElementById("apercu-carte-hd-competence");
+    if (conteneurCarte) {
+        conteneurCarte.style.display = "none";
+    }
+    window.CARTE_EN_APERCU = null;
 };
 
 window.basculerSelectionCarte = async function(idCarte) {
