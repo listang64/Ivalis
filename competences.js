@@ -336,13 +336,17 @@ window.afficherApercuCarteHD = function(idCarte) {
     setTimeout(() => conteneurCarte.style.opacity = "1", 10);
 };
 
-// Fonction utile pour cacher la carte (lorsqu'on ferme la fiche perso)
 window.masquerApercuCarteHD = function() {
     const conteneurCarte = document.getElementById("apercu-carte-hd-competence");
     if (conteneurCarte) {
         conteneurCarte.style.display = "none";
     }
     window.CARTE_EN_APERCU = null;
+    
+    // On nettoie le surlignage de la bannière quand on ferme la carte
+    document.querySelectorAll('.banniere-carte').forEach(el => {
+        el.style.filter = "none";
+    });
 };
 
 window.basculerSelectionCarte = async function(idCarte) {
@@ -580,8 +584,10 @@ function purgeDisconnectedZoneHexes(hexes, hasDistance) {
 // =========================================================================
 
 window.ouvrirCreationCompetence = async function() {
-    // NOUVEAU : On ferme la carte HD si elle était ouverte
-    if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD();
+    // NOUVEAU : On nettoie la carte et on désélectionne la bannière
+    if (typeof window.masquerApercuCarteHD === "function") {
+        window.masquerApercuCarteHD();
+    }
 
     window.forgeState.actions = [];
     window.forgeState.isCapReached = false;
@@ -600,7 +606,6 @@ window.ouvrirCreationCompetence = async function() {
     const snapCaracs = await getDoc(doc(db, "Caracteristiques", idPerso));
     window.forgeState.caracs = snapCaracs.exists() ? snapCaracs.data() : {};
 
-    // Forçage de lecture Firebase à chaque ouverture pour toujours avoir les dernières modifications !
     const snap = await getDocs(collection(db, "Combat_Effets"));
     window.forgeState.effetsBDD = snap.docs.map(d => {
         const data = d.data();
@@ -1281,4 +1286,42 @@ window.sauvegarderCompetence = async function() {
         btn.innerText = "✔️ VALIDER LA COMPÉTENCE";
         btn.disabled = false;
     }
+};
+
+// =========================================================================
+//  NETTOYAGE AUTOMATIQUE DE L'APERÇU HD (MÉTHODE NINJA)
+// =========================================================================
+
+// La fonction officielle qui détruit la carte visuellement
+window.masquerApercuCarteHD = function() {
+    const conteneurCarte = document.getElementById("apercu-carte-hd-competence");
+    if (conteneurCarte) conteneurCarte.style.display = "none";
+    
+    window.CARTE_EN_APERCU = null;
+    
+    // On enlève le halo Cyan sur toutes les bannières
+    document.querySelectorAll('.banniere-carte').forEach(el => {
+        el.style.filter = "none";
+    });
+};
+
+// 1. Interception de la Croix Rouge de la fiche perso
+const originalFermerFiche = window.fermerFichePerso;
+window.fermerFichePerso = function() {
+    window.masquerApercuCarteHD();
+    if (originalFermerFiche) originalFermerFiche();
+};
+
+// 2. Interception quand tu changes d'onglet (ex: passage à Statistiques)
+const originalChangerOnglet = window.changerOngletPerso;
+window.changerOngletPerso = function(evt, nomOnglet) {
+    window.masquerApercuCarteHD();
+    if (originalChangerOnglet) originalChangerOnglet(evt, nomOnglet);
+};
+
+// 3. Interception quand on ouvre un autre menu (ex: le chat ou la map)
+const originalFermerToutesFenetres = window.fermerToutesLesFenetres;
+window.fermerToutesLesFenetres = function() {
+    window.masquerApercuCarteHD();
+    if (originalFermerToutesFenetres) originalFermerToutesFenetres();
 };

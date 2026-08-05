@@ -1702,11 +1702,16 @@ function fermerToutPersonnages(immediat) {
   document.getElementById("fenetre-fiche-perso").style.display = "none";
   document.getElementById("voile-suppression-perso").style.display = "none";
 
-  // 🔻 NOUVEAU : On restaure l'image du tour actif
   const isChatOuvert = document.getElementById("fenetre-chatbox")?.style.display === "flex";
   if (window.imageTourActive && isChatOuvert) {
       window.imageTourActive.style.display = "block";
   }
+
+  // FORCE LA DÉSÉLECTION ET CACHE LA CARTE HD
+  window.CARTE_EN_APERCU = null;
+  const hdCard = document.getElementById("apercu-carte-hd-competence");
+  if (hdCard) hdCard.style.display = "none";
+  document.querySelectorAll('.banniere-carte').forEach(el => el.style.filter = "none");
 
   const liste = document.getElementById("conteneur-liste-personnages");
   if (!liste) return;
@@ -2147,13 +2152,16 @@ function fermerFichePerso() {
   document.getElementById("fenetre-fiche-perso").style.display = "none";
   document.getElementById("voile-suppression-perso").style.display = "none";
 
-  if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD();
-
-  // 🔻 NOUVEAU : On restaure l'image du tour actif si le chat est ouvert
   const isChatOuvert = document.getElementById("fenetre-chatbox")?.style.display === "flex";
   if (window.imageTourActive && isChatOuvert) {
       window.imageTourActive.style.display = "block";
   }
+
+  // FORCE LA DÉSÉLECTION ET CACHE LA CARTE HD
+  window.CARTE_EN_APERCU = null;
+  const hdCard = document.getElementById("apercu-carte-hd-competence");
+  if (hdCard) hdCard.style.display = "none";
+  document.querySelectorAll('.banniere-carte').forEach(el => el.style.filter = "none");
 }
 
 
@@ -2211,6 +2219,12 @@ function changerOngletPerso(evt, nomOnglet) {
   if (evt && evt.currentTarget) {
     evt.currentTarget.classList.add("actif");
   }
+
+  // FORCE LA DÉSÉLECTION QUAND ON CHANGE D'ONGLET
+  window.CARTE_EN_APERCU = null;
+  const hdCard = document.getElementById("apercu-carte-hd-competence");
+  if (hdCard) hdCard.style.display = "none";
+  document.querySelectorAll('.banniere-carte').forEach(el => el.style.filter = "none");
 }
 
 function rendreFenetreDeplacable(element) {
@@ -2477,7 +2491,6 @@ window.fermerToutesLesFenetres = function() {
 
   document.querySelectorAll('.bulle-portrait-hover-joueur, .bulle-portrait-hover-mj').forEach(img => img.style.display = 'none');
 
-  // 🔻 NOUVEAU : Restaurer les menus par défaut quand on ferme le chat 🔻
   const menuLat = document.getElementById('menu-lateral');
   const menuNav = document.getElementById('menu-navigation-bas');
   const btnFermerChat = document.getElementById('btn-fermer-chat-nouveau');
@@ -2495,6 +2508,12 @@ window.fermerToutesLesFenetres = function() {
   if (fichePerso) fichePerso.style.display = 'none';
   const voileSuppr = document.getElementById('voile-suppression-perso');
   if (voileSuppr) voileSuppr.style.display = 'none';
+
+  // FORCE LA DÉSÉLECTION ET CACHE LA CARTE HD
+  window.CARTE_EN_APERCU = null;
+  const hdCard = document.getElementById("apercu-carte-hd-competence");
+  if (hdCard) hdCard.style.display = "none";
+  document.querySelectorAll('.banniere-carte').forEach(el => el.style.filter = "none");
 
   // Fermer les paramètres
   const menuParam = document.getElementById('conteneur-parametres');
