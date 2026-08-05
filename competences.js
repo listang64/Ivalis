@@ -67,10 +67,8 @@ window.forgeState = {
     actions: [],
     isCapReached: false,
     armePrincipale: null,
-    
-    // Pour l'éditeur de Zone
     zoneActionIdEnCours: null,
-    selectedZoneHexes: [] // Array of {q, r}
+    selectedZoneHexes: [] 
 };
 
 const ORDRE_CARACS = ["FORCE", "DEXTÉRITÉ", "CONSTITUTION", "INTELLIGENCE", "SAGESSE", "CHARISME", "AUCUN"];
@@ -82,28 +80,69 @@ const LEGACY_TYPE_MAP = {
     Alteration: "Magique", Deplacement: "Spatial", Portee: "Spatial", Bonus: "Action/Global"
 };
 
+// Fonction vitale pour comprendre les virgules de la BDD (ex: 1,5 -> 1.5)
+function parseFrenchFloat(val) {
+    if (val === undefined || val === null || val === "") return 0;
+    const str = String(val).replace(',', '.');
+    const parsed = parseFloat(str);
+    return isNaN(parsed) ? 0 : parsed;
+}
+
 function normalizeForgeType(type, fallback = "Aucun") {
     if (!type) return fallback;
     return LEGACY_TYPE_MAP[type] || type;
 }
 
 function getMaxStacks(effet) {
-    if (effet.Pourcent_Base > 0 && effet.Pourcent_Max > 0) return Math.floor(effet.Pourcent_Max / effet.Pourcent_Base);
+    const pBase = parseFrenchFloat(effet.Pourcent_Base);
+    const pMax = parseFrenchFloat(effet.Pourcent_Max);
+    const valBase = parseFrenchFloat(effet.Valeur);
+
+    if (pBase > 0 && pMax > 0) return Math.floor(pMax / pBase);
+    if (valBase > 0 && pMax > 0) return Math.floor(pMax / valBase);
+    if (pMax > 0 && pBase === 0 && valBase === 0) return Math.floor(pMax);
+
     if (["Persistance terrain", "Durée +", "Durée étalement dégâts", "DOT", "Illusion"].includes(effet.Nom)) return 1;
     if (effet.Nom === "Initiative +") return 6;
-    if (effet.Nom === "Zone") return 15; // Max arbitraire élevé pour la Zone
+    if (effet.Nom === "Zone") return 15;
     return 25;
 }
 
+// Remplacement intelligent dans le texte selon les valeurs BDD en temps réel
 function formatterTexteEffet(effet, stacks) {
     let texte = effet.Effet_Base || "";
-    if (effet.Valeur > 0) {
-        texte = texte.replace(effet.Valeur.toString(), (effet.Valeur * stacks).toString());
-    } else if (effet.Pourcent_Base > 0) {
-        texte = texte.replace(effet.Pourcent_Base.toString() + "%", (effet.Pourcent_Base * stacks).toString() + "%");
-    } else {
-        texte += ` (x${stacks})`;
+    const val = parseFrenchFloat(effet.Valeur);
+    const pBase = parseFrenchFloat(effet.Pourcent_Base);
+    const pMax = parseFrenchFloat(effet.Pourcent_Max);
+
+    // 1. Remplacement du % de base et du Max
+    if (pBase > 0) {
+        const calcP = pBase * stacks;
+        if (/\d+(?:[.,]\d+)?\s*%/.test(texte)) {
+            texte = texte.replace(/\d+(?:[.,]\d+)?\s*%/, calcP + "%");
+        }
+        if (pMax > 0 && /[Mm]ax\s*\d+(?:[.,]\d+)?\s*%?/.test(texte)) {
+            texte = texte.replace(/([Mm]ax\s*)\d+(?:[.,]\d+)?(\s*%?)/i, `$1${pMax}$2`);
+        }
     }
+    
+    // 2. Remplacement de la Valeur (Dégâts, Initiative, etc.)
+    if (val > 0) {
+        const calcV = val * stacks;
+        if (pBase === 0) {
+            // Remplace le 1er chiffre s'il n'y a pas de pourcentage dans l'effet
+            texte = texte.replace(/\b\d+(?:[.,]\d+)?\b/, calcV);
+        } else {
+            // S'il y a un %, on remplace le 1er chiffre qui n'est PAS collé à un % (ex: "35" dans ton Electrifié)
+            texte = texte.replace(/\b\d+(?:[.,]\d+)?\b(?!\s*%)/, calcV);
+        }
+    }
+
+    // 3. Fallback générique
+    if (pBase === 0 && val === 0 && !["Persistance terrain", "Durée +", "DOT"].includes(effet.Nom)) {
+        if (!texte.includes(`(x${stacks})`)) texte += ` (x${stacks})`;
+    }
+    
     return texte;
 }
 
@@ -143,10 +182,9 @@ function hexDistance(h1, h2) {
 }
 
 function isConnectedToCenter(hexes, targetHex, hasDistance) {
-    if (hasDistance) return true; // Les attaques à distance peuvent s'étendre n'importe où
+    if (hasDistance) return true; 
     if (targetHex.q === 0 && targetHex.r === 0) return true;
 
-    // L'hexagone doit toucher le centre ou un autre hexagone sélectionné
     const neighbors = [
         {q: targetHex.q + 1, r: targetHex.r}, {q: targetHex.q + 1, r: targetHex.r - 1},
         {q: targetHex.q, r: targetHex.r - 1}, {q: targetHex.q - 1, r: targetHex.r},
@@ -205,18 +243,17 @@ window.ouvrirCreationCompetence = async function() {
     const snapCaracs = await getDoc(doc(db, "Caracteristiques", idPerso));
     window.forgeState.caracs = snapCaracs.exists() ? snapCaracs.data() : {};
 
-    if (window.forgeState.effetsBDD.length === 0) {
-        const snap = await getDocs(collection(db, "Combat_Effets"));
-        window.forgeState.effetsBDD = snap.docs.map(d => {
-            const data = d.data();
-            return {
-                id: d.id,
-                ...data,
-                Type_Mecanique: normalizeForgeType(data.Type_Mecanique, "Action/Global"),
-                Type_Mecanique_2: data.Type_Mecanique_2 ? normalizeForgeType(data.Type_Mecanique_2) : "Aucun"
-            };
-        });
-    }
+    // Forçage de lecture Firebase à chaque ouverture pour toujours avoir les dernières modifications !
+    const snap = await getDocs(collection(db, "Combat_Effets"));
+    window.forgeState.effetsBDD = snap.docs.map(d => {
+        const data = d.data();
+        return {
+            id: d.id,
+            ...data,
+            Type_Mecanique: normalizeForgeType(data.Type_Mecanique, "Action/Global"),
+            Type_Mecanique_2: data.Type_Mecanique_2 ? normalizeForgeType(data.Type_Mecanique_2) : "Aucun"
+        };
+    });
 
     document.getElementById("overlay-jeu-modale").style.display = "block";
     document.getElementById("modale-creation-competence").style.display = "block";
@@ -335,7 +372,7 @@ window.ajouterComposantPrincipal = function(effetId) {
     window.forgeState.actions.push({
         idInst: "ACT_" + Math.random().toString(36).substring(2, 9),
         baseEffet: eff, count: 1, mods: {},
-        zoneHexes: [] // Array customisé pour cet arbre
+        zoneHexes: [] 
     });
 
     window.fermerMenuAjoutForge();
@@ -359,7 +396,6 @@ window.modifierModCount = function(idInst, modId, delta) {
 
     if (act.mods[modId] <= 0) {
         delete act.mods[modId];
-        // Si on supprime "Zone", on purge les hexes
         const modEffet = window.forgeState.effetsBDD.find(e => e.id === modId);
         if (modEffet && modEffet.Nom === "Zone") act.zoneHexes = [];
     } else {
@@ -367,11 +403,8 @@ window.modifierModCount = function(idInst, modId, delta) {
         if (act.mods[modId] > getMaxStacks(modEffet)) act.mods[modId] = getMaxStacks(modEffet);
     }
     
-    // Synchronisation spéciale avec l'éditeur de Zone
     const modEffet = window.forgeState.effetsBDD.find(e => e.id === modId);
     if (modEffet && modEffet.Nom === "Zone") {
-        const diff = delta > 0 ? 1 : -1;
-        // On ne gère pas ça en auto, on laisse le joueur éditer manuellement, mais on force au moins 1 si ajouté
         if (act.zoneHexes.length === 0 && act.mods[modId] > 0) act.zoneHexes = [];
     }
 
@@ -425,7 +458,6 @@ window.fermerEditeurZone = function(valider) {
         const act = window.forgeState.actions.find(a => a.idInst === window.forgeState.zoneActionIdEnCours);
         act.zoneHexes = [...window.forgeState.selectedZoneHexes];
         
-        // Met à jour la quantité du modificateur "Zone" pour que le prix match
         const modZone = window.forgeState.effetsBDD.find(e => e.Nom === "Zone");
         if (modZone) {
             act.mods[modZone.id] = act.zoneHexes.length > 0 ? act.zoneHexes.length : 1;
@@ -441,7 +473,7 @@ window.clicHexagoneZone = function(q, r) {
     const hasDist = actionHasDistance(act);
     const isPlayer = (q === 0 && r === 0 && !hasDist);
 
-    if (isPlayer) return; // Impossible de désélectionner le joueur au cac
+    if (isPlayer) return; 
 
     const isSelected = window.forgeState.selectedZoneHexes.some(h => h.q === q && h.r === r);
 
@@ -451,7 +483,6 @@ window.clicHexagoneZone = function(q, r) {
     } else {
         const target = {q, r};
         if (isConnectedToCenter(window.forgeState.selectedZoneHexes, target, hasDist)) {
-            // Check Cap Limite (15)
             if (window.forgeState.selectedZoneHexes.length < 15) {
                 window.forgeState.selectedZoneHexes.push(target);
             }
@@ -473,11 +504,11 @@ window.dessinerGrilleZone = function() {
         "Sort au corps-à-corps. Les hexagones doivent toucher le lanceur (centre).";
 
     const modZone = window.forgeState.effetsBDD.find(e => e.Nom === "Zone");
-    const costPC = modZone ? parseFloat(modZone.Cout_PT) : 1.5;
+    const costPC = modZone ? parseFrenchFloat(modZone.Cout_PT) : 1.5;
 
     const currentZoneCount = window.forgeState.selectedZoneHexes.length;
-    // Le premier est gratuit (-1)
-    const finalCost = Math.max(0, (currentZoneCount - 1) * costPC);
+    // CORRECTION : Chaque hexagone coûte son prix (plus de gratuité)
+    const finalCost = currentZoneCount * costPC;
     
     const affichage = document.getElementById("zone-cout-affichage");
     affichage.innerText = finalCost === 0 ? "Gratuit" : `${finalCost} PC`;
@@ -506,7 +537,6 @@ window.dessinerGrilleZone = function() {
 
             const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
             
-            // Calcul des 6 coins
             let points = "";
             for(let i=0; i<6; i++) {
                 let angle = Math.PI / 3 * i - Math.PI / 6;
@@ -544,13 +574,14 @@ window.rafraichirForge = function() {
     const activeTags = getActiveTags();
 
     window.forgeState.actions.forEach(act => {
-        let baseActionCost = (parseFloat(act.baseEffet.Cout_PT) || 0) * act.count;
+        let baseActionCost = parseFrenchFloat(act.baseEffet.Cout_PT) * act.count;
         let dureeMult = 1.0;
         let coutMods = 0;
         let aDOT = false;
 
         if (act.baseEffet.Nom === "Initiative +") {
-            initBonusNet += act.count * (8 + (parseFloat(act.baseEffet.Cout_PT) || 0) * 5);
+            const baseVal = parseFrenchFloat(act.baseEffet.Valeur) || 8;
+            initBonusNet += act.count * (baseVal + parseFrenchFloat(act.baseEffet.Cout_PT) * 5);
         }
 
         Object.keys(act.mods).forEach(modId => {
@@ -559,19 +590,20 @@ window.rafraichirForge = function() {
 
             if (modEff) {
                 if (modEff.Nom === "Initiative +") {
-                    initBonusNet += modCount * (8 + (parseFloat(modEff.Cout_PT) || 0) * 5);
+                    const baseVal = parseFrenchFloat(modEff.Valeur) || 8;
+                    initBonusNet += modCount * (baseVal + parseFrenchFloat(modEff.Cout_PT) * 5);
                 }
 
                 if (modEff.Nom === "Durée +" || modEff.Nom === "Persistance terrain") {
                     dureeMult *= Math.pow(1.5, modCount);
                 } else if (modEff.Nom === "Zone") {
-                    // Le premier hexagone est gratuit, les suivants coûtent 1.5 PC chacun
                     let zoneLen = (act.zoneHexes && act.zoneHexes.length > 0) ? act.zoneHexes.length : modCount;
-                    coutMods += (parseFloat(modEff.Cout_PT) || 1.5) * Math.max(0, zoneLen - 1);
+                    // CORRECTION : Plus de Math.max(0, zoneLen - 1)
+                    coutMods += parseFrenchFloat(modEff.Cout_PT) * zoneLen;
                 } else if (modEff.Nom === "DOT" || modEff.Nom === "Durée étalement dégâts") {
                     aDOT = true;
                 } else {
-                    coutMods += (parseFloat(modEff.Cout_PT) || 0) * modCount;
+                    coutMods += parseFrenchFloat(modEff.Cout_PT) * modCount;
                 }
             }
         });
@@ -687,7 +719,6 @@ window.rafraichirForge = function() {
                 const isModMaxed = modCount >= getMaxStacks(modEff);
                 const btnPlusModDisabled = (isModMaxed || capDepasse) ? `disabled style="opacity: 0.3; cursor: not-allowed; border:none; background:none; font-weight:bold;"` : `style="color: green; cursor: pointer; border:none; background:none; font-weight:bold;"`;
 
-                // NOUVEAU : Bouton "Éditer" pour la Zone
                 let boutonEditerZone = "";
                 if (modEff.Nom === "Zone") {
                     boutonEditerZone = `<button class="btn-parametres" style="padding: 2px 6px; font-size: 10px; margin-right: 5px; background: #3b82f6; color: white;" onclick="window.ouvrirEditeurZone('${act.idInst}')">Éditer</button>`;
@@ -751,7 +782,7 @@ window.sauvegarderCompetence = async function() {
 
     const fatigue = parseInt(document.getElementById("forge-fatigue-val").innerText);
     const initiative = parseInt(document.getElementById("forge-initiative-val").innerText);
-    const coutPc = parseFloat(document.getElementById("forge-cout-pc").innerText.replace(" PC", "")) || 0;
+    const coutPc = parseFrenchFloat(document.getElementById("forge-cout-pc").innerText.replace(" PC", ""));
 
     const btn = document.getElementById("btn-valider-forge");
     btn.innerText = "Forge en cours...";
@@ -763,7 +794,7 @@ window.sauvegarderCompetence = async function() {
             baseEffetId: a.baseEffet.id,
             count: a.count,
             mods: { ...a.mods },
-            zoneHexes: a.zoneHexes || [] // On sauvegarde la forme de la zone
+            zoneHexes: a.zoneHexes || []
         }))
     };
 
