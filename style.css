@@ -1574,3 +1574,13 @@ textarea.input-texte-parchemin {
     letter-spacing: 1px;
     z-index: 3;
 }
+
+/* ======================================================= */
+/* DECK DE COMPÉTENCES — conteneur liste uniquement       */
+/* (bannières rendues en styles inline dans competences.js) */
+/* ======================================================= */
+
+#liste-competences-perso {
+    display: block !important;
+    overflow: visible;
+}

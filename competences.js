@@ -2,7 +2,17 @@
 //  IVALIS - MODULE DES COMPÉTENCES DE COMBAT
 // =========================================================================
 import { db } from "./firebase-config.js";
-import { collection, getDocs, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { collection, getDocs, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+// Variables globales pour le Deck interactif
+window.CARTES_SELECTIONNEES = [];
+window.COULEUR_PERSO_COURANT = "#4a1c1c";
+window.ID_PERSONNAGE_DECK = null;
+window.CARTES_MAX_PERSO = 0;
+window.CARTE_EN_APERCU = null;
+
+const IMAGE_CADRE_NORMAL = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png";
+const IMAGE_CADRE_SELECTIONNE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1783286721/ban_cible_pdpnad.png";
 
 window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 6) {
     const spanMax = document.getElementById("affichage-competences-max");
@@ -12,13 +22,30 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
 
     if (spanMax) spanMax.innerText = competencesMax;
 
+    // Initialisation des variables du personnage pour le Deck
+    window.ID_PERSONNAGE_DECK = idPersonnage;
+    window.CARTES_MAX_PERSO = competencesMax; 
+    window.CARTES_SELECTIONNEES = [];
+    window.COULEUR_PERSO_COURANT = "#4a1c1c";
+
     try {
+        // 1. Récupération de la couleur et du deck actuel du Héros
+        const persoRef = doc(db, "Personnages", idPersonnage);
+        const persoSnap = await getDoc(persoRef);
+        if (persoSnap.exists()) {
+            const dataPerso = persoSnap.data();
+            window.COULEUR_PERSO_COURANT = dataPerso.Couleur || "#4a1c1c";
+            window.CARTES_SELECTIONNEES = dataPerso.Deck_Equipe || [];
+        }
+
+        // 2. Récupération des compétences forgées
         const colRef = collection(db, "Personnages", idPersonnage, "Competences");
         const snap = await getDocs(colRef);
 
         const nbCreees = snap.size;
         const nbRestantes = competencesMax - nbCreees;
 
+        // Gestion du bouton de Forge
         if (spanRestantes) {
             spanRestantes.innerText = Math.max(0, nbRestantes);
             spanRestantes.style.color = nbRestantes > 0 ? "#1b6e3a" : "#ff4c4c";
@@ -39,19 +66,156 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
         }
 
         listeDiv.innerHTML = "";
+        
         if (nbCreees === 0) {
             listeDiv.innerHTML = `<p style="text-align: center; font-style: italic; color: #5c3a21; margin-top: 20px;">Le héros n'a pas encore forgé ses techniques de combat.</p>`;
-        } else {
-            snap.forEach(docSnap => {
-                const data = docSnap.data();
-                listeDiv.innerHTML += `
-                    <div style="background: rgba(255,255,255,0.6); padding: 12px; border-radius: 6px; border: 1px solid #c2a878;">
-                        <strong style="color: #2a1a0f;">${data.Nom || "Technique Inconnue"}</strong>
-                    </div>`;
-            });
+            return;
         }
+
+        // 3. AFFICHAGE DES BANNIÈRES (Styles CSS injectés en dur avec les proportions EXACTES)
+        let htmlDeck = `
+            <div style="position: sticky; top: -20px; z-index: 50; background: rgba(232, 213, 165, 0.95); backdrop-filter: blur(5px); border-bottom: 3px solid #5c3a21; padding: 12px 20px; margin: 10px -20px 20px -20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 5px 15px rgba(0,0,0,0.5); font-family: 'Cinzel', serif; font-size: 18px; color: #2c1e16; font-weight: bold;">
+                <span>Grimoire de Combat</span>
+                <span>Mémorisées : <span id="compteur-cartes-actuel" style="color: ${window.CARTES_SELECTIONNEES.length >= window.CARTES_MAX_PERSO ? '#ff4c4c' : '#1b6e3a'}">${window.CARTES_SELECTIONNEES.length}</span> / ${window.CARTES_MAX_PERSO}</span>
+            </div>
+            
+            <!-- Le conteneur retrouve sa largeur d'origine (max 580px) -->
+            <div style="display: flex; flex-direction: column; gap: 0px; width: 100%; max-width: 580px; margin: 15px 0; padding-bottom: 80px;">
+        `;
+
+        snap.forEach(docSnap => {
+            const data = docSnap.data();
+            const idCarte = docSnap.id;
+            const titre = data.Nom || "Technique Inconnue";
+            const initiative = data.Initiative || 0;
+            
+            const estSelectionnee = window.CARTES_SELECTIONNEES.includes(idCarte);
+            let isSelStr = estSelectionnee ? "true" : "false";
+            let decalageX = estSelectionnee ? "80px" : "0px";
+            let urlCadre = estSelectionnee ? IMAGE_CADRE_SELECTIONNE : IMAGE_CADRE_NORMAL;
+
+            htmlDeck += `
+                <div id="ui-carte-${idCarte}" class="banniere-carte" data-selectionnee="${isSelStr}"
+                     onclick="window.gererClicCarte('${idCarte}')"
+                     style="position: relative; width: 100%; height: 160px; display: flex; align-items: center; cursor: pointer; transition: transform 0.2s ease; margin-bottom: -75px; z-index: 2; transform: translateX(${decalageX});"
+                     onmouseover="this.style.transform = this.dataset.selectionnee === 'true' ? 'translateX(95px)' : 'translateX(12px)'; this.style.zIndex='100';"
+                     onmouseout="this.style.transform = this.dataset.selectionnee === 'true' ? 'translateX(80px)' : 'translateX(0px)'; this.style.zIndex='2';">
+                     
+                    <!-- Le Rectangle de Couleur de fond -->
+                    <div style="position: absolute; top: 47px; bottom: 55px; left: 115px; right: 57px; z-index: 1; border-radius: 0 15px 15px 0; background-color: ${window.COULEUR_PERSO_COURANT};"></div>
+                    
+                    <!-- L'Image du Cadre (Restaurée avec "contain" pour éviter l'écrasement) -->
+                    <div id="cadre-carte-${idCarte}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('${urlCadre}'); background-size: contain; background-position: center; background-repeat: no-repeat; z-index: 2; filter: drop-shadow(0px 6px 4px rgba(0,0,0,0.6));"></div>
+                    
+                    <!-- Initiative (Bulle de gauche) -->
+                    <div style="position: absolute; top: 44%; transform: translateY(-50%); left: 57px; width: 69px; text-align: center; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 30px; font-weight: bold; z-index: 3; text-shadow: 2px 2px 5px black; pointer-events: none;">${initiative}</div>
+                    
+                    <!-- Titre de la carte -->
+                    <div style="position: absolute; top: 48%; transform: translateY(-50%); left: 120px; right: 20px; text-align: center; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;">${titre}</div>
+                </div>
+            `;
+        });
+        
+        htmlDeck += `</div>`;
+        listeDiv.innerHTML = htmlDeck;
+
     } catch (e) {
         console.error("Erreur de lecture des compétences :", e);
+    }
+};
+
+// =========================================================================
+//  LOGIQUE DES CLICS (Aperçu vs Équiper)
+// =========================================================================
+
+window.gererClicCarte = function(idCarte) {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+
+    if (window.CARTE_EN_APERCU !== idCarte) {
+        // --- 1ER CLIC : FOCUS & APERÇU ---
+        window.CARTE_EN_APERCU = idCarte;
+
+        // On nettoie le surlignage des autres cartes
+        document.querySelectorAll('.banniere-carte').forEach(el => {
+            el.style.filter = "none";
+        });
+        
+        // On illumine la carte sélectionnée pour indiquer qu'on la regarde
+        const carteDiv = document.getElementById(`ui-carte-${idCarte}`);
+        if (carteDiv) {
+            carteDiv.style.filter = "drop-shadow(0px 0px 8px rgba(0, 255, 255, 0.8)) brightness(1.1)";
+        }
+        
+        // (L'affichage visuel de l'aperçu HD sur le côté se fera ici plus tard)
+        console.log("Focus sur la carte :", idCarte);
+        
+    } else {
+        // --- 2ÈME CLIC : ÉQUIPER / DÉSÉQUIPER ---
+        window.basculerSelectionCarte(idCarte);
+    }
+};
+
+window.basculerSelectionCarte = async function(idCarte) {
+    const elementBanniere = document.getElementById(`ui-carte-${idCarte}`);
+    const elementCadre = document.getElementById(`cadre-carte-${idCarte}`);
+    const compteurAffichage = document.getElementById("compteur-cartes-actuel");
+
+    if (!elementBanniere || !elementCadre) return;
+
+    let indexDansSelection = window.CARTES_SELECTIONNEES.indexOf(idCarte);
+
+    if (indexDansSelection > -1) {
+        // ACTION : RETIRER LA CARTE
+        window.CARTES_SELECTIONNEES.splice(indexDansSelection, 1);
+        elementBanniere.dataset.selectionnee = "false";
+        elementBanniere.style.transform = "translateX(0px)";
+        elementCadre.style.backgroundImage = `url('${IMAGE_CADRE_NORMAL}')`;
+    } else {
+        // ACTION : AJOUTER LA CARTE
+        if (window.CARTES_SELECTIONNEES.length >= window.CARTES_MAX_PERSO) {
+            // Limite Max Atteinte (Message immersif)
+            let msgErreur = document.getElementById("erreur-deck-immersif");
+
+            if (!msgErreur) {
+                msgErreur = document.createElement("div");
+                msgErreur.id = "erreur-deck-immersif";
+                msgErreur.style.cssText = "position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(40, 10, 10, 0.95); color: #e8d5a5; padding: 20px 40px; border: 2px solid #ff4c4c; border-radius: 12px; font-weight: bold; font-size: 22px; text-shadow: 0 0 10px red; box-shadow: 0 0 40px rgba(255, 0, 0, 0.9); z-index: 2000; text-align: center; pointer-events: none; opacity: 0; transition: opacity 0.3s ease; white-space: nowrap;";
+                document.body.appendChild(msgErreur);
+            }
+
+            msgErreur.innerHTML = `L'esprit est saturé.<br><span style="font-size: 16px; color: #e8d5a5;">Vous ne pouvez retenir que ${window.CARTES_MAX_PERSO} actions.</span>`;
+            msgErreur.style.opacity = "1";
+            setTimeout(() => { if (msgErreur) msgErreur.style.opacity = "0"; }, 2500);
+
+            // Tremblement de refus
+            elementBanniere.style.transform = "translateX(-5px)";
+            setTimeout(() => elementBanniere.style.transform = "translateX(5px)", 50);
+            setTimeout(() => elementBanniere.style.transform = elementBanniere.dataset.selectionnee === "true" ? "translateX(80px)" : "translateX(0px)", 100); 
+
+            return; 
+        }
+
+        window.CARTES_SELECTIONNEES.push(idCarte);
+        elementBanniere.dataset.selectionnee = "true";
+        elementBanniere.style.transform = "translateX(80px)";
+        elementCadre.style.backgroundImage = `url('${IMAGE_CADRE_SELECTIONNE}')`;
+    }
+
+    // Mise à jour visuelle du compteur
+    if (compteurAffichage) {
+        compteurAffichage.innerText = window.CARTES_SELECTIONNEES.length;
+        compteurAffichage.style.color = window.CARTES_SELECTIONNEES.length >= window.CARTES_MAX_PERSO ? '#ff4c4c' : '#1b6e3a';
+    }
+
+    // Sauvegarde silencieuse Firebase
+    if (window.ID_PERSONNAGE_DECK) {
+        try {
+            await updateDoc(doc(db, "Personnages", window.ID_PERSONNAGE_DECK), {
+                Deck_Equipe: window.CARTES_SELECTIONNEES
+            });
+        } catch (e) {
+            console.error("Erreur de synchronisation du deck :", e);
+        }
     }
 };
 
