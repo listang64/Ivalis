@@ -23,7 +23,6 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
 
     if (spanMax) spanMax.innerText = competencesMax;
 
-    // Initialisation des variables du personnage pour le Deck
     window.ID_PERSONNAGE_DECK = idPersonnage;
     window.CARTES_MAX_PERSO = competencesMax; 
     window.CARTES_SELECTIONNEES = [];
@@ -43,7 +42,24 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
         const colRef = collection(db, "Personnages", idPersonnage, "Competences");
         const snap = await getDocs(colRef);
 
-        const nbCreees = snap.size;
+        window.COMPETENCES_CACHE = {}; // On vide le cache à l'ouverture
+
+        // NOUVEAU : On stocke tout dans un tableau pour pouvoir les trier
+        let competencesArray = [];
+        snap.forEach(docSnap => {
+            const data = docSnap.data();
+            window.COMPETENCES_CACHE[docSnap.id] = data; // Mise en cache HD
+            competencesArray.push({ id: docSnap.id, data: data });
+        });
+
+        // NOUVEAU : Tri par Initiative (de la plus grande à la plus petite)
+        competencesArray.sort((a, b) => {
+            const initA = a.data.Initiative || 0;
+            const initB = b.data.Initiative || 0;
+            return initB - initA;
+        });
+
+        const nbCreees = competencesArray.length;
         const nbRestantes = competencesMax - nbCreees;
 
         // Gestion du bouton de Forge
@@ -73,23 +89,20 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
             return;
         }
 
-        // 3. AFFICHAGE DES BANNIÈRES (Styles CSS injectés en dur avec les proportions EXACTES)
+        // 3. AFFICHAGE DES BANNIÈRES
         let htmlDeck = `
             <div style="position: sticky; top: -20px; z-index: 50; background: rgba(232, 213, 165, 0.95); backdrop-filter: blur(5px); border-bottom: 3px solid #5c3a21; padding: 12px 20px; margin: 10px -20px 20px -20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 5px 15px rgba(0,0,0,0.5); font-family: 'Cinzel', serif; font-size: 18px; color: #2c1e16; font-weight: bold;">
                 <span>Grimoire de Combat</span>
                 <span>Mémorisées : <span id="compteur-cartes-actuel" style="color: ${window.CARTES_SELECTIONNEES.length >= window.CARTES_MAX_PERSO ? '#ff4c4c' : '#1b6e3a'}">${window.CARTES_SELECTIONNEES.length}</span> / ${window.CARTES_MAX_PERSO}</span>
             </div>
             
-            <!-- Le conteneur retrouve sa largeur d'origine (max 580px) -->
             <div style="display: flex; flex-direction: column; gap: 0px; width: 100%; max-width: 580px; margin: 15px 0; padding-bottom: 80px;">
         `;
 
-        window.COMPETENCES_CACHE = {}; // On vide le cache à l'ouverture
-        snap.forEach(docSnap => {
-            const data = docSnap.data();
-            const idCarte = docSnap.id;
-            // On sauvegarde toutes les infos de la carte pour l'aperçu HD !
-            window.COMPETENCES_CACHE[idCarte] = data;
+        // Boucle sur le tableau TRIÉ
+        competencesArray.forEach(comp => {
+            const data = comp.data;
+            const idCarte = comp.id;
             const titre = data.Nom || "Technique Inconnue";
             const initiative = data.Initiative || 0;
             
@@ -105,16 +118,12 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
                      onmouseover="this.style.transform = this.dataset.selectionnee === 'true' ? 'translateX(95px)' : 'translateX(12px)'; this.style.zIndex='100';"
                      onmouseout="this.style.transform = this.dataset.selectionnee === 'true' ? 'translateX(80px)' : 'translateX(0px)'; this.style.zIndex='2';">
                      
-                    <!-- Le Rectangle de Couleur de fond -->
                     <div style="position: absolute; top: 47px; bottom: 55px; left: 115px; right: 57px; z-index: 1; border-radius: 0 15px 15px 0; background-color: ${window.COULEUR_PERSO_COURANT};"></div>
                     
-                    <!-- L'Image du Cadre (Restaurée avec "contain" pour éviter l'écrasement) -->
                     <div id="cadre-carte-${idCarte}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('${urlCadre}'); background-size: contain; background-position: center; background-repeat: no-repeat; z-index: 2; filter: drop-shadow(0px 6px 4px rgba(0,0,0,0.6));"></div>
                     
-                    <!-- Initiative (Bulle de gauche) -->
                     <div style="position: absolute; top: 44%; transform: translateY(-50%); left: 57px; width: 69px; text-align: center; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 30px; font-weight: bold; z-index: 3; text-shadow: 2px 2px 5px black; pointer-events: none;">${initiative}</div>
                     
-                    <!-- Titre de la carte -->
                     <div style="position: absolute; top: 48%; transform: translateY(-50%); left: 120px; right: 20px; text-align: center; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;">${titre}</div>
                 </div>
             `;
@@ -165,7 +174,7 @@ window.afficherApercuCarteHD = function(idCarte) {
     if (!conteneurCarte) {
         conteneurCarte = document.createElement("div");
         conteneurCarte.id = "apercu-carte-hd-competence";
-        conteneurCarte.style.cssText = "position: fixed; top: 50%; right: 8vw; transform: translateY(-50%); width: 340px; height: 476px; z-index: 9999; display: none; border-radius: 12px; box-shadow: 0px 20px 40px rgba(0,0,0,0.9); transition: opacity 0.2s ease;";
+        conteneurCarte.style.cssText = "position: fixed; top: 50%; left: 59vw; transform: translateY(-50%); width: 340px; height: 476px; z-index: 9999; display: none; border-radius: 12px; box-shadow: 0px 20px 40px rgba(0,0,0,0.9); transition: opacity 0.2s ease;";
         document.body.appendChild(conteneurCarte);
 
         const style = document.createElement("style");
@@ -185,8 +194,9 @@ window.afficherApercuCarteHD = function(idCarte) {
     const fatigue = data.Fatigue || 0;
     const effets = data.Effets_Compiles || [];
 
-    // Récupération des données de la Zone
     let allZoneHexes = [];
+    let hasDist = false; 
+
     if (data.Composants && data.Composants.actions) {
         data.Composants.actions.forEach(act => {
             if (act.zoneHexes && act.zoneHexes.length > 0) {
@@ -196,16 +206,17 @@ window.afficherApercuCarteHD = function(idCarte) {
     }
 
     let htmlEffets = "";
-    let htmlZoneAbsolue = ""; // Nouveau conteneur pour la zone flottante
+    let htmlZoneAbsolue = "";
 
     effets.forEach(eff => {
-        // --- RÈGLE D'EXCLUSION : On ignore totalement "Initiative +" ---
+        let textToCheck = typeof eff === 'string' ? eff : eff.nom;
+        if (textToCheck.includes("Distance")) hasDist = true;
+
         if (typeof eff === 'string' && eff.includes("Initiative +")) return;
         if (typeof eff === 'object' && eff.nom === "Initiative +") return;
 
         if (typeof eff === 'string') {
             if (eff.includes("Zone")) {
-                // On ne fait plus rien ici pour le texte
             } else if (eff.startsWith("  ↳")) {
                 htmlEffets += `<div style="margin-left: 20px; color: #a89f91; font-size: 13px; padding: 2px 0;">${eff}</div>`;
             } else {
@@ -214,7 +225,6 @@ window.afficherApercuCarteHD = function(idCarte) {
         } 
         else {
             if (eff.isZone) {
-                // On ne fait plus rien ici pour le texte
             } else {
                 let padding = eff.isMod ? "margin-left: 15px; margin-top: 6px;" : "margin-top: 12px;";
                 let colorNom = eff.isMod ? "#c2a878" : "#e8d5a5";
@@ -230,47 +240,66 @@ window.afficherApercuCarteHD = function(idCarte) {
         }
     });
 
-    // Dessin du mini-SVG tactique avec bords BIEN BLANCS
+    // NOUVEAU : Dessin avec Bounding Box Dynamique (Rognage auto)
     if (allZoneHexes.length > 0) {
         let svgPolygons = "";
-        const hexRadius = 8;
+        const hexRadius = 11;
         const cx = 60;
         const cy = 60;
+        
+        // Variables pour tracker les dimensions exactes du dessin
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
         
         for (let q = -2; q <= 2; q++) {
             let r1 = Math.max(-2, -q - 2);
             let r2 = Math.min(2, -q + 2);
             for (let r = r1; r <= r2; r++) {
                 const isCenter = (q === 0 && r === 0);
+                const isPlayer = isCenter && !hasDist;
                 const isSelected = allZoneHexes.some(h => h.q === q && h.r === r);
+
+                if (!isSelected && !isPlayer) continue;
 
                 const x = cx + hexRadius * Math.sqrt(3) * (q + r / 2.0);
                 const y = cy + hexRadius * 3.0 / 2.0 * r;
 
-                // Couleurs de la grille
-                let fillColor = "rgba(255, 255, 255, 0.05)";
-                if (isCenter) fillColor = "rgba(150, 150, 150, 0.8)";
-                if (isSelected) fillColor = "rgba(255, 76, 76, 0.8)";
+                let fillColor = "rgba(255, 76, 76, 0.8)";
+                if (isPlayer && !isSelected) {
+                    fillColor = "rgba(150, 150, 150, 0.8)";
+                }
 
                 let points = "";
                 for(let i=0; i<6; i++) {
                     let angle = Math.PI / 3 * i - Math.PI / 6;
-                    points += `${x + hexRadius * Math.cos(angle)},${y + hexRadius * Math.sin(angle)} `;
+                    let px = x + hexRadius * Math.cos(angle);
+                    let py = y + hexRadius * Math.sin(angle);
+                    points += `${px},${py} `;
+                    
+                    // On met à jour les frontières extrêmes de notre dessin
+                    minX = Math.min(minX, px);
+                    maxX = Math.max(maxX, px);
+                    minY = Math.min(minY, py);
+                    maxY = Math.max(maxY, py);
                 }
                 
-                // MODIFICATION : stroke="#ffffff" et stroke-width="1.5" pour que ça ressorte !
                 svgPolygons += `<polygon points="${points.trim()}" fill="${fillColor}" stroke="#ffffff" stroke-width="1.5" />`;
             }
         }
         
-        // MODIFICATION : Position absolue en bas à droite
-        htmlZoneAbsolue = `
-            <div style="position: absolute; bottom: -15px; right: -15px; z-index: 10; filter: drop-shadow(0px 5px 10px rgba(0,0,0,0.9)); pointer-events: none;">
-                <svg width="120" height="120" viewBox="0 0 120 120">
-                    ${svgPolygons}
-                </svg>
-            </div>
-        `;
+        // Si on a dessiné quelque chose, on génère le SVG aux dimensions exactes
+        if (minX !== Infinity) {
+            let padding = 3; // Marge pour ne pas couper la bordure blanche
+            let viewBoxWidth = maxX - minX + (padding * 2);
+            let viewBoxHeight = maxY - minY + (padding * 2);
+            
+            htmlZoneAbsolue = `
+                <div style="position: absolute; bottom: 18px; right: 15px; z-index: 10; filter: drop-shadow(0px 5px 10px rgba(0,0,0,0.9)); pointer-events: none;">
+                    <svg width="${viewBoxWidth}" height="${viewBoxHeight}" viewBox="${minX - padding} ${minY - padding} ${viewBoxWidth} ${viewBoxHeight}">
+                        ${svgPolygons}
+                    </svg>
+                </div>
+            `;
+        }
     }
 
     conteneurCarte.innerHTML = `
@@ -281,29 +310,24 @@ window.afficherApercuCarteHD = function(idCarte) {
         <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1785866318/competance_carte_vy8omh.png" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none;">
         
         <!-- COUCHE 3 : LES DONNÉES -->
-        
-        <!-- Titre : Avec tes marges personnalisées -->
         <div style="position: absolute; top: 18px; left: 50px; right: 80px; text-align: center; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; color: #e0d0b0; text-transform: uppercase; text-shadow: 2px 2px 4px black; z-index: 3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;">
             ${titre}
         </div>
 
-        <!-- Initiative : AJOUT DU PADDING-LEFT pour décaler le texte sans casser la boîte -->
         <div style="position: absolute; top: 7px; right: 9px; width: 75px; height: 72px; display: flex; justify-content: center; align-items: center; padding-left: 8px; box-sizing: border-box; font-family: 'Cinzel', serif; font-size: 34px; font-weight: bold; color: white; text-shadow: 2px 2px 6px black; z-index: 3; pointer-events: none;">
             ${initiative}
         </div>
 
-        <!-- Fatigue : Avec tes marges personnalisées -->
         <div style="position: absolute; top: 50.7%; left: 50%; transform: translate(-50%, -50%); font-family: 'Cinzel', serif; font-size: 20px; font-weight: bold; color: #ff8b8b; text-shadow: 1px 1px 4px black; z-index: 3; pointer-events: none;">
             ${fatigue}
         </div>
 
-        <!-- Section des Effets : Avec tes marges personnalisées (débarrassée de la zone) -->
         <div class="zone-effets" style="position: absolute; top: 54%; left: 16%; right: 8%; bottom: 6%; z-index: 3; overflow-y: auto; font-family: 'Almendra', serif; display: flex; flex-direction: column; justify-content: flex-start;">
             <div style="flex-grow: 1;">
                 ${htmlEffets}
             </div>
         </div>
-        
+
         <!-- COUCHE 4 : LA ZONE FLOTTANTE -->
         ${htmlZoneAbsolue}
     `;
@@ -556,6 +580,9 @@ function purgeDisconnectedZoneHexes(hexes, hasDistance) {
 // =========================================================================
 
 window.ouvrirCreationCompetence = async function() {
+    // NOUVEAU : On ferme la carte HD si elle était ouverte
+    if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD();
+
     window.forgeState.actions = [];
     window.forgeState.isCapReached = false;
     window.forgeState.armePrincipale = null;
