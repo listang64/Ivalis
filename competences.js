@@ -168,7 +168,7 @@ window.afficherApercuCarteHD = function(idCarte) {
         conteneurCarte.style.cssText = "position: fixed; top: 50%; right: 8vw; transform: translateY(-50%); width: 340px; height: 476px; z-index: 9999; display: none; border-radius: 12px; box-shadow: 0px 20px 40px rgba(0,0,0,0.9); transition: opacity 0.2s ease;";
         document.body.appendChild(conteneurCarte);
 
-        // Discrète scrollbar pour la zone de texte si ça déborde
+        // Discrète scrollbar pour la zone de texte
         const style = document.createElement("style");
         style.innerHTML = `
             #apercu-carte-hd-competence .zone-effets::-webkit-scrollbar { width: 4px; }
@@ -186,24 +186,32 @@ window.afficherApercuCarteHD = function(idCarte) {
     const fatigue = data.Fatigue || 0;
     const effets = data.Effets_Compiles || [];
 
+    // Récupération des données de la Zone (les coordonnées hexagonales enregistrées)
+    let allZoneHexes = [];
+    if (data.Composants && data.Composants.actions) {
+        data.Composants.actions.forEach(act => {
+            if (act.zoneHexes && act.zoneHexes.length > 0) {
+                allZoneHexes = act.zoneHexes;
+            }
+        });
+    }
+
     let htmlEffets = "";
-    let htmlZone = "";
+    let htmlZone = ""; // Ne contiendra plus que l'image SVG
 
     effets.forEach(eff => {
-        // Compatibilité avec les anciennes compétences forgées (format texte)
         if (typeof eff === 'string') {
             if (eff.includes("Zone")) {
-                htmlZone += `<div style="text-align: center; color: #ff8b8b; font-size: 14px; margin-top: 15px; font-weight: bold; text-shadow: 1px 1px 2px black;">❖ ${eff.replace("  ↳ ", "")} ❖</div>`;
+                // On a supprimé la ligne qui ajoutait le texte rouge !
             } else if (eff.startsWith("  ↳")) {
                 htmlEffets += `<div style="margin-left: 20px; color: #a89f91; font-size: 13px; padding: 2px 0;">${eff}</div>`;
             } else {
                 htmlEffets += `<div style="margin-top: 8px; color: #e8d5a5; font-size: 15px; font-weight: bold;">${eff}</div>`;
             }
         } 
-        // Nouveau format d'objets (SANS le x2, AVEC le descriptif)
         else {
             if (eff.isZone) {
-                htmlZone += `<div style="text-align: center; color: #ff8b8b; font-size: 14px; margin-top: 15px; font-weight: bold; text-shadow: 1px 1px 2px black;">❖ Zone d'effet : ${eff.desc} ❖</div>`;
+                // On a supprimé la ligne qui ajoutait le texte rouge !
             } else {
                 let padding = eff.isMod ? "margin-left: 15px; margin-top: 6px;" : "margin-top: 12px;";
                 let colorNom = eff.isMod ? "#c2a878" : "#e8d5a5";
@@ -219,6 +227,47 @@ window.afficherApercuCarteHD = function(idCarte) {
         }
     });
 
+    // Dessin du mini-SVG tactique si une zone existe
+    if (allZoneHexes.length > 0) {
+        let svgPolygons = "";
+        const hexRadius = 8;
+        const cx = 60;
+        const cy = 60;
+        
+        for (let q = -2; q <= 2; q++) {
+            let r1 = Math.max(-2, -q - 2);
+            let r2 = Math.min(2, -q + 2);
+            for (let r = r1; r <= r2; r++) {
+                const isCenter = (q === 0 && r === 0);
+                const isSelected = allZoneHexes.some(h => h.q === q && h.r === r);
+
+                const x = cx + hexRadius * Math.sqrt(3) * (q + r / 2.0);
+                const y = cy + hexRadius * 3.0 / 2.0 * r;
+
+                // Couleurs de la grille
+                let fillColor = "rgba(255, 255, 255, 0.05)";
+                if (isCenter) fillColor = "rgba(150, 150, 150, 0.8)";
+                if (isSelected) fillColor = "rgba(255, 76, 76, 0.8)";
+
+                let points = "";
+                for(let i=0; i<6; i++) {
+                    let angle = Math.PI / 3 * i - Math.PI / 6;
+                    points += `${x + hexRadius * Math.cos(angle)},${y + hexRadius * Math.sin(angle)} `;
+                }
+                svgPolygons += `<polygon points="${points.trim()}" fill="${fillColor}" stroke="rgba(255,255,255,0.2)" stroke-width="0.5" />`;
+            }
+        }
+        
+        // On n'injecte QUE l'image SVG
+        htmlZone = `
+            <div style="display: flex; justify-content: center; margin-top: 15px; padding-bottom: 10px;">
+                <svg width="120" height="120" viewBox="0 0 120 120">
+                    ${svgPolygons}
+                </svg>
+            </div>
+        `;
+    }
+
     conteneurCarte.innerHTML = `
         <!-- COUCHE 1 : FOND DE COULEUR -->
         <div style="position: absolute; top: 12px; left: 12px; right: 12px; bottom: 12px; background-color: ${window.COULEUR_PERSO_COURANT}; border-radius: 8px; z-index: 1;"></div>
@@ -228,23 +277,23 @@ window.afficherApercuCarteHD = function(idCarte) {
         
         <!-- COUCHE 3 : LES DONNÉES -->
         
-        <!-- Titre : Centré et espacé du rond -->
-        <div style="position: absolute; top: 22px; left: 30px; right: 90px; text-align: center; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; color: #e0d0b0; text-transform: uppercase; text-shadow: 2px 2px 4px black; z-index: 3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+        <!-- Titre : Avec tes marges personnalisées -->
+        <div style="position: absolute; top: 18px; left: 50px; right: 80px; text-align: center; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; color: #e0d0b0; text-transform: uppercase; text-shadow: 2px 2px 4px black; z-index: 3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;">
             ${titre}
         </div>
 
-        <!-- Initiative : Centrage parfait dans le rond -->
-        <div style="position: absolute; top: 8px; right: 9px; width: 72px; height: 72px; display: flex; justify-content: center; align-items: center; font-family: 'Cinzel', serif; font-size: 34px; font-weight: bold; color: white; text-shadow: 2px 2px 6px black; z-index: 3;">
+        <!-- Initiative : AJOUT DU PADDING-LEFT pour décaler le texte sans casser la boîte -->
+        <div style="position: absolute; top: 7px; right: 9px; width: 75px; height: 72px; display: flex; justify-content: center; align-items: center; padding-left: 8px; box-sizing: border-box; font-family: 'Cinzel', serif; font-size: 34px; font-weight: bold; color: white; text-shadow: 2px 2px 6px black; z-index: 3; pointer-events: none;">
             ${initiative}
         </div>
 
-        <!-- Fatigue : Rouge pastel -->
-        <div style="position: absolute; top: 50.7%; left: 50%; transform: translate(-50%, -50%); font-family: 'Cinzel', serif; font-size: 20px; font-weight: bold; color: #ff8b8b; text-shadow: 1px 1px 4px black; z-index: 3;">
+        <!-- Fatigue : Avec tes marges personnalisées -->
+        <div style="position: absolute; top: 50.7%; left: 50%; transform: translate(-50%, -50%); font-family: 'Cinzel', serif; font-size: 20px; font-weight: bold; color: #ff8b8b; text-shadow: 1px 1px 4px black; z-index: 3; pointer-events: none;">
             ${fatigue}
         </div>
 
-        <!-- Section des Effets : Décalée vers la droite (left: 12%) et sans bordures -->
-        <div class="zone-effets" style="position: absolute; top: 54%; left: 12%; right: 8%; bottom: 6%; z-index: 3; overflow-y: auto; font-family: 'Almendra', serif; display: flex; flex-direction: column; justify-content: flex-start;">
+        <!-- Section des Effets : Avec tes marges personnalisées -->
+        <div class="zone-effets" style="position: absolute; top: 54%; left: 16%; right: 8%; bottom: 6%; z-index: 3; overflow-y: auto; font-family: 'Almendra', serif; display: flex; flex-direction: column; justify-content: flex-start;">
             <div style="flex-grow: 1;">
                 ${htmlEffets}
             </div>
