@@ -168,7 +168,6 @@ window.afficherApercuCarteHD = function(idCarte) {
         conteneurCarte.style.cssText = "position: fixed; top: 50%; right: 8vw; transform: translateY(-50%); width: 340px; height: 476px; z-index: 9999; display: none; border-radius: 12px; box-shadow: 0px 20px 40px rgba(0,0,0,0.9); transition: opacity 0.2s ease;";
         document.body.appendChild(conteneurCarte);
 
-        // Discrète scrollbar pour la zone de texte
         const style = document.createElement("style");
         style.innerHTML = `
             #apercu-carte-hd-competence .zone-effets::-webkit-scrollbar { width: 4px; }
@@ -186,7 +185,7 @@ window.afficherApercuCarteHD = function(idCarte) {
     const fatigue = data.Fatigue || 0;
     const effets = data.Effets_Compiles || [];
 
-    // Récupération des données de la Zone (les coordonnées hexagonales enregistrées)
+    // Récupération des données de la Zone
     let allZoneHexes = [];
     if (data.Composants && data.Composants.actions) {
         data.Composants.actions.forEach(act => {
@@ -197,12 +196,16 @@ window.afficherApercuCarteHD = function(idCarte) {
     }
 
     let htmlEffets = "";
-    let htmlZone = ""; // Ne contiendra plus que l'image SVG
+    let htmlZoneAbsolue = ""; // Nouveau conteneur pour la zone flottante
 
     effets.forEach(eff => {
+        // --- RÈGLE D'EXCLUSION : On ignore totalement "Initiative +" ---
+        if (typeof eff === 'string' && eff.includes("Initiative +")) return;
+        if (typeof eff === 'object' && eff.nom === "Initiative +") return;
+
         if (typeof eff === 'string') {
             if (eff.includes("Zone")) {
-                // On a supprimé la ligne qui ajoutait le texte rouge !
+                // On ne fait plus rien ici pour le texte
             } else if (eff.startsWith("  ↳")) {
                 htmlEffets += `<div style="margin-left: 20px; color: #a89f91; font-size: 13px; padding: 2px 0;">${eff}</div>`;
             } else {
@@ -211,7 +214,7 @@ window.afficherApercuCarteHD = function(idCarte) {
         } 
         else {
             if (eff.isZone) {
-                // On a supprimé la ligne qui ajoutait le texte rouge !
+                // On ne fait plus rien ici pour le texte
             } else {
                 let padding = eff.isMod ? "margin-left: 15px; margin-top: 6px;" : "margin-top: 12px;";
                 let colorNom = eff.isMod ? "#c2a878" : "#e8d5a5";
@@ -227,7 +230,7 @@ window.afficherApercuCarteHD = function(idCarte) {
         }
     });
 
-    // Dessin du mini-SVG tactique si une zone existe
+    // Dessin du mini-SVG tactique avec bords BIEN BLANCS
     if (allZoneHexes.length > 0) {
         let svgPolygons = "";
         const hexRadius = 8;
@@ -254,13 +257,15 @@ window.afficherApercuCarteHD = function(idCarte) {
                     let angle = Math.PI / 3 * i - Math.PI / 6;
                     points += `${x + hexRadius * Math.cos(angle)},${y + hexRadius * Math.sin(angle)} `;
                 }
-                svgPolygons += `<polygon points="${points.trim()}" fill="${fillColor}" stroke="rgba(255,255,255,0.2)" stroke-width="0.5" />`;
+                
+                // MODIFICATION : stroke="#ffffff" et stroke-width="1.5" pour que ça ressorte !
+                svgPolygons += `<polygon points="${points.trim()}" fill="${fillColor}" stroke="#ffffff" stroke-width="1.5" />`;
             }
         }
         
-        // On n'injecte QUE l'image SVG
-        htmlZone = `
-            <div style="display: flex; justify-content: center; margin-top: 15px; padding-bottom: 10px;">
+        // MODIFICATION : Position absolue en bas à droite
+        htmlZoneAbsolue = `
+            <div style="position: absolute; bottom: -15px; right: -15px; z-index: 10; filter: drop-shadow(0px 5px 10px rgba(0,0,0,0.9)); pointer-events: none;">
                 <svg width="120" height="120" viewBox="0 0 120 120">
                     ${svgPolygons}
                 </svg>
@@ -292,13 +297,15 @@ window.afficherApercuCarteHD = function(idCarte) {
             ${fatigue}
         </div>
 
-        <!-- Section des Effets : Avec tes marges personnalisées -->
+        <!-- Section des Effets : Avec tes marges personnalisées (débarrassée de la zone) -->
         <div class="zone-effets" style="position: absolute; top: 54%; left: 16%; right: 8%; bottom: 6%; z-index: 3; overflow-y: auto; font-family: 'Almendra', serif; display: flex; flex-direction: column; justify-content: flex-start;">
             <div style="flex-grow: 1;">
                 ${htmlEffets}
             </div>
-            ${htmlZone}
         </div>
+        
+        <!-- COUCHE 4 : LA ZONE FLOTTANTE -->
+        ${htmlZoneAbsolue}
     `;
 
     conteneurCarte.style.display = "block";
