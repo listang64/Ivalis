@@ -162,20 +162,18 @@ window.gererClicCarte = function(idCarte) {
 window.afficherApercuCarteHD = function(idCarte) {
     let conteneurCarte = document.getElementById("apercu-carte-hd-competence");
     
-    // Si le conteneur n'existe pas encore dans le HTML, on le crée
     if (!conteneurCarte) {
         conteneurCarte = document.createElement("div");
         conteneurCarte.id = "apercu-carte-hd-competence";
-        // On le positionne fixement sur la droite de l'écran
         conteneurCarte.style.cssText = "position: fixed; top: 50%; right: 8vw; transform: translateY(-50%); width: 340px; height: 476px; z-index: 9999; display: none; border-radius: 12px; box-shadow: 0px 20px 40px rgba(0,0,0,0.9); transition: opacity 0.2s ease;";
         document.body.appendChild(conteneurCarte);
 
-        // Petit script CSS injecté pour styliser la scrollbar des effets
+        // Discrète scrollbar pour la zone de texte si ça déborde
         const style = document.createElement("style");
         style.innerHTML = `
-            #apercu-carte-hd-competence .zone-effets::-webkit-scrollbar { width: 6px; }
-            #apercu-carte-hd-competence .zone-effets::-webkit-scrollbar-track { background: rgba(0,0,0,0.4); border-radius: 4px; }
-            #apercu-carte-hd-competence .zone-effets::-webkit-scrollbar-thumb { background: #5c3a21; border-radius: 4px; border: 1px solid #1a1a1a; }
+            #apercu-carte-hd-competence .zone-effets::-webkit-scrollbar { width: 4px; }
+            #apercu-carte-hd-competence .zone-effets::-webkit-scrollbar-track { background: transparent; }
+            #apercu-carte-hd-competence .zone-effets::-webkit-scrollbar-thumb { background: rgba(232, 213, 165, 0.3); border-radius: 4px; }
         `;
         document.head.appendChild(style);
     }
@@ -183,56 +181,79 @@ window.afficherApercuCarteHD = function(idCarte) {
     const data = window.COMPETENCES_CACHE[idCarte];
     if (!data) return;
 
-    // Récupération des données
     const titre = data.Nom || "Inconnue";
     const initiative = data.Initiative || 0;
     const fatigue = data.Fatigue || 0;
     const effets = data.Effets_Compiles || [];
 
-    // Formatage stylisé de la liste des effets
     let htmlEffets = "";
+    let htmlZone = "";
+
     effets.forEach(eff => {
-        if (eff.startsWith("  ↳")) {
-            // Sous-effet (retrait, texte plus petit, couleur grisée)
-            htmlEffets += `<div style="margin-left: 20px; color: #a89f91; font-size: 14px; padding: 2px 0;">${eff}</div>`;
-        } else {
-            // Effet Principal (en gras, séparateur)
-            htmlEffets += `<div style="margin-top: 8px; color: #e8d5a5; font-size: 15px; font-weight: bold; border-bottom: 1px solid rgba(194, 168, 120, 0.2); padding-bottom: 3px;">${eff}</div>`;
+        // Compatibilité avec les anciennes compétences forgées (format texte)
+        if (typeof eff === 'string') {
+            if (eff.includes("Zone")) {
+                htmlZone += `<div style="text-align: center; color: #ff8b8b; font-size: 14px; margin-top: 15px; font-weight: bold; text-shadow: 1px 1px 2px black;">❖ ${eff.replace("  ↳ ", "")} ❖</div>`;
+            } else if (eff.startsWith("  ↳")) {
+                htmlEffets += `<div style="margin-left: 20px; color: #a89f91; font-size: 13px; padding: 2px 0;">${eff}</div>`;
+            } else {
+                htmlEffets += `<div style="margin-top: 8px; color: #e8d5a5; font-size: 15px; font-weight: bold;">${eff}</div>`;
+            }
+        } 
+        // Nouveau format d'objets (SANS le x2, AVEC le descriptif)
+        else {
+            if (eff.isZone) {
+                htmlZone += `<div style="text-align: center; color: #ff8b8b; font-size: 14px; margin-top: 15px; font-weight: bold; text-shadow: 1px 1px 2px black;">❖ Zone d'effet : ${eff.desc} ❖</div>`;
+            } else {
+                let padding = eff.isMod ? "margin-left: 15px; margin-top: 6px;" : "margin-top: 12px;";
+                let colorNom = eff.isMod ? "#c2a878" : "#e8d5a5";
+                let prefix = eff.isMod ? "↳ " : "• ";
+                
+                htmlEffets += `
+                    <div style="${padding}">
+                        <div style="color: ${colorNom}; font-size: 15px; font-weight: bold; text-shadow: 1px 1px 2px black;">${prefix}${eff.nom}</div>
+                        <div style="color: #a89f91; font-size: 13px; margin-top: 2px; line-height: 1.3; font-style: italic;">${eff.desc}</div>
+                    </div>
+                `;
+            }
         }
     });
 
-    // Construction visuelle de la carte
     conteneurCarte.innerHTML = `
-        <!-- COUCHE 1 : FOND DE COULEUR DU PERSONNAGE -->
+        <!-- COUCHE 1 : FOND DE COULEUR -->
         <div style="position: absolute; top: 12px; left: 12px; right: 12px; bottom: 12px; background-color: ${window.COULEUR_PERSO_COURANT}; border-radius: 8px; z-index: 1;"></div>
         
-        <!-- COUCHE 2 : L'IMAGE DU CADRE -->
+        <!-- COUCHE 2 : L'IMAGE DE LA CARTE -->
         <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1785866318/competance_carte_vy8omh.png" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none;">
         
-        <!-- COUCHE 3 : LES DONNÉES (Textes) -->
-        <!-- Titre -->
-        <div style="position: absolute; top: 4%; left: 8%; width: 62%; text-align: center; font-family: 'Cinzel', serif; font-size: 17px; font-weight: bold; color: #e0d0b0; text-transform: uppercase; text-shadow: 2px 2px 4px black; z-index: 3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-top: 5px;">
+        <!-- COUCHE 3 : LES DONNÉES -->
+        
+        <!-- Titre : Centré et espacé du rond -->
+        <div style="position: absolute; top: 22px; left: 30px; right: 90px; text-align: center; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; color: #e0d0b0; text-transform: uppercase; text-shadow: 2px 2px 4px black; z-index: 3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             ${titre}
         </div>
 
-        <!-- Initiative (Le Rond) -->
-        <div style="position: absolute; top: 3.5%; right: 2%; width: 65px; height: 65px; display: flex; justify-content: center; align-items: center; font-family: 'Cinzel', serif; font-size: 28px; font-weight: bold; color: white; text-shadow: 2px 2px 6px black; z-index: 3;">
+        <!-- Initiative : Centrage parfait dans le rond -->
+        <div style="position: absolute; top: 8px; right: 9px; width: 72px; height: 72px; display: flex; justify-content: center; align-items: center; font-family: 'Cinzel', serif; font-size: 34px; font-weight: bold; color: white; text-shadow: 2px 2px 6px black; z-index: 3;">
             ${initiative}
         </div>
 
-        <!-- Fatigue (L'encart du milieu) -->
-        <div style="position: absolute; top: 50.5%; left: 50%; transform: translate(-50%, -50%); font-family: 'Cinzel', serif; font-size: 20px; font-weight: bold; color: #ff4c4c; text-shadow: 1px 1px 4px black; z-index: 3;">
+        <!-- Fatigue : Rouge pastel -->
+        <div style="position: absolute; top: 50.7%; left: 50%; transform: translate(-50%, -50%); font-family: 'Cinzel', serif; font-size: 20px; font-weight: bold; color: #ff8b8b; text-shadow: 1px 1px 4px black; z-index: 3;">
             ${fatigue}
         </div>
 
-        <!-- Section des Effets (Rectangle du bas) -->
-        <div class="zone-effets" style="position: absolute; top: 54%; left: 8%; width: 84%; height: 38%; z-index: 3; overflow-y: auto; padding-right: 5px; font-family: 'Almendra', serif;">
-            ${htmlEffets}
+        <!-- Section des Effets : Décalée vers la droite (left: 12%) et sans bordures -->
+        <div class="zone-effets" style="position: absolute; top: 54%; left: 12%; right: 8%; bottom: 6%; z-index: 3; overflow-y: auto; font-family: 'Almendra', serif; display: flex; flex-direction: column; justify-content: flex-start;">
+            <div style="flex-grow: 1;">
+                ${htmlEffets}
+            </div>
+            ${htmlZone}
         </div>
     `;
 
     conteneurCarte.style.display = "block";
-    conteneurCarte.style.opacity = "1";
+    setTimeout(() => conteneurCarte.style.opacity = "1", 10);
 };
 
 // Fonction utile pour cacher la carte (lorsqu'on ferme la fiche perso)
@@ -717,16 +738,36 @@ function getActiveTags() {
 function compilerEffetsTexte() {
     let descriptions = [];
     window.forgeState.actions.forEach(act => {
-        let txtBase = `${act.baseEffet.Nom} (x${act.count})`;
-        if (act.baseDuree > 0) txtBase += ` + ⏳ Durée(x${act.baseDuree})`;
-        descriptions.push(txtBase);
+        let descBase = formatterTexteEffet(act.baseEffet, act.count);
+        if (act.baseDuree > 0) descBase += ` <span style="color:#9333ea;">(+ ⏳ ${act.baseDuree} Trs)</span>`;
+        
+        // On sauvegarde un objet propre au lieu d'une simple phrase
+        descriptions.push({
+            nom: act.baseEffet.Nom,
+            desc: descBase,
+            isMod: false
+        });
 
         Object.keys(act.mods).forEach(modId => {
             const modEff = window.forgeState.effetsBDD.find(e => e.id === modId);
             if (modEff) {
-                let txtMod = `  ↳ ${modEff.Nom} (x${act.mods[modId]})`;
-                if (act.modsDuree && act.modsDuree[modId] > 0) txtMod += ` + ⏳ Durée(x${act.modsDuree[modId]})`;
-                descriptions.push(txtMod);
+                if (modEff.Nom === "Zone") {
+                    let zoneLen = (act.zoneHexes && act.zoneHexes.length > 0) ? act.zoneHexes.length : act.mods[modId];
+                    descriptions.push({
+                        nom: "Zone",
+                        desc: `${zoneLen} hexagone(s)`,
+                        isMod: true,
+                        isZone: true
+                    });
+                } else {
+                    let descMod = formatterTexteEffet(modEff, act.mods[modId]);
+                    if (act.modsDuree && act.modsDuree[modId] > 0) descMod += ` <span style="color:#9333ea;">(+ ⏳ ${act.modsDuree[modId]} Trs)</span>`;
+                    descriptions.push({
+                        nom: modEff.Nom,
+                        desc: descMod,
+                        isMod: true
+                    });
+                }
             }
         });
     });
