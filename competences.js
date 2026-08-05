@@ -72,7 +72,7 @@ window.forgeState = {
 };
 
 const ORDRE_CARACS = ["FORCE", "DEXTÉRITÉ", "CONSTITUTION", "INTELLIGENCE", "SAGESSE", "CHARISME", "AUCUN"];
-const ORDRE_MODS = ["FORCE", "DEXTÉRITÉ", "CONSTITUTION", "INTELLIGENCE", "SAGESSE", "CHARISME", "GÉNÉRAL"];
+const ORDRE_MODS = ["FORCE", "DEXTÉRITÉ", "CONSTITUTION", "INTELLIGENCE", "SAGESSE", "CHARISME", "GÉNÉRAL", "AUCUN"];
 
 const LEGACY_TYPE_MAP = {
     Degats: "Action/Global", Soin: "Action/Global", Defense: "Action/Global", Special: "Action/Global",
@@ -302,17 +302,21 @@ window.ouvrirMenuAjoutForge = function() {
                 
                 const isDisabled = isLocked || capAtteint || isArmeIncompatible;
                 const bgColor = isDisabled ? 'gray' : '#3b82f6';
+                
+                // Calcul de la fatigue
+                const coutFatigue = parseFrenchFloat(eff.Cout_PT) * 5;
 
                 htmlLignes += `
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid rgba(0,0,0,0.05); opacity: ${isDisabled ? 0.4 : 1};">
                         <div style="display: flex; flex-direction: column;">
                             <div>
-                                <strong style="color: #2a1a0f;">${eff.Nom}</strong>
-                                ${eff.Modificateur !== "AUCUN" ? `<span style="font-size: 10px; color: #9333ea; font-weight: bold;">[${eff.Modificateur}]</span>` : ""}
+                                <strong style="color: #2a1a0f; font-size: 16px;">${eff.Nom}</strong>
+                                ${eff.Modificateur !== "AUCUN" ? `<span style="font-size: 12px; color: #9333ea; font-weight: bold; margin-left: 4px;">[${eff.Modificateur}]</span>` : ""}
+                                <span style="font-size: 13px; font-weight: bold; color: #ff4c4c; margin-left: 6px;">⚡ ${coutFatigue}</span>
                             </div>
-                            <span style="font-size: 11px; color: gray;">${formatterTexteEffet(eff, 1)}</span>
+                            <span style="font-size: 13px; color: gray;">${formatterTexteEffet(eff, 1)}</span>
                         </div>
-                        <button class="btn-rond-plus" style="width: 30px; height: 30px; background-color: ${bgColor}; color: white; border: none; border-radius: 50%;"
+                        <button class="btn-rond-plus" style="width: 34px; height: 34px; font-size: 18px; background-color: ${bgColor}; color: white; border: none; border-radius: 50%;"
                                 onclick="window.ajouterComposantPrincipal('${eff.id}')" ${isDisabled ? "disabled" : ""}>+</button>
                     </div>
                 `;
@@ -371,8 +375,12 @@ window.ajouterComposantPrincipal = function(effetId) {
     const eff = window.forgeState.effetsBDD.find(e => e.id === effetId);
     window.forgeState.actions.push({
         idInst: "ACT_" + Math.random().toString(36).substring(2, 9),
-        baseEffet: eff, count: 1, mods: {},
-        zoneHexes: [] 
+        baseEffet: eff, 
+        count: 1, 
+        mods: {},
+        zoneHexes: [],
+        baseDuree: 0,
+        modsDuree: {}
     });
 
     window.fermerMenuAjoutForge();
@@ -396,6 +404,7 @@ window.modifierModCount = function(idInst, modId, delta) {
 
     if (act.mods[modId] <= 0) {
         delete act.mods[modId];
+        if (act.modsDuree && act.modsDuree[modId] !== undefined) delete act.modsDuree[modId];
         const modEffet = window.forgeState.effetsBDD.find(e => e.id === modId);
         if (modEffet && modEffet.Nom === "Zone") act.zoneHexes = [];
     } else {
@@ -408,6 +417,27 @@ window.modifierModCount = function(idInst, modId, delta) {
         if (act.zoneHexes.length === 0 && act.mods[modId] > 0) act.zoneHexes = [];
     }
 
+    window.rafraichirForge();
+};
+
+window.modifierDuree = function(idInst, modId, delta) {
+    const act = window.forgeState.actions.find(a => a.idInst === idInst);
+    if (!act) return;
+    
+    const effetDureePlus = window.forgeState.effetsBDD.find(e => e.Nom === "Durée +");
+    const max = effetDureePlus ? getMaxStacks(effetDureePlus) : 1;
+
+    if (modId === null) {
+        act.baseDuree = (act.baseDuree || 0) + delta;
+        if (act.baseDuree < 0) act.baseDuree = 0;
+        if (act.baseDuree > max) act.baseDuree = max;
+    } else {
+        if (!act.modsDuree) act.modsDuree = {};
+        act.modsDuree[modId] = (act.modsDuree[modId] || 0) + delta;
+        if (act.modsDuree[modId] < 0) act.modsDuree[modId] = 0;
+        if (act.modsDuree[modId] > max) act.modsDuree[modId] = max;
+    }
+    
     window.rafraichirForge();
 };
 
@@ -434,10 +464,17 @@ function getActiveTags() {
 function compilerEffetsTexte() {
     let descriptions = [];
     window.forgeState.actions.forEach(act => {
-        descriptions.push(`${act.baseEffet.Nom} (x${act.count})`);
+        let txtBase = `${act.baseEffet.Nom} (x${act.count})`;
+        if (act.baseDuree > 0) txtBase += ` + ⏳ Durée(x${act.baseDuree})`;
+        descriptions.push(txtBase);
+
         Object.keys(act.mods).forEach(modId => {
             const modEff = window.forgeState.effetsBDD.find(e => e.id === modId);
-            if (modEff) descriptions.push(`  ↳ ${modEff.Nom} (x${act.mods[modId]})`);
+            if (modEff) {
+                let txtMod = `  ↳ ${modEff.Nom} (x${act.mods[modId]})`;
+                if (act.modsDuree && act.modsDuree[modId] > 0) txtMod += ` + ⏳ Durée(x${act.modsDuree[modId]})`;
+                descriptions.push(txtMod);
+            }
         });
     });
     return descriptions;
@@ -507,8 +544,8 @@ window.dessinerGrilleZone = function() {
     const costPC = modZone ? parseFrenchFloat(modZone.Cout_PT) : 1.5;
 
     const currentZoneCount = window.forgeState.selectedZoneHexes.length;
-    // CORRECTION : Chaque hexagone coûte son prix (plus de gratuité)
-    const finalCost = currentZoneCount * costPC;
+    // On remet la gratuité pour le 1er hexagone
+    const finalCost = Math.max(0, (currentZoneCount - 1) * costPC);
     
     const affichage = document.getElementById("zone-cout-affichage");
     affichage.innerText = finalCost === 0 ? "Gratuit" : `${finalCost} PC`;
@@ -573,9 +610,15 @@ window.rafraichirForge = function() {
     let initBonusNet = 0;
     const activeTags = getActiveTags();
 
+    // Récupération dynamique de la BDD pour Durée+
+    const effetDureePlus = window.forgeState.effetsBDD.find(e => e.Nom === "Durée +");
+    const coutDureePlus = effetDureePlus ? parseFrenchFloat(effetDureePlus.Cout_PT) : 5;
+    const maxDureeStacks = effetDureePlus ? getMaxStacks(effetDureePlus) : 1;
+
     window.forgeState.actions.forEach(act => {
         let baseActionCost = parseFrenchFloat(act.baseEffet.Cout_PT) * act.count;
-        let dureeMult = 1.0;
+        let coutDureeBase = (act.baseDuree || 0) * coutDureePlus;
+        
         let coutMods = 0;
         let aDOT = false;
 
@@ -594,21 +637,23 @@ window.rafraichirForge = function() {
                     initBonusNet += modCount * (baseVal + parseFrenchFloat(modEff.Cout_PT) * 5);
                 }
 
-                if (modEff.Nom === "Durée +" || modEff.Nom === "Persistance terrain") {
-                    dureeMult *= Math.pow(1.5, modCount);
-                } else if (modEff.Nom === "Zone") {
+                if (modEff.Nom === "Zone") {
                     let zoneLen = (act.zoneHexes && act.zoneHexes.length > 0) ? act.zoneHexes.length : modCount;
-                    // CORRECTION : Plus de Math.max(0, zoneLen - 1)
-                    coutMods += parseFrenchFloat(modEff.Cout_PT) * zoneLen;
+                    // On remet le premier hexagone gratuit ici aussi !
+                    coutMods += parseFrenchFloat(modEff.Cout_PT) * Math.max(0, zoneLen - 1);
                 } else if (modEff.Nom === "DOT" || modEff.Nom === "Durée étalement dégâts") {
                     aDOT = true;
                 } else {
                     coutMods += parseFrenchFloat(modEff.Cout_PT) * modCount;
                 }
+
+                // Surcoût lié au bouton ⏳ de CE sous-effet
+                let currentModDuree = (act.modsDuree && act.modsDuree[modId]) || 0;
+                coutMods += currentModDuree * coutDureePlus;
             }
         });
 
-        let coutActionTotale = (baseActionCost + coutMods) * dureeMult;
+        let coutActionTotale = baseActionCost + coutDureeBase + coutMods;
         if (aDOT) coutActionTotale /= 1.2;
         totalPC += coutActionTotale;
     });
@@ -637,7 +682,7 @@ window.rafraichirForge = function() {
     const armeContainer = document.getElementById("forge-weapon-tag-container");
     if (armeContainer) {
         if (window.forgeState.armePrincipale) {
-            armeContainer.innerHTML = `<span onclick="jouerSonClic(); window.ouvrirMenuArme()" style="background: #2563eb; color: white; padding: 6px 16px; border-radius: 12px; font-size: 13px; font-weight: bold; letter-spacing: 1px; display: inline-block; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: transform 0.1s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'" title="Changer l'arme de la technique">${window.forgeState.armePrincipale.toUpperCase()} 🔄</span>`;
+            armeContainer.innerHTML = `<span onclick="jouerSonClic(); window.ouvrirMenuArme()" style="background: #2563eb; color: white; padding: 6px 16px; border-radius: 12px; font-size: 15px; font-weight: bold; letter-spacing: 1px; display: inline-block; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: transform 0.1s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'" title="Changer l'arme de la technique">${window.forgeState.armePrincipale.toUpperCase()} 🔄</span>`;
         } else {
             armeContainer.innerHTML = ``;
         }
@@ -646,9 +691,9 @@ window.rafraichirForge = function() {
     const tagsDiv = document.getElementById("forge-active-tags");
     if (tagsDiv) {
         if (activeTags.size === 0) {
-            tagsDiv.innerHTML = `<span style="color: gray; font-size: 12px; font-style: italic;">Aucune caractéristique cible</span>`;
+            tagsDiv.innerHTML = `<span style="color: gray; font-size: 14px; font-style: italic;">Aucune caractéristique cible</span>`;
         } else {
-            tagsDiv.innerHTML = Array.from(activeTags).map(t => `<span style="background: #9333ea; color: white; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 1px;">[${t}]</span>`).join("");
+            tagsDiv.innerHTML = Array.from(activeTags).map(t => `<span style="background: #9333ea; color: white; padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: bold; letter-spacing: 1px;">[${t}]</span>`).join("");
         }
     }
 
@@ -669,11 +714,11 @@ window.rafraichirForge = function() {
     conteneurCarte.innerHTML = "";
 
     const renderSelectMenu = (type, label, color, actionId) => {
-        if (type === "Physique" && window.forgeState.armePrincipale === "Magie") {
-            return "";
-        }
+        if (type === "Physique" && window.forgeState.armePrincipale === "Magie") return "";
 
-        let modsDispos = window.forgeState.effetsBDD.filter(e => e.Type_Mecanique === type || e.Type_Mecanique_2 === type);
+        let modsDispos = window.forgeState.effetsBDD.filter(e => 
+            (e.Type_Mecanique === type || e.Type_Mecanique_2 === type) && e.Nom !== "Durée +"
+        );
         let options = `<option value="">+ ${label}</option>`;
         
         let groupesMods = {};
@@ -682,7 +727,10 @@ window.rafraichirForge = function() {
             if (!isLocked) {
                 const carac = (mod.Modificateur && mod.Modificateur !== "AUCUN") ? mod.Modificateur.toUpperCase() : "GÉNÉRAL";
                 if (!groupesMods[carac]) groupesMods[carac] = [];
-                groupesMods[carac].push(`<option value="${mod.id}">${mod.Nom}</option>`);
+                
+                // Calcul de la fatigue pour l'affichage
+                const coutFatigue = parseFrenchFloat(mod.Cout_PT) * 5;
+                groupesMods[carac].push(`<option value="${mod.id}">${mod.Nom} (⚡ ${coutFatigue})</option>`);
             }
         });
 
@@ -702,14 +750,18 @@ window.rafraichirForge = function() {
             }
         });
 
-        return `<select ${capDepasse ? "disabled" : ""} style="font-size: 11px; font-weight: bold; color: ${color}; background: transparent; border: none; outline: none; cursor: ${capDepasse ? "not-allowed" : "pointer"}; max-width: 90px; opacity: ${capDepasse ? 0.4 : 1};" onchange="window.attacherModificateur(this, '${actionId}')">${options}</select>`;
+        return `<select ${capDepasse ? "disabled" : ""} style="font-size: 13px; font-weight: bold; color: ${color}; background: transparent; border: none; outline: none; cursor: ${capDepasse ? "not-allowed" : "pointer"}; max-width: 100px; opacity: ${capDepasse ? 0.4 : 1};" onchange="window.attacherModificateur(this, '${actionId}')">${options}</select>`;
     };
 
     if (window.forgeState.actions.length > 0) {
         window.forgeState.actions.forEach(act => {
 
             const isActMaxed = act.count >= getMaxStacks(act.baseEffet);
-            const btnPlusActDisabled = (isActMaxed || capDepasse) ? `disabled style="opacity: 0.3; cursor: not-allowed; border:none; background:none; font-weight:bold;"` : `style="color: green; cursor: pointer; border:none; background:none; font-weight:bold;"`;
+            const btnPlusActDisabled = (isActMaxed || capDepasse) ? `disabled style="opacity: 0.3; cursor: not-allowed; border:none; background:none; font-weight:bold; font-size:18px;"` : `style="color: green; cursor: pointer; border:none; background:none; font-weight:bold; font-size:18px;"`;
+
+            const baseHasDuree = parseFrenchFloat(act.baseEffet.Tours) > 0;
+            const currentBaseDuree = act.baseDuree || 0;
+            const btnPlusBaseDureeDisabled = (currentBaseDuree >= maxDureeStacks || capDepasse) ? `disabled style="opacity: 0.3; cursor: not-allowed; border:none; background:none; font-weight:bold; font-size:16px;"` : `style="color: green; cursor: pointer; border:none; background:none; font-weight:bold; font-size:16px;"`;
 
             let htmlMods = "";
             Object.keys(act.mods).forEach(modId => {
@@ -717,24 +769,38 @@ window.rafraichirForge = function() {
                 const modEff = window.forgeState.effetsBDD.find(e => e.id === modId);
 
                 const isModMaxed = modCount >= getMaxStacks(modEff);
-                const btnPlusModDisabled = (isModMaxed || capDepasse) ? `disabled style="opacity: 0.3; cursor: not-allowed; border:none; background:none; font-weight:bold;"` : `style="color: green; cursor: pointer; border:none; background:none; font-weight:bold;"`;
+                const btnPlusModDisabled = (isModMaxed || capDepasse) ? `disabled style="opacity: 0.3; cursor: not-allowed; border:none; background:none; font-weight:bold; font-size:16px;"` : `style="color: green; cursor: pointer; border:none; background:none; font-weight:bold; font-size:16px;"`;
 
                 let boutonEditerZone = "";
                 if (modEff.Nom === "Zone") {
-                    boutonEditerZone = `<button class="btn-parametres" style="padding: 2px 6px; font-size: 10px; margin-right: 5px; background: #3b82f6; color: white;" onclick="window.ouvrirEditeurZone('${act.idInst}')">Éditer</button>`;
+                    boutonEditerZone = `<button class="btn-parametres" style="padding: 3px 8px; font-size: 12px; margin-right: 5px; background: #3b82f6; color: white;" onclick="window.ouvrirEditeurZone('${act.idInst}')">Éditer</button>`;
                 }
+
+                const modHasDuree = parseFrenchFloat(modEff.Tours) > 0;
+                const currentModDuree = (act.modsDuree && act.modsDuree[modId]) || 0;
+                const btnPlusModDureeDisabled = (currentModDuree >= maxDureeStacks || capDepasse) ? `disabled style="opacity: 0.3; cursor: not-allowed; border:none; background:none; font-weight:bold; font-size:16px;"` : `style="color: green; cursor: pointer; border:none; background:none; font-weight:bold; font-size:16px;"`;
 
                 htmlMods += `
                     <div style="display: flex; justify-content: space-between; margin-left: 20px; padding: 4px 0;">
                         <div>
-                            <span style="color: gray;">↳</span> <b>${modEff.Nom}</b>
-                            ${modEff.Modificateur !== "AUCUN" ? `<span style="font-size: 10px; color: #9333ea;">[${modEff.Modificateur}]</span>` : ""}
-                            <div style="font-size: 11px; color: gray; margin-left: 15px;">${formatterTexteEffet(modEff, modCount)}</div>
+                            <span style="color: gray; font-size: 14px;">↳</span> <b style="font-size: 14px;">${modEff.Nom}</b>
+                            ${modEff.Modificateur !== "AUCUN" ? `<span style="font-size: 12px; color: #9333ea; font-weight: bold; margin-left: 4px;">[${modEff.Modificateur}]</span>` : ""}
+                            <div style="font-size: 13px; color: gray; margin-left: 15px;">
+                                ${formatterTexteEffet(modEff, modCount)}
+                                ${currentModDuree > 0 ? `<br><span style="color: #9333ea;">↳ ⏳ +${currentModDuree} Tour(s) (+${(currentModDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}
+                            </div>
                         </div>
-                        <div style="display: flex; gap: 5px; align-items: flex-start;">
+                        <div style="display: flex; gap: 6px; align-items: flex-start;">
+                            ${modHasDuree ? `
+                                <div style="display: flex; gap: 4px; align-items: center; background: rgba(147, 51, 234, 0.1); border-radius: 12px; padding: 3px 6px; margin-right: 5px;">
+                                    <button onclick="window.modifierDuree('${act.idInst}', '${modId}', -1)" style="border:none; background:none; color:red; font-weight:bold; cursor:pointer; font-size:16px;">-</button>
+                                    <span style="font-size:13px; font-weight:bold; color:#9333ea;" title="Augmenter la durée">⏳ ${currentModDuree}</span>
+                                    <button onclick="window.modifierDuree('${act.idInst}', '${modId}', 1)" ${btnPlusModDureeDisabled}>+</button>
+                                </div>
+                            ` : ""}
                             ${boutonEditerZone}
-                            <button onclick="window.modifierModCount('${act.idInst}', '${modId}', -1)" style="border:none; background:none; color:red; cursor:pointer; font-weight:bold;">-</button>
-                            <b>${modCount}</b>
+                            <button onclick="window.modifierModCount('${act.idInst}', '${modId}', -1)" style="border:none; background:none; color:red; cursor:pointer; font-weight:bold; font-size:16px;">-</button>
+                            <b style="font-size: 15px;">${modCount}</b>
                             <button onclick="window.modifierModCount('${act.idInst}', '${modId}', 1)" ${btnPlusModDisabled}>+</button>
                         </div>
                     </div>
@@ -742,21 +808,31 @@ window.rafraichirForge = function() {
             });
 
             conteneurCarte.innerHTML += `
-                <div style="margin-bottom: 15px; background: rgba(0,0,0,0.02); padding: 10px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.05);">
+                <div style="margin-bottom: 15px; background: rgba(0,0,0,0.02); padding: 12px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.05);">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                         <div>
-                            <b>• ${act.baseEffet.Nom}</b> ${act.baseEffet.Modificateur !== "AUCUN" ? `<span style="font-size: 10px; color: #9333ea;">[${act.baseEffet.Modificateur}]</span>` : ""}
-                            <div style="font-size: 11px; color: gray; margin-left: 10px;">${formatterTexteEffet(act.baseEffet, act.count)}</div>
+                            <b style="font-size: 16px;">• ${act.baseEffet.Nom}</b> ${act.baseEffet.Modificateur !== "AUCUN" ? `<span style="font-size: 12px; color: #9333ea; font-weight: bold; margin-left: 4px;">[${act.baseEffet.Modificateur}]</span>` : ""}
+                            <div style="font-size: 13px; color: gray; margin-left: 10px; margin-top: 2px;">
+                                ${formatterTexteEffet(act.baseEffet, act.count)}
+                                ${currentBaseDuree > 0 ? `<br><span style="color: #9333ea;">↳ ⏳ +${currentBaseDuree} Tour(s) (+${(currentBaseDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}
+                            </div>
                         </div>
-                        <div style="display: flex; gap: 8px; align-items: center; background: white; border: 1px solid rgba(0,0,0,0.1); border-radius: 12px; padding: 2px 5px;">
-                            <button onclick="window.modifierActionCount('${act.idInst}', -1)" style="border:none; background:none; color:red; font-weight:bold; cursor:pointer;">-</button>
-                            <b>${act.count}</b>
+                        <div style="display: flex; gap: 8px; align-items: center; background: white; border: 1px solid rgba(0,0,0,0.1); border-radius: 12px; padding: 4px 8px;">
+                            ${baseHasDuree ? `
+                                <div style="display: flex; gap: 4px; align-items: center; background: rgba(147, 51, 234, 0.1); border-radius: 12px; padding: 3px 6px; margin-right: 5px;">
+                                    <button onclick="window.modifierDuree('${act.idInst}', null, -1)" style="border:none; background:none; color:red; font-weight:bold; cursor:pointer; font-size:16px;">-</button>
+                                    <span style="font-size:14px; font-weight:bold; color:#9333ea;" title="Augmenter la durée">⏳ ${currentBaseDuree}</span>
+                                    <button onclick="window.modifierDuree('${act.idInst}', null, 1)" ${btnPlusBaseDureeDisabled}>+</button>
+                                </div>
+                            ` : ""}
+                            <button onclick="window.modifierActionCount('${act.idInst}', -1)" style="border:none; background:none; color:red; font-weight:bold; cursor:pointer; font-size:18px;">-</button>
+                            <b style="font-size: 18px;">${act.count}</b>
                             <button onclick="window.modifierActionCount('${act.idInst}', 1)" ${btnPlusActDisabled}>+</button>
                         </div>
                     </div>
                     ${htmlMods}
 
-                    <div style="display: flex; gap: 15px; margin-left: 20px; margin-top: 10px; padding-top: 5px; border-top: 1px dashed rgba(0,0,0,0.1);">
+                    <div style="display: flex; gap: 15px; margin-left: 20px; margin-top: 12px; padding-top: 8px; border-top: 1px dashed rgba(0,0,0,0.1);">
                         ${renderSelectMenu("Spatial", "Spatial", "#3b82f6", act.idInst)}
                         ${renderSelectMenu("Physique", "Physique", "#ef4444", act.idInst)}
                         ${renderSelectMenu("Magique", "Magique", "#a855f7", act.idInst)}
@@ -794,7 +870,9 @@ window.sauvegarderCompetence = async function() {
             baseEffetId: a.baseEffet.id,
             count: a.count,
             mods: { ...a.mods },
-            zoneHexes: a.zoneHexes || []
+            zoneHexes: a.zoneHexes || [],
+            baseDuree: a.baseDuree || 0,
+            modsDuree: { ...(a.modsDuree || {}) }
         }))
     };
 
