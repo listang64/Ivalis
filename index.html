@@ -364,6 +364,12 @@
       </button>
       <br><br>
 
+      <!-- NOUVEAU : BOUTON RACES DU MONDE -->
+      <button class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); window.ouvrirGestionRaces()">
+        Races de l'Univers
+      </button>
+      <br><br>
+
       <!-- NOUVEAU : BOUTON ARCHIVAGE -->
       <button class="btn-parametres btn-supprimer" style="width: 80%; padding: 15px; border-color: #ff4c4c;" onclick="jouerSonClic(); window.archiverSessionEtViderChat()">
         Clôturer & Vider le Chat
@@ -436,6 +442,33 @@
           <tbody id="tbody-effets"></tbody>
         </table>
         <button class="btn-parametres" style="margin-top: 15px;" onclick="jouerSonClic(); window.ajouterLigneEffetVide()">+ Nouvel Effet Vierge</button>
+      </div>
+    </div>
+
+    <!-- ======================================================= -->
+    <!-- FENÊTRE DE GESTION DES RACES (BDD)                      -->
+    <!-- ======================================================= -->
+    <div id="etape-gestion-races" class="fenetre-volante-parchemin-large fondu-interne" style="display: none; opacity: 0;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #5c3a21; margin-bottom: 10px; padding-bottom: 10px;">
+        <h2 style="margin: 0; border: none; padding: 0;">Grimoire des Races</h2>
+        <button class="btn-parametres" onclick="jouerSonClic(); window.fermerGestionRaces()">Retour</button>
+      </div>
+      
+      <div id="chargement-races" style="font-style: italic;">Lecture des anciens grimoires...</div>
+      
+      <div id="conteneur-table-races" style="display: none; max-height: 70vh; overflow-y: auto;">
+        <table class="table-effets-ivalis">
+          <thead>
+            <tr>
+              <th style="width: 20%;">Nom de la Race</th>
+              <th style="width: 35%;">Descriptif Physique</th>
+              <th style="width: 35%;">Place dans le Monde</th>
+              <th style="width: 10%; text-align: center;">Action</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-races"></tbody>
+        </table>
+        <button class="btn-parametres" style="margin-top: 15px;" onclick="jouerSonClic(); window.ajouterLigneRaceVide()">+ Nouvelle Race Vierge</button>
       </div>
     </div>
 
@@ -766,6 +799,40 @@
   </div>
 
   <!-- ======================================================= -->
+  <!-- WIZARD CREATION ETAPE 0 (SÉLECTION RACE ET GENRE)       -->
+  <!-- ======================================================= -->
+  <div id="ecran-selection-race" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 10000; background-color: #0a0a0a;">
+      <!-- L'image de fond déformable (object-fit: fill) -->
+      <img id="bg-selection-race" src="" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: fill; z-index: 1;">
+      
+      <!-- Léger voile dégradé pour que les boutons et onglets restent bien lisibles -->
+      <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, rgba(0,0,0,0) 40%, rgba(0,0,0,0.85) 100%); z-index: 2;"></div>
+
+      <!-- Onglets des 7 races -->
+      <div id="onglets-races" style="position: absolute; top: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 3; flex-wrap: wrap; justify-content: center; width: 90%;">
+          <button class="onglet-race actif" onclick="jouerSonClic(); window.changerRaceSelection('Humain')">Les Humains</button>
+          <button class="onglet-race" onclick="jouerSonClic(); window.changerRaceSelection('Ondari')">Les Ondaris</button>
+          <button class="onglet-race" onclick="jouerSonClic(); window.changerRaceSelection('Vargen')">Les Vargens</button>
+          <button class="onglet-race" onclick="jouerSonClic(); window.changerRaceSelection('Ankylar')">Les Ankylars</button>
+          <button class="onglet-race" onclick="jouerSonClic(); window.changerRaceSelection('Ophior')">Les Ophiors</button>
+          <button class="onglet-race" onclick="jouerSonClic(); window.changerRaceSelection('Gob')">Les Gobs</button>
+          <button class="onglet-race" onclick="jouerSonClic(); window.changerRaceSelection('Ethéré')">Les Ethérés</button>
+      </div>
+
+      <!-- Bouton de Fermeture -->
+      <button class="btn-fermer-fiche" style="position: absolute; top: 30px; right: 40px; z-index: 4; font-size: 50px; text-shadow: 2px 2px 5px black;" onclick="jouerSonClic(); window.fermerSelectionRace()">X</button>
+
+      <!-- Titre de la race (Pour l'immersion) -->
+      <h1 id="titre-race-selection" style="position: absolute; top: 12vh; left: 50%; transform: translateX(-50%); color: #e8d5a5; font-family: 'Cinzel', serif; font-size: 65px; text-shadow: 2px 2px 15px black, 0 0 20px rgba(0,0,0,0.8); z-index: 3; text-transform: uppercase; letter-spacing: 5px;">Les Humains</h1>
+
+      <!-- Sélection du genre avec les symboles -->
+      <div style="position: absolute; bottom: 8vh; left: 50%; transform: translateX(-50%); display: flex; gap: 120px; z-index: 3;">
+          <button class="btn-genre-selection" onclick="window.validerRaceEtGenre('Male')" title="Mâle">♂</button>
+          <button class="btn-genre-selection" onclick="window.validerRaceEtGenre('Femelle')" title="Femelle">♀</button>
+      </div>
+  </div>
+
+  <!-- ======================================================= -->
   <!-- NOUVEAU : WIZARD CREATION ETAPE 1 (DESCRIPTIF)          -->
   <!-- ======================================================= -->
   <div id="modale-creation-hero" class="modale-parchemin-jeu" style="display: none; z-index: 200; width: 850px; max-width: 95vw; max-height: 85vh; overflow-y: auto; overflow-x: hidden;">
@@ -787,6 +854,12 @@
             <select class="input-perso" id="champ-race">
               <option value="">-- Choisir --</option>
               <option value="Humain">Humain</option>
+              <option value="Ondari">Ondari</option>
+              <option value="Vargen">Vargen</option>
+              <option value="Ankylar">Ankylar</option>
+              <option value="Ophior">Ophior</option>
+              <option value="Gob">Gob</option>
+              <option value="Ethéré">Ethéré</option>
             </select>
           </div>
           <div class="champ-formulaire">

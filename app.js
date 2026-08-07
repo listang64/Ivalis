@@ -3728,6 +3728,120 @@ window.executerVoyage = async function(idHex, joursDeVoyage) {
 };
 
 // =========================================================================
+//  GESTION DES RACES DU MONDE
+// =========================================================================
+
+window.ouvrirGestionRaces = async function() {
+    const menuLat = document.getElementById('menu-lateral');
+    if (menuLat) menuLat.style.display = 'none';
+
+    naviguerFenetre('etape-menu-outils', 'etape-gestion-races');
+    document.getElementById("chargement-races").style.display = "block";
+    document.getElementById("conteneur-table-races").style.display = "none";
+    await window.chargerTableauRaces();
+};
+
+window.fermerGestionRaces = function() {
+    const menuLat = document.getElementById('menu-lateral');
+    if (menuLat) menuLat.style.display = 'flex';
+    naviguerFenetre('etape-gestion-races', 'etape-menu-outils');
+};
+
+window.chargerTableauRaces = async function() {
+    const tbody = document.getElementById("tbody-races");
+    tbody.innerHTML = "";
+    
+    try {
+        const q = query(collection(db, "Monde_Races"));
+        const snap = await getDocs(q);
+        
+        let racesList = [];
+        snap.forEach(docSnap => {
+            racesList.push({ id: docSnap.id, data: docSnap.data() });
+        });
+        
+        // Tri alphabétique sur le nom
+        racesList.sort((a, b) => {
+            let nomA = a.data.Nom || "";
+            let nomB = b.data.Nom || "";
+            return nomA.localeCompare(nomB);
+        });
+
+        racesList.forEach(item => {
+            window.ajouterLigneRaceHTML(item.id, item.data);
+        });
+
+        document.getElementById("chargement-races").style.display = "none";
+        document.getElementById("conteneur-table-races").style.display = "block";
+
+    } catch (e) {
+        console.error("Erreur chargement races :", e);
+        document.getElementById("chargement-races").innerText = "Interférence magique lors de la lecture.";
+    }
+};
+
+window.ajouterLigneRaceHTML = function(id, data = {}) {
+    const d = {
+        Nom: data.Nom || "",
+        Descriptif_Physique: data.Descriptif_Physique || "",
+        Place_Monde: data.Place_Monde || ""
+    };
+
+    const tbody = document.getElementById("tbody-races");
+    const tr = document.createElement("tr");
+    tr.id = `ligne-race-${id}`;
+
+    // Note : On utilise textarea pour permettre de rédiger du lore tranquillement
+    tr.innerHTML = `
+        <td><input type="text" id="race-nom-${id}" value="${d.Nom.replace(/"/g, '&quot;')}" placeholder="Nom de la race"></td>
+        <td><textarea id="race-phys-${id}" placeholder="Physiologie, durée de vie...">${d.Descriptif_Physique}</textarea></td>
+        <td><textarea id="race-place-${id}" placeholder="Culture, royaumes majeurs...">${d.Place_Monde}</textarea></td>
+        <td style="text-align: center; vertical-align: middle;">
+            <button class="btn-sauver-ligne" onclick="jouerSonClic(); window.sauvegarderRaceLigne('${id}')">💾</button>
+            <button class="btn-sauver-ligne" style="background-color: darkred; margin-top:5px; padding:2px;" onclick="jouerSonClic(); window.supprimerRaceLigne('${id}')">🗑️</button>
+        </td>
+    `;
+    tbody.appendChild(tr);
+};
+
+window.sauvegarderRaceLigne = async function(id) {
+    const btn = document.querySelector(`#ligne-race-${id} .btn-sauver-ligne`);
+    if (btn) btn.innerText = "⏳";
+
+    const newData = {
+        Nom: document.getElementById(`race-nom-${id}`).value.trim(),
+        Descriptif_Physique: document.getElementById(`race-phys-${id}`).value.trim(),
+        Place_Monde: document.getElementById(`race-place-${id}`).value.trim()
+    };
+
+    try {
+        await setDoc(doc(db, "Monde_Races", id), newData, { merge: true });
+        if (btn) {
+            btn.innerText = "✔️"; btn.style.backgroundColor = "#00ffff"; btn.style.color = "#000";
+            setTimeout(() => { btn.innerText = "💾"; btn.style.backgroundColor = "#1b6e3a"; btn.style.color = "white"; }, 1500);
+        }
+    } catch (e) {
+        console.error("Erreur sauvegarde race :", e);
+        if (btn) btn.innerText = "✖️";
+    }
+};
+
+window.supprimerRaceLigne = async function(id) {
+    if(!confirm("Détruire définitivement cette race de l'univers d'Ivalis ?")) return;
+    try {
+        await deleteDoc(doc(db, "Monde_Races", id));
+        document.getElementById(`ligne-race-${id}`).remove();
+    } catch(e) { alert("Échec de la suppression."); }
+};
+
+window.ajouterLigneRaceVide = function() {
+    const nouvelId = "RACE_" + Math.random().toString(36).substring(2, 9);
+    window.ajouterLigneRaceHTML(nouvelId);
+    const conteneur = document.getElementById("conteneur-table-races");
+    conteneur.scrollTop = conteneur.scrollHeight;
+};
+
+// =========================================================================
 //  EXPOSITION DES FONCTIONS AU SCOPE GLOBAL
 //  (necessaire car index.html utilise des handlers inline onclick="...",
 //   or un <script type="module"> a sa propre portee.)
@@ -3768,6 +3882,14 @@ Object.assign(window, {
   sauvegarderEffetLigne: window.sauvegarderEffetLigne,
   ajouterLigneEffetVide: window.ajouterLigneEffetVide,
   supprimerEffetLigne: window.supprimerEffetLigne,
+  // Gestion des Races
+  ouvrirGestionRaces: window.ouvrirGestionRaces,
+  fermerGestionRaces: window.fermerGestionRaces,
+  chargerTableauRaces: window.chargerTableauRaces,
+  ajouterLigneRaceHTML: window.ajouterLigneRaceHTML,
+  sauvegarderRaceLigne: window.sauvegarderRaceLigne,
+  ajouterLigneRaceVide: window.ajouterLigneRaceVide,
+  supprimerRaceLigne: window.supprimerRaceLigne,
   // Gestion de la Date
   ouvrirGestionDate, fermerGestionDate, modifierJoursAAjouter, validerChangementDate, demarrerDefilementJours, arreterDefilementJours,
   // Grille Hexagonale & Pion

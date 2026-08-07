@@ -1,12 +1,59 @@
 // =========================================================================
-//  IVALIS - MODULE DE CRÉATION DE HÉROS (WIZARD ÉTAPE 1)
+//  IVALIS - MODULE DE CRÉATION DE HÉROS (WIZARD ÉTAPE 0 & 1)
 // =========================================================================
 
 import { db } from "./firebase-config.js";
 import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
+window.RACE_SELECTIONNEE_TEMP = "Humain"; // Par défaut
+
+// --- ÉTAPE 0 : LE NOUVEL ÉCRAN DE SÉLECTION DE LA RACE ---
 window.ouvrirCreationHero = function() {
-    // Nettoyage de la modale
+    // On ouvre le grand écran en forçant l'affichage sur les Humains au démarrage
+    window.changerRaceSelection('Humain');
+    document.getElementById("ecran-selection-race").style.display = "block";
+};
+
+window.fermerSelectionRace = function() {
+    document.getElementById("ecran-selection-race").style.display = "none";
+};
+
+window.changerRaceSelection = function(race) {
+    window.RACE_SELECTIONNEE_TEMP = race;
+
+    // 1. Mise à jour visuelle des onglets
+    const boutons = document.querySelectorAll("#onglets-races .onglet-race");
+    boutons.forEach(btn => {
+        if (btn.innerText.toLowerCase().includes(race.toLowerCase())) {
+            btn.classList.add("actif");
+        } else {
+            btn.classList.remove("actif");
+        }
+    });
+
+    // 2. Mise à jour du grand titre
+    const titre = document.getElementById("titre-race-selection");
+    if (titre) titre.innerText = "Les " + race + "s"; // Gère le pluriel automatiquement
+
+    // 3. Mise à jour de l'image de fond (object-fit gèrera la déformation)
+    const bgImage = document.getElementById("bg-selection-race");
+    if (race === "Humain") {
+        bgImage.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786114507/Les_humains_h0ubwh.png";
+        bgImage.style.backgroundColor = "transparent";
+    } else {
+        // En attendant d'avoir les images des autres races, on met un fond noir propre
+        bgImage.src = "";
+        bgImage.style.backgroundColor = "#0a0a0a"; 
+    }
+};
+
+window.validerRaceEtGenre = function(genre) {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    
+    // 1. On ferme le grand écran de sélection des races
+    window.fermerSelectionRace();
+
+    // 2. Nettoyage de la modale descriptive (Étape 1 classique)
     const modale = document.getElementById("modale-creation-hero");
     const inputs = modale.querySelectorAll(".input-perso");
     inputs.forEach(input => {
@@ -15,9 +62,18 @@ window.ouvrirCreationHero = function() {
     });
     document.getElementById("champ-couleur-token").value = "#2a1a0f";
 
+    // --- AUTO-REMPLISSAGE DES CHAMPS SELECTIONNÉS ---
+    document.getElementById("champ-race").value = window.RACE_SELECTIONNEE_TEMP;
+    document.getElementById("champ-genre").value = genre;
+
+    // 3. Ouverture de la modale classique d'identité
     document.getElementById("overlay-jeu-modale").style.display = "block";
     modale.style.display = "block";
 };
+
+// =========================================================================
+// ÉTAPE 1 : LE FORMULAIRE CLASSIQUE
+// =========================================================================
 
 window.fermerCreationHero = function() {
     document.getElementById("modale-creation-hero").style.display = "none";
