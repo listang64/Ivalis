@@ -852,9 +852,18 @@
       <div>
         <div class="bloc-formulaire">
           <h4>Identité</h4>
-          <div class="champ-formulaire"><label>Prénom du héros</label><input type="text" class="input-perso" id="champ-prenom"></div>
+          <!-- Retrait de Prénom, on ne garde que le Nom du héros -->
           <div class="champ-formulaire"><label>Nom du héros</label><input type="text" class="input-perso" id="champ-nom"></div>
-          <div class="champ-formulaire"><label>Âge apparent</label><input type="text" class="input-perso" id="champ-age"></div>
+          <div class="champ-formulaire">
+            <label>Âge apparent</label>
+            <select class="input-perso" id="champ-age">
+              <option value="">-- Choisir --</option>
+              <option value="Jeune">Jeune</option>
+              <option value="Adolescent">Adolescent</option>
+              <option value="Âge mûr">Âge mûr</option>
+              <option value="Âge avancé">Âge avancé</option>
+            </select>
+          </div>
           <div class="champ-formulaire">
             <label>Race</label>
             <select class="input-perso" id="champ-race" disabled style="background-color: #d1c1a3; color: #5c3a21; cursor: not-allowed; opacity: 0.8;">
@@ -880,14 +889,34 @@
         </div>
         <div class="bloc-formulaire">
           <h4>Visage</h4>
-          <div class="champ-formulaire"><label>Couleur et coupe de cheveux</label><input type="text" class="input-perso" id="champ-cheveux"></div>
+          <!-- Ajout de l'ID groupe-cheveux -->
+          <div class="champ-formulaire" id="groupe-cheveux"><label>Couleur et coupe de cheveux</label><input type="text" class="input-perso" id="champ-cheveux"></div>
           <div class="champ-formulaire"><label>Yeux</label><input type="text" class="input-perso" id="champ-yeux"></div>
-          <div class="champ-formulaire"><label>Pilosité faciale</label><input type="text" class="input-perso" id="champ-pilosite"></div>
+          <!-- Ajout de l'ID groupe-pilosite -->
+          <div class="champ-formulaire" id="groupe-pilosite"><label>Pilosité faciale</label><input type="text" class="input-perso" id="champ-pilosite"></div>
         </div>
         <div class="bloc-formulaire">
           <h4>Détails</h4>
-          <div class="champ-formulaire"><label>Signes distinctifs</label><input type="text" class="input-perso" id="champ-signes"></div>
-          <div class="champ-formulaire"><label>Expression du visage</label><input type="text" class="input-perso" id="champ-expression"></div>
+          <div class="champ-formulaire"><label>Signes distinctifs et accessoires</label><input type="text" class="input-perso" id="champ-signes"></div>
+          <div class="champ-formulaire">
+            <label>Expression du visage</label>
+            <select class="input-perso" id="champ-expression">
+              <option value="">-- Choisir --</option>
+              <option value="Neutre">Neutre</option>
+              <option value="Souriant">Souriant</option>
+              <option value="Joyeux">Joyeux</option>
+              <option value="Déterminé">Déterminé</option>
+              <option value="Confiant">Confiant</option>
+              <option value="Pensif">Pensif</option>
+              <option value="Méfiant">Méfiant</option>
+              <option value="Agacé">Agacé</option>
+              <option value="En colère">En colère</option>
+              <option value="Triste">Triste</option>
+              <option value="Effrayé">Effrayé</option>
+              <option value="Surpris">Surpris</option>
+              <option value="Furieux">Furieux</option>
+            </select>
+          </div>
         </div>
       </div>
       <div>
@@ -899,19 +928,37 @@
               <option value="">-- Choisir --</option><option value="Tres maigre">Très maigre</option><option value="Maigre">Maigre</option><option value="Normal">Normal</option><option value="Athletique">Athlétique</option><option value="Obese">Obèse</option>
             </select>
           </div>
-          <div class="champ-formulaire">
-            <label>Taille</label>
-            <select class="input-perso" id="champ-taille">
-              <option value="">-- Choisir --</option><option value="Tres petit">Très petit</option><option value="Petit">Petit</option><option value="Normal">Normal</option><option value="Grand">Grand</option>
+          <!-- Retrait de la Taille -->
+          <div class="champ-formulaire" id="groupe-peau">
+            <label>Teint / Peau</label>
+            <select class="input-perso" id="champ-peau">
+              <option value="">-- Choisir --</option>
+              <option value="clair" style="background-color: #FFD4BA; color: #000;">Clair</option>
+              <option value="bronzé" style="background-color: #A6755E; color: #fff;">Bronzé</option>
+              <option value="foncé" style="background-color: #4C342A; color: #fff;">Foncé</option>
+              <option value="très foncé" style="background-color: #2E2019; color: #fff;">Très foncé</option>
             </select>
           </div>
-          <div class="champ-formulaire"><label>Teint / Peau</label><input type="text" class="input-perso" id="champ-peau"></div>
         </div>
         <div class="bloc-formulaire">
           <h4>Apparence</h4>
-          <div class="champ-formulaire"><label>Style vestimentaire</label><input type="text" class="input-perso" id="champ-style"></div>
+          <div class="champ-formulaire">
+            <label>Style vestimentaire</label>
+            <select class="input-perso" id="champ-style">
+              <option value="">-- Choisir --</option>
+              <option value="Tunique simple">Tunique simple</option>
+              <option value="Toge">Toge</option>
+              <option value="Pagne">Pagne</option>
+              <option value="Robe antique">Robe antique</option>
+              <option value="Habits de marchands">Habits de marchands</option>
+              <option value="Habits de chasseur">Habits de chasseur</option>
+              <option value="Habits du désert">Habits du désert</option>
+              <option value="Habit du nord">Habit du nord</option>
+              <option value="Tunique et jambière">Tunique et jambière</option>
+            </select>
+          </div>
           <div class="champ-formulaire"><label>Couleurs dominantes</label><input type="text" class="input-perso" id="champ-couleurs"></div>
-          <div class="champ-formulaire"><label>Équipement visible</label><input type="text" class="input-perso" id="champ-equipement"></div>
+          <!-- Retrait de l'Équipement visible -->
         </div>
         <div class="bloc-formulaire">
           <h4>Autres</h4>
@@ -919,16 +966,14 @@
             <label>Couleur du Token</label>
             <input type="color" class="input-perso input-couleur" id="champ-couleur-token" value="#2a1a0f" oninput="appliquerCouleurTheme(this.value)">
           </div>
-          <div class="champ-formulaire">
-            <label>Faction</label>
-            <select class="input-perso" id="champ-faction"><option value="">-- Chargement... --</option></select>
-          </div>
+          <!-- Retrait de la Faction -->
         </div>
       </div>
     </div>
 
+    <!-- Le bouton Valider mis à jour en Vert -->
     <div class="actions-formulaire" style="margin-top: 20px; display: flex; flex-wrap: wrap; justify-content: center; gap: 15px;">
-      <button id="btn-suivant-creation" class="btn-parametres" onclick="jouerSonClic(); window.validerEtapeDescriptif()">Étape Suivante : Caractéristiques</button>
+      <button id="btn-suivant-creation" class="btn-parametres" style="background-color: #1b6e3a; border-color: #0f4021;" onclick="jouerSonClic(); window.validerEtapeDescriptif()">Valider</button>
       
       <button id="btn-dev-skip-creation" class="btn-parametres" style="display: none; background-color: #ff4c4c; border-color: darkred;" onclick="jouerSonClic(); window.validerEtapeDescriptifRapide()">[DEV] Création Rapide (Sans IA)</button>
       

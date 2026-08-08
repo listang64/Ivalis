@@ -589,17 +589,23 @@ async function genererEtStockerPortrait(donnees) {
   // 2. Instruction de style additionnelle (Firestore)
   const instructionSupplementaire = await recupererInstructionStyle();
 
-  // 3. Construction du prompt (Contexte Antique Fantastique, Vue de 3/4 gauche, Plan américain, fond MAGENTA FLUO à la fin)
+  // 3. Construction du prompt (Dynamique et sécurisé)
+  let descriptionHero = `Il s'agit d'un héros de race ${donnees.race} et de genre ${donnees.genre}, d'âge apparent : ${donnees.age}. `;
+  
+  if (donnees.corpulence) descriptionHero += `Sa corpulence est ${donnees.corpulence}. `;
+  if (donnees.peau) descriptionHero += `Son teint de peau (ou écailles/carapace) est ${donnees.peau}. `;
+  if (donnees.cheveux) descriptionHero += `Ses cheveux sont ${donnees.cheveux}. `;
+  if (donnees.yeux) descriptionHero += `Ses yeux sont ${donnees.yeux}. `;
+  if (donnees.pilosite) descriptionHero += `Pilosité faciale : ${donnees.pilosite}. `;
+  if (donnees.expression) descriptionHero += `Son visage porte l'expression suivante : ${donnees.expression}. `;
+  if (donnees.signes) descriptionHero += `Signes distinctifs et accessoires : ${donnees.signes}. `;
+  if (donnees.style) descriptionHero += `Il est vêtu ainsi : ${donnees.style}. `;
+  if (donnees.couleursDom) descriptionHero += `Couleurs dominantes de la tenue : ${donnees.couleursDom}. `;
+
   const promptOpenAI =
     "Contexte de l'univers : Antique Fantastique (Mythic Ancient Fantasy, Antiquité Magique).\n\n" +
     "Description du personnage :\n" +
-    "Il s'agit d'un héros de genre " + donnees.genre + ", ayant environ " + donnees.age + " ans. " +
-    "Sa corpulence est " + donnees.corpulence + " et sa taille est " + donnees.taille + ". " +
-    "Son teint de peau est " + donnees.peau + ". Ses cheveux sont " + donnees.cheveux + " et il a les yeux " + donnees.yeux + ". " +
-    "Pilosité faciale : " + donnees.pilosite + ". " +
-    "Son visage porte l'expression suivante : " + donnees.expression + ", et on remarque ces signes distinctifs : " + donnees.signes + ".\n" +
-    "Il est vêtu ainsi : " + donnees.style + " avec une palette de couleurs dominantes " + donnees.couleursDom + ". " +
-    "Il porte l'équipement visible suivant : " + donnees.equipement + ".\n\n" +
+    descriptionHero + "\n\n" +
     "Directives de style artistique obligatoires : " + instructionSupplementaire + "\n\n" +
     "🛑 RÈGLE TECHNIQUE DÉFINITIVE (PRIORITAIRE SUR TOUT LE RESTE) : " +
     "Le personnage DOIT ÊTRE PLACÉ SUR UN FOND TOTALEMENT MAGENTA FLUO UNI (#FF00FF). " +
@@ -2062,6 +2068,7 @@ window.ajouterLigneEffetVide = function() {
 // =========================================================================
 function remplirSelectFactions(factions) {
   const select = document.getElementById("champ-faction");
+  if (!select) return;
   select.innerHTML = '<option value="">-- Aucune / Indépendant --</option>';
   factions.forEach((f) => {
     const opt = document.createElement("option");
