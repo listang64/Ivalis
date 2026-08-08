@@ -1589,32 +1589,39 @@ textarea.input-texte-parchemin {
 /* NOUVEL ÉCRAN DE SÉLECTION DE RACE (CRÉATION DE HÉROS)                     */
 /* ========================================================================= */
 .onglet-race {
-    background-color: rgba(42, 26, 15, 0.85);
-    color: #c2a878;
-    border: 2px solid #5c3a21;
-    padding: 12px 24px;
-    font-size: 20px;
+    background-color: rgba(255, 255, 255, 0.4); /* Voile interne très fin */
+    color: #1a0f08; /* Noir profond pour le texte */
+    border: none;
+    padding: 6px 18px; /* Bouton beaucoup moins épais */
+    font-size: 16px; /* Plus discret */
     font-weight: bold;
     cursor: pointer;
     font-family: 'Almendra', serif;
-    transition: all 0.3s ease;
-    border-radius: 8px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.8);
+    transition: all 0.4s ease;
+    border-radius: 30px; /* Forme très arrondie (pilule) */
+    
+    /* Le fameux Halo blanc diffus autour du bouton */
+    box-shadow: 0 0 15px 6px rgba(255, 255, 255, 0.5);
+    
+    /* La légère ombre portée noire pour détacher le texte */
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
 }
 
 .onglet-race:hover {
-    background-color: rgba(92, 58, 33, 0.95);
-    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.6);
+    box-shadow: 0 0 20px 8px rgba(255, 255, 255, 0.7);
     transform: translateY(-2px);
 }
 
 .onglet-race.actif {
-    background-color: #e8d5a5;
-    color: #2a1a0f;
-    box-shadow: 0 0 20px #e8d5a5;
-    border-color: #ffffff;
+    background-color: rgba(232, 213, 165, 0.6); /* Voile interne doré */
+    color: #1a0f08; /* Reste noir profond */
+    
+    /* Le Halo devient doré (#c2a878) lorsqu'il est sélectionné */
+    box-shadow: 0 0 20px 8px rgba(194, 168, 120, 0.7); 
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 .btn-genre-selection {
@@ -1640,4 +1647,60 @@ textarea.input-texte-parchemin {
     transform: scale(1.15);
     box-shadow: 0 0 50px #e8d5a5;
     border-color: #ffffff;
+}
+
+/* --- Conteneur des textes de la race (Création) --- */
+#conteneur-textes-race {
+    position: absolute;
+    top: 50%; /* Parfaitement centré verticalement */
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 45%; 
+    max-width: 700px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px; 
+    z-index: 3;
+}
+
+.boite-texte-race {
+    text-align: center;
+    color: #ffffff;
+    font-family: 'Almendra', serif;
+    font-size: 22px;
+    line-height: 1.5;
+    text-shadow: 2px 2px 5px black, 0 0 15px rgba(0,0,0,0.9);
+    background: rgba(10, 10, 10, 0.25); /* Encore plus transparent (0.25) */
+    padding: 20px 30px;
+    border-radius: 12px;
+    border: 1px solid rgba(194, 168, 120, 0.4); 
+    box-shadow: 0 0 10px rgba(0,0,0,0.3); /* Ombre encore plus douce */
+    margin: 0; 
+}
+
+/* NOUVEAU : La classe dédiée à la ligne de l'Atout */
+.atout-race {
+    margin-top: 15px;
+    font-size: 26px; /* Plus gros que le reste du texte (22px) */
+    line-height: 1.3;
+}
+
+/* Adaptation spéciale iPad / Tactile */
+@media (hover: none) and (pointer: coarse) {
+    #conteneur-textes-race {
+        width: 80%; 
+        top: 50%; 
+    }
+    .boite-texte-race {
+        font-size: 18px; 
+        padding: 15px 20px;
+    }
+    .atout-race {
+        font-size: 21px; /* Plus gros que le reste du texte iPad (18px) */
+        margin-top: 10px;
+    }
+    #titre-race-selection {
+        font-size: 45px !important;
+        top: 12vh !important;
+    }
 }
