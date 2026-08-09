@@ -2587,14 +2587,20 @@ window.fermerToutesLesFenetres = function() {
   const chatbox = document.getElementById('fenetre-chatbox');
   if (chatbox) chatbox.style.display = 'none';
 
+  // --- NOUVEAU : Fermer l'interface de combat ---
+  const fenetreCombat = document.getElementById('fenetre-combat');
+  if (fenetreCombat) fenetreCombat.style.display = 'none';
+
   document.querySelectorAll('.bulle-portrait-hover-joueur, .bulle-portrait-hover-mj').forEach(img => img.style.display = 'none');
 
   const menuLat = document.getElementById('menu-lateral');
   const menuNav = document.getElementById('menu-navigation-bas');
   const btnFermerChat = document.getElementById('btn-fermer-chat-nouveau');
+  const btnFermerCombat = document.getElementById('btn-fermer-combat');
   if (menuLat) menuLat.style.display = 'flex';
   if (menuNav) menuNav.style.display = 'flex';
   if (btnFermerChat) btnFermerChat.style.display = 'none';
+  if (btnFermerCombat) btnFermerCombat.style.display = 'none';
 
   // Fermer les personnages
   const menuPerso = document.getElementById('conteneur-liste-personnages');

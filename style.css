@@ -1704,3 +1704,27 @@ textarea.input-texte-parchemin {
         top: 12vh !important;
     }
 }
+
+/* ========================================================================= */
+/* MODE COMBAT : BOUTONS DE NAVIGATION DU HÉROS                              */
+/* ========================================================================= */
+.btn-combat-switch {
+    background: rgba(10, 10, 10, 0.5); 
+    color: #c2a878; 
+    border: 1px solid #5c3a21;
+    border-radius: 6px;
+    font-size: 10px;
+    cursor: pointer;
+    padding: 2px 9px;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+    backdrop-filter: blur(2px);
+}
+
+.btn-combat-switch:hover {
+    background: rgba(92, 58, 33, 0.8); 
+    color: #ffffff; 
+    border-color: #e8d5a5;
+    box-shadow: 0 0 10px rgba(194, 168, 120, 0.6);
+    transform: scale(1.05);
+}

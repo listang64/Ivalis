@@ -1295,11 +1295,20 @@ window.sauvegarderCompetence = async function() {
 // La fonction officielle qui détruit la carte visuellement
 window.masquerApercuCarteHD = function() {
     const conteneurCarte = document.getElementById("apercu-carte-hd-competence");
-    if (conteneurCarte) conteneurCarte.style.display = "none";
+    if (conteneurCarte) {
+        conteneurCarte.style.display = "none";
+        
+        // =========================================================
+        // NOUVEAU : RESET DE LA POSITION POUR LA FICHE PERSONNAGE
+        // =========================================================
+        conteneurCarte.style.left = "59vw";
+        conteneurCarte.style.top = "50%";
+        conteneurCarte.style.transform = "translateY(-50%)";
+    }
     
     window.CARTE_EN_APERCU = null;
     
-    // On enlève le halo Cyan sur toutes les bannières
+    // On enlève le halo Cyan sur toutes les bannières de la fiche perso
     document.querySelectorAll('.banniere-carte').forEach(el => {
         el.style.filter = "none";
     });

@@ -163,7 +163,7 @@
             <span class="texte-banniere">Rencontre</span>
           </div>
         </div>
-        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/combat_syxo0p.png" class="icone-menu" alt="Combat" onclick="jouerSonClic()">
+        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/combat_syxo0p.png" class="icone-menu" alt="Combat" onclick="jouerSonClic(); window.ouvrirCombat()">
       </div>
 
       <!-- BOUTON MISSIONS : JOURNAL -->
@@ -185,6 +185,36 @@
          style="display: none; position: fixed; top: 3vh; right: 1.5vw; width: 4vw; z-index: 10005;"
          onclick="window.afficherMenusDansChat()"
          title="Afficher l'interface">
+
+    <!-- Bouton pour quitter le mode Combat (Même design que celui du chat) -->
+    <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1783264616/A39F53B8-528E-4052-92AD-E9EDC3F700EB_lbr2mo.png"
+         id="btn-fermer-combat"
+         class="icone-menu"
+         style="display: none; position: fixed; top: 3vh; right: 1.5vw; width: 4vw; z-index: 10005;"
+         onclick="window.fermerCombat()"
+         title="Quitter la rencontre">
+
+    <!-- L'INTERFACE DE COMBAT -->
+    <div id="fenetre-combat" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 65; background-color: #1a1a1a; pointer-events: auto;">
+        
+        <!-- UI GAUCHE : Nom, Sélecteur et Compétences -->
+        <div style="position: absolute; top: 3vh; left: 3vw; display: flex; flex-direction: column; align-items: flex-start; gap: 8px;">
+            <div id="combat-nom-perso" style="font-family: 'Cinzel', serif; font-size: 38px; font-weight: bold; text-shadow: 2px 2px 4px black, 0 0 10px rgba(0,0,0,0.8); text-transform: uppercase; letter-spacing: 2px;">
+                <!-- Rempli par JavaScript -->
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-left: 5px;">
+                <button class="btn-combat-switch" onclick="window.changerPersoCombat(-1)" title="Héros précédent">◄</button>
+                <button class="btn-combat-switch" onclick="window.changerPersoCombat(1)" title="Héros suivant">►</button>
+            </div>
+
+            <!-- Zone d'affichage des bannières de combat -->
+            <div id="combat-liste-competences" style="margin-top: 15px; display: flex; flex-direction: column; gap: 0; width: 100%;">
+                <!-- Rempli par JavaScript -->
+            </div>
+        </div>
+        
+    </div>
 
     <div id="menu-navigation-bas">
       <div class="conteneur-volume-nav">
@@ -742,6 +772,7 @@
 <script type="module" src="creation_personnage.js"></script>
 <script type="module" src="recit_dynamique.js"></script>
 <script type="module" src="competences.js"></script>
+<script type="module" src="combat.js"></script>
 
 <div id="overlay-jet-des" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 5000; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
     
