@@ -185,23 +185,20 @@ window.validerEtapeDescriptif = async function() {
     if (nom === "") { alert("Le héros doit posséder un nom."); return; }
 
     // =========================================================
-    // CORRECTION DE L'ÉCRAN DE CHARGEMENT
+    // NOUVEAU : ON FERME LA MODALE IMMÉDIATEMENT AVANT LE CHARGEMENT
     // =========================================================
+    window.fermerCreationHero();
+
     const ecranLoad = document.getElementById("ecran-chargement-ia");
     const imgLoad = document.getElementById("image-chargement-ia");
     const titreLoad = document.getElementById("titre-chargement-ia");
     
     if (ecranLoad) {
-        ecranLoad.style.zIndex = "15000"; // On le force à passer par-dessus TOUT
+        ecranLoad.style.zIndex = "15000"; 
         ecranLoad.style.display = "flex";
     }
-    // On s'assure que c'est bien ton image d'incantation et non celle du voyage
     if (imgLoad) imgLoad.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781698939/ecran_chergement_personnage_nwimhq.png";
     if (titreLoad) titreLoad.innerText = "Création de personnage en cours ...";
-
-    const btn = document.getElementById("btn-suivant-creation");
-    btn.innerText = "Génération...";
-    btn.style.pointerEvents = "none";
 
     const donnees = {
         idPartie: window.ID_PARTIE_COURANTE,
@@ -243,7 +240,6 @@ window.validerEtapeDescriptif = async function() {
         document.getElementById("champ-id-personnage").setAttribute("data-url", resultatServeur.url);
         document.getElementById("titre-nom-personnage").innerText = nom;
         
-        window.fermerCreationHero();
         if (ecranLoad) ecranLoad.style.display = "none";
         
         window.ouvrirModaleCreationCaracs(resultatServeur.id);
@@ -251,9 +247,6 @@ window.validerEtapeDescriptif = async function() {
         console.error("Erreur de création :", e);
         alert("Une interférence magique a bloqué la création.");
         if (ecranLoad) ecranLoad.style.display = "none";
-    } finally {
-        btn.innerText = "Valider";
-        btn.style.pointerEvents = "auto";
     }
 };
 
@@ -261,9 +254,10 @@ window.validerEtapeDescriptifRapide = async function() {
     const nom = document.getElementById("champ-nom").value.trim();
     if (nom === "") { alert("Le héros doit posséder un nom."); return; }
 
-    const btn = document.getElementById("btn-dev-skip-creation");
-    btn.innerText = "Création DEV...";
-    btn.style.pointerEvents = "none";
+    // =========================================================
+    // NOUVEAU : ON FERME LA MODALE IMMÉDIATEMENT
+    // =========================================================
+    window.fermerCreationHero();
 
     const donnees = {
         idPartie: window.ID_PARTIE_COURANTE,
@@ -288,15 +282,10 @@ window.validerEtapeDescriptifRapide = async function() {
         document.getElementById("champ-id-personnage").setAttribute("data-url", "");
         document.getElementById("titre-nom-personnage").innerText = nom;
         
-        window.fermerCreationHero();
         window.ouvrirModaleCreationCaracs(resultatServeur.id);
-
     } catch (e) {
         console.error("Erreur de création DEV :", e);
         alert("Une interférence a bloqué la création rapide.");
-    } finally {
-        btn.innerText = "[DEV] Création Rapide (Sans IA)";
-        btn.style.pointerEvents = "auto";
     }
 };
 
