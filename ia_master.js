@@ -404,7 +404,7 @@ async function detourerFondMagentaPNJ(imageSource) {
 // =========================================================================
 //  NOUVEAU : MIA_PNJ (Création procédurale de PNJ nommés avec Détourage)
 // =========================================================================
-async function genererEtStockerImagePNJ(descriptionPhysique) {
+async function genererEtStockerImagePNJ(descriptionPhysique, racePNJ = "Humain") {
     const cles = {
         openai: localStorage.getItem("ivalis_OPENAI_API_KEY")?.trim(),
         cloudName: localStorage.getItem("ivalis_CLOUDINARY_CLOUD_NAME")?.trim(),
@@ -413,21 +413,53 @@ async function genererEtStockerImagePNJ(descriptionPhysique) {
     };
     if (!cles.openai || !cles.cloudName || !cles.cloudKey || !cles.cloudSecret) return "";
 
-    console.log("🎨 [MIA_PNJ] Incantation du portrait pour le nouveau PNJ...");
+    console.log(`🎨 [MIA_PNJ] Incantation du portrait pour le nouveau PNJ (${racePNJ})...`);
     
     const instructionStyle = await recupererInstructionStyleBackend();
-    
-    // NOUVEAU PROMPT : Le contexte Médiéval Fantastique ouvre le bal !
-    const promptOpenAI = 
-        "Contexte de l'univers : Antique Fantastique (Mythic Ancient Fantasy, Antiquité Magique).\n\n" +
-        "Description du personnage : " + descriptionPhysique + "\n\n" +
-        "Directives de style artistique : " + instructionStyle + "\n\n" +
-        "🛑 RÈGLE TECHNIQUE DÉFINITIVE (PRIORITAIRE SUR TOUT LE RESTE) : " +
-        "Le personnage DOIT ÊTRE PLACÉ SUR UN FOND TOTALEMENT MAGENTA FLUO UNI (#FF00FF). " +
-        "Il est STRICTEMENT INTERDIT de dessiner un décor, un paysage, un intérieur, une ombre au sol ou un dégradé. " +
-        "Même si la description du personnage mentionne un lieu ou des objets environnants, IGNORE LE DÉCOR. " +
-        "Remplis tout l'espace vide autour et derrière le personnage avec du magenta fluo pur. " +
-        "Le personnage doit être vu de trois quart, regardant vers la gauche, cadré en plan américain (coupé aux genoux). Ne dessine aucun texte.";
+
+    // =====================================================================
+    // 1. Récupération du descriptif physique de la race depuis le Grimoire
+    // =====================================================================
+    let loreRace = "";
+    if (racePNJ && racePNJ.toLowerCase() !== "humain") {
+        try {
+            const qRace = query(collection(db, "Monde_Races"));
+            const snapRace = await getDocs(qRace);
+            
+            // On ignore la casse et les accents pour la comparaison
+            const normaliser = (str) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const nomCherche = normaliser(racePNJ);
+
+            snapRace.forEach(docSnap => {
+                const dataRace = docSnap.data();
+                if (dataRace.Nom && normaliser(dataRace.Nom).includes(nomCherche)) {
+                    loreRace = dataRace.Descriptif_Physique || "";
+                }
+            });
+        } catch (e) {
+            console.error("[MIA_PNJ] Erreur récupération du lore de la race :", e);
+        }
+    }
+
+    // =====================================================================
+    // 2. NOUVEAU PROMPT : Anatomie de base VS Spécificités du PNJ
+    // =====================================================================
+    let promptOpenAI = "Contexte de l'univers : Antique Fantastique (Mythic Ancient Fantasy, Antiquité Magique).\n\n";
+
+    if (loreRace !== "") {
+        promptOpenAI += `--- ANATOMIE DE BASE DE L'ESPÈCE (${racePNJ}) ---\n` +
+                        loreRace + "\n\n";
+    }
+
+    promptOpenAI += "--- SPÉCIFICITÉS UNIQUES DU PERSONNAGE (TRÈS IMPORTANT, PRIORITAIRE SUR L'ANATOMIE DE BASE) ---\n" +
+                    "Description du personnage : " + descriptionPhysique + "\n\n" +
+                    "Directives de style artistique : " + instructionStyle + "\n\n" +
+                    "🛑 RÈGLE TECHNIQUE DÉFINITIVE (PRIORITAIRE SUR TOUT LE RESTE) : " +
+                    "Le personnage DOIT ÊTRE PLACÉ SUR UN FOND TOTALEMENT MAGENTA FLUO UNI (#FF00FF). " +
+                    "Il est STRICTEMENT INTERDIT de dessiner un décor, un paysage, un intérieur, une ombre au sol ou un dégradé. " +
+                    "Même si la description du personnage mentionne un lieu ou des objets environnants, IGNORE LE DÉCOR. " +
+                    "Remplis tout l'espace vide autour et derrière le personnage avec du magenta fluo pur. " +
+                    "Le personnage doit être vu de trois quart, regardant vers la gauche, cadré en plan américain (coupé aux genoux). Ne dessine aucun texte.";
 
     // LE PAYLOAD (gpt-image-2 + PNG)
     const payloadOpenAI = { model: "gpt-image-2", prompt: promptOpenAI, output_format: "png", n: 1, size: "1024x1792", quality: "medium", moderation: "low" };
@@ -568,6 +600,20 @@ Si oui, utilise l'outil 'signalerNoms' pour lister leurs prénoms. Sinon, liste 
     }
 
     // =========================================================
+    // NOUVEAU : On récupère les races connues d'Ivalis
+    // =========================================================
+    let racesConnues = ["Humain"]; // Par défaut
+    try {
+        const qRaces = query(collection(db, "Monde_Races"));
+        const snapRaces = await getDocs(qRaces);
+        snapRaces.forEach(docSnap => {
+            if (docSnap.data().Nom) racesConnues.push(docSnap.data().Nom);
+        });
+    } catch (e) {
+        console.warn("[MIA_PNJ] Impossible de lire le Grimoire des Races :", e);
+    }
+
+    // =========================================================
     // ÉTAPE 2 : LE CRÉATEUR (Chaud, Aléatoire et Créatif)
     // =========================================================
     const temperatureAleatoire = parseFloat((Math.random() * (1.20 - 0.80) + 0.80).toFixed(2));
@@ -575,6 +621,7 @@ Si oui, utilise l'outil 'signalerNoms' pour lister leurs prénoms. Sinon, liste 
 
     const promptCreation = `Tu es MIA_PNJ, le forgeron d'âmes.
 Tu dois inventer les fiches détaillées de ces nouveaux personnages : ${JSON.stringify(nouveauxNomsDetectes)}.
+RACES OBLIGATOIRES À UTILISER DANS CET UNIVERS : ${racesConnues.join(", ")}. Tu dois choisir l'une de ces races pour chaque personnage.
 Assure-toi que tous les éléments de la fiche sont cohérents entre eux et adaptés à l'univers Antique Fantastique (Antiquité magique, mythologie).
 Utilise l'outil 'creerNouveauxPNJ' pour générer leurs fiches.`;
 
@@ -614,8 +661,8 @@ Utilise l'outil 'creerNouveauxPNJ' pour générer leurs fiches.`;
                 systemInstruction: { parts: [{ text: promptCreation }] },
                 contents: [{ role: "user", parts: [{ text: texteMJ }] }],
                 tools: outilsCreation, 
-                toolConfig: { functionCallingConfig: { mode: "ANY" } }, // ANY force l'IA à utiliser l'outil
-                generationConfig: { temperature: temperatureAleatoire } // 🔻 Température ALÉATOIRE
+                toolConfig: { functionCallingConfig: { mode: "ANY" } }, 
+                generationConfig: { temperature: temperatureAleatoire } 
             })
         });
 
@@ -627,6 +674,24 @@ Utilise l'outil 'creerNouveauxPNJ' pour générer leurs fiches.`;
             
             for (const pnj of nouveauxPNJs) {
                 if (nomsHeros.includes(pnj.nom)) continue; 
+
+                // =========================================================
+                // 🛡️ SÉCURITÉ ANTI-HALLUCINATION (Le Videur)
+                // On vérifie que la race choisie par l'IA existe VRAIMENT.
+                // =========================================================
+                let raceValidee = "Humain"; // Valeur de repli par défaut (lore-friendly)
+                if (pnj.race) {
+                    const normaliser = (str) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                    const raceTrouvee = racesConnues.find(r => normaliser(r) === normaliser(pnj.race));
+                    
+                    if (raceTrouvee) {
+                        raceValidee = raceTrouvee; // On sécurise avec l'orthographe exacte de la BDD
+                    } else {
+                        console.warn(`[MIA_PNJ] L'IA a tenté d'inventer la race '${pnj.race}'. Remplacement forcé par 'Humain'.`);
+                    }
+                }
+                pnj.race = raceValidee; // On écrase la donnée de l'IA par la donnée sécurisée
+                // =========================================================
 
                 const numAleatoire = Math.floor(Math.random() * 10000).toString().padStart(4, "0");
                 const nomFormate = pnj.nom.replace(/[^a-zA-Z0-9]/g, "_");
@@ -652,7 +717,9 @@ Utilise l'outil 'creerNouveauxPNJ' pour générer leurs fiches.`;
                     });
                 });
 
-                const urlImage = await genererEtStockerImagePNJ(pnj.physique);
+                // On transmet la race (maintenant 100% sécurisée) au générateur d'image !
+                const urlImage = await genererEtStockerImagePNJ(pnj.physique, pnj.race);
+                
                 if (urlImage) {
                     await updateDoc(doc(db, "Monde_PNJ", docId), { URL_Cloudinary: urlImage });
                 }
