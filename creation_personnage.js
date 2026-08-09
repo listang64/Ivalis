@@ -117,20 +117,58 @@ window.validerRaceEtGenre = function(genre) {
     modale.style.display = "block";
 };
 
-// NOUVELLE FONCTION : Gère l'affichage des champs selon la race
 window.adapterFormulaireRace = function(race) {
-    // Par défaut, on s'assure que tout est affiché
-    document.getElementById("groupe-cheveux").style.display = "flex";
-    document.getElementById("groupe-pilosite").style.display = "flex";
-    document.getElementById("groupe-peau").style.display = "flex";
+    // 1. Liste de TOUS les champs dynamiques (on cache tout par défaut)
+    const tousLesChamps = [
+        "groupe-cheveux", "groupe-yeux", "groupe-pilosite", "groupe-peau", "groupe-style",
+        "groupe-ecailles", "groupe-aretes", "groupe-pelage", "groupe-cornes",
+        "groupe-champignons", "groupe-ecorce", "groupe-peau-gob", "groupe-oreilles",
+        "groupe-masque", "groupe-colonne", "groupe-expression" // <-- Ajout ici
+    ];
 
-    // Exemple de préparation : Si c'est un reptile (Ankylar), on cache les cheveux et la barbe !
-    if (race === "Ankylar") {
-        document.getElementById("groupe-cheveux").style.display = "none";
-        document.getElementById("groupe-pilosite").style.display = "none";
-    }
+    tousLesChamps.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = "none";
+    });
+
+    // 2. Champs communs à (presque) tout le monde
+    document.getElementById("groupe-yeux").style.display = "flex";
+    document.getElementById("groupe-style").style.display = "flex";
+    document.getElementById("groupe-expression").style.display = "flex"; // <-- Ajout ici
+
+    // 3. Activation chirurgicale selon la race
+    if (race === "Humain") {
+        document.getElementById("groupe-cheveux").style.display = "flex";
+        document.getElementById("groupe-pilosite").style.display = "flex";
+        document.getElementById("groupe-peau").style.display = "flex";
     
-    // Tu pourras rajouter d'autres "else if" ici pour les Gobs, Ophiors, etc.
+    } else if (race === "Ondari") {
+        document.getElementById("groupe-ecailles").style.display = "flex";
+        document.getElementById("groupe-aretes").style.display = "flex";
+    
+    } else if (race === "Vargen") {
+        document.getElementById("groupe-pelage").style.display = "flex";
+        document.getElementById("groupe-cornes").style.display = "flex";
+    
+    } else if (race === "Ankylar") {
+        document.getElementById("groupe-yeux").style.display = "none"; 
+    
+    } else if (race === "Ophior") {
+        document.getElementById("groupe-champignons").style.display = "flex";
+        document.getElementById("groupe-ecorce").style.display = "flex";
+    
+    } else if (race === "Gob") {
+        document.getElementById("groupe-cheveux").style.display = "flex"; 
+        document.getElementById("groupe-style").style.display = "none"; 
+        document.getElementById("groupe-peau-gob").style.display = "flex";
+        document.getElementById("groupe-oreilles").style.display = "flex";
+    
+    } else if (race === "Ethéré") {
+        document.getElementById("groupe-masque").style.display = "flex";
+        document.getElementById("groupe-colonne").style.display = "flex";
+        document.getElementById("groupe-yeux").style.display = "none"; // <-- Ajout ici
+        document.getElementById("groupe-expression").style.display = "none"; // <-- Ajout ici
+    }
 };
 
 // =========================================================================
@@ -154,26 +192,35 @@ window.validerEtapeDescriptif = async function() {
     const donnees = {
         idPartie: window.ID_PARTIE_COURANTE,
         idJoueur: localStorage.getItem("ID_JOUEUR_COURANT"),
-        idPersonnage: "", // C'est un nouveau personnage
+        idPersonnage: "", 
         statut: "Vivant",
-        prenom: nom, // On passe le Nom dans "prenom" pour garantir la rétrocompatibilité parfaite de tes bases de données existantes
+        prenom: nom, 
         nom: "",
-        age: document.getElementById("champ-age").value.trim(),
+        age: document.getElementById("champ-age").value,
         race: document.getElementById("champ-race").value,
         genre: document.getElementById("champ-genre").value,
-        cheveux: document.getElementById("champ-cheveux").value.trim(),
-        yeux: document.getElementById("champ-yeux").value.trim(),
-        pilosite: document.getElementById("champ-pilosite").value.trim(),
+        cheveux: document.getElementById("champ-cheveux") ? document.getElementById("champ-cheveux").value.trim() : "",
+        yeux: document.getElementById("champ-yeux") ? document.getElementById("champ-yeux").value.trim() : "",
+        pilosite: document.getElementById("champ-pilosite") ? document.getElementById("champ-pilosite").value.trim() : "",
         signes: document.getElementById("champ-signes").value.trim(),
         expression: document.getElementById("champ-expression").value,
         corpulence: document.getElementById("champ-corpulence").value,
-        taille: "",
-        peau: document.getElementById("champ-peau").value,
-        style: document.getElementById("champ-style").value,
+        peau: document.getElementById("champ-peau") ? document.getElementById("champ-peau").value : "",
+        style: document.getElementById("champ-style") ? document.getElementById("champ-style").value : "",
         couleursDom: document.getElementById("champ-couleurs").value.trim(),
-        equipement: "",
         couleur: document.getElementById("champ-couleur-token").value,
-        idFaction: ""
+        
+        // --- Nouveaux champs spécifiques ---
+        ecailles: document.getElementById("champ-ecailles") ? document.getElementById("champ-ecailles").value : "",
+        aretes: document.getElementById("champ-aretes") ? document.getElementById("champ-aretes").value : "",
+        pelage: document.getElementById("champ-pelage") ? document.getElementById("champ-pelage").value : "",
+        cornes: document.getElementById("champ-cornes") ? document.getElementById("champ-cornes").value : "",
+        champignons: document.getElementById("champ-champignons") ? document.getElementById("champ-champignons").value : "",
+        ecorce: document.getElementById("champ-ecorce") ? document.getElementById("champ-ecorce").value : "",
+        peauGob: document.getElementById("champ-peau-gob") ? document.getElementById("champ-peau-gob").value : "",
+        oreilles: document.getElementById("champ-oreilles") ? document.getElementById("champ-oreilles").value : "",
+        masque: document.getElementById("champ-masque") ? document.getElementById("champ-masque").value.trim() : "",
+        colonne: document.getElementById("champ-colonne") ? document.getElementById("champ-colonne").value : ""
     };
 
     try {
@@ -187,7 +234,6 @@ window.validerEtapeDescriptif = async function() {
         document.getElementById("ecran-chargement-ia").style.display = "none";
         
         window.ouvrirModaleCreationCaracs(resultatServeur.id);
-
     } catch (e) {
         console.error("Erreur de création :", e);
         alert("Une interférence magique a bloqué la création.");
@@ -213,13 +259,13 @@ window.validerEtapeDescriptifRapide = async function() {
         statut: "Vivant",
         prenom: nom,
         nom: "",
-        age: document.getElementById("champ-age").value.trim(),
+        age: document.getElementById("champ-age").value,
         race: document.getElementById("champ-race").value,
         genre: document.getElementById("champ-genre").value,
         couleur: document.getElementById("champ-couleur-token").value || "#ff4c4c",
-        idFaction: "",
-        cheveux: "", yeux: "", pilosite: "", signes: "", expression: "", 
-        corpulence: "", taille: "", peau: "", style: "", couleursDom: "", equipement: ""
+        
+        cheveux: "", yeux: "", pilosite: "", signes: "", expression: "", corpulence: "", peau: "", style: "", couleursDom: "",
+        ecailles: "", aretes: "", pelage: "", cornes: "", champignons: "", ecorce: "", peauGob: "", oreilles: "", masque: "", colonne: ""
     };
 
     try {

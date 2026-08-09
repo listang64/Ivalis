@@ -589,11 +589,33 @@ async function genererEtStockerPortrait(donnees) {
   // 2. Instruction de style additionnelle (Firestore)
   const instructionSupplementaire = await recupererInstructionStyle();
 
-  // 3. Construction du prompt (Dynamique et sécurisé)
+  // 2.bis Récupération du descriptif physique de la race depuis le Grimoire (Firestore)
+  let loreRace = "";
+  if (donnees.race !== "Humain") {
+      try {
+          const qRace = query(collection(db, "Monde_Races"));
+          const snapRace = await getDocs(qRace);
+          
+          // Fonction pour ignorer les majuscules et les accents lors de la recherche
+          const normaliser = (str) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          const nomCherche = normaliser(donnees.race);
+
+          snapRace.forEach(doc => {
+              const dataRace = doc.data();
+              if (dataRace.Nom && normaliser(dataRace.Nom).includes(nomCherche)) {
+                  loreRace = dataRace.Descriptif_Physique || "";
+              }
+          });
+      } catch (e) {
+          console.error("Erreur récupération du lore de la race :", e);
+      }
+  }
+
+  // 3. Construction des spécificités uniques du Héros
   let descriptionHero = `Il s'agit d'un héros de race ${donnees.race} et de genre ${donnees.genre}, d'âge apparent : ${donnees.age}. `;
   
   if (donnees.corpulence) descriptionHero += `Sa corpulence est ${donnees.corpulence}. `;
-  if (donnees.peau) descriptionHero += `Son teint de peau (ou écailles/carapace) est ${donnees.peau}. `;
+  if (donnees.peau) descriptionHero += `Son teint de peau (ou carapace) est ${donnees.peau}. `;
   if (donnees.cheveux) descriptionHero += `Ses cheveux sont ${donnees.cheveux}. `;
   if (donnees.yeux) descriptionHero += `Ses yeux sont ${donnees.yeux}. `;
   if (donnees.pilosite) descriptionHero += `Pilosité faciale : ${donnees.pilosite}. `;
@@ -601,18 +623,38 @@ async function genererEtStockerPortrait(donnees) {
   if (donnees.signes) descriptionHero += `Signes distinctifs et accessoires : ${donnees.signes}. `;
   if (donnees.style) descriptionHero += `Il est vêtu ainsi : ${donnees.style}. `;
   if (donnees.couleursDom) descriptionHero += `Couleurs dominantes de la tenue : ${donnees.couleursDom}. `;
+  
+  // --- Ajouts des spécificités de race ---
+  if (donnees.ecailles) descriptionHero += `Ses écailles sont de couleur ${donnees.ecailles}. `;
+  if (donnees.aretes) descriptionHero += `Taille de ses arêtes dorsales : ${donnees.aretes}. `;
+  if (donnees.pelage) descriptionHero += `Son pelage est de couleur ${donnees.pelage}. `;
+  if (donnees.cornes) descriptionHero += `Taille de ses cornes : ${donnees.cornes}. `;
+  if (donnees.champignons) descriptionHero += `Maturité des champignons sur son corps : ${donnees.champignons}. `;
+  if (donnees.ecorce) descriptionHero += `Croissance de son écorce corporelle : ${donnees.ecorce}. `;
+  if (donnees.peauGob) descriptionHero += `Sa peau est de couleur ${donnees.peauGob}. `;
+  if (donnees.oreilles) descriptionHero += `Taille de ses oreilles : ${donnees.oreilles}. `;
+  if (donnees.masque) descriptionHero += `Il porte un masque : ${donnees.masque}. `;
+  if (donnees.colonne) descriptionHero += `Taille des os apparents de sa colonne vertébrale : ${donnees.colonne}. `;
 
-  const promptOpenAI =
-    "Contexte de l'univers : Antique Fantastique (Mythic Ancient Fantasy, Antiquité Magique).\n\n" +
-    "Description du personnage :\n" +
-    descriptionHero + "\n\n" +
-    "Directives de style artistique obligatoires : " + instructionSupplementaire + "\n\n" +
-    "🛑 RÈGLE TECHNIQUE DÉFINITIVE (PRIORITAIRE SUR TOUT LE RESTE) : " +
-    "Le personnage DOIT ÊTRE PLACÉ SUR UN FOND TOTALEMENT MAGENTA FLUO UNI (#FF00FF). " +
-    "Il est STRICTEMENT INTERDIT de dessiner un décor, un paysage, un intérieur, une ombre au sol ou un dégradé. " +
-    "Même si la description du personnage mentionne un lieu ou des objets environnants, IGNORE LE DÉCOR. " +
-    "Remplis tout l'espace vide autour et derrière le personnage avec du magenta fluo pur. " +
-    "Le personnage doit être vu de trois quart, regardant vers la gauche, cadré en plan américain (coupé aux genoux). Ne dessine aucun texte.";
+  // 4. Assemblage final du Prompt pondéré
+  let promptOpenAI = "Contexte de l'univers : Antique Fantastique (Mythic Ancient Fantasy, Antiquité Magique).\n\n";
+  
+  // Si on a trouvé un descriptif dans la base de données, on définit l'anatomie de base
+  if (loreRace !== "") {
+      promptOpenAI += "--- ANATOMIE DE BASE DE L'ESPÈCE ---\n" +
+                      loreRace + "\n\n";
+  }
+
+  // On injecte les choix du joueur en lui donnant le statut de priorité absolue
+  promptOpenAI += "--- SPÉCIFICITÉS UNIQUES DU PERSONNAGE (TRÈS IMPORTANT, PRIORITAIRE SUR L'ANATOMIE DE BASE) ---\n" +
+                  descriptionHero + "\n\n" +
+                  "Directives de style artistique obligatoires : " + instructionSupplementaire + "\n\n" +
+                  "🛑 RÈGLE TECHNIQUE DÉFINITIVE (PRIORITAIRE SUR TOUT LE RESTE) : " +
+                  "Le personnage DOIT ÊTRE PLACÉ SUR UN FOND TOTALEMENT MAGENTA FLUO UNI (#FF00FF). " +
+                  "Il est STRICTEMENT INTERDIT de dessiner un décor, un paysage, un intérieur, une ombre au sol ou un dégradé. " +
+                  "Même si la description du personnage mentionne un lieu ou des objets environnants, IGNORE LE DÉCOR. " +
+                  "Remplis tout l'espace vide autour et derrière le personnage avec du magenta fluo pur. " +
+                  "Le personnage doit être vu de trois quart, regardant vers la gauche, cadré en plan américain (coupé aux genoux). Ne dessine aucun texte.";
 
   // 4. Appel a l'API OpenAI (Retour sur gpt-image-2 sans base64)
   const urlOpenAI = "https://api.openai.com/v1/images/generations";

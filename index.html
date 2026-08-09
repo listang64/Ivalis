@@ -852,7 +852,6 @@
       <div>
         <div class="bloc-formulaire">
           <h4>Identité</h4>
-          <!-- Retrait de Prénom, on ne garde que le Nom du héros -->
           <div class="champ-formulaire"><label>Nom du héros</label><input type="text" class="input-perso" id="champ-nom"></div>
           <div class="champ-formulaire">
             <label>Âge apparent</label>
@@ -888,47 +887,52 @@
           </div>
         </div>
         <div class="bloc-formulaire">
-          <h4>Visage</h4>
-          <!-- Ajout de l'ID groupe-cheveux -->
+          <h4>Visage / Tête</h4>
           <div class="champ-formulaire" id="groupe-cheveux"><label>Couleur et coupe de cheveux</label><input type="text" class="input-perso" id="champ-cheveux"></div>
-          <div class="champ-formulaire"><label>Yeux</label><input type="text" class="input-perso" id="champ-yeux"></div>
-          <!-- Ajout de l'ID groupe-pilosite -->
+          <div class="champ-formulaire" id="groupe-yeux"><label>Yeux</label><input type="text" class="input-perso" id="champ-yeux"></div>
           <div class="champ-formulaire" id="groupe-pilosite"><label>Pilosité faciale</label><input type="text" class="input-perso" id="champ-pilosite"></div>
+          
+          <!-- NOUVEAUX CHAMPS (Tête) -->
+          <div class="champ-formulaire" id="groupe-masque" style="display: none;"><label>Descriptif du masque</label><input type="text" class="input-perso" id="champ-masque" placeholder="Ex: Masque de bois sculpté..."></div>
+          
+          <div class="champ-formulaire" id="groupe-oreilles" style="display: none;">
+            <label>Taille des oreilles</label>
+            <select class="input-perso" id="champ-oreilles">
+              <option value="">-- Choisir --</option><option value="Petites">Petites</option><option value="Moyennes">Moyennes</option><option value="Grandes">Grandes</option>
+            </select>
+          </div>
+          
+          <div class="champ-formulaire" id="groupe-cornes" style="display: none;">
+            <label>Taille des cornes</label>
+            <select class="input-perso" id="champ-cornes">
+              <option value="">-- Choisir --</option><option value="Petites">Petites</option><option value="Moyennes">Moyennes</option><option value="Grandes">Grandes</option>
+            </select>
+          </div>
         </div>
         <div class="bloc-formulaire">
           <h4>Détails</h4>
           <div class="champ-formulaire"><label>Signes distinctifs et accessoires</label><input type="text" class="input-perso" id="champ-signes"></div>
-          <div class="champ-formulaire">
+          <div class="champ-formulaire" id="groupe-expression">
             <label>Expression du visage</label>
             <select class="input-perso" id="champ-expression">
               <option value="">-- Choisir --</option>
-              <option value="Neutre">Neutre</option>
-              <option value="Souriant">Souriant</option>
-              <option value="Joyeux">Joyeux</option>
-              <option value="Déterminé">Déterminé</option>
-              <option value="Confiant">Confiant</option>
-              <option value="Pensif">Pensif</option>
-              <option value="Méfiant">Méfiant</option>
-              <option value="Agacé">Agacé</option>
-              <option value="En colère">En colère</option>
-              <option value="Triste">Triste</option>
-              <option value="Effrayé">Effrayé</option>
-              <option value="Surpris">Surpris</option>
-              <option value="Furieux">Furieux</option>
+              <option value="Neutre">Neutre</option><option value="Souriant">Souriant</option><option value="Joyeux">Joyeux</option>
+              <option value="Déterminé">Déterminé</option><option value="Confiant">Confiant</option><option value="Pensif">Pensif</option>
+              <option value="Méfiant">Méfiant</option><option value="Agacé">Agacé</option><option value="En colère">En colère</option>
+              <option value="Triste">Triste</option><option value="Effrayé">Effrayé</option><option value="Surpris">Surpris</option><option value="Furieux">Furieux</option>
             </select>
           </div>
         </div>
       </div>
       <div>
         <div class="bloc-formulaire">
-          <h4>Physique</h4>
+          <h4>Physique / Corps</h4>
           <div class="champ-formulaire">
             <label>Corpulence</label>
             <select class="input-perso" id="champ-corpulence">
               <option value="">-- Choisir --</option><option value="Tres maigre">Très maigre</option><option value="Maigre">Maigre</option><option value="Normal">Normal</option><option value="Athletique">Athlétique</option><option value="Obese">Obèse</option>
             </select>
           </div>
-          <!-- Retrait de la Taille -->
           <div class="champ-formulaire" id="groupe-peau">
             <label>Teint / Peau</label>
             <select class="input-perso" id="champ-peau">
@@ -939,34 +943,90 @@
               <option value="très foncé" style="background-color: #2E2019; color: #fff;">Très foncé</option>
             </select>
           </div>
+          
+          <!-- NOUVEAUX CHAMPS (Corps) -->
+          <div class="champ-formulaire" id="groupe-ecailles" style="display: none;">
+            <label>Couleurs des écailles</label>
+            <select class="input-perso" id="champ-ecailles">
+              <option value="">-- Choisir --</option>
+              <option value="Bleu" style="background-color: #4FADE0; color: #fff;">Bleu</option>
+              <option value="Cyan" style="background-color: #6DBFC2; color: #000;">Cyan</option>
+              <option value="Violacé" style="background-color: #B09DEB; color: #000;">Violacé</option>
+              <option value="Vert d'eau" style="background-color: #8BC9B8; color: #000;">Vert d'eau</option>
+            </select>
+          </div>
+          
+          <div class="champ-formulaire" id="groupe-aretes" style="display: none;">
+            <label>Taille des arêtes dorsales</label>
+            <select class="input-perso" id="champ-aretes">
+              <option value="">-- Choisir --</option><option value="Très léger">Très léger</option><option value="Petite">Petite</option><option value="Grande">Grande</option>
+            </select>
+          </div>
+          
+          <div class="champ-formulaire" id="groupe-pelage" style="display: none;">
+            <label>Couleur du pelage</label>
+            <select class="input-perso" id="champ-pelage">
+              <option value="">-- Choisir --</option>
+              <option value="Marron clair" style="background-color: #70624D; color: #fff;">Marron clair</option>
+              <option value="Marron foncé" style="background-color: #24201C; color: #fff;">Marron foncé</option>
+              <option value="Blanc" style="background-color: #EBEBEB; color: #000;">Blanc</option>
+              <option value="Orangé" style="background-color: #B38047; color: #fff;">Orangé</option>
+            </select>
+          </div>
+          
+          <div class="champ-formulaire" id="groupe-champignons" style="display: none;">
+            <label>Maturité des champignons</label>
+            <select class="input-perso" id="champ-champignons">
+              <option value="">-- Choisir --</option><option value="Petits">Petits</option><option value="Grands">Grands</option><option value="Très développé">Très développé</option>
+            </select>
+          </div>
+          
+          <div class="champ-formulaire" id="groupe-ecorce" style="display: none;">
+            <label>Croissance de l'écorce corporelle</label>
+            <select class="input-perso" id="champ-ecorce">
+              <option value="">-- Choisir --</option><option value="Peu développé">Peu développé</option><option value="Très développé">Très développé</option>
+            </select>
+          </div>
+          
+          <div class="champ-formulaire" id="groupe-peau-gob" style="display: none;">
+            <label>Couleur de peau</label>
+            <select class="input-perso" id="champ-peau-gob">
+              <option value="">-- Choisir --</option>
+              <option value="Vert" style="background-color: #5FA35F; color: #fff;">Vert</option>
+              <option value="Vert foncé" style="background-color: #285428; color: #fff;">Vert foncé</option>
+              <option value="Gris-vert" style="background-color: #566356; color: #fff;">Gris-vert</option>
+            </select>
+          </div>
+          
+          <div class="champ-formulaire" id="groupe-colonne" style="display: none;">
+            <label>Os de la colonne vertébrale</label>
+            <select class="input-perso" id="champ-colonne">
+              <option value="">-- Choisir --</option><option value="Discrète">Discrète</option><option value="Moyenne">Moyenne</option><option value="Grande">Grande</option>
+            </select>
+          </div>
         </div>
+        
         <div class="bloc-formulaire">
           <h4>Apparence</h4>
-          <div class="champ-formulaire">
+          <div class="champ-formulaire" id="groupe-style">
             <label>Style vestimentaire</label>
             <select class="input-perso" id="champ-style">
               <option value="">-- Choisir --</option>
-              <option value="Tunique simple">Tunique simple</option>
-              <option value="Toge">Toge</option>
-              <option value="Pagne">Pagne</option>
-              <option value="Robe antique">Robe antique</option>
-              <option value="Habits de marchands">Habits de marchands</option>
-              <option value="Habits de chasseur">Habits de chasseur</option>
-              <option value="Habits du désert">Habits du désert</option>
-              <option value="Habit du nord">Habit du nord</option>
-              <option value="Tunique et jambière">Tunique et jambière</option>
+              <option value="Tunique simple">Tunique simple</option><option value="Toge">Toge</option><option value="Pagne">Pagne</option>
+              <option value="Robe antique">Robe antique</option><option value="Habits de marchands">Habits de marchands</option>
+              <option value="Habits de chasseur">Habits de chasseur</option><option value="Habits du désert">Habits du désert</option>
+              <option value="Habit du nord">Habit du nord</option><option value="Tunique et jambière">Tunique et jambière</option>
             </select>
           </div>
           <div class="champ-formulaire"><label>Couleurs dominantes</label><input type="text" class="input-perso" id="champ-couleurs"></div>
-          <!-- Retrait de l'Équipement visible -->
         </div>
+        
         <div class="bloc-formulaire">
           <h4>Autres</h4>
           <div class="champ-formulaire">
             <label>Couleur du Token</label>
             <input type="color" class="input-perso input-couleur" id="champ-couleur-token" value="#2a1a0f" oninput="appliquerCouleurTheme(this.value)">
           </div>
-          <!-- Retrait de la Faction -->
         </div>
       </div>
     </div>
