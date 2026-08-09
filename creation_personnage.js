@@ -184,7 +184,21 @@ window.validerEtapeDescriptif = async function() {
     const nom = document.getElementById("champ-nom").value.trim();
     if (nom === "") { alert("Le héros doit posséder un nom."); return; }
 
-    document.getElementById("ecran-chargement-ia").style.display = "flex";
+    // =========================================================
+    // CORRECTION DE L'ÉCRAN DE CHARGEMENT
+    // =========================================================
+    const ecranLoad = document.getElementById("ecran-chargement-ia");
+    const imgLoad = document.getElementById("image-chargement-ia");
+    const titreLoad = document.getElementById("titre-chargement-ia");
+    
+    if (ecranLoad) {
+        ecranLoad.style.zIndex = "15000"; // On le force à passer par-dessus TOUT
+        ecranLoad.style.display = "flex";
+    }
+    // On s'assure que c'est bien ton image d'incantation et non celle du voyage
+    if (imgLoad) imgLoad.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781698939/ecran_chergement_personnage_nwimhq.png";
+    if (titreLoad) titreLoad.innerText = "Création de personnage en cours ...";
+
     const btn = document.getElementById("btn-suivant-creation");
     btn.innerText = "Génération...";
     btn.style.pointerEvents = "none";
@@ -210,7 +224,6 @@ window.validerEtapeDescriptif = async function() {
         couleursDom: document.getElementById("champ-couleurs").value.trim(),
         couleur: document.getElementById("champ-couleur-token").value,
         
-        // --- Nouveaux champs spécifiques ---
         ecailles: document.getElementById("champ-ecailles") ? document.getElementById("champ-ecailles").value : "",
         aretes: document.getElementById("champ-aretes") ? document.getElementById("champ-aretes").value : "",
         pelage: document.getElementById("champ-pelage") ? document.getElementById("champ-pelage").value : "",
@@ -231,13 +244,13 @@ window.validerEtapeDescriptif = async function() {
         document.getElementById("titre-nom-personnage").innerText = nom;
         
         window.fermerCreationHero();
-        document.getElementById("ecran-chargement-ia").style.display = "none";
+        if (ecranLoad) ecranLoad.style.display = "none";
         
         window.ouvrirModaleCreationCaracs(resultatServeur.id);
     } catch (e) {
         console.error("Erreur de création :", e);
         alert("Une interférence magique a bloqué la création.");
-        document.getElementById("ecran-chargement-ia").style.display = "none";
+        if (ecranLoad) ecranLoad.style.display = "none";
     } finally {
         btn.innerText = "Valider";
         btn.style.pointerEvents = "auto";

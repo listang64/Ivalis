@@ -317,13 +317,6 @@ async function sauvegarderFichePersonnage(donnees, skipImage = false) {
   }
 
   if (!skipImage) {
-    // -----------------------------------------------------------------
-    //  GENERATION D'IMAGE 100% FRONT-END (projet prive) :
-    //  on genere TOUJOURS un nouveau portrait a chaque enregistrement, comme
-    //  dans l'ancienne logique. Les cles sont lues dans le localStorage.
-    //  Si une cle manque, genererEtStockerPortrait affiche l'alerte UI et
-    //  renvoie l'URL existante (le heros est tout de meme sauvegarde).
-    // -----------------------------------------------------------------
     donnees.urlCloudinary = await genererEtStockerPortrait(donnees);
   } else {
     donnees.urlCloudinary = "";
@@ -332,6 +325,28 @@ async function sauvegarderFichePersonnage(donnees, skipImage = false) {
 
   const docData = frontVersPersoDoc(donnees, idPersonnage);
   await setDoc(doc(db, COL.PERSONNAGES, idPersonnage), docData);
+
+  // =========================================================
+  // CORRECTION : AJOUT AUTOMATIQUE À L'INITIATIVE 
+  // =========================================================
+  if (estNouveau && donnees.idPartie) {
+      try {
+          const partieRef = doc(db, COL.PARTIES, donnees.idPartie);
+          const partieSnap = await getDoc(partieRef);
+          if (partieSnap.exists()) {
+              const dataPartie = partieSnap.data();
+              let ordre = dataPartie.Ordre_Initiative || [];
+              if (!ordre.includes(idPersonnage)) {
+                  ordre.push(idPersonnage);
+                  await updateDoc(partieRef, { Ordre_Initiative: ordre });
+                  console.log("✔️ Héros ajouté à l'ordre d'initiative.");
+              }
+          }
+      } catch (e) {
+          console.error("Erreur lors de l'ajout à l'initiative:", e);
+      }
+  }
+  // =========================================================
 
   return { id: idPersonnage, url: donnees.urlCloudinary || "" };
 }
