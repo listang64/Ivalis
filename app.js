@@ -59,6 +59,10 @@ window.ID_PARTIE_COURANTE = null;
 window.ID_PARTIE_EN_ATTENTE = null;
 window.LISTE_PARTIES_CACHE = [];
 
+// --- NOUVEAU CACHE DES COMPÉTENCES ---
+window.CACHE_COMPETENCES_GLOBAL = {};
+window.UNSUBSCRIBE_COMPETENCES = {};
+
 // References de desabonnement pour les ecouteurs temps reel
 let unsubscribePersonnages = null;
 let unsubscribeDate = null;
@@ -109,6 +113,7 @@ function persoDocVersFront(id, d) {
     idPersonnage: id,
     idPartie: d.ID_Partie || "",
     idJoueur: d.ID_Joueur || "",
+    deckEquipe: d.Deck_Equipe || [], // deck in cache
     couleur: d.Couleur || "",
     prenom: d.Prenom_Personnage || "",
     nom: d.Nom_Personnage || "",
@@ -1135,6 +1140,35 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
     window.PERSOS_PARTIE = persos; 
     afficherListePersonnages(persos);
     afficherBullesPersonnages(persos);
+
+    // =========================================================
+    // OPTIMISATION IPAD : PRÉCHARGEMENT DES COMPÉTENCES EN CACHE
+    // =========================================================
+    persos.forEach(p => {
+        // On crée un écouteur silencieux pour chaque personnage de la partie
+        if (!window.UNSUBSCRIBE_COMPETENCES[p.idPersonnage]) {
+            const qComp = collection(db, "Personnages", p.idPersonnage, "Competences");
+            window.UNSUBSCRIBE_COMPETENCES[p.idPersonnage] = onSnapshot(qComp, (snapComp) => {
+                let comps = {};
+                snapComp.forEach(docComp => {
+                    comps[docComp.id] = docComp.data();
+                });
+                
+                // On stocke tout dans la RAM de l'iPad
+                window.CACHE_COMPETENCES_GLOBAL[p.idPersonnage] = comps;
+                
+                // Si l'interface de combat est ouverte et qu'on modifie une compétence en direct, ça rafraîchit l'affichage
+                const combatOuvert = document.getElementById('fenetre-combat')?.style.display === 'block';
+                if (combatOuvert && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]?.idPersonnage === p.idPersonnage) {
+                    if (typeof window.afficherPersoCombatActuel === "function") {
+                        window.afficherPersoCombatActuel();
+                    }
+                }
+            });
+        }
+    });
+    // =========================================================
+
   }, (err) => console.error("onSnapshot Personnages :", err));
 }
 
@@ -1763,6 +1797,10 @@ function confirmerRetourMenu() {
   document.getElementById("ecran-menu").style.display = "block";
   window.ID_PARTIE_COURANTE = null;
   if (unsubscribePersonnages) { unsubscribePersonnages(); unsubscribePersonnages = null; }
+  // NOUVEAU : Nettoyage des écouteurs de compétences
+  Object.values(window.UNSUBSCRIBE_COMPETENCES).forEach(unsub => unsub());
+  window.UNSUBSCRIBE_COMPETENCES = {};
+  window.CACHE_COMPETENCES_GLOBAL = {};
 }
 
 function confirmerQuitterJeu() {
