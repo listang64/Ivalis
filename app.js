@@ -115,6 +115,9 @@ function persoDocVersFront(id, d) {
     idJoueur: d.ID_Joueur || "",
     deckEquipe: d.Deck_Equipe || [], // deck in cache
     couleur: d.Couleur || "",
+    // --- AJOUT POUR LA JAUGE DE COMBAT ---
+    fatigueActuelle: d.Fatigue_Actuelle !== undefined ? d.Fatigue_Actuelle : 100,
+    fatigueMax: d.Fatigue_Max !== undefined ? d.Fatigue_Max : 100,
     prenom: d.Prenom_Personnage || "",
     nom: d.Nom_Personnage || "",
     race: d.Race || "",

@@ -142,7 +142,7 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
 // =========================================================================
 
 window.gererClicCarte = function(idCarte) {
-    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    // if (typeof window.jouerSonClic === "function") window.jouerSonClic();
 
     if (window.CARTE_EN_APERCU !== idCarte) {
         // --- 1ER CLIC : FOCUS & APERÇU ---
@@ -302,6 +302,15 @@ window.afficherApercuCarteHD = function(idCarte) {
         }
     }
 
+    // NOUVEAU : On détecte si on est en plein combat pour afficher le bouton "Choisir"
+    const isCombatMode = document.getElementById("fenetre-combat")?.style.display === "block";
+    const boutonChoisirHtml = isCombatMode ? `
+        <!-- COUCHE 5 : LE BOUTON CHOISIR (MODE COMBAT UNIQUEMENT) -->
+        <div style="position: absolute; bottom: -70px; left: 50%; transform: translateX(-50%); z-index: 5;">
+            <button class="btn-choisir-combat" onclick="event.stopPropagation();">Choisir</button>
+        </div>
+    ` : "";
+
     conteneurCarte.innerHTML = `
         <!-- COUCHE 1 : FOND DE COULEUR -->
         <div style="position: absolute; top: 12px; left: 12px; right: 12px; bottom: 12px; background-color: ${window.COULEUR_PERSO_COURANT}; border-radius: 8px; z-index: 1;"></div>
@@ -330,6 +339,8 @@ window.afficherApercuCarteHD = function(idCarte) {
 
         <!-- COUCHE 4 : LA ZONE FLOTTANTE -->
         ${htmlZoneAbsolue}
+
+        ${boutonChoisirHtml}
     `;
 
     conteneurCarte.style.display = "block";

@@ -66,14 +66,17 @@ window.changerPersoCombat = function(direction) {
     window.afficherPersoCombatActuel();
 };
 
-window.afficherPersoCombatActuel = function() {
+window.afficherPersoCombatActuel = function() { 
     const divNom = document.getElementById("combat-nom-perso");
+    const imgPerso = document.getElementById("combat-portrait-perso");
+    
     if (!divNom) return;
 
     if (window.COMBAT_PERSOS_JOUEUR.length === 0) {
         divNom.innerText = "Aucun héros lié";
         divNom.style.color = "#888";
         document.getElementById("combat-liste-competences").innerHTML = "";
+        if (imgPerso) imgPerso.style.opacity = "0"; 
         return;
     }
 
@@ -83,6 +86,15 @@ window.afficherPersoCombatActuel = function() {
     
     divNom.innerText = (prenom + " " + nom).trim();
     divNom.style.color = persoActuel.couleur || "#e8d5a5";
+
+    if (imgPerso) {
+        if (persoActuel.urlCloudinary && persoActuel.urlCloudinary !== "") {
+            imgPerso.src = persoActuel.urlCloudinary;
+            imgPerso.style.opacity = "1";
+        } else {
+            imgPerso.style.opacity = "0";
+        }
+    }
 
     window.chargerCompetencesCombat(persoActuel.idPersonnage, persoActuel.couleur);
 };
@@ -97,6 +109,15 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
     try {
         const persoActuel = window.PERSOS_PARTIE.find(p => p.idPersonnage === idPersonnage);
         if (!persoActuel) return;
+        
+        // --- MISE EN MÉMOIRE DES STATS DE FATIGUE ---
+        window.COMBAT_FATIGUE_MAX = parseInt(persoActuel.fatigueMax) || 100;
+        window.COMBAT_FATIGUE_ACTUELLE = parseInt(persoActuel.fatigueActuelle) || window.COMBAT_FATIGUE_MAX;
+        
+        // On affiche le conteneur de la jauge et on la met à 0 (coût)
+        document.getElementById("combat-jauge-fatigue-container").style.opacity = "1";
+        window.mettreAJourJaugeFatigue(0);
+
         const deck = persoActuel.deckEquipe || [];
 
         if (deck.length === 0) {
@@ -112,13 +133,12 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
         deck.forEach(idCarte => {
             if (competencesDuPerso[idCarte]) {
                 const data = competencesDuPerso[idCarte];
-                window.COMPETENCES_CACHE[idCarte] = data;
+                window.COMPETENCES_CACHE[idCarte] = data; 
                 competencesToRender.push({ id: idCarte, data: data });
             }
         });
 
         competencesToRender.sort((a, b) => (b.data.Initiative || 0) - (a.data.Initiative || 0));
-
         window.COULEUR_PERSO_COURANT = couleur || "#4a1c1c";
 
         let htmlDeck = "";
@@ -140,11 +160,8 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
                      onmouseout="this.style.zIndex='2';">
                      
                     <div style="position: absolute; top: 49px; bottom: 58px; left: 63px; right: 7px; z-index: 1; border-radius: 0 15px 15px 0; background-color: ${window.COULEUR_PERSO_COURANT};"></div>
-                    
                     <div id="cadre-combat-${idCarte}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('${IMAGE_CADRE_NORMAL}'); background-size: contain; background-position: left center; background-repeat: no-repeat; z-index: 2; filter: drop-shadow(0px 6px 4px rgba(0,0,0,0.6)); transition: background-image 0.2s ease;"></div>
-                    
                     <div style="position: absolute; top: 44%; transform: translateY(-50%); left: 6px; width: 69px; text-align: center; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 30px; font-weight: bold; z-index: 3; text-shadow: 2px 2px 5px black; pointer-events: none;">${initiative}</div>
-                    
                     <div style="position: absolute; top: 48%; transform: translateY(-50%); left: 76px; right: 120px; text-align: left; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;">${titre}</div>
                 </div>
             </div>
@@ -154,22 +171,60 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
         listeDiv.innerHTML = htmlDeck;
 
     } catch (e) {
-        console.error("Erreur lors du chargement depuis le cache :", e);
-        listeDiv.innerHTML = "<div style='color:red; font-size:14px;'>Interférence magique.</div>";
+        console.error("Erreur cache :", e);
     }
 };
 
 // =========================================================================
-//  INTERACTIONS AVEC LES CARTES (IMAGE ET DÉPLACEMENT CARTE HD)
+//  LOGIQUE DE LA JAUGE DE FATIGUE
 // =========================================================================
+window.mettreAJourJaugeFatigue = function(coutFatigueBrut) {
+    const max = window.COMBAT_FATIGUE_MAX || 1;
+    const actuelle = window.COMBAT_FATIGUE_ACTUELLE || 0;
+    
+    const coutFatigue = parseInt(coutFatigueBrut) || 0; 
+    const coutReel = Math.min(coutFatigue, actuelle); 
+    const reste = actuelle - coutReel;
 
+    const pctGris = (reste / max) * 100;
+    const pctRouge = (coutReel / max) * 100;
+    const pctActuel = (actuelle / max) * 100;
+
+    // Mise à jour visuelle des barres avec leurs dégradés
+    document.getElementById('barre-fatigue-grise').style.width = pctGris + '%';
+    document.getElementById('barre-fatigue-rouge').style.width = pctRouge + '%';
+
+    // Mise à jour du texte Doré (Fatigue actuelle)
+    const labelActuelle = document.getElementById('label-fatigue-actuelle');
+    if (labelActuelle) {
+        labelActuelle.innerText = actuelle;
+        labelActuelle.style.left = pctActuel + '%';
+    }
+
+    // Mise à jour du texte Rouge (Fatigue restante si on utilise le sort)
+    const labelRestante = document.getElementById('label-fatigue-restante');
+    if (labelRestante) {
+        if (coutFatigue > 0) {
+            labelRestante.innerText = reste;
+            labelRestante.style.left = pctGris + '%'; 
+            labelRestante.style.opacity = '1';
+            document.getElementById('barre-fatigue-rouge').style.opacity = '1';
+        } else {
+            labelRestante.style.opacity = '0';
+            document.getElementById('barre-fatigue-rouge').style.opacity = '0';
+        }
+    }
+};
+
+// =========================================================================
+//  INTERACTIONS AVEC LES CARTES (IMAGE ET JAUGE)
+// =========================================================================
 window.gererClicCarteCombat = function(idCarte) {
-    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    // 🔇 Son volontairement supprimé ici
 
     const IMAGE_CADRE_NORMAL = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png";
     const IMAGE_CADRE_SELECTIONNE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1783286721/ban_cible_pdpnad.png";
 
-    // 1. On nettoie toutes les bannières (remise à zéro de l'image)
     document.querySelectorAll('.banniere-carte-combat').forEach(el => {
         el.dataset.actif = "false";
         const cadre = el.querySelector('[id^="cadre-combat-"]');
@@ -177,49 +232,53 @@ window.gererClicCarteCombat = function(idCarte) {
     });
 
     if (window.CARTE_EN_APERCU !== idCarte) {
-        // 2. On allume la nouvelle bannière
         window.CARTE_EN_APERCU = idCarte;
+        
+        // 1. Allumage de la bannière
         const carteDiv = document.getElementById(`combat-carte-${idCarte}`);
         const cadreDiv = document.getElementById(`cadre-combat-${idCarte}`);
-        
         if (carteDiv && cadreDiv) {
             carteDiv.dataset.actif = "true";
             cadreDiv.style.backgroundImage = `url('${IMAGE_CADRE_SELECTIONNE}')`;
         }
         
-        // 3. On affiche la carte HD et on la positionne manuellement
+        // 2. Récupération du coût de fatigue et animation de la jauge
+        const cout = window.COMPETENCES_CACHE[idCarte]?.Fatigue || 0;
+        window.mettreAJourJaugeFatigue(cout);
+        
+        // 3. Affichage HD
         if (typeof window.afficherApercuCarteHD === "function") {
             window.afficherApercuCarteHD(idCarte);
-            
-            // Un mini timeout permet d'attendre que la carte soit injectée dans le DOM avant de la bouger
             setTimeout(() => {
                 const hdCard = document.getElementById("apercu-carte-hd-competence");
                 if (hdCard) {
-                    hdCard.style.left = "calc(3vw + 350px)"; // Se cale parfaitement à droite des bannières
-                    hdCard.style.top = "15vh";               // Aligné vers le haut
-                    hdCard.style.transform = "none";         // Enlève l'ancien centrage Y
+                    hdCard.style.left = "calc(3vw + 350px)"; 
+                    hdCard.style.top = "15vh";               
+                    hdCard.style.transform = "none";         
                 }
             }, 10); 
         }
     } else {
-        // 3. Si on clique sur la même bannière, on referme
+        // Si on reclique sur la même, on referme tout
+        window.mettreAJourJaugeFatigue(0);
         if (typeof window.masquerApercuCarteHD === "function") {
             window.masquerApercuCarteHD();
         }
     }
 };
 
-// Écouteur global pour fermer la carte si on clique n'importe où ailleurs sur l'écran
+// Clic global (Fermeture dans le vide)
 document.addEventListener("click", function(event) {
     const btnFermer = document.getElementById('btn-fermer-combat');
     if (!btnFermer || btnFermer.style.display === 'none') return;
 
     const clicSurBanniere = event.target.closest('.banniere-carte-combat');
     const clicSurCarteHD = event.target.closest('#apercu-carte-hd-competence');
-    const clicSurFleche = event.target.closest('.btn-combat-switch'); // On ignore le clic sur les flèches
+    const clicSurFleche = event.target.closest('.btn-combat-switch'); 
     
-    // Si on clique dans le vide ET qu'une carte est affichée, on la ferme
     if (!clicSurBanniere && !clicSurCarteHD && !clicSurFleche && window.CARTE_EN_APERCU) {
+        window.mettreAJourJaugeFatigue(0); // Réinitialise la jauge
+        
         if (typeof window.masquerApercuCarteHD === "function") {
             window.masquerApercuCarteHD();
         }
