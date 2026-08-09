@@ -338,15 +338,49 @@ async function sauvegarderFichePersonnage(donnees, skipImage = false) {
 
 async function supprimerPersonnageBDD(idPersonnage) {
   if (!idPersonnage) return false;
-  
-  // Suppression du héros
-  await deleteDoc(doc(db, COL.PERSONNAGES, idPersonnage));
-  
-  // NOUVEAU : Nettoyage des bases annexes (Cartes & Caractéristiques)
-  await deleteDoc(doc(db, COL.CARACTERISTIQUES, idPersonnage)).catch(()=>{});
-  await deleteDoc(doc(db, "Cartes_Profils", idPersonnage)).catch(()=>{});
-  
-  return true;
+
+  try {
+      console.log(`🧹 [Nettoyage] Début de l'effacement total pour ${idPersonnage}...`);
+
+      // 1. Nettoyage de l'initiative dans la partie en cours
+      if (window.ID_PARTIE_COURANTE) {
+          const partieRef = doc(db, COL.PARTIES, window.ID_PARTIE_COURANTE);
+          const partieSnap = await getDoc(partieRef);
+          if (partieSnap.exists()) {
+              const dataPartie = partieSnap.data();
+              if (dataPartie.Ordre_Initiative) {
+                  const nouvelOrdre = dataPartie.Ordre_Initiative.filter(id => id !== idPersonnage);
+                  await updateDoc(partieRef, { Ordre_Initiative: nouvelOrdre });
+                  console.log("✔️ Retiré de l'ordre d'initiative.");
+              }
+          }
+      }
+
+      // 2. Suppression de la sous-collection "Competences" (En lot / Batch)
+      const qComp = query(collection(db, COL.PERSONNAGES, idPersonnage, "Competences"));
+      const snapComp = await getDocs(qComp);
+      if (!snapComp.empty) {
+          const batch = writeBatch(db);
+          snapComp.forEach(docComp => {
+              batch.delete(doc(db, COL.PERSONNAGES, idPersonnage, "Competences", docComp.id));
+          });
+          await batch.commit();
+          console.log("✔️ Sous-collection 'Competences' purgée.");
+      }
+
+      // 3. Suppression des données annexes (Caractéristiques)
+      await deleteDoc(doc(db, COL.CARACTERISTIQUES, idPersonnage));
+      console.log("✔️ Caractéristiques effacées.");
+
+      // 4. Suppression du document racine du héros
+      await deleteDoc(doc(db, COL.PERSONNAGES, idPersonnage));
+      console.log("✔️ Document racine du Héros incinéré.");
+
+      return true;
+  } catch (e) {
+      console.error("❌ Erreur lors de la suppression profonde du personnage :", e);
+      return false;
+  }
 }
 
 // =========================================================================
