@@ -50,6 +50,7 @@ window.ouvrirCombat = function() {
     if (fenetreCombat) fenetreCombat.style.display = 'block';
 
     window.initialiserPersosCombat();
+    window.initialiserPlateau();
 };
 
 window.fermerCombat = function() {
@@ -319,3 +320,113 @@ document.addEventListener("click", function(event) {
         });
     }
 });
+
+// =========================================================================
+//  GESTION DE LA CAMÉRA (TABLE VIRTUELLE - VTT)
+// =========================================================================
+
+window.PLATEAU_VTT = null;
+window.VTT_SCALE = 1;
+window.VTT_POS_X = 0;
+window.VTT_POS_Y = 0;
+let isDraggingVTT = false;
+let startDragX = 0;
+let startDragY = 0;
+
+window.initialiserPlateau = function() {
+    if (!window.PLATEAU_VTT) {
+        window.PLATEAU_VTT = new Plateau('plateau-canvas');
+        window.PLATEAU_VTT.renderMap(16); // Génère la grille (rayon de cases suffisant pour remplir 1800x1800)
+        window.centrerPlateau();
+        window.activerPanZoom();
+    }
+};
+
+window.centrerPlateau = function() {
+    // Calcul pour faire rentrer parfaitement le plateau 1800x1800 dans l'écran actuel
+    const winW = window.innerWidth;
+    const winH = window.innerHeight;
+    
+    // On dézoome légèrement pour voir les bords
+    window.VTT_SCALE = Math.min(winW / 1800, winH / 1800) * 0.9; 
+    
+    // On centre la caméra
+    window.VTT_POS_X = (winW - (1800 * window.VTT_SCALE)) / 2;
+    window.VTT_POS_Y = (winH - (1800 * window.VTT_SCALE)) / 2;
+    
+    window.appliquerTransformPlateau();
+};
+
+window.appliquerTransformPlateau = function() {
+    const conteneur = document.getElementById("transform-plateau");
+    if (conteneur) {
+        conteneur.style.transform = `translate(${window.VTT_POS_X}px, ${window.VTT_POS_Y}px) scale(${window.VTT_SCALE})`;
+    }
+};
+
+window.activerPanZoom = function() {
+    const conteneur = document.getElementById("conteneur-plateau-vtt");
+    if (!conteneur) return;
+
+    // --- ZOOM (Molette PC) ---
+    conteneur.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        const zoomIntensity = 0.08;
+        const wheel = e.deltaY < 0 ? 1 : -1;
+        const zoomFactor = Math.exp(wheel * zoomIntensity);
+        
+        // Cible de la souris pour zoomer vers le curseur (et non vers le coin)
+        const mouseX = e.clientX;
+        const mouseY = e.clientY;
+
+        window.VTT_POS_X = mouseX - (mouseX - window.VTT_POS_X) * zoomFactor;
+        window.VTT_POS_Y = mouseY - (mouseY - window.VTT_POS_Y) * zoomFactor;
+        window.VTT_SCALE *= zoomFactor;
+        
+        window.appliquerTransformPlateau();
+    }, { passive: false });
+
+    // --- PANNING SOURIS (Glisser sur PC) ---
+    conteneur.addEventListener("mousedown", (e) => {
+        // Clic anywhere dans le conteneur VTT (fond, canvas, transform…)
+        if (conteneur.contains(e.target)) {
+            isDraggingVTT = true;
+            startDragX = e.clientX - window.VTT_POS_X;
+            startDragY = e.clientY - window.VTT_POS_Y;
+            conteneur.style.cursor = "grabbing";
+        }
+    });
+
+    window.addEventListener("mousemove", (e) => {
+        if (!isDraggingVTT) return;
+        window.VTT_POS_X = e.clientX - startDragX;
+        window.VTT_POS_Y = e.clientY - startDragY;
+        window.appliquerTransformPlateau();
+    });
+
+    window.addEventListener("mouseup", () => {
+        isDraggingVTT = false;
+        if (conteneur) conteneur.style.cursor = "grab";
+    });
+
+    // --- PANNING TACTILE (Glisser 1 doigt sur iPad) ---
+    conteneur.addEventListener("touchstart", (e) => {
+        if (e.touches.length === 1 && conteneur.contains(e.target)) {
+            isDraggingVTT = true;
+            startDragX = e.touches[0].clientX - window.VTT_POS_X;
+            startDragY = e.touches[0].clientY - window.VTT_POS_Y;
+        }
+    }, { passive: false });
+
+    conteneur.addEventListener("touchmove", (e) => {
+        if (!isDraggingVTT || e.touches.length !== 1) return;
+        if (e.cancelable) e.preventDefault(); // Bloque le rebond natif d'Apple Safari
+        window.VTT_POS_X = e.touches[0].clientX - startDragX;
+        window.VTT_POS_Y = e.touches[0].clientY - startDragY;
+        window.appliquerTransformPlateau();
+    }, { passive: false });
+
+    conteneur.addEventListener("touchend", () => {
+        isDraggingVTT = false;
+    });
+};

@@ -215,9 +215,19 @@
 
     <!-- L'INTERFACE DE COMBAT -->
     <div id="fenetre-combat" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 65; background-color: #1a1a1a; pointer-events: auto;">
+        <!-- NOUVEAU : LA TABLE VIRTUELLE (Le Plateau VTT) -->
+        <div id="conteneur-plateau-vtt" style="position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; overflow: hidden; z-index: 1; cursor: grab;">
+            <!-- La "Caméra" qui va bouger et zoomer -->
+            <div id="transform-plateau" style="transform-origin: 0 0; transform: translate(0px, 0px) scale(1); width: 1800px; height: 1800px; position: absolute;">
+                <!-- Le fond map (placeholder d'attente pour l'image IA) -->
+                <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: #3a3a3a; border: 2px solid #5c3a21; box-shadow: 0 0 20px black inset;"></div>
+                <!-- Le canvas qui dessine la grille hexagonale -->
+                <canvas id="plateau-canvas" style="position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none;"></canvas>
+            </div>
+        </div>
         
         <!-- UI GAUCHE : Colonne Flexbox prenant toute la hauteur (top: 3vh, bottom: 0) -->
-        <div style="position: absolute; top: 3vh; bottom: 0; left: 3vw; display: flex; flex-direction: column; width: 450px; pointer-events: none;">
+        <div style="position: absolute; top: 3vh; bottom: 0; left: 3vw; display: flex; flex-direction: column; width: 450px; z-index: 10; pointer-events: none;">
             
             <!-- BLOC HAUT : Fixe (Nom, Flèches, Compétences) (flex-shrink: 0 l'empêche de s'écraser) -->
             <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 8px; flex-shrink: 0; pointer-events: auto;">
@@ -822,6 +832,7 @@
 <script type="module" src="creation_personnage.js"></script>
 <script type="module" src="recit_dynamique.js"></script>
 <script type="module" src="competences.js"></script>
+<script src="Plateau.js"></script>
 <script type="module" src="combat.js"></script>
 
 <div id="overlay-jet-des" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 5000; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
