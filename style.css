@@ -1864,3 +1864,34 @@ textarea.input-texte-parchemin {
     user-select: none;
     text-shadow: 1px 1px 2px black;
 }
+
+/* ========================================================================= */
+/* BOUTON TERRAIN DIFFICILE (LOSANGE VTT)                                    */
+/* ========================================================================= */
+.btn-losange-difficile {
+    width: 35px;
+    height: 35px;
+    background-color: rgba(20, 15, 10, 0.8);
+    border: 2px solid #5c3a21;
+    transform: rotate(45deg);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin: 10px auto 15px auto;
+}
+
+.btn-losange-difficile.actif {
+    border-color: #9b59b6;
+    background-color: rgba(155, 89, 182, 0.3);
+    box-shadow: 0 0 15px rgba(155, 89, 182, 0.5);
+}
+
+.btn-losange-difficile span {
+    transform: rotate(-45deg);
+    font-size: 18px;
+    color: #9b59b6;
+    user-select: none;
+    text-shadow: 1px 1px 2px black;
+}

@@ -130,6 +130,7 @@ class Plateau {
         // On vérifie quels outils le Maître du Jeu est en train d'utiliser
         const isGommeMode = window.VTT_MODE_EFFACEMENT === true;
         const isMursMode = window.VTT_MODE_MURS === true;
+        const isDifficileMode = window.VTT_MODE_DIFFICILE === true;
 
         // 1. GOMME : Si supprimée et qu'on n'a pas l'outil gomme, on l'efface totalement (invisible)
         if (state.isDeleted && !isGommeMode) return;
@@ -155,13 +156,16 @@ class Plateau {
             this.ctx.fill();
             this.ctx.strokeStyle = `rgba(0, 0, 0, ${this.gridOpacity})`;
         } else if (state.isBlocked && isMursMode) {
-            // NOUVEAU : On peint le mur en noir profond UNIQUEMENT si l'outil Murs est actif
             this.ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; 
             this.ctx.fill();
-            // Petit liseret blanc translucide pour bien distinguer la case noire sur des maps sombres
             this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; 
+        } else if (state.isDifficult && isDifficileMode) {
+            // NOUVEAU : Violet translucide avec contour blanc pour le terrain difficile (visible uniquement outil en main)
+            this.ctx.fillStyle = 'rgba(155, 89, 182, 0.5)'; 
+            this.ctx.fill();
+            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
         } else {
-            // Cas standard (y compris pour un "Mur" quand l'outil est fermé : on ne dessine que le contour !)
+            // Cas standard
             this.ctx.strokeStyle = `rgba(0, 0, 0, ${this.gridOpacity})`;
         }
 
@@ -183,7 +187,6 @@ class Plateau {
                     y >= -this.hexSize && y <= this.canvas.height + this.hexSize) {
                     
                     const state = this.getCaseState(q, r);
-                    // On ne passe plus d'arguments de mode ici, le drawHex se débrouille tout seul !
                     this.drawHex(x, y, state); 
                 }
             }

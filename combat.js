@@ -97,6 +97,20 @@ window.fermerCombat = function() {
         if (btnGomme) btnGomme.classList.remove("actif");
         if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
     }
+    if (window.VTT_MODE_MURS) {
+        window.VTT_MODE_MURS = false;
+        isPaintingVTT = false;
+        const btnMurs = document.getElementById("btn-murs-vtt");
+        if (btnMurs) btnMurs.classList.remove("actif");
+        if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
+    }
+    if (window.VTT_MODE_DIFFICILE) {
+        window.VTT_MODE_DIFFICILE = false;
+        isPaintingVTT = false;
+        const btnDifficile = document.getElementById("btn-difficile-vtt");
+        if (btnDifficile) btnDifficile.classList.remove("actif");
+        if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
+    }
     if (typeof window.fermerToutesLesFenetres === "function") {
         window.fermerToutesLesFenetres();
     }
@@ -410,8 +424,9 @@ window.appliquerTransformPlateau = function() {
 
 window.VTT_MODE_EFFACEMENT = false;
 window.VTT_MODE_MURS = false;
+window.VTT_MODE_DIFFICILE = false;
 let isPaintingVTT = false;
-let currentPaintAction = null; // 'delete', 'restore', 'block', 'unblock'
+let currentPaintAction = null; // 'delete', 'restore', 'block', 'unblock', 'difficult', 'undifficult'
 
 window.activerPanZoom = function() {
     const conteneur = document.getElementById("conteneur-plateau-vtt");
@@ -444,7 +459,7 @@ window.activerPanZoom = function() {
     // --- SOURIS (Pan & Peinture PC) ---
     conteneur.addEventListener("mousedown", (e) => {
         if (conteneur.contains(e.target)) {
-            if (window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS) {
+            if (window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS || window.VTT_MODE_DIFFICILE) {
                 isPaintingVTT = true;
                 const hex = getHexFromMouse(e.clientX, e.clientY);
                 if (hex) {
@@ -455,6 +470,9 @@ window.activerPanZoom = function() {
                     } else if (window.VTT_MODE_MURS) {
                         currentPaintAction = state.isBlocked ? 'unblock' : 'block';
                         window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isBlocked: currentPaintAction === 'block' });
+                    } else if (window.VTT_MODE_DIFFICILE) {
+                        currentPaintAction = state.isDifficult ? 'undifficult' : 'difficult';
+                        window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDifficult: currentPaintAction === 'difficult' });
                     }
                     window.PLATEAU_VTT.renderMap();
                 }
@@ -468,13 +486,15 @@ window.activerPanZoom = function() {
     });
 
     window.addEventListener("mousemove", (e) => {
-        if (isPaintingVTT && (window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS)) {
+        if (isPaintingVTT && (window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS || window.VTT_MODE_DIFFICILE)) {
             const hex = getHexFromMouse(e.clientX, e.clientY);
             if (hex) {
                 if (window.VTT_MODE_EFFACEMENT) {
                     window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
                 } else if (window.VTT_MODE_MURS) {
                     window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isBlocked: currentPaintAction === 'block' });
+                } else if (window.VTT_MODE_DIFFICILE) {
+                    window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDifficult: currentPaintAction === 'difficult' });
                 }
                 window.PLATEAU_VTT.renderMap(); 
             }
@@ -500,7 +520,7 @@ window.activerPanZoom = function() {
     conteneur.addEventListener("touchstart", (e) => {
         if (conteneur.contains(e.target)) {
             if (e.touches.length === 1) {
-                if (window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS) {
+                if (window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS || window.VTT_MODE_DIFFICILE) {
                     isPaintingVTT = true;
                     const hex = getHexFromMouse(e.touches[0].clientX, e.touches[0].clientY);
                     if (hex) {
@@ -511,6 +531,9 @@ window.activerPanZoom = function() {
                         } else if (window.VTT_MODE_MURS) {
                             currentPaintAction = state.isBlocked ? 'unblock' : 'block';
                             window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isBlocked: currentPaintAction === 'block' });
+                        } else if (window.VTT_MODE_DIFFICILE) {
+                            currentPaintAction = state.isDifficult ? 'undifficult' : 'difficult';
+                            window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDifficult: currentPaintAction === 'difficult' });
                         }
                         window.PLATEAU_VTT.renderMap();
                     }
@@ -534,13 +557,15 @@ window.activerPanZoom = function() {
         }
 
         if (e.touches.length === 1) {
-            if (isPaintingVTT && (window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS)) {
+            if (isPaintingVTT && (window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS || window.VTT_MODE_DIFFICILE)) {
                 const hex = getHexFromMouse(e.touches[0].clientX, e.touches[0].clientY);
                 if (hex) {
                     if (window.VTT_MODE_EFFACEMENT) {
                         window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
                     } else if (window.VTT_MODE_MURS) {
                         window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isBlocked: currentPaintAction === 'block' });
+                    } else if (window.VTT_MODE_DIFFICILE) {
+                        window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDifficult: currentPaintAction === 'difficult' });
                     }
                     window.PLATEAU_VTT.renderMap();
                 }
@@ -580,7 +605,7 @@ window.activerPanZoom = function() {
         
         if (e.touches.length === 1) {
             lastPinchDist = 0;
-            if (!window.VTT_MODE_EFFACEMENT && !window.VTT_MODE_MURS) {
+            if (!window.VTT_MODE_EFFACEMENT && !window.VTT_MODE_MURS && !window.VTT_MODE_DIFFICILE) {
                 isDraggingVTT = true;
                 startDragX = e.touches[0].clientX - window.VTT_POS_X;
                 startDragY = e.touches[0].clientY - window.VTT_POS_Y;
@@ -655,6 +680,11 @@ window.ecouterTerrainVTT = function() {
             // NOUVEAU : ...puis les murs
             if (data.Tuiles_Murs !== undefined) {
                 window.appliquerMurs(data.Tuiles_Murs);
+            }
+
+            // NOUVEAU : Application du terrain difficile
+            if (data.Tuiles_Difficiles !== undefined) {
+                window.appliquerTerrainDifficile(data.Tuiles_Difficiles);
             }
 
             // ...puis on gère la grille en elle-même !
@@ -819,72 +849,6 @@ window.changerTailleHexa = function(delta) {
 };
 
 // =========================================================================
-//  NOUVEAU : OUTIL DE PEINTURE (EFFACEMENT D'HEXAGONES)
-// =========================================================================
-
-window.toggleModeEffacementHex = function() {
-    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    
-    window.VTT_MODE_EFFACEMENT = !window.VTT_MODE_EFFACEMENT;
-    const btn = document.getElementById("btn-gomme-vtt");
-    
-    if (btn) {
-        if (window.VTT_MODE_EFFACEMENT) {
-            btn.classList.add("actif");
-        } else {
-            btn.classList.remove("actif");
-            // Lorsqu'on lâche l'outil, on sauvegarde la nouvelle géographie en BDD !
-            window.sauvegarderTuilesSupprimees();
-        }
-    } else if (!window.VTT_MODE_EFFACEMENT) {
-        window.sauvegarderTuilesSupprimees();
-    }
-    
-    // On met à jour l'affichage avec ou sans la surbrillance rouge
-    if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
-};
-
-window.sauvegarderTuilesSupprimees = async function() {
-    if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) return;
-    
-    // On scanne la mémoire pour récupérer la liste de tous les hexagones supprimés
-    const deletedHexes = [];
-    for (const key in window.PLATEAU_VTT.gridState) {
-        if (window.PLATEAU_VTT.gridState[key].isDeleted) {
-            deletedHexes.push(key);
-        }
-    }
-    
-    try {
-        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
-            Tuiles_Supprimees: deletedHexes
-        }, { merge: true });
-        console.log("[VTT] Nouvelle géographie synchronisée !");
-    } catch(e) {
-        console.error("Erreur synchro gomme :", e);
-    }
-};
-
-window.appliquerTuilesSupprimees = function(tuilesList) {
-    if (!window.PLATEAU_VTT) return;
-    
-    // 1. On réinitialise toutes les tuiles comme étant visibles
-    for (const key in window.PLATEAU_VTT.gridState) {
-        window.PLATEAU_VTT.gridState[key].isDeleted = false;
-    }
-    
-    // 2. On applique les trous selon la base de données
-    if (Array.isArray(tuilesList)) {
-        tuilesList.forEach(key => {
-            if (!window.PLATEAU_VTT.gridState[key]) window.PLATEAU_VTT.gridState[key] = {};
-            window.PLATEAU_VTT.gridState[key].isDeleted = true;
-        });
-    }
-    
-    window.PLATEAU_VTT.renderMap();
-};
-
-// =========================================================================
 //  GESTION DU PANNEAU LATÉRAL DE COMBAT (RÉTRACTABLE)
 // =========================================================================
 window.PANNEAU_GAUCHE_OUVERT = true;
@@ -908,80 +872,90 @@ window.togglePanneauGauche = function() {
 };
 
 // =========================================================================
-//  NOUVEAU : OUTIL DE MURS (BLOCAGE LIGNE DE VUE)
+//  GESTION DES PINCEAUX VTT (MURS, GOMME, DIFFICILE) ET EXCLUSIVITÉ
 // =========================================================================
+
+window.toggleModeEffacementHex = function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    
+    if (window.VTT_MODE_MURS) { window.VTT_MODE_MURS = false; document.getElementById("btn-murs-vtt")?.classList.remove("actif"); window.sauvegarderMurs(); }
+    if (window.VTT_MODE_DIFFICILE) { window.VTT_MODE_DIFFICILE = false; document.getElementById("btn-difficile-vtt")?.classList.remove("actif"); window.sauvegarderTerrainDifficile(); }
+
+    window.VTT_MODE_EFFACEMENT = !window.VTT_MODE_EFFACEMENT;
+    const btn = document.getElementById("btn-gomme-vtt");
+    if (btn) {
+        if (window.VTT_MODE_EFFACEMENT) btn.classList.add("actif");
+        else { btn.classList.remove("actif"); window.sauvegarderTuilesSupprimees(); }
+    }
+    if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
+};
 
 window.toggleModeMursHex = function() {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     
-    // Sécurité : On éteint la gomme si elle est active pour ne pas superposer les pinceaux
-    if (window.VTT_MODE_EFFACEMENT) {
-        window.VTT_MODE_EFFACEMENT = false;
-        document.getElementById("btn-gomme-vtt")?.classList.remove("actif");
-        window.sauvegarderTuilesSupprimees();
-    }
+    if (window.VTT_MODE_EFFACEMENT) { window.VTT_MODE_EFFACEMENT = false; document.getElementById("btn-gomme-vtt")?.classList.remove("actif"); window.sauvegarderTuilesSupprimees(); }
+    if (window.VTT_MODE_DIFFICILE) { window.VTT_MODE_DIFFICILE = false; document.getElementById("btn-difficile-vtt")?.classList.remove("actif"); window.sauvegarderTerrainDifficile(); }
 
     window.VTT_MODE_MURS = !window.VTT_MODE_MURS;
     const btn = document.getElementById("btn-murs-vtt");
-    
-    if (window.VTT_MODE_MURS) {
-        if (btn) btn.classList.add("actif");
-    } else {
-        if (btn) btn.classList.remove("actif");
-        // Lorsqu'on lâche l'outil, on sauvegarde les murs en BDD
-        window.sauvegarderMurs(); 
+    if (btn) {
+        if (window.VTT_MODE_MURS) btn.classList.add("actif");
+        else { btn.classList.remove("actif"); window.sauvegarderMurs(); }
     }
-    
-    // Repeint la map (surtout utile si on quitte le mode gomme rouge)
     if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
 };
 
-// On doit aussi sécuriser la gomme pour qu'elle éteigne les murs !
-const ancienneGomme = window.toggleModeEffacementHex;
-window.toggleModeEffacementHex = function() {
-    if (window.VTT_MODE_MURS) {
-        window.VTT_MODE_MURS = false;
-        document.getElementById("btn-murs-vtt")?.classList.remove("actif");
-        window.sauvegarderMurs();
+window.toggleModeTerrainDifficileHex = function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    
+    if (window.VTT_MODE_EFFACEMENT) { window.VTT_MODE_EFFACEMENT = false; document.getElementById("btn-gomme-vtt")?.classList.remove("actif"); window.sauvegarderTuilesSupprimees(); }
+    if (window.VTT_MODE_MURS) { window.VTT_MODE_MURS = false; document.getElementById("btn-murs-vtt")?.classList.remove("actif"); window.sauvegarderMurs(); }
+
+    window.VTT_MODE_DIFFICILE = !window.VTT_MODE_DIFFICILE;
+    const btn = document.getElementById("btn-difficile-vtt");
+    if (btn) {
+        if (window.VTT_MODE_DIFFICILE) btn.classList.add("actif");
+        else { btn.classList.remove("actif"); window.sauvegarderTerrainDifficile(); }
     }
-    ancienneGomme();
+    if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
+};
+
+// --- SYNC FIREBASE ---
+window.sauvegarderTuilesSupprimees = async function() {
+    if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) return;
+    const deletedHexes = Object.keys(window.PLATEAU_VTT.gridState).filter(key => window.PLATEAU_VTT.gridState[key].isDeleted);
+    try { await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), { Tuiles_Supprimees: deletedHexes }, { merge: true }); } catch(e) {}
 };
 
 window.sauvegarderMurs = async function() {
     if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) return;
-    
-    const blockedHexes = [];
-    for (const key in window.PLATEAU_VTT.gridState) {
-        if (window.PLATEAU_VTT.gridState[key].isBlocked) {
-            blockedHexes.push(key);
-        }
-    }
-    
-    try {
-        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
-            Tuiles_Murs: blockedHexes
-        }, { merge: true });
-        console.log("[VTT] Murs synchronisés !");
-    } catch(e) {
-        console.error("Erreur synchro murs :", e);
-    }
+    const blockedHexes = Object.keys(window.PLATEAU_VTT.gridState).filter(key => window.PLATEAU_VTT.gridState[key].isBlocked);
+    try { await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), { Tuiles_Murs: blockedHexes }, { merge: true }); } catch(e) {}
+};
+
+window.sauvegarderTerrainDifficile = async function() {
+    if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) return;
+    const diffHexes = Object.keys(window.PLATEAU_VTT.gridState).filter(key => window.PLATEAU_VTT.gridState[key].isDifficult);
+    try { await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), { Tuiles_Difficiles: diffHexes }, { merge: true }); } catch(e) {}
+};
+
+window.appliquerTuilesSupprimees = function(tuilesList) {
+    if (!window.PLATEAU_VTT) return;
+    for (const key in window.PLATEAU_VTT.gridState) window.PLATEAU_VTT.gridState[key].isDeleted = false;
+    if (Array.isArray(tuilesList)) tuilesList.forEach(key => { if (!window.PLATEAU_VTT.gridState[key]) window.PLATEAU_VTT.gridState[key] = {}; window.PLATEAU_VTT.gridState[key].isDeleted = true; });
+    window.PLATEAU_VTT.renderMap();
 };
 
 window.appliquerMurs = function(tuilesList) {
     if (!window.PLATEAU_VTT) return;
-    
-    // 1. Réinitialisation
-    for (const key in window.PLATEAU_VTT.gridState) {
-        window.PLATEAU_VTT.gridState[key].isBlocked = false;
-    }
-    
-    // 2. Application
-    if (Array.isArray(tuilesList)) {
-        tuilesList.forEach(key => {
-            if (!window.PLATEAU_VTT.gridState[key]) window.PLATEAU_VTT.gridState[key] = {};
-            window.PLATEAU_VTT.gridState[key].isBlocked = true;
-        });
-    }
-    
+    for (const key in window.PLATEAU_VTT.gridState) window.PLATEAU_VTT.gridState[key].isBlocked = false;
+    if (Array.isArray(tuilesList)) tuilesList.forEach(key => { if (!window.PLATEAU_VTT.gridState[key]) window.PLATEAU_VTT.gridState[key] = {}; window.PLATEAU_VTT.gridState[key].isBlocked = true; });
+    window.PLATEAU_VTT.renderMap();
+};
+
+window.appliquerTerrainDifficile = function(tuilesList) {
+    if (!window.PLATEAU_VTT) return;
+    for (const key in window.PLATEAU_VTT.gridState) window.PLATEAU_VTT.gridState[key].isDifficult = false;
+    if (Array.isArray(tuilesList)) tuilesList.forEach(key => { if (!window.PLATEAU_VTT.gridState[key]) window.PLATEAU_VTT.gridState[key] = {}; window.PLATEAU_VTT.gridState[key].isDifficult = true; });
     window.PLATEAU_VTT.renderMap();
 };
