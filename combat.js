@@ -3,6 +3,34 @@
 // =========================================================================
 
 window.COMBAT_PERSOS_JOUEUR = [];
+
+// =========================================================================
+//  GESTION DU POPUP DE PRÉ-RENCONTRE
+// =========================================================================
+
+window.ouvrirPopupRencontre = function() {
+    const modale = document.getElementById("modale-pre-combat");
+    if (modale) {
+        modale.style.display = "flex"; // Utilise flexbox pour centrer le contenu
+    }
+};
+
+window.fermerPopupRencontre = function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    const modale = document.getElementById("modale-pre-combat");
+    if (modale) {
+        modale.style.display = "none";
+    }
+};
+
+window.validerPopupRencontre = function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    // 1. On ferme le popup
+    window.fermerPopupRencontre();
+    // 2. On lance l'interface de combat
+    window.ouvrirCombat();
+};
+
 window.COMBAT_INDEX_PERSO = 0;
 
 window.ouvrirCombat = function() {

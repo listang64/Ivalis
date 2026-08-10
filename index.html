@@ -163,7 +163,7 @@
             <span class="texte-banniere">Rencontre</span>
           </div>
         </div>
-        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/combat_syxo0p.png" class="icone-menu" alt="Combat" onclick="jouerSonClic(); window.ouvrirCombat()">
+        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/combat_syxo0p.png" class="icone-menu" alt="Combat" onclick="jouerSonClic(); window.ouvrirPopupRencontre()">
       </div>
 
       <!-- BOUTON MISSIONS : JOURNAL -->
@@ -193,6 +193,25 @@
          style="display: none; position: fixed; top: 3vh; right: 1.5vw; width: 4vw; z-index: 10005;"
          onclick="window.fermerCombat()"
          title="Quitter la rencontre">
+
+    <!-- MODALE PRÉ-COMBAT (POPUP RENCONTRE) -->
+    <div id="modale-pre-combat" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center;">
+        <div style="background: rgba(20, 15, 10, 0.95); border: 2px solid #c2a878; border-radius: 12px; padding: 30px; width: 450px; text-align: center; box-shadow: 0 0 30px rgba(0,0,0,1);">
+            <h3 style="font-family: 'Cinzel', serif; color: #e8d5a5; font-size: 26px; margin-top: 0; margin-bottom: 25px; text-shadow: 2px 2px 4px black; letter-spacing: 2px; text-transform: uppercase;">
+                Préparation de la Rencontre
+            </h3>
+            
+            <div id="contenu-pre-combat" style="min-height: 120px; color: #a89f91; font-family: 'Almendra', serif; font-size: 18px; margin-bottom: 25px; display: flex; justify-content: center; align-items: center; border: 1px dashed #5c3a21; border-radius: 8px; background: rgba(0,0,0,0.3);">
+                <!-- C'est ici que tu mettras les futurs paramètres -->
+                <span style="font-style: italic;">(Options de la rencontre à venir...)</span>
+            </div>
+            
+            <div style="display: flex; justify-content: center; gap: 20px;">
+                <button class="btn-parametres" style="background-color: #1b6e3a; border-color: #0f4021;" onclick="window.validerPopupRencontre()">Créer la rencontre</button>
+                <button class="btn-parametres" onclick="window.fermerPopupRencontre()">Annuler</button>
+            </div>
+        </div>
+    </div>
 
     <!-- L'INTERFACE DE COMBAT -->
     <div id="fenetre-combat" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 65; background-color: #1a1a1a; pointer-events: auto;">

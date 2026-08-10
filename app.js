@@ -2628,9 +2628,12 @@ window.fermerToutesLesFenetres = function() {
   const chatbox = document.getElementById('fenetre-chatbox');
   if (chatbox) chatbox.style.display = 'none';
 
-  // --- NOUVEAU : Fermer l'interface de combat ---
+  // --- Fermer l'interface de combat et le popup ---
   const fenetreCombat = document.getElementById('fenetre-combat');
   if (fenetreCombat) fenetreCombat.style.display = 'none';
+
+  const popupRencontre = document.getElementById('modale-pre-combat');
+  if (popupRencontre) popupRencontre.style.display = 'none';
 
   document.querySelectorAll('.bulle-portrait-hover-joueur, .bulle-portrait-hover-mj').forEach(img => img.style.display = 'none');
 
