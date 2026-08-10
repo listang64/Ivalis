@@ -186,13 +186,23 @@
          onclick="window.afficherMenusDansChat()"
          title="Afficher l'interface">
 
-    <!-- Bouton pour quitter le mode Combat (Même design que celui du chat) -->
+    <!-- Bouton pour quitter le mode Combat -->
     <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1783264616/A39F53B8-528E-4052-92AD-E9EDC3F700EB_lbr2mo.png"
          id="btn-fermer-combat"
          class="icone-menu"
          style="display: none; position: fixed; top: 3vh; right: 1.5vw; width: 4vw; z-index: 10005;"
          onclick="window.fermerCombat()"
          title="Quitter la rencontre">
+
+    <!-- NOUVEAU : Bouton Engrenage Gris (Mode Dev Uniquement - Format Texte/Emoji propre) -->
+    <div id="btn-engrenage-combat"
+         style="display: none; position: fixed; top: 2.5vh; right: 6vw; font-size: 45px; z-index: 10005; cursor: pointer; filter: drop-shadow(0 0 5px rgba(255,255,255,0.2)); transition: filter 0.2s ease;"
+         onmouseover="this.style.filter='drop-shadow(0 0 10px rgba(255,255,255,0.6))'"
+         onmouseout="this.style.filter='drop-shadow(0 0 5px rgba(255,255,255,0.2))'"
+         onclick="window.toggleMenuCombat()"
+         title="Outils Développeur">
+         ⚙️
+    </div>
 
     <!-- MODALE PRÉ-COMBAT (POPUP RENCONTRE) -->
     <div id="modale-pre-combat" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center;">
@@ -215,6 +225,25 @@
 
     <!-- L'INTERFACE DE COMBAT -->
     <div id="fenetre-combat" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 65; background-color: #1a1a1a; pointer-events: auto;">
+        <!-- NOUVEAU : MENU COULISSANT DEV UNIQUE -->
+        <div id="menu-dev-combat" class="menu-coulissant-droit" style="border-color: #5c3a21; width: 100px;">
+            <h4 style="color: #c2a878; font-family: 'Cinzel', serif; text-align: center; margin-top: 0; text-shadow: 1px 1px 3px black; font-size: 16px;">MODE DEV</h4>
+            
+            <!-- Bouton Charger Map (Format Emoji agrandi) -->
+            <div style="font-size: 70px; margin-top: 15px; cursor: pointer; filter: drop-shadow(0 0 8px rgba(255,255,255,0.3)); transition: filter 0.2s ease;"
+                 onmouseover="this.style.filter='drop-shadow(0 0 15px rgba(255,255,255,0.8))'"
+                 onmouseout="this.style.filter='drop-shadow(0 0 8px rgba(255,255,255,0.3))'"
+                 onclick="console.log('Action : Charger une Map !')"
+                 title="Charger une Map de test">
+                 🗺️
+            </div>
+
+            <div style="flex-grow: 1;"></div>
+            
+            <!-- Bouton Fermer -->
+            <button class="btn-combat-switch" style="width: 100%; border-color: #ff4c4c; color: #ff4c4c; padding: 6px 0;" onclick="window.fermerMenusCoulissantsCombat(event)">Fermer</button>
+        </div>
+
         <!-- NOUVEAU : LA TABLE VIRTUELLE (Le Plateau VTT) -->
         <div id="conteneur-plateau-vtt" style="position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; overflow: hidden; z-index: 1; cursor: grab;">
             <!-- La "Caméra" qui va bouger et zoomer -->

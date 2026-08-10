@@ -34,28 +34,67 @@ window.validerPopupRencontre = function() {
 window.COMBAT_INDEX_PERSO = 0;
 
 window.ouvrirCombat = function() {
+    // 1. On ferme tout le reste
     if (typeof window.fermerToutesLesFenetres === "function") {
         window.fermerToutesLesFenetres();
     }
 
+    // 2. On masque les menus de navigation standards
     const menuLat = document.getElementById('menu-lateral');
     const menuNav = document.getElementById('menu-navigation-bas');
     if (menuLat) menuLat.style.display = 'none';
     if (menuNav) menuNav.style.display = 'none';
 
+    // 3. On affiche la modale de combat et le bouton de fermeture
     const btnFermer = document.getElementById('btn-fermer-combat');
     if (btnFermer) btnFermer.style.display = 'block';
 
     const fenetreCombat = document.getElementById('fenetre-combat');
     if (fenetreCombat) fenetreCombat.style.display = 'block';
 
+    // =========================================================
+    // 4. CORRECTION : AFFICHAGE DE L'ENGRENAGE DEV
+    // =========================================================
+    const btnEngrenage = document.getElementById('btn-engrenage-combat');
+    if (btnEngrenage) {
+        // On récupère la valeur brute du localStorage (clé principale : ivalis_DEV_MODE)
+        const valeurDevIvalis = localStorage.getItem("ivalis_DEV_MODE");
+        const valeurDevLocal = localStorage.getItem("MODE_DEV");
+        
+        // On vérifie de manière large (ivalis_DEV_MODE, MODE_DEV legacy, ou variable globale)
+        const modeDevActif = (
+            valeurDevIvalis === "on" ||
+            valeurDevLocal === "true" ||
+            valeurDevLocal === "1" ||
+            window.MODE_DEV === true
+        );
+        
+        console.log(`[DEBUG COMBAT] ivalis_DEV_MODE : ${valeurDevIvalis} | MODE_DEV : ${valeurDevLocal} | Résultat : ${modeDevActif}`);
+        
+        if (modeDevActif) {
+            btnEngrenage.style.display = 'block';
+        } else {
+            btnEngrenage.style.display = 'none';
+        }
+    }
+
+    // 5. Initialisation des données
     window.initialiserPersosCombat();
-    window.initialiserPlateau();
+    
+    // 6. Initialisation du plateau VTT
+    if (typeof window.initialiserPlateau === "function") {
+        window.initialiserPlateau();
+    }
 };
 
 window.fermerCombat = function() {
     if (typeof window.jouerSonSurvolParchemin === "function") {
         window.jouerSonSurvolParchemin();
+    }
+    const btnEngrenage = document.getElementById('btn-engrenage-combat');
+    if (btnEngrenage) btnEngrenage.style.display = 'none';
+    if (typeof window.fermerMenusCoulissantsCombat === "function") {
+        window.fermerMenusCoulissantsCombat();
     }
     if (typeof window.fermerToutesLesFenetres === "function") {
         window.fermerToutesLesFenetres();
@@ -429,4 +468,31 @@ window.activerPanZoom = function() {
     conteneur.addEventListener("touchend", () => {
         isDraggingVTT = false;
     });
+};
+
+// =========================================================================
+//  GESTION DU MENU DÉVELOPPEUR (COMBAT)
+// =========================================================================
+
+window.toggleMenuCombat = function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    
+    const menuDev = document.getElementById("menu-dev-combat");
+    if (!menuDev) return;
+    
+    if (menuDev.classList.contains("ouvert")) {
+        window.fermerMenusCoulissantsCombat();
+    } else {
+        menuDev.classList.add("ouvert");
+    }
+};
+
+window.fermerMenusCoulissantsCombat = function(e) {
+    // Petit son optionnel lors de la fermeture avec le bouton "Fermer"
+    const evt = e || (typeof window.event !== 'undefined' ? window.event : null);
+    if (evt && evt.target && evt.target.tagName === 'BUTTON' && typeof window.jouerSonClic === "function") {
+        window.jouerSonClic();
+    }
+    const menuDev = document.getElementById("menu-dev-combat");
+    if (menuDev) menuDev.classList.remove("ouvert");
 };

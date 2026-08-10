@@ -1767,3 +1767,39 @@ textarea.input-texte-parchemin {
 .barre-fatigue-cout {
     animation: effetHaloRougeFatigue 1.5s infinite;
 }
+
+/* ========================================================================= */
+/* MENUS COULISSANTS DE COMBAT                                               */
+/* ========================================================================= */
+
+.menu-coulissant-droit {
+    position: absolute;
+    top: 10vh;
+    right: -300px;
+    width: 80px; 
+    bottom: 5vh;
+    background: rgba(20, 15, 10, 0.95);
+    border: 2px solid #5c3a21;
+    border-right: none;
+    border-radius: 15px 0 0 15px;
+    padding: 20px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 100;
+    transition: right 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+    box-shadow: -5px 5px 25px rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(5px);
+}
+
+.menu-coulissant-droit.ouvert {
+    right: 0;
+}
+
+.bouton-tourne-hover {
+    transition: transform 0.4s ease, filter 0.2s ease !important;
+}
+
+.bouton-tourne-hover:hover {
+    transform: rotate(90deg) scale(1.1) !important;
+}

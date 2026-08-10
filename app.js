@@ -2646,6 +2646,12 @@ window.fermerToutesLesFenetres = function() {
   if (btnFermerChat) btnFermerChat.style.display = 'none';
   if (btnFermerCombat) btnFermerCombat.style.display = 'none';
 
+  const btnEngrenageCombat = document.getElementById('btn-engrenage-combat');
+  if (btnEngrenageCombat) btnEngrenageCombat.style.display = 'none';
+  if (typeof window.fermerMenusCoulissantsCombat === "function") {
+      window.fermerMenusCoulissantsCombat();
+  }
+
   // Fermer les personnages
   const menuPerso = document.getElementById('conteneur-liste-personnages');
   if (menuPerso) {
