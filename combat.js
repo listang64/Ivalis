@@ -424,7 +424,7 @@ window.activerPanZoom = function() {
         return window.PLATEAU_VTT.pixelToHex(canvasX, canvasY);
     }
 
-    // --- ZOOM (Molette PC) ---
+    // --- ZOOM SOURIS (Molette PC) ---
     conteneur.addEventListener("wheel", (e) => {
         e.preventDefault();
         const zoomIntensity = 0.08;
@@ -441,11 +441,10 @@ window.activerPanZoom = function() {
         window.appliquerTransformPlateau();
     }, { passive: false });
 
-    // --- SOURIS (PC) ---
+    // --- SOURIS (Pan & Peinture PC) ---
     conteneur.addEventListener("mousedown", (e) => {
         if (conteneur.contains(e.target)) {
             if (window.VTT_MODE_EFFACEMENT) {
-                // MODE PEINTURE : On détermine si le premier clic efface ou restaure
                 isPaintingVTT = true;
                 const hex = getHexFromMouse(e.clientX, e.clientY);
                 if (hex) {
@@ -455,7 +454,6 @@ window.activerPanZoom = function() {
                     window.PLATEAU_VTT.renderMap(true);
                 }
             } else {
-                // MODE PANNING CLASSIQUE
                 isDraggingVTT = true;
                 startDragX = e.clientX - window.VTT_POS_X;
                 startDragY = e.clientY - window.VTT_POS_Y;
@@ -469,7 +467,7 @@ window.activerPanZoom = function() {
             const hex = getHexFromMouse(e.clientX, e.clientY);
             if (hex) {
                 window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
-                window.PLATEAU_VTT.renderMap(true); // On repeint direct en mode édition
+                window.PLATEAU_VTT.renderMap(true); 
             }
             return;
         }
@@ -486,47 +484,124 @@ window.activerPanZoom = function() {
         if (conteneur) conteneur.style.cursor = "grab";
     });
 
-    // --- TACTILE (iPad) ---
+    // =======================================================
+    // --- NOUVEAU : TACTILE AVANCÉ IPAD (Pinch & Pan) ---
+    // =======================================================
+    let lastPinchDist = 0;
+    let lastPinchCenter = { x: 0, y: 0 };
+
     conteneur.addEventListener("touchstart", (e) => {
-        if (e.touches.length === 1 && conteneur.contains(e.target)) {
-            if (window.VTT_MODE_EFFACEMENT) {
-                isPaintingVTT = true;
-                const hex = getHexFromMouse(e.touches[0].clientX, e.touches[0].clientY);
-                if (hex) {
-                    const state = window.PLATEAU_VTT.getCaseState(hex.q, hex.r);
-                    currentPaintAction = state.isDeleted ? 'restore' : 'delete';
-                    window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
-                    window.PLATEAU_VTT.renderMap(true);
+        if (conteneur.contains(e.target)) {
+            if (e.touches.length === 1) {
+                // 1 DOIGT : PANNING OU PEINTURE
+                if (window.VTT_MODE_EFFACEMENT) {
+                    isPaintingVTT = true;
+                    const hex = getHexFromMouse(e.touches[0].clientX, e.touches[0].clientY);
+                    if (hex) {
+                        const state = window.PLATEAU_VTT.getCaseState(hex.q, hex.r);
+                        currentPaintAction = state.isDeleted ? 'restore' : 'delete';
+                        window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
+                        window.PLATEAU_VTT.renderMap(true);
+                    }
+                } else {
+                    isDraggingVTT = true;
+                    startDragX = e.touches[0].clientX - window.VTT_POS_X;
+                    startDragY = e.touches[0].clientY - window.VTT_POS_Y;
                 }
-            } else {
-                isDraggingVTT = true;
-                startDragX = e.touches[0].clientX - window.VTT_POS_X;
-                startDragY = e.touches[0].clientY - window.VTT_POS_Y;
+            } else if (e.touches.length === 2) {
+                // 2 DOIGTS : PINCH-TO-ZOOM (Annule la peinture/drag)
+                isDraggingVTT = false;
+                isPaintingVTT = false;
+                
+                // Calcul de la distance initiale entre les deux doigts
+                lastPinchDist = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX, 
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                // Calcul du point central entre les deux doigts
+                lastPinchCenter = {
+                    x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+                    y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+                };
             }
         }
     }, { passive: false });
 
     conteneur.addEventListener("touchmove", (e) => {
-        if (window.VTT_MODE_EFFACEMENT && isPaintingVTT && e.touches.length === 1) {
-            if (e.cancelable) e.preventDefault();
-            const hex = getHexFromMouse(e.touches[0].clientX, e.touches[0].clientY);
-            if (hex) {
-                window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
-                window.PLATEAU_VTT.renderMap(true);
-            }
-            return;
+        // Bloque le rebond de l'écran Apple
+        if (isDraggingVTT || isPaintingVTT || e.touches.length === 2) {
+            if (e.cancelable) e.preventDefault(); 
         }
 
-        if (!isDraggingVTT || e.touches.length !== 1) return;
-        if (e.cancelable) e.preventDefault();
-        window.VTT_POS_X = e.touches[0].clientX - startDragX;
-        window.VTT_POS_Y = e.touches[0].clientY - startDragY;
-        window.appliquerTransformPlateau();
+        if (e.touches.length === 1) {
+            // DÉPLACEMENT / PEINTURE (1 Doigt)
+            if (window.VTT_MODE_EFFACEMENT && isPaintingVTT) {
+                const hex = getHexFromMouse(e.touches[0].clientX, e.touches[0].clientY);
+                if (hex) {
+                    window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
+                    window.PLATEAU_VTT.renderMap(true);
+                }
+                return;
+            }
+
+            if (isDraggingVTT) {
+                window.VTT_POS_X = e.touches[0].clientX - startDragX;
+                window.VTT_POS_Y = e.touches[0].clientY - startDragY;
+                window.appliquerTransformPlateau();
+            }
+        } else if (e.touches.length === 2) {
+            // ZOOM (2 Doigts)
+            const currentDist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX, 
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            const currentCenter = {
+                x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+                y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+            };
+
+            if (lastPinchDist > 0) {
+                const zoomFactor = currentDist / lastPinchDist;
+                
+                // 1. Décalage de la caméra si les deux doigts se déplacent ensemble (Pan à deux doigts)
+                window.VTT_POS_X += currentCenter.x - lastPinchCenter.x;
+                window.VTT_POS_Y += currentCenter.y - lastPinchCenter.y;
+
+                // 2. Zoom dirigé vers le centre exact des deux doigts
+                window.VTT_POS_X = currentCenter.x - (currentCenter.x - window.VTT_POS_X) * zoomFactor;
+                window.VTT_POS_Y = currentCenter.y - (currentCenter.y - window.VTT_POS_Y) * zoomFactor;
+
+                window.VTT_SCALE *= zoomFactor;
+                
+                // Limites de zoom
+                if (window.VTT_SCALE < 0.1) window.VTT_SCALE = 0.1;
+                if (window.VTT_SCALE > 5) window.VTT_SCALE = 5;
+
+                window.appliquerTransformPlateau();
+            }
+
+            lastPinchDist = currentDist;
+            lastPinchCenter = currentCenter;
+        }
     }, { passive: false });
 
-    conteneur.addEventListener("touchend", () => {
-        isDraggingVTT = false;
+    conteneur.addEventListener("touchend", (e) => {
         isPaintingVTT = false;
+        
+        if (e.touches.length === 1) {
+            // Si l'utilisateur lève un doigt sur les deux, on remet à zéro la mémoire du Pinch
+            // et on active le Drag pour le doigt restant pour éviter que la carte ne "saute"
+            lastPinchDist = 0;
+            if (!window.VTT_MODE_EFFACEMENT) {
+                isDraggingVTT = true;
+                startDragX = e.touches[0].clientX - window.VTT_POS_X;
+                startDragY = e.touches[0].clientY - window.VTT_POS_Y;
+            }
+        } else if (e.touches.length === 0) {
+            // Plus aucun doigt
+            isDraggingVTT = false;
+            lastPinchDist = 0;
+        }
     });
 };
 
