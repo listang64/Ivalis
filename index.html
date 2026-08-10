@@ -229,13 +229,27 @@
         <div id="menu-dev-combat" class="menu-coulissant-droit" style="border-color: #5c3a21; width: 100px;">
             <h4 style="color: #c2a878; font-family: 'Cinzel', serif; text-align: center; margin-top: 0; text-shadow: 1px 1px 3px black; font-size: 16px;">MODE DEV</h4>
             
-            <!-- Bouton Charger Map (Format Emoji agrandi) -->
+            <!-- Bouton Charger Map -->
             <div style="font-size: 70px; margin-top: 15px; cursor: pointer; filter: drop-shadow(0 0 8px rgba(255,255,255,0.3)); transition: filter 0.2s ease;"
                  onmouseover="this.style.filter='drop-shadow(0 0 15px rgba(255,255,255,0.8))'"
                  onmouseout="this.style.filter='drop-shadow(0 0 8px rgba(255,255,255,0.3))'"
-                 onclick="console.log('Action : Charger une Map !')"
-                 title="Charger une Map de test">
+                 onclick="window.chargerMapTest()"
+                 title="Charger la Map du Port">
                  🗺️
+            </div>
+
+            <!-- NOUVEAU : Encart Échelle (Incrément 1 et bouton OK) -->
+            <div style="margin-top: 25px; width: 100%; border-top: 1px dashed #5c3a21; padding-top: 15px;">
+                <div style="color: #c2a878; font-family: 'Cinzel', serif; font-size: 13px; text-align: center; margin-bottom: 10px;">ÉCHELLE</div>
+                <div style="display: flex; justify-content: center; align-items: center; gap: 8px;">
+                    <button class="btn-combat-switch" style="padding: 2px 8px; font-size: 12px;" onclick="window.changerTailleHexa(-1)">-</button>
+                    <span id="label-taille-hexa" style="color: white; font-family: 'Cinzel', serif; font-size: 18px; width: 35px; text-align: center;">60</span>
+                    <button class="btn-combat-switch" style="padding: 2px 8px; font-size: 12px;" onclick="window.changerTailleHexa(1)">+</button>
+                </div>
+                <!-- Le bouton OK pour pousser la donnée en base -->
+                <div style="text-align: center; margin-top: 10px;">
+                    <button id="btn-ok-echelle" class="btn-combat-switch" style="padding: 4px 15px; font-size: 12px; border-color: #1b6e3a; color: #1b6e3a;" onclick="window.sauvegarderEchelleVTT()">OK</button>
+                </div>
             </div>
 
             <div style="flex-grow: 1;"></div>
@@ -244,15 +258,17 @@
             <button class="btn-combat-switch" style="width: 100%; border-color: #ff4c4c; color: #ff4c4c; padding: 6px 0;" onclick="window.fermerMenusCoulissantsCombat(event)">Fermer</button>
         </div>
 
-        <!-- NOUVEAU : LA TABLE VIRTUELLE (Le Plateau VTT) -->
+        <!-- La Table Virtuelle (Plateau VTT) -->
         <div id="conteneur-plateau-vtt" style="position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; overflow: hidden; z-index: 1; cursor: grab;">
-            <!-- La "Caméra" qui va bouger et zoomer -->
+            
             <div id="transform-plateau" style="transform-origin: 0 0; transform: translate(0px, 0px) scale(1); width: 1800px; height: 1800px; position: absolute;">
-                <!-- Le fond map (placeholder d'attente pour l'image IA) -->
-                <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: #3a3a3a; border: 2px solid #5c3a21; box-shadow: 0 0 20px black inset;"></div>
-                <!-- Le canvas qui dessine la grille hexagonale -->
+                <!-- NOUVEAU : L'image de fond (Map IA) -->
+                <img id="image-map-vtt" src="" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none;">
+                
+                <!-- Le canvas qui peint la grille par dessus -->
                 <canvas id="plateau-canvas" style="position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none;"></canvas>
             </div>
+            
         </div>
         
         <!-- UI GAUCHE : Colonne Flexbox prenant toute la hauteur (top: 3vh, bottom: 0) -->

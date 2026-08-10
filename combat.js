@@ -1,3 +1,6 @@
+import { db } from "./firebase-config.js";
+import { doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
 // =========================================================================
 //  IVALIS - MODULE DE COMBAT (INTERFACE DE BASE)
 // =========================================================================
@@ -34,42 +37,32 @@ window.validerPopupRencontre = function() {
 window.COMBAT_INDEX_PERSO = 0;
 
 window.ouvrirCombat = function() {
-    // 1. On ferme tout le reste
     if (typeof window.fermerToutesLesFenetres === "function") {
         window.fermerToutesLesFenetres();
     }
 
-    // 2. On masque les menus de navigation standards
     const menuLat = document.getElementById('menu-lateral');
     const menuNav = document.getElementById('menu-navigation-bas');
     if (menuLat) menuLat.style.display = 'none';
     if (menuNav) menuNav.style.display = 'none';
 
-    // 3. On affiche la modale de combat et le bouton de fermeture
     const btnFermer = document.getElementById('btn-fermer-combat');
     if (btnFermer) btnFermer.style.display = 'block';
 
     const fenetreCombat = document.getElementById('fenetre-combat');
     if (fenetreCombat) fenetreCombat.style.display = 'block';
 
-    // =========================================================
-    // 4. CORRECTION : AFFICHAGE DE L'ENGRENAGE DEV
-    // =========================================================
     const btnEngrenage = document.getElementById('btn-engrenage-combat');
     if (btnEngrenage) {
-        // On récupère la valeur brute du localStorage (clé principale : ivalis_DEV_MODE)
         const valeurDevIvalis = localStorage.getItem("ivalis_DEV_MODE");
         const valeurDevLocal = localStorage.getItem("MODE_DEV");
         
-        // On vérifie de manière large (ivalis_DEV_MODE, MODE_DEV legacy, ou variable globale)
         const modeDevActif = (
             valeurDevIvalis === "on" ||
             valeurDevLocal === "true" ||
             valeurDevLocal === "1" ||
             window.MODE_DEV === true
         );
-        
-        console.log(`[DEBUG COMBAT] ivalis_DEV_MODE : ${valeurDevIvalis} | MODE_DEV : ${valeurDevLocal} | Résultat : ${modeDevActif}`);
         
         if (modeDevActif) {
             btnEngrenage.style.display = 'block';
@@ -78,12 +71,12 @@ window.ouvrirCombat = function() {
         }
     }
 
-    // 5. Initialisation des données
+    // On charge juste l'UI de gauche
     window.initialiserPersosCombat();
     
-    // 6. Initialisation du plateau VTT
-    if (typeof window.initialiserPlateau === "function") {
-        window.initialiserPlateau();
+    // Le plateau a déjà été chargé en arrière-plan, on s'assure juste qu'il est bien centré
+    if (typeof window.centrerPlateau === "function") {
+        window.centrerPlateau();
     }
 };
 
@@ -375,23 +368,27 @@ let startDragY = 0;
 window.initialiserPlateau = function() {
     if (!window.PLATEAU_VTT) {
         window.PLATEAU_VTT = new Plateau('plateau-canvas');
-        window.PLATEAU_VTT.renderMap(16); // Génère la grille (rayon de cases suffisant pour remplir 1800x1800)
+        window.PLATEAU_VTT.renderMap();
         window.centrerPlateau();
         window.activerPanZoom();
     }
 };
 
 window.centrerPlateau = function() {
-    // Calcul pour faire rentrer parfaitement le plateau 1800x1800 dans l'écran actuel
+    const conteneur = document.getElementById("transform-plateau");
+    if (!conteneur) return;
+    
+    // On s'adapte à la taille physique du conteneur (qui va changer selon l'image)
+    const w = conteneur.offsetWidth || 1800;
+    const h = conteneur.offsetHeight || 1800;
+    
     const winW = window.innerWidth;
     const winH = window.innerHeight;
     
-    // On dézoome légèrement pour voir les bords
-    window.VTT_SCALE = Math.min(winW / 1800, winH / 1800) * 0.9; 
+    window.VTT_SCALE = Math.min(winW / w, winH / h) * 0.9; 
     
-    // On centre la caméra
-    window.VTT_POS_X = (winW - (1800 * window.VTT_SCALE)) / 2;
-    window.VTT_POS_Y = (winH - (1800 * window.VTT_SCALE)) / 2;
+    window.VTT_POS_X = (winW - (w * window.VTT_SCALE)) / 2;
+    window.VTT_POS_Y = (winH - (h * window.VTT_SCALE)) / 2;
     
     window.appliquerTransformPlateau();
 };
@@ -495,4 +492,148 @@ window.fermerMenusCoulissantsCombat = function(e) {
     }
     const menuDev = document.getElementById("menu-dev-combat");
     if (menuDev) menuDev.classList.remove("ouvert");
+};
+
+// =========================================================================
+//  GESTION DEV : MAPS ET ÉCHELLES (SYNCHRONISÉES EN BDD)
+// =========================================================================
+
+window.UNSUBSCRIBE_VTT = null;
+
+function urlsVTTIdentiques(currentSrc, targetUrl) {
+    if (!targetUrl) return !currentSrc;
+    try {
+        return new URL(currentSrc, window.location.href).href === new URL(targetUrl, window.location.href).href;
+    } catch {
+        return currentSrc === targetUrl;
+    }
+}
+
+// L'écouteur qui tourne en arrière-plan chez tous les joueurs
+window.ecouterTerrainVTT = function() {
+    if (!window.ID_PARTIE_COURANTE) return;
+    if (window.UNSUBSCRIBE_VTT) window.UNSUBSCRIBE_VTT(); 
+    
+    // On force la création du canevas en arrière-plan dès le début
+    if (typeof window.initialiserPlateau === "function") {
+        window.initialiserPlateau();
+    }
+
+    window.UNSUBSCRIBE_VTT = onSnapshot(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), (snap) => {
+        if (snap.exists()) {
+            const data = snap.data();
+            if (data.URL_Map && data.Taille_Hex) {
+                // Va télécharger l'image et tracer les hexagones en silence
+                window.appliquerTerrain(data.URL_Map, data.Taille_Hex);
+            }
+        }
+    });
+};
+
+// La fonction qui peint l'image et l'échelle (Appelée par l'écouteur)
+window.appliquerTerrain = function(url, scale) {
+    if (!window.PLATEAU_VTT) return;
+    const imgEl = document.getElementById("image-map-vtt");
+    const conteneurTransform = document.getElementById("transform-plateau");
+    if (!imgEl || !conteneurTransform) return;
+    
+    // Anti-scintillement : si on est déjà à la bonne image et bonne taille, on ignore
+    if (urlsVTTIdentiques(imgEl.src, url) && window.PLATEAU_VTT.hexSize === scale) return;
+
+    // 1. On applique mathématiquement l'échelle
+    window.PLATEAU_VTT.hexSize = scale;
+    window.PLATEAU_VTT.hexWidth = 2 * scale;
+    window.PLATEAU_VTT.hexHeight = Math.sqrt(3) * scale;
+    
+    const label = document.getElementById("label-taille-hexa");
+    if (label) label.innerText = scale;
+
+    const appliquerMapChargee = function() {
+        imgEl.style.display = "block";
+        const w = imgEl.naturalWidth;
+        const h = imgEl.naturalHeight;
+        conteneurTransform.style.width = w + "px";
+        conteneurTransform.style.height = h + "px";
+        window.PLATEAU_VTT.resize(w, h);
+        window.PLATEAU_VTT.renderMap();
+        window.centrerPlateau();
+    };
+
+    // 2. Si l'image a changé, on la charge
+    if (!urlsVTTIdentiques(imgEl.src, url) && url !== "") {
+        imgEl.onload = appliquerMapChargee;
+        imgEl.src = url;
+        // Si elle est déjà en cache, on bypass le onload
+        if (imgEl.complete && imgEl.naturalWidth > 0) appliquerMapChargee();
+    } else if (url !== "") {
+        // 3. Si c'est juste un changement d'échelle, on repeint direct
+        window.PLATEAU_VTT.renderMap();
+    }
+};
+
+// Pousse la Map dans la BDD (qui déclenchera l'écouteur chez tout le monde)
+window.chargerMapTest = async function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    if (!window.ID_PARTIE_COURANTE) return;
+    
+    const imgUrl = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786366789/port_ntpq8p.png";
+    const scale = window.PLATEAU_VTT ? window.PLATEAU_VTT.hexSize : 60;
+    
+    console.log("[VTT] Envoi de la map en base de données...");
+
+    try {
+        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
+            URL_Map: imgUrl,
+            Taille_Hex: scale
+        }, { merge: true });
+    } catch(e) {
+        console.error("Erreur synchro map :", e);
+    }
+};
+
+// Pousse l'échelle sélectionnée dans la BDD
+window.sauvegarderEchelleVTT = async function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) return;
+    
+    const imgEl = document.getElementById("image-map-vtt");
+    const url = imgEl ? imgEl.src || "" : "";
+
+    const btn = document.getElementById("btn-ok-echelle");
+    if (btn) btn.innerText = "⏳";
+
+    try {
+        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
+            URL_Map: url,
+            Taille_Hex: window.PLATEAU_VTT.hexSize
+        }, { merge: true });
+        
+        // Retour visuel pour le MJ
+        if (btn) {
+            btn.innerText = "✔️";
+            setTimeout(() => btn.innerText = "OK", 1500);
+        }
+    } catch(e) {
+        console.error("Erreur synchro échelle :", e);
+        if (btn) btn.innerText = "❌";
+    }
+};
+
+window.changerTailleHexa = function(delta) {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    if (!window.PLATEAU_VTT) return;
+    
+    let nouvelleTaille = window.PLATEAU_VTT.hexSize + delta;
+    
+    if (nouvelleTaille < 20) nouvelleTaille = 20; 
+    if (nouvelleTaille > 250) nouvelleTaille = 250; 
+    
+    // Modification locale uniquement (pour visualiser avant de valider)
+    window.PLATEAU_VTT.hexSize = nouvelleTaille;
+    window.PLATEAU_VTT.hexWidth = 2 * nouvelleTaille;
+    window.PLATEAU_VTT.hexHeight = Math.sqrt(3) * nouvelleTaille;
+    
+    const label = document.getElementById("label-taille-hexa");
+    if (label) label.innerText = nouvelleTaille;
+    window.PLATEAU_VTT.renderMap();
 };

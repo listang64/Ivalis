@@ -26,6 +26,14 @@ class Plateau {
     // ==========================================
 
     /**
+     * NOUVEAU : Adapte la résolution du canvas à l'image chargée en fond
+     */
+    resize(width, height) {
+        this.canvas.width = width;
+        this.canvas.height = height;
+    }
+
+    /**
      * Convertit les coordonnées de la grille (q, r) en pixels (x, y) pour l'affichage.
      * C'est ici que tes tokens viendront s'aimanter (au centre exact de l'hexagone).
      */
@@ -143,15 +151,27 @@ class Plateau {
         this.ctx.stroke();
     }
 
-    renderMap(mapRadius = 12) {
+    renderMap() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Dessine la grille de base
+        // Calcule la distance maximale depuis le centre jusqu'aux coins de l'image
+        const maxDist = Math.sqrt(Math.pow(this.canvas.width / 2, 2) + Math.pow(this.canvas.height / 2, 2));
+        
+        // Calcule le nombre d'hexagones nécessaires pour atteindre les coins
+        const mapRadius = Math.ceil(maxDist / this.hexSize);
+
+        // Dessine la grille pour "peindre" l'image
         for (let q = -mapRadius; q <= mapRadius; q++) {
             for (let r = Math.max(-mapRadius, -q - mapRadius); r <= Math.min(mapRadius, -q + mapRadius); r++) {
                 const { x, y } = this.hexToPixel(q, r);
-                const state = this.getCaseState(q, r);
-                this.drawHex(x, y, state);
+                
+                // Optimisation : Ne dessine l'hexagone QUE s'il est visible sur l'image
+                if (x >= -this.hexSize && x <= this.canvas.width + this.hexSize && 
+                    y >= -this.hexSize && y <= this.canvas.height + this.hexSize) {
+                    
+                    const state = this.getCaseState(q, r);
+                    this.drawHex(x, y, state);
+                }
             }
         }
     }

@@ -1019,7 +1019,16 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
   if (!idPartie) {
     afficherListePersonnages([]);
     afficherBullesPersonnages([]);
+    if (window.UNSUBSCRIBE_VTT) {
+      window.UNSUBSCRIBE_VTT();
+      window.UNSUBSCRIBE_VTT = null;
+    }
     return;
+  }
+
+  // NOUVEAU : On précharge la carte de combat VTT en cache pour l'iPad
+  if (typeof window.ecouterTerrainVTT === "function") {
+      window.ecouterTerrainVTT();
   }
 
   // NOUVEAU : Un petit marqueur pour ignorer la première lecture (la sauvegarde historique)
@@ -1804,6 +1813,11 @@ function confirmerRetourMenu() {
   Object.values(window.UNSUBSCRIBE_COMPETENCES).forEach(unsub => unsub());
   window.UNSUBSCRIBE_COMPETENCES = {};
   window.CACHE_COMPETENCES_GLOBAL = {};
+  // NOUVEAU : Nettoyage du VTT
+  if (window.UNSUBSCRIBE_VTT) {
+      window.UNSUBSCRIBE_VTT();
+      window.UNSUBSCRIBE_VTT = null;
+  }
 }
 
 function confirmerQuitterJeu() {
@@ -4054,5 +4068,6 @@ Object.assign(window, {
   calculerDistanceHex: window.calculerDistanceHex,
   avancerTempsAuto: window.avancerTempsAuto,
   executerVoyage: window.executerVoyage,
+  ecouterTerrainVTT: window.ecouterTerrainVTT,
   dessinerIconesCarte: window.dessinerIconesCarte,
 });
