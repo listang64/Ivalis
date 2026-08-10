@@ -95,7 +95,7 @@ window.fermerCombat = function() {
         isPaintingVTT = false;
         const btnGomme = document.getElementById("btn-gomme-vtt");
         if (btnGomme) btnGomme.classList.remove("actif");
-        if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap(false);
+        if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
     }
     if (typeof window.fermerToutesLesFenetres === "function") {
         window.fermerToutesLesFenetres();
@@ -376,7 +376,7 @@ let startDragY = 0;
 window.initialiserPlateau = function() {
     if (!window.PLATEAU_VTT) {
         window.PLATEAU_VTT = new Plateau('plateau-canvas');
-        window.PLATEAU_VTT.renderMap(window.VTT_MODE_EFFACEMENT || false);
+        window.PLATEAU_VTT.renderMap();
         window.centrerPlateau();
         window.activerPanZoom();
     }
@@ -409,14 +409,14 @@ window.appliquerTransformPlateau = function() {
 };
 
 window.VTT_MODE_EFFACEMENT = false;
+window.VTT_MODE_MURS = false;
 let isPaintingVTT = false;
-let currentPaintAction = null; // 'delete' ou 'restore'
+let currentPaintAction = null; // 'delete', 'restore', 'block', 'unblock'
 
 window.activerPanZoom = function() {
     const conteneur = document.getElementById("conteneur-plateau-vtt");
     if (!conteneur) return;
 
-    // Convertit les coordonnées de l'écran en coordonnées sur le canvas (en ignorant le zoom)
     function getHexFromMouse(clientX, clientY) {
         if (!window.PLATEAU_VTT) return null;
         const canvasX = (clientX - window.VTT_POS_X) / window.VTT_SCALE;
@@ -444,14 +444,19 @@ window.activerPanZoom = function() {
     // --- SOURIS (Pan & Peinture PC) ---
     conteneur.addEventListener("mousedown", (e) => {
         if (conteneur.contains(e.target)) {
-            if (window.VTT_MODE_EFFACEMENT) {
+            if (window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS) {
                 isPaintingVTT = true;
                 const hex = getHexFromMouse(e.clientX, e.clientY);
                 if (hex) {
                     const state = window.PLATEAU_VTT.getCaseState(hex.q, hex.r);
-                    currentPaintAction = state.isDeleted ? 'restore' : 'delete';
-                    window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
-                    window.PLATEAU_VTT.renderMap(true);
+                    if (window.VTT_MODE_EFFACEMENT) {
+                        currentPaintAction = state.isDeleted ? 'restore' : 'delete';
+                        window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
+                    } else if (window.VTT_MODE_MURS) {
+                        currentPaintAction = state.isBlocked ? 'unblock' : 'block';
+                        window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isBlocked: currentPaintAction === 'block' });
+                    }
+                    window.PLATEAU_VTT.renderMap();
                 }
             } else {
                 isDraggingVTT = true;
@@ -463,11 +468,15 @@ window.activerPanZoom = function() {
     });
 
     window.addEventListener("mousemove", (e) => {
-        if (isPaintingVTT && window.VTT_MODE_EFFACEMENT) {
+        if (isPaintingVTT && (window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS)) {
             const hex = getHexFromMouse(e.clientX, e.clientY);
             if (hex) {
-                window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
-                window.PLATEAU_VTT.renderMap(true); 
+                if (window.VTT_MODE_EFFACEMENT) {
+                    window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
+                } else if (window.VTT_MODE_MURS) {
+                    window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isBlocked: currentPaintAction === 'block' });
+                }
+                window.PLATEAU_VTT.renderMap(); 
             }
             return;
         }
@@ -484,24 +493,26 @@ window.activerPanZoom = function() {
         if (conteneur) conteneur.style.cursor = "grab";
     });
 
-    // =======================================================
-    // --- NOUVEAU : TACTILE AVANCÉ IPAD (Pinch & Pan) ---
-    // =======================================================
+    // --- TACTILE AVANCÉ IPAD (Pinch & Pan & Paint) ---
     let lastPinchDist = 0;
     let lastPinchCenter = { x: 0, y: 0 };
 
     conteneur.addEventListener("touchstart", (e) => {
         if (conteneur.contains(e.target)) {
             if (e.touches.length === 1) {
-                // 1 DOIGT : PANNING OU PEINTURE
-                if (window.VTT_MODE_EFFACEMENT) {
+                if (window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS) {
                     isPaintingVTT = true;
                     const hex = getHexFromMouse(e.touches[0].clientX, e.touches[0].clientY);
                     if (hex) {
                         const state = window.PLATEAU_VTT.getCaseState(hex.q, hex.r);
-                        currentPaintAction = state.isDeleted ? 'restore' : 'delete';
-                        window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
-                        window.PLATEAU_VTT.renderMap(true);
+                        if (window.VTT_MODE_EFFACEMENT) {
+                            currentPaintAction = state.isDeleted ? 'restore' : 'delete';
+                            window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
+                        } else if (window.VTT_MODE_MURS) {
+                            currentPaintAction = state.isBlocked ? 'unblock' : 'block';
+                            window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isBlocked: currentPaintAction === 'block' });
+                        }
+                        window.PLATEAU_VTT.renderMap();
                     }
                 } else {
                     isDraggingVTT = true;
@@ -509,37 +520,29 @@ window.activerPanZoom = function() {
                     startDragY = e.touches[0].clientY - window.VTT_POS_Y;
                 }
             } else if (e.touches.length === 2) {
-                // 2 DOIGTS : PINCH-TO-ZOOM (Annule la peinture/drag)
                 isDraggingVTT = false;
                 isPaintingVTT = false;
-                
-                // Calcul de la distance initiale entre les deux doigts
-                lastPinchDist = Math.hypot(
-                    e.touches[0].clientX - e.touches[1].clientX, 
-                    e.touches[0].clientY - e.touches[1].clientY
-                );
-                // Calcul du point central entre les deux doigts
-                lastPinchCenter = {
-                    x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-                    y: (e.touches[0].clientY + e.touches[1].clientY) / 2
-                };
+                lastPinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                lastPinchCenter = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
             }
         }
     }, { passive: false });
 
     conteneur.addEventListener("touchmove", (e) => {
-        // Bloque le rebond de l'écran Apple
         if (isDraggingVTT || isPaintingVTT || e.touches.length === 2) {
             if (e.cancelable) e.preventDefault(); 
         }
 
         if (e.touches.length === 1) {
-            // DÉPLACEMENT / PEINTURE (1 Doigt)
-            if (window.VTT_MODE_EFFACEMENT && isPaintingVTT) {
+            if (isPaintingVTT && (window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS)) {
                 const hex = getHexFromMouse(e.touches[0].clientX, e.touches[0].clientY);
                 if (hex) {
-                    window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
-                    window.PLATEAU_VTT.renderMap(true);
+                    if (window.VTT_MODE_EFFACEMENT) {
+                        window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
+                    } else if (window.VTT_MODE_MURS) {
+                        window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isBlocked: currentPaintAction === 'block' });
+                    }
+                    window.PLATEAU_VTT.renderMap();
                 }
                 return;
             }
@@ -550,30 +553,17 @@ window.activerPanZoom = function() {
                 window.appliquerTransformPlateau();
             }
         } else if (e.touches.length === 2) {
-            // ZOOM (2 Doigts)
-            const currentDist = Math.hypot(
-                e.touches[0].clientX - e.touches[1].clientX, 
-                e.touches[0].clientY - e.touches[1].clientY
-            );
-            const currentCenter = {
-                x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-                y: (e.touches[0].clientY + e.touches[1].clientY) / 2
-            };
+            const currentDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+            const currentCenter = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
 
             if (lastPinchDist > 0) {
                 const zoomFactor = currentDist / lastPinchDist;
-                
-                // 1. Décalage de la caméra si les deux doigts se déplacent ensemble (Pan à deux doigts)
                 window.VTT_POS_X += currentCenter.x - lastPinchCenter.x;
                 window.VTT_POS_Y += currentCenter.y - lastPinchCenter.y;
-
-                // 2. Zoom dirigé vers le centre exact des deux doigts
                 window.VTT_POS_X = currentCenter.x - (currentCenter.x - window.VTT_POS_X) * zoomFactor;
                 window.VTT_POS_Y = currentCenter.y - (currentCenter.y - window.VTT_POS_Y) * zoomFactor;
-
                 window.VTT_SCALE *= zoomFactor;
                 
-                // Limites de zoom
                 if (window.VTT_SCALE < 0.1) window.VTT_SCALE = 0.1;
                 if (window.VTT_SCALE > 5) window.VTT_SCALE = 5;
 
@@ -589,16 +579,13 @@ window.activerPanZoom = function() {
         isPaintingVTT = false;
         
         if (e.touches.length === 1) {
-            // Si l'utilisateur lève un doigt sur les deux, on remet à zéro la mémoire du Pinch
-            // et on active le Drag pour le doigt restant pour éviter que la carte ne "saute"
             lastPinchDist = 0;
-            if (!window.VTT_MODE_EFFACEMENT) {
+            if (!window.VTT_MODE_EFFACEMENT && !window.VTT_MODE_MURS) {
                 isDraggingVTT = true;
                 startDragX = e.touches[0].clientX - window.VTT_POS_X;
                 startDragY = e.touches[0].clientY - window.VTT_POS_Y;
             }
         } else if (e.touches.length === 0) {
-            // Plus aucun doigt
             isDraggingVTT = false;
             lastPinchDist = 0;
         }
@@ -665,6 +652,11 @@ window.ecouterTerrainVTT = function() {
                 window.appliquerTuilesSupprimees(data.Tuiles_Supprimees);
             }
 
+            // NOUVEAU : ...puis les murs
+            if (data.Tuiles_Murs !== undefined) {
+                window.appliquerMurs(data.Tuiles_Murs);
+            }
+
             // ...puis on gère la grille en elle-même !
             if (data.URL_Map !== undefined && data.Taille_Hex !== undefined) {
                 const opacite = data.Opacite_Grille !== undefined ? data.Opacite_Grille : 0.8;
@@ -704,7 +696,7 @@ window.appliquerTerrain = function(url, scale, opacity) {
         conteneurTransform.style.width = w + "px";
         conteneurTransform.style.height = h + "px";
         window.PLATEAU_VTT.resize(w, h);
-        window.PLATEAU_VTT.renderMap(window.VTT_MODE_EFFACEMENT);
+        window.PLATEAU_VTT.renderMap();
         window.centrerPlateau();
     };
 
@@ -714,7 +706,7 @@ window.appliquerTerrain = function(url, scale, opacity) {
         if (imgEl.complete && imgEl.naturalWidth > 0) appliquerMapChargee();
     } else {
         // Changement d'échelle/opacité seul, ou repeinture sans nouvelle image
-        window.PLATEAU_VTT.renderMap(window.VTT_MODE_EFFACEMENT);
+        window.PLATEAU_VTT.renderMap();
     }
 };
 
@@ -783,7 +775,7 @@ window.changerOpaciteGrille = function(delta) {
     const label = document.getElementById("label-opacite-hexa");
     if (label) label.innerText = nouvelleOpa.toFixed(1);
     
-    window.PLATEAU_VTT.renderMap(window.VTT_MODE_EFFACEMENT);
+    window.PLATEAU_VTT.renderMap();
 };
 
 window.sauvegarderOpaciteVTT = async function() {
@@ -823,7 +815,7 @@ window.changerTailleHexa = function(delta) {
     
     const label = document.getElementById("label-taille-hexa");
     if (label) label.innerText = nouvelleTaille;
-    window.PLATEAU_VTT.renderMap(window.VTT_MODE_EFFACEMENT);
+    window.PLATEAU_VTT.renderMap();
 };
 
 // =========================================================================
@@ -849,7 +841,7 @@ window.toggleModeEffacementHex = function() {
     }
     
     // On met à jour l'affichage avec ou sans la surbrillance rouge
-    if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap(window.VTT_MODE_EFFACEMENT);
+    if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
 };
 
 window.sauvegarderTuilesSupprimees = async function() {
@@ -889,7 +881,7 @@ window.appliquerTuilesSupprimees = function(tuilesList) {
         });
     }
     
-    window.PLATEAU_VTT.renderMap(window.VTT_MODE_EFFACEMENT);
+    window.PLATEAU_VTT.renderMap();
 };
 
 // =========================================================================
@@ -913,4 +905,83 @@ window.togglePanneauGauche = function() {
         panneau.style.transform = "translateX(calc(-100% + 5px))";
         fleche.innerText = "►";
     }
+};
+
+// =========================================================================
+//  NOUVEAU : OUTIL DE MURS (BLOCAGE LIGNE DE VUE)
+// =========================================================================
+
+window.toggleModeMursHex = function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    
+    // Sécurité : On éteint la gomme si elle est active pour ne pas superposer les pinceaux
+    if (window.VTT_MODE_EFFACEMENT) {
+        window.VTT_MODE_EFFACEMENT = false;
+        document.getElementById("btn-gomme-vtt")?.classList.remove("actif");
+        window.sauvegarderTuilesSupprimees();
+    }
+
+    window.VTT_MODE_MURS = !window.VTT_MODE_MURS;
+    const btn = document.getElementById("btn-murs-vtt");
+    
+    if (window.VTT_MODE_MURS) {
+        if (btn) btn.classList.add("actif");
+    } else {
+        if (btn) btn.classList.remove("actif");
+        // Lorsqu'on lâche l'outil, on sauvegarde les murs en BDD
+        window.sauvegarderMurs(); 
+    }
+    
+    // Repeint la map (surtout utile si on quitte le mode gomme rouge)
+    if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
+};
+
+// On doit aussi sécuriser la gomme pour qu'elle éteigne les murs !
+const ancienneGomme = window.toggleModeEffacementHex;
+window.toggleModeEffacementHex = function() {
+    if (window.VTT_MODE_MURS) {
+        window.VTT_MODE_MURS = false;
+        document.getElementById("btn-murs-vtt")?.classList.remove("actif");
+        window.sauvegarderMurs();
+    }
+    ancienneGomme();
+};
+
+window.sauvegarderMurs = async function() {
+    if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) return;
+    
+    const blockedHexes = [];
+    for (const key in window.PLATEAU_VTT.gridState) {
+        if (window.PLATEAU_VTT.gridState[key].isBlocked) {
+            blockedHexes.push(key);
+        }
+    }
+    
+    try {
+        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
+            Tuiles_Murs: blockedHexes
+        }, { merge: true });
+        console.log("[VTT] Murs synchronisés !");
+    } catch(e) {
+        console.error("Erreur synchro murs :", e);
+    }
+};
+
+window.appliquerMurs = function(tuilesList) {
+    if (!window.PLATEAU_VTT) return;
+    
+    // 1. Réinitialisation
+    for (const key in window.PLATEAU_VTT.gridState) {
+        window.PLATEAU_VTT.gridState[key].isBlocked = false;
+    }
+    
+    // 2. Application
+    if (Array.isArray(tuilesList)) {
+        tuilesList.forEach(key => {
+            if (!window.PLATEAU_VTT.gridState[key]) window.PLATEAU_VTT.gridState[key] = {};
+            window.PLATEAU_VTT.gridState[key].isBlocked = true;
+        });
+    }
+    
+    window.PLATEAU_VTT.renderMap();
 };

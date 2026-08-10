@@ -126,9 +126,13 @@ class Plateau {
     // MOTEUR DE RENDU
     // ==========================================
 
-    drawHex(x, y, state, isEditMode = false) {
-        // Si supprimée et qu'on n'est pas en train d'éditer, on l'efface totalement
-        if (state.isDeleted && !isEditMode) return;
+    drawHex(x, y, state) {
+        // On vérifie quels outils le Maître du Jeu est en train d'utiliser
+        const isGommeMode = window.VTT_MODE_EFFACEMENT === true;
+        const isMursMode = window.VTT_MODE_MURS === true;
+
+        // 1. GOMME : Si supprimée et qu'on n'a pas l'outil gomme, on l'efface totalement (invisible)
+        if (state.isDeleted && !isGommeMode) return;
 
         this.ctx.beginPath();
         for (let i = 0; i < 6; i++) {
@@ -141,20 +145,23 @@ class Plateau {
         }
         this.ctx.closePath();
 
-        // Rendu visuel dynamique
-        if (state.isDeleted && isEditMode) {
-            this.ctx.fillStyle = 'rgba(255, 0, 0, 0.2)'; // Calque rouge fantôme
+        // 2. RENDU VISUEL
+        if (state.isDeleted && isGommeMode) {
+            this.ctx.fillStyle = 'rgba(255, 0, 0, 0.2)'; 
             this.ctx.fill();
             this.ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
         } else if (state.isTargeted) {
             this.ctx.fillStyle = 'rgba(255, 50, 50, 0.4)'; 
             this.ctx.fill();
             this.ctx.strokeStyle = `rgba(0, 0, 0, ${this.gridOpacity})`;
-        } else if (state.isBlocked) {
-            this.ctx.fillStyle = 'rgba(50, 50, 50, 0.8)'; 
+        } else if (state.isBlocked && isMursMode) {
+            // NOUVEAU : On peint le mur en noir profond UNIQUEMENT si l'outil Murs est actif
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; 
             this.ctx.fill();
-            this.ctx.strokeStyle = `rgba(0, 0, 0, ${this.gridOpacity})`;
+            // Petit liseret blanc translucide pour bien distinguer la case noire sur des maps sombres
+            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; 
         } else {
+            // Cas standard (y compris pour un "Mur" quand l'outil est fermé : on ne dessine que le contour !)
             this.ctx.strokeStyle = `rgba(0, 0, 0, ${this.gridOpacity})`;
         }
 
@@ -162,7 +169,7 @@ class Plateau {
         this.ctx.stroke();
     }
 
-    renderMap(isEditMode = false) {
+    renderMap() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
         const maxDist = Math.sqrt(Math.pow(this.canvas.width / 2, 2) + Math.pow(this.canvas.height / 2, 2));
@@ -176,7 +183,8 @@ class Plateau {
                     y >= -this.hexSize && y <= this.canvas.height + this.hexSize) {
                     
                     const state = this.getCaseState(q, r);
-                    this.drawHex(x, y, state, isEditMode);
+                    // On ne passe plus d'arguments de mode ici, le drawHex se débrouille tout seul !
+                    this.drawHex(x, y, state); 
                 }
             }
         }

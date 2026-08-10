@@ -1833,3 +1833,34 @@ textarea.input-texte-parchemin {
     color: #ff4c4c;
     user-select: none;
 }
+
+/* ========================================================================= */
+/* BOUTON MURS (LOSANGE VTT)                                                 */
+/* ========================================================================= */
+.btn-losange-mur {
+    width: 35px;
+    height: 35px;
+    background-color: rgba(20, 15, 10, 0.8);
+    border: 2px solid #5c3a21;
+    transform: rotate(45deg);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin: 10px auto 15px auto;
+}
+
+.btn-losange-mur.actif {
+    border-color: #aaaaaa;
+    background-color: rgba(50, 50, 50, 0.5);
+    box-shadow: 0 0 15px rgba(150, 150, 150, 0.5);
+}
+
+.btn-losange-mur span {
+    transform: rotate(-45deg);
+    font-size: 18px;
+    color: #aaaaaa;
+    user-select: none;
+    text-shadow: 1px 1px 2px black;
+}
