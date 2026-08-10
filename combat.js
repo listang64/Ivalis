@@ -891,3 +891,26 @@ window.appliquerTuilesSupprimees = function(tuilesList) {
     
     window.PLATEAU_VTT.renderMap(window.VTT_MODE_EFFACEMENT);
 };
+
+// =========================================================================
+//  GESTION DU PANNEAU LATÉRAL DE COMBAT (RÉTRACTABLE)
+// =========================================================================
+window.PANNEAU_GAUCHE_OUVERT = true;
+
+window.togglePanneauGauche = function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    const panneau = document.getElementById("panneau-combat-gauche");
+    const fleche = document.getElementById("fleche-toggle-panneau");
+    if (!panneau || !fleche) return;
+    
+    window.PANNEAU_GAUCHE_OUVERT = !window.PANNEAU_GAUCHE_OUVERT;
+    
+    if (window.PANNEAU_GAUCHE_OUVERT) {
+        panneau.style.transform = "translateX(0)";
+        fleche.innerText = "◄";
+    } else {
+        // Rétracte le panneau en laissant dépasser 5px (pour voir un fin liseret) + l'onglet
+        panneau.style.transform = "translateX(calc(-100% + 5px))";
+        fleche.innerText = "►";
+    }
+};

@@ -292,8 +292,17 @@
         </div>
         
         <!-- UI GAUCHE : Panneau latéral assombri -->
-        <div style="position: absolute; top: 0; bottom: 0; left: 0; width: 380px; background: rgba(15, 10, 10, 0.85); border-right: 2px solid #c2a878; box-shadow: 5px 0 20px rgba(0,0,0,0.9); z-index: 10; pointer-events: none; display: flex; flex-direction: column; padding: 3vh 20px 0 20px; box-sizing: border-box; backdrop-filter: blur(3px);">
+        <div id="panneau-combat-gauche" style="position: absolute; top: 0; bottom: 0; left: 0; width: 380px; background: rgba(15, 10, 10, 0.85); border-right: 2px solid #c2a878; box-shadow: 5px 0 20px rgba(0,0,0,0.9); z-index: 10; pointer-events: none; display: flex; flex-direction: column; padding: 3vh 20px 0 20px; box-sizing: border-box; backdrop-filter: blur(3px); transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); transform: translateX(0);">
             
+            <!-- LE NOUVEAU BOUTON DE RÉTRACTATION (Onglet Trapèze) -->
+            <div onclick="window.togglePanneauGauche()" style="position: absolute; top: 50%; right: -24px; transform: translateY(-50%); width: 24px; height: 80px; cursor: pointer; pointer-events: auto; display: flex; justify-content: center; align-items: center; filter: drop-shadow(4px 0px 4px rgba(0,0,0,0.5)); transition: filter 0.2s ease;" onmouseover="this.style.filter='drop-shadow(4px 0px 6px rgba(194, 168, 120, 0.6))'" onmouseout="this.style.filter='drop-shadow(4px 0px 4px rgba(0,0,0,0.5))'">
+                <svg width="24" height="80" viewBox="0 0 24 80" style="position: absolute; top: 0; left: 0; z-index: -1;">
+                    <!-- La forme exacte de ton croquis qui fusionne avec le liseret ! -->
+                    <path d="M-2,0 L22,20 L22,60 L-2,80" fill="rgba(15, 10, 10, 0.95)" stroke="#c2a878" stroke-width="2"/>
+                </svg>
+                <span id="fleche-toggle-panneau" style="color: #c2a878; font-size: 14px; text-shadow: 1px 1px 2px black;">◄</span>
+            </div>
+
             <!-- BLOC HAUT : Fixe (Nom, Flèches, Compétences) -->
             <div style="display: flex; flex-direction: column; align-items: stretch; gap: 8px; flex-shrink: 0; pointer-events: auto;">
                 
@@ -322,16 +331,12 @@
                     <!-- Textes au-dessus -->
                     <div style="position: relative; height: 25px; font-family: 'Cinzel', serif; font-size: 15px; font-weight: bold;">
                         <span id="label-fatigue-restante" style="position: absolute; color: #ff4c4c; transform: translateX(-50%); bottom: 2px; opacity: 0; text-shadow: 1px 1px 3px black; transition: opacity 0.3s ease, left 0.3s ease;"></span>
-                        
-                        <!-- Chiffre actuel passé en Doré -->
                         <span id="label-fatigue-actuelle" style="position: absolute; color: #c2a878; transform: translateX(-50%); bottom: 2px; text-shadow: 1px 1px 3px black; transition: left 0.3s ease;"></span>
                     </div>
                     
                     <!-- La jauge avec ombre portée externe et ombre interne -->
                     <div style="width: 100%; height: 14px; background-color: #111; border-radius: 7px; border: 1px solid #222; display: flex; overflow: hidden; box-shadow: inset 0 2px 5px rgba(0,0,0,0.8), 0 5px 12px rgba(0,0,0,0.9);">
-                        <!-- Gris : Fatigue restante -->
                         <div id="barre-fatigue-grise" style="height: 100%; background: linear-gradient(to bottom, #888888 0%, #444444 100%); width: 0%; transition: width 0.3s ease;"></div>
-                        <!-- Rouge : Coût de la compétence -->
                         <div id="barre-fatigue-rouge" class="barre-fatigue-cout" style="height: 100%; background: linear-gradient(to bottom, #ff6b6b 0%, #cc0000 100%); width: 0%; opacity: 0; transition: width 0.3s ease, opacity 0.3s ease;"></div>
                     </div>
 
@@ -340,12 +345,11 @@
                         <span style="font-family: 'Cinzel', serif; font-size: 11px; color: #c2a878; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding-right: 8px; text-shadow: 1px 1px 2px black;">
                             Énergie
                         </span>
-                        <!-- La barre dorée qui prend la place restante des 50% -->
                         <div style="flex-grow: 1; height: 1px; background-color: #c2a878; box-shadow: 0 0 5px #c2a878, 0 0 2px #c2a878; opacity: 0.8;"></div>
                     </div>
                 </div>
 
-                <!-- Liste des compétences : CORRECTION DE L'ALIGNEMENT ICI (flex-start) -->
+                <!-- Liste des compétences -->
                 <div id="combat-liste-competences" style="margin-top: 15px; display: flex; flex-direction: column; align-items: flex-start; gap: 0; width: 100%; padding-left: 2px;">
                     <!-- Rempli par JavaScript -->
                 </div>
@@ -353,7 +357,6 @@
 
             <!-- BLOC BAS : Extensible (Avatar dynamique centré) -->
             <div style="flex-grow: 1; min-height: 0; width: 100%; position: relative; margin-top: 15px; pointer-events: none;">
-                <!-- L'image est calée en bas au centre et s'adapte à la largeur (100%) sans dépasser du liseret -->
                 <img id="combat-portrait-perso" src="" style="position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); max-width: 100%; height: 100%; object-fit: contain; object-position: bottom center; filter: drop-shadow(0 5px 15px rgba(0,0,0,0.9)); opacity: 0; transition: opacity 0.4s ease;">
             </div>
             
