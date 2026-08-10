@@ -19,6 +19,9 @@ class Plateau {
         // 3. Base de données locale de la grille
         // Structure clé-valeur (ex: "0,-1") idéale pour sauvegarder/charger depuis une BDD
         this.gridState = {};
+
+        // NOUVEAU : Transparence de la grille par défaut
+        this.gridOpacity = 0.8;
     }
 
     // ==========================================
@@ -123,10 +126,12 @@ class Plateau {
     // MOTEUR DE RENDU
     // ==========================================
 
-    drawHex(x, y, state) {
+    drawHex(x, y, state, isEditMode = false) {
+        // Si supprimée et qu'on n'est pas en train d'éditer, on l'efface totalement
+        if (state.isDeleted && !isEditMode) return;
+
         this.ctx.beginPath();
         for (let i = 0; i < 6; i++) {
-            // Un angle multiple de 60° (0, 60, 120...) génère un hexagone avec le bord plat en haut
             const angle_rad = Math.PI / 180 * (60 * i);
             const hx = x + this.hexSize * Math.cos(angle_rad);
             const hy = y + this.hexSize * Math.sin(angle_rad);
@@ -136,41 +141,42 @@ class Plateau {
         }
         this.ctx.closePath();
 
-        // Rendu visuel dynamique basé sur l'état de la case (provenant potentiellement de la BDD)
-        if (state.isTargeted) {
-            this.ctx.fillStyle = 'rgba(255, 50, 50, 0.4)'; // Aperçu de zone d'attaque (AoE) en rouge
+        // Rendu visuel dynamique
+        if (state.isDeleted && isEditMode) {
+            this.ctx.fillStyle = 'rgba(255, 0, 0, 0.2)'; // Calque rouge fantôme
             this.ctx.fill();
+            this.ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+        } else if (state.isTargeted) {
+            this.ctx.fillStyle = 'rgba(255, 50, 50, 0.4)'; 
+            this.ctx.fill();
+            this.ctx.strokeStyle = `rgba(0, 0, 0, ${this.gridOpacity})`;
         } else if (state.isBlocked) {
-            this.ctx.fillStyle = 'rgba(50, 50, 50, 0.8)'; // Obstacle
+            this.ctx.fillStyle = 'rgba(50, 50, 50, 0.8)'; 
             this.ctx.fill();
+            this.ctx.strokeStyle = `rgba(0, 0, 0, ${this.gridOpacity})`;
+        } else {
+            this.ctx.strokeStyle = `rgba(0, 0, 0, ${this.gridOpacity})`;
         }
 
-        // Contour par défaut : noir fin
-        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
         this.ctx.lineWidth = 1;
         this.ctx.stroke();
     }
 
-    renderMap() {
+    renderMap(isEditMode = false) {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Calcule la distance maximale depuis le centre jusqu'aux coins de l'image
         const maxDist = Math.sqrt(Math.pow(this.canvas.width / 2, 2) + Math.pow(this.canvas.height / 2, 2));
-        
-        // Calcule le nombre d'hexagones nécessaires pour atteindre les coins
         const mapRadius = Math.ceil(maxDist / this.hexSize);
 
-        // Dessine la grille pour "peindre" l'image
         for (let q = -mapRadius; q <= mapRadius; q++) {
             for (let r = Math.max(-mapRadius, -q - mapRadius); r <= Math.min(mapRadius, -q + mapRadius); r++) {
                 const { x, y } = this.hexToPixel(q, r);
                 
-                // Optimisation : Ne dessine l'hexagone QUE s'il est visible sur l'image
                 if (x >= -this.hexSize && x <= this.canvas.width + this.hexSize && 
                     y >= -this.hexSize && y <= this.canvas.height + this.hexSize) {
                     
                     const state = this.getCaseState(q, r);
-                    this.drawHex(x, y, state);
+                    this.drawHex(x, y, state, isEditMode);
                 }
             }
         }

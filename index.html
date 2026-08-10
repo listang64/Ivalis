@@ -229,8 +229,8 @@
         <div id="menu-dev-combat" class="menu-coulissant-droit" style="border-color: #5c3a21; width: 100px;">
             <h4 style="color: #c2a878; font-family: 'Cinzel', serif; text-align: center; margin-top: 0; text-shadow: 1px 1px 3px black; font-size: 16px;">MODE DEV</h4>
             
-            <!-- Bouton Charger Map -->
-            <div style="font-size: 70px; margin-top: 15px; cursor: pointer; filter: drop-shadow(0 0 8px rgba(255,255,255,0.3)); transition: filter 0.2s ease;"
+            <!-- Bouton Charger Map (Taille réduite de moitié) -->
+            <div style="font-size: 35px; margin-top: 15px; cursor: pointer; filter: drop-shadow(0 0 8px rgba(255,255,255,0.3)); transition: filter 0.2s ease;"
                  onmouseover="this.style.filter='drop-shadow(0 0 15px rgba(255,255,255,0.8))'"
                  onmouseout="this.style.filter='drop-shadow(0 0 8px rgba(255,255,255,0.3))'"
                  onclick="window.chargerMapTest()"
@@ -246,9 +246,29 @@
                     <span id="label-taille-hexa" style="color: white; font-family: 'Cinzel', serif; font-size: 18px; width: 35px; text-align: center;">60</span>
                     <button class="btn-combat-switch" style="padding: 2px 8px; font-size: 12px;" onclick="window.changerTailleHexa(1)">+</button>
                 </div>
-                <!-- Le bouton OK pour pousser la donnée en base -->
                 <div style="text-align: center; margin-top: 10px;">
                     <button id="btn-ok-echelle" class="btn-combat-switch" style="padding: 4px 15px; font-size: 12px; border-color: #1b6e3a; color: #1b6e3a;" onclick="window.sauvegarderEchelleVTT()">OK</button>
+                </div>
+            </div>
+
+            <!-- NOUVEAU : Encart Opacité Grille -->
+            <div style="margin-top: 15px; width: 100%; border-top: 1px dashed #5c3a21; padding-top: 15px;">
+                <div style="color: #c2a878; font-family: 'Cinzel', serif; font-size: 13px; text-align: center; margin-bottom: 10px;">OPACITÉ</div>
+                <div style="display: flex; justify-content: center; align-items: center; gap: 8px;">
+                    <button class="btn-combat-switch" style="padding: 2px 8px; font-size: 12px;" onclick="window.changerOpaciteGrille(-0.1)">-</button>
+                    <span id="label-opacite-hexa" style="color: white; font-family: 'Cinzel', serif; font-size: 18px; width: 35px; text-align: center;">0.8</span>
+                    <button class="btn-combat-switch" style="padding: 2px 8px; font-size: 12px;" onclick="window.changerOpaciteGrille(0.1)">+</button>
+                </div>
+                <div style="text-align: center; margin-top: 10px;">
+                    <button id="btn-ok-opacite" class="btn-combat-switch" style="padding: 4px 15px; font-size: 12px; border-color: #1b6e3a; color: #1b6e3a;" onclick="window.sauvegarderOpaciteVTT()">OK</button>
+                </div>
+            </div>
+
+            <!-- NOUVEAU : Outil Gomme (Losange) -->
+            <div style="margin-top: 15px; width: 100%; border-top: 1px dashed #5c3a21; padding-top: 15px; text-align: center;">
+                <div style="color: #c2a878; font-family: 'Cinzel', serif; font-size: 13px; margin-bottom: 5px;">GOMME</div>
+                <div id="btn-gomme-vtt" class="btn-losange-efface" onclick="window.toggleModeEffacementHex()" title="Activer/Désactiver le pinceau gommeur">
+                    <span>❌</span>
                 </div>
             </div>
 
