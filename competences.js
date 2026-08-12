@@ -99,6 +99,9 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
             <div style="display: flex; flex-direction: column; gap: 0px; width: 100%; max-width: 580px; margin: 15px 0; padding-bottom: 80px;">
         `;
 
+        // NOUVEAU : Récupération de l'espacement personnalisé (ou valeur par défaut plus resserrée : -85px)
+        window.ESPACEMENT_BANNIERES_COMBAT = parseInt(localStorage.getItem("ivalis_espacement_bannieres")) || -85;
+
         // Boucle sur le tableau TRIÉ
         competencesArray.forEach(comp => {
             const data = comp.data;
@@ -114,7 +117,7 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
             htmlDeck += `
                 <div id="ui-carte-${idCarte}" class="banniere-carte" data-selectionnee="${isSelStr}"
                      onclick="window.gererClicCarte('${idCarte}')"
-                     style="position: relative; width: 100%; height: 160px; display: flex; align-items: center; cursor: pointer; transition: transform 0.2s ease; margin-bottom: -75px; z-index: 2; transform: translateX(${decalageX});"
+                     style="position: relative; width: 100%; height: 160px; display: flex; align-items: center; cursor: pointer; transition: transform 0.2s ease; margin-bottom: ${window.ESPACEMENT_BANNIERES_COMBAT}px; z-index: 2; transform: translateX(${decalageX});"
                      onmouseover="this.style.transform = this.dataset.selectionnee === 'true' ? 'translateX(95px)' : 'translateX(12px)'; this.style.zIndex='100';"
                      onmouseout="this.style.transform = this.dataset.selectionnee === 'true' ? 'translateX(80px)' : 'translateX(0px)'; this.style.zIndex='2';">
                      

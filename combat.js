@@ -193,11 +193,9 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
         const persoActuel = window.PERSOS_PARTIE.find(p => p.idPersonnage === idPersonnage);
         if (!persoActuel) return;
         
-        // --- MISE EN MÉMOIRE DES STATS DE FATIGUE ---
         window.COMBAT_FATIGUE_MAX = parseInt(persoActuel.fatigueMax) || 100;
         window.COMBAT_FATIGUE_ACTUELLE = parseInt(persoActuel.fatigueActuelle) || window.COMBAT_FATIGUE_MAX;
         
-        // On affiche le conteneur de la jauge et on la met à 0 (coût)
         document.getElementById("combat-jauge-fatigue-container").style.opacity = "1";
         window.mettreAJourJaugeFatigue(0);
 
@@ -227,6 +225,12 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
         let htmlDeck = "";
         const IMAGE_CADRE_NORMAL = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png";
 
+        // =========================================================================
+        // 🔻 RÉGLAGE DE LA DISTANCE ENTRE LES BANNIÈRES 🔻
+        // Modifie cette valeur manuellement pour écarter ou resserrer les bannières.
+        // =========================================================================
+        const ESPACEMENT_BANNIERES = -45;
+
         competencesToRender.forEach(comp => {
             const data = comp.data;
             const idCarte = comp.id;
@@ -234,18 +238,27 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
             const initiative = data.Initiative || 0;
 
             htmlDeck += `
-            <div style="height: 100px; margin-bottom: -20px;">
-                <div id="combat-carte-${idCarte}" class="banniere-carte-combat"
-                     onclick="event.stopPropagation(); window.gererClicCarteCombat('${idCarte}')"
-                     data-actif="false"
-                     style="position: relative; width: 450px; height: 160px; display: flex; align-items: center; cursor: pointer; transition: filter 0.2s ease; transform: scale(0.75); transform-origin: left top; z-index: 2;"
-                     onmouseover="this.style.zIndex='100';"
-                     onmouseout="this.style.zIndex='2';">
+            <div style="position: relative; height: 100px; margin-bottom: ${ESPACEMENT_BANNIERES}px; transition: margin 0.2s ease;">
+                
+                <!-- ========================================================================= -->
+                <!-- 🔻 HITBOX (ZONE DE CLIC INVISIBLE) 🔻                                     -->
+                <!-- ========================================================================= -->
+                <div onclick="event.stopPropagation(); window.gererClicCarteCombat('${idCarte}')"
+                     onmouseover="document.getElementById('combat-carte-${idCarte}').style.transform='scale(0.75) translateX(15px)'; document.getElementById('combat-carte-${idCarte}').style.zIndex='100';"
+                     onmouseout="document.getElementById('combat-carte-${idCarte}').style.transform='scale(0.75) translateX(0px)'; document.getElementById('combat-carte-${idCarte}').style.zIndex='2';"
+                     style="position: absolute; top: 35px; left: 0; width: 335px; height: 40px; z-index: 10; cursor: pointer;">
+                </div>
+
+                <!-- ========================================================================= -->
+                <!-- 🎨 VISUELS : NE MODIFIE PLUS LES DIMENSIONS ICI (Elles fixent l'image)    -->
+                <!-- ========================================================================= -->
+                <div id="combat-carte-${idCarte}" class="banniere-carte-combat" data-actif="false"
+                     style="position: absolute; top: 0; left: 0; width: 450px; height: 160px; pointer-events: none; transition: filter 0.2s ease, transform 0.2s ease; transform: scale(0.75); transform-origin: left top; z-index: 2;">
                      
                     <div style="position: absolute; top: 49px; bottom: 58px; left: 63px; right: 7px; z-index: 1; border-radius: 0 15px 15px 0; background-color: ${window.COULEUR_PERSO_COURANT};"></div>
                     <div id="cadre-combat-${idCarte}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('${IMAGE_CADRE_NORMAL}'); background-size: contain; background-position: left center; background-repeat: no-repeat; z-index: 2; filter: drop-shadow(0px 6px 4px rgba(0,0,0,0.6)); transition: background-image 0.2s ease;"></div>
-                    <div style="position: absolute; top: 44%; transform: translateY(-50%); left: 6px; width: 69px; text-align: center; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 30px; font-weight: bold; z-index: 3; text-shadow: 2px 2px 5px black; pointer-events: none;">${initiative}</div>
-                    <div style="position: absolute; top: 48%; transform: translateY(-50%); left: 76px; right: 120px; text-align: left; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;">${titre}</div>
+                    <div style="position: absolute; top: 44%; transform: translateY(-50%); left: 6px; width: 69px; text-align: center; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 30px; font-weight: bold; z-index: 3; text-shadow: 2px 2px 5px black;">${initiative}</div>
+                    <div style="position: absolute; top: 48%; transform: translateY(-50%); left: 76px; right: 120px; text-align: left; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${titre}</div>
                 </div>
             </div>
             `;
@@ -959,3 +972,39 @@ window.appliquerTerrainDifficile = function(tuilesList) {
     if (Array.isArray(tuilesList)) tuilesList.forEach(key => { if (!window.PLATEAU_VTT.gridState[key]) window.PLATEAU_VTT.gridState[key] = {}; window.PLATEAU_VTT.gridState[key].isDifficult = true; });
     window.PLATEAU_VTT.renderMap();
 };
+
+// =========================================================================
+//  NOUVEAU : CONTRÔLE DE L'ESPACEMENT DES BANNIÈRES
+// =========================================================================
+
+window.changerEspacementBannieres = function(delta) {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    
+    // Récupération de l'espacement actuel (ou valeur par défaut)
+    let espacementActuel = parseInt(localStorage.getItem("ivalis_espacement_bannieres")) || -85;
+    let nouvelEspacement = espacementActuel + delta;
+    
+    // On met des limites raisonnables (-120px très serré, 0px très espacé)
+    if (nouvelEspacement < -120) nouvelEspacement = -120;
+    if (nouvelEspacement > 0) nouvelEspacement = 0;
+    
+    // Sauvegarde dans le navigateur
+    localStorage.setItem("ivalis_espacement_bannieres", nouvelEspacement);
+    window.ESPACEMENT_BANNIERES_COMBAT = nouvelEspacement;
+    
+    const label = document.getElementById("label-espacement-bannieres");
+    if (label) label.innerText = nouvelEspacement;
+    
+    // On force le rafraîchissement immédiat de l'UI
+    if (window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR.length > 0) {
+        window.afficherPersoCombatActuel();
+    }
+};
+
+// --- INITIALISATION VISUELLE DU LABEL AU DÉMARRAGE ---
+document.addEventListener("DOMContentLoaded", function () {
+    const label = document.getElementById("label-espacement-bannieres");
+    if (label) {
+        label.innerText = parseInt(localStorage.getItem("ivalis_espacement_bannieres")) || -85;
+    }
+});
