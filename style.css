@@ -9,17 +9,24 @@
 }
 
 /* --- REGLAGES GLOBAUX --- */
-/* --app-h est la hauteur reellement peinte par l'appareil. Sur iPad installe sur
-   l'ecran d'accueil, iOS annonce un viewport plus court que la dalle, ce qui laissait
-   une bande noire en bas. Le script en tete de index.html mesure la vraie valeur et
-   ecrase cette variable ; les valeurs ci-dessous ne sont que des replis. */
+/* Sur iPad installe sur l'ecran d'accueil, iOS donne au document une zone visible
+   plus courte que la dalle (mesure : 992 px pour un ecran de 1024 px). Les 32 px
+   restants ne sont atteignables par aucun contenu : WebKit n'y peint que le fond de
+   l'element racine. D'ou deux hauteurs distinctes :
+     --app-h       hauteur reellement visible, c'est elle qui dimensionne l'interface ;
+     --app-dalle-h hauteur physique de la dalle, uniquement pour etaler le fond de html.
+   Le script en tete de index.html mesure les deux ; les valeurs ci-dessous sont des replis. */
 :root {
   --app-h: 100%;
+  --app-dalle-h: 100%;
+  --marge-haute: env(safe-area-inset-top, 0px);
+  --marge-basse: env(safe-area-inset-bottom, 0px);
 }
 
 @supports (height: 100dvh) {
   :root {
     --app-h: 100dvh;
+    --app-dalle-h: 100dvh;
   }
 }
 
@@ -27,12 +34,27 @@ body, html {
   margin: 0;
   padding: 0;
   width: 100%;
-  height: var(--app-h);
-  position: fixed; /* Bloque l'écran */
-  top: 0; left: 0;
-  overflow: hidden;
+  overflow: hidden; /* Bloque l'écran */
   background-color: #000;
   touch-action: none;
+}
+
+/* Le fond de html est le seul calque que WebKit prolonge jusqu'au bord physique.
+   Sa boite est donc etiree a la dalle entiere, et le script y recopie en continu le
+   decor de la scene affichee : la bande du bas cesse d'etre noire. html reste en flux
+   normal, la position fixe empechait ce prolongement. */
+html {
+  height: var(--app-dalle-h);
+  background-repeat: no-repeat;
+  background-position: 0 0;
+  background-size: 100% 100%;
+}
+
+/* L'interface, elle, reste dans la zone reellement visible : rien n'est pousse dehors. */
+body {
+  position: fixed;
+  top: 0; left: 0;
+  height: var(--app-h);
 }
 
 /* --- SCENE 1 : L'ACCUEIL --- */

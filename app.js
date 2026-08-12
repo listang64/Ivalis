@@ -2431,10 +2431,10 @@ window.recadrerCarte = function() {
   const carte = document.getElementById("carte-fond-jeu");
   if (!carte) return;
 
-  // Hauteur reellement peinte par l'appareil : sur iPad installe en application, elle
-  // depasse window.innerHeight, et s'y fier laissait la carte s'arreter avant le bas.
-  const hauteurEcran = typeof window.hauteurEcranUtilisable === "function"
-    ? window.hauteurEcranUtilisable()
+  // On cadre sur la dalle physique, pas sur la zone visible : le fond de html recopie
+  // ensuite le rectangle de la carte pour combler la bande basse de l'iPad.
+  const hauteurEcran = typeof window.hauteurDalle === "function"
+    ? window.hauteurDalle()
     : window.innerHeight;
 
   const ratioX = window.innerWidth / 3840;

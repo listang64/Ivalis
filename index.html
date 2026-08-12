@@ -7,13 +7,16 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Ivalis - Le JDR</title>
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
 
   <script>
-    /* Bande noire en bas sur iPad installe sur l'ecran d'accueil : iOS annonce un
-       viewport plus court que la dalle qu'il peint reellement, donc ni 100%, ni 100vh,
-       ni 100dvh ne descendent jusqu'au bord. On mesure la hauteur reelle et on la
-       publie dans --app-h, que tous les ecrans plein cadre utilisent. */
+    /* Bande noire en bas sur iPad installe sur l'ecran d'accueil.
+       Mesure sur l'appareil : dalle 1024 px, zone visible 992 px. Les 32 px manquants
+       sont hors de la zone visible, donc hors d'atteinte de tout contenu : les agrandir
+       via 100%, 100vh, 100dvh ou une hauteur mesuree ne fait que pousser l'interface
+       dehors. Seul le fond de l'element racine est etale par WebKit sur la fenetre
+       native entiere. On garde donc l'interface dans les 992 px visibles et on recopie
+       le decor de la scene affichee dans le fond de html, qui comble la bande. */
     (function () {
       var racine = document.documentElement;
 
@@ -23,41 +26,108 @@
           || window.matchMedia('(display-mode: fullscreen)').matches;
       }
 
-      function saisieEnCours() {
-        var actif = document.activeElement;
-        if (!actif) return false;
-        var balise = actif.tagName;
-        return balise === 'INPUT' || balise === 'TEXTAREA' || actif.isContentEditable === true;
-      }
-
+      /* Hauteur reellement visible : c'est elle qui dimensionne l'interface. */
       window.hauteurEcranUtilisable = function () {
         var hauteur = window.innerHeight || racine.clientHeight;
-
         if (window.visualViewport && window.visualViewport.height > hauteur) {
           hauteur = window.visualViewport.height;
         }
-
-        /* En mode application la webview occupe toute la dalle : on peut donc faire
-           confiance a screen pour recuperer les pixels que le viewport nous cache. */
-        if (enApplicationInstallee() && window.screen && !saisieEnCours()) {
-          var enPaysage = window.innerWidth > window.innerHeight;
-          var petitCote = Math.min(window.screen.width, window.screen.height);
-          var grandCote = Math.max(window.screen.width, window.screen.height);
-          var hauteurDalle = enPaysage ? petitCote : grandCote;
-
-          /* Seul un ecart de type safe-area est comble : au-dela c'est un clavier
-             ou un multitache iPad, et rattraper l'ecart casserait la mise en page. */
-          if (hauteurDalle > hauteur && hauteurDalle - hauteur <= 100) {
-            hauteur = hauteurDalle;
-          }
-        }
-
         return Math.round(hauteur);
+      };
+
+      /* Hauteur physique de la dalle : sert uniquement de reference au fond de html. */
+      window.hauteurDalle = function () {
+        var visible = window.hauteurEcranUtilisable();
+        if (!enApplicationInstallee() || !window.screen) return visible;
+
+        var enPaysage = window.innerWidth > window.innerHeight;
+        var dalle = enPaysage
+          ? Math.min(window.screen.width, window.screen.height)
+          : Math.max(window.screen.width, window.screen.height);
+
+        /* Un ecart de type safe-area seulement : au-dela c'est un clavier ou le
+           multitache iPad, et etirer le fond n'aurait plus aucun sens. */
+        return (dalle > visible && dalle - visible <= 120) ? dalle : visible;
       };
 
       window.ajusterHauteurEcran = function () {
         racine.style.setProperty('--app-h', window.hauteurEcranUtilisable() + 'px');
+        racine.style.setProperty('--app-dalle-h', window.hauteurDalle() + 'px');
         if (typeof window.recadrerCarte === 'function') window.recadrerCarte();
+        window.synchroniserFondCanvas();
+      };
+
+      /* ------------------------------------------------------------------ */
+      /* Recopie du decor de la scene visible dans le fond de html.          */
+      /* ------------------------------------------------------------------ */
+
+      /* Scenes plein cadre, de la plus haute a la plus basse dans l'empilement.
+         'calque' designe l'enfant qui porte reellement le decor ; 'suivreRect' sert
+         aux calques transformes (la carte du monde est zoomee et deplacee), dont on
+         recopie la position exacte a l'ecran pour que la bande soit dans la continuite. */
+      var scenes = [
+        { cible: '#ecran-selection-race' },
+        { cible: '#ecran-recit-dynamique' },
+        { cible: '#ecran-accueil' },
+        { cible: '#ecran-identification' },
+        { cible: '#fenetre-combat' },
+        { cible: '#ecran-jeu', calque: '#carte-fond-jeu', suivreRect: true },
+        { cible: '#ecran-menu', calque: '.bg-menu' }
+      ];
+
+      function estVisible(element) {
+        if (!element) return false;
+        var style = getComputedStyle(element);
+        if (style.display === 'none' || style.visibility === 'hidden') return false;
+        return parseFloat(style.opacity) > 0.05;
+      }
+
+      var dernierFond = '';
+
+      window.synchroniserFondCanvas = function () {
+        if (!document.body) return;
+
+        var image = 'none';
+        var taille = '100% 100%';
+        var position = '0 0';
+        var couleur = '#000000';
+
+        for (var i = 0; i < scenes.length; i++) {
+          var scene = document.querySelector(scenes[i].cible);
+          if (!estVisible(scene)) continue;
+
+          var source = scenes[i].calque ? scene.querySelector(scenes[i].calque) : null;
+          if (!source) source = scene;
+
+          var style = getComputedStyle(source);
+          image = style.backgroundImage;
+
+          /* Un calque de decor est souvent sans couleur de fond : on remonte alors sur
+             la scene, puis sur le noir, pour ne jamais laisser le fond transparent. */
+          var teintes = [style.backgroundColor, getComputedStyle(scene).backgroundColor];
+          for (var t = 0; t < teintes.length; t++) {
+            if (teintes[t] && teintes[t] !== 'rgba(0, 0, 0, 0)' && teintes[t] !== 'transparent') {
+              couleur = teintes[t];
+              break;
+            }
+          }
+
+          if (scenes[i].suivreRect) {
+            var rect = source.getBoundingClientRect();
+            taille = Math.round(rect.width) + 'px ' + Math.round(rect.height) + 'px';
+            position = Math.round(rect.left) + 'px ' + Math.round(rect.top) + 'px';
+          }
+          break;
+        }
+
+        var signature = image + '|' + taille + '|' + position + '|' + couleur;
+        if (signature === dernierFond) return;
+        dernierFond = signature;
+
+        racine.style.backgroundColor = couleur;
+        racine.style.backgroundImage = image;
+        racine.style.backgroundSize = taille;
+        racine.style.backgroundPosition = position;
       };
 
       window.ajusterHauteurEcran();
@@ -74,24 +144,31 @@
         window.visualViewport.addEventListener('resize', window.ajusterHauteurEcran);
       }
 
-      /* Panneau de mesures, ouvert par un appui a trois doigts : permet de lire les
-         valeurs reelles directement sur l'iPad si une bande subsistait. */
+      /* Les scenes s'ouvrent et se ferment depuis une dizaine d'endroits du jeu :
+         une veille legere evite d'avoir a instrumenter chacun d'eux. */
+      window.addEventListener('DOMContentLoaded', function () {
+        window.synchroniserFondCanvas();
+        setInterval(window.synchroniserFondCanvas, 400);
+      });
+
+      /* Panneau de mesures, ouvert par un appui a trois doigts. */
       window.diagnosticEcran = function () {
         var panneau = document.getElementById('diagnostic-ecran');
         if (panneau) { panneau.remove(); return; }
 
+        var calcule = getComputedStyle(racine);
         panneau = document.createElement('div');
         panneau.id = 'diagnostic-ecran';
         panneau.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:2147483647;'
           + 'background:rgba(0,120,0,0.92);color:#fff;font:12px monospace;padding:8px;'
           + 'text-align:center;line-height:1.5;';
         panneau.textContent = 'innerHeight ' + window.innerHeight
-          + ' | clientHeight ' + racine.clientHeight
-          + ' | visualViewport ' + (window.visualViewport ? Math.round(window.visualViewport.height) : '-')
           + ' | screen ' + window.screen.width + 'x' + window.screen.height
-          + ' | ratio ' + window.devicePixelRatio
           + ' | --app-h ' + racine.style.getPropertyValue('--app-h')
-          + ' | app installee ' + enApplicationInstallee();
+          + ' | --app-dalle-h ' + racine.style.getPropertyValue('--app-dalle-h')
+          + ' | marge haute ' + calcule.getPropertyValue('--marge-haute')
+          + ' | marge basse ' + calcule.getPropertyValue('--marge-basse')
+          + ' | fond ' + racine.style.backgroundColor + ' ' + racine.style.backgroundSize;
         panneau.addEventListener('click', function () { panneau.remove(); });
         document.body.appendChild(panneau);
       };
@@ -1057,10 +1134,10 @@
 </div> 
 
 <!-- NOUVEAU : On charge le cerveau IA ici -->
-<script type="module" src="ia_master.js?v=3"></script>
-<script type="module" src="app.js?v=3"></script>
+<script type="module" src="ia_master.js?v=4"></script>
+<script type="module" src="app.js?v=4"></script>
 <script type="module" src="creation_personnage.js"></script>
-<script type="module" src="recit_dynamique.js?v=3"></script>
+<script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js"></script>
 <script src="Plateau.js"></script>
 <script type="module" src="combat.js"></script>
