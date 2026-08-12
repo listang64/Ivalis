@@ -17,7 +17,7 @@ function initInterfaceRecit() {
     const overlay = document.createElement("div");
     overlay.id = "ecran-recit-dynamique";
     overlay.style.cssText = `
-        display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        display: none; position: fixed; top: 0; left: 0; width: 100vw; height: var(--app-h);
         background-image: url('./images/Fond_Parchemin.png'); background-size: 100% 100%; background-position: center;
         z-index: 9000; opacity: 0; transition: opacity 1.5s ease-in-out; cursor: pointer;
     `;

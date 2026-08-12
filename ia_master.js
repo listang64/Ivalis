@@ -1419,7 +1419,7 @@ window.afficherEcranAttente = function(textePersonnalise) {
     if (document.getElementById("ecran-attente-ia")) return;
     const overlay = document.createElement("div");
     overlay.id = "ecran-attente-ia";
-    overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; backdrop-filter: blur(5px);`;
+    overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100vw; height: var(--app-h); background: rgba(0, 0, 0, 0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; backdrop-filter: blur(5px);`;
     const texte = document.createElement("h2");
     texte.innerText = textePersonnalise || "En attente du maitre du jeu ...";
     texte.style.cssText = "color: white; font-family: serif; font-size: 2rem; margin-bottom: 20px; letter-spacing: 2px; text-shadow: 2px 2px 4px #000; text-align: center;";

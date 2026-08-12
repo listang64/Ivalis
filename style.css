@@ -9,13 +9,27 @@
 }
 
 /* --- REGLAGES GLOBAUX --- */
+/* --app-h est la hauteur reellement peinte par l'appareil. Sur iPad installe sur
+   l'ecran d'accueil, iOS annonce un viewport plus court que la dalle, ce qui laissait
+   une bande noire en bas. Le script en tete de index.html mesure la vraie valeur et
+   ecrase cette variable ; les valeurs ci-dessous ne sont que des replis. */
+:root {
+  --app-h: 100%;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --app-h: 100dvh;
+  }
+}
+
 body, html {
   margin: 0;
   padding: 0;
   width: 100%;
-  height: 100%; /* On supprime les vh, vw et dvh qui rendent l'iPad fou */
+  height: var(--app-h);
   position: fixed; /* Bloque l'écran */
-  top: 0; left: 0; right: 0; bottom: 0; /* Étirement absolu aux 4 coins */
+  top: 0; left: 0;
   overflow: hidden;
   background-color: #000;
   touch-action: none;
@@ -213,7 +227,7 @@ body, html {
 #overlay-modale {
   display: none;
   position: fixed;
-  top: 0; left: 0; width: 100%; height: 100%;
+  top: 0; left: 0; width: 100%; height: var(--app-h);
   background-color: rgba(0, 0, 0, 0.8);
   z-index: 99;
   backdrop-filter: blur(3px);
@@ -341,9 +355,9 @@ body, html {
 #ecran-jeu {
   display: none;
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0; left: 0;
   width: 100%;
-  height: 100%;
+  height: var(--app-h);
   z-index: 20;
   overflow: hidden;
 }
@@ -603,7 +617,7 @@ body, html {
 #overlay-jeu-modale {
   display: none;
   position: fixed;
-  top: 0; left: 0; width: 100%; height: 100%;
+  top: 0; left: 0; width: 100%; height: var(--app-h);
   background-color: rgba(0, 0, 0, 0.8);
   z-index: 99;
   backdrop-filter: blur(3px);
@@ -928,7 +942,7 @@ textarea.input-texte-parchemin {
 
 #voile-suppression-perso { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.9); z-index: 100; flex-direction: column; justify-content: center; align-items: center; border-radius: 11px; }
 
-#ecran-chargement-ia { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(14, 8, 4, 0.95); z-index: 500; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(6px); }
+#ecran-chargement-ia { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: var(--app-h); background-color: rgba(14, 8, 4, 0.95); z-index: 500; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(6px); }
 #titre-chargement-ia { color: #ffffff; font-size: 32px; font-weight: bold; font-family: 'Almendra', serif; margin-bottom: 25px; text-shadow: 0px 0px 20px rgba(255, 255, 255, 0.7); text-align: center; letter-spacing: 1px; }
 #image-chargement-ia { max-width: 85%; max-height: 65vh; border: 3px solid #c2a878; border-radius: 12px; box-shadow: 0px 15px 40px rgba(0, 0, 0, 0.9); }
 
@@ -944,7 +958,7 @@ textarea.input-texte-parchemin {
 /* =========================================================================
    ALERTE UI : CLES API MANQUANTES (par-dessus tout, meme l'ecran de chargement)
    ========================================================================= */
-#overlay-alerte-cles { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.8); z-index: 600; backdrop-filter: blur(3px); }
+#overlay-alerte-cles { display: none; position: fixed; top: 0; left: 0; width: 100%; height: var(--app-h); background-color: rgba(0, 0, 0, 0.8); z-index: 600; backdrop-filter: blur(3px); }
 #modale-alerte-cles { z-index: 601; }
 #modale-alerte-cles p { font-size: 18px; line-height: 1.4; margin-bottom: 25px; }
 

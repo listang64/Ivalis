@@ -2431,13 +2431,19 @@ window.recadrerCarte = function() {
   const carte = document.getElementById("carte-fond-jeu");
   if (!carte) return;
 
+  // Hauteur reellement peinte par l'appareil : sur iPad installe en application, elle
+  // depasse window.innerHeight, et s'y fier laissait la carte s'arreter avant le bas.
+  const hauteurEcran = typeof window.hauteurEcranUtilisable === "function"
+    ? window.hauteurEcranUtilisable()
+    : window.innerHeight;
+
   const ratioX = window.innerWidth / 3840;
-  const ratioY = window.innerHeight / 2160;
+  const ratioY = hauteurEcran / 2160;
 
   carteZoom = Math.max(ratioX, ratioY);
 
   cartePanX = (window.innerWidth - 3840) / 2;
-  cartePanY = (window.innerHeight - 2160) / 2;
+  cartePanY = (hauteurEcran - 2160) / 2;
 
   carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
 };
