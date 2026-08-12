@@ -187,10 +187,10 @@
          title="Afficher l'interface">
 
     <!-- Bouton pour quitter le mode Combat -->
-    <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1783264616/A39F53B8-528E-4052-92AD-E9EDC3F700EB_lbr2mo.png"
+    <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/menu_omlu8e.png"
          id="btn-fermer-combat"
          class="icone-menu"
-         style="display: none; position: fixed; top: 3vh; right: 1.5vw; width: 4vw; z-index: 10005;"
+         style="display: none; position: fixed; top: 3vh; right: 1.5vw; width: 3vw; z-index: 10005;"
          onclick="window.fermerCombat()"
          title="Quitter la rencontre">
 
@@ -376,6 +376,39 @@
                 <img id="combat-portrait-perso" src="" style="position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); max-width: 100%; height: 100%; object-fit: contain; object-position: bottom center; filter: drop-shadow(0 5px 15px rgba(0,0,0,0.9)); opacity: 0; transition: opacity 0.4s ease;">
             </div>
             
+        </div>
+
+        <!-- NOUVEAU : HUD BAS DROITE (Fin de tour, Engrenage, Sablier) -->
+        <div id="combat-hud-bas-droite" style="position: absolute; bottom: 0; right: 0; width: 450px; z-index: 100; pointer-events: none;">
+            <!-- L'image de fond -->
+            <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/finTourAllum_gmn7ln.png" style="width: 100%; display: block; pointer-events: none;">
+
+            <!-- ========================================================================= -->
+            <!-- 🔻 RÉGLAGES DES ZONES DE CLIC ROUGES (À MODIFIER ICI) 🔻                 -->
+            <!-- Modifie 'top', 'right', 'width' et 'height' pour affiner la position.     -->
+            <!-- Quand l'alignement est parfait, remplace la couleur                       -->
+            <!-- 'rgba(255, 0, 0, 0.5)' par 'transparent' pour les rendre invisibles !     -->
+            <!-- ========================================================================= -->
+
+            <!-- 1. Bouton FIN DE TOUR (Le grand cercle à droite) -->
+            <div id="btn-hud-fintour"
+                 style="position: absolute; top: 3%; right: 2%; width: 43%; height: 94%; border-radius: 50%; background-color: transparent; cursor: pointer; pointer-events: auto; transition: transform 0.1s;"
+                 onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform='scale(1)'" onmouseleave="this.style.transform='scale(1)'"
+                 onclick="console.log('Action : Fin de Tour')" title="Fin du Tour"></div>
+
+            <!-- 2. Bouton ENGRENAGE (Le petit cercle au milieu) -->
+            <div id="btn-hud-engrenage"
+                 style="position: absolute; top: 40%; right: 52%; width: 16%; height: 30%; border-radius: 50%; background-color: transparent; cursor: pointer; pointer-events: auto; transition: transform 0.1s;"
+                 onmousedown="this.style.transform='scale(0.90)'" onmouseup="this.style.transform='scale(1)'" onmouseleave="this.style.transform='scale(1)'"
+                 onclick="window.toggleMenuCombat()" title="Outils Développeur"></div>
+
+            <!-- 3. Bouton SABLIER (Le petit cercle à gauche) -->
+            <div id="btn-hud-sablier"
+                 style="position: absolute; top: 40%; right: 70%; width: 16%; height: 30%; border-radius: 50%; background-color: transparent; cursor: pointer; pointer-events: auto; transition: transform 0.1s;"
+                 onmousedown="this.style.transform='scale(0.90)'" onmouseup="this.style.transform='scale(1)'" onmouseleave="this.style.transform='scale(1)'"
+                 onclick="console.log('Action : Sablier')" title="Gestion du Temps"></div>
+
+            <!-- ========================================================================= -->
         </div>
         
     </div>
