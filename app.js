@@ -138,6 +138,7 @@ function persoDocVersFront(id, d) {
     expression: d.Expression_Du_Visage || "",
     idFaction: d.ID_Faction || "",
     PV_Max: d.PV_Max || 0,
+    PV_Actuels: d.PV_Actuels !== undefined ? d.PV_Actuels : (d.PV_Max || 0),
     Fatigue_Max: d.Fatigue_Max !== undefined ? d.Fatigue_Max : 100,
     Regeneration: d.Regeneration !== undefined ? d.Regeneration : 30,
     Esquive: d.Esquive !== undefined ? d.Esquive : 15,

@@ -52,25 +52,6 @@ window.ouvrirCombat = function() {
     const fenetreCombat = document.getElementById('fenetre-combat');
     if (fenetreCombat) fenetreCombat.style.display = 'block';
 
-    const btnEngrenage = document.getElementById('btn-engrenage-combat');
-    if (btnEngrenage) {
-        const valeurDevIvalis = localStorage.getItem("ivalis_DEV_MODE");
-        const valeurDevLocal = localStorage.getItem("MODE_DEV");
-        
-        const modeDevActif = (
-            valeurDevIvalis === "on" ||
-            valeurDevLocal === "true" ||
-            valeurDevLocal === "1" ||
-            window.MODE_DEV === true
-        );
-        
-        if (modeDevActif) {
-            btnEngrenage.style.display = 'block';
-        } else {
-            btnEngrenage.style.display = 'none';
-        }
-    }
-
     // On charge juste l'UI de gauche
     window.initialiserPersosCombat();
     
@@ -84,8 +65,6 @@ window.fermerCombat = function() {
     if (typeof window.jouerSonSurvolParchemin === "function") {
         window.jouerSonSurvolParchemin();
     }
-    const btnEngrenage = document.getElementById('btn-engrenage-combat');
-    if (btnEngrenage) btnEngrenage.style.display = 'none';
     if (typeof window.fermerMenusCoulissantsCombat === "function") {
         window.fermerMenusCoulissantsCombat();
     }
@@ -160,6 +139,10 @@ window.afficherPersoCombatActuel = function() {
         divNom.style.color = "#888";
         document.getElementById("combat-liste-competences").innerHTML = "";
         if (imgPerso) imgPerso.style.opacity = "0"; 
+        
+        // On cache le nouveau conteneur
+        const jauges = document.getElementById("combat-jauges-container");
+        if (jauges) jauges.style.opacity = "0";
         return;
     }
 
@@ -173,7 +156,7 @@ window.afficherPersoCombatActuel = function() {
     if (imgPerso) {
         if (persoActuel.urlCloudinary && persoActuel.urlCloudinary !== "") {
             imgPerso.src = persoActuel.urlCloudinary;
-            imgPerso.style.opacity = "1";
+            imgPerso.style.opacity = "0.5"; // L'avatar s'affiche à 50%
         } else {
             imgPerso.style.opacity = "0";
         }
@@ -196,8 +179,15 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
         window.COMBAT_FATIGUE_MAX = parseInt(persoActuel.fatigueMax) || 100;
         window.COMBAT_FATIGUE_ACTUELLE = parseInt(persoActuel.fatigueActuelle) || window.COMBAT_FATIGUE_MAX;
         
-        document.getElementById("combat-jauge-fatigue-container").style.opacity = "1";
+        // Initialisation des PV Actuels (Liés à la BDD + Modificateurs DEV)
+        window.COMBAT_PV_MAX = (parseInt(persoActuel.PV_Max) || 1) + (parseInt(persoActuel.Dev_Mod_PV) || 0);
+        window.COMBAT_PV_ACTUELS = persoActuel.PV_Actuels !== undefined ? parseInt(persoActuel.PV_Actuels) : window.COMBAT_PV_MAX;
+
+        // Affichage de la boîte superposée
+        document.getElementById("combat-jauges-container").style.opacity = "1";
+        
         window.mettreAJourJaugeFatigue(0);
+        window.mettreAJourJaugePV();
 
         const deck = persoActuel.deckEquipe || [];
 
@@ -268,6 +258,26 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
 
     } catch (e) {
         console.error("Erreur cache :", e);
+    }
+};
+
+// =========================================================================
+//  LOGIQUE DE LA JAUGE DE PV
+// =========================================================================
+window.mettreAJourJaugePV = function() {
+    const max = window.COMBAT_PV_MAX || 1;
+    const actuelle = window.COMBAT_PV_ACTUELS || 0;
+    
+    // On bloque entre 0 et 100% visuellement
+    const pctActuel = Math.min(100, Math.max(0, (actuelle / max) * 100));
+
+    const barre = document.getElementById('barre-pv-rouge');
+    if (barre) barre.style.width = pctActuel + '%';
+
+    const labelActuelle = document.getElementById('label-pv-actuel');
+    if (labelActuelle) {
+        labelActuelle.innerText = actuelle;
+        labelActuelle.style.left = pctActuel + '%';
     }
 };
 
@@ -643,18 +653,26 @@ window.toggleMenuCombat = function() {
     if (menuDev.classList.contains("ouvert")) {
         window.fermerMenusCoulissantsCombat();
     } else {
+        // Fermeture automatique du panneau latéral gauche si ouvert
+        if (window.PANNEAU_GAUCHE_OUVERT && typeof window.togglePanneauGauche === "function") {
+            window.togglePanneauGauche();
+        }
+        
         menuDev.classList.add("ouvert");
+        menuDev.style.top = "0"; // Glisse depuis le haut
     }
 };
 
 window.fermerMenusCoulissantsCombat = function(e) {
-    // Petit son optionnel lors de la fermeture avec le bouton "Fermer"
     const evt = e || (typeof window.event !== 'undefined' ? window.event : null);
     if (evt && evt.target && evt.target.tagName === 'BUTTON' && typeof window.jouerSonClic === "function") {
         window.jouerSonClic();
     }
     const menuDev = document.getElementById("menu-dev-combat");
-    if (menuDev) menuDev.classList.remove("ouvert");
+    if (menuDev) {
+        menuDev.classList.remove("ouvert");
+        menuDev.style.top = "-150px"; // Repart se cacher en haut
+    }
 };
 
 // =========================================================================
