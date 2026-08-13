@@ -136,11 +136,14 @@ window.afficherPersoCombatActuel = function() {
 
     if (window.COMBAT_PERSOS_JOUEUR.length === 0) {
         divNom.innerText = "Aucun héros lié";
+        // Enlève l'effet doré si y'a personne pour remettre un gris classique
+        divNom.style.background = "none";
+        divNom.style.webkitTextFillColor = "inherit";
         divNom.style.color = "#888";
+        
         document.getElementById("combat-liste-competences").innerHTML = "";
         if (imgPerso) imgPerso.style.opacity = "0"; 
         
-        // On cache le nouveau conteneur
         const jauges = document.getElementById("combat-jauges-container");
         if (jauges) jauges.style.opacity = "0";
         return;
@@ -151,12 +154,16 @@ window.afficherPersoCombatActuel = function() {
     const nom = persoActuel.nom || "";
     
     divNom.innerText = (prenom + " " + nom).trim();
-    divNom.style.color = persoActuel.couleur || "#e8d5a5";
+    
+    // On restaure l'effet doré s'il a été désactivé par "Aucun héros"
+    divNom.style.background = "linear-gradient(135deg, #fbf5bd 0%, #c2a878 25%, #5c3a21 50%, #e8d5a5 75%, #ffffff 100%)";
+    divNom.style.webkitBackgroundClip = "text";
+    divNom.style.webkitTextFillColor = "transparent";
 
     if (imgPerso) {
         if (persoActuel.urlCloudinary && persoActuel.urlCloudinary !== "") {
             imgPerso.src = persoActuel.urlCloudinary;
-            imgPerso.style.opacity = "0.5"; // L'avatar s'affiche à 50%
+            imgPerso.style.opacity = "1"; // Rétablit l'avatar à 100% d'opacité !
         } else {
             imgPerso.style.opacity = "0";
         }
@@ -352,17 +359,9 @@ window.gererClicCarteCombat = function(idCarte) {
         const cout = window.COMPETENCES_CACHE[idCarte]?.Fatigue || 0;
         window.mettreAJourJaugeFatigue(cout);
         
-        // 3. Affichage HD
+        // 3. Affichage HD géré dynamiquement
         if (typeof window.afficherApercuCarteHD === "function") {
             window.afficherApercuCarteHD(idCarte);
-            setTimeout(() => {
-                const hdCard = document.getElementById("apercu-carte-hd-competence");
-                if (hdCard) {
-                    hdCard.style.left = "calc(3vw + 350px)"; 
-                    hdCard.style.top = "15vh";               
-                    hdCard.style.transform = "none";         
-                }
-            }, 10); 
         }
     } else {
         // Si on reclique sur la même, on referme tout

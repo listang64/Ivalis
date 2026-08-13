@@ -177,7 +177,8 @@ window.afficherApercuCarteHD = function(idCarte) {
     if (!conteneurCarte) {
         conteneurCarte = document.createElement("div");
         conteneurCarte.id = "apercu-carte-hd-competence";
-        conteneurCarte.style.cssText = "position: fixed; top: 50%; left: 59vw; transform: translateY(-50%); width: 340px; height: 476px; z-index: 9999; display: none; border-radius: 12px; box-shadow: 0px 20px 40px rgba(0,0,0,0.9); transition: opacity 0.2s ease;";
+        // Ajout de la transition fluide sur "left" et "opacity"
+        conteneurCarte.style.cssText = "position: fixed; border-radius: 12px; box-shadow: 0px 20px 40px rgba(0,0,0,0.9); transition: left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.3s ease; display: none; opacity: 0;";
         document.body.appendChild(conteneurCarte);
 
         const style = document.createElement("style");
@@ -188,6 +189,36 @@ window.afficherApercuCarteHD = function(idCarte) {
         `;
         document.head.appendChild(style);
     }
+
+    const isCombatMode = document.getElementById("fenetre-combat")?.style.display === "block";
+    const currentDisplayedId = conteneurCarte.dataset.cardId;
+    
+    // --- GESTION DU DÉFILEMENT (MODE COMBAT) ---
+    if (isCombatMode) {
+        const fenetreCombat = document.getElementById("fenetre-combat");
+        // On transfère l'élément dans la fenêtre de combat pour qu'il respecte les couches
+        if (conteneurCarte.parentNode !== fenetreCombat) fenetreCombat.appendChild(conteneurCarte);
+        conteneurCarte.style.zIndex = "9"; // z-index 9 = Pile entre la carte (1) et le panneau gauche (10)
+        
+        // Si on a cliqué sur une autre carte pendant qu'une est ouverte
+        if (currentDisplayedId && currentDisplayedId !== idCarte && conteneurCarte.style.opacity === "1") {
+            conteneurCarte.style.left = "50px"; // On la rentre sous le panneau
+            conteneurCarte.style.opacity = "0";
+            
+            // On attend qu'elle soit rentrée, puis on la relance avec le nouveau sort
+            setTimeout(() => {
+                window.afficherApercuCarteHD(idCarte);
+            }, 300);
+            return;
+        }
+    } else {
+        // En Fiche de personnage classique (Par dessus tout)
+        if (conteneurCarte.parentNode !== document.body) document.body.appendChild(conteneurCarte);
+        conteneurCarte.style.zIndex = "9999";
+    }
+
+    // Mémorise la carte en cours
+    conteneurCarte.dataset.cardId = idCarte;
 
     const data = window.COMPETENCES_CACHE[idCarte];
     if (!data) return;
@@ -306,7 +337,6 @@ window.afficherApercuCarteHD = function(idCarte) {
     }
 
     // NOUVEAU : On détecte si on est en plein combat pour afficher le bouton "Choisir"
-    const isCombatMode = document.getElementById("fenetre-combat")?.style.display === "block";
     const boutonChoisirHtml = isCombatMode ? `
         <!-- COUCHE 5 : LE BOUTON CHOISIR (MODE COMBAT UNIQUEMENT) -->
         <div style="position: absolute; bottom: -70px; left: 50%; transform: translateX(-50%); z-index: 5;">
@@ -347,17 +377,64 @@ window.afficherApercuCarteHD = function(idCarte) {
     `;
 
     conteneurCarte.style.display = "block";
-    setTimeout(() => conteneurCarte.style.opacity = "1", 10);
+    
+    if (isCombatMode) {
+        // Préparation du point de départ caché (sous le panneau)
+        if (conteneurCarte.style.opacity === "0" || conteneurCarte.style.left !== "400px") {
+            conteneurCarte.style.top = "15vh";
+            conteneurCarte.style.left = "50px"; 
+            conteneurCarte.style.transform = "none";
+            conteneurCarte.style.width = "340px";
+            conteneurCarte.style.height = "476px";
+            void conteneurCarte.offsetWidth; // Force le CSS à valider ce point de départ
+        }
+        
+        // Déclenchement de la glissade vers la droite
+        conteneurCarte.style.left = "400px";
+        conteneurCarte.style.opacity = "1";
+    } else {
+        // Positionnement Fiche Perso (Centré)
+        conteneurCarte.style.top = "50%";
+        conteneurCarte.style.left = "59vw";
+        conteneurCarte.style.transform = "translateY(-50%)";
+        conteneurCarte.style.width = "340px";
+        conteneurCarte.style.height = "476px";
+        void conteneurCarte.offsetWidth;
+        conteneurCarte.style.opacity = "1";
+    }
 };
 
 window.masquerApercuCarteHD = function() {
     const conteneurCarte = document.getElementById("apercu-carte-hd-competence");
     if (conteneurCarte) {
-        conteneurCarte.style.display = "none";
+        const isCombatMode = document.getElementById("fenetre-combat")?.style.display === "block";
+        
+        if (isCombatMode) {
+            // Glissade inversée vers la gauche
+            conteneurCarte.style.left = "50px";
+            conteneurCarte.style.opacity = "0";
+            
+            setTimeout(() => {
+                // On cache totalement l'objet si la glissade est terminée (anti-spam clic)
+                if (conteneurCarte.style.opacity === "0") {
+                    conteneurCarte.style.display = "none";
+                }
+            }, 400); // 400ms = Durée exacte de la transition CSS
+        } else {
+            // Disparition instantanée pour la fiche perso
+            conteneurCarte.style.display = "none";
+            conteneurCarte.style.opacity = "0";
+            conteneurCarte.style.left = "59vw";
+            conteneurCarte.style.top = "50%";
+            conteneurCarte.style.transform = "translateY(-50%)";
+        }
+        
+        conteneurCarte.dataset.cardId = ""; // Réinitialise la mémoire
     }
+    
     window.CARTE_EN_APERCU = null;
     
-    // On nettoie le surlignage de la bannière quand on ferme la carte
+    // Nettoyage de l'effet Cyan sur le bouton cliqué
     document.querySelectorAll('.banniere-carte').forEach(el => {
         el.style.filter = "none";
     });
@@ -1310,19 +1387,34 @@ window.sauvegarderCompetence = async function() {
 window.masquerApercuCarteHD = function() {
     const conteneurCarte = document.getElementById("apercu-carte-hd-competence");
     if (conteneurCarte) {
-        conteneurCarte.style.display = "none";
+        const isCombatMode = document.getElementById("fenetre-combat")?.style.display === "block";
         
-        // =========================================================
-        // NOUVEAU : RESET DE LA POSITION POUR LA FICHE PERSONNAGE
-        // =========================================================
-        conteneurCarte.style.left = "59vw";
-        conteneurCarte.style.top = "50%";
-        conteneurCarte.style.transform = "translateY(-50%)";
+        if (isCombatMode) {
+            // Glissade inversée vers la gauche
+            conteneurCarte.style.left = "50px";
+            conteneurCarte.style.opacity = "0";
+            
+            setTimeout(() => {
+                // On cache totalement l'objet si la glissade est terminée (anti-spam clic)
+                if (conteneurCarte.style.opacity === "0") {
+                    conteneurCarte.style.display = "none";
+                }
+            }, 400); // 400ms = Durée exacte de la transition CSS
+        } else {
+            // Disparition instantanée pour la fiche perso
+            conteneurCarte.style.display = "none";
+            conteneurCarte.style.opacity = "0";
+            conteneurCarte.style.left = "59vw";
+            conteneurCarte.style.top = "50%";
+            conteneurCarte.style.transform = "translateY(-50%)";
+        }
+        
+        conteneurCarte.dataset.cardId = ""; // Réinitialise la mémoire
     }
     
     window.CARTE_EN_APERCU = null;
     
-    // On enlève le halo Cyan sur toutes les bannières de la fiche perso
+    // Nettoyage de l'effet Cyan sur le bouton cliqué
     document.querySelectorAll('.banniere-carte').forEach(el => {
         el.style.filter = "none";
     });
