@@ -591,6 +591,11 @@ body {
   cursor: pointer;
   filter: drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.6));
   transition: filter 0.3s ease;
+  
+  /* 🔻 CORRECTIONS IPAD (Anti-clipping des ombres) 🔻 */
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: filter, transform;
 }
 
 .icone-nav:hover {
