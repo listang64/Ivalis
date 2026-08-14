@@ -331,14 +331,6 @@
          onclick="window.afficherMenusDansChat()"
          title="Afficher l'interface">
 
-    <!-- Bouton pour quitter le mode Combat -->
-    <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/menu_omlu8e.png"
-         id="btn-fermer-combat"
-         class="icone-menu"
-         style="display: none; position: fixed; top: 3vh; right: 1.5vw; width: 3vw; z-index: 10005;"
-         onclick="window.fermerCombat()"
-         title="Quitter la rencontre">
-
     <!-- MODALE PRÉ-COMBAT (POPUP RENCONTRE) -->
     <div id="modale-pre-combat" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: var(--app-h); background-color: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center;">
         <div style="background: rgba(20, 15, 10, 0.95); border: 2px solid #c2a878; border-radius: 12px; padding: 30px; width: 450px; text-align: center; box-shadow: 0 0 30px rgba(0,0,0,1);">
@@ -360,6 +352,14 @@
 
     <!-- L'INTERFACE DE COMBAT -->
     <div id="fenetre-combat" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: var(--app-h); z-index: 65; background-color: #1a1a1a; pointer-events: auto;">
+        
+        <!-- Bouton pour quitter le mode Combat (Désormais DANS la fenêtre) -->
+        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/menu_omlu8e.png"
+             id="btn-fermer-combat"
+             class="icone-menu"
+             style="display: none; position: fixed; top: 3vh; right: 1.5vw; width: 3vw; z-index: 9000;"
+             onclick="window.fermerCombat()"
+             title="Quitter la rencontre">
         <!-- NOUVEAU : MENU COULISSANT HAUT -->
         <div id="menu-dev-combat" style="position: fixed; top: -150px; left: 0; width: 100vw; background: rgba(20, 15, 10, 0.95); border-bottom: 2px solid #5c3a21; padding: 10px 20px; display: flex; flex-direction: row; align-items: center; justify-content: space-around; z-index: 10010; transition: top 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); box-shadow: 0 5px 25px rgba(0, 0, 0, 0.8); backdrop-filter: blur(5px); box-sizing: border-box;">
             
@@ -514,8 +514,30 @@
             
         </div>
 
-        <!-- NOUVEAU : HUD BAS DROITE (Fin de tour, Engrenage, Sablier) -->
-        <div id="combat-hud-bas-droite" style="position: absolute; bottom: 0; right: 0; width: 450px; z-index: 100; pointer-events: none;">
+        <!-- NOUVEAU : HUD BAS DROITE (Z-index réduit à 5 pour passer sous le panneau gauche) -->
+        <div id="combat-hud-bas-droite" style="position: absolute; bottom: 0; right: 0; width: 450px; z-index: 5; pointer-events: none;">
+            
+            <!-- LA PISTE D'INITIATIVE (Descendue et centrée) -->
+            <div id="piste-initiative" style="
+                position: absolute;
+                right: 45%; 
+                top: 28%;   /* 🔻 Augmenté pour descendre la piste (était 22%) */
+                height: 44%; /* 🔻 Réduit pour conserver un centrage parfait (28 + 44 + 28 = 100) */
+                width: 45vw; 
+                background: rgba(0, 0, 0, 0.4); 
+                border-radius: 20px 0 0 20px; 
+                box-shadow: 0 0 15px 5px rgba(0,0,0,0.5), inset 0 0 20px 5px rgba(0,0,0,0.7);
+                backdrop-filter: blur(3px); 
+                z-index: -1; 
+                pointer-events: auto; 
+                display: flex;
+                align-items: center;
+                padding: 0 20px;
+                gap: 15px;
+            ">
+                <!-- Les futurs avatars/tokens d'initiative viendront s'aligner ici -->
+            </div>
+
             <!-- L'image de fond -->
             <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/finTourAllum_gmn7ln.png" style="width: 100%; display: block; pointer-events: none;">
 

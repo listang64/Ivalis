@@ -439,6 +439,11 @@ body {
   filter: drop-shadow(-8px 8px 10px rgba(0, 0, 0, 0.7));
   transition: filter 0.3s ease, transform 0.2s ease;
   display: block;
+  
+  /* 🔻 CORRECTIONS IPAD (Anti-clipping des ombres) 🔻 */
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: filter, transform;
 }
 
 .icone-menu:hover {
@@ -1951,8 +1956,12 @@ textarea.input-texte-parchemin {
 /* HUD FIN DE TOUR : OMBRE PORTÉE SUR LES PIXELS VISIBLES                    */
 /* ========================================================================= */
 #combat-hud-bas-droite img {
-    /* L'ombre est décalée vers le bas et la gauche pour donner du volume */
     filter: drop-shadow(-8px 12px 15px rgba(0, 0, 0, 0.85));
+    
+    /* 🔻 CORRECTIONS IPAD (Anti-clipping des ombres) 🔻 */
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    will-change: filter, transform;
 }
 
 /* ========================================================================= */
