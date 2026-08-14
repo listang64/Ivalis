@@ -511,9 +511,9 @@ body {
     /* RÉDUCTIONS SPÉCIFIQUES IPAD (MODE COMBAT) */
     /* ========================================= */
 
-    /* 1. Réduction du HUD de Fin de Tour (passe de 450px à 320px) */
+    /* 1. Réduction du HUD de Fin de Tour (Ajusté à 380px pour le confort) */
     #combat-hud-bas-droite {
-        width: 320px !important; 
+        width: 380px !important; 
     }
 
     /* 2. Réduction du bouton Menu (Casse la règle des 110px minimum) */
@@ -1945,6 +1945,14 @@ textarea.input-texte-parchemin {
     color: #9b59b6;
     user-select: none;
     text-shadow: 1px 1px 2px black;
+}
+
+/* ========================================================================= */
+/* HUD FIN DE TOUR : OMBRE PORTÉE SUR LES PIXELS VISIBLES                    */
+/* ========================================================================= */
+#combat-hud-bas-droite img {
+    /* L'ombre est décalée vers le bas et la gauche pour donner du volume */
+    filter: drop-shadow(-8px 12px 15px rgba(0, 0, 0, 0.85));
 }
 
 /* ========================================================================= */
