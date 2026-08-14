@@ -517,12 +517,12 @@
         <!-- NOUVEAU : HUD BAS DROITE (Z-index réduit à 5 pour passer sous le panneau gauche) -->
         <div id="combat-hud-bas-droite" style="position: absolute; bottom: 0; right: 0; width: 450px; z-index: 5; pointer-events: none;">
             
-            <!-- LA PISTE D'INITIATIVE (Descendue et centrée) -->
+            <!-- LA PISTE D'INITIATIVE (Parfaitement centrée sur la partie rectangulaire) -->
             <div id="piste-initiative" style="
                 position: absolute;
                 right: 45%; 
-                top: 28%;   /* 🔻 Augmenté pour descendre la piste (était 22%) */
-                height: 44%; /* 🔻 Réduit pour conserver un centrage parfait (28 + 44 + 28 = 100) */
+                top: 34%;   /* 🔻 Plus bas pour s'aligner au centre du rectangle */
+                height: 38%; /* 🔻 Hauteur ajustée en conséquence */
                 width: 45vw; 
                 background: rgba(0, 0, 0, 0.4); 
                 border-radius: 20px 0 0 20px; 

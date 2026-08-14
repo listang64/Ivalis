@@ -402,7 +402,8 @@ body {
   width: 3840px; 
   height: 2160px;
   
-  background-image: url('./images/fond_jeu.png'); 
+  /* 🔻 NOUVELLE MAP PRINCIPALE 🔻 */
+  background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786748187/map_wx8s89.jpg'); 
   
   /* On force l'image à épouser exactement ces 3840x2160 pixels */
   background-size: 100% 100%; 
