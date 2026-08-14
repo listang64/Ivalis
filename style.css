@@ -506,6 +506,21 @@ body {
   
   .texte-sur-parchemin { font-size: clamp(16px, 3vw, 22px); }
   .texte-sur-parchemin span { font-size: clamp(22px, 3.5vw, 30px); }
+
+    /* ========================================= */
+    /* RÉDUCTIONS SPÉCIFIQUES IPAD (MODE COMBAT) */
+    /* ========================================= */
+
+    /* 1. Réduction du HUD de Fin de Tour (passe de 450px à 320px) */
+    #combat-hud-bas-droite {
+        width: 320px !important; 
+    }
+
+    /* 2. Réduction du bouton Menu (Casse la règle des 110px minimum) */
+    #btn-fermer-combat {
+        min-width: 45px !important; 
+        width: 6vw !important; 
+    }
 }
 
 .masque-banniere {
