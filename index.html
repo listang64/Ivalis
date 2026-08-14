@@ -151,31 +151,6 @@
         setInterval(window.synchroniserFondCanvas, 400);
       });
 
-      /* Panneau de mesures, ouvert par un appui a trois doigts. */
-      window.diagnosticEcran = function () {
-        var panneau = document.getElementById('diagnostic-ecran');
-        if (panneau) { panneau.remove(); return; }
-
-        var calcule = getComputedStyle(racine);
-        panneau = document.createElement('div');
-        panneau.id = 'diagnostic-ecran';
-        panneau.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:2147483647;'
-          + 'background:rgba(0,120,0,0.92);color:#fff;font:12px monospace;padding:8px;'
-          + 'text-align:center;line-height:1.5;';
-        panneau.textContent = 'innerHeight ' + window.innerHeight
-          + ' | screen ' + window.screen.width + 'x' + window.screen.height
-          + ' | --app-h ' + racine.style.getPropertyValue('--app-h')
-          + ' | --app-dalle-h ' + racine.style.getPropertyValue('--app-dalle-h')
-          + ' | marge haute ' + calcule.getPropertyValue('--marge-haute')
-          + ' | marge basse ' + calcule.getPropertyValue('--marge-basse')
-          + ' | fond ' + racine.style.backgroundColor + ' ' + racine.style.backgroundSize;
-        panneau.addEventListener('click', function () { panneau.remove(); });
-        document.body.appendChild(panneau);
-      };
-
-      document.addEventListener('touchstart', function (e) {
-        if (e.touches.length >= 3) window.diagnosticEcran();
-      }, { passive: true });
     })();
   </script>
 </head>

@@ -544,27 +544,36 @@ window.activerPanZoom = function() {
             if (e.touches.length === 1) {
                 if (window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS || window.VTT_MODE_DIFFICILE) {
                     isPaintingVTT = true;
-                    const hex = getHexFromMouse(e.touches[0].clientX, e.touches[0].clientY);
-                    if (hex) {
-                        const state = window.PLATEAU_VTT.getCaseState(hex.q, hex.r);
-                        if (window.VTT_MODE_EFFACEMENT) {
-                            currentPaintAction = state.isDeleted ? 'restore' : 'delete';
-                            window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
-                        } else if (window.VTT_MODE_MURS) {
-                            currentPaintAction = state.isBlocked ? 'unblock' : 'block';
-                            window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isBlocked: currentPaintAction === 'block' });
-                        } else if (window.VTT_MODE_DIFFICILE) {
-                            currentPaintAction = state.isDifficult ? 'undifficult' : 'difficult';
-                            window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDifficult: currentPaintAction === 'difficult' });
+                    
+                    // NOUVEAU : Délai de 100ms pour laisser le temps au 2ème doigt de se poser (Pinch to zoom)
+                    window.vttPaintTimeout = setTimeout(() => {
+                        if (isPaintingVTT && window.PLATEAU_VTT) {
+                            const hex = getHexFromMouse(e.touches[0].clientX, e.touches[0].clientY);
+                            if (hex) {
+                                const state = window.PLATEAU_VTT.getCaseState(hex.q, hex.r);
+                                if (window.VTT_MODE_EFFACEMENT) {
+                                    currentPaintAction = state.isDeleted ? 'restore' : 'delete';
+                                    window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
+                                } else if (window.VTT_MODE_MURS) {
+                                    currentPaintAction = state.isBlocked ? 'unblock' : 'block';
+                                    window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isBlocked: currentPaintAction === 'block' });
+                                } else if (window.VTT_MODE_DIFFICILE) {
+                                    currentPaintAction = state.isDifficult ? 'undifficult' : 'difficult';
+                                    window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDifficult: currentPaintAction === 'difficult' });
+                                }
+                                window.PLATEAU_VTT.renderMap();
+                            }
                         }
-                        window.PLATEAU_VTT.renderMap();
-                    }
+                    }, 100);
+
                 } else {
                     isDraggingVTT = true;
                     startDragX = e.touches[0].clientX - window.VTT_POS_X;
                     startDragY = e.touches[0].clientY - window.VTT_POS_Y;
                 }
             } else if (e.touches.length === 2) {
+                // C'est un zoom ! On annule immédiatement le pinceau du 1er doigt
+                clearTimeout(window.vttPaintTimeout);
                 isDraggingVTT = false;
                 isPaintingVTT = false;
                 lastPinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
@@ -623,6 +632,7 @@ window.activerPanZoom = function() {
     }, { passive: false });
 
     conteneur.addEventListener("touchend", (e) => {
+        clearTimeout(window.vttPaintTimeout);
         isPaintingVTT = false;
         
         if (e.touches.length === 1) {
