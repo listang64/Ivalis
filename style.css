@@ -2004,3 +2004,29 @@ textarea.input-texte-parchemin {
     pointer-events: none;
     z-index: -1;
 }
+
+/* ========================================================================= */
+/* HALO DORÉ DU TOUR ACTIF (PISTE D'INITIATIVE)                              */
+/* ========================================================================= */
+
+.bulle-initiative-base {
+    /* Ombre de base pour les personnages en attente */
+    filter: drop-shadow(0px 5px 8px rgba(0, 0, 0, 0.8));
+}
+
+.halo-tour-actif {
+    /* L'animation d'aura dorée pour le personnage qui doit jouer */
+    animation: respirationHaloDore 2s infinite alternate ease-in-out;
+    z-index: 5;
+}
+
+@keyframes respirationHaloDore {
+    0% {
+        /* Plus de mouvement, juste une lueur très discrète */
+        filter: drop-shadow(0px 5px 8px rgba(0,0,0,0.8)) drop-shadow(0px 0px 5px rgba(194, 168, 120, 0.4));
+    }
+    100% {
+        /* La lueur grandit un peu mais reste contenue (12px) */
+        filter: drop-shadow(0px 5px 8px rgba(0,0,0,0.8)) drop-shadow(0px 0px 12px rgba(255, 215, 0, 0.7));
+    }
+}

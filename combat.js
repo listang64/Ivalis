@@ -173,6 +173,9 @@ window.afficherPersoCombatActuel = function() {
     
     // NOUVEAU : Met à jour le bouton de fin de tour selon le héros affiché
     if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
+
+    // NOUVEAU : Affiche la carte lockée si le perso est dans la file d'attente
+    window.actualiserEtatCarteCombat();
 };
 
 // =========================================================================
@@ -1057,6 +1060,24 @@ window.jouerCarteCombat = async function(idCarte) {
     const btn = document.getElementById("btn-choisir-action");
     if(btn) { btn.innerText = "Préparation..."; btn.disabled = true; }
 
+    // 🔻 EFFET VISUEL IMMÉDIAT (N'attend pas le réseau)
+    const deckEl = document.getElementById("combat-liste-competences");
+    if (deckEl) {
+        deckEl.style.transition = "opacity 0.3s ease";
+        deckEl.style.opacity = "0";
+        deckEl.style.pointerEvents = "none";
+    }
+    window.mettreAJourJaugeFatigue(0); // Cache la jauge rouge
+    // 🔻 CORRECTION : Shrink immédiat en "vh"
+    const imgPerso = document.getElementById("combat-portrait-perso");
+    if (imgPerso) {
+        imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
+        imgPerso.style.height = "40vh"; /* Doit être identique à la valeur au-dessus */
+    }
+    if (typeof window.afficherApercuCarteHD === "function") {
+        window.afficherApercuCarteHD(idCarte, true); // Lock immédiat
+    }
+
     try {
         const { doc, getDoc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
         const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
@@ -1064,41 +1085,39 @@ window.jouerCarteCombat = async function(idCarte) {
 
         if (snap.exists()) {
             let file = snap.data().File_Attente_Combat || [];
-
-            // On retire le personnage s'il avait déjà joué une carte ce tour-ci
             file = file.filter(item => item.idPersonnage !== persoActuel.idPersonnage);
 
             file.push({
                 idPersonnage: persoActuel.idPersonnage,
+                idCarte: idCarte, // NOUVEAU : Sauvegarde la carte choisie !
                 initiative: dataCarte.Initiative || 0,
                 timestamp: new Date().getTime()
             });
 
-            // Tri : La plus haute initiative en premier (à gauche)
             file.sort((a, b) => {
                 if (b.initiative !== a.initiative) return b.initiative - a.initiative;
                 return a.timestamp - b.timestamp;
             });
 
-            // LOGIQUE DE PHASE : On compte les joueurs vivants
             let phase = snap.data().Phase_Combat || "Preparation";
             const nbJoueursVivants = (window.PERSOS_PARTIE || []).filter(p => p.statut !== "Mort").length;
             
-            // Si tout le monde a choisi, on déclenche l'apparition de la piste !
-            if (file.length >= nbJoueursVivants && nbJoueursVivants > 0) {
-                phase = "Resolution";
-            }
+            if (file.length >= nbJoueursVivants && nbJoueursVivants > 0) phase = "Resolution";
 
             await updateDoc(partieRef, { 
                 File_Attente_Combat: file,
                 Phase_Combat: phase 
             });
-
-            if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD();
         }
     } catch (e) {
         console.error("Erreur jouerCarteCombat:", e);
-        if(btn) { btn.innerText = "Choisir"; btn.disabled = false; }
+        if (deckEl) {
+            deckEl.style.opacity = "1";
+            deckEl.style.pointerEvents = "auto";
+        }
+        if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD(true);
+        if (btn) { btn.innerText = "Choisir"; btn.disabled = false; }
+        window.mettreAJourJaugeFatigue(0);
     }
 };
 
@@ -1108,20 +1127,17 @@ window.jouerCarteCombat = async function(idCarte) {
 
 window.PEUT_PASSER_TOUR = false;
 
-window.actualiserBoutonFinTour = function(queueOverride, phaseOverride) {
+window.actualiserBoutonFinTour = function(queueParam, phaseParam) {
     const imgBtn = document.getElementById("img-hud-fintour");
     if (!imgBtn) return;
 
-    // Récupération des données en temps réel
+    // Récupération des données (Paramètres en priorité, fallback sur PARTIE_DATA si on change juste de perso)
     const partie = window.PARTIE_DATA || {};
-    const queue = queueOverride || partie.File_Attente_Combat || [];
-    const phase = phaseOverride || partie.Phase_Combat || "Preparation";
+    const queue = queueParam !== undefined ? queueParam : (partie.File_Attente_Combat || []);
+    const phase = phaseParam !== undefined ? phaseParam : (partie.Phase_Combat || "Preparation");
     const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
 
     // C'est au tour du perso SI :
-    // 1. On est en phase de résolution.
-    // 2. La piste n'est pas vide.
-    // 3. Le premier perso sur la piste (index 0) est le personnage que l'on regarde actuellement.
     const estMonTour = (
         phase === "Resolution" && 
         queue.length > 0 && 
@@ -1130,11 +1146,9 @@ window.actualiserBoutonFinTour = function(queueOverride, phaseOverride) {
     );
 
     if (estMonTour) {
-        // C'est mon tour : on allume le bouton et on autorise le clic
         imgBtn.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/finTourAllum_gmn7ln.png";
         window.PEUT_PASSER_TOUR = true;
     } else {
-        // Ce n'est pas mon tour : on éteint le bouton et on bloque
         imgBtn.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/FinTourEteind_exjtxp.png";
         window.PEUT_PASSER_TOUR = false;
     }
@@ -1222,8 +1236,11 @@ window.afficherPisteInitiative = function(queue, phase) {
         // Identification de la première bulle pour l'animation de retrait
         const attributId = index === 0 ? 'id="premiere-bulle-initiative"' : '';
 
+        // Halo doré uniquement sur la première bulle en phase de Résolution
+        const classeBulle = (index === 0 && phase === "Resolution") ? "halo-tour-actif" : "bulle-initiative-base";
+
         html += `
-        <div ${attributId} style="position: relative; width: 110px; height: 126px; flex-shrink: 0; filter: drop-shadow(0px 5px 8px rgba(0,0,0,0.8)); margin-top: 0px; transition: all 0.4s ease; transform-origin: left center; margin-right: 15px;">
+        <div ${attributId} class="${classeBulle}" style="position: relative; width: 110px; height: 126px; flex-shrink: 0; margin-top: 0px; transition: all 0.4s ease; transform-origin: left center; margin-right: 15px;">
             <div style="position: absolute; inset: 0; background: linear-gradient(135deg, #fbf5bd 0%, #c2a878 30%, #5c3a21 50%, #e8d5a5 80%, #ffffff 100%); clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); display: flex; align-items: center; justify-content: center;">
                 <div style="width: 102px; height: 118px; background-color: #1a0f08; clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); position: relative;">
                     <img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: top center;">
@@ -1247,4 +1264,59 @@ window.afficherPisteInitiative = function(queue, phase) {
 
     piste.innerHTML = html;
     if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour(queue, phase);
+};
+
+// =========================================================================
+//  GESTION VISUELLE DE LA CARTE DANS LE PANNEAU GAUCHE
+// =========================================================================
+window.actualiserEtatCarteCombat = function() {
+    if (document.getElementById("fenetre-combat")?.style.display !== "block") return;
+    
+    const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+    if (!persoActuel) return;
+
+    const partie = window.PARTIE_DATA || {};
+    const queue = partie.File_Attente_Combat || [];
+    
+    // Le personnage a-t-il validé son tour dans la BDD ?
+    const persoInQueue = queue.find(q => q.idPersonnage === persoActuel.idPersonnage);
+    const deckEl = document.getElementById("combat-liste-competences");
+    const imgPerso = document.getElementById("combat-portrait-perso");
+    
+    if (deckEl) deckEl.style.transition = "opacity 0.3s ease";
+
+    if (persoInQueue && persoInQueue.idCarte) {
+        // OUI : On cache les bannières et on verrouille sa carte
+        if (deckEl) {
+            deckEl.style.opacity = "0";
+            deckEl.style.pointerEvents = "none";
+        }
+        window.mettreAJourJaugeFatigue(0);
+        // 🔻 CORRECTION : Utilisation de "vh" pour un pourcentage relatif à l'écran (Responsive + Uniforme)
+        if (imgPerso) {
+            imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
+            imgPerso.style.height = "40vh"; /* 40% de l'écran (ajuste à 35vh ou 45vh selon tes goûts) */
+        }
+        if (typeof window.afficherApercuCarteHD === "function") {
+            window.afficherApercuCarteHD(persoInQueue.idCarte, true); // true = Mode Verrouillé
+        }
+    } else {
+        // NON : On réaffiche le Deck
+        if (deckEl) {
+            deckEl.style.opacity = "1";
+            deckEl.style.pointerEvents = "auto";
+        }
+        if (imgPerso && !window.CARTE_EN_APERCU) {
+            imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
+            imgPerso.style.height = "100%";
+        }
+        // Si une carte était verrouillée avant (ex: fin de tour passée), on force sa disparition
+        const conteneurCarte = document.getElementById("apercu-carte-hd-competence");
+        if (conteneurCarte && conteneurCarte.dataset.locked === "true") {
+            conteneurCarte.dataset.locked = "false";
+            if (typeof window.masquerApercuCarteHD === "function") {
+                window.masquerApercuCarteHD(true); 
+            }
+        }
+    }
 };

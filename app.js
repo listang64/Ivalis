@@ -1094,6 +1094,11 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
          }
 
          window.PARTIE_DATA = dataPartie;
+
+         // NOUVEAU : Met à jour la carte "Lockée" du personnage
+         if (typeof window.actualiserEtatCarteCombat === "function") {
+             window.actualiserEtatCarteCombat();
+         }
          if (window.PERSOS_PARTIE) afficherBullesPersonnages(window.PERSOS_PARTIE);
 
          if (estPremierScanPartie) {

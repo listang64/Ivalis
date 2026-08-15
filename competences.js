@@ -171,14 +171,14 @@ window.gererClicCarte = function(idCarte) {
     }
 };
 
-window.afficherApercuCarteHD = function(idCarte) {
+window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     let conteneurCarte = document.getElementById("apercu-carte-hd-competence");
     
     if (!conteneurCarte) {
         conteneurCarte = document.createElement("div");
         conteneurCarte.id = "apercu-carte-hd-competence";
-        // Ajout de la transition fluide sur "left" et "opacity"
-        conteneurCarte.style.cssText = "position: fixed; border-radius: 12px; box-shadow: 0px 20px 40px rgba(0,0,0,0.9); transition: left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.3s ease; display: none; opacity: 0;";
+        // NOUVEAU : Transition super fluide sur Left
+        conteneurCarte.style.cssText = "position: fixed; border-radius: 12px; box-shadow: 0px 20px 40px rgba(0,0,0,0.9); transition: left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.3s ease; display: none; opacity: 0; pointer-events: auto;";
         document.body.appendChild(conteneurCarte);
 
         const style = document.createElement("style");
@@ -193,35 +193,34 @@ window.afficherApercuCarteHD = function(idCarte) {
     const isCombatMode = document.getElementById("fenetre-combat")?.style.display === "block";
     const currentDisplayedId = conteneurCarte.dataset.cardId;
     
-    // --- GESTION DU DÉFILEMENT (MODE COMBAT) ---
+    // CHANGEMENT DE COUCHE (Magie du Panneau Gauche)
     if (isCombatMode) {
-        const fenetreCombat = document.getElementById("fenetre-combat");
-        // On transfère l'élément dans la fenêtre de combat pour qu'il respecte les couches
-        if (conteneurCarte.parentNode !== fenetreCombat) fenetreCombat.appendChild(conteneurCarte);
-        conteneurCarte.style.zIndex = "9"; // z-index 9 = Pile entre la carte (1) et le panneau gauche (10)
+        const panneauGauche = document.getElementById("panneau-combat-gauche");
+        if (panneauGauche && conteneurCarte.parentNode !== panneauGauche) panneauGauche.appendChild(conteneurCarte);
         
-        // Si on a cliqué sur une autre carte pendant qu'une est ouverte
-        if (currentDisplayedId && currentDisplayedId !== idCarte && conteneurCarte.style.opacity === "1") {
-            conteneurCarte.style.left = "50px"; // On la rentre sous le panneau
+        // Z-Index à 100 pour passer devant les bannières, mais DANS le panneau gauche
+        conteneurCarte.style.zIndex = "100";
+        conteneurCarte.style.pointerEvents = "auto";
+        
+        // Si on change de carte en mode Aperçu
+        if (currentDisplayedId && currentDisplayedId !== idCarte && conteneurCarte.style.opacity === "1" && !isLocked) {
+            conteneurCarte.style.left = "50px"; 
             conteneurCarte.style.opacity = "0";
-            
-            // On attend qu'elle soit rentrée, puis on la relance avec le nouveau sort
-            setTimeout(() => {
-                window.afficherApercuCarteHD(idCarte);
-            }, 300);
+            setTimeout(() => { window.afficherApercuCarteHD(idCarte, isLocked); }, 300);
             return;
         }
     } else {
-        // En Fiche de personnage classique (Par dessus tout)
         if (conteneurCarte.parentNode !== document.body) document.body.appendChild(conteneurCarte);
         conteneurCarte.style.zIndex = "9999";
     }
 
-    // Mémorise la carte en cours
+    // Mémorise l'état actuel
     conteneurCarte.dataset.cardId = idCarte;
+    conteneurCarte.dataset.locked = isLocked ? "true" : "false";
 
     const data = window.COMPETENCES_CACHE[idCarte];
     if (!data) return;
+    window.CARTE_EN_APERCU = idCarte;
 
     const titre = data.Nom || "Inconnue";
     const initiative = data.Initiative || 0;
@@ -336,9 +335,8 @@ window.afficherApercuCarteHD = function(idCarte) {
         }
     }
 
-    // NOUVEAU : On détecte si on est en plein combat pour afficher le bouton "Choisir"
-    const boutonChoisirHtml = isCombatMode ? `
-        <!-- COUCHE 5 : LE BOUTON CHOISIR (MODE COMBAT UNIQUEMENT) -->
+    // Le bouton Choisir disparait si la carte est "Lockée"
+    const boutonChoisirHtml = (isCombatMode && !isLocked) ? `
         <div style="position: absolute; bottom: -70px; left: 50%; transform: translateX(-50%); z-index: 5;">
             <button id="btn-choisir-action" class="btn-choisir-combat" onclick="event.stopPropagation(); window.jouerCarteCombat('${idCarte}')">Choisir</button>
         </div>
@@ -379,18 +377,16 @@ window.afficherApercuCarteHD = function(idCarte) {
     conteneurCarte.style.display = "block";
     
     if (isCombatMode) {
-        // Préparation du point de départ caché (sous le panneau)
-        if (conteneurCarte.style.opacity === "0" || conteneurCarte.style.left !== "400px") {
+        if (conteneurCarte.style.opacity === "0" || conteneurCarte.style.top !== "15vh") {
             conteneurCarte.style.top = "15vh";
-            conteneurCarte.style.left = "50px"; 
+            conteneurCarte.style.left = "400px"; // Apparait à droite
             conteneurCarte.style.transform = "none";
             conteneurCarte.style.width = "340px";
             conteneurCarte.style.height = "476px";
-            void conteneurCarte.offsetWidth; // Force le CSS à valider ce point de départ
+            void conteneurCarte.offsetWidth; 
         }
-        
-        // Déclenchement de la glissade vers la droite
-        conteneurCarte.style.left = "400px";
+        // Si Locké -> 20px (au dessus des bannières), sinon 400px
+        conteneurCarte.style.left = isLocked ? "20px" : "400px";
         conteneurCarte.style.opacity = "1";
     } else {
         // Positionnement Fiche Perso (Centré)
@@ -404,24 +400,34 @@ window.afficherApercuCarteHD = function(idCarte) {
     }
 };
 
-window.masquerApercuCarteHD = function() {
+window.masquerApercuCarteHD = function(force = false) {
     const conteneurCarte = document.getElementById("apercu-carte-hd-competence");
     if (conteneurCarte) {
+        
+        // Bloque la disparition si la carte est verrouillée par un choix
+        if (!force && conteneurCarte.dataset.locked === "true") {
+            return;
+        }
+
         const isCombatMode = document.getElementById("fenetre-combat")?.style.display === "block";
         
         if (isCombatMode) {
-            // Glissade inversée vers la gauche
-            conteneurCarte.style.left = "50px";
+            conteneurCarte.style.left = "50px"; // Glisse en se cachant
             conteneurCarte.style.opacity = "0";
+
+            // 🔻 NOUVEAU : Restaure la taille de l'avatar
+            const imgPerso = document.getElementById("combat-portrait-perso");
+            if (imgPerso) {
+                imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
+                imgPerso.style.height = "100%";
+            }
             
             setTimeout(() => {
-                // On cache totalement l'objet si la glissade est terminée (anti-spam clic)
                 if (conteneurCarte.style.opacity === "0") {
                     conteneurCarte.style.display = "none";
                 }
-            }, 400); // 400ms = Durée exacte de la transition CSS
+            }, 400); 
         } else {
-            // Disparition instantanée pour la fiche perso
             conteneurCarte.style.display = "none";
             conteneurCarte.style.opacity = "0";
             conteneurCarte.style.left = "59vw";
@@ -429,15 +435,12 @@ window.masquerApercuCarteHD = function() {
             conteneurCarte.style.transform = "translateY(-50%)";
         }
         
-        conteneurCarte.dataset.cardId = ""; // Réinitialise la mémoire
+        conteneurCarte.dataset.cardId = ""; 
+        conteneurCarte.dataset.locked = "false";
     }
     
     window.CARTE_EN_APERCU = null;
-    
-    // Nettoyage de l'effet Cyan sur le bouton cliqué
-    document.querySelectorAll('.banniere-carte').forEach(el => {
-        el.style.filter = "none";
-    });
+    document.querySelectorAll('.banniere-carte').forEach(el => el.style.filter = "none");
 };
 
 window.basculerSelectionCarte = async function(idCarte) {
@@ -1384,24 +1387,34 @@ window.sauvegarderCompetence = async function() {
 // =========================================================================
 
 // La fonction officielle qui détruit la carte visuellement
-window.masquerApercuCarteHD = function() {
+window.masquerApercuCarteHD = function(force = false) {
     const conteneurCarte = document.getElementById("apercu-carte-hd-competence");
     if (conteneurCarte) {
+        
+        // Bloque la disparition si la carte est verrouillée par un choix
+        if (!force && conteneurCarte.dataset.locked === "true") {
+            return;
+        }
+
         const isCombatMode = document.getElementById("fenetre-combat")?.style.display === "block";
         
         if (isCombatMode) {
-            // Glissade inversée vers la gauche
-            conteneurCarte.style.left = "50px";
+            conteneurCarte.style.left = "50px"; // Glisse en se cachant
             conteneurCarte.style.opacity = "0";
+
+            // 🔻 NOUVEAU : Restaure la taille de l'avatar
+            const imgPerso = document.getElementById("combat-portrait-perso");
+            if (imgPerso) {
+                imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
+                imgPerso.style.height = "100%";
+            }
             
             setTimeout(() => {
-                // On cache totalement l'objet si la glissade est terminée (anti-spam clic)
                 if (conteneurCarte.style.opacity === "0") {
                     conteneurCarte.style.display = "none";
                 }
-            }, 400); // 400ms = Durée exacte de la transition CSS
+            }, 400); 
         } else {
-            // Disparition instantanée pour la fiche perso
             conteneurCarte.style.display = "none";
             conteneurCarte.style.opacity = "0";
             conteneurCarte.style.left = "59vw";
@@ -1409,15 +1422,12 @@ window.masquerApercuCarteHD = function() {
             conteneurCarte.style.transform = "translateY(-50%)";
         }
         
-        conteneurCarte.dataset.cardId = ""; // Réinitialise la mémoire
+        conteneurCarte.dataset.cardId = ""; 
+        conteneurCarte.dataset.locked = "false";
     }
     
     window.CARTE_EN_APERCU = null;
-    
-    // Nettoyage de l'effet Cyan sur le bouton cliqué
-    document.querySelectorAll('.banniere-carte').forEach(el => {
-        el.style.filter = "none";
-    });
+    document.querySelectorAll('.banniere-carte').forEach(el => el.style.filter = "none");
 };
 
 // 1. Interception de la Croix Rouge de la fiche perso
