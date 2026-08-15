@@ -2052,3 +2052,16 @@ textarea.input-texte-parchemin {
     85% { opacity: 1; transform: translate(-50%, -50%) scale(1); } /* Reste figé pendant 2.5 secondes */
     100% { opacity: 0; transform: translate(-50%, -50%) scale(1.3); } /* Disparition en fondu */
 }
+
+/* ========================================================================= */
+/* BANNIÈRES COMPÉTENCES ÉPUISÉES (MANQUE D'ÉNERGIE)                         */
+/* ========================================================================= */
+
+/* Grise le contenu pour un look "épuisé" (l'image de fond est gérée par JS) */
+.banniere-epuisee {
+    filter: grayscale(100%) brightness(0.85);
+}
+.banniere-epuisee * {
+    color: #888888 !important;
+    text-shadow: 1px 1px 2px #000000 !important;
+}

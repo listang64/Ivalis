@@ -335,7 +335,7 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         }
     }
 
-    // Vérification de la fatigue pour autoriser ou bloquer le bouton Choisir
+    // NOUVEAU : VÉRIFICATION DE LA FATIGUE POUR LA CARTE HD
     let estEpuise = false;
     if (isCombatMode && window.COMBAT_PERSOS_JOUEUR && window.COMBAT_INDEX_PERSO !== undefined) {
         const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
@@ -348,6 +348,7 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         }
     }
 
+    // Le bouton Choisir disparait si la carte est "Lockée" OU si le héros est épuisé
     let boutonChoisirHtml = "";
     if (isCombatMode && !isLocked) {
         if (estEpuise) {

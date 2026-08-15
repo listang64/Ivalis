@@ -346,12 +346,13 @@ window.gererClicCarteCombat = function(idCarte) {
     const fatigueMax = persoActuel ? (parseInt(persoActuel.Fatigue_Max) || 100) : 100;
     const fatiguePerso = (persoActuel && persoActuel.fatigueActuelle !== undefined) ? parseInt(persoActuel.fatigueActuelle) : fatigueMax;
 
+    // Réinitialise tout en gardant l'état épuisé si nécessaire
     document.querySelectorAll('.banniere-carte-combat').forEach(el => {
         el.dataset.actif = "false";
-        const cId = el.dataset.cardId;
+        const cId = el.id.replace("combat-carte-", "");
         const cData = window.COMPETENCES_CACHE[cId];
         const estEp = cData && (parseInt(cData.Fatigue) || 0) > fatiguePerso;
-        const cadre = el.querySelector('[id^="cadre-combat-"]');
+        const cadre = document.getElementById(`cadre-combat-${cId}`);
         if (cadre) cadre.style.backgroundImage = `url('${estEp ? IMAGE_CADRE_EPUISE : IMAGE_CADRE_NORMAL}')`;
     });
 
@@ -366,6 +367,7 @@ window.gererClicCarteCombat = function(idCarte) {
         const cadreDiv = document.getElementById(`cadre-combat-${idCarte}`);
         if (carteDiv && cadreDiv) {
             carteDiv.dataset.actif = "true";
+            // Si la carte est épuisée, on affiche pas la cible rouge, on garde la bannière usée
             cadreDiv.style.backgroundImage = `url('${estEpuise ? IMAGE_CADRE_EPUISE : IMAGE_CADRE_SELECTIONNE}')`;
         }
         
@@ -380,8 +382,12 @@ window.gererClicCarteCombat = function(idCarte) {
             window.masquerApercuCarteHD();
         }
     }
+    
+    // Force la réactualisation visuelle des couleurs grises
+    if (typeof window.actualiserBannieresEpuisees === "function") window.actualiserBannieresEpuisees();
 };
 
+// Clic global (Fermeture dans le vide)
 document.addEventListener("click", function(event) {
     const btnFermer = document.getElementById('btn-fermer-combat');
     if (!btnFermer || btnFermer.style.display === 'none') return;
@@ -391,15 +397,16 @@ document.addEventListener("click", function(event) {
     const clicSurFleche = event.target.closest('.btn-combat-switch'); 
     
     if (!clicSurBanniere && !clicSurCarteHD && !clicSurFleche && window.CARTE_EN_APERCU) {
-        window.mettreAJourJaugeFatigue(0);
+        window.mettreAJourJaugeFatigue(0); 
         
         if (typeof window.masquerApercuCarteHD === "function") {
             window.masquerApercuCarteHD();
         }
         
-        if (typeof window.actualiserBannieresEpuisees === "function") {
-            window.actualiserBannieresEpuisees();
-        }
+        document.querySelectorAll('.banniere-carte-combat').forEach(el => {
+            el.dataset.actif = "false";
+        });
+        if (typeof window.actualiserBannieresEpuisees === "function") window.actualiserBannieresEpuisees();
     }
 });
 
@@ -1168,9 +1175,8 @@ window.finDeTourCombat = async function(forcer = false) {
     if (premiereBulle) {
         premiereBulle.style.opacity = "0";
         premiereBulle.style.width = "0px";
-        premiereBulle.style.minWidth = "0px";
+        premiereBulle.style.minWidth = "0px"; 
         premiereBulle.style.marginRight = "0px";
-        premiereBulle.style.padding = "0px";
         premiereBulle.style.transform = "scale(0.5)";
     }
 
@@ -1180,9 +1186,12 @@ window.finDeTourCombat = async function(forcer = false) {
             const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
             const snap = await getDoc(partieRef);
 
+            let file = [];
+            let phase = "Preparation";
+
             if (snap.exists()) {
-                let file = snap.data().File_Attente_Combat || [];
-                let phase = snap.data().Phase_Combat || "Resolution";
+                file = snap.data().File_Attente_Combat || [];
+                phase = snap.data().Phase_Combat || "Resolution";
                 let tour = snap.data().Tour_Combat || 1;
 
                 if (file.length > 0) {
@@ -1225,10 +1234,7 @@ window.finDeTourCombat = async function(forcer = false) {
                             });
                             
                             if (regenAjoutee) await batch.commit();
-
-                            if (typeof window.mettreAJourJaugeFatigue === "function") {
-                                window.mettreAJourJaugeFatigue(0);
-                            }
+                            if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
                         }
                     }
                     
@@ -1239,7 +1245,12 @@ window.finDeTourCombat = async function(forcer = false) {
                     });
                 }
             }
+            
             window.ANIMATION_TOUR_EN_COURS = false;
+            if (typeof window.afficherPisteInitiative === "function") {
+                window.afficherPisteInitiative(file, phase);
+            }
+
         } catch (e) {
             window.ANIMATION_TOUR_EN_COURS = false;
             console.error("Erreur finDeTourCombat:", e);
@@ -1334,10 +1345,10 @@ window.actualiserEtatCarteCombat = function() {
         window.mettreAJourJaugeFatigue(0);
         if (imgPerso) {
             imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
-            imgPerso.style.height = "40vh";
+            imgPerso.style.height = "40vh"; 
         }
         if (typeof window.afficherApercuCarteHD === "function") {
-            window.afficherApercuCarteHD(persoInQueue.idCarte, true);
+            window.afficherApercuCarteHD(persoInQueue.idCarte, true); 
         }
     } else {
         if (deckEl) {
@@ -1374,36 +1385,26 @@ window.actualiserBannieresEpuisees = function() {
 
     const IMAGE_CADRE_NORMAL = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png";
     const IMAGE_CADRE_EPUISE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1783286721/ban_epuis%C3%A9_otc70l.png";
-    
-    Array.from(liste.querySelectorAll('.banniere-carte-combat')).forEach(ban => {
-        const idCarte = ban.dataset.cardId;
-        if (!idCarte) return;
 
+    Array.from(liste.querySelectorAll('.banniere-carte-combat')).forEach(ban => {
+        const idCarte = ban.id.replace("combat-carte-", "");
         const dataCarte = window.COMPETENCES_CACHE[idCarte];
+        
         if (dataCarte) {
             const coutFatigue = parseInt(dataCarte.Fatigue) || 0;
-            const cadre = ban.querySelector('[id^="cadre-combat-"]');
-            const txtInit = ban.querySelector('.texte-init-banniere');
-            const txtNom = ban.querySelector('.texte-nom-banniere');
-
+            const cadre = document.getElementById(`cadre-combat-${idCarte}`);
+            
             if (coutFatigue > fatiguePerso) {
                 ban.classList.add("banniere-epuisee");
                 if (cadre) cadre.style.backgroundImage = `url('${IMAGE_CADRE_EPUISE}')`;
-                if (txtInit) txtInit.style.color = "#888888";
-                if (txtNom) txtNom.style.color = "#888888";
             } else {
                 ban.classList.remove("banniere-epuisee");
                 if (cadre && ban.dataset.actif !== "true") cadre.style.backgroundImage = `url('${IMAGE_CADRE_NORMAL}')`;
-                if (txtInit) txtInit.style.color = "#e0d0b0";
-                if (txtNom) txtNom.style.color = "#e0d0b0";
             }
         }
     });
 };
 
-// =========================================================================
-//  VALIDATION DE CARTE : DÉDUCTION DE FATIGUE
-// =========================================================================
 window.validerCarteCombat = async function(idCarte, elementTexte) {
     if (elementTexte && elementTexte.innerText === "Validé") return;
 
@@ -1433,9 +1434,7 @@ window.validerCarteCombat = async function(idCarte, elementTexte) {
     const persoPartie = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === persoActuel.idPersonnage);
     if (persoPartie) persoPartie.fatigueActuelle = fatigue;
 
-    if (typeof window.mettreAJourJaugeFatigue === "function") {
-        window.mettreAJourJaugeFatigue(0);
-    }
+    if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
 
     if (typeof window.finDeTourCombat === "function") {
         window.finDeTourCombat(true);
@@ -1445,7 +1444,11 @@ window.validerCarteCombat = async function(idCarte, elementTexte) {
         try {
             const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
             const persoRef = doc(db, "Personnages", persoActuel.idPersonnage);
-            await updateDoc(persoRef, { Fatigue_Actuelle: fatigue });
+            
+            await updateDoc(persoRef, { 
+                Fatigue_Actuelle: fatigue 
+            });
+            
         } catch (e) {
             console.error("Erreur lors de la déduction de la fatigue :", e);
         }
