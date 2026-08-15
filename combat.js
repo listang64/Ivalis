@@ -194,14 +194,12 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
         const persoActuel = window.PERSOS_PARTIE.find(p => p.idPersonnage === idPersonnage);
         if (!persoActuel) return;
         
-        window.COMBAT_FATIGUE_MAX = parseInt(persoActuel.fatigueMax) || 100;
-        window.COMBAT_FATIGUE_ACTUELLE = parseInt(persoActuel.fatigueActuelle) || window.COMBAT_FATIGUE_MAX;
+        window.COMBAT_FATIGUE_MAX = parseInt(persoActuel.Fatigue_Max) || parseInt(persoActuel.fatigueMax) || 100;
+        window.COMBAT_FATIGUE_ACTUELLE = persoActuel.fatigueActuelle !== undefined ? parseInt(persoActuel.fatigueActuelle) : window.COMBAT_FATIGUE_MAX;
         
-        // Initialisation des PV Actuels (Liés à la BDD + Modificateurs DEV)
         window.COMBAT_PV_MAX = (parseInt(persoActuel.PV_Max) || 1) + (parseInt(persoActuel.Dev_Mod_PV) || 0);
         window.COMBAT_PV_ACTUELS = persoActuel.PV_Actuels !== undefined ? parseInt(persoActuel.PV_Actuels) : window.COMBAT_PV_MAX;
 
-        // Affichage de la boîte superposée
         document.getElementById("combat-jauges-container").style.opacity = "1";
         
         window.mettreAJourJaugeFatigue(0);
@@ -232,11 +230,8 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
 
         let htmlDeck = "";
         const IMAGE_CADRE_NORMAL = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png";
+        const IMAGE_CADRE_EPUISE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1783286721/ban_epuis%C3%A9_otc70l.png";
 
-        // =========================================================================
-        // 🔻 RÉGLAGE DE LA DISTANCE ENTRE LES BANNIÈRES 🔻
-        // Modifie cette valeur manuellement pour écarter ou resserrer les bannières.
-        // =========================================================================
         const ESPACEMENT_BANNIERES = -45;
 
         competencesToRender.forEach(comp => {
@@ -244,29 +239,28 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
             const idCarte = comp.id;
             const titre = data.Nom || "Technique";
             const initiative = data.Initiative || 0;
+            const coutFatigue = parseInt(data.Fatigue) || 0;
+            const estEpuise = coutFatigue > window.COMBAT_FATIGUE_ACTUELLE;
+
+            const urlCadre = estEpuise ? IMAGE_CADRE_EPUISE : IMAGE_CADRE_NORMAL;
+            const classeEpuise = estEpuise ? "banniere-epuisee" : "";
+            const couleurTexte = estEpuise ? "#888888" : "#e0d0b0";
 
             htmlDeck += `
             <div style="position: relative; height: 100px; margin-bottom: ${ESPACEMENT_BANNIERES}px; transition: margin 0.2s ease;">
-                
-                <!-- ========================================================================= -->
-                <!-- 🔻 HITBOX (ZONE DE CLIC INVISIBLE) 🔻                                     -->
-                <!-- ========================================================================= -->
                 <div onclick="event.stopPropagation(); window.gererClicCarteCombat('${idCarte}')"
                      onmouseover="document.getElementById('combat-carte-${idCarte}').style.transform='scale(0.75) translateX(15px)'; document.getElementById('combat-carte-${idCarte}').style.zIndex='100';"
                      onmouseout="document.getElementById('combat-carte-${idCarte}').style.transform='scale(0.75) translateX(0px)'; document.getElementById('combat-carte-${idCarte}').style.zIndex='2';"
                      style="position: absolute; top: 35px; left: 0; width: 335px; height: 40px; z-index: 10; cursor: pointer;">
                 </div>
 
-                <!-- ========================================================================= -->
-                <!-- 🎨 VISUELS : NE MODIFIE PLUS LES DIMENSIONS ICI (Elles fixent l'image)    -->
-                <!-- ========================================================================= -->
-                <div id="combat-carte-${idCarte}" class="banniere-carte-combat" data-actif="false"
+                <div id="combat-carte-${idCarte}" class="banniere-carte-combat ${classeEpuise}" data-actif="false" data-card-id="${idCarte}"
                      style="position: absolute; top: 0; left: 0; width: 450px; height: 160px; pointer-events: none; transition: filter 0.2s ease, transform 0.2s ease; transform: scale(0.75); transform-origin: left top; z-index: 2;">
                      
                     <div style="position: absolute; top: 49px; bottom: 58px; left: 63px; right: 7px; z-index: 1; border-radius: 0 15px 15px 0; background-color: ${window.COULEUR_PERSO_COURANT};"></div>
-                    <div id="cadre-combat-${idCarte}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('${IMAGE_CADRE_NORMAL}'); background-size: contain; background-position: left center; background-repeat: no-repeat; z-index: 2; filter: drop-shadow(0px 6px 4px rgba(0,0,0,0.6)); transition: background-image 0.2s ease;"></div>
-                    <div style="position: absolute; top: 44%; transform: translateY(-50%); left: 6px; width: 69px; text-align: center; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 30px; font-weight: bold; z-index: 3; text-shadow: 2px 2px 5px black;">${initiative}</div>
-                    <div style="position: absolute; top: 48%; transform: translateY(-50%); left: 76px; right: 120px; text-align: left; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${titre}</div>
+                    <div id="cadre-combat-${idCarte}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('${urlCadre}'); background-size: contain; background-position: left center; background-repeat: no-repeat; z-index: 2; filter: drop-shadow(0px 6px 4px rgba(0,0,0,0.6)); transition: background-image 0.2s ease;"></div>
+                    <div class="texte-init-banniere" style="position: absolute; top: 44%; transform: translateY(-50%); left: 6px; width: 69px; text-align: center; color: ${couleurTexte}; font-family: 'Cinzel', serif; font-size: 30px; font-weight: bold; z-index: 3; text-shadow: 2px 2px 5px black;">${initiative}</div>
+                    <div class="texte-nom-banniere" style="position: absolute; top: 48%; transform: translateY(-50%); left: 76px; right: 120px; text-align: left; color: ${couleurTexte}; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${titre}</div>
                 </div>
             </div>
             `;
@@ -344,38 +338,43 @@ window.mettreAJourJaugeFatigue = function(coutFatigueBrut) {
 //  INTERACTIONS AVEC LES CARTES (IMAGE ET JAUGE)
 // =========================================================================
 window.gererClicCarteCombat = function(idCarte) {
-    // 🔇 Son volontairement supprimé ici
-
     const IMAGE_CADRE_NORMAL = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png";
     const IMAGE_CADRE_SELECTIONNE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1783286721/ban_cible_pdpnad.png";
+    const IMAGE_CADRE_EPUISE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1783286721/ban_epuis%C3%A9_otc70l.png";
+
+    const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+    const fatigueMax = persoActuel ? (parseInt(persoActuel.Fatigue_Max) || 100) : 100;
+    const fatiguePerso = (persoActuel && persoActuel.fatigueActuelle !== undefined) ? parseInt(persoActuel.fatigueActuelle) : fatigueMax;
 
     document.querySelectorAll('.banniere-carte-combat').forEach(el => {
         el.dataset.actif = "false";
+        const cId = el.dataset.cardId;
+        const cData = window.COMPETENCES_CACHE[cId];
+        const estEp = cData && (parseInt(cData.Fatigue) || 0) > fatiguePerso;
         const cadre = el.querySelector('[id^="cadre-combat-"]');
-        if (cadre) cadre.style.backgroundImage = `url('${IMAGE_CADRE_NORMAL}')`;
+        if (cadre) cadre.style.backgroundImage = `url('${estEp ? IMAGE_CADRE_EPUISE : IMAGE_CADRE_NORMAL}')`;
     });
 
     if (window.CARTE_EN_APERCU !== idCarte) {
         window.CARTE_EN_APERCU = idCarte;
         
-        // 1. Allumage de la bannière
+        const dataCarte = window.COMPETENCES_CACHE[idCarte];
+        const cout = dataCarte?.Fatigue || 0;
+        const estEpuise = parseInt(cout) > fatiguePerso;
+
         const carteDiv = document.getElementById(`combat-carte-${idCarte}`);
         const cadreDiv = document.getElementById(`cadre-combat-${idCarte}`);
         if (carteDiv && cadreDiv) {
             carteDiv.dataset.actif = "true";
-            cadreDiv.style.backgroundImage = `url('${IMAGE_CADRE_SELECTIONNE}')`;
+            cadreDiv.style.backgroundImage = `url('${estEpuise ? IMAGE_CADRE_EPUISE : IMAGE_CADRE_SELECTIONNE}')`;
         }
         
-        // 2. Récupération du coût de fatigue et animation de la jauge
-        const cout = window.COMPETENCES_CACHE[idCarte]?.Fatigue || 0;
         window.mettreAJourJaugeFatigue(cout);
         
-        // 3. Affichage HD géré dynamiquement
         if (typeof window.afficherApercuCarteHD === "function") {
             window.afficherApercuCarteHD(idCarte);
         }
     } else {
-        // Si on reclique sur la même, on referme tout
         window.mettreAJourJaugeFatigue(0);
         if (typeof window.masquerApercuCarteHD === "function") {
             window.masquerApercuCarteHD();
@@ -383,7 +382,6 @@ window.gererClicCarteCombat = function(idCarte) {
     }
 };
 
-// Clic global (Fermeture dans le vide)
 document.addEventListener("click", function(event) {
     const btnFermer = document.getElementById('btn-fermer-combat');
     if (!btnFermer || btnFermer.style.display === 'none') return;
@@ -393,18 +391,15 @@ document.addEventListener("click", function(event) {
     const clicSurFleche = event.target.closest('.btn-combat-switch'); 
     
     if (!clicSurBanniere && !clicSurCarteHD && !clicSurFleche && window.CARTE_EN_APERCU) {
-        window.mettreAJourJaugeFatigue(0); // Réinitialise la jauge
+        window.mettreAJourJaugeFatigue(0);
         
         if (typeof window.masquerApercuCarteHD === "function") {
             window.masquerApercuCarteHD();
         }
         
-        const IMAGE_CADRE_NORMAL = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png";
-        document.querySelectorAll('.banniere-carte-combat').forEach(el => {
-            el.dataset.actif = "false";
-            const cadre = el.querySelector('[id^="cadre-combat-"]');
-            if (cadre) cadre.style.backgroundImage = `url('${IMAGE_CADRE_NORMAL}')`;
-        });
+        if (typeof window.actualiserBannieresEpuisees === "function") {
+            window.actualiserBannieresEpuisees();
+        }
     }
 });
 
@@ -1159,24 +1154,26 @@ window.actualiserBoutonFinTour = function(queueParam, phaseParam) {
     }
 };
 
-// 2. Le joueur ou le MJ clique sur "Fin du tour"
-window.finDeTourCombat = async function() {
-    // SÉCURITÉ : Si le bouton est éteint, on stoppe tout immédiatement !
-    if (!window.PEUT_PASSER_TOUR) return; 
+window.ANIMATION_TOUR_EN_COURS = false;
+
+window.finDeTourCombat = async function(forcer = false) {
+    if (!window.PEUT_PASSER_TOUR && !forcer) return; 
 
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     if (!window.ID_PARTIE_COURANTE) return;
 
-    // EFFET VISUEL IMMÉDIAT : La première bulle (à gauche) fond et rétrécit
+    window.ANIMATION_TOUR_EN_COURS = true;
+
     const premiereBulle = document.getElementById("premiere-bulle-initiative");
     if (premiereBulle) {
         premiereBulle.style.opacity = "0";
         premiereBulle.style.width = "0px";
+        premiereBulle.style.minWidth = "0px";
         premiereBulle.style.marginRight = "0px";
+        premiereBulle.style.padding = "0px";
         premiereBulle.style.transform = "scale(0.5)";
     }
 
-    // Le CSS "max-content" de la piste noire va forcer celle-ci à glisser vers la droite
     setTimeout(async () => {
         try {
             const { doc, getDoc, updateDoc, writeBatch } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
@@ -1189,21 +1186,19 @@ window.finDeTourCombat = async function() {
                 let tour = snap.data().Tour_Combat || 1;
 
                 if (file.length > 0) {
-                    file.shift(); // Supprime le 1er de la file d'attente
+                    file.shift();
                     
-                    // Si la piste est vide, c'est le DÉBUT DU NOUVEAU TOUR
                     if (file.length === 0) {
                         phase = "Preparation";
                         tour++;
                         
-                        // === SYSTÈME DE RÉGÉNÉRATION D'ÉNERGIE ===
                         if (window.PERSOS_PARTIE && window.PERSOS_PARTIE.length > 0) {
                             const batch = writeBatch(db);
                             let regenAjoutee = false;
                             
                             window.PERSOS_PARTIE.forEach(perso => {
                                 if (perso.statut !== "Mort") {
-                                    const fatigueMax = parseInt(perso.Fatigue_Max) || 100;
+                                    const fatigueMax = parseInt(perso.Fatigue_Max) || parseInt(perso.fatigueMax) || 100;
                                     let fatigue = perso.fatigueActuelle !== undefined ? parseInt(perso.fatigueActuelle) : fatigueMax;
                                     
                                     const regenPct = parseInt(perso.Regeneration) || 0;
@@ -1229,9 +1224,7 @@ window.finDeTourCombat = async function() {
                                 }
                             });
                             
-                            if (regenAjoutee) {
-                                await batch.commit();
-                            }
+                            if (regenAjoutee) await batch.commit();
 
                             if (typeof window.mettreAJourJaugeFatigue === "function") {
                                 window.mettreAJourJaugeFatigue(0);
@@ -1246,18 +1239,20 @@ window.finDeTourCombat = async function() {
                     });
                 }
             }
+            window.ANIMATION_TOUR_EN_COURS = false;
         } catch (e) {
+            window.ANIMATION_TOUR_EN_COURS = false;
             console.error("Erreur finDeTourCombat:", e);
         }
     }, 350); 
 };
 
-// 3. Dessin temps réel de la piste d'initiative
 window.afficherPisteInitiative = function(queue, phase) {
+    if (window.ANIMATION_TOUR_EN_COURS) return;
+
     const piste = document.getElementById("piste-initiative");
     if (!piste) return;
 
-    // Masqué tant qu'on est en Préparation (ou que la piste est vide)
     if (!queue || queue.length === 0 || phase === "Preparation") {
         piste.style.opacity = "0";
         piste.style.padding = "0px";
@@ -1267,7 +1262,7 @@ window.afficherPisteInitiative = function(queue, phase) {
     }
 
     piste.style.opacity = "1";
-    piste.style.padding = "0 15px 0 25px"; // 15px à droite pour dégager la bulle du bord du HUD
+    piste.style.padding = "0 15px 0 25px";
     let html = "";
 
     queue.forEach((item, index) => {
@@ -1278,17 +1273,12 @@ window.afficherPisteInitiative = function(queue, phase) {
         const pvActuels = perso.PV_Actuels !== undefined ? parseInt(perso.PV_Actuels) : pvMax;
         const pctPv = Math.min(100, Math.max(0, (pvActuels / pvMax) * 100));
 
-        // 🔻 CORRECTION FATIGUE CLIENT : Utilisation stricte de "fatigueActuelle"
-        const fatigueMax = parseInt(perso.Fatigue_Max) || 100;
+        const fatigueMax = parseInt(perso.Fatigue_Max) || parseInt(perso.fatigueMax) || 100;
         const fatigue = perso.fatigueActuelle !== undefined ? parseInt(perso.fatigueActuelle) : fatigueMax;
         const pctFatigue = Math.min(100, Math.max(0, (fatigue / fatigueMax) * 100));
 
         const imgUrl = perso.urlCloudinary || "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1786114507/Les_humains_h0ubwh.png";
-
-        // Identification de la première bulle pour l'animation de retrait
         const attributId = index === 0 ? 'id="premiere-bulle-initiative"' : '';
-
-        // Halo doré uniquement sur la première bulle en phase de Résolution
         const classeBulle = (index === 0 && phase === "Resolution") ? "halo-tour-actif" : "bulle-initiative-base";
 
         html += `
@@ -1330,7 +1320,6 @@ window.actualiserEtatCarteCombat = function() {
     const partie = window.PARTIE_DATA || {};
     const queue = partie.File_Attente_Combat || [];
     
-    // Le personnage a-t-il validé son tour dans la BDD ?
     const persoInQueue = queue.find(q => q.idPersonnage === persoActuel.idPersonnage);
     const deckEl = document.getElementById("combat-liste-competences");
     const imgPerso = document.getElementById("combat-portrait-perso");
@@ -1338,22 +1327,19 @@ window.actualiserEtatCarteCombat = function() {
     if (deckEl) deckEl.style.transition = "opacity 0.3s ease";
 
     if (persoInQueue && persoInQueue.idCarte) {
-        // OUI : On cache les bannières et on verrouille sa carte
         if (deckEl) {
             deckEl.style.opacity = "0";
             deckEl.style.pointerEvents = "none";
         }
         window.mettreAJourJaugeFatigue(0);
-        // 🔻 CORRECTION : Utilisation de "vh" pour un pourcentage relatif à l'écran (Responsive + Uniforme)
         if (imgPerso) {
             imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
-            imgPerso.style.height = "40vh"; /* 40% de l'écran (ajuste à 35vh ou 45vh selon tes goûts) */
+            imgPerso.style.height = "40vh";
         }
         if (typeof window.afficherApercuCarteHD === "function") {
-            window.afficherApercuCarteHD(persoInQueue.idCarte, true); // true = Mode Verrouillé
+            window.afficherApercuCarteHD(persoInQueue.idCarte, true);
         }
     } else {
-        // NON : On réaffiche le Deck
         if (deckEl) {
             deckEl.style.opacity = "1";
             deckEl.style.pointerEvents = "auto";
@@ -1362,7 +1348,6 @@ window.actualiserEtatCarteCombat = function() {
             imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
             imgPerso.style.height = "100%";
         }
-        // Si une carte était verrouillée avant (ex: fin de tour passée), on force sa disparition
         const conteneurCarte = document.getElementById("apercu-carte-hd-competence");
         if (conteneurCarte && conteneurCarte.dataset.locked === "true") {
             conteneurCarte.dataset.locked = "false";
@@ -1371,6 +1356,49 @@ window.actualiserEtatCarteCombat = function() {
             }
         }
     }
+
+    if (typeof window.actualiserBannieresEpuisees === "function") {
+        window.actualiserBannieresEpuisees();
+    }
+};
+
+window.actualiserBannieresEpuisees = function() {
+    const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+    if (!persoActuel) return;
+    
+    const fatigueMax = parseInt(persoActuel.Fatigue_Max) || parseInt(persoActuel.fatigueMax) || 100;
+    const fatiguePerso = persoActuel.fatigueActuelle !== undefined ? parseInt(persoActuel.fatigueActuelle) : fatigueMax;
+
+    const liste = document.getElementById("combat-liste-competences");
+    if (!liste) return;
+
+    const IMAGE_CADRE_NORMAL = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png";
+    const IMAGE_CADRE_EPUISE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1783286721/ban_epuis%C3%A9_otc70l.png";
+    
+    Array.from(liste.querySelectorAll('.banniere-carte-combat')).forEach(ban => {
+        const idCarte = ban.dataset.cardId;
+        if (!idCarte) return;
+
+        const dataCarte = window.COMPETENCES_CACHE[idCarte];
+        if (dataCarte) {
+            const coutFatigue = parseInt(dataCarte.Fatigue) || 0;
+            const cadre = ban.querySelector('[id^="cadre-combat-"]');
+            const txtInit = ban.querySelector('.texte-init-banniere');
+            const txtNom = ban.querySelector('.texte-nom-banniere');
+
+            if (coutFatigue > fatiguePerso) {
+                ban.classList.add("banniere-epuisee");
+                if (cadre) cadre.style.backgroundImage = `url('${IMAGE_CADRE_EPUISE}')`;
+                if (txtInit) txtInit.style.color = "#888888";
+                if (txtNom) txtNom.style.color = "#888888";
+            } else {
+                ban.classList.remove("banniere-epuisee");
+                if (cadre && ban.dataset.actif !== "true") cadre.style.backgroundImage = `url('${IMAGE_CADRE_NORMAL}')`;
+                if (txtInit) txtInit.style.color = "#e0d0b0";
+                if (txtNom) txtNom.style.color = "#e0d0b0";
+            }
+        }
+    });
 };
 
 // =========================================================================
@@ -1394,8 +1422,7 @@ window.validerCarteCombat = async function(idCarte, elementTexte) {
     if (!dataCarte) return;
 
     const coutFatigue = parseInt(dataCarte.Fatigue) || 0;
-    
-    const fatigueMax = parseInt(persoActuel.Fatigue_Max) || 100;
+    const fatigueMax = parseInt(persoActuel.Fatigue_Max) || parseInt(persoActuel.fatigueMax) || 100;
     let fatigue = persoActuel.fatigueActuelle !== undefined ? parseInt(persoActuel.fatigueActuelle) : fatigueMax;
 
     fatigue = Math.max(0, fatigue - coutFatigue);
@@ -1410,27 +1437,19 @@ window.validerCarteCombat = async function(idCarte, elementTexte) {
         window.mettreAJourJaugeFatigue(0);
     }
 
-    const partie = window.PARTIE_DATA || {};
-    if (typeof window.afficherPisteInitiative === "function") {
-        window.afficherPisteInitiative(partie.File_Attente_Combat || [], partie.Phase_Combat || "Preparation");
-    }
-
-    // 🔻 NOUVEAU : On déclenche automatiquement la fin de tour !
     if (typeof window.finDeTourCombat === "function") {
-        window.finDeTourCombat();
+        window.finDeTourCombat(true);
     }
 
-    try {
-        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
-        const persoRef = doc(db, "Personnages", persoActuel.idPersonnage);
-        
-        await updateDoc(persoRef, { 
-            Fatigue_Actuelle: fatigue 
-        });
-        
-    } catch (e) {
-        console.error("Erreur lors de la déduction de la fatigue :", e);
-    }
+    setTimeout(async () => {
+        try {
+            const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+            const persoRef = doc(db, "Personnages", persoActuel.idPersonnage);
+            await updateDoc(persoRef, { Fatigue_Actuelle: fatigue });
+        } catch (e) {
+            console.error("Erreur lors de la déduction de la fatigue :", e);
+        }
+    }, 350);
 };
 
 // =========================================================================

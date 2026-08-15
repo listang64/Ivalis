@@ -335,12 +335,33 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         }
     }
 
-    // Le bouton Choisir disparait si la carte est "Lockée"
-    const boutonChoisirHtml = (isCombatMode && !isLocked) ? `
-        <div style="position: absolute; bottom: -70px; left: 50%; transform: translateX(-50%); z-index: 5;">
-            <button id="btn-choisir-action" class="btn-choisir-combat" onclick="event.stopPropagation(); window.jouerCarteCombat('${idCarte}')">Choisir</button>
-        </div>
-    ` : "";
+    // Vérification de la fatigue pour autoriser ou bloquer le bouton Choisir
+    let estEpuise = false;
+    if (isCombatMode && window.COMBAT_PERSOS_JOUEUR && window.COMBAT_INDEX_PERSO !== undefined) {
+        const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+        if (persoActuel) {
+            const fatigueMax = parseInt(persoActuel.Fatigue_Max) || parseInt(persoActuel.fatigueMax) || 100;
+            const fatiguePerso = persoActuel.fatigueActuelle !== undefined ? parseInt(persoActuel.fatigueActuelle) : fatigueMax;
+            if (parseInt(fatigue) > fatiguePerso) {
+                estEpuise = true;
+            }
+        }
+    }
+
+    let boutonChoisirHtml = "";
+    if (isCombatMode && !isLocked) {
+        if (estEpuise) {
+            boutonChoisirHtml = `
+            <div style="position: absolute; bottom: -65px; left: 50%; transform: translateX(-50%); z-index: 5; color: #ff4c4c; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; text-transform: uppercase; white-space: nowrap; text-shadow: 2px 2px 4px black; letter-spacing: 1px;">
+                Énergie Insuffisante
+            </div>`;
+        } else {
+            boutonChoisirHtml = `
+            <div style="position: absolute; bottom: -70px; left: 50%; transform: translateX(-50%); z-index: 5;">
+                <button id="btn-choisir-action" class="btn-choisir-combat" onclick="event.stopPropagation(); window.jouerCarteCombat('${idCarte}')">Choisir</button>
+            </div>`;
+        }
+    }
 
     const partieTemp = window.PARTIE_DATA || {};
     const queueTemp = partieTemp.File_Attente_Combat || [];
@@ -363,7 +384,7 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         <!-- COUCHE 1 : FOND DE COULEUR -->
         <div style="position: absolute; top: 12px; left: 12px; right: 12px; bottom: 12px; background-color: ${window.COULEUR_PERSO_COURANT}; border-radius: 8px; z-index: 1;"></div>
         
-        <!-- COUCHE 2 : L'IMAGE DE LA CARTE -->
+        <!-- COUCHE 2 : L'IMAGE DE LA CARTE (CONSERVÉE PROPREMENT) -->
         <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1785866318/competance_carte_vy8omh.png" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none;">
         
         <!-- COUCHE 3 : LES DONNÉES -->
