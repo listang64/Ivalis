@@ -1086,6 +1086,13 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
          }
          // =========================================================
 
+         // =========================================================
+         // LECTURE DE LA PISTE D'INITIATIVE ET DES PHASES DE COMBAT
+         // =========================================================
+         if (typeof window.afficherPisteInitiative === "function") {
+             window.afficherPisteInitiative(dataPartie.File_Attente_Combat || [], dataPartie.Phase_Combat || "Preparation");
+         }
+
          window.PARTIE_DATA = dataPartie;
          if (window.PERSOS_PARTIE) afficherBullesPersonnages(window.PERSOS_PARTIE);
 

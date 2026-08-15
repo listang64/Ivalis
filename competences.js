@@ -340,7 +340,7 @@ window.afficherApercuCarteHD = function(idCarte) {
     const boutonChoisirHtml = isCombatMode ? `
         <!-- COUCHE 5 : LE BOUTON CHOISIR (MODE COMBAT UNIQUEMENT) -->
         <div style="position: absolute; bottom: -70px; left: 50%; transform: translateX(-50%); z-index: 5;">
-            <button class="btn-choisir-combat" onclick="event.stopPropagation();">Choisir</button>
+            <button id="btn-choisir-action" class="btn-choisir-combat" onclick="event.stopPropagation(); window.jouerCarteCombat('${idCarte}')">Choisir</button>
         </div>
     ` : "";
 

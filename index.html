@@ -517,13 +517,14 @@
         <!-- NOUVEAU : HUD BAS DROITE (Z-index réduit à 5 pour passer sous le panneau gauche) -->
         <div id="combat-hud-bas-droite" style="position: absolute; bottom: 0; right: 0; width: 450px; z-index: 5; pointer-events: none;">
             
-            <!-- LA PISTE D'INITIATIVE (Parfaitement centrée sur la partie rectangulaire) -->
+            <!-- LA PISTE D'INITIATIVE (Rétractable et Dynamique) -->
             <div id="piste-initiative" style="
                 position: absolute;
-                right: 45%; 
-                top: 34%;   /* 🔻 Plus bas pour s'aligner au centre du rectangle */
-                height: 38%; /* 🔻 Hauteur ajustée en conséquence */
-                width: 45vw; 
+                right: 96%; /* 🔻 MODIFIÉ ICI : Ancré au bord GAUCHE du HUD */
+                top: 34%;   
+                height: 38%; 
+                width: max-content; 
+                max-width: 60vw; 
                 background: rgba(0, 0, 0, 0.4); 
                 border-radius: 20px 0 0 20px; 
                 box-shadow: 0 0 15px 5px rgba(0,0,0,0.5), inset 0 0 20px 5px rgba(0,0,0,0.7);
@@ -531,21 +532,25 @@
                 z-index: -1; 
                 pointer-events: auto; 
                 display: flex;
+                flex-direction: row; 
                 align-items: center;
-                padding: 0 20px;
+                padding: 0px; 
                 gap: 15px;
+                opacity: 0; 
+                transition: opacity 0.4s ease, padding 0.4s ease;
+                white-space: nowrap; 
             ">
-                <!-- Les futurs avatars/tokens d'initiative viendront s'aligner ici -->
+                <!-- Rempli par JavaScript -->
             </div>
 
-            <!-- L'image de fond -->
-            <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/finTourAllum_gmn7ln.png" style="width: 100%; display: block; pointer-events: none;">
+            <!-- L'image de fond (Éteinte par défaut et avec un ID pour la cibler) -->
+            <img id="img-hud-fintour" src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/FinTourEteind_exjtxp.png" style="width: 100%; display: block; pointer-events: none;">
 
             <!-- 1. Bouton FIN DE TOUR (Le grand cercle à droite) -->
             <div id="btn-hud-fintour"
                  style="position: absolute; top: 3%; right: 2%; width: 43%; height: 94%; border-radius: 50%; background-color: transparent; cursor: pointer; pointer-events: auto; transition: transform 0.1s;"
                  onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform='scale(1)'" onmouseleave="this.style.transform='scale(1)'"
-                 onclick="console.log('Action : Fin de Tour')" title="Fin du Tour"></div>
+                 onclick="window.finDeTourCombat()" title="Fin du Tour"></div>
 
             <!-- 2. Bouton ENGRENAGE (Le petit cercle au milieu) -->
             <div id="btn-hud-engrenage"

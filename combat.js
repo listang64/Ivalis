@@ -170,6 +170,9 @@ window.afficherPersoCombatActuel = function() {
     }
 
     window.chargerCompetencesCombat(persoActuel.idPersonnage, persoActuel.couleur);
+    
+    // NOUVEAU : Met à jour le bouton de fin de tour selon le héros affiché
+    if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
 };
 
 // =========================================================================
@@ -1035,3 +1038,213 @@ document.addEventListener("DOMContentLoaded", function () {
         label.innerText = parseInt(localStorage.getItem("ivalis_espacement_bannieres")) || -85;
     }
 });
+
+// =========================================================================
+//  GESTION DU TOUR PAR TOUR ET PISTE D'INITIATIVE
+// =========================================================================
+
+// 1. Le Joueur choisit sa carte
+window.jouerCarteCombat = async function(idCarte) {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    if (!window.ID_PARTIE_COURANTE) return;
+
+    const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+    if (!persoActuel) return;
+
+    const dataCarte = window.COMPETENCES_CACHE[idCarte];
+    if (!dataCarte) return;
+
+    const btn = document.getElementById("btn-choisir-action");
+    if(btn) { btn.innerText = "Préparation..."; btn.disabled = true; }
+
+    try {
+        const { doc, getDoc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+        const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
+        const snap = await getDoc(partieRef);
+
+        if (snap.exists()) {
+            let file = snap.data().File_Attente_Combat || [];
+
+            // On retire le personnage s'il avait déjà joué une carte ce tour-ci
+            file = file.filter(item => item.idPersonnage !== persoActuel.idPersonnage);
+
+            file.push({
+                idPersonnage: persoActuel.idPersonnage,
+                initiative: dataCarte.Initiative || 0,
+                timestamp: new Date().getTime()
+            });
+
+            // Tri : La plus haute initiative en premier (à gauche)
+            file.sort((a, b) => {
+                if (b.initiative !== a.initiative) return b.initiative - a.initiative;
+                return a.timestamp - b.timestamp;
+            });
+
+            // LOGIQUE DE PHASE : On compte les joueurs vivants
+            let phase = snap.data().Phase_Combat || "Preparation";
+            const nbJoueursVivants = (window.PERSOS_PARTIE || []).filter(p => p.statut !== "Mort").length;
+            
+            // Si tout le monde a choisi, on déclenche l'apparition de la piste !
+            if (file.length >= nbJoueursVivants && nbJoueursVivants > 0) {
+                phase = "Resolution";
+            }
+
+            await updateDoc(partieRef, { 
+                File_Attente_Combat: file,
+                Phase_Combat: phase 
+            });
+
+            if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD();
+        }
+    } catch (e) {
+        console.error("Erreur jouerCarteCombat:", e);
+        if(btn) { btn.innerText = "Choisir"; btn.disabled = false; }
+    }
+};
+
+// =========================================================================
+//  GESTION VISUELLE DU BOUTON "FIN DU TOUR"
+// =========================================================================
+
+window.PEUT_PASSER_TOUR = false;
+
+window.actualiserBoutonFinTour = function(queueOverride, phaseOverride) {
+    const imgBtn = document.getElementById("img-hud-fintour");
+    if (!imgBtn) return;
+
+    // Récupération des données en temps réel
+    const partie = window.PARTIE_DATA || {};
+    const queue = queueOverride || partie.File_Attente_Combat || [];
+    const phase = phaseOverride || partie.Phase_Combat || "Preparation";
+    const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+
+    // C'est au tour du perso SI :
+    // 1. On est en phase de résolution.
+    // 2. La piste n'est pas vide.
+    // 3. Le premier perso sur la piste (index 0) est le personnage que l'on regarde actuellement.
+    const estMonTour = (
+        phase === "Resolution" && 
+        queue.length > 0 && 
+        persoActuel && 
+        queue[0].idPersonnage === persoActuel.idPersonnage
+    );
+
+    if (estMonTour) {
+        // C'est mon tour : on allume le bouton et on autorise le clic
+        imgBtn.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/finTourAllum_gmn7ln.png";
+        window.PEUT_PASSER_TOUR = true;
+    } else {
+        // Ce n'est pas mon tour : on éteint le bouton et on bloque
+        imgBtn.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/FinTourEteind_exjtxp.png";
+        window.PEUT_PASSER_TOUR = false;
+    }
+};
+
+// 2. Le joueur ou le MJ clique sur "Fin du tour"
+window.finDeTourCombat = async function() {
+    // SÉCURITÉ : Si le bouton est éteint, on stoppe tout immédiatement !
+    if (!window.PEUT_PASSER_TOUR) return; 
+
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    if (!window.ID_PARTIE_COURANTE) return;
+
+    // EFFET VISUEL IMMÉDIAT : La première bulle (à gauche) fond et rétrécit
+    const premiereBulle = document.getElementById("premiere-bulle-initiative");
+    if (premiereBulle) {
+        premiereBulle.style.opacity = "0";
+        premiereBulle.style.width = "0px";
+        premiereBulle.style.marginRight = "0px";
+        premiereBulle.style.transform = "scale(0.5)";
+    }
+
+    // Le CSS "max-content" de la piste noire va forcer celle-ci à glisser vers la droite
+    setTimeout(async () => {
+        try {
+            const { doc, getDoc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+            const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
+            const snap = await getDoc(partieRef);
+
+            if (snap.exists()) {
+                let file = snap.data().File_Attente_Combat || [];
+                let phase = snap.data().Phase_Combat || "Resolution";
+
+                if (file.length > 0) {
+                    file.shift(); // Supprime le 1er de la file d'attente
+                    
+                    // Si la piste est vide, on retourne en phase de choix
+                    if (file.length === 0) phase = "Preparation";
+                    
+                    await updateDoc(partieRef, { 
+                        File_Attente_Combat: file,
+                        Phase_Combat: phase 
+                    });
+                }
+            }
+        } catch (e) {
+            console.error("Erreur finDeTourCombat:", e);
+        }
+    }, 350); 
+};
+
+// 3. Dessin temps réel de la piste d'initiative
+window.afficherPisteInitiative = function(queue, phase) {
+    const piste = document.getElementById("piste-initiative");
+    if (!piste) return;
+
+    // Masqué tant qu'on est en Préparation (ou que la piste est vide)
+    if (!queue || queue.length === 0 || phase === "Preparation") {
+        piste.style.opacity = "0";
+        piste.style.padding = "0px";
+        setTimeout(() => piste.innerHTML = "", 400);
+        if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour(queue || [], phase);
+        return;
+    }
+
+    piste.style.opacity = "1";
+    piste.style.padding = "0 15px 0 25px"; // 15px à droite pour dégager la bulle du bord du HUD
+    let html = "";
+
+    queue.forEach((item, index) => {
+        const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === item.idPersonnage);
+        if (!perso) return;
+
+        const pvMax = (parseInt(perso.PV_Max) || 1) + (parseInt(perso.Dev_Mod_PV) || 0);
+        const pvActuels = perso.PV_Actuels !== undefined ? parseInt(perso.PV_Actuels) : pvMax;
+        const pctPv = Math.min(100, Math.max(0, (pvActuels / pvMax) * 100));
+
+        // 🔻 CORRECTION FATIGUE CLIENT : Utilisation stricte de "fatigueActuelle"
+        const fatigueMax = parseInt(perso.Fatigue_Max) || 100;
+        const fatigue = perso.fatigueActuelle !== undefined ? parseInt(perso.fatigueActuelle) : fatigueMax;
+        const pctFatigue = Math.min(100, Math.max(0, (fatigue / fatigueMax) * 100));
+
+        const imgUrl = perso.urlCloudinary || "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1786114507/Les_humains_h0ubwh.png";
+
+        // Identification de la première bulle pour l'animation de retrait
+        const attributId = index === 0 ? 'id="premiere-bulle-initiative"' : '';
+
+        html += `
+        <div ${attributId} style="position: relative; width: 110px; height: 126px; flex-shrink: 0; filter: drop-shadow(0px 5px 8px rgba(0,0,0,0.8)); margin-top: 0px; transition: all 0.4s ease; transform-origin: left center; margin-right: 15px;">
+            <div style="position: absolute; inset: 0; background: linear-gradient(135deg, #fbf5bd 0%, #c2a878 30%, #5c3a21 50%, #e8d5a5 80%, #ffffff 100%); clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); display: flex; align-items: center; justify-content: center;">
+                <div style="width: 102px; height: 118px; background-color: #1a0f08; clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); position: relative;">
+                    <img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: top center;">
+                    <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 40%; background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);"></div>
+                </div>
+            </div>
+
+            <div style="position: absolute; top: -6px; left: -8px; width: 38px; height: 38px; border-radius: 50%; border: 2px solid #e8d5a5; background: #1a0f08; box-shadow: 0 2px 5px rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 2;">
+                <span style="color: #e8d5a5; font-family: 'Cinzel', serif; font-size: 18px; font-weight: bold; text-shadow: 1px 1px 3px black, 0 0 5px rgba(232, 213, 165, 0.5);">${item.initiative}</span>
+            </div>
+
+            <div style="position: absolute; bottom: 8px; left: -10px; width: 50px; height: 8px; background: #000; border: 1px solid #1a0f08; border-radius: 4px; transform: rotate(30deg); transform-origin: center; box-shadow: 0 2px 4px rgba(0,0,0,0.8); overflow: hidden; z-index: 2;">
+                <div style="position: absolute; top: 0; right: 0; width: ${pctPv}%; height: 100%; background: linear-gradient(to right, #e63946, #ff8b8b); transition: width 0.3s ease;"></div>
+            </div>
+
+            <div style="position: absolute; bottom: 8px; right: -10px; width: 50px; height: 8px; background: #000; border: 1px solid #1a0f08; border-radius: 4px; transform: rotate(-30deg); transform-origin: center; box-shadow: 0 2px 4px rgba(0,0,0,0.8); overflow: hidden; z-index: 2;">
+                <div style="position: absolute; top: 0; left: 0; width: ${pctFatigue}%; height: 100%; background: linear-gradient(to right, #c2a878, #fbf5bd); transition: width 0.3s ease;"></div>
+            </div>
+        </div>`;
+    });
+
+    piste.innerHTML = html;
+    if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour(queue, phase);
+};
