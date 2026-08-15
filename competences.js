@@ -342,6 +342,23 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         </div>
     ` : "";
 
+    const partieTemp = window.PARTIE_DATA || {};
+    const queueTemp = partieTemp.File_Attente_Combat || [];
+    const phaseTemp = partieTemp.Phase_Combat || "Preparation";
+    const persoActuelTemp = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
+    const estMonTour = (
+        phaseTemp === "Resolution" &&
+        queueTemp.length > 0 &&
+        persoActuelTemp &&
+        queueTemp[0].idPersonnage === persoActuelTemp.idPersonnage
+    );
+
+    const boutonValiderHtml = (isCombatMode && isLocked && estMonTour) ? `
+        <div style="position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%); z-index: 5; color: black; font-family: 'Cinzel', serif; font-size: 14px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase;" onclick="event.stopPropagation(); window.validerCarteCombat('${idCarte}', this)">
+            Valider
+        </div>
+    ` : "";
+
     conteneurCarte.innerHTML = `
         <!-- COUCHE 1 : FOND DE COULEUR -->
         <div style="position: absolute; top: 12px; left: 12px; right: 12px; bottom: 12px; background-color: ${window.COULEUR_PERSO_COURANT}; border-radius: 8px; z-index: 1;"></div>
@@ -372,6 +389,7 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         ${htmlZoneAbsolue}
 
         ${boutonChoisirHtml}
+        ${boutonValiderHtml}
     `;
 
     conteneurCarte.style.display = "block";

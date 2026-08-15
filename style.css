@@ -2010,23 +2010,28 @@ textarea.input-texte-parchemin {
 /* ========================================================================= */
 
 .bulle-initiative-base {
-    /* Ombre de base pour les personnages en attente */
     filter: drop-shadow(0px 5px 8px rgba(0, 0, 0, 0.8));
+    -webkit-filter: drop-shadow(0px 5px 8px rgba(0, 0, 0, 0.8));
 }
 
 .halo-tour-actif {
-    /* L'animation d'aura dorée pour le personnage qui doit jouer */
     animation: respirationHaloDore 2s infinite alternate ease-in-out;
+    -webkit-animation: respirationHaloDore 2s infinite alternate ease-in-out;
     z-index: 5;
+    
+    /* 🔻 CORRECTIONS IPAD (Forçage GPU et WebKit) 🔻 */
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    transform: translateZ(0); 
 }
 
 @keyframes respirationHaloDore {
     0% {
-        /* Plus de mouvement, juste une lueur très discrète */
+        -webkit-filter: drop-shadow(0px 5px 8px rgba(0,0,0,0.8)) drop-shadow(0px 0px 5px rgba(194, 168, 120, 0.4));
         filter: drop-shadow(0px 5px 8px rgba(0,0,0,0.8)) drop-shadow(0px 0px 5px rgba(194, 168, 120, 0.4));
     }
     100% {
-        /* La lueur grandit un peu mais reste contenue (12px) */
+        -webkit-filter: drop-shadow(0px 5px 8px rgba(0,0,0,0.8)) drop-shadow(0px 0px 12px rgba(255, 215, 0, 0.7));
         filter: drop-shadow(0px 5px 8px rgba(0,0,0,0.8)) drop-shadow(0px 0px 12px rgba(255, 215, 0, 0.7));
     }
 }

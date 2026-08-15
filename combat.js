@@ -1320,3 +1320,63 @@ window.actualiserEtatCarteCombat = function() {
         }
     }
 };
+
+// =========================================================================
+//  VALIDATION DE CARTE : DÉDUCTION DE FATIGUE
+// =========================================================================
+window.validerCarteCombat = async function(idCarte, elementTexte) {
+    if (elementTexte && elementTexte.innerText === "Validé") return;
+
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    
+    if (elementTexte) {
+        elementTexte.innerText = "Validé";
+        elementTexte.style.opacity = "0.5";
+        elementTexte.style.pointerEvents = "none";
+    }
+
+    const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+    if (!persoActuel) return;
+
+    const dataCarte = window.COMPETENCES_CACHE[idCarte];
+    if (!dataCarte) return;
+
+    const coutFatigue = parseInt(dataCarte.Fatigue) || 0;
+    
+    const fatigueMax = parseInt(persoActuel.Fatigue_Max) || 100;
+    let fatigue = persoActuel.fatigueActuelle !== undefined ? parseInt(persoActuel.fatigueActuelle) : fatigueMax;
+
+    fatigue = Math.max(0, fatigue - coutFatigue);
+
+    persoActuel.fatigueActuelle = fatigue;
+    window.COMBAT_FATIGUE_ACTUELLE = fatigue;
+
+    const persoPartie = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === persoActuel.idPersonnage);
+    if (persoPartie) persoPartie.fatigueActuelle = fatigue;
+
+    if (typeof window.mettreAJourJaugeFatigue === "function") {
+        window.mettreAJourJaugeFatigue(0);
+    }
+
+    const partie = window.PARTIE_DATA || {};
+    if (typeof window.afficherPisteInitiative === "function") {
+        window.afficherPisteInitiative(partie.File_Attente_Combat || [], partie.Phase_Combat || "Preparation");
+    }
+
+    // 🔻 NOUVEAU : On déclenche automatiquement la fin de tour !
+    if (typeof window.finDeTourCombat === "function") {
+        window.finDeTourCombat();
+    }
+
+    try {
+        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+        const persoRef = doc(db, "Personnages", persoActuel.idPersonnage);
+        
+        await updateDoc(persoRef, { 
+            Fatigue_Actuelle: fatigue 
+        });
+        
+    } catch (e) {
+        console.error("Erreur lors de la déduction de la fatigue :", e);
+    }
+};
