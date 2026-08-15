@@ -352,6 +352,9 @@
 
     <!-- L'INTERFACE DE COMBAT -->
     <div id="fenetre-combat" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: var(--app-h); z-index: 65; background-color: #1a1a1a; pointer-events: auto;">
+        <!-- ANNONCE DU TOUR -->
+        <div id="annonce-tour-combat" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10000; pointer-events: none; opacity: 0; display: flex; align-items: center; justify-content: center; gap: 30px; font-family: 'Cinzel', serif; font-size: 110px; font-weight: bold; color: #e8d5a5; text-shadow: 0 0 30px rgba(232, 213, 165, 0.6), 2px 2px 15px black; text-transform: uppercase; white-space: nowrap;">
+        </div>
         
         <!-- Bouton pour quitter le mode Combat (Désormais DANS la fenêtre) -->
         <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/menu_omlu8e.png"
@@ -415,6 +418,11 @@
                     </div>
                 </div>
             </div>
+
+            <!-- BOUTON RESET COMBAT -->
+            <button onclick="window.reinitialiserCombat()" style="background: rgba(230, 57, 70, 0.8); color: white; border: 1px solid #ff8b8b; padding: 12px 20px; font-family: 'Cinzel', serif; font-weight: bold; font-size: 14px; border-radius: 8px; cursor: pointer; margin-top: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.5); transition: background 0.2s;">
+                Réinitialiser le Combat
+            </button>
 
             <!-- Fermer -->
             <button class="btn-combat-switch" style="border-color: #ff4c4c; color: #ff4c4c; padding: 6px 15px; font-size: 13px;" onclick="window.fermerMenusCoulissantsCombat(event)">Fermer</button>

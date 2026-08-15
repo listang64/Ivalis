@@ -1099,6 +1099,10 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
          if (typeof window.actualiserEtatCarteCombat === "function") {
              window.actualiserEtatCarteCombat();
          }
+         // NOUVEAU : Vérifie si le tour a changé pour lancer l'animation
+         if (typeof window.verifierChangementTour === "function") {
+             window.verifierChangementTour(dataPartie.Tour_Combat || 1);
+         }
          if (window.PERSOS_PARTIE) afficherBullesPersonnages(window.PERSOS_PARTIE);
 
          if (estPremierScanPartie) {

@@ -52,6 +52,11 @@ window.ouvrirCombat = function() {
     const fenetreCombat = document.getElementById('fenetre-combat');
     if (fenetreCombat) fenetreCombat.style.display = 'block';
 
+    // Annonce le tour actuel dès l'ouverture (Tour 1 au lancement)
+    if (typeof window.verifierChangementTour === "function") {
+        window.verifierChangementTour((window.PARTIE_DATA && window.PARTIE_DATA.Tour_Combat) || 1);
+    }
+
     // On charge juste l'UI de gauche
     window.initialiserPersosCombat();
     
@@ -1174,23 +1179,70 @@ window.finDeTourCombat = async function() {
     // Le CSS "max-content" de la piste noire va forcer celle-ci à glisser vers la droite
     setTimeout(async () => {
         try {
-            const { doc, getDoc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+            const { doc, getDoc, updateDoc, writeBatch } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
             const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
             const snap = await getDoc(partieRef);
 
             if (snap.exists()) {
                 let file = snap.data().File_Attente_Combat || [];
                 let phase = snap.data().Phase_Combat || "Resolution";
+                let tour = snap.data().Tour_Combat || 1;
 
                 if (file.length > 0) {
                     file.shift(); // Supprime le 1er de la file d'attente
                     
-                    // Si la piste est vide, on retourne en phase de choix
-                    if (file.length === 0) phase = "Preparation";
+                    // Si la piste est vide, c'est le DÉBUT DU NOUVEAU TOUR
+                    if (file.length === 0) {
+                        phase = "Preparation";
+                        tour++;
+                        
+                        // === SYSTÈME DE RÉGÉNÉRATION D'ÉNERGIE ===
+                        if (window.PERSOS_PARTIE && window.PERSOS_PARTIE.length > 0) {
+                            const batch = writeBatch(db);
+                            let regenAjoutee = false;
+                            
+                            window.PERSOS_PARTIE.forEach(perso => {
+                                if (perso.statut !== "Mort") {
+                                    const fatigueMax = parseInt(perso.Fatigue_Max) || 100;
+                                    let fatigue = perso.fatigueActuelle !== undefined ? parseInt(perso.fatigueActuelle) : fatigueMax;
+                                    
+                                    const regenPct = parseInt(perso.Regeneration) || 0;
+
+                                    if (regenPct > 0) {
+                                        const montantRegen = Math.floor((regenPct / 100) * fatigueMax);
+                                        fatigue = Math.min(fatigueMax, fatigue + montantRegen);
+
+                                        perso.fatigueActuelle = fatigue;
+
+                                        const persoJoueur = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === perso.idPersonnage);
+                                        if (persoJoueur) persoJoueur.fatigueActuelle = fatigue;
+
+                                        const persoActuel = window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+                                        if (persoActuel && persoActuel.idPersonnage === perso.idPersonnage) {
+                                            window.COMBAT_FATIGUE_ACTUELLE = fatigue;
+                                        }
+
+                                        const persoRef = doc(db, "Personnages", perso.idPersonnage);
+                                        batch.update(persoRef, { Fatigue_Actuelle: fatigue });
+                                        regenAjoutee = true;
+                                    }
+                                }
+                            });
+                            
+                            if (regenAjoutee) {
+                                await batch.commit();
+                            }
+
+                            if (typeof window.mettreAJourJaugeFatigue === "function") {
+                                window.mettreAJourJaugeFatigue(0);
+                            }
+                        }
+                    }
                     
                     await updateDoc(partieRef, { 
                         File_Attente_Combat: file,
-                        Phase_Combat: phase 
+                        Phase_Combat: phase,
+                        Tour_Combat: tour
                     });
                 }
             }
@@ -1378,5 +1430,94 @@ window.validerCarteCombat = async function(idCarte, elementTexte) {
         
     } catch (e) {
         console.error("Erreur lors de la déduction de la fatigue :", e);
+    }
+};
+
+// =========================================================================
+//  GESTION DES TOURS ET DE LA RÉINITIALISATION
+// =========================================================================
+
+window.DERNIER_TOUR_AFFICHE = 0; // Mémoire locale pour ne pas rejouer l'animation en boucle
+
+// 1. Détecte le changement de tour et lance l'animation
+window.verifierChangementTour = function(nouveauTour) {
+    const fenetreCombat = document.getElementById("fenetre-combat");
+    if (!fenetreCombat || fenetreCombat.style.display !== "block") return;
+    
+    // Au lancement du combat (Tour 1) ou si le tour change
+    if (window.DERNIER_TOUR_AFFICHE !== nouveauTour) {
+        window.DERNIER_TOUR_AFFICHE = nouveauTour;
+        window.animerTexteTour(nouveauTour);
+    }
+};
+
+// 2. Joue l'animation CSS centrale
+window.animerTexteTour = function(tour) {
+    const divAnnonce = document.getElementById("annonce-tour-combat");
+    if (!divAnnonce) return;
+    
+    divAnnonce.innerHTML = `<span>Tour</span> <span style="font-size: 2em; line-height: 0.8; margin-top: -15px;">${tour}</span>`;
+    
+    divAnnonce.classList.remove("anim-tour-pop");
+    void divAnnonce.offsetWidth; 
+    divAnnonce.classList.add("anim-tour-pop");
+};
+
+// 3. Le super bouton RESET
+window.reinitialiserCombat = async function() {
+    if (!confirm("Voulez-vous vraiment réinitialiser ce combat ? Tous les PV et la Fatigue seront restaurés, et le combat repassera au Tour 1.")) return;
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    
+    try {
+        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+        
+        // A. Reset de la Partie (Tour 1, file vide)
+        if (window.ID_PARTIE_COURANTE) {
+            const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
+            await updateDoc(partieRef, {
+                File_Attente_Combat: [],
+                Phase_Combat: "Preparation",
+                Tour_Combat: 1
+            });
+        }
+
+        // B. Reset des Personnages (Soin total de la Vie et de l'Énergie)
+        if (window.PERSOS_PARTIE && window.PERSOS_PARTIE.length > 0) {
+            for (let perso of window.PERSOS_PARTIE) {
+                const pvMax = (parseInt(perso.PV_Max) || 1) + (parseInt(perso.Dev_Mod_PV) || 0);
+                const fatigueMax = parseInt(perso.Fatigue_Max) || parseInt(perso.fatigueMax) || 100;
+
+                // Mise à jour locale immédiate (évite d'attendre le snapshot)
+                perso.PV_Actuels = pvMax;
+                perso.fatigueActuelle = fatigueMax;
+
+                const persoActuel = window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+                if (persoActuel && persoActuel.idPersonnage === perso.idPersonnage) {
+                    window.COMBAT_PV_MAX = pvMax;
+                    window.COMBAT_PV_ACTUELS = pvMax;
+                    window.COMBAT_FATIGUE_MAX = fatigueMax;
+                    window.COMBAT_FATIGUE_ACTUELLE = fatigueMax;
+                }
+
+                const persoRef = doc(db, "Personnages", perso.idPersonnage);
+                await updateDoc(persoRef, {
+                    PV_Actuels: pvMax,
+                    Fatigue_Actuelle: fatigueMax
+                });
+            }
+        }
+
+        if (typeof window.mettreAJourJaugePV === "function") window.mettreAJourJaugePV();
+        if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
+        
+        // Forcer la remise à zéro de la mémoire locale pour rejouer l'animation "Tour 1"
+        window.DERNIER_TOUR_AFFICHE = 0;
+        if (typeof window.verifierChangementTour === "function") {
+            window.verifierChangementTour(1);
+        }
+        console.log("Le combat a été entièrement réinitialisé !");
+        
+    } catch (e) {
+        console.error("Erreur lors de la réinitialisation du combat :", e);
     }
 };
