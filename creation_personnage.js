@@ -181,6 +181,23 @@ window.fermerCreationHero = function() {
 };
 
 window.validerEtapeDescriptif = async function() {
+    // 🔻 SÉCURITÉ : VÉRIFICATION DES CLÉS API (OpenAI et Cloudinary pour l'image) 🔻
+    const cles = {
+        openai: localStorage.getItem("ivalis_OPENAI_API_KEY"),
+        cloudName: localStorage.getItem("ivalis_CLOUDINARY_CLOUD_NAME"),
+        cloudKey: localStorage.getItem("ivalis_CLOUDINARY_API_KEY"),
+        cloudSecret: localStorage.getItem("ivalis_CLOUDINARY_API_SECRET")
+    };
+
+    if (!cles.openai || !cles.cloudName || !cles.cloudKey || !cles.cloudSecret) {
+        if (typeof window.afficherAlerteCles === "function") {
+            window.afficherAlerteCles("L'incantation du portrait d'un Héros nécessite les clés API (OpenAI et Cloudinary) dans les paramètres.");
+        } else {
+            alert("Clés API manquantes pour créer le personnage.");
+        }
+        return; // On bloque avant même de fermer la fenêtre de création !
+    }
+
     const nom = document.getElementById("champ-nom").value.trim();
     if (nom === "") { alert("Le héros doit posséder un nom."); return; }
 

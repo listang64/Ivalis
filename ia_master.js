@@ -1487,6 +1487,24 @@ window.declencherTourIA = async function() {
     console.log("🟢 Le bouton MJ a bien été détecté !");
     if (!window.ID_PARTIE_COURANTE) return;
 
+    // 🔻 SÉCURITÉ : VÉRIFICATION DES CLÉS API 🔻
+    const cles = {
+        gemini: localStorage.getItem("ivalis_GEMINI_API_KEY"),
+        openai: localStorage.getItem("ivalis_OPENAI_API_KEY"),
+        cloudName: localStorage.getItem("ivalis_CLOUDINARY_CLOUD_NAME"),
+        cloudKey: localStorage.getItem("ivalis_CLOUDINARY_API_KEY"),
+        cloudSecret: localStorage.getItem("ivalis_CLOUDINARY_API_SECRET")
+    };
+    
+    if (!cles.gemini || !cles.openai || !cles.cloudName || !cles.cloudKey || !cles.cloudSecret) {
+        if (typeof window.afficherAlerteCles === "function") {
+            window.afficherAlerteCles("Le Maître du Jeu a besoin que toutes les clés API (Gemini, OpenAI et Cloudinary) soient renseignées dans les paramètres.");
+        } else {
+            alert("Clés API manquantes pour lancer le Maître du Jeu.");
+        }
+        return; // On bloque l'exécution ici, la BDD ne sera jamais verrouillée !
+    }
+
     // 1. SÉCURITÉ LOCALE : Vérifie si le verrou est déjà actif
     const snapVerrou = await getDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE));
     if (snapVerrou.exists() && snapVerrou.data().IA_En_Cours === true) {
