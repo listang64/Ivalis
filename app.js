@@ -4062,7 +4062,7 @@ Object.assign(window, {
   modifierStat, validerCreationCaracs, lancerJetDeCaracteristique,
   // Cles API + generation d'image (front-end)
   ouvrirClesApi, sauvegarderClesApi, basculerAffichageCles,
-  fermerAlerteCles, ouvrirParametresDepuisAlerte,
+  afficherAlerteCles, fermerAlerteCles, ouvrirParametresDepuisAlerte,
   // Outils
   syncTemperature, sauvegarderTemperature, basculerAffichageTokens, basculerDevMode: window.basculerDevMode, toggleMicro,
   // Gestion Effets de Combat
