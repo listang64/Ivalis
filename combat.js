@@ -1129,6 +1129,75 @@ window.jouerCarteCombat = async function(idCarte) {
 };
 
 // =========================================================================
+//  MÉCANIQUE DE REPOS LONG
+// =========================================================================
+window.jouerReposLong = async function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    if (!window.ID_PARTIE_COURANTE) return;
+
+    const partie = window.PARTIE_DATA || {};
+    const phase = partie.Phase_Combat || "Preparation";
+    
+    if (phase !== "Preparation") return;
+
+    const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+    if (!persoActuel) return;
+
+    const deckEl = document.getElementById("combat-liste-competences");
+    if (deckEl) {
+        deckEl.style.transition = "opacity 0.3s ease";
+        deckEl.style.opacity = "0";
+        deckEl.style.pointerEvents = "none";
+    }
+    window.mettreAJourJaugeFatigue(0);
+    
+    const imgPerso = document.getElementById("combat-portrait-perso");
+    if (imgPerso) {
+        imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
+        imgPerso.style.height = "40vh"; 
+    }
+    
+    window.actualiserEtatCarteCombat("REPOS_LONG");
+
+    try {
+        const { doc, getDoc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+        const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
+        const snap = await getDoc(partieRef);
+
+        if (snap.exists()) {
+            let file = snap.data().File_Attente_Combat || [];
+            
+            file = file.filter(item => item.idPersonnage !== persoActuel.idPersonnage);
+
+            file.push({
+                idPersonnage: persoActuel.idPersonnage,
+                idCarte: "REPOS_LONG", 
+                initiative: 0,
+                timestamp: new Date().getTime()
+            });
+
+            file.sort((a, b) => {
+                if (b.initiative !== a.initiative) return b.initiative - a.initiative;
+                return a.timestamp - b.timestamp;
+            });
+
+            let newPhase = snap.data().Phase_Combat || "Preparation";
+            const nbJoueursVivants = (window.PERSOS_PARTIE || []).filter(p => p.statut !== "Mort").length;
+            
+            if (file.length >= nbJoueursVivants && nbJoueursVivants > 0) newPhase = "Resolution";
+
+            await updateDoc(partieRef, { 
+                File_Attente_Combat: file,
+                Phase_Combat: newPhase 
+            });
+        }
+    } catch (e) {
+        console.error("Erreur jouerReposLong:", e);
+        window.actualiserEtatCarteCombat();
+    }
+};
+
+// =========================================================================
 //  GESTION VISUELLE DU BOUTON "FIN DU TOUR"
 // =========================================================================
 
@@ -1195,6 +1264,35 @@ window.finDeTourCombat = async function(forcer = false) {
                 let tour = snap.data().Tour_Combat || 1;
 
                 if (file.length > 0) {
+                    const actionCourante = file[0];
+                    let reposLongEffectue = false;
+                    let nvFatigueRepos = null;
+                    let idPersoRepos = null;
+
+                    if (actionCourante.idCarte === "REPOS_LONG") {
+                        const persoAction = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === actionCourante.idPersonnage);
+                        if (persoAction && persoAction.statut !== "Mort") {
+                            const fatigueMax = parseInt(persoAction.Fatigue_Max) || parseInt(persoAction.fatigueMax) || 100;
+                            let fatigueActuelle = persoAction.fatigueActuelle !== undefined ? parseInt(persoAction.fatigueActuelle) : fatigueMax;
+                            
+                            const recup = Math.floor(fatigueMax * 0.35);
+                            fatigueActuelle = Math.min(fatigueMax, fatigueActuelle + recup);
+
+                            persoAction.fatigueActuelle = fatigueActuelle;
+                            const persoJoueur = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === actionCourante.idPersonnage);
+                            if (persoJoueur) persoJoueur.fatigueActuelle = fatigueActuelle;
+
+                            if (window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]?.idPersonnage === actionCourante.idPersonnage) {
+                                window.COMBAT_FATIGUE_ACTUELLE = fatigueActuelle;
+                                if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
+                            }
+                            
+                            reposLongEffectue = true;
+                            nvFatigueRepos = fatigueActuelle;
+                            idPersoRepos = actionCourante.idPersonnage;
+                        }
+                    }
+
                     file.shift();
                     
                     if (file.length === 0) {
@@ -1243,6 +1341,11 @@ window.finDeTourCombat = async function(forcer = false) {
                         Phase_Combat: phase,
                         Tour_Combat: tour
                     });
+
+                    if (file.length > 0 && reposLongEffectue) {
+                        const persoRef = doc(db, "Personnages", idPersoRepos);
+                        updateDoc(persoRef, { Fatigue_Actuelle: nvFatigueRepos }).catch(e => console.error(e));
+                    }
                 }
             }
             
@@ -1291,6 +1394,7 @@ window.afficherPisteInitiative = function(queue, phase) {
         const imgUrl = perso.urlCloudinary || "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1786114507/Les_humains_h0ubwh.png";
         const attributId = index === 0 ? 'id="premiere-bulle-initiative"' : '';
         const classeBulle = (index === 0 && phase === "Resolution") ? "halo-tour-actif" : "bulle-initiative-base";
+        const affichageInit = item.idCarte === "REPOS_LONG" ? "⏳" : item.initiative;
 
         html += `
         <div ${attributId} class="${classeBulle}" style="position: relative; width: 110px; height: 126px; flex-shrink: 0; margin-top: 0px; transition: all 0.4s ease; transform-origin: left center; margin-right: 15px;">
@@ -1302,7 +1406,7 @@ window.afficherPisteInitiative = function(queue, phase) {
             </div>
 
             <div style="position: absolute; top: -6px; left: -8px; width: 38px; height: 38px; border-radius: 50%; border: 2px solid #e8d5a5; background: #1a0f08; box-shadow: 0 2px 5px rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 2;">
-                <span style="color: #e8d5a5; font-family: 'Cinzel', serif; font-size: 18px; font-weight: bold; text-shadow: 1px 1px 3px black, 0 0 5px rgba(232, 213, 165, 0.5);">${item.initiative}</span>
+                <span style="color: #e8d5a5; font-family: 'Cinzel', serif; font-size: 18px; font-weight: bold; text-shadow: 1px 1px 3px black, 0 0 5px rgba(232, 213, 165, 0.5);">${affichageInit}</span>
             </div>
 
             <div style="position: absolute; bottom: 8px; left: -10px; width: 50px; height: 8px; background: #000; border: 1px solid #1a0f08; border-radius: 4px; transform: rotate(30deg); transform-origin: center; box-shadow: 0 2px 4px rgba(0,0,0,0.8); overflow: hidden; z-index: 2;">
@@ -1322,7 +1426,7 @@ window.afficherPisteInitiative = function(queue, phase) {
 // =========================================================================
 //  GESTION VISUELLE DE LA CARTE DANS LE PANNEAU GAUCHE
 // =========================================================================
-window.actualiserEtatCarteCombat = function() {
+window.actualiserEtatCarteCombat = function(simulationAction = null) {
     if (document.getElementById("fenetre-combat")?.style.display !== "block") return;
     
     const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
@@ -1331,11 +1435,26 @@ window.actualiserEtatCarteCombat = function() {
     const partie = window.PARTIE_DATA || {};
     const queue = partie.File_Attente_Combat || [];
     
-    const persoInQueue = queue.find(q => q.idPersonnage === persoActuel.idPersonnage);
+    const persoInQueue = simulationAction ? { idCarte: simulationAction } : queue.find(q => q.idPersonnage === persoActuel.idPersonnage);
+    
     const deckEl = document.getElementById("combat-liste-competences");
     const imgPerso = document.getElementById("combat-portrait-perso");
     
     if (deckEl) deckEl.style.transition = "opacity 0.3s ease";
+
+    let divRepos = document.getElementById("apercu-repos-long-ui");
+    if (!divRepos) {
+        divRepos = document.createElement("div");
+        divRepos.id = "apercu-repos-long-ui";
+        divRepos.style.cssText = "position: absolute; top: 15vh; left: 50px; width: 340px; height: 476px; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease, left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); pointer-events: none;";
+        divRepos.innerHTML = `
+            <div style="font-size: 120px; filter: drop-shadow(0 0 20px rgba(194, 168, 120, 0.8)); animation: levitation 3s infinite alternate ease-in-out;">⏳</div>
+            <div style="font-family: 'Cinzel', serif; font-size: 26px; font-weight: bold; color: #e8d5a5; text-shadow: 2px 2px 5px black; margin-top: 20px; text-transform: uppercase; letter-spacing: 2px;">Repos Long</div>
+            <div style="font-family: 'Almendra', serif; font-size: 18px; color: #c2a878; text-shadow: 1px 1px 3px black; margin-top: 15px; text-align: center; max-width: 80%;">Concentration et souffle.<br><br><span style="color:#1b6e3a;">+35% Énergie Max</span> à la fin du tour.</div>
+        `;
+        const panneauGauche = document.getElementById("panneau-combat-gauche");
+        if (panneauGauche) panneauGauche.appendChild(divRepos);
+    }
 
     if (persoInQueue && persoInQueue.idCarte) {
         if (deckEl) {
@@ -1347,8 +1466,15 @@ window.actualiserEtatCarteCombat = function() {
             imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
             imgPerso.style.height = "40vh"; 
         }
-        if (typeof window.afficherApercuCarteHD === "function") {
-            window.afficherApercuCarteHD(persoInQueue.idCarte, true); 
+        
+        if (persoInQueue.idCarte === "REPOS_LONG") {
+            if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD(true);
+            divRepos.style.left = "20px";
+            divRepos.style.opacity = "1";
+        } else {
+            divRepos.style.left = "50px";
+            divRepos.style.opacity = "0";
+            if (typeof window.afficherApercuCarteHD === "function") window.afficherApercuCarteHD(persoInQueue.idCarte, true); 
         }
     } else {
         if (deckEl) {
@@ -1359,12 +1485,14 @@ window.actualiserEtatCarteCombat = function() {
             imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
             imgPerso.style.height = "100%";
         }
+        
+        divRepos.style.left = "50px";
+        divRepos.style.opacity = "0";
+
         const conteneurCarte = document.getElementById("apercu-carte-hd-competence");
         if (conteneurCarte && conteneurCarte.dataset.locked === "true") {
             conteneurCarte.dataset.locked = "false";
-            if (typeof window.masquerApercuCarteHD === "function") {
-                window.masquerApercuCarteHD(true); 
-            }
+            if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD(true); 
         }
     }
 
