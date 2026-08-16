@@ -411,7 +411,7 @@ body {
   background-repeat: no-repeat;
   
   cursor: grab;
-  transform-origin: center;
+  transform-origin: 0 0; /* 🔻 MODIFIÉ ICI : Origine en haut à gauche */
   will-change: transform;
 }
 

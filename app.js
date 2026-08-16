@@ -2463,8 +2463,10 @@ window.recadrerCarte = function() {
   const ratioY = hauteurEcran / 2160;
 
   carteZoom = Math.max(ratioX, ratioY);
-  cartePanX = (window.innerWidth - 3840) / 2;
-  cartePanY = (hauteurEcran - 2160) / 2;
+
+  // 🔻 CORRECTION : Avec transform-origin: 0 0, on multiplie par le zoom pour centrer !
+  cartePanX = (window.innerWidth - (3840 * carteZoom)) / 2;
+  cartePanY = (hauteurEcran - (2160 * carteZoom)) / 2;
 
   carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
 };
@@ -2473,24 +2475,30 @@ function initialiserCarteInteractive() {
   const conteneur = document.getElementById("conteneur-carte-fond");
   if (!conteneur) return;
 
+  // Auto-cadrage au lancement
   window.recadrerCarte();
 
+  // 1. Gérer le Zoom avec la molette PC (Centré sur le curseur)
   conteneur.addEventListener("wheel", function(e) {
     e.preventDefault();
     const delta = Math.sign(e.deltaY) * -0.1;
     const zoomFactor = Math.exp(delta);
     
-    cartePanX = e.clientX - (e.clientX - cartePanX) * zoomFactor;
-    cartePanY = e.clientY - (e.clientY - cartePanY) * zoomFactor;
-    carteZoom *= zoomFactor;
+    // Sécurité de blocage pour éviter les décalages infinis
+    let nextZoom = carteZoom * zoomFactor;
+    if (nextZoom < 0.1) nextZoom = 0.1;
+    if (nextZoom > 5) nextZoom = 5;
+    const actualZoomFactor = nextZoom / carteZoom;
     
-    if (carteZoom < 0.1) carteZoom = 0.1;
-    if (carteZoom > 5) carteZoom = 5;
+    cartePanX = e.clientX - (e.clientX - cartePanX) * actualZoomFactor;
+    cartePanY = e.clientY - (e.clientY - cartePanY) * actualZoomFactor;
+    carteZoom = nextZoom;
 
     const carte = document.getElementById("carte-fond-jeu");
     if (carte) carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
   }, { passive: false });
 
+  // 2. Attraper la carte (Souris PC)
   conteneur.addEventListener("mousedown", function(e) {
     if (e.button !== 0) return;
     isDraggingCarte = true;
@@ -2498,6 +2506,7 @@ function initialiserCarteInteractive() {
     startDragY = e.clientY - cartePanY;
   });
 
+  // 3. Déplacer la carte (Souris PC)
   window.addEventListener("mousemove", function(e) {
     if (!isDraggingCarte) return;
     e.preventDefault();
@@ -2508,9 +2517,13 @@ function initialiserCarteInteractive() {
     if (carte) carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
   });
 
+  // 4. Lâcher la carte (Souris PC)
   window.addEventListener("mouseup", function() { isDraggingCarte = false; });
   window.addEventListener("mouseleave", function() { isDraggingCarte = false; });
 
+  // =========================================================
+  // 5. GESTION TACTILE IPAD (PAN & PINCH TO ZOOM)
+  // =========================================================
   conteneur.addEventListener("touchstart", function(e) {
       if (e.touches.length === 1) {
           isDraggingCarte = true;
@@ -2549,17 +2562,20 @@ function initialiserCarteInteractive() {
           if (lastMapPinchDist > 0) {
               const zoomFactor = currentDist / lastMapPinchDist;
               
+              // 🔻 CORRECTION : Sécurité anti-dérive quand on atteint le zoom limite
+              let nextZoom = carteZoom * zoomFactor;
+              if (nextZoom < 0.1) nextZoom = 0.1;
+              if (nextZoom > 5) nextZoom = 5;
+              const actualZoomFactor = nextZoom / carteZoom;
+              
               cartePanX += currentCenter.x - lastMapPinchCenter.x;
               cartePanY += currentCenter.y - lastMapPinchCenter.y;
               
-              cartePanX = currentCenter.x - (currentCenter.x - cartePanX) * zoomFactor;
-              cartePanY = currentCenter.y - (currentCenter.y - cartePanY) * zoomFactor;
+              // Centrage mathématique parfait sous les doigts de l'iPad
+              cartePanX = currentCenter.x - (currentCenter.x - cartePanX) * actualZoomFactor;
+              cartePanY = currentCenter.y - (currentCenter.y - cartePanY) * actualZoomFactor;
               
-              carteZoom *= zoomFactor;
-              
-              if (carteZoom < 0.1) carteZoom = 0.1;
-              if (carteZoom > 5) carteZoom = 5;
-
+              carteZoom = nextZoom;
               carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
           }
 
