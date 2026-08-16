@@ -2299,10 +2299,19 @@ async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPers
 
   document.getElementById("titre-nom-personnage").innerText = prenomPerso + " " + nomPerso;
 
-  // On récupère le portrait sur Firebase en arrière-plan
-  const donneesServeur = await recupererDetailsPersonnage(idPersonnage);
+  // 🔻 OPTIMISATION ZÉRO LATENCE : On lit la RAM (onSnapshot) au lieu de Firebase 🔻
+  let donneesServeur = null;
+  if (window.PERSOS_PARTIE) {
+      donneesServeur = window.PERSOS_PARTIE.find(p => p.idPersonnage === idPersonnage);
+  }
+
+  // Fallback réseau uniquement si le cache est vide
+  if (!donneesServeur) {
+      donneesServeur = await recupererDetailsPersonnage(idPersonnage);
+  }
+
   if (donneesServeur) {
-      if (donneesServeur.urlCloudinary !== "") {
+      if (donneesServeur.urlCloudinary) {
           document.getElementById("image-portrait-perso").src = donneesServeur.urlCloudinary;
           document.getElementById("image-portrait-perso").style.display = "block";
           document.getElementById("texte-aucun-portrait").style.display = "none";

@@ -29,27 +29,45 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
     window.COULEUR_PERSO_COURANT = "#4a1c1c";
 
     try {
-        // 1. Récupération de la couleur et du deck actuel du Héros
-        const persoRef = doc(db, "Personnages", idPersonnage);
-        const persoSnap = await getDoc(persoRef);
-        if (persoSnap.exists()) {
-            const dataPerso = persoSnap.data();
-            window.COULEUR_PERSO_COURANT = dataPerso.Couleur || "#4a1c1c";
-            window.CARTES_SELECTIONNEES = dataPerso.Deck_Equipe || [];
+        // 🔻 1. LECTURE ZÉRO LATENCE : Deck et Couleur depuis la RAM 🔻
+        let persoData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+
+        if (persoData) {
+            window.COULEUR_PERSO_COURANT = persoData.couleur || "#4a1c1c";
+            window.CARTES_SELECTIONNEES = persoData.deckEquipe || [];
+        } else {
+            // Fallback BDD si non trouvé en RAM
+            const persoRef = doc(db, "Personnages", idPersonnage);
+            const persoSnap = await getDoc(persoRef);
+            if (persoSnap.exists()) {
+                const dataPerso = persoSnap.data();
+                window.COULEUR_PERSO_COURANT = dataPerso.Couleur || "#4a1c1c";
+                window.CARTES_SELECTIONNEES = dataPerso.Deck_Equipe || [];
+            }
         }
 
-        // 2. Récupération des compétences forgées
-        const colRef = collection(db, "Personnages", idPersonnage, "Competences");
-        const snap = await getDocs(colRef);
+        // 🔻 2. LECTURE ZÉRO LATENCE : Compétences depuis la RAM 🔻
+        let competencesObject = window.CACHE_COMPETENCES_GLOBAL[idPersonnage];
 
-        window.COMPETENCES_CACHE = {}; // On vide le cache à l'ouverture
+        // Fallback BDD si l'écouteur n'a pas encore eu le temps de remplir le cache
+        if (!competencesObject) {
+            const colRef = collection(db, "Personnages", idPersonnage, "Competences");
+            const snap = await getDocs(colRef);
+            competencesObject = {};
+            snap.forEach(docSnap => {
+                competencesObject[docSnap.id] = docSnap.data();
+            });
+            window.CACHE_COMPETENCES_GLOBAL[idPersonnage] = competencesObject;
+        }
 
-        // NOUVEAU : On stocke tout dans un tableau pour pouvoir les trier
+        window.COMPETENCES_CACHE = {}; // On vide le cache d'affichage à l'ouverture
+
+        // On stocke tout dans un tableau pour pouvoir les trier
         let competencesArray = [];
-        snap.forEach(docSnap => {
-            const data = docSnap.data();
-            window.COMPETENCES_CACHE[docSnap.id] = data; // Mise en cache HD
-            competencesArray.push({ id: docSnap.id, data: data });
+        Object.keys(competencesObject).forEach(key => {
+            const data = competencesObject[key];
+            window.COMPETENCES_CACHE[key] = data; // Mise en cache HD
+            competencesArray.push({ id: key, data: data });
         });
 
         // NOUVEAU : Tri par Initiative (de la plus grande à la plus petite)
