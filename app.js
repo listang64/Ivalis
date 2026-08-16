@@ -2442,23 +2442,18 @@ let cartePanY = 0;
 let isDraggingCarte = false;
 let startDragX = 0;
 let startDragY = 0;
+let lastMapPinchDist = 0;
+let lastMapPinchCenter = { x: 0, y: 0 };
 
-// NOUVEAU : Fonction de recadrage isolée pour pouvoir être appelée lors des changements d'écran
 window.recadrerCarte = function() {
   const carte = document.getElementById("carte-fond-jeu");
   if (!carte) return;
 
-  // On cadre sur la dalle physique, pas sur la zone visible : le fond de html recopie
-  // ensuite le rectangle de la carte pour combler la bande basse de l'iPad.
-  const hauteurEcran = typeof window.hauteurDalle === "function"
-    ? window.hauteurDalle()
-    : window.innerHeight;
-
+  const hauteurEcran = typeof window.hauteurDalle === "function" ? window.hauteurDalle() : window.innerHeight;
   const ratioX = window.innerWidth / 3840;
   const ratioY = hauteurEcran / 2160;
 
   carteZoom = Math.max(ratioX, ratioY);
-
   cartePanX = (window.innerWidth - 3840) / 2;
   cartePanY = (hauteurEcran - 2160) / 2;
 
@@ -2469,21 +2464,24 @@ function initialiserCarteInteractive() {
   const conteneur = document.getElementById("conteneur-carte-fond");
   if (!conteneur) return;
 
-  // Auto-cadrage au lancement
   window.recadrerCarte();
 
-  // 1. Gérer le Zoom avec la molette
   conteneur.addEventListener("wheel", function(e) {
     e.preventDefault();
     const delta = Math.sign(e.deltaY) * -0.1;
-    carteZoom += delta;
-    carteZoom = Math.min(Math.max(0.1, carteZoom), 4);
+    const zoomFactor = Math.exp(delta);
+    
+    cartePanX = e.clientX - (e.clientX - cartePanX) * zoomFactor;
+    cartePanY = e.clientY - (e.clientY - cartePanY) * zoomFactor;
+    carteZoom *= zoomFactor;
+    
+    if (carteZoom < 0.1) carteZoom = 0.1;
+    if (carteZoom > 5) carteZoom = 5;
 
     const carte = document.getElementById("carte-fond-jeu");
     if (carte) carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
   }, { passive: false });
 
-  // 2. Attraper la carte
   conteneur.addEventListener("mousedown", function(e) {
     if (e.button !== 0) return;
     isDraggingCarte = true;
@@ -2491,7 +2489,6 @@ function initialiserCarteInteractive() {
     startDragY = e.clientY - cartePanY;
   });
 
-  // 3. Déplacer la carte
   window.addEventListener("mousemove", function(e) {
     if (!isDraggingCarte) return;
     e.preventDefault();
@@ -2502,9 +2499,77 @@ function initialiserCarteInteractive() {
     if (carte) carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
   });
 
-  // 4. Lâcher la carte
   window.addEventListener("mouseup", function() { isDraggingCarte = false; });
   window.addEventListener("mouseleave", function() { isDraggingCarte = false; });
+
+  conteneur.addEventListener("touchstart", function(e) {
+      if (e.touches.length === 1) {
+          isDraggingCarte = true;
+          startDragX = e.touches[0].clientX - cartePanX;
+          startDragY = e.touches[0].clientY - cartePanY;
+      } else if (e.touches.length === 2) {
+          isDraggingCarte = false;
+          lastMapPinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+          lastMapPinchCenter = {
+              x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+              y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+          };
+      }
+  }, { passive: false });
+
+  conteneur.addEventListener("touchmove", function(e) {
+      if (isDraggingCarte || e.touches.length === 2) {
+          if (e.cancelable) e.preventDefault();
+      }
+
+      const carte = document.getElementById("carte-fond-jeu");
+      if (!carte) return;
+
+      if (e.touches.length === 1 && isDraggingCarte) {
+          cartePanX = e.touches[0].clientX - startDragX;
+          cartePanY = e.touches[0].clientY - startDragY;
+          carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
+          
+      } else if (e.touches.length === 2) {
+          const currentDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+          const currentCenter = {
+              x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+              y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+          };
+
+          if (lastMapPinchDist > 0) {
+              const zoomFactor = currentDist / lastMapPinchDist;
+              
+              cartePanX += currentCenter.x - lastMapPinchCenter.x;
+              cartePanY += currentCenter.y - lastMapPinchCenter.y;
+              
+              cartePanX = currentCenter.x - (currentCenter.x - cartePanX) * zoomFactor;
+              cartePanY = currentCenter.y - (currentCenter.y - cartePanY) * zoomFactor;
+              
+              carteZoom *= zoomFactor;
+              
+              if (carteZoom < 0.1) carteZoom = 0.1;
+              if (carteZoom > 5) carteZoom = 5;
+
+              carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
+          }
+
+          lastMapPinchDist = currentDist;
+          lastMapPinchCenter = currentCenter;
+      }
+  }, { passive: false });
+
+  conteneur.addEventListener("touchend", function(e) {
+      if (e.touches.length === 1) {
+          lastMapPinchDist = 0;
+          isDraggingCarte = true;
+          startDragX = e.touches[0].clientX - cartePanX;
+          startDragY = e.touches[0].clientY - cartePanY;
+      } else if (e.touches.length === 0) {
+          isDraggingCarte = false;
+          lastMapPinchDist = 0;
+      }
+  });
 
   window.dessinerIconesCarte();
 }
@@ -2568,7 +2633,7 @@ window.dessinerGrilleHexagonale = function() {
                 points += `${px},${py} `;
             }
 
-            htmlPolygons += `<polygon id="${idHex}" points="${points.trim()}" class="tuile-hex" onclick="window.deplacerPionVers('${idHex}')"></polygon>`;
+            htmlPolygons += `<polygon id="${idHex}" points="${points.trim()}" class="tuile-hex" style="pointer-events: none;"></polygon>`;
         }
     }
 
@@ -2581,43 +2646,7 @@ window.dessinerGrilleHexagonale = function() {
 window.placerPionSurHex = function(idHex) {
     const pion = document.getElementById("pion-groupe");
     if (!pion) return;
-
-    if (!idHex || idHex === "") {
-        pion.style.display = "none";
-        return;
-    }
-
-    const parts = idHex.split('-');
-    if (parts.length !== 3) return;
-    const col = parseInt(parts[1]);
-    const row = parseInt(parts[2]);
-
-    const size = window.tailleHexActuelle;
-    const hexWidth = Math.sqrt(3) * size;
-    const hexHeight = 2 * size;
-    const xOffset = hexWidth;
-    const yOffset = (3/4) * hexHeight;
-
-    // =====================================================
-    // PARAMÈTRES DE DÉCALAGE MANUEL DU DRAPEAU
-    // Modifie ces valeurs en pixels pour affiner la position
-    // =====================================================
-    const decalageX = 65;  // Positif = Droite | Négatif = Gauche (ex: -10)
-    const decalageY = -160;  // Positif = Bas    | Négatif = Haut   (ex: -5)
-    // =====================================================
-
-    let x = col * xOffset + (row % 2 === 1 ? hexWidth / 2 : 0);
-    let y = row * yOffset;
-
-    const largeurPion = (hexWidth / 3) * 2.5; 
-    pion.style.width = `${largeurPion}px`;
-
-    // On ajoute tes décalages manuels au calcul final
-    pion.style.left = `${x + decalageX}px`;
-    pion.style.top = `${y + size + decalageY}px`;
-    
-    pion.style.transform = `translate(-50%, -100%)`;
-    pion.style.display = "block";
+    pion.style.display = "none";
 };
 
 // =========================================================================
@@ -3603,11 +3632,9 @@ window.toggleGrille = function() {
     window.grilleEstVisible = !window.grilleEstVisible;
     
     if (window.grilleEstVisible) {
-        svg.style.opacity = "1"; 
-        svg.style.pointerEvents = "auto"; // Révèle et rend les tuiles cliquables
+        svg.style.opacity = "1";
     } else {
-        svg.style.opacity = "0"; 
-        svg.style.pointerEvents = "none"; // Masque et laisse passer la souris au travers
+        svg.style.opacity = "0";
     }
 };
 
@@ -3797,37 +3824,7 @@ window.masquerTooltipLieu = function() {
 
 // 3. Le déclencheur au clic sur la carte (POUSSE VERS FIREBASE)
 window.deplacerPionVers = async function(idHex) {
-    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    
-    // 1. On FORCE la désactivation de la grille (au lieu d'inverser son état)
-    window.grilleEstVisible = false;
-    const svg = document.getElementById("grille-hexagonale");
-    if (svg) {
-        svg.style.opacity = "0"; 
-        svg.style.pointerEvents = "none"; 
-    }
-
-    // 2. SÉCURITÉ : Interdiction de voyager sur la tuile où l'on se trouve déjà
-    if (idHex === window.TUILE_ACTUELLE) {
-        return; // On annule l'action silencieusement
-    }
-
-    let distance = window.calculerDistanceHex(window.TUILE_ACTUELLE, idHex);
-    let joursDeVoyage = distance * 3;
-
-    if (joursDeVoyage > 0) {
-        // Enregistrement de la proposition de voyage dans Firebase
-        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
-        await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
-            Proposition_Voyage: {
-                Tuile_ID: idHex,
-                Jours: joursDeVoyage,
-                Timestamp: new Date().getTime()
-            }
-        });
-    } else {
-        window.executerVoyage(idHex, 0);
-    }
+    return;
 };
 
 // 4. L'exécution finale (Gestion du temps, IA, BDD)
@@ -4047,7 +4044,7 @@ Object.assign(window, {
   jouerSonSurvolParchemin, toggleBulleVolume,
   afficherMenusDansChat: window.afficherMenusDansChat,
   fermerModalesJeu, demanderRetourMenu, demanderQuitterJeu,
-  confirmerRetourMenu, confirmerQuitterJeu, recadrerCarte,
+  confirmerRetourMenu, confirmerQuitterJeu, recadrerCarte: window.recadrerCarte,
   // Parametres / Cerveau IA
   fermerParametres, naviguerFenetre, validerMdpParametres,
   ouvrirListeInstructions, basculerPoussoirIA, ouvrirEditeurInstruction,
