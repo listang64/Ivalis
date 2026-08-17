@@ -913,6 +913,45 @@ window.sauvegarderTailleToken = async function() {
     }
 };
 
+// =========================================================================
+//  SUPPRESSION D'UN PION (TOKEN)
+// =========================================================================
+window.supprimerTokenVTT = async function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    
+    // 1. Sécurité : vérifier qu'un pion est bien "ciblé" (halo bleu)
+    if (!window.TOKEN_SELECTIONNE) {
+        alert("Sélectionnez d'abord un pion sur la carte en cliquant dessus.");
+        return;
+    }
+    
+    if (!confirm("Voulez-vous vraiment retirer ce pion de la carte tactique ?")) return;
+
+    const idSupprime = window.TOKEN_SELECTIONNE;
+
+    // 2. Suppression dans la mémoire locale
+    delete window.TOKENS_VTT_DATA[idSupprime];
+    window.TOKEN_SELECTIONNE = null;
+    
+    // 3. Mise à jour visuelle de l'interface (Remet l'affichage de taille à zéro)
+    const label = document.getElementById("label-taille-token");
+    if (label) label.innerText = "--";
+    window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+
+    // 4. Pousse la mise à jour vers Firebase (deleteField pour vraiment retirer la clé)
+    if (!window.ID_PARTIE_COURANTE) return;
+    try {
+        const { doc, updateDoc, deleteField } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+        
+        await updateDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
+            ["Tokens." + idSupprime]: deleteField()
+        });
+        
+    } catch (e) {
+        console.error("Erreur lors de la suppression du token :", e);
+    }
+};
+
 window.genererTokensCombat = async function() {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT || !window.PERSOS_PARTIE) return;
