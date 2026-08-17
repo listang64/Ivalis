@@ -646,80 +646,184 @@ async function detourerFondMagenta(imageSource) {
 //  GÉNÉRATION DU PION TACTIQUE (VUE DE DESSUS) EN ARRIÈRE-PLAN
 // =========================================================================
 
+// Réécrit une URL Cloudinary pour forcer une livraison PNG.
+// f_auto peut renvoyer de l'AVIF, format refusé par l'API d'édition d'images.
+function urlCloudinaryEnPng(url) {
+    const marqueur = "/upload/";
+    const position = url.indexOf(marqueur);
+    if (position === -1) return url;
+
+    const base = url.slice(0, position + marqueur.length);
+    const segments = url.slice(position + marqueur.length).split("/");
+
+    const premier = segments[0];
+    const estTransformation = segments.length > 1 && premier.includes("_") && !premier.includes(".") && !/^v\d+$/.test(premier);
+    if (estTransformation) segments.shift();
+
+    return base + "f_png/" + segments.join("/");
+}
+
+// Prépare le portrait pour l'envoi binaire : PNG carré de 1024px sur fond magenta.
+async function portraitVersBlobPng(urlPortrait) {
+    const urlSource = urlCloudinaryEnPng(urlPortrait);
+
+    const blobCanvas = await new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.onload = () => {
+            try {
+                const cote = 1024;
+                const canvas = document.createElement("canvas");
+                canvas.width = cote;
+                canvas.height = cote;
+                const ctx = canvas.getContext("2d");
+
+                ctx.fillStyle = "#FF00FF";
+                ctx.fillRect(0, 0, cote, cote);
+
+                const echelle = Math.min(cote / img.width, cote / img.height);
+                const largeur = img.width * echelle;
+                const hauteur = img.height * echelle;
+                ctx.drawImage(img, (cote - largeur) / 2, (cote - hauteur) / 2, largeur, hauteur);
+
+                canvas.toBlob((b) => resolve(b), "image/png");
+            } catch (e) {
+                resolve(null);
+            }
+        };
+        img.onerror = () => resolve(null);
+        img.src = urlSource;
+    });
+
+    if (blobCanvas) return blobCanvas;
+
+    try {
+        const reponse = await fetch(urlSource);
+        return await reponse.blob();
+    } catch (e) {
+        console.error("🚁 [Token] Téléchargement du portrait impossible :", e);
+        return null;
+    }
+}
+
 // Fonction silencieuse qui tourne en arrière-plan
 async function genererEtStockerTokenBackground(donnees, idPersonnage, urlPortrait) {
-    console.log("🚁 [Token] Lancement de la génération du pion en arrière-plan...");
+    console.log("🚁 [Token] Lancement de la génération du pion tactique...");
     const cles = lireClesApi();
-    if (!cles.openai || !cles.cloudName || !cles.cloudKey || !cles.cloudSecret) return;
+    if (!cles.openai || !cles.cloudName || !cles.cloudKey || !cles.cloudSecret) return false;
+
+    // L'image de référence est envoyée en binaire : une URL dans le prompt est ignorée par le modèle.
+    const blobPortrait = await portraitVersBlobPng(urlPortrait);
+    if (!blobPortrait) {
+        console.error("🚁 [Token] Échec : portrait de référence illisible.");
+        return false;
+    }
 
     const instructionSupplementaire = await recupererInstructionStyle();
 
-    // 1. On reconstruit un résumé des traits physiques pour aider l'IA
-    let descriptionHero = `Héros de race ${donnees.race}, genre ${donnees.genre}. `;
-    if (donnees.corpulence) descriptionHero += `Corpulence : ${donnees.corpulence}. `;
-    if (donnees.peau) descriptionHero += `Peau : ${donnees.peau}. `;
-    if (donnees.cheveux) descriptionHero += `Cheveux : ${donnees.cheveux}. `;
-    if (donnees.style) descriptionHero += `Vêtements : ${donnees.style} (${donnees.couleursDom}). `;
-    if (donnees.signes) descriptionHero += `Signes/Accessoires : ${donnees.signes}. `;
+    let descriptionHero = `Race: ${donnees.race}, Genre: ${donnees.genre}. `;
+    if (donnees.corpulence) descriptionHero += `Corpulence: ${donnees.corpulence}. `;
+    if (donnees.peau) descriptionHero += `Peau: ${donnees.peau}. `;
+    if (donnees.cheveux) descriptionHero += `Cheveux: ${donnees.cheveux}. `;
+    if (donnees.style) descriptionHero += `Vêtements: ${donnees.style} (${donnees.couleursDom}). `;
+    if (donnees.signes) descriptionHero += `Signes: ${donnees.signes}. `;
 
-    // 2. Le prompt strict imposant la vue de dessus absolue
-    let promptOpenAI = "Contexte : Antique Fantastique (Mythic Ancient Fantasy).\n\n" +
-                       "--- DIRECTIVE DE PERSPECTIVE ABSOLUE ---\n" +
-                       "VUE DE DESSUS STRICTE (Top-down perspective, strictly bird's-eye view, zenithal angle). On regarde le personnage exactement depuis le ciel vers le sol. Ses épaules et le dessus de sa tête sont les éléments les plus visibles.\n\n" +
-                       "--- SUJET ---\n" +
-                       descriptionHero + "\n\n" +
-                       "Directives de style artistique : " + instructionSupplementaire + "\n\n" +
-                       "🛑 RÈGLE TECHNIQUE DÉFINITIVE : " +
+    const promptText = "L'image fournie est la RÉFÉRENCE VISUELLE PRINCIPALE du personnage.\n" +
+                       "Conserve fidèlement son identité visuelle : visage, coiffure, couleur de peau, " +
+                       "couleur et style des cheveux, vêtements, couleurs, accessoires et caractéristiques distinctives.\n" +
+                       "Ne crée pas un nouveau personnage et ne remplace pas son apparence.\n" +
+                       "La transformation demandée concerne uniquement la perspective : redessine ce même personnage " +
+                       "en VUE STRICTEMENT VERTICALE DU DESSUS (top-down, angle zénithal), le dessus de la tête et " +
+                       "les épaules étant les éléments les plus visibles.\n\n" +
+                       "--- SUJET ---\n" + descriptionHero + "\n\n" +
+                       "Directives de style : " + instructionSupplementaire + "\n\n" +
+                       "🛑 RÈGLE DÉFINITIVE : " +
                        "Le personnage DOIT ÊTRE PLACÉ SUR UN FOND TOTALEMENT MAGENTA FLUO UNI (#FF00FF). " +
-                       "Aucun décor, aucune ombre au sol, aucun objet environnant. " +
-                       "Uniquement le personnage vu de dessus isolé sur le fond magenta.";
+                       "Aucun décor, aucune ombre.";
 
-    // Astuce Universelle : On place l'URL publique de l'image Cloudinary au tout début du prompt !
-    // Si l'API utilise Midjourney ou un système similaire, elle va l'avaler comme "Image Prompt".
-    // Si elle ne le fait pas, elle se rabattra parfaitement sur le texte juste après.
-    promptOpenAI = urlPortrait + " " + promptOpenAI;
+    // input_fidelity est ignoré par gpt-image-2 (déjà haute fidélité) mais indispensable aux modèles précédents.
+    const modelesCandidats = [
+        { model: "gpt-image-2" },
+        { model: "gpt-image-1.5", input_fidelity: "high" },
+        { model: "gpt-image-1", input_fidelity: "high" }
+    ];
 
-    // 3. Le payload épuré pour éviter l'erreur "Commande erronée"
-    const payloadOpenAI = {
-        model: "gpt-image-2",
-        prompt: promptOpenAI,
-        output_format: "png",
-        n: 1,
-        size: "1024x1024",
-        quality: "low",
-        moderation: "low"
-    };
-
-    const optionsOpenAI = {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + cles.openai },
-        body: JSON.stringify(payloadOpenAI)
-    };
-
-    let tentative = 0;
-    let succes = false;
-    let texteReponseOpenAI = "";
+    let jsonOpenAI = null;
     const delais = [5000, 15000, 30000];
 
-    while (tentative < 3 && !succes) {
-        try {
-            const responseOpenAI = await fetch("https://api.openai.com/v1/images/generations", optionsOpenAI);
-            texteReponseOpenAI = await responseOpenAI.text();
-        } catch (e) { texteReponseOpenAI = "error"; }
+    for (const candidat of modelesCandidats) {
+        let tentative = 0;
 
-        if (texteReponseOpenAI.includes("error code: 1015") || texteReponseOpenAI.includes("Rate Limited")) {
-            await new Promise(r => setTimeout(r, delais[tentative])); 
-            tentative++;
-        } else { succes = true; }
+        while (tentative < 3) {
+            const form = new FormData();
+            form.append("model", candidat.model);
+            form.append("prompt", promptText);
+            form.append("image", blobPortrait, "portrait.png");
+            form.append("n", "1");
+            form.append("size", "1024x1024");
+            form.append("quality", "low");
+            form.append("output_format", "png");
+            if (candidat.input_fidelity) form.append("input_fidelity", candidat.input_fidelity);
+
+            let statut = 0;
+            let rawText = "";
+
+            try {
+                // Aucun en-tête Content-Type : le navigateur génère lui-même la frontière multipart.
+                const reponse = await fetch("https://api.openai.com/v1/images/edits", {
+                    method: "POST",
+                    headers: { "Authorization": "Bearer " + cles.openai },
+                    body: form
+                });
+                statut = reponse.status;
+                rawText = await reponse.text();
+            } catch (e) {
+                console.error("❌ [Token] Erreur réseau :", e);
+                tentative++;
+                continue;
+            }
+
+            console.log(`🚁 [Token] ${candidat.model} → HTTP ${statut}`);
+
+            if (statut === 429 || rawText.includes("error code: 1015") || rawText.includes("Rate Limited")) {
+                console.warn("🚁 [Token] Rate limit. Nouvelle tentative dans " + (delais[tentative] / 1000) + "s...");
+                await new Promise(r => setTimeout(r, delais[tentative]));
+                tentative++;
+                continue;
+            }
+
+            if (statut === 404 || rawText.includes("model_not_found") || rawText.includes("does not support")) {
+                console.warn(`🚁 [Token] ${candidat.model} indisponible pour l'édition, essai du modèle suivant...`);
+                break;
+            }
+
+            if (statut < 200 || statut >= 300) {
+                console.error("❌ [Token] ERREUR HTTP OPENAI :", statut, rawText);
+                break;
+            }
+
+            try {
+                jsonOpenAI = JSON.parse(rawText);
+            } catch (e) {
+                console.error("❌ [Token] Réponse illisible :", e);
+            }
+            break;
+        }
+
+        if (jsonOpenAI) break;
     }
 
-    let jsonOpenAI;
-    try { jsonOpenAI = JSON.parse(texteReponseOpenAI); } catch (e) { return; }
-    if (!jsonOpenAI.data || jsonOpenAI.data.length === 0) return;
+    if (!jsonOpenAI || !jsonOpenAI.data || jsonOpenAI.data.length === 0) {
+        console.error("🚁 [Token] Échec : Aucune image retournée par l'API.");
+        return false;
+    }
 
+    // Récupération de l'image (format standard)
     let imageSource = jsonOpenAI.data[0].url || ("data:image/png;base64," + jsonOpenAI.data[0].b64_json);
 
-    // 4. Passage par Cloudinary et Détourage
+    // =========================================================================
+    // PASSAGE PAR CLOUDINARY (POUR DÉTOURAGE MAGENTA)
+    // =========================================================================
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const dossier = "Tokens"; 
 
@@ -758,19 +862,17 @@ async function genererEtStockerTokenBackground(donnees, idPersonnage, urlPortrai
         const json2 = await res2.json();
         if (json2.secure_url) {
             const finalTokenUrl = json2.secure_url.replace("/upload/", "/upload/q_auto,f_auto/");
-            console.log("✅ [Token] Pion généré avec succès en arrière-plan !");
+            console.log("✅ [Token] Pion généré avec succès !");
             
-            // 5. Mise à jour de la Base de Données silencieuse
             const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
             await updateDoc(doc(db, "Personnages", idPersonnage), {
                 URL_Token: finalTokenUrl
             });
-            return true; // 🔻 NOUVEAU : On indique que c'est un succès
+            return true;
         }
-    } catch (e) {
-        console.error("Erreur upload Cloudinary Token :", e);
-    }
-    return false; // 🔻 NOUVEAU : On indique que c'est un échec
+    } catch (e) {}
+    
+    return false;
 }
 
 async function genererEtStockerPortrait(donnees) {
