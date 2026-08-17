@@ -745,6 +745,25 @@ window.ecouterTerrainVTT = function() {
                 const opacite = data.Opacite_Grille !== undefined ? data.Opacite_Grille : 0.8;
                 window.appliquerTerrain(data.URL_Map, data.Taille_Hex, opacite);
             }
+
+            // 🔻 NOUVEAU : Lecture des Pions (Tokens) et de leur taille 🔻
+            if (data.Taille_Token !== undefined) {
+                window.TAILLE_TOKEN_VTT = data.Taille_Token;
+                const label = document.getElementById("label-taille-token");
+                if (label) label.innerText = data.Taille_Token;
+            } else {
+                window.TAILLE_TOKEN_VTT = 80;
+            }
+
+            if (data.Tokens !== undefined) {
+                window.TOKENS_VTT_DATA = data.Tokens;
+                if (typeof window.appliquerTokensVTT === "function") {
+                    window.appliquerTokensVTT(data.Tokens);
+                }
+            } else {
+                window.TOKENS_VTT_DATA = {};
+                if (typeof window.appliquerTokensVTT === "function") window.appliquerTokensVTT({});
+            }
         }
     });
 };
@@ -836,6 +855,163 @@ window.sauvegarderEchelleVTT = async function() {
     } catch(e) {
         console.error("Erreur synchro échelle :", e);
         if (btn) btn.innerText = "❌";
+    }
+};
+
+// =========================================================================
+//  GESTION DEV : PIONS (TOKENS) SUR LA TABLE VIRTUELLE
+// =========================================================================
+window.TAILLE_TOKEN_VTT = 80;
+window.TOKENS_VTT_DATA = {};
+
+window.changerTailleToken = function(delta) {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    window.TAILLE_TOKEN_VTT += delta;
+    if (window.TAILLE_TOKEN_VTT < 20) window.TAILLE_TOKEN_VTT = 20; 
+    if (window.TAILLE_TOKEN_VTT > 250) window.TAILLE_TOKEN_VTT = 250; 
+    
+    const label = document.getElementById("label-taille-token");
+    if (label) label.innerText = window.TAILLE_TOKEN_VTT;
+    
+    // Redessine instantanément en local pour visualiser la taille avant de valider
+    window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+};
+
+window.sauvegarderTailleToken = async function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    if (!window.ID_PARTIE_COURANTE) return;
+    
+    const btn = document.getElementById("btn-ok-taille-token");
+    if (btn) btn.innerText = "⏳";
+
+    try {
+        const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
+            Taille_Token: window.TAILLE_TOKEN_VTT
+        }, { merge: true });
+        
+        if (btn) {
+            btn.innerText = "✔️";
+            setTimeout(() => btn.innerText = "OK", 1500);
+        }
+    } catch(e) {
+        console.error("Erreur synchro taille token :", e);
+        if (btn) btn.innerText = "❌";
+    }
+};
+
+window.genererTokensCombat = async function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT || !window.PERSOS_PARTIE) return;
+
+    let tokensData = { ...window.TOKENS_VTT_DATA };
+    let updated = false;
+
+    // Algorithme de recherche en spirale pour trouver la case libre la plus proche du centre
+    function trouverHexLibre() {
+        let radius = 0;
+        while (radius < 20) {
+            if (radius === 0) {
+                if (estHexLibre(0, 0)) return { q: 0, r: 0 };
+            } else {
+                let q = -radius, r = radius;
+                // Mouvements pour faire le tour de l'anneau hexagonal
+                const directions = [
+                    {dq: 1, dr: 0}, {dq: 0, dr: -1}, {dq: -1, dr: -1},
+                    {dq: -1, dr: 0}, {dq: 0, dr: 1}, {dq: 1, dr: 1}
+                ];
+                for (let i = 0; i < 6; i++) {
+                    for (let j = 0; j < radius; j++) {
+                        if (estHexLibre(q, r)) return { q, r };
+                        q += directions[i].dq;
+                        r += directions[i].dr;
+                    }
+                }
+            }
+            radius++;
+        }
+        return { q: 0, r: 0 }; // Sécurité de repli
+    }
+
+    function estHexLibre(q, r) {
+        // Vérifie si la case est supprimée ou est un mur
+        const state = window.PLATEAU_VTT.getCaseState(q, r);
+        if (state.isDeleted || state.isBlocked) return false;
+
+        // Vérifie si un token est déjà dessus
+        for (let id in tokensData) {
+            if (tokensData[id].q === q && tokensData[id].r === r) return false;
+        }
+        return true;
+    }
+
+    // On parcourt les héros vivants
+    window.PERSOS_PARTIE.forEach(perso => {
+        if (perso.statut === "Mort") return;
+
+        // Priorité à l'URL du Token vu de dessus ! Sinon, le grand portrait par défaut.
+        const imgToUse = perso.urlToken || perso.urlCloudinary;
+        if (!imgToUse) return;
+
+        // Si le personnage n'est pas encore sur la carte
+        if (!tokensData[perso.idPersonnage]) {
+            const hexLibre = trouverHexLibre();
+            tokensData[perso.idPersonnage] = {
+                q: hexLibre.q,
+                r: hexLibre.r,
+                url: imgToUse
+            };
+            updated = true;
+        }
+    });
+
+    if (updated) {
+        try {
+            const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+            await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
+                Tokens: tokensData
+            }, { merge: true });
+        } catch (e) {
+            console.error("Erreur génération tokens :", e);
+        }
+    }
+};
+
+window.appliquerTokensVTT = function(tokensMap) {
+    if (!window.PLATEAU_VTT) return;
+    const conteneur = document.getElementById("conteneur-tokens-vtt");
+    if (!conteneur) return;
+
+    conteneur.innerHTML = "";
+    const taille = window.TAILLE_TOKEN_VTT || 80;
+
+    for (let idPerso in tokensMap) {
+        const data = tokensMap[idPerso];
+        // Demande au plateau VTT les coordonnées parfaites en pixels !
+        const px = window.PLATEAU_VTT.hexToPixel(data.q, data.r);
+
+        const divToken = document.createElement("div");
+        divToken.style.position = "absolute";
+        divToken.style.left = px.x + "px";
+        divToken.style.top = px.y + "px";
+        divToken.style.width = taille + "px";
+        divToken.style.height = taille + "px";
+        divToken.style.transform = "translate(-50%, -50%)"; // Centre exact sur l'hexagone
+        
+        divToken.style.pointerEvents = "auto"; 
+        divToken.style.cursor = "grab";
+        divToken.style.zIndex = "10";
+        divToken.id = "token-" + idPerso;
+
+        const img = document.createElement("img");
+        img.src = data.url;
+        img.style.width = "100%";
+        img.style.height = "100%";
+        img.style.objectFit = "contain";
+        img.style.filter = "drop-shadow(0px 5px 8px rgba(0,0,0,0.8))";
+
+        divToken.appendChild(img);
+        conteneur.appendChild(divToken);
     }
 };
 

@@ -122,6 +122,7 @@ function persoDocVersFront(id, d) {
     nom: d.Nom_Personnage || "",
     race: d.Race || "",
     urlCloudinary: d.URL_Cloudinary || "",
+    urlToken: d.URL_Token || "", // 🔻 NOUVEAU : Chargement du Token
     statut: d.Statut || "Vivant",
     age: d.Age_Apparent || "",
     genre: d.Genre || "",
@@ -169,6 +170,7 @@ function frontVersPersoDoc(donnees, idPersonnage) {
     Nom_Personnage: donnees.nom || "",
     Race: donnees.race || "",
     URL_Cloudinary: donnees.urlCloudinary || "",
+    URL_Token: donnees.urlToken || "", // 🔻 NOUVEAU : Sauvegarde du Token
     Statut: donnees.statut || "Vivant",
     Age_Apparent: donnees.age || "",
     Genre: donnees.genre || "",
@@ -356,6 +358,12 @@ async function sauvegarderFichePersonnage(donnees, skipImage = false) {
       }
   }
   // =========================================================
+
+  // 🔻 NOUVEAU : On lance la génération du token top-down en arrière-plan ! 🔻
+  // Note : On ne met pas de "await" devant, pour libérer l'écran du joueur tout de suite.
+  if (!skipImage && donnees.urlCloudinary !== "") {
+      genererEtStockerTokenBackground(donnees, idPersonnage, donnees.urlCloudinary).catch(e => console.error(e));
+  }
 
   return { id: idPersonnage, url: donnees.urlCloudinary || "" };
 }
@@ -634,6 +642,137 @@ async function detourerFondMagenta(imageSource) {
     });
 }
 
+// =========================================================================
+//  GÉNÉRATION DU PION TACTIQUE (VUE DE DESSUS) EN ARRIÈRE-PLAN
+// =========================================================================
+
+// Fonction silencieuse qui tourne en arrière-plan
+async function genererEtStockerTokenBackground(donnees, idPersonnage, urlPortrait) {
+    console.log("🚁 [Token] Lancement de la génération du pion en arrière-plan...");
+    const cles = lireClesApi();
+    if (!cles.openai || !cles.cloudName || !cles.cloudKey || !cles.cloudSecret) return;
+
+    const instructionSupplementaire = await recupererInstructionStyle();
+
+    // 1. On reconstruit un résumé des traits physiques pour aider l'IA
+    let descriptionHero = `Héros de race ${donnees.race}, genre ${donnees.genre}. `;
+    if (donnees.corpulence) descriptionHero += `Corpulence : ${donnees.corpulence}. `;
+    if (donnees.peau) descriptionHero += `Peau : ${donnees.peau}. `;
+    if (donnees.cheveux) descriptionHero += `Cheveux : ${donnees.cheveux}. `;
+    if (donnees.style) descriptionHero += `Vêtements : ${donnees.style} (${donnees.couleursDom}). `;
+    if (donnees.signes) descriptionHero += `Signes/Accessoires : ${donnees.signes}. `;
+
+    // 2. Le prompt strict imposant la vue de dessus absolue
+    let promptOpenAI = "Contexte : Antique Fantastique (Mythic Ancient Fantasy).\n\n" +
+                       "--- DIRECTIVE DE PERSPECTIVE ABSOLUE ---\n" +
+                       "VUE DE DESSUS STRICTE (Top-down perspective, strictly bird's-eye view, zenithal angle). On regarde le personnage exactement depuis le ciel vers le sol. Ses épaules et le dessus de sa tête sont les éléments les plus visibles.\n\n" +
+                       "--- SUJET ---\n" +
+                       descriptionHero + "\n\n" +
+                       "Directives de style artistique : " + instructionSupplementaire + "\n\n" +
+                       "🛑 RÈGLE TECHNIQUE DÉFINITIVE : " +
+                       "Le personnage DOIT ÊTRE PLACÉ SUR UN FOND TOTALEMENT MAGENTA FLUO UNI (#FF00FF). " +
+                       "Aucun décor, aucune ombre au sol, aucun objet environnant. " +
+                       "Uniquement le personnage vu de dessus isolé sur le fond magenta.";
+
+    // Astuce Universelle : On place l'URL publique de l'image Cloudinary au tout début du prompt !
+    // Si l'API utilise Midjourney ou un système similaire, elle va l'avaler comme "Image Prompt".
+    // Si elle ne le fait pas, elle se rabattra parfaitement sur le texte juste après.
+    promptOpenAI = urlPortrait + " " + promptOpenAI;
+
+    // 3. Le payload épuré pour éviter l'erreur "Commande erronée"
+    const payloadOpenAI = {
+        model: "gpt-image-2",
+        prompt: promptOpenAI,
+        output_format: "png",
+        n: 1,
+        size: "1024x1024",
+        quality: "low",
+        moderation: "low"
+    };
+
+    const optionsOpenAI = {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + cles.openai },
+        body: JSON.stringify(payloadOpenAI)
+    };
+
+    let tentative = 0;
+    let succes = false;
+    let texteReponseOpenAI = "";
+    const delais = [5000, 15000, 30000];
+
+    while (tentative < 3 && !succes) {
+        try {
+            const responseOpenAI = await fetch("https://api.openai.com/v1/images/generations", optionsOpenAI);
+            texteReponseOpenAI = await responseOpenAI.text();
+        } catch (e) { texteReponseOpenAI = "error"; }
+
+        if (texteReponseOpenAI.includes("error code: 1015") || texteReponseOpenAI.includes("Rate Limited")) {
+            await new Promise(r => setTimeout(r, delais[tentative])); 
+            tentative++;
+        } else { succes = true; }
+    }
+
+    let jsonOpenAI;
+    try { jsonOpenAI = JSON.parse(texteReponseOpenAI); } catch (e) { return; }
+    if (!jsonOpenAI.data || jsonOpenAI.data.length === 0) return;
+
+    let imageSource = jsonOpenAI.data[0].url || ("data:image/png;base64," + jsonOpenAI.data[0].b64_json);
+
+    // 4. Passage par Cloudinary et Détourage
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const dossier = "Tokens"; 
+
+    let signature1 = await sha1Hex(`folder=${dossier}&timestamp=${timestamp}${cles.cloudSecret}`);
+    let form1 = new FormData();
+    form1.append("file", imageSource); form1.append("api_key", cles.cloudKey);
+    form1.append("timestamp", timestamp); form1.append("signature", signature1); form1.append("folder", dossier);
+
+    let urlSecurisee = imageSource;
+    let publicIdAecraser = null;
+
+    try {
+        const res1 = await fetch(`https://api.cloudinary.com/v1_1/${cles.cloudName}/image/upload`, { method: "POST", body: form1 });
+        const json1 = await res1.json();
+        if (json1.secure_url) {
+            urlSecurisee = json1.secure_url;
+            publicIdAecraser = json1.public_id;
+        }
+    } catch (e) {}
+
+    let imageDetoureeBase64 = await detourerFondMagenta(urlSecurisee);
+
+    let stringToSign2 = publicIdAecraser 
+        ? `public_id=${publicIdAecraser}&timestamp=${timestamp}${cles.cloudSecret}`
+        : `folder=${dossier}&timestamp=${timestamp}${cles.cloudSecret}`;
+    
+    let signature2 = await sha1Hex(stringToSign2);
+    let form2 = new FormData();
+    form2.append("file", imageDetoureeBase64); form2.append("api_key", cles.cloudKey);
+    form2.append("timestamp", timestamp); form2.append("signature", signature2);
+    if (publicIdAecraser) form2.append("public_id", publicIdAecraser);
+    else form2.append("folder", dossier);
+
+    try {
+        const res2 = await fetch(`https://api.cloudinary.com/v1_1/${cles.cloudName}/image/upload`, { method: "POST", body: form2 });
+        const json2 = await res2.json();
+        if (json2.secure_url) {
+            const finalTokenUrl = json2.secure_url.replace("/upload/", "/upload/q_auto,f_auto/");
+            console.log("✅ [Token] Pion généré avec succès en arrière-plan !");
+            
+            // 5. Mise à jour de la Base de Données silencieuse
+            const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+            await updateDoc(doc(db, "Personnages", idPersonnage), {
+                URL_Token: finalTokenUrl
+            });
+            return true; // 🔻 NOUVEAU : On indique que c'est un succès
+        }
+    } catch (e) {
+        console.error("Erreur upload Cloudinary Token :", e);
+    }
+    return false; // 🔻 NOUVEAU : On indique que c'est un échec
+}
+
 async function genererEtStockerPortrait(donnees) {
   // 1. Lecture des cles dans le localStorage
   const cles = lireClesApi();
@@ -854,6 +993,89 @@ async function genererEtStockerPortrait(donnees) {
 
   return urlSecurisee || "";
 }
+
+// =========================================================================
+//  INTERFACE DE RÉGÉNÉRATION MANUELLE DES TOKENS
+// =========================================================================
+
+window.ouvrirRegenerationToken = function() {
+    naviguerFenetre('etape-menu-outils', 'etape-regeneration-token');
+    
+    const conteneur = document.getElementById("liste-html-persos-token");
+    const chargement = document.getElementById("chargement-persos-token");
+    
+    if (!window.PERSOS_PARTIE || window.PERSOS_PARTIE.length === 0) {
+        chargement.style.display = "none";
+        conteneur.innerHTML = "<p style='text-align:center; padding: 10px;'>Aucun héros lié à l'expédition.</p>";
+        conteneur.style.display = "block";
+        return;
+    }
+
+    conteneur.innerHTML = "";
+    
+    // On peuple la liste avec les héros actuels
+    window.PERSOS_PARTIE.forEach(p => {
+        const div = document.createElement("div");
+        div.className = "item-perso";
+        div.style.display = "flex";
+        div.style.justifyContent = "space-between";
+        div.style.alignItems = "center";
+        
+        div.innerHTML = `
+            <span style="flex-grow: 1;">${p.prenom} ${p.nom}</span> 
+            <button class="btn-parametres" style="padding: 4px 12px; font-size: 12px; margin: 0;" 
+                    onclick="event.stopPropagation(); window.lancerRegenerationTokenManuelle('${p.idPersonnage}', this)">
+                Reforger
+            </button>
+        `;
+        conteneur.appendChild(div);
+    });
+
+    chargement.style.display = "none";
+    conteneur.style.display = "block";
+};
+
+window.lancerRegenerationTokenManuelle = async function(idPersonnage, btnElement) {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    
+    const originalText = btnElement.innerText;
+    btnElement.innerText = "⏳ En cours...";
+    btnElement.disabled = true;
+
+    // Récupération des données du personnage en RAM (Zéro Latence)
+    const perso = window.PERSOS_PARTIE.find(p => p.idPersonnage === idPersonnage);
+    
+    if (!perso || !perso.urlCloudinary) {
+        alert("Impossible de trouver le portrait d'origine de ce héros.");
+        btnElement.innerText = originalText;
+        btnElement.disabled = false;
+        return;
+    }
+
+    // Lancement de l'algorithme fantôme en forçant l'attente (await)
+    const succes = await genererEtStockerTokenBackground(perso, idPersonnage, perso.urlCloudinary);
+
+    // Feedback visuel
+    if (succes) {
+        btnElement.innerText = "✔️";
+        btnElement.style.backgroundColor = "#1b6e3a";
+        const msg = document.getElementById("msg-token-succes");
+        if (msg) {
+            msg.style.opacity = "1";
+            setTimeout(() => msg.style.opacity = "0", 3000);
+        }
+    } else {
+        btnElement.innerText = "❌";
+        btnElement.style.backgroundColor = "darkred";
+    }
+
+    // Réinitialisation du bouton après 3 secondes
+    setTimeout(() => {
+        btnElement.innerText = originalText;
+        btnElement.disabled = false;
+        btnElement.style.backgroundColor = "";
+    }, 3000);
+};
 
 // =========================================================================
 //  ECOUTEURS TEMPS REEL (onSnapshot)
@@ -2361,12 +2583,23 @@ async function validerSuppressionPerso() {
   btnConfirmer.style.pointerEvents = "none";
 
   // =========================================================
-  // NOUVEAU : SUPPRESSION DE L'IMAGE SUR CLOUDINARY
+  // NOUVEAU : SUPPRESSION DU PORTRAIT ET DU PION CLOUDINARY
   // =========================================================
-  const urlImage = document.getElementById("champ-id-personnage").getAttribute("data-url");
-  if (urlImage && urlImage !== "" && typeof window.supprimerImageCloudinary === "function") {
-      console.log("🔥 Incinération du portrait Cloudinary...");
-      await window.supprimerImageCloudinary(urlImage);
+  try {
+      const snap = await getDoc(doc(db, "Personnages", id));
+      if (snap.exists()) {
+          const d = snap.data();
+          if (d.URL_Cloudinary && typeof window.supprimerImageCloudinary === "function") {
+              console.log("🔥 Incinération du portrait Cloudinary...");
+              await window.supprimerImageCloudinary(d.URL_Cloudinary);
+          }
+          if (d.URL_Token && typeof window.supprimerImageCloudinary === "function") {
+              console.log("🔥 Incinération du pion tactique Cloudinary...");
+              await window.supprimerImageCloudinary(d.URL_Token);
+          }
+        }
+  } catch (e) {
+      console.error("Erreur lors de l'incinération des images :", e);
   }
   // =========================================================
 
@@ -4087,6 +4320,8 @@ Object.assign(window, {
   afficherAlerteCles, fermerAlerteCles, ouvrirParametresDepuisAlerte,
   // Outils
   syncTemperature, sauvegarderTemperature, basculerAffichageTokens, basculerDevMode: window.basculerDevMode, toggleMicro,
+  ouvrirRegenerationToken: window.ouvrirRegenerationToken,
+  lancerRegenerationTokenManuelle: window.lancerRegenerationTokenManuelle,
   // Gestion Effets de Combat
   ouvrirGestionEffets: window.ouvrirGestionEffets,
   fermerGestionEffets: window.fermerGestionEffets,

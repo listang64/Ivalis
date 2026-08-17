@@ -398,8 +398,28 @@
                 <button id="btn-ok-opacite" class="btn-combat-switch" style="padding: 2px 20px; font-size: 11px; border-color: #1b6e3a; color: #1b6e3a;" onclick="window.sauvegarderOpaciteVTT()">OK</button>
             </div>
 
+            <!-- 🔻 NOUVEAU : Bouton Déployer Pions 🔻 -->
+            <div style="display: flex; flex-direction: column; align-items: center; cursor: pointer; filter: drop-shadow(0 0 8px rgba(255,255,255,0.3)); transition: filter 0.2s ease; border-left: 1px dashed #5c3a21; padding-left: 15px;"
+                 onmouseover="this.style.filter='drop-shadow(0 0 15px rgba(255,255,255,0.8))'"
+                 onmouseout="this.style.filter='drop-shadow(0 0 8px rgba(255,255,255,0.3))'"
+                 onclick="window.genererTokensCombat()" title="Déployer les Pions">
+                 <div style="font-size: 30px;">♟️</div>
+                 <div style="color: #c2a878; font-family: 'Cinzel', serif; font-size: 10px; margin-top: 2px;">PIONS</div>
+            </div>
+
+            <!-- 🔻 NOUVEAU : Encart Taille Pion 🔻 -->
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; border-left: 1px dashed #5c3a21; padding-left: 15px; border-right: 1px dashed #5c3a21; padding-right: 15px;">
+                <div style="color: #c2a878; font-family: 'Cinzel', serif; font-size: 12px;">TAILLE PION</div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button class="btn-combat-switch" style="padding: 2px 8px; font-size: 12px;" onclick="window.changerTailleToken(-5)">-</button>
+                    <span id="label-taille-token" style="color: white; font-family: 'Cinzel', serif; font-size: 16px; width: 30px; text-align: center;">80</span>
+                    <button class="btn-combat-switch" style="padding: 2px 8px; font-size: 12px;" onclick="window.changerTailleToken(5)">+</button>
+                </div>
+                <button id="btn-ok-taille-token" class="btn-combat-switch" style="padding: 2px 20px; font-size: 11px; border-color: #1b6e3a; color: #1b6e3a;" onclick="window.sauvegarderTailleToken()">OK</button>
+            </div>
+
             <!-- Outils (Gomme, Murs, Terrain) -->
-            <div style="display: flex; align-items: center; gap: 15px; border-left: 1px dashed #5c3a21; padding-left: 15px; border-right: 1px dashed #5c3a21; padding-right: 15px;">
+            <div style="display: flex; align-items: center; gap: 15px; padding-right: 15px;">
                 <div style="display: flex; flex-direction: column; align-items: center;">
                     <div style="color: #c2a878; font-family: 'Cinzel', serif; font-size: 11px; margin-bottom: 2px;">GOMME</div>
                     <div id="btn-gomme-vtt" class="btn-losange-efface" style="margin: 0; width: 25px; height: 25px;" onclick="window.toggleModeEffacementHex()" title="Gomme">
@@ -438,6 +458,8 @@
                 
                 <!-- Le canvas qui peint la grille par dessus -->
                 <canvas id="plateau-canvas" style="position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none;"></canvas>
+                <!-- 🔻 NOUVEAU : Conteneur des Pions (Tokens) 🔻 -->
+                <div id="conteneur-tokens-vtt" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none;"></div>
             </div>
             
         </div>
@@ -748,6 +770,12 @@
       </button>
       <br><br>
 
+      <!-- 🔻 NOUVEAU : BOUTON RÉGÉNÉRER TOKEN 🔻 -->
+      <button class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); window.ouvrirRegenerationToken()">
+        Régénérer Pion Tactique (Token)
+      </button>
+      <br><br>
+
       <!-- NOUVEAU : BOUTON EFFETS DE COMBAT -->
       <button class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); window.ouvrirGestionEffets()">
         Effets de Combat
@@ -775,6 +803,23 @@
       </label>
       
       <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-menu-outils', 'etape-menu-parametres')">Retour</button>
+    </div>
+
+    <!-- NOUVEAU : Fenêtre de sélection des Pions -->
+    <div id="etape-regeneration-token" class="fenetre-volante-parchemin fondu-interne" style="display: none; opacity: 0;">
+      <h2>Reforger un Pion</h2>
+      <p style="font-size: 14px; margin-top: -10px; color: #5c3a21;">Sélectionnez un héros pour recréer sa vue de dessus.</p>
+      
+      <div id="chargement-persos-token" style="font-style: italic;">Recherche des héros...</div>
+      
+      <!-- Conteneur de la liste des personnages -->
+      <div class="liste-persos" id="liste-html-persos-token" style="display:none; max-height: 250px; overflow-y: auto;"></div>
+      
+      <p id="msg-token-succes" style="color: #1b6e3a; font-weight: bold; opacity: 0; transition: opacity 0.3s; margin-top: 10px;">Pion forgé avec succès !</p>
+      
+      <div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">
+        <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-regeneration-token', 'etape-menu-outils')">Retour</button>
+      </div>
     </div>
 
     <!-- NOUVEAU : Paramètre Température -->
