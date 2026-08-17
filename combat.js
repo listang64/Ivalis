@@ -853,12 +853,81 @@ window.sauvegarderEchelleVTT = async function() {
 // =========================================================================
 //  GESTION DEV : PIONS (TOKENS) SUR LA TABLE VIRTUELLE
 // =========================================================================
-window.TOKENS_VTT_DATA = {};
-window.TOKEN_SELECTIONNE = null;
+window.TOKENS_VTT_DATA = window.TOKENS_VTT_DATA || {};
+window.TOKEN_SELECTIONNE = window.TOKEN_SELECTIONNE ?? null;
+window.VTT_MODE_DEPLACEMENT = false;
 
-// Clic global pour désélectionner un pion
-document.addEventListener("click", function(event) {
-    if (window.TOKEN_SELECTIONNE && !event.target.closest(".token-vtt") && !event.target.closest("#menu-dev-combat")) {
+let vttClicStartX = 0;
+let vttClicStartY = 0;
+
+document.addEventListener("mousedown", e => { vttClicStartX = e.clientX; vttClicStartY = e.clientY; });
+document.addEventListener("touchstart", e => { if (e.touches.length > 0) { vttClicStartX = e.touches[0].clientX; vttClicStartY = e.touches[0].clientY; } });
+
+window.toggleModeDeplacementToken = function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    window.VTT_MODE_DEPLACEMENT = !window.VTT_MODE_DEPLACEMENT;
+    
+    const btn = document.getElementById("btn-move-token");
+    if (btn) {
+        if (window.VTT_MODE_DEPLACEMENT) {
+            btn.classList.add("actif");
+            btn.style.filter = "drop-shadow(0 0 15px rgba(255, 215, 0, 0.9))";
+        } else {
+            btn.classList.remove("actif");
+            btn.style.filter = "drop-shadow(0 0 8px rgba(255,255,255,0.3))";
+            window.TOKEN_SELECTIONNE = null;
+            const label = document.getElementById("label-taille-token");
+            if (label) label.innerText = "--";
+            window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+        }
+    }
+};
+
+document.addEventListener("click", async function(event) {
+    if (Math.abs(event.clientX - vttClicStartX) > 10 || Math.abs(event.clientY - vttClicStartY) > 10) return;
+
+    if (event.target.closest(".token-vtt") || event.target.closest("#menu-dev-combat")) return;
+
+    if (window.TOKEN_SELECTIONNE) {
+        if (window.VTT_MODE_DEPLACEMENT && window.PLATEAU_VTT) {
+            // Même conversion que getHexFromMouse (gomme / murs) : translate+scale de #transform-plateau
+            const canvasX = (event.clientX - window.VTT_POS_X) / window.VTT_SCALE;
+            const canvasY = (event.clientY - window.VTT_POS_Y) / window.VTT_SCALE;
+            const hex = window.PLATEAU_VTT.pixelToHex(canvasX, canvasY);
+
+            if (hex) {
+                const state = window.PLATEAU_VTT.getCaseState(hex.q, hex.r);
+                let isOccupied = false;
+                for (let id in window.TOKENS_VTT_DATA) {
+                    if (window.TOKENS_VTT_DATA[id].q === hex.q && window.TOKENS_VTT_DATA[id].r === hex.r) {
+                        isOccupied = true;
+                        break;
+                    }
+                }
+
+                if (!state.isDeleted && !state.isBlocked && !isOccupied) {
+                    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+                    
+                    window.TOKENS_VTT_DATA[window.TOKEN_SELECTIONNE].q = hex.q;
+                    window.TOKENS_VTT_DATA[window.TOKEN_SELECTIONNE].r = hex.r;
+                    
+                    window.TOKEN_SELECTIONNE = null;
+                    const label = document.getElementById("label-taille-token");
+                    if (label) label.innerText = "--";
+                    window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+
+                    try {
+                        const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+                        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
+                            Tokens: window.TOKENS_VTT_DATA
+                        }, { merge: true });
+                    } catch (e) {}
+                    
+                    return;
+                }
+            }
+        }
+
         window.TOKEN_SELECTIONNE = null;
         const label = document.getElementById("label-taille-token");
         if (label) label.innerText = "--";
@@ -1044,9 +1113,41 @@ window.appliquerTokensVTT = function(tokensMap) {
         divToken.style.borderRadius = "50%";
         divToken.id = "token-" + idPerso;
 
-        // Mise en évidence du pion sélectionné
+        // 🔻 NOUVEAU : OMBRE PORTÉE AU SOL (Le cercle noir flouté sous le pion) 🔻
+        const ombreSol = document.createElement("div");
+        ombreSol.style.position = "absolute";
+        ombreSol.style.top = "50%";
+        ombreSol.style.left = "50%";
+        ombreSol.style.transform = "translate(-50%, -50%)";
+        ombreSol.style.width = "60%";   // Prend 60% de la largeur du pion
+        ombreSol.style.height = "60%";  // Forme un cercle parfait vu de dessus
+        ombreSol.style.backgroundColor = "rgba(0, 0, 0, 0.85)"; // Noir dense
+        ombreSol.style.borderRadius = "50%";
+        ombreSol.style.filter = "blur(8px)"; // Flou pour l'effet de projection
+        ombreSol.style.zIndex = "-2"; // En dessous de tout (même du halo de sélection)
+        divToken.appendChild(ombreSol);
+
+        // 🔻 HALO DORÉ (SOUS L'IMAGE MAIS AU DESSUS DE L'OMBRE) 🔻
         if (window.TOKEN_SELECTIONNE === idPerso) {
-            divToken.style.boxShadow = "0 0 15px 5px #00ffff";
+            const glow = document.createElement("div");
+            glow.style.position = "absolute";
+            glow.style.top = "50%";
+            glow.style.left = "50%";
+            glow.style.transform = "translate(-50%, -50%)";
+            
+            // Diamètre calculé pour représenter "la moitié d'un hexagone"
+            const baseSize = window.PLATEAU_VTT.hexSize; 
+            glow.style.width = baseSize + "px"; 
+            glow.style.height = baseSize + "px";
+            
+            glow.style.borderRadius = "50%";
+            glow.style.backgroundColor = "rgba(255, 215, 0, 0.4)";
+            glow.style.boxShadow = "0 0 20px 10px rgba(255, 215, 0, 0.8)";
+            glow.style.zIndex = "-1"; // Se glisse sous le pion, sur l'ombre
+            
+            glow.style.animation = "respirationHaloDore 2s infinite alternate ease-in-out";
+            
+            divToken.appendChild(glow);
         }
 
         divToken.onclick = function(e) {
@@ -1054,7 +1155,6 @@ window.appliquerTokensVTT = function(tokensMap) {
             if (typeof window.jouerSonClic === "function") window.jouerSonClic();
             window.TOKEN_SELECTIONNE = idPerso;
             
-            // Affiche la taille de CE pion dans l'interface
             const label = document.getElementById("label-taille-token");
             if (label) label.innerText = taille;
 
@@ -1066,8 +1166,14 @@ window.appliquerTokensVTT = function(tokensMap) {
         img.style.width = "100%";
         img.style.height = "100%";
         img.style.objectFit = "contain";
-        img.style.filter = "drop-shadow(0px 5px 8px rgba(0,0,0,0.8))";
-        // Si l'URL n'est pas trouvée (ex: erreur de cache ou avatar vide) on évite une erreur graphique moche
+        
+        // 🔻 NOUVEAU : DOUBLE OMBRE PORTÉE 🔻
+        // drop-shadow 1 : Ombre de contact serrée et très sombre
+        // drop-shadow 2 : Ombre directionnelle très étirée en bas à gauche (comme ton croquis)
+        img.style.filter = "drop-shadow(-2px 5px 4px rgba(0,0,0,0.8)) drop-shadow(-25px 35px 15px rgba(0,0,0,0.65))";
+        
+        img.style.position = "relative";
+        img.style.zIndex = "2";
         img.onerror = () => { img.style.display = "none"; };
 
         divToken.appendChild(img);
