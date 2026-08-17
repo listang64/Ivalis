@@ -1086,12 +1086,29 @@ window.genererTokensCombat = async function() {
     }
 };
 
+// =========================================================================
+//  L'AFFICHAGE DES TOKENS, DE L'OMBRE AU SOL ET DE L'ANNEAU MAGIQUE
+// =========================================================================
 window.appliquerTokensVTT = function(tokensMap) {
     if (!window.PLATEAU_VTT) return;
     const conteneur = document.getElementById("conteneur-tokens-vtt");
     if (!conteneur) return;
 
     conteneur.innerHTML = "";
+
+    // 🔻 INJECTION DE L'ANIMATION CSS POUR LA ROTATION DE L'ANNEAU 🔻
+    if (!document.getElementById("anim-anneau-vtt")) {
+        const style = document.createElement("style");
+        style.id = "anim-anneau-vtt";
+        style.innerHTML = `
+            @keyframes rotationAnneauMagique {
+                0% { transform: translate(-50%, -50%) rotate(0deg) scale(1); filter: brightness(1); }
+                50% { transform: translate(-50%, -50%) rotate(45deg) scale(1.05); filter: brightness(1.2); }
+                100% { transform: translate(-50%, -50%) rotate(90deg) scale(1); filter: brightness(1); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
 
     for (let idPerso in tokensMap) {
         const data = tokensMap[idPerso];
@@ -1113,43 +1130,68 @@ window.appliquerTokensVTT = function(tokensMap) {
         divToken.style.borderRadius = "50%";
         divToken.id = "token-" + idPerso;
 
-        // 🔻 NOUVEAU : OMBRE PORTÉE AU SOL (Le cercle noir flouté sous le pion) 🔻
+        // 1️⃣ L'OMBRE PORTÉE AU SOL (En dessous de tout : z-index -2)
         const ombreSol = document.createElement("div");
         ombreSol.style.position = "absolute";
         ombreSol.style.top = "50%";
         ombreSol.style.left = "50%";
         ombreSol.style.transform = "translate(-50%, -50%)";
-        ombreSol.style.width = "60%";   // Prend 60% de la largeur du pion
-        ombreSol.style.height = "60%";  // Forme un cercle parfait vu de dessus
-        ombreSol.style.backgroundColor = "rgba(0, 0, 0, 0.85)"; // Noir dense
+        ombreSol.style.width = "60%";   
+        ombreSol.style.height = "60%";  
+        ombreSol.style.backgroundColor = "rgba(0, 0, 0, 0.85)"; 
         ombreSol.style.borderRadius = "50%";
-        ombreSol.style.filter = "blur(8px)"; // Flou pour l'effet de projection
-        ombreSol.style.zIndex = "-2"; // En dessous de tout (même du halo de sélection)
+        ombreSol.style.filter = "blur(8px)"; 
+        ombreSol.style.zIndex = "-2"; 
         divToken.appendChild(ombreSol);
 
-        // 🔻 HALO DORÉ (SOUS L'IMAGE MAIS AU DESSUS DE L'OMBRE) 🔻
+        // 2️⃣ LE NOUVEL ANNEAU DORÉ DE SÉLECTION (Entre l'ombre et le pion : z-index -1)
         if (window.TOKEN_SELECTIONNE === idPerso) {
-            const glow = document.createElement("div");
-            glow.style.position = "absolute";
-            glow.style.top = "50%";
-            glow.style.left = "50%";
-            glow.style.transform = "translate(-50%, -50%)";
+            const anneauSelection = document.createElement("div");
+            anneauSelection.style.position = "absolute";
+            anneauSelection.style.top = "50%";
+            anneauSelection.style.left = "50%";
             
-            // Diamètre calculé pour représenter "la moitié d'un hexagone"
-            const baseSize = window.PLATEAU_VTT.hexSize; 
-            glow.style.width = baseSize + "px"; 
-            glow.style.height = baseSize + "px";
+            // L'anneau est 40% plus grand que le pion pour bien l'entourer
+            const tailleAnneau = taille * 1.4;
+            anneauSelection.style.width = tailleAnneau + "px";
+            anneauSelection.style.height = tailleAnneau + "px";
             
-            glow.style.borderRadius = "50%";
-            glow.style.backgroundColor = "rgba(255, 215, 0, 0.4)";
-            glow.style.boxShadow = "0 0 20px 10px rgba(255, 215, 0, 0.8)";
-            glow.style.zIndex = "-1"; // Se glisse sous le pion, sur l'ombre
+            anneauSelection.style.zIndex = "-1"; 
+            anneauSelection.style.pointerEvents = "none";
+            anneauSelection.style.animation = "rotationAnneauMagique 8s linear infinite";
+
+            // Le code vectoriel parfait du cercle avec les 4 étoiles/losanges
+            anneauSelection.innerHTML = `
+                <svg viewBox="0 0 100 100" width="100%" height="100%" style="overflow: visible;">
+                    <defs>
+                        <filter id="glow-or" x="-50%" y="-50%" width="200%" height="200%">
+                            <feGaussianBlur stdDeviation="2.5" result="blur" />
+                            <feMerge>
+                                <feMergeNode in="blur" />
+                                <feMergeNode in="blur" />
+                                <feMergeNode in="SourceGraphic" />
+                            </feMerge>
+                        </filter>
+                    </defs>
+                    <!-- Cercle Extérieur Lumineux -->
+                    <circle cx="50" cy="50" r="46" fill="none" stroke="#ffd700" stroke-width="1.5" filter="url(#glow-or)"/>
+                    <!-- Cercle Central (Netteté) -->
+                    <circle cx="50" cy="50" r="46" fill="none" stroke="#ffffff" stroke-width="0.5" opacity="0.9"/>
+                    <!-- Cercle Intérieur (Profondeur) -->
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="#ffaa00" stroke-width="0.5" filter="url(#glow-or)" opacity="0.6"/>
+
+                    <!-- Les 4 Étoiles directionnelles -->
+                    <path d="M50,0 L51.5,2.5 L55,3 L51.5,3.5 L50,6 L48.5,3.5 L45,3 L48.5,2.5 Z" fill="#ffffff" filter="url(#glow-or)"/>
+                    <path d="M50,94 L51.5,96.5 L55,97 L51.5,97.5 L50,100 L48.5,97.5 L45,97 L48.5,96.5 Z" fill="#ffffff" filter="url(#glow-or)"/>
+                    <path d="M0,50 L2.5,48.5 L3,45 L3.5,48.5 L6,50 L3.5,51.5 L3,55 L2.5,51.5 Z" fill="#ffffff" filter="url(#glow-or)"/>
+                    <path d="M94,50 L96.5,48.5 L97,45 L97.5,48.5 L100,50 L97.5,51.5 L97,55 L96.5,51.5 Z" fill="#ffffff" filter="url(#glow-or)"/>
+                </svg>
+            `;
             
-            glow.style.animation = "respirationHaloDore 2s infinite alternate ease-in-out";
-            
-            divToken.appendChild(glow);
+            divToken.appendChild(anneauSelection);
         }
 
+        // Gestion du Clic
         divToken.onclick = function(e) {
             e.stopPropagation();
             if (typeof window.jouerSonClic === "function") window.jouerSonClic();
@@ -1161,19 +1203,16 @@ window.appliquerTokensVTT = function(tokensMap) {
             window.appliquerTokensVTT(window.TOKENS_VTT_DATA); 
         };
 
+        // 3️⃣ L'IMAGE DU PION (Au dessus de tout : z-index 2)
         const img = document.createElement("img");
         img.src = data.url;
         img.style.width = "100%";
         img.style.height = "100%";
         img.style.objectFit = "contain";
-        
-        // 🔻 NOUVEAU : DOUBLE OMBRE PORTÉE 🔻
-        // drop-shadow 1 : Ombre de contact serrée et très sombre
-        // drop-shadow 2 : Ombre directionnelle très étirée en bas à gauche (comme ton croquis)
+        // L'ombre directionnelle du personnage (comme tu me l'as dessinée en rouge)
         img.style.filter = "drop-shadow(-2px 5px 4px rgba(0,0,0,0.8)) drop-shadow(-25px 35px 15px rgba(0,0,0,0.65))";
-        
         img.style.position = "relative";
-        img.style.zIndex = "2";
+        img.style.zIndex = "2"; 
         img.onerror = () => { img.style.display = "none"; };
 
         divToken.appendChild(img);
