@@ -1151,10 +1151,12 @@ window.appliquerTokensVTT = function(tokensMap) {
             anneauSelection.style.top = "50%";
             anneauSelection.style.left = "50%";
             
-            // L'anneau est 40% plus grand que le pion pour bien l'entourer
-            const tailleAnneau = taille * 1.4;
+            // 🔻 VALEURS GRAVÉES DANS LE MARBRE 🔻
+            const tailleAnneau = taille * 0.90; // Échelle à 0.90
             anneauSelection.style.width = tailleAnneau + "px";
             anneauSelection.style.height = tailleAnneau + "px";
+            
+            anneauSelection.style.marginTop = "8px"; // Décalage de 8px vers le bas
             
             anneauSelection.style.zIndex = "-1"; 
             anneauSelection.style.pointerEvents = "none";
