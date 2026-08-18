@@ -1271,6 +1271,12 @@ window.appliquerTokensVTT = function(tokensMap) {
         const data = tokensMap[idPerso];
         const px = window.PLATEAU_VTT.hexToPixel(data.q, data.r);
         const taille = data.taille || 80;
+        const angle = data.angle || 0;
+
+        // 🔻 LE HACK ANTI-FLOU IPAD 🔻
+        const SCALE_FIX = 4; // L'image sera calculée 4x plus grande en RAM
+        const inverseScale = 1 / SCALE_FIX; // (0.25) pour lui redonner sa taille normale
+        const tailleGeante = taille * SCALE_FIX;
 
         const divToken = document.createElement("div");
         divToken.className = "token-vtt"; 
@@ -1279,9 +1285,8 @@ window.appliquerTokensVTT = function(tokensMap) {
         divToken.style.top = px.y + "px";
         divToken.style.width = taille + "px";
         divToken.style.height = taille + "px";
-        const angle = data.angle || 0;
         
-        // 🔻 CORRECTION 1 : Le conteneur reste fixe (pas de rotation)
+        // Le parent reste parfaitement fixe (aucune rotation)
         divToken.style.transform = `translate(-50%, -50%)`; 
         
         divToken.style.pointerEvents = "auto"; 
@@ -1304,7 +1309,7 @@ window.appliquerTokensVTT = function(tokensMap) {
         ombreSol.style.zIndex = "-2"; 
         divToken.appendChild(ombreSol);
 
-        // 2️⃣ LE NOUVEL ANNEAU DORÉ DE SÉLECTION
+        // 2️⃣ L'ANNEAU DORÉ DE SÉLECTION
         if (window.TOKEN_SELECTIONNE === idPerso) {
             const anneauSelection = document.createElement("div");
             anneauSelection.style.position = "absolute";
@@ -1362,54 +1367,60 @@ window.appliquerTokensVTT = function(tokensMap) {
             e.stopPropagation();
             if (typeof window.jouerSonClic === "function") window.jouerSonClic();
             window.TOKEN_SELECTIONNE = idPerso;
-            
             const label = document.getElementById("label-taille-token");
             if (label) label.innerText = taille;
-
             window.appliquerTokensVTT(window.TOKENS_VTT_DATA); 
             window.afficherDansPanneauGauche(idPerso);
         };
 
-        // 3️⃣ 🔻 CORRECTION 2 : LES OMBRES DIRECTIONNELLES (Images Fantômes)
-        // Elles suppriment le bug de flou sur iPad et gardent la direction fixe de la lumière !
+        // 3️⃣ LES OMBRES DIRECTIONNELLES (Images Fantômes Haute Résolution)
         const createShadow = (x, y, blur, opacity) => {
             const sh = document.createElement("img");
             sh.src = data.url;
             sh.className = "token-shadow";
-            sh.dataset.tx = x; // On mémorise la direction de la lumière
+            sh.dataset.tx = x; // On mémorise la direction visuelle de base
             sh.dataset.ty = y;
-            sh.style.width = "100%";
-            sh.style.height = "100%";
+            
+            sh.style.width = tailleGeante + "px";
+            sh.style.height = tailleGeante + "px";
             sh.style.objectFit = "contain";
             sh.style.position = "absolute";
-            sh.style.top = "0";
-            sh.style.left = "0";
-            // L'astuce magique : On décale l'ombre D'ABORD, puis on la tourne sur elle-même
-            sh.style.transform = `translate(${x}px, ${y}px) rotate(${angle}deg)`;
-            sh.style.filter = `brightness(0) blur(${blur}px) opacity(${opacity})`;
+            sh.style.top = "50%";
+            sh.style.left = "50%";
+            
+            // Puisqu'on réduit l'image finale de 75%, il faut multiplier son décalage pour qu'elle s'affiche au bon endroit !
+            const shiftX = x * SCALE_FIX;
+            const shiftY = y * SCALE_FIX;
+            
+            // Translation Fixe -> Rotation du perso -> Réduction d'échelle (Le combo magique)
+            sh.style.transform = `translate(calc(-50% + ${shiftX}px), calc(-50% + ${shiftY}px)) rotate(${angle}deg) scale(${inverseScale})`;
+            
+            // Le flou doit aussi être multiplié puisqu'il s'applique sur l'image géante
+            sh.style.filter = `brightness(0) blur(${blur * SCALE_FIX}px) opacity(${opacity})`;
             sh.style.zIndex = "1";
             sh.style.pointerEvents = "none";
             return sh;
         };
 
-        // On recrée tes deux ombres portées
         divToken.appendChild(createShadow(-2, 5, 4, 0.8));
         divToken.appendChild(createShadow(-25, 35, 15, 0.65));
 
-        // 4️⃣ 🔻 CORRECTION 3 : L'IMAGE DU PION (Plus de drop-shadow = netteté parfaite)
+        // 4️⃣ L'IMAGE DU PION (Haute Résolution)
         const img = document.createElement("img");
         img.className = "token-img-main";
         img.src = data.url;
-        img.style.width = "100%";
-        img.style.height = "100%";
+        img.style.width = tailleGeante + "px";
+        img.style.height = tailleGeante + "px";
         img.style.objectFit = "contain";
-        // La rotation s'applique directement sur l'image
-        img.style.transform = `rotate(${angle}deg)`;
-        img.style.position = "relative";
+        img.style.position = "absolute";
+        img.style.top = "50%";
+        img.style.left = "50%";
+        // La rotation s'applique ici, l'ombre et le flou de l'iPad disparaissent !
+        img.style.transform = `translate(-50%, -50%) rotate(${angle}deg) scale(${inverseScale})`;
         img.style.zIndex = "2"; 
         img.onerror = () => { img.style.display = "none"; };
-
         divToken.appendChild(img);
+
         conteneur.appendChild(divToken);
     }
 };

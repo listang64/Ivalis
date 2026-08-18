@@ -429,14 +429,19 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
     const glow = tokenDiv.querySelector("div[style*='rotationAnneauMagique']");
     if (glow) glow.style.opacity = "0";
 
-    // 🔻 CORRECTION : Le parent ne gère plus que les coordonnées X/Y
+    // Le parent gère la position absolue sur le plateau
     tokenDiv.style.transition = "left 0.4s linear, top 0.4s linear";
     
-    // 🔻 CORRECTION : On prépare les enfants (Pion + Ombres) pour la rotation
+    // On prépare les enfants (Pion + Ombres) pour l'animation de rotation
     const imgMain = tokenDiv.querySelector(".token-img-main");
     if (imgMain) imgMain.style.transition = "transform 0.2s ease";
+    
     const shadows = tokenDiv.querySelectorAll(".token-shadow");
     shadows.forEach(sh => sh.style.transition = "transform 0.2s ease");
+
+    // Valeurs du Hack anti-flou
+    const SCALE_FIX = 4;
+    const inverseScale = 1 / SCALE_FIX;
 
     for (let i = 0; i < actionMouvement.path.length; i++) {
         let step = actionMouvement.path[i];
@@ -446,11 +451,16 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
         tokenDiv.style.top = px.y + "px";
         
         // On fait tourner le pion principal
-        if (imgMain) imgMain.style.transform = `rotate(${step.angle}deg)`;
+        if (imgMain) {
+            imgMain.style.transform = `translate(-50%, -50%) rotate(${step.angle}deg) scale(${inverseScale})`;
+        }
         
-        // On fait tourner les ombres sans altérer leur décalage X/Y directionnel
+        // On fait tourner les ombres en maintenant leur décalage de lumière fixe
         shadows.forEach(sh => {
-            sh.style.transform = `translate(${sh.dataset.tx}px, ${sh.dataset.ty}px) rotate(${step.angle}deg)`;
+            const shiftX = parseFloat(sh.dataset.tx) * SCALE_FIX;
+            const shiftY = parseFloat(sh.dataset.ty) * SCALE_FIX;
+            
+            sh.style.transform = `translate(calc(-50% + ${shiftX}px), calc(-50% + ${shiftY}px)) rotate(${step.angle}deg) scale(${inverseScale})`;
         });
         
         await new Promise(r => setTimeout(r, 400));
