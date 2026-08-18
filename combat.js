@@ -1151,23 +1151,27 @@ window.appliquerTokensVTT = function(tokensMap) {
             anneauSelection.style.top = "50%";
             anneauSelection.style.left = "50%";
             
-            // 🔻 VALEURS GRAVÉES DANS LE MARBRE 🔻
-            const tailleAnneau = taille * 0.90; // Échelle à 0.90
+            // VALEURS GRAVÉES DANS LE MARBRE
+            const tailleAnneau = taille * 0.90; 
             anneauSelection.style.width = tailleAnneau + "px";
             anneauSelection.style.height = tailleAnneau + "px";
             
-            anneauSelection.style.marginTop = "8px"; // Décalage de 8px vers le bas
+            anneauSelection.style.marginTop = "8px"; 
             
             anneauSelection.style.zIndex = "-1"; 
             anneauSelection.style.pointerEvents = "none";
             anneauSelection.style.animation = "rotationAnneauMagique 8s linear infinite";
+            
+            // 🔻 NOUVEAU : Opacité globale à 65% 🔻
+            anneauSelection.style.opacity = "0.65"; 
 
-            // Le code vectoriel parfait du cercle avec les 4 étoiles/losanges
+            // Le code vectoriel du cercle (Couleurs adoucies et flou plus diffus)
             anneauSelection.innerHTML = `
                 <svg viewBox="0 0 100 100" width="100%" height="100%" style="overflow: visible;">
                     <defs>
                         <filter id="glow-or" x="-50%" y="-50%" width="200%" height="200%">
-                            <feGaussianBlur stdDeviation="2.5" result="blur" />
+                            <!-- 🔻 Flou augmenté (3.5 au lieu de 2.5) -->
+                            <feGaussianBlur stdDeviation="3.5" result="blur" />
                             <feMerge>
                                 <feMergeNode in="blur" />
                                 <feMergeNode in="blur" />
@@ -1175,12 +1179,12 @@ window.appliquerTokensVTT = function(tokensMap) {
                             </feMerge>
                         </filter>
                     </defs>
-                    <!-- Cercle Extérieur Lumineux -->
-                    <circle cx="50" cy="50" r="46" fill="none" stroke="#ffd700" stroke-width="1.5" filter="url(#glow-or)"/>
+                    <!-- Cercle Extérieur Lumineux (Couleur : Or très pâle / Blanc chaud) -->
+                    <circle cx="50" cy="50" r="46" fill="none" stroke="#fff5cc" stroke-width="1.5" filter="url(#glow-or)"/>
                     <!-- Cercle Central (Netteté) -->
                     <circle cx="50" cy="50" r="46" fill="none" stroke="#ffffff" stroke-width="0.5" opacity="0.9"/>
-                    <!-- Cercle Intérieur (Profondeur) -->
-                    <circle cx="50" cy="50" r="42" fill="none" stroke="#ffaa00" stroke-width="0.5" filter="url(#glow-or)" opacity="0.6"/>
+                    <!-- Cercle Intérieur (Profondeur - Couleur : Or doux) -->
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="#ffe699" stroke-width="0.5" filter="url(#glow-or)" opacity="0.6"/>
 
                     <!-- Les 4 Étoiles directionnelles -->
                     <path d="M50,0 L51.5,2.5 L55,3 L51.5,3.5 L50,6 L48.5,3.5 L45,3 L48.5,2.5 Z" fill="#ffffff" filter="url(#glow-or)"/>
