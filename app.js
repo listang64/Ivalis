@@ -4462,3 +4462,16 @@ Object.assign(window, {
   ecouterTerrainVTT: window.ecouterTerrainVTT,
   dessinerIconesCarte: window.dessinerIconesCarte,
 });
+
+// =========================================================================
+//  BLOCAGE DU ZOOM NATIF APPLE (IPAD / IOS)
+// =========================================================================
+document.addEventListener('gesturestart', function(e) {
+    e.preventDefault();
+});
+document.addEventListener('gesturechange', function(e) {
+    e.preventDefault();
+});
+document.addEventListener('gestureend', function(e) {
+    e.preventDefault();
+});
