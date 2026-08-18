@@ -436,6 +436,25 @@
                  <div style="color: #ff4c4c; font-family: 'Cinzel', serif; font-size: 10px; margin-top: 2px;">RETIRER</div>
             </div>
 
+            <!-- 🔻 NOUVEAU : Ennemis (Spawn & Reset) 🔻 -->
+            <div style="display: flex; align-items: center; gap: 10px; border-left: 1px dashed #5c3a21; padding-left: 15px; border-right: 1px dashed #5c3a21; padding-right: 15px;">
+                <div style="display: flex; flex-direction: column; align-items: center; cursor: pointer; filter: drop-shadow(0 0 8px rgba(255,76,76,0.3)); transition: filter 0.2s ease;"
+                     onmouseover="this.style.filter='drop-shadow(0 0 15px rgba(255,76,76,0.8))'"
+                     onmouseout="this.style.filter='drop-shadow(0 0 8px rgba(255,76,76,0.3))'"
+                     onclick="window.spawnEnnemiTest()" title="Faire apparaître un ennemi">
+                     <div style="font-size: 30px;">💀</div>
+                     <div style="color: #ff4c4c; font-family: 'Cinzel', serif; font-size: 10px; margin-top: 2px;">SPAWN</div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; align-items: center; cursor: pointer; filter: drop-shadow(0 0 8px rgba(27,110,58,0.3)); transition: filter 0.2s ease;"
+                     onmouseover="this.style.filter='drop-shadow(0 0 15px rgba(27,110,58,0.8))'"
+                     onmouseout="this.style.filter='drop-shadow(0 0 8px rgba(27,110,58,0.3))'"
+                     onclick="window.resetEnnemisTest()" title="Soigner tous les ennemis">
+                     <div style="font-size: 30px;">🔄</div>
+                     <div style="color: #1b6e3a; font-family: 'Cinzel', serif; font-size: 10px; margin-top: 2px;">SOINS</div>
+                </div>
+            </div>
+
             <!-- Outils (Gomme, Murs, Terrain) -->
             <div style="display: flex; align-items: center; gap: 15px; padding-right: 15px;">
                 <div style="display: flex; flex-direction: column; align-items: center;">

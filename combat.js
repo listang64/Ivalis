@@ -1224,36 +1224,6 @@ window.genererTokensCombat = async function() {
     let tokensData = { ...window.TOKENS_VTT_DATA };
     let updated = false;
 
-    // Algorithme en spirale : Cherche la première case vide autour du centre !
-    function trouverHexLibre() {
-        let radius = 0;
-        while (radius < 20) {
-            if (radius === 0) {
-                if (estHexLibre(0, 0)) return { q: 0, r: 0 };
-            } else {
-                let q = -radius, r = radius;
-                const directions = [ {dq: 1, dr: 0}, {dq: 0, dr: -1}, {dq: -1, dr: -1}, {dq: -1, dr: 0}, {dq: 0, dr: 1}, {dq: 1, dr: 1} ];
-                for (let i = 0; i < 6; i++) {
-                    for (let j = 0; j < radius; j++) {
-                        if (estHexLibre(q, r)) return { q, r };
-                        q += directions[i].dq; r += directions[i].dr;
-                    }
-                }
-            }
-            radius++;
-        }
-        return { q: 0, r: 0 }; 
-    }
-
-    function estHexLibre(q, r) {
-        const state = window.PLATEAU_VTT.getCaseState(q, r);
-        if (state.isDeleted || state.isBlocked) return false;
-        for (let id in tokensData) {
-            if (tokensData[id].q === q && tokensData[id].r === r) return false;
-        }
-        return true;
-    }
-
     window.PERSOS_PARTIE.forEach(perso => {
         if (perso.statut === "Mort") return;
 
@@ -1261,12 +1231,12 @@ window.genererTokensCombat = async function() {
         if (!imgToUse) return;
 
         if (!tokensData[perso.idPersonnage]) {
-            const hexLibre = trouverHexLibre();
+            const hexLibre = window.trouverHexLibreVTT(tokensData);
             tokensData[perso.idPersonnage] = {
                 q: hexLibre.q,
                 r: hexLibre.r,
                 url: imgToUse,
-                taille: 80 // Taille par défaut de ce pion
+                taille: 80
             };
             updated = true;
         }
@@ -1275,9 +1245,7 @@ window.genererTokensCombat = async function() {
     if (updated) {
         try {
             const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
-            await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
-                Tokens: tokensData
-            }, { merge: true });
+            await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), { Tokens: tokensData }, { merge: true });
         } catch (e) {}
     }
 };
@@ -2371,5 +2339,141 @@ window.reinitialiserCombat = async function() {
         
     } catch (e) {
         console.error("Erreur lors de la réinitialisation du combat :", e);
+    }
+};
+
+// =========================================================================
+//  GESTION DES ENNEMIS (SPAWN & RESET)
+// =========================================================================
+
+// Outil mutualisé : Cherche la case vide la plus proche du centre
+window.trouverHexLibreVTT = function(tokensData) {
+    function estHexLibre(q, r) {
+        if (!window.PLATEAU_VTT) return false;
+        const state = window.PLATEAU_VTT.getCaseState(q, r);
+        if (state.isDeleted || state.isBlocked) return false;
+        for (let id in tokensData) {
+            if (tokensData[id].q === q && tokensData[id].r === r) return false;
+        }
+        return true;
+    }
+
+    let radius = 0;
+    while (radius < 20) {
+        if (radius === 0) {
+            if (estHexLibre(0, 0)) return { q: 0, r: 0 };
+        } else {
+            let q = -radius, r = radius;
+            const directions = [ {dq: 1, dr: 0}, {dq: 0, dr: -1}, {dq: -1, dr: -1}, {dq: -1, dr: 0}, {dq: 0, dr: 1}, {dq: 1, dr: 1} ];
+            for (let i = 0; i < 6; i++) {
+                for (let j = 0; j < radius; j++) {
+                    if (estHexLibre(q, r)) return { q, r };
+                    q += directions[i].dq; r += directions[i].dr;
+                }
+            }
+        }
+        radius++;
+    }
+    return { q: 0, r: 0 }; 
+};
+
+// 1. Bouton "Crâne Rouge" : Fait spawner un ennemi
+window.spawnEnnemiTest = async function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) return;
+
+    const idEnnemi = "ENNEMI_" + Math.random().toString(36).substring(2, 9);
+    
+    // On compte le nombre d'ennemis actuels pour lui donner un numéro unique
+    const num = (window.PERSOS_PARTIE ? window.PERSOS_PARTIE.filter(p => p.camp === "Ennemi").length : 0) + 1;
+    const imgUrl = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1787085743/IMG_2041_h0gkcc.png";
+
+    // Modèle de données de notre ennemi (50 PV, 100 Fatigue)
+    const dataEnnemi = {
+        ID_Partie: window.ID_PARTIE_COURANTE,
+        ID_Joueur: "MJ", 
+        Camp: "Ennemi",
+        Prenom_Personnage: "Sbire",
+        Nom_Personnage: "#" + num,
+        Statut: "Vivant",
+        PV_Max: 50,
+        PV_Actuels: 50,
+        Fatigue_Max: 100,
+        Fatigue_Actuelle: 100,
+        URL_Cloudinary: imgUrl,
+        URL_Token: imgUrl, 
+        Couleur: "#ff4c4c", // Liseret Rouge
+        Initiative: 10,
+        Esquive: 10,
+        Parade: 0,
+        Critique: 5,
+        Def_Physique: 0,
+        Def_Magique: 0,
+        Competences_Max: 4
+    };
+
+    try {
+        const { doc, setDoc, getDoc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+        
+        // 1. On le crée dans la Base de données en tant que vrai personnage
+        await setDoc(doc(db, "Personnages", idEnnemi), dataEnnemi);
+
+        // 2. On l'ajoute à la piste d'initiative
+        const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
+        const partieSnap = await getDoc(partieRef);
+        if (partieSnap.exists()) {
+            let ordre = partieSnap.data().Ordre_Initiative || [];
+            ordre.push(idEnnemi);
+            await updateDoc(partieRef, { Ordre_Initiative: ordre });
+        }
+
+        // 3. On le pose sur la map VTT
+        let tokensData = { ...window.TOKENS_VTT_DATA };
+        const hexLibre = window.trouverHexLibreVTT(tokensData);
+        
+        tokensData[idEnnemi] = {
+            q: hexLibre.q,
+            r: hexLibre.r,
+            url: imgUrl,
+            taille: 80
+        };
+
+        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
+            Tokens: tokensData
+        }, { merge: true });
+        
+        console.log("💀 Ennemi spawn avec succès !");
+
+    } catch(e) {
+        console.error("Erreur spawn ennemi :", e);
+    }
+};
+
+// 2. Bouton "Reset" : Soigne tous les ennemis à 100%
+window.resetEnnemisTest = async function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    if (!window.ID_PARTIE_COURANTE || !window.PERSOS_PARTIE) return;
+
+    // Ne cible que les ennemis vivants
+    const ennemis = window.PERSOS_PARTIE.filter(p => p.camp === "Ennemi" && p.statut !== "Mort");
+    if (ennemis.length === 0) return;
+
+    try {
+        const { doc, writeBatch } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+        const batch = writeBatch(db);
+
+        ennemis.forEach(ennemi => {
+            const ref = doc(db, "Personnages", ennemi.idPersonnage);
+            batch.update(ref, {
+                PV_Actuels: (parseInt(ennemi.PV_Max) || 50) + (parseInt(ennemi.Dev_Mod_PV) || 0),
+                Fatigue_Actuelle: parseInt(ennemi.Fatigue_Max) || 100
+            });
+        });
+
+        await batch.commit();
+        console.log("🔄 Les ennemis ont récupéré toute leur santé et énergie !");
+        
+    } catch(e) {
+        console.error("Erreur reset ennemis :", e);
     }
 };

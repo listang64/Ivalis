@@ -113,6 +113,7 @@ function persoDocVersFront(id, d) {
     idPersonnage: id,
     idPartie: d.ID_Partie || "",
     idJoueur: d.ID_Joueur || "",
+    camp: d.Camp || "Allié", // 🔻 NOUVEAU : Différenciation Allié / Ennemi
     deckEquipe: d.Deck_Equipe || [], // deck in cache
     couleur: d.Couleur || "",
     // --- AJOUT POUR LA JAUGE DE COMBAT ---
@@ -164,6 +165,7 @@ function frontVersPersoDoc(donnees, idPersonnage) {
   return {
     ID_Partie: donnees.idPartie || "",
     ID_Joueur: donnees.idJoueur || "",
+    Camp: donnees.camp || "Allié", // 🔻 NOUVEAU
     ID_Personnage: idPersonnage,
     Couleur: donnees.couleur || "",
     Prenom_Personnage: donnees.prenom || "",
