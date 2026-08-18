@@ -118,6 +118,7 @@ window.changerPersoCombat = function(direction) {
     if (window.COMBAT_PERSOS_JOUEUR.length === 0) return;
 
     // Fermeture de la carte HD si on change de personnage
+    window.COUT_COMPETENCE_SELECTIONNEE = 0;
     if (typeof window.masquerApercuCarteHD === "function") {
         window.masquerApercuCarteHD();
     }
@@ -346,6 +347,22 @@ window.gererClicCarteCombat = function(idCarte) {
     const fatigueMax = persoActuel ? (parseInt(persoActuel.Fatigue_Max) || 100) : 100;
     const fatiguePerso = (persoActuel && persoActuel.fatigueActuelle !== undefined) ? parseInt(persoActuel.fatigueActuelle) : fatigueMax;
 
+    const dataCarte = window.COMPETENCES_CACHE[idCarte];
+    const cout = parseInt(dataCarte?.Fatigue) || 0;
+
+    if (window.CARTE_EN_APERCU !== idCarte) {
+        // A. On vérifie si la carte + le trajet tracé ne dépassent pas l'énergie max
+        if (cout + (window.MOUVEMENT_COUT_TOTAL || 0) > (window.COMBAT_FATIGUE_ACTUELLE || 0)) {
+            alert("Vous n'avez pas assez d'énergie pour lancer cette compétence avec ce déplacement.");
+            return; // On bloque le clic sur la carte !
+        }
+
+        // B. Si c'est bon, on prévient le moteur de déplacement du prix de la carte !
+        window.COUT_COMPETENCE_SELECTIONNEE = cout;
+    } else {
+        window.COUT_COMPETENCE_SELECTIONNEE = 0;
+    }
+
     // Réinitialise tout en gardant l'état épuisé si nécessaire
     document.querySelectorAll('.banniere-carte-combat').forEach(el => {
         el.dataset.actif = "false";
@@ -359,9 +376,7 @@ window.gererClicCarteCombat = function(idCarte) {
     if (window.CARTE_EN_APERCU !== idCarte) {
         window.CARTE_EN_APERCU = idCarte;
         
-        const dataCarte = window.COMPETENCES_CACHE[idCarte];
-        const cout = dataCarte?.Fatigue || 0;
-        const estEpuise = parseInt(cout) > fatiguePerso;
+        const estEpuise = cout > fatiguePerso;
 
         const carteDiv = document.getElementById(`combat-carte-${idCarte}`);
         const cadreDiv = document.getElementById(`cadre-combat-${idCarte}`);
@@ -397,6 +412,7 @@ document.addEventListener("click", function(event) {
     const clicSurFleche = event.target.closest('.btn-combat-switch'); 
     
     if (!clicSurBanniere && !clicSurCarteHD && !clicSurFleche && window.CARTE_EN_APERCU) {
+        window.COUT_COMPETENCE_SELECTIONNEE = 0;
         window.mettreAJourJaugeFatigue(0); 
         
         if (typeof window.masquerApercuCarteHD === "function") {
@@ -1765,6 +1781,8 @@ window.ANIMATION_TOUR_EN_COURS = false;
 window.finDeTourCombat = async function(forcer = false) {
     if (!window.PEUT_PASSER_TOUR && !forcer) return; 
 
+    window.COUT_COMPETENCE_SELECTIONNEE = 0;
+
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     if (!window.ID_PARTIE_COURANTE) return;
 
@@ -1966,6 +1984,22 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
     const queue = partie.File_Attente_Combat || [];
     
     const persoInQueue = simulationAction ? { idCarte: simulationAction } : queue.find(q => q.idPersonnage === persoActuel.idPersonnage);
+
+    // Dé-sélection visuelle si la carte en aperçu n'est plus finançable (ex. après un déplacement)
+    if (window.CARTE_EN_APERCU && !(persoInQueue && persoInQueue.idCarte)) {
+        const dataSel = window.COMPETENCES_CACHE[window.CARTE_EN_APERCU];
+        const coutSel = parseInt(dataSel?.Fatigue) || 0;
+        const fatigueRestante = persoActuel.fatigueActuelle !== undefined
+            ? parseInt(persoActuel.fatigueActuelle)
+            : (window.COMBAT_FATIGUE_ACTUELLE || 0);
+        if (coutSel > fatigueRestante) {
+            window.COUT_COMPETENCE_SELECTIONNEE = 0;
+            document.querySelectorAll('.banniere-carte-combat').forEach(el => {
+                el.dataset.actif = "false";
+            });
+            if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD();
+        }
+    }
     
     const deckEl = document.getElementById("combat-liste-competences");
     const imgPerso = document.getElementById("combat-portrait-perso");

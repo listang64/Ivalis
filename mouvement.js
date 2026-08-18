@@ -9,7 +9,6 @@ window.CHEMIN_MOUVEMENT = [];
 window.CHEMIN_START_NODE = null;
 window.MOUVEMENT_COUT_TOTAL = 0;
 
-// (Variable à lier à ton système de cartes : quand on sélectionne une compétence, mettre son coût ici)
 window.COUT_COMPETENCE_SELECTIONNEE = 0; 
 window.ANIMATION_VTT_EN_COURS = false;
 
@@ -52,6 +51,7 @@ function hexDistance(a, b) {
     return Math.max(Math.abs(aq - bq), Math.abs(ar - br), Math.abs(as - bs));
 }
 
+// 🔻 CORRECTION 1 : Algorithme A* prenant en compte le surcoût des terrains difficiles
 function calculerCheminAStar(startHex, endHex) {
     let openSet = [startHex];
     let cameFrom = new Map();
@@ -96,7 +96,9 @@ function calculerCheminAStar(startHex, endHex) {
                 continue; 
             }
 
-            let tentativeGScore = gScore.get(hash(current)) + 1;
+            // Poids cognitif pour l'A* : Si c'est difficile, l'IA pèse le pas à 2 au lieu de 1
+            let costStep = state.isDifficult ? 2 : 1;
+            let tentativeGScore = gScore.get(hash(current)) + costStep;
 
             if (!gScore.has(hash(neighbor)) || tentativeGScore < gScore.get(hash(neighbor))) {
                 cameFrom.set(hash(neighbor), current);
@@ -114,6 +116,37 @@ function calculerCheminAStar(startHex, endHex) {
 window.ajouterEtapeMouvement = function(q, r) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     
+    // 🔻 CORRECTION 2 : Clic d'annulation (Undo / Effaceur) 🔻
+    // Si on clique sur le perso lui-même, on annule tout
+    if (window.CHEMIN_START_NODE && window.CHEMIN_START_NODE.q === q && window.CHEMIN_START_NODE.r === r) {
+        window.annulerMouvement();
+        return;
+    }
+    
+    // Si on clique sur une case du chemin déjà tracé, on coupe la route à cet endroit !
+    let inPathIndex = window.CHEMIN_MOUVEMENT.findIndex(step => step.q === q && step.r === r);
+    if (inPathIndex !== -1) {
+        // On coupe le tableau (slice) pour ne garder que le chemin jusqu'au clic
+        window.CHEMIN_MOUVEMENT = window.CHEMIN_MOUVEMENT.slice(0, inPathIndex + 1);
+        
+        // Recalcul de l'énergie totale (en lisant les coûts déjà enregistrés dans le tableau)
+        window.MOUVEMENT_COUT_TOTAL = 0;
+        window.CHEMIN_MOUVEMENT.forEach(step => {
+            window.MOUVEMENT_COUT_TOTAL += step.cost;
+        });
+        
+        window.dessinerCheminMouvement();
+        
+        const bulle = document.getElementById("bulle-validation-mouvement");
+        const texteCout = document.getElementById("mouvement-cout-total");
+        if (bulle && texteCout) {
+            texteCout.innerText = window.MOUVEMENT_COUT_TOTAL + " ⚡";
+            texteCout.style.color = "#ffaa00";
+        }
+        return;
+    }
+
+    // Le reste du script de tracé
     const state = window.PLATEAU_VTT.getCaseState(q, r);
     if (state.isBlocked || state.isDeleted) {
         window.afficherMessageFlottantHex(q, r, "Passage bloqué");
@@ -131,12 +164,6 @@ window.ajouterEtapeMouvement = function(q, r) {
         return;
     }
 
-    let inPath = window.CHEMIN_MOUVEMENT.some(step => step.q === q && step.r === r);
-    if (inPath || (window.CHEMIN_START_NODE && window.CHEMIN_START_NODE.q === q && window.CHEMIN_START_NODE.r === r)) {
-        window.afficherMessageFlottantHex(q, r, "Déjà parcouru", "#ffaa00");
-        return;
-    }
-
     let startHex = window.CHEMIN_MOUVEMENT.length > 0 
         ? window.CHEMIN_MOUVEMENT[window.CHEMIN_MOUVEMENT.length - 1] 
         : window.CHEMIN_START_NODE;
@@ -148,11 +175,8 @@ window.ajouterEtapeMouvement = function(q, r) {
         return;
     }
 
-    // 🔻 CALCUL DE L'ÉNERGIE RÉELLE DISPONIBLE 🔻
     const persoActuel = window.COMBAT_PERSOS_JOUEUR ? window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO] : null;
     const fatigueBrute = persoActuel ? persoActuel.fatigueActuelle : (window.COMBAT_FATIGUE_ACTUELLE || 0);
-    
-    // On déduit la compétence qui est préparée par le joueur
     const coutCompetence = window.COUT_COMPETENCE_SELECTIONNEE || 0;
     const fatigueDispo = fatigueBrute - coutCompetence;
 
@@ -177,7 +201,6 @@ window.ajouterEtapeMouvement = function(q, r) {
             couleur = "#b366ff"; 
         }
 
-        // 🔻 VERROU SI ON DÉPASSE LE BUDGET ÉNERGIE (Marche + Compétence)
         if (window.MOUVEMENT_COUT_TOTAL + baseCost > fatigueDispo) {
             window.afficherMessageFlottantHex(step.q, step.r, "Énergie insuffisante");
             break; 
@@ -209,19 +232,15 @@ window.dessinerCheminMouvement = function() {
 
     if (window.CHEMIN_MOUVEMENT.length === 0) return;
 
-    // 1. Définitions pour les dégradés
     let defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
     svg.appendChild(defs);
 
-    // 2. Création de deux "calques" (Groupes SVG) pour forcer les lignes en dessous des bulles
     let groupeLignes = document.createElementNS("http://www.w3.org/2000/svg", "g");
     let groupeBulles = document.createElementNS("http://www.w3.org/2000/svg", "g");
     svg.appendChild(groupeLignes);
     svg.appendChild(groupeBulles);
 
     let currentPx = window.PLATEAU_VTT.hexToPixel(window.CHEMIN_START_NODE.q, window.CHEMIN_START_NODE.r);
-    
-    // On part du blanc (couleur par défaut de la première étape)
     let previousColor = "#ffffff"; 
 
     window.CHEMIN_MOUVEMENT.forEach((step, index) => {
@@ -229,9 +248,6 @@ window.dessinerCheminMouvement = function() {
         let currentColor = step.color;
         let gradId = `grad-mouv-${index}`;
 
-        // ==========================================
-        //  A. LE DÉGRADÉ DYNAMIQUE DE LA LIGNE
-        // ==========================================
         let linearGradient = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
         linearGradient.setAttribute("id", gradId);
         linearGradient.setAttribute("gradientUnits", "userSpaceOnUse");
@@ -252,71 +268,56 @@ window.dessinerCheminMouvement = function() {
         linearGradient.appendChild(stop2);
         defs.appendChild(linearGradient);
 
-        // ==========================================
-        //  B. LE TRACÉ (Dans le calque du DESSOUS)
-        // ==========================================
         let line = document.createElementNS("http://www.w3.org/2000/svg", "line");
         line.setAttribute("x1", currentPx.x); 
         line.setAttribute("y1", currentPx.y);
         line.setAttribute("x2", nextPx.x); 
         line.setAttribute("y2", nextPx.y);
         
-        // Application du dégradé
         line.setAttribute("stroke", `url(#${gradId})`);
         line.setAttribute("stroke-width", "5");
-        line.setAttribute("opacity", "0.85"); // 🔻 Tracé à 85% d'opacité
+        line.setAttribute("opacity", "0.85"); 
         
-        // Pointillés arrondis
         line.setAttribute("stroke-dasharray", "0, 12"); 
         line.setAttribute("stroke-linecap", "round"); 
         line.style.filter = "drop-shadow(0px 3px 5px rgba(0,0,0,0.8))";
         
         groupeLignes.appendChild(line);
 
-        // ==========================================
-        //  C. LA BULLE ET LE TEXTE (Dans le calque du DESSUS)
-        // ==========================================
-        
-        // Bulle noire
+        // 🔻 CORRECTION 3 : Recadrage mathématique parfait au pixel de la bulle SVG
         let rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-        rect.setAttribute("x", nextPx.x - 13); 
-        rect.setAttribute("y", nextPx.y - 10);
-        rect.setAttribute("width", "26"); 
-        rect.setAttribute("height", "20");
-        rect.setAttribute("rx", "10");
+        rect.setAttribute("x", nextPx.x - 14); // Élargi de 1px à gauche
+        rect.setAttribute("y", nextPx.y - 11); // Élargi de 1px en haut
+        rect.setAttribute("width", "28");      // Plus de marge horizontale
+        rect.setAttribute("height", "22");     // Plus de marge verticale
+        rect.setAttribute("rx", "11");
         rect.setAttribute("fill", "rgba(20, 15, 10, 0.95)");
         rect.setAttribute("stroke", currentColor);
         rect.setAttribute("stroke-width", "1.5");
         groupeBulles.appendChild(rect);
 
-        // Texte global
         let text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        // 🔻 Léger décalage sur X pour compenser le "dx" asymétrique du sous-texte
-        text.setAttribute("x", nextPx.x - 0.5); 
-        // 🔻 Centrage vertical parfait au milieu de la case avec dominant-baseline
-        text.setAttribute("y", nextPx.y + 0.5); 
+        text.setAttribute("x", nextPx.x - 1); // Pousse très légèrement l'ensemble à gauche
+        text.setAttribute("y", nextPx.y + 1); // Ajustement optique vers le bas pour le "baseline"
         text.setAttribute("dominant-baseline", "central"); 
         text.setAttribute("fill", currentColor);
         text.setAttribute("font-family", "Arial");
         text.setAttribute("font-weight", "bold");
         text.setAttribute("text-anchor", "middle");
 
-        // Sous-élément pour l'Éclair
         let tspanIcon = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
         tspanIcon.setAttribute("font-size", "10"); 
         tspanIcon.textContent = "⚡";
 
-        // Sous-élément pour le Chiffre
         let tspanCost = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
-        tspanCost.setAttribute("font-size", "12");
-        tspanCost.setAttribute("dx", "1.5"); // Espace entre l'éclair et le chiffre
+        tspanCost.setAttribute("font-size", "13"); // Léger grossissement pour équilibrer l'éclair
+        tspanCost.setAttribute("dx", "1.5");
         tspanCost.textContent = step.cost;
 
         text.appendChild(tspanIcon);
         text.appendChild(tspanCost);
         groupeBulles.appendChild(text);
 
-        // Préparation de l'étape suivante
         currentPx = nextPx;
         previousColor = currentColor;
     });
@@ -345,12 +346,22 @@ window.validerMouvement = async function() {
     const svg = document.getElementById("svg-chemin-mouvement");
     if (svg) svg.innerHTML = "";
 
-    // Déduction locale (Le mouvement est déduit, la compétence sera déduite à son propre lancement)
+    // Déduction locale
     const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
     let nvlFatigue = persoActuel.fatigueActuelle - window.MOUVEMENT_COUT_TOTAL;
     persoActuel.fatigueActuelle = nvlFatigue;
     window.COMBAT_FATIGUE_ACTUELLE = nvlFatigue;
+    
+    // 🔻 NOUVEAU : Désélection automatique de la carte si on n'a plus l'énergie après avoir marché 🔻
+    if (window.COUT_COMPETENCE_SELECTIONNEE > 0 && window.COUT_COMPETENCE_SELECTIONNEE > nvlFatigue) {
+        window.COUT_COMPETENCE_SELECTIONNEE = 0;
+        // Rafraîchit l'UI des cartes pour la dé-sélectionner visuellement
+        if (typeof window.actualiserEtatCarteCombat === "function") window.actualiserEtatCarteCombat();
+    }
+
     if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
+    // Rafraîchit toute la fiche du perso
+    if (typeof window.afficherPersoCombatActuel === "function") window.afficherPersoCombatActuel();
 
     let pathAvecAngles = [];
     let currentPx = window.PLATEAU_VTT.hexToPixel(window.CHEMIN_START_NODE.q, window.CHEMIN_START_NODE.r);
@@ -377,7 +388,6 @@ window.validerMouvement = async function() {
             file[0].aFaitSonMouvement = true;
         }
 
-        // On sauvegarde localement mais on NE REPEINT PAS l'écran tout de suite !
         window.TOKENS_VTT_DATA[idPerso].q = finalStep.q;
         window.TOKENS_VTT_DATA[idPerso].r = finalStep.r;
         window.TOKENS_VTT_DATA[idPerso].angle = finalAngle;
@@ -394,7 +404,6 @@ window.validerMouvement = async function() {
         const persoRef = doc(db, "Personnages", idPerso);
         await updateDoc(persoRef, { Fatigue_Actuelle: nvlFatigue });
         
-        // Pousse les tokens dans Firebase. Les autres joueurs vont animer puis redessiner.
         await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
             Tokens: window.TOKENS_VTT_DATA
         }, { merge: true });
@@ -415,10 +424,8 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
     const tokenDiv = document.getElementById("token-" + actionMouvement.idToken);
     if (!tokenDiv) return;
 
-    // 🔻 DÉMARRE LE VERROU ANTI-TÉLÉPORTATION 🔻
     window.ANIMATION_VTT_EN_COURS = true;
     
-    // Si l'anneau de sélection est visible, on le cache proprement le temps du trajet
     const glow = tokenDiv.querySelector("div[style*='rotationAnneauMagique']");
     if (glow) glow.style.opacity = "0";
 
@@ -435,7 +442,6 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
         await new Promise(r => setTimeout(r, 400));
     }
     
-    // 🔻 FIN DE L'ANIMATION : LE VERROU SAUTE ET ON REPEINT PROPREMENT 🔻
     window.ANIMATION_VTT_EN_COURS = false;
     if (typeof window.appliquerTokensVTT === "function") {
         window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
