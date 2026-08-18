@@ -4,8 +4,10 @@ class Plateau {
         this.ctx = this.canvas.getContext('2d');
 
         // 4. Dimensions fixées à 1800x1800
-        this.canvas.width = 1800;
-        this.canvas.height = 1800;
+        this.largeurLogique = 1800;
+        this.hauteurLogique = 1800;
+        this.ratioRendu = 1;
+        this.resize(1800, 1800);
 
         // 2. Taille de l'hexagone (rayon). 
         // À ajuster selon la taille de tes images de personnages vus de haut.
@@ -30,10 +32,29 @@ class Plateau {
 
     /**
      * NOUVEAU : Adapte la résolution du canvas à l'image chargée en fond
+     * Le canvas garde sa taille logique en CSS, mais dessine sur une surface plus dense
+     * pour que la grille reste nette quand le plateau est zoomé.
      */
     resize(width, height) {
-        this.canvas.width = width;
-        this.canvas.height = height;
+        this.largeurLogique = width;
+        this.hauteurLogique = height;
+        this.ratioRendu = this.calculerRatioRendu(width, height);
+
+        this.canvas.width = Math.round(width * this.ratioRendu);
+        this.canvas.height = Math.round(height * this.ratioRendu);
+        this.canvas.style.width = width + "px";
+        this.canvas.style.height = height + "px";
+    }
+
+    /**
+     * Safari iOS abandonne le rendu des canvas trop volumineux : on plafonne la surface.
+     */
+    calculerRatioRendu(width, height) {
+        // Plafond volontairement prudent : un canvas trop lourd fait décrocher le compositeur iOS
+        const surfaceMax = 6000000;
+        const ratioEcran = Math.min(window.devicePixelRatio || 1, 1.75);
+        const ratioSurface = Math.sqrt(surfaceMax / Math.max(width * height, 1));
+        return Math.max(1, Math.min(ratioEcran, ratioSurface));
     }
 
     /**
@@ -46,8 +67,8 @@ class Plateau {
         const y = this.hexSize * (Math.sqrt(3)/2 * q + Math.sqrt(3) * r);
         
         // Offset pour centrer le point 0,0 au milieu du canvas 1800x1800
-        const offsetX = this.canvas.width / 2;
-        const offsetY = this.canvas.height / 2;
+        const offsetX = this.largeurLogique / 2;
+        const offsetY = this.hauteurLogique / 2;
         
         return { x: x + offsetX, y: y + offsetY };
     }
@@ -57,8 +78,8 @@ class Plateau {
      * Indispensable pour le drag & drop, l'aimantation et les clics ciblés.
      */
     pixelToHex(x, y) {
-        const offsetX = this.canvas.width / 2;
-        const offsetY = this.canvas.height / 2;
+        const offsetX = this.largeurLogique / 2;
+        const offsetY = this.hauteurLogique / 2;
         const ptX = x - offsetX;
         const ptY = y - offsetY;
 
@@ -174,17 +195,19 @@ class Plateau {
     }
 
     renderMap() {
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0);
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.setTransform(this.ratioRendu, 0, 0, this.ratioRendu, 0, 0);
 
-        const maxDist = Math.sqrt(Math.pow(this.canvas.width / 2, 2) + Math.pow(this.canvas.height / 2, 2));
+        const maxDist = Math.sqrt(Math.pow(this.largeurLogique / 2, 2) + Math.pow(this.hauteurLogique / 2, 2));
         const mapRadius = Math.ceil(maxDist / this.hexSize);
 
         for (let q = -mapRadius; q <= mapRadius; q++) {
             for (let r = Math.max(-mapRadius, -q - mapRadius); r <= Math.min(mapRadius, -q + mapRadius); r++) {
                 const { x, y } = this.hexToPixel(q, r);
                 
-                if (x >= -this.hexSize && x <= this.canvas.width + this.hexSize && 
-                    y >= -this.hexSize && y <= this.canvas.height + this.hexSize) {
+                if (x >= -this.hexSize && x <= this.largeurLogique + this.hexSize && 
+                    y >= -this.hexSize && y <= this.hauteurLogique + this.hexSize) {
                     
                     const state = this.getCaseState(q, r);
                     this.drawHex(x, y, state); 

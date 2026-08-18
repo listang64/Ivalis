@@ -19,11 +19,15 @@ window.afficherMessageFlottantHex = function(q, r, texte, couleur = "#ff4c4c") {
     
     const px = window.PLATEAU_VTT.hexToPixel(q, r);
     
+    // Le conteneur n'est pas zoomé : on convertit la case en position écran
+    const ecranX = window.VTT_POS_X + px.x * window.VTT_SCALE;
+    const ecranY = window.VTT_POS_Y + px.y * window.VTT_SCALE;
+    
     const msg = document.createElement("div");
     msg.innerText = texte;
     msg.style.position = "absolute";
-    msg.style.left = px.x + "px";
-    msg.style.top = (px.y - 30) + "px";
+    msg.style.left = ecranX + "px";
+    msg.style.top = (ecranY - 30) + "px";
     msg.style.transform = "translate(-50%, -50%)";
     msg.style.color = couleur;
     msg.style.fontWeight = "bold";
@@ -38,7 +42,7 @@ window.afficherMessageFlottantHex = function(q, r, texte, couleur = "#ff4c4c") {
     conteneur.appendChild(msg);
     
     setTimeout(() => {
-        msg.style.top = (px.y - 100) + "px";
+        msg.style.top = (ecranY - 100) + "px";
         msg.style.opacity = "0";
     }, 50);
     
@@ -426,7 +430,7 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
 
     window.ANIMATION_VTT_EN_COURS = true;
     
-    const glow = tokenDiv.querySelector("div[style*='rotationAnneauMagique']");
+    const glow = tokenDiv.querySelector(".token-anneau");
     if (glow) glow.style.opacity = "0";
 
     tokenDiv.style.transition = "left 0.4s linear, top 0.4s linear";
@@ -438,20 +442,17 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
 
     for (let i = 0; i < actionMouvement.path.length; i++) {
         let step = actionMouvement.path[i];
-        let px = window.PLATEAU_VTT.hexToPixel(step.q, step.r);
         
-        tokenDiv.style.left = px.x + "px";
-        tokenDiv.style.top = px.y + "px";
-        
-        if (imgMain) imgMain.style.transform = `rotate(${step.angle}deg)`;
-        
-        shadows.forEach(sh => {
-            sh.style.transform = `translate(${sh.dataset.tx}px, ${sh.dataset.ty}px) rotate(${step.angle}deg)`;
-        });
+        // On met à jour la case de référence : le pion suit le zoom et le pan même en pleine marche
+        tokenDiv.dataset.q = step.q;
+        tokenDiv.dataset.r = step.r;
+        tokenDiv.dataset.angle = step.angle;
+        window.positionnerTokenVTT(tokenDiv, true);
         
         await new Promise(r => setTimeout(r, 400));
     }
     
+    tokenDiv.style.transition = "none";
     window.ANIMATION_VTT_EN_COURS = false;
     if (typeof window.appliquerTokensVTT === "function") {
         window.appliquerTokensVTT(window.TOKENS_VTT_DATA);

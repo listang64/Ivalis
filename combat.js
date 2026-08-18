@@ -454,6 +454,9 @@ window.initialiserPlateau = function() {
     }
 };
 
+window.VTT_SCALE_MIN = 0.1;
+window.VTT_SCALE_MAX = 5;
+
 window.centrerPlateau = function() {
     const conteneur = document.getElementById("transform-plateau");
     if (!conteneur) return;
@@ -467,17 +470,44 @@ window.centrerPlateau = function() {
     
     window.VTT_SCALE = Math.min(winW / w, winH / h) * 0.9; 
     
+    // Les bornes de zoom sont relatives au cadrage d'origine (une petite map ne se bloquait plus au bon moment)
+    window.VTT_SCALE_MIN = window.VTT_SCALE * 0.5;
+    window.VTT_SCALE_MAX = window.VTT_SCALE * 8;
+    
     window.VTT_POS_X = (winW - (w * window.VTT_SCALE)) / 2;
     window.VTT_POS_Y = (winH - (h * window.VTT_SCALE)) / 2;
     
     window.appliquerTransformPlateau();
 };
 
+// Zoom autour d'un point d'ancrage. Le facteur est recalculé APRÈS bridage :
+// sinon, une fois la limite atteinte, la carte continuait de glisser sans zoomer.
+window.appliquerZoomVTT = function(facteurDemande, ancreX, ancreY) {
+    const echelleVoulue = window.VTT_SCALE * facteurDemande;
+    const nouvelleEchelle = Math.min(Math.max(echelleVoulue, window.VTT_SCALE_MIN), window.VTT_SCALE_MAX);
+    const facteurReel = nouvelleEchelle / window.VTT_SCALE;
+
+    window.VTT_POS_X = ancreX - (ancreX - window.VTT_POS_X) * facteurReel;
+    window.VTT_POS_Y = ancreY - (ancreY - window.VTT_POS_Y) * facteurReel;
+    window.VTT_SCALE = nouvelleEchelle;
+
+    window.appliquerTransformPlateau();
+};
+
+let frameTransformVTT = null;
+
 window.appliquerTransformPlateau = function() {
     const conteneur = document.getElementById("transform-plateau");
     if (conteneur) {
         conteneur.style.transform = `translate(${window.VTT_POS_X}px, ${window.VTT_POS_Y}px) scale(${window.VTT_SCALE})`;
     }
+
+    // Les pions ne subissent pas ce scale : on les repositionne à la main, une fois par frame
+    if (frameTransformVTT) return;
+    frameTransformVTT = requestAnimationFrame(() => {
+        frameTransformVTT = null;
+        window.repositionnerTokensVTT();
+    });
 };
 
 window.VTT_MODE_EFFACEMENT = false;
@@ -504,14 +534,7 @@ window.activerPanZoom = function() {
         const wheel = e.deltaY < 0 ? 1 : -1;
         const zoomFactor = Math.exp(wheel * zoomIntensity);
         
-        const mouseX = e.clientX;
-        const mouseY = e.clientY;
-
-        window.VTT_POS_X = mouseX - (mouseX - window.VTT_POS_X) * zoomFactor;
-        window.VTT_POS_Y = mouseY - (mouseY - window.VTT_POS_Y) * zoomFactor;
-        window.VTT_SCALE *= zoomFactor;
-        
-        window.appliquerTransformPlateau();
+        window.appliquerZoomVTT(zoomFactor, e.clientX, e.clientY);
     }, { passive: false });
 
     // --- SOURIS (Pan & Peinture PC) ---
@@ -609,6 +632,7 @@ window.activerPanZoom = function() {
                 }
             } else if (e.touches.length === 2) {
                 // C'est un zoom ! On annule immédiatement le pinceau du 1er doigt
+                if (e.cancelable) e.preventDefault();
                 clearTimeout(window.vttPaintTimeout);
                 isDraggingVTT = false;
                 isPaintingVTT = false;
@@ -649,17 +673,11 @@ window.activerPanZoom = function() {
             const currentCenter = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
 
             if (lastPinchDist > 0) {
-                const zoomFactor = currentDist / lastPinchDist;
+                // 1. On suit le déplacement des deux doigts
                 window.VTT_POS_X += currentCenter.x - lastPinchCenter.x;
                 window.VTT_POS_Y += currentCenter.y - lastPinchCenter.y;
-                window.VTT_POS_X = currentCenter.x - (currentCenter.x - window.VTT_POS_X) * zoomFactor;
-                window.VTT_POS_Y = currentCenter.y - (currentCenter.y - window.VTT_POS_Y) * zoomFactor;
-                window.VTT_SCALE *= zoomFactor;
-                
-                if (window.VTT_SCALE < 0.1) window.VTT_SCALE = 0.1;
-                if (window.VTT_SCALE > 5) window.VTT_SCALE = 5;
-
-                window.appliquerTransformPlateau();
+                // 2. Puis on zoome autour de leur centre (bridage géré dans appliquerZoomVTT)
+                window.appliquerZoomVTT(currentDist / lastPinchDist, currentCenter.x, currentCenter.y);
             }
 
             lastPinchDist = currentDist;
@@ -682,6 +700,14 @@ window.activerPanZoom = function() {
             isDraggingVTT = false;
             lastPinchDist = 0;
         }
+    });
+
+    // iOS coupe parfois le geste (appel, geste système…) : sans ça l'état restait bloqué et la carte partait en glissade
+    conteneur.addEventListener("touchcancel", () => {
+        clearTimeout(window.vttPaintTimeout);
+        isPaintingVTT = false;
+        isDraggingVTT = false;
+        lastPinchDist = 0;
     });
 };
 
@@ -1116,6 +1142,17 @@ window.centrerMapSurToken = function(idPersonnage) {
         setTimeout(() => { if (conteneurTransform) conteneurTransform.style.transition = "none"; }, 400);
     }
 
+    // Les pions vivent hors du calque zoomé : ils doivent glisser au même rythme que la caméra
+    if (!window.ANIMATION_VTT_EN_COURS) {
+        const calqueTokens = document.getElementById("conteneur-tokens-vtt");
+        if (calqueTokens) {
+            calqueTokens.querySelectorAll(".token-vtt").forEach(div => {
+                div.style.transition = "left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), top 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)";
+                setTimeout(() => { div.style.transition = "none"; }, 400);
+            });
+        }
+    }
+
     // Calcul pour centrer le point exact au milieu de l'écran
     window.VTT_POS_X = (winW / 2) - (px.x * window.VTT_SCALE);
     window.VTT_POS_Y = (winH / 2) - (px.y * window.VTT_SCALE);
@@ -1248,6 +1285,55 @@ window.genererTokensCombat = async function() {
 // =========================================================================
 //  L'AFFICHAGE DES TOKENS, DE L'OMBRE AU SOL ET DE L'ANNEAU MAGIQUE
 // =========================================================================
+
+// Le pion vit hors du calque zoomé : sa position ET sa taille sont recalculées
+// en pixels écran. C'est ce qui garde l'image nette au zoom sur iPad.
+window.positionnerTokenVTT = function(divToken, majEchelle) {
+    if (!divToken || !window.PLATEAU_VTT) return;
+
+    const echelle = window.VTT_SCALE;
+    const px = window.PLATEAU_VTT.hexToPixel(parseFloat(divToken.dataset.q), parseFloat(divToken.dataset.r));
+
+    divToken.style.left = (window.VTT_POS_X + px.x * echelle) + "px";
+    divToken.style.top = (window.VTT_POS_Y + px.y * echelle) + "px";
+
+    if (!majEchelle) return;
+
+    const taille = parseFloat(divToken.dataset.taille) || 80;
+    const angle = parseFloat(divToken.dataset.angle) || 0;
+
+    divToken.style.width = (taille * echelle) + "px";
+    divToken.style.height = (taille * echelle) + "px";
+
+    const ombreSol = divToken.querySelector(".token-ombre-sol");
+    if (ombreSol) ombreSol.style.filter = `blur(${8 * echelle}px)`;
+
+    const anneau = divToken.querySelector(".token-anneau");
+    if (anneau) anneau.style.marginTop = (8 * echelle) + "px";
+
+    divToken.querySelectorAll(".token-shadow").forEach(sh => {
+        const decalageX = parseFloat(sh.dataset.tx) * echelle;
+        const decalageY = parseFloat(sh.dataset.ty) * echelle;
+        sh.style.transform = `translate(${decalageX}px, ${decalageY}px) rotate(${angle}deg)`;
+        sh.style.filter = `brightness(0) blur(${parseFloat(sh.dataset.blur) * echelle}px) opacity(${sh.dataset.opacite})`;
+    });
+
+    const img = divToken.querySelector(".token-img-main");
+    if (img) img.style.transform = `rotate(${angle}deg)`;
+};
+
+let echelleTokensAppliquee = null;
+
+window.repositionnerTokensVTT = function() {
+    const conteneur = document.getElementById("conteneur-tokens-vtt");
+    if (!conteneur) return;
+
+    // Le simple déplacement ne touche qu'à left/top : on évite de recalculer les flous à chaque frame
+    const echelleModifiee = echelleTokensAppliquee !== window.VTT_SCALE;
+    conteneur.querySelectorAll(".token-vtt").forEach(div => window.positionnerTokenVTT(div, echelleModifiee));
+    echelleTokensAppliquee = window.VTT_SCALE;
+};
+
 window.appliquerTokensVTT = function(tokensMap) {
     if (!window.PLATEAU_VTT) return;
     
@@ -1276,17 +1362,18 @@ window.appliquerTokensVTT = function(tokensMap) {
 
     for (let idPerso in tokensMap) {
         const data = tokensMap[idPerso];
-        const px = window.PLATEAU_VTT.hexToPixel(data.q, data.r);
         const taille = data.taille || 80;
         const angle = data.angle || 0;
 
         const divToken = document.createElement("div");
         divToken.className = "token-vtt"; 
         divToken.style.position = "absolute";
-        divToken.style.left = px.x + "px";
-        divToken.style.top = px.y + "px";
-        divToken.style.width = taille + "px";
-        divToken.style.height = taille + "px";
+
+        // La case et la taille de référence sont mémorisées : la position écran en découle à chaque zoom
+        divToken.dataset.q = data.q;
+        divToken.dataset.r = data.r;
+        divToken.dataset.taille = taille;
+        divToken.dataset.angle = angle;
         
         // Le conteneur reste fixe
         divToken.style.transform = `translate(-50%, -50%)`; 
@@ -1299,6 +1386,7 @@ window.appliquerTokensVTT = function(tokensMap) {
 
         // 1️⃣ L'OMBRE PORTÉE AU SOL (Brouillard de base)
         const ombreSol = document.createElement("div");
+        ombreSol.className = "token-ombre-sol";
         ombreSol.style.position = "absolute";
         ombreSol.style.top = "50%";
         ombreSol.style.left = "50%";
@@ -1314,16 +1402,14 @@ window.appliquerTokensVTT = function(tokensMap) {
         // 2️⃣ L'ANNEAU DORÉ DE SÉLECTION
         if (window.TOKEN_SELECTIONNE === idPerso) {
             const anneauSelection = document.createElement("div");
+            anneauSelection.className = "token-anneau";
             anneauSelection.style.position = "absolute";
             anneauSelection.style.top = "50%";
             anneauSelection.style.left = "50%";
             
-            // VALEURS GRAVÉES DANS LE MARBRE
-            const tailleAnneau = taille * 0.90; 
-            anneauSelection.style.width = tailleAnneau + "px";
-            anneauSelection.style.height = tailleAnneau + "px";
-            
-            anneauSelection.style.marginTop = "8px"; 
+            // VALEURS GRAVÉES DANS LE MARBRE (en % du pion, pour suivre le zoom)
+            anneauSelection.style.width = "90%";
+            anneauSelection.style.height = "90%"; 
             
             anneauSelection.style.zIndex = "-1"; 
             anneauSelection.style.pointerEvents = "none";
@@ -1376,20 +1462,21 @@ window.appliquerTokensVTT = function(tokensMap) {
         };
 
         // Les ombres directionnelles (Images Fantômes)
+        // Décalages et flous sont exprimés à l'échelle 1 : positionnerTokenVTT les convertit en pixels écran
         const createShadow = (x, y, blur, opacity) => {
             const sh = document.createElement("img");
             sh.src = data.url;
             sh.className = "token-shadow";
             sh.dataset.tx = x; 
             sh.dataset.ty = y;
+            sh.dataset.blur = blur;
+            sh.dataset.opacite = opacity;
             sh.style.width = "100%";
             sh.style.height = "100%";
             sh.style.objectFit = "contain";
             sh.style.position = "absolute";
             sh.style.top = "0";
             sh.style.left = "0";
-            sh.style.transform = `translate(${x}px, ${y}px) rotate(${angle}deg)`;
-            sh.style.filter = `brightness(0) blur(${blur}px) opacity(${opacity})`;
             sh.style.zIndex = "1";
             sh.style.pointerEvents = "none";
             return sh;
@@ -1405,15 +1492,17 @@ window.appliquerTokensVTT = function(tokensMap) {
         img.style.width = "100%";
         img.style.height = "100%";
         img.style.objectFit = "contain";
-        img.style.transform = `rotate(${angle}deg)`;
         img.style.position = "relative";
         img.style.zIndex = "2"; 
         img.onerror = () => { img.style.display = "none"; };
 
         divToken.appendChild(img);
 
+        window.positionnerTokenVTT(divToken, true);
         conteneur.appendChild(divToken);
     }
+
+    echelleTokensAppliquee = window.VTT_SCALE;
 };
 
 // =========================================================================
