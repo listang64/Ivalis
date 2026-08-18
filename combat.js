@@ -1280,7 +1280,9 @@ window.appliquerTokensVTT = function(tokensMap) {
         divToken.style.width = taille + "px";
         divToken.style.height = taille + "px";
         const angle = data.angle || 0;
-        divToken.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`; 
+        
+        // 🔻 CORRECTION 1 : Le conteneur reste fixe (pas de rotation)
+        divToken.style.transform = `translate(-50%, -50%)`; 
         
         divToken.style.pointerEvents = "auto"; 
         divToken.style.cursor = "pointer";
@@ -1288,7 +1290,7 @@ window.appliquerTokensVTT = function(tokensMap) {
         divToken.style.borderRadius = "50%";
         divToken.id = "token-" + idPerso;
 
-        // 1️⃣ L'OMBRE PORTÉE AU SOL (En dessous de tout : z-index -2)
+        // 1️⃣ L'OMBRE PORTÉE AU SOL (Brouillard de base)
         const ombreSol = document.createElement("div");
         ombreSol.style.position = "absolute";
         ombreSol.style.top = "50%";
@@ -1302,7 +1304,7 @@ window.appliquerTokensVTT = function(tokensMap) {
         ombreSol.style.zIndex = "-2"; 
         divToken.appendChild(ombreSol);
 
-        // 2️⃣ LE NOUVEL ANNEAU DORÉ DE SÉLECTION (Entre l'ombre et le pion : z-index -1)
+        // 2️⃣ LE NOUVEL ANNEAU DORÉ DE SÉLECTION
         if (window.TOKEN_SELECTIONNE === idPerso) {
             const anneauSelection = document.createElement("div");
             anneauSelection.style.position = "absolute";
@@ -1365,17 +1367,44 @@ window.appliquerTokensVTT = function(tokensMap) {
             if (label) label.innerText = taille;
 
             window.appliquerTokensVTT(window.TOKENS_VTT_DATA); 
-            window.afficherDansPanneauGauche(idPerso); // 🔻 NOUVEAU
+            window.afficherDansPanneauGauche(idPerso);
         };
 
-        // 3️⃣ L'IMAGE DU PION (Au dessus de tout : z-index 2)
+        // 3️⃣ 🔻 CORRECTION 2 : LES OMBRES DIRECTIONNELLES (Images Fantômes)
+        // Elles suppriment le bug de flou sur iPad et gardent la direction fixe de la lumière !
+        const createShadow = (x, y, blur, opacity) => {
+            const sh = document.createElement("img");
+            sh.src = data.url;
+            sh.className = "token-shadow";
+            sh.dataset.tx = x; // On mémorise la direction de la lumière
+            sh.dataset.ty = y;
+            sh.style.width = "100%";
+            sh.style.height = "100%";
+            sh.style.objectFit = "contain";
+            sh.style.position = "absolute";
+            sh.style.top = "0";
+            sh.style.left = "0";
+            // L'astuce magique : On décale l'ombre D'ABORD, puis on la tourne sur elle-même
+            sh.style.transform = `translate(${x}px, ${y}px) rotate(${angle}deg)`;
+            sh.style.filter = `brightness(0) blur(${blur}px) opacity(${opacity})`;
+            sh.style.zIndex = "1";
+            sh.style.pointerEvents = "none";
+            return sh;
+        };
+
+        // On recrée tes deux ombres portées
+        divToken.appendChild(createShadow(-2, 5, 4, 0.8));
+        divToken.appendChild(createShadow(-25, 35, 15, 0.65));
+
+        // 4️⃣ 🔻 CORRECTION 3 : L'IMAGE DU PION (Plus de drop-shadow = netteté parfaite)
         const img = document.createElement("img");
+        img.className = "token-img-main";
         img.src = data.url;
         img.style.width = "100%";
         img.style.height = "100%";
         img.style.objectFit = "contain";
-        // L'ombre directionnelle du personnage (comme tu me l'as dessinée en rouge)
-        img.style.filter = "drop-shadow(-2px 5px 4px rgba(0,0,0,0.8)) drop-shadow(-25px 35px 15px rgba(0,0,0,0.65))";
+        // La rotation s'applique directement sur l'image
+        img.style.transform = `rotate(${angle}deg)`;
         img.style.position = "relative";
         img.style.zIndex = "2"; 
         img.onerror = () => { img.style.display = "none"; };

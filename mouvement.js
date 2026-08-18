@@ -429,7 +429,14 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
     const glow = tokenDiv.querySelector("div[style*='rotationAnneauMagique']");
     if (glow) glow.style.opacity = "0";
 
-    tokenDiv.style.transition = "left 0.4s linear, top 0.4s linear, transform 0.2s ease";
+    // 🔻 CORRECTION : Le parent ne gère plus que les coordonnées X/Y
+    tokenDiv.style.transition = "left 0.4s linear, top 0.4s linear";
+    
+    // 🔻 CORRECTION : On prépare les enfants (Pion + Ombres) pour la rotation
+    const imgMain = tokenDiv.querySelector(".token-img-main");
+    if (imgMain) imgMain.style.transition = "transform 0.2s ease";
+    const shadows = tokenDiv.querySelectorAll(".token-shadow");
+    shadows.forEach(sh => sh.style.transition = "transform 0.2s ease");
 
     for (let i = 0; i < actionMouvement.path.length; i++) {
         let step = actionMouvement.path[i];
@@ -437,7 +444,14 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
         
         tokenDiv.style.left = px.x + "px";
         tokenDiv.style.top = px.y + "px";
-        tokenDiv.style.transform = `translate(-50%, -50%) rotate(${step.angle}deg)`;
+        
+        // On fait tourner le pion principal
+        if (imgMain) imgMain.style.transform = `rotate(${step.angle}deg)`;
+        
+        // On fait tourner les ombres sans altérer leur décalage X/Y directionnel
+        shadows.forEach(sh => {
+            sh.style.transform = `translate(${sh.dataset.tx}px, ${sh.dataset.ty}px) rotate(${step.angle}deg)`;
+        });
         
         await new Promise(r => setTimeout(r, 400));
     }
