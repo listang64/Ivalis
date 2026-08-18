@@ -774,7 +774,7 @@ window.appliquerTerrain = function(url, scale, opacity) {
     window.PLATEAU_VTT.hexWidth = 2 * scale;
     window.PLATEAU_VTT.hexHeight = Math.sqrt(3) * scale;
     
-    // NOUVEAU : Application de l'opacité
+    // Application de l'opacité
     window.PLATEAU_VTT.gridOpacity = opacity;
     
     const labelTaille = document.getElementById("label-taille-hexa");
@@ -792,6 +792,11 @@ window.appliquerTerrain = function(url, scale, opacity) {
         window.PLATEAU_VTT.resize(w, h);
         window.PLATEAU_VTT.renderMap();
         window.centrerPlateau();
+        
+        // 🔻 CORRECTION : On place les pions UNE FOIS que l'image a donné ses dimensions !
+        if (typeof window.appliquerTokensVTT === "function") {
+            window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+        }
     };
 
     if (!urlsVTTIdentiques(imgEl.src, url) && url !== "") {
@@ -801,6 +806,11 @@ window.appliquerTerrain = function(url, scale, opacity) {
     } else {
         // Changement d'échelle/opacité seul, ou repeinture sans nouvelle image
         window.PLATEAU_VTT.renderMap();
+        
+        // 🔻 CORRECTION : On replace les pions si le MJ change la taille de la grille en direct !
+        if (typeof window.appliquerTokensVTT === "function") {
+            window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+        }
     }
 };
 
@@ -879,23 +889,27 @@ window.toggleModeDeplacementToken = function() {
             const label = document.getElementById("label-taille-token");
             if (label) label.innerText = "--";
             window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+            window.restaurerPanneauGauche(); // 🔻 NOUVEAU
         }
     }
 };
 
+// Clic global (Sélection, Déplacement ou Désélection)
 document.addEventListener("click", async function(event) {
     if (Math.abs(event.clientX - vttClicStartX) > 10 || Math.abs(event.clientY - vttClicStartY) > 10) return;
 
-    if (event.target.closest(".token-vtt") || event.target.closest("#menu-dev-combat")) return;
+    // 🔻 NOUVEAU : On ignore le clic s'il est sur la piste d'initiative
+    if (event.target.closest(".token-vtt") || event.target.closest("#menu-dev-combat") || event.target.closest("#piste-initiative")) return;
 
     if (window.TOKEN_SELECTIONNE) {
-        if (window.VTT_MODE_DEPLACEMENT && window.PLATEAU_VTT) {
-            // Même conversion que getHexFromMouse (gomme / murs) : translate+scale de #transform-plateau
-            const canvasX = (event.clientX - window.VTT_POS_X) / window.VTT_SCALE;
-            const canvasY = (event.clientY - window.VTT_POS_Y) / window.VTT_SCALE;
-            const hex = window.PLATEAU_VTT.pixelToHex(canvasX, canvasY);
-
-            if (hex) {
+        if (window.VTT_MODE_DEPLACEMENT) {
+            const conteneur = document.getElementById("conteneur-plateau-vtt");
+            if (conteneur && conteneur.contains(event.target) && window.PLATEAU_VTT) {
+                
+                const canvasX = (event.clientX - window.VTT_POS_X) / window.VTT_SCALE;
+                const canvasY = (event.clientY - window.VTT_POS_Y) / window.VTT_SCALE;
+                const hex = window.PLATEAU_VTT.pixelToHex(canvasX, canvasY);
+                
                 const state = window.PLATEAU_VTT.getCaseState(hex.q, hex.r);
                 let isOccupied = false;
                 for (let id in window.TOKENS_VTT_DATA) {
@@ -915,6 +929,7 @@ document.addEventListener("click", async function(event) {
                     const label = document.getElementById("label-taille-token");
                     if (label) label.innerText = "--";
                     window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+                    window.restaurerPanneauGauche(); // 🔻 NOUVEAU
 
                     try {
                         const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
@@ -923,7 +938,7 @@ document.addEventListener("click", async function(event) {
                         }, { merge: true });
                     } catch (e) {}
                     
-                    return;
+                    return; 
                 }
             }
         }
@@ -932,6 +947,7 @@ document.addEventListener("click", async function(event) {
         const label = document.getElementById("label-taille-token");
         if (label) label.innerText = "--";
         window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+        window.restaurerPanneauGauche(); // 🔻 NOUVEAU
     }
 });
 
@@ -983,6 +999,89 @@ window.sauvegarderTailleToken = async function() {
 };
 
 // =========================================================================
+//  GESTION DU FOCUS ET DE LA CAMÉRA (PANNEAU ET CARTE)
+// =========================================================================
+
+window.COMBAT_PERSOS_JOUEUR_BACKUP = null;
+
+window.afficherDansPanneauGauche = function(idPersonnage) {
+    const indexLocal = window.COMBAT_PERSOS_JOUEUR.findIndex(p => p.idPersonnage === idPersonnage);
+    
+    if (indexLocal !== -1) {
+        // C'est un perso du joueur, on se positionne dessus normalement
+        if (window.COMBAT_PERSOS_JOUEUR_BACKUP) {
+            window.COMBAT_PERSOS_JOUEUR = [...window.COMBAT_PERSOS_JOUEUR_BACKUP];
+            window.COMBAT_PERSOS_JOUEUR_BACKUP = null;
+        }
+        window.COMBAT_INDEX_PERSO = indexLocal;
+        window.afficherPersoCombatActuel();
+    } else {
+        // C'est un PNJ ou un autre joueur, on l'injecte temporairement
+        const persoGlobal = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+        if (persoGlobal) {
+            if (!window.COMBAT_PERSOS_JOUEUR_BACKUP) {
+                window.COMBAT_PERSOS_JOUEUR_BACKUP = [...window.COMBAT_PERSOS_JOUEUR];
+            }
+            window.COMBAT_PERSOS_JOUEUR = [persoGlobal];
+            window.COMBAT_INDEX_PERSO = 0;
+            window.afficherPersoCombatActuel();
+        }
+    }
+};
+
+window.restaurerPanneauGauche = function() {
+    if (window.COMBAT_PERSOS_JOUEUR_BACKUP) {
+        window.COMBAT_PERSOS_JOUEUR = [...window.COMBAT_PERSOS_JOUEUR_BACKUP];
+        window.COMBAT_PERSOS_JOUEUR_BACKUP = null;
+        window.COMBAT_INDEX_PERSO = 0;
+        window.afficherPersoCombatActuel();
+    }
+};
+
+window.centrerMapSurToken = function(idPersonnage) {
+    if (!window.PLATEAU_VTT || !window.TOKENS_VTT_DATA || !window.TOKENS_VTT_DATA[idPersonnage]) return;
+    
+    const data = window.TOKENS_VTT_DATA[idPersonnage];
+    const px = window.PLATEAU_VTT.hexToPixel(data.q, data.r);
+    
+    const conteneur = document.getElementById("conteneur-plateau-vtt");
+    if (!conteneur) return;
+    
+    const winW = conteneur.offsetWidth || window.innerWidth;
+    const winH = conteneur.offsetHeight || window.innerHeight;
+    
+    // Ajout d'une transition CSS temporaire pour un mouvement de caméra fluide
+    const conteneurTransform = document.getElementById("transform-plateau");
+    if (conteneurTransform) {
+        conteneurTransform.style.transition = "transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)";
+        setTimeout(() => { if (conteneurTransform) conteneurTransform.style.transition = "none"; }, 400);
+    }
+
+    // Calcul pour centrer le point exact au milieu de l'écran
+    window.VTT_POS_X = (winW / 2) - (px.x * window.VTT_SCALE);
+    window.VTT_POS_Y = (winH / 2) - (px.y * window.VTT_SCALE);
+    
+    window.appliquerTransformPlateau();
+};
+
+window.selectionnerEtCentrerPerso = function(idPersonnage) {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    
+    window.TOKEN_SELECTIONNE = idPersonnage;
+    
+    if (window.TOKENS_VTT_DATA && window.TOKENS_VTT_DATA[idPersonnage]) {
+        const dataToken = window.TOKENS_VTT_DATA[idPersonnage];
+        const label = document.getElementById("label-taille-token");
+        if (label) label.innerText = dataToken.taille || 80;
+        
+        window.centrerMapSurToken(idPersonnage);
+    }
+    
+    window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    window.afficherDansPanneauGauche(idPersonnage);
+};
+
+// =========================================================================
 //  SUPPRESSION D'UN PION (TOKEN)
 // =========================================================================
 window.supprimerTokenVTT = async function() {
@@ -1001,6 +1100,7 @@ window.supprimerTokenVTT = async function() {
     // 2. Suppression dans la mémoire locale
     delete window.TOKENS_VTT_DATA[idSupprime];
     window.TOKEN_SELECTIONNE = null;
+    window.restaurerPanneauGauche();
     
     // 3. Mise à jour visuelle de l'interface (Remet l'affichage de taille à zéro)
     const label = document.getElementById("label-taille-token");
@@ -1207,6 +1307,7 @@ window.appliquerTokensVTT = function(tokensMap) {
             if (label) label.innerText = taille;
 
             window.appliquerTokensVTT(window.TOKENS_VTT_DATA); 
+            window.afficherDansPanneauGauche(idPerso); // 🔻 NOUVEAU
         };
 
         // 3️⃣ L'IMAGE DU PION (Au dessus de tout : z-index 2)
@@ -1784,7 +1885,7 @@ window.afficherPisteInitiative = function(queue, phase) {
         const affichageInit = item.idCarte === "REPOS_LONG" ? "⏳" : item.initiative;
 
         html += `
-        <div ${attributId} class="${classeBulle}" style="position: relative; width: 110px; height: 126px; flex-shrink: 0; margin-top: 0px; transition: all 0.4s ease; transform-origin: left center; margin-right: 15px;">
+        <div ${attributId} class="${classeBulle}" style="position: relative; width: 110px; height: 126px; flex-shrink: 0; margin-top: 0px; transition: all 0.4s ease; transform-origin: left center; margin-right: 15px; cursor: pointer;" onclick="window.selectionnerEtCentrerPerso('${item.idPersonnage}')">
             <div style="position: absolute; inset: 0; background: linear-gradient(135deg, #fbf5bd 0%, #c2a878 30%, #5c3a21 50%, #e8d5a5 80%, #ffffff 100%); clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); display: flex; align-items: center; justify-content: center;">
                 <div style="width: 102px; height: 118px; background-color: #1a0f08; clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); position: relative;">
                     <img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: top center;">
