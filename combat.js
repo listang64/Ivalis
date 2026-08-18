@@ -1350,11 +1350,13 @@ window.appliquerTokensVTT = function(tokensMap) {
     if (!document.getElementById("anim-anneau-vtt")) {
         const style = document.createElement("style");
         style.id = "anim-anneau-vtt";
+        // Pas de translate en % ici : dans une animation accélérée, le pourcentage est figé
+        // à la taille de départ de l'anneau, qui décrochait du pion dès qu'on zoomait.
         style.innerHTML = `
             @keyframes rotationAnneauMagique {
-                0% { transform: translate(-50%, -50%) rotate(0deg) scale(1); filter: brightness(1); }
-                50% { transform: translate(-50%, -50%) rotate(45deg) scale(1.05); filter: brightness(1.2); }
-                100% { transform: translate(-50%, -50%) rotate(90deg) scale(1); filter: brightness(1); }
+                0% { transform: rotate(0deg) scale(1); filter: brightness(1); }
+                50% { transform: rotate(45deg) scale(1.05); filter: brightness(1.2); }
+                100% { transform: rotate(90deg) scale(1); filter: brightness(1); }
             }
         `;
         document.head.appendChild(style);
@@ -1404,12 +1406,13 @@ window.appliquerTokensVTT = function(tokensMap) {
             const anneauSelection = document.createElement("div");
             anneauSelection.className = "token-anneau";
             anneauSelection.style.position = "absolute";
-            anneauSelection.style.top = "50%";
-            anneauSelection.style.left = "50%";
             
             // VALEURS GRAVÉES DANS LE MARBRE (en % du pion, pour suivre le zoom)
+            // Centrage par les bords plutôt que par un translate : l'anneau reste collé au pion
             anneauSelection.style.width = "90%";
-            anneauSelection.style.height = "90%"; 
+            anneauSelection.style.height = "90%";
+            anneauSelection.style.top = "5%";
+            anneauSelection.style.left = "5%"; 
             
             anneauSelection.style.zIndex = "-1"; 
             anneauSelection.style.pointerEvents = "none";
