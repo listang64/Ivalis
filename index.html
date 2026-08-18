@@ -476,6 +476,10 @@
                 
                 <!-- Le canvas qui peint la grille par dessus -->
                 <canvas id="plateau-canvas" style="position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none;"></canvas>
+                
+                <!-- 🔻 NOUVEAU : Calque SVG pour dessiner le tracé de déplacement 🔻 -->
+                <svg id="svg-chemin-mouvement" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; overflow: visible;"></svg>
+
                 <!-- 🔻 NOUVEAU : Conteneur des Pions (Tokens) 🔻 -->
                 <div id="conteneur-tokens-vtt" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none;"></div>
             </div>
@@ -1197,6 +1201,8 @@
 <script type="module" src="competences.js"></script>
 <script src="Plateau.js"></script>
 <script type="module" src="combat.js"></script>
+<!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
+<script type="module" src="mouvement.js"></script>
 
 <div id="overlay-jet-des" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: var(--app-h); background: rgba(0,0,0,0.85); z-index: 5000; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
     
@@ -1616,6 +1622,21 @@
       <div style="display: flex; justify-content: space-between; gap: 15px;">
           <button class="btn-parametres" style="background-color: transparent; border: 1px solid #ff4c4c; color: #ff4c4c; width: 40%; font-size: 16px;" onclick="jouerSonClic(); window.fermerEditeurZone(false)">Annuler</button>
           <button class="btn-parametres" style="background-color: #2563eb; color: white; width: 60%; font-size: 16px;" onclick="jouerSonClic(); window.fermerEditeurZone(true)">Valider la Zone</button>
+      </div>
+  </div>
+
+<!-- ======================================================= -->
+  <!-- BULLE DE VALIDATION DE DÉPLACEMENT TACTIQUE             -->
+  <!-- ======================================================= -->
+  <div id="bulle-validation-mouvement" style="display: none; position: fixed; top: 30px; left: 50%; transform: translateX(-50%); z-index: 10000; background: linear-gradient(180deg, #2a1a0f, #1a0f08); border: 2px solid #c2a878; border-radius: 30px; padding: 10px 25px; align-items: center; gap: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.9);">
+      <div style="color: white; font-family: 'Cinzel', serif; font-size: 20px; font-weight: bold; text-shadow: 1px 1px 3px black;">
+          Déplacement : <span id="mouvement-cout-total" style="color:#ffaa00; font-size: 24px;">0 ⚡</span>
+      </div>
+      <div style="display:flex; gap: 15px;">
+          <!-- Bouton Valider -->
+          <div onclick="window.validerMouvement()" style="width: 35px; height: 35px; background: #1b6e3a; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; font-weight: bold; font-size: 18px; border: 2px solid white; box-shadow: 0 0 10px #1b6e3a; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">✔️</div>
+          <!-- Bouton Annuler -->
+          <div onclick="window.annulerMouvement()" style="width: 35px; height: 35px; background: #d32f2f; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; font-weight: bold; font-size: 18px; border: 2px solid white; box-shadow: 0 0 10px #d32f2f; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">✖</div>
       </div>
   </div>
 

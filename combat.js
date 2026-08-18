@@ -902,6 +902,42 @@ document.addEventListener("click", async function(event) {
     if (event.target.closest(".token-vtt") || event.target.closest("#menu-dev-combat") || event.target.closest("#piste-initiative")) return;
 
     if (window.TOKEN_SELECTIONNE) {
+        
+        // 🔻 NOUVEAU : VERIFIER SI C'EST MON TOUR POUR TRACER UN CHEMIN 🔻
+        const partie = window.PARTIE_DATA || {};
+        const queue = partie.File_Attente_Combat || [];
+        const phase = partie.Phase_Combat || "Preparation";
+        const monId = localStorage.getItem("ID_JOUEUR_COURANT");
+        const persoSelectionne = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === window.TOKEN_SELECTIONNE);
+        
+        const estMonTour = (
+            phase === "Resolution" && 
+            queue.length > 0 && 
+            queue[0].idPersonnage === window.TOKEN_SELECTIONNE && 
+            persoSelectionne && persoSelectionne.idJoueur === monId &&
+            !queue[0].aFaitSonMouvement
+        );
+
+        if (estMonTour && !window.VTT_MODE_DEPLACEMENT) {
+            const conteneur = document.getElementById("conteneur-plateau-vtt");
+            if (conteneur && conteneur.contains(event.target) && window.PLATEAU_VTT) {
+                const canvasX = (event.clientX - window.VTT_POS_X) / window.VTT_SCALE;
+                const canvasY = (event.clientY - window.VTT_POS_Y) / window.VTT_SCALE;
+                const hex = window.PLATEAU_VTT.pixelToHex(canvasX, canvasY);
+                
+                // Initialise le point de départ du chemin
+                if (window.CHEMIN_MOUVEMENT.length === 0) {
+                    window.CHEMIN_START_NODE = {
+                        q: window.TOKENS_VTT_DATA[window.TOKEN_SELECTIONNE].q,
+                        r: window.TOKENS_VTT_DATA[window.TOKEN_SELECTIONNE].r
+                    };
+                }
+                
+                window.ajouterEtapeMouvement(hex.q, hex.r);
+                return;
+            }
+        }
+
         if (window.VTT_MODE_DEPLACEMENT) {
             const conteneur = document.getElementById("conteneur-plateau-vtt");
             if (conteneur && conteneur.contains(event.target) && window.PLATEAU_VTT) {
@@ -1191,6 +1227,11 @@ window.genererTokensCombat = async function() {
 // =========================================================================
 window.appliquerTokensVTT = function(tokensMap) {
     if (!window.PLATEAU_VTT) return;
+    
+    // 🔻 NOUVEAU : VERROU ANTI-TÉLÉPORTATION 🔻
+    // Si une animation de marche est en cours, on bloque le redessin de la carte !
+    if (window.ANIMATION_VTT_EN_COURS) return;
+    
     const conteneur = document.getElementById("conteneur-tokens-vtt");
     if (!conteneur) return;
 
@@ -1222,7 +1263,8 @@ window.appliquerTokensVTT = function(tokensMap) {
         divToken.style.top = px.y + "px";
         divToken.style.width = taille + "px";
         divToken.style.height = taille + "px";
-        divToken.style.transform = "translate(-50%, -50%)"; 
+        const angle = data.angle || 0;
+        divToken.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`; 
         
         divToken.style.pointerEvents = "auto"; 
         divToken.style.cursor = "pointer";

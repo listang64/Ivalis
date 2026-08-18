@@ -1431,11 +1431,20 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
 
          if (estPremierScanPartie) {
              if (dataPartie.Action_Des) window.DERNIER_JET_DES = dataPartie.Action_Des.timestamp;
+             // 🔻 NOUVEAU
+             if (dataPartie.Action_Mouvement) window.DERNIER_MOUVEMENT = dataPartie.Action_Mouvement.timestamp;
              estPremierScanPartie = false;
          } else {
              if (dataPartie.Action_Des && dataPartie.Action_Des.timestamp !== window.DERNIER_JET_DES) {
                  window.DERNIER_JET_DES = dataPartie.Action_Des.timestamp;
                  jouerAnimationDesGlobal(dataPartie.Action_Des);
+             }
+             // 🔻 NOUVEAU : On lance l'animation chez tous les joueurs connectés !
+             if (dataPartie.Action_Mouvement && dataPartie.Action_Mouvement.timestamp !== window.DERNIER_MOUVEMENT) {
+                 window.DERNIER_MOUVEMENT = dataPartie.Action_Mouvement.timestamp;
+                 if (typeof window.jouerAnimationMouvement === "function") {
+                     window.jouerAnimationMouvement(dataPartie.Action_Mouvement);
+                 }
              }
          }
      }
