@@ -1310,8 +1310,13 @@ window.positionnerTokenVTT = function(divToken, majEchelle) {
 
     const anneau = divToken.querySelector(".token-anneau");
     if (anneau) {
-        anneau.style.marginTop = (8 * echelle) + "px";
-        anneau.style.transform = `rotate(${angle}deg)`;
+        // L'anneau est volontairement excentré vers les pieds du personnage.
+        // Ce décalage doit pivoter avec lui, sinon il reste planté vers le bas de l'écran.
+        const radians = angle * Math.PI / 180;
+        const decalage = 8 * echelle;
+        const decalageX = -decalage * Math.sin(radians);
+        const decalageY = decalage * Math.cos(radians);
+        anneau.style.transform = `translate(${decalageX}px, ${decalageY}px)`;
     }
 
     divToken.querySelectorAll(".token-shadow").forEach(sh => {
