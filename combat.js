@@ -1309,7 +1309,10 @@ window.positionnerTokenVTT = function(divToken, majEchelle) {
     if (ombreSol) ombreSol.style.filter = `blur(${8 * echelle}px)`;
 
     const anneau = divToken.querySelector(".token-anneau");
-    if (anneau) anneau.style.marginTop = (8 * echelle) + "px";
+    if (anneau) {
+        anneau.style.marginTop = (8 * echelle) + "px";
+        anneau.style.transform = `rotate(${angle}deg)`;
+    }
 
     divToken.querySelectorAll(".token-shadow").forEach(sh => {
         const decalageX = parseFloat(sh.dataset.tx) * echelle;
@@ -1416,13 +1419,19 @@ window.appliquerTokensVTT = function(tokensMap) {
             
             anneauSelection.style.zIndex = "-1"; 
             anneauSelection.style.pointerEvents = "none";
-            anneauSelection.style.animation = "rotationAnneauMagique 8s linear infinite";
             
             // 🔻 NOUVEAU : Opacité globale à 65% 🔻
             anneauSelection.style.opacity = "0.65"; 
 
+            // Calque interne : il porte le scintillement, pendant que le calque parent
+            // porte l'orientation du personnage. Les deux rotations s'additionnent ainsi sans se battre.
+            const anneauAnime = document.createElement("div");
+            anneauAnime.style.width = "100%";
+            anneauAnime.style.height = "100%";
+            anneauAnime.style.animation = "rotationAnneauMagique 8s linear infinite";
+
             // Le code vectoriel du cercle (Couleurs adoucies et flou plus diffus)
-            anneauSelection.innerHTML = `
+            anneauAnime.innerHTML = `
                 <svg viewBox="0 0 100 100" width="100%" height="100%" style="overflow: visible;">
                     <defs>
                         <filter id="glow-or" x="-50%" y="-50%" width="200%" height="200%">
@@ -1450,6 +1459,7 @@ window.appliquerTokensVTT = function(tokensMap) {
                 </svg>
             `;
             
+            anneauSelection.appendChild(anneauAnime);
             divToken.appendChild(anneauSelection);
         }
 
