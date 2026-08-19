@@ -2561,6 +2561,43 @@ window.ajouterLigneEffetVide = function() {
     conteneur.scrollTop = conteneur.scrollHeight;
 };
 
+window.exporterEffetsBDD = async function() {
+    const btn = document.querySelector("#etape-gestion-effets button[onclick*='exporterEffetsBDD']");
+    if (!btn) return;
+    const originalText = btn.innerText;
+    btn.innerText = "⏳ Copie en cours...";
+
+    try {
+        const q = query(collection(db, "Combat_Effets"));
+        const snap = await getDocs(q);
+        
+        let exportData = [];
+        snap.forEach(docSnap => {
+            exportData.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        
+        // Transforme le JSON en texte lisible et formaté
+        const dataStr = JSON.stringify(exportData, null, 2);
+        
+        // Copie magique dans le presse-papier
+        await navigator.clipboard.writeText(dataStr);
+        
+        btn.innerText = "✔️ Copié !";
+        btn.style.backgroundColor = "#1b6e3a";
+        alert("Les effets ont été copiés dans votre presse-papier ! Vous pouvez faire Ctrl+V / Coller pour les envoyer à l'IA.");
+        
+        setTimeout(() => {
+            btn.innerText = originalText;
+            btn.style.backgroundColor = "#9333ea";
+        }, 3000);
+
+    } catch (e) {
+        console.error("Erreur d'export :", e);
+        btn.innerText = "❌ Échec";
+        alert("Impossible de copier dans le presse-papier. Assurez-vous que le navigateur autorise l'accès au presse-papier.");
+    }
+};
+
 // =========================================================================
 //  PERSONNAGES / FICHE PERSO
 // =========================================================================
@@ -4437,6 +4474,7 @@ Object.assign(window, {
   lancerRegenerationTokenManuelle: window.lancerRegenerationTokenManuelle,
   // Gestion Effets de Combat
   ouvrirGestionEffets: window.ouvrirGestionEffets,
+  exporterEffetsBDD: window.exporterEffetsBDD, // 🔻 NOUVELLE LIGNE
   fermerGestionEffets: window.fermerGestionEffets,
   chargerTableauEffets: window.chargerTableauEffets,
   ajouterLigneEffetHTML: window.ajouterLigneEffetHTML,
