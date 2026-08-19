@@ -374,10 +374,26 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         }
     }
 
-    // Le bouton Choisir disparait si la carte est "Lockée" OU si le héros est épuisé
+    const partieTemp = window.PARTIE_DATA || {};
+    const queueTemp = partieTemp.File_Attente_Combat || [];
+    const phaseTemp = partieTemp.Phase_Combat || "Preparation";
+    const persoActuelTemp = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
+    const estMonTour = (
+        phaseTemp === "Resolution" &&
+        queueTemp.length > 0 &&
+        persoActuelTemp &&
+        queueTemp[0].idPersonnage === persoActuelTemp.idPersonnage
+    );
+
+    // 🔻 CORRECTION 1 : On bloque le bouton Choisir si les combats ont commencé !
     let boutonChoisirHtml = "";
     if (isCombatMode && !isLocked) {
-        if (estEpuise) {
+        if (phaseTemp === "Resolution") {
+            boutonChoisirHtml = `
+            <div style="position: absolute; bottom: -65px; left: 50%; transform: translateX(-50%); z-index: 5; color: #a89f91; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; text-transform: uppercase; white-space: nowrap; text-shadow: 2px 2px 4px black; letter-spacing: 1px;">
+                Combat en cours
+            </div>`;
+        } else if (estEpuise) {
             boutonChoisirHtml = `
             <div style="position: absolute; bottom: -65px; left: 50%; transform: translateX(-50%); z-index: 5; color: #ff4c4c; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; text-transform: uppercase; white-space: nowrap; text-shadow: 2px 2px 4px black; letter-spacing: 1px;">
                 Énergie Insuffisante
@@ -390,22 +406,14 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         }
     }
 
-    const partieTemp = window.PARTIE_DATA || {};
-    const queueTemp = partieTemp.File_Attente_Combat || [];
-    const phaseTemp = partieTemp.Phase_Combat || "Preparation";
-    const persoActuelTemp = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
-    const estMonTour = (
-        phaseTemp === "Resolution" &&
-        queueTemp.length > 0 &&
-        persoActuelTemp &&
-        queueTemp[0].idPersonnage === persoActuelTemp.idPersonnage
-    );
-
-    // 🔻 NOUVEAU BOUTON "APPLIQUER" 🔻
+    // 🔻 NOUVEAU BOUTON APPLIQUER (DORÉ, EN HAUT) 🔻
     let boutonValiderHtml = "";
     if (isCombatMode && isLocked && estMonTour) {
         boutonValiderHtml = `
-        <div id="btn-appliquer-carte" style="position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%); z-index: 5; color: black; font-family: 'Cinzel', serif; font-size: 14px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase;" onclick="event.stopPropagation(); window.demarrerCiblage('${idCarte}')">
+        <div id="btn-appliquer-carte" style="position: absolute; top: -35px; left: 50%; transform: translateX(-50%); z-index: 5; color: #ffd700; font-family: 'Cinzel', serif; font-size: 18px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 0 0 10px #ffaa00, 2px 2px 4px black; transition: transform 0.2s;" 
+             onclick="event.stopPropagation(); window.demarrerCiblage('${idCarte}')" 
+             onmouseover="this.style.transform='translateX(-50%) scale(1.1)'" 
+             onmouseout="this.style.transform='translateX(-50%) scale(1)'">
             Appliquer
         </div>
         `;

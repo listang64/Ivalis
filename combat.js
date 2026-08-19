@@ -1721,6 +1721,9 @@ window.jouerCarteCombat = async function(idCarte) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     if (!window.ID_PARTIE_COURANTE) return;
 
+    const phase = (window.PARTIE_DATA || {}).Phase_Combat || "Preparation";
+    if (phase !== "Preparation") return;
+
     const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
     if (!persoActuel) return;
 
@@ -2099,10 +2102,11 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
 
     const partie = window.PARTIE_DATA || {};
     const queue = partie.File_Attente_Combat || [];
+    const phase = partie.Phase_Combat || "Preparation";
     
     const persoInQueue = simulationAction ? { idCarte: simulationAction } : queue.find(q => q.idPersonnage === persoActuel.idPersonnage);
 
-    // Dé-sélection visuelle si la carte en aperçu n'est plus finançable (ex. après un déplacement)
+    // Dé-sélection visuelle si la carte en aperçu n'est plus finançable
     if (window.CARTE_EN_APERCU && !(persoInQueue && persoInQueue.idCarte)) {
         const dataSel = window.COMPETENCES_CACHE[window.CARTE_EN_APERCU];
         const coutSel = parseInt(dataSel?.Fatigue) || 0;
@@ -2121,7 +2125,7 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
     const deckEl = document.getElementById("combat-liste-competences");
     const imgPerso = document.getElementById("combat-portrait-perso");
     
-    if (deckEl) deckEl.style.transition = "opacity 0.3s ease";
+    if (deckEl) deckEl.style.transition = "opacity 0.3s ease, filter 0.3s ease";
 
     let divRepos = document.getElementById("apercu-repos-long-ui");
     if (!divRepos) {
@@ -2158,9 +2162,17 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
             if (typeof window.afficherApercuCarteHD === "function") window.afficherApercuCarteHD(persoInQueue.idCarte, true); 
         }
     } else {
+        // 🔻 CORRECTION 2 : Si la phase est "Resolution", c'est qu'il a déjà joué et n'est plus dans la file ! On grise son deck.
         if (deckEl) {
-            deckEl.style.opacity = "1";
-            deckEl.style.pointerEvents = "auto";
+            if (phase === "Resolution") {
+                deckEl.style.opacity = "0.4";
+                deckEl.style.pointerEvents = "none";
+                deckEl.style.filter = "grayscale(100%)";
+            } else {
+                deckEl.style.opacity = "1";
+                deckEl.style.pointerEvents = "auto";
+                deckEl.style.filter = "none";
+            }
         }
         if (imgPerso && !window.CARTE_EN_APERCU) {
             imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";

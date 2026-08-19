@@ -27,7 +27,7 @@ window.demarrerCiblage = async function(idCarte) {
 
     const attaquesExtraites = [];
 
-    // Analyse la carte pour trouver les attaques
+    // Analyse la carte pour trouver les attaques de base
     dataCarte.Composants.actions.forEach(act => {
         const effBase = window.EFFETS_BDD_CACHE[act.baseEffetId];
         if (!effBase) return;
@@ -54,7 +54,7 @@ window.demarrerCiblage = async function(idCarte) {
         }
     });
 
-    // Si c'est un sort passif ou de mouvement (pas de cible requise)
+    // Si c'est un sort passif ou de mouvement pur (pas de cible requise)
     if (attaquesExtraites.length === 0) {
         window.validerCarteCombat(idCarte, document.getElementById("btn-appliquer-carte"));
         return;
@@ -68,7 +68,7 @@ window.demarrerCiblage = async function(idCarte) {
         indexAttaqueEnCours: 0
     };
 
-    // Modification de l'Interface
+    // Modification de l'Interface (On cache "Appliquer" et on affiche "Résoudre" en bas)
     const btnAppliquer = document.getElementById("btn-appliquer-carte");
     if (btnAppliquer) btnAppliquer.style.display = "none";
 
@@ -76,12 +76,16 @@ window.demarrerCiblage = async function(idCarte) {
     if (!btnResoudre) {
         btnResoudre = document.createElement("div");
         btnResoudre.id = "btn-resoudre-carte";
-        btnResoudre.style.cssText = "position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%); z-index: 5; font-family: 'Cinzel', serif; font-size: 14px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 2px black;";
+        btnResoudre.style.cssText = "position: absolute; bottom: -30px; left: 50%; transform: translateX(-50%); z-index: 5; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 2px black, 0 0 10px #00ffff; color: #00ffff; transition: transform 0.2s;";
+        btnResoudre.onmouseover = () => btnResoudre.style.transform = "translateX(-50%) scale(1.1)";
+        btnResoudre.onmouseout = () => btnResoudre.style.transform = "translateX(-50%) scale(1)";
         document.getElementById("apercu-carte-hd-competence").appendChild(btnResoudre);
     }
-    btnResoudre.innerText = "SÉLECTIONNEZ CIBLE";
-    btnResoudre.style.color = "#ff4c4c"; // Rouge tant que non prêt
-    btnResoudre.style.pointerEvents = "none";
+    
+    // Le bouton RÉSOUDRE est cliquable TOUT DE SUITE pour permettre de "Passer" les effets impossibles
+    btnResoudre.innerText = "RÉSOUDRE";
+    btnResoudre.style.pointerEvents = "auto";
+    btnResoudre.onclick = () => window.declencherResolution();
 
     // 🔻 INJECTION CSS DES ANNEAUX ROUGES DE CIBLAGE 🔻
     if (!document.getElementById("anim-ciblage-vtt")) {
@@ -99,12 +103,12 @@ window.demarrerCiblage = async function(idCarte) {
     window.afficherEtapeCiblage();
 };
 
-// 2. Mise à jour Visuelle (Texte Doré et Anneaux Rouges)
+// 2. Mise à jour Visuelle (Texte Doré sur la carte)
 window.afficherEtapeCiblage = function() {
     const state = window.ETAT_CIBLAGE;
     if (!state.actif) return;
 
-    // A. Éteindre toutes les lignes
+    // Éteindre toutes les lignes
     document.querySelectorAll("[id^='effet-hd-ligne-']").forEach(div => {
         const titre = div.querySelector('.titre-effet-hd');
         if (titre) {
@@ -113,7 +117,7 @@ window.afficherEtapeCiblage = function() {
         }
     });
 
-    // B. Allumer en Or la ligne en cours
+    // Allumer en Or la ligne en cours
     const attaqueCourante = state.attaques[state.indexAttaqueEnCours];
     if (attaqueCourante) {
         const divLigne = document.getElementById("effet-hd-ligne-" + attaqueCourante.indexUI);
@@ -142,16 +146,18 @@ window.dessinerAnneauxCiblage = function() {
     const tkLanceur = window.TOKENS_VTT_DATA[idLanceur];
     if (!tkLanceur) return;
 
-    // Pour l'instant, on cherche les cibles à 1 case de distance (CAC)
+    // Pour l'instant, Corps-à-Corps (Distance 1 stricte)
     for (let idToken in window.TOKENS_VTT_DATA) {
         if (idToken === idLanceur) continue; 
 
         const tk = window.TOKENS_VTT_DATA[idToken];
-        // Calcul mathématique de la distance (emprunté à Mouvement.js)
         const dist = (Math.abs(tkLanceur.q - tk.q) + Math.abs(tkLanceur.q + tkLanceur.r - tk.q - tk.r) + Math.abs(tkLanceur.r - tk.r)) / 2;
 
         if (dist === 1) {
-            const estSelectionne = window.ETAT_CIBLAGE.attaques.some(a => a.cibles.includes(idToken));
+            // 🔻 CORRECTION 3 : On ne regarde QUE l'attaque en cours. Ainsi, si on passe à l'attaque 2, 
+            // la cible 1 redeviendra clignotante et pourra être frappée à nouveau !
+            const attaqueCourante = window.ETAT_CIBLAGE.attaques[window.ETAT_CIBLAGE.indexAttaqueEnCours];
+            const estSelectionne = attaqueCourante ? attaqueCourante.cibles.includes(idToken) : false;
 
             const anneau = document.createElement("div");
             anneau.className = "anneau-ciblage";
@@ -166,7 +172,7 @@ window.dessinerAnneauxCiblage = function() {
             anneau.style.pointerEvents = "none";
             anneau.style.zIndex = "-1";
             
-            // Animation clignotante seulement s'il n'est pas encore verrouillé
+            // L'anneau clignote tant qu'il n'est pas verrouillé POUR L'ATTAQUE EN COURS
             anneau.style.animation = estSelectionne ? "none" : "pulsationCible 1.2s infinite alternate ease-in-out";
 
             const divToken = document.getElementById("token-" + idToken);
@@ -178,11 +184,11 @@ window.dessinerAnneauxCiblage = function() {
 // 4. Lorsqu'on clique sur un pion pendant le ciblage
 window.ajouterCibleCiblage = function(idCible) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    const persosJoueur = window.COMBAT_PERSOS_JOUEUR;
+    if (!persosJoueur || window.COMBAT_INDEX_PERSO === undefined || !persosJoueur[window.COMBAT_INDEX_PERSO]) return;
     const state = window.ETAT_CIBLAGE;
     const attaqueEnCours = state.attaques[state.indexAttaqueEnCours];
     
-    const persosJoueur = window.COMBAT_PERSOS_JOUEUR;
-    if (!persosJoueur || window.COMBAT_INDEX_PERSO === undefined || !persosJoueur[window.COMBAT_INDEX_PERSO]) return;
     const idLanceur = persosJoueur[window.COMBAT_INDEX_PERSO].idPersonnage;
     const tkLanceur = window.TOKENS_VTT_DATA[idLanceur];
     const tkCible = window.TOKENS_VTT_DATA[idCible];
@@ -196,27 +202,28 @@ window.ajouterCibleCiblage = function(idCible) {
         return;
     }
 
-    // Assigne la cible (remplace si on change d'avis sur la même attaque)
+    // Assigne la cible
     attaqueEnCours.cibles = [idCible]; 
 
-    // Vérifie si TOUTES les attaques ont une cible
     const toutCible = state.attaques.every(a => a.cibles.length > 0);
     const btnResoudre = document.getElementById("btn-resoudre-carte");
-    
-    if (toutCible) {
-        window.dessinerAnneauxCiblage(); // Met à jour le visuel
-        btnResoudre.innerText = "RÉSOUDRE";
-        btnResoudre.style.color = "#00ffff"; // Devient cliquable !
-        btnResoudre.style.pointerEvents = "auto";
-        btnResoudre.onclick = () => window.declencherResolution();
-    } else {
-        // Passe automatiquement à l'attaque suivante
+
+    // 🔻 CORRECTION 4 : Avance à la prochaine attaque et rafraîchit
+    if (state.indexAttaqueEnCours < state.attaques.length - 1) {
         state.indexAttaqueEnCours++;
-        window.afficherEtapeCiblage();
+        window.afficherEtapeCiblage(); // Remet les anneaux en pointillé pour la nouvelle attaque
+    } else {
+        window.dessinerAnneauxCiblage(); // Fige le dernier anneau en rouge solide
+    }
+
+    if (toutCible && btnResoudre) {
+        btnResoudre.innerText = "RÉSOUDRE";
+        btnResoudre.style.color = "#00ffff"; // Devient cliquable et bien visible !
+        btnResoudre.style.pointerEvents = "auto";
     }
 };
 
-// 5. Nettoyage si on annule la carte
+// 5. Nettoyage si on clique dans le vide ou si on annule
 window.nettoyerCiblage = function() {
     window.ETAT_CIBLAGE.actif = false;
     document.querySelectorAll(".anneau-ciblage").forEach(el => el.remove());
@@ -277,48 +284,83 @@ window.jouerAnimationMoteur = async function(action) {
 
     // On séquence les animations des attaques
     for (let attaque of action.attaques) {
+        
+        // Si le joueur a passé cette attaque sans cible, on l'ignore (skip automatique)
+        if (attaque.cibles.length === 0) continue;
+
         for (let idCible of attaque.cibles) {
             
             // 1. Récupérer les stats fraîches de la cible (Via RAM onSnapshot)
             const cibleData = window.PERSOS_PARTIE.find(p => p.idPersonnage === idCible);
             if (!cibleData) continue;
 
-            const esquive = parseInt(cibleData.Esquive) || 0;
-            const parade = parseInt(cibleData.Parade) || 0;
-            const defPhys = parseInt(cibleData.Def_Physique) || 0;
-            const defMag = parseInt(cibleData.Def_Magique) || 0;
-
+            const tkLanceur = window.TOKENS_VTT_DATA[lanceur];
             const tkCible = window.TOKENS_VTT_DATA[idCible];
 
-            // 2. Jet d'esquive / Parade (Le plus haut des deux)
+            // 2. 🔻 ROTATION DU LANCEUR VERS SA CIBLE 🔻
+            if (tkLanceur && tkCible) {
+                const pxLanceur = window.PLATEAU_VTT.hexToPixel(tkLanceur.q, tkLanceur.r);
+                const pxCible = window.PLATEAU_VTT.hexToPixel(tkCible.q, tkCible.r);
+                const dx = pxCible.x - pxLanceur.x;
+                const dy = pxCible.y - pxLanceur.y;
+                
+                // Formule trigonométrique pour trouver l'angle (Face à la cible)
+                const angle = Math.atan2(dy, dx) * (180 / Math.PI) - 90;
+                
+                tkLanceur.angle = angle;
+                window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+                
+                // Pousse la rotation dans Firebase (seulement si c'est nous qui attaquons pour ne pas faire de requêtes en double)
+                const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
+                const lanceurData = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
+                if (lanceurData && lanceurData.idJoueur === currentUserId) {
+                    updateDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
+                        [`Tokens.${lanceur}.angle`]: angle
+                    }).catch(e => console.error(e));
+                }
+                
+                // Petite pause pour laisser le temps au pion de tourner avant l'impact
+                await new Promise(r => setTimeout(r, 200)); 
+            }
+
+            // 3. Jet d'esquive / Parade (Le plus haut des deux)
+            const esquive = (parseInt(cibleData.Esquive) || 0) + (parseInt(cibleData.Dev_Mod_Esquive) || 0);
+            const parade = (parseInt(cibleData.Parade) || 0) + (parseInt(cibleData.Dev_Mod_Parade) || 0);
+            
             const jetDef = Math.floor(Math.random() * 100) + 1;
             const statDef = Math.max(esquive, parade);
             const motDef = parade > esquive ? "Paré 🛡️" : "Esquivé 💨";
 
             if (jetDef <= statDef) {
-                // Échec : C'est esquivé ou paré !
+                // Échec de l'attaque : C'est esquivé ou paré !
                 if (tkCible) window.afficherMessageFlottantHex(tkCible.q, tkCible.r, motDef, "#cccccc");
                 await new Promise(r => setTimeout(r, 1000));
                 continue; 
             }
 
-            // 3. Calcul des Dégâts
+            // 4. Calcul des Dégâts avec les Résistances
+            const defPhys = (parseInt(cibleData.Def_Physique) || 0) + (parseInt(cibleData.Dev_Mod_DefPhys) || 0);
+            const defMag = (parseInt(cibleData.Def_Magique) || 0) + (parseInt(cibleData.Dev_Mod_DefMag) || 0);
+
             let degats = attaque.valeurBrute;
             let resistance = attaque.typeRes === "Magique" ? defMag : defPhys;
             
-            // Réduction en pourcentage
-            let degatsFinaux = Math.floor(degats * (1 - (resistance / 100)));
+            // Réduction des dégâts en pourcentage (max 100% de réduction)
+            // Si la résistance est négative (ex: -50), ça ajoute des dégâts (+50%) = Faiblesse !
+            let reduction = resistance / 100;
+            if (reduction > 1) reduction = 1; 
+            
+            let degatsFinaux = Math.round(degats * (1 - reduction));
             if (degatsFinaux < 0) degatsFinaux = 0;
 
-            // 4. Application
             cibleData.PV_Actuels = (parseInt(cibleData.PV_Actuels) || 0) - degatsFinaux;
 
-            // Animations Visuelles
+            // 5. Animations Visuelles de l'impact
             if (tkCible) {
-                // Le texte flottant
+                // Le texte flottant des dégâts
                 window.afficherMessageFlottantHex(tkCible.q, tkCible.r, `-${degatsFinaux} 🩸`, "#ff4c4c");
 
-                // Le Flash Sanglant du pion
+                // Le Flash Sanglant du pion touché
                 const tokenDiv = document.getElementById("token-" + idCible);
                 if (tokenDiv) {
                     tokenDiv.style.transition = "filter 0.1s";
@@ -327,7 +369,7 @@ window.jouerAnimationMoteur = async function(action) {
                 }
             }
 
-            // 5. Le Lanceur est le SEUL à écrire dans la Base de Données (Évite le spam Firebase)
+            // 6. Le Lanceur est le SEUL à écrire les dégâts dans la Base de Données (Évite les conflits)
             const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
             const lanceurData = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
             
@@ -347,9 +389,10 @@ window.jouerAnimationMoteur = async function(action) {
         }
     }
 
-    // 6. Fin de la Séquence : On déduit la fatigue et on passe le tour (uniquement par le lanceur)
+    // 7. Fin de la Séquence : On déduit la fatigue et on passe le tour (uniquement par le lanceur)
     const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
     const lanceurData = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
+    
     if (lanceurData && lanceurData.idJoueur === currentUserId) {
         window.validerCarteCombat(action.idCarte, null);
     }
