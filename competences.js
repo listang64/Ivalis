@@ -259,19 +259,22 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     let htmlEffets = "";
     let htmlZoneAbsolue = "";
 
-    effets.forEach(eff => {
+    // 🔻 CORRECTION : On encapsule chaque effet dans une div avec un ID précis pour pouvoir le cibler (Surbrillance Dorée)
+    effets.forEach((eff, indexEffet) => {
         let textToCheck = typeof eff === 'string' ? eff : eff.nom;
         if (textToCheck.includes("Distance")) hasDist = true;
 
         if (typeof eff === 'string' && eff.includes("Initiative +")) return;
         if (typeof eff === 'object' && eff.nom === "Initiative +") return;
 
+        let content = "";
+
         if (typeof eff === 'string') {
             if (eff.includes("Zone")) {
             } else if (eff.startsWith("  ↳")) {
-                htmlEffets += `<div style="margin-left: 20px; color: #a89f91; font-size: 13px; padding: 2px 0;">${eff}</div>`;
+                content = `<div style="margin-left: 20px; color: #a89f91; font-size: 13px; padding: 2px 0;">${eff}</div>`;
             } else {
-                htmlEffets += `<div style="margin-top: 8px; color: #e8d5a5; font-size: 15px; font-weight: bold;">${eff}</div>`;
+                content = `<div style="margin-top: 8px; color: #e8d5a5; font-size: 15px; font-weight: bold;">${eff}</div>`;
             }
         } 
         else {
@@ -281,13 +284,18 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
                 let colorNom = eff.isMod ? "#c2a878" : "#e8d5a5";
                 let prefix = eff.isMod ? "↳ " : "• ";
                 
-                htmlEffets += `
+                content = `
                     <div style="${padding}">
-                        <div style="color: ${colorNom}; font-size: 15px; font-weight: bold; text-shadow: 1px 1px 2px black;">${prefix}${eff.nom}</div>
+                        <div class="titre-effet-hd" style="color: ${colorNom}; font-size: 15px; font-weight: bold; text-shadow: 1px 1px 2px black; transition: all 0.3s;">${prefix}${eff.nom}</div>
                         <div style="color: #a89f91; font-size: 13px; margin-top: 2px; line-height: 1.3; font-style: italic;">${eff.desc}</div>
                     </div>
                 `;
             }
+        }
+        
+        // On englobe le contenu avec l'ID
+        if (content !== "") {
+            htmlEffets += `<div id="effet-hd-ligne-${indexEffet}" style="transition: all 0.3s ease;">${content}</div>`;
         }
     });
 
@@ -393,11 +401,15 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         queueTemp[0].idPersonnage === persoActuelTemp.idPersonnage
     );
 
-    const boutonValiderHtml = (isCombatMode && isLocked && estMonTour) ? `
-        <div style="position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%); z-index: 5; color: black; font-family: 'Cinzel', serif; font-size: 14px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase;" onclick="event.stopPropagation(); window.validerCarteCombat('${idCarte}', this)">
-            Valider
+    // 🔻 NOUVEAU BOUTON "APPLIQUER" 🔻
+    let boutonValiderHtml = "";
+    if (isCombatMode && isLocked && estMonTour) {
+        boutonValiderHtml = `
+        <div id="btn-appliquer-carte" style="position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%); z-index: 5; color: black; font-family: 'Cinzel', serif; font-size: 14px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase;" onclick="event.stopPropagation(); window.demarrerCiblage('${idCarte}')">
+            Appliquer
         </div>
-    ` : "";
+        `;
+    }
 
     conteneurCarte.innerHTML = `
         <!-- COUCHE 1 : FOND DE COULEUR -->

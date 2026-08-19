@@ -412,6 +412,10 @@ document.addEventListener("click", function(event) {
     const clicSurFleche = event.target.closest('.btn-combat-switch'); 
     
     if (!clicSurBanniere && !clicSurCarteHD && !clicSurFleche && window.CARTE_EN_APERCU) {
+        
+        // 🔻 NOUVEAU : Annule le ciblage en cours si on clique dans le vide
+        if (typeof window.nettoyerCiblage === "function") window.nettoyerCiblage();
+
         window.COUT_COMPETENCE_SELECTIONNEE = 0;
         window.mettreAJourJaugeFatigue(0); 
         
@@ -1440,6 +1444,13 @@ window.appliquerTokensVTT = function(tokensMap) {
         divToken.onclick = function(e) {
             e.stopPropagation();
             if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+            
+            // 🔻 NOUVEAU : INTERCEPTION POUR LE CIBLAGE 🔻
+            if (window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif) {
+                if (typeof window.ajouterCibleCiblage === "function") window.ajouterCibleCiblage(idPerso);
+                return;
+            }
+
             window.TOKEN_SELECTIONNE = idPerso;
             const label = document.getElementById("label-taille-token");
             if (label) label.innerText = taille;

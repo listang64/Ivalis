@@ -1435,6 +1435,10 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
              if (dataPartie.Action_Des) window.DERNIER_JET_DES = dataPartie.Action_Des.timestamp;
              // 🔻 NOUVEAU
              if (dataPartie.Action_Mouvement) window.DERNIER_MOUVEMENT = dataPartie.Action_Mouvement.timestamp;
+             
+             // 🔻 NOUVEAU
+             if (dataPartie.Action_Moteur) window.DERNIER_ACTION_MOTEUR = dataPartie.Action_Moteur.timestamp;
+             
              estPremierScanPartie = false;
          } else {
              if (dataPartie.Action_Des && dataPartie.Action_Des.timestamp !== window.DERNIER_JET_DES) {
@@ -1447,6 +1451,11 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
                  if (typeof window.jouerAnimationMouvement === "function") {
                      window.jouerAnimationMouvement(dataPartie.Action_Mouvement);
                  }
+             }
+             // 🔻 NOUVEAU : Déclenchement de la résolution d'attaque pour TOUS les joueurs connectés
+             if (dataPartie.Action_Moteur && dataPartie.Action_Moteur.timestamp !== window.DERNIER_ACTION_MOTEUR) {
+                 window.DERNIER_ACTION_MOTEUR = dataPartie.Action_Moteur.timestamp;
+                 if (typeof window.jouerAnimationMoteur === "function") window.jouerAnimationMoteur(dataPartie.Action_Moteur);
              }
          }
      }
@@ -2561,6 +2570,14 @@ window.ajouterLigneEffetVide = function() {
     conteneur.scrollTop = conteneur.scrollHeight;
 };
 
+window.chargerCacheEffetsBDD = async function() {
+    try {
+        const snap = await getDocs(collection(db, "Combat_Effets"));
+        window.EFFETS_BDD_CACHE = {};
+        snap.forEach(d => window.EFFETS_BDD_CACHE[d.id] = d.data());
+    } catch(e) { console.error("Erreur cache effets :", e); }
+};
+
 window.exporterEffetsBDD = async function() {
     const btn = document.querySelector("#etape-gestion-effets button[onclick*='exporterEffetsBDD']");
     if (!btn) return;
@@ -3065,6 +3082,9 @@ document.addEventListener("DOMContentLoaded", function () {
   ecouterJoueurs();
   ecouterDateEnJeu();
   ecouterPartiesEnCours();
+
+  // 🔻 NOUVEAU : Chargement en cache de tous les effets du jeu au démarrage
+  if (typeof window.chargerCacheEffetsBDD === "function") window.chargerCacheEffetsBDD();
 
   // NOUVEAU : Application des volumes sauvegardés au lancement
   window.appliquerVolumesAudio();
