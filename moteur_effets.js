@@ -332,10 +332,17 @@ window.jouerAnimationMoteur = async function(action) {
                 const dx = pxCible.x - pxLanceur.x;
                 const dy = pxCible.y - pxLanceur.y;
                 
-                // Formule trigonométrique pour trouver l'angle (Face à la cible)
-                const angle = Math.atan2(dy, dx) * (180 / Math.PI) - 90;
+                // Angle absolu trigonométrique
+                const targetAngle = Math.atan2(dy, dx) * (180 / Math.PI) - 90;
+                let currentAngle = tkLanceur.angle || 0;
                 
-                tkLanceur.angle = angle;
+                // 🔻 ALGORITHME ANTI-PIROUETTE 🔻
+                let diff = (targetAngle - currentAngle) % 360;
+                if (diff > 180) diff -= 360;
+                if (diff < -180) diff += 360;
+                const nouvelAngle = currentAngle + diff;
+                
+                tkLanceur.angle = nouvelAngle;
                 window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
                 
                 // Pousse la rotation dans Firebase (seulement si c'est nous qui attaquons pour ne pas faire de requêtes en double)
@@ -343,7 +350,7 @@ window.jouerAnimationMoteur = async function(action) {
                 const lanceurData = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
                 if (lanceurData && lanceurData.idJoueur === currentUserId) {
                     updateDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
-                        [`Tokens.${lanceur}.angle`]: angle
+                        [`Tokens.${lanceur}.angle`]: nouvelAngle
                     }).catch(e => console.error(e));
                 }
                 

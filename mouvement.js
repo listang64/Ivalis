@@ -369,17 +369,26 @@ window.validerMouvement = async function() {
 
     let pathAvecAngles = [];
     let currentPx = window.PLATEAU_VTT.hexToPixel(window.CHEMIN_START_NODE.q, window.CHEMIN_START_NODE.r);
-    let finalAngle = window.TOKENS_VTT_DATA[idPerso].angle || 0;
+    
+    // 🔻 L'ANGLE DE DÉPART EST SAUVEGARDÉ ICI
+    let currentAngle = window.TOKENS_VTT_DATA[idPerso].angle || 0;
 
     window.CHEMIN_MOUVEMENT.forEach(step => {
         let nextPx = window.PLATEAU_VTT.hexToPixel(step.q, step.r);
         let dx = nextPx.x - currentPx.x;
         let dy = nextPx.y - currentPx.y;
         
-        let angle = Math.atan2(dy, dx) * (180 / Math.PI) - 90;
+        // L'angle absolu calculé par la trigonométrie
+        let targetAngle = Math.atan2(dy, dx) * (180 / Math.PI) - 90;
         
-        pathAvecAngles.push({ q: step.q, r: step.r, angle: angle });
-        finalAngle = angle;
+        // 🔻 L'ALGORITHME ANTI-PIROUETTE (Calcul du chemin le plus court) 🔻
+        let diff = (targetAngle - currentAngle) % 360;
+        if (diff > 180) diff -= 360;
+        if (diff < -180) diff += 360;
+        
+        currentAngle += diff; // On additionne pour créer un angle continu infini (ex: 370°, 720°...)
+        
+        pathAvecAngles.push({ q: step.q, r: step.r, angle: currentAngle });
         currentPx = nextPx;
     });
 
@@ -394,7 +403,7 @@ window.validerMouvement = async function() {
 
         window.TOKENS_VTT_DATA[idPerso].q = finalStep.q;
         window.TOKENS_VTT_DATA[idPerso].r = finalStep.r;
-        window.TOKENS_VTT_DATA[idPerso].angle = finalAngle;
+        window.TOKENS_VTT_DATA[idPerso].angle = currentAngle; // 🔻 On sauvegarde l'angle infini pour la suite
 
         await updateDoc(partieRef, {
             File_Attente_Combat: file,
