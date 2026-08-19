@@ -26,6 +26,7 @@ window.demarrerCiblage = async function(idCarte) {
     if (!dataCarte) return;
 
     const attaquesExtraites = [];
+    const indicesUtilises = new Set(); // 🔻 NOUVEAU : Mémoire des lignes déjà surlignées
 
     // Analyse la carte pour trouver les attaques de base
     dataCarte.Composants.actions.forEach(act => {
@@ -42,13 +43,24 @@ window.demarrerCiblage = async function(idCarte) {
 
         if (estUneAttaque) {
             let typeRes = (nomLower.includes("magique") || nomLower.includes("pouvoir")) ? "Magique" : "Physique";
-            let indexUI = dataCarte.Effets_Compiles.findIndex(e => (e.nom || e).toLowerCase() === nomLower);
+            
+            // 🔻 CORRECTION : On cherche la ligne de texte correspondante QUI N'A PAS ENCORE ÉTÉ SURLIGNÉE
+            let indexUI = dataCarte.Effets_Compiles.findIndex((e, i) => {
+                let texteEffet = (e.nom || e).toLowerCase();
+                return texteEffet === nomLower && !indicesUtilises.has(i);
+            });
+
+            if (indexUI !== -1) {
+                indicesUtilises.add(indexUI);
+            } else {
+                indexUI = 0; // Fallback par sécurité
+            }
 
             attaquesExtraites.push({
                 nom: effBase.Nom,
                 typeRes: typeRes,
                 valeurBrute: (parseFloat(effBase.Valeur) || 0) * (act.count || 1),
-                indexUI: indexUI !== -1 ? indexUI : 0,
+                indexUI: indexUI,
                 cibles: []
             });
         }
@@ -87,7 +99,7 @@ window.demarrerCiblage = async function(idCarte) {
     btnResoudre.style.pointerEvents = "auto";
     btnResoudre.onclick = () => window.declencherResolution();
 
-    // 🔻 INJECTION CSS DES ANNEAUX ROUGES DE CIBLAGE 🔻
+    // INJECTION CSS DES ANNEAUX ROUGES DE CIBLAGE
     if (!document.getElementById("anim-ciblage-vtt")) {
         const style = document.createElement("style");
         style.id = "anim-ciblage-vtt";
@@ -140,22 +152,29 @@ window.dessinerAnneauxCiblage = function() {
 
     if (!window.ETAT_CIBLAGE || !window.ETAT_CIBLAGE.actif) return;
 
-    const persosJoueur = window.COMBAT_PERSOS_JOUEUR;
-    if (!persosJoueur || window.COMBAT_INDEX_PERSO === undefined || !persosJoueur[window.COMBAT_INDEX_PERSO]) return;
-    const idLanceur = persosJoueur[window.COMBAT_INDEX_PERSO].idPersonnage;
+    if (!window.COMBAT_PERSOS_JOUEUR || window.COMBAT_INDEX_PERSO === undefined || !window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]) return;
+    const idLanceur = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
     const tkLanceur = window.TOKENS_VTT_DATA[idLanceur];
-    if (!tkLanceur) return;
+    
+    // 🔻 NOUVEAU : On récupère les données du lanceur pour connaître son camp
+    const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
+    
+    if (!tkLanceur || !lanceurData) return;
 
     // Pour l'instant, Corps-à-Corps (Distance 1 stricte)
     for (let idToken in window.TOKENS_VTT_DATA) {
         if (idToken === idLanceur) continue; 
 
+        // 🔻 NOUVEAU : On récupère les données de la cible potentielle
+        const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idToken);
+        
+        // On ignore les alliés (même camp que le lanceur) pour les attaques !
+        if (cibleData && cibleData.camp === lanceurData.camp) continue;
+
         const tk = window.TOKENS_VTT_DATA[idToken];
         const dist = (Math.abs(tkLanceur.q - tk.q) + Math.abs(tkLanceur.q + tkLanceur.r - tk.q - tk.r) + Math.abs(tkLanceur.r - tk.r)) / 2;
 
         if (dist === 1) {
-            // 🔻 CORRECTION 3 : On ne regarde QUE l'attaque en cours. Ainsi, si on passe à l'attaque 2, 
-            // la cible 1 redeviendra clignotante et pourra être frappée à nouveau !
             const attaqueCourante = window.ETAT_CIBLAGE.attaques[window.ETAT_CIBLAGE.indexAttaqueEnCours];
             const estSelectionne = attaqueCourante ? attaqueCourante.cibles.includes(idToken) : false;
 
@@ -184,16 +203,25 @@ window.dessinerAnneauxCiblage = function() {
 // 4. Lorsqu'on clique sur un pion pendant le ciblage
 window.ajouterCibleCiblage = function(idCible) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    const persosJoueur = window.COMBAT_PERSOS_JOUEUR;
-    if (!persosJoueur || window.COMBAT_INDEX_PERSO === undefined || !persosJoueur[window.COMBAT_INDEX_PERSO]) return;
+    if (!window.COMBAT_PERSOS_JOUEUR || window.COMBAT_INDEX_PERSO === undefined || !window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]) return;
     const state = window.ETAT_CIBLAGE;
     const attaqueEnCours = state.attaques[state.indexAttaqueEnCours];
     
-    const idLanceur = persosJoueur[window.COMBAT_INDEX_PERSO].idPersonnage;
+    const idLanceur = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
     const tkLanceur = window.TOKENS_VTT_DATA[idLanceur];
     const tkCible = window.TOKENS_VTT_DATA[idCible];
 
-    if (!tkLanceur || !tkCible) return;
+    // 🔻 NOUVEAU : On récupère les données
+    const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
+    const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idCible);
+
+    if (!tkLanceur || !tkCible || !lanceurData || !cibleData) return;
+
+    // 🔻 NOUVEAU : On empêche le joueur de cibler un allié même s'il clique dessus
+    if (cibleData.camp === lanceurData.camp) {
+        window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Cible invalide", "#aaaaaa");
+        return;
+    }
     
     const dist = (Math.abs(tkLanceur.q - tkCible.q) + Math.abs(tkLanceur.q + tkLanceur.r - tkCible.q - tkCible.r) + Math.abs(tkLanceur.r - tkCible.r)) / 2;
 
@@ -208,7 +236,7 @@ window.ajouterCibleCiblage = function(idCible) {
     const toutCible = state.attaques.every(a => a.cibles.length > 0);
     const btnResoudre = document.getElementById("btn-resoudre-carte");
 
-    // 🔻 CORRECTION 4 : Avance à la prochaine attaque et rafraîchit
+    // Avance à la prochaine attaque et rafraîchit
     if (state.indexAttaqueEnCours < state.attaques.length - 1) {
         state.indexAttaqueEnCours++;
         window.afficherEtapeCiblage(); // Remet les anneaux en pointillé pour la nouvelle attaque
