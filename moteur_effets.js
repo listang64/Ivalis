@@ -9,14 +9,13 @@ window.ETAT_CIBLAGE = {
     actif: false,
     idCarte: null,
     attaques: [], 
-    indexAttaqueEnCours: 0
+    cibleUnique: null
 };
 
 // 1. Lancement du Ciblage quand on clique sur "Appliquer"
 window.demarrerCiblage = async function(idCarte) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
 
-    // Sécurité : Vérifie que le cache des effets BDD est chargé
     if (!window.EFFETS_BDD_CACHE) {
         alert("Le grimoire du moteur n'est pas encore synchronisé.");
         return;
@@ -26,9 +25,7 @@ window.demarrerCiblage = async function(idCarte) {
     if (!dataCarte) return;
 
     const attaquesExtraites = [];
-    const indicesUtilises = new Set(); // 🔻 NOUVEAU : Mémoire des lignes déjà surlignées
 
-    // Analyse la carte pour trouver les attaques de base
     dataCarte.Composants.actions.forEach(act => {
         const effBase = window.EFFETS_BDD_CACHE[act.baseEffetId];
         if (!effBase) return;
@@ -44,62 +41,32 @@ window.demarrerCiblage = async function(idCarte) {
         if (estUneAttaque) {
             let typeRes = (nomLower.includes("magique") || nomLower.includes("pouvoir")) ? "Magique" : "Physique";
             
-            // 🔻 CORRECTION : On cherche la ligne de texte correspondante QUI N'A PAS ENCORE ÉTÉ SURLIGNÉE
-            let indexUI = dataCarte.Effets_Compiles.findIndex((e, i) => {
-                let texteEffet = (e.nom || e).toLowerCase();
-                return texteEffet === nomLower && !indicesUtilises.has(i);
-            });
-
-            if (indexUI !== -1) {
-                indicesUtilises.add(indexUI);
-            } else {
-                indexUI = 0; // Fallback par sécurité
-            }
-
             attaquesExtraites.push({
                 nom: effBase.Nom,
                 typeRes: typeRes,
                 valeurBrute: (parseFloat(effBase.Valeur) || 0) * (act.count || 1),
-                indexUI: indexUI,
                 cibles: []
             });
         }
     });
 
-    // Si c'est un sort passif ou de mouvement pur (pas de cible requise)
     if (attaquesExtraites.length === 0) {
         window.validerCarteCombat(idCarte, document.getElementById("btn-appliquer-carte"));
         return;
     }
 
-    // Initialisation de la machine à états
     window.ETAT_CIBLAGE = {
         actif: true,
         idCarte: idCarte,
         attaques: attaquesExtraites,
-        indexAttaqueEnCours: 0
+        cibleUnique: null
     };
 
-    // Modification de l'Interface (On cache "Appliquer" et on affiche "Résoudre" en bas)
+    // On cache le bouton "Appliquer"
     const btnAppliquer = document.getElementById("btn-appliquer-carte");
     if (btnAppliquer) btnAppliquer.style.display = "none";
 
-    let btnResoudre = document.getElementById("btn-resoudre-carte");
-    if (!btnResoudre) {
-        btnResoudre = document.createElement("div");
-        btnResoudre.id = "btn-resoudre-carte";
-        btnResoudre.style.cssText = "position: absolute; bottom: -30px; left: 50%; transform: translateX(-50%); z-index: 5; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 2px black, 0 0 10px #00ffff; color: #00ffff; transition: transform 0.2s;";
-        btnResoudre.onmouseover = () => btnResoudre.style.transform = "translateX(-50%) scale(1.1)";
-        btnResoudre.onmouseout = () => btnResoudre.style.transform = "translateX(-50%) scale(1)";
-        document.getElementById("apercu-carte-hd-competence").appendChild(btnResoudre);
-    }
-    
-    // Le bouton RÉSOUDRE est cliquable TOUT DE SUITE pour permettre de "Passer" les effets impossibles
-    btnResoudre.innerText = "RÉSOUDRE";
-    btnResoudre.style.pointerEvents = "auto";
-    btnResoudre.onclick = () => window.declencherResolution();
-
-    // INJECTION CSS DES ANNEAUX ROUGES DE CIBLAGE
+    // INJECTION CSS (Anneaux et Bulles)
     if (!document.getElementById("anim-ciblage-vtt")) {
         const style = document.createElement("style");
         style.id = "anim-ciblage-vtt";
@@ -108,116 +75,143 @@ window.demarrerCiblage = async function(idCarte) {
                 0% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; box-shadow: 0 0 5px #ff4c4c; }
                 100% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; box-shadow: 0 0 15px #ff4c4c; }
             }
+            @keyframes popBulle {
+                0% { transform: translateX(-50%) scale(0); }
+                70% { transform: translateX(-50%) scale(1.2); }
+                100% { transform: translateX(-50%) scale(1); }
+            }
         `;
         document.head.appendChild(style);
-    }
-
-    window.afficherEtapeCiblage();
-};
-
-// 2. Mise à jour Visuelle (Texte Doré sur la carte)
-window.afficherEtapeCiblage = function() {
-    const state = window.ETAT_CIBLAGE;
-    if (!state.actif) return;
-
-    // Éteindre toutes les lignes
-    document.querySelectorAll("[id^='effet-hd-ligne-']").forEach(div => {
-        const titre = div.querySelector('.titre-effet-hd');
-        if (titre) {
-            titre.style.color = "#e8d5a5"; 
-            titre.style.textShadow = "1px 1px 2px black";
-        }
-    });
-
-    // Allumer en Or la ligne en cours
-    const attaqueCourante = state.attaques[state.indexAttaqueEnCours];
-    if (attaqueCourante) {
-        const divLigne = document.getElementById("effet-hd-ligne-" + attaqueCourante.indexUI);
-        if (divLigne) {
-            const titre = divLigne.querySelector('.titre-effet-hd');
-            if (titre) {
-                titre.style.color = "#ffd700";
-                titre.style.textShadow = "0 0 10px #ffaa00, 2px 2px 2px black";
-            }
-        }
     }
 
     window.dessinerAnneauxCiblage();
 };
 
-// 3. Dessine les anneaux autour des cibles valides
+// 2. Dessine (ou met à jour) les anneaux autour des cibles valides
 window.dessinerAnneauxCiblage = function() {
-    // Nettoyer les anciens anneaux
-    document.querySelectorAll(".anneau-ciblage").forEach(el => el.remove());
+    if (!window.ETAT_CIBLAGE || !window.ETAT_CIBLAGE.actif) {
+        document.querySelectorAll(".anneau-ciblage, .bulle-validation-cible").forEach(el => el.remove());
+        return;
+    }
 
-    if (!window.ETAT_CIBLAGE || !window.ETAT_CIBLAGE.actif) return;
-
-    if (!window.COMBAT_PERSOS_JOUEUR || window.COMBAT_INDEX_PERSO === undefined || !window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]) return;
     const idLanceur = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
     const tkLanceur = window.TOKENS_VTT_DATA[idLanceur];
-    
-    // 🔻 NOUVEAU : On récupère les données du lanceur pour connaître son camp
     const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
     
     if (!tkLanceur || !lanceurData) return;
 
-    // Pour l'instant, Corps-à-Corps (Distance 1 stricte)
+    const ciblesValides = new Set();
+
     for (let idToken in window.TOKENS_VTT_DATA) {
         if (idToken === idLanceur) continue; 
 
-        // 🔻 NOUVEAU : On récupère les données de la cible potentielle
         const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idToken);
-        
-        // On ignore les alliés (même camp que le lanceur) pour les attaques !
         if (cibleData && cibleData.camp === lanceurData.camp) continue;
 
         const tk = window.TOKENS_VTT_DATA[idToken];
         const dist = (Math.abs(tkLanceur.q - tk.q) + Math.abs(tkLanceur.q + tkLanceur.r - tk.q - tk.r) + Math.abs(tkLanceur.r - tk.r)) / 2;
 
         if (dist === 1) {
-            const attaqueCourante = window.ETAT_CIBLAGE.attaques[window.ETAT_CIBLAGE.indexAttaqueEnCours];
-            const estSelectionne = attaqueCourante ? attaqueCourante.cibles.includes(idToken) : false;
-
-            const anneau = document.createElement("div");
-            anneau.className = "anneau-ciblage";
-            anneau.style.position = "absolute";
-            anneau.style.top = "50%";
-            anneau.style.left = "50%";
-            anneau.style.width = "110%";
-            anneau.style.height = "110%";
-            anneau.style.transform = "translate(-50%, -50%)";
-            anneau.style.borderRadius = "50%";
-            anneau.style.border = estSelectionne ? "4px solid #ff4c4c" : "3px dashed #ff4c4c";
-            anneau.style.pointerEvents = "none";
-            anneau.style.zIndex = "-1";
-            
-            // L'anneau clignote tant qu'il n'est pas verrouillé POUR L'ATTAQUE EN COURS
-            anneau.style.animation = estSelectionne ? "none" : "pulsationCible 1.2s infinite alternate ease-in-out";
-
+            ciblesValides.add(idToken);
+            const estSelectionne = window.ETAT_CIBLAGE.cibleUnique === idToken;
             const divToken = document.getElementById("token-" + idToken);
-            if (divToken) divToken.appendChild(anneau);
+            
+            if (divToken) {
+                // Création ou récupération de l'anneau
+                let anneau = divToken.querySelector(".anneau-ciblage");
+                if (!anneau) {
+                    anneau = document.createElement("div");
+                    anneau.className = "anneau-ciblage";
+                    anneau.style.position = "absolute";
+                    anneau.style.top = "50%";
+                    anneau.style.left = "50%";
+                    // On le crée à 110% par défaut
+                    anneau.style.width = "110%";
+                    anneau.style.height = "110%";
+                    anneau.style.transform = "translate(-50%, -50%)";
+                    anneau.style.borderRadius = "50%";
+                    anneau.style.pointerEvents = "none";
+                    anneau.style.zIndex = "-1";
+                    // 🔻 Transition fluide pour l'effet de rétrécissement
+                    anneau.style.transition = "width 0.3s ease, height 0.3s ease, border 0.3s ease";
+                    divToken.appendChild(anneau);
+                    void anneau.offsetWidth; // Force le navigateur à dessiner
+                }
+
+                // Application des états (Rétracté / Verrouillé ou Pulsation)
+                if (estSelectionne) {
+                    anneau.style.width = "85%";
+                    anneau.style.height = "85%";
+                    anneau.style.border = "4px solid #ff4c4c";
+                    anneau.style.animation = "none"; // Stoppe le clignotement
+                    
+                    // Apparition de la Bulle Verte
+                    let bulle = divToken.querySelector(".bulle-validation-cible");
+                    if (!bulle) {
+                        bulle = document.createElement("div");
+                        bulle.className = "bulle-validation-cible";
+                        bulle.style.position = "absolute";
+                        bulle.style.bottom = "-25px"; // Juste sous le jeton
+                        bulle.style.left = "50%";
+                        bulle.style.transform = "translateX(-50%)";
+                        bulle.style.width = "28px";
+                        bulle.style.height = "28px";
+                        bulle.style.backgroundColor = "#1b6e3a";
+                        bulle.style.borderRadius = "50%";
+                        bulle.style.border = "2px solid #e8d5a5";
+                        bulle.style.boxShadow = "0 0 10px #1b6e3a, 0 4px 6px rgba(0,0,0,0.5)";
+                        bulle.style.display = "flex";
+                        bulle.style.justifyContent = "center";
+                        bulle.style.alignItems = "center";
+                        bulle.style.cursor = "pointer";
+                        bulle.style.zIndex = "100";
+                        bulle.style.color = "white";
+                        bulle.style.fontWeight = "bold";
+                        bulle.style.fontSize = "16px";
+                        bulle.innerHTML = "✔"; 
+                        bulle.style.animation = "popBulle 0.3s ease-out forwards";
+                        
+                        bulle.onclick = function(e) {
+                            e.stopPropagation();
+                            window.declencherResolution();
+                        };
+                        divToken.appendChild(bulle);
+                    }
+                } else {
+                    anneau.style.width = "110%";
+                    anneau.style.height = "110%";
+                    anneau.style.border = "3px dashed #ff4c4c";
+                    anneau.style.animation = "pulsationCible 1.2s infinite alternate ease-in-out";
+                    
+                    // Destruction de la bulle si la cible est déselectionnée
+                    const bulle = divToken.querySelector(".bulle-validation-cible");
+                    if (bulle) bulle.remove();
+                }
+            }
         }
     }
+    
+    // Nettoyage de sécurité
+    document.querySelectorAll(".anneau-ciblage, .bulle-validation-cible").forEach(el => {
+        const tokenId = el.parentElement.id.replace("token-", "");
+        if (!ciblesValides.has(tokenId)) el.remove();
+    });
 };
 
-// 4. Lorsqu'on clique sur un pion pendant le ciblage
+// 3. Lorsqu'on clique sur un pion pendant le ciblage
 window.ajouterCibleCiblage = function(idCible) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    if (!window.COMBAT_PERSOS_JOUEUR || window.COMBAT_INDEX_PERSO === undefined || !window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]) return;
     const state = window.ETAT_CIBLAGE;
-    const attaqueEnCours = state.attaques[state.indexAttaqueEnCours];
     
     const idLanceur = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
     const tkLanceur = window.TOKENS_VTT_DATA[idLanceur];
     const tkCible = window.TOKENS_VTT_DATA[idCible];
 
-    // 🔻 NOUVEAU : On récupère les données
     const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
     const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idCible);
 
     if (!tkLanceur || !tkCible || !lanceurData || !cibleData) return;
 
-    // 🔻 NOUVEAU : On empêche le joueur de cibler un allié même s'il clique dessus
     if (cibleData.camp === lanceurData.camp) {
         window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Cible invalide", "#aaaaaa");
         return;
@@ -230,57 +224,35 @@ window.ajouterCibleCiblage = function(idCible) {
         return;
     }
 
-    // Assigne la cible
-    attaqueEnCours.cibles = [idCible]; 
-
-    const toutCible = state.attaques.every(a => a.cibles.length > 0);
-    const btnResoudre = document.getElementById("btn-resoudre-carte");
-
-    // Avance à la prochaine attaque et rafraîchit
-    if (state.indexAttaqueEnCours < state.attaques.length - 1) {
-        state.indexAttaqueEnCours++;
-        window.afficherEtapeCiblage(); // Remet les anneaux en pointillé pour la nouvelle attaque
+    // 🔻 NOUVEAU : Si on clique sur la cible DÉJÀ sélectionnée, on la DÉSÉLECTIONNE !
+    if (state.cibleUnique === idCible) {
+        state.cibleUnique = null; 
+        state.attaques.forEach(a => a.cibles = []);
     } else {
-        window.dessinerAnneauxCiblage(); // Fige le dernier anneau en rouge solide
+        // Sinon on la sélectionne
+        state.cibleUnique = idCible; 
+        state.attaques.forEach(a => a.cibles = [idCible]);
     }
 
-    if (toutCible && btnResoudre) {
-        btnResoudre.innerText = "RÉSOUDRE";
-        btnResoudre.style.color = "#00ffff"; // Devient cliquable et bien visible !
-        btnResoudre.style.pointerEvents = "auto";
-    }
+    window.dessinerAnneauxCiblage(); // Lance l'animation de rétrécissement ou de relâchement
 };
 
-// 5. Nettoyage si on clique dans le vide ou si on annule
+// 4. Nettoyage si on clique dans le vide ou si on annule
 window.nettoyerCiblage = function() {
     window.ETAT_CIBLAGE.actif = false;
-    document.querySelectorAll(".anneau-ciblage").forEach(el => el.remove());
+    document.querySelectorAll(".anneau-ciblage, .bulle-validation-cible").forEach(el => el.remove());
     
-    // Remettre les titres en normal
-    document.querySelectorAll("[id^='effet-hd-ligne-']").forEach(div => {
-        const titre = div.querySelector('.titre-effet-hd');
-        if (titre) {
-            titre.style.color = "#e8d5a5"; 
-            titre.style.textShadow = "1px 1px 2px black";
-        }
-    });
-
     const btnAppliquer = document.getElementById("btn-appliquer-carte");
-    const btnResoudre = document.getElementById("btn-resoudre-carte");
     if (btnAppliquer) btnAppliquer.style.display = "block";
-    if (btnResoudre) btnResoudre.remove();
 };
 
-// 6. Envoi de l'action de Dégâts à Firebase
+// 5. Envoi de l'action de Dégâts à Firebase
 window.declencherResolution = async function() {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     const state = window.ETAT_CIBLAGE;
 
-    const btnResoudre = document.getElementById("btn-resoudre-carte");
-    if (btnResoudre) {
-        btnResoudre.innerText = "Frappe...";
-        btnResoudre.style.pointerEvents = "none";
-    }
+    // Cache la bulle verte pendant le calcul
+    document.querySelectorAll(".bulle-validation-cible").forEach(el => el.style.display = "none");
 
     const actionData = {
         type: "ATTAQUES",
@@ -312,31 +284,31 @@ window.jouerAnimationMoteur = async function(action) {
 
     // On séquence les animations des attaques
     for (let attaque of action.attaques) {
-        
-        // Si le joueur a passé cette attaque sans cible, on l'ignore (skip automatique)
         if (attaque.cibles.length === 0) continue;
 
         for (let idCible of attaque.cibles) {
             
-            // 1. Récupérer les stats fraîches de la cible (Via RAM onSnapshot)
             const cibleData = window.PERSOS_PARTIE.find(p => p.idPersonnage === idCible);
             if (!cibleData) continue;
 
             const tkLanceur = window.TOKENS_VTT_DATA[lanceur];
             const tkCible = window.TOKENS_VTT_DATA[idCible];
 
-            // 2. 🔻 ROTATION DU LANCEUR VERS SA CIBLE 🔻
+            let dx = 0;
+            let dy = 0;
+
+            // 2. ROTATION DU LANCEUR VERS SA CIBLE
             if (tkLanceur && tkCible) {
                 const pxLanceur = window.PLATEAU_VTT.hexToPixel(tkLanceur.q, tkLanceur.r);
                 const pxCible = window.PLATEAU_VTT.hexToPixel(tkCible.q, tkCible.r);
-                const dx = pxCible.x - pxLanceur.x;
-                const dy = pxCible.y - pxLanceur.y;
                 
-                // Angle absolu trigonométrique
+                // Vecteur de l'attaquant vers la cible (Utile pour la rotation ET le recul)
+                dx = pxCible.x - pxLanceur.x;
+                dy = pxCible.y - pxLanceur.y;
+                
                 const targetAngle = Math.atan2(dy, dx) * (180 / Math.PI) - 90;
                 let currentAngle = tkLanceur.angle || 0;
                 
-                // 🔻 ALGORITHME ANTI-PIROUETTE 🔻
                 let diff = (targetAngle - currentAngle) % 360;
                 if (diff > 180) diff -= 360;
                 if (diff < -180) diff += 360;
@@ -345,7 +317,6 @@ window.jouerAnimationMoteur = async function(action) {
                 tkLanceur.angle = nouvelAngle;
                 window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
                 
-                // Pousse la rotation dans Firebase (seulement si c'est nous qui attaquons pour ne pas faire de requêtes en double)
                 const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
                 const lanceurData = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
                 if (lanceurData && lanceurData.idJoueur === currentUserId) {
@@ -354,11 +325,9 @@ window.jouerAnimationMoteur = async function(action) {
                     }).catch(e => console.error(e));
                 }
                 
-                // Petite pause pour laisser le temps au pion de tourner avant l'impact
                 await new Promise(r => setTimeout(r, 200)); 
             }
 
-            // 3. Jet d'esquive / Parade (Le plus haut des deux)
             const esquive = (parseInt(cibleData.Esquive) || 0) + (parseInt(cibleData.Dev_Mod_Esquive) || 0);
             const parade = (parseInt(cibleData.Parade) || 0) + (parseInt(cibleData.Dev_Mod_Parade) || 0);
             
@@ -366,45 +335,112 @@ window.jouerAnimationMoteur = async function(action) {
             const statDef = Math.max(esquive, parade);
             const motDef = parade > esquive ? "Paré 🛡️" : "Esquivé 💨";
 
+            // 3. VÉRIFICATION DE LA DÉFENSE (Esquive / Parade)
             if (jetDef <= statDef) {
-                // Échec de l'attaque : C'est esquivé ou paré !
-                if (tkCible) window.afficherMessageFlottantHex(tkCible.q, tkCible.r, motDef, "#cccccc");
+                if (tkCible) {
+                    window.afficherMessageFlottantHex(tkCible.q, tkCible.r, motDef, "#cccccc");
+                    
+                    // 🔻 NOUVEAU : ANIMATION DE RECUL (DODGE) 🔻
+                    const tokenDiv = document.getElementById("token-" + idCible);
+                    if (tokenDiv) {
+                        // On normalise le vecteur pour pousser la cible dans la même direction que l'attaque
+                        const mag = Math.sqrt(dx * dx + dy * dy) || 1;
+                        const reculX = (dx / mag) * 25 * window.VTT_SCALE; // Recul de 25 pixels (adapté au zoom)
+                        const reculY = (dy / mag) * 25 * window.VTT_SCALE;
+                        
+                        // Mouvement sec vers l'arrière
+                        tokenDiv.style.transition = "transform 0.15s cubic-bezier(0.25, 0.8, 0.25, 1)";
+                        tokenDiv.style.transform = `translate(calc(-50% + ${reculX}px), calc(-50% + ${reculY}px))`;
+                        
+                        // Retour élastique au centre de sa case
+                        setTimeout(() => {
+                            tokenDiv.style.transition = "transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)"; // Rebond
+                            tokenDiv.style.transform = `translate(-50%, -50%)`;
+                            
+                            // Nettoyage de la transition
+                            setTimeout(() => { tokenDiv.style.transition = "none"; }, 250);
+                        }, 150);
+                    }
+                }
+                
+                // On attend la fin de l'animation d'esquive
                 await new Promise(r => setTimeout(r, 1000));
+                
+                // 🔻 CRUCIAL : "continue" force le code à zapper la ligne 4 et 5 et passer à l'attaque suivante. Zéro Dégât.
                 continue; 
             }
 
-            // 4. Calcul des Dégâts avec les Résistances
+            // 4. Calcul des Dégâts (Ce code n'est LU QUE SI l'attaque a touché)
             const defPhys = (parseInt(cibleData.Def_Physique) || 0) + (parseInt(cibleData.Dev_Mod_DefPhys) || 0);
             const defMag = (parseInt(cibleData.Def_Magique) || 0) + (parseInt(cibleData.Dev_Mod_DefMag) || 0);
 
             let degats = attaque.valeurBrute;
             let resistance = attaque.typeRes === "Magique" ? defMag : defPhys;
             
-            // Réduction des dégâts en pourcentage (max 100% de réduction)
-            // Si la résistance est négative (ex: -50), ça ajoute des dégâts (+50%) = Faiblesse !
             let reduction = resistance / 100;
             if (reduction > 1) reduction = 1; 
             
             let degatsFinaux = Math.round(degats * (1 - reduction));
             if (degatsFinaux < 0) degatsFinaux = 0;
 
-            cibleData.PV_Actuels = (parseInt(cibleData.PV_Actuels) || 0) - degatsFinaux;
+            let oldPv = parseInt(cibleData.PV_Actuels) || 0;
+            let maxPv = (parseInt(cibleData.PV_Max) || 1) + (parseInt(cibleData.Dev_Mod_PV) || 0);
 
-            // 5. Animations Visuelles de l'impact
+            cibleData.PV_Actuels = oldPv - degatsFinaux;
+            if(cibleData.PV_Actuels < 0) cibleData.PV_Actuels = 0;
+            let newPv = cibleData.PV_Actuels;
+
+            // 5. Animations Visuelles de l'impact (Sang et Barre de Vie)
             if (tkCible) {
-                // Le texte flottant des dégâts
                 window.afficherMessageFlottantHex(tkCible.q, tkCible.r, `-${degatsFinaux} 🩸`, "#ff4c4c");
 
-                // Le Flash Sanglant du pion touché
                 const tokenDiv = document.getElementById("token-" + idCible);
                 if (tokenDiv) {
                     tokenDiv.style.transition = "filter 0.1s";
                     tokenDiv.style.filter = "sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.2)";
+                    
+                    const oldPct = Math.max(0, Math.min(100, (oldPv / maxPv) * 100));
+                    const newPct = Math.max(0, Math.min(100, (newPv / maxPv) * 100));
+                    
+                    const jaugeContainer = document.createElement("div");
+                    jaugeContainer.style.position = "absolute";
+                    jaugeContainer.style.bottom = "-12px"; 
+                    jaugeContainer.style.left = "50%";
+                    jaugeContainer.style.transform = "translateX(-50%)";
+                    jaugeContainer.style.width = "75%";
+                    jaugeContainer.style.height = "6px";
+                    jaugeContainer.style.backgroundColor = "#111";
+                    jaugeContainer.style.border = "1px solid #c2a878";
+                    jaugeContainer.style.borderRadius = "3px";
+                    jaugeContainer.style.zIndex = "5";
+                    jaugeContainer.style.opacity = "0"; 
+                    jaugeContainer.style.transition = "opacity 0.3s ease";
+                    jaugeContainer.style.boxShadow = "0 2px 4px rgba(0,0,0,0.8)";
+                    
+                    const jaugeFill = document.createElement("div");
+                    jaugeFill.style.height = "100%";
+                    jaugeFill.style.width = oldPct + "%";
+                    jaugeFill.style.backgroundColor = "#ff4c4c"; 
+                    jaugeFill.style.borderRadius = "2px";
+                    jaugeFill.style.transition = "width 0.5s ease-out";
+                    
+                    jaugeContainer.appendChild(jaugeFill);
+                    tokenDiv.appendChild(jaugeContainer);
+                    
+                    void jaugeContainer.offsetWidth;
+                    jaugeContainer.style.opacity = "1";
+                    
                     setTimeout(() => { tokenDiv.style.filter = ""; }, 300);
+                    setTimeout(() => { jaugeFill.style.width = newPct + "%"; }, 400);
+                    
+                    setTimeout(() => {
+                        jaugeContainer.style.opacity = "0";
+                        setTimeout(() => jaugeContainer.remove(), 300);
+                    }, 1500); 
                 }
             }
 
-            // 6. Le Lanceur est le SEUL à écrire les dégâts dans la Base de Données (Évite les conflits)
+            // 6. Mise à jour de Firebase et UI
             const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
             const lanceurData = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
             
@@ -413,21 +449,19 @@ window.jouerAnimationMoteur = async function(action) {
                 updateDoc(refPerso, { PV_Actuels: cibleData.PV_Actuels }).catch(e => console.error(e));
             }
 
-            // Si le joueur actif regarde la fiche de la victime, on met à jour la barre de vie UI en direct
             if (window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR.length > 0 && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]?.idPersonnage === idCible) {
                 window.COMBAT_PV_ACTUELS = cibleData.PV_Actuels;
                 if (typeof window.mettreAJourJaugePV === "function") window.mettreAJourJaugePV();
             }
 
-            // Pause pour laisser l'impact respirer avant la prochaine attaque
+            // Pause avant la prochaine attaque
             await new Promise(r => setTimeout(r, 1200));
         }
     }
 
-    // 7. Fin de la Séquence : On déduit la fatigue et on passe le tour (uniquement par le lanceur)
+    // 7. Fin de la Séquence globale
     const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
     const lanceurData = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
-    
     if (lanceurData && lanceurData.idJoueur === currentUserId) {
         window.validerCarteCombat(action.idCarte, null);
     }
