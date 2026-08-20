@@ -1,0 +1,5 @@
+attaque legere
+attaque lourde
+mots de pouvoirs
+attaque magique 
+portée
