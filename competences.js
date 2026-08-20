@@ -623,6 +623,18 @@ function normalizeForgeType(type, fallback = "Aucun") {
     return LEGACY_TYPE_MAP[type] || type;
 }
 
+// 🔻 FONCTION : Identifie les attaques de base 🔻
+function estUneAttaqueDeBase(nom) {
+    if (!nom) return false;
+    const n = nom.toLowerCase();
+    return n.includes("attaque magique") || 
+           n.includes("attaque légère") || 
+           n.includes("attaque legere") || 
+           n.includes("attaque lourde") || 
+           n.includes("mots de pouvoir") || 
+           n.includes("mot de pouvoir");
+}
+
 function getMaxStacks(effet) {
     const pBase = parseFrenchFloat(effet.Pourcent_Base);
     const pMax = parseFrenchFloat(effet.Pourcent_Max);
@@ -658,12 +670,18 @@ function formatterTexteEffet(effet, stacks) {
     
     // 2. Remplacement de la Valeur (Dégâts, Initiative, etc.)
     if (val > 0) {
-        const calcV = val * stacks;
+        let calcV = val * stacks;
+        
+        // 🔻 NOUVEAU : Si c'est l'effet Distance, on affiche +1 case (car 1 = CAC)
+        if (effet.Nom === "Distance") {
+            calcV += 1;
+        }
+
         if (pBase === 0) {
             // Remplace le 1er chiffre s'il n'y a pas de pourcentage dans l'effet
             texte = texte.replace(/\b\d+(?:[.,]\d+)?\b/, calcV);
         } else {
-            // S'il y a un %, on remplace le 1er chiffre qui n'est PAS collé à un % (ex: "35" dans ton Electrifié)
+            // S'il y a un %, on remplace le 1er chiffre qui n'est PAS collé à un %
             texte = texte.replace(/\b\d+(?:[.,]\d+)?\b(?!\s*%)/, calcV);
         }
     }
@@ -821,6 +839,9 @@ window.ouvrirMenuAjoutForge = function() {
 
     const capAtteint = window.forgeState.isCapReached;
 
+    // 🔻 On vérifie si une attaque a déjà été posée sur le parchemin
+    const aDejaUneAttaque = window.forgeState.actions.some(act => estUneAttaqueDeBase(act.baseEffet.Nom));
+
     ORDRE_CARACS.forEach(carac => {
         const effets = window.forgeState.effetsBDD.filter(e => {
             const mod = e.Modificateur ? e.Modificateur.toUpperCase() : "AUCUN";
@@ -834,7 +855,10 @@ window.ouvrirMenuAjoutForge = function() {
                 const isLocked = (activeTags.size >= 2 && eff.Modificateur !== "AUCUN" && !activeTags.has(eff.Modificateur.toUpperCase()));
                 const isArmeIncompatible = estIncompatibleAvecArme(eff.Nom, window.forgeState.armePrincipale);
                 
-                const isDisabled = isLocked || capAtteint || isArmeIncompatible;
+                // 🔻 On verrouille si c'est une attaque et qu'il y en a déjà une sur la carte
+                const isAttackLocked = aDejaUneAttaque && estUneAttaqueDeBase(eff.Nom);
+                
+                const isDisabled = isLocked || capAtteint || isArmeIncompatible || isAttackLocked;
                 const bgColor = isDisabled ? 'gray' : '#3b82f6';
                 
                 // Calcul de la fatigue
@@ -1276,9 +1300,15 @@ window.rafraichirForge = function() {
         let options = `<option value="">+ ${label}</option>`;
         
         let groupesMods = {};
+
+        // 🔻 Sécurité pour bloquer les attaques dans les menus déroulants
+        const aDejaUneAttaque = window.forgeState.actions.some(act => estUneAttaqueDeBase(act.baseEffet.Nom));
+
         modsDispos.forEach(mod => {
             const isLocked = activeTags.size >= 2 && mod.Modificateur !== "AUCUN" && !activeTags.has(mod.Modificateur.toUpperCase());
-            if (!isLocked) {
+            const isAttackLocked = aDejaUneAttaque && estUneAttaqueDeBase(mod.Nom);
+            
+            if (!isLocked && !isAttackLocked) {
                 const carac = (mod.Modificateur && mod.Modificateur !== "AUCUN") ? mod.Modificateur.toUpperCase() : "GÉNÉRAL";
                 if (!groupesMods[carac]) groupesMods[carac] = [];
                 

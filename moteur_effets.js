@@ -340,12 +340,37 @@ window.jouerAnimationMoteur = async function(action) {
                 if (tkCible) {
                     window.afficherMessageFlottantHex(tkCible.q, tkCible.r, motDef, "#cccccc");
                     
-                    // 🔻 NOUVEAU : ANIMATION DE RECUL (DODGE) 🔻
+                    // 🔻 NOUVEAU : ROTATION DE LA CIBLE VERS L'ATTAQUANT AVANT D'ESQUIVER 🔻
+                    // On inverse dx et dy car on veut regarder l'attaquant
+                    const targetAngleCible = Math.atan2(-dy, -dx) * (180 / Math.PI) - 90;
+                    let currentAngleCible = tkCible.angle || 0;
+                    
+                    let diffCible = (targetAngleCible - currentAngleCible) % 360;
+                    if (diffCible > 180) diffCible -= 360;
+                    if (diffCible < -180) diffCible += 360;
+                    const nouvelAngleCible = currentAngleCible + diffCible;
+                    
+                    tkCible.angle = nouvelAngleCible;
+                    window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+                    
+                    // Pousse la rotation de l'esquiveur dans Firebase pour que tout le monde le voie
+                    const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
+                    const lanceurData = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
+                    if (lanceurData && lanceurData.idJoueur === currentUserId) {
+                        updateDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
+                            [`Tokens.${idCible}.angle`]: nouvelAngleCible
+                        }).catch(e => console.error(e));
+                    }
+                    
+                    // Courte pause pour laisser le pion pivoter avant le saut en arrière
+                    await new Promise(r => setTimeout(r, 150));
+
+                    // 🔻 ANIMATION DE RECUL (DODGE) 🔻
                     const tokenDiv = document.getElementById("token-" + idCible);
                     if (tokenDiv) {
                         // On normalise le vecteur pour pousser la cible dans la même direction que l'attaque
                         const mag = Math.sqrt(dx * dx + dy * dy) || 1;
-                        const reculX = (dx / mag) * 25 * window.VTT_SCALE; // Recul de 25 pixels (adapté au zoom)
+                        const reculX = (dx / mag) * 25 * window.VTT_SCALE; // Recul de 25 pixels
                         const reculY = (dy / mag) * 25 * window.VTT_SCALE;
                         
                         // Mouvement sec vers l'arrière
@@ -366,7 +391,7 @@ window.jouerAnimationMoteur = async function(action) {
                 // On attend la fin de l'animation d'esquive
                 await new Promise(r => setTimeout(r, 1000));
                 
-                // 🔻 CRUCIAL : "continue" force le code à zapper la ligne 4 et 5 et passer à l'attaque suivante. Zéro Dégât.
+                // CRUCIAL : on passe à l'attaque suivante sans faire de dégâts
                 continue; 
             }
 
