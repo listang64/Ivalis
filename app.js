@@ -380,12 +380,33 @@ async function supprimerPersonnageBDD(idPersonnage) {
       if (window.ID_PARTIE_COURANTE) {
           const partieRef = doc(db, COL.PARTIES, window.ID_PARTIE_COURANTE);
           const partieSnap = await getDoc(partieRef);
+          
           if (partieSnap.exists()) {
               const dataPartie = partieSnap.data();
-              if (dataPartie.Ordre_Initiative) {
-                  const nouvelOrdre = dataPartie.Ordre_Initiative.filter(id => id !== idPersonnage);
-                  await updateDoc(partieRef, { Ordre_Initiative: nouvelOrdre });
-                  console.log("✔️ Retiré de l'ordre d'initiative.");
+              let ordre = dataPartie.Ordre_Initiative || [];
+              let file = dataPartie.File_Attente_Combat || [];
+              let phase = dataPartie.Phase_Combat || "Preparation";
+              
+              if (ordre.includes(idPersonnage) || file.some(f => f.idPersonnage === idPersonnage)) {
+                  const nouvelOrdre = ordre.filter(id => id !== idPersonnage);
+                  const nouvelleFile = file.filter(f => f.idPersonnage !== idPersonnage);
+                  
+                  // 🔻 CORRECTION : On se base sur l'initiative
+                  const nbJoueursRestants = nouvelOrdre.filter(id => {
+                      const p = (window.PERSOS_PARTIE || []).find(perso => perso.idPersonnage === id);
+                      return p && p.statut !== "Mort";
+                  }).length;
+                  
+                  if (phase === "Preparation" && nouvelleFile.length >= nbJoueursRestants && nbJoueursRestants > 0) {
+                      phase = "Resolution";
+                  }
+
+                  await updateDoc(partieRef, { 
+                      Ordre_Initiative: nouvelOrdre,
+                      File_Attente_Combat: nouvelleFile,
+                      Phase_Combat: phase
+                  });
+                  console.log("✔️ Retiré de l'ordre d'initiative et de la file d'attente.");
               }
           }
       }

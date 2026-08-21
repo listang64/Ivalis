@@ -9,7 +9,11 @@ window.ETAT_CIBLAGE = {
     actif: false,
     idCarte: null,
     attaques: [], 
-    cibleUnique: null
+    cibleUnique: null,
+    isZone: false,
+    zoneHexesBase: [],
+    zoneCenterHex: null,
+    zoneRotationStep: 0
 };
 
 // --- OUTILS MATHÉMATIQUES (Distances et Lignes de Vue) ---
@@ -18,15 +22,13 @@ function getHexDistance(a, b) {
     return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
 }
 
-// 🔻 CORRECTION : Algorithme strict de Ligne de Vue (Bresenham pour hexagones) 🔻
 function verifierLigneDeVue(hexA, hexB) {
     if (!window.PLATEAU_VTT) return true;
     let dist = getHexDistance(hexA, hexB);
     
-    if (dist <= 1) return true; // Le corps-à-corps n'est jamais bloqué par la ligne de vue
+    if (dist <= 1) return true; 
 
     const lerp = (a, b, t) => a + (b - a) * t;
-    
     const cubeRound = (q, r, s) => {
         let rq = Math.round(q), rr = Math.round(r), rs = Math.round(s);
         let q_diff = Math.abs(rq - q), r_diff = Math.abs(rr - r), s_diff = Math.abs(rs - s);
@@ -35,32 +37,144 @@ function verifierLigneDeVue(hexA, hexB) {
         return { q: rq, r: rr };
     };
 
-    // On trace une ligne stricte de Centre à Centre.
-    // L'epsilon (1e-6) est vital : il empêche le rayon de passer EXACTEMENT sur une arête 
-    // parfaite entre deux hexagones, ce qui créerait des faux positifs.
     let aCube = { q: hexA.q + 1e-6, r: hexA.r + 1e-6, s: -hexA.q - hexA.r - 2e-6 };
     let bCube = { q: hexB.q + 1e-6, r: hexB.r + 1e-6, s: -hexB.q - hexB.r - 2e-6 };
 
-    // On inspecte CHAQUE case traversée par la ligne (sauf le lanceur et la cible)
     for (let i = 1; i < dist; i++) { 
         let t = i / dist;
         let q = lerp(aCube.q, bCube.q, t);
         let r = lerp(aCube.r, bCube.r, t);
         let s = lerp(aCube.s, bCube.s, t);
-        
         let pt = cubeRound(q, r, s);
         
         const state = window.PLATEAU_VTT.getCaseState(pt.q, pt.r);
-        if (state && state.isBlocked) {
-            return false; // 💥 Le rayon a percuté un mur noir ! Tir impossible.
-        }
+        if (state && state.isBlocked) return false; 
     }
-
-    return true; // La voie est dégagée
+    return true; 
 }
 
+// Fait pivoter un hexagone relatif autour du centre (Par crans de 60 degrés)
+function rotateHex(hex, steps) {
+    let q = hex.q, r = hex.r;
+    for(let i = 0; i < steps; i++) {
+        let nq = -r;
+        let nr = q + r;
+        q = nq;
+        r = nr;
+    }
+    return {q, r};
+}
 
-// 1. Lancement du Ciblage quand on clique sur "Appliquer"
+// =========================================================================
+//  1. ÉVÉNEMENTS GLOBAUX DE LA SOURIS (DÉDIÉS AUX ZONES)
+// =========================================================================
+
+window.VTT_CIBLAGE_MOUSEMOVE = function(e) {
+    const state = window.ETAT_CIBLAGE;
+    if (!state || !state.actif || !state.isZone) return;
+
+    const tkLanceur = window.TOKENS_VTT_DATA[window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage];
+    const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage);
+    const attaqueCourante = state.attaques[0]; 
+
+    // Calcul de la case pointée par la souris
+    const canvasX = (e.clientX - window.VTT_POS_X) / window.VTT_SCALE;
+    const canvasY = (e.clientY - window.VTT_POS_Y) / window.VTT_SCALE;
+    const hoverHex = window.PLATEAU_VTT.pixelToHex(canvasX, canvasY);
+
+    if (attaqueCourante.isRanged) {
+        // --- ZONE À DISTANCE ---
+        const dist = getHexDistance(tkLanceur, hoverHex);
+        
+        let estEngage = false;
+        for (let idToken in window.TOKENS_VTT_DATA) {
+            if (idToken === tkLanceur) continue; 
+            const d = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idToken);
+            if (d && d.camp !== lanceurData.camp && d.statut !== "Mort" && getHexDistance(tkLanceur, window.TOKENS_VTT_DATA[idToken]) === 1) {
+                estEngage = true; break;
+            }
+        }
+
+        if (estEngage && dist > 1) state.zoneCenterHex = null; // Bloqué au CAC
+        else if (dist > attaqueCourante.rangeMax) state.zoneCenterHex = null; // Hors de portée
+        else if (!verifierLigneDeVue(tkLanceur, hoverHex)) state.zoneCenterHex = null; // Mûr
+        else state.zoneCenterHex = hoverHex; // C'est valide !
+
+    } else {
+        // --- ZONE AU CORPS-À-CORPS ---
+        state.zoneCenterHex = { q: tkLanceur.q, r: tkLanceur.r };
+        
+        // Orientation de la zone en fonction de la position de la souris
+        const pxLanceur = window.PLATEAU_VTT.hexToPixel(tkLanceur.q, tkLanceur.r);
+        const screenPxX = window.VTT_POS_X + pxLanceur.x * window.VTT_SCALE;
+        const screenPxY = window.VTT_POS_Y + pxLanceur.y * window.VTT_SCALE;
+        
+        const dy = e.clientY - screenPxY;
+        const dx = e.clientX - screenPxX;
+        let angleDeg = Math.atan2(dy, dx) * 180 / Math.PI;
+        
+        let step = Math.round(angleDeg / 60);
+        if (step < 0) step += 6;
+        state.zoneRotationStep = step % 6;
+    }
+
+    window.actualiserVisuelCiblage();
+};
+
+window.VTT_CIBLAGE_WHEEL = function(e) {
+    const state = window.ETAT_CIBLAGE;
+    if (!state || !state.actif || !state.isZone) return;
+    
+    // La molette ne pivote que les sorts à distance
+    if (state.attaques[0].isRanged) {
+        e.preventDefault();
+        e.stopPropagation(); // Bloque le zoom de la carte
+        let delta = Math.sign(e.deltaY);
+        state.zoneRotationStep = (state.zoneRotationStep + delta + 6) % 6;
+        window.actualiserVisuelCiblage();
+    }
+};
+
+window.VTT_CIBLAGE_CLICK = function(e) {
+    const state = window.ETAT_CIBLAGE;
+    if (!state || !state.actif || !state.isZone) return;
+    
+    const conteneur = document.getElementById("conteneur-plateau-vtt");
+    if (!conteneur || !conteneur.contains(e.target)) return;
+
+    e.stopPropagation(); // Empêche la sélection de jeton
+    
+    if (state.zoneCenterHex) {
+        if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+
+        // 1. Calcul de toutes les cases rouges finales
+        const finalHexes = state.zoneHexesBase.map(h => {
+            const rot = rotateHex(h, state.zoneRotationStep);
+            return { q: state.zoneCenterHex.q + rot.q, r: state.zoneCenterHex.r + rot.r };
+        });
+
+        // 2. Recherche de tous les personnages dans ces cases (Friendly Fire = ON)
+        let ciblesTouchees = [];
+        const idLanceur = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
+
+        for (let idToken in window.TOKENS_VTT_DATA) {
+            if (idToken === idLanceur) continue; // Le lanceur ne se blesse pas lui-même
+            const tk = window.TOKENS_VTT_DATA[idToken];
+            if (finalHexes.some(h => h.q === tk.q && h.r === tk.r)) {
+                ciblesTouchees.push(idToken);
+            }
+        }
+
+        // 3. Application aux attaques et Résolution
+        state.attaques.forEach(a => a.cibles = ciblesTouchees);
+        window.declencherResolution();
+    }
+};
+
+// =========================================================================
+//  2. DÉMARRAGE ET UI DU CIBLAGE
+// =========================================================================
+
 window.demarrerCiblage = async function(idCarte) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
 
@@ -73,8 +187,16 @@ window.demarrerCiblage = async function(idCarte) {
     if (!dataCarte) return;
 
     const attaquesExtraites = [];
+    let isZone = false;
+    let zoneHexesBase = [];
 
+    // Extraction des Attaques et détection de Zone
     dataCarte.Composants.actions.forEach(act => {
+        if (act.zoneHexes && act.zoneHexes.length > 0) {
+            isZone = true;
+            zoneHexesBase = act.zoneHexes;
+        }
+
         const effBase = window.EFFETS_BDD_CACHE[act.baseEffetId];
         if (!effBase) return;
         
@@ -88,17 +210,14 @@ window.demarrerCiblage = async function(idCarte) {
 
         if (estUneAttaque) {
             let typeRes = (nomLower.includes("magique") || nomLower.includes("pouvoir")) ? "Magique" : "Physique";
-            
-            // 🔻 NOUVEAU : Détection de la Distance 🔻
             let isRanged = false;
-            let rangeMax = 1; // 1 = Corps-à-Corps par défaut
+            let rangeMax = 1;
 
             Object.keys(act.mods).forEach(modId => {
                 const modEff = window.EFFETS_BDD_CACHE[modId];
                 if (modEff && modEff.Nom === "Distance") {
                     isRanged = true;
-                    let val = parseFloat(modEff.Valeur) || 0;
-                    rangeMax = 1 + (val * act.mods[modId]); // La valeur du modificateur s'ajoute à la base (1)
+                    rangeMax = 1 + ((parseFloat(modEff.Valeur) || 0) * act.mods[modId]); 
                 }
             });
 
@@ -118,30 +237,39 @@ window.demarrerCiblage = async function(idCarte) {
         return;
     }
 
+    // 🔻 NOUVEAU : Auto-centrage des zones à distance sur la souris 🔻
+    if (isZone && attaquesExtraites[0] && attaquesExtraites[0].isRanged) {
+        let sumQ = 0, sumR = 0;
+        zoneHexesBase.forEach(h => { sumQ += h.q; sumR += h.r; });
+        let avgQ = sumQ / zoneHexesBase.length;
+        let avgR = sumR / zoneHexesBase.length;
+        
+        // Arrondi axial pour s'aligner sur la grille
+        let s = -avgQ - avgR;
+        let rq = Math.round(avgQ), rr = Math.round(avgR), rs = Math.round(s);
+        let qDiff = Math.abs(rq - avgQ), rDiff = Math.abs(rr - avgR), sDiff = Math.abs(rs - s);
+        if (qDiff > rDiff && qDiff > sDiff) rq = -rr - rs;
+        else if (rDiff > sDiff) rr = -rq - rs;
+        
+        // Décalage pour placer le centre mathématique au pixel près de la souris
+        zoneHexesBase = zoneHexesBase.map(h => ({ q: h.q - rq, r: h.r - rr }));
+    }
+
     window.ETAT_CIBLAGE = {
         actif: true,
         idCarte: idCarte,
         attaques: attaquesExtraites,
-        cibleUnique: null
+        cibleUnique: null,
+        isZone: isZone,
+        zoneHexesBase: zoneHexesBase,
+        zoneCenterHex: null,
+        zoneRotationStep: 0
     };
 
     const btnAppliquer = document.getElementById("btn-appliquer-carte");
     if (btnAppliquer) btnAppliquer.style.display = "none";
 
-    let btnResoudre = document.getElementById("btn-resoudre-carte");
-    if (!btnResoudre) {
-        btnResoudre = document.createElement("div");
-        btnResoudre.id = "btn-resoudre-carte";
-        btnResoudre.style.cssText = "position: absolute; bottom: -30px; left: 50%; transform: translateX(-50%); z-index: 5; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 2px black, 0 0 10px #00ffff; color: #00ffff; transition: transform 0.2s;";
-        btnResoudre.onmouseover = () => btnResoudre.style.transform = "translateX(-50%) scale(1.1)";
-        btnResoudre.onmouseout = () => btnResoudre.style.transform = "translateX(-50%) scale(1)";
-        document.getElementById("apercu-carte-hd-competence").appendChild(btnResoudre);
-    }
-    
-    btnResoudre.innerText = "RÉSOUDRE";
-    btnResoudre.style.pointerEvents = "auto";
-    btnResoudre.onclick = () => window.declencherResolution();
-
+    // INJECTION CSS (Anneaux et Bulles)
     if (!document.getElementById("anim-ciblage-vtt")) {
         const style = document.createElement("style");
         style.id = "anim-ciblage-vtt";
@@ -159,17 +287,148 @@ window.demarrerCiblage = async function(idCarte) {
         document.head.appendChild(style);
     }
 
-    window.dessinerAnneauxCiblage();
+    // SI C'EST UNE ZONE : On attache les écouteurs de Souris et on affiche le texte
+    if (isZone) {
+        let msgZone = document.getElementById("msg-zone-ciblage");
+        if (!msgZone) {
+            msgZone = document.createElement("div");
+            msgZone.id = "msg-zone-ciblage";
+            msgZone.style.cssText = "position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; font-family: 'Cinzel', serif; font-size: 18px; color: #ff4c4c; font-weight: bold; text-shadow: 1px 1px 3px black, 0 0 10px #ffaa00; background: rgba(0,0,0,0.8); padding: 10px 20px; border-radius: 12px; pointer-events: none;";
+            document.getElementById("conteneur-plateau-vtt").appendChild(msgZone);
+        }
+        msgZone.innerText = attaquesExtraites[0].isRanged ? "Placez la zone (Molette = Pivoter, Clic = Tirer)" : "Orientez la zone (Souris = Pivoter, Clic = Frapper)";
+
+        window.addEventListener("mousemove", window.VTT_CIBLAGE_MOUSEMOVE, {capture: true});
+        window.addEventListener("wheel", window.VTT_CIBLAGE_WHEEL, {passive: false, capture: true});
+        window.addEventListener("click", window.VTT_CIBLAGE_CLICK, {capture: true});
+        
+    } else {
+        // SI C'EST UNE ATTAQUE SIMPLE : Bouton Résoudre classique
+        let btnResoudre = document.getElementById("btn-resoudre-carte");
+        if (!btnResoudre) {
+            btnResoudre = document.createElement("div");
+            btnResoudre.id = "btn-resoudre-carte";
+            btnResoudre.style.cssText = "position: absolute; bottom: -30px; left: 50%; transform: translateX(-50%); z-index: 5; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 2px black, 0 0 10px #00ffff; color: #00ffff; transition: transform 0.2s;";
+            btnResoudre.onmouseover = () => btnResoudre.style.transform = "translateX(-50%) scale(1.1)";
+            btnResoudre.onmouseout = () => btnResoudre.style.transform = "translateX(-50%) scale(1)";
+            document.getElementById("apercu-carte-hd-competence").appendChild(btnResoudre);
+        }
+        btnResoudre.innerText = "RÉSOUDRE";
+        btnResoudre.style.pointerEvents = "auto";
+        btnResoudre.onclick = () => window.declencherResolution();
+    }
+
+    window.actualiserVisuelCiblage();
 };
 
-// 2. Dessine (ou met à jour) les anneaux autour des cibles valides
+window.actualiserVisuelCiblage = function() {
+    if (!window.ETAT_CIBLAGE || !window.ETAT_CIBLAGE.actif) return;
+    
+    if (window.ETAT_CIBLAGE.isZone) {
+        window.dessinerZoneAoE();
+    } else {
+        window.dessinerAnneauxCiblage();
+    }
+};
+
+window.dessinerZoneAoE = function() {
+    let svg = document.getElementById("svg-zone-ciblage");
+    if (!svg) {
+        svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.id = "svg-zone-ciblage";
+        svg.style.position = "absolute";
+        svg.style.top = "0";
+        svg.style.left = "0";
+        svg.style.width = "100%";
+        svg.style.height = "100%";
+        svg.style.zIndex = "4"; // Juste au dessus de la grille, sous les pions
+        svg.style.pointerEvents = "none";
+        svg.style.overflow = "visible";
+        document.getElementById("transform-plateau").appendChild(svg);
+    }
+    svg.innerHTML = ""; // Nettoyage de l'ancienne frame
+    
+    const state = window.ETAT_CIBLAGE;
+    if (!state.zoneCenterHex) return;
+
+    const hexRadius = window.PLATEAU_VTT.hexSize;
+
+    // 1. Calcul des hexagones finaux impactés
+    const finalHexes = state.zoneHexesBase.map(h => {
+        const rot = rotateHex(h, state.zoneRotationStep);
+        return { q: state.zoneCenterHex.q + rot.q, r: state.zoneCenterHex.r + rot.r };
+    });
+
+    // 2. 🔻 NOUVEAU : Dessin des "Remplissages" (Fills) sans bordure pour éviter la superposition 🔻
+    finalHexes.forEach(h => {
+        const px = window.PLATEAU_VTT.hexToPixel(h.q, h.r);
+        const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+        let points = "";
+        for(let i=0; i<6; i++) {
+            // Angle de 60 degrés calé sur Plateau.js (Bords plats en haut/bas)
+            let angle_rad = Math.PI / 180 * (60 * i);
+            points += `${px.x + hexRadius * Math.cos(angle_rad)},${px.y + hexRadius * Math.sin(angle_rad)} `;
+        }
+        polygon.setAttribute("points", points.trim());
+        polygon.setAttribute("fill", "rgba(255, 76, 76, 0.35)");
+        // Une bordure de 1px de la même opacité empêche les micro-fissures (anti-aliasing)
+        polygon.setAttribute("stroke", "rgba(255, 76, 76, 0.35)");
+        polygon.setAttribute("stroke-width", "1");
+        svg.appendChild(polygon);
+    });
+
+    // 3. 🔻 NOUVEAU : Calcul mathématique de l'enveloppe externe pour le liseret épais 🔻
+    const dirs = [
+        {q: 1, r: 0},
+        {q: 0, r: 1},
+        {q: -1, r: 1},
+        {q: -1, r: 0},
+        {q: 0, r: -1},
+        {q: 1, r: -1}
+    ];
+
+    finalHexes.forEach(h => {
+        const px = window.PLATEAU_VTT.hexToPixel(h.q, h.r);
+        const corners = [];
+        // Calcul des 6 sommets de l'hexagone
+        for(let i=0; i<6; i++) {
+            let angle_rad = Math.PI / 180 * (60 * i);
+            corners.push({ x: px.x + hexRadius * Math.cos(angle_rad), y: px.y + hexRadius * Math.sin(angle_rad) });
+        }
+
+        // Pour chaque face de l'hexagone, on vérifie s'il y a un autre hexagone rouge collé
+        for(let i=0; i<6; i++) {
+            const nQ = h.q + dirs[i].q;
+            const nR = h.r + dirs[i].r;
+            
+            const aUnVoisinRouge = finalHexes.some(fh => fh.q === nQ && fh.r === nR);
+            
+            // Si la face touche du "vide", alors on trace un liseret rouge externe
+            if (!aUnVoisinRouge) {
+                const c1 = corners[i];
+                const c2 = corners[(i + 1) % 6];
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute("x1", c1.x);
+                line.setAttribute("y1", c1.y);
+                line.setAttribute("x2", c2.x);
+                line.setAttribute("y2", c2.y);
+                line.setAttribute("stroke", "#ff4c4c");
+                line.setAttribute("stroke-width", "3");
+                line.setAttribute("stroke-linecap", "round");
+                svg.appendChild(line);
+            }
+        }
+    });
+};
+
+// 3. Dessine (ou met à jour) les anneaux autour des cibles valides
 window.dessinerAnneauxCiblage = function() {
     if (!window.ETAT_CIBLAGE || !window.ETAT_CIBLAGE.actif) {
         document.querySelectorAll(".anneau-ciblage, .bulle-validation-cible").forEach(el => el.remove());
         return;
     }
 
-    const attaqueCourante = window.ETAT_CIBLAGE.attaques[0]; // Comme la cible est unique, on lit la config de la première attaque
+    const attaqueCourante = window.ETAT_CIBLAGE.attaques[0]; 
     if (!attaqueCourante) return;
 
     const idLanceur = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
@@ -178,7 +437,6 @@ window.dessinerAnneauxCiblage = function() {
     
     if (!tkLanceur || !lanceurData) return;
 
-    // 🔻 NOUVEAU : On vérifie si le lanceur est engagé au Corps-à-Corps 🔻
     let estEngage = false;
     for (let idToken in window.TOKENS_VTT_DATA) {
         if (idToken === idLanceur) continue; 
@@ -203,15 +461,8 @@ window.dessinerAnneauxCiblage = function() {
         const tk = window.TOKENS_VTT_DATA[idToken];
         const dist = getHexDistance(tkLanceur, tk);
 
-        // 🔻 LES 3 RÈGLES D'OR DU CIBLAGE 🔻
-        
-        // 1. Règle de Portée
         if (dist > attaqueCourante.rangeMax) continue;
-
-        // 2. Règle d'Engagement (Bloqué au CAC)
         if (estEngage && dist > 1) continue;
-
-        // 3. Règle de la Ligne de Vue (Murs)
         if (!verifierLigneDeVue(tkLanceur, tk)) continue;
 
         ciblesValides.add(idToken);
@@ -238,7 +489,6 @@ window.dessinerAnneauxCiblage = function() {
                 void anneau.offsetWidth; 
             }
 
-            // 🔻 NOUVEAU : Affichage de la pénalité de Tir dans la mêlée 🔻
             let malusLabel = anneau.querySelector(".malus-cac");
             if (attaqueCourante.isRanged && dist === 1) {
                 if (!malusLabel) {
@@ -315,7 +565,7 @@ window.dessinerAnneauxCiblage = function() {
     });
 };
 
-// 3. Lorsqu'on clique sur un pion pendant le ciblage
+// 4. Lorsqu'on clique sur un pion pendant le ciblage (Cible Unique)
 window.ajouterCibleCiblage = function(idCible) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     const state = window.ETAT_CIBLAGE;
@@ -378,16 +628,28 @@ window.ajouterCibleCiblage = function(idCible) {
     window.dessinerAnneauxCiblage();
 };
 
-// 4. Nettoyage si on clique dans le vide ou si on annule
+// 5. Nettoyage si on clique dans le vide ou si on annule
 window.nettoyerCiblage = function() {
     window.ETAT_CIBLAGE.actif = false;
     document.querySelectorAll(".anneau-ciblage, .bulle-validation-cible").forEach(el => el.remove());
     
+    const svgZone = document.getElementById("svg-zone-ciblage");
+    if (svgZone) svgZone.remove();
+    
+    const msgZone = document.getElementById("msg-zone-ciblage");
+    if (msgZone) msgZone.remove();
+
+    window.removeEventListener("mousemove", window.VTT_CIBLAGE_MOUSEMOVE, {capture: true});
+    window.removeEventListener("wheel", window.VTT_CIBLAGE_WHEEL, {capture: true});
+    window.removeEventListener("click", window.VTT_CIBLAGE_CLICK, {capture: true});
+
     const btnAppliquer = document.getElementById("btn-appliquer-carte");
+    const btnResoudre = document.getElementById("btn-resoudre-carte");
     if (btnAppliquer) btnAppliquer.style.display = "block";
+    if (btnResoudre) btnResoudre.remove();
 };
 
-// 5. Envoi de l'action de Dégâts à Firebase
+// 6. Envoi de l'action de Dégâts à Firebase
 window.declencherResolution = async function() {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     const state = window.ETAT_CIBLAGE;
@@ -399,6 +661,8 @@ window.declencherResolution = async function() {
         idLanceur: window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage,
         idCarte: state.idCarte,
         attaques: state.attaques,
+        isZone: state.isZone,
+        zoneCenterHex: state.zoneCenterHex,
         timestamp: new Date().getTime()
     };
 
@@ -421,8 +685,37 @@ window.jouerAnimationMoteur = async function(action) {
     if (action.type !== "ATTAQUES") return;
 
     const lanceur = action.idLanceur;
+    const tkLanceur = window.TOKENS_VTT_DATA[lanceur];
 
-    // On séquence les animations des attaques
+    // 🔻 NOUVEAU : Si c'est une ZONE, le lanceur pivote UNE FOIS vers le centre de la zone
+    if (action.isZone && action.zoneCenterHex && tkLanceur) {
+        if (tkLanceur.q !== action.zoneCenterHex.q || tkLanceur.r !== action.zoneCenterHex.r) {
+            const pxLanceur = window.PLATEAU_VTT.hexToPixel(tkLanceur.q, tkLanceur.r);
+            const pxCible = window.PLATEAU_VTT.hexToPixel(action.zoneCenterHex.q, action.zoneCenterHex.r);
+            const dx = pxCible.x - pxLanceur.x;
+            const dy = pxCible.y - pxLanceur.y;
+            
+            const targetAngle = Math.atan2(dy, dx) * (180 / Math.PI) - 90;
+            let currentAngle = tkLanceur.angle || 0;
+            let diff = (targetAngle - currentAngle) % 360;
+            if (diff > 180) diff -= 360;
+            if (diff < -180) diff += 360;
+            const nouvelAngle = currentAngle + diff;
+            
+            tkLanceur.angle = nouvelAngle;
+            window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+            
+            const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
+            const lanceurData = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
+            if (lanceurData && lanceurData.idJoueur === currentUserId) {
+                updateDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
+                    [`Tokens.${lanceur}.angle`]: nouvelAngle
+                }).catch(e => console.error(e));
+            }
+            await new Promise(r => setTimeout(r, 200)); 
+        }
+    }
+
     for (let attaque of action.attaques) {
         if (attaque.cibles.length === 0) continue;
 
@@ -431,14 +724,13 @@ window.jouerAnimationMoteur = async function(action) {
             const cibleData = window.PERSOS_PARTIE.find(p => p.idPersonnage === idCible);
             if (!cibleData) continue;
 
-            const tkLanceur = window.TOKENS_VTT_DATA[lanceur];
             const tkCible = window.TOKENS_VTT_DATA[idCible];
 
             let dx = 0; let dy = 0;
             const dist = getHexDistance(tkLanceur, tkCible);
 
-            // 2. ROTATION DU LANCEUR VERS SA CIBLE
-            if (tkLanceur && tkCible) {
+            // ROTATION DU LANCEUR (Uniquement si ce n'est PAS une Zone)
+            if (!action.isZone && tkLanceur && tkCible) {
                 const pxLanceur = window.PLATEAU_VTT.hexToPixel(tkLanceur.q, tkLanceur.r);
                 const pxCible = window.PLATEAU_VTT.hexToPixel(tkCible.q, tkCible.r);
                 
@@ -465,6 +757,12 @@ window.jouerAnimationMoteur = async function(action) {
                 }
                 
                 await new Promise(r => setTimeout(r, 200)); 
+            } else if (action.isZone) {
+                // On calcule quand même dx et dy pour l'esquive de la cible
+                const pxLanceur = window.PLATEAU_VTT.hexToPixel(tkLanceur.q, tkLanceur.r);
+                const pxCible = window.PLATEAU_VTT.hexToPixel(tkCible.q, tkCible.r);
+                dx = pxCible.x - pxLanceur.x;
+                dy = pxCible.y - pxLanceur.y;
             }
 
             const esquive = (parseInt(cibleData.Esquive) || 0) + (parseInt(cibleData.Dev_Mod_Esquive) || 0);
@@ -474,7 +772,7 @@ window.jouerAnimationMoteur = async function(action) {
             const statDef = Math.max(esquive, parade);
             const motDef = parade > esquive ? "Paré 🛡️" : "Esquivé 💨";
 
-            // 3. VÉRIFICATION DE LA DÉFENSE (Esquive / Parade)
+            // VÉRIFICATION DE LA DÉFENSE
             if (jetDef <= statDef) {
                 if (tkCible) {
                     window.afficherMessageFlottantHex(tkCible.q, tkCible.r, motDef, "#cccccc");
@@ -523,15 +821,14 @@ window.jouerAnimationMoteur = async function(action) {
                 continue; 
             }
 
-            // 4. Calcul des Dégâts (avec la pénalité de Tir dans la Mêlée)
+            // Calcul des Dégâts
             const defPhys = (parseInt(cibleData.Def_Physique) || 0) + (parseInt(cibleData.Dev_Mod_DefPhys) || 0);
             const defMag = (parseInt(cibleData.Def_Magique) || 0) + (parseInt(cibleData.Dev_Mod_DefMag) || 0);
 
             let degats = attaque.valeurBrute;
 
-            // 🔻 NOUVEAU : Application du Malus -30% si Tir au CAC 🔻
             if (attaque.isRanged && dist === 1) {
-                degats = Math.floor(degats * 0.7); // 70% des dégâts originaux
+                degats = Math.floor(degats * 0.7); 
             }
 
             let resistance = attaque.typeRes === "Magique" ? defMag : defPhys;
@@ -549,7 +846,7 @@ window.jouerAnimationMoteur = async function(action) {
             if(cibleData.PV_Actuels < 0) cibleData.PV_Actuels = 0;
             let newPv = cibleData.PV_Actuels;
 
-            // 5. Animations Visuelles de l'impact
+            // Animations Visuelles de l'impact
             if (tkCible) {
                 window.afficherMessageFlottantHex(tkCible.q, tkCible.r, `-${degatsFinaux} 🩸`, "#ff4c4c");
 
@@ -599,7 +896,6 @@ window.jouerAnimationMoteur = async function(action) {
                 }
             }
 
-            // 6. Mise à jour de Firebase et UI
             const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
             const lanceurData = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
             
@@ -617,7 +913,7 @@ window.jouerAnimationMoteur = async function(action) {
         }
     }
 
-    // 7. Fin de la Séquence globale
+    // Fin de la Séquence globale
     const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
     const lanceurData = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
     if (lanceurData && lanceurData.idJoueur === currentUserId) {

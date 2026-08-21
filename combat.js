@@ -1182,39 +1182,72 @@ window.selectionnerEtCentrerPerso = function(idPersonnage) {
 };
 
 // =========================================================================
-//  SUPPRESSION D'UN PION (TOKEN)
+//  SUPPRESSION D'UN PION (TOKEN) ET AUTO-DESTRUCTION DES ENNEMIS
 // =========================================================================
 window.supprimerTokenVTT = async function() {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     
-    // 1. Sécurité : vérifier qu'un pion est bien "ciblé" (halo bleu)
     if (!window.TOKEN_SELECTIONNE) {
         alert("Sélectionnez d'abord un pion sur la carte en cliquant dessus.");
         return;
     }
-    
     if (!confirm("Voulez-vous vraiment retirer ce pion de la carte tactique ?")) return;
 
     const idSupprime = window.TOKEN_SELECTIONNE;
+    const persoCible = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idSupprime);
+    const estEnnemi = persoCible && persoCible.camp === "Ennemi";
 
-    // 2. Suppression dans la mémoire locale
+    // 1. Suppression dans la mémoire locale
     delete window.TOKENS_VTT_DATA[idSupprime];
     window.TOKEN_SELECTIONNE = null;
     window.restaurerPanneauGauche();
     
-    // 3. Mise à jour visuelle de l'interface (Remet l'affichage de taille à zéro)
     const label = document.getElementById("label-taille-token");
     if (label) label.innerText = "--";
     window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
 
-    // 4. Pousse la mise à jour vers Firebase (deleteField pour vraiment retirer la clé)
     if (!window.ID_PARTIE_COURANTE) return;
     try {
-        const { doc, updateDoc, deleteField } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+        const { doc, getDoc, updateDoc, deleteDoc, deleteField } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
         
+        // 2. On le retire du plateau partagé
         await updateDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
             ["Tokens." + idSupprime]: deleteField()
         });
+
+        // 3. Si c'est un Ennemi, on purge l'initiative et la Base de données !
+        if (estEnnemi) {
+            const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
+            const partieSnap = await getDoc(partieRef);
+            
+            if (partieSnap.exists()) {
+                let ordre = partieSnap.data().Ordre_Initiative || [];
+                let file = partieSnap.data().File_Attente_Combat || [];
+                let phase = partieSnap.data().Phase_Combat || "Preparation";
+                
+                ordre = ordre.filter(id => id !== idSupprime);
+                file = file.filter(item => item.idPersonnage !== idSupprime);
+                
+                // 🔻 CORRECTION : On se base sur l'initiative restante
+                const nbJoueursRestants = ordre.filter(id => {
+                    const p = (window.PERSOS_PARTIE || []).find(perso => perso.idPersonnage === id);
+                    return p && p.statut !== "Mort";
+                }).length;
+                
+                if (phase === "Preparation" && file.length >= nbJoueursRestants && nbJoueursRestants > 0) {
+                    phase = "Resolution";
+                }
+                
+                await updateDoc(partieRef, { 
+                    Ordre_Initiative: ordre,
+                    File_Attente_Combat: file,
+                    Phase_Combat: phase
+                });
+            }
+            
+            await deleteDoc(doc(db, "Personnages", idSupprime));
+            console.log(`💀 L'ennemi ${idSupprime} a été incinéré pour garder la BDD propre.`);
+        }
         
     } catch (e) {
         console.error("Erreur lors de la suppression du token :", e);
@@ -1773,9 +1806,15 @@ window.jouerCarteCombat = async function(idCarte) {
             });
 
             let phase = snap.data().Phase_Combat || "Preparation";
-            const nbJoueursVivants = (window.PERSOS_PARTIE || []).filter(p => p.statut !== "Mort").length;
             
-            if (file.length >= nbJoueursVivants && nbJoueursVivants > 0) phase = "Resolution";
+            // 🔻 CORRECTION : On ne compte QUE les combattants présents dans l'Initiative !
+            let ordreInit = snap.data().Ordre_Initiative || [];
+            const nbJoueursActifs = ordreInit.filter(id => {
+                const p = (window.PERSOS_PARTIE || []).find(perso => perso.idPersonnage === id);
+                return p && p.statut !== "Mort";
+            }).length;
+            
+            if (file.length >= nbJoueursActifs && nbJoueursActifs > 0) phase = "Resolution";
 
             await updateDoc(partieRef, { 
                 File_Attente_Combat: file,
@@ -1789,6 +1828,7 @@ window.jouerCarteCombat = async function(idCarte) {
             deckEl.style.pointerEvents = "auto";
         }
         if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD(true);
+        const btn = document.getElementById("btn-choisir-action");
         if (btn) { btn.innerText = "Choisir"; btn.disabled = false; }
         window.mettreAJourJaugeFatigue(0);
     }
@@ -1848,9 +1888,15 @@ window.jouerReposLong = async function() {
             });
 
             let newPhase = snap.data().Phase_Combat || "Preparation";
-            const nbJoueursVivants = (window.PERSOS_PARTIE || []).filter(p => p.statut !== "Mort").length;
             
-            if (file.length >= nbJoueursVivants && nbJoueursVivants > 0) newPhase = "Resolution";
+            // 🔻 CORRECTION : Idem pour le Repos Long
+            let ordreInit = snap.data().Ordre_Initiative || [];
+            const nbJoueursActifs = ordreInit.filter(id => {
+                const p = (window.PERSOS_PARTIE || []).find(perso => perso.idPersonnage === id);
+                return p && p.statut !== "Mort";
+            }).length;
+            
+            if (file.length >= nbJoueursActifs && nbJoueursActifs > 0) newPhase = "Resolution";
 
             await updateDoc(partieRef, { 
                 File_Attente_Combat: file,
