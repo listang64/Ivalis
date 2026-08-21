@@ -13,7 +13,9 @@ window.ETAT_CIBLAGE = {
     isZone: false,
     zoneHexesBase: [],
     zoneCenterHex: null,
-    zoneRotationStep: 0
+    zoneRotationStep: 0,
+    initialTwistAngle: 0, // 🔻 CORRECTION : Renommé en Twist (Rotation)
+    initialZoneStep: 0
 };
 
 // --- OUTILS MATHÉMATIQUES (Distances et Lignes de Vue) ---
@@ -53,7 +55,6 @@ function verifierLigneDeVue(hexA, hexB) {
     return true; 
 }
 
-// Fait pivoter un hexagone relatif autour du centre (Par crans de 60 degrés)
 function rotateHex(hex, steps) {
     let q = hex.q, r = hex.r;
     for(let i = 0; i < steps; i++) {
@@ -66,10 +67,12 @@ function rotateHex(hex, steps) {
 }
 
 // =========================================================================
-//  1. ÉVÉNEMENTS GLOBAUX DE LA SOURIS (DÉDIÉS AUX ZONES)
+//  1. ÉVÉNEMENTS GLOBAUX (SOURIS ET TACTILE IPAD)
 // =========================================================================
 
 window.VTT_CIBLAGE_MOUSEMOVE = function(e) {
+    if (window.matchMedia("(hover: none) and (pointer: coarse)").matches) return;
+
     const state = window.ETAT_CIBLAGE;
     if (!state || !state.actif || !state.isZone) return;
 
@@ -77,13 +80,11 @@ window.VTT_CIBLAGE_MOUSEMOVE = function(e) {
     const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage);
     const attaqueCourante = state.attaques[0]; 
 
-    // Calcul de la case pointée par la souris
     const canvasX = (e.clientX - window.VTT_POS_X) / window.VTT_SCALE;
     const canvasY = (e.clientY - window.VTT_POS_Y) / window.VTT_SCALE;
     const hoverHex = window.PLATEAU_VTT.pixelToHex(canvasX, canvasY);
 
     if (attaqueCourante.isRanged) {
-        // --- ZONE À DISTANCE ---
         const dist = getHexDistance(tkLanceur, hoverHex);
         
         let estEngage = false;
@@ -95,16 +96,14 @@ window.VTT_CIBLAGE_MOUSEMOVE = function(e) {
             }
         }
 
-        if (estEngage && dist > 1) state.zoneCenterHex = null; // Bloqué au CAC
-        else if (dist > attaqueCourante.rangeMax) state.zoneCenterHex = null; // Hors de portée
-        else if (!verifierLigneDeVue(tkLanceur, hoverHex)) state.zoneCenterHex = null; // Mûr
-        else state.zoneCenterHex = hoverHex; // C'est valide !
+        if (estEngage && dist > 1) state.zoneCenterHex = null; 
+        else if (dist > attaqueCourante.rangeMax) state.zoneCenterHex = null; 
+        else if (!verifierLigneDeVue(tkLanceur, hoverHex)) state.zoneCenterHex = null; 
+        else state.zoneCenterHex = hoverHex; 
 
     } else {
-        // --- ZONE AU CORPS-À-CORPS ---
         state.zoneCenterHex = { q: tkLanceur.q, r: tkLanceur.r };
         
-        // Orientation de la zone en fonction de la position de la souris
         const pxLanceur = window.PLATEAU_VTT.hexToPixel(tkLanceur.q, tkLanceur.r);
         const screenPxX = window.VTT_POS_X + pxLanceur.x * window.VTT_SCALE;
         const screenPxY = window.VTT_POS_Y + pxLanceur.y * window.VTT_SCALE;
@@ -125,10 +124,9 @@ window.VTT_CIBLAGE_WHEEL = function(e) {
     const state = window.ETAT_CIBLAGE;
     if (!state || !state.actif || !state.isZone) return;
     
-    // La molette ne pivote que les sorts à distance
     if (state.attaques[0].isRanged) {
         e.preventDefault();
-        e.stopPropagation(); // Bloque le zoom de la carte
+        e.stopPropagation(); 
         let delta = Math.sign(e.deltaY);
         state.zoneRotationStep = (state.zoneRotationStep + delta + 6) % 6;
         window.actualiserVisuelCiblage();
@@ -141,33 +139,74 @@ window.VTT_CIBLAGE_CLICK = function(e) {
     
     const conteneur = document.getElementById("conteneur-plateau-vtt");
     if (!conteneur || !conteneur.contains(e.target)) return;
+    e.stopPropagation(); 
 
-    e.stopPropagation(); // Empêche la sélection de jeton
-    
-    if (state.zoneCenterHex) {
-        if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-
-        // 1. Calcul de toutes les cases rouges finales
-        const finalHexes = state.zoneHexesBase.map(h => {
-            const rot = rotateHex(h, state.zoneRotationStep);
-            return { q: state.zoneCenterHex.q + rot.q, r: state.zoneCenterHex.r + rot.r };
-        });
-
-        // 2. Recherche de tous les personnages dans ces cases (Friendly Fire = ON)
-        let ciblesTouchees = [];
-        const idLanceur = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
-
+    if (state.attaques[0].isRanged) {
+        const canvasX = (e.clientX - window.VTT_POS_X) / window.VTT_SCALE;
+        const canvasY = (e.clientY - window.VTT_POS_Y) / window.VTT_SCALE;
+        const targetHex = window.PLATEAU_VTT.pixelToHex(canvasX, canvasY);
+        
+        const tkLanceur = window.TOKENS_VTT_DATA[window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage];
+        const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage);
+        const dist = getHexDistance(tkLanceur, targetHex);
+        
+        let estEngage = false;
         for (let idToken in window.TOKENS_VTT_DATA) {
-            if (idToken === idLanceur) continue; // Le lanceur ne se blesse pas lui-même
-            const tk = window.TOKENS_VTT_DATA[idToken];
-            if (finalHexes.some(h => h.q === tk.q && h.r === tk.r)) {
-                ciblesTouchees.push(idToken);
+            if (idToken === tkLanceur) continue; 
+            const d = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idToken);
+            if (d && d.camp !== lanceurData.camp && d.statut !== "Mort" && getHexDistance(tkLanceur, window.TOKENS_VTT_DATA[idToken]) === 1) {
+                estEngage = true; break;
             }
         }
 
-        // 3. Application aux attaques et Résolution
-        state.attaques.forEach(a => a.cibles = ciblesTouchees);
-        window.declencherResolution();
+        if (estEngage && dist > 1) state.zoneCenterHex = null; 
+        else if (dist > state.attaques[0].rangeMax) state.zoneCenterHex = null; 
+        else if (!verifierLigneDeVue(tkLanceur, targetHex)) state.zoneCenterHex = null; 
+        else state.zoneCenterHex = targetHex; 
+
+        window.actualiserVisuelCiblage();
+    }
+};
+
+// 🔻 ÉVÉNEMENTS TACTILES IPAD (2 DOIGTS = ROTATION TWIST) 🔻
+window.VTT_CIBLAGE_TOUCHSTART = function(e) {
+    const state = window.ETAT_CIBLAGE;
+    if (!state || !state.actif || !state.isZone) return;
+
+    if (e.touches.length === 2) {
+        const dx = e.touches[1].clientX - e.touches[0].clientX;
+        const dy = e.touches[1].clientY - e.touches[0].clientY;
+        state.initialTwistAngle = Math.atan2(dy, dx) * 180 / Math.PI;
+        state.initialZoneStep = state.zoneRotationStep;
+    }
+};
+
+window.VTT_CIBLAGE_TOUCHMOVE = function(e) {
+    const state = window.ETAT_CIBLAGE;
+    if (!state || !state.actif || !state.isZone) return;
+
+    if (e.touches.length === 2) {
+        // 🔻 CORRECTION : On ne met plus de e.stopPropagation() ni de e.preventDefault() ici.
+        // Ainsi, l'iPad peut continuer d'interpréter le pinch (écartement) pour zoomer la carte, 
+        // tout en exécutant notre rotation de zone en même temps !
+
+        const dx = e.touches[1].clientX - e.touches[0].clientX;
+        const dy = e.touches[1].clientY - e.touches[0].clientY;
+        const currentAngle = Math.atan2(dy, dx) * 180 / Math.PI;
+        
+        let diff = currentAngle - state.initialTwistAngle;
+        if (diff > 180) diff -= 360;
+        if (diff < -180) diff += 360;
+        
+        let stepDelta = Math.round(diff / 60);
+        
+        let newStep = (state.initialZoneStep + stepDelta) % 6;
+        if (newStep < 0) newStep += 6;
+        
+        if (state.zoneRotationStep !== newStep) {
+            state.zoneRotationStep = newStep;
+            window.actualiserVisuelCiblage();
+        }
     }
 };
 
@@ -190,7 +229,6 @@ window.demarrerCiblage = async function(idCarte) {
     let isZone = false;
     let zoneHexesBase = [];
 
-    // Extraction des Attaques et détection de Zone
     dataCarte.Composants.actions.forEach(act => {
         if (act.zoneHexes && act.zoneHexes.length > 0) {
             isZone = true;
@@ -237,23 +275,22 @@ window.demarrerCiblage = async function(idCarte) {
         return;
     }
 
-    // 🔻 NOUVEAU : Auto-centrage des zones à distance sur la souris 🔻
     if (isZone && attaquesExtraites[0] && attaquesExtraites[0].isRanged) {
         let sumQ = 0, sumR = 0;
         zoneHexesBase.forEach(h => { sumQ += h.q; sumR += h.r; });
         let avgQ = sumQ / zoneHexesBase.length;
         let avgR = sumR / zoneHexesBase.length;
         
-        // Arrondi axial pour s'aligner sur la grille
         let s = -avgQ - avgR;
         let rq = Math.round(avgQ), rr = Math.round(avgR), rs = Math.round(s);
         let qDiff = Math.abs(rq - avgQ), rDiff = Math.abs(rr - avgR), sDiff = Math.abs(rs - s);
         if (qDiff > rDiff && qDiff > sDiff) rq = -rr - rs;
         else if (rDiff > sDiff) rr = -rq - rs;
         
-        // Décalage pour placer le centre mathématique au pixel près de la souris
         zoneHexesBase = zoneHexesBase.map(h => ({ q: h.q - rq, r: h.r - rr }));
     }
+
+    const tkLanceur = window.TOKENS_VTT_DATA[window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage];
 
     window.ETAT_CIBLAGE = {
         actif: true,
@@ -262,8 +299,10 @@ window.demarrerCiblage = async function(idCarte) {
         cibleUnique: null,
         isZone: isZone,
         zoneHexesBase: zoneHexesBase,
-        zoneCenterHex: null,
-        zoneRotationStep: 0
+        zoneCenterHex: isZone && !attaquesExtraites[0].isRanged ? {q: tkLanceur.q, r: tkLanceur.r} : null,
+        zoneRotationStep: 0,
+        initialTwistAngle: 0,
+        initialZoneStep: 0
     };
 
     const btnAppliquer = document.getElementById("btn-appliquer-carte");
@@ -287,8 +326,27 @@ window.demarrerCiblage = async function(idCarte) {
         document.head.appendChild(style);
     }
 
-    // SI C'EST UNE ZONE : On attache les écouteurs de Souris et on affiche le texte
     if (isZone) {
+        let bulleZone = document.getElementById("bulle-validation-zone");
+        if (!bulleZone) {
+            bulleZone = document.createElement("div");
+            bulleZone.id = "bulle-validation-zone";
+            bulleZone.style.cssText = "position: fixed; top: 100px; left: 50%; transform: translateX(-50%); z-index: 10000; background: linear-gradient(180deg, #2a1a0f, #1a0f08); border: 2px solid #c2a878; border-radius: 30px; padding: 10px 25px; display: flex; align-items: center; gap: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.9);";
+            
+            bulleZone.innerHTML = `
+                <div style="color: white; font-family: 'Cinzel', serif; font-size: 18px; font-weight: bold; text-shadow: 1px 1px 3px black;">Valider la Zone</div>
+                <div style="display:flex; gap: 15px;">
+                    <div id="btn-valider-zone-ok" style="width: 35px; height: 35px; background: #1b6e3a; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; font-weight: bold; font-size: 18px; border: 2px solid white; box-shadow: 0 0 10px #1b6e3a; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">✔️</div>
+                    <div id="btn-valider-zone-ko" style="width: 35px; height: 35px; background: #d32f2f; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; font-weight: bold; font-size: 18px; border: 2px solid white; box-shadow: 0 0 10px #d32f2f; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">✖</div>
+                </div>
+            `;
+            document.body.appendChild(bulleZone);
+        }
+        bulleZone.style.display = "flex";
+        
+        document.getElementById("btn-valider-zone-ok").onclick = () => window.validerZoneAoE();
+        document.getElementById("btn-valider-zone-ko").onclick = () => window.nettoyerCiblage();
+
         let msgZone = document.getElementById("msg-zone-ciblage");
         if (!msgZone) {
             msgZone = document.createElement("div");
@@ -296,14 +354,17 @@ window.demarrerCiblage = async function(idCarte) {
             msgZone.style.cssText = "position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; font-family: 'Cinzel', serif; font-size: 18px; color: #ff4c4c; font-weight: bold; text-shadow: 1px 1px 3px black, 0 0 10px #ffaa00; background: rgba(0,0,0,0.8); padding: 10px 20px; border-radius: 12px; pointer-events: none;";
             document.getElementById("conteneur-plateau-vtt").appendChild(msgZone);
         }
-        msgZone.innerText = attaquesExtraites[0].isRanged ? "Placez la zone (Molette = Pivoter, Clic = Tirer)" : "Orientez la zone (Souris = Pivoter, Clic = Frapper)";
+        
+        // 🔻 CORRECTION DU MESSAGE D'AIDE 🔻
+        msgZone.innerText = attaquesExtraites[0].isRanged ? "Placez la zone (1 doigt). Pivotez la zone (2 doigts)." : "Faites pivoter la zone (Rotation à 2 doigts).";
 
         window.addEventListener("mousemove", window.VTT_CIBLAGE_MOUSEMOVE, {capture: true});
         window.addEventListener("wheel", window.VTT_CIBLAGE_WHEEL, {passive: false, capture: true});
         window.addEventListener("click", window.VTT_CIBLAGE_CLICK, {capture: true});
+        window.addEventListener("touchstart", window.VTT_CIBLAGE_TOUCHSTART, {capture: true, passive: false});
+        window.addEventListener("touchmove", window.VTT_CIBLAGE_TOUCHMOVE, {capture: true, passive: false});
         
     } else {
-        // SI C'EST UNE ATTAQUE SIMPLE : Bouton Résoudre classique
         let btnResoudre = document.getElementById("btn-resoudre-carte");
         if (!btnResoudre) {
             btnResoudre = document.createElement("div");
@@ -319,6 +380,37 @@ window.demarrerCiblage = async function(idCarte) {
     }
 
     window.actualiserVisuelCiblage();
+};
+
+window.validerZoneAoE = function() {
+    const state = window.ETAT_CIBLAGE;
+    if (!state || !state.actif || !state.isZone) return;
+    
+    if (!state.zoneCenterHex) {
+        alert("Zone invalide (hors de portée, obstruée ou non placée).");
+        return;
+    }
+    
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+
+    const finalHexes = state.zoneHexesBase.map(h => {
+        const rot = rotateHex(h, state.zoneRotationStep);
+        return { q: state.zoneCenterHex.q + rot.q, r: state.zoneCenterHex.r + rot.r };
+    });
+
+    let ciblesTouchees = [];
+    const idLanceur = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
+
+    for (let idToken in window.TOKENS_VTT_DATA) {
+        if (idToken === idLanceur) continue; 
+        const tk = window.TOKENS_VTT_DATA[idToken];
+        if (finalHexes.some(h => h.q === tk.q && h.r === tk.r)) {
+            ciblesTouchees.push(idToken);
+        }
+    }
+
+    state.attaques.forEach(a => a.cibles = ciblesTouchees);
+    window.declencherResolution();
 };
 
 window.actualiserVisuelCiblage = function() {
@@ -341,69 +433,57 @@ window.dessinerZoneAoE = function() {
         svg.style.left = "0";
         svg.style.width = "100%";
         svg.style.height = "100%";
-        svg.style.zIndex = "4"; // Juste au dessus de la grille, sous les pions
+        svg.style.zIndex = "4"; 
         svg.style.pointerEvents = "none";
         svg.style.overflow = "visible";
         document.getElementById("transform-plateau").appendChild(svg);
     }
-    svg.innerHTML = ""; // Nettoyage de l'ancienne frame
+    svg.innerHTML = ""; 
     
     const state = window.ETAT_CIBLAGE;
     if (!state.zoneCenterHex) return;
 
     const hexRadius = window.PLATEAU_VTT.hexSize;
 
-    // 1. Calcul des hexagones finaux impactés
     const finalHexes = state.zoneHexesBase.map(h => {
         const rot = rotateHex(h, state.zoneRotationStep);
         return { q: state.zoneCenterHex.q + rot.q, r: state.zoneCenterHex.r + rot.r };
     });
 
-    // 2. 🔻 NOUVEAU : Dessin des "Remplissages" (Fills) sans bordure pour éviter la superposition 🔻
     finalHexes.forEach(h => {
         const px = window.PLATEAU_VTT.hexToPixel(h.q, h.r);
         const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
         let points = "";
         for(let i=0; i<6; i++) {
-            // Angle de 60 degrés calé sur Plateau.js (Bords plats en haut/bas)
             let angle_rad = Math.PI / 180 * (60 * i);
             points += `${px.x + hexRadius * Math.cos(angle_rad)},${px.y + hexRadius * Math.sin(angle_rad)} `;
         }
         polygon.setAttribute("points", points.trim());
         polygon.setAttribute("fill", "rgba(255, 76, 76, 0.35)");
-        // Une bordure de 1px de la même opacité empêche les micro-fissures (anti-aliasing)
         polygon.setAttribute("stroke", "rgba(255, 76, 76, 0.35)");
         polygon.setAttribute("stroke-width", "1");
         svg.appendChild(polygon);
     });
 
-    // 3. 🔻 NOUVEAU : Calcul mathématique de l'enveloppe externe pour le liseret épais 🔻
     const dirs = [
-        {q: 1, r: 0},
-        {q: 0, r: 1},
-        {q: -1, r: 1},
-        {q: -1, r: 0},
-        {q: 0, r: -1},
-        {q: 1, r: -1}
+        {q: 1, r: 0}, {q: 0, r: 1}, {q: -1, r: 1},
+        {q: -1, r: 0}, {q: 0, r: -1}, {q: 1, r: -1}
     ];
 
     finalHexes.forEach(h => {
         const px = window.PLATEAU_VTT.hexToPixel(h.q, h.r);
         const corners = [];
-        // Calcul des 6 sommets de l'hexagone
         for(let i=0; i<6; i++) {
             let angle_rad = Math.PI / 180 * (60 * i);
             corners.push({ x: px.x + hexRadius * Math.cos(angle_rad), y: px.y + hexRadius * Math.sin(angle_rad) });
         }
 
-        // Pour chaque face de l'hexagone, on vérifie s'il y a un autre hexagone rouge collé
         for(let i=0; i<6; i++) {
             const nQ = h.q + dirs[i].q;
             const nR = h.r + dirs[i].r;
             
             const aUnVoisinRouge = finalHexes.some(fh => fh.q === nQ && fh.r === nR);
             
-            // Si la face touche du "vide", alors on trace un liseret rouge externe
             if (!aUnVoisinRouge) {
                 const c1 = corners[i];
                 const c2 = corners[(i + 1) % 6];
@@ -421,7 +501,6 @@ window.dessinerZoneAoE = function() {
     });
 };
 
-// 3. Dessine (ou met à jour) les anneaux autour des cibles valides
 window.dessinerAnneauxCiblage = function() {
     if (!window.ETAT_CIBLAGE || !window.ETAT_CIBLAGE.actif) {
         document.querySelectorAll(".anneau-ciblage, .bulle-validation-cible").forEach(el => el.remove());
@@ -565,7 +644,6 @@ window.dessinerAnneauxCiblage = function() {
     });
 };
 
-// 4. Lorsqu'on clique sur un pion pendant le ciblage (Cible Unique)
 window.ajouterCibleCiblage = function(idCible) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     const state = window.ETAT_CIBLAGE;
@@ -587,13 +665,11 @@ window.ajouterCibleCiblage = function(idCible) {
     
     const dist = getHexDistance(tkLanceur, tkCible);
 
-    // Vérification Portée
     if (dist > attaqueCourante.rangeMax) {
         window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Hors de portée", "#aaaaaa");
         return;
     }
 
-    // Vérification Engagement
     let estEngage = false;
     for (let idToken in window.TOKENS_VTT_DATA) {
         if (idToken === idLanceur) continue; 
@@ -610,13 +686,11 @@ window.ajouterCibleCiblage = function(idCible) {
         return;
     }
 
-    // Vérification Ligne de Vue
     if (!verifierLigneDeVue(tkLanceur, tkCible)) {
         window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Vue obstruée", "#aaaaaa");
         return;
     }
 
-    // Assigne ou Désélectionne la cible unique
     if (state.cibleUnique === idCible) {
         state.cibleUnique = null; 
         state.attaques.forEach(a => a.cibles = []);
@@ -628,7 +702,6 @@ window.ajouterCibleCiblage = function(idCible) {
     window.dessinerAnneauxCiblage();
 };
 
-// 5. Nettoyage si on clique dans le vide ou si on annule
 window.nettoyerCiblage = function() {
     window.ETAT_CIBLAGE.actif = false;
     document.querySelectorAll(".anneau-ciblage, .bulle-validation-cible").forEach(el => el.remove());
@@ -639,9 +712,14 @@ window.nettoyerCiblage = function() {
     const msgZone = document.getElementById("msg-zone-ciblage");
     if (msgZone) msgZone.remove();
 
+    const bulleZone = document.getElementById("bulle-validation-zone");
+    if (bulleZone) bulleZone.style.display = "none";
+
     window.removeEventListener("mousemove", window.VTT_CIBLAGE_MOUSEMOVE, {capture: true});
     window.removeEventListener("wheel", window.VTT_CIBLAGE_WHEEL, {capture: true});
     window.removeEventListener("click", window.VTT_CIBLAGE_CLICK, {capture: true});
+    window.removeEventListener("touchstart", window.VTT_CIBLAGE_TOUCHSTART, {capture: true, passive: false});
+    window.removeEventListener("touchmove", window.VTT_CIBLAGE_TOUCHMOVE, {capture: true, passive: false});
 
     const btnAppliquer = document.getElementById("btn-appliquer-carte");
     const btnResoudre = document.getElementById("btn-resoudre-carte");
@@ -649,12 +727,13 @@ window.nettoyerCiblage = function() {
     if (btnResoudre) btnResoudre.remove();
 };
 
-// 6. Envoi de l'action de Dégâts à Firebase
 window.declencherResolution = async function() {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     const state = window.ETAT_CIBLAGE;
 
     document.querySelectorAll(".bulle-validation-cible").forEach(el => el.style.display = "none");
+    const bulleZone = document.getElementById("bulle-validation-zone");
+    if (bulleZone) bulleZone.style.display = "none";
 
     const actionData = {
         type: "ATTAQUES",
@@ -687,7 +766,6 @@ window.jouerAnimationMoteur = async function(action) {
     const lanceur = action.idLanceur;
     const tkLanceur = window.TOKENS_VTT_DATA[lanceur];
 
-    // 🔻 NOUVEAU : Si c'est une ZONE, le lanceur pivote UNE FOIS vers le centre de la zone
     if (action.isZone && action.zoneCenterHex && tkLanceur) {
         if (tkLanceur.q !== action.zoneCenterHex.q || tkLanceur.r !== action.zoneCenterHex.r) {
             const pxLanceur = window.PLATEAU_VTT.hexToPixel(tkLanceur.q, tkLanceur.r);
@@ -729,7 +807,6 @@ window.jouerAnimationMoteur = async function(action) {
             let dx = 0; let dy = 0;
             const dist = getHexDistance(tkLanceur, tkCible);
 
-            // ROTATION DU LANCEUR (Uniquement si ce n'est PAS une Zone)
             if (!action.isZone && tkLanceur && tkCible) {
                 const pxLanceur = window.PLATEAU_VTT.hexToPixel(tkLanceur.q, tkLanceur.r);
                 const pxCible = window.PLATEAU_VTT.hexToPixel(tkCible.q, tkCible.r);
@@ -758,7 +835,6 @@ window.jouerAnimationMoteur = async function(action) {
                 
                 await new Promise(r => setTimeout(r, 200)); 
             } else if (action.isZone) {
-                // On calcule quand même dx et dy pour l'esquive de la cible
                 const pxLanceur = window.PLATEAU_VTT.hexToPixel(tkLanceur.q, tkLanceur.r);
                 const pxCible = window.PLATEAU_VTT.hexToPixel(tkCible.q, tkCible.r);
                 dx = pxCible.x - pxLanceur.x;
@@ -772,12 +848,10 @@ window.jouerAnimationMoteur = async function(action) {
             const statDef = Math.max(esquive, parade);
             const motDef = parade > esquive ? "Paré 🛡️" : "Esquivé 💨";
 
-            // VÉRIFICATION DE LA DÉFENSE
             if (jetDef <= statDef) {
                 if (tkCible) {
                     window.afficherMessageFlottantHex(tkCible.q, tkCible.r, motDef, "#cccccc");
                     
-                    // ROTATION DE LA CIBLE VERS L'ATTAQUANT AVANT D'ESQUIVER
                     const targetAngleCible = Math.atan2(-dy, -dx) * (180 / Math.PI) - 90;
                     let currentAngleCible = tkCible.angle || 0;
                     
@@ -799,7 +873,6 @@ window.jouerAnimationMoteur = async function(action) {
                     
                     await new Promise(r => setTimeout(r, 150));
 
-                    // ANIMATION DE RECUL
                     const tokenDiv = document.getElementById("token-" + idCible);
                     if (tokenDiv) {
                         const mag = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -821,7 +894,6 @@ window.jouerAnimationMoteur = async function(action) {
                 continue; 
             }
 
-            // Calcul des Dégâts
             const defPhys = (parseInt(cibleData.Def_Physique) || 0) + (parseInt(cibleData.Dev_Mod_DefPhys) || 0);
             const defMag = (parseInt(cibleData.Def_Magique) || 0) + (parseInt(cibleData.Dev_Mod_DefMag) || 0);
 
@@ -846,7 +918,6 @@ window.jouerAnimationMoteur = async function(action) {
             if(cibleData.PV_Actuels < 0) cibleData.PV_Actuels = 0;
             let newPv = cibleData.PV_Actuels;
 
-            // Animations Visuelles de l'impact
             if (tkCible) {
                 window.afficherMessageFlottantHex(tkCible.q, tkCible.r, `-${degatsFinaux} 🩸`, "#ff4c4c");
 
@@ -913,7 +984,6 @@ window.jouerAnimationMoteur = async function(action) {
         }
     }
 
-    // Fin de la Séquence globale
     const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
     const lanceurData = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
     if (lanceurData && lanceurData.idJoueur === currentUserId) {
