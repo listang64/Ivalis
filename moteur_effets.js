@@ -174,6 +174,10 @@ window.VTT_CIBLAGE_TOUCHSTART = function(e) {
     if (!state || !state.actif || !state.isZone) return;
 
     if (e.touches.length === 2) {
+        // 🔻 NOUVEAU : On bloque le zoom dès la pose des doigts
+        e.preventDefault();
+        e.stopPropagation();
+
         const dx = e.touches[1].clientX - e.touches[0].clientX;
         const dy = e.touches[1].clientY - e.touches[0].clientY;
         state.initialTwistAngle = Math.atan2(dy, dx) * 180 / Math.PI;
@@ -186,9 +190,9 @@ window.VTT_CIBLAGE_TOUCHMOVE = function(e) {
     if (!state || !state.actif || !state.isZone) return;
 
     if (e.touches.length === 2) {
-        // 🔻 CORRECTION : On ne met plus de e.stopPropagation() ni de e.preventDefault() ici.
-        // Ainsi, l'iPad peut continuer d'interpréter le pinch (écartement) pour zoomer la carte, 
-        // tout en exécutant notre rotation de zone en même temps !
+        // 🔻 NOUVEAU : On empêche le plateau de zoomer pendant la rotation
+        e.preventDefault(); 
+        e.stopPropagation();
 
         const dx = e.touches[1].clientX - e.touches[0].clientX;
         const dy = e.touches[1].clientY - e.touches[0].clientY;
@@ -198,7 +202,8 @@ window.VTT_CIBLAGE_TOUCHMOVE = function(e) {
         if (diff > 180) diff -= 360;
         if (diff < -180) diff += 360;
         
-        let stepDelta = Math.round(diff / 60);
+        // 🔻 NOUVEAU : Sensibilité augmentée (x2) pour un pivotement rapide
+        let stepDelta = Math.round((diff * 2) / 60);
         
         let newStep = (state.initialZoneStep + stepDelta) % 6;
         if (newStep < 0) newStep += 6;

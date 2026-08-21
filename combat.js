@@ -1515,14 +1515,17 @@ window.appliquerTokensVTT = function(tokensMap) {
         divToken.appendChild(createShadow(-2, 5, 4, 0.8));
         divToken.appendChild(createShadow(-25, 35, 15, 0.65));
 
-        // L'IMAGE DU PION (Nette)
+        // 4️⃣ L'IMAGE DU PION (Nette)
         const img = document.createElement("img");
         img.className = "token-img-main";
         img.src = data.url;
         img.style.width = "100%";
         img.style.height = "100%";
         img.style.objectFit = "contain";
-        img.style.position = "relative";
+        // 🔻 CORRECTION DU BUG D'AFFICHAGE : On force la position absolue comme les ombres 🔻
+        img.style.position = "absolute";
+        img.style.top = "0";
+        img.style.left = "0";
         img.style.zIndex = "2"; 
         img.onerror = () => { img.style.display = "none"; };
 
