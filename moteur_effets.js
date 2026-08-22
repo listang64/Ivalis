@@ -286,25 +286,34 @@ window.demarrerCiblage = async function(idCarte) {
                 }
             });
 
-            // A. Détection Attaques & Soins
-            if (nomLower.includes("attaque") || nomLower.includes("pouvoir")) {
+            // A. Détection Attaques, Soins & Purifications
+            let isPurification = false;
+            let purifChance = 0;
+
+            if (nomLower.includes("purification")) {
+                isPurification = true;
+                purifChance += (parseFrFloat(effBase.Pourcent_Base) || 0) * (act.count || 1);
+            }
+            
+            listeMods.forEach(m => {
+                const modEff = window.EFFETS_BDD_CACHE[m.id];
+                if (modEff && (modEff.Nom || "").toLowerCase().includes("purification")) {
+                    isPurification = true;
+                    purifChance += (parseFrFloat(modEff.Pourcent_Base) || 0) * m.count;
+                }
+            });
+
+            if (nomLower.includes("attaque") || nomLower.includes("pouvoir") || nomLower.includes("soin") || nomLower.includes("guérison") || isPurification) {
+                let isHeal = nomLower.includes("soin") || nomLower.includes("guérison") || isPurification;
+
                 attaquesExtraites.push({
                     nom: effBase.Nom,
-                    typeRes: (nomLower.includes("magique") || nomLower.includes("pouvoir")) ? "Magique" : "Physique",
+                    typeRes: (nomLower.includes("magique") || nomLower.includes("pouvoir") || isHeal) ? "Magique" : "Physique",
                     valeurBrute: (parseFrFloat(effBase.Valeur) || 0) * (act.count || 1),
                     isRanged: isRanged,
                     rangeMax: rangeMax,
-                    isHeal: false,
-                    cibles: []
-                });
-            } else if (nomLower.includes("soin") || nomLower.includes("guérison")) {
-                attaquesExtraites.push({
-                    nom: effBase.Nom,
-                    typeRes: "Magique",
-                    valeurBrute: (parseFrFloat(effBase.Valeur) || 0) * (act.count || 1),
-                    isRanged: isRanged,
-                    rangeMax: rangeMax,
-                    isHeal: true,
+                    isHeal: isHeal,
+                    purifChance: purifChance,
                     cibles: []
                 });
             }
@@ -471,9 +480,19 @@ window.validerZoneAoE = function() {
 
     let ciblesTouchees = [];
     const idLanceur = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
+    const configSort = state.attaques[0] || state.alterations[0];
+    const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
 
     for (let idToken in window.TOKENS_VTT_DATA) {
-        if (idToken === idLanceur) continue; 
+        const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idToken);
+        if (!cibleData || cibleData.statut === "Mort") continue;
+
+        if (configSort && configSort.isHeal) {
+            if (cibleData.camp !== lanceurData.camp) continue;
+        } else if (idToken === idLanceur) {
+            continue;
+        }
+
         const tk = window.TOKENS_VTT_DATA[idToken];
         if (finalHexes.some(h => h.q === tk.q && h.r === tk.r)) ciblesTouchees.push(idToken);
     }
@@ -981,58 +1000,93 @@ window.jouerAnimationMoteur = async function(action) {
                 let newPv;
 
                 if (attaque.isHeal) {
-                    let soinBrut = attaque.valeurBrute;
-                    if (cibleData.race === "Ethéré") soinBrut = Math.floor(soinBrut * 1.3);
-                    cibleData.PV_Actuels = Math.min(maxPv, oldPv + soinBrut);
-                    newPv = cibleData.PV_Actuels;
-                    const soinsEffectifs = newPv - oldPv;
+                    newPv = oldPv;
 
-                    if (tkCible) {
-                        window.afficherMessageFlottantHex(tkCible.q, tkCible.r, `+${soinsEffectifs} ✚`, "#1b6e3a");
-                        const tokenDiv = document.getElementById("token-" + idCible);
-                        if (tokenDiv) {
-                            tokenDiv.style.transition = "filter 0.1s";
-                            tokenDiv.style.filter = "sepia(1) hue-rotate(90deg) saturate(5) brightness(1.2)";
-                            
-                            const oldPct = Math.max(0, Math.min(100, (oldPv / maxPv) * 100));
-                            const newPct = Math.max(0, Math.min(100, (newPv / maxPv) * 100));
-                            
-                            const jaugeContainer = document.createElement("div");
-                            jaugeContainer.style.position = "absolute";
-                            jaugeContainer.style.bottom = "-12px"; 
-                            jaugeContainer.style.left = "50%";
-                            jaugeContainer.style.transform = "translateX(-50%)";
-                            jaugeContainer.style.width = "75%";
-                            jaugeContainer.style.height = "6px";
-                            jaugeContainer.style.backgroundColor = "#111";
-                            jaugeContainer.style.border = "1px solid #c2a878";
-                            jaugeContainer.style.borderRadius = "3px";
-                            jaugeContainer.style.zIndex = "5";
-                            jaugeContainer.style.opacity = "0"; 
-                            jaugeContainer.style.transition = "opacity 0.3s ease";
-                            jaugeContainer.style.boxShadow = "0 2px 4px rgba(0,0,0,0.8)";
-                            
-                            const jaugeFill = document.createElement("div");
-                            jaugeFill.style.height = "100%";
-                            jaugeFill.style.width = oldPct + "%";
-                            jaugeFill.style.backgroundColor = "#1b6e3a"; 
-                            jaugeFill.style.borderRadius = "2px";
-                            jaugeFill.style.transition = "width 0.5s ease-out";
-                            
-                            jaugeContainer.appendChild(jaugeFill);
-                            tokenDiv.appendChild(jaugeContainer);
-                            
-                            void jaugeContainer.offsetWidth;
-                            jaugeContainer.style.opacity = "1";
-                            
-                            setTimeout(() => { tokenDiv.style.filter = ""; }, 300);
-                            setTimeout(() => { jaugeFill.style.width = newPct + "%"; }, 400);
-                            setTimeout(() => {
-                                jaugeContainer.style.opacity = "0";
-                                setTimeout(() => jaugeContainer.remove(), 300);
-                            }, 1500); 
+                    if (attaque.valeurBrute > 0) {
+                        let soinBrut = attaque.valeurBrute;
+                        if (cibleData.race === "Ethéré") soinBrut = Math.floor(soinBrut * 1.3);
+                        cibleData.PV_Actuels = Math.min(maxPv, oldPv + soinBrut);
+                        newPv = cibleData.PV_Actuels;
+                        const soinsEffectifs = newPv - oldPv;
+
+                        if (tkCible && soinsEffectifs > 0) {
+                            window.afficherMessageFlottantHex(tkCible.q, tkCible.r, `+${soinsEffectifs} ✚`, "#1b6e3a");
+                            const tokenDiv = document.getElementById("token-" + idCible);
+                            if (tokenDiv) {
+                                tokenDiv.style.transition = "filter 0.1s";
+                                tokenDiv.style.filter = "sepia(1) hue-rotate(90deg) saturate(5) brightness(1.2)";
+                                
+                                const oldPct = Math.max(0, Math.min(100, (oldPv / maxPv) * 100));
+                                const newPct = Math.max(0, Math.min(100, (newPv / maxPv) * 100));
+                                
+                                const jaugeContainer = document.createElement("div");
+                                jaugeContainer.style.position = "absolute";
+                                jaugeContainer.style.bottom = "-12px"; 
+                                jaugeContainer.style.left = "50%";
+                                jaugeContainer.style.transform = "translateX(-50%)";
+                                jaugeContainer.style.width = "75%";
+                                jaugeContainer.style.height = "6px";
+                                jaugeContainer.style.backgroundColor = "#111";
+                                jaugeContainer.style.border = "1px solid #c2a878";
+                                jaugeContainer.style.borderRadius = "3px";
+                                jaugeContainer.style.zIndex = "5";
+                                jaugeContainer.style.opacity = "0"; 
+                                jaugeContainer.style.transition = "opacity 0.3s ease";
+                                jaugeContainer.style.boxShadow = "0 2px 4px rgba(0,0,0,0.8)";
+                                
+                                const jaugeFill = document.createElement("div");
+                                jaugeFill.style.height = "100%";
+                                jaugeFill.style.width = oldPct + "%";
+                                jaugeFill.style.backgroundColor = "#1b6e3a"; 
+                                jaugeFill.style.borderRadius = "2px";
+                                jaugeFill.style.transition = "width 0.5s ease-out";
+                                
+                                jaugeContainer.appendChild(jaugeFill);
+                                tokenDiv.appendChild(jaugeContainer);
+                                
+                                void jaugeContainer.offsetWidth;
+                                jaugeContainer.style.opacity = "1";
+                                
+                                setTimeout(() => { tokenDiv.style.filter = ""; }, 300);
+                                setTimeout(() => { jaugeFill.style.width = newPct + "%"; }, 400);
+                                setTimeout(() => {
+                                    jaugeContainer.style.opacity = "0";
+                                    setTimeout(() => jaugeContainer.remove(), 300);
+                                }, 1500); 
+                            }
                         }
                     }
+
+                    if (attaque.purifChance > 0) {
+                        const rollPurif = Math.floor(Math.random() * 100) + 1;
+                        if (rollPurif <= attaque.purifChance) {
+                            cibleData.Etats_Alteres = [];
+                            let delaiAffichage = attaque.valeurBrute > 0 ? 800 : 0;
+
+                            setTimeout(() => {
+                                if (tkCible) window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Purifié ✨", "#ffffff");
+                            }, delaiAffichage);
+
+                            const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
+                            if (lanceurData && lanceurData.idJoueur === currentUserId) {
+                                updateDoc(doc(db, "Personnages", idCible), { Etats_Alteres: [] }).catch(e => console.error(e));
+                            }
+                            if (window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]?.idPersonnage === idCible) {
+                                if (typeof window.afficherPersoCombatActuel === "function") window.afficherPersoCombatActuel();
+                            }
+                        }
+                    }
+
+                    const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
+                    if (lanceurData && lanceurData.idJoueur === currentUserId) {
+                        const refPerso = doc(db, "Personnages", idCible);
+                        updateDoc(refPerso, { PV_Actuels: cibleData.PV_Actuels }).catch(e => console.error(e));
+                    }
+                    if (window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]?.idPersonnage === idCible) {
+                        window.COMBAT_PV_ACTUELS = cibleData.PV_Actuels;
+                        if (typeof window.mettreAJourJaugePV === "function") window.mettreAJourJaugePV();
+                    }
+                    await new Promise(r => setTimeout(r, 1200));
                 } else {
                     const defPhys = (parseInt(cibleData.Def_Physique) || 0) + (parseInt(cibleData.Dev_Mod_DefPhys) || 0);
                     const defMag = (parseInt(cibleData.Def_Magique) || 0) + (parseInt(cibleData.Dev_Mod_DefMag) || 0);
@@ -1094,18 +1148,17 @@ window.jouerAnimationMoteur = async function(action) {
                             }, 1500); 
                         }
                     }
+                    const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
+                    if (lanceurData && lanceurData.idJoueur === currentUserId) {
+                        const refPerso = doc(db, "Personnages", idCible);
+                        updateDoc(refPerso, { PV_Actuels: cibleData.PV_Actuels }).catch(e => console.error(e));
+                    }
+                    if (window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]?.idPersonnage === idCible) {
+                        window.COMBAT_PV_ACTUELS = cibleData.PV_Actuels;
+                        if (typeof window.mettreAJourJaugePV === "function") window.mettreAJourJaugePV();
+                    }
+                    await new Promise(r => setTimeout(r, 1200));
                 }
-
-                const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
-                if (lanceurData && lanceurData.idJoueur === currentUserId) {
-                    const refPerso = doc(db, "Personnages", idCible);
-                    updateDoc(refPerso, { PV_Actuels: cibleData.PV_Actuels }).catch(e => console.error(e));
-                }
-                if (window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]?.idPersonnage === idCible) {
-                    window.COMBAT_PV_ACTUELS = cibleData.PV_Actuels;
-                    if (typeof window.mettreAJourJaugePV === "function") window.mettreAJourJaugePV();
-                }
-                await new Promise(r => setTimeout(r, 1200));
             }
         }
     }
