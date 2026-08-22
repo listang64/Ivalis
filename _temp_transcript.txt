@@ -6,3 +6,4 @@ portée
 zones
 durée +
 etourdir
+soin

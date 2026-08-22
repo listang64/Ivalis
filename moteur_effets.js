@@ -74,8 +74,9 @@ window.VTT_CIBLAGE_MOUSEMOVE = function(e) {
     const state = window.ETAT_CIBLAGE;
     if (!state || !state.actif || !state.isZone) return;
 
-    const tkLanceur = window.TOKENS_VTT_DATA[window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage];
-    const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage);
+    const idLanceur = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
+    const tkLanceur = window.TOKENS_VTT_DATA[idLanceur];
+    const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
     const configSort = state.attaques[0] || state.alterations[0]; 
 
     const canvasX = (e.clientX - window.VTT_POS_X) / window.VTT_SCALE;
@@ -87,7 +88,7 @@ window.VTT_CIBLAGE_MOUSEMOVE = function(e) {
         
         let estEngage = false;
         for (let idToken in window.TOKENS_VTT_DATA) {
-            if (idToken === tkLanceur) continue; 
+            if (idToken === idLanceur) continue; 
             const d = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idToken);
             if (d && d.camp !== lanceurData.camp && d.statut !== "Mort" && getHexDistance(tkLanceur, window.TOKENS_VTT_DATA[idToken]) === 1) {
                 estEngage = true; break;
@@ -142,13 +143,14 @@ window.VTT_CIBLAGE_CLICK = function(e) {
         const canvasY = (e.clientY - window.VTT_POS_Y) / window.VTT_SCALE;
         const targetHex = window.PLATEAU_VTT.pixelToHex(canvasX, canvasY);
         
-        const tkLanceur = window.TOKENS_VTT_DATA[window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage];
-        const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage);
+        const idLanceur = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
+        const tkLanceur = window.TOKENS_VTT_DATA[idLanceur];
+        const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
         const dist = getHexDistance(tkLanceur, targetHex);
         
         let estEngage = false;
         for (let idToken in window.TOKENS_VTT_DATA) {
-            if (idToken === tkLanceur) continue; 
+            if (idToken === idLanceur) continue; 
             const d = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idToken);
             if (d && d.camp !== lanceurData.camp && d.statut !== "Mort" && getHexDistance(tkLanceur, window.TOKENS_VTT_DATA[idToken]) === 1) {
                 estEngage = true; break;
@@ -159,8 +161,12 @@ window.VTT_CIBLAGE_CLICK = function(e) {
         else if (dist > configSort.rangeMax) state.zoneCenterHex = null; 
         else if (!verifierLigneDeVue(tkLanceur, targetHex)) state.zoneCenterHex = null; 
         else state.zoneCenterHex = targetHex; 
+    }
 
-        window.actualiserVisuelCiblage();
+    window.actualiserVisuelCiblage();
+
+    if (state.zoneCenterHex && window.matchMedia("(hover: hover)").matches) {
+        window.validerZoneAoE();
     }
 };
 
@@ -280,7 +286,7 @@ window.demarrerCiblage = async function(idCarte) {
                 }
             });
 
-            // A. Détection Attaques
+            // A. Détection Attaques & Soins
             if (nomLower.includes("attaque") || nomLower.includes("pouvoir")) {
                 attaquesExtraites.push({
                     nom: effBase.Nom,
@@ -288,6 +294,17 @@ window.demarrerCiblage = async function(idCarte) {
                     valeurBrute: (parseFrFloat(effBase.Valeur) || 0) * (act.count || 1),
                     isRanged: isRanged,
                     rangeMax: rangeMax,
+                    isHeal: false,
+                    cibles: []
+                });
+            } else if (nomLower.includes("soin") || nomLower.includes("guérison")) {
+                attaquesExtraites.push({
+                    nom: effBase.Nom,
+                    typeRes: "Magique",
+                    valeurBrute: (parseFrFloat(effBase.Valeur) || 0) * (act.count || 1),
+                    isRanged: isRanged,
+                    rangeMax: rangeMax,
+                    isHeal: true,
                     cibles: []
                 });
             }
@@ -380,6 +397,8 @@ window.demarrerCiblage = async function(idCarte) {
     if (btnAppliquer) btnAppliquer.style.display = "none";
 
     if (isZone) {
+        const estPC = window.matchMedia("(hover: hover)").matches;
+
         let bulleZone = document.getElementById("bulle-validation-zone");
         if (!bulleZone) {
             bulleZone = document.createElement("div");
@@ -394,7 +413,7 @@ window.demarrerCiblage = async function(idCarte) {
             `;
             document.body.appendChild(bulleZone);
         }
-        bulleZone.style.display = "flex";
+        bulleZone.style.display = estPC ? "none" : "flex";
         
         document.getElementById("btn-valider-zone-ok").onclick = () => window.validerZoneAoE();
         document.getElementById("btn-valider-zone-ko").onclick = () => window.nettoyerCiblage();
@@ -406,7 +425,15 @@ window.demarrerCiblage = async function(idCarte) {
             msgZone.style.cssText = "position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; font-family: 'Cinzel', serif; font-size: 18px; color: #ff4c4c; font-weight: bold; text-shadow: 1px 1px 3px black, 0 0 10px #ffaa00; background: rgba(0,0,0,0.8); padding: 10px 20px; border-radius: 12px; pointer-events: none;";
             document.getElementById("conteneur-plateau-vtt").appendChild(msgZone);
         }
-        msgZone.innerText = (configSort && configSort.isRanged) ? "Placez la zone (1 doigt). Pivotez la zone (2 doigts)." : "Faites pivoter la zone (Rotation à 2 doigts).";
+        if (estPC) {
+            msgZone.innerText = (configSort && configSort.isRanged)
+                ? "Déplacez la souris pour viser. Molette pour pivoter. Clic pour valider."
+                : "Molette pour pivoter la zone. Clic n'importe où pour valider.";
+        } else {
+            msgZone.innerText = (configSort && configSort.isRanged)
+                ? "Placez la zone (1 doigt). Pivotez la zone (2 doigts)."
+                : "Faites pivoter la zone (Rotation à 2 doigts).";
+        }
 
         window.addEventListener("mousemove", window.VTT_CIBLAGE_MOUSEMOVE, {capture: true});
         window.addEventListener("wheel", window.VTT_CIBLAGE_WHEEL, {passive: false, capture: true});
@@ -483,6 +510,11 @@ window.dessinerZoneAoE = function() {
     if (!state.zoneCenterHex) return;
     const hexRadius = window.PLATEAU_VTT.hexSize;
 
+    const configSort = state.attaques[0] || state.alterations[0];
+    const estSoin = configSort && configSort.isHeal;
+    const couleurRemplissage = estSoin ? "rgba(27, 110, 58, 0.35)" : "rgba(255, 76, 76, 0.35)";
+    const couleurBordure = estSoin ? "#1b6e3a" : "#ff4c4c";
+
     const finalHexes = state.zoneHexesBase.map(h => {
         const rot = rotateHex(h, state.zoneRotationStep);
         return { q: state.zoneCenterHex.q + rot.q, r: state.zoneCenterHex.r + rot.r };
@@ -497,8 +529,8 @@ window.dessinerZoneAoE = function() {
             points += `${px.x + hexRadius * Math.cos(angle_rad)},${px.y + hexRadius * Math.sin(angle_rad)} `;
         }
         polygon.setAttribute("points", points.trim());
-        polygon.setAttribute("fill", "rgba(255, 76, 76, 0.35)");
-        polygon.setAttribute("stroke", "rgba(255, 76, 76, 0.35)");
+        polygon.setAttribute("fill", couleurRemplissage);
+        polygon.setAttribute("stroke", couleurRemplissage);
         polygon.setAttribute("stroke-width", "1");
         svg.appendChild(polygon);
     });
@@ -522,7 +554,7 @@ window.dessinerZoneAoE = function() {
                 const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
                 line.setAttribute("x1", c1.x); line.setAttribute("y1", c1.y);
                 line.setAttribute("x2", c2.x); line.setAttribute("y2", c2.y);
-                line.setAttribute("stroke", "#ff4c4c");
+                line.setAttribute("stroke", couleurBordure);
                 line.setAttribute("stroke-width", "3");
                 line.setAttribute("stroke-linecap", "round");
                 svg.appendChild(line);
@@ -557,17 +589,25 @@ window.dessinerAnneauxCiblage = function() {
         }
     }
 
+    const couleurAnneau = configSort.isHeal ? '#1b6e3a' : '#ff4c4c';
+
     const ciblesValides = new Set();
     for (let idToken in window.TOKENS_VTT_DATA) {
-        if (idToken === idLanceur) continue; 
         const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idToken);
-        if (!cibleData || cibleData.camp === lanceurData.camp || cibleData.statut === "Mort") continue;
+        if (!cibleData || cibleData.statut === "Mort") continue;
+
+        if (configSort.isHeal) {
+            if (cibleData.camp !== lanceurData.camp) continue;
+        } else {
+            if (idToken === idLanceur) continue;
+            if (cibleData.camp === lanceurData.camp) continue;
+        }
 
         const tk = window.TOKENS_VTT_DATA[idToken];
         const dist = getHexDistance(tkLanceur, tk);
 
         if (dist > configSort.rangeMax) continue;
-        if (estEngage && dist > 1) continue;
+        if (!configSort.isHeal && estEngage && dist > 1) continue;
         if (!verifierLigneDeVue(tkLanceur, tk)) continue;
 
         ciblesValides.add(idToken);
@@ -618,7 +658,7 @@ window.dessinerAnneauxCiblage = function() {
             if (estSelectionne) {
                 anneau.style.width = "85%";
                 anneau.style.height = "85%";
-                anneau.style.border = "4px solid #ff4c4c";
+                anneau.style.border = `4px solid ${couleurAnneau}`;
                 anneau.style.animation = "none"; 
                 
                 let bulle = divToken.querySelector(".bulle-validation-cible");
@@ -655,7 +695,7 @@ window.dessinerAnneauxCiblage = function() {
             } else {
                 anneau.style.width = "110%";
                 anneau.style.height = "110%";
-                anneau.style.border = "3px dashed #ff4c4c";
+                anneau.style.border = `3px dashed ${couleurAnneau}`;
                 anneau.style.animation = "pulsationCible 1.2s infinite alternate ease-in-out";
                 const bulle = divToken.querySelector(".bulle-validation-cible");
                 if (bulle) bulle.remove();
@@ -683,9 +723,21 @@ window.ajouterCibleCiblage = function(idCible) {
 
     if (!tkLanceur || !tkCible || !lanceurData || !cibleData) return;
 
-    if (cibleData.camp === lanceurData.camp) {
+    if (cibleData.statut === "Mort") {
         window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Cible invalide", "#aaaaaa");
         return;
+    }
+
+    if (configSort.isHeal) {
+        if (cibleData.camp !== lanceurData.camp) {
+            window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Cible invalide", "#aaaaaa");
+            return;
+        }
+    } else {
+        if (idCible === idLanceur || cibleData.camp === lanceurData.camp) {
+            window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Cible invalide", "#aaaaaa");
+            return;
+        }
     }
     
     const dist = getHexDistance(tkLanceur, tkCible);
@@ -706,7 +758,7 @@ window.ajouterCibleCiblage = function(idCible) {
         }
     }
 
-    if (estEngage && dist > 1) {
+    if (!configSort.isHeal && estEngage && dist > 1) {
         window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Engagé au CAC !", "#aaaaaa");
         return;
     }
@@ -879,7 +931,7 @@ window.jouerAnimationMoteur = async function(action) {
                 const statDef = Math.max(esquive, parade);
                 const motDef = parade > esquive ? "Paré 🛡️" : "Esquivé 💨";
 
-                if (jetDef <= statDef) {
+                if (!attaque.isHeal && jetDef <= statDef) {
                     if (tkCible) {
                         window.afficherMessageFlottantHex(tkCible.q, tkCible.r, motDef, "#cccccc");
                         
@@ -921,70 +973,126 @@ window.jouerAnimationMoteur = async function(action) {
                     continue; 
                 }
 
-                // Si on arrive ici, c'est que l'attaque a touché !
+                // Si on arrive ici, c'est que l'attaque a touché, OU que c'est un soin !
                 ciblesToucheesValides.add(idCible);
-
-                const defPhys = (parseInt(cibleData.Def_Physique) || 0) + (parseInt(cibleData.Dev_Mod_DefPhys) || 0);
-                const defMag = (parseInt(cibleData.Def_Magique) || 0) + (parseInt(cibleData.Dev_Mod_DefMag) || 0);
-                let degats = attaque.valeurBrute;
-                if (attaque.isRanged && dist === 1) degats = Math.floor(degats * 0.7); 
-                let resistance = attaque.typeRes === "Magique" ? defMag : defPhys;
-                let reduction = resistance / 100;
-                if (reduction > 1) reduction = 1; 
-                let degatsFinaux = Math.round(degats * (1 - reduction));
-                if (degatsFinaux < 0) degatsFinaux = 0;
 
                 let oldPv = parseInt(cibleData.PV_Actuels) || 0;
                 let maxPv = (parseInt(cibleData.PV_Max) || 1) + (parseInt(cibleData.Dev_Mod_PV) || 0);
+                let newPv;
 
-                cibleData.PV_Actuels = oldPv - degatsFinaux;
-                if(cibleData.PV_Actuels < 0) cibleData.PV_Actuels = 0;
-                let newPv = cibleData.PV_Actuels;
+                if (attaque.isHeal) {
+                    let soinBrut = attaque.valeurBrute;
+                    if (cibleData.race === "Ethéré") soinBrut = Math.floor(soinBrut * 1.3);
+                    cibleData.PV_Actuels = Math.min(maxPv, oldPv + soinBrut);
+                    newPv = cibleData.PV_Actuels;
+                    const soinsEffectifs = newPv - oldPv;
 
-                if (tkCible) {
-                    window.afficherMessageFlottantHex(tkCible.q, tkCible.r, `-${degatsFinaux} 🩸`, "#ff4c4c");
-                    const tokenDiv = document.getElementById("token-" + idCible);
-                    if (tokenDiv) {
-                        tokenDiv.style.transition = "filter 0.1s";
-                        tokenDiv.style.filter = "sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.2)";
-                        
-                        const oldPct = Math.max(0, Math.min(100, (oldPv / maxPv) * 100));
-                        const newPct = Math.max(0, Math.min(100, (newPv / maxPv) * 100));
-                        
-                        const jaugeContainer = document.createElement("div");
-                        jaugeContainer.style.position = "absolute";
-                        jaugeContainer.style.bottom = "-12px"; 
-                        jaugeContainer.style.left = "50%";
-                        jaugeContainer.style.transform = "translateX(-50%)";
-                        jaugeContainer.style.width = "75%";
-                        jaugeContainer.style.height = "6px";
-                        jaugeContainer.style.backgroundColor = "#111";
-                        jaugeContainer.style.border = "1px solid #c2a878";
-                        jaugeContainer.style.borderRadius = "3px";
-                        jaugeContainer.style.zIndex = "5";
-                        jaugeContainer.style.opacity = "0"; 
-                        jaugeContainer.style.transition = "opacity 0.3s ease";
-                        jaugeContainer.style.boxShadow = "0 2px 4px rgba(0,0,0,0.8)";
-                        
-                        const jaugeFill = document.createElement("div");
-                        jaugeFill.style.height = "100%";
-                        jaugeFill.style.width = oldPct + "%";
-                        jaugeFill.style.backgroundColor = "#ff4c4c"; 
-                        jaugeFill.style.borderRadius = "2px";
-                        jaugeFill.style.transition = "width 0.5s ease-out";
-                        
-                        jaugeContainer.appendChild(jaugeFill);
-                        tokenDiv.appendChild(jaugeContainer);
-                        
-                        void jaugeContainer.offsetWidth;
-                        jaugeContainer.style.opacity = "1";
-                        
-                        setTimeout(() => { tokenDiv.style.filter = ""; }, 300);
-                        setTimeout(() => { jaugeFill.style.width = newPct + "%"; }, 400);
-                        setTimeout(() => {
-                            jaugeContainer.style.opacity = "0";
-                            setTimeout(() => jaugeContainer.remove(), 300);
-                        }, 1500); 
+                    if (tkCible) {
+                        window.afficherMessageFlottantHex(tkCible.q, tkCible.r, `+${soinsEffectifs} ✚`, "#1b6e3a");
+                        const tokenDiv = document.getElementById("token-" + idCible);
+                        if (tokenDiv) {
+                            tokenDiv.style.transition = "filter 0.1s";
+                            tokenDiv.style.filter = "sepia(1) hue-rotate(90deg) saturate(5) brightness(1.2)";
+                            
+                            const oldPct = Math.max(0, Math.min(100, (oldPv / maxPv) * 100));
+                            const newPct = Math.max(0, Math.min(100, (newPv / maxPv) * 100));
+                            
+                            const jaugeContainer = document.createElement("div");
+                            jaugeContainer.style.position = "absolute";
+                            jaugeContainer.style.bottom = "-12px"; 
+                            jaugeContainer.style.left = "50%";
+                            jaugeContainer.style.transform = "translateX(-50%)";
+                            jaugeContainer.style.width = "75%";
+                            jaugeContainer.style.height = "6px";
+                            jaugeContainer.style.backgroundColor = "#111";
+                            jaugeContainer.style.border = "1px solid #c2a878";
+                            jaugeContainer.style.borderRadius = "3px";
+                            jaugeContainer.style.zIndex = "5";
+                            jaugeContainer.style.opacity = "0"; 
+                            jaugeContainer.style.transition = "opacity 0.3s ease";
+                            jaugeContainer.style.boxShadow = "0 2px 4px rgba(0,0,0,0.8)";
+                            
+                            const jaugeFill = document.createElement("div");
+                            jaugeFill.style.height = "100%";
+                            jaugeFill.style.width = oldPct + "%";
+                            jaugeFill.style.backgroundColor = "#1b6e3a"; 
+                            jaugeFill.style.borderRadius = "2px";
+                            jaugeFill.style.transition = "width 0.5s ease-out";
+                            
+                            jaugeContainer.appendChild(jaugeFill);
+                            tokenDiv.appendChild(jaugeContainer);
+                            
+                            void jaugeContainer.offsetWidth;
+                            jaugeContainer.style.opacity = "1";
+                            
+                            setTimeout(() => { tokenDiv.style.filter = ""; }, 300);
+                            setTimeout(() => { jaugeFill.style.width = newPct + "%"; }, 400);
+                            setTimeout(() => {
+                                jaugeContainer.style.opacity = "0";
+                                setTimeout(() => jaugeContainer.remove(), 300);
+                            }, 1500); 
+                        }
+                    }
+                } else {
+                    const defPhys = (parseInt(cibleData.Def_Physique) || 0) + (parseInt(cibleData.Dev_Mod_DefPhys) || 0);
+                    const defMag = (parseInt(cibleData.Def_Magique) || 0) + (parseInt(cibleData.Dev_Mod_DefMag) || 0);
+                    let degats = attaque.valeurBrute;
+                    if (attaque.isRanged && dist === 1) degats = Math.floor(degats * 0.7); 
+                    let resistance = attaque.typeRes === "Magique" ? defMag : defPhys;
+                    let reduction = resistance / 100;
+                    if (reduction > 1) reduction = 1; 
+                    let degatsFinaux = Math.round(degats * (1 - reduction));
+                    if (degatsFinaux < 0) degatsFinaux = 0;
+
+                    cibleData.PV_Actuels = oldPv - degatsFinaux;
+                    if(cibleData.PV_Actuels < 0) cibleData.PV_Actuels = 0;
+                    newPv = cibleData.PV_Actuels;
+
+                    if (tkCible) {
+                        window.afficherMessageFlottantHex(tkCible.q, tkCible.r, `-${degatsFinaux} 🩸`, "#ff4c4c");
+                        const tokenDiv = document.getElementById("token-" + idCible);
+                        if (tokenDiv) {
+                            tokenDiv.style.transition = "filter 0.1s";
+                            tokenDiv.style.filter = "sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.2)";
+                            
+                            const oldPct = Math.max(0, Math.min(100, (oldPv / maxPv) * 100));
+                            const newPct = Math.max(0, Math.min(100, (newPv / maxPv) * 100));
+                            
+                            const jaugeContainer = document.createElement("div");
+                            jaugeContainer.style.position = "absolute";
+                            jaugeContainer.style.bottom = "-12px"; 
+                            jaugeContainer.style.left = "50%";
+                            jaugeContainer.style.transform = "translateX(-50%)";
+                            jaugeContainer.style.width = "75%";
+                            jaugeContainer.style.height = "6px";
+                            jaugeContainer.style.backgroundColor = "#111";
+                            jaugeContainer.style.border = "1px solid #c2a878";
+                            jaugeContainer.style.borderRadius = "3px";
+                            jaugeContainer.style.zIndex = "5";
+                            jaugeContainer.style.opacity = "0"; 
+                            jaugeContainer.style.transition = "opacity 0.3s ease";
+                            jaugeContainer.style.boxShadow = "0 2px 4px rgba(0,0,0,0.8)";
+                            
+                            const jaugeFill = document.createElement("div");
+                            jaugeFill.style.height = "100%";
+                            jaugeFill.style.width = oldPct + "%";
+                            jaugeFill.style.backgroundColor = "#ff4c4c"; 
+                            jaugeFill.style.borderRadius = "2px";
+                            jaugeFill.style.transition = "width 0.5s ease-out";
+                            
+                            jaugeContainer.appendChild(jaugeFill);
+                            tokenDiv.appendChild(jaugeContainer);
+                            
+                            void jaugeContainer.offsetWidth;
+                            jaugeContainer.style.opacity = "1";
+                            
+                            setTimeout(() => { tokenDiv.style.filter = ""; }, 300);
+                            setTimeout(() => { jaugeFill.style.width = newPct + "%"; }, 400);
+                            setTimeout(() => {
+                                jaugeContainer.style.opacity = "0";
+                                setTimeout(() => jaugeContainer.remove(), 300);
+                            }, 1500); 
+                        }
                     }
                 }
 
