@@ -1,5 +1,5 @@
 import { db } from "./firebase-config.js";
-import { doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { doc, setDoc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // =========================================================================
 //  IVALIS - MODULE DE COMBAT (INTERFACE DE BASE)
@@ -152,6 +152,8 @@ window.afficherPersoCombatActuel = function() {
         
         const jauges = document.getElementById("combat-jauges-container");
         if (jauges) jauges.style.opacity = "0";
+        const divEtatsVide = document.getElementById("combat-etats-alteres");
+        if (divEtatsVide) divEtatsVide.innerHTML = "";
         return;
     }
 
@@ -160,6 +162,12 @@ window.afficherPersoCombatActuel = function() {
     const nom = persoActuel.nom || "";
     
     divNom.innerText = (prenom + " " + nom).trim();
+
+    if (!document.getElementById("combat-etats-alteres")) {
+        const divEtats = document.createElement("div");
+        divEtats.id = "combat-etats-alteres";
+        divNom.parentElement.parentElement.insertBefore(divEtats, divNom.parentElement.nextSibling);
+    }
     
     // On restaure l'effet doré s'il a été désactivé par "Aucun héros"
     divNom.style.background = "linear-gradient(135deg, #fbf5bd 0%, #c2a878 25%, #5c3a21 50%, #e8d5a5 75%, #ffffff 100%)";
@@ -182,6 +190,32 @@ window.afficherPersoCombatActuel = function() {
 
     // NOUVEAU : Affiche la carte lockée si le perso est dans la file d'attente
     window.actualiserEtatCarteCombat();
+
+    // 🔻 AFFICHAGE DES ÉTATS ALTÉRÉS DANS LA DIV DÉDIÉE 🔻
+    const conteneurEtats = document.getElementById("combat-etats-alteres");
+    if (conteneurEtats) {
+        if (persoActuel.Etats_Alteres && persoActuel.Etats_Alteres.length > 0) {
+            let etatsHtml = `<div style="display: flex; gap: 15px; justify-content: center; margin-top: 5px;">`;
+            persoActuel.Etats_Alteres.forEach(etat => {
+                etatsHtml += `
+                    <div style="position: relative; cursor: pointer;" 
+                         onmouseenter="if(window.matchMedia('(hover: hover)').matches) this.querySelector('.popup-etat').style.display='block'" 
+                         onmouseleave="if(window.matchMedia('(hover: hover)').matches) this.querySelector('.popup-etat').style.display='none'"
+                         onclick="const p = this.querySelector('.popup-etat'); document.querySelectorAll('.popup-etat').forEach(el => { if(el !== p) el.style.display='none'; }); p.style.display = p.style.display === 'block' ? 'none' : 'block'; event.stopPropagation();">
+                        <img src="${etat.icone}" style="width: 72px; height: auto; border: none; background: transparent; box-shadow: none; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.8));">
+                        <div class="popup-etat" style="display: none; position: absolute; top: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.95); border: 1px solid #c2a878; padding: 10px; border-radius: 6px; width: max-content; z-index: 1000; color: white; font-size: 13px; font-family: 'Almendra', serif; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.8);">
+                            <strong style="color: #ffaa00; font-family: 'Cinzel', serif;">${etat.nom} (${etat.duree} tours)</strong><br>
+                            <span style="color: #ccc;">${etat.desc}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            etatsHtml += `</div>`;
+            conteneurEtats.innerHTML = etatsHtml;
+        } else {
+            conteneurEtats.innerHTML = "";
+        }
+    }
 };
 
 // =========================================================================
@@ -406,6 +440,11 @@ window.gererClicCarteCombat = function(idCarte) {
 document.addEventListener("click", function(event) {
     const btnFermer = document.getElementById('btn-fermer-combat');
     if (!btnFermer || btnFermer.style.display === 'none') return;
+
+    // 🔻 NOUVEAU : Fermeture des popups d'états altérés tactiles si on clique dans le vide
+    if (!event.target.closest('#combat-etats-alteres')) {
+        document.querySelectorAll('.popup-etat').forEach(el => el.style.display = 'none');
+    }
 
     const clicSurBanniere = event.target.closest('.banniere-carte-combat');
     const clicSurCarteHD = event.target.closest('#apercu-carte-hd-competence');
@@ -1869,7 +1908,7 @@ window.jouerReposLong = async function() {
     window.actualiserEtatCarteCombat("REPOS_LONG");
 
     try {
-        const { doc, getDoc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+        const { getDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
         const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
         const snap = await getDoc(partieRef);
 
@@ -2022,17 +2061,19 @@ window.finDeTourCombat = async function(forcer = false) {
                             
                             window.PERSOS_PARTIE.forEach(perso => {
                                 if (perso.statut !== "Mort") {
+                                    let modifsFirebase = {};
+                                    let majRequise = false;
+
+                                    // 1. Régénération
                                     const fatigueMax = parseInt(perso.Fatigue_Max) || parseInt(perso.fatigueMax) || 100;
                                     let fatigue = perso.fatigueActuelle !== undefined ? parseInt(perso.fatigueActuelle) : fatigueMax;
-                                    
                                     const regenPct = parseInt(perso.Regeneration) || 0;
 
                                     if (regenPct > 0) {
                                         const montantRegen = Math.floor((regenPct / 100) * fatigueMax);
                                         fatigue = Math.min(fatigueMax, fatigue + montantRegen);
-
                                         perso.fatigueActuelle = fatigue;
-
+                                        
                                         const persoJoueur = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === perso.idPersonnage);
                                         if (persoJoueur) persoJoueur.fatigueActuelle = fatigue;
 
@@ -2041,9 +2082,30 @@ window.finDeTourCombat = async function(forcer = false) {
                                             window.COMBAT_FATIGUE_ACTUELLE = fatigue;
                                         }
 
+                                        modifsFirebase.Fatigue_Actuelle = fatigue;
+                                        majRequise = true;
+                                    }
+
+                                    // 2. 🔻 DÉCRÉMENTATION DES ÉTATS ALTÉRÉS AU NOUVEAU TOUR 🔻
+                                    if (perso.Etats_Alteres && perso.Etats_Alteres.length > 0) {
+                                        let etatsAJour = perso.Etats_Alteres.map(e => {
+                                            e.duree -= 1;
+                                            return e;
+                                        }).filter(e => e.duree > 0);
+
+                                        perso.Etats_Alteres = etatsAJour; // MAJ locale
+                                        
+                                        const persoJoueur = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === perso.idPersonnage);
+                                        if (persoJoueur) persoJoueur.Etats_Alteres = etatsAJour;
+
+                                        modifsFirebase.Etats_Alteres = etatsAJour;
+                                        majRequise = true;
+                                    }
+
+                                    if (majRequise) {
                                         const persoRef = doc(db, "Personnages", perso.idPersonnage);
-                                        batch.update(persoRef, { Fatigue_Actuelle: fatigue });
-                                        regenAjoutee = true;
+                                        batch.update(persoRef, modifsFirebase);
+                                        regenAjoutee = true; // Trigger le commit global
                                     }
                                 }
                             });
@@ -2079,6 +2141,10 @@ window.finDeTourCombat = async function(forcer = false) {
 };
 
 window.afficherPisteInitiative = function(queue, phase) {
+    if (queue === undefined && window.PARTIE_DATA) {
+        queue = window.PARTIE_DATA.File_Attente_Combat || [];
+        phase = window.PARTIE_DATA.Phase_Combat || "Preparation";
+    }
     if (window.ANIMATION_TOUR_EN_COURS) return;
 
     const piste = document.getElementById("piste-initiative");
@@ -2113,8 +2179,17 @@ window.afficherPisteInitiative = function(queue, phase) {
         const classeBulle = (index === 0 && phase === "Resolution") ? "halo-tour-actif" : "bulle-initiative-base";
         const affichageInit = item.idCarte === "REPOS_LONG" ? "⏳" : item.initiative;
 
+        let etatsHtml = "";
+        if (perso.Etats_Alteres && perso.Etats_Alteres.length > 0) {
+            etatsHtml = `<div style="position: absolute; bottom: -45px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; justify-content: center; z-index: 5;">`;
+            perso.Etats_Alteres.forEach(etat => {
+                etatsHtml += `<img src="${etat.icone}" style="width: 32px; height: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));">`;
+            });
+            etatsHtml += `</div>`;
+        }
+
         html += `
-        <div ${attributId} class="${classeBulle}" style="position: relative; width: 110px; height: 126px; flex-shrink: 0; margin-top: 0px; transition: all 0.4s ease; transform-origin: left center; margin-right: 15px; cursor: pointer;" onclick="window.selectionnerEtCentrerPerso('${item.idPersonnage}')">
+        <div ${attributId} class="${classeBulle}" style="position: relative; width: 110px; height: 126px; flex-shrink: 0; margin-top: 0px; margin-bottom: 45px; transition: all 0.4s ease; transform-origin: left center; margin-right: 15px; cursor: pointer;" onclick="window.selectionnerEtCentrerPerso('${item.idPersonnage}')">
             <div style="position: absolute; inset: 0; background: linear-gradient(135deg, #fbf5bd 0%, #c2a878 30%, #5c3a21 50%, #e8d5a5 80%, #ffffff 100%); clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); display: flex; align-items: center; justify-content: center;">
                 <div style="width: 102px; height: 118px; background-color: #1a0f08; clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); position: relative;">
                     <img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: top center;">
@@ -2133,6 +2208,7 @@ window.afficherPisteInitiative = function(queue, phase) {
             <div style="position: absolute; bottom: 8px; right: -10px; width: 50px; height: 8px; background: #000; border: 1px solid #1a0f08; border-radius: 4px; transform: rotate(-30deg); transform-origin: center; box-shadow: 0 2px 4px rgba(0,0,0,0.8); overflow: hidden; z-index: 2;">
                 <div style="position: absolute; top: 0; left: 0; width: ${pctFatigue}%; height: 100%; background: linear-gradient(to right, #c2a878, #fbf5bd); transition: width 0.3s ease;"></div>
             </div>
+            ${etatsHtml}
         </div>`;
     });
 
@@ -2312,7 +2388,6 @@ window.validerCarteCombat = async function(idCarte, elementTexte) {
 
     setTimeout(async () => {
         try {
-            const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
             const persoRef = doc(db, "Personnages", persoActuel.idPersonnage);
             
             await updateDoc(persoRef, { 

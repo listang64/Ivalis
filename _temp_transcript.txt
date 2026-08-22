@@ -3,3 +3,6 @@ attaque lourde
 mots de pouvoirs
 attaque magique 
 portée
+zones
+durée +
+etourdir

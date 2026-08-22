@@ -109,21 +109,30 @@ function nettoyer(valeur) {
 
 // Conversion : document Firestore "Personnages" (colonnes CSV) -> objet front-end
 function persoDocVersFront(id, d) {
+  let esquiveCalc = d.Esquive !== undefined ? d.Esquive : 15;
+  let paradeCalc = d.Parade !== undefined ? d.Parade : 0;
+  const etatsAlteres = d.Etats_Alteres || [];
+  
+  // 🔻 NOUVEAU : Application native des malus d'états à la racine ! 🔻
+  if (etatsAlteres.some(e => e.nom === "Étourdi")) {
+      esquiveCalc -= 20;
+      paradeCalc -= 20;
+  }
+
   return {
     idPersonnage: id,
     idPartie: d.ID_Partie || "",
     idJoueur: d.ID_Joueur || "",
-    camp: d.Camp || "Allié", // 🔻 NOUVEAU : Différenciation Allié / Ennemi
-    deckEquipe: d.Deck_Equipe || [], // deck in cache
+    camp: d.Camp || "Allié", 
+    deckEquipe: d.Deck_Equipe || [], 
     couleur: d.Couleur || "",
-    // --- AJOUT POUR LA JAUGE DE COMBAT ---
     fatigueActuelle: d.Fatigue_Actuelle !== undefined ? d.Fatigue_Actuelle : 100,
     fatigueMax: d.Fatigue_Max !== undefined ? d.Fatigue_Max : 100,
     prenom: d.Prenom_Personnage || "",
     nom: d.Nom_Personnage || "",
     race: d.Race || "",
     urlCloudinary: d.URL_Cloudinary || "",
-    urlToken: d.URL_Token || "", // 🔻 NOUVEAU : Chargement du Token
+    urlToken: d.URL_Token || "", 
     statut: d.Statut || "Vivant",
     age: d.Age_Apparent || "",
     genre: d.Genre || "",
@@ -143,8 +152,8 @@ function persoDocVersFront(id, d) {
     PV_Actuels: d.PV_Actuels !== undefined ? d.PV_Actuels : (d.PV_Max || 0),
     Fatigue_Max: d.Fatigue_Max !== undefined ? d.Fatigue_Max : 100,
     Regeneration: d.Regeneration !== undefined ? d.Regeneration : 30,
-    Esquive: d.Esquive !== undefined ? d.Esquive : 15,
-    Parade: d.Parade !== undefined ? d.Parade : 0,
+    Esquive: esquiveCalc, // 🔻 Calculé avec le malus
+    Parade: paradeCalc,   // 🔻 Calculé avec le malus
     Critique: d.Critique !== undefined ? d.Critique : 10,
     Def_Physique: d.Def_Physique !== undefined ? d.Def_Physique : 0,
     Def_Magique: d.Def_Magique !== undefined ? d.Def_Magique : 0,
@@ -156,7 +165,8 @@ function persoDocVersFront(id, d) {
     Dev_Mod_Critique: d.Dev_Mod_Critique || 0,
     Dev_Mod_DefPhys: d.Dev_Mod_DefPhys || 0,
     Dev_Mod_DefMag: d.Dev_Mod_DefMag || 0,
-    Competences_Max: d.Competences_Max !== undefined ? d.Competences_Max : 6
+    Competences_Max: d.Competences_Max !== undefined ? d.Competences_Max : 6,
+    Etats_Alteres: etatsAlteres
   };
 }
 
@@ -187,7 +197,9 @@ function frontVersPersoDoc(donnees, idPersonnage) {
     Equipement_Visible: donnees.equipement || "",
     Signes_Distinctif: donnees.signes || "",
     Expression_Du_Visage: donnees.expression || "",
-    ID_Faction: donnees.idFaction || ""
+    ID_Faction: donnees.idFaction || "",
+    // 🔻 NOUVEAU : On sauvegarde les états altérés ! 🔻
+    Etats_Alteres: donnees.Etats_Alteres || []
   };
 }
 
