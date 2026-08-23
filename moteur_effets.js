@@ -303,8 +303,10 @@ window.demarrerCiblage = async function(idCarte) {
                 }
             });
 
-            if (nomLower.includes("attaque") || nomLower.includes("pouvoir") || nomLower.includes("soin") || nomLower.includes("guérison") || isPurification) {
-                let isHeal = nomLower.includes("soin") || nomLower.includes("guérison") || isPurification;
+            let isShield = nomLower.includes("bouclier");
+
+            if (nomLower.includes("attaque") || nomLower.includes("pouvoir") || nomLower.includes("soin") || nomLower.includes("guérison") || isPurification || isShield) {
+                let isHeal = nomLower.includes("soin") || nomLower.includes("guérison") || isPurification || isShield;
 
                 attaquesExtraites.push({
                     nom: effBase.Nom,
@@ -313,6 +315,7 @@ window.demarrerCiblage = async function(idCarte) {
                     isRanged: isRanged,
                     rangeMax: rangeMax,
                     isHeal: isHeal,
+                    isShield: isShield,
                     purifChance: purifChance,
                     cibles: []
                 });
@@ -654,7 +657,7 @@ window.dessinerAnneauxCiblage = function() {
             }
 
             let malusLabel = anneau.querySelector(".malus-cac");
-            if (configSort.isRanged && dist === 1 && window.ETAT_CIBLAGE.attaques.length > 0) {
+            if (configSort.isRanged && dist === 1 && window.ETAT_CIBLAGE.attaques.length > 0 && !configSort.isHeal) {
                 if (!malusLabel) {
                     malusLabel = document.createElement("div");
                     malusLabel.className = "malus-cac";
@@ -992,14 +995,48 @@ window.jouerAnimationMoteur = async function(action) {
                     continue; 
                 }
 
-                // Si on arrive ici, c'est que l'attaque a touché, OU que c'est un soin !
+                // Si on arrive ici, c'est que l'attaque a touché, OU que c'est un soin / bouclier !
                 ciblesToucheesValides.add(idCible);
 
                 let oldPv = parseInt(cibleData.PV_Actuels) || 0;
                 let maxPv = (parseInt(cibleData.PV_Max) || 1) + (parseInt(cibleData.Dev_Mod_PV) || 0);
                 let newPv;
 
-                if (attaque.isHeal) {
+                // ======================================================
+                //  1. CRÉATION DU BOUCLIER MAGIQUE
+                // ======================================================
+                if (attaque.isShield) {
+                    if (oldPv < 30) {
+                        if (tkCible) window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Échec (PV < 30)", "#ffaa00");
+                        await new Promise(r => setTimeout(r, 1200));
+                    } else {
+                        let shieldValue = Math.floor(oldPv * attaque.valeurBrute / 100);
+                        if (shieldValue > 20) shieldValue = 20;
+
+                        cibleData.Bouclier_Max = shieldValue;
+                        cibleData.Bouclier_Actuel = shieldValue;
+
+                        if (tkCible) {
+                            window.afficherMessageFlottantHex(tkCible.q, tkCible.r, `+${shieldValue} 🛡️`, "#00ffff");
+                        }
+
+                        // Force le rafraîchissement immédiat du VTT pour afficher le halo bleu
+                        if (typeof window.appliquerTokensVTT === "function") window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+
+                        const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
+                        if (lanceurData && lanceurData.idJoueur === currentUserId) {
+                            updateDoc(doc(db, "Personnages", idCible), {
+                                Bouclier_Max: shieldValue,
+                                Bouclier_Actuel: shieldValue
+                            }).catch(e => console.error(e));
+                        }
+                        await new Promise(r => setTimeout(r, 1200));
+                    }
+                } 
+                // ======================================================
+                //  2. SOINS ET PURIFICATION
+                // ======================================================
+                else if (attaque.isHeal) {
                     newPv = oldPv;
 
                     if (attaque.valeurBrute > 0) {
@@ -1087,7 +1124,11 @@ window.jouerAnimationMoteur = async function(action) {
                         if (typeof window.mettreAJourJaugePV === "function") window.mettreAJourJaugePV();
                     }
                     await new Promise(r => setTimeout(r, 1200));
-                } else {
+                } 
+                // ======================================================
+                //  3. DÉGÂTS NORMAUX (Vérifie le bouclier d'abord)
+                // ======================================================
+                else {
                     const defPhys = (parseInt(cibleData.Def_Physique) || 0) + (parseInt(cibleData.Dev_Mod_DefPhys) || 0);
                     const defMag = (parseInt(cibleData.Def_Magique) || 0) + (parseInt(cibleData.Dev_Mod_DefMag) || 0);
                     let degats = attaque.valeurBrute;
@@ -1098,60 +1139,136 @@ window.jouerAnimationMoteur = async function(action) {
                     let degatsFinaux = Math.round(degats * (1 - reduction));
                     if (degatsFinaux < 0) degatsFinaux = 0;
 
-                    cibleData.PV_Actuels = oldPv - degatsFinaux;
-                    if(cibleData.PV_Actuels < 0) cibleData.PV_Actuels = 0;
-                    newPv = cibleData.PV_Actuels;
+                    let oldShield = parseInt(cibleData.Bouclier_Actuel) || 0;
+                    let maxShield = parseInt(cibleData.Bouclier_Max) || oldShield || 1;
+                    let shieldDestroyed = false;
 
-                    if (tkCible) {
-                        window.afficherMessageFlottantHex(tkCible.q, tkCible.r, `-${degatsFinaux} 🩸`, "#ff4c4c");
-                        const tokenDiv = document.getElementById("token-" + idCible);
-                        if (tokenDiv) {
-                            tokenDiv.style.transition = "filter 0.1s";
-                            tokenDiv.style.filter = "sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.2)";
-                            
-                            const oldPct = Math.max(0, Math.min(100, (oldPv / maxPv) * 100));
-                            const newPct = Math.max(0, Math.min(100, (newPv / maxPv) * 100));
-                            
-                            const jaugeContainer = document.createElement("div");
-                            jaugeContainer.style.position = "absolute";
-                            jaugeContainer.style.bottom = "-12px"; 
-                            jaugeContainer.style.left = "50%";
-                            jaugeContainer.style.transform = "translateX(-50%)";
-                            jaugeContainer.style.width = "75%";
-                            jaugeContainer.style.height = "6px";
-                            jaugeContainer.style.backgroundColor = "#111";
-                            jaugeContainer.style.border = "1px solid #c2a878";
-                            jaugeContainer.style.borderRadius = "3px";
-                            jaugeContainer.style.zIndex = "5";
-                            jaugeContainer.style.opacity = "0"; 
-                            jaugeContainer.style.transition = "opacity 0.3s ease";
-                            jaugeContainer.style.boxShadow = "0 2px 4px rgba(0,0,0,0.8)";
-                            
-                            const jaugeFill = document.createElement("div");
-                            jaugeFill.style.height = "100%";
-                            jaugeFill.style.width = oldPct + "%";
-                            jaugeFill.style.backgroundColor = "#ff4c4c"; 
-                            jaugeFill.style.borderRadius = "2px";
-                            jaugeFill.style.transition = "width 0.5s ease-out";
-                            
-                            jaugeContainer.appendChild(jaugeFill);
-                            tokenDiv.appendChild(jaugeContainer);
-                            
-                            void jaugeContainer.offsetWidth;
-                            jaugeContainer.style.opacity = "1";
-                            
-                            setTimeout(() => { tokenDiv.style.filter = ""; }, 300);
-                            setTimeout(() => { jaugeFill.style.width = newPct + "%"; }, 400);
-                            setTimeout(() => {
+                    // Si la cible a un bouclier actif, c'est lui qui absorbe !
+                    if (oldShield > 0) {
+                        let shieldNew = oldShield - degatsFinaux;
+                        if (shieldNew <= 0) shieldNew = 0; // L'overkill part dans le vide !
+
+                        cibleData.Bouclier_Actuel = shieldNew;
+                        newPv = oldPv;
+                        shieldDestroyed = shieldNew === 0;
+
+                        if (tkCible) {
+                            window.afficherMessageFlottantHex(tkCible.q, tkCible.r, `-${degatsFinaux} 🛡️`, "#00ffff");
+                            const tokenDiv = document.getElementById("token-" + idCible);
+                            if (tokenDiv) {
+                                tokenDiv.style.transition = "filter 0.1s";
+                                // Flash bleu clair pour le bouclier
+                                tokenDiv.style.filter = "sepia(1) hue-rotate(180deg) saturate(5) brightness(1.2)";
+
+                                const oldShieldPct = Math.max(0, Math.min(100, (oldShield / maxShield) * 100));
+                                const newShieldPct = Math.max(0, Math.min(100, (shieldNew / maxShield) * 100));
+
+                                // On dessine la barre Bleue du Bouclier
+                                const jaugeContainer = document.createElement("div");
+                                jaugeContainer.style.position = "absolute";
+                                jaugeContainer.style.bottom = "-12px";
+                                jaugeContainer.style.left = "50%";
+                                jaugeContainer.style.transform = "translateX(-50%)";
+                                jaugeContainer.style.width = "75%";
+                                jaugeContainer.style.height = "6px";
+                                jaugeContainer.style.backgroundColor = "#111";
+                                jaugeContainer.style.border = "1px solid #00ffff";
+                                jaugeContainer.style.borderRadius = "3px";
+                                jaugeContainer.style.zIndex = "5";
                                 jaugeContainer.style.opacity = "0";
-                                setTimeout(() => jaugeContainer.remove(), 300);
-                            }, 1500); 
+                                jaugeContainer.style.transition = "opacity 0.3s ease";
+                                jaugeContainer.style.boxShadow = "0 2px 4px rgba(0,0,0,0.8)";
+
+                                const jaugeFill = document.createElement("div");
+                                jaugeFill.style.height = "100%";
+                                jaugeFill.style.width = oldShieldPct + "%";
+                                jaugeFill.style.backgroundColor = "#00ffff";
+                                jaugeFill.style.borderRadius = "2px";
+                                jaugeFill.style.transition = "width 0.5s ease-out";
+
+                                jaugeContainer.appendChild(jaugeFill);
+                                tokenDiv.appendChild(jaugeContainer);
+
+                                void jaugeContainer.offsetWidth;
+                                jaugeContainer.style.opacity = "1";
+
+                                setTimeout(() => { tokenDiv.style.filter = ""; }, 300);
+                                setTimeout(() => { jaugeFill.style.width = newShieldPct + "%"; }, 400);
+                                setTimeout(() => {
+                                    jaugeContainer.style.opacity = "0";
+                                    setTimeout(() => {
+                                        jaugeContainer.remove();
+                                        // Si le bouclier est détruit, on efface le halo !
+                                        if (shieldDestroyed && typeof window.appliquerTokensVTT === "function") {
+                                            window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+                                        }
+                                    }, 300);
+                                }, 1500);
+                            }
+                        }
+                    } else {
+                        // Pas de bouclier : Dégâts rouges normaux sur les PV
+                        cibleData.PV_Actuels = oldPv - degatsFinaux;
+                        if(cibleData.PV_Actuels < 0) cibleData.PV_Actuels = 0;
+                        newPv = cibleData.PV_Actuels;
+
+                        if (tkCible) {
+                            window.afficherMessageFlottantHex(tkCible.q, tkCible.r, `-${degatsFinaux} 🩸`, "#ff4c4c");
+                            const tokenDiv = document.getElementById("token-" + idCible);
+                            if (tokenDiv) {
+                                tokenDiv.style.transition = "filter 0.1s";
+                                tokenDiv.style.filter = "sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.2)";
+                                
+                                const oldPct = Math.max(0, Math.min(100, (oldPv / maxPv) * 100));
+                                const newPct = Math.max(0, Math.min(100, (newPv / maxPv) * 100));
+                                
+                                const jaugeContainer = document.createElement("div");
+                                jaugeContainer.style.position = "absolute";
+                                jaugeContainer.style.bottom = "-12px"; 
+                                jaugeContainer.style.left = "50%";
+                                jaugeContainer.style.transform = "translateX(-50%)";
+                                jaugeContainer.style.width = "75%";
+                                jaugeContainer.style.height = "6px";
+                                jaugeContainer.style.backgroundColor = "#111";
+                                jaugeContainer.style.border = "1px solid #c2a878";
+                                jaugeContainer.style.borderRadius = "3px";
+                                jaugeContainer.style.zIndex = "5";
+                                jaugeContainer.style.opacity = "0"; 
+                                jaugeContainer.style.transition = "opacity 0.3s ease";
+                                jaugeContainer.style.boxShadow = "0 2px 4px rgba(0,0,0,0.8)";
+                                
+                                const jaugeFill = document.createElement("div");
+                                jaugeFill.style.height = "100%";
+                                jaugeFill.style.width = oldPct + "%";
+                                jaugeFill.style.backgroundColor = "#ff4c4c"; 
+                                jaugeFill.style.borderRadius = "2px";
+                                jaugeFill.style.transition = "width 0.5s ease-out";
+                                
+                                jaugeContainer.appendChild(jaugeFill);
+                                tokenDiv.appendChild(jaugeContainer);
+                                
+                                void jaugeContainer.offsetWidth;
+                                jaugeContainer.style.opacity = "1";
+                                
+                                setTimeout(() => { tokenDiv.style.filter = ""; }, 300);
+                                setTimeout(() => { jaugeFill.style.width = newPct + "%"; }, 400);
+                                setTimeout(() => {
+                                    jaugeContainer.style.opacity = "0";
+                                    setTimeout(() => jaugeContainer.remove(), 300);
+                                }, 1500); 
+                            }
                         }
                     }
+
                     const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
                     if (lanceurData && lanceurData.idJoueur === currentUserId) {
                         const refPerso = doc(db, "Personnages", idCible);
-                        updateDoc(refPerso, { PV_Actuels: cibleData.PV_Actuels }).catch(e => console.error(e));
+                        const updatePayload = { PV_Actuels: cibleData.PV_Actuels };
+                        if (oldShield > 0) {
+                            updatePayload.Bouclier_Actuel = cibleData.Bouclier_Actuel;
+                            if (shieldDestroyed) updatePayload.Bouclier_Max = cibleData.Bouclier_Max;
+                        }
+                        updateDoc(refPerso, updatePayload).catch(e => console.error(e));
                     }
                     if (window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]?.idPersonnage === idCible) {
                         window.COMBAT_PV_ACTUELS = cibleData.PV_Actuels;

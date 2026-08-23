@@ -1570,6 +1570,38 @@ window.appliquerTokensVTT = function(tokensMap) {
 
         divToken.appendChild(img);
 
+        // 🔻 5️⃣ NOUVEAU : LE HALO DU BOUCLIER MAGIQUE (Opacité et taille "entre deux") 🔻
+        const pData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPerso);
+        if (pData && (parseInt(pData.Bouclier_Actuel) || 0) > 0) {
+            if (!document.getElementById("anim-bouclier-vtt")) {
+                const styleBouclier = document.createElement("style");
+                styleBouclier.id = "anim-bouclier-vtt";
+                styleBouclier.innerHTML = `
+                    @keyframes pulsationBouclier {
+                        0% { transform: translate(-50%, -50%) scale(1); opacity: 0.4; box-shadow: 0 0 10px rgba(0,255,255,0.4), 0 0 20px rgba(0,255,255,0.2); }
+                        50% { transform: translate(-50%, -50%) scale(1.03); opacity: 0.7; box-shadow: 0 0 15px rgba(0,255,255,0.6), 0 0 30px rgba(0,255,255,0.4); }
+                        100% { transform: translate(-50%, -50%) scale(1); opacity: 0.4; box-shadow: 0 0 10px rgba(0,255,255,0.4), 0 0 20px rgba(0,255,255,0.2); }
+                    }
+                `;
+                document.head.appendChild(styleBouclier);
+            }
+
+            const haloBouclier = document.createElement("div");
+            haloBouclier.className = "token-halo-bouclier";
+            haloBouclier.style.position = "absolute";
+            haloBouclier.style.top = "50%";
+            haloBouclier.style.left = "50%";
+            haloBouclier.style.width = "104%"; // Un poil plus large que le pion pour qu'on le voie bien
+            haloBouclier.style.height = "104%";
+            haloBouclier.style.transform = "translate(-50%, -50%)"; // Centrage absolu indispensable
+            haloBouclier.style.borderRadius = "50%";
+            haloBouclier.style.border = "2px solid rgba(0, 255, 255, 0.5)"; // Liseret bien visible
+            haloBouclier.style.zIndex = "3";
+            haloBouclier.style.pointerEvents = "none";
+            haloBouclier.style.animation = "pulsationBouclier 2s ease-in-out infinite";
+            divToken.appendChild(haloBouclier);
+        }
+
         window.positionnerTokenVTT(divToken, true);
         conteneur.appendChild(divToken);
     }
@@ -2457,6 +2489,8 @@ window.reinitialiserCombat = async function() {
                 // Mise à jour locale immédiate (évite d'attendre le snapshot)
                 perso.PV_Actuels = pvMax;
                 perso.fatigueActuelle = fatigueMax;
+                perso.Bouclier_Max = 0;
+                perso.Bouclier_Actuel = 0;
 
                 const persoActuel = window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
                 if (persoActuel && persoActuel.idPersonnage === perso.idPersonnage) {
@@ -2469,13 +2503,16 @@ window.reinitialiserCombat = async function() {
                 const persoRef = doc(db, "Personnages", perso.idPersonnage);
                 await updateDoc(persoRef, {
                     PV_Actuels: pvMax,
-                    Fatigue_Actuelle: fatigueMax
+                    Fatigue_Actuelle: fatigueMax,
+                    Bouclier_Max: 0,
+                    Bouclier_Actuel: 0
                 });
             }
         }
 
         if (typeof window.mettreAJourJaugePV === "function") window.mettreAJourJaugePV();
         if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
+        if (typeof window.appliquerTokensVTT === "function") window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
         
         // Forcer la remise à zéro de la mémoire locale pour rejouer l'animation "Tour 1"
         window.DERNIER_TOUR_AFFICHE = 0;

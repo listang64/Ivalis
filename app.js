@@ -166,7 +166,9 @@ function persoDocVersFront(id, d) {
     Dev_Mod_DefPhys: d.Dev_Mod_DefPhys || 0,
     Dev_Mod_DefMag: d.Dev_Mod_DefMag || 0,
     Competences_Max: d.Competences_Max !== undefined ? d.Competences_Max : 6,
-    Etats_Alteres: etatsAlteres
+    Etats_Alteres: etatsAlteres,
+    Bouclier_Max: d.Bouclier_Max || 0,
+    Bouclier_Actuel: d.Bouclier_Actuel || 0
   };
 }
 
@@ -199,7 +201,9 @@ function frontVersPersoDoc(donnees, idPersonnage) {
     Expression_Du_Visage: donnees.expression || "",
     ID_Faction: donnees.idFaction || "",
     // 🔻 NOUVEAU : On sauvegarde les états altérés ! 🔻
-    Etats_Alteres: donnees.Etats_Alteres || []
+    Etats_Alteres: donnees.Etats_Alteres || [],
+    Bouclier_Max: donnees.Bouclier_Max || 0,
+    Bouclier_Actuel: donnees.Bouclier_Actuel || 0
   };
 }
 
