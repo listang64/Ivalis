@@ -364,6 +364,40 @@ window.demarrerCiblage = async function(idCarte) {
                     cibles: []
                 });
             }
+
+            // 🔻 NOUVEAU : DÉTECTION ABSORPTION 🔻
+            let isAbsorption = false;
+            let absorptionValeur = 0;
+
+            if (nomLower.includes("absorption")) {
+                isAbsorption = true;
+                absorptionValeur += (parseFrFloat(effBase.Valeur) || 20) * (act.count || 1);
+            }
+
+            listeMods.forEach(m => {
+                const modEff = window.EFFETS_BDD_CACHE[m.id];
+                if (modEff && (modEff.Nom || "").toLowerCase().includes("absorption")) {
+                    isAbsorption = true;
+                    absorptionValeur += (parseFrFloat(modEff.Valeur) || 20) * m.count;
+                }
+            });
+
+            if (isAbsorption) {
+                if (absorptionValeur > 100) absorptionValeur = 100; // Cap à 100% d'annulation
+                
+                alterationsExtraites.push({
+                    nom: "Absorption",
+                    icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", // NOTE: Remplace par le lien d'une belle icône Cloudinary !
+                    desc: `Annule ${absorptionValeur}% des dégâts subis et soigne de 10% de la frappe.`,
+                    chance: 100, // Toujours 100% d'application pour un buff
+                    duree: 1, // Dure uniquement le tour en cours !
+                    valeurAbs: absorptionValeur,
+                    isRanged: isRanged,
+                    rangeMax: rangeMax,
+                    isHeal: true, // ✅ IMPORTANT : Permet de cibler un allié ou soi-même
+                    cibles: []
+                });
+            }
         });
     }
 
@@ -1133,6 +1167,34 @@ window.jouerAnimationMoteur = async function(action) {
                     const defMag = (parseInt(cibleData.Def_Magique) || 0) + (parseInt(cibleData.Dev_Mod_DefMag) || 0);
                     let degats = attaque.valeurBrute;
                     if (attaque.isRanged && dist === 1) degats = Math.floor(degats * 0.7); 
+
+                    // 🔻 NOUVEAU : ABSORPTION RÉACTIVE 🔻
+                    const etatAbsorption = (cibleData.Etats_Alteres || []).find(e => e.nom === "Absorption");
+                    if (etatAbsorption) {
+                        const pctAnnule = etatAbsorption.valeurAbs || 20;
+                        const degatsAAnnuler = Math.floor(degats * (pctAnnule / 100));
+                        const soinAbsorption = Math.floor(degats * 0.10); // Toujours 10% du brut
+
+                        degats -= degatsAAnnuler;
+                        if (degats < 0) degats = 0;
+
+                        if (soinAbsorption > 0) {
+                            let maxPv = (parseInt(cibleData.PV_Max) || 1) + (parseInt(cibleData.Dev_Mod_PV) || 0);
+                            let tempPv = Math.min(maxPv, oldPv + soinAbsorption);
+                            
+                            cibleData.PV_Actuels = tempPv;
+                            oldPv = tempPv; // Mise à jour pour que le reste des dégâts tape sur cette nouvelle valeur !
+
+                            if (tkCible) {
+                                // Petit flash violet pour le drain de vie
+                                window.afficherMessageFlottantHex(tkCible.q, tkCible.r, `+${soinAbsorption} 🩸 (Drain)`, "#9b59b6");
+                                // ⏱️ On attend 600ms pour laisser ce texte monter avant d'afficher les dégâts rouges
+                                await new Promise(r => setTimeout(r, 600));
+                            }
+                        }
+                    }
+
+                    // Suite classique du calcul d'armure...
                     let resistance = attaque.typeRes === "Magique" ? defMag : defPhys;
                     let reduction = resistance / 100;
                     if (reduction > 1) reduction = 1; 

@@ -1204,6 +1204,10 @@ window.rafraichirForge = function() {
             const baseVal = parseFrenchFloat(act.baseEffet.Valeur) || 8;
             initBonusNet += act.count * (baseVal + parseFrenchFloat(act.baseEffet.Cout_PT) * 5);
         }
+        // 🔻 NOUVEAU : On rembourse la perte d'initiative pour l'Absorption (Action de base) 🔻
+        if ((act.baseEffet.Nom || "").toLowerCase().includes("absorption")) {
+            initBonusNet += baseActionCost * 5;
+        }
 
         Object.keys(act.mods).forEach(modId => {
             const modCount = act.mods[modId];
@@ -1213,6 +1217,10 @@ window.rafraichirForge = function() {
                 if (modEff.Nom === "Initiative +") {
                     const baseVal = parseFrenchFloat(modEff.Valeur) || 8;
                     initBonusNet += modCount * (baseVal + parseFrenchFloat(modEff.Cout_PT) * 5);
+                }
+                // 🔻 NOUVEAU : On rembourse la perte d'initiative pour l'Absorption (Modificateur) 🔻
+                if ((modEff.Nom || "").toLowerCase().includes("absorption")) {
+                    initBonusNet += (parseFrenchFloat(modEff.Cout_PT) * modCount) * 5;
                 }
 
                 if (modEff.Nom === "Zone") {
