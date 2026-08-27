@@ -498,11 +498,7 @@ function sauvegarderClesApi() {
   localStorage.setItem(CLES_LS.cloudKey, document.getElementById("cle-cloud-key").value.trim());
   localStorage.setItem(CLES_LS.cloudSecret, document.getElementById("cle-cloud-secret").value.trim());
 
-  const msg = document.getElementById("msg-cles-api");
-  msg.style.color = "#1b6e3a";
-  msg.innerText = "Clés enregistrées dans ce navigateur.";
-  msg.style.opacity = "1";
-  setTimeout(() => { msg.style.opacity = "0"; }, 2500);
+  afficherMessageClesApi("Clés enregistrées dans ce navigateur.", false);
 }
 
 function basculerAffichageCles(afficher) {
@@ -510,6 +506,63 @@ function basculerAffichageCles(afficher) {
   ["cle-gemini", "cle-openai", "cle-cloud-name", "cle-cloud-key", "cle-cloud-secret"].forEach((id) => {
     document.getElementById(id).type = type;
   });
+}
+
+function afficherMessageClesApi(texte, estErreur) {
+  const msg = document.getElementById("msg-cles-api");
+  if (!msg) return;
+  msg.style.color = estErreur ? "#c0392b" : "#1b6e3a";
+  msg.innerText = texte;
+  msg.style.opacity = "1";
+  setTimeout(() => { msg.style.opacity = "0"; }, 3500);
+}
+
+// --- IMPORT / EXPORT DES CLES API (fichier JSON local, pratique sur iPad) ---
+function creerFichierExempleClesApi() {
+  const exemple = {
+    GEMINI_API_KEY: "",
+    OPENAI_API_KEY: "",
+    CLOUDINARY_CLOUD_NAME: "",
+    CLOUDINARY_API_KEY: "",
+    CLOUDINARY_API_SECRET: ""
+  };
+  const blob = new Blob([JSON.stringify(exemple, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const lien = document.createElement("a");
+  lien.href = url;
+  lien.download = "ivalis-cles-api.json";
+  document.body.appendChild(lien);
+  lien.click();
+  lien.remove();
+  URL.revokeObjectURL(url);
+
+  afficherMessageClesApi("Fichier exemple téléchargé.", false);
+}
+
+function importerFichierClesApi(evenement) {
+  const fichier = evenement.target.files && evenement.target.files[0];
+  evenement.target.value = ""; // Permet de réimporter le même fichier plusieurs fois de suite
+
+  if (!fichier) return;
+
+  const lecteur = new FileReader();
+  lecteur.onload = () => {
+    try {
+      const donnees = JSON.parse(lecteur.result);
+
+      document.getElementById("cle-gemini").value = (donnees.GEMINI_API_KEY || "").trim();
+      document.getElementById("cle-openai").value = (donnees.OPENAI_API_KEY || "").trim();
+      document.getElementById("cle-cloud-name").value = (donnees.CLOUDINARY_CLOUD_NAME || "").trim();
+      document.getElementById("cle-cloud-key").value = (donnees.CLOUDINARY_API_KEY || "").trim();
+      document.getElementById("cle-cloud-secret").value = (donnees.CLOUDINARY_API_SECRET || "").trim();
+
+      afficherMessageClesApi("Champs remplis depuis le fichier. Vérifie puis clique sur Sauvegarder.", false);
+    } catch (e) {
+      afficherMessageClesApi("Fichier illisible : vérifie que c'est bien le JSON exporté.", true);
+    }
+  };
+  lecteur.onerror = () => afficherMessageClesApi("Impossible de lire ce fichier.", true);
+  lecteur.readAsText(fichier);
 }
 
 // --- ALERTE UI : cles manquantes ---
@@ -4514,6 +4567,7 @@ Object.assign(window, {
   modifierStat, validerCreationCaracs, lancerJetDeCaracteristique,
   // Cles API + generation d'image (front-end)
   ouvrirClesApi, sauvegarderClesApi, basculerAffichageCles,
+  creerFichierExempleClesApi, importerFichierClesApi,
   afficherAlerteCles, fermerAlerteCles, ouvrirParametresDepuisAlerte,
   // Outils
   syncTemperature, sauvegarderTemperature, basculerAffichageTokens, basculerDevMode: window.basculerDevMode, toggleMicro,

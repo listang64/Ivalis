@@ -758,6 +758,13 @@
 
       <p id="msg-cles-api" style="font-weight: bold; font-size: 15px; opacity: 0; transition: opacity 0.3s; min-height: 18px;"></p>
 
+      <input type="file" id="input-import-cles-api" accept=".json,application/json" style="display:none" onchange="importerFichierClesApi(event)">
+
+      <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+        <button class="btn-parametres" onclick="jouerSonClic(); creerFichierExempleClesApi()">📄 Créer un fichier exemple</button>
+        <button class="btn-parametres" onclick="jouerSonClic(); document.getElementById('input-import-cles-api').click()">📂 Importer un fichier</button>
+      </div>
+
       <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
         <button id="btn-sauvegarder-cles" class="btn-parametres" onclick="jouerSonClic(); sauvegarderClesApi()">Sauvegarder</button>
         <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-cles-api', 'etape-menu-parametres')">Retour</button>
