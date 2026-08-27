@@ -153,8 +153,11 @@ class Plateau {
         const isMursMode = window.VTT_MODE_MURS === true;
         const isDifficileMode = window.VTT_MODE_DIFFICILE === true;
 
-        // 1. GOMME : Si supprimée et qu'on n'a pas l'outil gomme, on l'efface totalement (invisible)
-        if (state.isDeleted && !isGommeMode) return;
+        // 1. GOMME : Si supprimée et qu'aucun outil d'édition n'est actif, on l'efface totalement (invisible).
+        // Avec un outil en main (gomme/murs/difficile), on garde la case visible pour pouvoir
+        // continuer à y peindre des murs ou du terrain difficile par-dessus.
+        const isEditingMode = isGommeMode || isMursMode || isDifficileMode;
+        if (state.isDeleted && !isEditingMode) return;
 
         this.ctx.beginPath();
         for (let i = 0; i < 6; i++) {
