@@ -1344,7 +1344,6 @@ window.positionnerTokenVTT = function(divToken, majEchelle) {
     if (!majEchelle) return;
 
     const taille = parseFloat(divToken.dataset.taille) || 80;
-    const angle = parseFloat(divToken.dataset.angle) || 0;
 
     divToken.style.width = (taille * echelle) + "px";
     divToken.style.height = (taille * echelle) + "px";
@@ -1355,23 +1354,17 @@ window.positionnerTokenVTT = function(divToken, majEchelle) {
     const anneau = divToken.querySelector(".token-anneau");
     if (anneau) {
         // L'anneau est volontairement excentré vers les pieds du personnage.
-        // Ce décalage doit pivoter avec lui, sinon il reste planté vers le bas de l'écran.
-        const radians = angle * Math.PI / 180;
+        // Le pion ne pivotant plus jamais, ce décalage reste fixe vers le bas.
         const decalage = 8 * echelle;
-        const decalageX = -decalage * Math.sin(radians);
-        const decalageY = decalage * Math.cos(radians);
-        anneau.style.transform = `translate(${decalageX}px, ${decalageY}px)`;
+        anneau.style.transform = `translate(0px, ${decalage}px)`;
     }
 
     divToken.querySelectorAll(".token-shadow").forEach(sh => {
         const decalageX = parseFloat(sh.dataset.tx) * echelle;
         const decalageY = parseFloat(sh.dataset.ty) * echelle;
-        sh.style.transform = `translate(${decalageX}px, ${decalageY}px) rotate(${angle}deg)`;
+        sh.style.transform = `translate(${decalageX}px, ${decalageY}px)`;
         sh.style.filter = `brightness(0) blur(${parseFloat(sh.dataset.blur) * echelle}px) opacity(${sh.dataset.opacite})`;
     });
-
-    const img = divToken.querySelector(".token-img-main");
-    if (img) img.style.transform = `rotate(${angle}deg)`;
 };
 
 let echelleTokensAppliquee = null;
@@ -1417,18 +1410,17 @@ window.appliquerTokensVTT = function(tokensMap) {
     for (let idPerso in tokensMap) {
         const data = tokensMap[idPerso];
         const taille = data.taille || 80;
-        const angle = data.angle || 0;
 
         const divToken = document.createElement("div");
-        divToken.className = "token-vtt"; 
+        divToken.className = "token-vtt";
         divToken.style.position = "absolute";
 
-        // La case et la taille de référence sont mémorisées : la position écran en découle à chaque zoom
+        // La case et la taille de référence sont mémorisées : la position écran en découle à chaque zoom.
+        // Les pions ne pivotent plus jamais : aucun angle n'est stocké ni appliqué.
         divToken.dataset.q = data.q;
         divToken.dataset.r = data.r;
         divToken.dataset.taille = taille;
-        divToken.dataset.angle = angle;
-        
+
         // Le conteneur reste fixe
         divToken.style.transform = `translate(-50%, -50%)`; 
         

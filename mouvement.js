@@ -367,30 +367,8 @@ window.validerMouvement = async function() {
     // Rafraîchit toute la fiche du perso
     if (typeof window.afficherPersoCombatActuel === "function") window.afficherPersoCombatActuel();
 
-    let pathAvecAngles = [];
-    let currentPx = window.PLATEAU_VTT.hexToPixel(window.CHEMIN_START_NODE.q, window.CHEMIN_START_NODE.r);
-    
-    // 🔻 L'ANGLE DE DÉPART EST SAUVEGARDÉ ICI
-    let currentAngle = window.TOKENS_VTT_DATA[idPerso].angle || 0;
-
-    window.CHEMIN_MOUVEMENT.forEach(step => {
-        let nextPx = window.PLATEAU_VTT.hexToPixel(step.q, step.r);
-        let dx = nextPx.x - currentPx.x;
-        let dy = nextPx.y - currentPx.y;
-        
-        // L'angle absolu calculé par la trigonométrie
-        let targetAngle = Math.atan2(dy, dx) * (180 / Math.PI) - 90;
-        
-        // 🔻 L'ALGORITHME ANTI-PIROUETTE (Calcul du chemin le plus court) 🔻
-        let diff = (targetAngle - currentAngle) % 360;
-        if (diff > 180) diff -= 360;
-        if (diff < -180) diff += 360;
-        
-        currentAngle += diff; // On additionne pour créer un angle continu infini (ex: 370°, 720°...)
-        
-        pathAvecAngles.push({ q: step.q, r: step.r, angle: currentAngle });
-        currentPx = nextPx;
-    });
+    // Les pions ne pivotent plus jamais : le chemin ne porte plus que les coordonnées de chaque étape.
+    let pathAvecAngles = window.CHEMIN_MOUVEMENT.map(step => ({ q: step.q, r: step.r }));
 
     try {
         const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
@@ -403,7 +381,6 @@ window.validerMouvement = async function() {
 
         window.TOKENS_VTT_DATA[idPerso].q = finalStep.q;
         window.TOKENS_VTT_DATA[idPerso].r = finalStep.r;
-        window.TOKENS_VTT_DATA[idPerso].angle = currentAngle; // 🔻 On sauvegarde l'angle infini pour la suite
 
         await updateDoc(partieRef, {
             File_Attente_Combat: file,
@@ -439,7 +416,7 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
 
     window.ANIMATION_VTT_EN_COURS = true;
     
-    // L'anneau reste visible et pivote avec le personnage pendant sa marche
+    // L'anneau reste visible pendant la marche (le pion ne pivote plus, seule sa position change)
     const glow = tokenDiv.querySelector(".token-anneau");
     if (glow) glow.style.transition = "transform 0.2s ease";
 
@@ -456,7 +433,6 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
         // On met à jour la case de référence : le pion suit le zoom et le pan même en pleine marche
         tokenDiv.dataset.q = step.q;
         tokenDiv.dataset.r = step.r;
-        tokenDiv.dataset.angle = step.angle;
         window.positionnerTokenVTT(tokenDiv, true);
         
         await new Promise(r => setTimeout(r, 400));

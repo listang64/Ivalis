@@ -925,32 +925,7 @@ window.jouerAnimationMoteur = async function(action) {
     let ciblesToucheesValides = new Set(); // Mémoire des cibles qui n'ont pas esquivé
 
     if (!attaqueRatee) {
-        if (action.isZone && action.zoneCenterHex && tkLanceur) {
-            if (tkLanceur.q !== action.zoneCenterHex.q || tkLanceur.r !== action.zoneCenterHex.r) {
-                const pxLanceur = window.PLATEAU_VTT.hexToPixel(tkLanceur.q, tkLanceur.r);
-                const pxCible = window.PLATEAU_VTT.hexToPixel(action.zoneCenterHex.q, action.zoneCenterHex.r);
-                const dx = pxCible.x - pxLanceur.x;
-                const dy = pxCible.y - pxLanceur.y;
-                
-                const targetAngle = Math.atan2(dy, dx) * (180 / Math.PI) - 90;
-                let currentAngle = tkLanceur.angle || 0;
-                let diff = (targetAngle - currentAngle) % 360;
-                if (diff > 180) diff -= 360;
-                if (diff < -180) diff += 360;
-                const nouvelAngle = currentAngle + diff;
-                
-                tkLanceur.angle = nouvelAngle;
-                window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
-                
-                const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
-                if (lanceurData && lanceurData.idJoueur === currentUserId) {
-                    updateDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
-                        [`Tokens.${lanceur}.angle`]: nouvelAngle
-                    }).catch(e => console.error(e));
-                }
-                await new Promise(r => setTimeout(r, 200)); 
-            }
-        }
+        // Les pions ne pivotent plus jamais pour se tourner vers une zone/cible : ils restent dans leur orientation initiale.
 
         for (let attaque of action.attaques) {
             if (attaque.cibles.length === 0) continue;
@@ -964,26 +939,11 @@ window.jouerAnimationMoteur = async function(action) {
                 const dist = getHexDistance(tkLanceur, tkCible);
 
                 if (!action.isZone && tkLanceur && tkCible) {
+                    // Le pion ne pivote plus vers sa cible : on garde seulement dx/dy pour le recul en cas d'esquive.
                     const pxLanceur = window.PLATEAU_VTT.hexToPixel(tkLanceur.q, tkLanceur.r);
                     const pxCible = window.PLATEAU_VTT.hexToPixel(tkCible.q, tkCible.r);
                     dx = pxCible.x - pxLanceur.x;
                     dy = pxCible.y - pxLanceur.y;
-                    const targetAngle = Math.atan2(dy, dx) * (180 / Math.PI) - 90;
-                    let currentAngle = tkLanceur.angle || 0;
-                    let diff = (targetAngle - currentAngle) % 360;
-                    if (diff > 180) diff -= 360;
-                    if (diff < -180) diff += 360;
-                    const nouvelAngle = currentAngle + diff;
-                    tkLanceur.angle = nouvelAngle;
-                    window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
-                    
-                    const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
-                    if (lanceurData && lanceurData.idJoueur === currentUserId) {
-                        updateDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
-                            [`Tokens.${lanceur}.angle`]: nouvelAngle
-                        }).catch(e => console.error(e));
-                    }
-                    await new Promise(r => setTimeout(r, 200)); 
                 } else if (action.isZone) {
                     const pxLanceur = window.PLATEAU_VTT.hexToPixel(tkLanceur.q, tkLanceur.r);
                     const pxCible = window.PLATEAU_VTT.hexToPixel(tkCible.q, tkCible.r);
@@ -1001,24 +961,8 @@ window.jouerAnimationMoteur = async function(action) {
                 if (!attaque.isHeal && jetDef <= statDef) {
                     if (tkCible) {
                         window.afficherMessageFlottantHex(tkCible.q, tkCible.r, motDef, "#cccccc");
-                        
-                        const targetAngleCible = Math.atan2(-dy, -dx) * (180 / Math.PI) - 90;
-                        let currentAngleCible = tkCible.angle || 0;
-                        let diffCible = (targetAngleCible - currentAngleCible) % 360;
-                        if (diffCible > 180) diffCible -= 360;
-                        if (diffCible < -180) diffCible += 360;
-                        const nouvelAngleCible = currentAngleCible + diffCible;
-                        
-                        tkCible.angle = nouvelAngleCible;
-                        window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
-                        
-                        const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
-                        if (lanceurData && lanceurData.idJoueur === currentUserId) {
-                            updateDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
-                                [`Tokens.${idCible}.angle`]: nouvelAngleCible
-                            }).catch(e => console.error(e));
-                        }
-                        
+
+                        // La cible ne pivote plus pour faire face à l'attaquant lors d'une esquive/parade.
                         await new Promise(r => setTimeout(r, 150));
 
                         const tokenDiv = document.getElementById("token-" + idCible);
