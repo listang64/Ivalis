@@ -214,7 +214,18 @@ window.VTT_CIBLAGE_TOUCHMOVE = function(e) {
 
 window.demarrerCiblage = async function(idCarte) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    if (!window.EFFETS_BDD_CACHE) return alert("Grimoire non synchronisé.");
+
+    // Le cache des effets n'est chargé qu'une fois, au tout premier chargement de la page.
+    // S'il a raté (réseau lent/instable) ou est resté vide, on le recharge ici avant de continuer :
+    // sinon, aucun effet de la carte n'est reconnu et elle se valide à vide, sans jamais proposer de cible.
+    if (!window.EFFETS_BDD_CACHE || Object.keys(window.EFFETS_BDD_CACHE).length === 0) {
+        if (typeof window.chargerCacheEffetsBDD === "function") {
+            await window.chargerCacheEffetsBDD();
+        }
+    }
+    if (!window.EFFETS_BDD_CACHE || Object.keys(window.EFFETS_BDD_CACHE).length === 0) {
+        return alert("Grimoire non synchronisé. Vérifie ta connexion et réessaie.");
+    }
 
     const dataCarte = window.COMPETENCES_CACHE[idCarte];
     if (!dataCarte) return;
