@@ -758,27 +758,17 @@ async function genererEtStockerTokenBackground(donnees, idPersonnage, urlPortrai
         return false;
     }
 
-    const instructionSupplementaire = await recupererInstructionStyle();
-
-    let descriptionHero = `Race: ${donnees.race}, Genre: ${donnees.genre}. `;
-    if (donnees.corpulence) descriptionHero += `Corpulence: ${donnees.corpulence}. `;
-    if (donnees.peau) descriptionHero += `Peau: ${donnees.peau}. `;
-    if (donnees.cheveux) descriptionHero += `Cheveux: ${donnees.cheveux}. `;
-    if (donnees.style) descriptionHero += `Vêtements: ${donnees.style} (${donnees.couleursDom}). `;
-    if (donnees.signes) descriptionHero += `Signes: ${donnees.signes}. `;
-
-    const promptText = "L'image fournie est la RÉFÉRENCE VISUELLE PRINCIPALE du personnage.\n" +
-                       "Conserve fidèlement son identité visuelle : visage, coiffure, couleur de peau, " +
-                       "couleur et style des cheveux, vêtements, couleurs, accessoires et caractéristiques distinctives.\n" +
-                       "Ne crée pas un nouveau personnage et ne remplace pas son apparence.\n" +
-                       "La transformation demandée concerne uniquement la perspective : redessine ce même personnage " +
-                       "en VUE STRICTEMENT VERTICALE DU DESSUS (top-down, angle zénithal), le dessus de la tête et " +
-                       "les épaules étant les éléments les plus visibles.\n\n" +
-                       "--- SUJET ---\n" + descriptionHero + "\n\n" +
-                       "Directives de style : " + instructionSupplementaire + "\n\n" +
-                       "🛑 RÈGLE DÉFINITIVE : " +
-                       "Le personnage DOIT ÊTRE PLACÉ SUR UN FOND TOTALEMENT MAGENTA FLUO UNI (#FF00FF). " +
-                       "Aucun décor, aucune ombre.";
+    const promptText = "À partir de l’image de référence fournie, créer un pion de jeu d’échecs fantastique sous forme de buste sculpté en bois clair, " +
+                       "représentant fidèlement le personnage de référence à partir de sa taille (torse et visage uniquement). " +
+                       "Conserver la coiffure, les détails des vêtements visibles sur le torse et les accessoires du haut du corps du personnage. " +
+                       "Le personnage est transformé en véritable sculpture 3D taillée dans un bois clair naturel avec veinage visible sans peinture. " +
+                       "Sculpture détaillée, artisanale, haut de gamme, aspect buste de collection ou pion de jeu de plateau. " +
+                       "Le buste repose sur un socle circulaire épais de style pièce d’échecs. Les bras ne doivent pas être coupés.\n\n" +
+                       "Vue de haut isométrique, caméra directement au-dessus de la figurine. Rendu 3D photoréaliste, très haute définition, ultra détaillé. " +
+                       "Figurine entièrement visible dans le cadre, parfaitement centrée.\n\n" +
+                       "Fond uni rose fluo magenta (#FF00FF) servant de fond de détourage (chroma key). Fond parfaitement uniforme, sans texture, sans dégradé, sans motif. " +
+                       "Aucune ombre portée, aucune ombre sous la figurine, aucun reflet au sol, aucun effet de lumière parasite. Éclairage studio uniforme et neutre. " +
+                       "Aucun autre objet, aucun décor, uniquement le pion sur le fond magenta.";
 
     // input_fidelity est ignoré par gpt-image-2 (déjà haute fidélité) mais indispensable aux modèles précédents.
     const modelesCandidats = [
