@@ -1576,29 +1576,39 @@ window.appliquerTokensVTT = function(tokensMap) {
             if (!document.getElementById("anim-bouclier-vtt")) {
                 const styleBouclier = document.createElement("style");
                 styleBouclier.id = "anim-bouclier-vtt";
+                // Pas de translate en % ici : dans une animation accélérée, le pourcentage est figé
+                // à la taille de départ du halo, qui décrochait du pion dès qu'on zoomait (même piège que l'anneau doré).
                 styleBouclier.innerHTML = `
                     @keyframes pulsationBouclier {
-                        0% { transform: translate(-50%, -50%) scale(1); opacity: 0.4; box-shadow: 0 0 10px rgba(0,255,255,0.4), 0 0 20px rgba(0,255,255,0.2); }
-                        50% { transform: translate(-50%, -50%) scale(1.03); opacity: 0.7; box-shadow: 0 0 15px rgba(0,255,255,0.6), 0 0 30px rgba(0,255,255,0.4); }
-                        100% { transform: translate(-50%, -50%) scale(1); opacity: 0.4; box-shadow: 0 0 10px rgba(0,255,255,0.4), 0 0 20px rgba(0,255,255,0.2); }
+                        0% { transform: scale(1); opacity: 0.4; box-shadow: 0 0 10px rgba(0,255,255,0.4), 0 0 20px rgba(0,255,255,0.2); }
+                        50% { transform: scale(1.03); opacity: 0.7; box-shadow: 0 0 15px rgba(0,255,255,0.6), 0 0 30px rgba(0,255,255,0.4); }
+                        100% { transform: scale(1); opacity: 0.4; box-shadow: 0 0 10px rgba(0,255,255,0.4), 0 0 20px rgba(0,255,255,0.2); }
                     }
                 `;
                 document.head.appendChild(styleBouclier);
             }
 
+            // Calque externe statique : centrage par les bords (suit le zoom sans JS).
             const haloBouclier = document.createElement("div");
             haloBouclier.className = "token-halo-bouclier";
             haloBouclier.style.position = "absolute";
-            haloBouclier.style.top = "50%";
-            haloBouclier.style.left = "50%";
-            haloBouclier.style.width = "104%"; // Un poil plus large que le pion pour qu'on le voie bien
+            haloBouclier.style.top = "-2%"; // Un poil plus large que le pion (104%), centré par les bords
+            haloBouclier.style.left = "-2%";
+            haloBouclier.style.width = "104%";
             haloBouclier.style.height = "104%";
-            haloBouclier.style.transform = "translate(-50%, -50%)"; // Centrage absolu indispensable
             haloBouclier.style.borderRadius = "50%";
-            haloBouclier.style.border = "2px solid rgba(0, 255, 255, 0.5)"; // Liseret bien visible
             haloBouclier.style.zIndex = "3";
             haloBouclier.style.pointerEvents = "none";
-            haloBouclier.style.animation = "pulsationBouclier 2s ease-in-out infinite";
+
+            // Calque interne : porte uniquement la pulsation (scale/opacité), jamais de translate.
+            const haloAnime = document.createElement("div");
+            haloAnime.style.width = "100%";
+            haloAnime.style.height = "100%";
+            haloAnime.style.borderRadius = "50%";
+            haloAnime.style.border = "2px solid rgba(0, 255, 255, 0.5)"; // Liseret bien visible
+            haloAnime.style.animation = "pulsationBouclier 2s ease-in-out infinite";
+
+            haloBouclier.appendChild(haloAnime);
             divToken.appendChild(haloBouclier);
         }
 
