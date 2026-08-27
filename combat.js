@@ -910,7 +910,7 @@ window.chargerMapTest = async function() {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     if (!window.ID_PARTIE_COURANTE) return;
     
-    const imgUrl = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786366789/port_ntpq8p.png";
+    const imgUrl = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1787867966/IMG_2048_fhzyrz.png";
     const scale = window.PLATEAU_VTT ? window.PLATEAU_VTT.hexSize : 60;
     const opacity = window.PLATEAU_VTT ? window.PLATEAU_VTT.gridOpacity : 0.8;
     
