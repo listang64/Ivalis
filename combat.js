@@ -1348,15 +1348,8 @@ window.positionnerTokenVTT = function(divToken, majEchelle) {
     divToken.style.width = (taille * echelle) + "px";
     divToken.style.height = (taille * echelle) + "px";
 
-    // L'ombre au sol est un dégradé en %, elle se redimensionne seule avec le pion (pas de recalcul ici).
-
-    const anneau = divToken.querySelector(".token-anneau");
-    if (anneau) {
-        // L'anneau est volontairement excentré vers les pieds du personnage.
-        // Le pion ne pivotant plus jamais, ce décalage reste fixe vers le bas.
-        const decalage = 8 * echelle;
-        anneau.style.transform = `translate(0px, ${decalage}px)`;
-    }
+    // L'ombre au sol et le halo de sélection sont en %/scale : ils se redimensionnent seuls
+    // avec le pion, sans aucun recalcul JS ici.
 };
 
 let echelleTokensAppliquee = null;
@@ -1382,22 +1375,6 @@ window.appliquerTokensVTT = function(tokensMap) {
     if (!conteneur) return;
 
     conteneur.innerHTML = "";
-
-    // 🔻 INJECTION DE L'ANIMATION CSS POUR LA ROTATION DE L'ANNEAU 🔻
-    if (!document.getElementById("anim-anneau-vtt")) {
-        const style = document.createElement("style");
-        style.id = "anim-anneau-vtt";
-        // Pas de translate en % ici : dans une animation accélérée, le pourcentage est figé
-        // à la taille de départ de l'anneau, qui décrochait du pion dès qu'on zoomait.
-        style.innerHTML = `
-            @keyframes rotationAnneauMagique {
-                0% { transform: rotate(0deg) scale(1); filter: brightness(1); }
-                50% { transform: rotate(45deg) scale(1.05); filter: brightness(1.2); }
-                100% { transform: rotate(90deg) scale(1); filter: brightness(1); }
-            }
-        `;
-        document.head.appendChild(style);
-    }
 
     for (let idPerso in tokensMap) {
         const data = tokensMap[idPerso];
@@ -1443,63 +1420,75 @@ window.appliquerTokensVTT = function(tokensMap) {
         ombreSol.style.pointerEvents = "none";
         divToken.appendChild(ombreSol);
 
-        // 2️⃣ L'ANNEAU DORÉ DE SÉLECTION
+        // 2️⃣ LE HALO DE SÉLECTION : traits de lumière partant du centre du pion, chacun grandissant
+        // et rétrécissant indépendamment et aléatoirement. Reste contenu dans l'hexagone (longueur
+        // plafonnée à une fraction de la taille du pion). Purement en %/scale : aucune valeur n'est
+        // recalculée en JS pendant le zoom, donc aucun risque de décrochage (même piège que l'ancien anneau).
         if (window.TOKEN_SELECTIONNE === idPerso) {
-            const anneauSelection = document.createElement("div");
-            anneauSelection.className = "token-anneau";
-            anneauSelection.style.position = "absolute";
-            
-            // VALEURS GRAVÉES DANS LE MARBRE (en % du pion, pour suivre le zoom)
-            // Centrage par les bords plutôt que par un translate : l'anneau reste collé au pion
-            anneauSelection.style.width = "90%";
-            anneauSelection.style.height = "90%";
-            anneauSelection.style.top = "5%";
-            anneauSelection.style.left = "5%"; 
-            
-            anneauSelection.style.zIndex = "-1"; 
-            anneauSelection.style.pointerEvents = "none";
-            
-            // 🔻 NOUVEAU : Opacité globale à 65% 🔻
-            anneauSelection.style.opacity = "0.65"; 
+            if (!document.getElementById("anim-halo-selection-vtt")) {
+                const styleHalo = document.createElement("style");
+                styleHalo.id = "anim-halo-selection-vtt";
+                // Plusieurs variantes d'amplitude tirées au hasard une seule fois au chargement :
+                // chaque trait pioche l'une d'elles, ce qui suffit à donner un mouvement désynchronisé.
+                let keyframesHalo = "";
+                for (let v = 0; v < 6; v++) {
+                    const mini = (0.35 + Math.random() * 0.15).toFixed(2);
+                    const maxi = (0.85 + Math.random() * 0.35).toFixed(2);
+                    keyframesHalo += `
+                        @keyframes pulsationTraitHalo${v} {
+                            0%   { transform: scaleY(${mini}); opacity: 0.2; }
+                            50%  { transform: scaleY(${maxi}); opacity: 0.9; }
+                            100% { transform: scaleY(${mini}); opacity: 0.2; }
+                        }
+                    `;
+                }
+                styleHalo.innerHTML = keyframesHalo;
+                document.head.appendChild(styleHalo);
+            }
 
-            // Calque interne : il porte le scintillement, pendant que le calque parent
-            // porte l'orientation du personnage. Les deux rotations s'additionnent ainsi sans se battre.
-            const anneauAnime = document.createElement("div");
-            anneauAnime.style.width = "100%";
-            anneauAnime.style.height = "100%";
-            anneauAnime.style.animation = "rotationAnneauMagique 8s linear infinite";
+            const haloSelection = document.createElement("div");
+            haloSelection.className = "token-halo-selection";
+            haloSelection.style.position = "absolute";
+            haloSelection.style.top = "0";
+            haloSelection.style.left = "0";
+            haloSelection.style.width = "100%";
+            haloSelection.style.height = "100%";
+            haloSelection.style.zIndex = "-1";
+            haloSelection.style.pointerEvents = "none";
+            haloSelection.style.opacity = "0.6"; // Un halo volontairement discret ("très léger")
 
-            // Le code vectoriel du cercle (Couleurs adoucies et flou plus diffus)
-            anneauAnime.innerHTML = `
-                <svg viewBox="0 0 100 100" width="100%" height="100%" style="overflow: visible;">
-                    <defs>
-                        <filter id="glow-or" x="-50%" y="-50%" width="200%" height="200%">
-                            <!-- 🔻 Flou augmenté (3.5 au lieu de 2.5) -->
-                            <feGaussianBlur stdDeviation="3.5" result="blur" />
-                            <feMerge>
-                                <feMergeNode in="blur" />
-                                <feMergeNode in="blur" />
-                                <feMergeNode in="SourceGraphic" />
-                            </feMerge>
-                        </filter>
-                    </defs>
-                    <!-- Cercle Extérieur Lumineux (Couleur : Or très pâle / Blanc chaud) -->
-                    <circle cx="50" cy="50" r="46" fill="none" stroke="#fff5cc" stroke-width="1.5" filter="url(#glow-or)"/>
-                    <!-- Cercle Central (Netteté) -->
-                    <circle cx="50" cy="50" r="46" fill="none" stroke="#ffffff" stroke-width="0.5" opacity="0.9"/>
-                    <!-- Cercle Intérieur (Profondeur - Couleur : Or doux) -->
-                    <circle cx="50" cy="50" r="42" fill="none" stroke="#ffe699" stroke-width="0.5" filter="url(#glow-or)" opacity="0.6"/>
+            const nbTraits = 12;
+            for (let i = 0; i < nbTraits; i++) {
+                const angle = (360 / nbTraits) * i + (Math.random() * 12 - 6); // léger désordre naturel
+                const longueur = 32 + Math.random() * 26; // % de la taille du pion : reste bien dans l'hexagone
+                const largeur = 2 + Math.random() * 2.5;
+                const variant = Math.floor(Math.random() * 6);
+                const duree = (1.3 + Math.random() * 1.8).toFixed(2);
+                const delai = (-Math.random() * 3).toFixed(2); // négatif : démarre déjà en cours de cycle
 
-                    <!-- Les 4 Étoiles directionnelles -->
-                    <path d="M50,0 L51.5,2.5 L55,3 L51.5,3.5 L50,6 L48.5,3.5 L45,3 L48.5,2.5 Z" fill="#ffffff" filter="url(#glow-or)"/>
-                    <path d="M50,94 L51.5,96.5 L55,97 L51.5,97.5 L50,100 L48.5,97.5 L45,97 L48.5,96.5 Z" fill="#ffffff" filter="url(#glow-or)"/>
-                    <path d="M0,50 L2.5,48.5 L3,45 L3.5,48.5 L6,50 L3.5,51.5 L3,55 L2.5,51.5 Z" fill="#ffffff" filter="url(#glow-or)"/>
-                    <path d="M94,50 L96.5,48.5 L97,45 L97.5,48.5 L100,50 L97.5,51.5 L97,55 L96.5,51.5 Z" fill="#ffffff" filter="url(#glow-or)"/>
-                </svg>
-            `;
-            
-            anneauSelection.appendChild(anneauAnime);
-            divToken.appendChild(anneauSelection);
+                // Support statique (position + rotation figées) : seul l'enfant ci-dessous est animé.
+                const support = document.createElement("div");
+                support.style.position = "absolute";
+                support.style.top = "50%";
+                support.style.left = "50%";
+                support.style.width = `${largeur}%`;
+                support.style.height = `${longueur}%`;
+                support.style.transformOrigin = "50% 100%";
+                support.style.transform = `translate(-50%, -100%) rotate(${angle}deg)`;
+
+                const trait = document.createElement("div");
+                trait.style.width = "100%";
+                trait.style.height = "100%";
+                trait.style.borderRadius = "2px";
+                trait.style.transformOrigin = "50% 100%";
+                trait.style.background = "linear-gradient(to top, rgba(255,245,204,0.95) 0%, rgba(255,230,153,0.55) 45%, rgba(255,255,255,0) 100%)";
+                trait.style.animation = `pulsationTraitHalo${variant} ${duree}s ease-in-out ${delai}s infinite`;
+
+                support.appendChild(trait);
+                haloSelection.appendChild(support);
+            }
+
+            divToken.appendChild(haloSelection);
         }
 
         // Gestion du Clic

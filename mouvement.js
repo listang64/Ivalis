@@ -415,10 +415,6 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
     if (!tokenDiv) return;
 
     window.ANIMATION_VTT_EN_COURS = true;
-    
-    // L'anneau reste visible pendant la marche (le pion ne pivote plus, seule sa position change)
-    const glow = tokenDiv.querySelector(".token-anneau");
-    if (glow) glow.style.transition = "transform 0.2s ease";
 
     tokenDiv.style.transition = "left 0.4s linear, top 0.4s linear";
     
