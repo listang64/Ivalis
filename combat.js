@@ -1543,14 +1543,14 @@ window.appliquerTokensVTT = function(tokensMap) {
             });
             haloBouclier.className = "token-halo-bouclier";
             haloBouclier.style.zIndex = "3"; // Devant le médaillon
+            haloBouclier.style.opacity = "0.8"; // Un tout petit peu plus transparent que le rendu de base
             divToken.appendChild(haloBouclier);
         }
 
         // Gestion du Clic
         divToken.onclick = function(e) {
             e.stopPropagation();
-            if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-            
+
             // 🔻 NOUVEAU : INTERCEPTION POUR LE CIBLAGE 🔻
             if (window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif) {
                 if (typeof window.ajouterCibleCiblage === "function") window.ajouterCibleCiblage(idPerso);
