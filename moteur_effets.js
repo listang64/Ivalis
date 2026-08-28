@@ -241,7 +241,10 @@ window.resoudreBondInteractif = function(idPerso, portee) {
         `;
         conteneurTransform.appendChild(overlay);
 
-        // 3. Un tap sur une case valide confirme le saut ; un tap ailleurs annule.
+        // 3. Un tap sur une case valide confirme le saut.
+        //    Un tap sur soi-même annule le saut (la carte reste quand même consommée).
+        //    Un tap sur un autre personnage affiche "Cible invalide" et reste en attente.
+        //    Un tap hors de portée ne fait rien : on reste en attente d'un clic valide.
         const nettoyer = () => {
             overlay.remove();
             window.removeEventListener("click", onClick, { capture: true });
@@ -251,14 +254,30 @@ window.resoudreBondInteractif = function(idPerso, portee) {
             if (!conteneur.contains(e.target)) return;
             e.stopPropagation();
 
+            const tokenClique = e.target.closest ? e.target.closest(".token-vtt") : null;
+            if (tokenClique) {
+                const idClique = tokenClique.id.replace("token-", "");
+
+                if (idClique === idPerso) {
+                    nettoyer();
+                    return resolve(false); // Annulé, mais la carte reste consommée par l'appelant
+                }
+
+                const tkClique = window.TOKENS_VTT_DATA[idClique];
+                if (tkClique && typeof window.afficherMessageFlottantHex === "function") {
+                    window.afficherMessageFlottantHex(tkClique.q, tkClique.r, "Cible invalide", "#aaaaaa");
+                }
+                return;
+            }
+
             const canvasX = (e.clientX - window.VTT_POS_X) / window.VTT_SCALE;
             const canvasY = (e.clientY - window.VTT_POS_Y) / window.VTT_SCALE;
             const hex = window.PLATEAU_VTT.pixelToHex(canvasX, canvasY);
             const cible = hexesValides.find(h => h.q === hex.q && h.r === hex.r);
 
-            nettoyer();
+            if (!cible) return; // Hors de portée : ne fait rien
 
-            if (!cible) return resolve(false);
+            nettoyer();
 
             const hexArrivee = { q: cible.q, r: cible.r };
             window.TOKENS_VTT_DATA[idPerso].q = hexArrivee.q;
@@ -650,12 +669,11 @@ window.demarrerCiblage = async function(idCarte) {
     }
 
     // Bond : résolu à part (choix de la case, animation), AVANT le reste de la carte.
-    // S'il n'y a rien d'autre dessus, la carte se termine ensuite normalement (comme une
-    // carte vide) ; s'il y a une attaque/altération en plus, on enchaîne sur son ciblage.
+    // Que le saut ait lieu ou soit annulé (clic sur soi-même), la carte reste consommée :
+    // on continue toujours vers la suite (fin de tour si rien d'autre, ou ciblage sinon).
     if (isBond) {
         const idLanceurBond = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
-        const aSaute = await window.resoudreBondInteractif(idLanceurBond, porteeBond);
-        if (!aSaute) return; // Annulé : la carte n'est pas consommée, rien n'est déduit
+        await window.resoudreBondInteractif(idLanceurBond, porteeBond);
     }
 
     if (attaquesExtraites.length === 0 && alterationsExtraites.length === 0) {
