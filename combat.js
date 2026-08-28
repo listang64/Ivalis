@@ -1437,8 +1437,8 @@ window.appliquerTokensVTT = function(tokensMap) {
         ombreSol.style.width = "97%";
         ombreSol.style.height = "97%";
         ombreSol.style.borderRadius = "50%";
-        // Coeur dense, puis fondu progressif : donne le flou du contact sans filtre CSS.
-        ombreSol.style.background = "radial-gradient(circle at 50% 50%, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.58) 58%, rgba(0,0,0,0.38) 74%, rgba(0,0,0,0.14) 87%, rgba(0,0,0,0) 97%)";
+        // Coeur dense et opaque, puis long fondu vers les bords : donne le flou du contact sans filtre CSS.
+        ombreSol.style.background = "radial-gradient(circle at 50% 50%, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.8) 35%, rgba(0,0,0,0.55) 60%, rgba(0,0,0,0.28) 80%, rgba(0,0,0,0) 100%)";
         ombreSol.style.zIndex = "-2";
         ombreSol.style.pointerEvents = "none";
         divToken.appendChild(ombreSol);

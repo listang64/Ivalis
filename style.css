@@ -238,15 +238,19 @@ body {
   filter: drop-shadow(0px 10px 10px rgba(0, 0, 0, 0.8));
 }
 
-.btn-jeu:hover::before {
-  transform: translate(-50%, -50%) scale(1.05);
-  filter: drop-shadow(0px 20px 20px rgba(0, 0, 0, 1));
-}
-
 .btn-nouvelle::before { background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781375437/nouvelle_partie_gajfyb.png'); }
-.btn-nouvelle:hover::before { background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781375437/nouvelle_partie_brillle_hpnomi.png'); }
 .btn-charger::before { background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781375436/charger_partie_f70wdb.png'); }
-.btn-charger:hover::before { background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781375437/charger_partie_brille_owinuh.png'); }
+
+/* Effet au survol : uniquement sur les appareils avec une vraie souris (pas de "hover collant" sur iPad/tactile) */
+@media (hover: hover) {
+  .btn-jeu:hover::before {
+    transform: translate(-50%, -50%) scale(1.05);
+    filter: drop-shadow(0px 20px 20px rgba(0, 0, 0, 1));
+  }
+
+  .btn-nouvelle:hover::before { background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781375437/nouvelle_partie_brillle_hpnomi.png'); }
+  .btn-charger:hover::before { background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781375437/charger_partie_brille_owinuh.png'); }
+}
 
 .preload-images { position: absolute; width: 0; height: 0; overflow: hidden; z-index: -1; }
 
