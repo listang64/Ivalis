@@ -146,7 +146,10 @@ window.afficherPersoCombatActuel = function() {
         divNom.style.background = "none";
         divNom.style.webkitTextFillColor = "inherit";
         divNom.style.color = "#888";
-        
+        // Ce texte est plus long que les prénoms habituels : taille réduite pour ne pas être tronqué
+        divNom.style.fontSize = "24px";
+        divNom.style.letterSpacing = "1px";
+
         document.getElementById("combat-liste-competences").innerHTML = "";
         if (imgPerso) imgPerso.style.opacity = "0"; 
         
@@ -169,10 +172,12 @@ window.afficherPersoCombatActuel = function() {
         divNom.parentElement.parentElement.insertBefore(divEtats, divNom.parentElement.nextSibling);
     }
     
-    // On restaure l'effet doré s'il a été désactivé par "Aucun héros"
+    // On restaure l'effet doré et la taille normale, au cas où "Aucun héros" les aurait modifiés
     divNom.style.background = "linear-gradient(135deg, #fbf5bd 0%, #c2a878 25%, #5c3a21 50%, #e8d5a5 75%, #ffffff 100%)";
     divNom.style.webkitBackgroundClip = "text";
     divNom.style.webkitTextFillColor = "transparent";
+    divNom.style.fontSize = "46px";
+    divNom.style.letterSpacing = "3px";
 
     if (imgPerso) {
         if (persoActuel.urlCloudinary && persoActuel.urlCloudinary !== "") {
@@ -2267,11 +2272,11 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
     if (!divRepos) {
         divRepos = document.createElement("div");
         divRepos.id = "apercu-repos-long-ui";
-        divRepos.style.cssText = "position: absolute; top: 15vh; left: 50px; width: 340px; height: 476px; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease, left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); pointer-events: none;";
+        divRepos.style.cssText = "position: absolute; top: 4vh; left: 50px; width: 340px; height: 300px; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; opacity: 0; transition: opacity 0.3s ease, left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); pointer-events: none;";
         divRepos.innerHTML = `
-            <div style="font-size: 120px; filter: drop-shadow(0 0 20px rgba(194, 168, 120, 0.8)); animation: levitation 3s infinite alternate ease-in-out;">⏳</div>
-            <div style="font-family: 'Cinzel', serif; font-size: 26px; font-weight: bold; color: #e8d5a5; text-shadow: 2px 2px 5px black; margin-top: 20px; text-transform: uppercase; letter-spacing: 2px;">Repos Long</div>
-            <div style="font-family: 'Almendra', serif; font-size: 18px; color: #c2a878; text-shadow: 1px 1px 3px black; margin-top: 15px; text-align: center; max-width: 80%;">Concentration et souffle.<br><br><span style="color:#1b6e3a;">+35% Énergie Max</span> à la fin du tour.</div>
+            <div style="font-size: 72px; filter: drop-shadow(0 0 20px rgba(194, 168, 120, 0.8)); animation: levitation 3s infinite alternate ease-in-out;">⏳</div>
+            <div style="font-family: 'Cinzel', serif; font-size: 24px; font-weight: bold; color: #e8d5a5; text-shadow: 2px 2px 5px black; margin-top: 10px; text-transform: uppercase; letter-spacing: 2px;">Repos Long</div>
+            <div style="font-family: 'Almendra', serif; font-size: 17px; color: #c2a878; text-shadow: 1px 1px 3px black; margin-top: 10px; text-align: center; max-width: 80%;">Concentration et souffle.<br><br><span style="color:#1b6e3a;">+35% Énergie Max</span> à la fin du tour.</div>
         `;
         const panneauGauche = document.getElementById("panneau-combat-gauche");
         if (panneauGauche) panneauGauche.appendChild(divRepos);
