@@ -31,63 +31,88 @@ function getHexDistance(a, b) {
 //  et les compétences équipées, mais toujours soumis à un jet d'esquive/parade
 //  et absorbés par un bouclier magique actif comme une attaque normale.
 // =========================================================================
+// Le jet est calculé UNE SEULE FOIS, sur l'écran de celui qui déplace le pion (seul client
+// à connaître le avant/après du mouvement). Le résultat déjà tranché (pas juste "il se passe
+// un truc, chacun relance son dé") est ensuite diffusé via Action_Opportunite : tous les
+// clients (celui qui a bougé y compris) le rejouent à l'identique via jouerAnimationOpportunite.
 window.resoudreAttaqueOpportunite = async function(idAttaquant, idCible) {
     const attaquantData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idAttaquant);
     const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idCible);
     if (!attaquantData || !cibleData) return;
     if (attaquantData.statut === "Mort" || cibleData.statut === "Mort") return;
-
-    const tkCible = window.TOKENS_VTT_DATA[idCible];
-
-    if (tkCible && typeof window.afficherMessageFlottantHex === "function") {
-        window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "⚔️ Attaque d'opportunité !", "#ffaa00");
-    }
-    await new Promise(r => setTimeout(r, 500));
+    if (!window.ID_PARTIE_COURANTE) return;
 
     const esquive = (parseInt(cibleData.Esquive) || 0) + (parseInt(cibleData.Dev_Mod_Esquive) || 0);
     const parade = (parseInt(cibleData.Parade) || 0) + (parseInt(cibleData.Dev_Mod_Parade) || 0);
     const jetDef = Math.floor(Math.random() * 100) + 1;
     const statDef = Math.max(esquive, parade);
     const motDef = parade > esquive ? "Paré 🛡️" : "Esquivé 💨";
+    const dodged = jetDef <= statDef;
 
-    if (jetDef <= statDef) {
-        if (tkCible && typeof window.afficherMessageFlottantHex === "function") {
-            window.afficherMessageFlottantHex(tkCible.q, tkCible.r, motDef, "#cccccc");
+    let degats = 0;
+    let viaBouclier = false;
+
+    if (!dodged) {
+        degats = 10; // Fixe : ignore l'armure et les compétences/références de l'attaquant
+        const oldShield = parseInt(cibleData.Bouclier_Actuel) || 0;
+
+        try {
+            const refPerso = doc(db, "Personnages", idCible);
+            if (oldShield > 0) {
+                viaBouclier = true;
+                const shieldNew = Math.max(0, oldShield - degats); // L'overkill part dans le vide, comme une attaque normale
+                cibleData.Bouclier_Actuel = shieldNew;
+                await updateDoc(refPerso, { Bouclier_Actuel: shieldNew });
+            } else {
+                const oldPv = parseInt(cibleData.PV_Actuels) || 0;
+                const newPv = Math.max(0, oldPv - degats);
+                cibleData.PV_Actuels = newPv;
+                await updateDoc(refPerso, { PV_Actuels: newPv });
+            }
+        } catch (e) {
+            console.error("Erreur attaque d'opportunité :", e);
         }
-        await new Promise(r => setTimeout(r, 700));
+    }
+
+    try {
+        await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
+            Action_Opportunite: { idAttaquant, idCible, dodged, motDef, degats, viaBouclier, timestamp: Date.now() }
+        });
+    } catch (e) {
+        console.error("Erreur diffusion attaque d'opportunité :", e);
+    }
+
+    // Laisse le temps à l'animation diffusée de se jouer avant d'enchaîner sur l'ennemi suivant
+    // (s'il y en a plusieurs) : sinon deux écritures trop rapprochées se marchent dessus.
+    await new Promise(r => setTimeout(r, dodged ? 1800 : 2000));
+};
+
+// Rejoue le résultat déjà tranché (par resoudreAttaqueOpportunite) chez CHAQUE joueur connecté,
+// y compris celui qui a déplacé le pion. Ne relance jamais le dé et n'écrit rien : uniquement
+// de l'affichage, la vraie donnée (PV/bouclier) arrive séparément via la sync habituelle des persos.
+window.jouerAnimationOpportunite = async function(data) {
+    if (!data || !data.idCible) return;
+    const tkCible = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[data.idCible] : null;
+    if (!tkCible || typeof window.afficherMessageFlottantHex !== "function") return;
+
+    window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "⚔️ Attaque d'opportunité !", "#ffaa00");
+    await new Promise(r => setTimeout(r, 500));
+
+    if (data.dodged) {
+        window.afficherMessageFlottantHex(tkCible.q, tkCible.r, data.motDef, "#cccccc");
         return;
     }
 
-    const degats = 10; // Fixe : ignore l'armure et les compétences/références de l'attaquant
-    const oldShield = parseInt(cibleData.Bouclier_Actuel) || 0;
+    const couleur = data.viaBouclier ? "#00ffff" : "#ff4c4c";
+    const icone = data.viaBouclier ? "🛡️" : "🩸";
+    window.afficherMessageFlottantHex(tkCible.q, tkCible.r, `-${data.degats} ${icone}`, couleur);
 
-    try {
-        const refPerso = doc(db, "Personnages", idCible);
-
-        if (oldShield > 0) {
-            const shieldNew = Math.max(0, oldShield - degats); // L'overkill part dans le vide, comme une attaque normale
-            cibleData.Bouclier_Actuel = shieldNew;
-            if (tkCible) window.afficherMessageFlottantHex(tkCible.q, tkCible.r, `-${degats} 🛡️`, "#00ffff");
-            await updateDoc(refPerso, { Bouclier_Actuel: shieldNew });
-        } else {
-            const oldPv = parseInt(cibleData.PV_Actuels) || 0;
-            const newPv = Math.max(0, oldPv - degats);
-            cibleData.PV_Actuels = newPv;
-            if (tkCible) window.afficherMessageFlottantHex(tkCible.q, tkCible.r, `-${degats} 🩸`, "#ff4c4c");
-            await updateDoc(refPerso, { PV_Actuels: newPv });
-        }
-    } catch (e) {
-        console.error("Erreur attaque d'opportunité :", e);
-    }
-
-    const tokenDiv = document.getElementById("token-" + idCible);
+    const tokenDiv = document.getElementById("token-" + data.idCible);
     if (tokenDiv) {
         tokenDiv.style.transition = "filter 0.1s";
         tokenDiv.style.filter = "sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.2)";
         setTimeout(() => { tokenDiv.style.filter = ""; }, 300);
     }
-
-    await new Promise(r => setTimeout(r, 600));
 };
 
 // Retourne la liste des idPersonnage adverses (camp opposé, vivants) au contact (distance 1)

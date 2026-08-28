@@ -1545,7 +1545,9 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
              
              // 🔻 NOUVEAU
              if (dataPartie.Action_Moteur) window.DERNIER_ACTION_MOTEUR = dataPartie.Action_Moteur.timestamp;
-             
+
+             if (dataPartie.Action_Opportunite) window.DERNIER_ACTION_OPPORTUNITE = dataPartie.Action_Opportunite.timestamp;
+
              estPremierScanPartie = false;
          } else {
              if (dataPartie.Action_Des && dataPartie.Action_Des.timestamp !== window.DERNIER_JET_DES) {
@@ -1563,6 +1565,11 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
              if (dataPartie.Action_Moteur && dataPartie.Action_Moteur.timestamp !== window.DERNIER_ACTION_MOTEUR) {
                  window.DERNIER_ACTION_MOTEUR = dataPartie.Action_Moteur.timestamp;
                  if (typeof window.jouerAnimationMoteur === "function") window.jouerAnimationMoteur(dataPartie.Action_Moteur);
+             }
+             // Attaque d'opportunité : le résultat est déjà tranché, on ne fait que le rejouer ici
+             if (dataPartie.Action_Opportunite && dataPartie.Action_Opportunite.timestamp !== window.DERNIER_ACTION_OPPORTUNITE) {
+                 window.DERNIER_ACTION_OPPORTUNITE = dataPartie.Action_Opportunite.timestamp;
+                 if (typeof window.jouerAnimationOpportunite === "function") window.jouerAnimationOpportunite(dataPartie.Action_Opportunite);
              }
          }
      }
