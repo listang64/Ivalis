@@ -816,7 +816,8 @@ async function genererEtStockerTokenBackground(donnees, idPersonnage, urlPortrai
                        "matching the pose and features of the reference character. The entire piece is crafted from a rich, medium-toned hardwood, like aged walnut, " +
                        "with a tactile, oiled finish. Visible wood grain patterns and fine, authentic chisel marks are present across all surfaces. " +
                        "The figure's drapery and specific details (like jewelry or textures) are faithfully translated into sculpted wood forms, matching the depth " +
-                       "and detail level of the reference. The background is a clean, isolated pure white with absolutely no cast shadows or drop shadows. " +
+                       "and detail level of the reference. The background is a clean, isolated pure fluorescent magenta (#FF00FF), used as a chroma key backdrop, " +
+                       "with absolutely no cast shadows or drop shadows. " +
                        "The lighting is precise, studio-quality, enhancing the forms and textures, identical in quality to the reference image. " +
                        "The image must be in a perfectly square format, with the medallion token scaled up to fill the entire frame completely from edge to edge.";
 
