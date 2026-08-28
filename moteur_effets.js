@@ -240,6 +240,7 @@ window.resoudreBondInteractif = function(idPerso, portee) {
             <rect x="-20000" y="-20000" width="40000" height="40000" fill="rgba(0,0,0,0.6)" mask="url(#${maskId})"/>
         `;
         conteneurTransform.appendChild(overlay);
+        window.surlignerEffetCarteActif("Bond");
 
         // 3. Un tap sur une case valide confirme le saut.
         //    Un tap sur soi-même annule le saut (la carte reste quand même consommée).
@@ -247,6 +248,7 @@ window.resoudreBondInteractif = function(idPerso, portee) {
         //    Un tap hors de portée ne fait rien : on reste en attente d'un clic valide.
         const nettoyer = () => {
             overlay.remove();
+            window.surlignerEffetCarteActif(null);
             window.removeEventListener("click", onClick, { capture: true });
         };
 
@@ -294,6 +296,11 @@ window.resoudreBondInteractif = function(idPerso, portee) {
                 console.error("Erreur Bond :", err);
             }
 
+            // On attend la durée de l'animation locale du saut (voir jouerAnimationBond) avant de
+            // rendre la main : sinon la suite de la carte (ex. ciblage d'une attaque) construit son
+            // affichage AVANT le rafraîchissement complet des pions qui clôt l'animation, et se fait
+            // aussitôt effacer par lui.
+            await new Promise(r => setTimeout(r, 750));
             resolve(true);
         };
 
@@ -486,6 +493,11 @@ window.demarrerCiblage = async function(idCarte) {
     let zoneHexesBase = [];
     let isBond = false;
     let porteeBond = 2;
+    // Pour que la carte se résolve dans l'ordre où elle est construite : on retient à quel
+    // rang du tableau se trouve le Bond, et à quel rang apparaît le premier autre effet
+    // (attaque/soin/altération). Si le Bond est après, on le joue après la résolution de l'attaque.
+    let indexBond = -1;
+    let indexPremierAutreEffet = -1;
 
     const parseFrFloat = (val) => {
         if (val === undefined || val === null || val === "") return 0;
@@ -523,7 +535,7 @@ window.demarrerCiblage = async function(idCarte) {
     };
 
     if (dataCarte.Composants && dataCarte.Composants.actions) {
-        dataCarte.Composants.actions.forEach(act => {
+        dataCarte.Composants.actions.forEach((act, idxAction) => {
             if (act.zoneHexes && act.zoneHexes.length > 0) {
                 isZone = true;
                 zoneHexesBase = act.zoneHexes;
@@ -539,6 +551,7 @@ window.demarrerCiblage = async function(idCarte) {
             // Bond : pas une attaque/alteration, traité à part avant tout le reste de la carte.
             if (nomLower.includes("bond")) {
                 isBond = true;
+                indexBond = idxAction;
                 porteeBond = Math.round(parseFrFloat(effBase.Valeur) * (act.count || 1)) || 2;
                 return;
             }
@@ -575,6 +588,7 @@ window.demarrerCiblage = async function(idCarte) {
             if (nomLower.includes("attaque") || nomLower.includes("pouvoir") || nomLower.includes("soin") || nomLower.includes("guérison") || isPurification || isShield) {
                 let isHeal = nomLower.includes("soin") || nomLower.includes("guérison") || isPurification || isShield;
 
+                if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 attaquesExtraites.push({
                     nom: effBase.Nom,
                     typeRes: (nomLower.includes("magique") || nomLower.includes("pouvoir") || isHeal) ? "Magique" : "Physique",
@@ -620,6 +634,7 @@ window.demarrerCiblage = async function(idCarte) {
                 if (stunDuree <= 0) stunDuree = 2; // Sécurité si la BDD n'a pas de durée
                 console.log(`⚡ État Étourdi configuré : ${stunDuree} tours (chance ${stunChance}%).`);
 
+                if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 alterationsExtraites.push({
                     nom: "Étourdi",
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1787381297/ETOURDIT_2_j7w36h.png",
@@ -651,7 +666,8 @@ window.demarrerCiblage = async function(idCarte) {
 
             if (isAbsorption) {
                 if (absorptionValeur > 100) absorptionValeur = 100; // Cap à 100% d'annulation
-                
+
+                if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 alterationsExtraites.push({
                     nom: "Absorption",
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", // NOTE: Remplace par le lien d'une belle icône Cloudinary !
@@ -668,11 +684,16 @@ window.demarrerCiblage = async function(idCarte) {
         });
     }
 
-    // Bond : résolu à part (choix de la case, animation), AVANT le reste de la carte.
-    // Que le saut ait lieu ou soit annulé (clic sur soi-même), la carte reste consommée :
-    // on continue toujours vers la suite (fin de tour si rien d'autre, ou ciblage sinon).
-    if (isBond) {
-        const idLanceurBond = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
+    // Bond : résolu à part (choix de la case, animation). On respecte l'ordre de la carte :
+    // si le Bond est avant le premier autre effet (ou qu'il n'y a rien d'autre), il se joue
+    // maintenant ; s'il est après une attaque/altération, on le reporte après leur résolution
+    // (voir declencherResolutionAvecBondEventuel plus bas). Dans tous les cas la carte reste
+    // consommée, saut annulé ou pas.
+    const idLanceurBond = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
+    const bondEnPremier = isBond && (indexPremierAutreEffet === -1 || indexBond < indexPremierAutreEffet);
+    const bondApresLeReste = isBond && !bondEnPremier;
+
+    if (bondEnPremier) {
         await window.resoudreBondInteractif(idLanceurBond, porteeBond);
     }
 
@@ -711,8 +732,11 @@ window.demarrerCiblage = async function(idCarte) {
         zoneCenterHex: isZone && configSort && !configSort.isRanged ? {q: tkLanceur.q, r: tkLanceur.r} : null,
         zoneRotationStep: 0,
         initialTwistAngle: 0,
-        initialZoneStep: 0
+        initialZoneStep: 0,
+        bondApresAttaque: bondApresLeReste ? { idLanceur: idLanceurBond, portee: porteeBond } : null
     };
+
+    if (configSort) window.surlignerEffetCarteActif(configSort.nom);
 
     const btnAppliquer = document.getElementById("btn-appliquer-carte");
     if (btnAppliquer) btnAppliquer.style.display = "none";
@@ -774,7 +798,7 @@ window.demarrerCiblage = async function(idCarte) {
         }
         btnResoudre.innerText = "RÉSOUDRE";
         btnResoudre.style.pointerEvents = "auto";
-        btnResoudre.onclick = () => window.declencherResolution();
+        btnResoudre.onclick = () => window.declencherResolutionAvecBondEventuel();
     }
     window.actualiserVisuelCiblage();
 };
@@ -811,7 +835,7 @@ window.validerZoneAoE = function() {
 
     state.attaques.forEach(a => a.cibles = ciblesTouchees);
     state.alterations.forEach(alt => alt.cibles = ciblesTouchees);
-    window.declencherResolution();
+    window.declencherResolutionAvecBondEventuel();
 };
 
 window.actualiserVisuelCiblage = function() {
@@ -892,6 +916,19 @@ window.dessinerZoneAoE = function() {
             }
         }
     });
+};
+
+// Fait clignoter en doré, sur l'aperçu HD de la carte, la ligne de l'effet en cours de
+// résolution (ex. "Bond" pendant le choix de la case, ou l'attaque pendant son ciblage).
+// Passe null pour tout éteindre.
+window.surlignerEffetCarteActif = function(nomEffet) {
+    const conteneur = document.getElementById("apercu-carte-hd-competence");
+    if (!conteneur) return;
+    const lignes = conteneur.querySelectorAll('[id^="effet-hd-ligne-"]');
+    lignes.forEach(el => el.classList.remove("effet-hd-actif"));
+    if (!nomEffet) return;
+    const cible = Array.from(lignes).find(el => el.textContent.toLowerCase().includes(nomEffet.toLowerCase()));
+    if (cible) cible.classList.add("effet-hd-actif");
 };
 
 window.dessinerAnneauxCiblage = function() {
@@ -1019,7 +1056,7 @@ window.dessinerAnneauxCiblage = function() {
                     
                     bulle.onclick = function(e) {
                         e.stopPropagation();
-                        window.declencherResolution();
+                        window.declencherResolutionAvecBondEventuel();
                     };
                     divToken.appendChild(bulle);
                 }
@@ -1113,6 +1150,7 @@ window.ajouterCibleCiblage = function(idCible) {
 
 window.nettoyerCiblage = function() {
     window.ETAT_CIBLAGE.actif = false;
+    window.surlignerEffetCarteActif(null);
     document.querySelectorAll(".anneau-ciblage, .bulle-validation-cible").forEach(el => el.remove());
     
     const svgZone = document.getElementById("svg-zone-ciblage");
@@ -1161,6 +1199,17 @@ window.declencherResolution = async function() {
     } catch (e) {
         console.error("Erreur résolution :", e);
         alert("Interférence magique, impossible de frapper.");
+    }
+};
+
+// Si la carte porte un Bond placé APRÈS l'attaque/altération, on le déclenche juste après
+// avoir lancé la résolution de celle-ci (le jet est déjà figé côté serveur) : l'ordre de la
+// carte est respecté, et le saut interactif ne bloque jamais le lancement de l'attaque.
+window.declencherResolutionAvecBondEventuel = async function() {
+    const bondEnAttente = window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.bondApresAttaque;
+    await window.declencherResolution();
+    if (bondEnAttente) {
+        await window.resoudreBondInteractif(bondEnAttente.idLanceur, bondEnAttente.portee);
     }
 };
 
