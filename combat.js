@@ -1460,21 +1460,25 @@ window.appliquerTokensVTT = function(tokensMap) {
             const nbTraits = 12;
             for (let i = 0; i < nbTraits; i++) {
                 const angle = (360 / nbTraits) * i + (Math.random() * 12 - 6); // léger désordre naturel
-                const longueur = 32 + Math.random() * 26; // % de la taille du pion : reste bien dans l'hexagone
+                // Le médaillon remplit presque tout le cadre : il faut dépasser ~50% pour être visible.
+                const longueur = 55 + Math.random() * 35; // % de la taille du pion : reste bien dans l'hexagone
                 const largeur = 2 + Math.random() * 2.5;
                 const variant = Math.floor(Math.random() * 6);
                 const duree = (1.3 + Math.random() * 1.8).toFixed(2);
                 const delai = (-Math.random() * 3).toFixed(2); // négatif : démarre déjà en cours de cycle
 
-                // Support statique (position + rotation figées) : seul l'enfant ci-dessous est animé.
+                // Support statique : positionné par left/bottom (pas de translate%), pivote autour de son
+                // propre coin bas-centre, qui coïncide exactement avec le centre du pion. Ainsi la rotation
+                // ne déplace jamais la base du trait, quel que soit l'angle (contrairement à translate+rotate,
+                // où le décalage ne suit pas la rotation et envoyait chaque trait dans une direction fixe).
                 const support = document.createElement("div");
                 support.style.position = "absolute";
-                support.style.top = "50%";
-                support.style.left = "50%";
+                support.style.bottom = "50%";
+                support.style.left = `calc(50% - ${largeur / 2}%)`;
                 support.style.width = `${largeur}%`;
                 support.style.height = `${longueur}%`;
                 support.style.transformOrigin = "50% 100%";
-                support.style.transform = `translate(-50%, -100%) rotate(${angle}deg)`;
+                support.style.transform = `rotate(${angle}deg)`;
 
                 const trait = document.createElement("div");
                 trait.style.width = "100%";
