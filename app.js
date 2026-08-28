@@ -821,7 +821,9 @@ async function genererEtStockerTokenBackground(donnees, idPersonnage, urlPortrai
                        "and detail level of the reference. The background is a clean, isolated pure fluorescent magenta (#FF00FF), used as a chroma key backdrop, " +
                        "with absolutely no cast shadows or drop shadows. " +
                        "The lighting is precise, studio-quality, enhancing the forms and textures, identical in quality to the reference image. " +
-                       "The image must be in a perfectly square format, with the medallion token scaled up to fill the entire frame completely from edge to edge.";
+                       "The image must be in a perfectly square format, with the medallion token scaled as large as possible while leaving a small margin from the edges. " +
+                       "The entire medallion, including any protruding details such as tails, limbs or weapons, must be fully visible inside the frame — " +
+                       "nothing may be cropped or cut off by the image border.";
 
     // input_fidelity est ignoré par gpt-image-2 (déjà haute fidélité) mais indispensable aux modèles précédents.
     const modelesCandidats = [

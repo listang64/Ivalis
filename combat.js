@@ -1422,18 +1422,20 @@ window.appliquerTokensVTT = function(tokensMap) {
         divToken.style.borderRadius = "50%";
         divToken.id = "token-" + idPerso;
 
-        // 1️⃣ L'OMBRE PORTÉE AU SOL, sous les pieds du pion.
+        // 1️⃣ L'OMBRE PORTÉE AU SOL, VISIBLE SOUS LE PION (au sud, pas cachée dessous).
+        // Le jeton remplit tout le cadre carré (image bord à bord) : l'ombre doit donc dépasser
+        // du bas de la div pour rester visible plutôt que d'être recouverte par le disque opaque.
         // Dégradé radial plutôt qu'un filtre "blur" : ce dernier doit être recalculé en pixels à
         // chaque étape du zoom, ce qui laissait des résidus visuels sur iPad (Safari) pendant un
         // pincement rapide. Un dégradé se redimensionne nativement avec l'élément, sans recalcul JS.
         const ombreSol = document.createElement("div");
         ombreSol.className = "token-ombre-sol";
         ombreSol.style.position = "absolute";
-        ombreSol.style.top = "70%";
+        ombreSol.style.top = "100%";
         ombreSol.style.left = "50%";
         ombreSol.style.transform = "translate(-50%, -50%)";
-        ombreSol.style.width = "75%";
-        ombreSol.style.height = "28%";
+        ombreSol.style.width = "65%";
+        ombreSol.style.height = "24%";
         ombreSol.style.borderRadius = "50%";
         ombreSol.style.background = "radial-gradient(ellipse at center, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0) 75%)";
         ombreSol.style.zIndex = "-2";
