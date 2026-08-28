@@ -149,8 +149,25 @@
          une veille legere evite d'avoir a instrumenter chacun d'eux. */
       window.addEventListener('DOMContentLoaded', function () {
         window.synchroniserFondCanvas();
-        setInterval(window.synchroniserFondCanvas, 400);
+        window._intervalSynchroCanvas = setInterval(window.synchroniserFondCanvas, 400);
       });
+
+      /* La fenetre de combat n'a pas besoin de cette veille (aucune des scenes qu'elle
+         surveille n'est visible pendant un combat) : on la coupe pour laisser le CPU/GPU
+         de l'iPad au plateau tactique, et on la reprend en sortant du combat. */
+      window.suspendreSynchroCanvas = function () {
+        if (window._intervalSynchroCanvas) {
+          clearInterval(window._intervalSynchroCanvas);
+          window._intervalSynchroCanvas = null;
+        }
+      };
+
+      window.reprendreSynchroCanvas = function () {
+        if (!window._intervalSynchroCanvas) {
+          window.synchroniserFondCanvas();
+          window._intervalSynchroCanvas = setInterval(window.synchroniserFondCanvas, 400);
+        }
+      };
 
     })();
   </script>

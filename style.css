@@ -414,7 +414,9 @@ body {
   height: 2160px;
   
   /* 🔻 NOUVELLE MAP PRINCIPALE 🔻 */
-  background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786748187/map_wx8s89.jpg'); 
+  /* w_2400,c_limit : l'image est etiree sur 3840x2160 en CSS quel que soit son poids reel ;
+     inutile de faire decoder un fichier 4K natif a l'iPad, 2400px de large suffit largement. */
+  background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/w_2400,c_limit,q_auto,f_auto/v1786748187/map_wx8s89.jpg');
   
   /* On force l'image à épouser exactement ces 3840x2160 pixels */
   background-size: 100% 100%; 
@@ -1295,13 +1297,15 @@ textarea.input-texte-parchemin {
 .tour-actif {
   background-color: rgba(46, 139, 87, 0.6) !important; /* Vert foncé transparent */
   border-color: #00ff00 !important;
-  box-shadow: 0 0 10px rgba(0, 255, 0, 0.4);
+  box-shadow: 0 0 12px rgba(0, 255, 0, 0.6); /* Halo fixe : anime seulement son opacite ci-dessous */
   animation: pulsation-tour 2s infinite alternate;
 }
 
+/* Anime l'opacite plutot que le box-shadow lui-meme : un box-shadow qui change de rayon force
+   un repaint a chaque frame, alors qu'une opacite se compose sur le GPU (bien moins couteux). */
 @keyframes pulsation-tour {
-  from { box-shadow: 0 0 5px rgba(0, 255, 0, 0.3); }
-  to { box-shadow: 0 0 15px rgba(0, 255, 0, 0.7); }
+  from { opacity: 0.55; }
+  to { opacity: 1; }
 }
 
 /* ========================================================================= */
@@ -1831,13 +1835,15 @@ textarea.input-texte-parchemin {
 /* ========================================================================= */
 /* ANIMATION JAUGE DE FATIGUE                                                */
 /* ========================================================================= */
+/* Anime l'opacite plutot que box-shadow/filter : ces deux proprietes forcent un repaint a
+   chaque frame quand elles changent, alors qu'une opacite se compose sur le GPU. */
 @keyframes effetHaloRougeFatigue {
-    0% { box-shadow: 0 0 5px rgba(255, 76, 76, 0.5); filter: brightness(1); }
-    50% { box-shadow: 0 0 15px rgba(255, 76, 76, 1); filter: brightness(1.3); }
-    100% { box-shadow: 0 0 5px rgba(255, 76, 76, 0.5); filter: brightness(1); }
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
 }
 
 .barre-fatigue-cout {
+    box-shadow: 0 0 12px rgba(255, 76, 76, 0.85);
     animation: effetHaloRougeFatigue 1.5s infinite;
 }
 
@@ -2026,24 +2032,27 @@ textarea.input-texte-parchemin {
 }
 
 .halo-tour-actif {
+    /* Filtre fixe (calcule une seule fois) : l'animation ci-dessous ne touche plus qu'a
+       l'opacite, qui se compose sur le GPU. Un filtre anime devrait etre recalcule pixel
+       par pixel a chaque frame, meme avec le forçage de calque ci-dessous. */
+    -webkit-filter: drop-shadow(0px 5px 8px rgba(0,0,0,0.8)) drop-shadow(0px 0px 10px rgba(225, 191, 146, 0.6));
+    filter: drop-shadow(0px 5px 8px rgba(0,0,0,0.8)) drop-shadow(0px 0px 10px rgba(225, 191, 146, 0.6));
     animation: respirationHaloDore 2s infinite alternate ease-in-out;
     -webkit-animation: respirationHaloDore 2s infinite alternate ease-in-out;
     z-index: 5;
-    
+
     /* 🔻 CORRECTIONS IPAD (Forçage GPU et WebKit) 🔻 */
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
-    transform: translateZ(0); 
+    transform: translateZ(0);
 }
 
 @keyframes respirationHaloDore {
     0% {
-        -webkit-filter: drop-shadow(0px 5px 8px rgba(0,0,0,0.8)) drop-shadow(0px 0px 5px rgba(194, 168, 120, 0.4));
-        filter: drop-shadow(0px 5px 8px rgba(0,0,0,0.8)) drop-shadow(0px 0px 5px rgba(194, 168, 120, 0.4));
+        opacity: 0.7;
     }
     100% {
-        -webkit-filter: drop-shadow(0px 5px 8px rgba(0,0,0,0.8)) drop-shadow(0px 0px 12px rgba(255, 215, 0, 0.7));
-        filter: drop-shadow(0px 5px 8px rgba(0,0,0,0.8)) drop-shadow(0px 0px 12px rgba(255, 215, 0, 0.7));
+        opacity: 1;
     }
 }
 

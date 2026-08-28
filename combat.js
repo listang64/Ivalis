@@ -52,6 +52,9 @@ window.ouvrirCombat = function() {
     const fenetreCombat = document.getElementById('fenetre-combat');
     if (fenetreCombat) fenetreCombat.style.display = 'block';
 
+    // Aucune des scenes surveillees par cette veille n'est visible en combat : on la coupe
+    if (typeof window.suspendreSynchroCanvas === "function") window.suspendreSynchroCanvas();
+
     // Annonce le tour actuel dès l'ouverture (Tour 1 au lancement)
     if (typeof window.verifierChangementTour === "function") {
         window.verifierChangementTour((window.PARTIE_DATA && window.PARTIE_DATA.Tour_Combat) || 1);
@@ -98,6 +101,9 @@ window.fermerCombat = function() {
     if (typeof window.fermerToutesLesFenetres === "function") {
         window.fermerToutesLesFenetres();
     }
+
+    // On quitte le combat : la veille redevient utile pour les autres scenes
+    if (typeof window.reprendreSynchroCanvas === "function") window.reprendreSynchroCanvas();
 };
 
 window.initialiserPersosCombat = function() {
@@ -192,7 +198,9 @@ window.afficherPersoCombatActuel = function() {
 
     if (imgPerso) {
         if (persoActuel.urlCloudinary && persoActuel.urlCloudinary !== "") {
-            imgPerso.src = persoActuel.urlCloudinary;
+            imgPerso.src = typeof window.redimensionnerImageCloudinary === "function"
+                ? window.redimensionnerImageCloudinary(persoActuel.urlCloudinary, 900)
+                : persoActuel.urlCloudinary;
             imgPerso.style.opacity = "1"; // Rétablit l'avatar à 100% d'opacité !
         } else {
             imgPerso.style.opacity = "0";
@@ -574,6 +582,36 @@ window.VTT_MODE_MURS = false;
 window.VTT_MODE_DIFFICILE = false;
 let isPaintingVTT = false;
 let currentPaintAction = null; // 'delete', 'restore', 'block', 'unblock', 'difficult', 'undifficult'
+let dernierHexPeint = null;
+let framePeintureVTT = null;
+
+// Regroupe tous les renderMap() d'un même geste en un seul par frame (au lieu d'un par
+// evenement pointer/touch, qui peut arriver a 60+ fois/seconde pendant qu'on peint).
+function demanderRenderPeintureVTT() {
+    if (framePeintureVTT) return;
+    framePeintureVTT = requestAnimationFrame(() => {
+        framePeintureVTT = null;
+        if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
+    });
+}
+
+// Applique l'outil actif (gomme/murs/difficile) sur une case, en ignorant les evenements
+// repetes sur la MEME case (le doigt qui bouge de quelques pixels sans changer d'hexagone).
+function peindreHexVTT(hex, forcer) {
+    if (!hex) return;
+    const cle = hex.q + "," + hex.r;
+    if (!forcer && cle === dernierHexPeint) return;
+    dernierHexPeint = cle;
+
+    if (window.VTT_MODE_EFFACEMENT) {
+        window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
+    } else if (window.VTT_MODE_MURS) {
+        window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isBlocked: currentPaintAction === 'block' });
+    } else if (window.VTT_MODE_DIFFICILE) {
+        window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDifficult: currentPaintAction === 'difficult' });
+    }
+    demanderRenderPeintureVTT();
+}
 
 window.activerPanZoom = function() {
     const conteneur = document.getElementById("conteneur-plateau-vtt");
@@ -601,20 +639,14 @@ window.activerPanZoom = function() {
         if (conteneur.contains(e.target)) {
             if (window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS || window.VTT_MODE_DIFFICILE) {
                 isPaintingVTT = true;
+                dernierHexPeint = null;
                 const hex = getHexFromMouse(e.clientX, e.clientY);
                 if (hex) {
                     const state = window.PLATEAU_VTT.getCaseState(hex.q, hex.r);
-                    if (window.VTT_MODE_EFFACEMENT) {
-                        currentPaintAction = state.isDeleted ? 'restore' : 'delete';
-                        window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
-                    } else if (window.VTT_MODE_MURS) {
-                        currentPaintAction = state.isBlocked ? 'unblock' : 'block';
-                        window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isBlocked: currentPaintAction === 'block' });
-                    } else if (window.VTT_MODE_DIFFICILE) {
-                        currentPaintAction = state.isDifficult ? 'undifficult' : 'difficult';
-                        window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDifficult: currentPaintAction === 'difficult' });
-                    }
-                    window.PLATEAU_VTT.renderMap();
+                    if (window.VTT_MODE_EFFACEMENT) currentPaintAction = state.isDeleted ? 'restore' : 'delete';
+                    else if (window.VTT_MODE_MURS) currentPaintAction = state.isBlocked ? 'unblock' : 'block';
+                    else if (window.VTT_MODE_DIFFICILE) currentPaintAction = state.isDifficult ? 'undifficult' : 'difficult';
+                    peindreHexVTT(hex, true);
                 }
             } else {
                 isDraggingVTT = true;
@@ -627,17 +659,7 @@ window.activerPanZoom = function() {
 
     window.addEventListener("mousemove", (e) => {
         if (isPaintingVTT && (window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS || window.VTT_MODE_DIFFICILE)) {
-            const hex = getHexFromMouse(e.clientX, e.clientY);
-            if (hex) {
-                if (window.VTT_MODE_EFFACEMENT) {
-                    window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
-                } else if (window.VTT_MODE_MURS) {
-                    window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isBlocked: currentPaintAction === 'block' });
-                } else if (window.VTT_MODE_DIFFICILE) {
-                    window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDifficult: currentPaintAction === 'difficult' });
-                }
-                window.PLATEAU_VTT.renderMap(); 
-            }
+            peindreHexVTT(getHexFromMouse(e.clientX, e.clientY), false);
             return;
         }
 
@@ -662,24 +684,18 @@ window.activerPanZoom = function() {
             if (e.touches.length === 1) {
                 if (window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS || window.VTT_MODE_DIFFICILE) {
                     isPaintingVTT = true;
-                    
+                    dernierHexPeint = null;
+
                     // NOUVEAU : Délai de 100ms pour laisser le temps au 2ème doigt de se poser (Pinch to zoom)
                     window.vttPaintTimeout = setTimeout(() => {
                         if (isPaintingVTT && window.PLATEAU_VTT) {
                             const hex = getHexFromMouse(e.touches[0].clientX, e.touches[0].clientY);
                             if (hex) {
                                 const state = window.PLATEAU_VTT.getCaseState(hex.q, hex.r);
-                                if (window.VTT_MODE_EFFACEMENT) {
-                                    currentPaintAction = state.isDeleted ? 'restore' : 'delete';
-                                    window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
-                                } else if (window.VTT_MODE_MURS) {
-                                    currentPaintAction = state.isBlocked ? 'unblock' : 'block';
-                                    window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isBlocked: currentPaintAction === 'block' });
-                                } else if (window.VTT_MODE_DIFFICILE) {
-                                    currentPaintAction = state.isDifficult ? 'undifficult' : 'difficult';
-                                    window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDifficult: currentPaintAction === 'difficult' });
-                                }
-                                window.PLATEAU_VTT.renderMap();
+                                if (window.VTT_MODE_EFFACEMENT) currentPaintAction = state.isDeleted ? 'restore' : 'delete';
+                                else if (window.VTT_MODE_MURS) currentPaintAction = state.isBlocked ? 'unblock' : 'block';
+                                else if (window.VTT_MODE_DIFFICILE) currentPaintAction = state.isDifficult ? 'undifficult' : 'difficult';
+                                peindreHexVTT(hex, true);
                             }
                         }
                     }, 100);
@@ -708,17 +724,7 @@ window.activerPanZoom = function() {
 
         if (e.touches.length === 1) {
             if (isPaintingVTT && (window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS || window.VTT_MODE_DIFFICILE)) {
-                const hex = getHexFromMouse(e.touches[0].clientX, e.touches[0].clientY);
-                if (hex) {
-                    if (window.VTT_MODE_EFFACEMENT) {
-                        window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDeleted: currentPaintAction === 'delete' });
-                    } else if (window.VTT_MODE_MURS) {
-                        window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isBlocked: currentPaintAction === 'block' });
-                    } else if (window.VTT_MODE_DIFFICILE) {
-                        window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDifficult: currentPaintAction === 'difficult' });
-                    }
-                    window.PLATEAU_VTT.renderMap();
-                }
+                peindreHexVTT(getHexFromMouse(e.touches[0].clientX, e.touches[0].clientY), false);
                 return;
             }
 
@@ -874,9 +880,16 @@ window.appliquerTerrain = function(url, scale, opacity) {
     const imgEl = document.getElementById("image-map-vtt");
     const conteneurTransform = document.getElementById("transform-plateau");
     if (!imgEl || !conteneurTransform) return;
-    
+
+    // Fond de carte de combat : souvent une image generee en tres haute resolution, inutile
+    // de la faire decoder a taille reelle par l'iPad. On compare/assigne toujours CETTE
+    // version (jamais l'URL brute) pour que le test anti-rechargement reste cohérent.
+    const url2 = url && typeof window.redimensionnerImageCloudinary === "function"
+        ? window.redimensionnerImageCloudinary(url, 2200)
+        : url;
+
     // Anti-scintillement global (URL, Taille, Opacité)
-    if (urlsVTTIdentiques(imgEl.src, url) && window.PLATEAU_VTT.hexSize === scale && Math.abs(window.PLATEAU_VTT.gridOpacity - opacity) < 0.001) return;
+    if (urlsVTTIdentiques(imgEl.src, url2) && window.PLATEAU_VTT.hexSize === scale && Math.abs(window.PLATEAU_VTT.gridOpacity - opacity) < 0.001) return;
 
     window.PLATEAU_VTT.hexSize = scale;
     window.PLATEAU_VTT.hexWidth = 2 * scale;
@@ -907,9 +920,9 @@ window.appliquerTerrain = function(url, scale, opacity) {
         }
     };
 
-    if (!urlsVTTIdentiques(imgEl.src, url) && url !== "") {
+    if (!urlsVTTIdentiques(imgEl.src, url2) && url !== "") {
         imgEl.onload = appliquerMapChargee;
-        imgEl.src = url;
+        imgEl.src = url2;
         if (imgEl.complete && imgEl.naturalWidth > 0) appliquerMapChargee();
     } else {
         // Changement d'échelle/opacité seul, ou repeinture sans nouvelle image
@@ -1584,7 +1597,9 @@ window.appliquerTokensVTT = function(tokensMap) {
         // 4️⃣ L'IMAGE DU PION (Nette)
         const img = document.createElement("img");
         img.className = "token-img-main";
-        img.src = data.url;
+        img.src = typeof window.redimensionnerImageCloudinary === "function"
+            ? window.redimensionnerImageCloudinary(data.url, 700)
+            : data.url;
         img.style.width = "100%";
         img.style.height = "100%";
         img.style.objectFit = "contain";

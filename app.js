@@ -755,6 +755,31 @@ function urlCloudinaryEnPng(url) {
     return base + "f_png/" + segments.join("/");
 }
 
+// Insère une largeur maximale dans une URL Cloudinary (c_limit ne fait que réduire, jamais
+// agrandir). Évite à l'iPad de télécharger/décoder des images bien plus grandes que ce qui
+// est réellement affiché à l'écran (portraits, fonds de carte de combat générés en 1024px+).
+function redimensionnerImageCloudinary(url, largeurMax) {
+    if (!url) return url;
+    const marqueur = "/upload/";
+    const position = url.indexOf(marqueur);
+    if (position === -1) return url;
+
+    const base = url.slice(0, position + marqueur.length);
+    const segments = url.slice(position + marqueur.length).split("/");
+
+    const premier = segments[0];
+    const estTransformation = segments.length > 1 && premier.includes("_") && !premier.includes(".") && !/^v\d+$/.test(premier);
+
+    if (estTransformation) {
+        segments[0] = `w_${largeurMax},c_limit,` + premier;
+    } else {
+        segments.unshift(`w_${largeurMax},c_limit`);
+    }
+
+    return base + segments.join("/");
+}
+window.redimensionnerImageCloudinary = redimensionnerImageCloudinary;
+
 // Prépare le portrait pour l'envoi binaire : PNG carré de 1024px sur fond magenta.
 async function portraitVersBlobPng(urlPortrait) {
     const urlSource = urlCloudinaryEnPng(urlPortrait);
