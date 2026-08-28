@@ -24,6 +24,90 @@ function getHexDistance(a, b) {
     return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
 }
 
+// =========================================================================
+//  ATTAQUES D'OPPORTUNITÉ
+//  Déclenchées depuis mouvement.js quand un personnage quitte le corps-à-corps
+//  d'un adversaire (camp opposé uniquement). 10 dégâts fixes, ignorant l'armure
+//  et les compétences équipées, mais toujours soumis à un jet d'esquive/parade
+//  et absorbés par un bouclier magique actif comme une attaque normale.
+// =========================================================================
+window.resoudreAttaqueOpportunite = async function(idAttaquant, idCible) {
+    const attaquantData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idAttaquant);
+    const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idCible);
+    if (!attaquantData || !cibleData) return;
+    if (attaquantData.statut === "Mort" || cibleData.statut === "Mort") return;
+
+    const tkCible = window.TOKENS_VTT_DATA[idCible];
+
+    if (tkCible && typeof window.afficherMessageFlottantHex === "function") {
+        window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "⚔️ Attaque d'opportunité !", "#ffaa00");
+    }
+    await new Promise(r => setTimeout(r, 500));
+
+    const esquive = (parseInt(cibleData.Esquive) || 0) + (parseInt(cibleData.Dev_Mod_Esquive) || 0);
+    const parade = (parseInt(cibleData.Parade) || 0) + (parseInt(cibleData.Dev_Mod_Parade) || 0);
+    const jetDef = Math.floor(Math.random() * 100) + 1;
+    const statDef = Math.max(esquive, parade);
+    const motDef = parade > esquive ? "Paré 🛡️" : "Esquivé 💨";
+
+    if (jetDef <= statDef) {
+        if (tkCible && typeof window.afficherMessageFlottantHex === "function") {
+            window.afficherMessageFlottantHex(tkCible.q, tkCible.r, motDef, "#cccccc");
+        }
+        await new Promise(r => setTimeout(r, 700));
+        return;
+    }
+
+    const degats = 10; // Fixe : ignore l'armure et les compétences/références de l'attaquant
+    const oldShield = parseInt(cibleData.Bouclier_Actuel) || 0;
+
+    try {
+        const refPerso = doc(db, "Personnages", idCible);
+
+        if (oldShield > 0) {
+            const shieldNew = Math.max(0, oldShield - degats); // L'overkill part dans le vide, comme une attaque normale
+            cibleData.Bouclier_Actuel = shieldNew;
+            if (tkCible) window.afficherMessageFlottantHex(tkCible.q, tkCible.r, `-${degats} 🛡️`, "#00ffff");
+            await updateDoc(refPerso, { Bouclier_Actuel: shieldNew });
+        } else {
+            const oldPv = parseInt(cibleData.PV_Actuels) || 0;
+            const newPv = Math.max(0, oldPv - degats);
+            cibleData.PV_Actuels = newPv;
+            if (tkCible) window.afficherMessageFlottantHex(tkCible.q, tkCible.r, `-${degats} 🩸`, "#ff4c4c");
+            await updateDoc(refPerso, { PV_Actuels: newPv });
+        }
+    } catch (e) {
+        console.error("Erreur attaque d'opportunité :", e);
+    }
+
+    const tokenDiv = document.getElementById("token-" + idCible);
+    if (tokenDiv) {
+        tokenDiv.style.transition = "filter 0.1s";
+        tokenDiv.style.filter = "sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.2)";
+        setTimeout(() => { tokenDiv.style.filter = ""; }, 300);
+    }
+
+    await new Promise(r => setTimeout(r, 600));
+};
+
+// Retourne la liste des idPersonnage adverses (camp opposé, vivants) au contact (distance 1)
+// d'un pion place en (q,r). Utilisée par mouvement.js pour comparer avant/après un déplacement.
+window.listerEnnemisAuContact = function(idPersonnage, hexPosition) {
+    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+    if (!perso || !hexPosition) return [];
+
+    const resultat = [];
+    for (let idAutre in (window.TOKENS_VTT_DATA || {})) {
+        if (idAutre === idPersonnage) continue;
+        const autre = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idAutre);
+        if (!autre || autre.statut === "Mort" || autre.camp === perso.camp) continue;
+        if (getHexDistance(hexPosition, window.TOKENS_VTT_DATA[idAutre]) === 1) {
+            resultat.push(idAutre);
+        }
+    }
+    return resultat;
+};
+
 function verifierLigneDeVue(hexA, hexB) {
     if (!window.PLATEAU_VTT) return true;
     let dist = getHexDistance(hexA, hexB);

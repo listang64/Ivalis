@@ -345,6 +345,17 @@ window.validerMouvement = async function() {
     const idPerso = window.TOKEN_SELECTIONNE;
     const finalStep = window.CHEMIN_MOUVEMENT[window.CHEMIN_MOUVEMENT.length - 1];
 
+    // ATTAQUES D'OPPORTUNITÉ : on compare le contact (adversaires au corps-à-corps) avant/après,
+    // calculé ICI avant toute mutation de position, pour comparer les deux états proprement.
+    const hexDepart = { q: window.TOKENS_VTT_DATA[idPerso].q, r: window.TOKENS_VTT_DATA[idPerso].r };
+    const ennemisAvant = typeof window.listerEnnemisAuContact === "function"
+        ? window.listerEnnemisAuContact(idPerso, hexDepart)
+        : [];
+    const ennemisApres = typeof window.listerEnnemisAuContact === "function"
+        ? window.listerEnnemisAuContact(idPerso, finalStep)
+        : [];
+    const ennemisQuittes = ennemisAvant.filter(id => !ennemisApres.includes(id));
+
     const bulle = document.getElementById("bulle-validation-mouvement");
     if (bulle) bulle.style.display = "none";
     const svg = document.getElementById("svg-chemin-mouvement");
@@ -404,6 +415,13 @@ window.validerMouvement = async function() {
 
     window.CHEMIN_MOUVEMENT = [];
     window.MOUVEMENT_COUT_TOTAL = 0;
+
+    // Une attaque d'opportunité par adversaire quitté, résolues l'une après l'autre.
+    if (ennemisQuittes.length > 0 && typeof window.resoudreAttaqueOpportunite === "function") {
+        for (const idEnnemi of ennemisQuittes) {
+            await window.resoudreAttaqueOpportunite(idEnnemi, idPerso);
+        }
+    }
 };
 
 // =========================================================================
