@@ -1422,22 +1422,23 @@ window.appliquerTokensVTT = function(tokensMap) {
         divToken.style.borderRadius = "50%";
         divToken.id = "token-" + idPerso;
 
-        // 1️⃣ L'OMBRE PORTÉE AU SOL, VISIBLE SOUS LE PION (au sud, pas cachée dessous).
-        // Le jeton remplit tout le cadre carré (image bord à bord) : l'ombre doit donc dépasser
-        // du bas de la div pour rester visible plutôt que d'être recouverte par le disque opaque.
+        // 1️⃣ L'OMBRE PORTÉE : jeton posé à plat sur la table, lumière venant du haut.
+        // C'est un disque de la taille du jeton, simplement décalé vers le bas : le médaillon
+        // opaque en recouvre la majeure partie, et il n'en dépasse qu'un croissant au sud.
         // Dégradé radial plutôt qu'un filtre "blur" : ce dernier doit être recalculé en pixels à
         // chaque étape du zoom, ce qui laissait des résidus visuels sur iPad (Safari) pendant un
         // pincement rapide. Un dégradé se redimensionne nativement avec l'élément, sans recalcul JS.
         const ombreSol = document.createElement("div");
         ombreSol.className = "token-ombre-sol";
         ombreSol.style.position = "absolute";
-        ombreSol.style.top = "100%";
+        ombreSol.style.top = "56%";  // Décalage vers le sud : c'est lui qui fait apparaître le croissant
         ombreSol.style.left = "50%";
         ombreSol.style.transform = "translate(-50%, -50%)";
-        ombreSol.style.width = "65%";
-        ombreSol.style.height = "24%";
+        ombreSol.style.width = "97%";
+        ombreSol.style.height = "97%";
         ombreSol.style.borderRadius = "50%";
-        ombreSol.style.background = "radial-gradient(ellipse at center, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0) 75%)";
+        // Coeur dense, puis fondu progressif : donne le flou du contact sans filtre CSS.
+        ombreSol.style.background = "radial-gradient(circle at 50% 50%, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.58) 58%, rgba(0,0,0,0.38) 74%, rgba(0,0,0,0.14) 87%, rgba(0,0,0,0) 97%)";
         ombreSol.style.zIndex = "-2";
         ombreSol.style.pointerEvents = "none";
         divToken.appendChild(ombreSol);
