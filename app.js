@@ -811,17 +811,14 @@ async function genererEtStockerTokenBackground(donnees, idPersonnage, urlPortrai
         return false;
     }
 
-    const promptText = "À partir de l’image de référence fournie, créer un pion de jeu d’échecs fantastique sous forme de buste sculpté en bois clair, " +
-                       "représentant fidèlement le personnage de référence à partir de sa taille (torse et visage uniquement). " +
-                       "Conserver la coiffure, les détails des vêtements visibles sur le torse et les accessoires du haut du corps du personnage. " +
-                       "Le personnage est transformé en véritable sculpture 3D taillée dans un bois clair naturel avec veinage visible sans peinture. " +
-                       "Sculpture détaillée, artisanale, haut de gamme, aspect buste de collection ou pion de jeu de plateau. " +
-                       "Le buste repose sur un socle circulaire épais de style pièce d’échecs. Les bras ne doivent pas être coupés.\n\n" +
-                       "Vue de haut isométrique, caméra directement au-dessus de la figurine. Rendu 3D photoréaliste, très haute définition, ultra détaillé. " +
-                       "Figurine entièrement visible dans le cadre, parfaitement centrée.\n\n" +
-                       "Fond uni rose fluo magenta (#FF00FF) servant de fond de détourage (chroma key). Fond parfaitement uniforme, sans texture, sans dégradé, sans motif. " +
-                       "Aucune ombre portée, aucune ombre sous la figurine, aucun reflet au sol, aucun effet de lumière parasite. Éclairage studio uniforme et neutre. " +
-                       "Aucun autre objet, aucun décor, uniquement le pion sur le fond magenta.";
+    const promptText = "A detailed photograph of a circular hand-carved high-relief wooden plaque medallion, featuring the character from the provided reference image " +
+                       "rendered in meticulously sculpted detail. The figure emerges from the central field with deep undercuts for a powerful three-dimensional effect, " +
+                       "matching the pose and features of the reference character. The entire piece is crafted from a rich, medium-toned hardwood, like aged walnut, " +
+                       "with a tactile, oiled finish. Visible wood grain patterns and fine, authentic chisel marks are present across all surfaces. " +
+                       "The figure's drapery and specific details (like jewelry or textures) are faithfully translated into sculpted wood forms, matching the depth " +
+                       "and detail level of the reference. The background is a clean, isolated pure white with absolutely no cast shadows or drop shadows. " +
+                       "The lighting is precise, studio-quality, enhancing the forms and textures, identical in quality to the reference image. " +
+                       "The image must be in a perfectly square format, with the medallion token scaled up to fill the entire frame completely from edge to edge.";
 
     // input_fidelity est ignoré par gpt-image-2 (déjà haute fidélité) mais indispensable aux modèles précédents.
     const modelesCandidats = [
