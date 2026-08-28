@@ -456,3 +456,42 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
         window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
     }
 };
+
+// Le Bond : pas un déplacement classique, un saut à vol d'oiseau vers la case d'arrivée.
+// Rétréci -> grandi pendant le trajet -> rétréci à l'atterrissage -> taille normale.
+window.jouerAnimationBond = async function(data) {
+    const tokenDiv = document.getElementById("token-" + data.idToken);
+    if (!tokenDiv || !window.PLATEAU_VTT) return;
+
+    const imgMain = tokenDiv.querySelector(".token-img-main");
+
+    window.ANIMATION_VTT_EN_COURS = true;
+
+    tokenDiv.style.transition = "left 0.25s ease-in-out, top 0.25s ease-in-out";
+    if (imgMain) imgMain.style.transition = "transform 0.12s ease-in-out";
+
+    if (imgMain) imgMain.style.transform = "scale(0.85)";
+    await new Promise(r => setTimeout(r, 120));
+
+    tokenDiv.dataset.q = data.arrivee.q;
+    tokenDiv.dataset.r = data.arrivee.r;
+    window.positionnerTokenVTT(tokenDiv, false);
+    if (imgMain) imgMain.style.transform = "scale(1.15)";
+    await new Promise(r => setTimeout(r, 250));
+
+    if (imgMain) imgMain.style.transform = "scale(0.85)";
+    await new Promise(r => setTimeout(r, 120));
+
+    if (imgMain) imgMain.style.transform = "scale(1)";
+    await new Promise(r => setTimeout(r, 150));
+
+    tokenDiv.style.transition = "none";
+    if (imgMain) {
+        imgMain.style.transition = "none";
+        imgMain.style.transform = "";
+    }
+    window.ANIMATION_VTT_EN_COURS = false;
+    if (typeof window.appliquerTokensVTT === "function") {
+        window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    }
+};

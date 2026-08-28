@@ -1,5 +1,5 @@
 import { db } from "./firebase-config.js";
-import { doc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { doc, updateDoc, setDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // =========================================================================
 //  IVALIS - MOTEUR DE RÉSOLUTION DES COMBATS (CIBLAGE ET DÉGÂTS)
@@ -158,10 +158,129 @@ function verifierLigneDeVue(hexA, hexB) {
         let pt = cubeRound(q, r, s);
         
         const state = window.PLATEAU_VTT.getCaseState(pt.q, pt.r);
-        if (state && state.isBlocked) return false; 
+        if (state && state.isBlocked) return false;
     }
-    return true; 
+    return true;
 }
+
+// =========================================================================
+//  BOND
+//  Saut de 1 à `portee` cases (pas un déplacement classique : aucune fatigue de mouvement,
+//  seul le coût de la carte s'applique). Peut survoler cases supprimées, alliés, ennemis et
+//  terrain difficile ; ne peut pas franchir un mur (même check que la ligne de vue). Ne
+//  déclenche jamais d'attaque d'opportunité et n'y est jamais sujet (cf. mouvement.js, qui
+//  n'appelle pas resoudreAttaqueOpportunite pour ce type d'action).
+// =========================================================================
+window.resoudreBondInteractif = function(idPerso, portee) {
+    return new Promise((resolve) => {
+        const tkDepart = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idPerso] : null;
+        if (!tkDepart || !window.PLATEAU_VTT) return resolve(false);
+
+        const hexDepart = { q: tkDepart.q, r: tkDepart.r };
+
+        // 1. Cases d'arrivée valides : à portée, ni mur, ni case supprimée, ni occupée,
+        //    et joignables sans franchir un mur (les autres obstacles se survolent).
+        const candidats = window.PLATEAU_VTT.getHexesInRadius(hexDepart.q, hexDepart.r, portee);
+        const hexesValides = candidats.filter(h => {
+            if (h.q === hexDepart.q && h.r === hexDepart.r) return false;
+
+            const state = window.PLATEAU_VTT.getCaseState(h.q, h.r);
+            if (state.isBlocked || state.isDeleted) return false;
+
+            for (let idAutre in window.TOKENS_VTT_DATA) {
+                if (idAutre === idPerso) continue;
+                const autre = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idAutre);
+                if (!autre || autre.statut === "Mort") continue;
+                const tkAutre = window.TOKENS_VTT_DATA[idAutre];
+                if (tkAutre.q === h.q && tkAutre.r === h.r) return false;
+            }
+
+            return verifierLigneDeVue(hexDepart, h);
+        });
+
+        if (hexesValides.length === 0) {
+            alert("Aucune case d'atterrissage disponible pour le Bond.");
+            return resolve(false);
+        }
+
+        // 2. Assombrit tout l'écran sauf la case de départ et les cases d'arrivée valides.
+        // SVG placé DANS #transform-plateau : il hérite du pan/zoom sans aucun recalcul JS.
+        const conteneurTransform = document.getElementById("transform-plateau");
+        const conteneur = document.getElementById("conteneur-plateau-vtt");
+        if (!conteneurTransform || !conteneur) return resolve(false);
+
+        const ancienOverlay = document.getElementById("svg-bond-assombrissement");
+        if (ancienOverlay) ancienOverlay.remove();
+
+        const hexSize = window.PLATEAU_VTT.hexSize;
+        const pointsHex = (q, r) => {
+            const px = window.PLATEAU_VTT.hexToPixel(q, r);
+            let pts = "";
+            for (let i = 0; i < 6; i++) {
+                const angle = Math.PI / 180 * (60 * i);
+                pts += (px.x + hexSize * Math.cos(angle)) + "," + (px.y + hexSize * Math.sin(angle)) + " ";
+            }
+            return pts.trim();
+        };
+
+        const maskId = "masque-bond-" + Date.now();
+        let trous = `<polygon points="${pointsHex(hexDepart.q, hexDepart.r)}" fill="black"/>`;
+        hexesValides.forEach(h => { trous += `<polygon points="${pointsHex(h.q, h.r)}" fill="black"/>`; });
+
+        const overlay = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        overlay.id = "svg-bond-assombrissement";
+        overlay.style.cssText = "position:absolute; top:0; left:0; overflow:visible; z-index:4; pointer-events:none;";
+        overlay.innerHTML = `
+            <defs>
+                <mask id="${maskId}">
+                    <rect x="-20000" y="-20000" width="40000" height="40000" fill="white"/>
+                    ${trous}
+                </mask>
+            </defs>
+            <rect x="-20000" y="-20000" width="40000" height="40000" fill="rgba(0,0,0,0.6)" mask="url(#${maskId})"/>
+        `;
+        conteneurTransform.appendChild(overlay);
+
+        // 3. Un tap sur une case valide confirme le saut ; un tap ailleurs annule.
+        const nettoyer = () => {
+            overlay.remove();
+            window.removeEventListener("click", onClick, { capture: true });
+        };
+
+        const onClick = async (e) => {
+            if (!conteneur.contains(e.target)) return;
+            e.stopPropagation();
+
+            const canvasX = (e.clientX - window.VTT_POS_X) / window.VTT_SCALE;
+            const canvasY = (e.clientY - window.VTT_POS_Y) / window.VTT_SCALE;
+            const hex = window.PLATEAU_VTT.pixelToHex(canvasX, canvasY);
+            const cible = hexesValides.find(h => h.q === hex.q && h.r === hex.r);
+
+            nettoyer();
+
+            if (!cible) return resolve(false);
+
+            const hexArrivee = { q: cible.q, r: cible.r };
+            window.TOKENS_VTT_DATA[idPerso].q = hexArrivee.q;
+            window.TOKENS_VTT_DATA[idPerso].r = hexArrivee.r;
+
+            try {
+                await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
+                    Action_Bond: { idToken: idPerso, depart: hexDepart, arrivee: hexArrivee, timestamp: Date.now() }
+                });
+                await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
+                    Tokens: window.TOKENS_VTT_DATA
+                }, { merge: true });
+            } catch (err) {
+                console.error("Erreur Bond :", err);
+            }
+
+            resolve(true);
+        };
+
+        window.addEventListener("click", onClick, { capture: true });
+    });
+};
 
 function rotateHex(hex, steps) {
     let q = hex.q, r = hex.r;
@@ -346,6 +465,8 @@ window.demarrerCiblage = async function(idCarte) {
     const alterationsExtraites = [];
     let isZone = false;
     let zoneHexesBase = [];
+    let isBond = false;
+    let porteeBond = 2;
 
     const parseFrFloat = (val) => {
         if (val === undefined || val === null || val === "") return 0;
@@ -395,6 +516,13 @@ window.demarrerCiblage = async function(idCarte) {
             const nomLower = (effBase.Nom || "").toLowerCase();
             const listeMods = extraireMods(act.mods);
             const modsDuree = act.modsDuree || {};
+
+            // Bond : pas une attaque/alteration, traité à part avant tout le reste de la carte.
+            if (nomLower.includes("bond")) {
+                isBond = true;
+                porteeBond = Math.round(parseFrFloat(effBase.Valeur) * (act.count || 1)) || 2;
+                return;
+            }
 
             let isRanged = false;
             let rangeMax = 1;
@@ -519,6 +647,15 @@ window.demarrerCiblage = async function(idCarte) {
                 });
             }
         });
+    }
+
+    // Bond : résolu à part (choix de la case, animation), AVANT le reste de la carte.
+    // S'il n'y a rien d'autre dessus, la carte se termine ensuite normalement (comme une
+    // carte vide) ; s'il y a une attaque/altération en plus, on enchaîne sur son ciblage.
+    if (isBond) {
+        const idLanceurBond = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
+        const aSaute = await window.resoudreBondInteractif(idLanceurBond, porteeBond);
+        if (!aSaute) return; // Annulé : la carte n'est pas consommée, rien n'est déduit
     }
 
     if (attaquesExtraites.length === 0 && alterationsExtraites.length === 0) {
