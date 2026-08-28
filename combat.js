@@ -541,7 +541,7 @@ window.centrerPlateau = function() {
     window.VTT_SCALE_MIN = window.VTT_SCALE * 0.5;
     window.VTT_SCALE_MAX = window.VTT_SCALE * 8;
     
-    window.VTT_POS_X = 0; // Bord gauche de la carte collé au bord gauche de l'écran à l'entrée
+    window.VTT_POS_X = winW - (w * window.VTT_SCALE); // Bord droit de la carte collé au bord droit de l'écran à l'entrée
     window.VTT_POS_Y = (winH - (h * window.VTT_SCALE)) / 2;
     
     window.appliquerTransformPlateau();
