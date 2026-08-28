@@ -2946,8 +2946,8 @@ window.recadrerCarte = function() {
 
   carteZoom = Math.max(ratioX, ratioY);
 
-  // 🔻 CORRECTION : Avec transform-origin: 0 0, on multiplie par le zoom pour centrer !
-  cartePanX = (window.innerWidth - (3840 * carteZoom)) / 2;
+  // Bord gauche de la carte collé au bord gauche de l'écran (même logique que la carte de combat)
+  cartePanX = 0;
   cartePanY = (hauteurEcran - (2160 * carteZoom)) / 2;
 
   carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
