@@ -1090,7 +1090,7 @@ window.changerTailleToken = function(delta) {
     let tokenData = window.TOKENS_VTT_DATA[window.TOKEN_SELECTIONNE];
     if (!tokenData) return;
     
-    let taille = tokenData.taille || 80;
+    let taille = tokenData.taille || 55;
     taille += delta;
     if (taille < 20) taille = 20; 
     if (taille > 400) taille = 400; 
@@ -1211,7 +1211,7 @@ window.selectionnerEtCentrerPerso = function(idPersonnage) {
     if (window.TOKENS_VTT_DATA && window.TOKENS_VTT_DATA[idPersonnage]) {
         const dataToken = window.TOKENS_VTT_DATA[idPersonnage];
         const label = document.getElementById("label-taille-token");
-        if (label) label.innerText = dataToken.taille || 80;
+        if (label) label.innerText = dataToken.taille || 55;
         
         window.centrerMapSurToken(idPersonnage);
     }
@@ -1312,7 +1312,7 @@ window.genererTokensCombat = async function() {
                 q: hexLibre.q,
                 r: hexLibre.r,
                 url: imgToUse,
-                taille: 80
+                taille: 55
             };
             updated = true;
         }
@@ -1343,13 +1343,12 @@ window.positionnerTokenVTT = function(divToken, majEchelle) {
 
     if (!majEchelle) return;
 
-    const taille = parseFloat(divToken.dataset.taille) || 80;
+    const taille = parseFloat(divToken.dataset.taille) || 55;
 
     divToken.style.width = (taille * echelle) + "px";
     divToken.style.height = (taille * echelle) + "px";
 
-    const ombreSol = divToken.querySelector(".token-ombre-sol");
-    if (ombreSol) ombreSol.style.filter = `blur(${8 * echelle}px)`;
+    // L'ombre au sol est un dégradé en %, elle se redimensionne seule avec le pion (pas de recalcul ici).
 
     const anneau = divToken.querySelector(".token-anneau");
     if (anneau) {
@@ -1358,13 +1357,6 @@ window.positionnerTokenVTT = function(divToken, majEchelle) {
         const decalage = 8 * echelle;
         anneau.style.transform = `translate(0px, ${decalage}px)`;
     }
-
-    divToken.querySelectorAll(".token-shadow").forEach(sh => {
-        const decalageX = parseFloat(sh.dataset.tx) * echelle;
-        const decalageY = parseFloat(sh.dataset.ty) * echelle;
-        sh.style.transform = `translate(${decalageX}px, ${decalageY}px)`;
-        sh.style.filter = `brightness(0) blur(${parseFloat(sh.dataset.blur) * echelle}px) opacity(${sh.dataset.opacite})`;
-    });
 };
 
 let echelleTokensAppliquee = null;
@@ -1409,7 +1401,7 @@ window.appliquerTokensVTT = function(tokensMap) {
 
     for (let idPerso in tokensMap) {
         const data = tokensMap[idPerso];
-        const taille = data.taille || 80;
+        const taille = data.taille || 55;
 
         const divToken = document.createElement("div");
         divToken.className = "token-vtt";
@@ -1430,19 +1422,22 @@ window.appliquerTokensVTT = function(tokensMap) {
         divToken.style.borderRadius = "50%";
         divToken.id = "token-" + idPerso;
 
-        // 1️⃣ L'OMBRE PORTÉE AU SOL (Brouillard de base)
+        // 1️⃣ L'OMBRE PORTÉE AU SOL, sous les pieds du pion.
+        // Dégradé radial plutôt qu'un filtre "blur" : ce dernier doit être recalculé en pixels à
+        // chaque étape du zoom, ce qui laissait des résidus visuels sur iPad (Safari) pendant un
+        // pincement rapide. Un dégradé se redimensionne nativement avec l'élément, sans recalcul JS.
         const ombreSol = document.createElement("div");
         ombreSol.className = "token-ombre-sol";
         ombreSol.style.position = "absolute";
-        ombreSol.style.top = "50%";
+        ombreSol.style.top = "70%";
         ombreSol.style.left = "50%";
         ombreSol.style.transform = "translate(-50%, -50%)";
-        ombreSol.style.width = "60%";   
-        ombreSol.style.height = "60%";  
-        ombreSol.style.backgroundColor = "rgba(0, 0, 0, 0.85)"; 
+        ombreSol.style.width = "75%";
+        ombreSol.style.height = "28%";
         ombreSol.style.borderRadius = "50%";
-        ombreSol.style.filter = "blur(8px)"; 
-        ombreSol.style.zIndex = "-2"; 
+        ombreSol.style.background = "radial-gradient(ellipse at center, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0) 75%)";
+        ombreSol.style.zIndex = "-2";
+        ombreSol.style.pointerEvents = "none";
         divToken.appendChild(ombreSol);
 
         // 2️⃣ L'ANNEAU DORÉ DE SÉLECTION
@@ -1522,29 +1517,6 @@ window.appliquerTokensVTT = function(tokensMap) {
             window.afficherDansPanneauGauche(idPerso);
         };
 
-        // Les ombres directionnelles (Images Fantômes)
-        // Décalages et flous sont exprimés à l'échelle 1 : positionnerTokenVTT les convertit en pixels écran
-        const createShadow = (x, y, blur, opacity) => {
-            const sh = document.createElement("img");
-            sh.src = data.url;
-            sh.className = "token-shadow";
-            sh.dataset.tx = x; 
-            sh.dataset.ty = y;
-            sh.dataset.blur = blur;
-            sh.dataset.opacite = opacity;
-            sh.style.width = "100%";
-            sh.style.height = "100%";
-            sh.style.objectFit = "contain";
-            sh.style.position = "absolute";
-            sh.style.top = "0";
-            sh.style.left = "0";
-            sh.style.zIndex = "1";
-            sh.style.pointerEvents = "none";
-            return sh;
-        };
-
-        divToken.appendChild(createShadow(-2, 5, 4, 0.8));
-        divToken.appendChild(createShadow(-25, 35, 15, 0.65));
 
         // 4️⃣ L'IMAGE DU PION (Nette)
         const img = document.createElement("img");
@@ -2621,7 +2593,7 @@ window.spawnEnnemiTest = async function() {
             q: hexLibre.q,
             r: hexLibre.r,
             url: imgUrl,
-            taille: 80
+            taille: 55
         };
 
         await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {

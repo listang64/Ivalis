@@ -813,7 +813,9 @@ async function genererEtStockerTokenBackground(donnees, idPersonnage, urlPortrai
 
     const promptText = "A detailed photograph of a circular hand-carved high-relief wooden plaque medallion, featuring the character from the provided reference image " +
                        "rendered in meticulously sculpted detail. The figure emerges from the central field with deep undercuts for a powerful three-dimensional effect, " +
-                       "matching the pose and features of the reference character. The entire piece is crafted from a rich, medium-toned hardwood, like aged walnut, " +
+                       "matching the pose and features of the reference character. The character is fully contained within the medallion's central circular field, " +
+                       "never overflowing past its inner border. The outer rim of the medallion carries a fine, delicate thin line of gold gilding traced along its circular edge. " +
+                       "The entire piece is crafted from a rich, medium-toned hardwood, like aged walnut, " +
                        "with a tactile, oiled finish. Visible wood grain patterns and fine, authentic chisel marks are present across all surfaces. " +
                        "The figure's drapery and specific details (like jewelry or textures) are faithfully translated into sculpted wood forms, matching the depth " +
                        "and detail level of the reference. The background is a clean, isolated pure fluorescent magenta (#FF00FF), used as a chroma key backdrop, " +

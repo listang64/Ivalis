@@ -424,8 +424,6 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
     
     const imgMain = tokenDiv.querySelector(".token-img-main");
     if (imgMain) imgMain.style.transition = "transform 0.2s ease";
-    const shadows = tokenDiv.querySelectorAll(".token-shadow");
-    shadows.forEach(sh => sh.style.transition = "transform 0.2s ease");
 
     for (let i = 0; i < actionMouvement.path.length; i++) {
         let step = actionMouvement.path[i];
