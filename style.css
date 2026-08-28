@@ -154,6 +154,13 @@ body {
   z-index: 1;
 }
 
+/* Meme detection tactile que le JS (pas de souris = iPad/tactile) : image de menu dediee sur ces appareils */
+@media (hover: none) and (pointer: coarse) {
+  .bg-menu {
+    background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1787900056/IMG_2057_ez0wu9.png');
+  }
+}
+
 .brume-lointaine {
   background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781374953/brume_lointaine_gxbkar.png');
   background-repeat: repeat-x;
