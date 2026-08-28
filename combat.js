@@ -151,8 +151,19 @@ window.afficherPersoCombatActuel = function() {
         divNom.style.letterSpacing = "1px";
 
         document.getElementById("combat-liste-competences").innerHTML = "";
-        if (imgPerso) imgPerso.style.opacity = "0"; 
-        
+        if (imgPerso) {
+            imgPerso.style.opacity = "0";
+            imgPerso.style.height = "100%"; // Sinon reste figé à 40vh si "Repos Long" était affiché avant
+        }
+
+        // Le panneau "Repos Long" est un aperçu lié au personnage affiché : sans personnage, il ne
+        // doit plus rester visible (sinon il reste figé à l'écran, superposé au texte "Aucun héros lié").
+        const divReposVide = document.getElementById("apercu-repos-long-ui");
+        if (divReposVide) {
+            divReposVide.style.opacity = "0";
+            divReposVide.style.left = "50px";
+        }
+
         const jauges = document.getElementById("combat-jauges-container");
         if (jauges) jauges.style.opacity = "0";
         const divEtatsVide = document.getElementById("combat-etats-alteres");
@@ -2272,7 +2283,7 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
     if (!divRepos) {
         divRepos = document.createElement("div");
         divRepos.id = "apercu-repos-long-ui";
-        divRepos.style.cssText = "position: absolute; top: 4vh; left: 50px; width: 340px; height: 300px; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; opacity: 0; transition: opacity 0.3s ease, left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); pointer-events: none;";
+        divRepos.style.cssText = "position: absolute; top: 9vh; left: 50px; width: 340px; height: 300px; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; opacity: 0; transition: opacity 0.3s ease, left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); pointer-events: none;";
         divRepos.innerHTML = `
             <div style="font-size: 72px; filter: drop-shadow(0 0 20px rgba(194, 168, 120, 0.8)); animation: levitation 3s infinite alternate ease-in-out;">⏳</div>
             <div style="font-family: 'Cinzel', serif; font-size: 24px; font-weight: bold; color: #e8d5a5; text-shadow: 2px 2px 5px black; margin-top: 10px; text-transform: uppercase; letter-spacing: 2px;">Repos Long</div>
