@@ -1420,29 +1420,23 @@ window.appliquerTokensVTT = function(tokensMap) {
         ombreSol.style.pointerEvents = "none";
         divToken.appendChild(ombreSol);
 
-        // 2️⃣ LE HALO DE SÉLECTION : traits de lumière partant du centre du pion, chacun grandissant
-        // et rétrécissant indépendamment et aléatoirement. Reste contenu dans l'hexagone (longueur
-        // plafonnée à une fraction de la taille du pion). Purement en %/scale : aucune valeur n'est
-        // recalculée en JS pendant le zoom, donc aucun risque de décrochage (même piège que l'ancien anneau).
+        // 2️⃣ LE HALO DE SÉLECTION : couronne d'énergie qui épouse le bord du médaillon.
+        // Une nappe lumineuse diffuse + des filaments qui tournent à des vitesses et dans des sens
+        // différents (pointillés décalés) + des étincelles qui scintillent.
+        // Tout est vectoriel dans un viewBox : le halo suit le zoom nativement, et le flou est celui
+        // du SVG (en unités de viewBox), jamais un filtre CSS en pixels — donc aucun artefact iPad.
         if (window.TOKEN_SELECTIONNE === idPerso) {
             if (!document.getElementById("anim-halo-selection-vtt")) {
                 const styleHalo = document.createElement("style");
                 styleHalo.id = "anim-halo-selection-vtt";
-                // Plusieurs variantes d'amplitude tirées au hasard une seule fois au chargement :
-                // chaque trait pioche l'une d'elles, ce qui suffit à donner un mouvement désynchronisé.
-                let keyframesHalo = "";
-                for (let v = 0; v < 6; v++) {
-                    const mini = (0.35 + Math.random() * 0.15).toFixed(2);
-                    const maxi = (0.85 + Math.random() * 0.35).toFixed(2);
-                    keyframesHalo += `
-                        @keyframes pulsationTraitHalo${v} {
-                            0%   { transform: scaleY(${mini}); opacity: 0.2; }
-                            50%  { transform: scaleY(${maxi}); opacity: 0.9; }
-                            100% { transform: scaleY(${mini}); opacity: 0.2; }
-                        }
-                    `;
-                }
-                styleHalo.innerHTML = keyframesHalo;
+                styleHalo.innerHTML = `
+                    @keyframes haloTourne     { from { transform: rotate(0deg); }   to { transform: rotate(360deg); } }
+                    @keyframes haloTourneInv  { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+                    @keyframes haloRespire    { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.9; } }
+                    @keyframes haloScintille  { 0%, 100% { opacity: 0.1; } 50% { opacity: 1; } }
+                    /* L'origine des rotations est le centre du viewBox, pas la boite de l'element */
+                    .halo-couche { transform-box: view-box; transform-origin: 50px 50px; }
+                `;
                 document.head.appendChild(styleHalo);
             }
 
@@ -1455,42 +1449,65 @@ window.appliquerTokensVTT = function(tokensMap) {
             haloSelection.style.height = "100%";
             haloSelection.style.zIndex = "-1";
             haloSelection.style.pointerEvents = "none";
-            haloSelection.style.opacity = "0.6"; // Un halo volontairement discret ("très léger")
 
-            const nbTraits = 12;
-            for (let i = 0; i < nbTraits; i++) {
-                const angle = (360 / nbTraits) * i + (Math.random() * 12 - 6); // léger désordre naturel
-                // Le médaillon remplit presque tout le cadre : il faut dépasser ~50% pour être visible.
-                const longueur = 55 + Math.random() * 35; // % de la taille du pion : reste bien dans l'hexagone
-                const largeur = 2 + Math.random() * 2.5;
-                const variant = Math.floor(Math.random() * 6);
-                const duree = (1.3 + Math.random() * 1.8).toFixed(2);
-                const delai = (-Math.random() * 3).toFixed(2); // négatif : démarre déjà en cours de cycle
-
-                // Support statique : positionné par left/bottom (pas de translate%), pivote autour de son
-                // propre coin bas-centre, qui coïncide exactement avec le centre du pion. Ainsi la rotation
-                // ne déplace jamais la base du trait, quel que soit l'angle (contrairement à translate+rotate,
-                // où le décalage ne suit pas la rotation et envoyait chaque trait dans une direction fixe).
-                const support = document.createElement("div");
-                support.style.position = "absolute";
-                support.style.bottom = "50%";
-                support.style.left = `calc(50% - ${largeur / 2}%)`;
-                support.style.width = `${largeur}%`;
-                support.style.height = `${longueur}%`;
-                support.style.transformOrigin = "50% 100%";
-                support.style.transform = `rotate(${angle}deg)`;
-
-                const trait = document.createElement("div");
-                trait.style.width = "100%";
-                trait.style.height = "100%";
-                trait.style.borderRadius = "2px";
-                trait.style.transformOrigin = "50% 100%";
-                trait.style.background = "linear-gradient(to top, rgba(255,245,204,0.95) 0%, rgba(255,230,153,0.55) 45%, rgba(255,255,255,0) 100%)";
-                trait.style.animation = `pulsationTraitHalo${variant} ${duree}s ease-in-out ${delai}s infinite`;
-
-                support.appendChild(trait);
-                haloSelection.appendChild(support);
+            // Étincelles réparties sur le pourtour, chacune avec son propre rythme.
+            let etincellesSvg = "";
+            for (let e = 0; e < 9; e++) {
+                const rad = (Math.random() * 360) * Math.PI / 180;
+                const dist = 50 + Math.random() * 4;
+                const cx = (50 + dist * Math.cos(rad)).toFixed(1);
+                const cy = (50 + dist * Math.sin(rad)).toFixed(1);
+                const rayon = (0.5 + Math.random() * 0.9).toFixed(2);
+                const duree = (1.1 + Math.random() * 1.9).toFixed(2);
+                const delai = (-Math.random() * 3).toFixed(2);
+                etincellesSvg += `<circle cx="${cx}" cy="${cy}" r="${rayon}" fill="#fffaf0"
+                    filter="url(#halo-flou-vtt)" style="animation: haloScintille ${duree}s ease-in-out ${delai}s infinite;"/>`;
             }
+
+            haloSelection.innerHTML = `
+                <svg viewBox="0 0 100 100" width="100%" height="100%" style="overflow: visible;">
+                    <defs>
+                        <filter id="halo-flou-vtt" x="-60%" y="-60%" width="220%" height="220%">
+                            <feGaussianBlur stdDeviation="1.1"/>
+                        </filter>
+                        <filter id="halo-flou-large-vtt" x="-70%" y="-70%" width="240%" height="240%">
+                            <feGaussianBlur stdDeviation="4.5"/>
+                        </filter>
+                    </defs>
+
+                    <!-- Nappe de lumière diffuse qui déborde du bord du médaillon -->
+                    <circle cx="50" cy="50" r="49" fill="none" stroke="#ffdb94" stroke-width="6"
+                            filter="url(#halo-flou-large-vtt)"
+                            style="animation: haloRespire 3.4s ease-in-out infinite;"/>
+
+                    <!-- Filaments : pointillés décalés, vitesses et sens différents = tressage lumineux -->
+                    <g class="halo-couche" style="animation: haloTourne 7s linear infinite;">
+                        <circle cx="50" cy="50" r="50.5" fill="none" stroke="#fff6dc" stroke-width="1.2"
+                                stroke-linecap="round" stroke-dasharray="16 11 5 21 9 26"
+                                filter="url(#halo-flou-vtt)"/>
+                    </g>
+                    <g class="halo-couche" style="animation: haloTourneInv 11s linear infinite;">
+                        <circle cx="50" cy="50" r="48.5" fill="none" stroke="#ffe9b4" stroke-width="0.9"
+                                stroke-linecap="round" stroke-dasharray="9 17 22 8 13 19"
+                                filter="url(#halo-flou-vtt)"/>
+                    </g>
+                    <g class="halo-couche" style="animation: haloTourne 16s linear infinite;">
+                        <circle cx="50" cy="50" r="52" fill="none" stroke="#ffffff" stroke-width="0.6"
+                                stroke-linecap="round" stroke-dasharray="5 27 11 33 7 24"
+                                filter="url(#halo-flou-vtt)" opacity="0.85"/>
+                    </g>
+                    <g class="halo-couche" style="animation: haloTourneInv 5.5s linear infinite;">
+                        <circle cx="50" cy="50" r="47" fill="none" stroke="#ffd589" stroke-width="0.7"
+                                stroke-linecap="round" stroke-dasharray="7 23 14 29"
+                                filter="url(#halo-flou-vtt)" opacity="0.75"/>
+                    </g>
+
+                    <!-- Étincelles -->
+                    <g class="halo-couche" style="animation: haloTourne 26s linear infinite;">
+                        ${etincellesSvg}
+                    </g>
+                </svg>
+            `;
 
             divToken.appendChild(haloSelection);
         }
