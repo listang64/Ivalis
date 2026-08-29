@@ -1537,7 +1537,11 @@ window.appliquerTokensVTT = function(tokensMap) {
         ombreSol.style.height = "97%";
         ombreSol.style.borderRadius = "50%";
         // Coeur dense et opaque, puis long fondu vers les bords : donne le flou du contact sans filtre CSS.
-        ombreSol.style.background = "radial-gradient(circle at 50% 50%, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.8) 35%, rgba(0,0,0,0.55) 60%, rgba(0,0,0,0.28) 80%, rgba(0,0,0,0) 100%)";
+        // "closest-side" est indispensable ici : sans lui, un dégradé radial va par défaut jusqu'au
+        // coin le plus éloigné (bien au-delà du cercle visible découpé par border-radius), donc le
+        // fondu n'atteint jamais 0 avant d'être tronqué net par le border-radius. Avec closest-side,
+        // le dégradé est calé sur le bord du cercle réellement visible : le fondu se termine pile là.
+        ombreSol.style.background = "radial-gradient(circle closest-side at 50% 50%, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.7) 30%, rgba(0,0,0,0.45) 55%, rgba(0,0,0,0.18) 78%, rgba(0,0,0,0) 100%)";
         ombreSol.style.zIndex = "-2";
         ombreSol.style.pointerEvents = "none";
         divToken.appendChild(ombreSol);
