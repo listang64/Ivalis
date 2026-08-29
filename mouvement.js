@@ -435,22 +435,36 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
     window.ANIMATION_VTT_EN_COURS = true;
 
     tokenDiv.style.transition = "left 0.4s linear, top 0.4s linear";
-    
+
     const imgMain = tokenDiv.querySelector(".token-img-main");
-    if (imgMain) imgMain.style.transition = "transform 0.2s ease";
+    // Petit "bond" à chaque case : le pion grandit légèrement en s'élançant vers la case
+    // suivante, puis retombe (rétréci) pile au moment où il l'atteint. Purement cosmétique
+    // (sur l'image, pas le pion lui-même) : ça n'a aucun impact sur la position/le timing du
+    // déplacement, qui reste calé sur les mêmes 400ms par case qu'avant.
+    if (imgMain) imgMain.style.transition = "transform 0.15s ease-out";
 
     for (let i = 0; i < actionMouvement.path.length; i++) {
         let step = actionMouvement.path[i];
-        
+
+        if (imgMain) imgMain.style.transform = "scale(1.12)";
+
         // On met à jour la case de référence : le pion suit le zoom et le pan même en pleine marche
         tokenDiv.dataset.q = step.q;
         tokenDiv.dataset.r = step.r;
         window.positionnerTokenVTT(tokenDiv, true);
-        
-        await new Promise(r => setTimeout(r, 400));
+
+        await new Promise(r => setTimeout(r, 250));
+
+        if (imgMain) imgMain.style.transform = "scale(1)";
+
+        await new Promise(r => setTimeout(r, 150));
     }
-    
+
     tokenDiv.style.transition = "none";
+    if (imgMain) {
+        imgMain.style.transition = "none";
+        imgMain.style.transform = "";
+    }
     window.ANIMATION_VTT_EN_COURS = false;
     if (typeof window.appliquerTokensVTT === "function") {
         window.appliquerTokensVTT(window.TOKENS_VTT_DATA);

@@ -1299,14 +1299,27 @@ window.rafraichirForge = function() {
     const conteneurCarte = document.getElementById("forge-contenu-carte");
     conteneurCarte.innerHTML = "";
 
-    const renderSelectMenu = (type, label, color, actionId) => {
+    // Poussée est un déplacement forcé instantané : la Persistance de terrain, la Zone et la
+    // Durée étalement dégâts n'ont pas de sens dessus (pas de terrain modifié, pas de zone, pas
+    // d'étalement dans le temps). On grise ces mods (visibles, mais non sélectionnables) plutôt
+    // que de les cacher, pour que ce soit clair que le choix n'est pas ouvert.
+    const NOMS_INCOMPATIBLES_POUSSEE = ["persistance terrain", "zone", "durée étalement dégâts"];
+    const actionContientPoussee = (act) => {
+        if ((act.baseEffet.Nom || "").toLowerCase().includes("pouss")) return true;
+        return Object.keys(act.mods).some(modId => {
+            const m = window.forgeState.effetsBDD.find(e => e.id === modId);
+            return m && (m.Nom || "").toLowerCase().includes("pouss");
+        });
+    };
+
+    const renderSelectMenu = (type, label, color, actionId, estActionPoussee) => {
         if (type === "Physique" && window.forgeState.armePrincipale === "Magie") return "";
 
-        let modsDispos = window.forgeState.effetsBDD.filter(e => 
+        let modsDispos = window.forgeState.effetsBDD.filter(e =>
             (e.Type_Mecanique === type || e.Type_Mecanique_2 === type) && e.Nom !== "Durée +"
         );
         let options = `<option value="">+ ${label}</option>`;
-        
+
         let groupesMods = {};
 
         // 🔻 Sécurité pour bloquer les attaques dans les menus déroulants
@@ -1315,14 +1328,19 @@ window.rafraichirForge = function() {
         modsDispos.forEach(mod => {
             const isLocked = activeTags.size >= 2 && mod.Modificateur !== "AUCUN" && !activeTags.has(mod.Modificateur.toUpperCase());
             const isAttackLocked = aDejaUneAttaque && estUneAttaqueDeBase(mod.Nom);
-            
+
             if (!isLocked && !isAttackLocked) {
                 const carac = (mod.Modificateur && mod.Modificateur !== "AUCUN") ? mod.Modificateur.toUpperCase() : "GÉNÉRAL";
                 if (!groupesMods[carac]) groupesMods[carac] = [];
-                
+
                 // Calcul de la fatigue pour l'affichage
                 const coutFatigue = parseFrenchFloat(mod.Cout_PT) * 5;
-                groupesMods[carac].push(`<option value="${mod.id}">${mod.Nom} (⚡ ${coutFatigue})</option>`);
+                const estIncompatiblePoussee = estActionPoussee && NOMS_INCOMPATIBLES_POUSSEE.includes((mod.Nom || "").toLowerCase());
+                groupesMods[carac].push(
+                    estIncompatiblePoussee
+                        ? `<option value="${mod.id}" disabled style="color: #999;">${mod.Nom} (non compatible)</option>`
+                        : `<option value="${mod.id}">${mod.Nom} (⚡ ${coutFatigue})</option>`
+                );
             }
         });
 
@@ -1425,10 +1443,10 @@ window.rafraichirForge = function() {
                     ${htmlMods}
 
                     <div style="display: flex; gap: 15px; margin-left: 20px; margin-top: 12px; padding-top: 8px; border-top: 1px dashed rgba(0,0,0,0.1);">
-                        ${renderSelectMenu("Spatial", "Spatial", "#3b82f6", act.idInst)}
-                        ${renderSelectMenu("Physique", "Physique", "#ef4444", act.idInst)}
-                        ${renderSelectMenu("Magique", "Magique", "#a855f7", act.idInst)}
-                        ${renderSelectMenu("Duree", "Durée", "#9333ea", act.idInst)}
+                        ${renderSelectMenu("Spatial", "Spatial", "#3b82f6", act.idInst, actionContientPoussee(act))}
+                        ${renderSelectMenu("Physique", "Physique", "#ef4444", act.idInst, actionContientPoussee(act))}
+                        ${renderSelectMenu("Magique", "Magique", "#a855f7", act.idInst, actionContientPoussee(act))}
+                        ${renderSelectMenu("Duree", "Durée", "#9333ea", act.idInst, actionContientPoussee(act))}
                     </div>
                 </div>
             `;
