@@ -1550,6 +1550,8 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
 
              if (dataPartie.Action_Bond) window.DERNIER_ACTION_BOND = dataPartie.Action_Bond.timestamp;
 
+             if (dataPartie.Action_Poussee) window.DERNIER_ACTION_POUSSEE = dataPartie.Action_Poussee.timestamp;
+
              estPremierScanPartie = false;
          } else {
              if (dataPartie.Action_Des && dataPartie.Action_Des.timestamp !== window.DERNIER_JET_DES) {
@@ -1577,6 +1579,11 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
              if (dataPartie.Action_Bond && dataPartie.Action_Bond.timestamp !== window.DERNIER_ACTION_BOND) {
                  window.DERNIER_ACTION_BOND = dataPartie.Action_Bond.timestamp;
                  if (typeof window.jouerAnimationBond === "function") window.jouerAnimationBond(dataPartie.Action_Bond);
+             }
+             // Poussée : le jet et la case d'arrivée sont déjà tranchés par le lanceur, on rejoue juste l'animation
+             if (dataPartie.Action_Poussee && dataPartie.Action_Poussee.timestamp !== window.DERNIER_ACTION_POUSSEE) {
+                 window.DERNIER_ACTION_POUSSEE = dataPartie.Action_Poussee.timestamp;
+                 if (typeof window.jouerAnimationPoussee === "function") window.jouerAnimationPoussee(dataPartie.Action_Poussee);
              }
          }
      }

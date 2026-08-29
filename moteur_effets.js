@@ -308,6 +308,82 @@ window.resoudreBondInteractif = function(idPerso, portee) {
     });
 };
 
+// =========================================================================
+//  POUSSÉE
+//  Déplacement forcé de 2 cases en ligne droite depuis le lanceur, à travers la cible.
+//  La chance est extraite dans demarrerCiblage ; le jet lui-même est fait UNE SEULE FOIS,
+//  par le lanceur uniquement (voir l'appel dans jouerAnimationMoteur), puis diffusé via
+//  Action_Poussee (même principe que le Bond) pour que tous les joueurs voient le même
+//  résultat plutôt que de rejouer chacun leur propre jet. Bloquée par un mur, une case
+//  supprimée ou une case occupée : la poussée s'arrête alors à la dernière case libre (1
+//  case), ou ne bouge pas du tout si la première l'est déjà. Ne déclenche jamais d'attaque
+//  d'opportunité (déplacement subi, pas un mouvement volontaire du joueur).
+// =========================================================================
+window.declencherPousseeCible = async function(idLanceur, idCible) {
+    const tkLanceur = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idLanceur] : null;
+    const tkCible = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idCible] : null;
+    if (!tkLanceur || !tkCible || !window.PLATEAU_VTT || !window.ID_PARTIE_COURANTE) return;
+
+    const dist = getHexDistance(tkLanceur, tkCible);
+    if (dist === 0) return;
+
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const cubeRound = (q, r, s) => {
+        let rq = Math.round(q), rr = Math.round(r), rs = Math.round(s);
+        let qd = Math.abs(rq - q), rd = Math.abs(rr - r), sd = Math.abs(rs - s);
+        if (qd > rd && qd > sd) rq = -rr - rs;
+        else if (rd > sd) rr = -rq - rs;
+        return { q: rq, r: rr };
+    };
+    const aCube = { q: tkLanceur.q + 1e-6, r: tkLanceur.r + 1e-6, s: -tkLanceur.q - tkLanceur.r - 2e-6 };
+    const bCube = { q: tkCible.q + 1e-6, r: tkCible.r + 1e-6, s: -tkCible.q - tkCible.r - 2e-6 };
+
+    // Bloquée par un mur, une case supprimée, OU une case occupée (règle demandée pour la
+    // Poussée : contrairement au Bond, on ne survole pas les personnages ni les cases rouges).
+    const estLibre = (q, r) => {
+        const state = window.PLATEAU_VTT.getCaseState(q, r);
+        if (state.isBlocked || state.isDeleted) return false;
+        for (let idAutre in window.TOKENS_VTT_DATA) {
+            if (idAutre === idCible) continue;
+            const autre = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idAutre);
+            if (!autre || autre.statut === "Mort") continue;
+            const tkAutre = window.TOKENS_VTT_DATA[idAutre];
+            if (tkAutre.q === q && tkAutre.r === r) return false;
+        }
+        return true;
+    };
+
+    const hexDepart = { q: tkCible.q, r: tkCible.r };
+    let arrivee = null;
+    for (let i = 1; i <= 2; i++) {
+        const t = (dist + i) / dist;
+        const pt = cubeRound(lerp(aCube.q, bCube.q, t), lerp(aCube.r, bCube.r, t), lerp(aCube.s, bCube.s, t));
+        if (!estLibre(pt.q, pt.r)) break;
+        arrivee = pt;
+    }
+
+    if (!arrivee) {
+        if (typeof window.afficherMessageFlottantHex === "function") {
+            window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Poussée (bloquée)", "#aaaaaa");
+        }
+        return;
+    }
+
+    window.TOKENS_VTT_DATA[idCible].q = arrivee.q;
+    window.TOKENS_VTT_DATA[idCible].r = arrivee.r;
+
+    try {
+        await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
+            Action_Poussee: { idToken: idCible, depart: hexDepart, arrivee: arrivee, timestamp: Date.now() }
+        });
+        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
+            Tokens: window.TOKENS_VTT_DATA
+        }, { merge: true });
+    } catch (err) {
+        console.error("Erreur Poussée :", err);
+    }
+};
+
 function rotateHex(hex, steps) {
     let q = hex.q, r = hex.r;
     for(let i = 0; i < steps; i++) {
@@ -644,6 +720,44 @@ window.demarrerCiblage = async function(idCarte) {
                     isRanged: isRanged,
                     rangeMax: rangeMax,
                     cibles: []
+                });
+            }
+
+            // 🔻 NOUVEAU : DÉTECTION POUSSÉE 🔻
+            // Chance de repousser la cible de 2 cases en ligne droite depuis le lanceur. Pas un état
+            // persistant (aucune entrée dans Etats_Alteres) : résolue et animée à part dans
+            // jouerAnimationMoteur / declencherPousseeCible, avec sa propre diffusion (comme le Bond)
+            // pour que tous les joueurs voient le même résultat.
+            let isPoussee = false;
+            let pousseeChance = 0;
+
+            if (nomLower.includes("pouss")) {
+                isPoussee = true;
+                pousseeChance += (parseFrFloat(effBase.Pourcent_Base) || 0) * (act.count || 1);
+            }
+
+            listeMods.forEach(m => {
+                const modEff = window.EFFETS_BDD_CACHE[m.id];
+                if (modEff && (modEff.Nom || "").toLowerCase().includes("pouss")) {
+                    isPoussee = true;
+                    pousseeChance += (parseFrFloat(modEff.Pourcent_Base) || 0) * m.count;
+                }
+            });
+
+            if (isPoussee) {
+                if (pousseeChance > 50) pousseeChance = 50; // Cap à 50%
+
+                if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
+                alterationsExtraites.push({
+                    nom: "Poussée",
+                    icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png",
+                    desc: `${pousseeChance}% de chance de repousser la cible de 2 cases en ligne droite.`,
+                    chance: pousseeChance,
+                    duree: 0, // Instantané : jamais ajouté à Etats_Alteres
+                    isRanged: isRanged,
+                    rangeMax: rangeMax,
+                    cibles: [],
+                    estPoussee: true
                 });
             }
 
@@ -1645,9 +1759,25 @@ window.jouerAnimationMoteur = async function(action) {
             let nouveauxEtats = cData.Etats_Alteres ? [...cData.Etats_Alteres] : [];
 
             for (let alt of action.alterations) {
+                // Poussée : pas un état persistant. Le jet et le déplacement ne sont faits qu'une
+                // seule fois, par le lanceur, puis diffusés (Action_Poussee) pour que tous les
+                // joueurs voient le même résultat — les autres clients ne font rien ici.
+                if (alt.estPoussee) {
+                    const currentUserIdPoussee = localStorage.getItem("ID_JOUEUR_COURANT");
+                    const lDataPoussee = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
+                    if (lDataPoussee && lDataPoussee.idJoueur === currentUserIdPoussee) {
+                        const rollPoussee = Math.floor(Math.random() * 100) + 1;
+                        console.log(`🎲 Jet de Poussée sur ${cData.nom} : Résultat ${rollPoussee} (Chance: ${alt.chance}%)`);
+                        if (rollPoussee <= alt.chance && typeof window.declencherPousseeCible === "function") {
+                            await window.declencherPousseeCible(lanceur, idCible);
+                        }
+                    }
+                    continue;
+                }
+
                 let roll = Math.floor(Math.random() * 100) + 1;
                 console.log(`🎲 Jet d'application [${alt.nom}] sur ${cData.nom} : Résultat ${roll} (Chance: ${alt.chance}%)`);
-                
+
                 if (roll <= alt.chance) {
                     let existing = nouveauxEtats.find(e => e.nom === alt.nom);
                     if (existing) {
