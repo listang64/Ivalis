@@ -366,7 +366,14 @@ window.validerMouvement = async function() {
     let nvlFatigue = persoActuel.fatigueActuelle - window.MOUVEMENT_COUT_TOTAL;
     persoActuel.fatigueActuelle = nvlFatigue;
     window.COMBAT_FATIGUE_ACTUELLE = nvlFatigue;
-    
+
+    // COMBAT_PERSOS_JOUEUR et PERSOS_PARTIE sont deux copies distinctes du même personnage :
+    // sans cette synchronisation, afficherPersoCombatActuel() (via chargerCompetencesCombat)
+    // relit l'ancienne fatigue depuis PERSOS_PARTIE juste après et écrase la jauge, donnant
+    // l'impression que le déplacement n'a rien coûté.
+    const persoPartie = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === persoActuel.idPersonnage);
+    if (persoPartie) persoPartie.fatigueActuelle = nvlFatigue;
+
     // 🔻 NOUVEAU : Désélection automatique de la carte si on n'a plus l'énergie après avoir marché 🔻
     if (window.COUT_COMPETENCE_SELECTIONNEE > 0 && window.COUT_COMPETENCE_SELECTIONNEE > nvlFatigue) {
         window.COUT_COMPETENCE_SELECTIONNEE = 0;
