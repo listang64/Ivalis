@@ -836,18 +836,19 @@ async function genererEtStockerTokenBackground(donnees, idPersonnage, urlPortrai
         return false;
     }
 
-    const promptText = "A detailed photograph of a circular hand-carved high-relief wooden plaque medallion, featuring the character from the provided reference image " +
-                       "rendered in meticulously sculpted detail. The figure emerges from the central field with deep undercuts for a powerful three-dimensional effect, " +
-                       "matching the pose and features of the reference character. The character is fully contained within the medallion's central circular field, " +
-                       "never overflowing past its inner border. The outer rim of the medallion carries a fine, delicate thin line of gold gilding traced along its circular edge. " +
+    const promptText = "A detailed photograph of a circular hand-carved high-relief wooden plaque medallion, featuring only the head of the character from the provided " +
+                       "reference image — a close-up head shot, not the bust or full body — rendered in meticulously sculpted detail. The head emerges from the " +
+                       "central field with deep undercuts for a powerful three-dimensional effect, matching the exact facial features, head shape and any " +
+                       "head-attached details (horns, ears, hair, headwear) of the reference character. The head is fully contained within the medallion's central " +
+                       "circular field, filling it closely, never overflowing past its inner border. The outer rim of the medallion carries a fine, delicate thin line of gold gilding traced along its circular edge. " +
                        "The entire piece is crafted from a rich, medium-toned hardwood, like aged walnut, " +
                        "with a tactile, oiled finish. Visible wood grain patterns and fine, authentic chisel marks are present across all surfaces. " +
-                       "The figure's drapery and specific details (like jewelry or textures) are faithfully translated into sculpted wood forms, matching the depth " +
+                       "The head's hair, headwear and specific details (like jewelry or facial textures) are faithfully translated into sculpted wood forms, matching the depth " +
                        "and detail level of the reference. The background is a clean, isolated pure fluorescent magenta (#FF00FF), used as a chroma key backdrop, " +
                        "with absolutely no cast shadows or drop shadows. " +
                        "The lighting is precise, studio-quality, enhancing the forms and textures, identical in quality to the reference image. " +
                        "The image must be in a perfectly square format, with the medallion token scaled as large as possible while leaving a small margin from the edges. " +
-                       "The entire medallion, including any protruding details such as tails, limbs or weapons, must be fully visible inside the frame — " +
+                       "The entire medallion, including any protruding details such as horns, ears or headwear, must be fully visible inside the frame — " +
                        "nothing may be cropped or cut off by the image border.";
 
     // input_fidelity est ignoré par gpt-image-2 (déjà haute fidélité) mais indispensable aux modèles précédents.
