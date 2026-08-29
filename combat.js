@@ -1541,7 +1541,9 @@ window.appliquerTokensVTT = function(tokensMap) {
         // coin le plus éloigné (bien au-delà du cercle visible découpé par border-radius), donc le
         // fondu n'atteint jamais 0 avant d'être tronqué net par le border-radius. Avec closest-side,
         // le dégradé est calé sur le bord du cercle réellement visible : le fondu se termine pile là.
-        ombreSol.style.background = "radial-gradient(circle closest-side at 50% 50%, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.7) 30%, rgba(0,0,0,0.45) 55%, rgba(0,0,0,0.18) 78%, rgba(0,0,0,0) 100%)";
+        // Les mêmes paliers de noir qu'avant (même intensité, même étendue visible), juste compressés
+        // pour que le tout dernier tronçon retombe à 0 exactement au bord, au lieu d'être coupé net.
+        ombreSol.style.background = "radial-gradient(circle closest-side at 50% 50%, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.8) 35%, rgba(0,0,0,0.55) 62%, rgba(0,0,0,0.3) 85%, rgba(0,0,0,0) 100%)";
         ombreSol.style.zIndex = "-2";
         ombreSol.style.pointerEvents = "none";
         divToken.appendChild(ombreSol);
