@@ -172,12 +172,13 @@ window.resoudreBondInteractif = function(idPerso, portee) {
         const tkDepart = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idPerso] : null;
         if (!tkDepart || !window.PLATEAU_VTT) return resolve(false);
 
-        // Immobilisation bloque tout mouvement volontaire, y compris le Bond (mais pas les
-        // déplacements subis comme Poussée/Traction/Peur).
+        // Immobilisation et Paralysie bloquent tout mouvement volontaire, y compris le Bond
+        // (mais pas les déplacements subis comme Poussée/Traction/Peur).
         const lanceurBond = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPerso);
-        if (lanceurBond && lanceurBond.Etats_Alteres && lanceurBond.Etats_Alteres.some(e => e.nom === "Immobilisation")) {
+        if (lanceurBond && lanceurBond.Etats_Alteres && lanceurBond.Etats_Alteres.some(e => e.nom === "Immobilisation" || e.nom === "Paralysie")) {
+            const estParalyseBond = lanceurBond.Etats_Alteres.some(e => e.nom === "Paralysie");
             if (typeof window.afficherMessageFlottantHex === "function") {
-                window.afficherMessageFlottantHex(tkDepart.q, tkDepart.r, "Immobilisé !", "#aaaaaa");
+                window.afficherMessageFlottantHex(tkDepart.q, tkDepart.r, estParalyseBond ? "Paralysé !" : "Immobilisé !", "#aaaaaa");
             }
             return resolve(false);
         }
@@ -935,6 +936,21 @@ window.demarrerCiblage = async function(idCarte) {
     const dataCarte = window.COMPETENCES_CACHE[idCarte];
     if (!dataCarte) return;
 
+    // 🔻 NOUVEAU : PARALYSIE 🔻
+    // Empêche tout mouvement ET toute compétence : on intercepte ici, avant même le ciblage, le
+    // personnage paralysé perd quand même la fatigue prévue de la carte (comme s'il l'avait
+    // jouée), mais aucun de ses effets ne se déclenche jamais — on réutilise directement
+    // validerCarteCombat (déduction de fatigue + fin de tour), sans jamais construire d'action.
+    const casterParalyse = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+    if (casterParalyse && casterParalyse.Etats_Alteres && casterParalyse.Etats_Alteres.some(e => e.nom === "Paralysie")) {
+        const tkCaster = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[casterParalyse.idPersonnage] : null;
+        if (tkCaster && typeof window.afficherMessageFlottantHex === "function") {
+            window.afficherMessageFlottantHex(tkCaster.q, tkCaster.r, "Paralysé !", "#aaaaaa");
+        }
+        window.validerCarteCombat(idCarte, document.getElementById("btn-appliquer-carte"));
+        return;
+    }
+
     // DEBUG POUR NICO (Pour comprendre la structure si ça rate un jour)
     console.log("=== STRUCTURE DE LA CARTE ===", JSON.parse(JSON.stringify(dataCarte)));
 
@@ -1199,6 +1215,26 @@ window.demarrerCiblage = async function(idCarte) {
                     desc: "20% de s'infliger sa propre compétence, 20% de cibler au hasard à portée, 10% de dissiper la confusion.",
                     chance: confusionChance,
                     duree: confusionDuree,
+                    isRanged: isRanged,
+                    rangeMax: rangeMax,
+                    cibles: []
+                });
+            }
+
+            // 🔻 NOUVEAU : DÉTECTION PARALYSIE 🔻
+            // Contrairement aux autres états, pas de jet de pourcentage : elle s'applique
+            // automatiquement dès que la cible est touchée (chance fixée à 100, la cible garde
+            // quand même sa chance d'esquive/parade normale, gérée en amont comme pour tous les
+            // autres effets). Durée fixe de 4 tours, jamais prolongeable par Durée+ (bouton
+            // masqué en Forge, comme pour Immobilisation).
+            if (nomLower.includes("paralys")) {
+                if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
+                alterationsExtraites.push({
+                    nom: "Paralysie",
+                    icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788088220/IMG_2081_p5xenm.png",
+                    desc: "Empêche tout mouvement volontaire et toute compétence pendant 4 tours (la fatigue de la carte tentée est quand même perdue).",
+                    chance: 100,
+                    duree: 4,
                     isRanged: isRanged,
                     rangeMax: rangeMax,
                     cibles: []

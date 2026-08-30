@@ -1055,15 +1055,17 @@ document.addEventListener("click", async function(event) {
             !queue[0].aFaitSonMouvement
         );
 
-        // Immobilisation bloque tout déplacement volontaire (mais pas les déplacements subis
-        // comme Poussée/Traction/Peur, qui ne passent pas par ce clic de tracé de chemin).
+        // Immobilisation et Paralysie bloquent tout déplacement volontaire (mais pas les
+        // déplacements subis comme Poussée/Traction/Peur, qui ne passent pas par ce clic de
+        // tracé de chemin).
         const estImmobilise = persoSelectionne && persoSelectionne.Etats_Alteres
-            && persoSelectionne.Etats_Alteres.some(e => e.nom === "Immobilisation");
+            && persoSelectionne.Etats_Alteres.some(e => e.nom === "Immobilisation" || e.nom === "Paralysie");
 
         if (estMonTour && estImmobilise && !window.VTT_MODE_DEPLACEMENT) {
             const tk = window.TOKENS_VTT_DATA[window.TOKEN_SELECTIONNE];
+            const estParalyse = persoSelectionne.Etats_Alteres.some(e => e.nom === "Paralysie");
             if (tk && typeof window.afficherMessageFlottantHex === "function") {
-                window.afficherMessageFlottantHex(tk.q, tk.r, "Immobilisé !", "#aaaaaa");
+                window.afficherMessageFlottantHex(tk.q, tk.r, estParalyse ? "Paralysé !" : "Immobilisé !", "#aaaaaa");
             }
             return;
         }
