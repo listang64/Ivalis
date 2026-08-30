@@ -989,6 +989,13 @@ window.demarrerCiblage = async function(idCarte) {
         });
     };
 
+    // Même principe que estEtatEtourdi, pour l'état Confusion.
+    const estEtatConfusion = (eff) => {
+        if (!eff) return false;
+        const champs = [eff.Nom, eff.Cible_Etat, eff.Type_Mecanique, eff.Type_Mecanique_2];
+        return champs.some(v => (v || "").toLowerCase().includes("confus"));
+    };
+
     if (dataCarte.Composants && dataCarte.Composants.actions) {
         dataCarte.Composants.actions.forEach((act, idxAction) => {
             if (act.zoneHexes && act.zoneHexes.length > 0) {
@@ -1145,6 +1152,53 @@ window.demarrerCiblage = async function(idCarte) {
                     desc: "Ne peut plus se déplacer volontairement, gagne 20 fatigue par tour immobilisé.",
                     chance: immobilisationChance,
                     duree: 2, // Fixe, jamais modifiable par un bonus de durée
+                    isRanged: isRanged,
+                    rangeMax: rangeMax,
+                    cibles: []
+                });
+            }
+
+            // 🔻 NOUVEAU : DÉTECTION CONFUSION 🔻
+            // État persistant classique (comme Étourdi), avec le même bonus de durée standard
+            // (act.baseDuree/modsDuree, +1 par Durée+). Ici on ne fait que détecter l'effet et
+            // calculer sa chance/durée : le jet "auto-cible / cible au hasard / dissipée" se joue
+            // une seule fois pour toute la carte au moment de la résoudre (voir declencherResolution).
+            let isConfusion = false;
+            let confusionChance = 0;
+            let confusionDuree = 0;
+
+            if (estEtatConfusion(effBase)) {
+                isConfusion = true;
+                confusionChance += parseFrFloat(effBase.Pourcent_Base) * (act.count || 1);
+                const bonus = parseFrFloat(act.baseDuree);
+                const d = parseFrFloat(effBase.Tours) + bonus;
+                if (d > confusionDuree) confusionDuree = d;
+            }
+
+            listeMods.forEach(m => {
+                const modEff = window.EFFETS_BDD_CACHE[m.id];
+                if (!estEtatConfusion(modEff)) return;
+
+                isConfusion = true;
+                const baseChance = parseFrFloat(modEff.Pourcent_Base) || parseFrFloat(modEff.Pourcent_Max);
+                confusionChance += baseChance * m.count;
+
+                const bonus = parseFrFloat(modsDuree[m.id]);
+                const d = parseFrFloat(modEff.Tours) + bonus;
+                if (d > confusionDuree) confusionDuree = d;
+            });
+
+            if (isConfusion) {
+                if (confusionChance > 40) confusionChance = 40; // Cap à 40%
+                if (confusionDuree <= 0) confusionDuree = 2; // Sécurité si la BDD n'a pas de durée
+
+                if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
+                alterationsExtraites.push({
+                    nom: "Confusion",
+                    icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788081823/IMG_2078_mi79mz.png",
+                    desc: "20% de s'infliger sa propre compétence, 20% de cibler au hasard à portée, 10% de dissiper la confusion.",
+                    chance: confusionChance,
+                    duree: confusionDuree,
                     isRanged: isRanged,
                     rangeMax: rangeMax,
                     cibles: []
@@ -1848,15 +1902,80 @@ window.declencherResolution = async function() {
     const bulleZone = document.getElementById("bulle-validation-zone");
     if (bulleZone) bulleZone.style.display = "none";
 
+    const idLanceur = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
+
+    // 🔻 NOUVEAU : CONFUSION — jet unique pour toute la carte, au moment de la jouer 🔻
+    // Le lanceur confus a 20% de s'infliger sa propre compétence, 20% de la lancer sur une cible
+    // au hasard à portée (alliés ET ennemis), 10% de dissiper la confusion (carte normale), sinon
+    // (50%) rien ne change. Les effets de déplacement forcé (Poussée/Traction/Peur) sur soi-même
+    // n'ont pas de sens (distance nulle) : on les neutralise plutôt que de les rediriger sur soi.
+    let confusionResultat = null;
+    let isZoneFinal = state.isZone;
+    const lanceurDataConf = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
+    const estConfus = lanceurDataConf && (lanceurDataConf.Etats_Alteres || []).some(e => e.nom === "Confusion");
+
+    if (estConfus) {
+        const rollConf = Math.floor(Math.random() * 100) + 1;
+        const carteAUneAttaque = (state.attaques || []).length > 0;
+
+        const redirigerVersSoi = () => {
+            state.attaques.forEach(a => a.cibles = [idLanceur]);
+            state.alterations.forEach(alt => {
+                alt.cibles = (alt.estPoussee || alt.estTraction || alt.estPeur) ? [] : [idLanceur];
+            });
+            isZoneFinal = false;
+        };
+
+        if (rollConf <= 20 || (rollConf <= 40 && !carteAUneAttaque)) {
+            redirigerVersSoi();
+            confusionResultat = { type: "auto" };
+        } else if (rollConf <= 40) {
+            const configSortConf = state.attaques[0] || state.alterations[0];
+            const tkLanceurConf = window.TOKENS_VTT_DATA[idLanceur];
+            const porteeConf = Math.max((configSortConf && configSortConf.rangeMax) || 1, state.porteeMinTraction || 0);
+            const carteEstAttaqueSimpleConf = configSortConf && !configSortConf.isHeal && !configSortConf.isShield
+                && (state.alterations || []).length === 0;
+
+            const ciblesPossibles = Object.keys(window.TOKENS_VTT_DATA).filter(id => {
+                if (id === idLanceur) return false;
+                const d = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === id);
+                if (!d || d.statut === "Mort") return false;
+                if (d.estIllusion && !carteEstAttaqueSimpleConf) return false;
+                const tk = window.TOKENS_VTT_DATA[id];
+                if (!tk || getHexDistance(tkLanceurConf, tk) > porteeConf) return false;
+                if (!verifierLigneDeVue(tkLanceurConf, tk)) return false;
+                return true;
+            });
+
+            if (ciblesPossibles.length === 0) {
+                redirigerVersSoi();
+                confusionResultat = { type: "auto" };
+            } else {
+                const idCibleHasard = ciblesPossibles[Math.floor(Math.random() * ciblesPossibles.length)];
+                state.attaques.forEach(a => a.cibles = [idCibleHasard]);
+                state.alterations.forEach(alt => alt.cibles = [idCibleHasard]);
+                isZoneFinal = false;
+                confusionResultat = { type: "aleatoire", idCible: idCibleHasard };
+            }
+        } else if (rollConf <= 50) {
+            const nouveauxEtatsConf = (lanceurDataConf.Etats_Alteres || []).filter(e => e.nom !== "Confusion");
+            lanceurDataConf.Etats_Alteres = nouveauxEtatsConf;
+            await updateDoc(doc(db, "Personnages", idLanceur), { Etats_Alteres: nouveauxEtatsConf }).catch(e => console.error(e));
+            confusionResultat = { type: "annulee" };
+        }
+        // 51-100 : comportement normal, la carte se résout comme choisi par le joueur.
+    }
+
     const actionData = {
         type: "ATTAQUES",
-        idLanceur: window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage,
+        idLanceur,
         idCarte: state.idCarte,
         attaques: state.attaques,
         alterations: state.alterations,
-        isZone: state.isZone,
+        isZone: isZoneFinal,
         zoneCenterHex: state.zoneCenterHex,
         tractionAvantAttaque: state.tractionAvantAttaque || false,
+        confusion: confusionResultat,
         timestamp: new Date().getTime()
     };
 
@@ -1897,7 +2016,20 @@ window.jouerAnimationMoteur = async function(action) {
     const lanceur = action.idLanceur;
     const tkLanceur = window.TOKENS_VTT_DATA[lanceur];
     const lanceurData = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
-    
+
+    // 🔻 NOUVEAU : message de confusion, affiché à tous avant que la carte (déjà redirigée
+    // côté Firestore par declencherResolution) ne se résolve, pour que la redirection soit lisible.
+    if (action.confusion && tkLanceur) {
+        let msgConf = "", couleurConf = "#ffaa00";
+        if (action.confusion.type === "auto") msgConf = "Confus : s'inflige sa propre compétence !";
+        else if (action.confusion.type === "aleatoire") msgConf = "Confus : cible au hasard !";
+        else if (action.confusion.type === "annulee") { msgConf = "Confusion dissipée !"; couleurConf = "#33cc66"; }
+        if (msgConf) {
+            window.afficherMessageFlottantHex(tkLanceur.q, tkLanceur.r, msgConf, couleurConf);
+            await new Promise(r => setTimeout(r, 1200));
+        }
+    }
+
     // 🔻 NOUVEAU : Jet d'Échec si le Lanceur est Étourdi 🔻
     let attaqueRatee = false;
     if (lanceurData && lanceurData.Etats_Alteres && lanceurData.Etats_Alteres.some(e => e.nom === "Étourdi")) {
