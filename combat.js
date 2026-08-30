@@ -180,21 +180,37 @@ window.afficherPersoCombatActuel = function() {
     const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
     const prenom = persoActuel.prenom || "";
     const nom = persoActuel.nom || "";
-    
-    divNom.innerText = (prenom + " " + nom).trim();
+    const nomComplet = (prenom + " " + nom).trim();
+
+    divNom.innerText = nomComplet;
 
     if (!document.getElementById("combat-etats-alteres")) {
         const divEtats = document.createElement("div");
         divEtats.id = "combat-etats-alteres";
         divNom.parentElement.parentElement.insertBefore(divEtats, divNom.parentElement.nextSibling);
     }
-    
-    // On restaure l'effet doré et la taille normale, au cas où "Aucun héros" les aurait modifiés
+
+    // On restaure l'effet doré, au cas où "Aucun héros" l'aurait modifié
     divNom.style.background = "linear-gradient(135deg, #fbf5bd 0%, #c2a878 25%, #5c3a21 50%, #e8d5a5 75%, #ffffff 100%)";
     divNom.style.webkitBackgroundClip = "text";
     divNom.style.webkitTextFillColor = "transparent";
-    divNom.style.fontSize = "46px";
-    divNom.style.letterSpacing = "3px";
+
+    // Taille et espacement des lettres réduits pour les noms longs (ex: "Illusion de X") : sinon
+    // le texte se tronque avec "..." (white-space: nowrap + text-overflow: ellipsis sur ce bloc).
+    const longueur = nomComplet.length;
+    if (longueur > 26) {
+        divNom.style.fontSize = "22px";
+        divNom.style.letterSpacing = "0.5px";
+    } else if (longueur > 20) {
+        divNom.style.fontSize = "28px";
+        divNom.style.letterSpacing = "1px";
+    } else if (longueur > 14) {
+        divNom.style.fontSize = "36px";
+        divNom.style.letterSpacing = "2px";
+    } else {
+        divNom.style.fontSize = "46px";
+        divNom.style.letterSpacing = "3px";
+    }
 
     if (imgPerso) {
         if (persoActuel.urlCloudinary && persoActuel.urlCloudinary !== "") {
