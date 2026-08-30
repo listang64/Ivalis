@@ -345,16 +345,30 @@ window.validerMouvement = async function() {
     const idPerso = window.TOKEN_SELECTIONNE;
     const finalStep = window.CHEMIN_MOUVEMENT[window.CHEMIN_MOUVEMENT.length - 1];
 
-    // ATTAQUES D'OPPORTUNITÉ : on compare le contact (adversaires au corps-à-corps) avant/après,
-    // calculé ICI avant toute mutation de position, pour comparer les deux états proprement.
+    // Les pions ne pivotent plus jamais : le chemin ne porte plus que les coordonnées de chaque étape.
+    let pathAvecAngles = window.CHEMIN_MOUVEMENT.map(step => ({ q: step.q, r: step.r }));
+
+    // ATTAQUES D'OPPORTUNITÉ : on suit le contact adversaire (corps-à-corps) case par case le
+    // long du trajet, pas juste avant/après le déplacement entier, pour savoir PRÉCISÉMENT à
+    // quelle étape chaque ennemi est quitté. Le jet et les dégâts sont tranchés ici (une seule
+    // fois, avant même d'écrire le déplacement) et embarqués dans Action_Mouvement : l'animation
+    // pourra alors marquer une vraie pause à cet endroit chez tous les joueurs, au lieu de jouer
+    // l'attaque après coup une fois le déplacement terminé.
     const hexDepart = { q: window.TOKENS_VTT_DATA[idPerso].q, r: window.TOKENS_VTT_DATA[idPerso].r };
-    const ennemisAvant = typeof window.listerEnnemisAuContact === "function"
-        ? window.listerEnnemisAuContact(idPerso, hexDepart)
-        : [];
-    const ennemisApres = typeof window.listerEnnemisAuContact === "function"
-        ? window.listerEnnemisAuContact(idPerso, finalStep)
-        : [];
-    const ennemisQuittes = ennemisAvant.filter(id => !ennemisApres.includes(id));
+    const opportunitesResolues = [];
+    if (typeof window.listerEnnemisAuContact === "function" && typeof window.resoudreAttaqueOpportunite === "function") {
+        let contactPrecedent = new Set(window.listerEnnemisAuContact(idPerso, hexDepart));
+        for (let i = 0; i < pathAvecAngles.length; i++) {
+            const contactActuel = new Set(window.listerEnnemisAuContact(idPerso, pathAvecAngles[i]));
+            for (const idEnnemi of contactPrecedent) {
+                if (!contactActuel.has(idEnnemi)) {
+                    const resultat = await window.resoudreAttaqueOpportunite(idEnnemi, idPerso);
+                    if (resultat) opportunitesResolues.push({ apresEtape: i, ...resultat });
+                }
+            }
+            contactPrecedent = contactActuel;
+        }
+    }
 
     const bulle = document.getElementById("bulle-validation-mouvement");
     if (bulle) bulle.style.display = "none";
@@ -385,13 +399,10 @@ window.validerMouvement = async function() {
     // Rafraîchit toute la fiche du perso
     if (typeof window.afficherPersoCombatActuel === "function") window.afficherPersoCombatActuel();
 
-    // Les pions ne pivotent plus jamais : le chemin ne porte plus que les coordonnées de chaque étape.
-    let pathAvecAngles = window.CHEMIN_MOUVEMENT.map(step => ({ q: step.q, r: step.r }));
-
     try {
         const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
         const snap = await getDoc(partieRef);
-        
+
         let file = snap.data().File_Attente_Combat || [];
         if (file.length > 0 && file[0].idPersonnage === idPerso) {
             file[0].aFaitSonMouvement = true;
@@ -405,13 +416,14 @@ window.validerMouvement = async function() {
             Action_Mouvement: {
                 idToken: idPerso,
                 path: pathAvecAngles,
+                opportunites: opportunitesResolues,
                 timestamp: new Date().getTime()
             }
         });
 
         const persoRef = doc(db, "Personnages", idPerso);
         await updateDoc(persoRef, { Fatigue_Actuelle: nvlFatigue });
-        
+
         await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
             Tokens: window.TOKENS_VTT_DATA
         }, { merge: true });
@@ -422,13 +434,6 @@ window.validerMouvement = async function() {
 
     window.CHEMIN_MOUVEMENT = [];
     window.MOUVEMENT_COUT_TOTAL = 0;
-
-    // Une attaque d'opportunité par adversaire quitté, résolues l'une après l'autre.
-    if (ennemisQuittes.length > 0 && typeof window.resoudreAttaqueOpportunite === "function") {
-        for (const idEnnemi of ennemisQuittes) {
-            await window.resoudreAttaqueOpportunite(idEnnemi, idPerso);
-        }
-    }
 };
 
 // =========================================================================
@@ -465,6 +470,21 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
         if (imgMain) imgMain.style.transform = "scale(1)";
 
         await new Promise(r => setTimeout(r, 150));
+
+        // Attaque(s) d'opportunité déclenchée(s) en quittant le corps-à-corps à cette étape : le
+        // personnage s'arrête ici, l'attaque se joue (même résultat chez tous les joueurs, déjà
+        // tranché par validerMouvement), puis le trajet reprend.
+        const opportunitesIci = (actionMouvement.opportunites || []).filter(o => o.apresEtape === i);
+        for (const opp of opportunitesIci) {
+            if (typeof window.jouerAnimationOpportunite === "function") {
+                await window.jouerAnimationOpportunite({ ...opp, hexPosition: step });
+            }
+        }
+        if (opportunitesIci.length > 0) {
+            // jouerAnimationOpportunite change tokenDiv.style.transition (teinte rouge sur le
+            // dégât) : on la restaure avant de reprendre la marche.
+            tokenDiv.style.transition = "left 0.4s linear, top 0.4s linear";
+        }
     }
 
     tokenDiv.style.transition = "none";

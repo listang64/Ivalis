@@ -35,12 +35,16 @@ function getHexDistance(a, b) {
 // à connaître le avant/après du mouvement). Le résultat déjà tranché (pas juste "il se passe
 // un truc, chacun relance son dé") est ensuite diffusé via Action_Opportunite : tous les
 // clients (celui qui a bougé y compris) le rejouent à l'identique via jouerAnimationOpportunite.
+// Ne diffuse plus rien elle-même : le jet et les dégâts/bouclier sont tranchés et persistés
+// UNE SEULE FOIS ici (par le personnage qui bouge), et le résultat est retourné à l'appelant
+// (validerMouvement, dans mouvement.js) pour être embarqué dans Action_Mouvement à l'étape du
+// trajet où l'ennemi est quitté. C'est ce qui permet à l'animation de marquer une vraie pause
+// pile à cet endroit chez tous les joueurs, au lieu de se jouer après coup une fois arrivé.
 window.resoudreAttaqueOpportunite = async function(idAttaquant, idCible) {
     const attaquantData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idAttaquant);
     const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idCible);
-    if (!attaquantData || !cibleData) return;
-    if (attaquantData.statut === "Mort" || cibleData.statut === "Mort") return;
-    if (!window.ID_PARTIE_COURANTE) return;
+    if (!attaquantData || !cibleData) return null;
+    if (attaquantData.statut === "Mort" || cibleData.statut === "Mort") return null;
 
     const esquive = (parseInt(cibleData.Esquive) || 0) + (parseInt(cibleData.Dev_Mod_Esquive) || 0);
     const parade = (parseInt(cibleData.Parade) || 0) + (parseInt(cibleData.Dev_Mod_Parade) || 0);
@@ -74,25 +78,17 @@ window.resoudreAttaqueOpportunite = async function(idAttaquant, idCible) {
         }
     }
 
-    try {
-        await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
-            Action_Opportunite: { idAttaquant, idCible, dodged, motDef, degats, viaBouclier, timestamp: Date.now() }
-        });
-    } catch (e) {
-        console.error("Erreur diffusion attaque d'opportunité :", e);
-    }
-
-    // Laisse le temps à l'animation diffusée de se jouer avant d'enchaîner sur l'ennemi suivant
-    // (s'il y en a plusieurs) : sinon deux écritures trop rapprochées se marchent dessus.
-    await new Promise(r => setTimeout(r, dodged ? 1800 : 2000));
+    return { idAttaquant, idCible, dodged, motDef, degats, viaBouclier };
 };
 
 // Rejoue le résultat déjà tranché (par resoudreAttaqueOpportunite) chez CHAQUE joueur connecté,
 // y compris celui qui a déplacé le pion. Ne relance jamais le dé et n'écrit rien : uniquement
-// de l'affichage, la vraie donnée (PV/bouclier) arrive séparément via la sync habituelle des persos.
+// de l'affichage. Appelée directement (et attendue) DEPUIS jouerAnimationMouvement, à l'étape du
+// trajet où l'attaque a lieu : data.hexPosition (la case du trajet à ce moment-là, pas forcément
+// la position finale) doit être fournie pour que le message apparaisse au bon endroit.
 window.jouerAnimationOpportunite = async function(data) {
     if (!data || !data.idCible) return;
-    const tkCible = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[data.idCible] : null;
+    const tkCible = data.hexPosition || (window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[data.idCible] : null);
     if (!tkCible || typeof window.afficherMessageFlottantHex !== "function") return;
 
     window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "⚔️ Attaque d'opportunité !", "#ffaa00");
@@ -649,6 +645,8 @@ window.demarrerCiblage = async function(idCarte) {
     // (attaque/soin/altération). Si le Bond est après, on le joue après la résolution de l'attaque.
     let indexBond = -1;
     let indexPremierAutreEffet = -1;
+    let indexTraction = -1;
+    let indexPremiereAttaque = -1;
 
     const parseFrFloat = (val) => {
         if (val === undefined || val === null || val === "") return 0;
@@ -740,6 +738,7 @@ window.demarrerCiblage = async function(idCarte) {
                 let isHeal = nomLower.includes("soin") || nomLower.includes("guérison") || isPurification || isShield;
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
+                if (indexPremiereAttaque === -1) indexPremiereAttaque = idxAction;
                 attaquesExtraites.push({
                     nom: effBase.Nom,
                     typeRes: (nomLower.includes("magique") || nomLower.includes("pouvoir") || isHeal) ? "Magique" : "Physique",
@@ -862,6 +861,7 @@ window.demarrerCiblage = async function(idCarte) {
                 if (tractionChance > 60) tractionChance = 60; // Cap à 60%
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
+                indexTraction = idxAction;
                 alterationsExtraites.push({
                     nom: "Traction",
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png",
@@ -954,6 +954,10 @@ window.demarrerCiblage = async function(idCarte) {
     // cible unique, la portée effective de ciblage doit être au moins celle de Traction.
     const tractionAlt = alterationsExtraites.find(a => a.estTraction);
     const porteeMinTraction = tractionAlt ? tractionAlt.rangeMax : 0;
+    // Si Traction est écrite avant la première attaque sur la carte, elle doit se résoudre avant
+    // elle (on tire la cible avant de la frapper) au lieu de toujours s'appliquer après, comme le
+    // fait une altération classique. Voir jouerAnimationMoteur qui lit ce drapeau.
+    const tractionAvantAttaque = !!tractionAlt && (indexPremiereAttaque === -1 || indexTraction < indexPremiereAttaque);
 
     window.ETAT_CIBLAGE = {
         actif: true,
@@ -968,7 +972,8 @@ window.demarrerCiblage = async function(idCarte) {
         initialTwistAngle: 0,
         initialZoneStep: 0,
         bondApresAttaque: bondApresLeReste ? { idLanceur: idLanceurBond, portee: porteeBond } : null,
-        porteeMinTraction: porteeMinTraction
+        porteeMinTraction: porteeMinTraction,
+        tractionAvantAttaque: tractionAvantAttaque
     };
 
     if (configSort) window.surlignerEffetCarteActif(configSort.nom);
@@ -1430,6 +1435,7 @@ window.declencherResolution = async function() {
         alterations: state.alterations,
         isZone: state.isZone,
         zoneCenterHex: state.zoneCenterHex,
+        tractionAvantAttaque: state.tractionAvantAttaque || false,
         timestamp: new Date().getTime()
     };
 
@@ -1478,6 +1484,30 @@ window.jouerAnimationMoteur = async function(action) {
     }
 
     let ciblesToucheesValides = new Set(); // Mémoire des cibles qui n'ont pas esquivé
+
+    // 🔻 NOUVEAU : Traction écrite AVANT l'attaque sur la carte se résout avant elle (on tire la
+    // cible avant de la frapper), au lieu de toujours s'appliquer après comme une altération
+    // classique. La cible étant unique, c'est la même pour l'attaque qui suit. Le jet lui-même
+    // n'est fait que par le lanceur (voir declencherTractionCible), mais TOUT LE MONDE attend le
+    // même délai avant d'enchaîner sur l'attaque, pour que la séquence reste lisible pour tous.
+    let tractionDejaResolue = false;
+    if (action.tractionAvantAttaque && !attaqueRatee) {
+        const tractionAlt = (action.alterations || []).find(a => a.estTraction);
+        const idCibleTraction = tractionAlt && tractionAlt.cibles && tractionAlt.cibles[0];
+        if (tractionAlt && idCibleTraction) {
+            const currentUserIdTractionTot = localStorage.getItem("ID_JOUEUR_COURANT");
+            const lDataTractionTot = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
+            if (lDataTractionTot && lDataTractionTot.idJoueur === currentUserIdTractionTot) {
+                const rollTractionTot = Math.floor(Math.random() * 100) + 1;
+                console.log(`🎲 Jet de Traction (avant attaque) : Résultat ${rollTractionTot} (Chance: ${tractionAlt.chance}%)`);
+                if (rollTractionTot <= tractionAlt.chance && typeof window.declencherTractionCible === "function") {
+                    await window.declencherTractionCible(lanceur, idCibleTraction);
+                }
+            }
+            await new Promise(r => setTimeout(r, 900));
+            tractionDejaResolue = true;
+        }
+    }
 
     if (!attaqueRatee) {
         // Les pions ne pivotent plus jamais pour se tourner vers une zone/cible : ils restent dans leur orientation initiale.
@@ -1904,7 +1934,9 @@ window.jouerAnimationMoteur = async function(action) {
                 }
 
                 // Traction : même principe que la Poussée, sens inverse. Pas un état persistant.
+                // Déjà résolue plus haut si elle précédait l'attaque sur la carte (tractionDejaResolue).
                 if (alt.estTraction) {
+                    if (tractionDejaResolue) continue;
                     const currentUserIdTraction = localStorage.getItem("ID_JOUEUR_COURANT");
                     const lDataTraction = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
                     if (lDataTraction && lDataTraction.idJoueur === currentUserIdTraction) {

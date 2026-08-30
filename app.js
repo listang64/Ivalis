@@ -1547,8 +1547,6 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
              // 🔻 NOUVEAU
              if (dataPartie.Action_Moteur) window.DERNIER_ACTION_MOTEUR = dataPartie.Action_Moteur.timestamp;
 
-             if (dataPartie.Action_Opportunite) window.DERNIER_ACTION_OPPORTUNITE = dataPartie.Action_Opportunite.timestamp;
-
              if (dataPartie.Action_Bond) window.DERNIER_ACTION_BOND = dataPartie.Action_Bond.timestamp;
 
              if (dataPartie.Action_Poussee) window.DERNIER_ACTION_POUSSEE = dataPartie.Action_Poussee.timestamp;
@@ -1572,11 +1570,6 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
              if (dataPartie.Action_Moteur && dataPartie.Action_Moteur.timestamp !== window.DERNIER_ACTION_MOTEUR) {
                  window.DERNIER_ACTION_MOTEUR = dataPartie.Action_Moteur.timestamp;
                  if (typeof window.jouerAnimationMoteur === "function") window.jouerAnimationMoteur(dataPartie.Action_Moteur);
-             }
-             // Attaque d'opportunité : le résultat est déjà tranché, on ne fait que le rejouer ici
-             if (dataPartie.Action_Opportunite && dataPartie.Action_Opportunite.timestamp !== window.DERNIER_ACTION_OPPORTUNITE) {
-                 window.DERNIER_ACTION_OPPORTUNITE = dataPartie.Action_Opportunite.timestamp;
-                 if (typeof window.jouerAnimationOpportunite === "function") window.jouerAnimationOpportunite(dataPartie.Action_Opportunite);
              }
              // Bond : la case d'arrivée est déjà validée, on ne fait que rejouer le saut visuellement
              if (dataPartie.Action_Bond && dataPartie.Action_Bond.timestamp !== window.DERNIER_ACTION_BOND) {
