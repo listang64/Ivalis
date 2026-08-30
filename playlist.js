@@ -15,5 +15,6 @@ export const playlist = [
   "https://res.cloudinary.com/dbcducaxm/video/upload/q_auto/f_auto/v1781909867/gemini_generated_video_3702AEA1_yumqya.mp3",
   "https://res.cloudinary.com/dbcducaxm/video/upload/q_auto/f_auto/v1781909866/gemini_generated_video_418BF6D3_tgzlqe.mp3",
   "https://res.cloudinary.com/dbcducaxm/video/upload/q_auto/f_auto/v1781909865/gemini_generated_video_434F0AC9_hprmk7.mp3",
-  "https://res.cloudinary.com/dbcducaxm/video/upload/q_auto/f_auto/v1781909865/gemini_generated_video_F87953A3_lhj1cw.mp3"
+  "https://res.cloudinary.com/dbcducaxm/video/upload/q_auto/f_auto/v1781909865/gemini_generated_video_F87953A3_lhj1cw.mp3",
+  "https://res.cloudinary.com/dbcducaxm/video/upload/q_auto,f_auto/v1788076261/gemini_generated_video_77510EB7_syvsbe.mp4"
 ];
