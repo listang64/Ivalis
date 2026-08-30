@@ -458,6 +458,23 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
     for (let i = 0; i < actionMouvement.path.length; i++) {
         let step = actionMouvement.path[i];
 
+        // Attaque(s) d'opportunité déclenchée(s) en quittant le corps-à-corps à CETTE étape : le
+        // personnage s'arrête sur sa case actuelle (encore au contact, avant de la quitter),
+        // l'attaque se joue là (même résultat chez tous les joueurs, déjà tranché par
+        // validerMouvement), puis seulement ensuite il avance vers la case suivante.
+        const positionActuelle = { q: parseFloat(tokenDiv.dataset.q), r: parseFloat(tokenDiv.dataset.r) };
+        const opportunitesIci = (actionMouvement.opportunites || []).filter(o => o.apresEtape === i);
+        for (const opp of opportunitesIci) {
+            if (typeof window.jouerAnimationOpportunite === "function") {
+                await window.jouerAnimationOpportunite({ ...opp, hexPosition: positionActuelle });
+            }
+        }
+        if (opportunitesIci.length > 0) {
+            // jouerAnimationOpportunite change tokenDiv.style.transition (teinte rouge sur le
+            // dégât) : on la restaure avant de reprendre la marche.
+            tokenDiv.style.transition = "left 0.4s linear, top 0.4s linear";
+        }
+
         if (imgMain) imgMain.style.transform = "scale(1.12)";
 
         // On met à jour la case de référence : le pion suit le zoom et le pan même en pleine marche
@@ -470,21 +487,6 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
         if (imgMain) imgMain.style.transform = "scale(1)";
 
         await new Promise(r => setTimeout(r, 150));
-
-        // Attaque(s) d'opportunité déclenchée(s) en quittant le corps-à-corps à cette étape : le
-        // personnage s'arrête ici, l'attaque se joue (même résultat chez tous les joueurs, déjà
-        // tranché par validerMouvement), puis le trajet reprend.
-        const opportunitesIci = (actionMouvement.opportunites || []).filter(o => o.apresEtape === i);
-        for (const opp of opportunitesIci) {
-            if (typeof window.jouerAnimationOpportunite === "function") {
-                await window.jouerAnimationOpportunite({ ...opp, hexPosition: step });
-            }
-        }
-        if (opportunitesIci.length > 0) {
-            // jouerAnimationOpportunite change tokenDiv.style.transition (teinte rouge sur le
-            // dégât) : on la restaure avant de reprendre la marche.
-            tokenDiv.style.transition = "left 0.4s linear, top 0.4s linear";
-        }
     }
 
     tokenDiv.style.transition = "none";
