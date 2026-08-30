@@ -1539,6 +1539,17 @@ window.jouerAnimationMoteur = async function(action) {
                 let dx = 0; let dy = 0;
                 const dist = getHexDistance(tkLanceur, tkCible);
 
+                // 🔻 NOUVEAU : vérification de portée au moment de résoudre, pas seulement au
+                // ciblage. Nécessaire depuis Traction : la cible peut être choisie à sa portée
+                // élargie (3) en pariant sur le tirage, mais si le jet de Traction échoue, la
+                // cible reste hors de portée réelle de l'attaque (souvent en mêlée, portée 1) et
+                // celle-ci ne doit pas se déclencher quand même.
+                if (!action.isZone && dist > attaque.rangeMax) {
+                    if (tkCible) window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Hors de portée", "#aaaaaa");
+                    await new Promise(r => setTimeout(r, 1000));
+                    continue;
+                }
+
                 if (!action.isZone && tkLanceur && tkCible) {
                     // Le pion ne pivote plus vers sa cible : on garde seulement dx/dy pour le recul en cas d'esquive.
                     const pxLanceur = window.PLATEAU_VTT.hexToPixel(tkLanceur.q, tkLanceur.r);
