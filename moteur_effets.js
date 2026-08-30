@@ -469,6 +469,117 @@ window.diffuserEchecDeplacementForce = async function(champFirestore, idCible, n
     }
 };
 
+// =========================================================================
+//  PEUR
+//  Fait fuir la cible sur 4 cases : à chaque case, on ne garde que les directions qui
+//  l'éloignent VRAIMENT du lanceur (jamais une ligne droite imposée comme la Poussée), et on en
+//  tire une au hasard parmi elles. Mêmes règles de blocage que Poussée/Traction (mur, case
+//  supprimée, case occupée) : si toutes les directions valides sont bloquées, la fuite s'arrête
+//  net (avant les 4 cases). Déclenche une attaque d'opportunité par ennemi quitté en chemin,
+//  SAUF celle du lanceur (c'est lui qui fait peur, il n'en profite pas d'un coup en plus) — même
+//  mécanique de résolution que pour un déplacement normal (une seule fois, par le lanceur,
+//  embarquée dans la diffusion pour que tous les joueurs voient le même résultat). Contrairement
+//  à Poussée/Traction, ce déplacement forcé coûte de la fatigue à la cible (coût de base d'un
+//  déplacement normal, 2 par case), comme une vraie fuite panique l'épuiserait.
+// =========================================================================
+window.declencherPeurCible = async function(idLanceur, idCible) {
+    const tkLanceur = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idLanceur] : null;
+    const tkCibleDepart = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idCible] : null;
+    if (!tkLanceur || !tkCibleDepart || !window.PLATEAU_VTT || !window.ID_PARTIE_COURANTE) return;
+
+    const DIRECTIONS_HEX = [
+        { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
+        { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 }
+    ];
+
+    const estLibre = (q, r) => {
+        const state = window.PLATEAU_VTT.getCaseState(q, r);
+        if (state.isBlocked || state.isDeleted) return false;
+        for (let idAutre in window.TOKENS_VTT_DATA) {
+            if (idAutre === idCible) continue;
+            const autre = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idAutre);
+            if (!autre || autre.statut === "Mort") continue;
+            const tkAutre = window.TOKENS_VTT_DATA[idAutre];
+            if (tkAutre.q === q && tkAutre.r === r) return false;
+        }
+        return true;
+    };
+
+    const chemin = [];
+    let hexActuel = { q: tkCibleDepart.q, r: tkCibleDepart.r };
+    for (let i = 0; i < 4; i++) {
+        const distActuelle = getHexDistance(tkLanceur, hexActuel);
+        const candidats = DIRECTIONS_HEX
+            .map(d => ({ q: hexActuel.q + d.q, r: hexActuel.r + d.r }))
+            .filter(c => getHexDistance(tkLanceur, c) > distActuelle && estLibre(c.q, c.r));
+
+        if (candidats.length === 0) break; // Coincée : la fuite s'arrête net
+
+        hexActuel = candidats[Math.floor(Math.random() * candidats.length)];
+        chemin.push({ q: hexActuel.q, r: hexActuel.r });
+    }
+
+    if (chemin.length === 0) {
+        if (typeof window.afficherMessageFlottantHex === "function") {
+            window.afficherMessageFlottantHex(tkCibleDepart.q, tkCibleDepart.r, "Peur (bloquée)", "#aaaaaa");
+        }
+        return;
+    }
+
+    // Attaques d'opportunité déclenchées en fuyant, case par case (même principe que pour un
+    // déplacement volontaire), sauf de la part du lanceur lui-même.
+    let contactPrecedent = new Set(
+        (typeof window.listerEnnemisAuContact === "function"
+            ? window.listerEnnemisAuContact(idCible, tkCibleDepart)
+            : []
+        ).filter(id => id !== idLanceur)
+    );
+    const opportunitesResolues = [];
+    for (let i = 0; i < chemin.length; i++) {
+        const contactActuel = new Set(
+            (typeof window.listerEnnemisAuContact === "function"
+                ? window.listerEnnemisAuContact(idCible, chemin[i])
+                : []
+            ).filter(id => id !== idLanceur)
+        );
+        for (const idEnnemi of contactPrecedent) {
+            if (!contactActuel.has(idEnnemi) && typeof window.resoudreAttaqueOpportunite === "function") {
+                const resultat = await window.resoudreAttaqueOpportunite(idEnnemi, idCible);
+                if (resultat) opportunitesResolues.push({ apresEtape: i, ...resultat });
+            }
+        }
+        contactPrecedent = contactActuel;
+    }
+
+    // La fuite coûte de la fatigue à la cible, comme un déplacement normal (coût de base : 2/case).
+    const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idCible);
+    if (cibleData) {
+        const fatigueMax = parseInt(cibleData.Fatigue_Max) || parseInt(cibleData.fatigueMax) || 100;
+        const fatigueActuelle = cibleData.fatigueActuelle !== undefined ? parseInt(cibleData.fatigueActuelle) : fatigueMax;
+        const nouvelleFatigue = Math.max(0, fatigueActuelle - chemin.length * 2);
+        cibleData.fatigueActuelle = nouvelleFatigue;
+        try {
+            await updateDoc(doc(db, "Personnages", idCible), { Fatigue_Actuelle: nouvelleFatigue });
+        } catch (err) {
+            console.error("Erreur fatigue Peur :", err);
+        }
+    }
+
+    window.TOKENS_VTT_DATA[idCible].q = hexActuel.q;
+    window.TOKENS_VTT_DATA[idCible].r = hexActuel.r;
+
+    try {
+        await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
+            Action_Peur: { idToken: idCible, path: chemin, opportunites: opportunitesResolues, timestamp: Date.now() }
+        });
+        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
+            Tokens: window.TOKENS_VTT_DATA
+        }, { merge: true });
+    } catch (err) {
+        console.error("Erreur Peur :", err);
+    }
+};
+
 function rotateHex(hex, steps) {
     let q = hex.q, r = hex.r;
     for(let i = 0; i < steps; i++) {
@@ -886,6 +997,46 @@ window.demarrerCiblage = async function(idCarte) {
                     rangeMax: 3,
                     cibles: [],
                     estTraction: true
+                });
+            }
+
+            // 🔻 NOUVEAU : DÉTECTION PEUR 🔻
+            // Chance de faire fuir la cible de 4 cases dans un sens aléatoire, en s'éloignant
+            // toujours du lanceur (jamais de ligne droite imposée comme la Poussée). Pas un état
+            // persistant. Déclenche les attaques d'opportunité de tous les ennemis quittés SAUF
+            // celle du lanceur (c'est lui qui fait peur, il n'en profite pas d'un coup en plus).
+            // Coûte de la fatigue à la cible (comme un déplacement normal), contrairement à
+            // Poussée/Traction qui sont gratuites. Voir declencherPeurCible / jouerAnimationPeur.
+            let isPeur = false;
+            let peurChance = 0;
+
+            if (nomLower.includes("peur")) {
+                isPeur = true;
+                peurChance += (parseFrFloat(effBase.Pourcent_Base) || 0) * (act.count || 1);
+            }
+
+            listeMods.forEach(m => {
+                const modEff = window.EFFETS_BDD_CACHE[m.id];
+                if (modEff && (modEff.Nom || "").toLowerCase().includes("peur")) {
+                    isPeur = true;
+                    peurChance += (parseFrFloat(modEff.Pourcent_Base) || 0) * m.count;
+                }
+            });
+
+            if (isPeur) {
+                if (peurChance > 60) peurChance = 60; // Cap à 60%
+
+                if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
+                alterationsExtraites.push({
+                    nom: "Peur",
+                    icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png",
+                    desc: `${peurChance}% de chance de faire fuir la cible de 4 cases.`,
+                    chance: peurChance,
+                    duree: 0, // Instantané : jamais ajouté à Etats_Alteres
+                    isRanged: isRanged,
+                    rangeMax: rangeMax,
+                    cibles: [],
+                    estPeur: true
                 });
             }
 
@@ -1998,6 +2149,23 @@ window.jouerAnimationMoteur = async function(action) {
                             await window.declencherTractionCible(lanceur, idCible);
                         } else if (typeof window.diffuserEchecDeplacementForce === "function") {
                             await window.diffuserEchecDeplacementForce("Action_Traction", idCible, "Traction");
+                        }
+                    }
+                    continue;
+                }
+
+                // Peur : pas un état persistant. Même principe que Poussée/Traction (jet et
+                // résolution une seule fois, par le lanceur, puis diffusés).
+                if (alt.estPeur) {
+                    const currentUserIdPeur = localStorage.getItem("ID_JOUEUR_COURANT");
+                    const lDataPeur = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
+                    if (lDataPeur && lDataPeur.idJoueur === currentUserIdPeur) {
+                        const rollPeur = Math.floor(Math.random() * 100) + 1;
+                        console.log(`🎲 Jet de Peur sur ${cData.nom} : Résultat ${rollPeur} (Chance: ${alt.chance}%)`);
+                        if (rollPeur <= alt.chance && typeof window.declencherPeurCible === "function") {
+                            await window.declencherPeurCible(lanceur, idCible);
+                        } else if (typeof window.diffuserEchecDeplacementForce === "function") {
+                            await window.diffuserEchecDeplacementForce("Action_Peur", idCible, "Peur");
                         }
                     }
                     continue;

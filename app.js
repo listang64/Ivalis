@@ -1553,6 +1553,8 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
 
              if (dataPartie.Action_Traction) window.DERNIER_ACTION_TRACTION = dataPartie.Action_Traction.timestamp;
 
+             if (dataPartie.Action_Peur) window.DERNIER_ACTION_PEUR = dataPartie.Action_Peur.timestamp;
+
              estPremierScanPartie = false;
          } else {
              if (dataPartie.Action_Des && dataPartie.Action_Des.timestamp !== window.DERNIER_JET_DES) {
@@ -1585,6 +1587,11 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
              if (dataPartie.Action_Traction && dataPartie.Action_Traction.timestamp !== window.DERNIER_ACTION_TRACTION) {
                  window.DERNIER_ACTION_TRACTION = dataPartie.Action_Traction.timestamp;
                  if (typeof window.jouerAnimationPoussee === "function") window.jouerAnimationPoussee(dataPartie.Action_Traction);
+             }
+             // Peur : chemin et attaques d'opportunité déjà tranchés par le lanceur, on rejoue juste l'animation
+             if (dataPartie.Action_Peur && dataPartie.Action_Peur.timestamp !== window.DERNIER_ACTION_PEUR) {
+                 window.DERNIER_ACTION_PEUR = dataPartie.Action_Peur.timestamp;
+                 if (typeof window.jouerAnimationPeur === "function") window.jouerAnimationPeur(dataPartie.Action_Peur);
              }
          }
      }

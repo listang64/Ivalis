@@ -539,6 +539,20 @@ window.jouerAnimationBond = async function(data) {
     }
 };
 
+// Peur : réutilise telle quelle l'animation de marche classique (même "bond" par case, même
+// pause pour les attaques d'opportunité en chemin) — declencherPeurCible construit son chemin
+// exactement dans le même format qu'un déplacement normal (path + opportunites).
+window.jouerAnimationPeur = async function(data) {
+    if (data.echec) {
+        const tk = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[data.idToken] : null;
+        if (tk && typeof window.afficherMessageFlottantHex === "function") {
+            window.afficherMessageFlottantHex(tk.q, tk.r, `${data.nomEffet || "Peur"} loupée`, "#aaaaaa");
+        }
+        return;
+    }
+    await window.jouerAnimationMouvement(data);
+};
+
 // La Poussée : même animation que le Bond, sans le rétrécissement de départ (la cible ne
 // s'y attend pas, l'impact est immédiat) — grandi pendant le trajet -> rétréci à
 // l'atterrissage -> taille normale.
