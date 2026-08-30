@@ -1233,8 +1233,6 @@ window.centrerMapSurToken = function(idPersonnage) {
 };
 
 window.selectionnerEtCentrerPerso = function(idPersonnage) {
-    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    
     window.TOKEN_SELECTIONNE = idPersonnage;
     
     if (window.TOKENS_VTT_DATA && window.TOKENS_VTT_DATA[idPersonnage]) {
