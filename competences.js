@@ -618,6 +618,14 @@ function parseFrenchFloat(val) {
     return isNaN(parsed) ? 0 : parsed;
 }
 
+// Certains noms d'effets en base contiennent des "&nbsp;" ou des espaces insécables ( ) en
+// tête, invisibles/indétectables par un simple .trim() (qui ne touche que le texte JS, pas les
+// entités HTML) : une fois insérés via innerHTML, ils s'affichent comme un vrai décalage vers la
+// droite. On les neutralise ici avant tout affichage.
+function nettoyerNomEffet(nom) {
+    return (nom || "").replace(/(&nbsp;| )+/gi, " ").trim();
+}
+
 function normalizeForgeType(type, fallback = "Aucun") {
     if (!type) return fallback;
     return LEGACY_TYPE_MAP[type] || type;
@@ -896,7 +904,7 @@ window.ouvrirMenuAjoutForge = function() {
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid rgba(0,0,0,0.05); opacity: ${isDisabled ? 0.4 : 1};">
                         <div style="display: flex; flex-direction: column;">
                             <div>
-                                <strong style="color: #2a1a0f; font-size: 16px;">${(eff.Nom || "").trim()}</strong>
+                                <strong style="color: #2a1a0f; font-size: 16px;">${nettoyerNomEffet(eff.Nom)}</strong>
                                 ${eff.Modificateur !== "AUCUN" ? `<span style="font-size: 12px; color: #9333ea; font-weight: bold; margin-left: 4px;">[${eff.Modificateur}]</span>` : ""}
                                 <span style="font-size: 13px; font-weight: bold; color: #ff4c4c; margin-left: 6px;">⚡ ${coutFatigue}</span>
                             </div>
@@ -1383,8 +1391,8 @@ window.rafraichirForge = function() {
                 const estIncompatibleIllusion = estActionIllusion && mod.Nom === "Zone";
                 groupesMods[carac].push(
                     (estIncompatiblePoussee || estIncompatibleTraction || estIncompatibleIllusion)
-                        ? `<option value="${mod.id}" disabled style="color: #999;">${(mod.Nom || "").trim()} (non compatible)</option>`
-                        : `<option value="${mod.id}">${(mod.Nom || "").trim()} (⚡ ${coutFatigue})</option>`
+                        ? `<option value="${mod.id}" disabled style="color: #999;">${nettoyerNomEffet(mod.Nom)} (non compatible)</option>`
+                        : `<option value="${mod.id}">${nettoyerNomEffet(mod.Nom)} (⚡ ${coutFatigue})</option>`
                 );
             }
         });
@@ -1443,7 +1451,7 @@ window.rafraichirForge = function() {
                 htmlMods += `
                     <div style="display: flex; justify-content: space-between; margin-left: 20px; padding: 4px 0;">
                         <div>
-                            <span style="color: gray; font-size: 14px;">↳</span> <b style="font-size: 14px;">${(modEff.Nom || "").trim()}</b>
+                            <span style="color: gray; font-size: 14px;">↳</span> <b style="font-size: 14px;">${nettoyerNomEffet(modEff.Nom)}</b>
                             ${modEff.Modificateur !== "AUCUN" ? `<span style="font-size: 12px; color: #9333ea; font-weight: bold; margin-left: 4px;">[${modEff.Modificateur}]</span>` : ""}
                             <div style="font-size: 13px; color: gray; margin-left: 15px;">
                                 ${formatterTexteEffet(modEff, modCount)}
@@ -1471,7 +1479,7 @@ window.rafraichirForge = function() {
                 <div style="margin-bottom: 15px; background: rgba(0,0,0,0.02); padding: 12px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.05);">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                         <div>
-                            <b style="font-size: 16px;">• ${(act.baseEffet.Nom || "").trim()}</b> ${act.baseEffet.Modificateur !== "AUCUN" ? `<span style="font-size: 12px; color: #9333ea; font-weight: bold; margin-left: 4px;">[${act.baseEffet.Modificateur}]</span>` : ""}
+                            <b style="font-size: 16px;">• ${nettoyerNomEffet(act.baseEffet.Nom)}</b> ${act.baseEffet.Modificateur !== "AUCUN" ? `<span style="font-size: 12px; color: #9333ea; font-weight: bold; margin-left: 4px;">[${act.baseEffet.Modificateur}]</span>` : ""}
                             <div style="font-size: 13px; color: gray; margin-left: 10px; margin-top: 2px;">
                                 ${formatterTexteEffet(act.baseEffet, act.count)}
                                 ${currentBaseDuree > 0 ? `<br><span style="color: #9333ea;">↳ ⏳ +${currentBaseDuree} Tour(s) (+${(currentBaseDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}

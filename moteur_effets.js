@@ -985,7 +985,7 @@ window.demarrerCiblage = async function(idCarte) {
         const champs = [eff.Nom, eff.Cible_Etat, eff.Type_Mecanique, eff.Type_Mecanique_2];
         return champs.some(v => {
             const s = (v || "").toLowerCase();
-            return s.includes("étourdi") || s.includes("etourdi") || s.includes("immobilis");
+            return s.includes("étourdi") || s.includes("etourdi");
         });
     };
 
