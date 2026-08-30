@@ -622,8 +622,16 @@ function parseFrenchFloat(val) {
 // tête, invisibles/indétectables par un simple .trim() (qui ne touche que le texte JS, pas les
 // entités HTML) : une fois insérés via innerHTML, ils s'affichent comme un vrai décalage vers la
 // droite. On les neutralise ici avant tout affichage.
+const REGEX_ESPACES_INVISIBLES = new RegExp(
+    "[\\u0000-\\u001F\\u007F\\u00A0\\u1680\\u2000-\\u200F\\u2028\\u2029\\u202F\\u205F\\u2060\\u3000\\uFEFF]",
+    "g"
+);
 function nettoyerNomEffet(nom) {
-    return (nom || "").replace(/(&nbsp;| )+/gi, " ").trim();
+    return (nom || "")
+        .replace(/&nbsp;/gi, " ")
+        .replace(REGEX_ESPACES_INVISIBLES, " ")
+        .replace(/\s+/g, " ")
+        .trim();
 }
 
 function normalizeForgeType(type, fallback = "Aucun") {

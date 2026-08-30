@@ -24,6 +24,65 @@ function getHexDistance(a, b) {
     return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
 }
 
+// Affiche le message flottant de dégâts/soin + le flash coloré + la mini-barre qui se vide (ou se
+// remplit) sur le pion, exactement comme pour une attaque classique (voir jouerAnimationMoteur).
+// Réutilisée par les attaques d'opportunité et les tics d'Empoisonnement, qui n'avaient jusqu'ici
+// que le message flottant générique, sans le retour visuel de la barre.
+window.afficherFlashDegatToken = function(idCible, ancienneValeur, nouvelleValeur, valeurMax, texte, couleurTexte, couleurBarre) {
+    const tkCible = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idCible] : null;
+    if (tkCible && typeof window.afficherMessageFlottantHex === "function") {
+        window.afficherMessageFlottantHex(tkCible.q, tkCible.r, texte, couleurTexte || "#ff4c4c");
+    }
+
+    const tokenDiv = document.getElementById("token-" + idCible);
+    if (!tokenDiv || !valeurMax) return;
+
+    const couleur = couleurBarre || "#ff4c4c";
+    const bordure = couleur === "#00ffff" ? "#00ffff" : "#c2a878";
+    const hueRotate = couleur === "#00ffff" ? "180deg" : (couleur === "#1b6e3a" ? "90deg" : "-50deg");
+
+    tokenDiv.style.transition = "filter 0.1s";
+    tokenDiv.style.filter = `sepia(1) hue-rotate(${hueRotate}) saturate(5) brightness(1.2)`;
+
+    const oldPct = Math.max(0, Math.min(100, (ancienneValeur / valeurMax) * 100));
+    const newPct = Math.max(0, Math.min(100, (nouvelleValeur / valeurMax) * 100));
+
+    const jaugeContainer = document.createElement("div");
+    jaugeContainer.style.position = "absolute";
+    jaugeContainer.style.bottom = "-12px";
+    jaugeContainer.style.left = "50%";
+    jaugeContainer.style.transform = "translateX(-50%)";
+    jaugeContainer.style.width = "75%";
+    jaugeContainer.style.height = "6px";
+    jaugeContainer.style.backgroundColor = "#111";
+    jaugeContainer.style.border = `1px solid ${bordure}`;
+    jaugeContainer.style.borderRadius = "3px";
+    jaugeContainer.style.zIndex = "5";
+    jaugeContainer.style.opacity = "0";
+    jaugeContainer.style.transition = "opacity 0.3s ease";
+    jaugeContainer.style.boxShadow = "0 2px 4px rgba(0,0,0,0.8)";
+
+    const jaugeFill = document.createElement("div");
+    jaugeFill.style.height = "100%";
+    jaugeFill.style.width = oldPct + "%";
+    jaugeFill.style.backgroundColor = couleur;
+    jaugeFill.style.borderRadius = "2px";
+    jaugeFill.style.transition = "width 0.5s ease-out";
+
+    jaugeContainer.appendChild(jaugeFill);
+    tokenDiv.appendChild(jaugeContainer);
+
+    void jaugeContainer.offsetWidth;
+    jaugeContainer.style.opacity = "1";
+
+    setTimeout(() => { tokenDiv.style.filter = ""; }, 300);
+    setTimeout(() => { jaugeFill.style.width = newPct + "%"; }, 400);
+    setTimeout(() => {
+        jaugeContainer.style.opacity = "0";
+        setTimeout(() => jaugeContainer.remove(), 300);
+    }, 1500);
+};
+
 // =========================================================================
 //  ATTAQUES D'OPPORTUNITÉ
 //  Déclenchées depuis mouvement.js quand un personnage quitte le corps-à-corps
@@ -101,13 +160,30 @@ window.jouerAnimationOpportunite = async function(data) {
 
     const couleur = data.viaBouclier ? "#00ffff" : "#ff4c4c";
     const icone = data.viaBouclier ? "🛡️" : "🩸";
-    window.afficherMessageFlottantHex(tkCible.q, tkCible.r, `-${data.degats} ${icone}`, couleur);
+    const texte = `-${data.degats} ${icone}`;
 
-    const tokenDiv = document.getElementById("token-" + data.idCible);
-    if (tokenDiv) {
-        tokenDiv.style.transition = "filter 0.1s";
-        tokenDiv.style.filter = "sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.2)";
-        setTimeout(() => { tokenDiv.style.filter = ""; }, 300);
+    // Barre qui se vide sur le pion, comme pour une attaque classique. On reconstruit l'ancienne
+    // valeur à partir de l'actuelle + les dégâts déjà connus (évite toute course avec le listener
+    // Firestore qui a pu déjà appliquer la nouvelle valeur chez ce client au moment du rejeu).
+    const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === data.idCible);
+    if (cibleData && typeof window.afficherFlashDegatToken === "function") {
+        if (data.viaBouclier) {
+            const maxShield = parseInt(cibleData.Bouclier_Max) || 1;
+            const newShield = parseInt(cibleData.Bouclier_Actuel) || 0;
+            window.afficherFlashDegatToken(data.idCible, newShield + data.degats, newShield, maxShield, texte, couleur, "#00ffff");
+        } else {
+            const maxPv = (parseInt(cibleData.PV_Max) || 1) + (parseInt(cibleData.Dev_Mod_PV) || 0);
+            const newPv = parseInt(cibleData.PV_Actuels) || 0;
+            window.afficherFlashDegatToken(data.idCible, newPv + data.degats, newPv, maxPv, texte, couleur);
+        }
+    } else {
+        window.afficherMessageFlottantHex(tkCible.q, tkCible.r, texte, couleur);
+        const tokenDiv = document.getElementById("token-" + data.idCible);
+        if (tokenDiv) {
+            tokenDiv.style.transition = "filter 0.1s";
+            tokenDiv.style.filter = "sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.2)";
+            setTimeout(() => { tokenDiv.style.filter = ""; }, 300);
+        }
     }
 };
 
@@ -2663,23 +2739,37 @@ window.jouerAnimationMoteur = async function(action) {
 
                     // Empoisonnement : tic immédiat de 15 fatigue + 8% des PV max, indépendant du
                     // jet de chance déjà validé ci-dessus (le 2e tic se joue au début du tour
-                    // suivant, voir la transition de round dans combat.js).
+                    // suivant, voir la transition de round dans combat.js). Même retour visuel
+                    // (flash + barre qui se vide) qu'une attaque classique, sur demande de Nico.
                     if (alt.estPoison) {
                         const pvMaxPoison = parseInt(cData.PV_Max) || 0;
                         const pvActuelsPoison = cData.PV_Actuels !== undefined ? parseInt(cData.PV_Actuels) : pvMaxPoison;
-                        cData.PV_Actuels = Math.max(0, pvActuelsPoison - Math.ceil(pvMaxPoison * 0.08));
+                        const nouveauPvPoison = Math.max(0, pvActuelsPoison - Math.ceil(pvMaxPoison * 0.08));
+                        const perteViePoison = pvActuelsPoison - nouveauPvPoison;
+                        cData.PV_Actuels = nouveauPvPoison;
 
                         const fatigueMaxPoison = parseInt(cData.fatigueMax) || parseInt(cData.Fatigue_Max) || 100;
                         const fatigueActuellePoison = cData.fatigueActuelle !== undefined ? parseInt(cData.fatigueActuelle) : fatigueMaxPoison;
-                        cData.fatigueActuelle = Math.max(0, fatigueActuellePoison - 15);
+                        const nouvelleFatiguePoison = Math.max(0, fatigueActuellePoison - 15);
+                        const perteFatiguePoison = fatigueActuellePoison - nouvelleFatiguePoison;
+                        cData.fatigueActuelle = nouvelleFatiguePoison;
 
                         poisonTickApplique = true;
 
                         if (window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]?.idPersonnage === idCible) {
                             window.COMBAT_PV_ACTUELS = cData.PV_Actuels;
                             window.COMBAT_FATIGUE_ACTUELLE = cData.fatigueActuelle;
-                            if (typeof window.mettreAJourJaugePV === "function") window.mettreAJourJaugePV();
                             if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
+                        }
+
+                        const tkPoison = window.TOKENS_VTT_DATA[idCible];
+                        if (tkPoison && perteFatiguePoison > 0) {
+                            window.afficherMessageFlottantHex(tkPoison.q, tkPoison.r, `-${perteFatiguePoison} ⚡`, "#ffaa00");
+                            await new Promise(r => setTimeout(r, 600));
+                        }
+                        if (perteViePoison > 0 && typeof window.afficherFlashDegatToken === "function") {
+                            window.afficherFlashDegatToken(idCible, pvActuelsPoison, nouveauPvPoison, pvMaxPoison, `-${perteViePoison} 🩸`, "#ff4c4c");
+                            await new Promise(r => setTimeout(r, 900));
                         }
                     }
 

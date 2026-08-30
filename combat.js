@@ -2196,12 +2196,14 @@ window.finDeTourCombat = async function(forcer = false) {
                                         // ensuite (tickFait), même si l'état reste affiché encore un tour.
                                         const etatPoison = perso.Etats_Alteres.find(e => e.nom === "Empoisonnement" && !e.tickFait);
                                         if (etatPoison) {
+                                            const ancienneFatiguePoison = fatigue;
                                             fatigue = Math.max(0, fatigue - 15);
                                             perso.fatigueActuelle = fatigue;
 
                                             const pvMaxPoison = parseInt(perso.PV_Max) || 0;
                                             const pvActuelsPoison = perso.PV_Actuels !== undefined ? parseInt(perso.PV_Actuels) : pvMaxPoison;
-                                            perso.PV_Actuels = Math.max(0, pvActuelsPoison - Math.ceil(pvMaxPoison * 0.08));
+                                            const nouveauPvPoison = Math.max(0, pvActuelsPoison - Math.ceil(pvMaxPoison * 0.08));
+                                            perso.PV_Actuels = nouveauPvPoison;
                                             etatPoison.tickFait = true;
 
                                             const persoJoueurPoison = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === perso.idPersonnage);
@@ -2214,7 +2216,17 @@ window.finDeTourCombat = async function(forcer = false) {
                                             if (persoActuelPoison && persoActuelPoison.idPersonnage === perso.idPersonnage) {
                                                 window.COMBAT_FATIGUE_ACTUELLE = fatigue;
                                                 window.COMBAT_PV_ACTUELS = perso.PV_Actuels;
-                                                if (typeof window.mettreAJourJaugePV === "function") window.mettreAJourJaugePV();
+                                                if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
+                                            }
+
+                                            // Même retour visuel qu'une attaque classique (flash + barre qui se
+                                            // vide), pour que le tic de début de tour soit visible de tous.
+                                            if (ancienneFatiguePoison - fatigue > 0 && typeof window.afficherMessageFlottantHex === "function" && window.TOKENS_VTT_DATA && window.TOKENS_VTT_DATA[perso.idPersonnage]) {
+                                                const tkPoisonTour = window.TOKENS_VTT_DATA[perso.idPersonnage];
+                                                window.afficherMessageFlottantHex(tkPoisonTour.q, tkPoisonTour.r, `-${ancienneFatiguePoison - fatigue} ⚡`, "#ffaa00");
+                                            }
+                                            if (pvActuelsPoison - nouveauPvPoison > 0 && typeof window.afficherFlashDegatToken === "function") {
+                                                window.afficherFlashDegatToken(perso.idPersonnage, pvActuelsPoison, nouveauPvPoison, pvMaxPoison, `-${pvActuelsPoison - nouveauPvPoison} 🩸`, "#ff4c4c");
                                             }
 
                                             modifsFirebase.Fatigue_Actuelle = fatigue;
