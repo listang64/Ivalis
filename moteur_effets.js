@@ -1249,6 +1249,43 @@ window.demarrerCiblage = async function(idCarte) {
                 });
             }
 
+            // 🔻 NOUVEAU : DÉTECTION EMPOISONNEMENT 🔻
+            // Doit toujours accompagner une attaque à dégâts quelque part sur la carte (voir
+            // verrouillage en Forge) : c'est cette attaque qui détermine le type de dégât du
+            // poison, résolu plus tard dans jouerAnimationMoteur (via state.attaques[0]). Chance
+            // cumulable comme les autres états (10%/action, cap 70%), durée fixe de 2 tours,
+            // jamais prolongeable. Deux tics fixes de 15 fatigue + 8% des PV max chacun : un
+            // immédiat à l'application, un au début du tour suivant (voir la transition de round).
+            let isPoison = nomLower.includes("poison");
+            let poisonChance = 0;
+            if (isPoison) {
+                poisonChance += (parseFrFloat(effBase.Pourcent_Base) || 0) * (act.count || 1);
+            }
+            listeMods.forEach(m => {
+                const modEff = window.EFFETS_BDD_CACHE[m.id];
+                if (modEff && (modEff.Nom || "").toLowerCase().includes("poison")) {
+                    isPoison = true;
+                    poisonChance += (parseFrFloat(modEff.Pourcent_Base) || 0) * m.count;
+                }
+            });
+
+            if (isPoison) {
+                if (poisonChance > 70) poisonChance = 70; // Cap à 70%
+                if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
+                alterationsExtraites.push({
+                    nom: "Empoisonnement",
+                    icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788096401/IMG_2083_pebnup.png",
+                    desc: "15 fatigue et 8% des PV max perdus immédiatement, puis à nouveau au début du tour suivant. Pas de cumul.",
+                    chance: poisonChance,
+                    duree: 2,
+                    isRanged: isRanged,
+                    rangeMax: rangeMax,
+                    cibles: [],
+                    estPoison: true,
+                    tickFait: false
+                });
+            }
+
             // 🔻 NOUVEAU : DÉTECTION POUSSÉE 🔻
             // Chance de repousser la cible de 2 cases en ligne droite depuis le lanceur. Pas un état
             // persistant (aucune entrée dans Etats_Alteres) : résolue et animée à part dans
@@ -2552,6 +2589,7 @@ window.jouerAnimationMoteur = async function(action) {
             }
             
             let cibleModifiee = false;
+            let poisonTickApplique = false;
             let nouveauxEtats = cData.Etats_Alteres ? [...cData.Etats_Alteres] : [];
 
             for (let alt of action.alterations) {
@@ -2615,15 +2653,40 @@ window.jouerAnimationMoteur = async function(action) {
                     let existing = nouveauxEtats.find(e => e.nom === alt.nom);
                     if (existing) {
                         existing.duree = Math.max(existing.duree, alt.duree); // Rafraîchit la durée
+                        // Pas de cumul, mais une nouvelle application redonne un tic de début de
+                        // tour (voir la transition de round dans combat.js).
+                        if (alt.estPoison) existing.tickFait = false;
                     } else {
                         nouveauxEtats.push({...alt});
                     }
                     cibleModifiee = true;
-                    
+
+                    // Empoisonnement : tic immédiat de 15 fatigue + 8% des PV max, indépendant du
+                    // jet de chance déjà validé ci-dessus (le 2e tic se joue au début du tour
+                    // suivant, voir la transition de round dans combat.js).
+                    if (alt.estPoison) {
+                        const pvMaxPoison = parseInt(cData.PV_Max) || 0;
+                        const pvActuelsPoison = cData.PV_Actuels !== undefined ? parseInt(cData.PV_Actuels) : pvMaxPoison;
+                        cData.PV_Actuels = Math.max(0, pvActuelsPoison - Math.ceil(pvMaxPoison * 0.08));
+
+                        const fatigueMaxPoison = parseInt(cData.fatigueMax) || parseInt(cData.Fatigue_Max) || 100;
+                        const fatigueActuellePoison = cData.fatigueActuelle !== undefined ? parseInt(cData.fatigueActuelle) : fatigueMaxPoison;
+                        cData.fatigueActuelle = Math.max(0, fatigueActuellePoison - 15);
+
+                        poisonTickApplique = true;
+
+                        if (window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]?.idPersonnage === idCible) {
+                            window.COMBAT_PV_ACTUELS = cData.PV_Actuels;
+                            window.COMBAT_FATIGUE_ACTUELLE = cData.fatigueActuelle;
+                            if (typeof window.mettreAJourJaugePV === "function") window.mettreAJourJaugePV();
+                            if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
+                        }
+                    }
+
                     const tkC = window.TOKENS_VTT_DATA[idCible];
                     if (tkC) {
                         // ⏱️ Pause d'une demi-seconde pour laisser les dégâts rouges disparaître
-                        await new Promise(r => setTimeout(r, 600)); 
+                        await new Promise(r => setTimeout(r, 600));
                         window.afficherMessageFlottantHex(tkC.q, tkC.r, `${alt.nom} !`, "#9333ea");
                         await new Promise(r => setTimeout(r, 1000));
                     }
@@ -2632,13 +2695,18 @@ window.jouerAnimationMoteur = async function(action) {
 
             if (cibleModifiee) {
                 cData.Etats_Alteres = nouveauxEtats; // MAJ locale immédiate
-                
+
                 const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
                 const lData = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
-                
+
                 // Envoi à la BDD
                 if (!lData || lData.idJoueur === currentUserId || !currentUserId) {
-                    await updateDoc(doc(db, "Personnages", idCible), { Etats_Alteres: nouveauxEtats }).catch(e=>console.error(e));
+                    const payloadAlterations = { Etats_Alteres: nouveauxEtats };
+                    if (poisonTickApplique) {
+                        payloadAlterations.PV_Actuels = cData.PV_Actuels;
+                        payloadAlterations.Fatigue_Actuelle = cData.fatigueActuelle;
+                    }
+                    await updateDoc(doc(db, "Personnages", idCible), payloadAlterations).catch(e=>console.error(e));
                 }
                 
                 // 🔄 RAFRAÎCHISSEMENT DE L'UI EN TEMPS RÉEL (Adapté à ta structure)

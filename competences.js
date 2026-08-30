@@ -894,7 +894,12 @@ window.ouvrirMenuAjoutForge = function() {
                 // Traction incompatible avec une portée déjà présente ailleurs sur la carte
                 const isTractionLocked = carteADejaDistance && (eff.Nom || "").toLowerCase().includes("traction");
 
-                const isDisabled = isLocked || capAtteint || isArmeIncompatible || isAttackLocked || isTractionLocked;
+                // Empoisonnement doit toujours être lié à une source de dégât (une attaque
+                // quelque part sur la carte détermine son type de dégât) : verrouillé tant
+                // qu'aucune attaque n'a été posée.
+                const isPoisonLocked = !aDejaUneAttaque && (eff.Nom || "").toLowerCase().includes("poison");
+
+                const isDisabled = isLocked || capAtteint || isArmeIncompatible || isAttackLocked || isTractionLocked || isPoisonLocked;
                 const bgColor = isDisabled ? 'gray' : '#3b82f6';
                 
                 // Calcul de la fatigue
@@ -1389,8 +1394,11 @@ window.rafraichirForge = function() {
                 const estIncompatiblePoussee = estActionPoussee && NOMS_INCOMPATIBLES_POUSSEE.includes(nomModLower);
                 const estIncompatibleTraction = (mod.Nom === "Distance" && carteADejaTraction) || (nomModLower.includes("traction") && carteADejaDistanceMod);
                 const estIncompatibleIllusion = estActionIllusion && mod.Nom === "Zone";
+                // Empoisonnement doit toujours être lié à une source de dégât (une attaque
+                // quelque part sur la carte), sinon aucun type de dégât n'est déterminable.
+                const estIncompatiblePoison = !aDejaUneAttaque && nomModLower.includes("poison");
                 groupesMods[carac].push(
-                    (estIncompatiblePoussee || estIncompatibleTraction || estIncompatibleIllusion)
+                    (estIncompatiblePoussee || estIncompatibleTraction || estIncompatibleIllusion || estIncompatiblePoison)
                         ? `<option value="${mod.id}" disabled style="color: #999;">${nettoyerNomEffet(mod.Nom)} (non compatible)</option>`
                         : `<option value="${mod.id}">${nettoyerNomEffet(mod.Nom)} (⚡ ${coutFatigue})</option>`
                 );
@@ -1422,11 +1430,12 @@ window.rafraichirForge = function() {
             const isActMaxed = act.count >= getMaxStacks(act.baseEffet);
             const btnPlusActDisabled = (isActMaxed || capDepasse) ? `disabled style="opacity: 0.3; cursor: not-allowed; border:none; background:none; font-weight:bold; font-size:18px;"` : `style="color: green; cursor: pointer; border:none; background:none; font-weight:bold; font-size:18px;"`;
 
-            // Immobilisation et Paralysie ont une durée fixe (2 et 4 tours) : le bouton ⏳
-            // (Durée +) ne doit jamais apparaître dessus, quoi que dise Tours en base.
+            // Immobilisation, Paralysie et Empoisonnement ont une durée fixe (2, 4 et 2 tours) :
+            // le bouton ⏳ (Durée +) ne doit jamais apparaître dessus, quoi que dise Tours en base.
             const baseHasDuree = parseFrenchFloat(act.baseEffet.Tours) > 0
                 && !(act.baseEffet.Nom || "").toLowerCase().includes("immobil")
-                && !(act.baseEffet.Nom || "").toLowerCase().includes("paralys");
+                && !(act.baseEffet.Nom || "").toLowerCase().includes("paralys")
+                && !(act.baseEffet.Nom || "").toLowerCase().includes("poison");
             const currentBaseDuree = act.baseDuree || 0;
             const btnPlusBaseDureeDisabled = (currentBaseDuree >= maxDureeStacks || capDepasse) ? `disabled style="opacity: 0.3; cursor: not-allowed; border:none; background:none; font-weight:bold; font-size:16px;"` : `style="color: green; cursor: pointer; border:none; background:none; font-weight:bold; font-size:16px;"`;
 
@@ -1443,10 +1452,12 @@ window.rafraichirForge = function() {
                     boutonEditerZone = `<button class="btn-parametres" style="padding: 3px 8px; font-size: 12px; margin-right: 5px; background: #3b82f6; color: white;" onclick="window.ouvrirEditeurZone('${act.idInst}')">Éditer</button>`;
                 }
 
-                // Même règle que pour la base : pas de bouton Durée + sur Immobilisation/Paralysie.
+                // Même règle que pour la base : pas de bouton Durée + sur
+                // Immobilisation/Paralysie/Empoisonnement.
                 const modHasDuree = parseFrenchFloat(modEff.Tours) > 0
                     && !(modEff.Nom || "").toLowerCase().includes("immobil")
-                    && !(modEff.Nom || "").toLowerCase().includes("paralys");
+                    && !(modEff.Nom || "").toLowerCase().includes("paralys")
+                    && !(modEff.Nom || "").toLowerCase().includes("poison");
                 const currentModDuree = (act.modsDuree && act.modsDuree[modId]) || 0;
                 const btnPlusModDureeDisabled = (currentModDuree >= maxDureeStacks || capDepasse) ? `disabled style="opacity: 0.3; cursor: not-allowed; border:none; background:none; font-weight:bold; font-size:16px;"` : `style="color: green; cursor: pointer; border:none; background:none; font-weight:bold; font-size:16px;"`;
 

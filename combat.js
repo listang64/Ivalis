@@ -2191,6 +2191,37 @@ window.finDeTourCombat = async function(forcer = false) {
                                             majRequise = true;
                                         }
 
+                                        // Empoisonnement : 2e et dernier tic (15 fatigue + 8% des PV max), une
+                                        // seule fois au début du tour suivant l'application — jamais retenté
+                                        // ensuite (tickFait), même si l'état reste affiché encore un tour.
+                                        const etatPoison = perso.Etats_Alteres.find(e => e.nom === "Empoisonnement" && !e.tickFait);
+                                        if (etatPoison) {
+                                            fatigue = Math.max(0, fatigue - 15);
+                                            perso.fatigueActuelle = fatigue;
+
+                                            const pvMaxPoison = parseInt(perso.PV_Max) || 0;
+                                            const pvActuelsPoison = perso.PV_Actuels !== undefined ? parseInt(perso.PV_Actuels) : pvMaxPoison;
+                                            perso.PV_Actuels = Math.max(0, pvActuelsPoison - Math.ceil(pvMaxPoison * 0.08));
+                                            etatPoison.tickFait = true;
+
+                                            const persoJoueurPoison = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === perso.idPersonnage);
+                                            if (persoJoueurPoison) {
+                                                persoJoueurPoison.fatigueActuelle = fatigue;
+                                                persoJoueurPoison.PV_Actuels = perso.PV_Actuels;
+                                            }
+
+                                            const persoActuelPoison = window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+                                            if (persoActuelPoison && persoActuelPoison.idPersonnage === perso.idPersonnage) {
+                                                window.COMBAT_FATIGUE_ACTUELLE = fatigue;
+                                                window.COMBAT_PV_ACTUELS = perso.PV_Actuels;
+                                                if (typeof window.mettreAJourJaugePV === "function") window.mettreAJourJaugePV();
+                                            }
+
+                                            modifsFirebase.Fatigue_Actuelle = fatigue;
+                                            modifsFirebase.PV_Actuels = perso.PV_Actuels;
+                                            majRequise = true;
+                                        }
+
                                         let etatsAJour = perso.Etats_Alteres.map(e => {
                                             e.duree -= 1;
                                             return e;
