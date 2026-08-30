@@ -1499,6 +1499,7 @@ window.appliquerTokensVTT = function(tokensMap) {
     for (let idPerso in tokensMap) {
         const data = tokensMap[idPerso];
         const taille = data.taille || 55;
+        const pData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPerso);
 
         const divToken = document.createElement("div");
         divToken.className = "token-vtt";
@@ -1525,27 +1526,30 @@ window.appliquerTokensVTT = function(tokensMap) {
         // Dégradé radial plutôt qu'un filtre "blur" : ce dernier doit être recalculé en pixels à
         // chaque étape du zoom, ce qui laissait des résidus visuels sur iPad (Safari) pendant un
         // pincement rapide. Un dégradé se redimensionne nativement avec l'élément, sans recalcul JS.
-        const ombreSol = document.createElement("div");
-        ombreSol.className = "token-ombre-sol";
-        ombreSol.style.position = "absolute";
-        ombreSol.style.top = "56%";  // Décalage vers le sud : c'est lui qui fait apparaître le croissant
-        ombreSol.style.left = "50%";
-        ombreSol.style.transform = "translate(-50%, -50%)";
-        ombreSol.style.width = "97%";
-        ombreSol.style.height = "97%";
-        ombreSol.style.borderRadius = "50%";
-        // Coeur dense et opaque, puis long fondu vers les bords : donne le flou du contact sans filtre CSS.
-        // "closest-side" est indispensable ici : sans lui, un dégradé radial va par défaut jusqu'au
-        // coin le plus éloigné (bien au-delà du cercle visible découpé par border-radius), donc le
-        // fondu n'atteint jamais 0 avant d'être tronqué net par le border-radius. Avec closest-side,
-        // le dégradé est calé sur le bord du cercle réellement visible : le fondu se termine pile là.
-        // Coeur franchement opaque jusqu'à 75% du rayon, puis fondu concentré sur le dernier quart :
-        // la zone visible (le croissant qui dépasse du médaillon) reste bien sombre, et seule
-        // l'extrémité du dégradé s'estompe en douceur au lieu d'être coupée net.
-        ombreSol.style.background = "radial-gradient(circle closest-side at 50% 50%, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.9) 75%, rgba(0,0,0,0.65) 90%, rgba(0,0,0,0) 100%)";
-        ombreSol.style.zIndex = "-2";
-        ombreSol.style.pointerEvents = "none";
-        divToken.appendChild(ombreSol);
+        // Une Illusion n'en projette pas : ce n'est qu'un leurre immatériel, pas un vrai jeton posé.
+        if (!pData || !pData.estIllusion) {
+            const ombreSol = document.createElement("div");
+            ombreSol.className = "token-ombre-sol";
+            ombreSol.style.position = "absolute";
+            ombreSol.style.top = "56%";  // Décalage vers le sud : c'est lui qui fait apparaître le croissant
+            ombreSol.style.left = "50%";
+            ombreSol.style.transform = "translate(-50%, -50%)";
+            ombreSol.style.width = "97%";
+            ombreSol.style.height = "97%";
+            ombreSol.style.borderRadius = "50%";
+            // Coeur dense et opaque, puis long fondu vers les bords : donne le flou du contact sans filtre CSS.
+            // "closest-side" est indispensable ici : sans lui, un dégradé radial va par défaut jusqu'au
+            // coin le plus éloigné (bien au-delà du cercle visible découpé par border-radius), donc le
+            // fondu n'atteint jamais 0 avant d'être tronqué net par le border-radius. Avec closest-side,
+            // le dégradé est calé sur le bord du cercle réellement visible : le fondu se termine pile là.
+            // Coeur franchement opaque jusqu'à 75% du rayon, puis fondu concentré sur le dernier quart :
+            // la zone visible (le croissant qui dépasse du médaillon) reste bien sombre, et seule
+            // l'extrémité du dégradé s'estompe en douceur au lieu d'être coupée net.
+            ombreSol.style.background = "radial-gradient(circle closest-side at 50% 50%, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.9) 75%, rgba(0,0,0,0.65) 90%, rgba(0,0,0,0) 100%)";
+            ombreSol.style.zIndex = "-2";
+            ombreSol.style.pointerEvents = "none";
+            divToken.appendChild(ombreSol);
+        }
 
         // 2️⃣ LE HALO DE SÉLECTION : couronne d'énergie dorée qui épouse le bord du médaillon.
         if (window.TOKEN_SELECTIONNE === idPerso) {
@@ -1565,7 +1569,6 @@ window.appliquerTokensVTT = function(tokensMap) {
         // 3️⃣ LE HALO DU BOUCLIER MAGIQUE : même effet, en cyan et deux fois plus lent.
         // Placé devant le médaillon (contrairement au halo de sélection) : les deux se
         // superposent proprement quand un personnage protégé est sélectionné.
-        const pData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPerso);
         if (pData && (parseInt(pData.Bouclier_Actuel) || 0) > 0) {
             const haloBouclier = construireHaloVTT({
                 idFiltre: "bouclier-" + idPerso,
@@ -1616,7 +1619,7 @@ window.appliquerTokensVTT = function(tokensMap) {
         img.onerror = () => { img.style.display = "none"; };
         // L'Illusion reprend le token du lanceur mais à 50% d'opacité, pour rester reconnaissable
         // comme un leurre plutôt qu'un vrai personnage.
-        if (pData && pData.estIllusion) img.style.opacity = "0.5";
+        if (pData && pData.estIllusion) img.style.opacity = "0.4";
 
         divToken.appendChild(img);
 

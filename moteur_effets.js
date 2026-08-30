@@ -424,7 +424,8 @@ window.creerIllusion = async function(idLanceur, q, r) {
     if (!lanceurData) return;
 
     const idIllusion = "ILLUSION_" + Math.random().toString(36).substring(2, 9);
-    const imgUrl = lanceurData.urlCloudinary || "";
+    // L'image du TOKEN de combat, pas le portrait du personnage.
+    const imgUrl = (window.TOKENS_VTT_DATA[idLanceur] && window.TOKENS_VTT_DATA[idLanceur].url) || lanceurData.urlCloudinary || "";
     const taille = (window.TOKENS_VTT_DATA[idLanceur] && window.TOKENS_VTT_DATA[idLanceur].taille) || 55;
 
     const dataIllusion = {
