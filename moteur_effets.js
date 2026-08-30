@@ -384,6 +384,81 @@ window.declencherPousseeCible = async function(idLanceur, idCible) {
     }
 };
 
+// =========================================================================
+//  TRACTION
+//  L'inverse de la Poussée : tire la cible vers le lanceur, jusqu'à 3 cases, sans jamais
+//  atterrir sur sa propre case (elle s'arrête au plus près à 1 case du lanceur). Même règles
+//  de blocage (mur, case supprimée, case occupée), même diffusion pour que tous les joueurs
+//  voient le même résultat, et même animation que la Poussée (voir jouerAnimationPoussee dans
+//  mouvement.js — la trajectoire suffit à donner l'impression inverse). La portée de ciblage
+//  (3 cases, ligne de vue) et le fait que Traction partage sa cible avec une éventuelle attaque
+//  sont gérés en amont dans demarrerCiblage/ajouterCibleCiblage.
+// =========================================================================
+window.declencherTractionCible = async function(idLanceur, idCible) {
+    const tkLanceur = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idLanceur] : null;
+    const tkCible = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idCible] : null;
+    if (!tkLanceur || !tkCible || !window.PLATEAU_VTT || !window.ID_PARTIE_COURANTE) return;
+
+    const dist = getHexDistance(tkLanceur, tkCible);
+    if (dist <= 1) return; // Déjà au contact : rien à tirer
+
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const cubeRound = (q, r, s) => {
+        let rq = Math.round(q), rr = Math.round(r), rs = Math.round(s);
+        let qd = Math.abs(rq - q), rd = Math.abs(rr - r), sd = Math.abs(rs - s);
+        if (qd > rd && qd > sd) rq = -rr - rs;
+        else if (rd > sd) rr = -rq - rs;
+        return { q: rq, r: rr };
+    };
+    // On part de la cible et on avance vers le lanceur (sens inverse de la Poussée).
+    const aCube = { q: tkCible.q + 1e-6, r: tkCible.r + 1e-6, s: -tkCible.q - tkCible.r - 2e-6 };
+    const bCube = { q: tkLanceur.q + 1e-6, r: tkLanceur.r + 1e-6, s: -tkLanceur.q - tkLanceur.r - 2e-6 };
+
+    const estLibre = (q, r) => {
+        const state = window.PLATEAU_VTT.getCaseState(q, r);
+        if (state.isBlocked || state.isDeleted) return false;
+        for (let idAutre in window.TOKENS_VTT_DATA) {
+            if (idAutre === idCible) continue;
+            const autre = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idAutre);
+            if (!autre || autre.statut === "Mort") continue;
+            const tkAutre = window.TOKENS_VTT_DATA[idAutre];
+            if (tkAutre.q === q && tkAutre.r === r) return false;
+        }
+        return true;
+    };
+
+    const hexDepart = { q: tkCible.q, r: tkCible.r };
+    const maxPas = Math.min(3, dist - 1); // Ne jamais atterrir sur la case du lanceur
+    let arrivee = null;
+    for (let i = 1; i <= maxPas; i++) {
+        const t = i / dist;
+        const pt = cubeRound(lerp(aCube.q, bCube.q, t), lerp(aCube.r, bCube.r, t), lerp(aCube.s, bCube.s, t));
+        if (!estLibre(pt.q, pt.r)) break;
+        arrivee = pt;
+    }
+
+    if (!arrivee) {
+        if (typeof window.afficherMessageFlottantHex === "function") {
+            window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Traction (bloquée)", "#aaaaaa");
+        }
+        return;
+    }
+
+    window.TOKENS_VTT_DATA[idCible].q = arrivee.q;
+    window.TOKENS_VTT_DATA[idCible].r = arrivee.r;
+
+    try {
+        await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
+            Action_Traction: { idToken: idCible, depart: hexDepart, arrivee: arrivee, timestamp: Date.now() }
+        });
+        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
+            Tokens: window.TOKENS_VTT_DATA
+        }, { merge: true });
+    } catch (err) {
+        console.error("Erreur Traction :", err);
+    }
+};
+
 function rotateHex(hex, steps) {
     let q = hex.q, r = hex.r;
     for(let i = 0; i < steps; i++) {
@@ -761,6 +836,45 @@ window.demarrerCiblage = async function(idCarte) {
                 });
             }
 
+            // 🔻 NOUVEAU : DÉTECTION TRACTION 🔻
+            // Chance de tirer la cible de 3 cases vers le lanceur (l'inverse de la Poussée). Porte
+            // toujours sa propre portée fixe de 3 cases + ligne de vue dégagée, incompatible avec le
+            // mod "Distance" (voir la Forge) pour ne jamais avoir deux portées à réconcilier. Pas un
+            // état persistant : résolue et diffusée à part comme la Poussée (même animation, sens
+            // inverse), voir declencherTractionCible / jouerAnimationPoussee.
+            let isTraction = false;
+            let tractionChance = 0;
+
+            if (nomLower.includes("traction")) {
+                isTraction = true;
+                tractionChance += (parseFrFloat(effBase.Pourcent_Base) || 0) * (act.count || 1);
+            }
+
+            listeMods.forEach(m => {
+                const modEff = window.EFFETS_BDD_CACHE[m.id];
+                if (modEff && (modEff.Nom || "").toLowerCase().includes("traction")) {
+                    isTraction = true;
+                    tractionChance += (parseFrFloat(modEff.Pourcent_Base) || 0) * m.count;
+                }
+            });
+
+            if (isTraction) {
+                if (tractionChance > 60) tractionChance = 60; // Cap à 60%
+
+                if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
+                alterationsExtraites.push({
+                    nom: "Traction",
+                    icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png",
+                    desc: `${tractionChance}% de chance de tirer la cible de 3 cases vers soi.`,
+                    chance: tractionChance,
+                    duree: 0, // Instantané : jamais ajouté à Etats_Alteres
+                    isRanged: true,
+                    rangeMax: 3,
+                    cibles: [],
+                    estTraction: true
+                });
+            }
+
             // 🔻 NOUVEAU : DÉTECTION ABSORPTION 🔻
             let isAbsorption = false;
             let absorptionValeur = 0;
@@ -835,6 +949,12 @@ window.demarrerCiblage = async function(idCarte) {
 
     const tkLanceur = window.TOKENS_VTT_DATA[window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage];
 
+    // Traction impose sa propre portée (3, ligne de vue dégagée) à toute la carte, même si
+    // l'attaque qui l'accompagne est en mêlée : comme les deux visent obligatoirement la même
+    // cible unique, la portée effective de ciblage doit être au moins celle de Traction.
+    const tractionAlt = alterationsExtraites.find(a => a.estTraction);
+    const porteeMinTraction = tractionAlt ? tractionAlt.rangeMax : 0;
+
     window.ETAT_CIBLAGE = {
         actif: true,
         idCarte: idCarte,
@@ -847,7 +967,8 @@ window.demarrerCiblage = async function(idCarte) {
         zoneRotationStep: 0,
         initialTwistAngle: 0,
         initialZoneStep: 0,
-        bondApresAttaque: bondApresLeReste ? { idLanceur: idLanceurBond, portee: porteeBond } : null
+        bondApresAttaque: bondApresLeReste ? { idLanceur: idLanceurBond, portee: porteeBond } : null,
+        porteeMinTraction: porteeMinTraction
     };
 
     if (configSort) window.surlignerEffetCarteActif(configSort.nom);
@@ -1088,7 +1209,11 @@ window.dessinerAnneauxCiblage = function() {
         const tk = window.TOKENS_VTT_DATA[idToken];
         const dist = getHexDistance(tkLanceur, tk);
 
-        if (dist > configSort.rangeMax) continue;
+        // Traction impose sa portée de 3 à toute la carte (même cible unique pour l'attaque
+        // éventuelle), sans jamais réduire la portée normale de l'attaque elle-même.
+        const porteeEffective = Math.max(configSort.rangeMax, window.ETAT_CIBLAGE.porteeMinTraction || 0);
+
+        if (dist > porteeEffective) continue;
         if (!configSort.isHeal && estEngage && dist > 1) continue;
         if (!verifierLigneDeVue(tkLanceur, tk)) continue;
 
@@ -1224,7 +1349,10 @@ window.ajouterCibleCiblage = function(idCible) {
     
     const dist = getHexDistance(tkLanceur, tkCible);
 
-    if (dist > configSort.rangeMax) {
+    // Traction impose sa portée de 3 à toute la carte (voir demarrerCiblage)
+    const porteeEffective = Math.max(configSort.rangeMax, window.ETAT_CIBLAGE.porteeMinTraction || 0);
+
+    if (dist > porteeEffective) {
         window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Hors de portée", "#aaaaaa");
         return;
     }
@@ -1770,6 +1898,20 @@ window.jouerAnimationMoteur = async function(action) {
                         console.log(`🎲 Jet de Poussée sur ${cData.nom} : Résultat ${rollPoussee} (Chance: ${alt.chance}%)`);
                         if (rollPoussee <= alt.chance && typeof window.declencherPousseeCible === "function") {
                             await window.declencherPousseeCible(lanceur, idCible);
+                        }
+                    }
+                    continue;
+                }
+
+                // Traction : même principe que la Poussée, sens inverse. Pas un état persistant.
+                if (alt.estTraction) {
+                    const currentUserIdTraction = localStorage.getItem("ID_JOUEUR_COURANT");
+                    const lDataTraction = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
+                    if (lDataTraction && lDataTraction.idJoueur === currentUserIdTraction) {
+                        const rollTraction = Math.floor(Math.random() * 100) + 1;
+                        console.log(`🎲 Jet de Traction sur ${cData.nom} : Résultat ${rollTraction} (Chance: ${alt.chance}%)`);
+                        if (rollTraction <= alt.chance && typeof window.declencherTractionCible === "function") {
+                            await window.declencherTractionCible(lanceur, idCible);
                         }
                     }
                     continue;

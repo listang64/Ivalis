@@ -714,6 +714,28 @@ function estIncompatibleAvecArme(nomEffet, arme) {
     return false;
 }
 
+// Traction a sa propre portée fixe (3 cases) : elle ne peut pas cohabiter avec le mod "Distance"
+// sur la même carte, ni dans un sens ni dans l'autre, pour éviter toute confusion sur la portée
+// réellement appliquée. Vérifié sur TOUTE la carte (toutes les actions), pas juste l'action en cours.
+function carteContientMotCle(motCle) {
+    return window.forgeState.actions.some(act => {
+        if ((act.baseEffet.Nom || "").toLowerCase().includes(motCle)) return true;
+        return Object.keys(act.mods).some(modId => {
+            const m = window.forgeState.effetsBDD.find(e => e.id === modId);
+            return m && (m.Nom || "").toLowerCase().includes(motCle);
+        });
+    });
+}
+
+function carteContientModExact(nomExact) {
+    return window.forgeState.actions.some(act =>
+        Object.keys(act.mods).some(modId => {
+            const m = window.forgeState.effetsBDD.find(e => e.id === modId);
+            return m && m.Nom === nomExact;
+        })
+    );
+}
+
 // === OUTILS POUR LA ZONE ===
 function actionHasDistance(act) {
     if (act.baseEffet.Nom === "Distance") return true;
@@ -842,6 +864,9 @@ window.ouvrirMenuAjoutForge = function() {
     // 🔻 On vérifie si une attaque a déjà été posée sur le parchemin
     const aDejaUneAttaque = window.forgeState.actions.some(act => estUneAttaqueDeBase(act.baseEffet.Nom));
 
+    // Traction (portée fixe de 3 cases) est incompatible avec le mod "Distance" sur la même carte
+    const carteADejaDistance = carteContientModExact("Distance");
+
     ORDRE_CARACS.forEach(carac => {
         const effets = window.forgeState.effetsBDD.filter(e => {
             const mod = e.Modificateur ? e.Modificateur.toUpperCase() : "AUCUN";
@@ -857,8 +882,11 @@ window.ouvrirMenuAjoutForge = function() {
                 
                 // 🔻 On verrouille si c'est une attaque et qu'il y en a déjà une sur la carte
                 const isAttackLocked = aDejaUneAttaque && estUneAttaqueDeBase(eff.Nom);
-                
-                const isDisabled = isLocked || capAtteint || isArmeIncompatible || isAttackLocked;
+
+                // Traction incompatible avec une portée déjà présente ailleurs sur la carte
+                const isTractionLocked = carteADejaDistance && (eff.Nom || "").toLowerCase().includes("traction");
+
+                const isDisabled = isLocked || capAtteint || isArmeIncompatible || isAttackLocked || isTractionLocked;
                 const bgColor = isDisabled ? 'gray' : '#3b82f6';
                 
                 // Calcul de la fatigue
@@ -1325,6 +1353,11 @@ window.rafraichirForge = function() {
         // 🔻 Sécurité pour bloquer les attaques dans les menus déroulants
         const aDejaUneAttaque = window.forgeState.actions.some(act => estUneAttaqueDeBase(act.baseEffet.Nom));
 
+        // Traction a sa propre portée fixe (3 cases) : incompatible avec "Distance" partout sur la
+        // carte, dans les deux sens, pour ne jamais avoir deux portées différentes à réconcilier.
+        const carteADejaTraction = carteContientMotCle("traction");
+        const carteADejaDistanceMod = carteContientModExact("Distance");
+
         modsDispos.forEach(mod => {
             const isLocked = activeTags.size >= 2 && mod.Modificateur !== "AUCUN" && !activeTags.has(mod.Modificateur.toUpperCase());
             const isAttackLocked = aDejaUneAttaque && estUneAttaqueDeBase(mod.Nom);
@@ -1335,9 +1368,11 @@ window.rafraichirForge = function() {
 
                 // Calcul de la fatigue pour l'affichage
                 const coutFatigue = parseFrenchFloat(mod.Cout_PT) * 5;
-                const estIncompatiblePoussee = estActionPoussee && NOMS_INCOMPATIBLES_POUSSEE.includes((mod.Nom || "").toLowerCase());
+                const nomModLower = (mod.Nom || "").toLowerCase();
+                const estIncompatiblePoussee = estActionPoussee && NOMS_INCOMPATIBLES_POUSSEE.includes(nomModLower);
+                const estIncompatibleTraction = (mod.Nom === "Distance" && carteADejaTraction) || (nomModLower.includes("traction") && carteADejaDistanceMod);
                 groupesMods[carac].push(
-                    estIncompatiblePoussee
+                    (estIncompatiblePoussee || estIncompatibleTraction)
                         ? `<option value="${mod.id}" disabled style="color: #999;">${mod.Nom} (non compatible)</option>`
                         : `<option value="${mod.id}">${mod.Nom} (⚡ ${coutFatigue})</option>`
                 );

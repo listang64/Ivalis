@@ -1553,6 +1553,8 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
 
              if (dataPartie.Action_Poussee) window.DERNIER_ACTION_POUSSEE = dataPartie.Action_Poussee.timestamp;
 
+             if (dataPartie.Action_Traction) window.DERNIER_ACTION_TRACTION = dataPartie.Action_Traction.timestamp;
+
              estPremierScanPartie = false;
          } else {
              if (dataPartie.Action_Des && dataPartie.Action_Des.timestamp !== window.DERNIER_JET_DES) {
@@ -1585,6 +1587,11 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
              if (dataPartie.Action_Poussee && dataPartie.Action_Poussee.timestamp !== window.DERNIER_ACTION_POUSSEE) {
                  window.DERNIER_ACTION_POUSSEE = dataPartie.Action_Poussee.timestamp;
                  if (typeof window.jouerAnimationPoussee === "function") window.jouerAnimationPoussee(dataPartie.Action_Poussee);
+             }
+             // Traction : même animation que la Poussée (la trajectoire suffit à inverser l'effet)
+             if (dataPartie.Action_Traction && dataPartie.Action_Traction.timestamp !== window.DERNIER_ACTION_TRACTION) {
+                 window.DERNIER_ACTION_TRACTION = dataPartie.Action_Traction.timestamp;
+                 if (typeof window.jouerAnimationPoussee === "function") window.jouerAnimationPoussee(dataPartie.Action_Traction);
              }
          }
      }
