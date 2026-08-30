@@ -1536,6 +1536,29 @@ window.jouerAnimationMoteur = async function(action) {
                     dy = pxCible.y - pxLanceur.y;
                 }
 
+                // 🔻 NOUVEAU : petite ruée de l'attaquant pour l'Attaque légère/lourde 🔻
+                // Il avance très légèrement vers sa cible puis reprend sa place initiale, juste
+                // avant que le résultat (esquive/dégâts) ne s'affiche.
+                const nomAttaqueLower = (attaque.nom || "").toLowerCase();
+                const estAttaqueLegereOuLourde = nomAttaqueLower.includes("attaque légère")
+                    || nomAttaqueLower.includes("attaque legere")
+                    || nomAttaqueLower.includes("attaque lourde");
+                if (estAttaqueLegereOuLourde && tkLanceur && tkCible) {
+                    const tokenDivLanceur = document.getElementById("token-" + lanceur);
+                    if (tokenDivLanceur) {
+                        const magRuee = Math.sqrt(dx * dx + dy * dy) || 1;
+                        const avanceX = (dx / magRuee) * 18 * window.VTT_SCALE;
+                        const avanceY = (dy / magRuee) * 18 * window.VTT_SCALE;
+                        tokenDivLanceur.style.transition = "transform 0.1s ease-out";
+                        tokenDivLanceur.style.transform = `translate(calc(-50% + ${avanceX}px), calc(-50% + ${avanceY}px))`;
+                        await new Promise(r => setTimeout(r, 100));
+                        tokenDivLanceur.style.transition = "transform 0.15s ease-in";
+                        tokenDivLanceur.style.transform = `translate(-50%, -50%)`;
+                        await new Promise(r => setTimeout(r, 150));
+                        tokenDivLanceur.style.transition = "none";
+                    }
+                }
+
                 let esquive = (parseInt(cibleData.Esquive) || 0) + (parseInt(cibleData.Dev_Mod_Esquive) || 0);
                 let parade = (parseInt(cibleData.Parade) || 0) + (parseInt(cibleData.Dev_Mod_Parade) || 0);
                 
