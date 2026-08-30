@@ -1048,12 +1048,25 @@ document.addEventListener("click", async function(event) {
         const persoSelectionne = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === window.TOKEN_SELECTIONNE);
         
         const estMonTour = (
-            phase === "Resolution" && 
-            queue.length > 0 && 
-            queue[0].idPersonnage === window.TOKEN_SELECTIONNE && 
+            phase === "Resolution" &&
+            queue.length > 0 &&
+            queue[0].idPersonnage === window.TOKEN_SELECTIONNE &&
             persoSelectionne && persoSelectionne.idJoueur === monId &&
             !queue[0].aFaitSonMouvement
         );
+
+        // Immobilisation bloque tout déplacement volontaire (mais pas les déplacements subis
+        // comme Poussée/Traction/Peur, qui ne passent pas par ce clic de tracé de chemin).
+        const estImmobilise = persoSelectionne && persoSelectionne.Etats_Alteres
+            && persoSelectionne.Etats_Alteres.some(e => e.nom === "Immobilisation");
+
+        if (estMonTour && estImmobilise && !window.VTT_MODE_DEPLACEMENT) {
+            const tk = window.TOKENS_VTT_DATA[window.TOKEN_SELECTIONNE];
+            if (tk && typeof window.afficherMessageFlottantHex === "function") {
+                window.afficherMessageFlottantHex(tk.q, tk.r, "Immobilisé !", "#aaaaaa");
+            }
+            return;
+        }
 
         if (estMonTour && !window.VTT_MODE_DEPLACEMENT) {
             const conteneur = document.getElementById("conteneur-plateau-vtt");
@@ -2157,6 +2170,25 @@ window.finDeTourCombat = async function(forcer = false) {
 
                                     // 2. 🔻 DÉCRÉMENTATION DES ÉTATS ALTÉRÉS AU NOUVEAU TOUR 🔻
                                     if (perso.Etats_Alteres && perso.Etats_Alteres.length > 0) {
+                                        // Immobilisation : +20 fatigue à chaque tour où le personnage est encore
+                                        // immobilisé (donc jusqu'à 2 fois sur ses 2 tours de durée), avant que la
+                                        // durée ne soit décrémentée plus bas.
+                                        if (perso.Etats_Alteres.some(e => e.nom === "Immobilisation" && e.duree > 0)) {
+                                            fatigue = Math.min(fatigueMax, fatigue + 20);
+                                            perso.fatigueActuelle = fatigue;
+
+                                            const persoJoueurImmo = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === perso.idPersonnage);
+                                            if (persoJoueurImmo) persoJoueurImmo.fatigueActuelle = fatigue;
+
+                                            const persoActuelImmo = window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+                                            if (persoActuelImmo && persoActuelImmo.idPersonnage === perso.idPersonnage) {
+                                                window.COMBAT_FATIGUE_ACTUELLE = fatigue;
+                                            }
+
+                                            modifsFirebase.Fatigue_Actuelle = fatigue;
+                                            majRequise = true;
+                                        }
+
                                         let etatsAJour = perso.Etats_Alteres.map(e => {
                                             e.duree -= 1;
                                             return e;

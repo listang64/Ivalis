@@ -1414,7 +1414,10 @@ window.rafraichirForge = function() {
             const isActMaxed = act.count >= getMaxStacks(act.baseEffet);
             const btnPlusActDisabled = (isActMaxed || capDepasse) ? `disabled style="opacity: 0.3; cursor: not-allowed; border:none; background:none; font-weight:bold; font-size:18px;"` : `style="color: green; cursor: pointer; border:none; background:none; font-weight:bold; font-size:18px;"`;
 
-            const baseHasDuree = parseFrenchFloat(act.baseEffet.Tours) > 0;
+            // Immobilisation a une durée fixe de 2 tours : le bouton ⏳ (Durée +) ne doit jamais
+            // apparaître dessus, quoi que dise Tours en base.
+            const baseHasDuree = parseFrenchFloat(act.baseEffet.Tours) > 0
+                && !(act.baseEffet.Nom || "").toLowerCase().includes("immobil");
             const currentBaseDuree = act.baseDuree || 0;
             const btnPlusBaseDureeDisabled = (currentBaseDuree >= maxDureeStacks || capDepasse) ? `disabled style="opacity: 0.3; cursor: not-allowed; border:none; background:none; font-weight:bold; font-size:16px;"` : `style="color: green; cursor: pointer; border:none; background:none; font-weight:bold; font-size:16px;"`;
 
@@ -1431,7 +1434,9 @@ window.rafraichirForge = function() {
                     boutonEditerZone = `<button class="btn-parametres" style="padding: 3px 8px; font-size: 12px; margin-right: 5px; background: #3b82f6; color: white;" onclick="window.ouvrirEditeurZone('${act.idInst}')">Éditer</button>`;
                 }
 
-                const modHasDuree = parseFrenchFloat(modEff.Tours) > 0;
+                // Même règle que pour la base : pas de bouton Durée + sur Immobilisation.
+                const modHasDuree = parseFrenchFloat(modEff.Tours) > 0
+                    && !(modEff.Nom || "").toLowerCase().includes("immobil");
                 const currentModDuree = (act.modsDuree && act.modsDuree[modId]) || 0;
                 const btnPlusModDureeDisabled = (currentModDuree >= maxDureeStacks || capDepasse) ? `disabled style="opacity: 0.3; cursor: not-allowed; border:none; background:none; font-weight:bold; font-size:16px;"` : `style="color: green; cursor: pointer; border:none; background:none; font-weight:bold; font-size:16px;"`;
 

@@ -172,6 +172,16 @@ window.resoudreBondInteractif = function(idPerso, portee) {
         const tkDepart = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idPerso] : null;
         if (!tkDepart || !window.PLATEAU_VTT) return resolve(false);
 
+        // Immobilisation bloque tout mouvement volontaire, y compris le Bond (mais pas les
+        // déplacements subis comme Poussée/Traction/Peur).
+        const lanceurBond = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPerso);
+        if (lanceurBond && lanceurBond.Etats_Alteres && lanceurBond.Etats_Alteres.some(e => e.nom === "Immobilisation")) {
+            if (typeof window.afficherMessageFlottantHex === "function") {
+                window.afficherMessageFlottantHex(tkDepart.q, tkDepart.r, "Immobilisé !", "#aaaaaa");
+            }
+            return resolve(false);
+        }
+
         const hexDepart = { q: tkDepart.q, r: tkDepart.r };
 
         // 1. Cases d'arrivée valides : à portée, ni mur, ni case supprimée, ni occupée,
@@ -1097,6 +1107,44 @@ window.demarrerCiblage = async function(idCarte) {
                     desc: "-20% Esquive/Parade, 10% de chance d'échec d'attaque.",
                     chance: stunChance,
                     duree: stunDuree,
+                    isRanged: isRanged,
+                    rangeMax: rangeMax,
+                    cibles: []
+                });
+            }
+
+            // 🔻 NOUVEAU : DÉTECTION IMMOBILISATION 🔻
+            // État persistant classique (comme Étourdi), mais durée FIXE de 2 tours : contrairement
+            // à Étourdi, on ignore volontairement tout bonus de durée (act.baseDuree/modsDuree) —
+            // la Forge masque de toute façon le bouton ⏳ pour cet effet, mais on se protège aussi
+            // ici au cas où. Pas de cumul : la fusion par nom dans la boucle d'altérations (déjà en
+            // place pour tous les états) prend simplement le max des deux durées, jamais l'addition.
+            let isImmobilisation = false;
+            let immobilisationChance = 0;
+
+            if (nomLower.includes("immobil")) {
+                isImmobilisation = true;
+                immobilisationChance += (parseFrFloat(effBase.Pourcent_Base) || 0) * (act.count || 1);
+            }
+
+            listeMods.forEach(m => {
+                const modEff = window.EFFETS_BDD_CACHE[m.id];
+                if (modEff && (modEff.Nom || "").toLowerCase().includes("immobil")) {
+                    isImmobilisation = true;
+                    immobilisationChance += (parseFrFloat(modEff.Pourcent_Base) || 0) * m.count;
+                }
+            });
+
+            if (isImmobilisation) {
+                if (immobilisationChance > 40) immobilisationChance = 40; // Cap à 40%
+
+                if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
+                alterationsExtraites.push({
+                    nom: "Immobilisation",
+                    icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788081285/IMG_2076_vze0an.png",
+                    desc: "Ne peut plus se déplacer volontairement, gagne 20 fatigue par tour immobilisé.",
+                    chance: immobilisationChance,
+                    duree: 2, // Fixe, jamais modifiable par un bonus de durée
                     isRanged: isRanged,
                     rangeMax: rangeMax,
                     cibles: []
