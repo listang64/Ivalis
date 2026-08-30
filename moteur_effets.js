@@ -1410,9 +1410,14 @@ window.validerZoneAoE = function() {
     const configSort = state.attaques[0] || state.alterations[0];
     const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
 
+    // Une Illusion encaisse les dégâts (même en zone) mais reste insensible à tout le reste.
+    const carteEstAttaqueSimple = !!configSort && !configSort.isHeal && !configSort.isShield
+        && (state.alterations || []).length === 0;
+
     for (let idToken in window.TOKENS_VTT_DATA) {
         const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idToken);
         if (!cibleData || cibleData.statut === "Mort") continue;
+        if (cibleData.estIllusion && !carteEstAttaqueSimple) continue;
 
         if (configSort && configSort.isHeal) {
             if (cibleData.camp !== lanceurData.camp) continue;
@@ -1537,9 +1542,10 @@ window.dessinerAnneauxCiblage = function() {
 
     if (!tkLanceur || !lanceurData) return;
 
-    // Une Illusion ne peut être touchée que par une attaque simple, directe : ni zone, ni soin/
-    // bouclier, ni aucune autre altération accrochée à la carte (Poussée, Traction, Peur, Étourdi...).
-    const carteEstAttaqueSimple = !window.ETAT_CIBLAGE.isZone && !configSort.isHeal && !configSort.isShield
+    // Une Illusion encaisse les dégâts (même en zone) mais reste insensible à tout le reste : ni
+    // soin, ni bouclier, ni aucune autre altération accrochée à la carte (Poussée, Traction, Peur,
+    // Étourdi...). La zone en elle-même n'est donc plus disqualifiante, seulement ces effets-là.
+    const carteEstAttaqueSimple = !configSort.isHeal && !configSort.isShield
         && (window.ETAT_CIBLAGE.alterations || []).length === 0;
 
     let estEngage = false;
@@ -1697,9 +1703,9 @@ window.ajouterCibleCiblage = function(idCible) {
         return;
     }
 
-    // Une Illusion ne peut être touchée que par une attaque simple, directe : ni zone, ni soin/
-    // bouclier, ni aucune autre altération accrochée à la carte.
-    const carteEstAttaqueSimple = !state.isZone && !configSort.isHeal && !configSort.isShield
+    // Une Illusion encaisse les dégâts (même en zone) mais reste insensible à tout le reste : ni
+    // soin, ni bouclier, ni aucune autre altération accrochée à la carte.
+    const carteEstAttaqueSimple = !configSort.isHeal && !configSort.isShield
         && (state.alterations || []).length === 0;
     if (cibleData.estIllusion && !carteEstAttaqueSimple) {
         window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Cible invalide", "#aaaaaa");
