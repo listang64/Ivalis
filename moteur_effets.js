@@ -305,6 +305,165 @@ window.resoudreBondInteractif = function(idPerso, portee) {
 };
 
 // =========================================================================
+//  ILLUSION
+//  Crée un leurre statique de 1 PV, avec l'image du lanceur (affichée à 50% d'opacité, voir
+//  appliquerTokensVTT), sur une case libre choisie interactivement (même écran assombri que le
+//  Bond) dans la portée de l'action (1 par défaut, plus si un mod Distance est posé dessus).
+//  N'entre jamais dans la file d'initiative : c'est un pion purement statique, jamais son tour.
+//  Toujours résolue en dernier sur la carte (voir demarrerCiblage / declencherResolutionAvecBondEventuel).
+// =========================================================================
+window.resoudreIllusionInteractif = function(idLanceur, portee) {
+    return new Promise((resolve) => {
+        const tkLanceur = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idLanceur] : null;
+        if (!tkLanceur || !window.PLATEAU_VTT) return resolve(false);
+
+        const candidats = window.PLATEAU_VTT.getHexesInRadius(tkLanceur.q, tkLanceur.r, portee);
+        const hexesValides = candidats.filter(h => {
+            if (h.q === tkLanceur.q && h.r === tkLanceur.r) return false;
+
+            const state = window.PLATEAU_VTT.getCaseState(h.q, h.r);
+            if (state.isBlocked || state.isDeleted) return false;
+
+            for (let idAutre in window.TOKENS_VTT_DATA) {
+                const autre = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idAutre);
+                if (!autre || autre.statut === "Mort") continue;
+                const tkAutre = window.TOKENS_VTT_DATA[idAutre];
+                if (tkAutre.q === h.q && tkAutre.r === h.r) return false;
+            }
+
+            return verifierLigneDeVue(tkLanceur, h);
+        });
+
+        if (hexesValides.length === 0) {
+            alert("Aucune case libre pour poser l'illusion.");
+            return resolve(false);
+        }
+
+        const conteneurTransform = document.getElementById("transform-plateau");
+        const conteneur = document.getElementById("conteneur-plateau-vtt");
+        if (!conteneurTransform || !conteneur) return resolve(false);
+
+        const ancienOverlay = document.getElementById("svg-illusion-assombrissement");
+        if (ancienOverlay) ancienOverlay.remove();
+
+        const hexSize = window.PLATEAU_VTT.hexSize;
+        const pointsHex = (q, r) => {
+            const px = window.PLATEAU_VTT.hexToPixel(q, r);
+            let pts = "";
+            for (let i = 0; i < 6; i++) {
+                const angle = Math.PI / 180 * (60 * i);
+                pts += (px.x + hexSize * Math.cos(angle)) + "," + (px.y + hexSize * Math.sin(angle)) + " ";
+            }
+            return pts.trim();
+        };
+
+        const maskId = "masque-illusion-" + Date.now();
+        let trous = "";
+        hexesValides.forEach(h => { trous += `<polygon points="${pointsHex(h.q, h.r)}" fill="black"/>`; });
+
+        const overlay = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        overlay.id = "svg-illusion-assombrissement";
+        overlay.style.cssText = "position:absolute; top:0; left:0; overflow:visible; z-index:4; pointer-events:none;";
+        overlay.innerHTML = `
+            <defs>
+                <mask id="${maskId}">
+                    <rect x="-20000" y="-20000" width="40000" height="40000" fill="white"/>
+                    ${trous}
+                </mask>
+            </defs>
+            <rect x="-20000" y="-20000" width="40000" height="40000" fill="rgba(0,0,0,0.6)" mask="url(#${maskId})"/>
+        `;
+        conteneurTransform.appendChild(overlay);
+        window.surlignerEffetCarteActif("Illusion");
+
+        const nettoyer = () => {
+            overlay.remove();
+            window.surlignerEffetCarteActif(null);
+            window.removeEventListener("click", onClick, { capture: true });
+        };
+
+        const onClick = async (e) => {
+            if (!conteneur.contains(e.target)) return;
+            e.stopPropagation();
+
+            const tokenClique = e.target.closest ? e.target.closest(".token-vtt") : null;
+            if (tokenClique) {
+                const tkClique = window.TOKENS_VTT_DATA[tokenClique.id.replace("token-", "")];
+                if (tkClique && typeof window.afficherMessageFlottantHex === "function") {
+                    window.afficherMessageFlottantHex(tkClique.q, tkClique.r, "Case invalide", "#aaaaaa");
+                }
+                return;
+            }
+
+            const canvasX = (e.clientX - window.VTT_POS_X) / window.VTT_SCALE;
+            const canvasY = (e.clientY - window.VTT_POS_Y) / window.VTT_SCALE;
+            const hex = window.PLATEAU_VTT.pixelToHex(canvasX, canvasY);
+            const cible = hexesValides.find(h => h.q === hex.q && h.r === hex.r);
+
+            if (!cible) return; // Hors zone valide : ne fait rien
+
+            nettoyer();
+
+            if (typeof window.creerIllusion === "function") {
+                await window.creerIllusion(idLanceur, cible.q, cible.r);
+            }
+
+            resolve(true);
+        };
+
+        window.addEventListener("click", onClick, { capture: true });
+    });
+};
+
+// Crée le personnage "Illusion" en base (comme un ennemi de test spawné, cf. spawnEnnemiTest) et
+// son pion sur le plateau : les écouteurs déjà en place sur Personnages/Combat_VTT propagent la
+// création à tous les joueurs, sans diffusion dédiée nécessaire.
+window.creerIllusion = async function(idLanceur, q, r) {
+    if (!window.ID_PARTIE_COURANTE) return;
+    const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
+    if (!lanceurData) return;
+
+    const idIllusion = "ILLUSION_" + Math.random().toString(36).substring(2, 9);
+    const imgUrl = lanceurData.urlCloudinary || "";
+    const taille = (window.TOKENS_VTT_DATA[idLanceur] && window.TOKENS_VTT_DATA[idLanceur].taille) || 55;
+
+    const dataIllusion = {
+        ID_Partie: window.ID_PARTIE_COURANTE,
+        ID_Joueur: lanceurData.idJoueur || "MJ",
+        Camp: lanceurData.camp,
+        Prenom_Personnage: "Illusion de",
+        Nom_Personnage: (lanceurData.prenom || lanceurData.nom || "").trim(),
+        Statut: "Vivant",
+        PV_Max: 1,
+        PV_Actuels: 1,
+        Fatigue_Max: 0,
+        Fatigue_Actuelle: 0,
+        URL_Cloudinary: imgUrl,
+        URL_Token: imgUrl,
+        Couleur: lanceurData.couleur || "#c2a878",
+        Initiative: 0,
+        Esquive: 0,
+        Parade: 0,
+        Critique: 0,
+        Def_Physique: 0,
+        Def_Magique: 0,
+        Competences_Max: 0,
+        Est_Illusion: true
+    };
+
+    try {
+        await setDoc(doc(db, "Personnages", idIllusion), dataIllusion);
+
+        window.TOKENS_VTT_DATA[idIllusion] = { q, r, url: imgUrl, taille };
+        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
+            Tokens: window.TOKENS_VTT_DATA
+        }, { merge: true });
+    } catch (err) {
+        console.error("Erreur création Illusion :", err);
+    }
+};
+
+// =========================================================================
 //  POUSSÉE
 //  Déplacement forcé de 2 cases en ligne droite depuis le lanceur, à travers la cible.
 //  La chance est extraite dans demarrerCiblage ; le jet lui-même est fait UNE SEULE FOIS,
@@ -781,6 +940,8 @@ window.demarrerCiblage = async function(idCarte) {
     let indexPremierAutreEffet = -1;
     let indexTraction = -1;
     let indexPremiereAttaque = -1;
+    let isIllusion = false;
+    let porteeIllusion = 1;
 
     const parseFrFloat = (val) => {
         if (val === undefined || val === null || val === "") return 0;
@@ -848,6 +1009,16 @@ window.demarrerCiblage = async function(idCarte) {
                     rangeMax = 1 + ((parseFrFloat(modEff.Valeur) || 0) * m.count);
                 }
             });
+
+            // Illusion : pas une attaque/altération, pas de cible ennemie — un effet auto-centré
+            // traité à part, comme le Bond, mais toujours résolu en DERNIER sur la carte (voir plus
+            // bas). Sa portée de placement suit la portée normale de l'action (1 par défaut, plus
+            // si un mod Distance est posé dessus).
+            if (nomLower.includes("illusion")) {
+                isIllusion = true;
+                porteeIllusion = rangeMax;
+                return;
+            }
 
             // A. Détection Attaques, Soins & Purifications
             let isPurification = false;
@@ -1100,6 +1271,11 @@ window.demarrerCiblage = async function(idCarte) {
     }
 
     if (attaquesExtraites.length === 0 && alterationsExtraites.length === 0) {
+        // Illusion seule sur la carte (ou dernière chose restante après le Bond) : elle se résout
+        // ici, immédiatement, puisqu'il n'y a rien d'autre après elle.
+        if (isIllusion) {
+            await window.resoudreIllusionInteractif(idLanceurBond, porteeIllusion);
+        }
         window.validerCarteCombat(idCarte, document.getElementById("btn-appliquer-carte"));
         return;
     }
@@ -1147,7 +1323,8 @@ window.demarrerCiblage = async function(idCarte) {
         initialZoneStep: 0,
         bondApresAttaque: bondApresLeReste ? { idLanceur: idLanceurBond, portee: porteeBond } : null,
         porteeMinTraction: porteeMinTraction,
-        tractionAvantAttaque: tractionAvantAttaque
+        tractionAvantAttaque: tractionAvantAttaque,
+        illusionEnAttente: isIllusion ? { idLanceur: idLanceurBond, portee: porteeIllusion } : null
     };
 
     if (configSort) window.surlignerEffetCarteActif(configSort.nom);
@@ -1351,14 +1528,19 @@ window.dessinerAnneauxCiblage = function() {
         return;
     }
 
-    const configSort = window.ETAT_CIBLAGE.attaques[0] || window.ETAT_CIBLAGE.alterations[0]; 
+    const configSort = window.ETAT_CIBLAGE.attaques[0] || window.ETAT_CIBLAGE.alterations[0];
     if (!configSort) return;
 
     const idLanceur = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
     const tkLanceur = window.TOKENS_VTT_DATA[idLanceur];
     const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
-    
+
     if (!tkLanceur || !lanceurData) return;
+
+    // Une Illusion ne peut être touchée que par une attaque simple, directe : ni zone, ni soin/
+    // bouclier, ni aucune autre altération accrochée à la carte (Poussée, Traction, Peur, Étourdi...).
+    const carteEstAttaqueSimple = !window.ETAT_CIBLAGE.isZone && !configSort.isHeal && !configSort.isShield
+        && (window.ETAT_CIBLAGE.alterations || []).length === 0;
 
     let estEngage = false;
     for (let idToken in window.TOKENS_VTT_DATA) {
@@ -1377,6 +1559,7 @@ window.dessinerAnneauxCiblage = function() {
     for (let idToken in window.TOKENS_VTT_DATA) {
         const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idToken);
         if (!cibleData || cibleData.statut === "Mort") continue;
+        if (cibleData.estIllusion && !carteEstAttaqueSimple) continue;
 
         if (configSort.isHeal) {
             if (cibleData.camp !== lanceurData.camp) continue;
@@ -1514,6 +1697,15 @@ window.ajouterCibleCiblage = function(idCible) {
         return;
     }
 
+    // Une Illusion ne peut être touchée que par une attaque simple, directe : ni zone, ni soin/
+    // bouclier, ni aucune autre altération accrochée à la carte.
+    const carteEstAttaqueSimple = !state.isZone && !configSort.isHeal && !configSort.isShield
+        && (state.alterations || []).length === 0;
+    if (cibleData.estIllusion && !carteEstAttaqueSimple) {
+        window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Cible invalide", "#aaaaaa");
+        return;
+    }
+
     if (configSort.isHeal) {
         if (cibleData.camp !== lanceurData.camp) {
             window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Cible invalide", "#aaaaaa");
@@ -1629,9 +1821,14 @@ window.declencherResolution = async function() {
 // carte est respecté, et le saut interactif ne bloque jamais le lancement de l'attaque.
 window.declencherResolutionAvecBondEventuel = async function() {
     const bondEnAttente = window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.bondApresAttaque;
+    const illusionEnAttente = window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.illusionEnAttente;
     await window.declencherResolution();
     if (bondEnAttente) {
         await window.resoudreBondInteractif(bondEnAttente.idLanceur, bondEnAttente.portee);
+    }
+    // L'Illusion se crée toujours en dernier sur la carte, après tout le reste (attaque, Bond...).
+    if (illusionEnAttente) {
+        await window.resoudreIllusionInteractif(illusionEnAttente.idLanceur, illusionEnAttente.portee);
     }
 };
 

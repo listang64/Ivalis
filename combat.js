@@ -1612,8 +1612,11 @@ window.appliquerTokensVTT = function(tokensMap) {
         img.style.position = "absolute";
         img.style.top = "0";
         img.style.left = "0";
-        img.style.zIndex = "2"; 
+        img.style.zIndex = "2";
         img.onerror = () => { img.style.display = "none"; };
+        // L'Illusion reprend le token du lanceur mais à 50% d'opacité, pour rester reconnaissable
+        // comme un leurre plutôt qu'un vrai personnage.
+        if (pData && pData.estIllusion) img.style.opacity = "0.5";
 
         divToken.appendChild(img);
 
@@ -2481,10 +2484,10 @@ window.animerTexteTour = function(tour) {
 window.reinitialiserCombat = async function() {
     if (!confirm("Voulez-vous vraiment réinitialiser ce combat ? Tous les PV et la Fatigue seront restaurés, et le combat repassera au Tour 1.")) return;
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    
+
     try {
-        const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
-        
+        const { doc, deleteDoc, updateDoc, deleteField } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+
         // A. Reset de la Partie (Tour 1, file vide)
         if (window.ID_PARTIE_COURANTE) {
             const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
@@ -2493,6 +2496,19 @@ window.reinitialiserCombat = async function() {
                 Phase_Combat: "Preparation",
                 Tour_Combat: 1
             });
+        }
+
+        // A bis. Les Illusions ne survivent pas au combat : c'est le seul vrai "fin de combat"
+        // disponible dans le jeu (pas de bouton dédié pour ça), donc leur nettoyage est accroché ici.
+        const illusions = (window.PERSOS_PARTIE || []).filter(p => p.estIllusion);
+        if (illusions.length > 0 && window.ID_PARTIE_COURANTE) {
+            const vttRef = doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE);
+            for (const illusion of illusions) {
+                delete window.TOKENS_VTT_DATA[illusion.idPersonnage];
+                await deleteDoc(doc(db, "Personnages", illusion.idPersonnage)).catch(e => console.error(e));
+                await updateDoc(vttRef, { ["Tokens." + illusion.idPersonnage]: deleteField() }).catch(e => console.error(e));
+            }
+            if (typeof window.appliquerTokensVTT === "function") window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
         }
 
         // B. Reset des Personnages (Soin total de la Vie et de l'Énergie)

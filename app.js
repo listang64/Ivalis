@@ -168,7 +168,8 @@ function persoDocVersFront(id, d) {
     Competences_Max: d.Competences_Max !== undefined ? d.Competences_Max : 6,
     Etats_Alteres: etatsAlteres,
     Bouclier_Max: d.Bouclier_Max || 0,
-    Bouclier_Actuel: d.Bouclier_Actuel || 0
+    Bouclier_Actuel: d.Bouclier_Actuel || 0,
+    estIllusion: d.Est_Illusion === true
   };
 }
 

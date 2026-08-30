@@ -1340,7 +1340,16 @@ window.rafraichirForge = function() {
         });
     };
 
-    const renderSelectMenu = (type, label, color, actionId, estActionPoussee) => {
+    // L'Illusion est un leurre statique, fixe : le mod "Zone" n'a pas de sens dessus.
+    const actionContientIllusion = (act) => {
+        if ((act.baseEffet.Nom || "").toLowerCase().includes("illusion")) return true;
+        return Object.keys(act.mods).some(modId => {
+            const m = window.forgeState.effetsBDD.find(e => e.id === modId);
+            return m && (m.Nom || "").toLowerCase().includes("illusion");
+        });
+    };
+
+    const renderSelectMenu = (type, label, color, actionId, estActionPoussee, estActionIllusion) => {
         if (type === "Physique" && window.forgeState.armePrincipale === "Magie") return "";
 
         let modsDispos = window.forgeState.effetsBDD.filter(e =>
@@ -1371,8 +1380,9 @@ window.rafraichirForge = function() {
                 const nomModLower = (mod.Nom || "").toLowerCase();
                 const estIncompatiblePoussee = estActionPoussee && NOMS_INCOMPATIBLES_POUSSEE.includes(nomModLower);
                 const estIncompatibleTraction = (mod.Nom === "Distance" && carteADejaTraction) || (nomModLower.includes("traction") && carteADejaDistanceMod);
+                const estIncompatibleIllusion = estActionIllusion && mod.Nom === "Zone";
                 groupesMods[carac].push(
-                    (estIncompatiblePoussee || estIncompatibleTraction)
+                    (estIncompatiblePoussee || estIncompatibleTraction || estIncompatibleIllusion)
                         ? `<option value="${mod.id}" disabled style="color: #999;">${mod.Nom} (non compatible)</option>`
                         : `<option value="${mod.id}">${mod.Nom} (⚡ ${coutFatigue})</option>`
                 );
@@ -1478,10 +1488,10 @@ window.rafraichirForge = function() {
                     ${htmlMods}
 
                     <div style="display: flex; gap: 15px; margin-left: 20px; margin-top: 12px; padding-top: 8px; border-top: 1px dashed rgba(0,0,0,0.1);">
-                        ${renderSelectMenu("Spatial", "Spatial", "#3b82f6", act.idInst, actionContientPoussee(act))}
-                        ${renderSelectMenu("Physique", "Physique", "#ef4444", act.idInst, actionContientPoussee(act))}
-                        ${renderSelectMenu("Magique", "Magique", "#a855f7", act.idInst, actionContientPoussee(act))}
-                        ${renderSelectMenu("Duree", "Durée", "#9333ea", act.idInst, actionContientPoussee(act))}
+                        ${renderSelectMenu("Spatial", "Spatial", "#3b82f6", act.idInst, actionContientPoussee(act), actionContientIllusion(act))}
+                        ${renderSelectMenu("Physique", "Physique", "#ef4444", act.idInst, actionContientPoussee(act), actionContientIllusion(act))}
+                        ${renderSelectMenu("Magique", "Magique", "#a855f7", act.idInst, actionContientPoussee(act), actionContientIllusion(act))}
+                        ${renderSelectMenu("Duree", "Durée", "#9333ea", act.idInst, actionContientPoussee(act), actionContientIllusion(act))}
                     </div>
                 </div>
             `;
