@@ -455,6 +455,20 @@ window.declencherTractionCible = async function(idLanceur, idCible) {
     }
 };
 
+// Diffuse un simple message d'échec (ni déplacement ni animation) quand le jet de Poussée/Traction
+// rate, pour que tous les joueurs comprennent que rien ne s'est passé volontairement, et non par bug.
+// Réutilise le même champ que le déplacement réussi : jouerAnimationPoussee sait afficher les deux.
+window.diffuserEchecDeplacementForce = async function(champFirestore, idCible, nomEffet) {
+    if (!window.ID_PARTIE_COURANTE) return;
+    try {
+        await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
+            [champFirestore]: { idToken: idCible, echec: true, nomEffet, timestamp: Date.now() }
+        });
+    } catch (err) {
+        console.error(`Erreur diffusion échec ${nomEffet} :`, err);
+    }
+};
+
 function rotateHex(hex, steps) {
     let q = hex.q, r = hex.r;
     for(let i = 0; i < steps; i++) {
@@ -1502,6 +1516,8 @@ window.jouerAnimationMoteur = async function(action) {
                 console.log(`🎲 Jet de Traction (avant attaque) : Résultat ${rollTractionTot} (Chance: ${tractionAlt.chance}%)`);
                 if (rollTractionTot <= tractionAlt.chance && typeof window.declencherTractionCible === "function") {
                     await window.declencherTractionCible(lanceur, idCibleTraction);
+                } else if (typeof window.diffuserEchecDeplacementForce === "function") {
+                    await window.diffuserEchecDeplacementForce("Action_Traction", idCibleTraction, "Traction");
                 }
             }
             await new Promise(r => setTimeout(r, 900));
@@ -1951,6 +1967,8 @@ window.jouerAnimationMoteur = async function(action) {
                         console.log(`🎲 Jet de Poussée sur ${cData.nom} : Résultat ${rollPoussee} (Chance: ${alt.chance}%)`);
                         if (rollPoussee <= alt.chance && typeof window.declencherPousseeCible === "function") {
                             await window.declencherPousseeCible(lanceur, idCible);
+                        } else if (typeof window.diffuserEchecDeplacementForce === "function") {
+                            await window.diffuserEchecDeplacementForce("Action_Poussee", idCible, "Poussée");
                         }
                     }
                     continue;
@@ -1967,6 +1985,8 @@ window.jouerAnimationMoteur = async function(action) {
                         console.log(`🎲 Jet de Traction sur ${cData.nom} : Résultat ${rollTraction} (Chance: ${alt.chance}%)`);
                         if (rollTraction <= alt.chance && typeof window.declencherTractionCible === "function") {
                             await window.declencherTractionCible(lanceur, idCible);
+                        } else if (typeof window.diffuserEchecDeplacementForce === "function") {
+                            await window.diffuserEchecDeplacementForce("Action_Traction", idCible, "Traction");
                         }
                     }
                     continue;

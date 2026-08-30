@@ -541,6 +541,16 @@ window.jouerAnimationBond = async function(data) {
 // s'y attend pas, l'impact est immédiat) — grandi pendant le trajet -> rétréci à
 // l'atterrissage -> taille normale.
 window.jouerAnimationPoussee = async function(data) {
+    // Jet raté : rien ne bouge, juste un petit message pour que tout le monde comprenne que
+    // l'effet a été tenté mais n'a pas fonctionné (et que ce n'est pas un bug).
+    if (data.echec) {
+        const tk = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[data.idToken] : null;
+        if (tk && typeof window.afficherMessageFlottantHex === "function") {
+            window.afficherMessageFlottantHex(tk.q, tk.r, `${data.nomEffet || "Effet"} loupée`, "#aaaaaa");
+        }
+        return;
+    }
+
     const tokenDiv = document.getElementById("token-" + data.idToken);
     if (!tokenDiv || !window.PLATEAU_VTT) return;
 
