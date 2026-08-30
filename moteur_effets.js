@@ -1227,7 +1227,15 @@ window.demarrerCiblage = async function(idCarte) {
             // quand même sa chance d'esquive/parade normale, gérée en amont comme pour tous les
             // autres effets). Durée fixe de 4 tours, jamais prolongeable par Durée+ (bouton
             // masqué en Forge, comme pour Immobilisation).
-            if (nomLower.includes("paralys")) {
+            let isParalysie = nomLower.includes("paralys");
+            listeMods.forEach(m => {
+                const modEff = window.EFFETS_BDD_CACHE[m.id];
+                if (modEff && (modEff.Nom || "").toLowerCase().includes("paralys")) {
+                    isParalysie = true;
+                }
+            });
+
+            if (isParalysie) {
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 alterationsExtraites.push({
                     nom: "Paralysie",
