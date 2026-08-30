@@ -506,16 +506,25 @@ window.declencherPeurCible = async function(idLanceur, idCible) {
     };
 
     const chemin = [];
+    const dejaVisite = new Set([`${tkCibleDepart.q},${tkCibleDepart.r}`]);
     let hexActuel = { q: tkCibleDepart.q, r: tkCibleDepart.r };
     for (let i = 0; i < 4; i++) {
         const distActuelle = getHexDistance(tkLanceur, hexActuel);
-        const candidats = DIRECTIONS_HEX
+        const voisinsLibres = DIRECTIONS_HEX
             .map(d => ({ q: hexActuel.q + d.q, r: hexActuel.r + d.r }))
-            .filter(c => getHexDistance(tkLanceur, c) > distActuelle && estLibre(c.q, c.r));
+            .filter(c => estLibre(c.q, c.r) && !dejaVisite.has(`${c.q},${c.r}`));
 
-        if (candidats.length === 0) break; // Coincée : la fuite s'arrête net
+        // On préfère les cases qui éloignent vraiment du lanceur ; si elles sont toutes
+        // bloquées (mur, case supprimée, occupée), on cherche un autre chemin plutôt que de
+        // s'arrêter net contre l'obstacle — la seule contrainte est de ne jamais repasser sur
+        // une case déjà prise pendant cette fuite.
+        let candidats = voisinsLibres.filter(c => getHexDistance(tkLanceur, c) > distActuelle);
+        if (candidats.length === 0) candidats = voisinsLibres;
+
+        if (candidats.length === 0) break; // Vraiment coincée : plus aucune case libre inexplorée
 
         hexActuel = candidats[Math.floor(Math.random() * candidats.length)];
+        dejaVisite.add(`${hexActuel.q},${hexActuel.r}`);
         chemin.push({ q: hexActuel.q, r: hexActuel.r });
     }
 
