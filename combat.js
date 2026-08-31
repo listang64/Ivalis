@@ -2509,9 +2509,10 @@ window.finDeTourCombat = async function(forcer = false) {
                         phase = "Preparation";
                         tour++;
 
-                        // 🔻 Zones persistantes : une case en moins à vivre à chaque nouveau tour.
-                        // Tous les clients recalculent la même valeur à partir du même snapshot,
-                        // donc l'écriture converge (même principe que les états altérés).
+                        // 🔻 Zones persistantes : un tour de moins à vivre à chaque nouveau tour.
+                        // L'écriture passe par sauvegarderZonesPersistantes (updateDoc) : un
+                        // setDoc en merge fusionnerait les clés et les zones expirées ne
+                        // disparaîtraient jamais.
                         const zonesActuelles = window.ZONES_PERSISTANTES || {};
                         if (Object.keys(zonesActuelles).length > 0) {
                             const zonesRestantes = {};
@@ -2521,9 +2522,9 @@ window.finDeTourCombat = async function(forcer = false) {
                             });
                             window.ZONES_PERSISTANTES = zonesRestantes;
                             if (typeof window.appliquerZonesPersistantes === "function") window.appliquerZonesPersistantes();
-                            setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
-                                Zones_Persistantes: zonesRestantes
-                            }, { merge: true }).catch(e => console.error(e));
+                            if (typeof window.sauvegarderZonesPersistantes === "function") {
+                                window.sauvegarderZonesPersistantes(zonesRestantes).catch(e => console.error(e));
+                            }
                         }
 
                         if (window.PERSOS_PARTIE && window.PERSOS_PARTIE.length > 0) {
@@ -2983,10 +2984,13 @@ window.reinitialiserCombat = async function() {
 
         // A bis. Les Illusions ne survivent pas au combat : c'est le seul vrai "fin de combat"
         // disponible dans le jeu (pas de bouton dédié pour ça), donc leur nettoyage est accroché ici.
-        // Les zones persistantes ne survivent pas à une réinitialisation de combat.
+        // Les zones persistantes ne survivent pas à une réinitialisation de combat. Là encore,
+        // updateDoc et pas setDoc/merge : sinon la map vide ne supprimerait rien du tout.
         if (window.ID_PARTIE_COURANTE) {
             window.ZONES_PERSISTANTES = {};
-            await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), { Zones_Persistantes: {} }, { merge: true }).catch(e => console.error(e));
+            if (typeof window.sauvegarderZonesPersistantes === "function") {
+                await window.sauvegarderZonesPersistantes({}).catch(e => console.error(e));
+            }
             if (typeof window.appliquerZonesPersistantes === "function") window.appliquerZonesPersistantes();
         }
 

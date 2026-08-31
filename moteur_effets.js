@@ -111,6 +111,25 @@ window.HABILLAGE_ZONES_PERSISTANTES = {
     neutre:      { message: "💥 Terrain piégé !", couleur: "#ff4c4c" }
 };
 
+// ⚠️ Toujours passer par ici pour écrire les zones : setDoc(..., {merge:true}) FUSIONNE les clés
+// des maps imbriquées, donc retirer une zone de l'objet ne la supprimait jamais côté Firestore
+// (zones éternelles, et bouton "Réinitialiser le combat" sans effet). updateDoc, lui, remplace
+// bien la valeur complète du champ.
+window.sauvegarderZonesPersistantes = async function(zones) {
+    if (!window.ID_PARTIE_COURANTE) return;
+    const ref = doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE);
+    try {
+        await updateDoc(ref, { Zones_Persistantes: zones });
+    } catch (e) {
+        // Document pas encore créé (début de partie) : on le crée avec le champ.
+        try {
+            await setDoc(ref, { Zones_Persistantes: zones }, { merge: true });
+        } catch (err) {
+            console.error("Erreur sauvegarde zones persistantes :", err);
+        }
+    }
+};
+
 // Construite par le lanceur uniquement (declencherResolution ne tourne que chez lui), puis
 // diffusée à tous via Combat_VTT.
 window.creerZonePersistante = async function(state, idLanceur) {
@@ -161,8 +180,17 @@ window.creerZonePersistante = async function(state, idLanceur) {
     const type = etat ? (window.TYPES_ZONES_PERSISTANTES[etat.nom] || "neutre") : "neutre";
     const id = "zp_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
 
-    window.ZONES_PERSISTANTES = window.ZONES_PERSISTANTES || {};
-    window.ZONES_PERSISTANTES[id] = {
+    // Pas de superposition : la nouvelle zone REMPLACE les anciennes sur les cases qu'elle
+    // recouvre. Une ancienne zone qui garde des cases ailleurs survit, amputée ; celle qui se
+    // fait entièrement recouvrir disparaît.
+    const casesPrises = new Set(hexes.map(h => h.q + "," + h.r));
+    const zonesConservees = {};
+    Object.values(window.ZONES_PERSISTANTES || {}).forEach(z => {
+        const restantes = (z.hexes || []).filter(h => !casesPrises.has(h.q + "," + h.r));
+        if (restantes.length > 0) zonesConservees[z.id] = { ...z, hexes: restantes };
+    });
+
+    zonesConservees[id] = {
         id: id,
         hexes: hexes,
         type: type,
@@ -172,15 +200,9 @@ window.creerZonePersistante = async function(state, idLanceur) {
         idLanceur: idLanceur || null
     };
 
+    window.ZONES_PERSISTANTES = zonesConservees;
     if (typeof window.appliquerZonesPersistantes === "function") window.appliquerZonesPersistantes();
-
-    try {
-        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
-            Zones_Persistantes: window.ZONES_PERSISTANTES
-        }, { merge: true });
-    } catch (e) {
-        console.error("Erreur création zone persistante :", e);
-    }
+    await window.sauvegarderZonesPersistantes(zonesConservees);
 };
 
 // Résout l'entrée d'un personnage sur UNE case. Appelée uniquement par le client qui pilote le
