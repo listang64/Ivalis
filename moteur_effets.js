@@ -1,5 +1,5 @@
 import { db } from "./firebase-config.js";
-import { doc, updateDoc, setDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { doc, updateDoc, setDoc, deleteDoc, deleteField } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // =========================================================================
 //  IVALIS - MOTEUR DE RÉSOLUTION DES COMBATS (CIBLAGE ET DÉGÂTS)
@@ -816,6 +816,32 @@ window.creerIllusion = async function(idLanceur, q, r) {
     } catch (err) {
         console.error("Erreur création Illusion :", err);
     }
+};
+
+// Défait exactement ce que creerIllusion a fait : le document, le pion sur le plateau, et
+// l'entrée dans Combat_VTT. Appelée quand l'illusion tombe à 0 PV (elle n'en a qu'un seul)
+// et lors de la réinitialisation du combat, pour qu'il ne reste jamais de leurre fantôme
+// ni en base ni sur la carte. N'est exécutée que par un seul client (voir les appels) : les
+// autres voient l'illusion disparaître via les écouteurs Firestore déjà en place.
+window.detruireIllusion = async function(idIllusion) {
+    if (!idIllusion || !window.ID_PARTIE_COURANTE) return;
+
+    if (window.TOKENS_VTT_DATA) delete window.TOKENS_VTT_DATA[idIllusion];
+    if (window.SOURCE_COMBATTANTS) delete window.SOURCE_COMBATTANTS[idIllusion];
+    if (Array.isArray(window.PERSOS_JOUEURS_PARTIE)) {
+        window.PERSOS_JOUEURS_PARTIE = window.PERSOS_JOUEURS_PARTIE.filter(p => p.idPersonnage !== idIllusion);
+    }
+    if (Array.isArray(window.PERSOS_PARTIE)) {
+        window.PERSOS_PARTIE = window.PERSOS_PARTIE.filter(p => p.idPersonnage !== idIllusion);
+    }
+
+    await deleteDoc(doc(db, "Personnages", idIllusion)).catch(e => console.error("Suppression illusion :", e));
+    await updateDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
+        ["Tokens." + idIllusion]: deleteField()
+    }).catch(e => console.error("Retrait du pion illusion :", e));
+
+    if (typeof window.appliquerTokensVTT === "function") window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    if (typeof window.afficherPisteInitiative === "function") window.afficherPisteInitiative();
 };
 
 // =========================================================================
@@ -3153,6 +3179,18 @@ window.jouerAnimationMoteur = async function(action) {
                         if (typeof window.mettreAJourJaugePV === "function") window.mettreAJourJaugePV();
                     }
                     await new Promise(r => setTimeout(r, 1200));
+
+                    // Une illusion n'a qu'un seul PV : le moindre coup encaissé la dissipe. On
+                    // attend que les dégâts se soient affichés avant de la faire disparaître, et
+                    // seul le client du lanceur écrit — les autres la voient s'effacer via les
+                    // écouteurs Firestore déjà en place.
+                    if (cibleData.estIllusion && (parseInt(cibleData.PV_Actuels) || 0) <= 0
+                        && lanceurData && lanceurData.idJoueur === currentUserId
+                        && typeof window.detruireIllusion === "function") {
+                        if (tkCible) window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Illusion dissipée", "#c2a878");
+                        await window.detruireIllusion(idCible);
+                        await new Promise(r => setTimeout(r, 600));
+                    }
                 }
             }
         }

@@ -1542,7 +1542,8 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
          if (typeof window.verifierChangementTour === "function") {
              window.verifierChangementTour(dataPartie.Tour_Combat || 1);
          }
-         if (window.PERSOS_PARTIE) afficherBullesPersonnages(window.PERSOS_PARTIE);
+         // Sans le filtre, les leurres se mettraient à parler dans les bulles de noms.
+         if (window.PERSOS_PARTIE) afficherBullesPersonnages(window.PERSOS_PARTIE.filter(p => !p.estIllusion));
 
          if (estPremierScanPartie) {
              if (dataPartie.Action_Des) window.DERNIER_JET_DES = dataPartie.Action_Des.timestamp;
@@ -1669,8 +1670,13 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
     } else {
       window.PERSOS_PARTIE = persos;
     }
-    afficherListePersonnages(persos);
-    afficherBullesPersonnages(persos);
+
+    // Les illusions sont de vrais combattants (le moteur doit les voir dans PERSOS_PARTIE),
+    // mais ce sont des leurres temporaires : elles n'ont rien à faire dans la liste des
+    // fiches de personnages ni dans les bulles de noms.
+    const persosReels = persos.filter(p => !p.estIllusion);
+    afficherListePersonnages(persosReels);
+    afficherBullesPersonnages(persosReels);
 
     // =========================================================
     // OPTIMISATION IPAD : PRÉCHARGEMENT DES COMPÉTENCES EN CACHE

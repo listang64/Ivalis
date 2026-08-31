@@ -3051,6 +3051,13 @@ window.reinitialiserCombat = async function() {
         // B. Reset des Personnages (Soin total de la Vie et de l'Énergie)
         if (window.PERSOS_PARTIE && window.PERSOS_PARTIE.length > 0) {
             for (let perso of window.PERSOS_PARTIE) {
+                // Les illusions viennent d'être supprimées juste au-dessus, mais PERSOS_PARTIE
+                // les contient encore (le snapshot Firestore n'est pas revenu). Les soigner
+                // reviendrait à écrire dans un document effacé : updateDoc lève alors une
+                // erreur qui interrompait TOUTE la boucle, laissant les personnages suivants
+                // sans soin. On les saute donc explicitement.
+                if (perso.estIllusion) continue;
+
                 const pvMax = (parseInt(perso.PV_Max) || 1) + (parseInt(perso.Dev_Mod_PV) || 0);
                 const fatigueMax = parseInt(perso.Fatigue_Max) || parseInt(perso.fatigueMax) || 100;
 
@@ -3068,13 +3075,15 @@ window.reinitialiserCombat = async function() {
                     window.COMBAT_FATIGUE_ACTUELLE = fatigueMax;
                 }
 
+                // Un échec sur un combattant (document supprimé entre-temps, coupure réseau)
+                // ne doit jamais empêcher les suivants d'être soignés.
                 const persoRef = window.refCombattant(perso.idPersonnage);
                 await updateDoc(persoRef, {
                     PV_Actuels: pvMax,
                     Fatigue_Actuelle: fatigueMax,
                     Bouclier_Max: 0,
                     Bouclier_Actuel: 0
-                });
+                }).catch(e => console.error(`Reset de ${perso.idPersonnage} :`, e));
             }
         }
 
