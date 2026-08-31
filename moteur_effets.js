@@ -1410,6 +1410,53 @@ window.demarrerCiblage = async function(idCarte) {
                 });
             }
 
+            // 🔻 NOUVEAU : DÉTECTION GLACÉ 🔻
+            // Même formule que Brûlé (10%/action, cap 60%, durée de base 2 tours + bonus Durée+).
+            // Pas de dégâts propres : double le coût en fatigue du mouvement à pied tant que
+            // l'état est actif (voir estGlace dans ajouterEtapeMouvement, mouvement.js).
+            let isGlace = false;
+            let glaceChance = 0;
+            let glaceDuree = 0;
+
+            if (nomLower.includes("glac")) {
+                isGlace = true;
+                glaceChance += parseFrFloat(effBase.Pourcent_Base) * (act.count || 1);
+                const bonus = parseFrFloat(act.baseDuree);
+                const d = parseFrFloat(effBase.Tours) + bonus;
+                if (d > glaceDuree) glaceDuree = d;
+            }
+
+            listeMods.forEach(m => {
+                const modEff = window.EFFETS_BDD_CACHE[m.id];
+                const modNomLower = (modEff && modEff.Nom || "").toLowerCase();
+                if (!modEff || !modNomLower.includes("glac")) return;
+
+                isGlace = true;
+                const baseChance = parseFrFloat(modEff.Pourcent_Base) || parseFrFloat(modEff.Pourcent_Max);
+                glaceChance += baseChance * m.count;
+
+                const bonus = parseFrFloat(modsDuree[m.id]);
+                const d = parseFrFloat(modEff.Tours) + bonus;
+                if (d > glaceDuree) glaceDuree = d;
+            });
+
+            if (isGlace) {
+                if (glaceChance > 60) glaceChance = 60; // Cap à 60%
+                if (glaceDuree <= 0) glaceDuree = 2; // Sécurité si la BDD n'a pas de durée
+
+                if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
+                alterationsExtraites.push({
+                    nom: "Glacé",
+                    icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181888/IMG_2089_isgcrs.png",
+                    desc: "Coût en fatigue du mouvement doublé.",
+                    chance: glaceChance,
+                    duree: glaceDuree,
+                    isRanged: isRanged,
+                    rangeMax: rangeMax,
+                    cibles: []
+                });
+            }
+
             // 🔻 NOUVEAU : DÉTECTION POUSSÉE 🔻
             // Chance de repousser la cible de 2 cases en ligne droite depuis le lanceur. Pas un état
             // persistant (aucune entrée dans Etats_Alteres) : résolue et animée à part dans

@@ -184,26 +184,33 @@ window.ajouterEtapeMouvement = function(q, r) {
     const coutCompetence = window.COUT_COMPETENCE_SELECTIONNEE || 0;
     const fatigueDispo = fatigueBrute - coutCompetence;
 
+    // Glacé : le coût en fatigue du mouvement (à pied) est doublé tant que l'état est actif,
+    // cumulable avec le doublement du terrain difficile.
+    const estGlace = persoActuel && persoActuel.Etats_Alteres
+        && persoActuel.Etats_Alteres.some(e => e.nom === "Glacé");
+
     for (let i = 0; i < segment.length; i++) {
         let step = segment[i];
-        
+
         let numeroCase = window.CHEMIN_MOUVEMENT.length + 1;
         let baseCost = 2;
-        let couleur = "#ffffff"; 
+        let couleur = "#ffffff";
 
         if (numeroCase >= 4 && numeroCase <= 6) {
             baseCost = 4;
-            couleur = "#ff8c00"; 
+            couleur = "#ff8c00";
         } else if (numeroCase >= 7) {
             baseCost = 6;
-            couleur = "#ff4c4c"; 
+            couleur = "#ff4c4c";
         }
 
         const stepState = window.PLATEAU_VTT.getCaseState(step.q, step.r);
         if (stepState.isDifficult) {
             baseCost *= 2;
-            couleur = "#b366ff"; 
+            couleur = "#b366ff";
         }
+
+        if (estGlace) baseCost *= 2;
 
         if (window.MOUVEMENT_COUT_TOTAL + baseCost > fatigueDispo) {
             window.afficherMessageFlottantHex(step.q, step.r, "Énergie insuffisante");
