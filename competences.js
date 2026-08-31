@@ -813,42 +813,76 @@ function purgeDisconnectedZoneHexes(hexes, hasDistance) {
 // =========================================================================
 
 window.ouvrirCreationCompetence = async function() {
-    // NOUVEAU : On nettoie la carte et on désélectionne la bannière
-    if (typeof window.masquerApercuCarteHD === "function") {
-        window.masquerApercuCarteHD();
+    // Garde-fou anti double-appui : le bouton était réputé "buggé" (il fallait cliquer plusieurs
+    // fois, ou fermer/rouvrir la fiche). La vraie cause : la fonction relançait 3 lectures
+    // Firestore SÉQUENTIELLES à chaque clic — dont un getDocs() qui retéléphonait TOUTE la
+    // collection Combat_Effets alors qu'elle est déjà mise en cache une fois pour toutes au
+    // démarrage (chargerCacheEffetsBDD, voir app.js). Sur une connexion iPad instable, la modale
+    // mettait donc plusieurs secondes à apparaître sans le moindre retour visuel entre-temps :
+    // l'utilisateur cliquait à nouveau en pensant que rien ne s'était passé, ce qui relançait
+    // tout depuis zéro en parallèle. On court-circuite maintenant les clics pendant le chargement,
+    // et on réutilise le cache global au lieu de le reconstruire.
+    if (window.OUVERTURE_FORGE_EN_COURS) return;
+    window.OUVERTURE_FORGE_EN_COURS = true;
+
+    const btnCreer = document.getElementById("btn-creer-competence");
+    const curseurOrigine = btnCreer ? btnCreer.style.cursor : "";
+    if (btnCreer) btnCreer.style.cursor = "wait";
+
+    try {
+        // NOUVEAU : On nettoie la carte et on désélectionne la bannière
+        if (typeof window.masquerApercuCarteHD === "function") {
+            window.masquerApercuCarteHD();
+        }
+
+        window.forgeState.actions = [];
+        window.forgeState.isCapReached = false;
+        window.forgeState.armePrincipale = null;
+
+        document.getElementById("forge-nom").value = "";
+        const selectElement = document.getElementById("forge-element");
+        if (selectElement) selectElement.value = "Aucun";
+
+        const idPerso = document.getElementById("champ-id-personnage").value;
+        window.forgeState.idPersonnage = idPerso;
+
+        // Le cache des effets n'est chargé qu'une fois, au tout premier chargement de la page.
+        // S'il a raté (réseau lent/instable) ou est resté vide, on le recharge ici avant de
+        // continuer, mais sans jamais retéléphoner la collection quand il est déjà disponible.
+        if (!window.EFFETS_BDD_CACHE || Object.keys(window.EFFETS_BDD_CACHE).length === 0) {
+            if (typeof window.chargerCacheEffetsBDD === "function") {
+                await window.chargerCacheEffetsBDD();
+            }
+        }
+
+        const [snapPerso, snapCaracs] = await Promise.all([
+            getDoc(doc(db, "Personnages", idPerso)),
+            getDoc(doc(db, "Caracteristiques", idPerso))
+        ]);
+
+        if (snapPerso.exists()) window.forgeState.statsPerso = snapPerso.data();
+        window.forgeState.caracs = snapCaracs.exists() ? snapCaracs.data() : {};
+
+        window.forgeState.effetsBDD = Object.keys(window.EFFETS_BDD_CACHE || {}).map(id => {
+            const data = window.EFFETS_BDD_CACHE[id];
+            return {
+                id: id,
+                ...data,
+                Type_Mecanique: normalizeForgeType(data.Type_Mecanique, "Action/Global"),
+                Type_Mecanique_2: data.Type_Mecanique_2 ? normalizeForgeType(data.Type_Mecanique_2) : "Aucun"
+            };
+        });
+
+        document.getElementById("overlay-jeu-modale").style.display = "block";
+        document.getElementById("modale-creation-competence").style.display = "block";
+        window.rafraichirForge();
+    } catch (e) {
+        console.error("Erreur ouverture Forge :", e);
+        alert("Impossible d'ouvrir la Forge. Vérifie ta connexion et réessaie.");
+    } finally {
+        window.OUVERTURE_FORGE_EN_COURS = false;
+        if (btnCreer) btnCreer.style.cursor = curseurOrigine;
     }
-
-    window.forgeState.actions = [];
-    window.forgeState.isCapReached = false;
-    window.forgeState.armePrincipale = null;
-
-    document.getElementById("forge-nom").value = "";
-    const selectElement = document.getElementById("forge-element");
-    if (selectElement) selectElement.value = "Aucun";
-
-    const idPerso = document.getElementById("champ-id-personnage").value;
-    window.forgeState.idPersonnage = idPerso;
-
-    const snapPerso = await getDoc(doc(db, "Personnages", idPerso));
-    if (snapPerso.exists()) window.forgeState.statsPerso = snapPerso.data();
-
-    const snapCaracs = await getDoc(doc(db, "Caracteristiques", idPerso));
-    window.forgeState.caracs = snapCaracs.exists() ? snapCaracs.data() : {};
-
-    const snap = await getDocs(collection(db, "Combat_Effets"));
-    window.forgeState.effetsBDD = snap.docs.map(d => {
-        const data = d.data();
-        return {
-            id: d.id,
-            ...data,
-            Type_Mecanique: normalizeForgeType(data.Type_Mecanique, "Action/Global"),
-            Type_Mecanique_2: data.Type_Mecanique_2 ? normalizeForgeType(data.Type_Mecanique_2) : "Aucun"
-        };
-    });
-
-    document.getElementById("overlay-jeu-modale").style.display = "block";
-    document.getElementById("modale-creation-competence").style.display = "block";
-    window.rafraichirForge();
 };
 
 window.fermerForgeCompetence = function() {
