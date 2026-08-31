@@ -84,6 +84,244 @@ window.afficherFlashDegatToken = function(idCible, ancienneValeur, nouvelleValeu
 };
 
 // =========================================================================
+//  ZONES PERSISTANTES (Persistance de terrain)
+//  Une carte portant le mod "Persistance de terrain" laisse, APRÈS s'être résolue
+//  normalement sur sa cible, une zone dangereuse sur la case visée (ou sur toute l'emprise
+//  de l'AoE si un mod Zone est présent). Elle dure 3 tours (jamais prolongeable), frappe
+//  TOUT LE MONDE sans distinction de camp, et se déclenche à CHAQUE case de la zone qu'un
+//  personnage franchit (pas une seule fois par déplacement).
+//  Les zones vivent dans Combat_VTT.Zones_Persistantes : tous les clients les reçoivent via
+//  le listener déjà en place, comme les Tokens.
+// =========================================================================
+window.ZONES_PERSISTANTES = window.ZONES_PERSISTANTES || {};
+
+// Quel visuel pour quel état embarqué par le sort d'origine.
+window.TYPES_ZONES_PERSISTANTES = {
+    "Brûlé": "feu",
+    "Glacé": "glace",
+    "Électrifié": "electrique",
+    "Empoisonnement": "poison"
+};
+
+window.HABILLAGE_ZONES_PERSISTANTES = {
+    feu:         { message: "🔥 Brasier !",       couleur: "#ff7a1a" },
+    glace:       { message: "❄️ Gel mordant !",   couleur: "#7fd8ff" },
+    electrique:  { message: "⚡ Décharge !",       couleur: "#bfe8ff" },
+    poison:      { message: "☠️ Nappe toxique !", couleur: "#8fdc4c" },
+    neutre:      { message: "💥 Terrain piégé !", couleur: "#ff4c4c" }
+};
+
+// Construite par le lanceur uniquement (declencherResolution ne tourne que chez lui), puis
+// diffusée à tous via Combat_VTT.
+window.creerZonePersistante = async function(state, idLanceur) {
+    if (!window.ID_PARTIE_COURANTE || !state) return;
+
+    // 1. Emprise : l'AoE complète si la carte porte un mod Zone, sinon la seule case visée.
+    let hexes = [];
+    if (state.isZone && Array.isArray(state.zoneHexesFinaux) && state.zoneHexesFinaux.length > 0) {
+        hexes = state.zoneHexesFinaux.map(h => ({ q: h.q, r: h.r }));
+    } else {
+        const idsCibles = new Set();
+        (state.attaques || []).forEach(a => (a.cibles || []).forEach(c => idsCibles.add(c)));
+        (state.alterations || []).forEach(a => (a.cibles || []).forEach(c => idsCibles.add(c)));
+        idsCibles.forEach(id => {
+            const tk = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[id] : null;
+            if (tk) hexes.push({ q: tk.q, r: tk.r });
+        });
+    }
+    const vues = new Set();
+    hexes = hexes.filter(h => {
+        const cle = h.q + "," + h.r;
+        if (vues.has(cle)) return false;
+        vues.add(cle);
+        return true;
+    });
+    if (hexes.length === 0) return;
+
+    // 2. Ce que la zone rejoue à chaque entrée : les dégâts de la carte (jamais les soins ni
+    //    les boucliers, qui n'ont pas de sens en piège au sol) et l'état élémentaire embarqué.
+    const attaqueDegats = (state.attaques || []).find(a => !a.isHeal && !a.isShield && (a.valeurBrute || 0) > 0);
+    const degats = attaqueDegats
+        ? { valeurBrute: attaqueDegats.valeurBrute, typeRes: attaqueDegats.typeRes }
+        : null;
+
+    const altPersistante = (state.alterations || []).find(a => window.TYPES_ZONES_PERSISTANTES[a.nom]);
+    const etat = altPersistante ? {
+        nom: altPersistante.nom,
+        icone: altPersistante.icone,
+        desc: altPersistante.desc || "",
+        chance: altPersistante.chance,
+        duree: altPersistante.duree,
+        estPoison: !!altPersistante.estPoison,
+        tickFait: false
+    } : null;
+
+    if (!degats && !etat) return; // Rien à faire persister : pas de zone fantôme
+
+    const type = etat ? (window.TYPES_ZONES_PERSISTANTES[etat.nom] || "neutre") : "neutre";
+    const id = "zp_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
+
+    window.ZONES_PERSISTANTES = window.ZONES_PERSISTANTES || {};
+    window.ZONES_PERSISTANTES[id] = {
+        id: id,
+        hexes: hexes,
+        type: type,
+        degats: degats,
+        etat: etat,
+        dureeRestante: 3, // Fixe : la Forge masque le bouton ⏳ sur ce mod
+        idLanceur: idLanceur || null
+    };
+
+    if (typeof window.appliquerZonesPersistantes === "function") window.appliquerZonesPersistantes();
+
+    try {
+        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
+            Zones_Persistantes: window.ZONES_PERSISTANTES
+        }, { merge: true });
+    } catch (e) {
+        console.error("Erreur création zone persistante :", e);
+    }
+};
+
+// Résout l'entrée d'un personnage sur UNE case. Appelée uniquement par le client qui pilote le
+// déplacement (comme les attaques d'opportunité) : le jet est tranché et persisté une seule
+// fois, puis le résultat est embarqué dans la diffusion du mouvement pour être rejoué à
+// l'identique chez tout le monde. Retourne un tableau de résultats (une zone peut en recouvrir
+// une autre) ou null.
+window.resoudreZonesPersistantesSurCase = async function(idPerso, hex) {
+    if (!hex) return null;
+    const zones = Object.values(window.ZONES_PERSISTANTES || {});
+    if (zones.length === 0) return null;
+
+    const zonesIci = zones.filter(z => (z.hexes || []).some(h => h.q === hex.q && h.r === hex.r));
+    if (zonesIci.length === 0) return null;
+
+    const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPerso);
+    if (!cibleData || cibleData.statut === "Mort") return null;
+
+    const resultats = [];
+
+    for (const zone of zonesIci) {
+        const esquive = (parseInt(cibleData.Esquive) || 0) + (parseInt(cibleData.Dev_Mod_Esquive) || 0);
+        const parade = (parseInt(cibleData.Parade) || 0) + (parseInt(cibleData.Dev_Mod_Parade) || 0);
+        const statDef = Math.max(esquive, parade);
+        const jetDef = Math.floor(Math.random() * 100) + 1;
+        const motDef = parade > esquive ? "Paré 🛡️" : "Esquivé 💨";
+        const dodged = jetDef <= statDef;
+
+        let degatsFinaux = 0;
+        let viaBouclier = false;
+        let etatApplique = null;
+
+        if (!dodged) {
+            if (zone.degats) {
+                const defPhys = (parseInt(cibleData.Def_Physique) || 0) + (parseInt(cibleData.Dev_Mod_DefPhys) || 0);
+                const defMag = (parseInt(cibleData.Def_Magique) || 0) + (parseInt(cibleData.Dev_Mod_DefMag) || 0);
+                const resistance = zone.degats.typeRes === "Magique" ? defMag : defPhys;
+                let reduction = resistance / 100;
+                if (reduction > 1) reduction = 1;
+                degatsFinaux = Math.round((zone.degats.valeurBrute || 0) * (1 - reduction));
+                if (degatsFinaux < 0) degatsFinaux = 0;
+
+                if (degatsFinaux > 0) {
+                    try {
+                        const refPerso = doc(db, "Personnages", idPerso);
+                        const oldShield = parseInt(cibleData.Bouclier_Actuel) || 0;
+                        if (oldShield > 0) {
+                            viaBouclier = true;
+                            cibleData.Bouclier_Actuel = Math.max(0, oldShield - degatsFinaux);
+                            await updateDoc(refPerso, { Bouclier_Actuel: cibleData.Bouclier_Actuel });
+                        } else {
+                            const oldPv = parseInt(cibleData.PV_Actuels) || 0;
+                            cibleData.PV_Actuels = Math.max(0, oldPv - degatsFinaux);
+                            await updateDoc(refPerso, { PV_Actuels: cibleData.PV_Actuels });
+                        }
+                    } catch (e) {
+                        console.error("Erreur dégâts zone persistante :", e);
+                    }
+                }
+            }
+
+            // L'état garde le pourcentage calculé au moment où le sort a été lancé.
+            if (zone.etat) {
+                const roll = Math.floor(Math.random() * 100) + 1;
+                if (roll <= (zone.etat.chance || 0)) {
+                    const etats = cibleData.Etats_Alteres ? [...cibleData.Etats_Alteres] : [];
+                    const existant = etats.find(e => e.nom === zone.etat.nom);
+                    if (existant) {
+                        existant.duree = Math.max(existant.duree, zone.etat.duree);
+                        if (zone.etat.estPoison) existant.tickFait = false;
+                    } else {
+                        etats.push({ ...zone.etat });
+                    }
+                    cibleData.Etats_Alteres = etats;
+                    etatApplique = zone.etat.nom;
+                    try {
+                        await updateDoc(doc(db, "Personnages", idPerso), { Etats_Alteres: etats });
+                    } catch (e) {
+                        console.error("Erreur état zone persistante :", e);
+                    }
+                }
+            }
+        }
+
+        resultats.push({
+            idCible: idPerso,
+            type: zone.type || "neutre",
+            dodged: dodged,
+            motDef: motDef,
+            degats: degatsFinaux,
+            viaBouclier: viaBouclier,
+            etatApplique: etatApplique
+        });
+    }
+
+    return resultats.length > 0 ? resultats : null;
+};
+
+// Rejoue chez CHAQUE joueur le résultat déjà tranché ci-dessus. N'écrit rien, ne relance aucun dé.
+window.jouerAnimationZonePersistante = async function(res, hexPosition) {
+    if (!res || !res.idCible) return;
+    const tk = hexPosition || (window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[res.idCible] : null);
+    if (!tk || typeof window.afficherMessageFlottantHex !== "function") return;
+
+    const habillage = window.HABILLAGE_ZONES_PERSISTANTES[res.type] || window.HABILLAGE_ZONES_PERSISTANTES.neutre;
+    window.afficherMessageFlottantHex(tk.q, tk.r, habillage.message, habillage.couleur);
+    await new Promise(r => setTimeout(r, 500));
+
+    if (res.dodged) {
+        window.afficherMessageFlottantHex(tk.q, tk.r, res.motDef, "#cccccc");
+        await new Promise(r => setTimeout(r, 700));
+        return;
+    }
+
+    if (res.degats > 0) {
+        const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === res.idCible);
+        const couleur = res.viaBouclier ? "#00ffff" : "#ff4c4c";
+        const texte = `-${res.degats} ${res.viaBouclier ? "🛡️" : "🩸"}`;
+        if (cibleData && typeof window.afficherFlashDegatToken === "function") {
+            if (res.viaBouclier) {
+                const maxShield = parseInt(cibleData.Bouclier_Max) || 1;
+                const newShield = parseInt(cibleData.Bouclier_Actuel) || 0;
+                window.afficherFlashDegatToken(res.idCible, newShield + res.degats, newShield, maxShield, texte, couleur, "#00ffff");
+            } else {
+                const maxPv = (parseInt(cibleData.PV_Max) || 1) + (parseInt(cibleData.Dev_Mod_PV) || 0);
+                const newPv = parseInt(cibleData.PV_Actuels) || 0;
+                window.afficherFlashDegatToken(res.idCible, newPv + res.degats, newPv, maxPv, texte, couleur);
+            }
+        } else {
+            window.afficherMessageFlottantHex(tk.q, tk.r, texte, couleur);
+        }
+        await new Promise(r => setTimeout(r, 900));
+    }
+
+    if (res.etatApplique) {
+        window.afficherMessageFlottantHex(tk.q, tk.r, `${res.etatApplique} !`, "#9333ea");
+        await new Promise(r => setTimeout(r, 900));
+    }
+};
+
+// =========================================================================
 //  ATTAQUES D'OPPORTUNITÉ
 //  Déclenchées depuis mouvement.js quand un personnage quitte le corps-à-corps
 //  d'un adversaire (camp opposé uniquement). 10 dégâts fixes, ignorant l'armure
@@ -365,12 +603,19 @@ window.resoudreBondInteractif = function(idPerso, portee) {
             nettoyer();
 
             const hexArrivee = { q: cible.q, r: cible.r };
+
+            // Atterrir dans une zone persistante la déclenche, exactement comme y entrer à pied.
+            let zonesBond = null;
+            if (typeof window.resoudreZonesPersistantesSurCase === "function") {
+                zonesBond = await window.resoudreZonesPersistantesSurCase(idPerso, hexArrivee);
+            }
+
             window.TOKENS_VTT_DATA[idPerso].q = hexArrivee.q;
             window.TOKENS_VTT_DATA[idPerso].r = hexArrivee.r;
 
             try {
                 await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
-                    Action_Bond: { idToken: idPerso, depart: hexDepart, arrivee: hexArrivee, timestamp: Date.now() }
+                    Action_Bond: { idToken: idPerso, depart: hexDepart, arrivee: hexArrivee, zones: zonesBond, timestamp: Date.now() }
                 });
                 await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
                     Tokens: window.TOKENS_VTT_DATA
@@ -612,12 +857,17 @@ window.declencherPousseeCible = async function(idLanceur, idCible) {
         return;
     }
 
+    let zonesPoussee = null;
+    if (typeof window.resoudreZonesPersistantesSurCase === "function") {
+        zonesPoussee = await window.resoudreZonesPersistantesSurCase(idCible, arrivee);
+    }
+
     window.TOKENS_VTT_DATA[idCible].q = arrivee.q;
     window.TOKENS_VTT_DATA[idCible].r = arrivee.r;
 
     try {
         await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
-            Action_Poussee: { idToken: idCible, depart: hexDepart, arrivee: arrivee, timestamp: Date.now() }
+            Action_Poussee: { idToken: idCible, depart: hexDepart, arrivee: arrivee, zones: zonesPoussee, timestamp: Date.now() }
         });
         await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
             Tokens: window.TOKENS_VTT_DATA
@@ -687,12 +937,17 @@ window.declencherTractionCible = async function(idLanceur, idCible) {
         return;
     }
 
+    let zonesTraction = null;
+    if (typeof window.resoudreZonesPersistantesSurCase === "function") {
+        zonesTraction = await window.resoudreZonesPersistantesSurCase(idCible, arrivee);
+    }
+
     window.TOKENS_VTT_DATA[idCible].q = arrivee.q;
     window.TOKENS_VTT_DATA[idCible].r = arrivee.r;
 
     try {
         await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
-            Action_Traction: { idToken: idCible, depart: hexDepart, arrivee: arrivee, timestamp: Date.now() }
+            Action_Traction: { idToken: idCible, depart: hexDepart, arrivee: arrivee, zones: zonesTraction, timestamp: Date.now() }
         });
         await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
             Tokens: window.TOKENS_VTT_DATA
@@ -807,6 +1062,15 @@ window.declencherPeurCible = async function(idLanceur, idCible) {
         contactPrecedent = contactActuel;
     }
 
+    // Une fuite paniquée traverse les zones persistantes comme n'importe quel déplacement.
+    const zonesResoluesPeur = [];
+    if (typeof window.resoudreZonesPersistantesSurCase === "function") {
+        for (let i = 0; i < chemin.length; i++) {
+            const resZone = await window.resoudreZonesPersistantesSurCase(idCible, chemin[i]);
+            if (resZone) zonesResoluesPeur.push({ apresEtape: i, resultats: resZone });
+        }
+    }
+
     // La fuite coûte de la fatigue à la cible, comme un déplacement normal (coût de base : 2/case).
     const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idCible);
     if (cibleData) {
@@ -826,7 +1090,7 @@ window.declencherPeurCible = async function(idLanceur, idCible) {
 
     try {
         await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
-            Action_Peur: { idToken: idCible, path: chemin, opportunites: opportunitesResolues, timestamp: Date.now() }
+            Action_Peur: { idToken: idCible, path: chemin, opportunites: opportunitesResolues, zones: zonesResoluesPeur, timestamp: Date.now() }
         });
         await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
             Tokens: window.TOKENS_VTT_DATA
@@ -1045,6 +1309,9 @@ window.demarrerCiblage = async function(idCarte) {
     let indexPremiereAttaque = -1;
     let isIllusion = false;
     let porteeIllusion = 1;
+    // Persistance de terrain : le sort laisse derrière lui une zone dangereuse sur la ou les
+    // cases visées (voir creerZonePersistante). Détecté ici, appliqué après la résolution.
+    let aPersistanceTerrain = false;
 
     const parseFrFloat = (val) => {
         if (val === undefined || val === null || val === "") return 0;
@@ -1101,6 +1368,15 @@ window.demarrerCiblage = async function(idCarte) {
             const nomLower = (effBase.Nom || "").toLowerCase();
             const listeMods = extraireMods(act.mods);
             const modsDuree = act.modsDuree || {};
+
+            // Persistance de terrain : simple drapeau de carte (mod ou effet de base). La zone
+            // qu'elle laisse derrière elle est construite après la résolution, à partir des
+            // dégâts/états de la carte (voir declencherResolution).
+            if (nomLower.includes("persistance")) aPersistanceTerrain = true;
+            listeMods.forEach(m => {
+                const modEff = window.EFFETS_BDD_CACHE[m.id];
+                if (modEff && (modEff.Nom || "").toLowerCase().includes("persistance")) aPersistanceTerrain = true;
+            });
 
             // Bond : pas une attaque/alteration, traité à part avant tout le reste de la carte.
             if (nomLower.includes("bond")) {
@@ -1727,7 +2003,9 @@ window.demarrerCiblage = async function(idCarte) {
         bondApresAttaque: bondApresLeReste ? { idLanceur: idLanceurBond, portee: porteeBond } : null,
         porteeMinTraction: porteeMinTraction,
         tractionAvantAttaque: tractionAvantAttaque,
-        illusionEnAttente: isIllusion ? { idLanceur: idLanceurBond, portee: porteeIllusion } : null
+        illusionEnAttente: isIllusion ? { idLanceur: idLanceurBond, portee: porteeIllusion } : null,
+        persistanceTerrain: aPersistanceTerrain,
+        zoneHexesFinaux: null
     };
 
     if (configSort) window.surlignerEffetCarteActif(configSort.nom);
@@ -1807,6 +2085,10 @@ window.validerZoneAoE = function() {
         const rot = rotateHex(h, state.zoneRotationStep);
         return { q: state.zoneCenterHex.q + rot.q, r: state.zoneCenterHex.r + rot.r };
     });
+
+    // Mémorisé pour la Persistance de terrain : c'est exactement l'emprise que gardera la zone
+    // résiduelle, sans avoir à refaire le calcul de rotation ailleurs.
+    state.zoneHexesFinaux = finalHexes;
 
     let ciblesTouchees = [];
     const idLanceur = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
@@ -2283,6 +2565,13 @@ window.declencherResolution = async function() {
         await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
             Action_Moteur: actionData
         });
+
+        // Persistance de terrain : la carte s'est résolue normalement ci-dessus, on laisse
+        // maintenant la zone résiduelle sur les cases visées (3 tours).
+        if (state.persistanceTerrain && typeof window.creerZonePersistante === "function") {
+            await window.creerZonePersistante(state, idLanceur);
+        }
+
         window.nettoyerCiblage();
     } catch (e) {
         console.error("Erreur résolution :", e);

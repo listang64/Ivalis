@@ -377,6 +377,17 @@ window.validerMouvement = async function() {
         }
     }
 
+    // ZONES PERSISTANTES : chaque case de zone franchie déclenche son propre jet (« s'il
+    // continue dans la zone, ça continue »). Tranché ici une seule fois, comme les attaques
+    // d'opportunité, puis embarqué dans Action_Mouvement pour être rejoué à l'identique partout.
+    const zonesResolues = [];
+    if (typeof window.resoudreZonesPersistantesSurCase === "function") {
+        for (let i = 0; i < pathAvecAngles.length; i++) {
+            const resultats = await window.resoudreZonesPersistantesSurCase(idPerso, pathAvecAngles[i]);
+            if (resultats) zonesResolues.push({ apresEtape: i, resultats: resultats });
+        }
+    }
+
     const bulle = document.getElementById("bulle-validation-mouvement");
     if (bulle) bulle.style.display = "none";
     const svg = document.getElementById("svg-chemin-mouvement");
@@ -424,6 +435,7 @@ window.validerMouvement = async function() {
                 idToken: idPerso,
                 path: pathAvecAngles,
                 opportunites: opportunitesResolues,
+                zones: zonesResolues,
                 timestamp: new Date().getTime()
             }
         });
@@ -494,6 +506,18 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
         if (imgMain) imgMain.style.transform = "scale(1)";
 
         await new Promise(r => setTimeout(r, 150));
+
+        // Zone persistante franchie : contrairement à l'attaque d'opportunité (qui se joue avant
+        // de quitter la case), le piège se déclenche une fois le pion ARRIVÉ sur la case.
+        const zonesIci = (actionMouvement.zones || []).filter(z => z.apresEtape === i);
+        for (const entree of zonesIci) {
+            for (const res of (entree.resultats || [])) {
+                if (typeof window.jouerAnimationZonePersistante === "function") {
+                    await window.jouerAnimationZonePersistante(res, step);
+                }
+            }
+        }
+        if (zonesIci.length > 0) tokenDiv.style.transition = "left 0.4s linear, top 0.4s linear";
     }
 
     tokenDiv.style.transition = "none";
@@ -501,6 +525,7 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
         imgMain.style.transition = "none";
         imgMain.style.transform = "";
     }
+
     window.ANIMATION_VTT_EN_COURS = false;
     if (typeof window.appliquerTokensVTT === "function") {
         window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
@@ -540,6 +565,15 @@ window.jouerAnimationBond = async function(data) {
         imgMain.style.transition = "none";
         imgMain.style.transform = "";
     }
+
+    // Zone persistante sur la case d'arrivée (saut ou déplacement forcé) : déjà tranchée par
+    // celui qui a déclenché l'effet, on ne fait que la rejouer ici.
+    for (const res of (data.zones || [])) {
+        if (typeof window.jouerAnimationZonePersistante === "function") {
+            await window.jouerAnimationZonePersistante(res, data.arrivee);
+        }
+    }
+
     window.ANIMATION_VTT_EN_COURS = false;
     if (typeof window.appliquerTokensVTT === "function") {
         window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
@@ -601,6 +635,15 @@ window.jouerAnimationPoussee = async function(data) {
         imgMain.style.transition = "none";
         imgMain.style.transform = "";
     }
+
+    // Zone persistante sur la case d'arrivée (saut ou déplacement forcé) : déjà tranchée par
+    // celui qui a déclenché l'effet, on ne fait que la rejouer ici.
+    for (const res of (data.zones || [])) {
+        if (typeof window.jouerAnimationZonePersistante === "function") {
+            await window.jouerAnimationZonePersistante(res, data.arrivee);
+        }
+    }
+
     window.ANIMATION_VTT_EN_COURS = false;
     if (typeof window.appliquerTokensVTT === "function") {
         window.appliquerTokensVTT(window.TOKENS_VTT_DATA);

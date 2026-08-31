@@ -1460,12 +1460,13 @@ window.rafraichirForge = function() {
                     boutonEditerZone = `<button class="btn-parametres" style="padding: 3px 8px; font-size: 12px; margin-right: 5px; background: #3b82f6; color: white;" onclick="window.ouvrirEditeurZone('${act.idInst}')">Éditer</button>`;
                 }
 
-                // Même règle que pour la base : pas de bouton Durée + sur
-                // Immobilisation/Paralysie/Empoisonnement.
+                // Même règle que pour la base : pas de bouton Durée + sur Immobilisation,
+                // Paralysie, Empoisonnement ni Persistance de terrain (durées figées).
                 const modHasDuree = parseFrenchFloat(modEff.Tours) > 0
                     && !(modEff.Nom || "").toLowerCase().includes("immobil")
                     && !(modEff.Nom || "").toLowerCase().includes("paralys")
-                    && !(modEff.Nom || "").toLowerCase().includes("poison");
+                    && !(modEff.Nom || "").toLowerCase().includes("poison")
+                    && !(modEff.Nom || "").toLowerCase().includes("persistance");
                 const currentModDuree = (act.modsDuree && act.modsDuree[modId]) || 0;
                 const btnPlusModDureeDisabled = (currentModDuree >= maxDureeStacks || capDepasse) ? `disabled style="opacity: 0.3; cursor: not-allowed; border:none; background:none; font-weight:bold; font-size:16px;"` : `style="color: green; cursor: pointer; border:none; background:none; font-weight:bold; font-size:16px;"`;
 

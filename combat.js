@@ -886,6 +886,12 @@ window.ecouterTerrainVTT = function() {
                 window.TOKENS_VTT_DATA = {};
                 if (typeof window.appliquerTokensVTT === "function") window.appliquerTokensVTT({});
             }
+
+            // 🔻 NOUVEAU : Zones persistantes (Persistance de terrain) 🔻
+            window.ZONES_PERSISTANTES = data.Zones_Persistantes || {};
+            if (typeof window.appliquerZonesPersistantes === "function") {
+                window.appliquerZonesPersistantes();
+            }
         }
     });
 };
@@ -1525,6 +1531,15 @@ window.appliquerTokensVTT = function(tokensMap) {
     const conteneur = document.getElementById("conteneur-tokens-vtt");
     if (!conteneur) return;
 
+    // Filet de sécurité : si le plateau a été (re)construit après la dernière synchro, le calque
+    // des zones persistantes a disparu avec lui — on le redessine sans attendre un nouveau
+    // snapshot Firestore (et sans rien refaire s'il est déjà là).
+    if (Object.keys(window.ZONES_PERSISTANTES || {}).length > 0
+        && !document.getElementById("svg-zones-persistantes")
+        && typeof window.appliquerZonesPersistantes === "function") {
+        window.appliquerZonesPersistantes();
+    }
+
     conteneur.innerHTML = "";
 
     for (let idPerso in tokensMap) {
@@ -1833,6 +1848,345 @@ window.appliquerTerrainDifficile = function(tuilesList) {
     for (const key in window.PLATEAU_VTT.gridState) window.PLATEAU_VTT.gridState[key].isDifficult = false;
     if (Array.isArray(tuilesList)) tuilesList.forEach(key => { if (!window.PLATEAU_VTT.gridState[key]) window.PLATEAU_VTT.gridState[key] = {}; window.PLATEAU_VTT.gridState[key].isDifficult = true; });
     window.PLATEAU_VTT.renderMap();
+};
+
+// =========================================================================
+//  RENDU DES ZONES PERSISTANTES (Persistance de terrain)
+//  Un calque SVG dédié, glissé DANS #transform-plateau (donc il suit le zoom et le pan comme
+//  le reste du plateau) et posé sous les pions (z-index 3 contre 10). Tout est vu du dessus :
+//  pas de flammes "de profil", mais un lit de braises, du givre qui s'étale, des arcs qui
+//  claquent au sol et une nappe de gaz qui dérive.
+// =========================================================================
+function injecterStyleZonesPersistantes() {
+    if (document.getElementById("style-zones-persistantes")) return;
+    const style = document.createElement("style");
+    style.id = "style-zones-persistantes";
+    style.textContent = `
+        #svg-zones-persistantes .zp-anim { transform-box: fill-box; transform-origin: center; }
+        @keyframes zpBraise {
+            0%, 100% { transform: scale(0.88); opacity: 0.55; }
+            50%      { transform: scale(1.18); opacity: 0.95; }
+        }
+        @keyframes zpLangue {
+            0%, 100% { transform: scaleY(0.75) scaleX(1.05); opacity: 0.65; }
+            35%      { transform: scaleY(1.35) scaleX(0.85); opacity: 1; }
+            70%      { transform: scaleY(0.95) scaleX(1.1);  opacity: 0.8; }
+        }
+        @keyframes zpEtincelle {
+            0%   { transform: translateX(0) scale(1);   opacity: 0; }
+            20%  { opacity: 0.95; }
+            100% { transform: translateX(14px) scale(0.2); opacity: 0; }
+        }
+        @keyframes zpGivre {
+            0%, 100% { transform: scale(0.94); opacity: 0.5; }
+            50%      { transform: scale(1.06); opacity: 0.95; }
+        }
+        @keyframes zpGivreTour { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes zpArc {
+            0%, 34%, 46%, 80%, 100% { opacity: 0; }
+            36%  { opacity: 1; }
+            38%  { opacity: 0.2; }
+            40%  { opacity: 0.95; }
+            44%  { opacity: 0; }
+            84%  { opacity: 1; }
+            86%  { opacity: 0.15; }
+            88%  { opacity: 1; }
+            94%  { opacity: 0; }
+        }
+        @keyframes zpNappe {
+            0%, 100% { transform: translate(0px, 0px) scale(1);      opacity: 0.30; }
+            50%      { transform: translate(7px, -6px) scale(1.18);  opacity: 0.55; }
+        }
+        @keyframes zpBulle {
+            0%   { transform: scale(0.3); opacity: 0; }
+            30%  { opacity: 0.8; }
+            100% { transform: scale(1.4); opacity: 0; }
+        }
+        @keyframes zpSocle { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.72; } }
+    `;
+    document.head.appendChild(style);
+}
+
+// Aléatoire déterministe : le décor d'une case reste identique d'un rendu à l'autre (sinon il
+// "sauterait" à chaque zoom, chaque déplacement de pion ou chaque snapshot Firestore).
+function graineZone(q, r, k) {
+    const x = Math.sin(q * 127.1 + r * 311.7 + k * 74.7) * 43758.5453;
+    return x - Math.floor(x);
+}
+
+function pointsHexZone(cx, cy, rayon) {
+    let s = "";
+    for (let i = 0; i < 6; i++) {
+        const a = Math.PI / 180 * (60 * i);
+        s += `${(cx + rayon * Math.cos(a)).toFixed(1)},${(cy + rayon * Math.sin(a)).toFixed(1)} `;
+    }
+    return s.trim();
+}
+
+// Tout est dessiné en coordonnées LOCALES (case centrée sur 0,0) dans un groupe translaté puis
+// découpé à l'hexagone : rien ne bave sur les cases voisines, et le contour reste lisible pour
+// que les joueurs voient exactement où le terrain est piégé.
+// `leger` : mode allégé automatique sur les très grandes emprises (moins d'éléments, pas de
+// flou) — un iPad ne doit pas ramer parce qu'un joueur a posé une AoE de 19 cases en feu.
+function dessinerHexZonePersistante(type, hex, R, leger) {
+    const px = window.PLATEAU_VTT.hexToPixel(hex.q, hex.r);
+    const rnd = (k) => graineZone(hex.q, hex.r, k);
+    const flouDoux = leger ? "" : ` filter="url(#zp-flou-doux)"`;
+    const flouFort = leger ? "" : ` filter="url(#zp-flou-fort)"`;
+    const halo = leger ? "" : ` filter="url(#zp-glow)"`;
+
+    let deco = "";
+    let contour = "#ff4c4c";
+
+    if (type === "feu") {
+        contour = "#ff8a2e";
+        deco += `<polygon points="${pointsHexZone(0, 0, R)}" fill="url(#zp-grad-feu)" class="zp-anim" style="animation: zpSocle 2.4s ease-in-out infinite; animation-delay:-${(rnd(1) * 2).toFixed(2)}s"/>`;
+        // Cœur incandescent : c'est lui qui donne la chaleur, les langues ne font que danser autour.
+        deco += `<ellipse rx="${(R * 0.42).toFixed(1)}" ry="${(R * 0.34).toFixed(1)}" fill="url(#zp-grad-coeur)"${flouDoux} class="zp-anim"
+            style="animation: zpBraise 2.1s ease-in-out infinite"/>`;
+
+        // Lit de braises : de larges taches chaudes qui respirent, vues du dessus.
+        const nbBraises = leger ? 2 : 3;
+        for (let k = 0; k < nbBraises; k++) {
+            const ang = (k * (360 / nbBraises) + rnd(k + 2) * 40) * Math.PI / 180;
+            const d = R * (0.08 + rnd(k + 8) * 0.30);
+            const rx = R * (0.30 + rnd(k + 14) * 0.14);
+            deco += `<g transform="translate(${(Math.cos(ang) * d).toFixed(1)},${(Math.sin(ang) * d).toFixed(1)})">
+                <ellipse rx="${rx.toFixed(1)}" ry="${(rx * 0.80).toFixed(1)}" fill="url(#zp-grad-braise)"${flouDoux} class="zp-anim"
+                    style="animation: zpBraise ${(1.3 + rnd(k + 20) * 1.1).toFixed(2)}s ease-in-out infinite; animation-delay:-${(rnd(k + 26) * 2).toFixed(2)}s"/></g>`;
+        }
+
+        // Langues de feu : de petites pointes claires qui lèchent vers l'extérieur.
+        const nbLangues = leger ? 2 : 4;
+        for (let k = 0; k < nbLangues; k++) {
+            // Angles franchement dispersés : réparties trop régulièrement, les langues dessinent
+            // une fleur au lieu d'un feu.
+            const ang = k * (360 / nbLangues) + rnd(k + 32) * 90 - 25;
+            const d = R * (0.10 + rnd(k + 38) * 0.34);
+            const t = R * (0.075 + rnd(k + 44) * 0.055);
+            const rad = ang * Math.PI / 180;
+            deco += `<g transform="translate(${(Math.cos(rad) * d).toFixed(1)},${(Math.sin(rad) * d).toFixed(1)}) rotate(${(ang + 90).toFixed(0)})">
+                <path d="M 0,${t.toFixed(1)} C ${(-t * 0.80).toFixed(1)},${(t * 0.15).toFixed(1)} ${(-t * 0.40).toFixed(1)},${(-t * 1.50).toFixed(1)} 0,${(-t * 2.60).toFixed(1)} C ${(t * 0.40).toFixed(1)},${(-t * 1.50).toFixed(1)} ${(t * 0.80).toFixed(1)},${(t * 0.15).toFixed(1)} 0,${t.toFixed(1)} Z"
+                    fill="url(#zp-grad-langue)"${halo} class="zp-anim"
+                    style="animation: zpLangue ${(0.7 + rnd(k + 50) * 0.5).toFixed(2)}s ease-in-out infinite; animation-delay:-${(rnd(k + 56) * 1.4).toFixed(2)}s"/></g>`;
+        }
+
+        // Escarbilles qui filent vers l'extérieur.
+        if (!leger) {
+            for (let k = 0; k < 3; k++) {
+                const ang = rnd(k + 62) * 360;
+                deco += `<g transform="rotate(${ang.toFixed(0)})">
+                    <circle r="${(R * 0.05).toFixed(1)}" fill="#ffe6ac"${halo} class="zp-anim"
+                        style="animation: zpEtincelle ${(1.6 + rnd(k + 68) * 1.2).toFixed(2)}s linear infinite; animation-delay:-${(rnd(k + 74) * 2.4).toFixed(2)}s"/></g>`;
+            }
+        }
+
+    } else if (type === "glace") {
+        contour = "#d6f4ff";
+        deco += `<polygon points="${pointsHexZone(0, 0, R)}" fill="url(#zp-grad-glace)"/>`;
+        deco += `<polygon points="${pointsHexZone(0, 0, R * 0.68)}" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.6" stroke-dasharray="5 9" class="zp-anim"
+            style="animation: zpGivreTour 26s linear infinite"/>`;
+
+        const nbCristaux = leger ? 3 : 5;
+        for (let k = 0; k < nbCristaux; k++) {
+            const ang = k * (360 / nbCristaux) + rnd(k + 3) * 35;
+            const d = R * (0.12 + rnd(k + 9) * 0.40);
+            const L = R * (0.17 + rnd(k + 15) * 0.13);
+            const rad = ang * Math.PI / 180;
+            deco += `<g transform="translate(${(Math.cos(rad) * d).toFixed(1)},${(Math.sin(rad) * d).toFixed(1)}) rotate(${(rnd(k + 21) * 360).toFixed(0)})">
+                <polygon points="0,${(-L).toFixed(1)} ${(L * 0.30).toFixed(1)},0 0,${L.toFixed(1)} ${(-L * 0.30).toFixed(1)},0"
+                    fill="url(#zp-grad-cristal)" stroke="rgba(255,255,255,0.9)" stroke-width="0.8" class="zp-anim"
+                    style="animation: zpGivre ${(2.6 + rnd(k + 27) * 2).toFixed(2)}s ease-in-out infinite; animation-delay:-${(rnd(k + 33) * 3).toFixed(2)}s"/></g>`;
+        }
+
+    } else if (type === "electrique") {
+        contour = "#9fdcff";
+        deco += `<polygon points="${pointsHexZone(0, 0, R)}" fill="url(#zp-grad-elec)" class="zp-anim" style="animation: zpSocle 3s ease-in-out infinite"/>`;
+
+        // Un arc se construit d'un bord à l'autre, en zigzag.
+        const arc = (k, largeur) => {
+            const angDep = rnd(k + 4) * 360;
+            const angArr = angDep + 120 + rnd(k + 10) * 120;
+            const radD = angDep * Math.PI / 180, radA = angArr * Math.PI / 180;
+            const x1 = Math.cos(radD) * R * 0.85, y1 = Math.sin(radD) * R * 0.85;
+            const x2 = Math.cos(radA) * R * 0.85, y2 = Math.sin(radA) * R * 0.85;
+            let d = `M ${x1.toFixed(1)},${y1.toFixed(1)}`;
+            const seg = 4;
+            for (let s = 1; s <= seg; s++) {
+                const t = s / seg;
+                const bx = x1 + (x2 - x1) * t;
+                const by = y1 + (y2 - y1) * t;
+                const ecart = s === seg ? 0 : (rnd(k * 10 + s + 16) - 0.5) * R * 0.5;
+                const nx = -(y2 - y1), ny = (x2 - x1);
+                const norme = Math.hypot(nx, ny) || 1;
+                d += ` L ${(bx + nx / norme * ecart).toFixed(1)},${(by + ny / norme * ecart).toFixed(1)}`;
+            }
+            return { d: d, largeur: largeur };
+        };
+
+        // Deux arcs de fond toujours visibles : la case reste "sous tension" même entre deux
+        // décharges, sinon elle a l'air éteinte les trois quarts du temps.
+        for (let k = 0; k < 2; k++) {
+            const a = arc(k + 90, R * 0.035);
+            deco += `<path d="${a.d}" fill="none" stroke="#7fc9ff" stroke-width="${a.largeur.toFixed(1)}" stroke-linecap="round" stroke-linejoin="round" opacity="0.30"/>`;
+        }
+        // Puis les décharges franches qui claquent chacune sur son tempo.
+        const nbArcs = leger ? 2 : 3;
+        for (let k = 0; k < nbArcs; k++) {
+            const a = arc(k, R * 0.055);
+            deco += `<path d="${a.d}" fill="none" stroke="#eaf7ff" stroke-width="${a.largeur.toFixed(1)}" stroke-linecap="round" stroke-linejoin="round"${halo}
+                style="animation: zpArc ${(1.8 + rnd(k + 40) * 1.6).toFixed(2)}s linear infinite; animation-delay:-${(rnd(k + 46) * 3).toFixed(2)}s"/>`;
+        }
+        // Étincelles au sol entre deux décharges.
+        const nbEclats = leger ? 2 : 4;
+        for (let k = 0; k < nbEclats; k++) {
+            const ang = rnd(k + 52) * 360 * Math.PI / 180;
+            const d = R * (0.15 + rnd(k + 58) * 0.55);
+            deco += `<circle cx="${(Math.cos(ang) * d).toFixed(1)}" cy="${(Math.sin(ang) * d).toFixed(1)}" r="${(R * 0.05).toFixed(1)}"
+                fill="#ffffff"${halo}
+                style="animation: zpArc ${(1.4 + rnd(k + 64) * 1.6).toFixed(2)}s linear infinite; animation-delay:-${(rnd(k + 70) * 2).toFixed(2)}s"/>`;
+        }
+
+    } else if (type === "poison") {
+        contour = "#8fdc4c";
+        deco += `<polygon points="${pointsHexZone(0, 0, R)}" fill="url(#zp-grad-poison)" class="zp-anim" style="animation: zpSocle 4s ease-in-out infinite"/>`;
+
+        const nbBouillons = leger ? 2 : 4;
+        for (let k = 0; k < nbBouillons; k++) {
+            const ang = (k * (360 / nbBouillons) + rnd(k + 5) * 45) * Math.PI / 180;
+            const d = R * (0.06 + rnd(k + 11) * 0.34);
+            const rr = R * (0.28 + rnd(k + 17) * 0.16);
+            deco += `<g transform="translate(${(Math.cos(ang) * d).toFixed(1)},${(Math.sin(ang) * d).toFixed(1)})">
+                <circle r="${rr.toFixed(1)}" fill="url(#zp-grad-vapeur)"${flouFort} class="zp-anim"
+                    style="animation: zpNappe ${(4.5 + rnd(k + 23) * 3).toFixed(2)}s ease-in-out infinite; animation-delay:-${(rnd(k + 29) * 5).toFixed(2)}s"/></g>`;
+        }
+        const nbBulles = leger ? 1 : 3;
+        for (let k = 0; k < nbBulles; k++) {
+            const ang = rnd(k + 35) * 360 * Math.PI / 180;
+            const d = R * (0.12 + rnd(k + 41) * 0.48);
+            deco += `<g transform="translate(${(Math.cos(ang) * d).toFixed(1)},${(Math.sin(ang) * d).toFixed(1)})">
+                <circle r="${(R * 0.11).toFixed(1)}" fill="none" stroke="#c9f79e" stroke-width="1.5" class="zp-anim"
+                    style="animation: zpBulle ${(2.4 + rnd(k + 47) * 1.8).toFixed(2)}s ease-out infinite; animation-delay:-${(rnd(k + 53) * 3).toFixed(2)}s"/></g>`;
+        }
+
+    } else {
+        deco += `<polygon points="${pointsHexZone(0, 0, R)}" fill="rgba(255,76,76,0.22)" class="zp-anim" style="animation: zpSocle 2.6s ease-in-out infinite"/>`;
+    }
+
+    return `<g transform="translate(${px.x.toFixed(1)},${px.y.toFixed(1)})">
+        <g clip-path="url(#zp-clip-hex)">${deco}</g>
+        <polygon points="${pointsHexZone(0, 0, R * 0.985)}" fill="none" stroke="${contour}" stroke-width="2.2" opacity="0.8"/>
+    </g>`;
+}
+
+window.appliquerZonesPersistantes = function() {
+    const conteneur = document.getElementById("transform-plateau");
+    if (!conteneur || !window.PLATEAU_VTT) return;
+
+    let svg = document.getElementById("svg-zones-persistantes");
+    if (!svg) {
+        svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.id = "svg-zones-persistantes";
+        svg.style.position = "absolute";
+        svg.style.top = "0";
+        svg.style.left = "0";
+        svg.style.width = "100%";
+        svg.style.height = "100%";
+        svg.style.zIndex = "3"; // Sous les pions (10), au-dessus du fond de carte
+        svg.style.pointerEvents = "none";
+        svg.style.overflow = "visible";
+        conteneur.appendChild(svg);
+    }
+
+    injecterStyleZonesPersistantes();
+
+    const zones = Object.values(window.ZONES_PERSISTANTES || {});
+    if (zones.length === 0) {
+        svg.innerHTML = "";
+        return;
+    }
+
+    const R = window.PLATEAU_VTT.hexSize;
+
+    const defs = `<defs>
+        <clipPath id="zp-clip-hex"><polygon points="${pointsHexZone(0, 0, R)}"/></clipPath>
+        <filter id="zp-glow" x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur stdDeviation="${(R * 0.11).toFixed(2)}" result="flou"/>
+            <feMerge><feMergeNode in="flou"/><feMergeNode in="flou"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="zp-flou-doux" x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur stdDeviation="${(R * 0.10).toFixed(2)}"/>
+        </filter>
+        <filter id="zp-flou-fort" x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur stdDeviation="${(R * 0.20).toFixed(2)}"/>
+        </filter>
+        <radialGradient id="zp-grad-feu">
+            <stop offset="0%"   stop-color="#ffa53c" stop-opacity="0.62"/>
+            <stop offset="55%"  stop-color="#d63a08" stop-opacity="0.50"/>
+            <stop offset="100%" stop-color="#4d1000" stop-opacity="0.40"/>
+        </radialGradient>
+        <radialGradient id="zp-grad-coeur">
+            <stop offset="0%"   stop-color="#fff6d2" stop-opacity="0.90"/>
+            <stop offset="45%"  stop-color="#ffab3a" stop-opacity="0.55"/>
+            <stop offset="100%" stop-color="#ff6a12" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="zp-grad-braise">
+            <stop offset="0%"   stop-color="#fff2b0" stop-opacity="0.95"/>
+            <stop offset="45%"  stop-color="#ff9d2e" stop-opacity="0.75"/>
+            <stop offset="100%" stop-color="#e03a05" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="zp-grad-langue" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0%"   stop-color="#ff7a1e" stop-opacity="0.90"/>
+            <stop offset="50%"  stop-color="#ffcf5c" stop-opacity="0.98"/>
+            <stop offset="100%" stop-color="#fffbe6" stop-opacity="1"/>
+        </linearGradient>
+        <radialGradient id="zp-grad-glace">
+            <stop offset="0%"   stop-color="#eafaff" stop-opacity="0.45"/>
+            <stop offset="70%"  stop-color="#8fd8f7" stop-opacity="0.38"/>
+            <stop offset="100%" stop-color="#4aa6cf" stop-opacity="0.32"/>
+        </radialGradient>
+        <linearGradient id="zp-grad-cristal" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.95"/>
+            <stop offset="100%" stop-color="#8fd8f7" stop-opacity="0.55"/>
+        </linearGradient>
+        <radialGradient id="zp-grad-elec">
+            <stop offset="0%"   stop-color="#9fd8ff" stop-opacity="0.30"/>
+            <stop offset="100%" stop-color="#1b4c7a" stop-opacity="0.22"/>
+        </radialGradient>
+        <radialGradient id="zp-grad-poison">
+            <stop offset="0%"   stop-color="#a8ef6c" stop-opacity="0.38"/>
+            <stop offset="100%" stop-color="#2f6b1f" stop-opacity="0.34"/>
+        </radialGradient>
+        <radialGradient id="zp-grad-vapeur">
+            <stop offset="0%"   stop-color="#e2ffb8" stop-opacity="0.92"/>
+            <stop offset="55%"  stop-color="#9ae04f" stop-opacity="0.50"/>
+            <stop offset="100%" stop-color="#4d9b32" stop-opacity="0"/>
+        </radialGradient>
+    </defs>`;
+
+    let totalHexes = 0;
+    zones.forEach(z => { totalHexes += (z.hexes || []).length; });
+    const leger = totalHexes > 12;
+
+    let corps = "";
+    zones.forEach(zone => {
+        (zone.hexes || []).forEach(hex => {
+            corps += dessinerHexZonePersistante(zone.type || "neutre", hex, R, leger);
+        });
+    });
+
+    // On passe par DOMParser plutôt que par innerHTML : l'affectation de balisage SVG via
+    // innerHTML est capricieuse selon les moteurs, et le jeu tourne sur iPad (WebKit).
+    svg.innerHTML = "";
+    try {
+        const docSvg = new DOMParser().parseFromString(
+            `<svg xmlns="http://www.w3.org/2000/svg">${defs}${corps}</svg>`, "image/svg+xml"
+        );
+        if (docSvg.querySelector("parsererror")) throw new Error("SVG des zones illisible");
+        Array.from(docSvg.documentElement.childNodes).forEach(n => svg.appendChild(document.importNode(n, true)));
+    } catch (e) {
+        console.error("Erreur rendu zones persistantes :", e);
+    }
 };
 
 // =========================================================================
@@ -2154,7 +2508,24 @@ window.finDeTourCombat = async function(forcer = false) {
                     if (file.length === 0) {
                         phase = "Preparation";
                         tour++;
-                        
+
+                        // 🔻 Zones persistantes : une case en moins à vivre à chaque nouveau tour.
+                        // Tous les clients recalculent la même valeur à partir du même snapshot,
+                        // donc l'écriture converge (même principe que les états altérés).
+                        const zonesActuelles = window.ZONES_PERSISTANTES || {};
+                        if (Object.keys(zonesActuelles).length > 0) {
+                            const zonesRestantes = {};
+                            Object.values(zonesActuelles).forEach(z => {
+                                const reste = (parseInt(z.dureeRestante) || 0) - 1;
+                                if (reste > 0) zonesRestantes[z.id] = { ...z, dureeRestante: reste };
+                            });
+                            window.ZONES_PERSISTANTES = zonesRestantes;
+                            if (typeof window.appliquerZonesPersistantes === "function") window.appliquerZonesPersistantes();
+                            setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
+                                Zones_Persistantes: zonesRestantes
+                            }, { merge: true }).catch(e => console.error(e));
+                        }
+
                         if (window.PERSOS_PARTIE && window.PERSOS_PARTIE.length > 0) {
                             const batch = writeBatch(db);
                             let regenAjoutee = false;
@@ -2612,6 +2983,13 @@ window.reinitialiserCombat = async function() {
 
         // A bis. Les Illusions ne survivent pas au combat : c'est le seul vrai "fin de combat"
         // disponible dans le jeu (pas de bouton dédié pour ça), donc leur nettoyage est accroché ici.
+        // Les zones persistantes ne survivent pas à une réinitialisation de combat.
+        if (window.ID_PARTIE_COURANTE) {
+            window.ZONES_PERSISTANTES = {};
+            await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), { Zones_Persistantes: {} }, { merge: true }).catch(e => console.error(e));
+            if (typeof window.appliquerZonesPersistantes === "function") window.appliquerZonesPersistantes();
+        }
+
         const illusions = (window.PERSOS_PARTIE || []).filter(p => p.estIllusion);
         if (illusions.length > 0 && window.ID_PARTIE_COURANTE) {
             const vttRef = doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE);
