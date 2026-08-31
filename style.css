@@ -2114,3 +2114,112 @@ textarea.input-texte-parchemin {
     color: #888888 !important;
     text-shadow: 1px 1px 2px #000000 !important;
 }
+
+/* =========================================================================
+   BESTIAIRE — Tableau d'équilibrage des gabarits de monstres
+   Reprend la lecture du tableau Numbers d'origine : un bandeau par archetype,
+   ses paliers en dessous, et les valeurs alignées en colonnes.
+   ========================================================================= */
+.table-monstres-ivalis {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: sans-serif;
+  font-size: 14px;
+}
+
+.table-monstres-ivalis th {
+  background-color: #5c3a21;
+  color: #e8d5a5;
+  padding: 8px 6px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  font-size: 13px;
+  font-weight: bold;
+  text-align: center;
+  border-bottom: 2px solid #2a1a0f;
+  white-space: nowrap;
+}
+
+/* Le rappel de plafond passe sous le titre, en plus discret, comme sur le
+   tableau d'origine : "Rés Phys (max 70)". */
+.table-monstres-ivalis th .plafond-colonne {
+  display: block;
+  font-size: 10px;
+  font-weight: normal;
+  opacity: 0.75;
+  margin-top: 2px;
+}
+
+.table-monstres-ivalis th.colonne-type-monstres { text-align: left; min-width: 130px; }
+
+.table-monstres-ivalis td {
+  padding: 3px 6px;
+  border-bottom: 1px solid #d8c6a4;
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* Bandeau de catégorie (DPS CAC, TANK CAC...) */
+.table-monstres-ivalis .ligne-archetype-monstres td {
+  background-color: #bfe4f5;
+  color: #16384a;
+  font-weight: bold;
+  font-family: 'Cinzel', serif;
+  letter-spacing: 1px;
+  text-align: left;
+  padding: 7px 10px;
+  border-bottom: 2px solid #5c3a21;
+}
+
+/* Respiration entre deux archetypes */
+.table-monstres-ivalis .ligne-separateur-monstres td {
+  height: 12px;
+  background-color: rgba(92, 58, 33, 0.12);
+  border-bottom: none;
+  padding: 0;
+}
+
+.table-monstres-ivalis .cellule-palier-monstres {
+  text-align: left;
+  font-weight: bold;
+  color: #2c1e16;
+  padding-left: 22px;
+  white-space: nowrap;
+}
+
+.table-monstres-ivalis .cellule-valeur-monstres {
+  white-space: nowrap;
+}
+
+.table-monstres-ivalis .cellule-valeur-monstres input {
+  width: 58px;
+  background-color: rgba(255, 255, 255, 0.55);
+  border: 1px solid #c2a878;
+  border-radius: 4px;
+  padding: 4px 2px;
+  text-align: center;
+  font-family: sans-serif;
+  font-size: 14px;
+  color: #2c1e16;
+}
+
+.table-monstres-ivalis .cellule-valeur-monstres input:focus {
+  outline: none;
+  border-color: #5c3a21;
+  background-color: #fffdf6;
+}
+
+/* Une valeur touchée mais pas encore enregistrée : on la marque pour qu'on
+   voie d'un coup d'œil ce qui partira au clic sur Enregistrer. */
+.table-monstres-ivalis .cellule-valeur-monstres input.valeur-modifiee {
+  border-color: #2563eb;
+  background-color: #e3f0ff;
+  font-weight: bold;
+}
+
+.table-monstres-ivalis .suffixe-pourcent {
+  color: #5c3a21;
+  font-size: 12px;
+  margin-left: 2px;
+}

@@ -1348,7 +1348,10 @@ window.supprimerTokenVTT = async function() {
                 });
             }
             
-            await deleteDoc(doc(db, "Personnages", idSupprime));
+            // refCombattant : l'ennemi vit désormais dans la collection Monstres, mais un
+            // pion retiré peut aussi être une illusion restée dans Personnages.
+            await deleteDoc(window.refCombattant(idSupprime));
+            if (window.SOURCE_COMBATTANTS) delete window.SOURCE_COMBATTANTS[idSupprime];
             console.log(`💀 L'ennemi ${idSupprime} a été incinéré pour garder la BDD propre.`);
         }
         
@@ -2286,7 +2289,7 @@ window.jouerCarteCombat = async function(idCarte) {
                 const persoPartieElec = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === persoActuel.idPersonnage);
                 if (persoPartieElec) persoPartieElec.Etats_Alteres = nouveauxEtatsElec;
 
-                updateDoc(doc(db, "Personnages", persoActuel.idPersonnage), { Etats_Alteres: nouveauxEtatsElec }).catch(e => console.error(e));
+                updateDoc(window.refCombattant(persoActuel.idPersonnage), { Etats_Alteres: nouveauxEtatsElec }).catch(e => console.error(e));
             }
 
             file.push({
@@ -2677,7 +2680,7 @@ window.finDeTourCombat = async function(forcer = false) {
                                     }
 
                                     if (majRequise) {
-                                        const persoRef = doc(db, "Personnages", perso.idPersonnage);
+                                        const persoRef = window.refCombattant(perso.idPersonnage);
                                         batch.update(persoRef, modifsFirebase);
                                         regenAjoutee = true; // Trigger le commit global
                                     }
@@ -2696,7 +2699,7 @@ window.finDeTourCombat = async function(forcer = false) {
                     });
 
                     if (file.length > 0 && reposLongEffectue) {
-                        const persoRef = doc(db, "Personnages", idPersoRepos);
+                        const persoRef = window.refCombattant(idPersoRepos);
                         updateDoc(persoRef, { Fatigue_Actuelle: nvFatigueRepos }).catch(e => console.error(e));
                     }
                 }
@@ -2962,7 +2965,7 @@ window.validerCarteCombat = async function(idCarte, elementTexte) {
 
     setTimeout(async () => {
         try {
-            const persoRef = doc(db, "Personnages", persoActuel.idPersonnage);
+            const persoRef = window.refCombattant(persoActuel.idPersonnage);
             
             await updateDoc(persoRef, { 
                 Fatigue_Actuelle: fatigue 
@@ -3065,7 +3068,7 @@ window.reinitialiserCombat = async function() {
                     window.COMBAT_FATIGUE_ACTUELLE = fatigueMax;
                 }
 
-                const persoRef = doc(db, "Personnages", perso.idPersonnage);
+                const persoRef = window.refCombattant(perso.idPersonnage);
                 await updateDoc(persoRef, {
                     PV_Actuels: pvMax,
                     Fatigue_Actuelle: fatigueMax,
@@ -3164,8 +3167,11 @@ window.spawnEnnemiTest = async function() {
     try {
         const { doc, setDoc, getDoc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
         
-        // 1. On le crée dans la Base de données en tant que vrai personnage
-        await setDoc(doc(db, "Personnages", idEnnemi), dataEnnemi);
+        // 1. On le crée dans la collection des MONSTRES (et non plus dans Personnages) :
+        //    il reste un combattant complet sur le plateau, mais n'encombre plus la liste
+        //    des fiches de personnages. Voir monstres.js.
+        if (window.SOURCE_COMBATTANTS) window.SOURCE_COMBATTANTS[idEnnemi] = "Monstres";
+        await setDoc(doc(db, "Monstres", idEnnemi), dataEnnemi);
 
         // 2. On l'ajoute à la piste d'initiative
         const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
@@ -3212,7 +3218,7 @@ window.resetEnnemisTest = async function() {
         const batch = writeBatch(db);
 
         ennemis.forEach(ennemi => {
-            const ref = doc(db, "Personnages", ennemi.idPersonnage);
+            const ref = window.refCombattant(ennemi.idPersonnage);
             batch.update(ref, {
                 PV_Actuels: (parseInt(ennemi.PV_Max) || 50) + (parseInt(ennemi.Dev_Mod_PV) || 0),
                 Fatigue_Actuelle: parseInt(ennemi.Fatigue_Max) || 100

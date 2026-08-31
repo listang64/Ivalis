@@ -247,7 +247,7 @@ window.resoudreZonesPersistantesSurCase = async function(idPerso, hex) {
 
                 if (degatsFinaux > 0) {
                     try {
-                        const refPerso = doc(db, "Personnages", idPerso);
+                        const refPerso = window.refCombattant(idPerso);
                         const oldShield = parseInt(cibleData.Bouclier_Actuel) || 0;
                         if (oldShield > 0) {
                             viaBouclier = true;
@@ -279,7 +279,7 @@ window.resoudreZonesPersistantesSurCase = async function(idPerso, hex) {
                     cibleData.Etats_Alteres = etats;
                     etatApplique = zone.etat.nom;
                     try {
-                        await updateDoc(doc(db, "Personnages", idPerso), { Etats_Alteres: etats });
+                        await updateDoc(window.refCombattant(idPerso), { Etats_Alteres: etats });
                     } catch (e) {
                         console.error("Erreur état zone persistante :", e);
                     }
@@ -380,7 +380,7 @@ window.resoudreAttaqueOpportunite = async function(idAttaquant, idCible) {
         const oldShield = parseInt(cibleData.Bouclier_Actuel) || 0;
 
         try {
-            const refPerso = doc(db, "Personnages", idCible);
+            const refPerso = window.refCombattant(idCible);
             if (oldShield > 0) {
                 viaBouclier = true;
                 const shieldNew = Math.max(0, oldShield - degats); // L'overkill part dans le vide, comme une attaque normale
@@ -1101,7 +1101,7 @@ window.declencherPeurCible = async function(idLanceur, idCible) {
         const nouvelleFatigue = Math.max(0, fatigueActuelle - chemin.length * 2);
         cibleData.fatigueActuelle = nouvelleFatigue;
         try {
-            await updateDoc(doc(db, "Personnages", idCible), { Fatigue_Actuelle: nouvelleFatigue });
+            await updateDoc(window.refCombattant(idCible), { Fatigue_Actuelle: nouvelleFatigue });
         } catch (err) {
             console.error("Erreur fatigue Peur :", err);
         }
@@ -2585,7 +2585,7 @@ window.declencherResolution = async function() {
         } else if (rollConf <= 50) {
             const nouveauxEtatsConf = (lanceurDataConf.Etats_Alteres || []).filter(e => e.nom !== "Confusion");
             lanceurDataConf.Etats_Alteres = nouveauxEtatsConf;
-            await updateDoc(doc(db, "Personnages", idLanceur), { Etats_Alteres: nouveauxEtatsConf }).catch(e => console.error(e));
+            await updateDoc(window.refCombattant(idLanceur), { Etats_Alteres: nouveauxEtatsConf }).catch(e => console.error(e));
             confusionResultat = { type: "annulee" };
         }
         // 51-100 : comportement normal, la carte se résout comme choisi par le joueur.
@@ -2825,7 +2825,7 @@ window.jouerAnimationMoteur = async function(action) {
 
                         const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
                         if (lanceurData && lanceurData.idJoueur === currentUserId) {
-                            updateDoc(doc(db, "Personnages", idCible), {
+                            updateDoc(window.refCombattant(idCible), {
                                 Bouclier_Max: shieldValue,
                                 Bouclier_Actuel: shieldValue
                             }).catch(e => console.error(e));
@@ -2910,7 +2910,7 @@ window.jouerAnimationMoteur = async function(action) {
 
                             const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
                             if (lanceurData && lanceurData.idJoueur === currentUserId) {
-                                updateDoc(doc(db, "Personnages", idCible), { Etats_Alteres: [] }).catch(e => console.error(e));
+                                updateDoc(window.refCombattant(idCible), { Etats_Alteres: [] }).catch(e => console.error(e));
                             }
                             if (window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]?.idPersonnage === idCible) {
                                 if (typeof window.afficherPersoCombatActuel === "function") window.afficherPersoCombatActuel();
@@ -2920,7 +2920,7 @@ window.jouerAnimationMoteur = async function(action) {
 
                     const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
                     if (lanceurData && lanceurData.idJoueur === currentUserId) {
-                        const refPerso = doc(db, "Personnages", idCible);
+                        const refPerso = window.refCombattant(idCible);
                         updateDoc(refPerso, { PV_Actuels: cibleData.PV_Actuels }).catch(e => console.error(e));
                     }
                     if (window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]?.idPersonnage === idCible) {
@@ -3132,7 +3132,7 @@ window.jouerAnimationMoteur = async function(action) {
 
                     const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
                     if (lanceurData && lanceurData.idJoueur === currentUserId) {
-                        const refPerso = doc(db, "Personnages", idCible);
+                        const refPerso = window.refCombattant(idCible);
                         const updatePayload = { PV_Actuels: cibleData.PV_Actuels };
                         if (oldShield > 0) {
                             updatePayload.Bouclier_Actuel = cibleData.Bouclier_Actuel;
@@ -3321,7 +3321,7 @@ window.jouerAnimationMoteur = async function(action) {
                         payloadAlterations.PV_Actuels = cData.PV_Actuels;
                         payloadAlterations.Fatigue_Actuelle = cData.fatigueActuelle;
                     }
-                    await updateDoc(doc(db, "Personnages", idCible), payloadAlterations).catch(e=>console.error(e));
+                    await updateDoc(window.refCombattant(idCible), payloadAlterations).catch(e=>console.error(e));
                 }
                 
                 // 🔄 RAFRAÎCHISSEMENT DE L'UI EN TEMPS RÉEL (Adapté à ta structure)

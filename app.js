@@ -173,6 +173,10 @@ function persoDocVersFront(id, d) {
   };
 }
 
+// Partagée avec monstres.js : un monstre doit exposer exactement les mêmes champs
+// qu'un personnage pour que tout le moteur de combat le traite sans le savoir.
+window.persoDocVersFront = persoDocVersFront;
+
 // Conversion : objet front-end -> document Firestore "Personnages" (colonnes CSV)
 function frontVersPersoDoc(donnees, idPersonnage) {
   return {
@@ -1642,12 +1646,29 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
   });
 
   // C. Écoute des Personnages
+  //    Les monstres ne sont PLUS ici : ils vivent dans leur propre collection
+  //    (voir monstres.js). On ne garde donc dans cette liste que les vrais
+  //    personnages — c'est ce qui les fait disparaître des fiches perso — et
+  //    c'est recomposerCombattants() qui refabrique window.PERSOS_PARTIE en
+  //    fusionnant les deux sources pour le moteur de combat.
+  if (typeof window.ecouterMonstresPartie === "function") {
+    window.ecouterMonstresPartie(idPartie);
+  }
+
   const q = query(collection(db, COL.PERSONNAGES), where("ID_Partie", "==", idPartie));
   unsubscribePersonnages = onSnapshot(q, (snap) => {
     const persos = [];
-    snap.forEach((document) => persos.push(persoDocVersFront(document.id, document.data())));
+    snap.forEach((document) => {
+      if (window.SOURCE_COMBATTANTS) window.SOURCE_COMBATTANTS[document.id] = "Personnages";
+      persos.push(persoDocVersFront(document.id, document.data()));
+    });
 
-    window.PERSOS_PARTIE = persos; 
+    window.PERSOS_JOUEURS_PARTIE = persos;
+    if (typeof window.recomposerCombattants === "function") {
+      window.recomposerCombattants();
+    } else {
+      window.PERSOS_PARTIE = persos;
+    }
     afficherListePersonnages(persos);
     afficherBullesPersonnages(persos);
 

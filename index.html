@@ -854,6 +854,12 @@
       </button>
       <br><br>
 
+      <!-- NOUVEAU : BOUTON MONSTRES (tableau d'équilibrage) -->
+      <button class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); window.ouvrirGestionMonstres()">
+        Monstres
+      </button>
+      <br><br>
+
       <!-- NOUVEAU : BOUTON ARCHIVAGE -->
       <button class="btn-parametres btn-supprimer" style="width: 80%; padding: 15px; border-color: #ff4c4c;" onclick="jouerSonClic(); window.archiverSessionEtViderChat()">
         Clôturer & Vider le Chat
@@ -972,6 +978,46 @@
           <tbody id="tbody-races"></tbody>
         </table>
         <button class="btn-parametres" style="margin-top: 15px;" onclick="jouerSonClic(); window.ajouterLigneRaceVide()">+ Nouvelle Race Vierge</button>
+      </div>
+    </div>
+
+    <!-- ======================================================= -->
+    <!--  MONSTRES : tableau d'équilibrage (gabarits de stats)   -->
+    <!-- ======================================================= -->
+    <div id="etape-gestion-monstres" class="fenetre-volante-parchemin-large fondu-interne" style="display: none; opacity: 0;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #5c3a21; margin-bottom: 10px; padding-bottom: 10px;">
+        <h2 style="margin: 0; border: none; padding: 0;">Bestiaire — Gabarits de stats</h2>
+        <div style="display: flex; gap: 10px;">
+          <button id="btn-sauver-monstres" class="btn-parametres" disabled style="opacity: 0.4; cursor: not-allowed;" onclick="window.sauvegarderGabaritsMonstres()">Enregistrer</button>
+          <button class="btn-parametres" onclick="jouerSonClic(); window.fermerGestionMonstres()">Retour</button>
+        </div>
+      </div>
+
+      <p style="font-size: 13px; color: #5c3a21; margin: 0 0 10px 0; font-style: italic;">
+        Stats de base par archetype et par palier. Un monstre créé plus tard héritera de ces valeurs.
+        Les plafonds (Rés. 70 %, Parade/Esquive 50 %) sont appliqués automatiquement à la saisie.
+      </p>
+
+      <div id="chargement-monstres" style="font-style: italic;">Réveil du bestiaire...</div>
+
+      <div id="conteneur-table-monstres" style="display: none; max-height: 70vh; overflow: auto;">
+        <table class="table-monstres-ivalis">
+          <thead>
+            <tr>
+              <th class="colonne-type-monstres">TYPE</th>
+              <th>PVs</th>
+              <th>Rés Phys<span class="plafond-colonne">max 70</span></th>
+              <th>Rés mag<span class="plafond-colonne">max 70</span></th>
+              <th>Parade/Esquive<span class="plafond-colonne">max 50</span></th>
+              <th>Fatigue max</th>
+              <th>Regen</th>
+              <th>Repos long</th>
+              <th>Nombre d'action</th>
+              <th>XP pour le groupe</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-monstres"></tbody>
+        </table>
       </div>
     </div>
 
@@ -1251,6 +1297,7 @@
 <script type="module" src="mouvement.js"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
 <script type="module" src="moteur_effets.js"></script>
+<script type="module" src="monstres.js"></script>
 
 <div id="overlay-jet-des" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: var(--app-h); background: rgba(0,0,0,0.85); z-index: 5000; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
     

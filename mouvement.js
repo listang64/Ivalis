@@ -440,7 +440,7 @@ window.validerMouvement = async function() {
             }
         });
 
-        const persoRef = doc(db, "Personnages", idPerso);
+        const persoRef = window.refCombattant(idPerso);
         await updateDoc(persoRef, { Fatigue_Actuelle: nvlFatigue });
 
         await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
