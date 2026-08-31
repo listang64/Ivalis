@@ -618,10 +618,11 @@ function parseFrenchFloat(val) {
     return isNaN(parsed) ? 0 : parsed;
 }
 
-// Certains noms d'effets en base contiennent des "&nbsp;" ou des espaces insécables ( ) en
-// tête, invisibles/indétectables par un simple .trim() (qui ne touche que le texte JS, pas les
-// entités HTML) : une fois insérés via innerHTML, ils s'affichent comme un vrai décalage vers la
-// droite. On les neutralise ici avant tout affichage.
+// Simple garde-fou d'affichage : neutralise les espaces parasites (y compris "&nbsp;" littéral
+// et les espaces insécables ou de largeur nulle) qu'un nom saisi en base pourrait traîner.
+// ⚠️ Ne pas confondre avec le décalage des titres du Grimoire, longtemps mis sur le dos de ces
+// caractères : il venait en réalité du text-align:center de .modale-parchemin-jeu, hérité par
+// la liste (voir #forge-menu-caracs dans index.html). Les noms n'y étaient pour rien.
 const REGEX_ESPACES_INVISIBLES = new RegExp(
     "[\\u0000-\\u001F\\u007F\\u00A0\\u1680\\u2000-\\u200F\\u2028\\u2029\\u202F\\u205F\\u2060\\u3000\\uFEFF]",
     "g"

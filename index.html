@@ -1624,7 +1624,11 @@
           <span id="forge-tags-count">0/2 Tags</span>
       </div>
 
-      <div id="forge-menu-caracs" style="display: flex; flex-direction: column; gap: 15px;">
+      <!-- text-align: left OBLIGATOIRE : la classe .modale-parchemin-jeu impose text-align:center
+           à toute la modale. Hérité ici, il centrait le nom de l'effet et sa description chacun
+           par rapport à la largeur du plus large des deux — d'où les titres qui semblaient
+           décalés vers la droite quand la description était plus longue (et l'inverse). -->
+      <div id="forge-menu-caracs" style="display: flex; flex-direction: column; gap: 15px; text-align: left;">
           <!-- Injecté par JS -->
       </div>
   </div>
