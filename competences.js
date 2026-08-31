@@ -148,7 +148,7 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
 
                     <div style="position: absolute; top: 48%; transform: translateY(-50%); left: 120px; right: 20px; text-align: center; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;">${titre}</div>
 
-                    <div onclick="window.gererClicCarte('${idCarte}')" style="position: absolute; top: 50px; left: 115px; width: 405px; height: 55px; z-index: 4; cursor: pointer;"></div>
+                    <div onclick="window.gererClicCarte('${idCarte}')" style="position: absolute; top: 47px; bottom: 55px; left: 115px; right: 57px; z-index: 4; cursor: pointer;"></div>
                 </div>
             `;
         });
