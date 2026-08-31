@@ -2894,6 +2894,11 @@ function fermerFichePerso() {
   const hdCard = document.getElementById("apercu-carte-hd-competence");
   if (hdCard) hdCard.style.display = "none";
   document.querySelectorAll('.banniere-carte').forEach(el => el.style.filter = "none");
+
+  // 🔧 Outil provisoire de debug de hitbox (competences.js) : posé en position
+  // fixe sur toute la page, il doit disparaître avec la fiche perso.
+  const panneauDebugHitbox = document.getElementById("debug-hitbox-panneau");
+  if (panneauDebugHitbox) panneauDebugHitbox.remove();
 }
 
 
