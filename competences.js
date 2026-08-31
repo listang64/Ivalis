@@ -227,7 +227,13 @@ window.initialiserDebugHitboxBanniere = function() {
 
     window.creerPanneauDebugHitbox();
 
+    // Filet de sécurité : un onglet encore display:none (l'onglet Compétences est prérempli en
+    // arrière-plan pendant que Caractéristiques est affiché) mesure toujours 0×0. On ignore une
+    // mesure invalide plutôt que de la graver en dur — la vraie taille sera reprise dès que
+    // changerOngletPerso() rappellera cette fonction au moment où l'onglet devient visible.
     const rect = boite.getBoundingClientRect();
+    if (rect.width < 10 || rect.height < 10) return;
+
     window.ETAT_DEBUG_HITBOX = { largeur: Math.round(rect.width), hauteur: Math.round(rect.height) };
     window.rafraichirAffichageDebugHitbox();
 };
