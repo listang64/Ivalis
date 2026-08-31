@@ -1362,6 +1362,54 @@ window.demarrerCiblage = async function(idCarte) {
                 });
             }
 
+            // 🔻 NOUVEAU : DÉTECTION BRÛLURE 🔻
+            // État persistant classique (comme Étourdi/Confusion) : chance cumulable (10%/action,
+            // cap 60%), durée de base 2 tours + bonus Durée+ normal (act.baseDuree/modsDuree).
+            // Pas de dégâts propres : -50% sur les soins reçus tant que l'état est actif (voir la
+            // branche SOINS de jouerAnimationMoteur).
+            let isBrule = false;
+            let bruleChance = 0;
+            let bruleDuree = 0;
+
+            if (nomLower.includes("brûl") || nomLower.includes("brul")) {
+                isBrule = true;
+                bruleChance += parseFrFloat(effBase.Pourcent_Base) * (act.count || 1);
+                const bonus = parseFrFloat(act.baseDuree);
+                const d = parseFrFloat(effBase.Tours) + bonus;
+                if (d > bruleDuree) bruleDuree = d;
+            }
+
+            listeMods.forEach(m => {
+                const modEff = window.EFFETS_BDD_CACHE[m.id];
+                const modNomLower = (modEff && modEff.Nom || "").toLowerCase();
+                if (!modEff || !(modNomLower.includes("brûl") || modNomLower.includes("brul"))) return;
+
+                isBrule = true;
+                const baseChance = parseFrFloat(modEff.Pourcent_Base) || parseFrFloat(modEff.Pourcent_Max);
+                bruleChance += baseChance * m.count;
+
+                const bonus = parseFrFloat(modsDuree[m.id]);
+                const d = parseFrFloat(modEff.Tours) + bonus;
+                if (d > bruleDuree) bruleDuree = d;
+            });
+
+            if (isBrule) {
+                if (bruleChance > 60) bruleChance = 60; // Cap à 60%
+                if (bruleDuree <= 0) bruleDuree = 2; // Sécurité si la BDD n'a pas de durée
+
+                if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
+                alterationsExtraites.push({
+                    nom: "Brûlé",
+                    icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181101/IMG_2087_q6chof.png",
+                    desc: "-50% de soins reçus.",
+                    chance: bruleChance,
+                    duree: bruleDuree,
+                    isRanged: isRanged,
+                    rangeMax: rangeMax,
+                    cibles: []
+                });
+            }
+
             // 🔻 NOUVEAU : DÉTECTION POUSSÉE 🔻
             // Chance de repousser la cible de 2 cases en ligne droite depuis le lanceur. Pas un état
             // persistant (aucune entrée dans Etats_Alteres) : résolue et animée à part dans
@@ -2367,6 +2415,10 @@ window.jouerAnimationMoteur = async function(action) {
                     if (attaque.valeurBrute > 0) {
                         let soinBrut = attaque.valeurBrute;
                         if (cibleData.race === "Ethéré") soinBrut = Math.floor(soinBrut * 1.3);
+                        // Brûlé : -50% sur tous les soins reçus tant que l'état est actif.
+                        if ((cibleData.Etats_Alteres || []).some(e => e.nom === "Brûlé")) {
+                            soinBrut = Math.floor(soinBrut * 0.5);
+                        }
                         cibleData.PV_Actuels = Math.min(maxPv, oldPv + soinBrut);
                         newPv = cibleData.PV_Actuels;
                         const soinsEffectifs = newPv - oldPv;
