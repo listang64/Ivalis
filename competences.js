@@ -132,17 +132,11 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
             let decalageX = estSelectionnee ? "80px" : "0px";
             let urlCadre = estSelectionnee ? IMAGE_CADRE_SELECTIONNE : IMAGE_CADRE_NORMAL;
 
-            // 🔧 Debug hitbox (case 1 seulement) : les bannières se chevauchent volontairement
-            // (marge négative) et, à z-index égal, celle qui suit dans le DOM passe PAR-DESSUS
-            // celle d'avant. Plus de la moitié de la boîte rouge de la 1ère carte se retrouvait
-            // donc masquée sous la 2e hors survol. On la passe devant en permanence, comme au
-            // survol, pour qu'elle reste entièrement visible et mesurable.
-            const zIndexBase = indexCarte === 0 ? 100 : 2;
+            const zIndexBase = 2;
 
             htmlDeck += `
                 <div id="ui-carte-${idCarte}" class="banniere-carte" data-selectionnee="${isSelStr}"
-                     onclick="window.gererClicCarte('${idCarte}')"
-                     style="position: relative; width: 100%; height: 160px; display: flex; align-items: center; cursor: pointer; transition: transform 0.2s ease; margin-bottom: ${window.ESPACEMENT_BANNIERES_COMBAT}px; z-index: ${zIndexBase}; transform: translateX(${decalageX});"
+                     style="position: relative; width: 100%; height: 160px; display: flex; align-items: center; transition: transform 0.2s ease; margin-bottom: ${window.ESPACEMENT_BANNIERES_COMBAT}px; z-index: ${zIndexBase}; transform: translateX(${decalageX});"
                      onmouseover="this.style.transform = this.dataset.selectionnee === 'true' ? 'translateX(95px)' : 'translateX(12px)'; this.style.zIndex='100';"
                      onmouseout="this.style.transform = this.dataset.selectionnee === 'true' ? 'translateX(80px)' : 'translateX(0px)'; this.style.zIndex='${zIndexBase}';">
 
@@ -154,7 +148,7 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
 
                     <div style="position: absolute; top: 48%; transform: translateY(-50%); left: 120px; right: 20px; text-align: center; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;">${titre}</div>
 
-                    ${indexCarte === 0 ? window.htmlDebugHitboxBanniere() : ""}
+                    <div onclick="window.gererClicCarte('${idCarte}')" style="position: absolute; top: 50px; left: 115px; width: 405px; height: 55px; z-index: 4; cursor: pointer;"></div>
                 </div>
             `;
         });
@@ -162,158 +156,8 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
         htmlDeck += `</div>`;
         listeDiv.innerHTML = htmlDeck;
 
-        if (typeof window.initialiserDebugHitboxBanniere === "function") {
-            window.initialiserDebugHitboxBanniere();
-        }
-
     } catch (e) {
         console.error("Erreur de lecture des compétences :", e);
-    }
-};
-
-// =========================================================================
-//  🔧 OUTIL PROVISOIRE — Debug de la hitbox des bannières de compétence 🔧
-//  Superpose sur la 1ère bannière une boîte rouge qui matérialise la zone
-//  actuellement cliquable (celle du onclick sur .banniere-carte, largeur
-//  100% × 160px). Les commandes (+ / - largeur, + / - hauteur, copier) sont
-//  posées sur document.body en position fixe : la bannière est dans une liste
-//  qui défile (overflow-y: auto) et fait partie de la pile d'empilement de
-//  sa propre carte (z-index 2, ou 100 au survol) — un panneau posé "au-dessus"
-//  d'elle en position absolue serait tantôt rogné par le défilement, tantôt
-//  masqué sous l'en-tête collant "Grimoire de Combat" (z-index 50). En fixe,
-//  le panneau reste visible et cliquable quoi qu'il arrive.
-//  ⚠️ À retirer une fois la vraie hitbox corrigée en dur dans le CSS.
-// =========================================================================
-// top/left : décalage du coin haut-gauche de la boîte par rapport à celui de la bannière
-// (0,0 au départ, comme le onclick actuel). largeur/hauteur : sa taille depuis ce coin.
-window.ETAT_DEBUG_HITBOX = { top: 0, left: 0, largeur: 0, hauteur: 0 };
-
-window.htmlDebugHitboxBanniere = function() {
-    return `<div id="debug-hitbox-boite" style="position: absolute; top: 0; left: 0; width: 100%; height: 160px; border: 3px solid #ff0000; background: rgba(255, 0, 0, 0.15); box-sizing: border-box; z-index: 150; pointer-events: none;"></div>`;
-};
-
-window.creerPanneauDebugHitbox = function() {
-    if (document.getElementById("debug-hitbox-panneau")) return;
-
-    const panneau = document.createElement("div");
-    panneau.id = "debug-hitbox-panneau";
-    panneau.onclick = (e) => e.stopPropagation();
-    panneau.style.cssText = "position: fixed; top: 12px; right: 12px; width: 210px; z-index: 99999; background: rgba(20, 10, 5, 0.94); border: 1px solid #ff4c4c; border-radius: 8px; padding: 8px 10px; font-family: sans-serif; color: #fff; cursor: default; box-shadow: 0 4px 12px rgba(0,0,0,0.6);";
-    const ligne = (label, id, dimension, margeBas) => `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: ${margeBas}px;">
-            <span style="font-size: 13px;">${label} : <b id="${id}">?</b>px</span>
-            <span>
-                <button onclick="event.stopPropagation(); window.ajusterDebugHitbox('${dimension}', -5)" style="width: 26px; height: 26px; border-radius: 4px; border: none; background: #5c3a21; color: #fff; font-weight: bold; cursor: pointer;">−</button>
-                <button onclick="event.stopPropagation(); window.ajusterDebugHitbox('${dimension}', 5)" style="width: 26px; height: 26px; border-radius: 4px; border: none; background: #5c3a21; color: #fff; font-weight: bold; cursor: pointer;">+</button>
-            </span>
-        </div>`;
-
-    panneau.innerHTML = `
-        <div style="font-size: 11px; color: #ff8a8a; font-weight: bold; margin-bottom: 6px; text-transform: uppercase;">🔧 Debug hitbox (1ère carte)</div>
-
-        <div style="font-size: 10px; color: #c9a878; margin-bottom: 4px;">Chaque + agrandit la boîte depuis ce bord, chaque − la réduit depuis ce bord.</div>
-
-        ${ligne("Bord haut", "debug-hitbox-haut-val", "haut", 4)}
-        ${ligne("Bord gauche", "debug-hitbox-gauche-val", "gauche", 4)}
-        ${ligne("Bord droit (largeur)", "debug-hitbox-largeur-val", "largeur", 4)}
-        ${ligne("Bord bas (hauteur)", "debug-hitbox-hauteur-val", "hauteur", 8)}
-
-        <button onclick="event.stopPropagation(); window.reinitialiserDebugHitbox()" style="width: 100%; padding: 5px; margin-bottom: 6px; border-radius: 6px; border: 1px solid #5c3a21; background: transparent; color: #c9a878; font-size: 11px; cursor: pointer;">↺ Réinitialiser</button>
-        <button id="debug-hitbox-btn-copier" onclick="event.stopPropagation(); window.copierDebugHitbox()" style="width: 100%; padding: 6px; border-radius: 6px; border: none; background: #2563eb; color: #fff; font-weight: bold; font-size: 12px; cursor: pointer;">📋 Copier les dimensions</button>
-    `;
-    document.body.appendChild(panneau);
-};
-
-// Mesure la boîte telle qu'affichée à l'écran pour initialiser les compteurs sur la vraie
-// taille de départ (celle du onclick actuel), pas une valeur arbitraire. Ne le fait qu'une
-// fois par boîte (dataset.mesure) : sinon revenir sur l'onglet Compétences réécraserait les
-// ajustements de Nico en cours de route.
-window.initialiserDebugHitboxBanniere = function() {
-    const boite = document.getElementById("debug-hitbox-boite");
-    if (!boite) return;
-
-    window.creerPanneauDebugHitbox();
-
-    if (boite.dataset.mesure === "1") {
-        window.rafraichirAffichageDebugHitbox(); // Même boîte qu'avant : on réapplique l'état déjà en mémoire.
-        return;
-    }
-
-    // Filet de sécurité : un onglet encore display:none (l'onglet Compétences est prérempli en
-    // arrière-plan pendant que Caractéristiques est affiché) mesure toujours 0×0. On ignore une
-    // mesure invalide plutôt que de la graver en dur — la vraie taille sera reprise dès que
-    // changerOngletPerso() rappellera cette fonction au moment où l'onglet devient visible.
-    const rect = boite.getBoundingClientRect();
-    if (rect.width < 10 || rect.height < 10) return;
-
-    boite.dataset.mesure = "1";
-    window.ETAT_DEBUG_HITBOX = { top: 0, left: 0, largeur: Math.round(rect.width), hauteur: Math.round(rect.height) };
-    // Instantané conservé à part : une fois la boîte redimensionnée, la remesurer ne renverrait
-    // plus que sa taille déjà modifiée. "Réinitialiser" doit revenir ICI, pas à l'état courant.
-    window.ETAT_DEBUG_HITBOX_ORIGINAL = { ...window.ETAT_DEBUG_HITBOX };
-    window.rafraichirAffichageDebugHitbox();
-};
-
-window.reinitialiserDebugHitbox = function() {
-    if (!window.ETAT_DEBUG_HITBOX_ORIGINAL) return;
-    window.ETAT_DEBUG_HITBOX = { ...window.ETAT_DEBUG_HITBOX_ORIGINAL };
-    window.rafraichirAffichageDebugHitbox();
-};
-
-// `bord` = quel bord de la boîte on déplace : 'haut'/'gauche' bougent AUSSI le coin de départ
-// (top/left) pour que ce soit bien CE bord-là qui bouge et pas le bord opposé ; 'largeur'
-// (bord droit) et 'hauteur' (bord bas) n'ont besoin de rien d'autre, le coin de départ ne bouge
-// jamais pour eux. Un delta positif agrandit toujours la boîte depuis ce bord.
-window.ajusterDebugHitbox = function(bord, delta) {
-    const etat = window.ETAT_DEBUG_HITBOX;
-
-    if (bord === "gauche") {
-        const nouvelleLargeur = Math.max(10, etat.largeur + delta);
-        etat.left -= (nouvelleLargeur - etat.largeur); // agrandir vers la gauche = le coin recule d'autant
-        etat.largeur = nouvelleLargeur;
-    } else if (bord === "haut") {
-        const nouvelleHauteur = Math.max(10, etat.hauteur + delta);
-        etat.top -= (nouvelleHauteur - etat.hauteur);
-        etat.hauteur = nouvelleHauteur;
-    } else {
-        etat[bord] = Math.max(10, (etat[bord] || 0) + delta); // 'largeur' (bord droit) / 'hauteur' (bord bas)
-    }
-
-    window.rafraichirAffichageDebugHitbox();
-};
-
-window.rafraichirAffichageDebugHitbox = function() {
-    const boite = document.getElementById("debug-hitbox-boite");
-    if (!boite) return;
-    const etat = window.ETAT_DEBUG_HITBOX;
-
-    boite.style.top = etat.top + "px";
-    boite.style.left = etat.left + "px";
-    boite.style.width = etat.largeur + "px";
-    boite.style.height = etat.hauteur + "px";
-
-    const idsParEtat = { top: "debug-hitbox-haut-val", left: "debug-hitbox-gauche-val", largeur: "debug-hitbox-largeur-val", hauteur: "debug-hitbox-hauteur-val" };
-    Object.keys(idsParEtat).forEach(cle => {
-        const el = document.getElementById(idsParEtat[cle]);
-        if (el) el.innerText = etat[cle];
-    });
-};
-
-window.copierDebugHitbox = async function() {
-    const { top, left, largeur, hauteur } = window.ETAT_DEBUG_HITBOX;
-    const texte = `Hitbox bannière compétence (fiche perso) :\nhaut: ${top}px\ngauche: ${left}px\nlargeur: ${largeur}px\nhauteur: ${hauteur}px`;
-
-    const btn = document.getElementById("debug-hitbox-btn-copier");
-    try {
-        await navigator.clipboard.writeText(texte);
-        if (btn) {
-            const original = btn.innerText;
-            btn.innerText = "✔️ Copié !";
-            setTimeout(() => { btn.innerText = original; }, 1200);
-        }
-    } catch (e) {
-        console.error("Erreur copie presse-papier :", e);
-        alert(texte); // Repli si le presse-papier est refusé par le navigateur
     }
 };
 

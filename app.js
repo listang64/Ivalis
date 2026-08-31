@@ -2894,11 +2894,6 @@ function fermerFichePerso() {
   const hdCard = document.getElementById("apercu-carte-hd-competence");
   if (hdCard) hdCard.style.display = "none";
   document.querySelectorAll('.banniere-carte').forEach(el => el.style.filter = "none");
-
-  // 🔧 Outil provisoire de debug de hitbox (competences.js) : posé en position
-  // fixe sur toute la page, il doit disparaître avec la fiche perso.
-  const panneauDebugHitbox = document.getElementById("debug-hitbox-panneau");
-  if (panneauDebugHitbox) panneauDebugHitbox.remove();
 }
 
 
@@ -2966,15 +2961,6 @@ function changerOngletPerso(evt, nomOnglet) {
   document.getElementById(nomOnglet).classList.add("actif");
   if (evt && evt.currentTarget) {
     evt.currentTarget.classList.add("actif");
-  }
-
-  // 🔧 Debug hitbox (competences.js) : chargerOngletCompetences() a rempli cet onglet en
-  // arrière-plan pendant qu'il était encore display:none (la fiche perso s'ouvre par défaut sur
-  // Caractéristiques), donc sa toute première mesure de la bannière donnait 0×0 — une valeur
-  // gravée en dur qui ne se corrigeait jamais toute seule. On la refait ici, au moment où
-  // l'onglet devient réellement visible.
-  if (nomOnglet === "onglet-competences" && typeof window.initialiserDebugHitboxBanniere === "function") {
-    window.initialiserDebugHitboxBanniere();
   }
 
   // FORCE LA DÉSÉLECTION QUAND ON CHANGE D'ONGLET
