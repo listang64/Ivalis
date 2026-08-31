@@ -1919,10 +1919,26 @@ window.jouerCarteCombat = async function(idCarte) {
             let file = snap.data().File_Attente_Combat || [];
             file = file.filter(item => item.idPersonnage !== persoActuel.idPersonnage);
 
+            // Électrifié : consommé sur la toute prochaine carte jouée, quelle qu'elle soit —
+            // -35 en initiative sur CETTE carte (la piste se retrie automatiquement puisque
+            // file.sort() ci-dessous relit la valeur qu'on vient d'écrire), puis l'état disparaît.
+            let initiativeCarte = dataCarte.Initiative || 0;
+            const etatElectrifie = persoActuel.Etats_Alteres && persoActuel.Etats_Alteres.find(e => e.nom === "Électrifié");
+            if (etatElectrifie) {
+                initiativeCarte = Math.max(0, initiativeCarte - 35);
+                const nouveauxEtatsElec = persoActuel.Etats_Alteres.filter(e => e !== etatElectrifie);
+                persoActuel.Etats_Alteres = nouveauxEtatsElec;
+
+                const persoPartieElec = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === persoActuel.idPersonnage);
+                if (persoPartieElec) persoPartieElec.Etats_Alteres = nouveauxEtatsElec;
+
+                updateDoc(doc(db, "Personnages", persoActuel.idPersonnage), { Etats_Alteres: nouveauxEtatsElec }).catch(e => console.error(e));
+            }
+
             file.push({
                 idPersonnage: persoActuel.idPersonnage,
                 idCarte: idCarte, // NOUVEAU : Sauvegarde la carte choisie !
-                initiative: dataCarte.Initiative || 0,
+                initiative: initiativeCarte,
                 timestamp: new Date().getTime()
             });
 

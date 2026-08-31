@@ -1315,7 +1315,7 @@ window.demarrerCiblage = async function(idCarte) {
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 alterationsExtraites.push({
                     nom: "Paralysie",
-                    icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788088220/IMG_2081_p5xenm.png",
+                    icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788182779/IMG_2091_tf3xnx.png",
                     desc: "Empêche tout mouvement volontaire et toute compétence pendant 4 tours (la fatigue de la carte tentée est quand même perdue).",
                     chance: 100,
                     duree: 4,
@@ -1451,6 +1451,54 @@ window.demarrerCiblage = async function(idCarte) {
                     desc: "Coût en fatigue du mouvement doublé.",
                     chance: glaceChance,
                     duree: glaceDuree,
+                    isRanged: isRanged,
+                    rangeMax: rangeMax,
+                    cibles: []
+                });
+            }
+
+            // 🔻 NOUVEAU : DÉTECTION ÉLECTRIFIÉ 🔻
+            // Même formule que Brûlé/Glacé (10%/action, cap 60%, durée de base 2 tours + bonus
+            // Durée+). Consommé en un seul jet : la TOUTE PROCHAINE carte jouée par la cible
+            // électrifiée perd 35 en initiative (voir jouerCarteCombat, combat.js), puis l'état
+            // disparaît immédiatement, que la durée soit écoulée ou non.
+            let isElectrifie = false;
+            let electrifieChance = 0;
+            let electrifieDuree = 0;
+
+            if (nomLower.includes("électrif") || nomLower.includes("electrif")) {
+                isElectrifie = true;
+                electrifieChance += parseFrFloat(effBase.Pourcent_Base) * (act.count || 1);
+                const bonus = parseFrFloat(act.baseDuree);
+                const d = parseFrFloat(effBase.Tours) + bonus;
+                if (d > electrifieDuree) electrifieDuree = d;
+            }
+
+            listeMods.forEach(m => {
+                const modEff = window.EFFETS_BDD_CACHE[m.id];
+                const modNomLower = (modEff && modEff.Nom || "").toLowerCase();
+                if (!modEff || !(modNomLower.includes("électrif") || modNomLower.includes("electrif"))) return;
+
+                isElectrifie = true;
+                const baseChance = parseFrFloat(modEff.Pourcent_Base) || parseFrFloat(modEff.Pourcent_Max);
+                electrifieChance += baseChance * m.count;
+
+                const bonus = parseFrFloat(modsDuree[m.id]);
+                const d = parseFrFloat(modEff.Tours) + bonus;
+                if (d > electrifieDuree) electrifieDuree = d;
+            });
+
+            if (isElectrifie) {
+                if (electrifieChance > 60) electrifieChance = 60; // Cap à 60%
+                if (electrifieDuree <= 0) electrifieDuree = 2; // Sécurité si la BDD n'a pas de durée
+
+                if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
+                alterationsExtraites.push({
+                    nom: "Électrifié",
+                    icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788088220/IMG_2081_p5xenm.png",
+                    desc: "La prochaine carte jouée perd 35 en initiative, puis l'état disparaît.",
+                    chance: electrifieChance,
+                    duree: electrifieDuree,
                     isRanged: isRanged,
                     rangeMax: rangeMax,
                     cibles: []
