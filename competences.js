@@ -134,11 +134,18 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
 
             const zIndexBase = 2;
 
+            // pointer-events: none sur le conteneur : les bannières se chevauchent volontairement
+            // (marge négative) et le rectangle plein d'une carte débordait sur la zone de clic de
+            // la carte suivante, même dans ses zones visuellement vides — il volait alors une
+            // partie de son clic quel que soit l'ordre d'empilement (z-index) choisi. En rendant
+            // le conteneur transparent aux clics et en ne réactivant pointer-events que sur le
+            // calque de clic réel (dimensions exactes du rectangle de couleur), seul ce calque
+            // peut être touché : plus aucun risque qu'une carte en vole une autre.
             htmlDeck += `
                 <div id="ui-carte-${idCarte}" class="banniere-carte" data-selectionnee="${isSelStr}"
-                     style="position: relative; width: 100%; height: 160px; display: flex; align-items: center; transition: transform 0.2s ease; margin-bottom: ${window.ESPACEMENT_BANNIERES_COMBAT}px; z-index: ${zIndexBase}; transform: translateX(${decalageX});"
-                     onmouseover="this.style.transform = this.dataset.selectionnee === 'true' ? 'translateX(95px)' : 'translateX(12px)'; this.style.zIndex='100';"
-                     onmouseout="this.style.transform = this.dataset.selectionnee === 'true' ? 'translateX(80px)' : 'translateX(0px)'; this.style.zIndex='${zIndexBase}';">
+                     style="position: relative; width: 100%; height: 160px; display: flex; align-items: center; transition: transform 0.2s ease; margin-bottom: ${window.ESPACEMENT_BANNIERES_COMBAT}px; z-index: ${zIndexBase}; transform: translateX(${decalageX}); pointer-events: none;"
+                     onmouseover="this.style.transform = this.dataset.selectionnee === 'true' ? 'translateX(95px)' : 'translateX(12px)';"
+                     onmouseout="this.style.transform = this.dataset.selectionnee === 'true' ? 'translateX(80px)' : 'translateX(0px)';">
 
                     <div style="position: absolute; top: 47px; bottom: 55px; left: 115px; right: 57px; z-index: 1; border-radius: 0 15px 15px 0; background-color: ${window.COULEUR_PERSO_COURANT};"></div>
 
@@ -148,7 +155,7 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
 
                     <div style="position: absolute; top: 48%; transform: translateY(-50%); left: 120px; right: 20px; text-align: center; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;">${titre}</div>
 
-                    <div onclick="window.gererClicCarte('${idCarte}')" style="position: absolute; top: 47px; bottom: 55px; left: 115px; right: 57px; z-index: 4; cursor: pointer; border: 3px solid red; background: rgba(255,0,0,0.25); box-sizing: border-box;"></div>
+                    <div onclick="window.gererClicCarte('${idCarte}')" style="position: absolute; top: 47px; bottom: 55px; left: 115px; right: 57px; z-index: 4; cursor: pointer; pointer-events: auto;"></div>
                 </div>
             `;
         });
