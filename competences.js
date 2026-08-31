@@ -132,12 +132,19 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
             let decalageX = estSelectionnee ? "80px" : "0px";
             let urlCadre = estSelectionnee ? IMAGE_CADRE_SELECTIONNE : IMAGE_CADRE_NORMAL;
 
+            // 🔧 Debug hitbox (case 1 seulement) : les bannières se chevauchent volontairement
+            // (marge négative) et, à z-index égal, celle qui suit dans le DOM passe PAR-DESSUS
+            // celle d'avant. Plus de la moitié de la boîte rouge de la 1ère carte se retrouvait
+            // donc masquée sous la 2e hors survol. On la passe devant en permanence, comme au
+            // survol, pour qu'elle reste entièrement visible et mesurable.
+            const zIndexBase = indexCarte === 0 ? 100 : 2;
+
             htmlDeck += `
                 <div id="ui-carte-${idCarte}" class="banniere-carte" data-selectionnee="${isSelStr}"
                      onclick="window.gererClicCarte('${idCarte}')"
-                     style="position: relative; width: 100%; height: 160px; display: flex; align-items: center; cursor: pointer; transition: transform 0.2s ease; margin-bottom: ${window.ESPACEMENT_BANNIERES_COMBAT}px; z-index: 2; transform: translateX(${decalageX});"
+                     style="position: relative; width: 100%; height: 160px; display: flex; align-items: center; cursor: pointer; transition: transform 0.2s ease; margin-bottom: ${window.ESPACEMENT_BANNIERES_COMBAT}px; z-index: ${zIndexBase}; transform: translateX(${decalageX});"
                      onmouseover="this.style.transform = this.dataset.selectionnee === 'true' ? 'translateX(95px)' : 'translateX(12px)'; this.style.zIndex='100';"
-                     onmouseout="this.style.transform = this.dataset.selectionnee === 'true' ? 'translateX(80px)' : 'translateX(0px)'; this.style.zIndex='2';">
+                     onmouseout="this.style.transform = this.dataset.selectionnee === 'true' ? 'translateX(80px)' : 'translateX(0px)'; this.style.zIndex='${zIndexBase}';">
 
                     <div style="position: absolute; top: 47px; bottom: 55px; left: 115px; right: 57px; z-index: 1; border-radius: 0 15px 15px 0; background-color: ${window.COULEUR_PERSO_COURANT};"></div>
 
