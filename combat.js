@@ -2622,6 +2622,46 @@ window.finDeTourCombat = async function(forcer = false) {
                                             majRequise = true;
                                         }
 
+                                        // Étalement des dégâts : second et dernier tic, du même
+                                        // montant que le premier. Le coup a déjà touché, donc pas
+                                        // de nouveau jet d'esquive — mais le bouclier encaisse en
+                                        // priorité, comme pour une attaque normale.
+                                        const etatEtalement = perso.Etats_Alteres.find(e => e.nom === "Étalement" && !e.tickFait);
+                                        if (etatEtalement) {
+                                            const montant = parseInt(etatEtalement.degatsRestants) || 0;
+                                            etatEtalement.tickFait = true;
+
+                                            if (montant > 0) {
+                                                const bouclierAvant = parseInt(perso.Bouclier_Actuel) || 0;
+                                                if (bouclierAvant > 0) {
+                                                    perso.Bouclier_Actuel = Math.max(0, bouclierAvant - montant);
+                                                    modifsFirebase.Bouclier_Actuel = perso.Bouclier_Actuel;
+                                                    if (typeof window.afficherFlashDegatToken === "function") {
+                                                        const bMax = parseInt(perso.Bouclier_Max) || bouclierAvant || 1;
+                                                        window.afficherFlashDegatToken(perso.idPersonnage, bouclierAvant, perso.Bouclier_Actuel, bMax, `-${montant} 🛡️`, "#00ffff", "#00ffff");
+                                                    }
+                                                } else {
+                                                    const pvMaxEtal = parseInt(perso.PV_Max) || 0;
+                                                    const pvAvantEtal = perso.PV_Actuels !== undefined ? parseInt(perso.PV_Actuels) : pvMaxEtal;
+                                                    perso.PV_Actuels = Math.max(0, pvAvantEtal - montant);
+                                                    modifsFirebase.PV_Actuels = perso.PV_Actuels;
+
+                                                    const persoJoueurEtal = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === perso.idPersonnage);
+                                                    if (persoJoueurEtal) persoJoueurEtal.PV_Actuels = perso.PV_Actuels;
+
+                                                    const persoActuelEtal = window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+                                                    if (persoActuelEtal && persoActuelEtal.idPersonnage === perso.idPersonnage) {
+                                                        window.COMBAT_PV_ACTUELS = perso.PV_Actuels;
+                                                        if (typeof window.mettreAJourJaugePV === "function") window.mettreAJourJaugePV();
+                                                    }
+                                                    if (typeof window.afficherFlashDegatToken === "function") {
+                                                        window.afficherFlashDegatToken(perso.idPersonnage, pvAvantEtal, perso.PV_Actuels, pvMaxEtal, `-${montant} 🩸`, "#ff4c4c");
+                                                    }
+                                                }
+                                            }
+                                            majRequise = true;
+                                        }
+
                                         let etatsAJour = perso.Etats_Alteres.map(e => {
                                             e.duree -= 1;
                                             return e;

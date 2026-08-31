@@ -1462,12 +1462,17 @@ window.rafraichirForge = function() {
                 }
 
                 // Même règle que pour la base : pas de bouton Durée + sur Immobilisation,
-                // Paralysie, Empoisonnement ni Persistance de terrain (durées figées).
+                // Paralysie, Empoisonnement, Persistance de terrain ni Étalement des dégâts
+                // (durées figées par leur propre mécanique).
+                const nomModDuree = (modEff.Nom || "").toLowerCase().trim();
                 const modHasDuree = parseFrenchFloat(modEff.Tours) > 0
-                    && !(modEff.Nom || "").toLowerCase().includes("immobil")
-                    && !(modEff.Nom || "").toLowerCase().includes("paralys")
-                    && !(modEff.Nom || "").toLowerCase().includes("poison")
-                    && !(modEff.Nom || "").toLowerCase().includes("persistance");
+                    && !nomModDuree.includes("immobil")
+                    && !nomModDuree.includes("paralys")
+                    && !nomModDuree.includes("poison")
+                    && !nomModDuree.includes("persistance")
+                    && !nomModDuree.includes("étalement")
+                    && !nomModDuree.includes("etalement")
+                    && nomModDuree !== "dot";
                 const currentModDuree = (act.modsDuree && act.modsDuree[modId]) || 0;
                 const btnPlusModDureeDisabled = (currentModDuree >= maxDureeStacks || capDepasse) ? `disabled style="opacity: 0.3; cursor: not-allowed; border:none; background:none; font-weight:bold; font-size:16px;"` : `style="color: green; cursor: pointer; border:none; background:none; font-weight:bold; font-size:16px;"`;
 

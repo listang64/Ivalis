@@ -1447,8 +1447,27 @@ window.demarrerCiblage = async function(idCarte) {
 
             let isShield = nomLower.includes("bouclier");
 
+            // Étalement des dégâts (mod "DOT" / "Durée étalement dégâts") : la carte coûte moins
+            // de fatigue (déjà géré par la Forge, coutActionTotale /= 1.2) mais ses dégâts sont
+            // coupés en deux — une moitié tout de suite, l'autre au début du tour suivant.
+            let aEtalement = false;
+            const estModEtalement = (nom) => {
+                const n = (nom || "").toLowerCase().trim();
+                return n === "dot" || n.includes("étalement") || n.includes("etalement");
+            };
+            if (estModEtalement(effBase.Nom)) aEtalement = true;
+            listeMods.forEach(m => {
+                const modEff = window.EFFETS_BDD_CACHE[m.id];
+                if (modEff && estModEtalement(modEff.Nom)) aEtalement = true;
+            });
+
             if (nomLower.includes("attaque") || nomLower.includes("pouvoir") || nomLower.includes("soin") || nomLower.includes("guérison") || isPurification || isShield) {
                 let isHeal = nomLower.includes("soin") || nomLower.includes("guérison") || isPurification || isShield;
+                // Un soin ou un bouclier ne s'étale pas : seuls les dégâts sont concernés. La
+                // coupe en deux se fait sur les dégâts FINAUX (après résistances), pas ici :
+                // diviser la valeur brute gonflerait le total sur les valeurs impaires
+                // (5 → 3 + 3 = 6 après arrondi de chaque moitié).
+                const etalementActif = aEtalement && !isHeal;
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 if (indexPremiereAttaque === -1) indexPremiereAttaque = idxAction;
@@ -1461,6 +1480,7 @@ window.demarrerCiblage = async function(idCarte) {
                     isHeal: isHeal,
                     isShield: isShield,
                     purifChance: purifChance,
+                    estEtalement: etalementActif,
                     cibles: []
                 });
             }
@@ -1656,6 +1676,7 @@ window.demarrerCiblage = async function(idCarte) {
                     rangeMax: rangeMax,
                     cibles: [],
                     estPoison: true,
+                    estDot: true, // Bloque l'Étalement des dégâts : pas deux DoT sur la même cible
                     tickFait: false
                 });
             }
@@ -2946,9 +2967,18 @@ window.jouerAnimationMoteur = async function(action) {
                     // Suite classique du calcul d'armure...
                     let resistance = attaque.typeRes === "Magique" ? defMag : defPhys;
                     let reduction = resistance / 100;
-                    if (reduction > 1) reduction = 1; 
+                    if (reduction > 1) reduction = 1;
                     let degatsFinaux = Math.round(degats * (1 - reduction));
                     if (degatsFinaux < 0) degatsFinaux = 0;
+
+                    // Étalement des dégâts : on coupe le total en deux ici, une fois les
+                    // résistances appliquées. Le reste (arrondi) part sur le premier tic, pour
+                    // que les deux moitiés fassent exactement le total d'une attaque normale.
+                    let degatsSecondTic = 0;
+                    if (attaque.estEtalement && degatsFinaux > 0) {
+                        degatsSecondTic = Math.floor(degatsFinaux / 2);
+                        degatsFinaux = degatsFinaux - degatsSecondTic;
+                    }
 
                     let oldShield = parseInt(cibleData.Bouclier_Actuel) || 0;
                     let maxShield = parseInt(cibleData.Bouclier_Max) || oldShield || 1;
@@ -3071,6 +3101,35 @@ window.jouerAnimationMoteur = async function(action) {
                         }
                     }
 
+                    // 🔻 ÉTALEMENT DES DÉGÂTS : la moitié vient de tomber, on programme la seconde
+                    // pour le début du tour suivant. Interdit si la cible porte déjà un DoT
+                    // (Empoisonnement ou un autre étalement) : dans ce cas le second tic est
+                    // simplement perdu, elle n'encaisse que la moitié.
+                    let dotAjoute = false;
+                    if (attaque.estEtalement && degatsSecondTic > 0) {
+                        const dotDejaPresent = (cibleData.Etats_Alteres || []).some(e => e.estDot);
+                        if (!dotDejaPresent) {
+                            const etats = cibleData.Etats_Alteres ? [...cibleData.Etats_Alteres] : [];
+                            etats.push({
+                                nom: "Étalement",
+                                icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788096401/IMG_2083_pebnup.png",
+                                desc: `Subira ${degatsSecondTic} dégâts au début du tour suivant.`,
+                                chance: 100,
+                                duree: 1, // Disparaît juste après avoir infligé son second tic
+                                estDot: true,
+                                degatsRestants: degatsSecondTic,
+                                tickFait: false
+                            });
+                            cibleData.Etats_Alteres = etats;
+                            dotAjoute = true;
+
+                            if (tkCible) {
+                                await new Promise(r => setTimeout(r, 500));
+                                window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Dégâts étalés…", "#c2a878");
+                            }
+                        }
+                    }
+
                     const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
                     if (lanceurData && lanceurData.idJoueur === currentUserId) {
                         const refPerso = doc(db, "Personnages", idCible);
@@ -3079,7 +3138,15 @@ window.jouerAnimationMoteur = async function(action) {
                             updatePayload.Bouclier_Actuel = cibleData.Bouclier_Actuel;
                             if (shieldDestroyed) updatePayload.Bouclier_Max = cibleData.Bouclier_Max;
                         }
+                        if (dotAjoute) updatePayload.Etats_Alteres = cibleData.Etats_Alteres;
                         updateDoc(refPerso, updatePayload).catch(e => console.error(e));
+                    }
+                    if (dotAjoute) {
+                        if (window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]?.idPersonnage === idCible
+                            && typeof window.afficherPersoCombatActuel === "function") {
+                            window.afficherPersoCombatActuel();
+                        }
+                        if (typeof window.afficherPisteInitiative === "function") window.afficherPisteInitiative();
                     }
                     if (window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]?.idPersonnage === idCible) {
                         window.COMBAT_PV_ACTUELS = cibleData.PV_Actuels;
