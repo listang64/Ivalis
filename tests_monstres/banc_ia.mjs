@@ -15,6 +15,14 @@ export function creerPlateau({ murs = [], supprimees = [], difficiles = [] } = {
 
 export function chargerIA(monde) {
   const w = {}; global.window = w;
+  // Réglages d'équilibrage surchargeables depuis l'environnement, pour comparer
+  // deux calibrages sans toucher au code du jeu (cf. calibrage_degats.mjs).
+  if (process.env.PLAFOND_COUP && process.env.PLAFOND_COUP !== "OFF") {
+    w.PART_PV_PAR_COUP = JSON.parse(process.env.PLAFOND_COUP);
+  }
+  if (process.env.PLAFOND_COUP === "OFF") {
+    w.PART_SOCLE = { brute:0, frappe:0, soutien:0, etat:0, controle:0, etalement:0, zone:0, persistance:0 };
+  }
   global.document = { getElementById: () => null, querySelectorAll: () => [] };
   global.localStorage = { getItem: () => null };
 

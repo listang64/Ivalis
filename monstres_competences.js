@@ -57,13 +57,72 @@ const ARME_PAR_ARCHETYPE = {
 // Combien de cartes de chaque patron on cherche à obtenir, par archetype.
 // L'ordre n'a pas d'importance : les patrons sont tirés puis mélangés.
 const PATRONS_PAR_ARCHETYPE = {
-    "DPS CAC":           ["frappe", "frappe", "etat", "etalement", "zone", "controle"],
-    "TANK CAC":          ["frappe", "controle", "controle", "soutien", "etat", "zone"],
-    "SOUTIEN":           ["soutien", "soutien", "etat", "frappe", "zone", "controle"],
-    "DPS MAGE CAC":      ["frappe", "etat", "zone", "persistance", "etalement", "soutien"],
-    "DPS DISTANCE":      ["frappe", "frappe", "etat", "zone", "etalement", "controle"],
-    "DPS MAGE DISTANCE": ["frappe", "zone", "persistance", "etat", "etalement", "soutien"]
+    "DPS CAC":           ["brute", "frappe", "etat", "etalement", "zone", "controle"],
+    "TANK CAC":          ["brute", "frappe", "controle", "soutien", "etat", "zone"],
+    "SOUTIEN":           ["soutien", "soutien", "etat", "frappe", "zone", "brute"],
+    "DPS MAGE CAC":      ["brute", "frappe", "etat", "zone", "persistance", "etalement"],
+    "DPS DISTANCE":      ["brute", "frappe", "etat", "zone", "etalement", "controle"],
+    "DPS MAGE DISTANCE": ["brute", "frappe", "zone", "persistance", "etat", "etalement"]
 };
+
+// Quelle PART de la tranche part dans le socle lui-même (l'attaque, ou le soin
+// d'une carte de soutien) plutôt que dans les modificateurs. C'est le curseur
+// dégâts / effets de chaque patron. Sans lui, le socle restait à un seul
+// exemplaire et l'ultime d'un Boss à 130 de fatigue infligeait... 7 dégâts :
+// tout le budget partait en états, en zones et en terrains persistants.
+// Aucun coup ne doit rayer un joueur de la carte d'une seule frappe. On plafonne
+// donc la puissance du socle en points de vie : une fraction des PV d'un
+// personnage, selon la stature de la créature. Le repère est lu sur les vrais
+// personnages de la partie quand ils sont là, pour que le plafond suive
+// automatiquement des héros plus robustes.
+// ⚙️ LE CURSEUR DE PUISSANCE DU JEU. Monter ces valeurs = des monstres qui
+// frappent plus fort. Une frappe de "Normal" à 0.30 emporte 30 % des points de
+// vie d'un personnage : trois frappes pour l'abattre.
+window.PART_PV_PAR_COUP = window.PART_PV_PAR_COUP ||
+    { "Petit": 0.20, "Normal": 0.30, "Élite": 0.40, "Boss": 0.55 };
+const PART_PV_PAR_COUP = window.PART_PV_PAR_COUP;
+const PV_JOUEUR_PAR_DEFAUT = 45;
+
+function pvJoueurRepere() {
+    const joueurs = (window.PERSOS_JOUEURS_PARTIE || [])
+        .filter(p => p && p.Camp !== "Ennemi" && parseInt(p.PV_Max) > 0);
+    if (joueurs.length === 0) return PV_JOUEUR_PAR_DEFAUT;
+    const total = joueurs.reduce((s, p) =>
+        s + (parseInt(p.PV_Max) || 0) + (parseInt(p.Dev_Mod_PV) || 0), 0);
+    return Math.max(10, Math.round(total / joueurs.length));
+}
+
+// Ce que coûte, en fatigue, un coup nu porté à sa pleine puissance autorisée.
+// C'est cette valeur qui décide dans QUELLE tranche le coup brut a sa place :
+// celle qu'il remplit tel quel, sans avoir à s'habiller de modificateurs pour
+// atteindre son prix. Une créature a ainsi une frappe nue qu'elle peut se payer
+// souvent, et ses tranches chères restent aux cartes riches.
+function fatigueCoupPlein(monstre, palette) {
+    const arme = ARME_PAR_ARCHETYPE[monstre.archetype] || "Arme polyvalente";
+    const attaques = palette.filter(e => estAttaqueDeBase(e.Nom) && coutPC(e) > 0
+                                         && !incompatibleAvecArme(e.Nom, arme));
+    if (attaques.length === 0) return null;
+    // La plus percutante des attaques que son arme autorise : c'est elle qui
+    // atteint le plafond avec le moins d'exemplaires, donc elle qui fixe la
+    // tranche où un coup nu tient tout seul.
+    const attaque = attaques.reduce((a, b) => nombreFr(b.Valeur) > nombreFr(a.Valeur) ? b : a);
+    const valeur = nombreFr(attaque.Valeur) || 2;
+    const partPV = PART_PV_PAR_COUP[monstre.palier] || 0.45;
+    const exemplaires = Math.max(1, Math.floor(pvJoueurRepere() * partPV / valeur));
+    return exemplaires * coutPC(attaque) * 5;
+}
+
+window.PART_SOCLE = window.PART_SOCLE || {
+    brute:       1.00,   // un coup nu : tout dans la puissance
+    frappe:      0.60,
+    soutien:     0.55,   // un soin de 2 PV ne soigne personne non plus
+    etat:        0.40,
+    controle:    0.40,
+    etalement:   0.35,
+    zone:        0.30,   // la zone multiplie déjà les dégâts par le nombre de cibles
+    persistance: 0.30
+};
+const PART_SOCLE = window.PART_SOCLE;
 
 // Mots-clés qui identifient chaque famille d'effets dans la base. On ne
 // travaille jamais sur des identifiants en dur : la base est éditable par
@@ -724,13 +783,53 @@ function fabriquerCarte(monstre, affinites, patron, tranche, palette, rang) {
         poserSiTientDansLaTranche(trouverMod(MOTS_CLES.distance), 1);
     }
 
+    // --- 2 bis. LA PUISSANCE DU SOCLE ---
+    // Les modificateurs habillent la carte ; c'est le socle qui la rend
+    // dangereuse. On lui réserve donc sa part de la tranche AVANT le
+    // remplissage, sinon il reste à un seul exemplaire et la carte, si belle
+    // soit-elle sur le papier, inflige deux dégâts. Le curseur d'empilement de
+    // richesse ne s'applique pas ici : le socle est justement le seul effet
+    // qu'une créature a le droit de marteler, comme un joueur qui monte son
+    // attaque à ×12 sur sa grosse carte.
+    const carteBrute = (patron === "brute");
+    const coutSocle = coutPC(effetBase) * 5;
+    // Plafond de puissance du socle, exprimé en nombre d'exemplaires. Il vaut
+    // pour toute la fabrication, y compris les rattrapages de fin : une carte
+    // qui n'arrive pas à remplir sa tranche doit s'enrichir, pas frapper plus
+    // fort que ne l'autorise la stature de la créature.
+    let plafondPuissance = maxEmpilements(effetBase);
+    {
+        const valeurUnitaire = nombreFr(effetBase.Valeur);
+        const compteDansLesDegats = estAttaqueDeBase(effetBase.Nom) || contient(effetBase.Nom, MOTS_CLES.soin);
+        if (compteDansLesDegats && valeurUnitaire > 0) {
+            const partPV = PART_PV_PAR_COUP[monstre.palier] || 0.45;
+            plafondPuissance = Math.min(plafondPuissance,
+                Math.max(1, Math.floor(pvJoueurRepere() * partPV / valeurUnitaire)));
+        }
+    }
+    if (coutSocle > 0) {
+        const fatigueMods = Math.max(0, fatigueDe(chantier, palette) - coutSocle);
+        const partSocle = PART_SOCLE[patron] !== undefined ? PART_SOCLE[patron] : 0.4;
+        // Une brute prend tout ce que la tranche autorise, les autres leur part.
+        const budget = carteBrute
+            ? (fatiguePlafond - fatigueMods)
+            : Math.min(fatiguePlafond - fatigueMods, fatigueCible * partSocle);
+        const vise = Math.floor(budget / coutSocle);
+        action.count = Math.max(1, Math.min(plafondPuissance, vise));
+        while (action.count > 1 && fatigueDe(chantier, palette) > fatiguePlafond) action.count--;
+    }
+
     // --- 3. Remplissage jusqu'à la tranche visée ---
     // On ajoute des mods compatibles tant qu'on est sous la cible, en
     // s'interdisant tout ce qui ferait dépasser le plafond de la tranche.
+    // Une brute n'ajoute rien tant qu'elle tient dans sa tranche : c'est un coup
+    // nu. Si le plafond de puissance l'a laissée sous le plancher, elle se
+    // rattrape avec le strict minimum de modificateurs pour y entrer.
+    const cibleRemplissage = carteBrute ? fatigueMin : fatigueCible;
     let garde = 0;
-    while (fatigueDe(chantier, palette) < fatigueCible && garde < 40) {
+    while (fatigueDe(chantier, palette) < cibleRemplissage && garde < 40) {
         garde++;
-        const budgetRestant = (fatigueCible - fatigueDe(chantier, palette)) / 5;
+        const budgetRestant = (cibleRemplissage - fatigueDe(chantier, palette)) / 5;
 
         const candidats = mods.filter(m => {
             if (!effetAutorise(chantier, m, true)) return false;
@@ -785,7 +884,9 @@ function fabriquerCarte(monstre, affinites, patron, tranche, palette, rang) {
     // Dernier ajustement : si on est encore sous le plancher, on empile
     // l'action de base elle-même, qui n'a pas de plafond de compatibilité.
     garde = 0;
-    const plafondBase = Math.min(maxEmpilements(effetBase), chantier.plafondEmpilement);
+    const plafondBase = carteBrute
+        ? plafondPuissance
+        : Math.min(plafondPuissance, chantier.plafondEmpilement);
     while (fatigueDe(chantier, palette) < fatigueMin && garde < 30) {
         garde++;
         if (action.count >= plafondBase) break;
@@ -855,7 +956,14 @@ function fabriquerCarte(monstre, affinites, patron, tranche, palette, rang) {
                 m.count++;
                 if (fatigueDe(chantier, palette) > fatiguePlafond) { m.count--; }
             }
-            if (act.count < maxEmpilements(act.baseEffet)) {
+            // Ici, et seulement ici, le plafond de puissance cède un peu : la
+            // tranche de fatigue est une règle du jeu, le plafond n'est qu'un
+            // garde-fou d'équilibrage. On lui accorde 20 % de marge pour ne pas
+            // laisser une carte saturée finir sous son plancher.
+            const plafondAct = (act === action)
+                ? Math.ceil(plafondPuissance * 1.2)
+                : maxEmpilements(act.baseEffet);
+            if (act.count < plafondAct) {
                 act.count++;
                 if (fatigueDe(chantier, palette) > fatiguePlafond) act.count--;
             }
@@ -978,7 +1086,8 @@ function nomsTechniquesParDefaut(cartes) {
         persistance: ["Terre maudite", "Champ ardent", "Sol vicié"],
         etalement:   ["Plaie ouverte", "Poison lent", "Blessure"],
         soutien:     ["Regain", "Carapace", "Souffle vital"],
-        controle:    ["Étreinte", "Fracas", "Entrave"]
+        controle:    ["Étreinte", "Fracas", "Entrave"],
+        brute:       ["Coup brutal", "Fracasse", "Estocade"]
     };
     const pris = new Set();
     return cartes.map((c, i) => {
@@ -1097,6 +1206,26 @@ window.genererCompetencesMonstre = async function(monstreBrut) {
     const patrons = [...(PATRONS_PAR_ARCHETYPE[monstre.archetype] || PATRONS_PAR_ARCHETYPE["DPS CAC"])]
         .sort(() => Math.random() - 0.5);
 
+    // Le coup brut n'est pas placé au hasard : il va dans la tranche que sa
+    // pleine puissance remplit exactement. Ailleurs, il serait soit bridé par le
+    // plafond de dégâts sous le plancher de sa tranche (et devrait s'habiller de
+    // modificateurs pour y entrer, donc ne serait plus un coup nu), soit trop
+    // cher pour ce qu'il apporte.
+    const iBrute = patrons.indexOf("brute");
+    if (iBrute >= 0) {
+        const coutPlein = fatigueCoupPlein(monstre, palette);
+        if (coutPlein) {
+            const fatMax = parseInt(monstre.fatigueMax) || 100;
+            let cible = TRANCHES_FATIGUE_PCT.findIndex(t =>
+                coutPlein >= Math.round(t[0] / 100 * fatMax) && coutPlein <= Math.round(t[1] / 100 * fatMax));
+            if (cible < 0) cible = (coutPlein < 0.15 * fatMax) ? 0 : TRANCHES_FATIGUE_PCT.length - 1;
+            if (cible !== iBrute) {
+                patrons[iBrute] = patrons[cible];
+                patrons[cible] = "brute";
+            }
+        }
+    }
+
     // Signature d'une carte : la liste de ses effets. Deux cartes de même
     // signature dans un même jeu, c'est la même technique proposée deux fois.
     const signature = (carte) => {
@@ -1109,7 +1238,7 @@ window.genererCompetencesMonstre = async function(monstreBrut) {
     };
 
     const fatigueMaxMonstre = parseInt(monstre.fatigueMax) || 100;
-    const tousLesPatrons = ["frappe", "etat", "zone", "persistance", "etalement", "soutien", "controle"];
+    const tousLesPatrons = ["brute", "frappe", "etat", "zone", "persistance", "etalement", "soutien", "controle"];
 
     const cartes = [];
     const dejaVues = new Set();
@@ -1120,16 +1249,22 @@ window.genererCompetencesMonstre = async function(monstreBrut) {
         // Qualité d'une carte : à tranche égale, on préfère celle qui combine
         // des effets variés plutôt que celle qui empile vingt fois le même.
         const qualite = (c) => {
-            let empilementMax = 0, distincts = new Set();
+            let empilementMods = 0, distincts = new Set(), puissanceSocle = 0;
             c.chantier.actions.forEach(act => {
-                empilementMax = Math.max(empilementMax, act.count);
                 distincts.add(act.baseEffet.Nom);
+                puissanceSocle += act.count;
                 act.modsEffets.forEach(m => {
-                    empilementMax = Math.max(empilementMax, m.count);
+                    empilementMods = Math.max(empilementMods, m.count);
                     distincts.add(m.effet.Nom);
                 });
             });
-            return distincts.size * 2 - Math.max(0, empilementMax - 6) * 3;
+            // Une brute ne se juge pas à sa richesse — elle n'en a pas — mais à
+            // la force du coup. Partout ailleurs on préfère la carte qui combine
+            // des effets variés plutôt que celle qui empile vingt fois le même
+            // MODIFICATEUR ; l'empilement du socle, lui, n'est plus pénalisé :
+            // c'est devenu le curseur de dégâts de la carte.
+            if (c.patron === "brute") return 100 + puissanceSocle;
+            return distincts.size * 2 - Math.max(0, empilementMods - 6) * 3;
         };
 
         let carte = null;
@@ -1148,7 +1283,11 @@ window.genererCompetencesMonstre = async function(monstreBrut) {
         // offensives — un archetype SOUTIEN finissait avec 8 % de cartes de soin
         // au lieu du tiers prévu par son plan.
         for (let essai = 0; essai < 8; essai++) {
-            const patronPrevu = essai < 3;
+            // Le coup brut a droit à plus d'insistance que les autres : c'est la
+            // carte qui garantit qu'une créature sait taper fort. Si on lâche
+            // après trois essais, une créature sur huit se retrouve sans.
+            const essaisPatron = (patrons[i] === "brute") ? 6 : 3;
+            const patronPrevu = essai < essaisPatron;
             const patron = patronPrevu
                 ? (patrons[i] || "frappe")
                 : tousLesPatrons[Math.floor(Math.random() * tousLesPatrons.length)];
@@ -1164,7 +1303,7 @@ window.genererCompetencesMonstre = async function(monstreBrut) {
             if (!carte || qualite(candidate) > qualite(carte)) carte = candidate;
             // Dès qu'une carte du patron prévu convient, on ne va pas chercher
             // ailleurs : les essais suivants ne servent qu'en cas d'impasse.
-            if (patronPrevu && essai >= 2) break;
+            if (patronPrevu && essai >= 2) break;   // le patron prévu convient : inutile d'aller voir ailleurs
         }
 
         // Aucune tentative parfaite : on garde la plus proche plutôt que de

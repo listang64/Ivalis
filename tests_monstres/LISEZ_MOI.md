@@ -49,6 +49,20 @@ node verrou.mjs             # concurrence entre plusieurs navigateurs
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 ```
 
+## Puissance des frappes
+
+```sh
+node degats_cartes.mjs      # combien de dégâts font vraiment les cartes
+node apercu_jeu.mjs         # les 6 cartes de trois créatures, lisibles à l'œil
+node calibrage_degats.mjs   # A/B du plafond de puissance sur 40 combats
+```
+
+Le curseur est `window.PART_PV_PAR_COUP` en tête de `monstres_competences.js` :
+la part des points de vie d'un personnage qu'une seule frappe a le droit
+d'emporter, par palier. `calibrage_degats.mjs` le surcharge par la variable
+d'environnement `PLAFOND_COUP` (ou `PLAFOND_COUP=OFF` pour revenir au socle à un
+seul exemplaire).
+
 ## Liaison avec le bestiaire
 
 ```sh

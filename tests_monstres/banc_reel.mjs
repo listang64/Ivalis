@@ -12,6 +12,12 @@ Object.values(GABARITS).forEach(g => {
 
 export function chargerGenerateur() {
   const fenetre = {}; global.window = fenetre;
+  if (process.env.PLAFOND_COUP && process.env.PLAFOND_COUP !== "OFF") {
+    fenetre.PART_PV_PAR_COUP = JSON.parse(process.env.PLAFOND_COUP);
+  }
+  if (process.env.PLAFOND_COUP === "OFF") {
+    fenetre.PART_SOCLE = { brute:0, frappe:0, soutien:0, etat:0, controle:0, etalement:0, zone:0, persistance:0 };
+  }
   global.localStorage = { getItem: () => null };   // algorithme pur, sans IA
   global.fetch = async () => { throw new Error("IA débranchée"); };
   global.document = { getElementById: () => null };

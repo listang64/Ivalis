@@ -445,9 +445,20 @@ window.choisirCarteMonstre = function(monstre) {
         if (pvMax > 0) besoinDeSoin = Math.max(besoinDeSoin, 1 - (isNaN(pv) ? pvMax : pv) / pvMax);
     });
 
+    // Les dégâts se jugent RELATIVEMENT au jeu de la créature, jamais en valeur
+    // absolue. Depuis que les cartes frappent pour de bon (une dizaine de points
+    // pour un petit, une trentaine pour un boss), un score proportionnel aux
+    // dégâts bruts écrasait le hasard, la portée et le frein de répétition : la
+    // créature rejouait sa plus grosse carte en boucle. Ramené à sa propre
+    // échelle, le curseur garde le même poids qu'avant quelle que soit la
+    // stature du monstre, et les cartes à effets restent dans la course.
+    const analyses = new Map();
+    abordables.forEach(c => analyses.set(c.id, window.analyserCarteMonstre(c.data)));
+    const degatsMax = Math.max(1, ...abordables.map(c => analyses.get(c.id).degats));
+
     let meilleure = null, meilleurScore = -Infinity;
     abordables.forEach(c => {
-        const infos = window.analyserCarteMonstre(c.data);
+        const infos = analyses.get(c.id);
         let score = 0;
 
         // Une carte utilisable dès ce tour vaut mieux qu'une carte hors d'atteinte.
@@ -462,9 +473,10 @@ window.choisirCarteMonstre = function(monstre) {
             // les 28 points de score.
             score += besoinDeSoin * 45 - 14;
         } else {
-            score += infos.degats * 1.4;
+            const forceRelative = infos.degats / degatsMax;
+            score += forceRelative * 16;
             // Un caractère sanguinaire cogne fort, un prudent préfère la portée.
-            score += t.cibleFaible * infos.degats * 0.5;
+            score += t.cibleFaible * forceRelative * 8;
             score += t.tientDistance * (infos.portee - 1) * 3;
         }
 
