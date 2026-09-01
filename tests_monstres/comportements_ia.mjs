@@ -195,4 +195,81 @@ console.log("\n10. ANTI-AGGLUTINEMENT");
   verifier("le tacticien s'agglutine moins que le brutal", tact <= brut, `(${tact} vs ${brut})`);
 }
 
+// Une carte nue (attaque et rien d'autre) et la même carte assortie d'un état :
+// le moteur n'accepte que la première contre un leurre.
+const CARTE_NUE   = { Nom:"Estoc", Fatigue:20, Initiative:80, Composants:{ actions:[
+  { baseEffetId:"EFF_ATTAQUE_LOURDE", count:6, mods:{}, zoneHexes:[], baseDuree:0, modsDuree:{} }] } };
+const CARTE_ETAT  = { Nom:"Morsure viciée", Fatigue:20, Initiative:80, Composants:{ actions:[
+  { baseEffetId:"EFF_ATTAQUE_LOURDE", count:4, mods:{ EFF_EMPOISONNEMENT:3 }, zoneHexes:[], baseDuree:0, modsDuree:{} }] } };
+
+console.log("\n11. LES LEURRES : ON NE GASPILLE PAS SON TOUR DESSUS");
+{
+  const w0 = chargerIA({ plateau: creerPlateau(), tokens:{}, persos:[] });
+  verifier("une attaque nue est reconnue comme telle", w0.analyserCarteMonstre(CARTE_NUE).estAttaqueSimple === true);
+  verifier("une attaque avec état ne l'est pas", w0.analyserCarteMonstre(CARTE_ETAT).estAttaqueSimple === false);
+  verifier("un soin ne l'est pas non plus", w0.analyserCarteMonstre(CARTE_SOIN).estAttaqueSimple === false);
+
+  // Le leurre est plus proche que le vrai joueur : sans garde-fou, il l'emporte.
+  const situation = (carte) => decider({ personnalite:"brutal", carte,
+    tokens:{ M1:{q:0,r:0}, IL:{q:1,r:0}, J1:{q:3,r:0} },
+    persos:[ combattant({idPersonnage:'M1', estMonstre:true, camp:'Ennemi'}),
+             combattant({idPersonnage:'IL', camp:'Allié', estIllusion:true}),
+             combattant({idPersonnage:'J1', camp:'Allié'}) ] });
+
+  let surLeLeurre = 0, surLeJoueur = 0;
+  for (let i = 0; i < 200; i++) {
+    const d = situation(CARTE_ETAT);
+    if (d.cible && d.cible.idPersonnage === "IL") surLeLeurre++;
+    if (d.cible && d.cible.idPersonnage === "J1") surLeJoueur++;
+  }
+  console.log(`     carte à état : leurre ${surLeLeurre}/200, vrai joueur ${surLeJoueur}/200`);
+  verifier("une carte à état ne vise jamais un leurre", surLeLeurre === 0);
+  verifier("elle se reporte sur un vrai adversaire", surLeJoueur === 200);
+
+  let leurreFrappe = 0;
+  for (let i = 0; i < 200; i++) {
+    const d = situation(CARTE_NUE);
+    if (d.cible && d.cible.idPersonnage === "IL") leurreFrappe++;
+  }
+  console.log(`     attaque nue : leurre ${leurreFrappe}/200`);
+  verifier("une attaque nue, elle, se fait bien piéger", leurreFrappe > 0, `(${leurreFrappe}/200)`);
+}
+
+console.log("\n12. CIBLE INATTEIGNABLE : IL AVANCE QUAND MÊME");
+{
+  // Neuf cases séparent la créature du joueur : trois pas ne suffisent pas.
+  const monde = { plateau: creerPlateau(),
+    tokens:{ M1:{q:0,r:0}, J1:{q:9,r:0} },
+    persos:[ combattant({idPersonnage:'M1', estMonstre:true, camp:'Ennemi', Personnalite:'brutal',
+                         prenom:'Ours', fatigueActuelle:120, deckEquipe:['C1'] }),
+             combattant({idPersonnage:'J1', camp:'Allié', prenom:'Jade'}) ],
+    competences:{ M1:{ C1: CARTE_NUE } } };
+  const w = activer(chargerIA(monde));
+  const journal = [];
+  w.afficherDansPanneauGauche = () => {}; w.centrerMapSurToken = () => {};
+  w.afficherMessageFlottantHex = (q,r,t) => journal.push("message:"+t);
+  w.annulerMouvement = () => { w.CHEMIN_MOUVEMENT = []; };
+  w.ajouterEtapeMouvement = (q,r) => {
+    const ch = w.calculerCheminVTT(w.CHEMIN_START_NODE, {q,r});
+    w.CHEMIN_MOUVEMENT = ch.map(st => ({ q:st.q, r:st.r, cost:2 }));
+  };
+  w.validerMouvement = async () => {
+    const d = w.CHEMIN_MOUVEMENT[w.CHEMIN_MOUVEMENT.length-1];
+    journal.push("deplacement:" + w.CHEMIN_MOUVEMENT.length);
+    if (d) w.TOKENS_VTT_DATA.M1 = { q:d.q, r:d.r };
+    w.CHEMIN_MOUVEMENT = [];
+  };
+  w.demarrerCiblage = async () => { journal.push("ciblage"); w.ETAT_CIBLAGE = { actif:false }; };
+  w.finDeTourCombat = async () => journal.push("finDeTour");
+
+  const depart = 9;
+  await w.jouerTourMonstre('M1','C1');
+  const arrivee = Math.abs(w.TOKENS_VTT_DATA.M1.q - 9);
+  console.log(`     séquence : ${journal.join(" → ")} — distance ${depart} puis ${arrivee}`);
+  verifier("il se rapproche au lieu de rester planté", arrivee < depart, `(${depart} → ${arrivee})`);
+  verifier("il ne tente pas un sort hors de portée", !journal.includes("ciblage"));
+  verifier("il annonce qu'il est hors de portée", journal.some(e => e.startsWith("message:Hors")));
+  verifier("il rend la main", journal[journal.length-1] === "finDeTour");
+}
+
 console.log(`\n${echecs === 0 ? "TOUS LES CONTRÔLES PASSENT" : echecs + " CONTRÔLE(S) EN ÉCHEC"}`);

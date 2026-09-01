@@ -80,17 +80,21 @@ console.log("\n2. PAS DE DOUBLE TOUR SI DEUX NOTIFICATIONS SE SUIVENT");
 
 console.log("\n3. PRÉPARATION : IL ATTEND SES TECHNIQUES AU LIEU DE SOUFFLER");
 {
+  // Le joueur a déjà posé sa carte : les créatures s'engagent après lui.
   const partagee = { doc: { Phase_Combat:"Preparation", Tour_Combat:1, Verrou_IA:null,
-    Ordre_Initiative:["M1","J1"], File_Attente_Combat:[] } };
+    Ordre_Initiative:["M1","J1"],
+    File_Attente_Combat:[ { idPersonnage:"J1", idCarte:"CJ", initiative:50, timestamp:1 } ] } };
   const w = creerPoste(partagee);
   const monstre = { idPersonnage:"M1", prenom:"Gnoll", estMonstre:true, camp:"Ennemi",
                     Personnalite:"brutal", Fatigue_Max:120, fatigueActuelle:120,
                     PV_Max:70, PV_Actuels:70, deckEquipe:[] };   // forge pas finie
-  w.PERSOS_PARTIE = [monstre]; w.MONSTRES_PARTIE = [monstre];
-  w.TOKENS_VTT_DATA = { M1:{q:0,r:0} };
+  const joueur = { idPersonnage:"J1", prenom:"Jade", camp:"Allié", PV_Max:42, PV_Actuels:42 };
+  w.PERSOS_PARTIE = [monstre, joueur]; w.MONSTRES_PARTIE = [monstre];
+  w.TOKENS_VTT_DATA = { M1:{q:0,r:0}, J1:{q:2,r:0} };
 
   await w.verifierTourIAMonstres();
-  verifier("rien n'est posé tant que la forge tourne", (partagee.doc.File_Attente_Combat||[]).length === 0);
+  verifier("rien n'est posé tant que la forge tourne",
+    !(partagee.doc.File_Attente_Combat||[]).some(f => f.idPersonnage === "M1"));
   verifier("aucun repos long n'a été inscrit",
     !(partagee.doc.File_Attente_Combat||[]).some(f => f.idCarte === "REPOS_LONG"));
   verifier("un rappel est programmé", !!w.RAPPEL_IA_MONSTRES);
@@ -101,8 +105,58 @@ console.log("\n3. PRÉPARATION : IL ATTEND SES TECHNIQUES AU LIEU DE SOUFFLER");
     Composants:{ actions:[{ baseEffetId:"EFF_ATTAQUE_LOURDE", count:6, mods:{}, zoneHexes:[], baseDuree:0, modsDuree:{} }] } } };
   await attendre(1800);
   const file = partagee.doc.File_Attente_Combat || [];
-  verifier("sa technique est posée dès qu'elle arrive", file.length === 1 && file[0].idCarte === "C1",
+  verifier("sa technique est posée dès qu'elle arrive", file.some(f => f.idCarte === "C1"),
            `(${file.map(f=>f.idCarte).join(", ") || "rien"})`);
+}
+
+console.log("\n5. LES CRÉATURES CHOISISSENT APRÈS LES JOUEURS");
+{
+  const partagee = { doc: { Phase_Combat:"Preparation", Tour_Combat:1, Verrou_IA:null,
+    Ordre_Initiative:["M1","J1","J2"], File_Attente_Combat:[] } };
+  const w = creerPoste(partagee);
+  const carte = { Nom:"Coup brutal", Fatigue:30, Initiative:70,
+    Composants:{ actions:[{ baseEffetId:"EFF_ATTAQUE_LOURDE", count:6, mods:{}, zoneHexes:[], baseDuree:0, modsDuree:{} }] } };
+  const monstre = { idPersonnage:"M1", prenom:"Gnoll", estMonstre:true, camp:"Ennemi",
+                    Personnalite:"brutal", Fatigue_Max:120, fatigueActuelle:120,
+                    PV_Max:70, PV_Actuels:70, deckEquipe:["C1"] };
+  const j1 = { idPersonnage:"J1", prenom:"Jade", camp:"Allié", PV_Max:42, PV_Actuels:42 };
+  const j2 = { idPersonnage:"J2", prenom:"Ben",  camp:"Allié", PV_Max:42, PV_Actuels:42 };
+  w.PERSOS_PARTIE = [monstre, j1, j2]; w.MONSTRES_PARTIE = [monstre];
+  w.TOKENS_VTT_DATA = { M1:{q:0,r:0}, J1:{q:2,r:0}, J2:{q:3,r:0} };
+  w.CACHE_COMPETENCES_GLOBAL.M1 = { C1: carte };
+
+  await w.verifierTourIAMonstres();
+  verifier("aucune carte posée tant qu'un joueur n'a pas choisi",
+    (partagee.doc.File_Attente_Combat||[]).length === 0);
+
+  // Un seul des deux joueurs a choisi : ce n'est pas encore aux monstres.
+  partagee.doc.File_Attente_Combat = [{ idPersonnage:"J1", idCarte:"CJ1", initiative:40, timestamp:1 }];
+  w.PARTIE_DATA = partagee.doc;
+  await w.verifierTourIAMonstres();
+  verifier("ni quand un seul des deux a choisi",
+    (partagee.doc.File_Attente_Combat||[]).length === 1);
+
+  // Toute la table a choisi : la créature s'engage à son tour.
+  partagee.doc.File_Attente_Combat.push({ idPersonnage:"J2", idCarte:"CJ2", initiative:30, timestamp:2 });
+  w.PARTIE_DATA = partagee.doc;
+  await w.verifierTourIAMonstres();
+  await attendre(200);
+  const posees = (partagee.doc.File_Attente_Combat||[]).map(f => f.idPersonnage);
+  verifier("une fois la table engagée, la créature choisit", posees.includes("M1"), `(${posees.join(", ")})`);
+
+  // Un joueur mort ne doit bloquer personne.
+  const partagee2 = { doc: { Phase_Combat:"Preparation", Tour_Combat:1, Verrou_IA:null,
+    Ordre_Initiative:["M1","J1"], File_Attente_Combat:[] } };
+  const w2 = creerPoste(partagee2);
+  const mort = { idPersonnage:"J1", prenom:"Jade", camp:"Allié", PV_Max:42, PV_Actuels:0, statut:"Mort" };
+  w2.PERSOS_PARTIE = [monstre, mort]; w2.MONSTRES_PARTIE = [monstre];
+  w2.TOKENS_VTT_DATA = { M1:{q:0,r:0}, J1:{q:2,r:0} };
+  w2.CACHE_COMPETENCES_GLOBAL.M1 = { C1: carte };
+  w2.estCombattantMort = (id) => id === "J1";
+  await w2.verifierTourIAMonstres();
+  await attendre(200);
+  verifier("un joueur à terre ne retient pas les monstres",
+    (partagee2.doc.File_Attente_Combat||[]).some(f => f.idPersonnage === "M1"));
 }
 
 console.log("\n4. RIEN À FAIRE : AUCUN RAPPEL INUTILE");

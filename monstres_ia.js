@@ -196,8 +196,17 @@ function allesAdjacents(q, r, campMonstre, idMonstre) {
 //  que l'IA ne puisse jamais se désynchroniser de ce qui sera réellement joué.
 // =========================================================================
 
+// Les douze altérations que le moteur sait accrocher à une carte (moteur_effets,
+// alterationsExtraites). Une carte qui n'en porte AUCUNE, et qui ne soigne ni ne
+// protège, est une "attaque simple" — la seule chose qu'une illusion accepte de
+// recevoir. Provocations n'y figure pas : le moteur ne la résout pas, elle se
+// joue à la table.
+const ALTERATIONS_MOTEUR = ["brûl", "brul", "glac", "électri", "electri", "empoison", "poison",
+    "confusion", "paralys", "immobilis", "peur", "pouss", "traction", "étourd", "etourd", "absorption"];
+
 window.analyserCarteMonstre = function(dataCarte) {
-    const infos = { portee: 1, estSoin: false, estZone: false, degats: 0, fatigue: parseInt(dataCarte?.Fatigue) || 0 };
+    const infos = { portee: 1, estSoin: false, estZone: false, degats: 0, aAlteration: false,
+                    fatigue: parseInt(dataCarte?.Fatigue) || 0 };
     const cache = window.EFFETS_BDD_CACHE || {};
     if (!dataCarte || !dataCarte.Composants || !dataCarte.Composants.actions) return infos;
 
@@ -214,6 +223,7 @@ window.analyserCarteMonstre = function(dataCarte) {
             infos.degats += (parseFloat(String(base.Valeur).replace(",", ".")) || 0) * (act.count || 1);
         }
         if (act.zoneHexes && act.zoneHexes.length > 0) infos.estZone = true;
+        if (ALTERATIONS_MOTEUR.some(mot => nomBase.includes(mot))) infos.aAlteration = true;
 
         Object.keys(act.mods || {}).forEach(idMod => {
             const mod = cache[idMod];
@@ -224,8 +234,16 @@ window.analyserCarteMonstre = function(dataCarte) {
             }
             if ((mod.Nom || "").toLowerCase().includes("traction")) infos.portee = Math.max(infos.portee, 3);
             if (mod.Nom === "Zone") infos.estZone = true;
+            const nomMod = (mod.Nom || "").toLowerCase();
+            if (ALTERATIONS_MOTEUR.some(mot => nomMod.includes(mot))) infos.aAlteration = true;
+            if (nomMod.includes("bouclier") || nomMod.includes("soin") || nomMod.includes("purification")) infos.estSoin = true;
         });
     });
+    // ⚖️ règle du moteur : une illusion "encaisse les dégâts mais reste
+    // insensible à tout le reste". Une carte qui porte la moindre altération,
+    // un soin ou un bouclier se voit répondre "Cible invalide" et le tour est
+    // perdu — d'où ce drapeau, que le choix de cible consulte.
+    infos.estAttaqueSimple = !infos.estSoin && !infos.aAlteration && infos.degats > 0;
     return infos;
 };
 
@@ -244,6 +262,11 @@ window.choisirCibleMonstre = function(monstre, infosCarte) {
         if (p.idPersonnage === monstre.idPersonnage && !infosCarte.estSoin) return false;
         if (typeof window.estCombattantMort === "function" && window.estCombattantMort(p.idPersonnage)) return false;
         if (!tokens[p.idPersonnage]) return false;
+        // Un leurre ne se laisse frapper que par une attaque nue : contre tout le
+        // reste, le moteur répond "Cible invalide" et la créature a perdu son
+        // tour. Elle peut donc encore se faire avoir — c'est le but d'une
+        // illusion — mais seulement quand le coup partira pour de bon.
+        if (p.estIllusion && !infosCarte.estAttaqueSimple) return false;
         return infosCarte.estSoin ? (p.camp === monstre.camp) : (p.camp !== monstre.camp);
     });
     if (candidats.length === 0) return null;
@@ -280,6 +303,24 @@ window.choisirCibleMonstre = function(monstre, infosCarte) {
 //  on garde la meilleure. C'est ici que se jouent le contournement, la fuite
 //  du corps-à-corps des tireurs, et l'évitement des zones.
 // =========================================================================
+
+// L'adversaire debout le plus proche, leurres exclus : c'est vers lui qu'une
+// créature marche quand sa carte ne peut atteindre personne ce tour-ci.
+function ennemiLePlusProche(monstre) {
+    const tokens = window.TOKENS_VTT_DATA || {};
+    const tk = tokens[monstre.idPersonnage];
+    if (!tk) return null;
+    let plusProche = null, meilleure = Infinity;
+    (window.PERSOS_PARTIE || []).forEach(p => {
+        if (p.camp === monstre.camp || p.estIllusion) return;
+        if (typeof window.estCombattantMort === "function" && window.estCombattantMort(p.idPersonnage)) return;
+        const tkP = tokens[p.idPersonnage];
+        if (!tkP) return;
+        const d = distanceHex(tk, tkP);
+        if (d < meilleure) { meilleure = d; plusProche = p; }
+    });
+    return plusProche;
+}
 
 window.choisirPositionMonstre = function(monstre, cible, infosCarte) {
     const tokens = window.TOKENS_VTT_DATA || {};
@@ -535,6 +576,19 @@ window.preparerCartesMonstres = async function() {
     const ordre = partie.Ordre_Initiative || [];
     const dejaChoisi = new Set((partie.File_Attente_Combat || []).map(f => f.idPersonnage));
 
+    // Les créatures s'engagent APRÈS la table. Sans cette attente, leurs cartes
+    // se posaient dès l'ouverture du tour : les joueurs voyaient l'initiative
+    // adverse avant de choisir, et les monstres décidaient sans rien savoir de
+    // ce qui se préparait en face. Un mort ne bloque personne.
+    const humainsEnAttente = ordre.filter(id => {
+        if (typeof window.estMonstre === "function" && window.estMonstre(id)) return false;
+        if (dejaChoisi.has(id)) return false;
+        if (typeof window.estCombattantMort === "function" && window.estCombattantMort(id)) return false;
+        const p = (window.PERSOS_PARTIE || []).find(x => x.idPersonnage === id);
+        return !(p && p.estIllusion);
+    });
+    if (humainsEnAttente.length > 0) return;
+
     const aJouer = (window.MONSTRES_PARTIE || []).filter(m =>
         ordre.includes(m.idPersonnage) &&
         !dejaChoisi.has(m.idPersonnage) &&
@@ -692,7 +746,27 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
 
     // --- 1. Choix de la cible, puis de la case ---
     const cible = window.choisirCibleMonstre(monstre, infos);
-    const position = window.choisirPositionMonstre(monstre, cible, infos);
+    let position = window.choisirPositionMonstre(monstre, cible, infos);
+
+    // Sa carte ne partira pas ce tour-ci — une créature de mêlée dont la proie
+    // reste hors d'atteinte après ses trois pas, par exemple. Elle ne doit pas
+    // rester plantée : elle marche vers l'adversaire le plus proche et passera
+    // son tour. Et comme elle ne lancera rien, inutile de garder la fatigue de
+    // la carte en réserve : elle peut aller aussi loin que ses jambes le
+    // permettent.
+    const tkCiblePrevue = cible ? (window.TOKENS_VTT_DATA || {})[cible.idPersonnage] : null;
+    const carteAtteindra = position && tkCiblePrevue
+        && distanceHex(position, tkCiblePrevue) <= infos.portee;
+    if (!carteAtteindra) {
+        const proche = ennemiLePlusProche(monstre);
+        if (proche) {
+            const repli = window.choisirPositionMonstre(monstre, proche, { ...infos, portee: 1, fatigue: 0 });
+            if (repli) {
+                position = repli;
+                window.COUT_COMPETENCE_SELECTIONNEE = 0;
+            }
+        }
+    }
 
     // --- 2. Déplacement, par les rails du jeu (opportunités, zones, fatigue) ---
     const immobilise = (monstre.Etats_Alteres || []).some(e => e.nom === "Immobilisation" || e.nom === "Paralysie");

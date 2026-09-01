@@ -2841,7 +2841,21 @@ window.finDeTourCombat = async function(forcer = false) {
     }, 350); 
 };
 
+// Le calque de la piste doit avoir exactement la boîte du HUD bas droite : la
+// piste s'y positionne en pourcentages (top 34 %, hauteur 38 %), calés sur le
+// bouton de fin de tour. La largeur est fixée en dur des deux côtés (450px), la
+// hauteur dépend de l'image du bouton : on la recopie ici.
+window.ajusterCalquePiste = function() {
+    const calque = document.getElementById("calque-piste-initiative");
+    const hud = document.getElementById("combat-hud-bas-droite");
+    if (!calque || !hud) return;
+    const hauteur = hud.offsetHeight;
+    if (hauteur > 0) calque.style.height = hauteur + "px";
+};
+
 window.afficherPisteInitiative = function(queue, phase) {
+    window.ajusterCalquePiste();
+
     if (queue === undefined && window.PARTIE_DATA) {
         queue = window.PARTIE_DATA.File_Attente_Combat || [];
         phase = window.PARTIE_DATA.Phase_Combat || "Preparation";
