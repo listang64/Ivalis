@@ -398,17 +398,39 @@ const derniereCarteJouee = (id) => window.DERNIERES_CARTES_MONSTRES[id] || null;
 
 const CARTE_REPOS = { id: "REPOS_LONG", data: { Nom: "Repos long", Fatigue: 0, Initiative: 0 }, repos: true };
 
+// Combien de temps on laisse la forge finir avant de considérer qu'une créature
+// n'aura jamais de techniques et qu'elle doit souffler pour libérer le tour.
+const DELAI_FORGE_MS = 30000;
+window.ATTENTE_TECHNIQUES_MONSTRES = window.ATTENTE_TECHNIQUES_MONSTRES || {};
+
 window.choisirCarteMonstre = function(monstre) {
     const cartes = cartesDuMonstre(monstre);
     const fatigue = parseInt(monstre.fatigueActuelle);
     const fatigueDispo = isNaN(fatigue) ? 0 : fatigue;
     const fatigueMax = parseInt(monstre.Fatigue_Max) || parseInt(monstre.fatigueMax) || 100;
 
-    // ⚠️ Un monstre qui ne pose RIEN dans la file fige le combat : la partie ne
-    // bascule en résolution que lorsque tous les combattants vivants ont choisi.
-    // Épuisé, il souffle donc au lieu de rester muet — ce qui le remet en jeu au
-    // tour suivant plutôt que de bloquer la partie.
-    if (cartes.length === 0) return CARTE_REPOS;
+    // ⚠️ Un monstre qui ne pose RIEN dans la file retient la bascule en
+    // résolution : la partie n'y passe que lorsque tous les combattants vivants
+    // ont choisi. Mais souffler parce que ses techniques ne sont PAS ENCORE
+    // arrivées serait pire : la forge tourne en arrière-plan (elle passe par
+    // l'IA pour les noms, ce qui prend quelques secondes) et une rencontre
+    // lancée dans la foulée voyait toutes ses créatures prendre un repos long au
+    // premier tour. Tant que le Deck_Equipe n'est pas écrit en base, on répond
+    // "pas prêt" et l'appel sera refait ; passé le délai de grâce, on souffle
+    // pour de bon plutôt que de figer le combat.
+    if (cartes.length === 0) {
+        const forgeFinie = Array.isArray(monstre.deckEquipe) && monstre.deckEquipe.length > 0;
+        const attentes = window.ATTENTE_TECHNIQUES_MONSTRES;
+        if (!attentes[monstre.idPersonnage]) attentes[monstre.idPersonnage] = Date.now();
+        const attendDepuis = Date.now() - attentes[monstre.idPersonnage];
+        if (attendDepuis < DELAI_FORGE_MS) {
+            console.log(`⏳ ${monstre.prenom || monstre.idPersonnage} attend ses techniques`
+                        + (forgeFinie ? " (déjà en base, cache en cours de lecture)" : " (forge en cours)"));
+            return null;
+        }
+        return CARTE_REPOS;
+    }
+    delete window.ATTENTE_TECHNIQUES_MONSTRES[monstre.idPersonnage];
 
     const abordables = cartes.filter(c => (parseInt(c.data.Fatigue) || 0) <= fatigueDispo);
     if (abordables.length === 0) return CARTE_REPOS;
@@ -531,10 +553,13 @@ window.preparerCartesMonstres = async function() {
     let file = snap.data().File_Attente_Combat || [];
     let auMoinsUn = false;
 
+    window.IA_MONSTRES_EN_ATTENTE = 0;
     for (const monstre of aJouer) {
         if (file.some(f => f.idPersonnage === monstre.idPersonnage)) continue;
         const carte = window.choisirCarteMonstre(monstre);
-        if (!carte) continue;
+        // Pas de carte : ses techniques ne sont pas encore forgées. On ne pose
+        // rien pour lui et on repassera — surtout pas un repos long par défaut.
+        if (!carte) { window.IA_MONSTRES_EN_ATTENTE++; continue; }
 
         if (carte.repos) {
             file.push({ idPersonnage: monstre.idPersonnage, idCarte: "REPOS_LONG",
@@ -567,7 +592,7 @@ window.preparerCartesMonstres = async function() {
         console.log(`🧠 ${monstre.prenom || monstre.idPersonnage} prépare « ${carte.data.Nom} » (init ${initiative})`);
     }
 
-    if (!auMoinsUn) return;
+    if (!auMoinsUn) return;   // personne n'a rien à poser : la file reste telle quelle
 
     file.sort((a, b) => (b.initiative !== a.initiative) ? b.initiative - a.initiative : a.timestamp - b.timestamp);
 
@@ -725,34 +750,77 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
 //  9. POINT D'ENTRÉE — appelé à chaque changement de la partie
 // =========================================================================
 
+// L'IA n'est réveillée que par les notifications de la base. Or il existe des
+// instants où elle ne PEUT pas jouer : une animation de fin de tour est en
+// train de se dérouler, un autre poste tient le verrou, les techniques d'une
+// créature ne sont pas encore forgées. Si elle se contente alors de renoncer,
+// plus personne ne la rappellera — la base ne changera plus — et le combat
+// reste figé sur un monstre qui ne fait rien, jusqu'à ce qu'un humain clique
+// "fin de tour" à sa place. C'est exactement ce qui arrivait : finDeTourCombat
+// lève son drapeau d'animation AVANT d'écrire en base, si bien que la
+// notification de la file qui avance tombait toujours pendant l'animation.
+// Elle se rappelle donc elle-même tant qu'il lui reste quelque chose à faire.
+function programmerRappelIA(delai = 800) {
+    if (window.RAPPEL_IA_MONSTRES) return;
+    window.RAPPEL_IA_MONSTRES = setTimeout(() => {
+        window.RAPPEL_IA_MONSTRES = null;
+        window.verifierTourIAMonstres();
+    }, delai);
+}
+
 window.verifierTourIAMonstres = async function() {
-    if (window.IA_MONSTRE_EN_COURS) return;
+    if (window.IA_MONSTRE_EN_COURS) { programmerRappelIA(); return; }
     if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) return;
-    // Rien tant que les animations en cours n'ont pas fini de se dérouler.
-    if (window.ANIMATION_VTT_EN_COURS || window.ANIMATION_TOUR_EN_COURS) return;
 
     const partie = window.PARTIE_DATA || {};
     const phase = partie.Phase_Combat || "Preparation";
+    const file = partie.File_Attente_Combat || [];
 
+    // Y a-t-il seulement quelque chose à faire ? Sinon, inutile de se rappeler.
+    const estMonstre = (id) => typeof window.estMonstre === "function" && window.estMonstre(id);
+    const aLaMain = phase !== "Preparation" && file.length > 0 && estMonstre(file[0].idPersonnage);
+    const aPreparer = phase === "Preparation" && (window.MONSTRES_PARTIE || []).some(m =>
+        (partie.Ordre_Initiative || []).includes(m.idPersonnage) &&
+        !file.some(f => f.idPersonnage === m.idPersonnage) &&
+        !(typeof window.estCombattantMort === "function" && window.estCombattantMort(m.idPersonnage)));
+    if (!aLaMain && !aPreparer) return;
+
+    // Signe de vie : c'est lui qui garde le bouton "fin de tour" éteint pendant
+    // qu'un monstre joue. S'il s'éteint (aucun poste ne fait plus tourner l'IA),
+    // les humains récupèrent la main au bout de vingt secondes.
+    window.IA_DERNIER_SIGNE = Date.now();
+    if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
+
+    // Rien tant que les animations en cours n'ont pas fini de se dérouler : on
+    // repassera dans un instant.
+    if (window.ANIMATION_VTT_EN_COURS || window.ANIMATION_TOUR_EN_COURS) { programmerRappelIA(); return; }
+
+    // Le drapeau se lève AVANT toute attente : le verrou écrit en base, ce qui
+    // déclenche une notification et donc un second appel de cette fonction. Sans
+    // ce garde-fou posé tout de suite, le même monstre jouait son tour deux fois.
+    window.IA_MONSTRE_EN_COURS = true;
     try {
         if (phase === "Preparation") {
-            window.IA_MONSTRE_EN_COURS = true;
             await window.preparerCartesMonstres();
+            // On repasse systématiquement : soit des créatures attendent encore
+            // leurs techniques, soit un autre poste tenait le verrou. Si tout est
+            // posé, le prochain passage ne trouvera rien à faire et s'arrêtera là.
+            programmerRappelIA(1200);
             return;
         }
 
-        const file = partie.File_Attente_Combat || [];
-        if (file.length === 0) return;
-
         const enTete = file[0];
-        if (typeof window.estMonstre !== "function" || !window.estMonstre(enTete.idPersonnage)) return;
 
         // Un seul poste joue ce tour précis : la clé identifie le monstre ET son
         // entrée dans la file, donc deux tours successifs ne se confondent pas.
         const cle = `tour|${enTete.idPersonnage}|${enTete.timestamp}`;
-        if (!(await reclamerVerrouIA(cle))) return;
+        if (!(await reclamerVerrouIA(cle))) {
+            // Un autre poste s'en occupe. S'il n'aboutit pas, le verrou devient
+            // périmé et on reprendra la main : on garde donc un œil dessus.
+            programmerRappelIA(DELAI_VERROU_MS / 2);
+            return;
+        }
 
-        window.IA_MONSTRE_EN_COURS = true;
         await window.jouerTourMonstre(enTete.idPersonnage, enTete.idCarte);
 
     } catch (e) {

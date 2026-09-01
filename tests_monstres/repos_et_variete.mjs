@@ -62,11 +62,20 @@ console.log("1. REPOS LONG QUAND LA FATIGUE MANQUE");
   verifier("le brutal s'entête parfois quand même", nBrut < 300, `(${nBrut}/400)`);
 }
 {
-  // Aucune compétence du tout : il ne doit JAMAIS rester muet (sinon le combat se fige).
+  // Aucune compétence du tout. Tant que la forge peut encore livrer, il répond
+  // "pas prêt" (null) et on ne pose rien pour lui — sans quoi une rencontre
+  // lancée dans la foulée voit toutes ses créatures souffler au premier tour.
+  // Passé le délai de grâce, il souffle pour de bon : le combat ne doit pas se
+  // figer sur une créature qui n'aura jamais de cartes.
   const { w, monstre } = monde({});
   monstre.deckEquipe = [];
+  w.ATTENTE_TECHNIQUES_MONSTRES = {};
+  const enAttente = w.choisirCarteMonstre(monstre);
+  verifier("techniques pas encore forgées : il attend au lieu de souffler", enAttente === null);
+
+  w.ATTENTE_TECHNIQUES_MONSTRES[monstre.idPersonnage] = Date.now() - 31000;
   const c = w.choisirCarteMonstre(monstre);
-  verifier("sans aucune carte, il souffle (jamais rien)", !!(c && c.repos));
+  verifier("délai de grâce dépassé : il souffle (jamais rien)", !!(c && c.repos));
 }
 
 console.log("\n2. VARIÉTÉ DES CARTES : PAS LA MÊME EN BOUCLE");

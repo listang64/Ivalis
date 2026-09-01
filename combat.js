@@ -2537,6 +2537,19 @@ window.actualiserBoutonFinTour = function(queueParam, phaseParam) {
         queue[0].idPersonnage === persoActuel.idPersonnage
     );
 
+    // Le tour d'un monstre appartient à l'IA, et à elle seule : le bouton reste
+    // éteint. Il se rallume quand même si l'IA n'a plus donné signe de vie
+    // depuis vingt secondes — mieux vaut une fin de tour à la main qu'une table
+    // bloquée devant une créature qui ne joue pas.
+    const teteEstMonstre = queue.length > 0 && typeof window.estMonstre === "function"
+                           && window.estMonstre(queue[0].idPersonnage);
+    const iaDonneSigneDeVie = (Date.now() - (window.IA_DERNIER_SIGNE || 0)) < 20000;
+    if (phase === "Resolution" && teteEstMonstre && iaDonneSigneDeVie) {
+        imgBtn.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/FinTourEteind_exjtxp.png";
+        window.PEUT_PASSER_TOUR = false;
+        return;
+    }
+
     if (estMonTour) {
         imgBtn.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/finTourAllum_gmn7ln.png";
         window.PEUT_PASSER_TOUR = true;
