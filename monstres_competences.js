@@ -198,8 +198,10 @@ function affinitesParDefaut(monstre) {
         let note = 5;
 
         if (contient(nom, MOTS_CLES.distance))    note = distance ? 9 : (cac ? 0 : 4);
+        // Une bête ou un guerrier ne lance pas d'incantation : sans cette mise à
+        // zéro, un ours finissait par sortir des "Mots de pouvoir".
         if (nom.toLowerCase().includes("attaque magique") || contient(nom, ["mot de pouvoir", "mots de pouvoir"]))
-                                                  note = magique ? 9 : 1;
+                                                  note = magique ? 9 : 0;
         if (nom.toLowerCase().includes("attaque lourde")) note = tank ? 9 : (cac ? 7 : 0);
         if (contient(nom, ["attaque légère", "attaque legere"])) note = distance ? 8 : (cac ? 6 : 2);
         if (contient(nom, MOTS_CLES.soin))        note = soutien ? 9 : (tank ? 5 : 2);
@@ -316,6 +318,19 @@ ${listeEffets}`;
 
 const entre = (min, max) => min + Math.floor(Math.random() * (max - min + 1));
 
+// Les "bouchons" : des effets sans couleur, sans tag et bon marché, que
+// l'algorithme finit par choisir par défaut quand il cherche à dépenser son
+// budget. Laissés libres, "Durée +" atterrissait sur deux cartes sur trois, et
+// "Initiative +" sur 42 % des grosses cartes — au point de les rendre PLUS
+// rapides que les petites frappes, soit exactement l'inverse du principe
+// (une technique lourde doit être lente). On ne les emploie qu'en dernier
+// recours, et sans les empiler.
+const PLAFOND_BOUCHON = 2;
+function estEffetBouchon(effet) {
+    const n = (effet.Nom || "").toLowerCase();
+    return n.startsWith("durée +") || n.startsWith("duree +") || n.startsWith("initiative +");
+}
+
 // Tirage pondéré : un effet noté 9 sort neuf fois plus souvent qu'un noté 1,
 // et un effet noté 0 ne sort jamais.
 function tirerPondere(candidats, poidsDe) {
@@ -367,8 +382,20 @@ function genererZoneHexes(taille) {
 //  Le chantier d'une carte : on y pose une action de base, puis des mods,
 //  en refusant tout ce qui violerait une règle de la Forge.
 // -------------------------------------------------------------------------
-function nouveauChantier(arme) {
-    return { arme, actions: [], tags: new Set() };
+function nouveauChantier(arme, rang) {
+    // `rang` = la tranche visée, de 0 (petite frappe) à 5 (technique ultime).
+    // Il pilote la RICHESSE de la carte : combien de mods différents elle a le
+    // droit de porter, et jusqu'où un même effet peut être empilé. Sans ce
+    // garde-fou, tout le budget des grosses cartes partait en empilements
+    // absurdes ("Attaque Magique ×12") au lieu de combiner des effets.
+    const r = Math.max(0, Math.min(5, rang || 0));
+    return {
+        arme,
+        actions: [],
+        tags: new Set(),
+        maxModsDistincts: 2 + Math.round(r * 0.6),   // 2 mods en tranche 1, 5 en tranche 6
+        plafondEmpilement: 3 + Math.round(r * 0.6)   // ×3 en tranche 1, ×6 en tranche 6
+    };
 }
 
 function chantierContientMotCle(chantier, motCle) {
@@ -416,7 +443,23 @@ function effetAutorise(chantier, effet, commeMod) {
     // Une illusion ne peut pas porter de zone.
     if (commeMod && nom === "zone" && chantierContientMotCle(chantier, "illusion")) return false;
 
+    // Un même effet racine ne peut pas être posé DEUX FOIS comme action séparée
+    // sur la même carte : cela donnait des aberrations du genre
+    // "Bond ×5 / Bond ×5 / Bond ×4" empilées en trois actions distinctes. Si la
+    // carte a besoin de plus de cet effet, elle approfondit celui déjà en place.
+    if (!commeMod && chantier.actions.some(act => act.baseEffet.Nom === effet.Nom)) return false;
+
     // --- Cohérence thématique (propre aux monstres, pas une règle de la Forge) ---
+    // Une carte de soin/protection ne doit pas porter d'altération offensive :
+    // ses cibles sont les alliés, et "Soin + Électrifié + Paralysie" reviendrait
+    // à soigner quelqu'un en l'électrocutant. La règle ne s'applique qu'aux
+    // cartes SANS attaque : une carte de pur contrôle, elle, reste légitime.
+    if (commeMod && !chantierAUneAttaque(chantier)) {
+        const carteDeSoutien = chantier.actions.some(act => contient(act.baseEffet.Nom, MOTS_CLES.soin));
+        const modOffensif = contient(nom, MOTS_CLES.etat) || contient(nom, MOTS_CLES.controle);
+        if (carteDeSoutien && modOffensif) return false;
+    }
+
     // Sans ces garde-fous, l'algorithme dépense son budget en empilant des
     // familles d'effets sans rapport et produit des cartes fourre-tout du genre
     // "brûle + gèle + électrocute + empoisonne + paralyse". Une vraie technique
@@ -444,11 +487,13 @@ function effetAutorise(chantier, effet, commeMod) {
             if (!nbEtats.has(nom) && nbEtats.size >= 2) return false;
         }
 
-        // Pas plus de 4 modificateurs DIFFÉRENTS sur une même action : le budget
-        // restant se dépense alors en approfondissant ce qui est déjà là
-        // (empilements), ce qui rend la technique plus forte sans la diluer.
+        // Nombre de modificateurs DIFFÉRENTS autorisés sur une action. Il monte
+        // avec la tranche : une petite frappe porte un ou deux mods, une grosse
+        // technique en combine davantage. C'est ce qui fait qu'une carte chère
+        // est réellement plus RICHE, et pas seulement plus empilée.
         const action = chantier.actions[chantier.actions.length - 1];
-        if (action && action.modsEffets.length >= 4 &&
+        const plafond = chantier.maxModsDistincts || 4;
+        if (action && action.modsEffets.length >= plafond &&
             !action.modsEffets.some(m => (m.effet.Nom || "").toLowerCase() === nom)) {
             return false;
         }
@@ -547,7 +592,7 @@ const fatigueDe = (chantier, palette) => Math.floor(coutPCChantier(chantier, pal
 //  Fabrication d'UNE carte : un patron impose le squelette, puis on remplit
 //  jusqu'à tomber dans la tranche de fatigue visée.
 // -------------------------------------------------------------------------
-function fabriquerCarte(monstre, affinites, patron, tranche, palette) {
+function fabriquerCarte(monstre, affinites, patron, tranche, palette, rang) {
     const arme = ARME_PAR_ARCHETYPE[monstre.archetype] || "Arme polyvalente";
     const fatigueMax = parseInt(monstre.fatigueMax) || 100;
     const fatigueMin = Math.max(1, Math.round(tranche[0] / 100 * fatigueMax));
@@ -555,7 +600,7 @@ function fabriquerCarte(monstre, affinites, patron, tranche, palette) {
     const fatiguePlafond = Math.round(tranche[1] / 100 * fatigueMax);
 
     const note = eff => (affinites[eff.Nom] !== undefined ? affinites[eff.Nom] : 5);
-    const chantier = nouveauChantier(arme);
+    const chantier = nouveauChantier(arme, rang);
 
     const racines = palette.filter(e => estRacine(e));
     const mods    = palette.filter(e => estModificateur(e));
@@ -602,21 +647,23 @@ function fabriquerCarte(monstre, affinites, patron, tranche, palette) {
     if (patron === "zone" || patron === "persistance") {
         const modZone = trouverMod(MOTS_CLES.zone);
         if (modZone) {
-            // La zone est agrandie hexagone par hexagone tant que la tranche le
-            // permet : un Boss couvre le terrain, une bestiole se contente de
-            // deux cases.
-            for (let taille = 2; taille <= 6; taille++) {
-                const hexes = genererZoneHexes(taille);
-                const sauvegarde = action.zoneHexes;
-                action.zoneHexes = hexes;
+            // Taille TIRÉE AU SORT autour d'une valeur qui monte avec la tranche,
+            // puis rabotée si la tranche ne suit pas. Une taille simplement
+            // "poussée au maximum" donnait des zones toutes identiques (6 hex à
+            // chaque fois) : c'est le contraire d'organique.
+            const ampleur = 2 + Math.round((rang || 0) * 0.8);        // 2 → 6 selon la tranche
+            let taille = Math.max(2, Math.min(12, entre(ampleur - 1, ampleur + 3)));
+
+            while (taille >= 2) {
                 action.modsEffets = action.modsEffets.filter(x => x.effet.id !== modZone.id);
-                poserMod(chantier, action, modZone, hexes.length);
-                if (fatigueDe(chantier, palette) > fatiguePlafond) {
-                    action.zoneHexes = sauvegarde;
-                    action.modsEffets = action.modsEffets.filter(x => x.effet.id !== modZone.id);
-                    if (sauvegarde.length > 0) poserMod(chantier, action, modZone, sauvegarde.length);
-                    break;
-                }
+                action.zoneHexes = genererZoneHexes(taille);
+                poserMod(chantier, action, modZone, action.zoneHexes.length);
+                if (fatigueDe(chantier, palette) <= fatiguePlafond) break;
+                taille--;
+            }
+            if (taille < 2) {
+                action.modsEffets = action.modsEffets.filter(x => x.effet.id !== modZone.id);
+                action.zoneHexes = [];
             }
         }
     }
@@ -643,12 +690,24 @@ function fabriquerCarte(monstre, affinites, patron, tranche, palette) {
             if (!effetAutorise(chantier, m, true)) return false;
             if (m.Nom === "Zone" || contient(m.Nom, MOTS_CLES.persistance)) return false; // déjà gérés par le patron
             const dejaPose = action.modsEffets.find(x => x.effet.id === m.id);
-            if (dejaPose && dejaPose.count >= maxEmpilements(m)) return false;
+            // Plafond d'empilement propre à la tranche, en plus du plafond de la
+            // base : c'est lui qui empêche les "Critique + ×6" systématiques.
+            const plafond = estEffetBouchon(m)
+                ? PLAFOND_BOUCHON
+                : Math.min(maxEmpilements(m), chantier.plafondEmpilement);
+            if (dejaPose && dejaPose.count >= plafond) return false;
             return coutPC(m) > 0 && coutPC(m) <= budgetRestant + 0.5;
         });
 
         if (candidats.length === 0) break;
-        const mod = tirerPondere(candidats, note);
+
+        const candidatsColores = candidats.filter(m => !estEffetBouchon(m));
+        const pool = candidatsColores.length > 0 ? candidatsColores : candidats;
+
+        // On privilégie un effet PAS ENCORE présent : la carte gagne en largeur
+        // avant de gagner en profondeur.
+        const inedits = pool.filter(m => !action.modsEffets.some(x => x.effet.id === m.id));
+        const mod = tirerPondere(inedits.length > 0 ? inedits : pool, note);
         if (!mod) break;
 
         const avant = fatigueDe(chantier, palette);
@@ -665,9 +724,10 @@ function fabriquerCarte(monstre, affinites, patron, tranche, palette) {
     // Dernier ajustement : si on est encore sous le plancher, on empile
     // l'action de base elle-même, qui n'a pas de plafond de compatibilité.
     garde = 0;
+    const plafondBase = Math.min(maxEmpilements(effetBase), chantier.plafondEmpilement);
     while (fatigueDe(chantier, palette) < fatigueMin && garde < 30) {
         garde++;
-        if (action.count >= maxEmpilements(effetBase)) break;
+        if (action.count >= plafondBase) break;
         action.count++;
         if (fatigueDe(chantier, palette) > fatiguePlafond) { action.count--; break; }
     }
@@ -680,14 +740,19 @@ function fabriquerCarte(monstre, affinites, patron, tranche, palette) {
     garde = 0;
     while (fatigueDe(chantier, palette) < fatigueMin && garde < 6) {
         garde++;
+        // Une seconde action ouvre la porte aux effets qui ne sont jamais des
+        // socles offensifs (Bond, Initiative +, Illusion) : c'est là qu'ils
+        // trouvent naturellement leur place, comme sur une carte de joueur.
         const candidatsSecondaires = racines.filter(e =>
-            effetAutorise(chantier, e, false) &&
-            !(e.Nom || "").toLowerCase().includes("illusion") &&
-            coutPC(e) > 0
+            effetAutorise(chantier, e, false) && coutPC(e) > 0
         );
         if (candidatsSecondaires.length === 0) break;
 
-        const secondaire = tirerPondere(candidatsSecondaires, note);
+        // Même règle que pour les mods : un bouchon ne sert que si rien d'autre
+        // ne peut porter la carte.
+        const secondairesColores = candidatsSecondaires.filter(e => !estEffetBouchon(e));
+        const secondaire = tirerPondere(
+            secondairesColores.length > 0 ? secondairesColores : candidatsSecondaires, note);
         if (!secondaire) break;
 
         const avant = fatigueDe(chantier, palette);
@@ -697,11 +762,45 @@ function fabriquerCarte(monstre, affinites, patron, tranche, palette) {
             break;
         }
         // Puis on l'empile tant que la tranche le permet.
-        while (fatigueDe(chantier, palette) < fatigueMin && actionSecondaire.count < maxEmpilements(secondaire)) {
+        const plafondSecondaire = estEffetBouchon(secondaire)
+            ? PLAFOND_BOUCHON
+            : Math.min(maxEmpilements(secondaire), chantier.plafondEmpilement);
+        while (fatigueDe(chantier, palette) < fatigueMin && actionSecondaire.count < plafondSecondaire) {
             actionSecondaire.count++;
             if (fatigueDe(chantier, palette) > fatiguePlafond) { actionSecondaire.count--; break; }
         }
         if (fatigueDe(chantier, palette) === avant) break; // plus rien ne bouge
+    }
+
+    // DERNIER RECOURS : les plafonds d'empilement ne sont qu'un confort de
+    // lisibilité, alors que la tranche de fatigue est une règle du jeu. Sur les
+    // très grosses cartes d'un Élite ou d'un Boss, tout se ligue pour bloquer
+    // (limite de 2 caractéristiques, une seule attaque de base, plafonds de
+    // richesse) et la carte reste sous son plancher. On relâche alors les
+    // plafonds, effet par effet, jusqu'à atteindre la tranche : mieux vaut une
+    // carte un peu plus empilée qu'une carte hors de sa tranche.
+    garde = 0;
+    while (fatigueDe(chantier, palette) < fatigueMin && garde < 60) {
+        garde++;
+        const avant = fatigueDe(chantier, palette);
+
+        for (const act of chantier.actions) {
+            if (fatigueDe(chantier, palette) >= fatigueMin) break;
+
+            // On approfondit d'abord les mods déjà posés, puis l'action elle-même.
+            for (const m of act.modsEffets) {
+                if (fatigueDe(chantier, palette) >= fatigueMin) break;
+                if (m.count >= maxEmpilements(m.effet)) continue;
+                m.count++;
+                if (fatigueDe(chantier, palette) > fatiguePlafond) { m.count--; }
+            }
+            if (act.count < maxEmpilements(act.baseEffet)) {
+                act.count++;
+                if (fatigueDe(chantier, palette) > fatiguePlafond) act.count--;
+            }
+        }
+
+        if (fatigueDe(chantier, palette) === avant) break; // vraiment plus rien à gagner
     }
 
     const fatigue = fatigueDe(chantier, palette);
@@ -912,14 +1011,75 @@ window.genererCompetencesMonstre = async function(monstreBrut) {
     const patrons = [...(PATRONS_PAR_ARCHETYPE[monstre.archetype] || PATRONS_PAR_ARCHETYPE["DPS CAC"])]
         .sort(() => Math.random() - 0.5);
 
+    // Signature d'une carte : la liste de ses effets. Deux cartes de même
+    // signature dans un même jeu, c'est la même technique proposée deux fois.
+    const signature = (carte) => {
+        const noms = [];
+        carte.chantier.actions.forEach(act => {
+            noms.push(act.baseEffet.Nom);
+            act.modsEffets.forEach(m => noms.push(m.effet.Nom));
+        });
+        return noms.sort().join("|");
+    };
+
+    const fatigueMaxMonstre = parseInt(monstre.fatigueMax) || 100;
+    const tousLesPatrons = ["frappe", "etat", "zone", "persistance", "etalement", "soutien", "controle"];
+
     const cartes = [];
+    const dejaVues = new Set();
     TRANCHES_FATIGUE_PCT.forEach((tranche, i) => {
-        let carte = fabriquerCarte(monstre, affinites, patrons[i] || "frappe", tranche, palette);
-        // Un patron peut ne rien donner si la base d'effets ne contient pas ce
-        // qu'il demande : on retombe sur une frappe simple plutôt que de
+        const plancher = Math.max(1, Math.round(tranche[0] / 100 * fatigueMaxMonstre));
+        const plafond  = Math.round(tranche[1] / 100 * fatigueMaxMonstre);
+
+        // Qualité d'une carte : à tranche égale, on préfère celle qui combine
+        // des effets variés plutôt que celle qui empile vingt fois le même.
+        const qualite = (c) => {
+            let empilementMax = 0, distincts = new Set();
+            c.chantier.actions.forEach(act => {
+                empilementMax = Math.max(empilementMax, act.count);
+                distincts.add(act.baseEffet.Nom);
+                act.modsEffets.forEach(m => {
+                    empilementMax = Math.max(empilementMax, m.count);
+                    distincts.add(m.effet.Nom);
+                });
+            });
+            return distincts.size * 2 - Math.max(0, empilementMax - 6) * 3;
+        };
+
+        let carte = null;
+        let meilleure = null;   // la moins mauvaise, si aucune tentative n'est parfaite
+
+        // On retente pour deux raisons. D'abord le doublon : le hasard produit
+        // forcément des collisions entre deux tranches voisines qui piochent
+        // dans les mêmes effets. Ensuite l'impasse : certaines combinaisons
+        // saturent (tous les effets à leur plafond, les deux caractéristiques
+        // consommées) sans atteindre le plancher de la tranche. Dans les deux
+        // cas, un autre patron ouvre d'autres effets et s'en sort.
+        for (let essai = 0; essai < 8; essai++) {
+            const patron = essai < 3
+                ? (patrons[i] || "frappe")
+                : tousLesPatrons[Math.floor(Math.random() * tousLesPatrons.length)];
+            const candidate = fabriquerCarte(monstre, affinites, patron, tranche, palette, i);
+            if (!candidate) continue;
+
+            if (!meilleure || Math.abs(candidate.fatigue - plancher) < Math.abs(meilleure.fatigue - plancher)) {
+                meilleure = candidate;
+            }
+            if (candidate.fatigue < plancher || candidate.fatigue > plafond) continue;
+            if (dejaVues.has(signature(candidate))) continue;
+            // Valide : on la retient, mais on continue de chercher mieux encore
+            // pendant quelques essais plutôt que de s'arrêter à la première.
+            if (!carte || qualite(candidate) > qualite(carte)) carte = candidate;
+            if (essai >= 4) break;
+        }
+
+        // Aucune tentative parfaite : on garde la plus proche plutôt que de
         // laisser un trou dans le jeu de cartes.
-        if (!carte) carte = fabriquerCarte(monstre, affinites, "frappe", tranche, palette);
-        if (carte) cartes.push(carte);
+        if (!carte) carte = meilleure || fabriquerCarte(monstre, affinites, "frappe", tranche, palette, i);
+        if (carte) {
+            dejaVues.add(signature(carte));
+            cartes.push(carte);
+        }
     });
 
     if (cartes.length === 0) return [];
