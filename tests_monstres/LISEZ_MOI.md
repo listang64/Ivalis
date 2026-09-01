@@ -35,3 +35,24 @@ node qualite_reelle.mjs  # variété, richesse, usage de la palette, progression
 ⚠️ `tirer_effets.mjs` lit la base en HTTP via la clé publique du client. Si les
 règles de sécurité Firestore passent en lecture authentifiée, ces scripts
 cesseront de fonctionner — c'est normal et sans effet sur le jeu.
+
+## Bancs de l'IA de combat (chapitre 3)
+
+```sh
+node comportements_ia.mjs   # personnalités, déplacement, ciblage, murs, fatigue
+node tour_ia.mjs            # enchaînement d'un tour complet
+node repos_et_variete.mjs   # repos long, variété et pertinence des cartes
+node renforts.mjs           # un renfort entre bien à la mort d'un monstre
+node combat_complet.mjs     # 24 combats entiers : cherche les blocages
+node cas_limites.mjs        # emmuré, sans cible, données abîmées
+node verrou.mjs             # concurrence entre plusieurs navigateurs
+```
+
+⚠️ `combat_complet.mjs` ramène à zéro la DURÉE des pauses de l'IA. Ne pas
+remplacer `setTimeout` par un appel synchrone : au bout de quelques dizaines
+d'enchaînements, la chaîne de promesses se bloque et le test paraît figé alors
+que le code va bien.
+
+⚠️ `global.window` est unique. Pour comparer deux situations, réactiver le bon
+monde avec `activer(w)` avant chaque mesure, sinon les deux mesures portent sur
+le même monde et donnent évidemment le même résultat.
