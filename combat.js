@@ -2593,7 +2593,13 @@ window.finDeTourCombat = async function(forcer = false) {
                             const fatigueMax = parseInt(persoAction.Fatigue_Max) || parseInt(persoAction.fatigueMax) || 100;
                             let fatigueActuelle = persoAction.fatigueActuelle !== undefined ? parseInt(persoAction.fatigueActuelle) : fatigueMax;
                             
-                            const recup = Math.floor(fatigueMax * 0.35);
+                            // Les monstres ont leur propre rendement de repos dans le
+                            // bestiaire (Repos_Long, en % de la jauge) : un petit gobelin
+                            // récupère tout, un boss beaucoup moins. Les personnages
+                            // joueurs, eux, gardent les 35% historiques.
+                            const pctRepos = parseInt(persoAction.Repos_Long);
+                            const tauxRepos = (!isNaN(pctRepos) && pctRepos > 0) ? pctRepos / 100 : 0.35;
+                            const recup = Math.floor(fatigueMax * tauxRepos);
                             fatigueActuelle = Math.min(fatigueMax, fatigueActuelle + recup);
 
                             persoAction.fatigueActuelle = fatigueActuelle;

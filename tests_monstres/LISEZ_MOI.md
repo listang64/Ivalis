@@ -46,7 +46,18 @@ node renforts.mjs           # un renfort entre bien à la mort d'un monstre
 node combat_complet.mjs     # 24 combats entiers : cherche les blocages
 node cas_limites.mjs        # emmuré, sans cible, données abîmées
 node verrou.mjs             # concurrence entre plusieurs navigateurs
+node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 ```
+
+## Liaison avec le bestiaire
+
+```sh
+node gabarit_relie.mjs      # le générateur suit-il le Fatigue_Max du tableau ?
+```
+
+Ce banc modifie la fatigue max d'un gabarit (60, 100, 150, 240) et vérifie que
+les six tranches de coût suivent proportionnellement, puis contrôle que sur tout
+le bestiaire réel aucune carte ne sort de sa tranche.
 
 ⚠️ `combat_complet.mjs` ramène à zéro la DURÉE des pauses de l'IA. Ne pas
 remplacer `setTimeout` par un appel synchrone : au bout de quelques dizaines

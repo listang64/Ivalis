@@ -5,6 +5,14 @@
 import fs from 'fs';
 import { chargerIA, creerPlateau, combattant, activer, EFFETS } from './banc_ia.mjs';
 
+// Même règle que combat.js : les monstres utilisent le Repos_Long de leur
+// gabarit (en % de la jauge), les joueurs gardent les 35% historiques.
+function tauxRepos(p) {
+  const pct = parseInt(p && p.Repos_Long);
+  return (!isNaN(pct) && pct > 0) ? pct / 100 : 0.35;
+}
+
+
 const GABARITS = JSON.parse(fs.readFileSync('gabarits_reels.json','utf-8'));
 const gabaritDe = (a,p) => Object.values(GABARITS).find(g => g.Archetype === a && g.Palier === p);
 
@@ -41,7 +49,7 @@ function tourJoueur(w, joueur, action, persos, tokens, journal) {
   if (action.idCarte === "REPOS_LONG" || !carte) {
     if (action.idCarte === "REPOS_LONG") {
       const max = joueur.Fatigue_Max;
-      joueur.fatigueActuelle = Math.min(max, joueur.fatigueActuelle + Math.floor(max*0.35));
+      joueur.fatigueActuelle = Math.min(max, joueur.fatigueActuelle + Math.floor(max*tauxRepos(joueur)));
       journal.reposJoueurs++;
     }
     return;
@@ -135,7 +143,7 @@ async function unCombat(numero) {
       PV_Max: gab.PV, PV_Actuels: gab.PV, Fatigue_Max: gab.Fatigue_Max, fatigueActuelle: gab.Fatigue_Max,
       Esquive: gab.Parade_Esquive, Parade: gab.Parade_Esquive,
       Def_Physique: gab.Res_Physique, Def_Magique: gab.Res_Magique,
-      Regeneration: gab.Regeneration });
+      Regeneration: gab.Regeneration, Repos_Long: gab.Repos_Long });
     const docs = await w0.genererCompetencesMonstre({ nom: m.nom || m.archetype, archetype: m.archetype,
                                                       palier: m.palier, fatigueMax: gab.Fatigue_Max });
     competences[id] = {}; docs.forEach((d,k) => competences[id][`${id}_c${k}`] = d);
@@ -199,7 +207,7 @@ async function unCombat(numero) {
     const a = partie.File_Attente_Combat[0];
     if (a && a.idCarte === "REPOS_LONG") {
       const p = persos.find(x => x.idPersonnage === a.idPersonnage);
-      if (p) { p.fatigueActuelle = Math.min(p.Fatigue_Max, p.fatigueActuelle + Math.floor(p.Fatigue_Max*0.35));
+      if (p) { p.fatigueActuelle = Math.min(p.Fatigue_Max, p.fatigueActuelle + Math.floor(p.Fatigue_Max*tauxRepos(p)));
                journal[p.estMonstre ? "reposMonstres" : "reposJoueurs"]++; }
     }
     partie.File_Attente_Combat.shift();

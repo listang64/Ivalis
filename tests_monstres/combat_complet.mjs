@@ -5,6 +5,14 @@
 import fs from 'fs';
 import { chargerIA, creerPlateau, combattant, activer } from './banc_ia.mjs';
 
+// Même règle que combat.js : les monstres utilisent le Repos_Long de leur
+// gabarit (en % de la jauge), les joueurs gardent les 35% historiques.
+function tauxRepos(p) {
+  const pct = parseInt(p && p.Repos_Long);
+  return (!isNaN(pct) && pct > 0) ? pct / 100 : 0.35;
+}
+
+
 const carte = (nom, fat, portee, deg) => ({ Nom:nom, Fatigue:fat, Initiative:Math.max(0,100-fat),
   Composants:{ actions:[{ baseEffetId: portee>1?"EFF_ATTAQUE_LEGERE":"EFF_ATTAQUE_LOURDE", count:deg,
   mods: portee>1?{EFF_DISTANCE:portee-1}:{}, zoneHexes:[], baseDuree:0, modsDuree:{} }] } });
@@ -77,7 +85,7 @@ function installerMoteur(monde, journal) {
       const p = persos.find(x => x.idPersonnage === action.idPersonnage);
       if (p) {
         const max = parseInt(p.Fatigue_Max) || 100;
-        p.fatigueActuelle = Math.min(max, p.fatigueActuelle + Math.floor(max * 0.35));
+        p.fatigueActuelle = Math.min(max, p.fatigueActuelle + Math.floor(max * tauxRepos(p)));
         journal.push({ type:"repos", id: action.idPersonnage, fatigue: p.fatigueActuelle });
       }
     }

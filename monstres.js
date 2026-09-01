@@ -695,9 +695,15 @@ window.genererRencontreMonstres = async function(difficulte) {
         return;
     }
 
-    // Les gabarits doivent être chargés, sinon aucune stat à recopier.
-    if (!window.GABARITS_MONSTRES || window.GABARITS_MONSTRES.length === 0) {
+    // Les gabarits doivent être chargés, sinon aucune stat à recopier. On les
+    // relit systématiquement : le tableau d'équilibrage peut avoir été modifié
+    // depuis un autre appareil, et une rencontre lancée sur des valeurs périmées
+    // donnerait des monstres et des techniques qui ne correspondent plus au
+    // bestiaire. Une lecture de plus ne coûte rien à côté de ça.
+    try {
         await window.chargerGabaritsMonstres();
+    } catch (e) {
+        console.error("Relecture des gabarits impossible, on garde ceux en mémoire :", e);
     }
 
     const composition = window.tirerCompositionRencontre(difficulte);
