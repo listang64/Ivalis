@@ -1542,10 +1542,9 @@ function construireHaloVTT(options) {
 // =========================================================================
 //  LES COMBATTANTS À TERRE
 // =========================================================================
-//  Un combattant mort reste visible sur la carte (son cadavre), mais il cesse
-//  d'exister pour les interactions : on ne peut plus le cliquer, et il ne
-//  bloque plus le passage — on marche par-dessus. Ces deux fonctions sont le
-//  seul endroit qui décide "qui est mort", pour que la carte, les clics et les
+//  Un combattant mort disparaît complètement du plateau : plus de pion, donc
+//  rien à cliquer, et sa case redevient libre. Ces deux fonctions sont le seul
+//  endroit qui décide "qui est mort", pour que l'affichage, les clics et les
 //  déplacements ne puissent jamais se contredire.
 // =========================================================================
 window.estCombattantMort = function(idCombattant) {
@@ -1593,6 +1592,12 @@ window.appliquerTokensVTT = function(tokensMap) {
         const taille = data.taille || 55;
         const pData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPerso);
 
+        // Un combattant à terre disparaît purement et simplement du plateau : pas de pion,
+        // donc rien à cliquer et rien qui barre le passage. Son entrée reste dans les Tokens
+        // (sa case est mémorisée) mais elle n'est plus dessinée. Toutes les animations qui
+        // cherchent un pion par son id gèrent déjà son absence.
+        if (window.estCombattantMort(idPerso)) continue;
+
         const divToken = document.createElement("div");
         divToken.className = "token-vtt";
         divToken.style.position = "absolute";
@@ -1606,14 +1611,10 @@ window.appliquerTokensVTT = function(tokensMap) {
         // Le conteneur reste fixe
         divToken.style.transform = `translate(-50%, -50%)`; 
         
-        // Un combattant à terre : cadavre à demi effacé, insensible aux clics, et sous
-        // les vivants pour qu'un pion qui lui marche dessus reste bien lisible.
-        const estMort = window.estCombattantMort(idPerso);
-
-        divToken.style.pointerEvents = estMort ? "none" : "auto";
-        divToken.style.cursor = estMort ? "default" : "pointer";
-        divToken.style.opacity = estMort ? "0.5" : "1";
-        divToken.style.zIndex = estMort ? "9" : "10";
+        // Seuls des combattants debout arrivent ici : les morts ont été écartés plus haut.
+        divToken.style.pointerEvents = "auto";
+        divToken.style.cursor = "pointer";
+        divToken.style.zIndex = "10";
         divToken.style.borderRadius = "50%";
         divToken.id = "token-" + idPerso;
 
