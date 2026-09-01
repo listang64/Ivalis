@@ -1,4 +1,4 @@
-import { chargerIA, creerPlateau, combattant, EFFETS } from './banc_ia.mjs';
+import { chargerIA, creerPlateau, combattant, EFFETS, activer } from './banc_ia.mjs';
 
 const CARTE_CAC  = { Nom:"Charge", Fatigue:20, Initiative:80, Composants:{ actions:[{ baseEffetId:"EFF_ATTAQUE_LOURDE", count:3, mods:{}, zoneHexes:[], baseDuree:0, modsDuree:{} }] } };
 const CARTE_TIR  = { Nom:"Trait",  Fatigue:20, Initiative:80, Composants:{ actions:[{ baseEffetId:"EFF_ATTAQUE_LEGERE", count:2, mods:{ EFF_DISTANCE:4 }, zoneHexes:[], baseDuree:0, modsDuree:{} }] } };
@@ -11,7 +11,7 @@ const verifier = (label, condition, detail="") => { if (!condition) echecs++; co
 // Construit une situation et renvoie la décision de l'IA.
 function decider({ personnalite, carte, tokens, persos, zones, plateau }) {
   const monde = { plateau: plateau || creerPlateau(), tokens, persos, zones };
-  const w = chargerIA(monde);
+  const w = activer(chargerIA(monde));
   const monstre = persos.find(p => p.estMonstre);
   monstre.Personnalite = personnalite;
   const infos = w.analyserCarteMonstre(carte);

@@ -91,8 +91,11 @@ console.log("\nE. CHOIX DE CARTE EN PRÉPARATION");
   }
   verifier("jamais de carte au-dessus de sa fatigue", choisieTropChere === 0, `(${choisieTropChere}/200)`);
 
+  // Épuisé, il ne doit surtout pas rester muet : sans entrée dans la file, la
+  // partie ne basculerait jamais en résolution et le combat se figerait.
   w.PERSOS_PARTIE[0].fatigueActuelle = 5;
-  verifier("épuisé : aucune carte choisie", w.choisirCarteMonstre(w.PERSOS_PARTIE[0]) === null);
+  const epuise = w.choisirCarteMonstre(w.PERSOS_PARTIE[0]);
+  verifier("épuisé : il prend un repos long", !!(epuise && epuise.repos));
 }
 
 console.log("\nF. IMMOBILISÉ : IL NE BOUGE PAS MAIS PEUT AGIR");

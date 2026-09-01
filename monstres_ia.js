@@ -387,16 +387,41 @@ function cartesDuMonstre(monstre) {
         .map(id => ({ id, data: cache[id] }));
 }
 
+// Le repos long est une entrée de file à part entière, exactement comme pour un
+// joueur : initiative 0 et identifiant "REPOS_LONG". C'est finDeTourCombat() qui
+// rend alors 35 % de la fatigue maximale.
+// Mémoire de la dernière carte jouée par chaque monstre, pour éviter les
+// répétitions. Volontairement en mémoire vive et non en base : si le poste qui
+// pilote change, on perd juste le frein d'un tour, ce qui est sans conséquence.
+window.DERNIERES_CARTES_MONSTRES = window.DERNIERES_CARTES_MONSTRES || {};
+const derniereCarteJouee = (id) => window.DERNIERES_CARTES_MONSTRES[id] || null;
+
+const CARTE_REPOS = { id: "REPOS_LONG", data: { Nom: "Repos long", Fatigue: 0, Initiative: 0 }, repos: true };
+
 window.choisirCarteMonstre = function(monstre) {
     const cartes = cartesDuMonstre(monstre);
-    if (cartes.length === 0) return null;
-
     const fatigue = parseInt(monstre.fatigueActuelle);
     const fatigueDispo = isNaN(fatigue) ? 0 : fatigue;
+    const fatigueMax = parseInt(monstre.Fatigue_Max) || parseInt(monstre.fatigueMax) || 100;
+
+    // ⚠️ Un monstre qui ne pose RIEN dans la file fige le combat : la partie ne
+    // bascule en résolution que lorsque tous les combattants vivants ont choisi.
+    // Épuisé, il souffle donc au lieu de rester muet — ce qui le remet en jeu au
+    // tour suivant plutôt que de bloquer la partie.
+    if (cartes.length === 0) return CARTE_REPOS;
+
     const abordables = cartes.filter(c => (parseInt(c.data.Fatigue) || 0) <= fatigueDispo);
-    if (abordables.length === 0) return null; // épuisé : il ne jouera pas ce tour-ci
+    if (abordables.length === 0) return CARTE_REPOS;
 
     const t = traits(monstre);
+
+    // Réserve presque vide : souffler maintenant plutôt que de lâcher une
+    // dernière carte et de rester bloqué le tour suivant. Un prudent y consent
+    // volontiers, un brutal s'entête.
+    if (fatigueDispo < fatigueMax * 0.2) {
+        const envieDeSouffler = 0.35 + t.tientDistance * 0.4 + t.peurZones * 0.2;
+        if (Math.random() < envieDeSouffler) return CARTE_REPOS;
+    }
     const tokens = window.TOKENS_VTT_DATA || {};
     const tkMonstre = tokens[monstre.idPersonnage];
 
@@ -431,7 +456,11 @@ window.choisirCarteMonstre = function(monstre) {
 
         if (infos.estSoin) {
             // Ne soigner que si quelqu'un en a besoin, sinon c'est un tour perdu.
-            score += besoinDeSoin * 22 - 12;
+            // Le gain doit pouvoir rivaliser avec la meilleure carte offensive :
+            // à +22 maximum, le soin ne sortait JAMAIS, pas même pour un allié à
+            // 8 points de vie, parce qu'une grosse attaque à distance dépassait
+            // les 28 points de score.
+            score += besoinDeSoin * 45 - 14;
         } else {
             score += infos.degats * 1.4;
             // Un caractère sanguinaire cogne fort, un prudent préfère la portée.
@@ -443,7 +472,12 @@ window.choisirCarteMonstre = function(monstre) {
         const reste = fatigueDispo - (parseInt(c.data.Fatigue) || 0);
         if (reste < 6) score -= 8;
 
-        score += bruit(6); // deux monstres identiques ne jouent pas la même carte
+        // Ne pas rejouer la carte du tour précédent : sans ce frein, la meilleure
+        // carte du jeu sortait deux fois sur trois et la créature devenait une
+        // mécanique. La pénalité reste franchissable si rien d'autre ne convient.
+        if (derniereCarteJouee(monstre.idPersonnage) === c.id) score -= 9;
+
+        score += bruit(10); // deux monstres identiques ne jouent pas la même carte
 
         if (score > meilleurScore) { meilleurScore = score; meilleure = c; }
     });
@@ -485,6 +519,14 @@ window.preparerCartesMonstres = async function() {
         const carte = window.choisirCarteMonstre(monstre);
         if (!carte) continue;
 
+        if (carte.repos) {
+            file.push({ idPersonnage: monstre.idPersonnage, idCarte: "REPOS_LONG",
+                        initiative: 0, timestamp: new Date().getTime() });
+            auMoinsUn = true;
+            console.log(`🧠 ${monstre.prenom || monstre.idPersonnage} souffle (repos long)`);
+            continue;
+        }
+
         // Électrifié : même règle que pour les joueurs, -35 d'initiative sur la
         // prochaine carte jouée, puis l'état se dissipe.
         let initiative = carte.data.Initiative || 0;
@@ -504,6 +546,7 @@ window.preparerCartesMonstres = async function() {
             timestamp: new Date().getTime()
         });
         auMoinsUn = true;
+        window.DERNIERES_CARTES_MONSTRES[monstre.idPersonnage] = carte.id;
         console.log(`🧠 ${monstre.prenom || monstre.idPersonnage} prépare « ${carte.data.Nom} » (init ${initiative})`);
     }
 
@@ -568,8 +611,23 @@ window.IA_MONSTRE_EN_COURS = false;
 
 window.jouerTourMonstre = async function(idMonstre, idCarte) {
     const monstre = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idMonstre);
-    const dataCarte = ((window.CACHE_COMPETENCES_GLOBAL || {})[idMonstre] || {})[idCarte];
     const tk = (window.TOKENS_VTT_DATA || {})[idMonstre];
+
+    // Repos long : il ne se déplace pas et ne lance rien. C'est finDeTourCombat()
+    // qui lui rend sa fatigue, exactement comme pour un joueur.
+    if (idCarte === "REPOS_LONG") {
+        window.TOKEN_SELECTIONNE = idMonstre;
+        if (typeof window.afficherDansPanneauGauche === "function") window.afficherDansPanneauGauche(idMonstre);
+        if (typeof window.centrerMapSurToken === "function") window.centrerMapSurToken(idMonstre);
+        if (tk && typeof window.afficherMessageFlottantHex === "function") {
+            window.afficherMessageFlottantHex(tk.q, tk.r, "Reprend son souffle", "#1b6e3a");
+        }
+        await pause(1500);
+        if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true);
+        return;
+    }
+
+    const dataCarte = ((window.CACHE_COMPETENCES_GLOBAL || {})[idMonstre] || {})[idCarte];
 
     // Sans carte lisible ou sans pion, on ne bloque pas le combat : on passe.
     if (!monstre || !dataCarte || !tk) {

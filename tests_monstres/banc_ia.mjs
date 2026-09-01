@@ -53,3 +53,9 @@ export const combattant = (o) => ({
   statut: "Vivant", PV_Max: 100, PV_Actuels: 100, Fatigue_Max: 120, fatigueActuelle: 120,
   Etats_Alteres: [], camp: "Allié", ...o
 });
+
+// ⚠️ global.window est unique : créer un second monde écrase le premier. Toute
+// comparaison entre deux situations DOIT réactiver le bon monde avant chaque
+// mesure, faute de quoi les deux mesures portent sur le même monde et donnent
+// évidemment le même résultat.
+export function activer(w) { global.window = w; return w; }
