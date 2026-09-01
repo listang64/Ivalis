@@ -1539,6 +1539,34 @@ function construireHaloVTT(options) {
     return halo;
 }
 
+// =========================================================================
+//  LES COMBATTANTS À TERRE
+// =========================================================================
+//  Un combattant mort reste visible sur la carte (son cadavre), mais il cesse
+//  d'exister pour les interactions : on ne peut plus le cliquer, et il ne
+//  bloque plus le passage — on marche par-dessus. Ces deux fonctions sont le
+//  seul endroit qui décide "qui est mort", pour que la carte, les clics et les
+//  déplacements ne puissent jamais se contredire.
+// =========================================================================
+window.estCombattantMort = function(idCombattant) {
+    const p = (window.PERSOS_PARTIE || []).find(x => x.idPersonnage === idCombattant);
+    if (!p) return false;
+    // PV_Max est vérifié avant de conclure : un combattant dont les PV ne sont pas
+    // encore chargés vaut 0 et passerait à tort pour un cadavre.
+    const pvMax = parseInt(p.PV_Max) || 0;
+    const pv = parseInt(p.PV_Actuels) || 0;
+    return p.statut === "Mort" || (pvMax > 0 && pv <= 0);
+};
+
+// Vrai seulement si un combattant ENCORE DEBOUT occupe la case.
+window.caseOccupeeParVivant = function(q, r, tokensData) {
+    const tokens = tokensData || window.TOKENS_VTT_DATA || {};
+    for (let id in tokens) {
+        if (tokens[id].q === q && tokens[id].r === r && !window.estCombattantMort(id)) return true;
+    }
+    return false;
+};
+
 window.appliquerTokensVTT = function(tokensMap) {
     if (!window.PLATEAU_VTT) return;
     
@@ -1578,9 +1606,14 @@ window.appliquerTokensVTT = function(tokensMap) {
         // Le conteneur reste fixe
         divToken.style.transform = `translate(-50%, -50%)`; 
         
-        divToken.style.pointerEvents = "auto"; 
-        divToken.style.cursor = "pointer";
-        divToken.style.zIndex = "10";
+        // Un combattant à terre : cadavre à demi effacé, insensible aux clics, et sous
+        // les vivants pour qu'un pion qui lui marche dessus reste bien lisible.
+        const estMort = window.estCombattantMort(idPerso);
+
+        divToken.style.pointerEvents = estMort ? "none" : "auto";
+        divToken.style.cursor = estMort ? "default" : "pointer";
+        divToken.style.opacity = estMort ? "0.5" : "1";
+        divToken.style.zIndex = estMort ? "9" : "10";
         divToken.style.borderRadius = "50%";
         divToken.id = "token-" + idPerso;
 
@@ -1687,9 +1720,8 @@ window.appliquerTokensVTT = function(tokensMap) {
             disque.style.alignItems = "center";
             disque.style.justifyContent = "center";
             disque.style.overflow = "hidden";
-            if (pData.statut === "Mort" || (parseInt(pData.PV_Actuels) || 0) <= 0) {
-                disque.style.filter = "grayscale(0.85) brightness(0.55)";
-            }
+            // Rien de particulier pour un monstre mort : l'opacité de 50 % est déjà
+            // appliquée plus haut sur le pion entier, comme pour tous les combattants.
 
             const nomAffiche = ((pData.prenom || "") + " " + (pData.nom || "")).trim() || "Créature";
 

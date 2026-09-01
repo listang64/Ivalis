@@ -469,7 +469,14 @@ const RENFORT_DIFFICULTE = {
     "Très difficile": "Boss"
 };
 
-const MAX_MONSTRES_TERRAIN = 4;
+// Le terrain accueille autant d'ennemis qu'il y a de joueurs, plus un. Les illusions
+// sont des leurres posés par les héros, pas des joueurs : les compter ferait grossir
+// la rencontre à chaque sort d'illusion. Plancher à 2 tant que la liste des
+// personnages n'est pas encore chargée (sinon une rencontre se réduirait à 1 ennemi).
+function limiteMonstresTerrain() {
+    const joueurs = (window.PERSOS_JOUEURS_PARTIE || []).filter(p => !p.estIllusion && p.camp !== "Ennemi");
+    return Math.max(2, joueurs.length + 1);
+}
 
 // Noms de repli, utilisés si la clé Gemini est absente ou si l'appel échoue :
 // jamais de monstre sans nom sur le plateau.
@@ -677,8 +684,9 @@ window.genererRencontreMonstres = async function(difficulte) {
     composition.forEach((m, i) => { m.nom = noms[i] || "Créature"; });
 
     // Le terrain est limité : le reste attend en réserve.
-    const surLeTerrain = composition.slice(0, MAX_MONSTRES_TERRAIN);
-    const enReserve    = composition.slice(MAX_MONSTRES_TERRAIN);
+    const limite = limiteMonstresTerrain();
+    const surLeTerrain = composition.slice(0, limite);
+    const enReserve    = composition.slice(limite);
 
     const tokensData = { ...window.TOKENS_VTT_DATA };
     for (const monstre of surLeTerrain) {
@@ -721,7 +729,7 @@ window.entrerRenfortMonstre = async function() {
     const vivants = (window.MONSTRES_PARTIE || []).filter(m =>
         m.statut !== "Mort" && (parseInt(m.PV_Actuels) || 0) > 0
     ).length;
-    if (vivants >= MAX_MONSTRES_TERRAIN) return null;
+    if (vivants >= limiteMonstresTerrain()) return null;
 
     const renfort = reserve.shift();
     const tokensData = { ...window.TOKENS_VTT_DATA };

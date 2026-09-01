@@ -87,13 +87,8 @@ function calculerCheminAStar(startHex, endHex) {
             const state = window.PLATEAU_VTT.getCaseState(neighbor.q, neighbor.r);
             if (state.isBlocked || state.isDeleted) continue;
             
-            let isOccupied = false;
-            for (let id in window.TOKENS_VTT_DATA) {
-                if (window.TOKENS_VTT_DATA[id].q === neighbor.q && window.TOKENS_VTT_DATA[id].r === neighbor.r) {
-                    isOccupied = true; break;
-                }
-            }
-            if (isOccupied) continue;
+            // Un cadavre ne barre plus la route : on lui passe dessus (cf. window.estCombattantMort).
+            if (window.caseOccupeeParVivant(neighbor.q, neighbor.r)) continue;
 
             let inPath = window.CHEMIN_MOUVEMENT.some(step => step.q === neighbor.q && step.r === neighbor.r);
             if (inPath || (window.CHEMIN_START_NODE && window.CHEMIN_START_NODE.q === neighbor.q && window.CHEMIN_START_NODE.r === neighbor.r)) {
@@ -157,13 +152,9 @@ window.ajouterEtapeMouvement = function(q, r) {
         return;
     }
     
-    let isOccupied = false;
-    for (let id in window.TOKENS_VTT_DATA) {
-        if (window.TOKENS_VTT_DATA[id].q === q && window.TOKENS_VTT_DATA[id].r === r) {
-            isOccupied = true; break;
-        }
-    }
-    if (isOccupied) {
+    // Seul un combattant debout occupe vraiment la case : on peut finir son
+    // déplacement sur le cadavre d'un mort.
+    if (window.caseOccupeeParVivant(q, r)) {
         window.afficherMessageFlottantHex(q, r, "Case occupée");
         return;
     }
