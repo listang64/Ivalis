@@ -6,6 +6,44 @@ import { collection, getDocs, doc, setDoc, getDoc, updateDoc } from "https://www
 
 // Variables globales pour le Deck interactif
 window.COMPETENCES_CACHE = {};
+
+// =========================================================================
+//  TITRES DE BANNIÈRE : ILS RÉTRÉCISSENT AU LIEU D'ÊTRE COUPÉS
+// =========================================================================
+//  Un nom de technique trop long finissait en "Souffle corrom…" : la bannière
+//  a une largeur fixe et le texte était tronqué. On mesure plutôt le débordement
+//  et on réduit la taille du texte jusqu'à ce qu'il tienne, comme le fait déjà
+//  le nom du personnage dans le panneau de combat. L'ellipse reste en dernier
+//  recours, pour un nom qui déborderait encore au plancher de lisibilité.
+window.TAILLE_MIN_TITRE_BANNIERE = 9;
+
+window.ajusterTitresBannieres = function(racine) {
+    const zone = racine || document;
+    const titres = zone.querySelectorAll ? zone.querySelectorAll(".titre-auto-reduit") : [];
+    if (!titres || titres.length === 0) return;
+
+    const ajuster = () => {
+        titres.forEach(el => {
+            const maxi = parseFloat(el.dataset.tailleMax) || 17;
+            // Invisible ou pas encore disposé : rien à mesurer, on repassera.
+            if (!el.clientWidth) return;
+            let taille = maxi;
+            el.style.fontSize = taille + "px";
+            // Une demi-graduation à la fois : l'œil ne voit pas la marche, et on
+            // ne descend jamais sous le plancher de lisibilité.
+            while (el.scrollWidth > el.clientWidth + 1 && taille > window.TAILLE_MIN_TITRE_BANNIERE) {
+                taille = Math.max(window.TAILLE_MIN_TITRE_BANNIERE, taille - 0.5);
+                el.style.fontSize = taille + "px";
+            }
+        });
+    };
+
+    ajuster();
+    // La police Cinzel arrive souvent après le premier rendu : ce qui tenait
+    // avec la police de repli peut déborder une fois la vraie police posée.
+    requestAnimationFrame(ajuster);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(ajuster).catch(() => {});
+};
 window.CARTES_SELECTIONNEES = [];
 window.COULEUR_PERSO_COURANT = "#4a1c1c";
 window.ID_PERSONNAGE_DECK = null;
@@ -153,7 +191,7 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
 
                     <div style="position: absolute; top: 44%; transform: translateY(-50%); left: 57px; width: 69px; text-align: center; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 30px; font-weight: bold; z-index: 3; text-shadow: 2px 2px 5px black; pointer-events: none;">${initiative}</div>
 
-                    <div style="position: absolute; top: 48%; transform: translateY(-50%); left: 120px; right: 20px; text-align: center; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;">${titre}</div>
+                    <div class="titre-auto-reduit" data-taille-max="17" style="position: absolute; top: 48%; transform: translateY(-50%); left: 120px; right: 20px; text-align: center; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;">${titre}</div>
 
                     <div onclick="window.gererClicCarte('${idCarte}')" style="position: absolute; top: 47px; bottom: 55px; left: 115px; right: 57px; z-index: 4; cursor: pointer; pointer-events: auto;"></div>
                 </div>
@@ -162,6 +200,7 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
 
         htmlDeck += `</div>`;
         listeDiv.innerHTML = htmlDeck;
+        window.ajusterTitresBannieres(listeDiv);
 
     } catch (e) {
         console.error("Erreur de lecture des compétences :", e);
@@ -442,7 +481,7 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1785866318/competance_carte_vy8omh.png" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none;">
         
         <!-- COUCHE 3 : LES DONNÉES -->
-        <div style="position: absolute; top: 18px; left: 50px; right: 80px; text-align: center; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; color: #e0d0b0; text-transform: uppercase; text-shadow: 2px 2px 4px black; z-index: 3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;">
+        <div class="titre-auto-reduit" data-taille-max="16" style="position: absolute; top: 18px; left: 50px; right: 80px; text-align: center; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; color: #e0d0b0; text-transform: uppercase; text-shadow: 2px 2px 4px black; z-index: 3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;">
             ${titre}
         </div>
 
@@ -468,6 +507,8 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     `;
 
     conteneurCarte.style.display = "block";
+    // Le titre se mesure une fois la carte affichée : avant, elle a une largeur nulle.
+    window.ajusterTitresBannieres(conteneurCarte);
     
     if (isCombatMode) {
         if (conteneurCarte.style.opacity === "0" || conteneurCarte.style.top !== "15vh") {
