@@ -241,6 +241,7 @@ window.ecouterMonstresPartie = function(idPartie) {
             objet.Archetype     = brut.Archetype || "";
             objet.Palier        = brut.Palier || "";
             objet.Gabarit       = brut.Gabarit || "";
+            objet.Personnalite  = brut.Personnalite || "brutal";
             objet.Nombre_Actions = brut.Nombre_Actions || 1;
             objet.XP_Groupe     = brut.XP_Groupe || 0;
             monstres.push(objet);
@@ -283,6 +284,13 @@ window.creerMonstreDepuisGabarit = async function(idMonstre, gabarit, donneesSup
         Nombre_Actions: gabarit.Nombre_Actions,
         XP_Groupe: gabarit.XP_Groupe,
         Couleur: "#ff4c4c",
+        // Caractère de combat, tiré une fois pour toutes : c'est lui qui décide
+        // si la créature fonce, contourne, fuit le corps-à-corps ou achève les
+        // blessés (cf. monstres_ia.js). Fixe pour toute la partie, pour que les
+        // joueurs puissent apprendre à la lire.
+        Personnalite: (typeof window.tirerPersonnaliteMonstre === "function")
+            ? window.tirerPersonnaliteMonstre(gabarit.Archetype)
+            : "brutal",
         ...donneesSupplementaires
     };
 

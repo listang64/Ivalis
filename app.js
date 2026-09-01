@@ -1534,6 +1534,12 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
 
          window.PARTIE_DATA = dataPartie;
 
+         // Les monstres jouent seuls : à chaque changement de la partie (une carte
+         // posée, un tour qui passe), l'IA regarde si c'est à eux d'agir.
+         if (typeof window.verifierTourIAMonstres === "function") {
+             window.verifierTourIAMonstres();
+         }
+
          // NOUVEAU : Met à jour la carte "Lockée" du personnage
          if (typeof window.actualiserEtatCarteCombat === "function") {
              window.actualiserEtatCarteCombat();

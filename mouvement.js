@@ -112,6 +112,13 @@ function calculerCheminAStar(startHex, endHex) {
     return []; 
 }
 
+// Exposés pour l'IA des monstres (monstres_ia.js) : elle a besoin de MESURER des
+// distances et d'ESSAYER des trajets pour choisir où aller, sans rien dessiner ni
+// modifier l'état du déplacement en cours. Le déplacement réel, lui, passe comme
+// pour un joueur par ajouterEtapeMouvement() puis validerMouvement().
+window.hexDistanceVTT = hexDistance;
+window.calculerCheminVTT = calculerCheminAStar;
+
 window.ajouterEtapeMouvement = function(q, r) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     
