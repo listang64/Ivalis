@@ -1060,6 +1060,17 @@ RÈGLES :
 // =========================================================================
 
 window.genererCompetencesMonstre = async function(monstreBrut) {
+    // Le cache des effets est chargé au démarrage du jeu, mais sans être attendu :
+    // une rencontre invoquée dans les premières secondes, ou sur une connexion
+    // iPad lente, trouverait un cache vide et repartirait sans aucune technique,
+    // en silence. On le charge donc à la demande, comme le font déjà la Forge et
+    // le moteur de combat.
+    if (!window.EFFETS_BDD_CACHE || Object.keys(window.EFFETS_BDD_CACHE).length === 0) {
+        if (typeof window.chargerCacheEffetsBDD === "function") {
+            await window.chargerCacheEffetsBDD().catch(e => console.error(e));
+        }
+    }
+
     const palette = window.paletteEffetsMonstres();
     if (palette.length === 0) {
         console.warn("Aucun effet de combat en cache : impossible de forger les techniques.");

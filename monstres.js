@@ -201,6 +201,17 @@ window.recomposerCombattants = function() {
         window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
     }
     if (typeof window.afficherPisteInitiative === "function") window.afficherPisteInitiative();
+
+    // Le panneau gauche affiche une copie figée du combattant sélectionné. Si
+    // c'est un monstre et que sa fiche vient de changer, il faut le redessiner,
+    // sinon il reste sur des données périmées. Cas concret : les techniques sont
+    // écrites AVANT le Deck_Equipe qui les équipe, donc le panneau affichait
+    // encore "Aucune compétence mémorisée" alors que la forge était terminée.
+    const affiche = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
+    if (affiche && affiche.estMonstre && typeof window.afficherDansPanneauGauche === "function") {
+        const frais = monstres.find(m => m.idPersonnage === affiche.idPersonnage);
+        if (frais) window.afficherDansPanneauGauche(affiche.idPersonnage);
+    }
 };
 
 let unsubscribeMonstres = null;
