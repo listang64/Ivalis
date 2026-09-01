@@ -368,9 +368,31 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
 // =========================================================================
 //  LOGIQUE DE LA JAUGE DE PV
 // =========================================================================
+// Le combattant affiché dans le panneau, tel qu'il est DANS PERSOS_PARTIE.
+// COMBAT_PERSOS_JOUEUR en garde une copie distincte, qui peut avoir vieilli
+// (un monstre injecté temporairement, un objet reconstruit par un snapshot).
+function combattantDuPanneau() {
+    const affiche = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
+    if (!affiche) return null;
+    return (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === affiche.idPersonnage) || affiche;
+}
+
 window.mettreAJourJaugePV = function() {
-    const max = window.COMBAT_PV_MAX || 1;
-    const actuelle = window.COMBAT_PV_ACTUELS || 0;
+    // Les globales COMBAT_PV_* sont recopiées à la main depuis une douzaine
+    // d'endroits du moteur, et il suffit qu'un seul oublie pour que la barre
+    // mente : le tic de poison, par exemple, baissait les points de vie puis ne
+    // redessinait que la jauge de fatigue. On repart donc de la donnée du
+    // combattant, et on remet les globales d'accord avec elle.
+    const perso = combattantDuPanneau();
+    let max = window.COMBAT_PV_MAX || 1;
+    let actuelle = window.COMBAT_PV_ACTUELS || 0;
+    if (perso) {
+        const maxReel = (parseInt(perso.PV_Max) || 0) + (parseInt(perso.Dev_Mod_PV) || 0);
+        if (maxReel > 0) max = maxReel;
+        if (perso.PV_Actuels !== undefined) actuelle = parseInt(perso.PV_Actuels) || 0;
+        window.COMBAT_PV_MAX = max;
+        window.COMBAT_PV_ACTUELS = actuelle;
+    }
     
     // On bloque entre 0 et 100% visuellement
     const pctActuel = Math.min(100, Math.max(0, (actuelle / max) * 100));
@@ -389,8 +411,17 @@ window.mettreAJourJaugePV = function() {
 //  LOGIQUE DE LA JAUGE DE FATIGUE
 // =========================================================================
 window.mettreAJourJaugeFatigue = function(coutFatigueBrut) {
-    const max = window.COMBAT_FATIGUE_MAX || 1;
-    const actuelle = window.COMBAT_FATIGUE_ACTUELLE || 0;
+    // Même règle que pour la vitalité : la donnée du combattant fait foi.
+    const perso = combattantDuPanneau();
+    let max = window.COMBAT_FATIGUE_MAX || 1;
+    let actuelle = window.COMBAT_FATIGUE_ACTUELLE || 0;
+    if (perso) {
+        const maxReel = parseInt(perso.Fatigue_Max) || parseInt(perso.fatigueMax) || 0;
+        if (maxReel > 0) max = maxReel;
+        if (perso.fatigueActuelle !== undefined) actuelle = parseInt(perso.fatigueActuelle) || 0;
+        window.COMBAT_FATIGUE_MAX = max;
+        window.COMBAT_FATIGUE_ACTUELLE = actuelle;
+    }
     
     const coutFatigue = parseInt(coutFatigueBrut) || 0; 
     const coutReel = Math.min(coutFatigue, actuelle); 
@@ -2749,7 +2780,10 @@ window.finDeTourCombat = async function(forcer = false) {
                                             if (persoActuelPoison && persoActuelPoison.idPersonnage === perso.idPersonnage) {
                                                 window.COMBAT_FATIGUE_ACTUELLE = fatigue;
                                                 window.COMBAT_PV_ACTUELS = perso.PV_Actuels;
+                                                // Le poison mord la vie ET l'énergie : les deux jauges
+                                                // doivent être redessinées, pas seulement la seconde.
                                                 if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
+                                                if (typeof window.mettreAJourJaugePV === "function") window.mettreAJourJaugePV();
                                             }
 
                                             // Même retour visuel qu'une attaque classique (flash + barre qui se

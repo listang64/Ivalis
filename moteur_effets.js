@@ -3341,7 +3341,10 @@ window.jouerAnimationMoteur = async function(action) {
                         if (window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]?.idPersonnage === idCible) {
                             window.COMBAT_PV_ACTUELS = cData.PV_Actuels;
                             window.COMBAT_FATIGUE_ACTUELLE = cData.fatigueActuelle;
+                            // Le poison mord la vie ET l'énergie : les deux jauges du panneau
+                            // doivent suivre, pas seulement celle de l'énergie.
                             if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
+                            if (typeof window.mettreAJourJaugePV === "function") window.mettreAJourJaugePV();
                         }
 
                         const tkPoison = window.TOKENS_VTT_DATA[idCible];

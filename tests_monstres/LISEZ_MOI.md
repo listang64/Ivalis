@@ -51,6 +51,7 @@ node lanceur_ia.mjs         # le sort part au nom de la créature, pas du joueur
 node zones_ia.mjs           # les zones sont posées, orientées et bien placées
 node piste_initiative.mjs   # la piste tient à droite du panneau, bulles réduites
 node titres_bannieres.mjs   # les noms de carte rétrécissent au lieu d'être coupés
+node jauges_panneau.mjs     # vitalité et énergie du panneau gauche, à chaque étape
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 ```
 
