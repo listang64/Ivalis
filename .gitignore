@@ -8,3 +8,6 @@ firebase-debug.log
 firebase-debug.*.log
 .firebase/
 *.local
+
+# Données tirées de la base pour le banc d'essai des monstres (regénérables)
+tests_monstres/*.json

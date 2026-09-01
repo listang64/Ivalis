@@ -76,7 +76,11 @@ const MOTS_CLES = {
     persistance: ["persistance"],
     etalement:   ["dot", "étalement", "etalement"],
     distance:    ["distance"],
-    controle:    ["poussée", "poussee", "traction", "immobilisation", "bond", "paralysie", "étourdi", "etourdi"],
+    // "peur" et "provocation" sont des altérations mentales au même titre que les
+    // autres : sans elles dans cette liste, elles échappaient à la limite de deux
+    // altérations par carte et se retrouvaient, étant bon marché et sans
+    // contrainte, sur près d'une carte sur deux.
+    controle:    ["poussée", "poussee", "traction", "immobilisation", "bond", "paralysie", "étourdi", "etourdi", "peur", "provocation"],
     etat:        ["brûl", "brul", "glac", "électri", "electri", "poison", "empoison", "confusion", "saignement", "malédiction", "malediction"]
 };
 
@@ -215,6 +219,11 @@ function affinitesParDefaut(monstre) {
         if (contient(nom, ["poison", "empoison", "saignement"]))           note = magique ? 7 : 6;
         if (contient(nom, ["confusion", "malédiction", "malediction"]))    note = magique ? 8 : 1;
         if (contient(nom, ["paralysie"]))                                  note = magique ? 7 : 2;
+        // Garde-fou général : tout effet qui se dit "magique" reste l'apanage des
+        // lanceurs de sorts. Sans cela, un ours se mettait à faire de la
+        // "Traction magique", qui est bien un effet de contrôle mais d'origine
+        // arcanique.
+        if (nom.toLowerCase().includes("magique") && !magique)             note = Math.min(note, 1);
         if (nom.toLowerCase().includes("illusion")) note = magique ? 6 : 0;
 
         notes[nom] = note;
@@ -328,7 +337,19 @@ const entre = (min, max) => min + Math.floor(Math.random() * (max - min + 1));
 const PLAFOND_BOUCHON = 2;
 function estEffetBouchon(effet) {
     const n = (effet.Nom || "").toLowerCase();
-    return n.startsWith("durée +") || n.startsWith("duree +") || n.startsWith("initiative +");
+    return n.startsWith("initiative +");
+}
+
+// ⚖️ règle Forge : "Durée +" est le SEUL effet que les menus de modificateurs
+// excluent (renderSelectMenu : `e.Nom !== "Durée +"`). Il ne se pose jamais
+// comme un mod ordinaire : il s'applique via les compteurs ⏳ (baseDuree pour
+// l'action, modsDuree pour un sous-effet), au tarif de son Cout_PT par tour.
+// Le poser dans `mods` ferait payer sa fatigue à la carte pour un effet que le
+// moteur de combat ne reconnaîtrait même pas — c'est ainsi que le fait une
+// vraie carte de joueur : { mods: {EFF_BRULE: 6}, modsDuree: {EFF_BRULE: 1} }.
+function estDureePlus(effet) {
+    const n = (effet.Nom || "").toLowerCase().trim();
+    return n === "durée +" || n === "duree +";
 }
 
 // Tirage pondéré : un effet noté 9 sort neuf fois plus souvent qu'un noté 1,
@@ -443,11 +464,24 @@ function effetAutorise(chantier, effet, commeMod) {
     // Une illusion ne peut pas porter de zone.
     if (commeMod && nom === "zone" && chantierContientMotCle(chantier, "illusion")) return false;
 
-    // Un même effet racine ne peut pas être posé DEUX FOIS comme action séparée
-    // sur la même carte : cela donnait des aberrations du genre
-    // "Bond ×5 / Bond ×5 / Bond ×4" empilées en trois actions distinctes. Si la
-    // carte a besoin de plus de cet effet, elle approfondit celui déjà en place.
-    if (!commeMod && chantier.actions.some(act => act.baseEffet.Nom === effet.Nom)) return false;
+    // Un même effet ne peut figurer qu'UNE SEULE FOIS sur une carte, quel que
+    // soit son rôle. Sans cette règle on obtenait des aberrations à deux titres :
+    // le même effet posé en trois actions séparées ("Bond ×5 / Bond ×5 / Bond
+    // ×4"), et — parce que plusieurs effets de la base sont à la fois racine et
+    // modificateur (Poussée, Traction magique) — le même effet compté une fois
+    // comme mod et une fois comme socle sur la même carte. S'il en faut
+    // davantage, on approfondit l'exemplaire déjà en place.
+    const dejaSurLaCarte = chantier.actions.some(act =>
+        act.baseEffet.Nom === effet.Nom ||
+        act.modsEffets.some(m => m.effet.Nom === effet.Nom));
+    if (dejaSurLaCarte) {
+        // Seule exception : re-piocher le mod déjà posé sur l'action courante,
+        // ce qui revient simplement à l'empiler d'un cran de plus.
+        const action = chantier.actions[chantier.actions.length - 1];
+        const estLeMemeModIci = commeMod && action &&
+            action.modsEffets.some(m => m.effet.Nom === effet.Nom);
+        if (!estLeMemeModIci) return false;
+    }
 
     // --- Cohérence thématique (propre aux monstres, pas une règle de la Forge) ---
     // Une carte de soin/protection ne doit pas porter d'altération offensive :
@@ -603,7 +637,11 @@ function fabriquerCarte(monstre, affinites, patron, tranche, palette, rang) {
     const chantier = nouveauChantier(arme, rang);
 
     const racines = palette.filter(e => estRacine(e));
-    const mods    = palette.filter(e => estModificateur(e));
+    const mods    = palette.filter(e => estModificateur(e) && !estDureePlus(e));
+    const effetDureePlus = palette.find(e => estDureePlus(e));
+    const coutDureePlus = effetDureePlus ? coutPC(effetDureePlus) : 5;
+    // ⚖️ règle Forge : le compteur ⏳ est plafonné par getMaxStacks("Durée +").
+    const maxDuree = effetDureePlus ? maxEmpilements(effetDureePlus) : 1;
 
     // --- 1. L'action de base, choisie selon le patron ---
     const veutSoin = patron === "soutien";
@@ -621,6 +659,14 @@ function fabriquerCarte(monstre, affinites, patron, tranche, palette, rang) {
     }
     if (candidatsBase.length === 0) candidatsBase = racines.filter(e => effetAutorise(chantier, e, false));
     if (candidatsBase.length === 0) return null;
+
+    // Un socle dont le coût seul dépasse déjà le plafond de la tranche condamne
+    // la carte d'avance : "Bouclier magique" vaut à lui seul 50 de fatigue, ce
+    // qui déborde une tranche basse. On ne garde que les socles abordables —
+    // sauf si aucun ne l'est, auquel cas on laisse faire et l'ajustement final
+    // s'en chargera.
+    const abordables = candidatsBase.filter(e => coutPC(e) * 5 <= fatiguePlafond);
+    if (abordables.length > 0) candidatsBase = abordables;
 
     const effetBase = tirerPondere(candidatsBase, note) || candidatsBase[0];
     const action = poserAction(chantier, effetBase, 1);
@@ -698,6 +744,21 @@ function fabriquerCarte(monstre, affinites, patron, tranche, palette, rang) {
             if (dejaPose && dejaPose.count >= plafond) return false;
             return coutPC(m) > 0 && coutPC(m) <= budgetRestant + 0.5;
         });
+
+        // Avant d'ajouter encore un effet, on peut prolonger d'un tour un effet
+        // déjà posé qui a une durée (Brûlé, Glacé, Empoisonnement...). C'est le
+        // bouton ⏳ de la Forge, et c'est ce que fait une vraie carte de joueur
+        // plutôt que d'empiler un effet de plus.
+        if (coutDureePlus > 0 && coutDureePlus <= budgetRestant && Math.random() < 0.35) {
+            const prolongeables = action.modsEffets.filter(m =>
+                (m.duree || 0) < maxDuree && nombreFr(m.effet.Tours) > 0);
+            if (prolongeables.length > 0) {
+                const cible = prolongeables[Math.floor(Math.random() * prolongeables.length)];
+                cible.duree = (cible.duree || 0) + 1;
+                if (fatigueDe(chantier, palette) > fatiguePlafond) cible.duree -= 1;
+                else continue;
+            }
+        }
 
         if (candidats.length === 0) break;
 
@@ -839,15 +900,29 @@ function chantierVersDocument(carte, nom, arme, palette) {
 
     // ⚖️ règle Forge : compilerEffetsTexte — c'est ce tableau que la carte
     // affiche dans le panneau de combat.
+    // ⚖️ règle Forge : les tours ajoutés au bouton ⏳ sont écrits à la suite de la
+    // description, dans le même violet que sur une carte de joueur.
+    const marqueurDuree = (tours) => tours > 0
+        ? ` <span style="color:#9333ea;">(+ ⏳ ${tours} Trs)</span>`
+        : "";
+
     const effetsCompiles = [];
     carte.chantier.actions.forEach(act => {
-        effetsCompiles.push({ nom: act.baseEffet.Nom, desc: texteEffet(act.baseEffet, act.count), isMod: false });
+        effetsCompiles.push({
+            nom: act.baseEffet.Nom,
+            desc: texteEffet(act.baseEffet, act.count) + marqueurDuree(act.baseDuree || 0),
+            isMod: false
+        });
         act.modsEffets.forEach(m => {
             if (m.effet.Nom === "Zone") {
                 const taille = act.zoneHexes.length > 0 ? act.zoneHexes.length : m.count;
                 effetsCompiles.push({ nom: "Zone", desc: `${taille} hexagone(s)`, isMod: true, isZone: true });
             } else {
-                effetsCompiles.push({ nom: m.effet.Nom, desc: texteEffet(m.effet, m.count), isMod: true });
+                effetsCompiles.push({
+                    nom: m.effet.Nom,
+                    desc: texteEffet(m.effet, m.count) + marqueurDuree(m.duree || 0),
+                    isMod: true
+                });
             }
         });
     });
@@ -1055,8 +1130,15 @@ window.genererCompetencesMonstre = async function(monstreBrut) {
         // saturent (tous les effets à leur plafond, les deux caractéristiques
         // consommées) sans atteindre le plancher de la tranche. Dans les deux
         // cas, un autre patron ouvre d'autres effets et s'en sort.
+        // Le patron prévu a la priorité absolue sur les trois premiers essais :
+        // on ne compare la qualité qu'entre cartes du MÊME patron. Comparer tous
+        // patrons confondus écartait systématiquement les cartes de soutien, plus
+        // pauvres en effets distincts parce qu'on leur interdit les altérations
+        // offensives — un archetype SOUTIEN finissait avec 8 % de cartes de soin
+        // au lieu du tiers prévu par son plan.
         for (let essai = 0; essai < 8; essai++) {
-            const patron = essai < 3
+            const patronPrevu = essai < 3;
+            const patron = patronPrevu
                 ? (patrons[i] || "frappe")
                 : tousLesPatrons[Math.floor(Math.random() * tousLesPatrons.length)];
             const candidate = fabriquerCarte(monstre, affinites, patron, tranche, palette, i);
@@ -1067,10 +1149,11 @@ window.genererCompetencesMonstre = async function(monstreBrut) {
             }
             if (candidate.fatigue < plancher || candidate.fatigue > plafond) continue;
             if (dejaVues.has(signature(candidate))) continue;
-            // Valide : on la retient, mais on continue de chercher mieux encore
-            // pendant quelques essais plutôt que de s'arrêter à la première.
+
             if (!carte || qualite(candidate) > qualite(carte)) carte = candidate;
-            if (essai >= 4) break;
+            // Dès qu'une carte du patron prévu convient, on ne va pas chercher
+            // ailleurs : les essais suivants ne servent qu'en cas d'impasse.
+            if (patronPrevu && essai >= 2) break;
         }
 
         // Aucune tentative parfaite : on garde la plus proche plutôt que de
