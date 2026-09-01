@@ -1159,6 +1159,12 @@ function rotateHex(hex, steps) {
     return {q, r};
 }
 
+// Partagées avec l'IA des monstres : elle doit poser ses zones exactement comme
+// un joueur le fait à la souris (même rotation, même règle de ligne de vue).
+window.rotateHexVTT = rotateHex;
+window.verifierLigneDeVueVTT = verifierLigneDeVue;
+window.hexDistanceCiblage = getHexDistance;
+
 // =========================================================================
 //  1. ÉVÉNEMENTS GLOBAUX
 // =========================================================================

@@ -206,7 +206,7 @@ const ALTERATIONS_MOTEUR = ["brûl", "brul", "glac", "électri", "electri", "emp
 
 window.analyserCarteMonstre = function(dataCarte) {
     const infos = { portee: 1, estSoin: false, estZone: false, degats: 0, aAlteration: false,
-                    fatigue: parseInt(dataCarte?.Fatigue) || 0 };
+                    zoneHexes: null, fatigue: parseInt(dataCarte?.Fatigue) || 0 };
     const cache = window.EFFETS_BDD_CACHE || {};
     if (!dataCarte || !dataCarte.Composants || !dataCarte.Composants.actions) return infos;
 
@@ -222,7 +222,13 @@ window.analyserCarteMonstre = function(dataCarte) {
         if (nomBase.includes("attaque") || nomBase.includes("mot de pouvoir") || nomBase.includes("mots de pouvoir")) {
             infos.degats += (parseFloat(String(base.Valeur).replace(",", ".")) || 0) * (act.count || 1);
         }
-        if (act.zoneHexes && act.zoneHexes.length > 0) infos.estZone = true;
+        if (act.zoneHexes && act.zoneHexes.length > 0) {
+            infos.estZone = true;
+            // L'emprise brute, telle que la Forge l'a dessinée autour de (0,0) :
+            // c'est elle qui permet de juger, AVANT de bouger, combien de monde
+            // une zone de mêlée ramasserait depuis telle ou telle case.
+            if (!infos.zoneHexes) infos.zoneHexes = act.zoneHexes;
+        }
         if (ALTERATIONS_MOTEUR.some(mot => nomBase.includes(mot))) infos.aAlteration = true;
 
         Object.keys(act.mods || {}).forEach(idMod => {
@@ -339,6 +345,16 @@ window.choisirPositionMonstre = function(monstre, cible, infosCarte) {
 
     const contactDepart = ennemisAuContactDepuis(tkMonstre.q, tkMonstre.r, monstre.camp);
 
+    // Carte de zone au corps-à-corps : l'emprise est centrée sur la créature, donc
+    // c'est SA case qui décide de qui sera pris dedans. On juge alors chaque case
+    // à ce que la zone y ramasserait, plutôt qu'à la seule distance d'une cible :
+    // sans ça, elle allait au contact du premier venu et arrosait une case vide.
+    const zoneDeMelee = infosCarte.estZone && infosCarte.zoneHexes
+                        && infosCarte.zoneHexes.length > 0 && infosCarte.portee <= 1;
+    const occupantsZone = zoneDeMelee
+        ? occupantsSousZone(monstre, !!infosCarte.estSoin, !infosCarte.estSoin && !infosCarte.aAlteration)
+        : null;
+
     let meilleure = null, meilleurScore = -Infinity;
 
     cases.forEach(c => {
@@ -356,7 +372,18 @@ window.choisirPositionMonstre = function(monstre, cible, infosCarte) {
 
         let score = 0;
 
-        if (tkCible) {
+        if (occupantsZone) {
+            // Zone de mêlée : la bonne case n'est pas "celle qui touche la
+            // cible", c'est celle dont l'emprise ramasse le plus de monde. On
+            // essaie les six orientations depuis chaque case et on juge là-dessus
+            // — sinon la créature fonçait sur le premier venu et arrosait du vide.
+            const couverture = meilleureOrientation(infosCarte.zoneHexes, c, occupantsZone).score;
+            score += couverture * 1.4;
+            // Rien à ramasser d'ici : on se rapproche quand même, comme pour une
+            // carte ordinaire.
+            if (couverture <= 0 && tkCible) score -= distanceHex(c, tkCible) * 2.5;
+
+        } else if (tkCible) {
             const distance = distanceHex(c, tkCible);
             if (distance <= infosCarte.portee) {
                 score += 25; // à portée : c'est l'objectif premier
@@ -705,6 +732,118 @@ async function reclamerVerrouIA(cle) {
 const pause = (ms) => new Promise(r => setTimeout(r, ms));
 window.IA_MONSTRE_EN_COURS = false;
 
+// =========================================================================
+//  7 bis. POSER UNE ZONE
+// =========================================================================
+//  Une carte de zone ne se contente pas d'être "lancée" : il faut lui choisir
+//  une ancre et une orientation, exactement comme un joueur le fait à la souris,
+//  puis appeler validerZoneAoE() qui calcule les cibles touchées. L'IA appelait
+//  directement declencherResolution() : la zone partait sans ancre et sans
+//  cible, donc sans toucher personne.
+// Ce que vaut chaque combattant sous une zone, du point de vue de la créature.
+// Sert deux fois : pour poser la zone au moment de lancer, et pour juger, avant
+// de bouger, depuis quelle case elle ramasserait le plus de monde.
+function occupantsSousZone(monstre, soigne, carteEstAttaqueSimple) {
+    const tokens = window.TOKENS_VTT_DATA || {};
+    const liste = [];
+    (window.PERSOS_PARTIE || []).forEach(p => {
+        if (p.idPersonnage === monstre.idPersonnage) return;   // le lanceur est épargné
+        if (typeof window.estCombattantMort === "function" && window.estCombattantMort(p.idPersonnage)) return;
+        const t = tokens[p.idPersonnage];
+        if (!t) return;
+        if (p.estIllusion && !carteEstAttaqueSimple) return;
+
+        const pvMax = (parseInt(p.PV_Max) || 1) + (parseInt(p.Dev_Mod_PV) || 0);
+        const pv = parseInt(p.PV_Actuels);
+        const manque = pvMax > 0 ? 1 - (isNaN(pv) ? pvMax : pv) / pvMax : 0;
+        const allie = (p.camp === monstre.camp);
+
+        // Une attaque de zone frappe TOUT le monde sauf le lanceur : les
+        // congénères pris dedans coûtent plus cher que l'adversaire ne rapporte,
+        // sinon la créature s'arroserait elle-même pour toucher un joueur.
+        const valeur = soigne
+            ? (allie ? 2 + manque * 12 : -6)
+            : (allie ? -16 : 10 + manque * 5);
+        liste.push({ q: t.q, r: t.r, valeur });
+    });
+    return liste;
+}
+
+// La meilleure orientation d'une emprise posée sur `centre`, et ce qu'elle vaut.
+function meilleureOrientation(base, centre, occupants) {
+    const tourner = window.rotateHexVTT || ((h) => h);
+    let meilleurScore = -Infinity, meilleureRotation = 0;
+    for (let rotation = 0; rotation < 6; rotation++) {
+        let score = 0;
+        base.forEach(h => {
+            const rot = tourner(h, rotation);
+            const q = centre.q + rot.q, r = centre.r + rot.r;
+            occupants.forEach(o => { if (o.q === q && o.r === r) score += o.valeur; });
+        });
+        if (score > meilleurScore) { meilleurScore = score; meilleureRotation = rotation; }
+    }
+    return { score: meilleurScore, rotation: meilleureRotation };
+}
+
+window.placerZoneMonstre = function(idMonstre) {
+    const state = window.ETAT_CIBLAGE;
+    if (!state || !state.isZone) return null;
+
+    const base = state.zoneHexesBase || [];
+    if (base.length === 0) return null;
+
+    const tokens = window.TOKENS_VTT_DATA || {};
+    const tk = tokens[idMonstre];
+    const monstre = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idMonstre);
+    if (!tk || !monstre) return null;
+
+    const config = (state.attaques || [])[0] || (state.alterations || [])[0] || null;
+    const soigne = !!(config && (config.isHeal || config.isShield));
+    const ligneDeVue = window.verifierLigneDeVueVTT || (() => true);
+
+    // Qui compte, et pour combien. Le lanceur est épargné par sa propre zone
+    // (validerZoneAoE l'exclut), les morts ne comptent pas, et un leurre ne
+    // reçoit qu'une attaque nue — même règle que pour une cible unique.
+    const carteEstAttaqueSimple = !soigne && (state.alterations || []).length === 0;
+    const occupants = occupantsSousZone(monstre, soigne, carteEstAttaqueSimple);
+
+    // Les ancres possibles. Une zone de corps-à-corps est centrée sur le
+    // lanceur : seule l'orientation se choisit. Une zone à distance se pose où
+    // l'on veut, dans la limite de la portée, de la ligne de vue, et de la règle
+    // d'engagement (au contact, on ne vise plus qu'à une case).
+    let ancres = [{ q: tk.q, r: tk.r }];
+    if (config && config.isRanged) {
+        const portee = Math.max(1, Math.min(8, parseInt(config.rangeMax) || 1));
+        const engage = occupants.some(o => o.valeur > 0 && distanceHex(tk, o) === 1);
+        const limite = engage ? 1 : portee;
+        ancres = [];
+        for (let dq = -limite; dq <= limite; dq++) {
+            for (let dr = -limite; dr <= limite; dr++) {
+                const hex = { q: tk.q + dq, r: tk.r + dr };
+                if (distanceHex(tk, hex) > limite) continue;
+                const etat = window.PLATEAU_VTT ? window.PLATEAU_VTT.getCaseState(hex.q, hex.r) : null;
+                if (etat && etat.isDeleted) continue;
+                if (!ligneDeVue(tk, hex)) continue;
+                ancres.push(hex);
+            }
+        }
+        if (ancres.length === 0) return null;
+    }
+
+    let meilleur = null, meilleurScore = -Infinity;
+    ancres.forEach(ancre => {
+        const orientation = meilleureOrientation(base, ancre, occupants);
+        // À prise égale, on pose la zone au plus près : c'est plus lisible à la
+        // table, et ça laisse la créature moins exposée.
+        const score = orientation.score - distanceHex(tk, ancre) * 0.4 + bruit(1.2);
+        if (score > meilleurScore) { meilleurScore = score; meilleur = { centre: ancre, rotation: orientation.rotation }; }
+    });
+
+    if (!meilleur) return null;
+    meilleur.score = meilleurScore;
+    return meilleur;
+};
+
 window.jouerTourMonstre = async function(idMonstre, idCarte) {
     const monstre = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idMonstre);
     const tk = (window.TOKENS_VTT_DATA || {})[idMonstre];
@@ -820,9 +959,20 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
 
         if (window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif) {
             if (window.ETAT_CIBLAGE.isZone) {
-                // Une zone est déjà centrée sur le lanceur ou sur la case visée :
-                // il n'y a plus qu'à confirmer.
-                if (typeof window.declencherResolution === "function") await window.declencherResolution();
+                // On choisit l'ancre et l'orientation, on les montre un instant,
+                // puis on valide : c'est validerZoneAoE qui calcule les cibles
+                // prises dans l'emprise et déclenche la résolution.
+                const plan = window.placerZoneMonstre(idMonstre);
+                if (plan) {
+                    window.ETAT_CIBLAGE.zoneCenterHex = plan.centre;
+                    window.ETAT_CIBLAGE.zoneRotationStep = plan.rotation;
+                    if (typeof window.actualiserVisuelCiblage === "function") window.actualiserVisuelCiblage();
+                    await pause(600);
+                    if (typeof window.validerZoneAoE === "function") window.validerZoneAoE();
+                    else if (typeof window.declencherResolution === "function") await window.declencherResolution();
+                } else if (typeof window.declencherResolution === "function") {
+                    await window.declencherResolution();
+                }
             } else {
                 window.ajouterCibleCiblage(cible.idPersonnage);
                 await pause(400);
