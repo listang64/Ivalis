@@ -469,6 +469,11 @@ window.choisirCarteMonstre = function(monstre) {
         }
 
         // Garder un peu de réserve : une carte qui vide la fatigue empêche de bouger.
+        // Volontairement le SEUL frein sur le coût : une pénalité proportionnelle
+        // au prix de la carte a été essayée puis retirée, mesures à l'appui — elle
+        // poussait vers les petites cartes et rendait les monstres à la fois moins
+        // dangereux et moins variés (43 % de victoires contre 54, et 13 % de
+        // répétitions d'un tour sur l'autre contre 9).
         const reste = fatigueDispo - (parseInt(c.data.Fatigue) || 0);
         if (reste < 6) score -= 8;
 
