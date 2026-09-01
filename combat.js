@@ -1215,7 +1215,20 @@ window.sauvegarderTailleToken = async function() {
 
 window.COMBAT_PERSOS_JOUEUR_BACKUP = null;
 
+// Le moteur identifie le LANCEUR d'une carte par le combattant affiché dans ce
+// panneau. Pendant qu'une créature joue son tour, il doit donc rester sur elle :
+// un joueur qui tape sur la carte ou sur une bulle d'initiative pendant
+// l'animation faisait basculer le panneau sur son propre personnage, et le sort
+// de la créature partait avec LUI comme lanceur — d'où le "Cible invalide"
+// affiché sur le personnage du joueur, qui devenait à la fois lanceur et cible.
+function panneauVerrouilleParIA(idPersonnage) {
+    return !!window.IA_MONSTRE_EN_COURS
+        && !!window.IA_MONSTRE_ACTEUR
+        && idPersonnage !== window.IA_MONSTRE_ACTEUR;
+}
+
 window.afficherDansPanneauGauche = function(idPersonnage) {
+    if (panneauVerrouilleParIA(idPersonnage)) return;
     const indexLocal = window.COMBAT_PERSOS_JOUEUR.findIndex(p => p.idPersonnage === idPersonnage);
     
     if (indexLocal !== -1) {
@@ -1241,6 +1254,9 @@ window.afficherDansPanneauGauche = function(idPersonnage) {
 };
 
 window.restaurerPanneauGauche = function() {
+    // Pas pendant le tour d'une créature : ce serait lui retirer le panneau,
+    // donc son statut de lanceur, au milieu de son sort.
+    if (window.IA_MONSTRE_EN_COURS && window.IA_MONSTRE_ACTEUR) return;
     if (window.COMBAT_PERSOS_JOUEUR_BACKUP) {
         window.COMBAT_PERSOS_JOUEUR = [...window.COMBAT_PERSOS_JOUEUR_BACKUP];
         window.COMBAT_PERSOS_JOUEUR_BACKUP = null;

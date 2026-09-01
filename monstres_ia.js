@@ -709,6 +709,11 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
     const monstre = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idMonstre);
     const tk = (window.TOKENS_VTT_DATA || {})[idMonstre];
 
+    // Le panneau gauche désigne le lanceur aux yeux du moteur : on le réserve à
+    // cette créature pour toute la durée de son tour (cf. panneauVerrouilleParIA
+    // dans combat.js).
+    window.IA_MONSTRE_ACTEUR = idMonstre;
+
     // Repos long : il ne se déplace pas et ne lance rien. C'est finDeTourCombat()
     // qui lui rend sa fatigue, exactement comme pour un joueur.
     if (idCarte === "REPOS_LONG") {
@@ -719,6 +724,7 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
             window.afficherMessageFlottantHex(tk.q, tk.r, "Reprend son souffle", "#1b6e3a");
         }
         await pause(1500);
+        window.IA_MONSTRE_ACTEUR = null;
         if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true);
         return;
     }
@@ -728,6 +734,7 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
     // Sans carte lisible ou sans pion, on ne bloque pas le combat : on passe.
     if (!monstre || !dataCarte || !tk) {
         console.warn("IA : tour impossible pour", idMonstre, "— on passe la main.");
+        window.IA_MONSTRE_ACTEUR = null;
         if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true);
         return;
     }
@@ -790,6 +797,24 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
     const aPortee = tkApres && tkCible && distanceHex(tkApres, tkCible) <= infos.portee;
 
     if (aPortee && typeof window.demarrerCiblage === "function") {
+        // Ceinture et bretelles : si quoi que ce soit a fait glisser le panneau
+        // pendant les temps morts, le sort partirait au nom du mauvais
+        // combattant. On le remet sur la créature, et on renonce plutôt que de
+        // lancer une carte au nom de quelqu'un d'autre.
+        const affiche = () => (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
+        const mauvaisLanceur = () => !!affiche() && affiche().idPersonnage !== idMonstre;
+        if (mauvaisLanceur()) {
+            if (typeof window.afficherDansPanneauGauche === "function") window.afficherDansPanneauGauche(idMonstre);
+            await pause(200);
+        }
+        if (mauvaisLanceur()) {
+            console.warn("IA : le panneau désigne", affiche().idPersonnage, "et non", idMonstre,
+                         "— on ne lance rien plutôt que de frapper au nom de quelqu'un d'autre.");
+            window.COUT_COMPETENCE_SELECTIONNEE = 0;
+            window.IA_MONSTRE_ACTEUR = null;
+            if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true);
+            return;
+        }
         await window.demarrerCiblage(idCarte);
         await pause(700);
 
@@ -817,6 +842,7 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
     }
 
     window.COUT_COMPETENCE_SELECTIONNEE = 0;
+    window.IA_MONSTRE_ACTEUR = null;
     if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true);
 };
 
@@ -905,5 +931,6 @@ window.verifierTourIAMonstres = async function() {
         }
     } finally {
         window.IA_MONSTRE_EN_COURS = false;
+        window.IA_MONSTRE_ACTEUR = null;
     }
 };

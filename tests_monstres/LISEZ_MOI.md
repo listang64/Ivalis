@@ -47,6 +47,7 @@ node combat_complet.mjs     # 24 combats entiers : cherche les blocages
 node cas_limites.mjs        # emmuré, sans cible, données abîmées
 node verrou.mjs             # concurrence entre plusieurs navigateurs
 node reveil_ia.mjs          # l'IA se réveille seule, et joue après les joueurs
+node lanceur_ia.mjs         # le sort part au nom de la créature, pas du joueur
 node piste_initiative.mjs   # la piste tient à droite du panneau, bulles réduites
 node titres_bannieres.mjs   # les noms de carte rétrécissent au lieu d'être coupés
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
