@@ -233,6 +233,13 @@ window.ecouterMonstresPartie = function(idPartie) {
             objet.Nombre_Actions = brut.Nombre_Actions || 1;
             objet.XP_Groupe     = brut.XP_Groupe || 0;
             monstres.push(objet);
+
+            // Les techniques du monstre vivent dans une sous-collection : il
+            // faut son propre écouteur pour que le panneau de combat les voie,
+            // exactement comme pour un personnage joueur.
+            if (typeof window.ecouterCompetencesMonstre === "function") {
+                window.ecouterCompetencesMonstre(document.id);
+            }
         });
         window.MONSTRES_PARTIE = monstres;
         window.recomposerCombattants();
@@ -689,12 +696,22 @@ window.genererRencontreMonstres = async function(difficulte) {
     const enReserve    = composition.slice(limite);
 
     const tokensData = { ...window.TOKENS_VTT_DATA };
+    const poses = [];
     for (const monstre of surLeTerrain) {
-        await window.poserMonstreSurTerrain(monstre, tokensData);
+        const idPose = await window.poserMonstreSurTerrain(monstre, tokensData);
+        if (idPose) poses.push({ ...monstre, id: idPose });
     }
 
     await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), { Tokens: tokensData }, { merge: true });
     await window.sauvegarderReserveMonstres(enReserve);
+
+    // Les techniques sont forgées EN ARRIÈRE-PLAN, sans bloquer : les pions
+    // apparaissent tout de suite, et les bannières se remplissent quelques
+    // secondes plus tard (les monstres ne jouent de toute façon qu'au tour de
+    // l'IA de combat). Les créatures sont traitées en parallèle entre elles.
+    if (typeof window.equiperCompetencesRencontre === "function") {
+        window.equiperCompetencesRencontre(poses).catch(e => console.error(e));
+    }
 
     console.log(`🐲 Rencontre ${difficulte} : ${surLeTerrain.length} sur le terrain, ${enReserve.length} en réserve.`);
     return { surLeTerrain, enReserve };
@@ -738,6 +755,12 @@ window.entrerRenfortMonstre = async function() {
     await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), { Tokens: tokensData }, { merge: true });
     await window.sauvegarderReserveMonstres(reserve);
 
+    // Un renfort arrive en cours de combat : il lui faut ses techniques, elles
+    // aussi forgées en arrière-plan pour ne pas figer l'écran en plein tour.
+    if (idMonstre && typeof window.equiperCompetencesMonstre === "function") {
+        window.equiperCompetencesMonstre(idMonstre, { ...renfort, id: idMonstre }).catch(e => console.error(e));
+    }
+
     console.log(`🐲 Renfort : ${renfort.nom} entre en jeu.`);
     return idMonstre;
 };
@@ -768,9 +791,23 @@ window.nettoyerMonstresCombat = async function() {
     for (const monstre of monstres) {
         const id = monstre.idPersonnage;
         delete window.TOKENS_VTT_DATA[id];
+
+        // ⚠️ Firestore n'efface PAS les sous-collections avec le document parent :
+        // sans ce passage, les techniques forgées resteraient orphelines en base
+        // à chaque combat. On les supprime donc explicitement avant le monstre.
+        const idsCartes = Object.keys((window.CACHE_COMPETENCES_GLOBAL || {})[id] || {});
+        for (const idCarte of idsCartes) {
+            await deleteDoc(doc(db, COLLECTION_MONSTRES, id, "Competences", idCarte)).catch(e => console.error(e));
+        }
+        if (window.CACHE_COMPETENCES_GLOBAL) delete window.CACHE_COMPETENCES_GLOBAL[id];
+
         await deleteDoc(doc(db, COLLECTION_MONSTRES, id)).catch(e => console.error(e));
         await updateDoc(vttRef, { ["Tokens." + id]: deleteField() }).catch(e => console.error(e));
         delete window.SOURCE_COMBATTANTS[id];
+    }
+
+    if (typeof window.arreterEcouteCompetencesMonstres === "function") {
+        window.arreterEcouteCompetencesMonstres();
     }
 
     const partieSnap = await getDoc(partieRef);

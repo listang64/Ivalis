@@ -395,9 +395,14 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         queueTemp[0].idPersonnage === persoActuelTemp.idPersonnage
     );
 
+    // Les monstres ne se pilotent pas à la main : leurs cartes s'affichent pour
+    // être consultées, mais sans "Choisir" ni "Appliquer". C'est l'IA de combat
+    // (chapitre suivant) qui décidera de ce qu'ils jouent.
+    const estCarteDeMonstre = !!(persoActuelTemp && persoActuelTemp.estMonstre);
+
     // 🔻 CORRECTION 1 : On bloque le bouton Choisir si les combats ont commencé !
     let boutonChoisirHtml = "";
-    if (isCombatMode && !isLocked) {
+    if (isCombatMode && !isLocked && !estCarteDeMonstre) {
         if (phaseTemp === "Resolution") {
             boutonChoisirHtml = `
             <div style="position: absolute; bottom: -65px; left: 50%; transform: translateX(-50%); z-index: 5; color: #a89f91; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; text-transform: uppercase; white-space: nowrap; text-shadow: 2px 2px 4px black; letter-spacing: 1px;">
@@ -418,7 +423,7 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
 
     // 🔻 NOUVEAU BOUTON APPLIQUER (DORÉ, EN HAUT) 🔻
     let boutonValiderHtml = "";
-    if (isCombatMode && isLocked && estMonTour) {
+    if (isCombatMode && isLocked && estMonTour && !estCarteDeMonstre) {
         boutonValiderHtml = `
         <div id="btn-appliquer-carte" style="position: absolute; top: -35px; left: 50%; transform: translateX(-50%); z-index: 5; color: #ffd700; font-family: 'Cinzel', serif; font-size: 18px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 0 0 10px #ffaa00, 2px 2px 4px black; transition: transform 0.2s;" 
              onclick="event.stopPropagation(); window.demarrerCiblage('${idCarte}')" 
