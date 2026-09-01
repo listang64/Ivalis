@@ -607,15 +607,9 @@
             
         </div>
 
-        <!-- LA PISTE D'INITIATIVE, DANS SON PROPRE CALQUE.
-             Elle vivait dans le HUD bas droite, volontairement placé SOUS le
-             panneau gauche (z-index 10) : dès que le combat comptait assez de
-             combattants, la piste s'étendait jusque derrière le panneau, qui la
-             coupait. Elle est donc remontée à z-index 20, dans un calque qui
-             reprend exactement la boîte du HUD : même largeur, et même hauteur,
-             recopiée par ajusterCalquePiste() puisque celle du HUD dépend de
-             l'image du bouton. La piste garde ainsi sa place au pixel près. -->
-        <div id="calque-piste-initiative" style="position: absolute; bottom: 0; right: 0; width: 450px; height: 0; z-index: 20; pointer-events: none;">
+        <!-- NOUVEAU : HUD BAS DROITE (Z-index réduit à 5 pour passer sous le panneau gauche) -->
+        <div id="combat-hud-bas-droite" style="position: absolute; bottom: 0; right: 0; width: 450px; z-index: 5; pointer-events: none;">
+            
             <!-- LA PISTE D'INITIATIVE (Rétractable et Dynamique) -->
             <div id="piste-initiative" style="
                 position: absolute;
@@ -628,13 +622,13 @@
                 border-radius: 20px 0 0 20px; 
                 box-shadow: 0 0 15px 5px rgba(0,0,0,0.5), inset 0 0 20px 5px rgba(0,0,0,0.7);
                 backdrop-filter: blur(3px); 
-                z-index: 1; 
+                z-index: -1; 
                 pointer-events: auto; 
                 display: flex;
                 flex-direction: row; 
                 align-items: center;
                 padding: 0px; 
-                gap: 15px;
+                gap: 8px;
                 opacity: 0; 
                 transition: opacity 0.4s ease, padding 0.4s ease;
                 white-space: nowrap; 
@@ -642,13 +636,8 @@
                 <!-- Rempli par JavaScript -->
             </div>
 
-        </div>
-
-        <!-- NOUVEAU : HUD BAS DROITE (Z-index réduit à 5 pour passer sous le panneau gauche) -->
-        <div id="combat-hud-bas-droite" style="position: absolute; bottom: 0; right: 0; width: 450px; z-index: 5; pointer-events: none;">
-            
             <!-- L'image de fond (Éteinte par défaut et avec un ID pour la cibler) -->
-            <img id="img-hud-fintour" src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/FinTourEteind_exjtxp.png" style="width: 100%; display: block; pointer-events: none;" onload="if (window.ajusterCalquePiste) window.ajusterCalquePiste();">
+            <img id="img-hud-fintour" src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/FinTourEteind_exjtxp.png" style="width: 100%; display: block; pointer-events: none;">
 
             <!-- 1. Bouton FIN DE TOUR (Le grand cercle à droite) -->
             <div id="btn-hud-fintour"
@@ -1306,7 +1295,7 @@
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=7"></script>
 <script src="Plateau.js"></script>
-<script type="module" src="combat.js?v=6"></script>
+<script type="module" src="combat.js?v=7"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=2"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->

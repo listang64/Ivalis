@@ -2843,21 +2843,7 @@ window.finDeTourCombat = async function(forcer = false) {
     }, 350); 
 };
 
-// Le calque de la piste doit avoir exactement la boîte du HUD bas droite : la
-// piste s'y positionne en pourcentages (top 34 %, hauteur 38 %), calés sur le
-// bouton de fin de tour. La largeur est fixée en dur des deux côtés (450px), la
-// hauteur dépend de l'image du bouton : on la recopie ici.
-window.ajusterCalquePiste = function() {
-    const calque = document.getElementById("calque-piste-initiative");
-    const hud = document.getElementById("combat-hud-bas-droite");
-    if (!calque || !hud) return;
-    const hauteur = hud.offsetHeight;
-    if (hauteur > 0) calque.style.height = hauteur + "px";
-};
-
 window.afficherPisteInitiative = function(queue, phase) {
-    window.ajusterCalquePiste();
-
     if (queue === undefined && window.PARTIE_DATA) {
         queue = window.PARTIE_DATA.File_Attente_Combat || [];
         phase = window.PARTIE_DATA.Phase_Combat || "Preparation";
@@ -2876,7 +2862,7 @@ window.afficherPisteInitiative = function(queue, phase) {
     }
 
     piste.style.opacity = "1";
-    piste.style.padding = "0 15px 0 25px";
+    piste.style.padding = "0 8px 0 12px";
     let html = "";
 
     queue.forEach((item, index) => {
@@ -2898,31 +2884,31 @@ window.afficherPisteInitiative = function(queue, phase) {
 
         let etatsHtml = "";
         if (perso.Etats_Alteres && perso.Etats_Alteres.length > 0) {
-            etatsHtml = `<div style="position: absolute; bottom: -45px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; justify-content: center; z-index: 5;">`;
+            etatsHtml = `<div style="position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%); display: flex; gap: 2px; justify-content: center; z-index: 5;">`;
             perso.Etats_Alteres.forEach(etat => {
-                etatsHtml += `<img src="${etat.icone}" style="width: 32px; height: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));">`;
+                etatsHtml += `<img src="${etat.icone}" style="width: 16px; height: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));">`;
             });
             etatsHtml += `</div>`;
         }
 
         html += `
-        <div ${attributId} class="${classeBulle}" style="position: relative; width: 110px; height: 126px; flex-shrink: 0; margin-top: 0px; margin-bottom: 45px; transition: all 0.4s ease; transform-origin: left center; margin-right: 15px; cursor: pointer;" onclick="window.selectionnerEtCentrerPerso('${item.idPersonnage}')">
+        <div ${attributId} class="${classeBulle}" style="position: relative; width: 55px; height: 63px; flex-shrink: 0; margin-top: 0px; margin-bottom: 22px; transition: all 0.4s ease; transform-origin: left center; margin-right: 8px; cursor: pointer;" onclick="window.selectionnerEtCentrerPerso('${item.idPersonnage}')">
             <div style="position: absolute; inset: 0; background: linear-gradient(135deg, #fbf5bd 0%, #c2a878 30%, #5c3a21 50%, #e8d5a5 80%, #ffffff 100%); clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); display: flex; align-items: center; justify-content: center;">
-                <div style="width: 102px; height: 118px; background-color: #1a0f08; clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); position: relative;">
+                <div style="width: 51px; height: 59px; background-color: #1a0f08; clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); position: relative;">
                     <img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: top center;">
                     <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 40%; background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);"></div>
                 </div>
             </div>
 
-            <div style="position: absolute; top: -6px; left: -8px; width: 38px; height: 38px; border-radius: 50%; border: 2px solid #e8d5a5; background: #1a0f08; box-shadow: 0 2px 5px rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 2;">
-                <span style="color: #e8d5a5; font-family: 'Cinzel', serif; font-size: 18px; font-weight: bold; text-shadow: 1px 1px 3px black, 0 0 5px rgba(232, 213, 165, 0.5);">${affichageInit}</span>
+            <div style="position: absolute; top: -3px; left: -4px; width: 19px; height: 19px; border-radius: 50%; border: 1px solid #e8d5a5; background: #1a0f08; box-shadow: 0 2px 5px rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 2;">
+                <span style="color: #e8d5a5; font-family: 'Cinzel', serif; font-size: 10px; font-weight: bold; text-shadow: 1px 1px 3px black, 0 0 5px rgba(232, 213, 165, 0.5);">${affichageInit}</span>
             </div>
 
-            <div style="position: absolute; bottom: 8px; left: -10px; width: 50px; height: 8px; background: #000; border: 1px solid #1a0f08; border-radius: 4px; transform: rotate(30deg); transform-origin: center; box-shadow: 0 2px 4px rgba(0,0,0,0.8); overflow: hidden; z-index: 2;">
+            <div style="position: absolute; bottom: 4px; left: -5px; width: 25px; height: 4px; background: #000; border: 1px solid #1a0f08; border-radius: 2px; transform: rotate(30deg); transform-origin: center; box-shadow: 0 2px 4px rgba(0,0,0,0.8); overflow: hidden; z-index: 2;">
                 <div style="position: absolute; top: 0; right: 0; width: ${pctPv}%; height: 100%; background: linear-gradient(to right, #e63946, #ff8b8b); transition: width 0.3s ease;"></div>
             </div>
 
-            <div style="position: absolute; bottom: 8px; right: -10px; width: 50px; height: 8px; background: #000; border: 1px solid #1a0f08; border-radius: 4px; transform: rotate(-30deg); transform-origin: center; box-shadow: 0 2px 4px rgba(0,0,0,0.8); overflow: hidden; z-index: 2;">
+            <div style="position: absolute; bottom: 4px; right: -5px; width: 25px; height: 4px; background: #000; border: 1px solid #1a0f08; border-radius: 2px; transform: rotate(-30deg); transform-origin: center; box-shadow: 0 2px 4px rgba(0,0,0,0.8); overflow: hidden; z-index: 2;">
                 <div style="position: absolute; top: 0; left: 0; width: ${pctFatigue}%; height: 100%; background: linear-gradient(to right, #c2a878, #fbf5bd); transition: width 0.3s ease;"></div>
             </div>
             ${etatsHtml}
