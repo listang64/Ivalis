@@ -769,7 +769,7 @@ window.resoudreIllusionInteractif = function(idLanceur, portee) {
     });
 };
 
-// Crée le personnage "Illusion" en base (comme un ennemi de test spawné, cf. spawnEnnemiTest) et
+// Crée le personnage "Illusion" en base (comme un monstre posé sur le plateau) et
 // son pion sur le plateau : les écouteurs déjà en place sur Personnages/Combat_VTT propagent la
 // création à tous les joueurs, sans diffusion dédiée nécessaire.
 window.creerIllusion = async function(idLanceur, q, r) {
@@ -3189,6 +3189,19 @@ window.jouerAnimationMoteur = async function(action) {
                         && typeof window.detruireIllusion === "function") {
                         if (tkCible) window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Illusion dissipée", "#c2a878");
                         await window.detruireIllusion(idCible);
+                        await new Promise(r => setTimeout(r, 600));
+                    }
+
+                    // Un monstre tombé à 0 PV est marqué Mort (son cadavre reste sur la carte
+                    // jusqu'à la fin du combat, qui efface tout de la base), et un éventuel
+                    // renfort prend sa place sur le terrain. Seul le client du lanceur écrit.
+                    if (!cibleData.estIllusion && cibleData.estMonstre && cibleData.statut !== "Mort"
+                        && (parseInt(cibleData.PV_Actuels) || 0) <= 0
+                        && lanceurData && lanceurData.idJoueur === currentUserId
+                        && typeof window.marquerMonstreMort === "function") {
+                        cibleData.statut = "Mort";
+                        if (tkCible) window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Terrassé !", "#ff6b6b");
+                        await window.marquerMonstreMort(idCible).catch(e => console.error(e));
                         await new Promise(r => setTimeout(r, 600));
                     }
                 }

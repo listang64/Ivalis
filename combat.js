@@ -156,6 +156,9 @@ window.afficherPersoCombatActuel = function() {
         divNom.style.fontSize = "24px";
         divNom.style.letterSpacing = "1px";
 
+        const divTypeVide = document.getElementById("combat-type-monstre");
+        if (divTypeVide) divTypeVide.style.display = "none";
+
         document.getElementById("combat-liste-competences").innerHTML = "";
         if (imgPerso) {
             imgPerso.style.opacity = "0";
@@ -183,6 +186,18 @@ window.afficherPersoCombatActuel = function() {
     const nomComplet = (prenom + " " + nom).trim();
 
     divNom.innerText = nomComplet;
+
+    // Type d'ennemi sous le nom : n'a de sens que pour un monstre (DPS CAC, TANK CAC...).
+    const divTypeMonstre = document.getElementById("combat-type-monstre");
+    if (divTypeMonstre) {
+        if (persoActuel.estMonstre && persoActuel.Archetype) {
+            const palier = persoActuel.Palier ? ` — ${persoActuel.Palier}` : "";
+            divTypeMonstre.innerText = persoActuel.Archetype + palier;
+            divTypeMonstre.style.display = "block";
+        } else {
+            divTypeMonstre.style.display = "none";
+        }
+    }
 
     if (!document.getElementById("combat-etats-alteres")) {
         const divEtats = document.createElement("div");
@@ -1651,7 +1666,64 @@ window.appliquerTokensVTT = function(tokensMap) {
         };
 
 
-        // 4️⃣ L'IMAGE DU PION (Nette)
+        // 4️⃣ LE PION LUI-MÊME
+        // Un monstre n'a pas de portrait : son pion est un simple disque rouge portant
+        // son nom en petit. On le construit à la place de l'image plutôt qu'en plus,
+        // sinon l'<img> vide afficherait l'icône de fichier cassé du navigateur.
+        if (pData && pData.estMonstre) {
+            const disque = document.createElement("div");
+            disque.className = "token-disque-monstre";
+            disque.style.position = "absolute";
+            disque.style.top = "0";
+            disque.style.left = "0";
+            disque.style.width = "100%";
+            disque.style.height = "100%";
+            disque.style.borderRadius = "50%";
+            disque.style.zIndex = "2";
+            disque.style.background = "radial-gradient(circle at 38% 32%, #ff6b6b 0%, #c62828 55%, #7a1414 100%)";
+            disque.style.border = "2px solid #ffb4b4";
+            disque.style.boxSizing = "border-box";
+            disque.style.display = "flex";
+            disque.style.alignItems = "center";
+            disque.style.justifyContent = "center";
+            disque.style.overflow = "hidden";
+            if (pData.statut === "Mort" || (parseInt(pData.PV_Actuels) || 0) <= 0) {
+                disque.style.filter = "grayscale(0.85) brightness(0.55)";
+            }
+
+            const nomAffiche = ((pData.prenom || "") + " " + (pData.nom || "")).trim() || "Créature";
+
+            const nomToken = document.createElement("div");
+            // La taille du pion est réglable : le texte doit suivre, sinon il déborde sur les
+            // petits pions et se perd sur les gros. On part de 15 % du diamètre, puis on rétrécit
+            // juste ce qu'il faut pour que le mot le plus long tienne sur une ligne : sans ça, un
+            // nom d'un seul tenant ("Nécromancien") se coupe en plein milieu ("Nécroman-cien").
+            const motLePlusLong = nomAffiche.split(/\s+/).reduce((a, b) => (b.length > a.length ? b : a), "");
+            const largeurUtile = taille * 0.8; // le texte a 10 % de marge de chaque côté
+            const taillePourMot = largeurUtile / Math.max(1, motLePlusLong.length * 0.58); // Cinzel gras ≈ 0.58 em/caractère
+            nomToken.style.fontSize = Math.max(6, Math.min(Math.round(taille * 0.15), Math.round(taillePourMot))) + "px";
+            nomToken.style.fontFamily = "'Cinzel', serif";
+            nomToken.style.fontWeight = "bold";
+            nomToken.style.color = "#fff4f4";
+            nomToken.style.textShadow = "1px 1px 3px rgba(0,0,0,0.95)";
+            nomToken.style.textAlign = "center";
+            nomToken.style.lineHeight = "1.1";
+            nomToken.style.padding = "0 10%";
+            nomToken.style.pointerEvents = "none";
+            // Un nom d'un seul mot long ("Nécromancien") est plus large que le disque :
+            // sans coupure autorisée, il déborderait de part et d'autre du pion.
+            nomToken.style.overflowWrap = "anywhere";
+            nomToken.style.wordBreak = "break-word";
+            nomToken.style.maxWidth = "100%";
+            nomToken.innerText = nomAffiche;
+            disque.appendChild(nomToken);
+
+            divToken.appendChild(disque);
+            window.positionnerTokenVTT(divToken, true);
+            conteneur.appendChild(divToken);
+            continue;
+        }
+
         const img = document.createElement("img");
         img.className = "token-img-main";
         img.src = typeof window.redimensionnerImageCloudinary === "function"
@@ -3037,6 +3109,12 @@ window.reinitialiserCombat = async function() {
             if (typeof window.appliquerZonesPersistantes === "function") window.appliquerZonesPersistantes();
         }
 
+        // A ter. Les monstres non plus ne survivent pas au combat : documents, pions,
+        // initiative et réserve de renforts sont effacés d'un bloc (cf. monstres.js).
+        if (typeof window.nettoyerMonstresCombat === "function") {
+            await window.nettoyerMonstresCombat().catch(e => console.error(e));
+        }
+
         const illusions = (window.PERSOS_PARTIE || []).filter(p => p.estIllusion);
         if (illusions.length > 0 && window.ID_PARTIE_COURANTE) {
             const vttRef = doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE);
@@ -3138,80 +3216,10 @@ window.trouverHexLibreVTT = function(tokensData) {
     return { q: 0, r: 0 }; 
 };
 
-// 1. Bouton "Crâne Rouge" : Fait spawner un ennemi
-window.spawnEnnemiTest = async function() {
-    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) return;
-
-    const idEnnemi = "ENNEMI_" + Math.random().toString(36).substring(2, 9);
-    
-    // On compte le nombre d'ennemis actuels pour lui donner un numéro unique
-    const num = (window.PERSOS_PARTIE ? window.PERSOS_PARTIE.filter(p => p.camp === "Ennemi").length : 0) + 1;
-    const imgUrl = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1787085743/IMG_2041_h0gkcc.png";
-
-    // Modèle de données de notre ennemi (50 PV, 100 Fatigue)
-    const dataEnnemi = {
-        ID_Partie: window.ID_PARTIE_COURANTE,
-        ID_Joueur: "MJ", 
-        Camp: "Ennemi",
-        Prenom_Personnage: "Sbire",
-        Nom_Personnage: "#" + num,
-        Statut: "Vivant",
-        PV_Max: 50,
-        PV_Actuels: 50,
-        Fatigue_Max: 100,
-        Fatigue_Actuelle: 100,
-        URL_Cloudinary: imgUrl,
-        URL_Token: imgUrl, 
-        Couleur: "#ff4c4c", // Liseret Rouge
-        Initiative: 10,
-        Esquive: 10,
-        Parade: 0,
-        Critique: 5,
-        Def_Physique: 0,
-        Def_Magique: 0,
-        Competences_Max: 4
-    };
-
-    try {
-        const { doc, setDoc, getDoc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
-        
-        // 1. On le crée dans la collection des MONSTRES (et non plus dans Personnages) :
-        //    il reste un combattant complet sur le plateau, mais n'encombre plus la liste
-        //    des fiches de personnages. Voir monstres.js.
-        if (window.SOURCE_COMBATTANTS) window.SOURCE_COMBATTANTS[idEnnemi] = "Monstres";
-        await setDoc(doc(db, "Monstres", idEnnemi), dataEnnemi);
-
-        // 2. On l'ajoute à la piste d'initiative
-        const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
-        const partieSnap = await getDoc(partieRef);
-        if (partieSnap.exists()) {
-            let ordre = partieSnap.data().Ordre_Initiative || [];
-            ordre.push(idEnnemi);
-            await updateDoc(partieRef, { Ordre_Initiative: ordre });
-        }
-
-        // 3. On le pose sur la map VTT
-        let tokensData = { ...window.TOKENS_VTT_DATA };
-        const hexLibre = window.trouverHexLibreVTT(tokensData);
-        
-        tokensData[idEnnemi] = {
-            q: hexLibre.q,
-            r: hexLibre.r,
-            url: imgUrl,
-            taille: 55
-        };
-
-        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
-            Tokens: tokensData
-        }, { merge: true });
-        
-        console.log("💀 Ennemi spawn avec succès !");
-
-    } catch(e) {
-        console.error("Erreur spawn ennemi :", e);
-    }
-};
+// Le bouton 💀 des options de combat ouvre désormais la fenêtre de génération de
+// rencontre (window.ouvrirGenerationRencontre, cf. monstres.js) : composition tirée
+// au sort d'après le tableau des rencontres, noms trouvés par l'IA, stats héritées
+// des gabarits. L'ancien ennemi de test générique (Sbire 50 PV) n'existe plus.
 
 // 2. Bouton "Reset" : Soigne tous les ennemis à 100%
 window.resetEnnemisTest = async function() {

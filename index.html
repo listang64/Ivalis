@@ -458,9 +458,9 @@
                 <div style="display: flex; flex-direction: column; align-items: center; cursor: pointer; filter: drop-shadow(0 0 8px rgba(255,76,76,0.3)); transition: filter 0.2s ease;"
                      onmouseover="this.style.filter='drop-shadow(0 0 15px rgba(255,76,76,0.8))'"
                      onmouseout="this.style.filter='drop-shadow(0 0 8px rgba(255,76,76,0.3))'"
-                     onclick="window.spawnEnnemiTest()" title="Faire apparaître un ennemi">
+                     onclick="window.ouvrirGenerationRencontre()" title="Générer une rencontre d'ennemis">
                      <div style="font-size: 30px;">💀</div>
-                     <div style="color: #ff4c4c; font-family: 'Cinzel', serif; font-size: 10px; margin-top: 2px;">SPAWN</div>
+                     <div style="color: #ff4c4c; font-family: 'Cinzel', serif; font-size: 10px; margin-top: 2px;">RENCONTRE</div>
                 </div>
 
                 <div style="display: flex; flex-direction: column; align-items: center; cursor: pointer; filter: drop-shadow(0 0 8px rgba(27,110,58,0.3)); transition: filter 0.2s ease;"
@@ -549,6 +549,9 @@
                         <!-- Rempli par JavaScript -->
                     </div>
                 </div>
+
+                <!-- Type d'ennemi (archetype), affiché uniquement pour les monstres -->
+                <div id="combat-type-monstre" style="display: none; text-align: center; margin-top: -12px; margin-bottom: 12px; font-family: 'Cinzel', serif; font-size: 14px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; color: #ff6b6b; text-shadow: 1px 1px 4px black;"></div>
 
                 <!-- Liste des compétences -->
                 <div id="combat-liste-competences" style="margin-top: 15px; display: flex; flex-direction: column; align-items: flex-start; gap: 0; width: 100%; padding-left: 2px;">
@@ -1292,12 +1295,58 @@
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=5"></script>
 <script src="Plateau.js"></script>
-<script type="module" src="combat.js"></script>
+<script type="module" src="combat.js?v=2"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
-<script type="module" src="moteur_effets.js"></script>
-<script type="module" src="monstres.js"></script>
+<script type="module" src="moteur_effets.js?v=2"></script>
+<script type="module" src="monstres.js?v=2"></script>
+
+<!-- ============================================================= -->
+<!--  GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)  -->
+<!-- ============================================================= -->
+<div id="etape-generation-rencontre" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: var(--app-h); background: rgba(0,0,0,0.82); z-index: 5000; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
+
+  <div style="width: 90%; max-width: 520px; background: linear-gradient(160deg, #2a1a10 0%, #17100a 100%); border: 2px solid #5c3a21; border-radius: 14px; padding: 25px 28px; box-shadow: 0 20px 50px rgba(0,0,0,0.85);">
+
+    <div style="font-family: 'Cinzel', serif; font-size: 26px; font-weight: bold; color: #ff6b6b; text-align: center; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 14px rgba(255,76,76,0.5); margin-bottom: 6px;">
+      Invoquer une rencontre
+    </div>
+    <p style="text-align: center; font-family: 'Almendra', serif; font-size: 14px; color: #c2a878; margin: 0 0 22px 0; font-style: italic;">
+      La composition est tirée au sort. Quatre ennemis au maximum sont posés sur le terrain, les suivants arrivent en renfort.
+    </p>
+
+    <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px;">
+      <div class="choix-difficulte-rencontre" data-difficulte="Normale"
+           onclick="window.choisirDifficulteRencontre('Normale')"
+           style="cursor: pointer; border: 2px solid #5c3a21; border-radius: 10px; padding: 12px 16px; background: rgba(0,0,0,0.25); transition: all 0.2s ease;">
+        <div style="font-family: 'Cinzel', serif; font-size: 18px; font-weight: bold; color: #e8d5a5;">Normale</div>
+        <div style="font-family: 'Almendra', serif; font-size: 13px; color: #a89f91;">Un groupe de créatures Petites et Normales.</div>
+      </div>
+
+      <div class="choix-difficulte-rencontre" data-difficulte="Difficile"
+           onclick="window.choisirDifficulteRencontre('Difficile')"
+           style="cursor: pointer; border: 2px solid #5c3a21; border-radius: 10px; padding: 12px 16px; background: rgba(0,0,0,0.25); transition: all 0.2s ease;">
+        <div style="font-family: 'Cinzel', serif; font-size: 18px; font-weight: bold; color: #e8d5a5;">Difficile</div>
+        <div style="font-family: 'Almendra', serif; font-size: 13px; color: #a89f91;">Le même groupe, mené par un champion Élite.</div>
+      </div>
+
+      <div class="choix-difficulte-rencontre" data-difficulte="Très difficile"
+           onclick="window.choisirDifficulteRencontre('Très difficile')"
+           style="cursor: pointer; border: 2px solid #5c3a21; border-radius: 10px; padding: 12px 16px; background: rgba(0,0,0,0.25); transition: all 0.2s ease;">
+        <div style="font-family: 'Cinzel', serif; font-size: 18px; font-weight: bold; color: #e8d5a5;">Très difficile</div>
+        <div style="font-family: 'Almendra', serif; font-size: 13px; color: #a89f91;">Le même groupe, mené par un Boss.</div>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 12px; justify-content: center;">
+      <button class="btn-combat-switch" style="padding: 10px 26px; font-size: 15px;"
+              onclick="jouerSonClic(); window.fermerGenerationRencontre()">Annuler</button>
+      <button id="btn-valider-rencontre" class="btn-combat-switch" style="padding: 10px 32px; font-size: 15px; border-color: #ff4c4c; color: #ff6b6b;"
+              onclick="window.validerGenerationRencontre()">Valider</button>
+    </div>
+  </div>
+</div>
 
 <div id="overlay-jet-des" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: var(--app-h); background: rgba(0,0,0,0.85); z-index: 5000; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
     

@@ -21,7 +21,8 @@
 // =========================================================================
 import { db } from "./firebase-config.js";
 import {
-    collection, doc, getDocs, setDoc, onSnapshot, query, where, writeBatch
+    collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, deleteField,
+    onSnapshot, query, where, writeBatch
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 const COLLECTION_GABARITS = "Monstres_Modeles";
@@ -219,10 +220,18 @@ window.ecouterMonstresPartie = function(idPartie) {
             // On réutilise la conversion des personnages : un monstre expose
             // exactement les mêmes champs à tout le moteur de combat.
             const versFront = window.persoDocVersFront;
+            const brut = document.data();
             const objet = typeof versFront === "function"
-                ? versFront(document.id, document.data())
-                : { idPersonnage: document.id, ...document.data() };
+                ? versFront(document.id, brut)
+                : { idPersonnage: document.id, ...brut };
             objet.estMonstre = true;
+            // persoDocVersFront ne recopie que les champs d'un personnage : les champs
+            // propres au bestiaire (affichés dans le panneau gauche) sont repris ici.
+            objet.Archetype     = brut.Archetype || "";
+            objet.Palier        = brut.Palier || "";
+            objet.Gabarit       = brut.Gabarit || "";
+            objet.Nombre_Actions = brut.Nombre_Actions || 1;
+            objet.XP_Groupe     = brut.XP_Groupe || 0;
             monstres.push(objet);
         });
         window.MONSTRES_PARTIE = monstres;
@@ -431,5 +440,404 @@ window.sauvegarderGabaritsMonstres = async function() {
         console.error("Erreur sauvegarde des gabarits :", e);
         alert("L'enregistrement a échoué. Vérifie ta connexion et réessaie.");
         if (bouton) { bouton.disabled = false; window.actualiserBoutonSauvegardeMonstres(); }
+    }
+};
+
+// =========================================================================
+//  5. GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)
+// =========================================================================
+//  Reprend le tableau "Rencontres" de Nico :
+//    - une rencontre NORMALE tire au sort l'une des 5 répartitions Petit/Normal ;
+//    - une rencontre DIFFICILE ajoute 1 Élite à ce tirage ;
+//    - une rencontre TRÈS DIFFICILE ajoute 1 Boss à ce tirage.
+//  Le terrain n'accueille que 4 ennemis à la fois : le surplus attend en
+//  réserve et entre en renfort dès qu'une place se libère (mort d'un monstre).
+// =========================================================================
+
+const REPARTITIONS_NORMALES = [
+    { Petit: 1, Normal: 3 },
+    { Petit: 2, Normal: 2 },
+    { Petit: 3, Normal: 1 },
+    { Petit: 5, Normal: 0 },
+    { Petit: 0, Normal: 4 }
+];
+
+// Ce que chaque cran de difficulté ajoute à la répartition de base.
+const RENFORT_DIFFICULTE = {
+    "Normale":        null,
+    "Difficile":      "Élite",
+    "Très difficile": "Boss"
+};
+
+const MAX_MONSTRES_TERRAIN = 4;
+
+// Noms de repli, utilisés si la clé Gemini est absente ou si l'appel échoue :
+// jamais de monstre sans nom sur le plateau.
+const NOMS_SECOURS = {
+    "DPS CAC":           ["Loup gris", "Bandit", "Gobelin rageur", "Hyène", "Écorcheur", "Sanglier"],
+    "TANK CAC":          ["Ours brun", "Troll de pierre", "Golem d'argile", "Colosse", "Rhinox", "Gardien"],
+    "SOUTIEN":           ["Chaman gobelin", "Guérisseur maudit", "Vieux druide", "Oracle", "Fétichiste"],
+    "DPS MAGE CAC":      ["Sorcier de mêlée", "Moine des braises", "Lame runique", "Danseur de foudre"],
+    "DPS DISTANCE":      ["Archer sylvestre", "Arbalétrier", "Frondeur", "Chasseur", "Sagittaire"],
+    "DPS MAGE DISTANCE": ["Mage noir", "Nécromancien", "Invocateur", "Liche mineure", "Pyromancien"]
+};
+
+// Ambiance donnée à l'IA pour chaque archetype : c'est ce qui oriente le nom.
+const AMBIANCE_ARCHETYPES = {
+    "DPS CAC":           "guerrier ou bête féroce au corps à corps, rapide et agressif",
+    "TANK CAC":          "créature massive et résistante qui encaisse (ours, golem, colosse...)",
+    "SOUTIEN":           "soigneur ou soutien du groupe (chaman, oracle, prêtre corrompu...)",
+    "DPS MAGE CAC":      "combattant magique de mêlée (moine élémentaire, lame enchantée...)",
+    "DPS DISTANCE":      "tireur à distance (archer, arbalétrier, frondeur...)",
+    "DPS MAGE DISTANCE": "lanceur de sorts à distance (mage noir, nécromancien, invocateur...)"
+};
+
+function hasard(tableau) {
+    return tableau[Math.floor(Math.random() * tableau.length)];
+}
+
+// Les archetypes disponibles pour un palier donné : le tableau d'équilibrage ne
+// prévoit pas de Boss pour le SOUTIEN, on ne doit donc jamais en tirer un.
+function archetypesPourPalier(palier) {
+    return Object.keys(AMBIANCE_ARCHETYPES).filter(a => window.gabaritMonstre(a, palier));
+}
+
+// Tire au sort la composition complète d'une rencontre : une liste
+// [{ archetype, palier }], dans l'ordre où les monstres entreront en jeu.
+window.tirerCompositionRencontre = function(difficulte) {
+    const repartition = hasard(REPARTITIONS_NORMALES);
+    const composition = [];
+
+    ["Petit", "Normal"].forEach(palier => {
+        for (let i = 0; i < (repartition[palier] || 0); i++) {
+            const archetypes = archetypesPourPalier(palier);
+            if (archetypes.length > 0) composition.push({ archetype: hasard(archetypes), palier });
+        }
+    });
+
+    // Le renfort de difficulté passe DEVANT : un Élite ou un Boss est la pièce
+    // maîtresse de la rencontre, il doit être sur le terrain dès le début et non
+    // coincé en réserve derrière quatre bestioles.
+    const palierRenfort = RENFORT_DIFFICULTE[difficulte];
+    if (palierRenfort) {
+        const archetypes = archetypesPourPalier(palierRenfort);
+        if (archetypes.length > 0) {
+            composition.unshift({ archetype: hasard(archetypes), palier: palierRenfort });
+        }
+    }
+
+    return composition;
+};
+
+// -------------------------------------------------------------------------
+//  Sous-agent IA : MIA_BESTIAIRE (nomme toute la rencontre en un seul appel)
+// -------------------------------------------------------------------------
+//  Un appel unique pour tout le groupe : c'est plus rapide, moins coûteux, et
+//  surtout l'IA voit la rencontre entière, donc elle évite les doublons.
+window.nommerMonstresIA = async function(composition) {
+    // Repli immédiat : noms de secours tirés au sort, sans doublon.
+    const nommerParDefaut = () => {
+        const dejaPris = new Set();
+        return composition.map(m => {
+            const banque = NOMS_SECOURS[m.archetype] || ["Créature"];
+            let nom = hasard(banque);
+            let essais = 0;
+            while (dejaPris.has(nom) && essais < 12) { nom = hasard(banque); essais++; }
+            if (dejaPris.has(nom)) nom = `${nom} ${dejaPris.size + 1}`;
+            dejaPris.add(nom);
+            return nom;
+        });
+    };
+
+    const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
+    if (!cleGemini || composition.length === 0) return nommerParDefaut();
+
+    const listePourIA = composition.map((m, i) =>
+        `${i + 1}. ${m.archetype} (palier ${m.palier}) — ${AMBIANCE_ARCHETYPES[m.archetype] || ""}`
+    ).join("\n");
+
+    const promptSysteme = `Tu es MIA_BESTIAIRE, l'IA qui baptise les créatures d'un jeu de rôle médiéval-fantastique sombre.
+On te donne la composition d'un groupe d'ennemis. Tu dois trouver UN nom court et thématique par créature.
+
+RÈGLES :
+- Le nom colle au rôle indiqué (un TANK est massif : ours, golem, troll ; un DPS MAGE DISTANCE est un lanceur de sorts : mage noir, nécromancien...).
+- 1 à 3 mots maximum, en français, sans numéro ni chiffre.
+- Le palier donne la stature : "Petit" = créature mineure, "Normal" = combattant ordinaire, "Élite" = champion redoutable, "Boss" = créature légendaire au nom marquant.
+- Tous les noms doivent être DIFFÉRENTS les uns des autres.
+- Renvoie EXACTEMENT ${composition.length} nom(s), dans le même ordre que la liste.`;
+
+    const outils = [{
+        functionDeclarations: [{
+            name: "nommerLesCreatures",
+            description: "Donne la liste des noms, dans l'ordre exact des créatures fournies.",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    noms: { type: "ARRAY", items: { type: "STRING" }, description: "Un nom par créature, dans l'ordre" }
+                },
+                required: ["noms"]
+            }
+        }]
+    }];
+
+    try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                systemInstruction: { parts: [{ text: promptSysteme }] },
+                contents: [{ role: "user", parts: [{ text: `Voici le groupe à nommer :\n${listePourIA}` }] }],
+                tools: outils,
+                toolConfig: { functionCallingConfig: { mode: "ANY" } }
+            })
+        });
+
+        const data = await res.json();
+        const appel = data.candidates?.[0]?.content?.parts?.find(p => p.functionCall)?.functionCall;
+        const noms = appel?.args?.noms;
+
+        if (!Array.isArray(noms) || noms.length === 0) return nommerParDefaut();
+
+        // L'IA peut en renvoyer trop peu : on complète avec les noms de secours.
+        const secours = nommerParDefaut();
+        return composition.map((m, i) => {
+            const nom = (noms[i] || "").toString().trim();
+            return nom.length > 0 ? nom.slice(0, 40) : secours[i];
+        });
+
+    } catch (e) {
+        console.error("[MIA_BESTIAIRE] Nommage impossible, repli sur les noms de secours :", e);
+        return nommerParDefaut();
+    }
+};
+
+// -------------------------------------------------------------------------
+//  Pose d'un monstre sur le plateau
+// -------------------------------------------------------------------------
+//  Crée le document, le pion, et l'inscrit dans l'ordre d'initiative. Sert à la
+//  génération initiale ET à l'arrivée d'un renfort.
+window.poserMonstreSurTerrain = async function(monstre, tokensData) {
+    const gabarit = window.gabaritMonstre(monstre.archetype, monstre.palier);
+    if (!gabarit) {
+        console.error("Gabarit introuvable :", monstre);
+        return null;
+    }
+
+    const idMonstre = "MONSTRE_" + Math.random().toString(36).substring(2, 9);
+
+    await window.creerMonstreDepuisGabarit(idMonstre, gabarit, {
+        // Le moteur de combat lit Prenom/Nom_Personnage pour l'affichage : le nom
+        // trouvé par l'IA tient dans le prénom, le nom reste vide.
+        Prenom_Personnage: monstre.nom,
+        Nom_Personnage: "",
+        Initiative: 10,
+        Critique: 5,
+        Competences_Max: 4,
+        URL_Cloudinary: "",
+        URL_Token: ""
+    });
+
+    const hexLibre = window.trouverHexLibreVTT(tokensData);
+    tokensData[idMonstre] = { q: hexLibre.q, r: hexLibre.r, url: "", taille: 55 };
+
+    const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
+    const partieSnap = await getDoc(partieRef);
+    if (partieSnap.exists()) {
+        const ordre = partieSnap.data().Ordre_Initiative || [];
+        if (!ordre.includes(idMonstre)) {
+            ordre.push(idMonstre);
+            await updateDoc(partieRef, { Ordre_Initiative: ordre });
+        }
+    }
+
+    return idMonstre;
+};
+
+// -------------------------------------------------------------------------
+//  Génération complète, déclenchée par le bouton "Valider" de la fenêtre
+// -------------------------------------------------------------------------
+window.genererRencontreMonstres = async function(difficulte) {
+    if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) {
+        alert("Ouvre d'abord un combat : les monstres ont besoin d'un plateau pour apparaître.");
+        return;
+    }
+
+    // Les gabarits doivent être chargés, sinon aucune stat à recopier.
+    if (!window.GABARITS_MONSTRES || window.GABARITS_MONSTRES.length === 0) {
+        await window.chargerGabaritsMonstres();
+    }
+
+    const composition = window.tirerCompositionRencontre(difficulte);
+    if (composition.length === 0) {
+        alert("Aucun gabarit de monstre disponible : ouvre Paramètres > Outils > Monstres pour les initialiser.");
+        return;
+    }
+
+    const noms = await window.nommerMonstresIA(composition);
+    composition.forEach((m, i) => { m.nom = noms[i] || "Créature"; });
+
+    // Le terrain est limité : le reste attend en réserve.
+    const surLeTerrain = composition.slice(0, MAX_MONSTRES_TERRAIN);
+    const enReserve    = composition.slice(MAX_MONSTRES_TERRAIN);
+
+    const tokensData = { ...window.TOKENS_VTT_DATA };
+    for (const monstre of surLeTerrain) {
+        await window.poserMonstreSurTerrain(monstre, tokensData);
+    }
+
+    await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), { Tokens: tokensData }, { merge: true });
+    await window.sauvegarderReserveMonstres(enReserve);
+
+    console.log(`🐲 Rencontre ${difficulte} : ${surLeTerrain.length} sur le terrain, ${enReserve.length} en réserve.`);
+    return { surLeTerrain, enReserve };
+};
+
+// -------------------------------------------------------------------------
+//  La réserve (renforts en attente d'une place libre)
+// -------------------------------------------------------------------------
+//  updateDoc et non setDoc/merge : merge fusionne les tableaux au lieu de les
+//  remplacer, la réserve ne se viderait donc jamais.
+window.sauvegarderReserveMonstres = async function(reserve) {
+    if (!window.ID_PARTIE_COURANTE) return;
+    const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
+    await updateDoc(partieRef, { Reserve_Monstres: reserve || [] })
+        .catch(e => console.error("Sauvegarde de la réserve :", e));
+};
+
+window.lireReserveMonstres = async function() {
+    if (!window.ID_PARTIE_COURANTE) return [];
+    const snap = await getDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE));
+    return snap.exists() ? (snap.data().Reserve_Monstres || []) : [];
+};
+
+// Appelé quand un monstre vient de mourir : si une place est libre et qu'il
+// reste des renforts, le suivant entre en jeu.
+window.entrerRenfortMonstre = async function() {
+    if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) return null;
+
+    const reserve = await window.lireReserveMonstres();
+    if (reserve.length === 0) return null;
+
+    const vivants = (window.MONSTRES_PARTIE || []).filter(m =>
+        m.statut !== "Mort" && (parseInt(m.PV_Actuels) || 0) > 0
+    ).length;
+    if (vivants >= MAX_MONSTRES_TERRAIN) return null;
+
+    const renfort = reserve.shift();
+    const tokensData = { ...window.TOKENS_VTT_DATA };
+    const idMonstre = await window.poserMonstreSurTerrain(renfort, tokensData);
+
+    await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), { Tokens: tokensData }, { merge: true });
+    await window.sauvegarderReserveMonstres(reserve);
+
+    console.log(`🐲 Renfort : ${renfort.nom} entre en jeu.`);
+    return idMonstre;
+};
+
+// -------------------------------------------------------------------------
+//  Mort et nettoyage
+// -------------------------------------------------------------------------
+//  Le monstre est d'abord marqué Mort (le cadavre reste visible, les effets en
+//  cours qui le ciblent ne pointent pas dans le vide), puis réellement effacé
+//  de la base à la fin du combat.
+window.marquerMonstreMort = async function(idMonstre) {
+    if (!window.estMonstre(idMonstre)) return;
+    await updateDoc(doc(db, COLLECTION_MONSTRES, idMonstre), { Statut: "Mort" })
+        .catch(e => console.error("Marquage de la mort :", e));
+    await window.entrerRenfortMonstre();
+};
+
+// Efface tous les monstres de la partie : documents, pions, initiative, réserve.
+// Appelé par la réinitialisation du combat (seule vraie "fin de combat" du jeu)
+// et disponible pour un nettoyage manuel.
+window.nettoyerMonstresCombat = async function() {
+    if (!window.ID_PARTIE_COURANTE) return;
+
+    const monstres = [...(window.MONSTRES_PARTIE || [])];
+    const vttRef = doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE);
+    const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
+
+    for (const monstre of monstres) {
+        const id = monstre.idPersonnage;
+        delete window.TOKENS_VTT_DATA[id];
+        await deleteDoc(doc(db, COLLECTION_MONSTRES, id)).catch(e => console.error(e));
+        await updateDoc(vttRef, { ["Tokens." + id]: deleteField() }).catch(e => console.error(e));
+        delete window.SOURCE_COMBATTANTS[id];
+    }
+
+    const partieSnap = await getDoc(partieRef);
+    if (partieSnap.exists()) {
+        const idsMonstres = monstres.map(m => m.idPersonnage);
+        const ordre = (partieSnap.data().Ordre_Initiative || []).filter(id => !idsMonstres.includes(id));
+        const file  = (partieSnap.data().File_Attente_Combat || []).filter(item => !idsMonstres.includes(item.idPersonnage));
+        await updateDoc(partieRef, {
+            Ordre_Initiative: ordre,
+            File_Attente_Combat: file,
+            Reserve_Monstres: []
+        }).catch(e => console.error(e));
+    }
+
+    window.MONSTRES_PARTIE = [];
+    window.recomposerCombattants();
+    if (typeof window.appliquerTokensVTT === "function") window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    if (monstres.length > 0) console.log(`🧹 ${monstres.length} monstre(s) effacé(s) de la base.`);
+};
+
+// =========================================================================
+//  6. LA FENÊTRE DE GÉNÉRATION (bouton 💀 des options de combat)
+// =========================================================================
+
+window.DIFFICULTE_RENCONTRE_CHOISIE = "Normale";
+
+window.ouvrirGenerationRencontre = function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+
+    if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) {
+        alert("Ouvre d'abord un combat : les monstres ont besoin d'un plateau pour apparaître.");
+        return;
+    }
+
+    const voile = document.getElementById("etape-generation-rencontre");
+    if (!voile) return;
+
+    window.DIFFICULTE_RENCONTRE_CHOISIE = "Normale";
+    window.choisirDifficulteRencontre("Normale");
+
+    const btn = document.getElementById("btn-valider-rencontre");
+    if (btn) { btn.disabled = false; btn.innerText = "Valider"; }
+
+    voile.style.display = "flex";
+};
+
+window.fermerGenerationRencontre = function() {
+    const voile = document.getElementById("etape-generation-rencontre");
+    if (voile) voile.style.display = "none";
+};
+
+window.choisirDifficulteRencontre = function(difficulte) {
+    window.DIFFICULTE_RENCONTRE_CHOISIE = difficulte;
+
+    document.querySelectorAll(".choix-difficulte-rencontre").forEach(el => {
+        const actif = el.dataset.difficulte === difficulte;
+        el.style.borderColor = actif ? "#ffd700" : "#5c3a21";
+        el.style.background  = actif ? "rgba(255, 215, 0, 0.12)" : "rgba(0, 0, 0, 0.25)";
+        el.style.boxShadow   = actif ? "0 0 14px rgba(255, 215, 0, 0.45)" : "none";
+    });
+};
+
+window.validerGenerationRencontre = async function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+
+    const btn = document.getElementById("btn-valider-rencontre");
+    if (btn) { btn.disabled = true; btn.innerText = "Invocation..."; }
+
+    try {
+        await window.genererRencontreMonstres(window.DIFFICULTE_RENCONTRE_CHOISIE);
+        window.fermerGenerationRencontre();
+    } catch (e) {
+        console.error("Erreur de génération de la rencontre :", e);
+        alert("La génération a échoué. Regarde la console pour le détail.");
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerText = "Valider"; }
     }
 };
