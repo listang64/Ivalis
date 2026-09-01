@@ -50,6 +50,13 @@ node reveil_ia.mjs          # l'IA se réveille seule après une animation
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 ```
 
+## Fidélité à la Forge
+
+```sh
+node cout_reel.mjs          # fatigue, initiative et coût PC recalculés par la Forge
+node textes_reels.mjs       # les descriptions, mot pour mot comme la Forge
+```
+
 ## Puissance des frappes
 
 ```sh

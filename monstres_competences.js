@@ -1050,14 +1050,22 @@ function chantierVersDocument(carte, nom, arme, palette) {
     };
 }
 
-// ⚖️ règle Forge : formatterTexteEffet, version réduite — la Forge injecte les
-// valeurs réelles dans le texte de l'effet selon le nombre d'empilements.
+// ⚖️ règle Forge : formatterTexteEffet — la description d'un effet empilé, mot
+// pour mot comme la Forge l'écrit sur une carte de joueur. La copie précédente
+// escamotait le cas des effets qui portent À LA FOIS un pourcentage et une
+// valeur — Poussée (10 %, 2 hexagones) et Traction magique (15 %, 3 hexagones),
+// les deux seuls de la base : le remplacement de la valeur retombait sur le
+// premier nombre du texte, c'est-à-dire le pourcentage qu'on venait d'écrire.
+// "10 % de chance de pousser de 2 hexagones" devenait "2 % de chance", et la
+// traction "6 %". Le lookahead (?!\s*%) protège le pourcentage, exactement
+// comme dans la Forge.
 function texteEffet(effet, empilements) {
     let texte = effet.Effet_Base || effet.Nom || "";
     const val = nombreFr(effet.Valeur);
     const pBase = nombreFr(effet.Pourcent_Base);
     const pMax = nombreFr(effet.Pourcent_Max);
 
+    // 1. Le pourcentage de base et son plafond.
     if (pBase > 0) {
         const calc = pBase * empilements;
         if (/\d+(?:[.,]\d+)?\s*%/.test(texte)) texte = texte.replace(/\d+(?:[.,]\d+)?\s*%/, calc + "%");
@@ -1065,12 +1073,26 @@ function texteEffet(effet, empilements) {
             texte = texte.replace(/([Mm]ax\s*)\d+(?:[.,]\d+)?(\s*%?)/i, `$1${pMax}$2`);
         }
     }
+
+    // 2. La valeur (dégâts, soins, hexagones...). Distance affiche +1 case,
+    //    parce que 1 correspond déjà au corps-à-corps.
     if (val > 0) {
-        const calc = val * empilements;
-        texte = texte.replace(/\b\d+(?:[.,]\d+)?\b/, String(calc));
+        let calc = val * empilements;
+        if (effet.Nom === "Distance") calc += 1;
+        texte = (pBase === 0)
+            ? texte.replace(/\b\d+(?:[.,]\d+)?\b/, String(calc))
+            : texte.replace(/\b\d+(?:[.,]\d+)?\b(?!\s*%)/, String(calc));
     }
+
+    // 3. Ni pourcentage ni valeur : on note simplement le nombre d'exemplaires.
+    if (pBase === 0 && val === 0 && !["Persistance terrain", "Durée +", "DOT"].includes(effet.Nom)) {
+        if (!texte.includes(`(x${empilements})`)) texte += ` (x${empilements})`;
+    }
+
     return texte;
 }
+// Exposée pour le banc d'essai, qui la compare mot pour mot à celle de la Forge.
+window.texteEffetMonstre = texteEffet;
 
 // =========================================================================
 //  3. MIA_TECHNIQUES — baptise les 6 cartes d'un seul appel
