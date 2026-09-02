@@ -4,6 +4,7 @@
 // même la fenêtre de combat fermée, la bulle venait se poser par-dessus l'écran
 // de création de personnage.
 import fs from 'fs';
+import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 
 const mouvement = fs.readFileSync('/home/user/Ivalis/mouvement.js','utf-8')
   .replace(/^import[\s\S]*?from\s+"[^"]+";/gm, '');
@@ -15,6 +16,9 @@ await p.route('**', r => r.request().url().startsWith('file:') ? r.continue() : 
 p.on('pageerror', () => {});
 await p.goto('file:///home/user/Ivalis/index.html');
 await p.waitForTimeout(200);
+// Les lectures de stats mutualisées (atouts de race compris) vivent dans
+// app.js, chargé avant tout le reste sur la vraie page.
+await p.evaluate(src => eval(src), SRC_STATS_COMMUNES);
 
 let echecs = 0;
 const verifier = (l, c, d="") => { if (!c) echecs++; console.log(`  ${l.padEnd(58)} ${c?"OK":"ÉCHEC"} ${d}`); };

@@ -9,7 +9,7 @@ const fenetre = chargerGenerateur();
 // La VRAIE fonction de la Forge, extraite de competences.js.
 const src = fs.readFileSync('/home/user/Ivalis/competences.js','utf-8');
 const aux = src.slice(src.indexOf('function parseFrenchFloat'), src.indexOf('function getMaxStacks'));
-const fn  = src.slice(src.indexOf('function formatterTexteEffet'), src.indexOf('function estIncompatibleAvecArme'));
+const fn  = src.slice(src.indexOf('function bonusPorteeDeRace'), src.indexOf('function estIncompatibleAvecArme'));
 const forge = eval(`(function(){ ${aux} ${fn} return formatterTexteEffet; })()`);
 
 let echecs = 0, comparaisons = 0;

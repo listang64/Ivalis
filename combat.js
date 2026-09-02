@@ -2722,7 +2722,11 @@ window.finDeTourCombat = async function(forcer = false) {
                             // joueurs, eux, gardent les 35% historiques.
                             const pctRepos = parseInt(persoAction.Repos_Long);
                             const tauxRepos = (!isNaN(pctRepos) && pctRepos > 0) ? pctRepos / 100 : 0.35;
-                            const recup = Math.floor(fatigueMax * tauxRepos);
+                            // Atout de l'Humain : dix points d'énergie de plus à chaque
+                            // repos long, en plus du pourcentage ordinaire.
+                            const bonusRace = (typeof window.atoutRace === "function"
+                                ? window.atoutRace(persoAction).bonusReposLong : 0) || 0;
+                            const recup = Math.floor(fatigueMax * tauxRepos) + bonusRace;
                             fatigueActuelle = Math.min(fatigueMax, fatigueActuelle + recup);
 
                             persoAction.fatigueActuelle = fatigueActuelle;

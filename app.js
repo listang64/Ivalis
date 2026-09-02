@@ -202,12 +202,110 @@ window.pvMaxCombattant = function(perso) {
 window.fatigueMaxCombattant = function(perso, defaut = 100) {
     if (!perso) return defaut;
     const socle = (parseInt(perso.Fatigue_Max) || parseInt(perso.fatigueMax) || defaut);
-    return socle + (parseInt(perso.Dev_Mod_Fatigue) || 0);
+    return socle + (parseInt(perso.Dev_Mod_Fatigue) || 0)
+                 + ((window.atoutRace ? window.atoutRace(perso).fatigueMax : 0) || 0);
 };
 
 window.regenerationCombattant = function(perso) {
     if (!perso) return 0;
     return (parseInt(perso.Regeneration) || 0) + (parseInt(perso.Dev_Mod_Regen) || 0);
+};
+
+// =========================================================================
+//  LES ATOUTS DE RACE
+// =========================================================================
+//  Chaque peuple apporte son avantage. Comme les retouches de la fiche, ils ne
+//  sont PAS recopiés dans les valeurs enregistrées : ils s'ajoutent à la
+//  lecture. Un personnage créé avant l'arrivée de ces atouts en profite donc
+//  immédiatement, et la valeur de base reste lisible telle qu'elle a été
+//  choisie à la création.
+//
+//  Le bestiaire n'enregistre aucune race : les créatures n'en tirent rien.
+
+window.ATOUTS_RACES = {
+    "Gob":     { esquive: 3, competences: 1 },
+    "Ankylar": { defPhysique: 10 },
+    "Ondari":  { porteeMagique: 1, immunites: ["Brûlé"] },
+    "Vargen":  { diviseurDeplacement: 2, esquiveOpportunite: 30 },
+    "Ophior":  { defMagique: 10 },
+    "Ethéré":  { soinsRecus: 30, immunites: ["Empoisonnement"] },
+    "Humain":  { fatigueMax: 10, bonusReposLong: 10 }
+};
+
+// La fiche front-end porte "race", le document Firestore porte "Race" : la
+// Forge lit l'un, le combat l'autre. On accepte les deux.
+window.atoutRace = function(perso) {
+    if (!perso || perso.estMonstre) return {};
+    return window.ATOUTS_RACES[perso.race] || window.ATOUTS_RACES[perso.Race] || {};
+};
+
+window.esquiveCombattant = function(perso) {
+    if (!perso) return 0;
+    return (parseInt(perso.Esquive) || 0) + (parseInt(perso.Dev_Mod_Esquive) || 0)
+         + (window.atoutRace(perso).esquive || 0);
+};
+
+window.paradeCombattant = function(perso) {
+    if (!perso) return 0;
+    return (parseInt(perso.Parade) || 0) + (parseInt(perso.Dev_Mod_Parade) || 0)
+         + (window.atoutRace(perso).parade || 0);
+};
+
+window.defPhysiqueCombattant = function(perso) {
+    if (!perso) return 0;
+    return (parseInt(perso.Def_Physique) || 0) + (parseInt(perso.Dev_Mod_DefPhys) || 0)
+         + (window.atoutRace(perso).defPhysique || 0);
+};
+
+window.defMagiqueCombattant = function(perso) {
+    if (!perso) return 0;
+    return (parseInt(perso.Def_Magique) || 0) + (parseInt(perso.Dev_Mod_DefMag) || 0)
+         + (window.atoutRace(perso).defMagique || 0);
+};
+
+window.critiqueCombattant = function(perso) {
+    if (!perso) return 0;
+    return (parseInt(perso.Critique) || 0) + (parseInt(perso.Dev_Mod_Critique) || 0)
+         + (window.atoutRace(perso).critique || 0);
+};
+
+// Le nombre de cartes qu'un héros peut mémoriser : six pour tout le monde, sept
+// pour un Gob — dès la création, donc aussi une carte de plus à forger.
+window.competencesMaxCombattant = function(perso) {
+    if (!perso) return 6;
+    const base = perso.Competences_Max !== undefined ? (parseInt(perso.Competences_Max) || 0) : 6;
+    return base + (window.atoutRace(perso).competences || 0);
+};
+
+// Un peuple immunisé n'attrape jamais l'état : ni par une carte, ni par une
+// zone laissée au sol.
+window.estImmunise = function(perso, nomEtat) {
+    const immunites = window.atoutRace(perso).immunites || [];
+    return immunites.includes(nomEtat);
+};
+
+// Les soins reçus, multipliés par l'atout du peuple (Éthéré : +30 %).
+window.multiplicateurSoinsRecus = function(perso) {
+    return 1 + ((window.atoutRace(perso).soinsRecus || 0) / 100);
+};
+
+// Une action est magique quand son effet de base l'est — même règle que le
+// moteur, qui range soins, purifications et boucliers du côté magique. La Forge
+// et le combat s'appuient tous deux dessus : c'est ce qui garantit que la carte
+// affiche la portée que le sort aura réellement.
+window.actionEstMagique = function(nomEffetBase) {
+    const n = (nomEffetBase || "").toLowerCase();
+    return n.includes("magique") || n.includes("pouvoir") || n.includes("soin")
+        || n.includes("guérison") || n.includes("guerison")
+        || n.includes("purification") || n.includes("bouclier");
+};
+
+// Atout de l'Ondari : une case de plus pour ses sorts magiques lancés à
+// distance. Le bonus s'ajoute UNE FOIS à la carte, pas une fois par cran de
+// Distance posé dessus — et une action au corps à corps n'y gagne rien.
+window.bonusPorteeMagique = function(perso, estMagique, aDeLaDistance) {
+    if (!estMagique || !aDeLaDistance) return 0;
+    return window.atoutRace(perso).porteeMagique || 0;
 };
 
 // Conversion : objet front-end -> document Firestore "Personnages" (colonnes CSV)
@@ -3026,7 +3124,9 @@ async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPers
       }
 
       if (typeof window.chargerOngletCompetences === "function") {
-          window.chargerOngletCompetences(idPersonnage, donneesServeur.Competences_Max);
+          // Le Gob mémorise une carte de plus que les autres : le compte se lit
+          // sur la fiche, atout de race compris.
+          window.chargerOngletCompetences(idPersonnage, window.competencesMaxCombattant(donneesServeur));
       }
   }
 }

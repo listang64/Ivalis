@@ -4,6 +4,7 @@
 // or une créature n'appartient à personne (ID_Joueur = "MJ") : personne
 // n'écrivait, les dégâts restaient locaux, et le premier snapshot les effaçait.
 import fs from 'fs';
+import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 
 const src = fs.readFileSync('/home/user/Ivalis/moteur_effets.js','utf-8')
   .replace(/^import[\s\S]*?from\s+"[^"]+";/gm, '');
@@ -43,6 +44,9 @@ function poste(nom, { monJoueur }) {
   global.window = w;
   global.document = { getElementById: () => null, querySelectorAll: () => [], createElement: () => ({ style:{}, appendChild(){}, remove(){} }) };
   global.localStorage = { getItem: () => monJoueur };
+  // Les lectures de stats mutualisées (atouts de race compris) vivent dans
+  // app.js, chargé avant tout le reste sur la vraie page.
+  new Function('window', SRC_STATS_COMMUNES)(w);
   new Function('window','db','doc','updateDoc','setDoc','deleteDoc','deleteField', src)(
     w, db, doc, updateDoc, setDoc, deleteDoc, deleteField);
   return { nom, w, ecritures };

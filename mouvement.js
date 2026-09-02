@@ -240,6 +240,12 @@ window.ajouterEtapeMouvement = function(q, r) {
 
         if (estGlace) baseCost *= 2;
 
+        // Atout du Vargen : il se déplace pour deux fois moins cher. Appliqué en
+        // dernier, donc APRÈS le terrain difficile et le Glacé : le prédateur
+        // garde son avantage même sur un sol qui coûte double.
+        const diviseur = window.atoutRace(persoActuel).diviseurDeplacement || 1;
+        if (diviseur > 1) baseCost = Math.max(1, Math.round(baseCost / diviseur));
+
         if (window.MOUVEMENT_COUT_TOTAL + baseCost > fatigueDispo) {
             window.afficherMessageFlottantHex(step.q, step.r, "Énergie insuffisante");
             break; 

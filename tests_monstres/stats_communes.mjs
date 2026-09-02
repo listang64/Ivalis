@@ -15,8 +15,14 @@ function fonction(marqueur) {
   return lignes.slice(d, f + 1).join('\n');
 }
 
-export const SRC_STATS_COMMUNES = [
-  fonction('window.pvMaxCombattant = function'),
-  fonction('window.fatigueMaxCombattant = function'),
-  fonction('window.regenerationCombattant = function')
-].join('\n\n');
+// Un bloc continu : des lectures de stats jusqu'aux atouts de race, qui en font
+// partie intégrante (une résistance, c'est la base, la retouche de la fiche ET
+// l'avantage du peuple, additionnés d'un seul coup).
+const debut = lignes.findIndex(l => l.startsWith('window.pvMaxCombattant = function'));
+let fin = lignes.findIndex((l, i) => i > debut && l.startsWith('window.bonusPorteeMagique = function'));
+for (let i = fin + 1; i < lignes.length; i++) { if (lignes[i] === '};') { fin = i; break; } }
+if (debut < 0 || fin < 0) throw new Error("Bloc des stats communes introuvable dans app.js");
+
+// La table des atouts vit juste avant les lectures : on la reprend aussi.
+const debutTable = lignes.findIndex(l => l.startsWith('window.ATOUTS_RACES = {'));
+export const SRC_STATS_COMMUNES = lignes.slice(Math.min(debut, debutTable), fin + 1).join('\n');

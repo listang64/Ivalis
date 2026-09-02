@@ -724,7 +724,22 @@ function getMaxStacks(effet) {
 }
 
 // Remplacement intelligent dans le texte selon les valeurs BDD en temps réel
-function formatterTexteEffet(effet, stacks) {
+// L'atout de portée du personnage pour qui la carte est forgée, s'il s'applique
+// à CETTE action : la règle du magique est celle du moteur (window.actionEstMagique),
+// pour que la carte n'annonce jamais une portée que le sort n'aura pas.
+function bonusPorteeDeRace(action) {
+    if (!action || typeof window.bonusPorteeMagique !== "function") return 0;
+    const nomBase = action.baseEffet ? action.baseEffet.Nom : "";
+    return window.bonusPorteeMagique(
+        window.forgeState.statsPerso,
+        window.actionEstMagique(nomBase),
+        true /* on est justement en train d'afficher l'effet Distance */);
+}
+
+// "action" est facultatif : quand il est fourni (une carte en construction ou
+// affichée), la portée tient compte de l'atout de race du personnage — l'Ondari
+// voit donc dans la Forge la portée que son sort aura vraiment en combat.
+function formatterTexteEffet(effet, stacks, action) {
     let texte = effet.Effet_Base || "";
     const val = parseFrenchFloat(effet.Valeur);
     const pBase = parseFrenchFloat(effet.Pourcent_Base);
@@ -748,6 +763,7 @@ function formatterTexteEffet(effet, stacks) {
         // 🔻 NOUVEAU : Si c'est l'effet Distance, on affiche +1 case (car 1 = CAC)
         if (effet.Nom === "Distance") {
             calcV += 1;
+            calcV += bonusPorteeDeRace(action);
         }
 
         if (pBase === 0) {
@@ -1176,7 +1192,7 @@ function getActiveTags() {
 function compilerEffetsTexte() {
     let descriptions = [];
     window.forgeState.actions.forEach(act => {
-        let descBase = formatterTexteEffet(act.baseEffet, act.count);
+        let descBase = formatterTexteEffet(act.baseEffet, act.count, act);
         if (act.baseDuree > 0) descBase += ` <span style="color:#9333ea;">(+ ⏳ ${act.baseDuree} Trs)</span>`;
         
         // On sauvegarde un objet propre au lieu d'une simple phrase
@@ -1198,7 +1214,7 @@ function compilerEffetsTexte() {
                         isZone: true
                     });
                 } else {
-                    let descMod = formatterTexteEffet(modEff, act.mods[modId]);
+                    let descMod = formatterTexteEffet(modEff, act.mods[modId], act);
                     if (act.modsDuree && act.modsDuree[modId] > 0) descMod += ` <span style="color:#9333ea;">(+ ⏳ ${act.modsDuree[modId]} Trs)</span>`;
                     descriptions.push({
                         nom: modEff.Nom,
@@ -1586,7 +1602,7 @@ window.rafraichirForge = function() {
                             <span style="color: gray; font-size: 14px;">↳</span> <b style="font-size: 14px;">${nettoyerNomEffet(modEff.Nom)}</b>
                             ${modEff.Modificateur !== "AUCUN" ? `<span style="font-size: 12px; color: #9333ea; font-weight: bold; margin-left: 4px;">[${modEff.Modificateur}]</span>` : ""}
                             <div style="font-size: 13px; color: gray; margin-left: 15px;">
-                                ${formatterTexteEffet(modEff, modCount)}
+                                ${formatterTexteEffet(modEff, modCount, act)}
                                 ${currentModDuree > 0 ? `<br><span style="color: #9333ea;">↳ ⏳ +${currentModDuree} Tour(s) (+${(currentModDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}
                             </div>
                         </div>
@@ -1613,7 +1629,7 @@ window.rafraichirForge = function() {
                         <div>
                             <b style="font-size: 16px;">• ${nettoyerNomEffet(act.baseEffet.Nom)}</b> ${act.baseEffet.Modificateur !== "AUCUN" ? `<span style="font-size: 12px; color: #9333ea; font-weight: bold; margin-left: 4px;">[${act.baseEffet.Modificateur}]</span>` : ""}
                             <div style="font-size: 13px; color: gray; margin-left: 10px; margin-top: 2px;">
-                                ${formatterTexteEffet(act.baseEffet, act.count)}
+                                ${formatterTexteEffet(act.baseEffet, act.count, act)}
                                 ${currentBaseDuree > 0 ? `<br><span style="color: #9333ea;">↳ ⏳ +${currentBaseDuree} Tour(s) (+${(currentBaseDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}
                             </div>
                         </div>
@@ -1696,7 +1712,7 @@ window.sauvegarderCompetence = async function() {
         window.fermerForgeCompetence();
 
         if (typeof window.chargerOngletCompetences === "function") {
-            window.chargerOngletCompetences(idPerso, window.forgeState.statsPerso.Competences_Max || 6);
+            window.chargerOngletCompetences(idPerso, window.competencesMaxCombattant(window.forgeState.statsPerso));
         }
     } catch (e) {
         console.error("Erreur de sauvegarde :", e);

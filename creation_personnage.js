@@ -324,23 +324,17 @@ window.afficherStatsCombat = function(donnees) {
     const modDefPhys = donnees.Dev_Mod_DefPhys || 0;
     const modDefMag = donnees.Dev_Mod_DefMag || 0;
 
-    const basePv = donnees.PV_Max || 0;
-    const baseFatigue = donnees.Fatigue_Max !== undefined ? donnees.Fatigue_Max : 100;
-    const baseRegen = donnees.Regeneration !== undefined ? donnees.Regeneration : 30;
-    const baseEsquive = donnees.Esquive !== undefined ? donnees.Esquive : 15;
-    const baseParade = donnees.Parade !== undefined ? donnees.Parade : 0;
-    const baseCritique = donnees.Critique !== undefined ? donnees.Critique : 10;
-    const baseDefPhys = donnees.Def_Physique !== undefined ? donnees.Def_Physique : 0;
-    const baseDefMag = donnees.Def_Magique !== undefined ? donnees.Def_Magique : 0;
-
-    const finalPv = basePv + modPv;
-    const finalFatigue = baseFatigue + modFatigue;
-    const finalRegen = baseRegen + modRegen;
-    const finalEsquive = baseEsquive + modEsquive;
-    const finalParade = baseParade + modParade;
-    const finalCritique = baseCritique + modCritique;
-    const finalDefPhys = baseDefPhys + modDefPhys;
-    const finalDefMag = baseDefMag + modDefMag;
+    // Les lectures mutualisées font foi : elles ajoutent la retouche de la fiche
+    // ET l'atout de race, exactement comme le combat les lira. La fiche annonce
+    // donc les chiffres que le personnage aura vraiment sur le plateau.
+    const finalPv = window.pvMaxCombattant(donnees);
+    const finalFatigue = window.fatigueMaxCombattant(donnees);
+    const finalRegen = window.regenerationCombattant(donnees);
+    const finalEsquive = window.esquiveCombattant(donnees);
+    const finalParade = window.paradeCombattant(donnees);
+    const finalCritique = window.critiqueCombattant(donnees);
+    const finalDefPhys = window.defPhysiqueCombattant(donnees);
+    const finalDefMag = window.defMagiqueCombattant(donnees);
 
     document.getElementById("stat-pv").innerText = finalPv;
     document.getElementById("stat-fatigue").innerText = finalFatigue;

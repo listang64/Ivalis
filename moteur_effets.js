@@ -230,8 +230,8 @@ window.resoudreZonesPersistantesSurCase = async function(idPerso, hex) {
     const resultats = [];
 
     for (const zone of zonesIci) {
-        const esquive = (parseInt(cibleData.Esquive) || 0) + (parseInt(cibleData.Dev_Mod_Esquive) || 0);
-        const parade = (parseInt(cibleData.Parade) || 0) + (parseInt(cibleData.Dev_Mod_Parade) || 0);
+        const esquive = window.esquiveCombattant(cibleData);
+        const parade = window.paradeCombattant(cibleData);
         const statDef = Math.max(esquive, parade);
         const jetDef = Math.floor(Math.random() * 100) + 1;
         const motDef = parade > esquive ? "Paré 🛡️" : "Esquivé 💨";
@@ -243,8 +243,8 @@ window.resoudreZonesPersistantesSurCase = async function(idPerso, hex) {
 
         if (!dodged) {
             if (zone.degats) {
-                const defPhys = (parseInt(cibleData.Def_Physique) || 0) + (parseInt(cibleData.Dev_Mod_DefPhys) || 0);
-                const defMag = (parseInt(cibleData.Def_Magique) || 0) + (parseInt(cibleData.Dev_Mod_DefMag) || 0);
+                const defPhys = window.defPhysiqueCombattant(cibleData);
+                const defMag = window.defMagiqueCombattant(cibleData);
                 const resistance = zone.degats.typeRes === "Magique" ? defMag : defPhys;
                 let reduction = resistance / 100;
                 if (reduction > 1) reduction = 1;
@@ -273,7 +273,8 @@ window.resoudreZonesPersistantesSurCase = async function(idPerso, hex) {
             // L'état garde le pourcentage calculé au moment où le sort a été lancé.
             if (zone.etat) {
                 const roll = Math.floor(Math.random() * 100) + 1;
-                if (roll <= (zone.etat.chance || 0)) {
+                // Un peuple immunisé traverse la zone sans rien attraper.
+                if (roll <= (zone.etat.chance || 0) && !window.estImmunise(cibleData, zone.etat.nom)) {
                     const etats = cibleData.Etats_Alteres ? [...cibleData.Etats_Alteres] : [];
                     const existant = etats.find(e => e.nom === zone.etat.nom);
                     if (existant) {
@@ -371,8 +372,18 @@ window.resoudreAttaqueOpportunite = async function(idAttaquant, idCible) {
     if (!attaquantData || !cibleData) return null;
     if (attaquantData.statut === "Mort" || cibleData.statut === "Mort") return null;
 
-    const esquive = (parseInt(cibleData.Esquive) || 0) + (parseInt(cibleData.Dev_Mod_Esquive) || 0);
-    const parade = (parseInt(cibleData.Parade) || 0) + (parseInt(cibleData.Dev_Mod_Parade) || 0);
+    // Atout du Vargen : une chance de se dérober AVANT même le jet de défense.
+    // C'est une esquive supplémentaire, pas un remplacement — il garde ensuite
+    // sa chance ordinaire.
+    const chanceDerobade = window.atoutRace(cibleData).esquiveOpportunite || 0;
+    // Le résultat est seulement tranché ici : c'est jouerAnimationOpportunite qui
+    // l'affiche, chez tous les joueurs à la fois, à la bonne étape du trajet.
+    if (chanceDerobade > 0 && Math.floor(Math.random() * 100) + 1 <= chanceDerobade) {
+        return { idAttaquant, idCible, dodged: true, motDef: "Dérobade 🐾", degats: 0, viaBouclier: false };
+    }
+
+    const esquive = window.esquiveCombattant(cibleData);
+    const parade = window.paradeCombattant(cibleData);
     const jetDef = Math.floor(Math.random() * 100) + 1;
     const statDef = Math.max(esquive, parade);
     const motDef = parade > esquive ? "Paré 🛡️" : "Esquivé 💨";
@@ -1356,7 +1367,10 @@ window.demarrerCiblage = async function(idCarte) {
     // personnage paralysé perd quand même la fatigue prévue de la carte (comme s'il l'avait
     // jouée), mais aucun de ses effets ne se déclenche jamais — on réutilise directement
     // validerCarteCombat (déduction de fatigue + fin de tour), sans jamais construire d'action.
-    const casterParalyse = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+    // Le lanceur de cette carte : sa paralysie l'empêche d'agir, sa race peut
+    // aussi allonger la portée de ses sorts (cf. plus bas).
+    const lanceurCarte = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+    const casterParalyse = lanceurCarte;
     if (casterParalyse && casterParalyse.Etats_Alteres && casterParalyse.Etats_Alteres.some(e => e.nom === "Paralysie")) {
         const tkCaster = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[casterParalyse.idPersonnage] : null;
         if (tkCaster && typeof window.afficherMessageFlottantHex === "function") {
@@ -1524,12 +1538,19 @@ window.demarrerCiblage = async function(idCarte) {
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 if (indexPremiereAttaque === -1) indexPremiereAttaque = idxAction;
+                const typeRes = (nomLower.includes("magique") || nomLower.includes("pouvoir") || isHeal)
+                    ? "Magique" : "Physique";
+                // Atout de l'Ondari : ses sorts magiques portent une case plus loin,
+                // dès lors qu'un cran de Distance est posé dessus.
+                const porteeReelle = rangeMax + window.bonusPorteeMagique(
+                    lanceurCarte, typeRes === "Magique", isRanged);
+
                 attaquesExtraites.push({
                     nom: effBase.Nom,
-                    typeRes: (nomLower.includes("magique") || nomLower.includes("pouvoir") || isHeal) ? "Magique" : "Physique",
+                    typeRes: typeRes,
                     valeurBrute: (parseFrFloat(effBase.Valeur) || 0) * (act.count || 1),
                     isRanged: isRanged,
-                    rangeMax: rangeMax,
+                    rangeMax: porteeReelle,
                     isHeal: isHeal,
                     isShield: isShield,
                     purifChance: purifChance,
@@ -2706,7 +2727,7 @@ window.declencherResolution = async function() {
         || !!lanceurCrit.estMonstre
         || lanceurCrit.camp === "Ennemi");
     if (lanceurCrit && !estCreature) {
-        const chanceCrit = (parseInt(lanceurCrit.Critique) || 0) + (parseInt(lanceurCrit.Dev_Mod_Critique) || 0);
+        const chanceCrit = window.critiqueCombattant(lanceurCrit);
         const jetCrit = Math.floor(Math.random() * 100) + 1;
         critique = jetCrit <= chanceCrit;
         console.log(`🎲 Jet de critique de ${lanceurCrit.prenom || idLanceur} : ${jetCrit} (Chance : ${chanceCrit}%)`
@@ -2909,8 +2930,8 @@ window.jouerAnimationMoteur = async function(action) {
                     }
                 }
 
-                let esquive = (parseInt(cibleData.Esquive) || 0) + (parseInt(cibleData.Dev_Mod_Esquive) || 0);
-                let parade = (parseInt(cibleData.Parade) || 0) + (parseInt(cibleData.Dev_Mod_Parade) || 0);
+                let esquive = window.esquiveCombattant(cibleData);
+                let parade = window.paradeCombattant(cibleData);
                 
                 const jetDef = Math.floor(Math.random() * 100) + 1;
                 const statDef = Math.max(esquive, parade);
@@ -2987,7 +3008,7 @@ window.jouerAnimationMoteur = async function(action) {
 
                     if (attaque.valeurBrute > 0) {
                         let soinBrut = attaque.valeurBrute * (critique ? 2 : 1);
-                        if (cibleData.race === "Ethéré") soinBrut = Math.floor(soinBrut * 1.3);
+                        soinBrut = Math.floor(soinBrut * window.multiplicateurSoinsRecus(cibleData));
                         // Brûlé : -50% sur tous les soins reçus tant que l'état est actif.
                         if ((cibleData.Etats_Alteres || []).some(e => e.nom === "Brûlé")) {
                             soinBrut = Math.floor(soinBrut * 0.5);
@@ -3078,8 +3099,8 @@ jaugeContainer.className = "jauge-flash-token";
                 //  3. DÉGÂTS NORMAUX (Vérifie le bouclier d'abord)
                 // ======================================================
                 else {
-                    const defPhys = (parseInt(cibleData.Def_Physique) || 0) + (parseInt(cibleData.Dev_Mod_DefPhys) || 0);
-                    const defMag = (parseInt(cibleData.Def_Magique) || 0) + (parseInt(cibleData.Dev_Mod_DefMag) || 0);
+                    const defPhys = window.defPhysiqueCombattant(cibleData);
+                    const defMag = window.defMagiqueCombattant(cibleData);
                     // Un critique double la frappe à la source : tout ce qui suit
                     // (malus au contact, absorption, résistances, étalement,
                     // bouclier) travaille ensuite sur ce montant doublé.
@@ -3350,8 +3371,8 @@ jaugeContainer.className = "jauge-flash-token";
             
             // Si c'est un sort pur (sans dégâts), il faut calculer l'esquive ICI
             if (!action.attaques || action.attaques.length === 0) {
-                let esquive = (parseInt(cData.Esquive) || 0) + (parseInt(cData.Dev_Mod_Esquive) || 0);
-                let parade = (parseInt(cData.Parade) || 0) + (parseInt(cData.Dev_Mod_Parade) || 0);
+                let esquive = window.esquiveCombattant(cData);
+                let parade = window.paradeCombattant(cData);
                 const statDef = Math.max(esquive, parade);
                 const jetDef = Math.floor(Math.random() * 100) + 1;
                 
@@ -3420,6 +3441,14 @@ jaugeContainer.className = "jauge-flash-token";
                 let roll = Math.floor(Math.random() * 100) + 1;
                 console.log(`🎲 Jet d'application [${alt.nom}] sur ${cData.nom} : Résultat ${roll} (Chance: ${alt.chance}%)`
                             + (critique ? " — imposé par le critique" : ""));
+
+                // Un peuple immunisé ne l'attrape jamais : le jet a beau réussir,
+                // et le critique a beau l'imposer, l'état ne prend pas sur lui.
+                if (window.estImmunise(cData, alt.nom)) {
+                    const tkImmun = window.TOKENS_VTT_DATA[idCible];
+                    if (tkImmun) window.afficherMessageFlottantHex(tkImmun.q, tkImmun.r, "Immunisé", "#7fd4ff");
+                    continue;
+                }
 
                 if (critique || roll <= alt.chance) {
                     let existing = nouveauxEtats.find(e => e.nom === alt.nom);
