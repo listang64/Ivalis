@@ -394,69 +394,175 @@ async function sauvegarderFichePersonnage(donnees, skipImage = false) {
 async function supprimerPersonnageBDD(idPersonnage) {
   if (!idPersonnage) return false;
 
-  try {
-      console.log(`🧹 [Nettoyage] Début de l'effacement total pour ${idPersonnage}...`);
+  console.log(`🧹 [Nettoyage] Effacement total de ${idPersonnage}...`);
 
-      // 1. Nettoyage de l'initiative dans la partie en cours
-      if (window.ID_PARTIE_COURANTE) {
-          const partieRef = doc(db, COL.PARTIES, window.ID_PARTIE_COURANTE);
+  // On lit la fiche AVANT de l'effacer : c'est elle qui porte sa partie et
+  // l'adresse de ses images.
+  let data = null;
+  try {
+      const snapPerso = await getDoc(doc(db, COL.PERSONNAGES, idPersonnage));
+      if (snapPerso.exists()) data = snapPerso.data();
+  } catch (e) {
+      console.error("Lecture de la fiche avant suppression :", e);
+  }
+
+  // Les parties à nettoyer : celle de la fiche ET celle ouverte à l'écran. Les
+  // deux diffèrent quand on efface un héros depuis le menu principal — c'est ce
+  // qui laissait son nom dans l'ordre d'initiative d'une partie pour toujours,
+  // et les créatures l'attendaient au moment de choisir leurs cartes.
+  const parties = new Set();
+  if (data && data.ID_Partie) parties.add(data.ID_Partie);
+  if (window.ID_PARTIE_COURANTE) parties.add(window.ID_PARTIE_COURANTE);
+
+  for (const idPartie of parties) {
+      // 1. Ordre d'initiative et file d'attente du combat.
+      try {
+          const partieRef = doc(db, COL.PARTIES, idPartie);
           const partieSnap = await getDoc(partieRef);
-          
           if (partieSnap.exists()) {
               const dataPartie = partieSnap.data();
-              let ordre = dataPartie.Ordre_Initiative || [];
-              let file = dataPartie.File_Attente_Combat || [];
-              let phase = dataPartie.Phase_Combat || "Preparation";
-              
+              const ordre = dataPartie.Ordre_Initiative || [];
+              const file = dataPartie.File_Attente_Combat || [];
+
               if (ordre.includes(idPersonnage) || file.some(f => f.idPersonnage === idPersonnage)) {
                   const nouvelOrdre = ordre.filter(id => id !== idPersonnage);
                   const nouvelleFile = file.filter(f => f.idPersonnage !== idPersonnage);
-                  
-                  // 🔻 CORRECTION : On se base sur l'initiative
-                  const nbJoueursRestants = nouvelOrdre.filter(id => {
+                  let phase = dataPartie.Phase_Combat || "Preparation";
+
+                  const nbRestants = nouvelOrdre.filter(id => {
                       const p = (window.PERSOS_PARTIE || []).find(perso => perso.idPersonnage === id);
                       return p && p.statut !== "Mort";
                   }).length;
-                  
-                  if (phase === "Preparation" && nouvelleFile.length >= nbJoueursRestants && nbJoueursRestants > 0) {
+                  if (phase === "Preparation" && nouvelleFile.length >= nbRestants && nbRestants > 0) {
                       phase = "Resolution";
                   }
 
-                  await updateDoc(partieRef, { 
+                  await updateDoc(partieRef, {
                       Ordre_Initiative: nouvelOrdre,
                       File_Attente_Combat: nouvelleFile,
                       Phase_Combat: phase
                   });
-                  console.log("✔️ Retiré de l'ordre d'initiative et de la file d'attente.");
+                  console.log(`   ✔️ Retiré de l'initiative de ${idPartie}.`);
               }
           }
+      } catch (e) {
+          console.error("Nettoyage de l'initiative :", e);
       }
 
-      // 2. Suppression de la sous-collection "Competences" (En lot / Batch)
-      const qComp = query(collection(db, COL.PERSONNAGES, idPersonnage, "Competences"));
-      const snapComp = await getDocs(qComp);
-      if (!snapComp.empty) {
-          const batch = writeBatch(db);
-          snapComp.forEach(docComp => {
-              batch.delete(doc(db, COL.PERSONNAGES, idPersonnage, "Competences", docComp.id));
-          });
-          await batch.commit();
-          console.log("✔️ Sous-collection 'Competences' purgée.");
+      // 2. Son pion sur le plateau, et les zones persistantes qu'il a posées :
+      //    sans ça son jeton restait à sa case et ses flaques continuaient de
+      //    brûler ceux qui passaient dessus.
+      try {
+          const vttRef = doc(db, "Combat_VTT", idPartie);
+          const vttSnap = await getDoc(vttRef);
+          if (vttSnap.exists()) {
+              const maj = { ["Tokens." + idPersonnage]: deleteField() };
+              const zones = vttSnap.data().Zones_Persistantes || {};
+              const zonesRestantes = {};
+              let zonesRetirees = 0;
+              Object.keys(zones).forEach(cle => {
+                  if (zones[cle] && zones[cle].idLanceur === idPersonnage) zonesRetirees++;
+                  else zonesRestantes[cle] = zones[cle];
+              });
+              if (zonesRetirees > 0) maj.Zones_Persistantes = zonesRestantes;
+              await updateDoc(vttRef, maj);
+              if (zonesRetirees > 0) console.log(`   ✔️ ${zonesRetirees} zone(s) persistante(s) effacée(s).`);
+              console.log(`   ✔️ Pion retiré du plateau de ${idPartie}.`);
+          }
+      } catch (e) {
+          console.error("Nettoyage du plateau :", e);
       }
-
-      // 3. Suppression des données annexes (Caractéristiques)
-      await deleteDoc(doc(db, COL.CARACTERISTIQUES, idPersonnage));
-      console.log("✔️ Caractéristiques effacées.");
-
-      // 4. Suppression du document racine du héros
-      await deleteDoc(doc(db, COL.PERSONNAGES, idPersonnage));
-      console.log("✔️ Document racine du Héros incinéré.");
-
-      return true;
-  } catch (e) {
-      console.error("❌ Erreur lors de la suppression profonde du personnage :", e);
-      return false;
   }
+
+  // 3. Ses illusions : ce sont des personnages à part entière en base, qui ne
+  //    servent plus à rien une fois leur créateur effacé.
+  try {
+      const snapIllusions = await getDocs(query(collection(db, COL.PERSONNAGES), where("Est_Illusion", "==", true)));
+      const prenom = (data && (data.Prenom_Personnage || "")).trim();
+      for (const docIllusion of snapIllusions.docs) {
+          const di = docIllusion.data();
+          const memeCreateur = di.ID_Lanceur === idPersonnage
+              || (!di.ID_Lanceur && prenom && (di.Nom_Personnage || "").trim() === prenom);
+          if (!memeCreateur) continue;
+          await deleteDoc(doc(db, COL.PERSONNAGES, docIllusion.id)).catch(e => console.error(e));
+          if (di.ID_Partie) {
+              await updateDoc(doc(db, "Combat_VTT", di.ID_Partie), {
+                  ["Tokens." + docIllusion.id]: deleteField()
+              }).catch(() => {});
+          }
+          console.log(`   ✔️ Illusion ${docIllusion.id} effacée.`);
+      }
+  } catch (e) {
+      console.error("Nettoyage des illusions :", e);
+  }
+
+  // 4. Sa sous-collection "Competences" : Firestore ne l'emporte PAS avec le
+  //    document parent, elle survivrait en orpheline.
+  try {
+      const snapComp = await getDocs(query(collection(db, COL.PERSONNAGES, idPersonnage, "Competences")));
+      if (!snapComp.empty) {
+          const lot = writeBatch(db);
+          snapComp.forEach(docComp => lot.delete(doc(db, COL.PERSONNAGES, idPersonnage, "Competences", docComp.id)));
+          await lot.commit();
+          console.log(`   ✔️ ${snapComp.size} compétence(s) effacée(s).`);
+      }
+  } catch (e) {
+      console.error("Nettoyage des compétences :", e);
+  }
+
+  // 5. Ses caractéristiques, puis sa fiche.
+  try {
+      await deleteDoc(doc(db, COL.CARACTERISTIQUES, idPersonnage));
+      console.log("   ✔️ Caractéristiques effacées.");
+  } catch (e) {
+      console.error("Suppression des caractéristiques :", e);
+  }
+
+  let ficheEffacee = false;
+  try {
+      await deleteDoc(doc(db, COL.PERSONNAGES, idPersonnage));
+      ficheEffacee = true;
+      console.log("   ✔️ Fiche effacée.");
+  } catch (e) {
+      console.error("Suppression de la fiche :", e);
+  }
+
+  // 6. Ses images sur Cloudinary : le portrait et le pion tactique. Sans les
+  //    clés Cloudinary en réglages, la fonction ne fait rien — on le dit, plutôt
+  //    que de laisser croire que tout est parti.
+  if (data && typeof window.supprimerImageCloudinary === "function") {
+      const aLesCles = !!localStorage.getItem("ivalis_CLOUDINARY_API_SECRET");
+      const images = [data.URL_Cloudinary, data.URL_Token].filter(Boolean);
+      if (images.length > 0 && !aLesCles) {
+          console.warn("   ⚠️ Images Cloudinary conservées : clés API absentes des réglages.");
+      }
+      for (const url of images) {
+          await window.supprimerImageCloudinary(url).catch(e => console.error(e));
+      }
+  }
+
+  // 7. Ce qu'il laissait derrière lui dans CE navigateur.
+  try {
+      localStorage.removeItem("ivalis_perso_" + idPersonnage);
+      if (window.SOURCE_COMBATTANTS) delete window.SOURCE_COMBATTANTS[idPersonnage];
+      if (window.TOKENS_VTT_DATA) delete window.TOKENS_VTT_DATA[idPersonnage];
+      if (window.CACHE_COMPETENCES_GLOBAL) delete window.CACHE_COMPETENCES_GLOBAL[idPersonnage];
+      if (Array.isArray(window.PERSOS_PARTIE)) {
+          window.PERSOS_PARTIE = window.PERSOS_PARTIE.filter(p => p.idPersonnage !== idPersonnage);
+      }
+      if (Array.isArray(window.PERSOS_JOUEURS_PARTIE)) {
+          window.PERSOS_JOUEURS_PARTIE = window.PERSOS_JOUEURS_PARTIE.filter(p => p.idPersonnage !== idPersonnage);
+      }
+      if (typeof window.appliquerTokensVTT === "function" && window.TOKENS_VTT_DATA) {
+          window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+      }
+      if (typeof window.afficherPisteInitiative === "function") window.afficherPisteInitiative();
+  } catch (e) {
+      console.error("Nettoyage local :", e);
+  }
+
+  console.log(ficheEffacee ? "🧹 [Nettoyage] Terminé." : "🧹 [Nettoyage] Terminé, mais la fiche n'a pas pu être effacée.");
+  return ficheEffacee;
 }
 
 // =========================================================================
@@ -2919,34 +3025,15 @@ async function validerSuppressionPerso() {
   btnConfirmer.innerText = "Destruction...";
   btnConfirmer.style.pointerEvents = "none";
 
-  // =========================================================
-  // NOUVEAU : SUPPRESSION DU PORTRAIT ET DU PION CLOUDINARY
-  // =========================================================
-  try {
-      const snap = await getDoc(doc(db, "Personnages", id));
-      if (snap.exists()) {
-          const d = snap.data();
-          if (d.URL_Cloudinary && typeof window.supprimerImageCloudinary === "function") {
-              console.log("🔥 Incinération du portrait Cloudinary...");
-              await window.supprimerImageCloudinary(d.URL_Cloudinary);
-          }
-          if (d.URL_Token && typeof window.supprimerImageCloudinary === "function") {
-              console.log("🔥 Incinération du pion tactique Cloudinary...");
-              await window.supprimerImageCloudinary(d.URL_Token);
-          }
-        }
-  } catch (e) {
-      console.error("Erreur lors de l'incinération des images :", e);
-  }
-  // =========================================================
-
+  // Tout part d'un seul endroit : fiche, caractéristiques, compétences,
+  // illusions, pion sur le plateau, zones persistantes, place dans l'ordre
+  // d'initiative, images Cloudinary et traces laissées dans ce navigateur.
   await supprimerPersonnageBDD(id);
 
   btnConfirmer.innerText = "Oui, détruire";
   btnConfirmer.style.pointerEvents = "auto";
   document.getElementById("voile-suppression-perso").style.display = "none";
 
-  localStorage.removeItem("ivalis_perso_" + id);
   fermerFichePerso();
   // La liste se met à jour automatiquement via onSnapshot (temps réel).
 }

@@ -91,6 +91,18 @@ console.log("\n3. ELLE DISPARAÎT BIEN TOUTE SEULE À LA FIN");
   verifier("aucune jauge ne reste collée au pion", r.restantes === 0, `(${r.restantes})`);
 }
 
+console.log("\n4. UN PION SANS COMBATTANT N'EST PLUS DESSINÉ");
+{
+  const r = await p.evaluate(() => {
+    window.TOKENS_VTT_DATA.FANTOME = { q:3, r:0, taille:55 };   // fiche supprimée
+    window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    return { fantome: !!document.getElementById("token-FANTOME"),
+             vrais: document.querySelectorAll(".token-vtt").length };
+  });
+  verifier("le pion fantôme n'apparaît pas", !r.fantome);
+  verifier("les vrais pions sont toujours là", r.vrais === 2, `(${r.vrais})`);
+}
+
 await p.screenshot({ path: '/tmp/jauge_token.png' });
 await b.close();
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

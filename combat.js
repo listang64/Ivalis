@@ -1661,6 +1661,11 @@ window.appliquerTokensVTT = function(tokensMap) {
         // cherchent un pion par son id gèrent déjà son absence.
         if (window.estCombattantMort(idPerso)) continue;
 
+        // Pion fantôme : son combattant n'existe plus (fiche supprimée, monstre
+        // effacé). On ne le dessine pas — il resterait un jeton vide et cliquable
+        // au milieu du plateau. Le nettoyage de fin de combat le retire pour de bon.
+        if (!pData) continue;
+
         const divToken = document.createElement("div");
         divToken.className = "token-vtt";
         divToken.style.position = "absolute";
@@ -3235,7 +3240,7 @@ window.reinitialiserCombat = async function() {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
 
     try {
-        const { doc, deleteDoc, updateDoc, deleteField } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+        const { doc, getDoc, deleteDoc, updateDoc, deleteField } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
 
         // A. Reset de la Partie (Tour 1, file vide)
         if (window.ID_PARTIE_COURANTE) {
@@ -3263,6 +3268,36 @@ window.reinitialiserCombat = async function() {
         // initiative et réserve de renforts sont effacés d'un bloc (cf. monstres.js).
         if (typeof window.nettoyerMonstresCombat === "function") {
             await window.nettoyerMonstresCombat().catch(e => console.error(e));
+        }
+
+        // A quater. Les fantômes : pions et entrées d'initiative dont le combattant
+        // n'existe plus (une fiche supprimée depuis un autre écran, un monstre
+        // effacé à la main). Ils encombrent le plateau et l'ordre de passage.
+        if (window.ID_PARTIE_COURANTE) {
+            try {
+                const existe = (id) => (window.PERSOS_PARTIE || []).some(p => p.idPersonnage === id);
+                const partieRefF = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
+                const snapF = await getDoc(partieRefF);
+                if (snapF.exists()) {
+                    const ordreF = snapF.data().Ordre_Initiative || [];
+                    const ordrePropre = ordreF.filter(existe);
+                    if (ordrePropre.length !== ordreF.length) {
+                        await updateDoc(partieRefF, { Ordre_Initiative: ordrePropre });
+                        console.log(`🧹 ${ordreF.length - ordrePropre.length} combattant(s) disparu(s) retiré(s) de l'ordre d'initiative.`);
+                    }
+                }
+
+                const fantomes = Object.keys(window.TOKENS_VTT_DATA || {}).filter(id => !existe(id));
+                if (fantomes.length > 0) {
+                    const vttRefF = doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE);
+                    const majF = {};
+                    fantomes.forEach(id => { delete window.TOKENS_VTT_DATA[id]; majF["Tokens." + id] = deleteField(); });
+                    await updateDoc(vttRefF, majF).catch(e => console.error(e));
+                    console.log(`🧹 ${fantomes.length} pion(s) fantôme(s) retiré(s) du plateau.`);
+                }
+            } catch (e) {
+                console.error("Nettoyage des fantômes :", e);
+            }
         }
 
         const illusions = (window.PERSOS_PARTIE || []).filter(p => p.estIllusion);

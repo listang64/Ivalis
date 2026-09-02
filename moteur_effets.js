@@ -791,6 +791,9 @@ window.creerIllusion = async function(idLanceur, q, r) {
     const dataIllusion = {
         ID_Partie: window.ID_PARTIE_COURANTE,
         ID_Joueur: lanceurData.idJoueur || "MJ",
+        // Qui l'a créée : c'est ce qui permet d'effacer ses leurres avec elle
+        // quand on supprime un personnage.
+        ID_Lanceur: idLanceur,
         Camp: lanceurData.camp,
         Prenom_Personnage: "Illusion de",
         Nom_Personnage: (lanceurData.prenom || lanceurData.nom || "").trim(),
