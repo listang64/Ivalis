@@ -52,6 +52,8 @@ node zones_ia.mjs           # les zones sont posées, orientées et bien placée
 node piste_initiative.mjs   # la piste tient à droite du panneau, bulles réduites
 node titres_bannieres.mjs   # les noms de carte rétrécissent au lieu d'être coupés
 node jauges_panneau.mjs     # vitalité et énergie du panneau gauche, à chaque étape
+node jauge_token.mjs        # la jauge sous le pion survit à un redessin
+node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 ```
 

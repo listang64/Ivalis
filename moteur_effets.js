@@ -48,6 +48,7 @@ window.afficherFlashDegatToken = function(idCible, ancienneValeur, nouvelleValeu
     const newPct = Math.max(0, Math.min(100, (nouvelleValeur / valeurMax) * 100));
 
     const jaugeContainer = document.createElement("div");
+jaugeContainer.className = "jauge-flash-token";
     jaugeContainer.style.position = "absolute";
     jaugeContainer.style.bottom = "-12px";
     jaugeContainer.style.left = "50%";
@@ -2636,6 +2637,14 @@ window.declencherResolution = async function() {
         timestamp: new Date().getTime()
     };
 
+    // C'est CE poste qui vient de résoudre la carte. Tous les navigateurs vont
+    // rejouer l'animation en recevant Action_Moteur, mais un seul doit écrire le
+    // résultat en base — sinon ils s'écriraient dessus. On retient donc l'instant
+    // exact de la résolution : celui qui le reconnaît est l'auteur.
+    window.RESOLUTIONS_LOCALES = window.RESOLUTIONS_LOCALES || [];
+    window.RESOLUTIONS_LOCALES.push(actionData.timestamp);
+    if (window.RESOLUTIONS_LOCALES.length > 40) window.RESOLUTIONS_LOCALES.shift();
+
     try {
         await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
             Action_Moteur: actionData
@@ -2681,6 +2690,15 @@ window.jouerAnimationMoteur = async function(action) {
     const tkLanceur = window.TOKENS_VTT_DATA[lanceur];
     const lanceurData = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
 
+    // Qui écrit le résultat en base ? Le poste qui a résolu la carte, et lui seul.
+    // C'était jusqu'ici « le propriétaire du lanceur » — ce qui marche pour la
+    // carte d'un joueur, mais PAS pour une créature : son ID_Joueur vaut "MJ", ne
+    // correspond à personne, et plus rien n'était écrit. Les dégâts, les états et
+    // la fatigue restaient donc dans la mémoire du navigateur, et le premier
+    // snapshot venu les effaçait — « mes points de vie restent bloqués à 12 ».
+    const jeSuisLAuteur = Array.isArray(window.RESOLUTIONS_LOCALES)
+        && window.RESOLUTIONS_LOCALES.includes(action.timestamp);
+
     // 🔻 NOUVEAU : message de confusion, affiché à tous avant que la carte (déjà redirigée
     // côté Firestore par declencherResolution) ne se résolve, pour que la redirection soit lisible.
     if (action.confusion && tkLanceur) {
@@ -2717,9 +2735,7 @@ window.jouerAnimationMoteur = async function(action) {
         const tractionAlt = (action.alterations || []).find(a => a.estTraction);
         const idCibleTraction = tractionAlt && tractionAlt.cibles && tractionAlt.cibles[0];
         if (tractionAlt && idCibleTraction) {
-            const currentUserIdTractionTot = localStorage.getItem("ID_JOUEUR_COURANT");
-            const lDataTractionTot = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
-            if (lDataTractionTot && lDataTractionTot.idJoueur === currentUserIdTractionTot) {
+            if (jeSuisLAuteur) {
                 const rollTractionTot = Math.floor(Math.random() * 100) + 1;
                 console.log(`🎲 Jet de Traction (avant attaque) : Résultat ${rollTractionTot} (Chance: ${tractionAlt.chance}%)`);
                 if (rollTractionTot <= tractionAlt.chance && typeof window.declencherTractionCible === "function") {
@@ -2855,8 +2871,7 @@ window.jouerAnimationMoteur = async function(action) {
                         // Force le rafraîchissement immédiat du VTT pour afficher le halo bleu
                         if (typeof window.appliquerTokensVTT === "function") window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
 
-                        const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
-                        if (lanceurData && lanceurData.idJoueur === currentUserId) {
+                        if (jeSuisLAuteur) {
                             updateDoc(window.refCombattant(idCible), {
                                 Bouclier_Max: shieldValue,
                                 Bouclier_Actuel: shieldValue
@@ -2893,6 +2908,7 @@ window.jouerAnimationMoteur = async function(action) {
                                 const newPct = Math.max(0, Math.min(100, (newPv / maxPv) * 100));
                                 
                                 const jaugeContainer = document.createElement("div");
+jaugeContainer.className = "jauge-flash-token";
                                 jaugeContainer.style.position = "absolute";
                                 jaugeContainer.style.bottom = "-12px"; 
                                 jaugeContainer.style.left = "50%";
@@ -2940,8 +2956,7 @@ window.jouerAnimationMoteur = async function(action) {
                                 if (tkCible) window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Purifié ✨", "#ffffff");
                             }, delaiAffichage);
 
-                            const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
-                            if (lanceurData && lanceurData.idJoueur === currentUserId) {
+                            if (jeSuisLAuteur) {
                                 updateDoc(window.refCombattant(idCible), { Etats_Alteres: [] }).catch(e => console.error(e));
                             }
                             if (window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]?.idPersonnage === idCible) {
@@ -2950,8 +2965,7 @@ window.jouerAnimationMoteur = async function(action) {
                         }
                     }
 
-                    const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
-                    if (lanceurData && lanceurData.idJoueur === currentUserId) {
+                    if (jeSuisLAuteur) {
                         const refPerso = window.refCombattant(idCible);
                         updateDoc(refPerso, { PV_Actuels: cibleData.PV_Actuels }).catch(e => console.error(e));
                     }
@@ -3038,6 +3052,7 @@ window.jouerAnimationMoteur = async function(action) {
 
                                 // On dessine la barre Bleue du Bouclier
                                 const jaugeContainer = document.createElement("div");
+jaugeContainer.className = "jauge-flash-token";
                                 jaugeContainer.style.position = "absolute";
                                 jaugeContainer.style.bottom = "-12px";
                                 jaugeContainer.style.left = "50%";
@@ -3096,6 +3111,7 @@ window.jouerAnimationMoteur = async function(action) {
                                 const newPct = Math.max(0, Math.min(100, (newPv / maxPv) * 100));
                                 
                                 const jaugeContainer = document.createElement("div");
+jaugeContainer.className = "jauge-flash-token";
                                 jaugeContainer.style.position = "absolute";
                                 jaugeContainer.style.bottom = "-12px"; 
                                 jaugeContainer.style.left = "50%";
@@ -3162,8 +3178,7 @@ window.jouerAnimationMoteur = async function(action) {
                         }
                     }
 
-                    const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
-                    if (lanceurData && lanceurData.idJoueur === currentUserId) {
+                    if (jeSuisLAuteur) {
                         const refPerso = window.refCombattant(idCible);
                         const updatePayload = { PV_Actuels: cibleData.PV_Actuels };
                         if (oldShield > 0) {
@@ -3191,7 +3206,7 @@ window.jouerAnimationMoteur = async function(action) {
                     // seul le client du lanceur écrit — les autres la voient s'effacer via les
                     // écouteurs Firestore déjà en place.
                     if (cibleData.estIllusion && (parseInt(cibleData.PV_Actuels) || 0) <= 0
-                        && lanceurData && lanceurData.idJoueur === currentUserId
+                        && jeSuisLAuteur
                         && typeof window.detruireIllusion === "function") {
                         if (tkCible) window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Illusion dissipée", "#c2a878");
                         await window.detruireIllusion(idCible);
@@ -3203,7 +3218,7 @@ window.jouerAnimationMoteur = async function(action) {
                     // renfort prend sa place sur le terrain. Seul le client du lanceur écrit.
                     if (!cibleData.estIllusion && cibleData.estMonstre && cibleData.statut !== "Mort"
                         && (parseInt(cibleData.PV_Actuels) || 0) <= 0
-                        && lanceurData && lanceurData.idJoueur === currentUserId
+                        && jeSuisLAuteur
                         && typeof window.marquerMonstreMort === "function") {
                         cibleData.statut = "Mort";
                         if (tkCible) window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Terrassé !", "#ff6b6b");
@@ -3255,9 +3270,7 @@ window.jouerAnimationMoteur = async function(action) {
                 // seule fois, par le lanceur, puis diffusés (Action_Poussee) pour que tous les
                 // joueurs voient le même résultat — les autres clients ne font rien ici.
                 if (alt.estPoussee) {
-                    const currentUserIdPoussee = localStorage.getItem("ID_JOUEUR_COURANT");
-                    const lDataPoussee = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
-                    if (lDataPoussee && lDataPoussee.idJoueur === currentUserIdPoussee) {
+                    if (jeSuisLAuteur) {
                         const rollPoussee = Math.floor(Math.random() * 100) + 1;
                         console.log(`🎲 Jet de Poussée sur ${cData.nom} : Résultat ${rollPoussee} (Chance: ${alt.chance}%)`);
                         if (rollPoussee <= alt.chance && typeof window.declencherPousseeCible === "function") {
@@ -3273,9 +3286,7 @@ window.jouerAnimationMoteur = async function(action) {
                 // Déjà résolue plus haut si elle précédait l'attaque sur la carte (tractionDejaResolue).
                 if (alt.estTraction) {
                     if (tractionDejaResolue) continue;
-                    const currentUserIdTraction = localStorage.getItem("ID_JOUEUR_COURANT");
-                    const lDataTraction = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
-                    if (lDataTraction && lDataTraction.idJoueur === currentUserIdTraction) {
+                    if (jeSuisLAuteur) {
                         const rollTraction = Math.floor(Math.random() * 100) + 1;
                         console.log(`🎲 Jet de Traction sur ${cData.nom} : Résultat ${rollTraction} (Chance: ${alt.chance}%)`);
                         if (rollTraction <= alt.chance && typeof window.declencherTractionCible === "function") {
@@ -3290,9 +3301,7 @@ window.jouerAnimationMoteur = async function(action) {
                 // Peur : pas un état persistant. Même principe que Poussée/Traction (jet et
                 // résolution une seule fois, par le lanceur, puis diffusés).
                 if (alt.estPeur) {
-                    const currentUserIdPeur = localStorage.getItem("ID_JOUEUR_COURANT");
-                    const lDataPeur = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
-                    if (lDataPeur && lDataPeur.idJoueur === currentUserIdPeur) {
+                    if (jeSuisLAuteur) {
                         const rollPeur = Math.floor(Math.random() * 100) + 1;
                         console.log(`🎲 Jet de Peur sur ${cData.nom} : Résultat ${rollPeur} (Chance: ${alt.chance}%)`);
                         if (rollPeur <= alt.chance && typeof window.declencherPeurCible === "function") {
@@ -3371,11 +3380,8 @@ window.jouerAnimationMoteur = async function(action) {
             if (cibleModifiee) {
                 cData.Etats_Alteres = nouveauxEtats; // MAJ locale immédiate
 
-                const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
-                const lData = window.PERSOS_PARTIE.find(p => p.idPersonnage === lanceur);
-
                 // Envoi à la BDD
-                if (!lData || lData.idJoueur === currentUserId || !currentUserId) {
+                if (jeSuisLAuteur) {
                     const payloadAlterations = { Etats_Alteres: nouveauxEtats };
                     if (poisonTickApplique) {
                         payloadAlterations.PV_Actuels = cData.PV_Actuels;
@@ -3397,8 +3403,16 @@ window.jouerAnimationMoteur = async function(action) {
         }
     }
 
-    const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
-    if (lanceurData && lanceurData.idJoueur === currentUserId) {
-        window.validerCarteCombat(action.idCarte, null);
+    if (jeSuisLAuteur) {
+        if (lanceurData && lanceurData.estMonstre) {
+            // Une créature paie sa carte comme tout le monde — sans quoi elle ne
+            // se fatiguait jamais et ne soufflait jamais. Mais c'est l'IA qui rend
+            // la main : validerCarteCombat enchaînerait une seconde fin de tour.
+            if (typeof window.deduireFatigueCarte === "function") {
+                window.deduireFatigueCarte(lanceur, action.idCarte);
+            }
+        } else {
+            window.validerCarteCombat(action.idCarte, null);
+        }
     }
 };

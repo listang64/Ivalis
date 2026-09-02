@@ -1634,6 +1634,20 @@ window.appliquerTokensVTT = function(tokensMap) {
         window.appliquerZonesPersistantes();
     }
 
+    // Les petites jauges qui apparaissent sous un pion pendant une animation de
+    // dégâts vivent DANS le pion. Or le moindre changement en base redessine tous
+    // les pions : la jauge était balayée en pleine descente, et on ne voyait donc
+    // jamais la barre d'un ennemi bouger. On les met de côté et on les remet en
+    // place : leurs animations, elles, continuent de tourner sur les mêmes
+    // éléments.
+    const jaugesEnCours = {};
+    conteneur.querySelectorAll(".jauge-flash-token").forEach(jauge => {
+        const pion = jauge.closest(".token-vtt");
+        if (!pion || !pion.id) return;
+        const id = pion.id.replace("token-", "");
+        (jaugesEnCours[id] = jaugesEnCours[id] || []).push(jauge);
+    });
+
     conteneur.innerHTML = "";
 
     for (let idPerso in tokensMap) {
@@ -1666,6 +1680,7 @@ window.appliquerTokensVTT = function(tokensMap) {
         divToken.style.zIndex = "10";
         divToken.style.borderRadius = "50%";
         divToken.id = "token-" + idPerso;
+        (jaugesEnCours[idPerso] || []).forEach(jauge => divToken.appendChild(jauge));
 
         // 1️⃣ L'OMBRE PORTÉE : jeton posé à plat sur la table, lumière venant du haut.
         // C'est un disque de la taille du jeton, simplement décalé vers le bas : le médaillon
@@ -3104,6 +3119,33 @@ window.actualiserBannieresEpuisees = function() {
     });
 };
 
+// Le paiement d'une carte : la fatigue du lanceur baisse, en mémoire et en base.
+// Extrait de validerCarteCombat pour qu'une créature puisse payer sa carte sans
+// déclencher, elle, la fin de tour (c'est son IA qui rend la main).
+window.deduireFatigueCarte = async function(idPersonnage, idCarte) {
+    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+    const dataCarte = (window.COMPETENCES_CACHE || {})[idCarte]
+        || ((window.CACHE_COMPETENCES_GLOBAL || {})[idPersonnage] || {})[idCarte];
+    if (!perso || !dataCarte) return;
+
+    const coutFatigue = parseInt(dataCarte.Fatigue) || 0;
+    const fatigueMax = parseInt(perso.Fatigue_Max) || parseInt(perso.fatigueMax) || 100;
+    const avant = perso.fatigueActuelle !== undefined ? parseInt(perso.fatigueActuelle) : fatigueMax;
+    const fatigue = Math.max(0, avant - coutFatigue);
+
+    perso.fatigueActuelle = fatigue;
+    const copiePanneau = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === idPersonnage);
+    if (copiePanneau) copiePanneau.fatigueActuelle = fatigue;
+    if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
+    if (typeof window.afficherPisteInitiative === "function") window.afficherPisteInitiative();
+
+    try {
+        await updateDoc(window.refCombattant(idPersonnage), { Fatigue_Actuelle: fatigue });
+    } catch (e) {
+        console.error("Erreur lors de la déduction de la fatigue :", e);
+    }
+};
+
 window.validerCarteCombat = async function(idCarte, elementTexte) {
     if (elementTexte && elementTexte.innerText === "Validé") return;
 
@@ -3121,36 +3163,11 @@ window.validerCarteCombat = async function(idCarte, elementTexte) {
     const dataCarte = window.COMPETENCES_CACHE[idCarte];
     if (!dataCarte) return;
 
-    const coutFatigue = parseInt(dataCarte.Fatigue) || 0;
-    const fatigueMax = parseInt(persoActuel.Fatigue_Max) || parseInt(persoActuel.fatigueMax) || 100;
-    let fatigue = persoActuel.fatigueActuelle !== undefined ? parseInt(persoActuel.fatigueActuelle) : fatigueMax;
-
-    fatigue = Math.max(0, fatigue - coutFatigue);
-
-    persoActuel.fatigueActuelle = fatigue;
-    window.COMBAT_FATIGUE_ACTUELLE = fatigue;
-
-    const persoPartie = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === persoActuel.idPersonnage);
-    if (persoPartie) persoPartie.fatigueActuelle = fatigue;
-
-    if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
+    await window.deduireFatigueCarte(persoActuel.idPersonnage, idCarte);
 
     if (typeof window.finDeTourCombat === "function") {
         window.finDeTourCombat(true);
     }
-
-    setTimeout(async () => {
-        try {
-            const persoRef = window.refCombattant(persoActuel.idPersonnage);
-            
-            await updateDoc(persoRef, { 
-                Fatigue_Actuelle: fatigue 
-            });
-            
-        } catch (e) {
-            console.error("Erreur lors de la déduction de la fatigue :", e);
-        }
-    }, 350);
 };
 
 // =========================================================================
