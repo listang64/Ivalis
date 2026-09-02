@@ -125,6 +125,34 @@ console.log("\nLA PISTE APPARAÎT MÊME SI LA BASCULE TOMBE PENDANT L'ANIMATION"
            r.apres.bulles === 3 && r.apres.opacite === "1", `(${r.apres.bulles} bulles, opacité ${r.apres.opacite})`);
 }
 
+console.log("\nLE VIDAGE RETARDÉ N'EFFACE PLUS LA PISTE FRAÎCHEMENT DESSINÉE");
+{
+  const r = await p.evaluate(async (fnPisteSrc) => {
+    eval(fnPisteSrc);
+    const noms = ["Pliors","Jade","Gnoll"];
+    window.PERSOS_PARTIE = noms.map((n, i) => ({ idPersonnage:"V"+i, prenom:n, PV_Max:50, PV_Actuels:40,
+      Fatigue_Max:100, fatigueActuelle:70, Etats_Alteres:[] }));
+    window.estCombattantMort = () => false;
+    window.ANIMATION_TOUR_EN_COURS = false;
+    const piste = document.getElementById('piste-initiative');
+    const file = noms.map((n,i) => ({ idPersonnage:"V"+i, idCarte:"X", initiative: 80 - i*10 }));
+
+    // Fin de tour : la piste se replie et programme son vidage 400 ms plus tard.
+    window.afficherPisteInitiative([], "Preparation");
+    // La bascule en résolution arrive tout de suite après, comme en vrai.
+    await new Promise(r => setTimeout(r, 100));
+    window.afficherPisteInitiative(file, "Resolution");
+    const juste = piste.children.length;
+    // On laisse passer l'heure du vidage.
+    await new Promise(r => setTimeout(r, 600));
+    return { juste, apres: piste.children.length, opacite: piste.style.opacity };
+  }, fnPiste);
+  console.log(`     dessinée : ${r.juste} bulles — 600 ms plus tard : ${r.apres}`);
+  verifier("la piste est dessinée aussitôt", r.juste === 3, `(${r.juste})`);
+  verifier("elle est toujours là après l'heure du vidage", r.apres === 3 && r.opacite === "1",
+           `(${r.apres} bulles, opacité ${r.opacite})`);
+}
+
 await p.screenshot({ path: '/tmp/piste.png' });
 
 // Combien de combattants tiennent avant que la piste ne recommence à passer

@@ -2747,6 +2747,7 @@ window.finDeTourCombat = async function(forcer = false) {
 
                         if (window.PERSOS_PARTIE && window.PERSOS_PARTIE.length > 0) {
                             const batch = writeBatch(db);
+                            const ecrituresParCombattant = [];
                             let regenAjoutee = false;
                             
                             window.PERSOS_PARTIE.forEach(perso => {
@@ -2900,12 +2901,30 @@ window.finDeTourCombat = async function(forcer = false) {
                                     if (majRequise) {
                                         const persoRef = window.refCombattant(perso.idPersonnage);
                                         batch.update(persoRef, modifsFirebase);
+                                        ecrituresParCombattant.push([perso.idPersonnage, modifsFirebase]);
                                         regenAjoutee = true; // Trigger le commit global
                                     }
                                 }
                             });
                             
-                            if (regenAjoutee) await batch.commit();
+                            // Un seul document introuvable — un monstre effacé, une fiche
+                            // supprimée, un combattant dont on ne sait plus dans quelle
+                            // collection il vit — et TOUT le lot échouait : ni régénération,
+                            // ni décompte des états pour personne, et l'écriture de la file
+                            // qui suit ne se faisait jamais (d'où des états qui s'éternisent
+                            // et une piste d'initiative qui n'apparaît pas). On réessaie donc
+                            // combattant par combattant, pour que les autres soient servis.
+                            if (regenAjoutee) {
+                                try {
+                                    await batch.commit();
+                                } catch (e) {
+                                    console.error("Fin de tour : écriture groupée refusée, on reprend un par un.", e);
+                                    for (const [idPerso, modifs] of ecrituresParCombattant) {
+                                        await updateDoc(window.refCombattant(idPerso), modifs)
+                                            .catch(err => console.error("   ↳ échec pour " + idPerso, err));
+                                    }
+                                }
+                            }
                             if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
                         }
                     }
@@ -2959,11 +2978,18 @@ window.afficherPisteInitiative = function(queue, phase) {
     if (!queue || queue.length === 0 || phase === "Preparation") {
         piste.style.opacity = "0";
         piste.style.padding = "0px";
-        setTimeout(() => piste.innerHTML = "", 400);
+        // Le vidage attend la fin du fondu. Si la piste se redessine entre-temps —
+        // et c'est courant, la bascule en résolution suit de peu la fin du tour —
+        // ce vidage retardé effaçait les bulles qui venaient d'être posées : la
+        // piste restait vide jusqu'à la prochaine action. On l'annule donc à
+        // chaque redessin.
+        clearTimeout(window.VIDAGE_PISTE_INITIATIVE);
+        window.VIDAGE_PISTE_INITIATIVE = setTimeout(() => piste.innerHTML = "", 400);
         if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour(queue || [], phase);
         return;
     }
 
+    clearTimeout(window.VIDAGE_PISTE_INITIATIVE);
     piste.style.opacity = "1";
     piste.style.padding = "0 8px 0 12px";
     let html = "";
@@ -2975,7 +3001,8 @@ window.afficherPisteInitiative = function(queue, phase) {
     if (queue.length === 0) {
         piste.style.opacity = "0";
         piste.style.padding = "0px";
-        setTimeout(() => piste.innerHTML = "", 400);
+        clearTimeout(window.VIDAGE_PISTE_INITIATIVE);
+        window.VIDAGE_PISTE_INITIATIVE = setTimeout(() => piste.innerHTML = "", 400);
         if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour(queue, phase);
         return;
     }

@@ -55,6 +55,7 @@ node occupation_cases.mjs   # qui occupe vraiment une case (morts et fantômes e
 node zone_assombrissement.mjs # où l'on peut poser une zone à distance, et l'écran noirci
 node zones_ia.mjs           # les zones sont posées, orientées et bien placées
 node piste_initiative.mjs   # la piste tient à droite du panneau, bulles réduites
+node fin_de_tour.mjs        # un document introuvable ne fait plus tomber tout le round
 node titres_bannieres.mjs   # les noms de carte rétrécissent au lieu d'être coupés
 node bouton_forge.mjs       # le + de la Forge devient un sablier pendant l'attente
 node jauges_panneau.mjs     # vitalité et énergie du panneau gauche, à chaque étape
