@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Ivalis - Le JDR</title>
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
 
  
   <script>
@@ -605,6 +605,21 @@
                 </div>
             </div>
             
+        </div>
+
+        <!-- BANDEAU D'ACTION (BAS GAUCHE) : la carte du combattant qui joue.
+             Z-index 5, comme le HUD de droite : le panneau latéral (z-index 10) le
+             recouvre entièrement quand il est ouvert, exactement comme demandé. -->
+        <div id="bandeau-action-combat" style="position: absolute; bottom: 26px; left: 26px; width: 44vw; max-width: 520px; z-index: 5; pointer-events: none; opacity: 0; transform: translateY(14px); transition: opacity 0.35s ease, transform 0.35s ease;">
+
+            <!-- Le nom de la carte, dans l'or brossé des noms de personnage -->
+            <div id="bandeau-action-titre" style="font-family: 'Cinzel', serif; font-size: 34px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; background: linear-gradient(135deg, #fbf5bd 0%, #c2a878 25%, #5c3a21 50%, #e8d5a5 75%, #ffffff 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.9));"></div>
+
+            <!-- Les effets qui la composent, sur une seule ligne -->
+            <div id="bandeau-action-effets" style="margin-top: 2px; font-family: 'Almendra', serif; font-size: 16px; line-height: 1.25; color: #c2a878; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 1px 1px 3px black, 0 0 6px black;"></div>
+
+            <!-- Le bouton doré clignotant : n'apparaît que pour le héros du poste -->
+            <div id="bandeau-action-lancer" class="btn-lancer-carte" style="display: none;" onclick="window.lancerCarteBandeau()">Lancer</div>
         </div>
 
         <!-- NOUVEAU : HUD BAS DROITE (Z-index réduit à 5 pour passer sous le panneau gauche) -->
@@ -1295,11 +1310,11 @@
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=8"></script>
 <script src="Plateau.js"></script>
-<script type="module" src="combat.js?v=15"></script>
+<script type="module" src="combat.js?v=16"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=3"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
-<script type="module" src="moteur_effets.js?v=9"></script>
+<script type="module" src="moteur_effets.js?v=10"></script>
 <script type="module" src="monstres.js?v=6"></script>
 <script type="module" src="monstres_competences.js?v=5"></script>
 <script type="module" src="monstres_ia.js?v=11"></script>

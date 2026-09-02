@@ -2616,6 +2616,10 @@ window.nettoyerCiblage = function() {
     const btnResoudre = document.getElementById("btn-resoudre-carte");
     if (btnAppliquer) btnAppliquer.style.display = "block";
     if (btnResoudre) btnResoudre.remove();
+
+    // Le bandeau du bas suit le même sort que le bouton "Appliquer" de la carte :
+    // ciblage annulé, la compétence est de nouveau lançable.
+    if (typeof window.actualiserBandeauAction === "function") window.actualiserBandeauAction();
 };
 
 window.declencherResolution = async function() {

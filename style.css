@@ -2223,3 +2223,61 @@ textarea.input-texte-parchemin {
   font-size: 12px;
   margin-left: 2px;
 }
+
+/* ========================================================================= */
+/* BANDEAU D'ACTION (BAS GAUCHE) : LA CARTE EN COURS DE RÉSOLUTION           */
+/* ========================================================================= */
+
+/* Le bouton doré qui déclenche la compétence. Le scintillement anime une
+   couche de halo posée derrière le texte, et rien d'autre : animer directement
+   box-shadow ou filter force un repaint à chaque frame et fait saccader
+   l'iPad, alors qu'une simple opacité se compose sur le GPU. */
+.btn-lancer-carte {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 10px;
+    padding: 7px 26px;
+    background-color: rgba(10, 8, 5, 0.95);
+    border: 1px solid #c2a878;
+    border-radius: 24px;
+    color: #ffd700;
+    font-family: 'Cinzel', serif;
+    font-size: 15px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    text-shadow: 0 0 8px #ffaa00, 1px 1px 3px black;
+    cursor: pointer;
+    pointer-events: auto;
+    transition: transform 0.2s ease, color 0.2s ease;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+}
+
+/* La couche de halo : c'est elle seule qui clignote. */
+.btn-lancer-carte::before {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: 26px;
+    box-shadow: 0 0 14px 4px rgba(255, 190, 60, 0.55);
+    animation: clignotementLancer 1.1s infinite alternate ease-in-out;
+    -webkit-animation: clignotementLancer 1.1s infinite alternate ease-in-out;
+    pointer-events: none;
+}
+
+.btn-lancer-carte:hover {
+    color: #ffffff;
+    transform: scale(1.06);
+}
+
+.btn-lancer-carte:active {
+    transform: scale(0.96);
+}
+
+@keyframes clignotementLancer {
+    0%   { opacity: 0.15; }
+    100% { opacity: 1; }
+}

@@ -537,8 +537,11 @@ document.addEventListener("click", function(event) {
     const clicSurBanniere = event.target.closest('.banniere-carte-combat');
     const clicSurCarteHD = event.target.closest('#apercu-carte-hd-competence');
     const clicSurFleche = event.target.closest('.btn-combat-switch'); 
+    // Le bandeau du bas n'est pas "le vide" : son bouton doré lance la carte, et
+    // ce nettoyage annulerait le ciblage dans la foulée du clic qui l'ouvre.
+    const clicSurBandeau = event.target.closest('#bandeau-action-combat');
     
-    if (!clicSurBanniere && !clicSurCarteHD && !clicSurFleche && window.CARTE_EN_APERCU) {
+    if (!clicSurBanniere && !clicSurCarteHD && !clicSurFleche && !clicSurBandeau && window.CARTE_EN_APERCU) {
         
         // 🔻 NOUVEAU : Annule le ciblage en cours si on clique dans le vide
         if (typeof window.nettoyerCiblage === "function") window.nettoyerCiblage();
@@ -1936,8 +1939,11 @@ window.changerTailleHexa = function(delta) {
 // =========================================================================
 window.PANNEAU_GAUCHE_OUVERT = true;
 
-window.togglePanneauGauche = function() {
-    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+// "silencieux" : la fermeture et la réouverture automatiques du panneau suivent
+// l'apparition de la piste d'initiative. Elles ne viennent d'aucun clic, et le
+// bruit de parchemin à chaque tour finirait par lasser.
+window.togglePanneauGauche = function(silencieux) {
+    if (!silencieux && typeof window.jouerSonClic === "function") window.jouerSonClic();
     const panneau = document.getElementById("panneau-combat-gauche");
     const fleche = document.getElementById("fleche-toggle-panneau");
     if (!panneau || !fleche) return;
@@ -1952,6 +1958,8 @@ window.togglePanneauGauche = function() {
         panneau.style.transform = "translateX(calc(-100% + 5px))";
         fleche.innerText = "►";
     }
+
+    if (typeof window.actualiserBandeauAction === "function") window.actualiserBandeauAction();
 };
 
 // =========================================================================
@@ -2614,6 +2622,11 @@ window.actualiserBoutonFinTour = function(queueParam, phaseParam) {
     const phase = phaseParam !== undefined ? phaseParam : (partie.Phase_Combat || "Preparation");
     const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
 
+    // Le bandeau du bas dépend des mêmes données que ce bouton (qui joue, avec
+    // quelle carte, sur quel poste) : on le rafraîchit ici, et il suit dès lors
+    // tous les appels existants — changement de héros affiché compris.
+    if (typeof window.actualiserBandeauAction === "function") window.actualiserBandeauAction(queue, phase);
+
     // C'est au tour du perso SI :
     const estMonTour = (
         phase === "Resolution" && 
@@ -2986,6 +2999,7 @@ window.afficherPisteInitiative = function(queue, phase) {
         clearTimeout(window.VIDAGE_PISTE_INITIATIVE);
         window.VIDAGE_PISTE_INITIATIVE = setTimeout(() => piste.innerHTML = "", 400);
         if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour(queue || [], phase);
+        if (typeof window.synchroniserPanneauAvecPiste === "function") window.synchroniserPanneauAvecPiste(false, queue || [], phase);
         return;
     }
 
@@ -3004,6 +3018,7 @@ window.afficherPisteInitiative = function(queue, phase) {
         clearTimeout(window.VIDAGE_PISTE_INITIATIVE);
         window.VIDAGE_PISTE_INITIATIVE = setTimeout(() => piste.innerHTML = "", 400);
         if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour(queue, phase);
+        if (typeof window.synchroniserPanneauAvecPiste === "function") window.synchroniserPanneauAvecPiste(false, queue, phase);
         return;
     }
 
@@ -3059,6 +3074,182 @@ window.afficherPisteInitiative = function(queue, phase) {
 
     piste.innerHTML = html;
     if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour(queue, phase);
+    if (typeof window.synchroniserPanneauAvecPiste === "function") window.synchroniserPanneauAvecPiste(true, queue, phase);
+};
+
+// =========================================================================
+//  BANDEAU D'ACTION (BAS GAUCHE) : LA CARTE DU COMBATTANT QUI JOUE
+// =========================================================================
+
+// La piste d'initiative et le panneau latéral se relaient : tant que l'ordre de
+// passage est affiché, le plateau doit rester dégagé ; dès que la file est vide
+// et qu'il faut de nouveau choisir une carte, le panneau revient de lui-même.
+// On n'agit qu'au changement d'état, sinon chaque redessin de la piste
+// refermerait le panneau que le joueur vient d'ouvrir à la main.
+window.PISTE_INITIATIVE_VISIBLE = null;
+
+window.synchroniserPanneauAvecPiste = function(visible, queue, phase) {
+    if (document.getElementById("fenetre-combat")?.style.display !== "block") return;
+
+    if (window.PISTE_INITIATIVE_VISIBLE !== visible) {
+        window.PISTE_INITIATIVE_VISIBLE = visible;
+        if (typeof window.togglePanneauGauche === "function"
+            && window.PANNEAU_GAUCHE_OUVERT === visible) {
+            window.togglePanneauGauche(true);
+        }
+    }
+    if (typeof window.actualiserBandeauAction === "function") window.actualiserBandeauAction(queue, phase);
+};
+
+// La fiche d'une carte, qu'elle appartienne à un héros (cache du panneau) ou à
+// une créature (cache global alimenté à la génération du monstre).
+window.donneesCarteCombattant = function(idPersonnage, idCarte) {
+    return (window.COMPETENCES_CACHE || {})[idCarte]
+        || ((window.CACHE_COMPETENCES_GLOBAL || {})[idPersonnage] || {})[idCarte]
+        || null;
+};
+
+// Les effets d'une carte ramenés à une seule ligne : les effets de base en clair,
+// leurs modificateurs en retrait de ton. "Initiative +" n'en fait pas partie —
+// ce n'est pas un effet de jeu, et la carte elle-même ne l'affiche pas.
+window.ligneEffetsCarte = function(dataCarte) {
+    const effets = (dataCarte && dataCarte.Effets_Compiles) || [];
+    const morceaux = [];
+
+    effets.forEach(eff => {
+        let nom = typeof eff === "string" ? eff : (eff && eff.nom);
+        if (!nom) return;
+        nom = nom.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+        if (!nom || nom.startsWith("↳") || nom.indexOf("Initiative +") === 0) return;
+
+        const estMod = typeof eff === "object" && !!eff.isMod;
+        const couleur = estMod ? "#a89f91" : "#e8d5a5";
+        morceaux.push(`<span style="color: ${couleur};">${nom}</span>`);
+    });
+
+    if (morceaux.length === 0) return `<span style="color: #a89f91; font-style: italic;">Aucun effet</span>`;
+    return morceaux.join(`<span style="color: #5c3a21;"> • </span>`);
+};
+
+// Une seule ligne, donc : plutôt que de couper le texte, on rétrécit la police
+// jusqu'à ce qu'il tienne — même parti pris que les titres des bannières.
+function ajusterSurUneLigne(element, tailleMax, tailleMin) {
+    if (!element) return;
+    let taille = tailleMax;
+    element.style.fontSize = taille + "px";
+    while (taille > tailleMin && element.scrollWidth > element.clientWidth) {
+        taille -= 1;
+        element.style.fontSize = taille + "px";
+    }
+}
+
+window.actualiserBandeauAction = function(queueParam, phaseParam) {
+    const bandeau = document.getElementById("bandeau-action-combat");
+    if (!bandeau) return;
+
+    const masquer = () => {
+        bandeau.style.opacity = "0";
+        bandeau.style.transform = "translateY(14px)";
+        bandeau.style.pointerEvents = "none";
+        const bouton = document.getElementById("bandeau-action-lancer");
+        if (bouton) bouton.style.display = "none";
+    };
+
+    if (document.getElementById("fenetre-combat")?.style.display !== "block") return masquer();
+
+    const partie = window.PARTIE_DATA || {};
+    const queue = queueParam !== undefined ? queueParam : (partie.File_Attente_Combat || []);
+    const phase = phaseParam !== undefined ? phaseParam : (partie.Phase_Combat || "Preparation");
+
+    const tete = (phase === "Resolution" && queue.length > 0) ? queue[0] : null;
+    if (!tete) return masquer();
+
+    // Panneau ouvert : c'est lui qui occupe le coin, le bandeau s'efface.
+    if (window.PANNEAU_GAUCHE_OUVERT) return masquer();
+
+    if (typeof window.estCombattantMort === "function" && window.estCombattantMort(tete.idPersonnage)) return masquer();
+
+    let titre = "";
+    let ligne = "";
+    if (tete.idCarte === "REPOS_LONG") {
+        titre = "Repos Long";
+        ligne = `<span style="color: #e8d5a5;">Concentration et souffle</span>`;
+    } else {
+        const dataCarte = window.donneesCarteCombattant(tete.idPersonnage, tete.idCarte);
+        if (!dataCarte) return masquer();
+        titre = dataCarte.Nom || "Technique";
+        ligne = window.ligneEffetsCarte(dataCarte);
+    }
+
+    const elTitre = document.getElementById("bandeau-action-titre");
+    const elEffets = document.getElementById("bandeau-action-effets");
+    if (elTitre && elTitre.textContent !== titre) {
+        elTitre.textContent = titre;
+        ajusterSurUneLigne(elTitre, 34, 18);
+    }
+    if (elEffets && elEffets.innerHTML !== ligne) {
+        elEffets.innerHTML = ligne;
+        ajusterSurUneLigne(elEffets, 16, 10);
+    }
+
+    // Le bouton n'appartient qu'au héros affiché sur ce poste : c'est lui, et lui
+    // seul, que le ciblage sait faire lancer (même condition que "Appliquer" sur
+    // la carte). Une créature joue toute seule, un repos long n'a rien à viser,
+    // et pendant un ciblage ou une animation en cours il n'y a plus rien à relancer.
+    const persoActuel = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
+    const estMonTour = !!persoActuel && tete.idPersonnage === persoActuel.idPersonnage && !persoActuel.estMonstre;
+    const ciblageEnCours = !!(window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif);
+
+    // Le verrou anti-double-appui ne sert que le temps que le ciblage s'ouvre.
+    // Passé une seconde, si plus rien n'est en cours, c'est que le joueur a
+    // renoncé à sa visée : la carte doit redevenir lançable.
+    if (bandeau.dataset.lance && !ciblageEnCours && !window.ANIMATION_MOTEUR_EN_COURS
+        && (Date.now() - parseInt(bandeau.dataset.lance) > 1000)) {
+        delete bandeau.dataset.lance;
+    }
+    const montrerBouton = estMonTour
+        && tete.idCarte !== "REPOS_LONG"
+        && !ciblageEnCours
+        && !window.ANIMATION_MOTEUR_EN_COURS
+        && !window.ANIMATION_TOUR_EN_COURS
+        && !window.ANIMATION_VTT_EN_COURS;
+
+    bandeau.dataset.carte = tete.idCarte;
+    bandeau.dataset.acteur = tete.idPersonnage;
+
+    // Le verrou de lancement ne se lève qu'au changement de combattant en tête :
+    // tant que la même carte est en cours, un second appui ne la relance pas.
+    const cleTete = tete.idPersonnage + "|" + tete.idCarte;
+    if (bandeau.dataset.tete !== cleTete) {
+        bandeau.dataset.tete = cleTete;
+        delete bandeau.dataset.lance;
+    }
+
+    const bouton = document.getElementById("bandeau-action-lancer");
+    if (bouton) bouton.style.display = (montrerBouton && !bandeau.dataset.lance) ? "inline-flex" : "none";
+
+    bandeau.style.opacity = "1";
+    bandeau.style.transform = "translateY(0)";
+    bandeau.style.pointerEvents = "none";
+};
+
+// Le bouton doré : il ouvre le ciblage de la carte en tête de file.
+window.lancerCarteBandeau = function() {
+    const bandeau = document.getElementById("bandeau-action-combat");
+    if (!bandeau) return;
+    const idCarte = bandeau.dataset.carte;
+    if (!idCarte || idCarte === "REPOS_LONG") return;
+
+    // Deux appuis rapprochés lanceraient deux fois la même carte : masquer le
+    // bouton ne suffit pas, le second toucher part avant le réaffichage. Le
+    // verrou tient jusqu'au changement de combattant en tête de file.
+    if (bandeau.dataset.lance) return;
+    bandeau.dataset.lance = String(Date.now());
+
+    const bouton = document.getElementById("bandeau-action-lancer");
+    if (bouton) bouton.style.display = "none";
+
+    if (typeof window.demarrerCiblage === "function") window.demarrerCiblage(idCarte);
 };
 
 // =========================================================================
@@ -3281,6 +3472,10 @@ window.animerTexteTour = function(tour) {
 window.reinitialiserCombat = async function() {
     if (!confirm("Voulez-vous vraiment réinitialiser ce combat ? Tous les PV et la Fatigue seront restaurés, et le combat repassera au Tour 1.")) return;
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+
+    // Le relais piste / panneau repart de zéro : le prochain passage en résolution
+    // doit de nouveau refermer le panneau, même s'il était déjà fermé avant le reset.
+    window.PISTE_INITIATIVE_VISIBLE = null;
 
     try {
         const { doc, getDoc, deleteDoc, updateDoc, deleteField } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
