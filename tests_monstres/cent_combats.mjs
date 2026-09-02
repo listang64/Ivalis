@@ -4,6 +4,7 @@
 // Les compétences des DEUX camps sortent du vrai générateur.
 import fs from 'fs';
 import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
+import { SRC_MODIFIER_PARTIE } from './transaction_partie.mjs';
 import { chargerIA, creerPlateau, combattant, activer, EFFETS } from './banc_ia.mjs';
 
 // Même règle que combat.js : les monstres utilisent le Repos_Long de leur
@@ -234,6 +235,10 @@ async function unCombat(numero) {
   // Les lectures de stats mutualisées vivent dans app.js, chargé avant tout le
   // reste sur la vraie page : un banc qui isole une fonction doit les poser aussi.
   new Function('window', SRC_STATS_COMMUNES)(w);
+  // Les cartes des créatures s'inscrivent dans la file sous transaction :
+  // c'est la vraie fonction du jeu qu'on installe, avec le Firestore du banc.
+  new Function('window', 'db', 'doc', 'runTransaction', SRC_MODIFIER_PARTIE)(
+    w, db, doc, runTransaction);
   eval(srcIA);
 
   // --- Déroulement ---

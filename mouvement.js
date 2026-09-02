@@ -470,28 +470,29 @@ window.validerMouvement = async function() {
     if (typeof window.afficherPersoCombatActuel === "function") window.afficherPersoCombatActuel();
 
     try {
-        const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
-        const snap = await getDoc(partieRef);
-
-        let file = snap.data().File_Attente_Combat || [];
-        if (file.length > 0 && file[0].idPersonnage === idPerso) {
-            // Le déplacement ne se ferme plus au premier arrêt : on cumule les pas,
-            // et c'est le lancement de la carte (qui met fin au tour) qui l'arrête.
-            file[0].pasParcourus = (parseInt(file[0].pasParcourus) || 0) + nbPas;
-        }
-
         window.TOKENS_VTT_DATA[idPerso].q = finalStep.q;
         window.TOKENS_VTT_DATA[idPerso].r = finalStep.r;
 
-        await updateDoc(partieRef, {
-            File_Attente_Combat: file,
-            Action_Mouvement: {
-                idToken: idPerso,
-                path: pathAvecAngles,
-                opportunites: opportunitesResolues,
-                zones: zonesResolues,
-                timestamp: new Date().getTime()
+        // Sous transaction : la file d'attente est partagée par tous les postes, et
+        // la réécrire à partir d'une lecture périmée effacerait la carte qu'un
+        // autre joueur vient d'y poser (cf. window.modifierPartie).
+        await window.modifierPartie((data) => {
+            const file = data.File_Attente_Combat || [];
+            if (file.length > 0 && file[0].idPersonnage === idPerso) {
+                // Le déplacement ne se ferme plus au premier arrêt : on cumule les pas,
+                // et c'est le lancement de la carte (qui met fin au tour) qui l'arrête.
+                file[0].pasParcourus = (parseInt(file[0].pasParcourus) || 0) + nbPas;
             }
+            return { maj: {
+                File_Attente_Combat: file,
+                Action_Mouvement: {
+                    idToken: idPerso,
+                    path: pathAvecAngles,
+                    opportunites: opportunitesResolues,
+                    zones: zonesResolues,
+                    timestamp: new Date().getTime()
+                }
+            } };
         });
 
         const persoRef = window.refCombattant(idPerso);

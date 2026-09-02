@@ -648,23 +648,25 @@ window.preparerCartesMonstres = async function() {
     // double dans la file.
     if (!(await reclamerVerrouIA("preparation|" + (partie.Tour_Combat || 1)))) return;
 
-    const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
-    const snap = await getDoc(partieRef);
-    if (!snap.exists()) return;
-
-    let file = snap.data().File_Attente_Combat || [];
+    // Les cartes des créatures sont choisies ici, puis inscrites dans la file
+    // sous transaction : le verrou ci-dessus n'écarte que les AUTRES postes qui
+    // font jouer l'IA, pas le joueur qui choisit sa propre carte au même
+    // instant — et l'un effaçait alors l'autre de la piste d'initiative.
+    const aInscrire = [];
     let auMoinsUn = false;
+
+    const fileConnue = ((window.PARTIE_DATA || {}).File_Attente_Combat) || [];
 
     window.IA_MONSTRES_EN_ATTENTE = 0;
     for (const monstre of aJouer) {
-        if (file.some(f => f.idPersonnage === monstre.idPersonnage)) continue;
+        if (fileConnue.some(f => f.idPersonnage === monstre.idPersonnage)) continue;
         const carte = window.choisirCarteMonstre(monstre);
         // Pas de carte : ses techniques ne sont pas encore forgées. On ne pose
         // rien pour lui et on repassera — surtout pas un repos long par défaut.
         if (!carte) { window.IA_MONSTRES_EN_ATTENTE++; continue; }
 
         if (carte.repos) {
-            file.push({ idPersonnage: monstre.idPersonnage, idCarte: "REPOS_LONG",
+            aInscrire.push({ idPersonnage: monstre.idPersonnage, idCarte: "REPOS_LONG",
                         initiative: 0, timestamp: new Date().getTime() });
             auMoinsUn = true;
             console.log(`🧠 ${monstre.prenom || monstre.idPersonnage} souffle (repos long)`);
@@ -683,7 +685,7 @@ window.preparerCartesMonstres = async function() {
                 .catch(e => console.error(e));
         }
 
-        file.push({
+        aInscrire.push({
             idPersonnage: monstre.idPersonnage,
             idCarte: carte.id,
             initiative,
@@ -696,17 +698,28 @@ window.preparerCartesMonstres = async function() {
 
     if (!auMoinsUn) return;   // personne n'a rien à poser : la file reste telle quelle
 
-    file.sort((a, b) => (b.initiative !== a.initiative) ? b.initiative - a.initiative : a.timestamp - b.timestamp);
+    await window.modifierPartie((data) => {
+        let file = data.File_Attente_Combat || [];
 
-    // Bascule en résolution dès que tous les combattants vivants ont choisi.
-    let phase = snap.data().Phase_Combat || "Preparation";
-    const nbActifs = (snap.data().Ordre_Initiative || []).filter(id => {
-        const p = (window.PERSOS_PARTIE || []).find(x => x.idPersonnage === id);
-        return p && !(typeof window.estCombattantMort === "function" && window.estCombattantMort(id));
-    }).length;
-    if (file.length >= nbActifs && nbActifs > 0) phase = "Resolution";
+        // La file relue dans la transaction fait foi : une créature déjà inscrite
+        // entre-temps (par un autre poste) n'est pas ajoutée une seconde fois.
+        aInscrire.forEach(entree => {
+            if (file.some(f => f.idPersonnage === entree.idPersonnage)) return;
+            file.push(entree);
+        });
 
-    await updateDoc(partieRef, { File_Attente_Combat: file, Phase_Combat: phase });
+        file.sort((a, b) => (b.initiative !== a.initiative) ? b.initiative - a.initiative : a.timestamp - b.timestamp);
+
+        // Bascule en résolution dès que tous les combattants vivants ont choisi.
+        let phase = data.Phase_Combat || "Preparation";
+        const nbActifs = (data.Ordre_Initiative || []).filter(id => {
+            const p = (window.PERSOS_PARTIE || []).find(x => x.idPersonnage === id);
+            return p && !(typeof window.estCombattantMort === "function" && window.estCombattantMort(id));
+        }).length;
+        if (file.length >= nbActifs && nbActifs > 0) phase = "Resolution";
+
+        return { maj: { File_Attente_Combat: file, Phase_Combat: phase } };
+    });
 };
 
 // =========================================================================
@@ -905,7 +918,7 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
         }
         await pause(1500);
         window.IA_MONSTRE_ACTEUR = null;
-        if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true);
+        if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true, idMonstre);
         return;
     }
 
@@ -915,7 +928,7 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
     if (!monstre || !dataCarte || !tk) {
         console.warn("IA : tour impossible pour", idMonstre, "— on passe la main.");
         window.IA_MONSTRE_ACTEUR = null;
-        if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true);
+        if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true, idMonstre);
         return;
     }
 
@@ -994,7 +1007,7 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
                          "— on ne lance rien plutôt que de frapper au nom de quelqu'un d'autre.");
             window.COUT_COMPETENCE_SELECTIONNEE = 0;
             window.IA_MONSTRE_ACTEUR = null;
-            if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true);
+            if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true, idMonstre);
             return;
         }
         const resolutionsAvant = resolutionsEmises();
@@ -1039,7 +1052,7 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
 
     window.COUT_COMPETENCE_SELECTIONNEE = 0;
     window.IA_MONSTRE_ACTEUR = null;
-    if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true);
+    if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true, idMonstre);
 };
 
 // =========================================================================
@@ -1115,7 +1128,7 @@ window.verifierTourIAMonstres = async function() {
             const enTeteMort = file[0];
             if (await reclamerVerrouIA(`mort|${enTeteMort.idPersonnage}|${enTeteMort.timestamp}`)) {
                 console.log("🧠 Tour passé :", enTeteMort.idPersonnage, "est à terre.");
-                if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true);
+                if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true, enTeteMort.idPersonnage);
             } else {
                 programmerRappelIA(DELAI_VERROU_MS / 2);
             }

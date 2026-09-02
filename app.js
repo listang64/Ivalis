@@ -192,6 +192,36 @@ window.persoDocVersFront = persoDocVersFront;
 //  Ces lectures sont mutualisées ici, au plus près de la conversion des fiches,
 //  pour qu'aucun morceau du moteur ne puisse à nouveau en oublier une.
 
+// =========================================================================
+//  UNE SEULE ANIMATION À LA FOIS
+// =========================================================================
+//  Une notification de la base peut apporter PLUSIEURS actions d'un coup : un
+//  déplacement de créature et la carte qu'elle a lancée juste après arrivent
+//  dans le même paquet dès que le réseau hoquète — ce qui n'arrive jamais quand
+//  un seul navigateur joue, et tout le temps à trois. Lancées ensemble, ces
+//  animations se marchent dessus : le trajet d'un pion est interrompu par la
+//  suivante, et il se retrouve d'un bond à sa case d'arrivée, à cinq cases de
+//  là. On les met donc à la queue leu leu.
+window.FILE_ANIMATIONS = Promise.resolve();
+
+// Une animation qui ne rendrait jamais la main bloquerait toutes les suivantes,
+// et la table entière avec. Passé vingt secondes — bien au-delà de la plus
+// longue (une fuite de Peur dure quelques secondes) — on passe à la suite.
+window.DELAI_MAX_ANIMATION_MS = 20000;
+
+window.filerAnimation = function(nom, fn) {
+    window.FILE_ANIMATIONS = window.FILE_ANIMATIONS
+        .then(() => Promise.race([
+            Promise.resolve().then(fn),
+            new Promise(resoudre => setTimeout(() => {
+                console.warn("Animation « " + nom + " » trop longue : on passe à la suite.");
+                resoudre();
+            }, window.DELAI_MAX_ANIMATION_MS))
+        ]))
+        .catch(e => console.error("Animation « " + nom + " » :", e));
+    return window.FILE_ANIMATIONS;
+};
+
 window.pvMaxCombattant = function(perso) {
     if (!perso) return 0;
     return (parseInt(perso.PV_Max) || 0) + (parseInt(perso.Dev_Mod_PV) || 0);
@@ -261,6 +291,16 @@ window.defMagiqueCombattant = function(perso) {
     if (!perso) return 0;
     return (parseInt(perso.Def_Magique) || 0) + (parseInt(perso.Dev_Mod_DefMag) || 0)
          + (window.atoutRace(perso).defMagique || 0);
+};
+
+// Une créature ou pas ? Trois indices concordants, parce que la réponse décide
+// d'une règle du jeu (les créatures ne font jamais de coup critique) et qu'un
+// seul d'entre eux peut manquer sur un poste qui vient de se connecter.
+window.estUneCreature = function(perso, idCombattant) {
+    const id = idCombattant || (perso && perso.idPersonnage);
+    if (typeof window.estMonstre === "function" && id && window.estMonstre(id)) return true;
+    if (!perso) return false;
+    return !!perso.estMonstre || perso.camp === "Ennemi" || perso.Camp === "Ennemi";
 };
 
 window.critiqueCombattant = function(perso) {
@@ -1820,33 +1860,49 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
              if (dataPartie.Action_Mouvement && dataPartie.Action_Mouvement.timestamp !== window.DERNIER_MOUVEMENT) {
                  window.DERNIER_MOUVEMENT = dataPartie.Action_Mouvement.timestamp;
                  if (typeof window.jouerAnimationMouvement === "function") {
-                     window.jouerAnimationMouvement(dataPartie.Action_Mouvement);
+                     const action = dataPartie.Action_Mouvement;
+                     window.filerAnimation("mouvement", () => window.jouerAnimationMouvement(action));
                  }
              }
              // 🔻 NOUVEAU : Déclenchement de la résolution d'attaque pour TOUS les joueurs connectés
              if (dataPartie.Action_Moteur && dataPartie.Action_Moteur.timestamp !== window.DERNIER_ACTION_MOTEUR) {
                  window.DERNIER_ACTION_MOTEUR = dataPartie.Action_Moteur.timestamp;
-                 if (typeof window.jouerAnimationMoteur === "function") window.jouerAnimationMoteur(dataPartie.Action_Moteur);
+                 if (typeof window.jouerAnimationMoteur === "function") {
+                     const action = dataPartie.Action_Moteur;
+                     window.filerAnimation("carte", () => window.jouerAnimationMoteur(action));
+                 }
              }
              // Bond : la case d'arrivée est déjà validée, on ne fait que rejouer le saut visuellement
              if (dataPartie.Action_Bond && dataPartie.Action_Bond.timestamp !== window.DERNIER_ACTION_BOND) {
                  window.DERNIER_ACTION_BOND = dataPartie.Action_Bond.timestamp;
-                 if (typeof window.jouerAnimationBond === "function") window.jouerAnimationBond(dataPartie.Action_Bond);
+                 if (typeof window.jouerAnimationBond === "function") {
+                     const action = dataPartie.Action_Bond;
+                     window.filerAnimation("bond", () => window.jouerAnimationBond(action));
+                 }
              }
              // Poussée : le jet et la case d'arrivée sont déjà tranchés par le lanceur, on rejoue juste l'animation
              if (dataPartie.Action_Poussee && dataPartie.Action_Poussee.timestamp !== window.DERNIER_ACTION_POUSSEE) {
                  window.DERNIER_ACTION_POUSSEE = dataPartie.Action_Poussee.timestamp;
-                 if (typeof window.jouerAnimationPoussee === "function") window.jouerAnimationPoussee(dataPartie.Action_Poussee);
+                 if (typeof window.jouerAnimationPoussee === "function") {
+                     const action = dataPartie.Action_Poussee;
+                     window.filerAnimation("poussée", () => window.jouerAnimationPoussee(action));
+                 }
              }
              // Traction : même animation que la Poussée (la trajectoire suffit à inverser l'effet)
              if (dataPartie.Action_Traction && dataPartie.Action_Traction.timestamp !== window.DERNIER_ACTION_TRACTION) {
                  window.DERNIER_ACTION_TRACTION = dataPartie.Action_Traction.timestamp;
-                 if (typeof window.jouerAnimationPoussee === "function") window.jouerAnimationPoussee(dataPartie.Action_Traction);
+                 if (typeof window.jouerAnimationPoussee === "function") {
+                     const action = dataPartie.Action_Traction;
+                     window.filerAnimation("traction", () => window.jouerAnimationPoussee(action));
+                 }
              }
              // Peur : chemin et attaques d'opportunité déjà tranchés par le lanceur, on rejoue juste l'animation
              if (dataPartie.Action_Peur && dataPartie.Action_Peur.timestamp !== window.DERNIER_ACTION_PEUR) {
                  window.DERNIER_ACTION_PEUR = dataPartie.Action_Peur.timestamp;
-                 if (typeof window.jouerAnimationPeur === "function") window.jouerAnimationPeur(dataPartie.Action_Peur);
+                 if (typeof window.jouerAnimationPeur === "function") {
+                     const action = dataPartie.Action_Peur;
+                     window.filerAnimation("peur", () => window.jouerAnimationPeur(action));
+                 }
              }
          }
      }

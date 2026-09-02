@@ -7,6 +7,7 @@
 // place. Ce banc rejoue cette séquence exacte.
 import fs from 'fs';
 import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
+import { SRC_MODIFIER_PARTIE } from './transaction_partie.mjs';
 
 let echecs = 0;
 const verifier = (l, c, d="") => { if (!c) echecs++; console.log(`  ${l.padEnd(58)} ${c?"OK":"ÉCHEC"} ${d}`); };
@@ -43,6 +44,10 @@ function creerPoste(partagee) {
   // Les lectures de stats mutualisées vivent dans app.js, chargé avant tout le
   // reste sur la vraie page : un banc qui isole une fonction doit les poser aussi.
   new Function('window', SRC_STATS_COMMUNES)(w);
+  // Les cartes des créatures s'inscrivent maintenant dans la file sous
+  // transaction : c'est la vraie fonction du jeu qu'on installe ici.
+  new Function('window', 'db', 'doc', 'runTransaction', SRC_MODIFIER_PARTIE)(
+    w, db, doc, runTransaction);
   new Function('window','db','doc','getDoc','updateDoc','runTransaction', src)(
     w, db, doc, getDoc, updateDoc, runTransaction);
   return w;

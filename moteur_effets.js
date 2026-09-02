@@ -2643,6 +2643,64 @@ window.nettoyerCiblage = function() {
     if (typeof window.actualiserBandeauAction === "function") window.actualiserBandeauAction();
 };
 
+// =========================================================================
+//  TOUS LES DÉS D'UNE CARTE, TIRÉS UNE SEULE FOIS
+// =========================================================================
+//  Chaque navigateur rejoue l'animation de la carte de son côté. Tant qu'il
+//  relançait ses propres dés, deux postes voyaient deux combats différents :
+//  chez l'un la cible esquivait, chez l'autre elle encaissait ; un état
+//  s'appliquait ici et pas là. Seul le poste qui a lancé la carte écrivait le
+//  résultat en base, si bien que les autres affichaient une scène qui n'avait
+//  jamais eu lieu — et gardaient en mémoire des points de vie et des états faux
+//  jusqu'à la notification suivante. D'où « le bouclier ne se fait pas » ou
+//  « l'effet n'est pas passé » à trois postes, jamais en solo.
+//
+//  Les dés sont donc tirés ICI, une fois, et embarqués dans l'action diffusée.
+function tirerLesDesDeLaCarte(state, lanceurData, critique) {
+    const d100 = () => Math.floor(Math.random() * 100) + 1;
+    const jets = { attaqueRatee: false, parCible: {} };
+
+    // Étourdi : une chance sur dix de rater complètement sa technique.
+    if (lanceurData && (lanceurData.Etats_Alteres || []).some(e => e.nom === "Étourdi")) {
+        jets.attaqueRatee = d100() <= 10;
+    }
+
+    const pourCible = (id) => {
+        if (!jets.parCible[id]) jets.parCible[id] = { etats: {} };
+        return jets.parCible[id];
+    };
+    const jetDeDefense = (id) => {
+        const cible = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === id);
+        const statDef = Math.max(window.esquiveCombattant(cible), window.paradeCombattant(cible));
+        return d100() <= statDef;
+    };
+
+    (state.attaques || []).forEach(attaque => {
+        (attaque.cibles || []).forEach(id => {
+            const c = pourCible(id);
+            // Un soin ne s'esquive pas.
+            if (c.esquive === undefined) c.esquive = attaque.isHeal ? false : jetDeDefense(id);
+            if ((attaque.purifChance || 0) > 0 && c.purifie === undefined) {
+                c.purifie = critique || d100() <= attaque.purifChance;
+            }
+        });
+    });
+
+    (state.alterations || []).forEach(alt => {
+        (alt.cibles || []).forEach(id => {
+            const c = pourCible(id);
+            // Carte sans dégâts : c'est ici que se joue l'esquive de la cible.
+            if (c.esquive === undefined) c.esquive = jetDeDefense(id);
+            // Un coup critique impose les effets de la carte, sans jet.
+            if (c.etats[alt.nom] === undefined) {
+                c.etats[alt.nom] = critique || d100() <= (alt.chance || 0);
+            }
+        });
+    });
+
+    return jets;
+}
+
 window.declencherResolution = async function() {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     const state = window.ETAT_CIBLAGE;
@@ -2722,11 +2780,7 @@ window.declencherResolution = async function() {
     // Les créatures n'y ont pas droit : elles frappent toujours normalement.
     let critique = false;
     const lanceurCrit = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
-    const estCreature = !!lanceurCrit && (
-        (typeof window.estMonstre === "function" && window.estMonstre(idLanceur))
-        || !!lanceurCrit.estMonstre
-        || lanceurCrit.camp === "Ennemi");
-    if (lanceurCrit && !estCreature) {
+    if (lanceurCrit && !window.estUneCreature(lanceurCrit, idLanceur)) {
         const chanceCrit = window.critiqueCombattant(lanceurCrit);
         const jetCrit = Math.floor(Math.random() * 100) + 1;
         critique = jetCrit <= chanceCrit;
@@ -2734,10 +2788,13 @@ window.declencherResolution = async function() {
                     + (critique ? " → CRITIQUE !" : ""));
     }
 
+    const jets = tirerLesDesDeLaCarte(state, lanceurCrit, critique);
+
     const actionData = {
         type: "ATTAQUES",
         idLanceur,
         critique,
+        jets,
         idCarte: state.idCarte,
         attaques: state.attaques,
         alterations: state.alterations,
@@ -2825,18 +2882,33 @@ window.jouerAnimationMoteur = async function(action) {
 
     // 🔻 COUP CRITIQUE : le jet a été tranché par le poste qui a lancé la carte
     // (cf. declencherResolution) ; ici on ne fait que le rejouer à l'identique.
-    const critique = !!action.critique;
+    // Deuxième verrou, au point d'effet : une créature ne critique jamais, même
+    // si l'action reçue le prétend. Le premier verrou est au lancement, mais il
+    // vit sur le poste qui a résolu la carte — celui-ci peut être en retard d'une
+    // mise à jour, ou avoir lu une liste de combattants incomplète. La règle,
+    // elle, doit tenir sur tous les écrans.
+    const critique = !!action.critique && !window.estUneCreature(lanceurData, lanceur);
+    if (!!action.critique && !critique) {
+        console.warn("Critique refusé : " + lanceur + " est une créature.");
+    }
     if (critique && tkLanceur) {
         window.afficherMessageFlottantHex(tkLanceur.q, tkLanceur.r, "Critique !", "#ff2d2d",
                                           { taille: 30, eclat: true });
         await new Promise(r => setTimeout(r, 900));
     }
 
+    // Les dés de la carte ont été tirés une seule fois, par le poste qui l'a
+    // lancée (cf. tirerLesDesDeLaCarte) : ici on ne fait que les relire, pour
+    // que les trois écrans voient exactement le même combat. Le repli local ne
+    // sert qu'à une action venue d'un poste pas encore à jour.
+    const jets = action.jets || null;
+    const desDe = (id) => (jets && jets.parCible && jets.parCible[id]) || null;
+
     // 🔻 NOUVEAU : Jet d'Échec si le Lanceur est Étourdi 🔻
     let attaqueRatee = false;
     if (lanceurData && lanceurData.Etats_Alteres && lanceurData.Etats_Alteres.some(e => e.nom === "Étourdi")) {
-        let echecRoll = Math.floor(Math.random() * 100) + 1;
-        if (echecRoll <= 10) {
+        const rate = jets ? !!jets.attaqueRatee : (Math.floor(Math.random() * 100) + 1) <= 10;
+        if (rate) {
             attaqueRatee = true;
             if (tkLanceur) window.afficherMessageFlottantHex(tkLanceur.q, tkLanceur.r, "Échec technique !", "#ffaa00");
             await new Promise(r => setTimeout(r, 1200));
@@ -2858,7 +2930,7 @@ window.jouerAnimationMoteur = async function(action) {
             if (jeSuisLAuteur) {
                 const rollTractionTot = Math.floor(Math.random() * 100) + 1;
                 console.log(`🎲 Jet de Traction (avant attaque) : Résultat ${rollTractionTot} (Chance: ${tractionAlt.chance}%)`);
-                if (rollTractionTot <= tractionAlt.chance && typeof window.declencherTractionCible === "function") {
+                if ((critique || rollTractionTot <= tractionAlt.chance) && typeof window.declencherTractionCible === "function") {
                     await window.declencherTractionCible(lanceur, idCibleTraction);
                 } else if (typeof window.diffuserEchecDeplacementForce === "function") {
                     await window.diffuserEchecDeplacementForce("Action_Traction", idCibleTraction, "Traction");
@@ -2933,11 +3005,14 @@ window.jouerAnimationMoteur = async function(action) {
                 let esquive = window.esquiveCombattant(cibleData);
                 let parade = window.paradeCombattant(cibleData);
                 
-                const jetDef = Math.floor(Math.random() * 100) + 1;
                 const statDef = Math.max(esquive, parade);
                 const motDef = parade > esquive ? "Paré 🛡️" : "Esquivé 💨";
+                const desCible = desDe(idCible);
+                const aEsquive = desCible
+                    ? !!desCible.esquive
+                    : (Math.floor(Math.random() * 100) + 1) <= statDef;
 
-                if (!attaque.isHeal && jetDef <= statDef) {
+                if (!attaque.isHeal && aEsquive) {
                     if (tkCible) {
                         window.afficherMessageFlottantHex(tkCible.q, tkCible.r, motDef, "#cccccc");
 
@@ -3067,8 +3142,10 @@ jaugeContainer.className = "jauge-flash-token";
                     }
 
                     if (attaque.purifChance > 0) {
-                        const rollPurif = Math.floor(Math.random() * 100) + 1;
-                        if (critique || rollPurif <= attaque.purifChance) {
+                        const purifie = (desCible && desCible.purifie !== undefined)
+                            ? desCible.purifie
+                            : (critique || (Math.floor(Math.random() * 100) + 1) <= attaque.purifChance);
+                        if (purifie) {
                             cibleData.Etats_Alteres = [];
                             let delaiAffichage = attaque.valeurBrute > 0 ? 800 : 0;
 
@@ -3374,9 +3451,12 @@ jaugeContainer.className = "jauge-flash-token";
                 let esquive = window.esquiveCombattant(cData);
                 let parade = window.paradeCombattant(cData);
                 const statDef = Math.max(esquive, parade);
-                const jetDef = Math.floor(Math.random() * 100) + 1;
+                const desSort = desDe(idCible);
+                const esquiveLeSort = desSort
+                    ? !!desSort.esquive
+                    : (Math.floor(Math.random() * 100) + 1) <= statDef;
                 
-                if (jetDef <= statDef) {
+                if (esquiveLeSort) {
                     const tkCible = window.TOKENS_VTT_DATA[idCible];
                     if (tkCible) window.afficherMessageFlottantHex(tkCible.q, tkCible.r, parade > esquive ? "Paré 🛡️" : "Esquivé 💨", "#cccccc");
                     await new Promise(r => setTimeout(r, 1000));
@@ -3436,11 +3516,14 @@ jaugeContainer.className = "jauge-flash-token";
                     continue;
                 }
 
-                // Un coup critique impose les effets de la carte : plus de jet
-                // d'application, l'état est posé d'office.
-                let roll = Math.floor(Math.random() * 100) + 1;
-                console.log(`🎲 Jet d'application [${alt.nom}] sur ${cData.nom} : Résultat ${roll} (Chance: ${alt.chance}%)`
-                            + (critique ? " — imposé par le critique" : ""));
+                // Le sort du jet d'application a été tranché au lancement de la
+                // carte, critique compris : on le relit, on ne le rejoue pas.
+                const desEtat = desDe(idCible);
+                const etatPasse = (desEtat && desEtat.etats && desEtat.etats[alt.nom] !== undefined)
+                    ? desEtat.etats[alt.nom]
+                    : (critique || (Math.floor(Math.random() * 100) + 1) <= alt.chance);
+                console.log(`🎲 [${alt.nom}] sur ${cData.nom} : ${etatPasse ? "appliqué" : "raté"}`
+                            + ` (Chance: ${alt.chance}%)` + (critique ? " — imposé par le critique" : ""));
 
                 // Un peuple immunisé ne l'attrape jamais : le jet a beau réussir,
                 // et le critique a beau l'imposer, l'état ne prend pas sur lui.
@@ -3450,7 +3533,7 @@ jaugeContainer.className = "jauge-flash-token";
                     continue;
                 }
 
-                if (critique || roll <= alt.chance) {
+                if (etatPasse) {
                     let existing = nouveauxEtats.find(e => e.nom === alt.nom);
                     if (existing) {
                         existing.duree = Math.max(existing.duree, alt.duree); // Rafraîchit la durée
@@ -3546,7 +3629,9 @@ jaugeContainer.className = "jauge-flash-token";
                 window.deduireFatigueCarte(lanceur, action.idCarte);
             }
         } else {
-            window.validerCarteCombat(action.idCarte, null);
+            // Le lanceur de l'action, pas le combattant affiché : c'est SON tour
+            // qui s'achève, et lui seul que la file doit laisser passer.
+            window.validerCarteCombat(action.idCarte, null, action.idLanceur);
         }
     }
 };

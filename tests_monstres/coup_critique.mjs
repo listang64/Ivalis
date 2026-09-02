@@ -123,6 +123,23 @@ console.log("1. LE JET, TIRÉ PAR LE POSTE QUI LANCE LA CARTE");
            action ? `(critique = ${action.data.Action_Moteur.critique})` : "(rien)");
 }
 
+{
+  // Second verrou, au point d'effet : une action reçue qui prétend qu'une
+  // créature a fait un critique doit être refusée à la relecture. Le premier
+  // verrou vit sur le poste qui lance la carte — celui-ci peut être en retard
+  // d'une mise à jour, ou avoir lu une liste de combattants incomplète.
+  const p = poste({ des: [0.99, 0.99, 0.99, 0.99] });
+  p.w.PERSOS_PARTIE = [creature(), victime()];
+  p.w.TOKENS_VTT_DATA = { M1: { q: 0, r: 0 }, J1: { q: 1, r: 0 } };
+  await p.w.jouerAnimationMoteur(carte({ idLanceur: "M1", critique: true }));
+  const cible = p.w.PERSOS_PARTIE.find(x => x.idPersonnage === "J1");
+  const annonce = p.messages.find(m => m.texte === "Critique !");
+  p.rendreLeHasard();
+  console.log(`     créature avec un critique dans l'action : ${100 - cible.PV_Actuels} dégâts`);
+  verifier("un critique de créature est refusé même à la relecture",
+           (100 - cible.PV_Actuels) === 12 && !annonce, `(${100 - cible.PV_Actuels} dégâts)`);
+}
+
 console.log("\n2. LE JET EST DIFFUSÉ, PAS REFAIT SUR CHAQUE POSTE");
 {
   // Le poste spectateur n'a pas résolu la carte : il rejoue le critique reçu,

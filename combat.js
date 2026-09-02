@@ -1,5 +1,49 @@
 import { db } from "./firebase-config.js";
-import { doc, setDoc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { doc, setDoc, onSnapshot, updateDoc, runTransaction } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+// =========================================================================
+//  TOUTE MODIFICATION PARTAGÉE DU DOCUMENT DE PARTIE PASSE PAR ICI
+// =========================================================================
+//  La file d'attente du combat est lue puis réécrite par cinq endroits
+//  différents (une carte choisie, un repos long, une fin de tour, les cartes
+//  des créatures, un déplacement validé). Tant qu'un seul navigateur jouait,
+//  ces lectures-écritures ne se croisaient jamais. À trois postes, si :
+//
+//    - trois joueurs choisissent leur carte au même instant, les trois lisent
+//      la même file vide et réécrivent chacun la leur par-dessus : deux
+//      entrées sur trois disparaissent, et la piste d'initiative n'affiche
+//      qu'un seul personnage ;
+//    - deux postes terminent le même tour, la file avance de deux crans et le
+//      combattant suivant ne joue jamais ;
+//    - deux postes franchissent la fin d'un round, la régénération et le
+//      décompte des états tombent deux fois.
+//
+//  Une transaction Firestore sérialise lecture et écriture : le second poste
+//  relit ce que le premier vient d'écrire au lieu de l'écraser.
+//
+//  "modifier" reçoit les données à jour et renvoie soit null (rien à faire),
+//  soit { maj, resultat } — les champs à écrire, et ce que l'appelant veut
+//  récupérer. Les écritures qui ne concernent PAS le document de partie
+//  (fatigue d'un combattant, états) restent en dehors : une transaction
+//  Firestore exige que toutes ses lectures précèdent ses écritures, et se
+//  rejoue parfois plusieurs fois — on ne veut pas d'effet de bord là-dedans.
+window.modifierPartie = async function(modifier) {
+    if (!window.ID_PARTIE_COURANTE) return null;
+    const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
+    try {
+        return await runTransaction(db, async (tx) => {
+            const snap = await tx.get(partieRef);
+            if (!snap.exists()) return null;
+            const sortie = modifier(snap.data());
+            if (!sortie) return null;
+            if (sortie.maj) tx.update(partieRef, sortie.maj);
+            return sortie.resultat !== undefined ? sortie.resultat : true;
+        });
+    } catch (e) {
+        console.error("Modification de la partie :", e);
+        return null;
+    }
+};
 
 // =========================================================================
 //  IVALIS - MODULE DE COMBAT (INTERFACE DE BASE)
@@ -2477,29 +2521,25 @@ window.jouerCarteCombat = async function(idCarte) {
         window.afficherApercuCarteHD(idCarte, true); // Lock immédiat
     }
 
-    try {
-        const { doc, getDoc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
-        const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
-        const snap = await getDoc(partieRef);
+    let etatsApresElectrifie = null;
 
-        if (snap.exists()) {
-            let file = snap.data().File_Attente_Combat || [];
+    try {
+        // Sous transaction : trois joueurs qui choisissent au même instant ne
+        // doivent pas s'effacer mutuellement de la file (cf. modifierPartie).
+        await window.modifierPartie((data) => {
+            let file = data.File_Attente_Combat || [];
             file = file.filter(item => item.idPersonnage !== persoActuel.idPersonnage);
 
             // Électrifié : consommé sur la toute prochaine carte jouée, quelle qu'elle soit —
             // -35 en initiative sur CETTE carte (la piste se retrie automatiquement puisque
             // file.sort() ci-dessous relit la valeur qu'on vient d'écrire), puis l'état disparaît.
+            // Une transaction peut être rejouée plusieurs fois : on n'écrit rien
+            // d'autre ici, on note seulement ce qu'il faudra faire après coup.
             let initiativeCarte = dataCarte.Initiative || 0;
             const etatElectrifie = persoActuel.Etats_Alteres && persoActuel.Etats_Alteres.find(e => e.nom === "Électrifié");
             if (etatElectrifie) {
                 initiativeCarte = Math.max(0, initiativeCarte - 35);
-                const nouveauxEtatsElec = persoActuel.Etats_Alteres.filter(e => e !== etatElectrifie);
-                persoActuel.Etats_Alteres = nouveauxEtatsElec;
-
-                const persoPartieElec = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === persoActuel.idPersonnage);
-                if (persoPartieElec) persoPartieElec.Etats_Alteres = nouveauxEtatsElec;
-
-                updateDoc(window.refCombattant(persoActuel.idPersonnage), { Etats_Alteres: nouveauxEtatsElec }).catch(e => console.error(e));
+                etatsApresElectrifie = persoActuel.Etats_Alteres.filter(e => e !== etatElectrifie);
             }
 
             file.push({
@@ -2514,10 +2554,10 @@ window.jouerCarteCombat = async function(idCarte) {
                 return a.timestamp - b.timestamp;
             });
 
-            let phase = snap.data().Phase_Combat || "Preparation";
+            let phase = data.Phase_Combat || "Preparation";
             
             // 🔻 CORRECTION : On ne compte QUE les combattants présents dans l'Initiative !
-            let ordreInit = snap.data().Ordre_Initiative || [];
+            let ordreInit = data.Ordre_Initiative || [];
             const nbJoueursActifs = ordreInit.filter(id => {
                 const p = (window.PERSOS_PARTIE || []).find(perso => perso.idPersonnage === id);
                 return p && p.statut !== "Mort";
@@ -2525,10 +2565,16 @@ window.jouerCarteCombat = async function(idCarte) {
             
             if (file.length >= nbJoueursActifs && nbJoueursActifs > 0) phase = "Resolution";
 
-            await updateDoc(partieRef, { 
-                File_Attente_Combat: file,
-                Phase_Combat: phase 
-            });
+            return { maj: { File_Attente_Combat: file, Phase_Combat: phase } };
+        });
+
+        // L'état Électrifié se dissipe une fois la carte réellement inscrite.
+        if (etatsApresElectrifie) {
+            persoActuel.Etats_Alteres = etatsApresElectrifie;
+            const persoPartieElec = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === persoActuel.idPersonnage);
+            if (persoPartieElec) persoPartieElec.Etats_Alteres = etatsApresElectrifie;
+            updateDoc(window.refCombattant(persoActuel.idPersonnage), { Etats_Alteres: etatsApresElectrifie })
+                .catch(e => console.error(e));
         }
     } catch (e) {
         console.error("Erreur jouerCarteCombat:", e);
@@ -2575,12 +2621,10 @@ window.jouerReposLong = async function() {
     window.actualiserEtatCarteCombat("REPOS_LONG");
 
     try {
-        const { getDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
-        const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
-        const snap = await getDoc(partieRef);
-
-        if (snap.exists()) {
-            let file = snap.data().File_Attente_Combat || [];
+        // Même règle que pour une carte ordinaire : sous transaction, sinon un
+        // repos long effacerait la carte qu'un autre joueur vient de poser.
+        await window.modifierPartie((data) => {
+            let file = data.File_Attente_Combat || [];
             
             file = file.filter(item => item.idPersonnage !== persoActuel.idPersonnage);
 
@@ -2596,10 +2640,10 @@ window.jouerReposLong = async function() {
                 return a.timestamp - b.timestamp;
             });
 
-            let newPhase = snap.data().Phase_Combat || "Preparation";
+            let newPhase = data.Phase_Combat || "Preparation";
             
             // 🔻 CORRECTION : Idem pour le Repos Long
-            let ordreInit = snap.data().Ordre_Initiative || [];
+            let ordreInit = data.Ordre_Initiative || [];
             const nbJoueursActifs = ordreInit.filter(id => {
                 const p = (window.PERSOS_PARTIE || []).find(perso => perso.idPersonnage === id);
                 return p && p.statut !== "Mort";
@@ -2607,11 +2651,8 @@ window.jouerReposLong = async function() {
             
             if (file.length >= nbJoueursActifs && nbJoueursActifs > 0) newPhase = "Resolution";
 
-            await updateDoc(partieRef, { 
-                File_Attente_Combat: file,
-                Phase_Combat: newPhase 
-            });
-        }
+            return { maj: { File_Attente_Combat: file, Phase_Combat: newPhase } };
+        });
     } catch (e) {
         console.error("Erreur jouerReposLong:", e);
         window.actualiserEtatCarteCombat();
@@ -2671,7 +2712,7 @@ window.actualiserBoutonFinTour = function(queueParam, phaseParam) {
 
 window.ANIMATION_TOUR_EN_COURS = false;
 
-window.finDeTourCombat = async function(forcer = false) {
+window.finDeTourCombat = async function(forcer = false, idQuiTermine = null) {
     if (!window.PEUT_PASSER_TOUR && !forcer) return; 
 
     window.COUT_COMPETENCE_SELECTIONNEE = 0;
@@ -2680,6 +2721,15 @@ window.finDeTourCombat = async function(forcer = false) {
     if (!window.ID_PARTIE_COURANTE) return;
 
     window.ANIMATION_TOUR_EN_COURS = true;
+
+    // QUI termine ce tour ? À trois postes, deux navigateurs peuvent demander la
+    // fin du MÊME tour (un joueur qui clique pendant que l'IA rend la main, deux
+    // rejeux d'une même carte…). Sans repère, la file avançait alors de deux
+    // crans et le combattant suivant ne jouait jamais. On retient donc le
+    // combattant attendu en tête, et la transaction ci-dessous n'avance la file
+    // que s'il y est encore.
+    const teteLocale = ((window.PARTIE_DATA || {}).File_Attente_Combat || [])[0];
+    const attendu = idQuiTermine || (teteLocale ? teteLocale.idPersonnage : null);
 
     const premiereBulle = document.getElementById("premiere-bulle-initiative");
     if (premiereBulle) {
@@ -2692,288 +2742,301 @@ window.finDeTourCombat = async function(forcer = false) {
 
     setTimeout(async () => {
         try {
-            const { doc, getDoc, updateDoc, writeBatch } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
-            const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
-            const snap = await getDoc(partieRef);
+            const { updateDoc, writeBatch } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
 
-            let file = [];
-            let phase = "Preparation";
+            // 1. LA FILE AVANCE — sous transaction, et une seule fois.
+            const passage = await window.modifierPartie((data) => {
+                let file = data.File_Attente_Combat || [];
+                let phase = data.Phase_Combat || "Resolution";
+                let tour = data.Tour_Combat || 1;
 
-            if (snap.exists()) {
-                file = snap.data().File_Attente_Combat || [];
-                phase = snap.data().Phase_Combat || "Resolution";
-                let tour = snap.data().Tour_Combat || 1;
+                if (file.length === 0) return null;
+                // Un autre poste a déjà fait avancer la file : on ne la pousse pas
+                // une seconde fois, sinon on saute le tour de quelqu'un.
+                if (attendu && file[0].idPersonnage !== attendu) return null;
 
-                if (file.length > 0) {
-                    const actionCourante = file[0];
-                    let reposLongEffectue = false;
-                    let nvFatigueRepos = null;
-                    let idPersoRepos = null;
+                const actionCourante = file[0];
+                file = file.slice(1);
 
-                    if (actionCourante.idCarte === "REPOS_LONG") {
-                        const persoAction = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === actionCourante.idPersonnage);
-                        if (persoAction && persoAction.statut !== "Mort") {
-                            const fatigueMax = window.fatigueMaxCombattant(persoAction);
-                            let fatigueActuelle = persoAction.fatigueActuelle !== undefined ? parseInt(persoAction.fatigueActuelle) : fatigueMax;
-                            
-                            // Les monstres ont leur propre rendement de repos dans le
-                            // bestiaire (Repos_Long, en % de la jauge) : un petit gobelin
-                            // récupère tout, un boss beaucoup moins. Les personnages
-                            // joueurs, eux, gardent les 35% historiques.
-                            const pctRepos = parseInt(persoAction.Repos_Long);
-                            const tauxRepos = (!isNaN(pctRepos) && pctRepos > 0) ? pctRepos / 100 : 0.35;
-                            // Atout de l'Humain : dix points d'énergie de plus à chaque
-                            // repos long, en plus du pourcentage ordinaire.
-                            const bonusRace = (typeof window.atoutRace === "function"
-                                ? window.atoutRace(persoAction).bonusReposLong : 0) || 0;
-                            const recup = Math.floor(fatigueMax * tauxRepos) + bonusRace;
-                            fatigueActuelle = Math.min(fatigueMax, fatigueActuelle + recup);
+                // Les combattants tombés entre-temps sortent de la file : sans
+                // ça leur tour finit par arriver, et il faut le passer à la main.
+                if (typeof window.estCombattantMort === "function") {
+                    file = file.filter(f => !window.estCombattantMort(f.idPersonnage));
+                }
 
-                            persoAction.fatigueActuelle = fatigueActuelle;
-                            const persoJoueur = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === actionCourante.idPersonnage);
-                            if (persoJoueur) persoJoueur.fatigueActuelle = fatigueActuelle;
+                const finDuRound = file.length === 0;
+                if (finDuRound) { phase = "Preparation"; tour++; }
 
-                            if (window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]?.idPersonnage === actionCourante.idPersonnage) {
-                                window.COMBAT_FATIGUE_ACTUELLE = fatigueActuelle;
-                                if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
-                            }
-                            
-                            reposLongEffectue = true;
-                            nvFatigueRepos = fatigueActuelle;
-                            idPersoRepos = actionCourante.idPersonnage;
-                        }
-                    }
+                return {
+                    maj: { File_Attente_Combat: file, Phase_Combat: phase, Tour_Combat: tour },
+                    resultat: { actionCourante, file, phase, tour, finDuRound }
+                };
+            });
 
-                    file.shift();
+            window.ANIMATION_TOUR_EN_COURS = false;
 
-                    // Les combattants tombés entre-temps sortent de la file : sans
-                    // ça leur tour finit par arriver, et il faut le passer à la main.
-                    if (typeof window.estCombattantMort === "function") {
-                        file = file.filter(f => !window.estCombattantMort(f.idPersonnage));
-                    }
+            // Rien à faire : la file était vide, ou un autre poste s'en est chargé.
+            // Le décompte des états et la régénération lui reviennent aussi : les
+            // faire ici en double donnerait deux régénérations pour un seul round.
+            if (!passage) {
+                if (typeof window.afficherPisteInitiative === "function") window.afficherPisteInitiative();
+                return;
+            }
 
-                    if (file.length === 0) {
-                        phase = "Preparation";
-                        tour++;
+            const { actionCourante, file, phase, tour, finDuRound } = passage;
+            let reposLongEffectue = false;
+            let nvFatigueRepos = null;
+            let idPersoRepos = null;
 
-                        // 🔻 Zones persistantes : un tour de moins à vivre à chaque nouveau tour.
-                        // L'écriture passe par sauvegarderZonesPersistantes (updateDoc) : un
-                        // setDoc en merge fusionnerait les clés et les zones expirées ne
-                        // disparaîtraient jamais.
-                        const zonesActuelles = window.ZONES_PERSISTANTES || {};
-                        if (Object.keys(zonesActuelles).length > 0) {
-                            const zonesRestantes = {};
-                            Object.values(zonesActuelles).forEach(z => {
-                                const reste = (parseInt(z.dureeRestante) || 0) - 1;
-                                if (reste > 0) zonesRestantes[z.id] = { ...z, dureeRestante: reste };
-                            });
-                            window.ZONES_PERSISTANTES = zonesRestantes;
-                            if (typeof window.appliquerZonesPersistantes === "function") window.appliquerZonesPersistantes();
-                            if (typeof window.sauvegarderZonesPersistantes === "function") {
-                                window.sauvegarderZonesPersistantes(zonesRestantes).catch(e => console.error(e));
-                            }
-                        }
+            // 2. LE REPOS LONG du combattant qui vient de jouer. Calculé après la
+            //    transaction, mais AVANT la régénération de fin de round : c'est
+            //    la fatigue déjà reconstituée que celle-ci doit reprendre.
+            if (actionCourante.idCarte === "REPOS_LONG") {
+                const persoAction = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === actionCourante.idPersonnage);
+                if (persoAction && persoAction.statut !== "Mort") {
+                    const fatigueMax = window.fatigueMaxCombattant(persoAction);
+                    let fatigueActuelle = persoAction.fatigueActuelle !== undefined ? parseInt(persoAction.fatigueActuelle) : fatigueMax;
+                    
+                    // Les monstres ont leur propre rendement de repos dans le
+                    // bestiaire (Repos_Long, en % de la jauge) : un petit gobelin
+                    // récupère tout, un boss beaucoup moins. Les personnages
+                    // joueurs, eux, gardent les 35% historiques.
+                    const pctRepos = parseInt(persoAction.Repos_Long);
+                    const tauxRepos = (!isNaN(pctRepos) && pctRepos > 0) ? pctRepos / 100 : 0.35;
+                    // Atout de l'Humain : dix points d'énergie de plus à chaque
+                    // repos long, en plus du pourcentage ordinaire.
+                    const bonusRace = (typeof window.atoutRace === "function"
+                        ? window.atoutRace(persoAction).bonusReposLong : 0) || 0;
+                    const recup = Math.floor(fatigueMax * tauxRepos) + bonusRace;
+                    fatigueActuelle = Math.min(fatigueMax, fatigueActuelle + recup);
 
-                        if (window.PERSOS_PARTIE && window.PERSOS_PARTIE.length > 0) {
-                            const batch = writeBatch(db);
-                            const ecrituresParCombattant = [];
-                            let regenAjoutee = false;
-                            
-                            window.PERSOS_PARTIE.forEach(perso => {
-                                if (perso.statut !== "Mort") {
-                                    let modifsFirebase = {};
-                                    let majRequise = false;
+                    persoAction.fatigueActuelle = fatigueActuelle;
+                    const persoJoueur = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === actionCourante.idPersonnage);
+                    if (persoJoueur) persoJoueur.fatigueActuelle = fatigueActuelle;
 
-                                    // 1. Régénération
-                                    const fatigueMax = window.fatigueMaxCombattant(perso);
-                                    let fatigue = perso.fatigueActuelle !== undefined ? parseInt(perso.fatigueActuelle) : fatigueMax;
-                                    const regenPct = window.regenerationCombattant(perso);
-
-                                    if (regenPct > 0) {
-                                        const montantRegen = Math.floor((regenPct / 100) * fatigueMax);
-                                        fatigue = Math.min(fatigueMax, fatigue + montantRegen);
-                                        perso.fatigueActuelle = fatigue;
-                                        
-                                        const persoJoueur = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === perso.idPersonnage);
-                                        if (persoJoueur) persoJoueur.fatigueActuelle = fatigue;
-
-                                        const persoActuel = window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
-                                        if (persoActuel && persoActuel.idPersonnage === perso.idPersonnage) {
-                                            window.COMBAT_FATIGUE_ACTUELLE = fatigue;
-                                        }
-
-                                        modifsFirebase.Fatigue_Actuelle = fatigue;
-                                        majRequise = true;
-                                    }
-
-                                    // 2. 🔻 DÉCRÉMENTATION DES ÉTATS ALTÉRÉS AU NOUVEAU TOUR 🔻
-                                    if (perso.Etats_Alteres && perso.Etats_Alteres.length > 0) {
-                                        // Immobilisation : +20 fatigue à chaque tour où le personnage est encore
-                                        // immobilisé (donc jusqu'à 2 fois sur ses 2 tours de durée), avant que la
-                                        // durée ne soit décrémentée plus bas.
-                                        if (perso.Etats_Alteres.some(e => e.nom === "Immobilisation" && e.duree > 0)) {
-                                            fatigue = Math.min(fatigueMax, fatigue + 20);
-                                            perso.fatigueActuelle = fatigue;
-
-                                            const persoJoueurImmo = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === perso.idPersonnage);
-                                            if (persoJoueurImmo) persoJoueurImmo.fatigueActuelle = fatigue;
-
-                                            const persoActuelImmo = window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
-                                            if (persoActuelImmo && persoActuelImmo.idPersonnage === perso.idPersonnage) {
-                                                window.COMBAT_FATIGUE_ACTUELLE = fatigue;
-                                            }
-
-                                            modifsFirebase.Fatigue_Actuelle = fatigue;
-                                            majRequise = true;
-                                        }
-
-                                        // Empoisonnement : 2e et dernier tic (15 fatigue + 8% des PV max), une
-                                        // seule fois au début du tour suivant l'application — jamais retenté
-                                        // ensuite (tickFait), même si l'état reste affiché encore un tour.
-                                        const etatPoison = perso.Etats_Alteres.find(e => e.nom === "Empoisonnement" && !e.tickFait);
-                                        if (etatPoison) {
-                                            const ancienneFatiguePoison = fatigue;
-                                            fatigue = Math.max(0, fatigue - 15);
-                                            perso.fatigueActuelle = fatigue;
-
-                                            const pvMaxPoison = window.pvMaxCombattant(perso);
-                                            const pvActuelsPoison = perso.PV_Actuels !== undefined ? parseInt(perso.PV_Actuels) : pvMaxPoison;
-                                            const nouveauPvPoison = Math.max(0, pvActuelsPoison - Math.ceil(pvMaxPoison * 0.08));
-                                            perso.PV_Actuels = nouveauPvPoison;
-                                            etatPoison.tickFait = true;
-
-                                            const persoJoueurPoison = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === perso.idPersonnage);
-                                            if (persoJoueurPoison) {
-                                                persoJoueurPoison.fatigueActuelle = fatigue;
-                                                persoJoueurPoison.PV_Actuels = perso.PV_Actuels;
-                                            }
-
-                                            const persoActuelPoison = window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
-                                            if (persoActuelPoison && persoActuelPoison.idPersonnage === perso.idPersonnage) {
-                                                window.COMBAT_FATIGUE_ACTUELLE = fatigue;
-                                                window.COMBAT_PV_ACTUELS = perso.PV_Actuels;
-                                                // Le poison mord la vie ET l'énergie : les deux jauges
-                                                // doivent être redessinées, pas seulement la seconde.
-                                                if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
-                                                if (typeof window.mettreAJourJaugePV === "function") window.mettreAJourJaugePV();
-                                            }
-
-                                            // Même retour visuel qu'une attaque classique (flash + barre qui se
-                                            // vide), pour que le tic de début de tour soit visible de tous.
-                                            if (ancienneFatiguePoison - fatigue > 0 && typeof window.afficherMessageFlottantHex === "function" && window.TOKENS_VTT_DATA && window.TOKENS_VTT_DATA[perso.idPersonnage]) {
-                                                const tkPoisonTour = window.TOKENS_VTT_DATA[perso.idPersonnage];
-                                                window.afficherMessageFlottantHex(tkPoisonTour.q, tkPoisonTour.r, `-${ancienneFatiguePoison - fatigue} ⚡`, "#ffaa00");
-                                            }
-                                            if (pvActuelsPoison - nouveauPvPoison > 0 && typeof window.afficherFlashDegatToken === "function") {
-                                                window.afficherFlashDegatToken(perso.idPersonnage, pvActuelsPoison, nouveauPvPoison, pvMaxPoison, `-${pvActuelsPoison - nouveauPvPoison} 🩸`, "#ff4c4c");
-                                            }
-
-                                            modifsFirebase.Fatigue_Actuelle = fatigue;
-                                            modifsFirebase.PV_Actuels = perso.PV_Actuels;
-                                            majRequise = true;
-                                        }
-
-                                        // Étalement des dégâts : second et dernier tic, du même
-                                        // montant que le premier. Le coup a déjà touché, donc pas
-                                        // de nouveau jet d'esquive — mais le bouclier encaisse en
-                                        // priorité, comme pour une attaque normale.
-                                        const etatEtalement = perso.Etats_Alteres.find(e => e.nom === "Étalement" && !e.tickFait);
-                                        if (etatEtalement) {
-                                            const montant = parseInt(etatEtalement.degatsRestants) || 0;
-                                            etatEtalement.tickFait = true;
-
-                                            if (montant > 0) {
-                                                const bouclierAvant = parseInt(perso.Bouclier_Actuel) || 0;
-                                                if (bouclierAvant > 0) {
-                                                    perso.Bouclier_Actuel = Math.max(0, bouclierAvant - montant);
-                                                    modifsFirebase.Bouclier_Actuel = perso.Bouclier_Actuel;
-                                                    if (typeof window.afficherFlashDegatToken === "function") {
-                                                        const bMax = parseInt(perso.Bouclier_Max) || bouclierAvant || 1;
-                                                        window.afficherFlashDegatToken(perso.idPersonnage, bouclierAvant, perso.Bouclier_Actuel, bMax, `-${montant} 🛡️`, "#00ffff", "#00ffff");
-                                                    }
-                                                } else {
-                                                    const pvMaxEtal = window.pvMaxCombattant(perso);
-                                                    const pvAvantEtal = perso.PV_Actuels !== undefined ? parseInt(perso.PV_Actuels) : pvMaxEtal;
-                                                    perso.PV_Actuels = Math.max(0, pvAvantEtal - montant);
-                                                    modifsFirebase.PV_Actuels = perso.PV_Actuels;
-
-                                                    const persoJoueurEtal = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === perso.idPersonnage);
-                                                    if (persoJoueurEtal) persoJoueurEtal.PV_Actuels = perso.PV_Actuels;
-
-                                                    const persoActuelEtal = window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
-                                                    if (persoActuelEtal && persoActuelEtal.idPersonnage === perso.idPersonnage) {
-                                                        window.COMBAT_PV_ACTUELS = perso.PV_Actuels;
-                                                        if (typeof window.mettreAJourJaugePV === "function") window.mettreAJourJaugePV();
-                                                    }
-                                                    if (typeof window.afficherFlashDegatToken === "function") {
-                                                        window.afficherFlashDegatToken(perso.idPersonnage, pvAvantEtal, perso.PV_Actuels, pvMaxEtal, `-${montant} 🩸`, "#ff4c4c");
-                                                    }
-                                                }
-                                            }
-                                            majRequise = true;
-                                        }
-
-                                        let etatsAJour = perso.Etats_Alteres.map(e => {
-                                            e.duree -= 1;
-                                            return e;
-                                        }).filter(e => e.duree > 0);
-
-                                        perso.Etats_Alteres = etatsAJour; // MAJ locale
-                                        
-                                        const persoJoueur = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === perso.idPersonnage);
-                                        if (persoJoueur) persoJoueur.Etats_Alteres = etatsAJour;
-
-                                        modifsFirebase.Etats_Alteres = etatsAJour;
-                                        majRequise = true;
-                                    }
-
-                                    if (majRequise) {
-                                        const persoRef = window.refCombattant(perso.idPersonnage);
-                                        batch.update(persoRef, modifsFirebase);
-                                        ecrituresParCombattant.push([perso.idPersonnage, modifsFirebase]);
-                                        regenAjoutee = true; // Trigger le commit global
-                                    }
-                                }
-                            });
-                            
-                            // Un seul document introuvable — un monstre effacé, une fiche
-                            // supprimée, un combattant dont on ne sait plus dans quelle
-                            // collection il vit — et TOUT le lot échouait : ni régénération,
-                            // ni décompte des états pour personne, et l'écriture de la file
-                            // qui suit ne se faisait jamais (d'où des états qui s'éternisent
-                            // et une piste d'initiative qui n'apparaît pas). On réessaie donc
-                            // combattant par combattant, pour que les autres soient servis.
-                            if (regenAjoutee) {
-                                try {
-                                    await batch.commit();
-                                } catch (e) {
-                                    console.error("Fin de tour : écriture groupée refusée, on reprend un par un.", e);
-                                    for (const [idPerso, modifs] of ecrituresParCombattant) {
-                                        await updateDoc(window.refCombattant(idPerso), modifs)
-                                            .catch(err => console.error("   ↳ échec pour " + idPerso, err));
-                                    }
-                                }
-                            }
-                            if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
-                        }
+                    if (window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO]?.idPersonnage === actionCourante.idPersonnage) {
+                        window.COMBAT_FATIGUE_ACTUELLE = fatigueActuelle;
+                        if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
                     }
                     
-                    await updateDoc(partieRef, { 
-                        File_Attente_Combat: file,
-                        Phase_Combat: phase,
-                        Tour_Combat: tour
-                    });
-
-                    if (file.length > 0 && reposLongEffectue) {
-                        const persoRef = window.refCombattant(idPersoRepos);
-                        updateDoc(persoRef, { Fatigue_Actuelle: nvFatigueRepos }).catch(e => console.error(e));
-                    }
+                    reposLongEffectue = true;
+                    nvFatigueRepos = fatigueActuelle;
+                    idPersoRepos = actionCourante.idPersonnage;
                 }
             }
-            
-            window.ANIMATION_TOUR_EN_COURS = false;
+
+            // 3. FIN DE ROUND — réservée au poste qui a réellement vidé la file.
+            if (finDuRound) {
+            // 🔻 Zones persistantes : un tour de moins à vivre à chaque nouveau tour.
+            // L'écriture passe par sauvegarderZonesPersistantes (updateDoc) : un
+            // setDoc en merge fusionnerait les clés et les zones expirées ne
+            // disparaîtraient jamais.
+            const zonesActuelles = window.ZONES_PERSISTANTES || {};
+            if (Object.keys(zonesActuelles).length > 0) {
+                const zonesRestantes = {};
+                Object.values(zonesActuelles).forEach(z => {
+                    const reste = (parseInt(z.dureeRestante) || 0) - 1;
+                    if (reste > 0) zonesRestantes[z.id] = { ...z, dureeRestante: reste };
+                });
+                window.ZONES_PERSISTANTES = zonesRestantes;
+                if (typeof window.appliquerZonesPersistantes === "function") window.appliquerZonesPersistantes();
+                if (typeof window.sauvegarderZonesPersistantes === "function") {
+                    window.sauvegarderZonesPersistantes(zonesRestantes).catch(e => console.error(e));
+                }
+            }
+            if (window.PERSOS_PARTIE && window.PERSOS_PARTIE.length > 0) {
+                const batch = writeBatch(db);
+                const ecrituresParCombattant = [];
+                let regenAjoutee = false;
+                
+                window.PERSOS_PARTIE.forEach(perso => {
+                    if (perso.statut !== "Mort") {
+                        let modifsFirebase = {};
+                        let majRequise = false;
+
+                        // 1. Régénération
+                        const fatigueMax = window.fatigueMaxCombattant(perso);
+                        let fatigue = perso.fatigueActuelle !== undefined ? parseInt(perso.fatigueActuelle) : fatigueMax;
+                        const regenPct = window.regenerationCombattant(perso);
+
+                        if (regenPct > 0) {
+                            const montantRegen = Math.floor((regenPct / 100) * fatigueMax);
+                            fatigue = Math.min(fatigueMax, fatigue + montantRegen);
+                            perso.fatigueActuelle = fatigue;
+                            
+                            const persoJoueur = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === perso.idPersonnage);
+                            if (persoJoueur) persoJoueur.fatigueActuelle = fatigue;
+
+                            const persoActuel = window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+                            if (persoActuel && persoActuel.idPersonnage === perso.idPersonnage) {
+                                window.COMBAT_FATIGUE_ACTUELLE = fatigue;
+                            }
+
+                            modifsFirebase.Fatigue_Actuelle = fatigue;
+                            majRequise = true;
+                        }
+
+                        // 2. 🔻 DÉCRÉMENTATION DES ÉTATS ALTÉRÉS AU NOUVEAU TOUR 🔻
+                        if (perso.Etats_Alteres && perso.Etats_Alteres.length > 0) {
+                            // Immobilisation : +20 fatigue à chaque tour où le personnage est encore
+                            // immobilisé (donc jusqu'à 2 fois sur ses 2 tours de durée), avant que la
+                            // durée ne soit décrémentée plus bas.
+                            if (perso.Etats_Alteres.some(e => e.nom === "Immobilisation" && e.duree > 0)) {
+                                fatigue = Math.min(fatigueMax, fatigue + 20);
+                                perso.fatigueActuelle = fatigue;
+
+                                const persoJoueurImmo = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === perso.idPersonnage);
+                                if (persoJoueurImmo) persoJoueurImmo.fatigueActuelle = fatigue;
+
+                                const persoActuelImmo = window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+                                if (persoActuelImmo && persoActuelImmo.idPersonnage === perso.idPersonnage) {
+                                    window.COMBAT_FATIGUE_ACTUELLE = fatigue;
+                                }
+
+                                modifsFirebase.Fatigue_Actuelle = fatigue;
+                                majRequise = true;
+                            }
+
+                            // Empoisonnement : 2e et dernier tic (15 fatigue + 8% des PV max), une
+                            // seule fois au début du tour suivant l'application — jamais retenté
+                            // ensuite (tickFait), même si l'état reste affiché encore un tour.
+                            const etatPoison = perso.Etats_Alteres.find(e => e.nom === "Empoisonnement" && !e.tickFait);
+                            if (etatPoison) {
+                                const ancienneFatiguePoison = fatigue;
+                                fatigue = Math.max(0, fatigue - 15);
+                                perso.fatigueActuelle = fatigue;
+
+                                const pvMaxPoison = window.pvMaxCombattant(perso);
+                                const pvActuelsPoison = perso.PV_Actuels !== undefined ? parseInt(perso.PV_Actuels) : pvMaxPoison;
+                                const nouveauPvPoison = Math.max(0, pvActuelsPoison - Math.ceil(pvMaxPoison * 0.08));
+                                perso.PV_Actuels = nouveauPvPoison;
+                                etatPoison.tickFait = true;
+
+                                const persoJoueurPoison = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === perso.idPersonnage);
+                                if (persoJoueurPoison) {
+                                    persoJoueurPoison.fatigueActuelle = fatigue;
+                                    persoJoueurPoison.PV_Actuels = perso.PV_Actuels;
+                                }
+
+                                const persoActuelPoison = window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+                                if (persoActuelPoison && persoActuelPoison.idPersonnage === perso.idPersonnage) {
+                                    window.COMBAT_FATIGUE_ACTUELLE = fatigue;
+                                    window.COMBAT_PV_ACTUELS = perso.PV_Actuels;
+                                    // Le poison mord la vie ET l'énergie : les deux jauges
+                                    // doivent être redessinées, pas seulement la seconde.
+                                    if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
+                                    if (typeof window.mettreAJourJaugePV === "function") window.mettreAJourJaugePV();
+                                }
+
+                                // Même retour visuel qu'une attaque classique (flash + barre qui se
+                                // vide), pour que le tic de début de tour soit visible de tous.
+                                if (ancienneFatiguePoison - fatigue > 0 && typeof window.afficherMessageFlottantHex === "function" && window.TOKENS_VTT_DATA && window.TOKENS_VTT_DATA[perso.idPersonnage]) {
+                                    const tkPoisonTour = window.TOKENS_VTT_DATA[perso.idPersonnage];
+                                    window.afficherMessageFlottantHex(tkPoisonTour.q, tkPoisonTour.r, `-${ancienneFatiguePoison - fatigue} ⚡`, "#ffaa00");
+                                }
+                                if (pvActuelsPoison - nouveauPvPoison > 0 && typeof window.afficherFlashDegatToken === "function") {
+                                    window.afficherFlashDegatToken(perso.idPersonnage, pvActuelsPoison, nouveauPvPoison, pvMaxPoison, `-${pvActuelsPoison - nouveauPvPoison} 🩸`, "#ff4c4c");
+                                }
+
+                                modifsFirebase.Fatigue_Actuelle = fatigue;
+                                modifsFirebase.PV_Actuels = perso.PV_Actuels;
+                                majRequise = true;
+                            }
+
+                            // Étalement des dégâts : second et dernier tic, du même
+                            // montant que le premier. Le coup a déjà touché, donc pas
+                            // de nouveau jet d'esquive — mais le bouclier encaisse en
+                            // priorité, comme pour une attaque normale.
+                            const etatEtalement = perso.Etats_Alteres.find(e => e.nom === "Étalement" && !e.tickFait);
+                            if (etatEtalement) {
+                                const montant = parseInt(etatEtalement.degatsRestants) || 0;
+                                etatEtalement.tickFait = true;
+
+                                if (montant > 0) {
+                                    const bouclierAvant = parseInt(perso.Bouclier_Actuel) || 0;
+                                    if (bouclierAvant > 0) {
+                                        perso.Bouclier_Actuel = Math.max(0, bouclierAvant - montant);
+                                        modifsFirebase.Bouclier_Actuel = perso.Bouclier_Actuel;
+                                        if (typeof window.afficherFlashDegatToken === "function") {
+                                            const bMax = parseInt(perso.Bouclier_Max) || bouclierAvant || 1;
+                                            window.afficherFlashDegatToken(perso.idPersonnage, bouclierAvant, perso.Bouclier_Actuel, bMax, `-${montant} 🛡️`, "#00ffff", "#00ffff");
+                                        }
+                                    } else {
+                                        const pvMaxEtal = window.pvMaxCombattant(perso);
+                                        const pvAvantEtal = perso.PV_Actuels !== undefined ? parseInt(perso.PV_Actuels) : pvMaxEtal;
+                                        perso.PV_Actuels = Math.max(0, pvAvantEtal - montant);
+                                        modifsFirebase.PV_Actuels = perso.PV_Actuels;
+
+                                        const persoJoueurEtal = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === perso.idPersonnage);
+                                        if (persoJoueurEtal) persoJoueurEtal.PV_Actuels = perso.PV_Actuels;
+
+                                        const persoActuelEtal = window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+                                        if (persoActuelEtal && persoActuelEtal.idPersonnage === perso.idPersonnage) {
+                                            window.COMBAT_PV_ACTUELS = perso.PV_Actuels;
+                                            if (typeof window.mettreAJourJaugePV === "function") window.mettreAJourJaugePV();
+                                        }
+                                        if (typeof window.afficherFlashDegatToken === "function") {
+                                            window.afficherFlashDegatToken(perso.idPersonnage, pvAvantEtal, perso.PV_Actuels, pvMaxEtal, `-${montant} 🩸`, "#ff4c4c");
+                                        }
+                                    }
+                                }
+                                majRequise = true;
+                            }
+
+                            let etatsAJour = perso.Etats_Alteres.map(e => {
+                                e.duree -= 1;
+                                return e;
+                            }).filter(e => e.duree > 0);
+
+                            perso.Etats_Alteres = etatsAJour; // MAJ locale
+                            
+                            const persoJoueur = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === perso.idPersonnage);
+                            if (persoJoueur) persoJoueur.Etats_Alteres = etatsAJour;
+
+                            modifsFirebase.Etats_Alteres = etatsAJour;
+                            majRequise = true;
+                        }
+
+                        if (majRequise) {
+                            const persoRef = window.refCombattant(perso.idPersonnage);
+                            batch.update(persoRef, modifsFirebase);
+                            ecrituresParCombattant.push([perso.idPersonnage, modifsFirebase]);
+                            regenAjoutee = true; // Trigger le commit global
+                        }
+                    }
+                });
+                
+                // Un seul document introuvable — un monstre effacé, une fiche
+                // supprimée, un combattant dont on ne sait plus dans quelle
+                // collection il vit — et TOUT le lot échouait : ni régénération,
+                // ni décompte des états pour personne, et l'écriture de la file
+                // qui suit ne se faisait jamais (d'où des états qui s'éternisent
+                // et une piste d'initiative qui n'apparaît pas). On réessaie donc
+                // combattant par combattant, pour que les autres soient servis.
+                if (regenAjoutee) {
+                    try {
+                        await batch.commit();
+                    } catch (e) {
+                        console.error("Fin de tour : écriture groupée refusée, on reprend un par un.", e);
+                        for (const [idPerso, modifs] of ecrituresParCombattant) {
+                            await updateDoc(window.refCombattant(idPerso), modifs)
+                                .catch(err => console.error("   ↳ échec pour " + idPerso, err));
+                        }
+                    }
+                }
+                if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
+            }
+            }
+
             if (typeof window.afficherPisteInitiative === "function") {
                 window.afficherPisteInitiative(file, phase);
+            }
+
+            // En fin de round, la régénération vient de réécrire la fatigue de tout
+            // le monde, repos compris : réécrire ici la valeur d'avant l'effacerait.
+            if (reposLongEffectue && !finDuRound) {
+                const persoRef = window.refCombattant(idPersoRepos);
+                updateDoc(persoRef, { Fatigue_Actuelle: nvFatigueRepos }).catch(e => console.error(e));
             }
 
         } catch (e) {
@@ -3430,7 +3493,7 @@ window.deduireFatigueCarte = async function(idPersonnage, idCarte) {
     }
 };
 
-window.validerCarteCombat = async function(idCarte, elementTexte) {
+window.validerCarteCombat = async function(idCarte, elementTexte, idLanceur) {
     if (elementTexte && elementTexte.innerText === "Validé") return;
 
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
@@ -3450,7 +3513,9 @@ window.validerCarteCombat = async function(idCarte, elementTexte) {
     await window.deduireFatigueCarte(persoActuel.idPersonnage, idCarte);
 
     if (typeof window.finDeTourCombat === "function") {
-        window.finDeTourCombat(true);
+        // On nomme le combattant dont le tour s'achève : la file n'avancera que
+        // s'il y est encore en tête, jamais deux fois pour le même tour.
+        window.finDeTourCombat(true, idLanceur || persoActuel.idPersonnage);
     }
 };
 

@@ -6,6 +6,7 @@
 // n'était jamais écrite (la piste d'initiative n'apparaissait pas).
 import fs from 'fs';
 import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
+import { SRC_MODIFIER_PARTIE } from './transaction_partie.mjs';
 
 const src = fs.readFileSync('/home/user/Ivalis/combat.js','utf-8');
 const lignes = src.split('\n');
@@ -47,7 +48,7 @@ await p.evaluate(src => eval(src), SRC_STATS_COMMUNES);
 let echecs = 0;
 const verifier = (l, c, d="") => { if (!c) echecs++; console.log(`  ${l.padEnd(58)} ${c?"OK":"ÉCHEC"} ${d}`); };
 
-const jouerFinDeTour = ({ lotCasse }) => p.evaluate(async ({ fnSrc, lotCasse }) => {
+const jouerFinDeTour = ({ lotCasse }) => p.evaluate(async ({ fnSrc, lotCasse, srcModifierPartie }) => {
   const journal = { ecrituresUnitaires: [], partie: null, lotTente: false };
 
   window.__fs = {
@@ -70,6 +71,18 @@ const jouerFinDeTour = ({ lotCasse }) => p.evaluate(async ({ fnSrc, lotCasse }) 
 
   window.db = {};                       // le module réel l'importe ; ici il suffit qu'il existe
   window.ID_PARTIE_COURANTE = "GAME_1";
+
+  // La vraie window.modifierPartie, avec un Firestore transactionnel de test :
+  // c'est elle qui fait avancer la file, et elle seule.
+  const partagee = { doc: { File_Attente_Combat: [{ idPersonnage: "J1", idCarte: "C1" }],
+                            Phase_Combat: "Resolution", Tour_Combat: 3 } };
+  const runTransaction = async (_db, fn) => fn({
+    get: async () => ({ exists: () => true, data: () => JSON.parse(JSON.stringify(partagee.doc)) }),
+    update: (_r, maj) => { Object.assign(partagee.doc, JSON.parse(JSON.stringify(maj))); journal.partie = maj; }
+  });
+  new Function('window', 'db', 'doc', 'runTransaction', srcModifierPartie)(
+    window, {}, () => ({}), runTransaction);
+  window.PARTIE_DATA = partagee.doc;
   window.PEUT_PASSER_TOUR = true;
   window.ZONES_PERSISTANTES = {};
   window.PERSOS_PARTIE = [
@@ -98,7 +111,7 @@ const jouerFinDeTour = ({ lotCasse }) => p.evaluate(async ({ fnSrc, lotCasse }) 
     journal,
     etats: window.PERSOS_PARTIE.map(x => ({ id:x.idPersonnage, etats:x.Etats_Alteres.map(e => e.nom + ":" + e.duree) }))
   };
-}, { fnSrc: fonction, lotCasse });
+}, { fnSrc: fonction, lotCasse, srcModifierPartie: SRC_MODIFIER_PARTIE });
 
 console.log("1. TOUT SE PASSE BIEN");
 {
