@@ -2316,9 +2316,44 @@ window.surlignerEffetCarteActif = function(nomEffet) {
     if (cible) cible.classList.add("effet-hd-actif");
 };
 
+// La petite jauge de vie sous une cible potentielle : elle dit d'un coup d'œil
+// s'il reste de quoi l'achever, ou s'il vaut mieux viser ailleurs. Même dessin
+// que la jauge qui apparaît quand un coup porte, mais celle-ci reste affichée
+// tant qu'on choisit sa cible.
+function dessinerJaugeCible(divToken, cibleData) {
+    const pvMax = (parseInt(cibleData.PV_Max) || 0) + (parseInt(cibleData.Dev_Mod_PV) || 0);
+    if (pvMax <= 0) return;
+    const pv = cibleData.PV_Actuels !== undefined ? parseInt(cibleData.PV_Actuels) : pvMax;
+    const pct = Math.max(0, Math.min(100, (pv / pvMax) * 100));
+
+    let jauge = divToken.querySelector(".jauge-cible-ciblage");
+    if (!jauge) {
+        // Enveloppe SANS "overflow:hidden" : le chiffre des points de vie est posé
+        // au-dessus de la barre, donc en dehors de ses limites. S'il était placé dans
+        // l'élément qui découpe le remplissage, il serait purement et simplement rogné.
+        jauge = document.createElement("div");
+        jauge.className = "jauge-cible-ciblage";
+        jauge.style.cssText = "position:absolute; bottom:-12px; left:50%; transform:translateX(-50%);"
+            + " width:75%; height:6px; z-index:20; pointer-events:none;";
+        jauge.innerHTML = `<div class="fond-jauge-cible" style="position:absolute; inset:0;`
+            + ` background-color:#111; border:1px solid #c2a878; border-radius:3px;`
+            + ` overflow:hidden; box-shadow:0 2px 4px rgba(0,0,0,0.8);">`
+            + `<div class="remplissage-jauge-cible" style="height:100%; width:100%;`
+            + ` background:linear-gradient(to right, #e63946, #ff8b8b); transition:width 0.3s ease;"></div>`
+            + `</div>`
+            + `<div class="texte-jauge-cible" style="position:absolute; bottom:9px; left:50%;`
+            + ` transform:translateX(-50%); font-family:'Cinzel', serif; font-size:11px; font-weight:bold;`
+            + ` color:#ffffff; text-shadow:0 0 3px black, 0 0 5px black, 1px 1px 2px black; white-space:nowrap;`
+            + ` line-height:1;"></div>`;
+        divToken.appendChild(jauge);
+    }
+    jauge.querySelector(".remplissage-jauge-cible").style.width = pct + "%";
+    jauge.querySelector(".texte-jauge-cible").innerText = pv + " / " + pvMax;
+}
+
 window.dessinerAnneauxCiblage = function() {
     if (!window.ETAT_CIBLAGE || !window.ETAT_CIBLAGE.actif) {
-        document.querySelectorAll(".anneau-ciblage, .bulle-validation-cible").forEach(el => el.remove());
+        document.querySelectorAll(".anneau-ciblage, .bulle-validation-cible, .jauge-cible-ciblage").forEach(el => el.remove());
         return;
     }
 
@@ -2380,6 +2415,8 @@ window.dessinerAnneauxCiblage = function() {
         const divToken = document.getElementById("token-" + idToken);
         
         if (divToken) {
+            dessinerJaugeCible(divToken, cibleData);
+
             let anneau = divToken.querySelector(".anneau-ciblage");
             if (!anneau) {
                 anneau = document.createElement("div");
@@ -2467,7 +2504,7 @@ window.dessinerAnneauxCiblage = function() {
         }
     }
     
-    document.querySelectorAll(".anneau-ciblage, .bulle-validation-cible").forEach(el => {
+    document.querySelectorAll(".anneau-ciblage, .bulle-validation-cible, .jauge-cible-ciblage").forEach(el => {
         const tokenId = el.parentElement.id.replace("token-", "");
         if (!ciblesValides.has(tokenId)) el.remove();
     });
@@ -2559,7 +2596,7 @@ window.ajouterCibleCiblage = function(idCible) {
 window.nettoyerCiblage = function() {
     window.ETAT_CIBLAGE.actif = false;
     window.surlignerEffetCarteActif(null);
-    document.querySelectorAll(".anneau-ciblage, .bulle-validation-cible").forEach(el => el.remove());
+    document.querySelectorAll(".anneau-ciblage, .bulle-validation-cible, .jauge-cible-ciblage").forEach(el => el.remove());
     
     const svgZone = document.getElementById("svg-zone-ciblage");
     if (svgZone) svgZone.remove();
