@@ -13,6 +13,9 @@ const d = lignes.findIndex(l => l.startsWith("//  POINTS D'APPARITION"));
 const f = lignes.findIndex((l, i) => i > d && l.startsWith('// Le bouton 💀'));
 const srcApparition = lignes.slice(d, f).join('\n');
 // Et la recherche de case libre historique, dont il se sert en dernier recours.
+const dMenu = lignes.findIndex(l => l.startsWith('window.toggleMenuCombat = function'));
+let fMenu = dMenu; for (let i = dMenu + 1; i < lignes.length; i++) { if (lignes[i] === '};') { fMenu = i; break; } }
+const srcMenuDev = lignes.slice(dMenu, fMenu + 1).join('\n');
 const dLibre = lignes.findIndex(l => l.startsWith('window.trouverHexLibreVTT = function'));
 let fLibre = dLibre; for (let i = dLibre + 1; i < lignes.length; i++) { if (lignes[i] === '};') { fLibre = i; break; } }
 const srcHexLibre = lignes.slice(dLibre, fLibre + 1).join('\n');
@@ -29,7 +32,7 @@ let echecs = 0;
 const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(58)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
 
 // Mise en place : un plateau de 40 cases de côté, aucune bloquée sauf un mur.
-await p.evaluate(({ srcApparition, srcHexLibre }) => {
+await p.evaluate(({ srcApparition, srcHexLibre, srcMenuDev }) => {
   document.documentElement.style.setProperty('--app-h', '800px');
   document.querySelectorAll('body > div[id^="ecran-"]').forEach(e => { if (e.id !== 'ecran-jeu') e.style.display = 'none'; });
   document.getElementById('ecran-jeu').style.display = 'block';
@@ -49,8 +52,14 @@ await p.evaluate(({ srcApparition, srcHexLibre }) => {
   window.jouerSonClic = () => {};
   window.afficherMessageFlottantHex = (q, r, t) => { window.MESSAGES = (window.MESSAGES || []); window.MESSAGES.push(t); };
   window.ECRITURES = [];
+  window.fermerMenusCoulissantsCombat = () => {
+    const m = document.getElementById('menu-dev-combat');
+    m.classList.remove('ouvert'); m.style.top = '-150px';
+    window.positionnerBandeauApparition();
+  };
   eval(srcHexLibre);
   eval(srcApparition);
+  eval(srcMenuDev);
   // On court-circuite l'écriture réseau, en gardant tout le reste du parcours.
   window.enregistrerPointsApparition = async (allies, ennemis) => {
     window.PARTIE_DATA.Spawn_Allies = allies;
@@ -58,7 +67,7 @@ await p.evaluate(({ srcApparition, srcHexLibre }) => {
     window.ECRITURES.push({ allies, ennemis });
   };
   window.verifierPointsApparition();
-}, { srcApparition, srcHexLibre });
+}, { srcApparition, srcHexLibre, srcMenuDev });
 
 const etape = () => p.evaluate(() => ({
   visible: document.getElementById('placement-apparition').style.display === 'flex',
@@ -72,6 +81,66 @@ const depart = await etape();
 verifier("la demande s'ouvre en entrant en combat", depart.visible);
 verifier("elle réclame d'abord le camp des héros", depart.etape === "Allié" && /héros/i.test(depart.titre),
          `(${depart.titre})`);
+
+// LE TAP D'UN IPAD : Safari déclenche le tactile, puis synthétise des
+// événements de souris juste derrière. Le même geste posait les DEUX repères.
+const apresTap = await p.evaluate(() => {
+  const cible = document.getElementById('conteneur-plateau-vtt');
+  const x = 180, y = 120;
+  const toucher = (type) => {
+    const t = new Touch({ identifier: 1, target: cible, clientX: x, clientY: y });
+    cible.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true,
+      touches: type === "touchend" ? [] : [t], changedTouches: [t] }));
+  };
+  toucher("touchstart");
+  toucher("touchend");
+  ["mousedown", "mouseup", "click"].forEach(type =>
+    cible.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y })));
+  return { etape: window.PLACEMENT_APPARITION ? window.PLACEMENT_APPARITION.etape : null,
+           ecritures: window.ECRITURES.length };
+});
+verifier("un tap d'iPad ne pose qu'un seul repère, pas les deux",
+         apresTap.etape === "Ennemi" && apresTap.ecritures === 0,
+         `(étape ${apresTap.etape}, ${apresTap.ecritures} enregistrement)`);
+
+// On revient au point de départ pour la suite des contrôles.
+await p.evaluate(() => {
+  window.arreterPlacementApparition();
+  window.ECRITURES = [];
+  delete window.PARTIE_DATA.Spawn_Allies; delete window.PARTIE_DATA.Spawn_Ennemis;
+  window.APPARITION_REPORTEE = false;
+  window.verifierPointsApparition();
+});
+
+// DEUX VRAIS APPUIS RAPPROCHÉS : le MJ pose ses deux repères coup sur coup.
+// Le garde-fou contre les événements fantômes ne doit pas avaler le second.
+const apresDeuxTaps = await p.evaluate(async () => {
+  const cible = document.getElementById('conteneur-plateau-vtt');
+  const tap = (x, y) => {
+    const t = new Touch({ identifier: 1, target: cible, clientX: x, clientY: y });
+    ["touchstart", "touchend"].forEach(type =>
+      cible.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true,
+        touches: type === "touchend" ? [] : [t], changedTouches: [t] })));
+  };
+  tap(180, 120);                                     // repère des héros
+  await new Promise(r => setTimeout(r, 120));        // 120 ms plus tard seulement
+  tap(600, 420);                                     // repère des ennemis
+  return { etape: window.PLACEMENT_APPARITION ? window.PLACEMENT_APPARITION.etape : null,
+           points: window.ECRITURES[0] || null };
+});
+verifier("deux appuis à 120 ms d'intervalle comptent tous les deux",
+         apresDeuxTaps.etape === null && !!apresDeuxTaps.points
+         && apresDeuxTaps.points.allies.q === 3 && apresDeuxTaps.points.ennemis.q === 10,
+         `(${JSON.stringify(apresDeuxTaps.points)})`);
+
+// On revient au point de départ pour la suite des contrôles.
+await p.evaluate(() => {
+  window.arreterPlacementApparition();
+  window.ECRITURES = [];
+  delete window.PARTIE_DATA.Spawn_Allies; delete window.PARTIE_DATA.Spawn_Ennemis;
+  window.APPARITION_REPORTEE = false;
+  window.verifierPointsApparition();
+});
 
 // Un GLISSEMENT de carte : le doigt part de (300,300) et arrive à (500,340).
 await p.mouse.move(300, 300);
@@ -110,6 +179,49 @@ verifier("les deux repères sont enregistrés une seule fois", apresSecond.ecrit
          `(${apresSecond.ecritures})`);
 verifier("aux cases cliquées", JSON.stringify(apresSecond.points) === JSON.stringify({ allies: { q: 5, r: 3 }, ennemis: { q: 12, r: 3 } }),
          `(${JSON.stringify(apresSecond.points)})`);
+
+// LA BARRE D'OUTILS DE COMBAT descend du haut de l'écran, par-dessus tout le
+// reste : le bandeau de la demande ne doit pas disparaître dessous.
+const barre = await p.evaluate(() => {
+  delete window.PARTIE_DATA.Spawn_Allies; delete window.PARTIE_DATA.Spawn_Ennemis;
+  window.APPARITION_REPORTEE = false;
+  window.verifierPointsApparition();
+
+  const boite = document.getElementById('placement-apparition-boite');
+  const calque = document.getElementById('placement-apparition');
+  const menu = document.getElementById('menu-dev-combat');
+  const mesurer = () => ({ haut: boite.getBoundingClientRect().top,
+                           basBarre: menu.getBoundingClientRect().bottom });
+
+  window.toggleMenuCombat();               // la barre se déploie
+  menu.style.transition = "none";
+  window.positionnerBandeauApparition();
+  boite.style.transition = "none";
+  const deployee = mesurer();
+
+  window.toggleMenuCombat();               // et se rétracte
+  window.positionnerBandeauApparition();
+  const repliee = mesurer();
+
+  return { deployee, repliee,
+           zCalque: parseInt(getComputedStyle(calque).zIndex),
+           zBarre: parseInt(getComputedStyle(menu).zIndex) };
+});
+
+verifier("barre déployée, le bandeau se pose dessous",
+         barre.deployee.haut >= barre.deployee.basBarre,
+         `(bandeau à ${Math.round(barre.deployee.haut)}px, barre jusqu'à ${Math.round(barre.deployee.basBarre)}px)`);
+verifier("barre repliée, il remonte en haut de l'écran",
+         barre.repliee.haut < barre.deployee.haut,
+         `(${Math.round(barre.repliee.haut)}px contre ${Math.round(barre.deployee.haut)}px)`);
+verifier("et il reste au-dessus d'elle dans l'empilement",
+         barre.zCalque > barre.zBarre, `(${barre.zCalque} > ${barre.zBarre})`);
+
+await p.evaluate(() => {
+  window.arreterPlacementApparition();
+  window.PARTIE_DATA.Spawn_Allies = { q: 5, r: 3 };
+  window.PARTIE_DATA.Spawn_Ennemis = { q: 12, r: 3 };
+});
 
 // La dispersion autour des repères.
 const dispersion = await p.evaluate(() => {

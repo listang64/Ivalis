@@ -58,6 +58,7 @@ node piste_initiative.mjs   # la piste tient à droite du panneau, bulles rédui
 node bandeau_action.mjs     # le relais piste/panneau et le bandeau "Lancer" du bas gauche
 node deplacement_repris.mjs # repartir en cours de tour, sans remise à zéro du barème
 node points_apparition.mjs  # les deux repères d'apparition, et la dispersion des pions
+node reinit_plateau.mjs     # la réinitialisation vide le plateau sans effacer la carte
 node fin_de_tour.mjs        # un document introuvable ne fait plus tomber tout le round
 node titres_bannieres.mjs   # les noms de carte rétrécissent au lieu d'être coupés
 node bouton_forge.mjs       # le + de la Forge devient un sablier pendant l'attente

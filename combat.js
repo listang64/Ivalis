@@ -870,6 +870,7 @@ window.toggleMenuCombat = function() {
         menuDev.classList.add("ouvert");
         menuDev.style.top = "0"; // Glisse depuis le haut
     }
+    if (typeof window.positionnerBandeauApparition === "function") window.positionnerBandeauApparition();
 };
 
 window.fermerMenusCoulissantsCombat = function(e) {
@@ -882,6 +883,7 @@ window.fermerMenusCoulissantsCombat = function(e) {
         menuDev.classList.remove("ouvert");
         menuDev.style.top = "-150px"; // Repart se cacher en haut
     }
+    if (typeof window.positionnerBandeauApparition === "function") window.positionnerBandeauApparition();
 };
 
 // =========================================================================
@@ -3556,6 +3558,23 @@ window.reinitialiserCombat = async function() {
             }
         }
 
+        // A quinquies. Le plateau est vidé de TOUS ses pions, héros compris : la
+        // rencontre suivante repose ses repères d'apparition, et le bouton
+        // "Déployer les pions" redistribue tout le monde autour. Un pion de héros
+        // laissé là où il était rendait ces repères inopérants pour son camp.
+        // updateDoc sur le seul champ Tokens : les murs, le terrain difficile et
+        // les tuiles effacées de la carte ne doivent pas partir avec.
+        if (window.ID_PARTIE_COURANTE) {
+            window.TOKENS_VTT_DATA = {};
+            try {
+                await updateDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), { Tokens: {} });
+            } catch (e) {
+                console.error("Vidage des pions du plateau :", e);
+            }
+            if (typeof window.appliquerTokensVTT === "function") window.appliquerTokensVTT({});
+            window.TOKEN_SELECTIONNE = null;
+        }
+
         const illusions = (window.PERSOS_PARTIE || []).filter(p => p.estIllusion);
         if (illusions.length > 0 && window.ID_PARTIE_COURANTE) {
             const vttRef = doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE);
@@ -3727,7 +3746,7 @@ function armerClicFrancPlateau(surCase) {
     const conteneur = document.getElementById("conteneur-plateau-vtt");
     if (!conteneur) return () => {};
 
-    let departX = 0, departY = 0, departT = 0, franc = false;
+    let departX = 0, departY = 0, departT = 0, franc = false, dernierToucher = 0;
 
     const debut = (x, y, nbDoigts) => {
         franc = nbDoigts <= 1;
@@ -3741,15 +3760,31 @@ function armerClicFrancPlateau(surCase) {
         franc = false;
         if (Date.now() - departT > 800) return;
         if (Math.abs(x - departX) > 10 || Math.abs(y - departY) > 10) return;
+
         surCase(x, y);
+        return true;
     };
 
-    const surSouris = e => debut(e.clientX, e.clientY, 1);
-    const surSourisBouge = e => bouge(e.clientX, e.clientY);
-    const surSourisFin = e => fin(e.clientX, e.clientY);
-    const surDoigt = e => { if (e.touches.length > 0) debut(e.touches[0].clientX, e.touches[0].clientY, e.touches.length); };
-    const surDoigtBouge = e => { if (e.touches.length > 0) bouge(e.touches[0].clientX, e.touches[0].clientY); };
-    const surDoigtFin = e => { if (e.changedTouches.length > 0) fin(e.changedTouches[0].clientX, e.changedTouches[0].clientY); };
+    // Un appui du doigt sur iPad déclenche le tactile, PUIS des événements de
+    // souris que Safari synthétise juste derrière : le même geste posait alors les
+    // deux repères d'un coup, au même endroit. On ignore donc toute souris qui
+    // suit de près un contact tactile. Deux vrais appuis restent tous deux
+    // tactiles, et ne se gênent pas — un simple délai de garde entre deux dépôts,
+    // lui, aurait avalé le second appui du MJ s'il était un peu rapide.
+    const fantomeDeDoigt = () => Date.now() - dernierToucher < 700;
+
+    const surSouris = e => { if (fantomeDeDoigt()) return; debut(e.clientX, e.clientY, 1); };
+    const surSourisBouge = e => { if (fantomeDeDoigt()) return; bouge(e.clientX, e.clientY); };
+    const surSourisFin = e => { if (fantomeDeDoigt()) return; fin(e.clientX, e.clientY); };
+    const surDoigt = e => { dernierToucher = Date.now(); if (e.touches.length > 0) debut(e.touches[0].clientX, e.touches[0].clientY, e.touches.length); };
+    const surDoigtBouge = e => { dernierToucher = Date.now(); if (e.touches.length > 0) bouge(e.touches[0].clientX, e.touches[0].clientY); };
+    const surDoigtFin = e => {
+        dernierToucher = Date.now();
+        if (e.changedTouches.length === 0) return;
+        // Couper la source des événements de souris fantômes plutôt que de les
+        // subir : le délai de garde ci-dessus reste là en second rideau.
+        if (fin(e.changedTouches[0].clientX, e.changedTouches[0].clientY)) e.preventDefault();
+    };
 
     // Le clic qui suit ne doit atteindre aucun autre gestionnaire : sans ce
     // barrage, le même geste sélectionnerait un pion ou tracerait un chemin.
@@ -3765,7 +3800,7 @@ function armerClicFrancPlateau(surCase) {
     conteneur.addEventListener("mouseup", surSourisFin, true);
     conteneur.addEventListener("touchstart", surDoigt, true);
     conteneur.addEventListener("touchmove", surDoigtBouge, true);
-    conteneur.addEventListener("touchend", surDoigtFin, true);
+    conteneur.addEventListener("touchend", surDoigtFin, { capture: true, passive: false });
     document.addEventListener("click", barrage, true);
 
     return () => {
@@ -3774,7 +3809,7 @@ function armerClicFrancPlateau(surCase) {
         conteneur.removeEventListener("mouseup", surSourisFin, true);
         conteneur.removeEventListener("touchstart", surDoigt, true);
         conteneur.removeEventListener("touchmove", surDoigtBouge, true);
-        conteneur.removeEventListener("touchend", surDoigtFin, true);
+        conteneur.removeEventListener("touchend", surDoigtFin, { capture: true });
         document.removeEventListener("click", barrage, true);
     };
 }
@@ -3790,6 +3825,19 @@ window.caseSousLEcran = function(clientX, clientY) {
     const state = window.PLATEAU_VTT.getCaseState(hex.q, hex.r);
     if (state.isDeleted || state.isBlocked) return null;
     return hex;
+};
+
+// La barre d'outils de combat descend du haut de l'écran par-dessus tout le
+// reste : le bandeau se décale sous elle tant qu'elle est déployée, au lieu de
+// disparaître derrière.
+window.positionnerBandeauApparition = function() {
+    const boite = document.getElementById("placement-apparition-boite");
+    if (!boite) return;
+    const menuDev = document.getElementById("menu-dev-combat");
+    const deploye = menuDev && menuDev.classList.contains("ouvert");
+    boite.style.marginTop = deploye
+        ? (menuDev.getBoundingClientRect().height + 14) + "px"
+        : "4vh";
 };
 
 window.arreterPlacementApparition = function() {
@@ -3846,6 +3894,7 @@ window.demarrerPlacementApparition = function() {
 
     window.PLACEMENT_APPARITION = { etape: "Allié", nettoyer: armerClicFrancPlateau(poser) };
     annoncer("Allié");
+    window.positionnerBandeauApparition();
     calque.style.display = "flex";
 };
 

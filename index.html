@@ -610,8 +610,8 @@
         <!-- PLACEMENT DES POINTS D'APPARITION (début de combat / après réinitialisation).
              Volontairement transparent aux clics : c'est le plateau, dessous, qui les reçoit.
              Seul le lien "Plus tard" est cliquable. -->
-        <div id="placement-apparition" style="position: absolute; top: 0; left: 0; width: 100%; z-index: 40; display: none; pointer-events: none; justify-content: center;">
-            <div style="margin-top: 4vh; padding: 14px 34px; background: rgba(15, 10, 10, 0.92); border: 1px solid #c2a878; border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,0.9); backdrop-filter: blur(4px); text-align: center; max-width: 80vw;">
+        <div id="placement-apparition" style="position: absolute; top: 0; left: 0; width: 100%; z-index: 10020; display: none; pointer-events: none; justify-content: center;">
+            <div id="placement-apparition-boite" style="margin-top: 4vh; transition: margin-top 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); padding: 14px 34px; background: rgba(15, 10, 10, 0.92); border: 1px solid #c2a878; border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,0.9); backdrop-filter: blur(4px); text-align: center; max-width: 80vw;">
                 <div id="placement-apparition-titre" style="font-family: 'Cinzel', serif; font-size: 22px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; color: #e8d5a5; text-shadow: 1px 1px 4px black;"></div>
                 <div style="margin-top: 6px; font-family: 'Almendra', serif; font-size: 15px; color: #a89f91; text-shadow: 1px 1px 3px black;">
                     Un clic franc sur le plateau — un glissement de carte ne compte pas.
@@ -1323,7 +1323,7 @@
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=8"></script>
 <script src="Plateau.js"></script>
-<script type="module" src="combat.js?v=17"></script>
+<script type="module" src="combat.js?v=18"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=4"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
