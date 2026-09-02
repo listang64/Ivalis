@@ -900,7 +900,6 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
     if (idCarte === "REPOS_LONG") {
         window.TOKEN_SELECTIONNE = idMonstre;
         if (typeof window.afficherDansPanneauGauche === "function") window.afficherDansPanneauGauche(idMonstre);
-        if (typeof window.centrerMapSurToken === "function") window.centrerMapSurToken(idMonstre);
         if (tk && typeof window.afficherMessageFlottantHex === "function") {
             window.afficherMessageFlottantHex(tk.q, tk.r, "Reprend son souffle", "#1b6e3a");
         }
@@ -926,8 +925,10 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
     // gauche : on y installe le monstre avant toute chose, comme le ferait un
     // joueur en sélectionnant son personnage.
     window.TOKEN_SELECTIONNE = idMonstre;
+    // La caméra ne suit PAS les créatures : recentrer l'écran sur elles arrachait
+    // la vue au joueur en plein tour adverse. On se contente de les afficher dans
+    // le panneau gauche, et chacun regarde où il veut.
     if (typeof window.afficherDansPanneauGauche === "function") window.afficherDansPanneauGauche(idMonstre);
-    if (typeof window.centrerMapSurToken === "function") window.centrerMapSurToken(idMonstre);
     // Réserve la fatigue de la carte pour que le déplacement ne la dévore pas.
     window.COUT_COMPETENCE_SELECTIONNEE = infos.fatigue;
     await pause(900);

@@ -52,6 +52,7 @@ node enchainement_ia.mjs    # une créature attend la fin de sa carte avant de p
 node hors_combat.mjs        # rien ne s'affiche quand la fenêtre de combat est fermée
 node suppression_perso.mjs  # effacer un héros emporte tout ce qui lui est lié
 node occupation_cases.mjs   # qui occupe vraiment une case (morts et fantômes exclus)
+node zone_assombrissement.mjs # où l'on peut poser une zone à distance, et l'écran noirci
 node zones_ia.mjs           # les zones sont posées, orientées et bien placées
 node piste_initiative.mjs   # la piste tient à droite du panneau, bulles réduites
 node titres_bannieres.mjs   # les noms de carte rétrécissent au lieu d'être coupés

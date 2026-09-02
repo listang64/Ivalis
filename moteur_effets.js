@@ -502,6 +502,76 @@ function verifierLigneDeVue(hexA, hexB) {
 }
 
 // =========================================================================
+//  ASSOMBRISSEMENT DU PLATEAU
+// =========================================================================
+//  Le même voile noir partout : tout l'écran s'assombrit sauf les cases où l'on
+//  peut cliquer. Le SVG est posé DANS #transform-plateau, donc il suit le pan et
+//  le zoom sans le moindre recalcul.
+// Les cases où l'on peut poser une zone à distance : c'est la règle du survol
+// (VTT_CIBLAGE_MOUSEMOVE), mise au propre pour pouvoir aussi la DESSINER.
+window.casesPosablesZone = function(idLanceur, configSort) {
+    const tkLanceur = (window.TOKENS_VTT_DATA || {})[idLanceur];
+    const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
+    if (!tkLanceur || !lanceurData || !window.PLATEAU_VTT || !configSort) return [];
+
+    const portee = Math.max(1, parseInt(configSort.rangeMax) || 1);
+
+    // Au corps-à-corps, on ne vise plus qu'à une case : c'est déjà la règle du jeu.
+    let estEngage = false;
+    for (let idAutre in window.TOKENS_VTT_DATA) {
+        if (idAutre === idLanceur) continue;
+        const autre = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idAutre);
+        if (!autre || autre.camp === lanceurData.camp || autre.statut === "Mort") continue;
+        if (getHexDistance(tkLanceur, window.TOKENS_VTT_DATA[idAutre]) === 1) { estEngage = true; break; }
+    }
+    const limite = estEngage ? 1 : portee;
+
+    return window.PLATEAU_VTT.getHexesInRadius(tkLanceur.q, tkLanceur.r, limite)
+        .filter(h => getHexDistance(tkLanceur, h) <= limite && verifierLigneDeVue(tkLanceur, h));
+};
+
+window.assombrirCasesJouables = function(idOverlay, hexes) {
+    const conteneurTransform = document.getElementById("transform-plateau");
+    if (!conteneurTransform || !window.PLATEAU_VTT || !Array.isArray(hexes)) return null;
+
+    window.retirerAssombrissement(idOverlay);
+
+    const hexSize = window.PLATEAU_VTT.hexSize;
+    const pointsHex = (q, r) => {
+        const px = window.PLATEAU_VTT.hexToPixel(q, r);
+        let pts = "";
+        for (let i = 0; i < 6; i++) {
+            const angle = Math.PI / 180 * (60 * i);
+            pts += (px.x + hexSize * Math.cos(angle)) + "," + (px.y + hexSize * Math.sin(angle)) + " ";
+        }
+        return pts.trim();
+    };
+
+    const maskId = "masque-" + idOverlay + "-" + Date.now();
+    const trous = hexes.map(h => `<polygon points="${pointsHex(h.q, h.r)}" fill="black"/>`).join("");
+
+    const overlay = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    overlay.id = idOverlay;
+    overlay.style.cssText = "position:absolute; top:0; left:0; overflow:visible; z-index:4; pointer-events:none;";
+    overlay.innerHTML = `
+        <defs>
+            <mask id="${maskId}">
+                <rect x="-20000" y="-20000" width="40000" height="40000" fill="white"/>
+                ${trous}
+            </mask>
+        </defs>
+        <rect x="-20000" y="-20000" width="40000" height="40000" fill="rgba(0,0,0,0.6)" mask="url(#${maskId})"/>
+    `;
+    conteneurTransform.appendChild(overlay);
+    return overlay;
+};
+
+window.retirerAssombrissement = function(idOverlay) {
+    const ancien = document.getElementById(idOverlay);
+    if (ancien) ancien.remove();
+};
+
+// =========================================================================
 //  BOND
 //  Saut de 1 à `portee` cases (pas un déplacement classique : aucune fatigue de mouvement,
 //  seul le coût de la carte s'applique). Peut survoler cases supprimées, alliés, ennemis et
@@ -554,41 +624,13 @@ window.resoudreBondInteractif = function(idPerso, portee) {
 
         // 2. Assombrit tout l'écran sauf la case de départ et les cases d'arrivée valides.
         // SVG placé DANS #transform-plateau : il hérite du pan/zoom sans aucun recalcul JS.
-        const conteneurTransform = document.getElementById("transform-plateau");
         const conteneur = document.getElementById("conteneur-plateau-vtt");
-        if (!conteneurTransform || !conteneur) return resolve(false);
+        if (!conteneur) return resolve(false);
 
-        const ancienOverlay = document.getElementById("svg-bond-assombrissement");
-        if (ancienOverlay) ancienOverlay.remove();
-
-        const hexSize = window.PLATEAU_VTT.hexSize;
-        const pointsHex = (q, r) => {
-            const px = window.PLATEAU_VTT.hexToPixel(q, r);
-            let pts = "";
-            for (let i = 0; i < 6; i++) {
-                const angle = Math.PI / 180 * (60 * i);
-                pts += (px.x + hexSize * Math.cos(angle)) + "," + (px.y + hexSize * Math.sin(angle)) + " ";
-            }
-            return pts.trim();
-        };
-
-        const maskId = "masque-bond-" + Date.now();
-        let trous = `<polygon points="${pointsHex(hexDepart.q, hexDepart.r)}" fill="black"/>`;
-        hexesValides.forEach(h => { trous += `<polygon points="${pointsHex(h.q, h.r)}" fill="black"/>`; });
-
-        const overlay = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        overlay.id = "svg-bond-assombrissement";
-        overlay.style.cssText = "position:absolute; top:0; left:0; overflow:visible; z-index:4; pointer-events:none;";
-        overlay.innerHTML = `
-            <defs>
-                <mask id="${maskId}">
-                    <rect x="-20000" y="-20000" width="40000" height="40000" fill="white"/>
-                    ${trous}
-                </mask>
-            </defs>
-            <rect x="-20000" y="-20000" width="40000" height="40000" fill="rgba(0,0,0,0.6)" mask="url(#${maskId})"/>
-        `;
-        conteneurTransform.appendChild(overlay);
+        // La case de départ reste éclairée : c'est elle qu'on tape pour renoncer.
+        const overlay = window.assombrirCasesJouables("svg-bond-assombrissement",
+            [hexDepart, ...hexesValides]);
+        if (!overlay) return resolve(false);
         window.surlignerEffetCarteActif("Bond");
 
         // 3. Un tap sur une case valide confirme le saut.
@@ -699,41 +741,11 @@ window.resoudreIllusionInteractif = function(idLanceur, portee) {
             return resolve(false);
         }
 
-        const conteneurTransform = document.getElementById("transform-plateau");
         const conteneur = document.getElementById("conteneur-plateau-vtt");
-        if (!conteneurTransform || !conteneur) return resolve(false);
+        if (!conteneur) return resolve(false);
 
-        const ancienOverlay = document.getElementById("svg-illusion-assombrissement");
-        if (ancienOverlay) ancienOverlay.remove();
-
-        const hexSize = window.PLATEAU_VTT.hexSize;
-        const pointsHex = (q, r) => {
-            const px = window.PLATEAU_VTT.hexToPixel(q, r);
-            let pts = "";
-            for (let i = 0; i < 6; i++) {
-                const angle = Math.PI / 180 * (60 * i);
-                pts += (px.x + hexSize * Math.cos(angle)) + "," + (px.y + hexSize * Math.sin(angle)) + " ";
-            }
-            return pts.trim();
-        };
-
-        const maskId = "masque-illusion-" + Date.now();
-        let trous = "";
-        hexesValides.forEach(h => { trous += `<polygon points="${pointsHex(h.q, h.r)}" fill="black"/>`; });
-
-        const overlay = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        overlay.id = "svg-illusion-assombrissement";
-        overlay.style.cssText = "position:absolute; top:0; left:0; overflow:visible; z-index:4; pointer-events:none;";
-        overlay.innerHTML = `
-            <defs>
-                <mask id="${maskId}">
-                    <rect x="-20000" y="-20000" width="40000" height="40000" fill="white"/>
-                    ${trous}
-                </mask>
-            </defs>
-            <rect x="-20000" y="-20000" width="40000" height="40000" fill="rgba(0,0,0,0.6)" mask="url(#${maskId})"/>
-        `;
-        conteneurTransform.appendChild(overlay);
+        const overlay = window.assombrirCasesJouables("svg-illusion-assombrissement", hexesValides);
+        if (!overlay) return resolve(false);
         window.surlignerEffetCarteActif("Illusion");
 
         const nettoyer = () => {
@@ -2136,6 +2148,14 @@ window.demarrerCiblage = async function(idCarte) {
                 : "Faites pivoter la zone (Rotation à 2 doigts).";
         }
 
+        // Zone à distance : on montre noir sur blanc où elle peut se poser. Sans ça
+        // le joueur tâtonne, et la zone disparaît dès qu'il sort de la portée ou
+        // de la ligne de vue sans qu'il sache pourquoi.
+        if (configSort && configSort.isRanged) {
+            const posables = window.casesPosablesZone(idLanceurBond, configSort);
+            if (posables.length > 0) window.assombrirCasesJouables("svg-zone-assombrissement", posables);
+        }
+
         window.addEventListener("mousemove", window.VTT_CIBLAGE_MOUSEMOVE, {capture: true});
         window.addEventListener("wheel", window.VTT_CIBLAGE_WHEEL, {passive: false, capture: true});
         window.addEventListener("click", window.VTT_CIBLAGE_CLICK, {capture: true});
@@ -2543,6 +2563,7 @@ window.nettoyerCiblage = function() {
     
     const svgZone = document.getElementById("svg-zone-ciblage");
     if (svgZone) svgZone.remove();
+    window.retirerAssombrissement("svg-zone-assombrissement");
     const msgZone = document.getElementById("msg-zone-ciblage");
     if (msgZone) msgZone.remove();
     const bulleZone = document.getElementById("bulle-validation-zone");
