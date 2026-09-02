@@ -785,6 +785,27 @@ function meilleureOrientation(base, centre, occupants) {
     return { score: meilleurScore, rotation: meilleureRotation };
 }
 
+// Attend que la carte qu'on vient de lancer ait FINI de s'appliquer. Le moteur
+// diffuse la résolution puis la rejoue de son côté, cible par cible : tant qu'elle
+// tourne, les positions et les points de vie ne sont pas encore ceux qui comptent.
+const resolutionsEmises = () => (window.RESOLUTIONS_LOCALES || []).length;
+
+async function attendreFinResolution(nbAvant, limiteMs = 20000) {
+    // Aucun moteur de résolution en face (bancs d'essai, page partielle) :
+    // il n'y a rien à attendre.
+    if (!Array.isArray(window.RESOLUTIONS_LOCALES)) return;
+    const debut = Date.now();
+    // La carte part de façon asynchrone : on lui laisse d'abord le temps d'être
+    // émise, sinon on croirait déjà tout fini.
+    while (resolutionsEmises() <= nbAvant && Date.now() - debut < 2500) await pause(100);
+    if (resolutionsEmises() <= nbAvant) { await pause(600); return; }   // rien n'est parti
+
+    const marqueur = (window.RESOLUTIONS_LOCALES || []).slice(-1)[0];
+    while (window.DERNIERE_RESOLUTION_TERMINEE !== marqueur && Date.now() - debut < limiteMs) {
+        await pause(150);
+    }
+}
+
 window.placerZoneMonstre = function(idMonstre) {
     const state = window.ETAT_CIBLAGE;
     if (!state || !state.isZone) return null;
@@ -954,6 +975,7 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
             if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true);
             return;
         }
+        const resolutionsAvant = resolutionsEmises();
         await window.demarrerCiblage(idCarte);
         await pause(700);
 
@@ -973,6 +995,7 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
                 } else if (typeof window.declencherResolution === "function") {
                     await window.declencherResolution();
                 }
+                await attendreFinResolution(resolutionsAvant);
             } else {
                 window.ajouterCibleCiblage(cible.idPersonnage);
                 await pause(400);
@@ -980,8 +1003,9 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
                     && typeof window.declencherResolution === "function") {
                     await window.declencherResolution();
                 }
+                await attendreFinResolution(resolutionsAvant);
             }
-            await pause(1600);
+            await pause(600);
         }
     } else {
         // Hors de portée après déplacement : le tour s'arrête là, comme prévu.
@@ -1043,7 +1067,8 @@ window.verifierTourIAMonstres = async function() {
 
     // Rien tant que les animations en cours n'ont pas fini de se dérouler : on
     // repassera dans un instant.
-    if (window.ANIMATION_VTT_EN_COURS || window.ANIMATION_TOUR_EN_COURS) { programmerRappelIA(); return; }
+    if (window.ANIMATION_VTT_EN_COURS || window.ANIMATION_TOUR_EN_COURS
+        || window.ANIMATION_MOTEUR_EN_COURS) { programmerRappelIA(); return; }
 
     // Le drapeau se lève AVANT toute attente : le verrou écrit en base, ce qui
     // déclenche une notification et donc un second appel de cette fonction. Sans

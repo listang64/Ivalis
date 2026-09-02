@@ -5,6 +5,11 @@ import { doc, updateDoc, setDoc, deleteDoc, deleteField } from "https://www.gsta
 //  IVALIS - MOTEUR DE RÉSOLUTION DES COMBATS (CIBLAGE ET DÉGÂTS)
 // =========================================================================
 
+// Les cartes résolues par CE poste : c'est ce qui lui permet de se reconnaître
+// comme auteur en rejouant l'animation, et à l'IA de savoir quand une carte a
+// vraiment fini de s'appliquer.
+window.RESOLUTIONS_LOCALES = [];
+
 window.ETAT_CIBLAGE = {
     actif: false,
     idCarte: null,
@@ -3414,5 +3419,23 @@ jaugeContainer.className = "jauge-flash-token";
         } else {
             window.validerCarteCombat(action.idCarte, null);
         }
+    }
+};
+
+// Lancer une carte ne suffit pas à la faire finir : le moteur rejoue ensuite
+// l'animation cible par cible, et c'est LÀ que tombent les dégâts, les états et
+// les déplacements forcés — une fuite de Peur dure plusieurs secondes. L'IA, qui
+// n'attendait que sa propre pause, enchaînait le tour suivant pendant ce
+// temps-là : la créature d'après se déplaçait sur des positions périmées et
+// récoltait une attaque d'opportunité d'un joueur qui, à l'écran, avait déjà fui.
+// Ce drapeau et ce marqueur de fin lui donnent de quoi attendre la fin réelle.
+const resolutionCarte = window.jouerAnimationMoteur;
+window.jouerAnimationMoteur = async function(action) {
+    window.ANIMATION_MOTEUR_EN_COURS = true;
+    try {
+        return await resolutionCarte(action);
+    } finally {
+        window.ANIMATION_MOTEUR_EN_COURS = false;
+        window.DERNIERE_RESOLUTION_TERMINEE = action && action.timestamp;
     }
 };
