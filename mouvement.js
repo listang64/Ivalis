@@ -37,7 +37,9 @@ window.COUT_COMPETENCE_SELECTIONNEE = 0;
 window.ANIMATION_VTT_EN_COURS = false;
 
 // Fonction de message flottant (UI)
-window.afficherMessageFlottantHex = function(q, r, texte, couleur = "#ff4c4c") {
+// "options" permet de sortir un message du lot — un coup critique, par exemple —
+// sans toucher aux dizaines d'appels existants, qui gardent les valeurs par défaut.
+window.afficherMessageFlottantHex = function(q, r, texte, couleur = "#ff4c4c", options = {}) {
     const conteneur = document.getElementById("conteneur-plateau-vtt");
     if (!conteneur || !window.PLATEAU_VTT) return;
     
@@ -55,9 +57,12 @@ window.afficherMessageFlottantHex = function(q, r, texte, couleur = "#ff4c4c") {
     msg.style.transform = "translate(-50%, -50%)";
     msg.style.color = couleur;
     msg.style.fontWeight = "bold";
-    msg.style.fontSize = "18px";
+    msg.style.fontSize = (options.taille || 18) + "px";
     msg.style.fontFamily = "'Cinzel', serif";
-    msg.style.textShadow = "0 0 5px black, 0 0 10px black, 2px 2px 2px black";
+    msg.style.textShadow = options.eclat
+        ? "0 0 6px black, 0 0 12px black, 0 0 20px " + couleur + ", 2px 2px 3px black"
+        : "0 0 5px black, 0 0 10px black, 2px 2px 2px black";
+    if (options.eclat) msg.style.letterSpacing = "2px";
     msg.style.pointerEvents = "none";
     msg.style.zIndex = "1000";
     msg.style.whiteSpace = "nowrap";

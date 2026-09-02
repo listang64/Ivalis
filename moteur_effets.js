@@ -2694,9 +2694,29 @@ window.declencherResolution = async function() {
         // 51-100 : comportement normal, la carte se résout comme choisi par le joueur.
     }
 
+    // 🔻 COUP CRITIQUE — un jet invisible par carte jouée, réservé aux héros 🔻
+    // Tiré ICI, une seule fois, puis embarqué dans l'action : chaque navigateur
+    // rejoue l'animation de son côté, et s'il relançait son propre dé, les
+    // joueurs ne verraient pas tous le même coup partir.
+    // Les créatures n'y ont pas droit : elles frappent toujours normalement.
+    let critique = false;
+    const lanceurCrit = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
+    const estCreature = !!lanceurCrit && (
+        (typeof window.estMonstre === "function" && window.estMonstre(idLanceur))
+        || !!lanceurCrit.estMonstre
+        || lanceurCrit.camp === "Ennemi");
+    if (lanceurCrit && !estCreature) {
+        const chanceCrit = (parseInt(lanceurCrit.Critique) || 0) + (parseInt(lanceurCrit.Dev_Mod_Critique) || 0);
+        const jetCrit = Math.floor(Math.random() * 100) + 1;
+        critique = jetCrit <= chanceCrit;
+        console.log(`🎲 Jet de critique de ${lanceurCrit.prenom || idLanceur} : ${jetCrit} (Chance : ${chanceCrit}%)`
+                    + (critique ? " → CRITIQUE !" : ""));
+    }
+
     const actionData = {
         type: "ATTAQUES",
         idLanceur,
+        critique,
         idCarte: state.idCarte,
         attaques: state.attaques,
         alterations: state.alterations,
@@ -2780,6 +2800,15 @@ window.jouerAnimationMoteur = async function(action) {
             window.afficherMessageFlottantHex(tkLanceur.q, tkLanceur.r, msgConf, couleurConf);
             await new Promise(r => setTimeout(r, 1200));
         }
+    }
+
+    // 🔻 COUP CRITIQUE : le jet a été tranché par le poste qui a lancé la carte
+    // (cf. declencherResolution) ; ici on ne fait que le rejouer à l'identique.
+    const critique = !!action.critique;
+    if (critique && tkLanceur) {
+        window.afficherMessageFlottantHex(tkLanceur.q, tkLanceur.r, "Critique !", "#ff2d2d",
+                                          { taille: 30, eclat: true });
+        await new Promise(r => setTimeout(r, 900));
     }
 
     // 🔻 NOUVEAU : Jet d'Échec si le Lanceur est Étourdi 🔻
@@ -2957,7 +2986,7 @@ window.jouerAnimationMoteur = async function(action) {
                     newPv = oldPv;
 
                     if (attaque.valeurBrute > 0) {
-                        let soinBrut = attaque.valeurBrute;
+                        let soinBrut = attaque.valeurBrute * (critique ? 2 : 1);
                         if (cibleData.race === "Ethéré") soinBrut = Math.floor(soinBrut * 1.3);
                         // Brûlé : -50% sur tous les soins reçus tant que l'état est actif.
                         if ((cibleData.Etats_Alteres || []).some(e => e.nom === "Brûlé")) {
@@ -3018,7 +3047,7 @@ jaugeContainer.className = "jauge-flash-token";
 
                     if (attaque.purifChance > 0) {
                         const rollPurif = Math.floor(Math.random() * 100) + 1;
-                        if (rollPurif <= attaque.purifChance) {
+                        if (critique || rollPurif <= attaque.purifChance) {
                             cibleData.Etats_Alteres = [];
                             let delaiAffichage = attaque.valeurBrute > 0 ? 800 : 0;
 
@@ -3051,7 +3080,10 @@ jaugeContainer.className = "jauge-flash-token";
                 else {
                     const defPhys = (parseInt(cibleData.Def_Physique) || 0) + (parseInt(cibleData.Dev_Mod_DefPhys) || 0);
                     const defMag = (parseInt(cibleData.Def_Magique) || 0) + (parseInt(cibleData.Dev_Mod_DefMag) || 0);
-                    let degats = attaque.valeurBrute;
+                    // Un critique double la frappe à la source : tout ce qui suit
+                    // (malus au contact, absorption, résistances, étalement,
+                    // bouclier) travaille ensuite sur ce montant doublé.
+                    let degats = attaque.valeurBrute * (critique ? 2 : 1);
                     if (attaque.isRanged && dist === 1) degats = Math.floor(degats * 0.7); 
 
                     // 🔻 NOUVEAU : ABSORPTION RÉACTIVE 🔻
@@ -3343,7 +3375,7 @@ jaugeContainer.className = "jauge-flash-token";
                     if (jeSuisLAuteur) {
                         const rollPoussee = Math.floor(Math.random() * 100) + 1;
                         console.log(`🎲 Jet de Poussée sur ${cData.nom} : Résultat ${rollPoussee} (Chance: ${alt.chance}%)`);
-                        if (rollPoussee <= alt.chance && typeof window.declencherPousseeCible === "function") {
+                        if ((critique || rollPoussee <= alt.chance) && typeof window.declencherPousseeCible === "function") {
                             await window.declencherPousseeCible(lanceur, idCible);
                         } else if (typeof window.diffuserEchecDeplacementForce === "function") {
                             await window.diffuserEchecDeplacementForce("Action_Poussee", idCible, "Poussée");
@@ -3359,7 +3391,7 @@ jaugeContainer.className = "jauge-flash-token";
                     if (jeSuisLAuteur) {
                         const rollTraction = Math.floor(Math.random() * 100) + 1;
                         console.log(`🎲 Jet de Traction sur ${cData.nom} : Résultat ${rollTraction} (Chance: ${alt.chance}%)`);
-                        if (rollTraction <= alt.chance && typeof window.declencherTractionCible === "function") {
+                        if ((critique || rollTraction <= alt.chance) && typeof window.declencherTractionCible === "function") {
                             await window.declencherTractionCible(lanceur, idCible);
                         } else if (typeof window.diffuserEchecDeplacementForce === "function") {
                             await window.diffuserEchecDeplacementForce("Action_Traction", idCible, "Traction");
@@ -3374,7 +3406,7 @@ jaugeContainer.className = "jauge-flash-token";
                     if (jeSuisLAuteur) {
                         const rollPeur = Math.floor(Math.random() * 100) + 1;
                         console.log(`🎲 Jet de Peur sur ${cData.nom} : Résultat ${rollPeur} (Chance: ${alt.chance}%)`);
-                        if (rollPeur <= alt.chance && typeof window.declencherPeurCible === "function") {
+                        if ((critique || rollPeur <= alt.chance) && typeof window.declencherPeurCible === "function") {
                             await window.declencherPeurCible(lanceur, idCible);
                         } else if (typeof window.diffuserEchecDeplacementForce === "function") {
                             await window.diffuserEchecDeplacementForce("Action_Peur", idCible, "Peur");
@@ -3383,10 +3415,13 @@ jaugeContainer.className = "jauge-flash-token";
                     continue;
                 }
 
+                // Un coup critique impose les effets de la carte : plus de jet
+                // d'application, l'état est posé d'office.
                 let roll = Math.floor(Math.random() * 100) + 1;
-                console.log(`🎲 Jet d'application [${alt.nom}] sur ${cData.nom} : Résultat ${roll} (Chance: ${alt.chance}%)`);
+                console.log(`🎲 Jet d'application [${alt.nom}] sur ${cData.nom} : Résultat ${roll} (Chance: ${alt.chance}%)`
+                            + (critique ? " — imposé par le critique" : ""));
 
-                if (roll <= alt.chance) {
+                if (critique || roll <= alt.chance) {
                     let existing = nouveauxEtats.find(e => e.nom === alt.nom);
                     if (existing) {
                         existing.duree = Math.max(existing.duree, alt.duree); // Rafraîchit la durée

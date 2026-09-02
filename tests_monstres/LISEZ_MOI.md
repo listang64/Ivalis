@@ -64,6 +64,7 @@ node titres_bannieres.mjs   # les noms de carte rétrécissent au lieu d'être c
 node bouton_forge.mjs       # le + de la Forge devient un sablier pendant l'attente
 node jauges_panneau.mjs     # vitalité et énergie du panneau gauche, à chaque étape
 node stats_fiche.mjs        # les retouches de la fiche perso suivies jusqu'au combat
+node coup_critique.mjs      # le jet de critique, ses dégâts doublés et ses effets imposés
 node jauge_token.mjs        # la jauge sous le pion survit à un redessin
 node jauge_cibles.mjs       # la vie restante des cibles s'affiche pendant le ciblage
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
