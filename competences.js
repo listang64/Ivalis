@@ -2,7 +2,7 @@
 //  IVALIS - MODULE DES COMPÉTENCES DE COMBAT
 // =========================================================================
 import { db } from "./firebase-config.js";
-import { collection, getDocs, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { collection, getDocs, doc, setDoc, getDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // Variables globales pour le Deck interactif
 window.COMPETENCES_CACHE = {};
@@ -158,6 +158,25 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
         // NOUVEAU : Récupération de l'espacement personnalisé (ou valeur par défaut plus resserrée : -85px)
         window.ESPACEMENT_BANNIERES_COMBAT = parseInt(localStorage.getItem("ivalis_espacement_bannieres")) || -85;
 
+        // La croix rouge d'effacement : outil de développement, donc réservée au
+        // mode développeur des paramètres. Posée à droite de la bannière, hors du
+        // calque de clic qui sert à équiper la carte, pour qu'un doigt un peu
+        // large n'efface jamais une technique en croyant l'équiper.
+        const modeDev = localStorage.getItem("ivalis_DEV_MODE") === "on";
+        // Le nom n'est pas passé en attribut : un titre contenant un guillemet ou
+        // un chevron casserait le HTML. La fonction le relit dans le cache.
+        const croixSuppression = (idCarte) => modeDev ? `
+                    <div onclick="event.stopPropagation(); window.supprimerCompetencePerso('${idCarte}')"
+                         title="Effacer définitivement cette technique"
+                         style="position: absolute; top: 34px; right: 4px; width: 30px; height: 30px; z-index: 6;
+                                display: flex; align-items: center; justify-content: center; cursor: pointer;
+                                pointer-events: auto; border-radius: 50%; background: rgba(20, 8, 8, 0.92);
+                                border: 1px solid #ff4c4c; color: #ff4c4c; font-family: 'Cinzel', serif;
+                                font-size: 17px; font-weight: bold; line-height: 1;
+                                box-shadow: 0 2px 6px rgba(0,0,0,0.8); transition: transform 0.15s ease;"
+                         onmouseover="this.style.transform='scale(1.2)'; this.style.color='#ffffff'; this.style.background='#7a1414';"
+                         onmouseout="this.style.transform='scale(1)'; this.style.color='#ff4c4c'; this.style.background='rgba(20, 8, 8, 0.92)';">✕</div>` : "";
+
         // Boucle sur le tableau TRIÉ
         competencesArray.forEach((comp, indexCarte) => {
             const data = comp.data;
@@ -194,6 +213,7 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
                     <div class="titre-auto-reduit" data-taille-max="17" style="position: absolute; top: 48%; transform: translateY(-50%); left: 120px; right: 20px; text-align: center; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;">${titre}</div>
 
                     <div onclick="window.gererClicCarte('${idCarte}')" style="position: absolute; top: 47px; bottom: 55px; left: 115px; right: 57px; z-index: 4; cursor: pointer; pointer-events: auto;"></div>
+                    ${croixSuppression(idCarte)}
                 </div>
             `;
         });
@@ -204,6 +224,79 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
 
     } catch (e) {
         console.error("Erreur de lecture des compétences :", e);
+    }
+};
+
+// =========================================================================
+//  EFFACER UNE TECHNIQUE (OUTIL DE DÉVELOPPEMENT)
+// =========================================================================
+//  La croix rouge des bannières, visible seulement en mode développeur.
+//  Une technique ne vit pas qu'à un seul endroit : son document dans la
+//  sous-collection du personnage, son identifiant dans le deck équipé, les
+//  deux caches en mémoire, et — si un combat tourne — l'entrée de la file
+//  d'attente qui la désigne. En oublier un laisse une carte fantôme : la
+//  piste d'initiative annonce un tour qui ne pourra jamais se jouer.
+
+window.supprimerCompetencePerso = async function(idCarte, titre) {
+    const idPersonnage = window.ID_PERSONNAGE_DECK;
+    if (!idPersonnage || !idCarte) return;
+
+    const nom = titre || (window.COMPETENCES_CACHE[idCarte] || {}).Nom || "cette technique";
+    if (!confirm(`Effacer définitivement « ${nom} » ?\n\nLa carte disparaîtra de la base : c'est irréversible.`)) return;
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+
+    // La bannière s'efface tout de suite : le réseau peut prendre une seconde.
+    const banniere = document.getElementById("ui-carte-" + idCarte);
+    if (banniere) {
+        banniere.style.transition = "opacity 0.25s ease, transform 0.25s ease";
+        banniere.style.opacity = "0";
+        banniere.style.transform = "translateX(-40px)";
+    }
+
+    try {
+        // 1. Le document de la technique.
+        await deleteDoc(doc(db, "Personnages", idPersonnage, "Competences", idCarte));
+
+        // 2. Le deck équipé, s'il la portait.
+        if (Array.isArray(window.CARTES_SELECTIONNEES) && window.CARTES_SELECTIONNEES.includes(idCarte)) {
+            window.CARTES_SELECTIONNEES = window.CARTES_SELECTIONNEES.filter(id => id !== idCarte);
+            await updateDoc(doc(db, "Personnages", idPersonnage), {
+                Deck_Equipe: window.CARTES_SELECTIONNEES
+            }).catch(e => console.error("Deck après suppression :", e));
+        }
+
+        // 3. Les caches en mémoire, pour que rien ne la ressuscite au prochain rendu.
+        if (window.CACHE_COMPETENCES_GLOBAL && window.CACHE_COMPETENCES_GLOBAL[idPersonnage]) {
+            delete window.CACHE_COMPETENCES_GLOBAL[idPersonnage][idCarte];
+        }
+        if (window.COMPETENCES_CACHE) delete window.COMPETENCES_CACHE[idCarte];
+        const persoRam = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+        if (persoRam && Array.isArray(persoRam.deckEquipe)) {
+            persoRam.deckEquipe = persoRam.deckEquipe.filter(id => id !== idCarte);
+        }
+
+        // 4. La file d'attente du combat, si la carte y était déjà posée : sans ça
+        //    son tour arriverait avec une technique introuvable.
+        if (window.ID_PARTIE_COURANTE && typeof window.modifierPartie === "function") {
+            await window.modifierPartie((data) => {
+                const file = data.File_Attente_Combat || [];
+                const propre = file.filter(f => f.idCarte !== idCarte);
+                if (propre.length === file.length) return null;
+                return { maj: { File_Attente_Combat: propre } };
+            });
+        }
+
+        console.log(`🗑️ Technique « ${nom} » effacée pour ${idPersonnage}.`);
+    } catch (e) {
+        console.error("Erreur de suppression d'une compétence :", e);
+        alert("La technique n'a pas pu être effacée. Vérifie ta connexion.");
+        if (banniere) { banniere.style.opacity = "1"; banniere.style.transform = "translateX(0)"; }
+        return;
+    }
+
+    // Le compteur de cartes restantes et la liste se redessinent.
+    if (typeof window.chargerOngletCompetences === "function") {
+        window.chargerOngletCompetences(idPersonnage, window.CARTES_MAX_PERSO || 6);
     }
 };
 
