@@ -74,6 +74,28 @@ verifier("elle est revenue dans le HUD, sous le bouton", res.dansLeHud && parseI
 verifier("le HUD reste sous le panneau gauche", parseInt(res.zHud) < parseInt(res.zPanneau),
          `(${res.zHud} < ${res.zPanneau})`);
 
+console.log("\nLES COMBATTANTS À TERRE QUITTENT LA PISTE");
+{
+  const r = await p.evaluate((fnPisteSrc) => {
+    eval(fnPisteSrc);
+    const noms = ["Pliors","Jade","Mémé","Invocateur d'os","Frêle flèche"];
+    window.PERSOS_PARTIE = noms.map((n, i) => ({ idPersonnage:"D"+i, prenom:n, PV_Max:50,
+      PV_Actuels: i === 2 ? 0 : 40, statut: i === 2 ? "Mort" : "Vivant",
+      Fatigue_Max:100, fatigueActuelle:70, Etats_Alteres:[] }));
+    window.estCombattantMort = (id) => {
+      const p = window.PERSOS_PARTIE.find(x => x.idPersonnage === id);
+      return !p || p.statut === "Mort" || p.PV_Actuels <= 0;
+    };
+    const file = noms.map((n,i) => ({ idPersonnage:"D"+i, idCarte:"X", initiative: 80 - i*10 }));
+    window.PARTIE_DATA = { Phase_Combat:"Resolution", File_Attente_Combat: file };
+    window.afficherPisteInitiative(file, "Resolution");
+    const piste = document.getElementById('piste-initiative');
+    return { bulles: piste.children.length, texte: piste.innerText.replace(/\s+/g, " ").trim() };
+  }, fnPiste);
+  console.log(`     ${r.bulles} bulles pour 5 combattants dont un à terre`);
+  verifier("le combattant à terre n'a plus sa bulle", r.bulles === 4, `(${r.bulles})`);
+}
+
 await p.screenshot({ path: '/tmp/piste.png' });
 
 // Combien de combattants tiennent avant que la piste ne recommence à passer

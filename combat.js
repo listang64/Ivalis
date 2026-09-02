@@ -2695,7 +2695,13 @@ window.finDeTourCombat = async function(forcer = false) {
                     }
 
                     file.shift();
-                    
+
+                    // Les combattants tombés entre-temps sortent de la file : sans
+                    // ça leur tour finit par arriver, et il faut le passer à la main.
+                    if (typeof window.estCombattantMort === "function") {
+                        file = file.filter(f => !window.estCombattantMort(f.idPersonnage));
+                    }
+
                     if (file.length === 0) {
                         phase = "Preparation";
                         tour++;
@@ -2929,6 +2935,18 @@ window.afficherPisteInitiative = function(queue, phase) {
     piste.style.opacity = "1";
     piste.style.padding = "0 8px 0 12px";
     let html = "";
+
+    // Un combattant à terre n'a plus sa place sur la piste : son pion a déjà
+    // disparu du plateau, sa bulle n'a pas à rester dans l'ordre de passage.
+    queue = queue.filter(item => !(typeof window.estCombattantMort === "function"
+                                   && window.estCombattantMort(item.idPersonnage)));
+    if (queue.length === 0) {
+        piste.style.opacity = "0";
+        piste.style.padding = "0px";
+        setTimeout(() => piste.innerHTML = "", 400);
+        if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour(queue, phase);
+        return;
+    }
 
     queue.forEach((item, index) => {
         const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === item.idPersonnage);

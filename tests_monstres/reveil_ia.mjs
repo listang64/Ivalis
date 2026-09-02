@@ -169,5 +169,35 @@ console.log("\n4. RIEN À FAIRE : AUCUN RAPPEL INUTILE");
   verifier("au tour d'un joueur, l'IA se tait et ne s'arme pas", !w.RAPPEL_IA_MONSTRES);
 }
 
+console.log("\n6. UN COMBATTANT À TERRE EN TÊTE DE FILE NE BLOQUE PAS LE COMBAT");
+{
+  const partagee = { doc: { Phase_Combat:"Resolution", Tour_Combat:1, Verrou_IA:null,
+    Ordre_Initiative:["J1","M1"],
+    File_Attente_Combat:[ { idPersonnage:"J1", idCarte:"CJ", initiative:80, timestamp:1 },
+                          { idPersonnage:"M1", idCarte:"C1", initiative:70, timestamp:2 } ] } };
+  const w = creerPoste(partagee);
+  const mort = { idPersonnage:"J1", prenom:"Jade", camp:"Allié", PV_Max:42, PV_Actuels:0, statut:"Mort" };
+  const monstre = { idPersonnage:"M1", prenom:"Gnoll", estMonstre:true, camp:"Ennemi",
+                    PV_Max:70, PV_Actuels:70, Fatigue_Max:120, fatigueActuelle:120, deckEquipe:["C1"] };
+  w.PERSOS_PARTIE = [mort, monstre]; w.MONSTRES_PARTIE = [monstre];
+  w.TOKENS_VTT_DATA = { M1:{q:0,r:0} };
+  w.estCombattantMort = (id) => id === "J1";
+  const passes = [];
+  w.finDeTourCombat = async () => { passes.push("finDeTour"); partagee.doc.File_Attente_Combat.shift(); };
+  const joues = [];
+  w.jouerTourMonstre = async (id) => { joues.push(id); };
+
+  await w.verifierTourIAMonstres();
+  verifier("le tour du combattant à terre est passé tout seul", passes.length === 1, `(${passes.length})`);
+  verifier("on n'a pas essayé de le faire jouer", joues.length === 0);
+
+  // La file avance : c'est au monstre, qui joue normalement.
+  w.PARTIE_DATA = partagee.doc;
+  w.IA_MONSTRE_EN_COURS = false;
+  await w.verifierTourIAMonstres();
+  verifier("la créature suivante joue bien son tour", joues.includes("M1"), `(${joues.join(", ") || "personne"})`);
+  if (w.RAPPEL_IA_MONSTRES) clearTimeout(w.RAPPEL_IA_MONSTRES);
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

@@ -1052,12 +1052,19 @@ window.verifierTourIAMonstres = async function() {
 
     // Y a-t-il seulement quelque chose à faire ? Sinon, inutile de se rappeler.
     const estMonstre = (id) => typeof window.estMonstre === "function" && window.estMonstre(id);
-    const aLaMain = phase !== "Preparation" && file.length > 0 && estMonstre(file[0].idPersonnage);
+    const mort = (id) => typeof window.estCombattantMort === "function" && window.estCombattantMort(id);
+
+    // Un combattant tombé avant son tour laisse son entrée dans la file : elle
+    // finit par arriver en tête et plus rien n'avance, puisqu'un mort ne joue pas
+    // et que personne ne clique "fin de tour" à sa place. On la passe donc, quel
+    // que soit son camp — le verrou garantit qu'un seul poste s'en charge.
+    const teteMorte = phase !== "Preparation" && file.length > 0 && mort(file[0].idPersonnage);
+    const aLaMain = phase !== "Preparation" && file.length > 0 && !teteMorte && estMonstre(file[0].idPersonnage);
     const aPreparer = phase === "Preparation" && (window.MONSTRES_PARTIE || []).some(m =>
         (partie.Ordre_Initiative || []).includes(m.idPersonnage) &&
         !file.some(f => f.idPersonnage === m.idPersonnage) &&
         !(typeof window.estCombattantMort === "function" && window.estCombattantMort(m.idPersonnage)));
-    if (!aLaMain && !aPreparer) return;
+    if (!aLaMain && !aPreparer && !teteMorte) return;
 
     // Signe de vie : c'est lui qui garde le bouton "fin de tour" éteint pendant
     // qu'un monstre joue. S'il s'éteint (aucun poste ne fait plus tourner l'IA),
@@ -1075,6 +1082,17 @@ window.verifierTourIAMonstres = async function() {
     // ce garde-fou posé tout de suite, le même monstre jouait son tour deux fois.
     window.IA_MONSTRE_EN_COURS = true;
     try {
+        if (teteMorte) {
+            const enTeteMort = file[0];
+            if (await reclamerVerrouIA(`mort|${enTeteMort.idPersonnage}|${enTeteMort.timestamp}`)) {
+                console.log("🧠 Tour passé :", enTeteMort.idPersonnage, "est à terre.");
+                if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true);
+            } else {
+                programmerRappelIA(DELAI_VERROU_MS / 2);
+            }
+            return;
+        }
+
         if (phase === "Preparation") {
             await window.preparerCartesMonstres();
             // On repasse systématiquement : soit des créatures attendent encore
