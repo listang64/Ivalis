@@ -480,7 +480,7 @@ window.choisirCarteMonstre = function(monstre) {
     const cartes = cartesDuMonstre(monstre);
     const fatigue = parseInt(monstre.fatigueActuelle);
     const fatigueDispo = isNaN(fatigue) ? 0 : fatigue;
-    const fatigueMax = parseInt(monstre.Fatigue_Max) || parseInt(monstre.fatigueMax) || 100;
+    const fatigueMax = window.fatigueMaxCombattant(monstre);
 
     // ⚠️ Un monstre qui ne pose RIEN dans la file retient la bascule en
     // résolution : la partie n'y passe que lorsque tous les combattants vivants

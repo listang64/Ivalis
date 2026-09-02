@@ -4,6 +4,7 @@
 // séquences réelles d'un combat et vérifie, à chaque étape, que la barre et le
 // chiffre disent la même chose que la donnée du combattant affiché.
 import fs from 'fs';
+import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 
 const combat = fs.readFileSync('/home/user/Ivalis/combat.js','utf-8');
 const html   = fs.readFileSync('/home/user/Ivalis/index.html','utf-8');
@@ -46,6 +47,9 @@ const p = await b.newPage({ viewport: { width: 500, height: 700 } });
 await p.route('**', r => r.request().url().startsWith('file:') ? r.continue() : r.abort());
 const erreurs = []; p.on('pageerror', e => erreurs.push(e.message));
 await p.goto('file:///tmp/jauges.html');
+// Les lectures de stats mutualisées vivent dans app.js, chargé avant tout le
+// reste sur la vraie page : un banc qui isole une fonction doit les poser aussi.
+await p.evaluate(src => eval(src), SRC_STATS_COMMUNES);
 
 let echecs = 0;
 const verifier = (l, c, d="") => { if (!c) echecs++; console.log(`  ${l.padEnd(56)} ${c?"OK":"ÉCHEC"} ${d}`); };

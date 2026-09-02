@@ -415,7 +415,7 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     if (isCombatMode && window.COMBAT_PERSOS_JOUEUR && window.COMBAT_INDEX_PERSO !== undefined) {
         const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
         if (persoActuel) {
-            const fatigueMax = parseInt(persoActuel.Fatigue_Max) || parseInt(persoActuel.fatigueMax) || 100;
+            const fatigueMax = window.fatigueMaxCombattant(persoActuel);
             const fatiguePerso = persoActuel.fatigueActuelle !== undefined ? parseInt(persoActuel.fatigueActuelle) : fatigueMax;
             if (parseInt(fatigue) > fatiguePerso) {
                 estEpuise = true;

@@ -5,6 +5,7 @@
 // encore la route — et l'outil de déplacement libre du MJ, lui, comptait même
 // les morts.
 import fs from 'fs';
+import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 
 const src = fs.readFileSync('/home/user/Ivalis/combat.js','utf-8');
 function fonction(marqueur) {
@@ -17,7 +18,10 @@ function fonction(marqueur) {
 
 const w = {};
 global.window = w;
-new Function('window', fonction('window.estCombattantMort = function') + '\n'
+// Les lectures de stats mutualisées vivent dans app.js, chargé avant tout le
+// reste sur la vraie page : un banc qui isole une fonction doit les poser aussi.
+new Function('window', SRC_STATS_COMMUNES + '\n'
+                     + fonction('window.estCombattantMort = function') + '\n'
                      + fonction('window.caseOccupeeParVivant = function'))(w);
 
 w.PERSOS_PARTIE = [

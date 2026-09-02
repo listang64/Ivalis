@@ -4,6 +4,7 @@
 // disparaître dessous. Ce banc ouvre la vraie page, joue le VRAI rendu de la
 // piste avec sept combattants, et mesure.
 import fs from 'fs';
+import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 
 const src = fs.readFileSync('/home/user/Ivalis/combat.js','utf-8');
 const lignes = src.split('\n');
@@ -20,6 +21,9 @@ await p.route('**', r => r.request().url().startsWith('file:') ? r.continue() : 
 p.on('pageerror', () => {});
 await p.goto('file:///home/user/Ivalis/index.html');
 await p.waitForTimeout(300);
+// Les lectures de stats mutualisées vivent dans app.js, chargé avant tout le
+// reste sur la vraie page : un banc qui isole une fonction doit les poser aussi.
+await p.evaluate(src => eval(src), SRC_STATS_COMMUNES);
 
 const res = await p.evaluate((fnPisteSrc) => {
   document.documentElement.style.setProperty('--app-h', window.innerHeight + 'px');
@@ -164,6 +168,7 @@ for (const largeur of [1366, 1180, 1024]) {
   await pw.route('**', r => r.request().url().startsWith('file:') ? r.continue() : r.abort());
   pw.on('pageerror', () => {});
   await pw.goto('file:///home/user/Ivalis/index.html');
+  await pw.evaluate(src => eval(src), SRC_STATS_COMMUNES);
   const max = await pw.evaluate(({ fnPisteSrc }) => {
     document.documentElement.style.setProperty('--app-h', window.innerHeight + 'px');
     const fenetre = document.getElementById('fenetre-combat');

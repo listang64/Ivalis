@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 export const EFFETS = JSON.parse(fs.readFileSync('effets_reels.json','utf-8'));
 
 // Plateau hexagonal simulé : murs, cases supprimées et terrain difficile.
@@ -57,6 +58,9 @@ export function chargerIA(monde) {
   w.hexDistanceVTT = outils.hexDistance;
   w.calculerCheminVTT = outils.calculerCheminAStar;
 
+  // Les lectures de stats mutualisées vivent dans app.js, chargé avant tout le
+  // reste sur la vraie page : un banc qui isole une fonction doit les poser aussi.
+  new Function('window', SRC_STATS_COMMUNES)(w);
   eval(fs.readFileSync('/home/user/Ivalis/monstres_ia.js','utf-8').replace(/^import[\s\S]*?from\s+"[^"]+";/gm,''));
   return w;
 }

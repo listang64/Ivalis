@@ -126,7 +126,10 @@ function persoDocVersFront(id, d) {
     camp: d.Camp || "Allié", 
     deckEquipe: d.Deck_Equipe || [], 
     couleur: d.Couleur || "",
-    fatigueActuelle: d.Fatigue_Actuelle !== undefined ? d.Fatigue_Actuelle : 100,
+    // À défaut de valeur enregistrée, un combattant démarre plein — donc à son
+    // maximum RETOUCHÉ, sinon un héros monté à 110 d'énergie naissait à 100.
+    fatigueActuelle: d.Fatigue_Actuelle !== undefined ? d.Fatigue_Actuelle
+        : ((d.Fatigue_Max !== undefined ? parseInt(d.Fatigue_Max) || 100 : 100) + (parseInt(d.Dev_Mod_Fatigue) || 0)),
     fatigueMax: d.Fatigue_Max !== undefined ? d.Fatigue_Max : 100,
     prenom: d.Prenom_Personnage || "",
     nom: d.Nom_Personnage || "",
@@ -149,7 +152,8 @@ function persoDocVersFront(id, d) {
     expression: d.Expression_Du_Visage || "",
     idFaction: d.ID_Faction || "",
     PV_Max: d.PV_Max || 0,
-    PV_Actuels: d.PV_Actuels !== undefined ? d.PV_Actuels : (d.PV_Max || 0),
+    PV_Actuels: d.PV_Actuels !== undefined ? d.PV_Actuels
+        : ((parseInt(d.PV_Max) || 0) + (parseInt(d.Dev_Mod_PV) || 0)),
     Fatigue_Max: d.Fatigue_Max !== undefined ? d.Fatigue_Max : 100,
     Regeneration: d.Regeneration !== undefined ? d.Regeneration : 30,
     Esquive: esquiveCalc, // 🔻 Calculé avec le malus
@@ -176,6 +180,35 @@ function persoDocVersFront(id, d) {
 // Partagée avec monstres.js : un monstre doit exposer exactement les mêmes champs
 // qu'un personnage pour que tout le moteur de combat le traite sans le savoir.
 window.persoDocVersFront = persoDocVersFront;
+
+// =========================================================================
+//  LES STATS RÉELLES D'UN COMBATTANT (BASE + RETOUCHES DE LA FICHE)
+// =========================================================================
+//  Les outils de développement de la fiche perso ne touchent pas aux valeurs
+//  de base : ils écrivent leur écart à côté (Dev_Mod_*). La fiche affiche bien
+//  la somme, mais le combat lisait la base seule pour l'énergie et la
+//  régénération — une Énergie Max portée à 110 retombait à 100 en jeu, et la
+//  vitalité maximale servant aux dégâts de poison ignorait sa retouche.
+//  Ces lectures sont mutualisées ici, au plus près de la conversion des fiches,
+//  pour qu'aucun morceau du moteur ne puisse à nouveau en oublier une.
+
+window.pvMaxCombattant = function(perso) {
+    if (!perso) return 0;
+    return (parseInt(perso.PV_Max) || 0) + (parseInt(perso.Dev_Mod_PV) || 0);
+};
+
+// Un monstre porte "fatigueMax", un personnage "Fatigue_Max" : les deux noms
+// coexistent dans le moteur, la lecture les accepte donc tous les deux.
+window.fatigueMaxCombattant = function(perso, defaut = 100) {
+    if (!perso) return defaut;
+    const socle = (parseInt(perso.Fatigue_Max) || parseInt(perso.fatigueMax) || defaut);
+    return socle + (parseInt(perso.Dev_Mod_Fatigue) || 0);
+};
+
+window.regenerationCombattant = function(perso) {
+    if (!perso) return 0;
+    return (parseInt(perso.Regeneration) || 0) + (parseInt(perso.Dev_Mod_Regen) || 0);
+};
 
 // Conversion : objet front-end -> document Firestore "Personnages" (colonnes CSV)
 function frontVersPersoDoc(donnees, idPersonnage) {

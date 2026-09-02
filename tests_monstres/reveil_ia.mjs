@@ -6,6 +6,7 @@
 // est bien choisie, mais il ne joue pas et il faut cliquer "fin de tour" à sa
 // place. Ce banc rejoue cette séquence exacte.
 import fs from 'fs';
+import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 
 let echecs = 0;
 const verifier = (l, c, d="") => { if (!c) echecs++; console.log(`  ${l.padEnd(58)} ${c?"OK":"ÉCHEC"} ${d}`); };
@@ -39,6 +40,9 @@ function creerPoste(partagee) {
   const src = fs.readFileSync('/home/user/Ivalis/monstres_ia.js','utf-8')
     .replace(/^import[\s\S]*?from\s+"[^"]+";/gm,'')
     .replace(/await pause\(\d+\);/g, '');
+  // Les lectures de stats mutualisées vivent dans app.js, chargé avant tout le
+  // reste sur la vraie page : un banc qui isole une fonction doit les poser aussi.
+  new Function('window', SRC_STATS_COMMUNES)(w);
   new Function('window','db','doc','getDoc','updateDoc','runTransaction', src)(
     w, db, doc, getDoc, updateDoc, runTransaction);
   return w;

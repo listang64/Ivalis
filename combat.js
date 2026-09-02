@@ -290,7 +290,7 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
         const persoActuel = window.PERSOS_PARTIE.find(p => p.idPersonnage === idPersonnage);
         if (!persoActuel) return;
         
-        window.COMBAT_FATIGUE_MAX = parseInt(persoActuel.Fatigue_Max) || parseInt(persoActuel.fatigueMax) || 100;
+        window.COMBAT_FATIGUE_MAX = window.fatigueMaxCombattant(persoActuel);
         window.COMBAT_FATIGUE_ACTUELLE = persoActuel.fatigueActuelle !== undefined ? parseInt(persoActuel.fatigueActuelle) : window.COMBAT_FATIGUE_MAX;
         
         window.COMBAT_PV_MAX = (parseInt(persoActuel.PV_Max) || 1) + (parseInt(persoActuel.Dev_Mod_PV) || 0);
@@ -422,7 +422,7 @@ window.mettreAJourJaugeFatigue = function(coutFatigueBrut) {
     let max = window.COMBAT_FATIGUE_MAX || 1;
     let actuelle = window.COMBAT_FATIGUE_ACTUELLE || 0;
     if (perso) {
-        const maxReel = parseInt(perso.Fatigue_Max) || parseInt(perso.fatigueMax) || 0;
+        const maxReel = window.fatigueMaxCombattant(perso, 0);
         if (maxReel > 0) max = maxReel;
         if (perso.fatigueActuelle !== undefined) actuelle = parseInt(perso.fatigueActuelle) || 0;
         window.COMBAT_FATIGUE_MAX = max;
@@ -472,7 +472,7 @@ window.gererClicCarteCombat = function(idCarte) {
     const IMAGE_CADRE_EPUISE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1783286721/ban_epuis%C3%A9_otc70l.png";
 
     const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
-    const fatigueMax = persoActuel ? (parseInt(persoActuel.Fatigue_Max) || 100) : 100;
+    const fatigueMax = window.fatigueMaxCombattant(persoActuel);
     const fatiguePerso = (persoActuel && persoActuel.fatigueActuelle !== undefined) ? parseInt(persoActuel.fatigueActuelle) : fatigueMax;
 
     const dataCarte = window.COMPETENCES_CACHE[idCarte];
@@ -1623,7 +1623,7 @@ window.estCombattantMort = function(idCombattant) {
     if (!p) return false;
     // PV_Max est vérifié avant de conclure : un combattant dont les PV ne sont pas
     // encore chargés vaut 0 et passerait à tort pour un cadavre.
-    const pvMax = parseInt(p.PV_Max) || 0;
+    const pvMax = window.pvMaxCombattant(p);
     const pv = parseInt(p.PV_Actuels) || 0;
     return p.statut === "Mort" || (pvMax > 0 && pv <= 0);
 };
@@ -2713,7 +2713,7 @@ window.finDeTourCombat = async function(forcer = false) {
                     if (actionCourante.idCarte === "REPOS_LONG") {
                         const persoAction = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === actionCourante.idPersonnage);
                         if (persoAction && persoAction.statut !== "Mort") {
-                            const fatigueMax = parseInt(persoAction.Fatigue_Max) || parseInt(persoAction.fatigueMax) || 100;
+                            const fatigueMax = window.fatigueMaxCombattant(persoAction);
                             let fatigueActuelle = persoAction.fatigueActuelle !== undefined ? parseInt(persoAction.fatigueActuelle) : fatigueMax;
                             
                             // Les monstres ont leur propre rendement de repos dans le
@@ -2781,9 +2781,9 @@ window.finDeTourCombat = async function(forcer = false) {
                                     let majRequise = false;
 
                                     // 1. Régénération
-                                    const fatigueMax = parseInt(perso.Fatigue_Max) || parseInt(perso.fatigueMax) || 100;
+                                    const fatigueMax = window.fatigueMaxCombattant(perso);
                                     let fatigue = perso.fatigueActuelle !== undefined ? parseInt(perso.fatigueActuelle) : fatigueMax;
-                                    const regenPct = parseInt(perso.Regeneration) || 0;
+                                    const regenPct = window.regenerationCombattant(perso);
 
                                     if (regenPct > 0) {
                                         const montantRegen = Math.floor((regenPct / 100) * fatigueMax);
@@ -2832,7 +2832,7 @@ window.finDeTourCombat = async function(forcer = false) {
                                             fatigue = Math.max(0, fatigue - 15);
                                             perso.fatigueActuelle = fatigue;
 
-                                            const pvMaxPoison = parseInt(perso.PV_Max) || 0;
+                                            const pvMaxPoison = window.pvMaxCombattant(perso);
                                             const pvActuelsPoison = perso.PV_Actuels !== undefined ? parseInt(perso.PV_Actuels) : pvMaxPoison;
                                             const nouveauPvPoison = Math.max(0, pvActuelsPoison - Math.ceil(pvMaxPoison * 0.08));
                                             perso.PV_Actuels = nouveauPvPoison;
@@ -2888,7 +2888,7 @@ window.finDeTourCombat = async function(forcer = false) {
                                                         window.afficherFlashDegatToken(perso.idPersonnage, bouclierAvant, perso.Bouclier_Actuel, bMax, `-${montant} 🛡️`, "#00ffff", "#00ffff");
                                                     }
                                                 } else {
-                                                    const pvMaxEtal = parseInt(perso.PV_Max) || 0;
+                                                    const pvMaxEtal = window.pvMaxCombattant(perso);
                                                     const pvAvantEtal = perso.PV_Actuels !== undefined ? parseInt(perso.PV_Actuels) : pvMaxEtal;
                                                     perso.PV_Actuels = Math.max(0, pvAvantEtal - montant);
                                                     modifsFirebase.PV_Actuels = perso.PV_Actuels;
@@ -3042,7 +3042,7 @@ window.afficherPisteInitiative = function(queue, phase) {
         const pvActuels = perso.PV_Actuels !== undefined ? parseInt(perso.PV_Actuels) : pvMax;
         const pctPv = Math.min(100, Math.max(0, (pvActuels / pvMax) * 100));
 
-        const fatigueMax = parseInt(perso.Fatigue_Max) || parseInt(perso.fatigueMax) || 100;
+        const fatigueMax = window.fatigueMaxCombattant(perso);
         const fatigue = perso.fatigueActuelle !== undefined ? parseInt(perso.fatigueActuelle) : fatigueMax;
         const pctFatigue = Math.min(100, Math.max(0, (fatigue / fatigueMax) * 100));
 
@@ -3371,7 +3371,7 @@ window.actualiserBannieresEpuisees = function() {
     const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
     if (!persoActuel) return;
     
-    const fatigueMax = parseInt(persoActuel.Fatigue_Max) || parseInt(persoActuel.fatigueMax) || 100;
+    const fatigueMax = window.fatigueMaxCombattant(persoActuel);
     const fatiguePerso = persoActuel.fatigueActuelle !== undefined ? parseInt(persoActuel.fatigueActuelle) : fatigueMax;
 
     const liste = document.getElementById("combat-liste-competences");
@@ -3409,7 +3409,7 @@ window.deduireFatigueCarte = async function(idPersonnage, idCarte) {
     if (!perso || !dataCarte) return;
 
     const coutFatigue = parseInt(dataCarte.Fatigue) || 0;
-    const fatigueMax = parseInt(perso.Fatigue_Max) || parseInt(perso.fatigueMax) || 100;
+    const fatigueMax = window.fatigueMaxCombattant(perso);
     const avant = perso.fatigueActuelle !== undefined ? parseInt(perso.fatigueActuelle) : fatigueMax;
     const fatigue = Math.max(0, avant - coutFatigue);
 
@@ -3597,7 +3597,7 @@ window.reinitialiserCombat = async function() {
                 if (perso.estIllusion) continue;
 
                 const pvMax = (parseInt(perso.PV_Max) || 1) + (parseInt(perso.Dev_Mod_PV) || 0);
-                const fatigueMax = parseInt(perso.Fatigue_Max) || parseInt(perso.fatigueMax) || 100;
+                const fatigueMax = window.fatigueMaxCombattant(perso);
 
                 // Mise à jour locale immédiate (évite d'attendre le snapshot)
                 perso.PV_Actuels = pvMax;
@@ -3976,7 +3976,7 @@ window.resetEnnemisTest = async function() {
             const ref = window.refCombattant(ennemi.idPersonnage);
             batch.update(ref, {
                 PV_Actuels: (parseInt(ennemi.PV_Max) || 50) + (parseInt(ennemi.Dev_Mod_PV) || 0),
-                Fatigue_Actuelle: parseInt(ennemi.Fatigue_Max) || 100
+                Fatigue_Actuelle: window.fatigueMaxCombattant(ennemi)
             });
         });
 

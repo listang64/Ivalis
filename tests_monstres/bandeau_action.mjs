@@ -4,6 +4,7 @@
 // résolution, le coin bas gauche annonce la carte jouée : son nom en or brossé,
 // ses effets sur une seule ligne, et un bouton doré clignotant pour la lancer.
 import fs from 'fs';
+import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 
 const src = fs.readFileSync('/home/user/Ivalis/combat.js', 'utf-8');
 const lignes = src.split('\n');
@@ -37,6 +38,9 @@ await p.route('**', r => r.request().url().startsWith('file:') ? r.continue() : 
 const erreurs = []; p.on('pageerror', e => erreurs.push(e.message));
 await p.goto('file:///home/user/Ivalis/index.html');
 await p.waitForTimeout(300);
+// Les lectures de stats mutualisées vivent dans app.js, chargé avant tout le
+// reste sur la vraie page : un banc qui isole une fonction doit les poser aussi.
+await p.evaluate(src => eval(src), SRC_STATS_COMMUNES);
 
 let echecs = 0;
 const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(58)} ${c ? "OK" : "ÉCHEC"} ${d}`); };

@@ -3,6 +3,7 @@
 // une phase qui ne bascule jamais, une file qui ne se vide pas, un monstre qui
 // ne joue jamais.
 import fs from 'fs';
+import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 import { chargerIA, creerPlateau, combattant, activer } from './banc_ia.mjs';
 
 // Même règle que combat.js : les monstres utilisent le Repos_Long de leur
@@ -134,6 +135,9 @@ async function jouerCombat({ nbJoueurs, nbMonstres, toursMax = 12 }) {
   const srcIA = fs.readFileSync('/home/user/Ivalis/monstres_ia.js','utf-8')
     .replace(/^import[\s\S]*?from\s+"[^"]+";/gm,'')
     .replace(/await pause\(\d+\);/g, 'await pause(0);');
+  // Les lectures de stats mutualisées vivent dans app.js, chargé avant tout le
+  // reste sur la vraie page : un banc qui isole une fonction doit les poser aussi.
+  new Function('window', SRC_STATS_COMMUNES)(w);
   eval(srcIA);
 
   let garde = 0;

@@ -1143,7 +1143,7 @@ window.declencherPeurCible = async function(idLanceur, idCible) {
     // La fuite coûte de la fatigue à la cible, comme un déplacement normal (coût de base : 2/case).
     const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idCible);
     if (cibleData) {
-        const fatigueMax = parseInt(cibleData.Fatigue_Max) || parseInt(cibleData.fatigueMax) || 100;
+        const fatigueMax = window.fatigueMaxCombattant(cibleData);
         const fatigueActuelle = cibleData.fatigueActuelle !== undefined ? parseInt(cibleData.fatigueActuelle) : fatigueMax;
         const nouvelleFatigue = Math.max(0, fatigueActuelle - chemin.length * 2);
         cibleData.fatigueActuelle = nouvelleFatigue;
@@ -3403,13 +3403,13 @@ jaugeContainer.className = "jauge-flash-token";
                     // suivant, voir la transition de round dans combat.js). Même retour visuel
                     // (flash + barre qui se vide) qu'une attaque classique, sur demande de Nico.
                     if (alt.estPoison) {
-                        const pvMaxPoison = parseInt(cData.PV_Max) || 0;
+                        const pvMaxPoison = window.pvMaxCombattant(cData);
                         const pvActuelsPoison = cData.PV_Actuels !== undefined ? parseInt(cData.PV_Actuels) : pvMaxPoison;
                         const nouveauPvPoison = Math.max(0, pvActuelsPoison - Math.ceil(pvMaxPoison * 0.08));
                         const perteViePoison = pvActuelsPoison - nouveauPvPoison;
                         cData.PV_Actuels = nouveauPvPoison;
 
-                        const fatigueMaxPoison = parseInt(cData.fatigueMax) || parseInt(cData.Fatigue_Max) || 100;
+                        const fatigueMaxPoison = window.fatigueMaxCombattant(cData);
                         const fatigueActuellePoison = cData.fatigueActuelle !== undefined ? parseInt(cData.fatigueActuelle) : fatigueMaxPoison;
                         const nouvelleFatiguePoison = Math.max(0, fatigueActuellePoison - 15);
                         const perteFatiguePoison = fatigueActuellePoison - nouvelleFatiguePoison;

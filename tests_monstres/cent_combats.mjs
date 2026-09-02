@@ -3,6 +3,7 @@
 // moteur (résistance en %, jet d'esquive/parade, malus de tir au contact).
 // Les compétences des DEUX camps sortent du vrai générateur.
 import fs from 'fs';
+import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 import { chargerIA, creerPlateau, combattant, activer, EFFETS } from './banc_ia.mjs';
 
 // Même règle que combat.js : les monstres utilisent le Repos_Long de leur
@@ -230,6 +231,9 @@ async function unCombat(numero) {
                                           update:(_r,d)=>Object.assign(partie,structuredClone(d)) });
   const srcIA = fs.readFileSync('/home/user/Ivalis/monstres_ia.js','utf-8')
     .replace(/^import[\s\S]*?from\s+"[^"]+";/gm,'').replace(/await pause\(\d+\);/g, 'await pause(0);');
+  // Les lectures de stats mutualisées vivent dans app.js, chargé avant tout le
+  // reste sur la vraie page : un banc qui isole une fonction doit les poser aussi.
+  new Function('window', SRC_STATS_COMMUNES)(w);
   eval(srcIA);
 
   // --- Déroulement ---

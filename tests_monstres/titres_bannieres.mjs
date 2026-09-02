@@ -2,6 +2,7 @@
 // maintenant rétrécir jusqu'à tenir. Ce banc rend les VRAIES bannières de combat
 // dans un navigateur, avec des noms courts et des noms à rallonge.
 import fs from 'fs';
+import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 
 const combat = fs.readFileSync('/home/user/Ivalis/combat.js','utf-8');
 const comp   = fs.readFileSync('/home/user/Ivalis/competences.js','utf-8');
@@ -37,6 +38,7 @@ window.CACHE_COMPETENCES_GLOBAL = { P1: ${JSON.stringify(cartes)} };
 window.mettreAJourJaugeFatigue = function(){}; window.mettreAJourJaugePV = function(){};
 window.COMPETENCES_CACHE = {};
 window.TAILLE_MIN_TITRE_BANNIERE = 9;
+${SRC_STATS_COMMUNES}
 ${fnAjuster}
 ${fnPanneau}
 window.chargerCompetencesCombat("P1", "#4a1c1c");
@@ -97,6 +99,7 @@ window.PERSOS_PARTIE = [{ idPersonnage:"P1", couleur:"#4a1c1c",
 window.CACHE_COMPETENCES_GLOBAL = { P1: ${JSON.stringify(cartes)} };
 window.COMPETENCES_CACHE = {};
 window.TAILLE_MIN_TITRE_BANNIERE = 9;
+${SRC_STATS_COMMUNES}
 ${cadres}
 ${fnAjuster}
 ${fnFiche}
