@@ -54,6 +54,7 @@ node suppression_perso.mjs  # effacer un héros emporte tout ce qui lui est lié
 node zones_ia.mjs           # les zones sont posées, orientées et bien placées
 node piste_initiative.mjs   # la piste tient à droite du panneau, bulles réduites
 node titres_bannieres.mjs   # les noms de carte rétrécissent au lieu d'être coupés
+node bouton_forge.mjs       # le + de la Forge devient un sablier pendant l'attente
 node jauges_panneau.mjs     # vitalité et énergie du panneau gauche, à chaque étape
 node jauge_token.mjs        # la jauge sous le pion survit à un redessin
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise

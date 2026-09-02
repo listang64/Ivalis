@@ -881,9 +881,19 @@ window.ouvrirCreationCompetence = async function() {
     if (window.OUVERTURE_FORGE_EN_COURS) return;
     window.OUVERTURE_FORGE_EN_COURS = true;
 
+    // Le bouton lui-même fait patienter : son "+" devient un sablier le temps que
+    // la Forge lise la fiche et les caractéristiques. Sur une connexion iPad
+    // capricieuse, ces lectures prennent parfois une seconde ou deux, et rien à
+    // l'écran ne disait que quelque chose se passait.
     const btnCreer = document.getElementById("btn-creer-competence");
-    const curseurOrigine = btnCreer ? btnCreer.style.cursor : "";
-    if (btnCreer) btnCreer.style.cursor = "wait";
+    const etatBouton = btnCreer
+        ? { texte: btnCreer.innerHTML, taille: btnCreer.style.fontSize, curseur: btnCreer.style.cursor }
+        : null;
+    if (btnCreer) {
+        btnCreer.innerHTML = "⏳";
+        btnCreer.style.fontSize = "22px";   // l'émoji est plus large qu'un "+"
+        btnCreer.style.cursor = "wait";
+    }
 
     try {
         // NOUVEAU : On nettoie la carte et on désélectionne la bannière
@@ -937,7 +947,11 @@ window.ouvrirCreationCompetence = async function() {
         alert("Impossible d'ouvrir la Forge. Vérifie ta connexion et réessaie.");
     } finally {
         window.OUVERTURE_FORGE_EN_COURS = false;
-        if (btnCreer) btnCreer.style.cursor = curseurOrigine;
+        if (btnCreer && etatBouton) {
+            btnCreer.innerHTML = etatBouton.texte;
+            btnCreer.style.fontSize = etatBouton.taille;
+            btnCreer.style.cursor = etatBouton.curseur;
+        }
     }
 };
 
