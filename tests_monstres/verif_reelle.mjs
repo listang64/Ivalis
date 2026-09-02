@@ -80,6 +80,19 @@ corpus.forEach(m => m.cartes.forEach((c, rang) => {
   if (d.Initiative < 0) inc("initiative négative", desc);
 }));
 
+// Une seule carte à terrain persistant par créature : deux flaques posées par la
+// même bestiole, c'est trop pour le plateau.
+corpus.forEach(m => {
+  const avecTerrain = m.cartes.filter(c =>
+    c.doc.Composants.actions.some(a =>
+      Object.keys(a.mods).some(id => /persistance/i.test(EFFETS[id].Nom)) ||
+      /persistance/i.test(EFFETS[a.baseEffetId].Nom)));
+  if (avecTerrain.length > 1) {
+    inc("plus d'un terrain persistant sur la même créature",
+        `${m.archetype}/${m.palier} : ${avecTerrain.map(c => "«" + c.nom + "»").join(", ")}`);
+  }
+});
+
 console.log(`VÉRIFICATION SUR LA VRAIE BASE`);
 console.log(`  ${COMBOS.length} gabarits réels × 40 tirages = ${corpus.length} monstres, ${toutes.length} cartes\n`);
 const cles = Object.keys(compteurs);

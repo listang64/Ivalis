@@ -960,8 +960,10 @@ function fabriquerCarte(monstre, affinites, patron, tranche, palette, rang) {
             // tranche de fatigue est une règle du jeu, le plafond n'est qu'un
             // garde-fou d'équilibrage. On lui accorde 20 % de marge pour ne pas
             // laisser une carte saturée finir sous son plancher.
+            // La marge de 20 % ne franchit jamais le plafond d'empilement de la
+            // Forge : c'est une règle du jeu, pas un réglage d'équilibrage.
             const plafondAct = (act === action)
-                ? Math.ceil(plafondPuissance * 1.2)
+                ? Math.min(maxEmpilements(act.baseEffet), Math.ceil(plafondPuissance * 1.2))
                 : maxEmpilements(act.baseEffet);
             if (act.count < plafondAct) {
                 act.count++;
@@ -1262,6 +1264,15 @@ window.genererCompetencesMonstre = async function(monstreBrut) {
     const fatigueMaxMonstre = parseInt(monstre.fatigueMax) || 100;
     const tousLesPatrons = ["brute", "frappe", "etat", "zone", "persistance", "etalement", "soutien", "controle"];
 
+    // Un seul terrain persistant par créature. Le patron "persistance" n'est déjà
+    // prévu qu'une fois dans le plan de chaque archetype, mais les essais de repli
+    // piochent un patron au hasard et pouvaient en produire un second : deux
+    // flaques posées par la même bestiole, c'est trop pour le plateau.
+    const poseUnTerrain = (candidate) => candidate.chantier.actions.some(act =>
+        contient(act.baseEffet.Nom, MOTS_CLES.persistance) ||
+        act.modsEffets.some(m => contient(m.effet.Nom, MOTS_CLES.persistance)));
+    let terrainDejaPose = false;
+
     const cartes = [];
     const dejaVues = new Set();
     TRANCHES_FATIGUE_PCT.forEach((tranche, i) => {
@@ -1315,6 +1326,7 @@ window.genererCompetencesMonstre = async function(monstreBrut) {
                 : tousLesPatrons[Math.floor(Math.random() * tousLesPatrons.length)];
             const candidate = fabriquerCarte(monstre, affinites, patron, tranche, palette, i);
             if (!candidate) continue;
+            if (terrainDejaPose && poseUnTerrain(candidate)) continue;
 
             if (!meilleure || Math.abs(candidate.fatigue - plancher) < Math.abs(meilleure.fatigue - plancher)) {
                 meilleure = candidate;
@@ -1331,8 +1343,13 @@ window.genererCompetencesMonstre = async function(monstreBrut) {
         // Aucune tentative parfaite : on garde la plus proche plutôt que de
         // laisser un trou dans le jeu de cartes.
         if (!carte) carte = meilleure || fabriquerCarte(monstre, affinites, "frappe", tranche, palette, i);
+        if (carte && terrainDejaPose && poseUnTerrain(carte)) {
+            // Le repli lui-même portait un terrain : on lui préfère une frappe.
+            carte = fabriquerCarte(monstre, affinites, "frappe", tranche, palette, i) || null;
+        }
         if (carte) {
             dejaVues.add(signature(carte));
+            if (poseUnTerrain(carte)) terrainDejaPose = true;
             cartes.push(carte);
         }
     });
