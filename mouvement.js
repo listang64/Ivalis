@@ -7,6 +7,30 @@ import { doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebase
 
 window.CHEMIN_MOUVEMENT = [];
 window.CHEMIN_START_NODE = null;
+
+// Un personnage peut repartir tant qu'il n'a pas lancé sa carte : il faut donc
+// se souvenir du nombre de cases DÉJÀ parcourues ce tour-ci, sinon le barème
+// (2 ⚡ pour les trois premières, 4 ⚡ jusqu'à la sixième, 6 ⚡ ensuite) repartirait
+// à zéro à chaque reprise et marcher en plusieurs fois coûterait moins cher.
+// La valeur de référence vit dans la file d'attente en base — elle survit à un
+// rechargement et vaut pour tous les postes ; la copie locale prend le relais
+// pendant le temps d'aller-retour du réseau.
+window.PAS_PARCOURUS_TOUR = { id: null, tour: null, pas: 0 };
+
+window.pasDejaParcourus = function(idPerso) {
+    const partie = window.PARTIE_DATA || {};
+    const queue = partie.File_Attente_Combat || [];
+    const tour = partie.Tour_Combat || 0;
+
+    const enBase = (queue.length > 0 && queue[0].idPersonnage === idPerso)
+        ? (parseInt(queue[0].pasParcourus) || 0) : 0;
+    const memoire = window.PAS_PARCOURUS_TOUR;
+    const enLocal = (memoire.id === idPerso && memoire.tour === tour) ? memoire.pas : 0;
+
+    // Le plus élevé des deux : la base peut être en retard juste après une
+    // validation, la copie locale peut l'être juste après un rechargement.
+    return Math.max(enBase, enLocal);
+};
 window.MOUVEMENT_COUT_TOTAL = 0;
 
 window.COUT_COMPETENCE_SELECTIONNEE = 0; 
@@ -190,7 +214,8 @@ window.ajouterEtapeMouvement = function(q, r) {
     for (let i = 0; i < segment.length; i++) {
         let step = segment[i];
 
-        let numeroCase = window.CHEMIN_MOUVEMENT.length + 1;
+        let numeroCase = window.pasDejaParcourus(window.TOKEN_SELECTIONNE)
+                       + window.CHEMIN_MOUVEMENT.length + 1;
         let baseCost = 2;
         let couleur = "#ffffff";
 
@@ -356,6 +381,17 @@ window.validerMouvement = async function() {
     
     const idPerso = window.TOKEN_SELECTIONNE;
     const finalStep = window.CHEMIN_MOUVEMENT[window.CHEMIN_MOUVEMENT.length - 1];
+    if (!finalStep) return;
+
+    // La copie locale est posée AVANT l'écriture réseau : le joueur peut repartir
+    // dans la seconde qui suit, sans attendre le retour de la base.
+    const nbPas = window.CHEMIN_MOUVEMENT.length;
+    const tourCourant = (window.PARTIE_DATA || {}).Tour_Combat || 0;
+    window.PAS_PARCOURUS_TOUR = {
+        id: idPerso,
+        tour: tourCourant,
+        pas: window.pasDejaParcourus(idPerso) + nbPas
+    };
 
     // Les pions ne pivotent plus jamais : le chemin ne porte plus que les coordonnées de chaque étape.
     let pathAvecAngles = window.CHEMIN_MOUVEMENT.map(step => ({ q: step.q, r: step.r }));
@@ -428,7 +464,9 @@ window.validerMouvement = async function() {
 
         let file = snap.data().File_Attente_Combat || [];
         if (file.length > 0 && file[0].idPersonnage === idPerso) {
-            file[0].aFaitSonMouvement = true;
+            // Le déplacement ne se ferme plus au premier arrêt : on cumule les pas,
+            // et c'est le lancement de la carte (qui met fin au tour) qui l'arrête.
+            file[0].pasParcourus = (parseInt(file[0].pasParcourus) || 0) + nbPas;
         }
 
         window.TOKENS_VTT_DATA[idPerso].q = finalStep.q;

@@ -670,7 +670,14 @@ window.poserMonstreSurTerrain = async function(monstre, tokensData) {
         URL_Token: ""
     });
 
-    const hexLibre = window.trouverHexLibreVTT(tokensData);
+    // Autour du repère d'apparition des ennemis, au hasard des cases libres —
+    // et à défaut de repère (ou de module de combat chargé), au plus près du
+    // centre comme autrefois.
+    const repereEnnemi = typeof window.pointApparition === "function"
+        ? window.pointApparition("Ennemi") : null;
+    const hexLibre = typeof window.trouverHexLibreAutour === "function"
+        ? window.trouverHexLibreAutour(tokensData, repereEnnemi, 2)
+        : window.trouverHexLibreVTT(tokensData);
     tokensData[idMonstre] = { q: hexLibre.q, r: hexLibre.r, url: "", taille: 55 };
 
     const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);

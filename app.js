@@ -1640,6 +1640,12 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
 
          window.PARTIE_DATA = dataPartie;
 
+         // Les repères d'apparition peuvent avoir été posés depuis un autre poste :
+         // la demande affichée ici doit alors se refermer d'elle-même.
+         if (typeof window.verifierPointsApparition === "function") {
+             window.verifierPointsApparition();
+         }
+
          // Les monstres jouent seuls : à chaque changement de la partie (une carte
          // posée, un tour qui passe), l'IA regarde si c'est à eux d'agir.
          if (typeof window.verifierTourIAMonstres === "function") {

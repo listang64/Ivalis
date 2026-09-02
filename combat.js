@@ -67,6 +67,10 @@ window.ouvrirCombat = function() {
     if (typeof window.centrerPlateau === "function") {
         window.centrerPlateau();
     }
+
+    // Nouveau combat : les deux repères d'apparition manquent, on les demande.
+    window.APPARITION_REPORTEE = false;
+    if (typeof window.verifierPointsApparition === "function") window.verifierPointsApparition();
 };
 
 window.fermerCombat = function() {
@@ -101,6 +105,8 @@ window.fermerCombat = function() {
     if (typeof window.fermerToutesLesFenetres === "function") {
         window.fermerToutesLesFenetres();
     }
+
+    if (typeof window.arreterPlacementApparition === "function") window.arreterPlacementApparition();
 
     // On quitte le combat : la veille redevient utile pour les autres scenes
     if (typeof window.reprendreSynchroCanvas === "function") window.reprendreSynchroCanvas();
@@ -1108,9 +1114,12 @@ document.addEventListener("click", async function(event) {
             phase === "Resolution" &&
             queue.length > 0 &&
             queue[0].idPersonnage === window.TOKEN_SELECTIONNE &&
-            persoSelectionne && persoSelectionne.idJoueur === monId &&
-            !queue[0].aFaitSonMouvement
+            persoSelectionne && persoSelectionne.idJoueur === monId
         );
+        // Le déplacement ne se referme plus après une première validation : tant
+        // que la carte n'est pas lancée (et son lancement met fin au tour), le
+        // personnage peut repartir d'où il s'est arrêté. Le barème du coût, lui,
+        // continue de grimper — cf. window.pasDejaParcourus.
 
         // Immobilisation et Paralysie bloquent tout déplacement volontaire (mais pas les
         // déplacements subis comme Poussée/Traction/Peur, qui ne passent pas par ce clic de
@@ -1448,7 +1457,8 @@ window.genererTokensCombat = async function() {
         if (!imgToUse) return;
 
         if (!tokensData[perso.idPersonnage]) {
-            const hexLibre = window.trouverHexLibreVTT(tokensData);
+            const hexLibre = window.trouverHexLibreAutour(
+                tokensData, window.pointApparition(perso.camp), 2);
             tokensData[perso.idPersonnage] = {
                 q: hexLibre.q,
                 r: hexLibre.r,
@@ -3486,8 +3496,16 @@ window.reinitialiserCombat = async function() {
             await updateDoc(partieRef, {
                 File_Attente_Combat: [],
                 Phase_Combat: "Preparation",
-                Tour_Combat: 1
+                Tour_Combat: 1,
+                // Les repères d'apparition ne survivent pas à une réinitialisation :
+                // le combat suivant se placera peut-être ailleurs sur la carte.
+                Spawn_Allies: deleteField(),
+                Spawn_Ennemis: deleteField()
             });
+            if (window.PARTIE_DATA) {
+                delete window.PARTIE_DATA.Spawn_Allies;
+                delete window.PARTIE_DATA.Spawn_Ennemis;
+            }
         }
 
         // A bis. Les Illusions ne survivent pas au combat : c'est le seul vrai "fin de combat"
@@ -3597,6 +3615,9 @@ window.reinitialiserCombat = async function() {
         if (typeof window.verifierChangementTour === "function") {
             window.verifierChangementTour(1);
         }
+        window.APPARITION_REPORTEE = false;
+        if (typeof window.verifierPointsApparition === "function") window.verifierPointsApparition();
+
         console.log("Le combat a été entièrement réinitialisé !");
         
     } catch (e) {
@@ -3637,6 +3658,251 @@ window.trouverHexLibreVTT = function(tokensData) {
         radius++;
     }
     return { q: 0, r: 0 }; 
+};
+
+// =========================================================================
+//  POINTS D'APPARITION (ALLIÉS / ENNEMIS)
+// =========================================================================
+//  Deux repères invisibles posés sur le plateau au début du combat : les pions
+//  des héros apparaissent autour du premier, ceux des créatures autour du
+//  second, au hasard des cases libres. Sans eux, tout le monde s'entassait au
+//  centre exact de la carte, joueurs et monstres mélangés.
+
+window.PLACEMENT_APPARITION = null; // { etape: "Allié" | "Ennemi", nettoyer: fn }
+
+// Distance en cases entre deux hexagones (coordonnées axiales).
+function distanceHexVTT(a, b) {
+    if (typeof window.hexDistanceVTT === "function") return window.hexDistanceVTT(a, b);
+    return Math.max(Math.abs(a.q - b.q), Math.abs(a.r - b.r),
+                    Math.abs((-a.q - a.r) - (-b.q - b.r)));
+}
+
+// Une case libre tirée au sort autour d'un point, en élargissant le cercle tant
+// qu'il n'y a pas de place. Sans point de repère, on retombe sur l'ancien
+// comportement : la case libre la plus proche du centre.
+window.trouverHexLibreAutour = function(tokensData, centre, rayon) {
+    if (!centre || centre.q === undefined || centre.r === undefined) {
+        return window.trouverHexLibreVTT(tokensData);
+    }
+
+    const estLibre = (q, r) => {
+        if (!window.PLATEAU_VTT) return false;
+        const state = window.PLATEAU_VTT.getCaseState(q, r);
+        if (state.isDeleted || state.isBlocked) return false;
+        for (let id in tokensData) {
+            if (tokensData[id].q === q && tokensData[id].r === r) return false;
+        }
+        return true;
+    };
+
+    const rayonDepart = rayon || 2;
+    for (let portee = rayonDepart; portee <= 20; portee++) {
+        const candidates = [];
+        for (let dq = -portee; dq <= portee; dq++) {
+            for (let dr = -portee; dr <= portee; dr++) {
+                const q = centre.q + dq, r = centre.r + dr;
+                if (distanceHexVTT(centre, { q, r }) > portee) continue;
+                if (estLibre(q, r)) candidates.push({ q, r });
+            }
+        }
+        if (candidates.length > 0) {
+            return candidates[Math.floor(Math.random() * candidates.length)];
+        }
+    }
+    return window.trouverHexLibreVTT(tokensData);
+};
+
+// Le point d'apparition d'un camp, tel qu'il est enregistré pour cette partie.
+window.pointApparition = function(camp) {
+    const partie = window.PARTIE_DATA || {};
+    const point = camp === "Ennemi" ? partie.Spawn_Ennemis : partie.Spawn_Allies;
+    if (!point || point.q === undefined || point.r === undefined) return null;
+    return { q: point.q, r: point.r };
+};
+
+// Un clic franc : ni un glissement de carte, ni un appui prolongé, ni un
+// pincement à deux doigts. Sur iPad, poser le doigt pour faire glisser le
+// plateau ne doit surtout pas planter un point d'apparition au passage.
+function armerClicFrancPlateau(surCase) {
+    const conteneur = document.getElementById("conteneur-plateau-vtt");
+    if (!conteneur) return () => {};
+
+    let departX = 0, departY = 0, departT = 0, franc = false;
+
+    const debut = (x, y, nbDoigts) => {
+        franc = nbDoigts <= 1;
+        departX = x; departY = y; departT = Date.now();
+    };
+    const bouge = (x, y) => {
+        if (Math.abs(x - departX) > 10 || Math.abs(y - departY) > 10) franc = false;
+    };
+    const fin = (x, y) => {
+        if (!franc) return;
+        franc = false;
+        if (Date.now() - departT > 800) return;
+        if (Math.abs(x - departX) > 10 || Math.abs(y - departY) > 10) return;
+        surCase(x, y);
+    };
+
+    const surSouris = e => debut(e.clientX, e.clientY, 1);
+    const surSourisBouge = e => bouge(e.clientX, e.clientY);
+    const surSourisFin = e => fin(e.clientX, e.clientY);
+    const surDoigt = e => { if (e.touches.length > 0) debut(e.touches[0].clientX, e.touches[0].clientY, e.touches.length); };
+    const surDoigtBouge = e => { if (e.touches.length > 0) bouge(e.touches[0].clientX, e.touches[0].clientY); };
+    const surDoigtFin = e => { if (e.changedTouches.length > 0) fin(e.changedTouches[0].clientX, e.changedTouches[0].clientY); };
+
+    // Le clic qui suit ne doit atteindre aucun autre gestionnaire : sans ce
+    // barrage, le même geste sélectionnerait un pion ou tracerait un chemin.
+    // Le bandeau de la demande fait exception, sinon son lien « Plus tard »
+    // serait lui aussi bloqué et la demande deviendrait impossible à écarter.
+    const barrage = e => {
+        if (e.target && e.target.closest && e.target.closest("#placement-apparition")) return;
+        e.stopPropagation();
+    };
+
+    conteneur.addEventListener("mousedown", surSouris, true);
+    conteneur.addEventListener("mousemove", surSourisBouge, true);
+    conteneur.addEventListener("mouseup", surSourisFin, true);
+    conteneur.addEventListener("touchstart", surDoigt, true);
+    conteneur.addEventListener("touchmove", surDoigtBouge, true);
+    conteneur.addEventListener("touchend", surDoigtFin, true);
+    document.addEventListener("click", barrage, true);
+
+    return () => {
+        conteneur.removeEventListener("mousedown", surSouris, true);
+        conteneur.removeEventListener("mousemove", surSourisBouge, true);
+        conteneur.removeEventListener("mouseup", surSourisFin, true);
+        conteneur.removeEventListener("touchstart", surDoigt, true);
+        conteneur.removeEventListener("touchmove", surDoigtBouge, true);
+        conteneur.removeEventListener("touchend", surDoigtFin, true);
+        document.removeEventListener("click", barrage, true);
+    };
+}
+
+// La case du plateau sous un point de l'écran, si elle est praticable.
+window.caseSousLEcran = function(clientX, clientY) {
+    const conteneur = document.getElementById("conteneur-plateau-vtt");
+    if (!conteneur || !window.PLATEAU_VTT) return null;
+    const canvasX = (clientX - window.VTT_POS_X) / window.VTT_SCALE;
+    const canvasY = (clientY - window.VTT_POS_Y) / window.VTT_SCALE;
+    const hex = window.PLATEAU_VTT.pixelToHex(canvasX, canvasY);
+    if (!hex) return null;
+    const state = window.PLATEAU_VTT.getCaseState(hex.q, hex.r);
+    if (state.isDeleted || state.isBlocked) return null;
+    return hex;
+};
+
+window.arreterPlacementApparition = function() {
+    if (window.PLACEMENT_APPARITION && window.PLACEMENT_APPARITION.nettoyer) {
+        window.PLACEMENT_APPARITION.nettoyer();
+    }
+    window.PLACEMENT_APPARITION = null;
+    const calque = document.getElementById("placement-apparition");
+    if (calque) calque.style.display = "none";
+};
+
+// Le MJ (ou le premier poste à ouvrir le combat) pose les deux repères. Si un
+// autre poste les a posés entre-temps, la demande se referme d'elle-même.
+window.demarrerPlacementApparition = function() {
+    if (window.PLACEMENT_APPARITION) return;
+    const calque = document.getElementById("placement-apparition");
+    const titre = document.getElementById("placement-apparition-titre");
+    if (!calque || !titre) return;
+
+    const points = {};
+
+    const annoncer = (camp) => {
+        titre.innerText = camp === "Ennemi"
+            ? "Où apparaissent les ennemis ?"
+            : "Où apparaissent les héros ?";
+        titre.style.color = camp === "Ennemi" ? "#ff8b8b" : "#e8d5a5";
+    };
+
+    const poser = (clientX, clientY) => {
+        const hex = window.caseSousLEcran(clientX, clientY);
+        if (!hex) {
+            if (typeof window.afficherMessageFlottantHex === "function") {
+                const raté = window.PLATEAU_VTT ? window.PLATEAU_VTT.pixelToHex(
+                    (clientX - window.VTT_POS_X) / window.VTT_SCALE,
+                    (clientY - window.VTT_POS_Y) / window.VTT_SCALE) : null;
+                if (raté) window.afficherMessageFlottantHex(raté.q, raté.r, "Case impraticable", "#ff4c4c");
+            }
+            return;
+        }
+        if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+
+        const etape = window.PLACEMENT_APPARITION.etape;
+        if (etape === "Allié") {
+            points.allies = hex;
+            window.PLACEMENT_APPARITION.etape = "Ennemi";
+            annoncer("Ennemi");
+            return;
+        }
+
+        points.ennemis = hex;
+        window.arreterPlacementApparition();
+        window.enregistrerPointsApparition(points.allies, points.ennemis);
+    };
+
+    window.PLACEMENT_APPARITION = { etape: "Allié", nettoyer: armerClicFrancPlateau(poser) };
+    annoncer("Allié");
+    calque.style.display = "flex";
+};
+
+window.enregistrerPointsApparition = async function(allies, ennemis) {
+    if (!window.ID_PARTIE_COURANTE) return;
+    // Écriture immédiate en mémoire : la génération des pions qui suit ne doit
+    // pas attendre l'aller-retour réseau pour connaître les deux repères.
+    if (window.PARTIE_DATA) {
+        window.PARTIE_DATA.Spawn_Allies = allies;
+        window.PARTIE_DATA.Spawn_Ennemis = ennemis;
+    }
+    try {
+        await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
+            Spawn_Allies: allies,
+            Spawn_Ennemis: ennemis
+        });
+        console.log("Points d'apparition enregistrés :", allies, ennemis);
+    } catch (e) {
+        console.error("Erreur d'enregistrement des points d'apparition :", e);
+    }
+};
+
+// Reporté à la main : on ne redemandera plus tant que la fenêtre reste ouverte.
+window.APPARITION_REPORTEE = false;
+window.reporterPointsApparition = function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    window.APPARITION_REPORTEE = true;
+    window.arreterPlacementApparition();
+};
+
+// Appelée à l'ouverture du combat, puis à chaque mise à jour de la partie : elle
+// lance la demande quand les repères manquent, et la referme dès qu'ils
+// arrivent — y compris quand c'est un autre poste qui les a posés.
+window.verifierPointsApparition = function() {
+    const enCombat = document.getElementById("fenetre-combat")?.style.display === "block";
+    if (!enCombat) {
+        window.arreterPlacementApparition();
+        return;
+    }
+
+    const complets = !!window.pointApparition("Allié") && !!window.pointApparition("Ennemi");
+    if (complets) {
+        window.arreterPlacementApparition();
+        return;
+    }
+
+    if (window.APPARITION_REPORTEE) return;
+
+    // La partie n'est pas encore chargée : on repasse dans un instant plutôt que
+    // de renoncer — l'ouverture du combat précède souvent la première lecture.
+    if (!window.PARTIE_DATA || !window.PLATEAU_VTT) {
+        clearTimeout(window.RAPPEL_APPARITION);
+        window.RAPPEL_APPARITION = setTimeout(window.verifierPointsApparition, 400);
+        return;
+    }
+
+    window.demarrerPlacementApparition();
 };
 
 // Le bouton 💀 des options de combat ouvre désormais la fenêtre de génération de
