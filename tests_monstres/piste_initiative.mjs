@@ -96,6 +96,35 @@ console.log("\nLES COMBATTANTS À TERRE QUITTENT LA PISTE");
   verifier("le combattant à terre n'a plus sa bulle", r.bulles === 4, `(${r.bulles})`);
 }
 
+console.log("\nLA PISTE APPARAÎT MÊME SI LA BASCULE TOMBE PENDANT L'ANIMATION");
+{
+  const r = await p.evaluate(async (fnPisteSrc) => {
+    eval(fnPisteSrc);
+    const noms = ["Pliors","Jade","Gnoll"];
+    window.PERSOS_PARTIE = noms.map((n, i) => ({ idPersonnage:"E"+i, prenom:n, PV_Max:50, PV_Actuels:40,
+      Fatigue_Max:100, fatigueActuelle:70, Etats_Alteres:[] }));
+    window.estCombattantMort = () => false;
+    const piste = document.getElementById('piste-initiative');
+    piste.innerHTML = ""; piste.style.opacity = "0";      // on repart d'une piste repliée
+    const file = noms.map((n,i) => ({ idPersonnage:"E"+i, idCarte:"X", initiative: 80 - i*10 }));
+
+    // La fin du tour précédent est encore en train de s'animer quand la bascule
+    // en résolution arrive : c'est exactement la fenêtre où la piste se perdait.
+    window.ANIMATION_TOUR_EN_COURS = true;
+    window.afficherPisteInitiative(file, "Resolution");
+    const pendant = { opacite: piste.style.opacity, bulles: piste.children.length };
+
+    // L'animation se termine. Aucune nouvelle notification ne viendra.
+    window.ANIMATION_TOUR_EN_COURS = false;
+    await new Promise(r => setTimeout(r, 700));
+    return { pendant, apres: { opacite: piste.style.opacity, bulles: piste.children.length } };
+  }, fnPiste);
+  console.log(`     pendant l'animation : ${r.pendant.bulles} bulle(s) — après : ${r.apres.bulles}`);
+  verifier("rien n'est dessiné pendant l'animation", r.pendant.bulles === 0);
+  verifier("la piste apparaît d'elle-même une fois l'animation finie",
+           r.apres.bulles === 3 && r.apres.opacite === "1", `(${r.apres.bulles} bulles, opacité ${r.apres.opacite})`);
+}
+
 await p.screenshot({ path: '/tmp/piste.png' });
 
 // Combien de combattants tiennent avant que la piste ne recommence à passer

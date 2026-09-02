@@ -144,6 +144,22 @@ console.log("\n5. LES CRÉATURES CHOISISSENT APRÈS LES JOUEURS");
   const posees = (partagee.doc.File_Attente_Combat||[]).map(f => f.idPersonnage);
   verifier("une fois la table engagée, la créature choisit", posees.includes("M1"), `(${posees.join(", ")})`);
 
+  // Un identifiant qui ne correspond à personne (fiche supprimée dont l'ordre
+  // garde la trace) ne doit pas bloquer non plus : sinon la partie ne bascule
+  // jamais en résolution et la piste d'initiative n'apparaît pas.
+  const partagee3 = { doc: { Phase_Combat:"Preparation", Tour_Combat:1, Verrou_IA:null,
+    Ordre_Initiative:["M1","J1","FANTOME"],
+    File_Attente_Combat:[{ idPersonnage:"J1", idCarte:"CJ1", initiative:40, timestamp:1 }] } };
+  const w3 = creerPoste(partagee3);
+  w3.PERSOS_PARTIE = [monstre, j1]; w3.MONSTRES_PARTIE = [monstre];
+  w3.TOKENS_VTT_DATA = { M1:{q:0,r:0}, J1:{q:2,r:0} };
+  w3.CACHE_COMPETENCES_GLOBAL.M1 = { C1: carte };
+  await w3.verifierTourIAMonstres();
+  await attendre(200);
+  verifier("un identifiant fantôme dans l'ordre ne bloque pas",
+    (partagee3.doc.File_Attente_Combat||[]).some(f => f.idPersonnage === "M1"),
+    `(${(partagee3.doc.File_Attente_Combat||[]).map(f=>f.idPersonnage).join(", ")})`);
+
   // Un joueur mort ne doit bloquer personne.
   const partagee2 = { doc: { Phase_Combat:"Preparation", Tour_Combat:1, Verrou_IA:null,
     Ordre_Initiative:["M1","J1"], File_Attente_Combat:[] } };

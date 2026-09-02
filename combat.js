@@ -2919,7 +2919,18 @@ window.afficherPisteInitiative = function(queue, phase) {
         queue = window.PARTIE_DATA.File_Attente_Combat || [];
         phase = window.PARTIE_DATA.Phase_Combat || "Preparation";
     }
-    if (window.ANIMATION_TOUR_EN_COURS) return;
+    // Pendant l'animation de fin de tour, on ne redessine pas la piste — elle est
+    // justement en train de se replier. Mais la notification qui apporte l'état
+    // suivant ne reviendra pas toute seule : si la bascule en résolution tombe
+    // pendant cette fenêtre (et elle y tombe souvent, puisque les créatures
+    // choisissent en dernier), la piste ne se dessinait plus jamais et le combat
+    // avait l'air figé. On se rappelle donc, comme le fait déjà l'IA.
+    if (window.ANIMATION_TOUR_EN_COURS) {
+        clearTimeout(window.RAPPEL_PISTE_INITIATIVE);
+        window.RAPPEL_PISTE_INITIATIVE = setTimeout(() => window.afficherPisteInitiative(queue, phase), 300);
+        return;
+    }
+    clearTimeout(window.RAPPEL_PISTE_INITIATIVE);
 
     const piste = document.getElementById("piste-initiative");
     if (!piste) return;

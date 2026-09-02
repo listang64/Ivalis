@@ -469,6 +469,11 @@ const CARTE_REPOS = { id: "REPOS_LONG", data: { Nom: "Repos long", Fatigue: 0, I
 // Combien de temps on laisse la forge finir avant de considérer qu'une créature
 // n'aura jamais de techniques et qu'elle doit souffler pour libérer le tour.
 const DELAI_FORGE_MS = 30000;
+
+// Combien de temps les créatures attendent que toute la table ait choisi avant
+// de s'engager quand même. Assez long pour laisser réfléchir, assez court pour
+// qu'un joueur absent ne fige pas le combat.
+const DELAI_ATTENTE_JOUEURS_MS = 180000;
 window.ATTENTE_TECHNIQUES_MONSTRES = window.ATTENTE_TECHNIQUES_MONSTRES || {};
 
 window.choisirCarteMonstre = function(monstre) {
@@ -608,13 +613,29 @@ window.preparerCartesMonstres = async function() {
     // adverse avant de choisir, et les monstres décidaient sans rien savoir de
     // ce qui se préparait en face. Un mort ne bloque personne.
     const humainsEnAttente = ordre.filter(id => {
-        if (typeof window.estMonstre === "function" && window.estMonstre(id)) return false;
         if (dejaChoisi.has(id)) return false;
-        if (typeof window.estCombattantMort === "function" && window.estCombattantMort(id)) return false;
+        // Un identifiant qui ne correspond à personne (fiche pas encore chargée,
+        // pion supprimé dont l'ordre garde la trace) ne doit surtout pas bloquer :
+        // il attendrait indéfiniment et la partie ne basculerait jamais en
+        // résolution.
         const p = (window.PERSOS_PARTIE || []).find(x => x.idPersonnage === id);
-        return !(p && p.estIllusion);
+        if (!p) return false;
+        if (p.estMonstre || p.estIllusion) return false;
+        return !(typeof window.estCombattantMort === "function" && window.estCombattantMort(id));
     });
-    if (humainsEnAttente.length > 0) return;
+    if (humainsEnAttente.length > 0) {
+        // Filet de sécurité : si l'attente s'éternise — un joueur parti en cours
+        // de partie, une fiche qui n'arrive jamais — les créatures finissent par
+        // s'engager, plutôt que de laisser la table devant un combat figé.
+        const cle = (partie.Tour_Combat || 1) + "|" + humainsEnAttente.join(",");
+        if (!window.ATTENTE_JOUEURS_IA || window.ATTENTE_JOUEURS_IA.cle !== cle) {
+            window.ATTENTE_JOUEURS_IA = { cle, depuis: Date.now() };
+        }
+        if (Date.now() - window.ATTENTE_JOUEURS_IA.depuis < DELAI_ATTENTE_JOUEURS_MS) return;
+        console.warn("IA : on n'attend plus", humainsEnAttente.join(", "), "— les créatures s'engagent.");
+    } else {
+        window.ATTENTE_JOUEURS_IA = null;
+    }
 
     const aJouer = (window.MONSTRES_PARTIE || []).filter(m =>
         ordre.includes(m.idPersonnage) &&
