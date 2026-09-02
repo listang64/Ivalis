@@ -23,7 +23,11 @@ export function chargerIA(monde) {
   if (process.env.PLAFOND_COUP === "OFF") {
     w.PART_SOCLE = { brute:0, frappe:0, soutien:0, etat:0, controle:0, etalement:0, zone:0, persistance:0 };
   }
-  global.document = { getElementById: () => null, querySelectorAll: () => [] };
+  // La fenêtre de combat est considérée ouverte : l'IA ne joue que dans ce cas.
+  global.document = {
+    getElementById: (id) => id === "fenetre-combat" ? { style: { display: "block" } } : null,
+    querySelectorAll: () => []
+  };
   global.localStorage = { getItem: () => null };
 
   w.PLATEAU_VTT = monde.plateau;

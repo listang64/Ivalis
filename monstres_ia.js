@@ -1067,6 +1067,13 @@ window.verifierTourIAMonstres = async function() {
     if (window.IA_MONSTRE_EN_COURS) { programmerRappelIA(); return; }
     if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) return;
 
+    // Pas de créature qui joue derrière le dos du joueur : tant que la fenêtre de
+    // combat n'est pas à l'écran, l'IA se tait. Sinon elle continuait de faire
+    // bouger ses pions pendant qu'on créait un personnage ou qu'on regardait la
+    // carte, avec la bulle de validation de déplacement qui venait se poser
+    // par-dessus. Un autre poste, lui, prendra la main s'il a le combat ouvert.
+    if (document.getElementById("fenetre-combat")?.style.display !== "block") return;
+
     const partie = window.PARTIE_DATA || {};
     const phase = partie.Phase_Combat || "Preparation";
     const file = partie.File_Attente_Combat || [];

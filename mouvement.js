@@ -225,12 +225,19 @@ window.ajouterEtapeMouvement = function(q, r) {
 
     window.dessinerCheminMouvement();
     
+    // La bulle est en position fixe au-dessus de TOUT l'écran : si la fenêtre de
+    // combat n'est pas ouverte, elle viendrait se poser par-dessus l'écran où se
+    // trouve le joueur (création de personnage, carte du monde...). On ne
+    // l'affiche donc que si le combat est bien à l'écran.
+    const combatOuvert = document.getElementById("fenetre-combat")?.style.display === "block";
     const bulle = document.getElementById("bulle-validation-mouvement");
     const texteCout = document.getElementById("mouvement-cout-total");
-    if (bulle && texteCout) {
+    if (bulle && texteCout && combatOuvert) {
         texteCout.innerText = window.MOUVEMENT_COUT_TOTAL + " ⚡";
         bulle.style.display = "flex";
         texteCout.style.color = "#ffaa00"; 
+    } else if (bulle && !combatOuvert) {
+        bulle.style.display = "none";
     }
 };
 

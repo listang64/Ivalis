@@ -11,6 +11,10 @@ let echecs = 0;
 const verifier = (l, c, d="") => { if (!c) echecs++; console.log(`  ${l.padEnd(58)} ${c?"OK":"ÉCHEC"} ${d}`); };
 const attendre = (ms) => new Promise(r => setTimeout(r, ms));
 
+// La fenêtre de combat est ouverte : sans ça l'IA se tait, par construction.
+const fenetreCombat = { style: { display: "block" } };
+global.document = { getElementById: (id) => id === "fenetre-combat" ? fenetreCombat : null };
+
 function creerPoste(partagee) {
   const w = {};
   const db = {}, doc = () => ({});
@@ -212,6 +216,31 @@ console.log("\n6. UN COMBATTANT À TERRE EN TÊTE DE FILE NE BLOQUE PAS LE COMBA
   w.IA_MONSTRE_EN_COURS = false;
   await w.verifierTourIAMonstres();
   verifier("la créature suivante joue bien son tour", joues.includes("M1"), `(${joues.join(", ") || "personne"})`);
+  if (w.RAPPEL_IA_MONSTRES) clearTimeout(w.RAPPEL_IA_MONSTRES);
+}
+
+console.log("\n7. FENÊTRE DE COMBAT FERMÉE : L'IA SE TAIT");
+{
+  const partagee = { doc: { Phase_Combat:"Resolution", Tour_Combat:1, Verrou_IA:null,
+    Ordre_Initiative:["M1"],
+    File_Attente_Combat:[ { idPersonnage:"M1", idCarte:"C1", initiative:80, timestamp:777 } ] } };
+  const w = creerPoste(partagee);
+  const joues = [];
+  w.jouerTourMonstre = async (id) => { joues.push(id); };
+
+  // Le joueur est ailleurs dans l'application : la fenêtre de combat est fermée.
+  const combat = global.document.getElementById("fenetre-combat");
+  combat.style.display = "none";
+  await w.verifierTourIAMonstres();
+  await attendre(200);
+  verifier("aucune créature ne joue en arrière-plan", joues.length === 0, `(${joues.length})`);
+  verifier("et aucun rappel ne tourne dans le vide", !w.RAPPEL_IA_MONSTRES);
+
+  // Il rouvre le combat : la créature reprend son tour.
+  combat.style.display = "block";
+  await w.verifierTourIAMonstres();
+  await attendre(200);
+  verifier("elle reprend dès que le combat est rouvert", joues.includes("M1"), `(${joues.join(", ") || "personne"})`);
   if (w.RAPPEL_IA_MONSTRES) clearTimeout(w.RAPPEL_IA_MONSTRES);
 }
 
