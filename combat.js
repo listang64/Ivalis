@@ -1153,13 +1153,11 @@ document.addEventListener("click", async function(event) {
                 const hex = window.PLATEAU_VTT.pixelToHex(canvasX, canvasY);
                 
                 const state = window.PLATEAU_VTT.getCaseState(hex.q, hex.r);
-                let isOccupied = false;
-                for (let id in window.TOKENS_VTT_DATA) {
-                    if (window.TOKENS_VTT_DATA[id].q === hex.q && window.TOKENS_VTT_DATA[id].r === hex.r) {
-                        isOccupied = true;
-                        break;
-                    }
-                }
+                // Même règle que pour un déplacement de combat : seuls les pions
+                // réellement présents et debout occupent une case. L'ancien
+                // décompte prenait aussi les morts (dont le pion a disparu) et les
+                // fantômes, et refusait des cases visiblement libres.
+                const isOccupied = window.caseOccupeeParVivant(hex.q, hex.r);
 
                 if (!state.isDeleted && !state.isBlocked && !isOccupied) {
                     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
@@ -1173,12 +1171,21 @@ document.addEventListener("click", async function(event) {
                     window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
                     window.restaurerPanneauGauche(); // 🔻 NOUVEAU
 
-                    try {
-                        const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
-                        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
-                            Tokens: window.TOKENS_VTT_DATA
-                        }, { merge: true });
-                    } catch (e) {}
+                    // L'écriture était silencieuse : si elle échouait, le pion
+                    // semblait déplacé à l'écran puis revenait à sa case au premier
+                    // rafraîchissement, sans que rien ne l'explique.
+                    if (!window.ID_PARTIE_COURANTE) {
+                        console.warn("Déplacement libre non enregistré : aucune partie ouverte.");
+                    } else {
+                        try {
+                            const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+                            await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
+                                Tokens: window.TOKENS_VTT_DATA
+                            }, { merge: true });
+                        } catch (e) {
+                            console.error("Déplacement libre : enregistrement du pion impossible.", e);
+                        }
+                    }
                     
                     return; 
                 }
@@ -1610,7 +1617,16 @@ window.estCombattantMort = function(idCombattant) {
 window.caseOccupeeParVivant = function(q, r, tokensData) {
     const tokens = tokensData || window.TOKENS_VTT_DATA || {};
     for (let id in tokens) {
-        if (tokens[id].q === q && tokens[id].r === r && !window.estCombattantMort(id)) return true;
+        if (tokens[id].q !== q || tokens[id].r !== r) continue;
+
+        // Un pion fantôme — son combattant n'existe plus, fiche supprimée ou
+        // monstre effacé — n'est plus dessiné sur le plateau : il ne doit pas
+        // barrer la route non plus. Sinon on lit "Case occupée" sur une case
+        // visiblement vide, et personne ne comprend pourquoi.
+        if (!(window.PERSOS_PARTIE || []).some(p => p.idPersonnage === id)) continue;
+
+        if (window.estCombattantMort(id)) continue;
+        return true;
     }
     return false;
 };
