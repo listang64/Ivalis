@@ -189,13 +189,22 @@ window.ennemisEncoreDebout = function() {
     return (window.MONSTRES_PARTIE || []).some(m => !estMort(m));
 };
 
+// Le combat est-il GAGNÉ, là, maintenant ? Il faut des ennemis, et qu'ils
+// soient tous à terre. Un plateau VIDE n'est pas une victoire : c'est l'état
+// d'un combat qu'on vient de réinitialiser, ou pas encore commencé. Sans cette
+// nuance, un butin oublié en base rouvrait sa fenêtre juste après une
+// réinitialisation, par-dessus la demande de points d'apparition.
+window.combatGagne = function() {
+    const monstres = window.MONSTRES_PARTIE || [];
+    if (monstres.length === 0) return false;
+    return !window.ennemisEncoreDebout();
+};
+
 window.verifierVictoireCombat = function() {
     if (document.getElementById("fenetre-combat")?.style.display !== "block") return;
     if (window.PARTIE_DATA && window.PARTIE_DATA.Butin && window.PARTIE_DATA.Butin.ouvert) return;
 
-    const monstres = window.MONSTRES_PARTIE || [];
-    if (monstres.length === 0) return;
-    if (window.ennemisEncoreDebout()) return;
+    if (!window.combatGagne()) return;
 
     const heroVivant = (window.PERSOS_PARTIE || []).some(p => p.camp === "Allié" && !p.estIllusion && p.actif !== false
         && !(typeof window.estCombattantMort === "function" && window.estCombattantMort(p.idPersonnage)));
@@ -303,10 +312,31 @@ window.signatureEtapeButin = function(butin) {
 
 window.fermerButinLocalement = function() {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    window.BUTIN_MASQUE_LOCALEMENT = window.signatureEtapeButin((window.PARTIE_DATA || {}).Butin);
+    // On masque ce que la fenêtre montre RÉELLEMENT (retenu au dernier
+    // affichage), pas ce qu'on relit de la partie : si PARTIE_DATA a dérivé
+    // entre-temps, la croix fermerait une étape que le joueur n'a pas sous les
+    // yeux, et la fenêtre se rouvrirait aussitôt. Une porte de sortie qui ne
+    // sort pas ne sert à rien.
+    window.BUTIN_MASQUE_LOCALEMENT = window.BUTIN_AFFICHE_SIGNATURE
+        || window.signatureEtapeButin((window.PARTIE_DATA || {}).Butin);
     const fenetre = document.getElementById("fenetre-butin");
     if (fenetre) fenetre.style.display = "none";
 };
+
+// La touche Échap et un clic sur le fond sombre ferment aussi : trois sorties
+// valent mieux qu'une pour un calque qui couvre tout l'écran.
+//
+// Sous garde, parce que ceci s'exécute au CHARGEMENT du module : une exception
+// ici et c'est loot.js tout entier qui ne se charge pas — plus une seule de
+// ses fonctions, donc une fenêtre de butin qui ne répond plus à rien. C'est
+// précisément le genre de panne qu'on cherche à rendre impossible.
+if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+    document.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return;
+        const fenetre = document.getElementById("fenetre-butin");
+        if (fenetre && fenetre.style.display !== "none") window.fermerButinLocalement();
+    });
+}
 
 window.afficherFenetreButin = function(butin) {
     const fenetre = document.getElementById("fenetre-butin");
@@ -332,7 +362,7 @@ window.afficherFenetreButin = function(butin) {
     // de la fenêtre de rencontre) : tant qu'il est là, on ne peut ni placer un
     // repère ni générer des ennemis, et les boutons du menu de combat semblent
     // morts. Dès qu'un ennemi est debout, le butin s'efface donc de lui-même.
-    if (window.ennemisEncoreDebout()) {
+    if (!window.combatGagne()) {
         fenetre.style.display = "none";
         return;
     }
@@ -346,6 +376,7 @@ window.afficherFenetreButin = function(butin) {
     }
 
     fenetre.style.display = "flex";
+    window.BUTIN_AFFICHE_SIGNATURE = window.signatureEtapeButin(butin);
 
     const joueurId = localStorage.getItem("ID_JOUEUR_COURANT");
     const mesPersonnages = (butin.participants || [])
@@ -365,34 +396,43 @@ window.afficherFenetreButin = function(butin) {
     // sien seul ; dans le partage commun, ceux de tous ses personnages.
     window.afficherEquipementActuelButin(herosCourant ? [herosCourant] : mesPersonnages);
 
+    // Aucun de ces éléments n'est tenu pour acquis. Cette fonction tourne au
+    // TOUT DÉBUT du traitement de chaque notification de partie (app.js), et
+    // 150 lignes de combat la suivent : points d'apparition, tour de l'IA,
+    // changement de tour, animations. Une exception ici les emportait toutes,
+    // à chaque notification — le combat entier paraissait cassé. Un index.html
+    // servi depuis le cache du navigateur (c'est le seul fichier sans ?v=)
+    // suffit à faire manquer un élément : on ne lui laisse plus cette prise.
     const vuePersonnel = document.getElementById("butin-vue-personnel");
     const vuePartage = document.getElementById("butin-vue-partage");
     const vueFin = document.getElementById("butin-vue-fin");
     const titre = document.getElementById("butin-titre");
     const sousTitre = document.getElementById("butin-sous-titre");
-    vuePersonnel.style.display = "none";
-    vuePartage.style.display = "none";
-    vueFin.style.display = "none";
+    if (vuePersonnel) vuePersonnel.style.display = "none";
+    if (vuePartage) vuePartage.style.display = "none";
+    if (vueFin) vueFin.style.display = "none";
+    const ecrire = (el, texte) => { if (el) el.innerText = texte; };
+    const montrer = (el) => { if (el) el.style.display = "block"; };
 
     if (butin.etape === "personnel") {
-        titre.innerText = herosCourant ? `Butin de ${herosCourant.prenom}` : "Butin de guerre";
+        ecrire(titre, herosCourant ? `Butin de ${herosCourant.prenom}` : "Butin de guerre");
         // Un joueur à plusieurs héros voit où il en est dans sa file.
         const restants = mesPersonnages.length > 1 && herosCourant
             ? ` (${mesPersonnages.length - enAttente.length + 1} sur ${mesPersonnages.length})` : "";
-        sousTitre.innerText = herosCourant
+        ecrire(sousTitre, herosCourant
             ? `Choisis ce que ${herosCourant.prenom} garde — l'objet remplacé est perdu pour de bon.${restants}`
-            : "Choisis ce que tu gardes — l'objet remplacé est perdu pour de bon.";
-        vuePersonnel.style.display = "block";
+            : "Choisis ce que tu gardes — l'objet remplacé est perdu pour de bon.");
+        montrer(vuePersonnel);
         window.rendreVuePersonnelleButin(butin, mesPersonnages, herosCourant);
     } else if (butin.etape === "partage") {
-        titre.innerText = "Partage du butin";
-        sousTitre.innerText = "Place-toi sur un ou plusieurs objets restants. Plusieurs prétendants ? Le sort tranchera.";
-        vuePartage.style.display = "block";
+        ecrire(titre, "Partage du butin");
+        ecrire(sousTitre, "Place-toi sur un ou plusieurs objets restants. Plusieurs prétendants ? Le sort tranchera.");
+        montrer(vuePartage);
         window.rendreVuePartageButin(butin, mesPersonnages.map(p => p.idPersonnage));
     } else if (butin.etape === "termine") {
-        titre.innerText = "Butin réparti";
-        sousTitre.innerText = "Voici ce que chacun a récupéré.";
-        vueFin.style.display = "block";
+        ecrire(titre, "Butin réparti");
+        ecrire(sousTitre, "Voici ce que chacun a récupéré.");
+        montrer(vueFin);
         window.rendreVueFinButin(butin, mesPersonnages.map(p => p.idPersonnage));
     }
 };
@@ -581,7 +621,8 @@ window.ouvrirConfirmationEquip = function(idPersonnage, item, uid) {
             `<button class="btn-parametres" onclick="window.confirmerChoixButin(false)">Annuler</button>`;
     }
 
-    document.getElementById("popup-confirmation-equip").style.display = "flex";
+    const popup = document.getElementById("popup-confirmation-equip");
+    if (popup) popup.style.display = "flex";
 };
 
 // "actuels" est une LISTE : une arme à deux mains chasse ce que portent les
@@ -602,14 +643,17 @@ window.remplirComparaisonEquip = function(actuels, nouveau) {
                 <div class="effet-objet-equipe">${objet.effetTexte || ""}</div>`;
     };
     const liste = Array.isArray(actuels) ? actuels : (actuels ? [actuels] : []);
-    document.getElementById("comparaison-actuel").innerHTML =
+    const actuel = document.getElementById("comparaison-actuel");
+    const neuf = document.getElementById("comparaison-nouveau");
+    if (actuel) actuel.innerHTML =
         liste.length === 0 ? rendre(null) : liste.map(rendre).join('<div class="separateur-comparaison"></div>');
-    document.getElementById("comparaison-nouveau").innerHTML = rendre(nouveau);
+    if (neuf) neuf.innerHTML = rendre(nouveau);
 };
 
 window.confirmerChoixButin = async function(confirme, main) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    document.getElementById("popup-confirmation-equip").style.display = "none";
+    const popupFerme = document.getElementById("popup-confirmation-equip");
+    if (popupFerme) popupFerme.style.display = "none";
     const attente = window.BUTIN_CHOIX_EN_ATTENTE;
     window.BUTIN_CHOIX_EN_ATTENTE = null;
     if (!attente) return;

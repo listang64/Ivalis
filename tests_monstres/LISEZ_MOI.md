@@ -115,6 +115,7 @@ le bestiaire réel aucune carte ne sort de sa tranche.
 
 ```sh
 node butin_loot.mjs         # détection de victoire, fenêtre personnelle, partage, tirage au sort
+node clics_butin.mjs        # on clique VRAIMENT dans la fenêtre : croix, prendre, laisser
 node objets_tableau.mjs     # le catalogue d'équipement, confronté au tableau de Nico
 node equipement_combat.mjs  # ce que les objets font une fois portés, en combat
 node apercu_butin.mjs       # onglet Inventaire et fenêtres de butin, capturés à l'écran
@@ -165,6 +166,29 @@ rien perdre : le butin reste en base et revient une fois ce combat gagné). Les
 illusions ne comptent pas comme ennemis, et c'est la MÊME fonction
 (`ennemisEncoreDebout`) qui sert à l'affichage et à la détection de victoire,
 pour que les deux ne puissent pas diverger.
+
+Et une troisième couche, la plus grave, découverte quand Nico a rapporté que
+« le mode combat est complètement bugué » après une réinitialisation :
+`afficherFenetreButin` tourne au TOUT DÉBUT du traitement de chaque
+notification de partie, et **150 lignes de combat la suivent** — points
+d'apparition, tour de l'IA, changement de tour, bulles, animations. Une seule
+exception dans l'affichage du butin les emportait toutes, à chaque
+notification. Or plusieurs `getElementById` y étaient utilisés sans garde, et
+`index.html` est le seul fichier sans `?v=` : une page servie depuis le cache
+du navigateur suffisait à faire manquer un élément. Trois verrous désormais :
+plus aucun accès DOM sans garde dans loot.js, un `try/catch` autour de l'appel
+dans app.js (le butin est la dernière chose dont la panne doit coûter la
+partie), et l'écouteur Échap sous garde — il s'exécute au chargement du module,
+donc une exception y aurait empêché loot.js entier de se charger.
+
+`clics_butin.mjs` est le seul banc qui CLIQUE pour de vrai : il monte le vrai
+balisage et le vrai style dans un navigateur, et se sert de `elementFromPoint`
+pour vérifier que chaque bouton est bien ce qui se trouve sous le doigt — c'est
+ainsi qu'on attrape un calque qui avale les clics, symptôme impossible à voir
+en appelant les fonctions à la main. Il joue la séquence complète (laisser,
+prendre, confirmer, équiper, refermer), vérifie que le menu de combat
+redevient cliquable une fois la fenêtre fermée, et surtout qu'un DOM incomplet
+ne fait plus tomber le reste du combat.
 
 `objets_tableau.mjs` relit les deux classeurs de Nico (figés dans
 `tableau_objets.json`, extraits des `.xlsx` d'origine) et confronte le catalogue

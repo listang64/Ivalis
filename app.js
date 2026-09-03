@@ -1941,8 +1941,21 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
 
          // Le butin de fin de combat : personnel, puis partagé. Rejoué à chaque
          // notification, comme la piste d'initiative.
+         //
+         // Sous try/catch, et ce n'est pas de la prudence de principe : TOUT ce
+         // qui suit dans cette fonction en dépendait. Les points d'apparition,
+         // le tour de l'IA, le changement de tour, les animations — une seule
+         // exception ici les emportait tous, à chaque notification, et le
+         // combat entier semblait cassé. Le butin est la dernière chose dont
+         // la panne doit coûter la partie : elle s'arrête donc à lui.
          if (typeof window.afficherFenetreButin === "function") {
-             window.afficherFenetreButin(dataPartie.Butin || null);
+             try {
+                 window.afficherFenetreButin(dataPartie.Butin || null);
+             } catch (e) {
+                 console.error("Affichage du butin (le combat continue) :", e);
+                 const fenetreButin = document.getElementById("fenetre-butin");
+                 if (fenetreButin) fenetreButin.style.display = "none";
+             }
          }
 
          // Les repères d'apparition peuvent avoir été posés depuis un autre poste :

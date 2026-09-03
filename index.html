@@ -1383,7 +1383,7 @@
 <!-- ============================================================= -->
 <!--  BUTIN DE FIN DE COMBAT (fenêtre personnelle puis partagée)     -->
 <!-- ============================================================= -->
-<div id="fenetre-butin" style="display: none;">
+<div id="fenetre-butin" style="display: none;" onclick="if (event.target === this) window.fermerButinLocalement()">
   <div class="carte-butin">
     <!-- Porte de sortie : referme la fenêtre pour CE joueur seulement. Le butin
          des autres continue son cours, et rouvrir le combat le fait revenir. -->
@@ -1439,7 +1439,7 @@
 
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <script type="module" src="ia_master.js?v=4"></script>
-<script type="module" src="app.js?v=13"></script>
+<script type="module" src="app.js?v=14"></script>
 <script type="module" src="creation_personnage.js?v=2"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=11"></script>
@@ -1454,7 +1454,7 @@
 <script type="module" src="monstres_ia.js?v=14"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=2"></script>
-<script type="module" src="loot.js?v=5"></script>
+<script type="module" src="loot.js?v=6"></script>
 
 <!-- ============================================================= -->
 <!--  GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)  -->

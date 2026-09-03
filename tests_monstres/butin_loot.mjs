@@ -112,11 +112,14 @@ function creerPoste(idJoueur, { partie, personnages, persos, monstres, difficult
   // Un DOM qui se SOUVIENT : les mêmes éléments d'un appel à l'autre. Sans
   // ça, impossible de relire ce que la fenêtre vient d'afficher.
   const elements = { "fenetre-combat": { style: { display: "block" } } };
+  const ecouteurs = [];
   const documentStub = {
     getElementById(id) {
       if (!elements[id]) elements[id] = { style: {}, innerHTML: "", innerText: "", value: "" };
       return elements[id];
-    }
+    },
+    // Un vrai document en a un : loot.js y accroche la sortie par Échap.
+    addEventListener: (type, fn) => ecouteurs.push({ type, fn })
   };
   // Deux usages distincts : l'identité du joueur, et le cache des caracs lu
   // par les prérequis d'équipement (absent ici, donc jamais bloquant).
@@ -148,7 +151,7 @@ function creerPoste(idJoueur, { partie, personnages, persos, monstres, difficult
     w, {}, doc, partie.runTransaction);
   new Function('window', 'db', 'importerFirestore', SRC_VICTOIRE_TEST)(w, {}, importerFirestore);
 
-  return { idJoueur, w, elements };
+  return { idJoueur, w, elements, ecouteurs };
 }
 
 const trosHeros = () => ([
@@ -603,14 +606,27 @@ console.log("\n11. LA FENÊTRE NE S'IMPOSE PLUS HORS COMBAT (bug du 03/09)");
            ecran["fenetre-butin"].style.display === "flex",
            `(display=${ecran["fenetre-butin"].style.display})`);
 
-  // Même sans héros chargés (l'autre moitié du bug), la fenêtre reste fermable.
-  const sansPersos = creerPoste("P9", { partie, personnages, persos: [], monstres: [], difficulte: "Normale" });
+  // Même sans héros chargés (l'autre moitié du bug : au premier instantané, les
+  // personnages ne sont pas encore là), la fenêtre reste fermable.
+  const sansPersos = creerPoste("P9", { partie, personnages, persos: [], monstres, difficulte: "Normale" });
   sansPersos.w.afficherFenetreButin(butin());
   verifier("un spectateur sans héros voit une fenêtre, mais peut la fermer",
-           sansPersos.elements["fenetre-butin"].style.display === "flex");
+           sansPersos.elements["fenetre-butin"].style.display === "flex",
+           `(display=${sansPersos.elements["fenetre-butin"].style.display})`);
   sansPersos.w.fermerButinLocalement();
   verifier("et la croix la referme vraiment",
            sansPersos.elements["fenetre-butin"].style.display === "none");
+
+  // Un plateau VIDE n'est pas une victoire : c'est l'état d'un combat qu'on
+  // vient de réinitialiser. Le butin ne doit surtout pas s'y inviter — il
+  // recouvrirait la demande de points d'apparition qui suit.
+  const apresReset = creerPoste("P1", { partie, personnages, persos, monstres: [], difficulte: "Normale" });
+  apresReset.w.afficherFenetreButin(butin());
+  verifier("plateau vidé par une réinitialisation : pas de fenêtre de butin",
+           apresReset.elements["fenetre-butin"].style.display === "none",
+           `(display=${apresReset.elements["fenetre-butin"].style.display})`);
+  verifier("et aucun butin n'est déclenché sur un plateau vide",
+           apresReset.w.combatGagne() === false);
 }
 
 // ==========================================================================
