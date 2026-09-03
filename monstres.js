@@ -192,7 +192,11 @@ window.estMonstre = function(idCombattant) {
 
 // Fusionne joueurs + monstres dans la liste unique que lit tout le combat.
 window.recomposerCombattants = function() {
-    const joueurs = window.PERSOS_JOUEURS_PARTIE || [];
+    // Un héros mis de côté depuis la liste (mode développeur) ne rejoint pas les
+    // combattants : c'est ce seul filtre qui le retire du plateau, de la piste
+    // d'initiative, du panneau, du décompte des joueurs prêts et des bulles de
+    // noms — tout le moteur travaille à partir de cette liste.
+    const joueurs = (window.PERSOS_JOUEURS_PARTIE || []).filter(p => p.actif !== false);
     const monstres = window.MONSTRES_PARTIE || [];
     window.PERSOS_PARTIE = [...joueurs, ...monstres];
 

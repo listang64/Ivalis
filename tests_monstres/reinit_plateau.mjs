@@ -56,8 +56,11 @@ const res = await p.evaluate(async (fnSrc) => {
   window.ID_PARTIE_COURANTE = "PARTIE_TEST";
   window.PARTIE_DATA = { Spawn_Allies: { q: 5, r: 3 }, Spawn_Ennemis: { q: 12, r: 3 } };
   window.PERSOS_PARTIE = [
-    { idPersonnage: "J1", camp: "Allié", PV_Max: 42, Fatigue_Max: 100 },
-    { idPersonnage: "J2", camp: "Allié", PV_Max: 38, Fatigue_Max: 100 }
+    { idPersonnage: "J1", camp: "Allié", PV_Max: 42, PV_Actuels: 5, Fatigue_Max: 100,
+      fatigueActuelle: 10, Bouclier_Actuel: 8, Bouclier_Max: 8,
+      Etats_Alteres: [{ nom: "Empoisonnement", duree: 3 }, { nom: "Brûlé", duree: 2 }] },
+    { idPersonnage: "J2", camp: "Allié", PV_Max: 38, PV_Actuels: 20, Fatigue_Max: 100,
+      fatigueActuelle: 40, Etats_Alteres: [{ nom: "Peur", duree: 1 }] }
   ];
   window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[0]];
   window.COMBAT_INDEX_PERSO = 0;
@@ -81,7 +84,12 @@ const res = await p.evaluate(async (fnSrc) => {
   try { await window.reinitialiserCombat(); } catch (e) { window.__erreurs.push('LEVÉE: ' + e.message); }
 
   const surVTT = journal.ecritures.filter(e => e.chemin.startsWith("Combat_VTT"));
+  const surCombattants = journal.ecritures.filter(e => e.chemin.startsWith("Personnages/"));
   return {
+    etatsMemoire: window.PERSOS_PARTIE.map(x => (x.Etats_Alteres || []).length),
+    etatsPanneau: (window.COMBAT_PERSOS_JOUEUR[0].Etats_Alteres || []).length,
+    soins: surCombattants.map(e => e.chemin + " → PV " + e.maj.PV_Actuels
+                                 + ", états " + JSON.stringify(e.maj.Etats_Alteres)),
     pionsRestants: Object.keys(window.TOKENS_VTT_DATA),
     tokensAppliques: window.TOKENS_APPLIQUES,
     selection: window.TOKEN_SELECTIONNE,
@@ -116,6 +124,13 @@ verifier("les repères d'apparition sont effacés en base",
          res.ecriturePartie && res.ecriturePartie.Spawn_Allies === "«champ supprimé»"
                             && res.ecriturePartie.Spawn_Ennemis === "«champ supprimé»");
 verifier("et redemandés dans la foulée", res.apparitionRedemandee);
+console.log("     soins :", res.soins.join(" | ") || "aucun");
+verifier("les altérations sont effacées en mémoire",
+         res.etatsMemoire.every(n => n === 0), `(${res.etatsMemoire.join(",")})`);
+verifier("et sur la copie du panneau gauche", res.etatsPanneau === 0, `(${res.etatsPanneau})`);
+verifier("chaque combattant est soigné ET débarrassé de ses états en base",
+         res.soins.length === 2 && res.soins.every(t => t.endsWith("états []")),
+         `(${res.soins.length} écriture(s))`);
 verifier("le combat repasse au tour 1, file vide",
          res.ecriturePartie && res.ecriturePartie.Tour_Combat === 1
                             && res.ecriturePartie.File_Attente_Combat.length === 0);

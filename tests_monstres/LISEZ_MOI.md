@@ -64,6 +64,7 @@ node fin_de_tour.mjs        # un document introuvable ne fait plus tomber tout l
 node titres_bannieres.mjs   # les noms de carte rétrécissent au lieu d'être coupés
 node bouton_forge.mjs       # le + de la Forge devient un sablier pendant l'attente
 node croix_suppression.mjs  # la croix rouge du mode dev efface une technique partout
+node mise_de_cote.mjs       # la case à cocher qui retire un héros du jeu, sans l'effacer
 node jauges_panneau.mjs     # vitalité et énergie du panneau gauche, à chaque étape
 node stats_fiche.mjs        # les retouches de la fiche perso suivies jusqu'au combat
 node coup_critique.mjs      # le jet de critique, ses dégâts doublés et ses effets imposés

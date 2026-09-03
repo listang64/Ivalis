@@ -3673,6 +3673,21 @@ window.reinitialiserCombat = async function() {
                 perso.fatigueActuelle = fatigueMax;
                 perso.Bouclier_Max = 0;
                 perso.Bouclier_Actuel = 0;
+                // Brûlures, poisons, peurs : rien de tout cela ne survit à une
+                // réinitialisation. Sans ce nettoyage, un personnage repartait au
+                // tour 1 avec la pleine santé mais toujours empoisonné.
+                perso.Etats_Alteres = [];
+
+                // La copie du panneau gauche est un autre objet : sans elle, les
+                // icônes d'état restaient affichées jusqu'au prochain redessin.
+                const copiePanneau = (window.COMBAT_PERSOS_JOUEUR || []).find(p => p.idPersonnage === perso.idPersonnage);
+                if (copiePanneau) {
+                    copiePanneau.Etats_Alteres = [];
+                    copiePanneau.PV_Actuels = pvMax;
+                    copiePanneau.fatigueActuelle = fatigueMax;
+                    copiePanneau.Bouclier_Max = 0;
+                    copiePanneau.Bouclier_Actuel = 0;
+                }
 
                 const persoActuel = window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
                 if (persoActuel && persoActuel.idPersonnage === perso.idPersonnage) {
@@ -3689,7 +3704,8 @@ window.reinitialiserCombat = async function() {
                     PV_Actuels: pvMax,
                     Fatigue_Actuelle: fatigueMax,
                     Bouclier_Max: 0,
-                    Bouclier_Actuel: 0
+                    Bouclier_Actuel: 0,
+                    Etats_Alteres: []
                 }).catch(e => console.error(`Reset de ${perso.idPersonnage} :`, e));
             }
         }

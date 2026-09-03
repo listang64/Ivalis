@@ -173,7 +173,11 @@ function persoDocVersFront(id, d) {
     Etats_Alteres: etatsAlteres,
     Bouclier_Max: d.Bouclier_Max || 0,
     Bouclier_Actuel: d.Bouclier_Actuel || 0,
-    estIllusion: d.Est_Illusion === true
+    estIllusion: d.Est_Illusion === true,
+    // Décoché depuis la liste des héros (mode développeur) : le personnage
+    // existe toujours, mais il est mis de côté — ni combat, ni tour de parole.
+    // L'absence du champ vaut "actif" : toutes les fiches d'avant le restent.
+    actif: d.Actif !== false
   };
 }
 
@@ -1973,15 +1977,18 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
     if (typeof window.recomposerCombattants === "function") {
       window.recomposerCombattants();
     } else {
-      window.PERSOS_PARTIE = persos;
+      window.PERSOS_PARTIE = persos.filter(p => p.actif !== false);
     }
 
     // Les illusions sont de vrais combattants (le moteur doit les voir dans PERSOS_PARTIE),
     // mais ce sont des leurres temporaires : elles n'ont rien à faire dans la liste des
     // fiches de personnages ni dans les bulles de noms.
     const persosReels = persos.filter(p => !p.estIllusion);
+    // La LISTE garde tout le monde : c'est là que se coche et se décoche
+    // l'activation. Les bulles de la chatbox, elles, ne montrent que ceux qui
+    // sont en jeu.
     afficherListePersonnages(persosReels);
-    afficherBullesPersonnages(persosReels);
+    afficherBullesPersonnages(persosReels.filter(p => p.actif !== false));
 
     // =========================================================
     // OPTIMISATION IPAD : PRÉCHARGEMENT DES COMPÉTENCES EN CACHE
@@ -3103,6 +3110,62 @@ function fermerMenuPersonnages() {
   fermerToutPersonnages();
 }
 
+// =========================================================================
+//  METTRE UN HÉROS DE CÔTÉ (OUTIL DE DÉVELOPPEMENT)
+// =========================================================================
+//  La case à cocher de la liste des héros. Décoché, le personnage n'est plus
+//  un combattant : il quitte le plateau, la piste d'initiative, le décompte
+//  des joueurs prêts et le tour de parole de la chatbox — mais sa fiche, ses
+//  compétences et son historique restent intacts. C'est un « en pause », pas
+//  une suppression.
+//
+//  Le tour de parole vit à part, dans Ordre_Initiative : il faut l'y retirer
+//  aussi, sinon la chatbox garderait un tour muet pour un absent.
+window.basculerActivationPersonnage = async function(idPersonnage, actif) {
+  if (!idPersonnage) return;
+  if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+
+  // Effet immédiat en mémoire : le plateau et la chatbox se remettent à jour
+  // sans attendre l'aller-retour réseau.
+  const enRam = (window.PERSOS_JOUEURS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+  if (enRam) enRam.actif = actif;
+  if (typeof window.recomposerCombattants === "function") window.recomposerCombattants();
+
+  try {
+    await updateDoc(doc(db, COL.PERSONNAGES, idPersonnage), { Actif: actif });
+
+    if (window.ID_PARTIE_COURANTE && typeof window.modifierPartie === "function") {
+      await window.modifierPartie((data) => {
+        const ordre = data.Ordre_Initiative || [];
+        let nouvel = ordre.slice();
+
+        if (actif) {
+          if (nouvel.includes(idPersonnage)) return null;
+          nouvel.push(idPersonnage);
+        } else {
+          nouvel = nouvel.filter(id => id !== idPersonnage);
+          if (nouvel.length === ordre.length) return null;
+        }
+
+        // L'index du tour de parole désigne une place dans ce tableau : après un
+        // retrait, il peut pointer au-delà de la fin. On le ramène au début
+        // plutôt que de laisser la chatbox donner la parole à personne.
+        const maj = { Ordre_Initiative: nouvel };
+        const index = data.Index_Initiative;
+        if (index !== undefined && index !== 999 && index >= nouvel.length) maj.Index_Initiative = 0;
+        return { maj };
+      });
+    }
+
+    console.log(`🎭 ${idPersonnage} est ${actif ? "de retour en jeu" : "mis de côté"}.`);
+  } catch (e) {
+    console.error("Activation du personnage :", e);
+    if (enRam) enRam.actif = !actif;
+    if (typeof window.recomposerCombattants === "function") window.recomposerCombattants();
+    alert("Le changement n'a pas pu être enregistré. Vérifie ta connexion.");
+  }
+};
+
 function afficherListePersonnages(persos) {
   const conteneur = document.getElementById("liste-html-persos");
   if (!conteneur) return;
@@ -3122,6 +3185,35 @@ function afficherListePersonnages(persos) {
       };
       
       div.innerHTML = `<span>${p.prenom} ${p.nom}</span>`;
+
+      // Mode développeur : une case à cocher pour mettre un héros de côté. Décoché,
+      // il disparaît du combat et du tour de parole de la chatbox, sans être effacé.
+      if (localStorage.getItem("ivalis_DEV_MODE") === "on") {
+        const actif = p.actif !== false;
+        const bascule = document.createElement("input");
+        bascule.type = "checkbox";
+        bascule.checked = actif;
+        bascule.title = actif ? "En jeu — décocher pour le mettre de côté"
+                              : "Mis de côté — cocher pour le remettre en jeu";
+        bascule.style.cssText = "margin-left: 12px; width: 20px; height: 20px; cursor: pointer;"
+                              + " accent-color: #5c3a21; flex-shrink: 0;";
+        // Le clic ne doit pas ouvrir la fiche derrière : la case et la ligne sont
+        // deux gestes différents.
+        bascule.onclick = (e) => e.stopPropagation();
+        bascule.onchange = (e) => {
+          e.stopPropagation();
+          window.basculerActivationPersonnage(p.idPersonnage, bascule.checked);
+        };
+        div.appendChild(bascule);
+        div.style.display = "flex";
+        div.style.alignItems = "center";
+        div.style.justifyContent = "space-between";
+        if (!actif) {
+          div.style.opacity = "0.45";
+          div.style.fontStyle = "italic";
+        }
+      }
+
       conteneur.appendChild(div);
     });
   }
@@ -3774,6 +3866,12 @@ window.actualiserDevMode = function() {
         }
     }
     
+    // Les cases à cocher de la liste des héros n'existent qu'en mode développeur :
+    // on redessine la liste tout de suite plutôt que d'attendre sa réouverture.
+    if (window.PERSOS_JOUEURS_PARTIE && document.getElementById("liste-html-persos")) {
+        afficherListePersonnages(window.PERSOS_JOUEURS_PARTIE.filter(p => !p.estIllusion));
+    }
+
     if (isDev) { console.log("🛠️ Mode Développeur : ACTIVÉ"); } 
     else { console.log("🛠️ Mode Développeur : DÉSACTIVÉ"); }
 };
