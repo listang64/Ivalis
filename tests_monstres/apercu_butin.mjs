@@ -32,15 +32,23 @@ const SRC_CHARGER_INVENTAIRE = fonctionApp('window.chargerOngletInventaire = fun
 
 const SRC_LOOT = fs.readFileSync('/home/user/Ivalis/loot.js', 'utf-8')
   .replace(/^import[\s\S]*?from\s+"[^"]+";\s*$/gm, '');
+const SRC_OBJETS = fs.readFileSync('/home/user/Ivalis/objets.js', 'utf-8');
 
-const ITEM = (nom, emplacement, effet) => ({
-  uid: "loot_" + nom.slice(0, 4), nom, emplacement, effetTexte: effet, image: ""
-});
+// Les objets d'exemple sortent du VRAI catalogue : ce qu'on regarde à l'écran
+// est donc exactement ce qu'un joueur trouvera en combat, chiffres compris.
+const wCatalogue = {};
+new Function('window', SRC_OBJETS)(wCatalogue);
+const ITEM = (modeleNom, rarete) => {
+  const modele = wCatalogue.MODELES_OBJETS.find(m => m.modele === modeleNom);
+  const objet = wCatalogue.fabriquerObjet(modele, rarete);
+  objet.uid = "loot_" + modeleNom.slice(0, 6).replace(/\s/g, "");
+  return objet;
+};
 
 const HEROS = [
   { idPersonnage: "J1", prenom: "Pliors", idJoueur: "P1", camp: "Allié",
-    equipArmure: ITEM("Cuirasse du Rempart", "Armure", "+15% Défense Physique"),
-    equipMainDroite: ITEM("Lame Fidèle", "Main_Droite", "+10% Dégâts physiques"),
+    equipArmure: ITEM("Armure lourde", "Rare"),
+    equipMainDroite: ITEM("Épée courte", "Commun"),
     equipMainGauche: null },
   { idPersonnage: "J2", prenom: "Jade", idJoueur: "P2", camp: "Allié",
     equipArmure: null, equipMainDroite: null, equipMainGauche: null }
@@ -78,6 +86,7 @@ function pageButin(etape, mesPersonnages) {
   ${MARKUP_POPUP}
   <script>
   window.PERSOS_PARTIE = ${JSON.stringify(HEROS)};
+  ${SRC_OBJETS}
   ${SRC_LOOT}
   document.getElementById("fenetre-butin").style.display = "flex";
   document.getElementById("butin-titre").innerText = ${JSON.stringify(etape.titre)};
@@ -90,11 +99,11 @@ function pageButin(etape, mesPersonnages) {
 
 const butinPersonnel = {
   parPersonnage: {
-    J1: { items: [ITEM("Marteau des Cimes", "Main_Droite", "+20% Dégâts, -10% Esquive"),
-                  ITEM("Focaliseur de Jade", "Main_Gauche", "+15% Magie")], decisions: {}, valide: false },
-    J2: { items: [ITEM("Manteau des Ombres", "Armure", "+10% Esquive"),
-                  ITEM("Dague du Chuchoteur", "Main_Droite", "+25% Critique")],
-          decisions: { ["loot_" + "Mant".slice(0,4)]: true, ["loot_" + "Dagu".slice(0,4)]: false }, valide: true }
+    J1: { items: [ITEM("Hache", "Très rare"),
+                  ITEM("Bagues DPS", "Rare")], decisions: {}, valide: false },
+    J2: { items: [ITEM("Armure légère", "Rare"),
+                  ITEM("Dague", "Épique")],
+          decisions: { ["loot_Armure"]: true, ["loot_Dague"]: false }, valide: true }
   }
 };
 const pagePersonnel = pageButin(
@@ -106,9 +115,9 @@ fs.writeFileSync('/tmp/apercu_butin_personnel.html', pagePersonnel);
 
 const butinPartage = {
   pool: [
-    { ...ITEM("Bouclier du Veilleur", "Main_Gauche", "+20% Défense"), candidats: ["J1"] },
-    { ...ITEM("Plates de l'Aube Ancienne", "Armure", "+30% PV Max"), candidats: ["J1", "J2"] },
-    { ...ITEM("Grimoire aux Pages Ternies", "Main_Gauche", "+20% Magie"), candidats: [] }
+    { ...ITEM("Bouclier lourd", "Rare"), candidats: ["J1"] },
+    { ...ITEM("Hache à deux mains", "Épique"), candidats: ["J1", "J2"] },
+    { ...ITEM("Fronde", "Très rare"), candidats: [] }
   ],
   participants: ["J1", "J2"], poolValides: ["J2"]
 };
@@ -121,9 +130,9 @@ fs.writeFileSync('/tmp/apercu_butin_partage.html', pagePartage);
 
 const butinFin = {
   pool: [
-    { ...ITEM("Bouclier du Veilleur", "Main_Gauche", "+20% Défense"), gagnant: "J1" },
-    { ...ITEM("Plates de l'Aube Ancienne", "Armure", "+30% PV Max"), gagnant: "J2" },
-    { ...ITEM("Grimoire aux Pages Ternies", "Main_Gauche", "+20% Magie"), gagnant: null }
+    { ...ITEM("Bouclier lourd", "Rare"), gagnant: "J1" },
+    { ...ITEM("Hache à deux mains", "Épique"), gagnant: "J2" },
+    { ...ITEM("Fronde", "Très rare"), gagnant: null }
   ]
 };
 const pageFin = pageButin(
@@ -141,14 +150,35 @@ const pagePopup = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${sty
 <body style="margin:0;">
 ${MARKUP_POPUP}
 <script>
+${SRC_OBJETS}
 ${SRC_LOOT}
 document.getElementById("popup-confirmation-equip").style.display = "flex";
 window.remplirComparaisonEquip(
-  ${JSON.stringify(ITEM("Lame Fidèle", "Main_Droite", "+10% Dégâts physiques"))},
-  ${JSON.stringify(ITEM("Marteau des Cimes", "Main_Droite", "+20% Dégâts, -10% Esquive"))}
+  ${JSON.stringify(ITEM("Épée courte", "Commun"))},
+  ${JSON.stringify(ITEM("Hache", "Très rare"))}
 );
 </script></body></html>`;
 fs.writeFileSync('/tmp/apercu_popup_confirmation.html', pagePopup);
+
+// Le cas le plus délicat : une arme à deux mains détruit CE QUE PORTENT LES
+// DEUX MAINS. Le joueur doit voir les deux objets sacrifiés d'un coup.
+const pagePopupDeuxMains = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${style}
+:root{--app-h:100vh;}</style></head>
+<body style="margin:0;">
+${MARKUP_POPUP}
+<script>
+${SRC_OBJETS}
+${SRC_LOOT}
+document.getElementById("popup-confirmation-equip").style.display = "flex";
+document.getElementById("actions-confirmation-equip").innerHTML =
+  '<button class="btn-parametres" style="background-color:#1b6e3a; border-color:#0f4021;">Équiper à deux mains (remplace Glaive et Scutum)</button>'
+  + '<button class="btn-parametres">Annuler</button>';
+window.remplirComparaisonEquip(
+  [${JSON.stringify(ITEM("Épée courte", "Commun"))}, ${JSON.stringify(ITEM("Bouclier lourd", "Rare"))}],
+  ${JSON.stringify(ITEM("Hache à deux mains", "Épique"))}
+);
+</script></body></html>`;
+fs.writeFileSync('/tmp/apercu_popup_deux_mains.html', pagePopupDeuxMains);
 
 // --------------------------------------------------------------------------
 // Captures.
@@ -176,6 +206,7 @@ ok = await capturer('/tmp/apercu_butin_personnel.html', '/tmp/apercu_butin_perso
 ok = await capturer('/tmp/apercu_butin_partage.html', '/tmp/apercu_butin_partage.png', { width: 700, height: 900 }) && ok;
 ok = await capturer('/tmp/apercu_butin_fin.html', '/tmp/apercu_butin_fin.png', { width: 700, height: 900 }) && ok;
 ok = await capturer('/tmp/apercu_popup_confirmation.html', '/tmp/apercu_popup_confirmation.png', { width: 700, height: 600 }) && ok;
+ok = await capturer('/tmp/apercu_popup_deux_mains.html', '/tmp/apercu_popup_deux_mains.png', { width: 760, height: 760 }) && ok;
 
 await b.close();
 console.log(ok ? "\nTOUTES LES CAPTURES SE SONT DÉROULÉES SANS ERREUR JS" : "\nDES ERREURS JS SE SONT PRODUITES");

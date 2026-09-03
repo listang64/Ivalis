@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Ivalis - Le JDR</title>
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=7">
 
  
   <script>
@@ -1299,7 +1299,11 @@
           </div>
           <div class="libelle-emplacement">Armure</div>
           <div id="emplacement-armure-nom" class="nom-objet-equipe">Emplacement vide</div>
+          <div id="emplacement-armure-rarete" class="etiquette-rarete"></div>
           <div id="emplacement-armure-effet" class="effet-objet-equipe"></div>
+          <div id="emplacement-armure-prerequis" class="prerequis-objet"></div>
+          <button id="emplacement-armure-lacher" class="btn-lacher-objet" style="display: none;"
+                  onclick="window.lacherObjet(document.getElementById('champ-id-personnage').value, 'Equip_Armure')">Lâcher</button>
         </div>
         <div id="emplacement-main-droite-carte" class="carte-equipement emplacement-vide">
           <div class="carre-equipement">
@@ -1308,7 +1312,11 @@
           </div>
           <div class="libelle-emplacement">Main droite</div>
           <div id="emplacement-main-droite-nom" class="nom-objet-equipe">Emplacement vide</div>
+          <div id="emplacement-main-droite-rarete" class="etiquette-rarete"></div>
           <div id="emplacement-main-droite-effet" class="effet-objet-equipe"></div>
+          <div id="emplacement-main-droite-prerequis" class="prerequis-objet"></div>
+          <button id="emplacement-main-droite-lacher" class="btn-lacher-objet" style="display: none;"
+                  onclick="window.lacherObjet(document.getElementById('champ-id-personnage').value, 'Equip_Main_Droite')">Lâcher</button>
         </div>
         <div id="emplacement-main-gauche-carte" class="carte-equipement emplacement-vide">
           <div class="carre-equipement">
@@ -1317,7 +1325,11 @@
           </div>
           <div class="libelle-emplacement">Main gauche</div>
           <div id="emplacement-main-gauche-nom" class="nom-objet-equipe">Emplacement vide</div>
+          <div id="emplacement-main-gauche-rarete" class="etiquette-rarete"></div>
           <div id="emplacement-main-gauche-effet" class="effet-objet-equipe"></div>
+          <div id="emplacement-main-gauche-prerequis" class="prerequis-objet"></div>
+          <button id="emplacement-main-gauche-lacher" class="btn-lacher-objet" style="display: none;"
+                  onclick="window.lacherObjet(document.getElementById('champ-id-personnage').value, 'Equip_Main_Gauche')">Lâcher</button>
         </div>
       </div>
     </div>
@@ -1416,30 +1428,29 @@
         <div id="comparaison-nouveau" class="contenu-comparaison"></div>
       </div>
     </div>
-    <div style="display: flex; gap: 16px; justify-content: center; margin-top: 22px;">
-      <button class="btn-parametres" style="background-color: #1b6e3a; border-color: #0f4021;" onclick="window.confirmerChoixButin(true)">Équiper</button>
-      <button class="btn-parametres" onclick="window.confirmerChoixButin(false)">Annuler</button>
-    </div>
+    <div id="message-confirmation-equip" class="message-confirmation-equip"></div>
+    <div id="actions-confirmation-equip" style="display: flex; gap: 16px; justify-content: center; margin-top: 22px; flex-wrap: wrap;"></div>
   </div>
 </div>
 
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <script type="module" src="ia_master.js?v=4"></script>
-<script type="module" src="app.js?v=11"></script>
+<script type="module" src="app.js?v=12"></script>
 <script type="module" src="creation_personnage.js?v=2"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=11"></script>
 <script src="Plateau.js"></script>
-<script type="module" src="combat.js?v=24"></script>
+<script type="module" src="combat.js?v=25"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
-<script type="module" src="mouvement.js?v=8"></script>
+<script type="module" src="mouvement.js?v=9"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
-<script type="module" src="moteur_effets.js?v=15"></script>
-<script type="module" src="monstres.js?v=10"></script>
+<script type="module" src="moteur_effets.js?v=16"></script>
+<script type="module" src="monstres.js?v=11"></script>
 <script type="module" src="monstres_competences.js?v=5"></script>
-<script type="module" src="monstres_ia.js?v=13"></script>
+<script type="module" src="monstres_ia.js?v=14"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
-<script type="module" src="loot.js?v=1"></script>
+<script type="module" src="objets.js?v=1"></script>
+<script type="module" src="loot.js?v=2"></script>
 
 <!-- ============================================================= -->
 <!--  GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)  -->

@@ -1542,7 +1542,14 @@ window.demarrerCiblage = async function(idCarte) {
                     ? "Magique" : "Physique";
                 // Atout de l'Ondari : ses sorts magiques portent une case plus loin,
                 // dès lors qu'un cran de Distance est posé dessus.
-                const porteeReelle = rangeMax + window.bonusPorteeMagique(
+                // L'équipement allonge le bras : "portée" pour une attaque à
+                // distance, "allonge" pour une attaque au contact. L'allonge ne
+                // transforme PAS l'attaque en tir — elle reste une attaque de
+                // contact (pas de malus de tir à bout portant, pas de règle de
+                // distance), elle atteint simplement une case de plus.
+                const bonusArme = isRanged ? window.bonusEquip(lanceurCarte, "portee")
+                                           : window.bonusEquip(lanceurCarte, "allonge");
+                const porteeReelle = rangeMax + bonusArme + window.bonusPorteeMagique(
                     lanceurCarte, typeRes === "Magique", isRanged);
 
                 attaquesExtraites.push({
@@ -2656,6 +2663,164 @@ window.nettoyerCiblage = function() {
 //  « l'effet n'est pas passé » à trois postes, jamais en solo.
 //
 //  Les dés sont donc tirés ICI, une fois, et embarqués dans l'action diffusée.
+// =========================================================================
+//  CE QUE L'ÉQUIPEMENT AJOUTE À UNE CARTE
+// =========================================================================
+//  Une arme ne joue pas de carte à part : elle enrichit celle que le héros
+//  vient de lancer. Deux greffes, faites AU MOMENT DE LA RÉSOLUTION (donc
+//  avant la diffusion de l'action, pour que les trois postes rejouent les
+//  mêmes chiffres) :
+//    - ses dégâts plats s'ajoutent à la valeur brute des attaques ;
+//    - les états qu'elle inflige sont injectés dans la liste des altérations
+//      de la carte, avec la même forme que ceux de la Forge. Ils empruntent
+//      ensuite TOUT le circuit existant : jet partagé, immunités de race,
+//      tic de poison, résolution particulière de Peur/Poussée/Traction,
+//      icône sur le pion. Rien n'est réécrit en parallèle.
+
+const GABARITS_ETATS_EQUIPEMENT = {
+    "Étourdi":        { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1787381297/ETOURDIT_2_j7w36h.png", desc: "-20% Esquive/Parade, 10% de chance d'échec d'attaque." },
+    "Immobilisation": { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788081285/IMG_2076_vze0an.png", desc: "Ne peut plus se déplacer volontairement, gagne 20 fatigue par tour immobilisé." },
+    "Empoisonnement": { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788096401/IMG_2083_pebnup.png", desc: "15 fatigue et 8% des PV max perdus immédiatement, puis à nouveau au début du tour suivant. Pas de cumul.", estPoison: true, estDot: true },
+    "Brûlé":          { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181101/IMG_2087_q6chof.png", desc: "-50% de soins reçus." },
+    "Glacé":          { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181888/IMG_2089_isgcrs.png", desc: "Coût en fatigue du mouvement doublé." },
+    "Poussée":        { duree: 0, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", desc: "", estPoussee: true },
+    "Traction":       { duree: 0, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", desc: "", estTraction: true },
+    "Peur":           { duree: 0, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", desc: "", estPeur: true },
+    "Provocation":    { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", desc: "Ne peut viser que celui qui l'a provoqué tant que l'état dure.", estProvocation: true }
+};
+window.GABARITS_ETATS_EQUIPEMENT = GABARITS_ETATS_EQUIPEMENT;
+
+// Les attaques qui portent réellement un coup : ni soin, ni bouclier, ni
+// purification. Ce sont les seules que l'arme peut enrichir.
+function attaquesFrappantes(state) {
+    return (state.attaques || []).filter(a => !a.isHeal && !a.isShield && (a.valeurBrute || 0) > 0);
+}
+
+window.appliquerEquipementALaCarte = function(state, lanceur) {
+    if (!state || !lanceur || state.equipementApplique) return;
+    if (typeof window.bonusEquip !== "function") return;
+    state.equipementApplique = true;   // une carte relancée ne doit pas cumuler deux fois
+
+    const degatsTous = window.bonusEquip(lanceur, "degats");
+    const degatsPhys = window.bonusEquip(lanceur, "degatsPhys");
+    const degatsMag  = window.bonusEquip(lanceur, "degatsMag");
+    const soin       = window.bonusEquip(lanceur, "soin");
+    const bonusDegatsPct = window.bonusEquip(lanceur, "degatsPct");
+
+    (state.attaques || []).forEach(attaque => {
+        if (attaque.isShield) return;
+        if (attaque.isHeal) {
+            if (soin > 0 && (attaque.valeurBrute || 0) > 0) attaque.valeurBrute += soin;
+            return;
+        }
+        if ((attaque.valeurBrute || 0) <= 0) return;
+        attaque.valeurBrute += degatsTous + (attaque.typeRes === "Magique" ? degatsMag : degatsPhys);
+        // Bénédiction offensive d'une bague de soin : un pourcentage en plus,
+        // appliqué APRÈS les dégâts plats, comme un dernier multiplicateur.
+        if (bonusDegatsPct > 0) attaque.valeurBrute = Math.round(attaque.valeurBrute * (1 + bonusDegatsPct / 100));
+    });
+
+    // Les états de l'arme visent exactement ce que la carte a frappé.
+    const etatsArme = typeof window.etatsEquipement === "function" ? window.etatsEquipement(lanceur) : [];
+    if (etatsArme.length === 0) return;
+
+    const frappees = attaquesFrappantes(state);
+    if (frappees.length === 0) return;
+    const cibles = [...new Set(frappees.flatMap(a => a.cibles || []))];
+    if (cibles.length === 0) return;
+
+    state.alterations = state.alterations || [];
+    etatsArme.forEach(e => {
+        const gabarit = GABARITS_ETATS_EQUIPEMENT[e.etat];
+        if (!gabarit) return;
+        // Si la carte inflige DÉJÀ cet état, l'arme ne le double pas : elle
+        // améliore simplement ses chances, en gardant la meilleure des deux.
+        const dejaLa = state.alterations.find(a => a.nom === e.etat);
+        if (dejaLa) {
+            dejaLa.chance = Math.max(dejaLa.chance || 0, e.chance || 0);
+            return;
+        }
+        state.alterations.push({
+            nom: e.etat, ...gabarit, chance: e.chance || 0,
+            venuDeLEquipement: true, isRanged: false, rangeMax: 1,
+            // La provocation retient QUI a provoqué : c'est ce que l'IA lit
+            // pour n'avoir plus d'yeux que pour lui (monstres_ia.js).
+            idProvocateur: e.etat === "Provocation" ? lanceur.idPersonnage : undefined,
+            cibles: [...cibles]
+        });
+    });
+};
+
+// Ce que l'équipement laisse DERRIÈRE une carte : l'élan d'initiative gagné en
+// frappant, les bénédictions posées sur ceux qu'on vient de soigner, et le pas
+// de retraite offert par certaines armes. Tous des états temporaires ordinaires
+// : ils portent un "bonusEquip" que window.bonusEquip additionne aux stats, et
+// s'éteignent tout seuls quand la transition de round épuise leur durée.
+window.appliquerSuitesEquipement = async function(action, jeSuisLAuteur) {
+    const jets = (action && action.jets) || {};
+    const buffs = jets.equipLanceur || [];
+    const benedictions = jets.equipBenedictions || [];
+    const pasOfferts = jets.equipPasOfferts || 0;
+    if (buffs.length === 0 && benedictions.length === 0 && pasOfferts === 0) return;
+
+    const poser = async (idCombattant, etat) => {
+        const cible = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idCombattant);
+        if (!cible) return;
+        const etats = [...(cible.Etats_Alteres || [])];
+        const existant = etats.find(e => e.nom === etat.nom);
+        if (existant) {
+            existant.duree = Math.max(existant.duree || 0, etat.duree);
+            existant.bonusEquip = etat.bonusEquip;
+        } else {
+            etats.push(etat);
+        }
+        cible.Etats_Alteres = etats;
+        if (jeSuisLAuteur) {
+            await updateDoc(window.refCombattant(idCombattant), { Etats_Alteres: etats })
+                .catch(e => console.error("État d'équipement :", e));
+        }
+        const tk = window.TOKENS_VTT_DATA[idCombattant];
+        if (tk) window.afficherMessageFlottantHex(tk.q, tk.r, etat.nom + " !", "#ffd700");
+    };
+
+    for (const buff of buffs) {
+        await poser(action.idLanceur, {
+            nom: "Élan", duree: buff.tours || 2,
+            bonusEquip: { initiative: buff.initiative || 0 },
+            icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png",
+            desc: `+${buff.initiative || 0} d'initiative sur les prochaines cartes.`
+        });
+    }
+
+    if (benedictions.length > 0) {
+        const soignes = [...new Set((action.attaques || [])
+            .filter(a => a.isHeal).flatMap(a => a.cibles || []))];
+        for (const beni of benedictions) {
+            const bonus = {};
+            if (beni.resPhys) bonus.resPhys = beni.resPhys;
+            if (beni.resMag) bonus.resMag = beni.resMag;
+            if (beni.degatsPct) bonus.degatsPct = beni.degatsPct;
+            const detail = [beni.resPhys ? `+${beni.resPhys}% résistance physique` : null,
+                            beni.resMag ? `+${beni.resMag}% résistance magique` : null,
+                            beni.degatsPct ? `+${beni.degatsPct}% de dégâts` : null].filter(Boolean).join(", ");
+            for (const id of soignes) {
+                await poser(id, { nom: "Béni", duree: beni.tours || 1, bonusEquip: bonus,
+                                  icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", desc: detail });
+            }
+        }
+    }
+
+    // Le pas de retraite : les premières cases du prochain déplacement ne
+    // coûtent rien (cf. mouvement.js). L'état dure le tour, pas plus.
+    if (pasOfferts > 0) {
+        await poser(action.idLanceur, {
+            nom: "Repli", duree: 1, bonusEquip: { hexApresAttaque: pasOfferts },
+            icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png",
+            desc: `${pasOfferts} case(s) de déplacement gratuite(s) après avoir frappé.`
+        });
+    }
+};
+
 function tirerLesDesDeLaCarte(state, lanceurData, critique) {
     const d100 = () => Math.floor(Math.random() * 100) + 1;
     const jets = { attaqueRatee: false, parCible: {} };
@@ -2697,6 +2862,48 @@ function tirerLesDesDeLaCarte(state, lanceurData, critique) {
             }
         });
     });
+
+    // --- Les jets de l'équipement -----------------------------------------
+    // Percer une armure ou ignorer les résistances se joue une fois, ici, et
+    // par cible : sans ça, un poste verrait le coup passer et l'autre non.
+    if (typeof window.bonusEquip === "function") {
+        const ignoreArmure = window.bonusEquip(lanceurData, "ignoreArmure");
+        const ignoreResistances = window.bonusEquip(lanceurData, "ignoreResistances");
+        if (ignoreArmure > 0 || ignoreResistances > 0) {
+            attaquesFrappantes(state).forEach(attaque => {
+                (attaque.cibles || []).forEach(id => {
+                    const c = pourCible(id);
+                    c.equip = c.equip || {};
+                    if (ignoreArmure > 0 && c.equip.ignoreArmure === undefined) {
+                        c.equip.ignoreArmure = d100() <= ignoreArmure;
+                    }
+                    if (ignoreResistances > 0 && c.equip.ignoreResistances === undefined) {
+                        c.equip.ignoreResistances = d100() <= ignoreResistances;
+                    }
+                });
+            });
+        }
+
+        // Les effets qui portent sur le lanceur ou sur la cible d'un soin :
+        // élan d'initiative, bénédictions des bagues de soin.
+        const speciaux = typeof window.effetsSpeciauxEquipement === "function"
+            ? window.effetsSpeciauxEquipement(lanceurData) : [];
+        const frappe = attaquesFrappantes(state).length > 0;
+        const soigne = (state.attaques || []).some(a => a.isHeal && (a.valeurBrute || 0) > 0);
+        jets.equipLanceur = [];
+        jets.equipBenedictions = [];
+        speciaux.forEach(e => {
+            // "10% de chance de gagner +15 d'initiative" : lié à une attaque.
+            if (e.buff && frappe && d100() <= (e.chance || 0)) jets.equipLanceur.push(e.buff);
+            // Les effets des bagues de soin ne se déclenchent que sur un soin.
+            if (e.buffSoi && soigne) jets.equipLanceur.push(e.buffSoi);
+            if (e.beniSoin && soigne) jets.equipBenedictions.push(e.beniSoin);
+        });
+
+        // "Gagne 1 hexagone de mouvement après l'attaque" : sans jet, mais
+        // seulement si la carte a bien frappé quelqu'un.
+        jets.equipPasOfferts = frappe ? window.bonusEquip(lanceurData, "hexApresAttaque") : 0;
+    }
 
     return jets;
 }
@@ -2787,6 +2994,11 @@ window.declencherResolution = async function() {
         console.log(`🎲 Jet de critique de ${lanceurCrit.prenom || idLanceur} : ${jetCrit} (Chance : ${chanceCrit}%)`
                     + (critique ? " → CRITIQUE !" : ""));
     }
+
+    // L'arme et l'armure enrichissent la carte AVANT que les dés ne tombent et
+    // avant la diffusion : les dégâts plats et les états ajoutés partent donc
+    // dans l'action, identiques pour tous les postes.
+    window.appliquerEquipementALaCarte(state, lanceurCrit);
 
     const jets = tirerLesDesDeLaCarte(state, lanceurCrit, critique);
 
@@ -3212,6 +3424,20 @@ jaugeContainer.className = "jauge-flash-token";
 
                     // Suite classique du calcul d'armure...
                     let resistance = attaque.typeRes === "Magique" ? defMag : defPhys;
+
+                    // Percer l'armure : le jet a été tranché au lancement, comme
+                    // tous les autres. "Ignorer l'armure" ne vaut que contre la
+                    // résistance PHYSIQUE (c'est ce que porte une armure) ;
+                    // "ignorer les résistances" balaie les deux.
+                    const desEquip = (desDe(idCible) || {}).equip || {};
+                    const percee = desEquip.ignoreResistances === true
+                                || (desEquip.ignoreArmure === true && attaque.typeRes !== "Magique");
+                    if (percee) {
+                        resistance = 0;
+                        const tkPercee = window.TOKENS_VTT_DATA[idCible];
+                        if (tkPercee) window.afficherMessageFlottantHex(tkPercee.q, tkPercee.r, "Armure percée !", "#ffd700");
+                    }
+
                     let reduction = resistance / 100;
                     if (reduction > 1) reduction = 1;
                     let degatsFinaux = Math.round(degats * (1 - reduction));
@@ -3619,6 +3845,10 @@ jaugeContainer.className = "jauge-flash-token";
             }
         }
     }
+
+    // Ce que l'équipement laisse derrière la carte, une fois toutes les cibles
+    // résolues : élan, bénédictions, pas de retraite.
+    await window.appliquerSuitesEquipement(action, jeSuisLAuteur);
 
     if (jeSuisLAuteur) {
         if (lanceurData && lanceurData.estMonstre) {

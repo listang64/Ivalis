@@ -6,6 +6,7 @@
 // les scènes avec le vrai code de loot.js et combat.js, à plusieurs postes.
 import fs from 'fs';
 import { SRC_MODIFIER_PARTIE } from './transaction_partie.mjs';
+import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 
 let echecs = 0;
 const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(62)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
@@ -25,6 +26,10 @@ const SRC_VICTOIRE_TEST = fonctionCombat('window.declencherVictoireTest = async 
 
 const SRC_LOOT = fs.readFileSync('/home/user/Ivalis/loot.js', 'utf-8')
   .replace(/^import[\s\S]*?from\s+"[^"]+";\s*$/gm, '');
+
+// Le catalogue d'équipement : c'est lui qui fabrique les objets du butin
+// depuis que le tableau de Nico a remplacé la collection "Objets".
+const SRC_OBJETS = fs.readFileSync('/home/user/Ivalis/objets.js', 'utf-8');
 
 // --------------------------------------------------------------------------
 // Un Firestore transactionnel pour "Systeme_Parties/P1", avec fusion par
@@ -76,7 +81,7 @@ function creerPersonnagesFirestore(ids) {
 // Un poste (navigateur) : ses propres document/localStorage (fermés sur SES
 // fonctions, pas de variable globale à jongler entre postes concurrents), sa
 // propre vue des combattants, mais le même Firestore partagé.
-function creerPoste(idJoueur, { partie, personnages, persos, monstres, catalogue }) {
+function creerPoste(idJoueur, { partie, personnages, persos, monstres, difficulte }) {
   const w = {};
   w.ID_PARTIE_COURANTE = "P1";
   w.PARTIE_DATA = partie.partagee.doc; // même objet, toujours à jour (muté en place)
@@ -85,7 +90,8 @@ function creerPoste(idJoueur, { partie, personnages, persos, monstres, catalogue
   // ennemi. declencherVictoireTest filtre PERSOS_PARTIE par camp "Ennemi".
   w.PERSOS_PARTIE = [...persos, ...monstres];
   w.MONSTRES_PARTIE = monstres;
-  w.CACHE_OBJETS = catalogue;
+  // La difficulté de la rencontre décide des chances de rareté (tableau de loot).
+  w.PARTIE_DATA.Difficulte_Rencontre = difficulte || "Normale";
   w.estCombattantMort = (id) => {
     const p = persos.find(x => x.idPersonnage === id) || monstres.find(x => x.idPersonnage === id);
     return !p || p.PV_Actuels <= 0 || p.statut === "Mort" || p.Statut === "Mort";
@@ -109,7 +115,11 @@ function creerPoste(idJoueur, { partie, personnages, persos, monstres, catalogue
       return { style: {}, innerHTML: "", value: "" };
     }
   };
-  const localStorageStub = { getItem: () => idJoueur };
+  // Deux usages distincts : l'identité du joueur, et le cache des caracs lu
+  // par les prérequis d'équipement (absent ici, donc jamais bloquant).
+  const localStorageStub = {
+    getItem: (cle) => cle === "ID_JOUEUR_COURANT" ? idJoueur : null
+  };
   const importerFirestore = async () => ({
     writeBatch: () => {
       const operations = [];
@@ -125,6 +135,10 @@ function creerPoste(idJoueur, { partie, personnages, persos, monstres, catalogue
     }
   });
 
+  new Function('window', SRC_OBJETS)(w);
+  // Les lectures de stats d'app.js : c'est window.bonusEquip qui additionne
+  // l'équipement aux caractéristiques.
+  new Function('window', SRC_STATS_COMMUNES)(w);
   new Function('window', 'db', 'doc', 'updateDoc', 'document', 'localStorage', SRC_LOOT)(
     w, {}, doc, updateDoc, documentStub, localStorageStub);
   new Function('window', 'db', 'doc', 'runTransaction', SRC_MODIFIER_PARTIE)(
@@ -133,14 +147,6 @@ function creerPoste(idJoueur, { partie, personnages, persos, monstres, catalogue
 
   return { idJoueur, w };
 }
-
-const CATALOGUE = [
-  { Nom: "Lame Fidèle", Emplacement: "Main_Droite", Effet_Texte: "+ dégâts physiques", URL_Image: "" },
-  { Nom: "Bouclier du Veilleur", Emplacement: "Main_Gauche", Effet_Texte: "+ défense", URL_Image: "" },
-  { Nom: "Cuirasse du Rempart", Emplacement: "Armure", Effet_Texte: "+ PV max", URL_Image: "" },
-  { Nom: "Dague du Chuchoteur", Emplacement: "Main_Droite", Effet_Texte: "+ critique", URL_Image: "" },
-  { Nom: "Grimoire aux Pages Ternies", Emplacement: "Main_Gauche", Effet_Texte: "+ magie", URL_Image: "" }
-];
 
 const trosHeros = () => ([
   { idPersonnage: "J1", prenom: "Pliors", idJoueur: "P1", camp: "Allié", statut: "Vivant", actif: true, PV_Actuels: 42,
@@ -159,7 +165,7 @@ console.log("1. LA COUPE DE TEST (bouton 🏆) NE PASSE PAS PAR LES RENFORTS");
   const personnages = creerPersonnagesFirestore(["J1"]);
   const persos = trosHeros().slice(0, 1);
   const monstres = unMonstreVivant();
-  const p1 = creerPoste("P1", { partie, personnages, persos, monstres, catalogue: CATALOGUE });
+  const p1 = creerPoste("P1", { partie, personnages, persos, monstres, difficulte: "Normale" });
 
   await p1.w.declencherVictoireTest();
   verifier("le monstre passe à Mort", monstres[0].Statut === "Mort", `(Statut=${monstres[0].Statut})`);
@@ -178,7 +184,7 @@ console.log("\n2. DÉTECTION DE VICTOIRE — les gardes-fous");
   const personnages = creerPersonnagesFirestore(["J1"]);
   const persos = trosHeros().slice(0, 1);
   const monstres = unMonstreVivant();
-  const p1 = creerPoste("P1", { partie, personnages, persos, monstres, catalogue: CATALOGUE });
+  const p1 = creerPoste("P1", { partie, personnages, persos, monstres, difficulte: "Normale" });
 
   p1.w.verifierVictoireCombat();
   await new Promise(r => setTimeout(r, 20));
@@ -213,7 +219,7 @@ console.log("\n3. TROIS POSTES DÉTECTENT LA VICTOIRE AU MÊME INSTANT");
   const personnages = creerPersonnagesFirestore(["J1", "J2", "J3"]);
   const persos = trosHeros();
   const monstres = [{ idPersonnage: "M1", camp: "Ennemi", statut: "Mort", PV_Actuels: 0, estIllusion: false }];
-  const postes = ["P1", "P2", "P3"].map(id => creerPoste(id, { partie, personnages, persos, monstres, catalogue: CATALOGUE }));
+  const postes = ["P1", "P2", "P3"].map(id => creerPoste(id, { partie, personnages, persos, monstres, difficulte: "Normale" }));
 
   // Les trois clients recomposent leurs combattants au même instant (fin du
   // dernier coup porté) et appellent donc demarrerButin en même temps.
@@ -239,7 +245,7 @@ let contexte4;
   const persos = trosHeros();
   const monstres = [{ idPersonnage: "M1", camp: "Ennemi", statut: "Mort", PV_Actuels: 0, estIllusion: false }];
   const postes = { P1: null, P2: null, P3: null };
-  ["P1", "P2", "P3"].forEach(id => postes[id] = creerPoste(id, { partie, personnages, persos, monstres, catalogue: CATALOGUE }));
+  ["P1", "P2", "P3"].forEach(id => postes[id] = creerPoste(id, { partie, personnages, persos, monstres, difficulte: "Normale" }));
 
   await postes.P1.w.demarrerButin();
   const items = { J1: partie.partagee.doc.Butin.parPersonnage.J1.items,
@@ -363,21 +369,107 @@ console.log("\n6. FERMETURE DE LA FENÊTRE — partagée, idempotente");
 }
 
 // ==========================================================================
-console.log("\n7. TIRAGE ALÉATOIRE — cas limites du catalogue");
+console.log("\n7. LE TIRAGE PUISE DANS LE TABLEAU D'ÉQUIPEMENT");
 {
   const partie = creerPartieButin({});
   const personnages = creerPersonnagesFirestore(["J1"]);
-  const p1 = creerPoste("P1", { partie, personnages, persos: [], monstres: [], catalogue: CATALOGUE });
+  const p1 = creerPoste("P1", { partie, personnages, persos: [], monstres: [], difficulte: "Normale" });
 
-  const deux = p1.w.tirerObjetsAleatoires(CATALOGUE, 2);
-  verifier("deux objets distincts tirés d'un catalogue suffisant", deux.length === 2 && deux[0].uid !== deux[1].uid);
-  verifier("chaque tirage a un identifiant unique préfixé loot_", deux.every(it => /^loot_/.test(it.uid)));
+  const deux = p1.w.tirerObjetsAleatoires("Normale", 2);
+  verifier("deux objets sont tirés, avec des identifiants distincts",
+           deux.length === 2 && deux[0].uid !== deux[1].uid);
+  verifier("chacun porte un nom, un type, une rareté et un emplacement",
+           deux.every(o => o.nom && o.type && o.rarete && o.emplacement));
+  verifier("chacun porte ses bonus chiffrés et son texte lisible",
+           deux.every(o => o.bonus && typeof o.effetTexte === "string" && o.effetTexte.length > 0),
+           `(« ${deux[0].effetTexte} »)`);
 
-  const unSeul = p1.w.tirerObjetsAleatoires([CATALOGUE[0]], 2);
-  verifier("un catalogue d'un seul objet ne donne qu'un seul tirage (pas de plantage)", unSeul.length === 1);
+  // Une rencontre normale ne donne jamais d'épique (0% au tableau).
+  const cent = [];
+  for (let i = 0; i < 300; i++) cent.push(...p1.w.tirerObjetsAleatoires("Normale", 2));
+  verifier("une rencontre normale ne sort aucun épique",
+           cent.every(o => o.rarete !== "Épique"));
+  verifier("mais bien des communs, des rares et des très rares",
+           new Set(cent.map(o => o.rarete)).size === 3,
+           `(${[...new Set(cent.map(o => o.rarete))].join(", ")})`);
 
-  const aucun = p1.w.tirerObjetsAleatoires([], 2);
-  verifier("un catalogue vide donne un tirage vide", aucun.length === 0);
+  // Sur un boss, l'épique devient possible.
+  const boss = [];
+  for (let i = 0; i < 600; i++) boss.push(...p1.w.tirerObjetsAleatoires("Très difficile", 2));
+  verifier("une rencontre très difficile finit par donner un épique",
+           boss.some(o => o.rarete === "Épique"),
+           `(${boss.filter(o => o.rarete === "Épique").length} sur ${boss.length})`);
+
+  // Sans objets.js, le butin ne doit pas planter la victoire.
+  const sansCatalogue = { tirerObjetsAleatoires: p1.w.tirerObjetsAleatoires };
+  new Function('window', 'return window')(sansCatalogue);
+  const vide = p1.w.tirerObjetsAleatoires.call(null, "Normale", 2);
+  verifier("le tirage rend toujours une liste (jamais d'exception)", Array.isArray(vide));
+}
+
+// ==========================================================================
+console.log("\n8. ÉQUIPER ET LÂCHER : LES MAINS, ET CE QU'ON DÉTRUIT");
+{
+  const partie = creerPartieButin({});
+  const personnages = creerPersonnagesFirestore(["J1"]);
+  const persos = trosHeros().slice(0, 1);
+  const p1 = creerPoste("P1", { partie, personnages, persos, monstres: [], difficulte: "Normale" });
+  const w = p1.w;
+  const heros = persos[0];
+
+  const modele = (nom) => w.MODELES_OBJETS.find(m => m.modele === nom);
+  const dague = w.fabriquerObjet(modele("Dague"), "Commun");
+  const bouclier = w.fabriquerObjet(modele("Bouclier léger"), "Commun");
+  const hacheDeuxMains = w.fabriquerObjet(modele("Hache à deux mains"), "Commun");
+  const armure = w.fabriquerObjet(modele("Armure lourde"), "Commun");
+
+  await w.equiperObjet("J1", dague, "Droite");
+  verifier("une arme à une main va dans la main demandée",
+           personnages.table.J1.Equip_Main_Droite?.uid === dague.uid);
+  verifier("et l'autre main reste libre", personnages.table.J1.Equip_Main_Gauche === null);
+
+  await w.equiperObjet("J1", bouclier, "Gauche");
+  verifier("le bouclier prend l'autre main sans chasser l'arme",
+           personnages.table.J1.Equip_Main_Gauche?.uid === bouclier.uid
+           && personnages.table.J1.Equip_Main_Droite?.uid === dague.uid);
+
+  await w.equiperObjet("J1", armure, null);
+  verifier("l'armure a son propre emplacement, indépendant des mains",
+           personnages.table.J1.Equip_Armure?.uid === armure.uid
+           && personnages.table.J1.Equip_Main_Droite?.uid === dague.uid);
+
+  // Avant d'équiper une arme à deux mains, le joueur doit voir les DEUX pertes.
+  const perdus = w.objetsEcrasesPar(heros, hacheDeuxMains, null);
+  verifier("une arme à deux mains annonce les deux objets qu'elle détruit",
+           perdus.length === 2 && perdus.some(o => o.uid === dague.uid) && perdus.some(o => o.uid === bouclier.uid),
+           `(${perdus.map(o => o.nom).join(", ")})`);
+
+  await w.equiperObjet("J1", hacheDeuxMains, null);
+  verifier("elle occupe ensuite les deux mains",
+           personnages.table.J1.Equip_Main_Droite?.uid === hacheDeuxMains.uid
+           && personnages.table.J1.Equip_Main_Gauche?.uid === hacheDeuxMains.uid);
+  verifier("la dague et le bouclier ont bien disparu",
+           !Object.values(personnages.table.J1).some(o => o && (o.uid === dague.uid || o.uid === bouclier.uid)));
+  verifier("mais l'armure, elle, est intacte", personnages.table.J1.Equip_Armure?.uid === armure.uid);
+
+  // Ses bonus ne doivent pas compter double malgré les deux emplacements.
+  verifier("ses dégâts ne sont comptés qu'une fois",
+           w.bonusEquip(heros, "degatsPhys") === hacheDeuxMains.bonus.degatsPhys,
+           `(${w.bonusEquip(heros, "degatsPhys")} pour ${hacheDeuxMains.bonus.degatsPhys})`);
+
+  // Lâcher une arme à deux mains libère les deux mains, où qu'on clique.
+  await w.lacherObjet("J1", "Equip_Main_Gauche");
+  verifier("la lâcher par une main libère les deux",
+           personnages.table.J1.Equip_Main_Droite === null && personnages.table.J1.Equip_Main_Gauche === null);
+  verifier("sans toucher à l'armure", personnages.table.J1.Equip_Armure?.uid === armure.uid);
+
+  await w.equiperObjet("J1", dague, "Droite");
+  await w.lacherObjet("J1", "Equip_Armure");
+  verifier("lâcher l'armure ne libère qu'elle",
+           personnages.table.J1.Equip_Armure === null
+           && personnages.table.J1.Equip_Main_Droite?.uid === dague.uid);
+  verifier("et le porteur n'a plus aucune résistance d'armure",
+           w.bonusEquip(heros, "resPhys") === 0, `(${w.bonusEquip(heros, "resPhys")})`);
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

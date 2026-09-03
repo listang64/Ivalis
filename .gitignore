@@ -11,3 +11,7 @@ firebase-debug.*.log
 
 # Données tirées de la base pour le banc d'essai des monstres (regénérables)
 tests_monstres/*.json
+# ...sauf le tableau d'équipement de Nico : ce n'est pas un dump régénérable
+# (il vient de ses .xlsx, absents du dépôt) mais la RÉFÉRENCE à laquelle
+# objets_tableau.mjs confronte le catalogue. Sans lui, le banc ne tourne plus.
+!tests_monstres/tableau_objets.json

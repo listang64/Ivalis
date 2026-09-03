@@ -33,61 +33,142 @@ window.emplacementVersChampFront = {
     "Main_Droite": "equipMainDroite",
     "Main_Gauche": "equipMainGauche"
 };
+window.champDocVersFront = {
+    "Equip_Armure": "equipArmure",
+    "Equip_Main_Droite": "equipMainDroite",
+    "Equip_Main_Gauche": "equipMainGauche"
+};
 
-window.iconeParEmplacement = function(emplacement) {
+window.iconeParEmplacement = function(objet) {
+    const emplacement = typeof objet === "string" ? objet : (objet && objet.emplacement);
+    const type = (objet && objet.type) || "";
     if (emplacement === "Armure") return "🛡️";
+    if (type === "Bouclier") return "🛡️";
+    if (type === "Magie") return "💍";
+    if (type.includes("Distance")) return "🏹";
     if (emplacement === "Main_Gauche") return "🗡️";
     return "⚔️";
 };
-window.libelleEmplacement = function(emplacement) {
+window.libelleEmplacement = function(objet) {
+    const emplacement = typeof objet === "string" ? objet : (objet && objet.emplacement);
     if (emplacement === "Armure") return "Armure";
+    if (typeof objet === "object" && objet && objet.deuxMains) return "Deux mains";
     if (emplacement === "Main_Gauche") return "Main gauche";
-    return "Main droite";
+    if (emplacement === "Main_Droite") return "Main droite";
+    return "Une main";
 };
 
-// Écrit un objet du butin dans l'emplacement du personnage qui l'a remporté —
-// que ce soit depuis la fenêtre personnelle ou la résolution du partage.
-// L'ancien objet, s'il y en avait un, n'est conservé nulle part : il n'existe
-// pas de "sac" dans Ivalis, l'écrasement est définitif et volontaire.
-window.equiperObjetButin = async function(idPersonnage, item) {
-    const champDoc = window.emplacementVersChampDoc[item.emplacement] || "Equip_Armure";
-    const champFront = window.emplacementVersChampFront[item.emplacement] || "equipArmure";
-    const valeur = { uid: item.uid, nom: item.nom, emplacement: item.emplacement,
-                     effetTexte: item.effetTexte || "", image: item.image || "" };
+// =========================================================================
+//  OÙ VA UN OBJET
+// =========================================================================
+//  L'armure a son emplacement ; tout le reste (armes, boucliers, bagues) va
+//  dans une main. Une arme à deux mains occupe les DEUX : elle est écrite dans
+//  les deux champs avec le même uid, et window.objetsEquipes (objets.js) la
+//  dédoublonne pour que ses bonus ne comptent pas double.
+//
+//  Les objets d'avant ce tableau portaient directement "Main_Droite" ou
+//  "Main_Gauche" comme emplacement : ils restent lisibles ici.
+window.champsPourObjet = function(objet, main) {
+    if (!objet) return [];
+    if (objet.emplacement === "Armure") return ["Equip_Armure"];
+    if (objet.deuxMains) return ["Equip_Main_Droite", "Equip_Main_Gauche"];
+    if (objet.emplacement === "Main_Gauche") return ["Equip_Main_Gauche"];
+    if (objet.emplacement === "Main_Droite") return ["Equip_Main_Droite"];
+    return [main === "Gauche" ? "Equip_Main_Gauche" : "Equip_Main_Droite"];
+};
+
+// Ce qui serait détruit en équipant cet objet à cet endroit. Sans sac dans
+// Ivalis, l'écrasement est définitif : le joueur doit le voir avant de valider.
+window.objetsEcrasesPar = function(perso, objet, main) {
+    if (!perso) return [];
+    return window.champsPourObjet(objet, main)
+        .map(champ => perso[window.champDocVersFront[champ]])
+        .filter(o => o && o.nom);
+};
+
+// Écrit un objet dans le ou les emplacements qui lui reviennent. L'ancien
+// occupant n'est conservé nulle part : c'est voulu, il n'existe pas de sac.
+window.equiperObjet = async function(idPersonnage, objet, main) {
+    const champs = window.champsPourObjet(objet, main);
+    if (champs.length === 0) return;
+
+    const valeur = JSON.parse(JSON.stringify(objet));
+    const maj = {};
+    // Une arme à deux mains chasse aussi ce qui occupait l'autre main : les
+    // deux champs sont réécrits, donc rien ne peut survivre à côté d'elle.
+    champs.forEach(champ => maj[champ] = valeur);
+
     try {
-        await updateDoc(doc(db, "Personnages", idPersonnage), { [champDoc]: valeur });
-        const enRam = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
-        if (enRam) enRam[champFront] = valeur;
-        // Si la fiche de ce héros est ouverte à l'écran, l'emplacement se
-        // redessine tout de suite plutôt que d'attendre une réouverture.
-        if (document.getElementById("champ-id-personnage")?.value === idPersonnage
-            && typeof window.afficherEmplacementEquipement === "function") {
-            const suffixe = item.emplacement === "Armure" ? "armure"
-                          : item.emplacement === "Main_Gauche" ? "main-gauche" : "main-droite";
-            window.afficherEmplacementEquipement(suffixe, valeur);
-        }
+        await updateDoc(doc(db, "Personnages", idPersonnage), maj);
+        window.appliquerEquipementEnRam(idPersonnage, maj);
     } catch (e) {
-        console.error("Équipement du butin :", e);
+        console.error("Équipement :", e);
     }
 };
 
-// Deux tirages distincts par héros quand le catalogue le permet ; un
-// catalogue trop petit ou vide donne simplement moins d'objets, plutôt que de
-// planter la victoire.
-window.tirerObjetsAleatoires = function(catalogue, n) {
-    const source = [...catalogue];
-    const tires = [];
-    for (let i = 0; i < n && source.length > 0; i++) {
-        const index = Math.floor(Math.random() * source.length);
-        const objet = source.splice(index, 1)[0];
-        tires.push({
-            uid: "loot_" + Math.random().toString(36).slice(2, 10),
-            nom: objet.Nom || "Objet mystérieux",
-            emplacement: objet.Emplacement || "Armure",
-            effetTexte: objet.Effet_Texte || "",
-            image: objet.URL_Image || ""
+// Lâche ce qu'on porte à un emplacement. Une arme à deux mains libère les deux
+// mains d'un coup, où qu'on ait cliqué.
+window.lacherObjet = async function(idPersonnage, champ) {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+    const porte = perso ? perso[window.champDocVersFront[champ]] : null;
+
+    const champs = (porte && porte.deuxMains)
+        ? ["Equip_Main_Droite", "Equip_Main_Gauche"]
+        : [champ];
+
+    const maj = {};
+    champs.forEach(c => maj[c] = null);
+    try {
+        await updateDoc(doc(db, "Personnages", idPersonnage), maj);
+        window.appliquerEquipementEnRam(idPersonnage, maj);
+    } catch (e) {
+        console.error("Lâcher l'objet :", e);
+    }
+};
+
+// Miroir en mémoire de ce qui vient d'être écrit : la fiche ouverte et les
+// stats de combat suivent sans attendre l'aller-retour de la base.
+window.appliquerEquipementEnRam = function(idPersonnage, maj) {
+    const enRam = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+    Object.keys(maj).forEach(champ => {
+        const champFront = window.champDocVersFront[champ];
+        if (enRam) enRam[champFront] = maj[champ];
+    });
+
+    // Si la fiche de ce héros est ouverte à l'écran, les encarts se redessinent
+    // tout de suite plutôt que d'attendre une réouverture.
+    if (document.getElementById("champ-id-personnage")?.value === idPersonnage
+        && typeof window.afficherEmplacementEquipement === "function") {
+        Object.keys(maj).forEach(champ => {
+            const suffixe = champ === "Equip_Armure" ? "armure"
+                          : champ === "Equip_Main_Gauche" ? "main-gauche" : "main-droite";
+            window.afficherEmplacementEquipement(suffixe, maj[champ]);
         });
     }
+};
+
+// Ancien nom, conservé le temps que le butin bascule entièrement : équipe dans
+// la main libre s'il y en a une, sinon la droite.
+window.equiperObjetButin = async function(idPersonnage, item, main) {
+    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+    let mainChoisie = main;
+    if (!mainChoisie && perso && !item.deuxMains && item.emplacement !== "Armure") {
+        mainChoisie = !perso.equipMainDroite ? "Droite" : (!perso.equipMainGauche ? "Gauche" : "Droite");
+    }
+    await window.equiperObjet(idPersonnage, item, mainChoisie);
+};
+
+// Deux objets par héros, tirés dans le tableau d'équipement (objets.js) selon
+// la difficulté de la rencontre. Chaque tirage est indépendant : deux héros
+// peuvent très bien convoiter la même arme, c'est au partage de trancher.
+window.tirerObjetsAleatoires = function(difficulte, n) {
+    const tires = [];
+    if (typeof window.tirerObjetPourDifficulte !== "function") {
+        console.warn("Butin : objets.js n'est pas chargé, aucun objet à tirer.");
+        return tires;
+    }
+    for (let i = 0; i < n; i++) tires.push(window.tirerObjetPourDifficulte(difficulte));
     return tires;
 };
 
@@ -123,28 +204,29 @@ window.verifierVictoireCombat = function() {
 window.demarrerButin = async function() {
     if (!window.ID_PARTIE_COURANTE) return;
 
-    const catalogue = Object.values(window.CACHE_OBJETS || {});
     const participants = (window.PERSOS_PARTIE || [])
         .filter(p => p.camp === "Allié" && !p.estIllusion && p.actif !== false
                   && !(typeof window.estCombattantMort === "function" && window.estCombattantMort(p.idPersonnage)))
         .map(p => p.idPersonnage);
     if (participants.length === 0) return;
 
-    if (catalogue.length === 0) {
-        console.warn("Butin : le catalogue d'objets (\"Objets\") est vide — window.seedObjetsExemple() pour le peupler.");
-    }
+    // La difficulté est celle de la dernière rencontre générée, enregistrée
+    // dans la partie (monstres.js). Des monstres posés à la main n'en laissent
+    // aucune : on retombe alors sur la ligne NORMAL du tableau de loot.
+    const difficulte = (window.PARTIE_DATA && window.PARTIE_DATA.Difficulte_Rencontre) || "Normale";
 
     await window.modifierPartie((data) => {
         if (data.Butin && data.Butin.ouvert) return null; // déjà ouvert par un autre poste
 
         const parPersonnage = {};
         participants.forEach(id => {
-            parPersonnage[id] = { items: window.tirerObjetsAleatoires(catalogue, 2), decisions: {}, valide: false };
+            parPersonnage[id] = { items: window.tirerObjetsAleatoires(difficulte, 2), decisions: {}, valide: false };
         });
 
         return { maj: { Butin: {
             ouvert: true,
             etape: "personnel",
+            difficulte,
             participants,
             parPersonnage,
             pool: [],
@@ -229,6 +311,20 @@ window.afficherEquipementActuelButin = function(mesPersonnages) {
 //  VUE 1 : LE BUTIN PERSONNEL
 // =========================================================================
 
+// L'étiquette de rareté et, s'il manque la carac, l'avertissement de prérequis
+// — les deux mêmes lignes dans les trois vues du butin.
+window.bandeauObjetButin = function(item, idPersonnage) {
+    const couleur = (window.COULEUR_RARETE && window.COULEUR_RARETE[item.rarete]) || "#5c3a21";
+    let html = `<div class="etiquette-rarete" style="color:${couleur};">${item.rarete || ""}${item.deuxMains ? " · deux mains" : ""}</div>`;
+    if (idPersonnage && typeof window.peutEquiper === "function") {
+        const test = window.peutEquiper(idPersonnage, item);
+        if (!test.possible) {
+            html += `<div class="prerequis-objet">⚠ ${item.carac} ${item.prerequis} requis (tu as ${test.valeur})</div>`;
+        }
+    }
+    return html;
+};
+
 window.rendreVuePersonnelleButin = function(butin, mesPersonnages) {
     const conteneur = document.getElementById("butin-vue-personnel");
     if (!conteneur) return;
@@ -265,23 +361,31 @@ window.rendreVuePersonnelleButin = function(butin, mesPersonnages) {
 
 window.rendreCarteLootPersonnel = function(idPersonnage, item, bloc) {
     const decision = bloc.decisions ? bloc.decisions[item.uid] : undefined;
-    const icone = window.iconeParEmplacement(item.emplacement);
+    const icone = window.iconeParEmplacement(item);
     const image = item.image ? `<img src="${item.image}" alt="${item.nom}" style="display:block;">`
                               : `<div class="icone-emplacement-vide">${icone}</div>`;
+
+    // Un objet dont on n'a pas la carac se prend quand même... mais ne peut pas
+    // s'équiper. Autant le dire ici : le bouton Prendre reste, grisé, et le
+    // joueur a tout intérêt à le laisser au partage pour un camarade.
+    const test = typeof window.peutEquiper === "function"
+        ? window.peutEquiper(idPersonnage, item) : { possible: true };
 
     let actions;
     if (decision === true) actions = `<div class="statut-loot pris">✔️ Pris</div>`;
     else if (decision === false) actions = `<div class="statut-loot laisse">Laissé</div>`;
     else if (bloc.valide) actions = `<div class="statut-loot laisse">Non décidé</div>`;
     else actions = `<div class="carte-loot-actions">
-        <button class="btn-loot-mini prendre" onclick="window.choisirLootPersonnel('${idPersonnage}','${item.uid}', true)">Prendre</button>
+        <button class="btn-loot-mini prendre"${test.possible ? "" : ' disabled style="opacity:0.4; cursor:not-allowed;" title="Caractéristique insuffisante"'}
+                onclick="window.choisirLootPersonnel('${idPersonnage}','${item.uid}', true)">Prendre</button>
         <button class="btn-loot-mini laisser" onclick="window.choisirLootPersonnel('${idPersonnage}','${item.uid}', false)">Laisser</button>
     </div>`;
 
-    return `<div class="carte-loot">
+    return `<div class="carte-loot${test.possible ? "" : " loot-hors-portee"}">
         <div class="carre-equipement">${image}</div>
-        <div class="libelle-emplacement">${window.libelleEmplacement(item.emplacement)}</div>
+        <div class="libelle-emplacement">${window.libelleEmplacement(item)}</div>
         <div class="nom-objet-equipe">${item.nom}</div>
+        ${window.bandeauObjetButin(item, idPersonnage)}
         <div class="effet-objet-equipe">${item.effetTexte || ""}</div>
         ${actions}
     </div>`;
@@ -301,33 +405,84 @@ window.choisirLootPersonnel = function(idPersonnage, uid, prendre) {
     const item = bloc && bloc.items.find(it => it.uid === uid);
     if (!item) return;
 
-    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
-    const champFront = window.emplacementVersChampFront[item.emplacement] || "equipArmure";
-    const actuel = perso ? perso[champFront] : null;
+    window.ouvrirConfirmationEquip(idPersonnage, item, uid);
+};
 
+// La fenêtre de confirmation, qui répond à trois questions d'un coup : ce que
+// l'objet apporte, ce qu'il DÉTRUIT (une arme à deux mains en écrase deux), et
+// dans quelle main le mettre. Un objet dont on n'a pas la carac s'affiche
+// quand même, mais sans bouton pour l'équiper : le joueur voit ce qu'il rate.
+window.ouvrirConfirmationEquip = function(idPersonnage, item, uid) {
+    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
     window.BUTIN_CHOIX_EN_ATTENTE = { idPersonnage, uid, item };
-    window.remplirComparaisonEquip(actuel, item);
+
+    const test = typeof window.peutEquiper === "function"
+        ? window.peutEquiper(idPersonnage, item) : { possible: true };
+
+    // Les mains proposées : une seule pour une armure ou une arme à deux mains,
+    // les deux pour le reste.
+    let choix;
+    if (item.emplacement === "Armure") {
+        choix = [{ libelle: "Équiper", main: null }];
+    } else if (item.deuxMains) {
+        choix = [{ libelle: "Équiper à deux mains", main: null }];
+    } else {
+        choix = [{ libelle: "Main droite", main: "Droite" }, { libelle: "Main gauche", main: "Gauche" }];
+    }
+
+    // La comparaison montre, pour le premier choix, ce qui serait perdu.
+    window.remplirComparaisonEquip(window.objetsEcrasesPar(perso, item, choix[0].main), item);
+
+    const message = document.getElementById("message-confirmation-equip");
+    if (message) {
+        message.innerText = test.possible ? ""
+            : `Il te faut ${item.prerequis} en ${item.carac} pour porter cet objet (tu as ${test.valeur}).`;
+        message.style.display = test.possible ? "none" : "block";
+    }
+
+    const actions = document.getElementById("actions-confirmation-equip");
+    if (actions) {
+        const boutons = test.possible ? choix.map(c => {
+            const perdus = window.objetsEcrasesPar(perso, item, c.main);
+            const detail = perdus.length ? ` (remplace ${perdus.map(o => o.nom).join(" et ")})` : "";
+            return `<button class="btn-parametres" style="background-color: #1b6e3a; border-color: #0f4021;"
+                        onmouseover="window.remplirComparaisonEquip(window.objetsEcrasesPar(
+                            (window.PERSOS_PARTIE||[]).find(p => p.idPersonnage === '${idPersonnage}'),
+                            window.BUTIN_CHOIX_EN_ATTENTE.item, ${c.main ? `'${c.main}'` : "null"}),
+                            window.BUTIN_CHOIX_EN_ATTENTE.item)"
+                        onclick="window.confirmerChoixButin(true, ${c.main ? `'${c.main}'` : "null"})">${c.libelle}${detail}</button>`;
+        }).join("") : "";
+        actions.innerHTML = boutons +
+            `<button class="btn-parametres" onclick="window.confirmerChoixButin(false)">Annuler</button>`;
+    }
+
     document.getElementById("popup-confirmation-equip").style.display = "flex";
 };
 
-window.remplirComparaisonEquip = function(actuel, nouveau) {
+// "actuels" est une LISTE : une arme à deux mains chasse ce que portent les
+// deux mains, et le joueur doit voir les deux objets qu'il sacrifie.
+window.remplirComparaisonEquip = function(actuels, nouveau) {
     const rendre = (objet) => {
         if (!objet || !objet.nom) {
             return `<div class="carre-equipement"><div class="icone-emplacement-vide">—</div></div>
                     <div class="nom-objet-equipe">Rien d'équipé</div>`;
         }
-        const icone = window.iconeParEmplacement(objet.emplacement);
+        const icone = window.iconeParEmplacement(objet);
         const image = objet.image ? `<img src="${objet.image}" alt="${objet.nom}" style="display:block;">`
                                    : `<div class="icone-emplacement-vide">${icone}</div>`;
+        const couleur = (window.COULEUR_RARETE && window.COULEUR_RARETE[objet.rarete]) || "#5c3a21";
         return `<div class="carre-equipement">${image}</div>
                 <div class="nom-objet-equipe">${objet.nom}</div>
+                <div class="etiquette-rarete" style="color:${couleur};">${objet.rarete || ""}</div>
                 <div class="effet-objet-equipe">${objet.effetTexte || ""}</div>`;
     };
-    document.getElementById("comparaison-actuel").innerHTML = rendre(actuel);
+    const liste = Array.isArray(actuels) ? actuels : (actuels ? [actuels] : []);
+    document.getElementById("comparaison-actuel").innerHTML =
+        liste.length === 0 ? rendre(null) : liste.map(rendre).join('<div class="separateur-comparaison"></div>');
     document.getElementById("comparaison-nouveau").innerHTML = rendre(nouveau);
 };
 
-window.confirmerChoixButin = async function(confirme) {
+window.confirmerChoixButin = async function(confirme, main) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     document.getElementById("popup-confirmation-equip").style.display = "none";
     const attente = window.BUTIN_CHOIX_EN_ATTENTE;
@@ -335,7 +490,7 @@ window.confirmerChoixButin = async function(confirme) {
     if (!attente) return;
 
     if (confirme) {
-        await window.equiperObjetButin(attente.idPersonnage, attente.item);
+        await window.equiperObjet(attente.idPersonnage, attente.item, main);
         await window.enregistrerDecisionButin(attente.idPersonnage, attente.uid, true);
     }
     // Annulé : la décision reste ouverte, le joueur peut recliquer Prendre ou Laisser.
@@ -419,7 +574,7 @@ window.rendreVuePartageButin = function(butin, mesIds) {
 };
 
 window.rendreCarteLootPool = function(item, mesIds, dejaValide) {
-    const icone = window.iconeParEmplacement(item.emplacement);
+    const icone = window.iconeParEmplacement(item);
     const image = item.image ? `<img src="${item.image}" alt="${item.nom}" style="display:block;">`
                               : `<div class="icone-emplacement-vide">${icone}</div>`;
     const candidats = item.candidats || [];
@@ -437,6 +592,14 @@ window.rendreCarteLootPool = function(item, mesIds, dejaValide) {
             const dedans = candidats.includes(id);
             const p = (window.PERSOS_PARTIE || []).find(x => x.idPersonnage === id);
             const suffixeNom = mesIds.length > 1 ? ` (${p ? p.prenom : id})` : "";
+            // Inutile de se placer sur un objet qu'on ne pourra pas porter :
+            // ce serait un tirage au sort gagné pour rien.
+            const test = typeof window.peutEquiper === "function"
+                ? window.peutEquiper(id, item) : { possible: true };
+            if (!test.possible) {
+                return `<button class="btn-loot-mini place" disabled style="opacity:0.4; cursor:not-allowed;"
+                    title="${item.carac} ${item.prerequis} requis">Hors de portée${suffixeNom}</button>`;
+            }
             return `<button class="btn-loot-mini ${dedans ? "retirer" : "place"}"
                 onclick="window.togglePlacementPool('${id}','${item.uid}')">${dedans ? "Se retirer" : "Se placer"}${suffixeNom}</button>`;
         }).join("") + `</div>`;
@@ -444,8 +607,9 @@ window.rendreCarteLootPool = function(item, mesIds, dejaValide) {
 
     return `<div class="carte-loot">
         <div class="carre-equipement">${image}</div>
-        <div class="libelle-emplacement">${window.libelleEmplacement(item.emplacement)}</div>
+        <div class="libelle-emplacement">${window.libelleEmplacement(item)}</div>
         <div class="nom-objet-equipe">${item.nom}</div>
+        ${window.bandeauObjetButin(item, mesIds[0])}
         <div class="effet-objet-equipe">${item.effetTexte || ""}</div>
         <div class="candidats-loot">${nomsCandidats.length ? "Convoité par : " + nomsCandidats.join(", ") : "Personne pour l'instant"}</div>
         ${actions}
@@ -516,7 +680,13 @@ window.validerButinPool = async function() {
 
     if (resolution) {
         for (const item of resolution) {
-            if (item.gagnant) await window.equiperObjetButin(item.gagnant, item);
+            if (!item.gagnant) continue;
+            // Dernier garde-fou : on n'équipe jamais quelqu'un qui n'a pas la
+            // carac (il n'aurait pas dû pouvoir se placer, mais une fiche lue
+            // en retard suffirait à passer au travers).
+            const test = typeof window.peutEquiper === "function"
+                ? window.peutEquiper(item.gagnant, item) : { possible: true };
+            if (test.possible) await window.equiperObjetButin(item.gagnant, item);
         }
     }
 };
@@ -533,7 +703,7 @@ window.rendreVueFinButin = function(butin, mesIds) {
         return;
     }
     conteneur.innerHTML = butin.pool.map(item => {
-        const icone = window.iconeParEmplacement(item.emplacement);
+        const icone = window.iconeParEmplacement(item);
         const image = item.image ? `<img src="${item.image}" alt="${item.nom}" style="display:block;">`
                                   : `<div class="icone-emplacement-vide">${icone}</div>`;
         const gagnantPerso = item.gagnant ? (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === item.gagnant) : null;
@@ -546,8 +716,9 @@ window.rendreVueFinButin = function(butin, mesIds) {
 
         return `<div class="carte-loot${inaccessible ? " loot-inaccessible" : ""}">
             <div class="carre-equipement">${image}</div>
-            <div class="libelle-emplacement">${window.libelleEmplacement(item.emplacement)}</div>
+            <div class="libelle-emplacement">${window.libelleEmplacement(item)}</div>
             <div class="nom-objet-equipe">${item.nom}</div>
+            ${window.bandeauObjetButin(item, null)}
             <div class="effet-objet-equipe">${item.effetTexte || ""}</div>
             ${statut}
         </div>`;

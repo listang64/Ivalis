@@ -216,6 +216,10 @@ window.ajouterEtapeMouvement = function(q, r) {
     const estGlace = persoActuel && persoActuel.Etats_Alteres
         && persoActuel.Etats_Alteres.some(e => e.nom === "Glacé");
 
+    // Cases gratuites accumulées en frappant (état "Repli", cf. moteur_effets.js).
+    const casesOffertes = typeof window.bonusEquip === "function"
+        ? window.bonusEquip(persoActuel, "hexApresAttaque") : 0;
+
     for (let i = 0; i < segment.length; i++) {
         let step = segment[i];
 
@@ -245,6 +249,21 @@ window.ajouterEtapeMouvement = function(q, r) {
         // garde son avantage même sur un sol qui coûte double.
         const diviseur = window.atoutRace(persoActuel).diviseurDeplacement || 1;
         if (diviseur > 1) baseCost = Math.max(1, Math.round(baseCost / diviseur));
+
+        // L'équipement alourdit ou allège chaque case : le bouclier lourd coûte
+        // une énergie de plus, le couteau une de moins. Une case ne descend
+        // jamais sous 1 : se déplacer coûte toujours quelque chose.
+        const modEquip = typeof window.bonusEquip === "function"
+            ? window.bonusEquip(persoActuel, "coutDeplacement") : 0;
+        if (modEquip) baseCost = Math.max(1, baseCost + modEquip);
+
+        // Le pas de retraite offert par une arme : les premières cases du
+        // prochain déplacement sont gratuites. Elles sont comptées sur le
+        // chemin en cours de tracé, et l'état est consommé à la validation.
+        if (window.CHEMIN_MOUVEMENT.length < casesOffertes) {
+            baseCost = 0;
+            couleur = "#ffd700";
+        }
 
         if (window.MOUVEMENT_COUT_TOTAL + baseCost > fatigueDispo) {
             window.afficherMessageFlottantHex(step.q, step.r, "Énergie insuffisante");

@@ -46,7 +46,6 @@ const COL = {
   PERSONNAGES: "Personnages",
   MESSAGES: "Messages_Chat",
   CARACTERISTIQUES: "Caracteristiques", // <-- NOUVEAU
-  OBJETS: "Objets" // Catalogue des armes/armures pouvant être trouvées en butin
 };
 
 // Identifiants des documents uniques (anciennes cellules fixes des Sheets)
@@ -197,56 +196,16 @@ window.persoDocVersFront = persoDocVersFront;
 // =========================================================================
 //  Les objets équipés sont enregistrés EN COPIE sur la fiche du personnage
 //  (comme les techniques de monstres recopient leur gabarit) plutôt que comme
-//  une simple référence vers le catalogue : si un objet du catalogue change
-//  ou disparaît plus tard, ce qu'un héros porte déjà n'est pas affecté.
-//  Un objet pris à un emplacement remplace définitivement celui qui s'y
-//  trouvait — il n'existe pas de "sac" où le ranger.
+//  une simple référence : un objet est tiré au hasard à la victoire, avec ses
+//  propres chiffres (objets.js), et ce qu'un héros porte lui appartient tel
+//  quel pour toujours. Un objet pris à un emplacement remplace définitivement
+//  celui qui s'y trouvait — il n'existe pas de "sac" où le ranger.
 
-window.CACHE_OBJETS = {};
-let unsubscribeObjets = null;
+// Les objets ne viennent plus d'une collection en base mais du tableau
+// d'équipement de Nico, transcrit dans objets.js : le tirage se fait donc
+// entièrement côté client, au moment de la victoire, à partir de la difficulté
+// de la rencontre. Rien à peupler, rien à synchroniser.
 
-// Catalogue des objets pouvant apparaître en butin, tenu à jour en temps réel.
-window.ecouterCatalogueObjets = function() {
-    if (unsubscribeObjets) unsubscribeObjets();
-    unsubscribeObjets = onSnapshot(collection(db, COL.OBJETS), (snap) => {
-        const catalogue = {};
-        snap.forEach(docSnap => { catalogue[docSnap.id] = { id: docSnap.id, ...docSnap.data() }; });
-        window.CACHE_OBJETS = catalogue;
-    }, (err) => console.error("onSnapshot Objets :", err));
-};
-
-// Un jeu d'objets de départ, pour tester le loot sans attendre l'outil de
-// création (prévu pour une phase suivante). Trois par emplacement.
-window.seedObjetsExemple = async function() {
-    const exemples = [
-        { Nom: "Cuirasse du Rempart", Emplacement: "Armure",
-          Effet_Texte: "Renforce la carapace du porteur : légère résistance aux coups physiques." },
-        { Nom: "Manteau des Ombres", Emplacement: "Armure",
-          Effet_Texte: "Tissé dans une étoffe qui boit la lumière : discrétion accrue en territoire hostile." },
-        { Nom: "Plates de l'Aube Ancienne", Emplacement: "Armure",
-          Effet_Texte: "Une armure lourde et austère, forgée pour encaisser sans broncher." },
-        { Nom: "Lame Fidèle", Emplacement: "Main_Droite",
-          Effet_Texte: "Une épée équilibrée, fiable en toutes circonstances." },
-        { Nom: "Marteau des Cimes", Emplacement: "Main_Droite",
-          Effet_Texte: "Un marteau de guerre massif, redoutable au corps à corps." },
-        { Nom: "Dague du Chuchoteur", Emplacement: "Main_Droite",
-          Effet_Texte: "Fine et rapide, elle frappe avant que l'adversaire ne réagisse." },
-        { Nom: "Bouclier du Veilleur", Emplacement: "Main_Gauche",
-          Effet_Texte: "Un bouclier robuste, pensé pour parer les assauts les plus rudes." },
-        { Nom: "Grimoire aux Pages Ternies", Emplacement: "Main_Gauche",
-          Effet_Texte: "Un vieux grimoire empli de formules à moitié oubliées." },
-        { Nom: "Focaliseur de Jade", Emplacement: "Main_Gauche",
-          Effet_Texte: "Une pierre taillée qui canalise l'énergie magique du porteur." }
-    ];
-    for (const objet of exemples) {
-        await setDoc(doc(collection(db, COL.OBJETS)), { ...objet, URL_Image: "" });
-    }
-    console.log(`🗡️ ${exemples.length} objets d'exemple créés dans la collection "Objets".`);
-};
-
-// Remplit les trois encarts de la fiche : image (ou icône par défaut), nom et
-// texte d'effet. "objet" est au format déjà posé sur la fiche (uid, nom,
-// emplacement, effetTexte, image) — le même que celui écrit par le butin.
 window.afficherEmplacementEquipement = function(suffixe, objet) {
     const carte = document.getElementById("emplacement-" + suffixe + "-carte");
     if (!carte) return;
@@ -254,6 +213,9 @@ window.afficherEmplacementEquipement = function(suffixe, objet) {
     const icone = document.getElementById("emplacement-" + suffixe + "-icone");
     const nom = document.getElementById("emplacement-" + suffixe + "-nom");
     const effet = document.getElementById("emplacement-" + suffixe + "-effet");
+    const rarete = document.getElementById("emplacement-" + suffixe + "-rarete");
+    const prerequis = document.getElementById("emplacement-" + suffixe + "-prerequis");
+    const lacher = document.getElementById("emplacement-" + suffixe + "-lacher");
 
     const rempli = !!(objet && objet.nom);
     carte.classList.toggle("emplacement-vide", !rempli);
@@ -261,7 +223,35 @@ window.afficherEmplacementEquipement = function(suffixe, objet) {
     if (effet) effet.innerText = rempli ? (objet.effetTexte || "") : "";
     const aUneImage = rempli && objet.image;
     if (image) { image.src = aUneImage ? objet.image : ""; image.style.display = aUneImage ? "block" : "none"; }
-    if (icone) icone.style.display = aUneImage ? "none" : "flex";
+    if (icone) {
+        icone.style.display = aUneImage ? "none" : "flex";
+        if (rempli && typeof window.iconeParEmplacement === "function") icone.innerText = window.iconeParEmplacement(objet);
+    }
+
+    // La rareté colore l'étiquette : c'est la lecture la plus rapide de la
+    // valeur d'un objet, et elle reprend les couleurs du tableau (gris, vert,
+    // bleu, violet). Une arme à deux mains le dit ici aussi.
+    if (rarete) {
+        const mots = rempli ? [objet.rarete, objet.deuxMains ? "deux mains" : null].filter(Boolean) : [];
+        rarete.innerText = mots.join(" · ");
+        rarete.style.display = mots.length ? "block" : "none";
+        rarete.style.color = (rempli && window.COULEUR_RARETE && window.COULEUR_RARETE[objet.rarete]) || "#5c3a21";
+    }
+
+    // Le prérequis n'apparaît que s'il n'est pas rempli : un objet qu'on porte
+    // sans avoir la carac ne donne rien, il faut le voir tout de suite.
+    if (prerequis) {
+        let texte = "";
+        const idPersonnage = document.getElementById("champ-id-personnage")?.value;
+        if (rempli && objet.prerequis > 0 && typeof window.peutEquiper === "function") {
+            const test = window.peutEquiper(idPersonnage, objet);
+            if (!test.possible) texte = `⚠ ${objet.carac} ${objet.prerequis} requis (tu as ${test.valeur})`;
+        }
+        prerequis.innerText = texte;
+        prerequis.style.display = texte ? "block" : "none";
+    }
+
+    if (lacher) lacher.style.display = rempli ? "inline-block" : "none";
 };
 
 // Appelée à l'ouverture de la fiche, comme chargerOngletCompetences : "donnees"
@@ -386,6 +376,23 @@ window.atoutRace = function(perso) {
     return window.ATOUTS_RACES[perso.race] || window.ATOUTS_RACES[perso.Race] || {};
 };
 
+// L'équipement (objets.js) s'ajoute aux stats exactement comme les atouts de
+// race : jamais recopié dans les valeurs enregistrées, toujours additionné à la
+// lecture. Retirer une arme rend donc immédiatement ses points, et un
+// personnage sans équipement se comporte comme avant.
+window.bonusEquip = function(perso, cle) {
+    if (!perso) return 0;
+    let total = 0;
+    if (typeof window.bonusEquipement === "function") total += window.bonusEquipement(perso)[cle] || 0;
+    // Un état peut porter les MÊMES bonus, le temps qu'il dure : c'est ainsi
+    // que fonctionnent l'élan d'initiative et les bénédictions des bagues de
+    // soin. Ils s'éteignent tout seuls avec la durée des états.
+    (perso.Etats_Alteres || []).forEach(e => {
+        if (e && e.bonusEquip && typeof e.bonusEquip[cle] === "number") total += e.bonusEquip[cle];
+    });
+    return total;
+};
+
 window.esquiveCombattant = function(perso) {
     if (!perso) return 0;
     return (parseInt(perso.Esquive) || 0) + (parseInt(perso.Dev_Mod_Esquive) || 0)
@@ -395,19 +402,22 @@ window.esquiveCombattant = function(perso) {
 window.paradeCombattant = function(perso) {
     if (!perso) return 0;
     return (parseInt(perso.Parade) || 0) + (parseInt(perso.Dev_Mod_Parade) || 0)
-         + (window.atoutRace(perso).parade || 0);
+         + (window.atoutRace(perso).parade || 0)
+         + window.bonusEquip(perso, "parade");
 };
 
 window.defPhysiqueCombattant = function(perso) {
     if (!perso) return 0;
     return (parseInt(perso.Def_Physique) || 0) + (parseInt(perso.Dev_Mod_DefPhys) || 0)
-         + (window.atoutRace(perso).defPhysique || 0);
+         + (window.atoutRace(perso).defPhysique || 0)
+         + window.bonusEquip(perso, "resPhys");
 };
 
 window.defMagiqueCombattant = function(perso) {
     if (!perso) return 0;
     return (parseInt(perso.Def_Magique) || 0) + (parseInt(perso.Dev_Mod_DefMag) || 0)
-         + (window.atoutRace(perso).defMagique || 0);
+         + (window.atoutRace(perso).defMagique || 0)
+         + window.bonusEquip(perso, "resMag");
 };
 
 // Une créature ou pas ? Trois indices concordants, parce que la réponse décide
@@ -423,7 +433,8 @@ window.estUneCreature = function(perso, idCombattant) {
 window.critiqueCombattant = function(perso) {
     if (!perso) return 0;
     return (parseInt(perso.Critique) || 0) + (parseInt(perso.Dev_Mod_Critique) || 0)
-         + (window.atoutRace(perso).critique || 0);
+         + (window.atoutRace(perso).critique || 0)
+         + window.bonusEquip(perso, "critique");
 };
 
 // Le nombre de cartes qu'un héros peut mémoriser : six pour tout le monde, sept
@@ -3754,7 +3765,6 @@ document.addEventListener("DOMContentLoaded", function () {
   if (typeof window.chargerCacheEffetsBDD === "function") window.chargerCacheEffetsBDD();
 
   // Catalogue des objets pouvant apparaître en butin.
-  if (typeof window.ecouterCatalogueObjets === "function") window.ecouterCatalogueObjets();
 
   // NOUVEAU : Application des volumes sauvegardés au lancement
   window.appliquerVolumesAudio();

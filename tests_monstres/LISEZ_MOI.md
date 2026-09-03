@@ -73,6 +73,8 @@ node atouts_races.mjs       # les sept peuples et leurs avantages, mesurés un p
 node jauge_token.mjs        # la jauge sous le pion survit à un redessin
 node jauge_cibles.mjs       # la vie restante des cibles s'affiche pendant le ciblage
 node butin_loot.mjs         # butin de fin de combat : détection, personnel, partage, tirage au sort
+node objets_tableau.mjs     # le catalogue d'équipement, confronté au tableau de Nico
+node equipement_combat.mjs  # ce que les objets font une fois portés, en combat
 node apercu_butin.mjs       # onglet Inventaire et fenêtres de butin, capturés à l'écran
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
@@ -109,10 +111,12 @@ Ce banc modifie la fatigue max d'un gabarit (60, 100, 150, 240) et vérifie que
 les six tranches de coût suivent proportionnellement, puis contrôle que sur tout
 le bestiaire réel aucune carte ne sort de sa tranche.
 
-## Butin de fin de combat
+## Butin, équipement et tableau des armes
 
 ```sh
 node butin_loot.mjs         # détection de victoire, fenêtre personnelle, partage, tirage au sort
+node objets_tableau.mjs     # le catalogue d'équipement, confronté au tableau de Nico
+node equipement_combat.mjs  # ce que les objets font une fois portés, en combat
 node apercu_butin.mjs       # onglet Inventaire et fenêtres de butin, capturés à l'écran
 ```
 
@@ -132,10 +136,31 @@ C'est ce banc qui a détecté un vrai bug avant qu'il n'atteigne le jeu :
 `validerButinPool` plantait (`for...of` sur `true`) dès qu'un joueur validait
 sans être le dernier, faute de `resultat` explicite dans ce cas.
 
+`objets_tableau.mjs` relit les deux classeurs de Nico (figés dans
+`tableau_objets.json`, extraits des `.xlsx` d'origine) et confronte le catalogue
+d'`objets.js` à leur contenu : les 23 lignes dans le même ordre, le type et la
+caractéristique de chacune, puis **les chiffres de chaque cellule de palier, un
+par un** (92 cellules), le nombre d'effets de rareté et leur réservoir, le
+doublement des épiques, les trois colonnes d'effets, les prérequis, et enfin les
+chances de rareté — vérifiées à la fois sur la table et sur 20 000 tirages
+réels. C'est le garde-fou contre la faute de frappe : une arme épique plus
+faible qu'une très rare ne se voit pas en jouant, elle se voit ici.
+
+`equipement_combat.mjs` regarde ce que les objets FONT une fois portés, sur le
+vrai code du moteur : bonus qui remontent dans les stats, arme à deux mains qui
+ne compte qu'une fois malgré ses deux emplacements, techniques interdites par
+l'arme en main (et le sort qui exige une main libre, qu'une bague ne ferme pas),
+dégâts plats greffés sur la carte, états de l'arme injectés dans les altérations
+(sans doublon quand la carte les inflige déjà), jets de percée d'armure tirés
+une seule fois pour tous les postes, portée et allonge, prérequis en
+caractéristique, provocation qui aveugle une créature, et états temporaires
+(élan, bénédictions) qui empruntent les mêmes canaux de stats que l'équipement.
+
 `apercu_butin.mjs` charge le vrai `style.css` et le vrai balisage
 d'`index.html`, remplit l'onglet Inventaire et les trois vues du butin avec les
-vraies fonctions de rendu, et capture des écrans (`/tmp/apercu_*.png`) — utile
-pour juger le rendu à l'œil sans ouvrir le jeu.
+vraies fonctions de rendu et de VRAIS objets tirés du catalogue, et capture des
+écrans (`/tmp/apercu_*.png`) — utile pour juger le rendu à l'œil sans ouvrir le
+jeu.
 
 ⚠️ `combat_complet.mjs` ramène à zéro la DURÉE des pauses de l'IA. Ne pas
 remplacer `setTimeout` par un appel synchrone : au bout de quelques dizaines

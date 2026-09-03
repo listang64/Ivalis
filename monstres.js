@@ -757,6 +757,13 @@ window.genererRencontreMonstres = async function(difficulte) {
         window.equiperCompetencesRencontre(poses).catch(e => console.error(e));
     }
 
+    // La difficulté sert au butin de fin de combat : c'est elle qui décide des
+    // chances de rareté (tableau de loot). Elle n'existait nulle part une fois
+    // la rencontre lancée — on la garde donc sur la partie.
+    if (typeof window.modifierPartie === "function") {
+        await window.modifierPartie(() => ({ maj: { Difficulte_Rencontre: difficulte } }));
+    }
+
     console.log(`🐲 Rencontre ${difficulte} : ${surLeTerrain.length} sur le terrain, ${enReserve.length} en réserve.`);
     return { surLeTerrain, enReserve };
 };

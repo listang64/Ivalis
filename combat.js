@@ -407,13 +407,21 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
             const coutFatigue = parseInt(data.Fatigue) || 0;
             const estEpuise = coutFatigue > window.COMBAT_FATIGUE_ACTUELLE;
 
-            const urlCadre = estEpuise ? IMAGE_CADRE_EPUISE : IMAGE_CADRE_NORMAL;
-            const classeEpuise = estEpuise ? "banniere-epuisee" : "";
-            const couleurTexte = estEpuise ? "#888888" : "#e0d0b0";
+            // L'arme en main peut interdire la technique. Une carte inadaptée
+            // reste visible — le joueur doit comprendre POURQUOI elle ne part
+            // pas — mais elle s'assombrit et annonce sa raison au survol.
+            const persoCarte = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
+            const blocageArme = typeof window.raisonBlocageCarte === "function"
+                ? window.raisonBlocageCarte(persoCarte, data.Arme) : null;
+
+            const urlCadre = (estEpuise || blocageArme) ? IMAGE_CADRE_EPUISE : IMAGE_CADRE_NORMAL;
+            const classeEpuise = (estEpuise || blocageArme) ? "banniere-epuisee" : "";
+            const couleurTexte = (estEpuise || blocageArme) ? "#888888" : "#e0d0b0";
+            const titreSurvol = blocageArme ? ` title="${blocageArme.replace(/"/g, "&quot;")}"` : "";
 
             htmlDeck += `
             <div style="position: relative; height: 100px; margin-bottom: ${ESPACEMENT_BANNIERES}px; transition: margin 0.2s ease;">
-                <div onclick="event.stopPropagation(); window.gererClicCarteCombat('${idCarte}')"
+                <div onclick="event.stopPropagation(); window.gererClicCarteCombat('${idCarte}')"${titreSurvol}
                      onmouseover="document.getElementById('combat-carte-${idCarte}').style.transform='scale(0.75) translateX(15px)'; document.getElementById('combat-carte-${idCarte}').style.zIndex='100';"
                      onmouseout="document.getElementById('combat-carte-${idCarte}').style.transform='scale(0.75) translateX(0px)'; document.getElementById('combat-carte-${idCarte}').style.zIndex='2';"
                      style="position: absolute; top: 35px; left: 0; width: 335px; height: 40px; z-index: 10; cursor: pointer;">
@@ -2518,6 +2526,22 @@ window.jouerCarteCombat = async function(idCarte) {
     const dataCarte = window.COMPETENCES_CACHE[idCarte];
     if (!dataCarte) return;
 
+    // Ce qu'on tient en main peut interdire la technique : pas d'attaque légère
+    // avec une hache, pas de sort les deux mains prises. Contrôlé ici, au
+    // moment de jouer, plutôt qu'à la Forge : une carte reste forgeable, elle
+    // attend seulement la bonne arme.
+    if (typeof window.raisonBlocageCarte === "function") {
+        const blocage = window.raisonBlocageCarte(persoActuel, dataCarte.Arme);
+        if (blocage) {
+            if (typeof window.afficherMessageFlottantHex === "function") {
+                const tk = (window.TOKENS_VTT_DATA || {})[persoActuel.idPersonnage];
+                if (tk) window.afficherMessageFlottantHex(tk.q, tk.r, "Arme inadaptée", "#ff4c4c");
+            }
+            alert(blocage);
+            return;
+        }
+    }
+
     const btn = document.getElementById("btn-choisir-action");
     if(btn) { btn.innerText = "Préparation..."; btn.disabled = true; }
 
@@ -2553,7 +2577,11 @@ window.jouerCarteCombat = async function(idCarte) {
             // file.sort() ci-dessous relit la valeur qu'on vient d'écrire), puis l'état disparaît.
             // Une transaction peut être rejouée plusieurs fois : on n'écrit rien
             // d'autre ici, on note seulement ce qu'il faudra faire après coup.
-            let initiativeCarte = dataCarte.Initiative || 0;
+            // L'équipement (épée courte, effet A/B "+3 initiative") avance le
+            // héros dans la piste ; l'élan temporaire gagné en frappant s'y
+            // ajoute tant qu'il dure.
+            let initiativeCarte = (dataCarte.Initiative || 0)
+                + (typeof window.bonusEquip === "function" ? window.bonusEquip(persoActuel, "initiative") : 0);
             const etatElectrifie = persoActuel.Etats_Alteres && persoActuel.Etats_Alteres.find(e => e.nom === "Électrifié");
             if (etatElectrifie) {
                 initiativeCarte = Math.max(0, initiativeCarte - 35);

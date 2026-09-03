@@ -1,0 +1,429 @@
+{
+ "modeles": [
+  {
+   "ligne": 3,
+   "type": "Arme légère CAC",
+   "modele": "Dague",
+   "carac": "DEXTÉRITÉ",
+   "Commun": "+3% chance de critique",
+   "Rare": "+6% chance de critique",
+   "Très rare": "+10% chance de critique + 1 Effet A",
+   "Épique": "+10% chance de critique + 2XEffet A",
+   "noms": "Sica, panazonium"
+  },
+  {
+   "ligne": 4,
+   "type": "Arme légère CAC",
+   "modele": "Couteau",
+   "carac": "DEXTÉRITÉ",
+   "Commun": "-1 au coût du déplacement",
+   "Rare": "+3% chance de critique - 1 au coût du déplacement",
+   "Très rare": "+5% chance de critique -1 au coût du déplacement + 1 Effet A",
+   "Épique": "+5% chance de critique -1 au coût du déplacement + 2XEffet A",
+   "noms": "Couteaux"
+  },
+  {
+   "ligne": 5,
+   "type": "Arme lourde CAC",
+   "modele": "Épée courte",
+   "carac": "FORCE",
+   "Commun": "+5 d’initiative",
+   "Rare": "+1 dégâts physique +5 d’initiative",
+   "Très rare": "+2 dégâts physique + 8 d’initiative + 1 Effet A",
+   "Épique": "+2 dégâts physique + 8 d’initiative + 2XEffet A",
+   "noms": "Glaive, xiphos"
+  },
+  {
+   "ligne": 6,
+   "type": "Arme légère CAC",
+   "modele": "Épée courbée",
+   "carac": "DEXTÉRITÉ",
+   "Commun": "+ 1 dégâts physique",
+   "Rare": "+1 dégâts physique + 3% chance de critique",
+   "Très rare": "+2 dégâts physique + 5% chance de critique + 1 Effet A",
+   "Épique": "+2 dégâts physique + 5% chance de critique + 2XEffet A",
+   "noms": "Harpé, machaira, falcata"
+  },
+  {
+   "ligne": 7,
+   "type": "Arme lourde CAC",
+   "modele": "Hache",
+   "carac": "FORCE",
+   "Commun": "+1 dégâts physique",
+   "Rare": "+2 dégâts physique",
+   "Très rare": "+3 dégâts physique +1 Effet A",
+   "Épique": "+3 dégâts physique +2XEffet A",
+   "noms": "Sagaris, Labrys"
+  },
+  {
+   "ligne": 9,
+   "type": "Arme lourde CAC",
+   "modele": "Gourdin",
+   "carac": "FORCE",
+   "Commun": "10% de chance d’étourdissement",
+   "Rare": "15% de chance d’étourdissement",
+   "Très rare": "20% de chance d’étourdissement + 1 dégât + 1 Effet A",
+   "Épique": "20% de chance d’étourdissement + 1 dégât + 2XEffet A",
+   "noms": "Gourdin"
+  },
+  {
+   "ligne": 10,
+   "type": "Arme lourde CAC",
+   "modele": "Masse",
+   "carac": "FORCE",
+   "Commun": "15% de chance d’ignorer l’armure",
+   "Rare": "20% de chance d’ignorer l’armure",
+   "Très rare": "25% de chance d’ignorer l’armure + 1 Effet A",
+   "Épique": "25% de chance d’ignorer l’armure + 2XEffet A",
+   "noms": "Gada"
+  },
+  {
+   "ligne": 11,
+   "type": "Arme lourde CAC",
+   "modele": "Lance courte",
+   "carac": "FORCE",
+   "Commun": "+1 dégâts physique",
+   "Rare": "+1dégâts physique + 5% de chance de parade",
+   "Très rare": "+2 dégâts physique + 5% de chance de parade + 1 Effet A",
+   "Épique": "+2 dégâts physique + 5% de chance de parade+ 2XEffet A",
+   "noms": "Doratium"
+  },
+  {
+   "ligne": 12,
+   "type": "Arme polyvalente",
+   "modele": "Javelots",
+   "carac": "FORCE",
+   "Commun": "+1 Dégâts physique",
+   "Rare": "+1dégâts physique + 10% de chance d’ignorer l’armure",
+   "Très rare": "+1 dégâts physique + 15% de chance d’ignorer l’armure + 1 Effet A",
+   "Épique": "+1 dégâts physique + 12% de chance d’ignorer l’armure + 2XEffet A",
+   "noms": "Hasta, pilum"
+  },
+  {
+   "ligne": 13,
+   "type": "Arme légère Distance",
+   "modele": "Fronde",
+   "carac": "DEXTÉRITÉ",
+   "Commun": "10% de chance d’immobilisation +1 Portée",
+   "Rare": "15% de chance d’immobilisation +1 Portée",
+   "Très rare": "20% de chance d’immobilisation + 1 Effet A +1 Portée",
+   "Épique": "20% de chance d’immobilisation + 1 portée + 2XEffet A",
+   "noms": "Fronde"
+  },
+  {
+   "ligne": 14,
+   "type": "Bouclier",
+   "modele": "Bouclier léger",
+   "carac": "DEXTÉRITÉ",
+   "Commun": "20 Parade",
+   "Rare": "25 Parade",
+   "Très rare": "25 Parade + 1 Effet A",
+   "Épique": "25 Parade + 2X Effet A",
+   "noms": "Pelta, caetra"
+  },
+  {
+   "ligne": 15,
+   "type": "Bouclier",
+   "modele": "Bouclier intermédiaire",
+   "carac": "FORCE",
+   "Commun": "20 Parade",
+   "Rare": "25 Parade",
+   "Très rare": "25 Parade + 1 Effet A",
+   "Épique": "25 Parade + 2X Effet A",
+   "noms": "Aspi, clipeus"
+  },
+  {
+   "ligne": 16,
+   "type": "Bouclier",
+   "modele": "Bouclier lourd",
+   "carac": "FORCE",
+   "Commun": "28 Parade - +1 au coût de déplacement",
+   "Rare": "32 Parade +1 au coût de déplacement",
+   "Très rare": "32 Parade +1 au coût de déplacement + 1 Effet A",
+   "Épique": "32 Parade +1 au coût de déplacement + 2X Effet A",
+   "noms": "Scutum"
+  },
+  {
+   "ligne": 18,
+   "type": "Arme lourde CAC",
+   "modele": "Hache a deux mains",
+   "carac": "FORCE",
+   "Commun": "+2 dégâts physique",
+   "Rare": "+4 dégâts physique",
+   "Très rare": "+6 dégâts physique + 2 Effet A",
+   "Épique": "+6 dégâts physique +2X (2 Effet A)",
+   "noms": "Hache a deux mains"
+  },
+  {
+   "ligne": 19,
+   "type": "Arme lourde CAC",
+   "modele": "Masse a deux mains",
+   "carac": "FORCE",
+   "Commun": "30% de chance d’ignorer l’armure",
+   "Rare": "40% de chance d’ignorer l’armure",
+   "Très rare": "50% de chance d’ignorer l’armure + 2 Effet A",
+   "Épique": "50% de chance d’ignorer l’armure + 2X ( 2 Effet A)",
+   "noms": "Gada a deux mains"
+  },
+  {
+   "ligne": 20,
+   "type": "Arme lourde CAC",
+   "modele": "Lance a deux mains",
+   "carac": "FORCE",
+   "Commun": "+1 allonge",
+   "Rare": "+1 allonge + 2 dégâts",
+   "Très rare": "+1 allonge + 4 dégâts + 2 Effet A",
+   "Épique": "+1 allonge + 4 Dégâts + 2X (2 Effet A)",
+   "noms": "Lance lourde"
+  },
+  {
+   "ligne": 21,
+   "type": "Arme légère CAC",
+   "modele": "Épée a deux mains",
+   "carac": "DEXTÉRITÉ",
+   "Commun": "+1 dégâts physique +5 d’initiative",
+   "Rare": "+2 dégâts physique + 10 d’initiative",
+   "Très rare": "+ 4 dégâts physique + 10 d’initiative + 2 Effet A",
+   "Épique": "+ 4 dégâts physique + 10 d’initiative +2X ( 2 Effet A)",
+   "noms": "Falx"
+  },
+  {
+   "ligne": 22,
+   "type": "Arme légère Distance",
+   "modele": "Arc court",
+   "carac": "DEXTÉRITÉ",
+   "Commun": "+1 portée",
+   "Rare": "+1 Portée + 2 dégâts",
+   "Très rare": "+1 portée +4 dégâts + 2 Effet B",
+   "Épique": "+1 portée + 4 dégâts + 2X (2 Effet B)",
+   "noms": "Arc court"
+  },
+  {
+   "ligne": 24,
+   "type": "Magie",
+   "modele": "Bagues DPS",
+   "carac": "INTELLIGENCE",
+   "Commun": "+1 dégâts magique",
+   "Rare": "+2 dégâts magiques",
+   "Très rare": "+3 dégâts magiques +1 Effet B",
+   "Épique": "+3 dégâts magiques +2X Effet B",
+   "noms": "Bagues"
+  },
+  {
+   "ligne": 25,
+   "type": "Magie",
+   "modele": "Bagues Soins",
+   "carac": "SAGESSE",
+   "Commun": "+1 soin",
+   "Rare": "+2 soins",
+   "Très rare": "+3 soins + Effet C",
+   "Épique": "+3 soins + 2X Effet C",
+   "noms": "Bagues"
+  },
+  {
+   "ligne": 27,
+   "type": "Armure légère",
+   "modele": "Armure légère (Tissu, etc)",
+   "carac": "INTELLIGENCE",
+   "Commun": "Entre15 et 25% résistances magique et 5% résistance physique",
+   "Rare": "Entre 20%-30% résistances magique et Entre 5% et 10% en résistance physique",
+   "Très rare": "Entre 25%-40% résistance magique de base et entre 10% et 15% en résistance physique .",
+   "Épique": "40% résistance magique et 15% en résistance physique + 1 Effet A, B, ou C",
+   "noms": ""
+  },
+  {
+   "ligne": 28,
+   "type": "Armure intermédiaire",
+   "modele": "Armure intermédiaire (Cuir, etc)",
+   "carac": "DEXTÉRITÉ",
+   "Commun": "Entre 10%-15% résistance physique et Entre 10%-15% résistance magique",
+   "Rare": "Entre 13%-20% résistance physique et Entre 13%-20% résistance magique",
+   "Très rare": "Entre 18%-26% résistances physique et Entre 18%-26% magique et 10% en plus à repartir entre les deux aléatoirement",
+   "Épique": "26% résistance magique et 26% en résistance physique + 1 Effet A, B, ou C",
+   "noms": ""
+  },
+  {
+   "ligne": 29,
+   "type": "Armure lourde",
+   "modele": "Armure lourde (Bronze, acier, etc)",
+   "carac": "FORCE",
+   "Commun": "Entre15 et 25% résistances physique et 5% résistance magique",
+   "Rare": "Entre 20%-30% résistances physique et Entre 5% et 10% en résistance magique",
+   "Très rare": "Entre 25%-40% résistance physique de base et entre 10% et 15% en résistance magique .",
+   "Épique": "40% résistance physique et 15% en résistance magique + 1 Effet A, B, ou C",
+   "noms": ""
+  }
+ ],
+ "effetsA": [
+  {
+   "ligne": 3,
+   "texte": "+1 dégat"
+  },
+  {
+   "ligne": 4,
+   "texte": "10% chance d’empoisonnement"
+  },
+  {
+   "ligne": 5,
+   "texte": "10% chance d’étourdissement"
+  },
+  {
+   "ligne": 6,
+   "texte": "10% chance de gelée"
+  },
+  {
+   "ligne": 7,
+   "texte": "10% de chance de bruler"
+  },
+  {
+   "ligne": 8,
+   "texte": "10% chance d’immobiliser"
+  },
+  {
+   "ligne": 9,
+   "texte": "10% chance de peur"
+  },
+  {
+   "ligne": 10,
+   "texte": "10% chance de repousser"
+  },
+  {
+   "ligne": 12,
+   "texte": "10% chance d’augmenter initiative de 15 pendant 2 tours"
+  },
+  {
+   "ligne": 13,
+   "texte": "Gagne 1 hexagone de mouvement après l’attaque"
+  },
+  {
+   "ligne": 14,
+   "texte": "10% chance de provoquer"
+  },
+  {
+   "ligne": 15,
+   "texte": "+3 initiative"
+  },
+  {
+   "ligne": 16,
+   "texte": "+3% chance de coup critique"
+  },
+  {
+   "ligne": 18,
+   "texte": "+10% de chance d’ignorer les résistances"
+  }
+ ],
+ "effetsB": [
+  {
+   "ligne": 4,
+   "texte": "+1 dégat"
+  },
+  {
+   "ligne": 5,
+   "texte": "10% chance d’empoisonnement"
+  },
+  {
+   "ligne": 6,
+   "texte": "10% chance d’étourdissement"
+  },
+  {
+   "ligne": 7,
+   "texte": "10% chance de gelée"
+  },
+  {
+   "ligne": 8,
+   "texte": "10% de chance de bruler"
+  },
+  {
+   "ligne": 9,
+   "texte": "10% chance d’immobiliser"
+  },
+  {
+   "ligne": 10,
+   "texte": "10% chance de peur"
+  },
+  {
+   "ligne": 11,
+   "texte": "10% chance de repousser"
+  },
+  {
+   "ligne": 12,
+   "texte": "10% chance de tracter"
+  },
+  {
+   "ligne": 13,
+   "texte": "10% chance d’augmenter initiative de 15 pendant 2 tours"
+  },
+  {
+   "ligne": 14,
+   "texte": "Gagne 1 hexagone de mouvement après l’attaque"
+  },
+  {
+   "ligne": 15,
+   "texte": "10% chance de provoquer"
+  },
+  {
+   "ligne": 16,
+   "texte": "+3% chance de coup critique"
+  },
+  {
+   "ligne": 18,
+   "texte": "+3 initiative"
+  },
+  {
+   "ligne": 19,
+   "texte": "+10% de chance d’ignorer les résistances"
+  }
+ ],
+ "effetsC": [
+  {
+   "ligne": 4,
+   "texte": "+ 1 Soin"
+  },
+  {
+   "ligne": 5,
+   "texte": "+8% résistance magique sur un sort de soin pendant 1 tour"
+  },
+  {
+   "ligne": 6,
+   "texte": "+8% résistance physique sur sort de soin pendant 1 tour"
+  },
+  {
+   "ligne": 7,
+   "texte": "+8% de degats d’attaque sur un sort de soin pendant 1 tour"
+  },
+  {
+   "ligne": 8,
+   "texte": "+10 initiative pendant 3 tours sur lui"
+  },
+  {
+   "ligne": 9,
+   "texte": "+10% de chance d’ignorer les résistances"
+  }
+ ],
+ "prerequis": {
+  "Commun": 0,
+  "Rare": 10,
+  "Très rare": 12,
+  "Épique": 12
+ },
+ "chancesRarete": {
+  "Normale": {
+   "Commun": 0.75,
+   "Rare": 0.2,
+   "Très rare": 0.05,
+   "Épique": 0
+  },
+  "Difficile": {
+   "Commun": 0.55,
+   "Rare": 0.3,
+   "Très rare": 0.15,
+   "Épique": 0
+  },
+  "Très difficile": {
+   "Commun": 0.2,
+   "Rare": 0.4,
+   "Très rare": 0.35,
+   "Épique": 0.05
+  }
+ }
+}

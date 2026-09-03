@@ -2608,3 +2608,69 @@ textarea.input-texte-parchemin {
 }
 .fleche-comparaison { font-size: 24px; color: #8a5a1c; flex-shrink: 0; }
 .contenu-comparaison .carre-equipement { margin: 0 auto 8px auto; width: 76px; height: 76px; }
+
+/* ========================================================================= */
+/* ÉQUIPEMENT : RARETÉ, PRÉREQUIS, LÂCHER                                    */
+/* ========================================================================= */
+
+/* La rareté se lit à la couleur, reprise du tableau : gris, vert, bleu, violet. */
+.etiquette-rarete {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin: 2px 0 4px 0;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.25);
+}
+
+/* Un prérequis non rempli : jamais discret, c'est ce qui empêche d'équiper. */
+.prerequis-objet {
+    font-family: 'Almendra', serif;
+    font-size: 12px;
+    color: #8c2f2f;
+    background: rgba(140, 47, 47, 0.1);
+    border: 1px solid rgba(140, 47, 47, 0.35);
+    border-radius: 6px;
+    padding: 2px 6px;
+    margin: 4px 0;
+}
+
+.btn-lacher-objet {
+    font-family: 'Cinzel', serif;
+    font-size: 12px;
+    font-weight: bold;
+    color: #6b1a1a;
+    background: rgba(255,255,255,0.25);
+    border: 2px solid #a33;
+    border-radius: 20px;
+    padding: 4px 14px;
+    margin-top: 8px;
+    cursor: pointer;
+    transition: transform 0.15s ease, background-color 0.15s ease;
+}
+.btn-lacher-objet:hover { transform: scale(1.06); background: rgba(163,51,51,0.18); }
+
+/* Un objet du butin hors de portée du héros : présent, mais visiblement pas
+   pour lui — il vaut mieux le laisser au partage que le gâcher. */
+.carte-loot.loot-hors-portee { opacity: 0.72; }
+.carte-loot.loot-hors-portee .carre-equipement { filter: grayscale(0.6); }
+
+.message-confirmation-equip {
+    display: none;
+    font-family: 'Almendra', serif;
+    font-size: 15px;
+    color: #8c2f2f;
+    background: rgba(140, 47, 47, 0.1);
+    border: 1px solid rgba(140, 47, 47, 0.35);
+    border-radius: 8px;
+    padding: 8px 14px;
+    margin-top: 18px;
+}
+
+/* Deux objets sacrifiés d'un coup (arme à deux mains) : un trait les sépare. */
+.separateur-comparaison {
+    height: 1px;
+    background: rgba(92, 58, 33, 0.35);
+    margin: 10px 0;
+}

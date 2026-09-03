@@ -277,6 +277,16 @@ window.choisirCibleMonstre = function(monstre, infosCarte) {
     });
     if (candidats.length === 0) return null;
 
+    // Provoquée (arme d'un héros, cf. objets.js), la créature ne voit plus que
+    // celui qui l'a défiée tant que l'état dure — sauf pour ses soins, qui vont
+    // toujours aux siens. Si le provocateur est tombé entre-temps, la contrainte
+    // s'efface d'elle-même et la créature retrouve son libre arbitre.
+    const provocation = (monstre.Etats_Alteres || []).find(e => e.nom === "Provocation");
+    if (provocation && provocation.idProvocateur && !infosCarte.estSoin) {
+        const force = candidats.filter(c => c.idPersonnage === provocation.idProvocateur);
+        if (force.length > 0) return force[0];
+    }
+
     let meilleure = null, meilleurScore = -Infinity;
     candidats.forEach(cible => {
         const tk = tokens[cible.idPersonnage];
