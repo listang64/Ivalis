@@ -25,7 +25,7 @@ function extraire(fichier, marqueur, finLigne = '};') {
 // Les gabarits d'états et la greffe d'équipement sur une carte : un bloc continu.
 const SRC_GREFFE = (() => {
     const src = fs.readFileSync('/home/user/Ivalis/moteur_effets.js', 'utf-8');
-    const d = src.indexOf('const GABARITS_ETATS_EQUIPEMENT = {');
+    const d = src.indexOf('window.porteeAvecArme = function');
     const f = src.indexOf('window.appliquerSuitesEquipement = async function');
     if (d < 0 || f < 0) throw new Error("bloc d'équipement introuvable dans moteur_effets.js");
     return src.slice(d, f);
@@ -258,25 +258,68 @@ console.log("\n5. LES JETS DE L'ÉQUIPEMENT SONT TIRÉS UNE SEULE FOIS");
 // =========================================================================
 console.log("\n6. PORTÉE, ALLONGE ET COÛT DE DÉPLACEMENT");
 {
-    const arc = objet("Arc court", "Commun");     // +1 portée
+    const arc = objet("Arc court", "Commun");           // +1 portée
     const lance = objet("Lance à deux mains", "Commun"); // +1 allonge
-    const couteau = objet("Couteau", "Commun");   // -1 au coût du déplacement
+    const couteau = objet("Couteau", "Commun");          // -1 au coût du déplacement
 
     const archer = heros({ equipMainDroite: arc, equipMainGauche: arc });
-    verifier("l'arc court donne +1 de portée", w.bonusEquip(archer, "portee") === 1);
-    verifier("et aucune allonge (ce n'est pas une arme de contact)",
-             w.bonusEquip(archer, "allonge") === 0);
-
     const lancier = heros({ equipMainDroite: lance, equipMainGauche: lance });
-    verifier("la lance à deux mains donne +1 d'allonge", w.bonusEquip(lancier, "allonge") === 1);
-    verifier("et aucune portée : elle reste une arme de contact",
-             w.bonusEquip(lancier, "portee") === 0);
+    const nu = heros();
+    w.PERSOS_PARTIE = [archer];
 
+    verifier("l'arc court donne +1 de portée", w.bonusEquip(archer, "portee") === 1);
+    verifier("la lance à deux mains donne +1 d'allonge", w.bonusEquip(lancier, "allonge") === 1);
     verifier("le couteau retire 1 au coût de chaque case",
              w.bonusEquip(heros({ equipMainDroite: couteau }), "coutDeplacement") === -1);
+
+    // Une technique de contact (aucun cran de Distance posé dessus).
+    const contact = () => ({ isRanged: false, rangeMax: 1 });
+
+    const sansArme = w.porteeAvecArme(nu, contact().isRanged, contact().rangeMax);
+    verifier("sans arme, une technique de contact le reste",
+             sansArme.isRanged === false && sansArme.rangeMax === 1);
+
+    // L'arc TIRE toujours : même une carte sans portée devient un tir.
+    const avecArc = w.porteeAvecArme(archer, contact().isRanged, contact().rangeMax);
+    verifier("l'arc transforme une technique de contact en tir",
+             avecArc.isRanged === true, `(isRanged=${avecArc.isRanged})`);
+    verifier("et lui donne la portée d'un cran de Distance (2 cases)",
+             avecArc.rangeMax === 2, `(${avecArc.rangeMax})`);
+
+    // Et sa portée S'AJOUTE à celle que le joueur a posée sur la carte.
+    // Un cran de Distance donne rangeMax 2 ; l'arc doit mener à 3.
+    const avecDistance = w.porteeAvecArme(archer, true, 2);
+    verifier("elle s'additionne à la portée posée par le joueur",
+             avecDistance.rangeMax === 3 && avecDistance.isRanged === true, `(${avecDistance.rangeMax})`);
+    const distanceForte = w.porteeAvecArme(archer, true, 4);   // Distance 3 sur la carte
+    verifier("y compris sur une grande portée (4 + 1 = 5)", distanceForte.rangeMax === 5,
+             `(${distanceForte.rangeMax})`);
+
+    // L'allonge, elle, ne transforme PAS l'attaque en tir : c'est ce qui lui
+    // évite le malus de tir à bout portant.
+    const avecLance = w.porteeAvecArme(lancier, contact().isRanged, contact().rangeMax);
+    verifier("l'allonge garde l'attaque au contact", avecLance.isRanged === false);
+    verifier("mais lui donne une case de plus", avecLance.rangeMax === 2, `(${avecLance.rangeMax})`);
+
+    // Une créature n'a pas d'emplacements d'équipement : sa portée ne doit
+    // JAMAIS bouger, sinon elle hériterait de l'arme du héros affiché.
+    const creature = { idPersonnage: "M1", camp: "Ennemi", estMonstre: true, Etats_Alteres: [] };
+    const portéeCreature = w.porteeAvecArme(creature, false, 1);
+    verifier("une créature ne prend rien de l'équipement des héros",
+             portéeCreature.isRanged === false && portéeCreature.rangeMax === 1,
+             `(isRanged=${portéeCreature.isRanged}, portée=${portéeCreature.rangeMax})`);
+
+    // Le malus de tir à bout portant est bien celui du moteur : une attaque
+    // devenue tir et résolue au contact perd 30% de ses dégâts.
+    const degatsAuContact = (isRanged, dist, brut) =>
+        (isRanged && dist === 1) ? Math.floor(brut * 0.7) : brut;
+    verifier("le désavantage est réel : 20 dégâts tombent à 14 au contact",
+             degatsAuContact(avecArc.isRanged, 1, 20) === 14,
+             `(${degatsAuContact(avecArc.isRanged, 1, 20)})`);
+    verifier("alors qu'une arme d'allonge garde ses 20 dégâts au contact",
+             degatsAuContact(avecLance.isRanged, 1, 20) === 20);
 }
 
-// =========================================================================
 console.log("\n7. LES PRÉREQUIS EN CARACTÉRISTIQUE");
 {
     const commun = objet("Hache", "Commun");     // aucun prérequis

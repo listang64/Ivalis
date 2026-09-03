@@ -109,10 +109,13 @@ function creerPoste(idJoueur, { partie, personnages, persos, monstres, difficult
     if (ref.col !== "Personnages") throw new Error("écriture inattendue sur " + ref.col);
     await personnages.updateDoc(ref, maj);
   };
+  // Un DOM qui se SOUVIENT : les mêmes éléments d'un appel à l'autre. Sans
+  // ça, impossible de relire ce que la fenêtre vient d'afficher.
+  const elements = { "fenetre-combat": { style: { display: "block" } } };
   const documentStub = {
     getElementById(id) {
-      if (id === "fenetre-combat") return { style: { display: "block" } };
-      return { style: {}, innerHTML: "", value: "" };
+      if (!elements[id]) elements[id] = { style: {}, innerHTML: "", innerText: "", value: "" };
+      return elements[id];
     }
   };
   // Deux usages distincts : l'identité du joueur, et le cache des caracs lu
@@ -145,7 +148,7 @@ function creerPoste(idJoueur, { partie, personnages, persos, monstres, difficult
     w, {}, doc, partie.runTransaction);
   new Function('window', 'db', 'importerFirestore', SRC_VICTOIRE_TEST)(w, {}, importerFirestore);
 
-  return { idJoueur, w };
+  return { idJoueur, w, elements };
 }
 
 const trosHeros = () => ([
@@ -470,6 +473,103 @@ console.log("\n8. ÉQUIPER ET LÂCHER : LES MAINS, ET CE QU'ON DÉTRUIT");
            && personnages.table.J1.Equip_Main_Droite?.uid === dague.uid);
   verifier("et le porteur n'a plus aucune résistance d'armure",
            w.bonusEquip(heros, "resPhys") === 0, `(${w.bonusEquip(heros, "resPhys")})`);
+}
+
+// ==========================================================================
+console.log("\n9. UNE FENÊTRE DÉDIÉE PAR HÉROS, PUIS LE PARTAGE");
+{
+  // Un seul joueur mène DEUX héros : il doit les traiter l'un après l'autre.
+  const partie = creerPartieButin({});
+  const personnages = creerPersonnagesFirestore(["J1", "J2"]);
+  const persos = trosHeros().slice(0, 2);
+  persos[1].idJoueur = "P1";                    // Jade appartient aussi à P1
+  const monstres = [{ idPersonnage: "M1", camp: "Ennemi", statut: "Mort", PV_Actuels: 0, estIllusion: false }];
+  const p1 = creerPoste("P1", { partie, personnages, persos, monstres, difficulte: "Normale" });
+  const w = p1.w, ecran = p1.elements;
+
+  await w.demarrerButin();
+  const butin = () => partie.partagee.doc.Butin;
+  const items = (id) => butin().parPersonnage[id].items;
+
+  w.afficherFenetreButin(butin());
+  verifier("la fenêtre s'ouvre sur le PREMIER héros, nommément",
+           ecran["butin-titre"].innerText === "Butin de Pliors",
+           `(« ${ecran["butin-titre"].innerText} »)`);
+  verifier("elle annonce où on en est dans la file (1 sur 2)",
+           ecran["butin-sous-titre"].innerText.includes("(1 sur 2)"),
+           `(« ${ecran["butin-sous-titre"].innerText} »)`);
+  // Sur les identifiants, pas sur les noms : deux héros peuvent parfaitement
+  // tirer un objet du même modèle, et le nom ne les distinguerait plus.
+  verifier("seuls les objets de ce héros sont proposés",
+           items("J1").every(it => ecran["butin-vue-personnel"].innerHTML.includes(it.uid))
+           && items("J2").every(it => !ecran["butin-vue-personnel"].innerHTML.includes(it.uid)));
+  verifier("le second héros est annoncé comme suivant",
+           ecran["butin-vue-personnel"].innerHTML.includes("Ensuite : Jade"));
+  verifier("le rappel d'équipement ne montre que ce héros",
+           ecran["butin-equipement-actuel"].innerHTML.includes("Pliors")
+           && !ecran["butin-equipement-actuel"].innerHTML.includes("Jade"));
+
+  // Pliors choisit et valide : la fenêtre doit passer à Jade.
+  for (const it of items("J1")) await w.enregistrerDecisionButin("J1", it.uid, false);
+  await w.validerButinPersonnel("J1");
+  w.afficherFenetreButin(butin());
+  verifier("une fois Pliors validé, la fenêtre passe à Jade",
+           ecran["butin-titre"].innerText === "Butin de Jade",
+           `(« ${ecran["butin-titre"].innerText} »)`);
+  verifier("et annonce (2 sur 2)", ecran["butin-sous-titre"].innerText.includes("(2 sur 2)"));
+  verifier("plus personne n'est annoncé après elle",
+           !ecran["butin-vue-personnel"].innerHTML.includes("Ensuite :"));
+  verifier("l'étape reste personnelle tant que Jade n'a pas choisi",
+           butin().etape === "personnel");
+
+  // Jade valide à son tour : les deux héros du joueur ont fini.
+  for (const it of items("J2")) await w.enregistrerDecisionButin("J2", it.uid, false);
+  await w.validerButinPersonnel("J2");
+
+  // Ici les deux participants ont validé, le partage s'ouvre tout seul.
+  verifier("les deux héros validés, le partage commun s'ouvre",
+           butin().etape === "partage", `(${butin().etape})`);
+  w.afficherFenetreButin(butin());
+  verifier("le titre devient celui du partage",
+           ecran["butin-titre"].innerText === "Partage du butin");
+  verifier("et le rappel d'équipement montre alors les DEUX héros",
+           ecran["butin-equipement-actuel"].innerHTML.includes("Pliors")
+           && ecran["butin-equipement-actuel"].innerHTML.includes("Jade"));
+}
+
+// ==========================================================================
+console.log("\n10. LE JOUEUR QUI A FINI ATTEND LES AUTRES");
+{
+  // Deux joueurs, un héros chacun : celui qui valide en premier voit un
+  // message d'attente, pas la fenêtre d'un héros qui n'est pas le sien.
+  const partie = creerPartieButin({});
+  const personnages = creerPersonnagesFirestore(["J1", "J2"]);
+  const persos = trosHeros().slice(0, 2);       // J1 à P1, J2 à P2
+  const monstres = [{ idPersonnage: "M1", camp: "Ennemi", statut: "Mort", PV_Actuels: 0, estIllusion: false }];
+  const p1 = creerPoste("P1", { partie, personnages, persos, monstres, difficulte: "Normale" });
+  const p2 = creerPoste("P2", { partie, personnages, persos, monstres, difficulte: "Normale" });
+
+  await p1.w.demarrerButin();
+  const butin = () => partie.partagee.doc.Butin;
+
+  for (const it of butin().parPersonnage.J1.items) await p1.w.enregistrerDecisionButin("J1", it.uid, false);
+  await p1.w.validerButinPersonnel("J1");
+
+  p1.w.afficherFenetreButin(butin());
+  verifier("le joueur qui a fini voit un message d'attente",
+           p1.elements["butin-vue-personnel"].innerHTML.includes("En attente des autres joueurs"),
+           `(« ${p1.elements["butin-vue-personnel"].innerHTML.slice(0, 60)} »)`);
+  verifier("avec le décompte des prêts (1/2 prêts)",
+           p1.elements["butin-vue-personnel"].innerHTML.includes("(1/2 prêts)"),
+           `(« ${p1.elements["butin-vue-personnel"].innerHTML.replace(/\s+/g, " ").slice(-70)} »)`);
+
+  // Chez l'autre joueur, la fenêtre est toujours celle de SON héros.
+  p2.w.afficherFenetreButin(butin());
+  verifier("l'autre joueur, lui, garde la fenêtre de son propre héros",
+           p2.elements["butin-titre"].innerText === "Butin de Jade",
+           `(« ${p2.elements["butin-titre"].innerText} »)`);
+  verifier("sans mention de file (il n'a qu'un héros)",
+           !p2.elements["butin-sous-titre"].innerText.includes("sur"));
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

@@ -1495,6 +1495,12 @@ window.demarrerCiblage = async function(idCarte) {
                 return;
             }
 
+            // L'arme équipée peut transformer l'action en tir, et allonger sa
+            // portée. Posé ICI, avant que isRanged et rangeMax ne servent :
+            // attaques et altérations partent donc avec la bonne portée, et
+            // une attaque devenue tir encaisse bien le malus au contact.
+            ({ isRanged, rangeMax } = window.porteeAvecArme(lanceurCarte, isRanged, rangeMax));
+
             // A. Détection Attaques, Soins & Purifications
             let isPurification = false;
             let purifChance = 0;
@@ -1542,14 +1548,9 @@ window.demarrerCiblage = async function(idCarte) {
                     ? "Magique" : "Physique";
                 // Atout de l'Ondari : ses sorts magiques portent une case plus loin,
                 // dès lors qu'un cran de Distance est posé dessus.
-                // L'équipement allonge le bras : "portée" pour une attaque à
-                // distance, "allonge" pour une attaque au contact. L'allonge ne
-                // transforme PAS l'attaque en tir — elle reste une attaque de
-                // contact (pas de malus de tir à bout portant, pas de règle de
-                // distance), elle atteint simplement une case de plus.
-                const bonusArme = isRanged ? window.bonusEquip(lanceurCarte, "portee")
-                                           : window.bonusEquip(lanceurCarte, "allonge");
-                const porteeReelle = rangeMax + bonusArme + window.bonusPorteeMagique(
+                // rangeMax porte déjà ce que l'arme apporte (window.porteeAvecArme,
+                // plus haut) : il ne reste que l'atout de l'Ondari.
+                const porteeReelle = rangeMax + window.bonusPorteeMagique(
                     lanceurCarte, typeRes === "Magique", isRanged);
 
                 attaquesExtraites.push({
@@ -2676,6 +2677,22 @@ window.nettoyerCiblage = function() {
 //      ensuite TOUT le circuit existant : jet partagé, immunités de race,
 //      tic de poison, résolution particulière de Peur/Poussée/Traction,
 //      icône sur le pion. Rien n'est réécrit en parallèle.
+
+// Une arme qui TIRE (fronde, arc) tire toujours, même quand la technique n'a
+// aucune portée : elle ajoute d'office l'équivalent d'un cran de Distance.
+// C'est autant une contrainte qu'un avantage — l'attaque devient un tir, elle
+// encaisse donc le malus de tir à bout portant si l'ennemi est au contact.
+// Sa portée S'AJOUTE à celle que le joueur a posée sur la carte.
+//
+// L'allonge, elle, ne transforme rien : l'attaque reste au contact (pas de
+// malus à bout portant), elle atteint simplement une case de plus.
+window.porteeAvecArme = function(lanceur, isRanged, rangeMax) {
+    if (!lanceur || typeof window.bonusEquip !== "function") return { isRanged, rangeMax };
+    const portee = window.bonusEquip(lanceur, "portee");
+    const allonge = window.bonusEquip(lanceur, "allonge");
+    if (portee > 0) return { isRanged: true, rangeMax: rangeMax + portee + allonge };
+    return { isRanged, rangeMax: rangeMax + allonge };
+};
 
 const GABARITS_ETATS_EQUIPEMENT = {
     "Étourdi":        { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1787381297/ETOURDIT_2_j7w36h.png", desc: "-20% Esquive/Parade, 10% de chance d'échec d'attaque." },

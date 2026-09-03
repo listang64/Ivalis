@@ -219,16 +219,15 @@ window.MODELES_OBJETS = [
         }
     },
     {
-        // Le tableau donne 15% d'ignore-armure en Très rare et 12% en Épique :
-        // repris tel quel, c'est la seule ligne où l'épique passe SOUS le très
-        // rare (signalé à Nico, à corriger dans le tableau si c'est une coquille).
+        // Le classeur portait 12% en Épique, sous les 15% du Très rare :
+        // coquille confirmée par Nico, l'épique tient ses 15%.
         modele: "Javelots", type: "Arme polyvalente", emplacement: "Main", deuxMains: false,
         carac: "FORCE", noms: ["Hasta", "Pilum"], effets: { reservoir: "A", nombre: 1 },
         paliers: {
             "Commun":    { degatsPhys: 1 },
             "Rare":      { degatsPhys: 1, ignoreArmure: 10 },
             "Très rare": { degatsPhys: 1, ignoreArmure: 15 },
-            "Épique":    { degatsPhys: 1, ignoreArmure: 12 }
+            "Épique":    { degatsPhys: 1, ignoreArmure: 15 }
         }
     },
     {

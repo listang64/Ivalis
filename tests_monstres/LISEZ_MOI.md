@@ -128,7 +128,9 @@ au-delà d'un seul niveau. Il couvre : la coupe de test (🏆) qui tue les ennem
 sans passer par les renforts, les gardes-fous de `verifierVictoireCombat`, la
 création atomique du butin quand plusieurs postes détectent la victoire en même
 temps, le choix personnel (prendre/laisser, équipement, décision verrouillée
-après validation), la construction du pool par le DERNIER héros à valider, le
+après validation), l'enchaînement des fenêtres — chaque héros a la SIENNE, et un
+joueur qui en mène deux les traite l'un après l'autre avant de rejoindre le
+partage —, la construction du pool par le DERNIER héros à valider, le
 placement dans le partage commun, et sa résolution (tirage au sort déterministe
 via `Math.random` forcé) par le DERNIER joueur à valider — avec vérification
 qu'un seul poste effectue réellement l'écriture d'équipement du gagnant.
@@ -152,9 +154,17 @@ ne compte qu'une fois malgré ses deux emplacements, techniques interdites par
 l'arme en main (et le sort qui exige une main libre, qu'une bague ne ferme pas),
 dégâts plats greffés sur la carte, états de l'arme injectés dans les altérations
 (sans doublon quand la carte les inflige déjà), jets de percée d'armure tirés
-une seule fois pour tous les postes, portée et allonge, prérequis en
-caractéristique, provocation qui aveugle une créature, et états temporaires
-(élan, bénédictions) qui empruntent les mêmes canaux de stats que l'équipement.
+une seule fois pour tous les postes, prérequis en caractéristique, provocation
+qui aveugle une créature, et états temporaires (élan, bénédictions) qui
+empruntent les mêmes canaux de stats que l'équipement.
+
+Il sépare aussi soigneusement **portée** et **allonge**, qui se ressemblent mais
+ne font pas la même chose. Une arme qui TIRE (fronde, arc) rend l'attaque à
+distance même sur une technique sans portée — c'est un désavantage autant qu'un
+atout, puisqu'un tir au contact perd 30% de ses dégâts — et sa portée s'ajoute à
+celle que le joueur a posée sur la carte. L'allonge, elle, ne transforme rien :
+l'attaque reste au contact, elle atteint simplement une case de plus. Le banc
+mesure les deux, malus de tir à bout portant compris.
 
 `apercu_butin.mjs` charge le vrai `style.css` et le vrai balisage
 d'`index.html`, remplit l'onglet Inventaire et les trois vues du butin avec les

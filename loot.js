@@ -255,7 +255,18 @@ window.afficherFenetreButin = function(butin) {
         .map(id => (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === id))
         .filter(p => p && p.idJoueur === joueurId);
 
-    window.afficherEquipementActuelButin(mesPersonnages);
+    // Le butin personnel se joue héros par héros : la fenêtre appartient à
+    // celui dont c'est le tour, et à lui seul. Un joueur qui mène deux
+    // personnages les traite l'un après l'autre, puis rejoint le partage.
+    const enAttente = mesPersonnages.filter(p => {
+        const bloc = (butin.parPersonnage || {})[p.idPersonnage];
+        return bloc && !bloc.valide;
+    });
+    const herosCourant = butin.etape === "personnel" ? (enAttente[0] || null) : null;
+
+    // L'équipement rappelé est celui du héros concerné : dans sa fenêtre, le
+    // sien seul ; dans le partage commun, ceux de tous ses personnages.
+    window.afficherEquipementActuelButin(herosCourant ? [herosCourant] : mesPersonnages);
 
     const vuePersonnel = document.getElementById("butin-vue-personnel");
     const vuePartage = document.getElementById("butin-vue-partage");
@@ -267,10 +278,15 @@ window.afficherFenetreButin = function(butin) {
     vueFin.style.display = "none";
 
     if (butin.etape === "personnel") {
-        titre.innerText = "Butin de guerre";
-        sousTitre.innerText = "Choisis ce que tu gardes — l'objet remplacé est perdu pour de bon.";
+        titre.innerText = herosCourant ? `Butin de ${herosCourant.prenom}` : "Butin de guerre";
+        // Un joueur à plusieurs héros voit où il en est dans sa file.
+        const restants = mesPersonnages.length > 1 && herosCourant
+            ? ` (${mesPersonnages.length - enAttente.length + 1} sur ${mesPersonnages.length})` : "";
+        sousTitre.innerText = herosCourant
+            ? `Choisis ce que ${herosCourant.prenom} garde — l'objet remplacé est perdu pour de bon.${restants}`
+            : "Choisis ce que tu gardes — l'objet remplacé est perdu pour de bon.";
         vuePersonnel.style.display = "block";
-        window.rendreVuePersonnelleButin(butin, mesPersonnages);
+        window.rendreVuePersonnelleButin(butin, mesPersonnages, herosCourant);
     } else if (butin.etape === "partage") {
         titre.innerText = "Partage du butin";
         sousTitre.innerText = "Place-toi sur un ou plusieurs objets restants. Plusieurs prétendants ? Le sort tranchera.";
@@ -325,7 +341,7 @@ window.bandeauObjetButin = function(item, idPersonnage) {
     return html;
 };
 
-window.rendreVuePersonnelleButin = function(butin, mesPersonnages) {
+window.rendreVuePersonnelleButin = function(butin, mesPersonnages, herosCourant) {
     const conteneur = document.getElementById("butin-vue-personnel");
     if (!conteneur) return;
 
@@ -334,29 +350,41 @@ window.rendreVuePersonnelleButin = function(butin, mesPersonnages) {
         return;
     }
 
-    conteneur.innerHTML = mesPersonnages.map(perso => {
-        const bloc = butin.parPersonnage[perso.idPersonnage];
-        if (!bloc) return "";
-        const cartes = bloc.items.map(item => window.rendreCarteLootPersonnel(perso.idPersonnage, item, bloc)).join("");
-        const tousDecides = bloc.items.every(it => bloc.decisions && bloc.decisions[it.uid] !== undefined);
+    // Tous mes héros ont choisi : il ne reste qu'à attendre les autres joueurs
+    // avant que le partage commun ne s'ouvre.
+    if (!herosCourant) {
+        const valides = (butin.participants || []).filter(id => (butin.parPersonnage[id] || {}).valide).length;
+        const total = (butin.participants || []).length;
+        conteneur.innerHTML = `
+            <p class="butin-attente">✔️ ${mesPersonnages.length > 1 ? "Tes héros ont" : "Ton héros a"} fait son choix.</p>
+            <p class="butin-attente">En attente des autres joueurs (${valides}/${total} prêts)...</p>`;
+        return;
+    }
 
-        let pied;
-        if (bloc.valide) {
-            pied = `<p class="butin-attente">✔️ Choix validé pour ${perso.prenom} — en attente des autres...</p>`;
-        } else {
-            pied = `<div class="butin-actions">
+    const bloc = butin.parPersonnage[herosCourant.idPersonnage];
+    if (!bloc) { conteneur.innerHTML = ""; return; }
+
+    const cartes = bloc.items.map(item =>
+        window.rendreCarteLootPersonnel(herosCourant.idPersonnage, item, bloc)).join("");
+    const tousDecides = bloc.items.every(it => bloc.decisions && bloc.decisions[it.uid] !== undefined);
+
+    // Un joueur qui mène plusieurs héros voit les suivants attendre leur tour.
+    const suivants = mesPersonnages.filter(p => p.idPersonnage !== herosCourant.idPersonnage
+        && !(butin.parPersonnage[p.idPersonnage] || {}).valide);
+    const fileAttente = suivants.length > 0
+        ? `<p class="butin-file-heros">Ensuite : ${suivants.map(p => p.prenom).join(", ")}</p>`
+        : "";
+
+    conteneur.innerHTML = `
+        <div class="bloc-heros-butin">
+            <div class="butin-grille">${cartes}</div>
+            <div class="butin-actions">
                 <button class="btn-parametres" style="background-color:#1b6e3a; border-color:#0f4021;${tousDecides ? "" : " opacity:0.4; cursor:not-allowed;"}"
                         ${tousDecides ? "" : "disabled"}
-                        onclick="window.validerButinPersonnel('${perso.idPersonnage}')">Valider mon choix</button>
-            </div>`;
-        }
-
-        return `<div class="bloc-heros-butin">
-            <div class="nom-heros-butin">${perso.prenom}</div>
-            <div class="butin-grille">${cartes}</div>
-            ${pied}
+                        onclick="window.validerButinPersonnel('${herosCourant.idPersonnage}')">Valider le choix de ${herosCourant.prenom}</button>
+            </div>
+            ${fileAttente}
         </div>`;
-    }).join("");
 };
 
 window.rendreCarteLootPersonnel = function(idPersonnage, item, bloc) {

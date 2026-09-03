@@ -96,7 +96,7 @@
    "Commun": "+1 Dégâts physique",
    "Rare": "+1dégâts physique + 10% de chance d’ignorer l’armure",
    "Très rare": "+1 dégâts physique + 15% de chance d’ignorer l’armure + 1 Effet A",
-   "Épique": "+1 dégâts physique + 12% de chance d’ignorer l’armure + 2XEffet A",
+   "Épique": "+1 dégâts physique + 15% de chance d’ignorer l’armure + 2XEffet A",
    "noms": "Hasta, pilum"
   },
   {
@@ -425,5 +425,8 @@
    "Très rare": 0.35,
    "Épique": 0.05
   }
+ },
+ "_corrections": {
+  "Javelots / Épique": "Le classeur d'origine portait 12% d'ignore-armure, sous les 15% du palier Très rare. Coquille confirmée par Nico le 03/09 : l'épique garde 15%. Seule retouche apportée à la transcription du classeur."
  }
 }

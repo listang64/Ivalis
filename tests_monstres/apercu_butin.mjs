@@ -107,10 +107,12 @@ const butinPersonnel = {
   }
 };
 const pagePersonnel = pageButin(
-  { titre: "Butin de guerre", sousTitre: "Choisis ce que tu gardes — l'objet remplacé est perdu pour de bon.",
+  { titre: "Butin de Pliors", sousTitre: "Choisis ce que Pliors garde — l'objet remplacé est perdu pour de bon. (1 sur 2)",
     vue: "butin-vue-personnel",
-    rendu: `window.rendreVuePersonnelleButin(${JSON.stringify(butinPersonnel)}, window.PERSOS_PARTIE);` },
-  HEROS);
+    // La fenêtre est dédiée à UN héros : on lui passe donc celui dont c'est
+    // le tour, comme le fait le vrai répartiteur.
+    rendu: `window.rendreVuePersonnelleButin(${JSON.stringify(butinPersonnel)}, window.PERSOS_PARTIE, window.PERSOS_PARTIE[0]);` },
+  HEROS.slice(0, 1));
 fs.writeFileSync('/tmp/apercu_butin_personnel.html', pagePersonnel);
 
 const butinPartage = {
