@@ -761,7 +761,12 @@ window.genererRencontreMonstres = async function(difficulte) {
     // chances de rareté (tableau de loot). Elle n'existait nulle part une fois
     // la rencontre lancée — on la garde donc sur la partie.
     if (typeof window.modifierPartie === "function") {
-        await window.modifierPartie(() => ({ maj: { Difficulte_Rencontre: difficulte } }));
+        // L'identifiant sert au butin : il lui permet de savoir s'il appartient
+        // au combat en cours ou à un combat déjà terminé (cf. demarrerButin).
+        await window.modifierPartie(() => ({ maj: {
+            Difficulte_Rencontre: difficulte,
+            ID_Rencontre: "renc_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8)
+        } }));
     }
 
     console.log(`🐲 Rencontre ${difficulte} : ${surLeTerrain.length} sur le terrain, ${enReserve.length} en réserve.`);

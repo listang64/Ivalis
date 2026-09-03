@@ -214,9 +214,16 @@ window.demarrerButin = async function() {
     // dans la partie (monstres.js). Des monstres posés à la main n'en laissent
     // aucune : on retombe alors sur la ligne NORMAL du tableau de loot.
     const difficulte = (window.PARTIE_DATA && window.PARTIE_DATA.Difficulte_Rencontre) || "Normale";
+    const idRencontre = (window.PARTIE_DATA && window.PARTIE_DATA.ID_Rencontre) || "";
 
     await window.modifierPartie((data) => {
-        if (data.Butin && data.Butin.ouvert) return null; // déjà ouvert par un autre poste
+        // Un butin déjà ouvert bloque celui-ci — mais SEULEMENT s'il appartient
+        // encore à ce combat. Sans cette nuance, un butin qu'on avait quitté
+        // sans le refermer (fenêtre fermée, page rechargée, joueur parti)
+        // restait "ouvert" pour toujours en base et empêchait tous les butins
+        // suivants : plus aucune victoire ne rapportait quoi que ce soit.
+        const ancien = data.Butin;
+        if (ancien && ancien.ouvert && !window.butinPerime(ancien, idRencontre)) return null;
 
         const parPersonnage = {};
         participants.forEach(id => {
@@ -226,6 +233,12 @@ window.demarrerButin = async function() {
         return { maj: { Butin: {
             ouvert: true,
             etape: "personnel",
+            // Deux marqueurs : celui du combat d'où vient ce butin, et le sien
+            // propre — ce dernier sert à la fermeture locale (une croix ne doit
+            // masquer QUE le butin qu'on a sous les yeux, pas le suivant).
+            id: "butin_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8),
+            creeLe: Date.now(),
+            idRencontre,
             difficulte,
             participants,
             parPersonnage,
@@ -236,9 +249,58 @@ window.demarrerButin = async function() {
     });
 };
 
+// Un butin est périmé quand il ne concerne plus le combat en cours : soit il
+// vient d'une rencontre précédente, soit il a déjà été résolu (sa raison
+// d'être est passée). Dans les deux cas, une nouvelle victoire peut l'écraser.
+//
+// L'ancienneté sert de dernier recours, pour les combats dont les monstres ont
+// été posés à la main (aucune rencontre générée, donc aucun identifiant des
+// deux côtés). Le délai peut être court sans risque : demarrerButin n'est
+// atteint que lorsqu'un poste croit qu'AUCUN butin n'est ouvert, ce qui, à
+// plusieurs, se joue en quelques millisecondes après la mort du dernier
+// monstre — jamais une minute plus tard. Un butin d'une minute appartient donc
+// forcément à un combat passé, quel que soit le temps que les joueurs mettent
+// à choisir.
+window.DELAI_BUTIN_PERIME_MS = 60000;
+
+window.butinPerime = function(butin, idRencontreCourante) {
+    if (!butin) return true;
+    if (butin.resolu) return true;
+    // Les deux rencontres sont identifiées et diffèrent : le butin est vieux.
+    if (idRencontreCourante && butin.idRencontre && butin.idRencontre !== idRencontreCourante) return true;
+    // Un butin d'avant cette mécanique n'a pas d'identifiant : on le laisse
+    // passer une fois, plutôt que de bloquer indéfiniment les butins suivants.
+    if (idRencontreCourante && !butin.idRencontre) return true;
+    // Ni l'un ni l'autre n'est identifié : on tranche à l'ancienneté.
+    if (butin.creeLe && (Date.now() - butin.creeLe) > window.DELAI_BUTIN_PERIME_MS) return true;
+    // Un butin d'avant cette correction n'a même pas de date : il ne doit pas
+    // condamner la partie pour autant.
+    if (!butin.creeLe && !butin.idRencontre) return true;
+    return false;
+};
+
 // =========================================================================
 //  AFFICHAGE — répartiteur appelé à chaque notification de la partie
 // =========================================================================
+
+// Fermeture MANUELLE, pour ce poste seulement. C'est une porte de sortie, pas
+// un bouton d'abandon : elle ne touche pas au butin des autres joueurs (une
+// croix cliquée par mégarde ne doit priver personne de son loot). Le butin
+// reste en base, et rouvrir le combat le fait réapparaître.
+// La fermeture vaut pour l'ÉTAPE en cours, pas pour tout le butin : fermer sa
+// fenêtre personnelle ne doit pas priver le joueur du partage commun qui suit.
+// Chaque étape peut être refermée à son tour, donc on n'est jamais coincé.
+window.signatureEtapeButin = function(butin) {
+    if (!butin) return "";
+    return (butin.id || "butin-sans-identifiant") + ":" + (butin.etape || "");
+};
+
+window.fermerButinLocalement = function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    window.BUTIN_MASQUE_LOCALEMENT = window.signatureEtapeButin((window.PARTIE_DATA || {}).Butin);
+    const fenetre = document.getElementById("fenetre-butin");
+    if (fenetre) fenetre.style.display = "none";
+};
 
 window.afficherFenetreButin = function(butin) {
     const fenetre = document.getElementById("fenetre-butin");
@@ -246,8 +308,27 @@ window.afficherFenetreButin = function(butin) {
 
     if (!butin || !butin.ouvert) {
         fenetre.style.display = "none";
+        window.BUTIN_MASQUE_LOCALEMENT = null;   // le prochain butin s'affichera
         return;
     }
+
+    // Le butin appartient à la fin d'un combat : hors de la fenêtre de combat,
+    // il n'a rien à faire à l'écran. Sans ce garde-fou, un butin resté ouvert
+    // en base rouvrait sa fenêtre au simple chargement de la partie — par-dessus
+    // la carte du monde, et sans que le joueur puisse rien en faire.
+    if (document.getElementById("fenetre-combat")?.style.display !== "block") {
+        fenetre.style.display = "none";
+        return;
+    }
+
+    // Ce joueur a refermé cette étape à la main : on ne la lui réimpose pas à
+    // chaque notification de la partie. L'étape suivante, elle, s'affichera.
+    if (window.BUTIN_MASQUE_LOCALEMENT
+        && window.BUTIN_MASQUE_LOCALEMENT === window.signatureEtapeButin(butin)) {
+        fenetre.style.display = "none";
+        return;
+    }
+
     fenetre.style.display = "flex";
 
     const joueurId = localStorage.getItem("ID_JOUEUR_COURANT");

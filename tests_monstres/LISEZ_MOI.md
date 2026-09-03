@@ -138,6 +138,20 @@ C'est ce banc qui a détecté un vrai bug avant qu'il n'atteigne le jeu :
 `validerButinPool` plantait (`for...of` sur `true`) dès qu'un joueur validait
 sans être le dernier, faute de `resultat` explicite dans ce cas.
 
+Il garde aussi la trace du bug du 03/09, remonté par le frère de Nico : la
+fenêtre de butin s'ouvrait au simple CHARGEMENT de la partie, vide et sans
+aucun bouton — un calque plein écran sans issue. Trois causes se combinaient,
+et les trois sont couvertes ici : l'affichage ne dépendait que de
+`Butin.ouvert` en base, sans vérifier qu'un combat était à l'écran ; aucune
+vue n'avait de fermeture (seule la dernière avait son bouton) ; et surtout un
+butin resté ouvert bloquait DÉFINITIVEMENT tous les butins suivants, puisque
+`demarrerButin` refusait de tirer tant que le drapeau était levé. Le banc
+vérifie donc que la fenêtre se tait hors combat, que la croix ne ferme que
+chez celui qui clique (une croix de travers ne doit priver personne de son
+loot) sans empêcher l'étape suivante de s'afficher, et qu'un butin périmé —
+autre rencontre, déjà résolu, ou simplement vieux d'une minute — se laisse
+remplacer, tout en résistant à la double détection de la même victoire.
+
 `objets_tableau.mjs` relit les deux classeurs de Nico (figés dans
 `tableau_objets.json`, extraits des `.xlsx` d'origine) et confronte le catalogue
 d'`objets.js` à leur contenu : les 23 lignes dans le même ordre, le type et la

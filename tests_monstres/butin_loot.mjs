@@ -572,5 +572,164 @@ console.log("\n10. LE JOUEUR QUI A FINI ATTEND LES AUTRES");
            !p2.elements["butin-sous-titre"].innerText.includes("sur"));
 }
 
+// ==========================================================================
+console.log("\n11. LA FENÊTRE NE S'IMPOSE PLUS HORS COMBAT (bug du 03/09)");
+{
+  // Le bug tel qu'il s'est produit : un butin resté "ouvert" en base, et un
+  // joueur qui ouvre simplement le jeu. La fenêtre s'affichait par-dessus tout,
+  // vide (ses héros n'étaient pas encore chargés) et sans aucun bouton.
+  const partie = creerPartieButin({});
+  const personnages = creerPersonnagesFirestore(["J1", "J2"]);
+  const persos = trosHeros().slice(0, 2);
+  const monstres = [{ idPersonnage: "M1", camp: "Ennemi", statut: "Mort", PV_Actuels: 0, estIllusion: false }];
+  const p1 = creerPoste("P1", { partie, personnages, persos, monstres, difficulte: "Normale" });
+  const w = p1.w, ecran = p1.elements;
+
+  await w.demarrerButin();
+  const butin = () => partie.partagee.doc.Butin;
+  verifier("le butin est bien ouvert en base", butin().ouvert === true);
+
+  // Hors combat : le jeu vient d'être chargé, la fenêtre de combat est fermée.
+  ecran["fenetre-combat"].style.display = "none";
+  w.afficherFenetreButin(butin());
+  verifier("fenêtre de combat fermée : le butin ne s'affiche pas",
+           ecran["fenetre-butin"].style.display === "none",
+           `(display=${ecran["fenetre-butin"].style.display})`);
+
+  // Le combat s'ouvre : là, le butin a sa place.
+  ecran["fenetre-combat"].style.display = "block";
+  w.afficherFenetreButin(butin());
+  verifier("combat ouvert : le butin s'affiche normalement",
+           ecran["fenetre-butin"].style.display === "flex",
+           `(display=${ecran["fenetre-butin"].style.display})`);
+
+  // Même sans héros chargés (l'autre moitié du bug), la fenêtre reste fermable.
+  const sansPersos = creerPoste("P9", { partie, personnages, persos: [], monstres: [], difficulte: "Normale" });
+  sansPersos.w.afficherFenetreButin(butin());
+  verifier("un spectateur sans héros voit une fenêtre, mais peut la fermer",
+           sansPersos.elements["fenetre-butin"].style.display === "flex");
+  sansPersos.w.fermerButinLocalement();
+  verifier("et la croix la referme vraiment",
+           sansPersos.elements["fenetre-butin"].style.display === "none");
+}
+
+// ==========================================================================
+console.log("\n12. LA CROIX NE FERME QUE CHEZ SOI");
+{
+  const partie = creerPartieButin({});
+  const personnages = creerPersonnagesFirestore(["J1", "J2"]);
+  const persos = trosHeros().slice(0, 2);
+  const monstres = [{ idPersonnage: "M1", camp: "Ennemi", statut: "Mort", PV_Actuels: 0, estIllusion: false }];
+  const p1 = creerPoste("P1", { partie, personnages, persos, monstres, difficulte: "Normale" });
+  const p2 = creerPoste("P2", { partie, personnages, persos, monstres, difficulte: "Normale" });
+
+  await p1.w.demarrerButin();
+  const butin = () => partie.partagee.doc.Butin;
+
+  p1.w.fermerButinLocalement();
+  verifier("le poste qui a cliqué voit sa fenêtre fermée",
+           p1.elements["fenetre-butin"].style.display === "none");
+  verifier("le butin reste ouvert en base pour les autres", butin().ouvert === true);
+
+  p2.w.afficherFenetreButin(butin());
+  verifier("l'autre joueur garde son butin à l'écran",
+           p2.elements["fenetre-butin"].style.display === "flex");
+
+  // Une notification de la partie ne doit pas réimposer la fenêtre fermée.
+  await p2.w.enregistrerDecisionButin("J2", butin().parPersonnage.J2.items[0].uid, false);
+  p1.w.afficherFenetreButin(butin());
+  verifier("et la fenêtre fermée ne se rouvre pas à chaque notification",
+           p1.elements["fenetre-butin"].style.display === "none");
+
+  // Fermer sa fenêtre personnelle ne doit PAS priver du partage commun : c'est
+  // l'étape en cours qu'on referme, pas le butin tout entier.
+  partie.partagee.doc.Butin.etape = "partage";
+  p1.w.afficherFenetreButin(butin());
+  verifier("le partage commun s'affiche quand même ensuite",
+           p1.elements["fenetre-butin"].style.display === "flex",
+           `(display=${p1.elements["fenetre-butin"].style.display})`);
+
+  // Et l'étape du partage peut elle aussi être refermée, sans se rouvrir.
+  p1.w.fermerButinLocalement();
+  p1.w.afficherFenetreButin(butin());
+  verifier("elle se referme à son tour, et reste fermée",
+           p1.elements["fenetre-butin"].style.display === "none");
+
+  // Le butin du combat SUIVANT réapparaît malgré tout.
+  partie.partagee.doc.Butin = { ...butin(), ouvert: true, id: "butin_suivant", etape: "personnel" };
+  p1.w.afficherFenetreButin(butin());
+  verifier("un nouveau butin s'affiche malgré la fermeture du précédent",
+           p1.elements["fenetre-butin"].style.display === "flex",
+           `(display=${p1.elements["fenetre-butin"].style.display})`);
+}
+
+// ==========================================================================
+console.log("\n13. UN BUTIN OUBLIÉ NE BLOQUE PLUS LES SUIVANTS");
+{
+  const partie = creerPartieButin({});
+  const personnages = creerPersonnagesFirestore(["J1", "J2"]);
+  const persos = trosHeros().slice(0, 2);
+  const monstres = [{ idPersonnage: "M1", camp: "Ennemi", statut: "Mort", PV_Actuels: 0, estIllusion: false }];
+
+  // Premier combat, avec son identifiant de rencontre.
+  partie.partagee.doc.ID_Rencontre = "renc_1";
+  const p1 = creerPoste("P1", { partie, personnages, persos, monstres, difficulte: "Normale" });
+  await p1.w.demarrerButin();
+  const premier = { ...partie.partagee.doc.Butin };
+  verifier("le premier butin est créé", premier.ouvert === true && premier.idRencontre === "renc_1");
+
+  // Personne ne le referme : il reste "ouvert" en base. Une victoire dans le
+  // MÊME combat ne doit pas l'écraser (c'est le garde-fou anti-concurrence).
+  await p1.w.demarrerButin();
+  verifier("dans le même combat, il n'est pas rejoué",
+           partie.partagee.doc.Butin.id === premier.id);
+
+  // Nouveau combat : nouvelle rencontre. Le vieux butin ne doit plus bloquer.
+  partie.partagee.doc.ID_Rencontre = "renc_2";
+  const p2 = creerPoste("P1", { partie, personnages, persos, monstres, difficulte: "Difficile" });
+  await p2.w.demarrerButin();
+  verifier("au combat suivant, un nouveau butin est bien tiré",
+           partie.partagee.doc.Butin.id !== premier.id
+           && partie.partagee.doc.Butin.idRencontre === "renc_2",
+           `(rencontre ${partie.partagee.doc.Butin.idRencontre})`);
+  verifier("et il suit la difficulté de CE combat-là",
+           partie.partagee.doc.Butin.difficulte === "Difficile");
+
+  // Un butin déjà résolu ne bloque pas non plus, même sans changer de rencontre.
+  partie.partagee.doc.Butin.resolu = true;
+  const idResolu = partie.partagee.doc.Butin.id;
+  await p2.w.demarrerButin();
+  verifier("un butin déjà résolu se laisse remplacer",
+           partie.partagee.doc.Butin.id !== idResolu);
+
+  // Un butin d'avant cette mécanique (sans identifiant) ne bloque pas non plus.
+  partie.partagee.doc.Butin = { ouvert: true, etape: "personnel", participants: [], parPersonnage: {} };
+  await p2.w.demarrerButin();
+  verifier("un butin d'avant cette correction ne bloque pas non plus",
+           !!partie.partagee.doc.Butin.id);
+
+  // Dernier recours : des monstres posés à la main, donc AUCUN identifiant de
+  // rencontre nulle part. C'est l'ancienneté qui tranche.
+  delete partie.partagee.doc.ID_Rencontre;
+  const p3 = creerPoste("P1", { partie, personnages, persos, monstres, difficulte: "Normale" });
+  delete p3.w.PARTIE_DATA.ID_Rencontre;
+  await p3.w.demarrerButin();
+  const frais = partie.partagee.doc.Butin;
+  verifier("sans rencontre identifiée, un butin est bien créé", !!frais.id && !!frais.creeLe);
+
+  // Tout juste créé : une seconde détection de la même victoire ne doit PAS
+  // le rejouer (c'est le garde-fou anti-concurrence, celui qui compte le plus).
+  await p3.w.demarrerButin();
+  verifier("un butin tout frais résiste à une seconde détection",
+           partie.partagee.doc.Butin.id === frais.id);
+
+  // Le même, vieilli d'une minute : il appartient forcément à un combat passé.
+  partie.partagee.doc.Butin.creeLe = Date.now() - (p3.w.DELAI_BUTIN_PERIME_MS + 1000);
+  await p3.w.demarrerButin();
+  verifier("mais un butin vieux d'une minute se laisse remplacer",
+           partie.partagee.doc.Butin.id !== frais.id,
+           `(${partie.partagee.doc.Butin.id === frais.id ? "toujours le même" : "remplacé"})`);
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Ivalis - Le JDR</title>
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=8">
+  <link rel="stylesheet" href="style.css?v=9">
 
  
   <script>
@@ -1385,6 +1385,10 @@
 <!-- ============================================================= -->
 <div id="fenetre-butin" style="display: none;">
   <div class="carte-butin">
+    <!-- Porte de sortie : referme la fenêtre pour CE joueur seulement. Le butin
+         des autres continue son cours, et rouvrir le combat le fait revenir. -->
+    <button id="btn-fermer-butin" class="croix-fermer-butin" title="Fermer cette fenêtre"
+            onclick="window.fermerButinLocalement()">✕</button>
     <h2 id="butin-titre">Butin de guerre</h2>
     <div id="butin-sous-titre" class="butin-soustitre"></div>
 
@@ -1445,12 +1449,12 @@
 <script type="module" src="mouvement.js?v=9"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
 <script type="module" src="moteur_effets.js?v=17"></script>
-<script type="module" src="monstres.js?v=11"></script>
+<script type="module" src="monstres.js?v=12"></script>
 <script type="module" src="monstres_competences.js?v=5"></script>
 <script type="module" src="monstres_ia.js?v=14"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=2"></script>
-<script type="module" src="loot.js?v=3"></script>
+<script type="module" src="loot.js?v=4"></script>
 
 <!-- ============================================================= -->
 <!--  GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)  -->
