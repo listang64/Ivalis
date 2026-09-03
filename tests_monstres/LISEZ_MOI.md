@@ -60,7 +60,7 @@ node piste_initiative.mjs   # la piste tient à droite du panneau, bulles rédui
 node bandeau_action.mjs     # le relais piste/panneau et le bandeau "Lancer" du bas gauche
 node deplacement_repris.mjs # repartir en cours de tour, sans remise à zéro du barème
 node points_apparition.mjs  # les deux repères d'apparition, et la dispersion des pions
-node reinit_plateau.mjs     # la réinitialisation vide le plateau sans effacer la carte
+node reinit_plateau.mjs     # la réinitialisation vide le plateau, puis enchaîne le déploiement
 node fin_de_tour.mjs        # un document introuvable ne fait plus tomber tout le round
 node titres_bannieres.mjs   # les noms de carte rétrécissent au lieu d'être coupés
 node bouton_forge.mjs       # le + de la Forge devient un sablier pendant l'attente
@@ -151,6 +151,20 @@ chez celui qui clique (une croix de travers ne doit priver personne de son
 loot) sans empêcher l'étape suivante de s'afficher, et qu'un butin périmé —
 autre rencontre, déjà résolu, ou simplement vieux d'une minute — se laisse
 remplacer, tout en résistant à la double détection de la même victoire.
+
+Le même bug avait une seconde moitié, découverte deux jours après : les boutons
+PION et RENCONTRE du menu de combat « ne faisaient plus rien ». Le calque du
+butin est à `z-index: 20000` — au-dessus du bandeau des points d'apparition
+(10020) et de la fenêtre de rencontre (5000). Un butin resté ouvert les
+recouvrait donc tous les deux ET avalait les clics sur le plateau : impossible
+de poser un repère, donc `pointApparition()` renvoyait `null`, et les deux
+boutons qui en dépendent échouaient en silence. La règle est maintenant
+explicite et vérifiée ici : **un combat en cours passe toujours avant un
+butin**. Dès qu'un ennemi est debout, la fenêtre s'efface d'elle-même (sans
+rien perdre : le butin reste en base et revient une fois ce combat gagné). Les
+illusions ne comptent pas comme ennemis, et c'est la MÊME fonction
+(`ennemisEncoreDebout`) qui sert à l'affichage et à la détection de victoire,
+pour que les deux ne puissent pas diverger.
 
 `objets_tableau.mjs` relit les deux classeurs de Nico (figés dans
 `tableau_objets.json`, extraits des `.xlsx` d'origine) et confronte le catalogue

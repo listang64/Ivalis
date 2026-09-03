@@ -3766,6 +3766,10 @@ window.reinitialiserCombat = async function() {
             window.verifierChangementTour(1);
         }
         window.APPARITION_REPORTEE = false;
+        // Réinitialiser, c'est repartir pour un combat : une fois les deux
+        // repères posés, on enchaîne tout seul sur le déploiement des héros
+        // puis sur la rencontre. Le MJ n'a plus qu'à choisir la difficulté.
+        window.DEPLOIEMENT_APRES_REPERES = true;
         if (typeof window.verifierPointsApparition === "function") window.verifierPointsApparition();
 
         console.log("Le combat a été entièrement réinitialisé !");
@@ -4046,6 +4050,28 @@ window.enregistrerPointsApparition = async function(allies, ennemis) {
     } catch (e) {
         console.error("Erreur d'enregistrement des points d'apparition :", e);
     }
+
+    // Poser les repères après une réinitialisation enchaîne sur la suite
+    // logique : les héros se déploient, puis la rencontre demande sa
+    // difficulté. Le drapeau est consommé tout de suite, pour qu'un
+    // replacement ultérieur des repères ne relance pas tout.
+    if (window.DEPLOIEMENT_APRES_REPERES) {
+        window.DEPLOIEMENT_APRES_REPERES = false;
+        await window.deployerCombatApresReperes();
+    }
+};
+
+// Le déploiement d'un combat neuf : les pions des héros autour de leur repère,
+// puis la fenêtre de rencontre pour choisir la difficulté des ennemis.
+window.deployerCombatApresReperes = async function() {
+    try {
+        if (typeof window.genererTokensCombat === "function") await window.genererTokensCombat();
+    } catch (e) {
+        console.error("Déploiement des héros :", e);
+    }
+    // La fenêtre de rencontre s'ouvre après les héros : le MJ voit déjà son
+    // groupe posé quand il choisit à quoi il va les confronter.
+    if (typeof window.ouvrirGenerationRencontre === "function") window.ouvrirGenerationRencontre();
 };
 
 // Reporté à la main : on ne redemandera plus tant que la fenêtre reste ouverte.

@@ -9,9 +9,17 @@ import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 
 const src = fs.readFileSync('/home/user/Ivalis/combat.js', 'utf-8');
 const lignes = src.split('\n');
-const d = lignes.findIndex(l => l.startsWith('window.reinitialiserCombat = async function'));
-let f = d; for (let i = d + 1; i < lignes.length; i++) { if (lignes[i] === '};') { f = i; break; } }
-const fnReset = lignes.slice(d, f + 1).join('\n');
+function fonctionCombat(marqueur) {
+  const i = lignes.findIndex(l => l.startsWith(marqueur));
+  if (i < 0) throw new Error("introuvable dans combat.js : " + marqueur);
+  let j = i; for (let k = i + 1; k < lignes.length; k++) { if (lignes[k] === '};') { j = k; break; } }
+  return lignes.slice(i, j + 1).join('\n');
+}
+const fnReset = fonctionCombat('window.reinitialiserCombat = async function');
+// L'enchaînement d'après la réinitialisation : les repères posés déclenchent le
+// déploiement des héros puis la demande de difficulté.
+const fnReperes = fonctionCombat('window.enregistrerPointsApparition = async function')
+                + '\n' + fonctionCombat('window.deployerCombatApresReperes = async function');
 
 const { chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs');
 const b = await chromium.launch();
@@ -97,6 +105,7 @@ const res = await p.evaluate(async (fnSrc) => {
     setDocsVTT: journal.setDocs.filter(e => e.chemin.startsWith("Combat_VTT")),
     ecriturePartie: (journal.ecritures.find(e => e.chemin.startsWith("Systeme_Parties")) || {}).maj,
     apparitionRedemandee: !!window.APPARITION_REDEMANDEE,
+    deploiementDemande: window.DEPLOIEMENT_APRES_REPERES === true,
     erreursInternes: window.__erreurs
   };
 }, fnReset);
@@ -124,6 +133,8 @@ verifier("les repères d'apparition sont effacés en base",
          res.ecriturePartie && res.ecriturePartie.Spawn_Allies === "«champ supprimé»"
                             && res.ecriturePartie.Spawn_Ennemis === "«champ supprimé»");
 verifier("et redemandés dans la foulée", res.apparitionRedemandee);
+verifier("la réinitialisation annonce un déploiement complet derrière",
+         res.deploiementDemande);
 console.log("     soins :", res.soins.join(" | ") || "aucun");
 verifier("les altérations sont effacées en mémoire",
          res.etatsMemoire.every(n => n === 0), `(${res.etatsMemoire.join(",")})`);
@@ -134,6 +145,61 @@ verifier("chaque combattant est soigné ET débarrassé de ses états en base",
 verifier("le combat repasse au tour 1, file vide",
          res.ecriturePartie && res.ecriturePartie.Tour_Combat === 1
                             && res.ecriturePartie.File_Attente_Combat.length === 0);
+
+// =========================================================================
+// Poser les deux repères après une réinitialisation doit enchaîner tout seul :
+// les héros se déploient, puis la rencontre demande sa difficulté. C'était
+// jusqu'ici deux clics à faire à la main, et ils passaient facilement à la
+// trappe — un combat sans pions ni ennemis en attendant.
+console.log("\nAPRÈS LES REPÈRES : DÉPLOIEMENT ET RENCONTRE");
+const suite = await p.evaluate(async (fnSrc) => {
+  const journal = { ordre: [], ecritures: [] };
+  window.__fs = {
+    doc: (...a) => ({ chemin: a.slice(1).join("/") }),
+    updateDoc: async (ref, maj) => { journal.ecritures.push({ chemin: ref.chemin, maj }); }
+  };
+  const db = { faux: true };
+  const updateDoc = window.__fs.updateDoc;
+  const doc = window.__fs.doc;
+
+  window.ID_PARTIE_COURANTE = "PARTIE_TEST";
+  window.PARTIE_DATA = {};
+  window.genererTokensCombat = async () => { journal.ordre.push("heros"); };
+  window.ouvrirGenerationRencontre = () => { journal.ordre.push("rencontre"); };
+  eval(fnSrc);
+
+  // 1. Sans réinitialisation derrière : poser des repères ne déclenche rien.
+  window.DEPLOIEMENT_APRES_REPERES = false;
+  await window.enregistrerPointsApparition({ q: 1, r: 1 }, { q: 9, r: 1 });
+  const sansReset = [...journal.ordre];
+
+  // 2. Après une réinitialisation : les deux étapes s'enchaînent, dans l'ordre.
+  journal.ordre.length = 0;
+  window.DEPLOIEMENT_APRES_REPERES = true;
+  await window.enregistrerPointsApparition({ q: 2, r: 2 }, { q: 8, r: 2 });
+  const avecReset = [...journal.ordre];
+
+  // 3. Le drapeau est consommé : replacer les repères ensuite ne rejoue rien.
+  journal.ordre.length = 0;
+  await window.enregistrerPointsApparition({ q: 3, r: 3 }, { q: 7, r: 3 });
+  const secondPlacement = [...journal.ordre];
+
+  return { sansReset, avecReset, secondPlacement,
+           reperesEnMemoire: window.PARTIE_DATA.Spawn_Allies,
+           ecritures: journal.ecritures.length,
+           drapeau: window.DEPLOIEMENT_APRES_REPERES };
+}, fnReperes);
+
+verifier("hors réinitialisation, poser des repères ne déclenche rien",
+         suite.sansReset.length === 0, `(${suite.sansReset.join(",") || "rien"})`);
+verifier("après une réinitialisation, héros PUIS rencontre s'enchaînent",
+         suite.avecReset.join(",") === "heros,rencontre", `(${suite.avecReset.join(",") || "rien"})`);
+verifier("le drapeau est consommé une seule fois",
+         suite.secondPlacement.length === 0 && suite.drapeau === false,
+         `(${suite.secondPlacement.join(",") || "rien"})`);
+verifier("les repères restent écrits en mémoire avant l'aller-retour réseau",
+         suite.reperesEnMemoire && suite.reperesEnMemoire.q === 3);
+verifier("et enregistrés en base à chaque fois", suite.ecritures === 3, `(${suite.ecritures})`);
 
 await b.close();
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

@@ -731,5 +731,54 @@ console.log("\n13. UN BUTIN OUBLIÉ NE BLOQUE PLUS LES SUIVANTS");
            `(${partie.partagee.doc.Butin.id === frais.id ? "toujours le même" : "remplacé"})`);
 }
 
+// ==========================================================================
+console.log("\n14. UN COMBAT EN COURS PASSE AVANT LE BUTIN");
+{
+  // Le calque du butin couvre tout l'écran (z-index 20000), au-dessus du
+  // bandeau des points d'apparition (10020) et de la fenêtre de rencontre
+  // (5000). Tant qu'il traîne, on ne peut ni poser un repère ni générer des
+  // ennemis : les boutons PION et RENCONTRE semblent morts. Il doit donc
+  // s'effacer dès qu'un ennemi est debout.
+  const partie = creerPartieButin({});
+  const personnages = creerPersonnagesFirestore(["J1", "J2"]);
+  const persos = trosHeros().slice(0, 2);
+  const mort = { idPersonnage: "M1", camp: "Ennemi", statut: "Mort", PV_Actuels: 0, estIllusion: false };
+  const monstres = [mort];
+  const p1 = creerPoste("P1", { partie, personnages, persos, monstres, difficulte: "Normale" });
+  const w = p1.w, ecran = p1.elements;
+
+  await w.demarrerButin();
+  const butin = () => partie.partagee.doc.Butin;
+
+  w.afficherFenetreButin(butin());
+  verifier("combat gagné : le butin s'affiche", ecran["fenetre-butin"].style.display === "flex");
+
+  // Le MJ lance une nouvelle rencontre : un ennemi debout apparaît.
+  monstres.push({ idPersonnage: "M2", camp: "Ennemi", statut: "Vivant", PV_Actuels: 30, estIllusion: false });
+  w.afficherFenetreButin(butin());
+  verifier("un ennemi debout et le butin s'efface aussitôt",
+           ecran["fenetre-butin"].style.display === "none",
+           `(display=${ecran["fenetre-butin"].style.display})`);
+  verifier("sans être perdu pour autant : il reste ouvert en base", butin().ouvert === true);
+
+  // Ce nouvel ennemi tombe à son tour : le butin peut revenir.
+  monstres[1].statut = "Mort";
+  w.afficherFenetreButin(butin());
+  verifier("une fois ce combat gagné aussi, le butin revient",
+           ecran["fenetre-butin"].style.display === "flex");
+
+  // Une illusion n'est pas un ennemi : elle ne doit pas masquer le butin.
+  monstres.push({ idPersonnage: "ILL1", camp: "Ennemi", statut: "Vivant", PV_Actuels: 10, estIllusion: true });
+  w.afficherFenetreButin(butin());
+  verifier("une illusion debout ne masque pas le butin",
+           ecran["fenetre-butin"].style.display === "flex");
+
+  // La même règle sert à la détection de victoire : une seule définition.
+  verifier("« des ennemis debout ? » ne voit pas l'illusion non plus",
+           w.ennemisEncoreDebout() === false);
+  monstres[2].estIllusion = false;
+  verifier("mais bien un vrai ennemi vivant", w.ennemisEncoreDebout() === true);
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

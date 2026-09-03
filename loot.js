@@ -180,16 +180,22 @@ window.tirerObjetsAleatoires = function(difficulte, n) {
 //  mourir au combat et la coupe de test les achever d'un coup. Bon marché et
 //  protégée par transaction (modifierPartie), donc sans risque à rejouer
 //  souvent ni depuis plusieurs postes à la fois.
+// Reste-t-il un ennemi debout ? La question sert deux fois : à savoir si le
+// combat est gagné, et à savoir si le butin a encore le droit d'occuper
+// l'écran. Une seule définition, donc aucun risque que les deux divergent.
+window.ennemisEncoreDebout = function() {
+    const estMort = (m) => m.estIllusion || m.statut === "Mort"
+        || (typeof window.estCombattantMort === "function" && window.estCombattantMort(m.idPersonnage));
+    return (window.MONSTRES_PARTIE || []).some(m => !estMort(m));
+};
+
 window.verifierVictoireCombat = function() {
     if (document.getElementById("fenetre-combat")?.style.display !== "block") return;
     if (window.PARTIE_DATA && window.PARTIE_DATA.Butin && window.PARTIE_DATA.Butin.ouvert) return;
 
     const monstres = window.MONSTRES_PARTIE || [];
     if (monstres.length === 0) return;
-
-    const estMort = (m) => m.estIllusion || m.statut === "Mort"
-        || (typeof window.estCombattantMort === "function" && window.estCombattantMort(m.idPersonnage));
-    if (!monstres.every(estMort)) return;
+    if (window.ennemisEncoreDebout()) return;
 
     const heroVivant = (window.PERSOS_PARTIE || []).some(p => p.camp === "Allié" && !p.estIllusion && p.actif !== false
         && !(typeof window.estCombattantMort === "function" && window.estCombattantMort(p.idPersonnage)));
@@ -317,6 +323,16 @@ window.afficherFenetreButin = function(butin) {
     // en base rouvrait sa fenêtre au simple chargement de la partie — par-dessus
     // la carte du monde, et sans que le joueur puisse rien en faire.
     if (document.getElementById("fenetre-combat")?.style.display !== "block") {
+        fenetre.style.display = "none";
+        return;
+    }
+
+    // Un combat en cours passe TOUJOURS avant un butin. Ce calque couvre tout
+    // l'écran (z-index 20000, au-dessus du bandeau des points d'apparition et
+    // de la fenêtre de rencontre) : tant qu'il est là, on ne peut ni placer un
+    // repère ni générer des ennemis, et les boutons du menu de combat semblent
+    // morts. Dès qu'un ennemi est debout, le butin s'efface donc de lui-même.
+    if (window.ennemisEncoreDebout()) {
         fenetre.style.display = "none";
         return;
     }
