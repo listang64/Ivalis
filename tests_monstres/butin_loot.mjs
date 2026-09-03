@@ -1,0 +1,384 @@
+// LE BUTIN DE FIN DE COMBAT — fenêtre personnelle puis partage commun.
+// Comme la file d'attente du combat, le document "Butin" est modifié par
+// plusieurs postes à la fois (chacun peut détecter la victoire, chacun peut
+// être le DERNIER à valider et donc celui qui construit le pool ou qui le
+// résout). Tout repose sur window.modifierPartie (combat.js) : ce banc rejoue
+// les scènes avec le vrai code de loot.js et combat.js, à plusieurs postes.
+import fs from 'fs';
+import { SRC_MODIFIER_PARTIE } from './transaction_partie.mjs';
+
+let echecs = 0;
+const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(62)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
+
+// --------------------------------------------------------------------------
+// Extraction du vrai code, tel quel.
+// --------------------------------------------------------------------------
+const lignesCombat = fs.readFileSync('/home/user/Ivalis/combat.js', 'utf-8').split('\n');
+function fonctionCombat(marqueur) {
+  const d = lignesCombat.findIndex(l => l.startsWith(marqueur));
+  if (d < 0) throw new Error("introuvable dans combat.js : " + marqueur);
+  let f = d; for (let i = d + 1; i < lignesCombat.length; i++) { if (lignesCombat[i] === '};') { f = i; break; } }
+  return lignesCombat.slice(d, f + 1).join('\n');
+}
+const SRC_VICTOIRE_TEST = fonctionCombat('window.declencherVictoireTest = async function')
+  .replace(/await import\("[^"]*"\)/g, 'await importerFirestore()');
+
+const SRC_LOOT = fs.readFileSync('/home/user/Ivalis/loot.js', 'utf-8')
+  .replace(/^import[\s\S]*?from\s+"[^"]+";\s*$/gm, '');
+
+// --------------------------------------------------------------------------
+// Un Firestore transactionnel pour "Systeme_Parties/P1", avec fusion par
+// chemin pointé à profondeur QUELCONQUE ("Butin.parPersonnage.J1.decisions.x") :
+// c'est exactement ce que fait le vrai service, et c'est ce dont le butin a
+// besoin (contrairement aux chemins à un seul niveau des autres bancs).
+function creerPartieButin(docInitial) {
+  const partagee = { doc: structuredClone(docInitial), file: Promise.resolve() };
+  const fusionnerChemin = (cible, chemin, valeur) => {
+    const segments = chemin.split(".");
+    let n = cible;
+    for (let i = 0; i < segments.length - 1; i++) {
+      if (typeof n[segments[i]] !== "object" || n[segments[i]] === null) n[segments[i]] = {};
+      n = n[segments[i]];
+    }
+    n[segments[segments.length - 1]] = structuredClone(valeur);
+  };
+  const runTransaction = async (_db, fn) => {
+    const precedent = partagee.file;
+    let debloquer;
+    partagee.file = new Promise(r => debloquer = r);
+    await precedent;
+    try {
+      const vue = structuredClone(partagee.doc);
+      await new Promise(r => setTimeout(r, 3)); // la fenêtre où deux postes se marchent dessus
+      return await fn({
+        get: async () => ({ exists: () => true, data: () => vue }),
+        update: (_r, maj) => Object.keys(maj).forEach(cle => fusionnerChemin(partagee.doc, cle, maj[cle]))
+      });
+    } finally { debloquer(); }
+  };
+  return { partagee, runTransaction };
+}
+
+// Le "Personnages" collection : une seule vraie base, partagée par tous les
+// postes, où finissent les écritures d'équipement (equiperObjetButin).
+function creerPersonnagesFirestore(ids) {
+  const table = {};
+  ids.forEach(id => table[id] = { Equip_Armure: null, Equip_Main_Droite: null, Equip_Main_Gauche: null });
+  const ecritures = [];
+  const updateDoc = async (ref, maj) => {
+    if (!table[ref.id]) throw new Error("personnage introuvable : " + ref.id);
+    Object.assign(table[ref.id], structuredClone(maj));
+    ecritures.push({ id: ref.id, maj: structuredClone(maj) });
+  };
+  return { table, ecritures, updateDoc };
+}
+
+// Un poste (navigateur) : ses propres document/localStorage (fermés sur SES
+// fonctions, pas de variable globale à jongler entre postes concurrents), sa
+// propre vue des combattants, mais le même Firestore partagé.
+function creerPoste(idJoueur, { partie, personnages, persos, monstres, catalogue }) {
+  const w = {};
+  w.ID_PARTIE_COURANTE = "P1";
+  w.PARTIE_DATA = partie.partagee.doc; // même objet, toujours à jour (muté en place)
+  // Comme le vrai recomposerCombattants (monstres.js) : PERSOS_PARTIE est la
+  // liste COMBINÉE joueurs+monstres, MONSTRES_PARTIE n'en est que le sous-set
+  // ennemi. declencherVictoireTest filtre PERSOS_PARTIE par camp "Ennemi".
+  w.PERSOS_PARTIE = [...persos, ...monstres];
+  w.MONSTRES_PARTIE = monstres;
+  w.CACHE_OBJETS = catalogue;
+  w.estCombattantMort = (id) => {
+    const p = persos.find(x => x.idPersonnage === id) || monstres.find(x => x.idPersonnage === id);
+    return !p || p.PV_Actuels <= 0 || p.statut === "Mort" || p.Statut === "Mort";
+  };
+  // Référence "combattant" : mutation directe de l'objet en RAM, comme le
+  // fait la vraie App une fois la notification Firestore revenue — pas
+  // besoin d'un aller-retour complet pour ce que ce banc vérifie ici.
+  w.refCombattant = (id) => {
+    const cible = persos.find(p => p.idPersonnage === id) || monstres.find(m => m.idPersonnage === id);
+    return { col: "Combattant", cible };
+  };
+
+  const doc = (_db, col, id) => ({ col, id });
+  const updateDoc = async (ref, maj) => {
+    if (ref.col !== "Personnages") throw new Error("écriture inattendue sur " + ref.col);
+    await personnages.updateDoc(ref, maj);
+  };
+  const documentStub = {
+    getElementById(id) {
+      if (id === "fenetre-combat") return { style: { display: "block" } };
+      return { style: {}, innerHTML: "", value: "" };
+    }
+  };
+  const localStorageStub = { getItem: () => idJoueur };
+  const importerFirestore = async () => ({
+    writeBatch: () => {
+      const operations = [];
+      return {
+        update: (ref, maj) => operations.push([ref, maj]),
+        commit: async () => {
+          for (const [ref, maj] of operations) {
+            if (ref.col === "Combattant") Object.assign(ref.cible, maj);
+            else await updateDoc(ref, maj);
+          }
+        }
+      };
+    }
+  });
+
+  new Function('window', 'db', 'doc', 'updateDoc', 'document', 'localStorage', SRC_LOOT)(
+    w, {}, doc, updateDoc, documentStub, localStorageStub);
+  new Function('window', 'db', 'doc', 'runTransaction', SRC_MODIFIER_PARTIE)(
+    w, {}, doc, partie.runTransaction);
+  new Function('window', 'db', 'importerFirestore', SRC_VICTOIRE_TEST)(w, {}, importerFirestore);
+
+  return { idJoueur, w };
+}
+
+const CATALOGUE = [
+  { Nom: "Lame Fidèle", Emplacement: "Main_Droite", Effet_Texte: "+ dégâts physiques", URL_Image: "" },
+  { Nom: "Bouclier du Veilleur", Emplacement: "Main_Gauche", Effet_Texte: "+ défense", URL_Image: "" },
+  { Nom: "Cuirasse du Rempart", Emplacement: "Armure", Effet_Texte: "+ PV max", URL_Image: "" },
+  { Nom: "Dague du Chuchoteur", Emplacement: "Main_Droite", Effet_Texte: "+ critique", URL_Image: "" },
+  { Nom: "Grimoire aux Pages Ternies", Emplacement: "Main_Gauche", Effet_Texte: "+ magie", URL_Image: "" }
+];
+
+const trosHeros = () => ([
+  { idPersonnage: "J1", prenom: "Pliors", idJoueur: "P1", camp: "Allié", statut: "Vivant", actif: true, PV_Actuels: 42,
+    equipArmure: null, equipMainDroite: null, equipMainGauche: null },
+  { idPersonnage: "J2", prenom: "Jade", idJoueur: "P2", camp: "Allié", statut: "Vivant", actif: true, PV_Actuels: 42,
+    equipArmure: null, equipMainDroite: null, equipMainGauche: null },
+  { idPersonnage: "J3", prenom: "Mémé", idJoueur: "P3", camp: "Allié", statut: "Vivant", actif: true, PV_Actuels: 42,
+    equipArmire: null, equipMainDroite: null, equipMainGauche: null }
+]);
+const unMonstreVivant = () => ([{ idPersonnage: "M1", camp: "Ennemi", statut: "Vivant", PV_Actuels: 30, estIllusion: false }]);
+
+// ==========================================================================
+console.log("1. LA COUPE DE TEST (bouton 🏆) NE PASSE PAS PAR LES RENFORTS");
+{
+  const partie = creerPartieButin({});
+  const personnages = creerPersonnagesFirestore(["J1"]);
+  const persos = trosHeros().slice(0, 1);
+  const monstres = unMonstreVivant();
+  const p1 = creerPoste("P1", { partie, personnages, persos, monstres, catalogue: CATALOGUE });
+
+  await p1.w.declencherVictoireTest();
+  verifier("le monstre passe à Mort", monstres[0].Statut === "Mort", `(Statut=${monstres[0].Statut})`);
+  verifier("ses PV tombent à 0", monstres[0].PV_Actuels === 0, `(${monstres[0].PV_Actuels})`);
+  verifier("le code ne mentionne pas marquerMonstreMort (pas de renfort déclenché)",
+           SRC_VICTOIRE_TEST.includes("SANS passer par window.marquerMonstreMort"));
+
+  await p1.w.declencherVictoireTest(); // plus aucun ennemi vivant : sans effet, ne doit pas planter
+  verifier("rejouer la coupe une fois tous les ennemis tombés ne fait rien de plus", true);
+}
+
+// ==========================================================================
+console.log("\n2. DÉTECTION DE VICTOIRE — les gardes-fous");
+{
+  const partie = creerPartieButin({});
+  const personnages = creerPersonnagesFirestore(["J1"]);
+  const persos = trosHeros().slice(0, 1);
+  const monstres = unMonstreVivant();
+  const p1 = creerPoste("P1", { partie, personnages, persos, monstres, catalogue: CATALOGUE });
+
+  p1.w.verifierVictoireCombat();
+  await new Promise(r => setTimeout(r, 20));
+  verifier("un ennemi encore vivant : pas de butin", !partie.partagee.doc.Butin);
+
+  monstres[0].statut = "Mort";
+  persos[0].statut = "Mort"; // aucun héros vivant non plus
+  p1.w.verifierVictoireCombat();
+  await new Promise(r => setTimeout(r, 20));
+  verifier("ennemis tombés mais aucun héros vivant : pas de butin", !partie.partagee.doc.Butin);
+
+  persos[0].statut = "Vivant";
+  p1.w.verifierVictoireCombat();
+  await new Promise(r => setTimeout(r, 20));
+  verifier("tous les ennemis tombés + un héros vivant : le butin s'ouvre",
+           !!(partie.partagee.doc.Butin && partie.partagee.doc.Butin.ouvert));
+  verifier("étape initiale : personnel", partie.partagee.doc.Butin.etape === "personnel");
+  verifier("deux objets tirés pour J1",
+           (partie.partagee.doc.Butin.parPersonnage.J1.items || []).length === 2);
+
+  const avant = JSON.stringify(partie.partagee.doc.Butin);
+  p1.w.verifierVictoireCombat(); // le butin est déjà ouvert : rejouer ne doit rien changer
+  await new Promise(r => setTimeout(r, 20));
+  verifier("un butin déjà ouvert n'est pas repris ni réinitialisé",
+           JSON.stringify(partie.partagee.doc.Butin) === avant);
+}
+
+// ==========================================================================
+console.log("\n3. TROIS POSTES DÉTECTENT LA VICTOIRE AU MÊME INSTANT");
+{
+  const partie = creerPartieButin({});
+  const personnages = creerPersonnagesFirestore(["J1", "J2", "J3"]);
+  const persos = trosHeros();
+  const monstres = [{ idPersonnage: "M1", camp: "Ennemi", statut: "Mort", PV_Actuels: 0, estIllusion: false }];
+  const postes = ["P1", "P2", "P3"].map(id => creerPoste(id, { partie, personnages, persos, monstres, catalogue: CATALOGUE }));
+
+  // Les trois clients recomposent leurs combattants au même instant (fin du
+  // dernier coup porté) et appellent donc demarrerButin en même temps.
+  await Promise.all(postes.map(p => p.w.demarrerButin()));
+
+  verifier("le butin existe et est ouvert une seule fois",
+           !!(partie.partagee.doc.Butin && partie.partagee.doc.Butin.ouvert));
+  verifier("les trois héros sont participants",
+           new Set(partie.partagee.doc.Butin.participants).size === 3);
+  ["J1", "J2", "J3"].forEach(id => {
+    verifier(`${id} a reçu exactement deux objets (pas de double tirage)`,
+             (partie.partagee.doc.Butin.parPersonnage[id].items || []).length === 2);
+  });
+}
+
+// ==========================================================================
+console.log("\n4. LA FENÊTRE PERSONNELLE — prendre, laisser, valider");
+let butinPartage; // réutilisé par les sections suivantes
+let contexte4;
+{
+  const partie = creerPartieButin({});
+  const personnages = creerPersonnagesFirestore(["J1", "J2", "J3"]);
+  const persos = trosHeros();
+  const monstres = [{ idPersonnage: "M1", camp: "Ennemi", statut: "Mort", PV_Actuels: 0, estIllusion: false }];
+  const postes = { P1: null, P2: null, P3: null };
+  ["P1", "P2", "P3"].forEach(id => postes[id] = creerPoste(id, { partie, personnages, persos, monstres, catalogue: CATALOGUE }));
+
+  await postes.P1.w.demarrerButin();
+  const items = { J1: partie.partagee.doc.Butin.parPersonnage.J1.items,
+                  J2: partie.partagee.doc.Butin.parPersonnage.J2.items,
+                  J3: partie.partagee.doc.Butin.parPersonnage.J3.items };
+
+  // J1 : prend son premier objet (via le popup de confirmation, comme un vrai
+  // clic "Prendre" puis "Équiper"), laisse le second.
+  postes.P1.w.choisirLootPersonnel("J1", items.J1[0].uid, true);
+  await postes.P1.w.confirmerChoixButin(true);
+  postes.P1.w.choisirLootPersonnel("J1", items.J1[1].uid, false);
+  await postes.P1.w.validerButinPersonnel("J1");
+
+  verifier("l'objet pris par J1 est équipé côté Personnages",
+           Object.values(personnages.table.J1).some(v => v && v.uid === items.J1[0].uid),
+           `(${JSON.stringify(personnages.table.J1)})`);
+  verifier("J1 est marqué validé", partie.partagee.doc.Butin.parPersonnage.J1.valide === true);
+  verifier("étape encore personnelle (tout le monde n'a pas validé)",
+           partie.partagee.doc.Butin.etape === "personnel");
+
+  // Une fois validé, revenir sur sa décision ne doit plus rien changer.
+  await postes.P1.w.enregistrerDecisionButin("J1", items.J1[1].uid, true);
+  verifier("après validation, une décision ne peut plus être changée",
+           partie.partagee.doc.Butin.parPersonnage.J1.decisions[items.J1[1].uid] === false);
+
+  postes.P2.w.choisirLootPersonnel("J2", items.J2[0].uid, true);
+  await postes.P2.w.confirmerChoixButin(true);
+  postes.P2.w.choisirLootPersonnel("J2", items.J2[1].uid, false);
+  await postes.P2.w.validerButinPersonnel("J2");
+  verifier("étape encore personnelle après le 2e héros", partie.partagee.doc.Butin.etape === "personnel");
+
+  // J3 est le DERNIER à valider : c'est cet appel qui doit construire le pool.
+  postes.P3.w.choisirLootPersonnel("J3", items.J3[0].uid, true);
+  await postes.P3.w.confirmerChoixButin(true);
+  postes.P3.w.choisirLootPersonnel("J3", items.J3[1].uid, false);
+  await postes.P3.w.validerButinPersonnel("J3");
+
+  verifier("le dernier à valider fait basculer l'étape sur le partage",
+           partie.partagee.doc.Butin.etape === "partage");
+  const pool = partie.partagee.doc.Butin.pool || [];
+  verifier("le pool contient les trois objets laissés (un par héros)", pool.length === 3,
+           `(${pool.length})`);
+  const uidsAttendus = new Set([items.J1[1].uid, items.J2[1].uid, items.J3[1].uid]);
+  verifier("ce sont bien LES objets laissés, pas les objets pris",
+           pool.every(it => uidsAttendus.has(it.uid)));
+  verifier("chaque objet du pool part sans candidat", pool.every(it => (it.candidats || []).length === 0));
+
+  contexte4 = { partie, personnages, persos, monstres, postes, items };
+  butinPartage = { pool, items };
+}
+
+// ==========================================================================
+console.log("\n5. LE PARTAGE COMMUN — placement, tirage au sort, résolution");
+{
+  const { partie, personnages, postes, items } = contexte4;
+  const idJ1Reste = items.J1[1].uid, idJ2Reste = items.J2[1].uid, idJ3Reste = items.J3[1].uid;
+
+  // J1 se place sur l'objet laissé par J2 ; J2 se place sur celui de J2 (le
+  // sien) ET celui de J3 ; J3 ne se place sur rien.
+  await postes.P1.w.togglePlacementPool("J1", idJ2Reste);
+  await postes.P2.w.togglePlacementPool("J2", idJ2Reste);
+  await postes.P2.w.togglePlacementPool("J2", idJ3Reste);
+
+  const pool = partie.partagee.doc.Butin.pool;
+  const itemJ1 = pool.find(it => it.uid === idJ1Reste);
+  const itemJ2 = pool.find(it => it.uid === idJ2Reste);
+  const itemJ3 = pool.find(it => it.uid === idJ3Reste);
+  verifier("objet de J1 : personne ne s'est placé dessus", itemJ1.candidats.length === 0);
+  verifier("objet de J2 : deux prétendants (J1 et J2)",
+           itemJ2.candidats.length === 2 && itemJ2.candidats.includes("J1") && itemJ2.candidats.includes("J2"));
+  verifier("objet de J3 : un seul prétendant (J2)",
+           itemJ3.candidats.length === 1 && itemJ3.candidats[0] === "J2");
+
+  // On peut changer d'avis avant la résolution : se replacer retire.
+  await postes.P2.w.togglePlacementPool("J2", idJ3Reste);
+  verifier("se replacer sur le même objet retire la candidature",
+           partie.partagee.doc.Butin.pool.find(it => it.uid === idJ3Reste).candidats.length === 0);
+  await postes.P2.w.togglePlacementPool("J2", idJ3Reste); // remis pour la suite
+
+  // Tirage au sort forcé et déterministe pour l'objet à deux prétendants
+  // (J1 et J2) : Math.random()=0 désigne le premier candidat inscrit, J1.
+  const vraiRandom = Math.random;
+  Math.random = () => 0;
+  try {
+    await Promise.all([postes.P1.w.validerButinPool(), postes.P2.w.validerButinPool(), postes.P3.w.validerButinPool()]);
+  } finally { Math.random = vraiRandom; }
+
+  verifier("le partage est résolu et l'étape passe à 'termine'",
+           partie.partagee.doc.Butin.resolu === true && partie.partagee.doc.Butin.etape === "termine");
+  const poolFinal = partie.partagee.doc.Butin.pool;
+  const finJ1 = poolFinal.find(it => it.uid === idJ1Reste);
+  const finJ2 = poolFinal.find(it => it.uid === idJ2Reste);
+  const finJ3 = poolFinal.find(it => it.uid === idJ3Reste);
+  verifier("objet sans prétendant : personne ne le gagne", finJ1.gagnant === null);
+  verifier("objet convoité par deux : le tirage désigne J1 (Math.random forcé à 0)",
+           finJ2.gagnant === "J1", `(gagnant=${finJ2.gagnant})`);
+  verifier("objet à un seul prétendant : il l'emporte sans tirage", finJ3.gagnant === "J2");
+
+  verifier("J1 a bien reçu son gain en écriture Firestore (Personnages)",
+           Object.values(personnages.table.J1).some(v => v && v.uid === finJ2.uid));
+  verifier("J2 a bien reçu son gain en écriture Firestore (Personnages)",
+           Object.values(personnages.table.J2).some(v => v && v.uid === finJ3.uid));
+  verifier("l'objet non gagné n'a déclenché aucune écriture d'équipement",
+           !personnages.ecritures.some(e => Object.values(e.maj).some(v => v && v.uid === finJ1?.uid)));
+
+  const ecrituresJ1 = personnages.ecritures.filter(e => e.id === "J1" && Object.values(e.maj).some(v => v && v.uid === finJ2.uid));
+  const ecrituresJ2 = personnages.ecritures.filter(e => e.id === "J2" && Object.values(e.maj).some(v => v && v.uid === finJ3.uid));
+  verifier("un seul poste a effectué l'équipement du gagnant (pas de double écriture concurrente)",
+           ecrituresJ1.length === 1 && ecrituresJ2.length === 1,
+           `(J1:${ecrituresJ1.length}, J2:${ecrituresJ2.length})`);
+}
+
+// ==========================================================================
+console.log("\n6. FERMETURE DE LA FENÊTRE — partagée, idempotente");
+{
+  const { partie, postes } = contexte4;
+  await postes.P3.w.fermerFenetreButin();
+  verifier("le butin se ferme pour tout le monde", partie.partagee.doc.Butin.ouvert === false);
+  await postes.P1.w.fermerFenetreButin(); // déjà fermé : ne doit pas planter
+  verifier("refermer un butin déjà fermé ne fait rien de plus", partie.partagee.doc.Butin.ouvert === false);
+}
+
+// ==========================================================================
+console.log("\n7. TIRAGE ALÉATOIRE — cas limites du catalogue");
+{
+  const partie = creerPartieButin({});
+  const personnages = creerPersonnagesFirestore(["J1"]);
+  const p1 = creerPoste("P1", { partie, personnages, persos: [], monstres: [], catalogue: CATALOGUE });
+
+  const deux = p1.w.tirerObjetsAleatoires(CATALOGUE, 2);
+  verifier("deux objets distincts tirés d'un catalogue suffisant", deux.length === 2 && deux[0].uid !== deux[1].uid);
+  verifier("chaque tirage a un identifiant unique préfixé loot_", deux.every(it => /^loot_/.test(it.uid)));
+
+  const unSeul = p1.w.tirerObjetsAleatoires([CATALOGUE[0]], 2);
+  verifier("un catalogue d'un seul objet ne donne qu'un seul tirage (pas de plantage)", unSeul.length === 1);
+
+  const aucun = p1.w.tirerObjetsAleatoires([], 2);
+  verifier("un catalogue vide donne un tirage vide", aucun.length === 0);
+}
+
+console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
+process.exit(echecs === 0 ? 0 : 1);

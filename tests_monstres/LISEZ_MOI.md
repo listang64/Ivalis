@@ -72,6 +72,8 @@ node coup_critique.mjs      # le jet de critique, ses dégâts doublés et ses e
 node atouts_races.mjs       # les sept peuples et leurs avantages, mesurés un par un
 node jauge_token.mjs        # la jauge sous le pion survit à un redessin
 node jauge_cibles.mjs       # la vie restante des cibles s'affiche pendant le ciblage
+node butin_loot.mjs         # butin de fin de combat : détection, personnel, partage, tirage au sort
+node apercu_butin.mjs       # onglet Inventaire et fenêtres de butin, capturés à l'écran
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 ```
@@ -106,6 +108,34 @@ node gabarit_relie.mjs      # le générateur suit-il le Fatigue_Max du tableau 
 Ce banc modifie la fatigue max d'un gabarit (60, 100, 150, 240) et vérifie que
 les six tranches de coût suivent proportionnellement, puis contrôle que sur tout
 le bestiaire réel aucune carte ne sort de sa tranche.
+
+## Butin de fin de combat
+
+```sh
+node butin_loot.mjs         # détection de victoire, fenêtre personnelle, partage, tirage au sort
+node apercu_butin.mjs       # onglet Inventaire et fenêtres de butin, capturés à l'écran
+```
+
+`butin_loot.mjs` rejoue le vrai code de `loot.js` et de `window.modifierPartie`
+(combat.js) à plusieurs postes à la fois, sur un faux Firestore transactionnel
+qui fusionne les chemins pointés à profondeur quelconque (`Butin.parPersonnage.
+J1.decisions.xxx`) — les autres bancs réseau n'avaient jamais eu besoin d'aller
+au-delà d'un seul niveau. Il couvre : la coupe de test (🏆) qui tue les ennemis
+sans passer par les renforts, les gardes-fous de `verifierVictoireCombat`, la
+création atomique du butin quand plusieurs postes détectent la victoire en même
+temps, le choix personnel (prendre/laisser, équipement, décision verrouillée
+après validation), la construction du pool par le DERNIER héros à valider, le
+placement dans le partage commun, et sa résolution (tirage au sort déterministe
+via `Math.random` forcé) par le DERNIER joueur à valider — avec vérification
+qu'un seul poste effectue réellement l'écriture d'équipement du gagnant.
+C'est ce banc qui a détecté un vrai bug avant qu'il n'atteigne le jeu :
+`validerButinPool` plantait (`for...of` sur `true`) dès qu'un joueur validait
+sans être le dernier, faute de `resultat` explicite dans ce cas.
+
+`apercu_butin.mjs` charge le vrai `style.css` et le vrai balisage
+d'`index.html`, remplit l'onglet Inventaire et les trois vues du butin avec les
+vraies fonctions de rendu, et capture des écrans (`/tmp/apercu_*.png`) — utile
+pour juger le rendu à l'œil sans ouvrir le jeu.
 
 ⚠️ `combat_complet.mjs` ramène à zéro la DURÉE des pauses de l'IA. Ne pas
 remplacer `setTimeout` par un appel synchrone : au bout de quelques dizaines

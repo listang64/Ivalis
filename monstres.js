@@ -216,6 +216,11 @@ window.recomposerCombattants = function() {
         const frais = monstres.find(m => m.idPersonnage === affiche.idPersonnage);
         if (frais) window.afficherDansPanneauGauche(affiche.idPersonnage);
     }
+
+    // Tous les ennemis sont-ils tombés ? La victoire (et son butin) se
+    // détecte ici : c'est le seul endroit qui voit changer la liste des
+    // monstres, qu'ils meurent au combat ou via la coupe de test.
+    if (typeof window.verifierVictoireCombat === "function") window.verifierVictoireCombat();
 };
 
 let unsubscribeMonstres = null;

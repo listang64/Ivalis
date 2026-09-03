@@ -45,7 +45,8 @@ const COL = {
   FACTIONS: "Monde_Factions",
   PERSONNAGES: "Personnages",
   MESSAGES: "Messages_Chat",
-  CARACTERISTIQUES: "Caracteristiques" // <-- NOUVEAU
+  CARACTERISTIQUES: "Caracteristiques", // <-- NOUVEAU
+  OBJETS: "Objets" // Catalogue des armes/armures pouvant être trouvées en butin
 };
 
 // Identifiants des documents uniques (anciennes cellules fixes des Sheets)
@@ -173,6 +174,12 @@ function persoDocVersFront(id, d) {
     Etats_Alteres: etatsAlteres,
     Bouclier_Max: d.Bouclier_Max || 0,
     Bouclier_Actuel: d.Bouclier_Actuel || 0,
+    // Or et équipement : propres à chaque personnage, jamais aux monstres (qui
+    // n'utilisent pas ce chemin de conversion pour ces champs-là).
+    or: parseInt(d.Or) || 0,
+    equipArmure: d.Equip_Armure || null,
+    equipMainDroite: d.Equip_Main_Droite || null,
+    equipMainGauche: d.Equip_Main_Gauche || null,
     estIllusion: d.Est_Illusion === true,
     // Décoché depuis la liste des héros (mode développeur) : le personnage
     // existe toujours, mais il est mis de côté — ni combat, ni tour de parole.
@@ -184,6 +191,112 @@ function persoDocVersFront(id, d) {
 // Partagée avec monstres.js : un monstre doit exposer exactement les mêmes champs
 // qu'un personnage pour que tout le moteur de combat le traite sans le savoir.
 window.persoDocVersFront = persoDocVersFront;
+
+// =========================================================================
+//  INVENTAIRE : OR ET ÉQUIPEMENT (ARMURE / MAIN DROITE / MAIN GAUCHE)
+// =========================================================================
+//  Les objets équipés sont enregistrés EN COPIE sur la fiche du personnage
+//  (comme les techniques de monstres recopient leur gabarit) plutôt que comme
+//  une simple référence vers le catalogue : si un objet du catalogue change
+//  ou disparaît plus tard, ce qu'un héros porte déjà n'est pas affecté.
+//  Un objet pris à un emplacement remplace définitivement celui qui s'y
+//  trouvait — il n'existe pas de "sac" où le ranger.
+
+window.CACHE_OBJETS = {};
+let unsubscribeObjets = null;
+
+// Catalogue des objets pouvant apparaître en butin, tenu à jour en temps réel.
+window.ecouterCatalogueObjets = function() {
+    if (unsubscribeObjets) unsubscribeObjets();
+    unsubscribeObjets = onSnapshot(collection(db, COL.OBJETS), (snap) => {
+        const catalogue = {};
+        snap.forEach(docSnap => { catalogue[docSnap.id] = { id: docSnap.id, ...docSnap.data() }; });
+        window.CACHE_OBJETS = catalogue;
+    }, (err) => console.error("onSnapshot Objets :", err));
+};
+
+// Un jeu d'objets de départ, pour tester le loot sans attendre l'outil de
+// création (prévu pour une phase suivante). Trois par emplacement.
+window.seedObjetsExemple = async function() {
+    const exemples = [
+        { Nom: "Cuirasse du Rempart", Emplacement: "Armure",
+          Effet_Texte: "Renforce la carapace du porteur : légère résistance aux coups physiques." },
+        { Nom: "Manteau des Ombres", Emplacement: "Armure",
+          Effet_Texte: "Tissé dans une étoffe qui boit la lumière : discrétion accrue en territoire hostile." },
+        { Nom: "Plates de l'Aube Ancienne", Emplacement: "Armure",
+          Effet_Texte: "Une armure lourde et austère, forgée pour encaisser sans broncher." },
+        { Nom: "Lame Fidèle", Emplacement: "Main_Droite",
+          Effet_Texte: "Une épée équilibrée, fiable en toutes circonstances." },
+        { Nom: "Marteau des Cimes", Emplacement: "Main_Droite",
+          Effet_Texte: "Un marteau de guerre massif, redoutable au corps à corps." },
+        { Nom: "Dague du Chuchoteur", Emplacement: "Main_Droite",
+          Effet_Texte: "Fine et rapide, elle frappe avant que l'adversaire ne réagisse." },
+        { Nom: "Bouclier du Veilleur", Emplacement: "Main_Gauche",
+          Effet_Texte: "Un bouclier robuste, pensé pour parer les assauts les plus rudes." },
+        { Nom: "Grimoire aux Pages Ternies", Emplacement: "Main_Gauche",
+          Effet_Texte: "Un vieux grimoire empli de formules à moitié oubliées." },
+        { Nom: "Focaliseur de Jade", Emplacement: "Main_Gauche",
+          Effet_Texte: "Une pierre taillée qui canalise l'énergie magique du porteur." }
+    ];
+    for (const objet of exemples) {
+        await setDoc(doc(collection(db, COL.OBJETS)), { ...objet, URL_Image: "" });
+    }
+    console.log(`🗡️ ${exemples.length} objets d'exemple créés dans la collection "Objets".`);
+};
+
+// Remplit les trois encarts de la fiche : image (ou icône par défaut), nom et
+// texte d'effet. "objet" est au format déjà posé sur la fiche (uid, nom,
+// emplacement, effetTexte, image) — le même que celui écrit par le butin.
+window.afficherEmplacementEquipement = function(suffixe, objet) {
+    const carte = document.getElementById("emplacement-" + suffixe + "-carte");
+    if (!carte) return;
+    const image = document.getElementById("emplacement-" + suffixe + "-image");
+    const icone = document.getElementById("emplacement-" + suffixe + "-icone");
+    const nom = document.getElementById("emplacement-" + suffixe + "-nom");
+    const effet = document.getElementById("emplacement-" + suffixe + "-effet");
+
+    const rempli = !!(objet && objet.nom);
+    carte.classList.toggle("emplacement-vide", !rempli);
+    if (nom) nom.innerText = rempli ? objet.nom : "Emplacement vide";
+    if (effet) effet.innerText = rempli ? (objet.effetTexte || "") : "";
+    const aUneImage = rempli && objet.image;
+    if (image) { image.src = aUneImage ? objet.image : ""; image.style.display = aUneImage ? "block" : "none"; }
+    if (icone) icone.style.display = aUneImage ? "none" : "flex";
+};
+
+// Appelée à l'ouverture de la fiche, comme chargerOngletCompetences : "donnees"
+// est déjà au format front-end (persoDocVersFront), quelle que soit sa source
+// (cache RAM ou lecture réseau de secours).
+window.chargerOngletInventaire = function(idPersonnage, donnees) {
+    window.ID_PERSONNAGE_INVENTAIRE = idPersonnage;
+    const champOr = document.getElementById("champ-or-perso");
+    if (champOr) champOr.value = donnees ? (parseInt(donnees.or) || 0) : 0;
+
+    window.afficherEmplacementEquipement("armure", donnees ? donnees.equipArmure : null);
+    window.afficherEmplacementEquipement("main-droite", donnees ? donnees.equipMainDroite : null);
+    window.afficherEmplacementEquipement("main-gauche", donnees ? donnees.equipMainGauche : null);
+};
+
+// L'or est modifié à la main par le joueur (case du bandeau) : jamais de
+// négatif, et on sécurise une valeur non numérique en la ramenant à 0.
+window.mettreAJourOr = async function(valeurBrute) {
+    const idPersonnage = window.ID_PERSONNAGE_INVENTAIRE || document.getElementById("champ-id-personnage").value;
+    if (!idPersonnage) return;
+
+    let valeur = parseInt(valeurBrute);
+    if (isNaN(valeur) || valeur < 0) valeur = 0;
+    const champ = document.getElementById("champ-or-perso");
+    if (champ) champ.value = valeur;
+
+    const enRam = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+    if (enRam) enRam.or = valeur;
+
+    try {
+        await updateDoc(doc(db, COL.PERSONNAGES, idPersonnage), { Or: valeur });
+    } catch (e) {
+        console.error("Mise à jour de l'or :", e);
+    }
+};
 
 // =========================================================================
 //  LES STATS RÉELLES D'UN COMBATTANT (BASE + RETOUCHES DE LA FICHE)
@@ -1815,6 +1928,12 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
 
          window.PARTIE_DATA = dataPartie;
 
+         // Le butin de fin de combat : personnel, puis partagé. Rejoué à chaque
+         // notification, comme la piste d'initiative.
+         if (typeof window.afficherFenetreButin === "function") {
+             window.afficherFenetreButin(dataPartie.Butin || null);
+         }
+
          // Les repères d'apparition peuvent avoir été posés depuis un autre poste :
          // la demande affichée ici doit alors se refermer d'elle-même.
          if (typeof window.verifierPointsApparition === "function") {
@@ -3276,6 +3395,10 @@ async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPers
           // sur la fiche, atout de race compris.
           window.chargerOngletCompetences(idPersonnage, window.competencesMaxCombattant(donneesServeur));
       }
+
+      if (typeof window.chargerOngletInventaire === "function") {
+          window.chargerOngletInventaire(idPersonnage, donneesServeur);
+      }
   }
 }
 
@@ -3629,6 +3752,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // 🔻 NOUVEAU : Chargement en cache de tous les effets du jeu au démarrage
   if (typeof window.chargerCacheEffetsBDD === "function") window.chargerCacheEffetsBDD();
+
+  // Catalogue des objets pouvant apparaître en butin.
+  if (typeof window.ecouterCatalogueObjets === "function") window.ecouterCatalogueObjets();
 
   // NOUVEAU : Application des volumes sauvegardés au lancement
   window.appliquerVolumesAudio();

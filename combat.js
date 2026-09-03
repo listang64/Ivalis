@@ -4090,3 +4090,32 @@ window.resetEnnemisTest = async function() {
         console.error("Erreur reset ennemis :", e);
     }
 };
+
+// Bouton coupe des paramètres de combat : termine le combat en un clic pour
+// tester le butin, sans avoir à vraiment vaincre les ennemis un par un.
+window.declencherVictoireTest = async function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    if (!window.ID_PARTIE_COURANTE || !window.PERSOS_PARTIE) return;
+
+    // Une illusion n'est pas un vrai ennemi : elle ne doit pas compter.
+    const ennemis = window.PERSOS_PARTIE.filter(p => p.camp === "Ennemi" && !p.estIllusion && p.statut !== "Mort");
+    if (ennemis.length === 0) return;
+
+    try {
+        const { writeBatch } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+        const batch = writeBatch(db);
+
+        // Volontairement SANS passer par window.marquerMonstreMort : elle ferait
+        // entrer un renfort depuis la réserve à la place de chaque tombé, ce qui
+        // empêcherait justement la victoire qu'on veut simuler ici.
+        ennemis.forEach(ennemi => {
+            const ref = window.refCombattant(ennemi.idPersonnage);
+            batch.update(ref, { Statut: "Mort", PV_Actuels: 0 });
+        });
+
+        await batch.commit();
+        console.log("🏆 Victoire de test : tous les ennemis sont terrassés.");
+    } catch (e) {
+        console.error("Erreur victoire de test :", e);
+    }
+};

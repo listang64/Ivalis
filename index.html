@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Ivalis - Le JDR</title>
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
 
  
   <script>
@@ -469,6 +469,15 @@
                      onclick="window.resetEnnemisTest()" title="Soigner tous les ennemis">
                      <div style="font-size: 30px;">🔄</div>
                      <div style="color: #1b6e3a; font-family: 'Cinzel', serif; font-size: 10px; margin-top: 2px;">SOINS</div>
+                </div>
+
+                <!-- Victoire de test : termine le combat d'un coup pour tester le butin -->
+                <div style="display: flex; flex-direction: column; align-items: center; cursor: pointer; filter: drop-shadow(0 0 8px rgba(255,215,0,0.3)); transition: filter 0.2s ease;"
+                     onmouseover="this.style.filter='drop-shadow(0 0 15px rgba(255,215,0,0.8))'"
+                     onmouseout="this.style.filter='drop-shadow(0 0 8px rgba(255,215,0,0.3))'"
+                     onclick="window.declencherVictoireTest()" title="Victoire de test : terrasse tous les ennemis et ouvre le butin">
+                     <div style="font-size: 30px;">🏆</div>
+                     <div style="color: #ffd700; font-family: 'Cinzel', serif; font-size: 10px; margin-top: 2px;">VICTOIRE</div>
                 </div>
             </div>
 
@@ -1268,7 +1277,50 @@
       </div>
       
     </div>
-    <div id="onglet-inventaire" class="contenu-onglet"><h3 style="margin-top: 0;">Sac à dos &amp; Équipement</h3><p><i>Armes, armures...</i></p></div>
+    <div id="onglet-inventaire" class="contenu-onglet">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #5c3a21; padding-bottom: 5px; margin-bottom: 20px;">
+        <h3 style="margin: 0; color: #2a1a0f; font-family: 'Cinzel', serif; font-size: 24px;">Inventaire</h3>
+      </div>
+
+      <!-- Bandeau Or -->
+      <div class="bandeau-or">
+        <span class="icone-or">🪙</span>
+        <input type="number" id="champ-or-perso" class="champ-or-input" min="0" step="1" value="0"
+               onchange="jouerSonClic(); window.mettreAJourOr(this.value)">
+        <span class="libelle-or">Or</span>
+      </div>
+
+      <!-- Emplacements d'équipement -->
+      <div class="grille-equipement">
+        <div id="emplacement-armure-carte" class="carte-equipement emplacement-vide">
+          <div class="carre-equipement">
+            <img id="emplacement-armure-image" src="" alt="Armure">
+            <div id="emplacement-armure-icone" class="icone-emplacement-vide">🛡️</div>
+          </div>
+          <div class="libelle-emplacement">Armure</div>
+          <div id="emplacement-armure-nom" class="nom-objet-equipe">Emplacement vide</div>
+          <div id="emplacement-armure-effet" class="effet-objet-equipe"></div>
+        </div>
+        <div id="emplacement-main-droite-carte" class="carte-equipement emplacement-vide">
+          <div class="carre-equipement">
+            <img id="emplacement-main-droite-image" src="" alt="Main droite">
+            <div id="emplacement-main-droite-icone" class="icone-emplacement-vide">⚔️</div>
+          </div>
+          <div class="libelle-emplacement">Main droite</div>
+          <div id="emplacement-main-droite-nom" class="nom-objet-equipe">Emplacement vide</div>
+          <div id="emplacement-main-droite-effet" class="effet-objet-equipe"></div>
+        </div>
+        <div id="emplacement-main-gauche-carte" class="carte-equipement emplacement-vide">
+          <div class="carre-equipement">
+            <img id="emplacement-main-gauche-image" src="" alt="Main gauche">
+            <div id="emplacement-main-gauche-icone" class="icone-emplacement-vide">🗡️</div>
+          </div>
+          <div class="libelle-emplacement">Main gauche</div>
+          <div id="emplacement-main-gauche-nom" class="nom-objet-equipe">Emplacement vide</div>
+          <div id="emplacement-main-gauche-effet" class="effet-objet-equipe"></div>
+        </div>
+      </div>
+    </div>
 
     <div id="onglet-dev" class="contenu-onglet">
       <h3 style="margin-top: 0; border-bottom: 2px solid #5c1e16; padding-bottom: 5px; color: #ff4c4c;">Zone Développeur</h3>
@@ -1314,23 +1366,80 @@
     </div>
   </div>
 
-</div> 
+</div>
+
+<!-- ============================================================= -->
+<!--  BUTIN DE FIN DE COMBAT (fenêtre personnelle puis partagée)     -->
+<!-- ============================================================= -->
+<div id="fenetre-butin" style="display: none;">
+  <div class="carte-butin">
+    <h2 id="butin-titre">Butin de guerre</h2>
+    <div id="butin-sous-titre" class="butin-soustitre"></div>
+
+    <!-- Rappel de l'équipement actuel du/des héros de ce joueur, pour comparer -->
+    <div id="butin-equipement-actuel" class="butin-equipement-actuel"></div>
+
+    <!-- Vue 1 : loot personnel (deux objets par héros, à prendre ou laisser) -->
+    <div id="butin-vue-personnel" style="display: none;"></div>
+
+    <!-- Vue 2 : partage du butin restant, en commun -->
+    <div id="butin-vue-partage" style="display: none;">
+      <div id="butin-grille-partage" class="butin-grille"></div>
+      <div class="butin-actions">
+        <button id="btn-valider-butin-partage" class="btn-parametres" style="background-color: #1b6e3a; border-color: #0f4021;" onclick="window.validerButinPool()">Valider mon choix</button>
+      </div>
+      <div id="butin-attente-partage" class="butin-attente"></div>
+    </div>
+
+    <!-- Vue 3 : résultat final -->
+    <div id="butin-vue-fin" style="display: none;">
+      <div id="butin-resultats" class="butin-grille"></div>
+      <div class="butin-actions">
+        <button class="btn-parametres" onclick="window.fermerFenetreButin()">Fermer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Popup de confirmation : compare l'objet actuel et le nouveau avant d'équiper -->
+<div id="popup-confirmation-equip" style="display: none;">
+  <div class="carte-confirmation-equip">
+    <h3>Équiper cet objet ?</h3>
+    <div class="comparaison-equip">
+      <div class="colonne-comparaison">
+        <div class="entete-comparaison">Actuellement</div>
+        <div id="comparaison-actuel" class="contenu-comparaison"></div>
+      </div>
+      <div class="fleche-comparaison">→</div>
+      <div class="colonne-comparaison">
+        <div class="entete-comparaison">Nouvel objet</div>
+        <div id="comparaison-nouveau" class="contenu-comparaison"></div>
+      </div>
+    </div>
+    <div style="display: flex; gap: 16px; justify-content: center; margin-top: 22px;">
+      <button class="btn-parametres" style="background-color: #1b6e3a; border-color: #0f4021;" onclick="window.confirmerChoixButin(true)">Équiper</button>
+      <button class="btn-parametres" onclick="window.confirmerChoixButin(false)">Annuler</button>
+    </div>
+  </div>
+</div>
 
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <script type="module" src="ia_master.js?v=4"></script>
-<script type="module" src="app.js?v=10"></script>
+<script type="module" src="app.js?v=11"></script>
 <script type="module" src="creation_personnage.js?v=2"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=11"></script>
 <script src="Plateau.js"></script>
-<script type="module" src="combat.js?v=23"></script>
+<script type="module" src="combat.js?v=24"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=8"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
 <script type="module" src="moteur_effets.js?v=15"></script>
-<script type="module" src="monstres.js?v=9"></script>
+<script type="module" src="monstres.js?v=10"></script>
 <script type="module" src="monstres_competences.js?v=5"></script>
 <script type="module" src="monstres_ia.js?v=13"></script>
+<!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
+<script type="module" src="loot.js?v=1"></script>
 
 <!-- ============================================================= -->
 <!--  GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)  -->
