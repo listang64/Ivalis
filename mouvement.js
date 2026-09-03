@@ -498,9 +498,7 @@ window.validerMouvement = async function() {
         const persoRef = window.refCombattant(idPerso);
         await updateDoc(persoRef, { Fatigue_Actuelle: nvlFatigue });
 
-        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
-            Tokens: window.TOKENS_VTT_DATA
-        }, { merge: true });
+        await window.enregistrerPionsVTT(idPerso);
 
     } catch (e) {
         console.error("Erreur de Validation Mouvement :", e);

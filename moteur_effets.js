@@ -698,9 +698,7 @@ window.resoudreBondInteractif = function(idPerso, portee) {
                 await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
                     Action_Bond: { idToken: idPerso, depart: hexDepart, arrivee: hexArrivee, zones: zonesBond, timestamp: Date.now() }
                 });
-                await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
-                    Tokens: window.TOKENS_VTT_DATA
-                }, { merge: true });
+                await window.enregistrerPionsVTT(idPerso);
             } catch (err) {
                 console.error("Erreur Bond :", err);
             }
@@ -842,9 +840,7 @@ window.creerIllusion = async function(idLanceur, q, r) {
         await setDoc(doc(db, "Personnages", idIllusion), dataIllusion);
 
         window.TOKENS_VTT_DATA[idIllusion] = { q, r, url: imgUrl, taille };
-        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
-            Tokens: window.TOKENS_VTT_DATA
-        }, { merge: true });
+        await window.enregistrerPionsVTT(idIllusion);
     } catch (err) {
         console.error("Erreur création Illusion :", err);
     }
@@ -949,9 +945,7 @@ window.declencherPousseeCible = async function(idLanceur, idCible) {
         await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
             Action_Poussee: { idToken: idCible, depart: hexDepart, arrivee: arrivee, zones: zonesPoussee, timestamp: Date.now() }
         });
-        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
-            Tokens: window.TOKENS_VTT_DATA
-        }, { merge: true });
+        await window.enregistrerPionsVTT(idCible);
     } catch (err) {
         console.error("Erreur Poussée :", err);
     }
@@ -1029,9 +1023,7 @@ window.declencherTractionCible = async function(idLanceur, idCible) {
         await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
             Action_Traction: { idToken: idCible, depart: hexDepart, arrivee: arrivee, zones: zonesTraction, timestamp: Date.now() }
         });
-        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
-            Tokens: window.TOKENS_VTT_DATA
-        }, { merge: true });
+        await window.enregistrerPionsVTT(idCible);
     } catch (err) {
         console.error("Erreur Traction :", err);
     }
@@ -1172,9 +1164,7 @@ window.declencherPeurCible = async function(idLanceur, idCible) {
         await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
             Action_Peur: { idToken: idCible, path: chemin, opportunites: opportunitesResolues, zones: zonesResoluesPeur, timestamp: Date.now() }
         });
-        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
-            Tokens: window.TOKENS_VTT_DATA
-        }, { merge: true });
+        await window.enregistrerPionsVTT(idCible);
     } catch (err) {
         console.error("Erreur Peur :", err);
     }
@@ -1359,8 +1349,18 @@ window.demarrerCiblage = async function(idCarte) {
         return alert("Grimoire non synchronisé. Vérifie ta connexion et réessaie.");
     }
 
-    const dataCarte = window.COMPETENCES_CACHE[idCarte];
-    if (!dataCarte) return;
+    // Le cache d'affichage n'est rempli que pour le combattant montré dans le
+    // panneau gauche. Quand une créature joue, c'est l'IA qui l'y met — et si ce
+    // chargement a pris du retard, la carte manquait ici et le sort partait…
+    // nulle part, sans un mot : la créature passait son tour sans rien faire.
+    // Le cache global, lui, contient les techniques de TOUS les combattants.
+    const idPourCache = (window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO] || {}).idPersonnage;
+    const dataCarte = window.COMPETENCES_CACHE[idCarte]
+        || ((window.CACHE_COMPETENCES_GLOBAL || {})[idPourCache] || {})[idCarte];
+    if (!dataCarte) {
+        console.warn(`Ciblage impossible : la technique ${idCarte} de ${idPourCache} est introuvable.`);
+        return;
+    }
 
     // 🔻 NOUVEAU : PARALYSIE 🔻
     // Empêche tout mouvement ET toute compétence : on intercepte ici, avant même le ciblage, le

@@ -44,6 +44,26 @@ w.creerMonstreDepuisGabarit = async (id, gab, extra) => {
 };
 w.appliquerTokensVTT = () => {};
 
+// L'écriture d'un pion vit dans combat.js, chargé avant monstres.js sur la
+// vraie page : un banc qui isole monstres.js doit la poser aussi.
+{
+  const lignes = fs.readFileSync('/home/user/Ivalis/combat.js', 'utf-8').split('\n');
+  const d = lignes.findIndex(l => l.startsWith('window.enregistrerPionsVTT = async function'));
+  let f = d; for (let i = d + 1; i < lignes.length; i++) { if (lignes[i] === '};') { f = i; break; } }
+  new Function('window', 'db', 'doc', 'setDoc', lignes.slice(d, f + 1).join('\n'))(
+    w, {}, (_db, col, id) => ({ col, id }),
+    // Les chemins pointés ("Tokens.M1") ne touchent qu'un pion, comme Firestore.
+    async (ref, maj) => {
+      base[ref.col] = base[ref.col] || {};
+      const cible = base[ref.col][ref.id] = base[ref.col][ref.id] || { Tokens: {} };
+      cible.Tokens = cible.Tokens || {};
+      Object.keys(maj).forEach(cle => {
+        const [, id] = cle.split(".");
+        if (id) cible.Tokens[id] = maj[cle];
+      });
+    });
+}
+
 // On charge les VRAIES fonctions de monstres.js (création, réserve, renforts).
 const src = fs.readFileSync('/home/user/Ivalis/monstres.js','utf-8').replace(/^import[\s\S]*?from\s+"[^"]+";/gm,'').replace(/^export const/gm, 'const');
 eval(src);

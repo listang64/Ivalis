@@ -738,7 +738,10 @@ window.genererRencontreMonstres = async function(difficulte) {
         if (idPose) poses.push({ ...monstre, id: idPose });
     }
 
-    await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), { Tokens: tokensData }, { merge: true });
+    // Seuls les pions posés à l'instant : renvoyer toute la carte remettrait au
+    // passage les positions périmées des combattants déjà sur le plateau.
+    window.TOKENS_VTT_DATA = tokensData;
+    await window.enregistrerPionsVTT(...poses.map(p => p.id));
     await window.sauvegarderReserveMonstres(enReserve);
 
     // Les techniques sont forgées EN ARRIÈRE-PLAN, sans bloquer : les pions
@@ -788,7 +791,8 @@ window.entrerRenfortMonstre = async function() {
     const tokensData = { ...window.TOKENS_VTT_DATA };
     const idMonstre = await window.poserMonstreSurTerrain(renfort, tokensData);
 
-    await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), { Tokens: tokensData }, { merge: true });
+    window.TOKENS_VTT_DATA = tokensData;
+    if (idMonstre) await window.enregistrerPionsVTT(idMonstre);
     await window.sauvegarderReserveMonstres(reserve);
 
     // Un renfort arrive en cours de combat : il lui faut ses techniques, elles

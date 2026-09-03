@@ -27,6 +27,31 @@ import { doc, setDoc, onSnapshot, updateDoc, runTransaction } from "https://www.
 //  (fatigue d'un combattant, états) restent en dehors : une transaction
 //  Firestore exige que toutes ses lectures précèdent ses écritures, et se
 //  rejoue parfois plusieurs fois — on ne veut pas d'effet de bord là-dedans.
+// =========================================================================
+//  ÉCRIRE UN PION SANS TOUCHER AUX AUTRES
+// =========================================================================
+//  Le plateau garde tous les pions dans une seule carte, "Tokens". Sept
+//  endroits l'envoyaient ENTIÈRE à chaque déplacement — la copie locale du
+//  poste qui bouge, avec sa vision possiblement périmée des autres pions. À
+//  trois postes, celui qui déplace son héros renvoyait donc au passage la
+//  vieille position d'une créature qu'un autre venait de faire avancer : le
+//  pion revenait en arrière, puis repartait d'un bond à la notification
+//  suivante. On n'écrit plus que la case du pion concerné.
+window.enregistrerPionsVTT = async function(...idsTokens) {
+    if (!window.ID_PARTIE_COURANTE || idsTokens.length === 0) return;
+    const maj = {};
+    idsTokens.forEach(id => {
+        const pion = (window.TOKENS_VTT_DATA || {})[id];
+        if (pion) maj["Tokens." + id] = pion;
+    });
+    if (Object.keys(maj).length === 0) return;
+    try {
+        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), maj, { merge: true });
+    } catch (e) {
+        console.error("Enregistrement du pion :", e);
+    }
+};
+
 window.modifierPartie = async function(modifier) {
     if (!window.ID_PARTIE_COURANTE) return null;
     const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
@@ -1236,10 +1261,7 @@ document.addEventListener("click", async function(event) {
                         console.warn("Déplacement libre non enregistré : aucune partie ouverte.");
                     } else {
                         try {
-                            const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
-                            await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
-                                Tokens: window.TOKENS_VTT_DATA
-                            }, { merge: true });
+                            await window.enregistrerPionsVTT(window.TOKEN_SELECTIONNE);
                         } catch (e) {
                             console.error("Déplacement libre : enregistrement du pion impossible.", e);
                         }
@@ -1290,10 +1312,7 @@ window.sauvegarderTailleToken = async function() {
     if (btn) btn.innerText = "⏳";
 
     try {
-        const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
-        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), {
-            Tokens: window.TOKENS_VTT_DATA
-        }, { merge: true });
+        await window.enregistrerPionsVTT(window.TOKEN_SELECTIONNE);
         
         if (btn) {
             btn.innerText = "✔️";
@@ -1449,33 +1468,32 @@ window.supprimerTokenVTT = async function() {
 
         // 3. Si c'est un Ennemi, on purge l'initiative et la Base de données !
         if (estEnnemi) {
-            const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
-            const partieSnap = await getDoc(partieRef);
-            
-            if (partieSnap.exists()) {
-                let ordre = partieSnap.data().Ordre_Initiative || [];
-                let file = partieSnap.data().File_Attente_Combat || [];
-                let phase = partieSnap.data().Phase_Combat || "Preparation";
-                
+            // Sous transaction, comme toute modification de la file : retirer une
+            // créature ne doit pas effacer la carte qu'un joueur vient de poser.
+            await window.modifierPartie((data) => {
+                let ordre = data.Ordre_Initiative || [];
+                let file = data.File_Attente_Combat || [];
+                let phase = data.Phase_Combat || "Preparation";
+
                 ordre = ordre.filter(id => id !== idSupprime);
                 file = file.filter(item => item.idPersonnage !== idSupprime);
-                
+
                 // 🔻 CORRECTION : On se base sur l'initiative restante
                 const nbJoueursRestants = ordre.filter(id => {
                     const p = (window.PERSOS_PARTIE || []).find(perso => perso.idPersonnage === id);
                     return p && p.statut !== "Mort";
                 }).length;
-                
+
                 if (phase === "Preparation" && file.length >= nbJoueursRestants && nbJoueursRestants > 0) {
                     phase = "Resolution";
                 }
-                
-                await updateDoc(partieRef, { 
+
+                return { maj: {
                     Ordre_Initiative: ordre,
                     File_Attente_Combat: file,
                     Phase_Combat: phase
-                });
-            }
+                } };
+            });
             
             // refCombattant : l'ennemi vit désormais dans la collection Monstres, mais un
             // pion retiré peut aussi être une illusion restée dans Personnages.
@@ -1494,7 +1512,7 @@ window.genererTokensCombat = async function() {
     if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT || !window.PERSOS_PARTIE) return;
 
     let tokensData = { ...window.TOKENS_VTT_DATA };
-    let updated = false;
+    const nouveaux = [];
 
     window.PERSOS_PARTIE.forEach(perso => {
         if (perso.statut === "Mort") return;
@@ -1511,15 +1529,15 @@ window.genererTokensCombat = async function() {
                 url: imgToUse,
                 taille: 55
             };
-            updated = true;
+            nouveaux.push(perso.idPersonnage);
         }
     });
 
-    if (updated) {
-        try {
-            const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
-            await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), { Tokens: tokensData }, { merge: true });
-        } catch (e) {}
+    // Seuls les pions qu'on vient de créer sont écrits : renvoyer toute la carte
+    // remettrait au passage les positions périmées des autres.
+    if (nouveaux.length > 0) {
+        window.TOKENS_VTT_DATA = tokensData;
+        await window.enregistrerPionsVTT(...nouveaux);
     }
 };
 

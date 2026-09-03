@@ -47,6 +47,7 @@ node combat_complet.mjs     # 24 combats entiers : cherche les blocages
 node cas_limites.mjs        # emmuré, sans cible, données abîmées
 node verrou.mjs             # concurrence entre plusieurs navigateurs
 node reseau_trois_postes.mjs # trois postes sur la même partie : file, tours, dés partagés
+node combat_reseau_complet.mjs # un combat ENTIER joué sur trois appareils, tour par tour
 node reveil_ia.mjs          # l'IA se réveille seule, et joue après les joueurs
 node lanceur_ia.mjs         # le sort part au nom de la créature, pas du joueur
 node enchainement_ia.mjs    # une créature attend la fin de sa carte avant de passer
