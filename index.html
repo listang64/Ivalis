@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Ivalis - Le JDR</title>
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=10">
+  <link rel="stylesheet" href="style.css?v=11">
 
  
   <!-- ===================================================================== -->
@@ -1472,6 +1472,20 @@
     <!-- Rappel de l'équipement actuel du/des héros de ce joueur, pour comparer -->
     <div id="butin-equipement-actuel" class="butin-equipement-actuel"></div>
 
+    <!-- Vue 0 : la fouille des cadavres, le temps que les objets soient dessinés -->
+    <div id="butin-vue-fouille" style="display: none;">
+      <div class="fouille-scene">
+        <span class="fouille-torche">🕯️</span>
+        <span class="fouille-corps">💀</span>
+      </div>
+      <p class="fouille-texte">Vous retournez les corps un à un, à la recherche de ce qui vaut la peine d'être emporté<span class="fouille-points"><i>.</i><i>.</i><i>.</i></span></p>
+      <div class="fouille-jauge"><div id="fouille-jauge-remplie"></div></div>
+      <p id="fouille-compteur" class="fouille-compteur"></p>
+      <div class="butin-actions">
+        <button class="btn-parametres" onclick="window.passerLaFouille()">Voir le butin sans attendre</button>
+      </div>
+    </div>
+
     <!-- Vue 1 : loot personnel (deux objets par héros, à prendre ou laisser) -->
     <div id="butin-vue-personnel" style="display: none;"></div>
 
@@ -1531,7 +1545,8 @@
 <script type="module" src="monstres_ia.js?v=14"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=2"></script>
-<script type="module" src="loot.js?v=6"></script>
+<script type="module" src="objets_ia.js?v=1"></script>
+<script type="module" src="loot.js?v=7"></script>
 
 <!-- ============================================================= -->
 <!--  GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)  -->

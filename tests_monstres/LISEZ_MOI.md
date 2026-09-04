@@ -74,6 +74,8 @@ node atouts_races.mjs       # les sept peuples et leurs avantages, mesurés un p
 node jauge_token.mjs        # la jauge sous le pion survit à un redessin
 node jauge_cibles.mjs       # la vie restante des cibles s'affiche pendant le ciblage
 node butin_loot.mjs         # butin de fin de combat : détection, personnel, partage, tirage au sort
+node images_objets.mjs      # MIA_Objets décrit, gpt-image dessine, Cloudinary héberge, la base reçoit
+node fouille_butin.mjs      # la fouille des cadavres et ses trois portes de sortie
 node objets_tableau.mjs     # le catalogue d'équipement, confronté au tableau de Nico
 node equipement_combat.mjs  # ce que les objets font une fois portés, en combat
 node apercu_butin.mjs       # onglet Inventaire et fenêtres de butin, capturés à l'écran

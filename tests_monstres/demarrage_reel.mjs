@@ -100,6 +100,8 @@ console.log("1. LES MODULES DU JEU SE CHARGENT TOUS");
     "monstres.js": ["recomposerCombattants", "ouvrirGenerationRencontre", "genererRencontreMonstres"],
     "monstres_ia.js": ["choisirCibleMonstre"],
     "objets.js": ["fabriquerObjet", "bonusEquipement", "raisonBlocageCarte"],
+    "objets_ia.js": ["promptImageObjet", "illustrerLesObjets", "lancerIllustrationButin",
+                     "avancementImagesButin", "peutIllustrerLesObjets"],
     "loot.js": ["afficherFenetreButin", "fermerButinLocalement", "demarrerButin",
                 "combatGagne", "equiperObjet"]
   };

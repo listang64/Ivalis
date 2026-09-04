@@ -403,16 +403,42 @@ window.afficherFenetreButin = function(butin) {
     // à chaque notification — le combat entier paraissait cassé. Un index.html
     // servi depuis le cache du navigateur (c'est le seul fichier sans ?v=)
     // suffit à faire manquer un élément : on ne lui laisse plus cette prise.
+    const vueFouille = document.getElementById("butin-vue-fouille");
     const vuePersonnel = document.getElementById("butin-vue-personnel");
     const vuePartage = document.getElementById("butin-vue-partage");
     const vueFin = document.getElementById("butin-vue-fin");
     const titre = document.getElementById("butin-titre");
     const sousTitre = document.getElementById("butin-sous-titre");
+    if (vueFouille) vueFouille.style.display = "none";
     if (vuePersonnel) vuePersonnel.style.display = "none";
     if (vuePartage) vuePartage.style.display = "none";
     if (vueFin) vueFin.style.display = "none";
     const ecrire = (el, texte) => { if (el) el.innerText = texte; };
     const montrer = (el) => { if (el) el.style.display = "block"; };
+
+    // Les objets de mes héros partent se faire dessiner dès l'ouverture du
+    // butin. L'appel ne travaille qu'une fois par butin, et rend la main tout
+    // de suite : l'affichage qui suit ne l'attend pas.
+    const mesIds = mesPersonnages.map(p => p.idPersonnage);
+    if (butin.etape === "personnel" && typeof window.lancerIllustrationButin === "function") {
+        // Volontairement pas attendu — mais une promesse rejetée sans oreille
+        // pour l'entendre remonterait jusqu'au rapporteur d'erreurs de l'écran.
+        Promise.resolve(window.lancerIllustrationButin(butin, mesIds))
+            .catch(e => console.error("Illustration du butin :", e));
+    }
+
+    // Tant que les objets ne sont pas identifiés, on fouille les cadavres :
+    // l'attente devient une scène de jeu au lieu d'un écran figé.
+    if (butin.etape === "personnel" && herosCourant && window.fouilleEnCours(butin, mesIds)) {
+        ecrire(titre, "Fouille des cadavres");
+        ecrire(sousTitre, "Le combat est gagné. Reste à savoir ce que les vaincus emportaient.");
+        // Le rappel d'équipement n'a rien à faire ici : on ne compare encore rien.
+        const rappel = document.getElementById("butin-equipement-actuel");
+        if (rappel) rappel.innerHTML = "";
+        montrer(vueFouille);
+        window.rendreFouilleButin(butin, mesIds);
+        return;
+    }
 
     if (butin.etape === "personnel") {
         ecrire(titre, herosCourant ? `Butin de ${herosCourant.prenom}` : "Butin de guerre");
@@ -458,6 +484,77 @@ window.afficherEquipementActuelButin = function(mesPersonnages) {
         ${carre(p.equipMainDroite, "⚔️")}
         ${carre(p.equipMainGauche, "🗡️")}
     `).join("");
+};
+
+// =========================================================================
+//  VUE 0 : LA FOUILLE DES CADAVRES
+// =========================================================================
+//  Les objets sortent de l'algorithme sans visage : il faut une quinzaine de
+//  secondes à MIA_Objets et au dessinateur pour leur en donner un. Plutôt
+//  qu'un écran figé, on met les héros à genoux dans la poussière — l'attente
+//  devient une scène, et la jauge dit honnêtement où l'on en est.
+//
+//  Trois portes de sortie, pour ne JAMAIS bloquer un joueur devant sa fouille :
+//  le bouton "sans attendre", un délai maximum, et l'absence de clés d'API qui
+//  fait sauter l'étape d'emblée.
+window.DELAI_FOUILLE_MAX_MS = 120000;
+window.FOUILLE_PASSEE = null;
+window.FOUILLE_DEBUT = {};
+
+window.fouilleEnCours = function(butin, mesIds) {
+    if (!butin || butin.etape !== "personnel") return false;
+    // Sans clés d'API, aucune image ne viendra jamais : fouiller serait mentir.
+    if (typeof window.peutIllustrerLesObjets !== "function" || !window.peutIllustrerLesObjets()) return false;
+    if (typeof window.avancementImagesButin !== "function") return false;
+
+    const signature = butin.id || "";
+    if (window.FOUILLE_PASSEE === signature) return false;
+
+    const avancement = window.avancementImagesButin(butin, mesIds);
+    if (avancement.total === 0 || avancement.prets >= avancement.total) return false;
+
+    // Le chronomètre part au premier regard porté sur ce butin, pas à sa
+    // création : un joueur qui rejoint en retard a droit à son délai entier.
+    if (!window.FOUILLE_DEBUT[signature]) window.FOUILLE_DEBUT[signature] = Date.now();
+    return (Date.now() - window.FOUILLE_DEBUT[signature]) <= window.DELAI_FOUILLE_MAX_MS;
+};
+
+window.rendreFouilleButin = function(butin, mesIds) {
+    const avancement = window.avancementImagesButin(butin, mesIds);
+    const pourcentage = avancement.total ? Math.round(100 * avancement.prets / avancement.total) : 0;
+
+    const jauge = document.getElementById("fouille-jauge-remplie");
+    if (jauge) jauge.style.width = pourcentage + "%";
+
+    const compteur = document.getElementById("fouille-compteur");
+    if (compteur) {
+        compteur.innerText = avancement.prets === 0
+            ? `Rien d'identifié pour l'instant (${avancement.total} trouvailles à examiner)`
+            : `${avancement.prets} trouvaille${avancement.prets > 1 ? "s" : ""} identifiée${avancement.prets > 1 ? "s" : ""} sur ${avancement.total}`;
+    }
+
+    // Filet de sécurité : si plus aucune image n'arrive — réseau coupé, quota
+    // épuisé, clé refusée — plus rien ne redessinerait cet écran et le joueur y
+    // resterait coincé. Ce battement le fait expirer tout seul.
+    clearTimeout(window.MINUTEUR_FOUILLE);
+    window.MINUTEUR_FOUILLE = setTimeout(() => window.rafraichirFouilleButin(), 3000);
+};
+
+// Redessine la fenêtre à partir de la partie telle qu'elle est MAINTENANT.
+// Appelée par MIA_Objets à chaque image posée, sans attendre le réseau.
+window.rafraichirFouilleButin = function() {
+    if (typeof window.afficherFenetreButin !== "function") return;
+    window.afficherFenetreButin((window.PARTIE_DATA || {}).Butin || null);
+};
+
+// Le joueur pressé. Les images continuent d'arriver derrière : elles
+// apparaîtront dans les cartes au fil des notifications.
+window.passerLaFouille = function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    const butin = (window.PARTIE_DATA || {}).Butin;
+    window.FOUILLE_PASSEE = (butin && butin.id) || "";
+    clearTimeout(window.MINUTEUR_FOUILLE);
+    window.rafraichirFouilleButin();
 };
 
 // =========================================================================

@@ -2355,8 +2355,14 @@ textarea.input-texte-parchemin {
     /* min-height d'abord : aspect-ratio n'existe qu'à partir de Safari 15, et
        sans ce repli le bandeau d'image s'écrase à zéro sur un iPad plus
        ancien — les cartes paraissent alors vides. */
-    min-height: 118px;
-    aspect-ratio: 16 / 10;
+    /* Carré : les images d'objets sont générées en 1024x1024, et un bandeau
+       plus large les rognerait en haut et en bas — soit précisément là où
+       pointe la lame d'une arme posée en diagonale. */
+    min-height: 150px;
+    aspect-ratio: 1 / 1;
+    /* La bordure du bas compte DANS le carré : sans cela le bandeau mesure
+       198 de large pour 200 de haut, et l'image carrée se retrouve étirée. */
+    box-sizing: border-box;
     border-radius: 12px 12px 0 0;
     background: radial-gradient(circle at 50% 35%, #2a1a0f, #150c06 78%);
     border-bottom: 2px solid #c2a878;
@@ -2451,6 +2457,9 @@ textarea.input-texte-parchemin {
     margin-bottom: 18px;
 }
 
+/* Vide, l'encart ne laisse plus son cadre en pointillés flotter tout seul —
+   c'est le cas pendant la fouille, où l'on n'a encore rien à comparer. */
+.butin-equipement-actuel:empty { display: none; }
 .butin-equipement-actuel {
     display: flex;
     flex-wrap: wrap;
@@ -2725,4 +2734,78 @@ textarea.input-texte-parchemin {
     background: rgba(140, 47, 47, 0.15);
     color: #6b1a1a;
     border-color: #a33;
+}
+
+
+/* =========================================================================
+   LA FOUILLE DES CADAVRES — l'écran d'attente de fin de combat
+   ========================================================================= */
+#butin-vue-fouille {
+    text-align: center;
+    padding: 10px 0 4px;
+}
+.fouille-scene {
+    position: relative;
+    height: 110px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+.fouille-corps {
+    font-size: 64px;
+    filter: grayscale(0.5) brightness(0.85);
+}
+.fouille-torche {
+    font-size: 48px;
+    transform-origin: 70% 90%;
+    animation: fouiller 2.2s ease-in-out infinite;
+}
+@keyframes fouiller {
+    0%, 100% { transform: rotate(-18deg) translateY(0); }
+    35%      { transform: rotate(14deg) translateY(6px); }
+    65%      { transform: rotate(-6deg) translateY(2px); }
+}
+.fouille-texte {
+    font-family: 'Cinzel', serif;
+    font-size: 15px;
+    /* Le parchemin de la fenêtre est clair : le texte doit être sombre. */
+    color: #4a2f19;
+    max-width: 460px;
+    margin: 0 auto 14px;
+    line-height: 1.5;
+}
+.fouille-points i { font-style: normal; opacity: 0; animation: pointsFouille 1.4s infinite; }
+.fouille-points i:nth-child(2) { animation-delay: 0.25s; }
+.fouille-points i:nth-child(3) { animation-delay: 0.5s; }
+@keyframes pointsFouille { 0%, 60%, 100% { opacity: 0; } 30% { opacity: 1; } }
+
+.fouille-jauge {
+    width: min(380px, 80%);
+    height: 12px;
+    margin: 0 auto 8px;
+    border: 2px solid #5c3a21;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+}
+#fouille-jauge-remplie {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #8a6a2f, #d8b45a);
+    transition: width 0.5s ease;
+}
+.fouille-compteur {
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    color: #6b4a2a;
+    margin: 0 0 14px;
+}
+
+/* Un doigt posé sur l'écran ne doit pas déclencher l'animation en boucle
+   chez ceux qui préfèrent le calme. */
+@media (prefers-reduced-motion: reduce) {
+    .fouille-torche, .fouille-points i { animation: none; }
+    .fouille-points i { opacity: 1; }
 }
