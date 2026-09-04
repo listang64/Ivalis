@@ -41,11 +41,15 @@ const FAUX_FIRESTORE = `
   export const collection = (_db, col) => ({ col });
   export const getDoc = async () => ({ exists: () => false, data: () => ({}) });
   export const getDocs = async () => ({ forEach: () => {}, docs: [], empty: true });
-  export const setDoc = async (...a) => noter("setDoc")(...a);
+  export const setDoc = async (ref, data, opts) => {
+    (window.__ecritures = window.__ecritures || []).push({ chemin: ref && ref.chemin, data, opts });
+    noter("setDoc")(ref, data, opts);
+  };
   export const updateDoc = async (...a) => noter("updateDoc")(...a);
   export const deleteDoc = async (...a) => noter("deleteDoc")(...a);
   export const addDoc = async (...a) => { noter("addDoc")(...a); return { id: "neuf" }; };
   export const deleteField = () => "«champ supprimé»";
+  export class FieldPath { constructor(...segments) { this.segments = segments; } }
   export const arrayUnion = (...v) => v;
   export const arrayRemove = (...v) => v;
   export const increment = (n) => n;
@@ -140,7 +144,8 @@ console.log("\n3. LE PARCOURS DE NICO : RÉINITIALISER, PLACER, GÉNÉRER");
       pixelToHex: (x, y) => ({ q: Math.round(x / 40), r: Math.round(y / 40) }),
       renderMap: () => {}, gridState: {}
     };
-    window.enregistrerPionsVTT = async () => { noter("pions écrits", true); };
+    // La VRAIE écriture des pions est laissée en place : c'est elle qu'on veut
+    // voir arriver en base, et sous la bonne forme.
     window.appliquerTokensVTT = () => {};
     window.confirm = () => true;
 
@@ -171,6 +176,18 @@ console.log("\n3. LE PARCOURS DE NICO : RÉINITIALISER, PLACER, GÉNÉRER");
           JSON.stringify(window.pointApparition("Allié")));
     noter("le pion du héros a été posé", Object.keys(window.TOKENS_VTT_DATA).length === 1,
           Object.keys(window.TOKENS_VTT_DATA).join(",") || "aucun");
+
+    // Le pion doit partir en base DANS la carte "Tokens". Écrit à plat
+    // ("Tokens.J1" en champ de premier niveau), il n'y arrive jamais et le
+    // plateau reste désespérément vide, sans la moindre erreur en console.
+    const ecritsVTT = (window.__ecritures || []).filter(e => (e.chemin || "").startsWith("Combat_VTT"));
+    const dernier = ecritsVTT[ecritsVTT.length - 1];
+    noter("le pion part en base dans la carte des pions",
+          !!dernier && !!dernier.data && !!dernier.data.Tokens && !!dernier.data.Tokens.J1,
+          dernier ? JSON.stringify(dernier.data) : "aucune écriture");
+    noter("sans champ bancal à côté de la carte",
+          !!dernier && Object.keys(dernier.data || {}).every(c => !c.startsWith("Tokens.")),
+          dernier ? Object.keys(dernier.data || {}).join(",") : "");
     noter("la fenêtre de difficulté s'est ouverte", rencontreDemandee
           && document.getElementById("etape-generation-rencontre").style.display === "flex",
           "display=" + document.getElementById("etape-generation-rencontre").style.display);

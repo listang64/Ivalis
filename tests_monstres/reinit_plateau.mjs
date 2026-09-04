@@ -35,6 +35,7 @@ await p.route('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js',
     export const setDoc = (...a) => window.__fs.setDoc(...a);
     export const deleteDoc = (...a) => window.__fs.deleteDoc(...a);
     export const deleteField = (...a) => window.__fs.deleteField(...a);
+    export class FieldPath { constructor(...segments) { this.segments = segments; } }
   `
 }));
 const erreurs = []; p.on('pageerror', e => erreurs.push(e.message));

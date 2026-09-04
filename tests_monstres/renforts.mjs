@@ -52,15 +52,22 @@ w.appliquerTokensVTT = () => {};
   let f = d; for (let i = d + 1; i < lignes.length; i++) { if (lignes[i] === '};') { f = i; break; } }
   new Function('window', 'db', 'doc', 'setDoc', lignes.slice(d, f + 1).join('\n'))(
     w, {}, (_db, col, id) => ({ col, id }),
-    // Les chemins pointés ("Tokens.M1") ne touchent qu'un pion, comme Firestore.
-    async (ref, maj) => {
+    // ⚠️ setDoc NE DÉCOUPE PAS ses clés sur les points : ce faux Firestore le
+    // reproduit fidèlement. Il faisait l'inverse, et validait donc une écriture
+    // de pion qui, en vrai, se rangeait à côté de la carte des pions.
+    async (ref, maj, opts) => {
       base[ref.col] = base[ref.col] || {};
-      const cible = base[ref.col][ref.id] = base[ref.col][ref.id] || { Tokens: {} };
-      cible.Tokens = cible.Tokens || {};
-      Object.keys(maj).forEach(cle => {
-        const [, id] = cle.split(".");
-        if (id) cible.Tokens[id] = maj[cle];
-      });
+      if (!opts || !opts.merge) { base[ref.col][ref.id] = structuredClone(maj); return; }
+      const fusionner = (cible, source) => {
+        Object.keys(source).forEach(cle => {
+          const valeur = source[cle];
+          if (valeur && typeof valeur === "object" && !Array.isArray(valeur)) {
+            if (!cible[cle] || typeof cible[cle] !== "object" || Array.isArray(cible[cle])) cible[cle] = {};
+            fusionner(cible[cle], valeur);
+          } else cible[cle] = structuredClone(valeur);
+        });
+      };
+      fusionner(base[ref.col][ref.id] = base[ref.col][ref.id] || { Tokens: {} }, maj);
     });
 }
 

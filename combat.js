@@ -1,5 +1,5 @@
 import { db } from "./firebase-config.js";
-import { doc, setDoc, onSnapshot, updateDoc, runTransaction } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { doc, setDoc, onSnapshot, updateDoc, runTransaction, deleteField, FieldPath } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // =========================================================================
 //  TOUTE MODIFICATION PARTAGÉE DU DOCUMENT DE PARTIE PASSE PAR ICI
@@ -37,19 +37,63 @@ import { doc, setDoc, onSnapshot, updateDoc, runTransaction } from "https://www.
 //  vieille position d'une créature qu'un autre venait de faire avancer : le
 //  pion revenait en arrière, puis repartait d'un bond à la notification
 //  suivante. On n'écrit plus que la case du pion concerné.
+//  ⚠️ setDoc NE COMPREND PAS LES CHEMINS POINTÉS. Écrire {"Tokens.abc": pion}
+//  ne range PAS le pion sous "Tokens" : cela crée un champ de premier niveau qui
+//  s'appelle littéralement "Tokens.abc". Seul updateDoc (et tx.update) découpe la
+//  clé sur les points. Le pion partait donc en base... à côté de la carte des
+//  pions, que personne ne relisait jamais : les jetons ne s'affichaient plus.
+//  On envoie donc un objet réellement imbriqué, que {merge:true} fusionne case
+//  par case sans toucher aux autres pions.
 window.enregistrerPionsVTT = async function(...idsTokens) {
     if (!window.ID_PARTIE_COURANTE || idsTokens.length === 0) return;
-    const maj = {};
+    const pions = {};
     idsTokens.forEach(id => {
         const pion = (window.TOKENS_VTT_DATA || {})[id];
-        if (pion) maj["Tokens." + id] = pion;
+        if (pion) pions[id] = pion;
     });
-    if (Object.keys(maj).length === 0) return;
+    if (Object.keys(pions).length === 0) return;
     try {
-        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), maj, { merge: true });
+        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE),
+                     { Tokens: pions }, { merge: true });
     } catch (e) {
         console.error("Enregistrement du pion :", e);
     }
+};
+
+// Réparation des parties déjà abîmées : les pions écrits à plat ("Tokens.abc"
+// en champ de premier niveau) sont remis à leur place dans la carte "Tokens",
+// puis le champ bancal est effacé. Le nom du champ contient un point : il faut
+// passer par un FieldPath d'un seul segment, sinon updateDoc le relit comme un
+// chemin et supprime le vrai pion.
+window.MIGRATION_PIONS_EN_COURS = false;
+window.reparerPionsAPlat = async function(data) {
+    if (window.MIGRATION_PIONS_EN_COURS || !window.ID_PARTIE_COURANTE) return false;
+    const champsAPlat = Object.keys(data || {}).filter(cle => cle.startsWith("Tokens."));
+    if (champsAPlat.length === 0) return false;
+
+    window.MIGRATION_PIONS_EN_COURS = true;
+    const recuperes = {};
+    champsAPlat.forEach(cle => {
+        const pion = data[cle];
+        const id = cle.slice("Tokens.".length);
+        if (id && pion && pion.q !== undefined && pion.r !== undefined) recuperes[id] = pion;
+    });
+
+    try {
+        const ref = doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE);
+        if (Object.keys(recuperes).length > 0) {
+            await setDoc(ref, { Tokens: recuperes }, { merge: true });
+        }
+        const paires = [];
+        champsAPlat.forEach(cle => paires.push(new FieldPath(cle), deleteField()));
+        await updateDoc(ref, ...paires);
+        console.log(`🧰 ${champsAPlat.length} pion(s) mal rangé(s) remis dans la carte des pions.`);
+    } catch (e) {
+        console.error("Réparation des pions à plat :", e);
+    } finally {
+        window.MIGRATION_PIONS_EN_COURS = false;
+    }
+    return true;
 };
 
 window.modifierPartie = async function(modifier) {
@@ -1012,6 +1056,10 @@ window.ecouterTerrainVTT = function() {
                 window.appliquerTerrain(data.URL_Map, data.Taille_Hex, opacite);
             }
 
+            // Une partie sauvée avant la correction peut encore contenir des pions
+            // rangés à plat : on les remet en place, le snapshot suivant les dessine.
+            if (typeof window.reparerPionsAPlat === "function") window.reparerPionsAPlat(data);
+
             // 🔻 NOUVEAU : Lecture des Pions (Tokens) depuis Firebase 🔻
             if (data.Tokens !== undefined) {
                 window.TOKENS_VTT_DATA = data.Tokens;
@@ -1545,6 +1593,11 @@ window.genererTokensCombat = async function() {
     // remettrait au passage les positions périmées des autres.
     if (nouveaux.length > 0) {
         window.TOKENS_VTT_DATA = tokensData;
+        // Dessinés tout de suite : le déploiement se voit sans attendre
+        // l'aller-retour réseau, comme partout ailleurs sur le plateau.
+        if (typeof window.appliquerTokensVTT === "function") {
+            window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+        }
         await window.enregistrerPionsVTT(...nouveaux);
     }
 };

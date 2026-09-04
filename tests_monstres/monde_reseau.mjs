@@ -18,26 +18,47 @@ export function creerMonde(documents) {
 
   const lire = (chemin) => monde.docs[chemin] ? structuredClone(monde.docs[chemin]) : null;
 
-  // Applique une mise à jour de champs, en gérant les chemins pointés
-  // ("Tokens.J1") et le marqueur de suppression, comme Firestore.
+  // ⚠️ DEUX MÉCANIQUES D'ÉCRITURE BIEN DISTINCTES, COMME CHEZ FIRESTORE.
+  //
+  //  updateDoc découpe ses clés sur les points : "Tokens.J1" désigne le pion J1
+  //  DANS la carte des pions. setDoc, lui, ne les découpe pas : la même clé y
+  //  crée un champ de premier niveau qui s'appelle littéralement "Tokens.J1",
+  //  à côté de la carte. Ce banc a longtemps confondu les deux, et a donc validé
+  //  une écriture de pion qui n'arrivait jamais à destination : plus aucun jeton
+  //  ne s'affichait sur le plateau, sans la moindre erreur en console.
   const appliquer = (chemin, maj, remplacer) => {
     if (remplacer) { monde.docs[chemin] = structuredClone(maj); return; }
     const cible = monde.docs[chemin] || (monde.docs[chemin] = {});
     Object.keys(maj).forEach(cle => {
       const valeur = maj[cle];
-      if (valeur === "«champ supprimé»") {
-        if (cle.includes(".")) {
-          const [racine, sous] = cle.split(".");
-          if (cible[racine]) delete cible[racine][sous];
-        } else delete cible[cle];
-        return;
+      const segments = cle.split(".");
+      let noeud = cible;
+      for (let i = 0; i < segments.length - 1; i++) {
+        if (!noeud[segments[i]] || typeof noeud[segments[i]] !== "object") noeud[segments[i]] = {};
+        noeud = noeud[segments[i]];
       }
-      if (cle.includes(".")) {
-        const [racine, sous] = cle.split(".");
-        cible[racine] = cible[racine] || {};
-        cible[racine][sous] = structuredClone(valeur);
-      } else cible[cle] = structuredClone(valeur);
+      const dernier = segments[segments.length - 1];
+      if (valeur === "«champ supprimé»") delete noeud[dernier];
+      else noeud[dernier] = structuredClone(valeur);
     });
+  };
+
+  // setDoc : les clés sont des NOMS de champs, points compris. Avec {merge:true}
+  // les cartes imbriquées fusionnent feuille à feuille ; sans lui, le document
+  // entier est remplacé.
+  const poser = (chemin, data, remplacer) => {
+    if (remplacer) { monde.docs[chemin] = structuredClone(data); return; }
+    const fusionner = (cible, source) => {
+      Object.keys(source).forEach(cle => {
+        const valeur = source[cle];
+        if (valeur === "«champ supprimé»") { delete cible[cle]; return; }
+        if (valeur && typeof valeur === "object" && !Array.isArray(valeur)) {
+          if (!cible[cle] || typeof cible[cle] !== "object" || Array.isArray(cible[cle])) cible[cle] = {};
+          fusionner(cible[cle], valeur);
+        } else cible[cle] = structuredClone(valeur);
+      });
+    };
+    fusionner(monde.docs[chemin] || (monde.docs[chemin] = {}), data);
   };
 
   const notifier = (chemin) => {
@@ -90,7 +111,7 @@ export function creerMonde(documents) {
     };
 
     const setDoc = async (ref, data, opts) => {
-      appliquer(ref.chemin, data, !(opts && opts.merge));
+      poser(ref.chemin, data, !(opts && opts.merge));
       notifier(ref.chemin);
     };
 
