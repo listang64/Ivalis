@@ -109,6 +109,7 @@ window.decrireObjetsAvecMIA = async function(objets) {
 On te donne des objets qui viennent d'être trouvés sur un champ de bataille, dans un univers Antique Fantastique (Antiquité magique, mythologie).
 L'ÉPOQUE EST UN INTERDIT, PAS UNE AMBIANCE : Grèce hoplitique, Rome, Perse, Égypte, steppes. Bronze, lin lamellé, cuir bouilli, écailles cousues, laine, fer brut, bois et os.
 Pour les armures et vêtements : linothorax, cuirasse musclée, lorica, spolas, exômide, chiton, ptéruges, fibules. JAMAIS d'armure de plates médiévale, de cotte de mailles de chevalier, de heaume à visière ni de plastron de fantasy moderne.
+UNE ARMURE EST UNE TENUE COMPLÈTE, jamais une pièce isolée : décris le vêtement de dessous, la protection, la ceinture, les ptéruges et les protections de bras et de jambes qui l'accompagnent. Quelqu'un doit pouvoir s'habiller entièrement avec ce que tu décris.
 Pour CHACUN, tu écris une description PUREMENT VISUELLE, destinée à un illustrateur qui ne connaît rien du jeu.
 Décris : la forme et les proportions exactes, les matières (bois, bronze, fer, cuir, os, pierre, tissu), les ornements et gravures, l'usure, les couleurs dominantes.
 La rareté doit se VOIR : un objet commun est simple, usé, sans fioriture ; un objet légendaire ou épique porte des matériaux nobles, des gravures fines et une lueur magique discrète.
@@ -172,10 +173,15 @@ window.promptImageObjet = function(objet, description, style) {
     const estArmure = objet.emplacement === "Armure";
 
     const miseEnScene = estArmure
-        ? "L'armure (ou le vêtement) est posée à plat sur le sol, entièrement dépliée et étalée, vue du dessus, "
-        + "de façon à ce qu'on en distingue la coupe complète. Elle est absolument VIDE : aucune personne, "
-        + "aucun corps, aucune tête, aucune main, aucun mannequin, aucun buste et aucun portant à l'intérieur ou à côté. "
-        + "C'est une pièce d'équipement abandonnée au sol, rien de plus."
+        ? "C'est une TENUE COMPLÈTE, pas une simple pièce de protection : le vêtement de dessous "
+        + "(tunique, chiton, exômide ou robe selon la pièce), la protection elle-même, la ceinture, "
+        + "les ptéruges, et les protections de bras et de jambes qui vont avec. Tout est posé à plat "
+        + "sur le sol, déplié et étalé comme sur un étal, disposé à la place qu'occupe chaque pièce sur "
+        + "un corps : le haut en haut, la ceinture au milieu, les jambières en bas. On doit pouvoir "
+        + "s'habiller entièrement avec ce qui est montré, sans rien y ajouter. "
+        + "L'ensemble est absolument VIDE : aucune personne, aucun corps, aucune tête, aucune main, "
+        + "aucun mannequin, aucun buste et aucun portant à l'intérieur ou à côté. "
+        + "C'est une tenue abandonnée au sol, rien de plus."
         : "L'objet est posé à même le sol, à plat, vu du dessus, en entier. "
         + "Personne ne le tient : aucune main, aucun bras, aucun personnage dans l'image.";
 

@@ -195,7 +195,8 @@ verifier("la température est tirée au hasard entre 0.80 et 1.20",
 
 console.log("\n2. LE PROMPT ENVOYÉ AU DESSINATEUR");
 verifier("l'arme est posée à même le sol", /posé à même le sol/.test(res.promptArme));
-verifier("l'armure est dépliée et étalée au sol", /dépliée et étalée/.test(res.promptArmure));
+verifier("l'armure est étalée au sol, tenue complète comprise",
+         /déplié et étalé/.test(res.promptArmure) && /TENUE COMPLÈTE/.test(res.promptArmure));
 verifier("et surtout : personne dedans",
          /aucun corps/.test(res.promptArmure) && /aucun mannequin/.test(res.promptArmure));
 verifier("le style graphique de la partie est injecté",

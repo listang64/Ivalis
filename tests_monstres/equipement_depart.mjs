@@ -234,8 +234,10 @@ console.log("\n4. LES ARMURES RESTENT ANTIQUES");
              /cotte de mailles/.test(promptArmure) && /heaume/.test(promptArmure));
     verifier("les armes aussi sont tenues à l'époque",
              /Antiquité méditerranéenne/.test(promptArme) && /Aucune forme médiévale/.test(promptArme));
-    verifier("l'armure reste dépliée, étalée et vide",
-             /dépliée et étalée/.test(promptArmure) && /aucun mannequin/.test(promptArmure));
+    verifier("l'armure reste étalée au sol, et vide",
+             /déplié et étalé/.test(promptArmure) && /aucun mannequin/.test(promptArmure));
+    verifier("et c'est bien une tenue COMPLÈTE qui est demandée",
+             /TENUE COMPLÈTE/.test(promptArmure) && /s'habiller entièrement/.test(promptArmure));
 
     // MIA_Objets, qui écrit les descriptions, reçoit la même contrainte.
     verifier("MIA_Objets reçoit elle aussi l'interdit d'époque",
