@@ -7,9 +7,86 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Ivalis - Le JDR</title>
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=9">
+  <link rel="stylesheet" href="style.css?v=10">
 
  
+  <!-- ===================================================================== -->
+  <!--  RAPPORTEUR D'ERREURS À L'ÉCRAN                                        -->
+  <!-- ===================================================================== -->
+  <!--  Le jeu se joue sur iPad, où il n'existe aucune console pour voir ce
+       qui a lâché. Une erreur au chargement d'un module y est INVISIBLE :
+       toutes ses fonctions disparaissent d'un coup, plusieurs boutons sans
+       rapport cessent de répondre, et il ne reste rien à raconter au
+       développeur. Ce bandeau rend l'erreur lisible à l'écran.
+
+       Volontairement en clair, tout en haut du document et hors module : il
+       doit être en place AVANT le premier <script type="module">, sans quoi il
+       manquerait précisément les pannes qu'on cherche.                        -->
+  <script>
+    (function () {
+      var vues = [];
+      function afficher(titre, detail) {
+        var cle = titre + detail;
+        if (vues.indexOf(cle) !== -1) return;   // une même erreur ne se répète pas
+        vues.push(cle);
+
+        var boite = document.getElementById("bandeau-erreurs-js");
+        if (!boite) {
+          boite = document.createElement("div");
+          boite.id = "bandeau-erreurs-js";
+          // EN BAS, et transparent aux doigts. Le menu de combat et le bandeau
+          // des points d'apparition vivent en HAUT de l'écran : un rapporteur
+          // posé là-haut, ou capable d'intercepter un clic, deviendrait
+          // lui-même la panne qu'il est censé aider à comprendre. Seule la
+          // croix reçoit les doigts.
+          boite.style.cssText = "position:fixed; bottom:0; left:0; right:0; z-index:2147483647;"
+            + "pointer-events:none;"
+            + "background:rgba(120,20,20,0.97); color:#ffe9e9; font-family:monospace;"
+            + "font-size:12px; line-height:1.45; padding:10px 44px 10px 12px;"
+            + "max-height:35vh; overflow:auto; box-shadow:0 -4px 18px rgba(0,0,0,0.6);"
+            + "-webkit-user-select:text; user-select:text;";
+          var croix = document.createElement("button");
+          croix.textContent = "\u2715";
+          croix.setAttribute("aria-label", "Masquer les erreurs");
+          croix.style.cssText = "position:absolute; top:6px; right:8px; width:36px; height:36px;"
+            + "pointer-events:auto;"
+            + "background:transparent; border:1px solid #ffb4b4; color:#ffe9e9;"
+            + "border-radius:6px; font-size:15px; cursor:pointer;";
+          croix.onclick = function () { boite.remove(); };
+          boite.appendChild(croix);
+          var entete = document.createElement("div");
+          entete.textContent = "Erreur JavaScript — montre cette capture au développeur :";
+          entete.style.cssText = "font-weight:bold; margin-bottom:6px;";
+          boite.appendChild(entete);
+          (document.body || document.documentElement).appendChild(boite);
+        }
+        var ligne = document.createElement("div");
+        ligne.textContent = "• " + titre + (detail ? "  [" + detail + "]" : "");
+        ligne.style.cssText = "margin-top:4px; word-break:break-word;";
+        boite.appendChild(ligne);
+      }
+
+      window.addEventListener("error", function (e) {
+        // Une balise <script> qui échoue lève un event sans message : c'est
+        // exactement le cas d'un module qui ne se charge pas.
+        if (e.target && e.target.tagName === "SCRIPT") {
+          afficher("module non chargé : " + (e.target.getAttribute("src") || "?"), "");
+          return;
+        }
+        var ou = e.filename ? String(e.filename).split("/").pop() : "";
+        afficher(e.message || "erreur inconnue", ou + (e.lineno ? ":" + e.lineno : ""));
+      }, true);
+
+      window.addEventListener("unhandledrejection", function (e) {
+        var r = e.reason;
+        afficher("promesse rejetée : " + ((r && (r.message || r)) || "?"), "");
+      });
+
+      // Accessible à la main, pour signaler une anomalie sans console.
+      window.signalerErreur = afficher;
+    })();
+  </script>
+
   <script>
     /* Bande noire en bas sur iPad installe sur l'ecran d'accueil.
        Mesure sur l'appareil : dalle 1024 px, zone visible 992 px. Les 32 px manquants
@@ -1449,7 +1526,7 @@
 <script type="module" src="mouvement.js?v=9"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
 <script type="module" src="moteur_effets.js?v=17"></script>
-<script type="module" src="monstres.js?v=12"></script>
+<script type="module" src="monstres.js?v=13"></script>
 <script type="module" src="monstres_competences.js?v=5"></script>
 <script type="module" src="monstres_ia.js?v=14"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->

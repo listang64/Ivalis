@@ -220,7 +220,14 @@ window.recomposerCombattants = function() {
     // Tous les ennemis sont-ils tombés ? La victoire (et son butin) se
     // détecte ici : c'est le seul endroit qui voit changer la liste des
     // monstres, qu'ils meurent au combat ou via la coupe de test.
-    if (typeof window.verifierVictoireCombat === "function") window.verifierVictoireCombat();
+    //
+    // Sous try/catch : cette fonction reconstruit PERSOS_PARTIE, dont dépendent
+    // le déploiement des pions, la génération de rencontre et tout le combat.
+    // Une exception venue du butin ne doit jamais emporter ça avec elle.
+    if (typeof window.verifierVictoireCombat === "function") {
+        try { window.verifierVictoireCombat(); }
+        catch (e) { console.error("Détection de victoire (le combat continue) :", e); }
+    }
 };
 
 let unsubscribeMonstres = null;

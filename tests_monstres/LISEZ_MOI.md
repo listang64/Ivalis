@@ -116,6 +116,7 @@ le bestiaire réel aucune carte ne sort de sa tranche.
 ```sh
 node butin_loot.mjs         # détection de victoire, fenêtre personnelle, partage, tirage au sort
 node clics_butin.mjs        # on clique VRAIMENT dans la fenêtre : croix, prendre, laisser
+node demarrage_reel.mjs     # la VRAIE page se charge-t-elle ? (les 12 modules, le parcours complet)
 node objets_tableau.mjs     # le catalogue d'équipement, confronté au tableau de Nico
 node equipement_combat.mjs  # ce que les objets font une fois portés, en combat
 node apercu_butin.mjs       # onglet Inventaire et fenêtres de butin, capturés à l'écran
@@ -189,6 +190,32 @@ en appelant les fonctions à la main. Il joue la séquence complète (laisser,
 prendre, confirmer, équiper, refermer), vérifie que le menu de combat
 redevient cliquable une fois la fenêtre fermée, et surtout qu'un DOM incomplet
 ne fait plus tomber le reste du combat.
+
+`demarrage_reel.mjs` répond à la question que AUCUN autre banc ne posait : est-ce
+que le jeu **démarre** ? Tous les autres découpent une fonction et la font
+tourner à part ; celui-ci sert la vraie `index.html` en HTTP (les modules ES
+refusent `file://`), remplace les deux modules Firebase du CDN par des
+doublures, et laisse **tout le reste se charger pour de vrai**. Il vérifie
+qu'une fonction représentative de chacun des huit modules existe — car il
+suffit qu'UN module lève à son chargement pour que toutes ses fonctions
+disparaissent d'un coup, sans le moindre message : des boutons sans rapport
+cessent alors de répondre, et le jeu paraît « complètement cassé ». Il rejoue
+ensuite le parcours exact de Nico : butin oublié en base, réinitialisation,
+pose des deux repères, déploiement, ouverture de la fenêtre de difficulté (en
+vérifiant qu'elle est bien cliquable, donc que rien ne la recouvre), puis les
+boutons PION et RENCONTRE.
+
+⚠️ **L'ordre des routes Playwright compte** : c'est la DERNIÈRE posée qui
+gagne. Le filtre général (`'**'`) doit donc venir AVANT les doublures Firebase,
+sans quoi il les coupe et plus rien ne se charge — le banc accuse alors le jeu
+d'une panne qui vient de lui-même.
+
+Enfin, `index.html` porte un **rapporteur d'erreurs à l'écran**, en clair et
+hors module, avant le premier `<script type="module">`. Le jeu se joue sur
+iPad, où il n'existe aucune console : une erreur y était totalement muette. Le
+bandeau rouge nomme désormais l'erreur, son fichier et sa ligne — et un module
+qui ne se charge pas est nommé explicitement. Une capture d'écran suffit à
+rapporter la panne.
 
 `objets_tableau.mjs` relit les deux classeurs de Nico (figés dans
 `tableau_objets.json`, extraits des `.xlsx` d'origine) et confronte le catalogue
