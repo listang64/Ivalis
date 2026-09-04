@@ -7,7 +7,7 @@
 // scènes exactes, avec le vrai code, à trois navigateurs.
 import fs from 'fs';
 import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
-import { SRC_MODIFIER_PARTIE } from './transaction_partie.mjs';
+import { SRC_MODIFIER_PARTIE, SRC_VERDICT_TOUR } from './transaction_partie.mjs';
 
 const combat = fs.readFileSync('/home/user/Ivalis/combat.js', 'utf-8');
 const lignes = combat.split('\n');
@@ -19,6 +19,9 @@ function fonction(marqueur) {
 }
 const SRC_CARTE = fonction('window.jouerCarteCombat = async function');
 const SRC_FIN   = fonction('window.finDeTourCombat = async function');
+// Le verdict « tout le monde a-t-il joué ? » voyage avec la transaction, dans
+// SRC_MODIFIER_PARTIE : sans lui, aucune carte n'entre dans la file.
+const SRC_VERDICT = SRC_VERDICT_TOUR;
 
 let echecs = 0;
 const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(58)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
@@ -100,6 +103,7 @@ function creerPoste(nom, partie, personnages, { monPerso }) {
     })
   });
   new Function('window', 'db', 'doc', 'updateDoc', 'importerFirestore',
+    SRC_VERDICT + '\n' +
     SRC_CARTE.replace(/await import\("[^"]*"\)/g, 'await importerFirestore()') + '\n' +
     SRC_FIN.replace(/await import\("[^"]*"\)/g, 'await importerFirestore()'))(
     w, db, doc, updateDoc, importer);

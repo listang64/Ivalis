@@ -217,6 +217,15 @@ window.recomposerCombattants = function() {
         if (frais) window.afficherDansPanneauGauche(affiche.idPersonnage);
     }
 
+    // Qui est à terre ? La réponse doit être la MÊME sur les trois écrans, et
+    // c'est ici qu'on voit changer les points de vie. La liste partagée est donc
+    // mise à jour au passage — sans rien écrire quand elle est déjà juste, et
+    // sans jamais juger un combattant que ce poste n'a pas encore chargé.
+    if (typeof window.synchroniserCombattantsHorsJeu === "function") {
+        Promise.resolve(window.synchroniserCombattantsHorsJeu())
+            .catch(e => console.error("Suivi des combattants à terre :", e));
+    }
+
     // Tous les ennemis sont-ils tombés ? La victoire (et son butin) se
     // détecte ici : c'est le seul endroit qui voit changer la liste des
     // monstres, qu'ils meurent au combat ou via la coupe de test.

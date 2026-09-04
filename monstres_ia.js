@@ -720,15 +720,16 @@ window.preparerCartesMonstres = async function() {
 
         file.sort((a, b) => (b.initiative !== a.initiative) ? b.initiative - a.initiative : a.timestamp - b.timestamp);
 
-        // Bascule en résolution dès que tous les combattants vivants ont choisi.
+        // Bascule en résolution dès que tous les combattants attendus ont choisi.
+        // Le verdict sort du document de partie, jamais de la liste locale :
+        // deux postes ne doivent pas basculer à des instants différents.
         let phase = data.Phase_Combat || "Preparation";
-        const nbActifs = (data.Ordre_Initiative || []).filter(id => {
-            const p = (window.PERSOS_PARTIE || []).find(x => x.idPersonnage === id);
-            return p && !(typeof window.estCombattantMort === "function" && window.estCombattantMort(id));
-        }).length;
-        if (file.length >= nbActifs && nbActifs > 0) phase = "Resolution";
+        let ontJoue = data.Ont_Joue_Ce_Round || [];
+        aInscrire.forEach(entree => { ontJoue = window.avecCarteJouee({ Ont_Joue_Ce_Round: ontJoue },
+                                                                      entree.idPersonnage); });
+        if (window.toutLeMondeAJoue({ ...data, Ont_Joue_Ce_Round: ontJoue }, file)) phase = "Resolution";
 
-        return { maj: { File_Attente_Combat: file, Phase_Combat: phase } };
+        return { maj: { File_Attente_Combat: file, Phase_Combat: phase, Ont_Joue_Ce_Round: ontJoue } };
     });
 };
 

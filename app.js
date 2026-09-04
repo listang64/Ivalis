@@ -873,18 +873,24 @@ async function supprimerPersonnageBDD(idPersonnage) {
                   const nouvelleFile = file.filter(f => f.idPersonnage !== idPersonnage);
                   let phase = dataPartie.Phase_Combat || "Preparation";
 
-                  const nbRestants = nouvelOrdre.filter(id => {
-                      const p = (window.PERSOS_PARTIE || []).find(perso => perso.idPersonnage === id);
-                      return p && p.statut !== "Mort";
-                  }).length;
-                  if (phase === "Preparation" && nouvelleFile.length >= nbRestants && nbRestants > 0) {
+                  // Le héros effacé ne doit plus être attendu, ni traîner dans
+                  // les listes de suivi du round.
+                  const horsJeu = (dataPartie.Combattants_Hors_Jeu || []).filter(id => id !== idPersonnage);
+                  const ontJoue = (dataPartie.Ont_Joue_Ce_Round || []).filter(id => id !== idPersonnage);
+
+                  if (phase === "Preparation" && typeof window.toutLeMondeAJoue === "function"
+                      && window.toutLeMondeAJoue({ Ordre_Initiative: nouvelOrdre,
+                                                   Combattants_Hors_Jeu: horsJeu,
+                                                   Ont_Joue_Ce_Round: ontJoue }, nouvelleFile)) {
                       phase = "Resolution";
                   }
 
                   await updateDoc(partieRef, {
                       Ordre_Initiative: nouvelOrdre,
                       File_Attente_Combat: nouvelleFile,
-                      Phase_Combat: phase
+                      Phase_Combat: phase,
+                      Combattants_Hors_Jeu: horsJeu,
+                      Ont_Joue_Ce_Round: ontJoue
                   });
                   console.log(`   ✔️ Retiré de l'initiative de ${idPartie}.`);
               }

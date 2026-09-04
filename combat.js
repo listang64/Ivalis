@@ -96,6 +96,89 @@ window.reparerPionsAPlat = async function(data) {
     return true;
 };
 
+// =========================================================================
+//  QUI DOIT ENCORE JOUER ? — LA SEULE QUESTION QUI COMPTE À TROIS POSTES
+// =========================================================================
+//  Cinq endroits décidaient du passage en Résolution, et TOUS lisaient
+//  window.PERSOS_PARTIE : la liste LOCALE du poste qui écrit. Trois appareils,
+//  trois réponses. Pire, deux règles cohabitaient pour la même question — ici
+//  « statut !== Mort », là « estCombattantMort() » — et un héros à zéro point
+//  de vie n'est jamais marqué "Mort" en base : il comptait donc comme vivant
+//  d'un côté, à terre de l'autre. Et un combattant pas encore chargé sur un
+//  poste (p introuvable) comptait comme mort, ce qui faisait basculer la phase
+//  trop tôt : le joueur qui n'avait pas encore choisi voyait son deck grisé et
+//  ne pouvait plus rien cliquer de tout le combat.
+//
+//  Désormais la réponse ne sort QUE du document de partie, relu dans la
+//  transaction. Deux listes, et le même verdict sur les trois écrans :
+//    Combattants_Hors_Jeu  — ceux qui ne joueront plus (à terre)
+//    Ont_Joue_Ce_Round     — ceux qui ont déjà posé leur carte
+window.combattantsAttendus = function(data) {
+    const horsJeu = new Set((data && data.Combattants_Hors_Jeu) || []);
+    return ((data && data.Ordre_Initiative) || []).filter(id => !horsJeu.has(id));
+};
+
+// La file passée en argument est celle de la transaction en cours, qui contient
+// déjà la carte qu'on est en train d'inscrire.
+window.toutLeMondeAJoue = function(data, fileEnCours) {
+    const attendus = window.combattantsAttendus(data);
+    if (attendus.length === 0) return false;
+    const aJoue = new Set((data && data.Ont_Joue_Ce_Round) || []);
+    (fileEnCours || (data && data.File_Attente_Combat) || []).forEach(f => aJoue.add(f.idPersonnage));
+    return attendus.every(id => aJoue.has(id));
+};
+
+// Un combattant vient de poser sa carte : on le note, pour que la file puisse
+// se vider pendant la résolution sans qu'on oublie qu'il a joué.
+window.avecCarteJouee = function(data, idPersonnage) {
+    const aJoue = new Set((data && data.Ont_Joue_Ce_Round) || []);
+    aJoue.add(idPersonnage);
+    return [...aJoue];
+};
+
+// LA MISE À JOUR DE « QUI EST À TERRE », convergente par construction.
+//  Deux règles, et elles comptent autant l'une que l'autre :
+//
+//  1. Chaque poste ne juge QUE les combattants qu'il connaît. Un combattant pas
+//     encore chargé n'est jamais déclaré à terre, si bien qu'un poste en retard
+//     ne peut plus faire basculer la phase à la place des autres.
+//  2. La liste ne fait que GRANDIR pendant un combat. Sans cela, un poste dont
+//     la fiche est en retard voit le tombé encore debout et le retire ; le
+//     poste d'à côté le remet ; et ainsi de suite — un va-et-vient d'écritures
+//     à chaque notification, précisément le genre de bavardage qui saccade les
+//     déplacements. Un combattant à terre le reste donc jusqu'à la
+//     réinitialisation du combat, qui vide la liste.
+//
+//  Trois postes qui constatent la même chute écrivent la même liste : la
+//  deuxième écriture ne voit plus de différence et n'a pas lieu.
+window.synchroniserCombattantsHorsJeu = async function() {
+    if (!window.ID_PARTIE_COURANTE) return false;
+    const data = window.PARTIE_DATA || {};
+    const ordre = data.Ordre_Initiative || [];
+    if (ordre.length === 0) return false;
+    if (typeof window.estCombattantMort !== "function") return false;
+
+    const connus = new Set((window.PERSOS_PARTIE || []).map(p => p.idPersonnage));
+    const voulue = new Set(data.Combattants_Hors_Jeu || []);
+    let change = false;
+
+    ordre.forEach(id => {
+        if (!connus.has(id)) return;              // pas encore chargé : on ne juge pas
+        if (window.estCombattantMort(id) && !voulue.has(id)) { voulue.add(id); change = true; }
+    });
+
+    // Seul retrait admis : un combattant qui n'est plus dans l'ordre
+    // d'initiative. Il a été effacé du combat, il n'y a plus rien à attendre
+    // de lui — et cette information-là, elle, vient de la partie partagée.
+    voulue.forEach(id => {
+        if (!ordre.includes(id)) { voulue.delete(id); change = true; }
+    });
+
+    if (!change) return false;
+    await window.modifierPartie(() => ({ maj: { Combattants_Hors_Jeu: [...voulue] } }));
+    return true;
+};
+
 window.modifierPartie = async function(modifier) {
     if (!window.ID_PARTIE_COURANTE) return null;
     const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
@@ -1534,20 +1617,24 @@ window.supprimerTokenVTT = async function() {
                 ordre = ordre.filter(id => id !== idSupprime);
                 file = file.filter(item => item.idPersonnage !== idSupprime);
 
-                // 🔻 CORRECTION : On se base sur l'initiative restante
-                const nbJoueursRestants = ordre.filter(id => {
-                    const p = (window.PERSOS_PARTIE || []).find(perso => perso.idPersonnage === id);
-                    return p && p.statut !== "Mort";
-                }).length;
+                // Le combattant retiré ne doit plus être attendu : on le sort
+                // aussi des deux listes de suivi du round.
+                const horsJeu = (data.Combattants_Hors_Jeu || []).filter(id => id !== idSupprime);
+                const ontJoue = (data.Ont_Joue_Ce_Round || []).filter(id => id !== idSupprime);
 
-                if (phase === "Preparation" && file.length >= nbJoueursRestants && nbJoueursRestants > 0) {
+                if (phase === "Preparation"
+                    && window.toutLeMondeAJoue({ ...data, Ordre_Initiative: ordre,
+                                                 Combattants_Hors_Jeu: horsJeu,
+                                                 Ont_Joue_Ce_Round: ontJoue }, file)) {
                     phase = "Resolution";
                 }
 
                 return { maj: {
                     Ordre_Initiative: ordre,
                     File_Attente_Combat: file,
-                    Phase_Combat: phase
+                    Phase_Combat: phase,
+                    Combattants_Hors_Jeu: horsJeu,
+                    Ont_Joue_Ce_Round: ontJoue
                 } };
             });
             
@@ -2654,17 +2741,14 @@ window.jouerCarteCombat = async function(idCarte) {
             });
 
             let phase = data.Phase_Combat || "Preparation";
-            
-            // 🔻 CORRECTION : On ne compte QUE les combattants présents dans l'Initiative !
-            let ordreInit = data.Ordre_Initiative || [];
-            const nbJoueursActifs = ordreInit.filter(id => {
-                const p = (window.PERSOS_PARTIE || []).find(perso => perso.idPersonnage === id);
-                return p && p.statut !== "Mort";
-            }).length;
-            
-            if (file.length >= nbJoueursActifs && nbJoueursActifs > 0) phase = "Resolution";
 
-            return { maj: { File_Attente_Combat: file, Phase_Combat: phase } };
+            // La bascule se décide sur le document de partie, jamais sur la
+            // liste locale du poste : c'est la seule façon que les trois écrans
+            // passent en résolution au même moment.
+            const ontJoue = window.avecCarteJouee(data, persoActuel.idPersonnage);
+            if (window.toutLeMondeAJoue({ ...data, Ont_Joue_Ce_Round: ontJoue }, file)) phase = "Resolution";
+
+            return { maj: { File_Attente_Combat: file, Phase_Combat: phase, Ont_Joue_Ce_Round: ontJoue } };
         });
 
         // L'état Électrifié se dissipe une fois la carte réellement inscrite.
@@ -2740,17 +2824,12 @@ window.jouerReposLong = async function() {
             });
 
             let newPhase = data.Phase_Combat || "Preparation";
-            
-            // 🔻 CORRECTION : Idem pour le Repos Long
-            let ordreInit = data.Ordre_Initiative || [];
-            const nbJoueursActifs = ordreInit.filter(id => {
-                const p = (window.PERSOS_PARTIE || []).find(perso => perso.idPersonnage === id);
-                return p && p.statut !== "Mort";
-            }).length;
-            
-            if (file.length >= nbJoueursActifs && nbJoueursActifs > 0) newPhase = "Resolution";
 
-            return { maj: { File_Attente_Combat: file, Phase_Combat: newPhase } };
+            const ontJoueRepos = window.avecCarteJouee(data, persoActuel.idPersonnage);
+            if (window.toutLeMondeAJoue({ ...data, Ont_Joue_Ce_Round: ontJoueRepos }, file)) newPhase = "Resolution";
+
+            return { maj: { File_Attente_Combat: file, Phase_Combat: newPhase,
+                            Ont_Joue_Ce_Round: ontJoueRepos } };
         });
     } catch (e) {
         console.error("Erreur jouerReposLong:", e);
@@ -2859,17 +2938,23 @@ window.finDeTourCombat = async function(forcer = false, idQuiTermine = null) {
 
                 // Les combattants tombés entre-temps sortent de la file : sans
                 // ça leur tour finit par arriver, et il faut le passer à la main.
-                if (typeof window.estCombattantMort === "function") {
-                    file = file.filter(f => !window.estCombattantMort(f.idPersonnage));
-                }
+                // La liste vient de la PARTIE : un poste ne doit pas retirer de
+                // la file quelqu'un que les deux autres y gardent encore.
+                const horsJeu = new Set(data.Combattants_Hors_Jeu || []);
+                file = file.filter(f => !horsJeu.has(f.idPersonnage));
 
                 const finDuRound = file.length === 0;
-                if (finDuRound) { phase = "Preparation"; tour++; }
+                const maj = { File_Attente_Combat: file, Phase_Combat: phase, Tour_Combat: tour };
+                if (finDuRound) {
+                    phase = "Preparation";
+                    tour++;
+                    maj.Phase_Combat = phase;
+                    maj.Tour_Combat = tour;
+                    // Nouveau round, tout le monde doit rejouer.
+                    maj.Ont_Joue_Ce_Round = [];
+                }
 
-                return {
-                    maj: { File_Attente_Combat: file, Phase_Combat: phase, Tour_Combat: tour },
-                    resultat: { actionCourante, file, phase, tour, finDuRound }
-                };
+                return { maj, resultat: { actionCourante, file, phase, tour, finDuRound } };
             });
 
             window.ANIMATION_TOUR_EN_COURS = false;
@@ -3501,9 +3586,18 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
             if (typeof window.afficherApercuCarteHD === "function") window.afficherApercuCarteHD(persoInQueue.idCarte, true); 
         }
     } else {
-        // 🔻 CORRECTION 2 : Si la phase est "Resolution", c'est qu'il a déjà joué et n'est plus dans la file ! On grise son deck.
+        // 🔻 Si la phase est "Resolution", c'est qu'il a déjà joué et n'est plus dans la file : on grise son deck.
+        //
+        // MAIS PAS S'IL N'A JAMAIS JOUÉ. C'est le filet qui manquait : un poste
+        // qui basculait la phase trop tôt condamnait le joueur en retard à
+        // regarder son deck éteint pendant tout le combat, sans rien pouvoir
+        // cliquer. Tant qu'il n'est pas noté comme ayant posé sa carte, ses
+        // techniques restent vivantes — il rentre alors dans la file, et le
+        // round se déroule normalement.
+        const aDejaJoue = !persoActuel
+            || ((window.PARTIE_DATA || {}).Ont_Joue_Ce_Round || []).includes(persoActuel.idPersonnage);
         if (deckEl) {
-            if (phase === "Resolution") {
+            if (phase === "Resolution" && aDejaJoue) {
                 deckEl.style.opacity = "0.4";
                 deckEl.style.pointerEvents = "none";
                 deckEl.style.filter = "grayscale(100%)";
@@ -3676,6 +3770,10 @@ window.reinitialiserCombat = async function() {
                 // en base ferait traîner un butin réputé "de cette rencontre"
                 // par-dessus le combat suivant.
                 Butin: deleteField(),
+                // Le suivi du round repart de zéro : personne n'est à terre,
+                // personne n'a encore joué.
+                Combattants_Hors_Jeu: [],
+                Ont_Joue_Ce_Round: [],
                 // La rencontre passée est close : sans cela, le prochain butin
                 // s'attribuerait l'identifiant de l'ancienne.
                 Difficulte_Rencontre: deleteField(),
