@@ -98,6 +98,23 @@ window.equiperObjet = async function(idPersonnage, objet, main) {
     // deux champs sont réécrits, donc rien ne peut survivre à côté d'elle.
     champs.forEach(champ => maj[champ] = valeur);
 
+    // L'INVERSE EST TOUT AUSSI VRAI, et il manquait. Une arme à deux mains est
+    // écrite DANS LES DEUX MAINS avec le même identifiant. La remplacer par une
+    // arme à une main n'écrasait qu'une des deux : la moitié orpheline restait
+    // dans l'autre main, et comme les bonus sont dédoublonnés par identifiant,
+    // l'arme rendue continuait tranquillement de compter ses points.
+    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+    if (perso) {
+        const uidsRemplaces = champs
+            .map(champ => (perso[window.champDocVersFront[champ]] || {}).uid)
+            .filter(Boolean);
+        ["Equip_Main_Droite", "Equip_Main_Gauche"].forEach(champ => {
+            if (maj[champ] !== undefined) return;
+            const porte = perso[window.champDocVersFront[champ]];
+            if (porte && porte.deuxMains && uidsRemplaces.includes(porte.uid)) maj[champ] = null;
+        });
+    }
+
     try {
         await updateDoc(doc(db, "Personnages", idPersonnage), maj);
         window.appliquerEquipementEnRam(idPersonnage, maj);
@@ -202,7 +219,20 @@ window.combatGagne = function() {
 
 window.verifierVictoireCombat = function() {
     if (document.getElementById("fenetre-combat")?.style.display !== "block") return;
-    if (window.PARTIE_DATA && window.PARTIE_DATA.Butin && window.PARTIE_DATA.Butin.ouvert) return;
+
+    // Un butin ouvert arrête tout — sauf s'il vient d'un combat déjà passé.
+    // Sans cette nuance, un butin resté "ouvert" en base (fenêtre quittée,
+    // page rechargée, joueur parti) empêchait DÉFINITIVEMENT toute victoire
+    // suivante d'être détectée : plus jamais de butin, sur aucune rencontre.
+    const partie = window.PARTIE_DATA || {};
+    const enCours = partie.Butin;
+    const idRencontreCourante = partie.ID_Rencontre || "";
+    if (enCours && enCours.ouvert && !window.butinPerime(enCours, idRencontreCourante)) return;
+
+    // Un combat qu'on est en train de réinitialiser n'a pas été gagné : ses
+    // cadavres sont ceux du combat d'avant.
+    if (partie.Reinitialisation_En_Cours
+        && (Date.now() - partie.Reinitialisation_En_Cours) < window.DELAI_REINIT_MAX_MS) return;
 
     if (!window.combatGagne()) return;
 
@@ -225,20 +255,59 @@ window.demarrerButin = async function() {
         .map(p => p.idPersonnage);
     if (participants.length === 0) return;
 
-    // La difficulté est celle de la dernière rencontre générée, enregistrée
-    // dans la partie (monstres.js). Des monstres posés à la main n'en laissent
-    // aucune : on retombe alors sur la ligne NORMAL du tableau de loot.
-    const difficulte = (window.PARTIE_DATA && window.PARTIE_DATA.Difficulte_Rencontre) || "Normale";
-    const idRencontre = (window.PARTIE_DATA && window.PARTIE_DATA.ID_Rencontre) || "";
-
     await window.modifierPartie((data) => {
+        // La rencontre est relue DANS la transaction, jamais depuis la mémoire
+        // du poste : entre le moment où une réinitialisation efface la
+        // rencontre et celui où la suppression des créatures parvient à tous
+        // les écrans, il existe un court instant où le plateau paraît "gagné"
+        // — de vieux cadavres, plus de rencontre. Un poste en retard d'une
+        // notification y ouvrait alors un butin fantôme, juste après le reset,
+        // par-dessus le combat qu'on venait de relancer.
+        //
+        // Pas de rencontre en cours, donc pas de butin : c'est elle qui dit à
+        // quel combat il appartient, et sur quelle ligne du tableau de loot
+        // tirer les raretés.
+        const idRencontre = data.ID_Rencontre || "";
+        const difficulte = data.Difficulte_Rencontre || "Normale";
+
+        // PAS DE RENCONTRE EN COURS, PAS DE BUTIN. C'est la seule barrière
+        // vraiment étanche contre le butin fantôme : la liste des créatures
+        // (window.MONSTRES_PARTIE) est LOCALE et peut avoir un train de retard,
+        // alors que la rencontre est relue ici dans la transaction. Sans elle,
+        // un poste qui n'a pas encore reçu la suppression des créatures voyait,
+        // juste après une réinitialisation, un plateau jonché de cadavres et
+        // ouvrait un butin sur le combat précédent.
+        //
+        // La rencontre dit aussi à quel combat le butin appartient et sur quelle
+        // ligne du tableau de loot tirer les raretés : sans elle, le butin
+        // n'aurait de toute façon aucun sens.
+        if (!idRencontre) {
+            console.warn("Butin ignoré : aucune rencontre en cours. Génère une rencontre pour que la victoire rapporte quelque chose.");
+            return null;
+        }
+
+        // Une réinitialisation en cours interdit tout butin. Elle efface la
+        // partie, puis les créatures, puis les pions : entre ces écritures, un
+        // poste en retard d'une notification voit de vieux cadavres sur un
+        // plateau sans butin, et croit à une victoire. Le drapeau voyage dans
+        // la MÊME écriture que l'effacement du butin, donc aucun poste ne peut
+        // voir l'un sans l'autre.
+        if (data.Reinitialisation_En_Cours
+            && (Date.now() - data.Reinitialisation_En_Cours) < window.DELAI_REINIT_MAX_MS) return null;
+
+
         // Un butin déjà ouvert bloque celui-ci — mais SEULEMENT s'il appartient
         // encore à ce combat. Sans cette nuance, un butin qu'on avait quitté
         // sans le refermer (fenêtre fermée, page rechargée, joueur parti)
         // restait "ouvert" pour toujours en base et empêchait tous les butins
         // suivants : plus aucune victoire ne rapportait quoi que ce soit.
+        // ⚠️ La condition ne regarde PAS si l'ancien butin est encore ouvert :
+        // une fois refermé, il resterait remplaçable, et comme les cadavres sont
+        // toujours sur le plateau (le combat est donc toujours "gagné"), un
+        // butin tout neuf se rouvrait aussitôt. De quoi retirer au sort autant
+        // d'objets qu'on veut, à l'infini, en fermant la fenêtre.
         const ancien = data.Butin;
-        if (ancien && ancien.ouvert && !window.butinPerime(ancien, idRencontre)) return null;
+        if (ancien && !window.butinPerime(ancien, idRencontre)) return null;
 
         const parPersonnage = {};
         participants.forEach(id => {
@@ -278,20 +347,31 @@ window.demarrerButin = async function() {
 // à choisir.
 window.DELAI_BUTIN_PERIME_MS = 60000;
 
+// Une réinitialisation qui n'aboutit pas (poste fermé en plein ménage, réseau
+// coupé) ne doit pas condamner tous les butins suivants : passé ce délai, le
+// drapeau est ignoré.
+window.DELAI_REINIT_MAX_MS = 30000;
+
 window.butinPerime = function(butin, idRencontreCourante) {
     if (!butin) return true;
-    if (butin.resolu) return true;
-    // Les deux rencontres sont identifiées et diffèrent : le butin est vieux.
-    if (idRencontreCourante && butin.idRencontre && butin.idRencontre !== idRencontreCourante) return true;
-    // Un butin d'avant cette mécanique n'a pas d'identifiant : on le laisse
-    // passer une fois, plutôt que de bloquer indéfiniment les butins suivants.
+
+    // UNE RENCONTRE NE DONNE QU'UN BUTIN. Tant qu'on est sur la même, celui-ci
+    // reste le sien — ouvert, refermé, ou déjà entièrement réparti. C'est ce qui
+    // empêche de rejouer le tirage sur les mêmes cadavres.
+    if (idRencontreCourante && butin.idRencontre) {
+        return butin.idRencontre !== idRencontreCourante;
+    }
+    // Un butin d'avant cette mécanique n'a pas d'identifiant : face à une
+    // rencontre identifiée, il est forcément d'avant.
     if (idRencontreCourante && !butin.idRencontre) return true;
-    // Ni l'un ni l'autre n'est identifié : on tranche à l'ancienneté.
-    if (butin.creeLe && (Date.now() - butin.creeLe) > window.DELAI_BUTIN_PERIME_MS) return true;
-    // Un butin d'avant cette correction n'a même pas de date : il ne doit pas
-    // condamner la partie pour autant.
-    if (!butin.creeLe && !butin.idRencontre) return true;
-    return false;
+
+    // Plus aucune rencontre identifiée : des monstres posés à la main. Un butin
+    // déjà réparti ne se rejoue jamais tout seul ; c'est la réinitialisation du
+    // combat qui l'efface et rend la place au suivant.
+    if (butin.resolu) return false;
+    // Un butin resté en plan, lui, finit par expirer.
+    if (butin.creeLe) return (Date.now() - butin.creeLe) > window.DELAI_BUTIN_PERIME_MS;
+    return true;
 };
 
 // =========================================================================

@@ -329,6 +329,43 @@ window.filerAnimation = function(nom, fn) {
     return window.FILE_ANIMATIONS;
 };
 
+// Les caractéristiques des héros de la partie, lues une fois et partagées par
+// tout le jeu. Sans elles, le prérequis d'un objet ne se vérifiait que chez le
+// joueur qui avait ouvert la fiche — les autres pouvaient équiper n'importe
+// quoi à n'importe qui. Une seule lecture par héros : les caractéristiques ne
+// bougent qu'à la création du personnage.
+async function chargerCaracsPartie(ids) {
+    window.CARACS_PARTIE = window.CARACS_PARTIE || {};
+    // "in" et non la valeur : une lecture en cours vaut null, et un héros sans
+    // fiche de caractéristiques vaut {} — dans les deux cas c'est déjà réglé.
+    const manquants = (ids || []).filter(id => id && !(id in window.CARACS_PARTIE));
+    if (manquants.length === 0) return;
+
+    // Marqué tout de suite : deux notifications rapprochées ne doivent pas
+    // lancer deux fois la même lecture.
+    manquants.forEach(id => { window.CARACS_PARTIE[id] = null; });
+
+    await Promise.all(manquants.map(async (id) => {
+        try {
+            const snap = await getDoc(doc(db, COL.CARACTERISTIQUES, id));
+            window.CARACS_PARTIE[id] = snap.exists() ? snap.data() : {};
+        } catch (e) {
+            console.error("Lecture des caractéristiques de " + id + " :", e);
+            delete window.CARACS_PARTIE[id];   // on réessaiera
+        }
+    }));
+
+    // L'encart d'équipement affiche l'avertissement de prérequis : il redevient
+    // juste maintenant qu'on sait vraiment ce que valent les héros.
+    // L'onglet Inventaire affiche l'avertissement de prérequis : s'il est ouvert,
+    // il redevient juste maintenant qu'on sait vraiment ce que valent les héros.
+    const ouvert = window.ID_PERSONNAGE_INVENTAIRE;
+    if (ouvert && typeof window.chargerOngletInventaire === "function") {
+        const perso = (window.PERSOS_JOUEURS_PARTIE || []).find(p => p.idPersonnage === ouvert);
+        if (perso) window.chargerOngletInventaire(ouvert, perso);
+    }
+}
+
 window.pvMaxCombattant = function(perso) {
     if (!perso) return 0;
     return (parseInt(perso.PV_Max) || 0) + (parseInt(perso.Dev_Mod_PV) || 0);
@@ -2117,6 +2154,9 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
     });
 
     window.PERSOS_JOUEURS_PARTIE = persos;
+    // Les caractéristiques suivent les héros : c'est d'elles que dépend le droit
+    // de porter un objet, et ce droit doit être le même sur tous les écrans.
+    chargerCaracsPartie(persos.map(p => p.idPersonnage));
     if (typeof window.recomposerCombattants === "function") {
       window.recomposerCombattants();
     } else {

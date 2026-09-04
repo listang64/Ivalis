@@ -630,9 +630,33 @@ window.CLE_CARAC_PAR_NOM = {
     "INTELLIGENCE": "int", "SAGESSE": "sag", "CHARISME": "cha"
 };
 
+// Les caractéristiques de tous les combattants de la partie, chargées depuis
+// Firestore (app.js). Elles ne peuvent PAS venir du seul cache local : celui-ci
+// ne se remplit qu'en ouvrant la fiche d'un héros, si bien qu'un joueur voyait
+// « prérequis non atteint » sur son écran là où son voisin, qui n'avait jamais
+// ouvert cette fiche, pouvait équiper l'objet sans rien remarquer. Deux écrans,
+// deux règles.
+window.CARACS_PARTIE = window.CARACS_PARTIE || {};
+
+// Le nom est comparé sans casse ni accents : "Force", "FORCE" et "force"
+// désignent la même caractéristique. Une correspondance stricte renvoyait null
+// au moindre écart, et un prérequis qui renvoie null ne bloque rien du tout —
+// l'objet devenait équipable par n'importe qui, sans le moindre message.
+const sansAccent = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+const CARAC_NORMALISEE = {};
+Object.keys(window.CLE_CARAC_PAR_NOM).forEach(nom => {
+    CARAC_NORMALISEE[sansAccent(nom)] = window.CLE_CARAC_PAR_NOM[nom];
+});
+
 window.caracDuPersonnage = function(idPersonnage, nomCarac) {
-    const cle = window.CLE_CARAC_PAR_NOM[nomCarac];
+    const cle = window.CLE_CARAC_PAR_NOM[nomCarac] || CARAC_NORMALISEE[sansAccent(nomCarac)];
     if (!cle) return null;
+
+    const partagees = (window.CARACS_PARTIE || {})[idPersonnage];
+    if (partagees && partagees[cle] !== undefined) return parseInt(partagees[cle]);
+
+    // Repli sur le cache du navigateur : il reste utile hors partie (la fiche
+    // consultée seule) et tant que la lecture réseau n'est pas revenue.
     try {
         const brut = localStorage.getItem("ivalis_caracs_" + idPersonnage);
         if (!brut) return null;

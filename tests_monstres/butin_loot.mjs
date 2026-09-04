@@ -37,7 +37,14 @@ const SRC_OBJETS = fs.readFileSync('/home/user/Ivalis/objets.js', 'utf-8');
 // c'est exactement ce que fait le vrai service, et c'est ce dont le butin a
 // besoin (contrairement aux chemins à un seul niveau des autres bancs).
 function creerPartieButin(docInitial) {
-  const partagee = { doc: structuredClone(docInitial), file: Promise.resolve() };
+  // Toute partie en plein combat a une rencontre en cours : c'est elle qui dit
+  // au butin à quel combat il appartient, et sans elle aucun butin ne s'ouvre.
+  // Les décors qui veulent en tester l'absence l'écrasent explicitement.
+  const partagee = {
+    doc: Object.assign({ ID_Rencontre: "renc_banc", Difficulte_Rencontre: "Normale" },
+                       structuredClone(docInitial)),
+    file: Promise.resolve()
+  };
   const fusionnerChemin = (cible, chemin, valeur) => {
     const segments = chemin.split(".");
     let n = cible;
@@ -186,7 +193,10 @@ console.log("1. LA COUPE DE TEST (bouton 🏆) NE PASSE PAS PAR LES RENFORTS");
 // ==========================================================================
 console.log("\n2. DÉTECTION DE VICTOIRE — les gardes-fous");
 {
-  const partie = creerPartieButin({});
+  // Une rencontre en cours : c'est la condition d'existence d'un butin. Sans
+  // elle, un poste en retard d'une notification ouvrirait un butin sur les
+  // cadavres du combat précédent, juste après une réinitialisation.
+  const partie = creerPartieButin({ ID_Rencontre: "renc_garde", Difficulte_Rencontre: "Normale" });
   const personnages = creerPersonnagesFirestore(["J1"]);
   const persos = trosHeros().slice(0, 1);
   const monstres = unMonstreVivant();
@@ -711,12 +721,34 @@ console.log("\n13. UN BUTIN OUBLIÉ NE BLOQUE PLUS LES SUIVANTS");
   verifier("et il suit la difficulté de CE combat-là",
            partie.partagee.doc.Butin.difficulte === "Difficile");
 
-  // Un butin déjà résolu ne bloque pas non plus, même sans changer de rencontre.
+  // UNE RENCONTRE NE DONNE QU'UN BUTIN, même une fois celui-ci entièrement
+  // réparti. Ce banc affirmait l'inverse — « un butin résolu se laisse
+  // remplacer » — et c'était la porte grande ouverte au loot infini : refermer
+  // la fenêtre laissait les cadavres sur le plateau, donc le combat restait
+  // gagné, donc un butin tout neuf s'ouvrait aussitôt. Autant de tirages qu'on
+  // voulait. Il faut désormais une nouvelle rencontre (ou une réinitialisation,
+  // qui efface le butin) pour rouvrir un tirage.
   partie.partagee.doc.Butin.resolu = true;
   const idResolu = partie.partagee.doc.Butin.id;
   await p2.w.demarrerButin();
-  verifier("un butin déjà résolu se laisse remplacer",
-           partie.partagee.doc.Butin.id !== idResolu);
+  verifier("un butin déjà réparti ne se rejoue pas sur la même rencontre",
+           partie.partagee.doc.Butin.id === idResolu,
+           `(${partie.partagee.doc.Butin.id})`);
+
+  // Refermer la fenêtre ne rend pas le butin remplaçable pour autant.
+  partie.partagee.doc.Butin.ouvert = false;
+  await p2.w.demarrerButin();
+  verifier("le refermer n'en relance pas un nouveau",
+           partie.partagee.doc.Butin.id === idResolu,
+           `(${partie.partagee.doc.Butin.id})`);
+
+  // Mais la rencontre suivante, elle, a bien droit au sien.
+  partie.partagee.doc.ID_Rencontre = "renc_3";
+  await p2.w.demarrerButin();
+  verifier("la rencontre suivante rouvre bien un tirage",
+           partie.partagee.doc.Butin.id !== idResolu
+           && partie.partagee.doc.Butin.idRencontre === "renc_3",
+           `(rencontre ${partie.partagee.doc.Butin.idRencontre})`);
 
   // Un butin d'avant cette mécanique (sans identifiant) ne bloque pas non plus.
   partie.partagee.doc.Butin = { ouvert: true, etape: "personnel", participants: [], parPersonnage: {} };
@@ -724,27 +756,36 @@ console.log("\n13. UN BUTIN OUBLIÉ NE BLOQUE PLUS LES SUIVANTS");
   verifier("un butin d'avant cette correction ne bloque pas non plus",
            !!partie.partagee.doc.Butin.id);
 
-  // Dernier recours : des monstres posés à la main, donc AUCUN identifiant de
-  // rencontre nulle part. C'est l'ancienneté qui tranche.
+  // Tout juste créé : une seconde détection de la même victoire ne doit PAS
+  // le rejouer (c'est le garde-fou anti-concurrence, celui qui compte le plus).
+  const frais = partie.partagee.doc.Butin;
+  await p2.w.demarrerButin();
+  verifier("un butin tout frais résiste à une seconde détection",
+           partie.partagee.doc.Butin.id === frais.id);
+
+  // PLUS DE RENCONTRE EN COURS : PLUS DE BUTIN.
+  // C'est la barrière qui empêche le butin fantôme. Juste après une
+  // réinitialisation, la rencontre est effacée mais les cadavres du combat
+  // précédent traînent encore dans la liste LOCALE des créatures d'un poste en
+  // retard d'une notification : il croyait alors à une victoire et ouvrait un
+  // butin par-dessus le combat qu'on venait de relancer. La rencontre, elle,
+  // est relue dans la transaction : elle ne ment jamais.
   delete partie.partagee.doc.ID_Rencontre;
   const p3 = creerPoste("P1", { partie, personnages, persos, monstres, difficulte: "Normale" });
   delete p3.w.PARTIE_DATA.ID_Rencontre;
   await p3.w.demarrerButin();
-  const frais = partie.partagee.doc.Butin;
-  verifier("sans rencontre identifiée, un butin est bien créé", !!frais.id && !!frais.creeLe);
+  verifier("sans rencontre en cours, aucun butin n'est ouvert",
+           partie.partagee.doc.Butin.id === frais.id,
+           `(${partie.partagee.doc.Butin.id === frais.id ? "inchangé" : "un butin fantôme est né"})`);
 
-  // Tout juste créé : une seconde détection de la même victoire ne doit PAS
-  // le rejouer (c'est le garde-fou anti-concurrence, celui qui compte le plus).
-  await p3.w.demarrerButin();
-  verifier("un butin tout frais résiste à une seconde détection",
-           partie.partagee.doc.Butin.id === frais.id);
-
-  // Le même, vieilli d'une minute : il appartient forcément à un combat passé.
-  partie.partagee.doc.Butin.creeLe = Date.now() - (p3.w.DELAI_BUTIN_PERIME_MS + 1000);
-  await p3.w.demarrerButin();
-  verifier("mais un butin vieux d'une minute se laisse remplacer",
-           partie.partagee.doc.Butin.id !== frais.id,
-           `(${partie.partagee.doc.Butin.id === frais.id ? "toujours le même" : "remplacé"})`);
+  // Et la rencontre suivante retrouve bien son droit au butin.
+  partie.partagee.doc.ID_Rencontre = "renc_apres_reset";
+  const p4 = creerPoste("P1", { partie, personnages, persos, monstres, difficulte: "Normale" });
+  await p4.w.demarrerButin();
+  verifier("la rencontre suivante rouvre un butin normalement",
+           partie.partagee.doc.Butin.id !== frais.id
+           && partie.partagee.doc.Butin.idRencontre === "renc_apres_reset",
+           `(rencontre ${partie.partagee.doc.Butin.idRencontre})`);
 }
 
 // ==========================================================================

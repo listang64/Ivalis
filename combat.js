@@ -3670,11 +3670,30 @@ window.reinitialiserCombat = async function() {
                 // Les repères d'apparition ne survivent pas à une réinitialisation :
                 // le combat suivant se placera peut-être ailleurs sur la carte.
                 Spawn_Allies: deleteField(),
-                Spawn_Ennemis: deleteField()
+                Spawn_Ennemis: deleteField(),
+                // Le butin du combat précédent non plus. Il est déjà réparti :
+                // ce qui a été pris est équipé, le reste est perdu. Le laisser
+                // en base ferait traîner un butin réputé "de cette rencontre"
+                // par-dessus le combat suivant.
+                Butin: deleteField(),
+                // La rencontre passée est close : sans cela, le prochain butin
+                // s'attribuerait l'identifiant de l'ancienne.
+                Difficulte_Rencontre: deleteField(),
+                ID_Rencontre: deleteField(),
+                // Le ménage qui suit prend plusieurs écritures (créatures,
+                // pions, soins). Tant qu'il dure, aucun poste ne doit prendre
+                // les cadavres du combat précédent pour une victoire fraîche et
+                // ouvrir un butin fantôme. Le drapeau part dans la MÊME écriture
+                // que l'effacement du butin : impossible de voir l'un sans
+                // l'autre.
+                Reinitialisation_En_Cours: Date.now()
             });
             if (window.PARTIE_DATA) {
                 delete window.PARTIE_DATA.Spawn_Allies;
                 delete window.PARTIE_DATA.Spawn_Ennemis;
+                delete window.PARTIE_DATA.Butin;
+                delete window.PARTIE_DATA.Difficulte_Rencontre;
+                delete window.PARTIE_DATA.ID_Rencontre;
             }
         }
 
@@ -3824,6 +3843,14 @@ window.reinitialiserCombat = async function() {
         // puis sur la rencontre. Le MJ n'a plus qu'à choisir la difficulté.
         window.DEPLOIEMENT_APRES_REPERES = true;
         if (typeof window.verifierPointsApparition === "function") window.verifierPointsApparition();
+
+        // Le ménage est fini : les butins redeviennent possibles.
+        if (window.ID_PARTIE_COURANTE) {
+            await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
+                Reinitialisation_En_Cours: deleteField()
+            }).catch(e => console.error("Levée du verrou de réinitialisation :", e));
+            if (window.PARTIE_DATA) delete window.PARTIE_DATA.Reinitialisation_En_Cours;
+        }
 
         console.log("Le combat a été entièrement réinitialisé !");
         

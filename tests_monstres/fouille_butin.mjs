@@ -75,7 +75,9 @@ ${SRC_LOOT}
 window.lancerIllustrationButin = async () => {};
 
 // Un butin frais, comme au sortir d'une victoire.
-window.PARTIE_DATA = { Difficulte_Rencontre: "Normale" };
+// Une rencontre en cours : sans elle, aucun butin ne s'ouvre (c'est ce qui
+// empêche un butin fantôme de surgir sur les cadavres du combat précédent).
+window.PARTIE_DATA = { Difficulte_Rencontre: "Normale", ID_Rencontre: "renc_banc" };
 window.demarrerButin().then(() => {
   window.afficherFenetreButin(window.PARTIE_DATA.Butin);
   window.__pret = true;
