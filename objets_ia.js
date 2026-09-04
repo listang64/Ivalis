@@ -485,3 +485,254 @@ window.lancerIllustrationButin = async function(butin, idsPersonnages) {
         console.error("[MIA_Objets] La fouille a été interrompue :", e);
     }
 };
+
+// =========================================================================
+//  L'AVATAR QUI PORTE VRAIMENT SON ARMURE
+// =========================================================================
+//  Même méthode que les pions : on n'envoie pas une URL dans le prompt (le
+//  modèle l'ignore), on envoie les PIXELS. Deux images en binaire cette fois —
+//  le portrait de référence du héros d'abord, l'image de l'armure ensuite — et
+//  le dessinateur rhabille le premier avec la seconde.
+//
+//  Le portrait de référence ne bouge JAMAIS (URL_Cloudinary). Repartir d'un
+//  avatar déjà habillé ferait dériver le visage d'armure en armure, comme une
+//  photocopie de photocopie. On repart donc toujours de l'original.
+//
+//  Les armes ne comptent pas : elles ne se voient pas sur l'avatar.
+
+window.PROMPT_AVATAR_ARMURE =
+    "Deux images de référence te sont fournies. La PREMIÈRE est le personnage : "
+  + "son visage, sa silhouette, sa race, sa couleur de peau, sa coiffure et tous ses signes "
+  + "distinctifs doivent être reproduits À L'IDENTIQUE, sans la moindre variation. C'est la même "
+  + "personne, ni un frère, ni un cousin. La SECONDE image est une pièce d'équipement posée au sol : "
+  + "l'armure ou le vêtement que ce personnage doit désormais porter.\n\n"
+  + "Redessine le personnage de la première image en train de PORTER l'armure de la seconde. "
+  + "Reprends fidèlement ses matières, ses couleurs, ses ornements et sa coupe, ajustés au corps du "
+  + "personnage. Tout ce que portait le personnage sur le buste et le torse est remplacé par cette "
+  + "armure ; ses armes, en revanche, ne doivent PAS apparaître.\n\n"
+  + "Contexte de l'univers : Antique Fantastique (Antiquité magique, mythologie méditerranéenne).\n"
+  + "🛑 RÈGLE TECHNIQUE DÉFINITIVE (PRIORITAIRE SUR TOUT LE RESTE) : "
+  + "Le personnage DOIT ÊTRE PLACÉ SUR UN FOND TOTALEMENT MAGENTA FLUO UNI (#FF00FF). "
+  + "Il est STRICTEMENT INTERDIT de dessiner un décor, un paysage, un intérieur, une ombre au sol ou "
+  + "un dégradé. Remplis tout l'espace autour et derrière le personnage avec du magenta fluo pur. "
+  + "Le personnage est vu de trois quarts, regardant vers la gauche, cadré en plan américain (coupé "
+  + "aux genoux), exactement comme sur l'image de référence. Ne dessine aucun texte.";
+
+// L'appel au dessinateur, avec DEUX images jointes. La même cascade de modèles
+// que les pions : gpt-image-2 d'abord, les précédents en repli.
+async function dessinerAvatarHabille(blobPersonnage, blobArmure, cles) {
+    const modeles = [
+        { model: "gpt-image-2" },
+        { model: "gpt-image-1.5", input_fidelity: "high" },
+        { model: "gpt-image-1", input_fidelity: "high" }
+    ];
+    const delais = [5000, 15000, 30000];
+
+    for (const candidat of modeles) {
+        for (let tentative = 0; tentative < 3; tentative++) {
+            await reserverCreneauImage();
+
+            const form = new FormData();
+            form.append("model", candidat.model);
+            form.append("prompt", window.PROMPT_AVATAR_ARMURE);
+            // L'ordre compte : le personnage EN PREMIER. C'est sur lui que
+            // portent les retouches, l'armure n'est qu'une référence de style.
+            form.append("image[]", blobPersonnage, "personnage.png");
+            form.append("image[]", blobArmure, "armure.png");
+            form.append("n", "1");
+            form.append("size", "1024x1536");
+            form.append("quality", "medium");
+            form.append("output_format", "png");
+            if (candidat.input_fidelity) form.append("input_fidelity", candidat.input_fidelity);
+
+            let statut = 0, brut = "";
+            try {
+                // Aucun en-tête Content-Type : le navigateur pose lui-même la frontière multipart.
+                const reponse = await fetch("https://api.openai.com/v1/images/edits", {
+                    method: "POST",
+                    headers: { "Authorization": "Bearer " + cles.openai },
+                    body: form
+                });
+                statut = reponse.status;
+                brut = await reponse.text();
+            } catch (e) {
+                console.error("[Avatar] Erreur réseau :", e);
+                await dormir(delais[tentative]);
+                continue;
+            }
+
+            if (statut === 429 || brut.includes("error code: 1015") || brut.includes("Rate Limited")) {
+                console.warn(`[Avatar] Débit limité, reprise dans ${delais[tentative] / 1000}s...`);
+                await dormir(delais[tentative]);
+                continue;
+            }
+            if (statut === 404 || brut.includes("model_not_found") || brut.includes("does not support")) {
+                console.warn(`[Avatar] ${candidat.model} indisponible, essai du modèle suivant...`);
+                break;
+            }
+            if (statut < 200 || statut >= 300) {
+                console.error("[Avatar] Erreur HTTP OpenAI :", statut, brut.slice(0, 400));
+                break;
+            }
+
+            try {
+                const json = JSON.parse(brut);
+                const image = json.data && json.data[0];
+                if (!image) return "";
+                return image.url || ("data:image/png;base64," + image.b64_json);
+            } catch (e) {
+                console.error("[Avatar] Réponse illisible :", e);
+                return "";
+            }
+        }
+    }
+    return "";
+}
+
+// Le pont Cloudinary puis le détourage, exactement comme pour le portrait de
+// base : le serveur de l'IA interdit la lecture des pixels depuis le navigateur,
+// il faut donc d'abord faire aspirer l'image par Cloudinary.
+async function hebergerAvatarDetoure(imageSource, cles) {
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const dossier = "Accueil/Heros";
+
+    const envoyer = async (fichier, publicId) => {
+        const aSigner = publicId
+            ? `public_id=${publicId}&timestamp=${timestamp}${cles.cloudSecret}`
+            : `folder=${dossier}&timestamp=${timestamp}${cles.cloudSecret}`;
+        const form = new FormData();
+        form.append("file", fichier);
+        form.append("api_key", cles.cloudKey);
+        form.append("timestamp", timestamp);
+        form.append("signature", await window.signatureCloudinaryIvalis(aSigner));
+        if (publicId) form.append("public_id", publicId);
+        else form.append("folder", dossier);
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${cles.cloudName}/image/upload`,
+                                { method: "POST", body: form });
+        return await res.json();
+    };
+
+    try {
+        const premier = await envoyer(imageSource, null);
+        if (!premier.secure_url) {
+            console.error("[Avatar] Cloudinary a refusé l'image :", premier.error || premier);
+            return "";
+        }
+        const detouree = await window.detourerFondMagenta(premier.secure_url);
+        const second = await envoyer(detouree, premier.public_id);
+        if (second.secure_url) return second.secure_url.replace("/upload/", "/upload/q_auto,f_auto/");
+        console.error("[Avatar] Détourage non enregistré :", second.error || second);
+    } catch (e) {
+        console.error("[Avatar] Hébergement impossible :", e);
+    }
+    return "";
+}
+
+// Un seul rhabillage à la fois par héros : équiper trois armures d'affilée ne
+// doit pas lancer trois dessins concurrents dont le dernier arrivé gagne.
+window.AVATARS_EN_COURS = window.AVATARS_EN_COURS || {};
+
+// LE POINT D'ENTRÉE. Appelé quand un héros équipe une armure, et à la création
+// une fois l'armure de départ illustrée.
+window.rhabillerAvatar = async function(idPersonnage, armure, urlReference) {
+    if (!idPersonnage || !armure || !armure.image) return "";
+    if (window.AVATARS_EN_COURS[idPersonnage]) return "";
+    if (!window.peutIllustrerLesObjets()) return "";
+
+    // La référence peut être donnée d'office : à la création, le héros vient
+    // d'être écrit en base et n'est pas encore arrivé dans PERSOS_PARTIE.
+    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+    const reference = urlReference || (perso && (perso.urlPortraitReference || perso.urlCloudinary));
+    if (!reference) {
+        console.warn("[Avatar] Pas de portrait de référence pour " + idPersonnage + " : rien à rhabiller.");
+        return "";
+    }
+
+    window.AVATARS_EN_COURS[idPersonnage] = armure.uid;
+    const cles = window.clesApiObjets();
+    const nom = (perso && perso.prenom) || idPersonnage;
+    console.log(`👗 [Avatar] ${nom} enfile ${armure.nom}...`);
+
+    try {
+        const [blobPerso, blobArmure] = await Promise.all([
+            window.imageVersBlobPng(reference),
+            window.imageVersBlobPng(armure.image)
+        ]);
+        if (!blobPerso || !blobArmure) {
+            console.error("[Avatar] Une des deux images de référence est illisible.");
+            return "";
+        }
+
+        const dessin = await dessinerAvatarHabille(blobPerso, blobArmure, cles);
+        if (!dessin) return "";
+
+        const url = await hebergerAvatarDetoure(dessin, cles);
+        if (!url) return "";
+
+        await window.poserAvatarEquipe(idPersonnage, url);
+        console.log(`✅ [Avatar] ${nom} porte désormais ${armure.nom}.`);
+        return url;
+    } catch (e) {
+        console.error("[Avatar] Rhabillage interrompu :", e);
+        return "";
+    } finally {
+        delete window.AVATARS_EN_COURS[idPersonnage];
+    }
+};
+
+// Écrit (ou efface) l'avatar habillé. Le portrait de référence n'est jamais
+// touché : c'est lui qui repartira au prochain changement d'armure.
+window.poserAvatarEquipe = async function(idPersonnage, url) {
+    try {
+        await updateDoc(doc(db, "Personnages", idPersonnage), { URL_Avatar_Equipe: url || "" });
+    } catch (e) {
+        console.error("[Avatar] Écriture de l'avatar :", e);
+        return;
+    }
+    // Miroir en mémoire : la fiche et le panneau de combat suivent sans
+    // attendre l'aller-retour de la base.
+    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+    if (perso) {
+        perso.urlAvatarEquipe = url || "";
+        perso.urlCloudinary = url || perso.urlPortraitReference || "";
+    }
+};
+
+// Le héros vient d'équiper quelque chose : si c'est une armure, on le rhabille.
+// L'image de l'armure peut manquer (butin passé « sans attendre ») : on la fait
+// alors dessiner d'abord, puisqu'il la faut en référence.
+window.suivreArmureEquipee = async function(idPersonnage, objet, urlReference) {
+    if (!objet || objet.emplacement !== "Armure") return "";
+    if (!window.peutIllustrerLesObjets()) return "";
+
+    const armure = objet;
+    if (!armure.image) {
+        // illustrerLesObjets pose l'URL sur l'objet lui-même ; on l'écrit
+        // ensuite là où elle doit vivre — dans le butin s'il est encore ouvert,
+        // et sur la fiche du héros qui la porte.
+        await window.illustrerLesObjets([armure], async (o, url) => {
+            if (typeof window.poserImageObjetEnBase === "function") {
+                await window.poserImageObjetEnBase(o.uid, url);
+            }
+            await poserImageArmurePortee(idPersonnage, o.uid, url);
+        });
+        if (!armure.image) return "";
+    }
+    return await window.rhabillerAvatar(idPersonnage, armure, urlReference);
+};
+
+// L'image de l'armure rejoint la fiche du porteur. poserImageObjetEnBase ne
+// couvre que les héros déjà dans PERSOS_PARTIE : à la création, le nouveau venu
+// n'y est pas encore, et son armure resterait sans dessin.
+async function poserImageArmurePortee(idPersonnage, uid, url) {
+    try {
+        const ref = doc(db, "Personnages", idPersonnage);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) return;
+        const portee = snap.data().Equip_Armure;
+        if (!portee || portee.uid !== uid || portee.image) return;
+        await updateDoc(ref, { Equip_Armure: Object.assign({}, portee, { image: url }) });
+    } catch (e) {
+        console.error("[Avatar] Image de l'armure portée :", e);
+    }
+}

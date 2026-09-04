@@ -120,6 +120,17 @@ window.equiperObjet = async function(idPersonnage, objet, main) {
         window.appliquerEquipementEnRam(idPersonnage, maj);
     } catch (e) {
         console.error("Équipement :", e);
+        return;
+    }
+
+    // Une nouvelle armure change l'allure du héros : son avatar est redessiné
+    // en arrière-plan, à partir de son portrait de référence et de l'image de
+    // l'armure. Volontairement pas attendu — le joueur continue de jouer, et
+    // l'image arrive quand elle arrive. Les armes, elles, ne se voient pas sur
+    // l'avatar : rien à refaire pour elles.
+    if (objet && objet.emplacement === "Armure" && typeof window.suivreArmureEquipee === "function") {
+        Promise.resolve(window.suivreArmureEquipee(idPersonnage, objet))
+            .catch(e => console.error("Rhabillage de l'avatar :", e));
     }
 };
 
@@ -136,6 +147,11 @@ window.lacherObjet = async function(idPersonnage, champ) {
 
     const maj = {};
     champs.forEach(c => maj[c] = null);
+
+    // Plus d'armure sur le dos : le héros retrouve son portrait de référence.
+    // Rien à redessiner, donc rien à payer ni à attendre.
+    if (champs.includes("Equip_Armure")) maj.URL_Avatar_Equipe = "";
+
     try {
         await updateDoc(doc(db, "Personnages", idPersonnage), maj);
         window.appliquerEquipementEnRam(idPersonnage, maj);
@@ -150,7 +166,16 @@ window.appliquerEquipementEnRam = function(idPersonnage, maj) {
     const enRam = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
     Object.keys(maj).forEach(champ => {
         const champFront = window.champDocVersFront[champ];
-        if (enRam) enRam[champFront] = maj[champ];
+        // URL_Avatar_Equipe voyage dans la même écriture mais n'est pas un
+        // emplacement d'équipement : il a son propre miroir.
+        if (champ === "URL_Avatar_Equipe") {
+            if (enRam) {
+                enRam.urlAvatarEquipe = maj[champ] || "";
+                enRam.urlCloudinary = maj[champ] || enRam.urlPortraitReference || "";
+            }
+            return;
+        }
+        if (enRam && champFront) enRam[champFront] = maj[champ];
     });
 
     // Si la fiche de ce héros est ouverte à l'écran, les encarts se redessinent

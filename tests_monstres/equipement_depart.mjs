@@ -61,6 +61,8 @@ console.log("1. LE FORMULAIRE PROPOSE LES BONNES FAMILLES");
     const inconnus = valeurs.filter(v => !typesReels.has(v));
     verifier("chaque famille proposée existe dans le catalogue",
              inconnus.length === 0, `(${inconnus.join(", ") || "aucune inconnue"})`);
+    verifier("le bouclier n'est pas proposé : ce n'est pas une arme",
+             !valeurs.includes("Bouclier"));
 
     // Et inversement : aucune famille d'arme du jeu ne doit manquer.
     const armesDuJeu = w.TYPES_ARMES_FORGE;
@@ -83,8 +85,9 @@ const res = await p.evaluate(({ srcObjets, srcEquiper, srcDoc, srcChamps }) => {
     eval(srcEquiper);
     eval(srcDoc);
 
+    // Le bouclier n'est pas une arme : il ne figure pas dans le menu de départ.
     const familles = ["Arme légère CAC", "Arme lourde CAC", "Arme polyvalente",
-                      "Arme légère Distance", "Bouclier", "Magie"];
+                      "Arme légère Distance", "Magie"];
     const armures = ["Armure légère", "Armure intermédiaire", "Armure lourde"];
 
     // 200 tirages par famille : on veut voir la variété ET les invariants.

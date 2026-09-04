@@ -134,7 +134,16 @@ function persoDocVersFront(id, d) {
     prenom: d.Prenom_Personnage || "",
     nom: d.Nom_Personnage || "",
     race: d.Race || "",
-    urlCloudinary: d.URL_Cloudinary || "",
+    // DEUX AVATARS, UN SEUL POINT DE BASCULE.
+    //  URL_Cloudinary est le portrait de RÉFÉRENCE : il ne bouge jamais, et
+    //  c'est lui qu'on renvoie au dessinateur à chaque changement d'armure.
+    //  Repartir d'un avatar déjà habillé ferait dériver le visage de héros en
+    //  héros, comme une photocopie de photocopie.
+    //  URL_Avatar_Equipe porte le héros dans son armure du moment. Tout le jeu
+    //  lit "urlCloudinary" : la bascule se fait donc ici, et une seule fois.
+    urlCloudinary: d.URL_Avatar_Equipe || d.URL_Cloudinary || "",
+    urlPortraitReference: d.URL_Cloudinary || "",
+    urlAvatarEquipe: d.URL_Avatar_Equipe || "",
     urlToken: d.URL_Token || "", 
     statut: d.Statut || "Vivant",
     age: d.Age_Apparent || "",
@@ -524,7 +533,9 @@ function frontVersPersoDoc(donnees, idPersonnage) {
     Prenom_Personnage: donnees.prenom || "",
     Nom_Personnage: donnees.nom || "",
     Race: donnees.race || "",
-    URL_Cloudinary: donnees.urlCloudinary || "",
+    // Le portrait de référence : celui d'où repartent toutes les régénérations.
+    URL_Cloudinary: donnees.urlPortraitReference || donnees.urlCloudinary || "",
+    URL_Avatar_Equipe: donnees.urlAvatarEquipe || "",
     URL_Token: donnees.urlToken || "", // 🔻 NOUVEAU : Sauvegarde du Token
     Statut: donnees.statut || "Vivant",
     Age_Apparent: donnees.age || "",
@@ -772,6 +783,21 @@ async function sauvegarderFichePersonnage(donnees, skipImage = false) {
   // Note : On ne met pas de "await" devant, pour libérer l'écran du joueur tout de suite.
   if (!skipImage && donnees.urlCloudinary !== "") {
       genererEtStockerTokenBackground(donnees, idPersonnage, donnees.urlCloudinary).catch(e => console.error(e));
+  }
+
+  // L'ARMURE DE DÉPART S'HABILLE EN ARRIÈRE-PLAN.
+  //  Le portrait de référence vient d'être dessiné à partir du seul NOM de
+  //  l'armure — son image, elle, n'existait pas encore. On la fait donc dessiner
+  //  maintenant, puis on rhabille le héros avec : même mécanique qu'un
+  //  changement d'armure en cours de partie. Rien n'est attendu ici : le joueur
+  //  a déjà repris la main, et son avatar s'habille pendant qu'il joue.
+  if (estNouveau && !skipImage && donnees.equipArmure && donnees.urlCloudinary) {
+      const reference = donnees.urlCloudinary;
+      const armure = donnees.equipArmure;
+      Promise.resolve()
+          .then(() => typeof window.suivreArmureEquipee === "function"
+              ? window.suivreArmureEquipee(idPersonnage, armure, reference) : null)
+          .catch(e => console.error("Habillage du héros à la création :", e));
   }
 
   return { id: idPersonnage, url: donnees.urlCloudinary || "" };
@@ -1278,6 +1304,15 @@ function redimensionnerImageCloudinary(url, largeurMax) {
 window.redimensionnerImageCloudinary = redimensionnerImageCloudinary;
 
 // Prépare le portrait pour l'envoi binaire : PNG carré de 1024px sur fond magenta.
+// Ces trois outils servent aussi à objets_ia.js, qui rhabille les héros à chaque
+// changement d'armure : une seule implémentation, pour que le pont Cloudinary,
+// le détourage et la mise au carré restent identiques partout.
+window.detourerFondMagenta = (...a) => detourerFondMagenta(...a);
+window.urlCloudinaryEnPng = (...a) => urlCloudinaryEnPng(...a);
+window.imageVersBlobPng = (...a) => portraitVersBlobPng(...a);
+window.signatureCloudinaryIvalis = (...a) => sha1Hex(...a);
+window.clesApiIvalis = () => lireClesApi();
+
 async function portraitVersBlobPng(urlPortrait) {
     const urlSource = urlCloudinaryEnPng(urlPortrait);
 
