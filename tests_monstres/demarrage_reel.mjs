@@ -234,7 +234,43 @@ console.log("\n3. LE PARCOURS DE NICO : RÉINITIALISER, PLACER, GÉNÉRER");
 // qui ne se charge pas y est totalement muet — ses fonctions disparaissent, des
 // boutons sans rapport cessent de répondre, et il n'y a rien à rapporter. Ce
 // bandeau rend la panne lisible à l'écran, et c'est LUI qu'on vérifie ici.
-console.log("\n4. LE RAPPORTEUR D'ERREURS DONNE À VOIR LA PANNE");
+// =========================================================================
+console.log("\n4. L'ÉQUIPEMENT DE DÉPART, DANS LA VRAIE PAGE");
+{
+  const formulaire = await p.evaluate(() => {
+    const lire = (id) => {
+      const el = document.getElementById(id);
+      if (!el) return null;
+      return { valeurs: [...el.options].map(o => o.value), defaut: el.value };
+    };
+    // Le formulaire s'adapte à la race : les deux encarts doivent survivre à
+    // chacune d'elles, sans exception.
+    const survivants = {};
+    ["Humain", "Ondari", "Vargen", "Ankylar", "Ophior", "Gob", "Ethéré"].forEach(race => {
+      if (typeof window.adapterFormulaireRace === "function") window.adapterFormulaireRace(race);
+      const arme = document.getElementById("groupe-type-arme");
+      const tenue = document.getElementById("groupe-tenue");
+      survivants[race] = (arme && arme.style.display !== "none")
+                      && (tenue && tenue.style.display !== "none");
+    });
+    return { arme: lire("champ-type-arme"), tenue: lire("champ-tenue"),
+             ancien: !!document.getElementById("champ-style"), survivants };
+  });
+
+  verifier("le menu des types d'arme est dans la page",
+           !!formulaire.arme, formulaire.arme ? `(${formulaire.arme.valeurs.length} choix)` : "(absent)");
+  verifier("le menu des tenues aussi",
+           !!formulaire.tenue, formulaire.tenue ? `(${formulaire.tenue.valeurs.join(", ")})` : "(absent)");
+  verifier("l'ancien menu de tenues décoratives a disparu", formulaire.ancien === false);
+  verifier("chaque menu a une valeur par défaut, jamais vide",
+           !!formulaire.arme.defaut && !!formulaire.tenue.defaut,
+           `(${formulaire.arme.defaut} / ${formulaire.tenue.defaut})`);
+  const racesQuiPerdent = Object.entries(formulaire.survivants).filter(([, ok]) => !ok).map(([r]) => r);
+  verifier("les deux encarts restent visibles pour TOUTES les races",
+           racesQuiPerdent.length === 0, `(${racesQuiPerdent.join(", ") || "aucune ne les perd"})`);
+}
+
+console.log("\n5. LE RAPPORTEUR D'ERREURS DONNE À VOIR LA PANNE");
 {
   const visible = await p.evaluate(() => {
     document.getElementById("bandeau-erreurs-js")?.remove();

@@ -1530,8 +1530,8 @@
 
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <script type="module" src="ia_master.js?v=4"></script>
-<script type="module" src="app.js?v=15"></script>
-<script type="module" src="creation_personnage.js?v=2"></script>
+<script type="module" src="app.js?v=16"></script>
+<script type="module" src="creation_personnage.js?v=3"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=11"></script>
 <script src="Plateau.js"></script>
@@ -1544,8 +1544,8 @@
 <script type="module" src="monstres_competences.js?v=5"></script>
 <script type="module" src="monstres_ia.js?v=14"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
-<script type="module" src="objets.js?v=3"></script>
-<script type="module" src="objets_ia.js?v=1"></script>
+<script type="module" src="objets.js?v=4"></script>
+<script type="module" src="objets_ia.js?v=2"></script>
 <script type="module" src="loot.js?v=8"></script>
 
 <!-- ============================================================= -->
@@ -1859,17 +1859,34 @@
         
         <div class="bloc-formulaire">
           <h4>Apparence</h4>
-          <div class="champ-formulaire" id="groupe-style">
-            <label>Style vestimentaire</label>
-            <select class="input-perso" id="champ-style">
-              <option value="">-- Choisir --</option>
-              <option value="Tunique simple">Tunique simple</option><option value="Toge">Toge</option><option value="Pagne">Pagne</option>
-              <option value="Robe antique">Robe antique</option><option value="Habits de marchands">Habits de marchands</option>
-              <option value="Habits de chasseur">Habits de chasseur</option><option value="Habits du désert">Habits du désert</option>
-              <option value="Habit du nord">Habit du nord</option><option value="Tunique et jambière">Tunique et jambière</option>
+          <div class="champ-formulaire"><label>Couleurs dominantes</label><input type="text" class="input-perso" id="champ-couleurs"></div>
+        </div>
+
+        <!-- Ce que le héros porte au premier jour. Le choix vaut pour TOUTES les
+             races : l'arme décide des techniques qu'il pourra lancer à la Forge,
+             la tenue de ce qu'il encaisse. Les deux sont tirés en qualité
+             commune et équipés d'office à la création. -->
+        <div class="bloc-formulaire">
+          <h4>Équipement de départ</h4>
+          <div class="champ-formulaire" id="groupe-type-arme">
+            <label>Type d'arme</label>
+            <select class="input-perso" id="champ-type-arme">
+              <option value="Arme légère CAC">Arme légère (corps à corps)</option>
+              <option value="Arme lourde CAC">Arme lourde (corps à corps)</option>
+              <option value="Arme polyvalente">Arme polyvalente</option>
+              <option value="Arme légère Distance">Arme à distance</option>
+              <option value="Bouclier">Bouclier</option>
+              <option value="Magie">Magie (bague)</option>
             </select>
           </div>
-          <div class="champ-formulaire"><label>Couleurs dominantes</label><input type="text" class="input-perso" id="champ-couleurs"></div>
+          <div class="champ-formulaire" id="groupe-tenue">
+            <label>Tenue</label>
+            <select class="input-perso" id="champ-tenue">
+              <option value="Armure légère">Armure légère</option>
+              <option value="Armure intermédiaire">Armure moyenne</option>
+              <option value="Armure lourde">Armure lourde</option>
+            </select>
+          </div>
         </div>
         
         <div class="bloc-formulaire">

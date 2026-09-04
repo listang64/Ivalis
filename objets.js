@@ -511,6 +511,30 @@ window.fabriquerObjet = function(modele, rarete) {
     return objet;
 };
 
+// L'ÉQUIPEMENT DE DÉPART, choisi à la création du héros.
+//  Le joueur ne choisit pas un objet mais une FAMILLE : « arme lourde », « armure
+//  moyenne ». On tire au sort dans cette famille, toujours en qualité commune —
+//  personne ne commence avec une relique.
+//
+//  Les armes à deux mains restent du lot : les écarter réduisait « arme à
+//  distance » à la seule fronde, et un joueur qui choisit une arme lourde
+//  accepte très bien d'avoir les deux mains prises. Elles occupent alors les
+//  deux emplacements, comme partout ailleurs dans le jeu.
+window.objetDeDepart = function(typeObjet, rarete) {
+    const modeles = (window.MODELES_OBJETS || []).filter(m => m.type === typeObjet);
+    if (modeles.length === 0) return null;
+    return window.fabriquerObjet(auHasard(modeles), rarete || "Commun");
+};
+
+// Les deux objets qu'un héros porte à sa création. Renvoie toujours un objet,
+// même partiel : un type inconnu ne doit pas empêcher la création du personnage.
+window.equipementDeDepart = function(typeArme, typeArmure) {
+    return {
+        arme: typeArme ? window.objetDeDepart(typeArme) : null,
+        armure: typeArmure ? window.objetDeDepart(typeArmure) : null
+    };
+};
+
 // Tire un objet complet pour une difficulté donnée. C'est l'unique porte
 // d'entrée utilisée par le butin.
 window.tirerObjetPourDifficulte = function(difficulte) {

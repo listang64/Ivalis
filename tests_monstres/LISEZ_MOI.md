@@ -77,6 +77,7 @@ node butin_loot.mjs         # butin de fin de combat : détection, personnel, pa
 node images_objets.mjs      # MIA_Objets décrit, gpt-image dessine, Cloudinary héberge, la base reçoit
 node fouille_butin.mjs      # la fouille des cadavres et ses trois portes de sortie
 node campagne_complete.mjs  # trois combats entiers sur trois postes : reset, rencontre, butin, équipement
+node equipement_depart.mjs  # l'arme et la tenue choisies à la création, et leur style antique
 node objets_tableau.mjs     # le catalogue d'équipement, confronté au tableau de Nico
 node equipement_combat.mjs  # ce que les objets font une fois portés, en combat
 node apercu_butin.mjs       # onglet Inventaire et fenêtres de butin, capturés à l'écran

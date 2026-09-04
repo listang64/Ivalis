@@ -107,6 +107,8 @@ window.decrireObjetsAvecMIA = async function(objets) {
 
     const promptSysteme = `Tu es MIA_Objets, l'armurière visionnaire d'Ivalis.
 On te donne des objets qui viennent d'être trouvés sur un champ de bataille, dans un univers Antique Fantastique (Antiquité magique, mythologie).
+L'ÉPOQUE EST UN INTERDIT, PAS UNE AMBIANCE : Grèce hoplitique, Rome, Perse, Égypte, steppes. Bronze, lin lamellé, cuir bouilli, écailles cousues, laine, fer brut, bois et os.
+Pour les armures et vêtements : linothorax, cuirasse musclée, lorica, spolas, exômide, chiton, ptéruges, fibules. JAMAIS d'armure de plates médiévale, de cotte de mailles de chevalier, de heaume à visière ni de plastron de fantasy moderne.
 Pour CHACUN, tu écris une description PUREMENT VISUELLE, destinée à un illustrateur qui ne connaît rien du jeu.
 Décris : la forme et les proportions exactes, les matières (bois, bronze, fer, cuir, os, pierre, tissu), les ornements et gravures, l'usure, les couleurs dominantes.
 La rareté doit se VOIR : un objet commun est simple, usé, sans fioriture ; un objet légendaire ou épique porte des matériaux nobles, des gravures fines et une lueur magique discrète.
@@ -177,6 +179,21 @@ window.promptImageObjet = function(objet, description, style) {
         : "L'objet est posé à même le sol, à plat, vu du dessus, en entier. "
         + "Personne ne le tient : aucune main, aucun bras, aucun personnage dans l'image.";
 
+    // Sans consigne, le dessinateur répond « armure » par une armure de plates
+    // de chevalier : c'est ce qu'il a le plus vu. Il faut donc nommer l'époque,
+    // les matières et les pièces — et dire explicitement ce qui est proscrit.
+    const ancrageAntique = estArmure
+        ? " ÉPOQUE OBLIGATOIRE : Antiquité méditerranéenne et proche-orientale — Grèce hoplitique, Rome, "
+        + "Perse, Égypte, peuples des steppes. Les matières sont le bronze martelé, le lin lamellé et collé, "
+        + "le cuir bouilli, les écailles cousues, la laine teinte et le fer brut. Les pièces sont celles de "
+        + "ce monde-là : linothorax, cuirasse musclée, lorica d'écailles ou de lanières, spolas de cuir, "
+        + "exômide, chiton, ptéruges (lanières de cuir aux épaules et aux hanches), fibules et lacets. "
+        + "IL EST STRICTEMENT INTERDIT de dessiner une armure de plates médiévale, une cotte de mailles "
+        + "rivetée de chevalier, un heaume à visière, un plastron gothique, une armure de fantasy moderne "
+        + "à pointes ou à plaques articulées : rien de postérieur à l'Antiquité."
+        : " ÉPOQUE OBLIGATOIRE : Antiquité méditerranéenne — bronze, fer brut, bois, cuir, os et tendon. "
+        + "Aucune forme médiévale ni moderne, aucune garde de rapière, aucun acier poli industriel.";
+
     let prompt = "Contexte de l'univers : Antique Fantastique (Mythic Ancient Fantasy, Antiquité Magique).\n\n";
     prompt += "--- OBJET UNIQUE À REPRÉSENTER ---\n";
     prompt += `Il s'agit de : ${objet.nom}`;
@@ -187,7 +204,7 @@ window.promptImageObjet = function(objet, description, style) {
 
     if (style) prompt += "Directives de style artistique obligatoires : " + style + "\n\n";
 
-    prompt += "🛑 RÈGLE DE COMPOSITION (PRIORITAIRE SUR TOUT LE RESTE) : " + miseEnScene + " "
+    prompt += "🛑 RÈGLE DE COMPOSITION (PRIORITAIRE SUR TOUT LE RESTE) : " + miseEnScene + ancrageAntique + " "
             + "Le sol est un sol de champ de bataille sobre — terre battue, pierre ou dalles usées — "
             + "et reste discret : l'objet occupe le centre et la majeure partie de l'image. "
             + "Format strictement carré. L'objet est ENTIÈREMENT visible, avec une petite marge : "

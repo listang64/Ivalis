@@ -537,6 +537,11 @@ function frontVersPersoDoc(donnees, idPersonnage) {
     Pilosite_Faciale: donnees.pilosite || "",
     Style_Vestimentaire: donnees.style || "",
     Couleurs_Dominante: donnees.couleursDom || "",
+    // L'équipement de départ, tiré à la création. Sur une fiche déjà en jeu ces
+    // trois champs valent ce qu'ils valaient : ils ne sont posés qu'une fois.
+    Equip_Armure: donnees.equipArmure || null,
+    Equip_Main_Droite: donnees.equipMainDroite || null,
+    Equip_Main_Gauche: donnees.equipMainGauche || null,
     Equipement_Visible: donnees.equipement || "",
     Signes_Distinctif: donnees.signes || "",
     Expression_Du_Visage: donnees.expression || "",
@@ -677,6 +682,50 @@ async function recupererDetailsPersonnage(idPersonnage) {
   return persoDocVersFront(snap.id, snap.data());
 }
 
+// L'ARME ET LA TENUE DU PREMIER JOUR.
+//  Le joueur a choisi deux familles dans le formulaire ; on en tire un objet
+//  commun de chaque, et on les lui met sur le dos tout de suite. Le tirage a
+//  lieu AVANT la génération du portrait, pour que l'image montre le héros vêtu
+//  de l'armure qu'il porte réellement — et non d'une tenue décorative sans
+//  rapport avec sa fiche.
+//
+//  Une bague part au doigt gauche : elle laisse la main droite libre pour une
+//  arme trouvée plus tard. Tout le reste va en main droite.
+function equiperLeHerosDeDepart(donnees) {
+  if (typeof window.equipementDeDepart !== "function") return;
+
+  let depart;
+  try {
+    depart = window.equipementDeDepart(donnees.typeArme, donnees.typeArmure);
+  } catch (e) {
+    console.error("Tirage de l'équipement de départ :", e);
+    return;
+  }
+
+  if (depart.arme) {
+    // Le placement passe par la MÊME règle que l'équipement en jeu : une arme à
+    // deux mains occupe les deux emplacements, avec le même identifiant. Écrire
+    // la main droite « à la main » ici laisserait une arme à deux mains à
+    // moitié posée, et le combat ne saurait plus quoi en penser.
+    const main = depart.arme.bague ? "Gauche" : "Droite";
+    const champs = typeof window.champsPourObjet === "function"
+        ? window.champsPourObjet(depart.arme, main)
+        : [depart.arme.bague ? "Equip_Main_Gauche" : "Equip_Main_Droite"];
+    champs.forEach(champ => {
+      if (champ === "Equip_Main_Droite") donnees.equipMainDroite = depart.arme;
+      if (champ === "Equip_Main_Gauche") donnees.equipMainGauche = depart.arme;
+    });
+  }
+  if (depart.armure) donnees.equipArmure = depart.armure;
+
+  // Le portrait décrit ce que le héros porte VRAIMENT : le nom de l'armure
+  // tirée remplace l'ancienne liste de tenues décoratives.
+  if (depart.armure) donnees.style = depart.armure.nom;
+
+  const porte = [depart.arme, depart.armure].filter(Boolean).map(o => o.nom);
+  if (porte.length > 0) console.log("🎒 Équipement de départ : " + porte.join(" et "));
+}
+
 async function sauvegarderFichePersonnage(donnees, skipImage = false) {
   let idPersonnage = donnees.idPersonnage;
   const estNouveau = (!idPersonnage || idPersonnage === "");
@@ -684,6 +733,7 @@ async function sauvegarderFichePersonnage(donnees, skipImage = false) {
   if (estNouveau) {
     idPersonnage = "PERSO_" + Math.floor(Math.random() * 1000000);
     donnees.statut = "Vivant";
+    equiperLeHerosDeDepart(donnees);
   }
 
   if (!skipImage) {
@@ -1477,7 +1527,16 @@ async function genererEtStockerPortrait(donnees) {
   if (donnees.pilosite) descriptionHero += `Pilosité faciale : ${donnees.pilosite}. `;
   if (donnees.expression) descriptionHero += `Son visage porte l'expression suivante : ${donnees.expression}. `;
   if (donnees.signes) descriptionHero += `Signes distinctifs et accessoires : ${donnees.signes}. `;
-  if (donnees.style) descriptionHero += `Il est vêtu ainsi : ${donnees.style}. `;
+  // "style" porte désormais le NOM de l'armure réellement tirée à la création
+  // (Linothorax, Lorica, Exômide...) : le portrait montre donc ce que le héros
+  // porte vraiment sur sa fiche. L'ancrage d'époque suit, sans quoi le modèle
+  // répond « armure » par une armure de plates de chevalier.
+  if (donnees.style) {
+      descriptionHero += `Il porte cette pièce d'équipement, et elle doit être bien visible : ${donnees.style}. `
+        + "Elle appartient à l'Antiquité méditerranéenne — bronze martelé, lin lamellé, cuir bouilli, "
+        + "écailles cousues, laine teinte, ptéruges de cuir aux épaules et aux hanches. "
+        + "Aucune armure de plates médiévale, aucune cotte de mailles de chevalier, aucun plastron de fantasy. ";
+  }
   if (donnees.couleursDom) descriptionHero += `Couleurs dominantes de la tenue : ${donnees.couleursDom}. `;
   
   // --- Ajouts des spécificités de race ---

@@ -119,8 +119,10 @@ window.validerRaceEtGenre = function(genre) {
 
 window.adapterFormulaireRace = function(race) {
     // 1. Liste de TOUS les champs dynamiques (on cache tout par défaut)
+    // L'équipement de départ (type d'arme, tenue) n'est PAS dans cette liste :
+    // il vaut pour toutes les races et ne se masque jamais.
     const tousLesChamps = [
-        "groupe-cheveux", "groupe-yeux", "groupe-pilosite", "groupe-peau", "groupe-style",
+        "groupe-cheveux", "groupe-yeux", "groupe-pilosite", "groupe-peau",
         "groupe-ecailles", "groupe-aretes", "groupe-pelage", "groupe-cornes",
         "groupe-champignons", "groupe-ecorce", "groupe-peau-gob", "groupe-oreilles",
         "groupe-masque", "groupe-colonne", "groupe-expression" // <-- Ajout ici
@@ -133,7 +135,6 @@ window.adapterFormulaireRace = function(race) {
 
     // 2. Champs communs à (presque) tout le monde
     document.getElementById("groupe-yeux").style.display = "flex";
-    document.getElementById("groupe-style").style.display = "flex";
     document.getElementById("groupe-expression").style.display = "flex"; // <-- Ajout ici
 
     // 3. Activation chirurgicale selon la race
@@ -159,7 +160,6 @@ window.adapterFormulaireRace = function(race) {
     
     } else if (race === "Gob") {
         document.getElementById("groupe-cheveux").style.display = "flex"; 
-        document.getElementById("groupe-style").style.display = "none"; 
         document.getElementById("groupe-peau-gob").style.display = "flex";
         document.getElementById("groupe-oreilles").style.display = "flex";
     
@@ -234,7 +234,8 @@ window.validerEtapeDescriptif = async function() {
         expression: document.getElementById("champ-expression").value,
         corpulence: document.getElementById("champ-corpulence").value,
         peau: document.getElementById("champ-peau") ? document.getElementById("champ-peau").value : "",
-        style: document.getElementById("champ-style") ? document.getElementById("champ-style").value : "",
+        typeArme: document.getElementById("champ-type-arme") ? document.getElementById("champ-type-arme").value : "",
+        typeArmure: document.getElementById("champ-tenue") ? document.getElementById("champ-tenue").value : "",
         couleursDom: document.getElementById("champ-couleurs").value.trim(),
         couleur: document.getElementById("champ-couleur-token").value,
         
@@ -288,6 +289,11 @@ window.validerEtapeDescriptifRapide = async function() {
         genre: document.getElementById("champ-genre").value,
         couleur: document.getElementById("champ-couleur-token").value || "#ff4c4c",
         
+        // Même équipement de départ que la création complète : les deux listes
+        // sont dans la modale, et à défaut on retombe sur un choix par défaut.
+        typeArme: document.getElementById("champ-type-arme") ? document.getElementById("champ-type-arme").value : "Arme légère CAC",
+        typeArmure: document.getElementById("champ-tenue") ? document.getElementById("champ-tenue").value : "Armure légère",
+
         cheveux: "", yeux: "", pilosite: "", signes: "", expression: "", corpulence: "", peau: "", style: "", couleursDom: "",
         ecailles: "", aretes: "", pelage: "", cornes: "", champignons: "", ecorce: "", peauGob: "", oreilles: "", masque: "", colonne: ""
     };
