@@ -63,6 +63,7 @@ node points_apparition.mjs  # les deux repères d'apparition, et la dispersion d
 node reinit_plateau.mjs     # la réinitialisation vide le plateau, puis enchaîne le déploiement
 node ecriture_pions.mjs     # les pions écrits en base atterrissent bien dans la carte Tokens
 node fin_de_tour.mjs        # un document introuvable ne fait plus tomber tout le round
+node regeneration_fin_de_tour.mjs # la régénération ne tombe qu'au passage au tour suivant, jamais avant
 node titres_bannieres.mjs   # les noms de carte rétrécissent au lieu d'être coupés
 node bouton_forge.mjs       # le + de la Forge devient un sablier pendant l'attente
 node croix_suppression.mjs  # la croix rouge du mode dev efface une technique partout

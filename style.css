@@ -2488,7 +2488,10 @@ textarea.input-texte-parchemin {
     font-size: 16px; overflow: hidden;
 }
 .butin-equipement-actuel .mini-carre-equip img { width: 100%; height: 100%; object-fit: cover; }
-.butin-equipement-actuel .mini-carre-equip.vide { opacity: 0.4; border-style: dashed; }
+.butin-equipement-actuel .mini-carre-equip.vide { opacity: 0.4; border-style: dashed; cursor: default; }
+/* Un emplacement rempli ouvre le détail de l'objet au clic ; un vide n'a rien à montrer. */
+.butin-equipement-actuel .mini-carre-equip:not(.vide) { cursor: pointer; }
+.butin-equipement-actuel .mini-carre-equip:not(.vide):hover { border-color: #e8d5a5; transform: scale(1.08); transition: transform 0.15s ease; }
 
 .bloc-heros-butin {
     border-top: 2px solid #8a7454;
@@ -2591,8 +2594,10 @@ textarea.input-texte-parchemin {
     font-style: italic;
 }
 
-/* Popup de confirmation avant/après */
-#popup-confirmation-equip {
+/* Popup de confirmation avant/après, et la popup de détail (lecture seule)
+   qui partage exactement le même habillage. */
+#popup-confirmation-equip,
+#popup-detail-objet-equipe {
     position: fixed;
     top: 0; left: 0;
     width: 100vw;

@@ -26,6 +26,26 @@ window.COULEUR_RARETE = {
     "Épique":    "#9b59b6"   // VIOLET
 };
 
+// Le champ "type" d'un objet (colonne Type du tableau) sert d'abord au moteur
+// de combat — c'est lui qui décide quelle technique peut partir. Ce libellé
+// n'en est que la traduction lisible, affichée sur les cartes de butin et
+// d'inventaire pour qu'on sache d'un coup d'œil si une arme trouvée correspond
+// à ce que le héros sait manier.
+window.LIBELLE_TYPE_OBJET = {
+    "Arme légère CAC":     "Arme légère (corps à corps)",
+    "Arme lourde CAC":     "Arme lourde (corps à corps)",
+    "Arme polyvalente":    "Arme polyvalente",
+    "Arme légère Distance":"Arme à distance",
+    "Bouclier":            "Bouclier",
+    "Magie":               "Magie",
+    "Armure légère":       "Armure légère",
+    "Armure intermédiaire":"Armure moyenne",
+    "Armure lourde":       "Armure lourde"
+};
+window.libelleTypeObjet = function(type) {
+    return window.LIBELLE_TYPE_OBJET[type] || type || "";
+};
+
 // Loot_Ivalis.xlsx — % de chance de loot par catégorie, selon la difficulté.
 // L'épique ne tombe que sur un boss (ligne "TRÈS DIFFICILE").
 window.CHANCES_RARETE = {
@@ -704,10 +724,13 @@ window.peutEquiper = function(idPersonnage, objet) {
 //  CE QUE L'ÉQUIPEMENT AUTORISE À LANCER
 // =========================================================================
 //  Chaque technique porte le type d'arme choisi à la Forge. Une hache ne peut
-//  pas servir une technique d'attaque légère, et un sort demande une main
-//  libre. La règle est un contrôle de CONTRADICTION, pas d'exigence : un héros
-//  qui ne porte aucune arme n'a rien qui s'oppose à sa technique — c'est
-//  seulement ce qu'il tient en main qui peut l'en empêcher.
+//  pas servir une technique d'attaque légère. La règle est un contrôle de
+//  CONTRADICTION, pas d'exigence : un héros qui ne porte aucune arme n'a rien
+//  qui s'oppose à sa technique — c'est seulement ce qu'il tient en main qui
+//  peut l'en empêcher.
+//
+//  La magie fait exception : un sort se lance quelles que soient les mains,
+//  qu'elles soient prises par une arme à deux mains, un bouclier ou autre chose.
 
 window.TYPES_ARMES_FORGE = ["Arme légère CAC", "Arme lourde CAC", "Arme polyvalente",
                             "Arme légère Distance", "Magie"];
@@ -718,22 +741,12 @@ window.armesEnMain = function(perso) {
         !o.bague && window.TYPES_ARMES_FORGE.includes(o.type) && o.type !== "Magie");
 };
 
-// Une main est "libre" si elle est vide ou si elle ne porte qu'une bague :
-// une bague se glisse au doigt, elle ne ferme pas la main.
-window.aUneMainLibre = function(perso) {
-    if (!perso) return true;
-    return [perso.equipMainDroite, perso.equipMainGauche]
-        .some(o => !o || !o.nom || o.bague === true);
-};
-
 // null = la carte peut partir ; sinon, la phrase à montrer au joueur.
 window.raisonBlocageCarte = function(perso, arme) {
     if (!perso || !arme || arme === "Sans arme / Arme rp" || arme === "Non spécifié") return null;
 
-    if (arme === "Magie") {
-        return window.aUneMainLibre(perso) ? null
-             : "Les deux mains sont prises : il faut une main libre pour lancer un sort.";
-    }
+    // Aucune contrainte de main pour la magie : le sort part toujours.
+    if (arme === "Magie") return null;
 
     const portees = window.armesEnMain(perso);
     if (portees.length === 0) return null;                        // rien en main, rien ne s'y oppose

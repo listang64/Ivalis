@@ -17,7 +17,8 @@ const extraitEntre = (debut, fin) => {
   return html.slice(d, f) + '</div>';
 };
 const MARKUP_BUTIN = extraitEntre('<div id="fenetre-butin"', '</div>\n\n<!-- Popup de confirmation');
-const MARKUP_POPUP = extraitEntre('<div id="popup-confirmation-equip"', '</div>\n\n<!-- NOUVEAU : On charge le cerveau IA');
+const MARKUP_POPUP = extraitEntre('<div id="popup-confirmation-equip"', '</div>\n\n<!-- Popup de détail');
+const MARKUP_DETAIL = extraitEntre('<div id="popup-detail-objet-equipe"', '</div>\n\n<!-- NOUVEAU : On charge le cerveau IA');
 
 const SRC_OBJETS = fs.readFileSync('/home/user/Ivalis/objets.js', 'utf-8');
 const SRC_LOOT = fs.readFileSync('/home/user/Ivalis/loot.js', 'utf-8')
@@ -39,6 +40,7 @@ const page = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${style}
 </div>
 ${MARKUP_BUTIN}
 ${MARKUP_POPUP}
+${MARKUP_DETAIL}
 <script>
 ${SRC_OBJETS}
 
@@ -224,6 +226,77 @@ console.log("\n5. TANT QUE LA FENÊTRE EST LÀ, ELLE BLOQUE LE COMBAT (attendu)"
 }
 
 // =========================================================================
+// Nico a demandé de pouvoir cliquer sur son équipement déjà porté, dans la
+// fenêtre de partage, pour en voir les stats sans avoir à rouvrir sa fiche.
+// À ce stade du banc, J1 a déjà équipé une arme (section 3, "MAIN DROITE") :
+// le bandeau "équipement actuel" doit donc montrer une case remplie,
+// réellement cliquable, qui ouvre le détail de CET objet précis.
+console.log("\n6. LE DÉTAIL DE L'ÉQUIPEMENT ACTUEL, D'UN VRAI CLIC");
+{
+  const objetPorte = await p.evaluate(() => window.PERSOS_PARTIE[0].equipMainDroite);
+  verifier("J1 porte bien une arme à ce stade (héritée de la section 3)",
+           !!(objetPorte && objetPorte.nom), `(${objetPorte && objetPorte.nom})`);
+
+  const filled = await p.evaluate(() => {
+    const el = document.querySelector("#butin-equipement-actuel .mini-carre-equip:not(.vide)");
+    return !!el;
+  });
+  verifier("la case correspondante s'affiche remplie, pas vide", filled);
+
+  const cible = await p.evaluate(() => {
+    const el = document.querySelector("#butin-equipement-actuel .mini-carre-equip:not(.vide)");
+    if (!el) return "élément absent";
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) return "taille nulle";
+    const dessus = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return (el === dessus || el.contains(dessus)) ? "le bouton lui-même"
+         : "RECOUVERT par " + (dessus && (dessus.id || dessus.className || dessus.tagName));
+  });
+  verifier("la case remplie est réellement atteignable au doigt", cible === "le bouton lui-même", cible);
+
+  await p.click("#butin-equipement-actuel .mini-carre-equip:not(.vide)");
+  await p.waitForTimeout(150);
+  const apresClic = await p.evaluate(() => {
+    const objet = window.PERSOS_PARTIE[0].equipMainDroite;
+    return {
+      popupOuvert: document.getElementById("popup-detail-objet-equipe").style.display === "flex",
+      texte: document.getElementById("detail-objet-equipe-contenu").innerText.replace(/\s+/g, " "),
+      nomAttendu: objet.nom
+    };
+  });
+  verifier("le popup s'ouvre au clic", apresClic.popupOuvert);
+  verifier("il montre le nom exact de l'objet réellement équipé",
+           apresClic.texte.includes(apresClic.nomAttendu), `(« ${apresClic.texte} »)`);
+  verifier("et son type d'arme, pas seulement sa rareté",
+           /Arme (légère|lourde|polyvalente|à distance)|Magie|Armure|Bouclier/i.test(apresClic.texte),
+           `(« ${apresClic.texte} »)`);
+
+  // Fermeture par le bouton.
+  await p.click("#popup-detail-objet-equipe button");
+  await p.waitForTimeout(100);
+  verifier("le bouton Fermer referme bien le détail",
+           await p.evaluate(() => document.getElementById("popup-detail-objet-equipe").style.display === "none"));
+
+  // Réouverture, puis fermeture par un clic sur le fond sombre.
+  await p.click("#butin-equipement-actuel .mini-carre-equip:not(.vide)");
+  await p.waitForTimeout(100);
+  await p.evaluate(() => document.getElementById("popup-detail-objet-equipe").click());
+  await p.waitForTimeout(100);
+  verifier("un clic sur le fond sombre referme aussi le détail",
+           await p.evaluate(() => document.getElementById("popup-detail-objet-equipe").style.display === "none"));
+
+  // Une case vide (main gauche, jamais équipée) ne doit rien ouvrir : elle n'a
+  // pas de onclick, un doigt dessus ne doit donc déclencher aucune popup.
+  const videCliquable = await p.evaluate(() => {
+    const cases = [...document.querySelectorAll("#butin-equipement-actuel .mini-carre-equip")];
+    const vide = cases.find(c => c.classList.contains("vide"));
+    return vide ? vide.getAttribute("onclick") : "aucune case vide trouvée";
+  });
+  verifier("une case vide n'a aucun gestionnaire de clic",
+           videCliquable === null, `(onclick="${videCliquable}")`);
+}
+
+// =========================================================================
 // LE POINT LE PLUS IMPORTANT DE CE BANC.
 // afficherFenetreButin tourne au tout début du traitement de chaque
 // notification de partie, et 150 lignes de combat la suivent : points
@@ -231,7 +304,7 @@ console.log("\n5. TANT QUE LA FENÊTRE EST LÀ, ELLE BLOQUE LE COMBAT (attendu)"
 // ici les emportait TOUTES, à chaque notification — d'où « le mode combat est
 // complètement bugué ». Un index.html servi depuis le cache du navigateur
 // (seul fichier sans ?v=) suffit à faire manquer un élément.
-console.log("\n6. UN BUTIN EN PANNE N'EMPORTE PLUS LE COMBAT");
+console.log("\n7. UN BUTIN EN PANNE N'EMPORTE PLUS LE COMBAT");
 {
   const resultat = await p.evaluate(() => {
     // On arrache du DOM les éléments que la fenêtre attend, exactement comme

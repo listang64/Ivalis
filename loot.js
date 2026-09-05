@@ -268,15 +268,20 @@ window.verifierVictoireCombat = function() {
     if (typeof window.demarrerButin === "function") window.demarrerButin();
 };
 
-// Pose le butin en base : un jet de deux objets par héros survivant, sous
-// transaction pour qu'un seul poste (parmi ceux qui détectent la victoire au
-// même instant) l'écrive réellement.
+// Pose le butin en base : un jet de deux objets par héros, sous transaction
+// pour qu'un seul poste (parmi ceux qui détectent la victoire au même instant)
+// l'écrive réellement.
+//
+// UNE VICTOIRE D'ÉQUIPE PROFITE À TOUTE L'ÉQUIPE. Un héros tombé pendant le
+// combat n'en a pas moins participé : il touche sa part comme les autres, à
+// charge pour ses compagnons de la lui remettre (ou de l'équiper directement
+// sur sa fiche, en prévision de son réveil). Seul un héros mis de côté ou une
+// illusion n'a rien à faire dans le partage — lui n'a pas combattu.
 window.demarrerButin = async function() {
     if (!window.ID_PARTIE_COURANTE) return;
 
     const participants = (window.PERSOS_PARTIE || [])
-        .filter(p => p.camp === "Allié" && !p.estIllusion && p.actif !== false
-                  && !(typeof window.estCombattantMort === "function" && window.estCombattantMort(p.idPersonnage)))
+        .filter(p => p.camp === "Allié" && !p.estIllusion && p.actif !== false)
         .map(p => p.idPersonnage);
     if (participants.length === 0) return;
 
@@ -570,15 +575,25 @@ window.afficherFenetreButin = function(butin) {
 
 // Rappel discret de ce que portent déjà "mes" héros, visible dans les deux
 // fenêtres — c'est ce à quoi le joueur compare avant de choisir.
+// Le registre des objets cliquables du bandeau : un index plutôt que l'objet
+// lui-même dans le onclick, pour ne pas avoir à échapper des guillemets et des
+// apostrophes de noms d'objets dans un attribut HTML.
+window.OBJETS_DETAIL_BUTIN = [];
+
 window.afficherEquipementActuelButin = function(mesPersonnages) {
     const conteneur = document.getElementById("butin-equipement-actuel");
     if (!conteneur) return;
     if (mesPersonnages.length === 0) { conteneur.innerHTML = ""; return; }
 
+    window.OBJETS_DETAIL_BUTIN = [];
     const carre = (objet, icone) => {
         if (objet && objet.nom) {
+            const index = window.OBJETS_DETAIL_BUTIN.push(objet) - 1;
             const img = objet.image ? `<img src="${objet.image}" alt="${objet.nom}" style="display:block;">` : icone;
-            return `<div class="mini-carre-equip" title="${objet.nom} — ${objet.effetTexte || ""}">${img}</div>`;
+            // Cliquable : on veut voir les stats de ce qu'on porte déjà avant
+            // de décider si le butin vaut mieux.
+            return `<div class="mini-carre-equip" title="${objet.nom} — ${objet.effetTexte || ""}"
+                         onclick="window.afficherDetailObjetEquipe(${index})">${img}</div>`;
         }
         return `<div class="mini-carre-equip vide">${icone}</div>`;
     };
@@ -589,6 +604,39 @@ window.afficherEquipementActuelButin = function(mesPersonnages) {
         ${carre(p.equipMainDroite, "⚔️")}
         ${carre(p.equipMainGauche, "🗡️")}
     `).join("");
+};
+
+// La popup en lecture seule : les stats de ce qu'on porte déjà, sans aucun
+// choix à faire. Elle répond à une seule question — "est-ce que je gagne
+// vraiment quelque chose à prendre cet objet-là ?" — sans qu'il faille
+// ouvrir la fiche du héros pour le savoir.
+window.afficherDetailObjetEquipe = function(index) {
+    const objet = window.OBJETS_DETAIL_BUTIN[index];
+    if (!objet) return;
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+
+    const icone = typeof window.iconeParEmplacement === "function" ? window.iconeParEmplacement(objet) : "⚔️";
+    const image = objet.image ? `<img src="${objet.image}" alt="${objet.nom}" style="display:block;">`
+                               : `<div class="icone-emplacement-vide">${icone}</div>`;
+    const couleur = (window.COULEUR_RARETE && window.COULEUR_RARETE[objet.rarete]) || "#5c3a21";
+    const type = typeof window.libelleTypeObjet === "function" ? window.libelleTypeObjet(objet.type) : (objet.type || "");
+    const mots = [objet.rarete, type, objet.deuxMains ? "deux mains" : null].filter(Boolean);
+
+    const conteneur = document.getElementById("detail-objet-equipe-contenu");
+    if (conteneur) conteneur.innerHTML = `
+        <div class="carre-equipement">${image}</div>
+        <div class="nom-objet-equipe">${objet.nom}</div>
+        <div class="etiquette-rarete" style="color:${couleur};">${mots.join(" · ")}</div>
+        <div class="effet-objet-equipe">${objet.effetTexte || "Aucun effet particulier."}</div>`;
+
+    const popup = document.getElementById("popup-detail-objet-equipe");
+    if (popup) popup.style.display = "flex";
+};
+
+window.fermerDetailObjetEquipe = function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    const popup = document.getElementById("popup-detail-objet-equipe");
+    if (popup) popup.style.display = "none";
 };
 
 // =========================================================================
@@ -670,7 +718,9 @@ window.passerLaFouille = function() {
 // — les deux mêmes lignes dans les trois vues du butin.
 window.bandeauObjetButin = function(item, idPersonnage) {
     const couleur = (window.COULEUR_RARETE && window.COULEUR_RARETE[item.rarete]) || "#5c3a21";
-    let html = `<div class="etiquette-rarete" style="color:${couleur};">${item.rarete || ""}${item.deuxMains ? " · deux mains" : ""}</div>`;
+    const type = typeof window.libelleTypeObjet === "function" ? window.libelleTypeObjet(item.type) : (item.type || "");
+    const mots = [item.rarete, type, item.deuxMains ? "deux mains" : null].filter(Boolean);
+    let html = `<div class="etiquette-rarete" style="color:${couleur};">${mots.join(" · ")}</div>`;
     if (idPersonnage && typeof window.peutEquiper === "function") {
         const test = window.peutEquiper(idPersonnage, item);
         if (!test.possible) {
@@ -839,9 +889,11 @@ window.remplirComparaisonEquip = function(actuels, nouveau) {
         const image = objet.image ? `<img src="${objet.image}" alt="${objet.nom}" style="display:block;">`
                                    : `<div class="icone-emplacement-vide">${icone}</div>`;
         const couleur = (window.COULEUR_RARETE && window.COULEUR_RARETE[objet.rarete]) || "#5c3a21";
+        const type = typeof window.libelleTypeObjet === "function" ? window.libelleTypeObjet(objet.type) : (objet.type || "");
+        const mots = [objet.rarete, type].filter(Boolean);
         return `<div class="carre-equipement">${image}</div>
                 <div class="nom-objet-equipe">${objet.nom}</div>
-                <div class="etiquette-rarete" style="color:${couleur};">${objet.rarete || ""}</div>
+                <div class="etiquette-rarete" style="color:${couleur};">${mots.join(" · ")}</div>
                 <div class="effet-objet-equipe">${objet.effetTexte || ""}</div>`;
     };
     const liste = Array.isArray(actuels) ? actuels : (actuels ? [actuels] : []);

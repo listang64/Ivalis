@@ -164,7 +164,7 @@ function persoDocVersFront(id, d) {
     PV_Actuels: d.PV_Actuels !== undefined ? d.PV_Actuels
         : ((parseInt(d.PV_Max) || 0) + (parseInt(d.Dev_Mod_PV) || 0)),
     Fatigue_Max: d.Fatigue_Max !== undefined ? d.Fatigue_Max : 100,
-    Regeneration: d.Regeneration !== undefined ? d.Regeneration : 30,
+    Regeneration: d.Regeneration !== undefined ? d.Regeneration : 35,
     Esquive: esquiveCalc, // 🔻 Calculé avec le malus
     Parade: paradeCalc,   // 🔻 Calculé avec le malus
     Critique: d.Critique !== undefined ? d.Critique : 10,
@@ -239,9 +239,12 @@ window.afficherEmplacementEquipement = function(suffixe, objet) {
 
     // La rareté colore l'étiquette : c'est la lecture la plus rapide de la
     // valeur d'un objet, et elle reprend les couleurs du tableau (gris, vert,
-    // bleu, violet). Une arme à deux mains le dit ici aussi.
+    // bleu, violet). Le type (Arme légère, Armure moyenne...) et une arme à
+    // deux mains se disent ici aussi.
     if (rarete) {
-        const mots = rempli ? [objet.rarete, objet.deuxMains ? "deux mains" : null].filter(Boolean) : [];
+        const type = rempli && typeof window.libelleTypeObjet === "function"
+            ? window.libelleTypeObjet(objet.type) : "";
+        const mots = rempli ? [objet.rarete, type, objet.deuxMains ? "deux mains" : null].filter(Boolean) : [];
         rarete.innerText = mots.join(" · ");
         rarete.style.display = mots.length ? "block" : "none";
         rarete.style.color = (rempli && window.COULEUR_RARETE && window.COULEUR_RARETE[objet.rarete]) || "#5c3a21";
@@ -4474,7 +4477,7 @@ window.validerCreationCaracs = async function() {
         PV_Max: pvMax,
         Objets_Max: objetsMax,
         Fatigue_Max: 100,
-        Regeneration: 30,
+        Regeneration: 35,
         Esquive: 15,
         Parade: 0,
         Critique: 10,

@@ -837,5 +837,56 @@ console.log("\n14. UN COMBAT EN COURS PASSE AVANT LE BUTIN");
   verifier("mais bien un vrai ennemi vivant", w.ennemisEncoreDebout() === true);
 }
 
+// ==========================================================================
+console.log("\n15. UNE VICTOIRE D'ÉQUIPE PROFITE À TOUTE L'ÉQUIPE, MÊME AUX TOMBÉS");
+{
+  // J2 meurt pendant le combat ; J1 et J3 achèvent le dernier ennemi. La
+  // victoire reste collective : J2 a participé, il touche sa part comme les
+  // deux autres — quelqu'un pourra la lui remettre à son réveil.
+  const partie = creerPartieButin({});
+  const personnages = creerPersonnagesFirestore(["J1", "J2", "J3"]);
+  const persos = trosHeros();
+  persos[1].statut = "Mort";
+  persos[1].PV_Actuels = 0;
+  const monstres = [{ idPersonnage: "M1", camp: "Ennemi", statut: "Mort", PV_Actuels: 0, estIllusion: false }];
+  const p1 = creerPoste("P1", { partie, personnages, persos, monstres, difficulte: "Normale" });
+
+  await p1.w.demarrerButin();
+  const butin = partie.partagee.doc.Butin;
+
+  verifier("le héros tombé fait bien partie des participants au butin",
+           (butin.participants || []).includes("J2"), `(${(butin.participants || []).join(",")})`);
+  verifier("les trois héros sont participants, tombé compris",
+           new Set(butin.participants).size === 3, `(${(butin.participants || []).join(",")})`);
+  verifier("il reçoit lui aussi ses deux objets",
+           (butin.parPersonnage.J2 && butin.parPersonnage.J2.items || []).length === 2,
+           `(${(butin.parPersonnage.J2 || {}).items ? butin.parPersonnage.J2.items.length : "bloc absent"})`);
+
+  // Un héros mis de côté (mode développeur), lui, n'a rien à faire dans le
+  // partage : il n'a pas combattu, contrairement à celui qui est juste tombé.
+  const partie2 = creerPartieButin({});
+  const personnages2 = creerPersonnagesFirestore(["J1", "J2", "J3"]);
+  const persos2 = trosHeros();
+  persos2[1].actif = false;
+  const monstres2 = [{ idPersonnage: "M1", camp: "Ennemi", statut: "Mort", PV_Actuels: 0, estIllusion: false }];
+  const p2 = creerPoste("P1", { partie: partie2, personnages: personnages2, persos: persos2, monstres: monstres2, difficulte: "Normale" });
+
+  await p2.w.demarrerButin();
+  const butin2 = partie2.partagee.doc.Butin;
+  verifier("un héros mis de côté, lui, reste hors du partage",
+           !(butin2.participants || []).includes("J2"), `(${(butin2.participants || []).join(",")})`);
+  verifier("seuls les deux héros actifs se partagent le butin",
+           new Set(butin2.participants).size === 2, `(${(butin2.participants || []).join(",")})`);
+
+  // Le héros tombé peut même équiper ce qu'il reçoit : rien dans le code ne le
+  // lui interdit, et l'objet l'attend sur sa fiche pour son réveil.
+  const item = butin.parPersonnage.J2.items[0];
+  await p1.w.choisirLootPersonnel("J2", item.uid, true);
+  await p1.w.confirmerChoixButin(true);
+  verifier("un héros tombé peut équiper ce qu'il vient de recevoir",
+           Object.values(personnages.table.J2).some(v => v && v.uid === item.uid),
+           `(${JSON.stringify(personnages.table.J2)})`);
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

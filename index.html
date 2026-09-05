@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Ivalis - Le JDR</title>
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=11">
+  <link rel="stylesheet" href="style.css?v=12">
 
  
   <!-- ===================================================================== -->
@@ -1528,9 +1528,22 @@
   </div>
 </div>
 
+<!-- Popup de détail : les stats de l'objet déjà équipé, cliqué depuis le
+     bandeau "équipement actuel" des fenêtres de butin. Lecture seule, rien à
+     choisir — juste de quoi comparer sans ouvrir la fiche du héros. -->
+<div id="popup-detail-objet-equipe" style="display: none;" onclick="if (event.target === this) window.fermerDetailObjetEquipe()">
+  <div class="carte-confirmation-equip">
+    <h3>Équipement actuel</h3>
+    <div id="detail-objet-equipe-contenu" class="contenu-comparaison"></div>
+    <div style="display: flex; justify-content: center; margin-top: 20px;">
+      <button class="btn-parametres" onclick="window.fermerDetailObjetEquipe()">Fermer</button>
+    </div>
+  </div>
+</div>
+
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <script type="module" src="ia_master.js?v=4"></script>
-<script type="module" src="app.js?v=19"></script>
+<script type="module" src="app.js?v=20"></script>
 <script type="module" src="creation_personnage.js?v=3"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=11"></script>
@@ -1544,9 +1557,9 @@
 <script type="module" src="monstres_competences.js?v=5"></script>
 <script type="module" src="monstres_ia.js?v=15"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
-<script type="module" src="objets.js?v=4"></script>
+<script type="module" src="objets.js?v=5"></script>
 <script type="module" src="objets_ia.js?v=4"></script>
-<script type="module" src="loot.js?v=9"></script>
+<script type="module" src="loot.js?v=10"></script>
 
 <!-- ============================================================= -->
 <!--  GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)  -->

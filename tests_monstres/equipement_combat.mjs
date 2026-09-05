@@ -138,22 +138,29 @@ console.log("\n3. CE QUE L'ARME EN MAIN AUTORISE À LANCER");
              w.raisonBlocageCarte(deuxArmes, "Arme légère CAC") === null
              && w.raisonBlocageCarte(deuxArmes, "Arme lourde CAC") === null);
 
-    verifier("une main libre suffit pour lancer un sort",
+    // LA MAGIE NE DEMANDE PLUS AUCUNE MAIN LIBRE : le sort part quelles que
+    // soient les mains, prises par une arme, un bouclier, ou les deux à la fois.
+    verifier("les mains libres, le sort part sans problème",
+             w.raisonBlocageCarte(nu, "Magie") === null);
+    verifier("une main prise ne bloque pas non plus",
              w.raisonBlocageCarte(avecHache, "Magie") === null);
     const mainsPrises = heros({ equipMainDroite: hache, equipMainGauche: bouclier });
-    verifier("les deux mains prises, le sort ne part pas",
-             w.raisonBlocageCarte(mainsPrises, "Magie") !== null);
+    verifier("les deux mains prises par une arme et un bouclier : le sort part quand même",
+             w.raisonBlocageCarte(mainsPrises, "Magie") === null);
 
     const bagueEtBouclier = heros({ equipMainDroite: bague, equipMainGauche: bouclier });
-    verifier("une bague ne ferme pas la main : le sort passe",
+    verifier("une bague et un bouclier n'y changent rien",
              w.raisonBlocageCarte(bagueEtBouclier, "Magie") === null);
     verifier("et une bague seule n'interdit aucune technique d'arme",
              w.raisonBlocageCarte(heros({ equipMainDroite: bague }), "Arme lourde CAC") === null);
 
     const hacheDeuxMains = objet("Hache à deux mains", "Commun");
     const prisesParDeuxMains = heros({ equipMainDroite: hacheDeuxMains, equipMainGauche: hacheDeuxMains });
-    verifier("une arme à deux mains empêche de lancer un sort",
-             w.raisonBlocageCarte(prisesParDeuxMains, "Magie") !== null);
+    verifier("même les deux mains prises par une arme à deux mains laissent partir le sort",
+             w.raisonBlocageCarte(prisesParDeuxMains, "Magie") === null);
+
+    verifier("la fonction aUneMainLibre n'existe plus : plus personne ne doit s'y fier",
+             typeof w.aUneMainLibre === "undefined");
 }
 
 // =========================================================================
@@ -400,6 +407,49 @@ console.log("\n9. LES ÉTATS TEMPORAIRES PASSENT PAR LES MÊMES STATS");
     w.PERSOS_PARTIE = [q];
     verifier("arme et état temporaire s'additionnent", w.bonusEquip(q, "initiative") === 20,
              `(${w.bonusEquip(q, "initiative")})`);
+}
+
+// =========================================================================
+// Nico a demandé que les descriptions de butin disent le TYPE d'arme (Arme
+// légère, etc.), pas seulement sa rareté. Le catalogue expose un type brut
+// ("Arme légère CAC") destiné au moteur de combat ; libelleTypeObjet en fait
+// la traduction lisible affichée sur les cartes.
+console.log("\n10. LE TYPE D'ARME EST LISIBLE PARTOUT OÙ UN OBJET S'AFFICHE");
+{
+    const attendus = {
+        "Arme légère CAC":      "Arme légère (corps à corps)",
+        "Arme lourde CAC":      "Arme lourde (corps à corps)",
+        "Arme polyvalente":     "Arme polyvalente",
+        "Arme légère Distance": "Arme à distance",
+        "Bouclier":             "Bouclier",
+        "Magie":                "Magie",
+        "Armure légère":        "Armure légère",
+        "Armure intermédiaire": "Armure moyenne",
+        "Armure lourde":        "Armure lourde"
+    };
+    Object.entries(attendus).forEach(([type, libelle]) => {
+        verifier(`« ${type} » se lit « ${libelle} »`,
+                 w.libelleTypeObjet(type) === libelle, `(${w.libelleTypeObjet(type)})`);
+    });
+    verifier("un type inconnu se rabat sur lui-même plutôt que de disparaître",
+             w.libelleTypeObjet("Type jamais vu") === "Type jamais vu");
+    verifier("un type absent ne casse rien", w.libelleTypeObjet(undefined) === "");
+
+    // Chaque type du catalogue doit être une entrée EXPLICITE du dictionnaire —
+    // sinon libelleTypeObjet retombe silencieusement sur le type brut passé en
+    // repli, et une carte de butin afficherait "Arme légère CAC" au lieu d'un
+    // texte lisible, sans que rien ne le signale.
+    const typesDuCatalogue = [...new Set(w.MODELES_OBJETS.map(m => m.type))];
+    const sansEntree = typesDuCatalogue.filter(t => !(t in w.LIBELLE_TYPE_OBJET));
+    verifier("chaque type du catalogue a une entrée explicite dans le dictionnaire",
+             sansEntree.length === 0, `(${sansEntree.join(", ") || "aucun manquant"})`);
+
+    // Le texte affiché sur les cartes de butin (loot.js) réutilise ce même
+    // libellé : on le vérifie ici en rejouant sa formule exacte.
+    const armure = objet("Armure intermédiaire", "Commun");
+    const mots = [armure.rarete, w.libelleTypeObjet(armure.type)].filter(Boolean);
+    verifier("l'étiquette d'une carte de butin inclut bien le type lisible",
+             mots.join(" · ") === "Commun · Armure moyenne", `(${mots.join(" · ")})`);
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
