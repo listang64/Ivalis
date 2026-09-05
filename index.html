@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Ivalis - Le JDR</title>
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=13">
+  <link rel="stylesheet" href="style.css?v=14">
 
  
   <!-- ===================================================================== -->
@@ -706,19 +706,41 @@
             </div>
         </div>
 
-        <!-- BANDEAU D'ACTION (BAS GAUCHE) : la carte du combattant qui joue.
-             Z-index 5, comme le HUD de droite : le panneau latéral (z-index 10) le
-             recouvre entièrement quand il est ouvert, exactement comme demandé. -->
-        <div id="bandeau-action-combat" style="position: absolute; bottom: 26px; left: 26px; width: 44vw; max-width: 520px; z-index: 5; pointer-events: none; opacity: 0; transform: translateY(14px); transition: opacity 0.35s ease, transform 0.35s ease;">
+        <!-- LA FENÊTRE DE TOUR (« le voile ») — voir sequence_tour.js.
+             Pendant qu'un combattant joue, le plateau s'obscurcit chez ceux qui
+             le REGARDENT (jamais chez celui qui agit) et cette fenêtre annonce
+             qui agit, dans quel état, avec quelle technique et pour quel effet.
+             Elle n'est pas décorative : c'est la barrière de synchronisation du
+             combat. Rien n'avance tant que tous les postes n'ont pas dit qu'ils
+             avaient reçu le tour, puis qu'ils l'avaient rejoué en entier.
+             Elle s'arrête au bord du panneau latéral (380px) et va jusqu'au bord
+             de l'écran quand celui-ci est replié. -->
+        <div id="voile-tour-combat" onclick="window.jouerSequenceTour(event)" style="position: absolute; top: 0; bottom: 0; left: 380px; right: 0; z-index: 12; display: none; opacity: 0; pointer-events: none; transition: opacity 0.45s ease, left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); background: radial-gradient(ellipse at 50% 35%, rgba(18, 11, 7, 0.86) 0%, rgba(0, 0, 0, 0.95) 100%); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); overflow: hidden;">
 
-            <!-- Le nom de la carte, dans l'or brossé des noms de personnage -->
-            <div id="bandeau-action-titre" style="font-family: 'Cinzel', serif; font-size: 34px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; background: linear-gradient(135deg, #fbf5bd 0%, #c2a878 25%, #5c3a21 50%, #e8d5a5 75%, #ffffff 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.9));"></div>
+            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 5vh 4vw 4vh 4vw; box-sizing: border-box; text-align: center; pointer-events: none;">
 
-            <!-- Les effets qui la composent, sur une seule ligne -->
-            <div id="bandeau-action-effets" style="margin-top: 2px; font-family: 'Almendra', serif; font-size: 16px; line-height: 1.25; color: #c2a878; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 1px 1px 3px black, 0 0 6px black;"></div>
+                <!-- Le nom du combattant, dans l'or brossé du panneau latéral -->
+                <div id="voile-tour-nom" style="max-width: 100%; font-family: 'Cinzel', serif; font-size: 46px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; background: linear-gradient(135deg, #fbf5bd 0%, #c2a878 25%, #5c3a21 50%, #e8d5a5 75%, #ffffff 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.9));"></div>
 
-            <!-- Le bouton doré clignotant : n'apparaît que pour le héros du poste -->
-            <div id="bandeau-action-lancer" class="btn-lancer-carte" style="display: none;" onclick="window.lancerCarteBandeau()">Lancer</div>
+                <!-- Les états qu'il porte, juste sous son nom -->
+                <div id="voile-tour-etats" style="display: flex; gap: 16px; justify-content: center; align-items: center; margin-top: 12px; min-height: 6px;"></div>
+
+                <!-- La technique qu'il joue, en grand -->
+                <div id="voile-tour-carte" style="max-width: 100%; margin-top: 4vh; font-family: 'Cinzel', serif; font-size: 38px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; line-height: 1.2; color: #e8d5a5; text-shadow: 0 0 14px rgba(255,170,0,0.35), 2px 3px 6px rgba(0,0,0,0.95);"></div>
+
+                <!-- Et le détail de ses effets -->
+                <div id="voile-tour-effets" style="max-width: 100%; margin-top: 12px; font-family: 'Almendra', serif; font-size: 20px; line-height: 1.5; color: #c2a878; text-shadow: 1px 1px 3px black, 0 0 6px black;"></div>
+
+                <!-- Qui l'on attend encore, ou l'invitation à jouer les animations -->
+                <div id="voile-tour-attente" style="margin-top: 4vh; font-family: 'Almendra', serif; font-size: 16px; font-style: italic; color: #8a8078; text-shadow: 1px 1px 3px black;"></div>
+
+                <!-- Le gros OK doré : il ne clignote que lorsque TOUS les postes ont répondu -->
+                <div id="voile-tour-ok" class="btn-lancer-carte btn-ok-voile" style="display: none;">OK</div>
+
+                <!-- Sortie de secours entièrement manuelle : aucun délai ne passe
+                     un poste absent tout seul, c'est un humain qui le décide. -->
+                <div id="voile-tour-forcer" onclick="window.forcerSequenceTour(event)" style="display: none; margin-top: 3vh; pointer-events: auto; cursor: pointer; font-family: 'Cinzel', serif; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #8a8078; text-decoration: underline; text-shadow: 1px 1px 3px black;">Continuer sans les absents</div>
+            </div>
         </div>
 
         <!-- NOUVEAU : HUD BAS DROITE (Z-index réduit à 5 pour passer sous le panneau gauche) -->
@@ -1551,19 +1573,20 @@
 
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <script type="module" src="ia_master.js?v=4"></script>
-<script type="module" src="app.js?v=23"></script>
+<script type="module" src="app.js?v=24"></script>
 <script type="module" src="creation_personnage.js?v=4"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=13"></script>
 <script src="Plateau.js"></script>
-<script type="module" src="combat.js?v=33"></script>
+<script type="module" src="sequence_tour.js?v=1"></script>
+<script type="module" src="combat.js?v=34"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=12"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
-<script type="module" src="moteur_effets.js?v=19"></script>
+<script type="module" src="moteur_effets.js?v=20"></script>
 <script type="module" src="monstres.js?v=16"></script>
 <script type="module" src="monstres_competences.js?v=7"></script>
-<script type="module" src="monstres_ia.js?v=16"></script>
+<script type="module" src="monstres_ia.js?v=17"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=7"></script>
 <script type="module" src="objets_ia.js?v=5"></script>

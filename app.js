@@ -330,15 +330,33 @@ window.DELAI_MAX_ANIMATION_MS = 20000;
 
 window.filerAnimation = function(nom, fn) {
     window.FILE_ANIMATIONS = window.FILE_ANIMATIONS
-        .then(() => Promise.race([
-            Promise.resolve().then(fn),
-            new Promise(resoudre => setTimeout(() => {
-                console.warn("Animation « " + nom + " » trop longue : on passe à la suite.");
-                resoudre();
-            }, window.DELAI_MAX_ANIMATION_MS))
-        ]))
+        .then(() => {
+            let minuteur = null;
+            const secours = new Promise(resoudre => {
+                minuteur = setTimeout(() => {
+                    console.warn("Animation « " + nom + " » trop longue : on passe à la suite.");
+                    resoudre();
+                }, window.DELAI_MAX_ANIMATION_MS);
+            });
+            // Le minuteur est annulé dès que l'animation rend la main. Sans cela
+            // il sonnait quand même vingt secondes plus tard, pour une animation
+            // terminée depuis longtemps : la console criait au blocage alors que
+            // tout allait bien, et chaque tour laissait derrière lui autant de
+            // minuteurs en sursis qu'il avait joué d'animations.
+            return Promise.race([Promise.resolve().then(fn), secours])
+                .finally(() => clearTimeout(minuteur));
+        })
         .catch(e => console.error("Animation « " + nom + " » :", e));
     return window.FILE_ANIMATIONS;
+};
+
+// Toutes les animations diffusées par la base passent par ici plutôt que
+// directement par filerAnimation : la séquence de tour (sequence_tour.js) les
+// met alors en attente derrière la fenêtre sombre, pour ne les rejouer, dans
+// l'ordre, qu'une fois tous les postes prêts. Cette version-ci est le filet :
+// si ce module n'est pas chargé, le combat se comporte exactement comme avant.
+window.programmerAnimationTour = function(nom, action, fn) {
+    return window.filerAnimation(nom, fn);
 };
 
 // =========================================================================
@@ -2244,6 +2262,18 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
              window.verifierPointsApparition();
          }
 
+         // La séquence de tour AVANT l'IA : c'est elle qui sait si le tour en
+         // cours est déjà calculé et n'attend plus que les autres postes. Sans
+         // ce passage en premier, la créature rejouerait son tour en boucle
+         // pendant l'attente (voir sequenceTourEnAttente, sequence_tour.js).
+         if (typeof window.suivreSequenceTour === "function") {
+             try {
+                 window.suivreSequenceTour(dataPartie);
+             } catch (e) {
+                 console.error("Séquence de tour :", e);
+             }
+         }
+
          // Les monstres jouent seuls : à chaque changement de la partie (une carte
          // posée, un tour qui passe), l'IA regarde si c'est à eux d'agir.
          if (typeof window.verifierTourIAMonstres === "function") {
@@ -2288,7 +2318,7 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
                  window.DERNIER_MOUVEMENT = dataPartie.Action_Mouvement.timestamp;
                  if (typeof window.jouerAnimationMouvement === "function") {
                      const action = dataPartie.Action_Mouvement;
-                     window.filerAnimation("mouvement", () => window.jouerAnimationMouvement(action));
+                     window.programmerAnimationTour("mouvement", action, () => window.jouerAnimationMouvement(action));
                  }
              }
              // 🔻 NOUVEAU : Déclenchement de la résolution d'attaque pour TOUS les joueurs connectés
@@ -2296,7 +2326,7 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
                  window.DERNIER_ACTION_MOTEUR = dataPartie.Action_Moteur.timestamp;
                  if (typeof window.jouerAnimationMoteur === "function") {
                      const action = dataPartie.Action_Moteur;
-                     window.filerAnimation("carte", () => window.jouerAnimationMoteur(action));
+                     window.programmerAnimationTour("carte", action, () => window.jouerAnimationMoteur(action));
                  }
              }
              // Bond : la case d'arrivée est déjà validée, on ne fait que rejouer le saut visuellement
@@ -2304,7 +2334,7 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
                  window.DERNIER_ACTION_BOND = dataPartie.Action_Bond.timestamp;
                  if (typeof window.jouerAnimationBond === "function") {
                      const action = dataPartie.Action_Bond;
-                     window.filerAnimation("bond", () => window.jouerAnimationBond(action));
+                     window.programmerAnimationTour("bond", action, () => window.jouerAnimationBond(action));
                  }
              }
              // Poussée : le jet et la case d'arrivée sont déjà tranchés par le lanceur, on rejoue juste l'animation
@@ -2312,7 +2342,7 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
                  window.DERNIER_ACTION_POUSSEE = dataPartie.Action_Poussee.timestamp;
                  if (typeof window.jouerAnimationPoussee === "function") {
                      const action = dataPartie.Action_Poussee;
-                     window.filerAnimation("poussée", () => window.jouerAnimationPoussee(action));
+                     window.programmerAnimationTour("poussée", action, () => window.jouerAnimationPoussee(action));
                  }
              }
              // Traction : même animation que la Poussée (la trajectoire suffit à inverser l'effet)
@@ -2320,7 +2350,7 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
                  window.DERNIER_ACTION_TRACTION = dataPartie.Action_Traction.timestamp;
                  if (typeof window.jouerAnimationPoussee === "function") {
                      const action = dataPartie.Action_Traction;
-                     window.filerAnimation("traction", () => window.jouerAnimationPoussee(action));
+                     window.programmerAnimationTour("traction", action, () => window.jouerAnimationPoussee(action));
                  }
              }
              // Peur : chemin et attaques d'opportunité déjà tranchés par le lanceur, on rejoue juste l'animation
@@ -2328,7 +2358,7 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
                  window.DERNIER_ACTION_PEUR = dataPartie.Action_Peur.timestamp;
                  if (typeof window.jouerAnimationPeur === "function") {
                      const action = dataPartie.Action_Peur;
-                     window.filerAnimation("peur", () => window.jouerAnimationPeur(action));
+                     window.programmerAnimationTour("peur", action, () => window.jouerAnimationPeur(action));
                  }
              }
          }

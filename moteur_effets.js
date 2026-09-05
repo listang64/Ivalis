@@ -2764,9 +2764,9 @@ window.nettoyerCiblage = function() {
     if (btnResoudre) btnResoudre.remove();
     if (btnAnnuler) btnAnnuler.remove();
 
-    // Le bandeau du bas suit le même sort que le bouton "Appliquer" de la carte :
-    // ciblage annulé, la compétence est de nouveau lançable.
-    if (typeof window.actualiserBandeauAction === "function") window.actualiserBandeauAction();
+    // La fenêtre de tour suit le même sort que le bouton "Appliquer" de la carte :
+    // ciblage annulé, l'écran doit refléter tout de suite le nouvel état.
+    if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
 };
 
 // =========================================================================
@@ -3388,7 +3388,19 @@ window.jouerAnimationMoteur = async function(action) {
                 // Si on arrive ici, c'est que l'attaque a touché, OU que c'est un soin / bouclier !
                 ciblesToucheesValides.add(idCible);
 
-                let oldPv = parseInt(cibleData.PV_Actuels) || 0;
+                // LE POINT DE DÉPART DE LA SOUSTRACTION. Depuis que le rejeu
+                // d'un tour attend que tous les postes soient prêts (voir
+                // sequence_tour.js), il peut démarrer bien après que l'auteur a
+                // écrit le résultat en base : les points de vie lus ici sont
+                // alors DÉJÀ ceux d'après, et retrancher les dégâts une seconde
+                // fois donnait un blessé deux fois plus amoché d'un écran à
+                // l'autre. La séquence de tour offre donc en lecture la valeur
+                // d'avant, photographiée à l'arrivée de l'ordre d'animer. Hors
+                // rejeu — chez l'auteur, ou sans ce module — elle renvoie
+                // simplement la valeur courante, et rien ne change.
+                const avant = (id, champ, courante) => (typeof window.valeurAvantRejeu === "function"
+                    ? window.valeurAvantRejeu(id, champ, courante) : courante);
+                let oldPv = parseInt(avant(idCible, "PV_Actuels", cibleData.PV_Actuels)) || 0;
                 let maxPv = (parseInt(cibleData.PV_Max) || 1) + (parseInt(cibleData.Dev_Mod_PV) || 0);
                 let newPv;
 
@@ -3587,7 +3599,7 @@ jaugeContainer.className = "jauge-flash-token";
                         degatsFinaux = degatsFinaux - degatsSecondTic;
                     }
 
-                    let oldShield = parseInt(cibleData.Bouclier_Actuel) || 0;
+                    let oldShield = parseInt(avant(idCible, "Bouclier_Actuel", cibleData.Bouclier_Actuel)) || 0;
                     let maxShield = parseInt(cibleData.Bouclier_Max) || oldShield || 1;
                     let shieldDestroyed = false;
 

@@ -673,6 +673,14 @@ window.positionsProtegees = function(tokensRecus, mouvementEnCours) {
         && (Date.now() - (mouvementEnCours.timestamp || 0)) < delaiMax) {
         garder(mouvementEnCours.idToken);
     }
+
+    // 3. Et ceux dont le trajet dort dans la fenêtre de tour, en attendant que
+    //    ce poste appuie sur OK. Là, aucune expiration : ce n'est plus une
+    //    animation qui traîne mais une attente VOULUE, qui dure aussi longtemps
+    //    qu'il le faut (un joueur parti chercher un café). Le rejeu vide la
+    //    liste tout seul, donc elle ne peut pas rester coincée.
+    Object.keys(window.PIONS_EN_ATTENTE_SEQUENCE || {}).forEach(garder);
+
     return recus;
 };
 
@@ -901,12 +909,12 @@ document.addEventListener("click", function(event) {
 
     const clicSurBanniere = event.target.closest('.banniere-carte-combat');
     const clicSurCarteHD = event.target.closest('#apercu-carte-hd-competence');
-    const clicSurFleche = event.target.closest('.btn-combat-switch'); 
-    // Le bandeau du bas n'est pas "le vide" : son bouton doré lance la carte, et
-    // ce nettoyage annulerait le ciblage dans la foulée du clic qui l'ouvre.
-    const clicSurBandeau = event.target.closest('#bandeau-action-combat');
-    
-    if (!clicSurBanniere && !clicSurCarteHD && !clicSurFleche && !clicSurBandeau && window.CARTE_EN_APERCU) {
+    const clicSurFleche = event.target.closest('.btn-combat-switch');
+    // La fenêtre de tour n'est pas "le vide" : le clic qui y lance les animations
+    // ne doit pas annuler au passage le ciblage qu'on est en train de préparer.
+    const clicSurVoile = event.target.closest('#voile-tour-combat');
+
+    if (!clicSurBanniere && !clicSurCarteHD && !clicSurFleche && !clicSurVoile && window.CARTE_EN_APERCU) {
         
         // 🔻 NOUVEAU : Annule le ciblage en cours si on clique dans le vide
         if (typeof window.nettoyerCiblage === "function") window.nettoyerCiblage();
@@ -2343,7 +2351,8 @@ window.togglePanneauGauche = function(silencieux) {
         fleche.innerText = "►";
     }
 
-    if (typeof window.actualiserBandeauAction === "function") window.actualiserBandeauAction();
+    // La fenêtre de tour s'arrête au bord du panneau : elle doit suivre.
+    if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
 };
 
 // =========================================================================
@@ -3045,10 +3054,19 @@ window.actualiserBoutonFinTour = function(queueParam, phaseParam) {
     const phase = phaseParam !== undefined ? phaseParam : (partie.Phase_Combat || "Preparation");
     const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
 
-    // Le bandeau du bas dépend des mêmes données que ce bouton (qui joue, avec
-    // quelle carte, sur quel poste) : on le rafraîchit ici, et il suit dès lors
+    // La fenêtre de tour dépend des mêmes données que ce bouton (qui joue, avec
+    // quelle carte, sur quel poste) : on la rafraîchit ici, et elle suit dès lors
     // tous les appels existants — changement de héros affiché compris.
-    if (typeof window.actualiserBandeauAction === "function") window.actualiserBandeauAction(queue, phase);
+    if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour(queue, phase);
+
+    // Un tour déjà calculé qui attend les autres postes n'est plus à passer :
+    // le bouton s'éteint, c'est la barrière de synchronisation qui prendra le
+    // relais dès que tout le monde aura fini de rejouer (voir sequence_tour.js).
+    if (typeof window.sequenceTourEnAttente === "function" && window.sequenceTourEnAttente()) {
+        imgBtn.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/FinTourEteind_exjtxp.png";
+        window.PEUT_PASSER_TOUR = false;
+        return;
+    }
 
     // C'est au tour du perso SI :
     const estMonTour = (
@@ -3083,7 +3101,19 @@ window.actualiserBoutonFinTour = function(queueParam, phaseParam) {
 window.ANIMATION_TOUR_EN_COURS = false;
 
 window.finDeTourCombat = async function(forcer = false, idQuiTermine = null) {
-    if (!window.PEUT_PASSER_TOUR && !forcer) return; 
+    if (!window.PEUT_PASSER_TOUR && !forcer) return;
+
+    // LA BARRIÈRE DE SYNCHRONISATION. Ce tour vient d'être CALCULÉ sur ce poste
+    // — pas encore vu par les autres. Avant, la file avançait ici même, tout de
+    // suite : le poste le plus rapide passait au combattant suivant pendant que
+    // les autres animaient encore, et sur iPad (qui traîne davantage) on voyait
+    // un déplacement sauté puis un pion téléporté un tour plus tard.
+    // Désormais on rend la main à la séquence de tour : elle annonce « calcul
+    // terminé », attend que chaque poste dise qu'il a tout reçu, puis qu'il ait
+    // tout rejoué, et c'est elle qui rappellera cette fonction avec le
+    // laissez-passer. Absente (bancs d'essai, page partielle), rien ne change.
+    if (typeof window.sequenceRetientFinDeTour === "function"
+        && await window.sequenceRetientFinDeTour(idQuiTermine)) return;
 
     window.COUT_COMPETENCE_SELECTIONNEE = 0;
 
@@ -3553,7 +3583,7 @@ window.synchroniserPanneauAvecPiste = function(visible, queue, phase) {
     }
     window.PISTE_INITIATIVE_VISIBLE = visible;
 
-    if (typeof window.actualiserBandeauAction === "function") window.actualiserBandeauAction(queue, phase);
+    if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour(queue, phase);
 };
 
 // La fiche d'une carte, qu'elle appartienne à un héros (cache du panneau) ou à
@@ -3598,31 +3628,75 @@ function ajusterSurUneLigne(element, tailleMax, tailleMin) {
     }
 }
 
-window.actualiserBandeauAction = function(queueParam, phaseParam) {
-    const bandeau = document.getElementById("bandeau-action-combat");
-    if (!bandeau) return;
+// =========================================================================
+//  LA FENÊTRE DE TOUR (« le voile ») — L'AFFICHAGE
+// =========================================================================
+//  Le protocole (qui a fini de calculer, qui a fini de rejouer, quand la file
+//  avance) vit dans sequence_tour.js. Ici on ne fait que peindre ce que ce
+//  protocole raconte : qui joue, dans quel état, avec quelle technique, et pour
+//  quel effet. Le tout est ici plutôt que là-bas parce que la mise à la bonne
+//  taille (ajusterSurUneLigne) et la lecture des cartes appartiennent à ce
+//  fichier depuis toujours.
+window.rafraichirVoileTour = function(queueParam, phaseParam) {
+    const voile = document.getElementById("voile-tour-combat");
+    if (!voile) return;
 
     const masquer = () => {
-        bandeau.style.opacity = "0";
-        bandeau.style.transform = "translateY(14px)";
-        bandeau.style.pointerEvents = "none";
-        const bouton = document.getElementById("bandeau-action-lancer");
-        if (bouton) bouton.style.display = "none";
+        voile.style.opacity = "0";
+        voile.style.pointerEvents = "none";
+        // Le retrait effectif attend la fin du fondu : sans ça la fenêtre
+        // disparaît d'un coup et le plateau saute à l'œil.
+        clearTimeout(voile._minuteurRetrait);
+        voile._minuteurRetrait = setTimeout(() => {
+            if (voile.style.opacity === "0") voile.style.display = "none";
+        }, 460);
+        const ok = document.getElementById("voile-tour-ok");
+        if (ok) ok.style.display = "none";
+        const forcer = document.getElementById("voile-tour-forcer");
+        if (forcer) forcer.style.display = "none";
     };
 
     if (document.getElementById("fenetre-combat")?.style.display !== "block") return masquer();
+
+    const seq = window.SEQUENCE_TOUR;
+    if (!seq || !seq.voile) return masquer();
 
     const partie = window.PARTIE_DATA || {};
     const queue = queueParam !== undefined ? queueParam : (partie.File_Attente_Combat || []);
     const phase = phaseParam !== undefined ? phaseParam : (partie.Phase_Combat || "Preparation");
 
     const tete = (phase === "Resolution" && queue.length > 0) ? queue[0] : null;
-    if (!tete) return masquer();
-
-    // Panneau ouvert : c'est lui qui occupe le coin, le bandeau s'efface.
-    if (window.PANNEAU_GAUCHE_OUVERT) return masquer();
-
+    if (!tete || tete.idPersonnage !== seq.acteur) return masquer();
     if (typeof window.estCombattantMort === "function" && window.estCombattantMort(tete.idPersonnage)) return masquer();
+
+    // La fenêtre s'arrête au bord du panneau latéral, et va jusqu'au bord de
+    // l'écran quand celui-ci est replié : elle couvre « le reste de l'écran ».
+    voile.style.left = window.PANNEAU_GAUCHE_OUVERT ? "380px" : "0px";
+
+    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === tete.idPersonnage) || {};
+
+    const elNom = document.getElementById("voile-tour-nom");
+    const nom = ((perso.prenom || "") + " " + (perso.nom || "")).trim() || "Combattant";
+    if (elNom && elNom.dataset.nom !== nom) {
+        elNom.dataset.nom = nom;
+        elNom.textContent = nom;
+        ajusterSurUneLigne(elNom, 46, 22);
+    }
+
+    // Les états qu'il porte, dans les mêmes icônes que le panneau latéral.
+    const elEtats = document.getElementById("voile-tour-etats");
+    if (elEtats) {
+        const etats = perso.Etats_Alteres || [];
+        const signature = etats.map(e => e.nom + ":" + e.duree).join("|");
+        if (elEtats.dataset.signature !== signature) {
+            elEtats.dataset.signature = signature;
+            elEtats.innerHTML = etats.map(etat => `
+                <div style="position: relative; text-align: center;">
+                    <img src="${etat.icone}" style="width: 58px; height: auto; border: none; background: transparent; box-shadow: none; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.9));">
+                    <div style="margin-top: 2px; font-family: 'Almendra', serif; font-size: 12px; color: #a89f91; text-shadow: 1px 1px 3px black;">${etat.nom} (${etat.duree})</div>
+                </div>`).join("");
+        }
+    }
 
     let titre = "";
     let ligne = "";
@@ -3631,80 +3705,43 @@ window.actualiserBandeauAction = function(queueParam, phaseParam) {
         ligne = `<span style="color: #e8d5a5;">Concentration et souffle</span>`;
     } else {
         const dataCarte = window.donneesCarteCombattant(tete.idPersonnage, tete.idCarte);
-        if (!dataCarte) return masquer();
-        titre = dataCarte.Nom || "Technique";
-        ligne = window.ligneEffetsCarte(dataCarte);
+        titre = dataCarte ? (dataCarte.Nom || "Technique") : "Technique";
+        ligne = dataCarte ? window.ligneEffetsCarte(dataCarte)
+                          : `<span style="color: #a89f91; font-style: italic;">Technique inconnue de ce poste</span>`;
     }
 
-    const elTitre = document.getElementById("bandeau-action-titre");
-    const elEffets = document.getElementById("bandeau-action-effets");
-    if (elTitre && elTitre.textContent !== titre) {
-        elTitre.textContent = titre;
-        ajusterSurUneLigne(elTitre, 34, 18);
+    const elCarte = document.getElementById("voile-tour-carte");
+    const elEffets = document.getElementById("voile-tour-effets");
+    if (elCarte && elCarte.textContent !== titre) {
+        elCarte.textContent = titre;
+        ajusterSurUneLigne(elCarte, 38, 18);
     }
-    if (elEffets && elEffets.innerHTML !== ligne) {
-        elEffets.innerHTML = ligne;
-        ajusterSurUneLigne(elEffets, 16, 10);
+    if (elEffets && elEffets.innerHTML !== ligne) elEffets.innerHTML = ligne;
+
+    // L'état de la barrière : ce que ce poste attend, et de qui.
+    const elAttente = document.getElementById("voile-tour-attente");
+    const elOk = document.getElementById("voile-tour-ok");
+    const elForcer = document.getElementById("voile-tour-forcer");
+    const etape = typeof window.etatSequenceTour === "function" ? window.etatSequenceTour() : null;
+
+    // Le joueur a appuyé sur OK : la fenêtre se lève pour laisser voir les
+    // animations. Elle ne revient que si la barrière suivante fait attendre.
+    if (etape && etape.masquee) return masquer();
+
+    if (elAttente && etape) {
+        const texte = etape.message || "";
+        if (elAttente.textContent !== texte) elAttente.textContent = texte;
     }
+    if (elOk) elOk.style.display = (etape && etape.okVisible) ? "inline-flex" : "none";
+    if (elForcer) elForcer.style.display = (etape && etape.forcerVisible) ? "block" : "none";
 
-    // Le bouton n'appartient qu'au héros affiché sur ce poste : c'est lui, et lui
-    // seul, que le ciblage sait faire lancer (même condition que "Appliquer" sur
-    // la carte). Une créature joue toute seule, un repos long n'a rien à viser,
-    // et pendant un ciblage ou une animation en cours il n'y a plus rien à relancer.
-    const persoActuel = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
-    const estMonTour = !!persoActuel && tete.idPersonnage === persoActuel.idPersonnage && !persoActuel.estMonstre;
-    const ciblageEnCours = !!(window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif);
-
-    // Le verrou anti-double-appui ne sert que le temps que le ciblage s'ouvre.
-    // Passé une seconde, si plus rien n'est en cours, c'est que le joueur a
-    // renoncé à sa visée : la carte doit redevenir lançable.
-    if (bandeau.dataset.lance && !ciblageEnCours && !window.ANIMATION_MOTEUR_EN_COURS
-        && (Date.now() - parseInt(bandeau.dataset.lance) > 1000)) {
-        delete bandeau.dataset.lance;
-    }
-    const montrerBouton = estMonTour
-        && tete.idCarte !== "REPOS_LONG"
-        && !ciblageEnCours
-        && !window.ANIMATION_MOTEUR_EN_COURS
-        && !window.ANIMATION_TOUR_EN_COURS
-        && !window.ANIMATION_VTT_EN_COURS;
-
-    bandeau.dataset.carte = tete.idCarte;
-    bandeau.dataset.acteur = tete.idPersonnage;
-
-    // Le verrou de lancement ne se lève qu'au changement de combattant en tête :
-    // tant que la même carte est en cours, un second appui ne la relance pas.
-    const cleTete = tete.idPersonnage + "|" + tete.idCarte;
-    if (bandeau.dataset.tete !== cleTete) {
-        bandeau.dataset.tete = cleTete;
-        delete bandeau.dataset.lance;
-    }
-
-    const bouton = document.getElementById("bandeau-action-lancer");
-    if (bouton) bouton.style.display = (montrerBouton && !bandeau.dataset.lance) ? "inline-flex" : "none";
-
-    bandeau.style.opacity = "1";
-    bandeau.style.transform = "translateY(0)";
-    bandeau.style.pointerEvents = "none";
-};
-
-// Le bouton doré : il ouvre le ciblage de la carte en tête de file.
-window.lancerCarteBandeau = function() {
-    const bandeau = document.getElementById("bandeau-action-combat");
-    if (!bandeau) return;
-    const idCarte = bandeau.dataset.carte;
-    if (!idCarte || idCarte === "REPOS_LONG") return;
-
-    // Deux appuis rapprochés lanceraient deux fois la même carte : masquer le
-    // bouton ne suffit pas, le second toucher part avant le réaffichage. Le
-    // verrou tient jusqu'au changement de combattant en tête de file.
-    if (bandeau.dataset.lance) return;
-    bandeau.dataset.lance = String(Date.now());
-
-    const bouton = document.getElementById("bandeau-action-lancer");
-    if (bouton) bouton.style.display = "none";
-
-    if (typeof window.demarrerCiblage === "function") window.demarrerCiblage(idCarte);
+    voile.style.display = "block";
+    // Le clic ne compte que lorsqu'il y a quelque chose à déclencher : sinon un
+    // doigt posé au hasard pendant le calcul consommerait le OK à venir.
+    voile.style.pointerEvents = (etape && (etape.okVisible || etape.forcerVisible)) ? "auto" : "none";
+    // Un reflow avant de monter l'opacité, sinon le fondu d'entrée est sauté.
+    void voile.offsetWidth;
+    voile.style.opacity = "1";
 };
 
 // =========================================================================

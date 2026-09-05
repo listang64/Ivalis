@@ -839,6 +839,18 @@ async function attendreFinResolution(nbAvant, limiteMs = 20000) {
     // Aucun moteur de résolution en face (bancs d'essai, page partielle) :
     // il n'y a rien à attendre.
     if (!Array.isArray(window.RESOLUTIONS_LOCALES)) return;
+
+    // Derrière la fenêtre de tour, l'animation de la carte ne part pas tout de
+    // suite : elle dort dans le tampon jusqu'à ce que tous les postes soient
+    // prêts. L'attendre ici bloquerait vingt secondes pour rien — et c'est
+    // désormais la barrière de synchronisation, bien plus stricte, qui garantit
+    // qu'aucun combattant ne commence son tour avant la fin du précédent.
+    // Les décisions de la créature, elles, ne dépendent pas de l'animation :
+    // validerMouvement a déjà posé sa nouvelle case dans TOKENS_VTT_DATA.
+    if (window.SEQUENCE_TOUR && window.SEQUENCE_TOUR.voile) {
+        await pause(300);
+        return;
+    }
     const debut = Date.now();
     // La carte part de façon asynchrone : on lui laisse d'abord le temps d'être
     // émise, sinon on croirait déjà tout fini.
@@ -1129,6 +1141,16 @@ window.verifierTourIAMonstres = async function() {
     // repassera dans un instant.
     if (window.ANIMATION_VTT_EN_COURS || window.ANIMATION_TOUR_EN_COURS
         || window.ANIMATION_MOTEUR_EN_COURS) { programmerRappelIA(); return; }
+
+    // Ce tour-ci est DÉJÀ calculé et n'attend plus que les autres postes : la
+    // créature ne doit surtout pas le rejouer. Son verrou, lui, répond toujours
+    // oui à qui le détient déjà — sans ce garde-fou elle repartait pour un tour
+    // à chaque notification pendant toute la durée de l'attente, et un autre
+    // poste finissait par le lui voler au bout de vingt-cinq secondes.
+    if (typeof window.sequenceTourEnAttente === "function" && window.sequenceTourEnAttente()) {
+        programmerRappelIA(1500);
+        return;
+    }
 
     // Le drapeau se lève AVANT toute attente : le verrou écrit en base, ce qui
     // déclenche une notification et donc un second appel de cette fonction. Sans

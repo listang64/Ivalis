@@ -53,7 +53,7 @@ function poste({ des }) {
   w.removeEventListener = () => {};
   w.surlignerEffetCarteActif = () => {};
   w.retirerAssombrissement = () => {};
-  w.actualiserBandeauAction = () => {};
+  w.rafraichirVoileTour = () => {};
 
   global.window = w;
   global.document = { getElementById: () => null, querySelectorAll: () => [],

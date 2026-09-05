@@ -2287,6 +2287,27 @@ textarea.input-texte-parchemin {
     100% { opacity: 1; }
 }
 
+/* Le même bouton, en grand, au milieu de la fenêtre de tour : c'est le signal
+   que TOUS les postes ont reçu le tour et qu'on peut enfin le regarder se
+   jouer. Un doigt le trouve au premier coup d'œil, y compris sur un iPad tenu
+   à bout de bras — d'où la taille, et le halo plus large. */
+.btn-ok-voile {
+    margin-top: 4vh;
+    padding: 14px 62px;
+    font-size: 30px;
+    letter-spacing: 8px;
+    border-width: 2px;
+    /* Le clic vaut sur toute la fenêtre : le bouton n'est qu'une cible visuelle,
+       il ne doit pas intercepter le toucher pour son seul compte. */
+    pointer-events: none;
+}
+
+.btn-ok-voile::before {
+    top: -6px; right: -6px; bottom: -6px; left: -6px;
+    border-radius: 34px;
+    box-shadow: 0 0 30px 10px rgba(255, 190, 60, 0.6);
+}
+
 /* ========================================================================= */
 /* INVENTAIRE : BANDEAU D'OR ET EMPLACEMENTS D'ÉQUIPEMENT                    */
 /* ========================================================================= */

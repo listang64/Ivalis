@@ -49,7 +49,7 @@ console.log("\n2. nettoyerCiblage RETIRE BIEN LE BOUTON ET LÈVE LE VERROU");
         window.ETAT_CIBLAGE = { actif: true };
         window.surlignerEffetCarteActif = () => {};
         window.retirerAssombrissement = () => {};
-        window.actualiserBandeauAction = () => { window.__bandeauRafraichi = true; };
+        window.rafraichirVoileTour = () => { window.__voileRafraichi = true; };
         window.VTT_CIBLAGE_MOUSEMOVE = () => {}; window.VTT_CIBLAGE_WHEEL = () => {};
         window.VTT_CIBLAGE_CLICK = () => {}; window.VTT_CIBLAGE_TOUCHSTART = () => {};
         window.VTT_CIBLAGE_TOUCHMOVE = () => {};
@@ -68,7 +68,7 @@ console.log("\n2. nettoyerCiblage RETIRE BIEN LE BOUTON ET LÈVE LE VERROU");
             resoudrePresent: !!document.getElementById("btn-resoudre-carte"),
             annulerPresent: !!document.getElementById("btn-annuler-ciblage"),
             appliquerVisible: document.getElementById("btn-appliquer-carte").style.display,
-            bandeauRafraichi: window.__bandeauRafraichi
+            voileRafraichi: window.__voileRafraichi
         };
     }, SRC_NETTOIE);
 
@@ -76,7 +76,7 @@ console.log("\n2. nettoyerCiblage RETIRE BIEN LE BOUTON ET LÈVE LE VERROU");
     verifier("le bouton RÉSOUDRE a disparu", !res.resoudrePresent);
     verifier("le bouton ANNULER a disparu aussi", !res.annulerPresent);
     verifier("le bouton APPLIQUER redevient visible", res.appliquerVisible === "block");
-    verifier("le bandeau du bas est rafraîchi (la compétence redevient lançable)", res.bandeauRafraichi === true);
+    verifier("la fenêtre de tour est rafraîchie (la compétence redevient lançable)", res.voileRafraichi === true);
 
     await b.close();
 }

@@ -57,7 +57,8 @@ node occupation_cases.mjs   # qui occupe vraiment une case (morts et fantômes e
 node zone_assombrissement.mjs # où l'on peut poser une zone à distance, et l'écran noirci
 node zones_ia.mjs           # les zones sont posées, orientées et bien placées
 node piste_initiative.mjs   # la piste tient à droite du panneau, bulles réduites
-node bandeau_action.mjs     # le relais piste/panneau et le bandeau "Lancer" du bas gauche
+node fenetre_tour.mjs       # la fenêtre sombre de tour : nom, états, technique, effets, OK doré
+node sequence_tour.mjs      # les deux barrières de synchronisation, sur trois postes
 node deplacement_repris.mjs # repartir en cours de tour, sans remise à zéro du barème
 node points_apparition.mjs  # les deux repères d'apparition, et la dispersion des pions
 node reinit_plateau.mjs     # la réinitialisation vide le plateau, puis enchaîne le déploiement
@@ -97,6 +98,44 @@ node etalement_sans_degats.mjs # Durée étalement dégâts grisée sur une cart
 node zone_soin_verte_carte.mjs # la zone persistante de soin se dessine en vert, jamais en rouge
 node annuler_ciblage.mjs # un bouton ANNULER reprend la main sur le déplacement en plein ciblage
 node carte_grisee_sans_message.mjs # cliquer une carte trop chère l'affiche sans message d'erreur
+
+## La séquence de tour (le gros changement d'architecture)
+
+Un tour de combat ne se déroule plus « chacun à son rythme ». Il passe par
+quatre temps, et personne ne franchit le suivant avant que tout le monde y
+soit — c'est ce qui a fait disparaître les déplacements sautés puis les pions
+téléportés un tour plus tard, vus sur iPad et jamais sur PC :
+
+1. **Calcul** — le poste qui agit (le joueur dont c'est le tour, ou celui qui
+   tient le verrou de l'IA) calcule et diffuse tout : déplacement, opportunités,
+   zones, carte, dés. Chez les spectateurs, la fenêtre sombre est déjà là et met
+   tout ce qui arrive **en attente** au lieu de l'animer.
+2. **Check « prêt »** — le calcul terminé est annoncé en base. Chaque poste
+   vérifie qu'il sait lire ce tour (le combattant, sa technique) — la
+   vérification base → client — puis signe.
+3. **OK doré** — quand tous ont signé, le gros OK clignote partout. Un doigt
+   n'importe où sur la fenêtre rejoue les animations, dans leur ordre d'arrivée.
+4. **Check « fini »** — chaque poste signe une seconde fois quand il a tout
+   rejoué. Le dernier Check fait avancer la file.
+
+Aucune minuterie ne passe un poste absent : la table reste en pause tant qu'il
+n'est pas revenu. Une sortie de secours entièrement manuelle
+(« Continuer sans les absents ») est offerte à qui la demande, et un héros mis
+de côté ne compte plus dans les postes attendus.
+
+Deux pièges refermés au passage, tous deux vérifiés par `sequence_tour.mjs` :
+
+- **Le sous-effet en retard.** Poussée, Traction et Peur ne sont calculées
+  qu'au moment où la carte s'anime : elles partent donc APRÈS l'annonce du
+  calcul. L'acteur publie la liste des animations du tour à la fin de son propre
+  rejeu — lue dans la base (ce qui a été DIFFUSÉ), et non dans son souvenir de
+  ce qu'il a rejoué, car l'écho d'une carte peut lui revenir après coup. Un
+  poste ne se déclare fini que lorsqu'il les a toutes jouées.
+- **Le rejeu qui frappe deux fois.** Le moteur applique les dégâts en
+  retranchant ce qu'il lit. Un rejeu qui démarre après le OK lit des points de
+  vie que la base a déjà mis à jour. On photographie donc les combattants à
+  l'arrivée de l'ordre d'animer, et on les remet dans cet état juste avant de
+  rejouer.
 ```
 
 ## Fidélité à la Forge

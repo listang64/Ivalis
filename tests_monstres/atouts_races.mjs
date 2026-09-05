@@ -56,7 +56,7 @@ function poste({ des = [], domComplet = false } = {}) {
   w.EFFETS_BDD_CACHE = {}; w.CACHE_COMPETENCES_GLOBAL = {};
   w.jouerSonClic = () => {}; w.RESOLUTIONS_LOCALES = [];
   w.removeEventListener = () => {}; w.surlignerEffetCarteActif = () => {};
-  w.retirerAssombrissement = () => {}; w.actualiserBandeauAction = () => {};
+  w.retirerAssombrissement = () => {}; w.rafraichirVoileTour = () => {};
   w.caseOccupeeParVivant = () => false;
 
   global.window = w;

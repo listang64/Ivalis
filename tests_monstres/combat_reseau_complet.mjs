@@ -15,6 +15,7 @@ import { creerPlateau, EFFETS } from './banc_ia.mjs';
 
 const SRC_MOTEUR = fs.readFileSync('/home/user/Ivalis/moteur_effets.js', 'utf-8')
   .replace(/^import[\s\S]*?from\s+"[^"]+";/gm, '');
+const SRC_SEQUENCE = fs.readFileSync('/home/user/Ivalis/sequence_tour.js', 'utf-8');
 const SRC_IA = fs.readFileSync('/home/user/Ivalis/monstres_ia.js', 'utf-8')
   .replace(/^import[\s\S]*?from\s+"[^"]+";/gm, '')
   .replace(/await pause\(\d+\);/g, 'await pause(1);');
@@ -192,7 +193,7 @@ function creerPoste(nom, monde, mesPersos) {
   w.mettreAJourJaugePV = () => {}; w.mettreAJourJaugeFatigue = () => {};
   w.afficherApercuCarteHD = () => {}; w.masquerApercuCarteHD = () => {};
   w.actualiserBannieresEpuisees = () => {}; w.ajusterTitresBannieres = () => {};
-  w.actualiserBandeauAction = () => {}; w.surlignerEffetCarteActif = () => {};
+  w.rafraichirVoileTour = () => {}; w.surlignerEffetCarteActif = () => {};
   w.retirerAssombrissement = () => {}; w.assombrirCasesJouables = () => {};
   w.dessinerAnneauxCiblage = () => {}; w.dessinerZoneAoE = () => {};
   w.actualiserVisuelCiblage = () => {}; w.centrerMapSurToken = () => {};
@@ -266,6 +267,10 @@ function creerPoste(nom, monde, mesPersos) {
     w, db, api.doc, api.updateDoc, api.setDoc, api.deleteDoc, api.deleteField);
   new Function('window', 'db', 'doc', 'getDoc', 'updateDoc', 'runTransaction', SRC_IA)(
     w, db, api.doc, api.getDoc, api.updateDoc, api.runTransaction);
+  // La séquence de tour : les deux barrières de synchronisation. Chaque poste a
+  // son propre identifiant, celui-là même qui signe les Check.
+  new Function('window', 'localStorage', SRC_SEQUENCE)(
+    w, { getItem: (c) => (c === "ID_JOUEUR_COURANT" ? mesPersos.joueur : null) });
 
   // Les fonctions purement visuelles sont neutralisées APRÈS le chargement des
   // modules : chargés ensuite, ils écrasaient les bouchons posés avant eux, et
@@ -306,6 +311,7 @@ function creerPoste(nom, monde, mesPersos) {
     activer();
     w.PARTIE_DATA = data;
     estPremierScanPartie = repartir(w, data, estPremierScanPartie, () => {});
+    if (typeof w.suivreSequenceTour === "function") w.suivreSequenceTour(data);
     if (typeof w.verifierTourIAMonstres === "function") w.verifierTourIAMonstres();
   });
   api.onSnapshot(api.doc(db, "Combat_VTT", "P1"), (data) => {
@@ -352,6 +358,39 @@ const postes = [
   creerPoste("iPad-Ben",  monde, { joueur: "P2", heros: "J2" }),
   creerPoste("PC-Adrien", monde, { joueur: "P3", heros: "J3" })
 ];
+// LE GESTE DU JOUEUR : dès que le gros OK doré s'allume, chacun touche son
+// écran. C'est lui qui déclenche le rejeu des animations mises de côté — et
+// sans lui, plus rien n'avance : c'est précisément la garantie recherchée.
+async function toucherLesEcrans() {
+  let unSeulATouche = false;
+  for (const poste of postes) {
+    const etape = typeof poste.w.etatSequenceTour === "function" ? poste.w.etatSequenceTour() : null;
+    if (etape && etape.okVisible) {
+      poste.activer();
+      await poste.w.jouerSequenceTour();
+      unSeulATouche = true;
+    }
+  }
+  return unSeulATouche;
+}
+
+const attendreBrut = monde.attendreLeReseau;
+monde.attendreLeReseau = async (tours = 60, minimum = 0) => {
+  for (let i = 0; i < 6; i++) {
+    await attendreBrut(tours, minimum);
+    if (!await toucherLesEcrans()) return;
+  }
+};
+monde.attendreQue = async (predicat, msMax = 4000) => {
+  const debut = Date.now();
+  while (Date.now() - debut < msMax) {
+    if (predicat(monde.docs)) return true;
+    await toucherLesEcrans();
+    await new Promise(r => setTimeout(r, 12));
+  }
+  return predicat(monde.docs);
+};
+
 await monde.attendreLeReseau();
 
 // Un poste joue la carte de SON héros quand c'est son tour.
@@ -480,6 +519,12 @@ for (let round = 1; round <= 3 && garde < 200; round++) {
         await monde.attendreLeReseau(80);
       }
     }
+    // On compare une fois le réseau VRAIMENT au calme. La file avance
+    // maintenant dans la transaction de la barrière, tandis que le décompte des
+    // états et la régénération suivent quelques instants plus tard : comparer
+    // au changement de tête, c'était prendre les trois postes en plein milieu
+    // d'une écriture, et se plaindre d'un désaccord qui n'existe déjà plus.
+    await monde.attendreLeReseau(140, 400);
     comparerLesPostes(`après le tour de ${tete.idPersonnage} (round ${partie.Tour_Combat})`);
     if (postes[0].w.PERSOS_PARTIE.some(x => (x.Etats_Alteres || []).length > 0)) toursAvecEtat++;
   }
