@@ -530,10 +530,14 @@ const RENFORT_DIFFICULTE = {
 
 // Le terrain accueille autant d'ennemis qu'il y a de joueurs, plus un. Les illusions
 // sont des leurres posés par les héros, pas des joueurs : les compter ferait grossir
-// la rencontre à chaque sort d'illusion. Plancher à 2 tant que la liste des
-// personnages n'est pas encore chargée (sinon une rencontre se réduirait à 1 ennemi).
+// la rencontre à chaque sort d'illusion. Un héros mis de côté (Actif: false) n'est
+// pas non plus un joueur présent au combat — même filtre que recomposerCombattants,
+// sinon un groupe réduit en cours de partie continue de faire face à une rencontre
+// taillée pour l'effectif d'avant. Plancher à 2 tant que la liste des personnages
+// n'est pas encore chargée (sinon une rencontre se réduirait à 1 ennemi).
 function limiteMonstresTerrain() {
-    const joueurs = (window.PERSOS_JOUEURS_PARTIE || []).filter(p => !p.estIllusion && p.camp !== "Ennemi");
+    const joueurs = (window.PERSOS_JOUEURS_PARTIE || [])
+        .filter(p => !p.estIllusion && p.camp !== "Ennemi" && p.actif !== false);
     return Math.max(2, joueurs.length + 1);
 }
 

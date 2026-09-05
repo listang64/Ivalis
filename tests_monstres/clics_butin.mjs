@@ -228,13 +228,18 @@ console.log("\n5. TANT QUE LA FENÊTRE EST LÀ, ELLE BLOQUE LE COMBAT (attendu)"
 // =========================================================================
 // Nico a demandé de pouvoir cliquer sur son équipement déjà porté, dans la
 // fenêtre de partage, pour en voir les stats sans avoir à rouvrir sa fiche.
-// À ce stade du banc, J1 a déjà équipé une arme (section 3, "MAIN DROITE") :
-// le bandeau "équipement actuel" doit donc montrer une case remplie,
-// réellement cliquable, qui ouvre le détail de CET objet précis.
+// À ce stade du banc, J1 a déjà équipé l'objet tiré à la section 3 — une arme,
+// une armure ou un bouclier selon le tirage (le butin pioche au hasard dans
+// tout le catalogue) : le bandeau "équipement actuel" doit donc montrer une
+// case remplie, réellement cliquable, qui ouvre le détail de CET objet précis,
+// quel que soit l'emplacement où il a atterri.
 console.log("\n6. LE DÉTAIL DE L'ÉQUIPEMENT ACTUEL, D'UN VRAI CLIC");
 {
-  const objetPorte = await p.evaluate(() => window.PERSOS_PARTIE[0].equipMainDroite);
-  verifier("J1 porte bien une arme à ce stade (héritée de la section 3)",
+  const objetPorte = await p.evaluate(() => {
+    const perso = window.PERSOS_PARTIE[0];
+    return perso.equipArmure || perso.equipMainDroite || perso.equipMainGauche || null;
+  });
+  verifier("J1 porte bien l'objet équipé à la section 3, quel que soit l'emplacement",
            !!(objetPorte && objetPorte.nom), `(${objetPorte && objetPorte.nom})`);
 
   const filled = await p.evaluate(() => {
@@ -257,7 +262,8 @@ console.log("\n6. LE DÉTAIL DE L'ÉQUIPEMENT ACTUEL, D'UN VRAI CLIC");
   await p.click("#butin-equipement-actuel .mini-carre-equip:not(.vide)");
   await p.waitForTimeout(150);
   const apresClic = await p.evaluate(() => {
-    const objet = window.PERSOS_PARTIE[0].equipMainDroite;
+    const p2 = window.PERSOS_PARTIE[0];
+    const objet = p2.equipArmure || p2.equipMainDroite || p2.equipMainGauche;
     return {
       popupOuvert: document.getElementById("popup-detail-objet-equipe").style.display === "flex",
       texte: document.getElementById("detail-objet-equipe-contenu").innerText.replace(/\s+/g, " "),

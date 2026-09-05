@@ -144,4 +144,75 @@ await w.marquerMonstreMort(v2);
 synchroniser();
 verifier("réserve vide : aucun monstre créé", Object.keys(base.Monstres).length === nbAvant);
 
+// --- Un joueur mis de côté doit réduire la limite du terrain (bug du 04/09) ---
+// Nico : "monstres = nb de joueurs + 1", et ça n'avait pas suivi la veille quand
+// un personnage joueur avait été désactivé (Actif: false, "mise de côté").
+console.log("\n5. UN JOUEUR MIS DE CÔTÉ RÉDUIT LA LIMITE DU TERRAIN");
+{
+  // Remise à zéro complète du champ de bataille pour un scénario isolé et net.
+  base.Monstres = {};
+  base.Combat_VTT.P1.Tokens = {};
+  base.Systeme_Parties.P1.Reserve_Monstres = [];
+  base.Systeme_Parties.P1.Ordre_Initiative = ["J1", "J2"];
+  w.MONSTRES_PARTIE = [];
+  w.CACHE_COMPETENCES_GLOBAL = {};
+
+  // Un des deux joueurs est mis de côté : un seul joueur restant -> limite à 2.
+  w.PERSOS_JOUEURS_PARTIE = [
+    { idPersonnage: "J1", camp: "Allié", actif: true },
+    { idPersonnage: "J2", camp: "Allié", actif: false }
+  ];
+
+  const resReduit = await w.genererRencontreMonstres("Normale");
+  await new Promise(r => setTimeout(r, 20));
+  synchroniser();
+  const surTerrainReduit = Object.keys(base.Monstres).length;
+  console.log(`     1 joueur actif -> ${surTerrainReduit} sur le terrain, ${resReduit.enReserve.length} en réserve`);
+  verifier("la limite suit le joueur mis de côté (1 + 1 = 2), pas l'ancien effectif (3)",
+           surTerrainReduit === 2, `(${surTerrainReduit})`);
+
+  // Un monstre meurt : le renfort qui entre ne doit pas dépasser cette limite
+  // réduite, même si la réserve contient encore des monstres en attente.
+  const idMort = Object.keys(base.Monstres)[0];
+  base.Monstres[idMort].Statut = "Mort"; base.Monstres[idMort].PV_Actuels = 0;
+  synchroniser();
+  await w.marquerMonstreMort(idMort);
+  synchroniser();
+
+  const vivantsApres = Object.values(base.Monstres).filter(m => m.Statut !== "Mort").length;
+  verifier("le renfort entre bien (une place s'est libérée sous la limite réduite)",
+           vivantsApres === 2, `(${vivantsApres} vivant(s))`);
+
+  // Le terrain est déjà à sa limite RÉDUITE (2) : un appel direct à
+  // entrerRenfortMonstre ne doit rien faire entrer de plus, même si la réserve
+  // n'est pas vide — preuve que le plafond utilisé est bien le nouveau (2), pas
+  // l'ancien effectif d'avant la mise de côté (3).
+  const reserveAvantPlein = base.Systeme_Parties.P1.Reserve_Monstres.length;
+  verifier("il reste bien un monstre en réserve pour rendre ce test significatif",
+           reserveAvantPlein > 0, `(${reserveAvantPlein})`);
+  await w.entrerRenfortMonstre();
+  synchroniser();
+  const vivantsFinal = Object.values(base.Monstres).filter(m => m.Statut !== "Mort").length;
+  verifier("terrain déjà plein sous la limite réduite : aucun renfort de plus",
+           vivantsFinal === 2 && base.Systeme_Parties.P1.Reserve_Monstres.length === reserveAvantPlein,
+           `(${vivantsFinal} vivant(s), réserve inchangée : ${base.Systeme_Parties.P1.Reserve_Monstres.length === reserveAvantPlein})`);
+
+  // Le joueur revient : la limite doit immédiatement suivre dans l'autre sens,
+  // sur une rencontre fraîche (limiteMonstresTerrain est privée à monstres.js,
+  // on la revérifie donc par son seul effet observable : genererRencontreMonstres).
+  base.Monstres = {};
+  base.Combat_VTT.P1.Tokens = {};
+  base.Systeme_Parties.P1.Reserve_Monstres = [];
+  w.MONSTRES_PARTIE = [];
+  w.PERSOS_JOUEURS_PARTIE[1].actif = true;
+
+  await w.genererRencontreMonstres("Normale");
+  await new Promise(r => setTimeout(r, 20));
+  synchroniser();
+  const surTerrainRetabli = Object.keys(base.Monstres).length;
+  verifier("le joueur réactivé rend la limite normale (2 joueurs + 1 = 3)",
+           surTerrainRetabli === 3, `(${surTerrainRetabli})`);
+}
+
 console.log(`\n${echecs === 0 ? "TOUS LES CONTRÔLES PASSENT" : echecs + " CONTRÔLE(S) EN ÉCHEC"}`);
+process.exit(echecs === 0 ? 0 : 1);

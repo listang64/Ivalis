@@ -1,8 +1,11 @@
 // LE BANDEAU D'ACTION ET LE RELAIS PISTE / PANNEAU.
-// Le panneau latéral gauche se referme dès que la piste d'initiative apparaît,
-// et se rouvre quand la file est vide (moment de choisir une carte). Pendant la
-// résolution, le coin bas gauche annonce la carte jouée : son nom en or brossé,
-// ses effets sur une seule ligne, et un bouton doré clignotant pour la lancer.
+// La piste d'initiative NE referme PLUS le panneau latéral gauche à son
+// apparition (Nico l'a fait retirer : ça le coupait dans la lecture de sa
+// fiche) — seule sa disparition continue de le rouvrir tout seul, au moment
+// de choisir une carte. Le panneau garde cependant sa vieille règle, elle
+// jamais remise en cause : tant qu'il est ouvert, il occupe le coin et le
+// bandeau du bas (nom en or brossé, effets sur une ligne, bouton doré
+// clignotant) reste masqué.
 import fs from 'fs';
 import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 
@@ -114,11 +117,20 @@ const res = await p.evaluate(async ({ sBandeau, sToggle, sBouton, sEtatInitial, 
   jouer([], "Preparation");
   const preparation = etat();
 
-  // 2. La piste se met en place : le panneau doit s'effacer, le bandeau paraître.
+  // 2. La piste se met en place : le panneau ne se referme plus tout seul (Nico).
+  //    Comme il reste ouvert, le bandeau, lui, reste masqué — règle inchangée.
   jouer(fileHeros, "Resolution");
-  const tourHeros = etat();
+  const tourHerosPanneauOuvert = etat();
 
-  // 3. Le panneau rouvert à la main masque le bandeau...
+  // 3. Le joueur referme lui-même le panneau : le bandeau annonce alors la carte.
+  window.togglePanneauGauche();
+  const tourHeros = etat();
+  // Un redessin de la piste ne le rouvre pas dans le dos du joueur qui vient
+  // de le fermer à la main.
+  jouer(fileHeros, "Resolution");
+  const apresRedessinFerme = etat();
+
+  // 4. Le panneau rouvert à la main masque de nouveau le bandeau...
   window.togglePanneauGauche();
   const panneauRouvert = etat();
   // ... et un redessin de la piste ne le referme pas dans le dos du joueur.
@@ -171,7 +183,10 @@ const res = await p.evaluate(async ({ sBandeau, sToggle, sBouton, sEtatInitial, 
   jouer([], "Preparation");
   const fileVidee = etat();
 
-  // 9. Une ligne d'effets à rallonge doit rétrécir, pas passer à la ligne.
+  // 9. Une ligne d'effets à rallonge doit rétrécir, pas passer à la ligne. Le
+  //    panneau vient de se rouvrir tout seul à l'étape 8 : on le referme à la
+  //    main, sinon le bandeau reste masqué et son contenu jamais recalculé.
+  window.togglePanneauGauche();
   window.COMPETENCES_CACHE.CARTE_LONGUE = { Nom: "Litanie interminable des sept douleurs anciennes",
     Effets_Compiles: [ { nom: "Attaque lourde", isMod: false }, { nom: "Saignement", isMod: true },
       { nom: "Poussée", isMod: true }, { nom: "Brûlure", isMod: true }, { nom: "Étourdissement", isMod: true },
@@ -202,7 +217,8 @@ const res = await p.evaluate(async ({ sBandeau, sToggle, sBouton, sEtatInitial, 
   // Le bouton clignote-t-il vraiment ? (animation CSS sur sa couche de halo)
   const anim = getComputedStyle(bouton, '::before').animationName;
 
-  return { preparation, tourHeros, panneauRouvert, apresRedessin, apresClic, clicAilleurs, pendantCiblage,
+  return { preparation, tourHerosPanneauOuvert, tourHeros, apresRedessinFerme, panneauRouvert, apresRedessin,
+           apresClic, clicAilleurs, pendantCiblage,
            ciblageAnnule, tourMonstre, autreHeros, reposLong, fileVidee, carteLongue, horsCombat,
            zBandeau, zPanneau, enBasAGauche, memeOr, anim };
 }, { sBandeau: srcBandeau, sToggle: srcToggle, sBouton: srcBouton, sEtatInitial: srcEtatInitial, sClicVide: srcClicVide });
@@ -213,8 +229,10 @@ console.log(`     tour de la goule: « ${res.tourMonstre.titre} » — ${res.tou
 console.log(`     carte à rallonge: ${res.carteLongue.tailleEffets}px, ${res.carteLongue.lignesEffets} ligne(s)`);
 
 verifier("en préparation, le panneau reste ouvert pour choisir", res.preparation.panneauOuvert);
-verifier("la piste apparaît : le panneau se referme", !res.tourHeros.panneauOuvert);
-verifier("le bandeau annonce la carte jouée", res.tourHeros.bandeauVisible && res.tourHeros.titre === "Lame du crépuscule",
+verifier("la piste apparaît : le panneau ne se referme plus tout seul", res.tourHerosPanneauOuvert.panneauOuvert);
+verifier("tant qu'il reste ouvert, le bandeau reste masqué", !res.tourHerosPanneauOuvert.bandeauVisible);
+verifier("le joueur ferme le panneau : le bandeau annonce alors la carte jouée",
+         res.tourHeros.bandeauVisible && res.tourHeros.titre === "Lame du crépuscule",
          `(${res.tourHeros.titre})`);
 verifier("ses effets tiennent sur une seule ligne", res.tourHeros.lignesEffets === 1 && !res.tourHeros.debordeEffets,
          `(${res.tourHeros.lignesEffets} ligne)`);
@@ -222,6 +240,7 @@ verifier("l'initiative n'est pas listée comme un effet", !/Initiative/.test(res
 verifier("les modificateurs sont bien là", /Distance/.test(res.tourHeros.effets) && /Saignement/.test(res.tourHeros.effets));
 verifier("le bouton doré s'affiche pour le héros du poste", res.tourHeros.boutonVisible);
 verifier("il clignote (animation sur sa couche de halo)", res.anim === "clignotementLancer", `(${res.anim})`);
+verifier("un redessin ne rouvre pas le panneau fermé à la main", !res.apresRedessinFerme.panneauOuvert);
 verifier("le panneau rouvert masque le bandeau", res.panneauRouvert.bandeauVisible === false);
 verifier("un redessin ne referme pas le panneau ouvert à la main", res.apresRedessin.panneauOuvert);
 verifier("le clic lance la bonne carte, une seule fois",

@@ -3536,23 +3536,23 @@ window.afficherPisteInitiative = function(queue, phase) {
 //  BANDEAU D'ACTION (BAS GAUCHE) : LA CARTE DU COMBATTANT QUI JOUE
 // =========================================================================
 
-// La piste d'initiative et le panneau latéral se relaient : tant que l'ordre de
-// passage est affiché, le plateau doit rester dégagé ; dès que la file est vide
-// et qu'il faut de nouveau choisir une carte, le panneau revient de lui-même.
-// On n'agit qu'au changement d'état, sinon chaque redessin de la piste
-// refermerait le panneau que le joueur vient d'ouvrir à la main.
+// Sur demande de Nico : la piste d'initiative n'a plus le droit de refermer
+// le panneau latéral toute seule à son apparition — seule sa DISPARITION
+// continue de le rouvrir tout seul s'il était fermé, pour qu'il retrouve sa
+// fiche au moment de choisir une carte. On n'agit qu'au changement d'état,
+// sinon chaque redessin de la piste le rouvrirait dans le dos du joueur qui
+// viendrait de le refermer à la main pendant la Préparation.
 window.PISTE_INITIATIVE_VISIBLE = null;
 
 window.synchroniserPanneauAvecPiste = function(visible, queue, phase) {
     if (document.getElementById("fenetre-combat")?.style.display !== "block") return;
 
-    if (window.PISTE_INITIATIVE_VISIBLE !== visible) {
-        window.PISTE_INITIATIVE_VISIBLE = visible;
-        if (typeof window.togglePanneauGauche === "function"
-            && window.PANNEAU_GAUCHE_OUVERT === visible) {
-            window.togglePanneauGauche(true);
-        }
+    if (!visible && window.PISTE_INITIATIVE_VISIBLE !== visible && !window.PANNEAU_GAUCHE_OUVERT
+        && typeof window.togglePanneauGauche === "function") {
+        window.togglePanneauGauche(true);
     }
+    window.PISTE_INITIATIVE_VISIBLE = visible;
+
     if (typeof window.actualiserBandeauAction === "function") window.actualiserBandeauAction(queue, phase);
 };
 
@@ -3939,8 +3939,9 @@ window.reinitialiserCombat = async function() {
     if (!confirm("Voulez-vous vraiment réinitialiser ce combat ? Tous les PV et la Fatigue seront restaurés, et le combat repassera au Tour 1.")) return;
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
 
-    // Le relais piste / panneau repart de zéro : le prochain passage en résolution
-    // doit de nouveau refermer le panneau, même s'il était déjà fermé avant le reset.
+    // Le relais piste / panneau repart de zéro : le prochain passage à une file
+    // vide doit de nouveau pouvoir rouvrir le panneau, même s'il l'était déjà
+    // avant le reset (sinon la comparaison ne verrait aucun changement d'état).
     window.PISTE_INITIATIVE_VISIBLE = null;
 
     try {
