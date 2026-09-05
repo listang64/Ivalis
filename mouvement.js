@@ -563,8 +563,12 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
     window.ANIMATION_VTT_EN_COURS = true;
     // Tant que ce pion marche, la case qui arrive du réseau ne le déplace pas :
     // sinon il se téléporte à l'arrivée avant même d'avoir commencé son trajet.
+    // La date (pas juste "true") permet à positionsProtegees (combat.js) de ne
+    // plus protéger un pion si cette animation a fini par tourner trop
+    // longtemps — un onglet iPad mis en veille en pleine marche ne doit pas
+    // geler sa position pour de bon.
     window.PIONS_EN_MOUVEMENT = window.PIONS_EN_MOUVEMENT || {};
-    window.PIONS_EN_MOUVEMENT[actionMouvement.idToken] = true;
+    window.PIONS_EN_MOUVEMENT[actionMouvement.idToken] = Date.now();
     // Ce trajet-là est joué : sa case d'arrivée n'a plus besoin d'être retenue.
     window.DERNIER_MOUVEMENT_ANIME = Math.max(window.DERNIER_MOUVEMENT_ANIME || 0,
                                               actionMouvement.timestamp || 0);
@@ -648,7 +652,7 @@ window.jouerAnimationBond = async function(data) {
 
     window.ANIMATION_VTT_EN_COURS = true;
     window.PIONS_EN_MOUVEMENT = window.PIONS_EN_MOUVEMENT || {};
-    window.PIONS_EN_MOUVEMENT[data.idToken] = true;
+    window.PIONS_EN_MOUVEMENT[data.idToken] = Date.now();
 
     tokenDiv.style.transition = "left 0.25s ease-in-out, top 0.25s ease-in-out";
     if (imgMain) imgMain.style.transition = "transform 0.12s ease-in-out";

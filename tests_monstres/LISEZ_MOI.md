@@ -91,6 +91,7 @@ node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
 node provocation.mjs        # l'effet Provocation (portée moteur), réservé aux joueurs
 node barre_progression_creation.mjs # la barre de progression et les phrases humoristiques à la création
+node reveil_arriere_plan.mjs # un onglet iPad endormi en pleine animation ne bloque plus la sync pour de bon
 ```
 
 ## Fidélité à la Forge

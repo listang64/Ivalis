@@ -341,6 +341,40 @@ window.filerAnimation = function(nom, fn) {
     return window.FILE_ANIMATIONS;
 };
 
+// =========================================================================
+//  RETOUR AU PREMIER PLAN (iPad surtout) : ON NE FAIT PLUS CONFIANCE À UNE
+//  ANIMATION QUI DORMAIT
+// =========================================================================
+//  Safari suspend agressivement les minuteurs et le réseau d'un onglet mis en
+//  arrière-plan ou l'écran verrouillé — bien plus qu'un navigateur de bureau,
+//  qui ne met jamais en veille son onglet actif de cette façon. Une animation
+//  de déplacement gelée en plein trajet pendant ce sommeil laisse plusieurs
+//  verrous coincés à l'état "actif" pour de bon, faute d'avoir pu atteindre
+//  leur ligne de nettoyage : ANIMATION_VTT_EN_COURS (mouvement.js), qui bloque
+//  alors TOUT redessin du plateau (appliquerTokensVTT s'arrête dessus en tout
+//  premier), et PIONS_EN_MOUVEMENT (combat.js), qui protège ce pion précis
+//  d'une case qui n'est déjà plus la bonne. C'est exactement le symptôme
+//  remonté sur iPad — un déplacement d'ennemi qui ne s'affiche pas, puis un
+//  autre qui téléporte d'un coup un tour plus tard, une fois qu'un mouvement
+//  ultérieur du MÊME pion a fini par lever le verrou — et jamais sur PC, dont
+//  l'onglet actif n'est jamais mis en veille de cette façon.
+//  Il n'y a rien à rattraper en douceur : le trajet manqué appartient au
+//  passé, et le rejouer en accéléré ajouterait de la confusion plutôt que
+//  d'aider. Au réveil, on lève donc tous ces verrous et on republie l'état du
+//  plateau tel qu'on le connaît — Firestore livre de toute façon un instantané
+//  frais dès que l'onglet redevient actif.
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden) return;
+
+    window.PIONS_EN_MOUVEMENT = {};
+    window.ANIMATION_VTT_EN_COURS = false;
+    window.FILE_ANIMATIONS = Promise.resolve();
+
+    if (window.TOKENS_VTT_DATA && typeof window.appliquerTokensVTT === "function") {
+        window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    }
+});
+
 // Les caractéristiques des héros de la partie, lues une fois et partagées par
 // tout le jeu. Sans elles, le prérequis d'un objet ne se vérifiait que chez le
 // joueur qui avait ouvert la fiche — les autres pouvaient équiper n'importe

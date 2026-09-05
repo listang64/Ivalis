@@ -619,9 +619,24 @@ function combattantDuPanneau() {
 //
 //  Aucune lecture réseau ici : on ne fait que remettre à l'écran ce que le
 //  poste sait déjà.
-// Les pions dont une animation de marche est en cours sur CE poste. Tant qu'un
-// pion y figure, sa case à l'écran est celle de l'animation, pas celle qui
-// arrive du réseau.
+// Les pions dont une animation de marche est en cours sur CE poste, avec la
+// date à laquelle chacun s'y est mis (Date.now(), plus jamais "true"). Tant
+// qu'un pion y figure ET que cette date est récente, sa case à l'écran est
+// celle de l'animation, pas celle qui arrive du réseau.
+//
+// Pourquoi une date et pas un simple drapeau : sur iPad/Safari, un onglet mis
+// en arrière-plan (écran verrouillé, appli changée pendant le tour d'un
+// autre joueur) peut geler l'animation en plein trajet — le setTimeout qui
+// devait la faire avancer, et donc le "delete" qui la sort de cette liste à
+// la fin, ne se rejoue jamais tant que l'onglet dort. Un simple drapeau sans
+// date restait alors bloqué à "true" pour de bon : la vraie position du
+// pion, elle, continuait d'avancer en base (d'autres tours se jouaient
+// pendant ce temps), et au réveil de l'onglet, la PROCHAINE animation de ce
+// même pion à se terminer normalement levait enfin le drapeau — laissant
+// passer d'un coup une position vieille de plusieurs tours : le
+// "téléporte-à-retardement" vu sur iPad, absent sur PC (dont l'onglet actif
+// n'est jamais mis en veille de cette façon). La date fait expirer la
+// protection toute seule, bien avant que ça arrive.
 window.PIONS_EN_MOUVEMENT = window.PIONS_EN_MOUVEMENT || {};
 
 // Le mouvement le plus récemment ANIMÉ sur ce poste. Il sert à reconnaître un
@@ -635,8 +650,18 @@ window.positionsProtegees = function(tokensRecus, mouvementEnCours) {
         if (recus[id] && locaux[id]) recus[id] = { ...recus[id], q: locaux[id].q, r: locaux[id].r };
     };
 
-    // 1. Les pions dont l'animation tourne en ce moment sur cet écran.
-    Object.keys(window.PIONS_EN_MOUVEMENT || {}).forEach(garder);
+    // Aucune animation légitime ne dépasse ce délai (déjà la limite retenue par
+    // filerAnimation, app.js) : passé ce temps réel, une protection encore
+    // active n'est plus le signe d'une marche en cours, mais d'un poste qui
+    // vient de se réveiller après avoir dormi pendant qu'elle tournait.
+    const delaiMax = window.DELAI_MAX_ANIMATION_MS || 20000;
+
+    // 1. Les pions dont l'animation tourne en ce moment sur cet écran — sauf si
+    //    elle dure depuis trop longtemps pour être encore vraie (voir plus haut).
+    Object.entries(window.PIONS_EN_MOUVEMENT || {}).forEach(([id, depuis]) => {
+        if (typeof depuis === "number" && (Date.now() - depuis) > delaiMax) return;
+        garder(id);
+    });
 
     // 2. Et celui dont le trajet est annoncé mais pas encore joué ICI. La case
     //    d'arrivée voyage dans le plateau, l'ordre d'animer dans la partie :
@@ -645,7 +670,7 @@ window.positionsProtegees = function(tokensRecus, mouvementEnCours) {
     //    sans l'autre — ce qui ferme la course pour de bon.
     if (mouvementEnCours && mouvementEnCours.idToken
         && (mouvementEnCours.timestamp || 0) > (window.DERNIER_MOUVEMENT_ANIME || 0)
-        && (Date.now() - (mouvementEnCours.timestamp || 0)) < 20000) {
+        && (Date.now() - (mouvementEnCours.timestamp || 0)) < delaiMax) {
         garder(mouvementEnCours.idToken);
     }
     return recus;
