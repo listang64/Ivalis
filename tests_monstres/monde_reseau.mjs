@@ -150,9 +150,15 @@ export function creerMonde(documents) {
     };
 
     const onSnapshot = (ref, fn) => {
-      monde.ecouteurs.push({ chemin: ref.chemin, poste: nomPoste, fn });
+      const entree = { chemin: ref.chemin, poste: nomPoste, fn };
+      monde.ecouteurs.push(entree);
       setTimeout(() => fn(lire(ref.chemin)), 1);
-      return () => {};
+      // Un vrai désabonnement : les scripts de tour ouvrent et referment une
+      // écoute par tour, et sans cela elles s'empilaient jusqu'à la fin du banc.
+      return () => {
+        const i = monde.ecouteurs.indexOf(entree);
+        if (i >= 0) monde.ecouteurs.splice(i, 1);
+      };
     };
 
     return { doc, getDoc, updateDoc, setDoc, deleteDoc, deleteField, runTransaction, writeBatch, onSnapshot };

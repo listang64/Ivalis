@@ -267,10 +267,32 @@ function creerPoste(nom, monde, mesPersos) {
     w, db, api.doc, api.updateDoc, api.setDoc, api.deleteDoc, api.deleteField);
   new Function('window', 'db', 'doc', 'getDoc', 'updateDoc', 'runTransaction', SRC_IA)(
     w, db, api.doc, api.getDoc, api.updateDoc, api.runTransaction);
-  // La séquence de tour : les deux barrières de synchronisation. Chaque poste a
-  // son propre identifiant, celui-là même qui signe les Check.
+  // La séquence de tour : le script et sa relecture. Chaque poste a son propre
+  // identifiant, celui-là même qui signe « j'ai fini de rejouer ».
   new Function('window', 'localStorage', SRC_SEQUENCE)(
     w, { getItem: (c) => (c === "ID_JOUEUR_COURANT" ? mesPersos.joueur : null) });
+
+  // La plomberie de la collection Scripts_Tour, telle qu'app.js l'expose.
+  const refScript = (id) => api.doc(db, "Scripts_Tour", id);
+  w.ecrireScriptTour = async (id, champs) => {
+    activer();
+    await api.setDoc(refScript(id), JSON.parse(JSON.stringify(champs)), { merge: true });
+    return true;
+  };
+  w.signerScriptTour = async (id, joueur) => {
+    activer();
+    await api.runTransaction(db, async (tx) => {
+      const snap = await tx.get(refScript(id));
+      const finis = new Set(((snap.exists() && snap.data().finis) || []));
+      finis.add(joueur);
+      tx.update(refScript(id), { finis: [...finis] });
+    });
+    return true;
+  };
+  w.ecouterScriptTour = (id, rappel) => api.onSnapshot(refScript(id), (data) => {
+    activer();
+    rappel(data || null);
+  });
 
   // Les fonctions purement visuelles sont neutralisées APRÈS le chargement des
   // modules : chargés ensuite, ils écrasaient les bouchons posés avant eux, et

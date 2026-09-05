@@ -57,8 +57,8 @@ node occupation_cases.mjs   # qui occupe vraiment une case (morts et fantômes e
 node zone_assombrissement.mjs # où l'on peut poser une zone à distance, et l'écran noirci
 node zones_ia.mjs           # les zones sont posées, orientées et bien placées
 node piste_initiative.mjs   # la piste tient à droite du panneau, bulles réduites
-node fenetre_tour.mjs       # la fenêtre sombre de tour : nom, états, technique, effets, OK doré
-node sequence_tour.mjs      # les deux barrières de synchronisation, sur trois postes
+node fenetre_tour.mjs       # la fenêtre de tour : nom coloré, effets détaillés, zone, OK doré
+node sequence_tour.mjs      # le script d'un tour et sa relecture, sur trois postes
 node deplacement_repris.mjs # repartir en cours de tour, sans remise à zéro du barème
 node points_apparition.mjs  # les deux repères d'apparition, et la dispersion des pions
 node reinit_plateau.mjs     # la réinitialisation vide le plateau, puis enchaîne le déploiement
@@ -101,50 +101,49 @@ node carte_grisee_sans_message.mjs # cliquer une carte trop chère l'affiche san
 
 ## La séquence de tour (le gros changement d'architecture)
 
-Un tour de combat ne se déroule plus « chacun à son rythme ». Il passe par
-quatre temps, et personne ne franchit le suivant avant que tout le monde y
-soit — c'est ce qui a fait disparaître les déplacements sautés puis les pions
-téléportés un tour plus tard, vus sur iPad et jamais sur PC :
+Un tour de combat ne se diffuse plus morceau par morceau, chacun l'animant dès
+qu'il le reçoit. Il s'ÉCRIT, en entier et dans l'ordre, dans un document qui
+n'appartient qu'à lui — `Scripts_Tour/{partie__clé}` — puis chaque poste le
+RELIT pour lui. C'est ce qui a fait disparaître les déplacements sautés puis les
+pions téléportés un tour plus tard, vus sur iPad et jamais sur PC.
 
-1. **Calcul** — le poste qui agit (le joueur dont c'est le tour, ou celui qui
-   tient le verrou de l'IA) calcule et diffuse tout : déplacement, opportunités,
-   zones, carte, dés. Chez les spectateurs, la fenêtre sombre est déjà là et met
-   tout ce qui arrive **en attente** au lieu de l'animer.
-2. **Check « prêt »** — le calcul terminé est annoncé en base. Chaque poste
-   vérifie qu'il sait lire ce tour (le combattant, sa technique) — la
-   vérification base → client — puis signe.
-3. **OK doré** — quand tous ont signé, le gros OK clignote partout. Un doigt
-   n'importe où sur la fenêtre rejoue les animations, dans leur ordre d'arrivée.
-4. **Check « fini »** — chaque poste signe une seconde fois quand il a tout
-   rejoué. Le dernier Check fait avancer la file.
+1. **Le poste qui agit** joue son tour normalement (c'est lui qui vise, qui se
+   déplace) et consigne chaque étape au fil de l'eau : le déplacement, la carte,
+   le bond, la poussée, la traction, la peur. L'ordre des appels est l'ordre du
+   tour. Les autres attendent derrière la fenêtre sombre — **opaque** : à moitié
+   transparente, on devinait les animations et les textes flottants du tour en
+   train de s'écrire, ce qui est exactement ce qu'elle doit cacher.
+2. **Le tour fini**, il pose `complet` sur le script. Ce simple drapeau allume le
+   gros OK doré chez tout le monde **au même instant** : il n'y a plus d'échange
+   de « prêt » d'un poste à l'autre, qui décalait le bouton d'un appareil à
+   l'autre.
+3. **Chaque poste rejoue le script pour lui**, à son rythme : une étape à la
+   fois, chacune attendant que la précédente ait vraiment fini, avec un temps de
+   respiration entre deux. Rien n'est plus « temps réel » : c'est une relecture,
+   et elle est identique partout.
+4. **Quand un poste a tout rejoué, il signe.** Le dernier Check fait avancer la
+   file : à cet instant, les trois écrans racontent la même histoire.
 
 Aucune minuterie ne passe un poste absent : la table reste en pause tant qu'il
-n'est pas revenu. Une sortie de secours entièrement manuelle
-(« Continuer sans les absents ») est offerte à qui la demande, et un héros mis
-de côté ne compte plus dans les postes attendus.
+n'est pas revenu. Une sortie de secours entièrement manuelle (« Continuer sans
+les absents ») est offerte après une longue attente, et un héros mis de côté ne
+compte plus dans les postes attendus.
 
-Deux pièges refermés au passage, tous deux vérifiés par `sequence_tour.mjs` :
+Trois pièges refermés en chemin, tous vérifiés par `sequence_tour.mjs` :
 
-- **Le sous-effet en retard.** Poussée, Traction et Peur ne sont calculées
-  qu'au moment où la carte s'anime : elles partent donc APRÈS l'annonce du
-  calcul. L'acteur publie la liste des animations du tour à la fin de son propre
-  rejeu — lue dans la base (ce qui a été DIFFUSÉ), et non dans son souvenir de
-  ce qu'il a rejoué, car l'écho d'une carte peut lui revenir après coup. Un
-  poste ne se déclare fini que lorsqu'il les a toutes jouées.
+- **La relecture qui frappe deux fois.** Le moteur applique les dégâts en
+  retranchant ce qu'il lit ; une relecture démarre forcément après que l'auteur
+  a écrit son résultat. Chaque étape du script porte donc les points de vie et
+  le bouclier **d'avant** des seuls combattants qu'elle nomme. Rien n'est
+  réécrit dans les combattants : ce que la base a livré entre-temps sur d'autres
+  — le tic d'une brûlure, l'énergie dépensée ailleurs — reste intact.
 - **La créature qui rejoue son tour.** Entre l'instant où la barrière tombe et
-  celui où la file avance vraiment en base, la tête de file désigne encore le
-  combattant qui vient de jouer. L'IA le voyait toujours « à la main », son
-  propre verrou lui répondait oui, et la créature repartait pour un second
-  tour : une carte de plus, diffusée après que tout le monde s'était déclaré
-  fini, jouée sur un seul écran et perdue sur les autres. Chaque poste garde
-  donc la trace des tours qu'il a bouclés.
-
-- **Le rejeu qui frappe deux fois.** Le moteur applique les dégâts en
-  retranchant ce qu'il lit. Un rejeu qui démarre après le OK lit des points de
-  vie que la base a déjà mis à jour. On photographie donc les combattants à
-  l'arrivée de l'ordre d'animer, et on les remet dans cet état juste avant de
-  rejouer.
-```
+  celui où la file avance vraiment, la tête de file désigne encore le combattant
+  qui vient de jouer. Son verrou d'IA répond toujours oui à qui le détient déjà.
+  Chaque poste garde donc la trace des tours qu'il a bouclés.
+- **Les animations derrière la fenêtre.** Un poste qui regarde ignore désormais
+  complètement les `Action_*` de la partie : il ne connaît le tour que par son
+  script, et ne le joue qu'après le OK.
 
 ## Fidélité à la Forge
 

@@ -735,10 +735,10 @@ window.resoudreBondInteractif = function(idPerso, portee) {
             window.TOKENS_VTT_DATA[idPerso].q = hexArrivee.q;
             window.TOKENS_VTT_DATA[idPerso].r = hexArrivee.r;
 
+            const actionBond = { idToken: idPerso, depart: hexDepart, arrivee: hexArrivee, zones: zonesBond, timestamp: Date.now() };
             try {
-                await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
-                    Action_Bond: { idToken: idPerso, depart: hexDepart, arrivee: hexArrivee, zones: zonesBond, timestamp: Date.now() }
-                });
+                await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), { Action_Bond: actionBond });
+                if (typeof window.consignerEtapeTour === "function") await window.consignerEtapeTour("bond", actionBond);
                 await window.enregistrerPionsVTT(idPerso);
             } catch (err) {
                 console.error("Erreur Bond :", err);
@@ -982,10 +982,10 @@ window.declencherPousseeCible = async function(idLanceur, idCible) {
     window.TOKENS_VTT_DATA[idCible].q = arrivee.q;
     window.TOKENS_VTT_DATA[idCible].r = arrivee.r;
 
+    const actionPoussee = { idToken: idCible, depart: hexDepart, arrivee: arrivee, zones: zonesPoussee, timestamp: Date.now() };
     try {
-        await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
-            Action_Poussee: { idToken: idCible, depart: hexDepart, arrivee: arrivee, zones: zonesPoussee, timestamp: Date.now() }
-        });
+        await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), { Action_Poussee: actionPoussee });
+        if (typeof window.consignerEtapeTour === "function") await window.consignerEtapeTour("poussee", actionPoussee);
         await window.enregistrerPionsVTT(idCible);
     } catch (err) {
         console.error("Erreur Poussée :", err);
@@ -1060,10 +1060,12 @@ window.declencherTractionCible = async function(idLanceur, idCible) {
     window.TOKENS_VTT_DATA[idCible].q = arrivee.q;
     window.TOKENS_VTT_DATA[idCible].r = arrivee.r;
 
+    const actionTraction = { idToken: idCible, depart: hexDepart, arrivee: arrivee, zones: zonesTraction, timestamp: Date.now() };
     try {
         await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
-            Action_Traction: { idToken: idCible, depart: hexDepart, arrivee: arrivee, zones: zonesTraction, timestamp: Date.now() }
+            Action_Traction: actionTraction
         });
+        if (typeof window.consignerEtapeTour === "function") await window.consignerEtapeTour("traction", actionTraction);
         await window.enregistrerPionsVTT(idCible);
     } catch (err) {
         console.error("Erreur Traction :", err);
@@ -1201,10 +1203,12 @@ window.declencherPeurCible = async function(idLanceur, idCible) {
     window.TOKENS_VTT_DATA[idCible].q = hexActuel.q;
     window.TOKENS_VTT_DATA[idCible].r = hexActuel.r;
 
+    const actionPeur = { idToken: idCible, path: chemin, opportunites: opportunitesResolues, zones: zonesResoluesPeur, timestamp: Date.now() };
     try {
         await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
-            Action_Peur: { idToken: idCible, path: chemin, opportunites: opportunitesResolues, zones: zonesResoluesPeur, timestamp: Date.now() }
+            Action_Peur: actionPeur
         });
+        if (typeof window.consignerEtapeTour === "function") await window.consignerEtapeTour("peur", actionPeur);
         await window.enregistrerPionsVTT(idCible);
     } catch (err) {
         console.error("Erreur Peur :", err);
@@ -3164,6 +3168,13 @@ window.declencherResolution = async function() {
         await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
             Action_Moteur: actionData
         });
+
+        // LA CARTE ENTRE DANS LE SCRIPT DU TOUR, avec les points de vie d'avant
+        // de ses cibles : c'est de là que les autres postes la rejoueront, à
+        // l'identique, une fois le tour écrit en entier.
+        if (typeof window.consignerEtapeTour === "function") {
+            await window.consignerEtapeTour("carte", actionData);
+        }
 
         // Persistance de terrain : la carte s'est résolue normalement ci-dessus, on laisse
         // maintenant la zone résiduelle sur les cases visées (3 tours).

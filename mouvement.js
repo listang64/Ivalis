@@ -517,6 +517,14 @@ window.validerMouvement = async function() {
         // Sous transaction : la file d'attente est partagée par tous les postes, et
         // la réécrire à partir d'une lecture périmée effacerait la carte qu'un
         // autre joueur vient d'y poser (cf. window.modifierPartie).
+        const actionMouvement = {
+            idToken: idPerso,
+            path: pathAvecAngles,
+            opportunites: opportunitesResolues,
+            zones: zonesResolues,
+            timestamp: horodatageMouvement
+        };
+
         await window.modifierPartie((data) => {
             const file = data.File_Attente_Combat || [];
             if (file.length > 0 && file[0].idPersonnage === idPerso) {
@@ -526,15 +534,15 @@ window.validerMouvement = async function() {
             }
             return { maj: {
                 File_Attente_Combat: file,
-                Action_Mouvement: {
-                    idToken: idPerso,
-                    path: pathAvecAngles,
-                    opportunites: opportunitesResolues,
-                    zones: zonesResolues,
-                    timestamp: horodatageMouvement
-                }
+                Action_Mouvement: actionMouvement
             } };
         });
+
+        // Le trajet entre aussi dans le SCRIPT du tour : c'est de là que les
+        // autres postes le rejoueront, dans l'ordre, après le OK doré.
+        if (typeof window.consignerEtapeTour === "function") {
+            await window.consignerEtapeTour("mouvement", actionMouvement);
+        }
 
         const persoRef = window.refCombattant(idPerso);
         await updateDoc(persoRef, { Fatigue_Actuelle: nvlFatigue });

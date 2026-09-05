@@ -3594,26 +3594,124 @@ window.donneesCarteCombattant = function(idPersonnage, idCarte) {
         || null;
 };
 
-// Les effets d'une carte ramenés à une seule ligne : les effets de base en clair,
-// leurs modificateurs en retrait de ton. "Initiative +" n'en fait pas partie —
-// ce n'est pas un effet de jeu, et la carte elle-même ne l'affiche pas.
+// Les effets d'une carte, en toutes lettres : le nom de l'effet, puis SA
+// DESCRIPTION — les dégâts, les pourcentages, les durées. C'est exactement ce
+// que la carte elle-même affiche en grand format ; il n'y a aucune raison que
+// la fenêtre de tour en dise moins. "Initiative +" n'en fait pas partie : ce
+// n'est pas un effet de jeu, et la carte ne l'affiche pas non plus.
 window.ligneEffetsCarte = function(dataCarte) {
     const effets = (dataCarte && dataCarte.Effets_Compiles) || [];
-    const morceaux = [];
+    const lignes = [];
 
     effets.forEach(eff => {
-        let nom = typeof eff === "string" ? eff : (eff && eff.nom);
-        if (!nom) return;
-        nom = nom.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
-        if (!nom || nom.startsWith("↳") || nom.indexOf("Initiative +") === 0) return;
+        // Les vieilles cartes gardent des effets en simple texte : on les
+        // affiche tels quels, sans description.
+        if (typeof eff === "string") {
+            const brut = eff.replace(/\s+/g, " ").trim();
+            if (!brut || brut.indexOf("Initiative +") >= 0) return;
+            lignes.push(`<div style="margin-top: 6px; color: #e8d5a5;">• ${brut}</div>`);
+            return;
+        }
+        if (!eff || !eff.nom) return;
+        if (eff.nom.indexOf("Initiative +") === 0) return;
+        // La zone est dessinée à côté, pas décrite en toutes lettres.
+        if (eff.isZone) return;
 
-        const estMod = typeof eff === "object" && !!eff.isMod;
-        const couleur = estMod ? "#a89f91" : "#e8d5a5";
-        morceaux.push(`<span style="color: ${couleur};">${nom}</span>`);
+        const estMod = !!eff.isMod;
+        const retrait = estMod ? "margin-left: 18px; margin-top: 4px;" : "margin-top: 10px;";
+        const couleur = estMod ? "#c2a878" : "#e8d5a5";
+        const prefixe = estMod ? "↳ " : "• ";
+        const detail = eff.desc
+            ? `<div style="color: #a89f91; font-size: 15px; font-style: italic; line-height: 1.3; margin-left: 14px;">${eff.desc}</div>`
+            : "";
+        lignes.push(`<div style="${retrait}">
+                <div style="color: ${couleur}; font-weight: bold;">${prefixe}${eff.nom}</div>
+                ${detail}
+            </div>`);
     });
 
-    if (morceaux.length === 0) return `<span style="color: #a89f91; font-style: italic;">Aucun effet</span>`;
-    return morceaux.join(`<span style="color: #5c3a21;"> • </span>`);
+    if (lignes.length === 0) return `<span style="color: #a89f91; font-style: italic;">Aucun effet</span>`;
+    return lignes.join("");
+};
+
+// La couleur d'un combattant : la sienne s'il en a une, le rouge de sang des
+// créatures sinon. Elle habille le nom de sa technique dans la fenêtre de tour.
+window.couleurCombattant = function(perso) {
+    const estCreature = !!(perso && perso.estMonstre)
+        || (typeof window.estMonstre === "function" && perso && window.estMonstre(perso.idPersonnage));
+    if (estCreature) return "#e63946";
+    const c = perso && perso.couleur;
+    return (typeof c === "string" && /^#[0-9a-fA-F]{3,8}$/.test(c)) ? c : "#e8d5a5";
+};
+
+// Le dégradé brossé du panneau latéral, mais dans la couleur qu'on lui donne :
+// un éclat clair, la couleur pleine, une ombre profonde, puis un reflet. C'est
+// « le même effet », transposé — et non un simple aplat.
+window.degradeBrosse = function(couleur) {
+    return `linear-gradient(135deg, #ffffff 0%, ${couleur} 22%, ${window.assombrirCouleur(couleur, 0.45)} 50%, ${couleur} 74%, #ffffff 100%)`;
+};
+
+window.assombrirCouleur = function(hex, facteur) {
+    let h = String(hex).replace("#", "");
+    if (h.length === 3) h = h.split("").map(c => c + c).join("");
+    const n = parseInt(h.slice(0, 6), 16);
+    if (isNaN(n)) return "#5c3a21";
+    const r = Math.round(((n >> 16) & 255) * (1 - facteur));
+    const v = Math.round(((n >> 8) & 255) * (1 - facteur));
+    const b = Math.round((n & 255) * (1 - facteur));
+    return "#" + [r, v, b].map(x => x.toString(16).padStart(2, "0")).join("");
+};
+
+// Le dessin de la zone d'une technique, en hexagones — le même que sur la carte
+// en grand format, mais aux couleurs du combattant et en plus lisible de loin.
+window.dessinZoneCarte = function(dataCarte, couleur, rayonHex) {
+    const actions = (dataCarte && dataCarte.Composants && dataCarte.Composants.actions) || [];
+    let hexesZone = [];
+    let aDistance = false;
+    actions.forEach(act => {
+        if (act.zoneHexes && act.zoneHexes.length > 0) hexesZone = act.zoneHexes;
+        if (act.mods && Object.keys(act.mods).some(id => /DISTANCE/i.test(id))) aDistance = true;
+    });
+    (dataCarte && dataCarte.Effets_Compiles || []).forEach(eff => {
+        if (eff && typeof eff === "object" && typeof eff.nom === "string" && eff.nom.indexOf("Distance") === 0) aDistance = true;
+    });
+    if (hexesZone.length === 0) return "";
+
+    const rayon = rayonHex || 15;
+    let polygones = "";
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+
+    for (let q = -3; q <= 3; q++) {
+        for (let r = Math.max(-3, -q - 3); r <= Math.min(3, -q + 3); r++) {
+            const estCentre = (q === 0 && r === 0);
+            const estLanceur = estCentre && !aDistance;
+            const estPrise = hexesZone.some(h => h.q === q && h.r === r);
+            if (!estPrise && !estLanceur) continue;
+
+            const x = rayon * Math.sqrt(3) * (q + r / 2.0);
+            const y = rayon * 1.5 * r;
+            const remplissage = (estLanceur && !estPrise) ? "rgba(160, 160, 160, 0.75)" : couleur;
+
+            let points = "";
+            for (let i = 0; i < 6; i++) {
+                const angle = Math.PI / 3 * i - Math.PI / 6;
+                const px = x + rayon * Math.cos(angle);
+                const py = y + rayon * Math.sin(angle);
+                points += `${px.toFixed(1)},${py.toFixed(1)} `;
+                minX = Math.min(minX, px); maxX = Math.max(maxX, px);
+                minY = Math.min(minY, py); maxY = Math.max(maxY, py);
+            }
+            polygones += `<polygon points="${points.trim()}" fill="${remplissage}" fill-opacity="0.8" stroke="#ffffff" stroke-width="1.5" />`;
+        }
+    }
+    if (minX === Infinity) return "";
+
+    const marge = 4;
+    const largeur = maxX - minX + marge * 2;
+    const hauteur = maxY - minY + marge * 2;
+    return `<svg width="${largeur.toFixed(0)}" height="${hauteur.toFixed(0)}"
+                 viewBox="${(minX - marge).toFixed(1)} ${(minY - marge).toFixed(1)} ${largeur.toFixed(1)} ${hauteur.toFixed(1)}"
+                 style="filter: drop-shadow(0 5px 10px rgba(0,0,0,0.9));">${polygones}</svg>`;
 };
 
 // Une seule ligne, donc : plutôt que de couper le texte, on rétrécit la police
@@ -3700,23 +3798,37 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
 
     let titre = "";
     let ligne = "";
+    let dessinZone = "";
+    // La couleur du héros — le rouge de sang pour une créature — habille le nom
+    // de sa technique. On la sait d'un coup d'œil, sans lire.
+    const couleur = window.couleurCombattant(perso);
     if (tete.idCarte === "REPOS_LONG") {
         titre = "Repos Long";
-        ligne = `<span style="color: #e8d5a5;">Concentration et souffle</span>`;
+        ligne = `<div style="color: #e8d5a5;">• Concentration et souffle</div>`;
     } else {
         const dataCarte = window.donneesCarteCombattant(tete.idPersonnage, tete.idCarte);
         titre = dataCarte ? (dataCarte.Nom || "Technique") : "Technique";
         ligne = dataCarte ? window.ligneEffetsCarte(dataCarte)
                           : `<span style="color: #a89f91; font-style: italic;">Technique inconnue de ce poste</span>`;
+        if (dataCarte) dessinZone = window.dessinZoneCarte(dataCarte, couleur, 16);
     }
 
     const elCarte = document.getElementById("voile-tour-carte");
     const elEffets = document.getElementById("voile-tour-effets");
-    if (elCarte && elCarte.textContent !== titre) {
+    const elZone = document.getElementById("voile-tour-zone");
+    if (elCarte && (elCarte.textContent !== titre || elCarte.dataset.couleur !== couleur)) {
+        elCarte.dataset.couleur = couleur;
         elCarte.textContent = titre;
+        // Le dégradé brossé du panneau, transposé dans sa couleur : l'effet est
+        // le même, seule la teinte change.
+        elCarte.style.background = window.degradeBrosse(couleur);
+        elCarte.style.webkitBackgroundClip = "text";
+        elCarte.style.backgroundClip = "text";
+        elCarte.style.webkitTextFillColor = "transparent";
         ajusterSurUneLigne(elCarte, 38, 18);
     }
     if (elEffets && elEffets.innerHTML !== ligne) elEffets.innerHTML = ligne;
+    if (elZone && elZone.innerHTML !== dessinZone) elZone.innerHTML = dessinZone;
 
     // L'état de la barrière : ce que ce poste attend, et de qui.
     const elAttente = document.getElementById("voile-tour-attente");

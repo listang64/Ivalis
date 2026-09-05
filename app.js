@@ -30,7 +30,8 @@ import {
   orderBy,
   onSnapshot,
   deleteField,
-  writeBatch
+  writeBatch,
+  arrayUnion
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // =========================================================================
@@ -351,12 +352,60 @@ window.filerAnimation = function(nom, fn) {
 };
 
 // Toutes les animations diffusées par la base passent par ici plutôt que
-// directement par filerAnimation : la séquence de tour (sequence_tour.js) les
-// met alors en attente derrière la fenêtre sombre, pour ne les rejouer, dans
-// l'ordre, qu'une fois tous les postes prêts. Cette version-ci est le filet :
-// si ce module n'est pas chargé, le combat se comporte exactement comme avant.
+// directement par filerAnimation : la séquence de tour (sequence_tour.js) sait
+// alors qu'un poste qui regarde derrière la fenêtre sombre ne doit RIEN jouer —
+// il rejouera le tour depuis son script. Cette version-ci est le filet : si ce
+// module n'est pas chargé, le combat se comporte exactement comme avant.
 window.programmerAnimationTour = function(nom, action, fn) {
     return window.filerAnimation(nom, fn);
+};
+
+// =========================================================================
+//  LE SCRIPT DU TOUR — SA COLLECTION À LUI
+// =========================================================================
+//  Un tour de combat s'écrit en entier, dans l'ordre, avec ses résolutions,
+//  dans un document qui n'appartient qu'à lui : Scripts_Tour/{partie__clé}.
+//  Les postes n'ont plus qu'à le lire et à le rejouer. Il vit à part de la
+//  partie exprès : la file d'attente s'écrit sous transaction à chaque tour,
+//  et un script de plusieurs kilo-octets n'a rien à faire dans cette bagarre.
+//  Toute la logique est dans sequence_tour.js ; ici, seulement la plomberie.
+const COL_SCRIPTS = "Scripts_Tour";
+const refScript = (idDoc) => doc(db, COL_SCRIPTS, idDoc);
+
+window.ecrireScriptTour = async function(idDoc, champs) {
+    if (!idDoc) return false;
+    try {
+        await setDoc(refScript(idDoc), champs, { merge: true });
+        return true;
+    } catch (e) {
+        console.error("Écriture du script de tour :", e);
+        return false;
+    }
+};
+
+// La signature « j'ai fini de rejouer » : arrayUnion, parce que trois postes
+// peuvent signer au même instant sans s'effacer les uns les autres.
+window.signerScriptTour = async function(idDoc, idJoueur) {
+    if (!idDoc || !idJoueur) return false;
+    try {
+        await updateDoc(refScript(idDoc), { finis: arrayUnion(idJoueur) });
+        return true;
+    } catch (e) {
+        console.error("Signature du script de tour :", e);
+        return false;
+    }
+};
+
+window.ecouterScriptTour = function(idDoc, rappel) {
+    if (!idDoc) return () => {};
+    try {
+        return onSnapshot(refScript(idDoc), (snap) => {
+            rappel(snap.exists() ? snap.data() : null);
+        }, (e) => console.error("Écoute du script de tour :", e));
+    } catch (e) {
+        console.error("Écoute du script de tour :", e);
+        return () => {};
+    }
 };
 
 // =========================================================================

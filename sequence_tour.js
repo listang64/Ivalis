@@ -1,74 +1,59 @@
 // =========================================================================
-//  LA SÉQUENCE DE TOUR — LES DEUX BARRIÈRES DE SYNCHRONISATION
+//  LA SÉQUENCE DE TOUR — LE SCRIPT ET SA RELECTURE
 // =========================================================================
 //
 //  LE PROBLÈME QU'ELLE RÈGLE
 //  -------------------------
-//  Jusqu'ici, chaque poste rejouait les animations d'un tour dès qu'il en
-//  recevait l'ordre, et le premier qui avait fini faisait avancer la file
-//  (finDeTourCombat). Sur trois appareils inégaux — un PC qui suit tout en
-//  temps réel, deux iPad qui traînent et que Safari met en veille dès qu'on
-//  regarde ailleurs — le combattant suivant commençait donc son tour pendant
-//  que les autres écrans en étaient encore au précédent. D'où les symptômes
-//  remontés : un déplacement d'ennemi sauté, puis le même pion téléporté un
-//  tour plus tard.
+//  Chaque poste rejouait les animations d'un tour dès qu'il en recevait
+//  l'ordre, et le premier qui avait fini faisait avancer la file. Sur trois
+//  appareils inégaux — un PC qui suit tout, deux iPad que Safari endort dès
+//  qu'on regarde ailleurs — le combattant suivant commençait son tour pendant
+//  que les autres écrans en étaient encore au précédent : un déplacement
+//  d'ennemi sauté, puis le même pion téléporté un tour plus tard.
 //
-//  LE PRINCIPE
-//  -----------
-//  On sectorise. Un tour de combat devient une SÉQUENCE en quatre temps, et
-//  personne ne passe au temps suivant avant que tout le monde y soit :
+//  LE PRINCIPE : UN SCRIPT, PUIS SA RELECTURE
+//  ------------------------------------------
+//  Un tour ne se diffuse plus morceau par morceau. Il s'ÉCRIT, en entier et
+//  dans l'ordre, dans un document qui n'appartient qu'à lui —
+//  Scripts_Tour/{partie__clé} — avec, pour chaque étape, tout ce qu'il faut
+//  pour la rejouer à l'identique : la donnée de l'animation ET les points de
+//  vie d'avant de ceux qu'elle touche.
 //
-//   1. CALCUL      Le poste qui agit (le joueur dont c'est le tour, ou celui
-//                  qui tient le verrou de l'IA) calcule et diffuse tout le
-//                  tour : déplacement, opportunités, zones, carte, dés. Chez
-//                  les SPECTATEURS, la fenêtre sombre est déjà là et met tout
-//                  ce qui arrive en attente au lieu de l'animer.
-//   2. CHECK « prêt »   Le calcul terminé est annoncé en base. Chaque poste
-//                  vérifie alors qu'il sait lire ce tour (le combattant, sa
-//                  technique) — la vérification base → client — et signe.
-//   3. OK DORÉ     Quand TOUS ont signé, le gros OK clignote partout. Un clic
-//                  n'importe où sur la fenêtre rejoue les animations mises de
-//                  côté, dans leur ordre d'arrivée.
-//   4. CHECK « fini »   Chaque poste signe une seconde fois quand il a tout
-//                  rejoué. Le dernier Check fait avancer la file.
+//   1. LE POSTE QUI AGIT joue son tour normalement (c'est lui qui vise, qui se
+//      déplace) et consigne chaque étape au fil de l'eau. Les autres attendent
+//      derrière la fenêtre sombre — opaque : rien ne transparaît.
+//   2. Le tour fini, il pose « complet » sur le script. Ce simple drapeau
+//      allume le gros OK doré chez TOUT LE MONDE en même temps : il n'y a plus
+//      d'échange de « prêt » d'un poste à l'autre, qui décalait le bouton d'un
+//      appareil à l'autre.
+//   3. Chaque poste rejoue le script POUR LUI, à son rythme : les étapes
+//      s'enchaînent une par une, chacune attendant que la précédente ait
+//      vraiment fini, avec un temps de respiration entre deux. Rien n'est plus
+//      « temps réel » : c'est une relecture, et elle est identique partout.
+//   4. Quand un poste a tout rejoué, il signe. Le dernier Check fait avancer la
+//      file : à cet instant, les trois écrans racontent la même histoire.
 //
 //  Aucune minuterie ne passe un poste absent : la table reste en pause tant
-//  qu'il n'est pas revenu. C'est voulu. Une sortie de secours entièrement
-//  manuelle ("Continuer sans les absents") est offerte à qui la demande.
+//  qu'il n'est pas revenu. Une sortie de secours entièrement manuelle
+//  (« Continuer sans les absents ») est offerte après une longue attente.
 //
-//  CE QUI VIT EN BASE (Systeme_Parties/{id}.Sequence_Tour)
-//  ------------------------------------------------------
-//    { cle, acteur, calcul, prets: [idJoueur], finis: [idJoueur],
-//      actions: [horodatages] | null }
-//  "calcul" passe à vrai quand l'acteur a fini de tout diffuser. "actions"
-//  porte, à la fin du rejeu de l'acteur, la liste EXACTE des animations du
-//  tour : un spectateur ne se déclare fini que lorsqu'il les a toutes jouées.
-//  C'est ce qui referme la dernière course — un sous-effet (Poussée, Traction,
-//  Peur) n'est calculé qu'au moment où la carte s'anime, donc il arrive APRÈS
-//  l'annonce du calcul, et un poste rapide aurait pu se croire fini sans lui.
-//
-//  ET LA PHOTO D'AVANT
-//  -------------------
-//  Un rejeu qui attend le OK démarre forcément plus tard que celui de l'auteur,
-//  qui a déjà écrit son résultat en base. Or le moteur applique les dégâts en
-//  RETRANCHANT ce qu'il lit : il lisait alors les points de vie D'APRÈS et
-//  retranchait une seconde fois. On photographie donc, à l'arrivée de chaque
-//  ordre d'animer, les points de vie et le bouclier des seuls combattants que
-//  cet ordre NOMME, et on les offre en lecture au moteur le temps du rejeu
-//  (valeurAvantRejeu). Rien n'est jamais réécrit dans les combattants : ce que
-//  la base a livré entre-temps sur d'autres — le tic d'une brûlure, l'énergie
-//  dépensée par quelqu'un d'autre — reste intact.
+//  POURQUOI LES POINTS DE VIE D'AVANT SONT DANS LE SCRIPT
+//  -----------------------------------------------------
+//  Le moteur applique les dégâts en RETRANCHANT ce qu'il lit. Une relecture
+//  démarre forcément après que l'auteur a écrit son résultat en base : elle
+//  lisait les points de vie D'APRÈS et retranchait une seconde fois. L'auteur
+//  note donc, dans l'étape elle-même, la valeur d'avant des combattants que
+//  cette étape nomme. La relecture repart de là, sur tous les postes, sans rien
+//  réécrire dans les combattants : ce que la base a livré entre-temps sur
+//  d'autres — le tic d'une brûlure, l'énergie dépensée ailleurs — reste intact.
 // =========================================================================
 
 // L'état local de la séquence en cours sur CE poste.
-//   { cle, acteur, idCarte, tour, voile, estActeur, calculTermine,
-//     tampon: [{nom, ts, fn}], jouees: [ts], drainEnCours, clique }
 window.SEQUENCE_TOUR = null;
 
-// Les pions dont le trajet dort dans le tampon : leur case à l'écran ne doit
-// pas suivre la base tant que le déplacement n'a pas été rejoué ici, sinon ils
-// se téléportent à l'arrivée avant même que le voile ne se lève. Lu par
-// positionsProtegees (combat.js).
+// Les pions dont le trajet dort dans le script en attendant le OK : leur case à
+// l'écran ne doit pas suivre la base, sinon ils se téléportent à l'arrivée
+// avant même que la fenêtre ne se lève. Lu par positionsProtegees (combat.js).
 window.PIONS_EN_ATTENTE_SEQUENCE = {};
 
 // Le laissez-passer que la barrière pose avant de rappeler finDeTourCombat :
@@ -79,64 +64,22 @@ window.SEQUENCE_LAISSEZ_PASSER = false;
 // celui où la file avance vraiment en base, la tête de file désigne encore le
 // combattant qui vient de jouer : sans cette mémoire, l'IA le voyait toujours
 // « à la main », son propre verrou lui répondait oui, et la créature rejouait
-// un second tour — une deuxième carte, diffusée après que tout le monde s'était
-// déclaré fini, donc jouée sur un seul écran et perdue sur les autres.
+// un second tour.
 window.SEQUENCES_TERMINEES = [];
+
+// Le temps de respiration entre deux étapes d'une relecture. Assez pour que
+// l'œil suive, assez court pour que le tour ne traîne pas.
+window.DELAI_ENTRE_ETAPES_MS = 320;
+
+let debutAttente = 0;
+
+const monPoste = () => localStorage.getItem("ID_JOUEUR_COURANT") || "poste-inconnu";
+const pause = (ms) => new Promise(r => setTimeout(r, ms));
 
 function marquerSequenceTerminee(cle) {
     if (!cle || window.SEQUENCES_TERMINEES.includes(cle)) return;
     window.SEQUENCES_TERMINEES.push(cle);
     if (window.SEQUENCES_TERMINEES.length > 20) window.SEQUENCES_TERMINEES.shift();
-}
-
-// L'instant où ce poste a commencé à attendre les autres. Sert uniquement à
-// proposer la sortie de secours manuelle, jamais à passer quoi que ce soit
-// tout seul.
-let debutAttente = 0;
-
-const monPoste = () => localStorage.getItem("ID_JOUEUR_COURANT") || "poste-inconnu";
-
-// Les six ordres d'animation que la partie sait diffuser.
-//  Chaque ordre a, dans le document, son horodatage — et, sur chaque poste, le
-//  souvenir du dernier qu'il a TRAITÉ (les DERNIER_*, tenus par le répartiteur
-//  d'app.js). Comparer les deux dit exactement ce qui vient d'arriver et qui
-//  n'a pas encore été distribué : c'est ce qui permet de reconnaître les ordres
-//  de ce tour-ci sans dépendre de l'instant où la fenêtre s'est ouverte.
-const CHAMPS_ACTIONS = {
-    Action_Mouvement: "DERNIER_MOUVEMENT",
-    Action_Moteur:    "DERNIER_ACTION_MOTEUR",
-    Action_Bond:      "DERNIER_ACTION_BOND",
-    Action_Poussee:   "DERNIER_ACTION_POUSSEE",
-    Action_Traction:  "DERNIER_ACTION_TRACTION",
-    Action_Peur:      "DERNIER_ACTION_PEUR"
-};
-
-// Ce que ce poste a DÉJÀ distribué. Lu sur les repères du répartiteur, et non
-// sur le document : le document, lui, porte peut-être déjà l'ordre de ce tour
-// alors que personne ne l'a encore vu passer, et on le croirait à tort ancien.
-function horodatagesDejaTraites() {
-    const sortie = {};
-    Object.keys(CHAMPS_ACTIONS).forEach(c => { sortie[c] = window[CHAMPS_ACTIONS[c]] || 0; });
-    return sortie;
-}
-
-// Ce que CE TOUR a diffusé : les ordres reçus depuis l'ouverture de la fenêtre,
-// PLUS ceux qui dorment encore dans le document sans avoir été distribués.
-//   Sans cette seconde moitié, l'acteur publiait la liste de ce qu'il avait
-//   lui-même rejoué — et il pouvait très bien vider un tampon encore vide,
-//   l'écho de sa propre carte n'étant pas revenu de la base. La liste partait
-//   incomplète, tout le monde se déclarait fini, la file avançait, et la carte
-//   en retard était jetée avec la séquence : un poste l'avait jouée, les autres
-//   non, et leurs écrans divergeaient pour de bon.
-function actionsDiffuseesDuTour(seq) {
-    const ts = new Set(seq.recues || []);
-    const p = window.PARTIE_DATA || {};
-    const avant = seq.avant || {};
-    Object.keys(CHAMPS_ACTIONS).forEach(c => {
-        const dans = (p[c] && p[c].timestamp) || 0;
-        if (dans && dans !== avant[c]) ts.add(dans);
-    });
-    return [...ts];
 }
 
 // =========================================================================
@@ -154,8 +97,6 @@ window.postesAttendusSequence = function() {
         if (typeof window.estMonstre === "function" && window.estMonstre(p.idPersonnage)) return;
         if (p.idJoueur) postes.add(p.idJoueur);
     });
-    // Un poste sans héros lisible (une partie qui démarre, un banc d'essai) ne
-    // doit pas s'attendre lui-même dans le vide : il se compte au minimum.
     postes.add(monPoste());
     return [...postes];
 };
@@ -171,12 +112,15 @@ window.cleSequenceTour = function(partie) {
     return [p.Tour_Combat || 1, tete.idPersonnage, tete.idCarte, tete.timestamp || 0].join("|");
 };
 
+// L'adresse du script en base. Un document par tour, dans sa collection.
+window.idScriptTour = function(cle) {
+    if (!cle || !window.ID_PARTIE_COURANTE) return null;
+    return window.ID_PARTIE_COURANTE + "__" + String(cle).replace(/[^A-Za-z0-9_.-]/g, "_");
+};
+
 // =========================================================================
 //  OUVERTURE / FERMETURE D'UNE SÉQUENCE
 // =========================================================================
-//  Appelée à chaque notification de la partie. Elle n'écrit rien : la séquence
-//  s'ouvre toute seule, de la même façon, sur chaque poste, à partir de la file
-//  d'attente. La base ne sert qu'aux deux Check.
 window.ouvrirSequenceTour = function(partie) {
     const p = partie || window.PARTIE_DATA || {};
     const cle = window.cleSequenceTour(p);
@@ -187,18 +131,13 @@ window.ouvrirSequenceTour = function(partie) {
         return null;
     }
     // Ce tour-là est déjà bouclé ici : on n'en rouvre pas une seconde fenêtre le
-    // temps que la file avance en base. Un ordre attardé se joue alors tout de
-    // suite, comme avant, plutôt que de dormir dans un tampon que personne ne
-    // videra jamais.
+    // temps que la file avance en base.
     if (window.SEQUENCES_TERMINEES.includes(cle)) {
         if (seq) window.fermerSequenceTour();
         return null;
     }
     if (seq && seq.cle === cle) return seq;
 
-    // Un nouveau combattant en tête : la séquence précédente est close, quoi
-    // qu'il lui reste dans le ventre. Ce qui n'a pas été rejoué appartient au
-    // passé — le rejouer maintenant ajouterait de la confusion.
     if (seq) window.fermerSequenceTour();
 
     const tete = (p.File_Attente_Combat || [])[0];
@@ -206,39 +145,51 @@ window.ouvrirSequenceTour = function(partie) {
     const estCreature = (typeof window.estMonstre === "function" && window.estMonstre(tete.idPersonnage))
                         || !!(perso && perso.estMonstre);
 
-    // La fenêtre est pour ceux qui REGARDENT. Le joueur dont c'est le tour garde
-    // son plateau dégagé : il doit viser, se déplacer, choisir. Une créature
-    // n'appartient à personne — tout le monde la regarde donc, y compris le
-    // poste qui la fait jouer, dont le tampon se videra comme les autres.
+    // La fenêtre est pour ceux qui REGARDENT. Le poste qui FAIT jouer ce
+    // combattant garde son plateau dégagé : c'est lui qui vise, qui déplace, et
+    // c'est son écran qui sert de modèle au script. Pour un héros, c'est son
+    // joueur ; pour une créature, celui qui tient le verrou de l'IA — il se
+    // reconnaîtra tout seul en consignant sa première étape.
     const estMonHeros = !estCreature && !!perso && perso.idJoueur === monPoste();
 
     debutAttente = Date.now();
     window.SEQUENCE_TOUR = {
         cle,
-        // Les ordres d'animation que ce poste avait déjà distribués avant ce
-        // tour : tout ce qui arrivera ensuite lui appartient, et devra être
-        // rejoué partout.
-        avant: horodatagesDejaTraites(),
-        // Et ceux qu'il reçoit pendant, qu'il les joue tout de suite ou non.
-        recues: [],
+        idScript: window.idScriptTour(cle),
         acteur: tete.idPersonnage,
         idCarte: tete.idCarte,
         tour: p.Tour_Combat || 1,
         voile: !estMonHeros,
-        estActeur: false,
+        estActeur: estMonHeros,
         calculTermine: false,
-        tampon: [],
-        jouees: [],
-        drainEnCours: false,
+        script: null,          // le document tel qu'il est en base
+        etapesLocales: [],     // ce que l'auteur consigne au fil de l'eau
+        jouees: 0,             // combien d'étapes ce poste a rejouées
+        rejeuEnCours: false,
         clique: false,
-        pretEnvoye: false,
         finiEnvoye: false,
-        actionsPubliees: false
+        completEnvoye: false
     };
+
+    // On écoute le script de ce tour-là, et lui seul.
+    if (typeof window.ecouterScriptTour === "function" && window.SEQUENCE_TOUR.idScript) {
+        const seqOuverte = window.SEQUENCE_TOUR;
+        seqOuverte.arreterEcoute = window.ecouterScriptTour(seqOuverte.idScript, (data) => {
+            if (window.SEQUENCE_TOUR !== seqOuverte) return;
+            seqOuverte.script = data;
+            if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
+            window.verifierBarriereSequence();
+        });
+    }
+
     return window.SEQUENCE_TOUR;
 };
 
 window.fermerSequenceTour = function() {
+    const seq = window.SEQUENCE_TOUR;
+    if (seq && typeof seq.arreterEcoute === "function") {
+        try { seq.arreterEcoute(); } catch (e) { /* écoute déjà close */ }
+    }
     window.SEQUENCE_TOUR = null;
     window.PIONS_EN_ATTENTE_SEQUENCE = {};
     debutAttente = 0;
@@ -246,35 +197,20 @@ window.fermerSequenceTour = function() {
 };
 
 // =========================================================================
-//  LA MISE EN ATTENTE DES ANIMATIONS
+//  L'ÉCRITURE DU SCRIPT
 // =========================================================================
-//  Tous les ordres d'animation diffusés par la base passent par ici (app.js).
-//  Derrière la fenêtre sombre, ils s'empilent au lieu de partir tout de suite.
-
-// LE POINT DÉLICAT DE TOUTE L'ARCHITECTURE.
-//  Le moteur d'animation applique les dégâts en RETRANCHANT : « points de vie
-//  actuels moins les dégâts ». C'était juste tant que tout le monde animait au
-//  même instant — avant que l'auteur n'ait eu le temps d'écrire le résultat en
-//  base. Mais un rejeu qui attend le OK démarre bien plus tard : la base a déjà
-//  livré les points de vie D'APRÈS, et retrancher une seconde fois les dégâts
-//  donnait un blessé deux fois plus amoché sur les écrans des spectateurs.
-//  D'où la photo : les deux seules valeurs que le moteur obtient par
-//  soustraction, prises à l'arrivée de l'ordre d'animer, et relues par lui au
-//  moment du rejeu comme point de départ. Elles ne sont jamais réécrites dans
-//  les combattants — voir valeurAvantRejeu, plus bas.
-const CHAMPS_PHOTO = ["PV_Actuels", "Bouclier_Actuel"];
-
-// Les combattants QUE CETTE ACTION NOMME, et eux seuls. Photographier toute la
-// table serait pire que le mal : une nouvelle venue de la base concernant
-// quelqu'un d'étranger à ce tour — l'énergie d'une créature, la brûlure de
-// quelqu'un d'autre — serait effacée au rejeu et ne reviendrait jamais.
+//  Les points de vie et le bouclier d'avant : les deux seules valeurs que le
+//  moteur obtient par soustraction. On ne note que les combattants que
+//  l'étape NOMME — noter toute la table, ce serait figer au passage ce qui n'a
+//  rien à voir avec ce tour.
+const CHAMPS_AVANT = ["PV_Actuels", "Bouclier_Actuel"];
 const CLES_COMBATTANTS = ["idLanceur", "idCible", "idToken", "idPersonnage", "cibles"];
 
-function idsConcernes(action, trouves) {
+function idsConcernes(donnee, trouves) {
     const ids = trouves || new Set();
-    if (!action || typeof action !== "object") return ids;
-    Object.keys(action).forEach(cle => {
-        const valeur = action[cle];
+    if (!donnee || typeof donnee !== "object") return ids;
+    Object.keys(donnee).forEach(cle => {
+        const valeur = donnee[cle];
         if (CLES_COMBATTANTS.includes(cle)) {
             if (typeof valeur === "string") ids.add(valeur);
             else if (Array.isArray(valeur)) valeur.forEach(v => { if (typeof v === "string") ids.add(v); });
@@ -284,144 +220,114 @@ function idsConcernes(action, trouves) {
     return ids;
 }
 
-// La photo se complète au fil du tour : un combattant n'y entre qu'à l'instant
-// où une action le nomme pour la première fois — c'est-à-dire avant que le
-// moindre effet de ce tour n'ait pu l'atteindre sur cet écran.
-function photographierCombattants(ids, photo) {
-    const sortie = photo || {};
+function valeursAvant(ids) {
+    const sortie = {};
     (window.PERSOS_PARTIE || []).forEach(p => {
-        if (!p || !p.idPersonnage) return;
-        if (!ids.has(p.idPersonnage)) return;
-        if (sortie[p.idPersonnage]) return;
+        if (!p || !p.idPersonnage || !ids.has(p.idPersonnage)) return;
         const copie = {};
-        CHAMPS_PHOTO.forEach(c => { if (p[c] !== undefined) copie[c] = p[c]; });
+        CHAMPS_AVANT.forEach(c => { if (p[c] !== undefined) copie[c] = p[c]; });
         sortie[p.idPersonnage] = copie;
     });
     return sortie;
 }
 
-// Une animation vient de rendre la main : ce qu'elle a écrit devient le point de
-// départ de la suivante. Sans cette mise à jour, la deuxième animation d'un même
-// tour repartait de ce que disait la base — c'est-à-dire du résultat déjà écrit
-// par l'auteur — et retranchait ses dégâts une seconde fois.
-//   Mais SEULS les combattants que cette animation-là nommait sont repris : la
-//   base a très bien pu livrer, pendant qu'elle se déroulait, le résultat d'une
-//   AUTRE animation du même tour, encore à rejouer ici. La recopier serait
-//   exactement l'erreur qu'on cherche à éviter, une étape plus loin.
-function rafraichirPhotoApresAnimation(photo, ids) {
-    if (!photo || !ids) return;
-    (window.PERSOS_PARTIE || []).forEach(p => {
-        const entree = p && photo[p.idPersonnage];
-        if (!entree || !ids.has(p.idPersonnage)) return;
-        CHAMPS_PHOTO.forEach(c => { if (p[c] !== undefined) entree[c] = p[c]; });
-    });
+function enteteScript(seq, complet) {
+    return {
+        ID_Partie: window.ID_PARTIE_COURANTE,
+        cle: seq.cle,
+        acteur: seq.acteur,
+        idCarte: seq.idCarte,
+        tour: seq.tour,
+        auteur: monPoste(),
+        etapes: seq.etapesLocales,
+        complet: !!complet,
+        horodatage: Date.now()
+    };
 }
 
-// La photo n'est JAMAIS réécrite dans les combattants : ce serait effacer, au
-// passage, tout ce que la base a livré entre-temps et qui n'a rien à voir avec
-// ce tour — une brûlure qui vient de faire son tic, l'énergie dépensée par
-// quelqu'un d'autre. Elle est seulement OFFERTE EN LECTURE au moteur, qui s'en
-// sert comme point de départ de sa soustraction (voir valeurAvantRejeu, lu par
-// moteur_effets.js). Le résultat écrit reste, lui, la vraie valeur d'après.
+// LE POINT D'ENTRÉE DE L'ÉCRITURE. Appelé par le poste qui joue, chaque fois
+// qu'il diffuse quelque chose à animer : déplacement, carte, bond, poussée,
+// traction, peur. L'ordre des appels EST l'ordre du tour.
+window.consignerEtapeTour = async function(type, donnee) {
+    const seq = window.ouvrirSequenceTour(window.PARTIE_DATA);
+    if (!seq || !seq.idScript || typeof window.ecrireScriptTour !== "function") return;
+
+    // Consigner, c'est se désigner comme auteur du tour : personne d'autre
+    // n'écrit dans ce script, et son écran sert de modèle aux autres.
+    seq.estActeur = true;
+    seq.voile = false;
+
+    seq.etapesLocales.push({
+        n: seq.etapesLocales.length,
+        type,
+        data: JSON.parse(JSON.stringify(donnee || {})),
+        avant: valeursAvant(idsConcernes(donnee))
+    });
+
+    await window.ecrireScriptTour(seq.idScript, enteteScript(seq, false));
+};
+
+// =========================================================================
+//  LA RELECTURE
+// =========================================================================
+//  Chaque étape attend que la précédente ait vraiment fini. Rien n'est joué en
+//  parallèle, rien n'est joué « en même temps que les autres postes » : c'est
+//  une relecture personnelle, et c'est exactement ce qui la rend identique
+//  partout.
 window.ETAT_AVANT_REJEU = null;
 
 window.valeurAvantRejeu = function(idCombattant, champ, valeurCourante) {
-    const photo = window.ETAT_AVANT_REJEU;
-    if (!photo) return valeurCourante;
-    const avant = photo[idCombattant];
-    if (!avant || avant[champ] === undefined) return valeurCourante;
-    return avant[champ];
+    const avant = window.ETAT_AVANT_REJEU;
+    if (!avant) return valeurCourante;
+    const fiche = avant[idCombattant];
+    if (!fiche || fiche[champ] === undefined) return valeurCourante;
+    return fiche[champ];
 };
 
-window.programmerAnimationTour = function(nom, action, fn) {
-    // L'ordre d'animer peut arriver avant que la notification qui ouvre la
-    // séquence n'ait été traitée — les deux voyagent dans le même document, et
-    // rien ne garantit l'ordre dans lequel un poste les lit. On ouvre donc la
-    // séquence ici si besoin : sans cela l'animation partait hors séquence,
-    // jouée tout de suite sur cet écran-là et mise en attente sur les autres,
-    // et personne ne savait plus qu'elle avait été jouée — la table restait en
-    // attente d'un rejeu déjà fait.
-    if (!window.SEQUENCE_TOUR && typeof window.ouvrirSequenceTour === "function") {
-        window.ouvrirSequenceTour(window.PARTIE_DATA);
-    }
-
-    const seq = window.SEQUENCE_TOUR;
-    const ts = (action && action.timestamp) || Date.now();
-    // Le même ordre ne se joue jamais deux fois dans le même tour. Le
-    // répartiteur a bien son garde-fou, mais il ne coûte rien de le doubler
-    // ici : une animation rejouée, ce sont des dégâts appliqués deux fois sur
-    // un seul écran, et deux tables qui ne racontent plus la même histoire.
-    if (seq && seq.recues.includes(ts)) return Promise.resolve();
-    // Reçu pendant ce tour : il en fait partie, qu'il parte tout de suite ou
-    // qu'il attende le OK. C'est cette liste que l'acteur publiera.
-    if (seq) seq.recues.push(ts);
-
-    // Pas de fenêtre sur ce poste (c'est mon tour), ou pas de séquence du tout :
-    // on joue comme avant, en notant tout de même ce qui a été joué.
-    if (!seq || !seq.voile) {
-        if (seq) seq.jouees.push(ts);
-        return window.filerAnimation(nom, fn);
-    }
-
-    // La photo appartient au TOUR, pas à chaque étape : les animations
-    // s'enchaînent, et chacune doit repartir de ce que la précédente a laissé.
-    // Seuls les combattants encore absents de la photo y sont ajoutés.
-    const concernes = idsConcernes(action);
-    seq.photo = photographierCombattants(concernes, seq.photo || {});
-    seq.tampon.push({ nom, ts, fn, concernes });
-
-    // Un déplacement en attente gèle la case du pion concerné : sans ça la base
-    // le pose à l'arrivée avant même que la fenêtre ne se lève.
-    if (action && action.idToken) window.PIONS_EN_ATTENTE_SEQUENCE[action.idToken] = true;
-    if (action && action.idLanceur) window.PIONS_EN_ATTENTE_SEQUENCE[action.idLanceur] = true;
-    if (action && action.idCible) window.PIONS_EN_ATTENTE_SEQUENCE[action.idCible] = true;
-
-    // Le tampon a bougé alors que le rejeu tournait déjà (un sous-effet calculé
-    // en pleine animation de carte), ou après qu'il se soit vidé (l'écho d'une
-    // carte revenu en retard de la base) : il faut le reprendre là où il s'est
-    // arrêté, sans quoi cette animation-là resterait sur le carreau.
-    if (seq.drainEnCours || seq.clique) window.viderTamponSequence();
-    else if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
-
-    return Promise.resolve();
+const ANIMATIONS = {
+    mouvement: (d) => window.jouerAnimationMouvement && window.jouerAnimationMouvement(d),
+    carte:     (d) => window.jouerAnimationMoteur && window.jouerAnimationMoteur(d),
+    bond:      (d) => window.jouerAnimationBond && window.jouerAnimationBond(d),
+    poussee:   (d) => window.jouerAnimationPoussee && window.jouerAnimationPoussee(d),
+    traction:  (d) => window.jouerAnimationPoussee && window.jouerAnimationPoussee(d),
+    peur:      (d) => window.jouerAnimationPeur && window.jouerAnimationPeur(d)
 };
 
-// =========================================================================
-//  LE REJEU, DANS L'ORDRE
-// =========================================================================
-window.viderTamponSequence = async function() {
+window.rejouerScriptTour = async function() {
     const seq = window.SEQUENCE_TOUR;
-    if (!seq || seq.drainEnCours) return;
-    seq.drainEnCours = true;
+    if (!seq || seq.rejeuEnCours) return;
+    const script = seq.script;
+    if (!script || !Array.isArray(script.etapes)) return;
 
+    seq.rejeuEnCours = true;
     try {
-        // La boucle relit le tampon à chaque tour : une animation peut en
-        // engendrer une autre (Poussée, Traction, Peur), qui doit s'enchaîner
-        // à la suite plutôt que d'être perdue.
-        // Le moteur repart des points de vie D'AVANT le tour, pas de ceux que la
-        // base a déjà livrés (voir la note au-dessus de programmerAnimationTour).
-        // La photo reste en place pendant TOUT le rejeu, et se met à jour après
-        // chaque animation : elles s'enchaînent alors les unes sur les autres,
-        // exactement comme chez l'auteur. La laisser figée sur la seule première
-        // laissait la deuxième repartir de la base, qui portait déjà le résultat.
-        window.ETAT_AVANT_REJEU = seq.photo || null;
+        while (seq.jouees < script.etapes.length && window.SEQUENCE_TOUR === seq) {
+            const etape = script.etapes[seq.jouees];
+            seq.jouees++;
 
-        while (seq.tampon.length > 0 && window.SEQUENCE_TOUR === seq) {
-            const etape = seq.tampon.shift();
-            seq.jouees.push(etape.ts);
-            await window.filerAnimation(etape.nom, etape.fn);
-            rafraichirPhotoApresAnimation(seq.photo, etape.concernes);
+            const jouer = ANIMATIONS[etape.type];
+            if (!jouer) continue;
+
+            window.ETAT_AVANT_REJEU = etape.avant || null;
+            try {
+                await window.filerAnimation(etape.type, () => jouer(etape.data));
+            } finally {
+                window.ETAT_AVANT_REJEU = null;
+            }
+            // Le temps de respiration : l'étape suivante ne part pas sur les
+            // talons de la précédente, et l'œil suit ce qui se passe.
+            await pause(window.DELAI_ENTRE_ETAPES_MS);
         }
     } finally {
-        seq.drainEnCours = false;
+        seq.rejeuEnCours = false;
         window.ETAT_AVANT_REJEU = null;
     }
 
     if (window.SEQUENCE_TOUR !== seq) return;
 
-    // Le trajet est joué : les pions retrouvent la case que dit la base.
+    // Le tour est rejoué : les pions retrouvent la case que dit la base.
     window.PIONS_EN_ATTENTE_SEQUENCE = {};
-    seq.finDrain = Date.now();
+    seq.finRejeu = Date.now();
     await window.verifierBarriereSequence();
 };
 
@@ -437,10 +343,8 @@ window.jouerSequenceTour = function(event) {
     seq.clique = true;
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
 
-    // La fenêtre s'efface le temps du spectacle, et ne revient que si la
-    // barrière suivante fait encore attendre.
     if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
-    return window.viderTamponSequence();
+    return window.rejouerScriptTour();
 };
 
 // =========================================================================
@@ -450,99 +354,52 @@ window.etatSequenceTour = function() {
     const seq = window.SEQUENCE_TOUR;
     if (!seq) return null;
 
-    const dbs = (window.PARTIE_DATA || {}).Sequence_Tour || null;
-    const aJour = !!dbs && dbs.cle === seq.cle;
-    const prets = aJour ? (dbs.prets || []) : [];
+    const script = seq.script;
+    const complet = !!(script && script.complet);
     const attendus = window.postesAttendusSequence();
-    const manquants = attendus.filter(id => !prets.includes(id));
-    const calcul = seq.calculTermine || (aJour && !!dbs.calcul);
+    const finis = (script && script.finis) || [];
 
-    // Le clic a eu lieu : la fenêtre se lève et laisse voir le plateau. C'est
-    // tout l'intérêt du bouton — le spectacle se joue derrière.
+    // Le clic a eu lieu : la fenêtre se lève et laisse voir la relecture.
     if (seq.clique) {
         const levee = { message: "", okVisible: false, forcerVisible: false, masquee: true };
-        if (seq.drainEnCours || seq.tampon.length > 0 || !seq.finDrain) return levee;
+        if (seq.rejeuEnCours || !seq.finRejeu) return levee;
 
         // Le rejeu est fini ici, mais la table attend encore quelqu'un. On ne
         // remonte la fenêtre qu'au bout de quelques secondes : une manche
         // normale se boucle bien plus vite, et un clignotement à chaque tour
-        // serait insupportable. Passé ce délai, il vaut mieux dire pourquoi
-        // rien ne bouge que de laisser le plateau muet.
-        const finis = aJour ? (dbs.finis || []) : [];
+        // serait insupportable.
         const resteAAttendre = !seq.finiEnvoye || !attendus.every(id => finis.includes(id));
-        if (!resteAAttendre || (Date.now() - seq.finDrain) < 3000) return levee;
+        if (!resteAAttendre || (Date.now() - seq.finRejeu) < 3000) return levee;
 
         const retard = attendus.filter(id => !finis.includes(id)).length;
         return {
-            message: "Rejeu terminé — en attente de " + retard + " poste" + (retard > 1 ? "s" : "") + "…",
+            message: "Tour rejoué — en attente de " + retard + " poste" + (retard > 1 ? "s" : "") + "…",
             okVisible: false,
-            forcerVisible: (Date.now() - seq.finDrain) > 25000
+            forcerVisible: (Date.now() - seq.finRejeu) > 25000
         };
     }
 
-    if (!calcul) {
-        // Le poste qui calcule peut avoir disparu en plein tour (une tablette
+    if (!complet) {
+        // Le poste qui joue peut avoir disparu en plein tour (une tablette
         // verrouillée, une page rechargée). Personne ne le passera tout seul,
-        // mais après une longue attente la sortie manuelle doit être offerte —
-        // sans elle, la table resterait devant « calcul en cours » pour de bon.
-        return { message: "Calcul du tour en cours…", okVisible: false,
-                 forcerVisible: debutAttente > 0 && (Date.now() - debutAttente) > 45000 };
-    }
-
-    if (manquants.length > 0) {
-        // Aucune minuterie ne passe personne : on se contente de dire qui manque,
-        // et de proposer la sortie manuelle après une longue attente.
-        const assezAttendu = debutAttente > 0 && (Date.now() - debutAttente) > 30000;
+        // mais après une longue attente la sortie manuelle doit être offerte.
+        const nb = (script && Array.isArray(script.etapes)) ? script.etapes.length : 0;
         return {
-            message: "En attente de " + manquants.length + " poste" + (manquants.length > 1 ? "s" : "") + "…",
+            message: nb > 0 ? "Le tour s'écrit… (" + nb + " étape" + (nb > 1 ? "s" : "") + ")"
+                            : "Le tour se prépare…",
             okVisible: false,
-            forcerVisible: assezAttendu
+            forcerVisible: debutAttente > 0 && (Date.now() - debutAttente) > 45000
         };
     }
 
+    // Le script est complet : le OK s'allume, partout, sur le même drapeau.
     return { message: "Touchez l'écran pour voir le tour", okVisible: true, forcerVisible: false };
 };
 
 // =========================================================================
-//  LES DEUX CHECK
+//  LE POINT DE PASSAGE DE finDeTourCombat
 // =========================================================================
-//  Une seule écriture pour les deux, sous transaction : deux postes qui signent
-//  au même instant ne s'effacent pas l'un l'autre.
-async function signerSequence(champs) {
-    const seq = window.SEQUENCE_TOUR;
-    if (!seq || typeof window.modifierPartie !== "function") return;
-    const moi = monPoste();
-    const cle = seq.cle;
-
-    await window.modifierPartie((data) => {
-        let s = data.Sequence_Tour || null;
-        // Une séquence d'un autre tour traîne encore : on repart de zéro plutôt
-        // que d'ajouter nos signatures aux siennes.
-        if (!s || s.cle !== cle) {
-            s = { cle, acteur: seq.acteur, calcul: false, prets: [], finis: [], actions: null };
-        } else {
-            s = { ...s, prets: [...(s.prets || [])], finis: [...(s.finis || [])] };
-        }
-
-        if (champs.calcul) s.calcul = true;
-        if (champs.pret && !s.prets.includes(moi)) s.prets.push(moi);
-        if (champs.fini && !s.finis.includes(moi)) s.finis.push(moi);
-        if (Array.isArray(champs.actions)) s.actions = champs.actions;
-        if (Array.isArray(champs.postesForces)) {
-            champs.postesForces.forEach(id => {
-                if (!s.prets.includes(id)) s.prets.push(id);
-                if (!s.finis.includes(id)) s.finis.push(id);
-            });
-            s.calcul = true;
-            if (!Array.isArray(s.actions)) s.actions = [];
-        }
-
-        return { maj: { Sequence_Tour: s } };
-    });
-}
-
-// LE POINT DE PASSAGE de finDeTourCombat. Renvoyer vrai = « je retiens ce tour,
-// ne fais pas avancer la file ».
+//  Renvoyer vrai = « je retiens ce tour, ne fais pas avancer la file ».
 window.sequenceRetientFinDeTour = async function(idQuiTermine) {
     if (window.SEQUENCE_LAISSEZ_PASSER) {
         window.SEQUENCE_LAISSEZ_PASSER = false;
@@ -550,17 +407,22 @@ window.sequenceRetientFinDeTour = async function(idQuiTermine) {
     }
 
     const seq = window.ouvrirSequenceTour(window.PARTIE_DATA);
-    // Pas de séquence lisible (un combattant à terre qu'on saute, une phase de
-    // préparation, un banc d'essai) : rien à retenir.
     if (!seq) return false;
     if (idQuiTermine && idQuiTermine !== seq.acteur) return false;
+    // Sans script en base (bancs d'essai, page partielle), rien à retenir.
+    if (!seq.idScript || typeof window.ecrireScriptTour !== "function") return false;
 
-    // C'est ce poste qui a calculé le tour : c'est donc lui qui annoncera aux
-    // autres que le calcul est bouclé, et qui publiera la liste des animations.
     seq.estActeur = true;
+    seq.voile = false;
     seq.calculTermine = true;
 
-    await signerSequence({ calcul: true });
+    // Le tour est écrit en entier : ce drapeau-là, et lui seul, allume le OK
+    // doré sur tous les appareils au même instant.
+    if (!seq.completEnvoye) {
+        seq.completEnvoye = true;
+        await window.ecrireScriptTour(seq.idScript, enteteScript(seq, true));
+    }
+
     await window.verifierBarriereSequence();
     if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
     return true;
@@ -569,107 +431,41 @@ window.sequenceRetientFinDeTour = async function(idQuiTermine) {
 // =========================================================================
 //  L'AVANCEMENT DE LA BARRIÈRE
 // =========================================================================
-//  Rappelée à chaque notification de la partie et à la fin de chaque rejeu.
-//  Elle ne fait qu'une chose à la fois, et toujours la plus en amont.
 window.verifierBarriereSequence = async function() {
     const seq = window.SEQUENCE_TOUR;
     if (!seq) return;
 
-    const dbs = (window.PARTIE_DATA || {}).Sequence_Tour || null;
-    const aJour = !!dbs && dbs.cle === seq.cle;
-    const calcul = seq.calculTermine || (aJour && !!dbs.calcul);
+    const script = seq.script;
+    if (!script || !script.complet) {
+        if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
+        return;
+    }
 
-    // 1. Tant que le tour n'est pas calculé, il n'y a rien à signer.
-    if (!calcul) return;
-
-    // 2. CHECK « prêt » : la vérification base → client. Ce poste sait-il lire ce
-    //    qu'on lui annonce — le combattant, et sa technique ? S'il ne les a pas
-    //    encore reçus, il attend le prochain instantané plutôt que de signer à
-    //    l'aveugle et de rejouer un tour qu'il ne comprend pas.
-    if (!seq.pretEnvoye) {
-        const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === seq.acteur);
-        // La lecture de la carte est refaite ici plutôt qu'empruntée à combat.js :
-        // une barrière qui dépendrait d'un module absent bloquerait la table
-        // entière au lieu de la protéger.
-        const carte = (window.COMPETENCES_CACHE || {})[seq.idCarte]
-                   || ((window.CACHE_COMPETENCES_GLOBAL || {})[seq.acteur] || {})[seq.idCarte];
-        const carteLisible = seq.idCarte === "REPOS_LONG" || !!carte;
-        if (!perso || !carteLisible) {
+    // 1. La relecture. Le poste qui a joué le tour l'a déjà vu en direct : il
+    //    n'a rien à rejouer. Les autres attendent le doigt sur l'écran.
+    if (seq.voile) {
+        if (!seq.clique) {
             if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
             return;
         }
-        seq.pretEnvoye = true;
-        await signerSequence({ pret: true });
-        if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
-        return;
+        if (seq.rejeuEnCours) return;
+        if (seq.jouees < (script.etapes || []).length) { window.rejouerScriptTour(); return; }
     }
 
+    // 2. CHECK « fini ». Il ne peut plus arriver trop tôt : le script est
+    //    complet, et ce poste a rejoué toutes ses étapes.
     const attendus = window.postesAttendusSequence();
-    const prets = aJour ? (dbs.prets || []) : [];
-    // 3. Tous prêts ? Sinon le OK doré ne s'allume pas — et on attend, sans
-    //    limite de temps : « reste en pause tant que le joueur n'est pas revenu ».
-    if (!attendus.every(id => prets.includes(id))) {
-        if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
-        return;
-    }
-
-    // 4. Le rejeu. Sans fenêtre (c'est mon tour, j'ai tout vu en direct) il n'y a
-    //    rien à rejouer et rien à attendre. Avec fenêtre, il faut le clic.
-    if (seq.voile && !seq.clique) {
-        if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
-        return;
-    }
-    if (seq.drainEnCours) return;
-    if (seq.tampon.length > 0) { window.viderTamponSequence(); return; }
-
-    // 5. L'acteur publie la liste exacte des animations du tour, une fois qu'il a
-    //    lui-même tout rejoué : c'est elle qui dit aux autres quand ils ont fini.
-    if (seq.estActeur && !seq.actionsPubliees) {
-        if (seq.publicationEnCours) return;
-        seq.publicationEnCours = true;
-        try {
-            // Le joueur dont c'est le tour a tout vu en direct : ses animations
-            // peuvent encore tourner au moment où il appuie sur "fin du tour",
-            // et un sous-effet (Poussée, Peur…) part au beau milieu de
-            // l'animation d'une carte. On laisse donc sa file retomber avant de
-            // figer la liste, sinon les autres postes se croiraient finis sans
-            // avoir rejoué ce sous-effet.
-            if (!seq.voile) {
-                for (let i = 0; i < 2; i++) {
-                    try { await window.FILE_ANIMATIONS; } catch (e) { /* déjà signalée ailleurs */ }
-                    await new Promise(r => setTimeout(r, 100));
-                }
-            }
-            if (window.SEQUENCE_TOUR !== seq) return;
-            // Ce que ce tour a DIFFUSÉ, pas seulement ce que ce poste a déjà
-            // rejoué : l'écho d'une carte peut n'être pas encore revenu de la
-            // base, et la liste partirait alors incomplète.
-            const attendues = new Set([...seq.jouees, ...actionsDiffuseesDuTour(seq)]);
-            seq.actionsPubliees = true;
-            await signerSequence({ actions: [...attendues] });
-        } finally {
-            seq.publicationEnCours = false;
+    const finis = script.finis || [];
+    if (!seq.finiEnvoye) {
+        seq.finiEnvoye = true;
+        if (typeof window.signerScriptTour === "function") {
+            await window.signerScriptTour(seq.idScript, monPoste());
         }
         return;
     }
 
-    // 6. CHECK « fini ». Un spectateur ne signe que lorsqu'il a joué TOUTES les
-    //    animations annoncées : un sous-effet arrivé en retard le retient encore.
-    const annoncees = aJour && Array.isArray(dbs.actions) ? dbs.actions : null;
-    if (!annoncees) return;
-    if (!annoncees.every(ts => seq.jouees.includes(ts))) {
-        if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
-        return;
-    }
-    if (!seq.finiEnvoye) {
-        seq.finiEnvoye = true;
-        await signerSequence({ fini: true });
-        return;
-    }
-
-    // 7. Tout le monde a rejoué : la file peut enfin avancer. Tous les postes
+    // 3. Tout le monde a rejoué : la file peut enfin avancer. Tous les postes
     //    tentent, la transaction de finDeTourCombat n'en laisse passer qu'un.
-    const finis = aJour ? (dbs.finis || []) : [];
     if (!attendus.every(id => finis.includes(id))) {
         if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
         return;
@@ -690,44 +486,63 @@ window.verifierBarriereSequence = async function() {
 window.forcerSequenceTour = async function(event) {
     if (event && event.stopPropagation) event.stopPropagation();
     const seq = window.SEQUENCE_TOUR;
-    if (!seq) return;
+    if (!seq || !seq.idScript) return;
 
-    const dbs = (window.PARTIE_DATA || {}).Sequence_Tour || null;
-    const aJour = !!dbs && dbs.cle === seq.cle;
-    const prets = aJour ? (dbs.prets || []) : [];
-    const finis = aJour ? (dbs.finis || []) : [];
-    // On force les deux Check à la fois : un poste peut très bien avoir signé le
-    // premier avant de disparaître, et ne jamais signer le second.
-    const manquants = window.postesAttendusSequence()
-        .filter(id => !prets.includes(id) || !finis.includes(id));
-    if (manquants.length === 0) return;
+    const script = seq.script || {};
+    const finis = script.finis || [];
+    const manquants = window.postesAttendusSequence().filter(id => !finis.includes(id));
+    if (manquants.length === 0 && script.complet) return;
 
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    await signerSequence({ postesForces: manquants });
+    if (typeof window.ecrireScriptTour === "function") {
+        await window.ecrireScriptTour(seq.idScript, {
+            complet: true,
+            finis: [...new Set([...finis, ...manquants])]
+        });
+    }
     await window.verifierBarriereSequence();
+};
+
+// =========================================================================
+//  LA MISE EN SILENCE DES ANIMATIONS DIFFUSÉES
+// =========================================================================
+//  Les Action_* de la partie continuent d'exister : c'est par elles que le
+//  poste qui JOUE voit son propre tour se dérouler. Mais un poste qui REGARDE
+//  n'en fait plus rien — il rejouera le tour depuis son script, dans l'ordre,
+//  après le OK. Sans ce filtre, les animations se déroulaient derrière la
+//  fenêtre sombre, et on les devinait par transparence.
+window.programmerAnimationTour = function(nom, action, fn) {
+    if (!window.SEQUENCE_TOUR && typeof window.ouvrirSequenceTour === "function") {
+        window.ouvrirSequenceTour(window.PARTIE_DATA);
+    }
+    const seq = window.SEQUENCE_TOUR;
+
+    if (seq && seq.voile) {
+        // Le pion concerné garde sa case à l'écran jusqu'à la relecture.
+        if (action && action.idToken) window.PIONS_EN_ATTENTE_SEQUENCE[action.idToken] = true;
+        if (action && action.idCible) window.PIONS_EN_ATTENTE_SEQUENCE[action.idCible] = true;
+        if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
+        return Promise.resolve();
+    }
+
+    return window.filerAnimation(nom, fn);
 };
 
 // =========================================================================
 //  LE GARDE-FOU DE L'IA
 // =========================================================================
-//  Une créature dont le tour est calculé mais pas encore validé par tous ne
-//  doit surtout pas le rejouer. Sans ce verrou, le poste qui tient l'IA
-//  reprenait la main à chaque notification (son propre verrou lui répond
-//  toujours oui) et la créature jouait son tour en boucle pendant l'attente.
+//  Une créature dont le tour est écrit ne doit surtout pas le rejouer. Son
+//  verrou, lui, répond toujours oui à qui le détient déjà : sans ce garde-fou
+//  elle repartait pour un tour à chaque notification pendant toute l'attente.
 window.sequenceTourEnAttente = function() {
-    // Un tour déjà bouclé dont la file n'a pas encore avancé : la créature ne
-    // doit pas le rejouer sous prétexte qu'elle est toujours en tête.
     const cleCourante = window.cleSequenceTour();
     if (cleCourante && window.SEQUENCES_TERMINEES.includes(cleCourante)) return true;
 
     const seq = window.SEQUENCE_TOUR;
     if (!seq || !seq.cle) return false;
-    // Ce poste a déjà tout rejoué et signé : sa part est faite, il n'y a plus
-    // rien à calculer pour ce tour, seulement à attendre les autres.
     if (seq.finiEnvoye) return true;
     if (seq.calculTermine) return true;
-    const dbs = (window.PARTIE_DATA || {}).Sequence_Tour || null;
-    return !!(dbs && dbs.cle === seq.cle && dbs.calcul);
+    return !!(seq.script && seq.script.complet);
 };
 
 // Appelé à chaque notification de la partie (app.js) : ouvre ou referme la
