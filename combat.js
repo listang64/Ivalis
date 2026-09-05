@@ -44,17 +44,33 @@ import { doc, setDoc, onSnapshot, updateDoc, runTransaction, deleteField, FieldP
 //  pions, que personne ne relisait jamais : les jetons ne s'affichaient plus.
 //  On envoie donc un objet réellement imbriqué, que {merge:true} fusionne case
 //  par case sans toucher aux autres pions.
+//  Le dernier argument peut être une ANNONCE de trajet ({idToken, timestamp}) :
+//  elle part alors dans la même écriture que la case d'arrivée. C'est ce qui
+//  permet aux autres postes de reconnaître un pion qui va marcher, et de ne pas
+//  le téléporter en attendant l'ordre d'animer — qui, lui, voyage par un autre
+//  document et peut très bien arriver après.
 window.enregistrerPionsVTT = async function(...idsTokens) {
     if (!window.ID_PARTIE_COURANTE || idsTokens.length === 0) return;
+
+    let annonce = null;
+    if (idsTokens.length > 0 && idsTokens[idsTokens.length - 1]
+        && typeof idsTokens[idsTokens.length - 1] === "object") {
+        annonce = idsTokens.pop();
+    }
+    if (idsTokens.length === 0) return;
+
     const pions = {};
     idsTokens.forEach(id => {
         const pion = (window.TOKENS_VTT_DATA || {})[id];
         if (pion) pions[id] = pion;
     });
     if (Object.keys(pions).length === 0) return;
+
+    const maj = { Tokens: pions };
+    if (annonce) maj.Mouvement_En_Cours = annonce;
+
     try {
-        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE),
-                     { Tokens: pions }, { merge: true });
+        await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), maj, { merge: true });
     } catch (e) {
         console.error("Enregistrement du pion :", e);
     }
@@ -258,6 +274,9 @@ window.ouvrirCombat = function() {
 
     // On charge juste l'UI de gauche
     window.initialiserPersosCombat();
+    // Le filet : toutes les deux secondes, l'écran se remet d'accord avec ce
+    // que le poste a déjà reçu. Aucune requête réseau, aucun quota consommé.
+    if (typeof window.demarrerTicAffichageCombat === "function") window.demarrerTicAffichageCombat();
     
     // Le plateau a déjà été chargé en arrière-plan, on s'assure juste qu'il est bien centré
     if (typeof window.centrerPlateau === "function") {
@@ -305,6 +324,7 @@ window.fermerCombat = function() {
     if (typeof window.arreterPlacementApparition === "function") window.arreterPlacementApparition();
 
     // On quitte le combat : la veille redevient utile pour les autres scenes
+    if (typeof window.arreterTicAffichageCombat === "function") window.arreterTicAffichageCombat();
     if (typeof window.reprendreSynchroCanvas === "function") window.reprendreSynchroCanvas();
 };
 
@@ -586,6 +606,115 @@ function combattantDuPanneau() {
     if (!affiche) return null;
     return (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === affiche.idPersonnage) || affiche;
 }
+
+// =========================================================================
+//  LE REDESSIN DE CE QUI EST DÉJÀ À L'ÉCRAN
+// =========================================================================
+//  Firestore pousse les données sans qu'on ait rien à demander : quand un héros
+//  dépense son énergie, les trois postes reçoivent sa fiche dans la seconde.
+//  Ce qui manquait, c'est le REDESSIN. Les jauges du panneau gauche n'étaient
+//  refaites que par le poste qui agissait ; sur les autres écrans elles
+//  restaient sur la valeur d'avant — 48 d'énergie ici, 18 là — jusqu'à ce qu'on
+//  change de héros et qu'on revienne, ce qui forçait un redessin.
+//
+//  Aucune lecture réseau ici : on ne fait que remettre à l'écran ce que le
+//  poste sait déjà.
+// Les pions dont une animation de marche est en cours sur CE poste. Tant qu'un
+// pion y figure, sa case à l'écran est celle de l'animation, pas celle qui
+// arrive du réseau.
+window.PIONS_EN_MOUVEMENT = window.PIONS_EN_MOUVEMENT || {};
+
+// Le mouvement le plus récemment ANIMÉ sur ce poste. Il sert à reconnaître un
+// trajet dont la case d'arrivée est arrivée avant l'ordre d'animer.
+window.DERNIER_MOUVEMENT_ANIME = 0;
+
+window.positionsProtegees = function(tokensRecus, mouvementEnCours) {
+    const recus = tokensRecus ? JSON.parse(JSON.stringify(tokensRecus)) : {};
+    const locaux = window.TOKENS_VTT_DATA || {};
+    const garder = (id) => {
+        if (recus[id] && locaux[id]) recus[id] = { ...recus[id], q: locaux[id].q, r: locaux[id].r };
+    };
+
+    // 1. Les pions dont l'animation tourne en ce moment sur cet écran.
+    Object.keys(window.PIONS_EN_MOUVEMENT || {}).forEach(garder);
+
+    // 2. Et celui dont le trajet est annoncé mais pas encore joué ICI. La case
+    //    d'arrivée voyage dans le plateau, l'ordre d'animer dans la partie :
+    //    deux documents, donc aucune garantie d'ordre. L'annonce est écrite
+    //    dans la MÊME opération que la case — impossible de recevoir l'une
+    //    sans l'autre — ce qui ferme la course pour de bon.
+    if (mouvementEnCours && mouvementEnCours.idToken
+        && (mouvementEnCours.timestamp || 0) > (window.DERNIER_MOUVEMENT_ANIME || 0)
+        && (Date.now() - (mouvementEnCours.timestamp || 0)) < 20000) {
+        garder(mouvementEnCours.idToken);
+    }
+    return recus;
+};
+
+window.rafraichirAffichageCombat = function() {
+    if (document.getElementById("fenetre-combat")?.style.display !== "block") return;
+
+    // Les objets de PERSOS_PARTIE sont REMPLACÉS à chaque notification (une
+    // nouvelle conversion par snapshot) : la liste du panneau, elle, garde les
+    // anciens. On la fait pointer sur les objets frais.
+    const frais = (p) => (window.PERSOS_PARTIE || []).find(x => x.idPersonnage === p.idPersonnage) || p;
+    if (Array.isArray(window.COMBAT_PERSOS_JOUEUR_BACKUP)) {
+        window.COMBAT_PERSOS_JOUEUR_BACKUP = window.COMBAT_PERSOS_JOUEUR_BACKUP.map(frais);
+    }
+    if (Array.isArray(window.COMBAT_PERSOS_JOUEUR)) {
+        window.COMBAT_PERSOS_JOUEUR = window.COMBAT_PERSOS_JOUEUR.map(frais);
+    }
+
+    // Un héros arrivé (ou reparti) après l'ouverture du combat doit entrer dans
+    // la liste du panneau : sans cela, il n'y apparaît jamais. On ne touche pas
+    // à la sélection tant que le panneau montre une créature (mode forcé).
+    const idJoueur = localStorage.getItem("ID_JOUEUR_COURANT");
+    if (idJoueur && !window.COMBAT_PERSOS_JOUEUR_BACKUP) {
+        const miens = (window.PERSOS_PARTIE || []).filter(p => p.idJoueur === idJoueur);
+        const affiche = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
+        const memesHeros = miens.length === (window.COMBAT_PERSOS_JOUEUR || []).length
+            && miens.every((p, i) => p.idPersonnage === window.COMBAT_PERSOS_JOUEUR[i].idPersonnage);
+        if (!memesHeros) {
+            window.COMBAT_PERSOS_JOUEUR = miens;
+            const i = miens.findIndex(p => affiche && p.idPersonnage === affiche.idPersonnage);
+            window.COMBAT_INDEX_PERSO = i >= 0 ? i : 0;
+        }
+    }
+
+    // Chaque redessin est isolé : une bulle d'initiative qui casse ne doit pas
+    // emporter les jauges avec elle.
+    const sansCasser = (nom, fn) => { try { fn(); } catch (e) { console.error("Redessin " + nom + " :", e); } };
+    if (typeof window.mettreAJourJaugePV === "function")
+        sansCasser("vitalité", () => window.mettreAJourJaugePV());
+    if (typeof window.mettreAJourJaugeFatigue === "function")
+        sansCasser("énergie", () => window.mettreAJourJaugeFatigue(0));
+    if (typeof window.afficherPisteInitiative === "function")
+        sansCasser("piste", () => window.afficherPisteInitiative());
+    if (typeof window.actualiserBoutonFinTour === "function")
+        sansCasser("bouton de fin de tour", () => window.actualiserBoutonFinTour());
+    if (typeof window.actualiserEtatCarteCombat === "function")
+        sansCasser("carte du panneau", () => window.actualiserEtatCarteCombat());
+};
+
+// LE TIC DE SÉCURITÉ.
+//  Toutes les deux secondes, l'écran se remet d'accord avec ce que le poste a
+//  déjà reçu. Il ne demande RIEN au réseau : c'est un simple redessin, dont le
+//  coût est nul et qui ne consomme aucun quota. Il rattrape ce qu'un
+//  rafraîchissement manquant aurait laissé passer — un cas oublié, une
+//  exception avalée — sans qu'on ait à tous les avoir prévus.
+window.TIC_AFFICHAGE_COMBAT = null;
+window.demarrerTicAffichageCombat = function() {
+    if (window.TIC_AFFICHAGE_COMBAT) return;
+    window.TIC_AFFICHAGE_COMBAT = setInterval(() => {
+        try { window.rafraichirAffichageCombat(); }
+        catch (e) { console.error("Tic d'affichage :", e); }
+    }, 2000);
+};
+window.arreterTicAffichageCombat = function() {
+    if (!window.TIC_AFFICHAGE_COMBAT) return;
+    clearInterval(window.TIC_AFFICHAGE_COMBAT);
+    window.TIC_AFFICHAGE_COMBAT = null;
+};
 
 window.mettreAJourJaugePV = function() {
     // Les globales COMBAT_PV_* sont recopiées à la main depuis une douzaine
@@ -1145,7 +1274,14 @@ window.ecouterTerrainVTT = function() {
 
             // 🔻 NOUVEAU : Lecture des Pions (Tokens) depuis Firebase 🔻
             if (data.Tokens !== undefined) {
-                window.TOKENS_VTT_DATA = data.Tokens;
+                // UN PION EN PLEINE MARCHE GARDE SA POSITION. La case d'arrivée
+                // et l'ordre d'animer voyagent dans deux documents différents,
+                // et rien ne garantit l'ordre d'arrivée : quand la case gagnait
+                // la course, le pion se téléportait à destination, puis
+                // l'animation le ramenait au départ pour rejouer son trajet —
+                // avec, au passage, la mise en scène des attaques
+                // d'opportunité qu'il venait pourtant de subir.
+                window.TOKENS_VTT_DATA = window.positionsProtegees(data.Tokens, data.Mouvement_En_Cours);
                 if (typeof window.appliquerTokensVTT === "function") {
                     window.appliquerTokensVTT(data.Tokens);
                 }

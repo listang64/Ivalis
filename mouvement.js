@@ -492,6 +492,11 @@ window.validerMouvement = async function() {
         window.TOKENS_VTT_DATA[idPerso].q = finalStep.q;
         window.TOKENS_VTT_DATA[idPerso].r = finalStep.r;
 
+        // Un seul horodatage pour les deux écritures : c'est lui qui permettra à
+        // chaque poste de reconnaître la case d'arrivée d'un trajet qu'il n'a
+        // pas encore animé.
+        const horodatageMouvement = new Date().getTime();
+
         // Sous transaction : la file d'attente est partagée par tous les postes, et
         // la réécrire à partir d'une lecture périmée effacerait la carte qu'un
         // autre joueur vient d'y poser (cf. window.modifierPartie).
@@ -509,7 +514,7 @@ window.validerMouvement = async function() {
                     path: pathAvecAngles,
                     opportunites: opportunitesResolues,
                     zones: zonesResolues,
-                    timestamp: new Date().getTime()
+                    timestamp: horodatageMouvement
                 }
             } };
         });
@@ -517,7 +522,10 @@ window.validerMouvement = async function() {
         const persoRef = window.refCombattant(idPerso);
         await updateDoc(persoRef, { Fatigue_Actuelle: nvlFatigue });
 
-        await window.enregistrerPionsVTT(idPerso);
+        // La case d'arrivée part avec l'ANNONCE du trajet, dans la même
+        // écriture : un poste ne peut donc pas recevoir la première sans la
+        // seconde, et ne téléportera plus le pion avant de l'animer.
+        await window.enregistrerPionsVTT(idPerso, { idToken: idPerso, timestamp: horodatageMouvement });
 
     } catch (e) {
         console.error("Erreur de Validation Mouvement :", e);
@@ -536,6 +544,13 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
     if (!tokenDiv) return;
 
     window.ANIMATION_VTT_EN_COURS = true;
+    // Tant que ce pion marche, la case qui arrive du réseau ne le déplace pas :
+    // sinon il se téléporte à l'arrivée avant même d'avoir commencé son trajet.
+    window.PIONS_EN_MOUVEMENT = window.PIONS_EN_MOUVEMENT || {};
+    window.PIONS_EN_MOUVEMENT[actionMouvement.idToken] = true;
+    // Ce trajet-là est joué : sa case d'arrivée n'a plus besoin d'être retenue.
+    window.DERNIER_MOUVEMENT_ANIME = Math.max(window.DERNIER_MOUVEMENT_ANIME || 0,
+                                              actionMouvement.timestamp || 0);
 
     tokenDiv.style.transition = "left 0.4s linear, top 0.4s linear";
 
@@ -599,6 +614,8 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
     }
 
     window.ANIMATION_VTT_EN_COURS = false;
+    // La marche est finie : le pion redevient gouverné par le réseau.
+    if (window.PIONS_EN_MOUVEMENT) delete window.PIONS_EN_MOUVEMENT[actionMouvement.idToken];
     if (typeof window.appliquerTokensVTT === "function") {
         window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
     }
@@ -613,6 +630,8 @@ window.jouerAnimationBond = async function(data) {
     const imgMain = tokenDiv.querySelector(".token-img-main");
 
     window.ANIMATION_VTT_EN_COURS = true;
+    window.PIONS_EN_MOUVEMENT = window.PIONS_EN_MOUVEMENT || {};
+    window.PIONS_EN_MOUVEMENT[data.idToken] = true;
 
     tokenDiv.style.transition = "left 0.25s ease-in-out, top 0.25s ease-in-out";
     if (imgMain) imgMain.style.transition = "transform 0.12s ease-in-out";
@@ -647,6 +666,8 @@ window.jouerAnimationBond = async function(data) {
     }
 
     window.ANIMATION_VTT_EN_COURS = false;
+    // La marche est finie : le pion redevient gouverné par le réseau.
+    if (window.PIONS_EN_MOUVEMENT) delete window.PIONS_EN_MOUVEMENT[data.idToken];
     if (typeof window.appliquerTokensVTT === "function") {
         window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
     }

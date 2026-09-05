@@ -81,6 +81,7 @@ node equipement_depart.mjs  # l'arme et la tenue choisies à la création, et le
 node avatar_armure.mjs      # le héros redessiné dans l'armure qu'il vient d'équiper
 node creation_equipee.mjs   # l'équipement dessiné AVANT le héros, et joint à son portrait
 node tour_synchronise.mjs   # le passage en résolution, identique sur les trois écrans
+node affichage_temps_reel.mjs # les jauges qui suivent la base, le tic, et le pion qui ne se téléporte plus
 node objets_tableau.mjs     # le catalogue d'équipement, confronté au tableau de Nico
 node equipement_combat.mjs  # ce que les objets font une fois portés, en combat
 node apercu_butin.mjs       # onglet Inventaire et fenêtres de butin, capturés à l'écran

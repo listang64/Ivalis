@@ -217,6 +217,14 @@ window.recomposerCombattants = function() {
         if (frais) window.afficherDansPanneauGauche(affiche.idPersonnage);
     }
 
+    // ...et pour les HÉROS, personne ne redessinait rien. Leur panneau gardait
+    // les chiffres du moment où le combat s'était ouvert : on voyait 48
+    // d'énergie là où le poste d'à côté en voyait 18, et il fallait changer de
+    // héros puis revenir pour que l'écran se remette d'accord.
+    if (typeof window.rafraichirAffichageCombat === "function") {
+        window.rafraichirAffichageCombat();
+    }
+
     // Qui est à terre ? La réponse doit être la MÊME sur les trois écrans, et
     // c'est ici qu'on voit changer les points de vie. La liste partagée est donc
     // mise à jour au passage — sans rien écrire quand elle est déjà juste, et
