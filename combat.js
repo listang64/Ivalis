@@ -836,15 +836,16 @@ window.gererClicCarteCombat = function(idCarte) {
     const dataCarte = window.COMPETENCES_CACHE[idCarte];
     const cout = parseInt(dataCarte?.Fatigue) || 0;
 
-    if (window.CARTE_EN_APERCU !== idCarte) {
-        // A. On vérifie si la carte + le trajet tracé ne dépassent pas l'énergie max
-        if (cout + (window.MOUVEMENT_COUT_TOTAL || 0) > (window.COMBAT_FATIGUE_ACTUELLE || 0)) {
-            alert("Vous n'avez pas assez d'énergie pour lancer cette compétence avec ce déplacement.");
-            return; // On bloque le clic sur la carte !
-        }
+    // Une carte trop chère (seule, ou combinée au trajet déjà tracé) reste
+    // consultable comme n'importe quelle autre : plus de message d'erreur ni de
+    // clic bloqué, elle s'ouvre et s'affiche normalement — c'est uniquement à
+    // l'affichage (competences.js, boutonChoisirHtml) que le bouton "Choisir"
+    // cède la place à "Énergie Insuffisante". On ne réserve simplement pas son
+    // coût auprès du déplacement, puisqu'elle ne pourra de toute façon pas partir.
+    const abordable = cout + (window.MOUVEMENT_COUT_TOTAL || 0) <= (window.COMBAT_FATIGUE_ACTUELLE || 0);
 
-        // B. Si c'est bon, on prévient le moteur de déplacement du prix de la carte !
-        window.COUT_COMPETENCE_SELECTIONNEE = cout;
+    if (window.CARTE_EN_APERCU !== idCarte) {
+        window.COUT_COMPETENCE_SELECTIONNEE = abordable ? cout : 0;
     } else {
         window.COUT_COMPETENCE_SELECTIONNEE = 0;
     }
@@ -861,8 +862,8 @@ window.gererClicCarteCombat = function(idCarte) {
 
     if (window.CARTE_EN_APERCU !== idCarte) {
         window.CARTE_EN_APERCU = idCarte;
-        
-        const estEpuise = cout > fatiguePerso;
+
+        const estEpuise = !abordable;
 
         const carteDiv = document.getElementById(`combat-carte-${idCarte}`);
         const cadreDiv = document.getElementById(`cadre-combat-${idCarte}`);
@@ -2653,6 +2654,22 @@ function dessinerHexZonePersistante(type, hex, R, leger) {
                     style="animation: zpBulle ${(2.4 + rnd(k + 47) * 1.8).toFixed(2)}s ease-out infinite; animation-delay:-${(rnd(k + 53) * 3).toFixed(2)}s"/></g>`;
         }
 
+    } else if (type === "soin") {
+        // Une zone bienfaisante : verte, jamais rouge — un remous de vie qui pulse doucement,
+        // avec quelques étincelles qui montent et s'effacent, comme une bénédiction posée au sol.
+        contour = "#4caf50";
+        deco += `<polygon points="${pointsHexZone(0, 0, R)}" fill="url(#zp-grad-soin)" class="zp-anim" style="animation: zpSocle 3.4s ease-in-out infinite"/>`;
+        deco += `<ellipse rx="${(R * 0.40).toFixed(1)}" ry="${(R * 0.32).toFixed(1)}" fill="url(#zp-grad-soin-coeur)"${flouDoux} class="zp-anim"
+            style="animation: zpBraise 2.6s ease-in-out infinite"/>`;
+
+        const nbEtincelles = leger ? 2 : 4;
+        for (let k = 0; k < nbEtincelles; k++) {
+            const ang = (k * (360 / nbEtincelles) + rnd(k + 5) * 45) * Math.PI / 180;
+            const d = R * (0.10 + rnd(k + 11) * 0.42);
+            deco += `<g transform="translate(${(Math.cos(ang) * d).toFixed(1)},${(Math.sin(ang) * d).toFixed(1)})">
+                <circle r="${(R * 0.09).toFixed(1)}" fill="url(#zp-grad-etincelle-soin)"${halo} class="zp-anim"
+                    style="animation: zpBulle ${(2.2 + rnd(k + 17) * 1.8).toFixed(2)}s ease-out infinite; animation-delay:-${(rnd(k + 23) * 3).toFixed(2)}s"/></g>`;
+        }
     } else {
         deco += `<polygon points="${pointsHexZone(0, 0, R)}" fill="rgba(255,76,76,0.22)" class="zp-anim" style="animation: zpSocle 2.6s ease-in-out infinite"/>`;
     }
@@ -2745,6 +2762,20 @@ window.appliquerZonesPersistantes = function() {
             <stop offset="0%"   stop-color="#e2ffb8" stop-opacity="0.92"/>
             <stop offset="55%"  stop-color="#9ae04f" stop-opacity="0.50"/>
             <stop offset="100%" stop-color="#4d9b32" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="zp-grad-soin">
+            <stop offset="0%"   stop-color="#c8f7a8" stop-opacity="0.55"/>
+            <stop offset="55%"  stop-color="#6fce4c" stop-opacity="0.42"/>
+            <stop offset="100%" stop-color="#2e7d32" stop-opacity="0.32"/>
+        </radialGradient>
+        <radialGradient id="zp-grad-soin-coeur">
+            <stop offset="0%"   stop-color="#ffffe6" stop-opacity="0.92"/>
+            <stop offset="45%"  stop-color="#baf78c" stop-opacity="0.55"/>
+            <stop offset="100%" stop-color="#6fce4c" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="zp-grad-etincelle-soin">
+            <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.95"/>
+            <stop offset="100%" stop-color="#9df57a" stop-opacity="0"/>
         </radialGradient>
     </defs>`;
 

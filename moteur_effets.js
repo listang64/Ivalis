@@ -2278,14 +2278,30 @@ window.demarrerCiblage = async function(idCarte) {
         if (!btnResoudre) {
             btnResoudre = document.createElement("div");
             btnResoudre.id = "btn-resoudre-carte";
-            btnResoudre.style.cssText = "position: absolute; bottom: -30px; left: 50%; transform: translateX(-50%); z-index: 5; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 2px black, 0 0 10px #00ffff; color: #00ffff; transition: transform 0.2s;";
-            btnResoudre.onmouseover = () => btnResoudre.style.transform = "translateX(-50%) scale(1.1)";
-            btnResoudre.onmouseout = () => btnResoudre.style.transform = "translateX(-50%) scale(1)";
+            btnResoudre.style.cssText = "position: absolute; bottom: -30px; left: 50%; transform: translateX(10px); z-index: 5; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 2px black, 0 0 10px #00ffff; color: #00ffff; transition: transform 0.2s;";
+            btnResoudre.onmouseover = () => btnResoudre.style.transform = "translateX(10px) scale(1.1)";
+            btnResoudre.onmouseout = () => btnResoudre.style.transform = "translateX(10px) scale(1)";
             document.getElementById("apercu-carte-hd-competence").appendChild(btnResoudre);
         }
         btnResoudre.innerText = "RÉSOUDRE";
         btnResoudre.style.pointerEvents = "auto";
         btnResoudre.onclick = () => window.declencherResolutionAvecBondEventuel();
+
+        // Annuler le ciblage sans perdre son tour : la carte revient au repos et le
+        // joueur peut continuer son déplacement, exactement comme le ✖ déjà offert
+        // en mode zone (bulle-validation-zone, plus haut).
+        let btnAnnuler = document.getElementById("btn-annuler-ciblage");
+        if (!btnAnnuler) {
+            btnAnnuler = document.createElement("div");
+            btnAnnuler.id = "btn-annuler-ciblage";
+            btnAnnuler.style.cssText = "position: absolute; bottom: -30px; left: 50%; transform: translateX(calc(-100% - 10px)); z-index: 5; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 2px black, 0 0 10px #ff4c4c; color: #ff4c4c; transition: transform 0.2s;";
+            btnAnnuler.onmouseover = () => btnAnnuler.style.transform = "translateX(calc(-100% - 10px)) scale(1.1)";
+            btnAnnuler.onmouseout = () => btnAnnuler.style.transform = "translateX(calc(-100% - 10px)) scale(1)";
+            document.getElementById("apercu-carte-hd-competence").appendChild(btnAnnuler);
+        }
+        btnAnnuler.innerText = "ANNULER";
+        btnAnnuler.style.pointerEvents = "auto";
+        btnAnnuler.onclick = () => window.nettoyerCiblage();
     }
     window.actualiserVisuelCiblage();
 };
@@ -2496,6 +2512,12 @@ window.dessinerAnneauxCiblage = function() {
 
     const couleurAnneau = configSort.isHeal ? '#1b6e3a' : '#ff4c4c';
 
+    // Poussée et Traction peuvent aussi viser un allié (l'écarter d'un danger, le
+    // ramener vers soi) : seule une carte SANS attaque qui les porte l'autorise —
+    // une carte qui frappe ET pousse reste une agression, donc réservée aux ennemis.
+    const cartePousseeOuTraction = (window.ETAT_CIBLAGE.attaques || []).length === 0
+        && (window.ETAT_CIBLAGE.alterations || []).some(a => a.estPoussee || a.estTraction);
+
     const ciblesValides = new Set();
     for (let idToken in window.TOKENS_VTT_DATA) {
         const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idToken);
@@ -2504,6 +2526,8 @@ window.dessinerAnneauxCiblage = function() {
 
         if (configSort.isHeal) {
             if (cibleData.camp !== lanceurData.camp) continue;
+        } else if (cartePousseeOuTraction) {
+            if (idToken === idLanceur) continue;
         } else {
             if (idToken === idLanceur) continue;
             if (cibleData.camp === lanceurData.camp) continue;
@@ -2649,8 +2673,18 @@ window.ajouterCibleCiblage = function(idCible) {
         return;
     }
 
+    // Poussée et Traction peuvent aussi viser un allié (voir dessinerAnneauxCiblage) :
+    // seule une carte SANS attaque qui les porte l'autorise.
+    const cartePousseeOuTraction = (state.attaques || []).length === 0
+        && (state.alterations || []).some(a => a.estPoussee || a.estTraction);
+
     if (configSort.isHeal) {
         if (cibleData.camp !== lanceurData.camp) {
+            window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Cible invalide", "#aaaaaa");
+            return;
+        }
+    } else if (cartePousseeOuTraction) {
+        if (idCible === idLanceur) {
             window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Cible invalide", "#aaaaaa");
             return;
         }
@@ -2725,8 +2759,10 @@ window.nettoyerCiblage = function() {
 
     const btnAppliquer = document.getElementById("btn-appliquer-carte");
     const btnResoudre = document.getElementById("btn-resoudre-carte");
+    const btnAnnuler = document.getElementById("btn-annuler-ciblage");
     if (btnAppliquer) btnAppliquer.style.display = "block";
     if (btnResoudre) btnResoudre.remove();
+    if (btnAnnuler) btnAnnuler.remove();
 
     // Le bandeau du bas suit le même sort que le bouton "Appliquer" de la carte :
     // ciblage annulé, la compétence est de nouveau lançable.

@@ -506,6 +506,11 @@ function effetAutorise(chantier, effet, commeMod) {
     // L'empoisonnement a besoin d'une source de dégâts pour exister.
     if (nom.includes("poison") && !chantierAUneAttaque(chantier)) return false;
 
+    // Étalement des dégâts coupe en deux les dégâts d'une attaque : sans attaque
+    // sur la carte, il n'y a rien à étaler.
+    if ((nom.trim() === "dot" || nom.includes("étalement") || nom.includes("etalement"))
+        && !chantierAUneAttaque(chantier)) return false;
+
     // Provocation force la cible à attaquer le lanceur : réservée aux joueurs,
     // un monstre ne peut jamais la lancer sur lui-même ni la poser sur un allié.
     if (nom.includes("provocation")) return false;

@@ -510,7 +510,10 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         if (persoActuel) {
             const fatigueMax = window.fatigueMaxCombattant(persoActuel);
             const fatiguePerso = persoActuel.fatigueActuelle !== undefined ? parseInt(persoActuel.fatigueActuelle) : fatigueMax;
-            if (parseInt(fatigue) > fatiguePerso) {
+            // Le trajet déjà tracé mord aussi sur le budget : une carte abordable
+            // seule mais pas une fois le déplacement compté doit perdre "Choisir"
+            // exactement comme gererClicCarteCombat (combat.js) le décide déjà.
+            if (parseInt(fatigue) + (window.MOUVEMENT_COUT_TOTAL || 0) > fatiguePerso) {
                 estEpuise = true;
             }
         }
@@ -1588,8 +1591,12 @@ window.rafraichirForge = function() {
                 // Empoisonnement doit toujours être lié à une source de dégât (une attaque
                 // quelque part sur la carte), sinon aucun type de dégât n'est déterminable.
                 const estIncompatiblePoison = !aDejaUneAttaque && nomModLower.includes("poison");
+                // Étalement des dégâts coupe en deux les DÉGÂTS d'une attaque : sur une carte
+                // sans attaque (un soin, un pur contrôle), il n'y a rien à étaler.
+                const estIncompatibleEtalement = !aDejaUneAttaque
+                    && (nomModLower.trim() === "dot" || nomModLower.includes("étalement") || nomModLower.includes("etalement"));
                 groupesMods[carac].push(
-                    (estIncompatiblePoussee || estIncompatibleIllusion || estIncompatiblePoison)
+                    (estIncompatiblePoussee || estIncompatibleIllusion || estIncompatiblePoison || estIncompatibleEtalement)
                         ? `<option value="${mod.id}" disabled style="color: #999;">${nettoyerNomEffet(mod.Nom)} (non compatible)</option>`
                         : `<option value="${mod.id}">${nettoyerNomEffet(mod.Nom)} (⚡ ${coutFatigue})</option>`
                 );

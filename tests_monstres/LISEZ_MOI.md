@@ -92,6 +92,11 @@ node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soi
 node provocation.mjs        # l'effet Provocation (portée moteur), réservé aux joueurs
 node barre_progression_creation.mjs # la barre de progression et les phrases humoristiques à la création
 node reveil_arriere_plan.mjs # un onglet iPad endormi en pleine animation ne bloque plus la sync pour de bon
+node poussee_traction_allies.mjs # Poussée/Traction peuvent viser un allié, sauf combinées à une attaque
+node etalement_sans_degats.mjs # Durée étalement dégâts grisée sur une carte sans attaque
+node zone_soin_verte_carte.mjs # la zone persistante de soin se dessine en vert, jamais en rouge
+node annuler_ciblage.mjs # un bouton ANNULER reprend la main sur le déplacement en plein ciblage
+node carte_grisee_sans_message.mjs # cliquer une carte trop chère l'affiche sans message d'erreur
 ```
 
 ## Fidélité à la Forge
