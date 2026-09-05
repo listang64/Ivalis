@@ -404,6 +404,15 @@ console.log("\n8. LE REJEU RETROUVE L'ÉTAT D'AVANT LE TOUR");
     const pvB = B.PERSOS_PARTIE.find(p => p.idPersonnage === "H1").PV_Actuels;
     verifier("le spectateur retombe sur les mêmes points de vie que l'auteur",
              pvA === 54 && pvB === 54, `(auteur 54, iPad ${pvA} et ${pvB})`);
+    // Une SECONDE animation dans le même tour doit repartir de ce que la
+    // première vient d'écrire, pas de ce que dit la base — qui porte déjà tout
+    // le résultat de l'auteur.
+    [pc, A, B].forEach(w => w.programmerAnimationTour("poussée", action(9002, { idCible: "H1" }), frapper(w)));
+    await t.reposer();
+    const pv2A = A.PERSOS_PARTIE.find(p => p.idPersonnage === "H1").PV_Actuels;
+    verifier("une deuxième animation s'enchaîne sur la première, sans frapper deux fois",
+             pv2A === 48, `(attendu 48, obtenu ${pv2A})`);
+
     verifier("l'état livré par la base pendant l'attente n'a pas été effacé",
              (A.PERSOS_PARTIE.find(p => p.idPersonnage === "H1").Etats_Alteres || []).length === 1,
              `(${JSON.stringify(A.PERSOS_PARTIE.find(p => p.idPersonnage === "H1").Etats_Alteres)})`);
@@ -450,6 +459,77 @@ console.log("\n9. UN ORDRE D'ANIMER REVENU EN RETARD DE LA BASE N'EST PAS PERDU"
              pc.JOUEES.join(">") === "carte" && A.JOUEES.join(">") === "carte" && B.JOUEES.join(">") === "carte",
              `(${pc.JOUEES.join(">")} / ${A.JOUEES.join(">")} / ${B.JOUEES.join(">")})`);
     verifier("et la file avance seulement là", t.avances.length > 0);
+}
+
+// =========================================================================
+console.log("\n10. UN ORDRE ARRIVÉ AVANT L'OUVERTURE DE LA FENÊTRE COMPTE QUAND MÊME");
+// =========================================================================
+//  L'avancée de la file et l'ordre d'animer voyagent dans le MÊME document :
+//  rien ne garantit dans quel ordre un poste les lit. S'il traite l'animation
+//  en premier, elle partait hors séquence — jouée tout de suite sur cet
+//  écran-là, mise en attente sur les autres — et plus personne ne savait
+//  qu'elle avait été jouée : la table attendait un rejeu déjà fait.
+{
+    const t = table();
+    const pc = t.postes["poste-pc"], A = t.postes["poste-ipadA"], B = t.postes["poste-ipadB"];
+
+    // Aucun poste n'a encore ouvert sa séquence : la notification n'est pas
+    // passée. L'ordre d'animer, lui, arrive déjà.
+    verifier("au départ, aucune séquence n'est ouverte", pc.SEQUENCE_TOUR === null);
+    [pc, A, B].forEach(w => w.programmerAnimationTour("carte", action(8801, { idLanceur: "M1" }), () => {}));
+
+    verifier("l'ordre ouvre la séquence lui-même", !!pc.SEQUENCE_TOUR && pc.SEQUENCE_TOUR.acteur === "M1");
+    verifier("et il est mis en attente, pas joué dans le vide",
+             pc.JOUEES.length === 0 && pc.SEQUENCE_TOUR.tampon.length === 1);
+
+    await pc.sequenceRetientFinDeTour("M1");
+    await t.reposer();
+    for (const w of [pc, A, B]) await w.jouerSequenceTour();
+    await t.reposer();
+
+    verifier("les trois l'ont rejoué et la file avance",
+             pc.JOUEES.join(">") === "carte" && A.JOUEES.join(">") === "carte"
+             && B.JOUEES.join(">") === "carte" && t.avances.length > 0);
+}
+
+// =========================================================================
+console.log("\n11. UNE CRÉATURE NE REJOUE PAS SON TOUR PENDANT QUE LA FILE AVANCE");
+// =========================================================================
+//  Entre l'instant où la barrière tombe et celui où la file avance vraiment en
+//  base, la tête de file désigne encore le combattant qui vient de jouer. L'IA
+//  le voyait toujours « à la main », son propre verrou lui répondait oui, et la
+//  créature repartait pour un second tour : une carte de plus, diffusée après
+//  que tout le monde s'était déclaré fini, jouée sur un seul écran et perdue
+//  sur les autres.
+{
+    const t = table();
+    await t.reposer();
+    const pc = t.postes["poste-pc"];
+
+    [pc, t.postes["poste-ipadA"], t.postes["poste-ipadB"]]
+        .forEach(w => w.programmerAnimationTour("carte", action(9101, { idLanceur: "M1" }), () => {}));
+    await pc.sequenceRetientFinDeTour("M1");
+    await t.reposer();
+    for (const w of Object.values(t.postes)) await w.jouerSequenceTour();
+    await t.reposer();
+
+    // La file vient d'avancer côté barrière. On remet la tête sur M1, comme le
+    // ferait une base qui n'a pas encore livré son instantané.
+    t.doc.File_Attente_Combat = [{ idPersonnage: "M1", idCarte: "CARTE_M", initiative: 55, timestamp: 1000 }];
+    t.doc.Phase_Combat = "Resolution";
+    Object.values(t.postes).forEach(w => { w.PARTIE_DATA = JSON.parse(JSON.stringify(t.doc)); });
+
+    verifier("la créature reste bloquée tant que la file n'a pas bougé",
+             pc.sequenceTourEnAttente() === true);
+    // Le poste qui a fait avancer la file a refermé sa fenêtre : elle ne doit
+    // pas se rouvrir sur ce tour-là le temps que la base rattrape son retard.
+    const meneur = Object.values(t.postes).find(w => (w.SEQUENCES_TERMINEES || []).length > 0);
+    verifier("le poste qui a fait avancer la file garde la trace du tour bouclé", !!meneur);
+    if (meneur) {
+        verifier("et aucune fenêtre ne s'y rouvre sur ce tour déjà joué",
+                 meneur.ouvrirSequenceTour(meneur.PARTIE_DATA) === null);
+        verifier("sa créature reste bloquée elle aussi", meneur.sequenceTourEnAttente() === true);
+    }
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

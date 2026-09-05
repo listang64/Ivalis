@@ -75,6 +75,20 @@ window.PIONS_EN_ATTENTE_SEQUENCE = {};
 // sans lui, elle se retiendrait elle-même indéfiniment.
 window.SEQUENCE_LAISSEZ_PASSER = false;
 
+// Les tours déjà bouclés sur ce poste. Entre l'instant où la barrière tombe et
+// celui où la file avance vraiment en base, la tête de file désigne encore le
+// combattant qui vient de jouer : sans cette mémoire, l'IA le voyait toujours
+// « à la main », son propre verrou lui répondait oui, et la créature rejouait
+// un second tour — une deuxième carte, diffusée après que tout le monde s'était
+// déclaré fini, donc jouée sur un seul écran et perdue sur les autres.
+window.SEQUENCES_TERMINEES = [];
+
+function marquerSequenceTerminee(cle) {
+    if (!cle || window.SEQUENCES_TERMINEES.includes(cle)) return;
+    window.SEQUENCES_TERMINEES.push(cle);
+    if (window.SEQUENCES_TERMINEES.length > 20) window.SEQUENCES_TERMINEES.shift();
+}
+
 // L'instant où ce poste a commencé à attendre les autres. Sert uniquement à
 // proposer la sortie de secours manuelle, jamais à passer quoi que ce soit
 // tout seul.
@@ -82,34 +96,47 @@ let debutAttente = 0;
 
 const monPoste = () => localStorage.getItem("ID_JOUEUR_COURANT") || "poste-inconnu";
 
-// Les six ordres d'animation que la partie sait diffuser. Leur horodatage dans
-// le document dit exactement ce qui a été émis, et quand : c'est la mémoire de
-// la base, pas celle d'un poste.
-const CHAMPS_ACTIONS = ["Action_Mouvement", "Action_Moteur", "Action_Bond",
-                        "Action_Poussee", "Action_Traction", "Action_Peur"];
+// Les six ordres d'animation que la partie sait diffuser.
+//  Chaque ordre a, dans le document, son horodatage — et, sur chaque poste, le
+//  souvenir du dernier qu'il a TRAITÉ (les DERNIER_*, tenus par le répartiteur
+//  d'app.js). Comparer les deux dit exactement ce qui vient d'arriver et qui
+//  n'a pas encore été distribué : c'est ce qui permet de reconnaître les ordres
+//  de ce tour-ci sans dépendre de l'instant où la fenêtre s'est ouverte.
+const CHAMPS_ACTIONS = {
+    Action_Mouvement: "DERNIER_MOUVEMENT",
+    Action_Moteur:    "DERNIER_ACTION_MOTEUR",
+    Action_Bond:      "DERNIER_ACTION_BOND",
+    Action_Poussee:   "DERNIER_ACTION_POUSSEE",
+    Action_Traction:  "DERNIER_ACTION_TRACTION",
+    Action_Peur:      "DERNIER_ACTION_PEUR"
+};
 
-function horodatagesActions(partie) {
-    const p = partie || window.PARTIE_DATA || {};
+// Ce que ce poste a DÉJÀ distribué. Lu sur les repères du répartiteur, et non
+// sur le document : le document, lui, porte peut-être déjà l'ordre de ce tour
+// alors que personne ne l'a encore vu passer, et on le croirait à tort ancien.
+function horodatagesDejaTraites() {
     const sortie = {};
-    CHAMPS_ACTIONS.forEach(c => { sortie[c] = (p[c] && p[c].timestamp) || 0; });
+    Object.keys(CHAMPS_ACTIONS).forEach(c => { sortie[c] = window[CHAMPS_ACTIONS[c]] || 0; });
     return sortie;
 }
 
-// Ce que CE TOUR a diffusé : tout ordre dont l'horodatage a changé depuis
-// l'ouverture de la séquence.
-//   Sans cela, l'acteur publiait la liste de ce qu'il avait lui-même rejoué —
-//   et il pouvait très bien vider un tampon encore vide, l'écho de sa propre
-//   carte n'étant pas revenu de la base. La liste partait alors incomplète,
-//   tout le monde se déclarait fini, la file avançait, et la carte en retard
-//   était jetée avec la séquence : un poste l'avait jouée, les deux autres non.
+// Ce que CE TOUR a diffusé : les ordres reçus depuis l'ouverture de la fenêtre,
+// PLUS ceux qui dorment encore dans le document sans avoir été distribués.
+//   Sans cette seconde moitié, l'acteur publiait la liste de ce qu'il avait
+//   lui-même rejoué — et il pouvait très bien vider un tampon encore vide,
+//   l'écho de sa propre carte n'étant pas revenu de la base. La liste partait
+//   incomplète, tout le monde se déclarait fini, la file avançait, et la carte
+//   en retard était jetée avec la séquence : un poste l'avait jouée, les autres
+//   non, et leurs écrans divergeaient pour de bon.
 function actionsDiffuseesDuTour(seq) {
-    const maintenant = horodatagesActions();
+    const ts = new Set(seq.recues || []);
+    const p = window.PARTIE_DATA || {};
     const avant = seq.avant || {};
-    const ts = [];
-    CHAMPS_ACTIONS.forEach(c => {
-        if (maintenant[c] && maintenant[c] !== avant[c]) ts.push(maintenant[c]);
+    Object.keys(CHAMPS_ACTIONS).forEach(c => {
+        const dans = (p[c] && p[c].timestamp) || 0;
+        if (dans && dans !== avant[c]) ts.add(dans);
     });
-    return ts;
+    return [...ts];
 }
 
 // =========================================================================
@@ -159,6 +186,14 @@ window.ouvrirSequenceTour = function(partie) {
         if (seq) window.fermerSequenceTour();
         return null;
     }
+    // Ce tour-là est déjà bouclé ici : on n'en rouvre pas une seconde fenêtre le
+    // temps que la file avance en base. Un ordre attardé se joue alors tout de
+    // suite, comme avant, plutôt que de dormir dans un tampon que personne ne
+    // videra jamais.
+    if (window.SEQUENCES_TERMINEES.includes(cle)) {
+        if (seq) window.fermerSequenceTour();
+        return null;
+    }
     if (seq && seq.cle === cle) return seq;
 
     // Un nouveau combattant en tête : la séquence précédente est close, quoi
@@ -180,9 +215,12 @@ window.ouvrirSequenceTour = function(partie) {
     debutAttente = Date.now();
     window.SEQUENCE_TOUR = {
         cle,
-        // L'état des ordres d'animation AVANT que ce tour ne commence : tout ce
-        // qui bougera ensuite appartient à ce tour, et devra être rejoué partout.
-        avant: horodatagesActions(p),
+        // Les ordres d'animation que ce poste avait déjà distribués avant ce
+        // tour : tout ce qui arrivera ensuite lui appartient, et devra être
+        // rejoué partout.
+        avant: horodatagesDejaTraites(),
+        // Et ceux qu'il reçoit pendant, qu'il les joue tout de suite ou non.
+        recues: [],
         acteur: tete.idPersonnage,
         idCarte: tete.idCarte,
         tour: p.Tour_Combat || 1,
@@ -262,6 +300,23 @@ function photographierCombattants(ids, photo) {
     return sortie;
 }
 
+// Une animation vient de rendre la main : ce qu'elle a écrit devient le point de
+// départ de la suivante. Sans cette mise à jour, la deuxième animation d'un même
+// tour repartait de ce que disait la base — c'est-à-dire du résultat déjà écrit
+// par l'auteur — et retranchait ses dégâts une seconde fois.
+//   Mais SEULS les combattants que cette animation-là nommait sont repris : la
+//   base a très bien pu livrer, pendant qu'elle se déroulait, le résultat d'une
+//   AUTRE animation du même tour, encore à rejouer ici. La recopier serait
+//   exactement l'erreur qu'on cherche à éviter, une étape plus loin.
+function rafraichirPhotoApresAnimation(photo, ids) {
+    if (!photo || !ids) return;
+    (window.PERSOS_PARTIE || []).forEach(p => {
+        const entree = p && photo[p.idPersonnage];
+        if (!entree || !ids.has(p.idPersonnage)) return;
+        CHAMPS_PHOTO.forEach(c => { if (p[c] !== undefined) entree[c] = p[c]; });
+    });
+}
+
 // La photo n'est JAMAIS réécrite dans les combattants : ce serait effacer, au
 // passage, tout ce que la base a livré entre-temps et qui n'a rien à voir avec
 // ce tour — une brûlure qui vient de faire son tic, l'énergie dépensée par
@@ -279,12 +334,30 @@ window.valeurAvantRejeu = function(idCombattant, champ, valeurCourante) {
 };
 
 window.programmerAnimationTour = function(nom, action, fn) {
+    // L'ordre d'animer peut arriver avant que la notification qui ouvre la
+    // séquence n'ait été traitée — les deux voyagent dans le même document, et
+    // rien ne garantit l'ordre dans lequel un poste les lit. On ouvre donc la
+    // séquence ici si besoin : sans cela l'animation partait hors séquence,
+    // jouée tout de suite sur cet écran-là et mise en attente sur les autres,
+    // et personne ne savait plus qu'elle avait été jouée — la table restait en
+    // attente d'un rejeu déjà fait.
+    if (!window.SEQUENCE_TOUR && typeof window.ouvrirSequenceTour === "function") {
+        window.ouvrirSequenceTour(window.PARTIE_DATA);
+    }
+
     const seq = window.SEQUENCE_TOUR;
     const ts = (action && action.timestamp) || Date.now();
+    // Le même ordre ne se joue jamais deux fois dans le même tour. Le
+    // répartiteur a bien son garde-fou, mais il ne coûte rien de le doubler
+    // ici : une animation rejouée, ce sont des dégâts appliqués deux fois sur
+    // un seul écran, et deux tables qui ne racontent plus la même histoire.
+    if (seq && seq.recues.includes(ts)) return Promise.resolve();
+    // Reçu pendant ce tour : il en fait partie, qu'il parte tout de suite ou
+    // qu'il attende le OK. C'est cette liste que l'acteur publiera.
+    if (seq) seq.recues.push(ts);
 
     // Pas de fenêtre sur ce poste (c'est mon tour), ou pas de séquence du tout :
-    // on joue comme avant, en notant tout de même ce qui a été joué — c'est
-    // cette liste que l'acteur publiera pour les autres.
+    // on joue comme avant, en notant tout de même ce qui a été joué.
     if (!seq || !seq.voile) {
         if (seq) seq.jouees.push(ts);
         return window.filerAnimation(nom, fn);
@@ -293,8 +366,9 @@ window.programmerAnimationTour = function(nom, action, fn) {
     // La photo appartient au TOUR, pas à chaque étape : les animations
     // s'enchaînent, et chacune doit repartir de ce que la précédente a laissé.
     // Seuls les combattants encore absents de la photo y sont ajoutés.
-    seq.photo = photographierCombattants(idsConcernes(action), seq.photo || {});
-    seq.tampon.push({ nom, ts, fn });
+    const concernes = idsConcernes(action);
+    seq.photo = photographierCombattants(concernes, seq.photo || {});
+    seq.tampon.push({ nom, ts, fn, concernes });
 
     // Un déplacement en attente gèle la case du pion concerné : sans ça la base
     // le pose à l'arrivée avant même que la fenêtre ne se lève.
@@ -326,16 +400,17 @@ window.viderTamponSequence = async function() {
         // à la suite plutôt que d'être perdue.
         // Le moteur repart des points de vie D'AVANT le tour, pas de ceux que la
         // base a déjà livrés (voir la note au-dessus de programmerAnimationTour).
-        // Seule la PREMIÈRE animation en a besoin : les suivantes s'enchaînent
-        // sur ce que la précédente vient d'écrire, comme chez l'auteur.
-        window.ETAT_AVANT_REJEU = seq.photoUtilisee ? null : (seq.photo || null);
-        seq.photoUtilisee = true;
+        // La photo reste en place pendant TOUT le rejeu, et se met à jour après
+        // chaque animation : elles s'enchaînent alors les unes sur les autres,
+        // exactement comme chez l'auteur. La laisser figée sur la seule première
+        // laissait la deuxième repartir de la base, qui portait déjà le résultat.
+        window.ETAT_AVANT_REJEU = seq.photo || null;
 
         while (seq.tampon.length > 0 && window.SEQUENCE_TOUR === seq) {
             const etape = seq.tampon.shift();
             seq.jouees.push(etape.ts);
             await window.filerAnimation(etape.nom, etape.fn);
-            window.ETAT_AVANT_REJEU = null;
+            rafraichirPhotoApresAnimation(seq.photo, etape.concernes);
         }
     } finally {
         seq.drainEnCours = false;
@@ -601,6 +676,7 @@ window.verifierBarriereSequence = async function() {
     }
 
     const acteur = seq.acteur;
+    marquerSequenceTerminee(seq.cle);
     window.fermerSequenceTour();
     window.SEQUENCE_LAISSEZ_PASSER = true;
     if (typeof window.finDeTourCombat === "function") {
@@ -639,8 +715,16 @@ window.forcerSequenceTour = async function(event) {
 //  reprenait la main à chaque notification (son propre verrou lui répond
 //  toujours oui) et la créature jouait son tour en boucle pendant l'attente.
 window.sequenceTourEnAttente = function() {
+    // Un tour déjà bouclé dont la file n'a pas encore avancé : la créature ne
+    // doit pas le rejouer sous prétexte qu'elle est toujours en tête.
+    const cleCourante = window.cleSequenceTour();
+    if (cleCourante && window.SEQUENCES_TERMINEES.includes(cleCourante)) return true;
+
     const seq = window.SEQUENCE_TOUR;
     if (!seq || !seq.cle) return false;
+    // Ce poste a déjà tout rejoué et signé : sa part est faite, il n'y a plus
+    // rien à calculer pour ce tour, seulement à attendre les autres.
+    if (seq.finiEnvoye) return true;
     if (seq.calculTermine) return true;
     const dbs = (window.PARTIE_DATA || {}).Sequence_Tour || null;
     return !!(dbs && dbs.cle === seq.cle && dbs.calcul);

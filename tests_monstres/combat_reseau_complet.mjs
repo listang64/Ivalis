@@ -310,8 +310,11 @@ function creerPoste(nom, monde, mesPersos) {
     if (!data) return;
     activer();
     w.PARTIE_DATA = data;
-    estPremierScanPartie = repartir(w, data, estPremierScanPartie, () => {});
+    // La séquence de tour AVANT le répartiteur, exactement comme dans app.js :
+    // c'est elle qui doit être ouverte quand les ordres d'animer arrivent, sinon
+    // ils partent hors séquence et personne ne sait qu'ils ont été joués.
     if (typeof w.suivreSequenceTour === "function") w.suivreSequenceTour(data);
+    estPremierScanPartie = repartir(w, data, estPremierScanPartie, () => {});
     if (typeof w.verifierTourIAMonstres === "function") w.verifierTourIAMonstres();
   });
   api.onSnapshot(api.doc(db, "Combat_VTT", "P1"), (data) => {

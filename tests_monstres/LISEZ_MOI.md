@@ -131,6 +131,14 @@ Deux pièges refermés au passage, tous deux vérifiés par `sequence_tour.mjs` 
   rejeu — lue dans la base (ce qui a été DIFFUSÉ), et non dans son souvenir de
   ce qu'il a rejoué, car l'écho d'une carte peut lui revenir après coup. Un
   poste ne se déclare fini que lorsqu'il les a toutes jouées.
+- **La créature qui rejoue son tour.** Entre l'instant où la barrière tombe et
+  celui où la file avance vraiment en base, la tête de file désigne encore le
+  combattant qui vient de jouer. L'IA le voyait toujours « à la main », son
+  propre verrou lui répondait oui, et la créature repartait pour un second
+  tour : une carte de plus, diffusée après que tout le monde s'était déclaré
+  fini, jouée sur un seul écran et perdue sur les autres. Chaque poste garde
+  donc la trace des tours qu'il a bouclés.
+
 - **Le rejeu qui frappe deux fois.** Le moteur applique les dégâts en
   retranchant ce qu'il lit. Un rejeu qui démarre après le OK lit des points de
   vie que la base a déjà mis à jour. On photographie donc les combattants à
