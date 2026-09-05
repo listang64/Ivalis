@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Ivalis - Le JDR</title>
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=12">
+  <link rel="stylesheet" href="style.css?v=13">
 
  
   <!-- ===================================================================== -->
@@ -1146,6 +1146,14 @@
   <div id="ecran-chargement-ia">
     <div id="titre-chargement-ia">Création de personnage en cours ...</div>
     <img id="image-chargement-ia" src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781698939/ecran_chergement_personnage_nwimhq.png" alt="Incantation du portrait...">
+    <!-- 🔻 NOUVEAU : barre de progression + phrases humoristiques, pour faire
+         patienter pendant la création de personnage (seul usage qui les affiche :
+         les autres écrans de chargement partageant ce même conteneur les laissent
+         cachées). 🔻 -->
+    <div id="barre-progression-creation" style="display: none;">
+      <div id="barre-progression-creation-remplissage"></div>
+    </div>
+    <div id="phrase-humoristique-creation" style="display: none;"></div>
   </div>
 
   <!-- ALERTE UI : cles API manquantes -->
@@ -1543,8 +1551,8 @@
 
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <script type="module" src="ia_master.js?v=4"></script>
-<script type="module" src="app.js?v=21"></script>
-<script type="module" src="creation_personnage.js?v=3"></script>
+<script type="module" src="app.js?v=22"></script>
+<script type="module" src="creation_personnage.js?v=4"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=12"></script>
 <script src="Plateau.js"></script>
@@ -1557,8 +1565,8 @@
 <script type="module" src="monstres_competences.js?v=6"></script>
 <script type="module" src="monstres_ia.js?v=16"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
-<script type="module" src="objets.js?v=6"></script>
-<script type="module" src="objets_ia.js?v=4"></script>
+<script type="module" src="objets.js?v=7"></script>
+<script type="module" src="objets_ia.js?v=5"></script>
 <script type="module" src="loot.js?v=10"></script>
 
 <!-- ============================================================= -->

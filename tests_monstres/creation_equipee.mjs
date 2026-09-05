@@ -167,6 +167,18 @@ console.log("\n1. L'ÉQUIPEMENT EST DESSINÉ AVANT LE HÉROS");
              `(${res.appels.filter(a => a.endpoint === "edits").length} édition(s))`);
 }
 
+console.log("\n1bis. L'ARMURE DE DÉPART N'A JAMAIS DE CASQUE");
+{
+    const objets = res.appels.filter(a => a.quoi === "génération");
+    const promptArmure = (objets.find(a => /TENUE COMPLÈTE/.test(a.prompt || "")) || {}).prompt || "";
+    const promptArme = (objets.find(a => !/TENUE COMPLÈTE/.test(a.prompt || "")) || {}).prompt || "";
+
+    verifier("le dessin de la tenue de départ interdit tout casque",
+             /AUCUN CASQUE/.test(promptArmure));
+    verifier("cette consigne ne pollue pas le dessin de l'arme",
+             !/AUCUN CASQUE/.test(promptArme));
+}
+
 console.log("\n2. LA TENUE EST JOINTE AU PORTRAIT, EN BINAIRE");
 {
     const portrait = res.appels.find(a => a.quoi === "édition") || {};
@@ -233,6 +245,21 @@ console.log("\n5. LA TENUE EST COMPLÈTE, PAS UN SIMPLE PLASTRON");
              /déplié et étalé/.test(prompt) && /aucun mannequin/.test(prompt));
     verifier("MIA_Objets reçoit la même consigne",
              SRC_IA.includes("UNE ARMURE EST UNE TENUE COMPLÈTE"));
+
+    // Une armure de BUTIN (trouvée en jeu, pas à la création) peut très bien
+    // porter un casque : la restriction ne doit s'appliquer qu'à la demande.
+    const promptButin = w2.promptImageObjet(armure, "Du cuir bouilli.", "STYLE");
+    verifier("sans l'option sansCasque, aucune interdiction de casque n'est ajoutée",
+             !/AUCUN CASQUE/.test(promptButin));
+    const promptDepart = w2.promptImageObjet(armure, "Du cuir bouilli.", "STYLE", { sansCasque: true });
+    verifier("avec l'option sansCasque, l'interdiction apparaît",
+             /AUCUN CASQUE/.test(promptDepart));
+    const armeSeule = w.objetDeDepart("Arme lourde CAC");
+    const promptArmeAvecOption = w2.promptImageObjet(armeSeule, "Une lame.", "STYLE", { sansCasque: true });
+    verifier("une arme reste indifférente à l'option sansCasque (elle n'a pas de tête)",
+             !/AUCUN CASQUE/.test(promptArmeAvecOption));
+    verifier("MIA_Objets (la description texte) reçoit aussi la consigne sansCasque",
+             SRC_IA.includes("sansCasque") && /AUCUN CASQUE/.test(SRC_IA));
 }
 
 // =========================================================================

@@ -762,7 +762,10 @@ async function illustrerEquipementDeDepart(donnees) {
 
   annoncerEtapeCreation("Forge de l'équipement...");
   try {
-    await window.illustrerLesObjets(aDessiner);
+    // Le héros de départ doit rester à visage découvert sur son portrait :
+    // son armure ne doit jamais embarquer de casque (contrairement au butin
+    // trouvé plus tard, où c'est permis).
+    await window.illustrerLesObjets(aDessiner, undefined, { sansCasque: true });
   } catch (e) {
     console.error("Illustration de l'équipement de départ :", e);
   }

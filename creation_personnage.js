@@ -172,6 +172,90 @@ window.adapterFormulaireRace = function(race) {
 };
 
 // =========================================================================
+//  BARRE DE PROGRESSION + PHRASES HUMORISTIQUES DE L'ÉCRAN DE CRÉATION
+// =========================================================================
+//  Aucune étape ne renvoie de pourcentage réel (portrait, équipement... tout
+//  passe par des appels IA à durée imprévisible) : la barre progresse donc en
+//  ralentissant sans jamais atteindre 100% toute seule, comme n'importe quelle
+//  barre de chargement honnête qui n'a rien de précis à annoncer, et ne saute
+//  à 100% qu'une fois la fiche réellement prête. Les phrases n'ont d'autre
+//  but que de faire sourire pendant l'attente : aucune ne décrit une étape
+//  réelle de la création.
+const PHRASES_ATTENTE_CREATION = [
+    "Le Maître du Jeu vérifie discrètement s'il a le droit de faire ça...",
+    "Un joueur fouille encore le meuble vide. On ne sait jamais.",
+    "Quelqu'un cherche son dé fétiche, tombé sous la table.",
+    "Le barde retente sa Persuasion sur le dragon. Une troisième fois.",
+    "Négociation en cours : qui va chercher les chips ?",
+    "Un 1 naturel vient de changer le cours de l'histoire.",
+    "Le PNJ générique reçoit un nom qu'on oubliera dans cinq minutes.",
+    "Quelqu'un relit sa fiche de personnage pour la douzième fois.",
+    "Le Maître du Jeu improvise. Ça va sûrement bien se passer.",
+    "Un joueur demande un jet d'Histoire pour la réponse évidente.",
+    "La quête principale attendra : il y a un chat à caresser ici.",
+    "Quelqu'un se souvient enfin qu'il avait un sort pour ça depuis le début.",
+    "Le groupe débat depuis dix minutes du nom de sa taverne préférée.",
+    "Un dé a roulé sous le canapé. La partie est officiellement en pause.",
+    "Le rôdeur explique une fois de plus pourquoi il n'a pas de background.",
+    "On tire les caractéristiques... et on négocie déjà pour les relancer."
+];
+
+let intervalleProgressionCreation = null;
+let intervalleFraseCreation = null;
+
+window.demarrerBarreProgressionCreation = function() {
+    const barre = document.getElementById("barre-progression-creation");
+    const remplissage = document.getElementById("barre-progression-creation-remplissage");
+    const phrase = document.getElementById("phrase-humoristique-creation");
+    if (!barre || !remplissage || !phrase) return;
+
+    barre.style.display = "block";
+    phrase.style.display = "block";
+    remplissage.style.width = "0%";
+
+    let pct = 0;
+    clearInterval(intervalleProgressionCreation);
+    intervalleProgressionCreation = setInterval(() => {
+        pct += (90 - pct) * 0.08;
+        remplissage.style.width = Math.min(pct, 90) + "%";
+    }, 400);
+
+    let dernierIndex = -1;
+    const tirerPhrase = () => {
+        let i;
+        do { i = Math.floor(Math.random() * PHRASES_ATTENTE_CREATION.length); }
+        while (i === dernierIndex && PHRASES_ATTENTE_CREATION.length > 1);
+        dernierIndex = i;
+        phrase.style.opacity = "0";
+        setTimeout(() => {
+            phrase.innerText = PHRASES_ATTENTE_CREATION[i];
+            phrase.style.opacity = "1";
+        }, 400);
+    };
+    tirerPhrase();
+    clearInterval(intervalleFraseCreation);
+    intervalleFraseCreation = setInterval(tirerPhrase, 3200);
+};
+
+window.arreterBarreProgressionCreation = function() {
+    clearInterval(intervalleProgressionCreation);
+    clearInterval(intervalleFraseCreation);
+    intervalleProgressionCreation = null;
+    intervalleFraseCreation = null;
+
+    const barre = document.getElementById("barre-progression-creation");
+    const remplissage = document.getElementById("barre-progression-creation-remplissage");
+    const phrase = document.getElementById("phrase-humoristique-creation");
+    if (remplissage) remplissage.style.width = "100%";
+
+    setTimeout(() => {
+        if (barre) barre.style.display = "none";
+        if (phrase) phrase.style.display = "none";
+        if (remplissage) remplissage.style.width = "0%";
+    }, 500);
+};
+
+// =========================================================================
 // ÉTAPE 1 : LE FORMULAIRE CLASSIQUE
 // =========================================================================
 
@@ -216,6 +300,7 @@ window.validerEtapeDescriptif = async function() {
     }
     if (imgLoad) imgLoad.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781698939/ecran_chergement_personnage_nwimhq.png";
     if (titreLoad) titreLoad.innerText = "Création de personnage en cours ...";
+    if (typeof window.demarrerBarreProgressionCreation === "function") window.demarrerBarreProgressionCreation();
 
     const donnees = {
         idPartie: window.ID_PARTIE_COURANTE,
@@ -257,13 +342,15 @@ window.validerEtapeDescriptif = async function() {
         document.getElementById("champ-id-personnage").value = resultatServeur.id;
         document.getElementById("champ-id-personnage").setAttribute("data-url", resultatServeur.url);
         document.getElementById("titre-nom-personnage").innerText = nom;
-        
+
+        if (typeof window.arreterBarreProgressionCreation === "function") window.arreterBarreProgressionCreation();
         if (ecranLoad) ecranLoad.style.display = "none";
-        
+
         window.ouvrirModaleCreationCaracs(resultatServeur.id);
     } catch (e) {
         console.error("Erreur de création :", e);
         alert("Une interférence magique a bloqué la création.");
+        if (typeof window.arreterBarreProgressionCreation === "function") window.arreterBarreProgressionCreation();
         if (ecranLoad) ecranLoad.style.display = "none";
     }
 };

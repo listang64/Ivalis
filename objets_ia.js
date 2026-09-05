@@ -81,7 +81,7 @@ window.styleGraphiqueIvalis = async function() {
 //  la première. Froide, MIA redonne toujours la même hache.
 window.TEMPERATURE_MIA_OBJETS = [0.80, 1.20];
 
-window.decrireObjetsAvecMIA = async function(objets) {
+window.decrireObjetsAvecMIA = async function(objets, options) {
     const descriptions = {};
     if (!objets || objets.length === 0) return descriptions;
 
@@ -116,7 +116,11 @@ La rareté doit se VOIR : un objet commun est simple, usé, sans fioriture ; un 
 Si l'objet a des pouvoirs, fais-les transparaître dans la matière (runes, veines lumineuses, givre, braise) — jamais par du texte écrit sur l'objet.
 Ne décris JAMAIS de personne, de main, de mannequin, de décor ni de fond : uniquement l'objet lui-même.
 Deux objets du même nom doivent être visiblement différents l'un de l'autre.
-Trois à quatre phrases par objet. Utilise l'outil 'decrireObjets'.`;
+Trois à quatre phrases par objet. Utilise l'outil 'decrireObjets'.` + (options && options.sansCasque
+        ? "\nCette tenue est l'équipement de départ d'un héros, dessiné en référence pour son portrait : "
+        + "pour toute armure, NE DÉCRIS AUCUN CASQUE, AUCUN HEAUME NI AUCUNE COIFFE DE TÊTE. La tenue "
+        + "s'arrête aux épaules — corps, bras et jambes seulement, jamais de protection de crâne."
+        : "");
 
     const outils = [{
         functionDeclarations: [{
@@ -169,8 +173,9 @@ Trois à quatre phrases par objet. Utilise l'outil 'decrireObjets'.`;
 //  Deux mises en scène, et deux seulement : l'arme est posée à même le sol,
 //  l'armure est étalée au sol, dépliée et VIDE. Le reste (style, cadrage) est
 //  commun, et le style vient de la partie, pas d'ici.
-window.promptImageObjet = function(objet, description, style) {
+window.promptImageObjet = function(objet, description, style, options) {
     const estArmure = objet.emplacement === "Armure";
+    const sansCasque = estArmure && options && options.sansCasque;
 
     const miseEnScene = estArmure
         ? "C'est une TENUE COMPLÈTE, pas une simple pièce de protection : le vêtement de dessous "
@@ -197,6 +202,11 @@ window.promptImageObjet = function(objet, description, style) {
         + "IL EST STRICTEMENT INTERDIT de dessiner une armure de plates médiévale, une cotte de mailles "
         + "rivetée de chevalier, un heaume à visière, un plastron gothique, une armure de fantasy moderne "
         + "à pointes ou à plaques articulées : rien de postérieur à l'Antiquité."
+        + (sansCasque
+            ? " 🛑 AUCUN CASQUE, AUCUN HEAUME, AUCUNE COIFFE DE TÊTE, quelle que soit l'époque : c'est "
+            + "l'équipement de départ d'un héros dont le portrait doit rester à visage découvert. La "
+            + "tenue s'arrête aux épaules — uniquement le corps, les bras et les jambes."
+            : "")
         : " ÉPOQUE OBLIGATOIRE : Antiquité méditerranéenne — bronze, fer brut, bois, cuir, os et tendon. "
         + "Aucune forme médiévale ni moderne, aucune garde de rapière, aucun acier poli industriel.";
 
@@ -329,8 +339,8 @@ window.hebergerImageObjet = async function(imageSource, cles) {
 };
 
 // La chaîne complète pour UN objet.
-window.illustrerObjet = async function(objet, description, style, cles) {
-    const prompt = window.promptImageObjet(objet, description, style);
+window.illustrerObjet = async function(objet, description, style, cles, options) {
+    const prompt = window.promptImageObjet(objet, description, style, options);
     const dessin = await window.dessinerObjet(prompt, cles);
     if (!dessin) return "";
     return await window.hebergerImageObjet(dessin, cles);
@@ -341,13 +351,13 @@ window.illustrerObjet = async function(objet, description, style, cles) {
 // =========================================================================
 //  surImage est appelé dès qu'une image est prête, pas à la fin : les joueurs
 //  voient la fouille avancer objet par objet au lieu de fixer un écran mort.
-window.illustrerLesObjets = async function(objets, surImage) {
+window.illustrerLesObjets = async function(objets, surImage, options) {
     if (!objets || objets.length === 0) return 0;
     const cles = window.clesApiObjets();
     if (!window.peutIllustrerLesObjets()) return 0;
 
     const style = await window.styleGraphiqueIvalis();
-    const descriptions = await window.decrireObjetsAvecMIA(objets);
+    const descriptions = await window.decrireObjetsAvecMIA(objets, options);
 
     let reussies = 0;
     const file = objets.slice();
@@ -357,7 +367,7 @@ window.illustrerLesObjets = async function(objets, surImage) {
             const objet = file.shift();
             if (!objet) return;
             try {
-                const url = await window.illustrerObjet(objet, descriptions[objet.uid] || "", style, cles);
+                const url = await window.illustrerObjet(objet, descriptions[objet.uid] || "", style, cles, options);
                 if (url) {
                     reussies++;
                     objet.image = url;

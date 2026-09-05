@@ -574,11 +574,34 @@ window.equipementDeDepart = function(typeArme, typeArmure) {
     };
 };
 
+// Bouclier ou armure : tout ce qui se porte sur le corps plutôt qu'en main
+// offensive. Les bagues (type "Magie") restent du côté "arme" : elles sont
+// tenues en main et jouent le même rôle offensif/de soin qu'une arme.
+function estBouclierOuArmure(modele) {
+    return modele.type === "Bouclier" || modele.emplacement === "Armure";
+}
+
 // Tire un objet complet pour une difficulté donnée. C'est l'unique porte
 // d'entrée utilisée par le butin.
+//
+// 60% de chance une arme, 40% un bouclier ou une armure — une pondération
+// voulue par Nico plutôt qu'un tirage brut sur tout le catalogue, où le
+// nombre de modèles de chaque famille faussait les proportions sans le
+// vouloir (beaucoup plus d'armes que d'armures dans le tableau).
 window.tirerObjetPourDifficulte = function(difficulte) {
     const rarete = window.tirerRarete(difficulte);
-    const modele = auHasard(window.MODELES_OBJETS);
+    const catalogue = window.MODELES_OBJETS || [];
+    const poolArmes = catalogue.filter(m => !estBouclierOuArmure(m));
+    const poolDefense = catalogue.filter(estBouclierOuArmure);
+
+    const veutUneArme = Math.random() < 0.6;
+    let pool = veutUneArme ? poolArmes : poolDefense;
+    // Si la famille visée est vide (catalogue incomplet), on retombe sur
+    // l'autre plutôt que de renvoyer un objet inexistant.
+    if (pool.length === 0) pool = poolArmes.length > 0 ? poolArmes : poolDefense;
+    if (pool.length === 0) pool = catalogue;
+
+    const modele = auHasard(pool);
     return window.fabriquerObjet(modele, rarete);
 };
 
