@@ -110,11 +110,12 @@ window.TYPES_ZONES_PERSISTANTES = {
 };
 
 window.HABILLAGE_ZONES_PERSISTANTES = {
-    feu:         { message: "🔥 Brasier !",       couleur: "#ff7a1a" },
-    glace:       { message: "❄️ Gel mordant !",   couleur: "#7fd8ff" },
-    electrique:  { message: "⚡ Décharge !",       couleur: "#bfe8ff" },
-    poison:      { message: "☠️ Nappe toxique !", couleur: "#8fdc4c" },
-    neutre:      { message: "💥 Terrain piégé !", couleur: "#ff4c4c" }
+    feu:         { message: "🔥 Brasier !",         couleur: "#ff7a1a" },
+    glace:       { message: "❄️ Gel mordant !",     couleur: "#7fd8ff" },
+    electrique:  { message: "⚡ Décharge !",         couleur: "#bfe8ff" },
+    poison:      { message: "☠️ Nappe toxique !",   couleur: "#8fdc4c" },
+    soin:        { message: "✨ Zone bienfaisante !", couleur: "#4caf50" },
+    neutre:      { message: "💥 Terrain piégé !",    couleur: "#ff4c4c" }
 };
 
 // ⚠️ Toujours passer par ici pour écrire les zones : setDoc(..., {merge:true}) FUSIONNE les clés
@@ -163,12 +164,16 @@ window.creerZonePersistante = async function(state, idLanceur) {
     });
     if (hexes.length === 0) return;
 
-    // 2. Ce que la zone rejoue à chaque entrée : les dégâts de la carte (jamais les soins ni
-    //    les boucliers, qui n'ont pas de sens en piège au sol) et l'état élémentaire embarqué.
+    // 2. Ce que la zone rejoue à chaque entrée : les dégâts de la carte (jamais les boucliers,
+    //    qui n'ont pas de sens en piège au sol), OU le soin d'une carte de soin (zone verte,
+    //    bienfaisante), et l'état élémentaire embarqué.
     const attaqueDegats = (state.attaques || []).find(a => !a.isHeal && !a.isShield && (a.valeurBrute || 0) > 0);
     const degats = attaqueDegats
         ? { valeurBrute: attaqueDegats.valeurBrute, typeRes: attaqueDegats.typeRes }
         : null;
+
+    const attaqueSoin = (state.attaques || []).find(a => a.isHeal && (a.valeurBrute || 0) > 0);
+    const soin = attaqueSoin ? { valeurBrute: attaqueSoin.valeurBrute } : null;
 
     const altPersistante = (state.alterations || []).find(a => window.TYPES_ZONES_PERSISTANTES[a.nom]);
     const etat = altPersistante ? {
@@ -181,9 +186,11 @@ window.creerZonePersistante = async function(state, idLanceur) {
         tickFait: false
     } : null;
 
-    if (!degats && !etat) return; // Rien à faire persister : pas de zone fantôme
+    if (!degats && !soin && !etat) return; // Rien à faire persister : pas de zone fantôme
 
-    const type = etat ? (window.TYPES_ZONES_PERSISTANTES[etat.nom] || "neutre") : "neutre";
+    const type = etat ? (window.TYPES_ZONES_PERSISTANTES[etat.nom] || "neutre")
+        : soin ? "soin"
+        : "neutre";
     const id = "zp_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
 
     // Pas de superposition : la nouvelle zone REMPLACE les anciennes sur les cases qu'elle
@@ -201,6 +208,7 @@ window.creerZonePersistante = async function(state, idLanceur) {
         hexes: hexes,
         type: type,
         degats: degats,
+        soin: soin,
         etat: etat,
         dureeRestante: 3, // Fixe : la Forge masque le bouton ⏳ sur ce mod
         idLanceur: idLanceur || null
@@ -238,6 +246,7 @@ window.resoudreZonesPersistantesSurCase = async function(idPerso, hex) {
         const dodged = jetDef <= statDef;
 
         let degatsFinaux = 0;
+        let soinFinal = 0;
         let viaBouclier = false;
         let etatApplique = null;
 
@@ -266,6 +275,24 @@ window.resoudreZonesPersistantesSurCase = async function(idPerso, hex) {
                         }
                     } catch (e) {
                         console.error("Erreur dégâts zone persistante :", e);
+                    }
+                }
+            }
+
+            // Zone de soin : soigne quiconque marche dessus, ami ou ennemi — la Persistance
+            // de terrain n'a jamais distingué les camps, un remous bienfaisant pas plus qu'un
+            // brasier. Jamais au-delà des PV max.
+            if (zone.soin) {
+                const pvMax = (parseInt(cibleData.PV_Max) || 0) + (parseInt(cibleData.Dev_Mod_PV) || 0);
+                const pvActuels = parseInt(cibleData.PV_Actuels) || 0;
+                soinFinal = Math.min(zone.soin.valeurBrute || 0, Math.max(0, pvMax - pvActuels));
+
+                if (soinFinal > 0) {
+                    try {
+                        cibleData.PV_Actuels = pvActuels + soinFinal;
+                        await updateDoc(window.refCombattant(idPerso), { PV_Actuels: cibleData.PV_Actuels });
+                    } catch (e) {
+                        console.error("Erreur soin zone persistante :", e);
                     }
                 }
             }
@@ -300,6 +327,7 @@ window.resoudreZonesPersistantesSurCase = async function(idPerso, hex) {
             dodged: dodged,
             motDef: motDef,
             degats: degatsFinaux,
+            soin: soinFinal,
             viaBouclier: viaBouclier,
             etatApplique: etatApplique
         });
@@ -340,6 +368,19 @@ window.jouerAnimationZonePersistante = async function(res, hexPosition) {
             }
         } else {
             window.afficherMessageFlottantHex(tk.q, tk.r, texte, couleur);
+        }
+        await new Promise(r => setTimeout(r, 900));
+    }
+
+    if (res.soin > 0) {
+        const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === res.idCible);
+        const texte = `+${res.soin} ✚`;
+        if (cibleData && typeof window.afficherFlashDegatToken === "function") {
+            const maxPv = (parseInt(cibleData.PV_Max) || 1) + (parseInt(cibleData.Dev_Mod_PV) || 0);
+            const newPv = parseInt(cibleData.PV_Actuels) || 0;
+            window.afficherFlashDegatToken(res.idCible, newPv - res.soin, newPv, maxPv, texte, "#1b6e3a", "#1b6e3a");
+        } else {
+            window.afficherMessageFlottantHex(tk.q, tk.r, texte, "#1b6e3a");
         }
         await new Promise(r => setTimeout(r, 900));
     }
@@ -1946,10 +1987,11 @@ window.demarrerCiblage = async function(idCarte) {
 
             // 🔻 NOUVEAU : DÉTECTION TRACTION 🔻
             // Chance de tirer la cible de 3 cases vers le lanceur (l'inverse de la Poussée). Porte
-            // toujours sa propre portée fixe de 3 cases + ligne de vue dégagée, incompatible avec le
-            // mod "Distance" (voir la Forge) pour ne jamais avoir deux portées à réconcilier. Pas un
-            // état persistant : résolue et diffusée à part comme la Poussée (même animation, sens
-            // inverse), voir declencherTractionCible / jouerAnimationPoussee.
+            // la portée NORMALE de la carte (1 par défaut, comme un contact), qui s'étend avec le
+            // mod "Distance" tout à fait normalement — plus de portée fixe imposée, c'est au joueur
+            // de la poser lui-même s'il veut tirer une cible de loin. Pas un état persistant :
+            // résolue et diffusée à part comme la Poussée (même animation, sens inverse), voir
+            // declencherTractionCible / jouerAnimationPoussee.
             let isTraction = false;
             let tractionChance = 0;
 
@@ -1977,8 +2019,8 @@ window.demarrerCiblage = async function(idCarte) {
                     desc: `${tractionChance}% de chance de tirer la cible de 3 cases vers soi.`,
                     chance: tractionChance,
                     duree: 0, // Instantané : jamais ajouté à Etats_Alteres
-                    isRanged: true,
-                    rangeMax: 3,
+                    isRanged: isRanged,
+                    rangeMax: rangeMax,
                     cibles: [],
                     estTraction: true
                 });
@@ -2021,6 +2063,46 @@ window.demarrerCiblage = async function(idCarte) {
                     rangeMax: rangeMax,
                     cibles: [],
                     estPeur: true
+                });
+            }
+
+            // 🔻 NOUVEAU : DÉTECTION PROVOCATION 🔻
+            // État persistant classique (comme Étourdi/Immobilisation), durée fixe de 2 tours.
+            // Oblige la cible à n'attaquer QUE le lanceur tant que l'état dure (lu par l'IA des
+            // monstres dans choisirCibleMonstre, monstres_ia.js). L'idProvocateur est fixé UNE FOIS
+            // ici, au moment où la carte est composée : c'est lui que l'IA compare à ses candidats.
+            // Interdite aux monstres eux-mêmes (⚖️ règle Forge répercutée dans
+            // monstres_competences.js) : seuls les joueurs peuvent la lancer.
+            let isProvocation = false;
+            let provocationChance = 0;
+
+            if (nomLower.includes("provocation")) {
+                isProvocation = true;
+                provocationChance += (parseFrFloat(effBase.Pourcent_Base) || 0) * (act.count || 1);
+            }
+
+            listeMods.forEach(m => {
+                const modEff = window.EFFETS_BDD_CACHE[m.id];
+                if (modEff && (modEff.Nom || "").toLowerCase().includes("provocation")) {
+                    isProvocation = true;
+                    provocationChance += (parseFrFloat(modEff.Pourcent_Base) || 0) * m.count;
+                }
+            });
+
+            if (isProvocation) {
+                if (provocationChance > 40) provocationChance = 40; // Cap à 40%
+
+                if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
+                alterationsExtraites.push({
+                    nom: "Provocation",
+                    icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png",
+                    desc: "Ne peut viser que celui qui l'a provoqué tant que l'état dure.",
+                    chance: provocationChance,
+                    duree: 2, // Fixe, jamais modifiable par un bonus de durée
+                    isRanged: isRanged,
+                    rangeMax: rangeMax,
+                    cibles: [],
+                    idProvocateur: lanceurCarte.idPersonnage
                 });
             }
 

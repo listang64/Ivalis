@@ -546,11 +546,30 @@ window.objetDeDepart = function(typeObjet, rarete) {
     return window.fabriquerObjet(auHasard(modeles), rarete || "Commun");
 };
 
-// Les deux objets qu'un héros porte à sa création. Renvoie toujours un objet,
-// même partiel : un type inconnu ne doit pas empêcher la création du personnage.
+// « Arme + Bouclier » n'est pas une famille du catalogue : c'est un CHOIX
+// combiné du formulaire de création. On y tire une arme à UNE MAIN parmi les
+// familles de corps à corps (jamais une arme à deux mains, sinon plus de main
+// libre pour le bouclier), plus un bouclier tiré à part — les deux se
+// retrouvent chacun dans une main à l'équipement (voir equiperLeHerosDeDepart).
+const FAMILLE_ARME_BOUCLIER = "Arme + Bouclier";
+const FAMILLES_UNE_MAIN_CAC = ["Arme légère CAC", "Arme lourde CAC", "Arme polyvalente"];
+
+window.objetDeDepartUneMain = function(familles, rarete) {
+    const modeles = (window.MODELES_OBJETS || [])
+        .filter(m => familles.includes(m.type) && !m.deuxMains);
+    if (modeles.length === 0) return null;
+    return window.fabriquerObjet(auHasard(modeles), rarete || "Commun");
+};
+
+// Les deux (ou trois, avec le bouclier) objets qu'un héros porte à sa création.
+// Renvoie toujours un objet, même partiel : un type inconnu ne doit pas
+// empêcher la création du personnage.
 window.equipementDeDepart = function(typeArme, typeArmure) {
+    const estArmeBouclier = typeArme === FAMILLE_ARME_BOUCLIER;
     return {
-        arme: typeArme ? window.objetDeDepart(typeArme) : null,
+        arme: estArmeBouclier ? window.objetDeDepartUneMain(FAMILLES_UNE_MAIN_CAC)
+              : typeArme ? window.objetDeDepart(typeArme) : null,
+        bouclier: estArmeBouclier ? window.objetDeDepart("Bouclier") : null,
         armure: typeArmure ? window.objetDeDepart(typeArmure) : null
     };
 };

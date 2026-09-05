@@ -54,15 +54,19 @@ console.log("1. LE FORMULAIRE PROPOSE LES BONNES FAMILLES");
     verifier("« Armure moyenne » est le libellé de l'intermédiaire",
              /value="Armure intermédiaire">Armure moyenne</.test(bloc));
 
-    // Le formulaire ne doit proposer que des familles qui existent réellement.
+    // Le formulaire ne doit proposer que des familles qui existent réellement,
+    // à l'exception d'« Arme + Bouclier » : un choix combiné du formulaire, pas
+    // une vraie famille du catalogue (voir objets.js, equipementDeDepart).
     const w = {};
     new Function('window', SRC_OBJETS)(w);
     const typesReels = new Set((w.MODELES_OBJETS || []).map(m => m.type));
-    const inconnus = valeurs.filter(v => !typesReels.has(v));
+    const inconnus = valeurs.filter(v => v !== "Arme + Bouclier" && !typesReels.has(v));
     verifier("chaque famille proposée existe dans le catalogue",
              inconnus.length === 0, `(${inconnus.join(", ") || "aucune inconnue"})`);
-    verifier("le bouclier n'est pas proposé : ce n'est pas une arme",
+    verifier("le bouclier n'est pas proposé seul : ce n'est pas une arme",
              !valeurs.includes("Bouclier"));
+    verifier("« Arme + Bouclier » est proposé",
+             valeurs.includes("Arme + Bouclier"));
 
     // Et inversement : aucune famille d'arme du jeu ne doit manquer.
     const armesDuJeu = w.TYPES_ARMES_FORGE;
@@ -116,6 +120,11 @@ const res = await p.evaluate(({ srcObjets, srcEquiper, srcDoc, srcChamps }) => {
     const inexistant = window.objetDeDepart("Épée laser");
     const partiel = window.equipementDeDepart("Arme lourde CAC", "");
 
+    // « Arme + Bouclier » : 200 tirages pour voir l'arme ET le bouclier, et
+    // vérifier qu'aucune arme à deux mains ne s'y glisse jamais.
+    const armeBouclier = [];
+    for (let i = 0; i < 200; i++) armeBouclier.push(window.equipementDeDepart("Arme + Bouclier", ""));
+
     // La fiche complète, telle qu'elle part en base.
     const fiches = [];
     for (let i = 0; i < 40; i++) {
@@ -126,6 +135,11 @@ const res = await p.evaluate(({ srcObjets, srcEquiper, srcDoc, srcChamps }) => {
             doc: frontVersPersoDoc(donnees, "PERSO_1")
         });
     }
+
+    // La fiche « Arme + Bouclier » elle-même, jusqu'en base.
+    const donneesBouclier = { prenom: "Test", typeArme: "Arme + Bouclier", typeArmure: "Armure légère" };
+    equiperLeHerosDeDepart(donneesBouclier);
+    const ficheBouclier = frontVersPersoDoc(donneesBouclier, "PERSO_1");
 
     // Ce que le combat lit de cette fiche : bonus et stats.
     const exemple = { prenom: "Test", typeArme: "Armure lourde", typeArmure: "Armure lourde" };
@@ -139,7 +153,7 @@ const res = await p.evaluate(({ srcObjets, srcEquiper, srcDoc, srcChamps }) => {
     const bonus = window.bonusEquipement(front);
     const portes = window.objetsEquipes(front);
 
-    return { parFamille, inexistant, partiel, fiches, bonus, portes,
+    return { parFamille, inexistant, partiel, fiches, bonus, portes, armeBouclier, ficheBouclier,
              cles: window.CLES_BONUS };
 }, { srcObjets: SRC_OBJETS, srcEquiper: SRC_EQUIPER, srcDoc: SRC_DOC, srcChamps: SRC_CHAMPS });
 
@@ -172,6 +186,33 @@ verifier("les armures vont bien à l'emplacement Armure",
 verifier("une famille inconnue ne casse rien", res.inexistant === null);
 verifier("un choix incomplet donne quand même l'autre moitié",
          !!res.partiel.arme && res.partiel.armure === null);
+
+// =========================================================================
+console.log("\n2bis. « ARME + BOUCLIER »");
+{
+    const typesArmeTires = [...new Set(res.armeBouclier.map(d => d.arme && d.arme.type))];
+    const familleAttendue = ["Arme légère CAC", "Arme lourde CAC", "Arme polyvalente"];
+    verifier("les 200 tirages donnent bien une arme ET un bouclier",
+             res.armeBouclier.every(d => !!d.arme && !!d.bouclier),
+             `(${res.armeBouclier.filter(d => !d.arme || !d.bouclier).length} incomplet(s))`);
+    verifier("l'arme vient d'une famille de corps à corps",
+             typesArmeTires.every(t => familleAttendue.includes(t)),
+             `(${typesArmeTires.join(", ")})`);
+    verifier("jamais une arme à deux mains : il faut une main pour le bouclier",
+             res.armeBouclier.every(d => !d.arme.deuxMains),
+             `(${res.armeBouclier.filter(d => d.arme.deuxMains).length} à deux mains)`);
+    verifier("le bouclier tiré est bien du catalogue « Bouclier »",
+             res.armeBouclier.every(d => d.bouclier.type === "Bouclier"));
+    verifier("le tirage varie (arme et bouclier ne sont pas figés)",
+             typesArmeTires.length > 1
+             && new Set(res.armeBouclier.map(d => d.bouclier.modele)).size > 1);
+
+    verifier("à l'équipement, l'arme part en main droite",
+             !!res.ficheBouclier.Equip_Main_Droite && !res.ficheBouclier.Equip_Main_Droite.deuxMains);
+    verifier("et le bouclier en main gauche, sans écraser l'arme",
+             !!res.ficheBouclier.Equip_Main_Gauche
+             && res.ficheBouclier.Equip_Main_Gauche.type === "Bouclier");
+}
 
 // =========================================================================
 console.log("\n3. LE HÉROS PART ÉQUIPÉ, ET LA BASE LE SAIT");

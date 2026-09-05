@@ -196,13 +196,14 @@ function allesAdjacents(q, r, campMonstre, idMonstre) {
 //  que l'IA ne puisse jamais se désynchroniser de ce qui sera réellement joué.
 // =========================================================================
 
-// Les douze altérations que le moteur sait accrocher à une carte (moteur_effets,
+// Les altérations que le moteur sait accrocher à une carte (moteur_effets,
 // alterationsExtraites). Une carte qui n'en porte AUCUNE, et qui ne soigne ni ne
 // protège, est une "attaque simple" — la seule chose qu'une illusion accepte de
-// recevoir. Provocations n'y figure pas : le moteur ne la résout pas, elle se
-// joue à la table.
+// recevoir. Provocation y figure aussi (les monstres ne peuvent pas la lancer,
+// mais un joueur le peut) : cette liste doit rester en phase avec le moteur.
 const ALTERATIONS_MOTEUR = ["brûl", "brul", "glac", "électri", "electri", "empoison", "poison",
-    "confusion", "paralys", "immobilis", "peur", "pouss", "traction", "étourd", "etourd", "absorption"];
+    "confusion", "paralys", "immobilis", "peur", "pouss", "traction", "étourd", "etourd", "absorption",
+    "provocation"];
 
 window.analyserCarteMonstre = function(dataCarte) {
     const infos = { portee: 1, estSoin: false, estZone: false, degats: 0, aAlteration: false,
@@ -238,7 +239,6 @@ window.analyserCarteMonstre = function(dataCarte) {
                 const val = parseFloat(String(mod.Valeur).replace(",", ".")) || 0;
                 infos.portee = Math.max(infos.portee, 1 + val * act.mods[idMod]);
             }
-            if ((mod.Nom || "").toLowerCase().includes("traction")) infos.portee = Math.max(infos.portee, 3);
             if (mod.Nom === "Zone") infos.estZone = true;
             const nomMod = (mod.Nom || "").toLowerCase();
             if (ALTERATIONS_MOTEUR.some(mot => nomMod.includes(mot))) infos.aAlteration = true;

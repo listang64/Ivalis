@@ -730,13 +730,16 @@ function equiperLeHerosDeDepart(donnees) {
       if (champ === "Equip_Main_Gauche") donnees.equipMainGauche = depart.arme;
     });
   }
+  // « Arme + Bouclier » : l'arme a pris la main droite (jamais à deux mains,
+  // voir objetDeDepartUneMain), le bouclier prend la gauche.
+  if (depart.bouclier) donnees.equipMainGauche = depart.bouclier;
   if (depart.armure) donnees.equipArmure = depart.armure;
 
   // Le portrait décrit ce que le héros porte VRAIMENT : le nom de l'armure
   // tirée remplace l'ancienne liste de tenues décoratives.
   if (depart.armure) donnees.style = depart.armure.nom;
 
-  const porte = [depart.arme, depart.armure].filter(Boolean).map(o => o.nom);
+  const porte = [depart.arme, depart.bouclier, depart.armure].filter(Boolean).map(o => o.nom);
   if (porte.length > 0) console.log("🎒 Équipement de départ : " + porte.join(" et "));
 }
 

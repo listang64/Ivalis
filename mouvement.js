@@ -39,21 +39,33 @@ window.ANIMATION_VTT_EN_COURS = false;
 // Fonction de message flottant (UI)
 // "options" permet de sortir un message du lot — un coup critique, par exemple —
 // sans toucher aux dizaines d'appels existants, qui gardent les valeurs par défaut.
+//
+// Plusieurs états peuvent tomber sur la même case au même instant (brûlure ET
+// poison au même tick, par exemple) : sans décalage, les messages se dessinent
+// pile les uns sur les autres et deviennent illisibles. window._MESSAGES_FLOTTANTS
+// compte, par case, combien de messages y sont déjà affichés pour empiler les
+// nouveaux un cran plus haut au lieu de les superposer.
 window.afficherMessageFlottantHex = function(q, r, texte, couleur = "#ff4c4c", options = {}) {
     const conteneur = document.getElementById("conteneur-plateau-vtt");
     if (!conteneur || !window.PLATEAU_VTT) return;
-    
+
     const px = window.PLATEAU_VTT.hexToPixel(q, r);
-    
+
     // Le conteneur n'est pas zoomé : on convertit la case en position écran
     const ecranX = window.VTT_POS_X + px.x * window.VTT_SCALE;
     const ecranY = window.VTT_POS_Y + px.y * window.VTT_SCALE;
-    
+
+    const cleCase = q + "," + r;
+    const actifs = window._MESSAGES_FLOTTANTS = window._MESSAGES_FLOTTANTS || {};
+    const rangEmpilement = actifs[cleCase] || 0;
+    actifs[cleCase] = rangEmpilement + 1;
+    const decalageEmpilement = rangEmpilement * 22;
+
     const msg = document.createElement("div");
     msg.innerText = texte;
     msg.style.position = "absolute";
     msg.style.left = ecranX + "px";
-    msg.style.top = (ecranY - 30) + "px";
+    msg.style.top = (ecranY - 30 - decalageEmpilement) + "px";
     msg.style.transform = "translate(-50%, -50%)";
     msg.style.color = couleur;
     msg.style.fontWeight = "bold";
@@ -66,16 +78,21 @@ window.afficherMessageFlottantHex = function(q, r, texte, couleur = "#ff4c4c", o
     msg.style.pointerEvents = "none";
     msg.style.zIndex = "1000";
     msg.style.whiteSpace = "nowrap";
-    msg.style.transition = "top 1s ease-out, opacity 1s ease-out";
-    
+    // Durée à l'écran allongée (2,2s au total, contre ~1s avant) pour mieux lire les
+    // états qui s'enchaînent en combat (brûlure, empoisonnement...).
+    msg.style.transition = "top 1.8s ease-out, opacity 1.8s ease-out";
+
     conteneur.appendChild(msg);
-    
+
     setTimeout(() => {
-        msg.style.top = (ecranY - 100) + "px";
+        msg.style.top = (ecranY - 130 - decalageEmpilement) + "px";
         msg.style.opacity = "0";
-    }, 50);
-    
-    setTimeout(() => msg.remove(), 1050);
+    }, 400);
+
+    setTimeout(() => {
+        msg.remove();
+        actifs[cleCase] = Math.max(0, (actifs[cleCase] || 1) - 1);
+    }, 2200);
 };
 
 function hexDistance(a, b) {

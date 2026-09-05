@@ -503,12 +503,12 @@ function effetAutorise(chantier, effet, commeMod) {
     // L'arme du monstre interdit certaines attaques.
     if (incompatibleAvecArme(effet.Nom, chantier.arme)) return false;
 
-    // Traction (portée fixe) et Distance ne peuvent pas cohabiter.
-    if (nom.includes("traction") && chantierContientMotCle(chantier, "distance")) return false;
-    if (nom === "distance" && chantierContientMotCle(chantier, "traction")) return false;
-
     // L'empoisonnement a besoin d'une source de dégâts pour exister.
     if (nom.includes("poison") && !chantierAUneAttaque(chantier)) return false;
+
+    // Provocation force la cible à attaquer le lanceur : réservée aux joueurs,
+    // un monstre ne peut jamais la lancer sur lui-même ni la poser sur un allié.
+    if (nom.includes("provocation")) return false;
 
     // Poussée est incompatible avec les zones et l'étalement.
     const incompatiblesPoussee = ["persistance terrain", "zone", "durée étalement dégâts"];

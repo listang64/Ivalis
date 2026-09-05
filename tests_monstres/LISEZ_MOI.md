@@ -88,6 +88,8 @@ node equipement_combat.mjs  # ce que les objets font une fois portés, en combat
 node apercu_butin.mjs       # onglet Inventaire et fenêtres de butin, capturés à l'écran
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
+node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
+node provocation.mjs        # l'effet Provocation (portée moteur), réservé aux joueurs
 ```
 
 ## Fidélité à la Forge

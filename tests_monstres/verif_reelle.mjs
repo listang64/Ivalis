@@ -12,7 +12,7 @@ const isConnectedToCenter = eval(src.slice(src.indexOf('function isConnectedToCe
 const estUneAttaqueDeBase  = eval(src.slice(src.indexOf('function estUneAttaqueDeBase'), src.indexOf('function getMaxStacks')) + '; estUneAttaqueDeBase');
 const parseFrenchFloat     = eval(src.slice(src.indexOf('function parseFrenchFloat'), src.indexOf('// Simple garde-fou')) + '; parseFrenchFloat');
 const getMaxStacks         = eval(src.slice(src.indexOf('function parseFrenchFloat'), src.indexOf('function formatterTexteEffet')) + '; getMaxStacks');
-const estIncompatibleAvecArme = eval(src.slice(src.indexOf('function estIncompatibleAvecArme'), src.indexOf('// Traction a sa propre portée fixe')) + '; estIncompatibleAvecArme');
+const estIncompatibleAvecArme = eval(src.slice(src.indexOf('function estIncompatibleAvecArme'), src.indexOf('// === OUTILS POUR LA ZONE ===')) + '; estIncompatibleAvecArme');
 
 const compteurs = {};
 const inc = (k, detail) => { (compteurs[k] = compteurs[k] || { n:0, ex:[] }).n++;
@@ -30,7 +30,7 @@ corpus.forEach(m => m.cartes.forEach((c, rang) => {
   if (d.Fatigue < min || d.Fatigue > max) inc("fatigue hors tranche", `${desc} -> ⚡${d.Fatigue} attendu ${min}-${max}`);
 
   // 2. Règles de la Forge
-  const tags = new Set(); let nbAttaques = 0, aAttaque = false, aPoison = false, aTraction = false, aDistance = false;
+  const tags = new Set(); let nbAttaques = 0, aAttaque = false, aPoison = false;
   d.Composants.actions.forEach(a => {
     const eff = [{ e: EFFETS[a.baseEffetId], n: a.count, racine: true },
                  ...Object.entries(a.mods).map(([id,v]) => ({ e: EFFETS[id], n: v, racine: false }))];
@@ -39,8 +39,7 @@ corpus.forEach(m => m.cartes.forEach((c, rang) => {
       if (e.Modificateur && e.Modificateur !== "AUCUN") tags.add(e.Modificateur.toUpperCase());
       if (estUneAttaqueDeBase(e.Nom)) { nbAttaques++; aAttaque = true; }
       if (/poison/i.test(e.Nom)) aPoison = true;
-      if (/traction/i.test(e.Nom)) aTraction = true;
-      if (e.Nom === "Distance") aDistance = true;
+      if (/provocation/i.test(e.Nom)) inc("provocation sur un monstre (réservée aux joueurs)", desc);
       if (estIncompatibleAvecArme(e.Nom, d.Arme)) inc("effet interdit par l'arme", `${desc} [arme ${d.Arme}]`);
       // plafond d'empilement RÉEL de la Forge
       if (n > getMaxStacks(e)) inc("empilement au-delà du max de la Forge", `${desc} — ${e.Nom}×${n} (max ${getMaxStacks(e)})`);
@@ -69,7 +68,6 @@ corpus.forEach(m => m.cartes.forEach((c, rang) => {
   if (tags.size > 2) inc("plus de 2 caractéristiques", `${desc} [${[...tags].join("+")}]`);
   if (nbAttaques > 1) inc("plus d'une attaque de base", desc);
   if (aPoison && !aAttaque) inc("poison sans source de dégâts", desc);
-  if (aTraction && aDistance) inc("Traction et Distance ensemble", desc);
 
   // 3. Champs du document
   ["Nom","Arme","Element","Fatigue","Initiative","Cout_PC","Effets_Compiles","Composants"].forEach(k => {
