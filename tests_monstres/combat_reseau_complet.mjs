@@ -40,11 +40,29 @@ const SRC_RECOMPOSE  = extraire('monstres.js', 'window.recomposerCombattants = f
 // tout le bloc, sinon FILE_ANIMATIONS n'existe pas.
 const SRC_FILE_ANIM  = ['window.FILE_ANIMATIONS = Promise.resolve();',
                         'window.DELAI_MAX_ANIMATION_MS = 20000;',
-                        extraire('app.js', 'window.filerAnimation = function')].join('\n');
+                        extraire('app.js', 'window.filerAnimation = function'),
+                        // Les verrous d'animation à expiration : c'est eux qui
+                        // empêchent un drapeau oublié de figer le combat.
+                        extraire('app.js', 'const DRAPEAUX_ANIMATION = {', '};'),
+                        extraire('app.js', 'const leveDepuis = {};', '});'),
+                        extraire('app.js', 'window.animationEnCours = function'),
+                        extraire('app.js', 'window.libererVerrousAnimation = function')].join('\n');
 const SRC_REPARTITEUR = extraireRepartiteur();
 
 let echecs = 0;
 const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(58)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
+
+// TOUTE ERREUR EST UN TOUR PERDU. Quand l'IA des créatures lève une exception,
+// elle rattrape le coup en PASSANT le tour — le combattant ne joue pas du tout.
+// En jeu, ça se voit comme « le tour d'un ennemi vient d'être complètement
+// passé », et ça ne laisse aucune trace ailleurs qu'en console. On les capte
+// donc toutes, et le banc échoue s'il en tombe une.
+const erreursConsole = [];
+const consoleErreurBrute = console.error;
+console.error = (...args) => {
+  erreursConsole.push(args.map(a => (a && a.stack) ? a.stack : String(a)).join(" "));
+  consoleErreurBrute("  ⚠", ...args);
+};
 const pause = (ms) => new Promise(r => setTimeout(r, ms));
 
 // ------------------------------------------------------------------
@@ -137,7 +155,12 @@ function creerPoste(nom, monde, mesPersos) {
     global.localStorage = { getItem: (c) => c === "ID_JOUEUR_COURANT" ? mesPersos.joueur : null,
                             setItem: () => {} };
     global.document = {
-      getElementById: (id) => id === "fenetre-combat" ? { style: { display: "block" } } : coquille(),
+      // La fenêtre de combat de CE poste. Un poste dont elle n'est pas à l'écran
+      // (l'autre joueur regarde sa fiche, ou a mis l'iPad de côté) ne fait plus
+      // jouer les créatures : c'est le vrai garde-fou du jeu, et il permet ici
+      // de désigner exactement quel poste tient l'IA.
+      getElementById: (id) => id === "fenetre-combat"
+          ? { style: { display: w.__FENETRE_COMBAT || "block" } } : coquille(),
       querySelectorAll: () => [], querySelector: () => null,
       addEventListener: () => {}, removeEventListener: () => {},
       createElement: () => coquille(), body: coquille()
@@ -288,6 +311,25 @@ function creerPoste(nom, monde, mesPersos) {
     await api.setDoc(refEv(n), { ...JSON.parse(JSON.stringify(ev)), ID_Partie: idPartie, n, horodatage: Date.now() });
     return n;
   };
+  // La publication groupée : une réservation de numéros, une écriture.
+  w.publierEvenementsCombat = async (idPartie, evenements) => {
+    const liste = (evenements || []).filter(Boolean);
+    if (!liste.length) return [];
+    const premier = await api.runTransaction(db, async (tx) => {
+      const snap = await tx.get(api.doc(db, "Systeme_Parties", "P1"));
+      const debut = (parseInt(snap.data().Compteur_Evenements) || 0) + 1;
+      tx.update(api.doc(db, "Systeme_Parties", "P1"), { Compteur_Evenements: debut + liste.length - 1 });
+      return debut;
+    });
+    const numeros = [];
+    for (let i = 0; i < liste.length; i++) {
+      const n = premier + i;
+      numeros.push(n);
+      await api.setDoc(refEv(n), { ...JSON.parse(JSON.stringify(liste[i])), ID_Partie: idPartie, n,
+                                   horodatage: Date.now() });
+    }
+    return numeros;
+  };
   w.lireEvenementCombat = async (idPartie, n) => {
     const snap = await api.getDoc(refEv(n));
     return snap.exists() ? snap.data() : null;
@@ -397,24 +439,37 @@ const postes = [
   creerPoste("iPad-Ben",  monde, { joueur: "P2", heros: "J2" }),
   creerPoste("PC-Adrien", monde, { joueur: "P3", heros: "J3" })
 ];
-// Chaque écran rejoue le journal pour lui, à son rythme : il n'y a plus de
-// barrière à franchir entre postes. Reste UN geste, purement local : chaque
-// tour s'ouvre sur la fenêtre sombre et son OK, le temps de lire la technique.
-// Ici, trois joueurs très attentifs touchent leur écran sans tarder — et on
-// laisse le réseau se calmer, le temps que les relectures s'achèvent.
+// =====================================================================
+//  UN POSTE QUI NE TOUCHE JAMAIS SON ÉCRAN
+// =====================================================================
+//  Chaque écran rejoue le journal pour lui, à son rythme, et chaque tour
+//  s'ouvre sur la fenêtre sombre et son OK. Tout le combat se joue donc ici
+//  avec un poste MUET : l'iPad de Ben ne touche pas une seule fois son écran
+//  de la partie. C'est le cas réel — quelqu'un pose sa tablette, va boire un
+//  café, ou regarde ailleurs.
+//
+//  Ce que ça doit changer pour les autres : RIEN. Les calculs, la file
+//  d'initiative, les tours des créatures, les points de vie : tout doit
+//  continuer d'avancer sans lui. Il ne doit ni figer la table, ni faire sauter
+//  un tour. Il rattrapera son retard quand il y reviendra, et retombera
+//  exactement au même état que les autres.
+const POSTE_MUET = "iPad-Ben";
 const attendreBrut = monde.attendreLeReseau;
-const toucherLesEcrans = async () => {
+const toucherLesEcrans = async (tousSansException = false) => {
   for (const p of postes) {
+    if (!tousSansException && p.nom === POSTE_MUET) continue;
     if (p.w.EVENEMENT_ATTENDU && typeof p.w.jouerSequenceTour === "function") {
       p.activer();
       await p.w.jouerSequenceTour();
     }
   }
 };
+const enRetard = (tousSansException = false) => postes.some(p =>
+  (tousSansException || p.nom !== POSTE_MUET)
+  && ((typeof p.w.evenementsEnAttente === "function" && p.w.evenementsEnAttente() > 0)
+      || p.w.EVENEMENT_ATTENDU));
 monde.attendreLeReseau = async (tours = 60, minimum = 0) => {
   await attendreBrut(tours, minimum);
-  const enRetard = () => postes.some(p => (typeof p.w.evenementsEnAttente === "function"
-                                           && p.w.evenementsEnAttente() > 0) || p.w.EVENEMENT_ATTENDU);
   for (let i = 0; i < 80 && enRetard(); i++) { await toucherLesEcrans(); await attendreBrut(20, 40); }
 };
 
@@ -610,6 +665,142 @@ console.log("\n3. DEUX POSTES DÉPLACENT UN PION EN MÊME TEMPS\n");
   monde.docs["Combat_VTT/P1"].Tokens.J3 = avant.J3;
 }
 
+console.log("\n3 bis. LE POSTE MUET RATTRAPE TOUT SON RETARD\n");
+{
+  // Tout le combat s'est joué sans lui. Il revient : il doit rattraper, dans
+  // l'ordre, et retomber exactement au même état que les autres.
+  const muet = postes.find(p => p.nom === POSTE_MUET);
+  const enAttente = muet.w.evenementsEnAttente() + (muet.w.EVENEMENT_ATTENDU ? 1 : 0);
+  console.log(`     ${POSTE_MUET} n'a pas touché son écran de la partie —`
+            + ` ${enAttente} événement(s) l'attendent`);
+  verifier("le combat a bien avancé sans lui", enAttente > 0,
+           `(${enAttente} en attente)`);
+
+  for (let i = 0; i < 200 && enRetard(true); i++) {
+    await toucherLesEcrans(true);
+    await attendreBrut(20, 40);
+  }
+  verifier("il finit par tout rejouer", !enRetard(true),
+           `(${muet.w.evenementsEnAttente()} restant(s))`);
+}
+
+console.log("\n3 ter. UN VERROU D'ANIMATION OUBLIÉ NE FIGE PLUS LA TABLE\n");
+{
+  // LA PANNE QU'ON NE REPRODUIT JAMAIS. Trois drapeaux disent « une animation
+  // tourne » et suffisent, à eux seuls, à faire taire l'IA des créatures et à
+  // empêcher tout redessin du plateau. Une animation qui casse en chemin, un
+  // onglet iPad endormi en pleine marche, une exception avant la ligne qui les
+  // rabaisse : le drapeau reste levé, et le combat se fige POUR DE BON sur ce
+  // poste. Plus aucune créature ne joue, le bouton de fin de tour reste éteint
+  // chez les humains (le poste continue de signaler « l'IA travaille »), et
+  // rien ne réveille personne.
+  const tourAvant = monde.docs["Systeme_Parties/P1"].Tour_Combat;
+  const fileAvant = (monde.docs["Systeme_Parties/P1"].File_Attente_Combat || []).length;
+
+  postes.forEach(p => {
+    p.activer();
+    // On les lève à la main, comme le ferait une animation interrompue.
+    p.w.ANIMATION_VTT_EN_COURS = true;
+    p.w.ANIMATION_TOUR_EN_COURS = true;
+    p.w.ANIMATION_MOTEUR_EN_COURS = true;
+  });
+
+  const bloquesTousDeSuite = postes.every(p => { p.activer(); return p.w.animationEnCours(); });
+  verifier("tout de suite après, les postes se croient bien en animation",
+           bloquesTousDeSuite);
+
+  // On fait vieillir les drapeaux au-delà du plus long plafond, sans toucher à
+  // rien d'autre : c'est exactement ce que vit un poste dont le verrou est
+  // resté coincé.
+  const vrai = Date.now;
+  const saut = 25000;
+  Date.now = () => vrai() + saut;
+  const libresApres = postes.every(p => { p.activer(); return !p.w.animationEnCours(); });
+  Date.now = vrai;
+
+  verifier("passé le délai d'une animation, ils ne bloquent plus rien", libresApres);
+  verifier("mais les drapeaux eux-mêmes n'ont pas été touchés en douce",
+           postes.every(p => { p.activer(); return p.w.ANIMATION_VTT_EN_COURS === true; }));
+
+  postes.forEach(p => { p.activer(); p.w.libererVerrousAnimation(); });
+  verifier("et le grand ménage les rabaisse tous",
+           postes.every(p => { p.activer(); return !p.w.ANIMATION_VTT_EN_COURS
+                                              && !p.w.ANIMATION_TOUR_EN_COURS
+                                              && !p.w.ANIMATION_MOTEUR_EN_COURS; }));
+  void tourAvant; void fileAvant;
+}
+
+console.log("\n3 quater. LES CRÉATURES JOUENT DEPUIS LE POSTE QUI N'A RIEN TOUCHÉ\n");
+{
+  // LE CAS RÉEL, celui qui figeait la table. Sur le PC on a appuyé sur OK et
+  // regardé les animations ; sur l'iPad, personne n'a rien touché — et c'est
+  // pourtant l'iPad qui fait jouer les créatures. Ce poste-là est en retard de
+  // plusieurs tours À L'ÉCRAN : il doit malgré tout calculer et faire avancer
+  // la partie, tout seul, en arrière-plan. Rien de ce qui décide ne doit
+  // dépendre de ce qui s'affiche.
+  //
+  // On coupe donc la fenêtre de combat des deux autres postes : à partir d'ici,
+  // SEUL l'iPad muet peut mener le combat.
+  postes.forEach(p => { p.activer(); p.w.__FENETRE_COMBAT = (p.nom === POSTE_MUET) ? "block" : "none"; });
+
+  const muet = postes.find(p => p.nom === POSTE_MUET);
+  const toursIA = () => postes.flatMap(p => p.journal.filter(e => e.iaFin)).length;
+  const toursJoues = toursIA();
+  const avant = structuredClone(monde.docs["Systeme_Parties/P1"]);
+
+  // Les humains choisissent leur technique. C'est au poste muet de faire
+  // choisir les créatures, puis de basculer le combat en résolution.
+  await Promise.all(postes.map((poste, i) => {
+    poste.activer();
+    const w = poste.w;
+    const perso = w.PERSOS_PARTIE.find(p => p.idPersonnage === HEROS[i].id);
+    w.COMBAT_PERSOS_JOUEUR = [perso]; w.COMBAT_INDEX_PERSO = 0;
+    w.COMPETENCES_CACHE = { ...COMPETENCES[HEROS[i].id] };
+    return w.jouerCarteCombat("CH1");
+  }));
+  for (let i = 0; i < 50 && monde.docs["Systeme_Parties/P1"].Phase_Combat !== "Resolution"; i++) {
+    await attendreBrut(40, 60);
+  }
+  const phaseAtteinte = monde.docs["Systeme_Parties/P1"].Phase_Combat;
+  console.log("     phase atteinte :", phaseAtteinte, "— file :",
+              (monde.docs["Systeme_Parties/P1"].File_Attente_Combat || [])
+                .map(f => f.idPersonnage).join(" > ") || "(vide)");
+  verifier("le poste muet fait choisir leurs techniques aux créatures",
+           phaseAtteinte === "Resolution", `(phase ${phaseAtteinte})`);
+
+  // Les humains jouent leur tour ; ensuite les créatures doivent enchaîner
+  // toutes seules, depuis ce poste en retard, sans que personne ne touche rien.
+  const tete = () => ((monde.docs["Systeme_Parties/P1"].File_Attente_Combat || [])[0] || {}).idPersonnage;
+  for (let i = 0; i < HEROS.length; i++) {
+    // On attend que ce héros soit vraiment en tête avant de lancer sa carte,
+    // puis qu'il ait quitté la tête : c'est le rythme d'une vraie table.
+    for (let t = 0; t < 60 && tete() !== HEROS[i].id; t++) await monde.attendreLeReseau(30);
+    await lancerLaCarteDe(postes[i], HEROS[i].id);
+    for (let t = 0; t < 60 && tete() === HEROS[i].id; t++) await monde.attendreLeReseau(30);
+  }
+  // Le round doit aller à son terme : les deux créatures jouent, la file se
+  // vide, la manche suivante s'ouvre. Sans que personne n'ait rien touché.
+  for (let i = 0; i < 200 && monde.docs["Systeme_Parties/P1"].Tour_Combat <= avant.Tour_Combat; i++) {
+    await attendreBrut(40, 60);
+  }
+
+  muet.activer();
+  const apres = monde.docs["Systeme_Parties/P1"];
+  console.log(`     ${POSTE_MUET} : ${muet.w.evenementsEnAttente()} événement(s) en attente à l'écran,`
+            + ` fenêtre sombre ${muet.w.EVENEMENT_ATTENDU ? "ouverte" : "levée"},`
+            + ` et ${toursIA() - toursJoues} tour(s) de créature joué(s) depuis`);
+  verifier("les créatures jouent quand même, depuis ce poste-là",
+           toursIA() > toursJoues, `(${toursIA() - toursJoues} tour(s))`);
+  verifier("le round va jusqu'au bout, sans que personne ne touche un écran",
+           apres.Tour_Combat > avant.Tour_Combat,
+           `(tour ${avant.Tour_Combat} → ${apres.Tour_Combat})`);
+  verifier("et ce poste-là a bien du retard à l'écran, sans que ça gêne personne",
+           muet.w.evenementsEnAttente() > 0 || !!muet.w.EVENEMENT_ATTENDU,
+           `(${muet.w.evenementsEnAttente()} en attente)`);
+
+  postes.forEach(p => { p.activer(); p.w.__FENETRE_COMBAT = "block"; });
+}
+
 console.log("\n4. CE QUE RACONTE LE COMBAT\n");
 const finale = photo(postes[0]);
 console.log(`     tour ${finale.tour}, phase ${finale.phase}`);
@@ -686,6 +877,9 @@ const ecarts = [];
     }
   });
 });
+verifier("aucune erreur n'est tombée pendant tout le combat", erreursConsole.length === 0,
+         erreursConsole.length ? `\n       ${erreursConsole.slice(0, 4).join("\n       ")}` : "");
+
 verifier("la mémoire de chaque poste colle à la base", ecarts.length === 0,
          ecarts.length ? "\n       " + ecarts.join("\n       ") : "");
 

@@ -564,17 +564,21 @@ window.validerMouvement = async function() {
         //  L'ORDRE COMPTE : les pas partent dans le journal AVANT que la case
         //  d'arrivée ne soit écrite sur le plateau. Aucun poste ne peut donc
         //  voir le pion arrivé sans avoir de quoi l'y amener à pied.
-        if (typeof window.consignerEtapeTour === "function") {
-            for (let i = 0; i < pathAvecAngles.length; i++) {
-                await window.consignerEtapeTour("pas", {
-                    idToken: idPerso,
-                    de: (i === 0 ? hexDepart : pathAvecAngles[i - 1]),
-                    vers: pathAvecAngles[i],
-                    opportunites: opportunitesResolues.filter(o => o.apresEtape === i),
-                    zones: zonesResolues.filter(z => z.apresEtape === i),
-                    timestamp: horodatageMouvement
-                });
-            }
+        //  Les pas partent GROUPÉS : une seule écriture pour tout le trajet,
+        //  appliquée en entier ou pas du tout. Un trajet ne peut donc pas
+        //  arriver à moitié dans le journal.
+        const pasDuTrajet = pathAvecAngles.map((vers, i) => ({
+            idToken: idPerso,
+            de: (i === 0 ? hexDepart : pathAvecAngles[i - 1]),
+            vers,
+            opportunites: opportunitesResolues.filter(o => o.apresEtape === i),
+            zones: zonesResolues.filter(z => z.apresEtape === i),
+            timestamp: horodatageMouvement
+        }));
+        if (typeof window.consignerEtapesTour === "function") {
+            await window.consignerEtapesTour("pas", pasDuTrajet);
+        } else if (typeof window.consignerEtapeTour === "function") {
+            for (const unPas of pasDuTrajet) await window.consignerEtapeTour("pas", unPas);
         }
 
         const persoRef = window.refCombattant(idPerso);

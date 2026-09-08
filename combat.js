@@ -2069,9 +2069,12 @@ window.caseOccupeeParVivant = function(q, r, tokensData) {
 window.appliquerTokensVTT = function(tokensMap) {
     if (!window.PLATEAU_VTT) return;
     
-    // 🔻 NOUVEAU : VERROU ANTI-TÉLÉPORTATION 🔻
-    // Si une animation de marche est en cours, on bloque le redessin de la carte !
-    if (window.ANIMATION_VTT_EN_COURS) return;
+    // VERROU ANTI-TÉLÉPORTATION : pendant qu'un pion marche, on ne redessine
+    // pas la carte sous ses pieds. Mais un verrou levé depuis plus longtemps
+    // qu'aucune animation ne dure n'est pas une marche en cours, c'est un verrou
+    // oublié — et il empêchait alors TOUT redessin pour le reste du combat.
+    if (typeof window.animationEnCours === "function"
+        ? window.animationEnCours("ANIMATION_VTT_EN_COURS") : window.ANIMATION_VTT_EN_COURS) return;
     
     const conteneur = document.getElementById("conteneur-tokens-vtt");
     if (!conteneur) return;

@@ -1132,10 +1132,20 @@ window.verifierTourIAMonstres = async function() {
     window.IA_DERNIER_SIGNE = Date.now();
     if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
 
-    // Rien tant que les animations en cours n'ont pas fini de se dérouler : on
-    // repassera dans un instant.
-    if (window.ANIMATION_VTT_EN_COURS || window.ANIMATION_TOUR_EN_COURS
-        || window.ANIMATION_MOTEUR_EN_COURS) { programmerRappelIA(); return; }
+    // Rien tant qu'une animation tourne VRAIMENT sur cet écran : on repassera
+    // dans un instant. « Vraiment » compte : un drapeau levé depuis plus longtemps
+    // qu'aucune animation ne dure n'est pas une animation en cours, c'est un
+    // verrou oublié — et il figeait le combat pour de bon sur ce poste, plus
+    // aucune créature ne jouant jamais (voir animationEnCours, app.js).
+    //
+    // Ce garde-fou ne concerne QUE l'écran. Les calculs, eux, ne dépendent de
+    // l'animation de personne : un poste qui regarde un tour passé en rejeu ne
+    // retient pas la partie, et un poste qui n'a pas touché son OK ne retient
+    // rien du tout.
+    if (typeof window.animationEnCours === "function"
+        ? window.animationEnCours()
+        : (window.ANIMATION_VTT_EN_COURS || window.ANIMATION_TOUR_EN_COURS
+           || window.ANIMATION_MOTEUR_EN_COURS)) { programmerRappelIA(); return; }
 
     // Ce tour-ci est DÉJÀ calculé et n'attend plus que les autres postes : la
     // créature ne doit surtout pas le rejouer. Son verrou, lui, répond toujours

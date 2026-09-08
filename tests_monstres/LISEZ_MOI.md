@@ -156,6 +156,32 @@ un Firestore qui applique cette règle-là. Il vérifie aussi le filet de sécur
 si le journal tombe pour une autre raison — droits, réseau —, la fenêtre s'efface
 et les animations reprennent leur ancien chemin, plutôt qu'un plateau figé.
 
+**Rien de ce qui DÉCIDE ne dépend de ce qui S'AFFICHE.** C'est la règle, et
+c'est celle qui manquait. Un poste peut être en retard de plusieurs tours à
+l'écran — sa fenêtre sombre attend un doigt qui ne vient pas — et rester
+pourtant celui qui fait jouer les créatures : il calcule et fait avancer la
+partie, tout seul, en arrière-plan. `combat_reseau_complet.mjs` joue désormais
+TOUT le combat avec un poste MUET, qui ne touche pas une seule fois son écran, et
+lui fait mener un round complet à lui seul pendant que les deux autres ont fermé
+leur fenêtre de combat.
+
+**Les verrous d'animation ne peuvent plus rester coincés.** Trois drapeaux disent
+« une animation tourne » et suffisent, à eux seuls, à faire taire l'IA des
+créatures et à empêcher tout redessin du plateau. Un seul resté levé — une
+animation qui casse en chemin, un onglet iPad endormi en pleine marche, une
+exception avant la ligne qui le rabaisse — et le combat se figeait POUR DE BON
+sur ce poste : plus aucune créature ne jouait, le bouton de fin de tour restait
+éteint chez les humains, et rien ne réveillait personne. On note maintenant
+l'INSTANT où chaque drapeau se lève ; passé le temps qu'une telle animation peut
+durer, il ne compte plus. Aucun autre fichier n'a à le savoir.
+
+**La fenêtre sombre ne se pose que pour annoncer un tour.** Elle restait
+autrefois là dès que ce n'était pas notre héros — c'est-à-dire presque tout le
+temps —, et le moindre grain de sable ailleurs laissait un écran noir figé sur un
+tour qui ne venait pas. Elle s'ouvre désormais pour présenter le combattant et sa
+technique, se lève au toucher, et le reste du temps le plateau est visible. Un
+plateau visible ne peut pas se bloquer.
+
 **Un hexagone, un numéro.** Un trajet entier tenait au départ dans UN seul
 événement, et c'était fragile de bout en bout : un poste qui le rejouait en
 retard partait d'une case qui n'était plus la bonne, une animation coupée en son

@@ -135,13 +135,20 @@ const res = await p.evaluate(async ({ sVoile, sToggle, sEtatInitial, sSequence }
   await new Promise(r => setTimeout(r, 500));
   const preparation = etat();
 
-  // 2. Au tour de la créature : la fenêtre s'ouvre, sans OK (rien n'est calculé).
+  // 2. Au tour d'une créature, mais SANS rien à annoncer encore : le plateau
+  //    reste dégagé. La fenêtre sombre ne sert qu'à présenter un tour avant de
+  //    le dérouler — elle n'a pas à rester posée pendant qu'on réfléchit.
   poser(fileMonstre, "Resolution");
-  await new Promise(r => setTimeout(r, 200));
-  const calculEnCours = etat();
+  await new Promise(r => setTimeout(r, 600));
+  const rienAAnnoncer = etat();
 
-  // 3. Le tour est écrit en entier : le OK doré s'allume, sur ce seul drapeau.
-  await ecrireTour();
+  // 3. Un événement arrive : le tour est retenu, la fenêtre s'ouvre.
+  window.jouerAnimationMoteur = () => {};
+  window.DELAI_ENTRE_ETAPES_MS = 1;
+  window.EVENEMENTS_RECUS[1] = { n: 1, type: "carte", acteur: "M1", idCarte: "CARTE_M",
+                                 tour: 1, data: { idLanceur: "M1" }, avant: {} };
+  await window.lireJournalCombat();
+  await new Promise(r => setTimeout(r, 200));
   const avecOk = etat();
 
   // 4. Le panneau replié : la fenêtre couvre tout l'écran.
@@ -153,14 +160,8 @@ const res = await p.evaluate(async ({ sVoile, sToggle, sEtatInitial, sSequence }
   window.rafraichirVoileTour();
   await new Promise(r => setTimeout(r, 600));
 
-  // 5. Un événement arrive : le tour est RETENU, le temps que le joueur lise la
-  //    technique. Le gros OK doré clignote, et le clic passe.
-  window.jouerAnimationMoteur = () => {};
-  window.DELAI_ENTRE_ETAPES_MS = 1;
-  window.EVENEMENTS_RECUS[1] = { n: 1, type: "carte", acteur: "M1", idCarte: "CARTE_M",
-                                 tour: 1, data: { idLanceur: "M1" }, avant: {} };
-  await window.lireJournalCombat();
-  await new Promise(r => setTimeout(r, 200));
+  // 5. Le tour est RETENU, le temps que le joueur lise la technique. Le gros OK
+  //    doré clignote, et le clic passe.
   const enPose = { ...etat(), retenu: !!window.EVENEMENT_ATTENDU, anims: [...(window.ANIMS || [])] };
 
   // 6. Le joueur touche l'écran : la fenêtre se lève et l'animation se joue.
@@ -214,7 +215,7 @@ const res = await p.evaluate(async ({ sVoile, sToggle, sEtatInitial, sSequence }
   const zPanneau = parseInt(getComputedStyle(document.getElementById('panneau-combat-gauche')).zIndex);
   const largeurPanneau = document.getElementById('panneau-combat-gauche').getBoundingClientRect().width;
 
-  return { preparation, calculEnCours, avecOk, panneauReplie, enPose, apresClic, monTourCouleur,
+  return { preparation, rienAAnnoncer, avecOk, panneauReplie, enPose, apresClic, monTourCouleur,
            monTour, tourDeLautre, mort, horsCombat, memeOr, anim, zVoile, zPanneau, largeurPanneau,
            largeurEcran: window.innerWidth };
 }, { sVoile: srcVoile, sToggle: srcToggle, sEtatInitial: srcEtatInitial, sSequence: srcSequence });
@@ -223,18 +224,16 @@ console.log("erreurs JS :", erreurs.length ? erreurs : "aucune");
 console.log(`     tour de la goule : « ${res.avecOk.nom} » — « ${res.avecOk.carte} » — ${res.avecOk.effets}`);
 
 verifier("en préparation, aucune fenêtre", !res.preparation.visible);
-verifier("au tour d'une créature, la fenêtre s'ouvre", res.calculEnCours.visible);
-verifier("elle annonce simplement que le tour se joue",
-         !res.calculEnCours.okVisible && /se joue/.test(res.calculEnCours.attente),
-         `(${res.calculEnCours.attente})`);
-verifier("la fenêtre est OPAQUE : rien ne transparaît du tour en train de s'écrire",
-         !/rgba\([^)]*0\.\d/.test(res.calculEnCours.opaque), `(${res.calculEnCours.opaque.slice(0, 70)}…)`);
-verifier("et le clic ne passe pas encore", !res.calculEnCours.clicPasse);
+verifier("au tour d'une créature, tant qu'il n'y a rien à annoncer, le plateau reste dégagé",
+         !res.rienAAnnoncer.visible);
+verifier("un tour à annoncer, et la fenêtre s'ouvre", res.avecOk.visible);
+verifier("la fenêtre est OPAQUE : rien ne transparaît du tour à venir",
+         !/rgba\([^)]*0\.\d/.test(res.avecOk.opaque), `(${res.avecOk.opaque.slice(0, 70)}…)`);
 verifier("elle s'arrête au bord du panneau latéral",
-         Math.abs(res.calculEnCours.gauche - res.largeurPanneau) < 2,
-         `(${res.calculEnCours.gauche}px vs ${res.largeurPanneau}px)`);
+         Math.abs(res.avecOk.gauche - res.largeurPanneau) < 2,
+         `(${res.avecOk.gauche}px vs ${res.largeurPanneau}px)`);
 verifier("elle couvre tout le reste de l'écran",
-         Math.abs(res.calculEnCours.gauche + res.calculEnCours.largeur - res.largeurEcran) < 2);
+         Math.abs(res.avecOk.gauche + res.avecOk.largeur - res.largeurEcran) < 2);
 verifier("le nom du combattant est affiché", res.avecOk.nom === "Goule putride", `(${res.avecOk.nom})`);
 verifier("dans l'or brossé du panneau latéral", res.memeOr);
 verifier("ses états sont sous son nom", res.avecOk.nbEtats === 2, `(${res.avecOk.nbEtats})`);
@@ -244,7 +243,8 @@ verifier("elle est plus grosse que le détail des effets", res.avecOk.tailleCart
 verifier("ses effets sont listés dessous", /Mot de pouvoir/.test(res.avecOk.effets) && /Peur/.test(res.avecOk.effets),
          `(${res.avecOk.effets.replace(/\s+/g, ' ').trim()})`);
 verifier("l'initiative n'y figure pas", !/Initiative/.test(res.avecOk.effets));
-verifier("tant qu'aucun événement n'est arrivé, pas de OK", !res.avecOk.okVisible);
+verifier("tant qu'aucun événement n'est arrivé, pas de fenêtre du tout",
+         !res.rienAAnnoncer.visible && !res.rienAAnnoncer.okVisible);
 verifier("panneau replié, la fenêtre prend tout l'écran", res.panneauReplie.gauche < 2,
          `(${res.panneauReplie.gauche}px)`);
 verifier("le nom de la technique porte la couleur du combattant",
@@ -272,7 +272,8 @@ verifier("pendant la relecture, la fenêtre se lève pour laisser voir le platea
          res.apresClic.pendantLecture && res.apresClic.pendantLecture.masquee !== false
          || !res.apresClic.visible);
 verifier("au tour de MON héros, aucune fenêtre : le plateau reste dégagé", !res.monTour.visible);
-verifier("au tour du héros d'un autre poste, elle revient", res.tourDeLautre.visible);
+verifier("au tour du héros d'un autre poste, sans rien à annoncer, le plateau reste dégagé",
+         !res.tourDeLautre.visible);
 verifier("aucune fenêtre pour un combattant à terre", !res.mort.visible);
 verifier("hors combat, jamais rien", !res.horsCombat.visible);
 verifier("la fenêtre passe au-dessus du plateau mais laisse le panneau",

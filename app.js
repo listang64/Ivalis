@@ -370,6 +370,63 @@ window.filerAnimation = function(nom, fn) {
     return window.FILE_ANIMATIONS;
 };
 
+// =========================================================================
+//  LES VERROUS D'ANIMATION NE PEUVENT PLUS RESTER COINCÉS
+// =========================================================================
+//  Trois drapeaux disent « une animation tourne » : ANIMATION_VTT_EN_COURS (un
+//  pion marche), ANIMATION_TOUR_EN_COURS (la piste d'initiative se replie),
+//  ANIMATION_MOTEUR_EN_COURS (une carte se résout). Tant qu'ils sont levés,
+//  l'IA des créatures se tait et le plateau ne se redessine pas.
+//
+//  Or un seul d'entre eux resté levé — une animation qui casse en chemin, un
+//  onglet iPad endormi en pleine marche, une exception avant la ligne qui le
+//  rabaisse — et le combat se fige POUR DE BON sur ce poste : plus aucune
+//  créature ne joue, plus aucun pion ne se redessine, et rien ne le réveille.
+//  C'est le genre de panne qu'on ne reproduit jamais et qui ruine une soirée.
+//
+//  On note donc l'INSTANT où chaque drapeau se lève. Passé le délai maximum
+//  d'une animation, il ne compte plus : ce n'est plus une animation en cours,
+//  c'est un verrou oublié. Aucun autre fichier n'a à le savoir — ils continuent
+//  d'écrire `window.ANIMATION_… = true / false` comme avant.
+//  Chacun a son propre plafond, à la mesure de ce qu'il couvre : un trajet peut
+//  durer plusieurs secondes, le repli de la piste d'initiative moins d'une.
+const DRAPEAUX_ANIMATION = {
+    ANIMATION_VTT_EN_COURS: 20000,      // un pion qui marche, opportunités comprises
+    ANIMATION_MOTEUR_EN_COURS: 20000,   // une carte qui se résout
+    ANIMATION_TOUR_EN_COURS: 6000       // le repli de la piste et le passage de file
+};
+const leveDepuis = {};
+Object.keys(DRAPEAUX_ANIMATION).forEach(nom => {
+    let valeur = false;
+    leveDepuis[nom] = 0;
+    Object.defineProperty(window, nom, {
+        configurable: true,
+        get() { return valeur; },
+        set(v) {
+            const actif = !!v;
+            if (actif && !valeur) leveDepuis[nom] = Date.now();
+            if (!actif) leveDepuis[nom] = 0;
+            valeur = actif;
+        }
+    });
+});
+
+// « Une animation est-elle VRAIMENT en train de tourner ? » — la seule question
+// qui vaille pour l'IA et pour le redessin. Sans argument, elle répond pour les
+// trois drapeaux ; avec un nom, pour celui-là seulement (le redessin du plateau
+// ne doit s'arrêter que devant un PION qui marche, pas devant une carte qui se
+// résout ni devant la piste d'initiative qui se replie).
+window.animationEnCours = function(nom) {
+    const noms = nom ? [nom] : Object.keys(DRAPEAUX_ANIMATION);
+    return noms.some(n => window[n] && DRAPEAUX_ANIMATION[n]
+                          && (Date.now() - (leveDepuis[n] || 0)) < DRAPEAUX_ANIMATION[n]);
+};
+
+// Le grand ménage : tout rabaisser. Appelé au retour au premier plan.
+window.libererVerrousAnimation = function() {
+    Object.keys(DRAPEAUX_ANIMATION).forEach(nom => { window[nom] = false; });
+};
+
 // Toutes les animations diffusées par la base passent par ici plutôt que
 // directement par filerAnimation : la séquence de tour (sequence_tour.js) sait
 // alors qu'un poste qui regarde derrière la fenêtre sombre ne doit RIEN jouer —
@@ -443,6 +500,46 @@ window.publierEvenementCombat = async function(idPartie, evenement) {
     } catch (e) {
         journalHorsService(e);
         return null;
+    }
+};
+
+// PUBLIER PLUSIEURS ÉVÉNEMENTS D'UN COUP. Un trajet de six cases, c'est six
+// numéros : les envoyer un par un faisait six transactions et six écritures,
+// donc six allers-retours réseau au milieu d'un tour — long sur un iPad en
+// wifi, et six occasions qu'un seul échoue et laisse un trou dans le journal.
+//
+// Ici, UNE transaction réserve les six numéros d'un coup (le compteur avance de
+// six), et UNE écriture groupée les pose tous. Firestore applique un lot en
+// entier ou pas du tout : soit le trajet est là au complet, soit il n'y est
+// pas. Les numéros restent consécutifs et dans l'ordre donné.
+window.publierEvenementsCombat = async function(idPartie, evenements) {
+    const liste = (evenements || []).filter(Boolean);
+    if (!idPartie || liste.length === 0) return [];
+    try {
+        const refPartie = doc(db, COL.PARTIES, idPartie);
+        // Le PREMIER numéro de la série ; les suivants s'en déduisent.
+        const premier = await runTransaction(db, async (tx) => {
+            const snap = await tx.get(refPartie);
+            if (!snap.exists()) return null;
+            const debut = (parseInt(snap.data().Compteur_Evenements) || 0) + 1;
+            tx.update(refPartie, { Compteur_Evenements: debut + liste.length - 1 });
+            return debut;
+        });
+        if (!premier) return [];
+
+        const lot = writeBatch(db);
+        const numeros = [];
+        const horodatage = Date.now();
+        liste.forEach((evenement, i) => {
+            const n = premier + i;
+            numeros.push(n);
+            lot.set(refEvenement(idPartie, n), { ...evenement, ID_Partie: idPartie, n, horodatage });
+        });
+        await lot.commit();
+        return numeros;
+    } catch (e) {
+        journalHorsService(e);
+        return [];
     }
 };
 

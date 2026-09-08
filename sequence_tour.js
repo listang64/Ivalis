@@ -226,6 +226,42 @@ window.consignerEtapeTour = async function(type, donnee) {
     return n;
 };
 
+// PLUSIEURS ÉTAPES D'UN COUP — un trajet, par exemple, où chaque hexagone est
+// son propre événement. Les envoyer une par une, c'est autant d'allers-retours
+// réseau au milieu d'un tour, et autant d'occasions qu'une seule échoue en
+// laissant un trou. Groupées, elles partent en une écriture, tout ou rien, avec
+// des numéros consécutifs dans l'ordre donné.
+window.consignerEtapesTour = async function(type, listeDeDonnees) {
+    const liste = (listeDeDonnees || []).filter(Boolean);
+    if (!liste.length) return [];
+    if (window.REJEU_SCRIPT_EN_COURS) return [];
+    if (!window.ID_PARTIE_COURANTE) return [];
+
+    // Sans la publication groupée (un app.js d'une version antérieure encore en
+    // cache), on retombe sur l'envoi une par une : plus lent, jamais faux.
+    if (typeof window.publierEvenementsCombat !== "function") {
+        const numeros = [];
+        for (const donnee of liste) numeros.push(await window.consignerEtapeTour(type, donnee));
+        return numeros.filter(n => n);
+    }
+
+    const acteur = window.acteurCourantCombat();
+    const tour = (window.PARTIE_DATA || {}).Tour_Combat || 0;
+    const evenements = liste.map(donnee => ({
+        type,
+        acteur: acteur ? acteur.idPersonnage : null,
+        idCarte: acteur ? acteur.idCarte : null,
+        tour,
+        data: JSON.parse(JSON.stringify(donnee || {})),
+        avant: valeursAvant(idsConcernes(donnee)),
+        auteur: monPoste()
+    }));
+
+    const numeros = await window.publierEvenementsCombat(window.ID_PARTIE_COURANTE, evenements);
+    if (window.monHerosJoue()) numeros.forEach(n => { window.EVENEMENTS_DEJA_VUS[n] = true; });
+    return numeros;
+};
+
 // =========================================================================
 //  LA RELECTURE, DANS L'ORDRE DES NUMÉROS
 // =========================================================================
@@ -497,14 +533,19 @@ window.etatSequenceTour = function() {
     if (window.JOURNAL_INDISPONIBLE) return { message: "", okVisible: false, forcerVisible: false, masquee: true };
 
     if (window.monHerosJoue()) return null;      // à moi de jouer : plateau dégagé
-    const tete = window.acteurCourantCombat();
-    if (!tete) return null;
 
-    const enAttente = window.evenementsEnAttente();
-    if (enAttente > 0 || lecteurEnCours) {
-        return { message: "", okVisible: false, forcerVisible: false, masquee: true };
-    }
-    return { message: "Le tour se joue…", okVisible: false, forcerVisible: false };
+    // LE RESTE DU TEMPS, LE PLATEAU EST DÉGAGÉ AUSSI. La fenêtre sombre n'a qu'un
+    // seul rôle : annoncer un tour avant de le dérouler. Tant qu'il n'y a rien
+    // à annoncer — pendant qu'un tour se rejoue, pendant qu'une créature
+    // réfléchit, pendant qu'un joueur lointain choisit sa carte — elle n'a rien
+    // à faire là.
+    //
+    // Elle restait autrefois posée en annonçant « le tour se joue… » dès que ce
+    // n'était pas notre héros, c'est-à-dire presque tout le temps. Le moindre
+    // grain de sable ailleurs, et on se retrouvait devant un écran noir figé
+    // sur un tour qui ne venait pas, sans rien pouvoir faire ni même regarder.
+    // Un plateau visible, lui, ne peut pas se bloquer.
+    return { message: "", okVisible: false, forcerVisible: false, masquee: true };
 };
 
 // La séquence, telle que l'affichage la lit (combat.js). Il n'y a plus d'objet
