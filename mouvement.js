@@ -545,10 +545,36 @@ window.validerMouvement = async function() {
             } };
         });
 
-        // Le trajet entre aussi dans le SCRIPT du tour : c'est de là que les
-        // autres postes le rejoueront, dans l'ordre, après le OK doré.
+        // =================================================================
+        //  UN HEXAGONE = UN NUMÉRO DU JOURNAL
+        // =================================================================
+        //  Le trajet entier tenait autrefois dans un seul événement. C'était
+        //  fragile de bout en bout : un poste qui le rejouait en retard partait
+        //  d'une case qui n'était plus la bonne, une animation interrompue en
+        //  son milieu laissait le pion nulle part, et rien ne disait où il en
+        //  était. Chaque PAS est maintenant son propre événement, avec sa case
+        //  de départ ET sa case d'arrivée : c'est une position ABSOLUE, pas un
+        //  décalage. Le rejouer deux fois donne le même résultat que le rejouer
+        //  une fois, et un poste qui reprend au milieu du trajet reprend
+        //  exactement au bon hexagone.
+        //
+        //  Les attaques d'opportunité et les zones franchies voyagent avec le
+        //  pas qui les déclenche — déjà tranchées, jamais rejouées au hasard.
+        //
+        //  L'ORDRE COMPTE : les pas partent dans le journal AVANT que la case
+        //  d'arrivée ne soit écrite sur le plateau. Aucun poste ne peut donc
+        //  voir le pion arrivé sans avoir de quoi l'y amener à pied.
         if (typeof window.consignerEtapeTour === "function") {
-            await window.consignerEtapeTour("mouvement", actionMouvement);
+            for (let i = 0; i < pathAvecAngles.length; i++) {
+                await window.consignerEtapeTour("pas", {
+                    idToken: idPerso,
+                    de: (i === 0 ? hexDepart : pathAvecAngles[i - 1]),
+                    vers: pathAvecAngles[i],
+                    opportunites: opportunitesResolues.filter(o => o.apresEtape === i),
+                    zones: zonesResolues.filter(z => z.apresEtape === i),
+                    timestamp: horodatageMouvement
+                });
+            }
         }
 
         const persoRef = window.refCombattant(idPerso);
@@ -665,8 +691,84 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
     window.ANIMATION_VTT_EN_COURS = false;
     // La marche est finie : le pion redevient gouverné par le réseau.
     if (window.PIONS_EN_MOUVEMENT) delete window.PIONS_EN_MOUVEMENT[actionMouvement.idToken];
-    if (typeof window.appliquerTokensVTT === "function") {
-        window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    if (typeof window.redessinerPions === "function") {
+        window.redessinerPions();
+    }
+};
+
+// =========================================================================
+//  UN SEUL PAS — L'ANIMATION D'UN NUMÉRO DU JOURNAL
+// =========================================================================
+//  Elle ne connaît qu'un hexagone : d'où l'on part, où l'on arrive, et ce qui
+//  se déclenche à ce pas-là. Elle pose d'abord le pion sur sa case de départ
+//  (sans transition, sinon il glisse en diagonale depuis là où il se trouvait),
+//  puis le fait marcher d'une case. Elle est ABSOLUE : la rejouer laisse
+//  toujours le pion sur « vers », quel que soit l'endroit d'où on la lance.
+//
+//  Et surtout, elle ne rend la main qu'une fois le pas VRAIMENT terminé — c'est
+//  ce que le journal attend pour passer au numéro suivant.
+window.jouerAnimationPas = async function(pas) {
+    if (!pas || !pas.vers) return;
+    const tokenDiv = document.getElementById("token-" + pas.idToken);
+    if (!tokenDiv) return;
+
+    window.ANIMATION_VTT_EN_COURS = true;
+    window.PIONS_EN_MOUVEMENT = window.PIONS_EN_MOUVEMENT || {};
+    window.PIONS_EN_MOUVEMENT[pas.idToken] = Date.now();
+    window.DERNIER_MOUVEMENT_ANIME = Math.max(window.DERNIER_MOUVEMENT_ANIME || 0, pas.timestamp || 0);
+
+    try {
+        // 1. Le pion est reposé sur sa case de départ, sans transition.
+        if (pas.de && typeof window.positionnerTokenVTT === "function") {
+            tokenDiv.style.transition = "none";
+            tokenDiv.dataset.q = pas.de.q;
+            tokenDiv.dataset.r = pas.de.r;
+            window.positionnerTokenVTT(tokenDiv, true);
+            void tokenDiv.offsetWidth;   // sinon le navigateur fond ce saut dans le pas
+        }
+
+        // 2. Les attaques d'opportunité se jouent AVANT de quitter la case :
+        //    le personnage est encore au contact.
+        const depart = { q: parseFloat(tokenDiv.dataset.q), r: parseFloat(tokenDiv.dataset.r) };
+        for (const opp of (pas.opportunites || [])) {
+            if (typeof window.jouerAnimationOpportunite === "function") {
+                await window.jouerAnimationOpportunite({ ...opp, hexPosition: depart });
+            }
+        }
+
+        // 3. Le pas lui-même.
+        tokenDiv.style.transition = "left 0.4s linear, top 0.4s linear";
+        const imgMain = tokenDiv.querySelector(".token-img-main");
+        if (imgMain) {
+            imgMain.style.transition = "transform 0.15s ease-out";
+            imgMain.style.transform = "scale(1.12)";
+        }
+        tokenDiv.dataset.q = pas.vers.q;
+        tokenDiv.dataset.r = pas.vers.r;
+        window.positionnerTokenVTT(tokenDiv, true);
+        await new Promise(r => setTimeout(r, 250));
+        if (imgMain) imgMain.style.transform = "scale(1)";
+        await new Promise(r => setTimeout(r, 150));
+
+        // 4. La zone persistante se déclenche une fois ARRIVÉ sur la case.
+        for (const entree of (pas.zones || [])) {
+            for (const res of (entree.resultats || [])) {
+                if (typeof window.jouerAnimationZonePersistante === "function") {
+                    await window.jouerAnimationZonePersistante(res, pas.vers);
+                }
+            }
+        }
+
+        tokenDiv.style.transition = "none";
+        if (imgMain) { imgMain.style.transition = "none"; imgMain.style.transform = ""; }
+    } finally {
+        // Quoi qu'il arrive — une animation d'opportunité qui casse, un pion
+        // retiré du plateau en plein pas —, les verrous se rouvrent. Sans ce
+        // filet, ANIMATION_VTT_EN_COURS restait à true et PLUS AUCUN pion
+        // n'était redessiné de tout le combat.
+        window.ANIMATION_VTT_EN_COURS = false;
+        if (window.PIONS_EN_MOUVEMENT) delete window.PIONS_EN_MOUVEMENT[pas.idToken];
+        if (typeof window.redessinerPions === "function") window.redessinerPions();
     }
 };
 
@@ -725,8 +827,8 @@ window.jouerAnimationBond = async function(data) {
     window.ANIMATION_VTT_EN_COURS = false;
     // La marche est finie : le pion redevient gouverné par le réseau.
     if (window.PIONS_EN_MOUVEMENT) delete window.PIONS_EN_MOUVEMENT[data.idToken];
-    if (typeof window.appliquerTokensVTT === "function") {
-        window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    if (typeof window.redessinerPions === "function") {
+        window.redessinerPions();
     }
 };
 
@@ -805,7 +907,7 @@ window.jouerAnimationPoussee = async function(data) {
     }
 
     window.ANIMATION_VTT_EN_COURS = false;
-    if (typeof window.appliquerTokensVTT === "function") {
-        window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    if (typeof window.redessinerPions === "function") {
+        window.redessinerPions();
     }
 };

@@ -310,11 +310,19 @@ console.log("\n6. LE TOUR D'UN JOUEUR : LUI VOIT TOUT EN DIRECT, LES AUTRES LE R
     A.programmerAnimationTour("mouvement", { idToken: "H1" }, () => {});
     verifier("lui voit son déplacement tout de suite", pc.JOUEES.join(">") === "mouvement");
     verifier("l'autre ne voit rien passer derrière sa fenêtre", A.JOUEES.length === 0);
-    verifier("et son pion garde sa case en attendant le journal",
-             A.PIONS_EN_ATTENTE_SEQUENCE.H1 === true);
 
     await pc.consignerEtapeTour("mouvement", { idToken: "H1", path: [{ q: 0, r: 0 }] });
-    await t.livrer();
+    // Le pion est retenu par l'ÉVÉNEMENT reçu et pas encore rejoué — la liste
+    // se déduit du journal, elle ne se tient pas à la main.
+    await t.livrer({ sansOk: true });
+    verifier("son pion garde sa case tant que l'événement n'est pas rejoué",
+             A.PIONS_EN_ATTENTE_SEQUENCE.H1 === true,
+             `(${JSON.stringify(A.PIONS_EN_ATTENTE_SEQUENCE)})`);
+    await t.toucher();
+    await t.respirer();
+    verifier("et il retrouve la case de la base une fois le trajet rejoué",
+             A.PIONS_EN_ATTENTE_SEQUENCE.H1 === undefined,
+             `(${JSON.stringify(A.PIONS_EN_ATTENTE_SEQUENCE)})`);
 
     verifier("le joueur ne se rejoue pas ce qu'il vient de voir",
              pc.JOUEES.join(">") === "mouvement", `(${pc.JOUEES.join(">")})`);

@@ -56,10 +56,32 @@ window.EVENEMENTS_RECUS = {};
 // rejoue pas, il les a déjà sous les yeux.
 window.EVENEMENTS_DEJA_VUS = {};
 
-// Les pions dont le trajet n'a pas encore été rejoué ici : leur case à l'écran
-// ne doit pas suivre la base, sinon ils se téléportent à l'arrivée avant même
-// d'avoir marché. Lu par positionsProtegees (combat.js).
-window.PIONS_EN_ATTENTE_SEQUENCE = {};
+// LES PIONS QUE LE JOURNAL RETIENT. Leur case à l'écran ne doit pas suivre la
+// base tant que l'événement qui les fait bouger n'a pas été rejoué ICI : sinon
+// ils se téléportent à l'arrivée avant même d'avoir marché.
+//
+// Cette liste ne se tient pas à la main — une liste tenue à la main finit
+// toujours par mentir, on oublie d'y inscrire un pion ou de l'en retirer. Elle
+// se DÉDUIT de ce que le journal a reçu et pas encore joué. Lue par
+// positionsProtegees (combat.js), qui la voit comme un simple objet.
+window.pionsRetenusParLeJournal = function() {
+    const retenus = {};
+    const noter = (ev) => {
+        if (!ev) return;
+        idsConcernes(ev.data || {}).forEach(id => { retenus[id] = true; });
+    };
+    Object.keys(window.EVENEMENTS_RECUS || {}).forEach(n => {
+        if (Number(n) > window.DERNIER_EVENEMENT_JOUE) noter(window.EVENEMENTS_RECUS[n]);
+    });
+    noter(window.EVENEMENT_ATTENDU);
+    noter(window.EVENEMENT_EN_COURS);
+    return retenus;
+};
+Object.defineProperty(window, "PIONS_EN_ATTENTE_SEQUENCE", {
+    configurable: true,
+    get() { return window.pionsRetenusParLeJournal(); },
+    set() {}     // l'ancien code l'effaçait à la main : sans effet, et sans dégât
+});
 
 // Le temps de respiration entre deux événements. Assez pour que l'œil suive,
 // assez court pour que le tour ne traîne pas.
@@ -291,8 +313,8 @@ function rendreLaGarde(garde) {
     if (!rendus) return;
     // Les jauges, les pions et le panneau lisent cette fiche : ils doivent
     // repartir de la valeur rendue, sinon l'écran garde le chiffre du rejeu.
-    if (typeof window.appliquerTokensVTT === "function" && window.TOKENS_VTT_DATA) {
-        try { window.appliquerTokensVTT(window.TOKENS_VTT_DATA); } catch (e) {}
+    if (typeof window.redessinerPions === "function" && window.TOKENS_VTT_DATA) {
+        try { window.redessinerPions(); } catch (e) {}
     }
     if (typeof window.rafraichirAffichageCombat === "function") {
         try { window.rafraichirAffichageCombat(); } catch (e) {}
@@ -300,6 +322,12 @@ function rendreLaGarde(garde) {
 }
 
 const ANIMATIONS = {
+    // UN HEXAGONE, UN NUMÉRO. C'est le grain le plus fin du journal, et le plus
+    // solide : chaque pas porte sa case de départ et sa case d'arrivée, donc une
+    // position absolue. Le rejouer deux fois donne le même résultat, et un poste
+    // qui reprend au milieu d'un trajet reprend au bon hexagone.
+    pas:       (d) => window.jouerAnimationPas && window.jouerAnimationPas(d),
+    // Les trajets d'un seul tenant des parties déjà en cours restent lisibles.
     mouvement: (d) => window.jouerAnimationMouvement && window.jouerAnimationMouvement(d),
     carte:     (d) => window.jouerAnimationMoteur && window.jouerAnimationMoteur(d),
     bond:      (d) => window.jouerAnimationBond && window.jouerAnimationBond(d),
@@ -403,8 +431,11 @@ window.lireJournalCombat = async function() {
         }
     } finally {
         lecteurEnCours = false;
-        // Tout est rejoué : les pions retrouvent la case que dit la base.
-        if (window.evenementsEnAttente() === 0) window.PIONS_EN_ATTENTE_SEQUENCE = {};
+        // Tout est rejoué : plus rien ne retient les pions, ils retrouvent la
+        // case que dit la base. Un dernier redessin le rend visible.
+        if (window.evenementsEnAttente() === 0 && typeof window.redessinerPions === "function") {
+            try { window.redessinerPions(); } catch (e) {}
+        }
         if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
     }
 };
@@ -518,9 +549,9 @@ window.programmerAnimationTour = function(nom, action, fn) {
     // base en sortent. La taire, c'était un tour où il ne se passait rien.
     if (nom === "carte" && window.jeJoueCeTour()) return window.filerAnimation(nom, fn);
 
-    // Tout le reste attend son numéro. Le pion concerné garde sa case à l'écran.
-    if (action && action.idToken) window.PIONS_EN_ATTENTE_SEQUENCE[action.idToken] = true;
-    if (action && action.idCible) window.PIONS_EN_ATTENTE_SEQUENCE[action.idCible] = true;
+    // Tout le reste attend son numéro. Le pion concerné garde sa case à l'écran
+    // — c'est l'événement pas encore rejoué qui le retient, il n'y a rien à
+    // inscrire nulle part (voir pionsRetenusParLeJournal).
     return Promise.resolve();
 };
 
@@ -549,6 +580,24 @@ window.jouerSequenceTour = function() {
 //  tout le monde : le journal numéroté suffit, et deux appareils qui ont lu les
 //  mêmes numéros sont au même point. Ces fonctions restent, vides, parce que le
 //  reste du jeu les appelle encore.
+// LE COMBAT EST FINI (ou repart de zéro) : ce poste oublie tout du journal et
+// se rebranchera au prochain passage. Appelé par viderJournalCombat (app.js),
+// qui efface les documents et remet le compteur à zéro.
+window.oublierJournalCombat = function() {
+    if (typeof arreterEcoute === "function") { try { arreterEcoute(); } catch (e) {} }
+    arreterEcoute = null;
+    partieEcoutee = null;              // force un rebranchement propre
+    window.DERNIER_EVENEMENT_JOUE = 0;
+    window.EVENEMENTS_RECUS = {};
+    window.EVENEMENTS_DEJA_VUS = {};
+    window.EVENEMENT_ATTENDU = null;
+    window.EVENEMENT_EN_COURS = null;
+    tourAcquitte = null;
+    attenteDepuis = 0;
+    if (typeof window.redessinerPions === "function") { try { window.redessinerPions(); } catch (e) {} }
+    if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
+};
+
 window.sequenceRetientFinDeTour = async function() { return false; };
 window.sequenceTourEnAttente = function() { return false; };
 window.forcerSequenceTour = async function() {};

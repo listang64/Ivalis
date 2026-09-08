@@ -909,7 +909,7 @@ window.detruireIllusion = async function(idIllusion) {
         ["Tokens." + idIllusion]: deleteField()
     }).catch(e => console.error("Retrait du pion illusion :", e));
 
-    if (typeof window.appliquerTokensVTT === "function") window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    if (typeof window.redessinerPions === "function") window.redessinerPions();
     if (typeof window.afficherPisteInitiative === "function") window.afficherPisteInitiative();
 };
 
@@ -3440,7 +3440,7 @@ window.jouerAnimationMoteur = async function(action) {
                         }
 
                         // Force le rafraîchissement immédiat du VTT pour afficher le halo bleu
-                        if (typeof window.appliquerTokensVTT === "function") window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+                        if (typeof window.redessinerPions === "function") window.redessinerPions();
 
                         if (jeSuisLAuteur) {
                             updateDoc(window.refCombattant(idCible), {
@@ -3677,8 +3677,8 @@ jaugeContainer.className = "jauge-flash-token";
                                     setTimeout(() => {
                                         jaugeContainer.remove();
                                         // Si le bouclier est détruit, on efface le halo !
-                                        if (shieldDestroyed && typeof window.appliquerTokensVTT === "function") {
-                                            window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+                                        if (shieldDestroyed && typeof window.redessinerPions === "function") {
+                                            window.redessinerPions();
                                         }
                                     }, 300);
                                 }, 1500);

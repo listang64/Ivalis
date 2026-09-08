@@ -643,11 +643,39 @@ window.PIONS_EN_MOUVEMENT = window.PIONS_EN_MOUVEMENT || {};
 // trajet dont la case d'arrivée est arrivée avant l'ordre d'animer.
 window.DERNIER_MOUVEMENT_ANIME = 0;
 
+// LE SEUL REDESSIN AUTORISÉ PENDANT UN COMBAT. appliquerTokensVTT dessine ce
+// qu'on lui donne, sans se poser de question : l'appeler avec les cases brutes
+// de la base pose chaque pion là où la BASE le croit — donc à l'arrivée d'un
+// trajet que cet écran n'a pas encore rejoué. C'était ça, le pion qui « se
+// téléporte n'importe où » : pas une animation ratée, un redessin de trop.
+// Ici, les cases passent d'abord par positionsProtegees.
+window.redessinerPions = function(source) {
+    if (typeof window.appliquerTokensVTT !== "function") return;
+    const brut = source || window.TOKENS_VTT_DATA || {};
+    const mouvement = (window.PARTIE_DATA || {}).Mouvement_En_Cours;
+    window.appliquerTokensVTT(window.positionsProtegees(brut, mouvement));
+};
+
 window.positionsProtegees = function(tokensRecus, mouvementEnCours) {
     const recus = tokensRecus ? JSON.parse(JSON.stringify(tokensRecus)) : {};
     const locaux = window.TOKENS_VTT_DATA || {};
+
+    // OÙ EST LE PION, VRAIMENT ? Sur l'ÉCRAN — c'est-à-dire dans le data-q /
+    // data-r de son élément, que l'animation déplace case par case. On lisait
+    // autrefois TOKENS_VTT_DATA, mais celui-ci porte désormais la vérité de la
+    // BASE : protéger un pion en le recopiant depuis la base revenait à ne pas
+    // le protéger du tout. Pire, l'ancienne version rangeait la position
+    // protégée DANS TOKENS_VTT_DATA : la case d'arrivée n'était plus notée
+    // nulle part, et le pion revenait à son point de départ dès que le trajet
+    // était rejoué. C'était ça, le pion qui « se déplace n'importe où ».
     const garder = (id) => {
-        if (recus[id] && locaux[id]) recus[id] = { ...recus[id], q: locaux[id].q, r: locaux[id].r };
+        if (!recus[id]) return;
+        const div = typeof document !== "undefined" ? document.getElementById("token-" + id) : null;
+        if (div && div.dataset && div.dataset.q !== undefined && div.dataset.q !== "") {
+            recus[id] = { ...recus[id], q: parseFloat(div.dataset.q), r: parseFloat(div.dataset.r) };
+        } else if (locaux[id]) {
+            recus[id] = { ...recus[id], q: locaux[id].q, r: locaux[id].r };
+        }
     };
 
     // Aucune animation légitime ne dépasse ce délai (déjà la limite retenue par
@@ -674,11 +702,15 @@ window.positionsProtegees = function(tokensRecus, mouvementEnCours) {
         garder(mouvementEnCours.idToken);
     }
 
-    // 3. Et ceux dont le trajet dort dans la fenêtre de tour, en attendant que
-    //    ce poste appuie sur OK. Là, aucune expiration : ce n'est plus une
-    //    animation qui traîne mais une attente VOULUE, qui dure aussi longtemps
-    //    qu'il le faut (un joueur parti chercher un café). Le rejeu vide la
-    //    liste tout seul, donc elle ne peut pas rester coincée.
+    // 3. Et ceux qu'un événement du journal n'a pas encore fait bouger ICI.
+    //    Cette liste n'est pas tenue à la main : elle se DÉDUIT des événements
+    //    reçus et pas encore rejoués (voir pionsRetenusParLeJournal, dans
+    //    sequence_tour.js). Une liste tenue à la main finissait toujours par
+    //    mentir — on oubliait d'y inscrire un pion, ou de l'en retirer.
+    //    Aucune expiration ici : ce n'est pas une animation qui traîne, c'est
+    //    une attente VOULUE, qui dure le temps qu'il faut (un joueur parti
+    //    chercher un café). Elle se vide d'elle-même quand le journal est à
+    //    jour, donc elle ne peut pas rester coincée.
     Object.keys(window.PIONS_EN_ATTENTE_SEQUENCE || {}).forEach(garder);
 
     return recus;
@@ -1315,10 +1347,18 @@ window.ecouterTerrainVTT = function() {
                 // l'animation le ramenait au départ pour rejouer son trajet —
                 // avec, au passage, la mise en scène des attaques
                 // d'opportunité qu'il venait pourtant de subir.
-                window.TOKENS_VTT_DATA = window.positionsProtegees(data.Tokens, data.Mouvement_En_Cours);
-                if (typeof window.appliquerTokensVTT === "function") {
-                    window.appliquerTokensVTT(data.Tokens);
-                }
+                // DEUX CHOSES DIFFÉRENTES, ET C'EST TOUT LE POINT :
+                //  — TOKENS_VTT_DATA porte la VÉRITÉ DE LA BASE. C'est elle que
+                //    lisent les portées, les cases occupées, le calcul de
+                //    chemin : ce qui doit raisonner juste, même quand l'écran
+                //    est en retard.
+                //  — l'ÉCRAN, lui, garde le pion là où il est tant que le
+                //    journal ne l'a pas fait marcher ici (redessinerPions).
+                // Ranger la position protégée dans TOKENS_VTT_DATA, comme
+                // avant, effaçait la case d'arrivée : le pion revenait à son
+                // point de départ sitôt le trajet rejoué.
+                window.TOKENS_VTT_DATA = data.Tokens || {};
+                if (typeof window.redessinerPions === "function") window.redessinerPions();
             } else {
                 window.TOKENS_VTT_DATA = {};
                 if (typeof window.appliquerTokensVTT === "function") window.appliquerTokensVTT({});
@@ -4138,6 +4178,15 @@ window.reinitialiserCombat = async function() {
                 // l'autre.
                 Reinitialisation_En_Cours: Date.now()
             });
+
+            // LE JOURNAL DU COMBAT PRÉCÉDENT N'A PLUS RIEN À RACONTER. On
+            // l'efface et on remet son compteur à zéro dans la foulée : sans
+            // ça, le combat suivant démarrerait avec des centaines de numéros
+            // derrière lui, et un poste qui rejoint rejouerait une bataille qui
+            // n'existe plus.
+            if (typeof window.viderJournalCombat === "function") {
+                await window.viderJournalCombat(window.ID_PARTIE_COURANTE);
+            }
             if (window.PARTIE_DATA) {
                 delete window.PARTIE_DATA.Spawn_Allies;
                 delete window.PARTIE_DATA.Spawn_Ennemis;

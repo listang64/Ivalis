@@ -266,6 +266,14 @@ window.verifierVictoireCombat = function() {
     if (!heroVivant) return;
 
     if (typeof window.demarrerButin === "function") window.demarrerButin();
+
+    // LE COMBAT EST GAGNÉ : son journal est clos. On l'efface (et on remet son
+    // compteur à zéro) pour que la rencontre suivante reparte d'une page
+    // blanche. Un seul poste y arrivera le premier, les autres trouveront un
+    // journal déjà vide — c'est sans conséquence, l'effacement est idempotent.
+    if (typeof window.viderJournalCombat === "function") {
+        window.viderJournalCombat(window.ID_PARTIE_COURANTE);
+    }
 };
 
 // Pose le butin en base : un jet de deux objets par héros, sous transaction

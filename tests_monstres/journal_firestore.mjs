@@ -102,7 +102,12 @@ function firestoreExigeant(options = {}) {
     const notifier = () => ecoutes.forEach(e =>
         e.rappel({ docs: documentsDe(e.q).map(data => ({ data: () => data })) }));
 
-    const setDoc = async (ref, data) => { base[ref.chemin] = JSON.parse(JSON.stringify(data)); notifier(); };
+    const setDoc = async (ref, data) => {
+        const copie = JSON.parse(JSON.stringify(data));
+        Object.defineProperty(copie, "__id", { value: ref.chemin.split("/").pop(), enumerable: false });
+        base[ref.chemin] = copie;
+        notifier();
+    };
     const getDoc = async (ref) => ({
         exists: () => !!base[ref.chemin],
         data: () => base[ref.chemin]
@@ -111,18 +116,35 @@ function firestoreExigeant(options = {}) {
         get: async (ref) => ({ exists: () => !!base[ref.chemin], data: () => base[ref.chemin] }),
         update: (ref, maj) => { Object.assign(base[ref.chemin], maj); }
     });
+    const updateDoc = async (ref, maj) => { Object.assign(base[ref.chemin] || (base[ref.chemin] = {}), maj); };
+    const limit = (n) => ({ type: "limit", n });
+    const getDocs = async (q) => {
+        let docs = documentsDe(q).map(data => ({ ref: { chemin: q.coll.chemin + "/" + data.__id }, data: () => data }));
+        const borne = q.contraintes.find(c => c.type === "limit");
+        if (borne) docs = docs.slice(0, borne.n);
+        return { docs, size: docs.length, empty: docs.length === 0 };
+    };
+    const writeBatch = () => {
+        const suppressions = [];
+        return {
+            delete: (ref) => suppressions.push(ref.chemin),
+            commit: async () => suppressions.forEach(c => { delete base[c]; })
+        };
+    };
 
-    return { base, requetes, api: { doc, collection, where, orderBy, query, onSnapshot, setDoc, getDoc, runTransaction } };
+    return { base, requetes, api: { doc, collection, where, orderBy, limit, query, onSnapshot,
+                                    setDoc, getDoc, getDocs, updateDoc, writeBatch, runTransaction } };
 }
 
 function chargerJournal(monde) {
     const w = { PARTIE_DATA: {}, ID_PARTIE_COURANTE: "P1" };
     const a = monde.api;
-    new Function('window', 'db', 'doc', 'collection', 'query', 'where', 'orderBy',
-                 'onSnapshot', 'setDoc', 'getDoc', 'runTransaction', 'COL',
-                 SRC_JOURNAL)(
-        w, {}, a.doc, a.collection, a.query, a.where, a.orderBy,
-        a.onSnapshot, a.setDoc, a.getDoc, a.runTransaction, { PARTIES: "Systeme_Parties" });
+    new Function('window', 'db', 'doc', 'collection', 'query', 'where', 'orderBy', 'limit',
+                 'onSnapshot', 'setDoc', 'getDoc', 'getDocs', 'updateDoc', 'writeBatch',
+                 'runTransaction', 'COL', SRC_JOURNAL)(
+        w, {}, a.doc, a.collection, a.query, a.where, a.orderBy, a.limit,
+        a.onSnapshot, a.setDoc, a.getDoc, a.getDocs, a.updateDoc, a.writeBatch,
+        a.runTransaction, { PARTIES: "Systeme_Parties" });
     return w;
 }
 
@@ -219,6 +241,46 @@ console.log("\n3. JOURNAL HORS SERVICE : LE COMBAT RESTE REGARDABLE");
     w.programmerAnimationTour("mouvement", { idToken: "M1" }, () => {});
     verifier("et les animations reprennent l'ancien chemin", w.JOUEES.join(">") === "mouvement",
              `(${w.JOUEES.join(">")})`);
+}
+
+// =========================================================================
+console.log("\n4. FINIR OU RÉINITIALISER UN COMBAT VIDE LE JOURNAL");
+// =========================================================================
+//  Un journal est l'histoire d'UN combat. S'il survit à la victoire ou à une
+//  réinitialisation, la rencontre suivante démarre avec des centaines de
+//  numéros derrière elle — et un poste qui rejoint rejoue une bataille qui
+//  n'existe plus.
+{
+    const monde = firestoreExigeant();
+    const w = chargerJournal(monde);
+    monde.base["Systeme_Parties/P1"] = { Compteur_Evenements: 0 };
+    console.error = () => {};
+
+    for (let i = 0; i < 7; i++) await w.publierEvenementCombat("P1", { type: "pas", acteur: "M1" });
+    w.DERNIER_EVENEMENT_JOUE = 7;
+    w.EVENEMENTS_RECUS = { 8: { n: 8 } };
+    let oubli = 0;
+    w.oublierJournalCombat = () => { oubli++; };
+
+    verifier("sept événements écrits, compteur à sept",
+             Object.keys(monde.base).filter(c => c.includes("Evenements_Combat")).length === 7
+             && monde.base["Systeme_Parties/P1"].Compteur_Evenements === 7);
+
+    const effaces = await w.viderJournalCombat("P1");
+
+    verifier("le ménage efface tous les documents", effaces === 7
+             && Object.keys(monde.base).filter(c => c.includes("Evenements_Combat")).length === 0,
+             `(${effaces} effacé(s))`);
+    verifier("et remet le compteur à zéro dans la foulée",
+             monde.base["Systeme_Parties/P1"].Compteur_Evenements === 0);
+    verifier("le poste repart lui aussi de zéro, sans attendre la base",
+             w.DERNIER_EVENEMENT_JOUE === 0 && Object.keys(w.EVENEMENTS_RECUS).length === 0);
+    verifier("et le lecteur est prévenu qu'il doit tout oublier", oubli === 1);
+
+    // Deux postes détectent la victoire au même instant : le second ne doit
+    // pas s'étrangler sur un journal déjà vide.
+    const encore = await w.viderJournalCombat("P1");
+    verifier("un second ménage sur un journal déjà vide ne casse rien", encore === 0);
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

@@ -28,6 +28,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
   onSnapshot,
   deleteField,
   writeBatch,
@@ -471,6 +472,41 @@ window.lireEvenementCombat = async function(idPartie, n) {
     } catch (e) {
         console.error("Lecture d'un événement de combat :", e);
         return null;
+    }
+};
+
+// LE MÉNAGE DE FIN DE COMBAT. Un journal est l'histoire d'UN combat : quand
+// celui-ci s'achève (victoire) ou repart de zéro (réinitialisation), il n'a plus
+// rien à raconter. On l'efface et on remet le compteur à zéro dans la MÊME
+// opération : un poste ne peut donc pas trouver un compteur à 200 devant un
+// journal vide, et se croire en retard de deux cents événements pour toujours.
+window.viderJournalCombat = async function(idPartie) {
+    const partie = idPartie || window.ID_PARTIE_COURANTE;
+    if (!partie) return 0;
+    try {
+        let effaces = 0;
+        // Par paquets : un long combat laisse facilement plusieurs centaines de
+        // numéros, et une écriture groupée Firestore en accepte 500 à la fois.
+        for (let garde = 0; garde < 40; garde++) {
+            const snap = await getDocs(query(collEvenements(partie), orderBy("n", "asc"), limit(400)));
+            if (snap.empty) break;
+            const lot = writeBatch(db);
+            snap.docs.forEach(d => lot.delete(d.ref));
+            await lot.commit();
+            effaces += snap.size;
+            if (snap.size < 400) break;
+        }
+        await updateDoc(doc(db, COL.PARTIES, partie), { Compteur_Evenements: 0 });
+        // Ce poste-ci repart aussi de zéro, sans attendre la notification.
+        window.DERNIER_EVENEMENT_JOUE = 0;
+        window.EVENEMENTS_RECUS = {};
+        window.EVENEMENTS_DEJA_VUS = {};
+        window.EVENEMENT_ATTENDU = null;
+        if (typeof window.oublierJournalCombat === "function") window.oublierJournalCombat();
+        return effaces;
+    } catch (e) {
+        console.error("Ménage du journal de combat :", e);
+        return 0;
     }
 };
 

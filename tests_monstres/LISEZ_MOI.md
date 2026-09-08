@@ -60,6 +60,7 @@ node piste_initiative.mjs   # la piste tient à droite du panneau, bulles rédui
 node fenetre_tour.mjs       # la fenêtre de tour : nom coloré, effets détaillés, zone dessinée
 node sequence_tour.mjs      # le journal d'événements : ordre, trous, rattrapage
 node journal_firestore.mjs  # la plomberie du journal face aux règles d'index de Firestore
+node deplacement_journal.mjs # un hexagone = un numéro : publication, ordre, absence de chevauchement
 node deplacement_repris.mjs # repartir en cours de tour, sans remise à zéro du barème
 node points_apparition.mjs  # les deux repères d'apparition, et la dispersion des pions
 node reinit_plateau.mjs     # la réinitialisation vide le plateau, puis enchaîne le déploiement
@@ -154,6 +155,39 @@ rien à créer. `journal_firestore.mjs` charge le vrai code d'app.js et lui pré
 un Firestore qui applique cette règle-là. Il vérifie aussi le filet de sécurité :
 si le journal tombe pour une autre raison — droits, réseau —, la fenêtre s'efface
 et les animations reprennent leur ancien chemin, plutôt qu'un plateau figé.
+
+**Un hexagone, un numéro.** Un trajet entier tenait au départ dans UN seul
+événement, et c'était fragile de bout en bout : un poste qui le rejouait en
+retard partait d'une case qui n'était plus la bonne, une animation coupée en son
+milieu laissait le pion nulle part, et rien ne disait où il en était. Chaque
+**pas** est maintenant son propre numéro, avec sa case de départ ET sa case
+d'arrivée — donc une position ABSOLUE : le rejouer deux fois donne le même
+résultat, et un poste qui reprend au milieu d'un trajet reprend au bon hexagone.
+Les pas partent dans le journal AVANT que la case d'arrivée ne soit écrite sur le
+plateau, si bien que personne ne peut voir le pion arrivé sans avoir de quoi l'y
+amener à pied. Le lecteur les joue un par un et n'entame jamais le suivant avant
+la fin du précédent (`deplacement_journal.mjs`).
+
+**Où est le pion, vraiment ?** Deux choses différentes, et c'est tout le point :
+`TOKENS_VTT_DATA` porte la VÉRITÉ DE LA BASE — c'est elle que lisent les portées,
+les cases occupées, le calcul de chemin ; l'ÉCRAN, lui, garde le pion là où il
+est tant que le journal ne l'a pas fait marcher ici. L'ancienne version rangeait
+la position PROTÉGÉE dans `TOKENS_VTT_DATA` : la case d'arrivée n'était alors
+notée nulle part, et le pion revenait à son point de départ sitôt le trajet
+rejoué, avant de resauter en avant à la notification suivante. C'était ça, le
+pion qui « se déplace n'importe où ». La position d'écran se lit désormais sur
+l'élément lui-même (`data-q` / `data-r`), et le seul redessin autorisé passe par
+`redessinerPions()`, qui applique la protection — appeler `appliquerTokensVTT`
+avec les cases brutes reposait chaque pion là où la base le croyait.
+
+**La liste des pions retenus ne se tient plus à la main** : elle se DÉDUIT des
+événements reçus et pas encore rejoués. Une liste tenue à la main finit toujours
+par mentir — on oublie d'y inscrire un pion, ou de l'en retirer.
+
+**Le journal se vide à la fin du combat** (victoire) et à la réinitialisation,
+documents et compteur dans la même opération : sans quoi la rencontre suivante
+démarrerait avec des centaines de numéros derrière elle, et un poste qui rejoint
+rejouerait une bataille qui n'existe plus.
 
 Cinq pièges refermés en chemin, tous vérifiés par `sequence_tour.mjs` :
 
