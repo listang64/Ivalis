@@ -72,6 +72,14 @@ window.REJEU_SCRIPT_EN_COURS = false;
 window.ETAT_AVANT_REJEU = null;
 window.EVENEMENT_EN_COURS = null;
 
+// LE TEMPS DE LIRE. Le premier événement d'un tour qu'on n'a pas joué soi-même
+// est retenu ici : la fenêtre sombre montre le combattant et sa technique, et
+// rien ne bouge tant que le joueur n'a pas touché l'écran. C'est une attente
+// PUREMENT LOCALE — aucun poste n'attend un autre, chacun lit à son rythme et
+// rattrape ensuite les numéros qui se sont accumulés.
+window.EVENEMENT_ATTENDU = null;
+let tourAcquitte = null;
+
 let lecteurEnCours = false;
 let arreterEcoute = null;
 let partieEcoutee = null;
@@ -102,13 +110,22 @@ window.jeJoueCeTour = function(partie) {
     return !estCreature && !!perso && perso.idJoueur === monPoste();
 };
 
-window.monHerosJoue = function(partie) {
-    const tete = window.acteurCourantCombat(partie);
-    if (!tete) return false;
-    const perso = (window.PERSOS_PARTIE || []).find(x => x.idPersonnage === tete.idPersonnage);
-    const estCreature = (typeof window.estMonstre === "function" && window.estMonstre(tete.idPersonnage))
+// « Ce combattant est-il MON héros ? » — posé sur un identifiant, et non sur la
+// tête de file : un poste en retard rejoue le tour d'un autre pendant que la
+// file, elle, est déjà passée à la suite. Se fier à la file lui ferait lever la
+// fenêtre au mauvais moment.
+function estMonHeros(idPersonnage) {
+    if (!idPersonnage) return false;
+    const perso = (window.PERSOS_PARTIE || []).find(x => x.idPersonnage === idPersonnage);
+    const estCreature = (typeof window.estMonstre === "function" && window.estMonstre(idPersonnage))
                         || !!(perso && perso.estMonstre);
     return !estCreature && !!perso && perso.idJoueur === monPoste();
+}
+window.estMonHerosCombat = estMonHeros;
+
+window.monHerosJoue = function(partie) {
+    const tete = window.acteurCourantCombat(partie);
+    return tete ? estMonHeros(tete.idPersonnage) : false;
 };
 
 // =========================================================================
@@ -160,6 +177,11 @@ window.consignerEtapeTour = async function(type, donnee) {
         type,
         acteur: acteur ? acteur.idPersonnage : null,
         idCarte: acteur ? acteur.idCarte : null,
+        // Le numéro de manche : avec l'acteur, il identifie LE TOUR. C'est lui
+        // qui dit à la relecture « ceci ouvre un nouveau tour, laisse le temps
+        // de le lire » — sans quoi un combattant qui rejoue deux manches de
+        // suite n'aurait droit qu'à un seul OK.
+        tour: (window.PARTIE_DATA || {}).Tour_Combat || 0,
         data: JSON.parse(JSON.stringify(donnee || {})),
         avant: valeursAvant(idsConcernes(donnee)),
         auteur: monPoste()
@@ -193,6 +215,10 @@ const ANIMATIONS = {
     peur:      (d) => window.jouerAnimationPeur && window.jouerAnimationPeur(d)
 };
 
+// L'identité d'un TOUR : la manche et celui qui agit. Tous les événements d'un
+// même tour la partagent ; le premier à la présenter ouvre le tour.
+const cleTour = (ev) => ev ? ((ev.tour === undefined ? "" : ev.tour) + "|" + (ev.acteur || "")) : null;
+
 // Combien d'événements attendent encore d'être rejoués ici.
 window.evenementsEnAttente = function() {
     return Object.keys(window.EVENEMENTS_RECUS)
@@ -204,6 +230,10 @@ window.lireJournalCombat = async function() {
     lecteurEnCours = true;
     try {
         while (true) {
+            // La fenêtre est ouverte et le joueur n'a pas encore touché
+            // l'écran : rien ne se déroule derrière son dos.
+            if (window.EVENEMENT_ATTENDU) break;
+
             const suivant = window.DERNIER_EVENEMENT_JOUE + 1;
             let ev = window.EVENEMENTS_RECUS[suivant];
 
@@ -231,16 +261,31 @@ window.lireJournalCombat = async function() {
             }
             attenteDepuis = 0;
 
+            const dejaVu = !!window.EVENEMENTS_DEJA_VUS[suivant];
+            const jouer = ANIMATIONS[ev.type];
+
+            // === LE TEMPS DE LIRE LA TECHNIQUE ===============================
+            // Premier événement d'un tour que ce poste va DÉCOUVRIR : on retient
+            // tout, la fenêtre sombre annonce le combattant et la compétence qui
+            // va se dérouler, et le OK doré clignote. Le tour ne commence qu'au
+            // toucher. On ne consomme surtout pas l'événement : il est rejoué
+            // entier après le OK.
+            if (!dejaVu && jouer && ev.acteur && !estMonHeros(ev.acteur) && cleTour(ev) !== tourAcquitte) {
+                window.EVENEMENT_ATTENDU = ev;
+                window.EVENEMENTS_RECUS[suivant] = ev;
+                if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
+                break;
+            }
+
             window.DERNIER_EVENEMENT_JOUE = suivant;
             delete window.EVENEMENTS_RECUS[suivant];
 
             // Déjà vu en direct par ce poste : on avance le curseur, c'est tout.
-            if (window.EVENEMENTS_DEJA_VUS[suivant]) {
+            if (dejaVu) {
                 delete window.EVENEMENTS_DEJA_VUS[suivant];
                 continue;
             }
 
-            const jouer = ANIMATIONS[ev.type];
             if (!jouer) continue;
 
             // La fenêtre annonce le combattant de L'ÉVÉNEMENT qu'on rejoue, pas
@@ -283,6 +328,8 @@ window.suivreSequenceTour = function(partie) {
             ? window.dernierNumeroEvenement(p) : 0;
         window.EVENEMENTS_RECUS = {};
         window.EVENEMENTS_DEJA_VUS = {};
+        window.EVENEMENT_ATTENDU = null;
+        tourAcquitte = null;
 
         if (typeof window.ecouterEvenementsCombat === "function") {
             arreterEcoute = window.ecouterEvenementsCombat(
@@ -302,10 +349,19 @@ window.suivreSequenceTour = function(partie) {
 // =========================================================================
 //  CE QUE LA FENÊTRE DOIT MONTRER
 // =========================================================================
-//  Elle n'attend plus personne : chaque écran rejoue pour lui, à son rythme.
-//  Elle dit seulement qui agit, avec quoi — et, tant qu'il reste des
-//  événements à rejouer, qu'il en reste.
+//  Elle n'attend AUCUN autre poste : chaque écran lit le journal pour lui seul.
+//  Elle a deux visages :
+//   — un tour va s'ouvrir : le nom, les états, la technique, ses effets, sa
+//     zone, et le OK doré. Le joueur lit, puis touche l'écran.
+//   — le tour se déroule : elle s'efface pour laisser voir les animations.
 window.etatSequenceTour = function() {
+    // Un tour attend d'être lu : le OK passe avant tout le reste, y compris
+    // avant ma propre entrée en scène — sinon un poste en retard verrait son
+    // plateau se dégager sur un tour qu'il n'a pas encore vu.
+    if (window.EVENEMENT_ATTENDU) {
+        return { message: "Touchez l'écran pour voir ce tour", okVisible: true, forcerVisible: false };
+    }
+
     if (window.monHerosJoue()) return null;      // à moi de jouer : plateau dégagé
     const tete = window.acteurCourantCombat();
     if (!tete) return null;
@@ -322,11 +378,12 @@ window.etatSequenceTour = function() {
 Object.defineProperty(window, "SEQUENCE_TOUR", {
     configurable: true,
     get() {
-        // En pleine relecture, c'est l'événement qui commande : un poste en
-        // retard doit annoncer le combattant qu'il est en train de montrer.
-        const ev = window.EVENEMENT_EN_COURS;
+        // En pleine relecture — ou devant un tour retenu par le OK —, c'est
+        // l'ÉVÉNEMENT qui commande : un poste en retard doit annoncer le
+        // combattant qu'il montre, pas celui que la file a déjà désigné.
+        const ev = window.EVENEMENT_EN_COURS || window.EVENEMENT_ATTENDU;
         if (ev && ev.acteur) {
-            return { acteur: ev.acteur, idCarte: ev.idCarte, voile: !window.monHerosJoue() };
+            return { acteur: ev.acteur, idCarte: ev.idCarte, evenement: true, voile: !estMonHeros(ev.acteur) };
         }
         const tete = window.acteurCourantCombat();
         if (!tete) return null;
@@ -360,14 +417,31 @@ window.programmerAnimationTour = function(nom, action, fn) {
 };
 
 // =========================================================================
+//  LE OK : « J'AI LU, VAS-Y »
+// =========================================================================
+//  Un clic n'importe où sur la fenêtre. Il ne prévient personne et n'attend
+//  personne : il ouvre le tour SUR CET ÉCRAN. Deux postes peuvent très bien
+//  regarder deux tours différents à quelques secondes d'écart — ils rejouent
+//  les mêmes numéros, ils finiront au même point.
+window.jouerSequenceTour = function() {
+    const attendu = window.EVENEMENT_ATTENDU;
+    if (!attendu) return Promise.resolve();
+
+    tourAcquitte = cleTour(attendu);
+    window.EVENEMENT_ATTENDU = null;
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
+    return window.lireJournalCombat();
+};
+
+// =========================================================================
 //  CE QUI A DISPARU AVEC LES BARRIÈRES
 // =========================================================================
-//  Plus de « Check » échangés entre postes, plus de OK doré à cliquer, plus de
-//  file retenue en attendant tout le monde : le journal numéroté suffit, et
-//  deux appareils qui ont lu les mêmes numéros sont au même point. Ces
-//  fonctions restent, vides, parce que le reste du jeu les appelle encore.
+//  Plus de « Check » échangés entre postes, plus de file retenue en attendant
+//  tout le monde : le journal numéroté suffit, et deux appareils qui ont lu les
+//  mêmes numéros sont au même point. Ces fonctions restent, vides, parce que le
+//  reste du jeu les appelle encore.
 window.sequenceRetientFinDeTour = async function() { return false; };
 window.sequenceTourEnAttente = function() { return false; };
-window.jouerSequenceTour = function() { return Promise.resolve(); };
 window.forcerSequenceTour = async function() {};
 window.postesAttendusSequence = function() { return [monPoste()]; };

@@ -396,14 +396,24 @@ const postes = [
   creerPoste("PC-Adrien", monde, { joueur: "P3", heros: "J3" })
 ];
 // Chaque écran rejoue le journal pour lui, à son rythme : il n'y a plus de
-// geste à faire ni de barrière à franchir. On laisse simplement le réseau se
-// calmer plus longtemps, le temps que les relectures s'achèvent.
+// barrière à franchir entre postes. Reste UN geste, purement local : chaque
+// tour s'ouvre sur la fenêtre sombre et son OK, le temps de lire la technique.
+// Ici, trois joueurs très attentifs touchent leur écran sans tarder — et on
+// laisse le réseau se calmer, le temps que les relectures s'achèvent.
 const attendreBrut = monde.attendreLeReseau;
+const toucherLesEcrans = async () => {
+  for (const p of postes) {
+    if (p.w.EVENEMENT_ATTENDU && typeof p.w.jouerSequenceTour === "function") {
+      p.activer();
+      await p.w.jouerSequenceTour();
+    }
+  }
+};
 monde.attendreLeReseau = async (tours = 60, minimum = 0) => {
   await attendreBrut(tours, minimum);
-  const enRetard = () => postes.some(p => typeof p.w.evenementsEnAttente === "function"
-                                          && p.w.evenementsEnAttente() > 0);
-  for (let i = 0; i < 80 && enRetard(); i++) await attendreBrut(20, 40);
+  const enRetard = () => postes.some(p => (typeof p.w.evenementsEnAttente === "function"
+                                           && p.w.evenementsEnAttente() > 0) || p.w.EVENEMENT_ATTENDU);
+  for (let i = 0; i < 80 && enRetard(); i++) { await toucherLesEcrans(); await attendreBrut(20, 40); }
 };
 
 await monde.attendreLeReseau();

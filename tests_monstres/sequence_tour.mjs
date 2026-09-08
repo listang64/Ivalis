@@ -12,7 +12,10 @@
 //     relecture tardive ne retranche pas les dégâts une seconde fois ;
 //   • le poste qui joue son propre héros ne se rejoue pas ce qu'il a vu ;
 //   • un poste qui rejoint un combat en cours ne rejoue pas tout depuis le
-//     début.
+//     début ;
+//   • chaque tour s'ouvre par un OK LOCAL : la fenêtre annonce le combattant
+//     et sa technique, rien ne bouge avant le toucher, et personne n'attend
+//     que les autres postes aient touché le leur.
 import fs from 'fs';
 
 const SRC = fs.readFileSync('/home/user/Ivalis/sequence_tour.js', 'utf-8');
@@ -75,6 +78,24 @@ function table(options = {}) {
         postes[id] = w;
     });
 
+    // Les relectures sont des promesses : on leur laisse le temps.
+    const respirer = async () => { for (let i = 0; i < 60; i++) await dormir(2); };
+
+    // LE DOIGT DU JOUEUR. Un tour qui s'ouvre reste en pose derrière son OK ;
+    // ici on touche l'écran de chaque poste tant qu'il y a un tour à ouvrir.
+    // « sansOk » laisse au contraire les fenêtres ouvertes, pour les vérifier.
+    async function toucher(sauf) {
+        for (let garde = 0; garde < 8; garde++) {
+            let unClic = false;
+            for (const id of Object.keys(postes)) {
+                if (sauf && sauf.includes(id)) continue;
+                if (postes[id].EVENEMENT_ATTENDU) { unClic = true; await postes[id].jouerSequenceTour(); }
+            }
+            if (!unClic) return;
+            await respirer();
+        }
+    }
+
     // Livre les événements en attente. « melange » les délivre à l'envers, pour
     // vérifier qu'un poste ne saute jamais un numéro manquant.
     async function livrer(options2 = {}) {
@@ -87,11 +108,11 @@ function table(options = {}) {
             w.PARTIE_DATA = clone(partie);
             await w.RAPPEL_JOURNAL([clone(journal[l.n])]);
         }
-        // Les relectures sont des promesses : on leur laisse le temps.
-        for (let i = 0; i < 60; i++) await dormir(2);
+        await respirer();
+        if (!options2.sansOk) { await toucher(options2.sauf); await respirer(); }
     }
 
-    async function reveiller(id) {
+    async function reveiller(id, options2 = {}) {
         // Le poste rattrape tout ce qu'il a manqué, d'un coup, comme Firestore
         // le ferait au retour au premier plan.
         const w = postes[id];
@@ -99,7 +120,8 @@ function table(options = {}) {
         const tout = Object.keys(journal).map(Number).sort((a, b) => a - b)
             .filter(n => n > w.DERNIER_EVENEMENT_JOUE).map(n => clone(journal[n]));
         if (w.RAPPEL_JOURNAL) await w.RAPPEL_JOURNAL(tout);
-        for (let i = 0; i < 60; i++) await dormir(2);
+        await respirer();
+        if (!options2.sansOk) { await toucher(Object.keys(postes).filter(p => p !== id)); await respirer(); }
     }
 
     async function brancher() {
@@ -109,7 +131,7 @@ function table(options = {}) {
         }
     }
 
-    return { partie, journal, postes, livrer, reveiller, brancher, livraisons };
+    return { partie, journal, postes, livrer, reveiller, brancher, toucher, respirer, livraisons };
 }
 
 // =========================================================================
@@ -194,7 +216,9 @@ console.log("\n3. LE TROU SE RATTRAPE PAR UNE LECTURE DIRECTE");
     // Passé le court délai d'attente, il va le lire lui-même.
     await dormir(900);
     await A.lireJournalCombat();
-    for (let i = 0; i < 60; i++) await dormir(2);
+    await t.respirer();
+    await t.toucher(["poste-pc", "poste-ipadB"]);
+    await t.respirer();
 
     verifier("puis il le récupère et rejoue les deux dans l'ordre",
              A.JOUEES.join(">") === "mouvement>carte", `(${A.JOUEES.join(">")})`);
@@ -299,6 +323,80 @@ console.log("\n7. REJOINDRE UN COMBAT EN COURS NE REJOUE PAS TOUT LE PASSÉ");
     verifier("et seul l'événement 153 est rejoué",
              A.JOUEES.join(">") === "carte" && A.DERNIER_EVENEMENT_JOUE === 153,
              `(${A.JOUEES.join(">")}, curseur ${A.DERNIER_EVENEMENT_JOUE})`);
+}
+
+// =========================================================================
+console.log("\n8. CHAQUE TOUR S'OUVRE PAR UN OK, ET IL EST PUREMENT LOCAL");
+// =========================================================================
+//  Le joueur doit avoir le temps de LIRE la technique avant de la voir se
+//  dérouler. La fenêtre annonce le combattant et sa carte, le OK clignote, et
+//  rien ne bouge avant le toucher. Mais ce toucher n'engage que cet écran-là :
+//  aucun poste n'attend le doigt d'un autre.
+{
+    const t = table();
+    await t.brancher();
+    const pc = t.postes["poste-pc"], A = t.postes["poste-ipadA"], B = t.postes["poste-ipadB"];
+    pc.IA_MONSTRE_ACTEUR = "M1";
+
+    await pc.consignerEtapeTour("mouvement", { idToken: "M1" });
+    await pc.consignerEtapeTour("carte", { idLanceur: "M1" });
+    await t.livrer({ sansOk: true });
+
+    verifier("le tour reste en pose : rien n'a été joué nulle part",
+             pc.JOUEES.length === 0 && A.JOUEES.length === 0 && B.JOUEES.length === 0,
+             `(${A.JOUEES.join(">")})`);
+    verifier("le premier événement du tour est retenu, pas consommé",
+             A.EVENEMENT_ATTENDU && A.EVENEMENT_ATTENDU.n === 1 && A.DERNIER_EVENEMENT_JOUE === 0);
+    verifier("le OK doré est demandé sur les trois écrans",
+             pc.etatSequenceTour().okVisible && A.etatSequenceTour().okVisible && B.etatSequenceTour().okVisible);
+    verifier("et la fenêtre annonce le combattant et sa technique",
+             A.SEQUENCE_TOUR.acteur === "M1" && A.SEQUENCE_TOUR.idCarte === "CARTE_M" && A.SEQUENCE_TOUR.voile === true);
+
+    // UN SEUL poste touche son écran.
+    await A.jouerSequenceTour();
+    await t.respirer();
+    verifier("celui qui a touché déroule tout son tour",
+             A.JOUEES.join(">") === "mouvement>carte" && A.DERNIER_EVENEMENT_JOUE === 2,
+             `(${A.JOUEES.join(">")})`);
+    verifier("un seul OK suffit pour tout le tour", A.EVENEMENT_ATTENDU === null);
+    verifier("la fenêtre se lève pour laisser voir les animations",
+             A.etatSequenceTour() === null || A.etatSequenceTour().okVisible === false);
+    verifier("les deux autres, eux, attendent encore leur propre doigt",
+             pc.JOUEES.length === 0 && B.JOUEES.length === 0 && !!B.EVENEMENT_ATTENDU);
+
+    await t.toucher(["poste-ipadA"]);
+    await t.respirer();
+    verifier("et quand ils touchent, ils rattrapent le même point",
+             pc.DERNIER_EVENEMENT_JOUE === 2 && B.DERNIER_EVENEMENT_JOUE === 2
+             && B.JOUEES.join(">") === "mouvement>carte");
+
+    // LA MANCHE SUIVANTE : la même créature rejoue, et redemande un OK.
+    t.partie.Tour_Combat = 2;
+    pc.PARTIE_DATA = clone(t.partie);
+    await pc.consignerEtapeTour("carte", { idLanceur: "M1" });
+    await t.livrer({ sansOk: true });
+    verifier("un nouveau tour du même combattant redemande un OK",
+             !!A.EVENEMENT_ATTENDU && A.JOUEES.join(">") === "mouvement>carte");
+    await t.toucher();
+    await t.respirer();
+    verifier("puis il se déroule", A.JOUEES.join(">") === "mouvement>carte>carte", `(${A.JOUEES.join(">")})`);
+}
+
+// =========================================================================
+console.log("\n9. LE JOUEUR DONT C'EST LE TOUR N'A PAS DE OK À DONNER");
+// =========================================================================
+{
+    const t = table({ file: [{ idPersonnage: "H1", idCarte: "CARTE_H", initiative: 70, timestamp: 1100 }] });
+    await t.brancher();
+    const pc = t.postes["poste-pc"], A = t.postes["poste-ipadA"];
+
+    await pc.consignerEtapeTour("mouvement", { idToken: "H1" });
+    await t.livrer({ sansOk: true });
+
+    verifier("son propre tour ne lui est jamais mis en pose", pc.EVENEMENT_ATTENDU === null);
+    verifier("son plateau reste dégagé", pc.etatSequenceTour() === null);
+    verifier("les autres, eux, lisent d'abord sa technique",
+             !!A.EVENEMENT_ATTENDU && A.etatSequenceTour().okVisible === true);
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

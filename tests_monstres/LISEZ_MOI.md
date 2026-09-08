@@ -124,9 +124,18 @@ passe devient un **événement numéroté**, écrit dans sa propre collection :
 Firebase ne synchronise pas l'animation : il synchronise l'ÉVÉNEMENT. Deux
 appareils qui ont lu les mêmes numéros sont forcément au même point.
 
-Ce qui a disparu avec ce modèle : les « Check » échangés entre postes, le OK
-doré à cliquer, et la file retenue en attendant tout le monde. C'est ce qui
-décalait le bouton d'un appareil à l'autre et pouvait figer la table.
+**Le OK d'ouverture de tour.** Le premier événement d'un tour n'est pas joué
+tout de suite : la fenêtre sombre annonce le combattant, ses états, sa technique
+et sa zone, et le gros OK doré clignote. Le joueur a le temps de LIRE ce qui va
+se dérouler sous ses yeux ; le tour ne commence qu'au toucher, et un seul OK
+ouvre tout le tour. Cette attente est **purement locale** : personne n'attend le
+doigt d'un autre poste, chacun ouvre son tour quand il veut et rattrape ensuite
+les numéros accumulés. C'est ce qui distingue ce OK de l'ancien, décalé d'un
+appareil à l'autre parce qu'il attendait tout le monde. Le tour d'un joueur
+n'est jamais mis en pose chez lui : il sait déjà ce qu'il a choisi.
+
+Ce qui a disparu avec ce modèle : les « Check » échangés entre postes et la file
+retenue en attendant tout le monde. C'est ce qui pouvait figer la table.
 
 Trois pièges refermés en chemin, tous vérifiés par `sequence_tour.mjs` :
 

@@ -3763,9 +3763,19 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
     const queue = queueParam !== undefined ? queueParam : (partie.File_Attente_Combat || []);
     const phase = phaseParam !== undefined ? phaseParam : (partie.Phase_Combat || "Preparation");
 
-    const tete = (phase === "Resolution" && queue.length > 0) ? queue[0] : null;
-    if (!tete || tete.idPersonnage !== seq.acteur) return masquer();
-    if (typeof window.estCombattantMort === "function" && window.estCombattantMort(tete.idPersonnage)) return masquer();
+    // Deux sources possibles pour « qui agit ». Quand la fenêtre parle d'un
+    // ÉVÉNEMENT — un tour retenu par le OK, ou un tour en cours de relecture —
+    // c'est l'événement qui fait foi : ce poste peut être en retard, la file
+    // avoir déjà tourné, et le combattant du tour être mort depuis. On raconte
+    // ce qu'on montre, pas ce que la base dit de l'instant présent.
+    let tete;
+    if (seq.evenement) {
+        tete = { idPersonnage: seq.acteur, idCarte: seq.idCarte };
+    } else {
+        tete = (phase === "Resolution" && queue.length > 0) ? queue[0] : null;
+        if (!tete || tete.idPersonnage !== seq.acteur) return masquer();
+        if (typeof window.estCombattantMort === "function" && window.estCombattantMort(tete.idPersonnage)) return masquer();
+    }
 
     // La fenêtre s'arrête au bord du panneau latéral, et va jusqu'au bord de
     // l'écran quand celui-ci est replié : elle couvre « le reste de l'écran ».

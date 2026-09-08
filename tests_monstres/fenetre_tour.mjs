@@ -4,8 +4,8 @@
 // c'est l'écran qu'on regarde, dans la VRAIE page : la fenêtre s'obscurcit à
 // droite du panneau latéral, annonce le nom du combattant dans l'or brossé du
 // panneau, ses états sous son nom, sa technique en grand, ses effets en
-// dessous, et ne fait clignoter le gros OK doré que lorsque tous les postes
-// ont répondu.
+// dessous, sa zone à côté — et fait clignoter le gros OK doré tant que le
+// joueur n'a pas touché l'écran pour ouvrir le tour.
 import fs from 'fs';
 import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 
@@ -153,11 +153,18 @@ const res = await p.evaluate(async ({ sVoile, sToggle, sEtatInitial, sSequence }
   window.rafraichirVoileTour();
   await new Promise(r => setTimeout(r, 600));
 
-  // 5. Un événement arrive : la fenêtre se lève pour laisser voir la relecture.
+  // 5. Un événement arrive : le tour est RETENU, le temps que le joueur lise la
+  //    technique. Le gros OK doré clignote, et le clic passe.
   window.jouerAnimationMoteur = () => {};
   window.DELAI_ENTRE_ETAPES_MS = 1;
-  window.EVENEMENTS_RECUS[1] = { n: 1, type: "carte", data: { idLanceur: "M1" }, avant: {} };
-  const lecture = window.lireJournalCombat();
+  window.EVENEMENTS_RECUS[1] = { n: 1, type: "carte", acteur: "M1", idCarte: "CARTE_M",
+                                 tour: 1, data: { idLanceur: "M1" }, avant: {} };
+  await window.lireJournalCombat();
+  await new Promise(r => setTimeout(r, 200));
+  const enPose = { ...etat(), retenu: !!window.EVENEMENT_ATTENDU, anims: [...(window.ANIMS || [])] };
+
+  // 6. Le joueur touche l'écran : la fenêtre se lève et l'animation se joue.
+  const lecture = window.jouerSequenceTour();
   const pendantLecture = etat();
   await lecture;
   await new Promise(r => setTimeout(r, 600));   // le temps du fondu de sortie
@@ -207,7 +214,7 @@ const res = await p.evaluate(async ({ sVoile, sToggle, sEtatInitial, sSequence }
   const zPanneau = parseInt(getComputedStyle(document.getElementById('panneau-combat-gauche')).zIndex);
   const largeurPanneau = document.getElementById('panneau-combat-gauche').getBoundingClientRect().width;
 
-  return { preparation, calculEnCours, avecOk, panneauReplie, apresClic, monTourCouleur,
+  return { preparation, calculEnCours, avecOk, panneauReplie, enPose, apresClic, monTourCouleur,
            monTour, tourDeLautre, mort, horsCombat, memeOr, anim, zVoile, zPanneau, largeurPanneau,
            largeurEcran: window.innerWidth };
 }, { sVoile: srcVoile, sToggle: srcToggle, sEtatInitial: srcEtatInitial, sSequence: srcSequence });
@@ -237,7 +244,7 @@ verifier("elle est plus grosse que le détail des effets", res.avecOk.tailleCart
 verifier("ses effets sont listés dessous", /Mot de pouvoir/.test(res.avecOk.effets) && /Peur/.test(res.avecOk.effets),
          `(${res.avecOk.effets.replace(/\s+/g, ' ').trim()})`);
 verifier("l'initiative n'y figure pas", !/Initiative/.test(res.avecOk.effets));
-verifier("aucun bouton à cliquer : chaque écran rejoue tout seul", !res.avecOk.okVisible);
+verifier("tant qu'aucun événement n'est arrivé, pas de OK", !res.avecOk.okVisible);
 verifier("panneau replié, la fenêtre prend tout l'écran", res.panneauReplie.gauche < 2,
          `(${res.panneauReplie.gauche}px)`);
 verifier("le nom de la technique porte la couleur du combattant",
@@ -251,7 +258,15 @@ verifier("la zone de la technique est dessinée à côté", res.avecOk.hexZone =
          `(${res.avecOk.hexZone} hexagone(s))`);
 verifier("la technique d'un héros prend SA couleur, pas le rouge",
          /74, 163, 223|#4aa3df/.test(res.monTourCouleur || ""), `(${(res.monTourCouleur || "").slice(0, 60)}…)`);
-verifier("l'arrivée d'un événement le rejoue tout seul", res.apresClic.anims.join(">") === "carte",
+verifier("l'arrivée d'un événement RETIENT le tour au lieu de le jouer",
+         res.enPose.retenu && res.enPose.anims.length === 0, `(${res.enPose.anims.join(">")})`);
+verifier("le gros OK doré s'allume et le clic passe partout sur la fenêtre",
+         res.enPose.visible && res.enPose.okVisible && res.enPose.clicPasse);
+verifier("et le joueur a sous les yeux la technique qui va se dérouler",
+         res.enPose.carte === "Hurlement putride" && /9 dégâts/.test(res.enPose.effets),
+         `(${res.enPose.carte})`);
+verifier("le OK clignote", /clignotement/i.test(res.anim || ""), `(${res.anim})`);
+verifier("une fois touché, l'animation du tour se joue", res.apresClic.anims.join(">") === "carte",
          `(${res.apresClic.anims.join(">")})`);
 verifier("pendant la relecture, la fenêtre se lève pour laisser voir le plateau",
          res.apresClic.pendantLecture && res.apresClic.pendantLecture.masquee !== false
@@ -271,6 +286,8 @@ await p.evaluate(async () => {
   document.getElementById('fenetre-combat').style.backgroundColor = "#211d18";
   window.PARTIE_DATA = { Tour_Combat: 2, Phase_Combat: "Resolution",
     File_Attente_Combat: [{ idPersonnage: "M1", idCarte: "CARTE_M", initiative: 55, timestamp: 99 }] };
+  // Un tour retenu : c'est l'écran que Nico verra au début de chaque tour.
+  window.EVENEMENT_ATTENDU = { n: 9, type: "carte", acteur: "M1", idCarte: "CARTE_M", tour: 2, data: {} };
   window.rafraichirVoileTour();
 });
 await p.waitForTimeout(700);
