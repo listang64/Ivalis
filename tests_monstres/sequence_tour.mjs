@@ -1,24 +1,18 @@
-// LE SCRIPT DU TOUR ET SA RELECTURE.
+// LE JOURNAL D'ÉVÉNEMENTS DU COMBAT.
 //
 // Le vrai sequence_tour.js est chargé tel quel dans TROIS postes distincts qui
-// partagent une seule partie simulée et une seule collection de scripts. Chaque
-// écriture rejoue une notification chez les trois, exactement comme Firestore.
-//
-// Ce que ce banc garantit :
-//   • le poste qui joue écrit son tour, étape par étape, dans SON document ;
-//   • les autres ne jouent RIEN pendant ce temps — rien ne doit transparaître
-//     derrière la fenêtre sombre ;
-//   • le gros OK doré s'allume sur un seul drapeau, « complet », donc au même
-//     instant partout : plus de « prêt » échangés qui décalaient le bouton d'un
-//     appareil à l'autre ;
-//   • la relecture est personnelle et séquentielle : une étape à la fois,
-//     chacune attendant la précédente ;
-//   • la file n'avance que lorsque TOUS ont fini de rejouer ;
-//   • les points de vie d'avant voyagent dans le script, si bien qu'une
+// partagent une seule partie et un seul journal. Ce que ce banc garantit :
+//   • le poste qui joue publie des événements NUMÉROTÉS, dans l'ordre ;
+//   • les autres ne jouent rien pendant ce temps, puis rejouent le journal
+//     numéro par numéro, chacun attendant que le précédent ait fini ;
+//   • un numéro qui manque n'est jamais sauté : on l'attend, puis on va le
+//     chercher ;
+//   • un poste endormi rattrape tout son retard, dans l'ordre ;
+//   • les points de vie d'avant voyagent dans l'événement, si bien qu'une
 //     relecture tardive ne retranche pas les dégâts une seconde fois ;
-//   • un poste absent met la table en pause pour de bon, et seule une action
-//     humaine la relance ;
-//   • une créature dont le tour est écrit ne le rejoue pas en boucle.
+//   • le poste qui joue son propre héros ne se rejoue pas ce qu'il a vu ;
+//   • un poste qui rejoint un combat en cours ne rejoue pas tout depuis le
+//     début.
 import fs from 'fs';
 
 const SRC = fs.readFileSync('/home/user/Ivalis/sequence_tour.js', 'utf-8');
@@ -26,9 +20,10 @@ const SRC = fs.readFileSync('/home/user/Ivalis/sequence_tour.js', 'utf-8');
 let echecs = 0;
 const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(62)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
 const clone = (o) => JSON.parse(JSON.stringify(o));
+const dormir = (ms) => new Promise(r => setTimeout(r, ms));
 
 // =========================================================================
-//  LA TABLE : une partie, une collection de scripts, trois postes autour
+//  LA TABLE : une partie, un journal, trois postes autour
 // =========================================================================
 function table(options = {}) {
     const heros = options.heros || [
@@ -41,15 +36,12 @@ function table(options = {}) {
     const partie = {
         Tour_Combat: 1,
         Phase_Combat: "Resolution",
+        Compteur_Evenements: options.compteur || 0,
         File_Attente_Combat: options.file || [{ idPersonnage: "M1", idCarte: "CARTE_M", initiative: 55, timestamp: 1000 }]
     };
-    // La collection Scripts_Tour, en miniature.
-    const scripts = {};
-
-    let aChange = true;
-    const avances = [];
+    const journal = {};                 // n -> événement
     const postes = {};
-    const ecoutes = [];
+    const livraisons = [];              // { poste, n } en attente de livraison
 
     (options.postes || ["poste-pc", "poste-ipadA", "poste-ipadB"]).forEach(id => {
         const w = { PARTIE_DATA: clone(partie), ID_PARTIE_COURANTE: "P1" };
@@ -64,302 +56,249 @@ function table(options = {}) {
         w.JOUEES = [];
         w.filerAnimation = async (nom, fn) => { w.JOUEES.push(nom); if (fn) await fn(); };
 
-        w.finDeTourCombat = async (forcer, idQui) => {
-            avances.push({ poste: id, acteur: idQui });
-            if (partie.File_Attente_Combat.length && partie.File_Attente_Combat[0].idPersonnage === idQui) {
-                partie.File_Attente_Combat = partie.File_Attente_Combat.slice(1);
-                if (partie.File_Attente_Combat.length === 0) partie.Phase_Combat = "Preparation";
-                aChange = true;
-            }
+        // La plomberie du journal, telle qu'app.js l'expose.
+        w.publierEvenementCombat = async (idPartie, ev) => {
+            const n = ++partie.Compteur_Evenements;
+            journal[n] = { ...clone(ev), ID_Partie: idPartie, n, horodatage: Date.now() };
+            // La livraison n'est pas instantanée, et pas forcément dans l'ordre.
+            Object.keys(postes).forEach(p => livraisons.push({ poste: p, n }));
+            return n;
         };
-
-        // La plomberie Firestore, telle qu'app.js l'expose.
-        w.ecrireScriptTour = async (idDoc, champs) => {
-            scripts[idDoc] = { ...(scripts[idDoc] || {}), ...clone(champs) };
-            aChange = true;
-            return true;
-        };
-        w.signerScriptTour = async (idDoc, idJoueur) => {
-            const d = scripts[idDoc] = scripts[idDoc] || {};
-            d.finis = [...new Set([...(d.finis || []), idJoueur])];
-            aChange = true;
-            return true;
-        };
-        w.ecouterScriptTour = (idDoc, rappel) => {
-            const entree = { idDoc, rappel, vivante: true };
-            ecoutes.push(entree);
-            // Firestore livre l'état courant dès l'abonnement.
-            Promise.resolve().then(() => { if (entree.vivante) rappel(scripts[idDoc] ? clone(scripts[idDoc]) : null); });
-            return () => { entree.vivante = false; };
-        };
+        w.lireEvenementCombat = async (idPartie, n) => (journal[n] ? clone(journal[n]) : null);
+        w.dernierNumeroEvenement = (p) => parseInt((p || {}).Compteur_Evenements) || 0;
+        w.ecouterEvenementsCombat = (idPartie, apres, rappel) => { w.RAPPEL_JOURNAL = rappel; return () => { w.RAPPEL_JOURNAL = null; }; };
 
         new Function('window', 'localStorage', SRC)(w, faussLocalStorage);
+        // Le temps de respiration entre deux animations est réduit au minimum :
+        // le banc vérifie l'ORDRE, pas la durée du spectacle.
+        w.DELAI_ENTRE_ETAPES_MS = 1;
         postes[id] = w;
     });
 
-    async function reposer(maxTours = 40) {
-        let n = 0, calmes = 0;
-        while (n++ < maxTours && calmes < 3) {
-            aChange = false;
-            await new Promise(r => setTimeout(r, 0));
-            for (const id of Object.keys(postes)) {
-                const w = postes[id];
-                w.PARTIE_DATA = clone(partie);
-                await w.suivreSequenceTour(w.PARTIE_DATA);
-            }
-            for (const e of [...ecoutes]) {
-                if (!e.vivante) continue;
-                await e.rappel(scripts[e.idDoc] ? clone(scripts[e.idDoc]) : null);
-            }
-            calmes = aChange ? 0 : calmes + 1;
+    // Livre les événements en attente. « melange » les délivre à l'envers, pour
+    // vérifier qu'un poste ne saute jamais un numéro manquant.
+    async function livrer(options2 = {}) {
+        const aLivrer = livraisons.splice(0, livraisons.length)
+            .filter(l => !options2.sauf || !options2.sauf.includes(l.poste));
+        if (options2.melange) aLivrer.reverse();
+        for (const l of aLivrer) {
+            const w = postes[l.poste];
+            if (!w || !w.RAPPEL_JOURNAL) continue;
+            w.PARTIE_DATA = clone(partie);
+            await w.RAPPEL_JOURNAL([clone(journal[l.n])]);
         }
-        return n;
+        // Les relectures sont des promesses : on leur laisse le temps.
+        for (let i = 0; i < 60; i++) await dormir(2);
     }
 
-    return { partie, scripts, postes, avances, reposer, notifier: () => { aChange = true; } };
+    async function reveiller(id) {
+        // Le poste rattrape tout ce qu'il a manqué, d'un coup, comme Firestore
+        // le ferait au retour au premier plan.
+        const w = postes[id];
+        w.PARTIE_DATA = clone(partie);
+        const tout = Object.keys(journal).map(Number).sort((a, b) => a - b)
+            .filter(n => n > w.DERNIER_EVENEMENT_JOUE).map(n => clone(journal[n]));
+        if (w.RAPPEL_JOURNAL) await w.RAPPEL_JOURNAL(tout);
+        for (let i = 0; i < 60; i++) await dormir(2);
+    }
+
+    async function brancher() {
+        for (const id of Object.keys(postes)) {
+            postes[id].PARTIE_DATA = clone(partie);
+            await postes[id].suivreSequenceTour(postes[id].PARTIE_DATA);
+        }
+    }
+
+    return { partie, journal, postes, livrer, reveiller, brancher, livraisons };
 }
 
-const leScript = (t) => Object.values(t.scripts)[0] || null;
-
 // =========================================================================
-console.log("\n1. UN TOUR DE CRÉATURE : ÉCRIT PAR UN, REJOUÉ PAR TOUS");
+console.log("\n1. UN TOUR DE CRÉATURE : PUBLIÉ PAR UN, REJOUÉ PAR TOUS DANS L'ORDRE");
 // =========================================================================
 {
     const t = table();
-    await t.reposer();
+    await t.brancher();
     const pc = t.postes["poste-pc"], A = t.postes["poste-ipadA"], B = t.postes["poste-ipadB"];
 
-    verifier("la fenêtre s'ouvre chez les trois (une créature n'est à personne)",
-             !!pc.SEQUENCE_TOUR && pc.SEQUENCE_TOUR.voile && A.SEQUENCE_TOUR.voile && B.SEQUENCE_TOUR.voile);
-    verifier("aucun OK tant que le tour n'est pas écrit en entier",
-             pc.etatSequenceTour().okVisible === false, `(${pc.etatSequenceTour().message})`);
+    verifier("la fenêtre est là chez les trois (une créature n'est à personne)",
+             pc.SEQUENCE_TOUR.voile && A.SEQUENCE_TOUR.voile && B.SEQUENCE_TOUR.voile);
 
-    // Le PC tient le verrou de l'IA : il joue le tour et le consigne.
+    // Le PC tient le verrou de l'IA : il calcule et publie.
+    pc.IA_MONSTRE_ACTEUR = "M1";
+    verifier("il se sait celui qui fait jouer la créature", pc.jeJoueCeTour() === true);
+    verifier("mais son plateau reste sous la fenêtre : ce n'est pas SON héros",
+             pc.monHerosJoue() === false);
+
     await pc.consignerEtapeTour("mouvement", { idToken: "M1", path: [{ q: 1, r: 0 }] });
     await pc.consignerEtapeTour("carte", { idLanceur: "M1", attaques: [{ cibles: ["H1"] }] });
-    await t.reposer();
 
-    verifier("le poste qui joue ne voit plus la fenêtre", pc.SEQUENCE_TOUR.voile === false);
-    verifier("le script porte les deux étapes, dans l'ordre",
-             leScript(t).etapes.map(e => e.type).join(">") === "mouvement>carte",
-             `(${leScript(t).etapes.map(e => e.type).join(">")})`);
-    verifier("il note les points de vie d'avant de la cible",
-             leScript(t).etapes[1].avant.H1.PV_Actuels === 60,
-             `(${JSON.stringify(leScript(t).etapes[1].avant)})`);
-    verifier("les spectateurs n'ont RIEN joué pendant ce temps",
-             A.JOUEES.length === 0 && B.JOUEES.length === 0);
-    verifier("et toujours pas de OK : le tour n'est pas fini d'écrire",
-             A.etatSequenceTour().okVisible === false, `(${A.etatSequenceTour().message})`);
+    verifier("le journal porte deux événements numérotés 1 et 2",
+             !!t.journal[1] && !!t.journal[2] && t.journal[1].type === "mouvement" && t.journal[2].type === "carte");
+    verifier("chacun emporte les points de vie d'avant de ce qu'il touche",
+             t.journal[2].avant.H1.PV_Actuels === 60, `(${JSON.stringify(t.journal[2].avant)})`);
+    verifier("avant livraison, personne n'a rien joué",
+             pc.JOUEES.length === 0 && A.JOUEES.length === 0 && B.JOUEES.length === 0);
 
-    const retenu = await pc.sequenceRetientFinDeTour("M1");
-    verifier("finDeTourCombat est retenue : la file n'avance pas toute seule", retenu === true);
-    await t.reposer();
-
-    verifier("le script est marqué complet", leScript(t).complet === true);
-    verifier("le gros OK doré s'allume chez les DEUX spectateurs en même temps",
-             A.etatSequenceTour().okVisible === true && B.etatSequenceTour().okVisible === true);
-    verifier("le poste qui a joué n'a rien à cliquer", pc.SEQUENCE_TOUR.finiEnvoye === true);
-    verifier("la file n'avance pas encore", t.avances.length === 0);
-
-    await A.jouerSequenceTour(); await t.reposer();
-    verifier("le premier iPad rejoue les deux étapes dans l'ordre",
-             A.JOUEES.join(">") === "mouvement>carte", `(${A.JOUEES.join(">")})`);
-    verifier("son pion retrouve la case de la base une fois le trajet rejoué",
+    await t.livrer();
+    verifier("les trois rejouent les deux événements, dans l'ordre",
+             pc.JOUEES.join(">") === "mouvement>carte"
+             && A.JOUEES.join(">") === "mouvement>carte"
+             && B.JOUEES.join(">") === "mouvement>carte",
+             `(${pc.JOUEES.join(">")} / ${A.JOUEES.join(">")} / ${B.JOUEES.join(">")})`);
+    verifier("les trois curseurs sont au même numéro",
+             pc.DERNIER_EVENEMENT_JOUE === 2 && A.DERNIER_EVENEMENT_JOUE === 2 && B.DERNIER_EVENEMENT_JOUE === 2);
+    verifier("les pions retrouvent la case de la base",
              Object.keys(A.PIONS_EN_ATTENTE_SEQUENCE).length === 0);
-    verifier("mais la file attend toujours le troisième poste", t.avances.length === 0,
-             `(finis : ${(leScript(t).finis || []).join(", ")})`);
-
-    await B.jouerSequenceTour(); await t.reposer();
-    verifier("le dernier poste fait enfin avancer la file", t.avances.length > 0,
-             `(${t.avances.map(a => a.poste).join(", ")})`);
-    verifier("et c'est bien le tour de la créature qui se termine",
-             t.avances.every(a => a.acteur === "M1"));
-    verifier("la file a avancé d'un seul cran", t.partie.File_Attente_Combat.length === 0);
-    verifier("les deux écrans ont rejoué exactement la même chose",
-             A.JOUEES.join(">") === B.JOUEES.join(">"));
 }
 
 // =========================================================================
-console.log("\n2. LA RELECTURE NE FRAPPE PAS DEUX FOIS");
-// =========================================================================
-//  Le moteur retranche les dégâts de ce qu'il lit. Une relecture démarre après
-//  que l'auteur a écrit son résultat en base : sans les points de vie d'avant
-//  dans le script, elle retrancherait une seconde fois.
-{
-    const t = table();
-    await t.reposer();
-    const pc = t.postes["poste-pc"], A = t.postes["poste-ipadA"], B = t.postes["poste-ipadB"];
-
-    const frapper = (w) => () => {
-        const cible = w.PERSOS_PARTIE.find(p => p.idPersonnage === "H1");
-        const depart = w.valeurAvantRejeu("H1", "PV_Actuels", cible.PV_Actuels);
-        cible.PV_Actuels = Math.max(0, depart - 6);
-    };
-    [pc, A, B].forEach(w => { w.jouerAnimationMoteur = frapper(w); });
-
-    await pc.consignerEtapeTour("carte", { idLanceur: "M1", attaques: [{ cibles: ["H1"] }] });
-    // L'auteur applique ses dégâts et les écrit en base.
-    pc.PERSOS_PARTIE.find(p => p.idPersonnage === "H1").PV_Actuels = 54;
-    await pc.sequenceRetientFinDeTour("M1");
-    await t.reposer();
-
-    // La base livre aux spectateurs les points de vie D'APRÈS — et, dans la même
-    // livraison, une brûlure qui n'a rien à voir avec ce tour-ci.
-    [A, B].forEach(w => {
-        const h1 = w.PERSOS_PARTIE.find(p => p.idPersonnage === "H1");
-        h1.PV_Actuels = 54;
-        h1.Etats_Alteres = [{ nom: "Brûlé", duree: 2 }];
-    });
-
-    await A.jouerSequenceTour(); await B.jouerSequenceTour(); await t.reposer();
-
-    const pvA = A.PERSOS_PARTIE.find(p => p.idPersonnage === "H1").PV_Actuels;
-    const pvB = B.PERSOS_PARTIE.find(p => p.idPersonnage === "H1").PV_Actuels;
-    verifier("le spectateur retombe sur les mêmes points de vie que l'auteur",
-             pvA === 54 && pvB === 54, `(auteur 54, iPad ${pvA} et ${pvB})`);
-    verifier("l'état livré par la base pendant l'attente n'a pas été effacé",
-             (A.PERSOS_PARTIE.find(p => p.idPersonnage === "H1").Etats_Alteres || []).length === 1);
-}
-
-// =========================================================================
-console.log("\n3. DEUX ÉTAPES S'ENCHAÎNENT, LA SECONDE APRÈS LA PREMIÈRE");
+console.log("\n2. UN NUMÉRO QUI MANQUE N'EST JAMAIS SAUTÉ");
 // =========================================================================
 {
     const t = table();
-    await t.reposer();
+    await t.brancher();
     const pc = t.postes["poste-pc"], A = t.postes["poste-ipadA"];
+    pc.IA_MONSTRE_ACTEUR = "M1";
 
-    const ordre = [];
+    await pc.consignerEtapeTour("mouvement", { idToken: "M1" });
+    await pc.consignerEtapeTour("carte", { idLanceur: "M1" });
+
+    // On livre à l'ENVERS : le 2 arrive avant le 1.
+    await t.livrer({ melange: true });
+
+    verifier("le 2 arrivé le premier n'a pas été joué avant le 1",
+             A.JOUEES.join(">") === "mouvement>carte", `(${A.JOUEES.join(">")})`);
+    verifier("et le curseur est bien à 2", A.DERNIER_EVENEMENT_JOUE === 2);
+}
+
+// =========================================================================
+console.log("\n3. LE TROU SE RATTRAPE PAR UNE LECTURE DIRECTE");
+// =========================================================================
+//  L'écriture du 1 n'atteint jamais l'iPad. Il reçoit le 2 et comprend qu'il
+//  lui manque quelque chose : il va le chercher plutôt que de l'oublier.
+{
+    const t = table();
+    await t.brancher();
+    const pc = t.postes["poste-pc"], A = t.postes["poste-ipadA"];
+    pc.IA_MONSTRE_ACTEUR = "M1";
+
+    await pc.consignerEtapeTour("mouvement", { idToken: "M1" });
+    // On jette la livraison du 1 vers l'iPad A.
+    const perdue = t.livraisons.findIndex(l => l.poste === "poste-ipadA" && l.n === 1);
+    t.livraisons.splice(perdue, 1);
+    await pc.consignerEtapeTour("carte", { idLanceur: "M1" });
+
+    await t.livrer();
+    verifier("il attend d'abord le numéro manquant", A.JOUEES.length === 0, `(${A.JOUEES.join(">")})`);
+
+    // Passé le court délai d'attente, il va le lire lui-même.
+    await dormir(900);
+    await A.lireJournalCombat();
+    for (let i = 0; i < 60; i++) await dormir(2);
+
+    verifier("puis il le récupère et rejoue les deux dans l'ordre",
+             A.JOUEES.join(">") === "mouvement>carte", `(${A.JOUEES.join(">")})`);
+}
+
+// =========================================================================
+console.log("\n4. UN POSTE ENDORMI RATTRAPE TOUT SON RETARD");
+// =========================================================================
+{
+    const t = table();
+    await t.brancher();
+    const pc = t.postes["poste-pc"], B = t.postes["poste-ipadB"];
+    pc.IA_MONSTRE_ACTEUR = "M1";
+
+    for (const type of ["mouvement", "carte", "poussee", "peur"]) {
+        await pc.consignerEtapeTour(type, { idToken: "M1" });
+    }
+    // L'iPad B dormait : il ne reçoit rien.
+    await t.livrer({ sauf: ["poste-ipadB"] });
+    verifier("pendant son sommeil, il n'a rien joué", B.JOUEES.length === 0);
+    verifier("les autres, eux, sont à jour", pc.DERNIER_EVENEMENT_JOUE === 4);
+
+    await t.reveiller("poste-ipadB");
+    verifier("au réveil, il rejoue les quatre dans l'ordre",
+             B.JOUEES.join(">") === "mouvement>carte>poussee>peur", `(${B.JOUEES.join(">")})`);
+    verifier("et rejoint les autres au même numéro", B.DERNIER_EVENEMENT_JOUE === 4);
+}
+
+// =========================================================================
+console.log("\n5. LA RELECTURE NE FRAPPE PAS DEUX FOIS");
+// =========================================================================
+{
+    const t = table();
+    await t.brancher();
+    const pc = t.postes["poste-pc"], A = t.postes["poste-ipadA"];
+    pc.IA_MONSTRE_ACTEUR = "M1";
+
+    // Le moteur, en miniature : il retranche 6 points à son point de départ.
     Object.values(t.postes).forEach(w => {
-        w.jouerAnimationMoteur = async (d) => {
-            ordre.push("debut:" + d.marque);
-            await new Promise(r => setTimeout(r, 30));
-            ordre.push("fin:" + d.marque);
+        w.jouerAnimationMoteur = () => {
+            const cible = w.PERSOS_PARTIE.find(p => p.idPersonnage === "H1");
+            const depart = w.valeurAvantRejeu("H1", "PV_Actuels", cible.PV_Actuels);
+            cible.PV_Actuels = Math.max(0, depart - 6);
         };
     });
 
-    await pc.consignerEtapeTour("carte", { idLanceur: "M1", marque: "A" });
-    await pc.consignerEtapeTour("carte", { idLanceur: "M1", marque: "B" });
-    await pc.sequenceRetientFinDeTour("M1");
-    await t.reposer();
+    await pc.consignerEtapeTour("carte", { idLanceur: "M1", attaques: [{ cibles: ["H1"] }] });
+    // La base livre à l'iPad les points de vie D'APRÈS avant qu'il ne rejoue,
+    // et une brûlure qui n'a rien à voir avec ce tour-ci.
+    const h1 = A.PERSOS_PARTIE.find(p => p.idPersonnage === "H1");
+    h1.PV_Actuels = 54;
+    h1.Etats_Alteres = [{ nom: "Brûlé", duree: 2 }];
 
-    ordre.length = 0;
-    await A.jouerSequenceTour();
-
-    verifier("la seconde ne démarre qu'une fois la première terminée",
-             ordre.join(">") === "debut:A>fin:A>debut:B>fin:B", `(${ordre.join(">")})`);
+    await t.livrer();
+    verifier("le spectateur retombe sur les mêmes points de vie que l'auteur",
+             h1.PV_Actuels === 54, `(attendu 54, obtenu ${h1.PV_Actuels})`);
+    verifier("l'état livré entre-temps n'a pas été effacé", (h1.Etats_Alteres || []).length === 1);
+    verifier("et le moteur n'a rien réécrit en base pendant la relecture",
+             A.REJEU_SCRIPT_EN_COURS === false);
 }
 
 // =========================================================================
-console.log("\n4. UN POSTE ABSENT MET LA TABLE EN PAUSE, SANS LIMITE DE TEMPS");
-// =========================================================================
-{
-    const t = table();
-    await t.reposer();
-    const pc = t.postes["poste-pc"], A = t.postes["poste-ipadA"];
-
-    delete t.postes["poste-ipadB"];   // l'iPad de B est parti
-
-    await pc.consignerEtapeTour("carte", { idLanceur: "M1" });
-    await pc.sequenceRetientFinDeTour("M1");
-    await t.reposer();
-    await A.jouerSequenceTour();
-    await t.reposer();
-
-    verifier("deux signatures sur trois", (leScript(t).finis || []).length === 2,
-             `(${(leScript(t).finis || []).join(", ")})`);
-    verifier("après plusieurs passages, personne n'est passé d'office",
-             (await (async () => { for (let i = 0; i < 5; i++) await t.reposer(); return t.avances.length; })()) === 0);
-
-    await pc.forcerSequenceTour();
-    await t.reposer();
-    verifier("la sortie manuelle relance la file", t.avances.length > 0);
-    verifier("les héros mis de côté ne comptent pas dans les postes attendus",
-             (() => {
-                 pc.PERSOS_PARTIE = pc.PERSOS_PARTIE.map(p => p.idJoueur === "poste-ipadB" ? { ...p, actif: false } : p);
-                 return !pc.postesAttendusSequence().includes("poste-ipadB");
-             })());
-}
-
-// =========================================================================
-console.log("\n5. UNE CRÉATURE NE REJOUE PAS SON TOUR");
-// =========================================================================
-{
-    const t = table();
-    await t.reposer();
-    const pc = t.postes["poste-pc"], A = t.postes["poste-ipadA"];
-
-    verifier("avant le tour, l'IA a le champ libre", pc.sequenceTourEnAttente() === false);
-    await pc.consignerEtapeTour("carte", { idLanceur: "M1" });
-    await pc.sequenceRetientFinDeTour("M1");
-    verifier("le tour écrit, le poste qui tient l'IA se bloque lui-même",
-             pc.sequenceTourEnAttente() === true);
-    await t.reposer();
-    verifier("les autres postes se bloquent aussi (le script est complet)",
-             A.sequenceTourEnAttente() === true);
-
-    for (const w of Object.values(t.postes)) await w.jouerSequenceTour();
-    await t.reposer();
-
-    // La base n'a pas encore livré la file avancée : la tête désigne toujours M1.
-    t.partie.File_Attente_Combat = [{ idPersonnage: "M1", idCarte: "CARTE_M", initiative: 55, timestamp: 1000 }];
-    t.partie.Phase_Combat = "Resolution";
-    Object.values(t.postes).forEach(w => { w.PARTIE_DATA = clone(t.partie); });
-
-    const meneur = Object.values(t.postes).find(w => (w.SEQUENCES_TERMINEES || []).length > 0);
-    verifier("le poste qui a fait avancer la file garde la trace du tour bouclé", !!meneur);
-    if (meneur) {
-        verifier("sa créature reste bloquée le temps que la base rattrape",
-                 meneur.sequenceTourEnAttente() === true);
-        verifier("et aucune fenêtre ne s'y rouvre sur ce tour déjà joué",
-                 meneur.ouvrirSequenceTour(meneur.PARTIE_DATA) === null);
-    }
-}
-
-// =========================================================================
-console.log("\n6. LE TOUR D'UN JOUEUR : LUI VOIT SON PLATEAU, LES AUTRES LA FENÊTRE");
+console.log("\n6. LE TOUR D'UN JOUEUR : LUI VOIT TOUT EN DIRECT, LES AUTRES LE REJOUENT");
 // =========================================================================
 {
     const t = table({ file: [{ idPersonnage: "H1", idCarte: "CARTE_H", initiative: 70, timestamp: 1100 }] });
-    await t.reposer();
-    const pc = t.postes["poste-pc"], A = t.postes["poste-ipadA"], B = t.postes["poste-ipadB"];
+    await t.brancher();
+    const pc = t.postes["poste-pc"], A = t.postes["poste-ipadA"];
 
-    verifier("le joueur dont c'est le tour garde son plateau dégagé", pc.SEQUENCE_TOUR.voile === false);
-    verifier("les deux autres postes ont la fenêtre sombre", A.SEQUENCE_TOUR.voile && B.SEQUENCE_TOUR.voile);
+    verifier("le joueur dont c'est le tour garde son plateau dégagé", pc.monHerosJoue() === true);
+    verifier("les autres ont la fenêtre sombre", A.SEQUENCE_TOUR.voile === true);
 
-    [pc, A, B].forEach(w => w.programmerAnimationTour("mouvement", { idToken: "H1", timestamp: 4001 }, () => {}));
-    verifier("lui voit son déplacement en direct", pc.JOUEES.join(">") === "mouvement");
-    verifier("les autres ne voient rien passer derrière la fenêtre",
-             A.JOUEES.length === 0 && B.JOUEES.length === 0);
-    verifier("et leur pion garde sa case en attendant la relecture",
+    // Son déplacement lui est joué en direct par l'ancien circuit ; aux autres non.
+    pc.programmerAnimationTour("mouvement", { idToken: "H1" }, () => {});
+    A.programmerAnimationTour("mouvement", { idToken: "H1" }, () => {});
+    verifier("lui voit son déplacement tout de suite", pc.JOUEES.join(">") === "mouvement");
+    verifier("l'autre ne voit rien passer derrière sa fenêtre", A.JOUEES.length === 0);
+    verifier("et son pion garde sa case en attendant le journal",
              A.PIONS_EN_ATTENTE_SEQUENCE.H1 === true);
 
     await pc.consignerEtapeTour("mouvement", { idToken: "H1", path: [{ q: 0, r: 0 }] });
-    await pc.sequenceRetientFinDeTour("H1");
-    await t.reposer();
+    await t.livrer();
 
-    verifier("le OK n'apparaît que chez les spectateurs",
-             A.etatSequenceTour().okVisible && B.etatSequenceTour().okVisible);
-    verifier("la file n'avance pas avant qu'ils aient vu", t.avances.length === 0);
-
-    await A.jouerSequenceTour(); await B.jouerSequenceTour(); await t.reposer();
-    verifier("les deux spectateurs rejouent le déplacement",
-             A.JOUEES.join(">") === "mouvement" && B.JOUEES.join(">") === "mouvement");
-    verifier("puis la file avance", t.avances.length > 0 && t.partie.File_Attente_Combat.length === 0);
+    verifier("le joueur ne se rejoue pas ce qu'il vient de voir",
+             pc.JOUEES.join(">") === "mouvement", `(${pc.JOUEES.join(">")})`);
+    verifier("mais son curseur avance quand même", pc.DERNIER_EVENEMENT_JOUE === 1);
+    verifier("l'autre, lui, le rejoue", A.JOUEES.join(">") === "mouvement");
 }
 
 // =========================================================================
-console.log("\n7. UN COMBATTANT À TERRE NE BLOQUE PAS LA FILE");
+console.log("\n7. REJOINDRE UN COMBAT EN COURS NE REJOUE PAS TOUT LE PASSÉ");
 // =========================================================================
 {
-    const t = table();
-    const pc = t.postes["poste-pc"];
-    Object.values(t.postes).forEach(w => { w.estCombattantMort = (id) => id === "M1"; });
-    await t.reposer();
+    const t = table({ compteur: 152 });
+    await t.brancher();
+    const A = t.postes["poste-ipadA"];
+    verifier("le curseur se pose sur le dernier numéro écrit", A.DERNIER_EVENEMENT_JOUE === 152);
 
-    verifier("aucune séquence ne s'ouvre sur un mort", pc.SEQUENCE_TOUR === null);
-    verifier("finDeTourCombat passe sans être retenue",
-             (await pc.sequenceRetientFinDeTour("M1")) === false);
+    t.postes["poste-pc"].IA_MONSTRE_ACTEUR = "M1";
+    await t.postes["poste-pc"].consignerEtapeTour("carte", { idLanceur: "M1" });
+    await t.livrer();
+    verifier("et seul l'événement 153 est rejoué",
+             A.JOUEES.join(">") === "carte" && A.DERNIER_EVENEMENT_JOUE === 153,
+             `(${A.JOUEES.join(">")}, curseur ${A.DERNIER_EVENEMENT_JOUE})`);
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

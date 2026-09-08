@@ -744,12 +744,11 @@
                 <!-- Qui l'on attend encore, ou l'invitation à jouer les animations -->
                 <div id="voile-tour-attente" style="margin-top: 4vh; font-family: 'Almendra', serif; font-size: 16px; font-style: italic; color: #8a8078; text-shadow: 1px 1px 3px black;"></div>
 
-                <!-- Le gros OK doré : il ne clignote que lorsque TOUS les postes ont répondu -->
+                <!-- Le gros bouton doré n'est plus utilisé : chaque écran rejoue
+                     le journal du combat tout seul, sans attendre les autres. Il
+                     reste ici, masqué, plutôt que d'éparpiller sa mise en page. -->
                 <div id="voile-tour-ok" class="btn-lancer-carte btn-ok-voile" style="display: none;">OK</div>
-
-                <!-- Sortie de secours entièrement manuelle : aucun délai ne passe
-                     un poste absent tout seul, c'est un humain qui le décide. -->
-                <div id="voile-tour-forcer" onclick="window.forcerSequenceTour(event)" style="display: none; margin-top: 3vh; pointer-events: auto; cursor: pointer; font-family: 'Cinzel', serif; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #8a8078; text-decoration: underline; text-shadow: 1px 1px 3px black;">Continuer sans les absents</div>
+                <div id="voile-tour-forcer" style="display: none;"></div>
             </div>
         </div>
 
@@ -1583,20 +1582,20 @@
 
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <script type="module" src="ia_master.js?v=4"></script>
-<script type="module" src="app.js?v=25"></script>
+<script type="module" src="app.js?v=27"></script>
 <script type="module" src="creation_personnage.js?v=4"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=13"></script>
 <script src="Plateau.js"></script>
-<script type="module" src="sequence_tour.js?v=2"></script>
+<script type="module" src="sequence_tour.js?v=4"></script>
 <script type="module" src="combat.js?v=35"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
-<script type="module" src="mouvement.js?v=13"></script>
+<script type="module" src="mouvement.js?v=14"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
-<script type="module" src="moteur_effets.js?v=21"></script>
+<script type="module" src="moteur_effets.js?v=22"></script>
 <script type="module" src="monstres.js?v=16"></script>
 <script type="module" src="monstres_competences.js?v=7"></script>
-<script type="module" src="monstres_ia.js?v=17"></script>
+<script type="module" src="monstres_ia.js?v=18"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=7"></script>
 <script type="module" src="objets_ia.js?v=5"></script>

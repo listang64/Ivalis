@@ -57,8 +57,8 @@ node occupation_cases.mjs   # qui occupe vraiment une case (morts et fantômes e
 node zone_assombrissement.mjs # où l'on peut poser une zone à distance, et l'écran noirci
 node zones_ia.mjs           # les zones sont posées, orientées et bien placées
 node piste_initiative.mjs   # la piste tient à droite du panneau, bulles réduites
-node fenetre_tour.mjs       # la fenêtre de tour : nom coloré, effets détaillés, zone, OK doré
-node sequence_tour.mjs      # le script d'un tour et sa relecture, sur trois postes
+node fenetre_tour.mjs       # la fenêtre de tour : nom coloré, effets détaillés, zone dessinée
+node sequence_tour.mjs      # le journal d'événements : ordre, trous, rattrapage
 node deplacement_repris.mjs # repartir en cours de tour, sans remise à zéro du barème
 node points_apparition.mjs  # les deux repères d'apparition, et la dispersion des pions
 node reinit_plateau.mjs     # la réinitialisation vide le plateau, puis enchaîne le déploiement
@@ -99,51 +99,54 @@ node zone_soin_verte_carte.mjs # la zone persistante de soin se dessine en vert,
 node annuler_ciblage.mjs # un bouton ANNULER reprend la main sur le déplacement en plein ciblage
 node carte_grisee_sans_message.mjs # cliquer une carte trop chère l'affiche sans message d'erreur
 
-## La séquence de tour (le gros changement d'architecture)
+## Le journal d'événements du combat (le gros changement d'architecture)
 
-Un tour de combat ne se diffuse plus morceau par morceau, chacun l'animant dès
-qu'il le reçoit. Il s'ÉCRIT, en entier et dans l'ordre, dans un document qui
-n'appartient qu'à lui — `Scripts_Tour/{partie__clé}` — puis chaque poste le
-RELIT pour lui. C'est ce qui a fait disparaître les déplacements sautés puis les
-pions téléportés un tour plus tard, vus sur iPad et jamais sur PC.
+Le combat ne se diffuse plus « action par action » dans le document de la
+partie, où rien ne garantissait ni l'ordre ni la complétude. Tout ce qui se
+passe devient un **événement numéroté**, écrit dans sa propre collection :
 
-1. **Le poste qui agit** joue son tour normalement (c'est lui qui vise, qui se
-   déplace) et consigne chaque étape au fil de l'eau : le déplacement, la carte,
-   le bond, la poussée, la traction, la peur. L'ordre des appels est l'ordre du
-   tour. Les autres attendent derrière la fenêtre sombre — **opaque** : à moitié
-   transparente, on devinait les animations et les textes flottants du tour en
-   train de s'écrire, ce qui est exactement ce qu'elle doit cacher.
-2. **Le tour fini**, il pose `complet` sur le script. Ce simple drapeau allume le
-   gros OK doré chez tout le monde **au même instant** : il n'y a plus d'échange
-   de « prêt » d'un poste à l'autre, qui décalait le bouton d'un appareil à
-   l'autre.
-3. **Chaque poste rejoue le script pour lui**, à son rythme : une étape à la
-   fois, chacune attendant que la précédente ait vraiment fini, avec un temps de
-   respiration entre deux. Rien n'est plus « temps réel » : c'est une relecture,
-   et elle est identique partout.
-4. **Quand un poste a tout rejoué, il signe.** Le dernier Check fait avancer la
-   file : à cet instant, les trois écrans racontent la même histoire.
+    Evenements_Combat/{partie}_000152   { n: 152, type: "carte", ... }
 
-Aucune minuterie ne passe un poste absent : la table reste en pause tant qu'il
-n'est pas revenu. Une sortie de secours entièrement manuelle (« Continuer sans
-les absents ») est offerte après une longue attente, et un héros mis de côté ne
-compte plus dans les postes attendus.
+1. **Le poste qui joue calcule et publie.** Dés, dégâts, états, cases : tout est
+   tranché chez lui, puis publié — 152 la goule se déplace, 153 elle frappe
+   Pliors pour 18, 154 au tour de Jade. Le numéro est attribué sous transaction
+   sur le compteur de la partie : deux postes ne peuvent pas tomber sur le même.
+2. **Tous les appareils écoutent le journal.**
+3. **Chacun rejoue les événements dans l'ordre de leur numéro**, un par un,
+   chacun attendant que le précédent ait vraiment fini, avec un temps de
+   respiration entre deux (`DELAI_ENTRE_ETAPES_MS`). L'animation n'est plus
+   « temps réel » : c'est la représentation locale d'un événement déjà tranché,
+   et chaque écran la joue pour lui, à son rythme.
+4. **Un numéro manquant se voit immédiatement** — on attend 153 et 154 arrive —
+   et se rattrape par une lecture directe. Aucun poste ne saute une étape, même
+   après une mise en veille de plusieurs tours.
+
+Firebase ne synchronise pas l'animation : il synchronise l'ÉVÉNEMENT. Deux
+appareils qui ont lu les mêmes numéros sont forcément au même point.
+
+Ce qui a disparu avec ce modèle : les « Check » échangés entre postes, le OK
+doré à cliquer, et la file retenue en attendant tout le monde. C'est ce qui
+décalait le bouton d'un appareil à l'autre et pouvait figer la table.
 
 Trois pièges refermés en chemin, tous vérifiés par `sequence_tour.mjs` :
 
 - **La relecture qui frappe deux fois.** Le moteur applique les dégâts en
   retranchant ce qu'il lit ; une relecture démarre forcément après que l'auteur
-  a écrit son résultat. Chaque étape du script porte donc les points de vie et
-  le bouclier **d'avant** des seuls combattants qu'elle nomme. Rien n'est
-  réécrit dans les combattants : ce que la base a livré entre-temps sur d'autres
-  — le tic d'une brûlure, l'énergie dépensée ailleurs — reste intact.
-- **La créature qui rejoue son tour.** Entre l'instant où la barrière tombe et
-  celui où la file avance vraiment, la tête de file désigne encore le combattant
-  qui vient de jouer. Son verrou d'IA répond toujours oui à qui le détient déjà.
-  Chaque poste garde donc la trace des tours qu'il a bouclés.
-- **Les animations derrière la fenêtre.** Un poste qui regarde ignore désormais
-  complètement les `Action_*` de la partie : il ne connaît le tour que par son
-  script, et ne le joue qu'après le OK.
+  a écrit son résultat. Chaque événement porte donc les points de vie et le
+  bouclier **d'avant** des seuls combattants qu'il nomme. Rien n'est réécrit
+  dans les combattants : ce que la base a livré entre-temps sur d'autres — le
+  tic d'une brûlure, l'énergie dépensée ailleurs — reste intact. Et pendant une
+  relecture, personne n'est l'auteur : le moteur ne réécrit rien en base et ne
+  redéclenche aucun sous-effet, qui sont déjà des événements à part entière.
+- **Les animations derrière la fenêtre.** Un poste qui regarde ignore les
+  `Action_*` de la partie : il ne connaîtra ce tour que par le journal. Une
+  seule exception, chez le poste qui CALCULE : l'animation de sa carte, qui
+  n'est pas une animation mais le moteur de résolution lui-même.
+- **Le trajet à l'envers.** Une relecture démarre longtemps après le
+  déplacement : le pion est déjà arrivé, et la marche repartait de sa case
+  d'arrivée. La case de DÉPART voyage maintenant avec le trajet, et le pion y
+  est reposé avant de se mettre en marche (même chose pour le bond, la poussée
+  et la traction).
 
 ## Fidélité à la Forge
 

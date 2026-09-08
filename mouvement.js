@@ -519,6 +519,13 @@ window.validerMouvement = async function() {
         // autre joueur vient d'y poser (cf. window.modifierPartie).
         const actionMouvement = {
             idToken: idPerso,
+            // La case de DÉPART voyage avec le trajet. Elle ne servait à rien
+            // tant que tout le monde animait au même instant, le pion étant
+            // encore dessus. Une relecture, elle, démarre bien plus tard : le
+            // pion est déjà arrivé, et la marche repartait de sa case
+            // d'arrivée pour rejoindre la première étape — le déplacement
+            // paraissait complètement cassé. On le repose au départ d'abord.
+            depart: hexDepart,
             path: pathAvecAngles,
             opportunites: opportunitesResolues,
             zones: zonesResolues,
@@ -580,6 +587,19 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
     // Ce trajet-là est joué : sa case d'arrivée n'a plus besoin d'être retenue.
     window.DERNIER_MOUVEMENT_ANIME = Math.max(window.DERNIER_MOUVEMENT_ANIME || 0,
                                               actionMouvement.timestamp || 0);
+
+    // On repose le pion sur sa case de départ AVANT de le faire marcher, sans
+    // transition : lors d'une relecture il est déjà à l'arrivée, et la marche
+    // partirait à l'envers.
+    if (actionMouvement.depart && typeof window.positionnerTokenVTT === "function") {
+        tokenDiv.style.transition = "none";
+        tokenDiv.dataset.q = actionMouvement.depart.q;
+        tokenDiv.dataset.r = actionMouvement.depart.r;
+        window.positionnerTokenVTT(tokenDiv, true);
+        // Un reflow, sinon le navigateur regroupe ce saut avec le premier pas
+        // et le pion glisse en diagonale depuis l'arrivée.
+        void tokenDiv.offsetWidth;
+    }
 
     tokenDiv.style.transition = "left 0.4s linear, top 0.4s linear";
 
@@ -662,6 +682,14 @@ window.jouerAnimationBond = async function(data) {
     window.PIONS_EN_MOUVEMENT = window.PIONS_EN_MOUVEMENT || {};
     window.PIONS_EN_MOUVEMENT[data.idToken] = Date.now();
 
+    if (data.depart && typeof window.positionnerTokenVTT === "function") {
+        tokenDiv.style.transition = "none";
+        tokenDiv.dataset.q = data.depart.q;
+        tokenDiv.dataset.r = data.depart.r;
+        window.positionnerTokenVTT(tokenDiv, true);
+        void tokenDiv.offsetWidth;
+    }
+
     tokenDiv.style.transition = "left 0.25s ease-in-out, top 0.25s ease-in-out";
     if (imgMain) imgMain.style.transition = "transform 0.12s ease-in-out";
 
@@ -736,6 +764,16 @@ window.jouerAnimationPoussee = async function(data) {
     const imgMain = tokenDiv.querySelector(".token-img-main");
 
     window.ANIMATION_VTT_EN_COURS = true;
+
+    // Comme pour la marche : en relecture, le pion est déjà arrivé. On le
+    // repose sur sa case de départ pour que la trajectoire se lise.
+    if (data.depart && typeof window.positionnerTokenVTT === "function") {
+        tokenDiv.style.transition = "none";
+        tokenDiv.dataset.q = data.depart.q;
+        tokenDiv.dataset.r = data.depart.r;
+        window.positionnerTokenVTT(tokenDiv, true);
+        void tokenDiv.offsetWidth;
+    }
 
     tokenDiv.style.transition = "left 0.25s ease-in-out, top 0.25s ease-in-out";
     if (imgMain) imgMain.style.transition = "transform 0.12s ease-in-out";

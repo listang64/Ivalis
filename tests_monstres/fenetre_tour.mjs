@@ -54,26 +54,17 @@ const res = await p.evaluate(async ({ sVoile, sToggle, sEtatInitial, sSequence }
   window.filerAnimation = async (n, f) => { window.ANIMS = (window.ANIMS || []).concat(n); if (f) await f(); };
   window.finDeTourCombat = async () => { window.AVANCES = (window.AVANCES || 0) + 1; };
   window.ID_PARTIE_COURANTE = "P1";
-  // La collection Scripts_Tour, en miniature.
-  window.SCRIPTS = {};
-  window.ecrireScriptTour = async (id, champs) => {
-    window.SCRIPTS[id] = { ...(window.SCRIPTS[id] || {}), ...JSON.parse(JSON.stringify(champs)) };
-    (window.RAPPELS_SCRIPT || []).forEach(r => { if (r.id === id) r.fn(window.SCRIPTS[id]); });
-    return true;
+  // Le journal d'événements, en miniature.
+  window.JOURNAL = {};
+  window.publierEvenementCombat = async (idPartie, ev) => {
+    const n = Object.keys(window.JOURNAL).length + 1;
+    window.JOURNAL[n] = { ...JSON.parse(JSON.stringify(ev)), n };
+    if (window.RAPPEL_JOURNAL) await window.RAPPEL_JOURNAL([window.JOURNAL[n]]);
+    return n;
   };
-  window.signerScriptTour = async (id, joueur) => {
-    const d = window.SCRIPTS[id] = window.SCRIPTS[id] || {};
-    d.finis = [...new Set([...(d.finis || []), joueur])];
-    (window.RAPPELS_SCRIPT || []).forEach(r => { if (r.id === id) r.fn(d); });
-    return true;
-  };
-  window.ecouterScriptTour = (id, fn) => {
-    window.RAPPELS_SCRIPT = window.RAPPELS_SCRIPT || [];
-    const e = { id, fn };
-    window.RAPPELS_SCRIPT.push(e);
-    Promise.resolve().then(() => fn(window.SCRIPTS[id] || null));
-    return () => { window.RAPPELS_SCRIPT = window.RAPPELS_SCRIPT.filter(x => x !== e); };
-  };
+  window.lireEvenementCombat = async (p, n) => window.JOURNAL[n] || null;
+  window.dernierNumeroEvenement = () => 0;
+  window.ecouterEvenementsCombat = (p, apres, rappel) => { window.RAPPEL_JOURNAL = rappel; return () => {}; };
 
   const icone = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23c2a878'/%3E%3C/svg%3E";
   window.PERSOS_PARTIE = [
@@ -131,16 +122,9 @@ const res = await p.evaluate(async ({ sVoile, sToggle, sEtatInitial, sSequence }
 
   const poser = (queue, phase) => {
     window.PARTIE_DATA = { Tour_Combat: 1, File_Attente_Combat: queue, Phase_Combat: phase };
-    window.ouvrirSequenceTour(window.PARTIE_DATA);
     window.rafraichirVoileTour();
   };
-  // Le tour est écrit par un AUTRE poste : on remplit son script à la main.
-  const ecrireTour = async (etapes) => {
-    const seq = window.SEQUENCE_TOUR;
-    await window.ecrireScriptTour(seq.idScript, { cle: seq.cle, acteur: seq.acteur, etapes, complet: true });
-    await new Promise(r => setTimeout(r, 20));
-    window.rafraichirVoileTour();
-  };
+  const ecrireTour = async () => { window.rafraichirVoileTour(); };
 
   const fileMonstre = [{ idPersonnage: "M1", idCarte: "CARTE_M", initiative: 55, timestamp: 10 }];
   const fileHeros   = [{ idPersonnage: "H1", idCarte: "CARTE_H", initiative: 70, timestamp: 20 }];
@@ -157,7 +141,7 @@ const res = await p.evaluate(async ({ sVoile, sToggle, sEtatInitial, sSequence }
   const calculEnCours = etat();
 
   // 3. Le tour est écrit en entier : le OK doré s'allume, sur ce seul drapeau.
-  await ecrireTour([{ n: 0, type: "carte", data: { idLanceur: "M1" }, avant: {} }]);
+  await ecrireTour();
   const avecOk = etat();
 
   // 4. Le panneau replié : la fenêtre couvre tout l'écran.
@@ -169,12 +153,16 @@ const res = await p.evaluate(async ({ sVoile, sToggle, sEtatInitial, sSequence }
   window.rafraichirVoileTour();
   await new Promise(r => setTimeout(r, 600));
 
-  // 5. Le clic rejoue le script, et la fenêtre s'efface.
+  // 5. Un événement arrive : la fenêtre se lève pour laisser voir la relecture.
   window.jouerAnimationMoteur = () => {};
-  await window.jouerSequenceTour();
-  window.rafraichirVoileTour();
+  window.DELAI_ENTRE_ETAPES_MS = 1;
+  window.EVENEMENTS_RECUS[1] = { n: 1, type: "carte", data: { idLanceur: "M1" }, avant: {} };
+  const lecture = window.lireJournalCombat();
+  const pendantLecture = etat();
+  await lecture;
   await new Promise(r => setTimeout(r, 600));   // le temps du fondu de sortie
-  const apresClic = { ...etat(), anims: [...(window.ANIMS || [])] };
+  window.rafraichirVoileTour();
+  const apresClic = { ...etat(), anims: [...(window.ANIMS || [])], pendantLecture };
 
   // 7. Au tour d'un HÉROS DU POSTE : aucune fenêtre, le plateau reste dégagé.
   poser(fileHeros, "Resolution");
@@ -184,7 +172,7 @@ const res = await p.evaluate(async ({ sVoile, sToggle, sEtatInitial, sSequence }
   // spectateur, la fenêtre ne s'affichant pas chez le joueur qui agit.
   localStorage.setItem("ID_JOUEUR_COURANT", "poste-ipad");
   poser([{ idPersonnage: "H1", idCarte: "CARTE_H", initiative: 70, timestamp: 21 }], "Resolution");
-  await ecrireTour([{ n: 0, type: "carte", data: { idLanceur: "H1" }, avant: {} }]);
+  await ecrireTour();
   const monTourCouleur = document.getElementById('voile-tour-carte').style.background || "";
   localStorage.setItem("ID_JOUEUR_COURANT", "poste-pc");
 
@@ -229,8 +217,8 @@ console.log(`     tour de la goule : « ${res.avecOk.nom} » — « ${res.avecOk
 
 verifier("en préparation, aucune fenêtre", !res.preparation.visible);
 verifier("au tour d'une créature, la fenêtre s'ouvre", res.calculEnCours.visible);
-verifier("tant que le tour s'écrit, pas de OK",
-         !res.calculEnCours.okVisible && /prépare|écrit/.test(res.calculEnCours.attente),
+verifier("elle annonce simplement que le tour se joue",
+         !res.calculEnCours.okVisible && /se joue/.test(res.calculEnCours.attente),
          `(${res.calculEnCours.attente})`);
 verifier("la fenêtre est OPAQUE : rien ne transparaît du tour en train de s'écrire",
          !/rgba\([^)]*0\.\d/.test(res.calculEnCours.opaque), `(${res.calculEnCours.opaque.slice(0, 70)}…)`);
@@ -249,9 +237,7 @@ verifier("elle est plus grosse que le détail des effets", res.avecOk.tailleCart
 verifier("ses effets sont listés dessous", /Mot de pouvoir/.test(res.avecOk.effets) && /Peur/.test(res.avecOk.effets),
          `(${res.avecOk.effets.replace(/\s+/g, ' ').trim()})`);
 verifier("l'initiative n'y figure pas", !/Initiative/.test(res.avecOk.effets));
-verifier("tous les postes prêts : le gros OK doré apparaît", res.avecOk.okVisible);
-verifier("il clignote (animation sur sa couche de halo)", res.anim === "clignotementLancer", `(${res.anim})`);
-verifier("et le clic passe alors sur toute la fenêtre", res.avecOk.clicPasse);
+verifier("aucun bouton à cliquer : chaque écran rejoue tout seul", !res.avecOk.okVisible);
 verifier("panneau replié, la fenêtre prend tout l'écran", res.panneauReplie.gauche < 2,
          `(${res.panneauReplie.gauche}px)`);
 verifier("le nom de la technique porte la couleur du combattant",
@@ -265,9 +251,11 @@ verifier("la zone de la technique est dessinée à côté", res.avecOk.hexZone =
          `(${res.avecOk.hexZone} hexagone(s))`);
 verifier("la technique d'un héros prend SA couleur, pas le rouge",
          /74, 163, 223|#4aa3df/.test(res.monTourCouleur || ""), `(${(res.monTourCouleur || "").slice(0, 60)}…)`);
-verifier("le clic rejoue le script", res.apresClic.anims.join(">") === "carte",
+verifier("l'arrivée d'un événement le rejoue tout seul", res.apresClic.anims.join(">") === "carte",
          `(${res.apresClic.anims.join(">")})`);
-verifier("puis la fenêtre s'efface pour laisser voir le plateau", !res.apresClic.visible);
+verifier("pendant la relecture, la fenêtre se lève pour laisser voir le plateau",
+         res.apresClic.pendantLecture && res.apresClic.pendantLecture.masquee !== false
+         || !res.apresClic.visible);
 verifier("au tour de MON héros, aucune fenêtre : le plateau reste dégagé", !res.monTour.visible);
 verifier("au tour du héros d'un autre poste, elle revient", res.tourDeLautre.visible);
 verifier("aucune fenêtre pour un combattant à terre", !res.mort.visible);
@@ -283,10 +271,6 @@ await p.evaluate(async () => {
   document.getElementById('fenetre-combat').style.backgroundColor = "#211d18";
   window.PARTIE_DATA = { Tour_Combat: 2, Phase_Combat: "Resolution",
     File_Attente_Combat: [{ idPersonnage: "M1", idCarte: "CARTE_M", initiative: 55, timestamp: 99 }] };
-  const seq = window.ouvrirSequenceTour(window.PARTIE_DATA);
-  await window.ecrireScriptTour(seq.idScript,
-    { cle: seq.cle, acteur: "M1", etapes: [{ n: 0, type: "carte", data: {}, avant: {} }], complet: true });
-  await new Promise(r => setTimeout(r, 30));
   window.rafraichirVoileTour();
 });
 await p.waitForTimeout(700);

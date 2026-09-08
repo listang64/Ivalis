@@ -3222,7 +3222,13 @@ window.jouerAnimationMoteur = async function(action) {
     // correspond à personne, et plus rien n'était écrit. Les dégâts, les états et
     // la fatigue restaient donc dans la mémoire du navigateur, et le premier
     // snapshot venu les effaçait — « mes points de vie restent bloqués à 12 ».
-    const jeSuisLAuteur = Array.isArray(window.RESOLUTIONS_LOCALES)
+    //  ET SURTOUT PAS PENDANT UNE RELECTURE. Le poste qui a joué le tour le
+    //  rejoue lui aussi, depuis le script, une fois le OK doré touché : s'il s'y
+    //  reconnaissait encore comme l'auteur, il réécrirait les dégâts en base et
+    //  redéclencherait ses sous-effets (Poussée, Traction, Peur) — qui sont déjà
+    //  des étapes du script, et seraient joués deux fois.
+    const jeSuisLAuteur = !window.REJEU_SCRIPT_EN_COURS
+        && Array.isArray(window.RESOLUTIONS_LOCALES)
         && window.RESOLUTIONS_LOCALES.includes(action.timestamp);
 
     // 🔻 NOUVEAU : message de confusion, affiché à tous avant que la carte (déjà redirigée

@@ -840,17 +840,12 @@ async function attendreFinResolution(nbAvant, limiteMs = 20000) {
     // il n'y a rien à attendre.
     if (!Array.isArray(window.RESOLUTIONS_LOCALES)) return;
 
-    // Derrière la fenêtre de tour, l'animation de la carte ne part pas tout de
-    // suite : elle dort dans le tampon jusqu'à ce que tous les postes soient
-    // prêts. L'attendre ici bloquerait vingt secondes pour rien — et c'est
-    // désormais la barrière de synchronisation, bien plus stricte, qui garantit
-    // qu'aucun combattant ne commence son tour avant la fin du précédent.
-    // Les décisions de la créature, elles, ne dépendent pas de l'animation :
-    // validerMouvement a déjà posé sa nouvelle case dans TOKENS_VTT_DATA.
-    if (window.SEQUENCE_TOUR && window.SEQUENCE_TOUR.voile) {
-        await pause(300);
-        return;
-    }
+    // NB : cette attente est plus nécessaire que jamais. Le poste qui fait jouer
+    // la créature calcule DERRIÈRE la fenêtre sombre, mais il calcule vraiment :
+    // c'est son animation de carte qui applique les dégâts, écrit en base et
+    // engendre les sous-effets. Déclarer le tour « écrit » avant qu'elle ait fini
+    // laisserait ces sous-effets hors du script, et les autres écrans ne les
+    // rejoueraient jamais.
     const debut = Date.now();
     // La carte part de façon asynchrone : on lui laisse d'abord le temps d'être
     // émise, sinon on croirait déjà tout fini.

@@ -31,7 +31,8 @@ import {
   onSnapshot,
   deleteField,
   writeBatch,
-  arrayUnion
+  arrayUnion,
+  runTransaction
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // =========================================================================
@@ -361,51 +362,84 @@ window.programmerAnimationTour = function(nom, action, fn) {
 };
 
 // =========================================================================
-//  LE SCRIPT DU TOUR — SA COLLECTION À LUI
+//  LE JOURNAL D'ÉVÉNEMENTS DU COMBAT
 // =========================================================================
-//  Un tour de combat s'écrit en entier, dans l'ordre, avec ses résolutions,
-//  dans un document qui n'appartient qu'à lui : Scripts_Tour/{partie__clé}.
-//  Les postes n'ont plus qu'à le lire et à le rejouer. Il vit à part de la
-//  partie exprès : la file d'attente s'écrit sous transaction à chaque tour,
-//  et un script de plusieurs kilo-octets n'a rien à faire dans cette bagarre.
-//  Toute la logique est dans sequence_tour.js ; ici, seulement la plomberie.
-const COL_SCRIPTS = "Scripts_Tour";
-const refScript = (idDoc) => doc(db, COL_SCRIPTS, idDoc);
+//  Le combat ne se diffuse plus « action par action » dans le document de la
+//  partie, où rien ne garantissait ni l'ordre ni la complétude. Tout ce qui se
+//  passe est écrit comme un ÉVÉNEMENT NUMÉROTÉ dans sa propre collection :
+//
+//      Evenements_Combat/{partie}_000152   { n: 152, type: "carte", ... }
+//
+//  Le poste qui joue calcule, puis publie. Tous les autres écoutent, et
+//  rejouent les événements DANS L'ORDRE DE LEUR NUMÉRO, un par un. Un numéro
+//  manquant se voit tout de suite (on attend 153 et il arrive 154) et se
+//  rattrape par une lecture directe. C'est ce que Firebase synchronise :
+//  l'événement et l'état du jeu — jamais l'animation, qui n'est que la
+//  représentation locale de l'événement reçu.
+//  Toute la logique vit dans sequence_tour.js ; ici, seulement la plomberie.
+const COL_EVENEMENTS = "Evenements_Combat";
+const idEvenement = (idPartie, n) => idPartie + "_" + String(n).padStart(6, "0");
+const refEvenement = (idPartie, n) => doc(db, COL_EVENEMENTS, idEvenement(idPartie, n));
 
-window.ecrireScriptTour = async function(idDoc, champs) {
-    if (!idDoc) return false;
+// LE NUMÉRO EST ATTRIBUÉ SOUS TRANSACTION, sur le compteur de la partie : deux
+// postes qui publient au même instant ne peuvent pas tomber sur le même.
+window.publierEvenementCombat = async function(idPartie, evenement) {
+    if (!idPartie) return null;
     try {
-        await setDoc(refScript(idDoc), champs, { merge: true });
-        return true;
+        const refPartie = doc(db, COL.PARTIES, idPartie);
+        const n = await runTransaction(db, async (tx) => {
+            const snap = await tx.get(refPartie);
+            if (!snap.exists()) return null;
+            const suivant = (parseInt(snap.data().Compteur_Evenements) || 0) + 1;
+            tx.update(refPartie, { Compteur_Evenements: suivant });
+            return suivant;
+        });
+        if (!n) return null;
+        await setDoc(refEvenement(idPartie, n), {
+            ...evenement, ID_Partie: idPartie, n, horodatage: Date.now()
+        });
+        return n;
     } catch (e) {
-        console.error("Écriture du script de tour :", e);
-        return false;
+        console.error("Publication d'un événement de combat :", e);
+        return null;
     }
 };
 
-// La signature « j'ai fini de rejouer » : arrayUnion, parce que trois postes
-// peuvent signer au même instant sans s'effacer les uns les autres.
-window.signerScriptTour = async function(idDoc, idJoueur) {
-    if (!idDoc || !idJoueur) return false;
+// L'écoute du journal. On ne remonte QUE les événements postérieurs au dernier
+// déjà connu : au chargement d'une partie en cours, il ne s'agit pas de rejouer
+// tout le combat depuis le début.
+window.ecouterEvenementsCombat = function(idPartie, apres, rappel) {
+    if (!idPartie) return () => {};
     try {
-        await updateDoc(refScript(idDoc), { finis: arrayUnion(idJoueur) });
-        return true;
+        const q = query(collection(db, COL_EVENEMENTS),
+                        where("ID_Partie", "==", idPartie),
+                        where("n", ">", apres || 0),
+                        orderBy("n", "asc"));
+        return onSnapshot(q, (snap) => {
+            rappel(snap.docs.map(d => d.data()));
+        }, (e) => console.error("Écoute du journal de combat :", e));
     } catch (e) {
-        console.error("Signature du script de tour :", e);
-        return false;
-    }
-};
-
-window.ecouterScriptTour = function(idDoc, rappel) {
-    if (!idDoc) return () => {};
-    try {
-        return onSnapshot(refScript(idDoc), (snap) => {
-            rappel(snap.exists() ? snap.data() : null);
-        }, (e) => console.error("Écoute du script de tour :", e));
-    } catch (e) {
-        console.error("Écoute du script de tour :", e);
+        console.error("Écoute du journal de combat :", e);
         return () => {};
     }
+};
+
+// Le rattrapage d'un trou : on attend 153, il arrive 154. On va le chercher.
+window.lireEvenementCombat = async function(idPartie, n) {
+    if (!idPartie || !n) return null;
+    try {
+        const snap = await getDoc(refEvenement(idPartie, n));
+        return snap.exists() ? snap.data() : null;
+    } catch (e) {
+        console.error("Lecture d'un événement de combat :", e);
+        return null;
+    }
+};
+
+// Le numéro du dernier événement écrit, lu sur la partie : c'est là que se
+// place le curseur d'un poste qui rejoint un combat déjà commencé.
+window.dernierNumeroEvenement = function(partie) {
+    return parseInt((partie || window.PARTIE_DATA || {}).Compteur_Evenements) || 0;
 };
 
 // =========================================================================
