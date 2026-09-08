@@ -25,6 +25,20 @@ const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const dormir = (ms) => new Promise(r => setTimeout(r, ms));
 
+// LA BASE PARLE. Dans le vrai jeu, chaque notification Firestore passe par
+// persoDocVersFront, qui remplace la fiche du combattant ET note sa dernière
+// parole dans VERITE_BASE. On fait ici les deux, à l'identique.
+const CHAMPS_VERITE = ["PV_Actuels", "Bouclier_Actuel", "fatigueActuelle", "Etats_Alteres", "statut"];
+function laBaseDit(w, idCombattant, champs) {
+    const perso = w.PERSOS_PARTIE.find(p => p.idPersonnage === idCombattant);
+    if (!perso) return;
+    Object.keys(champs).forEach(c => { perso[c] = champs[c]; });
+    w.VERITE_BASE = w.VERITE_BASE || {};
+    const verite = {};
+    CHAMPS_VERITE.forEach(c => { if (perso[c] !== undefined) verite[c] = clone(perso[c]); });
+    w.VERITE_BASE[idCombattant] = verite;
+}
+
 // =========================================================================
 //  LA TABLE : une partie, un journal, trois postes autour
 // =========================================================================
@@ -72,6 +86,7 @@ function table(options = {}) {
         w.ecouterEvenementsCombat = (idPartie, apres, rappel) => { w.RAPPEL_JOURNAL = rappel; return () => { w.RAPPEL_JOURNAL = null; }; };
 
         new Function('window', 'localStorage', SRC)(w, faussLocalStorage);
+        w.PERSOS_PARTIE.forEach(p => laBaseDit(w, p.idPersonnage, {}));
         // Le temps de respiration entre deux animations est réduit au minimum :
         // le banc vérifie l'ORDRE, pas la durée du spectacle.
         w.DELAI_ENTRE_ETAPES_MS = 1;
@@ -268,11 +283,10 @@ console.log("\n5. LA RELECTURE NE FRAPPE PAS DEUX FOIS");
     await pc.consignerEtapeTour("carte", { idLanceur: "M1", attaques: [{ cibles: ["H1"] }] });
     // La base livre à l'iPad les points de vie D'APRÈS avant qu'il ne rejoue,
     // et une brûlure qui n'a rien à voir avec ce tour-ci.
-    const h1 = A.PERSOS_PARTIE.find(p => p.idPersonnage === "H1");
-    h1.PV_Actuels = 54;
-    h1.Etats_Alteres = [{ nom: "Brûlé", duree: 2 }];
+    laBaseDit(A, "H1", { PV_Actuels: 54, Etats_Alteres: [{ nom: "Brûlé", duree: 2 }] });
 
     await t.livrer();
+    const h1 = A.PERSOS_PARTIE.find(p => p.idPersonnage === "H1");
     verifier("le spectateur retombe sur les mêmes points de vie que l'auteur",
              h1.PV_Actuels === 54, `(attendu 54, obtenu ${h1.PV_Actuels})`);
     verifier("l'état livré entre-temps n'a pas été effacé", (h1.Etats_Alteres || []).length === 1);
@@ -397,6 +411,88 @@ console.log("\n9. LE JOUEUR DONT C'EST LE TOUR N'A PAS DE OK À DONNER");
     verifier("son plateau reste dégagé", pc.etatSequenceTour() === null);
     verifier("les autres, eux, lisent d'abord sa technique",
              !!A.EVENEMENT_ATTENDU && A.etatSequenceTour().okVisible === true);
+}
+
+// =========================================================================
+console.log("\n10. UN REJEU TARDIF N'EFFACE PAS CE QUE LA BASE A DIT ENTRE-TEMPS");
+// =========================================================================
+//  Le cas qui faisait diverger les écrans pendant plusieurs tours. Le moteur
+//  applique les dégâts en RETRANCHANT du point de départ que l'événement lui
+//  donne. Un poste qui rejoue en retard écrivait donc une valeur du PASSÉ —
+//  d'après l'attaque, mais d'avant la brûlure et la régénération qui ont suivi
+//  — et il y restait jusqu'à ce que la fiche du combattant rebouge.
+{
+    const t = table();
+    await t.brancher();
+    const pc = t.postes["poste-pc"], A = t.postes["poste-ipadA"];
+    pc.IA_MONSTRE_ACTEUR = "M1";
+
+    Object.values(t.postes).forEach(w => {
+        w.jouerAnimationMoteur = () => {
+            const cible = w.PERSOS_PARTIE.find(p => p.idPersonnage === "H1");
+            const depart = w.valeurAvantRejeu("H1", "PV_Actuels", cible.PV_Actuels);
+            cible.PV_Actuels = Math.max(0, depart - 12);
+        };
+    });
+
+    // L'attaque part : au moment où elle est écrite, H1 a 60 points de vie.
+    await pc.consignerEtapeTour("carte", { idLanceur: "M1", attaques: [{ cibles: ["H1"] }] });
+
+    // L'iPad, lui, dort. Pendant ce temps la base avance sans lui : l'attaque
+    // passe (60 → 48), puis une brûlure tique (48 → 40) et la durée tombe.
+    laBaseDit(A, "H1", { PV_Actuels: 48 });
+    laBaseDit(A, "H1", { PV_Actuels: 40, Etats_Alteres: [{ nom: "Brûlé", duree: 1 }] });
+
+    await t.livrer();
+
+    const h1 = A.PERSOS_PARTIE.find(p => p.idPersonnage === "H1");
+    verifier("l'animation a bien été rejouée", A.JOUEES.join(">") === "carte", `(${A.JOUEES.join(">")})`);
+    verifier("mais elle n'a pas ramené le combattant à sa valeur du passé",
+             h1.PV_Actuels === 40, `(attendu 40, obtenu ${h1.PV_Actuels})`);
+    verifier("et la brûlure garde la durée que la base lui a donnée",
+             (h1.Etats_Alteres || []).length === 1 && h1.Etats_Alteres[0].duree === 1,
+             `(${JSON.stringify(h1.Etats_Alteres)})`);
+
+    // À l'inverse, quand la base n'a PAS encore appliqué l'attaque, le rejeu
+    // doit écrire : c'est lui qui fait avancer l'écran en attendant la fiche.
+    const B = t.postes["poste-ipadB"];
+    const h1B = B.PERSOS_PARTIE.find(p => p.idPersonnage === "H1");
+    verifier("là où la base n'a rien dit, le rejeu écrit le résultat",
+             h1B.PV_Actuels === 48, `(attendu 48, obtenu ${h1B.PV_Actuels})`);
+}
+
+// =========================================================================
+console.log("\n11. DEUX COUPS DE LA MÊME CARTE SE CUMULENT AU REJEU");
+// =========================================================================
+//  Une carte peut frapper deux fois la même cible : le moteur retranche alors le
+//  second coup de ce que le premier vient d'écrire. La valeur d'avant ne doit
+//  donc être servie qu'UNE fois — sinon les deux coups repartent du même
+//  chiffre, seul le dernier compte, et le spectateur voit moitié moins de
+//  dégâts que l'auteur.
+{
+    const t = table();
+    await t.brancher();
+    const pc = t.postes["poste-pc"], A = t.postes["poste-ipadA"];
+    pc.IA_MONSTRE_ACTEUR = "M1";
+
+    Object.values(t.postes).forEach(w => {
+        w.jouerAnimationMoteur = () => {
+            // Deux attaques, comme le vrai moteur : une boucle par attaque, et
+            // dans chacune une lecture du point de départ.
+            [7, 5].forEach(degats => {
+                const cible = w.PERSOS_PARTIE.find(p => p.idPersonnage === "H1");
+                const depart = w.valeurAvantRejeu("H1", "PV_Actuels", cible.PV_Actuels);
+                cible.PV_Actuels = Math.max(0, depart - degats);
+            });
+        };
+    });
+
+    await pc.consignerEtapeTour("carte", { idLanceur: "M1", attaques: [{ cibles: ["H1"] }] });
+    await t.livrer();
+
+    const h1 = A.PERSOS_PARTIE.find(p => p.idPersonnage === "H1");
+    verifier("les deux coups sont comptés, pas seulement le dernier",
+             h1.PV_Actuels === 48, `(attendu 60-7-5=48, obtenu ${h1.PV_Actuels})`);
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

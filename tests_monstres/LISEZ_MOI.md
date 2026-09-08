@@ -59,6 +59,7 @@ node zones_ia.mjs           # les zones sont posées, orientées et bien placée
 node piste_initiative.mjs   # la piste tient à droite du panneau, bulles réduites
 node fenetre_tour.mjs       # la fenêtre de tour : nom coloré, effets détaillés, zone dessinée
 node sequence_tour.mjs      # le journal d'événements : ordre, trous, rattrapage
+node journal_firestore.mjs  # la plomberie du journal face aux règles d'index de Firestore
 node deplacement_repris.mjs # repartir en cours de tour, sans remise à zéro du barème
 node points_apparition.mjs  # les deux repères d'apparition, et la dispersion des pions
 node reinit_plateau.mjs     # la réinitialisation vide le plateau, puis enchaîne le déploiement
@@ -137,7 +138,45 @@ n'est jamais mis en pose chez lui : il sait déjà ce qu'il a choisi.
 Ce qui a disparu avec ce modèle : les « Check » échangés entre postes et la file
 retenue en attendant tout le monde. C'est ce qui pouvait figer la table.
 
-Trois pièges refermés en chemin, tous vérifiés par `sequence_tour.mjs` :
+**La requête refusée.** Le piège le plus coûteux, et celui qu'aucun banc ne
+pouvait voir : ils simulent le réseau avec des documents rangés dans une carte,
+et ne connaissent donc rien des règles de Firestore. Or Firestore REFUSE une
+requête qui filtre par égalité sur un champ et borne ou trie sur un AUTRE champ,
+tant qu'un index composite n'a pas été créé à la main dans la console. La
+première version du journal faisait exactement cela — `where("ID_Partie","==") +
+where("n",">") + orderBy("n")`. L'écoute était refusée, l'erreur partait dans la
+console, et plus aucun événement n'était livré à personne : la fenêtre sombre
+annonçait un tour qui ne se jouait jamais, sans bouton et sans animation, pendant
+que la file passait au combattant suivant. Le journal vit désormais SOUS la
+partie — `Systeme_Parties/{id}/Evenements_Combat/{n}` — où le filtre et le tri
+portent sur le seul champ `n` : l'index automatique suffit, et il n'y aura jamais
+rien à créer. `journal_firestore.mjs` charge le vrai code d'app.js et lui présente
+un Firestore qui applique cette règle-là. Il vérifie aussi le filet de sécurité :
+si le journal tombe pour une autre raison — droits, réseau —, la fenêtre s'efface
+et les animations reprennent leur ancien chemin, plutôt qu'un plateau figé.
+
+Cinq pièges refermés en chemin, tous vérifiés par `sequence_tour.mjs` :
+
+- **Le rejeu qui efface ce que la base a dit entre-temps.** Le plus gros. Le
+  moteur écrit le résultat dans la fiche locale du combattant ; un poste qui
+  rejoue en retard y écrivait une valeur du PASSÉ — d'après l'attaque, mais
+  d'avant la brûlure et la régénération qui ont suivi — et il y restait jusqu'à
+  ce que la fiche rebouge. D'où des points de vie qui ne concordaient pas d'un
+  écran à l'autre pendant plusieurs tours. L'événement sert désormais de MOT DE
+  PASSE : si la fiche locale est encore exactement au point de départ qu'il
+  annonce, la base n'a pas appliqué la suite et le rejeu a le droit d'écrire ;
+  sinon la base est passée devant, l'animation se joue pour l'œil et le
+  combattant retrouve ensuite la dernière parole de la base (`VERITE_BASE`,
+  notée par `persoDocVersFront`, seul passage obligé de tout ce que la base
+  raconte d'un combattant). Une chaîne d'événements du même tour se recolle
+  d'elle-même : ce que le rejeu d'un événement écrit est, par construction, le
+  point de départ du suivant.
+- **Les deux coups de la même carte.** Une carte peut frapper deux fois la même
+  cible ; le moteur retranche alors le second coup de ce que le premier vient
+  d'écrire. La valeur d'avant, servie à chaque demande, cassait cette chaîne :
+  les deux coups repartaient du même chiffre, seul le dernier comptait, et le
+  spectateur voyait moitié moins de dégâts que l'auteur. Elle n'est plus servie
+  qu'à la PREMIÈRE demande pour un combattant et un champ donnés.
 
 - **La relecture qui frappe deux fois.** Le moteur applique les dégâts en
   retranchant ce qu'il lit ; une relecture démarre forcément après que l'auteur

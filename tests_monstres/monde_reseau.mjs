@@ -97,7 +97,11 @@ export function creerMonde(documents) {
 
   // L'API Firestore telle que le jeu l'utilise, pour un poste donné.
   monde.apiPour = (nomPoste) => {
-    const doc = (_db, col, id) => ({ chemin: col + "/" + id, col, id });
+    // Comme le vrai doc() de Firestore : un nombre pair de segments, donc aussi
+    // les sous-collections (Systeme_Parties/P1/Evenements_Combat/000152).
+    const doc = (_db, ...segments) => ({
+        chemin: segments.join("/"), col: segments[0], id: segments[segments.length - 1]
+    });
 
     const getDoc = async (ref) => {
       const d = lire(ref.chemin);

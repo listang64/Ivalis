@@ -274,7 +274,9 @@ function creerPoste(nom, monde, mesPersos) {
     w, { getItem: (c) => (c === "ID_JOUEUR_COURANT" ? mesPersos.joueur : null) });
 
   // La plomberie du journal d'événements, telle qu'app.js l'expose.
-  const refEv = (n) => api.doc(db, "Evenements_Combat", "P1_" + String(n).padStart(6, "0"));
+  // Le journal vit SOUS la partie, comme dans le vrai jeu :
+  // Systeme_Parties/P1/Evenements_Combat/{n}.
+  const refEv = (n) => api.doc(db, "Systeme_Parties", "P1", "Evenements_Combat", String(n).padStart(6, "0"));
   w.publierEvenementCombat = async (idPartie, ev) => {
     activer();
     const n = await api.runTransaction(db, async (tx) => {

@@ -131,11 +131,19 @@ window.monHerosJoue = function(partie) {
 // =========================================================================
 //  L'ÉCRITURE D'UN ÉVÉNEMENT
 // =========================================================================
-//  Les points de vie et le bouclier d'avant : les deux seules valeurs que le
-//  moteur obtient par soustraction. On ne note que les combattants que
-//  l'événement NOMME — noter toute la table figerait au passage ce qui n'a rien
-//  à voir avec lui.
-const CHAMPS_AVANT = ["PV_Actuels", "Bouclier_Actuel"];
+//  Les valeurs d'avant des combattants que l'événement NOMME — noter toute la
+//  table figerait au passage ce qui n'a rien à voir avec lui. Elles servent
+//  deux fois : le moteur y prend son point de départ (il travaille par
+//  soustraction), et la relecture s'en sert de MOT DE PASSE pour savoir si la
+//  base en est encore là (voir « la base a le dernier mot », plus bas).
+const CHAMPS_AVANT = ["PV_Actuels", "Bouclier_Actuel", "fatigueActuelle"];
+
+// Un quatrième mot de passe, jamais servi au moteur : la signature des états et
+// de leur durée. Une brûlure qui tique change la durée sans toucher au reste ;
+// sans ce repère, un rejeu tardif remettrait le compteur à sa valeur de départ.
+const signatureEtats = (perso) => ((perso && perso.Etats_Alteres) || [])
+    .map(e => (e && e.nom) + ":" + (e && e.duree)).sort().join(",");
+const CLE_ETATS = "__etats";
 const CLES_COMBATTANTS = ["idLanceur", "idCible", "idToken", "idPersonnage", "cibles"];
 
 function idsConcernes(donnee, trouves) {
@@ -158,6 +166,7 @@ function valeursAvant(ids) {
         if (!p || !p.idPersonnage || !ids.has(p.idPersonnage)) return;
         const copie = {};
         CHAMPS_AVANT.forEach(c => { if (p[c] !== undefined) copie[c] = p[c]; });
+        copie[CLE_ETATS] = signatureEtats(p);
         sortie[p.idPersonnage] = copie;
     });
     return sortie;
@@ -198,13 +207,97 @@ window.consignerEtapeTour = async function(type, donnee) {
 // =========================================================================
 //  LA RELECTURE, DANS L'ORDRE DES NUMÉROS
 // =========================================================================
+//  LE POINT DE DÉPART, UNE SEULE FOIS. Une carte peut frapper deux fois la même
+//  cible : le moteur retranche alors le second coup de ce que le premier vient
+//  d'écrire. Servir la valeur d'avant à CHAQUE demande cassait cette chaîne —
+//  les deux coups repartaient du même chiffre, et seul le dernier comptait, si
+//  bien qu'un spectateur voyait moins de dégâts que l'auteur. On ne la sert donc
+//  qu'à la première demande pour un combattant et un champ donnés : après quoi
+//  c'est la valeur courante, celle que le coup précédent vient d'inscrire.
+let dejaServiAvant = null;
+
 window.valeurAvantRejeu = function(idCombattant, champ, valeurCourante) {
     const avant = window.ETAT_AVANT_REJEU;
     if (!avant) return valeurCourante;
     const fiche = avant[idCombattant];
     if (!fiche || fiche[champ] === undefined) return valeurCourante;
+    const cle = idCombattant + "|" + champ;
+    if (dejaServiAvant && dejaServiAvant.has(cle)) return valeurCourante;
+    if (dejaServiAvant) dejaServiAvant.add(cle);
     return fiche[champ];
 };
+
+// =========================================================================
+//  LA BASE A LE DERNIER MOT
+// =========================================================================
+//  Un événement rejoué ne fait pas que dessiner : le moteur écrit le résultat
+//  dans la fiche locale du combattant (c'est par soustraction qu'il travaille).
+//  Tant que ce poste rejoue en suivant la base, tout va bien. Mais il rejoue
+//  parfois TARD — un iPad réveillé, un OK donné en retard — et pendant ce temps
+//  la base a continué sans lui : la brûlure a tiqué, la régénération est passée,
+//  un autre combattant a frappé. Ces changements-là ne sont pas des événements :
+//  ils arrivent par la fiche du combattant. Le rejeu tardif les écrasait, et le
+//  poste restait sur une valeur du passé jusqu'à ce que la fiche rebouge — d'où
+//  des points de vie qui ne concordaient pas d'un écran à l'autre pendant
+//  plusieurs tours.
+//
+//  LE MOT DE PASSE. L'événement dit d'où il part. Si la fiche locale est encore
+//  EXACTEMENT à ce point de départ, c'est que la base n'a pas encore appliqué ce
+//  qui suit : le rejeu a le droit d'écrire, et il écrira la même chose que
+//  l'auteur. Sinon, la base est déjà passée devant : on laisse l'animation se
+//  jouer pour l'œil, puis on rend au combattant la valeur qu'il avait — la base
+//  garde le dernier mot.
+//
+//  Une chaîne d'événements du même tour se recolle d'elle-même : ce que le rejeu
+//  d'un événement écrit est, par construction, le point de départ du suivant.
+const combattant = (id) => (window.PERSOS_PARTIE || []).find(p => p && p.idPersonnage === id);
+
+// Les combattants dont la base a déjà dépassé le point de départ de l'événement.
+// Eux seuls seront remis à la parole de la base après l'animation.
+function gardeDeRejeu(ev) {
+    const garde = [];
+    const avant = (ev && ev.avant) || {};
+    Object.keys(avant).forEach(id => {
+        const perso = combattant(id);
+        if (!perso) return;
+        const auPointDeDepart = CHAMPS_AVANT.every(champ =>
+            avant[id][champ] === undefined || String(perso[champ]) === String(avant[id][champ]))
+            && (avant[id][CLE_ETATS] === undefined || signatureEtats(perso) === avant[id][CLE_ETATS]);
+        if (auPointDeDepart) return;          // la base n'y est pas encore : le rejeu écrit
+        garde.push(id);
+    });
+    return garde;
+}
+
+// On ne rend PAS une photo prise avant l'animation : la base parle aussi
+// PENDANT — une régénération de fin de tour, le tour d'un autre poste — et cette
+// photo-là l'effacerait à son tour. On rend sa dernière parole, celle que
+// persoDocVersFront note à chaque notification.
+function rendreLaGarde(garde) {
+    let rendus = 0;
+    (garde || []).forEach(id => {
+        const verite = (window.VERITE_BASE || {})[id];
+        // La fiche a pu être remplacée par la base pendant l'animation : on la
+        // retrouve par son identifiant, jamais par la référence d'avant.
+        const perso = combattant(id);
+        if (!perso || !verite) return;
+        Object.keys(verite).forEach(champ => {
+            if (verite[champ] === undefined) return;
+            perso[champ] = (verite[champ] && typeof verite[champ] === "object")
+                ? JSON.parse(JSON.stringify(verite[champ])) : verite[champ];
+        });
+        rendus++;
+    });
+    if (!rendus) return;
+    // Les jauges, les pions et le panneau lisent cette fiche : ils doivent
+    // repartir de la valeur rendue, sinon l'écran garde le chiffre du rejeu.
+    if (typeof window.appliquerTokensVTT === "function" && window.TOKENS_VTT_DATA) {
+        try { window.appliquerTokensVTT(window.TOKENS_VTT_DATA); } catch (e) {}
+    }
+    if (typeof window.rafraichirAffichageCombat === "function") {
+        try { window.rafraichirAffichageCombat(); } catch (e) {}
+    }
+}
 
 const ANIMATIONS = {
     mouvement: (d) => window.jouerAnimationMouvement && window.jouerAnimationMouvement(d),
@@ -294,12 +387,16 @@ window.lireJournalCombat = async function() {
             window.EVENEMENT_EN_COURS = ev;
             window.ETAT_AVANT_REJEU = ev.avant || null;
             window.REJEU_SCRIPT_EN_COURS = true;
+            dejaServiAvant = new Set();
+            const garde = gardeDeRejeu(ev);
             try {
                 await window.filerAnimation(ev.type, () => jouer(ev.data));
             } finally {
                 window.REJEU_SCRIPT_EN_COURS = false;
                 window.ETAT_AVANT_REJEU = null;
                 window.EVENEMENT_EN_COURS = null;
+                dejaServiAvant = null;
+                rendreLaGarde(garde);
             }
             if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
             await pause(window.DELAI_ENTRE_ETAPES_MS);
@@ -362,6 +459,12 @@ window.etatSequenceTour = function() {
         return { message: "Touchez l'écran pour voir ce tour", okVisible: true, forcerVisible: false };
     }
 
+    // Le journal est hors service : il n'annoncera jamais de tour, et la fenêtre
+    // resterait sur « le tour se joue… » devant un plateau qu'on ne voit pas.
+    // On l'efface — les animations reprennent leur ancien chemin (voir
+    // programmerAnimationTour), et au moins le combat se regarde.
+    if (window.JOURNAL_INDISPONIBLE) return { message: "", okVisible: false, forcerVisible: false, masquee: true };
+
     if (window.monHerosJoue()) return null;      // à moi de jouer : plateau dégagé
     const tete = window.acteurCourantCombat();
     if (!tete) return null;
@@ -403,6 +506,11 @@ Object.defineProperty(window, "SEQUENCE_TOUR", {
 window.programmerAnimationTour = function(nom, action, fn) {
     // Un poste qui joue son propre héros voit tout en direct.
     if (window.monHerosJoue()) return window.filerAnimation(nom, fn);
+
+    // LE JOURNAL EST MUET. Taire une animation en comptant sur un numéro qui
+    // n'arrivera jamais, c'est un plateau où il ne se passe rien. On repasse au
+    // circuit d'avant : moins bien synchronisé, mais on voit le combat.
+    if (window.JOURNAL_INDISPONIBLE) return window.filerAnimation(nom, fn);
 
     // LA SEULE ANIMATION QU'ON NE PEUT PAS TAIRE CHEZ CELUI QUI CALCULE : la
     // carte. Ce n'est pas qu'une animation, c'est le moteur de résolution

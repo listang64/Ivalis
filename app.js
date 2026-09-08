@@ -121,7 +121,7 @@ function persoDocVersFront(id, d) {
       paradeCalc -= 20;
   }
 
-  return {
+  const fiche = {
     idPersonnage: id,
     idPartie: d.ID_Partie || "",
     idJoueur: d.ID_Joueur || "",
@@ -196,6 +196,23 @@ function persoDocVersFront(id, d) {
     // L'absence du champ vaut "actif" : toutes les fiches d'avant le restent.
     actif: d.Actif !== false
   };
+
+  // LA DERNIÈRE PAROLE DE LA BASE, mise de côté. Le rejeu d'un tour écrit dans
+  // la fiche locale du combattant (le moteur travaille par soustraction) ; quand
+  // il rejoue en retard, il écrase ce que la base a dit entre-temps — une
+  // brûlure qui tique, une régénération de fin de tour. sequence_tour.js rend
+  // alors au combattant ce qui est noté ici. C'est le seul endroit par où passe
+  // TOUT ce que la base raconte d'un combattant, monstres compris : c'est donc
+  // ici, et nulle part ailleurs, qu'on le note.
+  window.VERITE_BASE = window.VERITE_BASE || {};
+  window.VERITE_BASE[id] = {
+    PV_Actuels: fiche.PV_Actuels,
+    Bouclier_Actuel: fiche.Bouclier_Actuel,
+    fatigueActuelle: fiche.fatigueActuelle,
+    Etats_Alteres: JSON.parse(JSON.stringify(fiche.Etats_Alteres || [])),
+    statut: fiche.statut
+  };
+  return fiche;
 }
 
 // Partagée avec monstres.js : un monstre doit exposer exactement les mêmes champs
@@ -377,9 +394,32 @@ window.programmerAnimationTour = function(nom, action, fn) {
 //  l'événement et l'état du jeu — jamais l'animation, qui n'est que la
 //  représentation locale de l'événement reçu.
 //  Toute la logique vit dans sequence_tour.js ; ici, seulement la plomberie.
+//  LE JOURNAL VIT SOUS LA PARTIE — Systeme_Parties/{id}/Evenements_Combat/{n}
+//  —, et non dans une collection à part. La raison est technique et sans appel :
+//  une requête qui filtre sur un champ (ID_Partie) et borne/trie sur un AUTRE
+//  (n) exige un index composite, à créer à la main dans la console Firebase.
+//  Faute de cet index, Firestore REFUSE la requête : l'écoute ne livre jamais
+//  rien, aucun poste ne reçoit d'événement, et le combat reste derrière la
+//  fenêtre sombre en annonçant un tour qui ne se joue pas. Sous la partie, le
+//  filtre et le tri portent sur le SEUL champ n : l'index automatique de
+//  Firestore suffit, il n'y a rien à créer, et il n'y aura jamais rien à créer.
 const COL_EVENEMENTS = "Evenements_Combat";
-const idEvenement = (idPartie, n) => idPartie + "_" + String(n).padStart(6, "0");
-const refEvenement = (idPartie, n) => doc(db, COL_EVENEMENTS, idEvenement(idPartie, n));
+const numeroEvenement = (n) => String(n).padStart(6, "0");
+const collEvenements = (idPartie) => collection(db, COL.PARTIES, idPartie, COL_EVENEMENTS);
+const refEvenement = (idPartie, n) => doc(db, COL.PARTIES, idPartie, COL_EVENEMENTS, numeroEvenement(n));
+
+// LE FILET DE SÉCURITÉ. Si le journal ne fonctionne pas — droits, réseau,
+// requête refusée —, les postes qui REGARDENT ne doivent pas se retrouver
+// devant un plateau figé : ils reprennent les animations diffusées à l'ancienne
+// (les Action_* de la partie), comme avant le journal. Mieux vaut un combat
+// moins bien synchronisé qu'un combat qui ne montre rien.
+window.JOURNAL_INDISPONIBLE = false;
+function journalHorsService(e) {
+    console.error("Journal de combat indisponible — retour aux animations diffusées :", e);
+    if (window.JOURNAL_INDISPONIBLE) return;
+    window.JOURNAL_INDISPONIBLE = true;
+    if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
+}
 
 // LE NUMÉRO EST ATTRIBUÉ SOUS TRANSACTION, sur le compteur de la partie : deux
 // postes qui publient au même instant ne peuvent pas tomber sur le même.
@@ -400,7 +440,7 @@ window.publierEvenementCombat = async function(idPartie, evenement) {
         });
         return n;
     } catch (e) {
-        console.error("Publication d'un événement de combat :", e);
+        journalHorsService(e);
         return null;
     }
 };
@@ -411,15 +451,13 @@ window.publierEvenementCombat = async function(idPartie, evenement) {
 window.ecouterEvenementsCombat = function(idPartie, apres, rappel) {
     if (!idPartie) return () => {};
     try {
-        const q = query(collection(db, COL_EVENEMENTS),
-                        where("ID_Partie", "==", idPartie),
-                        where("n", ">", apres || 0),
-                        orderBy("n", "asc"));
+        const q = query(collEvenements(idPartie), where("n", ">", apres || 0), orderBy("n", "asc"));
         return onSnapshot(q, (snap) => {
+            window.JOURNAL_INDISPONIBLE = false;
             rappel(snap.docs.map(d => d.data()));
-        }, (e) => console.error("Écoute du journal de combat :", e));
+        }, journalHorsService);
     } catch (e) {
-        console.error("Écoute du journal de combat :", e);
+        journalHorsService(e);
         return () => {};
     }
 };
