@@ -3907,6 +3907,21 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
     const seq = window.SEQUENCE_TOUR;
     if (!seq || !seq.voile) return masquer();
 
+    // LA CROIX ROUGE l'a écartée à la main pour qu'on puisse regarder le plateau.
+    // Elle reste écartée tant que le tour retenu est le MÊME : dès qu'un
+    // nouveau tour se présente, la fenêtre reprend sa place toute seule — sinon
+    // on oublierait qu'on l'a fermée et on jouerait à l'aveugle. `revoirVoileTour()`
+    // la rappelle tout de suite.
+    if (window.VOILE_TOUR_MASQUE_DEBUG) {
+        const marque = `${seq.acteur}|${seq.idCarte || ""}`;
+        if (voile._tourMasqueDebug === undefined) voile._tourMasqueDebug = marque;
+        if (voile._tourMasqueDebug === marque) return masquer();
+        voile._tourMasqueDebug = undefined;
+        window.VOILE_TOUR_MASQUE_DEBUG = false;
+    } else {
+        voile._tourMasqueDebug = undefined;
+    }
+
     const partie = window.PARTIE_DATA || {};
     const queue = queueParam !== undefined ? queueParam : (partie.File_Attente_Combat || []);
     const phase = phaseParam !== undefined ? phaseParam : (partie.Phase_Combat || "Preparation");

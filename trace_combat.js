@@ -21,10 +21,18 @@
 //      [ 12.34s] iPad-Nico  📤 152  pas M1  (0,0 → 1,0)
 //      [ 12.51s] iPad-Nico  📥 152
 //      [ 13.02s] iPad-Nico  ⏸️  fenêtre : tour 3 de M1 (Griffes)
-//      [ 15.88s] iPad-Nico  👆 OK
+//      [ 15.88s] iPad-Nico  👆 OK — M1 (tour 3)  n°152 pas | 2 en file | tête : M1 | curseur 151
 //      [ 15.89s] iPad-Nico  ▶️  152  pas M1
 //      [ 16.31s] iPad-Nico  ⏹️  152
 //      [ 16.35s] iPad-Nico  💥 J1  60 → 48  (-12)  [auteur]
+//
+//  LA CROIX ROUGE DE LA FENÊTRE SOMBRE
+//  -----------------------------------
+//  En haut à droite du voile. Elle l'écarte SANS rien jouer : le plateau
+//  apparaît tel qu'il est, on regarde où en sont les pions et les jauges pendant
+//  que le tour est encore retenu, et rien n'est touché — ni le journal, ni la
+//  file. La fenêtre revient d'elle-même au tour suivant ; `revoirVoileTour()`
+//  la rappelle immédiatement.
 //
 //  La trace ne coûte rien : elle ne garde que les 500 dernières lignes, et se
 //  coupe entièrement avec `TRACE_COMBAT_ACTIVE = false`.
@@ -36,7 +44,7 @@
 // sur du vieux code — ce qui, dans un jeu où deux postes doivent s'entendre sur
 // qui joue, fabrique des bugs impossibles à comprendre autrement.
 // À MONTER À CHAQUE FOIS QUE index.html monte ses ?v=.
-window.VERSION_IVALIS = 27;
+window.VERSION_IVALIS = 28;
 
 window.TRACE_COMBAT_ACTIVE = true;
 // Quand une écriture de points de vie n'est ni un coup ni un rejeu mais une

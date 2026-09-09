@@ -756,6 +756,23 @@
                 <div id="voile-tour-ok" class="btn-lancer-carte btn-ok-voile" style="display: none;">OK</div>
                 <div id="voile-tour-forcer" style="display: none;"></div>
             </div>
+
+            <!-- LA SORTIE DE SECOURS. Une croix rouge qui lève la fenêtre sombre
+                 sans rien jouer : on voit le plateau tel qu'il est vraiment, on
+                 regarde où en sont les pions et les jauges, et on comprend ce qui
+                 déraille. Elle ne touche à rien — ni au journal, ni à la file :
+                 le tour retenu se rejouera dès qu'on rouvrira, ou au prochain
+                 événement. C'est un outil de débogage, pas une action de jeu. -->
+            <div id="voile-tour-fermer"
+                 onclick="event.stopPropagation(); window.masquerVoileTourDebug();"
+                 title="Fermer la fenêtre sombre (débogage) — le tour n'est pas joué"
+                 style="position: absolute; top: 14px; right: 18px; z-index: 3;
+                        width: 38px; height: 38px; border-radius: 50%;
+                        display: flex; align-items: center; justify-content: center;
+                        font-family: 'Cinzel', serif; font-size: 22px; font-weight: bold;
+                        color: #ff5c5c; background: rgba(30,8,8,0.75);
+                        border: 2px solid #ff5c5c; box-shadow: 0 0 12px rgba(255,60,60,0.45);
+                        cursor: pointer; pointer-events: auto; user-select: none;">✕</div>
         </div>
 
         <!-- NOUVEAU : HUD BAS DROITE (Z-index réduit à 5 pour passer sous le panneau gauche) -->
@@ -1589,15 +1606,15 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=4"></script>
+<script src="trace_combat.js?v=5"></script>
 <script type="module" src="ia_master.js?v=4"></script>
 <script type="module" src="app.js?v=34"></script>
 <script type="module" src="creation_personnage.js?v=4"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=13"></script>
 <script src="Plateau.js"></script>
-<script type="module" src="sequence_tour.js?v=15"></script>
-<script type="module" src="combat.js?v=42"></script>
+<script type="module" src="sequence_tour.js?v=16"></script>
+<script type="module" src="combat.js?v=43"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=17"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->

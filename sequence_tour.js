@@ -837,14 +837,68 @@ window.programmerAnimationTour = function(nom, action, fn) {
 //  les mêmes numéros, ils finiront au même point.
 window.jouerSequenceTour = function() {
     const attendu = window.EVENEMENT_ATTENDU;
-    if (!attendu) return Promise.resolve();
+    if (!attendu) {
+        // Un OK sur une fenêtre qui n'attend rien : ça arrive quand l'écran est
+        // resté sombre sans événement à jouer. Le dire est utile — c'est le
+        // signe d'un voile qui s'accroche pour une autre raison.
+        tracer("👆", "OK dans le vide", "(aucun tour en attente)");
+        return Promise.resolve();
+    }
 
     tourAcquitte = cleTour(attendu);
     window.EVENEMENT_ATTENDU = null;
-    tracer("👆", "OK", `(tour ${attendu.tour} de ${attendu.acteur})`);
+
+    // LE MOUCHARD DU OK, en détail. C'est le moment où le joueur reprend la
+    // main : savoir ce qu'il ouvre, combien de numéros lui restent à rattraper
+    // et où en est la file dit tout de suite si l'écran est en retard sur la
+    // partie, ou si c'est la partie qui l'attend.
+    const enAttente = Object.keys(window.EVENEMENTS_RECUS || {})
+        .filter(n => Number(n) > window.DERNIER_EVENEMENT_JOUE).length;
+    const tete = window.acteurCourantCombat();
+    tracer("👆", `OK — ${attendu.acteur} (tour ${attendu.tour})`,
+           `n°${attendu.n} ${attendu.type} | ${enAttente} en file | `
+           + `tête : ${tete ? tete.idPersonnage : "—"} | curseur ${window.DERNIER_EVENEMENT_JOUE}`);
+
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
     return window.lireJournalCombat();
+};
+
+// =========================================================================
+//  LA SORTIE DE SECOURS DE LA FENÊTRE SOMBRE
+// =========================================================================
+//  La croix rouge, en haut à droite du voile. Elle le lève SANS rien jouer :
+//  le plateau apparaît tel qu'il est vraiment, et on peut regarder où en sont
+//  les pions, les jauges et la piste d'initiative pendant que le tour est encore
+//  retenu. Rien n'est touché — ni le journal, ni la file, ni l'événement en
+//  attente : il se rejouera au prochain OK, ou à la prochaine arrivée. C'est un
+//  outil de débogage, jamais une action de jeu.
+window.VOILE_TOUR_MASQUE_DEBUG = false;
+
+window.masquerVoileTourDebug = function() {
+    window.VOILE_TOUR_MASQUE_DEBUG = true;
+    const attendu = window.EVENEMENT_ATTENDU;
+    tracer("👁️", "fenêtre sombre écartée à la main",
+           attendu ? `(le tour ${attendu.tour} de ${attendu.acteur} reste en attente)`
+                   : "(rien n'était retenu)");
+    const voile = document.getElementById("voile-tour-combat");
+    if (voile) {
+        // On note QUEL tour on écarte : la fenêtre reviendra d'elle-même au
+        // suivant (cf. rafraichirVoileTour), pour qu'on n'oublie pas l'avoir
+        // fermée et qu'on ne joue pas à l'aveugle tout un combat.
+        voile._tourMasqueDebug = attendu ? `${attendu.acteur}|${attendu.idCarte || ""}` : "";
+        voile.style.opacity = "0";
+        voile.style.pointerEvents = "none";
+        voile.style.display = "none";
+    }
+    console.log("%cFenêtre sombre écartée. Elle reviendra au prochain tour — "
+                + "ou tout de suite avec revoirVoileTour().", "color:#ff5c5c");
+};
+
+// Pour la faire revenir sans attendre le tour suivant.
+window.revoirVoileTour = function() {
+    window.VOILE_TOUR_MASQUE_DEBUG = false;
+    if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
 };
 
 // =========================================================================
