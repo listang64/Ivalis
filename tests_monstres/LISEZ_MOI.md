@@ -62,6 +62,7 @@ node sequence_tour.mjs      # le journal d'événements : ordre, trous, rattrapa
 node etat_combat.mjs        # LE NOYAU PUR : dés à graine, état du combat, invariants (sans réseau)
 node moteur_pur.mjs         # la chaîne de dégâts, maillon par maillon (10 000 cartes au hasard)
 node mouvement_pur.mjs      # chemin, coût des cases, attaques d'opportunité (1 000 trajets)
+node ia_pure.mjs            # qui viser, où se mettre : les cinq caractères, sans variable globale
 node journal_firestore.mjs  # la plomberie du journal face aux règles d'index de Firestore
 node deplacement_journal.mjs # un hexagone = un numéro : publication, ordre, absence de chevauchement
 node illusion_opportunite.mjs # une illusion ne porte aucune attaque d'opportunité
@@ -256,7 +257,15 @@ RÉSULTAT est figé dans l'état au début du combat, en appelant les vraies
 fonctions d'`app.js`. Une formule écrite à deux endroits finit toujours par
 diverger.
 
-Les trois bancs du noyau tournent en trois secondes, dix mille cartes et mille
+L'IA des créatures suit (`ia_pure.js`) : faire jouer un monstre, c'est répondre à
+deux questions — QUI viser, OÙ se mettre. Ces réponses se prenaient en lisant
+quatre variables globales (fiches, pions, zones, plateau), chacune pouvant être
+en retard d'une notification : deux postes qui faisaient jouer la même créature
+au même instant n'avaient donc pas le même plateau sous les yeux, et prenaient
+deux décisions différentes. C'est très exactement ce que montrait la trace de
+Nico. Désormais la décision ne dépend que de l'état passé et de la graine.
+
+Les quatre bancs du noyau tournent en trois secondes, dix mille cartes et mille
 trajets au hasard compris. Le test de propriété a déjà trouvé un vrai bug qu'aucun
 banc précédent ne pouvait voir : une valeur brute négative posait un bouclier
 négatif.

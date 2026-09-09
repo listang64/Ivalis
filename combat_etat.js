@@ -176,6 +176,9 @@ function combattantBrut(fiche, position) {
         joueur: fiche.estMonstre ? "" : (fiche.idJoueur || ""),
         race: fiche.race || "",
         couleur: fiche.couleur || "",
+        // Le caractère d'une créature : c'est lui qui décide si elle fonce, si
+        // elle contourne, ou si elle refuse d'entrer dans les flammes.
+        personnalite: fiche.Personnalite || "",
 
         pv: nombre(fiche.PV_Actuels, pvMax),
         pvMax,
