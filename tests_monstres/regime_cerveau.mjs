@@ -219,6 +219,9 @@ function creerPoste(f, poste, options = {}) {
     return { poste, regime, vu, fiches: () => fiches, ecran: () => dernier };
 }
 
+const lireDepuisBanc = async (f, partie) =>
+    await f.ioPour("banc").lister(CHEMINS.journal(partie), { champ: "v", sup: 0, tri: "v" });
+
 const empreinte = (etat) => {
     if (!etat) return "—";
     return Object.keys(etat.combattants).sort().map(id => {
@@ -717,6 +720,121 @@ async function banc() {
         }
         verifier("la vraie suite, elle, avance", ben.regime.vue() > vueAvant,
                  `(${vueAvant} → ${ben.regime.vue()})`);
+    }
+
+    // =====================================================================
+    console.log("\n10. L'ÉTAT D'UNE RENCONTRE PÉRIMÉE N'EMPÊCHE PAS LA SUIVANTE");
+    // =====================================================================
+    //  Le bug qui a coûté l'essai suivant, et il tenait à une seule question
+    //  mal posée. On demandait « y a-t-il un état publié ? » pour décider s'il
+    //  fallait ouvrir. Or l'état de la rencontre PRÉCÉDENTE survivait à la
+    //  réinitialisation : la réponse était oui, personne n'ouvrait, et le
+    //  plateau ne démarrait pas — sans une ligne dans la trace pour le dire.
+    //
+    //  La bonne question est « cet état parle-t-il de CETTE rencontre ? ».
+    {
+        const f = firestoreDeBanc();
+        const nico = creerPoste(f, "P_03");
+        await nico.regime.ouvrir(SOURCE);
+        await f.livrer();
+        await nico.regime.demanderFinDeTour("H1");
+        await f.livrer();
+        await nico.regime.tourner();
+        await f.livrer();
+
+        const ancien = await f.ioPour("P_03").lire(CHEMINS.etat(PARTIE));
+        verifier("la première rencontre a laissé un état", !!ancien && ancien.version > 0,
+                 `(version ${ancien.version}, combat ${ancien.combat})`);
+
+        // La rencontre suivante, avec sa propre identité. L'ancien état est
+        // encore là : il ne doit rien empêcher.
+        const suivante = { ...SOURCE, combat: "renc_banc_SUIVANTE" };
+        const ouvert = await nico.regime.ouvrir(suivante);
+        await f.livrer();
+        verifier("la rencontre suivante s'ouvre malgré l'état périmé", !!ouvert);
+        const neuf = await f.ioPour("P_03").lire(CHEMINS.etat(PARTIE));
+        verifier("et l'état publié est celui de la NOUVELLE rencontre",
+                 neuf.combat === "renc_banc_SUIVANTE", neuf.combat);
+        verifier("reparti de la version 0", neuf.version === 0, `(${neuf.version})`);
+
+        // Et l'écran ne rejoue pas le journal de la rencontre d'avant.
+        verifier("le journal de la rencontre d'avant a été balayé",
+                 (await lireDepuisBanc(f, PARTIE)).every(e => e.combat === "renc_banc_SUIVANTE"),
+                 "");
+    }
+
+    // =====================================================================
+    console.log("\n11. FERMER UN COMBAT NE LAISSE RIEN DERRIÈRE");
+    // =====================================================================
+    //  Une réinitialisation doit rendre la place nette : ni journal, ni
+    //  intentions, ni état. Tant que l'état traînait, la rencontre suivante ne
+    //  démarrait pas.
+    {
+        const f = firestoreDeBanc();
+        const nico = creerPoste(f, "P_03");
+        await nico.regime.ouvrir(SOURCE);
+        await f.livrer();
+        await nico.regime.demanderFinDeTour("H1");
+        await f.livrer();
+        await nico.regime.tourner();
+        await f.livrer();
+
+        verifier("le combat a bien laissé des traces en base",
+                 !!(await f.ioPour("P_03").lire(CHEMINS.etat(PARTIE))));
+
+        await nico.regime.fermer();
+        verifier("l'état a disparu",
+                 (await f.ioPour("P_03").lire(CHEMINS.etat(PARTIE))) === null);
+        verifier("le journal aussi", (await lireDepuisBanc(f, PARTIE)).length === 0);
+        verifier("et les intentions",
+                 (await f.ioPour("P_03").lister(CHEMINS.intentions(PARTIE), { tri: "ts" })).length === 0);
+
+        // Et la rencontre suivante repart de zéro, proprement.
+        const apres = creerPoste(f, "P_01");
+        const ouvert = await apres.regime.ouvrir({ ...SOURCE, combat: "renc_apres_menage" });
+        await f.livrer();
+        verifier("la rencontre suivante s'ouvre sur une place nette", !!ouvert);
+        verifier("et c'est le poste qui a ouvert qui tient le cerveau",
+                 apres.regime.jeSuisLeCerveau() === true);
+    }
+
+    // =====================================================================
+    console.log("\n12. ON DÉPLACE LES PIONS, ON N'EN INVENTE PAS");
+    // =====================================================================
+    //  La projection créait l'entrée manquante avec seulement q et r. Le
+    //  plateau la redessinait aussitôt, sans image ni nom : une volée de
+    //  « GET .../undefined 404 » et des pions fantômes sur la carte. Un
+    //  combattant que le plateau ne connaît pas encore n'est pas à nous de le
+    //  créer.
+    {
+        const { pionsDepuisEtat } = await import('../pont_combat.js');
+        const f = firestoreDeBanc();
+        const nico = creerPoste(f, "P_03");
+        await nico.regime.ouvrir(SOURCE);
+        await f.livrer();
+
+        const etat = nico.regime.etatAffiche();
+        const pions = pionsDepuisEtat(etat);
+        verifier("chaque combattant sur le plateau a sa case",
+                 Object.keys(pions).length === Object.keys(etat.combattants).length);
+
+        // La table du jeu, telle qu'elle est vraiment : des pions complets.
+        const table = { H1: { q: 9, r: 9, image: "h1.png" } };
+        const poser = (p2) => {
+            if (!table) return;
+            Object.keys(p2).forEach(id => {
+                const t = table[id];
+                if (!t) return;
+                if (p2[id].q === null || p2[id].r === null) return;
+                t.q = p2[id].q; t.r = p2[id].r;
+            });
+        };
+        poser(pions);
+        verifier("le pion connu est déplacé", table.H1.q === 0 && table.H1.r === 0,
+                 `(${table.H1.q},${table.H1.r})`);
+        verifier("et il garde tout ce qu'il avait", table.H1.image === "h1.png");
+        verifier("aucun pion n'est inventé", Object.keys(table).length === 1,
+                 Object.keys(table).join(","));
     }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

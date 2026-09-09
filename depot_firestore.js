@@ -260,6 +260,20 @@ export async function fermerCombat(io, idPartie) {
     return await faireTableRase(io, idPartie);
 }
 
+// EFFACER, c'est autre chose que fermer : on retire aussi l'ÉTAT. C'est ce
+// qu'une réinitialisation demande — la rencontre n'a pas eu lieu, il ne doit
+// rien en rester.
+//
+// Ce n'est pas une précaution de principe. Tant que l'état d'une rencontre
+// périmée traînait en base, la question « y a-t-il un combat publié ? »
+// répondait oui, personne n'ouvrait la rencontre suivante, et le plateau ne
+// démarrait pas — sans une ligne dans la trace pour le dire.
+export async function effacerLeCombat(io, idPartie) {
+    const efface = await faireTableRase(io, idPartie);
+    await io.lot([{ op: "delete", chemin: CHEMINS.etat(idPartie) }]);
+    return efface;
+}
+
 // =========================================================================
 //  5. CE QU'UN ÉCRAN ÉCOUTE
 // =========================================================================
@@ -308,7 +322,7 @@ if (typeof window !== "undefined") {
         COL_ETAT, COL_JOURNAL, COL_INTENTIONS, CHEMINS, numeroEntree,
         requeteJournal, requeteIntentions, enAttente,
         creerDepot, fabriquerIntention, envoyerIntention,
-        faireTableRase, ouvrirCombat, fermerCombat,
+        faireTableRase, ouvrirCombat, fermerCombat, effacerLeCombat,
         ecouterCombat, lireEntree, lireDepuis
     };
 }

@@ -501,6 +501,30 @@ sombre lit donc maintenant l'état AFFICHÉ par le spectateur — celui que cet 
 montre vraiment, pas celui que la base annonce. Un poste en retard raconte son
 propre retard, ce qui est exactement ce qu'on veut.
 
+### La question qu'on pose avant d'ouvrir
+
+Une seule question mal posée a coûté un essai entier. On demandait **« y a-t-il
+un état publié ? »** pour décider s'il fallait ouvrir. Or l'état de la rencontre
+précédente survivait à la réinitialisation — `fermerCombat` gardait
+délibérément l'état « parce qu'il dit qui a gagné ». La réponse était donc oui,
+personne n'ouvrait le nouveau combat, et le plateau ne démarrait pas. Aucune
+trace, aucune erreur, aucun `❌` : juste un silence complet après
+`⚙️ combat en régime CERVEAU`.
+
+La bonne question est **« cet état parle-t-il de CETTE rencontre ? »**. Un état
+qui parle d'une autre n'a plus cours, et il faut ouvrir par-dessus.
+
+Deux hygiènes s'ajoutent :
+
+- **Une réinitialisation n'épargne plus l'état.** Elle efface tout — journal,
+  intentions, état — et le fait même quand aucun régime n'est branché, puisque
+  c'est justement quand un état périmé traîne qu'il bloque la suite.
+- **La projection déplace les pions, elle n'en invente pas.** Elle créait
+  l'entrée manquante avec seulement `q` et `r` ; le plateau la redessinait
+  aussitôt sans image ni nom, d'où une volée de `GET .../undefined 404` et des
+  pions fantômes. Un combattant que le plateau ne connaît pas encore n'est pas à
+  nous de le créer.
+
 ### Le nouveau régime est le régime
 
 Il était éteint par défaut le temps de l'essayer ; il ne l'est plus. Et **un

@@ -35,7 +35,7 @@ import { creerCerveau, estLeCerveau, cerveauPerdu, ouvrirManche, BATTEMENT_MS } 
 import { creerSpectateur } from './spectateur_combat.js';
 import { creerPont, creerProjection } from './pont_combat.js';
 import {
-    creerDepot, ouvrirCombat, fermerCombat, ecouterCombat,
+    creerDepot, ouvrirCombat, effacerLeCombat, ecouterCombat,
     lireEntree, envoyerIntention, CHEMINS
 } from './depot_firestore.js';
 
@@ -273,8 +273,10 @@ export function creerRegime(contexte) {
         return pas.entree.v;
     }
 
+    // Fermer une rencontre, c'est ne rien en laisser : ni journal, ni
+    // intentions, ni état. Le combat suivant doit trouver la place nette.
     async function fermer() {
-        try { await fermerCombat(io, idPartie); } catch (e) {}
+        try { await effacerLeCombat(io, idPartie); } catch (e) {}
         debrancher();
     }
 
@@ -411,12 +413,23 @@ function contexteDuJeu() {
         // OÙ POSER L'ÉTAT. Un seul sens : l'état descend, rien ne remonte.
         ecran: {
             lireFiches: () => window.PERSOS_PARTIE || [],
+            // ON DÉPLACE LES PIONS, ON N'EN INVENTE PAS.
+            //
+            // La première version créait l'entrée manquante avec seulement q et
+            // r. Le plateau la redessinait aussitôt, sans image ni nom : d'où
+            // une volée de « GET .../undefined 404 » et trois pions fantômes
+            // sur la carte. Un combattant que le plateau ne connaît pas encore
+            // n'est pas à nous de le créer — c'est le chargement des pions qui
+            // s'en charge, avec tout ce qu'il faut.
             poserPions: (pions) => {
-                window.TOKENS_VTT_DATA = window.TOKENS_VTT_DATA || {};
+                const table = window.TOKENS_VTT_DATA;
+                if (!table) return;
                 Object.keys(pions).forEach(id => {
-                    const t = window.TOKENS_VTT_DATA[id];
-                    if (t) { t.q = pions[id].q; t.r = pions[id].r; }
-                    else window.TOKENS_VTT_DATA[id] = { ...pions[id] };
+                    const t = table[id];
+                    if (!t) return;
+                    if (pions[id].q === null || pions[id].r === null) return;
+                    t.q = pions[id].q;
+                    t.r = pions[id].r;
                 });
             },
             poserFiches: (fiches) => { window.PERSOS_PARTIE = fiches; },
@@ -573,7 +586,20 @@ if (typeof window !== "undefined") {
         if (phase === "Resolution" && avant === "Preparation") {
             const publie = REGIME.etatPublie();
             const file = (partie.File_Attente_Combat || []);
-            if (!publie) {
+
+            // « Y A-T-IL UN ÉTAT PUBLIÉ ? » ÉTAIT LA MAUVAISE QUESTION.
+            //
+            // Elle a coûté un essai entier : l'état de la rencontre PRÉCÉDENTE
+            // survivait à la réinitialisation, la réponse était donc oui, et
+            // personne n'ouvrait le nouveau combat. Aucune trace, aucune
+            // erreur, rien — juste un plateau qui ne démarre pas.
+            //
+            // La bonne question est « l'état publié parle-t-il de CETTE
+            // rencontre ? ». Un état qui parle d'une autre n'a plus cours, et
+            // il faut ouvrir par-dessus.
+            const idCombat = sourceDuJeu().combat;
+            const memeCombat = !!publie && publie.combat === idCombat;
+            if (!memeCombat) {
                 // SI L'OUVERTURE ÉCHOUE, LE COMBAT S'ARRÊTE — ON NE RETOMBE PAS
                 // DANS L'ANCIEN RÉGIME.
                 //
@@ -657,7 +683,19 @@ if (typeof window !== "undefined") {
 
     // LE COMBAT S'ARRÊTE (victoire, fuite, réinitialisation). On range.
     window.regimeFermerLeCombat = async function() {
-        if (!window.REGIME_CERVEAU || !REGIME) return;
+        // Même sans régime branché, l'état de la rencontre précédente doit
+        // partir : c'est justement quand il traîne qu'il empêche la suivante de
+        // s'ouvrir. On efface donc dans tous les cas.
+        if (!window.REGIME_CERVEAU) return;
+        if (!REGIME) {
+            try {
+                if (window.ioCombatFirestore && window.ID_PARTIE_COURANTE) {
+                    await effacerLeCombat(window.ioCombatFirestore, window.ID_PARTIE_COURANTE);
+                }
+            } catch (e) { console.error("Ménage du combat :", e); }
+            phasePrecedente = null;
+            return;
+        }
         await REGIME.fermer();
         REGIME = null;
         partieSuivie = null;

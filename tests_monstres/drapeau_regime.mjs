@@ -128,7 +128,10 @@ console.log("\n3. LE DRAPEAU EST ÉTEINT PAR DÉFAUT, ET IL SE GARDE");
     // quand le drapeau est éteint. On les nomme une par une : une garde
     // manquante ne se verrait qu'en jeu.
     [['regimeSuivreLaPartie', 'if (!window.REGIME_CERVEAU) { phasePrecedente = phaseVue; return; }'],
-     ['regimeFermerLeCombat', 'if (!window.REGIME_CERVEAU || !REGIME) return;']]
+     // Elle nettoie même quand aucun régime n'est branché : c'est justement
+     // quand un état périmé traîne qu'il empêche la rencontre suivante de
+     // s'ouvrir. Sa garde ne porte donc que sur le drapeau.
+     ['regimeFermerLeCombat', 'if (!window.REGIME_CERVEAU) return;\n        if (!REGIME) {']]
         .forEach(([nom, garde]) => {
             verifier(`${nom} sort tout de suite si le drapeau est éteint`, r.includes(garde));
         });
@@ -338,6 +341,40 @@ console.log("\n10. UNE SEULE OUVERTURE, ET UNE SEULE TRANSACTION");
              spectateur.includes("if (moi.combat && e.combat && e.combat !== moi.combat)"));
     verifier("l'identité vient du jeu, pas d'un tirage local",
              SOURCES['regime_cerveau.js'].includes('combat: partie.ID_Rencontre'));
+}
+
+// =========================================================================
+console.log("\n11. LA QUESTION QU'ON POSE AVANT D'OUVRIR");
+// =========================================================================
+//  « Y a-t-il un état publié ? » était la mauvaise question, et elle a coûté un
+//  essai entier : l'état de la rencontre précédente survivait à la
+//  réinitialisation, la réponse était donc oui, et personne n'ouvrait le
+//  nouveau combat. Aucune trace, aucune erreur — juste un plateau qui ne
+//  démarre pas.
+//
+//  La bonne question est « cet état parle-t-il de CETTE rencontre ? ».
+{
+    const r = SOURCES['regime_cerveau.js'];
+    const depot = lire('depot_firestore.js');
+
+    verifier("on compare l'identité de la rencontre",
+             r.includes('const memeCombat = !!publie && publie.combat === idCombat;'));
+    verifier("et c'est elle qui décide d'ouvrir", r.includes('if (!memeCombat) {'));
+    verifier("on ne se contente plus de l'existence d'un état",
+             !r.includes('if (!publie) {'));
+
+    // Le ménage : une réinitialisation ne laisse rien, état compris.
+    verifier("effacer un combat retire aussi l'état",
+             depot.includes('op: "delete", chemin: CHEMINS.etat(idPartie)'));
+    verifier("et la fermeture passe par là", r.includes('await effacerLeCombat(io, idPartie)'));
+    verifier("même sans régime branché, l'état périmé part",
+             r.includes('await effacerLeCombat(window.ioCombatFirestore, window.ID_PARTIE_COURANTE)'));
+
+    // Les pions : on déplace, on n'invente pas.
+    verifier("la projection ne fabrique pas de pion",
+             r.includes('const t = table[id];\n                    if (!t) return;'));
+    verifier("et elle ignore un combattant hors du plateau",
+             r.includes('if (pions[id].q === null || pions[id].r === null) return;'));
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
