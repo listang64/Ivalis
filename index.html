@@ -1621,6 +1621,12 @@
 <!-- LE SPECTATEUR : la boucle de rejeu. Elle lit le journal du cerveau, ouvre
      la fenêtre de tour, anime PUIS applique, et ne saute jamais un numéro. -->
 <script type="module" src="spectateur_combat.js?v=1"></script>
+<!-- LE DÉPÔT : la seule chose qui écrive pendant un combat. Un pas = un lot,
+     et le lot porte l'état, l'entrée de journal et la fermeture de l'intention. -->
+<script type="module" src="depot_firestore.js?v=1"></script>
+<!-- LE PONT : de l'étape à ce qu'on voit. Il traduit un résultat déjà calculé
+     vers les animations existantes — il ne recalcule jamais rien. -->
+<script type="module" src="pont_combat.js?v=1"></script>
 <script type="module" src="ia_master.js?v=4"></script>
 <script type="module" src="app.js?v=34"></script>
 <script type="module" src="creation_personnage.js?v=4"></script>
