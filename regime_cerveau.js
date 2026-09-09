@@ -36,7 +36,7 @@ import { creerSpectateur } from './spectateur_combat.js';
 import { creerPont, creerProjection } from './pont_combat.js';
 import {
     creerDepot, ouvrirCombat, effacerLeCombat, ecouterCombat,
-    lireEntree, envoyerIntention, CHEMINS
+    lireEntree, lireDepuis, envoyerIntention, CHEMINS
 } from './depot_firestore.js';
 
 const nombre = (v, defaut = 0) => {
@@ -143,6 +143,10 @@ export function creerRegime(contexte) {
     //  Deux écoutes, et il n'y en aura jamais d'autres : l'état, et les entrées
     //  qui suivent le curseur de cet écran.
     function brancher(depuis = 0) {
+        // SE BRANCHER DEUX FOIS, C'EST PERDRE SA PLACE. Débrancher remet le
+        // curseur et la file des entrées reçues à zéro ; si on est déjà
+        // branché sur cette partie, il n'y a rien à refaire, et tout à perdre.
+        if (moi.branche) return;
         debrancher();
         moi.branche = true;
 
@@ -160,7 +164,18 @@ export function creerRegime(contexte) {
                            `(ce poste connaît le ${FORMAT_ETAT} — recharge la page)`);
                     return;
                 }
-                const premier = !moi.etat;
+                // LE POINT DE DÉPART SUIT L'IDENTITÉ DU COMBAT, PAS « LA
+                // PREMIÈRE FOIS QU'ON VOIT UN ÉTAT ».
+                //
+                // C'était « la première fois », et ça a figé un écran : le
+                // poste qui PERD la réclamation d'ouverture se rebranchait, et
+                // sa première notification le faisait repartir de la version
+                // courante — effaçant d'un coup les trois entrées déjà reçues
+                // et la fenêtre qui attendait le OK. Le joueur cliquait dans le
+                // vide, et le combat ne se voyait jamais.
+                //
+                // Repartir n'a de sens qu'à un vrai changement de combat.
+                const changementDeCombat = !moi.etat || moi.etat.combat !== etat.combat;
                 moi.etat = etat;
 
                 // On (re)prend la main si l'état nous désigne, on la lâche
@@ -175,10 +190,28 @@ export function creerRegime(contexte) {
                     tracer("👀", "ce poste regarde", `(le cerveau est ${etat.cerveau})`);
                 }
 
-                // LE PREMIER ÉTAT REÇU DONNE LE POINT DE DÉPART DE L'ÉCRAN. On
-                // ne rejoue pas les trois cents entrées qui ont précédé : on
-                // part de là, et on s'anime à partir de la suite.
-                if (premier) spectateur.repartirDe(etat, etat.version);
+                // On ne rejoue pas les trois cents entrées d'un combat qu'on
+                // rejoint en route : on part de l'état publié, et on s'anime à
+                // partir de la suite.
+                if (changementDeCombat) {
+                    spectateur.repartirDe(etat, etat.version);
+                    // ET ON RELIT LE JOURNAL, une fois.
+                    //
+                    // L'état et le journal sont deux documents, donc deux
+                    // écoutes : rien ne garantit leur ordre d'arrivée. Les
+                    // entrées d'un combat qu'on ne connaissait pas encore ont
+                    // pu être écartées à la porte (elles portaient une autre
+                    // identité que celle qu'on avait), et une écoute ne
+                    // renotifie que lorsqu'un document bouge. Sans cette
+                    // relecture, elles ne reviendraient jamais et l'écran
+                    // resterait au point de départ pendant que le combat avance.
+                    lireDepuis(io, idPartie, etat.version).then(entrees => {
+                        if (!entrees || entrees.length === 0) return;
+                        spectateur.recevoir(entrees);
+                        spectateur.lire();
+                    }).catch(e => tracer("❌", "relecture du journal impossible",
+                                         String(e && e.message)));
+                }
 
                 if (aMoi) tourner();
             },
@@ -228,7 +261,7 @@ export function creerRegime(contexte) {
             // spectateur. Ce n'est PAS un échec.
             moi.ouvertureAilleurs = true;
             tracer("🤝", "un autre poste a ouvert ce combat", "on regarde");
-            brancher(0);
+            brancher(0);          // sans effet si on l'est déjà, et c'est voulu
             return null;
         }
         tracer("🎬", `combat ouvert par ${poste}`,
@@ -531,6 +564,7 @@ if (typeof window !== "undefined") {
     let partieSuivie = null;
     let phasePrecedente = null;
     let aPrevenuSansCombat = false;
+    let ouvertureEnCours = false;
 
     window.regimeDuJeu = () => REGIME;
 
@@ -616,11 +650,14 @@ if (typeof window !== "undefined") {
                 // Un ABANDON n'est pas un échec : quand un autre poste a déjà
                 // réclamé cette rencontre, `ouvrir` rend null sans rien casser.
                 // On le distingue par le drapeau `dejaOuvert`.
+                ouvertureEnCours = true;
                 REGIME.ouvrir(sourceDuJeu()).then(resultat => {
+                    ouvertureEnCours = false;
                     if (resultat) return;
                     if (REGIME && REGIME.ouvertureAilleurs()) return;   // un autre poste a la main
                     arreterLeCombat("le combat n'a pas pu s'ouvrir");
                 }).catch(e => {
+                    ouvertureEnCours = false;
                     console.error("Ouverture du combat :", e);
                     arreterLeCombat("erreur pendant l'ouverture : " + (e && e.message));
                 });
@@ -644,7 +681,12 @@ if (typeof window !== "undefined") {
         //    élection, et c'est précisément ce qu'on a supprimé. On le DIT, une
         //    fois, au lieu de laisser un plateau qui n'avance plus sans raison
         //    visible.
-        if (phase === "Resolution" && !REGIME.etatPublie() && !aPrevenuSansCombat) {
+        // ... et seulement si personne n'est en train d'ouvrir. Pendant la
+        // réclamation, l'état n'est pas encore publié — ce n'est pas la même
+        // chose que « il n'y en aura pas ». L'avertissement disait donc le
+        // contraire de la vérité à chaque début de combat.
+        if (phase === "Resolution" && !REGIME.etatPublie()
+            && !ouvertureEnCours && !aPrevenuSansCombat) {
             aPrevenuSansCombat = true;
             if (typeof window.tracerCombat === "function") {
                 window.tracerCombat("🛑", "nouveau régime coché en cours de combat",

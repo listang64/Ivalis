@@ -171,6 +171,21 @@ const CARTES = {
             attaques: [{ valeurBrute: 7, isRanged: true }], alterations: [] }
 };
 
+// La même rencontre, mais c'est une créature qui ouvre la manche. C'est le cas
+// courant en jeu — l'initiative ne trie pas les camps — et c'est le seul où le
+// cerveau publie AVANT qu'un joueur ait cliqué quoi que ce soit. Sans ça, les
+// deux chapitres qui suivent ne verraient jamais une seule entrée arriver.
+const SOURCE_CREATURE_DABORD = {
+    ...SOURCE,
+    partie: {
+        ...SOURCE.partie,
+        File_Attente_Combat: [
+            { idPersonnage: "M1", idCarte: "C_M1" }, { idPersonnage: "H1", idCarte: "C_H1" },
+            { idPersonnage: "M2", idCarte: "C_M2" }, { idPersonnage: "H2", idCarte: "C_H2" }
+        ]
+    }
+};
+
 const HEROS_DE = { P_03: ["H1"], P_01: ["H2"], P_07: [] };
 const PARTIE = "GAME_TEST";
 
@@ -835,6 +850,122 @@ async function banc() {
         verifier("et il garde tout ce qu'il avait", table.H1.image === "h1.png");
         verifier("aucun pion n'est inventé", Object.keys(table).length === 1,
                  Object.keys(table).join(","));
+    }
+
+    // =====================================================================
+    console.log("\n13. CELUI QUI PERD LA RÉCLAMATION NE PERD PAS SA PLACE");
+    // =====================================================================
+    //  Le bug qui a figé un écran, et mon banc ne le reproduisait pas parce
+    //  qu'il pilotait l'ouverture au lieu de la laisser courir.
+    //
+    //  Le poste qui PERD la réclamation se rebranchait. Or se rebrancher, c'est
+    //  débrancher d'abord — donc remettre le curseur et la file des entrées
+    //  reçues à zéro. Les trois entrées déjà arrivées et la fenêtre qui
+    //  attendait le OK disparaissaient d'un coup, et le joueur cliquait dans le
+    //  vide pendant que le combat avançait sans lui.
+    {
+        const f = firestoreDeBanc();
+        const nico = creerPoste(f, "P_03");
+        const ben = creerPoste(f, "P_01");
+
+        // Ben est branché depuis le chargement de sa page, comme en vrai.
+        ben.regime.rejoindre();
+        await f.livrer();
+
+        // Nico ouvre, le cerveau publie deux tours de créature.
+        await nico.regime.ouvrir(SOURCE_CREATURE_DABORD);
+        await f.livrer();
+        await nico.regime.tourner();
+        await f.livrer();
+
+        const enFileAvant = ben.regime.spectateur.enFile();
+        const attenduAvant = ben.regime.spectateur.enAttente();
+        verifier("Ben a reçu des entrées et attend le OK",
+                 enFileAvant > 0 || !!attenduAvant,
+                 `(${enFileAvant} en file, fenêtre ${attenduAvant ? "ouverte" : "fermée"})`);
+
+        // MAINTENANT Ben tente d'ouvrir le même combat, et perd.
+        const perdu = await ben.regime.ouvrir(SOURCE_CREATURE_DABORD);
+        await f.livrer();
+        verifier("il perd la réclamation", perdu === null);
+        verifier("et il le sait", ben.regime.ouvertureAilleurs() === true);
+
+        // ET IL N'A RIEN PERDU.
+        verifier("son curseur n'a pas sauté par-dessus les entrées",
+                 ben.regime.vue() === 0, `(vue ${ben.regime.vue()})`);
+        verifier("sa fenêtre attend toujours le même tour",
+                 !!ben.regime.spectateur.enAttente(), "");
+
+        // Et le OK marche.
+        for (let i = 0; i < 10 && ben.regime.spectateur.enAttente(); i++) {
+            await ben.regime.ok(); await f.livrer();
+        }
+        const publie = await f.ioPour("P_03").lire(CHEMINS.etat(PARTIE));
+        verifier("le OK rejoue vraiment le combat", ben.regime.vue() === publie.version,
+                 `(${ben.regime.vue()} / ${publie.version})`);
+        verifier("et son écran montre l'état publié",
+                 empreinte(ben.regime.etatAffiche()) === empreinte(publie),
+                 empreinte(ben.regime.etatAffiche()));
+
+        // Le cerveau regarde son propre écran comme les autres : le tour d'une
+        // créature n'est à personne, donc sa fenêtre s'ouvre aussi. Une fois
+        // qu'il a cliqué, les deux écrans se rejoignent.
+        for (let i = 0; i < 10 && nico.regime.spectateur.enAttente(); i++) {
+            await nico.regime.ok(); await f.livrer();
+        }
+        verifier("le cerveau aussi doit cliquer pour voir le tour",
+                 nico.vu.animations.length > 0, `(${nico.vu.animations.length})`);
+        verifier("et alors les deux écrans se rejoignent",
+                 empreinte(ben.regime.etatAffiche()) === empreinte(nico.regime.etatAffiche()),
+                 empreinte(nico.regime.etatAffiche()));
+        verifier("il a vu les animations passer", ben.vu.animations.length > 0,
+                 `(${ben.vu.animations.length})`);
+    }
+
+    // =====================================================================
+    console.log("\n14. LES DEUX ÉCOUTES N'ARRIVENT PAS DANS L'ORDRE");
+    // =====================================================================
+    //  L'état et le journal sont deux documents, donc deux écoutes : rien ne
+    //  garantit leur ordre. Une entrée d'un combat qu'on ne connaît pas encore
+    //  est écartée à la porte — c'est voulu — mais une écoute ne renotifie que
+    //  lorsqu'un document bouge. Sans relecture, ces entrées ne reviendraient
+    //  jamais, et l'écran resterait au départ pendant que le combat avance.
+    {
+        const f = firestoreDeBanc();
+        const nico = creerPoste(f, "P_03");
+        await nico.regime.ouvrir(SOURCE_CREATURE_DABORD);
+        await f.livrer();
+        await nico.regime.tourner();
+        await f.livrer();
+
+        const publie = await f.ioPour("P_03").lire(CHEMINS.etat(PARTIE));
+        verifier("le cerveau a publié des entrées", publie.version > 0,
+                 `(version ${publie.version})`);
+
+        // Un poste qui arrive maintenant : il reçoit tout d'un coup, et il doit
+        // repartir de l'état publié — pas rester à zéro.
+        const tard = creerPoste(f, "P_07");
+        tard.regime.rejoindre();
+        await f.livrer({ melanger: true, tours: 20 });
+
+        verifier("le retardataire est reparti de l'état publié",
+                 tard.regime.vue() === publie.version,
+                 `(vue ${tard.regime.vue()} / ${publie.version})`);
+        verifier("et il voit le même plateau",
+                 empreinte(tard.regime.etatAffiche()) === empreinte(publie));
+
+        // La suite lui arrive normalement.
+        await nico.regime.demanderFinDeTour("H1");
+        await f.livrer();
+        await nico.regime.tourner();
+        await f.livrer();
+        for (let i = 0; i < 10 && tard.regime.spectateur.enAttente(); i++) {
+            await tard.regime.ok(); await f.livrer();
+        }
+        const apres = await f.ioPour("P_03").lire(CHEMINS.etat(PARTIE));
+        verifier("et la suite se joue chez lui aussi",
+                 tard.regime.vue() === apres.version,
+                 `(${tard.regime.vue()} / ${apres.version})`);
     }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

@@ -525,6 +525,42 @@ Deux hygiènes s'ajoutent :
   pions fantômes. Un combattant que le plateau ne connaît pas encore n'est pas à
   nous de le créer.
 
+### Celui qui perd la réclamation ne perd pas sa place
+
+Trois postes ouvrent, un gagne — c'était acquis. Ce qui ne l'était pas : **ce
+que devient celui qui perd**.
+
+Il se rebranchait. Or se rebrancher, c'est débrancher d'abord — donc remettre le
+curseur et la file des entrées reçues à zéro. Les entrées déjà arrivées et la
+fenêtre qui attendait le OK disparaissaient d'un coup, et le joueur cliquait
+dans le vide pendant que le combat avançait sans lui. La trace le disait presque
+mot pour mot :
+
+```
+📥 1, 2, 3 reçues     ⏸️ fenêtre en attente du OK, n°1
+🤝 un autre poste a ouvert ce combat
+📚 journal branché (à partir de 3)     ← tout est effacé
+👆 OK dans le vide
+```
+
+Deux corrections. **Se brancher est idempotent** : déjà branché, rien à refaire
+et tout à perdre. Et **le point de départ suit l'identité du combat**, pas « la
+première fois qu'on voit un état » — repartir n'a de sens qu'à un vrai
+changement de rencontre.
+
+**Et une relecture, une seule.** L'état et le journal sont deux documents, donc
+deux écoutes : rien ne garantit leur ordre d'arrivée. Les entrées d'un combat
+qu'on ne connaissait pas encore ont pu être écartées à la porte — c'est voulu —
+mais une écoute ne renotifie que lorsqu'un document bouge. Sans relecture après
+un changement de combat, ces entrées ne reviendraient jamais.
+
+Le banc ne voyait rien de tout ça parce qu'il **pilotait** l'ouverture au lieu de
+la laisser courir, et parce que sa file commençait par un héros : le cerveau
+n'avait donc jamais rien à publier avant qu'un joueur clique. Il existe
+maintenant une seconde rencontre de banc où **une créature ouvre la manche** —
+le cas courant en jeu, l'initiative ne triant pas les camps, et le seul où le
+cerveau publie avant le moindre clic.
+
 ### Le nouveau régime est le régime
 
 Il était éteint par défaut le temps de l'essayer ; il ne l'est plus. Et **un

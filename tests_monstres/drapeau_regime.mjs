@@ -258,7 +258,14 @@ console.log("\n8. LE DRAPEAU COCHÉ EN COURS DE COMBAT NE RESTE PAS MUET");
 //  n'avance plus sans raison visible.
 {
     const r = SOURCES['regime_cerveau.js'];
-    verifier("le cas est détecté", r.includes("!REGIME.etatPublie() && !aPrevenuSansCombat"));
+    verifier("le cas est détecté",
+             r.includes("!REGIME.etatPublie()\n            && !ouvertureEnCours && !aPrevenuSansCombat"));
+    // ET IL NE MENT PAS PENDANT QU'ON OUVRE. Le message se déclenchait à chaque
+    // début de combat : pendant la réclamation l'état n'est pas encore publié,
+    // ce qui n'est pas la même chose que « il n'y en aura pas ».
+    verifier("il se tait pendant l'ouverture", r.includes("ouvertureEnCours = true;"));
+    verifier("et se rouvre quand elle est finie",
+             (r.match(/ouvertureEnCours = false;/g) || []).length >= 2);
     verifier("et il se dit une seule fois", r.includes('aPrevenuSansCombat = true'));
     verifier("le message dit quoi faire",
              r.includes("réinitialise le combat pour qu'il prenne effet"));
