@@ -561,6 +561,33 @@ maintenant une seconde rencontre de banc où **une créature ouvre la manche** �
 le cas courant en jeu, l'initiative ne triant pas les camps, et le seul où le
 cerveau publie avant le moindre clic.
 
+### La file doit redescendre là où le jeu la lit
+
+Le combat s'ouvrait, jouait le tour de la première créature… et s'arrêtait. Pas
+parce que le cerveau était bloqué : **parce que le joueur ne pouvait rien
+faire**.
+
+Le cerveau écrit l'état ; le document de la partie, lui, garde la file que la
+préparation y a posée et n'en bouge plus. Or **une douzaine d'endroits du jeu la
+lisent encore** — le bouton « fin de tour », le panneau des cartes, la piste
+d'initiative, la fenêtre sombre. Tous croyaient donc que c'était toujours à la
+créature de jouer.
+
+Plutôt que de réécrire ces douze lecteurs, on leur donne la vérité : la file de
+l'état redescend dans `PARTIE_DATA`, **en mémoire seulement**, et ils la lisent
+comme ils l'ont toujours fait. Rien ne remonte en base — c'est une projection,
+pas une écriture, et le banc du drapeau le vérifie : deux écrivains, et toute
+l'architecture tomberait.
+
+Deux moitiés, et les deux comptent. Une notification de la partie **remplace**
+`PARTIE_DATA` en entier ; sans repose, l'interface repart aussitôt sur la file
+périmée. La projection se redépose donc après chaque notification.
+
+Et le cerveau **dit qui il attend** quand il ne publie rien : `⌛ le cerveau
+attend PERSO_250418 (au joueur P_03)`. Neuf fois sur dix c'est normal — un
+joueur réfléchit — mais « rien ne se passe » sans explication est précisément ce
+qui a coûté le plus de temps depuis le début.
+
 ### Le nouveau régime est le régime
 
 Il était éteint par défaut le temps de l'essayer ; il ne l'est plus. Et **un

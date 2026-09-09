@@ -362,5 +362,74 @@ console.log("\n9. L'ÉTAT DESCEND VERS L'ÉCRAN, ET RIEN NE REMONTE");
     verifier("un état absent ne casse rien", (projeter(null), true));
 }
 
+// =========================================================================
+console.log("\n10. LA FILE DOIT REDESCENDRE LÀ OÙ LE JEU LA LIT");
+// =========================================================================
+//  Le combat s'ouvrait, jouait le tour de la première créature… et s'arrêtait.
+//  Pas parce que le cerveau était bloqué : parce que le JOUEUR ne pouvait rien
+//  faire.
+//
+//  Le cerveau écrit l'état ; le document de la partie garde la file que la
+//  préparation y a posée et n'en bouge plus. Or une douzaine d'endroits du jeu
+//  la lisent encore — le bouton « fin de tour », le panneau des cartes, la
+//  piste d'initiative, la fenêtre sombre. Tous croyaient donc que c'était
+//  toujours à la créature de jouer.
+//
+//  Plutôt que de réécrire ces douze lecteurs, on leur donne la vérité.
+{
+    const etat = monde();
+    // Le tour de M1 vient de se clore : la file a avancé.
+    etat.file = [{ id: "H1", carte: "C1", initiative: 50 },
+                 { id: "H2", carte: "C3", initiative: 15 }];
+    etat.ontJoue = ["M1"];
+    etat.manche = 2;
+
+    const partie = {
+        File_Attente_Combat: [{ idPersonnage: "M1", idCarte: "C2" },
+                              { idPersonnage: "H1", idCarte: "C1" }],
+        Phase_Combat: "Resolution", Tour_Combat: 1, Ont_Joue_Ce_Round: []
+    };
+
+    // La projection, telle que le régime la branche.
+    const projeter = creerProjection({
+        poserPions: () => {},
+        poserFiches: () => {},
+        lireFiches: () => [],
+        rafraichir: () => {},
+        poserFile: (file, infos) => {
+            partie.File_Attente_Combat = file;
+            partie.Phase_Combat = infos.phase;
+            partie.Tour_Combat = infos.manche;
+            partie.Ont_Joue_Ce_Round = infos.ontJoue;
+        }
+    });
+    projeter(etat);
+
+    verifier("la tête de file est celle de l'ÉTAT, pas celle de la partie",
+             partie.File_Attente_Combat[0].idPersonnage === "H1",
+             partie.File_Attente_Combat[0].idPersonnage);
+    verifier("la créature qui a joué n'y est plus",
+             !partie.File_Attente_Combat.some(f => f.idPersonnage === "M1"),
+             partie.File_Attente_Combat.map(f => f.idPersonnage).join(","));
+    verifier("chaque entrée garde sa carte — le panneau la lit",
+             partie.File_Attente_Combat[0].idCarte === "C1",
+             partie.File_Attente_Combat[0].idCarte);
+    verifier("la manche suit aussi", partie.Tour_Combat === 2, `(${partie.Tour_Combat})`);
+    verifier("et ceux qui ont joué", partie.Ont_Joue_Ce_Round.join(",") === "M1",
+             partie.Ont_Joue_Ce_Round.join(","));
+
+    // LA FORME COMPTE : les lecteurs du jeu attendent `idPersonnage`, pas `id`.
+    // Se tromper là-dessus, c'est une file que personne ne comprend.
+    verifier("la forme est celle que le jeu attend",
+             partie.File_Attente_Combat.every(f => f.idPersonnage && f.id === undefined),
+             JSON.stringify(partie.File_Attente_Combat[0]));
+
+    // Fin de manche : la file se vide et la phase repasse en préparation.
+    const enPreparation = { ...etat, file: [], phase: "Preparation", manche: 3 };
+    projeter(enPreparation);
+    verifier("une fin de manche vide la file", partie.File_Attente_Combat.length === 0);
+    verifier("et rend la main à la préparation", partie.Phase_Combat === "Preparation");
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

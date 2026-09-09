@@ -109,7 +109,20 @@ export function creerRegime(contexte) {
         if (!moi.cerveau || moi.enTrainDeTourner) return [];
         moi.enTrainDeTourner = true;
         try {
-            return await moi.cerveau.tournerJusquAuCalme();
+            const faits = await moi.cerveau.tournerJusquAuCalme();
+            // QUAND LE CERVEAU NE PUBLIE RIEN, IL FAUT SAVOIR POURQUOI. Neuf
+            // fois sur dix c'est normal — un joueur réfléchit — mais « rien ne
+            // se passe » sans explication est précisément ce qui coûte une
+            // soirée à comprendre. Une ligne, et on sait qui il attend.
+            if (faits.length === 0 && moi.etat) {
+                const tete = (moi.etat.file || [])[0];
+                const c = tete && moi.etat.combattants[tete.id];
+                tracer("⌛", tete ? `le cerveau attend ${tete.id}` : "la file est vide",
+                       c ? (c.estMonstre ? "(créature — elle devrait jouer)"
+                                         : `(au joueur ${c.joueur || "?"})`)
+                         : `(phase ${moi.etat.phase})`);
+            }
+            return faits;
         } catch (e) {
             // Une écriture qui rate n'est pas un drame : rien n'a bougé, et
             // l'intention sera reprise. Mais on le DIT — un cerveau muet qui
@@ -135,6 +148,13 @@ export function creerRegime(contexte) {
             if (moi.cerveau) { try { await moi.cerveau.battre(); } catch (e) {} }
             if (moi.branche) moi.minuteurBattement = programmer(encore, battementMs);
         }, battementMs);
+    }
+
+    // Une notification de la partie remplace PARTIE_DATA en entier, donc écrase
+    // la projection. On la repose après coup : la file de l'état est la vraie.
+    function reprojeter() {
+        const etat = spectateur.etat();
+        if (etat) projeter(etat);
     }
 
     // =====================================================================
@@ -354,7 +374,7 @@ export function creerRegime(contexte) {
     const ok = () => spectateur.ok();
 
     return {
-        ouvrir, rejoindre, fermer, brancher, debrancher, tourner, ok, ouvrirLaManche,
+        ouvrir, rejoindre, fermer, brancher, debrancher, tourner, ok, ouvrirLaManche, reprojeter,
         demander, demanderMouvement, demanderCarte, demanderFinDeTour,
         // De quoi regarder l'intérieur, pour la trace et les bancs.
         spectateur,
@@ -466,10 +486,37 @@ function contexteDuJeu() {
                 });
             },
             poserFiches: (fiches) => { window.PERSOS_PARTIE = fiches; },
+            // LA FILE DE L'ÉTAT REDESCEND DANS PARTIE_DATA — EN MÉMOIRE SEULEMENT.
+            //
+            // C'est ce qui manquait pour que le combat soit jouable. Le cerveau
+            // écrit l'état ; le document de la partie, lui, garde la file que la
+            // préparation y a posée et n'en bouge plus. Or une douzaine
+            // d'endroits du jeu la lisent encore : le bouton « fin de tour », le
+            // panneau des cartes, la piste d'initiative, la fenêtre sombre.
+            //
+            // Après le tour de la première créature, tous ces endroits croyaient
+            // donc que c'était toujours à elle de jouer. Le joueur dont c'était
+            // le tour ne pouvait rien faire : ni bouger, ni lancer, ni passer.
+            // Le combat s'ouvrait, jouait un tour, et s'arrêtait là.
+            //
+            // Plutôt que de réécrire ces douze lecteurs, on leur donne la
+            // vérité : l'état descend dans PARTIE_DATA et ils la lisent comme
+            // ils l'ont toujours fait. Rien ne remonte en base — c'est une
+            // projection, pas une écriture.
             poserFile: (file, infos) => {
-                if (typeof window.afficherPisteInitiative === "function") {
-                    try { window.afficherPisteInitiative(file, infos.phase); } catch (e) {}
+                const partie = window.PARTIE_DATA;
+                if (partie) {
+                    partie.File_Attente_Combat = file;
+                    partie.Phase_Combat = infos.phase;
+                    partie.Tour_Combat = infos.manche;
+                    partie.Ont_Joue_Ce_Round = infos.ontJoue;
                 }
+                [["afficherPisteInitiative", () => window.afficherPisteInitiative(file, infos.phase)],
+                 ["actualiserBoutonFinTour", () => window.actualiserBoutonFinTour(file, infos.phase)],
+                 ["actualiserEtatCarteCombat", () => window.actualiserEtatCarteCombat()]]
+                    .forEach(([nom, appel]) => {
+                        if (typeof window[nom] === "function") { try { appel(); } catch (e) {} }
+                    });
             },
             rafraichir: () => {
                 if (typeof window.rafraichirAffichageCombat === "function") {
@@ -694,6 +741,11 @@ if (typeof window !== "undefined") {
             }
         }
         if (phase === "Preparation") { aPrevenuSansCombat = false; dejaSignale = ""; }
+
+        // PARTIE_DATA vient d'être remplacée par la notification : on repose la
+        // file de l'état par-dessus, sinon toute l'interface repart sur celle
+        // que la préparation avait laissée.
+        REGIME.reprojeter();
     };
 
     // ON S'ARRÊTE, ET ON LE DIT — À L'ÉCRAN, PAS SEULEMENT DANS LA CONSOLE.

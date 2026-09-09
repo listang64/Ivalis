@@ -384,5 +384,46 @@ console.log("\n11. LA QUESTION QU'ON POSE AVANT D'OUVRIR");
              r.includes('if (pions[id].q === null || pions[id].r === null) return;'));
 }
 
+// =========================================================================
+console.log("\n12. L'INTERFACE LIT LA FILE DE L'ÉTAT, ET ELLE Y RESTE");
+// =========================================================================
+//  Le combat s'ouvrait, jouait le tour de la première créature, et s'arrêtait :
+//  le joueur suivant ne pouvait rien faire, parce que douze endroits du jeu
+//  lisaient encore la file du document de la partie, que le cerveau ne touche
+//  pas.
+//
+//  On leur donne la vérité plutôt que de les réécrire. Mais une notification de
+//  la partie remplace PARTIE_DATA en entier : sans repose, l'interface repart
+//  aussitôt sur la file périmée. Les deux moitiés comptent.
+{
+    const r = SOURCES['regime_cerveau.js'];
+
+    verifier("la file de l'état descend dans PARTIE_DATA",
+             r.includes("partie.File_Attente_Combat = file;"));
+    verifier("la phase et la manche aussi",
+             r.includes("partie.Phase_Combat = infos.phase;")
+             && r.includes("partie.Tour_Combat = infos.manche;"));
+    verifier("le bouton de fin de tour est rafraîchi",
+             r.includes('"actualiserBoutonFinTour"'));
+    verifier("le panneau des cartes aussi", r.includes('"actualiserEtatCarteCombat"'));
+
+    verifier("la projection se repose après chaque notification",
+             r.includes("REGIME.reprojeter();"));
+    verifier("et reprojeter part de l'état AFFICHÉ, pas du publié",
+             r.includes("const etat = spectateur.etat();\n        if (etat) projeter(etat);"));
+
+    // RIEN NE REMONTE EN BASE. C'est une projection, pas une écriture : si elle
+    // écrivait, on aurait deux écrivains et toute l'architecture tomberait.
+    verifier("et rien n'est écrit en base au passage",
+             !r.includes("File_Attente_Combat:") && !r.includes("updateDoc"));
+
+    // Le cerveau dit qui il attend : « rien ne se passe » sans explication est
+    // ce qui a coûté le plus de temps depuis le début.
+    verifier("le cerveau dit qui il attend quand il ne publie rien",
+             r.includes("le cerveau attend ${tete.id}"));
+    verifier("et distingue une créature d'un joueur",
+             r.includes("(créature — elle devrait jouer)"));
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);
