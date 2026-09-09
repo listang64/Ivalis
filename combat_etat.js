@@ -387,6 +387,16 @@ const APPLICATEURS = {
     }
 };
 
+// UNE SEULE ÉTAPE. C'est ce dont le spectateur a besoin : il anime, puis il
+// applique, puis il passe à la suivante — pour que l'écran raconte exactement ce
+// qu'il montre, et jamais deux pas d'avance.
+export function appliquerEtape(etat, etape) {
+    const suivant = clonerEtat(etat);
+    const appliquer = APPLICATEURS[etape && etape.type];
+    if (appliquer) appliquer(suivant, etape);
+    return suivant;
+}
+
 // Applique une entrée de journal complète et rend l'état d'après. L'original
 // n'est jamais modifié : on travaille sur une copie, comme partout ici.
 export function appliquerEntree(etat, entree) {
@@ -501,6 +511,7 @@ if (typeof window !== "undefined") {
     window.construireEtatCombat = construireEtatCombat;
     window.combattantDepuisFiche = combattantDepuisFiche;
     window.clonerEtat = clonerEtat;
+    window.appliquerEtape = appliquerEtape;
     window.appliquerEntree = appliquerEntree;
     window.appliquerEntrees = appliquerEntrees;
     window.verifierEtatCombat = verifierEtatCombat;

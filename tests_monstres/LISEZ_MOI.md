@@ -64,6 +64,7 @@ node moteur_pur.mjs         # la chaîne de dégâts, maillon par maillon (10 00
 node mouvement_pur.mjs      # chemin, coût des cases, attaques d'opportunité (1 000 trajets)
 node ia_pure.mjs            # qui viser, où se mettre : les cinq caractères, sans variable globale
 node cerveau_combat.mjs     # LE CERVEAU : intentions validées, un seul écrivain, un combat entier
+node spectateur_combat.mjs  # LE SPECTATEUR : le rejeu à l'écran, dans l'ordre, sans trou ni doublon
 node journal_firestore.mjs  # la plomberie du journal face aux règles d'index de Firestore
 node deplacement_journal.mjs # un hexagone = un numéro : publication, ordre, absence de chevauchement
 node illusion_opportunite.mjs # une illusion ne porte aucune attaque d'opportunité
@@ -289,10 +290,49 @@ carte en mémoire — et sait rater ses écritures. Ce qu'on vérifie alors : ap
 un échec, rien n'a bougé, le journal est vide, et l'intention est reprise UNE
 seule fois.
 
-Les cinq bancs du noyau tournent en trois secondes, dix mille cartes, mille
+Les six bancs du noyau tournent en trois secondes, dix mille cartes, mille
 trajets au hasard et un combat entier de cinq manches compris. Le test de propriété a déjà trouvé un vrai bug qu'aucun
 banc précédent ne pouvait voir : une valeur brute négative posait un bouclier
-négatif.
+négatif. Et le banc du cerveau en a trouvé un second, plus grave : une créature
+ne refermait pas son propre tour, alors le cerveau le rejouait sans fin — quarante
+pas publiés pour un seul déplacement. Un tour entier de créature tient désormais
+dans UNE entrée, close par le même batch qui l'a écrite.
+
+## Étape 4 : le spectateur
+
+`spectateur_combat.js` est l'autre bout du fil : le cerveau écrit, le spectateur
+regarde. C'est **la seule chose qui déclenche une animation** dans la nouvelle
+architecture. Il n'écrit rien, jamais.
+
+Trois règles, et tout le reste en découle.
+
+*On anime d'abord, on applique ensuite.* L'animation reçoit l'état **d'avant**
+l'étape — c'est ce qui lui permet de montrer les 60 points de vie descendre vers
+48. L'état n'avance qu'une fois l'animation finie. L'inverse (appliquer puis
+animer) est exactement ce qui faisait sauter les pions d'une case à l'autre.
+
+*On ne saute jamais un numéro.* Si le n°4 arrive avant le n°3, on ne joue pas le
+4 : on attend, et au bout de 800 ms on va chercher le 3 directement en base. Tant
+qu'il manque, rien n'avance et la trace le dit (`🔍 il manque le n°3`). Un
+journal reçu à l'envers se rejoue dans l'ordre.
+
+*Un tour = un OK.* La fenêtre sombre s'ouvre une fois par tour, pas une fois par
+étape : la clé d'un tour est `acteur|manche`. Un déplacement de trois cases suivi
+d'une carte et de ses dégâts, c'est un seul clic.
+
+Le chapitre 6 du banc est celui qui compte. Il fait tourner le **vrai** cerveau,
+récupère son journal, puis le donne à **trois spectateurs qui n'ont pas le même
+rythme** : un qui suit tout en direct, un qui dort et reçoit les entrées à
+l'envers au réveil, un qui ne clique jamais et rattrape sans animer. À la fin,
+les trois ont **le même état, au même numéro** — et celui qui rattrapait n'a joué
+aucune animation. C'est la garantie qu'on cherchait depuis le début : l'écran
+peut prendre du retard, il ne peut pas diverger.
+
+Ce qui protège du rejeu en double, le chapitre 7 le mesure : deux lectures qui
+arrivent en même temps ne se chevauchent jamais, une seule animation tourne à la
+fois. Et le chapitre 8 vérifie qu'on peut **rejoindre un combat déjà commencé**
+sans rejouer les vingt tours passés : on part de l'état publié, tel quel, et on
+s'anime à partir de la suite.
 
 **Un tour appartient à UN SEUL poste, et c'est le journal qui tranche.** Quatrième
 trace : P_03 prend le verrou de `MONSTRE_13sb8te`, le joue, publie l'événement 1

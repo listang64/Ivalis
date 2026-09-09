@@ -1610,7 +1610,7 @@
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
-<script type="module" src="combat_etat.js?v=4"></script>
+<script type="module" src="combat_etat.js?v=5"></script>
 <!-- LE MOTEUR PUR : la chaîne de dégâts et le mouvement, extraits des 5 000
      lignes du moteur actuel et testables sans réseau ni navigateur. -->
 <script type="module" src="moteur_pur.js?v=2"></script>
@@ -1618,6 +1618,9 @@
 <script type="module" src="ia_pure.js?v=1"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
 <script type="module" src="cerveau_combat.js?v=1"></script>
+<!-- LE SPECTATEUR : la boucle de rejeu. Elle lit le journal du cerveau, ouvre
+     la fenêtre de tour, anime PUIS applique, et ne saute jamais un numéro. -->
+<script type="module" src="spectateur_combat.js?v=1"></script>
 <script type="module" src="ia_master.js?v=4"></script>
 <script type="module" src="app.js?v=34"></script>
 <script type="module" src="creation_personnage.js?v=4"></script>
