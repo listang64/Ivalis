@@ -112,7 +112,34 @@ const nombre = (v, defaut = 0) => {
     return Number.isFinite(n) ? n : defaut;
 };
 
-export function combattantDepuisFiche(fiche, position) {
+// Les défenses se CALCULENT (race, équipement, retouches de développement) et
+// leurs formules vivent dans app.js. On ne les recopie pas ici — une formule
+// écrite à deux endroits finit toujours par diverger. On fige leur RÉSULTAT au
+// début du combat, en les appelant sur une fiche débarrassée de ses états
+// altérés : ceux-ci vivent dans l'état, changent pendant la rencontre, et c'est
+// le moteur qui ajoutera leur contribution au moment de trancher.
+const DEFENSES_SIMPLES = {
+    esquive:     f => nombre(f.Esquive) + nombre(f.Dev_Mod_Esquive),
+    parade:      f => nombre(f.Parade) + nombre(f.Dev_Mod_Parade),
+    defPhysique: f => nombre(f.Def_Physique) + nombre(f.Dev_Mod_DefPhys),
+    defMagique:  f => nombre(f.Def_Magique) + nombre(f.Dev_Mod_DefMag),
+    critique:    f => nombre(f.Critique) + nombre(f.Dev_Mod_Critique)
+};
+
+export function combattantDepuisFiche(fiche, position, regles) {
+    const calcul = { ...DEFENSES_SIMPLES, ...(regles || {}) };
+    const sansEtats = { ...fiche, Etats_Alteres: [] };
+    const def = {
+        esquive:  nombre(calcul.esquive(sansEtats)),
+        parade:   nombre(calcul.parade(sansEtats)),
+        physique: nombre(calcul.defPhysique(sansEtats)),
+        magique:  nombre(calcul.defMagique(sansEtats)),
+        critique: nombre(calcul.critique(sansEtats))
+    };
+    return { ...combattantBrut(fiche, position), def };
+}
+
+function combattantBrut(fiche, position) {
     const stats = {};
     CHAMPS_STATS.forEach(c => { if (fiche[c] !== undefined) stats[c] = fiche[c]; });
 
@@ -148,6 +175,7 @@ export function combattantDepuisFiche(fiche, position) {
         etats: JSON.parse(JSON.stringify(fiche.Etats_Alteres || [])),
         aTerre: fiche.statut === "Mort" || (pvMax > 0 && nombre(fiche.PV_Actuels, pvMax) <= 0),
 
+        bouclierMax: nombre(fiche.Bouclier_Max),
         stats
     };
 }
@@ -171,13 +199,14 @@ export function construireEtatCombat(source) {
         combattants = [],          // les fiches, format front (persoDocVersFront)
         positions = {},            // TOKENS_VTT_DATA : { id: {q, r} }
         partie = {},               // PARTIE_DATA
-        zones = {}                 // ZONES_PERSISTANTES
+        zones = {},                // ZONES_PERSISTANTES
+        regles = null              // les vraies formules de défense, quand on les a
     } = source || {};
 
     const table = {};
     combattants.forEach(fiche => {
         if (!fiche || !fiche.idPersonnage) return;
-        table[fiche.idPersonnage] = combattantDepuisFiche(fiche, positions[fiche.idPersonnage]);
+        table[fiche.idPersonnage] = combattantDepuisFiche(fiche, positions[fiche.idPersonnage], regles);
     });
 
     return {
@@ -466,7 +495,16 @@ if (typeof window !== "undefined") {
             combattants: window.PERSOS_PARTIE || [],
             positions: window.TOKENS_VTT_DATA || {},
             partie: window.PARTIE_DATA || {},
-            zones: window.ZONES_PERSISTANTES || {}
+            zones: window.ZONES_PERSISTANTES || {},
+            // Les vraies formules du jeu, injectées : le noyau n'en connaît
+            // aucune, il ne fait qu'appeler celles qu'on lui donne.
+            regles: {
+                esquive:     window.esquiveCombattant,
+                parade:      window.paradeCombattant,
+                defPhysique: window.defPhysiqueCombattant,
+                defMagique:  window.defMagiqueCombattant,
+                critique:    window.critiqueCombattant
+            }
         });
     };
 
