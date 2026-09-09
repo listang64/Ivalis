@@ -123,7 +123,11 @@ const DEFENSES_SIMPLES = {
     parade:      f => nombre(f.Parade) + nombre(f.Dev_Mod_Parade),
     defPhysique: f => nombre(f.Def_Physique) + nombre(f.Dev_Mod_DefPhys),
     defMagique:  f => nombre(f.Def_Magique) + nombre(f.Dev_Mod_DefMag),
-    critique:    f => nombre(f.Critique) + nombre(f.Dev_Mod_Critique)
+    critique:    f => nombre(f.Critique) + nombre(f.Dev_Mod_Critique),
+    // Les avantages du peuple, et ce que l'équipement change au déplacement.
+    // Comme les défenses : on ne recopie pas les formules, on fige leur résultat.
+    atouts:      () => ({}),
+    bonusEquip:  () => 0
 };
 
 export function combattantDepuisFiche(fiche, position, regles) {
@@ -136,7 +140,21 @@ export function combattantDepuisFiche(fiche, position, regles) {
         magique:  nombre(calcul.defMagique(sansEtats)),
         critique: nombre(calcul.critique(sansEtats))
     };
-    return { ...combattantBrut(fiche, position), def };
+    const race = calcul.atouts(fiche) || {};
+    const atouts = {
+        // Le Vargen se dérobe à une attaque d'opportunité, et se déplace pour
+        // deux fois moins cher : deux règles qui vivent dans les atouts de race.
+        esquiveOpportunite: nombre(race.esquiveOpportunite),
+        diviseurDeplacement: nombre(race.diviseurDeplacement, 1) || 1
+    };
+    const mod = {
+        // Ce que l'ÉQUIPEMENT change, hors états altérés : le bouclier lourd
+        // alourdit chaque case, le couteau l'allège, une arme offre un pas de
+        // retraite après avoir frappé.
+        coutDeplacement: nombre(calcul.bonusEquip(sansEtats, "coutDeplacement")),
+        hexApresAttaque: nombre(calcul.bonusEquip(sansEtats, "hexApresAttaque"))
+    };
+    return { ...combattantBrut(fiche, position), def, atouts, mod };
 }
 
 function combattantBrut(fiche, position) {
@@ -503,7 +521,9 @@ if (typeof window !== "undefined") {
                 parade:      window.paradeCombattant,
                 defPhysique: window.defPhysiqueCombattant,
                 defMagique:  window.defMagiqueCombattant,
-                critique:    window.critiqueCombattant
+                critique:    window.critiqueCombattant,
+                atouts:      window.atoutRace,
+                bonusEquip:  window.bonusEquip
             }
         });
     };

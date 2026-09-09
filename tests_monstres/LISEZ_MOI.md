@@ -60,6 +60,8 @@ node piste_initiative.mjs   # la piste tient à droite du panneau, bulles rédui
 node fenetre_tour.mjs       # la fenêtre de tour : nom coloré, effets détaillés, zone dessinée
 node sequence_tour.mjs      # le journal d'événements : ordre, trous, rattrapage
 node etat_combat.mjs        # LE NOYAU PUR : dés à graine, état du combat, invariants (sans réseau)
+node moteur_pur.mjs         # la chaîne de dégâts, maillon par maillon (10 000 cartes au hasard)
+node mouvement_pur.mjs      # chemin, coût des cases, attaques d'opportunité (1 000 trajets)
 node journal_firestore.mjs  # la plomberie du journal face aux règles d'index de Firestore
 node deplacement_journal.mjs # un hexagone = un numéro : publication, ordre, absence de chevauchement
 node illusion_opportunite.mjs # une illusion ne porte aucune attaque d'opportunité
@@ -232,6 +234,32 @@ orchestrer — et c'est tout l'objet de la migration.
 En jeu : `voirEtat()` dans la console affiche le combat en cours sous cette
 forme, avec la liste de ce qui cloche dedans. Deux appareils qui n'affichent pas
 le même tableau, c'est une désynchronisation prise sur le fait.
+
+## Étape 2 : le moteur devient une fonction pure
+
+`moteur_pur.js` et `mouvement_pur.js` prennent un état et une action, et rendent
+l'état d'après plus la liste de ce qui s'est passé. Rien d'autre : aucune
+écriture, aucune animation, aucune attente, aucune variable globale.
+
+**L'ordre des règles EST la règle du jeu**, et chaque maillon a son contrôle.
+Pour les dégâts : le brut doublé par un critique à la source, les trente pour
+cent perdus par une arme de jet au contact, l'absorption qui draine avant que le
+reste ne frappe, la résistance (annulée par une armure percée), l'étalement qui
+coupe APRÈS les résistances, le bouclier avant les points de vie. Pour le
+déplacement : le barème 2/4/6 selon la case, le terrain difficile qui double, le
+Glacé qui double aussi, l'atout du Vargen qui divise APRÈS les deux, l'équipement
+qui ajuste sans jamais descendre sous 1. Changer cet ordre change l'équilibre —
+et maintenant ça se voit.
+
+Les formules de défense et les atouts de race ne sont pas recopiés : leur
+RÉSULTAT est figé dans l'état au début du combat, en appelant les vraies
+fonctions d'`app.js`. Une formule écrite à deux endroits finit toujours par
+diverger.
+
+Les trois bancs du noyau tournent en trois secondes, dix mille cartes et mille
+trajets au hasard compris. Le test de propriété a déjà trouvé un vrai bug qu'aucun
+banc précédent ne pouvait voir : une valeur brute négative posait un bouclier
+négatif.
 
 **Un tour appartient à UN SEUL poste, et c'est le journal qui tranche.** Quatrième
 trace : P_03 prend le verrou de `MONSTRE_13sb8te`, le joue, publie l'événement 1
