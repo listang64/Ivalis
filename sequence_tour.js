@@ -620,25 +620,38 @@ window.suivreSequenceTour = function(partie) {
     if (window.ID_PARTIE_COURANTE && partieEcoutee !== window.ID_PARTIE_COURANTE) {
         if (typeof arreterEcoute === "function") { try { arreterEcoute(); } catch (e) {} }
         partieEcoutee = window.ID_PARTIE_COURANTE;
-        window.DERNIER_EVENEMENT_JOUE = typeof window.dernierNumeroEvenement === "function"
-            ? window.dernierNumeroEvenement(p) : 0;
+        const ouverte = partieEcoutee;
         window.EVENEMENTS_RECUS = {};
         window.EVENEMENTS_DEJA_VUS = {};
         window.EVENEMENT_ATTENDU = null;
         tourAcquitte = null;
 
-        if (typeof window.ecouterEvenementsCombat === "function") {
-            arreterEcoute = window.ecouterEvenementsCombat(
-                partieEcoutee, window.DERNIER_EVENEMENT_JOUE, (evenements) => {
-                    (evenements || []).forEach(ev => {
-                        if (ev && ev.n > window.DERNIER_EVENEMENT_JOUE) {
-                            if (!window.EVENEMENTS_RECUS[ev.n]) tracer("📥", `${ev.n} ${ev.type}`, "");
-                            window.EVENEMENTS_RECUS[ev.n] = ev;
-                        }
+        // Le curseur se lit maintenant en base (le compteur a quitté le document
+        // de la partie) : une promesse, donc, même quand un banc d'essai rend un
+        // simple nombre. On n'ouvre l'écoute qu'une fois le curseur posé — sinon
+        // on rejouerait tout le combat depuis son premier hexagone.
+        Promise.resolve(
+            typeof window.dernierNumeroEvenement === "function"
+                ? window.dernierNumeroEvenement(p) : 0
+        ).then((depuis) => {
+            // Une autre partie a été ouverte entre-temps : ce curseur-ci ne vaut
+            // plus rien.
+            if (partieEcoutee !== ouverte) return;
+            window.DERNIER_EVENEMENT_JOUE = parseInt(depuis) || 0;
+            if (typeof window.ecouterEvenementsCombat === "function") {
+                arreterEcoute = window.ecouterEvenementsCombat(
+                    ouverte, window.DERNIER_EVENEMENT_JOUE, (evenements) => {
+                        (evenements || []).forEach(ev => {
+                            if (ev && ev.n > window.DERNIER_EVENEMENT_JOUE) {
+                                if (!window.EVENEMENTS_RECUS[ev.n]) tracer("📥", `${ev.n} ${ev.type}`, "");
+                                window.EVENEMENTS_RECUS[ev.n] = ev;
+                            }
+                        });
+                        window.lireJournalCombat();
                     });
-                    window.lireJournalCombat();
-                });
-        }
+            }
+            window.lireJournalCombat();
+        });
     }
 
     if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();

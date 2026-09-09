@@ -62,6 +62,7 @@ node sequence_tour.mjs      # le journal d'événements : ordre, trous, rattrapa
 node journal_firestore.mjs  # la plomberie du journal face aux règles d'index de Firestore
 node deplacement_journal.mjs # un hexagone = un numéro : publication, ordre, absence de chevauchement
 node illusion_opportunite.mjs # une illusion ne porte aucune attaque d'opportunité
+node file_bousculee.mjs     # le tour sauté et les dégâts en double : écritures concurrentes
 node deplacement_repris.mjs # repartir en cours de tour, sans remise à zéro du barème
 node points_apparition.mjs  # les deux repères d'apparition, et la dispersion des pions
 node reinit_plateau.mjs     # la réinitialisation vide le plateau, puis enchaîne le déploiement
@@ -156,6 +157,28 @@ rien à créer. `journal_firestore.mjs` charge le vrai code d'app.js et lui pré
 un Firestore qui applique cette règle-là. Il vérifie aussi le filet de sécurité :
 si le journal tombe pour une autre raison — droits, réseau —, la fenêtre s'efface
 et les animations reprennent leur ancien chemin, plutôt qu'un plateau figé.
+
+**Le tour sauté, et les dégâts en double — la même cause.** Un document
+Firestore n'encaisse qu'une poignée d'écritures par seconde, et une transaction
+doublée par une écriture concurrente rend `failed-precondition`. Le document de
+la partie est le plus sollicité du jeu (file d'initiative, verrou de l'IA,
+`Action_*`) et portait en plus le compteur du journal, qui avance **à chaque
+hexagone parcouru**. Un tour de créature se calculant sans pauses, tout partait
+en même temps : c'est la transaction de fin de tour qui perdait. `modifierPartie`
+rendait alors `null` — exactement ce qu'elle rend quand il n'y a *rien à faire* —
+et `finDeTourCombat` prenait l'échec pour un « un autre poste s'en est chargé ».
+La file ne bougeait pas, la créature restait en tête, la notification suivante
+rappelait l'IA, le verrou répondait « oui, c'est toi qui l'as », et **la créature
+rejouait son tour du début** : deuxième déplacement, deuxième coup.
+
+Trois corrections, une seule cause : le compteur a son propre document
+(`Systeme_Parties/{id}/Journal_Combat/compteur`), que rien d'autre ne touche ;
+`modifierPartieOuEchec` rend `{ ok, resultat }`, retente une écriture bousculée
+avec une attente qui s'allonge, et distingue enfin l'échec du « rien à faire »,
+sur quoi `finDeTourCombat` revient à la charge au lieu de s'en aller ; et le
+verrou de l'IA refuse un tour DÉJÀ JOUÉ, même à celui qui le détient — la marque
+périme au bout du délai du verrou, pour qu'un combat vraiment bloqué puisse
+repartir. `file_bousculee.mjs` pose les trois devant le vrai code.
 
 **La trace du combat.** `trace_combat.js` est chargé avant tout le reste et
 écrit dans la console une ligne par chose qui arrive : événement publié, reçu,

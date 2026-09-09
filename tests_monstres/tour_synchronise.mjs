@@ -19,7 +19,8 @@ const SRC_HELPERS = ['window.combattantsAttendus = function',
                      'window.toutLeMondeAJoue = function',
                      'window.avecCarteJouee = function',
                      'window.synchroniserCombattantsHorsJeu = async function',
-                     'window.modifierPartie = async function',
+                     'window.modifierPartieOuEchec = async function',
+                    'window.modifierPartie = async function',
                      'window.estCombattantMort = function']
     .map(m => extraire('combat.js', m)).join('\n\n');
 

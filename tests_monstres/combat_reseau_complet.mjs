@@ -20,6 +20,7 @@ const SRC_IA = fs.readFileSync('/home/user/Ivalis/monstres_ia.js', 'utf-8')
   .replace(/^import[\s\S]*?from\s+"[^"]+";/gm, '')
   .replace(/await pause\(\d+\);/g, 'await pause(1);');
 const SRC_COMBAT = ['window.enregistrerPionsVTT = async function',
+                    'window.modifierPartieOuEchec = async function',
                     'window.modifierPartie = async function',
                     // Le verdict « tout le monde a-t-il joué ? », partagé par
                     // tous les postes : sans lui, aucune carte n'entre en file.

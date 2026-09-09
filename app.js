@@ -466,6 +466,51 @@ const numeroEvenement = (n) => String(n).padStart(6, "0");
 const collEvenements = (idPartie) => collection(db, COL.PARTIES, idPartie, COL_EVENEMENTS);
 const refEvenement = (idPartie, n) => doc(db, COL.PARTIES, idPartie, COL_EVENEMENTS, numeroEvenement(n));
 
+// LE COMPTEUR VIT À PART — Systeme_Parties/{id}/Journal_Combat/compteur.
+//
+// Il était dans le document de la partie, et c'était une faute lourde. Un
+// document Firestore n'encaisse qu'une poignée d'écritures par seconde, et
+// AUCUNE transaction ne survit à une écriture concurrente : elle repart, et au
+// bout de cinq essais elle rend « failed-precondition ». Or le document de la
+// partie est déjà le plus sollicité du jeu — la file d'initiative, le verrou de
+// l'IA, les Action_*. Y ajouter un compteur qui avance à CHAQUE hexagone
+// parcouru, c'est le mettre en surchauffe : pendant un tour de créature (calculé
+// sans pauses, donc en quelques millisecondes) une dizaine d'écritures se
+// bousculaient sur ce seul document, et c'est la transaction de finDeTourCombat
+// qui perdait. La file n'avançait pas, le tour de l'ennemi était « passé », et
+// l'IA reprenait le même tour depuis le début — d'où les dégâts comptés deux
+// fois.
+//
+// Le compteur a donc son propre document, que rien d'autre ne touche. Il vit
+// sous la partie pour disparaître avec elle, et hors de la collection des
+// événements pour ne jamais tomber dans les requêtes du journal ni dans son
+// ménage.
+const COL_JOURNAL = "Journal_Combat";
+const refCompteurEvenements = (idPartie) => doc(db, COL.PARTIES, idPartie, COL_JOURNAL, "compteur");
+
+// Réserve `combien` numéros d'un coup et rend le premier. Une seule transaction,
+// sur un document que personne d'autre n'écrit : elle ne peut pas se faire
+// doubler par la file d'initiative ou le verrou de l'IA.
+async function reserverNumerosEvenements(idPartie, combien) {
+    const ref = refCompteurEvenements(idPartie);
+    // LE COMBAT DÉJÀ COMMENCÉ. Une partie ouverte avant ce changement compte
+    // déjà, disons, quarante-deux événements — dans l'ancien champ de la partie,
+    // et sous les mêmes numéros dans le journal. Repartir de 1 les écraserait, et
+    // les postes dont le curseur est à 42 ne verraient plus jamais rien passer.
+    // On prend donc l'ancien compteur comme plancher, lu au passage dans la
+    // partie qu'on a déjà en mémoire : aucune lecture de plus, aucune contention.
+    const plancher = parseInt((window.PARTIE_DATA || {}).Compteur_Evenements) || 0;
+    return await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        const courant = snap.exists() ? (parseInt(snap.data().n) || 0) : plancher;
+        const debut = courant + 1;
+        // set, et non update : le tout premier événement d'une partie trouve un
+        // document qui n'existe pas encore.
+        tx.set(ref, { n: courant + combien });
+        return debut;
+    });
+}
+
 // LE FILET DE SÉCURITÉ. Si le journal ne fonctionne pas — droits, réseau,
 // requête refusée —, les postes qui REGARDENT ne doivent pas se retrouver
 // devant un plateau figé : ils reprennent les animations diffusées à l'ancienne
@@ -479,19 +524,12 @@ function journalHorsService(e) {
     if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
 }
 
-// LE NUMÉRO EST ATTRIBUÉ SOUS TRANSACTION, sur le compteur de la partie : deux
+// LE NUMÉRO EST ATTRIBUÉ SOUS TRANSACTION, sur le compteur du journal : deux
 // postes qui publient au même instant ne peuvent pas tomber sur le même.
 window.publierEvenementCombat = async function(idPartie, evenement) {
     if (!idPartie) return null;
     try {
-        const refPartie = doc(db, COL.PARTIES, idPartie);
-        const n = await runTransaction(db, async (tx) => {
-            const snap = await tx.get(refPartie);
-            if (!snap.exists()) return null;
-            const suivant = (parseInt(snap.data().Compteur_Evenements) || 0) + 1;
-            tx.update(refPartie, { Compteur_Evenements: suivant });
-            return suivant;
-        });
+        const n = await reserverNumerosEvenements(idPartie, 1);
         if (!n) return null;
         await setDoc(refEvenement(idPartie, n), {
             ...evenement, ID_Partie: idPartie, n, horodatage: Date.now()
@@ -516,15 +554,8 @@ window.publierEvenementsCombat = async function(idPartie, evenements) {
     const liste = (evenements || []).filter(Boolean);
     if (!idPartie || liste.length === 0) return [];
     try {
-        const refPartie = doc(db, COL.PARTIES, idPartie);
         // Le PREMIER numéro de la série ; les suivants s'en déduisent.
-        const premier = await runTransaction(db, async (tx) => {
-            const snap = await tx.get(refPartie);
-            if (!snap.exists()) return null;
-            const debut = (parseInt(snap.data().Compteur_Evenements) || 0) + 1;
-            tx.update(refPartie, { Compteur_Evenements: debut + liste.length - 1 });
-            return debut;
-        });
+        const premier = await reserverNumerosEvenements(idPartie, liste.length);
         if (!premier) return [];
 
         const lot = writeBatch(db);
@@ -593,7 +624,11 @@ window.viderJournalCombat = async function(idPartie) {
             effaces += snap.size;
             if (snap.size < 400) break;
         }
-        await updateDoc(doc(db, COL.PARTIES, partie), { Compteur_Evenements: 0 });
+        await setDoc(refCompteurEvenements(partie), { n: 0 });
+        // L'ancien compteur, du temps où il vivait dans la partie : on le remet
+        // à zéro aussi, pour qu'une page pas encore rechargée ne place pas son
+        // curseur deux cents crans trop loin.
+        await updateDoc(doc(db, COL.PARTIES, partie), { Compteur_Evenements: 0 }).catch(() => {});
         // Ce poste-ci repart aussi de zéro, sans attendre la notification.
         window.DERNIER_EVENEMENT_JOUE = 0;
         window.EVENEMENTS_RECUS = {};
@@ -607,10 +642,24 @@ window.viderJournalCombat = async function(idPartie) {
     }
 };
 
-// Le numéro du dernier événement écrit, lu sur la partie : c'est là que se
-// place le curseur d'un poste qui rejoint un combat déjà commencé.
-window.dernierNumeroEvenement = function(partie) {
-    return parseInt((partie || window.PARTIE_DATA || {}).Compteur_Evenements) || 0;
+// Le numéro du dernier événement écrit : c'est là que se place le curseur d'un
+// poste qui rejoint un combat déjà commencé. Une lecture, donc une promesse —
+// le compteur ne voyage plus avec la partie.
+//
+// Si le document n'existe pas encore, on retombe sur l'ancien champ de la
+// partie : une partie commencée avant ce changement garde son curseur au bon
+// endroit, et le premier événement publié créera le nouveau compteur.
+window.dernierNumeroEvenement = async function(partie) {
+    const id = window.ID_PARTIE_COURANTE;
+    const repli = parseInt((partie || window.PARTIE_DATA || {}).Compteur_Evenements) || 0;
+    if (!id) return repli;
+    try {
+        const snap = await getDoc(refCompteurEvenements(id));
+        return snap.exists() ? (parseInt(snap.data().n) || 0) : repli;
+    } catch (e) {
+        console.error("Lecture du compteur du journal :", e);
+        return repli;
+    }
 };
 
 // =========================================================================

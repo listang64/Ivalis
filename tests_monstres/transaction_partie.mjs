@@ -26,7 +26,12 @@ export const SRC_VERDICT_TOUR = [
   'window.avecCarteJouee = function'
 ].map(fonctionDeCombat).join('\n\n');
 
+// modifierPartie n'est plus qu'une façade : tout le travail — et surtout les
+// reprises quand une écriture concurrente fait échouer la transaction — est
+// dans modifierPartieOuEchec, qui rend { ok, resultat }. Les deux voyagent
+// ensemble : poser la façade sans son moteur, c'est un banc qui plante.
 export const SRC_MODIFIER_PARTIE = SRC_VERDICT_TOUR + '\n\n'
+  + fonctionDeCombat('window.modifierPartieOuEchec = async function') + '\n\n'
   + fonctionDeCombat('window.modifierPartie = async function');
 
 // Un faux Firestore transactionnel : les transactions d'un même document sont

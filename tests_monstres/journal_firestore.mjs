@@ -102,10 +102,16 @@ function firestoreExigeant(options = {}) {
     const notifier = () => ecoutes.forEach(e =>
         e.rappel({ docs: documentsDe(e.q).map(data => ({ data: () => data })) }));
 
+    // LES ÉCRITURES, COMPTÉES PAR DOCUMENT. C'est ce qui permet de vérifier que
+    // le compteur du journal ne martèle plus le document de la partie.
+    const ecritures = {};
+    const compter = (chemin) => { ecritures[chemin] = (ecritures[chemin] || 0) + 1; };
+
     const setDoc = async (ref, data) => {
         const copie = JSON.parse(JSON.stringify(data));
         Object.defineProperty(copie, "__id", { value: ref.chemin.split("/").pop(), enumerable: false });
         base[ref.chemin] = copie;
+        compter(ref.chemin);
         notifier();
     };
     const getDoc = async (ref) => ({
@@ -114,9 +120,12 @@ function firestoreExigeant(options = {}) {
     });
     const runTransaction = async (_db, fn) => fn({
         get: async (ref) => ({ exists: () => !!base[ref.chemin], data: () => base[ref.chemin] }),
-        update: (ref, maj) => { Object.assign(base[ref.chemin], maj); }
+        update: (ref, maj) => { compter(ref.chemin); Object.assign(base[ref.chemin], maj); },
+        // set, contrairement à update, crée le document s'il manque : c'est ce
+        // dont le compteur du journal a besoin au tout premier événement.
+        set: (ref, data) => { compter(ref.chemin); base[ref.chemin] = { ...data }; }
     });
-    const updateDoc = async (ref, maj) => { Object.assign(base[ref.chemin] || (base[ref.chemin] = {}), maj); };
+    const updateDoc = async (ref, maj) => { compter(ref.chemin); Object.assign(base[ref.chemin] || (base[ref.chemin] = {}), maj); };
     const limit = (n) => ({ type: "limit", n });
     const getDocs = async (q) => {
         let docs = documentsDe(q).map(data => ({ ref: { chemin: q.coll.chemin + "/" + data.__id }, data: () => data }));
@@ -125,14 +134,20 @@ function firestoreExigeant(options = {}) {
         return { docs, size: docs.length, empty: docs.length === 0 };
     };
     const writeBatch = () => {
-        const suppressions = [];
+        const gestes = [];
         return {
-            delete: (ref) => suppressions.push(ref.chemin),
-            commit: async () => suppressions.forEach(c => { delete base[c]; })
+            delete: (ref) => gestes.push(() => { compter(ref.chemin); delete base[ref.chemin]; }),
+            set: (ref, data) => gestes.push(() => {
+                compter(ref.chemin);
+                const copie = JSON.parse(JSON.stringify(data));
+                Object.defineProperty(copie, "__id", { value: ref.chemin.split("/").pop(), enumerable: false });
+                base[ref.chemin] = copie;
+            }),
+            commit: async () => { gestes.forEach(g => g()); notifier(); }
         };
     };
 
-    return { base, requetes, api: { doc, collection, where, orderBy, limit, query, onSnapshot,
+    return { base, requetes, ecritures, api: { doc, collection, where, orderBy, limit, query, onSnapshot,
                                     setDoc, getDoc, getDocs, updateDoc, writeBatch, runTransaction } };
 }
 
@@ -264,7 +279,7 @@ console.log("\n4. FINIR OU RÉINITIALISER UN COMBAT VIDE LE JOURNAL");
 
     verifier("sept événements écrits, compteur à sept",
              Object.keys(monde.base).filter(c => c.includes("Evenements_Combat")).length === 7
-             && monde.base["Systeme_Parties/P1"].Compteur_Evenements === 7);
+             && monde.base["Systeme_Parties/P1/Journal_Combat/compteur"].n === 7);
 
     const effaces = await w.viderJournalCombat("P1");
 
@@ -272,7 +287,7 @@ console.log("\n4. FINIR OU RÉINITIALISER UN COMBAT VIDE LE JOURNAL");
              && Object.keys(monde.base).filter(c => c.includes("Evenements_Combat")).length === 0,
              `(${effaces} effacé(s))`);
     verifier("et remet le compteur à zéro dans la foulée",
-             monde.base["Systeme_Parties/P1"].Compteur_Evenements === 0);
+             monde.base["Systeme_Parties/P1/Journal_Combat/compteur"].n === 0);
     verifier("le poste repart lui aussi de zéro, sans attendre la base",
              w.DERNIER_EVENEMENT_JOUE === 0 && Object.keys(w.EVENEMENTS_RECUS).length === 0);
     verifier("et le lecteur est prévenu qu'il doit tout oublier", oubli === 1);
@@ -281,6 +296,81 @@ console.log("\n4. FINIR OU RÉINITIALISER UN COMBAT VIDE LE JOURNAL");
     // pas s'étrangler sur un journal déjà vide.
     const encore = await w.viderJournalCombat("P1");
     verifier("un second ménage sur un journal déjà vide ne casse rien", encore === 0);
+}
+
+// =========================================================================
+console.log("\n5. LE COMPTEUR NE TOUCHE PLUS AU DOCUMENT DE LA PARTIE");
+// =========================================================================
+//  LE BUG, en une phrase : un document Firestore n'encaisse qu'une poignée
+//  d'écritures par seconde, et une transaction qui se fait doubler rend
+//  « failed-precondition ». Le compteur du journal vivait DANS le document de la
+//  partie — celui-là même où la file d'initiative avance. Un tour de créature se
+//  calcule sans pauses : une dizaine d'écritures sur ce seul document en
+//  quelques millisecondes, et c'est la transaction de fin de tour qui perdait.
+//  La file restait bloquée, le tour de l'ennemi était « passé », et l'IA
+//  reprenait le même tour du début — les dégâts comptés deux fois.
+{
+    const monde = firestoreExigeant();
+    const w = chargerJournal(monde);
+    monde.base["Systeme_Parties/P1"] = { Compteur_Evenements: 0, File_Attente_Combat: [] };
+    console.error = () => {};
+
+    const avant = monde.ecritures["Systeme_Parties/P1"] || 0;
+
+    // Un trajet de six cases, puis une carte : ce que fait une créature en un
+    // tour, exactement comme mouvement.js et moteur_effets.js le publient.
+    await w.publierEvenementsCombat("P1", Array.from({ length: 6 },
+        (_, i) => ({ type: "pas", acteur: "M1", data: { i } })));
+    await w.publierEvenementCombat("P1", { type: "carte", acteur: "M1" });
+
+    const apres = monde.ecritures["Systeme_Parties/P1"] || 0;
+    verifier("publier tout un tour n'écrit RIEN dans la partie", apres === avant,
+             `(${apres - avant} écriture(s))`);
+    verifier("le compteur a bien son document à lui",
+             monde.base["Systeme_Parties/P1/Journal_Combat/compteur"].n === 7,
+             `(${JSON.stringify(monde.base["Systeme_Parties/P1/Journal_Combat/compteur"])})`);
+    verifier("et les sept numéros se suivent sans trou",
+             [1,2,3,4,5,6,7].every(n => !!monde.base["Systeme_Parties/P1/Evenements_Combat/"
+                                                     + String(n).padStart(6, "0")]));
+
+    // Le compteur ne doit pas se retrouver dans les résultats du journal : il
+    // n'a pas de champ n... mais il en a un ! Il vit donc dans une AUTRE
+    // collection, et c'est ce qu'on vérifie ici.
+    const q = monde.api.query(monde.api.collection({}, "Systeme_Parties", "P1", "Evenements_Combat"),
+                              monde.api.where("n", ">", 0), monde.api.orderBy("n", "asc"));
+    const trouves = await monde.api.getDocs(q);
+    verifier("le compteur ne traîne pas parmi les événements", trouves.size === 7,
+             `(${trouves.size} document(s))`);
+
+    // Un poste qui rejoint le combat place son curseur sur le dernier numéro :
+    // il ne rejoue pas les sept événements déjà passés.
+    const curseur = await w.dernierNumeroEvenement({});
+    verifier("un poste qui rejoint place son curseur au bon endroit", curseur === 7, `(${curseur})`);
+}
+
+// =========================================================================
+console.log("\n6. UNE PARTIE COMMENCÉE AVANT LE CHANGEMENT NE REPART PAS DE ZÉRO");
+// =========================================================================
+//  Nico a des combats en cours. Leur compteur est encore dans la partie, et le
+//  document du journal n'existe pas. Le curseur doit quand même tomber juste,
+//  sinon le premier écran rechargé rejoue toute la bataille depuis le début.
+{
+    const monde = firestoreExigeant();
+    const w = chargerJournal(monde);
+    monde.base["Systeme_Parties/P1"] = { Compteur_Evenements: 42 };
+    w.PARTIE_DATA = { Compteur_Evenements: 42 };
+    console.error = () => {};
+
+    const curseur = await w.dernierNumeroEvenement({ Compteur_Evenements: 42 });
+    verifier("sans document de compteur, on retombe sur l'ancien champ", curseur === 42, `(${curseur})`);
+
+    // Et le premier événement publié REPREND LA SUITE : repartir de 1 écraserait
+    // les quarante-deux événements déjà écrits, et les postes dont le curseur est
+    // à 42 ne verraient plus jamais rien passer.
+    const n = await w.publierEvenementCombat("P1", { type: "carte", acteur: "M1" });
+    verifier("le nouveau compteur reprend à quarante-trois", n === 43, `(n=${n})`);
+    const suite = await w.publierEvenementsCombat("P1", [{ type: "pas" }, { type: "pas" }]);
+    verifier("et la suite s'enchaîne sans trou", suite.join(",") === "44,45", `(${suite.join(",")})`);
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

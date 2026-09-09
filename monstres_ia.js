@@ -745,8 +745,46 @@ window.preparerCartesMonstres = async function() {
 const DELAI_VERROU_MS = 25000;
 const ID_CLIENT = "cli_" + Math.random().toString(36).substring(2, 10);
 
+// LES TOURS QU'ON A DÉJÀ JOUÉS. Le verrou disait « oui » à qui le détenait
+// déjà — c'était voulu, pour qu'un tour interrompu puisse reprendre. Mais il
+// disait aussi « oui » à un tour ENTIÈREMENT JOUÉ, et c'est là que tout partait
+// de travers : si la file d'initiative n'avançait pas (une écriture bousculée,
+// cf. modifierPartieOuEchec), la créature restait en tête, la notification
+// suivante rappelait l'IA, le verrou répondait oui, et la créature rejouait son
+// tour du début — deuxième déplacement, DEUXIÈME COUP. Voilà les dégâts comptés
+// deux fois.
+//
+// On tient donc la liste de ce qui est fini. L'oubli est volontaire au bout du
+// délai du verrou : si après vingt-cinq secondes la file n'a toujours pas
+// bougé, ce n'est plus un doublon qu'on évite, c'est un combat mort qu'on
+// relance — et le rejeu devient le moindre mal.
+const TOURS_IA_TERMINES = new Map();
+
+function tourIADejaJoue(cle) {
+    const quand = TOURS_IA_TERMINES.get(cle);
+    if (!quand) return false;
+    if (Date.now() - quand > DELAI_VERROU_MS) { TOURS_IA_TERMINES.delete(cle); return false; }
+    return true;
+}
+
+function marquerTourIATermine(cle) {
+    TOURS_IA_TERMINES.set(cle, Date.now());
+    // On ne garde pas l'histoire d'un combat entier : les entrées périmées
+    // partent au fur et à mesure.
+    TOURS_IA_TERMINES.forEach((quand, k) => {
+        if (Date.now() - quand > DELAI_VERROU_MS * 2) TOURS_IA_TERMINES.delete(k);
+    });
+}
+
 async function reclamerVerrouIA(cle) {
     if (!window.ID_PARTIE_COURANTE) return false;
+    // Ce tour-là est joué. Pas deux fois.
+    if (tourIADejaJoue(cle)) {
+        if (typeof window.tracerCombat === "function") {
+            window.tracerCombat("🧠", "tour déjà joué, on ne le rejoue pas", cle);
+        }
+        return false;
+    }
     const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
     try {
         return await runTransaction(db, async (tx) => {
@@ -962,6 +1000,10 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
     // Sans carte lisible ou sans pion, on ne bloque pas le combat : on passe.
     if (!monstre || !dataCarte || !tk) {
         console.warn("IA : tour impossible pour", idMonstre, "— on passe la main.");
+        if (typeof window.tracerCombat === "function") {
+            window.tracerCombat("🚫", `tour impossible pour ${idMonstre}`,
+                !monstre ? "fiche absente" : !dataCarte ? `technique ${idCarte} pas encore forgée` : "pion absent");
+        }
         window.IA_MONSTRE_ACTEUR = null;
         if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true, idMonstre);
         return;
@@ -1079,6 +1121,10 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
         }
     } else {
         // Hors de portée après déplacement : le tour s'arrête là, comme prévu.
+        if (typeof window.tracerCombat === "function") {
+            window.tracerCombat("🚫", `${idMonstre} ne lance rien`,
+                cible ? `${cible.idPersonnage} hors de portée (${infos.portee})` : "aucune cible");
+        }
         if (tkApres && typeof window.afficherMessageFlottantHex === "function") {
             window.afficherMessageFlottantHex(tkApres.q, tkApres.r, "Hors de portée", "#c2a878");
         }
@@ -1182,8 +1228,10 @@ window.verifierTourIAMonstres = async function() {
     try {
         if (teteMorte) {
             const enTeteMort = file[0];
-            if (await reclamerVerrouIA(`mort|${enTeteMort.idPersonnage}|${enTeteMort.timestamp}`)) {
+            const cleMort = `mort|${enTeteMort.idPersonnage}|${enTeteMort.timestamp}`;
+            if (await reclamerVerrouIA(cleMort)) {
                 console.log("🧠 Tour passé :", enTeteMort.idPersonnage, "est à terre.");
+                marquerTourIATermine(cleMort);
                 if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true, enTeteMort.idPersonnage);
             } else {
                 programmerRappelIA(DELAI_VERROU_MS / 2);
@@ -1212,6 +1260,13 @@ window.verifierTourIAMonstres = async function() {
             return;
         }
 
+        // On note le tour comme joué AVANT de le jouer, pas après. Un tour
+        // interrompu en plein milieu ne se reprend pas : jouerTourMonstre repart
+        // toujours du début, donc « reprendre » ce serait frapper une seconde
+        // fois. Mieux vaut un tour écourté qu'un coup en double — et si vraiment
+        // rien n'avance, la marque périme au bout de vingt-cinq secondes et la
+        // créature retentera sa chance.
+        marquerTourIATermine(cle);
         if (typeof window.tracerCombat === "function") {
             window.tracerCombat("🧠", `verrou pris : tour de ${enTete.idPersonnage}`, `(${enTete.idCarte})`);
         }

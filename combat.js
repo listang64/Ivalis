@@ -195,22 +195,60 @@ window.synchroniserCombattantsHorsJeu = async function() {
     return true;
 };
 
-window.modifierPartie = async function(modifier) {
-    if (!window.ID_PARTIE_COURANTE) return null;
+// MODIFIER LA PARTIE, ET SAVOIR SI ÇA A MARCHÉ.
+//
+// Cette fonction rendait `null` dans DEUX cas qui n'ont rien à voir : « il n'y
+// avait rien à faire » et « l'écriture a échoué ». Ses appelants ne pouvaient
+// pas les distinguer, et finDeTourCombat prenait donc un échec pour un « un
+// autre poste s'en est chargé » : il rendait la main, la file d'initiative
+// n'avançait pas, et le combat restait planté sur une créature qui avait déjà
+// joué. C'est le « le tour d'un ennemi vient d'être complètement passé ».
+//
+// Le document de la partie est le plus disputé du jeu. Une transaction qui se
+// fait doubler rend « failed-precondition » : ce n'est pas une panne, c'est une
+// invitation à recommencer. On recommence donc, avec une attente qui s'allonge
+// et un grain de hasard pour que deux postes ne repartent pas ensemble.
+//
+// modifierPartieOuEchec rend { ok, resultat } : `ok` faux veut dire que RIEN
+// n'a été écrit, et que l'appelant doit s'en occuper.
+window.modifierPartieOuEchec = async function(modifier) {
+    if (!window.ID_PARTIE_COURANTE) return { ok: false, resultat: null };
+    const ESSAIS = 4;
     const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
-    try {
-        return await runTransaction(db, async (tx) => {
-            const snap = await tx.get(partieRef);
-            if (!snap.exists()) return null;
-            const sortie = modifier(snap.data());
-            if (!sortie) return null;
-            if (sortie.maj) tx.update(partieRef, sortie.maj);
-            return sortie.resultat !== undefined ? sortie.resultat : true;
-        });
-    } catch (e) {
-        console.error("Modification de la partie :", e);
-        return null;
+    let derniere = null;
+    for (let essai = 1; essai <= ESSAIS; essai++) {
+        try {
+            const resultat = await runTransaction(db, async (tx) => {
+                const snap = await tx.get(partieRef);
+                if (!snap.exists()) return null;
+                const sortie = modifier(snap.data());
+                if (!sortie) return null;
+                if (sortie.maj) tx.update(partieRef, sortie.maj);
+                return sortie.resultat !== undefined ? sortie.resultat : true;
+            });
+            return { ok: true, resultat };
+        } catch (e) {
+            derniere = e;
+            if (essai < ESSAIS) {
+                const attente = 150 * Math.pow(2, essai - 1) + Math.floor(Math.random() * 120);
+                if (typeof window.tracerCombat === "function") {
+                    window.tracerCombat("♻️", `écriture de la partie bousculée (essai ${essai})`,
+                                        `on retente dans ${attente} ms`);
+                }
+                await new Promise(r => setTimeout(r, attente));
+            }
+        }
     }
+    console.error("Modification de la partie :", derniere);
+    if (typeof window.tracerCombat === "function") {
+        window.tracerCombat("❌", "écriture de la partie IMPOSSIBLE",
+                            (derniere && derniere.code) || String(derniere));
+    }
+    return { ok: false, resultat: null };
+};
+
+window.modifierPartie = async function(modifier) {
+    return (await window.modifierPartieOuEchec(modifier)).resultat;
 };
 
 // =========================================================================
@@ -3199,7 +3237,7 @@ window.finDeTourCombat = async function(forcer = false, idQuiTermine = null) {
             const { updateDoc, writeBatch } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
 
             // 1. LA FILE AVANCE — sous transaction, et une seule fois.
-            const passage = await window.modifierPartie((data) => {
+            const tentative = await window.modifierPartieOuEchec((data) => {
                 let file = data.File_Attente_Combat || [];
                 let phase = data.Phase_Combat || "Resolution";
                 let tour = data.Tour_Combat || 1;
@@ -3235,12 +3273,45 @@ window.finDeTourCombat = async function(forcer = false, idQuiTermine = null) {
 
             window.ANIMATION_TOUR_EN_COURS = false;
 
+            // L'ÉCRITURE N'EST PAS PASSÉE. Ce n'est pas « quelqu'un d'autre s'en
+            // est chargé » : la file est restée exactement où elle était, et
+            // personne ne la poussera si on s'en va. On revient donc dessus, et
+            // on le dit dans la trace — un tour sauté sans un mot, c'est ce qui
+            // nous a coûté le plus de temps.
+            if (!tentative.ok) {
+                // Trois retours, pas plus : au-delà ce n'est plus de la
+                // bousculade, c'est une panne, et une boucle sans fin ne
+                // réparerait rien.
+                // Combien de fois on est déjà revenu à la charge pour ce
+                // combattant-là. Remis à zéro dès que ça passe.
+                const relances = window.RELANCES_FIN_DE_TOUR || (window.RELANCES_FIN_DE_TOUR = {});
+                const compte = (relances[attendu] || 0) + 1;
+                relances[attendu] = compte;
+                if (typeof window.tracerCombat === "function") {
+                    window.tracerCombat("🔁", `la file n'a pas avancé pour ${attendu}`,
+                                        compte <= 3 ? `on repasse (essai ${compte})` : "on abandonne");
+                }
+                if (compte <= 3) setTimeout(() => { window.finDeTourCombat(true, attendu); }, 800 * compte);
+                return;
+            }
+            if (window.RELANCES_FIN_DE_TOUR) delete window.RELANCES_FIN_DE_TOUR[attendu];
+
+            const passage = tentative.resultat;
+
             // Rien à faire : la file était vide, ou un autre poste s'en est chargé.
             // Le décompte des états et la régénération lui reviennent aussi : les
             // faire ici en double donnerait deux régénérations pour un seul round.
             if (!passage) {
+                if (typeof window.tracerCombat === "function") {
+                    window.tracerCombat("🔚", `file déjà avancée pour ${attendu}`, "rien à faire");
+                }
                 if (typeof window.afficherPisteInitiative === "function") window.afficherPisteInitiative();
                 return;
+            }
+
+            if (typeof window.tracerCombat === "function") {
+                window.tracerCombat("🔚", `file avancée : ${attendu} a joué`,
+                                    `suivant : ${(passage.file[0] || {}).idPersonnage || "—"}`);
             }
 
             const { actionCourante, file, phase, tour, finDuRound } = passage;

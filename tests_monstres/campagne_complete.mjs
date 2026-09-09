@@ -27,6 +27,7 @@ const sansImports = (f) => fs.readFileSync('/home/user/Ivalis/' + f, 'utf-8')
 
 const SRC_COMBAT = ['window.enregistrerPionsVTT = async function',
                     'window.reparerPionsAPlat = async function',
+                    'window.modifierPartieOuEchec = async function',
                     'window.modifierPartie = async function',
                     'window.estCombattantMort = function',
                     'window.caseOccupeeParVivant = function',
