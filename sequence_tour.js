@@ -102,6 +102,8 @@ window.EVENEMENT_EN_COURS = null;
 window.EVENEMENT_ATTENDU = null;
 let tourAcquitte = null;
 
+const tracer = (i, q, d) => { if (typeof window.tracerCombat === "function") window.tracerCombat(i, q, d); };
+
 let lecteurEnCours = false;
 let arreterEcoute = null;
 let partieEcoutee = null;
@@ -223,8 +225,21 @@ window.consignerEtapeTour = async function(type, donnee) {
     // la fenêtre sombre, auquel cas il n'a rien vu et le rejouera comme les
     // autres — c'est le cas d'une créature, que personne ne « joue » vraiment.
     if (n && window.monHerosJoue()) window.EVENEMENTS_DEJA_VUS[n] = true;
+    tracer("📤", `${n} ${type} ${acteur ? acteur.idPersonnage : "?"}`, resumeDonnee(donnee));
     return n;
 };
+
+// De quoi lire un événement d'un coup d'œil dans la trace.
+function resumeDonnee(d) {
+    if (!d || typeof d !== "object") return "";
+    if (d.de && d.vers) return `(${d.de.q},${d.de.r} → ${d.vers.q},${d.vers.r})`;
+    if (d.idCible) return `→ ${d.idCible}`;
+    if (Array.isArray(d.attaques)) {
+        const cibles = d.attaques.flatMap(a => a.cibles || []);
+        return cibles.length ? `→ ${cibles.join(",")}` : "";
+    }
+    return "";
+}
 
 // PLUSIEURS ÉTAPES D'UN COUP — un trajet, par exemple, où chaque hexagone est
 // son propre événement. Les envoyer une par une, c'est autant d'allers-retours
@@ -259,6 +274,8 @@ window.consignerEtapesTour = async function(type, listeDeDonnees) {
 
     const numeros = await window.publierEvenementsCombat(window.ID_PARTIE_COURANTE, evenements);
     if (window.monHerosJoue()) numeros.forEach(n => { window.EVENEMENTS_DEJA_VUS[n] = true; });
+    numeros.forEach((n, i) => tracer("📤", `${n} ${type} ${acteur ? acteur.idPersonnage : "?"}`,
+                                     resumeDonnee(liste[i])));
     return numeros;
 };
 
@@ -333,6 +350,8 @@ function gardeDeRejeu(ev) {
 // persoDocVersFront note à chaque notification.
 function rendreLaGarde(garde) {
     let rendus = 0;
+    window.__TRACE_CAUSE = "[base rendue]";
+    try {
     (garde || []).forEach(id => {
         const verite = (window.VERITE_BASE || {})[id];
         // La fiche a pu être remplacée par la base pendant l'animation : on la
@@ -346,6 +365,7 @@ function rendreLaGarde(garde) {
         });
         rendus++;
     });
+    } finally { window.__TRACE_CAUSE = null; }
     if (!rendus) return;
     // Les jauges, les pions et le panneau lisent cette fiche : ils doivent
     // repartir de la valeur rendue, sinon l'écran garde le chiffre du rejeu.
@@ -355,6 +375,91 @@ function rendreLaGarde(garde) {
     if (typeof window.rafraichirAffichageCombat === "function") {
         try { window.rafraichirAffichageCombat(); } catch (e) {}
     }
+}
+
+// =========================================================================
+//  CE QUI EST DÉJÀ MONTRÉ NE RECULE PAS, CE QUI NE L'EST PAS ENCORE N'AVANCE PAS
+// =========================================================================
+//  Les points de vie voyagent dans la fiche du combattant, pas dans le journal :
+//  ils arrivent donc chez tout le monde dès que l'auteur a tranché — c'est-à-dire
+//  AVANT que l'écran n'ait rejoué le tour. On voyait ainsi la vie d'un héros se
+//  retirer derrière la fenêtre sombre, plusieurs secondes avant le coup qui la
+//  lui prend.
+//
+//  Même principe que pour la case d'un pion : la BASE garde la vérité, l'ÉCRAN
+//  garde ce qu'il a déjà montré, et les deux se rejoignent dès que le tour est
+//  rejoué ici. Un combattant qu'un événement en attente NOMME garde donc à
+//  l'affichage ses valeurs d'avant ; tous les autres suivent la base.
+const CHAMPS_AFFICHES = ["PV_Actuels", "Bouclier_Actuel", "Etats_Alteres"];
+window.ETAT_AFFICHE = {};
+
+const copieValeur = (v) => (v && typeof v === "object") ? JSON.parse(JSON.stringify(v)) : v;
+
+function noterAffichage(perso) {
+    if (!perso || !perso.idPersonnage) return;
+    const photo = {};
+    CHAMPS_AFFICHES.forEach(c => { if (perso[c] !== undefined) photo[c] = copieValeur(perso[c]); });
+    window.ETAT_AFFICHE[perso.idPersonnage] = photo;
+}
+
+// Appelé à chaque recomposition des combattants (monstres.js) : c'est le seul
+// endroit par où passent les fiches fraîches venues de la base.
+window.figerAffichageRetenus = function() {
+    const retenus = window.pionsRetenusParLeJournal();
+    window.__TRACE_CAUSE = "[écran retenu]";
+    try {
+    (window.PERSOS_PARTIE || []).forEach(perso => {
+        if (!perso || !perso.idPersonnage) return;
+        const dejaMontre = window.ETAT_AFFICHE[perso.idPersonnage];
+        if (retenus[perso.idPersonnage] && dejaMontre) {
+            let gele = false;
+            CHAMPS_AFFICHES.forEach(c => {
+                if (dejaMontre[c] === undefined) return;
+                if (JSON.stringify(perso[c]) !== JSON.stringify(dejaMontre[c])) gele = true;
+                perso[c] = copieValeur(dejaMontre[c]);
+            });
+            if (gele) gelesEnCours.add(perso.idPersonnage);
+        } else {
+            noterAffichage(perso);
+        }
+    });
+    } finally { window.__TRACE_CAUSE = null; }
+};
+
+// L'ÉCRAN RATTRAPE LA BASE. Sans ça, un combattant figé pendant l'attente le
+// restait jusqu'à ce que sa fiche rebouge en base — et si elle ne rebougeait
+// plus, sa vie restait fausse pour le reste du combat. Le gel doit être
+// temporaire PAR CONSTRUCTION : dès que le journal est à jour, on recopie la
+// dernière parole de la base dans les fiches.
+//  On ne rattrape QUE les combattants qu'on avait effectivement retenus : pour
+//  ceux-là, et pour eux seuls, la base a forcément quelque chose de plus récent
+//  que l'écran. Rattraper les autres écraserait le résultat que le rejeu vient
+//  d'écrire alors que la base, elle, n'a pas encore parlé.
+const gelesEnCours = new Set();
+
+function rendreLaBaseATous() {
+    if (gelesEnCours.size === 0) return;
+    const verites = window.VERITE_BASE || {};
+    window.__TRACE_CAUSE = "[base rattrapée]";
+    try {
+        (window.PERSOS_PARTIE || []).forEach(perso => {
+            if (!perso || !gelesEnCours.has(perso.idPersonnage)) return;
+            const verite = verites[perso.idPersonnage];
+            if (!verite) return;
+            CHAMPS_AFFICHES.forEach(champ => {
+                if (verite[champ] !== undefined) perso[champ] = copieValeur(verite[champ]);
+            });
+        });
+    } finally { window.__TRACE_CAUSE = null; }
+    gelesEnCours.clear();
+}
+
+// Après une animation, ce qu'elle vient de montrer DEVIENT ce qui est affiché.
+function noterCeQuiVientDEtreMontre(ev) {
+    const ids = idsConcernes((ev && ev.data) || {});
+    (window.PERSOS_PARTIE || []).forEach(perso => {
+        if (perso && perso.idPersonnage && ids.has(perso.idPersonnage)) noterAffichage(perso);
+    });
 }
 
 const ANIMATIONS = {
@@ -430,6 +535,7 @@ window.lireJournalCombat = async function() {
             if (!dejaVu && jouer && ev.acteur && !estMonHeros(ev.acteur) && cleTour(ev) !== tourAcquitte) {
                 window.EVENEMENT_ATTENDU = ev;
                 window.EVENEMENTS_RECUS[suivant] = ev;
+                tracer("⏸️", `fenêtre : tour ${ev.tour} de ${ev.acteur}`, `(en attente du OK, n°${suivant})`);
                 if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
                 break;
             }
@@ -440,6 +546,7 @@ window.lireJournalCombat = async function() {
             // Déjà vu en direct par ce poste : on avance le curseur, c'est tout.
             if (dejaVu) {
                 delete window.EVENEMENTS_DEJA_VUS[suivant];
+                tracer("👁️", `${suivant} ${ev.type}`, "(déjà vu en direct, pas rejoué)");
                 continue;
             }
 
@@ -453,6 +560,7 @@ window.lireJournalCombat = async function() {
             window.REJEU_SCRIPT_EN_COURS = true;
             dejaServiAvant = new Set();
             const garde = gardeDeRejeu(ev);
+            tracer("▶️", `${suivant} ${ev.type} ${ev.acteur || "?"}`, resumeDonnee(ev.data));
             try {
                 await window.filerAnimation(ev.type, () => jouer(ev.data));
             } finally {
@@ -461,6 +569,8 @@ window.lireJournalCombat = async function() {
                 window.EVENEMENT_EN_COURS = null;
                 dejaServiAvant = null;
                 rendreLaGarde(garde);
+                noterCeQuiVientDEtreMontre(ev);
+                tracer("⏹️", `${suivant} ${ev.type}`, garde.length ? `(base prioritaire sur ${garde.join(",")})` : "");
             }
             if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
 
@@ -478,7 +588,13 @@ window.lireJournalCombat = async function() {
         lecteurEnCours = false;
         // Tout est rejoué : plus rien ne retient les pions, ils retrouvent la
         // case que dit la base. Un dernier redessin le rend visible.
-        if (window.evenementsEnAttente() === 0) {
+        if (window.evenementsEnAttente() === 0 && !window.EVENEMENT_ATTENDU) {
+            // Le journal est à jour : l'écran rattrape la base, partout.
+            rendreLaBaseATous();
+            (window.PERSOS_PARTIE || []).forEach(noterAffichage);
+            if (typeof window.rafraichirAffichageCombat === "function") {
+                try { window.rafraichirAffichageCombat(); } catch (e) {}
+            }
             if (typeof window.redessinerPions === "function") {
                 try { window.redessinerPions(); } catch (e) {}
             }
@@ -515,7 +631,10 @@ window.suivreSequenceTour = function(partie) {
             arreterEcoute = window.ecouterEvenementsCombat(
                 partieEcoutee, window.DERNIER_EVENEMENT_JOUE, (evenements) => {
                     (evenements || []).forEach(ev => {
-                        if (ev && ev.n > window.DERNIER_EVENEMENT_JOUE) window.EVENEMENTS_RECUS[ev.n] = ev;
+                        if (ev && ev.n > window.DERNIER_EVENEMENT_JOUE) {
+                            if (!window.EVENEMENTS_RECUS[ev.n]) tracer("📥", `${ev.n} ${ev.type}`, "");
+                            window.EVENEMENTS_RECUS[ev.n] = ev;
+                        }
                     });
                     window.lireJournalCombat();
                 });
@@ -550,18 +669,21 @@ window.etatSequenceTour = function() {
 
     if (window.monHerosJoue()) return null;      // à moi de jouer : plateau dégagé
 
-    // LE RESTE DU TEMPS, LE PLATEAU EST DÉGAGÉ AUSSI. La fenêtre sombre n'a qu'un
-    // seul rôle : annoncer un tour avant de le dérouler. Tant qu'il n'y a rien
-    // à annoncer — pendant qu'un tour se rejoue, pendant qu'une créature
-    // réfléchit, pendant qu'un joueur lointain choisit sa carte — elle n'a rien
-    // à faire là.
-    //
-    // Elle restait autrefois posée en annonçant « le tour se joue… » dès que ce
-    // n'était pas notre héros, c'est-à-dire presque tout le temps. Le moindre
-    // grain de sable ailleurs, et on se retrouvait devant un écran noir figé
-    // sur un tour qui ne venait pas, sans rien pouvoir faire ni même regarder.
-    // Un plateau visible, lui, ne peut pas se bloquer.
-    return { message: "", okVisible: false, forcerVisible: false, masquee: true };
+    // PENDANT QU'UN TOUR SE REJOUE, la fenêtre se lève : c'est justement le
+    // moment où il faut voir le plateau.
+    if (window.EVENEMENT_EN_COURS || lecteurEnCours || window.evenementsEnAttente() > 0) {
+        return { message: "", okVisible: false, forcerVisible: false, masquee: true };
+    }
+
+    // LA FENÊTRE SE POSE DÈS LE DÉBUT DU TOUR — ennemi comme allié —, sans
+    // attendre quoi que ce soit. Tant que le combattant en tête n'est pas le
+    // nôtre, son tour ne nous appartient pas : on ne doit ni le voir se
+    // préparer, ni voir ses points de vie bouger avant l'animation. Le plateau
+    // se rouvre quand le tour se rejoue, et à ce moment-là seulement.
+    const tete = window.acteurCourantCombat();
+    if (!tete) return null;
+    if (typeof window.estCombattantMort === "function" && window.estCombattantMort(tete.idPersonnage)) return null;
+    return { message: "Le tour se prépare…", okVisible: false, forcerVisible: false };
 };
 
 // La séquence, telle que l'affichage la lit (combat.js). Il n'y a plus d'objet
@@ -625,6 +747,7 @@ window.jouerSequenceTour = function() {
 
     tourAcquitte = cleTour(attendu);
     window.EVENEMENT_ATTENDU = null;
+    tracer("👆", "OK", `(tour ${attendu.tour} de ${attendu.acteur})`);
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
     return window.lireJournalCombat();

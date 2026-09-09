@@ -135,9 +135,10 @@ const res = await p.evaluate(async ({ sVoile, sToggle, sEtatInitial, sSequence }
   await new Promise(r => setTimeout(r, 500));
   const preparation = etat();
 
-  // 2. Au tour d'une créature, mais SANS rien à annoncer encore : le plateau
-  //    reste dégagé. La fenêtre sombre ne sert qu'à présenter un tour avant de
-  //    le dérouler — elle n'a pas à rester posée pendant qu'on réfléchit.
+  // 2. Au tour d'une créature, DÈS LE DÉBUT : la fenêtre se pose, sans attendre
+  //    quoi que ce soit. Le tour d'un autre ne nous appartient pas — on ne doit
+  //    ni le voir se préparer, ni voir des points de vie bouger avant
+  //    l'animation.
   poser(fileMonstre, "Resolution");
   await new Promise(r => setTimeout(r, 600));
   const rienAAnnoncer = etat();
@@ -243,9 +244,12 @@ console.log("erreurs JS :", erreurs.length ? erreurs : "aucune");
 console.log(`     tour de la goule : « ${res.avecOk.nom} » — « ${res.avecOk.carte} » — ${res.avecOk.effets}`);
 
 verifier("en préparation, aucune fenêtre", !res.preparation.visible);
-verifier("au tour d'une créature, tant qu'il n'y a rien à annoncer, le plateau reste dégagé",
-         !res.rienAAnnoncer.visible);
-verifier("un tour à annoncer, et la fenêtre s'ouvre", res.avecOk.visible);
+verifier("au tour d'une créature, la fenêtre se pose DÈS LE DÉBUT du tour",
+         res.rienAAnnoncer.visible, `(${res.rienAAnnoncer.attente})`);
+verifier("elle annonce que le tour se prépare, sans OK",
+         !res.rienAAnnoncer.okVisible && /se prépare/.test(res.rienAAnnoncer.attente),
+         `(${res.rienAAnnoncer.attente})`);
+verifier("le tour à annoncer allume ensuite le OK", res.avecOk.visible && res.avecOk.okVisible);
 verifier("la fenêtre est OPAQUE : rien ne transparaît du tour à venir",
          !/rgba\([^)]*0\.\d/.test(res.avecOk.opaque), `(${res.avecOk.opaque.slice(0, 70)}…)`);
 verifier("elle s'arrête au bord du panneau latéral",
@@ -262,8 +266,8 @@ verifier("elle est plus grosse que le détail des effets", res.avecOk.tailleCart
 verifier("ses effets sont listés dessous", /Mot de pouvoir/.test(res.avecOk.effets) && /Peur/.test(res.avecOk.effets),
          `(${res.avecOk.effets.replace(/\s+/g, ' ').trim()})`);
 verifier("l'initiative n'y figure pas", !/Initiative/.test(res.avecOk.effets));
-verifier("tant qu'aucun événement n'est arrivé, pas de fenêtre du tout",
-         !res.rienAAnnoncer.visible && !res.rienAAnnoncer.okVisible);
+verifier("tant qu'aucun événement n'est arrivé, la fenêtre est là mais sans OK",
+         res.rienAAnnoncer.visible && !res.rienAAnnoncer.okVisible);
 verifier("panneau replié, la fenêtre prend tout l'écran", res.panneauReplie.gauche < 2,
          `(${res.panneauReplie.gauche}px)`);
 verifier("le nom de la technique porte la couleur du combattant",
@@ -291,8 +295,8 @@ verifier("pendant la relecture, la fenêtre se lève pour laisser voir le platea
          res.apresClic.pendantLecture && res.apresClic.pendantLecture.masquee !== false
          || !res.apresClic.visible);
 verifier("au tour de MON héros, aucune fenêtre : le plateau reste dégagé", !res.monTour.visible);
-verifier("au tour du héros d'un autre poste, sans rien à annoncer, le plateau reste dégagé",
-         !res.tourDeLautre.visible);
+verifier("au tour du héros d'un AUTRE JOUEUR aussi, la fenêtre se pose dès le début",
+         res.tourDeLautre.visible, `(${res.tourDeLautre.attente})`);
 verifier("mais dès qu'il agit, la fenêtre sombre s'ouvre chez les autres",
          res.tourDunAutreJoueur.retenu && res.tourDunAutreJoueur.visible
          && res.tourDunAutreJoueur.okVisible,

@@ -1212,7 +1212,13 @@ window.verifierTourIAMonstres = async function() {
             return;
         }
 
+        if (typeof window.tracerCombat === "function") {
+            window.tracerCombat("🧠", `verrou pris : tour de ${enTete.idPersonnage}`, `(${enTete.idCarte})`);
+        }
         await window.jouerTourMonstre(enTete.idPersonnage, enTete.idCarte);
+        if (typeof window.tracerCombat === "function") {
+            window.tracerCombat("🧠", `tour de ${enTete.idPersonnage} terminé`, "");
+        }
 
     } catch (e) {
         console.error("IA des monstres :", e);

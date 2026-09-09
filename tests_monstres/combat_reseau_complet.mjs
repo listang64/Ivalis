@@ -530,7 +530,11 @@ const photo = (poste) => {
 };
 
 const comparerLesPostes = (etiquette) => {
-  const photos = postes.map(photo);
+  // Le poste MUET est volontairement en retard : il n'a pas touché son écran, il
+  // n'a donc pas vu les tours passer, et ce qu'il affiche est ce qu'il a vu.
+  // C'est justement ce qu'on veut. On compare les postes qui suivent ; le poste
+  // muet, lui, est vérifié à part quand il rattrape (chapitre 3 bis).
+  const photos = postes.filter(p => p.nom !== POSTE_MUET).map(photo);
   const differences = [];
   const cle = (ph) => JSON.stringify(ph);
   if (new Set(photos.map(cle)).size > 1) {
@@ -832,6 +836,13 @@ console.log("\n3 quinquies. RIEN NE SE JOUE AVANT SON TOUR\n");
   verifier("et aucune de ces visées ne s'est affichée avant l'heure",
            bavards.length === 0,
            bavards.length ? `(${bavards.map(t => t.quoi).join(", ")})` : "");
+}
+
+// Le poste muet revient pour de bon : il touche son écran jusqu'à avoir tout
+// rejoué. À partir d'ici, les trois postes doivent raconter la même histoire.
+for (let i = 0; i < 200 && enRetard(true); i++) {
+  await toucherLesEcrans(true);
+  await attendreBrut(20, 40);
 }
 
 console.log("\n4. CE QUE RACONTE LE COMBAT\n");

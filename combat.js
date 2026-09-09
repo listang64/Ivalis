@@ -3181,6 +3181,9 @@ window.finDeTourCombat = async function(forcer = false, idQuiTermine = null) {
     // que s'il y est encore.
     const teteLocale = ((window.PARTIE_DATA || {}).File_Attente_Combat || [])[0];
     const attendu = idQuiTermine || (teteLocale ? teteLocale.idPersonnage : null);
+    if (typeof window.tracerCombat === "function") {
+        window.tracerCombat("🔚", `fin de tour demandée pour ${attendu}`, forcer ? "(forcée)" : "");
+    }
 
     const premiereBulle = document.getElementById("premiere-bulle-initiative");
     if (premiereBulle) {

@@ -503,5 +503,51 @@ console.log("\n11. DEUX COUPS DE LA MÊME CARTE SE CUMULENT AU REJEU");
              h1.PV_Actuels === 48, `(attendu 60-7-5=48, obtenu ${h1.PV_Actuels})`);
 }
 
+// =========================================================================
+console.log("\n12. LA VIE NE SE RETIRE PAS DERRIÈRE LA FENÊTRE SOMBRE");
+// =========================================================================
+//  Les points de vie voyagent dans la fiche du combattant, pas dans le journal :
+//  ils arrivent donc chez tout le monde dès que l'auteur a tranché — c'est-à-dire
+//  AVANT que l'écran n'ait rejoué le tour. On voyait la vie d'un héros se retirer
+//  derrière la fenêtre sombre, plusieurs secondes avant le coup qui la lui prend.
+{
+    const t = table();
+    await t.brancher();
+    const pc = t.postes["poste-pc"], A = t.postes["poste-ipadA"];
+    pc.IA_MONSTRE_ACTEUR = "M1";
+
+    Object.values(t.postes).forEach(w => {
+        w.jouerAnimationMoteur = () => {
+            const cible = w.PERSOS_PARTIE.find(p => p.idPersonnage === "H1");
+            const depart = w.valeurAvantRejeu("H1", "PV_Actuels", cible.PV_Actuels);
+            cible.PV_Actuels = Math.max(0, depart - 12);
+        };
+    });
+
+    await pc.consignerEtapeTour("carte", { idLanceur: "M1", attaques: [{ cibles: ["H1"] }] });
+    await t.livrer({ sansOk: true });
+
+    // La base a livré les points de vie D'APRÈS pendant que l'iPad attend son
+    // OK : c'est exactement l'instant où la vie « se retirait ».
+    laBaseDit(A, "H1", { PV_Actuels: 48 });
+    A.figerAffichageRetenus();
+    const h1 = () => A.PERSOS_PARTIE.find(p => p.idPersonnage === "H1");
+
+    verifier("le tour attend le OK", !!A.EVENEMENT_ATTENDU);
+    verifier("et la vie affichée n'a PAS bougé", h1().PV_Actuels === 60,
+             `(attendu 60, obtenu ${h1().PV_Actuels})`);
+
+    await t.toucher();
+    await t.respirer();
+    verifier("elle ne tombe qu'une fois le coup rejoué", h1().PV_Actuels === 48,
+             `(attendu 48, obtenu ${h1().PV_Actuels})`);
+
+    // Et une fois le journal à jour, l'écran suit de nouveau la base sans retard.
+    laBaseDit(A, "H1", { PV_Actuels: 41 });
+    A.figerAffichageRetenus();
+    verifier("puis l'écran suit de nouveau la base", h1().PV_Actuels === 41,
+             `(attendu 41, obtenu ${h1().PV_Actuels})`);
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

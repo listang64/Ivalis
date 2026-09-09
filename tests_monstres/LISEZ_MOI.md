@@ -157,6 +157,29 @@ un Firestore qui applique cette règle-là. Il vérifie aussi le filet de sécur
 si le journal tombe pour une autre raison — droits, réseau —, la fenêtre s'efface
 et les animations reprennent leur ancien chemin, plutôt qu'un plateau figé.
 
+**La trace du combat.** `trace_combat.js` est chargé avant tout le reste et
+écrit dans la console une ligne par chose qui arrive : événement publié, reçu,
+retenu par le OK, rejoué, fin de tour, verrou de l'IA — et surtout **chaque
+changement de points de vie, avec sa cause** (`[direct]`, `[rejeu]`,
+`[calcul IA]`, `[base rendue]`, `[écran retenu]`). C'est le seul moyen de voir
+un dégât appliqué deux fois : la même cible, le même nombre, deux lignes. En
+jeu : `effacerTrace()` avant de reproduire, `copierTrace()` après. Elle ne garde
+que les 500 dernières lignes et se coupe avec `TRACE_COMBAT_ACTIVE = false`.
+
+**La fenêtre sombre se pose dès le début du tour**, ennemi comme allié, sans
+attendre le moindre événement. Le tour d'un autre ne nous appartient pas : on ne
+doit ni le voir se préparer, ni voir des points de vie bouger avant l'animation.
+Elle se lève quand le tour se rejoue — et à ce moment-là seulement.
+
+**Ce qui est déjà montré ne recule pas, ce qui ne l'est pas encore n'avance
+pas.** Les points de vie voyagent dans la fiche du combattant, pas dans le
+journal : ils arrivent donc chez tout le monde dès que l'auteur a tranché,
+c'est-à-dire AVANT que l'écran n'ait rejoué le tour. On voyait la vie d'un héros
+se retirer derrière la fenêtre sombre, plusieurs secondes avant le coup qui la
+lui prend. Même principe que pour la case d'un pion : un combattant qu'un
+événement en attente NOMME garde à l'affichage ses valeurs d'avant, et les deux
+se rejoignent dès que le tour est rejoué ici.
+
 **Le spectacle appartient à la relecture.** Faire jouer une créature, c'est la
 faire viser : le moteur allume les anneaux de ciblage, pose l'emprise de la
 zone, la fait tourner, la montre un instant, puis valide. Tout cela est du

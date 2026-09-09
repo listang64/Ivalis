@@ -200,6 +200,15 @@ window.recomposerCombattants = function() {
     const monstres = window.MONSTRES_PARTIE || [];
     window.PERSOS_PARTIE = [...joueurs, ...monstres];
 
+    // Un combattant dont le journal n'a pas encore rejoué le tour garde à
+    // l'écran les valeurs déjà montrées : sinon sa vie se retire derrière la
+    // fenêtre sombre, plusieurs secondes avant le coup qui la lui prend.
+    if (typeof window.figerAffichageRetenus === "function") window.figerAffichageRetenus();
+
+    // Chaque fiche fraîche est remise sous surveillance : c'est ainsi que la
+    // trace voit passer TOUS les changements de points de vie, avec leur cause.
+    if (typeof window.surveillerLesCombattants === "function") window.surveillerLesCombattants();
+
     // Rafraîchit ce qui dépend de la liste des combattants, si le combat tourne.
     if (typeof window.appliquerTokensVTT === "function" && window.TOKENS_VTT_DATA) {
         window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
