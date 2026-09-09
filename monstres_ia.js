@@ -1302,6 +1302,22 @@ window.verifierTourIAMonstres = async function() {
         !(typeof window.estCombattantMort === "function" && window.estCombattantMort(m.idPersonnage)));
     if (!aLaMain && !aPreparer && !teteMorte) return;
 
+    // SOUS LE NOUVEAU RÉGIME, CETTE FONCTION N'A PLUS QU'UN MÉTIER.
+    //
+    // Elle en a deux : préparer (les créatures choisissent leur technique et
+    // entrent dans la file) et jouer (elles déroulent leur tour). Le premier
+    // appartient à la phase de préparation, qui reste dans l'ancien monde ; le
+    // second appartient au cerveau, qui fait jouer les créatures lui-même.
+    //
+    // Les laisser tous les deux, ce serait faire jouer chaque créature deux
+    // fois — une ici avec son verrou, une dans le cerveau. Les couper tous les
+    // deux, c'est ce que j'avais fait, et les créatures ne posaient alors plus
+    // jamais leur carte : la file restait incomplète, la phase ne passait
+    // jamais en résolution, et la piste d'initiative ne se lançait pas.
+    //
+    // On s'arrête donc ici dès qu'il ne s'agit plus de préparer.
+    if (window.REGIME_CERVEAU === true && !aPreparer) return;
+
     // Signe de vie : c'est lui qui garde le bouton "fin de tour" éteint pendant
     // qu'un monstre joue. S'il s'éteint (aucun poste ne fait plus tourner l'IA),
     // les humains récupèrent la main au bout de vingt secondes.

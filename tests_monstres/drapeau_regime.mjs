@@ -198,5 +198,65 @@ console.log("\n6. LE DRAPEAU EST ATTEIGNABLE, ET LA TRACE DIT OÙ ON EST");
              `(annonce ${iAnnonce}, sortie ${iSortie})`);
 }
 
+// =========================================================================
+console.log("\n7. L'IA GARDE SON PREMIER MÉTIER : PRÉPARER LES CARTES");
+// =========================================================================
+//  verifierTourIAMonstres fait DEUX métiers, et un seul appartient au cerveau.
+//
+//    • Pendant la PRÉPARATION, elle fait choisir aux créatures leur technique
+//      et les inscrit dans la file d'initiative. C'est la phase de préparation,
+//      qui reste dans l'ancien monde — comme les joueurs qui choisissent leur
+//      carte.
+//    • Pendant la RÉSOLUTION, elle leur fait jouer leur tour. Ça, c'est le
+//      cerveau.
+//
+//  Je l'avais coupée en entier. Les créatures ne posaient donc plus jamais
+//  leur carte, la file restait incomplète, la phase ne passait jamais en
+//  résolution, et la piste d'initiative ne se lançait pas — sans que rien dans
+//  la trace ne dise pourquoi. Ce chapitre existe pour que ça ne se reproduise
+//  pas silencieusement.
+{
+    const app = SOURCES['app.js'];
+    const ia = lire('monstres_ia.js');
+
+    // L'appel doit être HORS du bloc qui éteint l'ancienne synchro.
+    const bloc = app.indexOf('if (!window.REGIME_CERVEAU) {');
+    const iSeq = app.indexOf('window.suivreSequenceTour(dataPartie)');
+    const iIA = app.indexOf('window.verifierTourIAMonstres();');
+    verifier("le rejeu de l'ancien journal reste éteint", bloc > 0 && iSeq > bloc, `(${bloc} < ${iSeq})`);
+    verifier("mais l'IA des monstres est toujours appelée", iIA > 0);
+    verifier("et elle l'est dans les DEUX régimes", iIA > iSeq,
+             "l'appel doit venir après le bloc conditionnel, donc hors de lui");
+
+    // Et c'est monstres_ia.js qui sait lequel de ses deux métiers s'arrête.
+    verifier("l'IA s'écarte d'elle-même quand le cerveau tient la main",
+             ia.includes('if (window.REGIME_CERVEAU === true && !aPreparer) return;'));
+    const iGarde = ia.indexOf('window.REGIME_CERVEAU === true && !aPreparer');
+    const iPrepare = ia.indexOf('await window.preparerCartesMonstres()');
+    const iJoue = ia.indexOf('await window.jouerTourMonstre(');
+    verifier("la garde passe avant les deux métiers", iGarde > 0 && iGarde < iPrepare && iGarde < iJoue,
+             `(garde ${iGarde}, préparer ${iPrepare}, jouer ${iJoue})`);
+    verifier("préparer reste atteignable — c'est ce que la garde laisse passer",
+             iPrepare > 0 && ia.includes('if (phase === "Preparation") {'));
+}
+
+// =========================================================================
+console.log("\n8. LE DRAPEAU COCHÉ EN COURS DE COMBAT NE RESTE PAS MUET");
+// =========================================================================
+//  Le cerveau se donne à l'OUVERTURE d'un combat. Cocher la case au milieu
+//  d'une rencontre déjà commencée n'ouvre donc rien — et aucun poste ne prend
+//  la main de son propre chef, ce serait une élection, et c'est précisément ce
+//  qu'on a supprimé. Il faut donc le dire, au lieu de laisser un plateau qui
+//  n'avance plus sans raison visible.
+{
+    const r = SOURCES['regime_cerveau.js'];
+    verifier("le cas est détecté", r.includes("!REGIME.etatPublie() && !aPrevenuSansCombat"));
+    verifier("et il se dit une seule fois", r.includes('aPrevenuSansCombat = true'));
+    verifier("le message dit quoi faire",
+             r.includes("réinitialise le combat pour qu'il prenne effet"));
+    verifier("et l'avertissement se réarme au combat suivant",
+             r.includes('if (phase === "Preparation") aPrevenuSansCombat = false;'));
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

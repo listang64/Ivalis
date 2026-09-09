@@ -2710,22 +2710,18 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
              }
          }
 
-         // L'ANCIENNE SYNCHRONISATION — débranchée, pas supprimée.
+         // L'ANCIEN REJEU — débranché, pas supprimé.
          //
-         // Sous le nouveau régime, ces deux appels n'ont plus lieu d'être et
-         // seraient même nuisibles : la séquence de tour rejouerait un second
-         // journal par-dessus le premier, et l'IA ferait jouer les créatures en
-         // double, une fois ici et une fois dans le cerveau. C'est très
-         // exactement le mécanisme des tours joués deux fois qu'on a passé une
-         // semaine à chasser — il n'y a aucune raison de le réinviter.
-         //
-         // Le drapeau éteint, tout ce qui suit se comporte comme avant, à la
-         // ligne près.
+         // Sous le nouveau régime, la séquence de tour rejouerait un second
+         // journal par-dessus celui du cerveau : deux récits du même combat sur
+         // le même écran. C'est le mécanisme des tours joués deux fois, et il
+         // n'y a aucune raison de le réinviter. Le drapeau éteint, cet appel se
+         // comporte exactement comme avant.
          if (!window.REGIME_CERVEAU) {
-             // La séquence de tour AVANT l'IA : c'est elle qui sait si le tour en
-             // cours est déjà calculé et n'attend plus que les autres postes. Sans
-             // ce passage en premier, la créature rejouerait son tour en boucle
-             // pendant l'attente (voir sequenceTourEnAttente, sequence_tour.js).
+             // C'est elle qui sait si le tour en cours est déjà calculé et
+             // n'attend plus que les autres postes. Sans ce passage avant l'IA,
+             // la créature rejouerait son tour en boucle pendant l'attente
+             // (voir sequenceTourEnAttente, sequence_tour.js).
              if (typeof window.suivreSequenceTour === "function") {
                  try {
                      window.suivreSequenceTour(dataPartie);
@@ -2733,12 +2729,26 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
                      console.error("Séquence de tour :", e);
                  }
              }
+         }
 
-             // Les monstres jouent seuls : à chaque changement de la partie (une carte
-             // posée, un tour qui passe), l'IA regarde si c'est à eux d'agir.
-             if (typeof window.verifierTourIAMonstres === "function") {
-                 window.verifierTourIAMonstres();
-             }
+         // L'IA DES MONSTRES RESTE APPELÉE DANS LES DEUX RÉGIMES, et c'est
+         // volontaire : cette fonction fait DEUX métiers, et un seul appartient
+         // au cerveau.
+         //
+         //   • Pendant la PRÉPARATION, elle fait choisir aux créatures leur
+         //     technique et les inscrit dans la file d'initiative. C'est la
+         //     phase de préparation, qui reste dans l'ancien monde — au même
+         //     titre que les joueurs qui choisissent leur carte.
+         //   • Pendant la RÉSOLUTION, elle leur fait jouer leur tour. Ça, c'est
+         //     le travail du cerveau, et verifierTourIAMonstres s'en écarte
+         //     d'elle-même quand le drapeau est levé.
+         //
+         // La couper en entier, c'était supprimer aussi le premier métier : les
+         // créatures ne posaient plus leur carte, la file restait incomplète,
+         // et la phase ne passait jamais en résolution. La piste d'initiative
+         // ne se lançait pas, et rien dans la trace ne disait pourquoi.
+         if (typeof window.verifierTourIAMonstres === "function") {
+             window.verifierTourIAMonstres();
          }
 
          // NOUVEAU : Met à jour la carte "Lockée" du personnage

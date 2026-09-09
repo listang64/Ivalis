@@ -480,6 +480,7 @@ if (typeof window !== "undefined") {
     let REGIME = null;
     let partieSuivie = null;
     let phasePrecedente = null;
+    let aPrevenuSansCombat = false;
 
     window.regimeDuJeu = () => REGIME;
 
@@ -511,6 +512,7 @@ if (typeof window !== "undefined") {
             REGIME = null;
             partieSuivie = null;
             phasePrecedente = null;
+            aPrevenuSansCombat = false;
         }
 
         const phase = partie.Phase_Combat || "Preparation";
@@ -545,6 +547,25 @@ if (typeof window !== "undefined") {
         //    notification, il regarde s'il a quelque chose à publier. Une
         //    intention arrivée pendant une coupure réseau est reprise ici.
         if (phase === "Resolution" && REGIME.jeSuisLeCerveau()) REGIME.tourner();
+
+        // 5. LE CAS QUI NE DOIT PAS ÊTRE SILENCIEUX : on est en résolution, le
+        //    drapeau est levé, et personne n'a jamais ouvert de combat dans le
+        //    nouveau régime. Ça arrive quand on coche la case au milieu d'une
+        //    rencontre déjà commencée : le cerveau se donne à l'ouverture, et
+        //    l'ouverture est passée.
+        //
+        //    Aucun poste ne prend la main de son propre chef — ce serait une
+        //    élection, et c'est précisément ce qu'on a supprimé. On le DIT, une
+        //    fois, au lieu de laisser un plateau qui n'avance plus sans raison
+        //    visible.
+        if (phase === "Resolution" && !REGIME.etatPublie() && !aPrevenuSansCombat) {
+            aPrevenuSansCombat = true;
+            if (typeof window.tracerCombat === "function") {
+                window.tracerCombat("🛑", "nouveau régime coché en cours de combat",
+                                    "aucun état publié — réinitialise le combat pour qu'il prenne effet");
+            }
+        }
+        if (phase === "Preparation") aPrevenuSansCombat = false;
     };
 
     // LE COMBAT S'ARRÊTE (victoire, fuite, réinitialisation). On range.
