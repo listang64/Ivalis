@@ -34,6 +34,9 @@ function getHexDistance(a, b) {
 // Réutilisée par les attaques d'opportunité et les tics d'Empoisonnement, qui n'avaient jusqu'ici
 // que le message flottant générique, sans le retour visuel de la barre.
 window.afficherFlashDegatToken = function(idCible, ancienneValeur, nouvelleValeur, valeurMax, texte, couleurTexte, couleurBarre) {
+    // Même règle que pour les messages flottants : pendant qu'une créature
+    // calcule son tour, le plateau ne clignote pas. Le coup se verra à son tour.
+    if (window.CALCUL_IA_SILENCIEUX) return;
     const tkCible = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idCible] : null;
     if (tkCible && typeof window.afficherMessageFlottantHex === "function") {
         window.afficherMessageFlottantHex(tkCible.q, tkCible.r, texte, couleurTexte || "#ff4c4c");
@@ -412,6 +415,8 @@ window.resoudreAttaqueOpportunite = async function(idAttaquant, idCible) {
     const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idCible);
     if (!attaquantData || !cibleData) return null;
     if (attaquantData.statut === "Mort" || cibleData.statut === "Mort") return null;
+    // Second verrou : une illusion ne porte aucun coup, d'où qu'on l'appelle.
+    if (attaquantData.estIllusion) return null;
 
     // Atout du Vargen : une chance de se dérober AVANT même le jet de défense.
     // C'est une esquive supplémentaire, pas un remplacement — il garde ensuite
@@ -516,6 +521,10 @@ window.listerEnnemisAuContact = function(idPersonnage, hexPosition) {
         if (idAutre === idPersonnage) continue;
         const autre = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idAutre);
         if (!autre || autre.statut === "Mort" || autre.camp === perso.camp) continue;
+        // UNE ILLUSION NE FRAPPE PAS. Elle occupe une case et détourne les
+        // coups, c'est tout son intérêt — mais elle n'a pas d'arme, et une
+        // image qui porte une attaque d'opportunité en passant, ça n'existe pas.
+        if (autre.estIllusion) continue;
         if (getHexDistance(hexPosition, window.TOKENS_VTT_DATA[idAutre]) === 1) {
             resultat.push(idAutre);
         }
@@ -2356,11 +2365,15 @@ window.validerZoneAoE = function() {
 
 window.actualiserVisuelCiblage = function() {
     if (!window.ETAT_CIBLAGE || !window.ETAT_CIBLAGE.actif) return;
+    // Pendant qu'une créature CALCULE son tour, viser ne se voit pas : le
+    // spectacle appartient à la relecture du journal, à son tour de jouer.
+    if (window.CALCUL_IA_SILENCIEUX) return;
     if (window.ETAT_CIBLAGE.isZone) window.dessinerZoneAoE();
     else window.dessinerAnneauxCiblage();
 };
 
 window.dessinerZoneAoE = function() {
+    if (window.CALCUL_IA_SILENCIEUX) return;
     let svg = document.getElementById("svg-zone-ciblage");
     if (!svg) {
         svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -2483,6 +2496,9 @@ function dessinerJaugeCible(divToken, cibleData) {
 }
 
 window.dessinerAnneauxCiblage = function() {
+    // Une créature qui calcule son tour ne montre pas sa visée : cette
+    // animation-là se joue au moment du tour, pas avant.
+    if (window.CALCUL_IA_SILENCIEUX) return;
     if (!window.ETAT_CIBLAGE || !window.ETAT_CIBLAGE.actif) {
         document.querySelectorAll(".anneau-ciblage, .bulle-validation-cible, .jauge-cible-ciblage").forEach(el => el.remove());
         return;

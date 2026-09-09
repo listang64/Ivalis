@@ -46,6 +46,12 @@ window.ANIMATION_VTT_EN_COURS = false;
 // compte, par case, combien de messages y sont déjà affichés pour empiler les
 // nouveaux un cran plus haut au lieu de les superposer.
 window.afficherMessageFlottantHex = function(q, r, texte, couleur = "#ff4c4c", options = {}) {
+    // Une créature qui CALCULE son tour ne fait pas parler le plateau : les
+    // dégâts, les états, les esquives s'afficheront quand le tour se jouera,
+    // depuis le journal. Sans ce silence, le poste qui fait tourner l'IA voyait
+    // tous les chiffres monter une première fois pendant le calcul, puis une
+    // seconde pendant l'animation.
+    if (window.CALCUL_IA_SILENCIEUX) return;
     const conteneur = document.getElementById("conteneur-plateau-vtt");
     if (!conteneur || !window.PLATEAU_VTT) return;
 
@@ -722,8 +728,17 @@ window.jouerAnimationPas = async function(pas) {
     window.DERNIER_MOUVEMENT_ANIME = Math.max(window.DERNIER_MOUVEMENT_ANIME || 0, pas.timestamp || 0);
 
     try {
-        // 1. Le pion est reposé sur sa case de départ, sans transition.
-        if (pas.de && typeof window.positionnerTokenVTT === "function") {
+        const imgMain = tokenDiv.querySelector(".token-img-main");
+
+        // 1. Le pion est reposé sur sa case de départ, sans transition — mais
+        //    SEULEMENT s'il n'y est pas déjà. Le replacer à chaque pas cassait
+        //    la marche : couper la transition puis la remettre dans le même
+        //    battement, et le navigateur applique le déplacement suivant SANS
+        //    transition. Le pion sautait de case en case, tout bêtement.
+        const dejaAuDepart = pas.de
+            && parseFloat(tokenDiv.dataset.q) === Number(pas.de.q)
+            && parseFloat(tokenDiv.dataset.r) === Number(pas.de.r);
+        if (pas.de && !dejaAuDepart && typeof window.positionnerTokenVTT === "function") {
             tokenDiv.style.transition = "none";
             tokenDiv.dataset.q = pas.de.q;
             tokenDiv.dataset.r = pas.de.r;
@@ -740,13 +755,16 @@ window.jouerAnimationPas = async function(pas) {
             }
         }
 
-        // 3. Le pas lui-même.
+        // 3. LE PAS, ET SON PETIT BOND. Le pion grandit en s'élançant vers la
+        //    case suivante et retombe pile en l'atteignant. Les transitions sont
+        //    posées AVANT le déplacement, avec un reflow entre les deux : sans
+        //    lui, le navigateur regroupe « pose la transition » et « change la
+        //    position » en un seul calcul, et le bond n'a jamais lieu.
         tokenDiv.style.transition = "left 0.4s linear, top 0.4s linear";
-        const imgMain = tokenDiv.querySelector(".token-img-main");
-        if (imgMain) {
-            imgMain.style.transition = "transform 0.15s ease-out";
-            imgMain.style.transform = "scale(1.12)";
-        }
+        if (imgMain) imgMain.style.transition = "transform 0.15s ease-out";
+        void tokenDiv.offsetWidth;
+
+        if (imgMain) imgMain.style.transform = "scale(1.12)";
         tokenDiv.dataset.q = pas.vers.q;
         tokenDiv.dataset.r = pas.vers.r;
         window.positionnerTokenVTT(tokenDiv, true);
@@ -762,17 +780,16 @@ window.jouerAnimationPas = async function(pas) {
                 }
             }
         }
-
-        tokenDiv.style.transition = "none";
-        if (imgMain) { imgMain.style.transition = "none"; imgMain.style.transform = ""; }
+        // On ne remet NI la transition à « none », NI l'échelle à zéro : le pas
+        // suivant enchaîne sur les mêmes réglages, et c'est cet enchaînement qui
+        // fait une marche au lieu d'une succession de sauts secs.
     } finally {
-        // Quoi qu'il arrive — une animation d'opportunité qui casse, un pion
-        // retiré du plateau en plein pas —, les verrous se rouvrent. Sans ce
-        // filet, ANIMATION_VTT_EN_COURS restait à true et PLUS AUCUN pion
-        // n'était redessiné de tout le combat.
-        window.ANIMATION_VTT_EN_COURS = false;
+        // Le pion n'est plus « en marche » au sens du réseau. En revanche on ne
+        // redessine PAS le plateau ici : appliquerTokensVTT reconstruit tous les
+        // pions, donc détruit l'élément qu'on vient d'animer — à chaque case.
+        // Le redessin a lieu une fois, à la fin de la relecture.
         if (window.PIONS_EN_MOUVEMENT) delete window.PIONS_EN_MOUVEMENT[pas.idToken];
-        if (typeof window.redessinerPions === "function") window.redessinerPions();
+        window.ANIMATION_VTT_EN_COURS = false;
     }
 };
 

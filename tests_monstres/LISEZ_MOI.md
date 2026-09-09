@@ -61,6 +61,7 @@ node fenetre_tour.mjs       # la fenêtre de tour : nom coloré, effets détaill
 node sequence_tour.mjs      # le journal d'événements : ordre, trous, rattrapage
 node journal_firestore.mjs  # la plomberie du journal face aux règles d'index de Firestore
 node deplacement_journal.mjs # un hexagone = un numéro : publication, ordre, absence de chevauchement
+node illusion_opportunite.mjs # une illusion ne porte aucune attaque d'opportunité
 node deplacement_repris.mjs # repartir en cours de tour, sans remise à zéro du barème
 node points_apparition.mjs  # les deux repères d'apparition, et la dispersion des pions
 node reinit_plateau.mjs     # la réinitialisation vide le plateau, puis enchaîne le déploiement
@@ -155,6 +156,29 @@ rien à créer. `journal_firestore.mjs` charge le vrai code d'app.js et lui pré
 un Firestore qui applique cette règle-là. Il vérifie aussi le filet de sécurité :
 si le journal tombe pour une autre raison — droits, réseau —, la fenêtre s'efface
 et les animations reprennent leur ancien chemin, plutôt qu'un plateau figé.
+
+**Le spectacle appartient à la relecture.** Faire jouer une créature, c'est la
+faire viser : le moteur allume les anneaux de ciblage, pose l'emprise de la
+zone, la fait tourner, la montre un instant, puis valide. Tout cela est du
+CALCUL — mais ça se voyait, et ça se voyait AVANT que le tour ne soit rejoué.
+Sur le poste qui fait tourner l'IA, on assistait donc deux fois au même tour :
+d'abord la créature qui vise en coulisses, puis l'animation pour de vrai.
+Pendant le calcul, les tracés de ciblage se taisent (`CALCUL_IA_SILENCIEUX`) et
+les temps de pose tombent à zéro — personne ne les regarde. Même principe pour
+les zones persistantes : elles sont écrites en base dès que la carte se résout
+chez son auteur, et se dessinaient donc plusieurs secondes avant l'animation qui
+les crée ; elles attendent maintenant que le journal soit à jour.
+
+**La marche, et son petit bond.** Découper le trajet en un événement par
+hexagone avait coûté l'animation : à la fin de chaque case on remettait la
+transition à « none » et l'échelle à zéro, si bien que le pas suivant partait
+sans transition — le pion sautait de case en case, tout bêtement. Pire, on
+redessinait le plateau après chaque case, ce qui DÉTRUISAIT l'élément en train
+d'être animé. Les réglages sont maintenant posés une fois, avec un reflow avant
+le déplacement, et rien n'est remis à zéro entre deux pas : le pas suivant
+enchaîne. Le journal ne marque plus non plus de temps de respiration entre deux
+pas d'un même trajet — une marche ne s'arrête pas un tiers de seconde à chaque
+case.
 
 **Rien de ce qui DÉCIDE ne dépend de ce qui S'AFFICHE.** C'est la règle, et
 c'est celle qui manquait. Un poste peut être en retard de plusieurs tours à

@@ -850,7 +850,7 @@ async function attendreFinResolution(nbAvant, limiteMs = 20000) {
     // La carte part de façon asynchrone : on lui laisse d'abord le temps d'être
     // émise, sinon on croirait déjà tout fini.
     while (resolutionsEmises() <= nbAvant && Date.now() - debut < 2500) await pause(100);
-    if (resolutionsEmises() <= nbAvant) { await pause(600); return; }   // rien n'est parti
+    if (resolutionsEmises() <= nbAvant) { await pause(poseIA(600)); return; }   // rien n'est parti
 
     const marqueur = (window.RESOLUTIONS_LOCALES || []).slice(-1)[0];
     while (window.DERNIERE_RESOLUTION_TERMINEE !== marqueur && Date.now() - debut < limiteMs) {
@@ -917,6 +917,22 @@ window.placerZoneMonstre = function(idMonstre) {
     return meilleur;
 };
 
+// =========================================================================
+//  LE TOUR D'UNE CRÉATURE SE CALCULE EN SILENCE
+// =========================================================================
+//  Faire jouer une créature, c'est la faire viser : le moteur allume les
+//  anneaux de ciblage, pose l'emprise de la zone, la fait tourner, la montre un
+//  instant, puis valide. Tout cela est du CALCUL — mais ça se voyait, et ça se
+//  voyait AVANT que le tour ne soit rejoué. Sur le poste qui fait tourner l'IA,
+//  on assistait donc deux fois au même tour : d'abord la créature qui vise en
+//  coulisses, puis l'animation pour de vrai.
+//
+//  Pendant le calcul, les tracés de ciblage se taisent et les temps de pose
+//  tombent à zéro : personne ne les regarde. Le spectacle, lui, est dans le
+//  journal, et il se joue à son tour.
+window.CALCUL_IA_SILENCIEUX = false;
+const poseIA = (ms) => (window.CALCUL_IA_SILENCIEUX ? 0 : ms);
+
 window.jouerTourMonstre = async function(idMonstre, idCarte) {
     const monstre = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idMonstre);
     const tk = (window.TOKENS_VTT_DATA || {})[idMonstre];
@@ -925,6 +941,7 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
     // cette créature pour toute la durée de son tour (cf. panneauVerrouilleParIA
     // dans combat.js).
     window.IA_MONSTRE_ACTEUR = idMonstre;
+    window.CALCUL_IA_SILENCIEUX = true;
 
     // Repos long : il ne se déplace pas et ne lance rien. C'est finDeTourCombat()
     // qui lui rend sa fatigue, exactement comme pour un joueur.
@@ -934,7 +951,7 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
         if (tk && typeof window.afficherMessageFlottantHex === "function") {
             window.afficherMessageFlottantHex(tk.q, tk.r, "Reprend son souffle", "#1b6e3a");
         }
-        await pause(1500);
+        await pause(poseIA(1500));
         window.IA_MONSTRE_ACTEUR = null;
         if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true, idMonstre);
         return;
@@ -962,7 +979,7 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
     if (typeof window.afficherDansPanneauGauche === "function") window.afficherDansPanneauGauche(idMonstre);
     // Réserve la fatigue de la carte pour que le déplacement ne la dévore pas.
     window.COUT_COMPETENCE_SELECTIONNEE = infos.fatigue;
-    await pause(900);
+    await pause(poseIA(900));
 
     // --- 1. Choix de la cible, puis de la case ---
     const cible = window.choisirCibleMonstre(monstre, infos);
@@ -998,7 +1015,7 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
 
         if (window.CHEMIN_MOUVEMENT.length > 0) {
             await window.validerMouvement();
-            await pause(1400);
+            await pause(poseIA(1400));
         } else if (typeof window.annulerMouvement === "function") {
             window.annulerMouvement();
         }
@@ -1018,7 +1035,7 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
         const mauvaisLanceur = () => !!affiche() && affiche().idPersonnage !== idMonstre;
         if (mauvaisLanceur()) {
             if (typeof window.afficherDansPanneauGauche === "function") window.afficherDansPanneauGauche(idMonstre);
-            await pause(200);
+            await pause(poseIA(200));
         }
         if (mauvaisLanceur()) {
             console.warn("IA : le panneau désigne", affiche().idPersonnage, "et non", idMonstre,
@@ -1030,7 +1047,7 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
         }
         const resolutionsAvant = resolutionsEmises();
         await window.demarrerCiblage(idCarte);
-        await pause(700);
+        await pause(poseIA(700));
 
         if (window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif) {
             if (window.ETAT_CIBLAGE.isZone) {
@@ -1042,7 +1059,7 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
                     window.ETAT_CIBLAGE.zoneCenterHex = plan.centre;
                     window.ETAT_CIBLAGE.zoneRotationStep = plan.rotation;
                     if (typeof window.actualiserVisuelCiblage === "function") window.actualiserVisuelCiblage();
-                    await pause(600);
+                    await pause(poseIA(600));
                     if (typeof window.validerZoneAoE === "function") window.validerZoneAoE();
                     else if (typeof window.declencherResolution === "function") await window.declencherResolution();
                 } else if (typeof window.declencherResolution === "function") {
@@ -1051,25 +1068,26 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
                 await attendreFinResolution(resolutionsAvant);
             } else {
                 window.ajouterCibleCiblage(cible.idPersonnage);
-                await pause(400);
+                await pause(poseIA(400));
                 if (window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif
                     && typeof window.declencherResolution === "function") {
                     await window.declencherResolution();
                 }
                 await attendreFinResolution(resolutionsAvant);
             }
-            await pause(600);
+            await pause(poseIA(600));
         }
     } else {
         // Hors de portée après déplacement : le tour s'arrête là, comme prévu.
         if (tkApres && typeof window.afficherMessageFlottantHex === "function") {
             window.afficherMessageFlottantHex(tkApres.q, tkApres.r, "Hors de portée", "#c2a878");
         }
-        await pause(900);
+        await pause(poseIA(900));
     }
 
     window.COUT_COMPETENCE_SELECTIONNEE = 0;
     window.IA_MONSTRE_ACTEUR = null;
+    window.CALCUL_IA_SILENCIEUX = false;
     if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true, idMonstre);
 };
 
@@ -1205,5 +1223,7 @@ window.verifierTourIAMonstres = async function() {
     } finally {
         window.IA_MONSTRE_EN_COURS = false;
         window.IA_MONSTRE_ACTEUR = null;
+        // Quoi qu'il soit arrivé, l'écran retrouve la parole.
+        window.CALCUL_IA_SILENCIEUX = false;
     }
 };

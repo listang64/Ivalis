@@ -2736,6 +2736,14 @@ window.appliquerZonesPersistantes = function() {
     const conteneur = document.getElementById("transform-plateau");
     if (!conteneur || !window.PLATEAU_VTT) return;
 
+    // UNE ZONE N'APPARAÎT PAS AVANT LE TOUR QUI LA POSE. Elle est écrite en base
+    // dès que la carte se résout chez son auteur ; les autres écrans, eux, n'ont
+    // pas encore rejoué ce tour-là. Sans cette retenue, la nappe de feu se
+    // dessinait sur le plateau plusieurs secondes avant l'animation qui la crée.
+    // La relecture rappelle cette fonction quand elle a fini (sequence_tour.js).
+    if ((typeof window.evenementsEnAttente === "function" && window.evenementsEnAttente() > 0)
+        || window.EVENEMENT_ATTENDU) return;
+
     let svg = document.getElementById("svg-zones-persistantes");
     if (!svg) {
         svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");

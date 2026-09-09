@@ -463,14 +463,30 @@ window.lireJournalCombat = async function() {
                 rendreLaGarde(garde);
             }
             if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
-            await pause(window.DELAI_ENTRE_ETAPES_MS);
+
+            // LE TEMPS DE RESPIRATION ENTRE DEUX ÉVÉNEMENTS — sauf entre deux
+            // PAS d'un même trajet : là, c'est une marche, et une marche ne
+            // s'arrête pas un tiers de seconde à chaque case. Le pas suivant
+            // enchaîne immédiatement sur les réglages du précédent.
+            const suivantEstUnPasDuMemeTrajet =
+                ev.type === "pas"
+                && (window.EVENEMENTS_RECUS[suivant + 1] || {}).type === "pas"
+                && (window.EVENEMENTS_RECUS[suivant + 1] || {}).acteur === ev.acteur;
+            if (!suivantEstUnPasDuMemeTrajet) await pause(window.DELAI_ENTRE_ETAPES_MS);
         }
     } finally {
         lecteurEnCours = false;
         // Tout est rejoué : plus rien ne retient les pions, ils retrouvent la
         // case que dit la base. Un dernier redessin le rend visible.
-        if (window.evenementsEnAttente() === 0 && typeof window.redessinerPions === "function") {
-            try { window.redessinerPions(); } catch (e) {}
+        if (window.evenementsEnAttente() === 0) {
+            if (typeof window.redessinerPions === "function") {
+                try { window.redessinerPions(); } catch (e) {}
+            }
+            // Les zones posées pendant les tours qu'on vient de rejouer ont
+            // attendu leur moment : elles peuvent enfin se dessiner.
+            if (typeof window.appliquerZonesPersistantes === "function") {
+                try { window.appliquerZonesPersistantes(); } catch (e) {}
+            }
         }
         if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
     }

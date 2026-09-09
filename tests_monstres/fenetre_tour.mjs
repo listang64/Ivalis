@@ -189,6 +189,24 @@ const res = await p.evaluate(async ({ sVoile, sToggle, sEtatInitial, sSequence }
   await new Promise(r => setTimeout(r, 200));
   const tourDeLautre = etat();
 
+  // 8 bis. LE TOUR D'UN AUTRE JOUEUR OUVRE LA FENÊTRE, comme celui d'une
+  //        créature : on doit voir qui joue et avec quoi, avant que ça se
+  //        déroule. Rien ne distingue un héros d'un monstre de ce point de vue,
+  //        sauf que ce n'est pas le nôtre.
+  window.DERNIER_EVENEMENT_JOUE = 10;
+  window.EVENEMENTS_RECUS = {};
+  window.EVENEMENT_ATTENDU = null;
+  window.ANIMS = [];
+  poser(fileAutre, "Resolution");
+  window.EVENEMENTS_RECUS[11] = { n: 11, type: "pas", acteur: "H2", idCarte: "CARTE_H",
+                                  tour: 3, avant: {}, data: { idToken: "H2" } };
+  window.jouerAnimationPas = async () => {};
+  await window.lireJournalCombat();
+  await new Promise(r => setTimeout(r, 200));
+  const tourDunAutreJoueur = { ...etat(), retenu: !!window.EVENEMENT_ATTENDU };
+  if (window.EVENEMENT_ATTENDU) await window.jouerSequenceTour();
+  await new Promise(r => setTimeout(r, 300));
+
   // 9. Un combattant à terre n'a droit à aucune fenêtre.
   window.MORTS = ["H2"];
   poser(fileAutre, "Resolution");
@@ -216,6 +234,7 @@ const res = await p.evaluate(async ({ sVoile, sToggle, sEtatInitial, sSequence }
   const largeurPanneau = document.getElementById('panneau-combat-gauche').getBoundingClientRect().width;
 
   return { preparation, rienAAnnoncer, avecOk, panneauReplie, enPose, apresClic, monTourCouleur,
+           tourDunAutreJoueur,
            monTour, tourDeLautre, mort, horsCombat, memeOr, anim, zVoile, zPanneau, largeurPanneau,
            largeurEcran: window.innerWidth };
 }, { sVoile: srcVoile, sToggle: srcToggle, sEtatInitial: srcEtatInitial, sSequence: srcSequence });
@@ -274,6 +293,13 @@ verifier("pendant la relecture, la fenêtre se lève pour laisser voir le platea
 verifier("au tour de MON héros, aucune fenêtre : le plateau reste dégagé", !res.monTour.visible);
 verifier("au tour du héros d'un autre poste, sans rien à annoncer, le plateau reste dégagé",
          !res.tourDeLautre.visible);
+verifier("mais dès qu'il agit, la fenêtre sombre s'ouvre chez les autres",
+         res.tourDunAutreJoueur.retenu && res.tourDunAutreJoueur.visible
+         && res.tourDunAutreJoueur.okVisible,
+         `(retenu ${res.tourDunAutreJoueur.retenu}, visible ${res.tourDunAutreJoueur.visible},`
+         + ` OK ${res.tourDunAutreJoueur.okVisible})`);
+verifier("et elle annonce bien SON nom", /Jade/.test(res.tourDunAutreJoueur.nom),
+         `(${res.tourDunAutreJoueur.nom})`);
 verifier("aucune fenêtre pour un combattant à terre", !res.mort.visible);
 verifier("hors combat, jamais rien", !res.horsCombat.visible);
 verifier("la fenêtre passe au-dessus du plateau mais laisse le panneau",

@@ -354,8 +354,16 @@ function creerPoste(nom, monde, mesPersos) {
   // modules : chargés ensuite, ils écrasaient les bouchons posés avant eux, et
   // le banc se mettait à dessiner des anneaux dans un DOM qui n'existe pas.
   // Tout ce qui décide de quelque chose reste le vrai code.
-  ["dessinerAnneauxCiblage", "dessinerZoneAoE", "actualiserVisuelCiblage",
-   "assombrirCasesJouables", "retirerAssombrissement", "afficherFlashDegatToken",
+  // Les tracés de ciblage sont neutralisés, mais on COMPTE les appels : c'est
+  // ainsi qu'on voit si une créature montre sa visée pendant qu'elle calcule —
+  // c'est-à-dire avant le tour où l'animation doit se jouer.
+  w.TRACES_CIBLAGE = [];
+  ["dessinerAnneauxCiblage", "dessinerZoneAoE", "actualiserVisuelCiblage"].forEach(nomFn => {
+    w[nomFn] = () => { w.TRACES_CIBLAGE.push({ quoi: nomFn,
+                                               pendantTourIA: !!w.IA_MONSTRE_EN_COURS,
+                                               silencieux: !!w.CALCUL_IA_SILENCIEUX }); };
+  });
+  ["assombrirCasesJouables", "retirerAssombrissement", "afficherFlashDegatToken",
    "construireHaloVTT", "positionnerTokenVTT"].forEach(nomFn => { w[nomFn] = () => {}; });
 
   // Trace du tour d'une créature : où s'arrête-t-il ?
@@ -799,6 +807,31 @@ console.log("\n3 quater. LES CRÉATURES JOUENT DEPUIS LE POSTE QUI N'A RIEN TOUC
            `(${muet.w.evenementsEnAttente()} en attente)`);
 
   postes.forEach(p => { p.activer(); p.w.__FENETRE_COMBAT = "block"; });
+}
+
+console.log("\n3 quinquies. RIEN NE SE JOUE AVANT SON TOUR\n");
+{
+  // LE SPECTACLE APPARTIENT À LA RELECTURE. Faire jouer une créature, c'est la
+  // faire viser : le moteur allume les anneaux de ciblage, pose l'emprise de la
+  // zone, la fait tourner, la montre un instant, puis valide. Tout cela est du
+  // CALCUL — mais ça se voyait, et ça se voyait AVANT que le tour ne soit
+  // rejoué. Sur le poste qui fait tourner l'IA, on assistait deux fois au même
+  // tour : la créature qui vise en coulisses, puis l'animation pour de vrai.
+  //  Le drapeau de silence doit couvrir TOUTE la durée du tour d'une créature.
+  //  On note à chaque tracé si l'IA était en train de jouer (IA_MONSTRE_EN_COURS,
+  //  qui ne dépend pas du drapeau) et si le silence était bien levé : un tracé
+  //  demandé pendant un tour de créature sans silence, c'est une visée qui
+  //  s'affiche à l'écran avant l'heure.
+  const traces = postes.flatMap(p => p.w.TRACES_CIBLAGE || []);
+  const pendantIA = traces.filter(t => t.pendantTourIA);
+  const bavards = pendantIA.filter(t => !t.silencieux);
+  console.log(`     tracés de ciblage : ${traces.length} au total,`
+            + ` dont ${pendantIA.length} pendant un tour de créature`);
+  verifier("une créature a bien visé pendant ses tours", pendantIA.length > 0,
+           `(${pendantIA.length})`);
+  verifier("et aucune de ces visées ne s'est affichée avant l'heure",
+           bavards.length === 0,
+           bavards.length ? `(${bavards.map(t => t.quoi).join(", ")})` : "");
 }
 
 console.log("\n4. CE QUE RACONTE LE COMBAT\n");
