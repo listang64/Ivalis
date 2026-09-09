@@ -486,8 +486,24 @@ if (typeof window !== "undefined") {
     // Appelé à chaque notification de la partie (app.js). C'est le seul point
     // d'entrée du nouveau régime dans l'ancien monde, et il tient en quatre cas.
     window.regimeSuivreLaPartie = function(partie) {
-        if (!window.REGIME_CERVEAU) return;
-        if (!partie || !window.ID_PARTIE_COURANTE || !window.ioCombatFirestore) return;
+        if (!partie) return;
+
+        // ON ANNONCE LE RÉGIME AU DÉBUT DE CHAQUE COMBAT, ALLUMÉ OU NON.
+        //
+        // La première vraie partie d'essai a tourné entièrement en ancien
+        // régime sans que rien ne le dise : la trace montrait des verrous et
+        // des Action_*, et il a fallu la relire ligne à ligne pour comprendre
+        // que le drapeau n'était simplement pas allumé. Une trace qui ne dit
+        // pas dans quel monde elle se trouve fait perdre une soirée.
+        const phaseVue = partie.Phase_Combat || "Preparation";
+        if (phaseVue === "Resolution" && phasePrecedente === "Preparation"
+            && typeof window.tracerCombat === "function") {
+            window.tracerCombat("⚙️", `combat en régime ${window.REGIME_CERVEAU ? "CERVEAU" : "ANCIEN"}`,
+                                window.REGIME_CERVEAU ? "(un seul poste écrit)" : "(verrous et Action_*)");
+        }
+
+        if (!window.REGIME_CERVEAU) { phasePrecedente = phaseVue; return; }
+        if (!window.ID_PARTIE_COURANTE || !window.ioCombatFirestore) return;
 
         // 1. On a changé de partie : on repart de zéro.
         if (partieSuivie && partieSuivie !== window.ID_PARTIE_COURANTE) {

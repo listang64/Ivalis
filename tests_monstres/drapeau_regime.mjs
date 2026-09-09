@@ -119,8 +119,14 @@ console.log("\n3. LE DRAPEAU EST ÉTEINT PAR DÉFAUT, ET IL SE GARDE");
     verifier("le drapeau naît éteint", r.includes('window.REGIME_CERVEAU = window.REGIME_CERVEAU === true;'));
     verifier("on l'allume d'une ligne", r.includes('window.regimeCerveau = function(actif)'));
     verifier("et le choix survit au rechargement", r.includes('localStorage.setItem("REGIME_CERVEAU"'));
-    verifier("le régime ne fait rien quand il est éteint",
-             r.includes('if (!window.REGIME_CERVEAU) return;'));
+    // Chaque fonction que l'ancien monde peut appeler doit sortir tout de suite
+    // quand le drapeau est éteint. On les nomme une par une : une garde
+    // manquante ne se verrait qu'en jeu.
+    [['regimeSuivreLaPartie', 'if (!window.REGIME_CERVEAU) { phasePrecedente = phaseVue; return; }'],
+     ['regimeFermerLeCombat', 'if (!window.REGIME_CERVEAU || !REGIME) return;']]
+        .forEach(([nom, garde]) => {
+            verifier(`${nom} sort tout de suite si le drapeau est éteint`, r.includes(garde));
+        });
 }
 
 // =========================================================================
@@ -156,6 +162,40 @@ console.log("\n5. TOUT EST CHARGÉ PAR LA PAGE");
     verifier("aucun module du combat n'est chargé sans son ?v=",
              sansVersion.every(t => !/(combat|moteur|mouvement|ia_|cerveau|spectateur|depot|pont|regime)/.test(t)),
              sansVersion.join(" "));
+}
+
+// =========================================================================
+console.log("\n6. LE DRAPEAU EST ATTEIGNABLE, ET LA TRACE DIT OÙ ON EST");
+// =========================================================================
+//  La première vraie partie d'essai a tourné entièrement en ancien régime sans
+//  que rien ne le dise : il a fallu relire la trace ligne à ligne pour
+//  comprendre que le drapeau n'était pas allumé. Deux corrections, et les deux
+//  sont vérifiées ici plutôt que promises.
+//
+//  Un drapeau qui n'est atteignable que par la console n'existe pas sur iPad :
+//  la console y est au bout d'un câble et d'un Mac. Autant dire qu'il n'était
+//  pas là où il fallait justement l'essayer.
+{
+    const html = SOURCES['index.html'];
+    const app = SOURCES['app.js'];
+    const r = SOURCES['regime_cerveau.js'];
+
+    verifier("le régime se coche depuis l'écran",
+             html.includes('id="toggle-regime-cerveau"'));
+    verifier("la case appelle bien la bascule",
+             html.includes('window.basculerRegimeCerveau(this.checked)'));
+    verifier("et la bascule existe", app.includes('window.basculerRegimeCerveau = function'));
+    verifier("la case reflète l'état réel du drapeau au chargement",
+             app.includes('caseRegime.checked = window.REGIME_CERVEAU === true'));
+
+    verifier("la trace annonce le régime au début d'un combat",
+             r.includes('combat en régime ${window.REGIME_CERVEAU ? "CERVEAU" : "ANCIEN"}'));
+    // Et elle l'annonce même quand le drapeau est ÉTEINT — sinon on retombe
+    // exactement dans le cas qui a coûté la soirée.
+    const iAnnonce = r.indexOf('combat en régime');
+    const iSortie = r.indexOf('if (!window.REGIME_CERVEAU) { phasePrecedente');
+    verifier("y compris quand il est éteint", iAnnonce > 0 && iAnnonce < iSortie,
+             `(annonce ${iAnnonce}, sortie ${iSortie})`);
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

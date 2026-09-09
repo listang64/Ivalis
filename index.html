@@ -1044,6 +1044,14 @@
       <label class="afficher-cles" style="margin: 20px 0; display: block; font-family: 'Almendra', serif; font-size: 16px; color: #ff4c4c;">
         <input type="checkbox" id="toggle-dev-mode" onchange="window.basculerDevMode(this.checked)"> 🛠️ Mode Développeur (DEV)
       </label>
+
+      <!-- LE NOUVEAU RÉGIME DE COMBAT. Il était derrière une ligne de console —
+           ce qui revient à dire qu'il n'existait pas sur iPad, où la console est
+           au bout d'un câble et d'un Mac. Il se coche ici, sur chaque appareil,
+           et se décoche pareil. -->
+      <label class="afficher-cles" style="margin: 20px 0; display: block; font-family: 'Almendra', serif; font-size: 16px; color: #66ff99;">
+        <input type="checkbox" id="toggle-regime-cerveau" onchange="window.basculerRegimeCerveau(this.checked)"> 🧠 Combat : nouveau régime (un seul cerveau)
+      </label>
       
       <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-menu-outils', 'etape-menu-parametres')">Retour</button>
     </div>
@@ -1629,9 +1637,9 @@
 <script type="module" src="pont_combat.js?v=1"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. Éteint
      par défaut — regimeCerveau(true) dans la console pour l'allumer. -->
-<script type="module" src="regime_cerveau.js?v=2"></script>
+<script type="module" src="regime_cerveau.js?v=3"></script>
 <script type="module" src="ia_master.js?v=4"></script>
-<script type="module" src="app.js?v=36"></script>
+<script type="module" src="app.js?v=37"></script>
 <script type="module" src="creation_personnage.js?v=4"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=13"></script>

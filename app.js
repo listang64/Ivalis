@@ -4764,6 +4764,22 @@ window.basculerAffichageTokens = function(estActive) {
     window.actualiserAffichageTokens();
 };
 
+// LE NOUVEAU RÉGIME DE COMBAT, DEPUIS L'ÉCRAN.
+//
+// Il n'était atteignable que par la console, et c'était une erreur : sur iPad,
+// la console est au bout d'un câble et d'un Mac. Autant dire que le drapeau
+// n'existait pas là où il fallait justement l'essayer. Il se coche maintenant
+// comme le mode développeur, sur chaque appareil.
+window.basculerRegimeCerveau = function(estActive) {
+    if (typeof window.regimeCerveau === "function") window.regimeCerveau(!!estActive);
+    else { window.REGIME_CERVEAU = !!estActive;
+           try { localStorage.setItem("REGIME_CERVEAU", estActive ? "1" : "0"); } catch (e) {} }
+    if (typeof window.tracerCombat === "function") {
+        window.tracerCombat("⚙️", `régime ${estActive ? "CERVEAU" : "ANCIEN"}`,
+                            "relance un combat pour qu'il prenne effet");
+    }
+};
+
 window.basculerDevMode = function(estActive) {
     localStorage.setItem("ivalis_DEV_MODE", estActive ? "on" : "off");
     window.actualiserDevMode();
@@ -4771,6 +4787,12 @@ window.basculerDevMode = function(estActive) {
 
 window.actualiserDevMode = function() {
     const isDev = localStorage.getItem("ivalis_DEV_MODE") === "on";
+
+    // La case du nouveau régime reflète ce que le drapeau vaut vraiment — pas
+    // ce qu'on croit qu'il vaut. C'est tout l'intérêt de la sortir de la
+    // console : on VOIT dans quel régime on est avant de lancer un combat.
+    const caseRegime = document.getElementById("toggle-regime-cerveau");
+    if (caseRegime) caseRegime.checked = window.REGIME_CERVEAU === true;
     
     const btnDevSkip = document.getElementById("btn-dev-skip-creation");
     if (btnDevSkip) btnDevSkip.style.display = isDev ? "inline-block" : "none";
