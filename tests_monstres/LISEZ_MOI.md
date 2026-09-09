@@ -67,6 +67,7 @@ node cerveau_combat.mjs     # LE CERVEAU : intentions validées, un seul écriva
 node spectateur_combat.mjs  # LE SPECTATEUR : le rejeu à l'écran, dans l'ordre, sans trou ni doublon
 node depot_firestore.mjs    # LE DÉPÔT : un pas = un lot, et un lot qui rate ne laisse rien
 node pont_combat.mjs        # LE PONT : de l'étape à ce qu'on voit, sans jamais recalculer
+node regime_cerveau.mjs     # TROIS POSTES, UN CERVEAU : un combat entier, trois écrans identiques
 node journal_firestore.mjs  # la plomberie du journal face aux règles d'index de Firestore
 node deplacement_journal.mjs # un hexagone = un numéro : publication, ordre, absence de chevauchement
 node illusion_opportunite.mjs # une illusion ne porte aucune attaque d'opportunité
@@ -335,6 +336,71 @@ arrivent en même temps ne se chevauchent jamais, une seule animation tourne à 
 fois. Et le chapitre 8 vérifie qu'on peut **rejoindre un combat déjà commencé**
 sans rejouer les vingt tours passés : on part de l'état publié, tel quel, et on
 s'anime à partir de la suite.
+
+## Étape 5 : le branchement
+
+Trois pièces, et elles ferment la boucle.
+
+`depot_firestore.js` **écrit**. Un pas = un seul `writeBatch`, et il porte
+l'état, l'entrée de journal et la fermeture des intentions. Firestore applique
+un lot en entier ou pas du tout : il n'existe donc aucun instant où l'état a
+avancé sans son entrée, ni où une intention a produit son effet sans être
+refermée. Le banc met le lot en échec et vérifie ce qui reste — l'état d'avant
+intact, le journal vide, l'intention toujours en attente, donc reprise, et
+refaisant exactement le même calcul puisque la graine n'a pas avancé non plus.
+
+**Ce qui disparaît en arrivant là : le compteur d'événements, et sa
+transaction.** Ce n'était pas un détail — ce compteur était le point de
+contention le plus chaud du jeu et la cause directe du `failed-precondition`
+qui faisait rejouer des tours entiers. Il n'existait que parce que trois postes
+publiaient dans le même journal. Un seul écrit maintenant, et le numéro d'une
+entrée EST la version de l'état qu'elle produit. Plus rien à réserver, donc plus
+rien à arbitrer, donc plus aucune transaction : le banc vérifie qu'il n'en est
+demandé nulle part.
+
+`pont_combat.js` **montre**. Il existe parce que les animations du jeu ont été
+écrites en même temps que le calcul : `jouerAnimationMoteur` ne montre pas une
+attaque, elle la RÉSOUT. La rejouer telle quelle sur trois appareils, c'est le
+mécanisme des dégâts doublés remis en marche. Ici, le calcul est déjà fait —
+`misEnScene` est pure, lit l'étape et l'état d'AVANT, et rend ce qu'on doit
+voir. Le banc vérifie qu'aucun type d'étape que le noyau sait appliquer n'est
+laissé sans mise en scène : pas ceux auxquels on a pensé, tous.
+
+`regime_cerveau.js` **branche**, et c'est tout ce qu'il fait. Il est le seul
+fichier qui voie toutes les pièces. Le drapeau `REGIME_CERVEAU` est éteint par
+défaut : tant qu'il l'est, le combat tourne exactement comme avant. Un
+basculement qui ne se défait pas en une ligne est un basculement qu'on n'ose pas
+essayer un soir de partie.
+
+### Le banc qui décide si on peut jouer
+
+`regime_cerveau.mjs` fait tourner **trois régimes complets côte à côte** sur un
+même Firestore de banc, avec de vraies conditions : notifications livrées à la
+demande, dans le désordre, et un poste mis en veille au milieu. Nico suit tout,
+Ben clique en retard, la tablette dort et reçoit tout d'un coup au réveil.
+
+Ce qu'il établit :
+
+- **Un seul poste écrit.** Ce n'est pas supposé : chaque poste a son propre
+  accès à la base, et le banc regarde ce que chacun a réellement écrit. Ben n'a
+  écrit que des intentions, la tablette rien du tout.
+- **Les trois écrans finissent identiques** — le même état, au même numéro,
+  combattant par combattant — et ils ont vu **la même suite d'animations**, dans
+  le même ordre, celui qui rattrapait compris.
+- **Un poste qui arrive en cours de route** part de l'état publié sans rejouer
+  les tours passés, puis s'anime à partir de la suite.
+- **Un poste qui n'a pas rechargé sa page ne joue pas.** Il refuse un format
+  qu'il ne connaît pas au lieu de faire semblant — le bug des deux verrous qui
+  ne se voyaient pas, rendu impossible.
+- **Une demande illégitime ne peut rien abîmer.** Jouer le héros d'un autre,
+  téléporter son pion, donner un ordre à une créature : les trois sont refusées
+  avec leur raison, l'état ne bouge pas, et le combat n'est pas bloqué pour
+  autant.
+
+Deux bugs trouvés par ce banc, et le premier est joli : un minuteur de battement
+de cœur qui se replanifiait sans jamais attendre faisait tourner une boucle à
+pleine vitesse. Un battement nul est maintenant un vrai réglage — « pas de
+battement » — au lieu d'un « battement infiniment rapide ».
 
 **Un tour appartient à UN SEUL poste, et c'est le journal qui tranche.** Quatrième
 trace : P_03 prend le verrou de `MONSTRE_13sb8te`, le joue, publie l'événement 1

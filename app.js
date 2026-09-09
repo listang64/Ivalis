@@ -768,6 +768,68 @@ document.addEventListener("visibilitychange", () => {
     }
 });
 
+// =========================================================================
+//  L'ACCÈS À FIRESTORE, DONNÉ AU NOUVEAU RÉGIME
+// =========================================================================
+//  Les identifiants Firebase vivent ici, et nulle part ailleurs. Le dépôt du
+//  cerveau (depot_firestore.js) ne les importe donc pas : on lui passe cet
+//  objet, qui sait faire cinq choses et rien d'autre.
+//
+//  C'est ce qui permet de le mettre au banc. Le banc lui donne un Firestore en
+//  mémoire qui applique les vraies règles — celle des index composites, celle
+//  du lot appliqué en entier ou pas du tout — et le dépôt ne fait pas la
+//  différence. Sans cette couture, la partie qui écrit ne serait vérifiable
+//  qu'en jouant, c'est-à-dire trop tard.
+//
+//  UN LOT, ET PAS UNE SUITE D'ÉCRITURES. `lot` passe par writeBatch : c'est ce
+//  qui rend impossible un état publié sans son entrée de journal.
+window.ioCombatFirestore = {
+    async lire(chemin) {
+        const snap = await getDoc(doc(db, ...chemin));
+        return snap.exists() ? snap.data() : null;
+    },
+
+    // Une seule règle tenue ici : on ne construit JAMAIS une requête qui
+    // filtre par égalité sur un champ et borne ou trie sur un autre. Le dépôt
+    // n'en demande pas, et cette fonction ne saurait pas en fabriquer.
+    async lister(chemin, requete) {
+        const contraintes = [];
+        const r = requete || {};
+        if (r.champ !== undefined && r.sup !== undefined) contraintes.push(where(r.champ, ">", r.sup));
+        if (r.tri) contraintes.push(orderBy(r.tri, "asc"));
+        if (r.limite) contraintes.push(limit(r.limite));
+        const snap = await getDocs(query(collection(db, ...chemin), ...contraintes));
+        return snap.docs.map(d => ({ ...d.data(), __chemin: d.ref.path.split("/") }));
+    },
+
+    async lot(operations) {
+        const b = writeBatch(db);
+        (operations || []).forEach(o => {
+            const ref = doc(db, ...o.chemin);
+            if (o.op === "delete") b.delete(ref);
+            else if (o.op === "update") b.update(ref, o.data);
+            else b.set(ref, o.data);
+        });
+        await b.commit();
+    },
+
+    ecouterDoc(chemin, rappel) {
+        return onSnapshot(doc(db, ...chemin),
+            (snap) => rappel(snap.exists() ? snap.data() : null),
+            (e) => console.error("Écoute de l'état du combat :", e));
+    },
+
+    ecouterCollection(chemin, requete, rappel) {
+        const contraintes = [];
+        const r = requete || {};
+        if (r.champ !== undefined && r.sup !== undefined) contraintes.push(where(r.champ, ">", r.sup));
+        if (r.tri) contraintes.push(orderBy(r.tri, "asc"));
+        return onSnapshot(query(collection(db, ...chemin), ...contraintes),
+            (snap) => rappel(snap.docs.map(d => ({ ...d.data(), __chemin: d.ref.path.split("/") }))),
+            (e) => console.error("Écoute du journal du combat :", e));
+    }
+};
+
 // Les caractéristiques des héros de la partie, lues une fois et partagées par
 // tout le jeu. Sans elles, le prérequis d'un objet ne se vérifiait que chez le
 // joueur qui avait ouvert la fiche — les autres pouvaient équiper n'importe
