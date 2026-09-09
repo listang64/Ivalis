@@ -436,6 +436,28 @@ window.validerMouvement = async function() {
     const finalStep = window.CHEMIN_MOUVEMENT[window.CHEMIN_MOUVEMENT.length - 1];
     if (!finalStep) return;
 
+    // SOUS LE NOUVEAU RÉGIME : on envoie le CHEMIN, et rien d'autre.
+    //
+    // Tout ce qui suit ci-dessous — les attaques d'opportunité tranchées ici,
+    // les zones persistantes franchies, le coût déduit à la main, la position
+    // écrite en base — est calculé par le cerveau, pour tout le monde, à partir
+    // du seul chemin. C'est ce qui garantit que les trois écrans voient le même
+    // trajet : personne n'a plus à recalculer ce que quelqu'un d'autre a déjà
+    // décidé. Le pion ne bouge pas ici : il bougera au rythme du journal, un
+    // hexagone à la fois, comme chez les autres.
+    if (window.REGIME_CERVEAU && window.regimeDemande && window.regimeDemande.actif()) {
+        const chemin = window.CHEMIN_MOUVEMENT.map(step => ({ q: step.q, r: step.r }));
+        const bulleR = document.getElementById("bulle-validation-mouvement");
+        if (bulleR) bulleR.style.display = "none";
+        const svgR = document.getElementById("svg-chemin-mouvement");
+        if (svgR) svgR.innerHTML = "";
+        window.CHEMIN_MOUVEMENT = [];
+        window.CHEMIN_START_NODE = null;
+        window.MOUVEMENT_COUT_TOTAL = 0;
+        return await window.regimeDemande.mouvement(
+            idPerso, chemin, window.COUT_COMPETENCE_SELECTIONNEE || 0);
+    }
+
     // La copie locale est posée AVANT l'écriture réseau : le joueur peut repartir
     // dans la seconde qui suit, sans attendre le retour de la base.
     const nbPas = window.CHEMIN_MOUVEMENT.length;
@@ -791,6 +813,51 @@ window.jouerAnimationPas = async function(pas) {
         if (window.PIONS_EN_MOUVEMENT) delete window.PIONS_EN_MOUVEMENT[pas.idToken];
         window.ANIMATION_VTT_EN_COURS = false;
     }
+};
+
+// =========================================================================
+//  LA RUÉE — MONTRER UNE CARTE PARTIR, SANS LA RÉSOUDRE
+// =========================================================================
+//  Elle n'existait pas, et c'est révélateur : jusqu'ici, montrer une attaque et
+//  la calculer étaient la même fonction. `jouerAnimationMoteur` tire les dés
+//  d'esquive, applique les dégâts et écrit en base — la rejouer sur trois
+//  écrans, c'est résoudre la carte trois fois.
+//
+//  Sous le nouveau régime, le résultat est déjà connu quand cette animation
+//  part : elle ne fait donc QUE montrer le lanceur s'élancer vers sa cible et
+//  revenir. Les conséquences arrivent juste après, chacune avec son propre
+//  moment à l'écran (le chiffre qui flotte, la barre qui descend).
+window.jouerRueeCarte = async function(data) {
+    const idLanceur = data && data.pion;
+    const cible = (data && (data.cibles || [])[0]) || null;
+    const tokenDiv = document.getElementById("token-" + idLanceur);
+    if (!tokenDiv || !window.PLATEAU_VTT) return;
+
+    const tkLanceur = (window.TOKENS_VTT_DATA || {})[idLanceur];
+    const tkCible = cible ? (window.TOKENS_VTT_DATA || {})[cible] : null;
+
+    // Sans cible lisible (une zone posée au sol, un soin sur soi), on se
+    // contente d'un petit sursaut sur place : il faut qu'on VOIE qui joue.
+    let dx = 0, dy = 0;
+    if (tkLanceur && tkCible) {
+        const pxL = window.PLATEAU_VTT.hexToPixel(tkLanceur.q, tkLanceur.r);
+        const pxC = window.PLATEAU_VTT.hexToPixel(tkCible.q, tkCible.r);
+        dx = pxC.x - pxL.x;
+        dy = pxC.y - pxL.y;
+    }
+    const mag = Math.sqrt(dx * dx + dy * dy) || 1;
+    const avanceX = (dx / mag) * 18 * (window.VTT_SCALE || 1);
+    const avanceY = (dy / mag) * 18 * (window.VTT_SCALE || 1);
+
+    tokenDiv.style.transition = "transform 0.1s ease-out";
+    tokenDiv.style.transform = (dx || dy)
+        ? `translate(calc(-50% + ${avanceX}px), calc(-50% + ${avanceY}px))`
+        : "translate(-50%, -50%) scale(1.12)";
+    await new Promise(r => setTimeout(r, 110));
+    tokenDiv.style.transition = "transform 0.15s ease-in";
+    tokenDiv.style.transform = "translate(-50%, -50%)";
+    await new Promise(r => setTimeout(r, 160));
+    tokenDiv.style.transition = "none";
 };
 
 // Le Bond : pas un déplacement classique, un saut à vol d'oiseau vers la case d'arrivée.

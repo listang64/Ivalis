@@ -3126,7 +3126,18 @@ window.declencherResolution = async function() {
                 isZoneFinal = false;
                 confusionResultat = { type: "aleatoire", idCible: idCibleHasard };
             }
-        } else if (rollConf <= 50) {
+        } else if (rollConf <= 50 && !window.REGIME_CERVEAU) {
+            // LA DISSIPATION DE LA CONFUSION N'EST PAS ENCORE PORTÉE PAR UNE
+            // INTENTION. Sous le nouveau régime, l'état d'un combattant ne
+            // s'écrit que par le cerveau, et cette bande de tirage (41-50)
+            // n'existe pas encore de son côté.
+            //
+            // Plutôt que d'écrire à moitié — enlever l'état dans la fiche mais
+            // pas dans l'état du combat, donc le voir revenir au prochain
+            // rafraîchissement —, on ne dissipe pas : la Confusion tient un
+            // tour de plus. C'est une différence petite, bornée et visible,
+            // là où l'écriture à moitié serait une divergence entre les écrans.
+            // À reprendre dans la tranche suivante.
             const nouveauxEtatsConf = (lanceurDataConf.Etats_Alteres || []).filter(e => e.nom !== "Confusion");
             lanceurDataConf.Etats_Alteres = nouveauxEtatsConf;
             await updateDoc(window.refCombattant(idLanceur), { Etats_Alteres: nouveauxEtatsConf }).catch(e => console.error(e));
@@ -3154,6 +3165,41 @@ window.declencherResolution = async function() {
     // avant la diffusion : les dégâts plats et les états ajoutés partent donc
     // dans l'action, identiques pour tous les postes.
     window.appliquerEquipementALaCarte(state, lanceurCrit);
+
+    // SOUS LE NOUVEAU RÉGIME : ON DEMANDE, ON NE RÉSOUT PAS.
+    //
+    // Le point de coupure est ici, et il est choisi : la carte est enrichie par
+    // l'équipement et ses cibles sont arrêtées (y compris redirigées par la
+    // Confusion), mais AUCUN dé n'est encore tombé. Les dés, le critique, les
+    // esquives, les dégâts et les états sont tirés par le cerveau — une fois,
+    // pour les trois écrans.
+    //
+    // C'est ce qui tue les dégâts doublés à la racine : il n'y a plus de
+    // « poste auteur » à distinguer d'un poste qui rejoue, plus de
+    // RESOLUTIONS_LOCALES, plus de timestamp à reconnaître. Personne ne résout
+    // deux fois, parce qu'un seul résout.
+    //
+    // L'enrichissement par l'équipement, lui, reste ici : il ne dépend que de
+    // la fiche du joueur qui joue sa propre carte, un seul poste l'exécute, et
+    // il ne peut donc pas diverger. C'est une couture assumée, à ramener dans
+    // le noyau avec le reste.
+    if (window.REGIME_CERVEAU && window.regimeDemande && window.regimeDemande.actif()) {
+        try {
+            await window.regimeDemande.carte(idLanceur, {
+                idCarte: state.idCarte,
+                attaques: state.attaques,
+                alterations: state.alterations,
+                coutFatigue: parseInt(state.coutFatigue || state.fatigue || window.COUT_COMPETENCE_SELECTIONNEE) || 0
+            });
+            if (state.persistanceTerrain && typeof window.creerZonePersistante === "function") {
+                await window.creerZonePersistante(state, idLanceur);
+            }
+        } catch (e) {
+            console.error("Demande de carte :", e);
+        }
+        window.nettoyerCiblage();
+        return;
+    }
 
     const jets = tirerLesDesDeLaCarte(state, lanceurCrit, critique);
 

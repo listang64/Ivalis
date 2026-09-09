@@ -68,6 +68,7 @@ node spectateur_combat.mjs  # LE SPECTATEUR : le rejeu à l'écran, dans l'ordre
 node depot_firestore.mjs    # LE DÉPÔT : un pas = un lot, et un lot qui rate ne laisse rien
 node pont_combat.mjs        # LE PONT : de l'étape à ce qu'on voit, sans jamais recalculer
 node regime_cerveau.mjs     # TROIS POSTES, UN CERVEAU : un combat entier, trois écrans identiques
+node drapeau_regime.mjs     # LE DRAPEAU : chaque redirection est gardée, l'ancien chemin est intact
 node journal_firestore.mjs  # la plomberie du journal face aux règles d'index de Firestore
 node deplacement_journal.mjs # un hexagone = un numéro : publication, ordre, absence de chevauchement
 node illusion_opportunite.mjs # une illusion ne porte aucune attaque d'opportunité
@@ -401,6 +402,52 @@ Deux bugs trouvés par ce banc, et le premier est joli : un minuteur de battemen
 de cœur qui se replanifiait sans jamais attendre faisait tourner une boucle à
 pleine vitesse. Un battement nul est maintenant un vrai réglage — « pas de
 battement » — au lieu d'un « battement infiniment rapide ».
+
+### Le branchement lui-même
+
+Cinq points d'appel redirigés, tous derrière la même garde :
+
+| Ce que fait le joueur | Avant | Maintenant |
+|---|---|---|
+| Fin de tour | transaction sur la file, arbitrage du combattant attendu, relances | `demanderFinDeTour` |
+| Déplacement validé | opportunités tranchées ici, zones franchies, coût déduit, position écrite | `demanderMouvement(chemin)` |
+| Carte lancée | dés, critique, esquives, dégâts, états, écriture en base | `demanderCarte(carte)` |
+| OK de la fenêtre sombre | curseur du journal d'événements | `regime.ok()` |
+| Notification de la partie | séquence de tour + IA des monstres | `regimeSuivreLaPartie` |
+
+**Le déplacement est le cas le plus parlant.** Avant, le poste qui bougeait
+tranchait lui-même les attaques d'opportunité, les zones franchies et le coût,
+puis écrivait la position d'arrivée. Maintenant il envoie **le chemin, et rien
+d'autre** : le cerveau calcule tout le reste, une fois, pour les trois écrans.
+Le pion ne bouge même pas chez celui qui l'a demandé — il bougera au rythme du
+journal, un hexagone à la fois, comme chez les autres.
+
+**Et la carte tue les dégâts doublés à la racine.** Le point de coupure est
+choisi : la carte est enrichie par l'équipement et ses cibles sont arrêtées,
+mais aucun dé n'est encore tombé. Il n'y a donc plus de « poste auteur » à
+distinguer d'un poste qui rejoue, plus de `RESOLUTIONS_LOCALES`, plus de
+timestamp à reconnaître. Personne ne résout deux fois, parce qu'un seul résout.
+
+`drapeau_regime.mjs` ne fait tourner aucun combat : il **lit le code du jeu** et
+vérifie que chaque redirection est gardée, que l'ancien chemin est intact, et
+que le régime n'écrit jamais dans l'ancien monde (ni `Action_*`, ni
+`modifierPartie`, ni Firestore en direct). C'est un banc de structure, et il
+attrape la classe d'erreur qu'aucun test de combat ne peut voir : un oubli de
+garde ne se verrait qu'en jeu, un soir, au milieu d'un combat.
+
+### Deux coutures assumées
+
+Elles sont écrites dans le code, à l'endroit exact où elles se trouvent :
+
+- **L'enrichissement par l'équipement** reste côté client. Il ne dépend que de
+  la fiche du joueur qui joue sa propre carte, un seul poste l'exécute, il ne
+  peut donc pas diverger — mais il a sa place dans le noyau.
+- **La dissipation de la Confusion** (bande 41-50) n'est pas encore portée par
+  une intention. Plutôt que d'écrire à moitié — retirer l'état de la fiche mais
+  pas de l'état du combat, donc le voir revenir au rafraîchissement suivant —,
+  on ne dissipe pas : la Confusion tient un tour de plus. Une différence petite,
+  bornée et visible, là où l'écriture à moitié serait une divergence entre les
+  écrans.
 
 **Un tour appartient à UN SEUL poste, et c'est le journal qui tranche.** Quatrième
 trace : P_03 prend le verrou de `MONSTRE_13sb8te`, le joue, publie l'événement 1

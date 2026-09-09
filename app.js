@@ -2699,22 +2699,46 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
              window.verifierPointsApparition();
          }
 
-         // La séquence de tour AVANT l'IA : c'est elle qui sait si le tour en
-         // cours est déjà calculé et n'attend plus que les autres postes. Sans
-         // ce passage en premier, la créature rejouerait son tour en boucle
-         // pendant l'attente (voir sequenceTourEnAttente, sequence_tour.js).
-         if (typeof window.suivreSequenceTour === "function") {
+         // LE NOUVEAU RÉGIME, S'IL EST ALLUMÉ. C'est le seul point d'entrée du
+         // cerveau dans l'ancien monde : il regarde la phase, ouvre le combat
+         // quand elle passe en résolution, et publie ce qu'il a à publier.
+         if (typeof window.regimeSuivreLaPartie === "function") {
              try {
-                 window.suivreSequenceTour(dataPartie);
+                 window.regimeSuivreLaPartie(dataPartie);
              } catch (e) {
-                 console.error("Séquence de tour :", e);
+                 console.error("Régime du cerveau :", e);
              }
          }
 
-         // Les monstres jouent seuls : à chaque changement de la partie (une carte
-         // posée, un tour qui passe), l'IA regarde si c'est à eux d'agir.
-         if (typeof window.verifierTourIAMonstres === "function") {
-             window.verifierTourIAMonstres();
+         // L'ANCIENNE SYNCHRONISATION — débranchée, pas supprimée.
+         //
+         // Sous le nouveau régime, ces deux appels n'ont plus lieu d'être et
+         // seraient même nuisibles : la séquence de tour rejouerait un second
+         // journal par-dessus le premier, et l'IA ferait jouer les créatures en
+         // double, une fois ici et une fois dans le cerveau. C'est très
+         // exactement le mécanisme des tours joués deux fois qu'on a passé une
+         // semaine à chasser — il n'y a aucune raison de le réinviter.
+         //
+         // Le drapeau éteint, tout ce qui suit se comporte comme avant, à la
+         // ligne près.
+         if (!window.REGIME_CERVEAU) {
+             // La séquence de tour AVANT l'IA : c'est elle qui sait si le tour en
+             // cours est déjà calculé et n'attend plus que les autres postes. Sans
+             // ce passage en premier, la créature rejouerait son tour en boucle
+             // pendant l'attente (voir sequenceTourEnAttente, sequence_tour.js).
+             if (typeof window.suivreSequenceTour === "function") {
+                 try {
+                     window.suivreSequenceTour(dataPartie);
+                 } catch (e) {
+                     console.error("Séquence de tour :", e);
+                 }
+             }
+
+             // Les monstres jouent seuls : à chaque changement de la partie (une carte
+             // posée, un tour qui passe), l'IA regarde si c'est à eux d'agir.
+             if (typeof window.verifierTourIAMonstres === "function") {
+                 window.verifierTourIAMonstres();
+             }
          }
 
          // NOUVEAU : Met à jour la carte "Lockée" du personnage

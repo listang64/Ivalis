@@ -3210,6 +3210,23 @@ window.ANIMATION_TOUR_EN_COURS = false;
 window.finDeTourCombat = async function(forcer = false, idQuiTermine = null) {
     if (!window.PEUT_PASSER_TOUR && !forcer) return;
 
+    // SOUS LE NOUVEAU RÉGIME : on ne fait pas avancer la file, on le DEMANDE.
+    // Le cerveau tranche — est-ce bien son tour, ce poste commande-t-il ce
+    // combattant — puis publie la file d'après avec son entrée de journal.
+    //
+    // Tout ce qui suit ci-dessous (la transaction, l'arbitrage du combattant
+    // attendu, les relances) existait pour empêcher deux postes d'avancer la
+    // file en même temps. Un seul l'écrit maintenant : il n'y a plus rien à
+    // empêcher.
+    if (window.REGIME_CERVEAU && window.regimeDemande && window.regimeDemande.actif()) {
+        const teteNouvelle = ((window.PARTIE_DATA || {}).File_Attente_Combat || [])[0];
+        const qui = idQuiTermine || (teteNouvelle ? teteNouvelle.idPersonnage : null);
+        if (!qui) return;
+        if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+        window.COUT_COMPETENCE_SELECTIONNEE = 0;
+        return await window.regimeDemande.finDeTour(qui);
+    }
+
     // LA BARRIÈRE DE SYNCHRONISATION. Ce tour vient d'être CALCULÉ sur ce poste
     // — pas encore vu par les autres. Avant, la file avançait ici même, tout de
     // suite : le poste le plus rapide passait au combattant suivant pendant que
@@ -4280,6 +4297,16 @@ window.reinitialiserCombat = async function() {
     // vide doit de nouveau pouvoir rouvrir le panneau, même s'il l'était déjà
     // avant le reset (sinon la comparaison ne verrait aucun changement d'état).
     window.PISTE_INITIATIVE_VISIBLE = null;
+
+    // LE COMBAT DU NOUVEAU RÉGIME SE FERME AUSSI, ET AVANT LE RESTE. Un état
+    // publié qui survivrait à une réinitialisation serait pire qu'inutile : les
+    // postes le liraient encore, avec ses positions et ses points de vie de la
+    // rencontre d'avant, par-dessus le plateau qu'on vient de nettoyer. C'est
+    // le bug du curseur resté sur le journal purgé, dans sa version la plus
+    // visible.
+    if (typeof window.regimeFermerLeCombat === "function") {
+        try { await window.regimeFermerLeCombat(); } catch (e) { console.error("Fermeture du régime :", e); }
+    }
 
     try {
         const { doc, getDoc, deleteDoc, updateDoc, deleteField } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");

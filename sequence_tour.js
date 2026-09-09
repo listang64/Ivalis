@@ -836,6 +836,15 @@ window.programmerAnimationTour = function(nom, action, fn) {
 //  regarder deux tours différents à quelques secondes d'écart — ils rejouent
 //  les mêmes numéros, ils finiront au même point.
 window.jouerSequenceTour = function() {
+    // SOUS LE NOUVEAU RÉGIME, le OK appartient au spectateur : c'est lui qui
+    // tient le curseur et la file des entrées reçues. Il reste purement local —
+    // aucun poste n'attend un autre, chacun lit à son rythme et rattrape
+    // ensuite. Rien ne change pour le joueur : c'est le même clic.
+    if (window.REGIME_CERVEAU && window.regimeDemande && window.regimeDemande.actif()) {
+        if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+        return Promise.resolve(window.regimeDemande.ok());
+    }
+
     const attendu = window.EVENEMENT_ATTENDU;
     if (!attendu) {
         // Un OK sur une fenêtre qui n'attend rien : ça arrive quand l'écran est

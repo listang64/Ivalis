@@ -296,16 +296,19 @@ async function banc() {
         tablette.regime.rejoindre();
         await f.livrer();
 
+        // LA RÉOUVERTURE D'UNE MANCHE PASSE PAR LE CERVEAU, comme tout le
+        // reste. La phase de préparation (l'ancien monde, inchangé) prépare la
+        // file dans le document de la partie ; le cerveau la fait entrer dans
+        // l'état par un PAS, avec son entrée de journal. Sans ça, l'état
+        // changerait sans que personne ne puisse le raconter, et les écrans en
+        // retard rateraient exactement le début d'une manche.
         const rouvrirLaManche = async () => {
-            // Ce que fera la phase de préparation : le cerveau s'arrête en fin
-            // de manche et rend la main aux joueurs pour choisir leurs cartes.
             const etat = await f.ioPour("P_03").lire(CHEMINS.etat(PARTIE));
             if (!etat || etat.phase !== "Preparation") return false;
-            etat.phase = "Resolution";
-            etat.file = etat.ordre
+            const file = etat.ordre
                 .filter(id => etat.combattants[id] && !etat.combattants[id].aTerre)
                 .map(id => ({ id, carte: `C_${id}`, initiative: 0 }));
-            await f.ioPour("P_03").lot([{ op: "set", chemin: CHEMINS.etat(PARTIE), data: etat }]);
+            await nico.regime.ouvrirLaManche(file);
             return true;
         };
 
@@ -506,6 +509,95 @@ async function banc() {
                   await nico.regime.tourner(), await f.livrer(),
                   nico.regime.etatPublie().version > 0),
                  `(version ${nico.regime.etatPublie().version})`);
+    }
+
+    // =====================================================================
+    console.log("\n7. UNE MANCHE S'OUVRE — ET ÇA SE RACONTE COMME LE RESTE");
+    // =====================================================================
+    //  La frontière du cerveau : il s'arrête en fin de manche et rend la main
+    //  aux joueurs, qui choisissent leurs cartes dans l'ancien monde. Quand la
+    //  file est prête, c'est le cerveau qui la fait entrer dans l'état — par un
+    //  PAS, avec son entrée de journal. Sans ça, l'état changerait sans que
+    //  personne ne puisse le raconter, et un écran en retard raterait
+    //  précisément le début d'une manche.
+    {
+        const f = firestoreDeBanc();
+        const nico = creerPoste(f, "P_03");
+        const ben = creerPoste(f, "P_01");
+        await nico.regime.ouvrir(SOURCE);
+        ben.regime.rejoindre();
+        await f.livrer();
+
+        // On vide la file jusqu'à la fin de la manche.
+        for (let i = 0; i < 12; i++) {
+            const etat = await f.ioPour("P_03").lire(CHEMINS.etat(PARTIE));
+            if (!etat || etat.phase !== "Resolution") break;
+            const tete = (etat.file || [])[0];
+            if (!tete) break;
+            const c = etat.combattants[tete.id];
+            if (!c.estMonstre) {
+                await (c.joueur === "P_01" ? ben : nico).regime.demanderFinDeTour(tete.id);
+            }
+            await f.livrer();
+            await nico.regime.tourner();
+            await f.livrer();
+        }
+
+        const finDeManche = await f.ioPour("P_03").lire(CHEMINS.etat(PARTIE));
+        verifier("en fin de manche, le cerveau rend la main",
+                 finDeManche.phase === "Preparation" && finDeManche.file.length === 0,
+                 `(phase ${finDeManche.phase}, file ${finDeManche.file.length})`);
+        verifier("et la manche a bien avancé", finDeManche.manche === 2, `(manche ${finDeManche.manche})`);
+
+        const avant = finDeManche.version;
+
+        // Un poste qui n'a pas la main n'ouvre rien, même s'il essaie.
+        await ben.regime.ouvrirLaManche([{ id: "H2", carte: "C_H2" }]);
+        await f.livrer();
+        verifier("un poste qui regarde n'ouvre pas la manche",
+                 (await f.ioPour("P_03").lire(CHEMINS.etat(PARTIE))).version === avant);
+
+        // Le cerveau, lui, l'ouvre — et ça produit une entrée de journal.
+        const v = await nico.regime.ouvrirLaManche([
+            { id: "H1", carte: "C_H1" }, { id: "M1", carte: "C_M1" },
+            { id: "H2", carte: "C_H2" }, { id: "M2", carte: "C_M2" }
+        ]);
+        await f.livrer();
+        const ouverte = await f.ioPour("P_03").lire(CHEMINS.etat(PARTIE));
+        verifier("le cerveau ouvre la manche", ouverte.phase === "Resolution");
+        verifier("et ça a produit une entrée de journal", v === avant + 1, `(n°${v})`);
+        verifier("la file est celle qu'on lui a donnée",
+                 ouverte.file.map(x => x.id).join(",") === "H1,M1,H2,M2",
+                 ouverte.file.map(x => x.id).join(","));
+
+        // Et l'écran de Ben le voit, sans rien faire de plus.
+        for (let i = 0; i < 6 && ben.regime.spectateur.enAttente(); i++) {
+            await ben.regime.ok(); await f.livrer();
+        }
+        await f.livrer();
+        verifier("l'écran qui regarde voit la manche s'ouvrir",
+                 (ben.regime.etatAffiche().file || []).length === 4,
+                 `(${(ben.regime.etatAffiche().file || []).length} en file)`);
+
+        // UN COMBATTANT À TERRE NE REVIENT PAS DANS LA FILE. C'est « nos héros
+        // rayés de la file » par le bon bout : on les écarte pour une raison
+        // lisible, au lieu de les perdre au petit bonheur.
+        const aTerre = await f.ioPour("P_03").lire(CHEMINS.etat(PARTIE));
+        aTerre.combattants.H2.aTerre = true;
+        aTerre.combattants.H2.pv = 0;
+        aTerre.phase = "Preparation";
+        aTerre.file = [];
+        await f.ioPour("P_03").lot([{ op: "set", chemin: CHEMINS.etat(PARTIE), data: aTerre }]);
+        await f.livrer();
+        await nico.regime.ouvrirLaManche([
+            { id: "H1", carte: "C_H1" }, { id: "H2", carte: "C_H2" }, { id: "M1", carte: "C_M1" }
+        ]);
+        await f.livrer();
+        const apres = await f.ioPour("P_03").lire(CHEMINS.etat(PARTIE));
+        verifier("un combattant à terre n'entre pas dans la nouvelle manche",
+                 !apres.file.some(x => x.id === "H2"), apres.file.map(x => x.id).join(","));
+        verifier("mais les autres, si",
+                 apres.file.map(x => x.id).join(",") === "H1,M1", apres.file.map(x => x.id).join(","));
     }
 
     console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

@@ -30,8 +30,8 @@
 //  contestée par un poste en retard, ce qui était tout le problème du verrou.
 // =========================================================================
 
-import { construireEtatCombat, verifierEtatCombat, FORMAT_ETAT } from './combat_etat.js';
-import { creerCerveau, estLeCerveau, cerveauPerdu, BATTEMENT_MS } from './cerveau_combat.js';
+import { construireEtatCombat, verifierEtatCombat, creerDes, FORMAT_ETAT } from './combat_etat.js';
+import { creerCerveau, estLeCerveau, cerveauPerdu, ouvrirManche, BATTEMENT_MS } from './cerveau_combat.js';
 import { creerSpectateur } from './spectateur_combat.js';
 import { creerPont, creerProjection } from './pont_combat.js';
 import {
@@ -229,6 +229,37 @@ export function creerRegime(contexte) {
     // rechargement de page du poste qui tenait la main.
     function rejoindre() { brancher(0); }
 
+    // =====================================================================
+    //  UNE MANCHE S'OUVRE
+    // =====================================================================
+    //  Le cerveau s'est arrêté en fin de manche et a rendu la main aux joueurs.
+    //  Ils ont choisi leurs cartes, l'initiative est lancée, et la phase de
+    //  préparation a écrit sa file. Il faut maintenant la faire entrer dans
+    //  l'état — et c'est le cerveau qui le fait, comme il fait tout le reste :
+    //  par un pas, avec son entrée de journal.
+    //
+    //  Un poste qui n'a pas la main ne fait RIEN ici. Il verra la manche
+    //  s'ouvrir arriver par le journal, comme le reste.
+    async function ouvrirLaManche(file) {
+        if (!moi.cerveau || !moi.etat) return null;
+        if (moi.etat.phase === "Resolution") return null;
+
+        const pas = ouvrirManche(moi.etat, file, creerDes(moi.etat.graine));
+        if (!pas) return null;
+
+        const soucis = verifierEtatCombat(pas.etat);
+        if (soucis.length > 0) {
+            tracer("❌", "manche non ouverte : état incohérent", soucis.join(" | "));
+            return null;
+        }
+        pas.etat.battement = maintenant();
+        await depot.publier(pas.etat, pas.entree, []);
+        tracer("🔄", `manche ${pas.etat.manche} ouverte`,
+               `${pas.etat.file.length} combattants`);
+        tourner();
+        return pas.entree.v;
+    }
+
     async function fermer() {
         try { await fermerCombat(io, idPartie); } catch (e) {}
         debrancher();
@@ -275,7 +306,7 @@ export function creerRegime(contexte) {
     const ok = () => spectateur.ok();
 
     return {
-        ouvrir, rejoindre, fermer, brancher, debrancher, tourner, ok,
+        ouvrir, rejoindre, fermer, brancher, debrancher, tourner, ok, ouvrirLaManche,
         demander, demanderMouvement, demanderCarte, demanderFinDeTour,
         // De quoi regarder l'intérieur, pour la trace et les bancs.
         spectateur,
@@ -296,6 +327,135 @@ export function creerRegime(contexte) {
 //
 //  En jeu : `regimeCerveau(true)` dans la console, puis on relance un combat.
 
+// =========================================================================
+//  3. LA FABRIQUE — LE RÉGIME BRANCHÉ SUR LE VRAI JEU
+// =========================================================================
+//  `creerRegime` ne lit aucune variable globale : c'est ce qui permet au banc
+//  d'en faire tourner trois côte à côte. Cette fonction-ci est l'inverse : elle
+//  ne fait QUE lire les globales du jeu et les ranger dans le contexte attendu.
+//
+//  Tout ce qu'elle contient est donc de la traduction, et rien d'autre. C'est
+//  volontairement le seul endroit qui connaisse à la fois les deux mondes.
+
+function contexteDuJeu() {
+    return {
+        io: window.ioCombatFirestore,
+        idPartie: window.ID_PARTIE_COURANTE,
+        poste: (() => {
+            try { return localStorage.getItem("ID_JOUEUR_COURANT") || "poste-inconnu"; }
+            catch (e) { return "poste-inconnu"; }
+        })(),
+
+        // « Ce combattant est-il un héros de ce poste ? » — c'est ce qui décide
+        // si la fenêtre sombre s'ouvre. Le mien, non : je sais déjà ce que j'ai
+        // demandé.
+        estAMoi: (id) => typeof window.estMonHerosCombat === "function"
+                         && window.estMonHerosCombat(id),
+
+        // La technique d'une créature, telle que la Forge l'a écrite.
+        carteDe: (idMonstre, idCarte) => {
+            const data = ((window.CACHE_COMPETENCES_GLOBAL || {})[idMonstre] || {})[idCarte];
+            if (!data || typeof window.analyserCarteMonstre !== "function") return null;
+            return { idCarte, infos: window.analyserCarteMonstre(data),
+                     attaques: data.attaques || [], alterations: data.alterations || [] };
+        },
+
+        // LE TERRAIN. Le noyau ne connaît pas la carte du plateau — c'est une
+        // donnée de jeu, pas une règle — alors on la lui passe. Sans elle, il
+        // travaillerait sur une plaine infinie et ferait traverser les murs.
+        plateau: {
+            etatCase: (q, r) => {
+                if (!window.PLATEAU_VTT || typeof window.PLATEAU_VTT.getCaseState !== "function") {
+                    return { bloquee: false, supprimee: false, difficile: false };
+                }
+                const e = window.PLATEAU_VTT.getCaseState(q, r) || {};
+                return { bloquee: !!e.isBlocked, supprimee: !!e.isDeleted, difficile: !!e.isDifficult };
+            }
+        },
+
+        // LES ANIMATIONS. Ce sont celles du jeu, telles quelles — on ne les
+        // réécrit pas, on les appelle. Seul `ruee` est neuf : montrer une carte
+        // partir sans la résoudre n'existait pas, puisque tout était mêlé.
+        animations: {
+            pas: (d) => window.jouerAnimationPas ? window.jouerAnimationPas(d) : null,
+            poussee: (d) => window.jouerAnimationPoussee ? window.jouerAnimationPoussee(d) : null,
+            bond: (d) => window.jouerAnimationBond ? window.jouerAnimationBond(d) : null,
+            ruee: (d) => window.jouerRueeCarte ? window.jouerRueeCarte(d) : null,
+            jauge: (...a) => window.afficherFlashDegatToken ? window.afficherFlashDegatToken(...a) : null,
+            message: (pion, texte, couleur, options) => {
+                const tk = (window.TOKENS_VTT_DATA || {})[pion];
+                if (tk && typeof window.afficherMessageFlottantHex === "function") {
+                    window.afficherMessageFlottantHex(tk.q, tk.r, texte, couleur, options || {});
+                }
+            },
+            opportunite: (d) => window.jouerAnimationOpportunite
+                ? window.jouerAnimationOpportunite(d) : null,
+            zone: () => window.appliquerZonesPersistantes
+                ? window.appliquerZonesPersistantes() : null
+        },
+
+        // OÙ POSER L'ÉTAT. Un seul sens : l'état descend, rien ne remonte.
+        ecran: {
+            lireFiches: () => window.PERSOS_PARTIE || [],
+            poserPions: (pions) => {
+                window.TOKENS_VTT_DATA = window.TOKENS_VTT_DATA || {};
+                Object.keys(pions).forEach(id => {
+                    const t = window.TOKENS_VTT_DATA[id];
+                    if (t) { t.q = pions[id].q; t.r = pions[id].r; }
+                    else window.TOKENS_VTT_DATA[id] = { ...pions[id] };
+                });
+            },
+            poserFiches: (fiches) => { window.PERSOS_PARTIE = fiches; },
+            poserFile: (file, infos) => {
+                if (typeof window.afficherPisteInitiative === "function") {
+                    try { window.afficherPisteInitiative(file, infos.phase); } catch (e) {}
+                }
+            },
+            rafraichir: () => {
+                if (typeof window.rafraichirAffichageCombat === "function") {
+                    try { window.rafraichirAffichageCombat(); } catch (e) {}
+                }
+                if (typeof window.redessinerPions === "function") {
+                    try { window.redessinerPions(); } catch (e) {}
+                }
+            }
+        },
+
+        surFenetre: (entree) => {
+            window.EVENEMENT_ATTENDU = entree
+                ? { acteur: entree.acteur, tour: entree.manche, n: entree.v, type: "tour" }
+                : null;
+            if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
+        },
+
+        tracer: (i, q, d) => {
+            if (typeof window.tracerCombat === "function") window.tracerCombat(i, q, d);
+        }
+    };
+}
+
+// L'ÉTAT DE DÉPART, tiré de ce que le jeu a déjà en mémoire. C'est le pont
+// entre l'ancien monde et le nouveau, et il ne sert qu'à OUVRIR un combat :
+// après quoi l'état ne vient plus que de lui-même.
+function sourceDuJeu() {
+    return {
+        graine: (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0,
+        combattants: window.PERSOS_PARTIE || [],
+        positions: window.TOKENS_VTT_DATA || {},
+        partie: window.PARTIE_DATA || {},
+        zones: window.ZONES_PERSISTANTES || {},
+        regles: {
+            esquive: window.esquiveCombattant,
+            parade: window.paradeCombattant,
+            defPhysique: window.defPhysiqueCombattant,
+            defMagique: window.defMagiqueCombattant,
+            critique: window.critiqueCombattant,
+            atouts: window.atoutRace,
+            bonusEquip: window.bonusEquip
+        }
+    };
+}
+
 if (typeof window !== "undefined") {
     window.REGIME_CERVEAU = window.REGIME_CERVEAU === true;
 
@@ -313,6 +473,85 @@ if (typeof window !== "undefined") {
     try {
         if (localStorage.getItem("REGIME_CERVEAU") === "1") window.REGIME_CERVEAU = true;
     } catch (e) {}
+
+    // =====================================================================
+    //  LE RÉGIME DU JEU — UN SEUL, ET IL SUIT LA PARTIE
+    // =====================================================================
+    let REGIME = null;
+    let partieSuivie = null;
+    let phasePrecedente = null;
+
+    window.regimeDuJeu = () => REGIME;
+
+    // Appelé à chaque notification de la partie (app.js). C'est le seul point
+    // d'entrée du nouveau régime dans l'ancien monde, et il tient en quatre cas.
+    window.regimeSuivreLaPartie = function(partie) {
+        if (!window.REGIME_CERVEAU) return;
+        if (!partie || !window.ID_PARTIE_COURANTE || !window.ioCombatFirestore) return;
+
+        // 1. On a changé de partie : on repart de zéro.
+        if (partieSuivie && partieSuivie !== window.ID_PARTIE_COURANTE) {
+            if (REGIME) REGIME.debrancher();
+            REGIME = null;
+            partieSuivie = null;
+            phasePrecedente = null;
+        }
+
+        const phase = partie.Phase_Combat || "Preparation";
+        const avant = phasePrecedente;
+        phasePrecedente = phase;
+
+        // 2. Pas encore branché : on se branche, et on écoute. Si un combat est
+        //    déjà publié, l'état nous dira qui tient le cerveau — y compris
+        //    nous, après un simple rechargement de page.
+        if (!REGIME) {
+            REGIME = creerRegime(contexteDuJeu());
+            partieSuivie = window.ID_PARTIE_COURANTE;
+            REGIME.rejoindre();
+        }
+
+        // 3. LA PHASE PASSE EN RÉSOLUTION. C'est le moment décisif : le combat
+        //    commence (ou une manche s'ouvre), et le poste qui provoque ce
+        //    passage est celui qui a cliqué en dernier. On le laisse prendre la
+        //    main s'il n'y a pas déjà d'état publié — sinon, seul le cerveau
+        //    en place ouvre la manche, et les autres ne font rien.
+        if (phase === "Resolution" && avant === "Preparation") {
+            const publie = REGIME.etatPublie();
+            const file = (partie.File_Attente_Combat || []);
+            if (!publie) {
+                REGIME.ouvrir(sourceDuJeu());
+            } else if (REGIME.jeSuisLeCerveau()) {
+                REGIME.ouvrirLaManche(file);
+            }
+        }
+
+        // 4. Le cerveau garde la main pendant toute la résolution : à chaque
+        //    notification, il regarde s'il a quelque chose à publier. Une
+        //    intention arrivée pendant une coupure réseau est reprise ici.
+        if (phase === "Resolution" && REGIME.jeSuisLeCerveau()) REGIME.tourner();
+    };
+
+    // LE COMBAT S'ARRÊTE (victoire, fuite, réinitialisation). On range.
+    window.regimeFermerLeCombat = async function() {
+        if (!window.REGIME_CERVEAU || !REGIME) return;
+        await REGIME.fermer();
+        REGIME = null;
+        partieSuivie = null;
+        phasePrecedente = null;
+    };
+
+    // LES TROIS DEMANDES, TELLES QUE L'INTERFACE LES APPELLE. Elles rendent
+    // `false` quand le nouveau régime n'est pas en marche : l'appelant sait
+    // alors qu'il doit suivre l'ancien chemin, et une seule ligne suffit à
+    // chaque point d'appel.
+    window.regimeDemande = {
+        actif: () => !!(window.REGIME_CERVEAU && REGIME),
+        mouvement: (acteur, chemin, reserve) =>
+            REGIME ? REGIME.demanderMouvement(acteur, chemin, reserve) : null,
+        carte: (acteur, carte) => REGIME ? REGIME.demanderCarte(acteur, carte) : null,
+        finDeTour: (acteur) => REGIME ? REGIME.demanderFinDeTour(acteur) : null,
+        ok: () => REGIME ? REGIME.ok() : null
+    };
 
     window.regimeCombat = { creerRegime, CHEMINS };
 }

@@ -199,6 +199,46 @@ export function cloturerTour(etat) {
     return { fini: partie.id, etapes };
 }
 
+// =========================================================================
+//  OUVRIR UNE MANCHE
+// =========================================================================
+//  LA FRONTIÈRE DU CERVEAU, ET ELLE EST VOULUE. En fin de manche la file se
+//  vide, la phase repasse à « Preparation », et le cerveau s'arrête. Ouvrir une
+//  manche, c'est choisir ses cartes et lancer l'initiative : ça appartient aux
+//  joueurs, et ça se passe encore dans l'ancien monde (la phase de préparation
+//  écrit la file dans le document de la partie, comme elle l'a toujours fait).
+//
+//  Quand cette file est prête, quelqu'un doit la faire entrer dans l'état. Ce
+//  quelqu'un est le cerveau, et il le fait comme il fait tout le reste : par un
+//  PAS, avec sa propre entrée de journal. Sans ça, l'état changerait sans que
+//  personne ne puisse le raconter, et les écrans en retard rateraient
+//  exactement ce moment-là — le début d'une manche.
+export function ouvrirManche(etat, file, des) {
+    if (!etat || !Array.isArray(file) || file.length === 0) return null;
+
+    const suivant = clonerEtat(etat);
+    // On n'entre dans la file que des combattants qui existent et tiennent
+    // debout. Un héros tombé pendant la manche précédente n'a rien à y faire —
+    // c'est très exactement « nos héros rayés de la file », par le bon bout :
+    // ici on les écarte pour une raison lisible, au lieu de les perdre.
+    const propre = file
+        .map(f => ({ id: f.id || f.idPersonnage, carte: f.carte || f.idCarte || null,
+                     initiative: nombre(f.initiative, 0) }))
+        .filter(f => {
+            const c = combattant(suivant, f.id);
+            return c && !c.aTerre;
+        });
+    if (propre.length === 0) return null;
+
+    suivant.file = propre;
+    suivant.phase = "Resolution";
+    suivant.ontJoue = [];
+
+    const etapes = [{ type: "tour", file: propre, phase: "Resolution",
+                      manche: suivant.manche, ontJoue: [] }];
+    return fabriquerPas(etat, suivant, etapes, `manche|${suivant.manche}`, null, des);
+}
+
 export function avancerFile(etat, des) {
     const suivant = clonerEtat(etat);
     const clot = cloturerTour(suivant);
@@ -448,7 +488,7 @@ export function creerCerveau(depot, contexte) {
 if (typeof window !== "undefined") {
     window.cerveauCombat = {
         BATTEMENT_MS, CERVEAU_PERDU_MS, estLeCerveau, cerveauPerdu,
-        validerIntention, appliquerIntention, avancerFile, jouerCreature,
+        validerIntention, appliquerIntention, avancerFile, ouvrirManche, jouerCreature,
         prochainPas, creerCerveau
     };
 }
