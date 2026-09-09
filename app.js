@@ -634,6 +634,31 @@ window.ecouterEvenementsCombat = function(idPartie, apres, rappel) {
     }
 };
 
+// LE COMPTEUR SE SURVEILLE, ET C'EST VITAL.
+//
+// L'écoute du journal ne remonte que les numéros SUPÉRIEURS au curseur de ce
+// poste. Or quand un combat se termine ou se réinitialise, le journal est vidé
+// et le compteur repart à zéro — par UN SEUL poste, celui qui a cliqué. Les
+// autres gardaient leur curseur sur l'ancien combat : la rencontre suivante
+// publiait les numéros 1, 2, 3… que leur écoute, calée sur « > 30 », ne livrait
+// jamais. Plus un seul événement reçu, plus une seule fenêtre de tour, plus une
+// seule animation — le combat se jouait en base et l'écran ne montrait rien.
+//
+// On surveille donc le compteur lui-même. Un seul document, une seule écoute :
+// quand il RECULE, c'est qu'un nouveau combat a commencé, et ce poste repart de
+// zéro sans attendre qu'on le lui dise.
+window.ecouterCompteurJournal = function(idPartie, rappel) {
+    if (!idPartie) return () => {};
+    try {
+        return onSnapshot(refCompteurEvenements(idPartie), (snap) => {
+            rappel(snap.exists() ? (parseInt(snap.data().n) || 0) : 0);
+        }, (e) => console.error("Écoute du compteur du journal :", e));
+    } catch (e) {
+        console.error("Écoute du compteur du journal :", e);
+        return () => {};
+    }
+};
+
 // Le rattrapage d'un trou : on attend 153, il arrive 154. On va le chercher.
 window.lireEvenementCombat = async function(idPartie, n) {
     if (!idPartie || !n) return null;

@@ -112,6 +112,12 @@ const tracer = (i, q, d) => { if (typeof window.tracerCombat === "function") win
 
 let lecteurEnCours = false;
 let arreterEcoute = null;
+// L'écoute du COMPTEUR du journal — un seul document, et il vaut de l'or : c'est
+// lui qui prévient ce poste qu'un autre a vidé le journal et qu'un nouveau
+// combat commence. Sans elle, un écran restait calé sur le combat précédent et
+// ne recevait plus jamais rien.
+let arreterCompteur = null;
+let journalRepartDeZero = false;
 let partieEcoutee = null;
 let attenteDepuis = 0;
 
@@ -665,25 +671,51 @@ window.suivreSequenceTour = function(partie) {
     // tout ce qui s'est passé avant l'arrivée.
     if (window.ID_PARTIE_COURANTE && partieEcoutee !== window.ID_PARTIE_COURANTE) {
         if (typeof arreterEcoute === "function") { try { arreterEcoute(); } catch (e) {} }
+        if (typeof arreterCompteur === "function") { try { arreterCompteur(); } catch (e) {} }
         partieEcoutee = window.ID_PARTIE_COURANTE;
         const ouverte = partieEcoutee;
+        const depuisZero = journalRepartDeZero;
+        journalRepartDeZero = false;
         window.EVENEMENTS_RECUS = {};
         window.EVENEMENTS_DEJA_VUS = {};
         window.EVENEMENT_ATTENDU = null;
         tourAcquitte = null;
 
+        // LE COMPTEUR SOUS SURVEILLANCE. Quand un combat se termine ou se
+        // réinitialise, le journal est vidé par UN SEUL poste. Les autres
+        // gardaient leur curseur sur l'ancien combat, et l'écoute — calée sur
+        // « numéro supérieur à trente » — ne leur livrait plus jamais rien : la
+        // rencontre suivante se jouait en base, et l'écran ne montrait aucune
+        // animation, aucune fenêtre de tour, rien. Un compteur qui RECULE, c'est
+        // un nouveau combat : on repart de zéro sans attendre qu'on nous le dise.
+        if (typeof window.ecouterCompteurJournal === "function") {
+            arreterCompteur = window.ecouterCompteurJournal(ouverte, (n) => {
+                if (partieEcoutee !== ouverte) return;
+                if (n < (window.DERNIER_EVENEMENT_JOUE || 0)) {
+                    tracer("🧹", "le journal est reparti de zéro", `(compteur à ${n})`);
+                    journalRepartDeZero = true;
+                    window.oublierJournalCombat();
+                    window.suivreSequenceTour();
+                }
+            });
+        }
+
         // Le curseur se lit maintenant en base (le compteur a quitté le document
         // de la partie) : une promesse, donc, même quand un banc d'essai rend un
         // simple nombre. On n'ouvre l'écoute qu'une fois le curseur posé — sinon
         // on rejouerait tout le combat depuis son premier hexagone.
+        // Sauf si le journal vient d'être vidé : là, le combat qui commence doit
+        // être vu DEPUIS SON PREMIER ÉVÉNEMENT, sans en rater un seul.
         Promise.resolve(
-            typeof window.dernierNumeroEvenement === "function"
-                ? window.dernierNumeroEvenement(p) : 0
+            depuisZero ? 0
+                       : (typeof window.dernierNumeroEvenement === "function"
+                            ? window.dernierNumeroEvenement(p) : 0)
         ).then((depuis) => {
             // Une autre partie a été ouverte entre-temps : ce curseur-ci ne vaut
             // plus rien.
             if (partieEcoutee !== ouverte) return;
             window.DERNIER_EVENEMENT_JOUE = parseInt(depuis) || 0;
+            tracer("📚", "journal branché", `(à partir de ${window.DERNIER_EVENEMENT_JOUE})`);
             if (typeof window.ecouterEvenementsCombat === "function") {
                 arreterEcoute = window.ecouterEvenementsCombat(
                     ouverte, window.DERNIER_EVENEMENT_JOUE, (evenements) => {
@@ -827,7 +859,11 @@ window.jouerSequenceTour = function() {
 // qui efface les documents et remet le compteur à zéro.
 window.oublierJournalCombat = function() {
     if (typeof arreterEcoute === "function") { try { arreterEcoute(); } catch (e) {} }
+    if (typeof arreterCompteur === "function") { try { arreterCompteur(); } catch (e) {} }
     arreterEcoute = null;
+    arreterCompteur = null;
+    // Le combat qui suit doit être vu depuis son tout premier événement.
+    journalRepartDeZero = true;
     partieEcoutee = null;              // force un rebranchement propre
     window.DERNIER_EVENEMENT_JOUE = 0;
     window.EVENEMENTS_RECUS = {};
