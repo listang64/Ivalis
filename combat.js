@@ -158,12 +158,19 @@ window.avecCarteJouee = function(data, idPersonnage) {
 //  1. Chaque poste ne juge QUE les combattants qu'il connaît. Un combattant pas
 //     encore chargé n'est jamais déclaré à terre, si bien qu'un poste en retard
 //     ne peut plus faire basculer la phase à la place des autres.
-//  2. La liste ne fait que GRANDIR pendant un combat. Sans cela, un poste dont
-//     la fiche est en retard voit le tombé encore debout et le retire ; le
-//     poste d'à côté le remet ; et ainsi de suite — un va-et-vient d'écritures
-//     à chaque notification, précisément le genre de bavardage qui saccade les
-//     déplacements. Un combattant à terre le reste donc jusqu'à la
-//     réinitialisation du combat, qui vide la liste.
+//  2. UN COMBATTANT DEBOUT N'EST PAS À TERRE. La liste ne faisait que grandir —
+//     pour éviter qu'un poste dont la fiche est en retard ne retire quelqu'un
+//     que le voisin vient d'y mettre. Mais elle est aussi consultée par
+//     finDeTourCombat, qui RETIRE DE LA FILE D'INITIATIVE tout ce qu'elle
+//     contient. Or à la réinitialisation d'un combat, les héros passent une
+//     fraction de seconde à zéro point de vie avant que leur fiche neuve
+//     n'arrive : ils entraient alors dans la liste, n'en sortaient plus jamais,
+//     et la rencontre suivante se jouait sans eux — la file se vidait après le
+//     dernier monstre, et personne ne pouvait jouer son tour.
+//     Un combattant que ce poste CONNAÎT et qu'il voit DEBOUT en sort donc,
+//     exactement comme il y entre quand il tombe. Le va-et-vient redouté est
+//     écarté par la règle 1 : un poste qui n'a pas la fiche ne juge pas, ni
+//     dans un sens ni dans l'autre.
 //
 //  Trois postes qui constatent la même chute écrivent la même liste : la
 //  deuxième écriture ne voit plus de différence et n'a pas lieu.
@@ -180,10 +187,13 @@ window.synchroniserCombattantsHorsJeu = async function() {
 
     ordre.forEach(id => {
         if (!connus.has(id)) return;              // pas encore chargé : on ne juge pas
-        if (window.estCombattantMort(id) && !voulue.has(id)) { voulue.add(id); change = true; }
+        const aTerre = window.estCombattantMort(id);
+        if (aTerre && !voulue.has(id)) { voulue.add(id); change = true; }
+        // Et l'inverse : celui qu'on voit debout n'a rien à faire dans la liste.
+        if (!aTerre && voulue.has(id)) { voulue.delete(id); change = true; }
     });
 
-    // Seul retrait admis : un combattant qui n'est plus dans l'ordre
+    // Retrait sans discussion : un combattant qui n'est plus dans l'ordre
     // d'initiative. Il a été effacé du combat, il n'y a plus rien à attendre
     // de lui — et cette information-là, elle, vient de la partie partagée.
     voulue.forEach(id => {
@@ -3254,8 +3264,21 @@ window.finDeTourCombat = async function(forcer = false, idQuiTermine = null) {
                 // ça leur tour finit par arriver, et il faut le passer à la main.
                 // La liste vient de la PARTIE : un poste ne doit pas retirer de
                 // la file quelqu'un que les deux autres y gardent encore.
+                //
+                // MAIS on ne raye jamais de la file quelqu'un qu'on voit DEBOUT.
+                // Cette liste est écrite par tous les postes, et une fiche vue
+                // une fraction de seconde à zéro point de vie (à la
+                // réinitialisation d'un combat, par exemple) y faisait entrer un
+                // héros bien vivant. Il disparaissait alors de la file, et la
+                // rencontre entière se jouait sans lui.
                 const horsJeu = new Set(data.Combattants_Hors_Jeu || []);
-                file = file.filter(f => !horsJeu.has(f.idPersonnage));
+                const bienATerre = (id) => {
+                    if (!horsJeu.has(id)) return false;
+                    if (typeof window.estCombattantMort !== "function") return true;
+                    const connu = (window.PERSOS_PARTIE || []).some(p => p.idPersonnage === id);
+                    return connu ? window.estCombattantMort(id) : true;
+                };
+                file = file.filter(f => !bienATerre(f.idPersonnage));
 
                 const finDuRound = file.length === 0;
                 const maj = { File_Attente_Combat: file, Phase_Combat: phase, Tour_Combat: tour };

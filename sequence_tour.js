@@ -75,6 +75,12 @@ window.pionsRetenusParLeJournal = function() {
     });
     noter(window.EVENEMENT_ATTENDU);
     noter(window.EVENEMENT_EN_COURS);
+    // LA CRÉATURE EN TRAIN D'ÊTRE CALCULÉE. Entre le moment où l'IA écrit sa
+    // nouvelle case dans Combat_VTT et celui où l'événement correspondant
+    // revient du journal, il s'écoule quelques dixièmes de seconde pendant
+    // lesquels plus rien ne retenait son pion : il sautait à l'arrivée, puis
+    // refaisait le trajet à pied quand l'animation se jouait enfin.
+    if (window.IA_MONSTRE_ACTEUR) retenus[window.IA_MONSTRE_ACTEUR] = true;
     return retenus;
 };
 Object.defineProperty(window, "PIONS_EN_ATTENTE_SEQUENCE", {
@@ -836,6 +842,49 @@ window.oublierJournalCombat = function() {
 };
 
 window.sequenceRetientFinDeTour = async function() { return false; };
-window.sequenceTourEnAttente = function() { return false; };
+
+// =========================================================================
+//  CET ÉCRAN A-T-IL DU RETARD SUR SON JOURNAL ?
+// =========================================================================
+//  Ça n'a l'air de rien, et c'est ce qui faisait téléporter les pions.
+//
+//  Les calculs de l'IA ne coûtent aucune pause : un tour de créature se décide
+//  en quelques dizaines de millisecondes. Pendant que l'écran rejouait
+//  tranquillement le premier hexagone du premier monstre, la base était déjà
+//  trois tours plus loin — trois créatures déplacées, trois cartes lancées. Les
+//  pions suivaient la base, l'écran racontait autre chose, et un pion qu'aucun
+//  événement en attente ne retenait plus sautait d'un bout du plateau à l'autre.
+//
+//  Une créature ne prend donc plus d'avance sur l'écran de celui qui la fait
+//  jouer. Ce n'est pas une barrière entre les postes — chacun reste maître de
+//  son rythme, et un autre poste à jour reprendra le verrou au bout de vingt-
+//  cinq secondes si celui-ci traîne. C'est une barrière entre le CALCUL et
+//  l'AFFICHAGE, sur un même appareil.
+//
+//  La soupape : au-delà d'une minute, on passe outre. Un poste laissé devant sa
+//  fenêtre sombre pendant qu'on va chercher un café ne doit pas figer la table.
+const ATTENTE_MAX_MS = 60000;
+let attenteIADepuis = 0;
+
+window.sequenceTourEnAttente = function() {
+    // Journal en panne : les animations reprennent l'ancien chemin, et rien
+    // n'attend plus personne.
+    if (window.JOURNAL_INDISPONIBLE) { attenteIADepuis = 0; return false; }
+
+    const enRetard = !!window.EVENEMENT_ATTENDU
+        || !!window.EVENEMENT_EN_COURS
+        || Object.keys(window.EVENEMENTS_RECUS || {})
+                 .some(n => Number(n) > window.DERNIER_EVENEMENT_JOUE);
+
+    if (!enRetard) { attenteIADepuis = 0; return false; }
+
+    if (!attenteIADepuis) attenteIADepuis = Date.now();
+    if (Date.now() - attenteIADepuis > ATTENTE_MAX_MS) {
+        tracer("⏭️", "l'écran traîne depuis une minute", "on n'attend plus");
+        attenteIADepuis = 0;
+        return false;
+    }
+    return true;
+};
 window.forcerSequenceTour = async function() {};
 window.postesAttendusSequence = function() { return [monPoste()]; };
