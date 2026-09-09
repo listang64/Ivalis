@@ -80,7 +80,8 @@ export function creerRegime(contexte) {
         arretEcoutes: null,
         minuteurBattement: null,
         enTrainDeTourner: false,
-        branche: false
+        branche: false,
+        ouvertureAilleurs: false
     };
 
     // Le spectateur : il anime par le pont, et projette par l'écran. Il ne sait
@@ -205,6 +206,7 @@ export function creerRegime(contexte) {
     //  tout le système où la main se donne, et elle se donne à celui qui a
     //  cliqué.
     async function ouvrir(source) {
+        moi.ouvertureAilleurs = false;
         const etat = construireEtatCombat({ ...source, idPartie, cerveau: poste });
 
         // On ne publie pas un état incohérent, même le premier. Un combat qui
@@ -217,7 +219,18 @@ export function creerRegime(contexte) {
         }
 
         etat.battement = maintenant();
-        await ouvrirCombat(io, idPartie, etat);
+        // On RÉCLAME. Les trois postes voient la même notification au même
+        // instant et tentent tous d'ouvrir ; Firestore en désigne un.
+        const obtenu = await ouvrirCombat(io, idPartie, etat);
+        if (!obtenu) {
+            // Perdu la réclamation, et c'est très bien : un autre poste tient le
+            // cerveau. On se branche et on regarde, comme n'importe quel
+            // spectateur. Ce n'est PAS un échec.
+            moi.ouvertureAilleurs = true;
+            tracer("🤝", "un autre poste a ouvert ce combat", "on regarde");
+            brancher(0);
+            return null;
+        }
         tracer("🎬", `combat ouvert par ${poste}`,
                `${Object.keys(etat.combattants).length} combattants, graine ${etat.graine}`);
         brancher(0);
@@ -314,6 +327,7 @@ export function creerRegime(contexte) {
         etatAffiche: () => spectateur.etat(),
         vue: () => spectateur.vue(),
         jeSuisLeCerveau: () => !!moi.cerveau,
+        ouvertureAilleurs: () => moi.ouvertureAilleurs,
         cerveauPerdu: () => cerveauPerdu(moi.etat, maintenant())
     };
 }
@@ -438,11 +452,20 @@ function contexteDuJeu() {
 // entre l'ancien monde et le nouveau, et il ne sert qu'à OUVRIR un combat :
 // après quoi l'état ne vient plus que de lui-même.
 function sourceDuJeu() {
+    const partie = window.PARTIE_DATA || {};
     return {
+        // L'IDENTITÉ DE CETTE RENCONTRE. Elle est posée par le jeu quand les
+        // créatures sont générées (ID_Rencontre, monstres.js), donc les trois
+        // postes lisent la MÊME valeur — c'est ce qui permet à la réclamation
+        // d'ouverture de savoir qu'ils parlent bien du même combat.
+        //
+        // Sans elle (une partie ouverte avant ce changement), on retombe sur la
+        // manche : moins précis, mais jamais vide.
+        combat: partie.ID_Rencontre || ("manche_" + (partie.Tour_Combat || 1)),
         graine: (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0,
         combattants: window.PERSOS_PARTIE || [],
         positions: window.TOKENS_VTT_DATA || {},
-        partie: window.PARTIE_DATA || {},
+        partie,
         zones: window.ZONES_PERSISTANTES || {},
         regles: {
             // LES MAXIMA D'ABORD, parce que ce sont eux qui ont fait échouer le
@@ -465,7 +488,11 @@ function sourceDuJeu() {
 }
 
 if (typeof window !== "undefined") {
-    window.REGIME_CERVEAU = window.REGIME_CERVEAU === true;
+    // LE NOUVEAU RÉGIME EST LE RÉGIME. Il était éteint par défaut le temps de
+    // l'essayer ; il ne l'est plus. L'ancien reste dans le dépôt — on ne
+    // supprime rien tant que le nouveau n'a pas tenu plusieurs vraies parties —
+    // mais il n'est plus le comportement par défaut de personne.
+    window.REGIME_CERVEAU = window.REGIME_CERVEAU !== false;
 
     window.regimeCerveau = function(actif) {
         if (actif === undefined) return window.REGIME_CERVEAU;
@@ -479,7 +506,9 @@ if (typeof window !== "undefined") {
     // Le choix survit au rechargement : sur iPad, rouvrir la console pour
     // retaper une ligne à chaque essai n'est pas une option.
     try {
-        if (localStorage.getItem("REGIME_CERVEAU") === "1") window.REGIME_CERVEAU = true;
+        const choix = localStorage.getItem("REGIME_CERVEAU");
+        if (choix === "0") window.REGIME_CERVEAU = false;
+        if (choix === "1") window.REGIME_CERVEAU = true;
     } catch (e) {}
 
     // =====================================================================
@@ -545,34 +574,30 @@ if (typeof window !== "undefined") {
             const publie = REGIME.etatPublie();
             const file = (partie.File_Attente_Combat || []);
             if (!publie) {
-                // SI L'OUVERTURE ÉCHOUE, ON REVIENT À L'ANCIEN RÉGIME. TOUT DE
-                // SUITE, ET ON LE DIT.
+                // SI L'OUVERTURE ÉCHOUE, LE COMBAT S'ARRÊTE — ON NE RETOMBE PAS
+                // DANS L'ANCIEN RÉGIME.
                 //
-                // C'est le piège que le premier vrai essai a révélé : les
-                // invariants ont refusé d'ouvrir (à juste titre — un héros
-                // était hors de ses bornes), et comme l'ancien rejeu est éteint
-                // sous le nouveau régime, la table s'est retrouvée SANS RIEN.
-                // Ni cerveau, ni ancien monde : un plateau qui n'avance plus.
+                // Une version précédente rebasculait pour « ne pas laisser la
+                // table sans rien ». C'était une mauvaise idée : l'ancien
+                // régime est cassé, et le rendre à la table sans prévenir, au
+                // milieu d'une rencontre, c'est offrir une soirée de bugs à la
+                // place d'un message clair.
                 //
-                // Un refus d'ouvrir est une bonne chose — mieux vaut ne pas
-                // publier qu'un état incohérent. Mais il ne doit jamais coûter
-                // la soirée : on rebascule, le combat se joue comme avant, et
-                // la raison reste écrite noir sur blanc dans la trace pour
-                // qu'on la corrige à froid.
-                REGIME.ouvrir(sourceDuJeu()).then(etat => {
-                    if (etat) return;
-                    if (typeof window.tracerCombat === "function") {
-                        window.tracerCombat("↩️", "retour à l'ANCIEN régime",
-                                            "le combat n'a pas pu s'ouvrir — on ne laisse pas la table sans rien");
-                    }
-                    console.warn("Nouveau régime : ouverture refusée, retour à l'ancien. "
-                                 + "La raison est dans la ligne ❌ juste au-dessus.");
-                    window.REGIME_CERVEAU = false;
-                    try { localStorage.setItem("REGIME_CERVEAU", "0"); } catch (e) {}
-                    const caseRegime = document.getElementById("toggle-regime-cerveau");
-                    if (caseRegime) caseRegime.checked = false;
-                    if (REGIME) { REGIME.debrancher(); REGIME = null; partieSuivie = null; }
-                }).catch(e => console.error("Ouverture du combat :", e));
+                // Un échec s'arrête donc, franchement, et se dit à l'écran :
+                // mieux vaut un combat qui ne démarre pas et qu'on sait
+                // pourquoi, qu'un combat qui démarre mal.
+                //
+                // Un ABANDON n'est pas un échec : quand un autre poste a déjà
+                // réclamé cette rencontre, `ouvrir` rend null sans rien casser.
+                // On le distingue par le drapeau `dejaOuvert`.
+                REGIME.ouvrir(sourceDuJeu()).then(resultat => {
+                    if (resultat) return;
+                    if (REGIME && REGIME.ouvertureAilleurs()) return;   // un autre poste a la main
+                    arreterLeCombat("le combat n'a pas pu s'ouvrir");
+                }).catch(e => {
+                    console.error("Ouverture du combat :", e);
+                    arreterLeCombat("erreur pendant l'ouverture : " + (e && e.message));
+                });
             } else if (REGIME.jeSuisLeCerveau()) {
                 REGIME.ouvrirLaManche(file);
             }
@@ -600,8 +625,35 @@ if (typeof window !== "undefined") {
                                     "aucun état publié — réinitialise le combat pour qu'il prenne effet");
             }
         }
-        if (phase === "Preparation") aPrevenuSansCombat = false;
+        if (phase === "Preparation") { aPrevenuSansCombat = false; dejaSignale = ""; }
     };
+
+    // ON S'ARRÊTE, ET ON LE DIT — À L'ÉCRAN, PAS SEULEMENT DANS LA CONSOLE.
+    //
+    // Un plateau qui ne bouge plus sans explication, on connaît : ça coûte une
+    // soirée à comprendre. Quand le nouveau régime ne peut pas démarrer, le
+    // combat ne démarre pas, et le message dit quoi faire. C'est volontairement
+    // brutal : mieux vaut un combat qui refuse de commencer qu'un combat qui
+    // commence mal.
+    let dejaSignale = "";
+    function arreterLeCombat(raison) {
+        if (dejaSignale === raison) return;
+        dejaSignale = raison;
+        if (typeof window.tracerCombat === "function") {
+            window.tracerCombat("🛑", "COMBAT ARRÊTÉ", raison);
+        }
+        console.error("Combat arrêté : " + raison
+                      + " — la cause est dans la ligne ❌ juste au-dessus de la trace.");
+        if (REGIME) { REGIME.debrancher(); REGIME = null; partieSuivie = null; }
+        // Une seule fenêtre, et elle dit quoi faire. Pas de bascule silencieuse
+        // vers l'ancien régime : il est cassé, et le rendre à la table sans
+        // prévenir serait pire que de s'arrêter.
+        try {
+            alert("Le combat n'a pas pu démarrer.\n\n" + raison
+                  + "\n\nRegarde la console (ligne ❌) pour la cause exacte, "
+                  + "puis réinitialise le combat.");
+        } catch (e) {}
+    }
 
     // LE COMBAT S'ARRÊTE (victoire, fuite, réinitialisation). On range.
     window.regimeFermerLeCombat = async function() {

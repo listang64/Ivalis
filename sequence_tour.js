@@ -131,6 +131,30 @@ const pause = (ms) => new Promise(r => setTimeout(r, ms));
 //  lui doit viser et se déplacer, son plateau reste dégagé. Le poste qui fait
 //  jouer une créature la voit donc lui aussi.
 window.acteurCourantCombat = function(partie) {
+    // SOUS LE NOUVEAU RÉGIME, LA FILE DE LA PARTIE NE VEUT PLUS RIEN DIRE.
+    //
+    // Le cerveau écrit l'état, pas le document de la partie : File_Attente_Combat
+    // y reste figée sur ce que la phase de préparation y a posé. Continuer à la
+    // lire, c'est annoncer un combattant qui a fini son tour depuis longtemps —
+    // et c'est précisément l'écran resté sur « le tour se prépare » pendant que
+    // le combat avançait ailleurs.
+    //
+    // On lit donc l'état AFFICHÉ par le spectateur : celui que cet écran montre
+    // vraiment, pas celui que la base annonce. Un poste en retard raconte alors
+    // son propre retard, ce qui est exactement ce qu'on veut.
+    if (window.REGIME_CERVEAU && typeof window.regimeDuJeu === "function") {
+        const regime = window.regimeDuJeu();
+        const etat = regime && regime.etatAffiche();
+        if (etat) {
+            if (etat.phase !== "Resolution") return null;
+            const tete = (etat.file || [])[0];
+            return tete ? { idPersonnage: tete.id, idCarte: tete.carte || null } : null;
+        }
+        // Le régime est allumé mais rien n'est encore publié : il n'y a pas de
+        // tour en cours, et surtout pas celui que la partie garde en mémoire.
+        return null;
+    }
+
     const p = partie || window.PARTIE_DATA || {};
     if ((p.Phase_Combat || "Preparation") !== "Resolution") return null;
     return (p.File_Attente_Combat || [])[0] || null;

@@ -241,6 +241,17 @@ export function construireEtatCombat(source) {
     const {
         idPartie = "",
         cerveau = "",
+        // L'IDENTITÉ DE CETTE RENCONTRE-CI. Elle vient du jeu (ID_Rencontre,
+        // posé quand les créatures sont générées) et voyage dans l'état ET dans
+        // chaque entrée de journal. C'est ce qui rend un vieux journal
+        // INOFFENSIF plutôt que dangereux : un écran ne rejoue que ce qui
+        // appartient au combat qu'il regarde, et les entrées d'une rencontre
+        // précédente sont simplement écartées.
+        //
+        // Sans elle, un poste dont le curseur était à 2 sur l'ancien combat
+        // attendait éternellement une entrée n°3 dans un journal reparti de
+        // zéro. C'est exactement l'écran qui se fige sur « le tour se prépare ».
+        combat = "",
         graine = 1,
         combattants = [],          // les fiches, format front (persoDocVersFront)
         positions = {},            // TOKENS_VTT_DATA : { id: {q, r} }
@@ -261,6 +272,7 @@ export function construireEtatCombat(source) {
         // qui permet à un poste en retard de savoir exactement ce qu'il a raté.
         version: 0,
         partie: idPartie,
+        combat: String(combat || ""),
 
         // Le poste qui a le droit d'écrire. Un seul, désigné, jamais élu.
         cerveau,

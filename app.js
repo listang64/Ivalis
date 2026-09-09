@@ -813,6 +813,27 @@ window.ioCombatFirestore = {
         await b.commit();
     },
 
+    // LA SEULE TRANSACTION DE TOUT LE NOUVEAU RÉGIME, et elle ne sert qu'à une
+    // chose : réclamer l'ouverture d'un combat. Les trois postes voient la même
+    // notification au même instant ; il faut donc que Firestore tranche, une
+    // fois, qui ouvre. Ce n'est pas le compteur d'événements d'avant, qui
+    // s'écrivait à chaque hexagone parcouru : celle-ci ne part qu'au début
+    // d'une rencontre, sur un document que rien d'autre ne touche.
+    //
+    // `decider` reçoit l'état actuel (ou null) et rend ce qu'il faut écrire, ou
+    // null pour abandonner. On rend true si on a écrit, false sinon.
+    async transaction(chemin, decider) {
+        const ref = doc(db, ...chemin);
+        return await runTransaction(db, async (tx) => {
+            const snap = await tx.get(ref);
+            const actuel = snap.exists() ? snap.data() : null;
+            const aEcrire = decider(actuel);
+            if (!aEcrire) return false;
+            tx.set(ref, aEcrire);
+            return true;
+        });
+    },
+
     ecouterDoc(chemin, rappel) {
         return onSnapshot(doc(db, ...chemin),
             (snap) => rappel(snap.exists() ? snap.data() : null),

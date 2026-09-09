@@ -44,7 +44,7 @@
 // sur du vieux code — ce qui, dans un jeu où deux postes doivent s'entendre sur
 // qui joue, fabrique des bugs impossibles à comprendre autrement.
 // À MONTER À CHAQUE FOIS QUE index.html monte ses ?v=.
-window.VERSION_IVALIS = 35;
+window.VERSION_IVALIS = 36;
 
 window.TRACE_COMBAT_ACTIVE = true;
 // Quand une écriture de points de vie n'est ni un coup ni un rejeu mais une

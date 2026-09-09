@@ -117,8 +117,11 @@ export function creerDepot(io, idPartie, options) {
     async function publier(etat, entree, traitees) {
         const ops = [
             { op: "set", chemin: CHEMINS.etat(idPartie), data: etat },
+            // L'entrée porte l'identité de SA rencontre. Un écran n'a alors
+            // aucune chance de rejouer le journal du combat d'avant : il ne
+            // reconnaît pas l'identité et l'écarte, sans rien attendre.
             { op: "set", chemin: CHEMINS.entree(idPartie, entree.v),
-              data: { ...entree, horodatage: maintenant() } }
+              data: { ...entree, combat: etat.combat || "", horodatage: maintenant() } }
         ];
         (traitees || []).forEach(id => {
             if (!id) return;
@@ -209,9 +212,44 @@ export async function faireTableRase(io, idPartie) {
     return efface;
 }
 
+// OUVRIR, C'EST RÉCLAMER — ET UN SEUL PEUT L'OBTENIR.
+//
+// La première version laissait chaque poste ouvrir de son côté. En jeu, les
+// trois voient la même notification au même instant, donc les trois ouvraient :
+// le dernier faisait table rase du journal des autres, et un poste dont le
+// curseur était déjà à 2 attendait pour toujours une entrée n°3 qui n'existait
+// plus. Écran figé, sans rien dans la trace pour le dire.
+//
+// La réclamation passe donc par une TRANSACTION sur le document d'état, et
+// Firestore tranche : exactement un gagnant, sans vote, sans horodatage, sans
+// comparaison d'horloges. Ce n'est pas une élection — c'est un compare-et-pose,
+// l'opération atomique qu'il fallait depuis le début.
+//
+// Les perdants ne font rien : ils liront l'état publié et suivront, comme
+// n'importe quel spectateur.
 export async function ouvrirCombat(io, idPartie, etat) {
+    const chemin = CHEMINS.etat(idPartie);
+
+    // Sans transaction disponible (un banc minimal), on retombe sur l'ancien
+    // chemin : c'est moins sûr, mais ça reste juste quand un seul poste ouvre.
+    if (typeof io.transaction !== "function") {
+        await faireTableRase(io, idPartie);
+        await io.lot([{ op: "set", chemin, data: etat }]);
+        return etat;
+    }
+
+    const gagne = await io.transaction(chemin, (actuel) => {
+        // Quelqu'un a déjà ouvert CETTE rencontre-ci : on ne la rouvre pas.
+        // (Une rencontre précédente, si : son état n'a plus cours.)
+        if (actuel && etat.combat && actuel.combat === etat.combat) return null;
+        return etat;
+    });
+    if (!gagne) return null;
+
+    // Le ménage vient APRÈS la réclamation, et il n'est plus critique : les
+    // entrées de la rencontre d'avant portent une autre identité, donc elles
+    // sont déjà inoffensives. C'est de l'hygiène, pas de la correction.
     await faireTableRase(io, idPartie);
-    await io.lot([{ op: "set", chemin: CHEMINS.etat(idPartie), data: etat }]);
     return etat;
 }
 

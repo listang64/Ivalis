@@ -470,6 +470,50 @@ ligne pour comprendre que le drapeau n'était pas allumé. Le régime s'annonce
 maintenant au début de chaque combat, allumé ou non — c'est précisément quand il
 est éteint que l'information manque.
 
+### L'ouverture est une réclamation, pas une décision locale
+
+Le bug qui a figé le deuxième écran, et il était de conception. Chaque poste
+voyait la phase passer en résolution et **ouvrait de son côté** : le dernier
+faisait table rase du journal des autres, et un poste dont le curseur était déjà
+à 2 attendait pour toujours une entrée n°3 qui n'existait plus. Écran figé sur
+« le tour se prépare », et rien dans la trace pour le dire.
+
+Deux corrections, et elles se complètent.
+
+**L'ouverture est atomique.** Elle passe par une transaction sur le document
+d'état : si la rencontre est déjà ouverte, on abandonne et on regarde. Pas de
+vote, pas d'horodatage, pas de comparaison d'horloges — un compare-et-pose, et
+la base tranche. C'est la **seule** transaction de tout le nouveau régime, et
+`depot_firestore.mjs` le compte : une pour tout un combat, là où le compteur
+d'avant en faisait une par hexagone parcouru.
+
+**Chaque entrée porte l'identité de sa rencontre** (`ID_Rencontre`, posé par le
+jeu quand les créatures sont générées, donc lu identique par les trois postes).
+Un écran n'a alors aucune chance de rejouer le journal du combat d'avant : il ne
+reconnaît pas l'identité et l'écarte — sans l'attendre. Le ménage du vieux
+journal devient de l'hygiène au lieu d'être de la correction, et toute la
+famille « curseur resté sur un journal purgé » disparaît.
+
+Et une conséquence qu'il fallait voir : **la file de la partie ne veut plus rien
+dire**. Le cerveau écrit l'état, pas le document de la partie, où
+`File_Attente_Combat` reste figée sur ce que la préparation y a posé. La fenêtre
+sombre lit donc maintenant l'état AFFICHÉ par le spectateur — celui que cet écran
+montre vraiment, pas celui que la base annonce. Un poste en retard raconte son
+propre retard, ce qui est exactement ce qu'on veut.
+
+### Le nouveau régime est le régime
+
+Il était éteint par défaut le temps de l'essayer ; il ne l'est plus. Et **un
+échec ne rebascule plus sur l'ancien** : une version intermédiaire le faisait
+« pour ne pas laisser la table sans rien », mais l'ancien régime est cassé, et le
+rendre à la table sans prévenir au milieu d'une rencontre, c'est offrir une
+soirée de bugs à la place d'un message clair.
+
+Un combat qui ne peut pas s'ouvrir **s'arrête**, franchement, et le dit à
+l'écran. Mieux vaut un combat qui refuse de commencer qu'un combat qui commence
+mal. Perdre la réclamation d'ouverture n'est pas un échec, en revanche : c'est
+un autre poste qui tient le cerveau, et on le suit.
+
 ### Deux coutures assumées
 
 Elles sont écrites dans le code, à l'endroit exact où elles se trouvent :

@@ -132,6 +132,9 @@ export function creerSpectateur(contexte) {
     function repartirDe(etat, version) {
         moi.etat = etat ? clonerEtat(etat) : null;
         moi.vue = version !== undefined ? nombre(version) : nombre(etat && etat.version);
+        // L'identité de la rencontre qu'on regarde. Tout ce qui vient d'une
+        // autre est écarté à la porte.
+        moi.combat = (etat && etat.combat) || "";
         moi.recues = {};
         moi.tourAcquitte = null;
         moi.attendue = null;
@@ -144,7 +147,17 @@ export function creerSpectateur(contexte) {
     // entrée déjà rejouée n'a plus rien à raconter.
     function recevoir(entrees) {
         (entrees || []).forEach(e => {
-            if (!e || nombre(e.v) <= moi.vue) return;
+            if (!e) return;
+            // UNE ENTRÉE D'UNE AUTRE RENCONTRE N'EST PAS UNE ENTRÉE EN RETARD :
+            // c'est une entrée qui ne nous concerne pas. On l'écarte, et on ne
+            // l'attend pas. Sans ce filtre, un poste dont le curseur était resté
+            // sur le combat précédent guettait un numéro qui ne viendrait
+            // jamais, et son écran restait figé sur « le tour se prépare ».
+            if (moi.combat && e.combat && e.combat !== moi.combat) {
+                tracer("🗑️", `entrée d'une autre rencontre écartée`, `n°${e.v}`);
+                return;
+            }
+            if (nombre(e.v) <= moi.vue) return;
             if (!moi.recues[e.v]) tracer("📥", `${e.v} ${e.acteur || "?"}`,
                                          `(${(e.etapes || []).length} étapes)`);
             moi.recues[e.v] = e;

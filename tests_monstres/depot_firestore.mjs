@@ -147,8 +147,24 @@ function firestoreDeBanc() {
             rappel(documentsDe(chemin, requete));
             return () => { const i = ecoutes.indexOf(e); if (i >= 0) ecoutes.splice(i, 1); };
         },
-        // On l'expose pour prouver qu'il n'est JAMAIS appelé.
-        async transaction() { transactions++; throw new Error("aucune transaction ne devrait être nécessaire"); }
+        // LA SEULE TRANSACTION DU NOUVEAU RÉGIME : réclamer l'ouverture d'un
+        // combat. Les trois postes voient la même notification au même instant,
+        // il faut donc que la base tranche une fois qui ouvre.
+        //
+        // On la compte, pour prouver qu'elle ne sert QU'À ÇA. Le compteur
+        // d'événements d'avant, lui, en faisait une par hexagone parcouru, sur
+        // le document le plus sollicité du jeu — c'est ce qui rendait
+        // `failed-precondition`.
+        async transaction(chemin, decider) {
+            transactions++;
+            const k = cle(chemin);
+            const actuel = base.get(k) || null;
+            const aEcrire = decider(actuel ? JSON.parse(JSON.stringify(actuel)) : null);
+            if (!aEcrire) return false;
+            base.set(k, JSON.parse(JSON.stringify(aEcrire)));
+            prevenir();
+            return true;
+        }
     };
 
     return {
@@ -169,7 +185,7 @@ const fiche = (id, extra = {}) => ({
 });
 
 const monde = () => construireEtatCombat({
-    idPartie: "GAME_TEST", cerveau: "P_03", graine: 4242,
+    idPartie: "GAME_TEST", cerveau: "P_03", graine: 4242, combat: "renc_1",
     combattants: [
         fiche("H1", { idJoueur: "P_03", camp: "Allié", prenom: "Naomi" }),
         fiche("H2", { idJoueur: "P_01", camp: "Allié", prenom: "Pliors" }),
@@ -394,8 +410,9 @@ async function banc() {
         const avant = await lireDepuis(f.io, PARTIE, 0);
         verifier("le premier combat a laissé un journal", avant.length > 0, `(${avant.length} entrées)`);
 
-        // La rencontre suivante.
-        await ouvrirCombat(f.io, PARTIE, monde());
+        // La rencontre suivante — une AUTRE rencontre, donc une autre identité.
+        // Rouvrir la même ne ferait rien, et c'est justement ce qu'on veut.
+        await ouvrirCombat(f.io, PARTIE, { ...monde(), combat: "renc_2" });
         const journal = await lireDepuis(f.io, PARTIE, 0);
         const intentions = await f.io.lister(CHEMINS.intentions(PARTIE), requeteIntentions());
         const etat = await f.io.lire(CHEMINS.etat(PARTIE));
@@ -471,7 +488,13 @@ async function banc() {
         verifier("l'état publié reste cohérent d'un bout à l'autre",
                  verifierEtatCombat(etat).length === 0, verifierEtatCombat(etat).join(" | "));
 
-        verifier("AUCUNE transaction n'a été nécessaire", f.transactions() === 0);
+        // UNE SEULE TRANSACTION POUR TOUT LE COMBAT : celle qui a réclamé
+        // l'ouverture. Pas une par hexagone parcouru comme le compteur d'avant,
+        // pas une par tour, pas une par carte lancée. Une, au début.
+        verifier("une seule transaction pour tout le combat", f.transactions() === 1,
+                 `(${f.transactions()})`);
+        verifier("et elle n'a servi qu'à ouvrir",
+                 f.lots.every(l => !l.some(o => /transaction/.test(o))));
         verifier("aucune requête n'a réclamé d'index", f.requetes.every(r =>
             !(r.egal && ((r.champ && r.champ !== r.egal.champ) || (r.tri && r.tri !== r.egal.champ)))));
         verifier("aucun compteur d'événements en base",

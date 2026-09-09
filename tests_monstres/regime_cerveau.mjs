@@ -83,6 +83,19 @@ function firestoreDeBanc() {
                 aVerser.forEach(([k, v]) => { if (v === null) base.delete(k); else base.set(k, v); });
                 empiler();
             },
+            // LA RÉCLAMATION D'OUVERTURE. Elle est atomique dans le vrai
+            // Firestore ; ici on la rend atomique en la faisant tourner d'un
+            // seul tenant, sans await entre la lecture et l'écriture.
+            async transaction(chemin, decider) {
+                const k = cle(chemin);
+                ecritures.push({ poste, op: "transaction", chemin: k });
+                const actuel = base.get(k) || null;
+                const aEcrire = decider(actuel ? JSON.parse(JSON.stringify(actuel)) : null);
+                if (!aEcrire) return false;
+                base.set(k, JSON.parse(JSON.stringify(aEcrire)));
+                empiler();
+                return true;
+            },
             ecouterDoc(chemin, rappel) {
                 const e = { chemin, rappel, estCollection: false, poste };
                 ecoutes.push(e);
@@ -132,6 +145,7 @@ const fiche = (id, extra = {}) => ({
 });
 
 const SOURCE = {
+    combat: "renc_banc_1",
     graine: 2024,
     combattants: [
         fiche("H1", { idJoueur: "P_03", camp: "Allié", prenom: "Naomi" }),
@@ -600,7 +614,112 @@ async function banc() {
                  apres.file.map(x => x.id).join(",") === "H1,M1", apres.file.map(x => x.id).join(","));
     }
 
-    console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
+        // =====================================================================
+    console.log("\n8. TROIS POSTES OUVRENT EN MÊME TEMPS — UN SEUL GAGNE");
+    // =====================================================================
+    //  Le bug qui a figé le deuxième écran, et il était de conception. Chaque
+    //  poste voyait la phase passer en résolution et ouvrait de son côté : le
+    //  dernier faisait table rase du journal des autres, et un poste dont le
+    //  curseur était déjà à 2 attendait pour toujours une entrée n°3 qui
+    //  n'existait plus.
+    //
+    //  L'ouverture est maintenant une RÉCLAMATION atomique. Pas de vote, pas
+    //  d'horodatage, pas de comparaison d'horloges : un compare-et-pose, et la
+    //  base tranche.
+    {
+        const f = firestoreDeBanc();
+        const nico = creerPoste(f, "P_03");
+        const ben = creerPoste(f, "P_01");
+        const tablette = creerPoste(f, "P_07");
+
+        // Les trois ouvrent la MÊME rencontre, au même instant.
+        const resultats = await Promise.all([
+            nico.regime.ouvrir(SOURCE),
+            ben.regime.ouvrir(SOURCE),
+            tablette.regime.ouvrir(SOURCE)
+        ]);
+        await f.livrer();
+
+        const gagnants = resultats.filter(Boolean).length;
+        verifier("exactement un poste ouvre le combat", gagnants === 1, `(${gagnants})`);
+
+        const cerveaux = [nico, ben, tablette].filter(p => p.regime.jeSuisLeCerveau());
+        verifier("et un seul tient le cerveau", cerveaux.length === 1,
+                 cerveaux.map(p => p.poste).join(","));
+
+        const perdants = [nico, ben, tablette].filter(p => !p.regime.jeSuisLeCerveau());
+        verifier("les perdants savent que quelqu'un d'autre a ouvert",
+                 perdants.every(p => p.regime.ouvertureAilleurs()),
+                 perdants.map(p => `${p.poste}:${p.regime.ouvertureAilleurs()}`).join(" "));
+        verifier("mais ils sont branchés et voient l'état",
+                 perdants.every(p => !!p.regime.etatAffiche()));
+        verifier("et les trois regardent le même combat",
+                 new Set([nico, ben, tablette].map(p => p.regime.etatAffiche().combat)).size === 1);
+
+        // Et un second appel sur la MÊME rencontre ne rouvre rien.
+        const encore = await nico.regime.ouvrir(SOURCE);
+        await f.livrer();
+        verifier("réouvrir la même rencontre ne fait rien", encore === null);
+
+        // Une rencontre DIFFÉRENTE, elle, s'ouvre : c'est un nouveau combat.
+        const suite = await nico.regime.ouvrir({ ...SOURCE, combat: "renc_banc_2" });
+        await f.livrer();
+        verifier("une nouvelle rencontre s'ouvre normalement", !!suite,
+                 suite ? suite.combat : "—");
+    }
+
+    // =====================================================================
+    console.log("\n9. LE JOURNAL D'UNE AUTRE RENCONTRE EST INOFFENSIF");
+    // =====================================================================
+    //  L'autre moitié du même bug. Un écran dont le curseur est resté sur le
+    //  combat précédent ne doit pas guetter un numéro qui ne viendra jamais :
+    //  chaque entrée porte l'identité de SA rencontre, et ce qui vient
+    //  d'ailleurs est écarté à la porte, sans être attendu.
+    {
+        const f = firestoreDeBanc();
+        const nico = creerPoste(f, "P_03");
+        const ben = creerPoste(f, "P_01");
+        await nico.regime.ouvrir(SOURCE);
+        ben.regime.rejoindre();
+        await f.livrer();
+
+        await nico.regime.demanderFinDeTour("H1");
+        await f.livrer();
+        await nico.regime.tourner();
+        await f.livrer();
+        for (let i = 0; i < 6 && ben.regime.spectateur.enAttente(); i++) {
+            await ben.regime.ok(); await f.livrer();
+        }
+        const vueAvant = ben.regime.vue();
+        verifier("Ben suit la première rencontre", vueAvant > 0, `(vue ${vueAvant})`);
+
+        // On lui glisse une entrée d'une AUTRE rencontre, avec un numéro
+        // parfaitement plausible.
+        const intrus = { v: vueAvant + 1, combat: "renc_dautrefois", acteur: "M1",
+                         manche: 1, etapes: [{ type: "degats", cible: "H1", pvApres: 1 }] };
+        ben.regime.spectateur.recevoir([intrus]);
+        await ben.regime.spectateur.lire();
+        verifier("l'entrée d'une autre rencontre n'est pas rejouée",
+                 ben.regime.vue() === vueAvant, `(vue ${ben.regime.vue()})`);
+        verifier("et le héros n'a pas encaissé",
+                 ben.regime.etatAffiche().combattants.H1.pv > 1,
+                 `(${ben.regime.etatAffiche().combattants.H1.pv} PV)`);
+        verifier("elle n'est pas non plus mise en attente",
+                 ben.regime.spectateur.enFile() === 0, `(${ben.regime.spectateur.enFile()})`);
+
+        // Et la vraie suite, elle, se joue.
+        await ben.regime.demanderFinDeTour("H2");
+        await f.livrer();
+        await nico.regime.tourner();
+        await f.livrer();
+        for (let i = 0; i < 8 && ben.regime.spectateur.enAttente(); i++) {
+            await ben.regime.ok(); await f.livrer();
+        }
+        verifier("la vraie suite, elle, avance", ben.regime.vue() > vueAvant,
+                 `(${vueAvant} → ${ben.regime.vue()})`);
+    }
+
+console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
     process.exit(echecs === 0 ? 0 : 1);
 }
 

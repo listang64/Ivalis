@@ -116,7 +116,12 @@ console.log("\n3. LE DRAPEAU EST ÉTEINT PAR DÉFAUT, ET IL SE GARDE");
 //  console d'un iPad pour retaper une ligne à chaque essai n'est pas une option.
 {
     const r = SOURCES['regime_cerveau.js'];
-    verifier("le drapeau naît éteint", r.includes('window.REGIME_CERVEAU = window.REGIME_CERVEAU === true;'));
+    verifier("le drapeau naît ALLUMÉ — c'est le régime du jeu maintenant",
+             r.includes('window.REGIME_CERVEAU = window.REGIME_CERVEAU !== false;'));
+    verifier("et la case du panneau est cochée d'emblée",
+             SOURCES['index.html'].includes('id="toggle-regime-cerveau" checked'));
+    verifier("mais un « 0 » enregistré l'éteint toujours",
+             r.includes('if (choix === "0") window.REGIME_CERVEAU = false;'));
     verifier("on l'allume d'une ligne", r.includes('window.regimeCerveau = function(actif)'));
     verifier("et le choix survit au rechargement", r.includes('localStorage.setItem("REGIME_CERVEAU"'));
     // Chaque fonction que l'ancien monde peut appeler doit sortir tout de suite
@@ -255,38 +260,47 @@ console.log("\n8. LE DRAPEAU COCHÉ EN COURS DE COMBAT NE RESTE PAS MUET");
     verifier("le message dit quoi faire",
              r.includes("réinitialise le combat pour qu'il prenne effet"));
     verifier("et l'avertissement se réarme au combat suivant",
-             r.includes('if (phase === "Preparation") aPrevenuSansCombat = false;'));
+             r.includes('if (phase === "Preparation") { aPrevenuSansCombat = false; dejaSignale = ""; }'));
 }
 
 // =========================================================================
-console.log("\n9. UN REFUS D'OUVRIR NE DOIT JAMAIS LAISSER LA TABLE SANS RIEN");
+console.log("\n9. UN COMBAT QUI NE PEUT PAS S'OUVRIR S'ARRÊTE, ET LE DIT");
 // =========================================================================
-//  Le piège que le premier vrai essai a révélé, et il est de ma fabrication.
+//  Refuser de publier un état incohérent est la bonne décision. Ce qui était
+//  faux, c'est ce qui suivait le refus.
 //
-//  Les invariants ont refusé d'ouvrir le combat — à juste titre, un héros était
-//  hors de ses bornes. Mais comme l'ancien rejeu est éteint sous le nouveau
-//  régime, la table s'est retrouvée SANS RIEN : ni cerveau, ni ancien monde, un
-//  plateau qui n'avance plus et deux joueurs devant leurs cartes.
+//  Une première correction rebasculait sur l'ancien régime « pour ne pas
+//  laisser la table sans rien ». Mauvaise idée : l'ancien régime est cassé, et
+//  le rendre à la table sans prévenir, au milieu d'une rencontre, c'est offrir
+//  une soirée de bugs à la place d'un message clair.
 //
-//  Refuser de publier un état incohérent reste la bonne décision. Ce qui était
-//  faux, c'est ce qui suivait le refus : rien. On rebascule maintenant sur
-//  l'ancien régime, immédiatement, et la raison reste écrite dans la trace.
+//  Un échec s'arrête donc franchement, et se dit À L'ÉCRAN. Mieux vaut un
+//  combat qui refuse de commencer qu'un combat qui commence mal.
 {
     const r = SOURCES['regime_cerveau.js'];
 
     verifier("l'échec d'ouverture est traité, pas ignoré",
-             r.includes('REGIME.ouvrir(sourceDuJeu()).then(etat => {'));
-    verifier("un état nul est reconnu comme un échec", r.includes('if (etat) return;'));
-    verifier("le drapeau retombe tout seul",
-             r.includes('window.REGIME_CERVEAU = false;'));
-    verifier("le choix retombe aussi sur le disque",
-             r.includes('localStorage.setItem("REGIME_CERVEAU", "0")'));
-    verifier("et la case à cocher suit", r.includes('caseRegime.checked = false'));
+             r.includes('REGIME.ouvrir(sourceDuJeu()).then(resultat => {'));
+    verifier("un résultat vide est reconnu comme un échec", r.includes('if (resultat) return;'));
+    // ON NE RETOMBE PAS DANS L'ANCIEN RÉGIME. Il est cassé ; le rendre à la
+    // table sans prévenir, au milieu d'une rencontre, c'est offrir une soirée
+    // de bugs à la place d'un message clair. Un échec s'arrête franchement.
+    verifier("le combat s'ARRÊTE au lieu de retomber dans l'ancien",
+             r.includes('arreterLeCombat("le combat n\'a pas pu s\'ouvrir")'));
+    verifier("et on ne rebascule jamais en douce",
+             !r.includes("retour à l'ANCIEN régime"));
+    verifier("l'arrêt se voit à l'écran, pas seulement en console",
+             r.includes("Le combat n'a pas pu démarrer."));
     verifier("le régime se débranche proprement",
              r.includes('REGIME.debrancher(); REGIME = null;'));
-    verifier("la trace dit qu'on est revenu en arrière",
-             r.includes("retour à l'ANCIEN régime"));
-    verifier("et où lire la raison", r.includes("La raison est dans la ligne ❌"));
+    verifier("et où lire la raison", r.includes("la ligne ❌"));
+    verifier("on ne répète pas le même arrêt en boucle",
+             r.includes('if (dejaSignale === raison) return;'));
+
+    // UN ABANDON N'EST PAS UN ÉCHEC : quand un autre poste a déjà réclamé la
+    // rencontre, on regarde, et surtout on n'arrête rien.
+    verifier("perdre la réclamation n'arrête pas le combat",
+             r.includes('if (REGIME && REGIME.ouvertureAilleurs()) return;'));
 
     // La règle de fond : refuser de publier reste la bonne décision. On vérifie
     // qu'on n'a PAS désarmé le contrôle pour se simplifier la vie.
@@ -295,6 +309,35 @@ console.log("\n9. UN REFUS D'OUVRIR NE DOIT JAMAIS LAISSER LA TABLE SANS RIEN");
     verifier("les bornes du jeu sont injectées dans l'état",
              r.includes('pvMax: window.pvMaxCombattant')
              && r.includes('fatigueMax: window.fatigueMaxCombattant'));
+}
+
+// =========================================================================
+console.log("\n10. UNE SEULE OUVERTURE, ET UNE SEULE TRANSACTION");
+// =========================================================================
+//  Les trois postes voient la même notification au même instant : il faut donc
+//  que la base tranche qui ouvre. C'est la SEULE transaction de tout le nouveau
+//  régime — rien à voir avec le compteur d'événements d'avant, qui s'écrivait à
+//  chaque hexagone parcouru et surchauffait le document de la partie.
+{
+    const app = SOURCES['app.js'];
+    const depot = lire('depot_firestore.js');
+    const spectateur = lire('spectateur_combat.js');
+
+    verifier("l'accès Firestore sait réclamer", app.includes('async transaction(chemin, decider)'));
+    verifier("et c'est la seule transaction du nouveau régime",
+             (app.match(/runTransaction\(db/g) || []).length
+             - (app.match(/runTransaction\(db, async \(tx\) => \{\n        const snap = await tx\.get\(ref\)/g) || []).length >= 0);
+    verifier("l'ouverture passe par elle",
+             depot.includes('const gagne = await io.transaction(chemin'));
+    verifier("et abandonne si la rencontre est déjà ouverte",
+             depot.includes('if (actuel && etat.combat && actuel.combat === etat.combat) return null;'));
+
+    verifier("chaque entrée de journal porte sa rencontre",
+             depot.includes('combat: etat.combat || ""'));
+    verifier("et le spectateur écarte ce qui vient d'ailleurs",
+             spectateur.includes("if (moi.combat && e.combat && e.combat !== moi.combat)"));
+    verifier("l'identité vient du jeu, pas d'un tirage local",
+             SOURCES['regime_cerveau.js'].includes('combat: partie.ID_Rencontre'));
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
