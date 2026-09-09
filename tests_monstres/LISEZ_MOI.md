@@ -59,6 +59,7 @@ node zones_ia.mjs           # les zones sont posées, orientées et bien placée
 node piste_initiative.mjs   # la piste tient à droite du panneau, bulles réduites
 node fenetre_tour.mjs       # la fenêtre de tour : nom coloré, effets détaillés, zone dessinée
 node sequence_tour.mjs      # le journal d'événements : ordre, trous, rattrapage
+node etat_combat.mjs        # LE NOYAU PUR : dés à graine, état du combat, invariants (sans réseau)
 node journal_firestore.mjs  # la plomberie du journal face aux règles d'index de Firestore
 node deplacement_journal.mjs # un hexagone = un numéro : publication, ordre, absence de chevauchement
 node illusion_opportunite.mjs # une illusion ne porte aucune attaque d'opportunité
@@ -212,6 +213,25 @@ Le verrou lui-même a quitté le document de la partie pour
 `Systeme_Parties/{id}/Journal_Combat/verrou`, où rien d'autre n'écrit ; le ménage
 de fin de combat l'efface avec le journal. Chapitres 9 et 10 de
 `file_bousculee.mjs`.
+
+## La nouvelle architecture — étape 1 : le noyau pur
+
+`combat_etat.js` est le socle de la refonte, et le premier fichier du projet qui
+ne connaît **ni Firebase, ni le navigateur, ni le temps qui passe**. Il fournit
+trois choses : la FORME de l'état du combat (un seul objet, donc un seul document
+Firestore, donc jamais d'état incohérent écrit) ; les DÉS À GRAINE, qui font
+voyager le hasard *dans* l'état et rendent tout combat rejouable à l'identique ;
+et les INVARIANTS — ce qui doit être vrai de tout état à tout instant.
+
+`etat_combat.mjs` le met à l'épreuve sans rien simuler : il importe le vrai
+fichier et l'appelle. Cinquante contrôles en quarante millisecondes, dont mille
+pas au hasard sans un seul état incohérent. C'est le premier banc du projet qui
+n'a besoin ni de faux Firestore, ni de faux navigateur, ni de trois postes à
+orchestrer — et c'est tout l'objet de la migration.
+
+En jeu : `voirEtat()` dans la console affiche le combat en cours sous cette
+forme, avec la liste de ce qui cloche dedans. Deux appareils qui n'affichent pas
+le même tableau, c'est une désynchronisation prise sur le fait.
 
 **Un tour appartient à UN SEUL poste, et c'est le journal qui tranche.** Quatrième
 trace : P_03 prend le verrou de `MONSTRE_13sb8te`, le joue, publie l'événement 1

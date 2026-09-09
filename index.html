@@ -1606,15 +1606,19 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=5"></script>
+<script src="trace_combat.js?v=6"></script>
+<!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
+     invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
+     de la nouvelle architecture. `voirEtat()` dans la console. -->
+<script type="module" src="combat_etat.js?v=1"></script>
 <script type="module" src="ia_master.js?v=4"></script>
 <script type="module" src="app.js?v=34"></script>
 <script type="module" src="creation_personnage.js?v=4"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=13"></script>
 <script src="Plateau.js"></script>
-<script type="module" src="sequence_tour.js?v=16"></script>
-<script type="module" src="combat.js?v=43"></script>
+<script type="module" src="sequence_tour.js?v=17"></script>
+<script type="module" src="combat.js?v=44"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=17"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->

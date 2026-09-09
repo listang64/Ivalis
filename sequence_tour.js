@@ -951,9 +951,26 @@ window.sequenceRetientFinDeTour = async function() { return false; };
 //  cinq secondes si celui-ci traîne. C'est une barrière entre le CALCUL et
 //  l'AFFICHAGE, sur un même appareil.
 //
+//  CE N'EST PAS « AUCUNE AVANCE », C'EST « PAS TROP D'AVANCE ». La première
+//  version bloquait dès le moindre retard — y compris quand un joueur laissait
+//  simplement sa fenêtre sombre ouverte sans toucher le OK. Résultat : plus
+//  aucune créature ne jouait tant qu'il n'avait pas cliqué, et à trois postes
+//  ça finissait par tout figer. Ce n'est pas ce qu'on cherche : un poste qui
+//  prend son temps pour lire ne doit gêner personne.
+//
+//  Ce qu'on veut empêcher, c'est la DÉRIVE : la base trois tours plus loin que
+//  l'écran, avec des pions qui suivent l'une pendant que l'autre raconte encore
+//  le tour d'avant. Un tour de créature fait cinq à six événements ; on tolère
+//  donc une poignée d'événements de retard, et on retient l'IA au-delà.
+//
 //  La soupape : au-delà d'une minute, on passe outre. Un poste laissé devant sa
 //  fenêtre sombre pendant qu'on va chercher un café ne doit pas figer la table.
+//
+//  (Tout ce mécanisme disparaît au basculement : quand l'écran ne suivra plus
+//  que le journal, la base ne pourra plus le doubler, et il n'y aura plus rien
+//  à retenir.)
 const ATTENTE_MAX_MS = 60000;
+const RETARD_TOLERE = 8;
 let attenteIADepuis = 0;
 
 window.sequenceTourEnAttente = function() {
@@ -961,10 +978,9 @@ window.sequenceTourEnAttente = function() {
     // n'attend plus personne.
     if (window.JOURNAL_INDISPONIBLE) { attenteIADepuis = 0; return false; }
 
-    const enRetard = !!window.EVENEMENT_ATTENDU
-        || !!window.EVENEMENT_EN_COURS
-        || Object.keys(window.EVENEMENTS_RECUS || {})
-                 .some(n => Number(n) > window.DERNIER_EVENEMENT_JOUE);
+    const enAttente = Object.keys(window.EVENEMENTS_RECUS || {})
+        .filter(n => Number(n) > window.DERNIER_EVENEMENT_JOUE).length;
+    const enRetard = enAttente > RETARD_TOLERE;
 
     if (!enRetard) { attenteIADepuis = 0; return false; }
 
@@ -974,6 +990,7 @@ window.sequenceTourEnAttente = function() {
         attenteIADepuis = 0;
         return false;
     }
+    tracer("⏳", `l'IA attend l'écran`, `(${enAttente} événements en retard)`);
     return true;
 };
 window.forcerSequenceTour = async function() {};

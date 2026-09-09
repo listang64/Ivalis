@@ -158,24 +158,35 @@ window.avecCarteJouee = function(data, idPersonnage) {
 //  1. Chaque poste ne juge QUE les combattants qu'il connaît. Un combattant pas
 //     encore chargé n'est jamais déclaré à terre, si bien qu'un poste en retard
 //     ne peut plus faire basculer la phase à la place des autres.
-//  2. UN COMBATTANT DEBOUT N'EST PAS À TERRE. La liste ne faisait que grandir —
-//     pour éviter qu'un poste dont la fiche est en retard ne retire quelqu'un
-//     que le voisin vient d'y mettre. Mais elle est aussi consultée par
-//     finDeTourCombat, qui RETIRE DE LA FILE D'INITIATIVE tout ce qu'elle
-//     contient. Or à la réinitialisation d'un combat, les héros passent une
-//     fraction de seconde à zéro point de vie avant que leur fiche neuve
-//     n'arrive : ils entraient alors dans la liste, n'en sortaient plus jamais,
-//     et la rencontre suivante se jouait sans eux — la file se vidait après le
-//     dernier monstre, et personne ne pouvait jouer son tour.
-//     Un combattant que ce poste CONNAÎT et qu'il voit DEBOUT en sort donc,
-//     exactement comme il y entre quand il tombe. Le va-et-vient redouté est
-//     écarté par la règle 1 : un poste qui n'a pas la fiche ne juge pas, ni
-//     dans un sens ni dans l'autre.
+//  2. LA LISTE NE FAIT QUE GRANDIR pendant un combat. Sans cela, un poste dont
+//     la fiche est en retard voit le tombé encore debout et le retire ; le
+//     poste d'à côté le remet ; et ainsi de suite — un va-et-vient d'écritures
+//     à chaque notification, précisément le genre de bavardage qui saccade les
+//     déplacements. Un combattant à terre le reste donc jusqu'à la
+//     réinitialisation du combat, qui vide la liste.
+//
+//     J'AI ESSAYÉ L'INVERSE, ET C'ÉTAIT PIRE. Faire sortir de la liste celui
+//     qu'on voit debout paraît symétrique, mais « je le vois debout » peut
+//     vouloir dire « ma fiche est périmée » : le va-et-vient revient aussitôt.
+//     Le vrai problème était ailleurs — voir la règle 3.
+//
+//  3. ON NE JUGE PAS PENDANT UNE RÉINITIALISATION. C'est là qu'était le bug qui
+//     a coûté à Nico une rencontre entière : en remettant le combat à zéro, les
+//     fiches passent une fraction de seconde à zéro point de vie avant de
+//     recevoir leurs valeurs neuves. Les deux héros entraient alors dans la
+//     liste, n'en sortaient plus, et finDeTourCombat les RAYAIT DE LA FILE
+//     D'INITIATIVE : la rencontre suivante se jouait sans eux, la file se vidait
+//     après le dernier monstre, et personne ne pouvait jouer son tour.
+//     Pendant une réinitialisation, cette fonction ne juge donc personne.
 //
 //  Trois postes qui constatent la même chute écrivent la même liste : la
 //  deuxième écriture ne voit plus de différence et n'a pas lieu.
 window.synchroniserCombattantsHorsJeu = async function() {
     if (!window.ID_PARTIE_COURANTE) return false;
+    // Le combat est en train d'être remis à zéro : les fiches traversent un
+    // instant où elles valent zéro point de vie sans que personne ne soit tombé.
+    // On ne juge rien tant que la poussière n'est pas retombée.
+    if (window.REINITIALISATION_COMBAT_EN_COURS) return false;
     const data = window.PARTIE_DATA || {};
     const ordre = data.Ordre_Initiative || [];
     if (ordre.length === 0) return false;
@@ -187,13 +198,10 @@ window.synchroniserCombattantsHorsJeu = async function() {
 
     ordre.forEach(id => {
         if (!connus.has(id)) return;              // pas encore chargé : on ne juge pas
-        const aTerre = window.estCombattantMort(id);
-        if (aTerre && !voulue.has(id)) { voulue.add(id); change = true; }
-        // Et l'inverse : celui qu'on voit debout n'a rien à faire dans la liste.
-        if (!aTerre && voulue.has(id)) { voulue.delete(id); change = true; }
+        if (window.estCombattantMort(id) && !voulue.has(id)) { voulue.add(id); change = true; }
     });
 
-    // Retrait sans discussion : un combattant qui n'est plus dans l'ordre
+    // Seul retrait admis : un combattant qui n'est plus dans l'ordre
     // d'initiative. Il a été effacé du combat, il n'y a plus rien à attendre
     // de lui — et cette information-là, elle, vient de la partie partagée.
     voulue.forEach(id => {
@@ -4261,6 +4269,13 @@ window.reinitialiserCombat = async function() {
     if (!confirm("Voulez-vous vraiment réinitialiser ce combat ? Tous les PV et la Fatigue seront restaurés, et le combat repassera au Tour 1.")) return;
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
 
+    // PENDANT TOUT CE QUI SUIT, ON NE JUGE PERSONNE À TERRE. Les fiches vont
+    // traverser un instant à zéro point de vie avant de recevoir leurs valeurs
+    // neuves : sans ce drapeau, les héros bien vivants entrent dans
+    // Combattants_Hors_Jeu, n'en sortent plus, et la rencontre suivante se joue
+    // sans eux (voir synchroniserCombattantsHorsJeu).
+    window.REINITIALISATION_COMBAT_EN_COURS = true;
+
     // Le relais piste / panneau repart de zéro : le prochain passage à une file
     // vide doit de nouveau pouvoir rouvrir le panneau, même s'il l'était déjà
     // avant le reset (sinon la comparaison ne verrait aucun changement d'état).
@@ -4478,6 +4493,11 @@ window.reinitialiserCombat = async function() {
         
     } catch (e) {
         console.error("Erreur lors de la réinitialisation du combat :", e);
+    } finally {
+        // On rend son jugement à la synchronisation, mais pas tout de suite :
+        // les fiches neuves mettent encore un aller-retour à revenir de la base,
+        // et juger avant leur retour ferait exactement le dégât qu'on évite.
+        setTimeout(() => { window.REINITIALISATION_COMBAT_EN_COURS = false; }, 4000);
     }
 };
 
