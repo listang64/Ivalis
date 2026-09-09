@@ -3,9 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <!-- Safari ne lit plus que la seconde ; on garde la première pour les
+       iPad déjà installés sur l'écran d'accueil, qui ne connaissent que celle-là. -->
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Ivalis - Le JDR</title>
+  <!-- Un blason gravé dans la page : sans lui, le navigateur réclame un
+       favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=14">
 
@@ -1590,7 +1596,7 @@
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=13"></script>
 <script src="Plateau.js"></script>
-<script type="module" src="sequence_tour.js?v=11"></script>
+<script type="module" src="sequence_tour.js?v=12"></script>
 <script type="module" src="combat.js?v=41"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=17"></script>
@@ -1598,7 +1604,7 @@
 <script type="module" src="moteur_effets.js?v=24"></script>
 <script type="module" src="monstres.js?v=17"></script>
 <script type="module" src="monstres_competences.js?v=7"></script>
-<script type="module" src="monstres_ia.js?v=22"></script>
+<script type="module" src="monstres_ia.js?v=23"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=7"></script>
 <script type="module" src="objets_ia.js?v=5"></script>

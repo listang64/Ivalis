@@ -255,5 +255,127 @@ console.log("\n5. LE COMPTEUR DU JOURNAL A QUITTÉ LE DOCUMENT DE LA PARTIE");
              /reserverNumerosEvenements\(idPartie, liste\.length\)/.test(app));
 }
 
+// =========================================================================
+console.log("\n6. LE VERROU NE SE VOLE PLUS SUR UNE HORLOGE QUI MENT");
+// =========================================================================
+//  Deuxième trace de Nico : DEUX événements « carte » pour un seul tour de
+//  créature, dont un publié par l'autre poste. Les deux appareils avaient donc
+//  joué le même tour. Le verrou jugeait l'ancienneté avec « maintenant moins
+//  l'heure inscrite dedans » — or cette heure vient de l'horloge de L'AUTRE
+//  APPAREIL. Un iPad en avance sur le PC trouvait périmé un verrou posé à
+//  l'instant, le volait, et calculait le tour en parallèle.
+{
+    const d = lignesIA.findIndex(l => l.startsWith('const DELAI_VERROU_MS'));
+    let f = lignesIA.findIndex((l, i) => i > d && l.startsWith('async function reclamerVerrouIA'));
+    for (let i = f; i < lignesIA.length; i++) { if (lignesIA[i] === '}') { f = i; break; } }
+    const SRC_VERROU = lignesIA.slice(d, f + 1).join('\n')
+        + '\nwindow.__reclamerVerrouIA = reclamerVerrouIA;';
+
+    // Un seul Firestore, deux postes : c'est tout l'enjeu.
+    const { etat, runTransaction } = firestoreDispute({ Verrou_IA: null });
+    const pc = { ID_PARTIE_COURANTE: "P1" }, ipad = { ID_PARTIE_COURANTE: "P1" };
+    new Function('window', 'db', 'doc', 'runTransaction', SRC_VERROU)(pc, {}, () => ({}), runTransaction);
+    new Function('window', 'db', 'doc', 'runTransaction', SRC_VERROU)(ipad, {}, () => ({}), runTransaction);
+
+    const cle = "tour|M1|1700000000";
+    verifier("le PC prend le verrou", (await pc.__reclamerVerrouIA(cle)) === true);
+
+    // L'iPad a une minute d'avance. Avec l'ancienne règle, il trouvait le verrou
+    // vieux de soixante secondes — donc abandonné — et jouait le tour lui aussi.
+    etat.doc.Verrou_IA.ts = Date.now() - 60000;
+    verifier("l'iPad en avance d'une minute ne le vole PAS",
+             (await ipad.__reclamerVerrouIA(cle)) === false,
+             `(verrou à ${etat.doc.Verrou_IA.client})`);
+    verifier("le verrou est toujours au PC", etat.doc.Verrou_IA.client !== undefined);
+
+    // Et il ne le vole toujours pas au deuxième coup d'œil : ce qui compte,
+    // c'est depuis combien de temps LUI le voit, pas l'heure qu'il est ailleurs.
+    verifier("ni au deuxième coup d'œil", (await ipad.__reclamerVerrouIA(cle)) === false);
+}
+
+// =========================================================================
+console.log("\n7. LE VERROU BOUSCULÉ EST RETENTÉ, PAS ABANDONNÉ");
+// =========================================================================
+//  La trace montre aussi un « failed-precondition » sur l'écriture de Verrou_IA
+//  au moment précis où la file avançait : les deux écrivent le document de la
+//  partie. Renoncer là, c'est une créature que personne ne joue.
+{
+    const d = lignesIA.findIndex(l => l.startsWith('const DELAI_VERROU_MS'));
+    let f = lignesIA.findIndex((l, i) => i > d && l.startsWith('async function reclamerVerrouIA'));
+    for (let i = f; i < lignesIA.length; i++) { if (lignesIA[i] === '}') { f = i; break; } }
+    const SRC_VERROU = lignesIA.slice(d, f + 1).join('\n')
+        + '\nwindow.__reclamerVerrouIA = reclamerVerrouIA;';
+
+    const { etat, runTransaction } = firestoreDispute({ Verrou_IA: null }, 2);
+    const w = { ID_PARTIE_COURANTE: "P1" };
+    const traces = [];
+    w.tracerCombat = (i, q) => traces.push(`${i} ${q}`);
+    new Function('window', 'db', 'doc', 'runTransaction', SRC_VERROU)(w, {}, () => ({}), runTransaction);
+    console.error = () => {};
+
+    verifier("après deux bousculades, le verrou finit par être pris",
+             (await w.__reclamerVerrouIA("tour|M1|1")) === true);
+    verifier("et il est bien écrit en base", !!etat.doc.Verrou_IA);
+    verifier("la trace montre les reprises", traces.filter(t => t.startsWith("♻️")).length === 2,
+             `(${traces.join(" | ")})`);
+}
+
+// =========================================================================
+console.log("\n8. LE MÊME TOUR PUBLIÉ DEUX FOIS NE SE JOUE QU'UNE");
+// =========================================================================
+//  La ceinture de sécurité, au cas où les deux corrections précédentes seraient
+//  encore prises en défaut : le lecteur reconnaît deux événements qui racontent
+//  exactement la même chose, signés par deux postes différents, et n'en rejoue
+//  qu'un. Sans lui, la trace de Nico donnait « ▶️ 1 carte » puis « ▶️ 2 carte »
+//  pour un seul coup de griffe.
+{
+    const SRC_SEQ = fs.readFileSync('/home/user/Ivalis/sequence_tour.js', 'utf-8');
+    const w = {
+        ID_PARTIE_COURANTE: "P1",
+        PERSOS_PARTIE: [
+            { idPersonnage: "H1", idJoueur: "PC", PV_Actuels: 42, Etats_Alteres: [] },
+            { idPersonnage: "M1", estMonstre: true, PV_Actuels: 40, Etats_Alteres: [] }
+        ],
+        PARTIE_DATA: { Tour_Combat: 1, Phase_Combat: "Resolution",
+                       File_Attente_Combat: [{ idPersonnage: "M1", idCarte: "C1" }] },
+        estMonstre: (id) => String(id).startsWith("M")
+    };
+    const jouees = [];
+    w.filerAnimation = async (nom, fn) => { jouees.push(nom); if (fn) await fn(); };
+    const traces = [];
+    w.tracerCombat = (i, q, d2) => traces.push(`${i} ${q} ${d2 || ""}`);
+    new Function('window', 'localStorage', SRC_SEQ)(w, { getItem: () => "PC" });
+
+    // Le même coup, publié par les deux postes : mêmes acteur, manche, nature et
+    // données (les dés sont dedans), auteurs différents.
+    const coup = { attaques: [{ cibles: ["H1"], degats: 9 }] };
+    const faire = (n, auteur) => ({ n, type: "carte", acteur: "M1", idCarte: "C1", tour: 1,
+                                    data: coup, avant: {}, auteur });
+    w.EVENEMENTS_RECUS = { 1: faire(1, "PC"), 2: faire(2, "iPad") };
+    w.DERNIER_EVENEMENT_JOUE = 0;
+
+    // Le tour d'une créature attend le OK : on le donne, puis on laisse lire.
+    await w.lireJournalCombat();
+    await w.jouerSequenceTour();                 // le OK doré
+    await new Promise(r => setTimeout(r, 60));
+
+    verifier("l'attaque n'est animée qu'une seule fois", jouees.length === 1,
+             `(${jouees.length} animation(s) : ${jouees.join(",")})`);
+    verifier("le curseur a quand même avancé jusqu'au bout",
+             w.DERNIER_EVENEMENT_JOUE === 2, `(n°${w.DERNIER_EVENEMENT_JOUE})`);
+    verifier("et la trace nomme le poste qui a publié le doublon",
+             traces.some(t => t.startsWith("👯") && t.includes("PC")), `(${traces.join(" | ")})`);
+
+    // Deux coups DIFFÉRENTS du même acteur dans la même manche, eux, se jouent
+    // tous les deux : l'empreinte porte les données, pas seulement l'acteur.
+    const autre = { attaques: [{ cibles: ["H1"], degats: 4 }] };
+    w.EVENEMENTS_RECUS = { 3: { n: 3, type: "carte", acteur: "M1", idCarte: "C1", tour: 1,
+                                data: autre, avant: {}, auteur: "iPad" } };
+    await w.lireJournalCombat();
+    await new Promise(r => setTimeout(r, 60));
+    verifier("un coup réellement différent, lui, passe", jouees.length === 2,
+             `(${jouees.length} animation(s))`);
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

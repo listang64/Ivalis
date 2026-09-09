@@ -180,11 +180,29 @@ verrou de l'IA refuse un tour DÉJÀ JOUÉ, même à celui qui le détient — l
 périme au bout du délai du verrou, pour qu'un combat vraiment bloqué puisse
 repartir. `file_bousculee.mjs` pose les trois devant le vrai code.
 
+**Un tour joué par DEUX postes à la fois.** La trace suivante a montré deux
+événements `carte` pour un seul tour de créature, dont un publié par l'autre
+appareil : les deux avaient joué le tour. Trois trous, tous bouchés. (a) Le
+verrou de l'IA jugeait son ancienneté avec l'heure inscrite dedans — celle de
+l'horloge de l'AUTRE appareil : un iPad en avance trouvait périmé un verrou posé
+à l'instant et le volait. L'ancienneté se mesure désormais depuis le moment où
+CE poste a vu ce verrou pour la première fois, sans qu'aucune horloge étrangère
+n'entre dans la décision. (b) L'écriture du verrou se faisait elle aussi
+bousculer (`failed-precondition` sur `Verrou_IA`, dans la trace) et le poste
+renonçait à jouer : elle est retentée. (c) Ceinture de sécurité côté lecture :
+deux événements racontant exactement la même chose — même acteur, même manche,
+même nature, mêmes données, les dés compris — mais **signés par deux postes
+différents** ne sont pas deux coups, c'est le même raconté deux fois ; le
+curseur avance, l'animation ne se rejoue pas. Chapitres 6 à 8 de
+`file_bousculee.mjs`.
+
 **La trace du combat.** `trace_combat.js` est chargé avant tout le reste et
 écrit dans la console une ligne par chose qui arrive : événement publié, reçu,
 retenu par le OK, rejoué, fin de tour, verrou de l'IA — et surtout **chaque
 changement de points de vie, avec sa cause** (`[direct]`, `[rejeu]`,
-`[calcul IA]`, `[base rendue]`, `[écran retenu]`). C'est le seul moyen de voir
+`[calcul IA]`, `[base rendue]`, `[écran retenu]`). Chaque événement reçu ou
+rejoué porte **le poste qui l'a publié** (`[de iPad-Ben]`) : c'est ce qui permet
+de voir en une ligne que deux appareils ont joué le même tour. C'est le seul moyen de voir
 un dégât appliqué deux fois : la même cible, le même nombre, deux lignes. En
 jeu : `effacerTrace()` avant de reproduire, `copierTrace()` après. Elle ne garde
 que les 500 dernières lignes et se coupe avec `TRACE_COMBAT_ACTIVE = false`.

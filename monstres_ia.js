@@ -776,6 +776,31 @@ function marquerTourIATermine(cle) {
     });
 }
 
+// DEPUIS QUAND VOIT-ON CE VERROU-LÀ ? Pas « depuis quelle heure il a été
+// posé » : cette heure-là vient de l'HORLOGE D'UN AUTRE APPAREIL. Un iPad en
+// avance d'une minute sur le PC jugeait périmé un verrou posé à l'instant, le
+// volait, et jouait le tour de la créature en parallèle — deux calculs, deux
+// écritures de dégâts, deux événements pour un seul tour. On mesure donc
+// l'ancienneté à NOTRE montre, depuis le moment où on a vu ce verrou pour la
+// première fois : aucune horloge étrangère n'entre dans la décision.
+const PREMIERE_VUE_VERROU = new Map();
+
+function ancienneteVerrou(verrou) {
+    const signature = `${verrou.cle}|${verrou.client}|${verrou.ts}`;
+    const vu = PREMIERE_VUE_VERROU.get(signature);
+    if (vu === undefined) { PREMIERE_VUE_VERROU.set(signature, Date.now()); return 0; }
+    if (PREMIERE_VUE_VERROU.size > 200) PREMIERE_VUE_VERROU.clear();
+    return Date.now() - vu;
+}
+
+// LE VERROU AUSSI SE FAIT BOUSCULER. Ta trace l'a montré noir sur blanc : un
+// « failed-precondition » sur l'écriture de Verrou_IA, juste au moment où la
+// file d'initiative avançait — les deux écrivent le document de la partie. Un
+// verrou refusé, c'est un poste qui renonce à jouer le tour ; si l'autre
+// renonce aussi, la créature reste plantée, et s'il ne renonce pas au bon
+// moment, ils jouent tous les deux. On retente, comme pour la file.
+const ESSAIS_VERROU = 3;
+
 async function reclamerVerrouIA(cle) {
     if (!window.ID_PARTIE_COURANTE) return false;
     // Ce tour-là est joué. Pas deux fois.
@@ -786,26 +811,44 @@ async function reclamerVerrouIA(cle) {
         return false;
     }
     const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
-    try {
-        return await runTransaction(db, async (tx) => {
-            const snap = await tx.get(partieRef);
-            if (!snap.exists()) return false;
-            const verrou = snap.data().Verrou_IA || null;
-            const maintenant = Date.now();
+    for (let essai = 1; essai <= ESSAIS_VERROU; essai++) {
+        try {
+            return await runTransaction(db, async (tx) => {
+                const snap = await tx.get(partieRef);
+                if (!snap.exists()) return false;
+                const verrou = snap.data().Verrou_IA || null;
 
-            if (verrou && verrou.cle === cle) {
-                // Déjà réclamé : soit par nous (on continue), soit par un autre
-                // poste encore vivant (on le laisse faire).
-                if (verrou.client === ID_CLIENT) return true;
-                if (maintenant - (verrou.ts || 0) < DELAI_VERROU_MS) return false;
+                if (verrou && verrou.cle === cle) {
+                    // Déjà réclamé : soit par nous (on continue), soit par un
+                    // autre poste encore vivant (on le laisse faire).
+                    if (verrou.client === ID_CLIENT) return true;
+                    if (ancienneteVerrou(verrou) < DELAI_VERROU_MS) return false;
+                    if (typeof window.tracerCombat === "function") {
+                        window.tracerCombat("🧠", `verrou abandonné repris à ${verrou.client}`, cle);
+                    }
+                }
+                tx.update(partieRef, { Verrou_IA: { cle, client: ID_CLIENT, ts: Date.now() } });
+                return true;
+            });
+        } catch (e) {
+            // Une transaction bousculée n'est pas un refus : c'est un « recommence ».
+            // Renoncer ici, c'est laisser la créature sans personne pour la jouer —
+            // ou, pire, laisser l'autre poste croire qu'il est seul.
+            if (essai < ESSAIS_VERROU) {
+                if (typeof window.tracerCombat === "function") {
+                    window.tracerCombat("♻️", `verrou bousculé (essai ${essai})`, cle);
+                }
+                await new Promise(r => setTimeout(r, 120 * essai + Math.floor(Math.random() * 100)));
+                continue;
             }
-            tx.update(partieRef, { Verrou_IA: { cle, client: ID_CLIENT, ts: maintenant } });
-            return true;
-        });
-    } catch (e) {
-        console.error("Verrou IA :", e);
-        return false;
+            console.error("Verrou IA :", e);
+            if (typeof window.tracerCombat === "function") {
+                window.tracerCombat("❌", "verrou IMPOSSIBLE à prendre", (e && e.code) || String(e));
+            }
+            return false;
+        }
     }
+    return false;
 }
 
 // =========================================================================

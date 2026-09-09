@@ -481,6 +481,19 @@ const ANIMATIONS = {
 // même tour la partagent ; le premier à la présenter ouvre le tour.
 const cleTour = (ev) => ev ? ((ev.tour === undefined ? "" : ev.tour) + "|" + (ev.acteur || "")) : null;
 
+// L'EMPREINTE D'UN ÉVÉNEMENT : ce qu'il RACONTE, sans son numéro ni son auteur.
+// Deux empreintes identiques signées de deux postes différents, ce n'est pas
+// deux coups : c'est le même coup, publié deux fois. Les dés sont dans `data`,
+// donc deux tours calculés séparément n'ont presque jamais la même empreinte —
+// et l'auteur, comparé ensuite, lève le doute qui resterait.
+const EMPREINTES_JOUEES = new Map();
+function empreinteEvenement(ev) {
+    if (!ev) return "";
+    let data = "";
+    try { data = JSON.stringify(ev.data || {}); } catch (e) { data = String(ev.data); }
+    return `${cleTour(ev)}|${ev.type}|${data}`;
+}
+
 // Combien d'événements attendent encore d'être rejoués ici.
 window.evenementsEnAttente = function() {
     return Object.keys(window.EVENEMENTS_RECUS)
@@ -543,6 +556,30 @@ window.lireJournalCombat = async function() {
             window.DERNIER_EVENEMENT_JOUE = suivant;
             delete window.EVENEMENTS_RECUS[suivant];
 
+            // === LE MÊME TOUR, PUBLIÉ PAR DEUX POSTES ========================
+            // Le verrou de l'IA est là pour qu'un seul poste calcule le tour
+            // d'une créature. Mais un verrou est une écriture, une écriture peut
+            // être bousculée, et une horloge peut mentir. Si ça arrive quand
+            // même, on le voit ici : deux événements décrivant exactement la
+            // même chose — même acteur, même manche, même nature, mêmes données
+            // — signés par DEUX POSTES DIFFÉRENTS. Le second n'est pas une
+            // deuxième attaque : c'est la même, racontée deux fois. On avance le
+            // curseur et on ne la rejoue pas.
+            const empreinte = empreinteEvenement(ev);
+            const jumeau = EMPREINTES_JOUEES.get(empreinte);
+            if (jumeau && jumeau !== (ev.auteur || "?")) {
+                tracer("👯", `${suivant} ${ev.type} ${ev.acteur || "?"}`,
+                       `(déjà joué, publié aussi par ${jumeau} — non rejoué)`);
+                continue;
+            }
+            EMPREINTES_JOUEES.set(empreinte, ev.auteur || "?");
+            if (EMPREINTES_JOUEES.size > 400) {
+                // Un combat entier tient largement là-dedans ; au-delà, c'est un
+                // autre combat, et l'ardoise repart propre.
+                const vieilles = [...EMPREINTES_JOUEES.keys()].slice(0, 200);
+                vieilles.forEach(k => EMPREINTES_JOUEES.delete(k));
+            }
+
             // Déjà vu en direct par ce poste : on avance le curseur, c'est tout.
             if (dejaVu) {
                 delete window.EVENEMENTS_DEJA_VUS[suivant];
@@ -560,7 +597,8 @@ window.lireJournalCombat = async function() {
             window.REJEU_SCRIPT_EN_COURS = true;
             dejaServiAvant = new Set();
             const garde = gardeDeRejeu(ev);
-            tracer("▶️", `${suivant} ${ev.type} ${ev.acteur || "?"}`, resumeDonnee(ev.data));
+            tracer("▶️", `${suivant} ${ev.type} ${ev.acteur || "?"}`,
+                   `${resumeDonnee(ev.data)} [de ${ev.auteur || "?"}]`);
             try {
                 await window.filerAnimation(ev.type, () => jouer(ev.data));
             } finally {
@@ -643,7 +681,10 @@ window.suivreSequenceTour = function(partie) {
                     ouverte, window.DERNIER_EVENEMENT_JOUE, (evenements) => {
                         (evenements || []).forEach(ev => {
                             if (ev && ev.n > window.DERNIER_EVENEMENT_JOUE) {
-                                if (!window.EVENEMENTS_RECUS[ev.n]) tracer("📥", `${ev.n} ${ev.type}`, "");
+                                if (!window.EVENEMENTS_RECUS[ev.n]) {
+                                    tracer("📥", `${ev.n} ${ev.type} ${ev.acteur || "?"}`,
+                                           `[de ${ev.auteur || "?"}]`);
+                                }
                                 window.EVENEMENTS_RECUS[ev.n] = ev;
                             }
                         });
@@ -787,6 +828,7 @@ window.oublierJournalCombat = function() {
     window.EVENEMENT_EN_COURS = null;
     tourAcquitte = null;
     attenteDepuis = 0;
+    EMPREINTES_JOUEES.clear();         // l'ardoise des doublons est propre aussi
     if (typeof window.redessinerPions === "function") { try { window.redessinerPions(); } catch (e) {} }
     if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
 };
