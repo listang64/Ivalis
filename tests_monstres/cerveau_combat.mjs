@@ -1,0 +1,466 @@
+// LE CERVEAU, MIS À L'ÉPREUVE — ÉTAPE 3.
+//
+// Un seul appareil écrit, tous les autres lisent. Ce banc vérifie que cette
+// phrase tient : que les intentions illégitimes sont refusées AVEC leur raison,
+// qu'un tour de créature tient dans une seule entrée, que la file avance toute
+// seule, et surtout qu'un état incohérent n'est JAMAIS publié.
+//
+// Le dépôt est en mémoire — et il sait rater ses écritures, parce qu'un
+// Firestore rate les siennes. Ce qu'on veut voir : après un échec, rien n'a
+// bougé, et l'intention est reprise.
+import {
+    estLeCerveau, cerveauPerdu, validerIntention, appliquerIntention,
+    avancerFile, jouerCreature, prochainPas, creerCerveau, CERVEAU_PERDU_MS
+} from '../cerveau_combat.js';
+import { construireEtatCombat, creerDes, verifierEtatCombat, clonerEtat } from '../combat_etat.js';
+import { distance } from '../mouvement_pur.js';
+
+let echecs = 0;
+const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(64)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
+
+const fiche = (id, extra = {}) => ({
+    idPersonnage: id, PV_Max: 60, PV_Actuels: 60, Fatigue_Max: 100,
+    Fatigue_Actuelle: 100, Esquive: 0, Parade: 0, Bouclier_Actuel: 0,
+    Etats_Alteres: [], statut: "Vivant", ...extra
+});
+
+// Deux héros, deux créatures. La file : le héros de Nico, une goule, le héros
+// de Ben, une seconde goule.
+const monde = () => construireEtatCombat({
+    idPartie: "GAME_TEST", cerveau: "P_03", graine: 4242,
+    combattants: [
+        fiche("H1", { idJoueur: "P_03", camp: "Allié", prenom: "Naomi" }),
+        fiche("H2", { idJoueur: "P_01", camp: "Allié", prenom: "Pliors" }),
+        fiche("M1", { estMonstre: true, camp: "Ennemi", nom: "Goule", Personnalite: "brutal" }),
+        fiche("M2", { estMonstre: true, camp: "Ennemi", nom: "Spectre", Personnalite: "prudent" })
+    ],
+    positions: { H1: { q: 0, r: 0 }, H2: { q: 0, r: 2 }, M1: { q: 3, r: 0 }, M2: { q: 5, r: 0 } },
+    partie: {
+        Phase_Combat: "Resolution", Tour_Combat: 1,
+        Ordre_Initiative: ["H1", "M1", "H2", "M2"],
+        File_Attente_Combat: [
+            { idPersonnage: "H1", idCarte: "C_H1" }, { idPersonnage: "M1", idCarte: "C_M1" },
+            { idPersonnage: "H2", idCarte: "C_H2" }, { idPersonnage: "M2", idCarte: "C_M2" }
+        ]
+    }
+});
+
+// La technique d'une créature, telle que le cerveau la lui donnera.
+const CARTES = {
+    C_M1: { idCarte: "C_M1", infos: { portee: 1, fatigue: 15 },
+            attaques: [{ valeurBrute: 12 }], alterations: [] },
+    C_M2: { idCarte: "C_M2", infos: { portee: 4, fatigue: 20 },
+            attaques: [{ valeurBrute: 8, isRanged: true }], alterations: [] }
+};
+const carteDe = (id, idCarte) => CARTES[idCarte] || null;
+
+// =========================================================================
+//  UN DÉPÔT EN MÉMOIRE, QUI SAIT RATER
+// =========================================================================
+//  Il publie l'état, l'entrée de journal et le marquage des intentions EN UN
+//  SEUL GESTE — ou pas du tout, comme un writeBatch Firestore.
+function creerDepot(etatInitial, echecsDAffilee = 0) {
+    const d = {
+        etat: clonerEtat(etatInitial),
+        journal: [],
+        intentions: [],
+        refus: [],
+        restants: echecsDAffilee,
+        ecritures: 0
+    };
+    return {
+        interne: d,
+        lireEtat: async () => clonerEtat(d.etat),
+        lireIntentions: async () => d.intentions.filter(i => !i.traitee).map(i => ({ ...i })),
+        publier: async (etat, entree, traitees) => {
+            if (d.restants > 0) { d.restants--; throw new Error("commit refusé"); }
+            // Tout ou rien : les trois écritures atterrissent ensemble.
+            d.etat = clonerEtat(etat);
+            d.journal.push(JSON.parse(JSON.stringify(entree)));
+            (traitees || []).forEach(id => {
+                const i = d.intentions.find(x => x.id === id);
+                if (i) i.traitee = true;
+            });
+            d.ecritures++;
+        },
+        refuser: async (id, raison, poste) => {
+            const i = d.intentions.find(x => x.id === id);
+            if (i) i.traitee = true;
+            d.refus.push({ id, raison, poste });
+        },
+        battre: async (quand) => { d.etat.battement = quand; }
+    };
+}
+
+// =========================================================================
+console.log("\n1. UN SEUL POSTE A LA MAIN");
+// =========================================================================
+{
+    const etat = monde();
+    verifier("le poste désigné est le cerveau", estLeCerveau(etat, "P_03") === true);
+    verifier("les autres ne le sont pas", estLeCerveau(etat, "P_01") === false);
+    verifier("et un poste inconnu non plus", estLeCerveau(etat, "P_99") === false);
+
+    etat.battement = 1000;
+    verifier("un cerveau qui vient de battre est vivant", cerveauPerdu(etat, 1000 + 5000) === false);
+    verifier("passé trente secondes, il est perdu",
+             cerveauPerdu(etat, 1000 + CERVEAU_PERDU_MS + 1) === true);
+
+    const orphelin = clonerEtat(etat);
+    orphelin.cerveau = "";
+    verifier("un combat sans cerveau est déclaré perdu", cerveauPerdu(orphelin, 0) === true);
+}
+
+// =========================================================================
+console.log("\n2. CE QU'UNE INTENTION DOIT PROUVER");
+// =========================================================================
+//  Un poste ne demande jamais un résultat, il demande une action — et le cerveau
+//  refuse EN DISANT POURQUOI, pour que l'écran puisse l'afficher au lieu de
+//  rester muet.
+{
+    const etat = monde();
+    const bon = { id: "I1", poste: "P_03", acteur: "H1", type: "mouvement",
+                  chemin: [{ q: 1, r: 0 }] };
+    verifier("une intention légitime passe", validerIntention(etat, bon).ok === true);
+
+    const dire = (i) => validerIntention(etat, i).raison;
+
+    verifier("sans identité, elle est refusée",
+             dire({ poste: "P_03", acteur: "H1", type: "finTour" }) === "intention sans identité");
+    verifier("un type inconnu est refusé",
+             dire({ id: "X", acteur: "H1", type: "danser" }).includes("type inconnu"));
+    verifier("un combattant absent est refusé",
+             dire({ id: "X", acteur: "FANTOME", type: "finTour" }).includes("n'est pas dans ce combat"));
+    verifier("ce n'est pas ton tour",
+             dire({ id: "X", poste: "P_01", acteur: "H2", type: "finTour" }) === "c'est au tour de H1");
+    verifier("et tu ne commandes pas ce héros",
+             dire({ id: "X", poste: "P_01", acteur: "H1", type: "finTour" })
+                .includes("ne commande pas"));
+
+    // Une créature ne reçoit pas d'ordre : elle est jouée par le cerveau.
+    const tourCreature = clonerEtat(etat);
+    tourCreature.file = [{ id: "M1", carte: "C_M1" }];
+    verifier("une créature ne reçoit pas d'ordre",
+             validerIntention(tourCreature, { id: "X", poste: "P_03", acteur: "M1", type: "finTour" })
+                .raison === "une créature ne reçoit pas d'ordre");
+
+    // Un chemin fantaisiste — page modifiée, bug d'interface — ne doit pas
+    // pouvoir téléporter un pion.
+    verifier("un chemin discontinu est refusé",
+             dire({ id: "X", poste: "P_03", acteur: "H1", type: "mouvement",
+                    chemin: [{ q: 5, r: 5 }] }) === "chemin discontinu");
+    verifier("un chemin qui traverse un vivant est refusé",
+             dire({ id: "X", poste: "P_03", acteur: "H1", type: "mouvement",
+                    chemin: [{ q: 0, r: 1 }, { q: 0, r: 2 }] }).includes("occupe"));
+
+    const epuise = clonerEtat(etat);
+    epuise.combattants.H1.fatigue = 1;
+    verifier("marcher sans énergie est refusé",
+             validerIntention(epuise, bon).raison.includes("pas assez d'énergie"));
+    verifier("lancer une carte trop chère aussi",
+             validerIntention(epuise, { id: "X", poste: "P_03", acteur: "H1", type: "carte",
+                                        idCarte: "C", coutFatigue: 40 })
+                .raison.includes("il en reste 1"));
+}
+
+// =========================================================================
+console.log("\n3. LA FILE AVANCE, ET LA MANCHE TOURNE");
+// =========================================================================
+{
+    const etat = monde();
+    const un = avancerFile(etat, creerDes(1));
+    verifier("le combattant en tête sort de la file",
+             un.etat.file.map(f => f.id).join(",") === "M1,H2,M2");
+    verifier("et il est noté comme ayant joué", un.etat.ontJoue.join(",") === "H1");
+    verifier("la version avance d'exactement un", un.etat.version === 1);
+
+    // Un combattant tombé entre-temps ne repasse pas.
+    const avecMort = clonerEtat(etat);
+    avecMort.combattants.M1.aTerre = true;
+    avecMort.combattants.M1.pv = 0;
+    const sansLui = avancerFile(avecMort, creerDes(1));
+    verifier("un combattant à terre sort de la file tout seul",
+             sansLui.etat.file.map(f => f.id).join(",") === "H2,M2");
+
+    // La file se vide : nouvelle manche.
+    let courant = etat;
+    for (let i = 0; i < 4; i++) courant = avancerFile(courant, creerDes(i + 1)).etat;
+    verifier("la file vidée ouvre une nouvelle manche", courant.manche === 2);
+    verifier("et repasse en préparation", courant.phase === "Preparation");
+    verifier("l'ardoise des combattants ayant joué est effacée", courant.ontJoue.length === 0);
+}
+
+// =========================================================================
+console.log("\n4. LE TOUR D'UNE CRÉATURE TIENT DANS UNE SEULE ENTRÉE");
+// =========================================================================
+//  Là où l'ancienne architecture faisait huit à douze écritures indépendantes,
+//  chacune pouvant échouer ou s'entrelacer avec autre chose.
+{
+    const etat = monde();
+    etat.file = [{ id: "M1", carte: "C_M1" }];
+
+    const pas = jouerCreature(etat, "M1", CARTES.C_M1, null);
+    verifier("le tour entier tient dans une entrée", pas.entree.v === 1);
+
+    const types = pas.entree.etapes.map(e => e.type);
+    verifier("elle marche…", types.includes("pas"));
+    verifier("…puis elle frappe", types.includes("carte") && types.includes("degats"));
+    verifier("dans cet ordre", types.indexOf("pas") < types.indexOf("carte"));
+
+    verifier("la créature a bougé", pas.etat.combattants.M1.q !== 3);
+    verifier("et le héros a encaissé", pas.etat.combattants.H1.pv < 60,
+             `(${pas.etat.combattants.H1.pv})`);
+    verifier("l'état reste cohérent", verifierEtatCombat(pas.etat).length === 0,
+             verifierEtatCombat(pas.etat).join(" | "));
+
+    // Trop loin pour frapper : elle avance, et DIT pourquoi elle ne lance rien.
+    // Cette ligne-là vaut de l'or dans la trace : « tour de 20 millisecondes
+    // sans rien faire » restait inexplicable.
+    const loin = clonerEtat(etat);
+    loin.combattants.M1.q = 14;
+    const marche = jouerCreature(loin, "M1", CARTES.C_M1, null);
+    verifier("hors d'atteinte, elle avance sans frapper",
+             !marche.entree.etapes.some(e => e.type === "degats"));
+    verifier("et le journal dit pourquoi",
+             marche.entree.etapes.some(e => e.type === "renonce" && e.raison));
+}
+
+// =========================================================================
+console.log("\n5. LE CERVEAU DÉCIDE TOUT SEUL QUOI FAIRE");
+// =========================================================================
+{
+    const etat = monde();
+
+    // Tête de file = un héros, aucune intention : on attend, et c'est très bien.
+    verifier("quand un joueur réfléchit, le cerveau attend",
+             prochainPas(etat, [], { carteDe }) === null);
+
+    // Tête de file = une créature : elle joue toute seule.
+    const tourM1 = clonerEtat(etat);
+    tourM1.file = [{ id: "M1", carte: "C_M1" }, { id: "H2", carte: "C_H2" }];
+    const auto = prochainPas(tourM1, [], { carteDe });
+    verifier("une créature en tête joue sans qu'on lui demande",
+             !!auto && auto.creature === "M1");
+
+    // Une intention légitime passe avant.
+    const avecIntention = prochainPas(etat, [
+        { id: "I1", poste: "P_03", acteur: "H1", type: "mouvement", chemin: [{ q: 1, r: 0 }] }
+    ], { carteDe });
+    verifier("une intention de joueur est servie", avecIntention.intention === "I1");
+    verifier("et elle bouge vraiment le pion",
+             avecIntention.etat.combattants.H1.q === 1);
+
+    // Une intention illégitime est refusée AVEC sa raison — et refermée, sinon
+    // elle reviendrait à chaque tour de boucle et bloquerait la file.
+    const refusee = prochainPas(etat, [
+        { id: "I2", poste: "P_01", acteur: "H1", type: "finTour" }
+    ], { carteDe });
+    verifier("une intention illégitime est refusée", refusee.refus === true);
+    verifier("avec la raison, et le poste à prévenir",
+             refusee.raison.includes("ne commande pas") && refusee.poste === "P_01");
+
+    // Le combattant en tête est tombé avant de jouer : son tour n'a plus lieu
+    // d'être. Sans ça, la file restait bloquée sur un cadavre.
+    const cadavre = clonerEtat(etat);
+    cadavre.combattants.H1.aTerre = true;
+    cadavre.combattants.H1.pv = 0;
+    const saute = prochainPas(cadavre, [], { carteDe });
+    verifier("un combattant tombé avant son tour est passé", saute && saute.passe === "H1");
+
+    // Hors résolution, le cerveau ne fait rien.
+    const prepa = clonerEtat(etat);
+    prepa.phase = "Preparation";
+    verifier("en préparation, il n'y a rien à jouer",
+             prochainPas(prepa, [], { carteDe }) === null);
+}
+
+// =========================================================================
+console.log("\n6. LA BOUCLE COMPLÈTE, AVEC SON DÉPÔT");
+// =========================================================================
+{
+    const depot = creerDepot(monde());
+    const cerveau = creerCerveau(depot, { poste: "P_03", carteDe, maintenant: () => 1000 });
+
+    // Nico joue : il bouge, il frappe, il passe la main.
+    depot.interne.intentions.push(
+        { id: "I1", poste: "P_03", acteur: "H1", type: "mouvement", chemin: [{ q: 1, r: 0 }] },
+        { id: "I2", poste: "P_03", acteur: "H1", type: "carte", idCarte: "C_H1",
+          coutFatigue: 25, attaques: [{ valeurBrute: 20, cibles: ["M1"] }], alterations: [] },
+        { id: "I3", poste: "P_03", acteur: "H1", type: "finTour" }
+    );
+
+    const faits = await cerveau.tournerJusquAuCalme();
+    verifier("le cerveau enchaîne les pas tout seul", faits.length >= 4,
+             `(${faits.length} pas : ${faits.join(", ")})`);
+    verifier("les numéros se suivent sans trou",
+             faits.every((v, i) => v === i + 1), `(${faits.join(",")})`);
+    verifier("le journal en a autant d'entrées", depot.interne.journal.length === faits.length);
+
+    verifier("le héros a bougé", depot.interne.etat.combattants.H1.q === 1);
+    verifier("la goule a encaissé", depot.interne.etat.combattants.M1.pv < 60,
+             `(${depot.interne.etat.combattants.M1.pv})`);
+    verifier("les trois intentions sont refermées",
+             depot.interne.intentions.every(i => i.traitee));
+
+    // Il s'est arrêté au bon endroit : le tour de Pliors, joué par l'autre poste.
+    verifier("il s'arrête devant le tour d'un autre joueur",
+             depot.interne.etat.file[0].id === "H2", `(${depot.interne.etat.file[0].id})`);
+    verifier("et le battement de cœur est posé", depot.interne.etat.battement === 1000);
+}
+
+// =========================================================================
+console.log("\n7. UN POSTE QUI N'EST PAS LE CERVEAU N'ÉCRIT RIEN");
+// =========================================================================
+//  La règle d'or, vérifiée. C'est elle qui rend impossibles tous les bugs de la
+//  semaine dernière.
+{
+    const depot = creerDepot(monde());
+    const intrus = creerCerveau(depot, { poste: "P_01", carteDe });
+    depot.interne.intentions.push(
+        { id: "I1", poste: "P_01", acteur: "H1", type: "finTour" });
+
+    const r = await intrus.unTour();
+    verifier("un poste qui n'a pas la main s'abstient",
+             r.attente === "un autre poste tient la main");
+    verifier("et rien n'a été écrit", depot.interne.ecritures === 0);
+    verifier("ni l'intention refermée", depot.interne.intentions[0].traitee !== true);
+}
+
+// =========================================================================
+console.log("\n8. UNE ÉCRITURE RATÉE NE PERD RIEN");
+// =========================================================================
+//  Le batch passe en entier ou pas du tout. Après un échec, l'état n'a pas
+//  bougé et l'intention est toujours en attente : elle sera reprise.
+{
+    const depot = creerDepot(monde(), 1);       // la première écriture échoue
+    const cerveau = creerCerveau(depot, { poste: "P_03", carteDe });
+    depot.interne.intentions.push(
+        { id: "I1", poste: "P_03", acteur: "H1", type: "mouvement", chemin: [{ q: 1, r: 0 }] });
+
+    let leve = false;
+    try { await cerveau.unTour(); } catch (e) { leve = true; }
+    verifier("l'échec du batch remonte", leve === true);
+    verifier("l'état n'a pas bougé d'un pouce",
+             depot.interne.etat.version === 0 && depot.interne.etat.combattants.H1.q === 0);
+    verifier("le journal est resté vide", depot.interne.journal.length === 0);
+    verifier("et l'intention attend toujours", depot.interne.intentions[0].traitee !== true);
+
+    // Deuxième essai : ça passe, et rien n'a été joué deux fois.
+    await cerveau.unTour();
+    verifier("la reprise applique l'intention une seule fois",
+             depot.interne.etat.version === 1 && depot.interne.etat.combattants.H1.q === 1);
+    verifier("le journal n'a qu'une entrée", depot.interne.journal.length === 1);
+}
+
+// =========================================================================
+console.log("\n9. UN COMBAT ENTIER, DU DÉBUT À LA FIN");
+// =========================================================================
+//  Les créatures jouent seules, les joueurs passent leur tour, et on va jusqu'à
+//  ce que tout le monde soit à terre d'un côté. C'est le test qui remplace nos
+//  simulations à trois navigateurs — et il tient en une seconde.
+{
+    const depot = creerDepot(monde());
+    const cerveau = creerCerveau(depot, { poste: "P_03", carteDe, maintenant: () => 1 });
+
+    let manches = 0;
+    for (let m = 0; m < 30; m++) {
+        const etat = depot.interne.etat;
+        if (etat.phase === "Preparation") {
+            // Nouvelle manche : on repose la file, comme le fera la préparation.
+            const debout = ["H1", "M1", "H2", "M2"].filter(id => !etat.combattants[id].aTerre);
+            if (debout.filter(id => etat.combattants[id].camp === "Allié").length === 0) break;
+            if (debout.filter(id => etat.combattants[id].camp === "Ennemi").length === 0) break;
+            depot.interne.etat.file = debout.map(id => ({ id, carte: "C_" + id }));
+            depot.interne.etat.phase = "Resolution";
+            manches++;
+        }
+        // Les joueurs passent leur tour : on veut voir les créatures jouer.
+        const tete = depot.interne.etat.file[0];
+        if (tete && !depot.interne.etat.combattants[tete.id].estMonstre) {
+            depot.interne.intentions.push({ id: `F${m}`, poste: depot.interne.etat.combattants[tete.id].joueur,
+                                            acteur: tete.id, type: "finTour" });
+        }
+        await cerveau.tournerJusquAuCalme();
+    }
+
+    verifier("le combat a duré plusieurs manches", manches >= 2, `(${manches} manches)`);
+    verifier("le journal raconte tout, sans trou",
+             depot.interne.journal.every((e, i) => e.v === i + 1),
+             `(${depot.interne.journal.length} entrées)`);
+    verifier("les héros ont pris des coups",
+             depot.interne.etat.combattants.H1.pv < 60 || depot.interne.etat.combattants.H2.pv < 60);
+    verifier("et l'état final est cohérent",
+             verifierEtatCombat(depot.interne.etat).length === 0,
+             verifierEtatCombat(depot.interne.etat).join(" | "));
+}
+
+// =========================================================================
+console.log("\n10. LE MÊME COMBAT, DEUX FOIS, AU CARACTÈRE PRÈS");
+// =========================================================================
+//  Ce qui transformera chaque partie de Nico en test de non-régression : on
+//  garde l'état de départ et la liste des intentions, on rejoue, on compare.
+{
+    const derouler = async () => {
+        const depot = creerDepot(monde());
+        const cerveau = creerCerveau(depot, { poste: "P_03", carteDe, maintenant: () => 1 });
+        depot.interne.intentions.push(
+            { id: "I1", poste: "P_03", acteur: "H1", type: "mouvement", chemin: [{ q: 1, r: 0 }] },
+            { id: "I2", poste: "P_03", acteur: "H1", type: "carte", idCarte: "C_H1",
+              coutFatigue: 25, attaques: [{ valeurBrute: 14, cibles: ["M1"] }], alterations: [] },
+            { id: "I3", poste: "P_03", acteur: "H1", type: "finTour" });
+        await cerveau.tournerJusquAuCalme();
+        return depot.interne;
+    };
+
+    const a = await derouler(), b = await derouler();
+    verifier("deux exécutions donnent le même état final",
+             JSON.stringify(a.etat) === JSON.stringify(b.etat));
+    verifier("et exactement le même journal",
+             JSON.stringify(a.journal) === JSON.stringify(b.journal));
+}
+
+// =========================================================================
+console.log("\n11. UN ÉTAT INCOHÉRENT N'EST JAMAIS PUBLIÉ");
+// =========================================================================
+//  Le dernier garde-fou : plutôt refuser d'écrire que diffuser une incohérence
+//  à trois appareils. Aucun de nos bugs n'aurait survécu à ce contrôle.
+{
+    const depot = creerDepot(monde());
+    const cerveau = creerCerveau(depot, { poste: "P_03", carteDe });
+
+    // On sabote l'état : un héros à terre, mais toujours en tête de file.
+    depot.interne.etat.combattants.M1.aTerre = true;
+    depot.interne.etat.combattants.M1.pv = 0;
+    // ...et on le laisse dans la file, ce que l'invariant interdit.
+    depot.interne.intentions.push(
+        { id: "I1", poste: "P_03", acteur: "H1", type: "mouvement", chemin: [{ q: 1, r: 0 }] });
+
+    const r = await cerveau.unTour();
+    verifier("le cerveau refuse de publier un état incohérent", !!r.erreur,
+             r.erreur ? r.erreur.join(" | ") : "(publié !)");
+    verifier("et rien n'a été écrit", depot.interne.ecritures === 0);
+    verifier("le journal est resté vide", depot.interne.journal.length === 0);
+}
+
+// =========================================================================
+console.log("\n12. LES REFUS REMONTENT AU BON POSTE");
+// =========================================================================
+{
+    const depot = creerDepot(monde());
+    const cerveau = creerCerveau(depot, { poste: "P_03", carteDe });
+    depot.interne.intentions.push(
+        { id: "I1", poste: "P_01", acteur: "H1", type: "finTour" });
+
+    await cerveau.unTour();
+    verifier("le refus est enregistré", depot.interne.refus.length === 1);
+    verifier("avec sa raison", depot.interne.refus[0].raison.includes("ne commande pas"));
+    verifier("et le poste à prévenir", depot.interne.refus[0].poste === "P_01");
+    verifier("l'intention est refermée, elle ne reviendra pas boucler",
+             depot.interne.intentions[0].traitee === true);
+
+    // Et la file n'a pas bougé : un refus ne fait pas avancer le combat.
+    verifier("la file n'a pas avancé", depot.interne.etat.file[0].id === "H1");
+}
+
+console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
+process.exit(echecs === 0 ? 0 : 1);

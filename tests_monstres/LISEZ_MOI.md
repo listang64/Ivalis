@@ -63,6 +63,7 @@ node etat_combat.mjs        # LE NOYAU PUR : dés à graine, état du combat, in
 node moteur_pur.mjs         # la chaîne de dégâts, maillon par maillon (10 000 cartes au hasard)
 node mouvement_pur.mjs      # chemin, coût des cases, attaques d'opportunité (1 000 trajets)
 node ia_pure.mjs            # qui viser, où se mettre : les cinq caractères, sans variable globale
+node cerveau_combat.mjs     # LE CERVEAU : intentions validées, un seul écrivain, un combat entier
 node journal_firestore.mjs  # la plomberie du journal face aux règles d'index de Firestore
 node deplacement_journal.mjs # un hexagone = un numéro : publication, ordre, absence de chevauchement
 node illusion_opportunite.mjs # une illusion ne porte aucune attaque d'opportunité
@@ -265,8 +266,31 @@ au même instant n'avaient donc pas le même plateau sous les yeux, et prenaient
 deux décisions différentes. C'est très exactement ce que montrait la trace de
 Nico. Désormais la décision ne dépend que de l'état passé et de la graine.
 
-Les quatre bancs du noyau tournent en trois secondes, dix mille cartes et mille
-trajets au hasard compris. Le test de propriété a déjà trouvé un vrai bug qu'aucun
+## Étape 3 : le cerveau
+
+`cerveau_combat.js` est la boucle qui tient l'architecture : il lit les
+intentions (« je veux bouger là », « je lance cette carte », « j'ai fini »), les
+VALIDE, appelle le moteur pur, et écrit l'état, l'entrée de journal et le
+marquage de l'intention **dans un seul writeBatch**. Tout ou rien.
+
+C'est ce marquage qui rend le doublon impossible : l'intention est refermée dans
+le batch qui applique son effet. S'il échoue, elle reste en attente et sera
+reprise ; s'il réussit, elle ne peut plus l'être. Il n'existe aucun instant où
+les deux états coexistent — contrairement au verrou d'avant, qui vivait dans un
+document séparé de celui qu'il protégeait.
+
+Un poste ne demande jamais un RÉSULTAT, il demande une ACTION : les dés sont
+tirés par le cerveau, jamais par le client. Et un refus dit toujours POURQUOI
+(« c'est au tour de H1 », « chemin discontinu », « il faut 40 d'énergie, il en
+reste 1 »), pour que l'écran l'affiche au lieu de rester muet.
+
+Le dépôt est injecté : le vrai parle à Firestore, celui du banc range dans une
+carte en mémoire — et sait rater ses écritures. Ce qu'on vérifie alors : après
+un échec, rien n'a bougé, le journal est vide, et l'intention est reprise UNE
+seule fois.
+
+Les cinq bancs du noyau tournent en trois secondes, dix mille cartes, mille
+trajets au hasard et un combat entier de cinq manches compris. Le test de propriété a déjà trouvé un vrai bug qu'aucun
 banc précédent ne pouvait voir : une valeur brute négative posait un bouclier
 négatif.
 
