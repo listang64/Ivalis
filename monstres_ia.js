@@ -790,13 +790,17 @@ async function marquerTourIATermine(cle) {
     try {
         await runTransaction(db, async (tx) => {
             const ref = refVerrouIA(window.ID_PARTIE_COURANTE);
+            const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
             const snap = await tx.get(ref);
+            const snapPartie = await tx.get(partieRef);
             const v = snap.exists() ? snap.data() : {};
             // On ne réclame pas la propriété du verrou pour le clore : si un
             // autre poste l'a pris entre-temps sur une AUTRE clé, on ne touche
             // à rien — c'est son tour à lui, maintenant.
             if (v.cle && v.cle !== cle) return;
-            tx.set(ref, { cle, client: ID_CLIENT, ts: Date.now(), fini: true });
+            const marque = { cle, client: ID_CLIENT, ts: Date.now(), fini: true };
+            tx.set(ref, marque);
+            if (snapPartie.exists()) tx.update(partieRef, { Verrou_IA: marque });
         });
     } catch (e) {
         // Tant pis : la liste locale tient encore ce poste-ci, et le tour
@@ -844,11 +848,29 @@ async function reclamerVerrouIA(cle) {
         return false;
     }
     const verrouRef = refVerrouIA(window.ID_PARTIE_COURANTE);
+    const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
     for (let essai = 1; essai <= ESSAIS_VERROU; essai++) {
         try {
             return await runTransaction(db, async (tx) => {
+                // DEUX EMPLACEMENTS, LUS ET ÉCRITS ENSEMBLE. Le verrou a
+                // déménagé dans son propre document — mais un poste dont la
+                // page n'a pas encore été rechargée, lui, écrit toujours dans
+                // celui de la partie. Deux verrous qui ne se voient pas, ce sont
+                // deux postes qui se croient seuls et qui jouent la même
+                // créature chacun de son côté. Tant qu'un appareil peut être en
+                // retard d'une version, on regarde des deux côtés, et on pose la
+                // marque des deux côtés — dans la MÊME transaction, donc sans
+                // jamais laisser l'un sans l'autre.
                 const snap = await tx.get(verrouRef);
-                const verrou = snap.exists() ? snap.data() : null;
+                const snapPartie = await tx.get(partieRef);
+                const ancien = snapPartie.exists() ? (snapPartie.data().Verrou_IA || null) : null;
+                let verrou = snap.exists() ? snap.data() : null;
+                // Le plus récent des deux fait foi ; à égalité de clé, celui qui
+                // dit « fini » l'emporte, car un tour joué reste joué.
+                if (ancien && (!verrou || (ancien.cle === verrou.cle && !verrou.fini)
+                               || (!verrou.fini && (ancien.ts || 0) > (verrou.ts || 0)))) {
+                    verrou = { ...ancien, fini: verrou ? !!verrou.fini : false };
+                }
 
                 if (verrou && verrou.cle === cle) {
                     // CE TOUR EST DÉJÀ JOUÉ, et pas seulement par nous : le
@@ -868,7 +890,10 @@ async function reclamerVerrouIA(cle) {
                         window.tracerCombat("🧠", `verrou abandonné repris à ${verrou.client}`, cle);
                     }
                 }
-                tx.set(verrouRef, { cle, client: ID_CLIENT, ts: Date.now(), fini: false });
+                const marque = { cle, client: ID_CLIENT, ts: Date.now(), fini: false };
+                tx.set(verrouRef, marque);
+                // La copie que lira un poste resté sur l'ancienne version.
+                if (snapPartie.exists()) tx.update(partieRef, { Verrou_IA: marque });
                 return true;
             });
         } catch (e) {

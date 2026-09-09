@@ -44,33 +44,45 @@ const dormir = (ms) => new Promise(r => setTimeout(r, ms));
 //  Le vrai service refuse une transaction dont le document a changé entre la
 //  lecture et l'écriture : « failed-precondition ». On le reproduit tel quel, et
 //  on choisit combien de fois de suite ça arrive.
+//  DEUX documents : celui de la partie, et celui du verrou de l'IA. Le verrou a
+//  le sien depuis qu'il ne doit plus se bousculer avec la file d'initiative —
+//  mais il écrit AUSSI dans la partie, pour rester visible d'un poste dont la
+//  page n'a pas été rechargée. On les distingue au nombre de segments du chemin.
 function firestoreDispute(docInitial, echecsDAffilee = 0) {
-    const etat = { doc: structuredClone(docInitial), transactions: 0, restants: echecsDAffilee };
+    const etat = { doc: structuredClone(docInitial), verrou: null,
+                   transactions: 0, restants: echecsDAffilee };
+    const estVerrou = (ref) => !!(ref && ref.estVerrou);
+    const doc = (_db, ...seg) => ({ estVerrou: seg.length > 3 });
     const runTransaction = async (_db, fn) => {
         etat.transactions++;
+        const enAttente = [];
         const sortie = await fn({
-            get: async () => ({ exists: () => Object.keys(etat.doc).length > 0,
-                                data: () => structuredClone(etat.doc) }),
-            update: (_r, data) => { etat.enAttente = structuredClone(data); },
-            set: (_r, data) => { etat.enAttente = structuredClone(data); }
+            get: async (ref) => estVerrou(ref)
+                ? ({ exists: () => !!etat.verrou, data: () => structuredClone(etat.verrou) })
+                : ({ exists: () => Object.keys(etat.doc).length > 0,
+                     data: () => structuredClone(etat.doc) }),
+            update: (ref, data) => enAttente.push([estVerrou(ref), "update", structuredClone(data)]),
+            set: (ref, data) => enAttente.push([estVerrou(ref), "set", structuredClone(data)])
         });
         if (etat.restants > 0) {
             etat.restants--;
-            etat.enAttente = null;
             const e = new Error("Commit failed");
             e.code = "failed-precondition";
             e.name = "FirebaseError";
             throw e;
         }
-        if (etat.enAttente) { Object.assign(etat.doc, etat.enAttente); etat.enAttente = null; }
+        enAttente.forEach(([verrou, op, data]) => {
+            if (verrou) etat.verrou = op === "set" ? data : { ...(etat.verrou || {}), ...data };
+            else Object.assign(etat.doc, data);
+        });
         return sortie;
     };
-    return { etat, runTransaction };
+    return { etat, runTransaction, doc };
 }
 
-function poserModifier(w, runTransaction) {
+function poserModifier(w, runTransaction, doc) {
     new Function('window', 'db', 'doc', 'runTransaction', SRC_MODIFIER_PARTIE)(
-        w, {}, () => ({}), runTransaction);
+        w, {}, doc || (() => ({})), runTransaction);
 }
 
 // LE VRAI VERROU DE L'IA, extrait de monstres_ia.js : de la constante de délai
@@ -84,9 +96,9 @@ const SRC_VERROU = lignesIA.filter(l => l.startsWith('const refVerrouIA')).join(
     + '\nwindow.__reclamerVerrouIA = reclamerVerrouIA;'
     + '\nwindow.__marquerTourIATermine = marquerTourIATermine;';
 
-function poserVerrou(w, runTransaction) {
+function poserVerrou(w, runTransaction, doc) {
     new Function('window', 'db', 'doc', 'runTransaction', SRC_VERROU)(
-        w, {}, () => ({}), runTransaction);
+        w, {}, doc || (() => ({})), runTransaction);
 }
 
 // =========================================================================
@@ -95,9 +107,9 @@ console.log("\n1. UNE ÉCRITURE BOUSCULÉE N'EST PAS UN « RIEN À FAIRE »");
 //  Le cœur de la correction. Les deux cas rendaient `null` ; ils sont
 //  maintenant distincts, et c'est ce qui permet à la fin de tour de réagir.
 {
-    const { etat, runTransaction } = firestoreDispute({ File_Attente_Combat: [{ idPersonnage: "M1" }] }, 99);
+    const { etat, runTransaction, doc } = firestoreDispute({ File_Attente_Combat: [{ idPersonnage: "M1" }] }, 99);
     const w = { ID_PARTIE_COURANTE: "P1" };
-    poserModifier(w, runTransaction);
+    poserModifier(w, runTransaction, doc);
     const cris = [];
     console.error = (...a) => cris.push(a.join(" "));
 
@@ -108,9 +120,9 @@ console.log("\n1. UNE ÉCRITURE BOUSCULÉE N'EST PAS UN « RIEN À FAIRE »");
              `(${etat.transactions} essais)`);
     verifier("et elle a crié dans la console", cris.length === 1);
 
-    const { etat: e2, runTransaction: r2 } = firestoreDispute({ File_Attente_Combat: [] });
+    const { etat: e2, runTransaction: r2, doc: doc2 } = firestoreDispute({ File_Attente_Combat: [] });
     const w2 = { ID_PARTIE_COURANTE: "P1" };
-    poserModifier(w2, r2);
+    poserModifier(w2, r2, doc2);
     const rien = await w2.modifierPartieOuEchec(() => null);
     verifier("« rien à faire », lui, reste une réussite", rien.ok === true && rien.resultat === null);
     verifier("et n'écrit rien non plus", Object.keys(e2.doc).length === 1);
@@ -122,10 +134,10 @@ console.log("\n2. UNE BOUSCULADE PASSAGÈRE NE COÛTE PLUS UN TOUR");
 //  C'est le cas réel : deux ou trois écritures se marchent dessus pendant un
 //  tour de créature, puis ça se calme. La transaction doit passer toute seule.
 {
-    const { etat, runTransaction } = firestoreDispute(
+    const { etat, runTransaction, doc } = firestoreDispute(
         { File_Attente_Combat: [{ idPersonnage: "M1" }, { idPersonnage: "H1" }] }, 2);
     const w = { ID_PARTIE_COURANTE: "P1" };
-    poserModifier(w, runTransaction);
+    poserModifier(w, runTransaction, doc);
     const traces = [];
     w.tracerCombat = (i, q, d) => traces.push(`${i} ${q}`);
     console.error = () => {};
@@ -154,11 +166,11 @@ console.log("\n3. UN TOUR DE CRÉATURE NE SE REJOUE PAS");
 //  reprendre un tour interrompu, mais jouerTourMonstre repart TOUJOURS du début.
 //  « Reprendre », c'était donc frapper une deuxième fois.
 {
-    const { etat, runTransaction } = firestoreDispute({});
+    const { etat, runTransaction, doc } = firestoreDispute({});
     const w = { ID_PARTIE_COURANTE: "P1" };
     const traces = [];
     w.tracerCombat = (i, q, d2) => traces.push(`${i} ${q}`);
-    poserVerrou(w, runTransaction);
+    poserVerrou(w, runTransaction, doc);
 
     const cle = "tour|M1|2";
 
@@ -182,7 +194,7 @@ console.log("\n3. UN TOUR DE CRÉATURE NE SE REJOUE PAS");
     // Le tour SUIVANT de la même créature, lui, a une autre clé : il doit passer.
     verifier("le tour suivant de la même créature, lui, se joue",
              (await w.__reclamerVerrouIA("tour|M1|3")) === true);
-    verifier("le verrou en base a bien suivi", etat.doc.cle === "tour|M1|3");
+    verifier("le verrou en base a bien suivi", etat.verrou.cle === "tour|M1|3");
 }
 
 // =========================================================================
@@ -194,10 +206,10 @@ console.log("\n4. LA FIN DE TOUR REVIENT À LA CHARGE AU LIEU DE S'EN ALLER");
     // On rejoue la décision de finDeTourCombat sans traîner tout combat.js :
     // ce qu'on vérifie, c'est qu'un échec ne se confond plus avec un « déjà
     // fait », et que la file finit par avancer.
-    const { etat, runTransaction } = firestoreDispute(
+    const { etat, runTransaction, doc } = firestoreDispute(
         { File_Attente_Combat: [{ idPersonnage: "M1" }, { idPersonnage: "H1" }] }, 99);
     const w = { ID_PARTIE_COURANTE: "P1" };
-    poserModifier(w, runTransaction);
+    poserModifier(w, runTransaction, doc);
     const traces = [];
     w.tracerCombat = (i, q, d2) => traces.push(`${i} ${q} ${d2 || ""}`);
     console.error = () => {};
@@ -261,7 +273,7 @@ console.log("\n5. LE COMPTEUR DU JOURNAL A QUITTÉ LE DOCUMENT DE LA PARTIE");
     verifier("l'ancien compteur n'est plus lu que comme plancher de reprise",
              /plancher/.test(reservation));
     verifier("et les numéros se réservent en un seul passage",
-             /reserverNumerosEvenements\(idPartie, liste\.length\)/.test(app));
+             /reserverNumerosEvenements\(idPartie, liste\.length, cleDuTour\(liste\[0\]\)\)/.test(app));
 }
 
 // =========================================================================
@@ -275,21 +287,21 @@ console.log("\n6. LE VERROU NE SE VOLE PLUS SUR UNE HORLOGE QUI MENT");
 //  l'instant, le volait, et calculait le tour en parallèle.
 {
     // Un seul Firestore, deux postes : c'est tout l'enjeu.
-    const { etat, runTransaction } = firestoreDispute({});
+    const { etat, runTransaction, doc } = firestoreDispute({});
     const pc = { ID_PARTIE_COURANTE: "P1" }, ipad = { ID_PARTIE_COURANTE: "P1" };
-    poserVerrou(pc, runTransaction);
-    poserVerrou(ipad, runTransaction);
+    poserVerrou(pc, runTransaction, doc);
+    poserVerrou(ipad, runTransaction, doc);
 
     const cle = "tour|M1|2";
     verifier("le PC prend le verrou", (await pc.__reclamerVerrouIA(cle)) === true);
 
     // L'iPad a une minute d'avance. Avec l'ancienne règle, il trouvait le verrou
     // vieux de soixante secondes — donc abandonné — et jouait le tour lui aussi.
-    etat.doc.ts = Date.now() - 60000;
+    etat.verrou.ts = Date.now() - 60000;
     verifier("l'iPad en avance d'une minute ne le vole PAS",
              (await ipad.__reclamerVerrouIA(cle)) === false,
-             `(verrou à ${etat.doc.client})`);
-    verifier("le verrou est toujours au PC", etat.doc.client !== undefined);
+             `(verrou à ${etat.verrou.client})`);
+    verifier("le verrou est toujours au PC", etat.verrou.client !== undefined);
 
     // Et il ne le vole toujours pas au deuxième coup d'œil : ce qui compte,
     // c'est depuis combien de temps LUI le voit, pas l'heure qu'il est ailleurs.
@@ -303,16 +315,16 @@ console.log("\n7. LE VERROU BOUSCULÉ EST RETENTÉ, PAS ABANDONNÉ");
 //  au moment précis où la file avançait : les deux écrivent le document de la
 //  partie. Renoncer là, c'est une créature que personne ne joue.
 {
-    const { etat, runTransaction } = firestoreDispute({}, 2);
+    const { etat, runTransaction, doc } = firestoreDispute({}, 2);
     const w = { ID_PARTIE_COURANTE: "P1" };
     const traces = [];
     w.tracerCombat = (i, q) => traces.push(`${i} ${q}`);
-    poserVerrou(w, runTransaction);
+    poserVerrou(w, runTransaction, doc);
     console.error = () => {};
 
     verifier("après deux bousculades, le verrou finit par être pris",
              (await w.__reclamerVerrouIA("tour|M1|1")) === true);
-    verifier("et il est bien écrit en base", !!etat.doc.cle);
+    verifier("et il est bien écrit en base", !!etat.verrou.cle);
     verifier("la trace montre les reprises", traces.filter(t => t.startsWith("♻️")).length === 2,
              `(${traces.join(" | ")})`);
 }
@@ -394,10 +406,10 @@ console.log("\n9. UNE CRÉATURE NE JOUE PAS DEUX FOIS, SUR DEUX APPAREILS");
 //     est maintenant écrit dans le verrou, donc partagé : un poste qui arrive
 //     après coup le lit et renonce, verrou périmé ou pas.
 {
-    const { etat, runTransaction } = firestoreDispute({});
+    const { etat, runTransaction, doc } = firestoreDispute({});
     const pc = { ID_PARTIE_COURANTE: "P1" }, ipad = { ID_PARTIE_COURANTE: "P1" };
-    poserVerrou(pc, runTransaction);
-    poserVerrou(ipad, runTransaction);
+    poserVerrou(pc, runTransaction, doc);
+    poserVerrou(ipad, runTransaction, doc);
     const traces = [];
     ipad.tracerCombat = (i, q, d2) => traces.push(`${i} ${q}`);
     console.error = () => {};
@@ -413,12 +425,12 @@ console.log("\n9. UNE CRÉATURE NE JOUE PAS DEUX FOIS, SUR DEUX APPAREILS");
     // Le PC joue, puis clôt le tour. La marque part en base.
     await pc.__marquerTourIATermine(cle);
     verifier("le tour est marqué fini en base, pas seulement chez le PC",
-             etat.doc.fini === true, `(${JSON.stringify(etat.doc)})`);
+             etat.verrou.fini === true, `(${JSON.stringify(etat.verrou)})`);
 
     // L'iPad revient BIEN PLUS TARD — le verrou serait périmé sur n'importe
     // quelle montre. C'est exactement le cas de la trace : il ne doit rien
     // rejouer.
-    etat.doc.ts = Date.now() - 10 * 60 * 1000;
+    etat.verrou.ts = Date.now() - 10 * 60 * 1000;
     verifier("même une heure plus tard, l'iPad ne rejoue pas ce tour",
              (await ipad.__reclamerVerrouIA(cle)) === false);
     verifier("et il dit qui l'a joué", traces.some(t => t.includes("tour déjà joué par")),
@@ -444,9 +456,14 @@ console.log("\n10. LA CLÉ DU VERROU NE DÉPEND PLUS DE LA FILE");
              /cleMort = `mort\|\$\{enTeteMort\.idPersonnage\}\|\$\{manche\}`/.test(ia));
     verifier("plus aucune clé de verrou ne s'appuie sur un horodatage de file",
              !/cle\w* = `(tour|mort)\|\$\{[^`]*\.timestamp\}`/.test(ia));
-    verifier("et le verrou a quitté le document de la partie",
-             /refVerrouIA = \(idPartie\) => doc\(db, "Systeme_Parties", idPartie, "Journal_Combat"/.test(ia)
-             && !/tx\.update\(partieRef, \{ Verrou_IA/.test(ia));
+    verifier("le verrou a son propre document",
+             /refVerrouIA = \(idPartie\) => doc\(db, "Systeme_Parties", idPartie, "Journal_Combat"/.test(ia));
+    // Il en garde une copie dans la partie tant qu'un appareil peut n'avoir pas
+    // rechargé sa page : deux verrous qui ne se voient pas, ce sont deux postes
+    // qui jouent la même créature.
+    verifier("mais il reste lisible d'un poste resté sur l'ancienne version",
+             /tx\.update\(partieRef, \{ Verrou_IA: marque \}\)/.test(ia)
+             && /snapPartie\.data\(\)\.Verrou_IA/.test(ia));
     const app = fs.readFileSync('/home/user/Ivalis/app.js', 'utf-8');
     verifier("et le ménage de fin de combat l'efface",
              /deleteDoc\(doc\(db, COL\.PARTIES, partie, COL_JOURNAL, "verrou"\)\)/.test(app));

@@ -213,6 +213,32 @@ Le verrou lui-même a quitté le document de la partie pour
 de fin de combat l'efface avec le journal. Chapitres 9 et 10 de
 `file_bousculee.mjs`.
 
+**Un tour appartient à UN SEUL poste, et c'est le journal qui tranche.** Quatrième
+trace : P_03 prend le verrou de `MONSTRE_13sb8te`, le joue, publie l'événement 1
+— et l'événement 2 arrive « de P_01 », la même carte sur la même cible. L'autre
+poste a joué le tour **sans avoir le verrou**. Un verrou est une pièce à part :
+un appareil dont la page n'a pas été rechargée, une écriture bousculée, un
+plateau désynchronisé peuvent le prendre en défaut. Deux réponses.
+
+*La dernière ligne.* Il existe un point de passage obligé, où une seule
+transaction fait déjà autorité : la réservation des numéros du journal. On y
+inscrit désormais **à qui appartient le tour** (acteur + manche, trente entrées
+de mémoire). Un second poste qui tente de publier le même tour n'obtient pas de
+numéros, et son récit ne part jamais — quel que soit l'état du verrou, quelle que
+soit la version d'en face. Le ménage de fin de combat libère les tours avec le
+reste. Chapitres 7 et 8 de `journal_firestore.mjs`.
+
+*La passerelle de version.* Le verrou avait déménagé dans son propre document
+sans passerelle : un poste resté sur l'ancienne version écrivait toujours dans
+celui de la partie, et **les deux verrous ne se voyaient pas**. Il est maintenant
+lu et écrit **aux deux emplacements dans la même transaction**, tant qu'un
+appareil peut être en retard d'une version.
+
+*Et pour le voir.* `window.VERSION_IVALIS` (dans `trace_combat.js`, à monter avec
+les `?v=` d'`index.html`) voyage avec chaque événement publié : la trace affiche
+`📥 2 carte M1 [de P_01 v24]`. Une ligne suffit alors à repérer l'appareil qui
+n'a pas rechargé.
+
 **La trace du combat.** `trace_combat.js` est chargé avant tout le reste et
 écrit dans la console une ligne par chose qui arrive : événement publié, reçu,
 retenu par le OK, rejoué, fin de tour, verrou de l'IA — et surtout **chaque

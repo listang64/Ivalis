@@ -491,7 +491,33 @@ const refCompteurEvenements = (idPartie) => doc(db, COL.PARTIES, idPartie, COL_J
 // Réserve `combien` numéros d'un coup et rend le premier. Une seule transaction,
 // sur un document que personne d'autre n'écrit : elle ne peut pas se faire
 // doubler par la file d'initiative ou le verrou de l'IA.
-async function reserverNumerosEvenements(idPartie, combien) {
+// UN TOUR APPARTIENT À UN SEUL POSTE, ET C'EST LE JOURNAL QUI TRANCHE.
+//
+// Le verrou de l'IA sert à ça — mais c'est une pièce à part, qu'un poste en
+// retard d'une version, une écriture bousculée ou un plateau désynchronisé peut
+// prendre en défaut. Or il existe un endroit par lequel TOUT passe forcément, et
+// où une seule transaction fait déjà autorité : la réservation des numéros
+// d'événements. On y inscrit donc, en même temps que les numéros, à QUI
+// appartient le tour en cours (l'acteur et la manche). Un second poste qui
+// tente de publier le même tour se voit refuser ses numéros, et son récit ne
+// part jamais. C'est la dernière ligne, celle qui ne dépend de rien d'autre.
+const MEMOIRE_TOURS = 30;          // de quoi couvrir largement une manche
+
+function arbitrerTour(tours, tour) {
+    if (!tour || !tour.cle || !tour.auteur) return true;
+    const proprietaire = tours[tour.cle];
+    if (proprietaire && proprietaire !== tour.auteur) return false;
+    if (!proprietaire) {
+        tours[tour.cle] = tour.auteur;
+        const cles = Object.keys(tours);
+        if (cles.length > MEMOIRE_TOURS) {
+            cles.slice(0, cles.length - MEMOIRE_TOURS).forEach(k => delete tours[k]);
+        }
+    }
+    return true;
+}
+
+async function reserverNumerosEvenements(idPartie, combien, tour) {
     const ref = refCompteurEvenements(idPartie);
     // LE COMBAT DÉJÀ COMMENCÉ. Une partie ouverte avant ce changement compte
     // déjà, disons, quarante-deux événements — dans l'ancien champ de la partie,
@@ -502,11 +528,22 @@ async function reserverNumerosEvenements(idPartie, combien) {
     const plancher = parseInt((window.PARTIE_DATA || {}).Compteur_Evenements) || 0;
     return await runTransaction(db, async (tx) => {
         const snap = await tx.get(ref);
-        const courant = snap.exists() ? (parseInt(snap.data().n) || 0) : plancher;
+        const donnees = snap.exists() ? (snap.data() || {}) : {};
+        const courant = snap.exists() ? (parseInt(donnees.n) || 0) : plancher;
+        const tours = { ...(donnees.tours || {}) };
+
+        // Ce tour appartient-il à quelqu'un d'autre ? Alors on ne publie rien.
+        if (!arbitrerTour(tours, tour)) {
+            if (typeof window.tracerCombat === "function") {
+                window.tracerCombat("🚷", `tour déjà publié par ${tours[tour.cle]}`, tour.cle);
+            }
+            return null;
+        }
+
         const debut = courant + 1;
         // set, et non update : le tout premier événement d'une partie trouve un
         // document qui n'existe pas encore.
-        tx.set(ref, { n: courant + combien });
+        tx.set(ref, { n: courant + combien, tours });
         return debut;
     });
 }
@@ -526,10 +563,16 @@ function journalHorsService(e) {
 
 // LE NUMÉRO EST ATTRIBUÉ SOUS TRANSACTION, sur le compteur du journal : deux
 // postes qui publient au même instant ne peuvent pas tomber sur le même.
+// La clé d'un tour : son acteur et sa manche. Elle se déduit de l'événement
+// lui-même, donc aucun appelant n'a à s'en occuper.
+const cleDuTour = (ev) => (ev && ev.acteur)
+    ? { cle: `${ev.acteur}|${ev.tour === undefined ? "" : ev.tour}`, auteur: ev.auteur || "?" }
+    : null;
+
 window.publierEvenementCombat = async function(idPartie, evenement) {
     if (!idPartie) return null;
     try {
-        const n = await reserverNumerosEvenements(idPartie, 1);
+        const n = await reserverNumerosEvenements(idPartie, 1, cleDuTour(evenement));
         if (!n) return null;
         await setDoc(refEvenement(idPartie, n), {
             ...evenement, ID_Partie: idPartie, n, horodatage: Date.now()
@@ -555,7 +598,7 @@ window.publierEvenementsCombat = async function(idPartie, evenements) {
     if (!idPartie || liste.length === 0) return [];
     try {
         // Le PREMIER numéro de la série ; les suivants s'en déduisent.
-        const premier = await reserverNumerosEvenements(idPartie, liste.length);
+        const premier = await reserverNumerosEvenements(idPartie, liste.length, cleDuTour(liste[0]));
         if (!premier) return [];
 
         const lot = writeBatch(db);

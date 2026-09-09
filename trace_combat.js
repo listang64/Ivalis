@@ -30,6 +30,14 @@
 //  coupe entièrement avec `TRACE_COMBAT_ACTIVE = false`.
 // =========================================================================
 
+// LA VERSION DE CE POSTE. Elle voyage avec chaque événement publié, et la trace
+// l'affiche à la réception : « 📥 2 carte M1 [de P_01 v24] ». Une seule ligne
+// suffit alors à voir qu'un appareil n'a pas rechargé la page et tourne encore
+// sur du vieux code — ce qui, dans un jeu où deux postes doivent s'entendre sur
+// qui joue, fabrique des bugs impossibles à comprendre autrement.
+// À MONTER À CHAQUE FOIS QUE index.html monte ses ?v=.
+window.VERSION_IVALIS = 25;
+
 window.TRACE_COMBAT_ACTIVE = true;
 // Quand une écriture de points de vie n'est ni un coup ni un rejeu mais une
 // remise en ordre de l'affichage, elle le dit : sans ça la trace est illisible.
@@ -126,5 +134,6 @@ window.surveillerLesCombattants = function() {
     (window.PERSOS_PARTIE || []).forEach(window.surveillerCombattant);
 };
 
-console.log("%cTrace du combat active. copierTrace() pour l'envoyer, effacerTrace() pour repartir de zéro.",
+console.log("%cTrace du combat active — version " + window.VERSION_IVALIS
+            + ". copierTrace() pour l'envoyer, effacerTrace() pour repartir de zéro.",
             "color:#c2a878; font-style:italic");

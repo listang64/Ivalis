@@ -217,7 +217,8 @@ window.consignerEtapeTour = async function(type, donnee) {
         tour: (window.PARTIE_DATA || {}).Tour_Combat || 0,
         data: JSON.parse(JSON.stringify(donnee || {})),
         avant: valeursAvant(idsConcernes(donnee)),
-        auteur: monPoste()
+        auteur: monPoste(),
+        v: window.VERSION_IVALIS || 0
     });
 
     // Ce que ce poste vient de publier, il le voit se dérouler en direct (c'est
@@ -269,7 +270,8 @@ window.consignerEtapesTour = async function(type, listeDeDonnees) {
         tour,
         data: JSON.parse(JSON.stringify(donnee || {})),
         avant: valeursAvant(idsConcernes(donnee)),
-        auteur: monPoste()
+        auteur: monPoste(),
+        v: window.VERSION_IVALIS || 0
     }));
 
     const numeros = await window.publierEvenementsCombat(window.ID_PARTIE_COURANTE, evenements);
@@ -598,7 +600,7 @@ window.lireJournalCombat = async function() {
             dejaServiAvant = new Set();
             const garde = gardeDeRejeu(ev);
             tracer("▶️", `${suivant} ${ev.type} ${ev.acteur || "?"}`,
-                   `${resumeDonnee(ev.data)} [de ${ev.auteur || "?"}]`);
+                   `${resumeDonnee(ev.data)} [de ${ev.auteur || "?"} v${ev.v || "?"}]`);
             try {
                 await window.filerAnimation(ev.type, () => jouer(ev.data));
             } finally {
@@ -683,7 +685,7 @@ window.suivreSequenceTour = function(partie) {
                             if (ev && ev.n > window.DERNIER_EVENEMENT_JOUE) {
                                 if (!window.EVENEMENTS_RECUS[ev.n]) {
                                     tracer("📥", `${ev.n} ${ev.type} ${ev.acteur || "?"}`,
-                                           `[de ${ev.auteur || "?"}]`);
+                                           `[de ${ev.auteur || "?"} v${ev.v || "?"}]`);
                                 }
                                 window.EVENEMENTS_RECUS[ev.n] = ev;
                             }

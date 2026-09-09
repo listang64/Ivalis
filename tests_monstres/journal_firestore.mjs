@@ -376,5 +376,98 @@ console.log("\n6. UNE PARTIE COMMENCÉE AVANT LE CHANGEMENT NE REPART PAS DE ZÉ
     verifier("et la suite s'enchaîne sans trou", suite.join(",") === "44,45", `(${suite.join(",")})`);
 }
 
+// =========================================================================
+console.log("\n7. UN TOUR APPARTIENT À UN SEUL POSTE — LE JOURNAL TRANCHE");
+// =========================================================================
+//  Quatrième trace de Nico, et le verrou n'y était pour rien : P_03 prend le
+//  verrou de MONSTRE_13sb8te, le joue, publie l'événement 1 — et l'événement 2
+//  arrive « de P_01 », la même carte sur la même cible. L'autre poste a joué le
+//  tour SANS avoir le verrou. Un verrou est une pièce à part : un appareil dont
+//  la page n'a pas été rechargée, une écriture bousculée, un plateau
+//  désynchronisé peuvent le prendre en défaut.
+//
+//  Il existe pourtant un point de passage OBLIGÉ, où une seule transaction fait
+//  déjà autorité : la réservation des numéros du journal. On y inscrit à qui
+//  appartient le tour. Un second poste qui tente de publier le même tour n'a
+//  pas de numéros, donc pas de récit. C'est la dernière ligne, celle qui ne
+//  dépend d'aucune autre pièce.
+{
+    const monde = firestoreExigeant();
+    const w = chargerJournal(monde);
+    monde.base["Systeme_Parties/P1"] = { Compteur_Evenements: 0 };
+    console.error = () => {};
+    const traces = [];
+    w.tracerCombat = (i, q, d2) => traces.push(`${i} ${q} ${d2 || ""}`);
+
+    const carte = (auteur) => ({ type: "carte", acteur: "MONSTRE_13sb8te", tour: 1,
+                                 auteur, data: { idCible: "PERSO_250418" } });
+
+    // P_03 joue le tour et publie.
+    const n1 = await w.publierEvenementCombat("P1", carte("P_03"));
+    verifier("le premier poste publie son tour", n1 === 1, `(n=${n1})`);
+
+    // P_01, qui n'aurait jamais dû jouer, tente de publier le même tour.
+    const n2 = await w.publierEvenementCombat("P1", carte("P_01"));
+    verifier("le second poste est refusé", n2 === null, `(n=${n2})`);
+    verifier("et rien de lui n'est entré dans le journal",
+             Object.keys(monde.base).filter(c => c.includes("Evenements_Combat")).length === 1);
+    verifier("la trace dit à qui appartenait le tour",
+             traces.some(t => t.startsWith("🚷") && t.includes("P_03")), `(${traces.join(" | ")})`);
+
+    // Le poste propriétaire, lui, continue son tour sans entrave : déplacement
+    // en plusieurs hexagones, puis carte.
+    const suite = await w.publierEvenementsCombat("P1",
+        [1, 2, 3].map(i => ({ type: "pas", acteur: "MONSTRE_13sb8te", tour: 1,
+                              auteur: "P_03", data: { de: { q: i, r: 0 }, vers: { q: i + 1, r: 0 } } })));
+    verifier("le propriétaire enchaîne ses hexagones", suite.join(",") === "2,3,4", `(${suite.join(",")})`);
+
+    // Et un lot entier venu de l'autre poste est refusé en bloc.
+    const refuse = await w.publierEvenementsCombat("P1",
+        [1, 2].map(() => ({ type: "pas", acteur: "MONSTRE_13sb8te", tour: 1, auteur: "P_01", data: {} })));
+    verifier("un trajet entier de l'intrus est refusé en bloc", refuse.length === 0,
+             `(${refuse.join(",")})`);
+    verifier("les numéros n'ont pas bougé pour autant",
+             monde.base["Systeme_Parties/P1/Journal_Combat/compteur"].n === 4);
+
+    // La MANCHE SUIVANTE de la même créature est un autre tour : elle appartient
+    // à qui la prend, fût-ce l'autre poste.
+    const manche2 = await w.publierEvenementCombat("P1",
+        { type: "carte", acteur: "MONSTRE_13sb8te", tour: 2, auteur: "P_01", data: {} });
+    verifier("la manche suivante appartient à qui la prend", manche2 === 5, `(n=${manche2})`);
+
+    // Et deux combattants DIFFÉRENTS dans la même manche ne se gênent pas.
+    const autre = await w.publierEvenementCombat("P1",
+        { type: "carte", acteur: "PERSO_338423", tour: 1, auteur: "P_01", data: {} });
+    verifier("deux combattants différents publient chacun le sien", autre === 6, `(n=${autre})`);
+}
+
+// =========================================================================
+console.log("\n8. LE MÉNAGE EFFACE AUSSI LA PROPRIÉTÉ DES TOURS");
+// =========================================================================
+//  Sinon la rencontre suivante, qui repart à la manche 1, retrouverait les
+//  tours de la précédente déjà attribués — et plus personne ne pourrait publier.
+{
+    const monde = firestoreExigeant();
+    const w = chargerJournal(monde);
+    monde.base["Systeme_Parties/P1"] = { Compteur_Evenements: 0 };
+    console.error = () => {};
+    w.oublierJournalCombat = () => {};
+
+    await w.publierEvenementCombat("P1", { type: "carte", acteur: "M1", tour: 1, auteur: "P_03", data: {} });
+    verifier("le tour est attribué",
+             (monde.base["Systeme_Parties/P1/Journal_Combat/compteur"].tours || {})["M1|1"] === "P_03");
+
+    await w.viderJournalCombat("P1");
+    const apres = monde.base["Systeme_Parties/P1/Journal_Combat/compteur"];
+    verifier("le ménage remet le compteur à zéro", apres.n === 0);
+    verifier("et libère tous les tours",
+             !apres.tours || Object.keys(apres.tours).length === 0,
+             `(${JSON.stringify(apres.tours)})`);
+
+    const rejoue = await w.publierEvenementCombat("P1",
+        { type: "carte", acteur: "M1", tour: 1, auteur: "P_01", data: {} });
+    verifier("un autre poste peut publier la manche 1 du combat suivant", rejoue === 1, `(n=${rejoue})`);
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);
