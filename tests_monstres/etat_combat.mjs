@@ -392,5 +392,83 @@ console.log("\n9. MILLE PAS AU HASARD, SANS UN SEUL ÉTAT INCOHÉRENT");
     verifier("la version a bien avancé de un en un", etat.version === 1000);
 }
 
+// =========================================================================
+console.log("\nLES MAXIMA SONT DES FORMULES, PAS DES CHAMPS");
+// =========================================================================
+//  Le premier vrai combat en nouveau régime a été refusé par les invariants :
+//  « PERSO_250418 : 110 d'énergie pour un maximum de 100 ». Le héros n'avait
+//  rien d'anormal — il était Humain, et l'atout de son peuple donne +10
+//  d'énergie maximale. La fiche porte 100, le jeu calcule 110, et lire le champ
+//  brut fabriquait un combattant hors de ses propres bornes avant même le
+//  premier tour.
+//
+//  Les bornes viennent donc des formules du jeu, injectées comme les défenses.
+{
+    const ATOUTS = { Humain: { fatigueMax: 10 }, Gob: { esquive: 3 } };
+    const reglesDuJeu = {
+        atouts: (p) => ATOUTS[p.race] || {},
+        fatigueMax: (p) => (parseInt(p.Fatigue_Max) || 100)
+                         + (parseInt(p.Dev_Mod_Fatigue) || 0)
+                         + ((ATOUTS[p.race] || {}).fatigueMax || 0),
+        pvMax: (p) => (parseInt(p.PV_Max) || 0) + (parseInt(p.Dev_Mod_PV) || 0)
+    };
+    const humain = {
+        idPersonnage: "H1", race: "Humain", idJoueur: "P_03", camp: "Allié",
+        PV_Max: 60, PV_Actuels: 60, Fatigue_Max: 100, Fatigue_Actuelle: 110,
+        Esquive: 0, Parade: 0, Bouclier_Actuel: 0, Etats_Alteres: [], statut: "Vivant"
+    };
+
+    const avec = construireEtatCombat({
+        idPartie: "G", cerveau: "P_03", graine: 1, combattants: [humain],
+        positions: { H1: { q: 0, r: 0 } },
+        partie: { Phase_Combat: "Resolution", Ordre_Initiative: ["H1"],
+                  File_Attente_Combat: [{ idPersonnage: "H1" }] },
+        regles: reglesDuJeu
+    });
+    verifier("l'atout de race entre dans le maximum d'énergie",
+             avec.combattants.H1.fatigueMax === 110, `(${avec.combattants.H1.fatigueMax})`);
+    verifier("un Humain à 110/110 est un état PARFAITEMENT cohérent",
+             verifierEtatCombat(avec).length === 0, verifierEtatCombat(avec).join(" | "));
+
+    // Et sans les formules du jeu, on retombe sur le calcul brut : c'est ce
+    // dont un banc a besoin, et ça ne doit pas changer.
+    const sans = construireEtatCombat({
+        idPartie: "G", cerveau: "P_03", graine: 1,
+        combattants: [{ ...humain, Fatigue_Actuelle: 100 }],
+        positions: { H1: { q: 0, r: 0 } },
+        partie: { Phase_Combat: "Resolution", Ordre_Initiative: ["H1"],
+                  File_Attente_Combat: [{ idPersonnage: "H1" }] }
+    });
+    verifier("sans formule injectée, le calcul brut tient toujours",
+             sans.combattants.H1.fatigueMax === 100, `(${sans.combattants.H1.fatigueMax})`);
+
+    // Le Dev_Mod continue de s'ajouter, avec ou sans formule.
+    const modifie = construireEtatCombat({
+        idPartie: "G", cerveau: "P_03", graine: 1,
+        combattants: [{ ...humain, Dev_Mod_Fatigue: 25, Fatigue_Actuelle: 135 }],
+        positions: { H1: { q: 0, r: 0 } },
+        partie: { Phase_Combat: "Resolution", Ordre_Initiative: ["H1"],
+                  File_Attente_Combat: [{ idPersonnage: "H1" }] },
+        regles: reglesDuJeu
+    });
+    verifier("les retouches de fiche s'ajoutent à l'atout",
+             modifie.combattants.H1.fatigueMax === 135, `(${modifie.combattants.H1.fatigueMax})`);
+    verifier("et l'état reste cohérent", verifierEtatCombat(modifie).length === 0);
+
+    // ET L'INVARIANT DOIT TOUJOURS MORDRE quand c'est vraiment faux : ce n'est
+    // pas parce qu'il s'est trompé de coupable qu'il faut le désarmer.
+    const faux = construireEtatCombat({
+        idPartie: "G", cerveau: "P_03", graine: 1,
+        combattants: [{ ...humain, Fatigue_Actuelle: 400 }],
+        positions: { H1: { q: 0, r: 0 } },
+        partie: { Phase_Combat: "Resolution", Ordre_Initiative: ["H1"],
+                  File_Attente_Combat: [{ idPersonnage: "H1" }] },
+        regles: reglesDuJeu
+    });
+    verifier("une énergie vraiment hors bornes est toujours refusée",
+             verifierEtatCombat(faux).some(s2 => /énergie/.test(s2)),
+             verifierEtatCombat(faux).join(" | "));
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

@@ -435,6 +435,41 @@ que le régime n'écrit jamais dans l'ancien monde (ni `Action_*`, ni
 attrape la classe d'erreur qu'aucun test de combat ne peut voir : un oubli de
 garde ne se verrait qu'en jeu, un soir, au milieu d'un combat.
 
+### Ce que les premiers vrais essais ont appris
+
+Trois choses, et aucune n'était visible depuis un banc. Elles sont toutes les
+trois épinglées par un contrôle maintenant.
+
+**Les maxima sont des formules, pas des champs.** Le premier combat ouvert en
+nouveau régime a été refusé par les invariants : « 110 d'énergie pour un maximum
+de 100 ». Le héros n'avait rien d'anormal — il était Humain, et l'atout de son
+peuple donne +10 d'énergie maximale. La fiche porte 100, le jeu calcule 110, et
+lire le champ brut fabriquait un combattant hors de ses propres bornes avant même
+le premier tour. Les bornes viennent désormais des formules du jeu, injectées
+comme les défenses.
+
+**Un refus d'ouvrir ne doit jamais laisser la table sans rien.** C'est le piège
+que ce même essai a révélé, et il était de ma fabrication : refuser de publier un
+état incohérent est la bonne décision, mais l'ancien rejeu étant éteint sous le
+nouveau régime, la table s'est retrouvée sans cerveau ET sans ancien monde. Un
+plateau qui n'avance plus, deux joueurs devant leurs cartes. L'échec rebascule
+maintenant sur l'ancien régime immédiatement, décoche la case, et laisse la
+raison écrite dans la trace pour qu'on la corrige à froid.
+
+**Une fonction peut avoir deux métiers.** `verifierTourIAMonstres` fait choisir
+leur technique aux créatures pendant la préparation, et leur fait jouer leur tour
+pendant la résolution. Seul le second appartient au cerveau. En la coupant
+entière, les créatures ne posaient plus jamais leur carte : la file restait
+incomplète, la phase ne passait jamais en résolution, et la piste d'initiative ne
+se lançait pas — sans que rien ne dise pourquoi.
+
+Et la leçon commune aux trois : **une trace qui ne dit pas dans quel monde elle
+se trouve fait perdre une soirée.** Le tout premier essai a tourné entièrement en
+ancien régime sans que rien ne l'annonce ; il a fallu relire la trace ligne à
+ligne pour comprendre que le drapeau n'était pas allumé. Le régime s'annonce
+maintenant au début de chaque combat, allumé ou non — c'est précisément quand il
+est éteint que l'information manque.
+
 ### Deux coutures assumées
 
 Elles sont écrites dans le code, à l'endroit exact où elles se trouvent :

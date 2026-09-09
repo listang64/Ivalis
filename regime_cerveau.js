@@ -445,6 +445,14 @@ function sourceDuJeu() {
         partie: window.PARTIE_DATA || {},
         zones: window.ZONES_PERSISTANTES || {},
         regles: {
+            // LES MAXIMA D'ABORD, parce que ce sont eux qui ont fait échouer le
+            // premier vrai combat : un Humain a +10 d'énergie maximale par
+            // l'atout de son peuple, la fiche porte 100 et le jeu calcule 110.
+            // Lire le champ brut donnait « 110 d'énergie pour un maximum de
+            // 100 », et les invariants refusaient d'ouvrir le combat — à juste
+            // titre.
+            pvMax: window.pvMaxCombattant,
+            fatigueMax: window.fatigueMaxCombattant,
             esquive: window.esquiveCombattant,
             parade: window.paradeCombattant,
             defPhysique: window.defPhysiqueCombattant,
@@ -537,7 +545,34 @@ if (typeof window !== "undefined") {
             const publie = REGIME.etatPublie();
             const file = (partie.File_Attente_Combat || []);
             if (!publie) {
-                REGIME.ouvrir(sourceDuJeu());
+                // SI L'OUVERTURE ÉCHOUE, ON REVIENT À L'ANCIEN RÉGIME. TOUT DE
+                // SUITE, ET ON LE DIT.
+                //
+                // C'est le piège que le premier vrai essai a révélé : les
+                // invariants ont refusé d'ouvrir (à juste titre — un héros
+                // était hors de ses bornes), et comme l'ancien rejeu est éteint
+                // sous le nouveau régime, la table s'est retrouvée SANS RIEN.
+                // Ni cerveau, ni ancien monde : un plateau qui n'avance plus.
+                //
+                // Un refus d'ouvrir est une bonne chose — mieux vaut ne pas
+                // publier qu'un état incohérent. Mais il ne doit jamais coûter
+                // la soirée : on rebascule, le combat se joue comme avant, et
+                // la raison reste écrite noir sur blanc dans la trace pour
+                // qu'on la corrige à froid.
+                REGIME.ouvrir(sourceDuJeu()).then(etat => {
+                    if (etat) return;
+                    if (typeof window.tracerCombat === "function") {
+                        window.tracerCombat("↩️", "retour à l'ANCIEN régime",
+                                            "le combat n'a pas pu s'ouvrir — on ne laisse pas la table sans rien");
+                    }
+                    console.warn("Nouveau régime : ouverture refusée, retour à l'ancien. "
+                                 + "La raison est dans la ligne ❌ juste au-dessus.");
+                    window.REGIME_CERVEAU = false;
+                    try { localStorage.setItem("REGIME_CERVEAU", "0"); } catch (e) {}
+                    const caseRegime = document.getElementById("toggle-regime-cerveau");
+                    if (caseRegime) caseRegime.checked = false;
+                    if (REGIME) { REGIME.debrancher(); REGIME = null; partieSuivie = null; }
+                }).catch(e => console.error("Ouverture du combat :", e));
             } else if (REGIME.jeSuisLeCerveau()) {
                 REGIME.ouvrirLaManche(file);
             }

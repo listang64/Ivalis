@@ -226,10 +226,51 @@ async function unCombat(numero) {
     }
   };
 
-  const db={}, doc=()=>({}), getDoc=async()=>({exists:()=>true,data:()=>structuredClone(partie)});
-  const updateDoc=async(_r,d)=>{Object.assign(partie,structuredClone(d));};
-  const runTransaction=async(_d,fn)=>fn({ get:async()=>({exists:()=>true,data:()=>structuredClone(partie)}),
-                                          update:(_r,d)=>Object.assign(partie,structuredClone(d)) });
+  // UN FIRESTORE DE BANC QUI SAIT DISTINGUER DEUX DOCUMENTS.
+  //
+  // Il n'en connaissait qu'un : doc() rendait toujours le même objet vide, et
+  // toute lecture rendait la partie. Le verrou de l'IA, lui, vit dans SON
+  // document — et sa transaction appelle tx.set, que ce faux Firestore ne
+  // savait pas faire. Résultat : reclamerVerrouIA levait « tx.set is not a
+  // function » à chaque manche, preparerCartesMonstres échouait en silence, et
+  // ce banc de cent combats ne testait pas la fonction qu'il croyait tester.
+  //
+  // C'est la même faute que celle qui a coûté le premier vrai essai du nouveau
+  // régime, en plus discret : un contrôle qui avale l'échec de son propre sujet
+  // ne contrôle rien.
+  const autresDocs = new Map();
+  const db = {};
+  // Le premier argument est db ; les suivants forment le chemin. Sans chemin
+  // (les appels du banc lui-même), on désigne la partie.
+  const doc = (...seg) => ({ segments: seg.filter(x => typeof x === "string") });
+  // LA PARTIE, c'est Systeme_Parties/{id} : deux segments. Ce qui est plus
+  // profond — Journal_Combat/verrou, par exemple — est un AUTRE document, et
+  // c'est tout l'intérêt de ce faux Firestore : les confondre, c'était faire
+  // lire le verrou dans la partie et réciproquement.
+  const estLaPartie = (ref) => !ref || !ref.segments || ref.segments.length <= 2;
+  const cheminDe = (ref) => (ref.segments || []).join("/");
+  const lire = (ref) => estLaPartie(ref) ? structuredClone(partie)
+                                         : (autresDocs.get(cheminDe(ref)) || null);
+  const instantane = (ref) => {
+    const d = lire(ref);
+    return { exists: () => d !== null, data: () => d ? structuredClone(d) : null };
+  };
+  const ecrire = (ref, d, fusionner) => {
+    if (estLaPartie(ref)) { Object.assign(partie, structuredClone(d)); return; }
+    const avant = fusionner ? (autresDocs.get(cheminDe(ref)) || {}) : {};
+    autresDocs.set(cheminDe(ref), { ...avant, ...structuredClone(d) });
+  };
+
+  const getDoc = async (ref) => instantane(ref);
+  const updateDoc = async (ref, d) => ecrire(ref, d, true);
+  const setDoc = async (ref, d) => ecrire(ref, d, false);
+  const deleteDoc = async (ref) => { if (!estLaPartie(ref)) autresDocs.delete(cheminDe(ref)); };
+  const runTransaction = async (_d, fn) => fn({
+    get: async (ref) => instantane(ref),
+    set: (ref, d) => ecrire(ref, d, false),
+    update: (ref, d) => ecrire(ref, d, true),
+    delete: (ref) => { if (!estLaPartie(ref)) autresDocs.delete(cheminDe(ref)); }
+  });
   const srcIA = fs.readFileSync('/home/user/Ivalis/monstres_ia.js','utf-8')
     .replace(/^import[\s\S]*?from\s+"[^"]+";/gm,'').replace(/await pause\(\d+\);/g, 'await pause(0);');
   // Les lectures de stats mutualisées vivent dans app.js, chargé avant tout le

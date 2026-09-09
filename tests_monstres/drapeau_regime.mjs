@@ -258,5 +258,44 @@ console.log("\n8. LE DRAPEAU COCHÉ EN COURS DE COMBAT NE RESTE PAS MUET");
              r.includes('if (phase === "Preparation") aPrevenuSansCombat = false;'));
 }
 
+// =========================================================================
+console.log("\n9. UN REFUS D'OUVRIR NE DOIT JAMAIS LAISSER LA TABLE SANS RIEN");
+// =========================================================================
+//  Le piège que le premier vrai essai a révélé, et il est de ma fabrication.
+//
+//  Les invariants ont refusé d'ouvrir le combat — à juste titre, un héros était
+//  hors de ses bornes. Mais comme l'ancien rejeu est éteint sous le nouveau
+//  régime, la table s'est retrouvée SANS RIEN : ni cerveau, ni ancien monde, un
+//  plateau qui n'avance plus et deux joueurs devant leurs cartes.
+//
+//  Refuser de publier un état incohérent reste la bonne décision. Ce qui était
+//  faux, c'est ce qui suivait le refus : rien. On rebascule maintenant sur
+//  l'ancien régime, immédiatement, et la raison reste écrite dans la trace.
+{
+    const r = SOURCES['regime_cerveau.js'];
+
+    verifier("l'échec d'ouverture est traité, pas ignoré",
+             r.includes('REGIME.ouvrir(sourceDuJeu()).then(etat => {'));
+    verifier("un état nul est reconnu comme un échec", r.includes('if (etat) return;'));
+    verifier("le drapeau retombe tout seul",
+             r.includes('window.REGIME_CERVEAU = false;'));
+    verifier("le choix retombe aussi sur le disque",
+             r.includes('localStorage.setItem("REGIME_CERVEAU", "0")'));
+    verifier("et la case à cocher suit", r.includes('caseRegime.checked = false'));
+    verifier("le régime se débranche proprement",
+             r.includes('REGIME.debrancher(); REGIME = null;'));
+    verifier("la trace dit qu'on est revenu en arrière",
+             r.includes("retour à l'ANCIEN régime"));
+    verifier("et où lire la raison", r.includes("La raison est dans la ligne ❌"));
+
+    // La règle de fond : refuser de publier reste la bonne décision. On vérifie
+    // qu'on n'a PAS désarmé le contrôle pour se simplifier la vie.
+    verifier("on refuse toujours de publier un état de départ incohérent",
+             r.includes('tracer("❌", "combat non ouvert : état de départ incohérent"'));
+    verifier("les bornes du jeu sont injectées dans l'état",
+             r.includes('pvMax: window.pvMaxCombattant')
+             && r.includes('fatigueMax: window.fatigueMaxCombattant'));
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

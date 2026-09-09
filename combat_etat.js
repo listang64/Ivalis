@@ -127,7 +127,21 @@ const DEFENSES_SIMPLES = {
     // Les avantages du peuple, et ce que l'équipement change au déplacement.
     // Comme les défenses : on ne recopie pas les formules, on fige leur résultat.
     atouts:      () => ({}),
-    bonusEquip:  () => 0
+    bonusEquip:  () => 0,
+
+    // LES MAXIMA SONT DES FORMULES, PAS DES CHAMPS. C'est ce que ce fichier a
+    // appris à ses dépens : le premier vrai combat en nouveau régime a été
+    // refusé par les invariants sur « 110 d'énergie pour un maximum de 100 ».
+    // Le héros n'avait rien d'anormal — il était Humain, et l'atout de son
+    // peuple donne +10 d'énergie maximale. La fiche porte 100, le jeu calcule
+    // 110, et lire le champ brut donnait un combattant hors de ses propres
+    // bornes avant même le premier tour.
+    //
+    // Les valeurs par défaut ci-dessous restent le calcul brut — c'est ce dont
+    // un banc a besoin. Le jeu, lui, injecte ses vraies formules.
+    pvMax:       f => nombre(f.PV_Max) + nombre(f.Dev_Mod_PV),
+    fatigueMax:  f => nombre(f.Fatigue_Max !== undefined ? f.Fatigue_Max : f.fatigueMax, 100)
+                    + nombre(f.Dev_Mod_Fatigue)
 };
 
 export function combattantDepuisFiche(fiche, position, regles) {
@@ -154,16 +168,27 @@ export function combattantDepuisFiche(fiche, position, regles) {
         coutDeplacement: nombre(calcul.bonusEquip(sansEtats, "coutDeplacement")),
         hexApresAttaque: nombre(calcul.bonusEquip(sansEtats, "hexApresAttaque"))
     };
-    return { ...combattantBrut(fiche, position), def, atouts, mod };
+    // Les maxima passent par les formules du jeu quand on les a. On les calcule
+    // sur la fiche SANS ses états altérés, comme les défenses : un état qui
+    // rabote l'énergie est l'affaire du moteur, pas celle de la borne.
+    const bornes = { pvMax: nombre(calcul.pvMax(sansEtats)),
+                     fatigueMax: nombre(calcul.fatigueMax(sansEtats)) };
+    return { ...combattantBrut(fiche, position, bornes), def, atouts, mod };
 }
 
-function combattantBrut(fiche, position) {
+function combattantBrut(fiche, position, bornes) {
     const stats = {};
     CHAMPS_STATS.forEach(c => { if (fiche[c] !== undefined) stats[c] = fiche[c]; });
 
-    const pvMax = nombre(fiche.PV_Max) + nombre(fiche.Dev_Mod_PV);
-    const fatigueMax = nombre(fiche.Fatigue_Max !== undefined ? fiche.Fatigue_Max : fiche.fatigueMax, 100)
-                     + nombre(fiche.Dev_Mod_Fatigue);
+    // Les bornes viennent des formules du jeu quand l'appelant les a calculées
+    // (voir combattantDepuisFiche) ; sinon on retombe sur le calcul brut.
+    const pvMax = bornes && bornes.pvMax !== undefined
+        ? nombre(bornes.pvMax)
+        : nombre(fiche.PV_Max) + nombre(fiche.Dev_Mod_PV);
+    const fatigueMax = bornes && bornes.fatigueMax !== undefined
+        ? nombre(bornes.fatigueMax)
+        : nombre(fiche.Fatigue_Max !== undefined ? fiche.Fatigue_Max : fiche.fatigueMax, 100)
+          + nombre(fiche.Dev_Mod_Fatigue);
 
     return {
         id: fiche.idPersonnage,
