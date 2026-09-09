@@ -132,7 +132,11 @@ export function creerMonde(documents) {
         const resultat = await fn({
           get: async (ref) => { const d = lire(ref.chemin);
                                 return { exists: () => d !== null, data: () => d }; },
-          update: (ref, maj) => { appliquer(ref.chemin, maj, false); aNotifier.add(ref.chemin); }
+          update: (ref, maj) => { appliquer(ref.chemin, maj, false); aNotifier.add(ref.chemin); },
+          // set crée le document s'il n'existe pas — ce dont ont besoin le
+          // compteur du journal et le verrou de l'IA, qui ont chacun le leur.
+          set: (ref, data) => { poser(ref.chemin, data, true); aNotifier.add(ref.chemin); },
+          delete: (ref) => { delete monde.docs[ref.chemin]; aNotifier.add(ref.chemin); }
         });
         aNotifier.forEach(notifier);
         return resultat;
@@ -142,13 +146,24 @@ export function creerMonde(documents) {
     const writeBatch = () => {
       const operations = [];
       return {
-        update: (ref, maj) => operations.push([ref, maj]),
+        update: (ref, maj) => operations.push(["update", ref, maj]),
+        set:    (ref, data) => operations.push(["set", ref, data]),
+        delete: (ref) => operations.push(["delete", ref, null]),
         commit: async () => {
-          operations.forEach(([ref, maj]) => {
-            if (!monde.docs[ref.chemin]) throw new Error("document absent : " + ref.chemin);
+          // Un lot Firestore passe en entier ou pas du tout : on vérifie
+          // d'abord, on applique ensuite. Seul `update` exige un document
+          // existant — set le crée, delete se moque de son absence.
+          operations.forEach(([op, ref]) => {
+            if (op === "update" && !monde.docs[ref.chemin]) {
+              throw new Error("document absent : " + ref.chemin);
+            }
           });
-          operations.forEach(([ref, maj]) => appliquer(ref.chemin, maj, false));
-          new Set(operations.map(([ref]) => ref.chemin)).forEach(notifier);
+          operations.forEach(([op, ref, data]) => {
+            if (op === "update") appliquer(ref.chemin, data, false);
+            else if (op === "set") poser(ref.chemin, data, true);
+            else delete monde.docs[ref.chemin];
+          });
+          new Set(operations.map(([, ref]) => ref.chemin)).forEach(notifier);
         }
       };
     };

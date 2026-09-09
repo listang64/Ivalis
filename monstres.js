@@ -203,7 +203,14 @@ window.recomposerCombattants = function() {
     // Un combattant dont le journal n'a pas encore rejoué le tour garde à
     // l'écran les valeurs déjà montrées : sinon sa vie se retire derrière la
     // fenêtre sombre, plusieurs secondes avant le coup qui la lui prend.
-    if (typeof window.figerAffichageRetenus === "function") window.figerAffichageRetenus();
+    //
+    // Tout ce qui bouge ICI vient de la BASE, pas d'un calcul local : la trace
+    // doit le dire, sans quoi une arrivée de Firebase pendant le tour d'une
+    // créature se lit « [calcul IA] » et fait accuser le mauvais coupable.
+    window.__TRACE_CAUSE = "[base]";
+    try {
+        if (typeof window.figerAffichageRetenus === "function") window.figerAffichageRetenus();
+    } finally { window.__TRACE_CAUSE = null; }
 
     // Chaque fiche fraîche est remise sous surveillance : c'est ainsi que la
     // trace voit passer TOUS les changements de points de vie, avec leur cause.

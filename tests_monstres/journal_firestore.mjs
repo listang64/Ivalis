@@ -126,6 +126,9 @@ function firestoreExigeant(options = {}) {
         set: (ref, data) => { compter(ref.chemin); base[ref.chemin] = { ...data }; }
     });
     const updateDoc = async (ref, maj) => { compter(ref.chemin); Object.assign(base[ref.chemin] || (base[ref.chemin] = {}), maj); };
+    // Le ménage de fin de combat efface aussi le verrou de l'IA, qui vit dans
+    // le même tiroir que le compteur.
+    const deleteDoc = async (ref) => { compter(ref.chemin); delete base[ref.chemin]; };
     const limit = (n) => ({ type: "limit", n });
     const getDocs = async (q) => {
         let docs = documentsDe(q).map(data => ({ ref: { chemin: q.coll.chemin + "/" + data.__id }, data: () => data }));
@@ -148,17 +151,17 @@ function firestoreExigeant(options = {}) {
     };
 
     return { base, requetes, ecritures, api: { doc, collection, where, orderBy, limit, query, onSnapshot,
-                                    setDoc, getDoc, getDocs, updateDoc, writeBatch, runTransaction } };
+                                    setDoc, getDoc, getDocs, updateDoc, deleteDoc, writeBatch, runTransaction } };
 }
 
 function chargerJournal(monde) {
     const w = { PARTIE_DATA: {}, ID_PARTIE_COURANTE: "P1" };
     const a = monde.api;
     new Function('window', 'db', 'doc', 'collection', 'query', 'where', 'orderBy', 'limit',
-                 'onSnapshot', 'setDoc', 'getDoc', 'getDocs', 'updateDoc', 'writeBatch',
+                 'onSnapshot', 'setDoc', 'getDoc', 'getDocs', 'updateDoc', 'deleteDoc', 'writeBatch',
                  'runTransaction', 'COL', SRC_JOURNAL)(
         w, {}, a.doc, a.collection, a.query, a.where, a.orderBy, a.limit,
-        a.onSnapshot, a.setDoc, a.getDoc, a.getDocs, a.updateDoc, a.writeBatch,
+        a.onSnapshot, a.setDoc, a.getDoc, a.getDocs, a.updateDoc, a.deleteDoc, a.writeBatch,
         a.runTransaction, { PARTIES: "Systeme_Parties" });
     return w;
 }

@@ -196,11 +196,28 @@ différents** ne sont pas deux coups, c'est le même raconté deux fois ; le
 curseur avance, l'animation ne se rejoue pas. Chapitres 6 à 8 de
 `file_bousculee.mjs`.
 
+**Une créature qui joue DEUX tours, un sur chaque appareil.** Le plus vilain des
+trois, et le seul que la ceinture de sécurité ci-dessus ne pouvait pas rattraper :
+ce n'étaient pas deux copies d'un même récit, c'étaient deux récits. Dans la
+trace, `MONSTRE_c1lxn01` publie un trajet et une carte depuis P_03, puis un AUTRE
+trajet (parti d'une autre case) et une AUTRE carte (sur une autre cible) depuis
+P_01. Deux trous : (a) la clé du verrou se fabriquait avec l'horodatage de
+l'entrée dans la file — deux postes qui n'avaient pas exactement la même file
+sous les yeux fabriquaient DEUX clés, prenaient chacun « son » verrou, et
+jouaient tous les deux ; elle porte désormais la MANCHE, que les deux lisent
+identique dans la partie. (b) « ce tour est joué » n'était su que du poste qui
+l'avait joué ; le drapeau `fini` est maintenant écrit dans le verrou, donc
+partagé — un poste qui arrive après coup le lit et renonce, verrou périmé ou pas.
+Le verrou lui-même a quitté le document de la partie pour
+`Systeme_Parties/{id}/Journal_Combat/verrou`, où rien d'autre n'écrit ; le ménage
+de fin de combat l'efface avec le journal. Chapitres 9 et 10 de
+`file_bousculee.mjs`.
+
 **La trace du combat.** `trace_combat.js` est chargé avant tout le reste et
 écrit dans la console une ligne par chose qui arrive : événement publié, reçu,
 retenu par le OK, rejoué, fin de tour, verrou de l'IA — et surtout **chaque
 changement de points de vie, avec sa cause** (`[direct]`, `[rejeu]`,
-`[calcul IA]`, `[base rendue]`, `[écran retenu]`). Chaque événement reçu ou
+`[calcul IA]`, `[base]`, `[base rendue]`, `[écran retenu]`). Chaque événement reçu ou
 rejoué porte **le poste qui l'a publié** (`[de iPad-Ben]`) : c'est ce qui permet
 de voir en une ligne que deux appareils ont joué le même tour. C'est le seul moyen de voir
 un dégât appliqué deux fois : la même cible, le même nombre, deux lignes. En

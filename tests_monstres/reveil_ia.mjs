@@ -19,12 +19,24 @@ global.document = { getElementById: (id) => id === "fenetre-combat" ? fenetreCom
 
 function creerPoste(partagee) {
   const w = {};
-  const db = {}, doc = () => ({});
-  const getDoc = async () => ({ exists: () => true, data: () => structuredClone(partagee.doc) });
-  const updateDoc = async (_r, data) => { Object.assign(partagee.doc, structuredClone(data)); };
+  // Le verrou de l'IA a son propre document depuis qu'il ne doit plus se
+  // bousculer avec la file d'initiative : on distingue les deux au nombre de
+  // segments du chemin, comme le vrai Firestore.
+  if (partagee.verrou === undefined) partagee.verrou = null;
+  const db = {}, doc = (_db, ...seg) => ({ estVerrou: seg.length > 3 });
+  const lire = (ref) => (ref && ref.estVerrou) ? partagee.verrou : partagee.doc;
+  const ecrire = (ref, data, remplace) => {
+    if (ref && ref.estVerrou) {
+      partagee.verrou = remplace ? structuredClone(data)
+                                 : { ...(partagee.verrou || {}), ...structuredClone(data) };
+    } else Object.assign(partagee.doc, structuredClone(data));
+  };
+  const getDoc = async (ref) => ({ exists: () => !!lire(ref), data: () => structuredClone(lire(ref)) });
+  const updateDoc = async (ref, data) => ecrire(ref, data, false);
   const runTransaction = async (_db, fn) => fn({
-    get: async () => ({ exists: () => true, data: () => structuredClone(partagee.doc) }),
-    update: (_r, data) => Object.assign(partagee.doc, structuredClone(data))
+    get: async (ref) => ({ exists: () => !!lire(ref), data: () => structuredClone(lire(ref)) }),
+    update: (ref, data) => ecrire(ref, data, false),
+    set: (ref, data) => ecrire(ref, data, true)
   });
 
   w.ID_PARTIE_COURANTE = "P1";

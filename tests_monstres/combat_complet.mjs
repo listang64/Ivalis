@@ -121,12 +121,23 @@ async function jouerCombat({ nbJoueurs, nbMonstres, toursMax = 12 }) {
   // On fournit de vrais simulacres Firestore adossés au document de partie :
   // le code du verrou est ainsi exercé tel quel, pas contourné.
   const db = {};
-  const doc = () => ({});
+  const doc = (_db, ...seg) => ({ estVerrou: seg.length > 3 });
   const getDoc = async () => ({ exists: () => true, data: () => structuredClone(partie) });
   const updateDoc = async (_ref, data) => { Object.assign(partie, structuredClone(data)); };
+  // Le verrou de l'IA a désormais son propre document ; ici, un seul document
+  // partagé suffit à exercer le code du verrou tel quel.
+  const verrou = { doc: null };
+  const estVerrou = (ref) => !!(ref && ref.estVerrou);
   const runTransaction = async (_db, fn) => fn({
-    get: async () => ({ exists: () => true, data: () => structuredClone(partie) }),
-    update: (_ref, data) => Object.assign(partie, structuredClone(data))
+    get: async (ref) => estVerrou(ref)
+      ? ({ exists: () => !!verrou.doc, data: () => structuredClone(verrou.doc) })
+      : ({ exists: () => true, data: () => structuredClone(partie) }),
+    update: (ref, data) => estVerrou(ref)
+      ? (verrou.doc = { ...(verrou.doc || {}), ...structuredClone(data) })
+      : Object.assign(partie, structuredClone(data)),
+    set: (ref, data) => estVerrou(ref)
+      ? (verrou.doc = structuredClone(data))
+      : Object.assign(partie, structuredClone(data))
   });
   // L'IA marque de vraies pauses (900 à 1600 ms par étape) pour que la table
   // suive ce qui se passe : un seul combat prendrait donc plusieurs minutes.

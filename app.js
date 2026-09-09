@@ -625,6 +625,10 @@ window.viderJournalCombat = async function(idPartie) {
             if (snap.size < 400) break;
         }
         await setDoc(refCompteurEvenements(partie), { n: 0 });
+        // Le verrou de l'IA vit dans le même tiroir, et porte la marque des
+        // tours déjà joués. Une nouvelle rencontre repart à la manche 1 : ces
+        // marques-là bloqueraient ses premiers tours.
+        await deleteDoc(doc(db, COL.PARTIES, partie, COL_JOURNAL, "verrou")).catch(() => {});
         // L'ancien compteur, du temps où il vivait dans la partie : on le remet
         // à zéro aussi, pour qu'une page pas encore rechargée ne place pas son
         // curseur deux cents crans trop loin.

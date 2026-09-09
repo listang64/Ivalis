@@ -31,6 +31,15 @@ import {
     doc, getDoc, updateDoc, runTransaction
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
+// LE VERROU DE L'IA A SON PROPRE DOCUMENT, comme le compteur du journal :
+// Systeme_Parties/{id}/Journal_Combat/verrou. Il vivait dans le document de la
+// partie, au milieu de la file d'initiative, du compteur des tours et de la
+// liste des combattants à terre — le document le plus écrit du jeu. Une
+// transaction bousculée y est refusée (« failed-precondition »), et un verrou
+// refusé, c'est soit une créature que personne ne joue, soit deux postes qui se
+// croient seuls. Ici, personne d'autre n'écrit.
+const refVerrouIA = (idPartie) => doc(db, "Systeme_Parties", idPartie, "Journal_Combat", "verrou");
+
 // =========================================================================
 //  1. LES PERSONNALITÉS
 // =========================================================================
@@ -758,22 +767,42 @@ const ID_CLIENT = "cli_" + Math.random().toString(36).substring(2, 10);
 // délai du verrou : si après vingt-cinq secondes la file n'a toujours pas
 // bougé, ce n'est plus un doublon qu'on évite, c'est un combat mort qu'on
 // relance — et le rejeu devient le moindre mal.
+// Cette liste-ci est LOCALE, et ne protège donc que de nous-mêmes. La vraie
+// garantie, celle qui vaut d'un appareil à l'autre, est le drapeau `fini` écrit
+// dans le document du verrou (voir marquerTourIATermine) : c'est lui qui a
+// manqué quand une créature a joué deux fois, chacun de son côté, sur deux
+// plateaux qui ne racontaient déjà plus la même histoire.
 const TOURS_IA_TERMINES = new Map();
 
 function tourIADejaJoue(cle) {
-    const quand = TOURS_IA_TERMINES.get(cle);
-    if (!quand) return false;
-    if (Date.now() - quand > DELAI_VERROU_MS) { TOURS_IA_TERMINES.delete(cle); return false; }
-    return true;
+    return TOURS_IA_TERMINES.has(cle);
 }
 
-function marquerTourIATermine(cle) {
+// « CE TOUR EST JOUÉ » — écrit là où les autres postes peuvent le lire.
+// Un poste qui arrive après coup, verrou périmé ou pas, y trouve la réponse et
+// ne rejoue rien. Sans ça, le verrou ne protégeait que pendant vingt-cinq
+// secondes : au-delà, la créature repartait pour un tour entier, avec un second
+// déplacement et un second coup.
+async function marquerTourIATermine(cle) {
     TOURS_IA_TERMINES.set(cle, Date.now());
-    // On ne garde pas l'histoire d'un combat entier : les entrées périmées
-    // partent au fur et à mesure.
-    TOURS_IA_TERMINES.forEach((quand, k) => {
-        if (Date.now() - quand > DELAI_VERROU_MS * 2) TOURS_IA_TERMINES.delete(k);
-    });
+    if (TOURS_IA_TERMINES.size > 200) TOURS_IA_TERMINES.clear();
+    if (!window.ID_PARTIE_COURANTE) return;
+    try {
+        await runTransaction(db, async (tx) => {
+            const ref = refVerrouIA(window.ID_PARTIE_COURANTE);
+            const snap = await tx.get(ref);
+            const v = snap.exists() ? snap.data() : {};
+            // On ne réclame pas la propriété du verrou pour le clore : si un
+            // autre poste l'a pris entre-temps sur une AUTRE clé, on ne touche
+            // à rien — c'est son tour à lui, maintenant.
+            if (v.cle && v.cle !== cle) return;
+            tx.set(ref, { cle, client: ID_CLIENT, ts: Date.now(), fini: true });
+        });
+    } catch (e) {
+        // Tant pis : la liste locale tient encore ce poste-ci, et le tour
+        // suivant réécrira le verrou proprement.
+        console.error("Clôture du tour de l'IA :", e);
+    }
 }
 
 // DEPUIS QUAND VOIT-ON CE VERROU-LÀ ? Pas « depuis quelle heure il a été
@@ -784,6 +813,10 @@ function marquerTourIATermine(cle) {
 // l'ancienneté à NOTRE montre, depuis le moment où on a vu ce verrou pour la
 // première fois : aucune horloge étrangère n'entre dans la décision.
 const PREMIERE_VUE_VERROU = new Map();
+// Exposée pour les bancs d'essai : c'est la MÉMOIRE du verrou sur ce poste, et
+// sans elle un banc devrait attendre vingt-cinq secondes pour vérifier qu'un
+// verrou abandonné est bien repris.
+window.__VUES_VERROU_IA = PREMIERE_VUE_VERROU;
 
 function ancienneteVerrou(verrou) {
     const signature = `${verrou.cle}|${verrou.client}|${verrou.ts}`;
@@ -810,24 +843,32 @@ async function reclamerVerrouIA(cle) {
         }
         return false;
     }
-    const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
+    const verrouRef = refVerrouIA(window.ID_PARTIE_COURANTE);
     for (let essai = 1; essai <= ESSAIS_VERROU; essai++) {
         try {
             return await runTransaction(db, async (tx) => {
-                const snap = await tx.get(partieRef);
-                if (!snap.exists()) return false;
-                const verrou = snap.data().Verrou_IA || null;
+                const snap = await tx.get(verrouRef);
+                const verrou = snap.exists() ? snap.data() : null;
 
                 if (verrou && verrou.cle === cle) {
-                    // Déjà réclamé : soit par nous (on continue), soit par un
-                    // autre poste encore vivant (on le laisse faire).
+                    // CE TOUR EST DÉJÀ JOUÉ, et pas seulement par nous : le
+                    // drapeau est en base, tous les postes le voient. Personne
+                    // ne le rejoue, jamais, quel que soit le temps écoulé.
+                    if (verrou.fini) {
+                        if (typeof window.tracerCombat === "function") {
+                            window.tracerCombat("🧠", `tour déjà joué par ${verrou.client}`, cle);
+                        }
+                        return false;
+                    }
+                    // En cours : soit par nous (on continue), soit par un autre
+                    // poste encore vivant (on le laisse faire).
                     if (verrou.client === ID_CLIENT) return true;
                     if (ancienneteVerrou(verrou) < DELAI_VERROU_MS) return false;
                     if (typeof window.tracerCombat === "function") {
                         window.tracerCombat("🧠", `verrou abandonné repris à ${verrou.client}`, cle);
                     }
                 }
-                tx.update(partieRef, { Verrou_IA: { cle, client: ID_CLIENT, ts: Date.now() } });
+                tx.set(verrouRef, { cle, client: ID_CLIENT, ts: Date.now(), fini: false });
                 return true;
             });
         } catch (e) {
@@ -1216,6 +1257,9 @@ window.verifierTourIAMonstres = async function() {
     const partie = window.PARTIE_DATA || {};
     const phase = partie.Phase_Combat || "Preparation";
     const file = partie.File_Attente_Combat || [];
+    // La manche en cours : elle vient de la partie, donc les deux appareils la
+    // lisent identique. C'est ce qui rend la clé du verrou reproductible.
+    const manche = partie.Tour_Combat || 1;
 
     // Y a-t-il seulement quelque chose à faire ? Sinon, inutile de se rappeler.
     const estMonstre = (id) => typeof window.estMonstre === "function" && window.estMonstre(id);
@@ -1271,10 +1315,10 @@ window.verifierTourIAMonstres = async function() {
     try {
         if (teteMorte) {
             const enTeteMort = file[0];
-            const cleMort = `mort|${enTeteMort.idPersonnage}|${enTeteMort.timestamp}`;
+            const cleMort = `mort|${enTeteMort.idPersonnage}|${manche}`;
             if (await reclamerVerrouIA(cleMort)) {
                 console.log("🧠 Tour passé :", enTeteMort.idPersonnage, "est à terre.");
-                marquerTourIATermine(cleMort);
+                await marquerTourIATermine(cleMort);
                 if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true, enTeteMort.idPersonnage);
             } else {
                 programmerRappelIA(DELAI_VERROU_MS / 2);
@@ -1293,9 +1337,15 @@ window.verifierTourIAMonstres = async function() {
 
         const enTete = file[0];
 
-        // Un seul poste joue ce tour précis : la clé identifie le monstre ET son
-        // entrée dans la file, donc deux tours successifs ne se confondent pas.
-        const cle = `tour|${enTete.idPersonnage}|${enTete.timestamp}`;
+        // UN SEUL POSTE JOUE CE TOUR-LÀ. La clé identifie le monstre ET la
+        // manche : deux tours successifs de la même créature ne se confondent
+        // pas, et — c'est le point — les deux appareils la calculent à
+        // l'identique. Elle reposait avant sur l'horodatage de l'entrée dans la
+        // file : si les deux postes n'avaient pas exactement la même file sous
+        // les yeux, ils fabriquaient DEUX clés différentes, prenaient chacun
+        // « son » verrou, et jouaient la même créature chacun de son côté — sur
+        // des plateaux qui ne racontaient déjà plus la même histoire.
+        const cle = `tour|${enTete.idPersonnage}|${manche}`;
         if (!(await reclamerVerrouIA(cle))) {
             // Un autre poste s'en occupe. S'il n'aboutit pas, le verrou devient
             // périmé et on reprendra la main : on garde donc un œil dessus.
@@ -1309,7 +1359,7 @@ window.verifierTourIAMonstres = async function() {
         // fois. Mieux vaut un tour écourté qu'un coup en double — et si vraiment
         // rien n'avance, la marque périme au bout de vingt-cinq secondes et la
         // créature retentera sa chance.
-        marquerTourIATermine(cle);
+        await marquerTourIATermine(cle);
         if (typeof window.tracerCombat === "function") {
             window.tracerCombat("🧠", `verrou pris : tour de ${enTete.idPersonnage}`, `(${enTete.idCarte})`);
         }

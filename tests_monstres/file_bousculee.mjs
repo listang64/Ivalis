@@ -49,7 +49,8 @@ function firestoreDispute(docInitial, echecsDAffilee = 0) {
     const runTransaction = async (_db, fn) => {
         etat.transactions++;
         const sortie = await fn({
-            get: async () => ({ exists: () => true, data: () => structuredClone(etat.doc) }),
+            get: async () => ({ exists: () => Object.keys(etat.doc).length > 0,
+                                data: () => structuredClone(etat.doc) }),
             update: (_r, data) => { etat.enAttente = structuredClone(data); },
             set: (_r, data) => { etat.enAttente = structuredClone(data); }
         });
@@ -69,6 +70,22 @@ function firestoreDispute(docInitial, echecsDAffilee = 0) {
 
 function poserModifier(w, runTransaction) {
     new Function('window', 'db', 'doc', 'runTransaction', SRC_MODIFIER_PARTIE)(
+        w, {}, () => ({}), runTransaction);
+}
+
+// LE VRAI VERROU DE L'IA, extrait de monstres_ia.js : de la constante de délai
+// jusqu'à la fin de reclamerVerrouIA. On y ajoute la ligne qui donne au verrou
+// son propre document — elle vit en tête de fichier, hors de la tranche.
+const dVerrou = lignesIA.findIndex(l => l.startsWith('const DELAI_VERROU_MS'));
+let fVerrou = lignesIA.findIndex((l, i) => i > dVerrou && l.startsWith('async function reclamerVerrouIA'));
+for (let i = fVerrou; i < lignesIA.length; i++) { if (lignesIA[i] === '}') { fVerrou = i; break; } }
+const SRC_VERROU = lignesIA.filter(l => l.startsWith('const refVerrouIA')).join('\n') + '\n'
+    + lignesIA.slice(dVerrou, fVerrou + 1).join('\n')
+    + '\nwindow.__reclamerVerrouIA = reclamerVerrouIA;'
+    + '\nwindow.__marquerTourIATermine = marquerTourIATermine;';
+
+function poserVerrou(w, runTransaction) {
+    new Function('window', 'db', 'doc', 'runTransaction', SRC_VERROU)(
         w, {}, () => ({}), runTransaction);
 }
 
@@ -137,25 +154,17 @@ console.log("\n3. UN TOUR DE CRÉATURE NE SE REJOUE PAS");
 //  reprendre un tour interrompu, mais jouerTourMonstre repart TOUJOURS du début.
 //  « Reprendre », c'était donc frapper une deuxième fois.
 {
-    // On charge le vrai verrou, avec ses deux gardiens.
-    const d = lignesIA.findIndex(l => l.startsWith('const DELAI_VERROU_MS'));
-    let f = lignesIA.findIndex((l, i) => i > d && l.startsWith('async function reclamerVerrouIA'));
-    for (let i = f; i < lignesIA.length; i++) { if (lignesIA[i] === '}') { f = i; break; } }
-    const SRC_VERROU = lignesIA.slice(d, f + 1).join('\n')
-        + '\nwindow.__reclamerVerrouIA = reclamerVerrouIA;'
-        + '\nwindow.__marquerTourIATermine = marquerTourIATermine;';
-
-    const { etat, runTransaction } = firestoreDispute({ Verrou_IA: null });
+    const { etat, runTransaction } = firestoreDispute({});
     const w = { ID_PARTIE_COURANTE: "P1" };
     const traces = [];
     w.tracerCombat = (i, q, d2) => traces.push(`${i} ${q}`);
-    new Function('window', 'db', 'doc', 'runTransaction', SRC_VERROU)(w, {}, () => ({}), runTransaction);
+    poserVerrou(w, runTransaction);
 
-    const cle = "tour|M1|1700000000";
+    const cle = "tour|M1|2";
 
     verifier("le premier appel prend le verrou", (await w.__reclamerVerrouIA(cle)) === true);
     // Le tour est joué : on le note, comme le fait verifierTourIAMonstres.
-    w.__marquerTourIATermine(cle);
+    await w.__marquerTourIATermine(cle);
 
     // La file n'a pas avancé (l'écriture a été bousculée) : la créature est
     // toujours en tête, la notification suivante rappelle l'IA. C'est ICI que
@@ -172,8 +181,8 @@ console.log("\n3. UN TOUR DE CRÉATURE NE SE REJOUE PAS");
 
     // Le tour SUIVANT de la même créature, lui, a une autre clé : il doit passer.
     verifier("le tour suivant de la même créature, lui, se joue",
-             (await w.__reclamerVerrouIA("tour|M1|1700000099")) === true);
-    verifier("le verrou en base a bien suivi", etat.doc.Verrou_IA.cle === "tour|M1|1700000099");
+             (await w.__reclamerVerrouIA("tour|M1|3")) === true);
+    verifier("le verrou en base a bien suivi", etat.doc.cle === "tour|M1|3");
 }
 
 // =========================================================================
@@ -265,28 +274,22 @@ console.log("\n6. LE VERROU NE SE VOLE PLUS SUR UNE HORLOGE QUI MENT");
 //  APPAREIL. Un iPad en avance sur le PC trouvait périmé un verrou posé à
 //  l'instant, le volait, et calculait le tour en parallèle.
 {
-    const d = lignesIA.findIndex(l => l.startsWith('const DELAI_VERROU_MS'));
-    let f = lignesIA.findIndex((l, i) => i > d && l.startsWith('async function reclamerVerrouIA'));
-    for (let i = f; i < lignesIA.length; i++) { if (lignesIA[i] === '}') { f = i; break; } }
-    const SRC_VERROU = lignesIA.slice(d, f + 1).join('\n')
-        + '\nwindow.__reclamerVerrouIA = reclamerVerrouIA;';
-
     // Un seul Firestore, deux postes : c'est tout l'enjeu.
-    const { etat, runTransaction } = firestoreDispute({ Verrou_IA: null });
+    const { etat, runTransaction } = firestoreDispute({});
     const pc = { ID_PARTIE_COURANTE: "P1" }, ipad = { ID_PARTIE_COURANTE: "P1" };
-    new Function('window', 'db', 'doc', 'runTransaction', SRC_VERROU)(pc, {}, () => ({}), runTransaction);
-    new Function('window', 'db', 'doc', 'runTransaction', SRC_VERROU)(ipad, {}, () => ({}), runTransaction);
+    poserVerrou(pc, runTransaction);
+    poserVerrou(ipad, runTransaction);
 
-    const cle = "tour|M1|1700000000";
+    const cle = "tour|M1|2";
     verifier("le PC prend le verrou", (await pc.__reclamerVerrouIA(cle)) === true);
 
     // L'iPad a une minute d'avance. Avec l'ancienne règle, il trouvait le verrou
     // vieux de soixante secondes — donc abandonné — et jouait le tour lui aussi.
-    etat.doc.Verrou_IA.ts = Date.now() - 60000;
+    etat.doc.ts = Date.now() - 60000;
     verifier("l'iPad en avance d'une minute ne le vole PAS",
              (await ipad.__reclamerVerrouIA(cle)) === false,
-             `(verrou à ${etat.doc.Verrou_IA.client})`);
-    verifier("le verrou est toujours au PC", etat.doc.Verrou_IA.client !== undefined);
+             `(verrou à ${etat.doc.client})`);
+    verifier("le verrou est toujours au PC", etat.doc.client !== undefined);
 
     // Et il ne le vole toujours pas au deuxième coup d'œil : ce qui compte,
     // c'est depuis combien de temps LUI le voit, pas l'heure qu'il est ailleurs.
@@ -300,22 +303,16 @@ console.log("\n7. LE VERROU BOUSCULÉ EST RETENTÉ, PAS ABANDONNÉ");
 //  au moment précis où la file avançait : les deux écrivent le document de la
 //  partie. Renoncer là, c'est une créature que personne ne joue.
 {
-    const d = lignesIA.findIndex(l => l.startsWith('const DELAI_VERROU_MS'));
-    let f = lignesIA.findIndex((l, i) => i > d && l.startsWith('async function reclamerVerrouIA'));
-    for (let i = f; i < lignesIA.length; i++) { if (lignesIA[i] === '}') { f = i; break; } }
-    const SRC_VERROU = lignesIA.slice(d, f + 1).join('\n')
-        + '\nwindow.__reclamerVerrouIA = reclamerVerrouIA;';
-
-    const { etat, runTransaction } = firestoreDispute({ Verrou_IA: null }, 2);
+    const { etat, runTransaction } = firestoreDispute({}, 2);
     const w = { ID_PARTIE_COURANTE: "P1" };
     const traces = [];
     w.tracerCombat = (i, q) => traces.push(`${i} ${q}`);
-    new Function('window', 'db', 'doc', 'runTransaction', SRC_VERROU)(w, {}, () => ({}), runTransaction);
+    poserVerrou(w, runTransaction);
     console.error = () => {};
 
     verifier("après deux bousculades, le verrou finit par être pris",
              (await w.__reclamerVerrouIA("tour|M1|1")) === true);
-    verifier("et il est bien écrit en base", !!etat.doc.Verrou_IA);
+    verifier("et il est bien écrit en base", !!etat.doc.cle);
     verifier("la trace montre les reprises", traces.filter(t => t.startsWith("♻️")).length === 2,
              `(${traces.join(" | ")})`);
 }
@@ -375,6 +372,84 @@ console.log("\n8. LE MÊME TOUR PUBLIÉ DEUX FOIS NE SE JOUE QU'UNE");
     await new Promise(r => setTimeout(r, 60));
     verifier("un coup réellement différent, lui, passe", jouees.length === 2,
              `(${jouees.length} animation(s))`);
+}
+
+// =========================================================================
+console.log("\n9. UNE CRÉATURE NE JOUE PAS DEUX FOIS, SUR DEUX APPAREILS");
+// =========================================================================
+//  Troisième trace de Nico, et le plus vilain des trois. MONSTRE_c1lxn01 a joué
+//  DEUX tours entiers dans la même manche : les événements 5 à 8 publiés par
+//  P_03 (trajet -1,1 → -1,2 → -1,3 → -2,4, puis une carte sur PERSO_338423), et
+//  les événements 9 à 11 publiés par P_01 (trajet -1,-1 → -1,0 → -1,1, puis une
+//  carte sur PERSO_250418). Deux départs différents : les deux appareils ne
+//  voyaient déjà plus le même plateau. Le garde-fou du chapitre 8 ne pouvait
+//  rien : ce ne sont pas deux copies d'un même récit, ce sont deux récits.
+//
+//  Deux trous, comblés ici :
+//   • la clé du verrou reposait sur l'horodatage de l'entrée dans la file. Deux
+//     postes qui n'ont pas exactement la même file fabriquaient DEUX clés,
+//     prenaient chacun « son » verrou, et jouaient tous les deux. La clé porte
+//     désormais la MANCHE, que les deux lisent identique dans la partie.
+//   • « ce tour est joué » n'était su que du poste qui l'avait joué. Le drapeau
+//     est maintenant écrit dans le verrou, donc partagé : un poste qui arrive
+//     après coup le lit et renonce, verrou périmé ou pas.
+{
+    const { etat, runTransaction } = firestoreDispute({});
+    const pc = { ID_PARTIE_COURANTE: "P1" }, ipad = { ID_PARTIE_COURANTE: "P1" };
+    poserVerrou(pc, runTransaction);
+    poserVerrou(ipad, runTransaction);
+    const traces = [];
+    ipad.tracerCombat = (i, q, d2) => traces.push(`${i} ${q}`);
+    console.error = () => {};
+
+    // Manche 3, MONSTRE_c1lxn01. Les deux postes calculent la même clé — c'est
+    // tout l'objet du changement.
+    const cle = "tour|MONSTRE_c1lxn01|3";
+
+    verifier("le PC prend le tour", (await pc.__reclamerVerrouIA(cle)) === true);
+    verifier("l'iPad, au même instant, ne l'a pas",
+             (await ipad.__reclamerVerrouIA(cle)) === false);
+
+    // Le PC joue, puis clôt le tour. La marque part en base.
+    await pc.__marquerTourIATermine(cle);
+    verifier("le tour est marqué fini en base, pas seulement chez le PC",
+             etat.doc.fini === true, `(${JSON.stringify(etat.doc)})`);
+
+    // L'iPad revient BIEN PLUS TARD — le verrou serait périmé sur n'importe
+    // quelle montre. C'est exactement le cas de la trace : il ne doit rien
+    // rejouer.
+    etat.doc.ts = Date.now() - 10 * 60 * 1000;
+    verifier("même une heure plus tard, l'iPad ne rejoue pas ce tour",
+             (await ipad.__reclamerVerrouIA(cle)) === false);
+    verifier("et il dit qui l'a joué", traces.some(t => t.includes("tour déjà joué par")),
+             `(${traces.join(" | ")})`);
+
+    // La manche suivante, elle, appartient à qui la prend.
+    verifier("la manche suivante se joue normalement",
+             (await ipad.__reclamerVerrouIA("tour|MONSTRE_c1lxn01|4")) === true);
+    verifier("et le PC n'y touche pas",
+             (await pc.__reclamerVerrouIA("tour|MONSTRE_c1lxn01|4")) === false);
+}
+
+// =========================================================================
+console.log("\n10. LA CLÉ DU VERROU NE DÉPEND PLUS DE LA FILE");
+// =========================================================================
+//  Le point précis qui laissait passer deux verrous : la clé se fabriquait avec
+//  `enTete.timestamp`. On lit la source pour s'assurer qu'on n'y revient pas.
+{
+    const ia = fs.readFileSync('/home/user/Ivalis/monstres_ia.js', 'utf-8');
+    verifier("la clé du tour porte la manche",
+             /const cle = `tour\|\$\{enTete\.idPersonnage\}\|\$\{manche\}`/.test(ia));
+    verifier("celle d'un combattant à terre aussi",
+             /cleMort = `mort\|\$\{enTeteMort\.idPersonnage\}\|\$\{manche\}`/.test(ia));
+    verifier("plus aucune clé de verrou ne s'appuie sur un horodatage de file",
+             !/cle\w* = `(tour|mort)\|\$\{[^`]*\.timestamp\}`/.test(ia));
+    verifier("et le verrou a quitté le document de la partie",
+             /refVerrouIA = \(idPartie\) => doc\(db, "Systeme_Parties", idPartie, "Journal_Combat"/.test(ia)
+             && !/tx\.update\(partieRef, \{ Verrou_IA/.test(ia));
+    const app = fs.readFileSync('/home/user/Ivalis/app.js', 'utf-8');
+    verifier("et le ménage de fin de combat l'efface",
+             /deleteDoc\(doc\(db, COL\.PARTIES, partie, COL_JOURNAL, "verrou"\)\)/.test(app));
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
