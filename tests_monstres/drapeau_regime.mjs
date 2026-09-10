@@ -32,6 +32,7 @@ const SOURCES = {
     'moteur_effets.js': lire('moteur_effets.js'),
     'sequence_tour.js': lire('sequence_tour.js'),
     'regime_cerveau.js': lire('regime_cerveau.js'),
+    'pont_combat.js': lire('pont_combat.js'),
     'index.html': lire('index.html')
 };
 
@@ -138,17 +139,40 @@ console.log("\n3. LE DRAPEAU EST ÉTEINT PAR DÉFAUT, ET IL SE GARDE");
 }
 
 // =========================================================================
-console.log("\n4. LE NOUVEAU RÉGIME N'ÉCRIT JAMAIS DANS L'ANCIEN MONDE");
+console.log("\n4. LE NOUVEAU RÉGIME N'ÉCRIT DANS L'ANCIEN MONDE QU'À UN SEUL ENDROIT");
 // =========================================================================
 //  Le fichier du régime ne doit toucher ni au document de la partie, ni aux
 //  fiches, ni aux Action_*. S'il le faisait, on aurait deux écrivains — et
 //  toute l'architecture repose sur le fait qu'il n'y en a qu'un.
 {
     const r = SOURCES['regime_cerveau.js'];
-    ['Action_Moteur', 'Action_Mouvement', 'Action_Bond', 'modifierPartie',
-     'File_Attente_Combat:', 'updateDoc', 'setDoc', 'writeBatch'].forEach(interdit => {
+    ['Action_Moteur', 'Action_Mouvement', 'Action_Bond',
+     'updateDoc', 'setDoc', 'writeBatch'].forEach(interdit => {
         verifier(`le régime ne touche pas à ${interdit}`, !r.includes(interdit));
     });
+
+    // LA SEULE EXCEPTION, ET ELLE EST NOMMÉE. En fin de manche, le cerveau est
+    // le seul à savoir que la manche est finie : il est donc le seul à pouvoir
+    // rendre la main aux joueurs. Sans cette écriture, le document de la partie
+    // restait en « Resolution » avec la file de la manche écoulée, et le combat
+    // s'arrêtait après le premier tour de table — définitivement.
+    const ecritures = (r.match(/window\.modifierPartie\(/g) || []).length;
+    verifier("le régime n'écrit dans la partie qu'à un seul endroit", ecritures === 1,
+             `(${ecritures} appel(s))`);
+    verifier("et c'est le retour à la préparation", r.includes("function rendreLaPreparation"));
+    verifier("il vide la file et repasse en préparation",
+             r.includes("File_Attente_Combat: [],")
+             && r.includes('Phase_Combat: "Preparation",')
+             && r.includes("Ont_Joue_Ce_Round: []"));
+    verifier("seul le cerveau rend la main",
+             r.includes("if (REGIME.jeSuisLeCerveau()) rendreLaPreparation(phase);"));
+    verifier("et seulement si la partie est encore en résolution",
+             r.includes('if (phaseEnBase !== "Resolution") { preparationRendue = \"\"; return; }')
+             && r.includes('if ((data.Phase_Combat || "Preparation") !== "Resolution") return null;'));
+    verifier("une seule fois par manche",
+             r.includes("if (preparationRendue === marque) return;"));
+    verifier("et une écriture ratée se rejoue",
+             r.includes("preparationRendue = \"\";\n            console.error"));
     verifier("il ne connaît Firestore qu'à travers l'accès injecté",
              r.includes('window.ioCombatFirestore') && !r.includes('firebase-firestore.js'));
 }
@@ -412,12 +436,21 @@ console.log("\n12. L'INTERFACE LIT LA FILE DE L'ÉTAT, ET ELLE Y RESTE");
     verifier("la projection se repose après chaque notification",
              r.includes("REGIME.reprojeter();"));
     verifier("et reprojeter part de l'état AFFICHÉ, pas du publié",
-             r.includes("const etat = spectateur.etat();\n        if (etat) projeter(etat);"));
+             r.includes("const etat = spectateur.etat();"));
 
-    // RIEN NE REMONTE EN BASE. C'est une projection, pas une écriture : si elle
-    // écrivait, on aurait deux écrivains et toute l'architecture tomberait.
-    verifier("et rien n'est écrit en base au passage",
-             !r.includes("File_Attente_Combat:") && !r.includes("updateDoc"));
+    // EN PRÉPARATION, LA PARTIE REPREND LA PAROLE SUR LA FILE. L'état l'a vidée
+    // en fin de manche : la reposer par-dessus effacerait de l'écran les cartes
+    // que les joueurs viennent de choisir une par une.
+    verifier("mais la file de la partie est laissée tranquille en préparation",
+             r.includes('projeter(etat, { file: (etat.phase || "") === "Resolution" });'));
+    verifier("et le pont sait ne projeter que le reste",
+             SOURCES['pont_combat.js'].includes("options.file !== false"));
+
+    // RIEN NE REMONTE EN BASE PAR LA PROJECTION. C'est une projection, pas une
+    // écriture : elle ne touche que window.PARTIE_DATA, en mémoire.
+    verifier("la projection n'écrit rien : elle ne touche que PARTIE_DATA",
+             r.includes("const partie = window.PARTIE_DATA;")
+             && !r.includes("updateDoc"));
 
     // Le cerveau dit qui il attend : « rien ne se passe » sans explication est
     // ce qui a coûté le plus de temps depuis le début.

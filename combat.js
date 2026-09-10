@@ -2963,16 +2963,29 @@ document.addEventListener("DOMContentLoaded", function () {
 // 1. Le Joueur choisit sa carte
 window.jouerCarteCombat = async function(idCarte) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    if (!window.ID_PARTIE_COURANTE) return;
+
+    // UN CLIC QUI NE FAIT RIEN, ET RIEN QUI LE DISE. Cette fonction avait quatre
+    // sorties muettes : le joueur choisissait sa carte, l'écran ne bougeait pas,
+    // et aucune trace ne disait pourquoi. « Sur l'iPad ça ne voulait pas prendre
+    // la carte sélectionnée » a coûté une soirée à cause de ça. Chaque refus se
+    // nomme maintenant.
+    const refuser = (raison, detail) => {
+        if (typeof window.tracerCombat === "function") {
+            window.tracerCombat("🚫", `carte ${idCarte} refusée : ${raison}`, detail || "");
+        }
+    };
+
+    if (!window.ID_PARTIE_COURANTE) return refuser("aucune partie en cours");
 
     const phase = (window.PARTIE_DATA || {}).Phase_Combat || "Preparation";
-    if (phase !== "Preparation") return;
+    if (phase !== "Preparation") return refuser("on n'est pas en préparation", `(phase ${phase})`);
 
     const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
-    if (!persoActuel) return;
+    if (!persoActuel) return refuser("aucun héros sélectionné dans le panneau",
+                                     `(index ${window.COMBAT_INDEX_PERSO})`);
 
     const dataCarte = window.COMPETENCES_CACHE[idCarte];
-    if (!dataCarte) return;
+    if (!dataCarte) return refuser("technique absente du cache", `(${persoActuel.idPersonnage})`);
 
     // Ce qu'on tient en main peut interdire la technique : pas d'attaque légère
     // avec une hache, pas de sort les deux mains prises. Contrôlé ici, au

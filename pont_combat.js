@@ -342,7 +342,17 @@ export function fichesDepuisEtat(etat, fichesActuelles) {
             ...fiche,
             PV_Actuels: nombre(c.pv),
             PV_Max: nombre(c.pvMax, fiche.PV_Max),
+            // DEUX NOMS POUR LA MÊME ÉNERGIE, et il faut écrire les deux.
+            // Le document de base dit `Fatigue_Actuelle`, tout le jeu en
+            // mémoire dit `fatigueActuelle` (app.js le renomme au chargement).
+            // Ne poser que le premier revenait à ne rien poser : les jauges du
+            // panneau et surtout l'IA des créatures — qui lit
+            // `monstre.fatigueActuelle` pour savoir ce qu'elle peut se payer —
+            // continuaient de voir la jauge du DÉBUT du combat. À la manche
+            // suivante, les créatures choisissaient donc des techniques
+            // qu'elles ne pouvaient plus payer, et le cerveau les refusait.
             Fatigue_Actuelle: nombre(c.fatigue),
+            fatigueActuelle: nombre(c.fatigue),
             Bouclier_Actuel: nombre(c.bouclier),
             Etats_Alteres: JSON.parse(JSON.stringify(c.etats || [])),
             statut: c.aTerre ? "Inconscient" : (fiche.statut === "Inconscient" ? "Vivant" : fiche.statut)
@@ -365,13 +375,19 @@ export function creerProjection(ecran) {
         lireFiches = () => []
     } = ecran || {};
 
-    return function projeter(etat) {
+    // `options.file` à faux projette tout SAUF la file d'initiative. Ça sert
+    // pendant la phase de préparation : là, c'est le document de la partie qui
+    // dit la file (les joueurs y posent leurs cartes une par une), et reposer
+    // par-dessus la file VIDE de l'état effacerait leurs choix de l'écran.
+    return function projeter(etat, options) {
         if (!etat) return;
         poserPions(pionsDepuisEtat(etat));
         poserFiches(fichesDepuisEtat(etat, lireFiches()));
-        poserFile(fileDepuisEtat(etat), {
-            phase: etat.phase, manche: nombre(etat.manche, 1), ontJoue: etat.ontJoue || []
-        });
+        if (!options || options.file !== false) {
+            poserFile(fileDepuisEtat(etat), {
+                phase: etat.phase, manche: nombre(etat.manche, 1), ontJoue: etat.ontJoue || []
+            });
+        }
         rafraichir(etat);
     };
 }

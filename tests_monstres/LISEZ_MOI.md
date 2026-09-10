@@ -114,6 +114,7 @@ node annuler_ciblage.mjs # un bouton ANNULER reprend la main sur le déplacement
 node carte_grisee_sans_message.mjs # cliquer une carte trop chère l'affiche sans message d'erreur
 node portee_zone.mjs        # une zone lancée à distance emporte bien la distance posée sur la carte
 node butin_avance.mjs       # le butin tiré et dessiné dès le début du combat, gardé si le combat est perdu
+node manche_suivante.mjs    # DEUX manches d'affilée : le cerveau rend la main à la préparation
 
 ## Le journal d'événements du combat (le gros changement d'architecture)
 
@@ -1017,6 +1018,26 @@ distance en modificateur (ce qui marchait déjà), la distance en action sépar�
 lanceur), deux sources de distance sur la même action (la plus longue gagne, on
 ne les additionne pas), et une carte sans zone (que la correction ne doit pas
 toucher).
+
+`manche_suivante.mjs` fait tourner le VRAI `regime_cerveau.js`, couche fenêtre
+comprise (`window.regimeSuivreLaPartie`), sur un Firestore en mémoire, et joue
+**deux manches d'affilée**. C'est le chaînon qui manquait, et il a coûté une
+soirée de test : en fin de manche, le cerveau vide sa file et repasse sa phase à
+« Preparation » — mais le DOCUMENT DE LA PARTIE, lui, restait en « Resolution »
+avec la file de la manche écoulée. Or c'est lui que la préparation lit. Plus
+personne ne pouvait choisir de carte, et le passage Preparation → Resolution — le
+seul qui ouvre une manche — ne pouvait plus jamais se produire : le combat jouait
+sa première manche, puis répétait « la file est vide » toutes les cinq secondes.
+
+Ouvrir une manche appartient aux joueurs et se passe encore dans l'ancien monde ;
+c'est un choix, pas un oubli. Mais quelqu'un doit LEUR RENDRE LA MAIN, et ce ne
+peut être que le cerveau : lui seul sait que la manche est finie. Le banc vérifie
+qu'il l'écrit, qu'il ne l'écrit qu'une fois, que la préparation garde ensuite la
+parole sur la file (la projection ne doit pas reposer sa file vide par-dessus les
+cartes que les joueurs viennent de choisir), que la manche 2 s'ouvre toute seule,
+et que l'énergie remonte au passage — la régénération de fin de manche, que
+l'ancien monde faisait dans `finDeTourCombat`, un chemin que le nouveau régime ne
+traverse plus.
 
 `butin_avance.mjs` couvre la réserve de butin. Tirer les objets ne coûte rien ;
 les DESSINER prend une quinzaine de secondes par lot, et ce temps se payait

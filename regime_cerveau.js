@@ -154,7 +154,13 @@ export function creerRegime(contexte) {
     // la projection. On la repose après coup : la file de l'état est la vraie.
     function reprojeter() {
         const etat = spectateur.etat();
-        if (etat) projeter(etat);
+        if (!etat) return;
+        // EN PRÉPARATION, C'EST LA PARTIE QUI DIT LA FILE. L'état, lui, l'a
+        // vidée en fin de manche : la reposer par-dessus effacerait de l'écran
+        // les cartes que les joueurs viennent de choisir, une par une, dans le
+        // document de la partie. Le reste (pions, fiches, points de vie) reste
+        // la vérité de l'état et se projette comme toujours.
+        projeter(etat, { file: (etat.phase || "") === "Resolution" });
     }
 
     // =====================================================================
@@ -495,7 +501,22 @@ function contexteDuJeu() {
                     t.r = pions[id].r;
                 });
             },
-            poserFiches: (fiches) => { window.PERSOS_PARTIE = fiches; },
+            poserFiches: (fiches) => {
+                window.PERSOS_PARTIE = fiches;
+
+                // LES CRÉATURES ONT LEUR PROPRE LISTE. window.MONSTRES_PARTIE est
+                // lue par l'IA (pour savoir ce qu'une créature peut se payer) et
+                // par la détection de victoire. On y reporte l'état combattant
+                // par combattant, SANS JAMAIS EN RETIRER PERSONNE : un renfort
+                // qui n'est pas encore entré ne figure pas dans les fiches, et le
+                // faire disparaître d'ici ferait croire le combat gagné.
+                const parId = {};
+                (fiches || []).forEach(f => { if (f && f.estMonstre) parId[f.idPersonnage] = f; });
+                (window.MONSTRES_PARTIE || []).forEach(m => {
+                    const f = parId[m.idPersonnage];
+                    if (f) Object.assign(m, f);
+                });
+            },
             // LA FILE DE L'ÉTAT REDESCEND DANS PARTIE_DATA — EN MÉMOIRE SEULEMENT.
             //
             // C'est ce qui manquait pour que le combat soit jouable. Le cerveau
@@ -798,6 +819,24 @@ if (typeof window !== "undefined") {
         //    intention arrivée pendant une coupure réseau est reprise ici.
         if (phase === "Resolution" && REGIME.jeSuisLeCerveau()) REGIME.tourner();
 
+        // 4-bis. LA MANCHE EST FINIE : LE CERVEAU REND LA MAIN À LA PRÉPARATION.
+        //
+        // C'EST LE CHAÎNON QUI MANQUAIT, ET IL A COÛTÉ UNE SOIRÉE. En fin de
+        // manche, `cloturerTour` vide la file de l'état et repasse sa phase à
+        // « Preparation » : le cerveau s'arrête, comme prévu. Mais le DOCUMENT DE
+        // LA PARTIE, lui, restait en « Resolution » avec la file de la manche
+        // écoulée. Or c'est lui que la préparation lit : les joueurs ne pouvaient
+        // plus choisir, les créatures non plus, et le passage
+        // Preparation → Resolution — le seul qui ouvre une manche — ne pouvait
+        // plus jamais se produire. Le combat jouait sa première manche, puis
+        // répétait « la file est vide » toutes les cinq secondes, pour toujours.
+        //
+        // Ouvrir une manche appartient aux joueurs et se passe encore dans
+        // l'ancien monde ; c'est un choix, pas un oubli. Mais alors quelqu'un
+        // doit LEUR RENDRE LA MAIN, et ce quelqu'un ne peut être que le cerveau :
+        // lui seul sait que la manche est finie.
+        if (REGIME.jeSuisLeCerveau()) rendreLaPreparation(phase);
+
         // 5. LE CAS QUI NE DOIT PAS ÊTRE SILENCIEUX : on est en résolution, le
         //    drapeau est levé, et personne n'a jamais ouvert de combat dans le
         //    nouveau régime. Ça arrive quand on coche la case au milieu d'une
@@ -827,6 +866,46 @@ if (typeof window !== "undefined") {
         // que la préparation avait laissée.
         REGIME.reprojeter();
     };
+
+    // La manche que ce poste a déjà rendue. Sans ce repère, chaque notification
+    // reposterait la même écriture le temps que la nouvelle phase revienne.
+    let preparationRendue = "";
+
+    function rendreLaPreparation(phaseEnBase) {
+        // La partie est déjà en préparation : c'est fait, et le repère peut
+        // s'effacer pour la manche suivante.
+        if (phaseEnBase !== "Resolution") { preparationRendue = ""; return; }
+
+        const etat = REGIME.etatPublie();
+        if (!etat || (etat.phase || "") !== "Preparation") return;
+
+        const marque = (etat.combat || "") + "#" + nombre(etat.manche, 1);
+        if (preparationRendue === marque) return;
+        preparationRendue = marque;
+
+        if (typeof window.tracerCombat === "function") {
+            window.tracerCombat("🔄", `manche ${nombre(etat.manche, 1)} : la main revient aux joueurs`,
+                                "file vidée dans la partie");
+        }
+
+        if (typeof window.modifierPartie !== "function") return;
+        Promise.resolve(window.modifierPartie((data) => {
+            // Un autre poste s'en est chargé entre-temps : rien à faire.
+            if ((data.Phase_Combat || "Preparation") !== "Resolution") return null;
+            return { maj: {
+                File_Attente_Combat: [],
+                Phase_Combat: "Preparation",
+                Tour_Combat: nombre(etat.manche, 1),
+                // Nouvelle manche : tout le monde doit rejouer.
+                Ont_Joue_Ce_Round: []
+            } };
+        })).catch(e => {
+            // L'écriture a raté : on retire le repère pour que la prochaine
+            // notification réessaie. Un combat qui s'arrête ici serait pire.
+            preparationRendue = "";
+            console.error("Retour à la préparation :", e);
+        });
+    }
 
     // ON S'ARRÊTE, ET ON LE DIT — À L'ÉCRAN, PAS SEULEMENT DANS LA CONSOLE.
     //

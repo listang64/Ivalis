@@ -195,8 +195,43 @@ export function cloturerTour(etat) {
 
     const etapes = [{ type: "tour", fini: partie.id, file, phase: etat.phase,
                       manche: etat.manche, ontJoue: etat.ontJoue }];
-    if (finDeManche) etapes.push({ type: "manche", numero: etat.manche });
+    if (finDeManche) {
+        // LA RÉGÉNÉRATION DE FIN DE MANCHE. Sans elle, l'énergie ne remonte
+        // jamais et le combat s'éteint tout seul au bout de trois manches :
+        // plus personne n'a de quoi lancer quoi que ce soit. L'ancien monde la
+        // faisait dans finDeTourCombat, que le nouveau régime ne traverse plus.
+        //
+        // Comme toute étape, elle porte le RÉSULTAT et non l'opération : rejouée
+        // deux fois sur trois écrans, elle donne le même chiffre.
+        etapes.push(...regenererFinDeManche(etat));
+        etapes.push({ type: "manche", numero: etat.manche });
+    }
     return { fini: partie.id, etapes };
+}
+
+// Le pourcentage de la jauge que ce combattant reprend à chaque fin de manche.
+// Même formule que window.regenerationCombattant (app.js) : la caractéristique
+// du modèle plus la retouche du mode développeur.
+function regenerationDe(c) {
+    const stats = (c && c.stats) || {};
+    return nombre(stats.Regeneration) + nombre(stats.Dev_Mod_Regen);
+}
+
+export function regenererFinDeManche(etat) {
+    const etapes = [];
+    (etat.ordre || Object.keys(etat.combattants || {})).forEach(id => {
+        const c = combattant(etat, id);
+        if (!c || c.aTerre) return;
+        const pct = regenerationDe(c);
+        if (pct <= 0) return;
+        const gagne = Math.floor((pct / 100) * nombre(c.fatigueMax));
+        if (gagne <= 0) return;
+        const apres = Math.min(nombre(c.fatigueMax), nombre(c.fatigue) + gagne);
+        if (apres === nombre(c.fatigue)) return;
+        c.fatigue = apres;
+        etapes.push({ type: "fatigue", cible: id, fatigueApres: apres, regeneration: gagne });
+    });
+    return etapes;
 }
 
 // =========================================================================
