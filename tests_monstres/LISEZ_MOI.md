@@ -1076,6 +1076,38 @@ quand c'est au tour d'un de MES héros, le régime regarde si le bouton
 `🧊 à moi de jouer mais RIEN À CLIQUER`, avec la raison (carte absente, bouton
 absent, fenêtre sombre encore levée).
 
+### Ce que la fenêtre sombre montre, et quand elle se lève
+
+Deux défauts vus à la table, dans la même fenêtre, et les deux tenaient à une
+information que le nouveau régime ne transmettait plus.
+
+**« Technique inconnue de ce poste »**, à chaque tour. La fenêtre recevait
+l'acteur et le numéro de l'entrée, jamais la carte : elle n'avait aucun moyen de
+la nommer. La technique annoncée pour le tour voyage maintenant avec l'entrée de
+journal — prise dans la file d'AVANT le pas, celle qui dit ce que ce combattant a
+annoncé.
+
+**Un second écran noir par-dessus l'animation.** Après le OK, la fenêtre se
+refermait — puis revenait aussitôt, puisque le combattant en tête de file est
+encore celui dont le tour s'anime. L'animation se déroulait donc derrière un
+voile, sans OK et sans clic possible : on ne voyait rien. L'ancien monde avait
+pourtant la réponse — `EVENEMENT_EN_COURS`, que `etatSequenceTour` lit pour lever
+la fenêtre pendant la relecture — mais le nouveau régime ne le renseignait plus.
+Le spectateur annonce désormais ce qu'il rejoue (`surRejeu`), et la fenêtre se
+lève pendant l'animation puis se repose au tour suivant. Le chapitre « 1 ter » de
+`manche_suivante.mjs` enregistre ce que la fenêtre lit à chaque appel et vérifie
+les deux.
+
+### Le cerveau rend la main sans attendre une notification
+
+Le premier essai du retour à la préparation était branché sur les notifications
+du document de la partie. Or, une fois le combat ouvert, **plus rien n'écrit dans
+ce document** : le cerveau n'écrit que son propre état. Le retour n'était donc
+jamais déclenché, et la manche 2 ne démarrait pas — « la file est vide » toutes
+les cinq secondes, indéfiniment. C'est la PUBLICATION du cerveau qui le réveille
+maintenant. Le chapitre 2 de `manche_suivante.mjs` ne notifie plus la partie du
+tout : c'est précisément ce qu'il vérifie.
+
 ### La fenêtre sombre ne doit enfermer personne
 
 Un iPad est resté figé derrière la fenêtre sombre, sur la technique d'un tour

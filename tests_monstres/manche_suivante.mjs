@@ -125,6 +125,7 @@ global.document = {
 global.localStorage = { getItem: (c) => (c === "ID_JOUEUR_COURANT" ? "P_01" : null), setItem: () => {} };
 
 const filesVues = [];          // ce que la projection a posé dans l'écran
+const voile = [];              // ce que la fenêtre sombre a lu, appel par appel
 const traces = [];
 
 global.window = {
@@ -171,7 +172,13 @@ global.window = {
     actualiserEtatCarteCombat: () => {},
     rafraichirAffichageCombat: () => {},
     redessinerPions: () => {},
-    rafraichirVoileTour: () => {}
+    // Chaque appel du voile est enregistré avec ce qu'il aurait lu : c'est
+    // exactement ce dont la fenêtre sombre se sert pour décider de se lever ou
+    // de se poser, et de nommer la technique.
+    rafraichirVoileTour: () => voile.push({
+        attendu: window.EVENEMENT_ATTENDU ? { ...window.EVENEMENT_ATTENDU } : null,
+        enCours: window.EVENEMENT_EN_COURS ? { ...window.EVENEMENT_EN_COURS } : null
+    })
 };
 
 await import('/home/user/Ivalis/regime_cerveau.js');
@@ -261,6 +268,38 @@ console.log("\n1 bis. CE QUE L'INTERFACE VOIT QUAND C'EST AU TOUR DU JOUEUR");
 }
 
 // ==========================================================================
+console.log("\n1 ter. LA FENÊTRE SOMBRE SAIT QUOI MONTRER, ET QUAND SE LEVER");
+// DEUX DÉFAUTS VUS À LA TABLE, dans la même fenêtre.
+//
+// 1. « Technique inconnue de ce poste » à chaque tour : la fenêtre recevait
+//    l'acteur et le numéro, jamais la carte. Elle n'avait aucun moyen de la
+//    nommer. La technique annoncée voyage maintenant avec l'entrée de journal.
+//
+// 2. UN SECOND ÉCRAN NOIR par-dessus l'animation. Après le OK, la fenêtre se
+//    refermait — puis revenait aussitôt, puisque le combattant en tête est
+//    encore celui dont le tour s'anime. L'animation se déroulait derrière un
+//    voile, sans OK et sans clic possible : on ne voyait rien. L'ancien monde
+//    avait la réponse (EVENEMENT_EN_COURS, qui lève la fenêtre pendant la
+//    relecture) ; le nouveau régime ne la renseignait simplement plus.
+{
+    const retenus = voile.filter(v => v.attendu);
+    verifier("la fenêtre a bien retenu un tour", retenus.length > 0, `(${retenus.length} fois)`);
+    verifier("ET ELLE SAIT QUELLE TECHNIQUE ANNONCER",
+             retenus.every(v => !!v.attendu.idCarte),
+             `(${retenus.map(v => v.attendu.idCarte || "INCONNUE").join(", ")})`);
+
+    const rejoues = voile.filter(v => v.enCours);
+    verifier("elle sait aussi qu'un tour est en train de se rejouer",
+             rejoues.length > 0, `(${rejoues.length} fois)`);
+    verifier("et pendant ce temps elle ne retient plus rien : le plateau est dégagé",
+             rejoues.every(v => !v.attendu));
+    verifier("le tour rejoué est nommé lui aussi",
+             rejoues.every(v => !!v.enCours.acteur), "");
+    verifier("une fois le rejeu fini, plus rien n'est en cours",
+             !window.EVENEMENT_EN_COURS, String(window.EVENEMENT_EN_COURS));
+}
+
+// ==========================================================================
 console.log("\n2. LA MANCHE EST FINIE : LE CERVEAU REND LA MAIN");
 {
     // Le héros termine son tour : c'est la dernière chose que la manche attend.
@@ -272,7 +311,15 @@ console.log("\n2. LA MANCHE EST FINIE : LE CERVEAU REND LA MAIN");
     verifier("sa file est vide", (etat.file || []).length === 0);
     verifier("et c'est la manche 2", etat.manche === 2, `(manche ${etat.manche})`);
 
-    await notifier();      // c'est ici que le cerveau doit écrire dans la partie
+    // AUCUNE NOTIFICATION DE PARTIE ICI, ET C'EST TOUT LE CONTRÔLE.
+    //
+    // Une fois le combat ouvert, PLUS RIEN N'ÉCRIT dans le document de la
+    // partie : le cerveau n'écrit que son propre état. Un retour à la
+    // préparation branché sur les notifications de partie n'était donc jamais
+    // appelé — la manche 2 ne démarrait jamais, et la trace répétait « la file
+    // est vide » toutes les cinq secondes, pour toujours. C'est la PUBLICATION
+    // du cerveau qui doit le réveiller.
+    await f.livrer(6);
 
     verifier("LA PARTIE REPASSE EN PRÉPARATION", partieDoc.Phase_Combat === "Preparation",
              `(${partieDoc.Phase_Combat})`);
@@ -284,7 +331,7 @@ console.log("\n2. LA MANCHE EST FINIE : LE CERVEAU REND LA MAIN");
              traces.some(t => t.includes("la main revient aux joueurs")));
 
     const avant = ecrituresPartie.length;
-    for (let i = 0; i < 5; i++) await notifier();
+    for (let i = 0; i < 5; i++) { await notifier(); await f.livrer(4); }
     verifier("et il ne le réécrit pas à chaque notification", ecrituresPartie.length === avant,
              `(${ecrituresPartie.length - avant} écriture(s) de trop)`);
 }

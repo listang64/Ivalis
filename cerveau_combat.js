@@ -147,12 +147,22 @@ function fabriquerPas(etatAvant, etatApres, etapes, cause, acteur, des) {
     des.fraction();
     suivant.graine = des.graine();
 
+    // LA TECHNIQUE ANNONCÉE POUR CE TOUR VOYAGE AVEC L'ENTRÉE.
+    //
+    // Sans elle, la fenêtre sombre affichait « Technique inconnue de ce poste »
+    // à chaque tour : elle ne recevait que l'acteur et le numéro, et n'avait
+    // aucun moyen de retrouver la carte. On la prend là où elle est vraie — la
+    // file d'AVANT le pas, celle qui dit ce que ce combattant a annoncé.
+    const enTete = (etatAvant.file || [])[0];
+    const carte = (enTete && enTete.id === acteur) ? (enTete.carte || null) : null;
+
     return {
         etat: suivant,
         entree: {
             v: suivant.version,
             cause: cause || null,
             acteur: acteur || null,
+            carte,
             manche: suivant.manche,
             graine: suivant.graine,
             etapes

@@ -165,10 +165,31 @@ console.log("\n4. LE NOUVEAU RÉGIME N'ÉCRIT DANS L'ANCIEN MONDE QU'À UN SEUL 
              && r.includes('Phase_Combat: "Preparation",')
              && r.includes("Ont_Joue_Ce_Round: []"));
     verifier("seul le cerveau rend la main",
-             r.includes("if (REGIME.jeSuisLeCerveau()) rendreLaPreparation(phase);"));
+             r.includes("if (!REGIME || !REGIME.jeSuisLeCerveau()) return;"));
     verifier("et seulement si la partie est encore en résolution",
-             r.includes('if (phaseEnBase !== "Resolution") { preparationRendue = \"\"; return; }')
-             && r.includes('if ((data.Phase_Combat || "Preparation") !== "Resolution") return null;'));
+             r.includes('if ((data.Phase_Combat || "Preparation") !== "Resolution") return null;'));
+
+    // ET SURTOUT : IL NE L'APPREND PAS D'UNE NOTIFICATION QUI N'ARRIVERA JAMAIS.
+    // Une fois le combat ouvert, plus rien n'écrit dans le document de la
+    // partie : le cerveau n'écrit que son propre état. Brancher le retour à la
+    // préparation sur les notifications de partie, c'est ne jamais le déclencher
+    // — la manche 2 ne démarrait pas, et la trace répétait « la file est vide »
+    // toutes les cinq secondes, pour toujours.
+    verifier("c'est la publication du cerveau qui le réveille",
+             r.includes("surPublication: () => rendreLaMainAuxJoueurs()")
+             && r.includes("rendreLaMainAuxJoueurs = () => rendreLaPreparation();"));
+    verifier("et le régime appelle bien ce rappel à chaque état publié",
+             r.includes("try { surPublication(etat); }"));
+    verifier("la phase n'est plus lue dans PARTIE_DATA, qui porte la projection",
+             !r.includes("rendreLaPreparation(phase)"));
+
+    // LA FENÊTRE SOMBRE : elle doit savoir quoi montrer, et quand se lever.
+    verifier("le tour retenu nomme sa technique",
+             r.includes("idCarte: entree.carte || null"));
+    verifier("un rejeu en cours est annoncé, pour que la fenêtre se lève",
+             r.includes("surRejeu: (entree)") && r.includes("window.EVENEMENT_EN_COURS = entree"));
+    verifier("et la technique voyage avec l'entrée de journal",
+             lire('cerveau_combat.js').includes("const enTete = (etatAvant.file || [])[0];"));
     verifier("une seule fois par manche",
              r.includes("if (preparationRendue === marque) return;"));
     verifier("et une écriture ratée se rejoue",

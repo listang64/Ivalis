@@ -63,6 +63,8 @@ export function creerRegime(contexte) {
         carteDe = () => null,                // la technique d'une créature
         plateau = null,                      // le terrain, pour les coûts de déplacement
         surFenetre = () => {},               // ouvrir/fermer la fenêtre sombre
+        surRejeu = () => {},                 // « un tour est en train de se rejouer »
+        surPublication = () => {},           // un état vient d'être publié (par nous ou par un autre)
         tracer = () => {},
         maintenant = () => Date.now(),
         programmer = (fn, ms) => setTimeout(fn, ms),
@@ -95,6 +97,7 @@ export function creerRegime(contexte) {
         },
         surEtat: projeter,
         surFenetre,
+        surRejeu,
         tracer,
         programmer
     });
@@ -231,6 +234,13 @@ export function creerRegime(contexte) {
                     moi.cerveau = null;
                     tracer("👀", "ce poste regarde", `(le cerveau est ${etat.cerveau})`);
                 }
+
+                // Un état vient d'arriver : l'appelant peut avoir quelque chose à
+                // en conclure. C'est par là que le cerveau constate qu'une manche
+                // est finie et rend la main aux joueurs — sans quoi il faudrait
+                // attendre qu'un tiers touche le document de la partie, ce que
+                // plus personne ne fait une fois le combat ouvert.
+                try { surPublication(etat); } catch (e) { tracer("❌", "surPublication", String(e && e.message)); }
 
                 // On ne rejoue pas les trois cents entrées d'un combat qu'on
                 // rejoint en route : on part de l'état publié, et on s'anime à
@@ -427,6 +437,18 @@ export function creerRegime(contexte) {
 //
 //  Tout ce qu'elle contient est donc de la traduction, et rien d'autre. C'est
 //  volontairement le seul endroit qui connaisse à la fois les deux mondes.
+
+// LE CERVEAU DOIT POUVOIR RENDRE LA MAIN SANS ATTENDRE UNE NOTIFICATION.
+//
+// C'était le défaut du premier essai : le retour à la préparation n'était appelé
+// que depuis regimeSuivreLaPartie, c'est-à-dire à chaque notification du
+// document de la partie. Or, une fois le combat ouvert, PLUS RIEN N'ÉCRIT dans
+// ce document — le cerveau n'écrit que son propre état. Aucune notification, donc
+// aucun retour à la préparation, et la manche 2 ne démarrait jamais : « la file
+// est vide » toutes les cinq secondes, pour toujours.
+//
+// Le cerveau publie son état : c'est CE moment-là qu'il faut écouter.
+let rendreLaMainAuxJoueurs = () => {};
 
 // C'EST À MOI DE JOUER : EST-CE QUE JE PEUX ?
 //
@@ -650,9 +672,37 @@ function contexteDuJeu() {
             }
         },
 
+        // LA FENÊTRE SOMBRE RETIENT UN TOUR, et elle doit pouvoir le NOMMER.
+        // `idCarte` manquait : la fenêtre affichait « Technique inconnue de ce
+        // poste » à chaque tour, faute de savoir quelle carte annoncer. Elle
+        // voyage maintenant avec l'entrée de journal.
+        // Chaque état publié est une occasion de constater que la manche est
+        // finie — et de rendre la main aux joueurs sans attendre que quelqu'un
+        // d'autre touche le document de la partie.
+        surPublication: () => rendreLaMainAuxJoueurs(),
+
         surFenetre: (entree) => {
             window.EVENEMENT_ATTENDU = entree
-                ? { acteur: entree.acteur, tour: entree.manche, n: entree.v, type: "tour" }
+                ? { acteur: entree.acteur, tour: entree.manche, n: entree.v,
+                    idCarte: entree.carte || null, type: "tour" }
+                : null;
+            if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
+        },
+
+        // UN TOUR EST EN TRAIN DE SE REJOUER : LA FENÊTRE SE LÈVE.
+        //
+        // C'est le second écran noir que la table a vu. Après le OK, la fenêtre
+        // se refermait — puis revenait aussitôt, parce que le combattant en tête
+        // est encore celui dont le tour s'anime. L'animation se déroulait donc
+        // derrière un voile, sans OK et sans clic possible : on ne voyait rien.
+        //
+        // L'ancien monde avait déjà la réponse (`EVENEMENT_EN_COURS`, lu par
+        // etatSequenceTour pour lever la fenêtre pendant la relecture) ; le
+        // nouveau régime ne la renseignait simplement plus.
+        surRejeu: (entree) => {
+            window.EVENEMENT_EN_COURS = entree
+                ? { acteur: entree.acteur, tour: entree.manche, n: entree.v,
+                    idCarte: entree.carte || null, type: "tour" }
                 : null;
             if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
         },
@@ -926,7 +976,7 @@ if (typeof window !== "undefined") {
         // l'ancien monde ; c'est un choix, pas un oubli. Mais alors quelqu'un
         // doit LEUR RENDRE LA MAIN, et ce quelqu'un ne peut être que le cerveau :
         // lui seul sait que la manche est finie.
-        if (REGIME.jeSuisLeCerveau()) rendreLaPreparation(phase);
+        rendreLaPreparation();
 
         // 5. LE CAS QUI NE DOIT PAS ÊTRE SILENCIEUX : on est en résolution, le
         //    drapeau est levé, et personne n'a jamais ouvert de combat dans le
@@ -962,10 +1012,17 @@ if (typeof window !== "undefined") {
     // reposterait la même écriture le temps que la nouvelle phase revienne.
     let preparationRendue = "";
 
-    function rendreLaPreparation(phaseEnBase) {
-        // La partie est déjà en préparation : c'est fait, et le repère peut
-        // s'effacer pour la manche suivante.
-        if (phaseEnBase !== "Resolution") { preparationRendue = ""; return; }
+    // Le cerveau publie son état sans que personne ne touche le document de la
+    // partie : c'est donc SA publication qui doit réveiller le retour à la
+    // préparation, pas une notification qui n'arrivera jamais.
+    rendreLaMainAuxJoueurs = () => rendreLaPreparation();
+
+    function rendreLaPreparation() {
+        // ON NE SE FIE PLUS À LA PHASE LUE LOCALEMENT. window.PARTIE_DATA est
+        // écrasée par la projection : elle dit la phase de l'ÉTAT, pas celle du
+        // document. C'est la transaction ci-dessous qui relit la vraie, et elle
+        // seule qui tranche.
+        if (!REGIME || !REGIME.jeSuisLeCerveau()) return;
 
         const etat = REGIME.etatPublie();
         if (!etat || (etat.phase || "") !== "Preparation") return;

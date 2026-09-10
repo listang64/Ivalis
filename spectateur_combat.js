@@ -107,6 +107,12 @@ export function creerSpectateur(contexte) {
         chercher = async () => null,
         surEtat = () => {},
         surFenetre = () => {},
+        // « JE SUIS EN TRAIN DE REJOUER CECI » — et rien d'autre ne le disait.
+        // Pendant qu'une entrée se rejoue, la fenêtre sombre DOIT se lever :
+        // c'est précisément le moment où il faut voir le plateau. Sans cette
+        // annonce, elle se refermait aussitôt après le OK et l'animation se
+        // déroulait derrière un second écran noir, invisible.
+        surRejeu = () => {},
         tracer = () => {},
         pause = (ms) => new Promise(r => setTimeout(r, ms)),
         // De quoi se rappeler soi-même. Quand un numéro manque, on laisse au
@@ -260,6 +266,7 @@ export function creerSpectateur(contexte) {
                 const entree = suite.entree;
                 tracer("▶️", `${entree.v} ${entree.acteur || "?"}`,
                        `(${(entree.etapes || []).length} étapes)`);
+                surRejeu(entree);
 
                 for (const etape of (entree.etapes || [])) {
                     // Animer D'ABORD, appliquer ENSUITE : l'écran ne doit jamais
@@ -273,6 +280,7 @@ export function creerSpectateur(contexte) {
 
                 moi.vue = nombre(entree.v);
                 delete moi.recues[entree.v];
+                surRejeu(null);
                 tracer("⏹️", `${entree.v}`, "");
 
                 // Le temps de respirer entre deux entrées, pour que l'œil suive.
@@ -281,6 +289,11 @@ export function creerSpectateur(contexte) {
             }
         } finally {
             moi.enCours = false;
+            // QUOI QU'IL ARRIVE, ON N'EST PLUS EN TRAIN DE REJOUER. La boucle
+            // peut sortir par un trou, par une attente ou par une exception :
+            // laisser le drapeau levé garderait le plateau dégagé alors qu'un
+            // tour attend le OK.
+            surRejeu(null);
         }
     }
 
