@@ -113,6 +113,7 @@ node zone_soin_verte_carte.mjs # la zone persistante de soin se dessine en vert,
 node annuler_ciblage.mjs # un bouton ANNULER reprend la main sur le déplacement en plein ciblage
 node carte_grisee_sans_message.mjs # cliquer une carte trop chère l'affiche sans message d'erreur
 node portee_zone.mjs        # une zone lancée à distance emporte bien la distance posée sur la carte
+node butin_avance.mjs       # le butin tiré et dessiné dès le début du combat, gardé si le combat est perdu
 
 ## Le journal d'événements du combat (le gros changement d'architecture)
 
@@ -1016,6 +1017,23 @@ distance en modificateur (ce qui marchait déjà), la distance en action sépar�
 lanceur), deux sources de distance sur la même action (la plus longue gagne, on
 ne les additionne pas), et une carte sans zone (que la correction ne doit pas
 toucher).
+
+`butin_avance.mjs` couvre la réserve de butin. Tirer les objets ne coûte rien ;
+les DESSINER prend une quinzaine de secondes par lot, et ce temps se payait
+jusqu'ici en pleine fouille des cadavres, jauge à l'écran. Le tirage part
+maintenant dès l'ouverture du combat, en arrière-plan, et à la victoire le butin
+est déjà illustré. Un combat perdu ne jette pas son lot : il le garde en
+réserve, RANGÉE PAR DIFFICULTÉ (les raretés ne sortent pas de la même ligne du
+tableau d'équipement selon la rencontre), pour le prochain combat de cette
+difficulté-là.
+
+Le banc surveille surtout ce qui se paie : à trois postes lancés ensemble, un
+seul lot est tiré et **un seul appareil commande les images**. Il vérifie aussi
+qu'une préparation rejouée trente fois n'écrit plus rien, qu'un héros de plus est
+complété à la volée et un héros de moins rend ses objets à la réserve, qu'un
+poste sans clés d'API ne revendique pas un dessin qu'il ne peut pas faire, et
+qu'une revendication abandonnée en route (onglet fermé) se périme au lieu de
+condamner la réserve.
 
 `apercu_butin.mjs` charge le vrai `style.css` et le vrai balisage
 d'`index.html`, remplit l'onglet Inventaire et les trois vues du butin avec les

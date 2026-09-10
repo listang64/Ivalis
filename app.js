@@ -2714,6 +2714,24 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
              }
          }
 
+         // LE BUTIN SE TIRE AU DÉBUT DU COMBAT, PAS À LA FIN. Les objets partent
+         // se faire dessiner pendant qu'on joue : à la victoire, la fouille des
+         // cadavres ne dure plus qu'un clignement d'œil. Un combat perdu ne perd
+         // pas son tirage, il le garde en réserve pour la prochaine rencontre de
+         // la même difficulté.
+         //
+         // Volontairement pas attendu, et sous try/catch pour la même raison que
+         // le butin juste au-dessus : les 150 lignes de combat qui suivent ne
+         // doivent jamais tomber avec lui.
+         if (typeof window.preparerButinEnAvance === "function") {
+             try {
+                 Promise.resolve(window.preparerButinEnAvance())
+                     .catch(e => console.error("Préparation du butin (le combat continue) :", e));
+             } catch (e) {
+                 console.error("Préparation du butin (le combat continue) :", e);
+             }
+         }
+
          // Les repères d'apparition peuvent avoir été posés depuis un autre poste :
          // la demande affichée ici doit alors se refermer d'elle-même.
          if (typeof window.verifierPointsApparition === "function") {

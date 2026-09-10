@@ -215,6 +215,213 @@ window.tirerObjetsAleatoires = function(difficulte, n) {
 };
 
 // =========================================================================
+//  LE BUTIN TIRÉ D'AVANCE
+// =========================================================================
+//  Tirer les objets ne coûte rien : c'est LES DESSINER qui prend une quinzaine
+//  de secondes par lot (MIA_Objets décrit, le dessinateur illustre, Cloudinary
+//  héberge). Jusqu'ici tout ce travail démarrait à la victoire, et les héros
+//  fouillaient les cadavres en regardant une jauge avancer.
+//
+//  On le fait donc AU DÉBUT du combat, en arrière-plan, pendant que les joueurs
+//  jouent : à la victoire, le butin est déjà illustré et la fouille dure le
+//  temps d'un clignement d'œil.
+//
+//  Et si le combat est PERDU (ou réinitialisé, ou abandonné) ? Le tirage n'est
+//  pas jeté : il reste en réserve, rangé par difficulté, et sert au prochain
+//  combat de cette difficulté-là. Rien n'est payé deux fois.
+//
+//  La réserve vit dans le document de la partie, à côté du butin :
+//
+//      Butin_Reserve: { "Normale": { id, creeLe, difficulte, items:[…] }, … }
+//
+//  Rangée PAR DIFFICULTÉ, et non en un seul tas, parce qu'une réserve tirée
+//  pour une rencontre difficile n'a rien à faire dans un combat facile : les
+//  raretés ne sortent pas de la même ligne du tableau d'équipement.
+//
+//  ⚠️ La carte entière est réécrite à chaque fois, jamais par chemin pointé
+//  (`Butin_Reserve.Très difficile`) : une des trois difficultés porte un espace
+//  dans son nom, et un chemin de champ Firestore ne le supporte pas.
+
+window.NB_OBJETS_PAR_HEROS = 2;
+
+// Qui touche une part ? Exactement les mêmes que dans demarrerButin — un héros
+// tombé au combat a participé, un héros mis de côté ou une illusion non.
+// Une seule définition, donc la réserve ne peut pas viser à côté.
+window.participantsAuButin = function() {
+    return (window.PERSOS_PARTIE || [])
+        .filter(p => p.camp === "Allié" && !p.estIllusion && p.actif !== false)
+        .map(p => p.idPersonnage);
+};
+
+// Le poste qui a écrit la réserve est celui qui paie les images : sans cette
+// mémoire, trois appareils enverraient trois fois la même commande au
+// dessinateur. Elle porte la signature de la réserve ET son nombre d'objets,
+// pour qu'un complément (un héros de plus qu'au tirage précédent) relance bien
+// le travail au lieu d'être pris pour du déjà-vu.
+window.RESERVE_ILLUSTREE_EN_COURS = null;
+
+window.signatureReserve = function(reserve) {
+    if (!reserve) return "";
+    return (reserve.id || "") + "@" + ((reserve.items || []).length);
+};
+
+// Complète la réserve de cette difficulté jusqu'à deux objets par héros, puis
+// envoie chez le dessinateur ce qui n'a pas encore de visage.
+//
+// Rejouée à chaque notification de la partie, comme la piste d'initiative :
+// elle DOIT donc être bon marché quand il n'y a rien à faire. Le premier
+// contrôle se fait sur la copie locale de la partie, sans toucher au réseau ;
+// la transaction n'est ouverte que lorsqu'il manque vraiment des objets.
+window.preparerButinEnAvance = async function() {
+    if (!window.ID_PARTIE_COURANTE) return;
+
+    // Hors de la fenêtre de combat, il n'y a pas de combat à préparer.
+    if (document.getElementById("fenetre-combat")?.style.display !== "block") return;
+
+    const partie = window.PARTIE_DATA || {};
+
+    // Pas de rencontre en cours, pas de butin — la même règle qu'à la victoire :
+    // c'est elle qui dit sur quelle ligne du tableau tirer les raretés.
+    if (!partie.ID_Rencontre) return;
+
+    // Combat déjà gagné : c'est le vrai butin qui parle maintenant, pas la
+    // réserve. La préparer ici ne servirait qu'à tirer des objets que personne
+    // ne verrait jamais.
+    if (typeof window.combatGagne === "function" && window.combatGagne()) return;
+
+    const difficulte = partie.Difficulte_Rencontre || "Normale";
+    const participants = window.participantsAuButin();
+    if (participants.length === 0) return;
+
+    const cible = participants.length * window.NB_OBJETS_PAR_HEROS;
+    const locale = (partie.Butin_Reserve || {})[difficulte] || null;
+    const items = (locale && locale.items) || [];
+
+    // LE CAS ORDINAIRE, ET IL DOIT ÊTRE GRATUIT. Cette fonction est rejouée à
+    // chaque notification de la partie : quand la réserve est pleine et déjà
+    // dessinée (ou qu'un poste est en train de la dessiner), on ne touche NI au
+    // réseau NI à la base. Le premier verdict se rend sur la copie locale.
+    const complete = items.length >= cible;
+    const resteADessiner = items.some(it => !it.image)
+                       && typeof window.peutIllustrerLesObjets === "function"
+                       && window.peutIllustrerLesObjets();
+    if (complete && (!resteADessiner || window.dessinReserveEnCours(locale))) return;
+
+    const ecrite = await window.modifierPartie((data) => {
+        // La réserve est relue DANS la transaction : entre-temps, un autre poste
+        // a très bien pu la tirer. Deux appareils qui préparent le même combat
+        // au même instant ne doivent produire qu'un seul lot — et surtout ne
+        // commander qu'une seule fois les images, qui, elles, se paient.
+        const reserves = Object.assign({}, data.Butin_Reserve || {});
+        const actuelle = reserves[difficulte] || null;
+        const liste = ((actuelle && actuelle.items) || []).slice();
+
+        const manquants = cible - liste.length;
+        if (manquants > 0) liste.push(...window.tirerObjetsAleatoires(difficulte, manquants));
+
+        const aDessiner = liste.some(it => !it.image);
+        const jePeuxDessiner = typeof window.peutIllustrerLesObjets === "function"
+                            && window.peutIllustrerLesObjets();
+        // Rien à ajouter, et le dessin est fait ou déjà pris en charge : on se
+        // retire sans rien écrire. C'est ce `null` qui empêche les deux autres
+        // postes de lancer le dessinateur à leur tour.
+        if (manquants <= 0 && (!aDessiner || !jePeuxDessiner
+                               || window.dessinReserveEnCours(actuelle))) return null;
+
+        reserves[difficulte] = {
+            // L'identifiant ne change pas quand on complète une réserve héritée
+            // d'un combat perdu : c'est toujours le même lot, avec les mêmes
+            // images déjà payées.
+            id: (actuelle && actuelle.id) || ("reserve_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8)),
+            creeLe: (actuelle && actuelle.creeLe) || Date.now(),
+            difficulte,
+            items: liste,
+            // La revendication du dessin voyage dans la MÊME écriture que les
+            // objets : impossible pour un poste de voir les uns sans l'autre.
+            // Elle s'éteint d'elle-même si le poste qui l'a prise disparaît en
+            // cours de route (onglet fermé, réseau coupé).
+            //
+            // On ne revendique QUE si l'on a de quoi dessiner. Un poste sans
+            // clés d'API qui prendrait le verrou condamnerait la réserve à
+            // rester grise pendant trois minutes — alors que l'appareil du MJ,
+            // lui, n'attendait que ça.
+            dessinLe: (aDessiner && jePeuxDessiner) ? Date.now() : ((actuelle && actuelle.dessinLe) || null)
+        };
+        return { maj: { Butin_Reserve: reserves }, resultat: reserves[difficulte] };
+    });
+
+    // Seul le poste qui a RÉELLEMENT écrit paie les images. Les autres ont reçu
+    // null (un concurrent les a doublés) et se taisent.
+    if (!ecrite) return;
+    if (!complete) {
+        console.log(`🎁 Butin préparé d'avance : ${cible} objet(s) en réserve pour une rencontre ${difficulte}.`);
+    }
+    await window.lancerIllustrationReserve(ecrite);
+};
+
+// Un poste dessine-t-il DÉJÀ cette réserve ? Passé ce délai, on considère qu'il
+// a disparu en chemin (onglet fermé, réseau coupé, quota épuisé) et un autre
+// peut reprendre le travail — sans quoi une réserve à moitié dessinée le
+// resterait pour toujours.
+window.DELAI_DESSIN_RESERVE_MS = 180000;
+
+window.dessinReserveEnCours = function(reserve) {
+    if (!reserve || !reserve.dessinLe) return false;
+    return (Date.now() - reserve.dessinLe) < window.DELAI_DESSIN_RESERVE_MS;
+};
+
+// Les objets de la réserve partent se faire dessiner. Même chaîne que la
+// fouille des cadavres, mais sans personne pour la regarder : les images se
+// posent dans la réserve, en base, au fil de leur arrivée.
+window.lancerIllustrationReserve = async function(reserve) {
+    if (!reserve) return;
+    const objets = (reserve.items || []).filter(it => !it.image);
+    if (objets.length === 0) return;
+
+    if (typeof window.peutIllustrerLesObjets !== "function" || !window.peutIllustrerLesObjets()) {
+        console.warn("[MIA_Objets] Clés d'API absentes : la réserve de butin restera sans images.");
+        return;
+    }
+
+    const signature = window.signatureReserve(reserve);
+    if (window.RESERVE_ILLUSTREE_EN_COURS === signature) return;
+    window.RESERVE_ILLUSTREE_EN_COURS = signature;
+
+    if (typeof window.oublierStyleGraphique === "function") window.oublierStyleGraphique();
+    console.log(`[MIA_Objets] 🎁 ${objets.length} objet(s) de réserve à illustrer pendant le combat.`);
+
+    try {
+        await window.illustrerLesObjets(objets, async (objet, url) => {
+            await window.poserImageObjetEnBase(objet.uid, url);
+        });
+    } catch (e) {
+        // Une réserve sans images n'est pas une panne : la fouille des cadavres
+        // rattrapera ce qui manque à la victoire, comme avant.
+        console.error("[MIA_Objets] Illustration de la réserve interrompue :", e);
+    }
+};
+
+// Sert les héros dans la réserve, et rend ce qui n'a pas été distribué.
+// Un objet gardé en réserve est un objet DÉJÀ DESSINÉ : on puise donc dedans
+// avant de tirer quoi que ce soit de neuf. Ce qui manque encore (un héros de
+// plus qu'au tirage) est complété à la volée, sans image — la fouille des
+// cadavres s'en chargera, exactement comme avant cette mécanique.
+window.servirDepuisLaReserve = function(reserve, participants, difficulte) {
+    const disponibles = ((reserve && reserve.items) || []).slice();
+    const parPersonnage = {};
+    participants.forEach(id => {
+        const items = [];
+        while (items.length < window.NB_OBJETS_PAR_HEROS && disponibles.length > 0) {
+            items.push(disponibles.shift());
+        }
+        const manquants = window.NB_OBJETS_PAR_HEROS - items.length;
+        if (manquants > 0) items.push(...window.tirerObjetsAleatoires(difficulte, manquants));
+        parPersonnage[id] = { items, decisions: {}, valide: false };
+    });
+    return { parPersonnage, restants: disponibles };
+};
+
+// =========================================================================
 //  DÉTECTION DE VICTOIRE
 // =========================================================================
 //  Rejouée à chaque changement de la liste des combattants (recomposerCombattants,
@@ -288,9 +495,7 @@ window.verifierVictoireCombat = function() {
 window.demarrerButin = async function() {
     if (!window.ID_PARTIE_COURANTE) return;
 
-    const participants = (window.PERSOS_PARTIE || [])
-        .filter(p => p.camp === "Allié" && !p.estIllusion && p.actif !== false)
-        .map(p => p.idPersonnage);
+    const participants = window.participantsAuButin();
     if (participants.length === 0) return;
 
     await window.modifierPartie((data) => {
@@ -347,12 +552,27 @@ window.demarrerButin = async function() {
         const ancien = data.Butin;
         if (ancien && !window.butinPerime(ancien, idRencontre)) return null;
 
-        const parPersonnage = {};
-        participants.forEach(id => {
-            parPersonnage[id] = { items: window.tirerObjetsAleatoires(difficulte, 2), decisions: {}, valide: false };
-        });
+        // LE BUTIN EST DÉJÀ TIRÉ, ET DÉJÀ DESSINÉ. Il attend en réserve depuis
+        // le début du combat (voir preparerButinEnAvance) — ou depuis un combat
+        // de la même difficulté qui s'est mal terminé. On le sert tel quel : ce
+        // sont ces objets-là, avec leurs images, qui apparaissent à l'écran.
+        //
+        // La réserve est relue DANS la transaction, comme tout le reste : c'est
+        // la seule façon d'être sûr que deux postes qui détectent la victoire au
+        // même instant ne distribuent pas deux fois les mêmes objets.
+        const reserves = Object.assign({}, data.Butin_Reserve || {});
+        const service = window.servirDepuisLaReserve(reserves[difficulte], participants, difficulte);
+        const parPersonnage = service.parPersonnage;
 
-        return { maj: { Butin: {
+        // Ce qui reste après le partage (un héros mis de côté entre-temps) ne se
+        // perd pas : il est déjà payé, il attend le combat suivant.
+        if (service.restants.length > 0) {
+            reserves[difficulte] = Object.assign({}, reserves[difficulte] || { difficulte }, { items: service.restants });
+        } else {
+            delete reserves[difficulte];
+        }
+
+        return { maj: { Butin_Reserve: reserves, Butin: {
             ouvert: true,
             etape: "personnel",
             // Deux marqueurs : celui du combat d'où vient ce butin, et le sien
