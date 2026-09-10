@@ -17,7 +17,7 @@
 // =========================================================================
 
 import { db } from "./firebase-config.js";
-import { doc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { doc, updateDoc, deleteField } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // =========================================================================
 //  VOCABULAIRE COMMUN DES EMPLACEMENTS
@@ -230,19 +230,40 @@ window.tirerObjetsAleatoires = function(difficulte, n) {
 //  pas jeté : il reste en réserve, rangé par difficulté, et sert au prochain
 //  combat de cette difficulté-là. Rien n'est payé deux fois.
 //
-//  La réserve vit dans le document de la partie, à côté du butin :
+//  ⚠️ LA RÉSERVE A SON PROPRE DOCUMENT, ET C'EST LA LEÇON DU PREMIER ESSAI :
 //
-//      Butin_Reserve: { "Normale": { id, creeLe, difficulte, items:[…] }, … }
+//      Systeme_Parties/{partie}/Combat_Butin/reserve_normale
 //
-//  Rangée PAR DIFFICULTÉ, et non en un seul tas, parce qu'une réserve tirée
-//  pour une rencontre difficile n'a rien à faire dans un combat facile : les
-//  raretés ne sortent pas de la même ligne du tableau d'équipement.
+//  La première version la rangeait dans le document de la partie. Or c'est LE
+//  document disputé du jeu — la file d'initiative, les verrous, les tours, tout
+//  y passe — et chaque image posée y réécrivait le lot entier, une charge utile
+//  de plusieurs kilo-octets, au moment précis où le combat se met en place. Le
+//  résultat s'est vu dès le premier test : « failed-precondition », verrou de
+//  préparation abandonné, deux minutes perdues avant le premier tour, et une
+//  carte qui refusait de se laisser choisir sur l'iPad.
 //
-//  ⚠️ La carte entière est réécrite à chaque fois, jamais par chemin pointé
-//  (`Butin_Reserve.Très difficile`) : une des trois difficultés porte un espace
-//  dans son nom, et un chemin de champ Firestore ne le supporte pas.
+//  Le butin n'a aucune raison d'être là. Il est FROID : personne ne l'attend
+//  pendant le combat. Il vit maintenant dans son coin, où il peut être réécrit
+//  autant de fois qu'il le faut sans jamais croiser le chemin d'un tour de jeu.
+//
+//  Un document par difficulté, et non un seul tas : une réserve tirée pour une
+//  rencontre difficile n'a rien à faire dans un combat facile, les raretés ne
+//  sortent pas de la même ligne du tableau d'équipement.
 
 window.NB_OBJETS_PAR_HEROS = 2;
+
+// Le nom du document. Une des trois difficultés porte un espace et un accent
+// (« Très difficile ») : on le réduit à un identifiant sans surprise.
+window.cleReserve = function(difficulte) {
+    const propre = String(difficulte || "Normale")
+        .normalize("NFD").replace(/[̀-ͯ]/g, "")
+        .toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    return "reserve_" + (propre || "normale");
+};
+
+window.cheminReserve = function(idPartie, difficulte) {
+    return ["Systeme_Parties", idPartie, "Combat_Butin", window.cleReserve(difficulte)];
+};
 
 // Qui touche une part ? Exactement les mêmes que dans demarrerButin — un héros
 // tombé au combat a participé, un héros mis de côté ou une illusion non.
@@ -253,16 +274,22 @@ window.participantsAuButin = function() {
         .map(p => p.idPersonnage);
 };
 
-// Le poste qui a écrit la réserve est celui qui paie les images : sans cette
-// mémoire, trois appareils enverraient trois fois la même commande au
-// dessinateur. Elle porte la signature de la réserve ET son nombre d'objets,
-// pour qu'un complément (un héros de plus qu'au tirage précédent) relance bien
-// le travail au lieu d'être pris pour du déjà-vu.
-window.RESERVE_ILLUSTREE_EN_COURS = null;
+// Ce que ce poste a vu de la réserve, pour ne pas retourner la lire à chaque
+// notification de la partie. Quand elle est pleine et dessinée, il n'y a plus
+// jamais rien à faire : pas une lecture, pas une écriture.
+window.RESERVE_CONNUE = {};
+window.DERNIER_REGARD_RESERVE = {};
+window.DELAI_REGARD_RESERVE_MS = 30000;
 
-window.signatureReserve = function(reserve) {
-    if (!reserve) return "";
-    return (reserve.id || "") + "@" + ((reserve.items || []).length);
+// Un poste dessine-t-il DÉJÀ cette réserve ? Passé ce délai, on considère qu'il
+// a disparu en chemin (onglet fermé, réseau coupé, quota épuisé) et un autre
+// peut reprendre le travail — sans quoi une réserve à moitié dessinée le
+// resterait pour toujours.
+window.DELAI_DESSIN_RESERVE_MS = 180000;
+
+window.dessinReserveEnCours = function(reserve) {
+    if (!reserve || !reserve.dessinLe) return false;
+    return (Date.now() - reserve.dessinLe) < window.DELAI_DESSIN_RESERVE_MS;
 };
 
 // Complète la réserve de cette difficulté jusqu'à deux objets par héros, puis
@@ -270,15 +297,24 @@ window.signatureReserve = function(reserve) {
 //
 // Rejouée à chaque notification de la partie, comme la piste d'initiative :
 // elle DOIT donc être bon marché quand il n'y a rien à faire. Le premier
-// contrôle se fait sur la copie locale de la partie, sans toucher au réseau ;
-// la transaction n'est ouverte que lorsqu'il manque vraiment des objets.
+// verdict se rend sur ce que ce poste a déjà vu, sans toucher au réseau.
 window.preparerButinEnAvance = async function() {
     if (!window.ID_PARTIE_COURANTE) return;
 
     // Hors de la fenêtre de combat, il n'y a pas de combat à préparer.
     if (document.getElementById("fenetre-combat")?.style.display !== "block") return;
 
+    const io = window.ioCombatFirestore;
+    if (!io || typeof io.transaction !== "function") return;
+
     const partie = window.PARTIE_DATA || {};
+
+    // Le ménage de la première version, s'il reste à faire (une écriture, une
+    // seule fois par partie) : la réserve ne vit plus là.
+    if (partie.Butin_Reserve && typeof window.effacerAncienneReserveDePartie === "function") {
+        window.effacerAncienneReserveDePartie()
+            .catch(e => console.error("Butin : ménage de l'ancienne réserve :", e));
+    }
 
     // Pas de rencontre en cours, pas de butin — la même règle qu'à la victoire :
     // c'est elle qui dit sur quelle ligne du tableau tirer les raretés.
@@ -294,27 +330,28 @@ window.preparerButinEnAvance = async function() {
     if (participants.length === 0) return;
 
     const cible = participants.length * window.NB_OBJETS_PAR_HEROS;
-    const locale = (partie.Butin_Reserve || {})[difficulte] || null;
-    const items = (locale && locale.items) || [];
+    const cle = window.cleReserve(difficulte);
+    const chemin = window.cheminReserve(window.ID_PARTIE_COURANTE, difficulte);
 
-    // LE CAS ORDINAIRE, ET IL DOIT ÊTRE GRATUIT. Cette fonction est rejouée à
-    // chaque notification de la partie : quand la réserve est pleine et déjà
-    // dessinée (ou qu'un poste est en train de la dessiner), on ne touche NI au
-    // réseau NI à la base. Le premier verdict se rend sur la copie locale.
-    const complete = items.length >= cible;
-    const resteADessiner = items.some(it => !it.image)
-                       && typeof window.peutIllustrerLesObjets === "function"
-                       && window.peutIllustrerLesObjets();
-    if (complete && (!resteADessiner || window.dessinReserveEnCours(locale))) return;
+    // LE CAS ORDINAIRE, ET IL DOIT ÊTRE GRATUIT.
+    const connue = window.RESERVE_CONNUE[cle] || null;
+    if (connue && !window.reserveADuTravail(connue, cible)) return;
 
-    const ecrite = await window.modifierPartie((data) => {
+    // On ne retourne pas voir toutes les cinq secondes : ce qu'on ignore, c'est
+    // le travail d'un AUTRE poste, et il ne va pas plus vite parce qu'on regarde.
+    const dernier = window.DERNIER_REGARD_RESERVE[cle] || 0;
+    if (Date.now() - dernier < window.DELAI_REGARD_RESERVE_MS) return;
+    window.DERNIER_REGARD_RESERVE[cle] = Date.now();
+
+    let vue = null;
+    let ecrite = null;
+    const aEcrit = await io.transaction(chemin, (actuel) => {
         // La réserve est relue DANS la transaction : entre-temps, un autre poste
         // a très bien pu la tirer. Deux appareils qui préparent le même combat
         // au même instant ne doivent produire qu'un seul lot — et surtout ne
         // commander qu'une seule fois les images, qui, elles, se paient.
-        const reserves = Object.assign({}, data.Butin_Reserve || {});
-        const actuelle = reserves[difficulte] || null;
-        const liste = ((actuelle && actuelle.items) || []).slice();
+        vue = actuel;
+        const liste = ((actuel && actuel.items) || []).slice();
 
         const manquants = cible - liste.length;
         if (manquants > 0) liste.push(...window.tirerObjetsAleatoires(difficulte, manquants));
@@ -322,58 +359,59 @@ window.preparerButinEnAvance = async function() {
         const aDessiner = liste.some(it => !it.image);
         const jePeuxDessiner = typeof window.peutIllustrerLesObjets === "function"
                             && window.peutIllustrerLesObjets();
+
         // Rien à ajouter, et le dessin est fait ou déjà pris en charge : on se
         // retire sans rien écrire. C'est ce `null` qui empêche les deux autres
         // postes de lancer le dessinateur à leur tour.
         if (manquants <= 0 && (!aDessiner || !jePeuxDessiner
-                               || window.dessinReserveEnCours(actuelle))) return null;
+                               || window.dessinReserveEnCours(actuel))) return null;
 
-        reserves[difficulte] = {
+        ecrite = {
             // L'identifiant ne change pas quand on complète une réserve héritée
             // d'un combat perdu : c'est toujours le même lot, avec les mêmes
             // images déjà payées.
-            id: (actuelle && actuelle.id) || ("reserve_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8)),
-            creeLe: (actuelle && actuelle.creeLe) || Date.now(),
+            id: (actuel && actuel.id) || ("reserve_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8)),
+            creeLe: (actuel && actuel.creeLe) || Date.now(),
             difficulte,
             items: liste,
             // La revendication du dessin voyage dans la MÊME écriture que les
             // objets : impossible pour un poste de voir les uns sans l'autre.
-            // Elle s'éteint d'elle-même si le poste qui l'a prise disparaît en
-            // cours de route (onglet fermé, réseau coupé).
             //
             // On ne revendique QUE si l'on a de quoi dessiner. Un poste sans
             // clés d'API qui prendrait le verrou condamnerait la réserve à
             // rester grise pendant trois minutes — alors que l'appareil du MJ,
             // lui, n'attendait que ça.
-            dessinLe: (aDessiner && jePeuxDessiner) ? Date.now() : ((actuelle && actuelle.dessinLe) || null)
+            dessinLe: (aDessiner && jePeuxDessiner) ? Date.now() : ((actuel && actuel.dessinLe) || null)
         };
-        return { maj: { Butin_Reserve: reserves }, resultat: reserves[difficulte] };
+        return ecrite;
     });
 
-    // Seul le poste qui a RÉELLEMENT écrit paie les images. Les autres ont reçu
-    // null (un concurrent les a doublés) et se taisent.
-    if (!ecrite) return;
-    if (!complete) {
+    window.RESERVE_CONNUE[cle] = aEcrit ? ecrite : vue;
+
+    // Seul le poste qui a RÉELLEMENT écrit paie les images. Les autres ont vu
+    // leur transaction rendre null (un concurrent les a doublés) et se taisent.
+    if (!aEcrit) return;
+    if (!vue || ((vue.items || []).length < cible)) {
         console.log(`🎁 Butin préparé d'avance : ${cible} objet(s) en réserve pour une rencontre ${difficulte}.`);
     }
-    await window.lancerIllustrationReserve(ecrite);
+    await window.lancerIllustrationReserve(ecrite, chemin);
 };
 
-// Un poste dessine-t-il DÉJÀ cette réserve ? Passé ce délai, on considère qu'il
-// a disparu en chemin (onglet fermé, réseau coupé, quota épuisé) et un autre
-// peut reprendre le travail — sans quoi une réserve à moitié dessinée le
-// resterait pour toujours.
-window.DELAI_DESSIN_RESERVE_MS = 180000;
-
-window.dessinReserveEnCours = function(reserve) {
-    if (!reserve || !reserve.dessinLe) return false;
-    return (Date.now() - reserve.dessinLe) < window.DELAI_DESSIN_RESERVE_MS;
+// Reste-t-il quelque chose à faire sur cette réserve ? La question se pose deux
+// fois — avant d'aller la lire, et une fois lue — et elle doit donner la même
+// réponse aux deux endroits.
+window.reserveADuTravail = function(reserve, cible) {
+    const items = (reserve && reserve.items) || [];
+    if (items.length < cible) return true;
+    if (!items.some(it => !it.image)) return false;
+    if (typeof window.peutIllustrerLesObjets !== "function" || !window.peutIllustrerLesObjets()) return false;
+    return !window.dessinReserveEnCours(reserve);
 };
 
 // Les objets de la réserve partent se faire dessiner. Même chaîne que la
 // fouille des cadavres, mais sans personne pour la regarder : les images se
-// posent dans la réserve, en base, au fil de leur arrivée.
-window.lancerIllustrationReserve = async function(reserve) {
+// posent dans le document de la réserve, au fil de leur arrivée.
+window.lancerIllustrationReserve = async function(reserve, chemin) {
     if (!reserve) return;
     const objets = (reserve.items || []).filter(it => !it.image);
     if (objets.length === 0) return;
@@ -383,16 +421,12 @@ window.lancerIllustrationReserve = async function(reserve) {
         return;
     }
 
-    const signature = window.signatureReserve(reserve);
-    if (window.RESERVE_ILLUSTREE_EN_COURS === signature) return;
-    window.RESERVE_ILLUSTREE_EN_COURS = signature;
-
     if (typeof window.oublierStyleGraphique === "function") window.oublierStyleGraphique();
     console.log(`[MIA_Objets] 🎁 ${objets.length} objet(s) de réserve à illustrer pendant le combat.`);
 
     try {
         await window.illustrerLesObjets(objets, async (objet, url) => {
-            await window.poserImageObjetEnBase(objet.uid, url);
+            await window.poserImageDansLaReserve(chemin, objet.uid, url);
         });
     } catch (e) {
         // Une réserve sans images n'est pas une panne : la fouille des cadavres
@@ -401,13 +435,39 @@ window.lancerIllustrationReserve = async function(reserve) {
     }
 };
 
+// L'URL rejoint le document de la réserve — JAMAIS celui de la partie. Le
+// tableau d'items est réécrit en entier faute de pouvoir viser une case de
+// tableau, et c'est justement pourquoi cette écriture n'a rien à faire sur le
+// document que le combat se dispute.
+window.poserImageDansLaReserve = async function(chemin, uid, url) {
+    const io = window.ioCombatFirestore;
+    if (!io || typeof io.transaction !== "function" || !uid || !url) return false;
+
+    let apres = null;
+    const pose = await io.transaction(chemin, (actuel) => {
+        if (!actuel) return null;
+        const items = (actuel.items || []).slice();
+        const i = items.findIndex(it => it.uid === uid);
+        if (i < 0 || items[i].image) return null;
+        items[i] = Object.assign({}, items[i], { image: url });
+        apres = Object.assign({}, actuel, { items });
+        return apres;
+    });
+
+    // Ce poste connaît maintenant l'état exact de la réserve : inutile d'aller
+    // le redemander à la prochaine notification.
+    if (pose && apres) window.RESERVE_CONNUE[window.cleReserve(apres.difficulte)] = apres;
+    return !!pose;
+};
+
 // Sert les héros dans la réserve, et rend ce qui n'a pas été distribué.
 // Un objet gardé en réserve est un objet DÉJÀ DESSINÉ : on puise donc dedans
 // avant de tirer quoi que ce soit de neuf. Ce qui manque encore (un héros de
 // plus qu'au tirage) est complété à la volée, sans image — la fouille des
 // cadavres s'en chargera, exactement comme avant cette mécanique.
 window.servirDepuisLaReserve = function(reserve, participants, difficulte) {
-    const disponibles = ((reserve && reserve.items) || []).slice();
+    const utilisable = reserve && (!reserve.difficulte || reserve.difficulte === difficulte);
+    const disponibles = ((utilisable && reserve.items) || []).slice();
     const parPersonnage = {};
     participants.forEach(id => {
         const items = [];
@@ -418,7 +478,34 @@ window.servirDepuisLaReserve = function(reserve, participants, difficulte) {
         if (manquants > 0) items.push(...window.tirerObjetsAleatoires(difficulte, manquants));
         parPersonnage[id] = { items, decisions: {}, valide: false };
     });
-    return { parPersonnage, restants: disponibles };
+    // `utilise` dit si on a VRAIMENT puisé dans cette réserve. Sans ce mot, une
+    // réserve d'une autre difficulté (une réinitialisation entre la lecture et
+    // la transaction) était jugée « entièrement distribuée » et se faisait
+    // effacer : un lot d'objets déjà payés, jeté pour rien.
+    return { parPersonnage, restants: disponibles, utilise: !!utilisable };
+};
+
+// Ce qui reste après le partage (un héros mis de côté entre-temps) ne se perd
+// pas : il est déjà payé, il attend le combat suivant. Ce qui a été distribué,
+// lui, quitte la réserve — sinon la rencontre suivante redistribuerait les
+// mêmes objets.
+window.reglerLaReserveApresPartage = async function(chemin, reserve, restants) {
+    const io = window.ioCombatFirestore;
+    if (!io || typeof io.lot !== "function" || !reserve) return;
+    const cle = window.cleReserve(reserve.difficulte);
+    try {
+        if (restants.length > 0) {
+            const suite = Object.assign({}, reserve, { items: restants, dessinLe: null });
+            await io.lot([{ op: "set", chemin, data: suite }]);
+            window.RESERVE_CONNUE[cle] = suite;
+        } else {
+            await io.lot([{ op: "delete", chemin }]);
+            window.RESERVE_CONNUE[cle] = null;
+        }
+        delete window.DERNIER_REGARD_RESERVE[cle];
+    } catch (e) {
+        console.error("Butin : la réserve n'a pas pu être rangée après le partage :", e);
+    }
 };
 
 // =========================================================================
@@ -498,7 +585,25 @@ window.demarrerButin = async function() {
     const participants = window.participantsAuButin();
     if (participants.length === 0) return;
 
-    await window.modifierPartie((data) => {
+    // LA RÉSERVE SE LIT AVANT LA TRANSACTION, parce qu'elle vit dans son propre
+    // document (voir plus haut : le butin n'a rien à faire sur le document que
+    // le combat se dispute). Deux postes peuvent donc lire la même réserve au
+    // même instant — mais un seul écrira le butin, et le perdant jette son
+    // calcul sans dommage. C'est la transaction du butin qui tranche, comme
+    // avant.
+    const difficulteVue = (window.PARTIE_DATA || {}).Difficulte_Rencontre || "Normale";
+    const cheminReserve = window.cheminReserve(window.ID_PARTIE_COURANTE, difficulteVue);
+    let reserveLue = null;
+    try {
+        const io = window.ioCombatFirestore;
+        if (io && typeof io.lire === "function") reserveLue = await io.lire(cheminReserve);
+    } catch (e) {
+        // Une réserve illisible ne fait pas rater le butin : on tire à neuf,
+        // comme avant cette mécanique.
+        console.error("Butin : réserve illisible, tirage à neuf :", e);
+    }
+
+    const servi = await window.modifierPartie((data) => {
         // La rencontre est relue DANS la transaction, jamais depuis la mémoire
         // du poste : entre le moment où une réinitialisation efface la
         // rencontre et celui où la suppression des créatures parvient à tous
@@ -560,19 +665,11 @@ window.demarrerButin = async function() {
         // La réserve est relue DANS la transaction, comme tout le reste : c'est
         // la seule façon d'être sûr que deux postes qui détectent la victoire au
         // même instant ne distribuent pas deux fois les mêmes objets.
-        const reserves = Object.assign({}, data.Butin_Reserve || {});
-        const service = window.servirDepuisLaReserve(reserves[difficulte], participants, difficulte);
+        const service = window.servirDepuisLaReserve(reserveLue, participants, difficulte);
         const parPersonnage = service.parPersonnage;
 
-        // Ce qui reste après le partage (un héros mis de côté entre-temps) ne se
-        // perd pas : il est déjà payé, il attend le combat suivant.
-        if (service.restants.length > 0) {
-            reserves[difficulte] = Object.assign({}, reserves[difficulte] || { difficulte }, { items: service.restants });
-        } else {
-            delete reserves[difficulte];
-        }
-
-        return { maj: { Butin_Reserve: reserves, Butin: {
+        return { resultat: { restants: service.restants, utilise: service.utilise },
+                 maj: { Butin: {
             ouvert: true,
             etape: "personnel",
             // Deux marqueurs : celui du combat d'où vient ce butin, et le sien
@@ -589,6 +686,14 @@ window.demarrerButin = async function() {
             resolu: false
         } } };
     });
+
+    // On a gagné la course : la réserve est rangée. Ce qui a été distribué la
+    // quitte (sinon la rencontre suivante redonnerait les mêmes objets), ce qui
+    // reste y demeure, déjà payé. Le poste qui a perdu la course n'a rien écrit
+    // et ne touche à rien.
+    if (servi && servi.utilise && reserveLue) {
+        await window.reglerLaReserveApresPartage(cheminReserve, reserveLue, servi.restants || []);
+    }
 };
 
 // Un butin est périmé quand il ne concerne plus le combat en cours : soit il
@@ -604,6 +709,26 @@ window.demarrerButin = async function() {
 // forcément à un combat passé, quel que soit le temps que les joueurs mettent
 // à choisir.
 window.DELAI_BUTIN_PERIME_MS = 60000;
+
+// LE MÉNAGE DE LA PREMIÈRE VERSION. Les parties qui ont tourné avec la réserve
+// rangée dans le document de la partie en gardent un champ `Butin_Reserve`
+// devenu inutile — et pesant, puisqu'il voyage à chaque notification. Une
+// écriture, une seule fois, et on n'en parle plus.
+window.RESERVE_ANCIENNE_EFFACEE = false;
+
+window.effacerAncienneReserveDePartie = async function() {
+    if (window.RESERVE_ANCIENNE_EFFACEE) return;
+    if (!window.ID_PARTIE_COURANTE) return;
+    if (!(window.PARTIE_DATA || {}).Butin_Reserve) return;
+    window.RESERVE_ANCIENNE_EFFACEE = true;
+    try {
+        await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE),
+                        { Butin_Reserve: deleteField() });
+        console.log("🧹 Ancienne réserve de butin retirée du document de la partie.");
+    } catch (e) {
+        console.error("Butin : l'ancienne réserve n'a pas pu être retirée :", e);
+    }
+};
 
 // Une réinitialisation qui n'aboutit pas (poste fermé en plein ménage, réseau
 // coupé) ne doit pas condamner tous les butins suivants : passé ce délai, le

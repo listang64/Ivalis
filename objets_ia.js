@@ -420,27 +420,9 @@ window.poserImageObjetEnBase = async function(uid, url) {
     if (!uid || !url) return false;
 
     const pose = await window.modifierPartie((data) => {
-        const maj = {};
-
-        // L'objet peut appartenir à la RÉSERVE : le butin tiré d'avance, celui
-        // qu'on dessine pendant le combat. C'est même le cas le plus fréquent
-        // depuis que la fouille des cadavres n'attend plus rien.
-        const reserves = data.Butin_Reserve || {};
-        let reserveTouchee = false;
-        Object.keys(reserves).forEach(difficulte => {
-            const items = (reserves[difficulte] || {}).items || [];
-            const vise = items.find(it => it.uid === uid);
-            if (!vise || vise.image) return;
-            vise.image = url;
-            reserveTouchee = true;
-        });
-        if (reserveTouchee) maj["Butin_Reserve"] = reserves;
-
         const butin = data.Butin;
-        if (!butin) {
-            if (Object.keys(maj).length === 0) return null;
-            return { maj };
-        }
+        if (!butin) return null;
+        const maj = {};
 
         Object.keys(butin.parPersonnage || {}).forEach(id => {
             const items = (butin.parPersonnage[id] || {}).items || [];

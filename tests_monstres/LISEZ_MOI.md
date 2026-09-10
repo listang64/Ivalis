@@ -1027,7 +1027,19 @@ réserve, RANGÉE PAR DIFFICULTÉ (les raretés ne sortent pas de la même ligne
 tableau d'équipement selon la rencontre), pour le prochain combat de cette
 difficulté-là.
 
-Le banc surveille surtout ce qui se paie : à trois postes lancés ensemble, un
+⚠️ La réserve a son PROPRE document (`Systeme_Parties/{partie}/Combat_Butin/…`),
+et c'est la leçon du premier essai. La première version la rangeait dans le
+document de la partie : chaque image posée y réécrivait le lot entier, plusieurs
+kilo-octets, sur le document le plus disputé du jeu — celui de la file
+d'initiative, des verrous et des tours. Résultat en vrai combat :
+« failed-precondition », verrou de préparation abandonné, deux minutes perdues
+avant le premier tour, et une carte qui refusait de se laisser choisir sur
+l'iPad. Le butin est FROID, personne ne l'attend pendant le combat : il vit
+maintenant dans son coin. Le chapitre 11 du banc est là pour ça — il compte les
+écritures sur le document de la partie et exige **zéro** pendant toute la
+préparation, la seule permise étant le butin lui-même, à la victoire.
+
+Le banc surveille aussi ce qui se paie : à trois postes lancés ensemble, un
 seul lot est tiré et **un seul appareil commande les images**. Il vérifie aussi
 qu'une préparation rejouée trente fois n'écrit plus rien, qu'un héros de plus est
 complété à la volée et un héros de moins rend ses objets à la réserve, qu'un
