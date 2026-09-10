@@ -412,6 +412,67 @@ export function creerRegime(contexte) {
 //  Tout ce qu'elle contient est donc de la traduction, et rien d'autre. C'est
 //  volontairement le seul endroit qui connaisse à la fois les deux mondes.
 
+// C'EST À MOI DE JOUER : EST-CE QUE JE PEUX ?
+//
+// Le seul chemin par lequel un joueur lance sa carte pendant son tour est le
+// bouton doré « Appliquer » (competences.js). Il n'apparaît que si TROIS choses
+// sont vraies au moment du rendu : la phase est « Resolution », mon héros est en
+// TÊTE de la file, et son entrée porte l'identifiant de sa carte.
+//
+// Quand ces trois choses sont vraies et que le bouton n'est PAS là, le joueur
+// est devant un écran mort et personne ne le sait — ni lui, ni la trace, ni moi.
+// C'est ce qui a coûté la troisième soirée d'essai : « le cerveau attend
+// PERSO_338423 » pendant vingt-cinq secondes, et rien pour dire que le poste de
+// PERSO_338423 n'avait aucun bouton à cliquer.
+//
+// Une ligne par tour, jamais plus : c'est un diagnostic, pas un journal.
+let tourVerifie = "";
+
+function verifierQueJePeuxJouer(file) {
+    if (typeof document === "undefined") return;
+    const tete = (file || [])[0];
+    if (!tete) { tourVerifie = ""; return; }
+
+    const aMoi = typeof window.estMonHerosCombat === "function"
+              && window.estMonHerosCombat(tete.idPersonnage);
+    if (!aMoi) { tourVerifie = ""; return; }
+
+    const cle = tete.idPersonnage + "|" + (tete.idCarte || "");
+    if (tourVerifie === cle) return;
+    tourVerifie = cle;
+
+    const bouton = document.getElementById("btn-appliquer-carte");
+    const voile = !!window.EVENEMENT_ATTENDU;
+    if (bouton && !voile) {
+        if (typeof window.tracerCombat === "function") {
+            window.tracerCombat("🎯", `à moi de jouer : ${tete.idPersonnage}`,
+                                `bouton Appliquer prêt (${tete.idCarte || "sans carte"})`);
+        }
+        return;
+    }
+    if (typeof window.tracerCombat === "function") {
+        window.tracerCombat("🧊", `à moi de jouer mais RIEN À CLIQUER : ${tete.idPersonnage}`,
+                            [`carte ${tete.idCarte || "ABSENTE"}`,
+                             bouton ? "bouton présent" : "bouton Appliquer absent",
+                             voile ? "la fenêtre sombre est encore levée" : "pas de voile"].join(" · "));
+    }
+}
+
+// Une panne d'affichage se dit UNE FOIS, avec son nom et sa cause. Répétée à
+// chaque étape elle noierait la trace ; jamais dite, elle coûte une soirée.
+const PANNES_VUES = new Set();
+
+function signalerPanne(nom, cause) {
+    const message = cause && cause.message ? cause.message : String(cause);
+    const cle = nom + "|" + message;
+    if (PANNES_VUES.has(cle)) return;
+    PANNES_VUES.add(cle);
+    if (typeof window !== "undefined" && typeof window.tracerCombat === "function") {
+        window.tracerCombat("💣", `${nom} a échoué`, message);
+    }
+    console.error(`Projection : ${nom} a échoué —`, cause);
+}
+
 function contexteDuJeu() {
     return {
         io: window.ioCombatFirestore,
@@ -542,20 +603,34 @@ function contexteDuJeu() {
                     partie.Tour_Combat = infos.manche;
                     partie.Ont_Joue_Ce_Round = infos.ontJoue;
                 }
+                // UN RAFRAÎCHISSEMENT QUI TOMBE NE DOIT PLUS TOMBER EN SILENCE.
+                //
+                // Ces trois appels étaient sous `catch (e) {}`. C'est la pire
+                // ligne de tout le fichier : `actualiserEtatCarteCombat` est ce
+                // qui fait apparaître le bouton « Appliquer » — le SEUL chemin
+                // par lequel un joueur lance sa carte pendant son tour. Si elle
+                // lève une exception, le joueur clique dans le vide, la trace ne
+                // dit rien, et on cherche ailleurs pendant une soirée entière.
+                //
+                // On avale toujours l'exception (le combat ne doit pas s'arrêter
+                // pour un bouton), mais on la NOMME, une fois par sorte de panne
+                // pour ne pas inonder la trace à chaque étape.
                 [["afficherPisteInitiative", () => window.afficherPisteInitiative(file, infos.phase)],
                  ["actualiserBoutonFinTour", () => window.actualiserBoutonFinTour(file, infos.phase)],
                  ["actualiserEtatCarteCombat", () => window.actualiserEtatCarteCombat()]]
                     .forEach(([nom, appel]) => {
-                        if (typeof window[nom] === "function") { try { appel(); } catch (e) {} }
+                        if (typeof window[nom] !== "function") { signalerPanne(nom, "absent de la page"); return; }
+                        try { appel(); } catch (e) { signalerPanne(nom, e); }
                     });
+                verifierQueJePeuxJouer(file);
             },
             rafraichir: () => {
-                if (typeof window.rafraichirAffichageCombat === "function") {
-                    try { window.rafraichirAffichageCombat(); } catch (e) {}
-                }
-                if (typeof window.redessinerPions === "function") {
-                    try { window.redessinerPions(); } catch (e) {}
-                }
+                [["rafraichirAffichageCombat", () => window.rafraichirAffichageCombat()],
+                 ["redessinerPions", () => window.redessinerPions()]]
+                    .forEach(([nom, appel]) => {
+                        if (typeof window[nom] !== "function") return;
+                        try { appel(); } catch (e) { signalerPanne(nom, e); }
+                    });
             }
         },
 

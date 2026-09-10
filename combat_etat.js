@@ -159,7 +159,11 @@ export function combattantDepuisFiche(fiche, position, regles) {
         // Le Vargen se dérobe à une attaque d'opportunité, et se déplace pour
         // deux fois moins cher : deux règles qui vivent dans les atouts de race.
         esquiveOpportunite: nombre(race.esquiveOpportunite),
-        diviseurDeplacement: nombre(race.diviseurDeplacement, 1) || 1
+        diviseurDeplacement: nombre(race.diviseurDeplacement, 1) || 1,
+        // L'Humain reprend dix points d'énergie de plus à chaque repos long.
+        // Le repos se calcule maintenant chez le cerveau : son atout doit donc
+        // voyager dans l'état, sinon il disparaît du jeu.
+        bonusReposLong: nombre(race.bonusReposLong)
     };
     const mod = {
         // Ce que l'ÉQUIPEMENT change, hors états altérés : le bouclier lourd

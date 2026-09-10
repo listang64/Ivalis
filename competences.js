@@ -378,8 +378,31 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     conteneurCarte.dataset.cardId = idCarte;
     conteneurCarte.dataset.locked = isLocked ? "true" : "false";
 
-    const data = window.COMPETENCES_CACHE[idCarte];
-    if (!data) return;
+    // LE DERNIER RETOUR MUET DE LA CHAÎNE, et il est sur le chemin du bouton
+    // « Appliquer » — le SEUL par lequel un joueur lance sa carte pendant son
+    // tour. COMPETENCES_CACHE ne contient que le deck du héros AFFICHÉ dans le
+    // panneau : dès qu'on regarde un autre personnage, ou qu'un rendu arrive
+    // avant que le deck ne soit chargé, la carte du tour n'y est plus. La
+    // fonction rendait alors la main sans un mot, le bouton n'apparaissait
+    // jamais, et le joueur cliquait dans le vide devant un plateau figé.
+    //
+    // On va donc la chercher là où elle est de toute façon : le cache global,
+    // rangé par personnage. Et si elle n'y est vraiment pas, on le DIT.
+    let data = window.COMPETENCES_CACHE[idCarte];
+    if (!data) {
+        const global = window.CACHE_COMPETENCES_GLOBAL || {};
+        for (const idPerso of Object.keys(global)) {
+            if (global[idPerso] && global[idPerso][idCarte]) { data = global[idPerso][idCarte]; break; }
+        }
+        if (data) window.COMPETENCES_CACHE[idCarte] = data;
+    }
+    if (!data) {
+        if (typeof window.tracerCombat === "function") {
+            window.tracerCombat("💣", `technique ${idCarte} introuvable`,
+                                "aucune carte à afficher — le bouton Appliquer ne peut pas exister");
+        }
+        return;
+    }
     window.CARTE_EN_APERCU = idCarte;
 
     const titre = data.Nom || "Inconnue";

@@ -507,5 +507,88 @@ console.log("\n13. LA CARTE D'UNE CRÉATURE PASSE PAR L'EXTRACTEUR DU JEU");
              r.includes("n'a pas de carte jouable"));
 }
 
+// =========================================================================
+console.log("\n14. PLUS UNE SEULE PANNE MUETTE");
+// =========================================================================
+//  Trois soirées de test perdues, et la même cause à chaque fois : quelque
+//  chose échouait sans le dire. Ce chapitre interdit les silences qu'on a payés.
+{
+    const r = SOURCES['regime_cerveau.js'];
+    const c = SOURCES['combat.js'];
+    const cerveau = lire('cerveau_combat.js');
+
+    // 1. LA PROJECTION AVALAIT SES EXCEPTIONS. actualiserEtatCarteCombat est ce
+    //    qui fait apparaître le bouton « Appliquer » — le seul chemin par lequel
+    //    un joueur lance sa carte pendant son tour. Sous `catch (e) {}`, un
+    //    plantage là-dedans laissait le joueur cliquer dans le vide, sans un mot.
+    const bloc = r.slice(r.indexOf("poserFile: (file, infos)"), r.indexOf("surFenetre: (entree)"));
+    // Sans les commentaires : celui qui RACONTE la faute d'hier la contient
+    // forcément, et il n'est pas la faute.
+    const codeSeul = bloc.split("\n").filter(l => !l.trim().startsWith("//")).join("\n");
+    verifier("la projection ne cache plus ses pannes", !codeSeul.includes("catch (e) {}"));
+    verifier("elle les nomme, une fois chacune", r.includes("function signalerPanne"));
+    verifier("et le rafraîchissement d'écran aussi",
+             bloc.includes('["rafraichirAffichageCombat"'));
+
+    // 2. UN REFUS DIT CE QU'IL REFUSE. « c'est au tour de X » ne disait pas si le
+    //    joueur avait tenté sa carte, un déplacement, ou une fin de tour.
+    verifier("un refus nomme le type demandé et son acteur",
+             cerveau.includes("type: intention.type, acteur: intention.acteur"));
+    verifier("et le poste qui l'a demandé",
+             cerveau.includes("demandé par ${pas.poste"));
+
+    // 3. UN TOUR QUI SE FERME SANS CARTE LE DIT. C'était le symptôme exact de
+    //    « ça ne veut pas prendre la carte sélectionnée » : un pas publié, une
+    //    seule étape, et rien qui explique que la carte n'était jamais partie.
+    verifier("un tour fermé sans carte est signalé",
+             cerveau.includes("tour fermé SANS carte"));
+
+    // 4. UNE CARTE SANS CIBLE PASSE PAR LE CERVEAU. Paralysie, Illusion seule,
+    //    Bond seul : elles déduisaient l'énergie en local et en base, puis
+    //    envoyaient une fin de tour nue.
+    const valider = c.slice(c.indexOf("window.validerCarteCombat = async function"));
+    const finValider = valider.slice(0, valider.indexOf("\n};"));
+    verifier("validerCarteCombat demande une carte au cerveau",
+             finValider.includes("window.regimeDemande.carte("));
+    verifier("et la demande AVANT toute déduction locale",
+             finValider.indexOf("window.regimeDemande.carte(")
+             < finValider.indexOf("window.deduireFatigueCarte("));
+    verifier("l'ancien chemin reste intact pour le régime éteint",
+             finValider.includes("window.deduireFatigueCarte(")
+             && finValider.includes("window.finDeTourCombat("));
+
+    // 5. LE REPOS LONG EXISTE DANS LE CERVEAU. Il n'y était nulle part.
+    verifier("le cerveau connaît le repos long", cerveau.includes('carte !== "REPOS_LONG"'));
+    verifier("et il le paie à la fermeture du tour",
+             cerveau.includes("reposLongDuTour(suivant)"));
+    verifier("l'atout de l'Humain voyage jusqu'à lui",
+             lire('combat_etat.js').includes("bonusReposLong"));
+
+    // 6. UN CLIC DE CARTE REFUSÉ EN PRÉPARATION LE DIT AUSSI.
+    verifier("les refus du choix de carte sont nommés",
+             c.includes("carte ${idCarte} refusée"));
+
+    // 7. LE DERNIER RETOUR MUET DE LA CHAÎNE. afficherApercuCarteHD rendait la
+    //    main sans un mot quand la technique du tour n'était pas dans le cache
+    //    d'affichage — qui ne contient que le deck du héros AFFICHÉ. Le bouton
+    //    « Appliquer » ne pouvait alors jamais exister.
+    const comp = lire('competences.js');
+    verifier("la technique est cherchée dans le cache global si besoin",
+             comp.includes("CACHE_COMPETENCES_GLOBAL || {}")
+             && comp.includes("global[idPerso][idCarte]"));
+    verifier("et son absence est dite au lieu d'être avalée",
+             comp.includes("technique ${idCarte} introuvable"));
+
+    // 8. LA QUESTION QUI RESTAIT SANS RÉPONSE : quand c'est à moi de jouer,
+    //    ai-je vraiment quelque chose à cliquer ? Le régime le regarde et le dit.
+    verifier("le régime vérifie que le joueur peut jouer",
+             r.includes("function verifierQueJePeuxJouer"));
+    verifier("et distingue « prêt » de « rien à cliquer »",
+             r.includes("à moi de jouer : ") && r.includes("RIEN À CLIQUER"));
+    verifier("en nommant la cause",
+             r.includes("bouton Appliquer absent")
+             && r.includes("la fenêtre sombre est encore levée"));
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

@@ -4255,6 +4255,31 @@ window.validerCarteCombat = async function(idCarte, elementTexte, idLanceur) {
     const dataCarte = window.COMPETENCES_CACHE[idCarte];
     if (!dataCarte) return;
 
+    // SOUS LE NOUVEAU RÉGIME, MÊME UNE CARTE QUI NE FRAPPE RIEN PASSE PAR LE
+    // CERVEAU. C'est par ici que sortent les cartes qui n'ont personne à
+    // toucher : un lanceur paralysé, une Illusion seule, un Bond seul. Elles
+    // déduisaient leur énergie ICI, en mémoire ET en base, puis envoyaient une
+    // fin de tour toute nue. Résultat, à la table : le cerveau fermait le tour
+    // sans savoir qu'une carte avait été jouée, son état gardait l'énergie
+    // intacte, et la projection suivante EFFAÇAIT la déduction locale. La carte
+    // ne coûtait rien et ne faisait rien — une étape, et le tour est fini.
+    //
+    // On demande donc une carte, sans attaque ni altération : le cerveau paie
+    // l'énergie, ferme le tour, et les trois écrans voient la même chose.
+    if (window.REGIME_CERVEAU && window.regimeDemande && window.regimeDemande.actif()) {
+        const qui = idLanceur || persoActuel.idPersonnage;
+        if (typeof window.tracerCombat === "function") {
+            window.tracerCombat("🎴", `carte sans cible pour ${qui}`,
+                                `${idCarte} — ${parseInt(dataCarte.Fatigue) || 0} d'énergie`);
+        }
+        return await window.regimeDemande.carte(qui, {
+            idCarte,
+            attaques: [],
+            alterations: [],
+            coutFatigue: parseInt(dataCarte.Fatigue) || 0
+        });
+    }
+
     await window.deduireFatigueCarte(persoActuel.idPersonnage, idCarte);
 
     if (typeof window.finDeTourCombat === "function") {

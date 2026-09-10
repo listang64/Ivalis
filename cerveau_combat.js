@@ -276,9 +276,35 @@ export function ouvrirManche(etat, file, des) {
 
 export function avancerFile(etat, des) {
     const suivant = clonerEtat(etat);
+    // LE REPOS LONG SE PAIE ICI, au moment où le tour se ferme. Il n'existait
+    // NULLE PART dans le cerveau : un joueur qui choisissait « Repos long »
+    // fermait son tour en une étape et ne récupérait pas un point d'énergie. Le
+    // calcul vivait dans l'ancien finDeTourCombat, un chemin que le nouveau
+    // régime ne traverse plus.
+    const etapes = reposLongDuTour(suivant);
     const clot = cloturerTour(suivant);
     if (!clot) return null;
-    return fabriquerPas(etat, suivant, clot.etapes, `fin|${clot.fini}`, clot.fini, des);
+    etapes.push(...clot.etapes);
+    return fabriquerPas(etat, suivant, etapes, `fin|${clot.fini}`, clot.fini, des);
+}
+
+// Le combattant en tête de file a-t-il choisi de souffler ? La règle est celle
+// du jeu, mot pour mot : le rendement propre à la créature (Repos_Long, en % de
+// sa jauge) ou 35% pour un héros, plus l'atout de l'Humain. Et comme toute
+// étape, celle-ci porte le RÉSULTAT, jamais l'opération.
+export function reposLongDuTour(etat) {
+    const tete = (etat.file || [])[0];
+    if (!tete || tete.carte !== "REPOS_LONG") return [];
+    const c = combattant(etat, tete.id);
+    if (!c) return [];
+    const pct = nombre(c.stats && c.stats.Repos_Long);
+    const taux = pct > 0 ? pct / 100 : 0.35;
+    const bonus = nombre(c.atouts && c.atouts.bonusReposLong);
+    const apres = Math.min(nombre(c.fatigueMax),
+                           nombre(c.fatigue) + Math.floor(nombre(c.fatigueMax) * taux) + bonus);
+    if (apres === nombre(c.fatigue)) return [];
+    c.fatigue = apres;
+    return [{ type: "fatigue", cible: tete.id, fatigueApres: apres, repos: true }];
 }
 
 // =========================================================================
@@ -424,7 +450,14 @@ export function prochainPas(etat, intentions, contexte) {
         if (!verdict.ok) {
             // On la referme quand même : sans ça, une intention illégitime
             // reviendrait à chaque tour de boucle et bloquerait la file.
+            // UN REFUS DIT CE QU'IL REFUSE. Il ne disait que sa raison : « c'est
+            // au tour de X », sans jamais nommer ce qui avait été demandé, ni
+            // pour qui, ni par quel appareil. Devant la trace, impossible de
+            // savoir si le joueur avait essayé de lancer sa carte, de bouger, ou
+            // de finir son tour — et c'est précisément ce qu'on cherchait.
             return { refus: true, intention: intention.id, poste: intention.poste,
+                     type: intention.type, acteur: intention.acteur,
+                     carte: intention.idCarte || null,
                      raison: verdict.raison };
         }
         const pas = appliquerIntention(etat, intention, plateau);
@@ -487,7 +520,8 @@ export function creerCerveau(depot, contexte) {
             if (!pas) return { attente: "rien à faire" };
 
             if (pas.refus) {
-                tracer("🚫", `intention refusée : ${pas.raison}`, pas.intention);
+                tracer("🚫", `${pas.type || "intention"} de ${pas.acteur || "?"} refusé${pas.carte ? " (" + pas.carte + ")" : ""} : ${pas.raison}`,
+                       `demandé par ${pas.poste || "?"}`);
                 if (depot.refuser) await depot.refuser(pas.intention, pas.raison, pas.poste);
                 // On rend son identité : la boucle en a besoin pour reconnaître
                 // un refus qui revient, donc une fermeture qui n'a pas pris.
@@ -505,7 +539,14 @@ export function creerCerveau(depot, contexte) {
 
             pas.etat.battement = maintenant();
             await depot.publier(pas.etat, pas.entree, pas.intention ? [pas.intention] : []);
-            tracer("🧠", `pas ${pas.entree.v} publié`, pas.entree.acteur || "");
+            // ON DIT CE QUE LE PAS CONTIENT. « pas 3 publié PERSO_250418 » ne
+            // disait pas que ce tour s'était fermé SANS QU'AUCUNE CARTE NE
+            // PARTE — et c'est très exactement le symptôme qu'on cherchait :
+            // « ça ne voulait pas prendre la carte sélectionnée ».
+            const types = (pas.entree.etapes || []).map(e => e && e.type);
+            const aJoue = types.includes("carte");
+            tracer("🧠", `pas ${pas.entree.v} publié`,
+                   `${pas.entree.acteur || ""}${aJoue ? "" : " — tour fermé SANS carte"}`);
             return { publie: pas.entree.v, acteur: pas.entree.acteur };
         } finally {
             enMarche = false;

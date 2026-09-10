@@ -1039,6 +1039,43 @@ et que l'énergie remonte au passage — la régénération de fin de manche, qu
 l'ancien monde faisait dans `finDeTourCombat`, un chemin que le nouveau régime ne
 traverse plus.
 
+Le chapitre « UN TOUR QUI NE FRAPPE RIEN COMPTE QUAND MÊME » de
+`cerveau_combat.mjs` couvre deux trous trouvés en vrai combat, tous les deux dans
+la même couture : ce qui se passe quand un tour se termine SANS attaque.
+
+Le **repos long** n'existait nulle part dans le cerveau. Un joueur qui
+choisissait de souffler envoyait une fin de tour toute nue : son tour se fermait
+en une étape et il ne récupérait pas un point d'énergie. Le calcul vivait dans
+l'ancien `finDeTourCombat`, un chemin que le nouveau régime ne traverse plus.
+Trois manches plus tard, plus personne n'a de quoi lancer quoi que ce soit et le
+combat s'éteint tout seul.
+
+Une **carte sans cible** ne coûtait rien. Un lanceur paralysé, une Illusion
+seule, un Bond seul : ces cartes sortent par `validerCarteCombat`, qui déduisait
+l'énergie EN LOCAL (mémoire *et* base) puis envoyait une fin de tour nue. Le
+cerveau fermait donc le tour sans savoir qu'une carte avait été jouée, son état
+gardait l'énergie intacte, et la projection suivante effaçait la déduction
+locale. La carte ne coûtait rien et ne faisait rien — une étape, et le tour est
+fini. C'est précisément ce que la trace montrait : `pas 3 publié PERSO_250418`,
+une seule étape.
+
+Le chapitre 14 de `drapeau_regime.mjs`, « PLUS UNE SEULE PANNE MUETTE », interdit
+les silences qui ont coûté trois soirées d'essai. Le pire était sous
+`catch (e) {}` dans la projection : `actualiserEtatCarteCombat` est ce qui fait
+apparaître le bouton « Appliquer », le SEUL chemin par lequel un joueur lance sa
+carte pendant son tour. Un plantage là-dedans laissait le joueur cliquer dans le
+vide, sans un mot dans la trace. Les autres silences fermés : un refus qui ne
+disait pas ce qu'il refusait (« c'est au tour de X », sans dire si le joueur
+avait tenté sa carte, un déplacement ou une fin de tour), un pas publié qui ne
+disait pas que le tour s'était fermé sans qu'aucune carte ne parte, et quatre
+sorties muettes dans le choix d'une carte.
+
+S'y ajoute une ligne de diagnostic qui tranche la question au lieu de la poser :
+quand c'est au tour d'un de MES héros, le régime regarde si le bouton
+« Appliquer » est réellement dans la page et le dit — `🎯 à moi de jouer` ou
+`🧊 à moi de jouer mais RIEN À CLIQUER`, avec la raison (carte absente, bouton
+absent, fenêtre sombre encore levée).
+
 `butin_avance.mjs` couvre la réserve de butin. Tirer les objets ne coûte rien ;
 les DESSINER prend une quinzaine de secondes par lot, et ce temps se payait
 jusqu'ici en pleine fouille des cadavres, jauge à l'écran. Le tirage part

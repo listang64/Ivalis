@@ -235,14 +235,38 @@ console.log("\n1. LA PREMIÈRE MANCHE S'OUVRE ET SE JOUE");
     verifier("la créature a joué", (etat.file || []).length <= 1,
              `(${(etat.file || []).map(x => x.id).join(",") || "file vide"})`);
 
-    // Le héros termine son tour : c'est la dernière chose que la manche attend.
-    window.regimeDemande.finDeTour("H1");
-    await attendreEtCliquer();
+}
+
+// ==========================================================================
+console.log("\n1 bis. CE QUE L'INTERFACE VOIT QUAND C'EST AU TOUR DU JOUEUR");
+// C'EST LE CONTRÔLE QUI MANQUAIT DEPUIS LE DÉBUT. Le bouton « Appliquer » — le
+// seul chemin par lequel un joueur lance sa carte pendant son tour — n'apparaît
+// que si TROIS choses sont vraies dans window.PARTIE_DATA : la phase est
+// « Resolution », le héros est EN TÊTE de la file, et son entrée porte bien
+// l'identifiant de sa carte (competences.js, `estMonTour` + `isLocked`).
+// Ces trois choses viennent de la projection du cerveau. Si l'une manque, le
+// joueur regarde son écran sans rien pouvoir cliquer, et RIEN ne le dit.
+{
+    const vue = window.PARTIE_DATA;
+    verifier("la phase projetée est bien la résolution", vue.Phase_Combat === "Resolution",
+             `(${vue.Phase_Combat})`);
+    const tete = (vue.File_Attente_Combat || [])[0];
+    verifier("le héros est en tête de la file projetée", !!tete && tete.idPersonnage === "H1",
+             `(${tete ? tete.idPersonnage : "file vide"})`);
+    verifier("et son entrée porte l'identifiant de sa carte", !!tete && !!tete.idCarte,
+             `(${tete ? String(tete.idCarte) : "—"})`);
+    verifier("il n'est pas noté comme ayant déjà joué",
+             !((vue.Ont_Joue_Ce_Round || []).includes("H1")),
+             `(${(vue.Ont_Joue_Ce_Round || []).join(", ") || "personne"})`);
 }
 
 // ==========================================================================
 console.log("\n2. LA MANCHE EST FINIE : LE CERVEAU REND LA MAIN");
 {
+    // Le héros termine son tour : c'est la dernière chose que la manche attend.
+    window.regimeDemande.finDeTour("H1");
+    await attendreEtCliquer();
+
     const etat = window.regimeDuJeu().etatPublie();
     verifier("l'état repasse en préparation", etat.phase === "Preparation", `(${etat.phase})`);
     verifier("sa file est vide", (etat.file || []).length === 0);

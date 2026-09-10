@@ -137,7 +137,9 @@ export function creerDepot(io, idPartie, options) {
     // rester devant un écran muet.
     async function refuser(id, raison, poste) {
         if (!id) return;
-        tracer("🚫", `intention refusée : ${raison}`, poste || "");
+        // Le cerveau a déjà tracé le refus, en disant ce qu'il refusait. Inutile
+        // de le redire à moitié : deux lignes pour un seul refus, dont une moins
+        // renseignée que l'autre, se lisent comme deux refus.
         await io.lot([{ op: "update", chemin: CHEMINS.intention(idPartie, id),
                         data: { traitee: true, refus: raison || "refusée" } }]);
     }

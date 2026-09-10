@@ -524,5 +524,104 @@ console.log("\nUNE CARTE TERMINE LE TOUR");
              creature.entree.etapes.some(e => e.type === "tour"));
 }
 
+console.log("\nUN TOUR QUI NE FRAPPE RIEN COMPTE QUAND MÊME");
+// =========================================================================
+//  DEUX TROUS TROUVÉS EN VRAI COMBAT, tous les deux dans la même couture : ce
+//  qui se passe quand un tour se termine SANS attaque.
+//
+//  1. LE REPOS LONG N'EXISTAIT NULLE PART DANS LE CERVEAU. Un joueur qui
+//     choisissait « souffler » envoyait une fin de tour toute nue : son tour se
+//     fermait en une étape et il ne récupérait pas un point d'énergie. Le calcul
+//     vivait dans l'ancien finDeTourCombat, un chemin que le nouveau régime ne
+//     traverse plus. Trois manches plus tard, plus personne n'a de quoi lancer
+//     quoi que ce soit, et le combat s'éteint tout seul.
+//
+//  2. UNE CARTE SANS CIBLE NE COÛTAIT RIEN. Un lanceur paralysé, une Illusion
+//     seule, un Bond seul : ces cartes sortent par validerCarteCombat, qui
+//     déduisait l'énergie EN LOCAL puis envoyait une fin de tour nue. Le cerveau
+//     fermait donc le tour sans savoir qu'une carte avait été jouée, son état
+//     gardait l'énergie intacte, et la projection suivante effaçait la déduction
+//     locale. La carte ne coûtait rien et ne faisait rien.
+{
+    // --- LE REPOS LONG -----------------------------------------------------
+    const etat = monde();
+    etat.file[0] = { id: "H1", carte: "REPOS_LONG", initiative: 0 };
+    etat.combattants.H1.fatigue = 30;
+
+    const pas = avancerFile(etat, creerDes(etat.graine));
+    verifier("le tour se ferme", !!pas && pas.entree.etapes.some(e => e.type === "tour"));
+    const repos = pas.entree.etapes.find(e => e.type === "fatigue" && e.repos);
+    verifier("et le repos long rend de l'énergie", !!repos, repos ? `→ ${repos.fatigueApres}` : "aucune");
+    // 35% d'une jauge de 100, ajoutés à 30 : la règle du jeu, mot pour mot.
+    verifier("exactement le rendement du jeu (35% pour un héros)",
+             repos && repos.fatigueApres === 65, repos && String(repos.fatigueApres));
+    verifier("l'étape porte le RÉSULTAT, pas le gain",
+             repos && repos.fatigueApres !== undefined && repos.montant === undefined);
+    verifier("et l'état d'après le porte aussi", pas.etat.combattants.H1.fatigue === 65,
+             String(pas.etat.combattants.H1.fatigue));
+
+    // Rejoué, il donne le même chiffre : c'est ce qui rend le rejeu sûr.
+    const bis = avancerFile(etat, creerDes(etat.graine));
+    verifier("rejoué, il donne le même chiffre",
+             bis.entree.etapes.find(e => e.repos).fatigueApres === 65);
+
+    // Une créature garde SON rendement, celui du bestiaire.
+    const creature = monde();
+    creature.file[0] = { id: "H1", carte: "REPOS_LONG", initiative: 0 };
+    creature.combattants.H1.stats.Repos_Long = 10;
+    creature.combattants.H1.fatigue = 30;
+    const pasC = avancerFile(creature, creerDes(creature.graine));
+    verifier("un rendement propre l'emporte sur les 35% par défaut",
+             pasC.entree.etapes.find(e => e.repos).fatigueApres === 40,
+             String(pasC.entree.etapes.find(e => e.repos).fatigueApres));
+
+    // L'atout de l'Humain s'ajoute par-dessus.
+    const humain = monde();
+    humain.file[0] = { id: "H1", carte: "REPOS_LONG", initiative: 0 };
+    humain.combattants.H1.atouts.bonusReposLong = 10;
+    humain.combattants.H1.fatigue = 30;
+    const pasH = avancerFile(humain, creerDes(humain.graine));
+    verifier("et l'atout de l'Humain s'ajoute par-dessus",
+             pasH.entree.etapes.find(e => e.repos).fatigueApres === 75,
+             String(pasH.entree.etapes.find(e => e.repos).fatigueApres));
+
+    // Une jauge presque pleine ne dépasse jamais son maximum.
+    const plein = monde();
+    plein.file[0] = { id: "H1", carte: "REPOS_LONG", initiative: 0 };
+    plein.combattants.H1.fatigue = 95;
+    const pasP = avancerFile(plein, creerDes(plein.graine));
+    verifier("une jauge presque pleine ne déborde pas",
+             pasP.etat.combattants.H1.fatigue === 100,
+             String(pasP.etat.combattants.H1.fatigue));
+
+    // Un tour ordinaire ne rend rien, évidemment.
+    const ordinaire = avancerFile(monde(), creerDes(4242));
+    verifier("un tour ordinaire ne rend aucune énergie",
+             !ordinaire.entree.etapes.some(e => e.repos));
+
+    // --- UNE CARTE SANS CIBLE ---------------------------------------------
+    const nue = monde();
+    nue.combattants.H1.fatigue = 60;
+    const pasNu = appliquerIntention(nue, {
+        id: "INT_NU", type: "carte", acteur: "H1", poste: "P_03", idCarte: "C_BOND",
+        attaques: [], alterations: [], coutFatigue: 25
+    }, null);
+    verifier("une carte sans attaque est bien jouée", !!pasNu);
+    verifier("son énergie est payée PAR LE CERVEAU",
+             pasNu && pasNu.etat.combattants.H1.fatigue === 35,
+             pasNu && String(pasNu.etat.combattants.H1.fatigue));
+    verifier("et elle ferme le tour comme les autres",
+             pasNu && pasNu.entree.etapes.some(e => e.type === "tour"));
+    verifier("le lanceur n'est plus en tête",
+             pasNu && (pasNu.etat.file[0] || {}).id !== "H1");
+
+    // Et une carte trop chère est refusée, même sans cible.
+    const trop = validerIntention(nue, {
+        id: "INT_TROP", type: "carte", acteur: "H1", poste: "P_03", idCarte: "C_BOND",
+        attaques: [], alterations: [], coutFatigue: 120
+    });
+    verifier("une carte sans cible mais trop chère est refusée", trop.ok === false, trop.raison);
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);
