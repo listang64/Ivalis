@@ -112,6 +112,7 @@ node etalement_sans_degats.mjs # Durée étalement dégâts grisée sur une cart
 node zone_soin_verte_carte.mjs # la zone persistante de soin se dessine en vert, jamais en rouge
 node annuler_ciblage.mjs # un bouton ANNULER reprend la main sur le déplacement en plein ciblage
 node carte_grisee_sans_message.mjs # cliquer une carte trop chère l'affiche sans message d'erreur
+node portee_zone.mjs        # une zone lancée à distance emporte bien la distance posée sur la carte
 
 ## Le journal d'événements du combat (le gros changement d'architecture)
 
@@ -997,6 +998,24 @@ atout, puisqu'un tir au contact perd 30% de ses dégâts — et sa portée s'ajo
 celle que le joueur a posée sur la carte. L'allonge, elle, ne transforme rien :
 l'attaque reste au contact, elle atteint simplement une case de plus. Le banc
 mesure les deux, malus de tir à bout portant compris.
+
+`portee_zone.mjs` traque un désaccord entre la Forge et le moteur. Dans la
+Forge, une carte gagne sa portée de DEUX façons : l'effet **Distance** posé
+comme action à part entière, ou la même Distance greffée en modificateur sur
+une attaque. `competences.js` reconnaît les deux (`actionHasDistance`) et
+affiche fièrement « portée 3 » sur la carte ; le moteur, lui, ne lisait que le
+modificateur. Une carte de soin de zone dont la distance était posée comme
+action partait donc en combat avec une portée de 1 — et une zone à portée 1 se
+pose sur le lanceur, ce qui donne exactement le symptôme observé : « il ne prend
+pas en compte la distance mise sur la capacité ».
+
+Le banc injecte le vrai `moteur_effets.js` et fait tourner le vrai extracteur
+(`demarrerCiblage(idCarte, { extraire: true })`) sur cinq formes de carte : la
+distance en modificateur (ce qui marchait déjà), la distance en action séparée
+(ce qui était ignoré), une zone sans aucune distance (elle doit rester collée au
+lanceur), deux sources de distance sur la même action (la plus longue gagne, on
+ne les additionne pas), et une carte sans zone (que la correction ne doit pas
+toucher).
 
 `apercu_butin.mjs` charge le vrai `style.css` et le vrai balisage
 d'`index.html`, remplit l'onglet Inventaire et les trois vues du butin avec les

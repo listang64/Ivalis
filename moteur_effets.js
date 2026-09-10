@@ -1462,6 +1462,9 @@ window.demarrerCiblage = async function(idCarte, options) {
     const alterationsExtraites = [];
     let isZone = false;
     let zoneHexesBase = [];
+    // La portée de placement de la zone, lue sur l'action qui la dessine.
+    let zoneEstADistance = false;
+    let zonePortee = 0;
     let isBond = false;
     let porteeBond = 2;
     // Pour que la carte se résolve dans l'ordre où elle est construite : on retient à quel
@@ -1550,13 +1553,35 @@ window.demarrerCiblage = async function(idCarte, options) {
                 return;
             }
 
+            // LA DISTANCE A DEUX SOURCES, ET LE COMBAT N'EN LISAIT QU'UNE.
+            //
+            // La Forge, elle, en reconnaît deux (voir actionHasDistance,
+            // competences.js) : « Distance » posée comme MOD sur une action, ou
+            // « Distance » choisie comme EFFET DE BASE d'une action à part
+            // entière. Les deux sont des façons normales de construire une
+            // carte, et la Forge dessine la zone de la même manière dans les
+            // deux cas.
+            //
+            // Ici, seule la première comptait. Une carte dont la portée vient
+            // d'une action « Distance » repartait donc en combat avec une portée
+            // de 1 — et une zone à portée 1 se colle au lanceur. C'est très
+            // exactement « il ne prend pas en compte la distance mise sur la
+            // capacité ».
             let isRanged = false;
             let rangeMax = 1;
+            const porteeDe = (eff, count) => 1 + ((parseFrFloat(eff.Valeur) || 0) * (count || 1));
+
+            if ((effBase.Nom || "") === "Distance") {
+                isRanged = true;
+                rangeMax = porteeDe(effBase, act.count);
+            }
             listeMods.forEach(m => {
                 const modEff = window.EFFETS_BDD_CACHE[m.id];
                 if (modEff && modEff.Nom === "Distance") {
                     isRanged = true;
-                    rangeMax = 1 + ((parseFrFloat(modEff.Valeur) || 0) * m.count);
+                    // Deux sources sur la même action : on garde la plus longue
+                    // plutôt que d'écraser l'une par l'autre.
+                    rangeMax = Math.max(rangeMax, porteeDe(modEff, m.count));
                 }
             });
 
@@ -1575,6 +1600,17 @@ window.demarrerCiblage = async function(idCarte, options) {
             // attaques et altérations partent donc avec la bonne portée, et
             // une attaque devenue tir encaisse bien le malus au contact.
             ({ isRanged, rangeMax } = window.porteeAvecArme(lanceurCarte, isRanged, rangeMax));
+
+            // LA ZONE PORTE SA PROPRE DISTANCE. C'est l'action qui dessine la
+            // zone qui dit à quelle distance on peut la poser — pas forcément
+            // celle qui soigne ou qui frappe. Sur une carte où la Distance est
+            // une action à part et le soin une autre, la zone n'avait aucune
+            // portée à elle : elle héritait de celle du soin, c'est-à-dire une
+            // case, et restait collée au lanceur.
+            if (act.zoneHexes && act.zoneHexes.length > 0 && isRanged) {
+                zoneEstADistance = true;
+                zonePortee = Math.max(zonePortee, rangeMax);
+            }
 
             // A. Détection Attaques, Soins & Purifications
             let isPurification = false;
@@ -2202,6 +2238,16 @@ window.demarrerCiblage = async function(idCarte, options) {
     }
 
     const configSort = attaquesExtraites[0] || alterationsExtraites[0];
+
+    // La portée de la zone l'emporte sur celle de l'effet, quand elle est plus
+    // longue. Pour une carte de zone, `rangeMax` ne sert QU'au placement — la
+    // résolution ignore la portée (voir « if (!action.isZone && dist >
+    // attaque.rangeMax) » dans jouerAnimationMoteur) —, donc la reporter ici ne
+    // change rien d'autre que l'endroit où la zone peut se poser.
+    if (isZone && configSort && zoneEstADistance) {
+        configSort.isRanged = true;
+        configSort.rangeMax = Math.max(parseInt(configSort.rangeMax) || 1, zonePortee);
+    }
 
     if (isZone && configSort && configSort.isRanged) {
         let sumQ = 0, sumR = 0;
