@@ -86,6 +86,18 @@ console.log("\n1. QUE FAIRE MAINTENANT ? — LA DÉCISION, SEULE");
     verifier("l'entrée suivante est là : on joue",
              prochaineEtape(0, { 1: TOUR_H2 }, "H2|1", mien).quoi === "jouer");
 
+    // UNE ENTRÉE SANS ACTEUR N'EST PAS UN TOUR. L'ouverture d'une manche en est
+    // une : elle installe la nouvelle file et n'appartient à personne. La
+    // fenêtre sombre s'ouvrait dessus — « fenêtre : null (manche 2), en attente
+    // du OK » — et retenait derrière elle tout le rejeu de la manche : les tours
+    // se publiaient, personne ne les voyait, le combat semblait figé.
+    const ouverture = { v: 1, acteur: null, manche: 2,
+                        etapes: [{ type: "tour", file: [], phase: "Resolution" }] };
+    verifier("l'ouverture d'une manche ne retient jamais l'écran",
+             prochaineEtape(0, { 1: ouverture }, null, mien).quoi === "jouer");
+    verifier("même quand rien n'a été acquitté",
+             prochaineEtape(0, { 1: ouverture }, "autre|9", mien).quoi === "jouer");
+
     // Le tour d'un autre s'ouvre : la fenêtre sombre attend le OK.
     const attente = prochaineEtape(0, { 1: TOUR_M1 }, null, mien);
     verifier("le tour d'un autre demande le OK", attente.quoi === "attendre");

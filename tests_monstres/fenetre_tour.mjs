@@ -38,6 +38,9 @@ const erreurs = []; p.on('pageerror', e => erreurs.push(e.message));
 await p.goto('file:///home/user/Ivalis/index.html');
 await p.waitForTimeout(300);
 await p.evaluate(s => eval(s), SRC_STATS_COMMUNES);
+// L'icône d'un état est dessinée par une fonction à part, que la fenêtre
+// appelle : on la pose une fois pour toute la page, comme le vrai combat.js.
+await p.evaluate(s => eval(s), fonction('window.imageEtat = function'));
 
 let echecs = 0;
 const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(60)} ${c ? "OK" : "ÉCHEC"} ${d}`); };

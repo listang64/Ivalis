@@ -75,6 +75,15 @@ export function prochaineEtape(vue, recues, tourAcquitte, estAMoi) {
         return { quoi: "rien" };
     }
 
+    // UNE ENTRÉE SANS ACTEUR N'EST PAS UN TOUR : ON NE LA RETIENT JAMAIS.
+    //
+    // L'ouverture d'une manche en est une : elle installe la nouvelle file et
+    // n'appartient à personne. La fenêtre sombre s'ouvrait dessus — « fenêtre :
+    // null (manche 2), en attente du OK » — et retenait tout le rejeu derrière
+    // un voile qui n'annonçait rien et que rien ne justifiait. La manche 2
+    // publiait ses tours, personne ne les voyait, et le combat semblait figé.
+    if (!entree.acteur) return { quoi: "jouer", entree };
+
     // Un tour qui s'ouvre et qui n'est pas le mien : la fenêtre sombre s'affiche
     // et attend le OK. Le mien, non — c'est moi qui l'ai demandé, je sais déjà
     // ce qui va se passer.

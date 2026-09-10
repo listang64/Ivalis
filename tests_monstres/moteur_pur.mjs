@@ -158,7 +158,25 @@ console.log("\n4. LES ÉTATS SE RENOUVELLENT, ILS NE S'EMPILENT PAS");
     verifier("le second ne s'empile pas", etat.combattants.H1.etats.length === 1,
              `(${etat.combattants.H1.etats.length})`);
     verifier("et c'est la plus longue durée qui reste",
-             etat.combattants.H1.etats[0].tours === 3, `(${etat.combattants.H1.etats[0].tours})`);
+             etat.combattants.H1.etats[0].duree === 3, `(${etat.combattants.H1.etats[0].duree})`);
+
+    // UN SEUL VOCABULAIRE, ET C'EST CELUI DU JEU. Ce noyau disait `tours` et
+    // lisait `alt.tours` — sur une altération qui, elle, porte `duree`. Chaque
+    // état posé par le cerveau durait donc UN tour au lieu du sien. Et comme il
+    // ne gardait que le nom, l'icône disparaissait : la piste d'initiative
+    // affichait une image cassée (GET .../undefined 404) sous le portrait.
+    const vraie = resoudreCarte(neuf(), {
+        type: "carte", idLanceur: "M1", idCarte: "C1", attaques: [],
+        alterations: [{ nom: "Étourdi", duree: 3, chance: 100, cibles: ["H1"],
+                        icone: "https://images/etourdi.png",
+                        desc: "-20% Esquive/Parade." }],
+        jets: { parCible: { H1: { esquive: false, etats: { "Étourdi": true } } } }
+    });
+    const pose = vraie.etat.combattants.H1.etats[0];
+    verifier("la durée posée est celle de l'altération", pose.duree === 3, `(${pose.duree})`);
+    verifier("l'état parle le même mot que le reste du jeu", pose.tours === undefined);
+    verifier("il emporte son icône", pose.icone === "https://images/etourdi.png");
+    verifier("et sa description", /Esquive/.test(pose.desc || ""));
 
     // Un jet raté ne pose rien.
     const rate = resoudreCarte(etat, {

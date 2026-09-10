@@ -12,6 +12,11 @@ const debut = lignes.findIndex(l => l.startsWith('window.afficherPisteInitiative
 let fin = debut; for (let i = debut + 1; i < lignes.length; i++) { if (lignes[i] === '};') { fin = i; break; } }
 const fnPiste = lignes.slice(debut, fin + 1).join('\n');
 
+// L'icône d'un état est dessinée par une fonction à part : la piste l'appelle.
+const dImg = lignes.findIndex(l => l.startsWith('window.imageEtat = function'));
+let fImg = dImg; for (let i = dImg + 1; i < lignes.length; i++) { if (lignes[i] === '};') { fImg = i; break; } }
+const fnImageEtat = lignes.slice(dImg, fImg + 1).join('\n');
+
 const { chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs');
 const b = await chromium.launch();
 // Taille de l'iPad de Nico, déduite de sa capture : le panneau gauche (380px)
@@ -24,6 +29,9 @@ await p.waitForTimeout(300);
 // Les lectures de stats mutualisées vivent dans app.js, chargé avant tout le
 // reste sur la vraie page : un banc qui isole une fonction doit les poser aussi.
 await p.evaluate(src => eval(src), SRC_STATS_COMMUNES);
+// L'icône d'un état est dessinée par une fonction à part, que la piste appelle :
+// on la pose une fois pour toute la page, comme le vrai combat.js le fait.
+await p.evaluate(src => eval(src), fnImageEtat);
 
 const res = await p.evaluate((fnPisteSrc) => {
   document.documentElement.style.setProperty('--app-h', window.innerHeight + 'px');
@@ -98,6 +106,40 @@ console.log("\nLES COMBATTANTS À TERRE QUITTENT LA PISTE");
   }, fnPiste);
   console.log(`     ${r.bulles} bulles pour 5 combattants dont un à terre`);
   verifier("le combattant à terre n'a plus sa bulle", r.bulles === 4, `(${r.bulles})`);
+}
+
+console.log("\nUN ÉTAT SANS ICÔNE NE DESSINE PAS D'IMAGE CASSÉE");
+// Sous le portrait du héros, dans la piste, un rectangle d'image cassée — et
+// dans la console, GET .../undefined 404 en boucle, plusieurs fois par seconde.
+// Les états posés par le cerveau n'emportaient pas leur icône, et le rendu
+// écrivait <img src="undefined"> sans se poser de question. Un état sans visage
+// ne se dessine pas : il ne casse rien.
+{
+  const r = await p.evaluate((fnPisteSrc) => {
+    eval(fnPisteSrc);
+    window.PERSOS_PARTIE = [
+      { idPersonnage: "E1", prenom: "Cybile", PV_Max: 50, PV_Actuels: 40, statut: "Vivant",
+        Fatigue_Max: 100, fatigueActuelle: 70,
+        // Un état complet, un état SANS icône (l'Étalement en est un).
+        Etats_Alteres: [{ nom: "Étourdi", duree: 2, icone: "https://images/etourdi.png" },
+                        { nom: "Étalement", duree: 1 }] }
+    ];
+    window.estCombattantMort = () => false;
+    const file = [{ idPersonnage: "E1", idCarte: "X", initiative: 50 }];
+    window.PARTIE_DATA = { Phase_Combat: "Resolution", File_Attente_Combat: file };
+    window.afficherPisteInitiative(file, "Resolution");
+    const piste = document.getElementById('piste-initiative');
+    const images = [...piste.querySelectorAll('img')].map(i => i.getAttribute('src'));
+    return { images, html: piste.innerHTML };
+  }, fnPiste);
+
+  verifier("aucune image ne pointe vers « undefined »",
+           !r.images.some(src => !src || src === "undefined" || /undefined/.test(src)),
+           `(${r.images.join(", ") || "aucune image"})`);
+  verifier("et rien ne l'écrit dans le balisage non plus",
+           !/src="undefined"/.test(r.html));
+  verifier("l'état QUI A une icône est bien dessiné",
+           r.images.some(src => /etourdi\.png$/.test(src)), `(${r.images.length} image(s))`);
 }
 
 console.log("\nLA PISTE APPARAÎT MÊME SI LA BASCULE TOMBE PENDANT L'ANIMATION");

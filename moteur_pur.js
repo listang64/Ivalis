@@ -331,7 +331,7 @@ export function resoudreCarte(etat, action) {
             // cible. On la range dans ses états, comme une brûlure.
             if (compte.secondTic > 0) {
                 cible.etats = [...cible.etats,
-                               { nom: "Étalement", tours: 1, degatsDifferes: compte.secondTic }];
+                               { nom: "Étalement", duree: 1, degatsDifferes: compte.secondTic }];
                 etapes.push({ type: "etats", cible: idCible, liste: cible.etats });
             }
 
@@ -359,13 +359,28 @@ export function resoudreCarte(etat, action) {
             // Un même état ne s'empile pas : il se renouvelle, en gardant la
             // plus longue des deux durées. Sans cette règle, deux brûlures
             // successives donnaient deux compteurs distincts sur la même fiche.
+            // DEUX VOCABULAIRES DANS LE MÊME TABLEAU, ET ÇA SE VOYAIT À L'ÉCRAN.
+            //
+            // Tout le jeu — les fiches, la Forge, le panneau, la piste — dit
+            // `duree`. Ce noyau disait `tours`, et lisait `alt.tours` sur une
+            // altération qui porte `duree` : chaque état posé par le cerveau
+            // durait donc UN tour au lieu de sa vraie durée. Et comme il ne
+            // gardait que le nom, l'icône et la description disparaissaient :
+            // la piste d'initiative affichait une image cassée
+            // (GET .../undefined 404) sous le portrait du héros.
+            //
+            // Un seul vocabulaire, celui du jeu, et l'état emporte de quoi être
+            // montré.
             const existant = cible.etats.find(e => e && e.nom === alt.nom);
+            const duree = nombre(alt.duree !== undefined ? alt.duree : alt.tours, 1);
             if (existant) {
-                existant.tours = Math.max(nombre(existant.tours), nombre(alt.tours, 1));
+                existant.duree = Math.max(nombre(existant.duree), duree);
             } else {
                 cible.etats = [...cible.etats, {
                     nom: alt.nom,
-                    tours: nombre(alt.tours, 1),
+                    duree,
+                    ...(alt.icone ? { icone: alt.icone } : {}),
+                    ...(alt.desc ? { desc: alt.desc } : {}),
                     ...(alt.valeurAbs !== undefined ? { valeurAbs: alt.valeurAbs } : {}),
                     ...(alt.bonusEquip ? { bonusEquip: alt.bonusEquip } : {})
                 }];

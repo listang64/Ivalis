@@ -599,6 +599,38 @@ console.log("\nUN TOUR QUI NE FRAPPE RIEN COMPTE QUAND MÊME");
     verifier("un tour ordinaire ne rend aucune énergie",
              !ordinaire.entree.etapes.some(e => e.repos));
 
+    // --- LES ÉTATS ALTÉRÉS VIEILLISSENT -----------------------------------
+    //  Le décompte vivait dans l'ancien finDeTourCombat, que le nouveau régime
+    //  ne traverse plus : un Étourdi posé au premier tour durait TOUT le combat.
+    const etats = monde();
+    etats.file = [{ id: "H1", carte: "C_H1", initiative: 0 }];   // dernier de la manche
+    etats.combattants.H1.etats = [{ nom: "Étourdi", duree: 2, icone: "ico_etourdi" },
+                                  { nom: "Brûlure", duree: 1 }];
+    etats.combattants.M1.etats = [{ nom: "Gel", duree: 3 }];
+
+    const finManche = avancerFile(etats, creerDes(etats.graine));
+    const vieillis = finManche.entree.etapes.filter(e => e.type === "etats" && e.vieillissement);
+    verifier("les états vieillissent à la fin de la manche", vieillis.length === 2,
+             `(${vieillis.length} combattant(s))`);
+
+    const apresH1 = finManche.etat.combattants.H1.etats;
+    verifier("un état de 2 tours en garde 1", apresH1.some(e => e.nom === "Étourdi" && e.duree === 1),
+             JSON.stringify(apresH1.map(e => `${e.nom}:${e.duree}`)));
+    verifier("un état d'un seul tour tombe", !apresH1.some(e => e.nom === "Brûlure"));
+    verifier("et il garde son icône en chemin",
+             apresH1.some(e => e.nom === "Étourdi" && e.icone === "ico_etourdi"));
+    verifier("les créatures vieillissent aussi",
+             finManche.etat.combattants.M1.etats[0].duree === 2,
+             String(finManche.etat.combattants.M1.etats[0].duree));
+
+    // Un tour ORDINAIRE, lui, ne touche à rien : le décompte est par MANCHE.
+    const milieu = monde();
+    milieu.combattants.H1.etats = [{ nom: "Étourdi", duree: 2 }];
+    const pasMilieu = avancerFile(milieu, creerDes(milieu.graine));
+    verifier("un tour ordinaire ne vieillit aucun état",
+             !pasMilieu.entree.etapes.some(e => e.vieillissement)
+             && pasMilieu.etat.combattants.H1.etats[0].duree === 2);
+
     // --- UNE CARTE SANS CIBLE ---------------------------------------------
     const nue = monde();
     nue.combattants.H1.fatigue = 60;

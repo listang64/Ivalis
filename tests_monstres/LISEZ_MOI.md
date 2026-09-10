@@ -1076,6 +1076,39 @@ quand c'est au tour d'un de MES héros, le régime regarde si le bouton
 `🧊 à moi de jouer mais RIEN À CLIQUER`, avec la raison (carte absente, bouton
 absent, fenêtre sombre encore levée).
 
+### L'ouverture d'une manche n'est pas un tour
+
+La fenêtre sombre s'ouvrait dessus — `fenêtre : null (manche 2), en attente du
+OK` — et retenait derrière elle TOUT le rejeu de la manche : les tours se
+publiaient, personne ne les voyait, et le combat semblait figé pour la seconde
+fois au même endroit. L'entrée qui ouvre une manche installe la nouvelle file et
+n'appartient à personne : elle n'a pas d'acteur, donc elle ne se retient jamais.
+Chapitre 1 de `spectateur_combat.mjs`.
+
+### Un seul vocabulaire pour les états altérés
+
+Tout le jeu — les fiches, la Forge, le panneau, la piste — dit `duree`. Le noyau
+pur disait `tours`, et lisait `alt.tours` sur une altération qui porte `duree` :
+**chaque état posé par le cerveau durait donc UN tour au lieu du sien**. Et comme
+il ne gardait que le nom, l'icône et la description disparaissaient en chemin :
+la piste d'initiative dessinait `<img src="undefined">` sous le portrait du
+héros, ce qui donnait un rectangle d'image cassée à l'écran et un
+`GET .../undefined 404` en boucle dans la console, plusieurs fois par seconde.
+
+Deux corrections, et une ceinture : le noyau parle le mot du jeu et l'état
+emporte de quoi être montré (chapitre 4 de `moteur_pur.mjs`) ; et les trois
+endroits qui dessinent une icône passent par `window.imageEtat`, qui ne dessine
+rien plutôt qu'une image cassée — un état sans visage existe (l'Étalement en est
+un). `piste_initiative.mjs` le vérifie sur le vrai rendu, en relisant les `src`
+réellement posés dans la page.
+
+Les états **vieillissent** aussi d'une manche à l'autre : le décompte vivait
+dans l'ancien `finDeTourCombat`, un chemin que le nouveau régime ne traverse
+plus, si bien qu'un Étourdi posé au premier tour durait tout le combat.
+⚠️ Ce qui est porté, c'est le DÉCOMPTE seul. Les tics propres à certains états —
+les 20 d'énergie de l'Immobilisation, le second tic de l'Empoisonnement, la
+Brûlure — vivent encore dans l'ancien monde et ne sont pas repris.
+
 ### Ce que la fenêtre sombre montre, et quand elle se lève
 
 Deux défauts vus à la table, dans la même fenêtre, et les deux tenaient à une

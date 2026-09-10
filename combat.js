@@ -535,7 +535,7 @@ window.afficherPersoCombatActuel = function() {
                          onmouseenter="if(window.matchMedia('(hover: hover)').matches) this.querySelector('.popup-etat').style.display='block'" 
                          onmouseleave="if(window.matchMedia('(hover: hover)').matches) this.querySelector('.popup-etat').style.display='none'"
                          onclick="const p = this.querySelector('.popup-etat'); document.querySelectorAll('.popup-etat').forEach(el => { if(el !== p) el.style.display='none'; }); p.style.display = p.style.display === 'block' ? 'none' : 'block'; event.stopPropagation();">
-                        <img src="${etat.icone}" style="width: 72px; height: auto; border: none; background: transparent; box-shadow: none; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.8));">
+                        ${window.imageEtat(etat, 72)}
                         <div class="popup-etat" style="display: none; position: absolute; top: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.95); border: 1px solid #c2a878; padding: 10px; border-radius: 6px; width: max-content; z-index: 1000; color: white; font-size: 13px; font-family: 'Almendra', serif; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.8);">
                             <strong style="color: #ffaa00; font-family: 'Cinzel', serif;">${etat.nom} (${etat.duree} tours)</strong><br>
                             <span style="color: #ccc;">${etat.desc}</span>
@@ -2094,6 +2094,21 @@ function construireHaloVTT(options) {
 //  endroit qui décide "qui est mort", pour que l'affichage, les clics et les
 //  déplacements ne puissent jamais se contredire.
 // =========================================================================
+// L'ICÔNE D'UN ÉTAT, OU RIEN DU TOUT.
+//
+// Trois endroits dessinaient <img src="${etat.icone}"> sans se demander si
+// l'icône existait. Un état sans icône — l'Étalement en est un, et tout état
+// posé par le cerveau l'était avant qu'il ne transmette la sienne — donnait
+// donc `src="undefined"`, une requête 404 en boucle dans la console et un
+// rectangle d'image cassée sous le portrait du héros, dans la piste
+// d'initiative. Un état sans visage ne se dessine pas : il ne casse rien.
+window.imageEtat = function(etat, taille) {
+    if (!etat || !etat.icone) return "";
+    return `<img src="${etat.icone}" style="width: ${taille}px; height: auto; border: none;`
+         + ` background: transparent; box-shadow: none;`
+         + ` filter: drop-shadow(0 ${taille > 30 ? 4 : 2}px ${taille > 30 ? 6 : 4}px rgba(0,0,0,0.85));">`;
+};
+
 window.estCombattantMort = function(idCombattant) {
     const p = (window.PERSOS_PARTIE || []).find(x => x.idPersonnage === idCombattant);
     if (!p) return false;
@@ -3714,7 +3729,7 @@ window.afficherPisteInitiative = function(queue, phase) {
         if (perso.Etats_Alteres && perso.Etats_Alteres.length > 0) {
             etatsHtml = `<div style="position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%); display: flex; gap: 2px; justify-content: center; z-index: 5;">`;
             perso.Etats_Alteres.forEach(etat => {
-                etatsHtml += `<img src="${etat.icone}" style="width: 16px; height: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));">`;
+                etatsHtml += window.imageEtat(etat, 16);
             });
             etatsHtml += `</div>`;
         }
@@ -4001,7 +4016,7 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
             elEtats.dataset.signature = signature;
             elEtats.innerHTML = etats.map(etat => `
                 <div style="position: relative; text-align: center;">
-                    <img src="${etat.icone}" style="width: 58px; height: auto; border: none; background: transparent; box-shadow: none; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.9));">
+                    ${window.imageEtat(etat, 58)}
                     <div style="margin-top: 2px; font-family: 'Almendra', serif; font-size: 12px; color: #a89f91; text-shadow: 1px 1px 3px black;">${etat.nom} (${etat.duree})</div>
                 </div>`).join("");
         }

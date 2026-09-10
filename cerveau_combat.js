@@ -214,6 +214,7 @@ export function cloturerTour(etat) {
         // Comme toute étape, elle porte le RÉSULTAT et non l'opération : rejouée
         // deux fois sur trois écrans, elle donne le même chiffre.
         etapes.push(...regenererFinDeManche(etat));
+        etapes.push(...vieillirLesEtats(etat));
         etapes.push({ type: "manche", numero: etat.manche });
     }
     return { fini: partie.id, etapes };
@@ -225,6 +226,30 @@ export function cloturerTour(etat) {
 function regenerationDe(c) {
     const stats = (c && c.stats) || {};
     return nombre(stats.Regeneration) + nombre(stats.Dev_Mod_Regen);
+}
+
+// LES ÉTATS ALTÉRÉS VIEILLISSENT D'UNE MANCHE, et ceux qui arrivent à zéro
+// tombent. Le décompte vivait dans l'ancien finDeTourCombat, un chemin que le
+// nouveau régime ne traverse plus : un Étourdi posé au premier tour durait donc
+// TOUT LE COMBAT.
+//
+// ⚠️ Ce qu'on porte ici, c'est le DÉCOMPTE, rien d'autre. Les tics propres à
+// certains états — les 20 d'énergie de l'Immobilisation, le second tic de
+// l'Empoisonnement, la Brûlure — vivent encore dans l'ancien monde et ne sont
+// pas repris. C'est une couture connue, pas un oubli.
+export function vieillirLesEtats(etat) {
+    const etapes = [];
+    (etat.ordre || Object.keys(etat.combattants || {})).forEach(id => {
+        const c = combattant(etat, id);
+        if (!c || !Array.isArray(c.etats) || c.etats.length === 0) return;
+        const apres = c.etats
+            .map(e => ({ ...e, duree: nombre(e.duree, 1) - 1 }))
+            .filter(e => e.duree > 0);
+        if (apres.length === c.etats.length && apres.every((e, i) => e.duree === nombre(c.etats[i].duree, 1))) return;
+        c.etats = apres;
+        etapes.push({ type: "etats", cible: id, liste: apres, vieillissement: true });
+    });
+    return etapes;
 }
 
 export function regenererFinDeManche(etat) {
