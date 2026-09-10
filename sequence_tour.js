@@ -146,6 +146,14 @@ window.acteurCourantCombat = function(partie) {
         const regime = window.regimeDuJeu();
         const etat = regime && regime.etatAffiche();
         if (etat) {
+            // UN ÉTAT QUI PARLE D'UN AUTRE COMBAT N'ANNONCE PLUS PERSONNE. Sans
+            // cette ligne, l'écran restait sombre sur « le tour se prépare… »
+            // pour une technique de la rencontre PRÉCÉDENTE : plus rien
+            // n'arrivait jamais, et le joueur était enfermé derrière la fenêtre.
+            // C'est la même règle qu'à l'ouverture du combat — un état qui ne
+            // parle pas de CETTE rencontre est inerte, pas dangereux.
+            const rencontre = (window.PARTIE_DATA || {}).ID_Rencontre || "";
+            if (rencontre && etat.combat && etat.combat !== rencontre) return null;
             if (etat.phase !== "Resolution") return null;
             const tete = (etat.file || [])[0];
             return tete ? { idPersonnage: tete.id, idCarte: tete.carte || null } : null;
@@ -866,7 +874,22 @@ window.jouerSequenceTour = function() {
     // ensuite. Rien ne change pour le joueur : c'est le même clic.
     if (window.REGIME_CERVEAU && window.regimeDemande && window.regimeDemande.actif()) {
         if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-        return Promise.resolve(window.regimeDemande.ok());
+        const ouvert = window.regimeDemande.ok();
+
+        // UN CLIC QUI N'OUVRE RIEN LÈVE LE VOILE. Sinon le joueur est enfermé :
+        // la fenêtre sombre reste sur un tour qui ne viendra jamais, taper
+        // l'écran ne fait rien, et la seule sortie est une croix rouge de
+        // débogage — que le bouton du menu recouvre entièrement sur iPad. Là où
+        // il n'y a pas de console, c'est un blocage sans issue.
+        //
+        // On ne joue rien, on ne touche à rien : on rend simplement le plateau
+        // visible. La fenêtre revient d'elle-même au tour suivant.
+        if (ouvert === false) {
+            tracer("🔓", "voile levé à la main", "(il n'y avait aucun tour à ouvrir)");
+            if (typeof window.masquerVoileTourDebug === "function") window.masquerVoileTourDebug();
+            return Promise.resolve();
+        }
+        return Promise.resolve(ouvert);
     }
 
     const attendu = window.EVENEMENT_ATTENDU;

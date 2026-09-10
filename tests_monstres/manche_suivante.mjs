@@ -335,5 +335,46 @@ console.log("\n5. L'ÉNERGIE REMONTE À CHAQUE FIN DE MANCHE");
              `(${m.fatigue})`);
 }
 
+// ==========================================================================
+console.log("\n6. UN COMBAT EFFACÉ DÉGAGE L'ÉCRAN");
+// Un iPad est resté figé derrière la fenêtre sombre sur la technique d'un tour
+// d'une rencontre déjà terminée. La réinitialisation supprime le document
+// d'état — et le régime IGNORAIT cette disparition (`if (!etat) return;`).
+// L'écran gardait donc son dernier tour pour toujours, sans plus rien qui puisse
+// arriver, et sans console pour s'en sortir.
+{
+    verifier("avant l'effacement, un état est bien affiché",
+             !!window.regimeDuJeu().etatAffiche());
+
+    // La réinitialisation, vue de ce poste : le document d'état disparaît.
+    await f.io.lot([{ op: "delete", chemin: ["Systeme_Parties", PARTIE, "Combat_Cerveau", "etat"] }]);
+    await f.livrer(6);
+
+    verifier("l'état publié est oublié", window.regimeDuJeu().etatPublie() === null);
+    verifier("l'écran n'affiche plus aucun tour", window.regimeDuJeu().etatAffiche() === null);
+    verifier("et la fenêtre sombre est refermée", !window.EVENEMENT_ATTENDU,
+             String(window.EVENEMENT_ATTENDU));
+    verifier("le tout est annoncé dans la trace",
+             traces.some(t => t.includes("le combat a été effacé")));
+
+    // ET CE N'EST PAS UN INTERRUPTEUR DÉFINITIF : la rencontre suivante repart.
+    partieDoc.ID_Rencontre = "renc_apres_reset";
+    partieDoc.Phase_Combat = "Preparation";
+    partieDoc.File_Attente_Combat = [];
+    partieDoc.Tour_Combat = 1;
+    await notifier();
+    partieDoc.File_Attente_Combat = fileDe("M1", "H1");
+    partieDoc.Phase_Combat = "Resolution";
+    await notifier();
+
+    const neuf = window.regimeDuJeu().etatPublie();
+    verifier("un nouveau combat s'ouvre quand même", !!neuf,
+             neuf ? `(version ${neuf.version})` : "aucun");
+    verifier("et c'est bien la nouvelle rencontre",
+             !!neuf && neuf.combat === "renc_apres_reset",
+             neuf ? String(neuf.combat) : "—");
+    verifier("l'écran le suit de nouveau", !!window.regimeDuJeu().etatAffiche());
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

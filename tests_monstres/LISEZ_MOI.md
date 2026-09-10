@@ -1076,6 +1076,38 @@ quand c'est au tour d'un de MES héros, le régime regarde si le bouton
 `🧊 à moi de jouer mais RIEN À CLIQUER`, avec la raison (carte absente, bouton
 absent, fenêtre sombre encore levée).
 
+### La fenêtre sombre ne doit enfermer personne
+
+Un iPad est resté figé derrière la fenêtre sombre, sur la technique d'un tour
+d'une rencontre déjà terminée. Rien ne pouvait plus arriver, taper l'écran ne
+faisait rien, et la seule sortie — une croix rouge de débogage — se trouvait en
+haut à DROITE du voile, c'est-à-dire exactement sous le bouton du menu (position
+fixe en haut à droite, z-index 9000 contre 12 pour le voile), qui la recouvrait
+entièrement. Sur l'appareil qui n'a pas de console, c'était un blocage sans
+issue. Quatre verrous ont sauté, et chacun a son contrôle :
+
+1. **La disparition de l'état était avalée.** `ecouterCombat` faisait
+   `if (data) surEtat(data)` : la nouvelle la plus importante que ce document
+   puisse porter — « ce combat n'existe plus », ce qu'écrit la réinitialisation —
+   n'arrivait jamais. Le `null` passe maintenant, et le régime éteint l'écran.
+2. **Repartir de zéro ne suffisait pas.** L'état et le journal sont deux
+   documents : rien ne garantit l'ordre de leur effacement, et le spectateur
+   rejouait les entrées de l'ancien combat depuis le début — la fenêtre se
+   relevait aussitôt. `spectateur.oublier()` l'éteint franchement : ni entrée, ni
+   rejeu, jusqu'au prochain vrai combat. Le chapitre 6 de `manche_suivante.mjs`
+   vérifie les deux, ET qu'une rencontre suivante repart bien (ce n'est pas un
+   interrupteur définitif).
+3. **Un état d'une autre rencontre n'annonce plus de tour.** Même règle qu'à
+   l'ouverture du combat : ce qui ne parle pas de CETTE rencontre est inerte.
+   Chapitre 13 de `sequence_tour.mjs`.
+4. **Taper l'écran lève le voile quand il n'y a rien à ouvrir.** Le spectateur
+   rend désormais `false` quand aucun tour n'attendait, et le clic dégage le
+   plateau au lieu de ne rien faire.
+
+Et la croix rouge est passée à gauche. `fenetre_tour.mjs` ne vérifie pas des
+coordonnées : il demande au navigateur, par `elementFromPoint`, QUI reçoit
+vraiment le clic au centre de la croix — la seule question qui compte.
+
 `butin_avance.mjs` couvre la réserve de butin. Tirer les objets ne coûte rien ;
 les DESSINER prend une quinzaine de secondes par lot, et ce temps se payait
 jusqu'ici en pleine fouille des cadavres, jauge à l'écran. Le tirage part

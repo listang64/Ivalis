@@ -291,9 +291,18 @@ export async function effacerLeCombat(io, idPartie) {
 export function ecouterCombat(io, idPartie, contexte) {
     const { surEtat = () => {}, surEntrees = () => {}, depuis = 0 } = contexte || {};
 
-    const arretEtat = io.ecouterDoc(CHEMINS.etat(idPartie), (data) => {
-        if (data) surEtat(data);
-    });
+    // LA DISPARITION DE L'ÉTAT EST UNE NOUVELLE, PAS UN SILENCE.
+    //
+    // Ce `if (data)` avalait l'information la plus importante que ce document
+    // puisse porter : « ce combat n'existe plus ». C'est ce que la
+    // réinitialisation écrit (effacerLeCombat supprime le document), et l'écran
+    // ne l'apprenait jamais : il restait figé sur le dernier tour vu, fenêtre
+    // sombre comprise, sans plus rien qui puisse arriver. Un iPad y était
+    // enfermé sans issue — pas de console pour s'en sortir.
+    //
+    // On transmet donc le `null` tel quel, et c'est à l'écoutant de savoir quoi
+    // en faire.
+    const arretEtat = io.ecouterDoc(CHEMINS.etat(idPartie), (data) => surEtat(data || null));
 
     const arretJournal = io.ecouterCollection(
         CHEMINS.journal(idPartie), requeteJournal(depuis),

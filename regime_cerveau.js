@@ -179,7 +179,23 @@ export function creerRegime(contexte) {
         moi.arretEcoutes = ecouterCombat(io, idPartie, {
             depuis,
             surEtat: (etat) => {
-                if (!etat) return;
+                // L'ÉTAT A DISPARU : LE COMBAT EST FINI, ET L'ÉCRAN DOIT SE
+                // DÉGAGER. C'est très exactement ce que fait la réinitialisation
+                // (effacerLeCombat supprime le document d'état). On l'ignorait
+                // purement et simplement — `if (!etat) return;` — et l'écran
+                // restait figé sur le dernier tour vu, fenêtre sombre comprise,
+                // sans plus rien qui puisse jamais arriver. Un iPad, qui n'a pas
+                // de console pour s'en sortir, y était enfermé : la seule issue
+                // était une croix de débogage cachée sous le bouton du menu.
+                if (!etat) {
+                    if (moi.etat) {
+                        tracer("🧹", "le combat a été effacé", "l'écran se dégage");
+                        moi.etat = null;
+                        moi.cerveau = null;
+                        spectateur.oublier();
+                    }
+                    return;
+                }
                 // UN POSTE QUI NE COMPREND PAS LE FORMAT NE JOUE PAS. Il ne fait
                 // pas semblant, il ne devine pas : il se tait et le dit. C'est
                 // le bug des deux verrous qui ne se voyaient pas, rendu

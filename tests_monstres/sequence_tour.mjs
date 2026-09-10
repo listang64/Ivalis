@@ -549,5 +549,53 @@ console.log("\n12. LA VIE NE SE RETIRE PAS DERRIÈRE LA FENÊTRE SOMBRE");
              `(attendu 41, obtenu ${h1().PV_Actuels})`);
 }
 
+console.log("\n13. UN ÉTAT QUI PARLE D'UN AUTRE COMBAT N'ENFERME PLUS PERSONNE");
+// =========================================================================
+//  Un iPad est resté figé derrière la fenêtre sombre, sur la technique du tour
+//  d'une rencontre DÉJÀ TERMINÉE. Rien ne pouvait plus arriver : l'écran
+//  annonçait « le tour se prépare… » pour un combattant d'un combat qui
+//  n'existait plus, taper ne faisait rien, et la seule sortie était une croix de
+//  débogage cachée sous le bouton du menu.
+//
+//  C'est la même règle qu'à l'ouverture du combat : un état qui ne parle pas de
+//  CETTE rencontre est inerte. Il n'annonce donc plus personne.
+{
+    const w = { ID_PARTIE_COURANTE: "P1", REGIME_CERVEAU: true };
+    w.PERSOS_PARTIE = [{ idPersonnage: "H1", idJoueur: "moi", camp: "Allié" },
+                       { idPersonnage: "M1", camp: "Ennemi", estMonstre: true }];
+    w.estMonstre = (id) => String(id).startsWith("M");
+    w.estCombattantMort = () => false;
+    new Function('window', 'localStorage', SRC)(w, { getItem: () => "moi" });
+
+    const etatDe = (combat) => ({
+        combat, phase: "Resolution",
+        file: [{ id: "M1", carte: "CARTE_M" }],
+        combattants: { H1: {}, M1: {} }
+    });
+    w.regimeDuJeu = () => ({ etatAffiche: () => etatDe("renc_ancienne") });
+
+    // La rencontre en cours est une AUTRE : l'ancien état n'annonce plus rien.
+    w.PARTIE_DATA = { ID_Rencontre: "renc_nouvelle", Phase_Combat: "Resolution" };
+    verifier("un état d'une autre rencontre n'annonce plus de tour",
+             w.acteurCourantCombat() === null,
+             String(JSON.stringify(w.acteurCourantCombat())));
+    verifier("donc la fenêtre sombre n'a plus de raison d'être",
+             w.SEQUENCE_TOUR === null);
+
+    // La même rencontre : tout fonctionne comme avant.
+    w.PARTIE_DATA = { ID_Rencontre: "renc_ancienne", Phase_Combat: "Resolution" };
+    const tete = w.acteurCourantCombat();
+    verifier("sur la BONNE rencontre, le tour est bien annoncé",
+             !!tete && tete.idPersonnage === "M1", tete ? tete.idPersonnage : "aucun");
+    verifier("et la fenêtre se pose pour un combattant qui n'est pas le mien",
+             !!w.SEQUENCE_TOUR && w.SEQUENCE_TOUR.voile === true);
+
+    // Une partie sans rencontre identifiée (monstres posés à la main) ne doit
+    // pas tout faire disparaître : on ne compare que ce qu'on peut comparer.
+    w.PARTIE_DATA = { Phase_Combat: "Resolution" };
+    verifier("sans rencontre identifiée, on ne juge pas",
+             !!w.acteurCourantCombat());
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

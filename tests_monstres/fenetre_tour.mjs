@@ -309,6 +309,75 @@ verifier("hors combat, jamais rien", !res.horsCombat.visible);
 verifier("la fenêtre passe au-dessus du plateau mais laisse le panneau",
          res.zVoile > 5 && res.zVoile >= res.zPanneau, `(${res.zVoile} / ${res.zPanneau})`);
 
+// =========================================================================
+// LA SORTIE DE SECOURS DOIT ÊTRE ATTEIGNABLE
+// =========================================================================
+//  Un iPad est resté bloqué derrière la fenêtre sombre, sur la technique du tour
+//  d'AVANT. La seule sortie était la croix rouge — placée en haut à DROITE du
+//  voile, c'est-à-dire exactement sous le bouton du menu (position fixe en haut à
+//  droite, z-index 9000 contre 12 pour le voile), qui la recouvrait entièrement.
+//  Sur l'appareil sans console, c'était un blocage sans issue.
+//
+//  On ne vérifie pas des coordonnées : on demande au navigateur QUI reçoit
+//  vraiment le clic au centre de la croix. C'est la seule question qui compte.
+{
+  const r = await p.evaluate(() => {
+    const fen = document.getElementById("fenetre-combat");
+    fen.style.display = "block";
+    const menu = document.getElementById("btn-fermer-combat");
+    if (menu) menu.style.display = "block";
+
+    const voile = document.getElementById("voile-tour-combat");
+    voile.style.display = "block";
+    voile.style.opacity = "1";
+    voile.style.pointerEvents = "auto";
+
+    const croix = document.getElementById("voile-tour-fermer");
+    const bc = croix.getBoundingClientRect();
+    const recoit = document.elementFromPoint(bc.left + bc.width / 2, bc.top + bc.height / 2);
+
+    const bm = menu ? menu.getBoundingClientRect() : null;
+    const seChevauchent = bm && !(bc.right < bm.left || bc.left > bm.right
+                              || bc.bottom < bm.top || bc.top > bm.bottom);
+
+    return {
+      croixVisible: bc.width > 0 && bc.height > 0,
+      taille: Math.round(Math.min(bc.width, bc.height)),
+      recoitLeClic: !!recoit && (recoit.id === "voile-tour-fermer"
+                                 || recoit.closest("#voile-tour-fermer") !== null),
+      quiRecoit: recoit ? (recoit.id || recoit.tagName) : "personne",
+      seChevauchent: !!seChevauchent
+    };
+  });
+  verifier("la croix rouge est bien dessinée", r.croixVisible, `(${r.taille}px)`);
+  verifier("elle n'est pas sous le bouton du menu", !r.seChevauchent);
+  verifier("ET C'EST ELLE QUI REÇOIT LE CLIC", r.recoitLeClic, `(${r.quiRecoit})`);
+  verifier("assez grande pour un doigt sur iPad", r.taille >= 34, `(${r.taille}px)`);
+}
+
+// =========================================================================
+// UN CLIC QUI N'OUVRE RIEN LÈVE LE VOILE
+// =========================================================================
+//  L'autre moitié du blocage : taper l'écran ne faisait RIEN quand la fenêtre
+//  n'avait aucun tour à ouvrir. Le joueur tapait, retapait, et restait enfermé.
+{
+  const r = await p.evaluate(() => {
+    // Un régime allumé dont le spectateur n'attend rien : `ok()` rend false.
+    window.REGIME_CERVEAU = true;
+    window.regimeDemande = { actif: () => true, ok: () => false };
+    const voile = document.getElementById("voile-tour-combat");
+    voile.style.display = "block";
+    voile.style.opacity = "1";
+    window.jouerSequenceTour();
+    return { opacite: voile.style.opacity, ecarte: window.VOILE_TOUR_MASQUE_DEBUG === true };
+  });
+  verifier("taper l'écran lève la fenêtre quand il n'y a rien à ouvrir",
+           r.opacite === "0", `(opacité ${r.opacite})`);
+  verifier("et le jeu sait qu'elle a été écartée à la main", r.ecarte);
+}
+await p.evaluate(() => { window.REGIME_CERVEAU = false; delete window.regimeDemande;
+                         window.VOILE_TOUR_MASQUE_DEBUG = false; });
+
 // Contrôle visuel : la fenêtre telle que Nico la verra, OK doré compris.
 await p.evaluate(async () => {
   // Le bandeau rouge « modules non chargés » appartient au banc (le réseau y est

@@ -129,7 +129,33 @@ export function creerSpectateur(contexte) {
     };
 
     // On repart d'un état connu : au chargement, ou quand un combat recommence.
+    // LE COMBAT N'EXISTE PLUS : ON N'A PLUS RIEN À REGARDER.
+    //
+    // Ce n'est pas la même chose que « repartir d'un autre état ». La
+    // réinitialisation supprime le document d'état ET le journal, mais rien ne
+    // garantit l'ordre d'arrivée des deux nouvelles : repartir de zéro laissait
+    // le spectateur rejouer les entrées de l'ancien combat depuis le début, et
+    // la fenêtre sombre se relevait aussitôt sur un tour qui n'existait plus.
+    // Un iPad y restait enfermé, sans console pour s'en sortir.
+    //
+    // Éteint, le spectateur refuse tout : ni entrée, ni rejeu, jusqu'au prochain
+    // vrai combat.
+    function oublier() {
+        moi.etat = null;
+        moi.vue = 0;
+        moi.combat = "";
+        moi.recues = {};
+        moi.tourAcquitte = null;
+        moi.attendue = null;
+        moi.depuis = 0;
+        moi.eteint = true;
+        tracer("🧹", "plus rien à regarder", "(le combat a été effacé)");
+        surFenetre(null);
+        surEtat(null);
+    }
+
     function repartirDe(etat, version) {
+        moi.eteint = false;
         moi.etat = etat ? clonerEtat(etat) : null;
         moi.vue = version !== undefined ? nombre(version) : nombre(etat && etat.version);
         // L'identité de la rencontre qu'on regarde. Tout ce qui vient d'une
@@ -146,6 +172,7 @@ export function creerSpectateur(contexte) {
     // Ce que le journal livre. On ne garde que ce qui est devant nous : une
     // entrée déjà rejouée n'a plus rien à raconter.
     function recevoir(entrees) {
+        if (moi.eteint) return;      // le combat a été effacé : plus rien n'entre
         (entrees || []).forEach(e => {
             if (!e) return;
             // UNE ENTRÉE D'UNE AUTRE RENCONTRE N'EST PAS UNE ENTRÉE EN RETARD :
@@ -167,7 +194,11 @@ export function creerSpectateur(contexte) {
     // Le OK doré. Purement local : aucun poste n'attend un autre, chacun lit à
     // son rythme et rattrape ensuite les numéros accumulés.
     function ok() {
-        if (!moi.attendue) { tracer("👆", "OK dans le vide", "(rien n'attendait)"); return; }
+        // ON REND `false` QUAND RIEN N'ATTENDAIT, et ce n'est pas un détail : sur
+        // iPad, où il n'y a pas de console, un voile resté levé sur un tour qui
+        // ne viendra jamais enferme le joueur. L'appelant a besoin de savoir que
+        // son clic n'a rien ouvert, pour lever le voile lui-même.
+        if (!moi.attendue) { tracer("👆", "OK dans le vide", "(rien n'attendait)"); return false; }
         const e = moi.attendue;
         const enFile = Object.keys(moi.recues).filter(n => Number(n) > moi.vue).length;
         tracer("👆", `OK — ${e.acteur} (manche ${e.manche})`,
@@ -182,6 +213,7 @@ export function creerSpectateur(contexte) {
     // joueraient deux animations l'une sur l'autre, et c'est exactement le genre
     // de chevauchement qui faisait sauter les pions.
     async function lire() {
+        if (moi.eteint) return;      // plus de combat : rien à rejouer
         if (moi.enCours) return;
         moi.enCours = true;
         try {
@@ -280,7 +312,7 @@ export function creerSpectateur(contexte) {
     }
 
     return {
-        repartirDe, recevoir, ok, lire, rejoindre, rattraperSansAnimer,
+        repartirDe, oublier, recevoir, ok, lire, rejoindre, rattraperSansAnimer,
         // De quoi regarder l'intérieur, pour la trace et les bancs.
         etat: () => moi.etat,
         vue: () => moi.vue,
