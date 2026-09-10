@@ -289,8 +289,10 @@ console.log("\n9. UN COMBAT QUI NE PEUT PAS S'OUVRIR S'ARRÊTE, ET LE DIT");
 {
     const r = SOURCES['regime_cerveau.js'];
 
+    // L'ouverture est maintenant précédée de la lecture des cartes des
+    // créatures : la chaîne commence par elles, mais l'échec se traite pareil.
     verifier("l'échec d'ouverture est traité, pas ignoré",
-             r.includes('REGIME.ouvrir(sourceDuJeu()).then(resultat => {'));
+             r.includes('.then(() => REGIME.ouvrir(sourceDuJeu())).then(resultat => {'));
     verifier("un résultat vide est reconnu comme un échec", r.includes('if (resultat) return;'));
     // ON NE RETOMBE PAS DANS L'ANCIEN RÉGIME. Il est cassé ; le rendre à la
     // table sans prévenir, au milieu d'une rencontre, c'est offrir une soirée
@@ -423,6 +425,53 @@ console.log("\n12. L'INTERFACE LIT LA FILE DE L'ÉTAT, ET ELLE Y RESTE");
              r.includes("le cerveau attend ${tete.id}"));
     verifier("et distingue une créature d'un joueur",
              r.includes("(créature — elle devrait jouer)"));
+}
+
+// =========================================================================
+console.log("\n13. LA CARTE D'UNE CRÉATURE PASSE PAR L'EXTRACTEUR DU JEU");
+// =========================================================================
+//  Les créatures lançaient une carte VIDE : elles marchaient, « renonçaient »,
+//  et on ne voyait ni animation ni dégât. La cause tenait à un champ qui
+//  n'existe pas — la première version lisait `data.attaques`, alors que la Forge
+//  écrit `Composants.actions`, et qu'il faut sept cents lignes d'extraction pour
+//  en tirer des attaques.
+//
+//  Réécrire cet extracteur en pur, ce serait le dupliquer, donc le laisser
+//  dériver. On lui ouvre une porte : `demarrerCiblage(idCarte, { extraire: true,
+//  idLanceur })` fait tout le travail et rend la carte SANS toucher à l'écran ni
+//  au ciblage.
+{
+    const moteur = lire('moteur_effets.js');
+    const r = SOURCES['regime_cerveau.js'];
+
+    verifier("l'extracteur accepte une demande d'extraction",
+             moteur.includes("window.demarrerCiblage = async function(idCarte, options)"));
+    verifier("le lanceur peut être nommé au lieu d'être lu dans le panneau",
+             moteur.includes("const persoLanceur = (options && options.idLanceur)"));
+    verifier("et il n'est plus lu dans le panneau au milieu de l'extraction",
+             !/const idLanceurBond = window\.COMBAT_PERSOS_JOUEUR/.test(moteur)
+             && !/const tkLanceur = window\.TOKENS_VTT_DATA\[window\.COMBAT_PERSOS_JOUEUR/.test(moteur));
+
+    // LE POINT DE COUPE : la carte est construite, rien n'a touché l'écran.
+    verifier("l'extraction rend la carte au lieu de cibler",
+             moteur.includes("if (extraireSeulement) return carteConstruite;"));
+    verifier("et le ciblage normal continue de poser ETAT_CIBLAGE",
+             moteur.includes("window.ETAT_CIBLAGE = carteConstruite;"));
+    verifier("une extraction ne valide jamais la carte",
+             (moteur.match(/if \(extraireSeulement\) return null;/g) || []).length >= 2);
+    verifier("ni ne joue de son", moteur.includes("if (!extraireSeulement && typeof window.jouerSonClic"));
+
+    // LA LECTURE EST FAITE À L'AVANCE : le cerveau est synchrone.
+    verifier("les cartes sont lues avant d'ouvrir", r.includes("async function preparerLesCartes(file)"));
+    verifier("et rangées pour le cerveau", r.includes("window.CARTES_DU_CERVEAU = table;"));
+    verifier("le cerveau les lit sans rien recalculer",
+             r.includes("const prete = (window.CARTES_DU_CERVEAU || {})[idMonstre];"));
+    verifier("l'ouverture d'un combat les prépare d'abord",
+             r.includes("preparerLesCartes(file).then(() => REGIME.ouvrir(sourceDuJeu()))"));
+    verifier("et l'ouverture d'une manche aussi",
+             r.includes("preparerLesCartes(file).then(() => REGIME.ouvrirLaManche(file))"));
+    verifier("une créature sans carte jouable est signalée",
+             r.includes("n'a pas de carte jouable"));
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

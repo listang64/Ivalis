@@ -588,6 +588,50 @@ attend PERSO_250418 (au joueur P_03)`. Neuf fois sur dix c'est normal — un
 joueur réfléchit — mais « rien ne se passe » sans explication est précisément ce
 qui a coûté le plus de temps depuis le début.
 
+### Une carte termine le tour
+
+La règle du jeu depuis toujours : `validerCarteCombat` enchaîne sur
+`finDeTourCombat`. Le cerveau ne le faisait pas, et ça se voyait de deux façons
+à la table — le tour ne se finissait pas après l'attaque, et **on pouvait lancer
+la même carte plusieurs fois de suite**.
+
+La clôture règle les deux d'un coup : le lanceur quitte la tête de file, donc une
+seconde carte est refusée d'elle-même (« c'est au tour de X »). Il n'y a pas de
+compteur à tenir, juste une règle à dire.
+
+Deux conséquences qu'il fallait suivre. **Un refus n'est pas une fin** : le
+« fin de tour » qu'un joueur envoie juste après son attaque arrive trop tard,
+il est refusé — et la boucle s'arrêtait dessus, sans faire jouer les créatures
+qui suivaient. Mais **un refus qui revient est un mur** : si l'intention n'a pas
+pu être refermée (un dépôt sans `refuser`, une écriture perdue), on repasserait
+dessus indéfiniment. La boucle continue sur un refus, et s'arrête franchement
+sur le même refus deux fois.
+
+### La carte d'une créature passe par l'extracteur du jeu
+
+Les créatures lançaient une carte **vide** : elles marchaient, « renonçaient »,
+et on ne voyait ni animation ni dégât. La cause tenait à un champ qui n'existe
+pas — je lisais `data.attaques`, alors que la Forge écrit `Composants.actions`,
+et qu'il faut **sept cents lignes d'extraction** pour en tirer des attaques, des
+altérations, une zone, un bond.
+
+Réécrire cet extracteur en pur, ce serait le dupliquer, donc le laisser dériver.
+On lui ouvre une porte : `demarrerCiblage(idCarte, { extraire: true, idLanceur })`
+fait tout le travail et rend la carte **sans toucher à l'écran ni au ciblage**.
+Le point de coupe est net — juste après la construction de la carte, avant la
+première ligne d'interface.
+
+Quatre références au panneau gauche devenaient un obstacle (« qui lance ? ») :
+elles passent par un `persoLanceur` résolu une fois, nommé par l'appelant ou lu
+dans le panneau comme avant.
+
+Et parce que **le cerveau est synchrone** alors que l'extraction ne l'est pas,
+les cartes des créatures sont lues **à l'avance**, à l'ouverture du combat et de
+chaque manche, puis rangées. Ce n'est pas une optimisation : c'est la seule façon
+de lui donner une carte complète sans dupliquer l'extracteur. Et c'est cohérent
+avec les règles — la technique d'une créature est choisie pendant la préparation
+et ne change plus pendant la manche.
+
 ### Le nouveau régime est le régime
 
 Il était éteint par défaut le temps de l'essayer ; il ne l'est plus. Et **un

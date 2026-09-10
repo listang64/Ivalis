@@ -230,6 +230,15 @@ console.log("\n6. TROIS ÉCRANS, TROIS RYTHMES, LE MÊME RÉSULTAT");
                 const i = memoire.intentions.find(x => x.id === id);
                 if (i) i.traitee = true;
             });
+        },
+        // UN VRAI DÉPÔT SAIT REFUSER, et c'est indispensable : depuis qu'une
+        // carte clôt le tour, le « fin de tour » qu'un joueur envoie juste après
+        // son attaque arrive trop tard et se fait refuser. Sans fermeture, le
+        // cerveau repasserait dessus indéfiniment — il s'arrête plutôt que de
+        // tourner en rond, donc un dépôt qui ne referme pas bloque le combat.
+        refuser: async (id, raison) => {
+            const i = memoire.intentions.find(x => x.id === id);
+            if (i) { i.traitee = true; i.refus = raison; }
         }
     }, { poste: "P_03", carteDe: (id, c) => CARTES[c] || null, maintenant: () => 1 });
 

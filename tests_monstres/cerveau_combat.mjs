@@ -10,7 +10,7 @@
 // bougé, et l'intention est reprise.
 import {
     estLeCerveau, cerveauPerdu, validerIntention, appliquerIntention,
-    avancerFile, jouerCreature, prochainPas, creerCerveau, CERVEAU_PERDU_MS
+    avancerFile, jouerCreature, prochainPas, creerCerveau, cloturerTour, CERVEAU_PERDU_MS
 } from '../cerveau_combat.js';
 import { construireEtatCombat, creerDes, verifierEtatCombat, clonerEtat } from '../combat_etat.js';
 import { distance } from '../mouvement_pur.js';
@@ -290,7 +290,14 @@ console.log("\n6. LA BOUCLE COMPLÈTE, AVEC SON DÉPÔT");
     );
 
     const faits = await cerveau.tournerJusquAuCalme();
-    verifier("le cerveau enchaîne les pas tout seul", faits.length >= 4,
+    // TROIS PAS, ET NON QUATRE : le déplacement, la carte (qui CLÔT le tour),
+    // puis la créature. Le « fin de tour » que Nico envoie après son attaque
+    // arrive trop tard — la carte l'a déjà terminé — et il est refusé.
+    //
+    // C'est la règle du jeu, pas un accident : validerCarteCombat a toujours
+    // enchaîné sur finDeTourCombat. Ce qui compte, c'est que le refus ne
+    // BLOQUE pas la suite : la créature joue quand même.
+    verifier("le cerveau enchaîne les pas tout seul", faits.length === 3,
              `(${faits.length} pas : ${faits.join(", ")})`);
     verifier("les numéros se suivent sans trou",
              faits.every((v, i) => v === i + 1), `(${faits.join(",")})`);
@@ -301,6 +308,12 @@ console.log("\n6. LA BOUCLE COMPLÈTE, AVEC SON DÉPÔT");
              `(${depot.interne.etat.combattants.M1.pv})`);
     verifier("les trois intentions sont refermées",
              depot.interne.intentions.every(i => i.traitee));
+
+    // Le « fin de tour » tardif a été refusé, et refermé quand même : sans ça
+    // il reviendrait à chaque tour de boucle et bloquerait la file derrière lui.
+    const finTardif = depot.interne.intentions.find(i => i.id === "I3");
+    verifier("le fin de tour tardif est refusé, pas rejoué",
+             finTardif.traitee === true, JSON.stringify(finTardif.refus || ""));
 
     // Il s'est arrêté au bon endroit : le tour de Pliors, joué par l'autre poste.
     verifier("il s'arrête devant le tour d'un autre joueur",
@@ -460,6 +473,55 @@ console.log("\n12. LES REFUS REMONTENT AU BON POSTE");
 
     // Et la file n'a pas bougé : un refus ne fait pas avancer le combat.
     verifier("la file n'a pas avancé", depot.interne.etat.file[0].id === "H1");
+}
+
+// =========================================================================
+console.log("\nUNE CARTE TERMINE LE TOUR");
+// =========================================================================
+//  La règle du jeu depuis toujours : validerCarteCombat enchaîne sur
+//  finDeTourCombat. Le cerveau ne le faisait pas, et ça se voyait de deux
+//  façons à la table — le tour ne se finissait pas après l'attaque, et on
+//  pouvait lancer la même carte plusieurs fois de suite.
+//
+//  La clôture règle les deux d'un coup : le lanceur quitte la tête de file,
+//  donc une seconde carte est refusée d'elle-même. Il n'y a pas de compteur à
+//  tenir, juste une règle à dire.
+{
+    const etat = monde();
+    const intention = {
+        id: "INT_C", type: "carte", acteur: "H1", poste: "P_03", idCarte: "C_H1",
+        attaques: [{ valeurBrute: 10, cibles: ["M1"] }], alterations: [], coutFatigue: 12
+    };
+
+    const pas = appliquerIntention(etat, intention, null);
+    verifier("la carte se résout", !!pas);
+    const types = pas.entree.etapes.map(e => e.type);
+    verifier("et le tour se clôt dans la même entrée", types.includes("tour"),
+             types.join(","));
+    verifier("le lanceur n'est plus en tête de file",
+             (pas.etat.file[0] || {}).id !== "H1", (pas.etat.file[0] || {}).id);
+    verifier("il est noté comme ayant joué", (pas.etat.ontJoue || []).includes("H1"));
+
+    // ET LA SECONDE CARTE EST REFUSÉE D'ELLE-MÊME : c'est ce qui rend le
+    // doublon impossible sans rien compter.
+    const encore = validerIntention(pas.etat, { ...intention, id: "INT_C2" });
+    verifier("une seconde carte est refusée", encore.ok === false);
+    verifier("et la raison nomme celui dont c'est le tour",
+             /c'est au tour de/.test(encore.raison || ""), encore.raison);
+
+    // Le cerveau, lui, ne publie donc qu'un seul pas pour les deux demandes.
+    const deux = prochainPas(etat, [intention, { ...intention, id: "INT_C2" }],
+                             { carteDe });
+    verifier("le cerveau ne publie qu'un pas pour deux demandes",
+             deux && deux.intention === "INT_C", deux && deux.intention);
+
+    // Une carte lancée par une créature clôt aussi son tour — c'était déjà le
+    // cas, et ça ne doit pas changer.
+    const enJeu = clonerEtat(etat);
+    cloturerTour(enJeu);
+    const creature = jouerCreature(enJeu, "M1", CARTES.C_M1, null);
+    verifier("le tour d'une créature se clôt toujours",
+             creature.entree.etapes.some(e => e.type === "tour"));
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

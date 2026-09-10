@@ -421,12 +421,22 @@ function contexteDuJeu() {
         estAMoi: (id) => typeof window.estMonHerosCombat === "function"
                          && window.estMonHerosCombat(id),
 
-        // La technique d'une créature, telle que la Forge l'a écrite.
+        // LA TECHNIQUE D'UNE CRÉATURE, TELLE QUE LA FORGE L'A ÉCRITE.
+        //
+        // Elle est lue à l'AVANCE et rangée dans CARTES_DU_CERVEAU (voir
+        // preparerLesCartes ci-dessous). La lecture, elle, demande sept cents
+        // lignes d'extraction et un aller-retour asynchrone ; le cerveau, lui,
+        // est synchrone. On ne peut donc pas la faire au moment de jouer.
+        //
+        // La première version se contentait de `data.attaques`, un champ qui
+        // n'existe pas : la Forge écrit `Composants.actions`. Les créatures
+        // lançaient donc une carte VIDE — elles marchaient, « renonçaient », et
+        // on ne voyait ni animation ni dégât. C'est exactement ce que la table
+        // a constaté.
         carteDe: (idMonstre, idCarte) => {
-            const data = ((window.CACHE_COMPETENCES_GLOBAL || {})[idMonstre] || {})[idCarte];
-            if (!data || typeof window.analyserCarteMonstre !== "function") return null;
-            return { idCarte, infos: window.analyserCarteMonstre(data),
-                     attaques: data.attaques || [], alterations: data.alterations || [] };
+            const prete = (window.CARTES_DU_CERVEAU || {})[idMonstre];
+            if (!prete || prete.idCarte !== idCarte) return null;
+            return prete;
         },
 
         // LE TERRAIN. Le noyau ne connaît pas la carte du plateau — c'est une
@@ -539,6 +549,70 @@ function contexteDuJeu() {
             if (typeof window.tracerCombat === "function") window.tracerCombat(i, q, d);
         }
     };
+}
+
+// =========================================================================
+//  LES CARTES DES CRÉATURES, LUES À L'AVANCE
+// =========================================================================
+//  Le cerveau est synchrone : quand il fait jouer une créature, il ne peut pas
+//  attendre une extraction. Or lire une carte forgée demande sept cents lignes
+//  et un chargement de cache. On les lit donc TOUTES avant d'ouvrir la manche,
+//  et on les range.
+//
+//  Ce n'est pas une optimisation : c'est la seule façon de donner au cerveau une
+//  carte complète sans dupliquer l'extracteur du jeu. Et c'est cohérent avec les
+//  règles — la technique d'une créature est choisie pendant la préparation et ne
+//  change plus pendant la manche.
+//  (La table elle-même est posée à la première lecture : ce fichier doit rester
+//  chargeable hors navigateur, où `window` n'existe pas.)
+
+async function preparerLesCartes(file) {
+    if (typeof window === "undefined") return;
+    window.CARTES_DU_CERVEAU = window.CARTES_DU_CERVEAU || {};
+    const tracer = (i, q, d) => {
+        if (typeof window.tracerCombat === "function") window.tracerCombat(i, q, d);
+    };
+    if (typeof window.demarrerCiblage !== "function") return;
+
+    const aLire = (file || []).filter(f => {
+        const id = f.id || f.idPersonnage;
+        const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === id);
+        return perso && perso.estMonstre;
+    });
+
+    const table = {};
+    for (const f of aLire) {
+        const id = f.id || f.idPersonnage;
+        const idCarte = f.carte || f.idCarte;
+        if (!idCarte) continue;
+        try {
+            const carte = await window.demarrerCiblage(idCarte, { extraire: true, idLanceur: id });
+            const data = ((window.CACHE_COMPETENCES_GLOBAL || {})[id] || {})[idCarte];
+            const infos = (data && typeof window.analyserCarteMonstre === "function")
+                ? window.analyserCarteMonstre(data) : { portee: 1, fatigue: 0 };
+            if (!carte) {
+                // Pas de carte jouable (paralysie, technique sans effet) : on le
+                // dit, plutôt que de laisser la créature « renoncer » sans
+                // qu'on sache pourquoi.
+                tracer("🃏", `${id} n'a pas de carte jouable`, idCarte);
+                continue;
+            }
+            table[id] = {
+                idCarte,
+                infos,
+                attaques: carte.attaques || [],
+                alterations: carte.alterations || [],
+                isZone: !!carte.isZone,
+                zoneHexesBase: carte.zoneHexesBase || []
+            };
+        } catch (e) {
+            tracer("❌", `carte de ${id} illisible`, String(e && e.message));
+        }
+    }
+    window.CARTES_DU_CERVEAU = table;
+    const compte = Object.keys(table).length;
+    tracer("🃏", `${compte} technique(s) de créature prête(s)`,
+           Object.entries(table).map(([id, c]) => `${id}:${(c.attaques || []).length} att.`).join(" "));
 }
 
 // L'ÉTAT DE DÉPART, tiré de ce que le jeu a déjà en mémoire. C'est le pont
@@ -698,7 +772,11 @@ if (typeof window !== "undefined") {
                 // réclamé cette rencontre, `ouvrir` rend null sans rien casser.
                 // On le distingue par le drapeau `dejaOuvert`.
                 ouvertureEnCours = true;
-                REGIME.ouvrir(sourceDuJeu()).then(resultat => {
+                // LES CARTES DES CRÉATURES D'ABORD. Le cerveau ne peut pas les
+                // lire au moment de jouer : il est synchrone, et l'extraction ne
+                // l'est pas. Sans cette lecture préalable, chaque créature
+                // lance une carte vide.
+                preparerLesCartes(file).then(() => REGIME.ouvrir(sourceDuJeu())).then(resultat => {
                     ouvertureEnCours = false;
                     if (resultat) return;
                     if (REGIME && REGIME.ouvertureAilleurs()) return;   // un autre poste a la main
@@ -709,7 +787,9 @@ if (typeof window !== "undefined") {
                     arreterLeCombat("erreur pendant l'ouverture : " + (e && e.message));
                 });
             } else if (REGIME.jeSuisLeCerveau()) {
-                REGIME.ouvrirLaManche(file);
+                // Une nouvelle manche, de nouvelles techniques : on relit.
+                preparerLesCartes(file).then(() => REGIME.ouvrirLaManche(file))
+                    .catch(e => console.error("Ouverture de la manche :", e));
             }
         }
 

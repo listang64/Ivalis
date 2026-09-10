@@ -275,7 +275,22 @@ export function appliquerIntention(etat, intention, plateau) {
         };
         action.jets = tirerDesCarte(etat, action, intention.acteur, critique, des);
         const r = resoudreCarte(etat, action);
-        return fabriquerPas(etat, r.etat, r.etapes, intention.id, intention.acteur, des);
+
+        // UNE CARTE TERMINE LE TOUR, et c'est la règle du jeu depuis toujours :
+        // validerCarteCombat enchaîne sur finDeTourCombat. Le cerveau ne le
+        // faisait pas, et ça se voyait de deux façons à la table — le tour ne
+        // se finissait pas après l'attaque, et on pouvait lancer la même carte
+        // plusieurs fois de suite.
+        //
+        // La clôture règle les deux d'un coup : le lanceur quitte la tête de
+        // file, donc une seconde carte est refusée d'elle-même (« c'est au tour
+        // de X »). Il n'y a pas de compteur à tenir, juste une règle à dire.
+        const suivant = clonerEtat(r.etat);
+        const etapes = [...r.etapes];
+        const clot = cloturerTour(suivant);
+        if (clot) etapes.push(...clot.etapes);
+
+        return fabriquerPas(etat, suivant, etapes, intention.id, intention.acteur, des);
     }
 
     return null;
@@ -439,7 +454,9 @@ export function creerCerveau(depot, contexte) {
             if (pas.refus) {
                 tracer("🚫", `intention refusée : ${pas.raison}`, pas.intention);
                 if (depot.refuser) await depot.refuser(pas.intention, pas.raison, pas.poste);
-                return { refus: pas.raison };
+                // On rend son identité : la boucle en a besoin pour reconnaître
+                // un refus qui revient, donc une fermeture qui n'a pas pris.
+                return { refus: pas.raison, intention: pas.intention };
             }
 
             // Le garde-fou avant d'écrire : plutôt refuser de publier un état
@@ -474,9 +491,38 @@ export function creerCerveau(depot, contexte) {
     // borne pour qu'un état pathologique ne fasse jamais tourner à l'infini.
     async function tournerJusquAuCalme(maxPas = 40) {
         const faits = [];
+        // Les refus déjà vus dans CE passage. Un refus est censé se refermer sur
+        // l'intention elle-même ; s'il revient, c'est que la fermeture n'a pas
+        // pris, et il ne faut surtout pas tourner en rond dessus.
+        const dejaRefuses = new Set();
+
         for (let i = 0; i < maxPas; i++) {
             const r = await unTour();
-            if (!r || !r.publie) break;
+            if (!r) break;
+
+            // UN REFUS N'EST PAS UNE FIN : c'est du travail fait. L'intention
+            // est refermée, donc le tour suivant de boucle voit la suite.
+            //
+            // La boucle s'arrêtait dessus, et ça se voit à la table depuis que
+            // la carte clôt le tour : le « fin de tour » qu'un joueur envoie
+            // juste après son attaque arrive trop tard, il est refusé — et le
+            // cerveau s'arrêtait là, sans faire jouer les créatures qui
+            // suivaient.
+            if (r.refus) {
+                // MAIS UN REFUS QUI REVIENT EST UN MUR, pas un pas de plus. Si
+                // l'intention n'a pas pu être refermée — un dépôt sans
+                // `refuser`, une écriture perdue — on repasserait dessus
+                // indéfiniment sans jamais atteindre le combattant suivant. On
+                // s'arrête, et c'est visible plutôt que silencieux.
+                if (dejaRefuses.has(r.intention)) {
+                    tracer("🚧", "un refus ne se referme pas", r.intention || "");
+                    break;
+                }
+                dejaRefuses.add(r.intention);
+                continue;
+            }
+
+            if (!r.publie) break;
             faits.push(r.publie);
         }
         return faits;

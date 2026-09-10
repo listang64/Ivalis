@@ -1388,8 +1388,20 @@ window.VTT_CIBLAGE_TOUCHMOVE = function(e) {
 //  2. DÉMARRAGE ET UI DU CIBLAGE
 // =========================================================================
 
-window.demarrerCiblage = async function(idCarte) {
-    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+// `options` ouvre une seconde porte à cette fonction, sans rien changer à la
+// première : `{ extraire: true, idLanceur }` fait TOUT le travail d'extraction —
+// les sept cents lignes qui lisent la carte forgée et en tirent des attaques,
+// des altérations, une zone, un bond — puis rend le résultat SANS toucher à
+// l'écran ni au ciblage.
+//
+// C'est ce dont le cerveau a besoin. Une créature lance une carte forgée par la
+// Forge : sans cette extraction, elle lançait une carte VIDE, marchait, et
+// « renonçait » — aucune animation, aucun dégât, exactement ce qu'on voyait à la
+// table. Réécrire l'extracteur en pur aurait été le dupliquer, donc le laisser
+// dériver ; on lui ouvre une porte au lieu d'en faire une copie.
+window.demarrerCiblage = async function(idCarte, options) {
+    const extraireSeulement = !!(options && options.extraire);
+    if (!extraireSeulement && typeof window.jouerSonClic === "function") window.jouerSonClic();
 
     // Le cache des effets n'est chargé qu'une fois, au tout premier chargement de la page.
     // S'il a raté (réseau lent/instable) ou est resté vide, on le recharge ici avant de continuer :
@@ -1408,7 +1420,13 @@ window.demarrerCiblage = async function(idCarte) {
     // chargement a pris du retard, la carte manquait ici et le sort partait…
     // nulle part, sans un mot : la créature passait son tour sans rien faire.
     // Le cache global, lui, contient les techniques de TOUS les combattants.
-    const idPourCache = (window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO] || {}).idPersonnage;
+    // QUI LANCE. Le panneau gauche le dit pour un joueur ; pour une extraction
+    // demandée par le cerveau, c'est l'appelant qui le nomme — on ne va pas
+    // déplacer le panneau d'un joueur pour lire la carte d'une créature.
+    const persoLanceur = (options && options.idLanceur)
+        ? ((window.PERSOS_PARTIE || []).find(p => p.idPersonnage === options.idLanceur) || null)
+        : (window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO] || null);
+    const idPourCache = (persoLanceur || {}).idPersonnage;
     const dataCarte = window.COMPETENCES_CACHE[idCarte]
         || ((window.CACHE_COMPETENCES_GLOBAL || {})[idPourCache] || {})[idCarte];
     if (!dataCarte) {
@@ -1423,10 +1441,13 @@ window.demarrerCiblage = async function(idCarte) {
     // validerCarteCombat (déduction de fatigue + fin de tour), sans jamais construire d'action.
     // Le lanceur de cette carte : sa paralysie l'empêche d'agir, sa race peut
     // aussi allonger la portée de ses sorts (cf. plus bas).
-    const lanceurCarte = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+    const lanceurCarte = persoLanceur;
     const casterParalyse = lanceurCarte;
     if (casterParalyse && casterParalyse.Etats_Alteres && casterParalyse.Etats_Alteres.some(e => e.nom === "Paralysie")) {
         const tkCaster = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[casterParalyse.idPersonnage] : null;
+        // En extraction, un paralysé n'a simplement pas de carte à jouer : on
+        // rend null et on ne touche à rien. C'est le cerveau qui décidera.
+        if (extraireSeulement) return null;
         if (tkCaster && typeof window.afficherMessageFlottantHex === "function") {
             window.afficherMessageFlottantHex(tkCaster.q, tkCaster.r, "Paralysé !", "#aaaaaa");
         }
@@ -2161,7 +2182,7 @@ window.demarrerCiblage = async function(idCarte) {
     // maintenant ; s'il est après une attaque/altération, on le reporte après leur résolution
     // (voir declencherResolutionAvecBondEventuel plus bas). Dans tous les cas la carte reste
     // consommée, saut annulé ou pas.
-    const idLanceurBond = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
+    const idLanceurBond = (persoLanceur || {}).idPersonnage;
     const bondEnPremier = isBond && (indexPremierAutreEffet === -1 || indexBond < indexPremierAutreEffet);
     const bondApresLeReste = isBond && !bondEnPremier;
 
@@ -2172,6 +2193,7 @@ window.demarrerCiblage = async function(idCarte) {
     if (attaquesExtraites.length === 0 && alterationsExtraites.length === 0) {
         // Illusion seule sur la carte (ou dernière chose restante après le Bond) : elle se résout
         // ici, immédiatement, puisqu'il n'y a rien d'autre après elle.
+        if (extraireSeulement) return null;   // rien à frapper : pas de carte
         if (isIllusion) {
             await window.resoudreIllusionInteractif(idLanceurBond, porteeIllusion);
         }
@@ -2196,7 +2218,7 @@ window.demarrerCiblage = async function(idCarte) {
         zoneHexesBase = zoneHexesBase.map(h => ({ q: h.q - rq, r: h.r - rr }));
     }
 
-    const tkLanceur = window.TOKENS_VTT_DATA[window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage];
+    const tkLanceur = window.TOKENS_VTT_DATA[(persoLanceur || {}).idPersonnage] || { q: 0, r: 0 };
 
     // Traction impose sa propre portée (3, ligne de vue dégagée) à toute la carte, même si
     // l'attaque qui l'accompagne est en mêlée : comme les deux visent obligatoirement la même
@@ -2208,7 +2230,7 @@ window.demarrerCiblage = async function(idCarte) {
     // fait une altération classique. Voir jouerAnimationMoteur qui lit ce drapeau.
     const tractionAvantAttaque = !!tractionAlt && (indexPremiereAttaque === -1 || indexTraction < indexPremiereAttaque);
 
-    window.ETAT_CIBLAGE = {
+    const carteConstruite = {
         actif: true,
         idCarte: idCarte,
         attaques: attaquesExtraites,
@@ -2227,6 +2249,13 @@ window.demarrerCiblage = async function(idCarte) {
         persistanceTerrain: aPersistanceTerrain,
         zoneHexesFinaux: null
     };
+
+    // ICI, ET NULLE PART AILLEURS. La carte est lue, ses effets sont extraits,
+    // et rien n'a encore touché l'écran. C'est exactement ce que le cerveau
+    // demande : la carte, sans le ciblage.
+    if (extraireSeulement) return carteConstruite;
+
+    window.ETAT_CIBLAGE = carteConstruite;
 
     if (configSort) window.surlignerEffetCarteActif(configSort.nom);
 
