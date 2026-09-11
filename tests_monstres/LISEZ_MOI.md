@@ -62,6 +62,7 @@ node sequence_tour.mjs      # le journal d'événements : ordre, trous, rattrapa
 node etat_combat.mjs        # LE NOYAU PUR : dés à graine, état du combat, invariants (sans réseau)
 node moteur_pur.mjs         # la chaîne de dégâts, maillon par maillon (10 000 cartes au hasard)
 node cap_fatigue.mjs        # le CAP de fatigue d'une compétence, table de Nico + atout humain
+node gouttes_etat.mjs       # les gouttes de couleur sous un pion, un vrai token de la base, capture à l'appui
 node mouvement_pur.mjs      # chemin, coût des cases, attaques d'opportunité (1 000 trajets)
 node ia_pure.mjs            # qui viser, où se mettre : les cinq caractères, sans variable globale
 node cerveau_combat.mjs     # LE CERVEAU : intentions validées, un seul écrivain, un combat entier
@@ -1384,6 +1385,33 @@ le reste de la fatigue d'un personnage. Le banc le prouve en vérifiant l'écart
 Il charge le vrai bloc de `competences.js` par découpage de source (comme
 `cout_reel.mjs` le fait déjà pour le coût d'une carte), pas une réécriture de
 la table dans le banc.
+
+`gouttes_etat.mjs` couvre le repère demandé pour voir « d'un coup d'œil sur la
+map » qui subit quoi : un petit point de couleur en bas du pion, un par état
+actif, en arc de cercle s'il y en a plusieurs. Trois choix comptent, et le banc
+les vérifie chacun.
+
+Le CHOIX D'UN VRAI TOKEN, comme demandé : le pion est celui de Pliors, tiré de
+`persos_reels.json` (un vrai instantané de Firestore, comme les autres bancs
+qui s'en servent déjà) — sa vraie image Cloudinary, pas un carré gris. La
+COULEUR de chaque état (`window.COULEUR_ETAT`, `combat.js`) est une table
+fixe, une par état persistant du jeu (Étourdi, Poison, Brûlure, Gel…), avec un
+gris neutre pour tout ce qui n'y figure pas encore — un état sans couleur
+connue prend ce gris plutôt que de disparaître. Et le CALCUL DE POSITION
+(`construireIndicateursEtatsToken`) est vérifié sur ses coordonnées, pas
+seulement sur le nombre de points : un test qui ne compterait que "il y a bien
+trois points" laisserait passer trois points empilés au même endroit. Le banc
+lit les pourcentages posés en `left`/`top` et vérifie que trois états forment
+un arc bombé (celui du milieu plus bas que les deux côtés), pas une pile ni une
+ligne droite.
+
+⚠️ Une capture accompagne ce banc (`/tmp/gouttes_etat.png`), et sa légende
+mérite d'être lue avant de la regarder : la politique réseau de CETTE session
+bloque `res.cloudinary.com` (403 côté proxy agent), donc le vrai portrait de
+Pliors ne charge pas dans la capture — on n'y voit que l'ombre du pion sous les
+gouttes de couleur. Le mécanisme ne regarde jamais d'où vient l'image : sur un
+poste avec un accès réseau normal (le jeu, en vrai), le portrait s'affiche
+sous les mêmes gouttes, sans rien à changer.
 
 `apercu_butin.mjs` charge le vrai `style.css` et le vrai balisage
 d'`index.html`, remplit l'onglet Inventaire et les trois vues du butin avec les

@@ -2181,6 +2181,90 @@ window.caseOccupeeParVivant = function(q, r, tokensData) {
     return false;
 };
 
+// =========================================================================
+//  LES GOUTTES D'ÉTAT — VOIR D'UN COUP D'ŒIL QUI SUBIT QUOI
+// =========================================================================
+//  Nico l'a demandé en une phrase : « que d'un coup d'œil sur la map on
+//  puisse voir les altérations d'état sur les belligérants ». Pas un texte à
+//  lire, une couleur à reconnaître — un petit point discret en bas du pion,
+//  un par état actif, avec juste assez de dégradé et d'ombre pour ressembler
+//  à une goutte posée sur le médaillon plutôt qu'à un aplat plat.
+//
+//  Chaque état a SA couleur, choisie pour être reconnaissable sans hésiter :
+//  le feu est orange, le poison est vert, le gel est bleu clair, etc. Un état
+//  qui n'a pas encore la sienne (une nouveauté de la Forge) prend un gris
+//  neutre plutôt que de disparaître — mieux vaut un point terne que rien.
+window.COULEUR_ETAT = {
+    "Étourdi":        "#f9a825",   // ambre — les étoiles qui tournent
+    "Immobilisation": "#795548",   // brun — les racines qui retiennent
+    "Confusion":      "#ab47bc",   // violet — les idées mélangées
+    "Paralysie":      "#00897b",   // sarcelle — le corps qui ne répond plus
+    "Empoisonnement": "#66bb6a",   // vert — le poison classique
+    "Brûlé":          "#e64a19",   // orange-rouge — la flamme
+    "Glacé":          "#4fc3f7",   // bleu clair — la glace
+    "Électrifié":     "#fdd835",   // jaune vif — l'éclair
+    "Provocation":    "#c62828",   // rouge sombre — la rage qu'on impose
+    "Absorption":     "#1e88e5",   // bleu profond — le bouclier qui draine
+    "Étalement":      "#ad1457",   // bordeaux — la blessure qui continue de saigner
+    "Élan":           "#26a69a",   // turquoise — la vitesse gagnée
+    "Béni":           "#ffe082",   // or pâle — la bénédiction
+    "Repli":          "#78909c"    // gris bleuté — le pas de recul défensif
+};
+window.COULEUR_ETAT_DEFAUT = "#9e9e9e";
+
+//  PLUSIEURS ÉTATS, UN ARC DE CERCLE. Les empiler en colonne aurait vite
+//  débordé sous un petit pion ; les aligner le long du bord bas, si, tient
+//  toujours dans le même espace discret. L'arc s'élargit avec le nombre
+//  d'états, mais reste borné à 130° : au-delà, les points glisseraient sur
+//  les côtés du pion plutôt que de rester "en bas".
+window.construireIndicateursEtatsToken = function(etats, taille) {
+    // Un même état ne compte qu'une fois (il ne s'empile jamais sur la fiche
+    // non plus) : deux points identiques ne diraient rien de plus qu'un seul.
+    const noms = [...new Set((etats || []).map(e => e && e.nom).filter(Boolean))];
+    if (noms.length === 0) return [];
+
+    const n = noms.length;
+    const t = taille || 55;
+    const diametre = Math.max(6, Math.round(t * 0.16));
+    const rayonPct = 46;                          // juste sur le bord du médaillon
+    const etalement = Math.min(130, (n - 1) * 34); // écart total de l'arc, borné
+
+    return noms.map((nom, i) => {
+        // 90° = plein sud (le bas du pion, en coordonnées écran) ; l'arc se
+        // déploie symétriquement de part et d'autre.
+        const decalage = n === 1 ? 0 : -etalement / 2 + (etalement * i) / (n - 1);
+        const rad = ((90 + decalage) * Math.PI) / 180;
+        const x = 50 + rayonPct * Math.cos(rad);
+        const y = 50 + rayonPct * Math.sin(rad);
+
+        const couleur = window.COULEUR_ETAT[nom] || window.COULEUR_ETAT_DEFAUT;
+        const point = document.createElement("div");
+        point.className = "point-etat-token";
+        point.dataset.etat = nom;
+        point.title = nom;
+        point.style.position = "absolute";
+        point.style.left = x + "%";
+        point.style.top = y + "%";
+        point.style.width = diametre + "px";
+        point.style.height = diametre + "px";
+        point.style.borderRadius = "50%";
+        point.style.transform = "translate(-50%, -50%)";
+        point.style.zIndex = "4";
+        point.style.pointerEvents = "none";
+        // Le dégradé façon goutte : un reflet clair en haut-gauche (la lumière
+        // qui accroche), la teinte de l'état au centre, assombrie sur le
+        // pourtour — plus une ombre portée qui la détache du pion sans
+        // l'alourdir. C'est ce mélange, pas la couleur seule, qui donne
+        // l'impression d'une petite goutte posée là plutôt qu'un autocollant.
+        point.style.background =
+            "radial-gradient(circle at 35% 30%, rgba(255,255,255,0.85) 0%, "
+            + couleur + " 42%, " + couleur + " 75%, rgba(0,0,0,0.35) 100%)";
+        point.style.boxShadow = "0 1px 2px rgba(0,0,0,0.6)";
+        point.style.border = "0.5px solid rgba(0,0,0,0.35)";
+        return point;
+    });
+};
+
 window.appliquerTokensVTT = function(tokensMap) {
     if (!window.PLATEAU_VTT) return;
     
@@ -2390,6 +2474,14 @@ window.appliquerTokensVTT = function(tokensMap) {
             disque.appendChild(nomToken);
 
             divToken.appendChild(disque);
+
+            // 5️⃣ LES GOUTTES D'ÉTAT : un point par altération active, discret,
+            // en bas du médaillon.
+            if (pData.Etats_Alteres && pData.Etats_Alteres.length > 0) {
+                window.construireIndicateursEtatsToken(pData.Etats_Alteres, taille)
+                    .forEach(point => divToken.appendChild(point));
+            }
+
             window.positionnerTokenVTT(divToken, true);
             conteneur.appendChild(divToken);
             continue;
@@ -2414,6 +2506,13 @@ window.appliquerTokensVTT = function(tokensMap) {
         if (pData && pData.estIllusion) img.style.opacity = "0.4";
 
         divToken.appendChild(img);
+
+        // 5️⃣ LES GOUTTES D'ÉTAT : même repère, pour un héros comme pour un
+        // monstre — un problème se voit pareil des deux côtés du plateau.
+        if (pData && pData.Etats_Alteres && pData.Etats_Alteres.length > 0) {
+            window.construireIndicateursEtatsToken(pData.Etats_Alteres, taille)
+                .forEach(point => divToken.appendChild(point));
+        }
 
         window.positionnerTokenVTT(divToken, true);
         conteneur.appendChild(divToken);
