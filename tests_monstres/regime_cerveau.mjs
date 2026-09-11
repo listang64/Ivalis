@@ -201,7 +201,9 @@ function creerPoste(f, poste, options = {}) {
         poste,
         estAMoi: (id) => (HEROS_DE[poste] || []).includes(id),
         carteDe: (id, idCarte) => CARTES[idCarte] || null,
-        maintenant: () => 1000,
+        // Une montre par poste, et le banc peut l'avancer : c'est ce qui permet
+        // de faire vieillir un silence sans attendre trente secondes pour de vrai.
+        maintenant: options.maintenant || (() => 1000),
         // Le banc respecte les délais qu'on lui donne — c'est important pour le
         // rattrapage d'un trou, qui laisse au réseau 800 ms avant d'aller
         // chercher. Et il ne veut pas de battement de cœur : il n'y a personne
@@ -966,6 +968,91 @@ async function banc() {
         verifier("et la suite se joue chez lui aussi",
                  tard.regime.vue() === apres.version,
                  `(${tard.regime.vue()} / ${apres.version})`);
+    }
+
+    // =====================================================================
+    console.log("\n15. LE CERVEAU MEURT : LA TABLE REPREND LA MAIN");
+    // =====================================================================
+    //  Un seul navigateur écrit le combat. S'il ferme son onglet, part en veille
+    //  ou perd le réseau, tout s'arrête — et jusqu'ici rien ne le disait, ni ne
+    //  permettait d'en sortir. C'était le dernier endroit où une soirée pouvait
+    //  mourir sans un mot.
+    {
+        const f = firestoreDeBanc();
+        // Trois montres, qu'on avance à la main.
+        const montre = { P_01: 1000, P_03: 1000, P_07: 1000 };
+        const nico = creerPoste(f, "P_01", { maintenant: () => montre.P_01 });
+        const ben  = creerPoste(f, "P_03", { maintenant: () => montre.P_03 });
+        const ipad = creerPoste(f, "P_07", { maintenant: () => montre.P_07 });
+        [nico, ben, ipad].forEach(p => p.regime.rejoindre());
+        await f.livrer();
+
+        await nico.regime.ouvrir(SOURCE_CREATURE_DABORD);
+        await f.livrer();
+        verifier("le combat s'ouvre chez Nico", nico.regime.jeSuisLeCerveau());
+        verifier("et les autres le regardent",
+                 !ben.regime.jeSuisLeCerveau() && !ipad.regime.jeSuisLeCerveau());
+        verifier("personne ne crie au loup tout de suite",
+                 !ben.regime.cerveauSilencieux());
+
+        // LE POSTE DE NICO DISPARAÎT. Il ne bat plus, il n'écrit plus.
+        nico.regime.debrancher();
+
+        // Les montres des autres avancent : le battement, lui, ne bouge plus.
+        montre.P_03 += 40000;
+        montre.P_07 += 40000;
+        verifier("au bout de trente secondes, le silence se voit",
+                 ben.regime.cerveauSilencieux() && ipad.regime.cerveauSilencieux());
+
+        // DEUX POSTES CLIQUENT À LA MÊME SECONDE : UN SEUL PREND.
+        const [prisBen, prisIpad] = await Promise.all([
+            ben.regime.reprendreLaMain(),
+            ipad.regime.reprendreLaMain()
+        ]);
+        await f.livrer();
+        verifier("un seul poste reprend la main", (prisBen ? 1 : 0) + (prisIpad ? 1 : 0) === 1,
+                 `(Ben ${prisBen}, iPad ${prisIpad})`);
+
+        const etat = await f.ioPour("banc").lire(CHEMINS.etat(PARTIE));
+        verifier("l'état désigne bien le nouveau cerveau",
+                 etat.cerveau === (prisBen ? "P_03" : "P_07"), etat.cerveau);
+        const repreneur = prisBen ? ben : ipad;
+        const autre = prisBen ? ipad : ben;
+        verifier("et le repreneur le sait", repreneur.regime.jeSuisLeCerveau());
+        verifier("l'autre s'efface sans discuter", !autre.regime.jeSuisLeCerveau());
+
+        // ET LE COMBAT REPART. C'est tout l'intérêt : pas seulement un bouton,
+        // mais un combat qui continue là où il s'était tu.
+        //  La file attend le héros de Ben : il termine son tour, et c'est LE
+        //  NOUVEAU CERVEAU qui publie — la preuve que le combat continue.
+        const avant = etat.version;
+        [ben, ipad].forEach(p => p.regime.ok());
+        await f.livrer();
+        await ben.regime.demanderFinDeTour("H1");
+        await f.livrer();
+        await repreneur.regime.tourner();
+        await f.livrer();
+        const apres = await f.ioPour("banc").lire(CHEMINS.etat(PARTIE));
+        verifier("le combat repart sous la nouvelle main", apres.version > avant,
+                 `(${avant} → ${apres.version})`);
+        verifier("et c'est bien le repreneur qui a écrit",
+                 apres.cerveau === (prisBen ? "P_03" : "P_07"), apres.cerveau);
+
+        // LE CERVEAU REVENU GARDE SA PLACE. Un wifi qui hoquette ne doit pas
+        // faire changer de cerveau : tant que le battement bouge, personne ne
+        // reprend rien.
+        const vivant = firestoreDeBanc();
+        const a = creerPoste(vivant, "P_01", { maintenant: () => 1000 });
+        const b = creerPoste(vivant, "P_03", { maintenant: () => 1000 });
+        [a, b].forEach(p => p.regime.rejoindre());
+        await vivant.livrer();
+        await a.regime.ouvrir(SOURCE_CREATURE_DABORD);
+        await vivant.livrer();
+        const refus = await b.regime.reprendreLaMain();
+        await vivant.livrer();
+        verifier("on ne prend pas la main d'un cerveau vivant", refus === false);
+        verifier("qui reste donc le cerveau", a.regime.jeSuisLeCerveau());
+        verifier("et l'autre reste spectateur", !b.regime.jeSuisLeCerveau());
     }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

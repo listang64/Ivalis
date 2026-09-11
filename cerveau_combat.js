@@ -68,6 +68,35 @@ export function cerveauPerdu(etat, maintenant) {
     return (nombre(maintenant) - nombre(etat.battement)) > CERVEAU_PERDU_MS;
 }
 
+// LE SILENCE, PLUTÔT QUE L'HEURE.
+//
+// `cerveauPerdu` compare le battement de l'état à une heure qu'on lui passe —
+// et c'est très exactement le piège : ce battement est écrit par l'horloge du
+// poste qui tient le cerveau, et relu par celle d'un AUTRE appareil. Deux
+// montres qui décalent de trente secondes, et un cerveau en pleine forme paraît
+// mort (ou l'inverse). Personne ne règle sa tablette à la seconde près.
+//
+// On ne regarde donc pas L'HEURE du battement : on regarde s'il CHANGE. Le
+// cerveau réécrit ce champ toutes les cinq secondes, ce qui provoque une
+// notification ; tant qu'elles arrivent, il est vivant. Le décompte se fait
+// alors entièrement sur MA montre, et aucune comparaison entre appareils n'a
+// plus lieu.
+//
+// Ces deux fonctions sont pures : le suivi entre, un suivi sort.
+
+export function suivreBattement(suivi, etat, maintenant) {
+    const valeur = nombre(etat && etat.battement);
+    // Un battement inchangé garde la date du premier où on l'a vu : c'est elle
+    // qui mesure le silence.
+    if (suivi && suivi.valeur === valeur) return suivi;
+    return { valeur, vuA: nombre(maintenant) };
+}
+
+export function cerveauSilencieux(suivi, maintenant) {
+    if (!suivi || !suivi.vuA) return false;      // on n'a encore rien vu : on n'accuse pas
+    return (nombre(maintenant) - nombre(suivi.vuA)) > CERVEAU_PERDU_MS;
+}
+
 // =========================================================================
 //  2. LES INTENTIONS, ET CE QUI LES REND RECEVABLES
 // =========================================================================
@@ -729,6 +758,7 @@ export function creerCerveau(depot, contexte) {
 if (typeof window !== "undefined") {
     window.cerveauCombat = {
         BATTEMENT_MS, CERVEAU_PERDU_MS, estLeCerveau, cerveauPerdu,
+        suivreBattement, cerveauSilencieux,
         validerIntention, appliquerIntention, avancerFile, ouvrirManche, jouerCreature,
         prochainPas, creerCerveau
     };

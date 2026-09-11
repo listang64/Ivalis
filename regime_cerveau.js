@@ -31,7 +31,8 @@
 // =========================================================================
 
 import { construireEtatCombat, verifierEtatCombat, creerDes, FORMAT_ETAT } from './combat_etat.js';
-import { creerCerveau, estLeCerveau, cerveauPerdu, ouvrirManche, BATTEMENT_MS } from './cerveau_combat.js';
+import { creerCerveau, estLeCerveau, cerveauPerdu, suivreBattement, cerveauSilencieux,
+         ouvrirManche, BATTEMENT_MS } from './cerveau_combat.js';
 import { creerSpectateur } from './spectateur_combat.js';
 import { creerPont, creerProjection } from './pont_combat.js';
 import {
@@ -83,7 +84,10 @@ export function creerRegime(contexte) {
         minuteurBattement: null,
         enTrainDeTourner: false,
         branche: false,
-        ouvertureAilleurs: false
+        ouvertureAilleurs: false,
+        // Ce qu'on sait du battement du cerveau : sa dernière valeur, et
+        // l'heure — la NÔTRE — à laquelle on l'a vue changer.
+        suivi: null
     };
 
     // Le spectateur : il anime par le pont, et projette par l'écran. Il ne sait
@@ -137,9 +141,56 @@ export function creerRegime(contexte) {
         }
     }
 
+    // =====================================================================
+    //  REPRENDRE LA MAIN
+    // =====================================================================
+    //  Le cerveau d'un combat vit dans UN navigateur. Si celui-là ferme son
+    //  onglet, part en veille ou perd le réseau, la table entière s'arrête : plus
+    //  personne n'écrit, et rien ne le dit. C'était le dernier point où une
+    //  soirée pouvait mourir sans un mot.
+    //
+    //  La reprise est volontaire — un bouton, jamais une élection automatique :
+    //  un wifi qui hoquette ne doit pas faire changer de cerveau en plein tour.
+    //  Mais la PRISE, elle, est atomique : trois postes peuvent cliquer à la même
+    //  seconde, Firestore n'en laisse passer qu'un.
+    async function reprendreLaMain() {
+        if (!moi.etat) return false;
+        if (estLeCerveau(moi.etat, poste)) return true;
+
+        // ON NE PREND PAS LA MAIN D'UN CERVEAU VIVANT, et cette garde est ICI,
+        // pas chez l'appelant. Un bouton peut être cliqué par erreur, une
+        // interface peut se tromper ; la règle, elle, ne doit dépendre de
+        // personne. Sans cette ligne, n'importe quel clic volait le cerveau en
+        // plein tour — le banc l'a pris la main dans le sac.
+        if (!cerveauSilencieux(moi.suivi, maintenant())) {
+            tracer("🤝", "la main n'a pas été reprise", "(le cerveau répond toujours)");
+            return false;
+        }
+
+        const combatVise = moi.etat.combat;
+        const pris = await depot.reprendre((actuel) => {
+            if (!actuel) return null;
+            // Un état qui parle d'un autre combat : ce n'est pas celui qu'on
+            // regarde, on n'y touche pas.
+            if (actuel.combat !== combatVise) return null;
+            if (estLeCerveau(actuel, poste)) return null;          // déjà à nous
+            // Le battement a-t-il repris entre-temps ? On relit la valeur : si
+            // elle a bougé depuis celle qu'on tient, le cerveau est revenu.
+            if (nombre(actuel.battement) !== nombre(moi.suivi && moi.suivi.valeur)) return null;
+            return { ...actuel, cerveau: poste, battement: maintenant() };
+        });
+
+        if (pris) {
+            tracer("🧠", "ce poste REPREND la main", "(l'ancien cerveau ne répondait plus)");
+        } else {
+            tracer("🤝", "la main n'a pas été reprise", "(un autre poste l'a prise, ou le cerveau est revenu)");
+        }
+        return pris;
+    }
+
     // Le battement de cœur. Il ne sert qu'à une chose : permettre aux autres
-    // postes de constater que ce cerveau est vivant. Personne ne s'en sert
-    // encore pour reprendre la main — ça, c'est l'étape suivante.
+    // postes de constater que ce cerveau est vivant — et, s'il se tait trop
+    // longtemps, de proposer à la table de reprendre la main.
     function battre() {
         // Un battement nul, c'est « pas de battement » : les bancs n'en veulent
         // pas, et un minuteur qui se replanifie lui-même sans jamais attendre
@@ -240,6 +291,11 @@ export function creerRegime(contexte) {
                 // est finie et rend la main aux joueurs — sans quoi il faudrait
                 // attendre qu'un tiers touche le document de la partie, ce que
                 // plus personne ne fait une fois le combat ouvert.
+                // LE BATTEMENT, SUIVI SUR NOTRE PROPRE MONTRE. Chaque état qui
+                // arrive porte le battement du cerveau ; tant qu'il change, il
+                // est vivant. On ne compare jamais deux horloges d'appareils.
+                moi.suivi = suivreBattement(moi.suivi, etat, maintenant());
+
                 try { surPublication(etat); } catch (e) { tracer("❌", "surPublication", String(e && e.message)); }
 
                 // On ne rejoue pas les trois cents entrées d'un combat qu'on
@@ -407,6 +463,7 @@ export function creerRegime(contexte) {
 
     return {
         ouvrir, rejoindre, fermer, brancher, debrancher, tourner, ok, ouvrirLaManche, reprojeter,
+        reprendreLaMain,
         demander, demanderMouvement, demanderCarte, demanderFinDeTour,
         // De quoi regarder l'intérieur, pour la trace et les bancs.
         spectateur,
@@ -415,7 +472,10 @@ export function creerRegime(contexte) {
         vue: () => spectateur.vue(),
         jeSuisLeCerveau: () => !!moi.cerveau,
         ouvertureAilleurs: () => moi.ouvertureAilleurs,
-        cerveauPerdu: () => cerveauPerdu(moi.etat, maintenant())
+        cerveauPerdu: () => cerveauPerdu(moi.etat, maintenant()),
+        // La vraie question, celle qui ne compare pas deux montres : depuis
+        // combien de temps ce poste n'a-t-il plus vu le battement changer ?
+        cerveauSilencieux: () => cerveauSilencieux(moi.suivi, maintenant())
     };
 }
 
@@ -904,6 +964,7 @@ if (typeof window !== "undefined") {
         // 1. On a changé de partie : on repart de zéro.
         if (partieSuivie && partieSuivie !== window.ID_PARTIE_COURANTE) {
             if (REGIME) REGIME.debrancher();
+            fermerLeGuet();
             REGIME = null;
             partieSuivie = null;
             phasePrecedente = null;
@@ -921,6 +982,7 @@ if (typeof window !== "undefined") {
             REGIME = creerRegime(contexteDuJeu());
             partieSuivie = window.ID_PARTIE_COURANTE;
             REGIME.rejoindre();
+            ouvrirLeGuet();
         }
 
         // 3. LA PHASE PASSE EN RÉSOLUTION. C'est le moment décisif : le combat
@@ -1083,6 +1145,68 @@ if (typeof window !== "undefined") {
         });
     }
 
+    // =====================================================================
+    //  LE CERVEAU NE RÉPOND PLUS : ON LE DIT, ET ON PROPOSE
+    // =====================================================================
+    //  Personne ne reprend la main tout seul : ce serait une élection, et c'est
+    //  précisément ce que cette architecture a supprimé. On montre une bannière,
+    //  un joueur clique, et Firestore tranche.
+    //
+    //  ⚠️ Ce guet a besoin de SON PROPRE minuteur. Quand le cerveau meurt, plus
+    //  rien ne bouge : ni l'état, ni le journal, ni le document de la partie. Il
+    //  n'arrive donc AUCUNE notification pour réveiller quoi que ce soit — c'est
+    //  le silence lui-même qu'il faut mesurer.
+    let guetCerveau = null;
+    let banniereLevee = false;
+
+    function surveillerLeCerveau() {
+        if (typeof document === "undefined") return;
+        const banniere = document.getElementById("banniere-cerveau-perdu");
+        if (!banniere) return;
+
+        const enCombat = document.getElementById("fenetre-combat")
+                      && document.getElementById("fenetre-combat").style.display === "block";
+        const silence = !!REGIME && enCombat && !!REGIME.etatAffiche()
+                     && !REGIME.jeSuisLeCerveau() && REGIME.cerveauSilencieux();
+
+        if (silence === banniereLevee) return;
+        banniereLevee = silence;
+        banniere.style.display = silence ? "flex" : "none";
+        if (typeof window.tracerCombat === "function") {
+            window.tracerCombat(silence ? "💔" : "💚",
+                                silence ? "le cerveau ne répond plus" : "le cerveau est revenu",
+                                silence ? "la table peut reprendre la main" : "");
+        }
+    }
+
+    function ouvrirLeGuet() {
+        if (guetCerveau) return;
+        guetCerveau = setInterval(surveillerLeCerveau, 5000);
+    }
+    function fermerLeGuet() {
+        if (guetCerveau) clearInterval(guetCerveau);
+        guetCerveau = null;
+        banniereLevee = false;
+        const banniere = typeof document !== "undefined"
+            && document.getElementById("banniere-cerveau-perdu");
+        if (banniere) banniere.style.display = "none";
+    }
+
+    // Le bouton de la bannière.
+    window.reprendreLeCerveau = async function() {
+        if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+        if (!REGIME) return false;
+        const pris = await REGIME.reprendreLaMain();
+        if (pris) {
+            banniereLevee = false;
+            const banniere = document.getElementById("banniere-cerveau-perdu");
+            if (banniere) banniere.style.display = "none";
+            // On enchaîne tout de suite : le combat reprend là où il s'était tu.
+            REGIME.tourner();
+        }
+        return pris;
+    };
+
     // ON S'ARRÊTE, ET ON LE DIT — À L'ÉCRAN, PAS SEULEMENT DANS LA CONSOLE.
     //
     // Un plateau qui ne bouge plus sans explication, on connaît : ça coûte une
@@ -1126,6 +1250,7 @@ if (typeof window !== "undefined") {
             return;
         }
         await REGIME.fermer();
+        fermerLeGuet();
         REGIME = null;
         partieSuivie = null;
         phasePrecedente = null;

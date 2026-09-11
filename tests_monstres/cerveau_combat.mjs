@@ -10,7 +10,8 @@
 // bougé, et l'intention est reprise.
 import {
     estLeCerveau, cerveauPerdu, validerIntention, appliquerIntention,
-    avancerFile, jouerCreature, prochainPas, creerCerveau, cloturerTour, CERVEAU_PERDU_MS
+    avancerFile, jouerCreature, prochainPas, creerCerveau, cloturerTour, CERVEAU_PERDU_MS,
+    suivreBattement, cerveauSilencieux
 } from '../cerveau_combat.js';
 import { construireEtatCombat, creerDes, verifierEtatCombat, clonerEtat } from '../combat_etat.js';
 import { distance } from '../mouvement_pur.js';
@@ -708,6 +709,53 @@ console.log("\nUN TOUR QUI NE FRAPPE RIEN COMPTE QUAND MÊME");
         attaques: [], alterations: [], coutFatigue: 120
     });
     verifier("une carte sans cible mais trop chère est refusée", trop.ok === false, trop.raison);
+}
+
+console.log("\nLE SILENCE DU CERVEAU SE MESURE SUR SA PROPRE MONTRE");
+// =========================================================================
+//  Un seul navigateur écrit le combat. S'il ferme son onglet, part en veille ou
+//  perd le réseau, la table entière s'arrête — et rien ne le disait.
+//
+//  LE PIÈGE ÉTAIT DE REGARDER L'HEURE. Le battement est écrit par l'horloge du
+//  poste qui tient le cerveau, et relu par celle d'un AUTRE appareil : deux
+//  montres décalées de trente secondes, et un cerveau en pleine forme paraît
+//  mort. Personne ne règle sa tablette à la seconde près.
+//
+//  On ne regarde donc pas l'heure du battement : on regarde s'il CHANGE.
+{
+    const t = (ms) => ms;   // notre montre, et elle seule
+
+    // Premier battement vu : on note l'heure — la nôtre.
+    let suivi = suivreBattement(null, { battement: 1000 }, t(50000));
+    verifier("le premier battement est daté sur notre montre", suivi.vuA === 50000,
+             String(suivi.vuA));
+    verifier("et on n'accuse personne tout de suite", cerveauSilencieux(suivi, t(50000)) === false);
+
+    // Le même battement, vu et revu : la date du PREMIER ne bouge pas — c'est
+    // elle qui mesure le silence.
+    suivi = suivreBattement(suivi, { battement: 1000 }, t(60000));
+    verifier("un battement inchangé garde sa date", suivi.vuA === 50000, String(suivi.vuA));
+    verifier("vingt secondes de silence ne suffisent pas",
+             cerveauSilencieux(suivi, t(70000)) === false);
+    verifier("trente et une, oui", cerveauSilencieux(suivi, t(81000)) === true);
+
+    // Le cerveau reparle : le compteur repart de zéro.
+    suivi = suivreBattement(suivi, { battement: 2000 }, t(82000));
+    verifier("un battement qui change remet le compteur à zéro", suivi.vuA === 82000);
+    verifier("et le cerveau n'est plus silencieux", cerveauSilencieux(suivi, t(90000)) === false);
+
+    // ET L'HORLOGE DE L'AUTRE APPAREIL N'ENTRE JAMAIS EN JEU. Un battement
+    // délirant — une montre en avance d'une heure — ne change rien : seul
+    // compte le fait qu'il BOUGE.
+    let decale = suivreBattement(null, { battement: 9999999999 }, t(100000));
+    verifier("une horloge délirante ne déclenche rien",
+             cerveauSilencieux(decale, t(110000)) === false);
+    decale = suivreBattement(decale, { battement: 9999999999 }, t(140000));
+    verifier("seul le silence compte, pas l'heure écrite",
+             cerveauSilencieux(decale, t(140000)) === true);
+
+    // Sans rien avoir vu, on n'accuse pas.
+    verifier("sans aucun battement vu, aucun verdict", cerveauSilencieux(null, t(999999)) === false);
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

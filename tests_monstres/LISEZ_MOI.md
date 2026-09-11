@@ -1076,6 +1076,40 @@ quand c'est au tour d'un de MES héros, le régime regarde si le bouton
 `🧊 à moi de jouer mais RIEN À CLIQUER`, avec la raison (carte absente, bouton
 absent, fenêtre sombre encore levée).
 
+### Le cerveau peut mourir, et la table doit pouvoir reprendre
+
+Un seul navigateur écrit le combat. S'il ferme son onglet, part en veille ou perd
+le réseau, la table entière s'arrête — et jusqu'ici rien ne le disait, ni ne
+permettait d'en sortir. C'était le dernier endroit où une soirée pouvait mourir
+sans un mot.
+
+**Le piège était de regarder l'heure.** Le battement de cœur est écrit par
+l'horloge du poste qui tient le cerveau, et relu par celle d'un AUTRE appareil :
+deux montres décalées de trente secondes, et un cerveau en pleine forme paraît
+mort. Personne ne règle sa tablette à la seconde près. On ne regarde donc pas
+l'heure du battement, **on regarde s'il CHANGE** — le décompte se fait alors
+entièrement sur sa propre montre, et aucune comparaison entre appareils n'a plus
+lieu (`suivreBattement` / `cerveauSilencieux`, purs et benchés sous horloge
+délirante).
+
+**La reprise est volontaire** : une bannière, un bouton, jamais une élection
+automatique — un wifi qui hoquette ne doit pas faire changer de cerveau en plein
+tour. Mais **la prise est atomique**, par la même mécanique que l'ouverture d'un
+combat : une transaction sur le document d'état lui-même. Trois postes peuvent
+cliquer à la même seconde, Firestore n'en laisse passer qu'un ; il n'y a ni
+élection, ni négociation, ni verrou à côté.
+
+⚠️ Le guet a besoin de **son propre minuteur**. Quand le cerveau meurt, plus rien
+ne bouge : ni l'état, ni le journal, ni le document de la partie. Il n'arrive
+donc aucune notification pour réveiller quoi que ce soit — c'est le silence
+lui-même qu'il faut mesurer.
+
+Le chapitre 15 de `regime_cerveau.mjs` tue le cerveau pour de bon, fait vieillir
+les montres des deux autres, les fait cliquer à la même seconde, vérifie qu'un
+seul prend — **et que le combat repart sous la nouvelle main**. Il vérifie aussi
+qu'on ne vole jamais la main d'un cerveau vivant : c'est ce banc qui a attrapé ce
+trou, la garde manquait.
+
 ### Les tics de fin de manche
 
 Ils vivaient tous dans l'ancien `finDeTourCombat`, un chemin que le nouveau

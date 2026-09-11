@@ -611,5 +611,51 @@ console.log("\n14. PLUS UNE SEULE PANNE MUETTE");
              && r.includes("la fenêtre sombre est encore levée"));
 }
 
+// =========================================================================
+console.log("\n15. LE CERVEAU PEUT MOURIR, ET LA TABLE DOIT POUVOIR REPRENDRE");
+// =========================================================================
+{
+    const r = SOURCES['regime_cerveau.js'];
+    const cerveau = lire('cerveau_combat.js');
+    const html = SOURCES['index.html'];
+
+    // LE GUET A SON PROPRE MINUTEUR, et c'est indispensable : quand le cerveau
+    // meurt, plus rien ne bouge — ni l'état, ni le journal, ni la partie. Aucune
+    // notification ne vient réveiller quoi que ce soit. C'est le SILENCE qu'il
+    // faut mesurer, donc il faut battre soi-même.
+    verifier("le guet a son propre minuteur", r.includes("setInterval(surveillerLeCerveau"));
+    verifier("il s'ouvre quand on suit une partie", r.includes("ouvrirLeGuet();"));
+    verifier("et se referme quand on la lâche", r.includes("fermerLeGuet();"));
+
+    // LE SILENCE SE MESURE SUR SA PROPRE MONTRE, jamais en comparant deux
+    // horloges d'appareils : personne ne règle sa tablette à la seconde près.
+    verifier("le silence se mesure sans comparer deux horloges",
+             cerveau.includes("export function suivreBattement")
+             && cerveau.includes("export function cerveauSilencieux"));
+    verifier("et le régime suit le battement à chaque état reçu",
+             r.includes("moi.suivi = suivreBattement(moi.suivi, etat, maintenant());"));
+
+    // LA REPRISE EST VOLONTAIRE — un bouton, jamais une élection automatique :
+    // un wifi qui hoquette ne doit pas faire changer de cerveau en plein tour.
+    verifier("la bannière existe dans la page", html.includes('id="banniere-cerveau-perdu"'));
+    verifier("et elle porte le bouton", html.includes("window.reprendreLeCerveau()"));
+    verifier("elle est au niveau du combat, pas dans le voile",
+             html.indexOf('id="banniere-cerveau-perdu"') < html.indexOf('id="voile-tour-combat"'));
+
+    // MAIS LA PRISE EST ATOMIQUE : trois postes peuvent cliquer à la même
+    // seconde, Firestore n'en laisse passer qu'un. Même mécanique que
+    // l'ouverture — ni élection, ni verrou à côté.
+    verifier("la reprise passe par une transaction sur l'état",
+             lire('depot_firestore.js').includes("async function reprendre(decider)"));
+    verifier("et on ne prend jamais la main d'un cerveau vivant",
+             r.includes("if (!cerveauSilencieux(moi.suivi, maintenant())) {"));
+    verifier("ni celle d'un autre combat",
+             r.includes("if (actuel.combat !== combatVise) return null;"));
+    verifier("ni si le battement a repris entre le clic et la transaction",
+             r.includes("nombre(actuel.battement) !== nombre(moi.suivi && moi.suivi.valeur)"));
+    verifier("et le combat repart tout de suite après la prise",
+             r.includes("REGIME.tourner();"));
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

@@ -151,7 +151,21 @@ export function creerDepot(io, idPartie, options) {
                         data: { battement: nombre(quand) } }]);
     }
 
-    return { lireEtat, lireIntentions, publier, refuser, battre };
+    // REPRENDRE LA MAIN, ET UN SEUL PEUT LA PRENDRE.
+    //
+    // C'est la même mécanique que la réclamation d'ouverture, et pour la même
+    // raison : trois postes peuvent constater le silence du cerveau à la même
+    // seconde. Firestore tranche, une fois, sur le document d'état lui-même —
+    // il n'y a donc ni élection, ni négociation, ni verrou à côté.
+    //
+    // `decider` reçoit l'état tel qu'il est VRAIMENT en base et rend l'état à
+    // écrire, ou null pour renoncer. On rend true si on a écrit.
+    async function reprendre(decider) {
+        if (typeof io.transaction !== "function") return false;
+        return await io.transaction(CHEMINS.etat(idPartie), decider);
+    }
+
+    return { lireEtat, lireIntentions, publier, refuser, battre, reprendre };
 }
 
 // =========================================================================
