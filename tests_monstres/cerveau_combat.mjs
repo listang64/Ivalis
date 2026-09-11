@@ -11,7 +11,7 @@
 import {
     estLeCerveau, cerveauPerdu, validerIntention, appliquerIntention,
     avancerFile, jouerCreature, prochainPas, creerCerveau, cloturerTour, CERVEAU_PERDU_MS,
-    suivreBattement, cerveauSilencieux
+    suivreBattement, cerveauSilencieux, regenererPvFinDeManche
 } from '../cerveau_combat.js';
 import { construireEtatCombat, creerDes, verifierEtatCombat, clonerEtat } from '../combat_etat.js';
 import { distance } from '../mouvement_pur.js';
@@ -756,6 +756,60 @@ console.log("\nLE SILENCE DU CERVEAU SE MESURE SUR SA PROPRE MONTRE");
 
     // Sans rien avoir vu, on n'accuse pas.
     verifier("sans aucun battement vu, aucun verdict", cerveauSilencieux(null, t(999999)) === false);
+}
+
+// =========================================================================
+console.log("\nL'ATOUT DE L'OPHIOR : DES PV REPRIS À CHAQUE FIN DE MANCHE");
+// =========================================================================
+//  Même geste que la fatigue de tout le monde (regenererFinDeManche), mais sur
+//  l'autre jauge, et seulement pour qui porte cet atout.
+{
+    // En isolation d'abord : la fonction pure, seule.
+    let etat = monde();
+    etat.combattants.H1.pv = 40;
+    etat.combattants.H1.atouts = { ...(etat.combattants.H1.atouts || {}), regenPv: 3 };
+    etat.combattants.H2.pv = 45;   // pas d'atout : ne doit pas bouger
+
+    const etapes = regenererPvFinDeManche(etat);
+    verifier("l'Ophior reprend ses 3 PV", etat.combattants.H1.pv === 43,
+             `(${etat.combattants.H1.pv})`);
+    verifier("un héros sans cet atout ne gagne rien", etat.combattants.H2.pv === 45);
+    const etapeH1 = etapes.find(e => e.cible === "H1");
+    verifier("l'étape publiée est un SOIN, celui que chaque écran sait déjà jouer",
+             !!etapeH1 && etapeH1.type === "soin" && etapeH1.montant === 3 && etapeH1.pvApres === 43,
+             JSON.stringify(etapeH1));
+    verifier("un héros sans gain ne publie aucune étape", !etapes.some(e => e.cible === "H2"));
+
+    // Le plafond tient : personne ne dépasse son maximum.
+    let plein = monde();
+    plein.combattants.H1.pv = plein.combattants.H1.pvMax - 1;
+    plein.combattants.H1.atouts = { ...(plein.combattants.H1.atouts || {}), regenPv: 3 };
+    regenererPvFinDeManche(plein);
+    verifier("le soin de race ne dépasse jamais le maximum",
+             plein.combattants.H1.pv === plein.combattants.H1.pvMax,
+             `(${plein.combattants.H1.pv}/${plein.combattants.H1.pvMax})`);
+
+    // Un combattant à terre ne se relève pas tout seul.
+    let terre = monde();
+    terre.combattants.H1.pv = 0;
+    terre.combattants.H1.aTerre = true;
+    terre.combattants.H1.atouts = { ...(terre.combattants.H1.atouts || {}), regenPv: 3 };
+    regenererPvFinDeManche(terre);
+    verifier("un combattant à terre ne profite pas du soin de race",
+             terre.combattants.H1.pv === 0);
+
+    // ET LE VRAI CHEMIN : à travers cloturerTour, à la fermeture de la manche.
+    let vrai = monde();
+    vrai.combattants.H1.pv = 50;
+    vrai.combattants.H1.atouts = { ...(vrai.combattants.H1.atouts || {}), regenPv: 3 };
+    vrai.file = [{ id: "H1", carte: null, initiative: 50 }];   // dernier de la manche
+    const r = cloturerTour(vrai);
+    verifier("cloturerTour ferme bien la manche", vrai.manche === 2, `(manche ${vrai.manche})`);
+    verifier("et l'Ophior a repris ses PV au passage", vrai.combattants.H1.pv === 53,
+             `(${vrai.combattants.H1.pv})`);
+    verifier("l'étape de soin est bien dans le lot publié",
+             r.etapes.some(e => e.type === "soin" && e.cible === "H1" && e.regeneration === true),
+             JSON.stringify(r.etapes.map(e => e.type)));
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

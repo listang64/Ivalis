@@ -506,5 +506,58 @@ console.log("\nLE PALIER D'UNE CRÉATURE VOYAGE DANS L'ÉTAT");
     verifier("un héros, lui, n'a pas de palier", etatHeros.combattants.H1.palier === "");
 }
 
+// =========================================================================
+console.log("\nLES IMMUNITÉS ET LE SOIN DE RACE VOYAGENT AUSSI");
+// =========================================================================
+//  Même chemin que le palier : sans eux, le noyau ne saurait ni qu'un Ankylar
+//  résiste à l'Étourdi (bonusMonstreDe voisine, moteur_pur.js), ni qu'un
+//  Ophior reprend des points de vie en fin de manche (regenererPvFinDeManche,
+//  cerveau_combat.js). On injecte ici la VRAIE table (ATOUTS_RACES, app.js),
+//  pas une copie : c'est elle qui doit rester la seule source.
+{
+    const ATOUTS = {
+        Ankylar: { defPhysique: 8, immunites: ["Étourdi"] },
+        Ophior: { defMagique: 8, regenPv: 3 }
+    };
+    const reglesDuJeu = { atouts: (p) => ATOUTS[p.race] || {} };
+
+    const anky = {
+        idPersonnage: "H1", race: "Ankylar", idJoueur: "P_01", camp: "Allié",
+        PV_Max: 60, PV_Actuels: 60, Fatigue_Max: 100,
+        Esquive: 0, Parade: 0, Etats_Alteres: [], statut: "Vivant"
+    };
+    const ophior = {
+        idPersonnage: "H2", race: "Ophior", idJoueur: "P_03", camp: "Allié",
+        PV_Max: 60, PV_Actuels: 60, Fatigue_Max: 100,
+        Esquive: 0, Parade: 0, Etats_Alteres: [], statut: "Vivant"
+    };
+    const etat = construireEtatCombat({
+        idPartie: "G", cerveau: "P_03", graine: 1, combattants: [anky, ophior],
+        positions: { H1: { q: 0, r: 0 }, H2: { q: 1, r: 0 } },
+        partie: { Phase_Combat: "Resolution", Ordre_Initiative: ["H1", "H2"],
+                  File_Attente_Combat: [{ idPersonnage: "H1" }, { idPersonnage: "H2" }] },
+        regles: reglesDuJeu
+    });
+    verifier("l'immunité de l'Ankylar atterrit dans ses atouts",
+             etat.combattants.H1.atouts.immunites.includes("Étourdi"),
+             JSON.stringify(etat.combattants.H1.atouts.immunites));
+    verifier("l'Ophior, lui, n'a aucune immunité", etat.combattants.H2.atouts.immunites.length === 0);
+    verifier("le soin de race de l'Ophior atterrit dans ses atouts",
+             etat.combattants.H2.atouts.regenPv === 3, `(${etat.combattants.H2.atouts.regenPv})`);
+    verifier("l'Ankylar, lui, n'a pas ce soin", etat.combattants.H1.atouts.regenPv === 0);
+
+    // Sans formules injectées (le cas d'un banc qui n'en a pas besoin), on
+    // retombe sur des listes et des nombres vides — jamais sur un plantage.
+    const sansRegles = construireEtatCombat({
+        idPartie: "G", cerveau: "P_03", graine: 1, combattants: [anky],
+        positions: { H1: { q: 0, r: 0 } },
+        partie: { Phase_Combat: "Resolution", Ordre_Initiative: ["H1"],
+                  File_Attente_Combat: [{ idPersonnage: "H1" }] }
+    });
+    verifier("sans formules du jeu, aucune immunité ne s'invente",
+             Array.isArray(sansRegles.combattants.H1.atouts.immunites)
+             && sansRegles.combattants.H1.atouts.immunites.length === 0);
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

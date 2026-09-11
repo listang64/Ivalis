@@ -556,5 +556,66 @@ console.log("\n15. UN BOUCLIER LANCÉ RESTE UN BOUCLIER — MÊME MARQUÉ « isH
              JSON.stringify(r.etapes.map(e => e.type)));
 }
 
+// =========================================================================
+console.log("\n16. UNE IMMUNITÉ DE PEUPLE PASSE AVANT LES DÉS");
+// =========================================================================
+//  L'Ankylar est immunisé à l'Étourdi. Le die est pourtant tiré pareil pour
+//  tout le monde (tirerDesCarte, à graine égale) : c'est l'APPLICATION qui
+//  doit refuser l'état, jamais le tirage — sans quoi deux cibles différentes
+//  consommeraient un nombre différent de dés, et le rejeu diverger.
+{
+    let etat = neuf();
+    etat.combattants.H1.atouts = { ...(etat.combattants.H1.atouts || {}), immunites: ["Étourdi"] };
+
+    const alterer = (etatDepart, idCible, chance = 100) => resoudreCarte(etatDepart, {
+        type: "carte", idLanceur: "M1", idCarte: "CE",
+        attaques: [], alterations: [{ nom: "Étourdi", chance, duree: 2, cibles: [idCible] }],
+        jets: { parCible: { [idCible]: { esquive: false, etats: { "Étourdi": true } } } }
+    });
+
+    const surImmunise = alterer(etat, "H1");
+    verifier("l'Ankylar n'attrape pas l'Étourdi, même à 100 % de chance",
+             !surImmunise.etat.combattants.H1.etats.some(e => e.nom === "Étourdi"),
+             JSON.stringify(surImmunise.etat.combattants.H1.etats));
+    const etapeImmun = surImmunise.etapes.find(e => e.type === "etatRate" && e.cible === "H1");
+    verifier("l'étape le dit, et dit que c'est une immunité",
+             !!etapeImmun && etapeImmun.immunise === true, JSON.stringify(etapeImmun));
+
+    // Sur une cible ordinaire, la même carte, le même jet : l'état se pose.
+    const surH2 = alterer(etat, "H2");
+    verifier("mais un autre héros, sans cet atout, l'attrape normalement",
+             surH2.etat.combattants.H2.etats.some(e => e.nom === "Étourdi"),
+             JSON.stringify(surH2.etat.combattants.H2.etats));
+}
+
+// =========================================================================
+console.log("\n17. LA TRICHE DES CRÉATURES ET L'IMMUNITÉ VIVENT CHACUNE LEUR VIE");
+// =========================================================================
+//  Deux réglages posés le même jour, sur deux combattants différents : rien
+//  ne doit se mélanger entre le bonus de dégâts d'un monstre et l'immunité
+//  d'un héros.
+{
+    let etat = neuf();
+    etat.combattants.M1.palier = "Boss";
+    etat.combattants.H2.atouts = { ...(etat.combattants.H2.atouts || {}), immunites: ["Étourdi"] };
+
+    const carte = {
+        type: "carte", idLanceur: "M1", idCarte: "CB",
+        attaques: [{ valeurBrute: 10, cibles: ["H1"] }],
+        alterations: [{ nom: "Étourdi", chance: 100, duree: 2, cibles: ["H2"] }],
+        jets: { parCible: {
+            H1: { esquive: false, etats: {} },
+            H2: { esquive: false, etats: { "Étourdi": true } }
+        } }
+    };
+    const r = resoudreCarte(etat, carte);
+    // 10 de brut + 6 de triche (Boss) contre H1, sans défense : 16.
+    verifier("le Boss inflige toujours son bonus de dégâts",
+             r.etat.combattants.H1.pv === 44, `(${r.etat.combattants.H1.pv})`);
+    verifier("et H2 reste immunisé à l'Étourdi malgré le Boss qui frappe ailleurs",
+             !r.etat.combattants.H2.etats.some(e => e.nom === "Étourdi"),
+             JSON.stringify(r.etat.combattants.H2.etats));
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

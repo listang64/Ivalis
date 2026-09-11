@@ -1343,6 +1343,30 @@ ne l'avait vu, parce que le chapitre 7 (SOIN, BOUCLIER, PURIFICATION) teste
 chapitre 15 la reproduit telle quelle et vérifie qu'un bouclier reste un
 bouclier ; l'ordre des deux `if`, dans `resoudreCarte`, est maintenant inversé.
 
+**Chapitres 16 et 17 : les immunités de peuple avaient disparu sous le nouveau
+régime, sans que rien ne le montre.** En révisant l'Ankylar (immunisé à
+l'Étourdi, en plus de sa résistance) et l'Ophior (des PV repris chaque manche,
+en plus de la sienne), il est apparu que `window.estImmunise` — le mécanisme
+qui protège déjà l'Ondari du feu et l'Éthéré du poison — n'existe QUE dans le
+vieux moteur (`moteur_effets.js`). Le noyau pur (`moteur_pur.js`,
+`cerveau_combat.js`) ne le connaît pas du tout : sous le régime du cerveau, qui
+tourne par défaut depuis l'étape 5, ces deux immunités ne protégeaient plus
+personne. Aucun banc ne pouvait le voir, puisqu'aucun ne testait l'immunité
+dans le nouveau moteur — seulement dans l'ancien (`atouts_races.mjs`, via
+`jouerAnimationMoteur`).
+
+Le palier d'un monstre (chapitre 14) avait déjà dû apprendre à voyager de la
+fiche à l'état de combat ; les immunités et le nouveau soin de race suivent la
+même route (`atouts.immunites`, `atouts.regenPv`, `combattantDepuisFiche` dans
+`combat_etat.js`, vérifiés à part dans `etat_combat.mjs`). Le chapitre 16 de
+`moteur_pur.mjs` pose la vraie question : le jet d'un état (tiré une fois pour
+tout le monde, à graine égale) tombe-t-il toujours le même nombre de fois, que
+la cible soit immunisée ou pas ? Il fallait vérifier que l'immunité bloque
+l'APPLICATION et jamais le TIRAGE — sans quoi deux cibles consommeraient un
+nombre différent de dés, et le rejeu diverger. Le chapitre 17 vérifie que
+la triche du monstre (chapitre 14) et l'immunité d'un héros ne se marchent
+jamais dessus, sur deux combattants de la même carte.
+
 `cap_fatigue.mjs` couvre le CAP de fatigue d'une compétence — combien une
 technique peut coûter, selon la caractéristique qu'elle mobilise. C'était une
 droite, `(carac-5) × 10` : chaque point valait toujours dix de plus. La vraie

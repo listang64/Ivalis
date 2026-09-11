@@ -1649,14 +1649,14 @@
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
-<script type="module" src="combat_etat.js?v=9"></script>
+<script type="module" src="combat_etat.js?v=10"></script>
 <!-- LE MOTEUR PUR : la chaîne de dégâts et le mouvement, extraits des 5 000
      lignes du moteur actuel et testables sans réseau ni navigateur. -->
-<script type="module" src="moteur_pur.js?v=6"></script>
+<script type="module" src="moteur_pur.js?v=7"></script>
 <script type="module" src="mouvement_pur.js?v=2"></script>
 <script type="module" src="ia_pure.js?v=1"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
-<script type="module" src="cerveau_combat.js?v=9"></script>
+<script type="module" src="cerveau_combat.js?v=10"></script>
 <!-- LE SPECTATEUR : la boucle de rejeu. Elle lit le journal du cerveau, ouvre
      la fenêtre de tour, anime PUIS applique, et ne saute jamais un numéro. -->
 <script type="module" src="spectateur_combat.js?v=5"></script>
@@ -1665,13 +1665,13 @@
 <script type="module" src="depot_firestore.js?v=6"></script>
 <!-- LE PONT : de l'étape à ce qu'on voit. Il traduit un résultat déjà calculé
      vers les animations existantes — il ne recalcule jamais rien. -->
-<script type="module" src="pont_combat.js?v=4"></script>
+<script type="module" src="pont_combat.js?v=5"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. Éteint
      par défaut — regimeCerveau(true) dans la console pour l'allumer. -->
 <script type="module" src="regime_cerveau.js?v=17"></script>
 <script type="module" src="ia_master.js?v=4"></script>
-<script type="module" src="app.js?v=40"></script>
-<script type="module" src="creation_personnage.js?v=4"></script>
+<script type="module" src="app.js?v=41"></script>
+<script type="module" src="creation_personnage.js?v=5"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=16"></script>
 <script src="Plateau.js"></script>

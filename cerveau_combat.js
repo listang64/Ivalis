@@ -243,6 +243,7 @@ export function cloturerTour(etat) {
         // Comme toute étape, elle porte le RÉSULTAT et non l'opération : rejouée
         // deux fois sur trois écrans, elle donne le même chiffre.
         etapes.push(...regenererFinDeManche(etat));
+        etapes.push(...regenererPvFinDeManche(etat));
         etapes.push(...ticsDeFinDeManche(etat));
         etapes.push(...vieillirLesEtats(etat));
         etapes.push({ type: "manche", numero: etat.manche });
@@ -378,6 +379,29 @@ export function regenererFinDeManche(etat) {
         if (apres === nombre(c.fatigue)) return;
         c.fatigue = apres;
         etapes.push({ type: "fatigue", cible: id, fatigueApres: apres, regeneration: gagne });
+    });
+    return etapes;
+}
+
+// L'ATOUT DE L'OPHIOR : quelques points de vie repris à chaque fin de manche,
+// exactement comme la fatigue de tout le monde ci-dessus, mais sur l'autre
+// jauge — et sur elle seule, puisque personne d'autre n'a ce genre d'atout.
+// On réutilise l'étape "soin" telle quelle : c'est ce que chaque écran sait
+// déjà animer, il n'a rien de nouveau à apprendre pour un point de vie qui
+// remonte tout seul.
+export function regenererPvFinDeManche(etat) {
+    const etapes = [];
+    (etat.ordre || Object.keys(etat.combattants || {})).forEach(id => {
+        const c = combattant(etat, id);
+        if (!c || c.aTerre) return;
+        const gagne = nombre(c.atouts && c.atouts.regenPv);
+        if (gagne <= 0) return;
+        const avant = nombre(c.pv);
+        const apres = Math.min(nombre(c.pvMax), avant + gagne);
+        if (apres === avant) return;
+        c.pv = apres;
+        etapes.push({ type: "soin", cible: id, montant: apres - avant, pvApres: apres,
+                      regeneration: true });
     });
     return etapes;
 }

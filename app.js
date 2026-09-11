@@ -926,10 +926,16 @@ window.regenerationCombattant = function(perso) {
 
 window.ATOUTS_RACES = {
     "Gob":     { esquive: 3, competences: 1 },
-    "Ankylar": { defPhysique: 10 },
+    // L'immunité à l'Étourdi rejoint la résistance : les Ankylars ne
+    // craignent plus qu'on leur fasse perdre leur tour, en plus d'encaisser
+    // mieux les coups.
+    "Ankylar": { defPhysique: 8, immunites: ["Étourdi"] },
     "Ondari":  { porteeMagique: 1, immunites: ["Brûlé"] },
     "Vargen":  { diviseurDeplacement: 2, esquiveOpportunite: 30 },
-    "Ophior":  { defMagique: 10 },
+    // regenPv : des points de vie repris à chaque fin de manche, comme la
+    // fatigue de tout le monde (regenerationDe, cerveau_combat.js) mais sur
+    // la jauge de vie — un mécanisme qui n'existait pour personne d'autre.
+    "Ophior":  { defMagique: 8, regenPv: 3 },
     "Ethéré":  { soinsRecus: 30, immunites: ["Empoisonnement"] },
     "Humain":  { fatigueMax: 10, bonusReposLong: 10 }
 };

@@ -117,9 +117,9 @@ console.log("1. LES CHIFFRES DE LA FICHE");
 
   verifier("Gob : +3 % d'esquive", gob.esquive === 18, `(${gob.esquive} %)`);
   verifier("Gob : une compétence de plus", gob.cartes === 7, `(${gob.cartes})`);
-  verifier("Ankylar : +10 % de résistance physique", anky.defPhys === 10, `(${anky.defPhys} %)`);
+  verifier("Ankylar : +8 % de résistance physique", anky.defPhys === 8, `(${anky.defPhys} %)`);
   verifier("Ankylar : sa résistance magique ne bouge pas", anky.defMag === 0, `(${anky.defMag} %)`);
-  verifier("Ophior : +10 % de résistance magique", ophior.defMag === 10, `(${ophior.defMag} %)`);
+  verifier("Ophior : +8 % de résistance magique", ophior.defMag === 8, `(${ophior.defMag} %)`);
   verifier("Ophior : sa résistance physique ne bouge pas", ophior.defPhys === 0, `(${ophior.defPhys} %)`);
   verifier("Humain : 110 d'énergie de base", humain.energie === 110, `(${humain.energie})`);
   verifier("les autres peuples gardent 6 cartes", anky.cartes === 6, `(${anky.cartes})`);
@@ -165,10 +165,10 @@ console.log("\n2. LES RÉSISTANCES À L'ŒUVRE DANS UNE FRAPPE");
   console.log(`     Humain  : ${humain.phys} physique, ${humain.mag} magique`);
   console.log(`     Ankylar : ${anky.phys} physique, ${anky.mag} magique`);
   console.log(`     Ophior  : ${ophior.phys} physique, ${ophior.mag} magique`);
-  verifier("l'Ankylar encaisse 10 % de moins en physique", anky.phys === 18 && humain.phys === 20,
+  verifier("l'Ankylar encaisse 8 % de moins en physique", anky.phys === 18 && humain.phys === 20,
            `(${humain.phys} → ${anky.phys})`);
   verifier("mais pas en magique", anky.mag === humain.mag, `(${anky.mag})`);
-  verifier("l'Ophior encaisse 10 % de moins en magique", ophior.mag === 18, `(${ophior.mag})`);
+  verifier("l'Ophior encaisse 8 % de moins en magique", ophior.mag === 18, `(${ophior.mag})`);
   verifier("mais pas en physique", ophior.phys === humain.phys, `(${ophior.phys})`);
 }
 
@@ -204,6 +204,16 @@ console.log("\n3. LES IMMUNITÉS");
   verifier("et l'écran le dit", ethere.messages.includes("Immunisé"));
   verifier("un Humain attrape bien la brûlure", humainFeu.etats.includes("Brûlé"));
   verifier("l'Ondari est immunisé à la brûlure", !ondari.etats.includes("Brûlé"));
+
+  // Le plus récent des trois : l'Ankylar et l'Étourdi.
+  const anky = await empoisonner("Ankylar", "Étourdi");
+  const humainEtourdi = await empoisonner("Humain", "Étourdi");
+  console.log(`     Ankylar / étourdi : ${anky.etats.join(",") || "aucun état"}`
+            + ` — Humain : ${humainEtourdi.etats.join(",") || "aucun"}`);
+  verifier("un Humain se fait étourdir normalement", humainEtourdi.etats.includes("Étourdi"));
+  verifier("l'Ankylar est immunisé à l'Étourdi, même sur un critique",
+           !anky.etats.includes("Étourdi"));
+  verifier("et l'écran le dit aussi pour lui", anky.messages.includes("Immunisé"));
 }
 
 // ------------------------------------------------------------------

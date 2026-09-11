@@ -131,7 +131,12 @@ const SCENES = {
                  couleur: COULEURS.attention, duree: RYTHME.message };
     },
     etatRate(e) {
-        return { geste: "message", pion: e.cible, texte: `${e.nom || "État"} résisté`,
+        // Une immunité de peuple n'est pas un jet manqué : c'est écrit sur la
+        // fiche, pas dans les dés. Le mot doit le dire, sans quoi un joueur
+        // qui teste sans arrêt le même état sur un Ankylar croira à une
+        // longue série de chance.
+        const texte = e.immunise ? `${e.nom || "État"} : immunisé` : `${e.nom || "État"} résisté`;
+        return { geste: "message", pion: e.cible, texte,
                  couleur: COULEURS.neutre, duree: RYTHME.message };
     },
     trajetEcourte(e) {

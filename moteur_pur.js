@@ -436,6 +436,17 @@ export function resoudreCarte(etat, action) {
         (alt.cibles || []).forEach(idCible => {
             const cible = combattant(suivant, idCible);
             if (!cible || cible.aTerre) return;
+
+            // L'IMMUNITÉ DE PEUPLE PASSE AVANT TOUT LE RESTE : ni jet, ni
+            // esquive — la cible n'attrape tout simplement jamais cet état-là.
+            // Elle ne consomme aucun dé : le jet de la carte (tirerDesCarte)
+            // a été tiré pareil pour tout le monde, seule l'application change.
+            const immunites = (cible.atouts && cible.atouts.immunites) || [];
+            if (immunites.includes(alt.nom)) {
+                etapes.push({ type: "etatRate", cible: idCible, nom: alt.nom, immunise: true });
+                return;
+            }
+
             const des = desDe(idCible);
             if (des.esquive) return;
             if (!des.etats || des.etats[alt.nom] !== true) {

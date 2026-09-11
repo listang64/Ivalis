@@ -59,12 +59,12 @@ window.changerRaceSelection = function(race) {
     } else if (race === "Ankylar") {
         bgImage.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786220393/Ankylars_tbaq8b.png";
         texteDesc = "Robustes humanoïdes reptiliens, les Ankylars sont des guerriers endurants et des maîtres de la forge. Peuple dominant de Volcanisse, ils valorisent l'honneur, la discipline et le combat martial, tout en rejetant profondément la magie.";
-        texteGameplay = "Robustes et résistants, les Ankylars encaissent particulièrement bien les dégâts physiques grâce à leur constitution naturelle.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> +10 % de résistance physique</div>";
+        texteGameplay = "Robustes et résistants, les Ankylars encaissent particulièrement bien les dégâts physiques grâce à leur constitution naturelle, et leur carapace ne laisse aucune prise à ce qui cherche à leur faire perdre leur tour.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> +8 % de résistance physique • Immunisé à l'Étourdissement</div>";
     
     } else if (race === "Ophior") {
         bgImage.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786221325/ophiors_zdmtjn.png";
         texteDesc = "Êtres humanoïdes vivant en symbiose avec les champignons et la nature, les Ophiors ont une apparence aussi fascinante qu'inquiétante. Pacifiques par nature et profondément liés aux forêts, ils évitent les conflits mais savent se défendre lorsque cela devient nécessaire.";
-        texteGameplay = "Profondément liés à la nature, les Ophiors possèdent une résistance naturelle aux énergies magiques.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> +10 % de résistance magique</div>";
+        texteGameplay = "Profondément liés à la nature, les Ophiors possèdent une résistance naturelle aux énergies magiques, et leur symbiose avec les champignons referme lentement leurs blessures au fil du combat.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> +8 % de résistance magique • +3 PV soignés à chaque fin de manche</div>";
     
     } else if (race === "Gob") {
         bgImage.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786221325/Gobs_wayc5p.png";

@@ -163,7 +163,14 @@ export function combattantDepuisFiche(fiche, position, regles) {
         // L'Humain reprend dix points d'énergie de plus à chaque repos long.
         // Le repos se calcule maintenant chez le cerveau : son atout doit donc
         // voyager dans l'état, sinon il disparaît du jeu.
-        bonusReposLong: nombre(race.bonusReposLong)
+        bonusReposLong: nombre(race.bonusReposLong),
+        // Ce à quoi ce peuple ne peut pas être soumis (l'Ondari et le feu,
+        // l'Éthéré et le poison, l'Ankylar et l'Étourdi désormais) : une liste
+        // de noms d'état, lue par le noyau au moment de poser une altération.
+        immunites: Array.isArray(race.immunites) ? race.immunites : [],
+        // L'Ophior reprend des points de vie à chaque fin de manche — la seule
+        // race à en avoir, donc le seul atout de ce genre à porter un nombre.
+        regenPv: nombre(race.regenPv)
     };
     const mod = {
         // Ce que l'ÉQUIPEMENT change, hors états altérés : le bouclier lourd
