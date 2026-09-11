@@ -507,10 +507,55 @@ export function fusionnerPionsVTT(pionsFirestore, pionsLocaux, combattantsDuCerv
     return fusion;
 }
 
+// =========================================================================
+//  LES COLLECTIONS PERSONNAGES/MONSTRES NE DOIVENT PLUS DÉCIDER D'UN PV
+// =========================================================================
+//  Même trou que Combat_VTT, une porte plus loin. `PERSOS_PARTIE` se
+//  reconstruit ENTIÈREMENT à chaque instantané des collections Personnages ou
+//  Monstres (recomposerCombattants, monstres.js) — et ces documents ne
+//  reçoivent plus une seule écriture de PV, de fatigue, de bouclier ou
+//  d'états depuis que le combat vit dans l'état du cerveau. Un geste sans
+//  aucun rapport avec le combat — une fiche qu'on corrige, un monstre qu'on
+//  retouche entre deux tours — reconstruit alors CE combattant-là (et lui
+//  seul : la requête ne renvoie que les documents qu'elle surveille) à partir
+//  de sa valeur d'AVANT le combat.
+//
+//  Un filet existait déjà pour un problème voisin mais différent
+//  (figerAffichageRetenus, sequence_tour.js) : il retient l'affichage d'un
+//  combattant dont l'ANIMATION n'a pas fini de rejouer son tour. Il ne
+//  protège donc que les combattants activement en train de jouer — pas ceux
+//  qui attendent, debout, entre deux actions, le cas le plus fréquent d'un
+//  combat. Celui-ci le complète : tant que le cerveau tient CE combat, ses
+//  combattants gardent les chiffres qu'il leur connaît, quelle que soit la
+//  raison de l'instantané.
+const CHAMPS_COMBAT_PROTEGES = [
+    "PV_Actuels", "Bouclier_Actuel", "Etats_Alteres", "Fatigue_Actuelle", "fatigueActuelle"
+];
+
+export function fusionnerFichesCombat(fichesFraiches, fichesActuelles, combattantsDuCerveau) {
+    if (!combattantsDuCerveau) return fichesFraiches || [];
+
+    const actuelles = {};
+    (fichesActuelles || []).forEach(f => { if (f && f.idPersonnage) actuelles[f.idPersonnage] = f; });
+
+    return (fichesFraiches || []).map(fraiche => {
+        if (!fraiche || !fraiche.idPersonnage) return fraiche;
+        if (!combattantsDuCerveau[fraiche.idPersonnage]) return fraiche;
+        const actuelle = actuelles[fraiche.idPersonnage];
+        if (!actuelle) return fraiche;   // Première apparition : rien à garder encore.
+
+        const gardee = { ...fraiche };
+        CHAMPS_COMBAT_PROTEGES.forEach(champ => {
+            if (actuelle[champ] !== undefined) gardee[champ] = actuelle[champ];
+        });
+        return gardee;
+    });
+}
+
 if (typeof window !== "undefined") {
     window.pontCombat = {
         COULEURS, RYTHME, misEnScene, TYPES_MIS_EN_SCENE, creerPont,
         pionsDepuisEtat, fichesDepuisEtat, fileDepuisEtat, creerProjection,
-        fusionnerPionsVTT
+        fusionnerPionsVTT, fusionnerFichesCombat
     };
 }

@@ -428,8 +428,20 @@ const APPLICATEURS = {
 
     // Un déplacement imposé : poussée, traction, bond. Même effet sur l'état,
     // un nom différent pour que l'écran choisisse la bonne animation.
-    poussee(etat, e) { APPLICATEURS.pas(etat, e); },
-    traction(etat, e) { APPLICATEURS.pas(etat, e); },
+    //
+    // CELUI QUI BOUGE N'EST PAS TOUJOURS CELUI QUI AGIT. Pour un pas normal
+    // (et pour un Bond, qui se saute soi-même), `acteur` ET la case qui change
+    // sont la même personne — c'est pour ça que ce bug est resté invisible :
+    // le seul déplacement imposé testé en rejeu était le Bond, où les deux se
+    // confondent. Pour une Poussée ou une Traction, `acteur` est le LANCEUR
+    // et `cible` est celui qu'on déplace : déléguer tel quel à `pas` (qui lit
+    // `e.acteur`) faisait donc AVANCER LE LANCEUR d'un rejeu à l'autre, en
+    // laissant la cible plantée sur place — invisible chez qui calcule (il
+    // mute directement le bon combattant dans resoudreCarte), mais faux chez
+    // quiconque REJOUE le journal : un autre poste, ou soi-même après une
+    // reconnexion.
+    poussee(etat, e) { APPLICATEURS.pas(etat, { ...e, acteur: e.cible || e.acteur }); },
+    traction(etat, e) { APPLICATEURS.pas(etat, { ...e, acteur: e.cible || e.acteur }); },
     bond(etat, e) { APPLICATEURS.pas(etat, e); },
 
     // Une technique part. Rien ne change dans l'état : ce sont les étapes

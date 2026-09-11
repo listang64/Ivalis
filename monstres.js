@@ -198,7 +198,22 @@ window.recomposerCombattants = function() {
     // noms — tout le moteur travaille à partir de cette liste.
     const joueurs = (window.PERSOS_JOUEURS_PARTIE || []).filter(p => p.actif !== false);
     const monstres = window.MONSTRES_PARTIE || [];
-    window.PERSOS_PARTIE = [...joueurs, ...monstres];
+    const fraiches = [...joueurs, ...monstres];
+
+    // TANT QUE LE CERVEAU TIENT CE COMBAT, SES CHIFFRES FONT FOI — jamais ceux
+    // que Personnages ou Monstres viennent de renvoyer. Ces documents ne
+    // reçoivent plus une seule écriture de PV, fatigue, bouclier ou états
+    // depuis que le combat vit dans l'état du cerveau : un geste sans rapport
+    // avec le combat (une fiche corrigée, un monstre retouché) reconstruirait
+    // sinon ce combattant à sa valeur d'AVANT le combat. Voir
+    // fusionnerFichesCombat (pont_combat.js).
+    const etatCerveauOuvert = window.REGIME_CERVEAU
+        && typeof window.regimeDuJeu === "function" && window.regimeDuJeu()
+        && window.regimeDuJeu().etatPublie();
+    window.PERSOS_PARTIE = (etatCerveauOuvert && window.pontCombat
+                            && typeof window.pontCombat.fusionnerFichesCombat === "function")
+        ? window.pontCombat.fusionnerFichesCombat(fraiches, window.PERSOS_PARTIE, etatCerveauOuvert.combattants)
+        : fraiches;
 
     // Un combattant dont le journal n'a pas encore rejoué le tour garde à
     // l'écran les valeurs déjà montrées : sinon sa vie se retire derrière la

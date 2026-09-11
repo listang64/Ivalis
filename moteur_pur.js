@@ -179,6 +179,43 @@ export function destinationPoussee(lanceur, cible, cases, estLibre) {
     return arrivee;
 }
 
+// Le sens inverse de la Poussée : on tire la cible vers le lanceur au lieu de
+// la repousser. Même géométrie (interpolation cubique, arrondi au caractère
+// près — un tirage en diagonale doit partir dans la même direction qu'avant),
+// avec deux différences qui tiennent à ce que « tirer » veut dire :
+//   - au contact (distance ≤ 1), il n'y a rien à tirer — aucune direction
+//     n'existerait, et un jeu de un million de cases ne trancherait rien ;
+//   - on ne va jamais jusqu'au bout : la cible ne doit jamais atterrir SUR
+//     la case du lanceur, elle vient s'arrêter juste avant.
+export function destinationTraction(lanceur, cible, cases, estLibre) {
+    const distance = distanceHex(lanceur, cible);
+    if (!Number.isFinite(distance) || distance <= 1) return null;
+
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const arrondiCube = (q, r, s) => {
+        let rq = Math.round(q), rr = Math.round(r), rs = Math.round(s);
+        const dq = Math.abs(rq - q), dr = Math.abs(rr - r), ds = Math.abs(rs - s);
+        if (dq > dr && dq > ds) rq = -rr - rs;
+        else if (dr > ds) rr = -rq - rs;
+        return { q: rq, r: rr };
+    };
+    // On part de la cible et on avance vers le lanceur — le sens inverse de
+    // la Poussée, tout le reste est identique.
+    const a = { q: cible.q + 1e-6, r: cible.r + 1e-6, s: -cible.q - cible.r - 2e-6 };
+    const b = { q: lanceur.q + 1e-6, r: lanceur.r + 1e-6, s: -lanceur.q - lanceur.r - 2e-6 };
+
+    // Jamais jusqu'au bout (i = distance atterrirait sur le lanceur lui-même).
+    const maxPas = Math.min(nombre(cases, 3), distance - 1);
+    let arrivee = null;
+    for (let i = 1; i <= maxPas; i++) {
+        const t = i / distance;
+        const pt = arrondiCube(lerp(a.q, b.q, t), lerp(a.r, b.r, t), lerp(a.s, b.s, t));
+        if (!estLibre(pt.q, pt.r)) break;
+        arrivee = pt;
+    }
+    return arrivee;
+}
+
 // La distance hexagonale, en coordonnées axiales. La même formule que partout
 // ailleurs dans le jeu — elle décide du malus de tir à bout portant.
 export function distanceHex(a, b) {
@@ -1047,11 +1084,42 @@ export function resoudreCarte(etat, action, plateau) {
                 return;
             }
 
-            // Les autres effets instantanés (Traction, Peur) ne se posent pas
-            // non plus comme des états : leur durée est nulle. Le noyau ne sait
-            // pas encore les jouer — ils restaient jusqu'ici accrochés à la
-            // fiche comme un état de durée zéro, avec une pastille de couleur
-            // sur le pion pour rien. On ne pose plus ce fantôme.
+            // --- LA TRACTION : SYMÉTRIQUE DE LA POUSSÉE --------------------
+            //  Même principe, sens inverse : elle tire la cible vers le
+            //  lanceur au lieu de la repousser. Un effet, pas un état — elle
+            //  ne pose plus, elle non plus, de fantôme de durée zéro.
+            if (alt.nom === "Traction") {
+                const depart = { q: nombre(cible.q), r: nombre(cible.r) };
+                const arrivee = destinationTraction(lanceur, cible, nombre(alt.cases, 3),
+                                                    (q, r) => caseLibre(suivant, carte, q, r, idCible));
+                if (arrivee) {
+                    cible.q = arrivee.q;
+                    cible.r = arrivee.r;
+                    etapes.push({ type: "traction", cible: idCible, acteur: idLanceur,
+                                  de: depart, vers: arrivee });
+                } else {
+                    etapes.push({ type: "message", cible: idCible, acteur: idLanceur,
+                                  texte: "Traction bloquée" });
+                }
+                return;
+            }
+
+            // --- LA PEUR : IL LUI FAUT DES DÉS, ELLE SE JOUE UN CRAN PLUS LOIN
+            //  Fuir, c'est choisir une direction à chaque case parcourue — un
+            //  jet par pas, avec autant de pas que la fuite en compte. Ce
+            //  noyau n'a plus de dé en main ici : tirerDesCarte a déjà fini de
+            //  tirer avant qu'on y arrive, et le sien est à sens unique. Le
+            //  cerveau la résout juste après coup (resoudrePeur,
+            //  mouvement_pur.js), avec ses propres dés — exactement comme il
+            //  le fait déjà pour les attaques d'opportunité d'une marche
+            //  normale. On ne pose rien ici : ni fantôme, ni double emploi.
+            if (alt.nom === "Peur") return;
+
+            // Les états ordinaires, eux, se posent comme prévu — mais leur
+            // durée est nulle. Le noyau ne sait pas encore les jouer — ils
+            // restaient jusqu'ici accrochés à la fiche comme un état de durée
+            // zéro, avec une pastille de couleur sur le pion pour rien. On ne
+            // pose plus ce fantôme.
             if (nombre(alt.duree !== undefined ? alt.duree : alt.tours, 1) <= 0) {
                 etapes.push({ type: "message", cible: idCible, acteur: idLanceur,
                               texte: alt.nom });

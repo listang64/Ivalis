@@ -42,7 +42,7 @@ import { clonerEtat, combattant, creerDes, combattantIllusion,
 import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion,
          traverserZones, creerZonePure, poserZone, vieillirZones,
          chaineDeDegats, REGLES_ETATS } from './moteur_pur.js';
-import { resoudreMouvement, resoudreBond, distance, planifierTrajet,
+import { resoudreMouvement, resoudreBond, resoudrePeur, distance, planifierTrajet,
          occupantVivant } from './mouvement_pur.js';
 import { deciderTourCreature } from './ia_pure.js';
 
@@ -629,13 +629,33 @@ export function appliquerIntention(etat, intention, plateau) {
         const suivant = clonerEtat(r.etat);
         const etapes = [...r.etapes];
 
-        // ÊTRE POUSSÉ DANS LE FEU BRÛLE AUTANT QU'Y MARCHER. La traversée de
-        // zone se fait ici et non dans resoudreCarte, pour une raison simple :
-        // resoudreCarte ne tient aucun dé — tous ses jets sont tirés d'avance
-        // par tirerDesCarte, et une case d'arrivée n'est connue qu'une fois la
-        // poussée résolue. Ici, le dé est encore à portée de main.
-        etapes.filter(e => e.type === "poussee" && e.vers).forEach(e => {
+        // ÊTRE POUSSÉ OU TIRÉ DANS LE FEU BRÛLE AUTANT QU'Y MARCHER. La
+        // traversée de zone se fait ici et non dans resoudreCarte, pour une
+        // raison simple : resoudreCarte ne tient aucun dé — tous ses jets
+        // sont tirés d'avance par tirerDesCarte, et une case d'arrivée n'est
+        // connue qu'une fois le déplacement résolu. Ici, le dé est encore à
+        // portée de main.
+        etapes.filter(e => (e.type === "poussee" || e.type === "traction") && e.vers).forEach(e => {
             etapes.push(...traverserZones(suivant, e.cible, e.vers, des));
+        });
+
+        // LA PEUR SE JOUE ICI, ET NULLE PART AILLEURS. resoudreCarte l'a
+        // laissée volontairement de côté (voir moteur_pur.js) : fuir suppose
+        // un jet de direction À CHAQUE CASE, avec autant de jets que la fuite
+        // en compte — une chose que le noyau, sans dé en main, ne peut pas
+        // trancher. On regarde ici, directement dans les jets déjà tirés (pas
+        // de nouveau tirage : le hasard de la CIBLE a déjà tranché si l'effet
+        // la touche), qui a été touché par une Peur qui a atteint sa cible,
+        // et on la fait fuir avec les dés du cerveau — exactement comme une
+        // marche normale (resoudreMouvement) tranche déjà ses propres
+        // attaques d'opportunité en vivant.
+        (action.alterations || []).forEach(alt => {
+            if (alt.nom !== "Peur") return;
+            (alt.cibles || []).forEach(idCible => {
+                const jetCible = (action.jets && action.jets.parCible && action.jets.parCible[idCible]) || {};
+                if (jetCible.esquive || (jetCible.etats || {}).Peur !== true) return;
+                etapes.push(...resoudrePeur(suivant, action.idLanceur, idCible, des, plateau));
+            });
         });
 
         // LA ZONE QUE LA CARTE LAISSE DERRIÈRE ELLE. Elle se posait jusqu'ici
@@ -724,9 +744,21 @@ export function jouerCreature(etat, id, carte, plateau) {
         courant = clonerEtat(r.etat);
         etapes.push(...r.etapes);
 
-        // Une créature qui pousse quelqu'un dans le feu le brûle, elle aussi.
-        r.etapes.filter(e => e.type === "poussee" && e.vers).forEach(e => {
+        // Une créature qui pousse ou tire quelqu'un dans le feu le brûle, elle aussi.
+        r.etapes.filter(e => (e.type === "poussee" || e.type === "traction") && e.vers).forEach(e => {
             etapes.push(...traverserZones(courant, e.cible, e.vers, des));
+        });
+
+        // Et une créature qui fait fuir sa cible la fait fuir pour de vrai —
+        // même raisonnement que côté joueur (voir plus haut) : la Peur a
+        // besoin de dés qu'on n'a plus dans resoudreCarte.
+        (action.alterations || []).forEach(alt => {
+            if (alt.nom !== "Peur") return;
+            (alt.cibles || []).forEach(idCible => {
+                const jetCible = (action.jets && action.jets.parCible && action.jets.parCible[idCible]) || {};
+                if (jetCible.esquive || (jetCible.etats || {}).Peur !== true) return;
+                etapes.push(...resoudrePeur(courant, id, idCible, des, plateau));
+            });
         });
     } else if (!aPortee) {
         // Pourquoi elle n'a rien lancé. Dans la trace, cette ligne vaut de l'or :

@@ -28,7 +28,7 @@
 
 import { clonerEtat, combattant } from './combat_etat.js';
 import { esquiveDe, paradeDe, bonusDesEtats, aLEtat, traverserZones,
-         ligneDeVue } from './moteur_pur.js';
+         ligneDeVue, caseLibre } from './moteur_pur.js';
 
 const nombre = (v, defaut = 0) => {
     const n = parseInt(v);
@@ -398,10 +398,125 @@ export function resoudreBond(etat, action, des, plateau) {
     return { etat: suivant, etapes };
 }
 
+// =========================================================================
+//  6. LA PEUR
+// =========================================================================
+//  Fait fuir la cible sur 4 cases : à chaque case, on ne garde que les
+//  directions qui l'éloignent VRAIMENT du lanceur (jamais une ligne droite
+//  imposée comme la Poussée), et on en tire une au hasard parmi elles. Mêmes
+//  règles de blocage que Poussée/Traction (mur, case supprimée, case
+//  occupée) : si toutes les directions valides sont bloquées, la fuite
+//  s'arrête net, avant ses 4 cases s'il le faut. Déclenche une attaque
+//  d'opportunité par ennemi quitté en chemin, SAUF celle du lanceur — c'est
+//  lui qui fait peur, il n'en profite pas d'un coup en plus. Contrairement à
+//  Poussée/Traction, ce déplacement forcé coûte de la fatigue à la cible
+//  (coût de base d'un déplacement normal, 2 par case) : une vraie fuite
+//  panique épuise.
+//
+//  Portage de declencherPeurCible (moteur_effets.js), avec une différence
+//  voulue : cette fonction consomme le dé du CERVEAU (des.fraction, comme
+//  resoudreOpportunite consomme déjà des.d100 pour les attaques quittées en
+//  chemin), là où l'ancien moteur tirait Math.random() dans le navigateur du
+//  lanceur — un résultat que les autres postes devaient croire sur parole.
+//
+//  POURQUOI CETTE FONCTION VIT ICI ET PAS DANS resoudreCarte
+//  (moteur_pur.js). resoudreCarte ne tient plus aucun dé : tirerDesCarte a
+//  déjà tiré tout ce qu'une carte doit tirer, en une seule fois, avant que
+//  les effets ne s'appliquent. Fuir a besoin d'un jet PAR CASE, dont le
+//  nombre dépend du chemin lui-même — impossible à précalculer sans rejouer
+//  toute la géométrie deux fois. Le cerveau, qui a le dé en main au moment
+//  d'exécuter une carte (voir cerveau_combat.js), la résout donc juste
+//  après resoudreCarte, exactement comme il tranche déjà les attaques
+//  d'opportunité d'une marche normale.
+//
+//  Mute directement l'état qu'on lui passe (comme traverserZones) et rend
+//  les étapes à publier.
+export function resoudrePeur(etat, idLanceur, idCible, des, plateau) {
+    const etapes = [];
+    const cible = combattant(etat, idCible);
+    if (!cible || cible.aTerre) return etapes;
+
+    const depart = { q: nombre(cible.q), r: nombre(cible.r) };
+    const lanceur = combattant(etat, idLanceur) || depart;
+    const dejaVisite = new Set([`${depart.q},${depart.r}`]);
+    let hexActuel = depart;
+    const chemin = [];
+
+    for (let i = 0; i < 4; i++) {
+        const distActuelle = distance(lanceur, hexActuel);
+        const libres = voisinsDe(hexActuel).filter(c =>
+            caseLibre(etat, plateau, c.q, c.r, idCible) && !dejaVisite.has(`${c.q},${c.r}`));
+        // On préfère les cases qui éloignent vraiment du lanceur ; si elles
+        // sont toutes bloquées, on cherche un autre chemin plutôt que de
+        // s'arrêter net contre l'obstacle — la seule contrainte est de ne
+        // jamais repasser sur une case déjà prise pendant cette fuite.
+        let candidats = libres.filter(c => distance(lanceur, c) > distActuelle);
+        if (candidats.length === 0) candidats = libres;
+        if (candidats.length === 0) break;  // Vraiment coincée.
+
+        hexActuel = candidats[Math.min(candidats.length - 1, Math.floor(des.fraction() * candidats.length))];
+        dejaVisite.add(`${hexActuel.q},${hexActuel.r}`);
+        chemin.push(hexActuel);
+    }
+
+    if (chemin.length === 0) {
+        etapes.push({ type: "message", cible: idCible, acteur: idLanceur, texte: "Peur (bloquée)" });
+        return etapes;
+    }
+
+    // Attaques d'opportunité déclenchées en fuyant, case par case (même
+    // principe qu'un déplacement volontaire), sauf de la part du lanceur.
+    let contactAvant = new Set(ennemisAuContact(etat, idCible, depart).filter(id => id !== idLanceur));
+    for (const pas of chemin) {
+        const de = { q: cible.q, r: cible.r };
+        cible.q = pas.q;
+        cible.r = pas.r;
+        cible.fatigue = Math.max(0, nombre(cible.fatigue) - 2);
+        etapes.push({ type: "pas", acteur: idCible, de, vers: pas, cout: 2, fatigueApres: cible.fatigue });
+
+        const contactApres = new Set(ennemisAuContact(etat, idCible, pas).filter(id => id !== idLanceur));
+        for (const ennemi of contactAvant) {
+            if (contactApres.has(ennemi)) continue;
+            const coup = resoudreOpportunite(etat, ennemi, idCible, des);
+            if (!coup) continue;
+
+            if (coup.evitee) {
+                etapes.push({ type: "opportunite", ...coup, hex: pas });
+            } else {
+                if (cible.bouclier > 0) {
+                    cible.bouclier = Math.max(0, cible.bouclier - coup.montant);
+                } else {
+                    cible.pv = Math.max(0, cible.pv - coup.montant);
+                }
+                etapes.push({ type: "opportunite", ...coup, hex: pas,
+                              bouclierApres: cible.bouclier, pvApres: cible.pv });
+                etapes.push({ type: "degats", cible: idCible, acteur: ennemi,
+                              montant: coup.montant, opportunite: true,
+                              bouclierApres: cible.bouclier, pvApres: cible.pv });
+
+                if (cible.pvMax > 0 && cible.pv <= 0 && !cible.aTerre) {
+                    cible.aTerre = true;
+                    etapes.push({ type: "chute", cible: idCible, acteur: ennemi });
+                }
+            }
+        }
+        contactAvant = contactApres;
+
+        if (cible.aTerre) break;  // Tombée en chemin : la fuite s'arrête là.
+
+        // Une fuite paniquée traverse une nappe au sol comme n'importe quel
+        // déplacement.
+        etapes.push(...traverserZones(etat, idCible, pas, des));
+        if (cible.aTerre) break;  // Tombée dans le feu : pareil.
+    }
+
+    return etapes;
+}
+
 if (typeof window !== "undefined") {
     window.mouvementPur = {
         distance, voisinsDe, trouverChemin, coutDuPas, planifierTrajet,
         ennemisAuContact, resoudreOpportunite, resoudreMouvement,
-        casesDeBond, resoudreBond, DEGATS_OPPORTUNITE
+        casesDeBond, resoudreBond, resoudrePeur, DEGATS_OPPORTUNITE
     };
 }
