@@ -645,13 +645,12 @@ window.resoudreBondInteractif = function(idPerso, portee) {
         const tkDepart = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idPerso] : null;
         if (!tkDepart || !window.PLATEAU_VTT) return resolve(false);
 
-        // Immobilisation et Paralysie bloquent tout mouvement volontaire, y compris le Bond
+        // L'Immobilisation bloque tout mouvement volontaire, y compris le Bond
         // (mais pas les déplacements subis comme Poussée/Traction/Peur).
         const lanceurBond = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPerso);
-        if (lanceurBond && lanceurBond.Etats_Alteres && lanceurBond.Etats_Alteres.some(e => e.nom === "Immobilisation" || e.nom === "Paralysie")) {
-            const estParalyseBond = lanceurBond.Etats_Alteres.some(e => e.nom === "Paralysie");
+        if (lanceurBond && lanceurBond.Etats_Alteres && lanceurBond.Etats_Alteres.some(e => e.nom === "Immobilisation")) {
             if (typeof window.afficherMessageFlottantHex === "function") {
-                window.afficherMessageFlottantHex(tkDepart.q, tkDepart.r, estParalyseBond ? "Paralysé !" : "Immobilisé !", "#aaaaaa");
+                window.afficherMessageFlottantHex(tkDepart.q, tkDepart.r, "Immobilisé !", "#aaaaaa");
             }
             return resolve(false);
         }
@@ -1434,26 +1433,10 @@ window.demarrerCiblage = async function(idCarte, options) {
         return;
     }
 
-    // 🔻 NOUVEAU : PARALYSIE 🔻
-    // Empêche tout mouvement ET toute compétence : on intercepte ici, avant même le ciblage, le
-    // personnage paralysé perd quand même la fatigue prévue de la carte (comme s'il l'avait
-    // jouée), mais aucun de ses effets ne se déclenche jamais — on réutilise directement
-    // validerCarteCombat (déduction de fatigue + fin de tour), sans jamais construire d'action.
-    // Le lanceur de cette carte : sa paralysie l'empêche d'agir, sa race peut
-    // aussi allonger la portée de ses sorts (cf. plus bas).
+    // La Paralysie a été retirée du jeu : plus personne n'est empêché de jouer
+    // sa carte par un état. Le lanceur, lui, sert encore juste après (sa race
+    // peut allonger la portée de ses sorts).
     const lanceurCarte = persoLanceur;
-    const casterParalyse = lanceurCarte;
-    if (casterParalyse && casterParalyse.Etats_Alteres && casterParalyse.Etats_Alteres.some(e => e.nom === "Paralysie")) {
-        const tkCaster = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[casterParalyse.idPersonnage] : null;
-        // En extraction, un paralysé n'a simplement pas de carte à jouer : on
-        // rend null et on ne touche à rien. C'est le cerveau qui décidera.
-        if (extraireSeulement) return null;
-        if (tkCaster && typeof window.afficherMessageFlottantHex === "function") {
-            window.afficherMessageFlottantHex(tkCaster.q, tkCaster.r, "Paralysé !", "#aaaaaa");
-        }
-        window.validerCarteCombat(idCarte, document.getElementById("btn-appliquer-carte"));
-        return;
-    }
 
     // DEBUG POUR NICO (Pour comprendre la structure si ça rate un jour)
     console.log("=== STRUCTURE DE LA CARTE ===", JSON.parse(JSON.stringify(dataCarte)));
@@ -1722,7 +1705,7 @@ window.demarrerCiblage = async function(idCarte, options) {
                 alterationsExtraites.push({
                     nom: "Étourdi",
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1787381297/ETOURDIT_2_j7w36h.png",
-                    desc: "-20% Esquive/Parade, 10% de chance d'échec d'attaque.",
+                    desc: "-30% Esquive/Parade, 20% de chance d'échec d'attaque.",
                     chance: stunChance,
                     duree: stunDuree,
                     isRanged: isRanged,
@@ -1816,33 +1799,10 @@ window.demarrerCiblage = async function(idCarte, options) {
                 });
             }
 
-            // 🔻 NOUVEAU : DÉTECTION PARALYSIE 🔻
-            // Contrairement aux autres états, pas de jet de pourcentage : elle s'applique
-            // automatiquement dès que la cible est touchée (chance fixée à 100, la cible garde
-            // quand même sa chance d'esquive/parade normale, gérée en amont comme pour tous les
-            // autres effets). Durée fixe de 4 tours, jamais prolongeable par Durée+ (bouton
-            // masqué en Forge, comme pour Immobilisation).
-            let isParalysie = nomLower.includes("paralys");
-            listeMods.forEach(m => {
-                const modEff = window.EFFETS_BDD_CACHE[m.id];
-                if (modEff && (modEff.Nom || "").toLowerCase().includes("paralys")) {
-                    isParalysie = true;
-                }
-            });
-
-            if (isParalysie) {
-                if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
-                alterationsExtraites.push({
-                    nom: "Paralysie",
-                    icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788182779/IMG_2091_tf3xnx.png",
-                    desc: "Empêche tout mouvement volontaire et toute compétence pendant 4 tours (la fatigue de la carte tentée est quand même perdue).",
-                    chance: 100,
-                    duree: 4,
-                    isRanged: isRanged,
-                    rangeMax: rangeMax,
-                    cibles: []
-                });
-            }
+            // LA PARALYSIE A ÉTÉ RETIRÉE DU JEU (demande de Nico). Elle bloquait
+            // tout — mouvement ET technique — pendant quatre tours : trop long,
+            // et un joueur privé de son tour n'a plus de jeu du tout. Son effet
+            // a disparu de la base ; il n'y a donc plus rien à extraire ici.
 
             // 🔻 NOUVEAU : DÉTECTION EMPOISONNEMENT 🔻
             // Doit toujours accompagner une attaque à dégâts quelque part sur la carte (voir
@@ -1921,7 +1881,7 @@ window.demarrerCiblage = async function(idCarte, options) {
                 alterationsExtraites.push({
                     nom: "Brûlé",
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181101/IMG_2087_q6chof.png",
-                    desc: "-50% de soins reçus.",
+                    desc: "-50% de soins reçus, et 3 dégâts à chaque fin de manche tant que la brûlure dure.",
                     chance: bruleChance,
                     duree: bruleDuree,
                     isRanged: isRanged,
@@ -1968,7 +1928,7 @@ window.demarrerCiblage = async function(idCarte, options) {
                 alterationsExtraites.push({
                     nom: "Glacé",
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181888/IMG_2089_isgcrs.png",
-                    desc: "Coût en fatigue du mouvement doublé.",
+                    desc: "Coût en fatigue du mouvement doublé, et 20% de dégâts subis en plus.",
                     chance: glaceChance,
                     duree: glaceDuree,
                     isRanged: isRanged,
@@ -2016,7 +1976,7 @@ window.demarrerCiblage = async function(idCarte, options) {
                 alterationsExtraites.push({
                     nom: "Électrifié",
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788088220/IMG_2081_p5xenm.png",
-                    desc: "La prochaine carte jouée perd 35 en initiative, puis l'état disparaît.",
+                    desc: "La prochaine carte jouée perd 35 en initiative, puis l'état disparaît. Subit 20% de dégâts magiques en plus.",
                     chance: electrifieChance,
                     duree: electrifieDuree,
                     isRanged: isRanged,
@@ -2053,7 +2013,8 @@ window.demarrerCiblage = async function(idCarte, options) {
                 alterationsExtraites.push({
                     nom: "Poussée",
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png",
-                    desc: `${pousseeChance}% de chance de repousser la cible de 2 cases en ligne droite.`,
+                    desc: `${pousseeChance}% de chance de repousser la cible de 2 cases en ligne droite, `
+                        + `dont 15% de la bousculer (-20% d'énergie).`,
                     chance: pousseeChance,
                     duree: 0, // Instantané : jamais ajouté à Etats_Alteres
                     isRanged: isRanged,
@@ -2920,11 +2881,11 @@ window.porteeAvecArme = function(lanceur, isRanged, rangeMax) {
 };
 
 const GABARITS_ETATS_EQUIPEMENT = {
-    "Étourdi":        { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1787381297/ETOURDIT_2_j7w36h.png", desc: "-20% Esquive/Parade, 10% de chance d'échec d'attaque." },
+    "Étourdi":        { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1787381297/ETOURDIT_2_j7w36h.png", desc: "-30% Esquive/Parade, 20% de chance d'échec d'attaque." },
     "Immobilisation": { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788081285/IMG_2076_vze0an.png", desc: "Ne peut plus se déplacer volontairement, gagne 20 fatigue par tour immobilisé." },
     "Empoisonnement": { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788096401/IMG_2083_pebnup.png", desc: "15 fatigue et 8% des PV max perdus immédiatement, puis à nouveau au début du tour suivant. Pas de cumul.", estPoison: true, estDot: true },
-    "Brûlé":          { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181101/IMG_2087_q6chof.png", desc: "-50% de soins reçus." },
-    "Glacé":          { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181888/IMG_2089_isgcrs.png", desc: "Coût en fatigue du mouvement doublé." },
+    "Brûlé":          { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181101/IMG_2087_q6chof.png", desc: "-50% de soins reçus, et 3 dégâts par manche." },
+    "Glacé":          { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181888/IMG_2089_isgcrs.png", desc: "Coût en fatigue du mouvement doublé, et 20% de dégâts subis en plus." },
     "Poussée":        { duree: 0, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", desc: "", estPoussee: true },
     "Traction":       { duree: 0, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", desc: "", estTraction: true },
     "Peur":           { duree: 0, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", desc: "", estPeur: true },
@@ -3067,9 +3028,9 @@ function tirerLesDesDeLaCarte(state, lanceurData, critique) {
     const d100 = () => Math.floor(Math.random() * 100) + 1;
     const jets = { attaqueRatee: false, parCible: {} };
 
-    // Étourdi : une chance sur dix de rater complètement sa technique.
+    // Étourdi : une chance sur cinq de rater complètement sa technique.
     if (lanceurData && (lanceurData.Etats_Alteres || []).some(e => e.nom === "Étourdi")) {
-        jets.attaqueRatee = d100() <= 10;
+        jets.attaqueRatee = d100() <= 20;
     }
 
     const pourCible = (id) => {
@@ -3420,7 +3381,7 @@ window.jouerAnimationMoteur = async function(action) {
     // 🔻 NOUVEAU : Jet d'Échec si le Lanceur est Étourdi 🔻
     let attaqueRatee = false;
     if (lanceurData && lanceurData.Etats_Alteres && lanceurData.Etats_Alteres.some(e => e.nom === "Étourdi")) {
-        const rate = jets ? !!jets.attaqueRatee : (Math.floor(Math.random() * 100) + 1) <= 10;
+        const rate = jets ? !!jets.attaqueRatee : (Math.floor(Math.random() * 100) + 1) <= 20;
         if (rate) {
             attaqueRatee = true;
             if (tkLanceur) window.afficherMessageFlottantHex(tkLanceur.q, tkLanceur.r, "Échec technique !", "#ffaa00");

@@ -64,6 +64,8 @@ node moteur_pur.mjs         # la chaîne de dégâts, maillon par maillon (10 00
 node cap_fatigue.mjs        # le CAP de fatigue d'une compétence, table de Nico + atout humain
 node gouttes_etat.mjs       # les gouttes de couleur sous un pion, un vrai token de la base, capture à l'appui
 node equipement_cerveau.mjs # percer une armure, l'élan, la bénédiction, le pas de retraite — reliés au cerveau
+node durees_etats.mjs       # la durée d'un état, de la Forge (⏳ Durée +) jusqu'à sa dernière manche
+node migration_effets.mjs   # la mise à jour de la base des effets : bonne cible, sans danger à relancer
 node mouvement_pur.mjs      # chemin, coût des cases, attaques d'opportunité (1 000 trajets)
 node ia_pure.mjs            # qui viser, où se mettre : les cinq caractères, sans variable globale
 node cerveau_combat.mjs     # LE CERVEAU : intentions validées, un seul écrivain, un combat entier
@@ -1467,6 +1469,30 @@ jeu (`pvMaxCombattant`, `esquiveCombattant`, etc.) que tout le reste — la
 preuve tenait déjà dans `atouts_races.mjs` (l'atout s'ajoute à la retouche de
 la fiche) et dans le détecteur de `stats_fiche.mjs` (aucune stat lue sans sa
 retouche dans tout le moteur). Rien à réparer là ; seulement à confirmer.
+
+`durees_etats.mjs` répond à une question de Nico : « les durées sont-elles bien
+implantées dans le cerveau, y compris durée+ ? ». Cette durée traverse quatre
+mondes avant de compter — la Forge la compose (les `Tours` de l'effet en base,
+plus les crans du bouton ⏳, rangés à part dans `act.baseDuree`), l'extracteur
+l'additionne, le noyau la pose sur la cible, la fin de manche la décompte. Un
+maillon cassé, et l'état dure un tour au lieu de quatre, ou pour toujours —
+c'est arrivé une fois, quand le noyau lisait `tours` là où la Forge écrit
+`duree`. Le banc tient la chaîne entière : le vrai extracteur d'un côté (dans un
+navigateur, avec les VRAIES valeurs de `effets_reels.json`), le vrai
+vieillissement de l'autre, et au milieu le noyau. Il vérifie aussi ce qui ne
+doit PAS bouger : l'Immobilisation et l'Empoisonnement gardent leurs deux tours
+même si une vieille carte porte des crans de ⏳.
+
+`migration_effets.mjs` couvre le bouton « Mettre la BDD à jour » (écran des
+effets). Un effet vit à DEUX endroits — sa mécanique dans le moteur, sa fiche
+dans `Combat_Effets` (chiffres, texte lu par le joueur, coût) — et quand une
+règle change, les deux doivent bouger ensemble, sans quoi la Forge annonce une
+chose et le combat en fait une autre. Le banc fait tourner le vrai code sur un
+Firestore de papier, à partir du VRAI instantané de la base, et tient trois
+choses : la migration vise les bons effets avec les bonnes valeurs ; elle est
+sans danger à relancer (le second passage n'écrit pas une seule fois — un bouton
+qu'on n'ose pas cliquer deux fois n'est pas un outil) ; et une panne réseau ou
+un effet manquant n'emporte pas le reste et ne se tait pas.
 
 `apercu_butin.mjs` charge le vrai `style.css` et le vrai balisage
 d'`index.html`, remplit l'onglet Inventaire et les trois vues du butin avec les

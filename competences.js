@@ -1544,7 +1544,7 @@ window.rafraichirForge = function() {
         });
 
         let coutActionTotale = baseActionCost + coutDureeBase + coutMods;
-        if (aDOT) coutActionTotale /= 1.2;
+        if (aDOT) coutActionTotale /= 1.3;
         totalPC += coutActionTotale;
     });
 
@@ -1625,6 +1625,22 @@ window.rafraichirForge = function() {
         });
     };
 
+    // L'ÉTALEMENT NE S'ACCROCHE QU'À CE QUI FRAPPE. Il étale des DÉGÂTS dans
+    // le temps : le poser sur un état altéré (un étourdissement, une
+    // provocation) n'a aucun sens — il n'y a rien à couper en deux. Il ne peut
+    // donc se greffer que sur une attaque, une Zone ou une Distance : les
+    // trois actions par lesquelles un coup arrive.
+    const estUnModEtalement = (nomLower) => {
+        const n = (nomLower || "").trim();
+        return n === "dot" || n.includes("étalement") || n.includes("etalement");
+    };
+    const actionAccepteEtalement = (act) => {
+        if (!act || !act.baseEffet) return false;
+        if (estUneAttaqueDeBase(act.baseEffet.Nom)) return true;
+        const nom = (act.baseEffet.Nom || "").toLowerCase();
+        return nom.includes("zone") || nom.includes("distance");
+    };
+
     const renderSelectMenu = (type, label, color, actionId, estActionPoussee, estActionIllusion) => {
         if (type === "Physique" && window.forgeState.armePrincipale === "Magie") return "";
 
@@ -1637,6 +1653,9 @@ window.rafraichirForge = function() {
 
         // 🔻 Sécurité pour bloquer les attaques dans les menus déroulants
         const aDejaUneAttaque = window.forgeState.actions.some(act => estUneAttaqueDeBase(act.baseEffet.Nom));
+        // L'action sur laquelle ce menu greffe ses sous-effets : certains ne
+        // peuvent aller que sur une action qui frappe (voir l'Étalement).
+        const actionCourante = window.forgeState.actions.find(a => a.idInst === actionId);
 
         modsDispos.forEach(mod => {
             const isLocked = activeTags.size >= 2 && mod.Modificateur !== "AUCUN" && !activeTags.has(mod.Modificateur.toUpperCase());
@@ -1658,9 +1677,11 @@ window.rafraichirForge = function() {
                 // quelque part sur la carte), sinon aucun type de dégât n'est déterminable.
                 const estIncompatiblePoison = !aDejaUneAttaque && nomModLower.includes("poison");
                 // Étalement des dégâts coupe en deux les DÉGÂTS d'une attaque : sur une carte
-                // sans attaque (un soin, un pur contrôle), il n'y a rien à étaler.
-                const estIncompatibleEtalement = !aDejaUneAttaque
-                    && (nomModLower.trim() === "dot" || nomModLower.includes("étalement") || nomModLower.includes("etalement"));
+                // sans attaque (un soin, un pur contrôle) il n'y a rien à étaler, et sur une
+                // action qui ne porte pas de coup (un état altéré) il n'y a rien à quoi
+                // l'accrocher.
+                const estIncompatibleEtalement = estUnModEtalement(nomModLower)
+                    && (!aDejaUneAttaque || !actionAccepteEtalement(actionCourante));
                 groupesMods[carac].push(
                     (estIncompatiblePoussee || estIncompatibleIllusion || estIncompatiblePoison || estIncompatibleEtalement)
                         ? `<option value="${mod.id}" disabled style="color: #999;">${nettoyerNomEffet(mod.Nom)} (non compatible)</option>`
@@ -1694,11 +1715,10 @@ window.rafraichirForge = function() {
             const isActMaxed = act.count >= getMaxStacks(act.baseEffet);
             const btnPlusActDisabled = (isActMaxed || capDepasse) ? `disabled style="opacity: 0.3; cursor: not-allowed; border:none; background:none; font-weight:bold; font-size:18px;"` : `style="color: green; cursor: pointer; border:none; background:none; font-weight:bold; font-size:18px;"`;
 
-            // Immobilisation, Paralysie et Empoisonnement ont une durée fixe (2, 4 et 2 tours) :
+            // Immobilisation et Empoisonnement ont une durée fixe (2 tours chacun) :
             // le bouton ⏳ (Durée +) ne doit jamais apparaître dessus, quoi que dise Tours en base.
             const baseHasDuree = parseFrenchFloat(act.baseEffet.Tours) > 0
                 && !(act.baseEffet.Nom || "").toLowerCase().includes("immobil")
-                && !(act.baseEffet.Nom || "").toLowerCase().includes("paralys")
                 && !(act.baseEffet.Nom || "").toLowerCase().includes("poison");
             const currentBaseDuree = act.baseDuree || 0;
             const btnPlusBaseDureeDisabled = (currentBaseDuree >= maxDureeStacks || capDepasse) ? `disabled style="opacity: 0.3; cursor: not-allowed; border:none; background:none; font-weight:bold; font-size:16px;"` : `style="color: green; cursor: pointer; border:none; background:none; font-weight:bold; font-size:16px;"`;
@@ -1717,12 +1737,11 @@ window.rafraichirForge = function() {
                 }
 
                 // Même règle que pour la base : pas de bouton Durée + sur Immobilisation,
-                // Paralysie, Empoisonnement, Persistance de terrain ni Étalement des dégâts
+                // Empoisonnement, Persistance de terrain ni Étalement des dégâts
                 // (durées figées par leur propre mécanique).
                 const nomModDuree = (modEff.Nom || "").toLowerCase().trim();
                 const modHasDuree = parseFrenchFloat(modEff.Tours) > 0
                     && !nomModDuree.includes("immobil")
-                    && !nomModDuree.includes("paralys")
                     && !nomModDuree.includes("poison")
                     && !nomModDuree.includes("persistance")
                     && !nomModDuree.includes("étalement")

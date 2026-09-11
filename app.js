@@ -118,8 +118,8 @@ function persoDocVersFront(id, d) {
   
   // 🔻 NOUVEAU : Application native des malus d'états à la racine ! 🔻
   if (etatsAlteres.some(e => e.nom === "Étourdi")) {
-      esquiveCalc -= 20;
-      paradeCalc -= 20;
+      esquiveCalc -= 30;
+      paradeCalc -= 30;
   }
 
   const fiche = {
@@ -4024,6 +4024,101 @@ window.ajouterLigneEffetVide = function() {
     conteneur.scrollTop = conteneur.scrollHeight;
 };
 
+// =========================================================================
+//  METTRE LA BASE AU NIVEAU DES RÈGLES DU CODE
+// =========================================================================
+//  Un effet vit à DEUX endroits : sa mécanique dans le moteur, et sa fiche
+//  dans la base (Combat_Effets) — chiffres, texte lu par le joueur, coût. Quand
+//  une règle change, les deux doivent bouger ensemble, sans quoi la Forge
+//  annonce une chose et le combat en fait une autre.
+//
+//  Ce bouton fait la moitié « base » du travail, une fois, en un clic. Il est
+//  SANS DANGER À RELANCER : il ne réécrit que ce qui diffère, et dit exactement
+//  ce qu'il a touché. Un effet déjà à jour n'est même pas envoyé au réseau.
+//
+//  Chaque ligne est datée de la règle qu'elle accompagne, pour qu'on sache, en
+//  relisant, pourquoi elle est là.
+window.MIGRATION_EFFETS = [
+    { id: "EFF_ETOURDIT",
+      champs: { Notes: "EFFET ETAT ÉTOURDIT = -30% d'esquive / parade ET 20% de chance de louper sa technique" } },
+    { id: "EFF_GLACE",
+      champs: { Notes: "Mouvement coût doublé, et la cible reçoit 20% de dégâts en plus" } },
+    { id: "EFF_ELECTRIFIE",
+      champs: { Notes: "Baisse d'initiative sur la prochaine carte, et 20% de dégâts MAGIQUES en plus subis" } },
+    { id: "EFF_BRULE",
+      champs: { Notes: "-50% de soins reçus, et 3 dégâts à chaque fin de manche (du type de l'attaque qui a brûlé)" } },
+    { id: "EFF_POUSSEE",
+      champs: { Effet_Base: "10% chance de poussée la cible de 2 hexagones en ligne droite. Peut se déplacer ensuite. 15% de chance de la bousculer : -20% d'énergie.",
+                Notes: "Ne génère pas d'attaque d'opportunité" } },
+    { id: "EFF_DUREE_ETALEMENT_DEGATS",
+      champs: { Cout_PT: "Cout / 1.3",
+                Effet_Base: "Dégâts coupés en deux : rien au lancement, une moitié à la fin de cette manche, l'autre à la fin de la suivante.",
+                Notes: "Ne se pose que sur une attaque, une Zone ou une Distance — jamais sur un état." } },
+    // La Paralysie quitte le jeu : elle bloquait tout pendant quatre tours, et
+    // un joueur privé de son tour n'a plus de jeu du tout.
+    { id: "EFF_PARALYSIE", supprimer: true }
+];
+
+window.appliquerMigrationEffets = async function() {
+    const btn = document.getElementById("btn-migration-effets");
+    const texteOrigine = btn ? btn.innerText : "";
+    if (btn) { btn.innerText = "⏳ Mise à jour..."; btn.style.pointerEvents = "none"; }
+
+    const faits = [];
+    const inchanges = [];
+    const rates = [];
+    try {
+        for (const regle of window.MIGRATION_EFFETS) {
+            const ref = doc(db, "Combat_Effets", regle.id);
+            try {
+                const snap = await getDoc(ref);
+
+                if (regle.supprimer) {
+                    if (!snap.exists()) { inchanges.push(regle.id + " (déjà absent)"); continue; }
+                    await deleteDoc(ref);
+                    faits.push(regle.id + " — supprimé");
+                    continue;
+                }
+
+                if (!snap.exists()) { rates.push(regle.id + " : introuvable en base"); continue; }
+
+                // On ne renvoie QUE ce qui diffère : relancer la migration sur
+                // une base déjà à jour ne doit toucher à rien.
+                const actuel = snap.data() || {};
+                const aEcrire = {};
+                Object.keys(regle.champs).forEach(cle => {
+                    if (actuel[cle] !== regle.champs[cle]) aEcrire[cle] = regle.champs[cle];
+                });
+                if (Object.keys(aEcrire).length === 0) { inchanges.push(regle.id); continue; }
+
+                await setDoc(ref, aEcrire, { merge: true });
+                faits.push(`${regle.id} — ${Object.keys(aEcrire).join(", ")}`);
+            } catch (e) {
+                rates.push(`${regle.id} : ${e && e.message}`);
+            }
+        }
+
+        // Le cache du jeu doit repartir de la base, sinon la Forge continuerait
+        // d'afficher les anciens textes jusqu'au prochain rechargement.
+        if (typeof window.chargerCacheEffetsBDD === "function") await window.chargerCacheEffetsBDD();
+        if (document.getElementById("conteneur-table-effets")
+            && typeof window.chargerTableauEffets === "function") {
+            await window.chargerTableauEffets();
+        }
+    } finally {
+        if (btn) { btn.innerText = texteOrigine || "Mettre la BDD à jour"; btn.style.pointerEvents = "auto"; }
+    }
+
+    const lignes = [];
+    lignes.push(faits.length ? `Mis à jour (${faits.length}) :\n  • ` + faits.join("\n  • ")
+                             : "Rien à mettre à jour.");
+    if (inchanges.length) lignes.push(`Déjà à jour (${inchanges.length}) : ${inchanges.join(", ")}`);
+    if (rates.length) lignes.push(`⚠️ Échecs (${rates.length}) :\n  • ` + rates.join("\n  • "));
+    console.log("🧪 Migration des effets :", { faits, inchanges, rates });
+    alert(lignes.join("\n\n"));
+    return { faits, inchanges, rates };
+};
+
 window.chargerCacheEffetsBDD = async function() {
     try {
         const snap = await getDocs(collection(db, "Combat_Effets"));
@@ -6058,6 +6153,7 @@ Object.assign(window, {
   sauvegarderEffetLigne: window.sauvegarderEffetLigne,
   ajouterLigneEffetVide: window.ajouterLigneEffetVide,
   supprimerEffetLigne: window.supprimerEffetLigne,
+  appliquerMigrationEffets: window.appliquerMigrationEffets,
   // Gestion des Races
   ouvrirGestionRaces: window.ouvrirGestionRaces,
   fermerGestionRaces: window.fermerGestionRaces,

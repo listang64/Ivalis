@@ -153,12 +153,13 @@ console.log("\n1. LA TABLE DE COULEURS COUVRE TOUS LES ÉTATS PERSISTANTS DU JEU
 //  Poussée/Traction/Peur qui sont instantanés) doit avoir SA couleur —
 //  sans quoi il tomberait dans le gris par défaut sans que ce soit voulu.
 {
-    const etatsDuJeu = ["Étourdi", "Immobilisation", "Confusion", "Paralysie",
+    // La Paralysie a été retirée du jeu : treize états persistants, pas quatorze.
+    const etatsDuJeu = ["Étourdi", "Immobilisation", "Confusion",
         "Empoisonnement", "Brûlé", "Glacé", "Électrifié", "Provocation",
         "Absorption", "Étalement", "Élan", "Béni", "Repli"];
     const r = await p.evaluate((noms) => noms.map(n => window.COULEUR_ETAT[n]), etatsDuJeu);
     const manquants = etatsDuJeu.filter((n, i) => !r[i]);
-    verifier("les quatorze états du jeu ont chacun leur couleur", manquants.length === 0,
+    verifier("les treize états du jeu ont chacun leur couleur", manquants.length === 0,
              manquants.join(", "));
     const couleurs = new Set(r);
     verifier("et aucune couleur n'est partagée entre deux états",

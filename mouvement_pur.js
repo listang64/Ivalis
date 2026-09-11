@@ -248,7 +248,7 @@ export function resoudreMouvement(etat, action, des, plateau) {
     if (!c) return { etat: suivant, etapes };
 
     // Immobilisé : on ne bouge pas d'un pouce, et on le dit.
-    if (aLEtat(c, "Immobilisation") || aLEtat(c, "Paralysie")) {
+    if (aLEtat(c, "Immobilisation")) {
         etapes.push({ type: "echec", acteur: id, raison: "Immobilisation" });
         return { etat: suivant, etapes };
     }

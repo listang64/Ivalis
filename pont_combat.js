@@ -130,6 +130,14 @@ const SCENES = {
         return { geste: "message", pion: e.acteur, texte: "Échec technique !",
                  couleur: COULEURS.attention, duree: RYTHME.message };
     },
+    // Une étape qui ne change rien à l'état et n'a qu'un mot à dire : une
+    // poussée qu'un mur a arrêtée, un effet que le noyau ne sait pas encore
+    // jouer. Elle EXISTE pour que ce silence-là s'affiche au lieu de passer
+    // inaperçu — la leçon de toutes les soirées perdues de cette semaine.
+    message(e) {
+        return { geste: "message", pion: e.cible || e.acteur, texte: e.texte || "",
+                 couleur: COULEURS.neutre, duree: RYTHME.message };
+    },
     etatRate(e) {
         // Une immunité de peuple n'est pas un jet manqué : c'est écrit sur la
         // fiche, pas dans les dés. Le mot doit le dire, sans quoi un joueur

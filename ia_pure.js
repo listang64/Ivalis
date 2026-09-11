@@ -340,7 +340,7 @@ export function deciderTourCreature(etat, id, infosCarte, plateau, des) {
     }
 
     // Immobilisée, elle reste où elle est — mais peut encore frapper.
-    if (aLEtat(moi, "Immobilisation") || aLEtat(moi, "Paralysie")) {
+    if (aLEtat(moi, "Immobilisation")) {
         place = { q: moi.q, r: moi.r, chemin: [], cout: 0 };
     }
 

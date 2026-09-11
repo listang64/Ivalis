@@ -139,7 +139,7 @@ const MOTS_CLES = {
     // autres : sans elles dans cette liste, elles échappaient à la limite de deux
     // altérations par carte et se retrouvaient, étant bon marché et sans
     // contrainte, sur près d'une carte sur deux.
-    controle:    ["poussée", "poussee", "traction", "immobilisation", "bond", "paralysie", "étourdi", "etourdi", "peur", "provocation"],
+    controle:    ["poussée", "poussee", "traction", "immobilisation", "bond", "étourdi", "etourdi", "peur", "provocation"],
     etat:        ["brûl", "brul", "glac", "électri", "electri", "poison", "empoison", "confusion", "saignement", "malédiction", "malediction"]
 };
 
@@ -277,7 +277,6 @@ function affinitesParDefaut(monstre) {
         if (contient(nom, ["brûl", "brul", "glac", "électri", "electri"])) note = magique ? 8 : 0;
         if (contient(nom, ["poison", "empoison", "saignement"]))           note = magique ? 7 : 6;
         if (contient(nom, ["confusion", "malédiction", "malediction"]))    note = magique ? 8 : 1;
-        if (contient(nom, ["paralysie"]))                                  note = magique ? 7 : 2;
         // Garde-fou général : tout effet qui se dit "magique" reste l'apanage des
         // lanceurs de sorts. Sans cela, un ours se mettait à faire de la
         // "Traction magique", qui est bien un effet de contrôle mais d'origine
@@ -656,7 +655,7 @@ function coutPCChantier(chantier, palette) {
         });
 
         let coutAction = coutBase + coutDuree + coutMods;
-        if (aEtalement) coutAction /= 1.2;
+        if (aEtalement) coutAction /= 1.3;
         totalPC += coutAction;
     });
     return totalPC;

@@ -7,12 +7,13 @@
 // L'ORDRE DE LA CHAÎNE EST LA RÈGLE DU JEU, et chaque chapitre en garde un
 // maillon : le critique double à la source, le tir à bout portant ampute de
 // trente pour cent, l'absorption draine avant que le reste ne frappe, la
-// résistance réduit, l'étalement coupe APRÈS les résistances, le bouclier
+// résistance réduit, l'étalement diffère tout après les résistances, le bouclier
 // encaisse avant les points de vie. Changer cet ordre change l'équilibre du
 // jeu — et sans ce banc, personne ne s'en apercevrait.
 import {
     jouer, resoudreCarte, chaineDeDegats, tirerDesCarte, tirerCritique,
-    esquiveDe, paradeDe, defPhysiqueDe, distanceHex, bonusMonstreDe
+    esquiveDe, paradeDe, defPhysiqueDe, distanceHex, bonusMonstreDe,
+    REGLES_ETATS, CHANCE_BOUSCULADE_POUSSEE, FATIGUE_BOUSCULADE_POUSSEE
 } from '../moteur_pur.js';
 import { construireEtatCombat, creerDes, verifierEtatCombat, clonerEtat } from '../combat_etat.js';
 
@@ -76,12 +77,15 @@ console.log("\n1. LA CHAÎNE DE DÉGÂTS, MAILLON PAR MAILLON");
     c = chaineDeDegats(blinde, { valeurBrute: 20 }, { percee: true });
     verifier("une armure percée ne réduit plus rien", c.degats === 20, `(${c.degats})`);
 
-    // Étalement : 15 après résistances → 8 maintenant, 7 plus tard.
+    // Étalement : 15 après résistances → RIEN tout de suite, 8 à la fin de
+    // cette manche, 7 à la fin de la suivante. C'est ce qui paie sa ristourne
+    // de fatigue : on frappe moins cher, mais il faut attendre.
     c = chaineDeDegats(blinde, { valeurBrute: 20, estEtalement: true }, {});
-    verifier("l'étalement coupe APRÈS les résistances",
-             c.degats === 8 && c.secondTic === 7, `(${c.degats} + ${c.secondTic})`);
+    verifier("une technique étalée ne fait RIEN au lancement", c.degats === 0, `(${c.degats})`);
+    verifier("elle range deux tics, dans l'ordre", JSON.stringify(c.tics) === "[8,7]",
+             JSON.stringify(c.tics));
     verifier("et les deux moitiés font exactement le total",
-             c.degats + c.secondTic === 15);
+             c.tics.reduce((a, b) => a + b, 0) === 15);
 
     // Absorption : 20 % annulés, drain de 10 % du brut.
     const absorbant = { pv: 40, pvMax: 60, bouclier: 0,
@@ -615,6 +619,219 @@ console.log("\n17. LA TRICHE DES CRÉATURES ET L'IMMUNITÉ VIVENT CHACUNE LEUR V
     verifier("et H2 reste immunisé à l'Étourdi malgré le Boss qui frappe ailleurs",
              !r.etat.combattants.H2.etats.some(e => e.nom === "Étourdi"),
              JSON.stringify(r.etat.combattants.H2.etats));
+}
+
+// =========================================================================
+console.log("\n18. CE QUE CHAQUE ÉTAT FAIT, MAINTENANT QU'IL EST ÉCRIT EN UN SEUL ENDROIT");
+// =========================================================================
+//  Ces règles vivaient éparpillées — le malus d'esquive de l'Étourdi dans la
+//  conversion d'une fiche Firestore, sa chance d'échec dans deux moteurs, le
+//  reste nulle part. Sous le régime du cerveau, qui ne traverse aucun de ces
+//  chemins, l'Étourdi ne coûtait PLUS RIEN. Le tableau REGLES_ETATS est la
+//  réponse, et ce chapitre en garde chaque ligne.
+{
+    const nu = { pv: 60, pvMax: 60, bouclier: 0, etats: [], def: {} };
+    const gele = { ...nu, etats: [{ nom: "Glacé", duree: 2 }] };
+    const foudroye = { ...nu, etats: [{ nom: "Électrifié", duree: 2 }] };
+    const lesDeux = { ...nu, etats: [{ nom: "Glacé", duree: 2 }, { nom: "Électrifié", duree: 2 }] };
+
+    verifier("le tableau dit ce que l'Étourdi coûte",
+             REGLES_ETATS["Étourdi"].esquive === -30 && REGLES_ETATS["Étourdi"].parade === -30
+             && REGLES_ETATS["Étourdi"].echecTechnique === 20,
+             JSON.stringify(REGLES_ETATS["Étourdi"]));
+
+    // GLACÉ : +20 % de dégâts subis, tous types confondus.
+    verifier("un corps gelé encaisse 20 % de plus (20 → 24)",
+             chaineDeDegats(gele, { valeurBrute: 20 }, {}).degats === 24,
+             String(chaineDeDegats(gele, { valeurBrute: 20 }, {}).degats));
+    verifier("et un corps ordinaire, non", chaineDeDegats(nu, { valeurBrute: 20 }, {}).degats === 20);
+
+    // ÉLECTRIFIÉ : +20 %, mais SEULEMENT en magique.
+    verifier("un corps électrifié conduit la magie (20 → 24)",
+             chaineDeDegats(foudroye, { valeurBrute: 20, typeRes: "Magique" }, {}).degats === 24);
+    verifier("mais pas l'acier (20 reste 20)",
+             chaineDeDegats(foudroye, { valeurBrute: 20, typeRes: "Physique" }, {}).degats === 20);
+
+    // LES DEUX ENSEMBLE s'additionnent : +40 % sur un coup magique.
+    verifier("gelé ET électrifié, un sort fait 40 % de plus (20 → 28)",
+             chaineDeDegats(lesDeux, { valeurBrute: 20, typeRes: "Magique" }, {}).degats === 28,
+             String(chaineDeDegats(lesDeux, { valeurBrute: 20, typeRes: "Magique" }, {}).degats));
+    verifier("et un coup physique n'en prend que vingt (20 → 24)",
+             chaineDeDegats(lesDeux, { valeurBrute: 20, typeRes: "Physique" }, {}).degats === 24);
+
+    // LA VULNÉRABILITÉ PASSE AVANT L'ARMURE, pas après : elle fait arriver le
+    // coup plus fort, elle n'affaiblit pas la protection.
+    const geleBlinde = { ...nu, def: { physique: 50 }, etats: [{ nom: "Glacé", duree: 2 }] };
+    verifier("elle se heurte quand même à l'armure (24 × 0,5 = 12)",
+             chaineDeDegats(geleBlinde, { valeurBrute: 20 }, {}).degats === 12,
+             String(chaineDeDegats(geleBlinde, { valeurBrute: 20 }, {}).degats));
+
+    // L'ÉTOURDI, sur un vrai combattant de l'état.
+    let etat = neuf();
+    etat.combattants.H1.etats = [{ nom: "Étourdi", duree: 2 }];
+    verifier("l'Étourdi retire 30 d'esquive", esquiveDe(etat.combattants.H1) === -30,
+             String(esquiveDe(etat.combattants.H1)));
+    verifier("et 30 de parade", paradeDe(etat.combattants.H1) === -30);
+
+    // ET SA CHANCE DE RATER : 20 %, tirée au lancement.
+    const desFixe = (suite) => { const f = [...suite]; return { d100: () => f.length ? f.shift() : 1 }; };
+    const jetsRate = tirerDesCarte(etat, { attaques: [] }, "H1", false, desFixe([20]));
+    verifier("à 20 pile, la technique rate", jetsRate.attaqueRatee === true);
+    const jetsPasse = tirerDesCarte(etat, { attaques: [] }, "H1", false, desFixe([21]));
+    verifier("à 21, elle part", jetsPasse.attaqueRatee === false);
+    // Un combattant sans Étourdi ne tire même pas ce dé.
+    const sansEtourdi = neuf();
+    verifier("sans Étourdi, aucun jet d'échec",
+             tirerDesCarte(sansEtourdi, { attaques: [] }, "H1", false,
+                           desFixe([1])).attaqueRatee === false);
+}
+
+// =========================================================================
+console.log("\n19. LA BRÛLURE RONGE, ET RETIENT CE QUI L'A ALLUMÉE");
+// =========================================================================
+{
+    let etat = neuf();
+    const brulerAvec = (typeRes) => resoudreCarte(etat, {
+        type: "carte", idLanceur: "M1", idCarte: "C1",
+        attaques: [{ valeurBrute: 5, typeRes, cibles: ["H1"] }],
+        alterations: [{ nom: "Brûlé", duree: 2, chance: 100, cibles: ["H1"] }],
+        jets: { parCible: { H1: { esquive: false, etats: { "Brûlé": true } } } }
+    });
+
+    const magique = brulerAvec("Magique").etat.combattants.H1.etats.find(e => e.nom === "Brûlé");
+    verifier("une flamme magique retient son type", magique && magique.typeDegats === "Magique",
+             magique && magique.typeDegats);
+    const physique = brulerAvec("Physique").etat.combattants.H1.etats.find(e => e.nom === "Brûlé");
+    verifier("une torche plantée dans la plaie aussi", physique && physique.typeDegats === "Physique",
+             physique && physique.typeDegats);
+
+    verifier("et le tableau dit combien elle ronge", REGLES_ETATS["Brûlé"].degatsParTour === 3);
+    verifier("et de combien elle ampute les soins", REGLES_ETATS["Brûlé"].soinsRecus === -50);
+}
+
+// =========================================================================
+console.log("\n20. CE QUE LA CIBLE FAIT DU SOIN QU'ELLE REÇOIT");
+// =========================================================================
+//  Deux règles qui ne vivaient que dans l'ancien moteur : l'atout de l'Éthéré
+//  (+30 %) et la brûlure (-50 %). Sous le cerveau, un Éthéré soignait comme
+//  tout le monde et une plaie qui brûle se refermait aussi bien qu'une autre.
+{
+    const soigner = (etat, valeur) => resoudreCarte(etat, {
+        type: "carte", idLanceur: "H2", idCarte: "CS",
+        attaques: [{ valeurBrute: valeur, isHeal: true, cibles: ["H1"] }], alterations: [],
+        jets: { parCible: { H1: { esquive: false, etats: {} } } }
+    });
+
+    let etat = neuf();
+    etat.combattants.H1.pv = 20;
+    verifier("un soin ordinaire rend sa valeur (20 → 40)",
+             soigner(etat, 20).etat.combattants.H1.pv === 40);
+
+    let ethere = neuf();
+    ethere.combattants.H1.pv = 20;
+    ethere.combattants.H1.atouts = { ...(ethere.combattants.H1.atouts || {}), soinsRecus: 30 };
+    verifier("l'Éthéré en tire 30 % de plus (20 → 46)",
+             soigner(ethere, 20).etat.combattants.H1.pv === 46,
+             String(soigner(ethere, 20).etat.combattants.H1.pv));
+
+    let brule = neuf();
+    brule.combattants.H1.pv = 20;
+    brule.combattants.H1.etats = [{ nom: "Brûlé", duree: 2 }];
+    verifier("une plaie qui brûle en perd la moitié (20 → 30)",
+             soigner(brule, 20).etat.combattants.H1.pv === 30,
+             String(soigner(brule, 20).etat.combattants.H1.pv));
+
+    // Les deux ensemble : +30 % et -50 % s'additionnent sur la même ligne.
+    let lesDeux = neuf();
+    lesDeux.combattants.H1.pv = 20;
+    lesDeux.combattants.H1.atouts = { ...(lesDeux.combattants.H1.atouts || {}), soinsRecus: 30 };
+    lesDeux.combattants.H1.etats = [{ nom: "Brûlé", duree: 2 }];
+    verifier("un Éthéré brûlé reçoit 80 % du soin (20 → 36)",
+             soigner(lesDeux, 20).etat.combattants.H1.pv === 36,
+             String(soigner(lesDeux, 20).etat.combattants.H1.pv));
+}
+
+// =========================================================================
+console.log("\n21. LA POUSSÉE POUSSE VRAIMENT, ET PEUT BOUSCULER");
+// =========================================================================
+//  Le cerveau ne la jouait pas du tout : il posait un état « Poussée » de durée
+//  zéro qui ne poussait personne, s'effaçait à la manche suivante, et laissait
+//  au passage une pastille de couleur sur le pion pour rien.
+{
+    const desFixe = (suite) => { const f = [...suite]; return { d100: () => f.length ? f.shift() : 1 }; };
+    const carte = (jets) => ({
+        type: "carte", idLanceur: "H1", idCarte: "CP", attaques: [],
+        alterations: [{ nom: "Poussée", duree: 0, chance: 100, cibles: ["M1"] }], jets
+    });
+
+    // H1 est en (0,0), M1 en (1,0) — et H2 se tient en (3,0). La poussée part
+    // donc pour deux cases mais s'arrête à (2,0) : contrairement au Bond, elle
+    // ne survole personne. Deux règles vérifiées d'un coup.
+    let etat = neuf();
+    const sansBousculade = resoudreCarte(etat, carte({
+        parCible: { M1: { esquive: false, etats: { "Poussée": true }, bouscule: false } } }));
+    verifier("la cible recule, et s'arrête sur le voisin qui barre la route",
+             sansBousculade.etat.combattants.M1.q === 2 && sansBousculade.etat.combattants.M1.r === 0,
+             `(${sansBousculade.etat.combattants.M1.q},${sansBousculade.etat.combattants.M1.r})`);
+    verifier("et une étape de poussée le raconte",
+             sansBousculade.etapes.some(e => e.type === "poussee" && e.cible === "M1"
+                                             && e.vers.q === 2 && e.de.q === 1),
+             JSON.stringify(sansBousculade.etapes.find(e => e.type === "poussee")));
+
+    // Sans personne devant, elle va bien jusqu'au bout des deux cases.
+    const degage = clonerEtat(etat);
+    degage.combattants.H2.q = 0; degage.combattants.H2.r = 5;
+    const loin = resoudreCarte(degage, carte({
+        parCible: { M1: { esquive: false, etats: { "Poussée": true }, bouscule: false } } }));
+    verifier("le passage dégagé, elle recule bien de deux cases",
+             loin.etat.combattants.M1.q === 3, String(loin.etat.combattants.M1.q));
+    verifier("aucun état fantôme n'est posé",
+             !sansBousculade.etat.combattants.M1.etats.some(e => e.nom === "Poussée"),
+             JSON.stringify(sansBousculade.etat.combattants.M1.etats));
+    verifier("et sans bousculade, l'énergie ne bouge pas",
+             sansBousculade.etat.combattants.M1.fatigue === etat.combattants.M1.fatigue);
+
+    // La bousculade : 20 % de l'énergie MAXIMALE.
+    const avecBousculade = resoudreCarte(etat, carte({
+        parCible: { M1: { esquive: false, etats: { "Poussée": true }, bouscule: true } } }));
+    const attendu = etat.combattants.M1.fatigue
+                  - Math.ceil(etat.combattants.M1.fatigueMax * FATIGUE_BOUSCULADE_POUSSEE / 100);
+    verifier("bousculée, elle perd 20 % de son énergie maximale",
+             avecBousculade.etat.combattants.M1.fatigue === attendu,
+             `(${avecBousculade.etat.combattants.M1.fatigue} au lieu de ${attendu})`);
+
+    // LE JET DE BOUSCULADE : 15 %, tiré une fois, et seulement pour la Poussée.
+    const jets = tirerDesCarte(etat, { attaques: [],
+        alterations: [{ nom: "Poussée", chance: 100, cibles: ["M1"] }] },
+        "H1", false, desFixe([99, 1, 15]));
+    verifier("à 15 pile, la bousculade passe", jets.parCible.M1.bouscule === true,
+             JSON.stringify(jets.parCible.M1));
+    const jets16 = tirerDesCarte(etat, { attaques: [],
+        alterations: [{ nom: "Poussée", chance: 100, cibles: ["M1"] }] },
+        "H1", false, desFixe([99, 1, 16]));
+    verifier("à 16, non", jets16.parCible.M1.bouscule === false);
+    verifier("et le chiffre est celui du tableau", CHANCE_BOUSCULADE_POUSSEE === 15);
+
+    // Un autre état ne tire jamais ce dé : la suite des dés de toutes les
+    // autres cartes du jeu doit rester exactement la même qu'avant.
+    const jetsAutre = tirerDesCarte(etat, { attaques: [],
+        alterations: [{ nom: "Étourdi", chance: 100, cibles: ["M1"] }] },
+        "H1", false, desFixe([99, 1]));
+    verifier("un autre état ne consomme aucun dé de bousculade",
+             jetsAutre.parCible.M1.bouscule === undefined);
+
+    // UN MUR ARRÊTE LA POUSSÉE, mais la bousculade a quand même lieu : être
+    // projeté contre une paroi fatigue autant.
+    const mur = { etatCase: (q, r) => ({ bloquee: q >= 2, supprimee: false, difficile: false }) };
+    const contreLeMur = resoudreCarte(etat, carte({
+        parCible: { M1: { esquive: false, etats: { "Poussée": true }, bouscule: true } } }), mur);
+    verifier("contre un mur, la cible ne bouge pas",
+             contreLeMur.etat.combattants.M1.q === 1, String(contreLeMur.etat.combattants.M1.q));
+    verifier("le blocage est annoncé, pas avalé en silence",
+             contreLeMur.etapes.some(e => e.type === "message" && /bloquée/i.test(e.texte || "")),
+             JSON.stringify(contreLeMur.etapes.map(e => e.type)));
+    verifier("et elle est quand même bousculée",
+             contreLeMur.etat.combattants.M1.fatigue === attendu);
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

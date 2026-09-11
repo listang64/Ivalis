@@ -171,7 +171,11 @@ export function combattantDepuisFiche(fiche, position, regles) {
         immunites: Array.isArray(race.immunites) ? race.immunites : [],
         // L'Ophior reprend des points de vie à chaque fin de manche — la seule
         // race à en avoir, donc le seul atout de ce genre à porter un nombre.
-        regenPv: nombre(race.regenPv)
+        regenPv: nombre(race.regenPv),
+        // L'Éthéré tire trente pour cent de plus de chaque soin reçu. Le noyau
+        // applique ce pourcentage au moment de soigner (moteur_pur.js) : sans
+        // ce champ, l'atout restait dans l'ancien moteur et ne servait à rien.
+        soinsRecus: nombre(race.soinsRecus)
     };
     const mod = {
         // Ce que l'ÉQUIPEMENT change EN PERMANENCE, hors états altérés : le

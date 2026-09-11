@@ -64,13 +64,120 @@ export function bonusDesEtats(c, cle) {
     return total;
 }
 
-export const esquiveDe     = (c) => nombre(c && c.def && c.def.esquive)  + bonusDesEtats(c, "esquive");
-export const paradeDe      = (c) => nombre(c && c.def && c.def.parade)   + bonusDesEtats(c, "parade");
+// =========================================================================
+//  CE QUE CHAQUE ÉTAT FAIT, EN UN SEUL ENDROIT
+// =========================================================================
+//  Jusqu'ici, ce que faisait un état était éparpillé : le malus d'esquive de
+//  l'Étourdi vivait dans la conversion d'une fiche Firestore (app.js), sa
+//  chance de rater une technique dans deux moteurs différents, le coût doublé
+//  du Glacé dans le module de mouvement. Résultat : sous le régime du cerveau,
+//  qui ne traverse aucun de ces chemins, l'Étourdi ne coûtait PLUS RIEN en
+//  esquive ni en parade — il ne faisait qu'exister.
+//
+//  Ce tableau est la réponse : une ligne par état, lue par le noyau au moment
+//  de trancher. Changer l'équilibre d'un état, c'est changer un nombre ici.
+//
+//    esquive / parade        points de défense retirés tant que l'état dure
+//    echecTechnique          % de chance de rater complètement sa technique
+//    degatsSubis             % de dégâts EN PLUS encaissés, tous types
+//    degatsMagiquesSubis     % de dégâts EN PLUS, seulement en magique
+//    degatsParTour           dégâts pris à chaque fin de manche tant qu'il dure
+//    soinsRecus              % ajouté (ou retiré) à tout soin reçu
+//
+//  Le coût de déplacement doublé du Glacé, lui, reste dans mouvement_pur.js :
+//  il ne se mesure pas en pourcentage mais en règle de chemin.
+export const REGLES_ETATS = {
+    "Étourdi":    { esquive: -30, parade: -30, echecTechnique: 20 },
+    "Glacé":      { degatsSubis: 20 },
+    "Électrifié": { degatsMagiquesSubis: 20 },
+    "Brûlé":      { degatsParTour: 3, soinsRecus: -50 }
+};
+
+// LA BOUSCULADE. Une poussée qui aboutit peut, en plus, faire perdre pied :
+// la cible se rattrape, et ça lui coûte de l'énergie. C'est ce qui remplace la
+// « mise à terre » — le jeu n'a pas d'état « couché », mais il a une jauge de
+// fatigue, et la dépenser sans avoir rien choisi est une vraie punition.
+export const CHANCE_BOUSCULADE_POUSSEE = 15;   // % de chance
+export const FATIGUE_BOUSCULADE_POUSSEE = 20;  // % de l'énergie maximale
+
+// Ce que les états d'un combattant lui coûtent (ou lui rapportent) sur une
+// ligne donnée du tableau. Un état inconnu du tableau ne change rien.
+export function regleDesEtats(c, cle) {
+    let total = 0;
+    (c && c.etats ? c.etats : []).forEach(e => {
+        const regle = e && REGLES_ETATS[e.nom];
+        if (regle && typeof regle[cle] === "number") total += regle[cle];
+    });
+    return total;
+}
+
+export const esquiveDe     = (c) => nombre(c && c.def && c.def.esquive)  + bonusDesEtats(c, "esquive")
+                                  + regleDesEtats(c, "esquive");
+export const paradeDe      = (c) => nombre(c && c.def && c.def.parade)   + bonusDesEtats(c, "parade")
+                                  + regleDesEtats(c, "parade");
 export const defPhysiqueDe = (c) => nombre(c && c.def && c.def.physique) + bonusDesEtats(c, "resPhys");
 export const defMagiqueDe  = (c) => nombre(c && c.def && c.def.magique)  + bonusDesEtats(c, "resMag");
 export const critiqueDe    = (c) => nombre(c && c.def && c.def.critique) + bonusDesEtats(c, "critique");
 
 export const aLEtat = (c, nom) => (c && c.etats ? c.etats : []).some(e => e && e.nom === nom);
+
+// =========================================================================
+//  LA POUSSÉE : OÙ LA CIBLE ATTERRIT
+// =========================================================================
+
+// Une plaine sans obstacle : ce que voit le noyau quand personne ne lui passe
+// de plateau (un banc, un rejeu hors du jeu).
+const PLAINE = { etatCase: () => ({ bloquee: false, supprimee: false, difficile: false }) };
+
+// Une case où l'on peut atterrir : ni mur, ni trou, ni voisin debout dessus.
+// Contrairement au Bond, une poussée ne survole personne — c'est la règle de
+// l'ancien moteur, reprise telle quelle.
+export function caseLibre(etat, plateau, q, r, idIgnore) {
+    const carte = plateau || PLAINE;
+    const dessus = (carte.etatCase ? carte.etatCase(q, r) : null) || {};
+    if (dessus.bloquee || dessus.supprimee) return false;
+    const table = (etat && etat.combattants) || {};
+    return !Object.keys(table).some(id => {
+        if (id === idIgnore) return false;
+        const c = table[id];
+        return c && !c.aTerre && c.q === q && c.r === r;
+    });
+}
+
+//  On prolonge la ligne lanceur → cible, case par case, et on s'arrête au
+//  premier obstacle. La géométrie est celle de l'ancien moteur, reprise au
+//  caractère près (interpolation en coordonnées cubiques, puis arrondi) : une
+//  poussée en diagonale doit partir dans la même direction qu'avant.
+//
+//  `estLibre` est fourni par l'appelant — le noyau ne connaît ni le plateau ni
+//  qui se tient où, on les lui passe. Rendre `null`, c'est « bloquée » : la
+//  cible ne bouge pas d'un pouce.
+export function destinationPoussee(lanceur, cible, cases, estLibre) {
+    const distance = distanceHex(lanceur, cible);
+    if (!Number.isFinite(distance) || distance === 0) return null;
+
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const arrondiCube = (q, r, s) => {
+        let rq = Math.round(q), rr = Math.round(r), rs = Math.round(s);
+        const dq = Math.abs(rq - q), dr = Math.abs(rr - r), ds = Math.abs(rs - s);
+        if (dq > dr && dq > ds) rq = -rr - rs;
+        else if (dr > ds) rr = -rq - rs;
+        return { q: rq, r: rr };
+    };
+    // Le millionième de case évite une ligne parfaitement à cheval entre deux
+    // colonnes, qui partirait d'un côté ou de l'autre selon l'arrondi.
+    const a = { q: lanceur.q + 1e-6, r: lanceur.r + 1e-6, s: -lanceur.q - lanceur.r - 2e-6 };
+    const b = { q: cible.q + 1e-6, r: cible.r + 1e-6, s: -cible.q - cible.r - 2e-6 };
+
+    let arrivee = null;
+    for (let i = 1; i <= nombre(cases, 2); i++) {
+        const t = (distance + i) / distance;
+        const pt = arrondiCube(lerp(a.q, b.q, t), lerp(a.r, b.r, t), lerp(a.s, b.s, t));
+        if (!estLibre(pt.q, pt.r)) break;
+        arrivee = pt;
+    }
+    return arrivee;
+}
 
 // La distance hexagonale, en coordonnées axiales. La même formule que partout
 // ailleurs dans le jeu — elle décide du malus de tir à bout portant.
@@ -95,8 +202,10 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
     const jets = { attaqueRatee: false, parCible: {} };
     const lanceur = combattant(etat, idLanceur);
 
-    // Étourdi : une chance sur dix de rater complètement sa technique.
-    if (aLEtat(lanceur, "Étourdi")) jets.attaqueRatee = des.d100() <= 10;
+    // Étourdi : une chance de rater complètement sa technique — le chiffre
+    // vient du tableau des états, il ne traîne plus en dur ici.
+    const echec = regleDesEtats(lanceur, "echecTechnique");
+    if (echec > 0) jets.attaqueRatee = des.d100() <= echec;
 
     const pourCible = (id) => {
         if (!jets.parCible[id]) jets.parCible[id] = { etats: {} };
@@ -135,6 +244,14 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
             // Un coup critique impose les effets de la carte, sans jet.
             if (c.etats[alt.nom] === undefined) {
                 c.etats[alt.nom] = critique || des.d100() <= (alt.chance || 0);
+            }
+            // LA BOUSCULADE DE LA POUSSÉE. Une cible poussée peut en plus perdre
+            // pied : un second jet, sur la seule Poussée, qui lui coûte une part
+            // de son énergie. Le dé n'est tiré QUE pour cet état-là — ajouter un
+            // tirage pour tout le monde décalerait la suite des dés de toutes
+            // les autres cartes du jeu.
+            if (alt.nom === "Poussée" && c.bouscule === undefined) {
+                c.bouscule = des.d100() <= CHANCE_BOUSCULADE_POUSSEE;
             }
         });
     });
@@ -241,6 +358,15 @@ export function chaineDeDegats(cible, attaque, options) {
     // 2. Une arme de jet employée au contact perd trente pour cent.
     if (attaque.isRanged && distance === 1) degats = Math.floor(degats * 0.7);
 
+    // 2 bis. LES VULNÉRABILITÉS DE LA CIBLE. Un corps gelé casse plus
+    //    facilement (+20 % de tout), un corps électrifié conduit la magie
+    //    (+20 % de magique en plus). Elles s'ajoutent l'une à l'autre, et se
+    //    posent AVANT l'absorption et les résistances : c'est le coup qui
+    //    arrive plus fort, pas l'armure qui protège moins.
+    let vulnerabilite = regleDesEtats(cible, "degatsSubis");
+    if (attaque.typeRes === "Magique") vulnerabilite += regleDesEtats(cible, "degatsMagiquesSubis");
+    if (vulnerabilite !== 0) degats = Math.max(0, Math.round(degats * (1 + vulnerabilite / 100)));
+
     // 3. Absorption réactive : la cible annule une part du coup et draine.
     const abs = (cible.etats || []).find(e => e && e.nom === "Absorption");
     if (abs) {
@@ -258,11 +384,17 @@ export function chaineDeDegats(cible, attaque, options) {
     const reduction = Math.min(1, resistance / 100);
     let degatsFinaux = Math.max(0, Math.round(degats * (1 - reduction)));
 
-    // 5. L'étalement : le reste de la division part sur le premier tic, pour que
-    //    les deux moitiés fassent exactement le total d'une attaque normale.
+    // 5. L'ÉTALEMENT NE FRAPPE PLUS TOUT DE SUITE. Une technique étalée ne fait
+    //    RIEN au moment où elle part : sa première moitié tombe à la fin de la
+    //    manche en cours, la seconde à la fin de la suivante. C'est ce qui
+    //    justifie sa ristourne de fatigue — on paie moins cher, mais il faut
+    //    attendre. Le reste de la division va sur le premier tic, pour que les
+    //    deux moitiés fassent exactement le total d'une attaque normale.
     if (attaque.estEtalement && degatsFinaux > 0) {
-        compte.secondTic = Math.floor(degatsFinaux / 2);
-        degatsFinaux = degatsFinaux - compte.secondTic;
+        const second = Math.floor(degatsFinaux / 2);
+        compte.tics = [degatsFinaux - second, second];
+        compte.secondTic = second;   // gardé pour qui lit encore l'ancien nom
+        degatsFinaux = 0;
     }
     compte.degats = degatsFinaux;
 
@@ -333,12 +465,17 @@ export function projectileDe(action) {
 //  aucun message flottant. Ces choses-là se déduisent des étapes, sur chaque
 //  écran, au rythme de chaque écran.
 
-export function resoudreCarte(etat, action) {
+export function resoudreCarte(etat, action, plateau) {
     const suivant = clonerEtat(etat);
     const etapes = [];
     const idLanceur = action.idLanceur;
     const lanceur = combattant(suivant, idLanceur);
     if (!lanceur) return { etat: suivant, etapes };
+
+    // Le terrain, pour les effets qui déplacent (la Poussée). Sans lui, on
+    // travaille sur une plaine infinie : c'est ce dont un banc a besoin, et
+    // jamais ce que le jeu fournit.
+    const carte = plateau || PLAINE;
 
     // Une créature ne critique jamais, même si l'action reçue le prétend. Le
     // premier verrou est au lancement ; celui-ci tient sur tous les écrans.
@@ -363,7 +500,7 @@ export function resoudreCarte(etat, action) {
 
     // Le lanceur étourdi rate parfois complètement sa technique. Le jet a été
     // tiré au lancement ; on ne fait que le lire.
-    if (aLEtat(lanceur, "Étourdi") && jets.attaqueRatee) {
+    if (regleDesEtats(lanceur, "echecTechnique") > 0 && jets.attaqueRatee) {
         etapes.push({ type: "echec", acteur: idLanceur, raison: "Étourdi" });
         return { etat: suivant, etapes };
     }
@@ -411,7 +548,15 @@ export function resoudreCarte(etat, action) {
             //  dégât ni un soin.
             if (attaque.isHeal) {
                 const avant = cible.pv;
-                const soin = Math.max(0, nombre(attaque.valeurBrute) + bonusMonstre) * (critique ? 2 : 1);
+                let soin = Math.max(0, nombre(attaque.valeurBrute) + bonusMonstre) * (critique ? 2 : 1);
+                // CE QUE LA CIBLE FAIT DU SOIN QU'ELLE REÇOIT. L'Éthéré en tire
+                // trente pour cent de plus ; une plaie qui brûle en perd la
+                // moitié. Ces deux règles ne vivaient que dans l'ancien moteur :
+                // sous le régime du cerveau, un Éthéré soignait comme tout le
+                // monde et une brûlure ne gênait aucun soin.
+                const partSoins = 100 + nombre(cible.atouts && cible.atouts.soinsRecus)
+                                      + regleDesEtats(cible, "soinsRecus");
+                soin = Math.max(0, Math.round(soin * (partSoins / 100)));
                 cible.pv = Math.min(cible.pvMax, avant + soin);
                 etapes.push({ type: "soin", cible: idCible, acteur: idLanceur,
                               montant: cible.pv - avant, pvApres: cible.pv });
@@ -456,11 +601,21 @@ export function resoudreCarte(etat, action) {
                 critique
             });
 
-            // L'étalement : la seconde moitié tombera à la fin du tour de la
-            // cible. On la range dans ses états, comme une brûlure.
-            if (compte.secondTic > 0) {
-                cible.etats = [...cible.etats,
-                               { nom: "Étalement", duree: 1, degatsDifferes: compte.secondTic }];
+            // L'ÉTALEMENT : LES DEUX MOITIÉS ATTENDENT. Rien n'a été retiré
+            // au-dessus (compte.degats vaut zéro) ; tout est rangé dans l'état,
+            // une moitié pour la fin de cette manche, l'autre pour la fin de la
+            // suivante. Un second étalement sur une cible déjà touchée rallonge
+            // la file plutôt que d'écraser ce qui lui reste à encaisser.
+            if ((compte.tics || []).length > 0) {
+                const dejaLa = cible.etats.find(e => e && e.nom === "Étalement");
+                if (dejaLa) {
+                    dejaLa.tics = [...(dejaLa.tics || []), ...compte.tics];
+                    dejaLa.duree = Math.max(nombre(dejaLa.duree), dejaLa.tics.length);
+                } else {
+                    cible.etats = [...cible.etats,
+                                   { nom: "Étalement", duree: compte.tics.length,
+                                     tics: [...compte.tics] }];
+                }
                 etapes.push({ type: "etats", cible: idCible, liste: cible.etats });
             }
 
@@ -474,7 +629,17 @@ export function resoudreCarte(etat, action) {
     // --- LES ÉTATS ALTÉRÉS -----------------------------------------------
     //  Ils se posent sur les cibles qui n'ont pas esquivé, et seulement si leur
     //  jet est passé — jet tiré au lancement, comme tout le reste.
+    //
+    //  Le type de dégâts de la carte sert aux états qui rongent (la brûlure) :
+    //  ils frapperont du même type que le coup qui les a posés. Une carte qui
+    //  ne fait que poser l'état, sans frapper, allume une flamme magique — un
+    //  état altéré est un effet magique dans la Forge.
+    const typeDeLaCarte = ((action.attaques || [])
+        .find(a => !a.isHeal && !a.isShield && (a.valeurBrute || 0) > 0) || {}).typeRes || "Magique";
+
     (action.alterations || []).forEach(alt => {
+        const regleAlt = REGLES_ETATS[alt.nom] || {};
+        const typeDegatsDeLEtat = regleAlt.degatsParTour > 0 ? typeDeLaCarte : null;
         (alt.cibles || []).forEach(idCible => {
             const cible = combattant(suivant, idCible);
             if (!cible || cible.aTerre) return;
@@ -493,6 +658,50 @@ export function resoudreCarte(etat, action) {
             if (des.esquive) return;
             if (!des.etats || des.etats[alt.nom] !== true) {
                 etapes.push({ type: "etatRate", cible: idCible, nom: alt.nom });
+                return;
+            }
+
+            // --- LA POUSSÉE : UN EFFET, PAS UN ÉTAT ------------------------
+            //  Elle ne dure pas : elle déplace, et c'est fini. Le cerveau ne la
+            //  jouait pas du tout — il posait un état « Poussée » de durée zéro
+            //  qui ne poussait personne et s'effaçait tout seul à la manche
+            //  suivante. Ici, la cible part vraiment.
+            if (alt.nom === "Poussée") {
+                const depart = { q: nombre(cible.q), r: nombre(cible.r) };
+                const arrivee = destinationPoussee(lanceur, cible, nombre(alt.cases, 2),
+                                                   (q, r) => caseLibre(suivant, carte, q, r, idCible));
+                if (arrivee) {
+                    cible.q = arrivee.q;
+                    cible.r = arrivee.r;
+                    etapes.push({ type: "poussee", cible: idCible, acteur: idLanceur,
+                                  de: depart, vers: arrivee });
+                } else {
+                    etapes.push({ type: "message", cible: idCible, acteur: idLanceur,
+                                  texte: "Poussée bloquée" });
+                }
+
+                // La bousculade : elle se joue même quand un mur a arrêté la
+                // poussée — être projeté contre une paroi fatigue autant.
+                if (des.bouscule) {
+                    const perte = Math.ceil(nombre(cible.fatigueMax) * (FATIGUE_BOUSCULADE_POUSSEE / 100));
+                    const apres = Math.max(0, nombre(cible.fatigue) - perte);
+                    if (apres !== nombre(cible.fatigue)) {
+                        cible.fatigue = apres;
+                        etapes.push({ type: "fatigue", cible: idCible, fatigueApres: apres,
+                                      tic: "Bousculade" });
+                    }
+                }
+                return;
+            }
+
+            // Les autres effets instantanés (Traction, Peur) ne se posent pas
+            // non plus comme des états : leur durée est nulle. Le noyau ne sait
+            // pas encore les jouer — ils restaient jusqu'ici accrochés à la
+            // fiche comme un état de durée zéro, avec une pastille de couleur
+            // sur le pion pour rien. On ne pose plus ce fantôme.
+            if (nombre(alt.duree !== undefined ? alt.duree : alt.tours, 1) <= 0) {
+                etapes.push({ type: "message", cible: idCible, acteur: idLanceur,
+                              texte: alt.nom });
                 return;
             }
 
@@ -515,6 +724,9 @@ export function resoudreCarte(etat, action) {
             const duree = nombre(alt.duree !== undefined ? alt.duree : alt.tours, 1);
             if (existant) {
                 existant.duree = Math.max(nombre(existant.duree), duree);
+                // Une brûlure ravivée par une autre carte reprend le type de
+                // CELLE-CI : c'est la dernière flamme posée qui brûle.
+                if (typeDegatsDeLEtat) existant.typeDegats = typeDegatsDeLEtat;
             } else {
                 cible.etats = [...cible.etats, {
                     nom: alt.nom,
@@ -522,7 +734,13 @@ export function resoudreCarte(etat, action) {
                     ...(alt.icone ? { icone: alt.icone } : {}),
                     ...(alt.desc ? { desc: alt.desc } : {}),
                     ...(alt.valeurAbs !== undefined ? { valeurAbs: alt.valeurAbs } : {}),
-                    ...(alt.bonusEquip ? { bonusEquip: alt.bonusEquip } : {})
+                    ...(alt.bonusEquip ? { bonusEquip: alt.bonusEquip } : {}),
+                    // LA BRÛLURE SE SOUVIENT DE CE QUI L'A ALLUMÉE. Elle ronge
+                    // à chaque manche (REGLES_ETATS.Brûlé.degatsParTour), et
+                    // ces dégâts-là sont du type de l'attaque qui l'a posée :
+                    // une flamme magique se heurte à la résistance magique,
+                    // une torche plantée dans la plaie à l'armure.
+                    ...(typeDegatsDeLEtat ? { typeDegats: typeDegatsDeLEtat } : {})
                 }];
             }
             etapes.push({ type: "etats", cible: idCible, pose: alt.nom, liste: cible.etats });

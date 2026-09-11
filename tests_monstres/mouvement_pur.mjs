@@ -308,7 +308,8 @@ console.log("\n9. ON NE BOUGE PAS QUAND ON EST IMMOBILISÉ");
 // =========================================================================
 {
     const etat = neuf();
-    ["Immobilisation", "Paralysie"].forEach(nom => {
+    // La Paralysie a été retirée du jeu : il ne reste que l'Immobilisation.
+    ["Immobilisation"].forEach(nom => {
         const bloque = clonerEtat(etat);
         bloque.combattants.H1.etats = [{ nom, tours: 2 }];
         const { etat: apres, etapes } = resoudreMouvement(

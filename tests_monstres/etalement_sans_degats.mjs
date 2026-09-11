@@ -1,10 +1,12 @@
-// ÉTALEMENT DES DÉGÂTS : RÉSERVÉ AUX CARTES QUI FRAPPENT.
-// Le mod "Durée étalement dégâts" (alias "DOT") coupe en deux les dégâts d'une
-// attaque — sur une carte sans attaque (un soin, un pur contrôle), il n'y a
-// rien à étaler et le mod ne faisait déjà rien à la résolution (moteur_effets.js
-// : etalementActif = aEtalement && !isHeal). Ce banc vérifie que la Forge le
-// grise désormais aussi à l'écran, sur le VRAI code de competences.js, comme
-// elle le fait déjà pour l'Empoisonnement.
+// ÉTALEMENT DES DÉGÂTS : RÉSERVÉ À CE QUI FRAPPE, ET SEULEMENT LÀ.
+// Le mod "Durée étalement dégâts" (alias "DOT") étale les dégâts d'une attaque
+// dans le temps. Deux conditions, et le banc tient les deux sur le VRAI code de
+// competences.js :
+//   • LA CARTE doit frapper quelque part — sur un soin ou un pur contrôle, il
+//     n'y a rien à étaler (c'était déjà la règle) ;
+//   • L'ACTION à laquelle on l'accroche doit être un coup, une Zone ou une
+//     Distance — jamais un état altéré. Étaler un étourdissement ne veut rien
+//     dire : on ne coupe pas un état en deux moitiés de dégâts.
 import fs from 'fs';
 
 const src = fs.readFileSync('/home/user/Ivalis/competences.js', 'utf-8');
@@ -18,6 +20,18 @@ const SRC_ATTAQUE = src.slice(src.indexOf('function estUneAttaqueDeBase'), src.i
 const finAttaque = SRC_ATTAQUE.indexOf('\n}\n') + 3;
 const SRC_ATTAQUE_FN = SRC_ATTAQUE.slice(0, finAttaque);
 
+// Les deux règles qui décident SUR QUOI l'étalement peut se greffer, prises
+// telles quelles dans la Forge — pas réécrites ici.
+const SRC_REGLES_ETALEMENT = src.slice(src.indexOf('    const estUnModEtalement = (nomLower) => {'),
+                                       src.indexOf('    const renderSelectMenu = (type, label'));
+if (!SRC_REGLES_ETALEMENT.includes('actionAccepteEtalement')) {
+    throw new Error("les règles d'étalement ne sont plus là où le banc les cherche");
+}
+
+// Les trois formes d'action sur lesquelles l'étalement a un sens, et une qui
+// ne doit jamais l'accepter.
+const action = (nomEffetBase) => ({ idInst: "A1", baseEffet: { Nom: nomEffetBase }, mods: {} });
+
 // Le bloc RÉEL qui construit chaque <option> du menu déroulant de mods,
 // extrait entre ses deux repères stables (rien de plus, rien de moins).
 const debutBloc = src.indexOf('modsDispos.forEach(mod => {');
@@ -29,7 +43,8 @@ if (!SRC_BLOC.includes('estIncompatibleEtalement')) {
 }
 
 // Rejoue exactement l'environnement local que ce bloc trouve dans rafraichirForge.
-function optionsPour({ aDejaUneAttaque, estActionPoussee = false, estActionIllusion = false, mods }) {
+function optionsPour({ aDejaUneAttaque, estActionPoussee = false, estActionIllusion = false, mods,
+                      actionCourante = action("Attaque légère") }) {
     const groupesMods = {};
     const activeTags = new Set();
     const NOMS_INCOMPATIBLES_POUSSEE = ["persistance terrain", "zone", "durée étalement dégâts"];
@@ -37,7 +52,8 @@ function optionsPour({ aDejaUneAttaque, estActionPoussee = false, estActionIllus
     // Un seul eval : les déclarations de fonction d'un eval strict (modules ES)
     // ne fuient jamais vers l'appelant, mais restent visibles ENTRE ELLES à
     // l'intérieur d'un même bloc évalué.
-    eval(SRC_PARSE + '\n' + SRC_NETTOIE + '\n' + SRC_ATTAQUE_FN + '\n' + SRC_BLOC);
+    eval(SRC_PARSE + '\n' + SRC_NETTOIE + '\n' + SRC_ATTAQUE_FN + '\n'
+         + SRC_REGLES_ETALEMENT + '\n' + SRC_BLOC);
     return Object.values(groupesMods).flat().join("");
 }
 
@@ -67,6 +83,37 @@ console.log("\n4. LES AUTRES MODS NE SONT PAS TOUCHÉS PAR CETTE RÈGLE");
 {
     const html = optionsPour({ aDejaUneAttaque: false, mods: [modEtalement("Distance")] });
     verifier("un mod sans rapport reste disponible même sans attaque", !/disabled/.test(html), html);
+}
+
+console.log("\n5. ET SEULEMENT SUR UNE ACTION QUI FRAPPE, UNE ZONE OU UNE DISTANCE");
+// Nouvelle règle : la carte a beau frapper ailleurs, l'étalement ne s'accroche
+// pas à n'importe quelle action. Sur un état altéré, il n'y a rien à étaler.
+{
+    const surAttaque = optionsPour({ aDejaUneAttaque: true, mods: [modEtalement("DOT")],
+                                     actionCourante: action("Attaque lourde") });
+    verifier("sur une attaque : disponible", !/disabled/.test(surAttaque));
+
+    const surZone = optionsPour({ aDejaUneAttaque: true, mods: [modEtalement("DOT")],
+                                  actionCourante: action("Zone") });
+    verifier("sur une Zone : disponible", !/disabled/.test(surZone));
+
+    const surDistance = optionsPour({ aDejaUneAttaque: true, mods: [modEtalement("DOT")],
+                                      actionCourante: action("Distance") });
+    verifier("sur une Distance : disponible", !/disabled/.test(surDistance));
+
+    const surEtat = optionsPour({ aDejaUneAttaque: true, mods: [modEtalement("DOT")],
+                                  actionCourante: action("Étourdit") });
+    verifier("sur un état altéré : GRISÉ, même si la carte frappe ailleurs",
+             /disabled/.test(surEtat) && /non compatible/.test(surEtat), surEtat);
+
+    const surSoin = optionsPour({ aDejaUneAttaque: true, mods: [modEtalement("DOT")],
+                                  actionCourante: action("Soin") });
+    verifier("sur un soin : grisé aussi", /disabled/.test(surSoin), surSoin);
+
+    // Et les autres mods, eux, restent offerts sur une action d'état.
+    const autre = optionsPour({ aDejaUneAttaque: true, mods: [modEtalement("Distance")],
+                                actionCourante: action("Étourdit") });
+    verifier("un mod sans rapport reste disponible sur un état", !/disabled/.test(autre), autre);
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} ÉCHEC(S)`);

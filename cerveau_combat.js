@@ -38,7 +38,8 @@
 // =========================================================================
 
 import { clonerEtat, combattant, creerDes, verifierEtatCombat, FORMAT_ETAT } from './combat_etat.js';
-import { resoudreCarte, tirerDesCarte, tirerCritique } from './moteur_pur.js';
+import { resoudreCarte, tirerDesCarte, tirerCritique,
+         chaineDeDegats, REGLES_ETATS } from './moteur_pur.js';
 import { resoudreMouvement, distance, planifierTrajet, occupantVivant } from './mouvement_pur.js';
 import { deciderTourCreature } from './ia_pure.js';
 
@@ -313,33 +314,65 @@ export function ticsDeFinDeManche(etat) {
             }
         }
 
-        // --- ÉTALEMENT : le second et dernier coup ---------------------------
-        //  Il a déjà touché : pas de nouveau jet d'esquive. Mais le bouclier
-        //  encaisse en priorité, comme pour une attaque ordinaire.
-        const etalement = c.etats.find(e => e && e.nom === "Étalement" && !e.tickFait);
-        if (etalement) {
-            etalement.tickFait = true;
-            const montant = nombre(etalement.degatsDifferes !== undefined
-                                   ? etalement.degatsDifferes : etalement.degatsRestants);
-            if (montant > 0) {
-                const bouclierAvant = nombre(c.bouclier);
-                if (bouclierAvant > 0) {
-                    c.bouclier = Math.max(0, bouclierAvant - montant);
-                    etapes.push({ type: "degats", cible: id, montant,
-                                  surBouclier: Math.min(bouclierAvant, montant),
-                                  bouclierApres: c.bouclier, pvApres: nombre(c.pv),
-                                  tic: "Étalement" });
-                } else {
-                    const pvApres = Math.max(0, nombre(c.pv) - montant);
-                    c.pv = pvApres;
-                    c.aTerre = nombre(c.pvMax) > 0 && pvApres <= 0;
-                    etapes.push({ type: "degats", cible: id, montant, pvApres,
-                                  bouclierApres: 0, tic: "Étalement" });
-                }
+        // --- BRÛLURE : elle ronge tant qu'elle dure --------------------------
+        //  Trois dégâts par manche, du TYPE de l'attaque qui a allumé la
+        //  flamme (le noyau l'a retenu au moment de poser l'état) : une brûlure
+        //  magique se heurte à la résistance magique, une torche plantée dans
+        //  la plaie à l'armure. Contrairement au poison, elle mord à CHAQUE
+        //  manche, pas une seule fois — c'est ce qui la rend dangereuse quand
+        //  on la laisse durer.
+        const brulure = c.etats.find(e => e && e.nom === "Brûlé");
+        if (brulure) {
+            const parTour = nombre((REGLES_ETATS["Brûlé"] || {}).degatsParTour);
+            const typeRes = brulure.typeDegats === "Physique" ? "Physique" : "Magique";
+            const compte = chaineDeDegats(c, { valeurBrute: parTour, typeRes }, {});
+            if (compte.degats > 0) {
+                etapes.push(...infligerTic(c, id, compte.degats, "Brûlure"));
             }
+        }
+
+        // --- ÉTALEMENT : une moitié par manche, jamais au lancement ----------
+        //  La technique étalée n'a rien fait quand elle est partie : ses deux
+        //  moitiés attendent dans cette file, une par fin de manche. Le
+        //  bouclier encaisse en priorité, comme pour une attaque ordinaire.
+        const etalement = c.etats.find(e => e && e.nom === "Étalement");
+        if (etalement) {
+            let montant = 0;
+            if (Array.isArray(etalement.tics) && etalement.tics.length > 0) {
+                montant = nombre(etalement.tics.shift());
+            } else if (!etalement.tickFait) {
+                // Un étalement posé par une version précédente du jeu : il ne
+                // porte qu'un seul montant, sous son ancien nom. On l'honore.
+                etalement.tickFait = true;
+                montant = nombre(etalement.degatsDifferes !== undefined
+                                 ? etalement.degatsDifferes : etalement.degatsRestants);
+            }
+            if (montant > 0) etapes.push(...infligerTic(c, id, montant, "Étalement"));
         }
     });
 
+    return etapes;
+}
+
+// Un tic de dégâts posé sur un combattant : le bouclier d'abord, la vie
+// ensuite, et la chute si la vie tombe à zéro. Trois états s'en servent (la
+// brûlure, l'étalement, et demain ce qu'on ajoutera) — l'écrire une fois
+// évite qu'ils divergent.
+function infligerTic(c, id, montant, nomDuTic) {
+    const etapes = [];
+    const bouclierAvant = nombre(c.bouclier);
+    if (bouclierAvant > 0) {
+        c.bouclier = Math.max(0, bouclierAvant - montant);
+        etapes.push({ type: "degats", cible: id, montant,
+                      surBouclier: Math.min(bouclierAvant, montant),
+                      bouclierApres: c.bouclier, pvApres: nombre(c.pv), tic: nomDuTic });
+    } else {
+        const pvApres = Math.max(0, nombre(c.pv) - montant);
+        c.pv = pvApres;
+        c.aTerre = nombre(c.pvMax) > 0 && pvApres <= 0;
+        etapes.push({ type: "degats", cible: id, montant, pvApres,
+                      bouclierApres: 0, tic: nomDuTic });
+    }
     return etapes;
 }
 
@@ -507,7 +540,7 @@ export function appliquerIntention(etat, intention, plateau) {
             coutFatigue: nombre(intention.coutFatigue), critique
         };
         action.jets = tirerDesCarte(etat, action, intention.acteur, critique, des);
-        const r = resoudreCarte(etat, action);
+        const r = resoudreCarte(etat, action, plateau);
 
         // UNE CARTE TERMINE LE TOUR, et c'est la règle du jeu depuis toujours :
         // validerCarteCombat enchaîne sur finDeTourCombat. Le cerveau ne le
@@ -573,7 +606,7 @@ export function jouerCreature(etat, id, carte, plateau) {
             coutFatigue: nombre(infos.fatigue), critique
         };
         action.jets = tirerDesCarte(courant, action, id, critique, des);
-        const r = resoudreCarte(courant, action);
+        const r = resoudreCarte(courant, action, plateau);
         courant = r.etat;
         etapes.push(...r.etapes);
     } else if (!aPortee) {

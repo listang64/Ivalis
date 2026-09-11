@@ -211,7 +211,7 @@ function allesAdjacents(q, r, campMonstre, idMonstre) {
 // recevoir. Provocation y figure aussi (les monstres ne peuvent pas la lancer,
 // mais un joueur le peut) : cette liste doit rester en phase avec le moteur.
 const ALTERATIONS_MOTEUR = ["brûl", "brul", "glac", "électri", "electri", "empoison", "poison",
-    "confusion", "paralys", "immobilis", "peur", "pouss", "traction", "étourd", "etourd", "absorption",
+    "confusion", "immobilis", "peur", "pouss", "traction", "étourd", "etourd", "absorption",
     "provocation"];
 
 window.analyserCarteMonstre = function(dataCarte) {
@@ -1157,7 +1157,7 @@ window.jouerTourMonstre = async function(idMonstre, idCarte) {
     }
 
     // --- 2. Déplacement, par les rails du jeu (opportunités, zones, fatigue) ---
-    const immobilise = (monstre.Etats_Alteres || []).some(e => e.nom === "Immobilisation" || e.nom === "Paralysie");
+    const immobilise = (monstre.Etats_Alteres || []).some(e => e.nom === "Immobilisation");
     if (position && !immobilise && (position.q !== tk.q || position.r !== tk.r)) {
         window.CHEMIN_MOUVEMENT = [];
         window.MOUVEMENT_COUT_TOTAL = 0;

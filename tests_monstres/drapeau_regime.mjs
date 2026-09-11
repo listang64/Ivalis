@@ -511,8 +511,13 @@ console.log("\n13. LA CARTE D'UNE CRÉATURE PASSE PAR L'EXTRACTEUR DU JEU");
              moteur.includes("if (extraireSeulement) return carteConstruite;"));
     verifier("et le ciblage normal continue de poser ETAT_CIBLAGE",
              moteur.includes("window.ETAT_CIBLAGE = carteConstruite;"));
+    // Une extraction rend `null` plutôt que d'aller valider la carte dans
+    // l'interface. Il ne reste qu'un seul de ces points de sortie depuis que la
+    // Paralysie a quitté le jeu (c'était l'autre) : une carte sans rien à
+    // frapper n'est pas une carte.
     verifier("une extraction ne valide jamais la carte",
-             (moteur.match(/if \(extraireSeulement\) return null;/g) || []).length >= 2);
+             (moteur.match(/if \(extraireSeulement\) return null;/g) || []).length >= 1
+             && !/if \(extraireSeulement\)[\s\S]{0,80}validerCarteCombat/.test(moteur));
     verifier("ni ne joue de son", moteur.includes("if (!extraireSeulement && typeof window.jouerSonClic"));
 
     // LA LECTURE EST FAITE À L'AVANCE : le cerveau est synchrone.

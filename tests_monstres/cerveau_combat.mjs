@@ -11,7 +11,7 @@
 import {
     estLeCerveau, cerveauPerdu, validerIntention, appliquerIntention,
     avancerFile, jouerCreature, prochainPas, creerCerveau, cloturerTour, CERVEAU_PERDU_MS,
-    suivreBattement, cerveauSilencieux, regenererPvFinDeManche
+    suivreBattement, cerveauSilencieux, regenererPvFinDeManche, ticsDeFinDeManche
 } from '../cerveau_combat.js';
 import { construireEtatCombat, creerDes, verifierEtatCombat, clonerEtat } from '../combat_etat.js';
 import { distance } from '../mouvement_pur.js';
@@ -810,6 +810,83 @@ console.log("\nL'ATOUT DE L'OPHIOR : DES PV REPRIS À CHAQUE FIN DE MANCHE");
     verifier("l'étape de soin est bien dans le lot publié",
              r.etapes.some(e => e.type === "soin" && e.cible === "H1" && e.regeneration === true),
              JSON.stringify(r.etapes.map(e => e.type)));
+}
+
+// =========================================================================
+console.log("\nCE QUE LES ÉTATS FONT À CHAQUE FIN DE MANCHE");
+// =========================================================================
+//  Deux règles neuves, et elles se jouent toutes les deux ICI plutôt qu'au
+//  moment de lancer la carte : la brûlure qui ronge, et l'étalement qui ne
+//  frappe plus au lancement du tout.
+{
+    // --- LA BRÛLURE : 3 dégâts par manche, du type de ce qui l'a allumée ----
+    let etat = monde();
+    etat.combattants.H1.etats = [{ nom: "Brûlé", duree: 3, typeDegats: "Magique" }];
+    const avant = etat.combattants.H1.pv;
+    let etapes = ticsDeFinDeManche(etat);
+    verifier("une brûlure ronge de trois points", etat.combattants.H1.pv === avant - 3,
+             `(${avant} → ${etat.combattants.H1.pv})`);
+    verifier("et le dit avec son nom", etapes.some(e => e.tic === "Brûlure"),
+             JSON.stringify(etapes.map(e => e.tic)));
+
+    // Contrairement au poison, elle mord à CHAQUE manche.
+    ticsDeFinDeManche(etat);
+    verifier("elle mord encore à la manche suivante", etat.combattants.H1.pv === avant - 6,
+             String(etat.combattants.H1.pv));
+
+    // Elle passe par les résistances du type retenu : une armure ne protège
+    // pas d'une flamme magique, une résistance magique si.
+    let resistant = monde();
+    resistant.combattants.H1.def = { ...resistant.combattants.H1.def, magique: 100 };
+    resistant.combattants.H1.etats = [{ nom: "Brûlé", duree: 2, typeDegats: "Magique" }];
+    const pvAvant = resistant.combattants.H1.pv;
+    ticsDeFinDeManche(resistant);
+    verifier("une résistance magique totale éteint une flamme magique",
+             resistant.combattants.H1.pv === pvAvant, String(resistant.combattants.H1.pv));
+
+    let blinde = monde();
+    blinde.combattants.H1.def = { ...blinde.combattants.H1.def, physique: 100 };
+    blinde.combattants.H1.etats = [{ nom: "Brûlé", duree: 2, typeDegats: "Physique" }];
+    const pvBlinde = blinde.combattants.H1.pv;
+    ticsDeFinDeManche(blinde);
+    verifier("et une armure totale arrête une brûlure physique",
+             blinde.combattants.H1.pv === pvBlinde);
+
+    // Le bouclier encaisse en premier, comme pour n'importe quel coup.
+    let protege = monde();
+    protege.combattants.H1.bouclier = 10;
+    protege.combattants.H1.etats = [{ nom: "Brûlé", duree: 2, typeDegats: "Magique" }];
+    const pvProtege = protege.combattants.H1.pv;
+    ticsDeFinDeManche(protege);
+    verifier("le bouclier prend la brûlure avant la chair",
+             protege.combattants.H1.bouclier === 7 && protege.combattants.H1.pv === pvProtege,
+             `(bouclier ${protege.combattants.H1.bouclier})`);
+
+    // --- L'ÉTALEMENT : une moitié par manche, jamais au lancement -----------
+    let etale = monde();
+    etale.combattants.H2.etats = [{ nom: "Étalement", duree: 2, tics: [8, 7] }];
+    const pvEtale = etale.combattants.H2.pv;
+    ticsDeFinDeManche(etale);
+    verifier("la première moitié tombe à la fin de la manche",
+             etale.combattants.H2.pv === pvEtale - 8, String(etale.combattants.H2.pv));
+    ticsDeFinDeManche(etale);
+    verifier("la seconde à la fin de la suivante",
+             etale.combattants.H2.pv === pvEtale - 15, String(etale.combattants.H2.pv));
+    ticsDeFinDeManche(etale);
+    verifier("et rien de plus ensuite : la file est vide",
+             etale.combattants.H2.pv === pvEtale - 15, String(etale.combattants.H2.pv));
+
+    // Un étalement posé par une version précédente du jeu (un seul montant,
+    // sous son ancien nom) doit encore être honoré : une partie en cours ne
+    // doit pas perdre les dégâts qu'elle attend.
+    let ancien = monde();
+    ancien.combattants.H2.etats = [{ nom: "Étalement", duree: 1, degatsDifferes: 9 }];
+    const pvAncien = ancien.combattants.H2.pv;
+    ticsDeFinDeManche(ancien);
+    verifier("un étalement de l'ancienne forme tombe quand même",
+             ancien.combattants.H2.pv === pvAncien - 9, String(ancien.combattants.H2.pv));
+    ticsDeFinDeManche(ancien);
+    verifier("mais une seule fois", ancien.combattants.H2.pv === pvAncien - 9);
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

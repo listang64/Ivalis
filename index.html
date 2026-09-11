@@ -1132,6 +1132,10 @@
         <div style="display: flex; gap: 10px;">
           <!-- 🔻 NOUVEAU BOUTON D'EXPORT 🔻 -->
           <button class="btn-parametres" style="background-color: #9333ea; border-color: #7e22ce;" onclick="jouerSonClic(); window.exporterEffetsBDD()">Exporter BDD (Copier)</button>
+
+          <!-- Met la base au niveau des règles écrites dans le code. Sans danger
+               à relancer : ce qui est déjà à jour n'est pas réécrit. -->
+          <button id="btn-migration-effets" class="btn-parametres" style="background-color: #1b6e3a; border-color: #14532d;" onclick="jouerSonClic(); window.appliquerMigrationEffets()" title="Aligne les effets de la base sur les règles actuelles du moteur">Mettre la BDD à jour</button>
           
           <button class="btn-parametres" onclick="jouerSonClic(); window.fermerGestionEffets()">Retour</button>
         </div>
@@ -1649,14 +1653,14 @@
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
-<script type="module" src="combat_etat.js?v=11"></script>
+<script type="module" src="combat_etat.js?v=12"></script>
 <!-- LE MOTEUR PUR : la chaîne de dégâts et le mouvement, extraits des 5 000
      lignes du moteur actuel et testables sans réseau ni navigateur. -->
-<script type="module" src="moteur_pur.js?v=8"></script>
-<script type="module" src="mouvement_pur.js?v=3"></script>
-<script type="module" src="ia_pure.js?v=1"></script>
+<script type="module" src="moteur_pur.js?v=9"></script>
+<script type="module" src="mouvement_pur.js?v=4"></script>
+<script type="module" src="ia_pure.js?v=2"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
-<script type="module" src="cerveau_combat.js?v=10"></script>
+<script type="module" src="cerveau_combat.js?v=11"></script>
 <!-- LE SPECTATEUR : la boucle de rejeu. Elle lit le journal du cerveau, ouvre
      la fenêtre de tour, anime PUIS applique, et ne saute jamais un numéro. -->
 <script type="module" src="spectateur_combat.js?v=5"></script>
@@ -1665,25 +1669,25 @@
 <script type="module" src="depot_firestore.js?v=6"></script>
 <!-- LE PONT : de l'étape à ce qu'on voit. Il traduit un résultat déjà calculé
      vers les animations existantes — il ne recalcule jamais rien. -->
-<script type="module" src="pont_combat.js?v=5"></script>
+<script type="module" src="pont_combat.js?v=6"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. Éteint
      par défaut — regimeCerveau(true) dans la console pour l'allumer. -->
 <script type="module" src="regime_cerveau.js?v=18"></script>
 <script type="module" src="ia_master.js?v=4"></script>
-<script type="module" src="app.js?v=41"></script>
+<script type="module" src="app.js?v=42"></script>
 <script type="module" src="creation_personnage.js?v=5"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
-<script type="module" src="competences.js?v=16"></script>
+<script type="module" src="competences.js?v=17"></script>
 <script src="Plateau.js"></script>
 <script type="module" src="sequence_tour.js?v=20"></script>
-<script type="module" src="combat.js?v=50"></script>
+<script type="module" src="combat.js?v=51"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=19"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
-<script type="module" src="moteur_effets.js?v=28"></script>
+<script type="module" src="moteur_effets.js?v=29"></script>
 <script type="module" src="monstres.js?v=18"></script>
-<script type="module" src="monstres_competences.js?v=7"></script>
-<script type="module" src="monstres_ia.js?v=26"></script>
+<script type="module" src="monstres_competences.js?v=8"></script>
+<script type="module" src="monstres_ia.js?v=27"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=7"></script>
 <script type="module" src="objets_ia.js?v=7"></script>

@@ -1597,17 +1597,17 @@ document.addEventListener("click", async function(event) {
         // personnage peut repartir d'où il s'est arrêté. Le barème du coût, lui,
         // continue de grimper — cf. window.pasDejaParcourus.
 
-        // Immobilisation et Paralysie bloquent tout déplacement volontaire (mais pas les
+        // L'Immobilisation bloque tout déplacement volontaire (mais pas les
         // déplacements subis comme Poussée/Traction/Peur, qui ne passent pas par ce clic de
         // tracé de chemin).
         const estImmobilise = persoSelectionne && persoSelectionne.Etats_Alteres
-            && persoSelectionne.Etats_Alteres.some(e => e.nom === "Immobilisation" || e.nom === "Paralysie");
+            && persoSelectionne.Etats_Alteres.some(e => e.nom === "Immobilisation");
 
         if (estMonTour && estImmobilise && !window.VTT_MODE_DEPLACEMENT) {
             const tk = window.TOKENS_VTT_DATA[window.TOKEN_SELECTIONNE];
-            const estParalyse = persoSelectionne.Etats_Alteres.some(e => e.nom === "Paralysie");
+
             if (tk && typeof window.afficherMessageFlottantHex === "function") {
-                window.afficherMessageFlottantHex(tk.q, tk.r, estParalyse ? "Paralysé !" : "Immobilisé !", "#aaaaaa");
+                window.afficherMessageFlottantHex(tk.q, tk.r, "Immobilisé !", "#aaaaaa");
             }
             return;
         }
@@ -2198,7 +2198,6 @@ window.COULEUR_ETAT = {
     "Étourdi":        "#f9a825",   // ambre — les étoiles qui tournent
     "Immobilisation": "#795548",   // brun — les racines qui retiennent
     "Confusion":      "#ab47bc",   // violet — les idées mélangées
-    "Paralysie":      "#00897b",   // sarcelle — le corps qui ne répond plus
     "Empoisonnement": "#66bb6a",   // vert — le poison classique
     "Brûlé":          "#e64a19",   // orange-rouge — la flamme
     "Glacé":          "#4fc3f7",   // bleu clair — la glace
@@ -2225,8 +2224,8 @@ window.construireIndicateursEtatsToken = function(etats, taille) {
 
     const n = noms.length;
     const t = taille || 55;
-    const diametre = Math.max(6, Math.round(t * 0.16));
-    const rayonPct = 46;                          // juste sur le bord du médaillon
+    const diametre = Math.max(5, Math.round(t * 0.115));
+    const rayonPct = 37;                          // bien DANS le médaillon, pas sur son bord
     const etalement = Math.min(130, (n - 1) * 34); // écart total de l'arc, borné
 
     return noms.map((nom, i) => {
