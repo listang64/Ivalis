@@ -76,6 +76,9 @@ node rejeu_deplacements_imposes.mjs  # une Poussée ou une Traction rejouée dé
 node traction_peur_cerveau.mjs  # Traction (déterministe) et Peur (fuite, opportunités, fatigue) dans le cerveau
 node fiches_figees.mjs      # Personnages/Monstres ne font plus reculer les PV en plein combat
 node pont_resilience.mjs    # une animation en panne ne fige plus le reste du journal, et la Poussée est traduite
+node tokens_ne_traversent_pas.mjs  # marche, Poussée, Traction, Peur, Bond, Illusion : jamais deux vivants sur une case
+node mots_de_pouvoir_armure.mjs  # l'attaque magique ignore l'armure physique, preuve par les chiffres
+node extraction_ne_pend_pas.mjs  # préparer la carte d'une créature (Bond en tête) n'ouvre plus un ciblage qui pend
 node ia_pure.mjs            # qui viser, où se mettre : les cinq caractères, sans variable globale
 node cerveau_combat.mjs     # LE CERVEAU : intentions validées, un seul écrivain, un combat entier
 node spectateur_combat.mjs  # LE SPECTATEUR : le rejeu à l'écran, dans l'ordre, sans trou ni doublon

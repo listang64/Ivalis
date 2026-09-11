@@ -161,6 +161,17 @@ export function validerIntention(etat, intention) {
         if (!vers || vers.q === undefined || vers.r === undefined) {
             return refus("bond sans case d'arrivée");
         }
+        // La géométrie complète (portée, murs, ligne de vue) reste le travail
+        // de resoudreBond — elle a besoin du plateau, qu'une intention venue
+        // de Firestore ne porte jamais (une fonction ne se sérialise pas). Ce
+        // qui NE dépend que de l'état, en revanche, doit être refusé ici :
+        // sans ce filet, un bond visant un pion occupé traversait quand même
+        // la validation, consommait une entrée de journal, pour finalement
+        // échouer en silence dans resoudreBond (« Bond impossible ») — jamais
+        // dangereux (personne n'atterrit jamais sur personne), mais un aller
+        //-retour inutile là où la marche et l'illusion refusent d'emblée.
+        const occupant = occupantVivant(etat, vers.q, vers.r, intention.acteur);
+        if (occupant) return refus(`${occupant} occupe (${vers.q},${vers.r})`);
     }
 
     if (intention.type === "illusion") {

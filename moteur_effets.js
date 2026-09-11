@@ -2235,7 +2235,20 @@ window.demarrerCiblage = async function(idCarte, options) {
     const bondEnPremier = isBond && (indexPremierAutreEffet === -1 || indexBond < indexPremierAutreEffet);
     const bondApresLeReste = isBond && !bondEnPremier;
 
+    // EXTRAIRE NE DOIT JAMAIS OUVRIR UN CIBLAGE. `{ extraire: true }` sert à
+    // regime_cerveau.js (preparerLesCartes) pour lire la STRUCTURE d'une
+    // carte de créature à l'avance, en arrière-plan, bien avant que ce soit
+    // son tour — jamais pour la jouer. resoudreBondInteractif, lui, assombrit
+    // l'écran et ATTEND UN CLIC : appelé ici, il attendait un clic qui ne
+    // viendrait jamais, et `preparerLesCartes` (une boucle `for…await`)
+    // restait pendue dessus pour de bon — non seulement cette créature ne
+    // recevait jamais sa carte, mais AUCUNE créature suivante dans la liste
+    // n'en recevait une non plus, le tour entier suivant restant bloqué. Un
+    // Bond en tête de carte est un cas parmi d'autres, comme une Paralysie ou
+    // une technique sans effet : « pas de carte jouable ce tour-ci », pas un
+    // blocage pour tout le monde.
     if (bondEnPremier) {
+        if (extraireSeulement) return null;
         await window.resoudreBondInteractif(idLanceurBond, porteeBond);
     }
 
