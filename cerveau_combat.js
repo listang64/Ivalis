@@ -37,10 +37,13 @@
 //  et c'est pour ça qu'on peut le faire tourner mille fois en une seconde.
 // =========================================================================
 
-import { clonerEtat, combattant, creerDes, verifierEtatCombat, FORMAT_ETAT } from './combat_etat.js';
-import { resoudreCarte, tirerDesCarte, tirerCritique,
+import { clonerEtat, combattant, creerDes, combattantIllusion,
+         verifierEtatCombat, FORMAT_ETAT } from './combat_etat.js';
+import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion,
+         traverserZones, creerZonePure, poserZone, vieillirZones,
          chaineDeDegats, REGLES_ETATS } from './moteur_pur.js';
-import { resoudreMouvement, distance, planifierTrajet, occupantVivant } from './mouvement_pur.js';
+import { resoudreMouvement, resoudreBond, distance, planifierTrajet,
+         occupantVivant } from './mouvement_pur.js';
 import { deciderTourCreature } from './ia_pure.js';
 
 const nombre = (v, defaut = 0) => {
@@ -105,7 +108,7 @@ export function cerveauSilencieux(suivi, maintenant) {
 //  cerveau qui tranche — et il refuse en disant pourquoi, pour que l'écran
 //  puisse l'afficher au lieu de rester muet.
 
-export const TYPES_INTENTION = ["mouvement", "carte", "finTour"];
+export const TYPES_INTENTION = ["mouvement", "carte", "bond", "illusion", "finTour"];
 
 export function validerIntention(etat, intention) {
     const refus = (raison) => ({ ok: false, raison });
@@ -148,6 +151,27 @@ export function validerIntention(etat, intention) {
             reserveCarte: nombre(intention.reserveCarte)
         });
         if (plan.pas.length === 0) return refus("pas assez d'énergie pour un seul pas");
+    }
+
+    // Un saut sans destination n'est pas un saut. La validité de la case,
+    // elle, est tranchée à la résolution (resoudreBond) : elle dépend du
+    // terrain, que ce contrôle n'a pas toujours sous la main.
+    if (intention.type === "bond") {
+        const vers = intention.vers;
+        if (!vers || vers.q === undefined || vers.r === undefined) {
+            return refus("bond sans case d'arrivée");
+        }
+    }
+
+    if (intention.type === "illusion") {
+        const vers = intention.vers;
+        if (!intention.idIllusion) return refus("illusion sans identité");
+        if (combattant(etat, intention.idIllusion)) return refus("cette illusion existe déjà");
+        if (!vers || vers.q === undefined || vers.r === undefined) {
+            return refus("illusion sans case");
+        }
+        const occupant = occupantVivant(etat, vers.q, vers.r, intention.idIllusion);
+        if (occupant) return refus(`${occupant} occupe (${vers.q},${vers.r})`);
     }
 
     if (intention.type === "carte") {
@@ -247,6 +271,11 @@ export function cloturerTour(etat) {
         etapes.push(...regenererPvFinDeManche(etat));
         etapes.push(...ticsDeFinDeManche(etat));
         etapes.push(...vieillirLesEtats(etat));
+        // Les nappes au sol vieillissent comme les états. Ce décompte vivait
+        // dans combat.js, sur le poste qui avait vidé la file — donc nulle part
+        // sous ce régime, où plus personne ne « finit » le round de son côté :
+        // une zone posée une fois serait restée jusqu'à la fin du combat.
+        etapes.push(...vieillirZones(etat));
         etapes.push({ type: "manche", numero: etat.manche });
     }
     return { fini: partie.id, etapes };
@@ -521,6 +550,41 @@ export function appliquerIntention(etat, intention, plateau) {
 
     if (intention.type === "finTour") return avancerFile(etat, des);
 
+    // LE BOND EST UN DÉPLACEMENT COMME UN AUTRE, il passe donc par le cerveau
+    // comme les autres. Il sautait jusqu'ici par-dessus lui : le navigateur du
+    // joueur déplaçait le pion et écrivait en base tout seul, depuis la phase
+    // de ciblage. La case, elle, reste choisie à l'écran — c'est du ciblage,
+    // pas un résultat de dé.
+    //
+    // Le bond ne clôt pas le tour : la carte qui le porte continue de se
+    // résoudre après (une attaque qui suit le saut, par exemple).
+    // L'ILLUSION ENTRE EN SCÈNE, comme un renfort. Elle naissait d'un document
+    // créé à la volée par le navigateur du lanceur : le cerveau, qui arrête sa
+    // liste de combattants à l'ouverture du combat, n'en savait rien. Le leurre
+    // s'affichait sur le plateau sans exister pour personne — impossible à
+    // viser, impossible à faire tomber.
+    //
+    // Elle n'entre PAS dans l'ordre d'initiative : ce n'est jamais son tour.
+    if (intention.type === "illusion") {
+        const suivant = clonerEtat(etat);
+        const lanceur = combattant(suivant, intention.acteur);
+        const vers = intention.vers || {};
+        const leurre = combattantIllusion(lanceur, intention.idIllusion, vers.q, vers.r);
+        suivant.combattants[leurre.id] = leurre;
+        return fabriquerPas(etat, suivant,
+            [{ type: "arrivee", combattant: leurre }],
+            intention.id, intention.acteur, des);
+    }
+
+    if (intention.type === "bond") {
+        const r = resoudreBond(etat, {
+            idLanceur: intention.acteur,
+            vers: intention.vers,
+            portee: nombre(intention.portee, 1)
+        }, des, plateau);
+        return fabriquerPas(etat, r.etat, r.etapes, intention.id, intention.acteur, des);
+    }
+
     if (intention.type === "mouvement") {
         const r = resoudreMouvement(etat, {
             idLanceur: intention.acteur,
@@ -534,11 +598,22 @@ export function appliquerIntention(etat, intention, plateau) {
         // Les dés se tirent ICI, chez le cerveau, une fois pour tout le monde.
         // Un client n'envoie jamais de résultat : il ne pourrait pas être cru.
         const critique = tirerCritique(etat, intention.acteur, des);
-        const action = {
+        const brute = {
             type: "carte", idLanceur: intention.acteur, idCarte: intention.idCarte,
             attaques: intention.attaques || [], alterations: intention.alterations || [],
             coutFatigue: nombre(intention.coutFatigue), critique
         };
+
+        // LA CONFUSION DÉTOURNE LA CARTE AVANT QUE LES DÉS NE TOMBENT. L'ordre
+        // n'est pas négociable : les jets de tirerDesCarte sont rangés PAR
+        // CIBLE, donc il faut savoir qui est visé avant de les tirer. Tiré
+        // après, on aurait des dés pour des cibles que la carte ne touche plus,
+        // et aucun pour celle qu'elle touche vraiment.
+        //
+        // Le dé n'est consommé que si le lanceur est confus (voir
+        // appliquerConfusion) : une carte ordinaire tire exactement les mêmes
+        // dés qu'avant, et les journaux déjà écrits se rejouent à l'identique.
+        const action = appliquerConfusion(etat, brute, plateau, des);
         action.jets = tirerDesCarte(etat, action, intention.acteur, critique, des);
         const r = resoudreCarte(etat, action, plateau);
 
@@ -553,6 +628,40 @@ export function appliquerIntention(etat, intention, plateau) {
         // de X »). Il n'y a pas de compteur à tenir, juste une règle à dire.
         const suivant = clonerEtat(r.etat);
         const etapes = [...r.etapes];
+
+        // ÊTRE POUSSÉ DANS LE FEU BRÛLE AUTANT QU'Y MARCHER. La traversée de
+        // zone se fait ici et non dans resoudreCarte, pour une raison simple :
+        // resoudreCarte ne tient aucun dé — tous ses jets sont tirés d'avance
+        // par tirerDesCarte, et une case d'arrivée n'est connue qu'une fois la
+        // poussée résolue. Ici, le dé est encore à portée de main.
+        etapes.filter(e => e.type === "poussee" && e.vers).forEach(e => {
+            etapes.push(...traverserZones(suivant, e.cible, e.vers, des));
+        });
+
+        // LA ZONE QUE LA CARTE LAISSE DERRIÈRE ELLE. Elle se posait jusqu'ici
+        // hors du cerveau (creerZonePersistante écrivait dans Combat_VTT et
+        // dans une variable globale), donc l'état du combat ne la connaissait
+        // pas : le feu se dessinait sur le plateau, mais aucun combattant ne
+        // pouvait marcher dedans puisque, pour le cerveau, il n'existait pas.
+        //
+        // Les cases viennent du client : c'est du CIBLAGE, décidé par le joueur
+        // au moment où il pose sa carte, exactement comme la liste des cibles.
+        // Aucun dé là-dedans — rien qu'un poste puisse fausser à son avantage.
+        if (intention.persistanceTerrain) {
+            const zone = creerZonePure(suivant, action, intention.zoneHexes || [],
+                                       intention.acteur);
+            if (zone) etapes.push(...poserZone(suivant, zone));
+        }
+
+        // UNE CARTE TERMINE LE TOUR, et c'est la règle du jeu depuis toujours :
+        // validerCarteCombat enchaîne sur finDeTourCombat. Le cerveau ne le
+        // faisait pas, et ça se voyait de deux façons à la table — le tour ne
+        // se finissait pas après l'attaque, et on pouvait lancer la même carte
+        // plusieurs fois de suite.
+        //
+        // La clôture règle les deux d'un coup : le lanceur quitte la tête de
+        // file, donc une seconde carte est refusée d'elle-même (« c'est au tour
+        // de X »). Il n'y a pas de compteur à tenir, juste une règle à dire.
         const clot = cloturerTour(suivant);
         if (clot) etapes.push(...clot.etapes);
 
@@ -599,16 +708,26 @@ export function jouerCreature(etat, id, carte, plateau) {
 
     if (aPortee && carte && carte.idCarte) {
         const critique = tirerCritique(courant, id, des);
-        const action = {
+        const brute = {
             type: "carte", idLanceur: id, idCarte: carte.idCarte,
             attaques: (carte.attaques || []).map(a => ({ ...a, cibles: [plan.cible] })),
             alterations: (carte.alterations || []).map(a => ({ ...a, cibles: [plan.cible] })),
             coutFatigue: nombre(infos.fatigue), critique
         };
+        // UNE CRÉATURE CONFUSE SE TROMPE AUSSI DE CIBLE. La confusion ne vivait
+        // que du côté des joueurs (elle était tirée dans le navigateur du
+        // lanceur) : un monstre confus visait tranquillement qui il voulait.
+        // Même dé, même règle, pour tout le monde.
+        const action = appliquerConfusion(courant, brute, plateau, des);
         action.jets = tirerDesCarte(courant, action, id, critique, des);
         const r = resoudreCarte(courant, action, plateau);
-        courant = r.etat;
+        courant = clonerEtat(r.etat);
         etapes.push(...r.etapes);
+
+        // Une créature qui pousse quelqu'un dans le feu le brûle, elle aussi.
+        r.etapes.filter(e => e.type === "poussee" && e.vers).forEach(e => {
+            etapes.push(...traverserZones(courant, e.cible, e.vers, des));
+        });
     } else if (!aPortee) {
         // Pourquoi elle n'a rien lancé. Dans la trace, cette ligne vaut de l'or :
         // « tour de 20 millisecondes sans rien faire » restait inexplicable.

@@ -27,7 +27,8 @@
 // =========================================================================
 
 import { clonerEtat, combattant } from './combat_etat.js';
-import { esquiveDe, paradeDe, bonusDesEtats, aLEtat } from './moteur_pur.js';
+import { esquiveDe, paradeDe, bonusDesEtats, aLEtat, traverserZones,
+         ligneDeVue } from './moteur_pur.js';
 
 const nombre = (v, defaut = 0) => {
     const n = parseInt(v);
@@ -260,7 +261,11 @@ export function resoudreMouvement(etat, action, des, plateau) {
 
     let contactAvant = new Set(ennemisAuContact(suivant, id, { q: c.q, r: c.r }));
 
-    plan.pas.forEach(pas => {
+    // UN COMBATTANT QUI TOMBE EN CHEMIN S'ARRÊTE LÀ. La marche se déroulait
+    // jusqu'au bout quoi qu'il arrive : un pion mis à terre par une attaque
+    // d'opportunité continuait sa route, et finissait son trajet couché. Une
+    // boucle qu'on peut interrompre, plutôt qu'un forEach qu'on ne peut pas.
+    for (const pas of plan.pas) {
         c.q = pas.vers.q;
         c.r = pas.vers.r;
         c.fatigue = Math.max(0, c.fatigue - pas.cout);
@@ -296,7 +301,20 @@ export function resoudreMouvement(etat, action, des, plateau) {
             }
         }
         contactAvant = contactApres;
-    });
+
+        // LA CASE OÙ L'ON POSE LE PIED PEUT BRÛLER. Chaque case franchie
+        // déclenche sa propre résolution — « s'il continue dans la zone, ça
+        // continue » —, après les opportunités de ce pas, comme dans l'ancien
+        // moteur. Les dés ne sont consommés que si une zone recouvre vraiment
+        // la case : une marche en terrain nu tire exactement les mêmes dés
+        // qu'avant, et les journaux déjà écrits se rejouent à l'identique.
+        etapes.push(...traverserZones(suivant, id, pas.vers, des));
+
+        if (c.aTerre) {
+            etapes.push({ type: "trajetEcourte", acteur: id, raison: "à terre" });
+            break;
+        }
+    }
 
     // Tombé en chemin : la marche s'arrête là où elle s'est arrêtée.
     if (plan.tronque) etapes.push({ type: "trajetEcourte", acteur: id, raison: "énergie" });
@@ -304,9 +322,86 @@ export function resoudreMouvement(etat, action, des, plateau) {
     return { etat: suivant, etapes, cout: plan.cout };
 }
 
+// =========================================================================
+//  5. LE BOND
+// =========================================================================
+//  Un saut par-dessus le terrain : on ne marche pas, on survole. Ni fatigue, ni
+//  attaque d'opportunité — c'est ce qui le distingue d'une course.
+//
+//  CE QUI ÉTAIT CASSÉ. resoudreBondInteractif faisait tout dans le navigateur
+//  du joueur : il déplaçait le pion dans TOKENS_VTT_DATA et écrivait
+//  directement dans Firestore, depuis la phase de ciblage — partagée par les
+//  deux régimes, donc y compris sous le cerveau. Deux écrivains pour une même
+//  vérité : le saut pouvait être effacé par la publication suivante de l'état,
+//  ou pire, rester sur un écran et pas sur les autres.
+//
+//  Le choix de la case, lui, reste à l'écran : c'est du ciblage, un seul joueur
+//  clique, exactement comme on désigne une cible. Ce qui remonte au cerveau
+//  n'est pas un résultat, c'est une intention : « je saute là ».
+
+// Les cases où l'on peut atterrir. UNE SEULE DÉFINITION, lue par l'écran qui
+// les éclaire ET par le cerveau qui valide : si les deux divergeaient d'une
+// case, le joueur pourrait cliquer un hexagone que le cerveau refuse, et sa
+// carte serait consommée pour rien.
+export function casesDeBond(etat, id, portee, plateau) {
+    const c = combattant(etat, id);
+    if (!c) return [];
+    const carte = plateau || PLAINE;
+    const cases = [];
+    const p = Math.max(0, nombre(portee, 1));
+
+    for (let dq = -p; dq <= p; dq++) {
+        for (let dr = Math.max(-p, -dq - p); dr <= Math.min(p, -dq + p); dr++) {
+            if (dq === 0 && dr === 0) continue;
+            const q = c.q + dq, r = c.r + dr;
+            const dessus = (carte.etatCase ? carte.etatCase(q, r) : null) || {};
+            if (dessus.bloquee || dessus.supprimee) continue;
+            if (occupantVivant(etat, q, r, id)) continue;
+            // On survole les trous et les gravats, jamais un mur.
+            if (!ligneDeVue(carte, c, { q, r })) continue;
+            cases.push({ q, r });
+        }
+    }
+    return cases;
+}
+
+export function resoudreBond(etat, action, des, plateau) {
+    const suivant = clonerEtat(etat);
+    const etapes = [];
+    const id = action.idLanceur || action.id;
+    const c = combattant(suivant, id);
+    if (!c) return { etat: suivant, etapes };
+
+    // L'Immobilisation cloue sur place tout mouvement VOLONTAIRE. Les
+    // déplacements subis — poussée, traction, peur — passent outre : on ne
+    // choisit pas de se faire pousser.
+    if (aLEtat(c, "Immobilisation")) {
+        etapes.push({ type: "echec", acteur: id, raison: "Immobilisation" });
+        return { etat: suivant, etapes };
+    }
+
+    const vers = action.vers || {};
+    const permises = casesDeBond(suivant, id, action.portee, plateau);
+    if (!permises.some(h => h.q === vers.q && h.r === vers.r)) {
+        etapes.push({ type: "message", cible: id, acteur: id, texte: "Bond impossible" });
+        return { etat: suivant, etapes };
+    }
+
+    const de = { q: c.q, r: c.r };
+    c.q = vers.q;
+    c.r = vers.r;
+    etapes.push({ type: "bond", cible: id, acteur: id, de, vers: { q: vers.q, r: vers.r } });
+
+    // Atterrir dans le feu brûle autant que d'y entrer à pied.
+    etapes.push(...traverserZones(suivant, id, vers, des));
+
+    return { etat: suivant, etapes };
+}
+
 if (typeof window !== "undefined") {
     window.mouvementPur = {
         distance, voisinsDe, trouverChemin, coutDuPas, planifierTrajet,
-        ennemisAuContact, resoudreOpportunite, resoudreMouvement, DEGATS_OPPORTUNITE
+        ennemisAuContact, resoudreOpportunite, resoudreMouvement,
+        casesDeBond, resoudreBond, DEGATS_OPPORTUNITE
     };
 }

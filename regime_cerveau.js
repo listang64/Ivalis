@@ -453,7 +453,24 @@ export function creerRegime(contexte) {
     const demanderCarte = (acteur, carte) =>
         demander({ type: "carte", acteur, idCarte: carte.idCarte,
                    attaques: carte.attaques || [], alterations: carte.alterations || [],
-                   coutFatigue: nombre(carte.coutFatigue) });
+                   coutFatigue: nombre(carte.coutFatigue),
+                   // La nappe que la carte laisse au sol, et les cases qu'elle
+                   // couvre. Du ciblage, pas un résultat : le joueur les a
+                   // désignées, le cerveau en fait une zone.
+                   persistanceTerrain: !!carte.persistanceTerrain,
+                   zoneHexes: carte.zoneHexes || [] });
+
+    // Le saut. La case a été choisie à l'écran ; ce qui part d'ici est une
+    // intention, pas un déplacement déjà fait.
+    const demanderBond = (acteur, vers, portee) =>
+        demander({ type: "bond", acteur, vers: { q: nombre(vers.q), r: nombre(vers.r) },
+                   portee: nombre(portee, 1) });
+
+    // Le leurre. Son identité (nom, image) est un document Personnages créé par
+    // le lanceur ; ce qui part d'ici, c'est son entrée dans le combat.
+    const demanderIllusion = (acteur, idIllusion, vers) =>
+        demander({ type: "illusion", acteur, idIllusion,
+                   vers: { q: nombre(vers.q), r: nombre(vers.r) } });
 
     const demanderFinDeTour = (acteur) => demander({ type: "finTour", acteur });
 
@@ -464,7 +481,8 @@ export function creerRegime(contexte) {
     return {
         ouvrir, rejoindre, fermer, brancher, debrancher, tourner, ok, ouvrirLaManche, reprojeter,
         reprendreLaMain,
-        demander, demanderMouvement, demanderCarte, demanderFinDeTour,
+        demander, demanderMouvement, demanderCarte, demanderBond, demanderIllusion,
+        demanderFinDeTour,
         // De quoi regarder l'intérieur, pour la trace et les bancs.
         spectateur,
         etatPublie: () => moi.etat,
@@ -587,14 +605,24 @@ function signalerPanne(nom, cause) {
     console.error(`Projection : ${nom} a échoué —`, cause);
 }
 
+// Quel poste je suis. Lu à la demande plutôt que gardé : le même calcul servait
+// déjà à l'ouverture du régime, il sert maintenant aussi à savoir si c'est à moi
+// d'effacer un leurre tombé.
+function monPoste() {
+    try { return localStorage.getItem("ID_JOUEUR_COURANT") || "poste-inconnu"; }
+    catch (e) { return "poste-inconnu"; }
+}
+
+// Les illusions déjà effacées. Sans cette mémoire, chaque projection d'état
+// redemanderait la suppression du même document : une volée d'erreurs de
+// console pour un leurre qui a déjà disparu.
+const LEURRES_EFFACES = new Set();
+
 function contexteDuJeu() {
     return {
         io: window.ioCombatFirestore,
         idPartie: window.ID_PARTIE_COURANTE,
-        poste: (() => {
-            try { return localStorage.getItem("ID_JOUEUR_COURANT") || "poste-inconnu"; }
-            catch (e) { return "poste-inconnu"; }
-        })(),
+        poste: monPoste(),
 
         // « Ce combattant est-il un héros de ce poste ? » — c'est ce qui décide
         // si la fenêtre sombre s'ouvre. Le mien, non : je sais déjà ce que j'ai
@@ -640,7 +668,16 @@ function contexteDuJeu() {
         animations: {
             pas: (d) => window.jouerAnimationPas ? window.jouerAnimationPas(d) : null,
             poussee: (d) => window.jouerAnimationPoussee ? window.jouerAnimationPoussee(d) : null,
-            bond: (d) => window.jouerAnimationBond ? window.jouerAnimationBond(d) : null,
+            // DEUX VOCABULAIRES POUR LE MÊME SAUT. Le pont dit `de`/`vers`
+            // comme pour un pas ; jouerAnimationBond, écrit pour l'ancien
+            // monde, lit `depart`/`arrivee` — et allait droit sur un
+            // « arrivee.q de undefined ». Le geste n'avait jamais servi
+            // jusqu'ici : aucune étape « bond » ne sortait du noyau, le saut
+            // s'animait tout seul dans son coin. On traduit ici, à la frontière.
+            bond: (d) => window.jouerAnimationBond
+                ? window.jouerAnimationBond({ idToken: d.idToken,
+                                              depart: d.de, arrivee: d.vers })
+                : null,
             ruee: (d) => window.jouerRueeCarte ? window.jouerRueeCarte(d) : null,
             // Le tir : la flèche, la boule bleue, la boule verte. Ce que la
             // carte envoie a été décidé par le noyau (projectileDe) et voyage
@@ -755,7 +792,40 @@ function contexteDuJeu() {
                 }
                 verifierQueJePeuxJouer(file);
             },
-            rafraichir: () => {
+            // LES NAPPES AU SOL DESCENDENT DE L'ÉTAT, comme les pions. Elles
+            // vivaient dans une variable globale que seul l'ancien moteur
+            // nourrissait ; le cerveau les porte maintenant, et cette ligne les
+            // rend visibles. On ne réécrit rien en base : le dessin suit l'état,
+            // il ne le devance pas.
+            poserZones: (zones) => {
+                window.ZONES_PERSISTANTES = zones || {};
+                if (typeof window.appliquerZonesPersistantes === "function") {
+                    try { window.appliquerZonesPersistantes(); }
+                    catch (e) { signalerPanne("appliquerZonesPersistantes", e); }
+                }
+            },
+            rafraichir: (etat) => {
+                // UN LEURRE TOMBÉ S'EFFACE. L'illusion n'a qu'un point de vie ;
+                // une fois à terre, elle n'a plus rien à faire ni sur le
+                // plateau ni en base. L'ancien moteur la retirait depuis
+                // jouerAnimationMoteur, un chemin que ce régime ne traverse
+                // plus : elle serait restée couchée sur la carte jusqu'à la fin
+                // du combat.
+                //
+                // Seul le poste qui tient le cerveau efface, et une seule fois
+                // par leurre : trois postes supprimant le même document, c'est
+                // deux erreurs de console pour rien.
+                if (etat && etat.combattants && estLeCerveau(etat, monPoste())) {
+                    Object.values(etat.combattants).forEach(c => {
+                        if (!c || !c.estIllusion || !c.aTerre) return;
+                        if (LEURRES_EFFACES.has(c.id)) return;
+                        LEURRES_EFFACES.add(c.id);
+                        if (typeof window.detruireIllusion === "function") {
+                            Promise.resolve(window.detruireIllusion(c.id))
+                                .catch(e => signalerPanne("detruireIllusion", e));
+                        }
+                    });
+                }
                 [["rafraichirAffichageCombat", () => window.rafraichirAffichageCombat()],
                  ["redessinerPions", () => window.redessinerPions()]]
                     .forEach(([nom, appel]) => {
@@ -1310,6 +1380,15 @@ if (typeof window !== "undefined") {
             marquerDemande(acteur);
             return REGIME.demanderCarte(acteur, carte);
         },
+        // LE BOND NE MARQUE PAS DE DEMANDE. Il arrive AU MILIEU d'une carte —
+        // le saut d'abord, l'attaque ensuite —, et marquer le combattant ici
+        // ferait refuser la carte qui suit comme un doublon.
+        bond: (acteur, vers, portee) =>
+            REGIME ? REGIME.demanderBond(acteur, vers, portee) : null,
+        // Même raison que le bond : l'illusion se pose au milieu d'une carte,
+        // marquer une demande ici ferait refuser la suite comme un doublon.
+        illusion: (acteur, idIllusion, vers) =>
+            REGIME ? REGIME.demanderIllusion(acteur, idIllusion, vers) : null,
         finDeTour: (acteur) => {
             if (!REGIME) return null;
             marquerDemande(acteur);

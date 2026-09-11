@@ -266,6 +266,42 @@ function combattantBrut(fiche, position, bornes) {
     };
 }
 
+// UN LEURRE, ET RIEN D'AUTRE. L'Illusion est un combattant à part : un seul
+// point de vie, aucune défense, aucune énergie, jamais son tour. Elle existe
+// pour attirer un coup et disparaître.
+//
+// ELLE DOIT ENTRER DANS L'ÉTAT DU COMBAT, et c'est tout le correctif. Elle
+// naissait jusqu'ici d'un document Firestore créé à la volée par le navigateur
+// du lanceur, en plein milieu du combat. Le cerveau, lui, arrête la liste de
+// ses combattants à l'ouverture : un leurre né après ne figurait donc nulle
+// part chez lui. On ne pouvait ni le viser, ni lui enlever son unique point de
+// vie, ni le faire tomber — il n'existait que sur le plateau, comme une image.
+//
+// Son identité (le nom, l'image, la couleur) reste un document Personnages :
+// c'est une fiche, au même titre que celle d'un héros. Ce qui change, c'est que
+// sa vie de combat appartient maintenant au cerveau, comme celle de tout le
+// monde.
+export function combattantIllusion(lanceur, id, q, r) {
+    return {
+        id,
+        joueur: (lanceur && lanceur.joueur) || null,
+        camp: (lanceur && lanceur.camp) || "Allié",
+        nom: `Illusion de ${(lanceur && lanceur.nom) || ""}`.trim(),
+        estMonstre: false,
+        estIllusion: true,
+        personnalite: "",
+        palier: "",
+        pv: 1, pvMax: 1,
+        bouclier: 0, bouclierMax: 0,
+        fatigue: 0, fatigueMax: 0,
+        q: nombre(q), r: nombre(r),
+        etats: [],
+        aTerre: false,
+        def: { esquive: 0, parade: 0, physique: 0, magique: 0, critique: 0 },
+        atouts: {}, equip: {}, mod: {}, stats: {}
+    };
+}
+
 // =========================================================================
 //  3. CONSTRUIRE L'ÉTAT DEPUIS L'ANCIEN MONDE
 // =========================================================================

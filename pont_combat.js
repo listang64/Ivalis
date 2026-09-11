@@ -134,9 +134,13 @@ const SCENES = {
     // poussée qu'un mur a arrêtée, un effet que le noyau ne sait pas encore
     // jouer. Elle EXISTE pour que ce silence-là s'affiche au lieu de passer
     // inaperçu — la leçon de toutes les soirées perdues de cette semaine.
+    //
+    // La couleur peut voyager avec l'étape, quand le noyau en tient une : la
+    // confusion qui se dissipe est une bonne nouvelle et se dit en vert, pas
+    // dans le gris de tout le reste. Sans couleur portée, on garde le neutre.
     message(e) {
         return { geste: "message", pion: e.cible || e.acteur, texte: e.texte || "",
-                 couleur: COULEURS.neutre, duree: RYTHME.message };
+                 couleur: e.couleur || COULEURS.neutre, duree: RYTHME.message };
     },
     etatRate(e) {
         // Une immunité de peuple n'est pas un jet manqué : c'est écrit sur la
@@ -426,6 +430,7 @@ export function creerProjection(ecran) {
         poserPions = () => {},
         poserFiches = () => {},
         poserFile = () => {},
+        poserZones = () => {},
         rafraichir = () => {},
         lireFiches = () => []
     } = ecran || {};
@@ -438,6 +443,11 @@ export function creerProjection(ecran) {
         if (!etat) return;
         poserPions(pionsDepuisEtat(etat));
         poserFiches(fichesDepuisEtat(etat, lireFiches()));
+        // Les nappes au sol descendent comme les pions : c'est l'état qui dit
+        // où le feu brûle, et l'écran qui le dessine. Sans cette ligne, une
+        // zone posée pendant le combat n'existait que pour le cerveau et
+        // restait invisible.
+        poserZones(JSON.parse(JSON.stringify(etat.zones || {})));
         if (!options || options.file !== false) {
             poserFile(fileDepuisEtat(etat), {
                 phase: etat.phase, manche: nombre(etat.manche, 1), ontJoue: etat.ontJoue || []

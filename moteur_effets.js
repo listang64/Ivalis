@@ -734,6 +734,30 @@ window.resoudreBondInteractif = function(idPerso, portee) {
 
             const hexArrivee = { q: cible.q, r: cible.r };
 
+            // SOUS LE NOUVEAU RÉGIME, ON DEMANDE — ON N'ÉCRIT PAS.
+            //
+            // Tout ce qui suit (le pion déplacé à la main, la zone résolue
+            // ici, l'écriture dans le document de la partie) était fait par le
+            // navigateur du seul joueur qui saute, DEPUIS LA PHASE DE CIBLAGE
+            // — partagée par les deux régimes. Le cerveau n'en savait donc
+            // rien : à sa prochaine publication, il reposait le pion là où il
+            // croyait qu'il était. Le saut revenait en arrière, ou ne se
+            // voyait que sur un écran.
+            //
+            // La case choisie, elle, reste choisie ici : c'est du ciblage.
+            if (window.REGIME_CERVEAU && window.regimeDemande && window.regimeDemande.actif()) {
+                try {
+                    await window.regimeDemande.bond(idPerso, hexArrivee, portee);
+                } catch (err) {
+                    console.error("Demande de bond :", err);
+                }
+                // Le cerveau rejouera le saut chez tout le monde, animation
+                // comprise : on attend le même temps qu'avant pour que la suite
+                // de la carte ne construise pas son ciblage par-dessus.
+                await new Promise(r => setTimeout(r, 750));
+                return resolve(true);
+            }
+
             // Atterrir dans une zone persistante la déclenche, exactement comme y entrer à pied.
             let zonesBond = null;
             if (typeof window.resoudreZonesPersistantesSurCase === "function") {
@@ -853,6 +877,9 @@ window.creerIllusion = async function(idLanceur, q, r) {
     const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
     if (!lanceurData) return;
 
+    // L'identifiant est tiré ici, une seule fois, par le seul poste qui pose le
+    // leurre : ce n'est pas un jet de dé, c'est un nom propre. Le cerveau le
+    // reçoit tel quel et refuse une illusion qui porterait un nom déjà pris.
     const idIllusion = "ILLUSION_" + Math.random().toString(36).substring(2, 9);
     // L'image du TOKEN de combat, pas le portrait du personnage.
     const imgUrl = (window.TOKENS_VTT_DATA[idLanceur] && window.TOKENS_VTT_DATA[idLanceur].url) || lanceurData.urlCloudinary || "";
@@ -886,10 +913,27 @@ window.creerIllusion = async function(idLanceur, q, r) {
     };
 
     try {
+        // LA FICHE D'ABORD, LE COMBATTANT ENSUITE — et dans cet ordre.
+        //
+        // Le document Personnages porte son IDENTITÉ : le nom, l'image, la
+        // couleur. C'est une fiche, comme celle d'un héros, et les écouteurs
+        // déjà en place la propagent à tous les écrans. Le pion, de même : sans
+        // lui, le plateau n'aurait rien à dessiner (il ne fabrique jamais un
+        // pion qu'il ne connaît pas — trois pions fantômes l'ont appris).
+        //
+        // Mais sa VIE DE COMBAT — son point de vie unique, sa case, le fait
+        // qu'on puisse la viser et la faire tomber — appartient au cerveau. Il
+        // arrête sa liste de combattants à l'ouverture du combat : un leurre né
+        // après, écrit seulement ici, n'existait pour lui à aucun moment. On
+        // pouvait le voir sur le plateau et le traverser sans le toucher.
         await setDoc(doc(db, "Personnages", idIllusion), dataIllusion);
 
         window.TOKENS_VTT_DATA[idIllusion] = { q, r, url: imgUrl, taille };
         await window.enregistrerPionsVTT(idIllusion);
+
+        if (window.REGIME_CERVEAU && window.regimeDemande && window.regimeDemande.actif()) {
+            await window.regimeDemande.illusion(idLanceur, idIllusion, { q, r });
+        }
     } catch (err) {
         console.error("Erreur création Illusion :", err);
     }
@@ -3126,10 +3170,21 @@ window.declencherResolution = async function() {
     // au hasard à portée (alliés ET ennemis), 10% de dissiper la confusion (carte normale), sinon
     // (50%) rien ne change. Les effets de déplacement forcé (Poussée/Traction/Peur) sur soi-même
     // n'ont pas de sens (distance nulle) : on les neutralise plutôt que de les rediriger sur soi.
+    //
+    // SOUS LE NOUVEAU RÉGIME, CE BLOC NE TOURNE PLUS DU TOUT. Le cerveau tire
+    // lui-même le dé de confusion et détourne la carte (appliquerConfusion,
+    // moteur_pur.js), pour trois raisons qui manquaient ici : le résultat est
+    // le même sur tous les écrans au lieu d'être décidé par le seul navigateur
+    // du lanceur ; le mot « Confus : cible au hasard ! » s'affiche enfin chez
+    // tout le monde, alors qu'il vivait dans jouerAnimationMoteur et que
+    // personne ne le voyait plus ; et la dissipation (bande 41-50), désactivée
+    // ici faute de pouvoir effacer un état sans écrire par-dessus le cerveau,
+    // redevient une étape ordinaire.
     let confusionResultat = null;
     let isZoneFinal = state.isZone;
     const lanceurDataConf = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
-    const estConfus = lanceurDataConf && (lanceurDataConf.Etats_Alteres || []).some(e => e.nom === "Confusion");
+    const estConfus = !window.REGIME_CERVEAU
+        && lanceurDataConf && (lanceurDataConf.Etats_Alteres || []).some(e => e.nom === "Confusion");
 
     if (estConfus) {
         const rollConf = Math.floor(Math.random() * 100) + 1;
@@ -3174,18 +3229,7 @@ window.declencherResolution = async function() {
                 isZoneFinal = false;
                 confusionResultat = { type: "aleatoire", idCible: idCibleHasard };
             }
-        } else if (rollConf <= 50 && !window.REGIME_CERVEAU) {
-            // LA DISSIPATION DE LA CONFUSION N'EST PAS ENCORE PORTÉE PAR UNE
-            // INTENTION. Sous le nouveau régime, l'état d'un combattant ne
-            // s'écrit que par le cerveau, et cette bande de tirage (41-50)
-            // n'existe pas encore de son côté.
-            //
-            // Plutôt que d'écrire à moitié — enlever l'état dans la fiche mais
-            // pas dans l'état du combat, donc le voir revenir au prochain
-            // rafraîchissement —, on ne dissipe pas : la Confusion tient un
-            // tour de plus. C'est une différence petite, bornée et visible,
-            // là où l'écriture à moitié serait une divergence entre les écrans.
-            // À reprendre dans la tranche suivante.
+        } else if (rollConf <= 50) {
             const nouveauxEtatsConf = (lanceurDataConf.Etats_Alteres || []).filter(e => e.nom !== "Confusion");
             lanceurDataConf.Etats_Alteres = nouveauxEtatsConf;
             await updateDoc(window.refCombattant(idLanceur), { Etats_Alteres: nouveauxEtatsConf }).catch(e => console.error(e));
@@ -3233,15 +3277,44 @@ window.declencherResolution = async function() {
     // le noyau avec le reste.
     if (window.REGIME_CERVEAU && window.regimeDemande && window.regimeDemande.actif()) {
         try {
+            // LA ZONE PERSISTANTE PART AVEC LA CARTE, elle ne s'écrit plus à
+            // côté. creerZonePersistante posait la nappe directement dans
+            // Combat_VTT et dans ZONES_PERSISTANTES, sans passer par le
+            // cerveau : l'état du combat ne la connaissait donc pas, et
+            // personne ne pouvait marcher dedans — le feu était un décor.
+            //
+            // On marque ici les altérations qui font zone (la table vit côté
+            // jeu, le noyau ne la connaît pas) et on envoie les cases visées.
+            const TYPES = window.TYPES_ZONES_PERSISTANTES || {};
+            const alterations = (state.alterations || []).map(a => (
+                TYPES[a.nom] ? { ...a, persistante: true, typeZone: TYPES[a.nom] } : a
+            ));
+
+            // L'emprise : l'AoE complète si la carte porte un mod Zone, sinon la
+            // seule case de chaque cible.
+            let zoneHexes = [];
+            if (state.persistanceTerrain) {
+                if (state.isZone && Array.isArray(state.zoneHexesFinaux) && state.zoneHexesFinaux.length > 0) {
+                    zoneHexes = state.zoneHexesFinaux.map(h => ({ q: h.q, r: h.r }));
+                } else {
+                    const ids = new Set();
+                    (state.attaques || []).forEach(a => (a.cibles || []).forEach(c => ids.add(c)));
+                    (state.alterations || []).forEach(a => (a.cibles || []).forEach(c => ids.add(c)));
+                    ids.forEach(id => {
+                        const tk = (window.TOKENS_VTT_DATA || {})[id];
+                        if (tk) zoneHexes.push({ q: tk.q, r: tk.r });
+                    });
+                }
+            }
+
             await window.regimeDemande.carte(idLanceur, {
                 idCarte: state.idCarte,
                 attaques: state.attaques,
-                alterations: state.alterations,
-                coutFatigue: parseInt(state.coutFatigue || state.fatigue || window.COUT_COMPETENCE_SELECTIONNEE) || 0
+                alterations,
+                coutFatigue: parseInt(state.coutFatigue || state.fatigue || window.COUT_COMPETENCE_SELECTIONNEE) || 0,
+                persistanceTerrain: !!state.persistanceTerrain,
+                zoneHexes
             });
-            if (state.persistanceTerrain && typeof window.creerZonePersistante === "function") {
-                await window.creerZonePersistante(state, idLanceur);
-            }
         } catch (e) {
             console.error("Demande de carte :", e);
         }

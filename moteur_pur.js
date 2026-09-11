@@ -186,6 +186,134 @@ export function distanceHex(a, b) {
     return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
 }
 
+// Voir de A à B, c'est n'avoir aucun mur entre les deux. On tire la ligne
+// droite, case par case, et le premier obstacle la coupe. Portage à
+// l'identique de verifierLigneDeVue (moteur_effets.js) : mêmes coordonnées
+// cubiques, même millionième de case pour départager une ligne à cheval, et
+// seules les cases BLOQUÉES arrêtent le regard — un trou dans le sol se
+// survole des yeux.
+export function ligneDeVue(plateau, a, b) {
+    const carte = plateau || PLAINE;
+    const distance = distanceHex(a, b);
+    if (!Number.isFinite(distance) || distance <= 1) return true;
+
+    const lerp = (x, y, t) => x + (y - x) * t;
+    const arrondiCube = (q, r, s) => {
+        let rq = Math.round(q), rr = Math.round(r), rs = Math.round(s);
+        const dq = Math.abs(rq - q), dr = Math.abs(rr - r), ds = Math.abs(rs - s);
+        if (dq > dr && dq > ds) rq = -rr - rs;
+        else if (dr > ds) rr = -rq - rs;
+        return { q: rq, r: rr };
+    };
+    const ca = { q: a.q + 1e-6, r: a.r + 1e-6, s: -a.q - a.r - 2e-6 };
+    const cb = { q: b.q + 1e-6, r: b.r + 1e-6, s: -b.q - b.r - 2e-6 };
+
+    for (let i = 1; i < distance; i++) {
+        const t = i / distance;
+        const pt = arrondiCube(lerp(ca.q, cb.q, t), lerp(ca.r, cb.r, t), lerp(ca.s, cb.s, t));
+        const dessus = (carte.etatCase ? carte.etatCase(pt.q, pt.r) : null) || {};
+        if (dessus.bloquee) return false;
+    }
+    return true;
+}
+
+// =========================================================================
+//  LA CONFUSION — QUAND LA CARTE PART DE TRAVERS
+// =========================================================================
+//  Un combattant confus ne maîtrise plus ce qu'il lance. Un dé, tiré une fois
+//  pour toute la carte, décide :
+//
+//    1-20   il se l'inflige à lui-même ;
+//    21-40  il vise quelqu'un d'autre au hasard, ami ou ennemi, à portée ;
+//    41-50  la confusion se dissipe, et la carte part normalement ;
+//    51-100 rien ne change.
+//
+//  UNE CARTE SANS ATTAQUE NE PEUT PAS PARTIR AU HASARD. Un soin, un bouclier,
+//  une pose d'état : la bande 21-40 rejoint la bande 1-20 et se retourne sur
+//  le lanceur. C'est la règle de l'ancien moteur, et elle a sa logique — on ne
+//  « rate » pas un soin sur un inconnu, on se le donne à soi.
+//
+//  POURQUOI CE TIRAGE VIT ICI, ET PLUS CHEZ LE JOUEUR. Il était fait dans le
+//  navigateur du lanceur, avec Math.random(), avant l'envoi de la carte. Deux
+//  conséquences : le résultat ne pouvait pas être vérifié (un poste envoyait
+//  un dé que les autres devaient croire), et surtout la DISSIPATION était
+//  purement et simplement désactivée sous le régime du cerveau — la bande
+//  41-50 y était sautée, faute d'un chemin pour effacer un état sans écrire
+//  par-dessus le cerveau. Tiré ici, le dé est le même pour tout le monde, et
+//  la dissipation redevient une étape comme une autre.
+//
+//  LE DÉ N'EST TIRÉ QUE SI LE LANCEUR EST CONFUS. C'est la règle de toute la
+//  maison : un dé consommé par condition décalerait la suite du tirage pour
+//  tous les autres effets de la carte, et deux postes qui rejouent le même
+//  tour n'auraient plus la même partie.
+export const CHANCE_CONFUSION_AUTO      = 20;
+export const CHANCE_CONFUSION_ALEATOIRE = 40;
+export const CHANCE_CONFUSION_DISSIPEE  = 50;
+
+export function appliquerConfusion(etat, action, plateau, des) {
+    const lanceur = combattant(etat, action.idLanceur);
+    if (!lanceur || !aLEtat(lanceur, "Confusion")) return action;
+
+    const jet = des.d100();
+    const attaques = action.attaques || [];
+    const alterations = action.alterations || [];
+    const carteAUneAttaque = attaques.length > 0;
+
+    // Se viser soi-même. Les déplacements forcés n'ont aucun sens sur place
+    // (la distance est nulle, la géométrie ne donne aucune direction) : on les
+    // éteint plutôt que de les retourner sur le lanceur.
+    const versSoi = () => ({
+        ...action,
+        attaques: attaques.map(a => ({ ...a, cibles: [action.idLanceur] })),
+        alterations: alterations.map(alt => ({
+            ...alt,
+            cibles: (alt.estPoussee || alt.estTraction || alt.estPeur) ? [] : [action.idLanceur]
+        })),
+        isZone: false,
+        confusion: { type: "auto" }
+    });
+
+    if (jet <= CHANCE_CONFUSION_AUTO || (jet <= CHANCE_CONFUSION_ALEATOIRE && !carteAUneAttaque)) {
+        return versSoi();
+    }
+
+    if (jet <= CHANCE_CONFUSION_ALEATOIRE) {
+        const config = attaques[0] || alterations[0] || {};
+        const portee = Math.max(nombre(config.rangeMax, 1), nombre(action.porteeMinTraction, 0));
+        // Une illusion ne se fait leurrer que par une attaque nue : un soin ou
+        // un état lancé sur un mirage serait perdu pour rien.
+        const attaqueSimple = !config.isHeal && !config.isShield && alterations.length === 0;
+
+        const table = etat.combattants || {};
+        const possibles = Object.keys(table).filter(id => {
+            if (id === action.idLanceur) return false;
+            const c = table[id];
+            if (!c || c.aTerre) return false;
+            if (c.estIllusion && !attaqueSimple) return false;
+            if (distanceHex(lanceur, c) > portee) return false;
+            return ligneDeVue(plateau, lanceur, c);
+        }).sort();
+
+        // Personne d'autre à portée : la carte se retourne sur son lanceur.
+        if (possibles.length === 0) return versSoi();
+
+        const idCible = des.parmi(possibles);
+        return {
+            ...action,
+            attaques: attaques.map(a => ({ ...a, cibles: [idCible] })),
+            alterations: alterations.map(alt => ({ ...alt, cibles: [idCible] })),
+            isZone: false,
+            confusion: { type: "aleatoire", idCible }
+        };
+    }
+
+    if (jet <= CHANCE_CONFUSION_DISSIPEE) {
+        return { ...action, confusion: { type: "annulee" } };
+    }
+
+    return action;  // 51-100 : la carte part comme le joueur l'a voulue.
+}
+
 // =========================================================================
 //  2. LES DÉS DE LA CARTE
 // =========================================================================
@@ -436,6 +564,208 @@ export function chaineDeDegats(cible, attaque, options) {
 //  que c'est elle qu'on regarde. Un bouclier posé de loin n'est pas un soin,
 //  c'est un sort — il part en bleu. Et ce qui ne porte pas (portée 1, corps à
 //  corps) ne lance rien : la ruée du lanceur suffit à le raconter.
+
+// =========================================================================
+//  TRAVERSER UNE ZONE PERSISTANTE
+// =========================================================================
+//  La nappe de feu, la flaque de poison, le remous qui soigne : ce que laisse
+//  une carte de Persistance de terrain, et qui frappe quiconque met le pied
+//  dessus. Portage de resoudreZonesPersistantesSurCase (moteur_effets.js).
+//
+//  CE QUI ÉTAIT CASSÉ. Sous le régime du cerveau, marcher dans le feu ne
+//  faisait plus rien du tout. La zone se posait bien, se dessinait bien, et
+//  l'IA la contournait bien — mais la seule fonction qui infligeait vraiment
+//  quelque chose vivait dans l'ancien moteur, appelée depuis des chemins que
+//  le nouveau régime ne traverse jamais (l'ancienne branche de validerMouvement
+//  et les vieux déplacements forcés). Une zone était devenue un décor.
+//
+//  La chaîne est plus courte que celle d'une carte, et c'est voulu : un piège
+//  au sol n'a pas de coup critique, pas de malus à bout portant, pas
+//  d'absorption. Juste la résistance, puis le bouclier, puis la chair.
+//
+//  Cette fonction MODIFIE le combattant dans l'état qu'on lui passe, et rend
+//  les étapes à jouer. Elle est appelée au milieu d'une marche déjà en cours
+//  (resoudreMouvement travaille sur sa copie) : lui faire cloner l'état à
+//  chaque case ferait perdre les pas déjà écrits.
+export function traverserZones(etat, id, hex, des) {
+    const etapes = [];
+    const cible = combattant(etat, id);
+    if (!cible || cible.aTerre || !hex) return etapes;
+
+    const zones = Object.values((etat && etat.zones) || {})
+        .filter(z => z && (z.hexes || []).some(h => h && h.q === hex.q && h.r === hex.r))
+        // L'ordre des clés d'un objet n'est pas une garantie : on le fixe, sans
+        // quoi deux postes pourraient résoudre deux zones superposées dans un
+        // ordre différent — et consommer les dés dans un ordre différent.
+        .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+
+    zones.forEach(zone => {
+        // Le jet de défense d'abord, comme pour une attaque d'opportunité :
+        // une seule chance de passer au travers, quel que soit le contenu.
+        const esquive = esquiveDe(cible), parade = paradeDe(cible);
+        const evitee = des.d100() <= Math.max(esquive, parade);
+        if (evitee) {
+            etapes.push({ type: "esquive", cible: id, acteur: zone.idLanceur || id,
+                          parade: parade > esquive, zone: zone.id });
+            return;
+        }
+
+        if (zone.degats) {
+            const resistance = zone.degats.typeRes === "Magique"
+                ? defMagiqueDe(cible) : defPhysiqueDe(cible);
+            const part = Math.min(Math.max(resistance, 0), 100) / 100;
+            const montant = Math.max(0, Math.round(nombre(zone.degats.valeurBrute) * (1 - part)));
+            if (montant > 0) {
+                let surBouclier = 0;
+                if (cible.bouclier > 0) {
+                    // Le surplus part dans le vide, comme partout ailleurs.
+                    surBouclier = Math.min(cible.bouclier, montant);
+                    cible.bouclier = Math.max(0, cible.bouclier - montant);
+                } else {
+                    cible.pv = Math.max(0, cible.pv - montant);
+                }
+                etapes.push({ type: "degats", cible: id, acteur: zone.idLanceur || id,
+                              montant, surBouclier, zone: zone.id,
+                              bouclierApres: cible.bouclier, pvApres: cible.pv });
+
+                if (cible.pvMax > 0 && cible.pv <= 0 && !cible.aTerre) {
+                    cible.aTerre = true;
+                    etapes.push({ type: "chute", cible: id, acteur: zone.idLanceur || id });
+                    return;   // Tombé dans le feu : le reste de la zone ne le concerne plus.
+                }
+            }
+        }
+
+        // Un remous bienfaisant ne distingue pas les camps — la Persistance de
+        // terrain n'a jamais fait le tri, pas plus pour un soin que pour un
+        // brasier.
+        if (zone.soin) {
+            const avant = cible.pv;
+            cible.pv = Math.min(cible.pvMax, cible.pv + nombre(zone.soin.valeurBrute));
+            if (cible.pv !== avant) {
+                etapes.push({ type: "soin", cible: id, acteur: zone.idLanceur || id,
+                              montant: cible.pv - avant, pvApres: cible.pv, zone: zone.id });
+            }
+        }
+
+        // L'état garde le pourcentage calculé quand le sort a été lancé.
+        if (zone.etat && zone.etat.nom) {
+            const immunites = (cible.atouts && cible.atouts.immunites) || [];
+            const pris = des.d100() <= nombre(zone.etat.chance);
+            if (immunites.includes(zone.etat.nom)) {
+                etapes.push({ type: "etatRate", cible: id, nom: zone.etat.nom, immunise: true });
+            } else if (pris) {
+                const existant = (cible.etats || []).find(e => e && e.nom === zone.etat.nom);
+                if (existant) {
+                    existant.duree = Math.max(nombre(existant.duree), nombre(zone.etat.duree));
+                    if (zone.etat.estPoison) existant.tickFait = false;
+                } else {
+                    cible.etats = [...(cible.etats || []), { ...zone.etat }];
+                }
+                etapes.push({ type: "etats", cible: id, pose: zone.etat.nom,
+                              liste: cible.etats, zone: zone.id });
+            }
+        }
+    });
+
+    return etapes;
+}
+
+// La zone laissée par une carte de Persistance de terrain. Portage de
+// creerZonePersistante, moins ses écritures : ici la zone entre dans l'état, et
+// c'est le cerveau qui la diffuse comme tout le reste.
+//
+// SON IDENTIFIANT NE PEUT PAS ÊTRE UN HORODATAGE. L'ancien la nommait
+// « zp_<Date.now()>_<Math.random()> » : deux postes rejouant le même tour
+// fabriquaient deux identifiants différents, donc deux zones là où il n'y en a
+// qu'une. Le numéro de version de l'état, lui, est le même pour tout le monde.
+export function creerZonePure(etat, action, hexes, idLanceur) {
+    const cases = (hexes || []).filter(Boolean).map(h => ({ q: h.q, r: h.r }));
+    const vues = new Set();
+    const emprise = cases.filter(h => {
+        const cle = h.q + "," + h.r;
+        if (vues.has(cle)) return false;
+        vues.add(cle);
+        return true;
+    });
+    if (emprise.length === 0) return null;
+
+    const attaques = action.attaques || [];
+    const frappe = attaques.find(a => !a.isHeal && !a.isShield && nombre(a.valeurBrute) > 0);
+    const soigne = attaques.find(a => a.isHeal && nombre(a.valeurBrute) > 0);
+    const alt = (action.alterations || []).find(a => a && a.persistante);
+
+    const degats = frappe ? { valeurBrute: nombre(frappe.valeurBrute), typeRes: frappe.typeRes } : null;
+    const soin = soigne ? { valeurBrute: nombre(soigne.valeurBrute) } : null;
+    const etatDeZone = alt ? {
+        nom: alt.nom, icone: alt.icone, desc: alt.desc || "",
+        chance: nombre(alt.chance), duree: nombre(alt.duree),
+        estPoison: !!alt.estPoison, tickFait: false
+    } : null;
+
+    // Rien à faire persister : pas de zone fantôme.
+    if (!degats && !soin && !etatDeZone) return null;
+
+    const id = `zp_${nombre(etat.version)}_${idLanceur || "x"}`;
+    const type = etatDeZone ? (alt.typeZone || "neutre") : (soin ? "soin" : "neutre");
+
+    return {
+        id, hexes: emprise, type, degats, soin, etat: etatDeZone,
+        dureeRestante: 3,          // Fixe : la Forge masque le bouton ⏳ sur ce mod
+        idLanceur: idLanceur || null
+    };
+}
+
+// Pas de superposition : la nouvelle zone REMPLACE les anciennes sur les cases
+// qu'elle recouvre. Une ancienne qui garde des cases ailleurs survit, amputée ;
+// celle qui se fait entièrement recouvrir disparaît.
+//
+// CHAQUE ZONE TOUCHÉE PORTE SON ÉTAPE, y compris celles qu'on ampute et celles
+// qu'on efface. N'annoncer que la nouvelle suffirait à l'affichage mais pas au
+// rejeu : un poste qui rejoue le journal poserait la nouvelle zone SANS retirer
+// ce qu'elle recouvre, et se retrouverait avec deux nappes superposées là où le
+// cerveau n'en a qu'une. Une divergence silencieuse, celle qui coûte le plus
+// cher à retrouver.
+export function poserZone(etat, zone) {
+    const etapes = [];
+    const prises = new Set((zone.hexes || []).map(h => h.q + "," + h.r));
+    const restantes = {};
+    Object.values(etat.zones || {}).forEach(z => {
+        const garde = (z.hexes || []).filter(h => !prises.has(h.q + "," + h.r));
+        if (garde.length > 0) {
+            restantes[z.id] = { ...z, hexes: garde };
+            if (garde.length !== (z.hexes || []).length) {
+                etapes.push({ type: "zone", id: z.id, zone: restantes[z.id] });
+            }
+        } else {
+            etapes.push({ type: "zone", id: z.id, retiree: true });
+        }
+    });
+    restantes[zone.id] = zone;
+    etat.zones = restantes;
+    etapes.push({ type: "zone", id: zone.id, zone });
+    return etapes;
+}
+
+// Un tour de moins à vivre, à chaque fin de manche. Celles qui tombent à zéro
+// s'effacent. Ce décompte vivait dans combat.js, sur le poste qui avait vidé la
+// file — donc nulle part sous le nouveau régime, où plus personne ne « finit »
+// le round de son côté.
+export function vieillirZones(etat) {
+    const etapes = [];
+    Object.values(etat.zones || {}).forEach(z => {
+        const reste = nombre(z.dureeRestante) - 1;
+        if (reste > 0) {
+            etat.zones[z.id] = { ...z, dureeRestante: reste };
+            etapes.push({ type: "zone", id: z.id, zone: etat.zones[z.id] });
+        } else {
+            delete etat.zones[z.id];
+            etapes.push({ type: "zone", id: z.id, retiree: true });
+        }
+    });
+    return etapes;
+}
+
 export function projectileDe(action) {
     const aCibles = (e) => !!e && !!e.isRanged && ((e.cibles || []).length > 0);
 
@@ -497,6 +827,29 @@ export function resoudreCarte(etat, action, plateau) {
             ...(action.alterations || []).map(a => a.cibles || [])
         ))]
     });
+
+    // LA CONFUSION SE DIT AVANT DE SE VOIR. Sans ce mot, le joueur regarde sa
+    // carte partir sur son propre camp sans comprendre, et croit à un bug :
+    // l'ancien moteur l'affichait (jouerAnimationMoteur), le cerveau ne le
+    // faisait pas. Les cibles, elles, ont déjà été détournées en amont par
+    // appliquerConfusion — ici on ne fait qu'annoncer, et dissiper s'il y a
+    // lieu.
+    if (action.confusion) {
+        const dit = {
+            auto:      "Confus : s'inflige sa propre compétence !",
+            aleatoire: "Confus : cible au hasard !",
+            annulee:   "Confusion dissipée !"
+        }[action.confusion.type];
+        if (dit) {
+            etapes.push({ type: "message", cible: idLanceur, acteur: idLanceur,
+                          texte: dit,
+                          couleur: action.confusion.type === "annulee" ? "#33cc66" : "#cc66ff" });
+        }
+        if (action.confusion.type === "annulee") {
+            lanceur.etats = (lanceur.etats || []).filter(e => e && e.nom !== "Confusion");
+            etapes.push({ type: "etats", cible: idLanceur, liste: lanceur.etats });
+        }
+    }
 
     // Le lanceur étourdi rate parfois complètement sa technique. Le jet a été
     // tiré au lancement ; on ne fait que le lire.
@@ -727,6 +1080,9 @@ export function resoudreCarte(etat, action, plateau) {
                 // Une brûlure ravivée par une autre carte reprend le type de
                 // CELLE-CI : c'est la dernière flamme posée qui brûle.
                 if (typeDegatsDeLEtat) existant.typeDegats = typeDegatsDeLEtat;
+                // Même principe pour la Provocation : provoqué une seconde fois,
+                // c'est le dernier qui a crié qu'on doit aller frapper.
+                if (alt.idProvocateur) existant.idProvocateur = alt.idProvocateur;
             } else {
                 cible.etats = [...cible.etats, {
                     nom: alt.nom,
@@ -735,6 +1091,13 @@ export function resoudreCarte(etat, action, plateau) {
                     ...(alt.desc ? { desc: alt.desc } : {}),
                     ...(alt.valeurAbs !== undefined ? { valeurAbs: alt.valeurAbs } : {}),
                     ...(alt.bonusEquip ? { bonusEquip: alt.bonusEquip } : {}),
+                    // QUI A PROVOQUÉ. Sans ce nom, la Provocation ne provoque
+                    // rien : l'IA (ia_pure.js) cherche l'état, lit
+                    // `idProvocateur` pour se retourner vers celui qui l'a
+                    // défiée, ne trouve rien, et choisit sa cible comme si de
+                    // rien n'était. L'extraction le posait, ce tri le jetait —
+                    // l'effet phare du tank était décoratif sous ce régime.
+                    ...(alt.idProvocateur ? { idProvocateur: alt.idProvocateur } : {}),
                     // LA BRÛLURE SE SOUVIENT DE CE QUI L'A ALLUMÉE. Elle ronge
                     // à chaque manche (REGLES_ETATS.Brûlé.degatsParTour), et
                     // ces dégâts-là sont du type de l'attaque qui l'a posée :

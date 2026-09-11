@@ -7,6 +7,9 @@
 // La lecture côté IA (choisirCibleMonstre) est déjà couverte par
 // equipement_combat.mjs.
 import fs from 'fs';
+import { resoudreCarte } from '../moteur_pur.js';
+import { choisirCible } from '../ia_pure.js';
+import { construireEtatCombat, creerDes } from '../combat_etat.js';
 
 const src = fs.readFileSync('/home/user/Ivalis/moteur_effets.js', 'utf-8');
 const debut = src.indexOf('// 🔻 NOUVEAU : DÉTECTION PROVOCATION 🔻');
@@ -70,6 +73,87 @@ console.log("\n4. AUCUNE FAUSSE DÉTECTION");
 {
     const alts = executerBloc({ effBase: { Nom: "Peur", Pourcent_Base: "10" } });
     verifier("une carte sans provocation ne produit rien", alts.length === 0, `(${alts.length} alteration(s))`);
+}
+
+// =========================================================================
+console.log("\n5. LE TRAJET COMPLET : DE L'EXTRACTION JUSQU'À LA CIBLE FORCÉE");
+// =========================================================================
+//  LE CHAÎNON QUI MANQUAIT, ET QUI RENDAIT L'EFFET DÉCORATIF.
+//
+//  Les quatre chapitres au-dessus prouvaient que l'extraction pose bien
+//  `idProvocateur` sur l'altération. Le banc de l'IA, lui, prouvait que
+//  choisirCible sait s'en servir. Entre les deux, personne ne regardait : et
+//  c'est justement entre les deux que le nom se perdait. Le noyau posait
+//  l'état en recopiant une liste blanche de champs (nom, durée, icône,
+//  description…) où `idProvocateur` ne figurait pas. L'état arrivait donc sur
+//  la fiche avec sa jolie pastille, et l'IA le lisait sans y trouver personne
+//  à aller frapper.
+//
+//  Ce chapitre refait le voyage en entier, avec le vrai noyau et la vraie IA.
+{
+    const fiche = (id, camp, extra = {}) => ({
+        idPersonnage: id, camp, prenom: id, PV_Max: 60, PV_Actuels: 60,
+        Fatigue_Max: 100, Fatigue_Actuelle: 100, Esquive: 0, Parade: 0,
+        Critique: 0, Def_Physique: 0, Def_Magique: 0, Bouclier_Actuel: 0,
+        Bouclier_Max: 0, Etats_Alteres: [], statut: "Vivant", ...extra
+    });
+
+    // Le tank provoque, son camarade est juste à côté — et bien plus tendre.
+    const etatDepart = construireEtatCombat({
+        idPartie: "P1", cerveau: "P_01", graine: 77,
+        combattants: [fiche("TANK", "Allié", { PV_Actuels: 60 }),
+                      fiche("FRAGILE", "Allié", { PV_Actuels: 8 }),
+                      fiche("GOBELIN", "Ennemi", { personnalite: "brutal" })],
+        positions: { TANK: { q: 0, r: 0 }, FRAGILE: { q: 1, r: 0 }, GOBELIN: { q: 2, r: 0 } },
+        partie: { Tour_Combat: 1 }
+    });
+
+    // La carte du tank, telle que l'extraction la construit (chapitre 1).
+    const carteDuTank = {
+        type: "carte", idLanceur: "TANK", idCarte: "C_PROVOC",
+        attaques: [],
+        alterations: [{ nom: "Provocation", duree: 2, chance: 100, cibles: ["GOBELIN"],
+                        idProvocateur: "TANK" }],
+        jets: { attaqueRatee: false,
+                parCible: { GOBELIN: { esquive: false, etats: { Provocation: true } } } }
+    };
+
+    const { etat: apres } = resoudreCarte(etatDepart, carteDuTank);
+    const etatPose = (apres.combattants.GOBELIN.etats || [])
+        .find(e => e && e.nom === "Provocation");
+
+    verifier("le cerveau pose bien l'état sur la créature", !!etatPose);
+    verifier("ET il garde le nom du provocateur",
+             etatPose && etatPose.idProvocateur === "TANK",
+             etatPose ? JSON.stringify(etatPose) : "(aucun état)");
+
+    // Maintenant l'IA choisit. Sans provocation elle irait au plus faible.
+    const carteDuGobelin = { estSoin: false, portee: 3 };
+    const cibleProvoquee = choisirCible(apres, "GOBELIN", carteDuGobelin, creerDes(1));
+    verifier("la créature provoquée se retourne vers le tank",
+             cibleProvoquee && cibleProvoquee.id === "TANK",
+             cibleProvoquee ? cibleProvoquee.id : "(aucune cible)");
+
+    // Le contre-essai : sans l'état, elle repart sur le plus fragile. C'est ce
+    // qui prouve que le chapitre au-dessus mesure vraiment la provocation, et
+    // pas un hasard qui tomberait sur le tank de toute façon.
+    const cibleLibre = choisirCible(etatDepart, "GOBELIN", carteDuGobelin, creerDes(1));
+    verifier("sans provocation, elle choisit le plus fragile",
+             cibleLibre && cibleLibre.id === "FRAGILE",
+             cibleLibre ? cibleLibre.id : "(aucune cible)");
+
+    // Provoqué une seconde fois par quelqu'un d'autre : c'est le dernier qui a
+    // crié qu'on va frapper, pas le premier.
+    const carteDuFragile = {
+        ...carteDuTank, idLanceur: "FRAGILE",
+        alterations: [{ ...carteDuTank.alterations[0], idProvocateur: "FRAGILE" }]
+    };
+    const { etat: reprovoque } = resoudreCarte(apres, carteDuFragile);
+    const etatRenouvele = (reprovoque.combattants.GOBELIN.etats || [])
+        .find(e => e && e.nom === "Provocation");
+    verifier("une seconde provocation remplace le provocateur",
+             etatRenouvele && etatRenouvele.idProvocateur === "FRAGILE",
+             etatRenouvele ? etatRenouvele.idProvocateur : "(aucun état)");
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} ÉCHEC(S)`);

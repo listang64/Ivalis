@@ -67,6 +67,10 @@ node equipement_cerveau.mjs # percer une armure, l'élan, la bénédiction, le p
 node durees_etats.mjs       # la durée d'un état, de la Forge (⏳ Durée +) jusqu'à sa dernière manche
 node migration_effets.mjs   # la mise à jour de la base des effets : bonne cible, sans danger à relancer
 node mouvement_pur.mjs      # chemin, coût des cases, attaques d'opportunité (1 000 trajets)
+node confusion_cerveau.mjs  # les quatre bandes du dé, la dissipation, et le mot qui prévient le joueur
+node zones_cerveau.mjs      # une nappe au sol : elle naît dans l'état, elle brûle, elle vieillit, elle meurt
+node bond_cerveau.mjs       # le saut passe par le cerveau au lieu d'écrire en base tout seul
+node illusion_cerveau.mjs   # le leurre entre vraiment dans le combat : visable, frappable, effaçable
 node ia_pure.mjs            # qui viser, où se mettre : les cinq caractères, sans variable globale
 node cerveau_combat.mjs     # LE CERVEAU : intentions validées, un seul écrivain, un combat entier
 node spectateur_combat.mjs  # LE SPECTATEUR : le rejeu à l'écran, dans l'ordre, sans trou ni doublon
