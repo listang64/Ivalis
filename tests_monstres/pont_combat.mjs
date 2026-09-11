@@ -104,6 +104,52 @@ console.log("1. AUCUN TYPE D'ÉTAPE N'EST LAISSÉ SANS MISE EN SCÈNE");
 }
 
 // =========================================================================
+console.log("\n1 bis. UNE ESQUIVE A DEUX MOITIÉS : LE MOT ET LE RECUL");
+// =========================================================================
+//  Le pont ne transmettait que la première. À l'écran, une créature qui
+//  esquivait ne bougeait pas d'un pixel : « l'animation d'esquive ne se fait pas
+//  pour les ennemis ». Le recul a besoin de la case de l'ATTAQUANT pour savoir
+//  de quel côté se dérober — elle se lit dans l'état d'AVANT le coup.
+{
+    const etat = {
+        combattants: {
+            H1: { id: "H1", q: 0, r: 0, pv: 50, pvMax: 50 },
+            M1: { id: "M1", q: 3, r: 0, pv: 40, pvMax: 40 }
+        }
+    };
+
+    const scene = misEnScene({ type: "esquive", cible: "M1", acteur: "H1" }, etat);
+    verifier("une esquive est un geste à part entière", scene.geste === "esquive", scene.geste);
+    verifier("elle sait QUI se dérobe", scene.pion === "M1", scene.pion);
+    verifier("et D'OÙ vient le coup", !!scene.depuis && scene.depuis.q === 0 && scene.depuis.r === 0,
+             JSON.stringify(scene.depuis));
+    verifier("le mot par défaut est l'esquive", scene.texte === "Esquivé 💨", scene.texte);
+
+    // La parade sauve aussi la mise, mais ce n'est pas le même mot.
+    const paree = misEnScene({ type: "esquive", cible: "M1", acteur: "H1", parade: true }, etat);
+    verifier("une parade se dit « Paré »", paree.texte === "Paré 🛡️", paree.texte);
+
+    // Un attaquant qu'on ne trouve pas ne fait pas tomber la scène : on montre
+    // le mot, sans recul.
+    const sansAttaquant = misEnScene({ type: "esquive", cible: "M1", acteur: "FANTÔME" }, etat);
+    verifier("un attaquant introuvable ne casse rien", sansAttaquant.depuis === null);
+
+    // ET LE PONT LA JOUE VRAIMENT : c'est ce qui manquait.
+    const joues = [];
+    const pont = creerPont({
+        esquive: (d) => joues.push(d),
+        message: (pion, texte) => joues.push({ message: pion + ":" + texte }),
+        pause: async () => {}
+    });
+    await pont.animer({ type: "esquive", cible: "M1", acteur: "H1" }, etat);
+    verifier("le pont appelle l'animation d'esquive", joues.length === 1 && !joues[0].message,
+             JSON.stringify(joues[0]));
+    verifier("en lui donnant la cible et l'origine du coup",
+             joues[0].idCible === "M1" && joues[0].depuis.q === 0,
+             JSON.stringify(joues[0]));
+}
+
+// =========================================================================
 console.log("\n2. UNE JAUGE A DEUX BOUTS, ET LE DÉPART VIENT DE L'ÉTAT D'AVANT");
 // =========================================================================
 //  Le point qui rend le rejeu juste. L'étape ne dit que « pvApres: 48 » ; sans

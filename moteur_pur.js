@@ -102,10 +102,18 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
         if (!jets.parCible[id]) jets.parCible[id] = { etats: {} };
         return jets.parCible[id];
     };
-    // Esquive OU parade : c'est la meilleure des deux qui protège.
+    // Esquive OU parade : c'est la meilleure des deux qui protège. On retient
+    // LAQUELLE, sans tirer un dé de plus : c'est ce qui permet à l'écran
+    // d'annoncer « Paré 🛡️ » plutôt que « Esquivé 💨 » quand c'est la parade qui
+    // a sauvé la mise. L'ancien moteur le disait déjà ; le nouveau ne le
+    // transmettait pas.
     const jetDeDefense = (id) => {
         const c = combattant(etat, id);
-        return des.d100() <= Math.max(esquiveDe(c), paradeDe(c));
+        const esq = esquiveDe(c);
+        const par = paradeDe(c);
+        const reussi = des.d100() <= Math.max(esq, par);
+        if (reussi) pourCible(id).parade = par > esq;
+        return reussi;
     };
 
     (plan.attaques || []).forEach(attaque => {
@@ -269,7 +277,8 @@ export function resoudreCarte(etat, action) {
             // Une esquive vaut pour toute la carte : la cible n'esquive pas
             // chaque effet séparément, elle esquive le coup.
             if (des.esquive) {
-                etapes.push({ type: "esquive", cible: idCible, acteur: idLanceur });
+                etapes.push({ type: "esquive", cible: idCible, acteur: idLanceur,
+                              parade: !!des.parade });
                 return;
             }
             touchees.add(idCible);

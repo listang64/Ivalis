@@ -479,6 +479,22 @@ function verifierQueJePeuxJouer(file) {
     if (tourVerifie === cle) return;
     tourVerifie = cle;
 
+    // DEUX ATTENTES PARFAITEMENT NORMALES, qu'il ne faut pas confondre avec une
+    // panne. Un REPOS LONG n'a pas de bouton « Appliquer » : il se joue par
+    // FIN DU TOUR, et c'est très bien. Et une demande déjà envoyée attend
+    // simplement la réponse du cerveau.
+    if (tete.idCarte === "REPOS_LONG") {
+        if (typeof window.tracerCombat === "function") {
+            window.tracerCombat("🎯", `à moi de jouer : ${tete.idPersonnage}`,
+                                "repos long — c'est FIN DU TOUR qui le joue");
+        }
+        return;
+    }
+    if (window.regimeDemande && typeof window.regimeDemande.enVol === "function"
+        && window.regimeDemande.enVol(tete.idPersonnage)) {
+        return;
+    }
+
     const bouton = document.getElementById("btn-appliquer-carte");
     const voile = !!window.EVENEMENT_ATTENDU;
     if (bouton && !voile) {
@@ -572,6 +588,15 @@ function contexteDuJeu() {
                     window.afficherMessageFlottantHex(tk.q, tk.r, texte, couleur, options || {});
                 }
             },
+            // L'esquive : le mot qui monte ET le pion qui se dérobe. Les deux
+            // vivent dans animerEsquive (combat.js), à un seul endroit.
+            esquive: (d) => {
+                if (typeof window.animerEsquive === "function") return window.animerEsquive(d);
+                const tk = (window.TOKENS_VTT_DATA || {})[d.idCible];
+                if (tk && typeof window.afficherMessageFlottantHex === "function") {
+                    window.afficherMessageFlottantHex(tk.q, tk.r, d.texte, d.couleur);
+                }
+            },
             opportunite: (d) => window.jouerAnimationOpportunite
                 ? window.jouerAnimationOpportunite(d) : null,
             zone: () => window.appliquerZonesPersistantes
@@ -660,6 +685,9 @@ function contexteDuJeu() {
                         if (typeof window[nom] !== "function") { signalerPanne(nom, "absent de la page"); return; }
                         try { appel(); } catch (e) { signalerPanne(nom, e); }
                     });
+                if (typeof window.regimeOublierDemande === "function") {
+                    window.regimeOublierDemande(file, infos.manche);
+                }
                 verifierQueJePeuxJouer(file);
             },
             rafraichir: () => {
@@ -1107,13 +1135,58 @@ if (typeof window !== "undefined") {
     // `false` quand le nouveau régime n'est pas en marche : l'appelant sait
     // alors qu'il doit suivre l'ancien chemin, et une seule ligne suffit à
     // chaque point d'appel.
+    // UNE DEMANDE EN VOL FERME LE TOUR TOUT DE SUITE, À L'ÉCRAN.
+    //
+    // Entre le moment où le joueur applique sa carte et celui où le cerveau
+    // publie le pas, il s'écoule un aller-retour réseau — une demi-seconde,
+    // parfois plus. Pendant ce temps, la file projetée le montre TOUJOURS en
+    // tête : le bouton « Appliquer » restait donc là, et on pouvait relancer la
+    // même carte une seconde fois. Le cerveau refusait bien la seconde (« c'est
+    // au tour de X »), mais le joueur, lui, avait déjà vu son ciblage repartir.
+    //
+    // Le repère est local et volontairement bête : « j'ai demandé pour CE
+    // combattant, à CETTE manche ». Il tombe dès que la file avance, c'est-à-dire
+    // dès que le cerveau a répondu.
+    let demandeEnVol = "";
+
+    const marquerDemande = (acteur) => {
+        const etat = REGIME && REGIME.etatAffiche();
+        demandeEnVol = (acteur || "") + "|" + nombre(etat && etat.manche, 1);
+    };
+
+    // Appelée à chaque projection : si la tête de file n'est plus celle qu'on
+    // attendait, la demande a abouti (ou a été refusée) et le repère tombe.
+    window.regimeOublierDemande = function(file, manche) {
+        if (!demandeEnVol) return;
+        const tete = (file || [])[0];
+        if (!tete || (tete.idPersonnage + "|" + nombre(manche, 1)) !== demandeEnVol) {
+            demandeEnVol = "";
+        }
+    };
+
     window.regimeDemande = {
         actif: () => !!(window.REGIME_CERVEAU && REGIME),
         mouvement: (acteur, chemin, reserve) =>
             REGIME ? REGIME.demanderMouvement(acteur, chemin, reserve) : null,
-        carte: (acteur, carte) => REGIME ? REGIME.demanderCarte(acteur, carte) : null,
-        finDeTour: (acteur) => REGIME ? REGIME.demanderFinDeTour(acteur) : null,
-        ok: () => REGIME ? REGIME.ok() : null
+        carte: (acteur, carte) => {
+            if (!REGIME) return null;
+            // On marque AVANT d'envoyer : l'écriture réseau est justement ce
+            // qu'on ne veut pas laisser sans réponse à l'écran.
+            marquerDemande(acteur);
+            return REGIME.demanderCarte(acteur, carte);
+        },
+        finDeTour: (acteur) => {
+            if (!REGIME) return null;
+            marquerDemande(acteur);
+            return REGIME.demanderFinDeTour(acteur);
+        },
+        ok: () => REGIME ? REGIME.ok() : null,
+        // « Ce combattant a-t-il déjà demandé quelque chose pour ce tour ? »
+        enVol: (acteur) => {
+            if (!demandeEnVol) return false;
+            if (!acteur) return true;
+            return demandeEnVol.split("|")[0] === acteur;
+        }
     };
 
     window.regimeCombat = { creerRegime, CHEMINS };

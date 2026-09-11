@@ -2109,6 +2109,50 @@ window.imageEtat = function(etat, taille) {
          + ` filter: drop-shadow(0 ${taille > 30 ? 4 : 2}px ${taille > 30 ? 6 : 4}px rgba(0,0,0,0.85));">`;
 };
 
+// L'ESQUIVE SE VOIT : LE PION RECULE.
+//
+// Elle avait DEUX moitiés dans l'ancien moteur — le mot qui monte (« Esquivé 💨 »
+// ou « Paré 🛡️ ») et le pion qui se dérobe, un pas en arrière puis retour. Le
+// nouveau régime ne reprenait que la première : à l'écran, une attaque esquivée
+// par une créature ne se voyait pas bouger, et on croyait que rien ne s'était
+// passé.
+//
+// La voici pour de bon, et à un seul endroit cette fois : elle prend la case de
+// l'attaquant pour savoir DE QUEL CÔTÉ se dérober.
+window.animerEsquive = function({ idCible, depuis, texte, couleur }) {
+    const tkCible = (window.TOKENS_VTT_DATA || {})[idCible];
+    if (!tkCible) return;
+
+    if (typeof window.afficherMessageFlottantHex === "function") {
+        window.afficherMessageFlottantHex(tkCible.q, tkCible.r,
+                                          texte || "Esquivé 💨", couleur || "#cccccc");
+    }
+
+    const pion = document.getElementById("token-" + idCible);
+    if (!pion || !depuis || !window.PLATEAU_VTT
+        || typeof window.PLATEAU_VTT.hexToPixel !== "function") return;
+
+    const pxAttaquant = window.PLATEAU_VTT.hexToPixel(depuis.q, depuis.r);
+    const pxCible = window.PLATEAU_VTT.hexToPixel(tkCible.q, tkCible.r);
+    const dx = pxCible.x - pxAttaquant.x;
+    const dy = pxCible.y - pxAttaquant.y;
+    const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+    const echelle = window.VTT_SCALE || 1;
+    const reculX = (dx / distance) * 25 * echelle;
+    const reculY = (dy / distance) * 25 * echelle;
+
+    // Un léger temps avant de se dérober : le mot a le temps de se lire.
+    setTimeout(() => {
+        pion.style.transition = "transform 0.15s cubic-bezier(0.25, 0.8, 0.25, 1)";
+        pion.style.transform = `translate(calc(-50% + ${reculX}px), calc(-50% + ${reculY}px))`;
+        setTimeout(() => {
+            pion.style.transition = "transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+            pion.style.transform = `translate(-50%, -50%)`;
+            setTimeout(() => { pion.style.transition = "none"; }, 250);
+        }, 150);
+    }, 150);
+};
+
 window.estCombattantMort = function(idCombattant) {
     const p = (window.PERSOS_PARTIE || []).find(x => x.idPersonnage === idCombattant);
     if (!p) return false;

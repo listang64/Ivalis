@@ -98,9 +98,17 @@ const SCENES = {
     },
 
     // --- CE QUI TOUCHE, ET CE QUI RATE -----------------------------------
-    esquive(e) {
-        return { geste: "message", pion: e.cible, texte: "Esquivé 💨",
-                 couleur: COULEURS.neutre, recul: e.acteur, duree: RYTHME.esquive };
+    // UNE ESQUIVE A DEUX MOITIÉS : le mot qui monte, et le pion qui se dérobe.
+    // On ne transmettait que la première — à l'écran, une créature qui esquivait
+    // ne bougeait pas, et on croyait qu'il ne s'était rien passé. Il faut la
+    // case de l'ATTAQUANT pour savoir de quel côté reculer : elle se lit dans
+    // l'état d'avant, que le spectateur nous donne exprès.
+    esquive(e, etat) {
+        const attaquant = combattantDe(etat, e.acteur);
+        return { geste: "esquive", pion: e.cible,
+                 depuis: attaquant ? { q: nombre(attaquant.q), r: nombre(attaquant.r) } : null,
+                 texte: e.parade ? "Paré 🛡️" : "Esquivé 💨",
+                 couleur: COULEURS.neutre, duree: RYTHME.esquive };
     },
     echec(e) {
         return { geste: "message", pion: e.acteur, texte: "Échec technique !",
@@ -235,6 +243,7 @@ export function creerPont(effets) {
         ruee = async () => {},             // le lanceur s'élance vers sa cible
         jauge = () => {},                  // afficherFlashDegatToken
         message = () => {},                // afficherMessageFlottantHex
+        esquive = () => {},                // animerEsquive : le mot ET le recul
         opportunite = async () => {},      // jouerAnimationOpportunite
         zone = async () => {},             // appliquerZonesPersistantes
         pause = (ms) => new Promise(r => setTimeout(r, ms)),
@@ -276,6 +285,12 @@ export function creerPont(effets) {
                 // apprend ce qu'il vient d'encaisser.
                 jauge(scene.pion, scene.de, scene.vers, scene.max,
                       scene.texte, scene.couleurTexte, scene.couleurBarre);
+                await pause(scene.duree);
+                break;
+
+            case "esquive":
+                esquive({ idCible: scene.pion, depuis: scene.depuis,
+                          texte: scene.texte, couleur: scene.couleur });
                 await pause(scene.duree);
                 break;
 

@@ -1465,6 +1465,13 @@ window.demarrerCiblage = async function(idCarte, options) {
     // La portée de placement de la zone, lue sur l'action qui la dessine.
     let zoneEstADistance = false;
     let zonePortee = 0;
+    // LA PLUS LONGUE PORTÉE DE TOUTE LA CARTE, quelle que soit l'action qui la
+    // porte. La carte, elle, se lit en entier : afficherApercuCarteHD décide de
+    // détacher la zone du lanceur dès qu'un effet « Distance » apparaît
+    // N'IMPORTE OÙ dans la carte. L'extraction, elle, ne regardait que l'action
+    // qui dessine la zone — d'où « un soin à distance 3 avec persistance
+    // terrain, mais je ne peux poser la zone qu'au corps-à-corps ».
+    let porteeDeLaCarte = 0;
     let isBond = false;
     let porteeBond = 2;
     // Pour que la carte se résolve dans l'ordre où elle est construite : on retient à quel
@@ -1611,6 +1618,7 @@ window.demarrerCiblage = async function(idCarte, options) {
                 zoneEstADistance = true;
                 zonePortee = Math.max(zonePortee, rangeMax);
             }
+            if (isRanged) porteeDeLaCarte = Math.max(porteeDeLaCarte, rangeMax);
 
             // A. Détection Attaques, Soins & Purifications
             let isPurification = false;
@@ -2244,9 +2252,13 @@ window.demarrerCiblage = async function(idCarte, options) {
     // résolution ignore la portée (voir « if (!action.isZone && dist >
     // attaque.rangeMax) » dans jouerAnimationMoteur) —, donc la reporter ici ne
     // change rien d'autre que l'endroit où la zone peut se poser.
-    if (isZone && configSort && zoneEstADistance) {
+    //  Et si AUCUNE action portant la zone n'est à distance, mais qu'une autre
+    //  action de la carte l'est, c'est la carte qui gagne : c'est ce que le
+    //  joueur lit dessus, et c'est ce que l'aperçu lui montre.
+    if (isZone && configSort && (zoneEstADistance || porteeDeLaCarte > 1)) {
         configSort.isRanged = true;
-        configSort.rangeMax = Math.max(parseInt(configSort.rangeMax) || 1, zonePortee);
+        configSort.rangeMax = Math.max(parseInt(configSort.rangeMax) || 1,
+                                       zonePortee, porteeDeLaCarte);
     }
 
     if (isZone && configSort && configSort.isRanged) {

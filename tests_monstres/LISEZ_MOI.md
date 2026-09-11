@@ -1076,6 +1076,48 @@ quand c'est au tour d'un de MES héros, le régime regarde si le bouton
 `🧊 à moi de jouer mais RIEN À CLIQUER`, avec la raison (carte absente, bouton
 absent, fenêtre sombre encore levée).
 
+### Les tics de fin de manche
+
+Ils vivaient tous dans l'ancien `finDeTourCombat`, un chemin que le nouveau
+régime ne traverse plus : un empoisonnement ne mordait jamais, une immobilisation
+ne coûtait rien, un étalement ne portait jamais son second coup. Ils sont
+maintenant dans le cerveau, avec la règle du jeu mot pour mot — l'immobilisation
+puise 20 d'énergie à chaque manche où elle dure, le poison prend 15 d'énergie et
+8% des points de vie maximum **une seule fois** (`tickFait` voyage avec l'état),
+l'étalement porte son reste sur le bouclier en priorité. **L'ordre compte**, et
+c'est celui de l'ancien monde : régénération, puis les tics, puis le
+vieillissement. Chaque étape porte le RÉSULTAT, comme toutes les autres.
+
+### Une esquive a deux moitiés
+
+Le mot qui monte (« Esquivé 💨 » ou « Paré 🛡️ ») **et le pion qui se dérobe**, un
+pas en arrière puis retour. Le pont ne transmettait que la première : à l'écran,
+une créature qui esquivait ne bougeait pas d'un pixel, et on croyait qu'il ne
+s'était rien passé. Le recul a besoin de la case de l'ATTAQUANT pour savoir de
+quel côté se dérober — elle se lit dans l'état d'AVANT le coup, celui que le
+spectateur donne exprès au pont. Au passage, le noyau dit enfin LAQUELLE des deux
+défenses a sauvé la mise, sans tirer un dé de plus : « Paré » quand c'est la
+parade. Chapitre « 1 bis » de `pont_combat.mjs`.
+
+### La zone prend la distance de la CARTE, pas d'une action
+
+Deuxième étage du même désaccord. `afficherApercuCarteHD` détache la zone du
+lanceur dès qu'un effet « Distance » apparaît N'IMPORTE OÙ dans la carte — c'est
+ce que le joueur voit dessus. L'extraction, elle, ne regardait que l'action qui
+DESSINE la zone. Une carte « soin à distance 3 + persistance terrain », où la
+distance vit sur l'action de soin et la zone sur l'action de persistance, ne
+pouvait donc se poser qu'au corps-à-corps. Chapitre 5 de `portee_zone.mjs`.
+
+### Une demande en vol ferme le tour tout de suite
+
+Entre le moment où le joueur applique sa carte et celui où le cerveau publie le
+pas, il s'écoule un aller-retour réseau. Pendant ce temps la file projetée le
+montre TOUJOURS en tête : le bouton « Appliquer » restait là, et on pouvait
+relancer la même carte. Le cerveau refusait bien la seconde (« c'est au tour de
+X »), mais le ciblage était déjà reparti sous les yeux du joueur. Un repère local
+— « j'ai demandé pour CE combattant, à CETTE manche » — ferme le bouton dès
+l'envoi et tombe dès que la file avance.
+
 ### L'ouverture d'une manche n'est pas un tour
 
 La fenêtre sombre s'ouvrait dessus — `fenêtre : null (manche 2), en attente du

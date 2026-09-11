@@ -546,11 +546,24 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     const queueTemp = partieTemp.File_Attente_Combat || [];
     const phaseTemp = partieTemp.Phase_Combat || "Preparation";
     const persoActuelTemp = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
+    // UNE DEMANDE DÉJÀ ENVOYÉE FERME LE TOUR TOUT DE SUITE.
+    //
+    // Entre le moment où le joueur applique sa carte et celui où le cerveau
+    // publie le pas, il s'écoule un aller-retour réseau. Pendant ce temps la
+    // file le montre toujours en tête : le bouton « Appliquer » restait donc là
+    // et on pouvait relancer la même carte. Le cerveau refusait bien la seconde,
+    // mais le ciblage était déjà reparti sous les yeux du joueur.
+    const demandeDejaEnVol = !!(window.regimeDemande
+        && typeof window.regimeDemande.enVol === "function"
+        && persoActuelTemp
+        && window.regimeDemande.enVol(persoActuelTemp.idPersonnage));
+
     const estMonTour = (
         phaseTemp === "Resolution" &&
         queueTemp.length > 0 &&
         persoActuelTemp &&
-        queueTemp[0].idPersonnage === persoActuelTemp.idPersonnage
+        queueTemp[0].idPersonnage === persoActuelTemp.idPersonnage &&
+        !demandeDejaEnVol
     );
 
     // Les monstres ne se pilotent pas à la main : leurs cartes s'affichent pour

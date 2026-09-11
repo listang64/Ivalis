@@ -631,6 +631,61 @@ console.log("\nUN TOUR QUI NE FRAPPE RIEN COMPTE QUAND MÊME");
              !pasMilieu.entree.etapes.some(e => e.vieillissement)
              && pasMilieu.etat.combattants.H1.etats[0].duree === 2);
 
+    // --- LES TICS DE FIN DE MANCHE -----------------------------------------
+    //  Ils vivaient dans l'ancien finDeTourCombat : un empoisonnement ne mordait
+    //  jamais, une immobilisation ne coûtait rien, un étalement ne portait
+    //  jamais son second coup.
+    const tics = monde();
+    tics.file = [{ id: "H1", carte: "C_H1", initiative: 0 }];   // dernier de la manche
+    tics.combattants.H1.fatigue = 80;
+    tics.combattants.H1.stats.Regeneration = 0;                 // on isole les tics
+    tics.combattants.H1.etats = [{ nom: "Immobilisation", duree: 2 }];
+    tics.combattants.H2.fatigue = 50;
+    tics.combattants.H2.stats.Regeneration = 0;
+    tics.combattants.H2.pv = 40;
+    tics.combattants.H2.etats = [{ nom: "Empoisonnement", duree: 2 }];
+    tics.combattants.M1.bouclier = 10;
+    tics.combattants.M1.etats = [{ nom: "Étalement", duree: 1, degatsDifferes: 7 }];
+    tics.combattants.M2.pv = 30;
+    tics.combattants.M2.bouclier = 0;
+    tics.combattants.M2.etats = [{ nom: "Étalement", duree: 1, degatsDifferes: 9 }];
+
+    const finTics = avancerFile(tics, creerDes(tics.graine));
+    const apres = finTics.etat.combattants;
+
+    verifier("l'immobilisation coûte 20 d'énergie", apres.H1.fatigue === 100,
+             `(80 → ${apres.H1.fatigue})`);
+    verifier("le poison prend 15 d'énergie", apres.H2.fatigue === 35, `(50 → ${apres.H2.fatigue})`);
+    // 8% de 60 PV max = 4,8, arrondi au supérieur : 5.
+    verifier("et 8% des points de vie maximum", apres.H2.pv === 35, `(40 → ${apres.H2.pv})`);
+    verifier("l'étalement tape le bouclier en priorité",
+             apres.M1.bouclier === 3 && apres.M1.pv === 60,
+             `(bouclier ${apres.M1.bouclier}, pv ${apres.M1.pv})`);
+    verifier("sans bouclier, il tape la vie", apres.M2.pv === 21, `(30 → ${apres.M2.pv})`);
+
+    // ET CHAQUE TIC NE TOMBE QU'UNE FOIS. L'empoisonnement et l'étalement
+    // portent `tickFait` ; l'immobilisation, elle, mord à chaque manche.
+    const suite = clonerEtat(finTics.etat);
+    suite.file = [{ id: "H1", carte: "C_H1", initiative: 0 }];
+    suite.phase = "Resolution";
+    const finTics2 = avancerFile(suite, creerDes(suite.graine));
+    const apres2 = finTics2.etat.combattants;
+    verifier("le poison ne mord pas deux fois", apres2.H2.pv === 35, `(${apres2.H2.pv})`);
+    verifier("mais l'immobilisation, elle, coûte à chaque manche",
+             finTics2.entree.etapes.some(e => e.tic === "Immobilisation")
+             || apres2.H1.etats.length === 0,
+             `(états restants : ${apres2.H1.etats.map(e => e.nom).join(",") || "aucun"})`);
+
+    // Un tic qui achève sa cible la couche : l'état d'après doit le dire.
+    const mortel = monde();
+    mortel.file = [{ id: "H1", carte: "C_H1", initiative: 0 }];
+    mortel.combattants.M2.pv = 3;
+    mortel.combattants.M2.bouclier = 0;
+    mortel.combattants.M2.etats = [{ nom: "Étalement", duree: 1, degatsDifferes: 9 }];
+    const fin3 = avancerFile(mortel, creerDes(mortel.graine));
+    verifier("un tic qui achève sa cible la couche",
+             fin3.etat.combattants.M2.pv === 0 && fin3.etat.combattants.M2.aTerre === true);
+
     // --- UNE CARTE SANS CIBLE ---------------------------------------------
     const nue = monde();
     nue.combattants.H1.fatigue = 60;

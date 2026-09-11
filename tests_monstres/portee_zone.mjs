@@ -165,7 +165,34 @@ console.log("\n4. DEUX SOURCES SUR LA MÊME ACTION : LA PLUS LONGUE GAGNE");
 }
 
 // =========================================================================
-console.log("\n5. UNE CARTE SANS ZONE N'EST PAS TOUCHÉE");
+console.log("\n5. LA DISTANCE EST SUR UNE AUTRE ACTION QUE LA ZONE");
+// =========================================================================
+//  Le cas de Nico : « un soin à distance 3 avec persistance terrain, mais en
+//  combat je ne peux poser la zone qu'au corps-à-corps ». La Distance vit sur
+//  l'action de soin ; la zone, elle, est dessinée par une AUTRE action — celle
+//  qui pose la persistance. L'extraction ne regardait que l'action porteuse de
+//  la zone, et n'y trouvait aucune portée.
+//
+//  La CARTE, elle, se lit en entier : afficherApercuCarteHD détache la zone du
+//  lanceur dès qu'un effet « Distance » apparaît n'importe où dedans. C'est ce
+//  que le joueur voit sur sa carte, donc c'est ce que le combat doit faire.
+{
+    const r = await extraire({ id: "C_AUTRE_ACTION", data: {
+        Nom: "Bénédiction du sol", Fatigue: 30, Arme: "Magie",
+        Composants: { actions: [
+            { baseEffetId: "SOIN", mods: { DIST: 2 } },          // la distance est ici…
+            { baseEffetId: "SOIN", mods: {}, zoneHexes: ZONE }   // …et la zone là.
+        ] }
+    }});
+    verifier("la carte est bien une zone", r && r.isZone === true);
+    verifier("LA ZONE PREND LA DISTANCE DE LA CARTE", r && r.isRanged === true);
+    verifier("et sa portée est celle qu'on lit sur la carte", r && r.rangeMax === 3,
+             r && String(r.rangeMax));
+    verifier("le centre n'est donc pas imposé au lanceur", r && r.centreImpose === false);
+}
+
+// =========================================================================
+console.log("\n6. UNE CARTE SANS ZONE N'EST PAS TOUCHÉE");
 // =========================================================================
 //  La portée d'une zone ne doit pas déteindre sur un soin à cible unique.
 {

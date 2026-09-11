@@ -214,6 +214,7 @@ export function cloturerTour(etat) {
         // Comme toute étape, elle porte le RÉSULTAT et non l'opération : rejouée
         // deux fois sur trois écrans, elle donne le même chiffre.
         etapes.push(...regenererFinDeManche(etat));
+        etapes.push(...ticsDeFinDeManche(etat));
         etapes.push(...vieillirLesEtats(etat));
         etapes.push({ type: "manche", numero: etat.manche });
     }
@@ -228,15 +229,98 @@ function regenerationDe(c) {
     return nombre(stats.Regeneration) + nombre(stats.Dev_Mod_Regen);
 }
 
+// CE QUE LES ÉTATS FONT EN FIN DE MANCHE, avant de vieillir.
+//
+// Ces tics vivaient dans l'ancien finDeTourCombat, un chemin que le nouveau
+// régime ne traverse plus : un empoisonnement ne mordait jamais, une
+// immobilisation ne coûtait rien, un étalement ne portait jamais son second
+// coup. La règle est celle du jeu, mot pour mot — et comme toute étape, chacune
+// porte le RÉSULTAT, jamais l'opération.
+//
+// L'ORDRE COMPTE, et c'est celui de l'ancien monde : l'immobilisation puise
+// l'énergie tant que l'état dure, le poison mord une fois, l'étalement porte
+// son reste — PUIS tout vieillit d'un cran (vieillirLesEtats, juste après).
+export function ticsDeFinDeManche(etat) {
+    const etapes = [];
+
+    (etat.ordre || Object.keys(etat.combattants || {})).forEach(id => {
+        const c = combattant(etat, id);
+        if (!c || c.aTerre || !Array.isArray(c.etats) || c.etats.length === 0) return;
+
+        // --- IMMOBILISATION : 20 d'énergie à chaque manche où elle dure ------
+        if (c.etats.some(e => e && e.nom === "Immobilisation" && nombre(e.duree) > 0)) {
+            const apres = Math.min(nombre(c.fatigueMax), nombre(c.fatigue) + 20);
+            if (apres !== nombre(c.fatigue)) {
+                c.fatigue = apres;
+                etapes.push({ type: "fatigue", cible: id, fatigueApres: apres,
+                              tic: "Immobilisation" });
+            }
+        }
+
+        // --- EMPOISONNEMENT : un seul tic, jamais retenté --------------------
+        //  15 d'énergie et 8% des points de vie maximum. `tickFait` reste sur
+        //  l'état : il voyage avec lui dans l'étape de vieillissement qui suit,
+        //  donc le poison ne mord pas deux fois même s'il dure encore.
+        const poison = c.etats.find(e => e && e.nom === "Empoisonnement" && !e.tickFait);
+        if (poison) {
+            poison.tickFait = true;
+
+            const fatigueApres = Math.max(0, nombre(c.fatigue) - 15);
+            if (fatigueApres !== nombre(c.fatigue)) {
+                c.fatigue = fatigueApres;
+                etapes.push({ type: "fatigue", cible: id, fatigueApres,
+                              tic: "Empoisonnement" });
+            }
+
+            const morsure = Math.ceil(nombre(c.pvMax) * 0.08);
+            if (morsure > 0) {
+                const pvApres = Math.max(0, nombre(c.pv) - morsure);
+                c.pv = pvApres;
+                c.aTerre = nombre(c.pvMax) > 0 && pvApres <= 0;
+                etapes.push({ type: "degats", cible: id, montant: morsure,
+                              pvApres, bouclierApres: nombre(c.bouclier),
+                              tic: "Empoisonnement" });
+            }
+        }
+
+        // --- ÉTALEMENT : le second et dernier coup ---------------------------
+        //  Il a déjà touché : pas de nouveau jet d'esquive. Mais le bouclier
+        //  encaisse en priorité, comme pour une attaque ordinaire.
+        const etalement = c.etats.find(e => e && e.nom === "Étalement" && !e.tickFait);
+        if (etalement) {
+            etalement.tickFait = true;
+            const montant = nombre(etalement.degatsDifferes !== undefined
+                                   ? etalement.degatsDifferes : etalement.degatsRestants);
+            if (montant > 0) {
+                const bouclierAvant = nombre(c.bouclier);
+                if (bouclierAvant > 0) {
+                    c.bouclier = Math.max(0, bouclierAvant - montant);
+                    etapes.push({ type: "degats", cible: id, montant,
+                                  surBouclier: Math.min(bouclierAvant, montant),
+                                  bouclierApres: c.bouclier, pvApres: nombre(c.pv),
+                                  tic: "Étalement" });
+                } else {
+                    const pvApres = Math.max(0, nombre(c.pv) - montant);
+                    c.pv = pvApres;
+                    c.aTerre = nombre(c.pvMax) > 0 && pvApres <= 0;
+                    etapes.push({ type: "degats", cible: id, montant, pvApres,
+                                  bouclierApres: 0, tic: "Étalement" });
+                }
+            }
+        }
+    });
+
+    return etapes;
+}
+
 // LES ÉTATS ALTÉRÉS VIEILLISSENT D'UNE MANCHE, et ceux qui arrivent à zéro
 // tombent. Le décompte vivait dans l'ancien finDeTourCombat, un chemin que le
 // nouveau régime ne traverse plus : un Étourdi posé au premier tour durait donc
 // TOUT LE COMBAT.
 //
-// ⚠️ Ce qu'on porte ici, c'est le DÉCOMPTE, rien d'autre. Les tics propres à
-// certains états — les 20 d'énergie de l'Immobilisation, le second tic de
-// l'Empoisonnement, la Brûlure — vivent encore dans l'ancien monde et ne sont
-// pas repris. C'est une couture connue, pas un oubli.
+// Les tics propres à chaque état tombent JUSTE AVANT (ticsDeFinDeManche) :
+// l'immobilisation puise l'énergie tant qu'elle dure, le poison mord une fois,
+// l'étalement porte son reste. Ici, on ne fait que vieillir. C'est une couture connue, pas un oubli.
 export function vieillirLesEtats(etat) {
     const etapes = [];
     (etat.ordre || Object.keys(etat.combattants || {})).forEach(id => {
