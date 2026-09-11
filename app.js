@@ -895,11 +895,17 @@ window.pvMaxCombattant = function(perso) {
 
 // Un monstre porte "fatigueMax", un personnage "Fatigue_Max" : les deux noms
 // coexistent dans le moteur, la lecture les accepte donc tous les deux.
+// Le bonus qu'un atout de race ajoute à l'énergie maximale — à part, pour que
+// ceux qui en ont besoin ailleurs (le CAP de fatigue d'une compétence dans la
+// Forge, competences.js) n'aient pas à connaître la forme d'ATOUTS_RACES.
+window.bonusRaceFatigue = function(perso) {
+    return (window.atoutRace ? window.atoutRace(perso).fatigueMax : 0) || 0;
+};
+
 window.fatigueMaxCombattant = function(perso, defaut = 100) {
     if (!perso) return defaut;
     const socle = (parseInt(perso.Fatigue_Max) || parseInt(perso.fatigueMax) || defaut);
-    return socle + (parseInt(perso.Dev_Mod_Fatigue) || 0)
-                 + ((window.atoutRace ? window.atoutRace(perso).fatigueMax : 0) || 0);
+    return socle + (parseInt(perso.Dev_Mod_Fatigue) || 0) + window.bonusRaceFatigue(perso);
 };
 
 window.regenerationCombattant = function(perso) {

@@ -1457,6 +1457,36 @@ window.dessinerGrilleZone = function() {
     }
 };
 
+// =========================================================================
+//  LE CAP DE FATIGUE D'UNE COMPÉTENCE
+// =========================================================================
+//  Combien une technique peut coûter, selon la caractéristique qu'elle
+//  mobilise. Ce n'était qu'une droite ((carac-5)*10) : chaque point valait
+//  toujours dix de plus. La vraie table n'est pas une droite — un 15 vaut
+//  bien plus qu'un 14 (75 → 90, +15 au lieu de +10), pendant qu'un 16 ne
+//  reprend que dix (90 → 100). On la fige donc telle quelle plutôt que de
+//  chercher une formule qui la retomberait par hasard.
+//
+//  Elle ne connaît aucune race elle-même : l'écart humain (110 au lieu de 100
+//  à carac 16) n'est pas un cas à part ici, il vient tout seul de l'atout de
+//  peuple déjà existant (voir bonusRaceFatigue, app.js) qu'on rajoute
+//  par-dessus, exactement comme sur le reste de la réserve d'énergie d'un
+//  personnage. Un Humain a plus de coffre partout ; ses techniques n'y
+//  échappent pas.
+window.TABLE_CAP_FATIGUE = { 8: 15, 9: 25, 10: 35, 11: 45, 12: 55, 13: 65, 14: 75, 15: 90, 16: 100 };
+
+window.capFatigueDeCarac = function(caracMoyenne, perso) {
+    const table = window.TABLE_CAP_FATIGUE;
+    const c = Math.floor(caracMoyenne);
+    let base;
+    if (c <= 8) base = table[8];
+    else if (c >= 16) base = table[16] + (c - 16) * 10;   // au-delà de 16 : personne n'y va, mais on ne casse rien
+    else base = table[c];
+
+    const bonusRace = window.bonusRaceFatigue ? window.bonusRaceFatigue(perso || {}) : 0;
+    return base + bonusRace;
+};
+
 window.rafraichirForge = function() {
     let totalPC = 0;
     let initBonusNet = 0;
@@ -1525,11 +1555,11 @@ window.rafraichirForge = function() {
         "SAGESSE": caracs.sag ?? 8, "CHARISME": caracs.cha ?? 8
     };
 
-    let capFatigue = 30;
+    let capFatigue = window.capFatigueDeCarac(8, window.forgeState.statsPerso);
     if (activeTags.size > 0) {
         let somme = 0;
         activeTags.forEach(c => { somme += statsTable[c] || 8; });
-        capFatigue = (Math.floor(somme / activeTags.size) - 5) * 10;
+        capFatigue = window.capFatigueDeCarac(somme / activeTags.size, window.forgeState.statsPerso);
     }
 
     const fatigueConsommee = Math.floor(totalPC * 5);

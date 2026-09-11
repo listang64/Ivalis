@@ -151,6 +151,20 @@ export function tirerCritique(etat, idLanceur, des) {
     return des.d100() <= critiqueDe(c);
 }
 
+// LA TRICHE DES CRÉATURES : un bonus fixe sur ce qu'elles infligent ET ce
+// qu'elles soignent, selon leur stature. Un héros calcule sa carte au point
+// près ; une créature, elle, tape un peu plus fort et soigne un peu plus,
+// sans qu'aucune règle de fiche ne l'explique — c'est délibéré, pour que le
+// combat reste dur sans multiplier les points de vie des monstres. Nico l'a
+// posé comme un réglage provisoire ; s'il change, ce tableau est le seul
+// endroit à toucher.
+const TABLE_BONUS_MONSTRE = { "Petit": 3, "Normal": 4, "Élite": 5, "Boss": 6 };
+
+export function bonusMonstreDe(c) {
+    if (!c || !c.estMonstre) return 0;
+    return TABLE_BONUS_MONSTRE[c.palier] || 0;
+}
+
 // =========================================================================
 //  3. LA CHAÎNE DE DÉGÂTS
 // =========================================================================
@@ -314,6 +328,7 @@ export function resoudreCarte(etat, action) {
 
     // --- LES ATTAQUES, DANS L'ORDRE DE LA CARTE --------------------------
     const touchees = new Set();
+    const bonusMonstre = bonusMonstreDe(lanceur);
 
     (action.attaques || []).forEach(attaque => {
         (attaque.cibles || []).forEach(idCible => {
@@ -330,17 +345,14 @@ export function resoudreCarte(etat, action) {
             }
             touchees.add(idCible);
 
-            // --- SOIN ---------------------------------------------------
-            if (attaque.isHeal) {
-                const avant = cible.pv;
-                const soin = Math.max(0, nombre(attaque.valeurBrute)) * (critique ? 2 : 1);
-                cible.pv = Math.min(cible.pvMax, avant + soin);
-                etapes.push({ type: "soin", cible: idCible, acteur: idLanceur,
-                              montant: cible.pv - avant, pvApres: cible.pv });
-                return;
-            }
-
             // --- BOUCLIER -----------------------------------------------
+            // AVANT le soin, et c'est capital : l'extraction (moteur_effets.js)
+            // marque un « Bouclier » isHeal ET isShield à la fois, pour que la
+            // Forge le range dans les mêmes menus qu'un vrai soin. Ici, c'est
+            // une vraie fourche entre deux portes, et il fallait ouvrir la
+            // bonne en premier — sans quoi une créature (ou un joueur) qui
+            // lance un bouclier soignait des points de vie qu'on ne voit
+            // jamais grandir sur la fiche, et ne posait jamais le bouclier.
             if (attaque.isShield) {
                 const avant = cible.bouclier;
                 const gain = Math.max(0, nombre(attaque.valeurBrute));
@@ -351,13 +363,32 @@ export function resoudreCarte(etat, action) {
                 return;
             }
 
+            // --- SOIN ---------------------------------------------------
+            //  La triche des créatures (bonusMonstreDe) s'ajoute ici, sur le
+            //  soin lui-même — jamais sur un gain de bouclier, qui n'est ni un
+            //  dégât ni un soin.
+            if (attaque.isHeal) {
+                const avant = cible.pv;
+                const soin = Math.max(0, nombre(attaque.valeurBrute) + bonusMonstre) * (critique ? 2 : 1);
+                cible.pv = Math.min(cible.pvMax, avant + soin);
+                etapes.push({ type: "soin", cible: idCible, acteur: idLanceur,
+                              montant: cible.pv - avant, pvApres: cible.pv });
+                return;
+            }
+
             // --- DÉGÂTS -------------------------------------------------
             const distance = distanceHex(lanceur, cible);
             const equip = des.equip || {};
             const percee = equip.ignoreResistances === true
                         || (equip.ignoreArmure === true && attaque.typeRes !== "Magique");
 
-            const compte = chaineDeDegats(cible, attaque, { critique, distance, percee });
+            // La triche des créatures s'ajoute AU BRUT, avant la chaîne : elle
+            // traverse donc le malus à bout portant et les résistances comme
+            // un dégât normal, plutôt que de passer en douce derrière l'armure.
+            const attaqueAvecBonus = bonusMonstre
+                ? { ...attaque, valeurBrute: nombre(attaque.valeurBrute) + bonusMonstre }
+                : attaque;
+            const compte = chaineDeDegats(cible, attaqueAvecBonus, { critique, distance, percee });
 
             // Le drain de l'absorption soigne AVANT que le reste ne frappe.
             if (compte.soinAbsorption > 0) {

@@ -208,6 +208,10 @@ function combattantBrut(fiche, position, bornes) {
         // Le caractère d'une créature : c'est lui qui décide si elle fonce, si
         // elle contourne, ou si elle refuse d'entrer dans les flammes.
         personnalite: fiche.Personnalite || "",
+        // Sa stature (Petit/Normal/Élite/Boss) : le noyau pur en tire un bonus
+        // fixe de dégâts et de soin (voir bonusMonstreDe, moteur_pur.js). Vide
+        // pour un héros — il n'a pas de palier, et n'y a donc jamais droit.
+        palier: fiche.Palier || fiche.palier || "",
 
         pv: nombre(fiche.PV_Actuels, pvMax),
         pvMax,

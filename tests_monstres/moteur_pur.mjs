@@ -12,7 +12,7 @@
 // jeu — et sans ce banc, personne ne s'en apercevrait.
 import {
     jouer, resoudreCarte, chaineDeDegats, tirerDesCarte, tirerCritique,
-    esquiveDe, paradeDe, defPhysiqueDe, distanceHex
+    esquiveDe, paradeDe, defPhysiqueDe, distanceHex, bonusMonstreDe
 } from '../moteur_pur.js';
 import { construireEtatCombat, creerDes, verifierEtatCombat, clonerEtat } from '../combat_etat.js';
 
@@ -468,6 +468,92 @@ console.log("\n13. LA DISTANCE, ET LE MALUS DE BOUT PORTANT EN SITUATION");
     absent.combattants.H2.r = null;
     verifier("un combattant hors du plateau est à distance infinie",
              distanceHex(absent.combattants.M1, absent.combattants.H2) === Infinity);
+}
+
+// =========================================================================
+console.log("\n14. LA TRICHE DES CRÉATURES : UN BONUS SELON LA STATURE");
+// =========================================================================
+//  Petit +3, Normal +4, Élite +5, Boss +6, sur ce qu'une créature inflige ET
+//  sur ce qu'elle soigne — jamais sur un héros, jamais sur un gain de
+//  bouclier. C'est un réglage brut, posé comme tel : le tableau est le seul
+//  endroit à toucher s'il change.
+{
+    verifier("un héros n'a droit à rien", bonusMonstreDe({ estMonstre: false, palier: "Boss" }) === 0);
+    verifier("une créature sans palier connu non plus",
+             bonusMonstreDe({ estMonstre: true, palier: "" }) === 0);
+    verifier("Petit vaut +3", bonusMonstreDe({ estMonstre: true, palier: "Petit" }) === 3);
+    verifier("Normal vaut +4", bonusMonstreDe({ estMonstre: true, palier: "Normal" }) === 4);
+    verifier("Élite vaut +5", bonusMonstreDe({ estMonstre: true, palier: "Élite" }) === 5);
+    verifier("Boss vaut +6", bonusMonstreDe({ estMonstre: true, palier: "Boss" }) === 6);
+
+    // Le vrai chemin : une goule (M1) devenue Élite, sur une vraie carte.
+    let etat = neuf();
+    etat.combattants.M1.palier = "Élite";
+
+    // DÉGÂTS : 20 de brut + 5 de triche = 25, contre une cible sans défense.
+    const coup = resoudreCarte(etat, frappe("H1", 20));
+    verifier("le bonus s'ajoute au brut, AVANT les résistances",
+             coup.etat.combattants.H1.pv === 35, `(${coup.etat.combattants.H1.pv})`);
+
+    // Et il traverse la résistance comme un dégât ordinaire : H2 a 25 % de
+    // résistance physique — (20+5) × 0.75 = 18.75, arrondi à 19.
+    const coupBlinde = resoudreCarte(etat, frappe("H2", 20));
+    verifier("il n'ignore pas l'armure pour autant",
+             coupBlinde.etat.combattants.H2.pv === 31, `(${coupBlinde.etat.combattants.H2.pv})`);
+
+    // SOIN : une Élite qui soigne un allié ajoute aussi ses +5.
+    const soigneuse = resoudreCarte(etat, {
+        type: "carte", idLanceur: "M1", idCarte: "CS",
+        attaques: [{ valeurBrute: 10, isHeal: true, cibles: ["M1"] }], alterations: [],
+        jets: { parCible: { M1: { esquive: false, etats: {} } } }
+    });
+    verifier("le soin d'une créature profite aussi du bonus",
+             soigneuse.etat.combattants.M1.pv === 70, `(${soigneuse.etat.combattants.M1.pv})`);
+
+    // BOUCLIER : ni dégât ni soin — pas de triche dessus.
+    const bouclier = resoudreCarte(etat, {
+        type: "carte", idLanceur: "M1", idCarte: "CB",
+        attaques: [{ valeurBrute: 10, isHeal: true, isShield: true, cibles: ["M1"] }], alterations: [],
+        jets: { parCible: { M1: { esquive: false, etats: {} } } }
+    });
+    verifier("un gain de bouclier n'en profite pas", bouclier.etat.combattants.M1.bouclier === 10,
+             `(${bouclier.etat.combattants.M1.bouclier})`);
+
+    // LE HÉROS, LUI, NE TRICHE JAMAIS : même carte, même valeur, sans le
+    // moindre bonus — c'est la fiche qui décide, pas la triche.
+    const coupHeros = resoudreCarte(etat, {
+        type: "carte", idLanceur: "H1", idCarte: "C1",
+        attaques: [{ valeurBrute: 20, cibles: ["H2"] }], alterations: [],
+        jets: { parCible: { H2: { esquive: false, etats: {} } } }
+    });
+    verifier("un héros ne touche que ce que sa carte annonce (20 × 0.75 = 15)",
+             coupHeros.etat.combattants.H2.pv === 35, `(${coupHeros.etat.combattants.H2.pv})`);
+}
+
+// =========================================================================
+console.log("\n15. UN BOUCLIER LANCÉ RESTE UN BOUCLIER — MÊME MARQUÉ « isHeal »");
+// =========================================================================
+//  L'extraction réelle (moteur_effets.js) pose isHeal ET isShield ensemble sur
+//  un effet « Bouclier », pour que la Forge le range dans les mêmes menus
+//  qu'un soin. Le noyau doit trancher la bonne porte EN PREMIER : vérifié ici
+//  avec exactement cette combinaison, celle que le jeu envoie pour de vrai —
+//  pas la version isolée du chapitre 7, qui ne l'aurait jamais attrapée.
+{
+    const etat = neuf();
+    const r = resoudreCarte(etat, {
+        type: "carte", idLanceur: "H2", idCarte: "CB",
+        attaques: [{ valeurBrute: 14, isHeal: true, isShield: true, cibles: ["H1"] }],
+        alterations: [],
+        jets: { parCible: { H1: { esquive: false, etats: {} } } }
+    });
+    verifier("le bouclier se pose vraiment", r.etat.combattants.H1.bouclier === 14,
+             `(${r.etat.combattants.H1.bouclier})`);
+    verifier("et les points de vie ne bougent pas d'un pouce",
+             r.etat.combattants.H1.pv === 60, `(${r.etat.combattants.H1.pv})`);
+    const etape = r.etapes.find(e => e.cible === "H1" && "bouclierApres" in e);
+    verifier("l'étape publiée parle bien de bouclier, pas de soin",
+             !!etape && !r.etapes.some(e => e.type === "soin" && e.cible === "H1"),
+             JSON.stringify(r.etapes.map(e => e.type)));
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

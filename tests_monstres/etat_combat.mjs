@@ -470,5 +470,41 @@ console.log("\nLES MAXIMA SONT DES FORMULES, PAS DES CHAMPS");
              verifierEtatCombat(faux).join(" | "));
 }
 
+// =========================================================================
+console.log("\nLE PALIER D'UNE CRÉATURE VOYAGE DANS L'ÉTAT");
+// =========================================================================
+//  Sans ce champ, le noyau ne saurait pas quelle triche de dégâts/soin
+//  appliquer (bonusMonstreDe, moteur_pur.js) : la stature d'un monstre doit
+//  donc survivre au passage de la fiche à l'état de combat, comme sa
+//  personnalité ou sa race.
+{
+    const gob = {
+        idPersonnage: "M1", estMonstre: true, camp: "Ennemi", nom: "Goule",
+        Palier: "Élite", PV_Max: 70, PV_Actuels: 70, Fatigue_Max: 90,
+        Esquive: 0, Parade: 0, Etats_Alteres: [], statut: "Vivant"
+    };
+    const etat = construireEtatCombat({
+        idPartie: "G", cerveau: "P_03", graine: 1, combattants: [gob],
+        positions: { M1: { q: 0, r: 0 } },
+        partie: { Phase_Combat: "Resolution", Ordre_Initiative: ["M1"],
+                  File_Attente_Combat: [{ idPersonnage: "M1" }] }
+    });
+    verifier("le palier de la fiche (Palier) atterrit dans l'état",
+             etat.combattants.M1.palier === "Élite", `(${etat.combattants.M1.palier})`);
+
+    const heros = {
+        idPersonnage: "H1", idJoueur: "P_01", camp: "Allié", prenom: "Naomi",
+        PV_Max: 60, PV_Actuels: 60, Fatigue_Max: 100,
+        Esquive: 0, Parade: 0, Etats_Alteres: [], statut: "Vivant"
+    };
+    const etatHeros = construireEtatCombat({
+        idPartie: "G", cerveau: "P_03", graine: 1, combattants: [heros],
+        positions: { H1: { q: 0, r: 0 } },
+        partie: { Phase_Combat: "Resolution", Ordre_Initiative: ["H1"],
+                  File_Attente_Combat: [{ idPersonnage: "H1" }] }
+    });
+    verifier("un héros, lui, n'a pas de palier", etatHeros.combattants.H1.palier === "");
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

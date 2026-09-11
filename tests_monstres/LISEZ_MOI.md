@@ -61,6 +61,7 @@ node fenetre_tour.mjs       # la fenêtre de tour : nom coloré, effets détaill
 node sequence_tour.mjs      # le journal d'événements : ordre, trous, rattrapage
 node etat_combat.mjs        # LE NOYAU PUR : dés à graine, état du combat, invariants (sans réseau)
 node moteur_pur.mjs         # la chaîne de dégâts, maillon par maillon (10 000 cartes au hasard)
+node cap_fatigue.mjs        # le CAP de fatigue d'une compétence, table de Nico + atout humain
 node mouvement_pur.mjs      # chemin, coût des cases, attaques d'opportunité (1 000 trajets)
 node ia_pure.mjs            # qui viser, où se mettre : les cinq caractères, sans variable globale
 node cerveau_combat.mjs     # LE CERVEAU : intentions validées, un seul écrivain, un combat entier
@@ -1314,6 +1315,51 @@ projectile téléporté vole très bien. Le banc lit la matrice CALCULÉE, deux 
 plus loin, jamais au-delà de la cible. Encore faut-il que le plateau soit
 VISIBLE : sur un élément en `display:none`, aucune transition ne tourne, et le
 banc mesurait un projectile parfaitement immobile.
+
+Les chapitres 14 et 15 de `moteur_pur.mjs` couvrent deux choses posées le même
+jour, et la seconde n'existerait pas sans la première.
+
+**Chapitre 14 : la triche des créatures.** Une créature inflige et soigne un
+peu plus qu'un héros à carte égale — Petit +3, Normal +4, Élite +5, Boss +6 —
+selon sa stature (`palier`, posé sur la fiche par le bestiaire). C'est un
+réglage brut assumé comme tel (`bonusMonstreDe`, `moteur_pur.js`), pas une règle
+qui se justifie par l'équipement ou les caractéristiques. Le bonus s'ajoute AU
+BRUT, avant la chaîne de dégâts : il traverse donc le malus à bout portant et
+les résistances comme un dégât ordinaire, il ne les contourne pas. Il ne
+s'applique jamais à un héros, ni à un gain de bouclier (ni dégât, ni soin). Le
+`palier` devait d'abord apprendre à voyager de la fiche à l'état de combat —
+ajouté dans `combattantBrut` (`combat_etat.js`), et vérifié à part dans
+`etat_combat.mjs`.
+
+**Chapitre 15 : le bouclier qui se prenait pour un soin.** En écrivant le
+bonus sur la branche "soin" de `resoudreCarte`, un vieux défaut est apparu :
+l'extraction réelle (`moteur_effets.js`) pose `isHeal: true` ET `isShield: true`
+sur un effet « Bouclier », pour que la Forge le range dans les mêmes menus
+qu'un soin. Le noyau, lui, vérifiait `isHeal` EN PREMIER — la branche bouclier
+n'était donc jamais atteinte pour une vraie carte de bouclier, et celle-ci
+soignait des points de vie invisibles au lieu de poser un bouclier. Aucun banc
+ne l'avait vu, parce que le chapitre 7 (SOIN, BOUCLIER, PURIFICATION) teste
+`isShield: true` SEUL — jamais la combinaison que le jeu envoie réellement. Le
+chapitre 15 la reproduit telle quelle et vérifie qu'un bouclier reste un
+bouclier ; l'ordre des deux `if`, dans `resoudreCarte`, est maintenant inversé.
+
+`cap_fatigue.mjs` couvre le CAP de fatigue d'une compétence — combien une
+technique peut coûter, selon la caractéristique qu'elle mobilise. C'était une
+droite, `(carac-5) × 10` : chaque point valait toujours dix de plus. La vraie
+table que Nico a donnée n'en est pas une — le pas de 14 à 15 vaut +15 (75 →
+90), celui de 15 à 16 ne reprend que +10 (90 → 100) — elle est donc figée telle
+quelle (`window.TABLE_CAP_FATIGUE`, `competences.js`) plutôt que devinée par une
+formule qui retomberait dessus par hasard.
+
+L'écart humain que Nico note lui-même (« 16 = 100, ou 110 pour les humains »)
+n'est PAS un cas à part codé dans cette table : il vient tout seul de l'atout
+de race déjà existant (`ATOUTS_RACES.Humain.fatigueMax = 10`, posé bien avant
+dans `app.js`), rajouté par-dessus la table exactement comme il l'est déjà sur
+le reste de la fatigue d'un personnage. Le banc le prouve en vérifiant l'écart
+à PLUSIEURS paliers (pas seulement à 16) et avec un peuple sans ce bonus (Gob).
+Il charge le vrai bloc de `competences.js` par découpage de source (comme
+`cout_reel.mjs` le fait déjà pour le coût d'une carte), pas une réécriture de
+la table dans le banc.
 
 `apercu_butin.mjs` charge le vrai `style.css` et le vrai balisage
 d'`index.html`, remplit l'onglet Inventaire et les trois vues du butin avec les
