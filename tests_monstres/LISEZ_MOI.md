@@ -71,6 +71,7 @@ node confusion_cerveau.mjs  # les quatre bandes du dé, la dissipation, et le mo
 node zones_cerveau.mjs      # une nappe au sol : elle naît dans l'état, elle brûle, elle vieillit, elle meurt
 node bond_cerveau.mjs       # le saut passe par le cerveau au lieu d'écrire en base tout seul
 node illusion_cerveau.mjs   # le leurre entre vraiment dans le combat : visable, frappable, effaçable
+node plateau_vtt_fige.mjs   # Combat_VTT ne fait plus sauter les pions en arrière ni ressusciter un leurre
 node ia_pure.mjs            # qui viser, où se mettre : les cinq caractères, sans variable globale
 node cerveau_combat.mjs     # LE CERVEAU : intentions validées, un seul écrivain, un combat entier
 node spectateur_combat.mjs  # LE SPECTATEUR : le rejeu à l'écran, dans l'ordre, sans trou ni doublon

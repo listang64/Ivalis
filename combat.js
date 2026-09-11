@@ -1394,6 +1394,26 @@ window.ecouterTerrainVTT = function() {
             // rangés à plat : on les remet en place, le snapshot suivant les dessine.
             if (typeof window.reparerPionsAPlat === "function") window.reparerPionsAPlat(data);
 
+            // LE CERVEAU, QUAND IL TIENT DÉJÀ CE COMBAT, EST LA SEULE AUTORITÉ
+            // SUR LA POSITION. Ce document (Combat_VTT) reste la vérité du
+            // TERRAIN — murs, trous, apparence d'un pion — mais sa carte
+            // `Tokens` ne reçoit plus une seule écriture de position depuis
+            // que les déplacements vivent dans l'état du cerveau : elle se
+            // fige au moment où le combat s'ouvre, sauf pour les rares
+            // écritures encore couturées (une Illusion qui range son image).
+            //
+            // Avant ce filet, CHAQUE instantané de ce document — un mur posé,
+            // une Illusion qui naît — reposait cette photo figée par-dessus
+            // les positions à jour de tout le monde : les pions sautaient en
+            // arrière d'un coup, le temps que la prochaine action du cerveau
+            // les remette en place. Voir fusionnerPionsVTT (pont_combat.js) :
+            // on reprend de Firestore ce que le cerveau ignore (l'apparence),
+            // jamais ce qu'il sait mieux (la position).
+            const etatCerveauOuvert = window.REGIME_CERVEAU
+                && typeof window.regimeDuJeu === "function" && window.regimeDuJeu()
+                && window.regimeDuJeu().etatPublie();
+            const combattantsDuCerveau = etatCerveauOuvert ? etatCerveauOuvert.combattants : null;
+
             // 🔻 NOUVEAU : Lecture des Pions (Tokens) depuis Firebase 🔻
             if (data.Tokens !== undefined) {
                 // UN PION EN PLEINE MARCHE GARDE SA POSITION. La case d'arrivée
@@ -1413,17 +1433,30 @@ window.ecouterTerrainVTT = function() {
                 // Ranger la position protégée dans TOKENS_VTT_DATA, comme
                 // avant, effaçait la case d'arrivée : le pion revenait à son
                 // point de départ sitôt le trajet rejoué.
-                window.TOKENS_VTT_DATA = data.Tokens || {};
+                window.TOKENS_VTT_DATA = (combattantsDuCerveau && window.pontCombat
+                                          && typeof window.pontCombat.fusionnerPionsVTT === "function")
+                    ? window.pontCombat.fusionnerPionsVTT(data.Tokens, window.TOKENS_VTT_DATA, combattantsDuCerveau)
+                    : (data.Tokens || {});
                 if (typeof window.redessinerPions === "function") window.redessinerPions();
-            } else {
+            } else if (!combattantsDuCerveau) {
                 window.TOKENS_VTT_DATA = {};
                 if (typeof window.appliquerTokensVTT === "function") window.appliquerTokensVTT({});
             }
 
             // 🔻 NOUVEAU : Zones persistantes (Persistance de terrain) 🔻
-            window.ZONES_PERSISTANTES = data.Zones_Persistantes || {};
-            if (typeof window.appliquerZonesPersistantes === "function") {
-                window.appliquerZonesPersistantes();
+            //
+            // Une fois le combat ouvert sous le cerveau, ce champ ne reçoit
+            // plus une seule écriture (les nappes vivent dans l'état, voir
+            // moteur_pur.js/creerZonePure) : il reste figé sur ce qu'il
+            // valait à l'ouverture, le plus souvent rien. Le relire ici
+            // effacerait, à chaque instantané de ce document, une zone que
+            // le cerveau vient pourtant de poser — jusqu'à ce que sa propre
+            // projection (poserZones, regime_cerveau.js) la redessine.
+            if (!combattantsDuCerveau) {
+                window.ZONES_PERSISTANTES = data.Zones_Persistantes || {};
+                if (typeof window.appliquerZonesPersistantes === "function") {
+                    window.appliquerZonesPersistantes();
+                }
             }
         }
     });

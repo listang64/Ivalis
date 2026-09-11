@@ -457,9 +457,60 @@ export function creerProjection(ecran) {
     };
 }
 
+// =========================================================================
+//  LE PLATEAU (Combat_VTT) NE DOIT PLUS DÉCIDER D'UNE POSITION
+// =========================================================================
+//  Combat_VTT reste le document du TERRAIN — les murs, les trous, la carte —
+//  et un pion qui vient d'être créé (une Illusion, un renfort) y écrit encore
+//  son IMAGE et sa TAILLE, faute d'un autre endroit où les ranger : le cerveau
+//  ne connaît que q et r, jamais l'apparence d'un pion.
+//
+//  Mais sa POSITION, sous ce régime, n'appartient plus qu'au cerveau. Rien ne
+//  réécrit plus `Combat_VTT.Tokens` à chaque pas : ce champ se fige dès
+//  l'ouverture du combat, sauf pour les rares écritures encore couturées
+//  (l'apparence d'une Illusion). Le lire tel quel à chaque instantané —
+//  c'est ce que faisait l'écouteur du plateau — REMPLAÇAIT la position à
+//  jour de tout le monde par cette photo figée, à chaque fois qu'un mur
+//  changeait ou qu'un leurre naissait : les pions sautaient en arrière une
+//  fraction de seconde, jusqu'à la prochaine action qui les remettait en
+//  place.
+//
+//  Ce que Firestore sait que le cerveau ignore (image, taille) est repris.
+//  Ce que le cerveau sait mieux que Firestore (où l'on est) ne l'est jamais.
+export function fusionnerPionsVTT(pionsFirestore, pionsLocaux, combattantsDuCerveau) {
+    if (!combattantsDuCerveau) return { ...(pionsFirestore || {}) };
+
+    const fusion = {};
+    Object.keys(pionsFirestore || {}).forEach(id => {
+        const deFirestore = pionsFirestore[id];
+        const enCombat = combattantsDuCerveau[id];
+        const local = (pionsLocaux || {})[id];
+        fusion[id] = (enCombat && local)
+            ? { ...deFirestore, q: local.q, r: local.r }
+            : deFirestore;
+    });
+    // Un pion que le cerveau connaît déjà mais que cet instantané ne porte pas
+    // encore (l'écriture de son apparence n'a pas fini de traverser le réseau)
+    // ne doit pas disparaître de l'écran pour autant.
+    //
+    // SAUF S'IL EST À TERRE. C'est exactement le cas d'une Illusion détruite :
+    // son entrée dans `Tokens` est explicitement effacée (voir detruireIllusion),
+    // mais elle reste « connue du cerveau » pour toujours (un mort n'est jamais
+    // retiré de l'état, il garde juste `aTerre`). Sans cette exception, le
+    // filet censé protéger un pion tout juste né aurait ressuscité, chez tous
+    // les écrans SAUF celui qui l'a détruit, un leurre qu'on venait pourtant
+    // d'effacer.
+    Object.keys(pionsLocaux || {}).forEach(id => {
+        const c = combattantsDuCerveau[id];
+        if (!fusion[id] && c && !c.aTerre) fusion[id] = pionsLocaux[id];
+    });
+    return fusion;
+}
+
 if (typeof window !== "undefined") {
     window.pontCombat = {
         COULEURS, RYTHME, misEnScene, TYPES_MIS_EN_SCENE, creerPont,
-        pionsDepuisEtat, fichesDepuisEtat, fileDepuisEtat, creerProjection
+        pionsDepuisEtat, fichesDepuisEtat, fileDepuisEtat, creerProjection,
+        fusionnerPionsVTT
     };
 }
