@@ -1649,7 +1649,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=9"></script>
+<script src="trace_combat.js?v=10"></script>
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
@@ -1669,10 +1669,10 @@
 <script type="module" src="depot_firestore.js?v=6"></script>
 <!-- LE PONT : de l'étape à ce qu'on voit. Il traduit un résultat déjà calculé
      vers les animations existantes — il ne recalcule jamais rien. -->
-<script type="module" src="pont_combat.js?v=9"></script>
+<script type="module" src="pont_combat.js?v=10"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. Éteint
      par défaut — regimeCerveau(true) dans la console pour l'allumer. -->
-<script type="module" src="regime_cerveau.js?v=19"></script>
+<script type="module" src="regime_cerveau.js?v=20"></script>
 <script type="module" src="ia_master.js?v=4"></script>
 <script type="module" src="app.js?v=42"></script>
 <script type="module" src="creation_personnage.js?v=5"></script>

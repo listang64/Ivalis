@@ -75,6 +75,7 @@ node plateau_vtt_fige.mjs   # Combat_VTT ne fait plus sauter les pions en arriè
 node rejeu_deplacements_imposes.mjs  # une Poussée ou une Traction rejouée déplace la cible, jamais le lanceur
 node traction_peur_cerveau.mjs  # Traction (déterministe) et Peur (fuite, opportunités, fatigue) dans le cerveau
 node fiches_figees.mjs      # Personnages/Monstres ne font plus reculer les PV en plein combat
+node pont_resilience.mjs    # une animation en panne ne fige plus le reste du journal, et la Poussée est traduite
 node ia_pure.mjs            # qui viser, où se mettre : les cinq caractères, sans variable globale
 node cerveau_combat.mjs     # LE CERVEAU : intentions validées, un seul écrivain, un combat entier
 node spectateur_combat.mjs  # LE SPECTATEUR : le rejeu à l'écran, dans l'ordre, sans trou ni doublon

@@ -34,7 +34,7 @@ import { construireEtatCombat, verifierEtatCombat, creerDes, FORMAT_ETAT } from 
 import { creerCerveau, estLeCerveau, cerveauPerdu, suivreBattement, cerveauSilencieux,
          ouvrirManche, BATTEMENT_MS } from './cerveau_combat.js';
 import { creerSpectateur } from './spectateur_combat.js';
-import { creerPont, creerProjection } from './pont_combat.js';
+import { creerPont, creerProjection, versAnimationDeSaut } from './pont_combat.js';
 import {
     creerDepot, ouvrirCombat, effacerLeCombat, ecouterCombat,
     lireEntree, lireDepuis, envoyerIntention, CHEMINS
@@ -667,17 +667,16 @@ function contexteDuJeu() {
         // était mêlé, et un tir ne se voyait pas traverser le plateau.
         animations: {
             pas: (d) => window.jouerAnimationPas ? window.jouerAnimationPas(d) : null,
-            poussee: (d) => window.jouerAnimationPoussee ? window.jouerAnimationPoussee(d) : null,
-            // DEUX VOCABULAIRES POUR LE MÊME SAUT. Le pont dit `de`/`vers`
-            // comme pour un pas ; jouerAnimationBond, écrit pour l'ancien
-            // monde, lit `depart`/`arrivee` — et allait droit sur un
-            // « arrivee.q de undefined ». Le geste n'avait jamais servi
-            // jusqu'ici : aucune étape « bond » ne sortait du noyau, le saut
-            // s'animait tout seul dans son coin. On traduit ici, à la frontière.
+            // versAnimationDeSaut traduit `de`/`vers` (le vocabulaire du pont)
+            // en `depart`/`arrivee` (celui de ces deux animations, écrites
+            // pour l'ancien monde). Une Poussée sortie du cerveau est allée
+            // droit sur un « arrivee.q de undefined », en pleine partie, parce
+            // que cette traduction n'existait que pour le Bond : l'avoir
+            // écrite deux fois, à la main, a laissé passer l'oubli.
+            poussee: (d) => window.jouerAnimationPoussee
+                ? window.jouerAnimationPoussee(versAnimationDeSaut(d)) : null,
             bond: (d) => window.jouerAnimationBond
-                ? window.jouerAnimationBond({ idToken: d.idToken,
-                                              depart: d.de, arrivee: d.vers })
-                : null,
+                ? window.jouerAnimationBond(versAnimationDeSaut(d)) : null,
             ruee: (d) => window.jouerRueeCarte ? window.jouerRueeCarte(d) : null,
             // Le tir : la flèche, la boule bleue, la boule verte. Ce que la
             // carte envoie a été décidé par le noyau (projectileDe) et voyage

@@ -268,6 +268,21 @@ export const TYPES_MIS_EN_SCENE = Object.keys(SCENES);
 //  leur demande ; le jeu donne les vraies. Aucune des deux n'est un cas
 //  particulier de l'autre.
 
+// LE PONT DIT `de`/`vers`, COMME POUR UN PAS ORDINAIRE. Les animations de
+// saut de l'ancien monde (jouerAnimationBond, jouerAnimationPoussee — et
+// Traction, qui rejoue la même) lisent `depart`/`arrivee` : sans traduction,
+// elles vont droit sur un « arrivee.q de undefined ».
+//
+// UNE SEULE TRADUCTION, PAS UNE PAR APPELANT. C'est justement l'avoir écrite
+// à la main pour le Bond, en oubliant la Poussée juste à côté, qui a laissé
+// passer une exception non rattrapée en pleine partie — la première fois
+// qu'une Poussée est sortie du cerveau. La prochaine fois qu'un déplacement
+// imposé rejoue cette même animation, il appelle celle-ci et ne peut plus
+// s'en écarter.
+export function versAnimationDeSaut(d) {
+    return { idToken: d.idToken, depart: d.de, arrivee: d.vers };
+}
+
 export function creerPont(effets) {
     const {
         pas = async () => {},              // jouerAnimationPas
@@ -289,6 +304,26 @@ export function creerPont(effets) {
         if (scene.inconnu) tracer("❓", `étape sans mise en scène : ${scene.inconnu}`, "");
         if (scene.geste === "rien") return scene;
 
+        // UNE ANIMATION QUI CASSE NE DOIT PAS ARRÊTER LA PARTIE. Sans ce
+        // filet, une exception au milieu d'un geste (l'écran d'un joueur en
+        // retard, une fonction du jeu absente, un format de données qu'on n'a
+        // pas prévu) remontait telle quelle jusqu'au lecteur du journal
+        // (spectateur_combat.js) et y restait — PROMESSE REJETÉE, JAMAIS
+        // RATTRAPÉE : plus aucune étape suivante ne se jouait pour qui
+        // regardait ce tour, sur cet écran, jusqu'à ce qu'il recharge la
+        // page. Une seule Poussée mal traduite pouvait ainsi figer un
+        // spectateur en pleine partie — c'est très exactement ce qui vient
+        // d'arriver. L'état, lui, reste juste : il descend par projeter(),
+        // indépendamment de ce que l'animation a réussi à montrer.
+        try {
+            await jouerLeGeste(scene);
+        } catch (e) {
+            tracer("❌", `animation « ${scene.geste} » en échec`, String(e && e.message));
+        }
+        return scene;
+    }
+
+    async function jouerLeGeste(scene) {
         switch (scene.geste) {
             case "pas":
                 await pas({ idToken: scene.pion, de: scene.de, vers: scene.vers });
@@ -363,7 +398,6 @@ export function creerPont(effets) {
             default:
                 break;
         }
-        return scene;
     }
 
     return { animer, misEnScene };
