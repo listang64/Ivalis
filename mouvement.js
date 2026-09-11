@@ -860,6 +860,132 @@ window.jouerRueeCarte = async function(data) {
     tokenDiv.style.transition = "none";
 };
 
+// =========================================================================
+//  LE PROJECTILE — CE QUI TRAVERSE LE PLATEAU
+// =========================================================================
+//  Une attaque à distance ne se voyait pas partir : le lanceur s'élançait à
+//  peine, puis les dégâts tombaient chez la cible, à l'autre bout du plateau.
+//  Rien ne reliait les deux, et on ne savait pas qui avait tiré sur qui.
+//
+//  TROIS FORMES, ET C'EST LA CARTE QUI CHOISIT :
+//    • une FLÈCHE pour un tir qui n'est pas magique ;
+//    • une BOULE BLEUE lumineuse pour un sort offensif ;
+//    • la même, VERTE, pour un soin lancé de loin.
+//
+//  Le dessin est posé DANS #transform-plateau, comme le voile des zones : il
+//  hérite du pan et du zoom sans le moindre recalcul en JavaScript. Les
+//  coordonnées sont donc celles du plateau, pas celles de l'écran.
+window.TEINTES_PROJECTILE = {
+    fleche: { corps: "#e8d5a5", bord: "#5c3a21", halo: "rgba(232,213,165,0.55)" },
+    magie:  { corps: "#7fd4ff", bord: "#0a4a7a", halo: "rgba(90,190,255,0.85)" },
+    soin:   { corps: "#8ff0a4", bord: "#125c2a", halo: "rgba(120,240,150,0.85)" }
+};
+
+// La durée suit la distance : un tir à bout portant claque, un tir long prend
+// le temps de traverser. Bornée des deux côtés — on ne veut ni un clignement,
+// ni une attente.
+window.dureeProjectile = function(distancePx) {
+    return Math.min(560, Math.max(220, Math.round(distancePx * 1.15)));
+};
+
+window.animerProjectile = async function({ de, vers, sorte }) {
+    const cibles = (Array.isArray(vers) ? vers : [vers]).filter(Boolean);
+    if (!de || cibles.length === 0) return;
+    if (!window.PLATEAU_VTT || typeof window.PLATEAU_VTT.hexToPixel !== "function") return;
+
+    const conteneur = document.getElementById("transform-plateau");
+    if (!conteneur) return;
+
+    const teinte = window.TEINTES_PROJECTILE[sorte] || window.TEINTES_PROJECTILE.fleche;
+    const taille = (window.PLATEAU_VTT.hexSize || 30) / 30;   // l'échelle du plateau
+    const depart = window.PLATEAU_VTT.hexToPixel(de.q, de.r);
+
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "projectile-combat");
+    svg.style.cssText = "position:absolute; top:0; left:0; overflow:visible;"
+                      + " z-index:6; pointer-events:none;";
+
+    const idFiltre = "lueur-projectile-" + Math.random().toString(36).slice(2, 8);
+    let contenu = `<defs>
+        <filter id="${idFiltre}" x="-120%" y="-120%" width="340%" height="340%">
+            <feGaussianBlur stdDeviation="${4 * taille}" result="flou"/>
+            <feMerge><feMergeNode in="flou"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+    </defs>`;
+
+    let duree = 220;
+    let dessines = 0;
+    cibles.forEach((cible, i) => {
+        const arrivee = window.PLATEAU_VTT.hexToPixel(cible.q, cible.r);
+        const dx = arrivee.x - depart.x;
+        const dy = arrivee.y - depart.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        // Un tir sur soi-même n'a nulle part où aller : on ne dessine rien.
+        if (distance < 1) return;
+        duree = Math.max(duree, window.dureeProjectile(distance));
+        dessines++;
+
+        const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+        const dessin = sorte === "fleche"
+            // Une flèche : hampe, empenne, pointe. Orientée vers sa cible.
+            ? `<polygon points="${-16 * taille},${-2.2 * taille} ${4 * taille},${-2.2 * taille}
+                                ${4 * taille},${-6 * taille} ${16 * taille},0
+                                ${4 * taille},${6 * taille} ${4 * taille},${2.2 * taille}
+                                ${-16 * taille},${2.2 * taille}"
+                        fill="${teinte.corps}" stroke="${teinte.bord}" stroke-width="${1.4 * taille}"
+                        stroke-linejoin="round"/>
+               <polygon points="${-16 * taille},${-2.2 * taille} ${-10 * taille},${-7 * taille}
+                                ${-7 * taille},${-2.2 * taille} ${-7 * taille},${2.2 * taille}
+                                ${-10 * taille},${7 * taille} ${-16 * taille},${2.2 * taille}"
+                        fill="${teinte.bord}" opacity="0.9"/>`
+            // Une boule lumineuse : un halo large, un cœur clair, une traîne.
+            : `<ellipse cx="${-14 * taille}" cy="0" rx="${14 * taille}" ry="${3.5 * taille}"
+                        fill="${teinte.halo}" opacity="0.55"/>
+               <circle r="${10 * taille}" fill="${teinte.halo}"/>
+               <circle r="${5.5 * taille}" fill="${teinte.corps}"/>
+               <circle r="${2.4 * taille}" fill="#ffffff" opacity="0.9"/>`;
+
+        contenu += `<g class="tir-${i}" filter="url(#${idFiltre})"
+                       style="transform: translate(${depart.x}px, ${depart.y}px) rotate(${angle}deg);
+                              opacity: 0.15;">${dessin}</g>`;
+    });
+
+    // Un soin sur soi-même, une zone posée sous ses pieds : aucune cible n'est
+    // ailleurs que le lanceur, il n'y a donc rien à faire traverser. On sort
+    // avant de poser le dessin, plutôt que de laisser un SVG vide sur le
+    // plateau.
+    if (dessines === 0) return;
+
+    svg.innerHTML = contenu;
+    conteneur.appendChild(svg);
+
+    // Un souffle avant de partir : sans ce reflow, le navigateur applique la
+    // position d'arrivée d'emblée et le projectile n'a jamais l'air de voler.
+    void svg.getBoundingClientRect();
+
+    cibles.forEach((cible, i) => {
+        const g = svg.querySelector(".tir-" + i);
+        if (!g) return;
+        const arrivee = window.PLATEAU_VTT.hexToPixel(cible.q, cible.r);
+        const dx = arrivee.x - depart.x;
+        const dy = arrivee.y - depart.y;
+        const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+        g.style.transition = `transform ${duree}ms cubic-bezier(0.35, 0, 0.65, 1), opacity 90ms ease-out`;
+        g.style.transform = `translate(${arrivee.x}px, ${arrivee.y}px) rotate(${angle}deg)`;
+        g.style.opacity = "1";
+    });
+
+    await new Promise(r => setTimeout(r, duree));
+
+    // L'impact : la lueur s'éteint d'un coup, la flèche se fiche et disparaît.
+    svg.querySelectorAll("g").forEach(g => {
+        g.style.transition = "opacity 120ms ease-in, transform 120ms ease-in";
+        g.style.opacity = "0";
+    });
+    await new Promise(r => setTimeout(r, 130));
+    if (svg.parentNode) svg.parentNode.removeChild(svg);
+};
+
 // Le Bond : pas un déplacement classique, un saut à vol d'oiseau vers la case d'arrivée.
 // Rétréci -> grandi pendant le trajet -> rétréci à l'atterrissage -> taille normale.
 window.jouerAnimationBond = async function(data) {

@@ -634,13 +634,18 @@ function contexteDuJeu() {
         },
 
         // LES ANIMATIONS. Ce sont celles du jeu, telles quelles — on ne les
-        // réécrit pas, on les appelle. Seul `ruee` est neuf : montrer une carte
-        // partir sans la résoudre n'existait pas, puisque tout était mêlé.
+        // réécrit pas, on les appelle. Seuls `ruee` et `projectile` sont neufs :
+        // montrer une carte partir sans la résoudre n'existait pas, puisque tout
+        // était mêlé, et un tir ne se voyait pas traverser le plateau.
         animations: {
             pas: (d) => window.jouerAnimationPas ? window.jouerAnimationPas(d) : null,
             poussee: (d) => window.jouerAnimationPoussee ? window.jouerAnimationPoussee(d) : null,
             bond: (d) => window.jouerAnimationBond ? window.jouerAnimationBond(d) : null,
             ruee: (d) => window.jouerRueeCarte ? window.jouerRueeCarte(d) : null,
+            // Le tir : la flèche, la boule bleue, la boule verte. Ce que la
+            // carte envoie a été décidé par le noyau (projectileDe) et voyage
+            // sur l'étape — ici on ne fait que le dessiner.
+            projectile: (d) => window.animerProjectile ? window.animerProjectile(d) : null,
             jauge: (...a) => window.afficherFlashDegatToken ? window.afficherFlashDegatToken(...a) : null,
             message: (pion, texte, couleur, options) => {
                 const tk = (window.TOKENS_VTT_DATA || {})[pion];

@@ -227,6 +227,47 @@ export function chaineDeDegats(cible, attaque, options) {
 }
 
 // =========================================================================
+//  3 bis. CE QUI TRAVERSE LE PLATEAU
+// =========================================================================
+//  Une attaque à distance ne se voyait pas partir : le lanceur s'élançait à
+//  peine sur place, puis les dégâts tombaient à l'autre bout du plateau, et
+//  rien ne reliait les deux. On ne savait pas qui avait tiré sur qui.
+//
+//  LE CHOIX EST UNE RÈGLE, PAS UN DÉTAIL D'AFFICHAGE. C'est la carte qui dit
+//  ce qu'elle envoie, et elle le dit de la même façon sur les trois écrans —
+//  donc ça se décide ici, dans le noyau pur, et ça voyage sur l'étape comme
+//  tout le reste. Un écran ne redécide jamais : il dessine ce qu'on lui dit.
+//
+//      • une FLÈCHE  — un tir qui n'est pas magique (arc, dague lancée, arme
+//                      devenue tir par l'équipement : typeRes « Physique ») ;
+//      • une BOULE BLEUE — un sort offensif lancé de loin (typeRes
+//                      « Magique » : les effets « pouvoir », « magique ») ;
+//      • une BOULE VERTE — un soin lancé de loin.
+//
+//  L'ordre compte : une carte qui frappe ET soigne montre son attaque, parce
+//  que c'est elle qu'on regarde. Un bouclier posé de loin n'est pas un soin,
+//  c'est un sort — il part en bleu. Et ce qui ne porte pas (portée 1, corps à
+//  corps) ne lance rien : la ruée du lanceur suffit à le raconter.
+export function projectileDe(action) {
+    const aCibles = (e) => !!e && !!e.isRanged && ((e.cibles || []).length > 0);
+
+    const attaques = (action && action.attaques) || [];
+    const offensive = attaques.find(a => aCibles(a) && !a.isHeal);
+    if (offensive) return offensive.typeRes === "Magique" ? "magie" : "fleche";
+
+    const soin = attaques.find(a => aCibles(a) && a.isHeal && !a.isShield);
+    if (soin) return "soin";
+
+    // Ce qui reste et qui porte : un bouclier jeté sur un allié, une
+    // immobilisation lancée à trois cases. Ça n'a pas de forme propre, mais ça
+    // traverse quand même le plateau.
+    if (attaques.some(aCibles)) return "magie";
+    if (((action && action.alterations) || []).some(aCibles)) return "magie";
+
+    return null;
+}
+
+// =========================================================================
 //  4. RÉSOUDRE UNE CARTE
 // =========================================================================
 //  Le point d'entrée. On lui donne l'état et l'action (la carte, ses cibles,
@@ -249,9 +290,15 @@ export function resoudreCarte(etat, action) {
     const jets = action.jets || { parCible: {} };
     const desDe = (id) => (jets.parCible && jets.parCible[id]) || {};
 
+    const projectile = projectileDe(action);
     etapes.push({
         type: "carte", acteur: idLanceur, carte: action.idCarte,
         critique,
+        // Ce que la carte envoie, s'il y a quelque chose à voir traverser. Le
+        // champ n'est posé que lorsqu'il vaut quelque chose : une étape de
+        // corps à corps reste exactement ce qu'elle était, et les journaux déjà
+        // écrits se rejouent sans rien de neuf.
+        ...(projectile ? { projectile } : {}),
         cibles: [...new Set([].concat(
             ...(action.attaques || []).map(a => a.cibles || []),
             ...(action.alterations || []).map(a => a.cibles || [])

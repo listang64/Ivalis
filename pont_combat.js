@@ -92,9 +92,25 @@ const SCENES = {
     //  On ne rejoue PAS la résolution : on montre le lanceur s'élancer vers sa
     //  cible, et c'est tout. Les conséquences arrivent dans les étapes qui
     //  suivent, chacune avec son propre moment à l'écran.
-    carte(e) {
-        return { geste: "carte", pion: e.acteur, cibles: e.cibles || [],
-                 critique: !!e.critique, carte: e.carte || null };
+    //
+    //  LE PROJECTILE SE LIT DANS L'ÉTAT D'AVANT. L'étape dit ce qui part
+    //  (`projectile`) et vers qui (`cibles`) ; les cases, elles, viennent de
+    //  l'état que le spectateur n'a pas encore fait avancer. C'est la même
+    //  raison que pour l'esquive : après coup, un pion poussé aurait déjà
+    //  bougé, et la flèche partirait d'où il n'était plus.
+    carte(e, etat) {
+        const lanceur = combattantDe(etat, e.acteur);
+        const cibles = e.cibles || [];
+        return {
+            geste: "carte", pion: e.acteur, cibles,
+            critique: !!e.critique, carte: e.carte || null,
+            projectile: e.projectile || null,
+            depuis: lanceur ? { q: nombre(lanceur.q), r: nombre(lanceur.r) } : null,
+            vers: cibles.map(id => {
+                const c = combattantDe(etat, id);
+                return c ? { q: nombre(c.q), r: nombre(c.r) } : null;
+            }).filter(Boolean)
+        };
     },
 
     // --- CE QUI TOUCHE, ET CE QUI RATE -----------------------------------
@@ -241,6 +257,7 @@ export function creerPont(effets) {
         poussee = async () => {},          // jouerAnimationPoussee
         bond = async () => {},             // jouerAnimationBond
         ruee = async () => {},             // le lanceur s'élance vers sa cible
+        projectile = async () => {},       // animerProjectile : flèche ou boule
         jauge = () => {},                  // afficherFlashDegatToken
         message = () => {},                // afficherMessageFlottantHex
         esquive = () => {},                // animerEsquive : le mot ET le recul
@@ -276,6 +293,16 @@ export function creerPont(effets) {
                     await pause(RYTHME.critique);
                 }
                 await ruee({ pion: scene.pion, cibles: scene.cibles });
+                // PUIS CE QUI TRAVERSE, s'il y a quelque chose à voir voler.
+                // Dans cet ordre, et pas l'inverse : le lanceur s'élance, PUIS
+                // le tir part — un projectile qui partirait avant le geste
+                // aurait l'air de s'échapper tout seul. L'attente est celle de
+                // l'animation elle-même : les dégâts ne doivent pas tomber
+                // avant que la flèche n'arrive.
+                if (scene.projectile && scene.depuis && (scene.vers || []).length) {
+                    await projectile({ de: scene.depuis, vers: scene.vers,
+                                       sorte: scene.projectile });
+                }
                 await pause(RYTHME.carte);
                 break;
 

@@ -22,7 +22,7 @@ import {
     pionsDepuisEtat, fichesDepuisEtat, fileDepuisEtat, creerProjection
 } from '../pont_combat.js';
 import { construireEtatCombat, appliquerEtape, TYPES_ETAPES } from '../combat_etat.js';
-import { resoudreCarte, tirerDesCarte } from '../moteur_pur.js';
+import { resoudreCarte, tirerDesCarte, projectileDe } from '../moteur_pur.js';
 import { resoudreMouvement } from '../mouvement_pur.js';
 import { creerDes } from '../combat_etat.js';
 import { jouerCreature, cloturerTour } from '../cerveau_combat.js';
@@ -147,6 +147,150 @@ console.log("\n1 bis. UNE ESQUIVE A DEUX MOITIÉS : LE MOT ET LE RECUL");
     verifier("en lui donnant la cible et l'origine du coup",
              joues[0].idCible === "M1" && joues[0].depuis.q === 0,
              JSON.stringify(joues[0]));
+}
+
+// =========================================================================
+console.log("\n1 ter. CE QUI TRAVERSE LE PLATEAU : FLÈCHE, BOULE BLEUE, BOULE VERTE");
+// =========================================================================
+//  Une attaque à distance ne se voyait pas partir : le lanceur s'élançait à
+//  peine sur place, puis les dégâts tombaient à trois cases de là. Rien ne
+//  reliait les deux, et on ne savait pas qui avait tiré sur qui.
+//
+//  Trois choses à tenir ici, et chacune a sa raison d'être.
+//
+//  UN. LE CHOIX EST UNE RÈGLE, DONC IL EST DANS LE NOYAU. Si chaque écran
+//  décidait de son côté ce qu'il dessine, une flèche chez l'un serait une boule
+//  chez l'autre — et on retomberait sur des écrans qui ne racontent pas la même
+//  chose, ce qui est exactement le mal qu'on a passé six étapes à soigner.
+//
+//  DEUX. LES CASES SE LISENT DANS L'ÉTAT D'AVANT, comme pour l'esquive. Une
+//  carte qui pousse sa cible avant de la frapper la déplacerait ; la flèche
+//  partirait alors vers une case vide.
+//
+//  TROIS. LE CORPS À CORPS NE LANCE RIEN. Une épée n'envoie pas de projectile,
+//  et un soin sur soi-même n'a nulle part où aller.
+{
+    const etat = {
+        combattants: {
+            H1: { id: "H1", q: 0, r: 0, pv: 50, pvMax: 50 },
+            H2: { id: "H2", q: 1, r: 0, pv: 30, pvMax: 50 },
+            M1: { id: "M1", q: 4, r: 0, pv: 40, pvMax: 40 }
+        }
+    };
+
+    // --- LE CHOIX, DANS LE NOYAU -------------------------------------------
+    const tir = { attaques: [{ isRanged: true, typeRes: "Physique", cibles: ["M1"] }] };
+    verifier("un tir non magique envoie une flèche", projectileDe(tir) === "fleche",
+             String(projectileDe(tir)));
+
+    const sort = { attaques: [{ isRanged: true, typeRes: "Magique", cibles: ["M1"] }] };
+    verifier("un sort offensif à distance envoie une boule", projectileDe(sort) === "magie",
+             String(projectileDe(sort)));
+
+    const soin = { attaques: [{ isRanged: true, typeRes: "Magique", isHeal: true, cibles: ["H2"] }] };
+    verifier("un soin à distance envoie la même, en vert", projectileDe(soin) === "soin",
+             String(projectileDe(soin)));
+
+    const cac = { attaques: [{ isRanged: false, typeRes: "Physique", cibles: ["M1"] }] };
+    verifier("une attaque au contact n'envoie rien", projectileDe(cac) === null,
+             String(projectileDe(cac)));
+
+    // Une carte sans cible ne lance rien, même à distance : c'est une zone posée
+    // au sol, et elle a sa propre animation.
+    verifier("sans cible, rien ne part",
+             projectileDe({ attaques: [{ isRanged: true, cibles: [] }] }) === null);
+    verifier("et une carte vide non plus", projectileDe({}) === null && projectileDe(null) === null);
+
+    // L'ORDRE COMPTE. Une carte qui frappe ET soigne montre son attaque : c'est
+    // elle qu'on regarde.
+    const lesDeux = { attaques: [
+        { isRanged: true, typeRes: "Magique", isHeal: true, cibles: ["H2"] },
+        { isRanged: true, typeRes: "Physique", cibles: ["M1"] }
+    ] };
+    verifier("frapper l'emporte sur soigner", projectileDe(lesDeux) === "fleche",
+             String(projectileDe(lesDeux)));
+
+    // Un bouclier posé de loin n'est pas un soin : c'est un sort, il part en bleu.
+    const bouclier = { attaques: [{ isRanged: true, typeRes: "Magique", isHeal: true,
+                                    isShield: true, cibles: ["H2"] }] };
+    verifier("un bouclier lancé de loin part en bleu", projectileDe(bouclier) === "magie",
+             String(projectileDe(bouclier)));
+
+    // Et un état lancé à distance sans aucune attaque : une immobilisation jetée
+    // à trois cases traverse quand même le plateau.
+    const etatSeul = { alterations: [{ nom: "Immobilisation", isRanged: true, cibles: ["M1"] }] };
+    verifier("un état jeté de loin traverse aussi", projectileDe(etatSeul) === "magie",
+             String(projectileDe(etatSeul)));
+
+    // --- ET LE CHOIX VOYAGE SUR L'ÉTAPE -----------------------------------
+    //  C'est ce qui garantit que les trois écrans dessinent la même chose : ils
+    //  ne décident pas, ils lisent.
+    const des = creerDes(77);
+    const r = resoudreCarte(etat, {
+        idLanceur: "H1", idCarte: "ARC",
+        attaques: [{ nom: "Attaque", typeRes: "Physique", valeurBrute: 10,
+                     isRanged: true, rangeMax: 4, cibles: ["M1"] }],
+        jets: { parCible: { M1: { esquive: false } } }
+    });
+    const etapeCarte = r.etapes.find(e => e.type === "carte");
+    verifier("l'étape « carte » porte ce qui part", etapeCarte.projectile === "fleche",
+             String(etapeCarte.projectile));
+
+    // Le corps à corps, lui, laisse l'étape exactement comme elle était : un
+    // journal déjà écrit se rejoue sans rien de neuf.
+    const rCac = resoudreCarte(etat, {
+        idLanceur: "H1", idCarte: "EPEE",
+        attaques: [{ nom: "Attaque", typeRes: "Physique", valeurBrute: 10, cibles: ["H2"] }],
+        jets: { parCible: { H2: { esquive: false } } }
+    });
+    verifier("et au contact, le champ n'existe même pas",
+             !("projectile" in rCac.etapes.find(e => e.type === "carte")));
+
+    // --- LES CASES VIENNENT DE L'ÉTAT D'AVANT ------------------------------
+    const scene = misEnScene({ type: "carte", acteur: "H1", carte: "ARC",
+                              cibles: ["M1"], projectile: "fleche" }, etat);
+    verifier("la scène sait d'où le tir part",
+             scene.depuis.q === 0 && scene.depuis.r === 0, JSON.stringify(scene.depuis));
+    verifier("et où il arrive",
+             scene.vers.length === 1 && scene.vers[0].q === 4, JSON.stringify(scene.vers));
+
+    // Une cible que l'état ne connaît pas ne fait pas tomber la scène : on tire
+    // vers celles qu'on sait placer, et c'est tout.
+    const fantome = misEnScene({ type: "carte", acteur: "H1", cibles: ["M1", "FANTÔME"],
+                                 projectile: "magie" }, etat);
+    verifier("une cible introuvable ne casse rien", fantome.vers.length === 1,
+             JSON.stringify(fantome.vers));
+
+    // --- ET LE PONT LE JOUE VRAIMENT --------------------------------------
+    const tirs = [];
+    const ordre = [];
+    const pont = creerPont({
+        ruee: async () => ordre.push("ruée"),
+        projectile: async (d) => { ordre.push("tir"); tirs.push(d); },
+        pause: async () => {}
+    });
+    await pont.animer({ type: "carte", acteur: "H1", carte: "ARC",
+                       cibles: ["M1"], projectile: "fleche" }, etat);
+    verifier("le pont lance l'animation de projectile", tirs.length === 1,
+             JSON.stringify(tirs[0] || null));
+    verifier("en lui disant quoi dessiner", (tirs[0] || {}).sorte === "fleche");
+    verifier("d'où et vers où",
+             tirs[0].de.q === 0 && tirs[0].vers[0].q === 4, JSON.stringify(tirs[0]));
+    // Le geste d'abord, le tir ensuite : un projectile qui partirait avant que
+    // le lanceur ne bouge aurait l'air de s'échapper tout seul.
+    verifier("le lanceur s'élance, PUIS le tir part",
+             ordre.join(" → ") === "ruée → tir", ordre.join(" → "));
+
+    // Et au contact : rien ne traverse.
+    const rien = [];
+    const pontCac = creerPont({
+        ruee: async () => {},
+        projectile: async (d) => rien.push(d),
+        pause: async () => {}
+    });
+    await pontCac.animer({ type: "carte", acteur: "H1", carte: "EPEE", cibles: ["H2"] }, etat);
+    verifier("au contact, aucun projectile n'est demandé", rien.length === 0,
+             JSON.stringify(rien));
 }
 
 // =========================================================================

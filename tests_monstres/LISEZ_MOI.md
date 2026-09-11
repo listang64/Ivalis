@@ -115,6 +115,7 @@ node carte_grisee_sans_message.mjs # cliquer une carte trop chère l'affiche san
 node portee_zone.mjs        # une zone lancée à distance emporte bien la distance posée sur la carte
 node butin_avance.mjs       # le butin tiré et dessiné dès le début du combat, gardé si le combat est perdu
 node manche_suivante.mjs    # DEUX manches d'affilée : le cerveau rend la main à la préparation
+node projectile.mjs         # flèche, boule bleue, boule verte : ce qui traverse le plateau
 
 ## Le journal d'événements du combat (le gros changement d'architecture)
 
@@ -1277,6 +1278,42 @@ complété à la volée et un héros de moins rend ses objets à la réserve, qu
 poste sans clés d'API ne revendique pas un dessin qu'il ne peut pas faire, et
 qu'une revendication abandonnée en route (onglet fermé) se périme au lieu de
 condamner la réserve.
+
+`projectile.mjs` tient les deux bouts d'une chaîne qu'un banc ordinaire couperait
+en son milieu. Une attaque à distance ne se voyait pas partir : le lanceur
+s'élançait d'un demi-pas sur place, puis les dégâts tombaient chez une cible à
+quatre cases de là, sans rien entre les deux. Il y a maintenant une flèche pour
+un tir qui n'est pas magique, une boule bleue lumineuse pour un sort offensif, la
+même en vert pour un soin lancé de loin.
+
+**En haut, la vraie Forge.** Le choix se décide sur `isRanged` et `typeRes`, deux
+champs que personne n'écrit à la main : ils sortent des sept cents lignes
+d'extraction de `moteur_effets.js`. Un banc qui les fabriquerait lui-même
+vérifierait que mon idée de la carte correspond à mon idée de la carte. Celui-ci
+fait tourner le VRAI extracteur sur de VRAIES cartes (un arc, un « Pouvoir
+magique », un soin, une épée, un bouclier jeté de loin, une immobilisation sans
+la moindre attaque) et regarde ce qui en sort.
+
+**Au milieu, une règle du jeu, pas un détail d'affichage.** `projectileDe`
+(`moteur_pur.js`) décide, et le résultat voyage sur l'étape « carte » comme tout
+le reste. Si chaque écran choisissait de son côté, une flèche chez l'un serait
+une boule chez l'autre — exactement le mal qu'on a passé six étapes à soigner.
+
+**En bas, le vrai dessin.** `animerProjectile` pose un SVG dans
+`#transform-plateau`, comme le voile des zones : il hérite du pan et du zoom sans
+un seul recalcul en JavaScript. Trois choses pouvaient mal tourner sans se voir —
+le calque restant collé au plateau après l'impact et s'empilant tir après tir, un
+départ pris sur la mauvaise case, et l'animation rendant la main avant d'être
+arrivée (auquel cas le chiffre rouge s'affiche avant que la flèche ne touche).
+
+⚠️ Et une leçon de banc, qui a coûté deux essais. Le style inline porte
+l'ARRIVÉE dès la première frame : c'est la transition CSS qui fait le voyage.
+Lire `g.style.transform`, c'est donc lire la destination — et croire qu'un
+projectile téléporté vole très bien. Le banc lit la matrice CALCULÉE, deux fois,
+à vingt puis cent quarante millisecondes : au départ près du lanceur, ensuite
+plus loin, jamais au-delà de la cible. Encore faut-il que le plateau soit
+VISIBLE : sur un élément en `display:none`, aucune transition ne tourne, et le
+banc mesurait un projectile parfaitement immobile.
 
 `apercu_butin.mjs` charge le vrai `style.css` et le vrai balisage
 d'`index.html`, remplit l'onglet Inventaire et les trois vues du butin avec les
