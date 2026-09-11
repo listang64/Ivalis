@@ -128,6 +128,7 @@ const DEFENSES_SIMPLES = {
     // Comme les défenses : on ne recopie pas les formules, on fige leur résultat.
     atouts:      () => ({}),
     bonusEquip:  () => 0,
+    effetsSpeciaux: () => [],
 
     // LES MAXIMA SONT DES FORMULES, PAS DES CHAMPS. C'est ce que ce fichier a
     // appris à ses dépens : le premier vrai combat en nouveau régime a été
@@ -173,18 +174,38 @@ export function combattantDepuisFiche(fiche, position, regles) {
         regenPv: nombre(race.regenPv)
     };
     const mod = {
-        // Ce que l'ÉQUIPEMENT change, hors états altérés : le bouclier lourd
-        // alourdit chaque case, le couteau l'allège, une arme offre un pas de
-        // retraite après avoir frappé.
-        coutDeplacement: nombre(calcul.bonusEquip(sansEtats, "coutDeplacement")),
-        hexApresAttaque: nombre(calcul.bonusEquip(sansEtats, "hexApresAttaque"))
+        // Ce que l'ÉQUIPEMENT change EN PERMANENCE, hors états altérés : le
+        // bouclier lourd alourdit chaque case, le couteau l'allège. PAS le pas
+        // de retraite après une attaque : celui-là n'est jamais permanent (voir
+        // `equip.hexApresAttaque` ci-dessous), c'est une réaction à un coup
+        // porté, posée comme un état d'un tour (Repli) au moment de résoudre
+        // la carte — jamais une ligne de mouvement gratuite du premier au
+        // dernier tour.
+        coutDeplacement: nombre(calcul.bonusEquip(sansEtats, "coutDeplacement"))
+    };
+    // CE QUE L'ÉQUIPEMENT DÉCLENCHE QUAND ON JOUE UNE CARTE, plutôt que ce
+    // qu'il change en continu : percer une armure, gagner de l'élan en
+    // frappant, bénir qui vient d'être soigné, s'offrir un pas de retraite.
+    // Figé ici comme le reste — l'équipement ne change pas en cours de
+    // rencontre — et consommé par tirerDesCarte/resoudreCarte (moteur_pur.js),
+    // qui décident CE tour-ci qui en profite.
+    const equip = {
+        ignoreArmure: nombre(calcul.bonusEquip(sansEtats, "ignoreArmure")),
+        ignoreResistances: nombre(calcul.bonusEquip(sansEtats, "ignoreResistances")),
+        hexApresAttaque: nombre(calcul.bonusEquip(sansEtats, "hexApresAttaque")),
+        // Défensif au-delà du filet habituel ({...DEFENSES_SIMPLES, ...regles}) :
+        // un appelant qui fournit ses PROPRES règles sans cette clé (par
+        // exemple un ancien monde du jeu où objets.js n'est pas encore chargé)
+        // pose `effetsSpeciaux: undefined` dans regles, ce qui écrase le
+        // défaut au moment du spread — le filet ne suffit alors plus.
+        effetsSpeciaux: (typeof calcul.effetsSpeciaux === "function" ? calcul.effetsSpeciaux(sansEtats) : []) || []
     };
     // Les maxima passent par les formules du jeu quand on les a. On les calcule
     // sur la fiche SANS ses états altérés, comme les défenses : un état qui
     // rabote l'énergie est l'affaire du moteur, pas celle de la borne.
     const bornes = { pvMax: nombre(calcul.pvMax(sansEtats)),
                      fatigueMax: nombre(calcul.fatigueMax(sansEtats)) };
-    return { ...combattantBrut(fiche, position, bornes), def, atouts, mod };
+    return { ...combattantBrut(fiche, position, bornes), def, atouts, mod, equip };
 }
 
 function combattantBrut(fiche, position, bornes) {

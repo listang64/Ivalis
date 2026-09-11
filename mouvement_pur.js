@@ -155,7 +155,11 @@ export function planifierTrajet(etat, id, chemin, plateau, options) {
     const carte = plateau || PLAINE;
     if (!c) return { pas: [], cout: 0, tronque: false };
 
-    const offertes = nombre(c.mod && c.mod.hexApresAttaque) + bonusDesEtats(c, "hexApresAttaque");
+    // Les cases offertes après une attaque ne sont JAMAIS permanentes (voir
+    // combat_etat.js) : elles viennent uniquement de l'état "Repli", posé pour
+    // un tour par resoudreCarte quand une arme le prévoit et qu'on vient de
+    // frapper.
+    const offertes = bonusDesEtats(c, "hexApresAttaque");
     const budget = Math.max(0, c.fatigue - Math.max(0, reserveCarte));
 
     const pas = [];

@@ -904,7 +904,12 @@ function sourceDuJeu() {
             defMagique: window.defMagiqueCombattant,
             critique: window.critiqueCombattant,
             atouts: window.atoutRace,
-            bonusEquip: window.bonusEquip
+            bonusEquip: window.bonusEquip,
+            // Les effets spéciaux d'un objet (élan d'initiative en frappant,
+            // bénédiction posée sur qui vient d'être soigné) : sans eux, une
+            // bague ou une arme qui les porte ne fait plus rien sous ce
+            // régime — ils vivaient uniquement dans l'ancien moteur.
+            effetsSpeciaux: window.effetsSpeciauxEquipement
         }
     };
 }

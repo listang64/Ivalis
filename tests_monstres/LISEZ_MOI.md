@@ -63,6 +63,7 @@ node etat_combat.mjs        # LE NOYAU PUR : dés à graine, état du combat, in
 node moteur_pur.mjs         # la chaîne de dégâts, maillon par maillon (10 000 cartes au hasard)
 node cap_fatigue.mjs        # le CAP de fatigue d'une compétence, table de Nico + atout humain
 node gouttes_etat.mjs       # les gouttes de couleur sous un pion, un vrai token de la base, capture à l'appui
+node equipement_cerveau.mjs # percer une armure, l'élan, la bénédiction, le pas de retraite — reliés au cerveau
 node mouvement_pur.mjs      # chemin, coût des cases, attaques d'opportunité (1 000 trajets)
 node ia_pure.mjs            # qui viser, où se mettre : les cinq caractères, sans variable globale
 node cerveau_combat.mjs     # LE CERVEAU : intentions validées, un seul écrivain, un combat entier
@@ -1412,6 +1413,60 @@ Pliors ne charge pas dans la capture — on n'y voit que l'ombre du pion sous le
 gouttes de couleur. Le mécanisme ne regarde jamais d'où vient l'image : sur un
 poste avec un accès réseau normal (le jeu, en vrai), le portrait s'affiche
 sous les mêmes gouttes, sans rien à changer.
+
+`equipement_cerveau.mjs` répond à une question précise de Nico : « les armes et
+armures qui augmentent les statistiques sont-elles bien reliées au nouveau
+cerveau ? ». La réponse était oui pour tout ce qui est PERMANENT — résistances,
+parade, critique, dégâts plats, portée, coût de déplacement — parce que
+`combattantDepuisFiche` (`combat_etat.js`) les fige déjà via les vraies
+formules du jeu, et parce que `appliquerEquipementALaCarte` (moteur_effets.js)
+enrichit une carte AVANT de la confier au cerveau. Elle était NON pour tout ce
+qu'un objet ne fait qu'EN RÉACTION à une carte jouée : percer une armure ou une
+résistance (un jet par cible), gagner de l'élan en frappant, bénir qui vient
+d'être soigné, s'offrir un pas de retraite après un coup. Ces quatre choses ne
+vivaient QUE dans `tirerLesDesDeLaCarte` / `appliquerSuitesEquipement`
+(`moteur_effets.js`), un chemin que le régime du cerveau — le régime par
+défaut depuis l'étape 5 — ne traverse jamais. Une arme perce-armure, un sabre
+qui donne de l'élan, une bague de bénédiction ne faisaient donc RIEN sous le
+régime courant, et rien ne le montrait : aucun banc ne les avait suivis
+jusque dans le nouveau moteur.
+
+Portés dans le noyau : `combat_etat.js` gèle les valeurs réactives d'un
+combattant dans `equip` (`ignoreArmure`, `ignoreResistances`,
+`hexApresAttaque`, `effetsSpeciaux`) au lieu de les laisser dans le seul monde
+de l'ancien moteur ; `tirerDesCarte` (`moteur_pur.js`) y tire les jets qui
+manquaient — percée par cible, chance d'élan — dans le MÊME ordre que
+l'ancien moteur, pour que le rejeu consomme les dés pareil des deux côtés ;
+`resoudreCarte` pose les états qui en résultent (Élan, Béni, Repli) avec la
+même règle de renouvellement que toute autre altération.
+
+⚠️ Une correction est passée avec : `hexApresAttaque` était gelé dans `mod`
+comme un modificateur de déplacement PERMANENT — copié à l'identique de
+`coutDeplacement`, sans remarquer que ce n'est pas la même sorte de bonus.
+Une arme "offre un pas de retraite après une attaque" ne doit jamais donner
+de mouvement gratuit à CHAQUE tour : ce n'est un cadeau que le tour où l'on
+vient de frapper, posé comme l'état "Repli" d'un seul tour. Le chapitre 1 du
+banc vérifie que `mod.hexApresAttaque` n'existe plus, et le chapitre 9 boucle
+la preuve jusqu'à `mouvement_pur.js` : l'état posé par `resoudreCarte` doit
+vraiment rendre les premières cases du PROCHAIN trajet gratuites.
+
+Le banc charge le vrai `objets.js` (aucun import, donc directement évaluable)
+et le vrai `window.bonusEquip` (`app.js`) — des objets à sa forme exacte
+(`.bonus`, `.effets`), pas une réécriture — et un dé truqué à file fixe plutôt
+que la graine du jeu, pour poser des cas précis (percé / pas percé, élan
+réussi / raté) sans deviner une suite pseudo-aléatoire. Il vérifie aussi ce
+qui ne doit PAS changer : « frappe » regarde le TYPE de la carte, pas si le
+coup a atterri (l'Élan part même sur une cible qui esquive, comme avant), un
+combattant à terre ne reçoit aucune suite, et sans objet réactif, aucun dé
+n'est même tiré (pas de gaspillage) et rien ne se pose sur le lanceur.
+
+Nico a aussi demandé de vérifier le menu de triche de la fiche personnage
+(`onglet-dev`, les huit champs `Dev_Mod_*`). Il l'était déjà : ces champs
+passent par `CHAMPS_STATS` (`combat_etat.js`) et par les mêmes formules du
+jeu (`pvMaxCombattant`, `esquiveCombattant`, etc.) que tout le reste — la
+preuve tenait déjà dans `atouts_races.mjs` (l'atout s'ajoute à la retouche de
+la fiche) et dans le détecteur de `stats_fiche.mjs` (aucune stat lue sans sa
+retouche dans tout le moteur). Rien à réparer là ; seulement à confirmer.
 
 `apercu_butin.mjs` charge le vrai `style.css` et le vrai balisage
 d'`index.html`, remplit l'onglet Inventaire et les trois vues du butin avec les

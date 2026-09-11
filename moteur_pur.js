@@ -139,6 +139,48 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
         });
     });
 
+    // --- LES JETS DE L'ÉQUIPEMENT -----------------------------------------
+    //  Percer une armure ou ignorer les résistances se joue une fois ici, PAR
+    //  CIBLE : sans ça, un poste verrait le coup passer et l'autre non — même
+    //  raison que l'esquive juste au-dessus. C'est une chance du LANCEUR
+    //  (l'arme qu'il tient), appliquée à chaque cible frappée par une attaque
+    //  qui porte vraiment (ni soin, ni bouclier).
+    const frappantes = (plan.attaques || [])
+        .filter(a => !a.isHeal && !a.isShield && (a.valeurBrute || 0) > 0);
+    const equipLanceur = (lanceur && lanceur.equip) || {};
+    const ignoreArmure = nombre(equipLanceur.ignoreArmure);
+    const ignoreResistances = nombre(equipLanceur.ignoreResistances);
+    if (ignoreArmure > 0 || ignoreResistances > 0) {
+        frappantes.forEach(attaque => {
+            (attaque.cibles || []).forEach(id => {
+                const c = pourCible(id);
+                c.equip = c.equip || {};
+                if (ignoreArmure > 0 && c.equip.ignoreArmure === undefined) {
+                    c.equip.ignoreArmure = des.d100() <= ignoreArmure;
+                }
+                if (ignoreResistances > 0 && c.equip.ignoreResistances === undefined) {
+                    c.equip.ignoreResistances = des.d100() <= ignoreResistances;
+                }
+            });
+        });
+    }
+
+    // Ce que l'équipement déclenche APRÈS la carte : élan d'initiative,
+    // bénédiction de soin, pas de retraite. "frappe"/"soigne" regardent le
+    // TYPE de la carte, pas si le coup a atterri — une arme de contact offre
+    // son pas de retraite même sur une cible qui esquive : c'est le geste qui
+    // compte, pas le résultat, exactement comme dans l'ancien moteur.
+    const frappe = frappantes.length > 0;
+    const soigne = (plan.attaques || []).some(a => a.isHeal && (a.valeurBrute || 0) > 0);
+    jets.equipLanceur = [];
+    jets.equipBenedictions = [];
+    (equipLanceur.effetsSpeciaux || []).forEach(e => {
+        if (e.buff && frappe && des.d100() <= (e.chance || 0)) jets.equipLanceur.push(e.buff);
+        if (e.buffSoi && soigne) jets.equipLanceur.push(e.buffSoi);
+        if (e.beniSoin && soigne) jets.equipBenedictions.push(e.beniSoin);
+    });
+    jets.equipPasOfferts = frappe ? nombre(equipLanceur.hexApresAttaque) : 0;
+
     return jets;
 }
 
@@ -500,6 +542,59 @@ export function resoudreCarte(etat, action) {
             etapes.push({ type: "etats", cible: idCible, purifie: true, liste: [] });
         });
     });
+
+    // --- LES SUITES DE L'ÉQUIPEMENT ---------------------------------------
+    //  Ce que l'arme ou la bague laisse DERRIÈRE la carte : l'élan
+    //  d'initiative gagné en frappant, la bénédiction posée sur qui vient
+    //  d'être soigné, le pas de retraite offert après un coup porté. Les jets
+    //  (tirerDesCarte) ont déjà tranché qui en profite ; on ne fait que poser
+    //  les états qui en résultent, exactement comme n'importe quelle
+    //  altération de carte — même règle de renouvellement (la plus longue des
+    //  deux durées, jamais de cumul).
+    const ICONE_SUITE_EQUIPEMENT =
+        "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png";
+    const poserSuiteEquipement = (idCible, nom, duree, bonusEquip, desc) => {
+        const cible = combattant(suivant, idCible);
+        if (!cible || cible.aTerre) return;
+        const existant = cible.etats.find(e => e && e.nom === nom);
+        if (existant) {
+            existant.duree = Math.max(nombre(existant.duree), duree);
+            existant.bonusEquip = bonusEquip;
+        } else {
+            cible.etats = [...cible.etats,
+                           { nom, duree, bonusEquip, icone: ICONE_SUITE_EQUIPEMENT, desc }];
+        }
+        etapes.push({ type: "etats", cible: idCible, pose: nom, liste: cible.etats });
+    };
+
+    (jets.equipLanceur || []).forEach(buff => {
+        poserSuiteEquipement(idLanceur, "Élan", buff.tours || 2,
+            { initiative: buff.initiative || 0 },
+            `+${buff.initiative || 0} d'initiative sur les prochaines cartes.`);
+    });
+
+    if ((jets.equipBenedictions || []).length > 0) {
+        // La bénédiction vise qui vient d'être soigné par CETTE carte — jamais
+        // le lanceur d'office, sauf s'il se soigne lui-même.
+        const soignes = [...new Set((action.attaques || [])
+            .filter(a => a.isHeal).flatMap(a => a.cibles || []))];
+        jets.equipBenedictions.forEach(beni => {
+            const bonus = {};
+            if (beni.resPhys) bonus.resPhys = beni.resPhys;
+            if (beni.resMag) bonus.resMag = beni.resMag;
+            if (beni.degatsPct) bonus.degatsPct = beni.degatsPct;
+            const detail = [beni.resPhys ? `+${beni.resPhys}% résistance physique` : null,
+                            beni.resMag ? `+${beni.resMag}% résistance magique` : null,
+                            beni.degatsPct ? `+${beni.degatsPct}% de dégâts` : null]
+                .filter(Boolean).join(", ");
+            soignes.forEach(id => poserSuiteEquipement(id, "Béni", beni.tours || 1, bonus, detail));
+        });
+    }
+
+    if (nombre(jets.equipPasOfferts) > 0) {
+        poserSuiteEquipement(idLanceur, "Repli", 1, { hexApresAttaque: nombre(jets.equipPasOfferts) },
+            `${nombre(jets.equipPasOfferts)} case(s) de déplacement gratuite(s) après avoir frappé.`);
+    }
 
     // --- LA FATIGUE DU LANCEUR -------------------------------------------
     if (action.coutFatigue !== undefined) {
