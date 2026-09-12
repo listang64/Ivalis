@@ -139,103 +139,12 @@ console.log("1. LES CHIFFRES DE LA FICHE");
   p.rendreLeHasard();
 }
 
-// ------------------------------------------------------------------
-console.log("\n2. LES RÉSISTANCES À L'ŒUVRE DANS UNE FRAPPE");
-{
-  const frapper = async (race) => {
-    const p = poste({ des: [0.99, 0.99, 0.99, 0.99] });   // aucune esquive
-    const cible = combattant(race, { idPersonnage: "J1", camp: "Ennemi" });
-    p.w.PERSOS_PARTIE = [combattant("Ophior", { idPersonnage: "J2" }), cible];
-    p.w.TOKENS_VTT_DATA = { J2: { q: 0, r: 0 }, J1: { q: 1, r: 0 } };
-    const attaque = (magique) => ({ nom: magique ? "Mot de pouvoir" : "Attaque légère",
-      typeRes: magique ? "Magique" : "Physique", valeurBrute: 20, isRanged: false, rangeMax: 1,
-      isHeal: false, isShield: false, purifChance: 0, estEtalement: false, cibles: ["J1"] });
-    const jouer = async (magique) => {
-      cible.PV_Actuels = 100;
-      await p.w.jouerAnimationMoteur({ type: "ATTAQUES", idLanceur: "J2", idCarte: "C1",
-        attaques: [attaque(magique)], alterations: [], isZone: false, confusion: null,
-        critique: false, timestamp: Date.now() });
-      return 100 - cible.PV_Actuels;
-    };
-    const phys = await jouer(false), mag = await jouer(true);
-    p.rendreLeHasard();
-    return { phys, mag };
-  };
-  const humain = await frapper("Humain"), anky = await frapper("Ankylar"), ophior = await frapper("Ophior");
-  console.log(`     Humain  : ${humain.phys} physique, ${humain.mag} magique`);
-  console.log(`     Ankylar : ${anky.phys} physique, ${anky.mag} magique`);
-  console.log(`     Ophior  : ${ophior.phys} physique, ${ophior.mag} magique`);
-  verifier("l'Ankylar encaisse 8 % de moins en physique", anky.phys === 18 && humain.phys === 20,
-           `(${humain.phys} → ${anky.phys})`);
-  verifier("mais pas en magique", anky.mag === humain.mag, `(${anky.mag})`);
-  verifier("l'Ophior encaisse 8 % de moins en magique", ophior.mag === 18, `(${ophior.mag})`);
-  verifier("mais pas en physique", ophior.phys === humain.phys, `(${ophior.phys})`);
-}
-
-// ------------------------------------------------------------------
-console.log("\n3. LES IMMUNITÉS");
-{
-  const empoisonner = async (race, nomEtat) => {
-    const p = poste({ des: [0.99, 0.99, 0.99, 0.99, 0.99] });
-    const cible = combattant(race, { idPersonnage: "J1", camp: "Ennemi" });
-    p.w.PERSOS_PARTIE = [combattant("Ophior", { idPersonnage: "J2" }), cible];
-    p.w.TOKENS_VTT_DATA = { J2: { q: 0, r: 0 }, J1: { q: 1, r: 0 } };
-    await p.w.jouerAnimationMoteur({ type: "ATTAQUES", idLanceur: "J2", idCarte: "C1",
-      attaques: [{ nom: "Attaque légère", typeRes: "Physique", valeurBrute: 5, isRanged: false,
-                   rangeMax: 1, isHeal: false, isShield: false, purifChance: 0,
-                   estEtalement: false, cibles: ["J1"] }],
-      alterations: [{ nom: nomEtat, chance: 100, duree: 3, icone: "",
-                      estPoison: nomEtat === "Empoisonnement" }],
-      isZone: false, confusion: null, critique: true, timestamp: Date.now() });
-    p.rendreLeHasard();
-    return { etats: cible.Etats_Alteres.map(e => e.nom), messages: p.messages.map(m => m.texte) };
-  };
-  const ethere = await empoisonner("Ethéré", "Empoisonnement");
-  const humainPoison = await empoisonner("Humain", "Empoisonnement");
-  const ondari = await empoisonner("Ondari", "Brûlé");
-  const humainFeu = await empoisonner("Humain", "Brûlé");
-  console.log(`     Éthéré / poison : ${ethere.etats.join(",") || "aucun état"}`
-            + ` — Humain : ${humainPoison.etats.join(",") || "aucun"}`);
-  console.log(`     Ondari / brûlure : ${ondari.etats.join(",") || "aucun état"}`
-            + ` — Humain : ${humainFeu.etats.join(",") || "aucun"}`);
-  verifier("un Humain attrape bien le poison", humainPoison.etats.includes("Empoisonnement"));
-  verifier("l'Éthéré est immunisé au poison, même sur un critique",
-           !ethere.etats.includes("Empoisonnement"));
-  verifier("et l'écran le dit", ethere.messages.includes("Immunisé"));
-  verifier("un Humain attrape bien la brûlure", humainFeu.etats.includes("Brûlé"));
-  verifier("l'Ondari est immunisé à la brûlure", !ondari.etats.includes("Brûlé"));
-
-  // Le plus récent des trois : l'Ankylar et l'Étourdi.
-  const anky = await empoisonner("Ankylar", "Étourdi");
-  const humainEtourdi = await empoisonner("Humain", "Étourdi");
-  console.log(`     Ankylar / étourdi : ${anky.etats.join(",") || "aucun état"}`
-            + ` — Humain : ${humainEtourdi.etats.join(",") || "aucun"}`);
-  verifier("un Humain se fait étourdir normalement", humainEtourdi.etats.includes("Étourdi"));
-  verifier("l'Ankylar est immunisé à l'Étourdi, même sur un critique",
-           !anky.etats.includes("Étourdi"));
-  verifier("et l'écran le dit aussi pour lui", anky.messages.includes("Immunisé"));
-}
-
-// ------------------------------------------------------------------
-console.log("\n4. LES SOINS REÇUS");
-{
-  const soigner = async (race) => {
-    const p = poste({ des: [0.99, 0.99] });
-    const cible = combattant(race, { idPersonnage: "J1", PV_Actuels: 50 });
-    p.w.PERSOS_PARTIE = [combattant("Ophior", { idPersonnage: "J2" }), cible];
-    p.w.TOKENS_VTT_DATA = { J2: { q: 0, r: 0 }, J1: { q: 1, r: 0 } };
-    await p.w.jouerAnimationMoteur({ type: "ATTAQUES", idLanceur: "J2", idCarte: "C1",
-      attaques: [{ nom: "Soin", typeRes: "Magique", valeurBrute: 20, isRanged: false, rangeMax: 1,
-                   isHeal: true, isShield: false, purifChance: 0, estEtalement: false, cibles: ["J1"] }],
-      alterations: [], isZone: false, confusion: null, critique: false, timestamp: Date.now() });
-    p.rendreLeHasard();
-    return cible.PV_Actuels - 50;
-  };
-  const humain = await soigner("Humain"), ethere = await soigner("Ethéré");
-  console.log(`     soin de 20 : +${humain} pour un Humain, +${ethere} pour un Éthéré`);
-  verifier("un soin ordinaire rend sa valeur", humain === 20, `(+${humain})`);
-  verifier("l'Éthéré reçoit 30 % de plus", ethere === 26, `(+${ethere})`);
-}
+// Les sections 2 à 4 (résistances, immunités, soins reçus, vérifiées via
+// jouerAnimationMoteur) sont parties à la grande suppression de l'ancien
+// moteur, remplacées par tests_monstres/atouts_races_cerveau.mjs — la même
+// épreuve, mais résolue par resoudreCarte (moteur_pur.js) avec les VRAIES
+// formules de app.js injectées comme `regles`, exactement comme le fait le
+// cerveau en jeu réel (combat_etat.js, etatDepuisLeJeu).
 
 // ------------------------------------------------------------------
 console.log("\n5. LE VARGEN : DÉPLACEMENT ET DÉROBADE");

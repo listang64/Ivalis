@@ -14,14 +14,6 @@ const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd
 // -------------------------------------------------------------------------
 const SRC_OBJETS = fs.readFileSync('/home/user/Ivalis/objets.js', 'utf-8');
 
-function extraire(fichier, marqueur, finLigne = '};') {
-    const lignes = fs.readFileSync('/home/user/Ivalis/' + fichier, 'utf-8').split('\n');
-    const d = lignes.findIndex(l => l.startsWith(marqueur));
-    if (d < 0) throw new Error(`${marqueur} introuvable dans ${fichier}`);
-    let f = d; for (let i = d + 1; i < lignes.length; i++) { if (lignes[i] === finLigne) { f = i; break; } }
-    return lignes.slice(d, f + 1).join('\n');
-}
-
 // Les gabarits d'états et la greffe d'équipement sur une carte : un bloc continu.
 const SRC_GREFFE = (() => {
     const src = fs.readFileSync('/home/user/Ivalis/moteur_effets.js', 'utf-8');
@@ -30,7 +22,6 @@ const SRC_GREFFE = (() => {
     if (d < 0 || f < 0) throw new Error("bloc d'équipement introuvable dans moteur_effets.js");
     return src.slice(d, f);
 })();
-const SRC_DES = extraire('moteur_effets.js', 'function tirerLesDesDeLaCarte(state, lanceurData, critique) {', '}');
 // Le ciblage de l'IA s'appuie sur des aides internes du module (traits, bruit,
 // distanceHex) : on charge donc le fichier entier, comme les autres bancs d'IA.
 const SRC_IA = fs.readFileSync('/home/user/Ivalis/monstres_ia.js', 'utf-8')
@@ -52,11 +43,7 @@ function creerMonde() {
 
     new Function('window', SRC_OBJETS)(w);
     new Function('window', SRC_STATS_COMMUNES)(w);
-    // Les deux blocs partagent la même portée dans moteur_effets.js (le tirage
-    // des dés appelle attaquesFrappantes) : ils doivent donc être évalués
-    // ensemble ici aussi, sinon le banc testerait une découpe qui n'existe pas.
-    new Function('window', SRC_GREFFE + '\n' + SRC_DES
-        + '\nwindow.tirerLesDesDeLaCarte = tirerLesDesDeLaCarte;')(w);
+    new Function('window', SRC_GREFFE)(w);
     return w;
 }
 
@@ -228,39 +215,11 @@ console.log("\n4. LA GREFFE SUR UNE CARTE : DÉGÂTS, SOINS, ÉTATS");
     verifier("une arme sans état n'ajoute aucune altération", c4.alterations.length === 0);
 }
 
-// =========================================================================
-console.log("\n5. LES JETS DE L'ÉQUIPEMENT SONT TIRÉS UNE SEULE FOIS");
-{
-    const masse = objet("Masse", "Commun");  // 15% d'ignorer l'armure
-    const p = heros({ equipMainDroite: masse });
-    const cible = { idPersonnage: "M1", camp: "Ennemi", Esquive: 0, Parade: 0, Etats_Alteres: [] };
-    w.PERSOS_PARTIE = [p, cible];
-
-    const state = {
-        attaques: [{ typeRes: "Physique", valeurBrute: 20, isHeal: false, isShield: false, cibles: ["M1"] }],
-        alterations: []
-    };
-
-    const vrai = Math.random;
-    Math.random = () => 0;            // un jet de 1 : la percée passe
-    const jetsReussis = w.tirerLesDesDeLaCarte(state, p, false);
-    Math.random = () => 0.99;         // un jet de 100 : elle échoue
-    const jetsRates = w.tirerLesDesDeLaCarte(state, p, false);
-    Math.random = vrai;
-
-    verifier("le jet de percée d'armure est bien pris avec les autres dés",
-             jetsReussis.parCible.M1.equip !== undefined);
-    verifier("un petit jet perce l'armure", jetsReussis.parCible.M1.equip.ignoreArmure === true);
-    verifier("un gros jet ne la perce pas", jetsRates.parCible.M1.equip.ignoreArmure === false);
-
-    // Une arme sans percée ne doit produire aucun jet inutile.
-    const dague = objet("Dague", "Commun");
-    const q = heros({ equipMainDroite: dague });
-    w.PERSOS_PARTIE = [q, cible];
-    const jetsDague = w.tirerLesDesDeLaCarte(state, q, false);
-    verifier("une arme sans percée ne tire pas de jet de percée",
-             !jetsDague.parCible.M1.equip || jetsDague.parCible.M1.equip.ignoreArmure === undefined);
-}
+// La section 5 (« les jets de l'équipement sont tirés une seule fois »,
+// vérifiée via l'ancien tirerLesDesDeLaCarte) est partie à la grande
+// suppression de l'ancien moteur, remplacée par tests_monstres/moteur_pur.mjs
+// section 23 — le même tirage, mais pris dans tirerDesCarte (moteur_pur.js),
+// la fonction qui l'a remplacé sous le régime cerveau.
 
 // =========================================================================
 console.log("\n6. PORTÉE, ALLONGE ET COÛT DE DÉPLACEMENT");

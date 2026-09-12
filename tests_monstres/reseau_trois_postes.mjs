@@ -249,97 +249,14 @@ async function finDeRoundATrois(transactionnel) {
            `(${regens.filter(n => n > 0).length} poste(s) sur 3)`);
 }
 
-// ------------------------------------------------------------------
-console.log("\n5. LES TROIS ÉCRANS VOIENT LE MÊME COMBAT");
-{
-  // La carte est lancée une fois, puis rejouée par chaque poste. Tant que
-  // chacun relançait ses propres dés, l'un voyait la cible esquiver et l'autre
-  // encaisser — et les deux gardaient en mémoire des valeurs différentes.
-  const moteur = fs.readFileSync('/home/user/Ivalis/moteur_effets.js', 'utf-8')
-    .replace(/^import[\s\S]*?from\s+"[^"]+";/gm, '');
-
-  function posteMoteur(des) {
-    const w = {};
-    const db = {}, doc = () => ({});
-    const updateDoc = async () => {}, setDoc = async () => {};
-    w.PERSOS_PARTIE = [
-      { idPersonnage: "J1", prenom: "Ben", camp: "Allié", idJoueur: "P1", PV_Max: 100, PV_Actuels: 100,
-        Fatigue_Max: 100, fatigueActuelle: 100, Esquive: 40, Parade: 0, Critique: 0,
-        Def_Physique: 0, Def_Magique: 0, Bouclier_Actuel: 0, Bouclier_Max: 0, Etats_Alteres: [] },
-      { idPersonnage: "M1", prenom: "Goule", camp: "Ennemi", estMonstre: true, PV_Max: 100, PV_Actuels: 100,
-        Fatigue_Max: 100, fatigueActuelle: 100, Esquive: 40, Parade: 0, Critique: 0,
-        Def_Physique: 0, Def_Magique: 0, Bouclier_Actuel: 0, Bouclier_Max: 0, Etats_Alteres: [] }
-    ];
-    w.TOKENS_VTT_DATA = { J1: { q: 0, r: 0 }, M1: { q: 1, r: 0 } };
-    w.COMBAT_PERSOS_JOUEUR = [w.PERSOS_PARTIE[0]]; w.COMBAT_INDEX_PERSO = 0;
-    w.ID_PARTIE_COURANTE = "P1"; w.RESOLUTIONS_LOCALES = [];
-    w.refCombattant = (id) => ({ id });
-    w.afficherMessageFlottantHex = () => {}; w.afficherFlashDegatToken = () => {};
-    w.appliquerTokensVTT = () => {}; w.afficherPisteInitiative = () => {};
-    w.afficherPersoCombatActuel = () => {}; w.mettreAJourJaugePV = () => {};
-    w.mettreAJourJaugeFatigue = () => {}; w.validerCarteCombat = () => {};
-    w.deduireFatigueCarte = () => {}; w.jouerSonClic = () => {};
-    w.estCombattantMort = () => false; w.estMonstre = (id) => String(id).startsWith("M");
-    w.PLATEAU_VTT = { getCaseState: () => ({ isBlocked: false, isDeleted: false, isDifficult: false }),
-                      hexToPixel: (q, r) => ({ x: q * 50, y: r * 50 }),
-                      pixelToHex: (x, y) => ({ q: Math.round(x / 50), r: Math.round(y / 50) }) };
-    w.VTT_POS_X = 0; w.VTT_POS_Y = 0; w.VTT_SCALE = 1;
-    w.EFFETS_BDD_CACHE = {}; w.CACHE_COMPETENCES_GLOBAL = {};
-    global.window = w;
-    global.document = { getElementById: () => null, querySelectorAll: () => [],
-                        createElement: () => ({ style: {}, appendChild() {}, remove() {} }) };
-    global.localStorage = { getItem: () => "P1" };
-    const vrai = Math.random;
-    // Chaque poste a sa propre suite de dés : s'il en tirait, il verrait autre chose.
-    Math.random = () => des.shift() ?? 0.99;
-    new Function('window', SRC_STATS_COMMUNES)(w);
-    new Function('window', 'db', 'doc', 'updateDoc', 'setDoc', 'deleteDoc', 'deleteField', moteur)(
-      w, db, doc, updateDoc, setDoc, async () => {}, () => ({}));
-    return { w, rendre: () => { Math.random = vrai; } };
-  }
-
-  const carte = (jets) => ({
-    type: "ATTAQUES", idLanceur: "J1", idCarte: "C1", critique: false, jets,
-    attaques: [{ nom: "Attaque légère", typeRes: "Physique", valeurBrute: 20, isRanged: false,
-                 rangeMax: 1, isHeal: false, isShield: false, purifChance: 0,
-                 estEtalement: false, cibles: ["M1"] }],
-    alterations: [{ nom: "Saignement", chance: 50, duree: 3, icone: "", cibles: ["M1"] }],
-    isZone: false, confusion: null, timestamp: 1
-  });
-
-  // Les dés tirés par le lanceur : la cible n'esquive pas, l'état passe.
-  const jetsPartages = { attaqueRatee: false, parCible: { M1: { esquive: false, etats: { Saignement: true } } } };
-
-  const resultats = [];
-  for (const des of [[0.01, 0.01, 0.01, 0.01], [0.99, 0.99, 0.99, 0.99], [0.30, 0.70, 0.10, 0.90]]) {
-    const p = posteMoteur([...des]);
-    await p.w.jouerAnimationMoteur(carte(jetsPartages));
-    const cible = p.w.PERSOS_PARTIE.find(x => x.idPersonnage === "M1");
-    resultats.push({ pv: cible.PV_Actuels, etats: cible.Etats_Alteres.map(e => e.nom).join(",") });
-    p.rendre();
-  }
-  console.log(`     les trois postes : ${resultats.map(r => r.pv + " PV [" + (r.etats || "aucun") + "]").join("  |  ")}`);
-  verifier("les trois postes affichent les mêmes points de vie",
-           new Set(resultats.map(r => r.pv)).size === 1, `(${resultats.map(r => r.pv).join(",")})`);
-  verifier("et les mêmes états sur la cible",
-           new Set(resultats.map(r => r.etats)).size === 1, `(${resultats.map(r => r.etats).join(" / ")})`);
-  verifier("l'esquive décidée au lancement a bien été suivie", resultats[0].pv === 80,
-           `(${resultats[0].pv} PV)`);
-
-  // Sans les dés partagés (une action venue d'un poste pas encore à jour), chaque
-  // navigateur retombe sur son propre tirage : c'est le défaut d'avant.
-  const sansJets = [];
-  for (const des of [[0.01, 0.01, 0.01, 0.01], [0.99, 0.99, 0.99, 0.99]]) {
-    const p = posteMoteur([...des]);
-    await p.w.jouerAnimationMoteur(carte(undefined));
-    const cible = p.w.PERSOS_PARTIE.find(x => x.idPersonnage === "M1");
-    sansJets.push(cible.PV_Actuels);
-    p.rendre();
-  }
-  console.log(`     sans dés partagés : ${sansJets.join(" et ")} PV`);
-  verifier("le défaut est bien là sans dés partagés : deux résultats différents",
-           new Set(sansJets).size > 1, `(${sansJets.join(",")})`);
-}
+// La section 5 de ce banc (« les trois écrans voient le même combat ») a été
+// retirée à la grande suppression de l'ancien moteur : elle vérifiait que des
+// dés PARTAGÉS empêchaient chaque poste de retirer les siens en rejouant
+// jouerAnimationMoteur. Sous le régime cerveau, cette garantie est plus forte
+// et vérifiée ailleurs — appliquerEtape/appliquerEntree (combat_etat.js) ne
+// tirent JAMAIS de dé, un « degats » porte directement son pvApres déjà
+// calculé (voir tests_monstres/etat_combat.mjs) : il n'y a plus de second
+// tirage à empêcher, la question ne se pose plus.
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

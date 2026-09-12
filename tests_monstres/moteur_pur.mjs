@@ -834,5 +834,72 @@ console.log("\n21. LA POUSSÉE POUSSE VRAIMENT, ET PEUT BOUSCULER");
              contreLeMur.etat.combattants.M1.fatigue === attendu);
 }
 
+// =========================================================================
+console.log("\n22. LE CRITIQUE IMPOSE LES EFFETS DE LA CARTE, ET DOUBLE AUSSI LES SOINS");
+// =========================================================================
+//  Ce chapitre couvrait `tirerLesDesDeLaCarte` + `jouerAnimationMoteur`, dans
+//  l'ancien moteur (tests_monstres/coup_critique.mjs, section 3) : la Poussée,
+//  la Traction et la Peur passent par ce même mécanisme (ce sont des
+//  altérations comme les autres pour tirerDesCarte), donc les couvrir ici
+//  suffit — resoudrePeur/resoudreBond n'ont pas leur mot à dire sur CE point,
+//  ils ne s'exécutent qu'une fois l'altération déjà actée.
+{
+    const etat = neuf();
+    const desFixe = (suite) => { const f = [...suite]; return { d100: () => f.length ? f.shift() : 99 }; };
+
+    // Un effet à 1 % de chance, avec un dé qui raterait à coup sûr (99) :
+    // sans critique il échoue, avec critique il passe quand même.
+    const plan = { attaques: [], alterations: [{ nom: "Peur", chance: 1, cibles: ["H1"] }] };
+    const sansCritique = tirerDesCarte(etat, plan, "M1", false, desFixe([1, 99]));
+    verifier("à 1 % de chance, un dé à 99 échoue normalement",
+             sansCritique.parCible.H1.etats.Peur === false);
+    const avecCritique = tirerDesCarte(etat, plan, "M1", true, desFixe([1, 99]));
+    verifier("le même dé, mais critique : l'effet passe sans jet",
+             avecCritique.parCible.H1.etats.Peur === true);
+
+    // Le doublement des dégâts vaut aussi pour les soins — mais seulement pour
+    // un héros : un monstre ne critique jamais (voir section 5), frappe() le
+    // fait lancer par "M1" par défaut, donc on prête la carte à "H2" ici.
+    const blesse = clonerEtat(etat);
+    blesse.combattants.H1.pv = 20;
+    const soigner = (critique) => resoudreCarte(blesse, {
+        ...frappe("H1", 15, { isHeal: true }), idLanceur: "H2", critique
+    });
+    const soin = soigner(false), soinCritique = soigner(true);
+    verifier("un soin normal rend sa valeur brute",
+             soin.etat.combattants.H1.pv - 20 === 15, `(${soin.etat.combattants.H1.pv - 20})`);
+    verifier("un soin critique en rend le double",
+             soinCritique.etat.combattants.H1.pv - 20 === 30,
+             `(${soinCritique.etat.combattants.H1.pv - 20})`);
+}
+
+// =========================================================================
+console.log("\n23. LE JET DE PERCÉE D'ARMURE VOYAGE AVEC LES AUTRES DÉS DE LA CARTE");
+// =========================================================================
+//  Repris de equipement_combat.mjs (grande suppression de l'ancien moteur,
+//  section « LES JETS DE L'ÉQUIPEMENT SONT TIRÉS UNE SEULE FOIS ») : la
+//  conversion objet → pourcentage (bonusEquip) est testée ailleurs, seul le
+//  TIRAGE lui-même — une fois, avec le reste de la carte, et jamais pour une
+//  arme sans percée — appartient à tirerDesCarte (moteur_pur.js).
+{
+    const desFixe = (suite) => { const f = [...suite]; return { d100: () => f.length ? f.shift() : 99 }; };
+    const armePercante = clonerEtat(neuf());
+    armePercante.combattants.H2.equip = { ignoreArmure: 15 };
+    const plan = { attaques: [{ valeurBrute: 20, cibles: ["H1"] }], alterations: [] };
+
+    const jetsReussis = tirerDesCarte(armePercante, plan, "H2", false, desFixe([99, 1]));
+    verifier("le jet de percée est bien pris avec les autres dés",
+             jetsReussis.parCible.H1.equip !== undefined);
+    verifier("un petit jet perce l'armure", jetsReussis.parCible.H1.equip.ignoreArmure === true);
+
+    const jetsRates = tirerDesCarte(armePercante, plan, "H2", false, desFixe([99, 100]));
+    verifier("un gros jet ne la perce pas", jetsRates.parCible.H1.equip.ignoreArmure === false);
+
+    const sansPercee = clonerEtat(neuf());
+    const jetsSansArme = tirerDesCarte(sansPercee, plan, "H2", false, desFixe([99]));
+    verifier("une arme sans percée ne tire aucun jet inutile",
+             !jetsSansArme.parCible.H1.equip || jetsSansArme.parCible.H1.equip.ignoreArmure === undefined);
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);
