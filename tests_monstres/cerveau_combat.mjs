@@ -11,7 +11,8 @@
 import {
     estLeCerveau, cerveauPerdu, validerIntention, appliquerIntention,
     avancerFile, jouerCreature, prochainPas, creerCerveau, cloturerTour, CERVEAU_PERDU_MS,
-    suivreBattement, cerveauSilencieux, regenererPvFinDeManche, ticsDeFinDeManche
+    suivreBattement, cerveauSilencieux, regenererPvFinDeManche, regenererFinDeManche,
+    ticsDeFinDeManche
 } from '../cerveau_combat.js';
 import { construireEtatCombat, creerDes, verifierEtatCombat, clonerEtat } from '../combat_etat.js';
 import { distance } from '../mouvement_pur.js';
@@ -887,6 +888,50 @@ console.log("\nCE QUE LES ÉTATS FONT À CHAQUE FIN DE MANCHE");
              ancien.combattants.H2.pv === pvAncien - 9, String(ancien.combattants.H2.pv));
     ticsDeFinDeManche(ancien);
     verifier("mais une seule fois", ancien.combattants.H2.pv === pvAncien - 9);
+}
+
+// =========================================================================
+console.log("\nLA RÉGÉNÉRATION DE FIN DE MANCHE, MÊME RÈGLE POUR TOUT LE MONDE");
+// =========================================================================
+//  Repris de regeneration_fin_de_tour.mjs (grande suppression de l'ancien
+//  moteur, sections 1-2) : cette règle vivait dans finDeTourCombat, un chemin
+//  que le régime cerveau ne traverse plus — avancerFile l'applique désormais
+//  lui-même (voir regenererFinDeManche ci-dessus). La section 3 de ce banc,
+//  elle, testait persoDocVersFront/validerCreationCaracs (app.js), sans
+//  rapport avec l'ancien moteur : elle reste dans regeneration_fin_de_tour.mjs.
+{
+    const etat = construireEtatCombat({
+        idPartie: "P1", cerveau: "P1", graine: 1,
+        combattants: [
+            { idPersonnage: "J1", PV_Max: 42, PV_Actuels: 30, Fatigue_Max: 100,
+              Fatigue_Actuelle: 20, Etats_Alteres: [], statut: "Vivant" },
+            { idPersonnage: "J2", PV_Max: 42, PV_Actuels: 42, Fatigue_Max: 100,
+              Fatigue_Actuelle: 90, Etats_Alteres: [], statut: "Vivant" },
+            { idPersonnage: "J3", PV_Max: 42, PV_Actuels: 0, Fatigue_Max: 100,
+              Fatigue_Actuelle: 10, Etats_Alteres: [], statut: "Mort" },
+            { idPersonnage: "M1", PV_Max: 70, PV_Actuels: 70, Fatigue_Max: 120,
+              Fatigue_Actuelle: 60, Etats_Alteres: [], statut: "Vivant", estMonstre: true }
+        ],
+        positions: {},
+        partie: { Tour_Combat: 1, Ordre_Initiative: ["J1", "J2", "J3", "M1"] }
+    });
+    // Regeneration vit sur .stats, recopié depuis la fiche par combattantBrut.
+    ["J1", "J2", "J3", "M1"].forEach(id => { etat.combattants[id].stats.Regeneration = 40; });
+    // J3 est mort : le combattant doit le savoir pour être exclu, exactement
+    // comme le fait le cerveau après une chute (voir combat_etat.js, aTerre).
+    etat.combattants.J3.aTerre = true;
+
+    const etapes = regenererFinDeManche(etat);
+    verifier("J1 (20 + 40% de 100 = 60) reçoit exactement sa régénération",
+             etat.combattants.J1.fatigue === 60, `(${etat.combattants.J1.fatigue})`);
+    verifier("J2, déjà presque plein, plafonne à Fatigue_Max sans déborder",
+             etat.combattants.J2.fatigue === 100, `(${etat.combattants.J2.fatigue})`);
+    verifier("un combattant tombé ne reçoit rien du tout",
+             etat.combattants.J3.fatigue === 10, `(${etat.combattants.J3.fatigue})`);
+    verifier("les monstres régénèrent avec la même règle que les héros (60 + 40% de 120 = 108)",
+             etat.combattants.M1.fatigue === 108, `(${etat.combattants.M1.fatigue})`);
+    verifier("exactement trois combattants régénérés (les vivants, pas le mort)",
+             etapes.length === 3, `(${etapes.length})`);
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

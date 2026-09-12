@@ -152,102 +152,15 @@ console.log("1. TROIS JOUEURS CHOISISSENT LEUR CARTE AU MÊME INSTANT");
            new Set(apres.File_Attente_Combat.map(f => f.idPersonnage)).size === 3);
 }
 
-// ------------------------------------------------------------------
-async function deuxTerminentLeMemeTour(transactionnel) {
-  const doc = partieNeuve();
-  doc.Phase_Combat = "Resolution";
-  doc.File_Attente_Combat = [
-    { idPersonnage: "J1", idCarte: "C_LOURD", initiative: 70, timestamp: 1 },
-    { idPersonnage: "J2", idCarte: "C_LOURD", initiative: 60, timestamp: 2 },
-    { idPersonnage: "J3", idCarte: "C_LOURD", initiative: 50, timestamp: 3 }
-  ];
-  const partie = creerPartie(doc, { transactionnel });
-  const postes = ["J1", "J2", "J3"].map((id, i) =>
-    creerPoste("poste" + (i + 1), partie, TROIS_HEROS, { monPerso: id }));
-  // Deux postes croient devoir terminer le tour de J1 : le joueur clique sur
-  // "fin de tour" pendant que la résolution de sa carte le fait aussi.
-  postes[0].w.finDeTourCombat(true, "J1");
-  postes[1].w.finDeTourCombat(true, "J1");
-  await attendre(600);
-  return partie.partagee.doc;
-}
-
-console.log("\n2. DEUX POSTES TERMINENT LE MÊME TOUR");
-{
-  const apres = await deuxTerminentLeMemeTour(true);
-  console.log(`     file restante : ${apres.File_Attente_Combat.map(f => f.idPersonnage).join(",") || "vide"}`);
-  verifier("la file n'avance que d'un cran", apres.File_Attente_Combat.length === 2,
-           `(${apres.File_Attente_Combat.length} restants sur 3)`);
-  verifier("c'est bien J2 qui joue ensuite, son tour n'est pas sauté",
-           apres.File_Attente_Combat[0] && apres.File_Attente_Combat[0].idPersonnage === "J2",
-           `(${apres.File_Attente_Combat[0] ? apres.File_Attente_Combat[0].idPersonnage : "personne"})`);
-  verifier("le tour de combat n'a pas changé", apres.Tour_Combat === 1, `(${apres.Tour_Combat})`);
-}
-
-// ------------------------------------------------------------------
-console.log("\n3. UN TOUR DÉJÀ TERMINÉ PAR UN AUTRE POSTE");
-{
-  const doc = partieNeuve();
-  doc.Phase_Combat = "Resolution";
-  doc.File_Attente_Combat = [
-    { idPersonnage: "J2", idCarte: "C_LOURD", initiative: 60, timestamp: 2 },
-    { idPersonnage: "J3", idCarte: "C_LOURD", initiative: 50, timestamp: 3 }
-  ];
-  const partie = creerPartie(doc, { transactionnel: true });
-  const poste = creerPoste("retardataire", partie, TROIS_HEROS, { monPerso: "J1" });
-  // Ce poste croit encore que c'est à J1 de jouer : sa demande doit rester sans effet.
-  await poste.w.finDeTourCombat(true, "J1");
-  await attendre(600);
-  console.log(`     file restante : ${partie.partagee.doc.File_Attente_Combat.map(f => f.idPersonnage).join(",")}`);
-  verifier("un poste en retard ne fait pas avancer la file",
-           partie.partagee.doc.File_Attente_Combat.length === 2,
-           `(${partie.partagee.doc.File_Attente_Combat.length})`);
-  verifier("J2 garde son tour", partie.partagee.doc.File_Attente_Combat[0].idPersonnage === "J2");
-}
-
-// ------------------------------------------------------------------
-console.log("\n4. LA FIN DE ROUND N'A LIEU QU'UNE FOIS");
-async function finDeRoundATrois(transactionnel) {
-  const doc = partieNeuve();
-  doc.Phase_Combat = "Resolution";
-  doc.Tour_Combat = 4;
-  doc.File_Attente_Combat = [{ idPersonnage: "J3", idCarte: "C_LOURD", initiative: 50, timestamp: 3 }];
-  const partie = creerPartie(doc, { transactionnel });
-  const postes = ["J1", "J2", "J3"].map((id, i) =>
-    creerPoste("poste" + (i + 1), partie, TROIS_HEROS, { monPerso: id }));
-  postes.forEach(p => p.w.finDeTourCombat(true, "J3"));
-  await attendre(700);
-  return { doc: partie.partagee.doc,
-           regens: postes.map(p => p.lots.filter(e => e.maj && e.maj.Fatigue_Actuelle !== undefined).length) };
-}
-{
-  const avant = await finDeRoundATrois(false);
-  console.log(`     sans transaction : tour ${avant.doc.Tour_Combat},`
-            + ` régénérations ${avant.regens.join(",")}`);
-  verifier("le défaut est bien là sans transaction : le round saute ou double",
-           avant.doc.Tour_Combat !== 5 || avant.regens.filter(n => n > 0).length > 1,
-           `(tour ${avant.doc.Tour_Combat}, ${avant.regens.filter(n => n > 0).length} poste(s))`);
-
-  const doc = partieNeuve();
-  doc.Phase_Combat = "Resolution";
-  doc.Tour_Combat = 4;
-  doc.File_Attente_Combat = [{ idPersonnage: "J3", idCarte: "C_LOURD", initiative: 50, timestamp: 3 }];
-  const partie = creerPartie(doc, { transactionnel: true });
-  const postes = ["J1", "J2", "J3"].map((id, i) =>
-    creerPoste("poste" + (i + 1), partie, TROIS_HEROS, { monPerso: id }));
-  postes.forEach(p => p.w.finDeTourCombat(true, "J3"));
-  await attendre(700);
-  const regens = postes.map(p => p.lots.filter(e => e.maj && e.maj.Fatigue_Actuelle !== undefined).length);
-  console.log(`     combattants régénérés par poste : ${regens.join(", ")}`);
-  verifier("le round passe au suivant", partie.partagee.doc.Tour_Combat === 5,
-           `(tour ${partie.partagee.doc.Tour_Combat})`);
-  verifier("la file est vide et le combat repasse en préparation",
-           partie.partagee.doc.File_Attente_Combat.length === 0
-           && partie.partagee.doc.Phase_Combat === "Preparation");
-  verifier("la régénération a bien eu lieu", regens.some(n => n === 3), `(${regens.join(",")})`);
-  verifier("et un seul poste l'a faite", regens.filter(n => n > 0).length === 1,
-           `(${regens.filter(n => n > 0).length} poste(s) sur 3)`);
-}
+// Les sections 2 à 4 de ce banc (deux postes qui terminent le même tour, un
+// poste en retard, la fin de round une seule fois — toutes vérifiées via
+// window.finDeTourCombat) sont parties à la grande suppression de l'ancien
+// moteur : cette transaction de file n'existe plus, la file avance désormais
+// dans le cerveau, où UN SEUL poste écrit (plus de course à départager).
+// La garantie « trois postes finissent d'accord » est reprise, plus fort,
+// par regime_cerveau.mjs section 3 (un combat entier, trois écrans
+// identiques) et section 8 (trois postes ouvrent en même temps, un seul
+// gagne).
 
 // La section 5 de ce banc (« les trois écrans voient le même combat ») a été
 // retirée à la grande suppression de l'ancien moteur : elle vérifiait que des

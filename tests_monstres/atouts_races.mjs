@@ -10,7 +10,6 @@ const src = fs.readFileSync('/home/user/Ivalis/moteur_effets.js', 'utf-8')
   .replace(/^import[\s\S]*?from\s+"[^"]+";/gm, '');
 const mouvement = fs.readFileSync('/home/user/Ivalis/mouvement.js', 'utf-8')
   .replace(/^import[\s\S]*?from\s+"[^"]+";/gm, '');
-const combat = fs.readFileSync('/home/user/Ivalis/combat.js', 'utf-8');
 const comp = fs.readFileSync('/home/user/Ivalis/competences.js', 'utf-8');
 
 // Les trois fonctions de la Forge qui écrivent la portée sur la carte.
@@ -203,28 +202,11 @@ console.log("\n6. L'ONDARI : LA PORTÉE DE SES SORTS");
 }
 
 // ------------------------------------------------------------------
-console.log("\n7. LE REPOS LONG DE L'HUMAIN");
-{
-  // La récupération est calculée dans finDeTourCombat : on rejoue sa formule
-  // exacte, extraite du fichier, plutôt que de la réécrire ici.
-  const lignes = combat.split('\n');
-  const d = lignes.findIndex(l => l.includes("const bonusRace = (typeof window.atoutRace"));
-  const formule = lignes.slice(d, d + 5).join('\n');
-  const p = poste();
-  const recuperer = (race) => {
-    const persoAction = combattant(race);
-    const fatigueMax = p.w.fatigueMaxCombattant(persoAction);
-    let fatigueActuelle = 0;
-    const tauxRepos = 0.35;
-    const window_ = p.w;
-    return eval(`(function(){ const window = window_; ${formule} return recup; })()`);
-  };
-  const humain = recuperer("Humain"), gob = recuperer("Gob");
-  console.log(`     repos long : +${gob} pour un Gob, +${humain} pour un Humain`);
-  verifier("un repos long ordinaire rend 35 % de la jauge", gob === 35, `(+${gob})`);
-  verifier("l'Humain récupère 10 points de plus", humain === 48, `(+${humain} sur 110)`);
-  p.rendreLeHasard();
-}
+// La section 7 (« le repos long de l'Humain », dont la formule vivait dans
+// finDeTourCombat) est partie à la grande suppression de l'ancien moteur : le
+// repos long se calcule désormais dans le cerveau (reposLongDuTour,
+// cerveau_combat.js), déjà testé — base 35 %, atout de l'Humain compris —
+// dans tests_monstres/cerveau_combat.mjs (« LE REPOS LONG »).
 
 // ------------------------------------------------------------------
 console.log("\n8. LA FORGE ANNONCE LA PORTÉE RÉELLE");

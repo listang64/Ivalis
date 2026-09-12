@@ -136,24 +136,7 @@ const res = await p.evaluate(async ({ srcMouvement, srcSequence, srcProtection }
   new Function('window', 'localStorage', srcSequence)(window, localStorage);
   window.DELAI_ENTRE_ETAPES_MS = 1;
 
-  // =====================================================================
-  //  1. VALIDER UN TRAJET DE QUATRE CASES
-  // =====================================================================
   etat();
-  window.ORDRE_ECRITURES = [];
-  window.CHEMIN_MOUVEMENT = [{ q: 1, r: 0 }, { q: 2, r: 0 }, { q: 3, r: 0 }, { q: 3, r: 1 }];
-  window.CHEMIN_START_NODE = { q: 0, r: 0 };
-  window.MOUVEMENT_COUT_TOTAL = 8;
-  await window.validerMouvement();
-
-  const pas = Object.keys(window.JOURNAL).map(Number).sort((a, b) => a - b)
-                    .map(n => window.JOURNAL[n]).filter(e => e.type === "pas");
-  const publication = {
-    nombre: pas.length,
-    types: Object.values(window.JOURNAL).map(e => e.type),
-    chaine: pas.map(e => `${e.data.de.q},${e.data.de.r}>${e.data.vers.q},${e.data.vers.r}`),
-    ordreEcritures: [...window.ORDRE_ECRITURES]
-  };
 
   // =====================================================================
   //  2. L'ANIMATION D'UN PAS EST ABSOLUE
@@ -228,7 +211,7 @@ const res = await p.evaluate(async ({ srcMouvement, srcSequence, srcProtection }
   window.jouerAnimationPas = vraiPas;
 
   return {
-    publication, apresPasIsole, apresRejeu, verrouLibere,
+    apresPasIsole, apresRejeu, verrouLibere,
     trace, chevauchements, enPose, posApresRedessin,
     posFinale: posDiv(),
     retenuAvant: Object.keys(retenuAvant),
@@ -240,16 +223,13 @@ await b.close();
 
 console.log("erreurs JS :", erreurs.length ? erreurs : "aucune");
 
-console.log("\n1. VALIDER UN TRAJET : UN HEXAGONE, UN NUMÉRO");
-verifier("quatre cases parcourues, quatre événements", res.publication.nombre === 4,
-         `(${res.publication.nombre} — types : ${res.publication.types.join(",")})`);
-verifier("les cases s'enchaînent sans trou, du départ à l'arrivée",
-         res.publication.chaine.join(" | ") === "0,0>1,0 | 1,0>2,0 | 2,0>3,0 | 3,0>3,1",
-         `(${res.publication.chaine.join(" | ")})`);
-verifier("les pas partent AVANT que la case d'arrivée soit écrite",
-         res.publication.ordreEcritures.indexOf("case-arrivee")
-         === res.publication.ordreEcritures.length - 1,
-         `(${res.publication.ordreEcritures.join(" > ")})`);
+// La section 1 (« valider un trajet : un hexagone, un numéro », via l'ancien
+// window.validerMouvement) est partie à la grande suppression de l'ancien
+// moteur : la publication d'un événement par hexagone, dans l'ordre et sans
+// trou, est désormais garantie par construction — resoudreMouvement
+// (mouvement_pur.js) produit une étape par case, et appliquerEntree
+// (combat_etat.js) les rejoue une à une, jamais toutes d'un bloc. Voir
+// tests_monstres/mouvement_pur.mjs et rejeu_deplacements_imposes.mjs.
 
 console.log("\n2. L'ANIMATION D'UN PAS EST ABSOLUE");
 verifier("lancé depuis une case aberrante, il finit quand même sur « vers »",

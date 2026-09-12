@@ -77,13 +77,21 @@ console.log("1. CHAQUE REDIRECTION EST DERRIÈRE LE DRAPEAU");
 }
 
 // =========================================================================
-console.log("\n2. L'ANCIENNE SYNCHRONISATION EST DÉBRANCHÉE, PAS SUPPRIMÉE");
+console.log("\n2. L'ANCIENNE SYNCHRONISATION A ÉTÉ DÉBRANCHÉE, PUIS SUPPRIMÉE");
 // =========================================================================
 //  Sous le nouveau régime, la séquence de tour rejouerait un second journal
 //  par-dessus le premier, et l'IA ferait jouer les créatures en double — une
 //  fois là, une fois dans le cerveau. C'est très exactement le mécanisme des
-//  tours joués deux fois. Les deux appels sont donc éteints — et SEULEMENT
-//  éteints : le code reste, entier, pour qu'on puisse revenir.
+//  tours joués deux fois. Les deux appels sont donc éteints.
+//
+//  CE QUI A CHANGÉ DEPUIS L'ÉCRITURE DE CE BANC : à l'origine (étape 5), le
+//  code de l'ancien monde restait entier derrière le drapeau, pour qu'on
+//  puisse revenir en arrière après une vraie partie jouée au bout. Cette
+//  partie a été jouée, la grande suppression est venue : declencherResolution,
+//  validerMouvement, finDeTourCombat et validerCarteCombat gardent leur garde
+//  (le drapeau ÉTEINT lève toujours une alerte, jamais un silence ou un appel
+//  à du code disparu), mais leur ancien corps est parti. Les Action_Moteur/
+//  Action_Mouvement/Action_Poussee/... n'existent plus nulle part.
 {
     const app = SOURCES['app.js'];
     verifier("le nouveau régime a son point d'entrée dans la partie",
@@ -98,15 +106,29 @@ console.log("\n2. L'ANCIENNE SYNCHRONISATION EST DÉBRANCHÉE, PAS SUPPRIMÉE");
     verifier("la séquence de tour est dedans", debut > 0 && iSeq > debut, `(${debut} < ${iSeq})`);
     verifier("l'IA des monstres aussi", iIA > debut, `(${iIA})`);
 
-    // Et rien n'a été effacé.
+    // Et ce qui reste vraiment partagé n'a pas bougé.
     verifier("suivreSequenceTour existe toujours",
              SOURCES['sequence_tour.js'].includes('window.suivreSequenceTour = function'));
-    verifier("l'ancien chemin de la fin de tour est intact",
-             SOURCES['combat.js'].includes('window.modifierPartieOuEchec'));
-    verifier("celui du déplacement aussi",
-             SOURCES['mouvement.js'].includes('Action_Mouvement'));
-    verifier("et celui de la carte", SOURCES['moteur_effets.js'].includes('Action_Moteur'));
     verifier("le verrou de l'IA n'a pas bougé", lire('monstres_ia.js').includes('reclamerVerrouIA'));
+
+    // La grande suppression : plus une seule écriture des champs Action_*
+    // nulle part dans le jeu — ni sous l'ancien nom, ni sous un autre.
+    ['Action_Moteur', 'Action_Mouvement', 'Action_Poussee', 'Action_Traction', 'Action_Peur']
+        .forEach(champ => {
+            verifier(`${champ} n'est plus écrit nulle part`,
+                     !SOURCES['combat.js'].includes(`${champ}:`)
+                     && !SOURCES['mouvement.js'].includes(`${champ}:`)
+                     && !SOURCES['moteur_effets.js'].includes(`${champ}:`));
+        });
+    // Chaque point de coupure retombe sur le même message honnête, jamais sur
+    // du code mort ou un silence.
+    [['moteur_effets.js', 'Ancien moteur de combat indisponible'],
+     ['mouvement.js', 'Ancien moteur de déplacement indisponible'],
+     ['combat.js', 'Ancienne fin de tour indisponible'],
+     ['combat.js', 'Ancienne carte sans cible indisponible']]
+        .forEach(([fichier, message]) => {
+            verifier(`${fichier} retombe sur « ${message} »`, SOURCES[fichier].includes(message));
+        });
 }
 
 // =========================================================================
@@ -571,17 +593,19 @@ console.log("\n14. PLUS UNE SEULE PANNE MUETTE");
 
     // 4. UNE CARTE SANS CIBLE PASSE PAR LE CERVEAU. Paralysie, Illusion seule,
     //    Bond seul : elles déduisaient l'énergie en local et en base, puis
-    //    envoyaient une fin de tour nue.
+    //    envoyaient une fin de tour nue — l'ancien chemin (deduireFatigueCarte,
+    //    l'appel direct à finDeTourCombat) est parti à la grande suppression,
+    //    remplacé par le même message honnête que partout ailleurs.
     const valider = c.slice(c.indexOf("window.validerCarteCombat = async function"));
     const finValider = valider.slice(0, valider.indexOf("\n};"));
     verifier("validerCarteCombat demande une carte au cerveau",
              finValider.includes("window.regimeDemande.carte("));
-    verifier("et la demande AVANT toute déduction locale",
-             finValider.indexOf("window.regimeDemande.carte(")
-             < finValider.indexOf("window.deduireFatigueCarte("));
-    verifier("l'ancien chemin reste intact pour le régime éteint",
-             finValider.includes("window.deduireFatigueCarte(")
-             && finValider.includes("window.finDeTourCombat("));
+    verifier("et retombe sur le message honnête, plus sur l'ancien chemin",
+             finValider.includes("Ancienne carte sans cible indisponible")
+             && !finValider.includes("window.deduireFatigueCarte(")
+             && !finValider.includes("window.finDeTourCombat("));
+    verifier("deduireFatigueCarte n'est plus défini nulle part",
+             !SOURCES['combat.js'].includes("window.deduireFatigueCarte ="));
 
     // 5. LE REPOS LONG EXISTE DANS LE CERVEAU. Il n'y était nulle part.
     verifier("le cerveau connaît le repos long", cerveau.includes('carte !== "REPOS_LONG"'));
