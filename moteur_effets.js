@@ -140,205 +140,13 @@ window.sauvegarderZonesPersistantes = async function(zones) {
     }
 };
 
-// Construite par le lanceur uniquement (declencherResolution ne tourne que chez lui), puis
-// diffusée à tous via Combat_VTT.
-window.creerZonePersistante = async function(state, idLanceur) {
-    if (!window.ID_PARTIE_COURANTE || !state) return;
-
-    // 1. Emprise : l'AoE complète si la carte porte un mod Zone, sinon la seule case visée.
-    let hexes = [];
-    if (state.isZone && Array.isArray(state.zoneHexesFinaux) && state.zoneHexesFinaux.length > 0) {
-        hexes = state.zoneHexesFinaux.map(h => ({ q: h.q, r: h.r }));
-    } else {
-        const idsCibles = new Set();
-        (state.attaques || []).forEach(a => (a.cibles || []).forEach(c => idsCibles.add(c)));
-        (state.alterations || []).forEach(a => (a.cibles || []).forEach(c => idsCibles.add(c)));
-        idsCibles.forEach(id => {
-            const tk = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[id] : null;
-            if (tk) hexes.push({ q: tk.q, r: tk.r });
-        });
-    }
-    const vues = new Set();
-    hexes = hexes.filter(h => {
-        const cle = h.q + "," + h.r;
-        if (vues.has(cle)) return false;
-        vues.add(cle);
-        return true;
-    });
-    if (hexes.length === 0) return;
-
-    // 2. Ce que la zone rejoue à chaque entrée : les dégâts de la carte (jamais les boucliers,
-    //    qui n'ont pas de sens en piège au sol), OU le soin d'une carte de soin (zone verte,
-    //    bienfaisante), et l'état élémentaire embarqué.
-    const attaqueDegats = (state.attaques || []).find(a => !a.isHeal && !a.isShield && (a.valeurBrute || 0) > 0);
-    const degats = attaqueDegats
-        ? { valeurBrute: attaqueDegats.valeurBrute, typeRes: attaqueDegats.typeRes }
-        : null;
-
-    const attaqueSoin = (state.attaques || []).find(a => a.isHeal && (a.valeurBrute || 0) > 0);
-    const soin = attaqueSoin ? { valeurBrute: attaqueSoin.valeurBrute } : null;
-
-    const altPersistante = (state.alterations || []).find(a => window.TYPES_ZONES_PERSISTANTES[a.nom]);
-    const etat = altPersistante ? {
-        nom: altPersistante.nom,
-        icone: altPersistante.icone,
-        desc: altPersistante.desc || "",
-        chance: altPersistante.chance,
-        duree: altPersistante.duree,
-        estPoison: !!altPersistante.estPoison,
-        tickFait: false
-    } : null;
-
-    if (!degats && !soin && !etat) return; // Rien à faire persister : pas de zone fantôme
-
-    const type = etat ? (window.TYPES_ZONES_PERSISTANTES[etat.nom] || "neutre")
-        : soin ? "soin"
-        : "neutre";
-    const id = "zp_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
-
-    // Pas de superposition : la nouvelle zone REMPLACE les anciennes sur les cases qu'elle
-    // recouvre. Une ancienne zone qui garde des cases ailleurs survit, amputée ; celle qui se
-    // fait entièrement recouvrir disparaît.
-    const casesPrises = new Set(hexes.map(h => h.q + "," + h.r));
-    const zonesConservees = {};
-    Object.values(window.ZONES_PERSISTANTES || {}).forEach(z => {
-        const restantes = (z.hexes || []).filter(h => !casesPrises.has(h.q + "," + h.r));
-        if (restantes.length > 0) zonesConservees[z.id] = { ...z, hexes: restantes };
-    });
-
-    zonesConservees[id] = {
-        id: id,
-        hexes: hexes,
-        type: type,
-        degats: degats,
-        soin: soin,
-        etat: etat,
-        dureeRestante: 3, // Fixe : la Forge masque le bouton ⏳ sur ce mod
-        idLanceur: idLanceur || null
-    };
-
-    window.ZONES_PERSISTANTES = zonesConservees;
-    if (typeof window.appliquerZonesPersistantes === "function") window.appliquerZonesPersistantes();
-    await window.sauvegarderZonesPersistantes(zonesConservees);
-};
-
-// Résout l'entrée d'un personnage sur UNE case. Appelée uniquement par le client qui pilote le
-// déplacement (comme les attaques d'opportunité) : le jet est tranché et persisté une seule
-// fois, puis le résultat est embarqué dans la diffusion du mouvement pour être rejoué à
-// l'identique chez tout le monde. Retourne un tableau de résultats (une zone peut en recouvrir
-// une autre) ou null.
-window.resoudreZonesPersistantesSurCase = async function(idPerso, hex) {
-    if (!hex) return null;
-    const zones = Object.values(window.ZONES_PERSISTANTES || {});
-    if (zones.length === 0) return null;
-
-    const zonesIci = zones.filter(z => (z.hexes || []).some(h => h.q === hex.q && h.r === hex.r));
-    if (zonesIci.length === 0) return null;
-
-    const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPerso);
-    if (!cibleData || cibleData.statut === "Mort") return null;
-
-    const resultats = [];
-
-    for (const zone of zonesIci) {
-        const esquive = window.esquiveCombattant(cibleData);
-        const parade = window.paradeCombattant(cibleData);
-        const statDef = Math.max(esquive, parade);
-        const jetDef = Math.floor(Math.random() * 100) + 1;
-        const motDef = parade > esquive ? "Paré 🛡️" : "Esquivé 💨";
-        const dodged = jetDef <= statDef;
-
-        let degatsFinaux = 0;
-        let soinFinal = 0;
-        let viaBouclier = false;
-        let etatApplique = null;
-
-        if (!dodged) {
-            if (zone.degats) {
-                const defPhys = window.defPhysiqueCombattant(cibleData);
-                const defMag = window.defMagiqueCombattant(cibleData);
-                const resistance = zone.degats.typeRes === "Magique" ? defMag : defPhys;
-                let reduction = resistance / 100;
-                if (reduction > 1) reduction = 1;
-                degatsFinaux = Math.round((zone.degats.valeurBrute || 0) * (1 - reduction));
-                if (degatsFinaux < 0) degatsFinaux = 0;
-
-                if (degatsFinaux > 0) {
-                    try {
-                        const refPerso = window.refCombattant(idPerso);
-                        const oldShield = parseInt(cibleData.Bouclier_Actuel) || 0;
-                        if (oldShield > 0) {
-                            viaBouclier = true;
-                            cibleData.Bouclier_Actuel = Math.max(0, oldShield - degatsFinaux);
-                            await updateDoc(refPerso, { Bouclier_Actuel: cibleData.Bouclier_Actuel });
-                        } else {
-                            const oldPv = parseInt(cibleData.PV_Actuels) || 0;
-                            cibleData.PV_Actuels = Math.max(0, oldPv - degatsFinaux);
-                            await updateDoc(refPerso, { PV_Actuels: cibleData.PV_Actuels });
-                        }
-                    } catch (e) {
-                        console.error("Erreur dégâts zone persistante :", e);
-                    }
-                }
-            }
-
-            // Zone de soin : soigne quiconque marche dessus, ami ou ennemi — la Persistance
-            // de terrain n'a jamais distingué les camps, un remous bienfaisant pas plus qu'un
-            // brasier. Jamais au-delà des PV max.
-            if (zone.soin) {
-                const pvMax = (parseInt(cibleData.PV_Max) || 0) + (parseInt(cibleData.Dev_Mod_PV) || 0);
-                const pvActuels = parseInt(cibleData.PV_Actuels) || 0;
-                soinFinal = Math.min(zone.soin.valeurBrute || 0, Math.max(0, pvMax - pvActuels));
-
-                if (soinFinal > 0) {
-                    try {
-                        cibleData.PV_Actuels = pvActuels + soinFinal;
-                        await updateDoc(window.refCombattant(idPerso), { PV_Actuels: cibleData.PV_Actuels });
-                    } catch (e) {
-                        console.error("Erreur soin zone persistante :", e);
-                    }
-                }
-            }
-
-            // L'état garde le pourcentage calculé au moment où le sort a été lancé.
-            if (zone.etat) {
-                const roll = Math.floor(Math.random() * 100) + 1;
-                // Un peuple immunisé traverse la zone sans rien attraper.
-                if (roll <= (zone.etat.chance || 0) && !window.estImmunise(cibleData, zone.etat.nom)) {
-                    const etats = cibleData.Etats_Alteres ? [...cibleData.Etats_Alteres] : [];
-                    const existant = etats.find(e => e.nom === zone.etat.nom);
-                    if (existant) {
-                        existant.duree = Math.max(existant.duree, zone.etat.duree);
-                        if (zone.etat.estPoison) existant.tickFait = false;
-                    } else {
-                        etats.push({ ...zone.etat });
-                    }
-                    cibleData.Etats_Alteres = etats;
-                    etatApplique = zone.etat.nom;
-                    try {
-                        await updateDoc(window.refCombattant(idPerso), { Etats_Alteres: etats });
-                    } catch (e) {
-                        console.error("Erreur état zone persistante :", e);
-                    }
-                }
-            }
-        }
-
-        resultats.push({
-            idCible: idPerso,
-            type: zone.type || "neutre",
-            dodged: dodged,
-            motDef: motDef,
-            degats: degatsFinaux,
-            soin: soinFinal,
-            viaBouclier: viaBouclier,
-            etatApplique: etatApplique
-        });
-    }
-
-    return resultats.length > 0 ? resultats : null;
-};
-
+// GRANDE SUPPRESSION : window.creerZonePersistante et window.resoudreZonesPersistantesSurCase
+// (l'ancien moteur, écriture directe dans Combat_VTT/ZONES_PERSISTANTES depuis le poste qui
+// joue la carte ou qui déplace le pion) ont disparu d'ici. La zone entre maintenant dans
+// l'état du cerveau au moment de résoudre la carte (voir creerZonePersistante et
+// resoudreZonesPersistantesSurCase, moteur_pur.js) : plus aucun poste ne la pose ou n'y
+// marche dans son coin. sauvegarderZonesPersistantes, elle, reste : reinitialiserCombat
+// (combat.js) l'appelle encore pour vider Combat_VTT.Zones_Persistantes à la fin d'un combat.
 // Rejoue chez CHAQUE joueur le résultat déjà tranché ci-dessus. N'écrit rien, ne relance aucun dé.
 window.jouerAnimationZonePersistante = async function(res, hexPosition) {
     if (!res || !res.idCible) return;
@@ -401,73 +209,12 @@ window.jouerAnimationZonePersistante = async function(res, hexPosition) {
 //  et les compétences équipées, mais toujours soumis à un jet d'esquive/parade
 //  et absorbés par un bouclier magique actif comme une attaque normale.
 // =========================================================================
-// Le jet est calculé UNE SEULE FOIS, sur l'écran de celui qui déplace le pion (seul client
-// à connaître le avant/après du mouvement). Le résultat déjà tranché (pas juste "il se passe
-// un truc, chacun relance son dé") est ensuite diffusé via Action_Opportunite : tous les
-// clients (celui qui a bougé y compris) le rejouent à l'identique via jouerAnimationOpportunite.
-// Ne diffuse plus rien elle-même : le jet et les dégâts/bouclier sont tranchés et persistés
-// UNE SEULE FOIS ici (par le personnage qui bouge), et le résultat est retourné à l'appelant
-// (validerMouvement, dans mouvement.js) pour être embarqué dans Action_Mouvement à l'étape du
-// trajet où l'ennemi est quitté. C'est ce qui permet à l'animation de marquer une vraie pause
-// pile à cet endroit chez tous les joueurs, au lieu de se jouer après coup une fois arrivé.
-window.resoudreAttaqueOpportunite = async function(idAttaquant, idCible) {
-    const attaquantData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idAttaquant);
-    const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idCible);
-    if (!attaquantData || !cibleData) return null;
-    if (attaquantData.statut === "Mort" || cibleData.statut === "Mort") return null;
-    // Second verrou : une illusion ne porte aucun coup, d'où qu'on l'appelle.
-    if (attaquantData.estIllusion) return null;
-
-    // Atout du Vargen : une chance de se dérober AVANT même le jet de défense.
-    // C'est une esquive supplémentaire, pas un remplacement — il garde ensuite
-    // sa chance ordinaire.
-    const chanceDerobade = window.atoutRace(cibleData).esquiveOpportunite || 0;
-    // Le résultat est seulement tranché ici : c'est jouerAnimationOpportunite qui
-    // l'affiche, chez tous les joueurs à la fois, à la bonne étape du trajet.
-    if (chanceDerobade > 0 && Math.floor(Math.random() * 100) + 1 <= chanceDerobade) {
-        return { idAttaquant, idCible, dodged: true, motDef: "Dérobade 🐾", degats: 0, viaBouclier: false };
-    }
-
-    const esquive = window.esquiveCombattant(cibleData);
-    const parade = window.paradeCombattant(cibleData);
-    const jetDef = Math.floor(Math.random() * 100) + 1;
-    const statDef = Math.max(esquive, parade);
-    const motDef = parade > esquive ? "Paré 🛡️" : "Esquivé 💨";
-    const dodged = jetDef <= statDef;
-
-    let degats = 0;
-    let viaBouclier = false;
-
-    if (!dodged) {
-        degats = 10; // Fixe : ignore l'armure et les compétences/références de l'attaquant
-        const oldShield = parseInt(cibleData.Bouclier_Actuel) || 0;
-
-        try {
-            const refPerso = window.refCombattant(idCible);
-            if (oldShield > 0) {
-                viaBouclier = true;
-                const shieldNew = Math.max(0, oldShield - degats); // L'overkill part dans le vide, comme une attaque normale
-                cibleData.Bouclier_Actuel = shieldNew;
-                await updateDoc(refPerso, { Bouclier_Actuel: shieldNew });
-            } else {
-                const oldPv = parseInt(cibleData.PV_Actuels) || 0;
-                const newPv = Math.max(0, oldPv - degats);
-                cibleData.PV_Actuels = newPv;
-                await updateDoc(refPerso, { PV_Actuels: newPv });
-            }
-        } catch (e) {
-            console.error("Erreur attaque d'opportunité :", e);
-        }
-    }
-
-    return { idAttaquant, idCible, dodged, motDef, degats, viaBouclier };
-};
-
-// Rejoue le résultat déjà tranché (par resoudreAttaqueOpportunite) chez CHAQUE joueur connecté,
-// y compris celui qui a déplacé le pion. Ne relance jamais le dé et n'écrit rien : uniquement
-// de l'affichage. Appelée directement (et attendue) DEPUIS jouerAnimationMouvement, à l'étape du
-// trajet où l'attaque a lieu : data.hexPosition (la case du trajet à ce moment-là, pas forcément
-// la position finale) doit être fournie pour que le message apparaisse au bon endroit.
+// GRANDE SUPPRESSION : window.resoudreAttaqueOpportunite (le jet et les dégâts fixes, tranchés
+// et écrits ici par le poste qui déplace le pion) a disparu — c'est resoudreOpportunite
+// (mouvement_pur.js) qui tranche maintenant l'attaque, dans le cerveau, avec ses propres dés.
+// jouerAnimationOpportunite reste : elle ne fait qu'AFFICHER un résultat déjà tranché, que ce
+// résultat vienne d'ici (mort) ou du cerveau (vivant) — regime_cerveau.js et jouerAnimationPas
+// (mouvement.js) l'appellent encore pour ça.
 window.jouerAnimationOpportunite = async function(data) {
     if (!data || !data.idCible) return;
     const tkCible = data.hexPosition || (window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[data.idCible] : null);
@@ -510,27 +257,10 @@ window.jouerAnimationOpportunite = async function(data) {
     }
 };
 
-// Retourne la liste des idPersonnage adverses (camp opposé, vivants) au contact (distance 1)
-// d'un pion place en (q,r). Utilisée par mouvement.js pour comparer avant/après un déplacement.
-window.listerEnnemisAuContact = function(idPersonnage, hexPosition) {
-    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
-    if (!perso || !hexPosition) return [];
-
-    const resultat = [];
-    for (let idAutre in (window.TOKENS_VTT_DATA || {})) {
-        if (idAutre === idPersonnage) continue;
-        const autre = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idAutre);
-        if (!autre || autre.statut === "Mort" || autre.camp === perso.camp) continue;
-        // UNE ILLUSION NE FRAPPE PAS. Elle occupe une case et détourne les
-        // coups, c'est tout son intérêt — mais elle n'a pas d'arme, et une
-        // image qui porte une attaque d'opportunité en passant, ça n'existe pas.
-        if (autre.estIllusion) continue;
-        if (getHexDistance(hexPosition, window.TOKENS_VTT_DATA[idAutre]) === 1) {
-            resultat.push(idAutre);
-        }
-    }
-    return resultat;
-};
+// GRANDE SUPPRESSION : window.listerEnnemisAuContact ne servait qu'à l'ancien
+// validerMouvement (mouvement.js) pour repérer, pas à pas, quel ennemi quitte le
+// corps-à-corps. Le cerveau tranche maintenant les opportunités lui-même
+// (resoudreOpportunite, mouvement_pur.js) à partir de son propre état.
 
 function verifierLigneDeVue(hexA, hexB) {
     if (!window.PLATEAU_VTT) return true;
@@ -758,30 +488,11 @@ window.resoudreBondInteractif = function(idPerso, portee) {
                 return resolve(true);
             }
 
-            // Atterrir dans une zone persistante la déclenche, exactement comme y entrer à pied.
-            let zonesBond = null;
-            if (typeof window.resoudreZonesPersistantesSurCase === "function") {
-                zonesBond = await window.resoudreZonesPersistantesSurCase(idPerso, hexArrivee);
-            }
-
-            window.TOKENS_VTT_DATA[idPerso].q = hexArrivee.q;
-            window.TOKENS_VTT_DATA[idPerso].r = hexArrivee.r;
-
-            const actionBond = { idToken: idPerso, depart: hexDepart, arrivee: hexArrivee, zones: zonesBond, timestamp: Date.now() };
-            try {
-                await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), { Action_Bond: actionBond });
-                if (typeof window.consignerEtapeTour === "function") await window.consignerEtapeTour("bond", actionBond);
-                await window.enregistrerPionsVTT(idPerso);
-            } catch (err) {
-                console.error("Erreur Bond :", err);
-            }
-
-            // On attend la durée de l'animation locale du saut (voir jouerAnimationBond) avant de
-            // rendre la main : sinon la suite de la carte (ex. ciblage d'une attaque) construit son
-            // affichage AVANT le rafraîchissement complet des pions qui clôt l'animation, et se fait
-            // aussitôt effacer par lui.
-            await new Promise(r => setTimeout(r, 750));
-            resolve(true);
+            // Il n'existe plus d'autre chemin : voir declencherResolution plus bas pour
+            // l'explication complète (même situation, même traitement).
+            console.error("Bond indisponible : active le régime cerveau.");
+            alert("Ce combat ne peut plus se jouer sans le régime cerveau (mode développeur → Régime cerveau).");
+            resolve(false);
         };
 
         window.addEventListener("click", onClick, { capture: true });
@@ -965,307 +676,17 @@ window.detruireIllusion = async function(idIllusion) {
     if (typeof window.afficherPisteInitiative === "function") window.afficherPisteInitiative();
 };
 
-// =========================================================================
-//  POUSSÉE
-//  Déplacement forcé de 2 cases en ligne droite depuis le lanceur, à travers la cible.
-//  La chance est extraite dans demarrerCiblage ; le jet lui-même est fait UNE SEULE FOIS,
-//  par le lanceur uniquement (voir l'appel dans jouerAnimationMoteur), puis diffusé via
-//  Action_Poussee (même principe que le Bond) pour que tous les joueurs voient le même
-//  résultat plutôt que de rejouer chacun leur propre jet. Bloquée par un mur, une case
-//  supprimée ou une case occupée : la poussée s'arrête alors à la dernière case libre (1
-//  case), ou ne bouge pas du tout si la première l'est déjà. Ne déclenche jamais d'attaque
-//  d'opportunité (déplacement subi, pas un mouvement volontaire du joueur).
-// =========================================================================
-window.declencherPousseeCible = async function(idLanceur, idCible) {
-    const tkLanceur = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idLanceur] : null;
-    const tkCible = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idCible] : null;
-    if (!tkLanceur || !tkCible || !window.PLATEAU_VTT || !window.ID_PARTIE_COURANTE) return;
-
-    const dist = getHexDistance(tkLanceur, tkCible);
-    if (dist === 0) return;
-
-    const lerp = (a, b, t) => a + (b - a) * t;
-    const cubeRound = (q, r, s) => {
-        let rq = Math.round(q), rr = Math.round(r), rs = Math.round(s);
-        let qd = Math.abs(rq - q), rd = Math.abs(rr - r), sd = Math.abs(rs - s);
-        if (qd > rd && qd > sd) rq = -rr - rs;
-        else if (rd > sd) rr = -rq - rs;
-        return { q: rq, r: rr };
-    };
-    const aCube = { q: tkLanceur.q + 1e-6, r: tkLanceur.r + 1e-6, s: -tkLanceur.q - tkLanceur.r - 2e-6 };
-    const bCube = { q: tkCible.q + 1e-6, r: tkCible.r + 1e-6, s: -tkCible.q - tkCible.r - 2e-6 };
-
-    // Bloquée par un mur, une case supprimée, OU une case occupée (règle demandée pour la
-    // Poussée : contrairement au Bond, on ne survole pas les personnages ni les cases rouges).
-    const estLibre = (q, r) => {
-        const state = window.PLATEAU_VTT.getCaseState(q, r);
-        if (state.isBlocked || state.isDeleted) return false;
-        for (let idAutre in window.TOKENS_VTT_DATA) {
-            if (idAutre === idCible) continue;
-            const autre = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idAutre);
-            if (!autre || autre.statut === "Mort") continue;
-            const tkAutre = window.TOKENS_VTT_DATA[idAutre];
-            if (tkAutre.q === q && tkAutre.r === r) return false;
-        }
-        return true;
-    };
-
-    const hexDepart = { q: tkCible.q, r: tkCible.r };
-    let arrivee = null;
-    for (let i = 1; i <= 2; i++) {
-        const t = (dist + i) / dist;
-        const pt = cubeRound(lerp(aCube.q, bCube.q, t), lerp(aCube.r, bCube.r, t), lerp(aCube.s, bCube.s, t));
-        if (!estLibre(pt.q, pt.r)) break;
-        arrivee = pt;
-    }
-
-    if (!arrivee) {
-        if (typeof window.afficherMessageFlottantHex === "function") {
-            window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Poussée (bloquée)", "#aaaaaa");
-        }
-        return;
-    }
-
-    let zonesPoussee = null;
-    if (typeof window.resoudreZonesPersistantesSurCase === "function") {
-        zonesPoussee = await window.resoudreZonesPersistantesSurCase(idCible, arrivee);
-    }
-
-    window.TOKENS_VTT_DATA[idCible].q = arrivee.q;
-    window.TOKENS_VTT_DATA[idCible].r = arrivee.r;
-
-    const actionPoussee = { idToken: idCible, depart: hexDepart, arrivee: arrivee, zones: zonesPoussee, timestamp: Date.now() };
-    try {
-        await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), { Action_Poussee: actionPoussee });
-        if (typeof window.consignerEtapeTour === "function") await window.consignerEtapeTour("poussee", actionPoussee);
-        await window.enregistrerPionsVTT(idCible);
-    } catch (err) {
-        console.error("Erreur Poussée :", err);
-    }
-};
-
-// =========================================================================
-//  TRACTION
-//  L'inverse de la Poussée : tire la cible vers le lanceur, jusqu'à 3 cases, sans jamais
-//  atterrir sur sa propre case (elle s'arrête au plus près à 1 case du lanceur). Même règles
-//  de blocage (mur, case supprimée, case occupée), même diffusion pour que tous les joueurs
-//  voient le même résultat, et même animation que la Poussée (voir jouerAnimationPoussee dans
-//  mouvement.js — la trajectoire suffit à donner l'impression inverse). La portée de ciblage
-//  (3 cases, ligne de vue) et le fait que Traction partage sa cible avec une éventuelle attaque
-//  sont gérés en amont dans demarrerCiblage/ajouterCibleCiblage.
-// =========================================================================
-window.declencherTractionCible = async function(idLanceur, idCible) {
-    const tkLanceur = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idLanceur] : null;
-    const tkCible = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idCible] : null;
-    if (!tkLanceur || !tkCible || !window.PLATEAU_VTT || !window.ID_PARTIE_COURANTE) return;
-
-    const dist = getHexDistance(tkLanceur, tkCible);
-    if (dist <= 1) return; // Déjà au contact : rien à tirer
-
-    const lerp = (a, b, t) => a + (b - a) * t;
-    const cubeRound = (q, r, s) => {
-        let rq = Math.round(q), rr = Math.round(r), rs = Math.round(s);
-        let qd = Math.abs(rq - q), rd = Math.abs(rr - r), sd = Math.abs(rs - s);
-        if (qd > rd && qd > sd) rq = -rr - rs;
-        else if (rd > sd) rr = -rq - rs;
-        return { q: rq, r: rr };
-    };
-    // On part de la cible et on avance vers le lanceur (sens inverse de la Poussée).
-    const aCube = { q: tkCible.q + 1e-6, r: tkCible.r + 1e-6, s: -tkCible.q - tkCible.r - 2e-6 };
-    const bCube = { q: tkLanceur.q + 1e-6, r: tkLanceur.r + 1e-6, s: -tkLanceur.q - tkLanceur.r - 2e-6 };
-
-    const estLibre = (q, r) => {
-        const state = window.PLATEAU_VTT.getCaseState(q, r);
-        if (state.isBlocked || state.isDeleted) return false;
-        for (let idAutre in window.TOKENS_VTT_DATA) {
-            if (idAutre === idCible) continue;
-            const autre = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idAutre);
-            if (!autre || autre.statut === "Mort") continue;
-            const tkAutre = window.TOKENS_VTT_DATA[idAutre];
-            if (tkAutre.q === q && tkAutre.r === r) return false;
-        }
-        return true;
-    };
-
-    const hexDepart = { q: tkCible.q, r: tkCible.r };
-    const maxPas = Math.min(3, dist - 1); // Ne jamais atterrir sur la case du lanceur
-    let arrivee = null;
-    for (let i = 1; i <= maxPas; i++) {
-        const t = i / dist;
-        const pt = cubeRound(lerp(aCube.q, bCube.q, t), lerp(aCube.r, bCube.r, t), lerp(aCube.s, bCube.s, t));
-        if (!estLibre(pt.q, pt.r)) break;
-        arrivee = pt;
-    }
-
-    if (!arrivee) {
-        if (typeof window.afficherMessageFlottantHex === "function") {
-            window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Traction (bloquée)", "#aaaaaa");
-        }
-        return;
-    }
-
-    let zonesTraction = null;
-    if (typeof window.resoudreZonesPersistantesSurCase === "function") {
-        zonesTraction = await window.resoudreZonesPersistantesSurCase(idCible, arrivee);
-    }
-
-    window.TOKENS_VTT_DATA[idCible].q = arrivee.q;
-    window.TOKENS_VTT_DATA[idCible].r = arrivee.r;
-
-    const actionTraction = { idToken: idCible, depart: hexDepart, arrivee: arrivee, zones: zonesTraction, timestamp: Date.now() };
-    try {
-        await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
-            Action_Traction: actionTraction
-        });
-        if (typeof window.consignerEtapeTour === "function") await window.consignerEtapeTour("traction", actionTraction);
-        await window.enregistrerPionsVTT(idCible);
-    } catch (err) {
-        console.error("Erreur Traction :", err);
-    }
-};
-
-// Diffuse un simple message d'échec (ni déplacement ni animation) quand le jet de Poussée/Traction
-// rate, pour que tous les joueurs comprennent que rien ne s'est passé volontairement, et non par bug.
-// Réutilise le même champ que le déplacement réussi : jouerAnimationPoussee sait afficher les deux.
-window.diffuserEchecDeplacementForce = async function(champFirestore, idCible, nomEffet) {
-    if (!window.ID_PARTIE_COURANTE) return;
-    try {
-        await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
-            [champFirestore]: { idToken: idCible, echec: true, nomEffet, timestamp: Date.now() }
-        });
-    } catch (err) {
-        console.error(`Erreur diffusion échec ${nomEffet} :`, err);
-    }
-};
-
-// =========================================================================
-//  PEUR
-//  Fait fuir la cible sur 4 cases : à chaque case, on ne garde que les directions qui
-//  l'éloignent VRAIMENT du lanceur (jamais une ligne droite imposée comme la Poussée), et on en
-//  tire une au hasard parmi elles. Mêmes règles de blocage que Poussée/Traction (mur, case
-//  supprimée, case occupée) : si toutes les directions valides sont bloquées, la fuite s'arrête
-//  net (avant les 4 cases). Déclenche une attaque d'opportunité par ennemi quitté en chemin,
-//  SAUF celle du lanceur (c'est lui qui fait peur, il n'en profite pas d'un coup en plus) — même
-//  mécanique de résolution que pour un déplacement normal (une seule fois, par le lanceur,
-//  embarquée dans la diffusion pour que tous les joueurs voient le même résultat). Contrairement
-//  à Poussée/Traction, ce déplacement forcé coûte de la fatigue à la cible (coût de base d'un
-//  déplacement normal, 2 par case), comme une vraie fuite panique l'épuiserait.
-// =========================================================================
-window.declencherPeurCible = async function(idLanceur, idCible) {
-    const tkLanceur = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idLanceur] : null;
-    const tkCibleDepart = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idCible] : null;
-    if (!tkLanceur || !tkCibleDepart || !window.PLATEAU_VTT || !window.ID_PARTIE_COURANTE) return;
-
-    const DIRECTIONS_HEX = [
-        { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
-        { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 }
-    ];
-
-    const estLibre = (q, r) => {
-        const state = window.PLATEAU_VTT.getCaseState(q, r);
-        if (state.isBlocked || state.isDeleted) return false;
-        for (let idAutre in window.TOKENS_VTT_DATA) {
-            if (idAutre === idCible) continue;
-            const autre = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idAutre);
-            if (!autre || autre.statut === "Mort") continue;
-            const tkAutre = window.TOKENS_VTT_DATA[idAutre];
-            if (tkAutre.q === q && tkAutre.r === r) return false;
-        }
-        return true;
-    };
-
-    const chemin = [];
-    const dejaVisite = new Set([`${tkCibleDepart.q},${tkCibleDepart.r}`]);
-    let hexActuel = { q: tkCibleDepart.q, r: tkCibleDepart.r };
-    for (let i = 0; i < 4; i++) {
-        const distActuelle = getHexDistance(tkLanceur, hexActuel);
-        const voisinsLibres = DIRECTIONS_HEX
-            .map(d => ({ q: hexActuel.q + d.q, r: hexActuel.r + d.r }))
-            .filter(c => estLibre(c.q, c.r) && !dejaVisite.has(`${c.q},${c.r}`));
-
-        // On préfère les cases qui éloignent vraiment du lanceur ; si elles sont toutes
-        // bloquées (mur, case supprimée, occupée), on cherche un autre chemin plutôt que de
-        // s'arrêter net contre l'obstacle — la seule contrainte est de ne jamais repasser sur
-        // une case déjà prise pendant cette fuite.
-        let candidats = voisinsLibres.filter(c => getHexDistance(tkLanceur, c) > distActuelle);
-        if (candidats.length === 0) candidats = voisinsLibres;
-
-        if (candidats.length === 0) break; // Vraiment coincée : plus aucune case libre inexplorée
-
-        hexActuel = candidats[Math.floor(Math.random() * candidats.length)];
-        dejaVisite.add(`${hexActuel.q},${hexActuel.r}`);
-        chemin.push({ q: hexActuel.q, r: hexActuel.r });
-    }
-
-    if (chemin.length === 0) {
-        if (typeof window.afficherMessageFlottantHex === "function") {
-            window.afficherMessageFlottantHex(tkCibleDepart.q, tkCibleDepart.r, "Peur (bloquée)", "#aaaaaa");
-        }
-        return;
-    }
-
-    // Attaques d'opportunité déclenchées en fuyant, case par case (même principe que pour un
-    // déplacement volontaire), sauf de la part du lanceur lui-même.
-    let contactPrecedent = new Set(
-        (typeof window.listerEnnemisAuContact === "function"
-            ? window.listerEnnemisAuContact(idCible, tkCibleDepart)
-            : []
-        ).filter(id => id !== idLanceur)
-    );
-    const opportunitesResolues = [];
-    for (let i = 0; i < chemin.length; i++) {
-        const contactActuel = new Set(
-            (typeof window.listerEnnemisAuContact === "function"
-                ? window.listerEnnemisAuContact(idCible, chemin[i])
-                : []
-            ).filter(id => id !== idLanceur)
-        );
-        for (const idEnnemi of contactPrecedent) {
-            if (!contactActuel.has(idEnnemi) && typeof window.resoudreAttaqueOpportunite === "function") {
-                const resultat = await window.resoudreAttaqueOpportunite(idEnnemi, idCible);
-                if (resultat) opportunitesResolues.push({ apresEtape: i, ...resultat });
-            }
-        }
-        contactPrecedent = contactActuel;
-    }
-
-    // Une fuite paniquée traverse les zones persistantes comme n'importe quel déplacement.
-    const zonesResoluesPeur = [];
-    if (typeof window.resoudreZonesPersistantesSurCase === "function") {
-        for (let i = 0; i < chemin.length; i++) {
-            const resZone = await window.resoudreZonesPersistantesSurCase(idCible, chemin[i]);
-            if (resZone) zonesResoluesPeur.push({ apresEtape: i, resultats: resZone });
-        }
-    }
-
-    // La fuite coûte de la fatigue à la cible, comme un déplacement normal (coût de base : 2/case).
-    const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idCible);
-    if (cibleData) {
-        const fatigueMax = window.fatigueMaxCombattant(cibleData);
-        const fatigueActuelle = cibleData.fatigueActuelle !== undefined ? parseInt(cibleData.fatigueActuelle) : fatigueMax;
-        const nouvelleFatigue = Math.max(0, fatigueActuelle - chemin.length * 2);
-        cibleData.fatigueActuelle = nouvelleFatigue;
-        try {
-            await updateDoc(window.refCombattant(idCible), { Fatigue_Actuelle: nouvelleFatigue });
-        } catch (err) {
-            console.error("Erreur fatigue Peur :", err);
-        }
-    }
-
-    window.TOKENS_VTT_DATA[idCible].q = hexActuel.q;
-    window.TOKENS_VTT_DATA[idCible].r = hexActuel.r;
-
-    const actionPeur = { idToken: idCible, path: chemin, opportunites: opportunitesResolues, zones: zonesResoluesPeur, timestamp: Date.now() };
-    try {
-        await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
-            Action_Peur: actionPeur
-        });
-        if (typeof window.consignerEtapeTour === "function") await window.consignerEtapeTour("peur", actionPeur);
-        await window.enregistrerPionsVTT(idCible);
-    } catch (err) {
-        console.error("Erreur Peur :", err);
-    }
-};
+// GRANDE SUPPRESSION : window.declencherPousseeCible, window.declencherTractionCible,
+// window.diffuserEchecDeplacementForce et window.declencherPeurCible n'existent plus.
+// C'étaient les déplacements forcés de l'ancien moteur — calculés en local par le
+// lanceur, écrits dans Action_Poussee/Action_Traction/Action_Peur, puis rejoués par
+// jouerAnimationPoussee/jouerAnimationPeur (mouvement.js) chez chacun. Le cerveau les
+// calcule maintenant lui-même, une fois pour tout le monde (destinationTraction et
+// resoudreCarte pour la Poussée/Traction, resoudrePeur pour la Peur — moteur_pur.js /
+// mouvement_pur.js), et les diffuse comme des étapes de son journal — plus aucun
+// Action_Poussee/Action_Traction/Action_Peur n'est écrit. jouerAnimationPoussee et
+// jouerAnimationPeur restent, elles : ce sont des fonctions d'AFFICHAGE, réutilisées
+// par le pont du cerveau (pont_combat.js / regime_cerveau.js) pour montrer le résultat.
 
 function rotateHex(hex, steps) {
     let q = hex.q, r = hex.r;

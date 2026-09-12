@@ -229,6 +229,25 @@ console.log("\n8. LA NAISSANCE D'UNE ZONE, DANS L'ÉTAT");
     verifier("une carte sans dégât, sans soin ni état ne pose rien", rien === null);
     verifier("et sans case visée non plus",
              creerZonePure(etat, action, [], "LANCEUR") === null);
+
+    // Une carte de SOIN laisse aussi sa nappe (repris de
+    // zone_persistante_soin.mjs, grande suppression de l'ancien moteur) : le
+    // remous testé en section 5 ne tombe pas du ciel, il naît d'ici.
+    const carteDeSoin = { attaques: [{ isHeal: true, isShield: false, valeurBrute: 20, cibles: ["MARCHEUR"] }],
+                          alterations: [] };
+    const zoneSoin = creerZonePure(etat, carteDeSoin, [{ q: 2, r: 3 }], "LANCEUR");
+    verifier("une zone de soin se crée aussi (avant : les soins étaient exclus)", !!zoneSoin);
+    verifier("elle est de type « soin » (verte)", zoneSoin && zoneSoin.type === "soin");
+    verifier("elle porte le montant de soin de la carte",
+             zoneSoin && zoneSoin.soin && zoneSoin.soin.valeurBrute === 20);
+    verifier("elle ne porte aucun dégât", zoneSoin && zoneSoin.degats === null);
+
+    // Un bouclier seul (isShield, valeurBrute non nulle) ne laisse rien non
+    // plus : ce n'est ni un dégât, ni un soin, au sens de la zone.
+    const carteBouclier = { attaques: [{ isHeal: false, isShield: true, valeurBrute: 15, cibles: ["MARCHEUR"] }],
+                            alterations: [] };
+    verifier("un bouclier seul ne crée pas de zone fantôme",
+             creerZonePure(etat, carteBouclier, [{ q: 1, r: 1 }], "LANCEUR") === null);
 }
 
 // =========================================================================

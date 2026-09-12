@@ -173,31 +173,12 @@ console.log("\n5. LE VARGEN : DÉPLACEMENT ET DÉROBADE");
   verifier("huit cases coûtent 30 ⚡ à tout le monde", humain.total === 30, `(${humain.total})`);
   verifier("le Vargen les paie moitié prix", vargen.total === 15, `(${vargen.total})`);
   verifier("aucune case n'est gratuite", vargen.couts.every(c => c >= 1), `(${vargen.couts.join(",")})`);
-
-  // La dérobade : 30 % avant même le jet de défense.
-  const opportunite = async (race, de) => {
-    const p = poste({ des: [de, 0.99] });
-    // Esquive et parade à zéro : seule la dérobade peut encore sauver le fuyard,
-    // sinon le jet de défense ordinaire brouillerait la mesure.
-    const fuyard = combattant(race, { idPersonnage: "J1", camp: "Allié", PV_Actuels: 100,
-                                      Esquive: 0, Parade: 0 });
-    p.w.PERSOS_PARTIE = [combattant("Ophior", { idPersonnage: "M1", camp: "Ennemi" }), fuyard];
-    p.w.TOKENS_VTT_DATA = { M1: { q: 0, r: 0 }, J1: { q: 1, r: 0 } };
-    const res = await p.w.resoudreAttaqueOpportunite("M1", "J1");
-    p.rendreLeHasard();
-    return { res, pv: fuyard.PV_Actuels };
-  };
-  const vargenChanceux = await opportunite("Vargen", 0.10);   // dé à 11 : sous 30 %
-  const vargenMalchanceux = await opportunite("Vargen", 0.50); // dé à 51 : au-dessus
-  const humainOpp = await opportunite("Humain", 0.10);
-  console.log(`     Vargen (dé 11) : ${vargenChanceux.res.motDef}, ${vargenChanceux.pv} PV`);
-  console.log(`     Vargen (dé 51) : ${vargenMalchanceux.res.motDef || "touché"}, ${vargenMalchanceux.pv} PV`);
-  verifier("le Vargen se dérobe une fois sur trois", vargenChanceux.res.dodged
-           && vargenChanceux.res.motDef === "Dérobade 🐾" && vargenChanceux.pv === 100);
-  verifier("sinon il encaisse comme les autres", vargenMalchanceux.pv === 90,
-           `(${vargenMalchanceux.pv} PV)`);
-  verifier("un autre peuple n'a pas de dérobade", humainOpp.pv === 90, `(${humainOpp.pv} PV)`);
 }
+
+// La dérobade du Vargen (30 % avant le jet de défense, vérifiée via l'ancien
+// window.resoudreAttaqueOpportunite) est partie à la grande suppression de
+// l'ancien moteur, remplacée par atouts_races_cerveau.mjs section 4 —
+// resoudreOpportunite (mouvement_pur.js), même table ATOUTS_RACES réelle.
 
 // ------------------------------------------------------------------
 console.log("\n6. L'ONDARI : LA PORTÉE DE SES SORTS");

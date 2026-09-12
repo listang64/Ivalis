@@ -11,6 +11,7 @@ import fs from 'fs';
 import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 import { construireEtatCombat, clonerEtat } from '../combat_etat.js';
 import { resoudreCarte } from '../moteur_pur.js';
+import { resoudreOpportunite, DEGATS_OPPORTUNITE } from '../mouvement_pur.js';
 
 const w = {};
 new Function('window', SRC_STATS_COMMUNES)(w);
@@ -104,6 +105,32 @@ console.log("\n3. LES SOINS REÇUS");
     console.log(`     soin de 20 : +${humain} pour un Humain, +${ethere} pour un Éthéré`);
     verifier("un soin ordinaire rend sa valeur", humain === 20, `(+${humain})`);
     verifier("l'Éthéré reçoit 30 % de plus", ethere === 26, `(+${ethere})`);
+}
+
+// =========================================================================
+console.log("\n4. LE VARGEN SE DÉROBE À UNE ATTAQUE D'OPPORTUNITÉ");
+// =========================================================================
+//  Repris d'atouts_races.mjs section 5 (la moitié « dérobade », qui passait
+//  par l'ancien window.resoudreAttaqueOpportunite) : même épreuve, mais
+//  tranchée par resoudreOpportunite (mouvement_pur.js) avec la VRAIE table
+//  ATOUTS_RACES injectée comme `regles`. La moitié « coût de déplacement »
+//  de cette section ne touchait pas l'ancien moteur et reste dans
+//  atouts_races.mjs.
+{
+    const desFixe = (suite) => { const f = [...suite]; return { d100: () => f.length ? f.shift() : 99 }; };
+
+    const chanceux = resoudreOpportunite(etatAvec("Vargen"), "LANCEUR", "CIBLE", desFixe([11]));
+    verifier("le Vargen se dérobe une fois sur trois",
+             chanceux.evitee && chanceux.mot === "Dérobade 🐾" && chanceux.montant === 0,
+             JSON.stringify(chanceux));
+
+    const malchanceux = resoudreOpportunite(etatAvec("Vargen"), "LANCEUR", "CIBLE", desFixe([51, 99]));
+    verifier("sinon il encaisse comme les autres",
+             !malchanceux.evitee && malchanceux.montant === DEGATS_OPPORTUNITE, JSON.stringify(malchanceux));
+
+    const humain = resoudreOpportunite(etatAvec("Humain"), "LANCEUR", "CIBLE", desFixe([99]));
+    verifier("un autre peuple n'a pas de dérobade",
+             !humain.evitee && humain.montant === DEGATS_OPPORTUNITE, JSON.stringify(humain));
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
