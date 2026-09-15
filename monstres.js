@@ -858,9 +858,22 @@ window.entrerRenfortMonstre = async function() {
     const reserve = await window.lireReserveMonstres();
     if (reserve.length === 0) return null;
 
-    const vivants = (window.MONSTRES_PARTIE || []).filter(m =>
-        m.statut !== "Mort" && (parseInt(m.PV_Actuels) || 0) > 0
-    ).length;
+    // COMBIEN DE CRÉATURES TIENNENT ENCORE DEBOUT ? La question paraît simple,
+    // et elle a pourtant failli rendre la réserve inutilisable.
+    //
+    // On comptait sur `MONSTRES_PARTIE`, qui vient tout droit des documents
+    // Monstres. Or ces documents ne reçoivent plus une seule écriture de points
+    // de vie depuis que le combat vit dans l'état du cerveau : tous les
+    // monstres y sont éternellement au maximum, donc tous vivants, donc le
+    // terrain paraissait toujours plein et aucun renfort n'entrait jamais.
+    //
+    // `estCombattantMort` lit PERSOS_PARTIE, où les chiffres du cerveau sont
+    // reversés (fusionnerFichesCombat) : c'est la seule réponse du jeu à la
+    // question « celui-là est-il à terre ? », et c'est celle qu'on prend.
+    const aTerre = typeof window.estCombattantMort === "function"
+        ? (m) => window.estCombattantMort(m.idPersonnage)
+        : (m) => m.statut === "Mort" || (parseInt(m.PV_Actuels) || 0) <= 0;
+    const vivants = (window.MONSTRES_PARTIE || []).filter(m => !aTerre(m)).length;
     if (vivants >= limiteMonstresTerrain()) return null;
 
     const renfort = reserve.shift();

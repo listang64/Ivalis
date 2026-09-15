@@ -214,5 +214,53 @@ console.log("\n5. UN JOUEUR MIS DE CÔTÉ RÉDUIT LA LIMITE DU TERRAIN");
            surTerrainRetabli === 3, `(${surTerrainRetabli})`);
 }
 
+// --- Le décompte des places libres sous le régime cerveau -------------------
+// LE PIÈGE : « combien de créatures tiennent encore debout ? » se lisait dans
+// MONSTRES_PARTIE, c'est-à-dire dans les documents Monstres. Or ces documents ne
+// reçoivent plus une seule écriture de points de vie depuis que le combat vit
+// dans l'état du cerveau : tout le monde y est éternellement au maximum, donc
+// vivant, donc le terrain paraît toujours plein et LA RÉSERVE NE SE VIDE PLUS
+// JAMAIS. La réponse doit venir de `estCombattantMort`, qui lit PERSOS_PARTIE —
+// là où les chiffres du cerveau sont reversés.
+console.log("\n6. LE TERRAIN SE COMPTE AVEC LES CHIFFRES DU CERVEAU, PAS CEUX DES DOCUMENTS");
+{
+  base.Monstres = {};
+  base.Combat_VTT.P1.Tokens = {};
+  base.Systeme_Parties.P1.Reserve_Monstres = [];
+  base.Systeme_Parties.P1.Ordre_Initiative = ["J1", "J2"];
+  w.MONSTRES_PARTIE = [];
+  w.CACHE_COMPETENCES_GLOBAL = {};
+  w.PERSOS_JOUEURS_PARTIE = [
+    { idPersonnage: "J1", camp: "Allié", actif: true },
+    { idPersonnage: "J2", camp: "Allié", actif: true }
+  ];
+
+  await w.genererRencontreMonstres("Normale");
+  await new Promise(r => setTimeout(r, 20));
+  synchroniser();
+  const reserveAvant = base.Systeme_Parties.P1.Reserve_Monstres.length;
+  verifier("il reste un renfort en réserve pour que ce test veuille dire quelque chose",
+           reserveAvant > 0, `(${reserveAvant})`);
+
+  // Une créature tombe DANS LE CERVEAU SEULEMENT : son document reste intact,
+  // exactement comme en vraie partie.
+  const tombe = Object.keys(base.Monstres)[0];
+  verifier("son document la montre toujours vivante et au maximum",
+           base.Monstres[tombe].Statut !== "Mort" && base.Monstres[tombe].PV_Actuels > 0,
+           `(${base.Monstres[tombe].PV_Actuels} pv, statut ${base.Monstres[tombe].Statut})`);
+
+  // La seule chose qui change : ce que le jeu répond à « est-il à terre ? ».
+  const vraiEstMort = w.estCombattantMort;
+  w.estCombattantMort = (id) => id === tombe;
+  try {
+    await w.entrerRenfortMonstre();
+    synchroniser();
+  } finally { w.estCombattantMort = vraiEstMort; }
+
+  verifier("UNE PLACE EST VUE COMME LIBRE : le renfort entre",
+           base.Systeme_Parties.P1.Reserve_Monstres.length === reserveAvant - 1,
+           `(réserve ${reserveAvant} → ${base.Systeme_Parties.P1.Reserve_Monstres.length})`);
+}
+
 console.log(`\n${echecs === 0 ? "TOUS LES CONTRÔLES PASSENT" : echecs + " CONTRÔLE(S) EN ÉCHEC"}`);
 process.exit(echecs === 0 ? 0 : 1);

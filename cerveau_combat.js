@@ -519,6 +519,45 @@ export function ouvrirManche(etat, file, des) {
     return fabriquerPas(etat, suivant, etapes, `manche|${suivant.manche}`, null, des);
 }
 
+// =========================================================================
+//  UN RENFORT ENTRE EN SCÈNE
+// =========================================================================
+//  Le cerveau arrête sa liste de combattants à l'OUVERTURE du combat. Tant
+//  qu'aucune créature ne mourait, ça ne se voyait pas. Mais la réserve envoie
+//  un remplaçant dès qu'une place se libère : ce nouveau venu recevait bien un
+//  document, un pion et une ligne dans l'ordre d'initiative — et n'existait
+//  chez le cerveau nulle part. `ouvrirManche` l'écartait donc de la file
+//  (combattant() rend `undefined`), et il restait planté sur le plateau, joli
+//  et inutile, jusqu'à la fin de la rencontre.
+//
+//  C'est mot pour mot ce qui était arrivé au leurre de l'Illusion, et la
+//  réponse est la même : une étape « arrivee », qui le fait entrer dans l'état
+//  comme n'importe quel autre changement — par le journal, donc à l'identique
+//  sur les trois écrans.
+//
+//  Différence avec le leurre : lui, c'est une créature entière. Elle entre
+//  DANS L'ORDRE D'INITIATIVE, parce que ce sera son tour.
+export function accueillirCombattant(etat, venu, des) {
+    if (!etat || !venu || !venu.id) return null;
+    if (combattant(etat, venu.id)) return null;          // déjà là : rien à faire
+    // Sans case, il n'est pas sur le plateau. On ne le fait pas entrer : un
+    // combattant sans position est exactement le pion fantôme qu'on passe son
+    // temps à chasser.
+    if (venu.q === null || venu.q === undefined || venu.r === null || venu.r === undefined) return null;
+    if (occupantVivant(etat, venu.q, venu.r, venu.id)) return null;
+
+    const suivant = clonerEtat(etat);
+    const copie = JSON.parse(JSON.stringify(venu));
+    suivant.combattants[copie.id] = copie;
+    const ordre = [...(suivant.ordre || [])];
+    if (!ordre.includes(copie.id)) ordre.push(copie.id);
+    suivant.ordre = ordre;
+
+    return fabriquerPas(etat, suivant,
+        [{ type: "arrivee", combattant: copie, ordre }],
+        `arrivee|${copie.id}`, null, des);
+}
+
 export function avancerFile(etat, des) {
     const suivant = clonerEtat(etat);
     // LE REPOS LONG SE PAIE ICI, au moment où le tour se ferme. Il n'existait

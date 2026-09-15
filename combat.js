@@ -179,9 +179,23 @@ window.avecCarteJouee = function(data, idPersonnage) {
 //     après le dernier monstre, et personne ne pouvait jouer son tour.
 //     Pendant une réinitialisation, cette fonction ne juge donc personne.
 //
+//  4. LE CERVEAU A LE DERNIER MOT, quand il parle. `idsATerre` porte les
+//     combattants que l'ÉTAT DU COMBAT déclare tombés, et ceux-là entrent sans
+//     autre examen : c'est la vérité partagée, la même sur les trois écrans.
+//
+//     Ce n'est pas un raffinement, c'est ce qui manquait. Cette fonction ne
+//     s'appelait plus que depuis `recomposerCombattants`, réveillée par une
+//     notification des documents Personnages/Monstres — documents qui ne
+//     reçoivent plus une écriture de points de vie depuis que le combat vit
+//     dans l'état du cerveau. Personne ne constatait donc plus une chute, la
+//     liste restait vide, et `toutLeMondeAJoue` attendait éternellement la
+//     carte d'un mort : le combat se figeait en préparation dès la première
+//     créature tuée. Le cerveau appelle maintenant ici (voir `rafraichir`,
+//     regime_cerveau.js) avec ce qu'il voit, et ce qu'il voit fait foi.
+//
 //  Trois postes qui constatent la même chute écrivent la même liste : la
 //  deuxième écriture ne voit plus de différence et n'a pas lieu.
-window.synchroniserCombattantsHorsJeu = async function() {
+window.synchroniserCombattantsHorsJeu = async function(idsATerre) {
     if (!window.ID_PARTIE_COURANTE) return false;
     // Le combat est en train d'être remis à zéro : les fiches traversent un
     // instant où elles valent zéro point de vie sans que personne ne soit tombé.
@@ -199,6 +213,14 @@ window.synchroniserCombattantsHorsJeu = async function() {
     ordre.forEach(id => {
         if (!connus.has(id)) return;              // pas encore chargé : on ne juge pas
         if (window.estCombattantMort(id) && !voulue.has(id)) { voulue.add(id); change = true; }
+    });
+
+    // Ceux que le cerveau déclare à terre : pas de filtre « est-il chargé
+    // ici ? », la question ne se pose pas. L'état du combat est la même chose
+    // pour tout le monde.
+    (idsATerre || []).forEach(id => {
+        if (!id || voulue.has(id) || !ordre.includes(id)) return;
+        voulue.add(id); change = true;
     });
 
     // Seul retrait admis : un combattant qui n'est plus dans l'ordre

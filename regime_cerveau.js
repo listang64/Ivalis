@@ -30,9 +30,10 @@
 //  contestée par un poste en retard, ce qui était tout le problème du verrou.
 // =========================================================================
 
-import { construireEtatCombat, verifierEtatCombat, creerDes, FORMAT_ETAT } from './combat_etat.js';
+import { construireEtatCombat, verifierEtatCombat, creerDes, combattantDepuisFiche,
+         FORMAT_ETAT } from './combat_etat.js';
 import { creerCerveau, estLeCerveau, cerveauPerdu, suivreBattement, cerveauSilencieux,
-         ouvrirManche, BATTEMENT_MS } from './cerveau_combat.js';
+         ouvrirManche, accueillirCombattant, BATTEMENT_MS } from './cerveau_combat.js';
 import { creerSpectateur } from './spectateur_combat.js';
 import { creerPont, creerProjection, versAnimationDeSaut } from './pont_combat.js';
 import {
@@ -62,6 +63,12 @@ export function creerRegime(contexte) {
         ecran = {},                          // où poser l'état
         estAMoi = () => false,               // « ce combattant est-il à moi ? »
         carteDe = () => null,                // la technique d'une créature
+        // LES COMBATTANTS QUI N'ÉTAIENT PAS LÀ À L'OUVERTURE. Rend les fiches,
+        // au format du cerveau, de ceux que le jeu connaît et que l'état
+        // ignore encore — un renfort sorti de la réserve, essentiellement.
+        // Comme tout le reste ici, c'est injecté : ce fichier ne lit pas une
+        // seule variable globale, et le banc peut en faire tourner trois.
+        nouveauxVenus = () => [],
         plateau = null,                      // le terrain, pour les coûts de déplacement
         surFenetre = () => {},               // ouvrir/fermer la fenêtre sombre
         surRejeu = () => {},                 // « un tour est en train de se rejouer »
@@ -384,6 +391,52 @@ export function creerRegime(contexte) {
     function rejoindre() { brancher(0); }
 
     // =====================================================================
+    //  FAIRE ENTRER CEUX QUI SONT ARRIVÉS APRÈS L'OUVERTURE
+    // =====================================================================
+    //  Le cerveau arrête sa liste de combattants quand le combat s'ouvre. Ça a
+    //  tenu tant qu'aucune créature ne mourait : la réserve envoie un
+    //  remplaçant dès qu'une place se libère, et ce remplaçant recevait bien un
+    //  document, un pion et une ligne dans l'ordre d'initiative — mais restait
+    //  INCONNU DU CERVEAU. `ouvrirManche` l'écartait donc de la file, et il
+    //  passait la rencontre entière planté sur le plateau sans jamais jouer.
+    //
+    //  On accueille juste avant d'ouvrir la manche : c'est le seul instant où
+    //  ça compte, et c'est aussi le seul où l'état est au calme.
+    async function accueillirLesNouveaux() {
+        if (!moi.cerveau || !moi.etat) return 0;
+        let entres = 0;
+        for (const venu of (nouveauxVenus(moi.etat) || [])) {
+            const pas = accueillirCombattant(moi.etat, venu, creerDes(moi.etat.graine));
+            if (!pas) continue;
+            const soucis = verifierEtatCombat(pas.etat);
+            if (soucis.length > 0) {
+                tracer("❌", `${venu.id} non accueilli : état incohérent`, soucis.join(" | "));
+                continue;
+            }
+            pas.etat.battement = maintenant();
+            try {
+                await depot.publier(pas.etat, pas.entree, []);
+            } catch (e) {
+                // Une écriture bousculée n'emporte pas la manche avec elle :
+                // le nouveau venu entrera à la suivante.
+                tracer("❌", `${venu.id} non accueilli`, String(e && e.message));
+                continue;
+            }
+            // ON AVANCE L'ÉTAT LOCAL TOUT DE SUITE, sans attendre que la
+            // notification nous revienne. Sinon le pas suivant — l'ouverture de
+            // la manche, à quelques lignes d'ici — repartirait de l'état
+            // d'AVANT l'arrivée et la publierait par-dessus : le renfort
+            // entrait, puis disparaissait aussitôt. La notification repassera
+            // la même chose, et ça ne coûte rien.
+            moi.etat = pas.etat;
+            tracer("🐲", `${venu.nom || venu.id} entre dans le combat`,
+                   `case (${venu.q},${venu.r})`);
+            entres++;
+        }
+        return entres;
+    }
+
+    // =====================================================================
     //  UNE MANCHE S'OUVRE
     // =====================================================================
     //  Le cerveau s'est arrêté en fin de manche et a rendu la main aux joueurs.
@@ -397,6 +450,11 @@ export function creerRegime(contexte) {
     async function ouvrirLaManche(file) {
         if (!moi.cerveau || !moi.etat) return null;
         if (moi.etat.phase === "Resolution") return null;
+
+        // Un renfort inscrit dans la file par l'IA doit EXISTER avant qu'on
+        // ouvre, sinon ouvrirManche l'écarte silencieusement.
+        await accueillirLesNouveaux();
+        if (!moi.etat || moi.etat.phase === "Resolution") return null;
 
         const pas = ouvrirManche(moi.etat, file, creerDes(moi.etat.graine));
         if (!pas) return null;
@@ -480,6 +538,7 @@ export function creerRegime(contexte) {
 
     return {
         ouvrir, rejoindre, fermer, brancher, debrancher, tourner, ok, ouvrirLaManche, reprojeter,
+        accueillirLesNouveaux,
         reprendreLaMain,
         demander, demanderMouvement, demanderCarte, demanderBond, demanderIllusion,
         demanderFinDeTour,
@@ -620,6 +679,11 @@ function monPoste() {
 // console pour un leurre qui a déjà disparu.
 const LEURRES_EFFACES = new Set();
 
+// Les créatures déjà déclarées mortes. Même raison que ci-dessus : sans cette
+// mémoire, chaque projection redemanderait le marquage et un renfort de plus.
+// Elle s'oublie au changement de partie : les deux combats n'ont rien en commun.
+const TOMBES_ANNONCEES = new Set();
+
 function contexteDuJeu() {
     return {
         io: window.ioCombatFirestore,
@@ -648,6 +712,35 @@ function contexteDuJeu() {
             const prete = (window.CARTES_DU_CERVEAU || {})[idMonstre];
             if (!prete || prete.idCarte !== idCarte) return null;
             return prete;
+        },
+
+        // CEUX QUI NE SONT PAS ENTRÉS AVEC LES AUTRES.
+        //
+        // L'ordre d'initiative de la PARTIE fait foi : c'est là que
+        // `poserMonstreSurTerrain` inscrit un renfort sorti de la réserve. Tout
+        // ce qui s'y trouve et que l'état du cerveau ne connaît pas encore est
+        // un nouveau venu — à condition qu'on ait sa fiche ET son pion, sans
+        // quoi on fabriquerait un combattant sans case, c'est-à-dire un
+        // fantôme. On n'invente rien : on repasse au tour d'après.
+        //
+        // Le leurre de l'Illusion n'entre jamais dans l'ordre d'initiative :
+        // il ne peut donc pas passer par ici deux fois.
+        nouveauxVenus: (etat) => {
+            const partie = window.PARTIE_DATA || {};
+            const connus = (etat && etat.combattants) || {};
+            const fiches = window.PERSOS_PARTIE || [];
+            const pions = window.TOKENS_VTT_DATA || {};
+            const regles = reglesDuJeu();
+            const venus = [];
+            (partie.Ordre_Initiative || []).forEach(id => {
+                if (!id || connus[id]) return;
+                const fiche = fiches.find(f => f && f.idPersonnage === id);
+                const pion = pions[id];
+                if (!fiche || !pion || pion.q === undefined || pion.r === undefined) return;
+                try { venus.push(combattantDepuisFiche(fiche, pion, regles)); }
+                catch (e) { console.error("Accueil d'un combattant :", e); }
+            });
+            return venus;
         },
 
         // LE TERRAIN. Le noyau ne connaît pas la carte du plateau — c'est une
@@ -827,6 +920,69 @@ function contexteDuJeu() {
                         }
                     });
                 }
+
+                // =====================================================
+                //  UN COMBATTANT TOMBÉ CESSE D'ÊTRE ATTENDU
+                // =====================================================
+                //  ET C'EST LE BUG QUI A ARRÊTÉ UNE RENCONTRE ENTIÈRE.
+                //
+                //  Tuer une créature laissait le combat définitivement bloqué
+                //  en préparation : chaque joueur choisissait sa carte, l'IA
+                //  choisissait la sienne, et la manche ne s'ouvrait jamais.
+                //  Aucune erreur, aucun message — juste « la file est vide »
+                //  toutes les cinq secondes, pour toujours.
+                //
+                //  La raison tient en une phrase : le passage en Résolution est
+                //  tranché par `toutLeMondeAJoue`, qui attend une carte de
+                //  CHAQUE combattant de l'ordre d'initiative sauf ceux inscrits
+                //  dans `Combattants_Hors_Jeu`. Or cette liste n'était tenue à
+                //  jour que par `synchroniserCombattantsHorsJeu`, appelée
+                //  depuis `recomposerCombattants`, elle-même déclenchée par une
+                //  notification des documents Personnages/Monstres. Et depuis
+                //  que le combat vit dans l'état du cerveau, ces documents NE
+                //  REÇOIVENT PLUS UNE SEULE ÉCRITURE DE POINTS DE VIE. Plus
+                //  d'écriture, plus de notification ; plus de notification,
+                //  personne pour constater la chute. On attendait la carte d'un
+                //  cadavre.
+                //
+                //  Même histoire pour la mort d'une créature et le renfort qui
+                //  la remplace : l'ancien moteur les déclenchait depuis
+                //  `jouerAnimationMoteur`, supprimé avec lui. La réserve ne
+                //  s'est plus jamais vidée.
+                //
+                //  Les deux se réparent ici, au seul endroit qui voit vraiment
+                //  tomber quelqu'un : la projection de l'état, sur le poste qui
+                //  tient le cerveau. La vérité vient de l'état — jamais des
+                //  fiches locales, qui peuvent être retenues derrière la
+                //  fenêtre sombre.
+                if (etat && etat.combattants && estLeCerveau(etat, monPoste())) {
+                    const tombes = Object.values(etat.combattants).filter(c => c && c.aTerre);
+
+                    if (typeof window.synchroniserCombattantsHorsJeu === "function") {
+                        Promise.resolve(window.synchroniserCombattantsHorsJeu(tombes.map(c => c.id)))
+                            .catch(e => signalerPanne("synchroniserCombattantsHorsJeu", e));
+                    }
+
+                    // Une créature tombée est marquée morte dans son document
+                    // (son cadavre reste sur la carte jusqu'à la fin du combat)
+                    // et laisse sa place au renfort suivant, s'il en reste un.
+                    tombes.forEach(c => {
+                        if (!c.estMonstre || c.estIllusion) return;
+                        if (TOMBES_ANNONCEES.has(c.id)) return;
+                        // Le repère se pose APRÈS s'être assuré qu'on peut
+                        // vraiment agir : le poser avant condamnerait la
+                        // créature à ne jamais être marquée si monstres.js
+                        // n'était pas encore chargé au moment de sa chute.
+                        if (typeof window.marquerMonstreMort !== "function") return;
+                        TOMBES_ANNONCEES.add(c.id);
+                        if (typeof window.tracerCombat === "function") {
+                            window.tracerCombat("☠️", `${c.nom || c.id} est terrassé`,
+                                                "la réserve peut envoyer un renfort");
+                        }
+                        Promise.resolve(window.marquerMonstreMort(c.id))
+                            .catch(e => signalerPanne("marquerMonstreMort", e));
+                    });
+                }
                 [["rafraichirAffichageCombat", () => window.rafraichirAffichageCombat()],
                  ["redessinerPions", () => window.redessinerPions()]]
                     .forEach(([nom, appel]) => {
@@ -960,28 +1116,35 @@ function sourceDuJeu() {
         positions: window.TOKENS_VTT_DATA || {},
         partie,
         zones: window.ZONES_PERSISTANTES || {},
-        regles: {
-            // LES MAXIMA D'ABORD, parce que ce sont eux qui ont fait échouer le
-            // premier vrai combat : un Humain a +10 d'énergie maximale par
-            // l'atout de son peuple, la fiche porte 100 et le jeu calcule 110.
-            // Lire le champ brut donnait « 110 d'énergie pour un maximum de
-            // 100 », et les invariants refusaient d'ouvrir le combat — à juste
-            // titre.
-            pvMax: window.pvMaxCombattant,
-            fatigueMax: window.fatigueMaxCombattant,
-            esquive: window.esquiveCombattant,
-            parade: window.paradeCombattant,
-            defPhysique: window.defPhysiqueCombattant,
-            defMagique: window.defMagiqueCombattant,
-            critique: window.critiqueCombattant,
-            atouts: window.atoutRace,
-            bonusEquip: window.bonusEquip,
-            // Les effets spéciaux d'un objet (élan d'initiative en frappant,
-            // bénédiction posée sur qui vient d'être soigné) : sans eux, une
-            // bague ou une arme qui les porte ne fait plus rien sous ce
-            // régime — ils vivaient uniquement dans l'ancien moteur.
-            effetsSpeciaux: window.effetsSpeciauxEquipement
-        }
+        regles: reglesDuJeu()
+    };
+}
+
+// LES VRAIES FORMULES DU JEU, celles qui font qu'un combattant fabriqué par le
+// cerveau a les mêmes maxima que celui qu'affiche la fiche. Elles étaient
+// enfermées dans sourceDuJeu, qui ne sert qu'à OUVRIR un combat ; un renfort
+// arrivant en cours de route en a exactement le même besoin.
+function reglesDuJeu() {
+    return {
+        // LES MAXIMA D'ABORD, parce que ce sont eux qui ont fait échouer le
+        // premier vrai combat : un Humain a +10 d'énergie maximale par l'atout
+        // de son peuple, la fiche porte 100 et le jeu calcule 110. Lire le
+        // champ brut donnait « 110 d'énergie pour un maximum de 100 », et les
+        // invariants refusaient d'ouvrir le combat — à juste titre.
+        pvMax: window.pvMaxCombattant,
+        fatigueMax: window.fatigueMaxCombattant,
+        esquive: window.esquiveCombattant,
+        parade: window.paradeCombattant,
+        defPhysique: window.defPhysiqueCombattant,
+        defMagique: window.defMagiqueCombattant,
+        critique: window.critiqueCombattant,
+        atouts: window.atoutRace,
+        bonusEquip: window.bonusEquip,
+        // Les effets spéciaux d'un objet (élan d'initiative en frappant,
+        // bénédiction posée sur qui vient d'être soigné) : sans eux, une bague
+        // ou une arme qui les porte ne fait plus rien sous ce régime — ils
+        // vivaient uniquement dans l'ancien moteur.
+        effetsSpeciaux: window.effetsSpeciauxEquipement
     };
 }
 
@@ -1046,6 +1209,8 @@ if (typeof window !== "undefined") {
         if (partieSuivie && partieSuivie !== window.ID_PARTIE_COURANTE) {
             if (REGIME) REGIME.debrancher();
             fermerLeGuet();
+            TOMBES_ANNONCEES.clear();
+            LEURRES_EFFACES.clear();
             REGIME = null;
             partieSuivie = null;
             phasePrecedente = null;
