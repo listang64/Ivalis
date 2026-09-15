@@ -532,7 +532,7 @@ let rendreLaMainAuxJoueurs = () => {};
 //
 // Le seul chemin par lequel un joueur lance sa carte pendant son tour est le
 // bouton fin de tour (combat.js, actualiserBoutonFinTour), sous son image
-// « choisir compétence ». Il ne prend ce visage que si TROIS choses sont
+// « lancer ». Il ne prend ce visage que si TROIS choses sont
 // vraies au moment du rendu : la phase est « Resolution », mon héros est en
 // TÊTE de la file, et son entrée porte l'identifiant de sa carte.
 //
@@ -575,7 +575,7 @@ function verifierQueJePeuxJouer(file) {
         return;
     }
 
-    const pret = document.getElementById("img-hud-fintour") && window.MODE_BOUTON_FINTOUR === "choisir_competence";
+    const pret = document.getElementById("img-hud-fintour") && window.MODE_BOUTON_FINTOUR === "lancer";
     const voile = !!window.EVENEMENT_ATTENDU;
     if (pret && !voile) {
         if (typeof window.tracerCombat === "function") {
@@ -587,7 +587,7 @@ function verifierQueJePeuxJouer(file) {
     if (typeof window.tracerCombat === "function") {
         window.tracerCombat("🧊", `à moi de jouer mais RIEN À CLIQUER : ${tete.idPersonnage}`,
                             [`carte ${tete.idCarte || "ABSENTE"}`,
-                             pret ? "bouton prêt" : "bouton fin de tour pas sur « choisir compétence »",
+                             pret ? "bouton prêt" : "bouton fin de tour pas sur « lancer »",
                              voile ? "la fenêtre sombre est encore levée" : "pas de voile"].join(" · "));
     }
 }

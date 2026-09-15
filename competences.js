@@ -551,8 +551,16 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     // (chapitre suivant) qui décidera de ce qu'ils jouent.
     const estCarteDeMonstre = !!(persoActuelTemp && persoActuelTemp.estMonstre);
 
-    // 🔻 CORRECTION 1 : On bloque le bouton Choisir si les combats ont commencé !
+    // 🔻 CORRECTION 1 : On bloque le choix de la carte si les combats ont commencé !
+    //
+    // LES DEUX BOUTONS FLOTTANTS SONT PARTIS (refonte du bouton fin de tour) :
+    // « Choisir » (retenir la carte pour la manche) et « Appliquer » (démarrer
+    // le ciblage) vivent maintenant sur le bouton fin de tour, sous ses images
+    // « choisir compétence » et « lancer » (combat.js, actualiserBoutonFinTour).
+    // Ce qui reste ici, c'est ce que le bouton ne peut pas dire : POURQUOI la
+    // carte ne peut pas être retenue.
     let boutonChoisirHtml = "";
+    let choisissable = false;
     if (isCombatMode && !isLocked && !estCarteDeMonstre) {
         if (phaseTemp === "Resolution") {
             boutonChoisirHtml = `
@@ -565,17 +573,13 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
                 Énergie Insuffisante
             </div>`;
         } else {
-            boutonChoisirHtml = `
-            <div style="position: absolute; bottom: -70px; left: 50%; transform: translateX(-50%); z-index: 5;">
-                <button id="btn-choisir-action" class="btn-choisir-combat" onclick="event.stopPropagation(); window.jouerCarteCombat('${idCarte}')">Choisir</button>
-            </div>`;
+            choisissable = true;
         }
     }
 
-    // L'ANCIEN BOUTON APPLIQUER (doré, flottant au-dessus de la carte) est
-    // parti : c'est maintenant le bouton fin de tour qui démarre le ciblage
-    // d'une carte verrouillée, sous son image « choisir compétence »
-    // (combat.js, actualiserBoutonFinTour/actionBoutonFinTour).
+    // Ce que le bouton fin de tour a besoin de savoir : quelle carte est sous
+    // les yeux du joueur, et s'il peut la retenir pour la manche.
+    window.CARTE_APERCU = { idCarte, choisissable };
 
     conteneurCarte.innerHTML = `
         <!-- COUCHE 1 : FOND DE COULEUR -->
@@ -635,16 +639,25 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         void conteneurCarte.offsetWidth;
         conteneurCarte.style.opacity = "1";
     }
+
+    // La carte vient de s'ouvrir : le bouton fin de tour doit passer en
+    // « choisir compétence » (ou rester éteint si elle n'est pas retenable).
+    if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
 };
 
 window.masquerApercuCarteHD = function(force = false) {
     const conteneurCarte = document.getElementById("apercu-carte-hd-competence");
     if (conteneurCarte) {
-        
+
         // Bloque la disparition si la carte est verrouillée par un choix
         if (!force && conteneurCarte.dataset.locked === "true") {
             return;
         }
+
+        // Plus de carte sous les yeux : le bouton fin de tour n'a plus rien à
+        // retenir pour la manche.
+        window.CARTE_APERCU = null;
+        if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
 
         const isCombatMode = document.getElementById("fenetre-combat")?.style.display === "block";
         

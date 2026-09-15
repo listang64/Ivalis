@@ -3371,36 +3371,48 @@ window.PEUT_PASSER_TOUR = false;
 // LES CINQ VISAGES DU BOUTON.
 //
 // Il tenait jusqu'ici deux états (éteint / allumé) et ne servait qu'à finir le
-// tour. Il absorbe maintenant tout ce que quatre bulles flottantes faisaient
-// séparément (valider le déplacement, appliquer la carte choisie, résoudre le
-// ciblage) : un seul geste, toujours au même endroit, dont l'image dit ce que
-// ce geste fera. Les zones (bulle-validation-zone) restent à part — leur
-// rotation ne tient pas dans un simple clic.
+// tour. Il porte maintenant, TOUJOURS AU MÊME ENDROIT, l'action principale du
+// moment — et son image dit laquelle :
+//
+//   • éteint (IMG_2134) ....... ce n'est pas à nous de jouer, entre les tours ;
+//   • choisir compétence ...... en PRÉPARATION, une carte est affichée en grand
+//     (IMG_2131)               et attend d'être retenue pour cette manche ;
+//   • valider déplacement ..... à notre tour, un chemin est tracé et attend
+//     (IMG_2130)               d'être confirmé (l'annuler passe par la petite
+//                              croix sous le pion, voir appliquerTokensVTT) ;
+//   • lancer (IMG_2132) ....... à notre tour, on ne veut plus se déplacer : on
+//                              part sur le ciblage de sa carte, qui se déroule
+//                              ensuite comme avant (RÉSOUDRE / ANNULER) ;
+//   • fin de tour (IMG_2124) .. pendant le ciblage, ou quand il n'y a rien à
+//                              lancer : finir son tour sans dépenser sa carte.
 //
 // window.MODE_BOUTON_FINTOUR mémorise CE QUE le prochain clic déclenchera :
-// c'est lui que lit window.actionBoutonFinTour (ci-dessous), pour ne jamais
-// avoir à redeviner l'état au moment du clic.
-window.MODE_BOUTON_FINTOUR = "fin_de_tour";
-
-// À VIDE OU DÉJÀ TOUCHÉ ? Rien dans File_Attente_Combat ou ETAT_CIBLAGE ne le
-// dit : les deux se lisent pareil qu'on vienne d'annuler un déplacement ou que
-// le tour commence à peine. D'où ce drapeau, remis à vrai chaque fois que ce
-// n'est PAS notre tour, et abaissé dès qu'on touche à quoi que ce soit — pour
-// que « fin de tour » affiche la bonne image selon lequel des deux c'est.
-window.FINTOUR_VIERGE = true;
+// c'est lui que lit window.actionBoutonFinTour (plus bas), pour ne jamais avoir
+// à redeviner l'état au moment du clic.
+window.MODE_BOUTON_FINTOUR = "eteint";
 
 const IMG_FINTOUR = {
-    eteint:              "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/FinTourEteind_exjtxp.png",
-    fin_de_tour_vierge:  "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789309135/IMG_2134_nh3lfn.png",
-    fin_de_tour_reprise: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789309133/IMG_2124_afpicw.png",
-    valider_deplacement: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789309134/IMG_2130_hosju1.png",
+    eteint:              "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789309135/IMG_2134_nh3lfn.png",
     choisir_competence:  "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789309134/IMG_2131_pgtsas.png",
-    lancer:              "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789309134/IMG_2132_ldpmqq.png"
+    valider_deplacement: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789309134/IMG_2130_hosju1.png",
+    lancer:              "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789309134/IMG_2132_ldpmqq.png",
+    fin_de_tour:         "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789309133/IMG_2124_afpicw.png"
 };
+
+// LA CARTE AFFICHÉE EN GRAND, ET SI ELLE PEUT ÊTRE RETENUE. Posée par
+// afficherApercuCarteHD (competences.js), effacée par masquerApercuCarteHD :
+// c'est elle que « choisir compétence » verrouille pour la manche.
+window.CARTE_APERCU = null;
 
 window.actualiserBoutonFinTour = function(queueParam, phaseParam) {
     const imgBtn = document.getElementById("img-hud-fintour");
     if (!imgBtn) return;
+
+    const poser = (mode, actionnable) => {
+        imgBtn.src = IMG_FINTOUR[mode];
+        window.MODE_BOUTON_FINTOUR = mode;
+        window.PEUT_PASSER_TOUR = actionnable;
+    };
 
     // Récupération des données (Paramètres en priorité, fallback sur PARTIE_DATA si on change juste de perso)
     const partie = window.PARTIE_DATA || {};
@@ -3417,16 +3429,21 @@ window.actualiserBoutonFinTour = function(queueParam, phaseParam) {
     // le bouton s'éteint, c'est la barrière de synchronisation qui prendra le
     // relais dès que tout le monde aura fini de rejouer (voir sequence_tour.js).
     if (typeof window.sequenceTourEnAttente === "function" && window.sequenceTourEnAttente()) {
-        imgBtn.src = IMG_FINTOUR.eteint;
-        window.PEUT_PASSER_TOUR = false;
-        window.MODE_BOUTON_FINTOUR = "eteint";
-        window.FINTOUR_VIERGE = true;
-        return;
+        return poser("eteint", false);
     }
 
-    // C'est au tour du perso SI :
+    // === LA PRÉPARATION : RETENIR SA CARTE POUR LA MANCHE ===================
+    // Le bouton ne s'allume que si une carte est ouverte en grand ET qu'elle
+    // peut être retenue (assez d'énergie, arme compatible : c'est
+    // afficherApercuCarteHD qui en juge, et qui le dit dans CARTE_APERCU).
+    if (phase !== "Resolution") {
+        const apercu = window.CARTE_APERCU;
+        if (apercu && apercu.choisissable) return poser("choisir_competence", true);
+        return poser("eteint", false);
+    }
+
+    // === LA RÉSOLUTION : NOTRE TOUR, OU PAS ================================
     const estMonTour = (
-        phase === "Resolution" &&
         queue.length > 0 &&
         persoActuel &&
         queue[0].idPersonnage === persoActuel.idPersonnage
@@ -3439,63 +3456,29 @@ window.actualiserBoutonFinTour = function(queueParam, phaseParam) {
     const teteEstMonstre = queue.length > 0 && typeof window.estMonstre === "function"
                            && window.estMonstre(queue[0].idPersonnage);
     const iaDonneSigneDeVie = (Date.now() - (window.IA_DERNIER_SIGNE || 0)) < 20000;
-    if (phase === "Resolution" && teteEstMonstre && iaDonneSigneDeVie) {
-        imgBtn.src = IMG_FINTOUR.eteint;
-        window.PEUT_PASSER_TOUR = false;
-        window.MODE_BOUTON_FINTOUR = "eteint";
-        window.FINTOUR_VIERGE = true;
-        return;
-    }
+    if (teteEstMonstre && iaDonneSigneDeVie) return poser("eteint", false);
 
-    if (!estMonTour) {
-        imgBtn.src = IMG_FINTOUR.eteint;
-        window.PEUT_PASSER_TOUR = false;
-        window.MODE_BOUTON_FINTOUR = "eteint";
-        window.FINTOUR_VIERGE = true;
-        return;
-    }
+    if (!estMonTour) return poser("eteint", false);
 
-    window.PEUT_PASSER_TOUR = true;
-
-    // 1. UN DÉPLACEMENT SE TRACE : le bouton le valide. Annuler passe par la
-    // petite croix posée sous le pion (voir appliquerTokensVTT, combat.js).
-    if ((window.CHEMIN_MOUVEMENT || []).length > 0) {
-        imgBtn.src = IMG_FINTOUR.valider_deplacement;
-        window.MODE_BOUTON_FINTOUR = "valider_deplacement";
-        window.FINTOUR_VIERGE = false;
-        return;
-    }
-
-    // 2. LE CIBLAGE D'UNE CARTE (hors zone, qui garde sa propre bulle avec sa
-    // rotation) EST ACTIF : le bouton lance la compétence — ou, si rien n'a
-    // encore été visé, annule et passe le tour sans dépenser l'énergie de la
-    // carte (voir window.actionBoutonFinTour).
+    // 1. LE CIBLAGE EST OUVERT : la carte se joue par ses propres boutons
+    // (RÉSOUDRE / ANNULER, ou la bulle des zones). Ce bouton-ci n'offre plus
+    // qu'une sortie : finir son tour sans lancer, donc sans rien dépenser.
     const ciblage = window.ETAT_CIBLAGE;
-    if (ciblage && ciblage.actif && !ciblage.isZone) {
-        imgBtn.src = IMG_FINTOUR.lancer;
-        window.MODE_BOUTON_FINTOUR = "lancer";
-        window.FINTOUR_VIERGE = false;
-        return;
-    }
+    if (ciblage && ciblage.actif) return poser("fin_de_tour", true);
 
-    // 3. UNE CARTE EST VERROUILLÉE POUR CE TOUR (choisie pendant la
-    // préparation) ET ATTEND D'ÊTRE APPLIQUÉE : le bouton démarre son ciblage.
-    // Exclut un ciblage de ZONE déjà en cours (ci-dessus) : sa carte est déjà
-    // « appliquée », c'est la bulle de zone qui prend le relais.
+    // 2. UN DÉPLACEMENT SE TRACE : le bouton le valide.
+    if ((window.CHEMIN_MOUVEMENT || []).length > 0) return poser("valider_deplacement", true);
+
+    // 3. UNE CARTE ATTEND D'ÊTRE LANCÉE : on ne se déplace plus, on vise.
     const idCarteEnAttente = queue[0] && queue[0].idCarte;
     const estCarteDeMonstre = persoActuel && persoActuel.estMonstre;
-    if (idCarteEnAttente && idCarteEnAttente !== "REPOS_LONG" && !estCarteDeMonstre
-        && !(ciblage && ciblage.actif)) {
-        imgBtn.src = IMG_FINTOUR.choisir_competence;
-        window.MODE_BOUTON_FINTOUR = "choisir_competence";
-        window.FINTOUR_VIERGE = false;
-        return;
+    if (idCarteEnAttente && idCarteEnAttente !== "REPOS_LONG" && !estCarteDeMonstre) {
+        return poser("lancer", true);
     }
 
-    // 4. RIEN À FAIRE (ou plus rien à faire) : fin de tour. Deux images pour
-    // une même action, selon qu'on vient d'y toucher ou non (voir FINTOUR_VIERGE).
-    imgBtn.src = window.FINTOUR_VIERGE ? IMG_FINTOUR.fin_de_tour_vierge : IMG_FINTOUR.fin_de_tour_reprise;
-    window.MODE_BOUTON_FINTOUR = "fin_de_tour";
+    // 4. RIEN À LANCER (repos long, aucune carte retenue) : il ne reste que la
+    // fin du tour.
+    return poser("fin_de_tour", true);
 };
 
 // LE CLIC SUR LE BOUTON : ce qu'il déclenche dépend entièrement de l'image
@@ -3503,56 +3486,44 @@ window.actualiserBoutonFinTour = function(queueParam, phaseParam) {
 window.actionBoutonFinTour = function() {
     if (!window.PEUT_PASSER_TOUR) return;
 
+    // Une demande déjà partie attend la réponse du cerveau : le temps de
+    // l'aller-retour réseau, le bouton montre encore l'action d'avant. Sans
+    // cette garde, un second clic la referait une seconde fois — exactement le
+    // doublon que demandeDejaEnVol empêchait pour l'ancien bouton Appliquer
+    // (voir regime_cerveau.js).
+    const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+    if (window.regimeDemande && typeof window.regimeDemande.enVol === "function"
+        && persoActuel && window.regimeDemande.enVol(persoActuel.idPersonnage)) {
+        return;
+    }
+
+    if (window.MODE_BOUTON_FINTOUR === "choisir_competence") {
+        const apercu = window.CARTE_APERCU;
+        if (apercu && apercu.idCarte && typeof window.jouerCarteCombat === "function") {
+            return window.jouerCarteCombat(apercu.idCarte);
+        }
+        return;
+    }
+
     if (window.MODE_BOUTON_FINTOUR === "valider_deplacement") {
         return window.validerMouvement();
     }
 
-    if (window.MODE_BOUTON_FINTOUR === "choisir_competence") {
-        // Une carte sans rien à viser (Illusion seule, Bond seul...) se joue ICI
-        // MÊME, tout de suite, sans jamais passer par « lancer » (voir
-        // demarrerCiblage). Sans cette garde, un double-clic la jouerait deux
-        // fois avant que la file n'ait eu le temps d'avancer.
-        const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
-        if (window.regimeDemande && typeof window.regimeDemande.enVol === "function"
-            && persoActuel && window.regimeDemande.enVol(persoActuel.idPersonnage)) {
-            return;
-        }
+    if (window.MODE_BOUTON_FINTOUR === "lancer") {
         const queue = (window.PARTIE_DATA || {}).File_Attente_Combat || [];
         const idCarte = queue[0] && queue[0].idCarte;
         if (idCarte && typeof window.demarrerCiblage === "function") return window.demarrerCiblage(idCarte);
         return;
     }
 
-    if (window.MODE_BOUTON_FINTOUR === "lancer") {
-        // ENTRE LE CLIC ET LA RÉPONSE DU CERVEAU, ce bouton continue d'afficher
-        // « Lancer » — le ciblage ne se referme qu'une fois la demande retombée
-        // (voir declencherResolution). Sans cette garde, un second clic pendant
-        // cet aller-retour réseau relançait la même carte une seconde fois :
-        // exactement le doublon que demandeDejaEnVol empêchait déjà pour
-        // l'ancien bouton Appliquer (regime_cerveau.js).
-        const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
-        if (window.regimeDemande && typeof window.regimeDemande.enVol === "function"
-            && persoActuel && window.regimeDemande.enVol(persoActuel.idPersonnage)) {
-            return;
-        }
-
-        const ciblage = window.ETAT_CIBLAGE;
-        const aUneCible = !!(ciblage && (
-            ciblage.cibleUnique ||
-            (ciblage.attaques || []).some(a => (a.cibles || []).length > 0) ||
-            (ciblage.alterations || []).some(a => (a.cibles || []).length > 0)
-        ));
-        // Une cible est déjà choisie : on lance, exactement comme le faisait
-        // RÉSOUDRE (déplacé ici, sans changer sa mécanique).
-        if (aUneCible) return window.declencherResolutionAvecBondEventuel();
-        // Rien de choisi : on renonce plutôt que de lancer une carte dans le
-        // vide. La carte n'a jamais été envoyée au cerveau, donc son énergie
-        // n'a jamais été dépensée.
-        if (typeof window.nettoyerCiblage === "function") window.nettoyerCiblage();
-        window.COUT_COMPETENCE_SELECTIONNEE = 0;
-        return window.finDeTourCombat();
+    // FIN DE TOUR. Si un ciblage était ouvert, il se referme sans rien lancer :
+    // la carte n'a jamais été envoyée au cerveau, donc son énergie n'a jamais
+    // été dépensée.
+    if (window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif
+        && typeof window.nettoyerCiblage === "function") {
+        window.nettoyerCiblage();
     }
-
+    window.COUT_COMPETENCE_SELECTIONNEE = 0;
     return window.finDeTourCombat();
 };
 

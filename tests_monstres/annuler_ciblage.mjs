@@ -5,16 +5,16 @@
 // ciblage à une seule cible n'en avait aucun, d'où le premier ANNULER
 // flottant (voir git log, tâche « Bouton annuler ciblage »).
 //
-// REFONTE DU BOUTON FIN DE TOUR : ce ANNULER flottant est parti à son tour,
-// absorbé par le bouton fin de tour — mais avec un comportement VOULU
-// différent. L'ancien rendait la main pour continuer à se déplacer ; le
-// nouveau, lui, CLÔT le tour sans dépenser l'énergie de la carte (ce
-// changement précis est vérifié en détail dans bouton_fintour.mjs, section
-// 7). Ce banc-ci garde ce qui lui est propre : (1) que demarrerCiblage et
-// nettoyerCiblage ne posent plus les anciens boutons texte et rafraîchissent
-// bien le bouton fin de tour à leur place, et (2) que le clic sur son propre
-// pion redevient une sélection de mouvement une fois le ciblage retombé,
-// quelle qu'en soit la raison.
+// REFONTE DU BOUTON FIN DE TOUR : ce ANNULER-là ne bouge pas (le ciblage se
+// déroule comme avant), mais il a maintenant un voisin qu'il ne faut pas
+// confondre avec lui — pendant le ciblage, le bouton fin de tour affiche
+// « fin de tour » et TERMINE le tour sans dépenser la carte, là où ANNULER
+// referme seulement le ciblage et rend la main pour continuer à se déplacer.
+// Ce banc vérifie donc, sur le VRAI code : (1) qu'ANNULER est bien câblé et
+// que l'ouverture/fermeture du ciblage rafraîchit le bouton fin de tour,
+// (2) que nettoyerCiblage retire les deux boutons et lève le verrou, et
+// (3) que le clic sur son propre pion redevient une sélection de mouvement
+// une fois le ciblage annulé.
 import fs from 'fs';
 
 const combat = fs.readFileSync('/home/user/Ivalis/combat.js', 'utf-8');
@@ -32,24 +32,29 @@ function fonction(src, marqueur, finLigne = '};') {
 let echecs = 0;
 const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(64)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
 
-console.log("1. LES ANCIENS BOUTONS TEXTE SONT PARTIS, LE BOUTON FIN DE TOUR PREND LE RELAIS");
+console.log("1. LE CODE CÂBLE BIEN UN BOUTON ANNULER EN MODE CIBLE UNIQUE");
 {
-    verifier("RÉSOUDRE (btn-resoudre-carte) n'existe plus", !moteur.includes('btn-resoudre-carte'));
-    verifier("ANNULER (btn-annuler-ciblage) n'existe plus", !moteur.includes('btn-annuler-ciblage'));
-    verifier("APPLIQUER (btn-appliquer-carte) n'existe plus", !moteur.includes('btn-appliquer-carte'));
+    const debut = moteur.indexOf('let btnResoudre = document.getElementById("btn-resoudre-carte");');
+    verifier("le bloc du bouton RÉSOUDRE (ciblage à une cible) est repérable", debut > 0);
+    const bloc = moteur.slice(debut, debut + 3000);
+    verifier("un bouton « btn-annuler-ciblage » y est créé", bloc.includes('btn-annuler-ciblage'));
+    verifier("son texte est bien ANNULER", /btnAnnuler\.innerText = "ANNULER"/.test(bloc));
+    verifier("il appelle nettoyerCiblage (pas une simple fermeture visuelle)",
+             /btnAnnuler\.onclick = \(\) => window\.nettoyerCiblage\(\)/.test(bloc));
 
-    // La branche non-zone de demarrerCiblage doit rafraîchir le bouton fin de
-    // tour (qui prend alors l'image « lancer ») — sans quoi il resterait
-    // affiché sur « choisir compétence » après le début du ciblage.
-    const debutFonction = moteur.indexOf('window.demarrerCiblage = async function');
-    const debutBrancheNonZone = moteur.indexOf('} else {', debutFonction);
-    const finBrancheNonZone = moteur.indexOf('window.actualiserVisuelCiblage();', debutBrancheNonZone);
-    const brancheNonZone = moteur.slice(debutBrancheNonZone, finBrancheNonZone);
-    verifier("la branche à cible unique rafraîchit le bouton fin de tour",
-             brancheNonZone.includes('window.actualiserBoutonFinTour()'));
+    // L'ancien bouton doré « Appliquer » (qui démarrait le ciblage) est parti :
+    // c'est le bouton fin de tour, sous son image « lancer », qui le remplace.
+    verifier("l'ancien bouton Appliquer n'est plus posé nulle part",
+             !moteur.includes('btn-appliquer-carte'));
+    // Et l'ouverture du ciblage doit rafraîchir le bouton fin de tour, qui
+    // passe alors sur « fin de tour » : renoncer à sa carte sans la dépenser.
+    const ouverture = moteur.slice(moteur.indexOf('window.demarrerCiblage = async function'),
+                                   moteur.indexOf('window.validerZoneAoE = function'));
+    verifier("l'ouverture du ciblage rafraîchit le bouton fin de tour",
+             ouverture.includes('window.actualiserBoutonFinTour()'));
 }
 
-console.log("\n2. nettoyerCiblage LÈVE LE VERROU ET REDONNE LA MAIN AU BOUTON FIN DE TOUR");
+console.log("\n2. nettoyerCiblage RETIRE LES BOUTONS, LÈVE LE VERROU ET REND LA MAIN");
 {
     const { chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs');
     const b = await chromium.launch();
@@ -69,19 +74,27 @@ console.log("\n2. nettoyerCiblage LÈVE LE VERROU ET REDONNE LA MAIN AU BOUTON F
         window.VTT_CIBLAGE_CLICK = () => {}; window.VTT_CIBLAGE_TOUCHSTART = () => {};
         window.VTT_CIBLAGE_TOUCHMOVE = () => {};
 
+        const btnResoudre = document.createElement("div"); btnResoudre.id = "btn-resoudre-carte";
+        const btnAnnuler = document.createElement("div"); btnAnnuler.id = "btn-annuler-ciblage";
+        document.body.append(btnResoudre, btnAnnuler);
+
         eval(src);
         window.nettoyerCiblage();
 
         return {
             actif: window.ETAT_CIBLAGE.actif,
+            resoudrePresent: !!document.getElementById("btn-resoudre-carte"),
+            annulerPresent: !!document.getElementById("btn-annuler-ciblage"),
             voileRafraichi: window.__voileRafraichi,
             boutonRafraichi: window.__boutonRafraichi
         };
     }, SRC_NETTOIE);
 
     verifier("le ciblage n'est plus actif", res.actif === false);
+    verifier("le bouton RÉSOUDRE a disparu", !res.resoudrePresent);
+    verifier("le bouton ANNULER a disparu aussi", !res.annulerPresent);
     verifier("la fenêtre de tour est rafraîchie (la compétence redevient lançable)", res.voileRafraichi === true);
-    verifier("le bouton fin de tour est rafraîchi (il reflète le nouvel état)", res.boutonRafraichi === true);
+    verifier("le bouton fin de tour repasse sur « lancer »", res.boutonRafraichi === true);
 
     await b.close();
 }

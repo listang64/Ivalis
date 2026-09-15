@@ -1809,20 +1809,42 @@ window.demarrerCiblage = async function(idCarte, options) {
         window.addEventListener("touchstart", window.VTT_CIBLAGE_TOUCHSTART, {capture: true, passive: false});
         window.addEventListener("touchmove", window.VTT_CIBLAGE_TOUCHMOVE, {capture: true, passive: false});
 
-        // La zone garde sa propre bulle (rotation, valider, annuler) : le
-        // bouton fin de tour redescend en « fin de tour », sa carte n'ayant
-        // plus rien à faire ici.
-        if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
-
     } else {
-        // RÉSOUDRE et ANNULER (flottants au-dessus de la carte) sont partis :
-        // c'est le bouton fin de tour qui lance la carte visée, sous son image
-        // « lancer » — et qui, si rien n'a encore été visé, annule ET passe le
-        // tour sans dépenser l'énergie (voir combat.js, actionBoutonFinTour).
-        // Ce dernier point est un changement voulu : l'ancien ANNULER rendait la
-        // main pour continuer à se déplacer, le nouveau clôt le tour.
-        if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
+        let btnResoudre = document.getElementById("btn-resoudre-carte");
+        if (!btnResoudre) {
+            btnResoudre = document.createElement("div");
+            btnResoudre.id = "btn-resoudre-carte";
+            btnResoudre.style.cssText = "position: absolute; bottom: -30px; left: 50%; transform: translateX(10px); z-index: 5; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 2px black, 0 0 10px #00ffff; color: #00ffff; transition: transform 0.2s;";
+            btnResoudre.onmouseover = () => btnResoudre.style.transform = "translateX(10px) scale(1.1)";
+            btnResoudre.onmouseout = () => btnResoudre.style.transform = "translateX(10px) scale(1)";
+            document.getElementById("apercu-carte-hd-competence").appendChild(btnResoudre);
+        }
+        btnResoudre.innerText = "RÉSOUDRE";
+        btnResoudre.style.pointerEvents = "auto";
+        btnResoudre.onclick = () => window.declencherResolutionAvecBondEventuel();
+
+        // Annuler le ciblage sans perdre son tour : la carte revient au repos et le
+        // joueur peut continuer son déplacement, exactement comme le ✖ déjà offert
+        // en mode zone (bulle-validation-zone, plus haut). À ne pas confondre avec
+        // le bouton fin de tour, qui affiche « fin de tour » pendant le ciblage et
+        // termine le tour pour de bon (voir combat.js, actionBoutonFinTour).
+        let btnAnnuler = document.getElementById("btn-annuler-ciblage");
+        if (!btnAnnuler) {
+            btnAnnuler = document.createElement("div");
+            btnAnnuler.id = "btn-annuler-ciblage";
+            btnAnnuler.style.cssText = "position: absolute; bottom: -30px; left: 50%; transform: translateX(calc(-100% - 10px)); z-index: 5; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 2px black, 0 0 10px #ff4c4c; color: #ff4c4c; transition: transform 0.2s;";
+            btnAnnuler.onmouseover = () => btnAnnuler.style.transform = "translateX(calc(-100% - 10px)) scale(1.1)";
+            btnAnnuler.onmouseout = () => btnAnnuler.style.transform = "translateX(calc(-100% - 10px)) scale(1)";
+            document.getElementById("apercu-carte-hd-competence").appendChild(btnAnnuler);
+        }
+        btnAnnuler.innerText = "ANNULER";
+        btnAnnuler.style.pointerEvents = "auto";
+        btnAnnuler.onclick = () => window.nettoyerCiblage();
     }
+
+    // Le ciblage est ouvert : le bouton fin de tour passe en « fin de tour » —
+    // la seule chose qu'il propose encore est de renoncer à la carte.
+    if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
     window.actualiserVisuelCiblage();
 };
 
@@ -2284,9 +2306,15 @@ window.nettoyerCiblage = function() {
     window.removeEventListener("touchstart", window.VTT_CIBLAGE_TOUCHSTART, {capture: true, passive: false});
     window.removeEventListener("touchmove", window.VTT_CIBLAGE_TOUCHMOVE, {capture: true, passive: false});
 
-    // La fenêtre de tour et le bouton fin de tour suivent le même sort que
-    // l'ancien bouton "Appliquer" de la carte : ciblage annulé (ou résolu),
-    // l'écran doit refléter tout de suite le nouvel état.
+    const btnResoudre = document.getElementById("btn-resoudre-carte");
+    const btnAnnuler = document.getElementById("btn-annuler-ciblage");
+    if (btnResoudre) btnResoudre.remove();
+    if (btnAnnuler) btnAnnuler.remove();
+
+    // La fenêtre de tour et le bouton fin de tour suivent le même sort que les
+    // boutons de ciblage : ciblage annulé (ou résolu), l'écran doit refléter
+    // tout de suite le nouvel état — le bouton repasse alors sur « lancer »
+    // si la carte attend toujours d'être jouée.
     if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
     if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
 };
