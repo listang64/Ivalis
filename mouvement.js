@@ -194,13 +194,6 @@ window.ajouterEtapeMouvement = function(q, r) {
         });
         
         window.dessinerCheminMouvement();
-        
-        const bulle = document.getElementById("bulle-validation-mouvement");
-        const texteCout = document.getElementById("mouvement-cout-total");
-        if (bulle && texteCout) {
-            texteCout.innerText = window.MOUVEMENT_COUT_TOTAL + " ⚡";
-            texteCout.style.color = "#ffaa00";
-        }
         return;
     }
 
@@ -302,20 +295,15 @@ window.ajouterEtapeMouvement = function(q, r) {
     }
 
     window.dessinerCheminMouvement();
-    
-    // La bulle est en position fixe au-dessus de TOUT l'écran : si la fenêtre de
-    // combat n'est pas ouverte, elle viendrait se poser par-dessus l'écran où se
-    // trouve le joueur (création de personnage, carte du monde...). On ne
-    // l'affiche donc que si le combat est bien à l'écran.
+
+    // La croix d'annulation (sous le pion) et le bouton fin de tour (« valider
+    // déplacement ») ne doivent apparaître que si le combat est bien à l'écran :
+    // sans cette garde, un déplacement tracé ailleurs (création de personnage,
+    // carte du monde...) les ferait surgir par-dessus le mauvais écran.
     const combatOuvert = document.getElementById("fenetre-combat")?.style.display === "block";
-    const bulle = document.getElementById("bulle-validation-mouvement");
-    const texteCout = document.getElementById("mouvement-cout-total");
-    if (bulle && texteCout && combatOuvert) {
-        texteCout.innerText = window.MOUVEMENT_COUT_TOTAL + " ⚡";
-        bulle.style.display = "flex";
-        texteCout.style.color = "#ffaa00"; 
-    } else if (bulle && !combatOuvert) {
-        bulle.style.display = "none";
+    if (combatOuvert) {
+        if (typeof window.appliquerTokensVTT === "function") window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+        if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
     }
 };
 
@@ -421,12 +409,14 @@ window.annulerMouvement = function() {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     window.CHEMIN_MOUVEMENT = [];
     window.MOUVEMENT_COUT_TOTAL = 0;
-    
+
     const svg = document.getElementById("svg-chemin-mouvement");
     if (svg) svg.innerHTML = "";
-    
-    const bulle = document.getElementById("bulle-validation-mouvement");
-    if (bulle) bulle.style.display = "none";
+
+    // La croix disparaît avec le chemin (redessin des pions), et le bouton fin
+    // de tour retombe sur son état d'avant le déplacement.
+    if (typeof window.appliquerTokensVTT === "function") window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
 };
 
 window.validerMouvement = async function() {
@@ -447,13 +437,15 @@ window.validerMouvement = async function() {
     // hexagone à la fois, comme chez les autres.
     if (window.REGIME_CERVEAU && window.regimeDemande && window.regimeDemande.actif()) {
         const chemin = window.CHEMIN_MOUVEMENT.map(step => ({ q: step.q, r: step.r }));
-        const bulleR = document.getElementById("bulle-validation-mouvement");
-        if (bulleR) bulleR.style.display = "none";
         const svgR = document.getElementById("svg-chemin-mouvement");
         if (svgR) svgR.innerHTML = "";
         window.CHEMIN_MOUVEMENT = [];
         window.CHEMIN_START_NODE = null;
         window.MOUVEMENT_COUT_TOTAL = 0;
+        // La croix sous le pion disparaît avec le chemin ; le bouton fin de tour
+        // repasse en « fin de tour » le temps que le cerveau publie le trajet.
+        if (typeof window.appliquerTokensVTT === "function") window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+        if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
         return await window.regimeDemande.mouvement(
             idPerso, chemin, window.COUT_COMPETENCE_SELECTIONNEE || 0);
     }

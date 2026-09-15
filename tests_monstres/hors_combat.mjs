@@ -1,8 +1,17 @@
 // RIEN NE DOIT SE PASSER HORS DU COMBAT.
-// La bulle de validation de déplacement est en position fixe au-dessus de tout
-// l'écran. Comme l'IA des monstres continuait de jouer ses tours en arrière-plan
-// même la fenêtre de combat fermée, la bulle venait se poser par-dessus l'écran
-// de création de personnage.
+// La bulle de validation de déplacement était en position fixe au-dessus de
+// tout l'écran. Comme l'IA des monstres continuait de jouer ses tours en
+// arrière-plan même la fenêtre de combat fermée, la bulle venait se poser
+// par-dessus l'écran de création de personnage.
+//
+// La bulle est partie (refonte du bouton fin de tour) : la croix d'annulation
+// vit maintenant sous le pion lui-même, et « valider » est devenu une image du
+// bouton fin de tour — tous deux posés par appliquerTokensVTT/
+// actualiserBoutonFinTour (combat.js), jamais par ce fichier. Le risque reste
+// le même sous une autre forme : si ces deux redessins tournaient hors combat,
+// ils écriraient dans un DOM qui n'est pas censé bouger (pion d'un autre
+// écran, bouton d'un HUD masqué). Ce banc vérifie donc qu'ajouterEtapeMouvement
+// ne les appelle QUE si le combat est à l'écran.
 import fs from 'fs';
 import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 
@@ -41,8 +50,9 @@ const tracer = (combatOuvert) => p.evaluate(({ src, combatOuvert }) => {
   window.afficherMessageFlottantHex = () => {};
   window.caseOccupeeParVivant = () => false;
   window.estCombattantMort = () => false;
-  const bulle = document.getElementById("bulle-validation-mouvement");
-  bulle.style.display = "none";
+  window.APPELS = [];
+  window.appliquerTokensVTT = () => window.APPELS.push("appliquerTokensVTT");
+  window.actualiserBoutonFinTour = () => window.APPELS.push("actualiserBoutonFinTour");
   // Le module remet ses propres variables à zéro en se chargeant : on le charge
   // d'abord, on pose l'état de la partie ensuite.
   new Function('window', src)(window);
@@ -50,20 +60,22 @@ const tracer = (combatOuvert) => p.evaluate(({ src, combatOuvert }) => {
   window.CHEMIN_START_NODE = { q:0, r:0 };
   window.MOUVEMENT_COUT_TOTAL = 0;
   window.ajouterEtapeMouvement(1, 0);
-  return { affichee: getComputedStyle(bulle).display !== "none",
-           etapes: (window.CHEMIN_MOUVEMENT || []).length };
+  return { appels: window.APPELS, etapes: (window.CHEMIN_MOUVEMENT || []).length };
 }, { src: mouvement, combatOuvert });
 
 console.log("1. FENÊTRE DE COMBAT FERMÉE");
 {
   const r = await tracer(false);
-  verifier("la bulle de déplacement ne s'affiche pas", !r.affichee, `(${r.affichee ? "affichée" : "cachée"})`);
+  verifier("ni la croix (appliquerTokensVTT) ni le bouton fin de tour ne se redessinent",
+           r.appels.length === 0, `(${JSON.stringify(r.appels)})`);
 }
 
 console.log("\n2. FENÊTRE DE COMBAT OUVERTE");
 {
   const r = await tracer(true);
-  verifier("la bulle s'affiche normalement en combat", r.affichee);
+  verifier("la croix et le bouton fin de tour se redessinent normalement en combat",
+           r.appels.includes("appliquerTokensVTT") && r.appels.includes("actualiserBoutonFinTour"),
+           `(${JSON.stringify(r.appels)})`);
   verifier("le chemin est bien tracé", r.etapes > 0, `(${r.etapes} étape(s))`);
 }
 

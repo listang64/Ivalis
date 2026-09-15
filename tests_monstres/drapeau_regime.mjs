@@ -645,7 +645,7 @@ console.log("\n14. PLUS UNE SEULE PANNE MUETTE");
     verifier("et distingue « prêt » de « rien à cliquer »",
              r.includes("à moi de jouer : ") && r.includes("RIEN À CLIQUER"));
     verifier("en nommant la cause",
-             r.includes("bouton Appliquer absent")
+             r.includes("bouton fin de tour pas sur « choisir compétence »")
              && r.includes("la fenêtre sombre est encore levée"));
 }
 

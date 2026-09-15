@@ -842,7 +842,7 @@
             <div id="btn-hud-fintour"
                  style="position: absolute; top: 3%; right: 2%; width: 43%; height: 94%; border-radius: 50%; background-color: transparent; cursor: pointer; pointer-events: auto; transition: transform 0.1s;"
                  onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform='scale(1)'" onmouseleave="this.style.transform='scale(1)'"
-                 onclick="window.finDeTourCombat()" title="Fin du Tour"></div>
+                 onclick="window.actionBoutonFinTour()" title="Fin du Tour"></div>
 
             <!-- 2. Bouton ENGRENAGE (Le petit cercle au milieu) -->
             <div id="btn-hud-engrenage"
@@ -1672,19 +1672,19 @@
 <script type="module" src="pont_combat.js?v=10"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. Éteint
      par défaut — regimeCerveau(true) dans la console pour l'allumer. -->
-<script type="module" src="regime_cerveau.js?v=20"></script>
+<script type="module" src="regime_cerveau.js?v=21"></script>
 <script type="module" src="ia_master.js?v=4"></script>
 <script type="module" src="app.js?v=43"></script>
 <script type="module" src="creation_personnage.js?v=5"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
-<script type="module" src="competences.js?v=17"></script>
+<script type="module" src="competences.js?v=18"></script>
 <script src="Plateau.js"></script>
 <script type="module" src="sequence_tour.js?v=21"></script>
-<script type="module" src="combat.js?v=53"></script>
+<script type="module" src="combat.js?v=54"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
-<script type="module" src="mouvement.js?v=20"></script>
+<script type="module" src="mouvement.js?v=21"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
-<script type="module" src="moteur_effets.js?v=34"></script>
+<script type="module" src="moteur_effets.js?v=35"></script>
 <script type="module" src="monstres.js?v=19"></script>
 <script type="module" src="monstres_competences.js?v=8"></script>
 <script type="module" src="monstres_ia.js?v=28"></script>
@@ -2181,20 +2181,10 @@
       </div>
   </div>
 
-<!-- ======================================================= -->
-  <!-- BULLE DE VALIDATION DE DÉPLACEMENT TACTIQUE             -->
-  <!-- ======================================================= -->
-  <div id="bulle-validation-mouvement" style="display: none; position: fixed; top: 30px; left: 50%; transform: translateX(-50%); z-index: 10000; background: linear-gradient(180deg, #2a1a0f, #1a0f08); border: 2px solid #c2a878; border-radius: 30px; padding: 10px 25px; align-items: center; gap: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.9);">
-      <div style="color: white; font-family: 'Cinzel', serif; font-size: 20px; font-weight: bold; text-shadow: 1px 1px 3px black;">
-          Déplacement : <span id="mouvement-cout-total" style="color:#ffaa00; font-size: 24px;">0 ⚡</span>
-      </div>
-      <div style="display:flex; gap: 15px;">
-          <!-- Bouton Valider -->
-          <div onclick="window.validerMouvement()" style="width: 35px; height: 35px; background: #1b6e3a; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; font-weight: bold; font-size: 18px; border: 2px solid white; box-shadow: 0 0 10px #1b6e3a; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">✔️</div>
-          <!-- Bouton Annuler -->
-          <div onclick="window.annulerMouvement()" style="width: 35px; height: 35px; background: #d32f2f; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; font-weight: bold; font-size: 18px; border: 2px solid white; box-shadow: 0 0 10px #d32f2f; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">✖</div>
-      </div>
-  </div>
+  <!-- La bulle de validation de déplacement (checkmark/croix flottants en haut
+       de l'écran) est partie : le bouton fin de tour valide le déplacement, et
+       la croix pour l'annuler vit maintenant sous le pion lui-même (combat.js,
+       appliquerTokensVTT). -->
 
 </body>
 </html>

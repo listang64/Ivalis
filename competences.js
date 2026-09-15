@@ -543,28 +543,8 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     }
 
     const partieTemp = window.PARTIE_DATA || {};
-    const queueTemp = partieTemp.File_Attente_Combat || [];
     const phaseTemp = partieTemp.Phase_Combat || "Preparation";
     const persoActuelTemp = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
-    // UNE DEMANDE DÉJÀ ENVOYÉE FERME LE TOUR TOUT DE SUITE.
-    //
-    // Entre le moment où le joueur applique sa carte et celui où le cerveau
-    // publie le pas, il s'écoule un aller-retour réseau. Pendant ce temps la
-    // file le montre toujours en tête : le bouton « Appliquer » restait donc là
-    // et on pouvait relancer la même carte. Le cerveau refusait bien la seconde,
-    // mais le ciblage était déjà reparti sous les yeux du joueur.
-    const demandeDejaEnVol = !!(window.regimeDemande
-        && typeof window.regimeDemande.enVol === "function"
-        && persoActuelTemp
-        && window.regimeDemande.enVol(persoActuelTemp.idPersonnage));
-
-    const estMonTour = (
-        phaseTemp === "Resolution" &&
-        queueTemp.length > 0 &&
-        persoActuelTemp &&
-        queueTemp[0].idPersonnage === persoActuelTemp.idPersonnage &&
-        !demandeDejaEnVol
-    );
 
     // Les monstres ne se pilotent pas à la main : leurs cartes s'affichent pour
     // être consultées, mais sans "Choisir" ni "Appliquer". C'est l'IA de combat
@@ -592,18 +572,10 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         }
     }
 
-    // 🔻 NOUVEAU BOUTON APPLIQUER (DORÉ, EN HAUT) 🔻
-    let boutonValiderHtml = "";
-    if (isCombatMode && isLocked && estMonTour && !estCarteDeMonstre) {
-        boutonValiderHtml = `
-        <div id="btn-appliquer-carte" style="position: absolute; top: -35px; left: 50%; transform: translateX(-50%); z-index: 5; color: #ffd700; font-family: 'Cinzel', serif; font-size: 18px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 0 0 10px #ffaa00, 2px 2px 4px black; transition: transform 0.2s;" 
-             onclick="event.stopPropagation(); window.demarrerCiblage('${idCarte}')" 
-             onmouseover="this.style.transform='translateX(-50%) scale(1.1)'" 
-             onmouseout="this.style.transform='translateX(-50%) scale(1)'">
-            Appliquer
-        </div>
-        `;
-    }
+    // L'ANCIEN BOUTON APPLIQUER (doré, flottant au-dessus de la carte) est
+    // parti : c'est maintenant le bouton fin de tour qui démarre le ciblage
+    // d'une carte verrouillée, sous son image « choisir compétence »
+    // (combat.js, actualiserBoutonFinTour/actionBoutonFinTour).
 
     conteneurCarte.innerHTML = `
         <!-- COUCHE 1 : FOND DE COULEUR -->
@@ -635,7 +607,6 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         ${htmlZoneAbsolue}
 
         ${boutonChoisirHtml}
-        ${boutonValiderHtml}
     `;
 
     conteneurCarte.style.display = "block";

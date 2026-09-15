@@ -531,12 +531,14 @@ let rendreLaMainAuxJoueurs = () => {};
 // C'EST À MOI DE JOUER : EST-CE QUE JE PEUX ?
 //
 // Le seul chemin par lequel un joueur lance sa carte pendant son tour est le
-// bouton doré « Appliquer » (competences.js). Il n'apparaît que si TROIS choses
-// sont vraies au moment du rendu : la phase est « Resolution », mon héros est en
+// bouton fin de tour (combat.js, actualiserBoutonFinTour), sous son image
+// « choisir compétence ». Il ne prend ce visage que si TROIS choses sont
+// vraies au moment du rendu : la phase est « Resolution », mon héros est en
 // TÊTE de la file, et son entrée porte l'identifiant de sa carte.
 //
-// Quand ces trois choses sont vraies et que le bouton n'est PAS là, le joueur
-// est devant un écran mort et personne ne le sait — ni lui, ni la trace, ni moi.
+// Quand ces trois choses sont vraies et que le bouton n'a PAS ce visage, le
+// joueur est devant un écran mort et personne ne le sait — ni lui, ni la
+// trace, ni moi.
 // C'est ce qui a coûté la troisième soirée d'essai : « le cerveau attend
 // PERSO_338423 » pendant vingt-cinq secondes, et rien pour dire que le poste de
 // PERSO_338423 n'avait aucun bouton à cliquer.
@@ -573,19 +575,19 @@ function verifierQueJePeuxJouer(file) {
         return;
     }
 
-    const bouton = document.getElementById("btn-appliquer-carte");
+    const pret = document.getElementById("img-hud-fintour") && window.MODE_BOUTON_FINTOUR === "choisir_competence";
     const voile = !!window.EVENEMENT_ATTENDU;
-    if (bouton && !voile) {
+    if (pret && !voile) {
         if (typeof window.tracerCombat === "function") {
             window.tracerCombat("🎯", `à moi de jouer : ${tete.idPersonnage}`,
-                                `bouton Appliquer prêt (${tete.idCarte || "sans carte"})`);
+                                `bouton fin de tour prêt (${tete.idCarte || "sans carte"})`);
         }
         return;
     }
     if (typeof window.tracerCombat === "function") {
         window.tracerCombat("🧊", `à moi de jouer mais RIEN À CLIQUER : ${tete.idPersonnage}`,
                             [`carte ${tete.idCarte || "ABSENTE"}`,
-                             bouton ? "bouton présent" : "bouton Appliquer absent",
+                             pret ? "bouton prêt" : "bouton fin de tour pas sur « choisir compétence »",
                              voile ? "la fenêtre sombre est encore levée" : "pas de voile"].join(" · "));
     }
 }
