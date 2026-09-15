@@ -1001,8 +1001,16 @@ document.addEventListener("click", function(event) {
     // La fenêtre de tour n'est pas "le vide" : le clic qui y lance les animations
     // ne doit pas annuler au passage le ciblage qu'on est en train de préparer.
     const clicSurVoile = event.target.closest('#voile-tour-combat');
+    // LE BOUTON FIN DE TOUR NON PLUS. C'est lui qui OUVRE le ciblage depuis son
+    // image « lancer » : son clic partait ici en remontant et appelait
+    // nettoyerCiblage dans la foulée — la carte s'ouvrait et se refermait dans
+    // le même geste, sans que rien à l'écran ne le dise. Du temps où le ciblage
+    // démarrait par « Appliquer », posé SUR la carte, le cas ne pouvait pas se
+    // produire (clicSurCarteHD couvrait le bouton).
+    const clicSurBoutonFinTour = event.target.closest('#btn-hud-fintour');
 
-    if (!clicSurBanniere && !clicSurCarteHD && !clicSurFleche && !clicSurVoile && window.CARTE_EN_APERCU) {
+    if (!clicSurBanniere && !clicSurCarteHD && !clicSurFleche && !clicSurVoile
+        && !clicSurBoutonFinTour && window.CARTE_EN_APERCU) {
         
         // 🔻 NOUVEAU : Annule le ciblage en cours si on clique dans le vide
         if (typeof window.nettoyerCiblage === "function") window.nettoyerCiblage();
@@ -1608,7 +1616,15 @@ document.addEventListener("click", async function(event) {
     if (Math.abs(event.clientX - vttClicStartX) > 10 || Math.abs(event.clientY - vttClicStartY) > 10) return;
 
     // 🔻 NOUVEAU : On ignore le clic s'il est sur la piste d'initiative
-    if (event.target.closest(".token-vtt") || event.target.closest("#menu-dev-combat") || event.target.closest("#piste-initiative")) return;
+    // LE HUD N'EST PAS LE PLATEAU. Ce qu'on y clique (fin de tour, engrenage,
+    // repos long) ne doit ni tracer un pas de déplacement, ni tomber dans la
+    // désélection « clic dans le vide » du bas de cette fonction : celle-ci
+    // remet TOKEN_SELECTIONNE à null et redessine les pions, ce qui EFFACE au
+    // passage les anneaux du ciblage que le bouton fin de tour vient tout juste
+    // d'ouvrir. Du temps où le ciblage partait du bouton « Appliquer », posé
+    // sur l'aperçu de la carte, le cas ne pouvait pas se produire.
+    if (event.target.closest(".token-vtt") || event.target.closest("#menu-dev-combat")
+        || event.target.closest("#piste-initiative") || event.target.closest("#combat-hud-bas-droite")) return;
 
     if (window.TOKEN_SELECTIONNE) {
         
@@ -3512,8 +3528,18 @@ window.actionBoutonFinTour = function() {
     if (window.MODE_BOUTON_FINTOUR === "lancer") {
         const queue = (window.PARTIE_DATA || {}).File_Attente_Combat || [];
         const idCarte = queue[0] && queue[0].idCarte;
-        if (idCarte && typeof window.demarrerCiblage === "function") return window.demarrerCiblage(idCarte);
-        return;
+        if (!idCarte || typeof window.demarrerCiblage !== "function") return;
+
+        // LA CARTE DOIT ÊTRE À L'ÉCRAN AVANT DE VISER. RÉSOUDRE et ANNULER se
+        // posent sur son aperçu (moteur_effets.js) : l'ancien bouton
+        // « Appliquer » vivait dessus, donc l'aperçu était forcément là. Ce
+        // bouton-ci, lui, est dans le HUD et se clique même carte refermée —
+        // le ciblage partait alors sans ses deux boutons, et la carte restait
+        // en l'air sans rien pour la résoudre ni l'annuler.
+        if (typeof window.afficherApercuCarteHD === "function") {
+            window.afficherApercuCarteHD(idCarte, true);
+        }
+        return window.demarrerCiblage(idCarte);
     }
 
     // FIN DE TOUR. Si un ciblage était ouvert, il se referme sans rien lancer :

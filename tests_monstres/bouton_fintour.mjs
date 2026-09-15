@@ -25,6 +25,8 @@ import fs from 'fs';
 import http from 'http';
 import path from 'path';
 
+const EFFETS_REELS = JSON.parse(fs.readFileSync('/home/user/Ivalis/tests_monstres/effets_reels.json', 'utf-8'));
+
 const RACINE = '/home/user/Ivalis';
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
                 '.css': 'text/css; charset=utf-8', '.json': 'application/json' };
@@ -91,10 +93,25 @@ p.on('console', m => { if (m.type() === 'error' && !/net::|Failed to load resour
 await p.goto(base + '/index.html');
 await p.waitForTimeout(2000);
 
+// LES VRAIES FONCTIONS, MISES DE CÔTÉ AVANT QUE LES SECTIONS NE LES DOUBLENT.
+// Les chapitres qui suivent remplacent demarrerCiblage & co. par des mouchards
+// pour savoir QUI est appelé ; le dernier, lui, fait tourner le vrai moteur et
+// a besoin de les retrouver intactes.
+await p.evaluate(() => {
+  window.__VRAIES = {};
+  ["demarrerCiblage", "nettoyerCiblage", "finDeTourCombat", "validerMouvement",
+   "jouerCarteCombat", "declencherResolutionAvecBondEventuel"].forEach(nom => {
+    window.__VRAIES[nom] = window[nom];
+  });
+});
+
 // =========================================================================
 //  LE MONDE MINIMAL : un héros seul, une créature en face.
 // =========================================================================
 const monde = () => p.evaluate(() => {
+  document.documentElement.style.setProperty('--app-h', window.innerHeight + 'px');
+  document.querySelectorAll('body > div[id^="ecran-"]').forEach(e => { if (e.id !== 'ecran-jeu') e.style.display = 'none'; });
+  document.getElementById('ecran-jeu').style.display = 'block';
   document.getElementById("fenetre-combat").style.display = "block";
 
   window.jouerSonClic = () => {};
@@ -141,6 +158,16 @@ const monde = () => p.evaluate(() => {
   window.actualiserBoutonFinTour();
 });
 
+// LE CLIC PASSE PAR LE DOM, PAS PAR LA FONCTION. C'est toute la leçon de ce
+// banc : appeler window.actionBoutonFinTour() à la main ne réveille AUCUN des
+// écouteurs globaux du jeu. Or deux d'entre eux (le « clic dans le vide » de
+// combat.js) annulaient le ciblage et effaçaient ses anneaux dans la foulée du
+// clic — invisible depuis un appel direct, fatal en jeu.
+const cliquerBouton = async () => {
+  await p.evaluate(() => document.getElementById("btn-hud-fintour").click());
+  await p.waitForTimeout(150);
+};
+
 const etatBouton = () => p.evaluate(() => ({
   src: document.getElementById("img-hud-fintour").src,
   mode: window.MODE_BOUTON_FINTOUR,
@@ -159,7 +186,7 @@ console.log("\n1. PRÉPARATION : ÉTEINT TANT QU'AUCUNE CARTE N'EST OUVERTE");
   verifier("et le bouton ne fait rien", e.actionnable === false);
 
   await p.evaluate(() => { window.jouerCarteCombat = async (id) => { window.APPELS.push(["choisirDirect", id]); }; });
-  await p.evaluate(() => window.actionBoutonFinTour());
+  await cliquerBouton();
   const appels = await p.evaluate(() => window.APPELS);
   verifier("cliquer dessus ne déclenche rien", appels.length === 0, JSON.stringify(appels));
 }
@@ -177,7 +204,7 @@ console.log("\n2. PRÉPARATION : UNE CARTE OUVERTE EN GRAND SE CHOISIT PAR CE BO
   verifier("le mode est « choisir compétence »", e.mode === "choisir_competence", `(${e.mode})`);
   verifier("l'image est IMG_2131", e.src.includes("IMG_2131"), e.src);
 
-  await p.evaluate(() => window.actionBoutonFinTour());
+  await cliquerBouton();
   const appels = await p.evaluate(() => window.APPELS);
   verifier("le clic retient la carte pour la manche (jouerCarteCombat)",
            appels.some(a => a[0] === "choisirDirect" && a[1] === "C1"), JSON.stringify(appels));
@@ -225,7 +252,7 @@ console.log("\n4. NOTRE TOUR : « LANCER », TANT QU'ON N'A PAS COMMENCÉ À VIS
   verifier("l'image est IMG_2132", e.src.includes("IMG_2132"), e.src);
 
   await p.evaluate(() => { window.demarrerCiblage = async (id) => { window.APPELS.push(["ciblageDirect", id]); }; });
-  await p.evaluate(() => window.actionBoutonFinTour());
+  await cliquerBouton();
   const appels = await p.evaluate(() => window.APPELS);
   verifier("le clic démarre le ciblage de la carte retenue",
            appels.some(a => a[0] === "ciblageDirect" && a[1] === "C1"), JSON.stringify(appels));
@@ -249,7 +276,7 @@ console.log("\n5. UN DÉPLACEMENT SE TRACE : « VALIDER », ET LA CROIX SOUS LE 
   verifier("la croix d'annulation apparaît sous le pion", croix);
 
   await p.evaluate(() => { window.validerMouvement = async () => { window.APPELS.push(["validerDirect"]); }; });
-  await p.evaluate(() => window.actionBoutonFinTour());
+  await cliquerBouton();
   const appels = await p.evaluate(() => window.APPELS);
   verifier("le clic valide le déplacement", appels.some(a => a[0] === "validerDirect"), JSON.stringify(appels));
 }
@@ -291,7 +318,7 @@ console.log("\n7. PENDANT LE CIBLAGE : « FIN DE TOUR », SANS DÉPENSER SA CART
   verifier("le mode est « fin de tour »", e.mode === "fin_de_tour", `(${e.mode})`);
   verifier("l'image est IMG_2124", e.src.includes("IMG_2124"), e.src);
 
-  await p.evaluate(() => window.actionBoutonFinTour());
+  await cliquerBouton();
   const res = await p.evaluate(() => ({ appels: window.APPELS, cout: window.COUT_COMPETENCE_SELECTIONNEE }));
   verifier("le ciblage se referme", res.appels.some(a => a[0] === "nettoyerDirect"), JSON.stringify(res.appels));
   verifier("le tour se termine", res.appels.some(a => a[0] === "finTourDirect"), JSON.stringify(res.appels));
@@ -314,7 +341,7 @@ console.log("\n8. RIEN À LANCER (repos long) : « FIN DE TOUR » AUSSI");
   const e = await etatBouton();
   verifier("le mode est « fin de tour »", e.mode === "fin_de_tour", `(${e.mode})`);
   verifier("l'image est IMG_2124", e.src.includes("IMG_2124"), e.src);
-  await p.evaluate(() => window.actionBoutonFinTour());
+  await cliquerBouton();
   const appels = await p.evaluate(() => window.APPELS);
   verifier("le clic finit le tour", appels.some(a => a[0] === "finTourDirect"), JSON.stringify(appels));
 }
@@ -330,7 +357,7 @@ console.log("\n9. LA GARDE ANTI-DOUBLE-CLIC : UNE DEMANDE DÉJÀ EN VOL EST IGNO
     window.APPELS = [];
     window.actualiserBoutonFinTour();
   });
-  await p.evaluate(() => window.actionBoutonFinTour());
+  await cliquerBouton();
   const appels = await p.evaluate(() => window.APPELS);
   verifier("le clic est ignoré pendant qu'une demande est en vol", appels.length === 0, JSON.stringify(appels));
   await p.evaluate(() => { window.regimeDemande.enVol = () => false; });
@@ -348,6 +375,72 @@ console.log("\n10. LA BULLE DE VALIDATION DE DÉPLACEMENT A DISPARU");
   verifier("la bulle de déplacement n'existe plus", !restes.bulleMouvement);
   verifier("l'ancien bouton Appliquer n'existe plus", !restes.btnAppliquer);
   verifier("l'ancien bouton Choisir n'existe plus", !restes.btnChoisir);
+}
+
+// =========================================================================
+console.log("\n11. LE CLIC SUR « LANCER » OUVRE UN VRAI CIBLAGE, ET IL TIENT");
+// =========================================================================
+//  LE BANC QUI MANQUAIT. Tout ce qui précède passait déjà alors que le jeu,
+//  lui, ne lançait rien : le clic ouvrait le ciblage puis DEUX écouteurs
+//  globaux de combat.js — « clic dans le vide » — le refermaient dans la
+//  foulée du même événement (nettoyerCiblage, puis un redessin des pions qui
+//  effaçait les anneaux). Invisible tant qu'on appelait actionBoutonFinTour à
+//  la main : il faut le vrai clic, le vrai moteur de ciblage, et une vraie
+//  carte. On ne remplace donc ici NI demarrerCiblage, NI les écouteurs.
+{
+  await monde();
+  await p.evaluate((EFFETS) => {
+    Object.keys(window.__VRAIES).forEach(nom => { window[nom] = window.__VRAIES[nom]; });
+    window.EFFETS_BDD_CACHE = EFFETS;
+    window.ZONES_PERSISTANTES = {};
+    window.VTT_SCALE = 1; window.VTT_POS_X = 0; window.VTT_POS_Y = 0;
+    window.PLATEAU_VTT.pixelToHex = () => ({ q: 0, r: 0 });
+    // Un ennemi au contact : la carte doit pouvoir le viser.
+    window.TOKENS_VTT_DATA = { H1: { q: 0, r: 0 }, M1: { q: 1, r: 0 } };
+    window.PERSOS_PARTIE = [
+      { idPersonnage: "H1", camp: "Allié", prenom: "Nico", idJoueur: "P_01", PV_Max: 60, PV_Actuels: 60,
+        Fatigue_Max: 100, fatigueActuelle: 100, Bouclier_Actuel: 0, Etats_Alteres: [], statut: "Vivant" },
+      { idPersonnage: "M1", camp: "Ennemi", prenom: "Gnoll", estMonstre: true, PV_Max: 40, PV_Actuels: 40,
+        Fatigue_Max: 100, fatigueActuelle: 100, Bouclier_Actuel: 0, Etats_Alteres: [], statut: "Vivant" }
+    ];
+    window.COMBAT_PERSOS_JOUEUR = [ window.PERSOS_PARTIE[0] ];
+    const CARTE = { Nom: "Trait perçant", Arme: "Arme légère", Fatigue: 20, Initiative: 15,
+      Effets_Compiles: [], Composants: { actions: [
+        { baseEffetId: "EFF_ATTAQUE_LEGERE", count: 3, mods: {}, zoneHexes: [], baseDuree: 0, modsDuree: {} } ] } };
+    window.COMPETENCES_CACHE = { C1: CARTE };
+    window.CACHE_COMPETENCES_GLOBAL = { H1: { C1: CARTE } };
+    window.PARTIE_DATA = { Phase_Combat: "Resolution", Tour_Combat: 1,
+      File_Attente_Combat: [{ idPersonnage: "H1", idCarte: "C1", initiative: 15 }] };
+    window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    window.actualiserBoutonFinTour();
+  }, EFFETS_REELS);
+
+  const avant = await etatBouton();
+  verifier("avant le clic, le bouton propose « lancer »", avant.mode === "lancer", `(${avant.mode})`);
+
+  await cliquerBouton();
+  await p.waitForTimeout(300);
+
+  const apres = await p.evaluate(() => {
+    const btn = document.getElementById("btn-resoudre-carte");
+    const rect = btn && btn.getBoundingClientRect();
+    return {
+      mode: window.MODE_BOUTON_FINTOUR,
+      ciblageActif: !!(window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif),
+      anneaux: document.querySelectorAll(".anneau-ciblage").length,
+      resoudreVisible: !!(rect && rect.width > 0 && rect.height > 0),
+      annulerPresent: !!document.getElementById("btn-annuler-ciblage"),
+      tokenTenu: window.TOKEN_SELECTIONNE
+    };
+  });
+
+  verifier("le ciblage est bel et bien ouvert", apres.ciblageActif, JSON.stringify(apres));
+  verifier("ses anneaux sont dessinés ET ils TIENNENT", apres.anneaux > 0, `(${apres.anneaux} anneau(x))`);
+  verifier("RÉSOUDRE est là, et visible", apres.resoudreVisible);
+  verifier("ANNULER aussi", apres.annulerPresent);
+  verifier("le bouton fin de tour propose maintenant de renoncer", apres.mode === "fin_de_tour", `(${apres.mode})`);
+  verifier("le pion reste sélectionné (le clic n'a pas désélectionné le héros)",
+           apres.tokenTenu === "H1", `(${apres.tokenTenu})`);
 }
 
 verifier("aucune erreur JS pendant toute la séance", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

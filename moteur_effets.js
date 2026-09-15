@@ -1810,36 +1810,53 @@ window.demarrerCiblage = async function(idCarte, options) {
         window.addEventListener("touchmove", window.VTT_CIBLAGE_TOUCHMOVE, {capture: true, passive: false});
 
     } else {
-        let btnResoudre = document.getElementById("btn-resoudre-carte");
-        if (!btnResoudre) {
-            btnResoudre = document.createElement("div");
-            btnResoudre.id = "btn-resoudre-carte";
-            btnResoudre.style.cssText = "position: absolute; bottom: -30px; left: 50%; transform: translateX(10px); z-index: 5; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 2px black, 0 0 10px #00ffff; color: #00ffff; transition: transform 0.2s;";
-            btnResoudre.onmouseover = () => btnResoudre.style.transform = "translateX(10px) scale(1.1)";
-            btnResoudre.onmouseout = () => btnResoudre.style.transform = "translateX(10px) scale(1)";
-            document.getElementById("apercu-carte-hd-competence").appendChild(btnResoudre);
-        }
-        btnResoudre.innerText = "RÉSOUDRE";
-        btnResoudre.style.pointerEvents = "auto";
-        btnResoudre.onclick = () => window.declencherResolutionAvecBondEventuel();
+        // LES DEUX BOUTONS VIVENT SUR L'APERÇU DE LA CARTE, et cet aperçu naît
+        // paresseusement (competences.js) : il peut ne pas être là. Il l'était
+        // forcément du temps où l'on cliquait « Appliquer », qui était posé
+        // dessus ; depuis que c'est le bouton fin de tour qui lance le ciblage,
+        // plus rien ne le garantit. Un appendChild sur `null` levait alors une
+        // exception EN PLEIN MILIEU du ciblage : l'état était posé, mais ni les
+        // anneaux ni les boutons n'arrivaient — la carte ne partait jamais et
+        // rien à l'écran ne disait pourquoi.
+        const hoteBoutons = document.getElementById("apercu-carte-hd-competence");
+        if (!hoteBoutons) {
+            console.error("Ciblage : l'aperçu de la carte est absent, RÉSOUDRE et ANNULER n'ont nulle part où se poser.");
+            if (typeof window.tracerCombat === "function") {
+                window.tracerCombat("🧊", `ciblage sans aperçu de carte (${idCarte})`,
+                                    "RÉSOUDRE/ANNULER introuvables — la carte ne peut pas être résolue");
+            }
+        } else {
+            let btnResoudre = document.getElementById("btn-resoudre-carte");
+            if (!btnResoudre) {
+                btnResoudre = document.createElement("div");
+                btnResoudre.id = "btn-resoudre-carte";
+                btnResoudre.style.cssText = "position: absolute; bottom: -30px; left: 50%; transform: translateX(10px); z-index: 5; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 2px black, 0 0 10px #00ffff; color: #00ffff; transition: transform 0.2s;";
+                btnResoudre.onmouseover = () => btnResoudre.style.transform = "translateX(10px) scale(1.1)";
+                btnResoudre.onmouseout = () => btnResoudre.style.transform = "translateX(10px) scale(1)";
+                hoteBoutons.appendChild(btnResoudre);
+            }
+            btnResoudre.innerText = "RÉSOUDRE";
+            btnResoudre.style.pointerEvents = "auto";
+            btnResoudre.onclick = () => window.declencherResolutionAvecBondEventuel();
 
-        // Annuler le ciblage sans perdre son tour : la carte revient au repos et le
-        // joueur peut continuer son déplacement, exactement comme le ✖ déjà offert
-        // en mode zone (bulle-validation-zone, plus haut). À ne pas confondre avec
-        // le bouton fin de tour, qui affiche « fin de tour » pendant le ciblage et
-        // termine le tour pour de bon (voir combat.js, actionBoutonFinTour).
-        let btnAnnuler = document.getElementById("btn-annuler-ciblage");
-        if (!btnAnnuler) {
-            btnAnnuler = document.createElement("div");
-            btnAnnuler.id = "btn-annuler-ciblage";
-            btnAnnuler.style.cssText = "position: absolute; bottom: -30px; left: 50%; transform: translateX(calc(-100% - 10px)); z-index: 5; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 2px black, 0 0 10px #ff4c4c; color: #ff4c4c; transition: transform 0.2s;";
-            btnAnnuler.onmouseover = () => btnAnnuler.style.transform = "translateX(calc(-100% - 10px)) scale(1.1)";
-            btnAnnuler.onmouseout = () => btnAnnuler.style.transform = "translateX(calc(-100% - 10px)) scale(1)";
-            document.getElementById("apercu-carte-hd-competence").appendChild(btnAnnuler);
+            // Annuler le ciblage sans perdre son tour : la carte revient au repos et le
+            // joueur peut continuer son déplacement, exactement comme le ✖ déjà offert
+            // en mode zone (bulle-validation-zone, plus haut). À ne pas confondre avec
+            // le bouton fin de tour, qui affiche « fin de tour » pendant le ciblage et
+            // termine le tour pour de bon (voir combat.js, actionBoutonFinTour).
+            let btnAnnuler = document.getElementById("btn-annuler-ciblage");
+            if (!btnAnnuler) {
+                btnAnnuler = document.createElement("div");
+                btnAnnuler.id = "btn-annuler-ciblage";
+                btnAnnuler.style.cssText = "position: absolute; bottom: -30px; left: 50%; transform: translateX(calc(-100% - 10px)); z-index: 5; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 2px black, 0 0 10px #ff4c4c; color: #ff4c4c; transition: transform 0.2s;";
+                btnAnnuler.onmouseover = () => btnAnnuler.style.transform = "translateX(calc(-100% - 10px)) scale(1.1)";
+                btnAnnuler.onmouseout = () => btnAnnuler.style.transform = "translateX(calc(-100% - 10px)) scale(1)";
+                hoteBoutons.appendChild(btnAnnuler);
+            }
+            btnAnnuler.innerText = "ANNULER";
+            btnAnnuler.style.pointerEvents = "auto";
+            btnAnnuler.onclick = () => window.nettoyerCiblage();
         }
-        btnAnnuler.innerText = "ANNULER";
-        btnAnnuler.style.pointerEvents = "auto";
-        btnAnnuler.onclick = () => window.nettoyerCiblage();
     }
 
     // Le ciblage est ouvert : le bouton fin de tour passe en « fin de tour » —
