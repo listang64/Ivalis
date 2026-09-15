@@ -216,7 +216,8 @@ const ALTERATIONS_MOTEUR = ["brûl", "brul", "glac", "électri", "electri", "emp
 
 window.analyserCarteMonstre = function(dataCarte) {
     const infos = { portee: 1, estSoin: false, estZone: false, degats: 0, aAlteration: false,
-                    zoneHexes: null, fatigue: parseInt(dataCarte?.Fatigue) || 0 };
+                    zoneHexes: null, zoneEstADistance: false, zonePortee: 1,
+                    persistanceTerrain: false, fatigue: parseInt(dataCarte?.Fatigue) || 0 };
     const cache = window.EFFETS_BDD_CACHE || {};
     if (!dataCarte || !dataCarte.Composants || !dataCarte.Composants.actions) return infos;
 
@@ -232,6 +233,18 @@ window.analyserCarteMonstre = function(dataCarte) {
         if (nomBase.includes("attaque") || nomBase.includes("mot de pouvoir") || nomBase.includes("mots de pouvoir")) {
             infos.degats += (parseFloat(String(base.Valeur).replace(",", ".")) || 0) * (act.count || 1);
         }
+        if (nomBase.includes("persistance")) infos.persistanceTerrain = true;
+
+        // LA ZONE PORTE SA PROPRE DISTANCE (même règle que dans moteur_effets.js,
+        // voir zoneEstADistance/zonePortee là-bas) : c'est l'action qui dessine
+        // l'emprise qui dit à quelle distance on peut la poser, pas une autre
+        // action de la même carte — un soin à distance sur une carte dont
+        // l'attaque de zone reste au contact ne doit pas lui prêter sa portée.
+        let porteeAction = 1, actionADistance = (nomBase === "distance");
+        if (actionADistance) {
+            porteeAction = 1 + (parseFloat(String(base.Valeur).replace(",", ".")) || 0) * (act.count || 1);
+        }
+
         if (act.zoneHexes && act.zoneHexes.length > 0) {
             infos.estZone = true;
             // L'emprise brute, telle que la Forge l'a dessinée autour de (0,0) :
@@ -247,12 +260,20 @@ window.analyserCarteMonstre = function(dataCarte) {
             if (mod.Nom === "Distance") {
                 const val = parseFloat(String(mod.Valeur).replace(",", ".")) || 0;
                 infos.portee = Math.max(infos.portee, 1 + val * act.mods[idMod]);
+                actionADistance = true;
+                porteeAction = Math.max(porteeAction, 1 + val * act.mods[idMod]);
             }
             if (mod.Nom === "Zone") infos.estZone = true;
             const nomMod = (mod.Nom || "").toLowerCase();
             if (ALTERATIONS_MOTEUR.some(mot => nomMod.includes(mot))) infos.aAlteration = true;
             if (nomMod.includes("bouclier") || nomMod.includes("soin") || nomMod.includes("purification")) infos.estSoin = true;
+            if (nomMod.includes("persistance")) infos.persistanceTerrain = true;
         });
+
+        if (act.zoneHexes && act.zoneHexes.length > 0 && actionADistance) {
+            infos.zoneEstADistance = true;
+            infos.zonePortee = Math.max(infos.zonePortee, porteeAction);
+        }
     });
     // ⚖️ règle du moteur : une illusion "encaisse les dégâts mais reste
     // insensible à tout le reste". Une carte qui porte la moindre altération,
@@ -262,206 +283,11 @@ window.analyserCarteMonstre = function(dataCarte) {
     return infos;
 };
 
-// =========================================================================
-//  4. QUI VISER
-// =========================================================================
-
-window.choisirCibleMonstre = function(monstre, infosCarte) {
-    const t = traits(monstre);
-    const tokens = window.TOKENS_VTT_DATA || {};
-    const tkMonstre = tokens[monstre.idPersonnage];
-    if (!tkMonstre) return null;
-
-    // Une carte de soutien se tourne vers les siens, le reste vers l'adversaire.
-    const candidats = (window.PERSOS_PARTIE || []).filter(p => {
-        if (p.idPersonnage === monstre.idPersonnage && !infosCarte.estSoin) return false;
-        if (typeof window.estCombattantMort === "function" && window.estCombattantMort(p.idPersonnage)) return false;
-        if (!tokens[p.idPersonnage]) return false;
-        // Un leurre ne se laisse frapper que par une attaque nue : contre tout le
-        // reste, le moteur répond "Cible invalide" et la créature a perdu son
-        // tour. Elle peut donc encore se faire avoir — c'est le but d'une
-        // illusion — mais seulement quand le coup partira pour de bon.
-        if (p.estIllusion && !infosCarte.estAttaqueSimple) return false;
-        return infosCarte.estSoin ? (p.camp === monstre.camp) : (p.camp !== monstre.camp);
-    });
-    if (candidats.length === 0) return null;
-
-    // Provoquée (arme d'un héros, cf. objets.js), la créature ne voit plus que
-    // celui qui l'a défiée tant que l'état dure — sauf pour ses soins, qui vont
-    // toujours aux siens. Si le provocateur est tombé entre-temps, la contrainte
-    // s'efface d'elle-même et la créature retrouve son libre arbitre.
-    const provocation = (monstre.Etats_Alteres || []).find(e => e.nom === "Provocation");
-    if (provocation && provocation.idProvocateur && !infosCarte.estSoin) {
-        const force = candidats.filter(c => c.idPersonnage === provocation.idProvocateur);
-        if (force.length > 0) return force[0];
-    }
-
-    let meilleure = null, meilleurScore = -Infinity;
-    candidats.forEach(cible => {
-        const tk = tokens[cible.idPersonnage];
-        const distance = distanceHex(tkMonstre, tk);
-
-        const pvMax = (parseInt(cible.PV_Max) || 1) + (parseInt(cible.Dev_Mod_PV) || 0);
-        const pv = parseInt(cible.PV_Actuels);
-        const ratioPV = pvMax > 0 ? Math.max(0, Math.min(1, (isNaN(pv) ? pvMax : pv) / pvMax)) : 1;
-
-        let score = 0;
-        // Achever un blessé : c'est le trait "cibleFaible" qui décide du poids.
-        score += t.cibleFaible * (1 - ratioPV) * 10;
-        // Un soin va à celui qui en a le plus besoin, et à personne s'ils vont tous bien.
-        if (infosCarte.estSoin) score += (1 - ratioPV) * 14 - 4;
-        // À situation égale, on préfère ce qui est proche : moins de trajet, moins de risques.
-        score -= distance * 1.2;
-        // Déjà à portée sans bouger : gros avantage, c'est un tour utile garanti.
-        if (distance <= infosCarte.portee) score += 6;
-        score += bruit(2.5);
-
-        if (score > meilleurScore) { meilleurScore = score; meilleure = cible; }
-    });
-    return meilleure;
-};
-
-// =========================================================================
-//  5. OÙ SE PLACER
-// =========================================================================
-//  On note chaque case atteignable (3 pas au plus) selon la personnalité, et
-//  on garde la meilleure. C'est ici que se jouent le contournement, la fuite
-//  du corps-à-corps des tireurs, et l'évitement des zones.
-// =========================================================================
-
-// L'adversaire debout le plus proche, leurres exclus : c'est vers lui qu'une
-// créature marche quand sa carte ne peut atteindre personne ce tour-ci.
-function ennemiLePlusProche(monstre) {
-    const tokens = window.TOKENS_VTT_DATA || {};
-    const tk = tokens[monstre.idPersonnage];
-    if (!tk) return null;
-    let plusProche = null, meilleure = Infinity;
-    (window.PERSOS_PARTIE || []).forEach(p => {
-        if (p.camp === monstre.camp || p.estIllusion) return;
-        if (typeof window.estCombattantMort === "function" && window.estCombattantMort(p.idPersonnage)) return;
-        const tkP = tokens[p.idPersonnage];
-        if (!tkP) return;
-        const d = distanceHex(tk, tkP);
-        if (d < meilleure) { meilleure = d; plusProche = p; }
-    });
-    return plusProche;
-}
-
-window.choisirPositionMonstre = function(monstre, cible, infosCarte) {
-    const tokens = window.TOKENS_VTT_DATA || {};
-    const tkMonstre = tokens[monstre.idPersonnage];
-    const tkCible = cible ? tokens[cible.idPersonnage] : null;
-    if (!tkMonstre) return null;
-
-    const t = traits(monstre);
-    const cases = window.casesAccessiblesMonstre(monstre.idPersonnage);
-    if (cases.length === 0) return null;
-
-    // Fatigue réellement disponible pour marcher : la carte est payée d'abord.
-    const fatigue = parseInt(monstre.fatigueActuelle);
-    const fatigueDispo = (isNaN(fatigue) ? 0 : fatigue) - infosCarte.fatigue;
-    const estGlace = (monstre.Etats_Alteres || []).some(e => e.nom === "Glacé");
-
-    const contactDepart = ennemisAuContactDepuis(tkMonstre.q, tkMonstre.r, monstre.camp);
-
-    // Carte de zone au corps-à-corps : l'emprise est centrée sur la créature, donc
-    // c'est SA case qui décide de qui sera pris dedans. On juge alors chaque case
-    // à ce que la zone y ramasserait, plutôt qu'à la seule distance d'une cible :
-    // sans ça, elle allait au contact du premier venu et arrosait une case vide.
-    const zoneDeMelee = infosCarte.estZone && infosCarte.zoneHexes
-                        && infosCarte.zoneHexes.length > 0 && infosCarte.portee <= 1;
-    const occupantsZone = zoneDeMelee
-        ? occupantsSousZone(monstre, !!infosCarte.estSoin, !infosCarte.estSoin && !infosCarte.aAlteration)
-        : null;
-
-    let meilleure = null, meilleurScore = -Infinity;
-
-    cases.forEach(c => {
-        // Coût réel du trajet, barème du jeu : 2 par case sur les trois premières,
-        // doublé sur terrain difficile et doublé encore si le monstre est gelé.
-        let cout = 0;
-        c.chemin.forEach(step => {
-            let pas = 2;
-            const etat = window.PLATEAU_VTT.getCaseState(step.q, step.r);
-            if (etat.isDifficult) pas *= 2;
-            if (estGlace) pas *= 2;
-            cout += pas;
-        });
-        if (cout > fatigueDispo) return; // il ne pourrait plus lancer sa carte
-
-        let score = 0;
-
-        if (occupantsZone) {
-            // Zone de mêlée : la bonne case n'est pas "celle qui touche la
-            // cible", c'est celle dont l'emprise ramasse le plus de monde. On
-            // essaie les six orientations depuis chaque case et on juge là-dessus
-            // — sinon la créature fonçait sur le premier venu et arrosait du vide.
-            const couverture = meilleureOrientation(infosCarte.zoneHexes, c, occupantsZone).score;
-            score += couverture * 1.4;
-            // Rien à ramasser d'ici : on se rapproche quand même, comme pour une
-            // carte ordinaire.
-            if (couverture <= 0 && tkCible) score -= distanceHex(c, tkCible) * 2.5;
-
-        } else if (tkCible) {
-            const distance = distanceHex(c, tkCible);
-            if (distance <= infosCarte.portee) {
-                score += 25; // à portée : c'est l'objectif premier
-                // Un tireur ne veut pas coller sa cible : il garde ses distances.
-                if (t.tientDistance > 0 && infosCarte.portee > 1) {
-                    const ideale = Math.max(2, infosCarte.portee - 1);
-                    score -= t.tientDistance * Math.abs(distance - ideale) * 3;
-                }
-            } else {
-                // Hors de portée : on récompense au moins le rapprochement.
-                score -= distance * 2.5;
-            }
-        }
-
-        // Les zones persistantes : redoutées ou ignorées selon le caractère.
-        // La pénalité doit pouvoir l'emporter sur le bonus de mise à portée,
-        // sinon "prudent" ne voudrait rien dire : une créature méfiante préfère
-        // renoncer à frapper ce tour-ci plutôt que de finir son mouvement dans
-        // les flammes. Traverser une case de zone reste bien moins grave que
-        // s'y arrêter.
-        score -= t.peurZones * dangerZone(c.q, c.r) * 45;
-        c.chemin.forEach(step => { score -= t.peurZones * dangerZone(step.q, step.r) * 8; });
-
-        // Attaques d'opportunité : quitter un corps-à-corps se paie.
-        const contactArrivee = ennemisAuContactDepuis(c.q, c.r, monstre.camp);
-        if (contactDepart > 0 && contactArrivee < contactDepart) {
-            score -= t.eviteAO * (contactDepart - contactArrivee) * 12;
-        }
-        // Un combattant à distance cherche malgré tout à se dégager du corps-à-corps.
-        if (infosCarte.portee > 1 && contactArrivee > 0) score -= t.tientDistance * 10;
-        // Un bagarreur, lui, veut le contact.
-        if (infosCarte.portee <= 1 && contactArrivee > 0) score += (1 - t.tientDistance) * 6;
-
-        // Ne pas s'entasser : on évite les cases déjà entourées de congénères.
-        score -= t.contourne * allesAdjacents(c.q, c.r, monstre.camp, monstre.idPersonnage) * 5;
-
-        // À bénéfice égal, rester sur place plutôt que gaspiller de la fatigue.
-        score -= c.pas * 1.2;
-
-        // Si la position actuelle est déjà CONFORTABLE, ne pas gigoter pour rien :
-        // sans cette prime, la part d'aléatoire suffisait à faire trottiner un
-        // ours déjà au contact de sa proie, pour deux cases et quatre points de
-        // fatigue perdus. « Confortable » ne veut pas seulement dire à portée :
-        // un tireur coincé au corps-à-corps ou une créature debout dans les
-        // flammes a toutes les raisons de bouger, et ne doit pas être récompensée
-        // de rester.
-        if (c.pas === 0 && tkCible && distanceHex(tkMonstre, tkCible) <= infosCarte.portee) {
-            const coinceAuContact = infosCarte.portee > 1 && t.tientDistance > 0.3 && contactDepart > 0;
-            const dansLeDanger = t.peurZones * dangerZone(tkMonstre.q, tkMonstre.r) > 0.2;
-            if (!coinceAuContact && !dansLeDanger) score += 9;
-        }
-
-        score += bruit(3);
-
-        if (score > meilleurScore) { meilleurScore = score; meilleure = c; }
-    });
-
-    return meilleure;
-};
+// GRANDE SUPPRESSION : window.choisirCibleMonstre et window.choisirPositionMonstre
+// (section 4, « QUI VISER ») n'existent plus — elles ne servaient qu'à
+// window.jouerTourMonstre, supprimée avec elles. Le cerveau choisit
+// maintenant lui-même la cible et la position de chaque créature
+// (ia_pure.js : ennemiLePlusProche, choisirCible, choisirPosition).
 
 // =========================================================================
 //  6. PHASE DE PRÉPARATION — le monstre choisit sa carte
@@ -917,334 +743,17 @@ async function reclamerVerrouIA(cle) {
     return false;
 }
 
-// =========================================================================
-//  8. PHASE DE RÉSOLUTION — le monstre joue son tour
-// =========================================================================
-
-const pause = (ms) => new Promise(r => setTimeout(r, ms));
 window.IA_MONSTRE_EN_COURS = false;
 
-// =========================================================================
-//  7 bis. POSER UNE ZONE
-// =========================================================================
-//  Une carte de zone ne se contente pas d'être "lancée" : il faut lui choisir
-//  une ancre et une orientation, exactement comme un joueur le fait à la souris,
-//  puis appeler validerZoneAoE() qui calcule les cibles touchées. L'IA appelait
-//  directement declencherResolution() : la zone partait sans ancre et sans
-//  cible, donc sans toucher personne.
-// Ce que vaut chaque combattant sous une zone, du point de vue de la créature.
-// Sert deux fois : pour poser la zone au moment de lancer, et pour juger, avant
-// de bouger, depuis quelle case elle ramasserait le plus de monde.
-function occupantsSousZone(monstre, soigne, carteEstAttaqueSimple) {
-    const tokens = window.TOKENS_VTT_DATA || {};
-    const liste = [];
-    (window.PERSOS_PARTIE || []).forEach(p => {
-        if (p.idPersonnage === monstre.idPersonnage) return;   // le lanceur est épargné
-        if (typeof window.estCombattantMort === "function" && window.estCombattantMort(p.idPersonnage)) return;
-        const t = tokens[p.idPersonnage];
-        if (!t) return;
-        if (p.estIllusion && !carteEstAttaqueSimple) return;
-
-        const pvMax = (parseInt(p.PV_Max) || 1) + (parseInt(p.Dev_Mod_PV) || 0);
-        const pv = parseInt(p.PV_Actuels);
-        const manque = pvMax > 0 ? 1 - (isNaN(pv) ? pvMax : pv) / pvMax : 0;
-        const allie = (p.camp === monstre.camp);
-
-        // Une attaque de zone frappe TOUT le monde sauf le lanceur : les
-        // congénères pris dedans coûtent plus cher que l'adversaire ne rapporte,
-        // sinon la créature s'arroserait elle-même pour toucher un joueur.
-        const valeur = soigne
-            ? (allie ? 2 + manque * 12 : -6)
-            : (allie ? -16 : 10 + manque * 5);
-        liste.push({ q: t.q, r: t.r, valeur });
-    });
-    return liste;
-}
-
-// La meilleure orientation d'une emprise posée sur `centre`, et ce qu'elle vaut.
-function meilleureOrientation(base, centre, occupants) {
-    const tourner = window.rotateHexVTT || ((h) => h);
-    let meilleurScore = -Infinity, meilleureRotation = 0;
-    for (let rotation = 0; rotation < 6; rotation++) {
-        let score = 0;
-        base.forEach(h => {
-            const rot = tourner(h, rotation);
-            const q = centre.q + rot.q, r = centre.r + rot.r;
-            occupants.forEach(o => { if (o.q === q && o.r === r) score += o.valeur; });
-        });
-        if (score > meilleurScore) { meilleurScore = score; meilleureRotation = rotation; }
-    }
-    return { score: meilleurScore, rotation: meilleureRotation };
-}
-
-// Attend que la carte qu'on vient de lancer ait FINI de s'appliquer. Le moteur
-// diffuse la résolution puis la rejoue de son côté, cible par cible : tant qu'elle
-// tourne, les positions et les points de vie ne sont pas encore ceux qui comptent.
-const resolutionsEmises = () => (window.RESOLUTIONS_LOCALES || []).length;
-
-async function attendreFinResolution(nbAvant, limiteMs = 20000) {
-    // Aucun moteur de résolution en face (bancs d'essai, page partielle) :
-    // il n'y a rien à attendre.
-    if (!Array.isArray(window.RESOLUTIONS_LOCALES)) return;
-
-    // NB : cette attente est plus nécessaire que jamais. Le poste qui fait jouer
-    // la créature calcule DERRIÈRE la fenêtre sombre, mais il calcule vraiment :
-    // c'est son animation de carte qui applique les dégâts, écrit en base et
-    // engendre les sous-effets. Déclarer le tour « écrit » avant qu'elle ait fini
-    // laisserait ces sous-effets hors du script, et les autres écrans ne les
-    // rejoueraient jamais.
-    const debut = Date.now();
-    // La carte part de façon asynchrone : on lui laisse d'abord le temps d'être
-    // émise, sinon on croirait déjà tout fini.
-    while (resolutionsEmises() <= nbAvant && Date.now() - debut < 2500) await pause(100);
-    if (resolutionsEmises() <= nbAvant) { await pause(poseIA(600)); return; }   // rien n'est parti
-
-    const marqueur = (window.RESOLUTIONS_LOCALES || []).slice(-1)[0];
-    while (window.DERNIERE_RESOLUTION_TERMINEE !== marqueur && Date.now() - debut < limiteMs) {
-        await pause(150);
-    }
-}
-
-window.placerZoneMonstre = function(idMonstre) {
-    const state = window.ETAT_CIBLAGE;
-    if (!state || !state.isZone) return null;
-
-    const base = state.zoneHexesBase || [];
-    if (base.length === 0) return null;
-
-    const tokens = window.TOKENS_VTT_DATA || {};
-    const tk = tokens[idMonstre];
-    const monstre = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idMonstre);
-    if (!tk || !monstre) return null;
-
-    const config = (state.attaques || [])[0] || (state.alterations || [])[0] || null;
-    const soigne = !!(config && (config.isHeal || config.isShield));
-    const ligneDeVue = window.verifierLigneDeVueVTT || (() => true);
-
-    // Qui compte, et pour combien. Le lanceur est épargné par sa propre zone
-    // (validerZoneAoE l'exclut), les morts ne comptent pas, et un leurre ne
-    // reçoit qu'une attaque nue — même règle que pour une cible unique.
-    const carteEstAttaqueSimple = !soigne && (state.alterations || []).length === 0;
-    const occupants = occupantsSousZone(monstre, soigne, carteEstAttaqueSimple);
-
-    // Les ancres possibles. Une zone de corps-à-corps est centrée sur le
-    // lanceur : seule l'orientation se choisit. Une zone à distance se pose où
-    // l'on veut, dans la limite de la portée, de la ligne de vue, et de la règle
-    // d'engagement (au contact, on ne vise plus qu'à une case).
-    let ancres = [{ q: tk.q, r: tk.r }];
-    if (config && config.isRanged) {
-        const portee = Math.max(1, Math.min(8, parseInt(config.rangeMax) || 1));
-        const engage = occupants.some(o => o.valeur > 0 && distanceHex(tk, o) === 1);
-        const limite = engage ? 1 : portee;
-        ancres = [];
-        for (let dq = -limite; dq <= limite; dq++) {
-            for (let dr = -limite; dr <= limite; dr++) {
-                const hex = { q: tk.q + dq, r: tk.r + dr };
-                if (distanceHex(tk, hex) > limite) continue;
-                const etat = window.PLATEAU_VTT ? window.PLATEAU_VTT.getCaseState(hex.q, hex.r) : null;
-                if (etat && etat.isDeleted) continue;
-                if (!ligneDeVue(tk, hex)) continue;
-                ancres.push(hex);
-            }
-        }
-        if (ancres.length === 0) return null;
-    }
-
-    let meilleur = null, meilleurScore = -Infinity;
-    ancres.forEach(ancre => {
-        const orientation = meilleureOrientation(base, ancre, occupants);
-        // À prise égale, on pose la zone au plus près : c'est plus lisible à la
-        // table, et ça laisse la créature moins exposée.
-        const score = orientation.score - distanceHex(tk, ancre) * 0.4 + bruit(1.2);
-        if (score > meilleurScore) { meilleurScore = score; meilleur = { centre: ancre, rotation: orientation.rotation }; }
-    });
-
-    if (!meilleur) return null;
-    meilleur.score = meilleurScore;
-    return meilleur;
-};
-
-// =========================================================================
-//  LE TOUR D'UNE CRÉATURE SE CALCULE EN SILENCE
-// =========================================================================
-//  Faire jouer une créature, c'est la faire viser : le moteur allume les
-//  anneaux de ciblage, pose l'emprise de la zone, la fait tourner, la montre un
-//  instant, puis valide. Tout cela est du CALCUL — mais ça se voyait, et ça se
-//  voyait AVANT que le tour ne soit rejoué. Sur le poste qui fait tourner l'IA,
-//  on assistait donc deux fois au même tour : d'abord la créature qui vise en
-//  coulisses, puis l'animation pour de vrai.
-//
-//  Pendant le calcul, les tracés de ciblage se taisent et les temps de pose
-//  tombent à zéro : personne ne les regarde. Le spectacle, lui, est dans le
-//  journal, et il se joue à son tour.
-window.CALCUL_IA_SILENCIEUX = false;
-const poseIA = (ms) => (window.CALCUL_IA_SILENCIEUX ? 0 : ms);
-
-window.jouerTourMonstre = async function(idMonstre, idCarte) {
-    const monstre = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idMonstre);
-    const tk = (window.TOKENS_VTT_DATA || {})[idMonstre];
-
-    // Le panneau gauche désigne le lanceur aux yeux du moteur : on le réserve à
-    // cette créature pour toute la durée de son tour (cf. panneauVerrouilleParIA
-    // dans combat.js).
-    window.IA_MONSTRE_ACTEUR = idMonstre;
-    window.CALCUL_IA_SILENCIEUX = true;
-
-    // Repos long : il ne se déplace pas et ne lance rien. C'est finDeTourCombat()
-    // qui lui rend sa fatigue, exactement comme pour un joueur.
-    if (idCarte === "REPOS_LONG") {
-        window.TOKEN_SELECTIONNE = idMonstre;
-        if (typeof window.afficherDansPanneauGauche === "function") window.afficherDansPanneauGauche(idMonstre);
-        if (tk && typeof window.afficherMessageFlottantHex === "function") {
-            window.afficherMessageFlottantHex(tk.q, tk.r, "Reprend son souffle", "#1b6e3a");
-        }
-        await pause(poseIA(1500));
-        window.IA_MONSTRE_ACTEUR = null;
-        if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true, idMonstre);
-        return;
-    }
-
-    const dataCarte = ((window.CACHE_COMPETENCES_GLOBAL || {})[idMonstre] || {})[idCarte];
-
-    // Sans carte lisible ou sans pion, on ne bloque pas le combat : on passe.
-    if (!monstre || !dataCarte || !tk) {
-        console.warn("IA : tour impossible pour", idMonstre, "— on passe la main.");
-        if (typeof window.tracerCombat === "function") {
-            window.tracerCombat("🚫", `tour impossible pour ${idMonstre}`,
-                !monstre ? "fiche absente" : !dataCarte ? `technique ${idCarte} pas encore forgée` : "pion absent");
-        }
-        window.IA_MONSTRE_ACTEUR = null;
-        if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true, idMonstre);
-        return;
-    }
-
-    const infos = window.analyserCarteMonstre(dataCarte);
-
-    // Le moteur identifie le lanceur par le combattant affiché dans le panneau
-    // gauche : on y installe le monstre avant toute chose, comme le ferait un
-    // joueur en sélectionnant son personnage.
-    window.TOKEN_SELECTIONNE = idMonstre;
-    // La caméra ne suit PAS les créatures : recentrer l'écran sur elles arrachait
-    // la vue au joueur en plein tour adverse. On se contente de les afficher dans
-    // le panneau gauche, et chacun regarde où il veut.
-    if (typeof window.afficherDansPanneauGauche === "function") window.afficherDansPanneauGauche(idMonstre);
-    // Réserve la fatigue de la carte pour que le déplacement ne la dévore pas.
-    window.COUT_COMPETENCE_SELECTIONNEE = infos.fatigue;
-    await pause(poseIA(900));
-
-    // --- 1. Choix de la cible, puis de la case ---
-    const cible = window.choisirCibleMonstre(monstre, infos);
-    let position = window.choisirPositionMonstre(monstre, cible, infos);
-
-    // Sa carte ne partira pas ce tour-ci — une créature de mêlée dont la proie
-    // reste hors d'atteinte après ses trois pas, par exemple. Elle ne doit pas
-    // rester plantée : elle marche vers l'adversaire le plus proche et passera
-    // son tour. Et comme elle ne lancera rien, inutile de garder la fatigue de
-    // la carte en réserve : elle peut aller aussi loin que ses jambes le
-    // permettent.
-    const tkCiblePrevue = cible ? (window.TOKENS_VTT_DATA || {})[cible.idPersonnage] : null;
-    const carteAtteindra = position && tkCiblePrevue
-        && distanceHex(position, tkCiblePrevue) <= infos.portee;
-    if (!carteAtteindra) {
-        const proche = ennemiLePlusProche(monstre);
-        if (proche) {
-            const repli = window.choisirPositionMonstre(monstre, proche, { ...infos, portee: 1, fatigue: 0 });
-            if (repli) {
-                position = repli;
-                window.COUT_COMPETENCE_SELECTIONNEE = 0;
-            }
-        }
-    }
-
-    // --- 2. Déplacement, par les rails du jeu (opportunités, zones, fatigue) ---
-    const immobilise = (monstre.Etats_Alteres || []).some(e => e.nom === "Immobilisation");
-    if (position && !immobilise && (position.q !== tk.q || position.r !== tk.r)) {
-        window.CHEMIN_MOUVEMENT = [];
-        window.MOUVEMENT_COUT_TOTAL = 0;
-        window.CHEMIN_START_NODE = { q: tk.q, r: tk.r };
-        window.ajouterEtapeMouvement(position.q, position.r);
-
-        if (window.CHEMIN_MOUVEMENT.length > 0) {
-            await window.validerMouvement();
-            await pause(poseIA(1400));
-        } else if (typeof window.annulerMouvement === "function") {
-            window.annulerMouvement();
-        }
-    }
-
-    // --- 3. La carte, si la cible est effectivement à portée ---
-    const tkApres = (window.TOKENS_VTT_DATA || {})[idMonstre];
-    const tkCible = cible ? (window.TOKENS_VTT_DATA || {})[cible.idPersonnage] : null;
-    const aPortee = tkApres && tkCible && distanceHex(tkApres, tkCible) <= infos.portee;
-
-    if (aPortee && typeof window.demarrerCiblage === "function") {
-        // Ceinture et bretelles : si quoi que ce soit a fait glisser le panneau
-        // pendant les temps morts, le sort partirait au nom du mauvais
-        // combattant. On le remet sur la créature, et on renonce plutôt que de
-        // lancer une carte au nom de quelqu'un d'autre.
-        const affiche = () => (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
-        const mauvaisLanceur = () => !!affiche() && affiche().idPersonnage !== idMonstre;
-        if (mauvaisLanceur()) {
-            if (typeof window.afficherDansPanneauGauche === "function") window.afficherDansPanneauGauche(idMonstre);
-            await pause(poseIA(200));
-        }
-        if (mauvaisLanceur()) {
-            console.warn("IA : le panneau désigne", affiche().idPersonnage, "et non", idMonstre,
-                         "— on ne lance rien plutôt que de frapper au nom de quelqu'un d'autre.");
-            window.COUT_COMPETENCE_SELECTIONNEE = 0;
-            window.IA_MONSTRE_ACTEUR = null;
-            if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true, idMonstre);
-            return;
-        }
-        const resolutionsAvant = resolutionsEmises();
-        await window.demarrerCiblage(idCarte);
-        await pause(poseIA(700));
-
-        if (window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif) {
-            if (window.ETAT_CIBLAGE.isZone) {
-                // On choisit l'ancre et l'orientation, on les montre un instant,
-                // puis on valide : c'est validerZoneAoE qui calcule les cibles
-                // prises dans l'emprise et déclenche la résolution.
-                const plan = window.placerZoneMonstre(idMonstre);
-                if (plan) {
-                    window.ETAT_CIBLAGE.zoneCenterHex = plan.centre;
-                    window.ETAT_CIBLAGE.zoneRotationStep = plan.rotation;
-                    if (typeof window.actualiserVisuelCiblage === "function") window.actualiserVisuelCiblage();
-                    await pause(poseIA(600));
-                    if (typeof window.validerZoneAoE === "function") window.validerZoneAoE();
-                    else if (typeof window.declencherResolution === "function") await window.declencherResolution();
-                } else if (typeof window.declencherResolution === "function") {
-                    await window.declencherResolution();
-                }
-                await attendreFinResolution(resolutionsAvant);
-            } else {
-                window.ajouterCibleCiblage(cible.idPersonnage);
-                await pause(poseIA(400));
-                if (window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif
-                    && typeof window.declencherResolution === "function") {
-                    await window.declencherResolution();
-                }
-                await attendreFinResolution(resolutionsAvant);
-            }
-            await pause(poseIA(600));
-        }
-    } else {
-        // Hors de portée après déplacement : le tour s'arrête là, comme prévu.
-        if (typeof window.tracerCombat === "function") {
-            window.tracerCombat("🚫", `${idMonstre} ne lance rien`,
-                cible ? `${cible.idPersonnage} hors de portée (${infos.portee})` : "aucune cible");
-        }
-        if (tkApres && typeof window.afficherMessageFlottantHex === "function") {
-            window.afficherMessageFlottantHex(tkApres.q, tkApres.r, "Hors de portée", "#c2a878");
-        }
-        await pause(poseIA(900));
-    }
-
-    window.COUT_COMPETENCE_SELECTIONNEE = 0;
-    window.IA_MONSTRE_ACTEUR = null;
-    window.CALCUL_IA_SILENCIEUX = false;
-    if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true, idMonstre);
-};
+// GRANDE SUPPRESSION : occupantsSousZone, meilleureOrientation,
+// resolutionsEmises, attendreFinResolution, placerZoneMonstre, poseIA, pause
+// et window.jouerTourMonstre n'existent plus. Elles déroulaient le tour d'une
+// créature (cible, position, zone, dégâts) depuis ce fichier, en appelant
+// l'ancien moteur — un chemin devenu inaccessible : verifierTourIAMonstres ne
+// dépasse plus jamais la phase de préparation sous REGIME_CERVEAU (voir plus
+// bas), et RESOLUTIONS_LOCALES, dont attendreFinResolution dépendait, n'est
+// plus jamais alimenté. C'est le cerveau qui fait maintenant jouer les
+// créatures lui-même, avec ses propres cible/position/zone (ia_pure.js).
 
 // =========================================================================
 //  9. POINT D'ENTRÉE — appelé à chaque changement de la partie
@@ -1354,19 +863,13 @@ window.verifierTourIAMonstres = async function() {
     // ce garde-fou posé tout de suite, le même monstre jouait son tour deux fois.
     window.IA_MONSTRE_EN_COURS = true;
     try {
-        if (teteMorte) {
-            const enTeteMort = file[0];
-            const cleMort = `mort|${enTeteMort.idPersonnage}|${manche}`;
-            if (await reclamerVerrouIA(cleMort)) {
-                console.log("🧠 Tour passé :", enTeteMort.idPersonnage, "est à terre.");
-                await marquerTourIATermine(cleMort);
-                if (typeof window.finDeTourCombat === "function") await window.finDeTourCombat(true, enTeteMort.idPersonnage);
-            } else {
-                programmerRappelIA(DELAI_VERROU_MS / 2);
-            }
-            return;
-        }
-
+        // GRANDE SUPPRESSION : le passage d'un combattant tombé en tête de file
+        // (teteMorte) et le déroulement du tour d'une créature (jouerTourMonstre,
+        // avec son verrou dédié) sont partis. Le garde ci-dessus
+        // (REGIME_CERVEAU === true && !aPreparer) rend les deux cas impossibles :
+        // teteMorte exige phase !== "Preparation", jouer le tour aussi — et on
+        // n'arrive ici qu'avec aPreparer, donc phase === "Preparation". C'est le
+        // cerveau qui fait maintenant jouer les créatures lui-même.
         if (phase === "Preparation") {
             await window.preparerCartesMonstres();
             // On repasse systématiquement : soit des créatures attendent encore
@@ -1374,39 +877,6 @@ window.verifierTourIAMonstres = async function() {
             // posé, le prochain passage ne trouvera rien à faire et s'arrêtera là.
             programmerRappelIA(1200);
             return;
-        }
-
-        const enTete = file[0];
-
-        // UN SEUL POSTE JOUE CE TOUR-LÀ. La clé identifie le monstre ET la
-        // manche : deux tours successifs de la même créature ne se confondent
-        // pas, et — c'est le point — les deux appareils la calculent à
-        // l'identique. Elle reposait avant sur l'horodatage de l'entrée dans la
-        // file : si les deux postes n'avaient pas exactement la même file sous
-        // les yeux, ils fabriquaient DEUX clés différentes, prenaient chacun
-        // « son » verrou, et jouaient la même créature chacun de son côté — sur
-        // des plateaux qui ne racontaient déjà plus la même histoire.
-        const cle = `tour|${enTete.idPersonnage}|${manche}`;
-        if (!(await reclamerVerrouIA(cle))) {
-            // Un autre poste s'en occupe. S'il n'aboutit pas, le verrou devient
-            // périmé et on reprendra la main : on garde donc un œil dessus.
-            programmerRappelIA(DELAI_VERROU_MS / 2);
-            return;
-        }
-
-        // On note le tour comme joué AVANT de le jouer, pas après. Un tour
-        // interrompu en plein milieu ne se reprend pas : jouerTourMonstre repart
-        // toujours du début, donc « reprendre » ce serait frapper une seconde
-        // fois. Mieux vaut un tour écourté qu'un coup en double — et si vraiment
-        // rien n'avance, la marque périme au bout de vingt-cinq secondes et la
-        // créature retentera sa chance.
-        await marquerTourIATermine(cle);
-        if (typeof window.tracerCombat === "function") {
-            window.tracerCombat("🧠", `verrou pris : tour de ${enTete.idPersonnage}`, `(${enTete.idCarte})`);
-        }
-        await window.jouerTourMonstre(enTete.idPersonnage, enTete.idCarte);
-        if (typeof window.tracerCombat === "function") {
-            window.tracerCombat("🧠", `tour de ${enTete.idPersonnage} terminé`, "");
         }
 
     } catch (e) {

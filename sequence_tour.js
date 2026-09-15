@@ -228,53 +228,14 @@ function idsConcernes(donnee, trouves) {
     return ids;
 }
 
-function valeursAvant(ids) {
-    const sortie = {};
-    (window.PERSOS_PARTIE || []).forEach(p => {
-        if (!p || !p.idPersonnage || !ids.has(p.idPersonnage)) return;
-        const copie = {};
-        CHAMPS_AVANT.forEach(c => { if (p[c] !== undefined) copie[c] = p[c]; });
-        copie[CLE_ETATS] = signatureEtats(p);
-        sortie[p.idPersonnage] = copie;
-    });
-    return sortie;
-}
-
-// LE POINT D'ENTRÉE DE L'ÉCRITURE. Appelé par le poste qui joue, chaque fois
-// qu'il vient de trancher quelque chose : déplacement, carte, bond, poussée,
-// traction, peur, passage au combattant suivant. L'ordre des appels devient
-// l'ordre des numéros, et donc l'ordre des animations, partout.
-window.consignerEtapeTour = async function(type, donnee) {
-    // JAMAIS pendant une relecture : on rejoue le journal, on ne le réécrit pas.
-    if (window.REJEU_SCRIPT_EN_COURS) return null;
-    if (!window.ID_PARTIE_COURANTE || typeof window.publierEvenementCombat !== "function") return null;
-
-    const acteur = window.acteurCourantCombat();
-    const n = await window.publierEvenementCombat(window.ID_PARTIE_COURANTE, {
-        type,
-        acteur: acteur ? acteur.idPersonnage : null,
-        idCarte: acteur ? acteur.idCarte : null,
-        // Le numéro de manche : avec l'acteur, il identifie LE TOUR. C'est lui
-        // qui dit à la relecture « ceci ouvre un nouveau tour, laisse le temps
-        // de le lire » — sans quoi un combattant qui rejoue deux manches de
-        // suite n'aurait droit qu'à un seul OK.
-        tour: (window.PARTIE_DATA || {}).Tour_Combat || 0,
-        data: JSON.parse(JSON.stringify(donnee || {})),
-        avant: valeursAvant(idsConcernes(donnee)),
-        auteur: monPoste(),
-        v: window.VERSION_IVALIS || 0
-    });
-
-    // Ce que ce poste vient de publier, il le voit se dérouler en direct (c'est
-    // lui qui calcule) : inutile de le lui rejouer. Sauf s'il regarde derrière
-    // la fenêtre sombre, auquel cas il n'a rien vu et le rejouera comme les
-    // autres — c'est le cas d'une créature, que personne ne « joue » vraiment.
-    if (n && window.monHerosJoue()) window.EVENEMENTS_DEJA_VUS[n] = true;
-    tracer("📤", `${n} ${type} ${acteur ? acteur.idPersonnage : "?"}`, resumeDonnee(donnee));
-    return n;
-};
-
-// De quoi lire un événement d'un coup d'œil dans la trace.
+// GRANDE SUPPRESSION : window.consignerEtapeTour et window.consignerEtapesTour
+// n'existent plus. Elles publiaient un événement par étape (déplacement,
+// carte, bond, poussée, traction, peur) pour l'ancien journal ; le cerveau
+// diffuse maintenant son propre journal (voir cerveau_combat.js/regime_cerveau.js),
+// que les autres postes lisent, jamais celui-ci. idsConcernes reste : elle sert
+// aussi à pionsRetenusParLeJournal, plus haut. resumeDonnee reste aussi : elle ne
+// publiait rien, elle ne fait que résumer un événement d'un coup d'œil dans la
+// trace, et window.lireJournalCombat (plus bas) s'en sert encore pour ça.
 function resumeDonnee(d) {
     if (!d || typeof d !== "object") return "";
     if (d.de && d.vers) return `(${d.de.q},${d.de.r} → ${d.vers.q},${d.vers.r})`;
@@ -285,45 +246,6 @@ function resumeDonnee(d) {
     }
     return "";
 }
-
-// PLUSIEURS ÉTAPES D'UN COUP — un trajet, par exemple, où chaque hexagone est
-// son propre événement. Les envoyer une par une, c'est autant d'allers-retours
-// réseau au milieu d'un tour, et autant d'occasions qu'une seule échoue en
-// laissant un trou. Groupées, elles partent en une écriture, tout ou rien, avec
-// des numéros consécutifs dans l'ordre donné.
-window.consignerEtapesTour = async function(type, listeDeDonnees) {
-    const liste = (listeDeDonnees || []).filter(Boolean);
-    if (!liste.length) return [];
-    if (window.REJEU_SCRIPT_EN_COURS) return [];
-    if (!window.ID_PARTIE_COURANTE) return [];
-
-    // Sans la publication groupée (un app.js d'une version antérieure encore en
-    // cache), on retombe sur l'envoi une par une : plus lent, jamais faux.
-    if (typeof window.publierEvenementsCombat !== "function") {
-        const numeros = [];
-        for (const donnee of liste) numeros.push(await window.consignerEtapeTour(type, donnee));
-        return numeros.filter(n => n);
-    }
-
-    const acteur = window.acteurCourantCombat();
-    const tour = (window.PARTIE_DATA || {}).Tour_Combat || 0;
-    const evenements = liste.map(donnee => ({
-        type,
-        acteur: acteur ? acteur.idPersonnage : null,
-        idCarte: acteur ? acteur.idCarte : null,
-        tour,
-        data: JSON.parse(JSON.stringify(donnee || {})),
-        avant: valeursAvant(idsConcernes(donnee)),
-        auteur: monPoste(),
-        v: window.VERSION_IVALIS || 0
-    }));
-
-    const numeros = await window.publierEvenementsCombat(window.ID_PARTIE_COURANTE, evenements);
-    if (window.monHerosJoue()) numeros.forEach(n => { window.EVENEMENTS_DEJA_VUS[n] = true; });
-    numeros.forEach((n, i) => tracer("📤", `${n} ${type} ${acteur ? acteur.idPersonnage : "?"}`,
-                                     resumeDonnee(liste[i])));
-    return numeros;
-};
 
 // =========================================================================
 //  LA RELECTURE, DANS L'ORDRE DES NUMÉROS
@@ -692,84 +614,15 @@ window.lireJournalCombat = async function() {
     }
 };
 
-// =========================================================================
-//  L'ÉCOUTE DU JOURNAL
-// =========================================================================
-window.suivreSequenceTour = function(partie) {
-    const p = partie || window.PARTIE_DATA || {};
-
-    // Nouvelle partie : on ouvre son journal, et on place le curseur sur le
-    // dernier numéro écrit. Rejoindre un combat en cours ne doit pas rejouer
-    // tout ce qui s'est passé avant l'arrivée.
-    if (window.ID_PARTIE_COURANTE && partieEcoutee !== window.ID_PARTIE_COURANTE) {
-        if (typeof arreterEcoute === "function") { try { arreterEcoute(); } catch (e) {} }
-        if (typeof arreterCompteur === "function") { try { arreterCompteur(); } catch (e) {} }
-        partieEcoutee = window.ID_PARTIE_COURANTE;
-        const ouverte = partieEcoutee;
-        const depuisZero = journalRepartDeZero;
-        journalRepartDeZero = false;
-        window.EVENEMENTS_RECUS = {};
-        window.EVENEMENTS_DEJA_VUS = {};
-        window.EVENEMENT_ATTENDU = null;
-        tourAcquitte = null;
-
-        // LE COMPTEUR SOUS SURVEILLANCE. Quand un combat se termine ou se
-        // réinitialise, le journal est vidé par UN SEUL poste. Les autres
-        // gardaient leur curseur sur l'ancien combat, et l'écoute — calée sur
-        // « numéro supérieur à trente » — ne leur livrait plus jamais rien : la
-        // rencontre suivante se jouait en base, et l'écran ne montrait aucune
-        // animation, aucune fenêtre de tour, rien. Un compteur qui RECULE, c'est
-        // un nouveau combat : on repart de zéro sans attendre qu'on nous le dise.
-        if (typeof window.ecouterCompteurJournal === "function") {
-            arreterCompteur = window.ecouterCompteurJournal(ouverte, (n) => {
-                if (partieEcoutee !== ouverte) return;
-                if (n < (window.DERNIER_EVENEMENT_JOUE || 0)) {
-                    tracer("🧹", "le journal est reparti de zéro", `(compteur à ${n})`);
-                    journalRepartDeZero = true;
-                    window.oublierJournalCombat();
-                    window.suivreSequenceTour();
-                }
-            });
-        }
-
-        // Le curseur se lit maintenant en base (le compteur a quitté le document
-        // de la partie) : une promesse, donc, même quand un banc d'essai rend un
-        // simple nombre. On n'ouvre l'écoute qu'une fois le curseur posé — sinon
-        // on rejouerait tout le combat depuis son premier hexagone.
-        // Sauf si le journal vient d'être vidé : là, le combat qui commence doit
-        // être vu DEPUIS SON PREMIER ÉVÉNEMENT, sans en rater un seul.
-        Promise.resolve(
-            depuisZero ? 0
-                       : (typeof window.dernierNumeroEvenement === "function"
-                            ? window.dernierNumeroEvenement(p) : 0)
-        ).then((depuis) => {
-            // Une autre partie a été ouverte entre-temps : ce curseur-ci ne vaut
-            // plus rien.
-            if (partieEcoutee !== ouverte) return;
-            window.DERNIER_EVENEMENT_JOUE = parseInt(depuis) || 0;
-            tracer("📚", "journal branché", `(à partir de ${window.DERNIER_EVENEMENT_JOUE})`);
-            if (typeof window.ecouterEvenementsCombat === "function") {
-                arreterEcoute = window.ecouterEvenementsCombat(
-                    ouverte, window.DERNIER_EVENEMENT_JOUE, (evenements) => {
-                        (evenements || []).forEach(ev => {
-                            if (ev && ev.n > window.DERNIER_EVENEMENT_JOUE) {
-                                if (!window.EVENEMENTS_RECUS[ev.n]) {
-                                    tracer("📥", `${ev.n} ${ev.type} ${ev.acteur || "?"}`,
-                                           `[de ${ev.auteur || "?"} v${ev.v || "?"}]`);
-                                }
-                                window.EVENEMENTS_RECUS[ev.n] = ev;
-                            }
-                        });
-                        window.lireJournalCombat();
-                    });
-            }
-            window.lireJournalCombat();
-        });
-    }
-
-    if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
-    return window.lireJournalCombat();
-};
+// GRANDE SUPPRESSION : window.suivreSequenceTour n'existe plus. Elle ouvrait
+// l'écoute Firestore de l'ancien journal (Evenements_Combat) pour un poste qui
+// vient de charger la partie — son seul appelant (app.js) est dans le bloc
+// `if (!window.REGIME_CERVEAU)`, donc déjà inatteignable en pratique : le
+// cerveau publie et écoute son propre état (regime_cerveau.js, surPublication/
+// surFenetre), sans jamais passer par ce vieux journal. lireJournalCombat,
+// l'ANIMATIONS map et les variables partieEcoutee/arreterEcoute/arreterCompteur/
+// journalRepartDeZero restent : window.jouerSequenceTour (le bouton OK) et
+// window.oublierJournalCombat en dépendent encore, hors de ce bloc.
 
 // =========================================================================
 //  CE QUE LA FENÊTRE DOIT MONTRER
@@ -987,8 +840,6 @@ window.oublierJournalCombat = function() {
     if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
 };
 
-window.sequenceRetientFinDeTour = async function() { return false; };
-
 // =========================================================================
 //  CET ÉCRAN A-T-IL DU RETARD SUR SON JOURNAL ?
 // =========================================================================
@@ -1049,5 +900,3 @@ window.sequenceTourEnAttente = function() {
     tracer("⏳", `l'IA attend l'écran`, `(${enAttente} événements en retard)`);
     return true;
 };
-window.forcerSequenceTour = async function() {};
-window.postesAttendusSequence = function() { return [monPoste()]; };

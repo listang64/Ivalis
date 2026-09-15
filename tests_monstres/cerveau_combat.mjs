@@ -934,5 +934,52 @@ console.log("\nLA RÉGÉNÉRATION DE FIN DE MANCHE, MÊME RÈGLE POUR TOUT LE MO
              etapes.length === 3, `(${etapes.length})`);
 }
 
+// =========================================================================
+console.log("\nUNE CRÉATURE AVEC UNE CARTE DE ZONE RAMASSE PLUSIEURS CIBLES");
+// =========================================================================
+//  Portage de la section 5 de l'ancien tests_monstres/zones_ia.mjs (« TOUR
+//  COMPLET : LA ZONE EST BIEN VALIDÉE, PAS JUSTE RÉSOLUE ») avant la grande
+//  suppression. Ce qu'elle vérifiait à coups de journal simulé sur l'ancien
+//  moteur (ETAT_CIBLAGE, validerZoneAoE, demarrerCiblage...), on le vérifie
+//  ici directement sur jouerCreature : la carte porte plusieurs cibles, pas
+//  la seule « cible » choisie pour la marche, et une carte à persistance de
+//  terrain laisse bien sa nappe dans etat.zones.
+{
+    const etat = construireEtatCombat({
+        idPartie: "P1", cerveau: "P_03", graine: 7,
+        combattants: [
+            fiche("J1", { idJoueur: "P_01", camp: "Allié" }),
+            fiche("J2", { idJoueur: "P_01", camp: "Allié" }),
+            fiche("M1", { estMonstre: true, camp: "Ennemi", Personnalite: "brutal" })
+        ],
+        positions: { M1: { q: 0, r: 0 }, J1: { q: 1, r: 0 }, J2: { q: 2, r: 0 } },
+        partie: { Phase_Combat: "Resolution", Tour_Combat: 1,
+                  Ordre_Initiative: ["M1", "J1", "J2"], File_Attente_Combat: [] }
+    });
+
+    // Une ligne de trois cases devant le lanceur : au contact de J1 comme
+    // posée, elle prend aussi J2, juste derrière.
+    const CARTE_ZONE = {
+        idCarte: "C_ZONE",
+        infos: { portee: 1, fatigue: 20, estZone: true, estAttaqueSimple: true,
+                 zoneHexes: [{ q: 1, r: 0 }, { q: 2, r: 0 }, { q: 3, r: 0 }],
+                 zoneEstADistance: false, persistanceTerrain: true },
+        attaques: [{ valeurBrute: 15, typeRes: "Physique" }],
+        alterations: []
+    };
+
+    const pas = jouerCreature(etat, "M1", CARTE_ZONE, null);
+    verifier("le tour produit bien une entrée", !!pas);
+    verifier("J1, sous l'emprise, encaisse", pas.etat.combattants.J1.pv < 60,
+             `(${pas.etat.combattants.J1.pv})`);
+    verifier("J2, sous l'emprise lui aussi, encaisse", pas.etat.combattants.J2.pv < 60,
+             `(${pas.etat.combattants.J2.pv})`);
+    verifier("le lanceur, hors emprise (elle exclut sa propre case), ne s'inflige rien",
+             pas.etat.combattants.M1.pv === 60);
+    verifier("la persistance de terrain laisse bien une nappe dans l'état",
+             Object.keys(pas.etat.zones || {}).length === 1,
+             JSON.stringify(pas.etat.zones));
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

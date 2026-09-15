@@ -13,7 +13,8 @@
 // même situation donne toujours la même décision.
 import {
     PERSONNALITES, traitsDe, dangerDeLaCase, ennemisAuContactDepuis, alliesAdjacents,
-    ennemiLePlusProche, casesAccessibles, choisirCible, choisirPosition, deciderTourCreature
+    ennemiLePlusProche, casesAccessibles, choisirCible, choisirPosition, choisirZone,
+    deciderTourCreature
 } from '../ia_pure.js';
 import { construireEtatCombat, creerDes, clonerEtat } from '../combat_etat.js';
 import { distance } from '../mouvement_pur.js';
@@ -395,6 +396,188 @@ console.log("\n12. ELLE NE DÉPENSE JAMAIS L'ÉNERGIE DE SA CARTE");
     verifier("hors d'atteinte, elle dépense tout pour se rapprocher",
              repli.lancera === false && repli.coutTrajet > 4,
              `(${repli.coutTrajet} d'énergie)`);
+}
+
+// =========================================================================
+console.log("\n13. OÙ POSER UNE ZONE — L'EMPRISE QUI SE CHOISIT SEULE");
+// =========================================================================
+//  Portage des scénarios de l'ancien tests_monstres/zones_ia.mjs, qui vivait
+//  sur occupantsSousZone/meilleureOrientation/placerZoneMonstre
+//  (monstres_ia.js, avant la grande suppression). Même barème, même
+//  géométrie — choisirZone doit poser l'ancre et l'orientation exactement
+//  comme le faisait l'ancien code, mais depuis l'état pur.
+{
+    const LIGNE3 = [{ q: 1, r: 0 }, { q: 2, r: 0 }, { q: 3, r: 0 }];
+    const PATE   = [{ q: 1, r: 0 }, { q: 0, r: 1 }, { q: 1, r: -1 }];
+    const emprise = (base, plan) => base.map(h => {
+        let q = h.q, r = h.r;
+        for (let i = 0; i < plan.rotation; i++) { const nq = -r, nr = q + r; q = nq; r = nr; }
+        return { q: plan.centre.q + q, r: plan.centre.r + r };
+    });
+    const touche = (base, plan, hex) => emprise(base, plan).some(h => h.q === hex.q && h.r === hex.r);
+
+    // 13.1 — Zone de mêlée : orientée vers l'adversaire, jamais vers un congénère.
+    {
+        let versJoueur = 0, versAllie = 0;
+        for (let s = 0; s < 60; s++) {
+            const etat = construireEtatCombat({
+                idPartie: "P1", cerveau: "P_03", graine: s,
+                combattants: [
+                    fiche("J1", { camp: "Allié" }),
+                    fiche("A1", { estMonstre: true, camp: "Ennemi" }),
+                    fiche("M1", { estMonstre: true, camp: "Ennemi" })
+                ],
+                positions: { M1: { q: 0, r: 0 }, J1: { q: 2, r: 0 }, A1: { q: -2, r: 0 } },
+                partie: { Phase_Combat: "Resolution", Tour_Combat: 1, Ordre_Initiative: ["M1"], File_Attente_Combat: [] }
+            });
+            const infos = { estZone: true, zoneHexes: LIGNE3, zoneEstADistance: false, estAttaqueSimple: true };
+            const plan = choisirZone(etat, "M1", infos, null, creerDes(s));
+            if (!plan) continue;
+            if (touche(LIGNE3, plan, { q: 2, r: 0 })) versJoueur++;
+            if (touche(LIGNE3, plan, { q: -2, r: 0 })) versAllie++;
+        }
+        verifier("la zone de mêlée s'oriente vers le joueur", versJoueur === 60, `(${versJoueur}/60)`);
+        verifier("elle n'arrose jamais son congénère", versAllie === 0, `(${versAllie}/60)`);
+
+        const etatSeul = construireEtatCombat({
+            idPartie: "P1", cerveau: "P_03", graine: 1,
+            combattants: [ fiche("J1", { camp: "Allié" }), fiche("M1", { estMonstre: true, camp: "Ennemi" }) ],
+            positions: { M1: { q: 0, r: 0 }, J1: { q: 2, r: 0 } },
+            partie: { Phase_Combat: "Resolution", Tour_Combat: 1, Ordre_Initiative: ["M1"], File_Attente_Combat: [] }
+        });
+        const planSeul = choisirZone(etatSeul, "M1",
+            { estZone: true, zoneHexes: LIGNE3, zoneEstADistance: false, estAttaqueSimple: true }, null, creerDes(1));
+        verifier("une zone de mêlée reste centrée sur la créature",
+                 planSeul && planSeul.centre.q === 0 && planSeul.centre.r === 0);
+    }
+
+    // 13.2 — Zone à distance : elle se pose sur le paquet, pas sur l'isolé.
+    {
+        let deux = 0;
+        for (let s = 0; s < 60; s++) {
+            const etat = construireEtatCombat({
+                idPartie: "P1", cerveau: "P_03", graine: s,
+                combattants: [
+                    fiche("J1", { camp: "Allié" }), fiche("J2", { camp: "Allié" }), fiche("J3", { camp: "Allié" }),
+                    fiche("M1", { estMonstre: true, camp: "Ennemi" })
+                ],
+                positions: { M1: { q: 0, r: 0 }, J1: { q: 4, r: 0 }, J2: { q: 5, r: -1 }, J3: { q: 0, r: 5 } },
+                partie: { Phase_Combat: "Resolution", Tour_Combat: 1, Ordre_Initiative: ["M1"], File_Attente_Combat: [] }
+            });
+            const infos = { estZone: true, zoneHexes: PATE, zoneEstADistance: true, zonePortee: 6, estAttaqueSimple: true };
+            const plan = choisirZone(etat, "M1", infos, null, creerDes(s));
+            if (!plan) continue;
+            const pris = [{ q: 4, r: 0 }, { q: 5, r: -1 }, { q: 0, r: 5 }].filter(t => touche(PATE, plan, t)).length;
+            if (pris >= 2) deux++;
+        }
+        verifier("elle attrape le groupe plutôt qu'un isolé", deux === 60, `(${deux}/60)`);
+    }
+
+    // 13.3 — Les règles du ciblage : portée, engagement, ligne de vue.
+    {
+        let horsPortee = 0;
+        for (let s = 0; s < 40; s++) {
+            const etat = construireEtatCombat({
+                idPartie: "P1", cerveau: "P_03", graine: s,
+                combattants: [ fiche("J1", { camp: "Allié" }), fiche("M1", { estMonstre: true, camp: "Ennemi" }) ],
+                positions: { M1: { q: 0, r: 0 }, J1: { q: 9, r: 0 } },
+                partie: { Phase_Combat: "Resolution", Tour_Combat: 1, Ordre_Initiative: ["M1"], File_Attente_Combat: [] }
+            });
+            const plan = choisirZone(etat, "M1",
+                { estZone: true, zoneHexes: PATE, zoneEstADistance: true, zonePortee: 3, estAttaqueSimple: true },
+                null, creerDes(s));
+            if (plan && distance({ q: 0, r: 0 }, plan.centre) > 3) horsPortee++;
+        }
+        verifier("l'ancre reste dans la portée de la carte", horsPortee === 0, `(${horsPortee}/40)`);
+
+        let tropLoin = 0;
+        for (let s = 0; s < 40; s++) {
+            const etat = construireEtatCombat({
+                idPartie: "P1", cerveau: "P_03", graine: s,
+                combattants: [ fiche("J1", { camp: "Allié" }), fiche("J2", { camp: "Allié" }),
+                              fiche("M1", { estMonstre: true, camp: "Ennemi" }) ],
+                positions: { M1: { q: 0, r: 0 }, J1: { q: 1, r: 0 }, J2: { q: 5, r: 0 } },
+                partie: { Phase_Combat: "Resolution", Tour_Combat: 1, Ordre_Initiative: ["M1"], File_Attente_Combat: [] }
+            });
+            const plan = choisirZone(etat, "M1",
+                { estZone: true, zoneHexes: PATE, zoneEstADistance: true, zonePortee: 6, estAttaqueSimple: true },
+                null, creerDes(s));
+            if (plan && distance({ q: 0, r: 0 }, plan.centre) > 1) tropLoin++;
+        }
+        verifier("au corps-à-corps, elle ne vise plus au loin", tropLoin === 0, `(${tropLoin}/40)`);
+
+        let derriereLeMur = 0;
+        const mur = { etatCase: (q, r) => ({ bloquee: q === 2 && r >= -1 && r <= 1, supprimee: false, difficile: false }) };
+        for (let s = 0; s < 40; s++) {
+            const etat = construireEtatCombat({
+                idPartie: "P1", cerveau: "P_03", graine: s,
+                combattants: [ fiche("J1", { camp: "Allié" }), fiche("M1", { estMonstre: true, camp: "Ennemi" }) ],
+                positions: { M1: { q: 0, r: 0 }, J1: { q: 5, r: 0 } },
+                partie: { Phase_Combat: "Resolution", Tour_Combat: 1, Ordre_Initiative: ["M1"], File_Attente_Combat: [] }
+            });
+            const plan = choisirZone(etat, "M1",
+                { estZone: true, zoneHexes: PATE, zoneEstADistance: true, zonePortee: 6, estAttaqueSimple: true },
+                mur, creerDes(s));
+            if (plan && plan.centre.q > 2) derriereLeMur++;
+        }
+        verifier("elle ne pose pas une zone derrière un mur", derriereLeMur === 0, `(${derriereLeMur}/40)`);
+    }
+
+    // 13.4 — Zone de soin : elle va sur le congénère blessé, jamais sur l'adversaire.
+    {
+        let surLeBlesse = 0, surLeJoueur = 0;
+        for (let s = 0; s < 60; s++) {
+            const etat = construireEtatCombat({
+                idPartie: "P1", cerveau: "P_03", graine: s,
+                combattants: [
+                    fiche("A1", { estMonstre: true, camp: "Ennemi", PV_Actuels: 12 }),
+                    fiche("A2", { estMonstre: true, camp: "Ennemi" }),
+                    fiche("J1", { camp: "Allié" }),
+                    fiche("M1", { estMonstre: true, camp: "Ennemi" })
+                ],
+                positions: { M1: { q: 0, r: 0 }, A1: { q: 3, r: 0 }, A2: { q: -3, r: 0 }, J1: { q: 0, r: 3 } },
+                partie: { Phase_Combat: "Resolution", Tour_Combat: 1, Ordre_Initiative: ["M1"], File_Attente_Combat: [] }
+            });
+            const infos = { estZone: true, zoneHexes: PATE, zoneEstADistance: true, zonePortee: 5, estSoin: true };
+            const plan = choisirZone(etat, "M1", infos, null, creerDes(s));
+            if (!plan) continue;
+            if (touche(PATE, plan, { q: 3, r: 0 })) surLeBlesse++;
+            if (touche(PATE, plan, { q: 0, r: 3 })) surLeJoueur++;
+        }
+        verifier("le soin de zone couvre le congénère blessé", surLeBlesse === 60, `(${surLeBlesse}/60)`);
+        verifier("il ne se pose pas sur l'adversaire", surLeJoueur === 0, `(${surLeJoueur}/60)`);
+    }
+
+    // 13.5 — Se placer pour que la zone ramasse du monde : choisirPosition doit
+    // préférer la case qui prend deux joueurs, pas foncer sur le plus proche.
+    {
+        let deuxJoueurs = 0, essais = 0;
+        for (let s = 0; s < 60; s++) {
+            const etat = construireEtatCombat({
+                idPartie: "P1", cerveau: "P_03", graine: s,
+                combattants: [
+                    fiche("J1", { camp: "Allié" }), fiche("J2", { camp: "Allié" }), fiche("J3", { camp: "Allié" }),
+                    fiche("M1", { estMonstre: true, camp: "Ennemi", Personnalite: "brutal" })
+                ],
+                positions: { M1: { q: 0, r: 0 }, J1: { q: 3, r: 0 }, J2: { q: 3, r: -1 }, J3: { q: 0, r: 2 } },
+                partie: { Phase_Combat: "Resolution", Tour_Combat: 1, Ordre_Initiative: ["M1"], File_Attente_Combat: [] }
+            });
+            const infos = { estZone: true, zoneHexes: PATE, zoneEstADistance: false, estAttaqueSimple: true, fatigue: 0 };
+            const cible = choisirCible(etat, "M1", infos, creerDes(s));
+            const pos = choisirPosition(etat, "M1", cible, infos, null, creerDes(s));
+            if (!pos) continue;
+            essais++;
+            let maxPris = 0;
+            for (let rot = 0; rot < 6; rot++) {
+                const pris = [{ q: 3, r: 0 }, { q: 3, r: -1 }, { q: 0, r: 2 }]
+                    .filter(t => touche(PATE, { centre: pos, rotation: rot }, t)).length;
+                if (pris > maxPris) maxPris = pris;
+            }
+            if (maxPris >= 2) deuxJoueurs++;
+        }
+        verifier("elle se place pour ramasser deux joueurs", deuxJoueurs > essais * 0.9,
+                 `(${deuxJoueurs}/${essais})`);
+    }
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

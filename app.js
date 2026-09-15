@@ -488,65 +488,11 @@ const refEvenement = (idPartie, n) => doc(db, COL.PARTIES, idPartie, COL_EVENEME
 const COL_JOURNAL = "Journal_Combat";
 const refCompteurEvenements = (idPartie) => doc(db, COL.PARTIES, idPartie, COL_JOURNAL, "compteur");
 
-// Réserve `combien` numéros d'un coup et rend le premier. Une seule transaction,
-// sur un document que personne d'autre n'écrit : elle ne peut pas se faire
-// doubler par la file d'initiative ou le verrou de l'IA.
-// UN TOUR APPARTIENT À UN SEUL POSTE, ET C'EST LE JOURNAL QUI TRANCHE.
-//
-// Le verrou de l'IA sert à ça — mais c'est une pièce à part, qu'un poste en
-// retard d'une version, une écriture bousculée ou un plateau désynchronisé peut
-// prendre en défaut. Or il existe un endroit par lequel TOUT passe forcément, et
-// où une seule transaction fait déjà autorité : la réservation des numéros
-// d'événements. On y inscrit donc, en même temps que les numéros, à QUI
-// appartient le tour en cours (l'acteur et la manche). Un second poste qui
-// tente de publier le même tour se voit refuser ses numéros, et son récit ne
-// part jamais. C'est la dernière ligne, celle qui ne dépend de rien d'autre.
-const MEMOIRE_TOURS = 30;          // de quoi couvrir largement une manche
-
-function arbitrerTour(tours, tour) {
-    if (!tour || !tour.cle || !tour.auteur) return true;
-    const proprietaire = tours[tour.cle];
-    if (proprietaire && proprietaire !== tour.auteur) return false;
-    if (!proprietaire) {
-        tours[tour.cle] = tour.auteur;
-        const cles = Object.keys(tours);
-        if (cles.length > MEMOIRE_TOURS) {
-            cles.slice(0, cles.length - MEMOIRE_TOURS).forEach(k => delete tours[k]);
-        }
-    }
-    return true;
-}
-
-async function reserverNumerosEvenements(idPartie, combien, tour) {
-    const ref = refCompteurEvenements(idPartie);
-    // LE COMBAT DÉJÀ COMMENCÉ. Une partie ouverte avant ce changement compte
-    // déjà, disons, quarante-deux événements — dans l'ancien champ de la partie,
-    // et sous les mêmes numéros dans le journal. Repartir de 1 les écraserait, et
-    // les postes dont le curseur est à 42 ne verraient plus jamais rien passer.
-    // On prend donc l'ancien compteur comme plancher, lu au passage dans la
-    // partie qu'on a déjà en mémoire : aucune lecture de plus, aucune contention.
-    const plancher = parseInt((window.PARTIE_DATA || {}).Compteur_Evenements) || 0;
-    return await runTransaction(db, async (tx) => {
-        const snap = await tx.get(ref);
-        const donnees = snap.exists() ? (snap.data() || {}) : {};
-        const courant = snap.exists() ? (parseInt(donnees.n) || 0) : plancher;
-        const tours = { ...(donnees.tours || {}) };
-
-        // Ce tour appartient-il à quelqu'un d'autre ? Alors on ne publie rien.
-        if (!arbitrerTour(tours, tour)) {
-            if (typeof window.tracerCombat === "function") {
-                window.tracerCombat("🚷", `tour déjà publié par ${tours[tour.cle]}`, tour.cle);
-            }
-            return null;
-        }
-
-        const debut = courant + 1;
-        // set, et non update : le tout premier événement d'une partie trouve un
-        // document qui n'existe pas encore.
-        tx.set(ref, { n: courant + combien, tours });
-        return debut;
-    });
-}
+// GRANDE SUPPRESSION : MEMOIRE_TOURS, arbitrerTour et reserverNumerosEvenements
+// n'existent plus — elles réservaient les numéros de l'ancien journal pour
+// window.publierEvenementCombat/publierEvenementsCombat, supprimées avec elles.
+// refCompteurEvenements reste : window.viderJournalCombat s'en sert encore
+// pour remettre le compteur à zéro à la fin d'un combat.
 
 // LE FILET DE SÉCURITÉ. Si le journal ne fonctionne pas — droits, réseau,
 // requête refusée —, les postes qui REGARDENT ne doivent pas se retrouver
@@ -554,110 +500,17 @@ async function reserverNumerosEvenements(idPartie, combien, tour) {
 // (les Action_* de la partie), comme avant le journal. Mieux vaut un combat
 // moins bien synchronisé qu'un combat qui ne montre rien.
 window.JOURNAL_INDISPONIBLE = false;
-function journalHorsService(e) {
-    console.error("Journal de combat indisponible — retour aux animations diffusées :", e);
-    if (window.JOURNAL_INDISPONIBLE) return;
-    window.JOURNAL_INDISPONIBLE = true;
-    if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
-}
 
-// LE NUMÉRO EST ATTRIBUÉ SOUS TRANSACTION, sur le compteur du journal : deux
-// postes qui publient au même instant ne peuvent pas tomber sur le même.
-// La clé d'un tour : son acteur et sa manche. Elle se déduit de l'événement
-// lui-même, donc aucun appelant n'a à s'en occuper.
-const cleDuTour = (ev) => (ev && ev.acteur)
-    ? { cle: `${ev.acteur}|${ev.tour === undefined ? "" : ev.tour}`, auteur: ev.auteur || "?" }
-    : null;
-
-window.publierEvenementCombat = async function(idPartie, evenement) {
-    if (!idPartie) return null;
-    try {
-        const n = await reserverNumerosEvenements(idPartie, 1, cleDuTour(evenement));
-        if (!n) return null;
-        await setDoc(refEvenement(idPartie, n), {
-            ...evenement, ID_Partie: idPartie, n, horodatage: Date.now()
-        });
-        return n;
-    } catch (e) {
-        journalHorsService(e);
-        return null;
-    }
-};
-
-// PUBLIER PLUSIEURS ÉVÉNEMENTS D'UN COUP. Un trajet de six cases, c'est six
-// numéros : les envoyer un par un faisait six transactions et six écritures,
-// donc six allers-retours réseau au milieu d'un tour — long sur un iPad en
-// wifi, et six occasions qu'un seul échoue et laisse un trou dans le journal.
-//
-// Ici, UNE transaction réserve les six numéros d'un coup (le compteur avance de
-// six), et UNE écriture groupée les pose tous. Firestore applique un lot en
-// entier ou pas du tout : soit le trajet est là au complet, soit il n'y est
-// pas. Les numéros restent consécutifs et dans l'ordre donné.
-window.publierEvenementsCombat = async function(idPartie, evenements) {
-    const liste = (evenements || []).filter(Boolean);
-    if (!idPartie || liste.length === 0) return [];
-    try {
-        // Le PREMIER numéro de la série ; les suivants s'en déduisent.
-        const premier = await reserverNumerosEvenements(idPartie, liste.length, cleDuTour(liste[0]));
-        if (!premier) return [];
-
-        const lot = writeBatch(db);
-        const numeros = [];
-        const horodatage = Date.now();
-        liste.forEach((evenement, i) => {
-            const n = premier + i;
-            numeros.push(n);
-            lot.set(refEvenement(idPartie, n), { ...evenement, ID_Partie: idPartie, n, horodatage });
-        });
-        await lot.commit();
-        return numeros;
-    } catch (e) {
-        journalHorsService(e);
-        return [];
-    }
-};
-
-// L'écoute du journal. On ne remonte QUE les événements postérieurs au dernier
-// déjà connu : au chargement d'une partie en cours, il ne s'agit pas de rejouer
-// tout le combat depuis le début.
-window.ecouterEvenementsCombat = function(idPartie, apres, rappel) {
-    if (!idPartie) return () => {};
-    try {
-        const q = query(collEvenements(idPartie), where("n", ">", apres || 0), orderBy("n", "asc"));
-        return onSnapshot(q, (snap) => {
-            window.JOURNAL_INDISPONIBLE = false;
-            rappel(snap.docs.map(d => d.data()));
-        }, journalHorsService);
-    } catch (e) {
-        journalHorsService(e);
-        return () => {};
-    }
-};
-
-// LE COMPTEUR SE SURVEILLE, ET C'EST VITAL.
-//
-// L'écoute du journal ne remonte que les numéros SUPÉRIEURS au curseur de ce
-// poste. Or quand un combat se termine ou se réinitialise, le journal est vidé
-// et le compteur repart à zéro — par UN SEUL poste, celui qui a cliqué. Les
-// autres gardaient leur curseur sur l'ancien combat : la rencontre suivante
-// publiait les numéros 1, 2, 3… que leur écoute, calée sur « > 30 », ne livrait
-// jamais. Plus un seul événement reçu, plus une seule fenêtre de tour, plus une
-// seule animation — le combat se jouait en base et l'écran ne montrait rien.
-//
-// On surveille donc le compteur lui-même. Un seul document, une seule écoute :
-// quand il RECULE, c'est qu'un nouveau combat a commencé, et ce poste repart de
-// zéro sans attendre qu'on le lui dise.
-window.ecouterCompteurJournal = function(idPartie, rappel) {
-    if (!idPartie) return () => {};
-    try {
-        return onSnapshot(refCompteurEvenements(idPartie), (snap) => {
-            rappel(snap.exists() ? (parseInt(snap.data().n) || 0) : 0);
-        }, (e) => console.error("Écoute du compteur du journal :", e));
-    } catch (e) {
-        console.error("Écoute du compteur du journal :", e);
-        return () => {};
-    }
-};
+// GRANDE SUPPRESSION : journalHorsService, cleDuTour, window.publierEvenementCombat,
+// window.publierEvenementsCombat, window.ecouterEvenementsCombat et
+// window.ecouterCompteurJournal n'existent plus — elles écrivaient et
+// écoutaient l'ancien journal (Evenements_Combat) pour le compte de
+// window.consignerEtapeTour/consignerEtapesTour et window.suivreSequenceTour
+// (sequence_tour.js), tous deux déjà supprimés : le cerveau publie et écoute
+// désormais son propre état (regime_cerveau.js). window.JOURNAL_INDISPONIBLE
+// reste (lu par sequence_tour.js) mais ne peut plus jamais devenir vrai — il
+// ne l'était déjà plus en pratique, faute d'appelant vivant pour l'écoute qui
+// le levait.
 
 // Le rattrapage d'un trou : on attend 153, il arrive 154. On va le chercher.
 window.lireEvenementCombat = async function(idPartie, n) {
@@ -714,25 +567,9 @@ window.viderJournalCombat = async function(idPartie) {
     }
 };
 
-// Le numéro du dernier événement écrit : c'est là que se place le curseur d'un
-// poste qui rejoint un combat déjà commencé. Une lecture, donc une promesse —
-// le compteur ne voyage plus avec la partie.
-//
-// Si le document n'existe pas encore, on retombe sur l'ancien champ de la
-// partie : une partie commencée avant ce changement garde son curseur au bon
-// endroit, et le premier événement publié créera le nouveau compteur.
-window.dernierNumeroEvenement = async function(partie) {
-    const id = window.ID_PARTIE_COURANTE;
-    const repli = parseInt((partie || window.PARTIE_DATA || {}).Compteur_Evenements) || 0;
-    if (!id) return repli;
-    try {
-        const snap = await getDoc(refCompteurEvenements(id));
-        return snap.exists() ? (parseInt(snap.data().n) || 0) : repli;
-    } catch (e) {
-        console.error("Lecture du compteur du journal :", e);
-        return repli;
-    }
-};
+// GRANDE SUPPRESSION : window.dernierNumeroEvenement n'existe plus — elle ne
+// servait qu'à window.suivreSequenceTour (sequence_tour.js), supprimée avec
+// elle, pour placer le curseur d'un poste qui rejoint un combat déjà commencé.
 
 // =========================================================================
 //  RETOUR AU PREMIER PLAN (iPad surtout) : ON NE FAIT PLUS CONFIANCE À UNE
@@ -2813,75 +2650,19 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
          // Sans le filtre, les leurres se mettraient à parler dans les bulles de noms.
          if (window.PERSOS_PARTIE) afficherBullesPersonnages(window.PERSOS_PARTIE.filter(p => !p.estIllusion));
 
+         // GRANDE SUPPRESSION : les six blocs Action_Mouvement/Action_Moteur/
+         // Action_Bond/Action_Poussee/Action_Traction/Action_Peur qui vivaient
+         // ici (premier scan et diffusion en direct) sont partis — plus rien
+         // n'écrit ces champs (le cerveau publie et diffuse son propre état),
+         // donc chaque `if` lisait toujours `undefined` et ne se déclenchait
+         // jamais. Action_Des reste : c'est un champ différent, encore vivant.
          if (estPremierScanPartie) {
              if (dataPartie.Action_Des) window.DERNIER_JET_DES = dataPartie.Action_Des.timestamp;
-             // 🔻 NOUVEAU
-             if (dataPartie.Action_Mouvement) window.DERNIER_MOUVEMENT = dataPartie.Action_Mouvement.timestamp;
-             
-             // 🔻 NOUVEAU
-             if (dataPartie.Action_Moteur) window.DERNIER_ACTION_MOTEUR = dataPartie.Action_Moteur.timestamp;
-
-             if (dataPartie.Action_Bond) window.DERNIER_ACTION_BOND = dataPartie.Action_Bond.timestamp;
-
-             if (dataPartie.Action_Poussee) window.DERNIER_ACTION_POUSSEE = dataPartie.Action_Poussee.timestamp;
-
-             if (dataPartie.Action_Traction) window.DERNIER_ACTION_TRACTION = dataPartie.Action_Traction.timestamp;
-
-             if (dataPartie.Action_Peur) window.DERNIER_ACTION_PEUR = dataPartie.Action_Peur.timestamp;
-
              estPremierScanPartie = false;
          } else {
              if (dataPartie.Action_Des && dataPartie.Action_Des.timestamp !== window.DERNIER_JET_DES) {
                  window.DERNIER_JET_DES = dataPartie.Action_Des.timestamp;
                  jouerAnimationDesGlobal(dataPartie.Action_Des);
-             }
-             // 🔻 NOUVEAU : On lance l'animation chez tous les joueurs connectés !
-             if (dataPartie.Action_Mouvement && dataPartie.Action_Mouvement.timestamp !== window.DERNIER_MOUVEMENT) {
-                 window.DERNIER_MOUVEMENT = dataPartie.Action_Mouvement.timestamp;
-                 if (typeof window.jouerAnimationMouvement === "function") {
-                     const action = dataPartie.Action_Mouvement;
-                     window.programmerAnimationTour("mouvement", action, () => window.jouerAnimationMouvement(action));
-                 }
-             }
-             // 🔻 NOUVEAU : Déclenchement de la résolution d'attaque pour TOUS les joueurs connectés
-             if (dataPartie.Action_Moteur && dataPartie.Action_Moteur.timestamp !== window.DERNIER_ACTION_MOTEUR) {
-                 window.DERNIER_ACTION_MOTEUR = dataPartie.Action_Moteur.timestamp;
-                 if (typeof window.jouerAnimationMoteur === "function") {
-                     const action = dataPartie.Action_Moteur;
-                     window.programmerAnimationTour("carte", action, () => window.jouerAnimationMoteur(action));
-                 }
-             }
-             // Bond : la case d'arrivée est déjà validée, on ne fait que rejouer le saut visuellement
-             if (dataPartie.Action_Bond && dataPartie.Action_Bond.timestamp !== window.DERNIER_ACTION_BOND) {
-                 window.DERNIER_ACTION_BOND = dataPartie.Action_Bond.timestamp;
-                 if (typeof window.jouerAnimationBond === "function") {
-                     const action = dataPartie.Action_Bond;
-                     window.programmerAnimationTour("bond", action, () => window.jouerAnimationBond(action));
-                 }
-             }
-             // Poussée : le jet et la case d'arrivée sont déjà tranchés par le lanceur, on rejoue juste l'animation
-             if (dataPartie.Action_Poussee && dataPartie.Action_Poussee.timestamp !== window.DERNIER_ACTION_POUSSEE) {
-                 window.DERNIER_ACTION_POUSSEE = dataPartie.Action_Poussee.timestamp;
-                 if (typeof window.jouerAnimationPoussee === "function") {
-                     const action = dataPartie.Action_Poussee;
-                     window.programmerAnimationTour("poussée", action, () => window.jouerAnimationPoussee(action));
-                 }
-             }
-             // Traction : même animation que la Poussée (la trajectoire suffit à inverser l'effet)
-             if (dataPartie.Action_Traction && dataPartie.Action_Traction.timestamp !== window.DERNIER_ACTION_TRACTION) {
-                 window.DERNIER_ACTION_TRACTION = dataPartie.Action_Traction.timestamp;
-                 if (typeof window.jouerAnimationPoussee === "function") {
-                     const action = dataPartie.Action_Traction;
-                     window.programmerAnimationTour("traction", action, () => window.jouerAnimationPoussee(action));
-                 }
-             }
-             // Peur : chemin et attaques d'opportunité déjà tranchés par le lanceur, on rejoue juste l'animation
-             if (dataPartie.Action_Peur && dataPartie.Action_Peur.timestamp !== window.DERNIER_ACTION_PEUR) {
-                 window.DERNIER_ACTION_PEUR = dataPartie.Action_Peur.timestamp;
-                 if (typeof window.jouerAnimationPeur === "function") {
-                     const action = dataPartie.Action_Peur;
-                     window.programmerAnimationTour("peur", action, () => window.jouerAnimationPeur(action));
-                 }
              }
          }
      }

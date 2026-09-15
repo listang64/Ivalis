@@ -4,8 +4,8 @@
 // monstres_competences.js, effetAutorise). Ce banc teste le VRAI bloc de
 // détection de moteur_effets.js (demarrerCiblage), extrait par ses commentaires
 // repères, exactement comme coup_critique.mjs extrait afficherMessageFlottantHex.
-// La lecture côté IA (choisirCibleMonstre) est déjà couverte par
-// equipement_combat.mjs.
+// La lecture côté IA (choisirCible, ia_pure.js) est déjà couverte par
+// ia_pure.mjs, section 4 « LA PROVOCATION PRIME SUR TOUT LE RESTE ».
 import fs from 'fs';
 import { resoudreCarte } from '../moteur_pur.js';
 import { choisirCible } from '../ia_pure.js';

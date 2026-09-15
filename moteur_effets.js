@@ -1573,7 +1573,7 @@ window.demarrerCiblage = async function(idCarte, options) {
             // 🔻 NOUVEAU : DÉTECTION PROVOCATION 🔻
             // État persistant classique (comme Étourdi/Immobilisation), durée fixe de 2 tours.
             // Oblige la cible à n'attaquer QUE le lanceur tant que l'état dure (lu par l'IA des
-            // monstres dans choisirCibleMonstre, monstres_ia.js). L'idProvocateur est fixé UNE FOIS
+            // monstres dans choisirCible, ia_pure.js). L'idProvocateur est fixé UNE FOIS
             // ici, au moment où la carte est composée : c'est lui que l'IA compare à ses candidats.
             // Interdite aux monstres eux-mêmes (⚖️ règle Forge répercutée dans
             // monstres_competences.js) : seuls les joueurs peuvent la lancer.

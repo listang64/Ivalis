@@ -44,7 +44,7 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion,
          chaineDeDegats, REGLES_ETATS } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, distance, planifierTrajet,
          occupantVivant } from './mouvement_pur.js';
-import { deciderTourCreature } from './ia_pure.js';
+import { deciderTourCreature, choisirZone } from './ia_pure.js';
 
 const nombre = (v, defaut = 0) => {
     const n = parseInt(v);
@@ -737,12 +737,22 @@ export function jouerCreature(etat, id, carte, plateau) {
     const aPortee = moi && !moi.aTerre && cible && !cible.aTerre
                     && distance(moi, cible) <= nombre(infos.portee, 1);
 
+    // UNE CARTE DE ZONE ne ramasse pas la cible unique choisie plus haut — elle
+    // ne sert ici qu'à décider si ça valait le coup de marcher. On recalcule
+    // l'emprise APRÈS le déplacement réellement joué (une attaque d'opportunité
+    // a pu dévier la créature du plan) : c'est la même fonction qu'a utilisée
+    // deciderTourCreature, sur l'état à jour plutôt que sur l'arrivée prévue.
+    const zone = (aPortee && infos.estZone)
+        ? choisirZone(courant, id, infos, plateau, des, { q: moi.q, r: moi.r })
+        : null;
+    const ciblesFrappees = (zone && zone.cibles.length) ? zone.cibles : [plan.cible];
+
     if (aPortee && carte && carte.idCarte) {
         const critique = tirerCritique(courant, id, des);
         const brute = {
             type: "carte", idLanceur: id, idCarte: carte.idCarte,
-            attaques: (carte.attaques || []).map(a => ({ ...a, cibles: [plan.cible] })),
-            alterations: (carte.alterations || []).map(a => ({ ...a, cibles: [plan.cible] })),
+            attaques: (carte.attaques || []).map(a => ({ ...a, cibles: ciblesFrappees })),
+            alterations: (carte.alterations || []).map(a => ({ ...a, cibles: ciblesFrappees })),
             coutFatigue: nombre(infos.fatigue), critique
         };
         // UNE CRÉATURE CONFUSE SE TROMPE AUSSI DE CIBLE. La confusion ne vivait
@@ -754,6 +764,15 @@ export function jouerCreature(etat, id, carte, plateau) {
         const r = resoudreCarte(courant, action, plateau);
         courant = clonerEtat(r.etat);
         etapes.push(...r.etapes);
+
+        // LA ZONE QU'UNE CARTE DE PERSISTANCE LAISSE DERRIÈRE ELLE — même
+        // raisonnement que pour un joueur (voir prochainPas plus haut) : une
+        // créature qui lance une carte à persistance de terrain laisse le
+        // même feu au sol, avec la même emprise que celle qui a frappé.
+        if (infos.persistanceTerrain && zone && zone.hexes.length) {
+            const zonePosee = creerZonePure(courant, action, zone.hexes, id);
+            if (zonePosee) etapes.push(...poserZone(courant, zonePosee));
+        }
 
         // Une créature qui pousse ou tire quelqu'un dans le feu le brûle, elle aussi.
         r.etapes.filter(e => (e.type === "poussee" || e.type === "traction") && e.vers).forEach(e => {

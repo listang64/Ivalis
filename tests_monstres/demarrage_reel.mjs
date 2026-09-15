@@ -98,7 +98,7 @@ console.log("1. LES MODULES DU JEU SE CHARGENT TOUS");
     "mouvement.js": ["dessinerCheminMouvement"],
     "moteur_effets.js": ["demarrerCiblage", "porteeAvecArme", "appliquerEquipementALaCarte"],
     "monstres.js": ["recomposerCombattants", "ouvrirGenerationRencontre", "genererRencontreMonstres"],
-    "monstres_ia.js": ["choisirCibleMonstre"],
+    "monstres_ia.js": ["analyserCarteMonstre"],
     "objets.js": ["fabriquerObjet", "bonusEquipement", "raisonBlocageCarte"],
     "objets_ia.js": ["promptImageObjet", "illustrerLesObjets", "lancerIllustrationButin",
                      "avancementImagesButin", "peutIllustrerLesObjets"],

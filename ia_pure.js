@@ -24,7 +24,7 @@
 // =========================================================================
 
 import { combattant } from './combat_etat.js';
-import { aLEtat } from './moteur_pur.js';
+import { aLEtat, ligneDeVue } from './moteur_pur.js';
 import { distance, voisinsDe, occupantVivant, coutDuPas } from './mouvement_pur.js';
 
 const nombre = (v, defaut = 0) => {
@@ -226,11 +226,6 @@ export function choisirCible(etat, id, infosCarte, des) {
 //  C'est ici que se jouent le contournement, la fuite du corps-à-corps des
 //  tireurs, et l'évitement des zones.
 //
-//  Le placement des cartes de ZONE (choisir l'ancre et l'orientation d'une
-//  emprise) n'est pas encore ici : il reste dans monstres_ia.js jusqu'à ce que
-//  le ciblage de zone passe à son tour en pur. On le dit plutôt que de faire
-//  semblant.
-
 export function choisirPosition(etat, id, cible, infosCarte, plateau, des) {
     const moi = combattant(etat, id);
     if (!moi || moi.q === null) return null;
@@ -247,6 +242,15 @@ export function choisirPosition(etat, id, cible, infosCarte, plateau, des) {
     const contactDepart = ennemisAuContactDepuis(etat, moi.q, moi.r, moi.camp);
     const portee = nombre(infos.portee, 1);
 
+    // CARTE DE ZONE AU CORPS-À-CORPS : l'emprise est centrée sur la créature,
+    // donc c'est SA case qui décide de qui sera pris dedans. On juge alors
+    // chaque case à ce que la zone y ramasserait plutôt qu'à la seule distance
+    // d'une cible : sans ça, elle allait au contact du premier venu et
+    // arrosait une case vide à côté du reste du groupe.
+    const zoneDeMelee = infos.estZone && !infos.zoneEstADistance
+                        && Array.isArray(infos.zoneHexes) && infos.zoneHexes.length > 0;
+    const occupantsZone = zoneDeMelee ? occupantsSousEmprise(etat, id, infos) : null;
+
     let meilleure = null, meilleurScore = -Infinity;
 
     cases.forEach(c => {
@@ -260,7 +264,16 @@ export function choisirPosition(etat, id, cible, infosCarte, plateau, des) {
 
         let score = 0;
 
-        if (cible) {
+        if (occupantsZone) {
+            // La bonne case n'est pas « celle qui touche la cible », c'est
+            // celle dont l'emprise ramasse le plus de monde : on essaie les
+            // six orientations depuis chaque case et on juge là-dessus.
+            const couverture = meilleureOrientation(infos.zoneHexes, c, occupantsZone).score;
+            score += couverture * 1.4;
+            // Rien à ramasser d'ici : on se rapproche quand même de la cible,
+            // comme pour une carte ordinaire.
+            if (couverture <= 0 && cible) score -= distance(c, cible) * 2.5;
+        } else if (cible) {
             const d = distance(c, cible);
             if (d <= portee) {
                 score += 25;           // à portée : c'est l'objectif premier
@@ -307,6 +320,135 @@ export function choisirPosition(etat, id, cible, infosCarte, plateau, des) {
 }
 
 // =========================================================================
+//  5 bis. OÙ POSER UNE ZONE
+// =========================================================================
+//  Une carte de zone ne vise pas UNE cible : elle ramasse tout ce qui se
+//  trouve sous son emprise. Choisir où la poser, c'est répondre à la même
+//  question qu'un joueur à la souris — quelle rotation ramasse le plus
+//  d'ennemis et le moins d'alliés — mais sans souris ni ETAT_CIBLAGE : une
+//  créature doit trancher seule, à partir du seul état.
+//
+//  Portage fidèle de l'ancien occupantsSousZone/meilleureOrientation/
+//  placerZoneMonstre (monstres_ia.js, avant la grande suppression) : même
+//  barème, même géométrie. Seule la source change — l'état pur remplace
+//  PERSOS_PARTIE/TOKENS_VTT_DATA/ETAT_CIBLAGE.
+
+// Rotation d'un hexagone autour de (0,0), par pas de 60° — la même formule
+// que rotateHexVTT (moteur_effets.js), pour que la créature pose sa zone
+// exactement comme un joueur le ferait à la souris.
+function rotationHex(hex, pas) {
+    let q = hex.q, r = hex.r;
+    for (let i = 0; i < pas; i++) {
+        const nq = -r, nr = q + r;
+        q = nq; r = nr;
+    }
+    return { q, r };
+}
+
+// Ce que chaque combattant vaut, une fois pris sous l'emprise. Une attaque de
+// zone frappe tout le monde sauf le lanceur : un congénère pris dedans coûte
+// bien plus cher que l'ennemi ne rapporte, sinon la créature s'arroserait
+// elle-même pour toucher un joueur.
+function occupantsSousEmprise(etat, id, infosCarte) {
+    const moi = combattant(etat, id);
+    const soigne = !!infosCarte.estSoin;
+    const liste = [];
+    for (const autre in etat.combattants) {
+        if (autre === id) continue;   // le lanceur est épargné par sa propre zone
+        const c = etat.combattants[autre];
+        if (!c || c.aTerre || c.q === null || c.q === undefined) continue;
+        if (c.estIllusion && !infosCarte.estAttaqueSimple) continue;
+        const allie = c.camp === moi.camp;
+        const ratioPV = c.pvMax > 0 ? Math.max(0, Math.min(1, c.pv / c.pvMax)) : 1;
+        const manque = 1 - ratioPV;
+        const valeur = soigne
+            ? (allie ? 2 + manque * 12 : -6)
+            : (allie ? -16 : 10 + manque * 5);
+        liste.push({ id: autre, q: c.q, r: c.r, valeur });
+    }
+    return liste;
+}
+
+// La meilleure orientation d'une emprise posée sur `centre`, et ce qu'elle vaut.
+function meilleureOrientation(base, centre, occupants) {
+    let meilleurScore = -Infinity, meilleureRotation = 0;
+    for (let rotation = 0; rotation < 6; rotation++) {
+        let score = 0;
+        base.forEach(h => {
+            const rot = rotationHex(h, rotation);
+            const q = centre.q + rot.q, r = centre.r + rot.r;
+            occupants.forEach(o => { if (o.q === q && o.r === r) score += o.valeur; });
+        });
+        if (score > meilleurScore) { meilleurScore = score; meilleureRotation = rotation; }
+    }
+    return { score: meilleurScore, rotation: meilleureRotation };
+}
+
+// `depart` est la case sur laquelle l'ancre se calcule — l'arrivée PRÉVUE
+// pendant la décision du tour, la position RÉELLE une fois le déplacement
+// résolu (une attaque d'opportunité a pu le faire dévier en chemin).
+export function choisirZone(etat, id, infosCarte, plateau, des, depart) {
+    const moi = combattant(etat, id);
+    if (!moi) return null;
+    const origine = depart || { q: moi.q, r: moi.r };
+    if (origine.q === null || origine.q === undefined) return null;
+
+    const infos = infosCarte || {};
+    const base = infos.zoneHexes || [];
+    if (base.length === 0) return null;
+    const carte = plateau || PLAINE;
+
+    const occupants = occupantsSousEmprise(etat, id, infos);
+
+    // Une zone de corps-à-corps est centrée sur le lanceur : seule
+    // l'orientation se choisit. Une zone à distance se pose où l'on veut, dans
+    // la limite de la portée, de la ligne de vue, et de la règle d'engagement
+    // (au contact d'un ennemi, on ne vise plus qu'à une case — mêmes règles
+    // que pour une carte à cible unique).
+    let ancres = [{ q: origine.q, r: origine.r }];
+    if (infos.zoneEstADistance) {
+        const portee = Math.max(1, Math.min(8, nombre(infos.zonePortee, 1)));
+        const engage = occupants.some(o => o.valeur > 0 && distance(origine, o) === 1);
+        const limite = engage ? 1 : portee;
+        ancres = [];
+        for (let dq = -limite; dq <= limite; dq++) {
+            for (let dr = -limite; dr <= limite; dr++) {
+                const hex = { q: origine.q + dq, r: origine.r + dr };
+                if (distance(origine, hex) > limite) continue;
+                const etatCase = carte.etatCase(hex.q, hex.r) || {};
+                if (etatCase.supprimee) continue;
+                if (!ligneDeVue(carte, origine, hex)) continue;
+                ancres.push(hex);
+            }
+        }
+        if (ancres.length === 0) return null;
+    }
+
+    let meilleur = null, meilleurScore = -Infinity;
+    ancres.forEach(ancre => {
+        const orientation = meilleureOrientation(base, ancre, occupants);
+        // À prise égale, on pose la zone au plus près : c'est plus lisible à
+        // la table, et ça laisse la créature moins exposée.
+        const score = orientation.score - distance(origine, ancre) * 0.4 + bruit(des, 1.2);
+        if (score > meilleurScore) {
+            meilleurScore = score;
+            meilleur = { centre: ancre, rotation: orientation.rotation };
+        }
+    });
+    if (!meilleur) return null;
+
+    const hexes = base.map(h => {
+        const rot = rotationHex(h, meilleur.rotation);
+        return { q: meilleur.centre.q + rot.q, r: meilleur.centre.r + rot.r };
+    });
+    const cibles = occupants
+        .filter(o => hexes.some(h => h.q === o.q && h.r === o.r))
+        .map(o => o.id);
+
+    return { centre: meilleur.centre, rotation: meilleur.rotation, hexes, cibles, score: meilleurScore };
+}
+
+// =========================================================================
 //  6. LE TOUR D'UNE CRÉATURE, DÉCIDÉ
 // =========================================================================
 //  Ce que le cerveau appellera : l'état et la carte choisie entrent, un PLAN
@@ -347,12 +489,22 @@ export function deciderTourCreature(etat, id, infosCarte, plateau, des) {
     const arrivee = place ? { q: place.q, r: place.r } : { q: moi.q, r: moi.r };
     const aPortee = cible && distance(arrivee, cible) <= nombre(infos.portee, 1);
 
+    // UNE CARTE DE ZONE ne vise pas la cible choisie plus haut : elle sert
+    // juste à décider si ça vaut le coup de marcher (le contournement, la fuite
+    // du corps-à-corps). Ce qui compte à l'arrivée, c'est ce que l'emprise
+    // ramasse — recalculé ici pour que le plan porte la même information que
+    // ce que le cerveau appliquera (voir jouerCreature, qui la recalcule une
+    // seconde fois après un déplacement réellement joué, opportunités comprises).
+    const zone = infos.estZone ? choisirZone(etat, id, infos, plateau, des, arrivee) : null;
+
     return {
         acteur: id,
         cible: cible ? cible.id : null,
         chemin: place ? place.chemin : [],
         coutTrajet: place ? nombre(place.cout) : 0,
         lancera: !!aPortee,
+        zoneHexes: zone ? zone.hexes : null,
+        zoneCibles: zone ? zone.cibles : null,
         // Pourquoi elle ne lance rien : utile dans la trace, et honnête.
         raison: aPortee ? null : (cible ? "hors de portée" : "aucune cible")
     };
@@ -361,6 +513,7 @@ export function deciderTourCreature(etat, id, infosCarte, plateau, des) {
 if (typeof window !== "undefined") {
     window.iaPure = {
         PERSONNALITES, traitsDe, dangerDeLaCase, ennemisAuContactDepuis, alliesAdjacents,
-        ennemiLePlusProche, casesAccessibles, choisirCible, choisirPosition, deciderTourCreature
+        ennemiLePlusProche, casesAccessibles, choisirCible, choisirPosition, choisirZone,
+        deciderTourCreature
     };
 }

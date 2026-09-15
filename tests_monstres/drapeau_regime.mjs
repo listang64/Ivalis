@@ -106,9 +106,12 @@ console.log("\n2. L'ANCIENNE SYNCHRONISATION A ÉTÉ DÉBRANCHÉE, PUIS SUPPRIM�
     verifier("la séquence de tour est dedans", debut > 0 && iSeq > debut, `(${debut} < ${iSeq})`);
     verifier("l'IA des monstres aussi", iIA > debut, `(${iIA})`);
 
-    // Et ce qui reste vraiment partagé n'a pas bougé.
-    verifier("suivreSequenceTour existe toujours",
-             SOURCES['sequence_tour.js'].includes('window.suivreSequenceTour = function'));
+    // La grande suppression (étape 7, annoncée en tête de ce banc) est passée
+    // par là : suivreSequenceTour n'existe plus, mais l'appel resté dans le
+    // bloc éteint est protégé par un typeof — il ne fait rien, il ne casse rien.
+    verifier("suivreSequenceTour est bien parti, et l'appel encore là ne casse rien",
+             !SOURCES['sequence_tour.js'].includes('window.suivreSequenceTour = function')
+             && app.includes('typeof window.suivreSequenceTour === "function"'));
     verifier("le verrou de l'IA n'a pas bougé", lire('monstres_ia.js').includes('reclamerVerrouIA'));
 
     // La grande suppression : plus une seule écriture des champs Action_*
@@ -308,11 +311,17 @@ console.log("\n7. L'IA GARDE SON PREMIER MÉTIER : PRÉPARER LES CARTES");
              ia.includes('if (window.REGIME_CERVEAU === true && !aPreparer) return;'));
     const iGarde = ia.indexOf('window.REGIME_CERVEAU === true && !aPreparer');
     const iPrepare = ia.indexOf('await window.preparerCartesMonstres()');
-    const iJoue = ia.indexOf('await window.jouerTourMonstre(');
-    verifier("la garde passe avant les deux métiers", iGarde > 0 && iGarde < iPrepare && iGarde < iJoue,
-             `(garde ${iGarde}, préparer ${iPrepare}, jouer ${iJoue})`);
+    verifier("la garde passe avant le seul métier qui reste", iGarde > 0 && iGarde < iPrepare,
+             `(garde ${iGarde}, préparer ${iPrepare})`);
     verifier("préparer reste atteignable — c'est ce que la garde laisse passer",
              iPrepare > 0 && ia.includes('if (phase === "Preparation") {'));
+    // Le second métier, lui, est parti pour de bon (grande suppression, étape 7) :
+    // jouer le tour d'une créature, calculer sa cible et sa position lui
+    // appartenaient en propre, sans qu'aucun joueur ne les redemande jamais —
+    // le cerveau (cerveau_combat.js/ia_pure.js) s'en charge maintenant seul.
+    verifier("jouer le tour d'une créature est bien parti, le cerveau s'en charge",
+             !ia.includes('window.jouerTourMonstre =') && !ia.includes('window.choisirCibleMonstre =')
+             && !ia.includes('window.choisirPositionMonstre =') && !ia.includes('window.placerZoneMonstre ='));
 }
 
 // =========================================================================
