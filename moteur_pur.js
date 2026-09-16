@@ -520,8 +520,19 @@ export function chaineDeDegats(cible, attaque, options) {
     //    coups. C'est le test de propriété qui l'a trouvé, au 633e essai.
     let degats = Math.max(0, nombre(attaque.valeurBrute)) * (critique ? 2 : 1);
 
-    // 2. Une arme de jet employée au contact perd trente pour cent.
-    if (attaque.isRanged && distance === 1) degats = Math.floor(degats * 0.7);
+    // 2. UNE ATTAQUE À DISTANCE employée au contact perd trente pour cent.
+    //
+    //    « À distance » veut dire que la CARTE porte un effet Distance — pas
+    //    que le lanceur a un arc dans la main. Une arme à distance rend toutes
+    //    les actions de son porteur tirables (isRanged, qui dit jusqu'où l'on
+    //    peut viser), et le malus suivait cette bascule : une technique écrite
+    //    au corps à corps perdait trente pour cent au contact, là où l'on ne
+    //    tire rien du tout. `tirDeLaCarte` sépare les deux.
+    //
+    //    Le repli sur `isRanged` garde les vieilles attaques lisibles : une
+    //    action fabriquée avant cette séparation n'a pas le nouveau champ.
+    const cestUnTir = attaque.tirDeLaCarte !== undefined ? attaque.tirDeLaCarte : attaque.isRanged;
+    if (cestUnTir && distance === 1) degats = Math.floor(degats * 0.7);
 
     // 2 bis. LES VULNÉRABILITÉS DE LA CIBLE. Un corps gelé casse plus
     //    facilement (+20 % de tout), un corps électrifié conduit la magie

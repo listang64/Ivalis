@@ -1050,10 +1050,22 @@ window.demarrerCiblage = async function(idCarte, options) {
                 return;
             }
 
+            // CE QUE LA CARTE DIT D'ELLE-MÊME, retenu avant que l'arme ne s'en
+            // mêle. C'est la seule chose qui décide du malus de tir à bout
+            // portant, et il a fallu séparer les deux notions.
+            //
+            // Une arme à distance (fronde, arc) rend TOUTES les actions de son
+            // porteur tirables — c'est voulu, une technique ne dépend pas de
+            // l'arme qui la sert. Mais le malus, lui, suivait la même bascule :
+            // une technique écrite au corps à corps affichait « -30% Dégâts »
+            // dès qu'on la lançait au contact, alors qu'on n'y tire rien. Le
+            // malus appartient à l'ATTAQUE À DISTANCE, pas à l'arme rangée dans
+            // la main.
+            const tirDeLaCarte = isRanged;
+
             // L'arme équipée peut transformer l'action en tir, et allonger sa
             // portée. Posé ICI, avant que isRanged et rangeMax ne servent :
-            // attaques et altérations partent donc avec la bonne portée, et
-            // une attaque devenue tir encaisse bien le malus au contact.
+            // attaques et altérations partent donc avec la bonne portée.
             ({ isRanged, rangeMax } = window.porteeAvecArme(lanceurCarte, isRanged, rangeMax));
 
             // LA ZONE PORTE SA PROPRE DISTANCE. C'est l'action qui dessine la
@@ -1125,6 +1137,11 @@ window.demarrerCiblage = async function(idCarte, options) {
                     typeRes: typeRes,
                     valeurBrute: (parseFrFloat(effBase.Valeur) || 0) * (act.count || 1),
                     isRanged: isRanged,
+                    // Séparé d'isRanged exprès : `isRanged` dit jusqu'où l'on
+                    // peut viser (l'arme compte), `tirDeLaCarte` dit si c'est
+                    // un tir (l'arme ne compte pas). Seul le second paie le
+                    // malus au contact.
+                    tirDeLaCarte: tirDeLaCarte,
                     rangeMax: porteeReelle,
                     isHeal: isHeal,
                     isShield: isShield,
@@ -1730,6 +1747,20 @@ window.demarrerCiblage = async function(idCarte, options) {
     const carteConstruite = {
         actif: true,
         idCarte: idCarte,
+        // LE COÛT DE LA CARTE VOYAGE AVEC LA CARTE, et c'est tout le correctif.
+        //
+        // Il était lu dans window.COUT_COMPETENCE_SELECTIONNEE, une globale que
+        // pose le clic sur la bannière d'une carte. Ça tenait tant que le
+        // ciblage démarrait par « Appliquer », posé SUR la carte qu'on venait
+        // de cliquer : les deux gestes se suivaient. Depuis que la carte part
+        // du bouton fin de tour, en pleine résolution, il s'écoule toute une
+        // phase de préparation entre les deux — et finDeTourCombat remet cette
+        // globale à zéro à chaque tour clos. Le cerveau recevait donc
+        // `coutFatigue: 0` et l'énergie ne descendait plus jamais.
+        //
+        // La fiche de la carte est là, à portée de main, depuis le début de
+        // cette fonction. On la lit.
+        coutFatigue: parseInt(dataCarte.Fatigue) || 0,
         attaques: attaquesExtraites,
         alterations: alterationsExtraites,
         cibleUnique: null,
@@ -2137,7 +2168,13 @@ window.dessinerAnneauxCiblage = function() {
             }
 
             let malusLabel = anneau.querySelector(".malus-cac");
-            if (configSort.isRanged && dist === 1 && window.ETAT_CIBLAGE.attaques.length > 0 && !configSort.isHeal) {
+            // Le malus appartient au TIR, pas à l'arme : une technique de corps à
+            // corps lancée par un porteur d'arc n'en paie pas. Voir
+            // `tirDeLaCarte` plus haut, et chaineDeDegats (moteur_pur.js), qui
+            // applique exactement la même règle sur les dégâts.
+            const cestUnTir = configSort.tirDeLaCarte !== undefined
+                ? configSort.tirDeLaCarte : configSort.isRanged;
+            if (cestUnTir && dist === 1 && window.ETAT_CIBLAGE.attaques.length > 0 && !configSort.isHeal) {
                 if (!malusLabel) {
                     malusLabel = document.createElement("div");
                     malusLabel.className = "malus-cac";
@@ -2606,7 +2643,14 @@ window.declencherResolution = async function() {
                 idCarte: state.idCarte,
                 attaques: state.attaques,
                 alterations,
-                coutFatigue: parseInt(state.coutFatigue || state.fatigue || window.COUT_COMPETENCE_SELECTIONNEE) || 0,
+                // La carte dit son coût (voir carteConstruite). Les deux
+                // sources d'avant restent en secours, pour un état de ciblage
+                // fabriqué ailleurs — mais la première est désormais toujours
+                // renseignée, y compris à zéro, d'où le test explicite : un
+                // `||` ferait retomber une carte gratuite sur la globale.
+                coutFatigue: parseInt(state.coutFatigue !== undefined && state.coutFatigue !== null
+                                      ? state.coutFatigue
+                                      : (state.fatigue || window.COUT_COMPETENCE_SELECTIONNEE)) || 0,
                 persistanceTerrain: !!state.persistanceTerrain,
                 zoneHexes
             });
