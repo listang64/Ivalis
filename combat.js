@@ -3464,15 +3464,22 @@ window.jouerCarteCombat = async function(idCarte) {
 
     // 🔻 EFFET VISUEL IMMÉDIAT (N'attend pas le réseau)
     //
-    // L'ORDRE COMPTE. La carte est verrouillée en grand AVANT que le volet ne
-    // remonte : dans l'autre sens, la fermeture du volet effacerait un aperçu
-    // pas encore verrouillé, et la carte clignoterait le temps de se reposer.
-    if (typeof window.afficherApercuCarteHD === "function") {
-        window.afficherApercuCarteHD(idCarte, true); // Lock immédiat
-    }
+    // LA CARTE RETENUE S'EN VA, ELLE AUSSI. Elle restait posée en grand au
+    // milieu de l'écran jusqu'à la résolution, verrouillée pour qu'on ne puisse
+    // pas la refermer. C'était la mémoire du choix du temps où rien d'autre ne
+    // le montrait ; le bouton de fin de tour et la piste le disent maintenant,
+    // et la carte ne faisait plus qu'occuper le plateau.
+    //
+    // `true` force le masquage : sans lui, un aperçu verrouillé refuse de se
+    // fermer, c'est tout son rôle.
+    if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD(true);
     if (typeof window.rangerDeckApresChoix === "function") window.rangerDeckApresChoix();
     window.mettreAJourJaugeFatigue(0); // Cache la jauge rouge
     // 🔻 CORRECTION : Shrink immédiat en "vh"
+    //
+    // APRÈS le masquage, et pas avant : masquer l'aperçu rend au portrait sa
+    // taille pleine, et dans l'autre sens le rétrécissement était annulé dans
+    // la foulée.
     const imgPerso = document.getElementById("combat-portrait-perso");
     if (imgPerso) {
         imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
@@ -4487,24 +4494,31 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
 
     if (persoInQueue && persoInQueue.idCarte) {
         window.mettreAJourJaugeFatigue(0);
-        if (imgPerso) {
-            imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
-            imgPerso.style.height = "40vh"; 
-        }
-        
+
+        // La carte retenue quitte l'écran, quelle qu'elle soit — c'était déjà
+        // le cas du repos long, ça l'est maintenant de toutes les techniques.
+        if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD(true);
+
         if (persoInQueue.idCarte === "REPOS_LONG") {
-            if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD(true);
             divRepos.style.left = "20px";
             divRepos.style.opacity = "1";
         } else {
             divRepos.style.left = "50px";
             divRepos.style.opacity = "0";
-            if (typeof window.afficherApercuCarteHD === "function") window.afficherApercuCarteHD(persoInQueue.idCarte, true); 
         }
 
-        // Et seulement maintenant, l'aperçu étant verrouillé : le volet remonte.
-        // Ce rafraîchissement-là est le filet du geste immédiat — il rattrape
-        // les postes qui apprennent le choix par le réseau plutôt qu'au clic.
+        // Le portrait rapetisse APRÈS le rangement de la carte : masquer
+        // l'aperçu rend au portrait sa taille pleine, et l'ordre inverse
+        // annulait le rétrécissement dans la foulée — le repos long en
+        // souffrait déjà.
+        if (imgPerso) {
+            imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
+            imgPerso.style.height = "40vh"; 
+        }
+
+        // Et seulement maintenant : le volet remonte. Ce rafraîchissement-là
+        // est le filet du geste immédiat — il rattrape les postes qui
+        // apprennent le choix par le réseau plutôt qu'au clic.
         if (typeof window.rangerDeckApresChoix === "function") window.rangerDeckApresChoix();
     } else {
         // 🔻 Si la phase est "Resolution", c'est qu'il a déjà joué et n'est plus dans la file : on grise son deck.

@@ -528,9 +528,16 @@
                                            height: 100%; z-index: 14; pointer-events: none;">
             <div id="volet-contenu" style="position: absolute; top: 0; left: 0; width: 100%;
                                            height: 100%; transform: translateY(-115%);">
+                <!-- DEUX FOIS PLUS GRANDE, ET PAS UN PIXEL DE DÉFORMATION.
+                     Seule la largeur est écrite ; la hauteur reste `auto`, donc
+                     le navigateur garde les proportions de l'image quoi qu'il
+                     arrive. Doubler la largeur double la hauteur, et la lanière
+                     descend d'autant plus bas dans l'écran.
+                     Le `left` a été reculé de la moitié du gain (122 - 43 = 79)
+                     pour qu'elle grandisse autour de son axe, sans se décaler. -->
                 <img id="volet-laniere"
                      src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789309135/IMG_2135_vk5wq4.png"
-                     style="position: absolute; top: -40px; left: 122px; width: 86px; height: auto;
+                     style="position: absolute; top: -40px; left: 79px; width: 172px; height: auto;
                             pointer-events: none; filter: drop-shadow(3px 4px 10px rgba(0,0,0,0.75));">
                 <!-- `none` au départ, et c'est important : replié, le volet est
                      hors champ mais il couvre tout le flanc gauche. Il ne doit
@@ -1719,7 +1726,7 @@
 <script type="module" src="competences.js?v=22"></script>
 <script src="Plateau.js"></script>
 <script type="module" src="sequence_tour.js?v=21"></script>
-<script type="module" src="combat.js?v=66"></script>
+<script type="module" src="combat.js?v=67"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=22"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->

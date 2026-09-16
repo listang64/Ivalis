@@ -22,7 +22,9 @@
 //     bouton fin de tour ;
 //   • l'ouverture et la fermeture ont bien leur effet de ressort ;
 //   • la carte en grand se pose À DROITE du volet, et PAR-DESSUS ;
-//   • retenir une carte range le volet EN ENTIER, lanière comprise.
+//   • retenir une carte range le volet EN ENTIER, lanière comprise, ET fait
+//     disparaître la carte en grand ;
+//   • la lanière est à sa taille doublée, sans une once de déformation.
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
@@ -72,6 +74,15 @@ const p = await b.newPage({ viewport: { width: 1194, height: 834 } });
 await p.route('**', r => r.request().url().startsWith(base) ? r.continue() : r.abort());
 await p.route('**/firebase-app.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_APP }));
 await p.route('**/firebase-firestore.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_FIRESTORE }));
+
+// UNE FAUSSE LANIÈRE, DE PROPORTIONS CONNUES. Cloudinary est injoignable depuis
+// le bac à sable, et une image qui ne charge pas a une hauteur `auto` de zéro :
+// impossible de vérifier qu'elle descend plus bas sans se déformer. On lui sert
+// donc un rectangle de 100 × 400 — un rapport de 4 pour 1, facile à contrôler.
+const RAPPORT_LANIERE = 4;
+await p.route('**/IMG_2135*', r => r.fulfill({ contentType: 'image/svg+xml',
+  headers: {'Access-Control-Allow-Origin':'*'},
+  body: `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="400" viewBox="0 0 100 400"><rect width="100" height="400" fill="#6b4423"/></svg>` }));
 
 await p.goto(base + '/index.html');
 await p.waitForTimeout(2000);
@@ -425,11 +436,14 @@ console.log("=========================================================");
   const apres = await p.evaluate(() => {
     const contenu = document.getElementById("volet-contenu");
     const deck = document.getElementById("combat-liste-competences");
+    const carte = document.getElementById("apercu-carte-hd-competence");
     return {
       basDuVolet: Math.round(contenu.getBoundingClientRect().bottom),
       opacite: deck.style.opacity,
       clics: getComputedStyle(deck).pointerEvents,
-      gris: deck.style.filter
+      gris: deck.style.filter,
+      carteVisible: !!carte && carte.style.display !== "none" && carte.style.opacity !== "0",
+      carteVerrouillee: !!carte && carte.dataset.locked === "true"
     };
   });
   verifier("LA LANIÈRE DE CUIR EST REMONTÉE HORS CHAMP",
@@ -437,6 +451,25 @@ console.log("=========================================================");
   verifier("le deck est verrouillé, pas effacé", apres.opacite === "0.4", apres.opacite);
   verifier("il est grisé", (apres.gris || "").includes("grayscale"), apres.gris);
   verifier("et il ne répond plus au doigt", apres.clics === "none", apres.clics);
+
+  // LA CARTE RETENUE S'EN VA ELLE AUSSI. Elle restait posée en grand au milieu
+  // de l'écran jusqu'à la résolution, verrouillée pour qu'on ne puisse pas la
+  // refermer : c'était la mémoire du choix, du temps où rien d'autre ne le
+  // montrait. Le bouton de fin de tour et la piste le disent maintenant.
+  verifier("LA CARTE EN GRAND DISPARAÎT UNE FOIS RETENUE", apres.carteVisible === false);
+  verifier("et elle n'est plus verrouillée à l'écran", apres.carteVerrouillee === false);
+
+  // Mais elle revient au moment de viser : RÉSOUDRE et ANNULER se posent sur
+  // son aperçu, un ciblage lancé carte refermée n'aurait rien pour se résoudre.
+  const auCiblage = await p.evaluate(async () => {
+    window.afficherApercuCarteHD("K0", true);
+    await new Promise(r => setTimeout(r, 700));
+    const c = document.getElementById("apercu-carte-hd-competence");
+    return { visible: c.style.display !== "none" && c.style.opacity === "1",
+             x: Math.round(c.getBoundingClientRect().x) };
+  });
+  verifier("elle sait revenir pour le ciblage", auCiblage.visible === true, JSON.stringify(auCiblage));
+  await p.evaluate(() => window.masquerApercuCarteHD(true));
 
   // Le chemin de l'échec rend tout au joueur : deck rallumé, volet redescendu.
   await p.evaluate(() => window.rouvrirDeckApresEchec());
@@ -448,6 +481,49 @@ console.log("=========================================================");
   verifier("en cas d'échec, le volet redescend", repli.ouvert === true);
   verifier("et le deck se rallume", repli.opacite === "1" && repli.gris === "none",
            `${repli.opacite} / ${repli.gris}`);
+}
+
+console.log("\n=========================================================");
+console.log("  9. LA LANIÈRE EST DEUX FOIS PLUS GRANDE, ET INTACTE");
+console.log("=========================================================");
+{
+  // Elle était trop courte : elle descendait à peine sous le bord de l'écran.
+  // On double sa largeur — et SEULEMENT sa largeur, la hauteur restant `auto`,
+  // pour que le navigateur garde les proportions de l'image. C'est la condition
+  // posée : plus longue, mais pas étirée.
+  //
+  // Le `left` recule de la moitié du gain pour qu'elle grandisse autour de son
+  // axe au lieu de dériver vers la droite.
+  await p.evaluate(() => window.toggleVoletCompetences(true));
+  await p.waitForTimeout(800);
+
+  const l = await p.evaluate(async () => {
+    const img = document.getElementById("volet-laniere");
+    if (img && !img.complete) await img.decode().catch(() => {});
+    const r = img.getBoundingClientRect();
+    const bannieres = document.getElementById("volet-bannieres").getBoundingClientRect();
+    return {
+      largeur: Math.round(r.width), hauteur: Math.round(r.height),
+      hautDeclare: img.style.top, hauteurDeclaree: img.style.height,
+      centre: Math.round(r.x + r.width / 2),
+      bas: Math.round(r.bottom),
+      basDesBannieres: Math.round(bannieres.bottom),
+      naturelle: img.naturalWidth + "x" + img.naturalHeight
+    };
+  });
+
+  verifier("la hauteur reste libre (aucune déformation possible)",
+           l.hauteurDeclaree === "auto" || l.hauteurDeclaree === "", `"${l.hauteurDeclaree}"`);
+  verifier("elle fait bien le double des 86 px d'origine", l.largeur === 172, `${l.largeur}px`);
+  verifier("ET SES PROPORTIONS SONT INTACTES",
+           l.hauteur === l.largeur * RAPPORT_LANIERE,
+           `${l.largeur}×${l.hauteur} pour une image ${l.naturelle}`);
+  verifier("elle a grandi autour de son axe (centre inchangé à 165)",
+           l.centre === 165, `centre = ${l.centre}`);
+  verifier("son sommet est toujours mangé par le bord de l'écran",
+           l.hautDeclare === "-40px", l.hautDeclare);
+  verifier("ELLE DESCEND PLUS BAS QUE LES BANNIÈRES QU'ELLE PORTE",
+           l.bas > l.basDesBannieres, `lanière jusqu'à ${l.bas}, bannières jusqu'à ${l.basDesBannieres}`);
 }
 
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 2).join(" | "));
