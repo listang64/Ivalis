@@ -10,14 +10,16 @@
 //    tour clos. Le cerveau recevait donc « coutFatigue: 0 » : signalé en
 //    partie, « mes attaques ne réduisent plus la jauge de fatigue ».
 //
-// 2. LE MALUS DE TIR À BOUT PORTANT (-30 %).
-//    Une arme à distance (fronde, arc) rend toutes les actions de son porteur
-//    tirables — c'est voulu, une technique ne dépend pas de l'arme qui la sert.
-//    Mais le malus suivait la même bascule : une technique écrite au corps à
-//    corps affichait « -30% Dégâts » et perdait vraiment trente pour cent dès
-//    qu'on la lançait au contact, là où l'on ne tire rien du tout. Signalé en
-//    partie : « il me met -30% de dégâts, alors que ça devrait être que pour
-//    les attaques avec une distance ».
+// 2. UNE CARTE QUI NE DISAIT PAS SA PORTÉE.
+//    Une arme à distance — fronde, arc — donne une portée de base à CHAQUE
+//    technique de son porteur : une carte écrite au corps à corps devient un
+//    tir, atteint plus loin, et perd trente pour cent au contact. La règle est
+//    juste (j'ai cru un instant l'inverse et je me suis trompé). Ce qui manquait
+//    est ailleurs : la carte n'en disait pas un mot tant que le joueur n'avait
+//    pas posé d'effet « Distance » dessus. On lisait « attaque lourde, 10 dégâts
+//    physiques » sur une technique qui tirait à deux cases et encaissait le
+//    malus. Signalé en partie : « la distance doit apparaître dans les
+//    compétences même si le joueur n'en met aucune ».
 //
 // Les deux se vérifient sur le VRAI code : l'extraction de carte de
 // moteur_effets.js dans un navigateur, et chaineDeDegats importée telle quelle.
@@ -32,28 +34,20 @@ let echecs = 0;
 const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(64)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
 
 console.log("\n=========================================================");
-console.log("  1. LE NOYAU : LE MALUS APPARTIENT AU TIR, PAS À L'ARME");
+console.log("  1. LE NOYAU : LE MALUS DE TIR À BOUT PORTANT");
 console.log("=========================================================");
 {
   const cible = { pv: 100, pvMax: 100, bouclier: 0, etats: [], def: {}, mod: {} };
   const nu = (a) => chaineDeDegats(cible, a, { distance: 1 }).degats;
 
-  verifier("une attaque de la carte à distance perd 30 % au contact",
-           nu({ valeurBrute: 10, tirDeLaCarte: true, isRanged: true }) === 7,
-           `(${nu({ valeurBrute: 10, tirDeLaCarte: true, isRanged: true })})`);
-  verifier("UNE TECHNIQUE DE CORPS À CORPS N'EN PERD PAS, arc en main ou non",
-           nu({ valeurBrute: 10, tirDeLaCarte: false, isRanged: true }) === 10,
-           `(${nu({ valeurBrute: 10, tirDeLaCarte: false, isRanged: true })})`);
-  verifier("et à distance, le tir ne perd rien",
-           chaineDeDegats(cible, { valeurBrute: 10, tirDeLaCarte: true, isRanged: true },
-                          { distance: 3 }).degats === 10);
-  // Les journaux et les actions d'avant la séparation n'ont pas le nouveau
-  // champ : elles doivent continuer de se lire comme avant.
-  verifier("une attaque d'avant la séparation garde l'ancienne règle",
+  verifier("une attaque à distance perd 30 % au contact",
            nu({ valeurBrute: 10, isRanged: true }) === 7,
            `(${nu({ valeurBrute: 10, isRanged: true })})`);
-  verifier("et une attaque de contact d'avant ne perd rien non plus",
+  verifier("une attaque de contact n'en perd rien",
            nu({ valeurBrute: 10, isRanged: false }) === 10);
+  verifier("et à distance, le tir ne perd rien",
+           chaineDeDegats(cible, { valeurBrute: 10, isRanged: true },
+                          { distance: 3 }).degats === 10);
 }
 
 // =========================================================================
@@ -182,17 +176,44 @@ if (!idAttaque || !idDistance) {
 
   verifier("la carte de corps à corps porte bien une attaque",
            !!cac && (cac.attaques || []).length > 0, JSON.stringify((cac || {}).attaques || []).slice(0, 120));
-  verifier("l'arc lui donne de la portée (elle reste visable de loin)",
+  verifier("L'ARC LA REND TIRABLE : c'est la règle, et elle est juste",
            !!cac && cac.attaques[0].isRanged === true);
-  verifier("MAIS ELLE N'EST PAS UN TIR : pas de malus au contact",
-           !!cac && cac.attaques[0].tirDeLaCarte === false,
-           String((cac.attaques[0] || {}).tirDeLaCarte));
+  verifier("sa portée dépasse donc la case voisine",
+           !!cac && cac.attaques[0].rangeMax > 1, String(((cac||{}).attaques||[{}])[0].rangeMax));
+  verifier("la carte à distance porte la sienne, plus longue",
+           !!tir && tir.attaques[0].rangeMax > cac.attaques[0].rangeMax,
+           `(${((tir||{}).attaques||[{}])[0].rangeMax} contre ${((cac||{}).attaques||[{}])[0].rangeMax})`);
 
-  verifier("la carte à distance, elle, est bien un tir",
-           !!tir && tir.attaques[0].tirDeLaCarte === true,
-           String(((tir || {}).attaques || [{}])[0].tirDeLaCarte));
-  verifier("et sa portée dépasse la case voisine",
-           !!tir && tir.attaques[0].rangeMax > 1, String(((tir||{}).attaques||[{}])[0].rangeMax));
+  console.log("\n=========================================================");
+  console.log("  2 bis. ET LA CARTE LE DIT, MÊME SANS EFFET « DISTANCE »");
+  console.log("=========================================================");
+  const lu = await p.evaluate(() => {
+    const cac = window.porteeReelleCarte(window.COMPETENCES_CACHE.C_CAC, window.PERSOS_PARTIE[0]);
+    const tir = window.porteeReelleCarte(window.COMPETENCES_CACHE.C_TIR, window.PERSOS_PARTIE[0]);
+    // Sans arme en main, la même carte de contact ne porte plus rien.
+    const vraiBonus = window.bonusEquip;
+    window.bonusEquip = () => 0;
+    const cacSansArme = window.porteeReelleCarte(window.COMPETENCES_CACHE.C_CAC, window.PERSOS_PARTIE[0]);
+    window.bonusEquip = vraiBonus;
+
+    // Et ce que la carte affiche vraiment à l'écran.
+    window.afficherApercuCarteHD("C_CAC");
+    const texte = (document.getElementById("apercu-carte-hd-competence") || {}).innerText || "";
+    return { cac, tir, cacSansArme, texte };
+  });
+  verifier("le calcul partagé retrouve la portée donnée par l'arme",
+           lu.cac.portee === cac.attaques[0].rangeMax,
+           `(${lu.cac.portee} contre ${cac.attaques[0].rangeMax} au moteur)`);
+  verifier("et il nomme ce que l'arme y apporte", lu.cac.apportArme === 1, String(lu.cac.apportArme));
+  verifier("sans arme à distance, la carte de contact ne porte plus",
+           lu.cacSansArme.portee === 1, String(lu.cacSansArme.portee));
+  verifier("le même calcul vaut pour la carte à distance",
+           lu.tir.portee === tir.attaques[0].rangeMax,
+           `(${lu.tir.portee} contre ${tir.attaques[0].rangeMax})`);
+  verifier("LA CARTE AFFICHE SA PORTÉE À L'ÉCRAN",
+           /Port[ée]e\s*:\s*2\s*cases/i.test(lu.texte),
+           lu.texte.replace(/\s+/g, " ").slice(0, 120));
+  verifier("et elle dit d'où elle vient", /de l'arme/i.test(lu.texte));
 
   console.log("\n=========================================================");
   console.log("  3. LA CARTE PORTE SON PROPRE COÛT EN ÉNERGIE");

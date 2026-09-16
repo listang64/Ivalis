@@ -464,6 +464,29 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         }
     });
 
+    // LA PORTÉE, EN TÊTE DE LA LISTE, ET SANS MENTIR.
+    //
+    // Une arme à distance donne une portée de base à CHAQUE technique de son
+    // porteur : une carte écrite au corps à corps devient un tir. La carte n'en
+    // disait rien tant que le joueur n'avait pas posé d'effet « Distance »
+    // dessus — on lisait « attaque lourde, 10 dégâts physiques » sur une
+    // technique qui portait à deux cases et perdait trente pour cent au
+    // contact. Elle le dit maintenant, et elle le dit avec le calcul du moteur
+    // lui-même (porteeReelleCarte), pas avec une copie qui dériverait.
+    //
+    // Sur une carte qui porte déjà sa propre Distance, la ligne reste utile :
+    // l'effet annonce ce QU'IL donne, celle-ci annonce ce que la carte FERA,
+    // arme et atout de peuple compris.
+    if (typeof window.porteeReelleCarte === "function") {
+        const lanceur = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO] || null;
+        const p = window.porteeReelleCarte(data, lanceur);
+        if (p.portee > 1) {
+            htmlEffets = `<div style="margin-top: 4px; color: #9fd2ff; font-size: 14px; font-weight: bold; text-shadow: 1px 1px 2px black;">
+                    ◆ Portée : ${p.portee} cases${p.apportArme > 0 ? ` <span style="color: #7fa8c9; font-weight: normal; font-style: italic;">(dont ${p.apportArme} de l'arme)</span>` : ""}
+                </div>` + htmlEffets;
+        }
+    }
+
     // NOUVEAU : Dessin avec Bounding Box Dynamique (Rognage auto)
     if (allZoneHexes.length > 0) {
         let svgPolygons = "";

@@ -1050,22 +1050,10 @@ window.demarrerCiblage = async function(idCarte, options) {
                 return;
             }
 
-            // CE QUE LA CARTE DIT D'ELLE-MÊME, retenu avant que l'arme ne s'en
-            // mêle. C'est la seule chose qui décide du malus de tir à bout
-            // portant, et il a fallu séparer les deux notions.
-            //
-            // Une arme à distance (fronde, arc) rend TOUTES les actions de son
-            // porteur tirables — c'est voulu, une technique ne dépend pas de
-            // l'arme qui la sert. Mais le malus, lui, suivait la même bascule :
-            // une technique écrite au corps à corps affichait « -30% Dégâts »
-            // dès qu'on la lançait au contact, alors qu'on n'y tire rien. Le
-            // malus appartient à l'ATTAQUE À DISTANCE, pas à l'arme rangée dans
-            // la main.
-            const tirDeLaCarte = isRanged;
-
             // L'arme équipée peut transformer l'action en tir, et allonger sa
             // portée. Posé ICI, avant que isRanged et rangeMax ne servent :
-            // attaques et altérations partent donc avec la bonne portée.
+            // attaques et altérations partent donc avec la bonne portée, et une
+            // attaque devenue tir encaisse bien le malus au contact.
             ({ isRanged, rangeMax } = window.porteeAvecArme(lanceurCarte, isRanged, rangeMax));
 
             // LA ZONE PORTE SA PROPRE DISTANCE. C'est l'action qui dessine la
@@ -1137,11 +1125,6 @@ window.demarrerCiblage = async function(idCarte, options) {
                     typeRes: typeRes,
                     valeurBrute: (parseFrFloat(effBase.Valeur) || 0) * (act.count || 1),
                     isRanged: isRanged,
-                    // Séparé d'isRanged exprès : `isRanged` dit jusqu'où l'on
-                    // peut viser (l'arme compte), `tirDeLaCarte` dit si c'est
-                    // un tir (l'arme ne compte pas). Seul le second paie le
-                    // malus au contact.
-                    tirDeLaCarte: tirDeLaCarte,
                     rangeMax: porteeReelle,
                     isHeal: isHeal,
                     isShield: isShield,
@@ -2168,13 +2151,7 @@ window.dessinerAnneauxCiblage = function() {
             }
 
             let malusLabel = anneau.querySelector(".malus-cac");
-            // Le malus appartient au TIR, pas à l'arme : une technique de corps à
-            // corps lancée par un porteur d'arc n'en paie pas. Voir
-            // `tirDeLaCarte` plus haut, et chaineDeDegats (moteur_pur.js), qui
-            // applique exactement la même règle sur les dégâts.
-            const cestUnTir = configSort.tirDeLaCarte !== undefined
-                ? configSort.tirDeLaCarte : configSort.isRanged;
-            if (cestUnTir && dist === 1 && window.ETAT_CIBLAGE.attaques.length > 0 && !configSort.isHeal) {
+            if (configSort.isRanged && dist === 1 && window.ETAT_CIBLAGE.attaques.length > 0 && !configSort.isHeal) {
                 if (!malusLabel) {
                     malusLabel = document.createElement("div");
                     malusLabel.className = "malus-cac";
@@ -2408,6 +2385,78 @@ window.nettoyerCiblage = function() {
 //
 // L'allonge, elle, ne transforme rien : l'attaque reste au contact (pas de
 // malus à bout portant), elle atteint simplement une case de plus.
+// =========================================================================
+//  LA PORTÉE D'UNE CARTE, TELLE QU'ELLE SERA VRAIMENT
+// =========================================================================
+//  UNE CARTE DOIT DIRE CE QU'ELLE FAIT. Une arme à distance — fronde, arc —
+//  donne une portée de base à CHAQUE technique de son porteur : une carte
+//  écrite au corps à corps devient un tir, avec tout ce que ça implique (elle
+//  atteint plus loin, et elle perd trente pour cent au contact). La carte, elle,
+//  n'en disait pas un mot : elle n'affichait une portée que si le joueur avait
+//  posé un effet « Distance » dessus. On lisait donc « attaque lourde, 10 dégâts
+//  physiques » sur une technique qui tirait à deux cases et se prenait un malus.
+//
+//  Cette fonction dit la vérité, et elle la dit en refaisant EXACTEMENT le
+//  calcul du moteur (voir demarrerCiblage) : les deux sources de Distance de la
+//  carte, puis l'arme, puis l'atout de portée magique. Une seule règle, deux
+//  lecteurs — sans quoi la carte finirait par annoncer autre chose que ce que
+//  le combat applique, et ce serait pire que de ne rien dire.
+window.porteeReelleCarte = function(dataCarte, lanceur) {
+    const vide = { portee: 1, isRanged: false, porteeCarte: 1, apportArme: 0 };
+    if (!dataCarte || !dataCarte.Composants || !Array.isArray(dataCarte.Composants.actions)) return vide;
+    const effets = window.EFFETS_BDD_CACHE || {};
+    if (Object.keys(effets).length === 0) return vide;
+
+    const nombreFr = (v) => {
+        const n = parseFloat(String(v === undefined || v === null ? "" : v).replace(",", "."));
+        return Number.isFinite(n) ? n : 0;
+    };
+    const porteeDe = (eff, count) => 1 + (nombreFr(eff.Valeur) * (count || 1));
+    const mods = (bruts) => {
+        if (!bruts) return [];
+        if (Array.isArray(bruts)) {
+            return bruts.map(m => (typeof m === "string" ? { id: m, count: 1 }
+                                 : { id: m.id || m.effetId, count: m.count || 1 }))
+                        .filter(m => m.id);
+        }
+        return Object.keys(bruts).map(k => ({ id: k, count: bruts[k] }));
+    };
+
+    let meilleure = vide;
+    dataCarte.Composants.actions.forEach(act => {
+        const effBase = effets[act.baseEffetId];
+        if (!effBase) return;
+        const nomLower = (effBase.Nom || "").toLowerCase();
+        // Le Bond a sa propre portée de saut, qui n'est pas une portée de tir.
+        if (nomLower.includes("bond")) return;
+
+        let isRanged = false;
+        let rangeMax = 1;
+        if ((effBase.Nom || "") === "Distance") { isRanged = true; rangeMax = porteeDe(effBase, act.count); }
+        mods(act.mods).forEach(m => {
+            const modEff = effets[m.id];
+            if (modEff && modEff.Nom === "Distance") {
+                isRanged = true;
+                rangeMax = Math.max(rangeMax, porteeDe(modEff, m.count));
+            }
+        });
+
+        const porteeCarte = rangeMax;
+        ({ isRanged, rangeMax } = window.porteeAvecArme(lanceur, isRanged, rangeMax));
+
+        // L'atout de portée magique, comme dans demarrerCiblage : il ne joue
+        // que sur une action magique qui a déjà de la distance.
+        const estMagique = nomLower.includes("magique") || nomLower.includes("pouvoir");
+        const totale = rangeMax + (typeof window.bonusPorteeMagique === "function"
+            ? window.bonusPorteeMagique(lanceur, estMagique, isRanged) : 0);
+
+        if (totale > meilleure.portee) {
+            meilleure = { portee: totale, isRanged, porteeCarte, apportArme: totale - porteeCarte };
+        }
+    });
+    return meilleure;
+};
+
 window.porteeAvecArme = function(lanceur, isRanged, rangeMax) {
     if (!lanceur || typeof window.bonusEquip !== "function") return { isRanged, rangeMax };
     const portee = window.bonusEquip(lanceur, "portee");
