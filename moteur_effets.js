@@ -24,6 +24,32 @@ window.ETAT_CIBLAGE = {
     initialZoneStep: 0
 };
 
+// =========================================================================
+//  QUI LANCE LA CARTE EN COURS DE CIBLAGE
+// =========================================================================
+//  CE N'EST PAS CELUI QU'ON REGARDE. Six endroits de ce fichier lisaient le
+//  combattant AFFICHÉ DANS LE PANNEAU GAUCHE pour savoir d'où part le sort :
+//  les anneaux de ciblage, la portée, les cibles, la résolution. Or ce panneau
+//  est une visionneuse — un clic sur un portrait, dans la piste d'initiative ou
+//  sur un pion du plateau, y installe ce combattant, créature comprise
+//  (afficherDansPanneauGauche remplace alors COMBAT_PERSOS_JOUEUR par [lui]).
+//
+//  Consulter la fiche d'un ennemi au milieu de son tour suffisait donc à
+//  déplacer l'origine du sort sur lui : les anneaux se redessinaient depuis sa
+//  case, les portées se mesuraient depuis lui, et la carte serait partie à son
+//  nom. Depuis que la piste d'initiative est permanente et montre un médaillon
+//  par créature, ce geste est devenu le plus naturel du monde.
+//
+//  Le ciblage sait qui l'a ouvert (demarrerCiblage l'inscrit dans l'état) : on
+//  le lui demande. Le repli sur le panneau ne sert qu'aux appels d'avant, quand
+//  aucun ciblage n'est ouvert.
+window.lanceurDuCiblage = function() {
+    const state = window.ETAT_CIBLAGE;
+    if (state && state.idLanceur) return state.idLanceur;
+    const affiche = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
+    return (affiche && affiche.idPersonnage) || null;
+};
+
 // --- OUTILS MATHÉMATIQUES ---
 function getHexDistance(a, b) {
     return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
@@ -714,7 +740,7 @@ window.VTT_CIBLAGE_MOUSEMOVE = function(e) {
     const state = window.ETAT_CIBLAGE;
     if (!state || !state.actif || !state.isZone) return;
 
-    const idLanceur = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
+    const idLanceur = window.lanceurDuCiblage();
     const tkLanceur = window.TOKENS_VTT_DATA[idLanceur];
     const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
     const configSort = state.attaques[0] || state.alterations[0]; 
@@ -783,7 +809,7 @@ window.VTT_CIBLAGE_CLICK = function(e) {
         const canvasY = (e.clientY - window.VTT_POS_Y) / window.VTT_SCALE;
         const targetHex = window.PLATEAU_VTT.pixelToHex(canvasX, canvasY);
         
-        const idLanceur = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
+        const idLanceur = window.lanceurDuCiblage();
         const tkLanceur = window.TOKENS_VTT_DATA[idLanceur];
         const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
         const dist = getHexDistance(tkLanceur, targetHex);
@@ -1744,6 +1770,12 @@ window.demarrerCiblage = async function(idCarte, options) {
         // La fiche de la carte est là, à portée de main, depuis le début de
         // cette fonction. On la lit.
         coutFatigue: parseInt(dataCarte.Fatigue) || 0,
+        // QUI LANCE, retenu au moment où le ciblage s'ouvre. Tout le moteur le
+        // relit ensuite par lanceurDuCiblage : les anneaux, les portées, les
+        // cibles, la résolution. Sans ce champ, chacun retombait sur le panneau
+        // gauche — le combattant qu'on REGARDE — et un clic sur le portrait
+        // d'un ennemi déplaçait l'origine du sort sur lui.
+        idLanceur: (persoLanceur || {}).idPersonnage || null,
         attaques: attaquesExtraites,
         alterations: alterationsExtraites,
         cibleUnique: null,
@@ -1895,7 +1927,7 @@ window.validerZoneAoE = function() {
     state.zoneHexesFinaux = finalHexes;
 
     let ciblesTouchees = [];
-    const idLanceur = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
+    const idLanceur = window.lanceurDuCiblage();
     const configSort = state.attaques[0] || state.alterations[0];
     const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
 
@@ -2067,7 +2099,7 @@ window.dessinerAnneauxCiblage = function() {
     const configSort = window.ETAT_CIBLAGE.attaques[0] || window.ETAT_CIBLAGE.alterations[0];
     if (!configSort) return;
 
-    const idLanceur = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
+    const idLanceur = window.lanceurDuCiblage();
     const tkLanceur = window.TOKENS_VTT_DATA[idLanceur];
     const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
 
@@ -2230,7 +2262,7 @@ window.ajouterCibleCiblage = function(idCible) {
     const state = window.ETAT_CIBLAGE;
     const configSort = state.attaques[0] || state.alterations[0];
     
-    const idLanceur = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
+    const idLanceur = window.lanceurDuCiblage();
     const tkLanceur = window.TOKENS_VTT_DATA[idLanceur];
     const tkCible = window.TOKENS_VTT_DATA[idCible];
 
@@ -2617,7 +2649,11 @@ window.declencherResolution = async function() {
     const bulleZone = document.getElementById("bulle-validation-zone");
     if (bulleZone) bulleZone.style.display = "none";
 
-    const idLanceur = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO].idPersonnage;
+    const idLanceur = window.lanceurDuCiblage();
+    if (!idLanceur) {
+        console.error("Résolution sans lanceur : le ciblage ne dit pas qui joue.");
+        return;
+    }
 
     // 🔻 COUP CRITIQUE — un jet invisible par carte jouée, réservé aux héros 🔻
     // Tiré ICI, une seule fois, puis embarqué dans l'action : chaque navigateur

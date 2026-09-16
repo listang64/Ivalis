@@ -3469,11 +3469,34 @@ window.actualiserBoutonFinTour = function(queueParam, phaseParam) {
     }
 
     // === LA RÉSOLUTION : NOTRE TOUR, OU PAS ================================
-    const estMonTour = (
-        queue.length > 0 &&
-        persoActuel &&
-        queue[0].idPersonnage === persoActuel.idPersonnage
-    );
+    //
+    // LA FILE DIT QUI JOUE. LE PANNEAU DIT QUI ON REGARDE. Ce sont deux
+    // questions différentes, et les confondre a désarmé des tours entiers.
+    //
+    // Ce test comparait la tête de file au combattant AFFICHÉ DANS LE PANNEAU
+    // GAUCHE. Or ce panneau est une VISIONNEUSE : cliquer sur un portrait —
+    // dans la piste d'initiative, sur un pion du plateau — y installe ce
+    // combattant, créature comprise (afficherDansPanneauGauche remplace alors
+    // COMBAT_PERSOS_JOUEUR par [la créature]). Regarder la fiche d'un ennemi
+    // suffisait donc à répondre « ce n'est pas ton tour » : le bouton
+    // s'éteignait, et le clic ne lançait plus rien. Depuis que la piste est
+    // permanente, en haut, avec un médaillon par créature, ce geste est devenu
+    // le plus naturel du monde — mais le défaut, lui, était déjà là.
+    //
+    // La bonne question est « la tête de file est-elle un de MES héros ? », et
+    // la réponse ne se lit pas dans le panneau : elle se lit dans la liste des
+    // héros de ce poste. Quand le panneau est détourné pour montrer quelqu'un
+    // d'autre, cette liste est justement mise de côté dans
+    // COMBAT_PERSOS_JOUEUR_BACKUP — c'est elle qui fait foi.
+    //
+    // On ne passe volontairement PAS par estMonHerosCombat, qui compare
+    // l'idJoueur de la fiche au poste courant : une fiche dont ce champ manque
+    // ou ne correspond pas éteindrait le bouton pour tout le combat, et on
+    // remplacerait un défaut par un autre. La liste des héros du poste, elle,
+    // est vraie par construction.
+    const idQuiJoue = queue.length > 0 ? queue[0].idPersonnage : null;
+    const mesHeros = window.COMBAT_PERSOS_JOUEUR_BACKUP || window.COMBAT_PERSOS_JOUEUR || [];
+    const estMonTour = !!idQuiJoue && mesHeros.some(h => h && h.idPersonnage === idQuiJoue);
 
     // Le tour d'un monstre appartient à l'IA, et à elle seule : le bouton reste
     // éteint. Il se rallume quand même si l'IA n'a plus donné signe de vie
@@ -3496,9 +3519,11 @@ window.actualiserBoutonFinTour = function(queueParam, phaseParam) {
     if ((window.CHEMIN_MOUVEMENT || []).length > 0) return poser("valider_deplacement", true);
 
     // 3. UNE CARTE ATTEND D'ÊTRE LANCÉE : on ne se déplace plus, on vise.
+    //    La créature en tête est déjà écartée plus haut (teteEstMonstre) : on
+    //    ne regarde donc plus si le PANNEAU montre une créature, ce qui
+    //    éteignait le bouton dès qu'on consultait la fiche d'un ennemi.
     const idCarteEnAttente = queue[0] && queue[0].idCarte;
-    const estCarteDeMonstre = persoActuel && persoActuel.estMonstre;
-    if (idCarteEnAttente && idCarteEnAttente !== "REPOS_LONG" && !estCarteDeMonstre) {
+    if (idCarteEnAttente && idCarteEnAttente !== "REPOS_LONG") {
         return poser("lancer", true);
     }
 
@@ -3517,9 +3542,16 @@ window.actionBoutonFinTour = function() {
     // cette garde, un second clic la referait une seconde fois — exactement le
     // doublon que demandeDejaEnVol empêchait pour l'ancien bouton Appliquer
     // (voir regime_cerveau.js).
-    const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+    // QUI JOUE : la tête de file, toujours — jamais le combattant que le
+    // panneau gauche montre. Voir actualiserBoutonFinTour pour l'histoire de
+    // cette confusion. Le repli sur le panneau ne sert qu'à la préparation, où
+    // la file peut être vide.
+    const teteDeFile = ((window.PARTIE_DATA || {}).File_Attente_Combat || [])[0];
+    const idQuiJoue = (teteDeFile && teteDeFile.idPersonnage)
+        || ((window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO] || {}).idPersonnage || null);
+
     if (window.regimeDemande && typeof window.regimeDemande.enVol === "function"
-        && persoActuel && window.regimeDemande.enVol(persoActuel.idPersonnage)) {
+        && idQuiJoue && window.regimeDemande.enVol(idQuiJoue)) {
         return;
     }
 
@@ -3549,7 +3581,10 @@ window.actionBoutonFinTour = function() {
         if (typeof window.afficherApercuCarteHD === "function") {
             window.afficherApercuCarteHD(idCarte, true);
         }
-        return window.demarrerCiblage(idCarte);
+        // ON NOMME LE LANCEUR. Sans ça, demarrerCiblage le déduit du panneau
+        // gauche — c'est-à-dire du combattant qu'on regarde, pas de celui qui
+        // joue — et allait chercher la carte dans le mauvais deck.
+        return window.demarrerCiblage(idCarte, { idLanceur: idQuiJoue });
     }
 
     // FIN DE TOUR. Si un ciblage était ouvert, il se referme sans rien lancer :
