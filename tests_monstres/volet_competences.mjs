@@ -20,7 +20,9 @@
 //   • les bannières sont au pixel près là où elles étaient ;
 //   • le repos long y a sa bannière, se choisit comme une carte, et part par le
 //     bouton fin de tour ;
-//   • l'ouverture et la fermeture ont bien leur effet de ressort.
+//   • l'ouverture et la fermeture ont bien leur effet de ressort ;
+//   • la carte en grand se pose À DROITE du volet, et PAR-DESSUS ;
+//   • retenir une carte range le volet EN ENTIER, lanière comprise.
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
@@ -318,6 +320,134 @@ console.log("=========================================================");
   verifier("la remontée plonge d'abord vers le bas",
            remonte.some(k => /translateY\(3\.2%\)/.test(k)), JSON.stringify(remonte));
   verifier("et finit hors écran", remonte.some(k => /translateY\(-115%\)/.test(k)), JSON.stringify(remonte));
+}
+
+console.log("\n=========================================================");
+console.log("  7. LA CARTE EN GRAND NE PASSE PLUS SOUS LES BANNIÈRES");
+console.log("=========================================================");
+{
+  // DEUX FAUTES SE CACHAIENT L'UNE DERRIÈRE L'AUTRE.
+  //
+  // La carte était accrochée au panneau latéral gauche : ce panneau est à
+  // z-index 10, il ouvre son propre contexte d'empilement, et le z-index 100
+  // écrit sur la carte ne pouvait donc RIEN dépasser au-dehors — le volet est à
+  // 14, la carte passait dessous quoi qu'on fasse.
+  //
+  // Et une fois retenue, elle glissait à x = 20 px, c'est-à-dire pile sur les
+  // bannières. Du temps du panneau c'était voulu (elle les recouvrait) ; avec le
+  // volet, elle se retrouvait dessous, à moitié cachée.
+  //
+  // On contrôle donc les deux séparément : l'abscisse, et l'empilement. Pour
+  // l'empilement, on pose volontairement la carte SUR les bannières le temps
+  // d'une mesure et on demande au navigateur qui il voit en premier.
+  await p.evaluate(() => { window.PARTIE_DATA.Phase_Combat = "Preparation"; window.PARTIE_DATA.File_Attente_Combat = []; });
+  await p.evaluate(() => { const c = document.getElementById("apercu-carte-hd-competence"); if (c) c.dataset.locked = "false"; });
+  await p.evaluate(() => window.toggleVoletCompetences(true));
+  await p.waitForTimeout(800);
+  verifier("le volet est ouvert pour la mesure", (await lire()).ouvert === true);
+
+  const m = await p.evaluate(async () => {
+    window.afficherApercuCarteHD("K0", false);
+    await new Promise(r => setTimeout(r, 700));
+    const carte = document.getElementById("apercu-carte-hd-competence");
+    const ban = document.querySelector("#combat-liste-competences .banniere-carte-combat");
+    const rc = carte.getBoundingClientRect();
+    const rb = ban.getBoundingClientRect();
+
+    // L'ÉPREUVE D'EMPILEMENT : la carte vient volontairement se poser sur les
+    // bannières, sans transition, le temps d'une question au navigateur.
+    const garde = carte.style.left, gardeT = carte.style.transition;
+    carte.style.transition = "none";
+    carte.style.left = Math.round(rb.x + 10) + "px";
+    void carte.offsetWidth;
+    const r2 = carte.getBoundingClientRect();
+    const vu = document.elementFromPoint(Math.round(r2.x + 30), Math.round(r2.y + 40));
+    carte.style.left = garde; carte.style.transition = gardeT;
+
+    return {
+      parent: carte.parentNode ? carte.parentNode.id : null,
+      dansPanneau: !!carte.closest("#panneau-combat-gauche"),
+      carteX: Math.round(rc.x),
+      banDroite: Math.round(rb.right),
+      dessus: !vu ? "rien"
+            : vu.closest("#apercu-carte-hd-competence") ? "carte"
+            : vu.closest("#volet-competences") ? "volet"
+            : (vu.id || vu.tagName)
+    };
+  });
+
+  verifier("la carte a quitté le panneau latéral", m.dansPanneau === false, String(m.parent));
+  verifier("elle est accrochée à la fenêtre de combat", m.parent === "fenetre-combat", String(m.parent));
+  verifier("ELLE SE POSE À DROITE DES BANNIÈRES",
+           m.carteX >= m.banDroite, `carte x=${m.carteX}, bannières jusqu'à ${m.banDroite}`);
+  verifier("ET QUAND ELLES SE CROISENT, C'EST ELLE QU'ON VOIT",
+           m.dessus === "carte", m.dessus);
+
+  const verrouillee = await p.evaluate(async () => {
+    window.afficherApercuCarteHD("K0", true);
+    await new Promise(r => setTimeout(r, 700));
+    return Math.round(document.getElementById("apercu-carte-hd-competence").getBoundingClientRect().x);
+  });
+  verifier("retenue, elle ne repart pas sur les bannières",
+           verrouillee >= m.banDroite, `x=${verrouillee}`);
+}
+
+console.log("\n=========================================================");
+console.log("  8. RETENIR UNE CARTE RANGE LE VOLET EN ENTIER");
+console.log("=========================================================");
+{
+  // LE SYMPTÔME : on choisissait sa carte, les bannières s'évaporaient, et la
+  // lanière de cuir restait pendue au plafond avec rien au bout. On ne faisait
+  // que passer le deck à l'opacité zéro — un geste hérité du panneau latéral,
+  // où il n'y avait pas de lanière à ranger.
+  //
+  // On éprouve le chemin du RAFRAÎCHISSEMENT (actualiserEtatCarteCombat), celui
+  // qui repasse à chaque tick et qui rattrape aussi les autres postes : c'est
+  // lui qui laissait la lanière en place, tick après tick.
+  await p.evaluate(() => { const c = document.getElementById("apercu-carte-hd-competence"); if (c) c.dataset.locked = "false"; });
+  await p.evaluate(() => window.masquerApercuCarteHD(true));
+  await p.evaluate(() => window.toggleVoletCompetences(true));
+  await p.waitForTimeout(800);
+  verifier("le volet est ouvert avant le choix", (await lire()).ouvert === true);
+
+  await p.evaluate(() => {
+    window.PARTIE_DATA.Phase_Combat = "Resolution";
+    window.PARTIE_DATA.File_Attente_Combat = [{ idPersonnage: "H1", idCarte: "K0", initiative: 70 }];
+    window.actualiserEtatCarteCombat("K0");
+  });
+  await p.waitForTimeout(900);
+
+  const v = await lire();
+  verifier("LE VOLET SE REFERME QUAND LA CARTE EST RETENUE", v.ouvert === false);
+  verifier("et il part avec son animation de remontée",
+           (v.classes || "").includes("volet-ferme"), String(v.classes));
+
+  const apres = await p.evaluate(() => {
+    const contenu = document.getElementById("volet-contenu");
+    const deck = document.getElementById("combat-liste-competences");
+    return {
+      basDuVolet: Math.round(contenu.getBoundingClientRect().bottom),
+      opacite: deck.style.opacity,
+      clics: getComputedStyle(deck).pointerEvents,
+      gris: deck.style.filter
+    };
+  });
+  verifier("LA LANIÈRE DE CUIR EST REMONTÉE HORS CHAMP",
+           apres.basDuVolet <= 0, `bas = ${apres.basDuVolet}px`);
+  verifier("le deck est verrouillé, pas effacé", apres.opacite === "0.4", apres.opacite);
+  verifier("il est grisé", (apres.gris || "").includes("grayscale"), apres.gris);
+  verifier("et il ne répond plus au doigt", apres.clics === "none", apres.clics);
+
+  // Le chemin de l'échec rend tout au joueur : deck rallumé, volet redescendu.
+  await p.evaluate(() => window.rouvrirDeckApresEchec());
+  await p.waitForTimeout(800);
+  const repli = await p.evaluate(() => {
+    const deck = document.getElementById("combat-liste-competences");
+    return { ouvert: window.VOLET_COMPETENCES_OUVERT, opacite: deck.style.opacity, gris: deck.style.filter };
+  });
+  verifier("en cas d'échec, le volet redescend", repli.ouvert === true);
+  verifier("et le deck se rallume", repli.opacite === "1" && repli.gris === "none",
+           `${repli.opacite} / ${repli.gris}`);
 }
 
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 2).join(" | "));

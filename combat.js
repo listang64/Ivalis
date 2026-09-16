@@ -592,6 +592,40 @@ window.afficherPersoCombatActuel = function() {
 //  Deux listes concurrentes, elles, auraient divergé au premier tour.
 window.VOLET_COMPETENCES_OUVERT = false;
 
+// LA CARTE EST RETENUE : LE VOLET S'EN VA EN ENTIER.
+//
+// Quand un joueur retenait sa carte, on faisait simplement passer le deck à
+// l'opacité zéro. Du temps du panneau latéral, c'était tout ce qu'il y avait à
+// faire. Avec le volet, ça donnait une scène bancale : les bannières
+// s'évaporaient et la lanière de cuir restait pendue là, toute seule, sans rien
+// au bout.
+//
+// Le volet remonte donc entièrement, avec son animation. Et les bannières
+// dessous passent en « verrouillé » (grisées, éteintes) plutôt qu'invisibles :
+// si le joueur rouvre le volet, il voit son deck, et il voit qu'il est fermé.
+window.rangerDeckApresChoix = function() {
+    const deck = document.getElementById("combat-liste-competences");
+    if (deck) {
+        deck.style.transition = "opacity 0.3s ease, filter 0.3s ease";
+        deck.style.opacity = "0.4";
+        deck.style.filter = "grayscale(100%)";
+        deck.style.pointerEvents = "none";
+    }
+    if (typeof window.fermerVoletCompetences === "function") window.fermerVoletCompetences();
+};
+
+// Le pendant exact, pour les chemins qui rendent la main au joueur (une erreur
+// réseau, un tour qui recommence) : le deck se rallume et le volet redescend.
+window.rouvrirDeckApresEchec = function() {
+    const deck = document.getElementById("combat-liste-competences");
+    if (deck) {
+        deck.style.opacity = "1";
+        deck.style.filter = "none";
+        deck.style.pointerEvents = "auto";
+    }
+    if (typeof window.toggleVoletCompetences === "function") window.toggleVoletCompetences(true);
+};
+
 // Le déménagement n'a lieu qu'une fois, et seulement si les deux éléments sont
 // là : une page à moitié chargée ne doit pas perdre la liste en route.
 //
@@ -633,13 +667,19 @@ window.choisirReposLongDansVolet = function() {
 };
 
 window.toggleVoletCompetences = function(forcer) {
-    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     const contenu = document.getElementById("volet-contenu");
     if (!contenu || !window.installerVoletCompetences()) return;
 
     const ouvrir = (forcer === undefined) ? !window.VOLET_COMPETENCES_OUVERT : !!forcer;
     if (ouvrir === window.VOLET_COMPETENCES_OUVERT) return;
     window.VOLET_COMPETENCES_OUVERT = ouvrir;
+
+    // LE SON APRÈS LES GARDES, ET PAS AVANT. Le volet est désormais refermé par
+    // du code autant que par un doigt — un choix de carte, un ciblage, un
+    // déplacement, et chaque rafraîchissement qui repasse par là. En tête de
+    // fonction, le clic retentissait à chaque appel, même quand le volet était
+    // déjà replié et qu'il n'y avait rien à animer.
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
 
     contenu.classList.remove("volet-ouvre", "volet-ferme");
     // Une animation relancée sur le même élément ne rejoue pas toute seule : il
@@ -3423,21 +3463,20 @@ window.jouerCarteCombat = async function(idCarte) {
     if(btn) { btn.innerText = "Préparation..."; btn.disabled = true; }
 
     // 🔻 EFFET VISUEL IMMÉDIAT (N'attend pas le réseau)
-    const deckEl = document.getElementById("combat-liste-competences");
-    if (deckEl) {
-        deckEl.style.transition = "opacity 0.3s ease";
-        deckEl.style.opacity = "0";
-        deckEl.style.pointerEvents = "none";
+    //
+    // L'ORDRE COMPTE. La carte est verrouillée en grand AVANT que le volet ne
+    // remonte : dans l'autre sens, la fermeture du volet effacerait un aperçu
+    // pas encore verrouillé, et la carte clignoterait le temps de se reposer.
+    if (typeof window.afficherApercuCarteHD === "function") {
+        window.afficherApercuCarteHD(idCarte, true); // Lock immédiat
     }
+    if (typeof window.rangerDeckApresChoix === "function") window.rangerDeckApresChoix();
     window.mettreAJourJaugeFatigue(0); // Cache la jauge rouge
     // 🔻 CORRECTION : Shrink immédiat en "vh"
     const imgPerso = document.getElementById("combat-portrait-perso");
     if (imgPerso) {
         imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
         imgPerso.style.height = "40vh"; /* Doit être identique à la valeur au-dessus */
-    }
-    if (typeof window.afficherApercuCarteHD === "function") {
-        window.afficherApercuCarteHD(idCarte, true); // Lock immédiat
     }
 
     let etatsApresElectrifie = null;
@@ -3498,11 +3537,8 @@ window.jouerCarteCombat = async function(idCarte) {
         }
     } catch (e) {
         console.error("Erreur jouerCarteCombat:", e);
-        if (deckEl) {
-            deckEl.style.opacity = "1";
-            deckEl.style.pointerEvents = "auto";
-        }
         if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD(true);
+        if (typeof window.rouvrirDeckApresEchec === "function") window.rouvrirDeckApresEchec();
         const btn = document.getElementById("btn-choisir-action");
         if (btn) { btn.innerText = "Choisir"; btn.disabled = false; }
         window.mettreAJourJaugeFatigue(0);
@@ -3524,12 +3560,7 @@ window.jouerReposLong = async function() {
     const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
     if (!persoActuel) return;
 
-    const deckEl = document.getElementById("combat-liste-competences");
-    if (deckEl) {
-        deckEl.style.transition = "opacity 0.3s ease";
-        deckEl.style.opacity = "0";
-        deckEl.style.pointerEvents = "none";
-    }
+    if (typeof window.rangerDeckApresChoix === "function") window.rangerDeckApresChoix();
     window.mettreAJourJaugeFatigue(0);
     
     const imgPerso = document.getElementById("combat-portrait-perso");
@@ -4455,10 +4486,6 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
     }
 
     if (persoInQueue && persoInQueue.idCarte) {
-        if (deckEl) {
-            deckEl.style.opacity = "0";
-            deckEl.style.pointerEvents = "none";
-        }
         window.mettreAJourJaugeFatigue(0);
         if (imgPerso) {
             imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
@@ -4474,6 +4501,11 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
             divRepos.style.opacity = "0";
             if (typeof window.afficherApercuCarteHD === "function") window.afficherApercuCarteHD(persoInQueue.idCarte, true); 
         }
+
+        // Et seulement maintenant, l'aperçu étant verrouillé : le volet remonte.
+        // Ce rafraîchissement-là est le filet du geste immédiat — il rattrape
+        // les postes qui apprennent le choix par le réseau plutôt qu'au clic.
+        if (typeof window.rangerDeckApresChoix === "function") window.rangerDeckApresChoix();
     } else {
         // 🔻 Si la phase est "Resolution", c'est qu'il a déjà joué et n'est plus dans la file : on grise son deck.
         //

@@ -262,5 +262,87 @@ console.log("\n6. LE TERRAIN SE COMPTE AVEC LES CHIFFRES DU CERVEAU, PAS CEUX DE
            `(réserve ${reserveAvant} → ${base.Systeme_Parties.P1.Reserve_Monstres.length})`);
 }
 
+// LE POSTE QUI POSE LE RENFORT N'EST PAS CELUI QUI A LANCÉ LA RENCONTRE.
+//
+// Les gabarits ne sont lus qu'à deux occasions : la fenêtre de gestion des
+// monstres, et la génération d'une rencontre. Tant que c'était le meneur qui
+// faisait les deux, personne n'a rien vu.
+//
+// Depuis que le cerveau décide des chutes, c'est le poste cerveau qui appelle
+// marquerMonstreMort puis entrerRenfortMonstre — et il n'a aucune raison
+// d'avoir ouvert la fenêtre des monstres ni lancé la rencontre. Son bestiaire
+// était vide, `poserMonstreSurTerrain` sortait sur « Gabarit introuvable », et
+// pas un seul renfort n'entrait de toute la partie. Pire : la créature avait
+// déjà été retirée de la réserve, elle était donc perdue pour de bon.
+console.log("\n7. UN POSTE SANS BESTIAIRE EN MÉMOIRE SAIT QUAND MÊME POSER UN RENFORT");
+{
+  base.Monstres = {};
+  base.Combat_VTT.P1.Tokens = {};
+  base.Systeme_Parties.P1.Ordre_Initiative = ["J1", "J2"];
+  w.MONSTRES_PARTIE = [];
+  w.CACHE_COMPETENCES_GLOBAL = {};
+  synchroniser();
+
+  const attendu = { archetype: "DPS MAGE DISTANCE", palier: "Normal", nom: "Mage noir" };
+  base.Systeme_Parties.P1.Reserve_Monstres = [attendu];
+
+  // Le poste vient d'ouvrir la page : il n'a jamais lu le bestiaire.
+  w.GABARITS_MONSTRES = [];
+  let relectures = 0;
+  const vraiCharger = w.chargerGabaritsMonstres;
+  w.chargerGabaritsMonstres = async function() { relectures++; return vraiCharger.apply(this, arguments); };
+
+  let id = null;
+  try { id = await w.entrerRenfortMonstre(); }
+  finally { w.chargerGabaritsMonstres = vraiCharger; }
+  await new Promise(r => setTimeout(r, 20));
+  synchroniser();
+
+  verifier("le bestiaire vide est relu à la demande", relectures === 1, `(${relectures})`);
+  verifier("LE RENFORT ENTRE QUAND MÊME EN JEU", !!id && !!base.Monstres[id], String(id));
+  verifier("il porte bien le nom prévu",
+           !!id && base.Monstres[id].Prenom_Personnage === "Mage noir",
+           id ? String(base.Monstres[id].Prenom_Personnage) : "-");
+  verifier("et la réserve est bien consommée",
+           base.Systeme_Parties.P1.Reserve_Monstres.length === 0,
+           `(${base.Systeme_Parties.P1.Reserve_Monstres.length})`);
+}
+
+// ET SI LA POSE ÉCHOUE MALGRÉ TOUT, LA RÉSERVE NE DOIT PAS ÊTRE DÉVORÉE.
+//
+// On retirait la créature de la liste AVANT de savoir si elle arrivait vraiment
+// à entrer. Une pose ratée la faisait donc disparaître de la réserve sans
+// jamais toucher le terrain — définitivement perdue — pendant que la console
+// annonçait tranquillement son arrivée.
+console.log("\n8. UNE POSE RATÉE NE MANGE PAS LE RENFORT");
+{
+  base.Monstres = {};
+  base.Combat_VTT.P1.Tokens = {};
+  base.Systeme_Parties.P1.Ordre_Initiative = ["J1", "J2"];
+  w.MONSTRES_PARTIE = [];
+  synchroniser();
+
+  const perdu = { archetype: "ARCHETYPE_QUI_N_EXISTE_PAS", palier: "Normal", nom: "Fantôme" };
+  base.Systeme_Parties.P1.Reserve_Monstres = [perdu];
+
+  // Le bestiaire est vide ET la relecture ne ramène rien : la pose est
+  // réellement impossible, pas juste « pas encore chargée ».
+  w.GABARITS_MONSTRES = [];
+  const vraiCharger = w.chargerGabaritsMonstres;
+  w.chargerGabaritsMonstres = async () => { w.GABARITS_MONSTRES = []; return []; };
+
+  const silence = console.error; console.error = () => {};
+  let id = null;
+  try { id = await w.entrerRenfortMonstre(); }
+  finally { console.error = silence; w.chargerGabaritsMonstres = vraiCharger; }
+
+  verifier("aucun monstre n'est créé", id === null && Object.keys(base.Monstres).length === 0, String(id));
+  verifier("LE RENFORT RESTE EN RÉSERVE POUR LA PROCHAINE FOIS",
+           base.Systeme_Parties.P1.Reserve_Monstres.length === 1,
+           `(${base.Systeme_Parties.P1.Reserve_Monstres.length})`);
+  verifier("et c'est bien lui qui y est resté",
+           (base.Systeme_Parties.P1.Reserve_Monstres[0] || {}).nom === "Fantôme");
+}
+
 console.log(`\n${echecs === 0 ? "TOUS LES CONTRÔLES PASSENT" : echecs + " CONTRÔLE(S) EN ÉCHEC"}`);
 process.exit(echecs === 0 ? 0 : 1);

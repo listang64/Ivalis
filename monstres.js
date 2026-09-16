@@ -718,7 +718,33 @@ RÈGLES :
 //  Crée le document, le pion, et l'inscrit dans l'ordre d'initiative. Sert à la
 //  génération initiale ET à l'arrivée d'un renfort.
 window.poserMonstreSurTerrain = async function(monstre, tokensData) {
-    const gabarit = window.gabaritMonstre(monstre.archetype, monstre.palier);
+    let gabarit = window.gabaritMonstre(monstre.archetype, monstre.palier);
+
+    // LE BESTIAIRE N'EST PAS TOUJOURS EN MÉMOIRE, et ça a coûté tous les renforts.
+    //
+    // Les gabarits ne sont lus qu'à deux occasions : l'ouverture de la fenêtre
+    // de gestion des monstres, et la génération d'une rencontre. Autrefois
+    // c'était suffisant, parce que le poste qui générait la rencontre était
+    // aussi celui qui posait les renforts.
+    //
+    // Depuis que le cerveau décide des chutes, c'est le poste cerveau qui
+    // appelle marquerMonstreMort puis entrerRenfortMonstre — et ce poste-là
+    // n'est pas forcément celui qui a lancé la rencontre. Il se retrouvait avec
+    // GABARITS_MONSTRES vide, un « Gabarit introuvable » en console, et pas le
+    // moindre renfort sur le terrain de toute la partie.
+    //
+    // On relit donc le bestiaire à la demande, une seule fois, quand la clé
+    // cherchée manque. C'est une lecture de plus le jour où elle sert, et rien
+    // du tout les autres jours.
+    if (!gabarit) {
+        try {
+            await window.chargerGabaritsMonstres();
+            gabarit = window.gabaritMonstre(monstre.archetype, monstre.palier);
+        } catch (e) {
+            console.error("Relecture du bestiaire impossible :", e);
+        }
+    }
+
     if (!gabarit) {
         console.error("Gabarit introuvable :", monstre);
         return null;
@@ -880,13 +906,23 @@ window.entrerRenfortMonstre = async function() {
     const tokensData = { ...window.TOKENS_VTT_DATA };
     const idMonstre = await window.poserMonstreSurTerrain(renfort, tokensData);
 
+    // UNE POSE RATÉE NE DOIT PAS DÉVORER LA RÉSERVE. On retirait la créature de
+    // la liste AVANT de savoir si elle arrivait vraiment à entrer : quand la
+    // pose échouait, le renfort disparaissait de la réserve sans jamais toucher
+    // le terrain, définitivement perdu — et la console annonçait quand même son
+    // arrivée. On la remet à sa place et on laisse le prochain décès réessayer.
+    if (!idMonstre) {
+        console.error("Renfort impossible à poser, il reste en réserve :", renfort);
+        return null;
+    }
+
     window.TOKENS_VTT_DATA = tokensData;
-    if (idMonstre) await window.enregistrerPionsVTT(idMonstre);
+    await window.enregistrerPionsVTT(idMonstre);
     await window.sauvegarderReserveMonstres(reserve);
 
     // Un renfort arrive en cours de combat : il lui faut ses techniques, elles
     // aussi forgées en arrière-plan pour ne pas figer l'écran en plein tour.
-    if (idMonstre && typeof window.equiperCompetencesMonstre === "function") {
+    if (typeof window.equiperCompetencesMonstre === "function") {
         window.equiperCompetencesMonstre(idMonstre, { ...renfort, id: idMonstre }).catch(e => console.error(e));
     }
 

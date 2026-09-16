@@ -331,6 +331,21 @@ window.gererClicCarte = function(idCarte) {
     }
 };
 
+// OÙ SE POSE LA CARTE EN GRAND, PENDANT UN COMBAT.
+//
+// Elle se posait à 400 px en simple aperçu, et glissait à 20 px une fois
+// retenue — c'est-à-dire pile sur les bannières. Tant que celles-ci vivaient
+// dans le panneau de gauche, ça n'avait aucune importance : la carte était
+// posée DANS ce panneau et passait devant. Depuis que les bannières pendent du
+// volet, la carte se retrouvait dessous, illisible et à moitié cachée.
+//
+// Elle reste donc à droite du volet dans les deux cas. Le volet occupe les
+// 380 premiers pixels, les bannières s'arrêtent à 360 : à 400, la carte ne
+// touche rien. Et sa petite glissade de disparition s'arrête à 365 au lieu de
+// filer jusqu'à 50, pour ne pas traverser les bannières en s'effaçant.
+const APERCU_CARTE_X = "400px";
+const APERCU_CARTE_X_CACHE = "365px";
+
 window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     let conteneurCarte = document.getElementById("apercu-carte-hd-competence");
     
@@ -353,18 +368,28 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     const isCombatMode = document.getElementById("fenetre-combat")?.style.display === "block";
     const currentDisplayedId = conteneurCarte.dataset.cardId;
     
-    // CHANGEMENT DE COUCHE (Magie du Panneau Gauche)
+    // CHANGEMENT DE COUCHE.
+    //
+    // La carte était accrochée au panneau latéral gauche, et son z-index de 100
+    // était un leurre : le panneau est lui-même à 10, il ouvre son propre
+    // contexte d'empilement, et rien de ce qu'il contient ne peut monter
+    // au-dessus du volet des compétences (14). La carte passait donc SOUS les
+    // bannières quoi qu'on écrive dessus.
+    //
+    // Elle est maintenant accrochée à la fenêtre de combat elle-même, au même
+    // niveau que le volet, avec 15 pour passer juste devant lui — et toujours
+    // derrière l'annonce de tour et le menu de développement, qui doivent
+    // continuer de la recouvrir.
     if (isCombatMode) {
-        const panneauGauche = document.getElementById("panneau-combat-gauche");
-        if (panneauGauche && conteneurCarte.parentNode !== panneauGauche) panneauGauche.appendChild(conteneurCarte);
-        
-        // Z-Index à 100 pour passer devant les bannières, mais DANS le panneau gauche
-        conteneurCarte.style.zIndex = "100";
+        const fenetreCombat = document.getElementById("fenetre-combat");
+        if (fenetreCombat && conteneurCarte.parentNode !== fenetreCombat) fenetreCombat.appendChild(conteneurCarte);
+
+        conteneurCarte.style.zIndex = "15";
         conteneurCarte.style.pointerEvents = "auto";
         
         // Si on change de carte en mode Aperçu
         if (currentDisplayedId && currentDisplayedId !== idCarte && conteneurCarte.style.opacity === "1" && !isLocked) {
-            conteneurCarte.style.left = "50px"; 
+            conteneurCarte.style.left = APERCU_CARTE_X_CACHE;
             conteneurCarte.style.opacity = "0";
             setTimeout(() => { window.afficherApercuCarteHD(idCarte, isLocked); }, 300);
             return;
@@ -656,14 +681,17 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     if (isCombatMode) {
         if (conteneurCarte.style.opacity === "0" || conteneurCarte.style.top !== "15vh") {
             conteneurCarte.style.top = "15vh";
-            conteneurCarte.style.left = "400px"; // Apparait à droite
+            conteneurCarte.style.left = APERCU_CARTE_X; // Apparait à droite du volet
             conteneurCarte.style.transform = "none";
             conteneurCarte.style.width = "340px";
             conteneurCarte.style.height = "476px";
             void conteneurCarte.offsetWidth; 
         }
-        // Si Locké -> 20px (au dessus des bannières), sinon 400px
-        conteneurCarte.style.left = isLocked ? "20px" : "400px";
+        // Retenue ou simplement survolée, elle ne bouge plus : autrefois la
+        // carte choisie glissait à 20 px pour venir couvrir les bannières, ce
+        // qui n'a plus de sens maintenant que le volet se referme tout seul dès
+        // qu'une carte est retenue.
+        conteneurCarte.style.left = APERCU_CARTE_X;
         conteneurCarte.style.opacity = "1";
     } else {
         // Positionnement Fiche Perso (Centré)
@@ -698,7 +726,7 @@ window.masquerApercuCarteHD = function(force = false) {
         const isCombatMode = document.getElementById("fenetre-combat")?.style.display === "block";
         
         if (isCombatMode) {
-            conteneurCarte.style.left = "50px"; // Glisse en se cachant
+            conteneurCarte.style.left = APERCU_CARTE_X_CACHE; // Glisse en se cachant
             conteneurCarte.style.opacity = "0";
 
             // 🔻 NOUVEAU : Restaure la taille de l'avatar
@@ -1900,49 +1928,16 @@ window.sauvegarderCompetence = async function() {
 //  NETTOYAGE AUTOMATIQUE DE L'APERÇU HD (MÉTHODE NINJA)
 // =========================================================================
 
-// La fonction officielle qui détruit la carte visuellement
-window.masquerApercuCarteHD = function(force = false) {
-    const conteneurCarte = document.getElementById("apercu-carte-hd-competence");
-    if (conteneurCarte) {
-        
-        // Bloque la disparition si la carte est verrouillée par un choix
-        if (!force && conteneurCarte.dataset.locked === "true") {
-            return;
-        }
-
-        const isCombatMode = document.getElementById("fenetre-combat")?.style.display === "block";
-        
-        if (isCombatMode) {
-            conteneurCarte.style.left = "50px"; // Glisse en se cachant
-            conteneurCarte.style.opacity = "0";
-
-            // 🔻 NOUVEAU : Restaure la taille de l'avatar
-            const imgPerso = document.getElementById("combat-portrait-perso");
-            if (imgPerso) {
-                imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
-                imgPerso.style.height = "100%";
-            }
-            
-            setTimeout(() => {
-                if (conteneurCarte.style.opacity === "0") {
-                    conteneurCarte.style.display = "none";
-                }
-            }, 400); 
-        } else {
-            conteneurCarte.style.display = "none";
-            conteneurCarte.style.opacity = "0";
-            conteneurCarte.style.left = "59vw";
-            conteneurCarte.style.top = "50%";
-            conteneurCarte.style.transform = "translateY(-50%)";
-        }
-        
-        conteneurCarte.dataset.cardId = ""; 
-        conteneurCarte.dataset.locked = "false";
-    }
-    
-    window.CARTE_EN_APERCU = null;
-    document.querySelectorAll('.banniere-carte').forEach(el => el.style.filter = "none");
-};
+// LA SECONDE DÉFINITION DE masquerApercuCarteHD A ÉTÉ SUPPRIMÉE D'ICI.
+//
+// Il y en avait deux, mot pour mot identiques à un détail près : celle-ci,
+// écrite plus bas dans le fichier, écrasait la vraie au chargement — et elle
+// avait perdu en route les deux lignes qui remettent CARTE_APERCU à null et
+// rafraîchissent le bouton de fin de tour. Fermer une carte laissait donc le
+// bouton croire qu'une compétence était toujours sous les yeux du joueur.
+//
+// Les interceptions qui suivent (croix de la fiche, clic hors carte) appellent
+// maintenant la seule et unique version, celle du chapitre de l'aperçu.
 
 // 1. Interception de la Croix Rouge de la fiche perso
 const originalFermerFiche = window.fermerFichePerso;
