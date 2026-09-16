@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=14">
+  <link rel="stylesheet" href="style.css?v=15">
 
  
   <!-- ===================================================================== -->
@@ -480,6 +480,33 @@
                            box-shadow: 0 3px 10px rgba(0,0,0,0.6);">Reprendre la main</button>
         </div>
 
+        <!-- =================================================================
+             LA PISTE D'INITIATIVE — EN HAUT, AU CENTRE, ET ELLE NE PART PLUS
+             =================================================================
+             Elle vivait accrochée au HUD du bas à droite, et elle s'effaçait
+             entre deux manches : on perdait de vue l'ordre de passage au
+             moment précis où on choisit sa carte en fonction de lui.
+
+             Elle est maintenant posée en haut de l'écran, centrée, et elle
+             reste. Le conteneur ne fait que centrer ; toute la géométrie (la
+             largeur, la place de chaque portrait) est calculée par
+             afficherPisteInitiative, qui a besoin de positionner les tuiles
+             une par une pour qu'elles GLISSENT d'une manche à l'autre au lieu
+             de réapparaître ailleurs.
+
+             `pointer-events: none` sur la zone, `auto` sur la piste : la bande
+             transparente qui traverse tout le haut de l'écran ne doit pas
+             voler les clics destinés au plateau. -->
+        <div id="piste-initiative-zone" style="position: absolute; top: 10px; left: 0; right: 0;
+                                               display: flex; justify-content: center;
+                                               z-index: 12; pointer-events: none;">
+            <div id="piste-initiative" style="position: relative; height: 0; width: 0;
+                                              pointer-events: auto;
+                                              transition: width 0.45s cubic-bezier(0.25, 0.8, 0.25, 1);">
+                <!-- Rempli par JavaScript -->
+            </div>
+        </div>
+
         <!-- Bouton pour quitter le mode Combat (Désormais DANS la fenêtre) -->
         <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/menu_omlu8e.png"
              id="btn-fermer-combat"
@@ -809,32 +836,6 @@
         <!-- NOUVEAU : HUD BAS DROITE (Z-index réduit à 5 pour passer sous le panneau gauche) -->
         <div id="combat-hud-bas-droite" style="position: absolute; bottom: 0; right: 0; width: 450px; z-index: 5; pointer-events: none;">
             
-            <!-- LA PISTE D'INITIATIVE (Rétractable et Dynamique) -->
-            <div id="piste-initiative" style="
-                position: absolute;
-                right: 96%; /* 🔻 MODIFIÉ ICI : Ancré au bord GAUCHE du HUD */
-                top: 34%;   
-                height: 38%; 
-                width: max-content; 
-                max-width: 60vw; 
-                background: rgba(0, 0, 0, 0.4); 
-                border-radius: 20px 0 0 20px; 
-                box-shadow: 0 0 15px 5px rgba(0,0,0,0.5), inset 0 0 20px 5px rgba(0,0,0,0.7);
-                backdrop-filter: blur(3px); 
-                z-index: -1; 
-                pointer-events: auto; 
-                display: flex;
-                flex-direction: row; 
-                align-items: center;
-                padding: 0px; 
-                gap: 8px;
-                opacity: 0; 
-                transition: opacity 0.4s ease, padding 0.4s ease;
-                white-space: nowrap; 
-            ">
-                <!-- Rempli par JavaScript -->
-            </div>
-
             <!-- L'image de fond (Éteinte par défaut et avec un ID pour la cibler) -->
             <img id="img-hud-fintour" src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/FinTourEteind_exjtxp.png" style="width: 100%; display: block; pointer-events: none;">
 
@@ -1680,7 +1681,7 @@
 <script type="module" src="competences.js?v=19"></script>
 <script src="Plateau.js"></script>
 <script type="module" src="sequence_tour.js?v=21"></script>
-<script type="module" src="combat.js?v=57"></script>
+<script type="module" src="combat.js?v=58"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=21"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->

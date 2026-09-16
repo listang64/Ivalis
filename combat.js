@@ -2335,6 +2335,19 @@ window.construireIndicateursEtatsToken = function(etats, taille) {
     });
 };
 
+// LE VISAGE DES CRÉATURES, EN UN SEUL ENDROIT.
+//
+// Une créature n'a pas de portrait généré : son pion était jusqu'ici un disque
+// rouge avec son nom écrit dedans, et ça se voyait — tous les ennemis d'une
+// rencontre se ressemblaient, et un nom long finissait coupé en deux.
+//
+// Elle porte maintenant une image, la même pour tous, au format et à la taille
+// de référence d'un pion de joueur (55). La constante vit ici parce que DEUX
+// endroits en ont besoin : le plateau (ci-dessous) et la piste d'initiative.
+// Les documents Monstres, eux, ne portent toujours aucune URL : ce n'est pas
+// une donnée de la créature, c'est une décision d'affichage.
+window.IMAGE_TOKEN_ENNEMI = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789309136/IMG_2137_mxyexl.png";
+
 window.appliquerTokensVTT = function(tokensMap) {
     if (!window.PLATEAU_VTT) return;
     
@@ -2507,57 +2520,32 @@ window.appliquerTokensVTT = function(tokensMap) {
 
 
         // 4️⃣ LE PION LUI-MÊME
-        // Un monstre n'a pas de portrait : son pion est un simple disque rouge portant
-        // son nom en petit. On le construit à la place de l'image plutôt qu'en plus,
-        // sinon l'<img> vide afficherait l'icône de fichier cassé du navigateur.
+        // Une créature n'a pas de portrait généré : elle porte l'image commune
+        // des ennemis (IMAGE_TOKEN_ENNEMI), au même format et à la même taille
+        // qu'un pion de joueur. On la construit À LA PLACE de l'image du
+        // portrait plutôt qu'en plus : `data.url` est vide pour un monstre, et
+        // un <img> vide afficherait l'icône de fichier cassé du navigateur.
+        //
+        // Son NOM ne s'écrit plus dessus. Il se lisait mal (un « Nécromancien »
+        // ne tient pas dans 55 pixels), il encombrait le plateau dès que deux
+        // créatures se touchaient, et il est de toute façon affiché en clair
+        // dans le panneau latéral et dans la fenêtre sombre de tour.
         if (pData && pData.estMonstre) {
-            const disque = document.createElement("div");
-            disque.className = "token-disque-monstre";
-            disque.style.position = "absolute";
-            disque.style.top = "0";
-            disque.style.left = "0";
-            disque.style.width = "100%";
-            disque.style.height = "100%";
-            disque.style.borderRadius = "50%";
-            disque.style.zIndex = "2";
-            disque.style.background = "radial-gradient(circle at 38% 32%, #ff6b6b 0%, #c62828 55%, #7a1414 100%)";
-            disque.style.border = "2px solid #ffb4b4";
-            disque.style.boxSizing = "border-box";
-            disque.style.display = "flex";
-            disque.style.alignItems = "center";
-            disque.style.justifyContent = "center";
-            disque.style.overflow = "hidden";
-            // Rien de particulier pour un monstre mort : l'opacité de 50 % est déjà
-            // appliquée plus haut sur le pion entier, comme pour tous les combattants.
-
-            const nomAffiche = ((pData.prenom || "") + " " + (pData.nom || "")).trim() || "Créature";
-
-            const nomToken = document.createElement("div");
-            // La taille du pion est réglable : le texte doit suivre, sinon il déborde sur les
-            // petits pions et se perd sur les gros. On part de 15 % du diamètre, puis on rétrécit
-            // juste ce qu'il faut pour que le mot le plus long tienne sur une ligne : sans ça, un
-            // nom d'un seul tenant ("Nécromancien") se coupe en plein milieu ("Nécroman-cien").
-            const motLePlusLong = nomAffiche.split(/\s+/).reduce((a, b) => (b.length > a.length ? b : a), "");
-            const largeurUtile = taille * 0.8; // le texte a 10 % de marge de chaque côté
-            const taillePourMot = largeurUtile / Math.max(1, motLePlusLong.length * 0.58); // Cinzel gras ≈ 0.58 em/caractère
-            nomToken.style.fontSize = Math.max(6, Math.min(Math.round(taille * 0.15), Math.round(taillePourMot))) + "px";
-            nomToken.style.fontFamily = "'Cinzel', serif";
-            nomToken.style.fontWeight = "bold";
-            nomToken.style.color = "#fff4f4";
-            nomToken.style.textShadow = "1px 1px 3px rgba(0,0,0,0.95)";
-            nomToken.style.textAlign = "center";
-            nomToken.style.lineHeight = "1.1";
-            nomToken.style.padding = "0 10%";
-            nomToken.style.pointerEvents = "none";
-            // Un nom d'un seul mot long ("Nécromancien") est plus large que le disque :
-            // sans coupure autorisée, il déborderait de part et d'autre du pion.
-            nomToken.style.overflowWrap = "anywhere";
-            nomToken.style.wordBreak = "break-word";
-            nomToken.style.maxWidth = "100%";
-            nomToken.innerText = nomAffiche;
-            disque.appendChild(nomToken);
-
-            divToken.appendChild(disque);
+            const imgEnnemi = document.createElement("img");
+            imgEnnemi.className = "token-img-main";
+            imgEnnemi.src = typeof window.redimensionnerImageCloudinary === "function"
+                ? window.redimensionnerImageCloudinary(window.IMAGE_TOKEN_ENNEMI, 700)
+                : window.IMAGE_TOKEN_ENNEMI;
+            imgEnnemi.style.position = "absolute";
+            imgEnnemi.style.top = "0";
+            imgEnnemi.style.left = "0";
+            imgEnnemi.style.width = "100%";
+            imgEnnemi.style.height = "100%";
+            imgEnnemi.style.objectFit = "contain";
+            imgEnnemi.style.zIndex = "2";
+            imgEnnemi.style.pointerEvents = "none";
+            imgEnnemi.onerror = () => { imgEnnemi.style.display = "none"; };
+            divToken.appendChild(imgEnnemi);
 
             // 5️⃣ LES GOUTTES D'ÉTAT : un point par altération active, discret,
             // en bas du médaillon.
@@ -3607,17 +3595,74 @@ window.finDeTourCombat = async function(forcer = false, idQuiTermine = null) {
     alert("Ce combat ne peut plus se jouer sans le régime cerveau (mode développeur → Régime cerveau).");
 };
 
+// =========================================================================
+//  LA PISTE D'INITIATIVE
+// =========================================================================
+//  ELLE NE DISPARAÎT PLUS. C'était son défaut de fond : elle s'effaçait dès la
+//  fin de la manche, c'est-à-dire précisément au moment où on choisit sa carte
+//  — et où l'ordre de passage est l'information la plus utile de l'écran. Il
+//  fallait la deviner de mémoire, ou attendre la manche suivante pour la
+//  revoir.
+//
+//  Elle reste donc affichée pendant toute la rencontre, en haut et au centre,
+//  et raconte trois choses à la fois :
+//    · qui a DÉJÀ JOUÉ ce tour-ci   → son portrait passe en retrait (0,7)
+//    · à qui c'est le TOUR          → une lueur dorée respire derrière lui
+//    · dans quel ORDRE on passera   → la place de chacun sur la bande
+//
+//  CE QUE LA FILE NE DIT PAS, ET POURQUOI IL A FALLU UNE MÉMOIRE
+//  ------------------------------------------------------------
+//  `File_Attente_Combat` ne contient que ceux qui n'ont PAS ENCORE joué : le
+//  cerveau en retire la tête à chaque tour clos. Une piste dessinée à partir
+//  d'elle verrait donc les combattants s'évaporer un par un — l'inverse de ce
+//  qu'on veut. On retient donc l'ordre COMPLET au moment où la manche s'ouvre
+//  (PISTE_MANCHE), et la file courante ne sert plus qu'à répondre à « celui-là
+//  a-t-il déjà joué ? ».
+//
+//  Cette mémoire sert une seconde fois : pendant la PRÉPARATION, la file est
+//  vide (personne n'a encore choisi). La piste montre alors l'ordre de la
+//  manche qui vient de finir, tout le monde à opacité pleine — et quand la
+//  nouvelle manche s'ouvre, les portraits GLISSENT à leur nouvelle place au
+//  lieu de réapparaître ailleurs. C'est pour ce glissement que les tuiles sont
+//  positionnées une par une en absolu et réutilisées d'un dessin à l'autre :
+//  un `innerHTML` reconstruit à chaque fois n'anime rien.
+// =========================================================================
+
+// La géométrie, en un seul endroit. La piste est « un peu plus grosse » que
+// l'ancienne (55 × 63) ; tout le reste — l'encart d'initiative, les jauges, les
+// états — se déduit de ces trois nombres.
+const PISTE_LARGEUR_TUILE = 68;
+const PISTE_HAUTEUR_TUILE = 78;
+// L'écart n'est pas qu'une question de goût : les deux jauges penchées
+// débordent de six pixels de chaque côté de leur portrait. À douze pixels
+// d'intervalle, celle du voisin venait toucher la sienne.
+const PISTE_ECART = 22;
+const PISTE_PAS = PISTE_LARGEUR_TUILE + PISTE_ECART;
+// De la place sous les portraits pour les pastilles d'état, qui débordent.
+const PISTE_MARGE_ETATS = 26;
+
+// L'ordre COMPLET de la manche en cours : { manche, ordre: [{id, initiative, idCarte}] }.
+window.PISTE_MANCHE = { manche: 0, ordre: [] };
+
+// Le combattant a-t-il fini son tour ? Il est dans l'ordre de la manche, mais
+// plus dans la file de ceux qui restent à jouer.
+function pisteAJoue(id, resteAJouer) {
+    return !resteAJouer.has(id);
+}
+
 window.afficherPisteInitiative = function(queue, phase) {
     if (queue === undefined && window.PARTIE_DATA) {
         queue = window.PARTIE_DATA.File_Attente_Combat || [];
         phase = window.PARTIE_DATA.Phase_Combat || "Preparation";
     }
-    // Pendant l'animation de fin de tour, on ne redessine pas la piste — elle est
-    // justement en train de se replier. Mais la notification qui apporte l'état
-    // suivant ne reviendra pas toute seule : si la bascule en résolution tombe
-    // pendant cette fenêtre (et elle y tombe souvent, puisque les créatures
-    // choisissent en dernier), la piste ne se dessinait plus jamais et le combat
-    // avait l'air figé. On se rappelle donc, comme le fait déjà l'IA.
+    queue = queue || [];
+
+    // Pendant l'animation de fin de tour, on ne redessine pas la piste. Mais la
+    // notification qui apporte l'état suivant ne reviendra pas toute seule : si
+    // la bascule en résolution tombe pendant cette fenêtre (et elle y tombe
+    // souvent, puisque les créatures choisissent en dernier), la piste ne se
+    // remettrait plus jamais à jour et le combat aurait l'air figé. On se
+    // rappelle donc, comme le fait déjà l'IA.
     if (window.ANIMATION_TOUR_EN_COURS) {
         clearTimeout(window.RAPPEL_PISTE_INITIATIVE);
         window.RAPPEL_PISTE_INITIATIVE = setTimeout(() => window.afficherPisteInitiative(queue, phase), 300);
@@ -3628,118 +3673,194 @@ window.afficherPisteInitiative = function(queue, phase) {
     const piste = document.getElementById("piste-initiative");
     if (!piste) return;
 
-    if (!queue || queue.length === 0 || phase === "Preparation") {
-        piste.style.opacity = "0";
-        piste.style.padding = "0px";
-        // Le vidage attend la fin du fondu. Si la piste se redessine entre-temps —
-        // et c'est courant, la bascule en résolution suit de peu la fin du tour —
-        // ce vidage retardé effaçait les bulles qui venaient d'être posées : la
-        // piste restait vide jusqu'à la prochaine action. On l'annule donc à
-        // chaque redessin.
-        clearTimeout(window.VIDAGE_PISTE_INITIATIVE);
-        window.VIDAGE_PISTE_INITIATIVE = setTimeout(() => piste.innerHTML = "", 400);
-        if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour(queue || [], phase);
-        if (typeof window.synchroniserPanneauAvecPiste === "function") window.synchroniserPanneauAvecPiste(false, queue || [], phase);
-        return;
+    const partie = window.PARTIE_DATA || {};
+    const manche = parseInt(partie.Tour_Combat) || 1;
+    const enResolution = phase === "Resolution" && queue.length > 0;
+
+    // MÉMORISER L'ORDRE DE LA MANCHE, une fois, à son ouverture. On repère une
+    // manche neuve à son numéro ; le test sur la longueur n'est qu'un filet, au
+    // cas où une file arriverait plus complète que celle qu'on a retenue (un
+    // poste qui rattrape son retard, par exemple).
+    if (enResolution && (window.PISTE_MANCHE.manche !== manche
+                         || queue.length > window.PISTE_MANCHE.ordre.length)) {
+        window.PISTE_MANCHE = {
+            manche,
+            ordre: queue.map(f => ({ id: f.idPersonnage, initiative: f.initiative, idCarte: f.idCarte }))
+        };
     }
 
-    clearTimeout(window.VIDAGE_PISTE_INITIATIVE);
-    piste.style.opacity = "1";
-    piste.style.padding = "0 8px 0 12px";
-    let html = "";
-
-    // Un combattant à terre n'a plus sa place sur la piste : son pion a déjà
-    // disparu du plateau, sa bulle n'a pas à rester dans l'ordre de passage.
-    queue = queue.filter(item => !(typeof window.estCombattantMort === "function"
-                                   && window.estCombattantMort(item.idPersonnage)));
-    if (queue.length === 0) {
-        piste.style.opacity = "0";
-        piste.style.padding = "0px";
-        clearTimeout(window.VIDAGE_PISTE_INITIATIVE);
-        window.VIDAGE_PISTE_INITIATIVE = setTimeout(() => piste.innerHTML = "", 400);
-        if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour(queue, phase);
-        if (typeof window.synchroniserPanneauAvecPiste === "function") window.synchroniserPanneauAvecPiste(false, queue, phase);
-        return;
+    // CE QU'ON DESSINE. En résolution : l'ordre retenu de la manche. Sinon
+    // (préparation, ou file vide) : le même ordre, celui de la manche qui vient
+    // de finir — et si le combat vient de commencer et qu'on n'a encore rien
+    // retenu, l'ordre d'initiative de la partie, sans chiffres.
+    let ordre = window.PISTE_MANCHE.ordre;
+    if (ordre.length === 0) {
+        ordre = (partie.Ordre_Initiative || []).map(id => ({ id, initiative: null, idCarte: null }));
     }
 
-    queue.forEach((item, index) => {
-        const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === item.idPersonnage);
-        if (!perso) return;
+    // Un combattant à terre quitte la piste : son pion a déjà disparu du
+    // plateau, sa place dans l'ordre de passage n'a plus de sens.
+    ordre = ordre.filter(e => !(typeof window.estCombattantMort === "function"
+                                && window.estCombattantMort(e.id)));
 
-        const pvMax = (parseInt(perso.PV_Max) || 1) + (parseInt(perso.Dev_Mod_PV) || 0);
-        const pvActuels = perso.PV_Actuels !== undefined ? parseInt(perso.PV_Actuels) : pvMax;
-        const pctPv = Math.min(100, Math.max(0, (pvActuels / pvMax) * 100));
+    const resteAJouer = new Set(enResolution ? queue.map(f => f.idPersonnage) : ordre.map(e => e.id));
+    const idQuiJoue = enResolution ? queue[0].idPersonnage : null;
 
-        const fatigueMax = window.fatigueMaxCombattant(perso);
-        const fatigue = perso.fatigueActuelle !== undefined ? parseInt(perso.fatigueActuelle) : fatigueMax;
-        const pctFatigue = Math.min(100, Math.max(0, (fatigue / fatigueMax) * 100));
+    // On ne garde que ceux dont on a vraiment la fiche : sans elle il n'y a ni
+    // portrait, ni jauges, ni rien à montrer.
+    const visibles = ordre
+        .map(e => ({ ...e, perso: (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === e.id) }))
+        .filter(e => !!e.perso);
 
-        const imgUrl = perso.urlCloudinary || "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1786114507/Les_humains_h0ubwh.png";
-        const attributId = index === 0 ? 'id="premiere-bulle-initiative"' : '';
-        const classeBulle = (index === 0 && phase === "Resolution") ? "halo-tour-actif" : "bulle-initiative-base";
-        const affichageInit = item.idCarte === "REPOS_LONG" ? "⏳" : item.initiative;
-
-        let etatsHtml = "";
-        if (perso.Etats_Alteres && perso.Etats_Alteres.length > 0) {
-            etatsHtml = `<div style="position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%); display: flex; gap: 2px; justify-content: center; z-index: 5;">`;
-            perso.Etats_Alteres.forEach(etat => {
-                etatsHtml += window.imageEtat(etat, 16);
-            });
-            etatsHtml += `</div>`;
+    // LA PISTE NE DOIT JAMAIS SORTIR DE L'ÉCRAN. Ancrée en bas à droite, elle
+    // se contentait d'un `max-width` et débordait sous le panneau : centrée en
+    // haut, un débordement la ferait sortir des DEUX côtés à la fois. Trois
+    // joueurs contre quatre créatures font déjà sept portraits, et une illusion
+    // ou un renfort en ajoutent.
+    //
+    // Plutôt que de couper, on resserre : les portraits se chevauchent comme un
+    // jeu de cartes en éventail, et tout le monde reste visible.
+    const largeurMax = Math.max(320, (window.innerWidth || 1024) * 0.92);
+    let pas = PISTE_PAS;
+    if (visibles.length > 1) {
+        const besoin = (visibles.length - 1) * pas + PISTE_LARGEUR_TUILE;
+        if (besoin > largeurMax) {
+            pas = Math.max(28, (largeurMax - PISTE_LARGEUR_TUILE) / (visibles.length - 1));
         }
+    }
 
-        html += `
-        <div ${attributId} class="${classeBulle}" style="position: relative; width: 55px; height: 63px; flex-shrink: 0; margin-top: 0px; margin-bottom: 22px; transition: all 0.4s ease; transform-origin: left center; margin-right: 8px; cursor: pointer;" onclick="window.selectionnerEtCentrerPerso('${item.idPersonnage}')">
-            <div style="position: absolute; inset: 0; background: linear-gradient(135deg, #fbf5bd 0%, #c2a878 30%, #5c3a21 50%, #e8d5a5 80%, #ffffff 100%); clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); display: flex; align-items: center; justify-content: center;">
-                <div style="width: 51px; height: 59px; background-color: #1a0f08; clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); position: relative;">
-                    <img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: top center;">
-                    <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 40%; background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);"></div>
-                </div>
-            </div>
+    piste.style.width = visibles.length === 0
+        ? "0px"
+        : ((visibles.length - 1) * pas + PISTE_LARGEUR_TUILE) + "px";
+    piste.style.height = (PISTE_HAUTEUR_TUILE + PISTE_MARGE_ETATS) + "px";
+    piste.style.opacity = visibles.length === 0 ? "0" : "1";
 
-            <div style="position: absolute; top: -3px; left: -4px; width: 19px; height: 19px; border-radius: 50%; border: 1px solid #e8d5a5; background: #1a0f08; box-shadow: 0 2px 5px rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 2;">
-                <span style="color: #e8d5a5; font-family: 'Cinzel', serif; font-size: 10px; font-weight: bold; text-shadow: 1px 1px 3px black, 0 0 5px rgba(232, 213, 165, 0.5);">${affichageInit}</span>
-            </div>
+    // L'ombre sous la bande : un seul élément, posé une fois, qui suit la
+    // largeur de la piste puisqu'il est ancré à ses deux bords.
+    let ombre = piste.querySelector(".piste-ombre-sol");
+    if (!ombre) {
+        ombre = document.createElement("div");
+        ombre.className = "piste-ombre-sol";
+        piste.appendChild(ombre);
+    }
 
-            <div style="position: absolute; bottom: 4px; left: -5px; width: 25px; height: 4px; background: #000; border: 1px solid #1a0f08; border-radius: 2px; transform: rotate(30deg); transform-origin: center; box-shadow: 0 2px 4px rgba(0,0,0,0.8); overflow: hidden; z-index: 2;">
-                <div style="position: absolute; top: 0; right: 0; width: ${pctPv}%; height: 100%; background: linear-gradient(to right, #e63946, #ff8b8b); transition: width 0.3s ease;"></div>
-            </div>
-
-            <div style="position: absolute; bottom: 4px; right: -5px; width: 25px; height: 4px; background: #000; border: 1px solid #1a0f08; border-radius: 2px; transform: rotate(-30deg); transform-origin: center; box-shadow: 0 2px 4px rgba(0,0,0,0.8); overflow: hidden; z-index: 2;">
-                <div style="position: absolute; top: 0; left: 0; width: ${pctFatigue}%; height: 100%; background: linear-gradient(to right, #c2a878, #fbf5bd); transition: width 0.3s ease;"></div>
-            </div>
-            ${etatsHtml}
-        </div>`;
+    // LES TUILES SONT RÉUTILISÉES, jamais reconstruites : c'est ce qui leur
+    // permet de glisser. On les retrouve par l'identifiant du combattant.
+    const vues = new Set();
+    visibles.forEach((e, index) => {
+        vues.add(e.id);
+        let tuile = piste.querySelector(`.piste-tuile[data-id="${e.id}"]`);
+        if (!tuile) {
+            tuile = document.createElement("div");
+            tuile.className = "piste-tuile";
+            tuile.dataset.id = e.id;
+            tuile.style.width = PISTE_LARGEUR_TUILE + "px";
+            tuile.style.height = PISTE_HAUTEUR_TUILE + "px";
+            // Une tuile qui naît se pose directement à sa place, sans glisser
+            // depuis la gauche de l'écran : la transition ne doit courir que
+            // sur les DÉPLACEMENTS.
+            tuile.style.left = (index * pas) + "px";
+            tuile.onclick = () => window.selectionnerEtCentrerPerso(e.id);
+            piste.appendChild(tuile);
+        }
+        tuile.style.left = (index * pas) + "px";
+        // Resserrés, les portraits se recouvrent : le premier de la file passe
+        // devant ses voisins, comme dans un éventail.
+        tuile.style.zIndex = String(visibles.length - index);
+        tuile.classList.toggle("a-joue", enResolution && pisteAJoue(e.id, resteAJouer));
+        tuile.innerHTML = contenuTuilePiste(e, e.id === idQuiJoue);
     });
 
-    piste.innerHTML = html;
+    // Un combattant qui n'est plus sur la piste (tombé, retiré du combat)
+    // emporte sa tuile.
+    piste.querySelectorAll(".piste-tuile").forEach(t => {
+        if (!vues.has(t.dataset.id)) t.remove();
+    });
+
     if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour(queue, phase);
-    if (typeof window.synchroniserPanneauAvecPiste === "function") window.synchroniserPanneauAvecPiste(true, queue, phase);
+    if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour(queue, phase);
 };
+
+// Le contenu d'une tuile : le portrait (hexagone pour un héros, médaillon rond
+// pour une créature), l'encart d'initiative, les deux jauges penchées, et les
+// pastilles d'état sous le tout.
+function contenuTuilePiste(entree, cestSonTour) {
+    const perso = entree.perso;
+    const L = PISTE_LARGEUR_TUILE, H = PISTE_HAUTEUR_TUILE;
+
+    const pvMax = (parseInt(perso.PV_Max) || 1) + (parseInt(perso.Dev_Mod_PV) || 0);
+    const pvActuels = perso.PV_Actuels !== undefined ? parseInt(perso.PV_Actuels) : pvMax;
+    const pctPv = Math.min(100, Math.max(0, (pvActuels / pvMax) * 100));
+
+    const fatigueMax = window.fatigueMaxCombattant(perso);
+    const fatigue = perso.fatigueActuelle !== undefined ? parseInt(perso.fatigueActuelle) : fatigueMax;
+    const pctFatigue = Math.min(100, Math.max(0, (fatigue / fatigueMax) * 100));
+
+    // UNE CRÉATURE PORTE SON MÉDAILLON ROND, celui-là même qu'elle a sur le
+    // plateau, et à la taille des portraits voisins : on reconnaît d'un coup
+    // d'œil qui est qui sans avoir à lire un nom.
+    const estEnnemi = !!perso.estMonstre && !perso.estIllusion;
+    const imgUrl = estEnnemi
+        ? window.IMAGE_TOKEN_ENNEMI
+        : (perso.urlCloudinary || "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1786114507/Les_humains_h0ubwh.png");
+
+    const hexagone = "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
+    const portrait = estEnnemi
+        ? `<div style="position: absolute; top: ${Math.round((H - L) / 2)}px; left: 0; width: ${L}px; height: ${L}px;
+                       border-radius: 50%; overflow: hidden; z-index: 1;">
+               <img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: contain;">
+           </div>`
+        : `<div style="position: absolute; inset: 0; z-index: 1;
+                       background: linear-gradient(135deg, #fbf5bd 0%, #c2a878 30%, #5c3a21 50%, #e8d5a5 80%, #ffffff 100%);
+                       clip-path: ${hexagone}; display: flex; align-items: center; justify-content: center;">
+               <div style="width: ${L - 5}px; height: ${H - 5}px; background-color: #1a0f08; clip-path: ${hexagone}; position: relative;">
+                   <img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: top center;">
+                   <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 40%; background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);"></div>
+               </div>
+           </div>`;
+
+    // Le chiffre d'initiative, dans le même petit encart pour tout le monde.
+    // Vide tant que la manche n'a pas ouvert (la piste montre alors l'ordre de
+    // la précédente, ou le simple ordre d'initiative au tout premier tour).
+    const affichageInit = entree.idCarte === "REPOS_LONG" ? "⏳"
+                        : (entree.initiative === null || entree.initiative === undefined ? "–" : entree.initiative);
+
+    let etatsHtml = "";
+    if (perso.Etats_Alteres && perso.Etats_Alteres.length > 0) {
+        etatsHtml = `<div style="position: absolute; bottom: -${PISTE_MARGE_ETATS - 4}px; left: 50%; transform: translateX(-50%); display: flex; gap: 2px; justify-content: center; z-index: 5;">`;
+        perso.Etats_Alteres.forEach(etat => { etatsHtml += window.imageEtat(etat, 18); });
+        etatsHtml += `</div>`;
+    }
+
+    return `
+        ${cestSonTour ? '<div class="piste-scintillement"></div>' : ''}
+        ${portrait}
+        <div style="position: absolute; top: -3px; left: -5px; width: 23px; height: 23px; border-radius: 50%; border: 1px solid #e8d5a5; background: #1a0f08; box-shadow: 0 2px 5px rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 3;">
+            <span style="color: #e8d5a5; font-family: 'Cinzel', serif; font-size: 12px; font-weight: bold; text-shadow: 1px 1px 3px black, 0 0 5px rgba(232, 213, 165, 0.5);">${affichageInit}</span>
+        </div>
+
+        <div style="position: absolute; bottom: 5px; left: -6px; width: 31px; height: 5px; background: #000; border: 1px solid #1a0f08; border-radius: 2px; transform: rotate(30deg); transform-origin: center; box-shadow: 0 2px 4px rgba(0,0,0,0.8); overflow: hidden; z-index: 3;">
+            <div style="position: absolute; top: 0; right: 0; width: ${pctPv}%; height: 100%; background: linear-gradient(to right, #e63946, #ff8b8b); transition: width 0.3s ease;"></div>
+        </div>
+
+        <div style="position: absolute; bottom: 5px; right: -6px; width: 31px; height: 5px; background: #000; border: 1px solid #1a0f08; border-radius: 2px; transform: rotate(-30deg); transform-origin: center; box-shadow: 0 2px 4px rgba(0,0,0,0.8); overflow: hidden; z-index: 3;">
+            <div style="position: absolute; top: 0; left: 0; width: ${pctFatigue}%; height: 100%; background: linear-gradient(to right, #c2a878, #fbf5bd); transition: width 0.3s ease;"></div>
+        </div>
+        ${etatsHtml}`;
+}
 
 // =========================================================================
 //  BANDEAU D'ACTION (BAS GAUCHE) : LA CARTE DU COMBATTANT QUI JOUE
 // =========================================================================
 
-// Sur demande de Nico : la piste d'initiative n'a plus le droit de refermer
-// le panneau latéral toute seule à son apparition — seule sa DISPARITION
-// continue de le rouvrir tout seul s'il était fermé, pour qu'il retrouve sa
-// fiche au moment de choisir une carte. On n'agit qu'au changement d'état,
-// sinon chaque redessin de la piste le rouvrirait dans le dos du joueur qui
-// viendrait de le refermer à la main pendant la Préparation.
-window.PISTE_INITIATIVE_VISIBLE = null;
-
-window.synchroniserPanneauAvecPiste = function(visible, queue, phase) {
-    if (document.getElementById("fenetre-combat")?.style.display !== "block") return;
-
-    if (!visible && window.PISTE_INITIATIVE_VISIBLE !== visible && !window.PANNEAU_GAUCHE_OUVERT
-        && typeof window.togglePanneauGauche === "function") {
-        window.togglePanneauGauche(true);
-    }
-    window.PISTE_INITIATIVE_VISIBLE = visible;
-
-    if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour(queue, phase);
-};
+// LE RELAIS PISTE → PANNEAU LATÉRAL A DISPARU AVEC SON DÉCLENCHEUR.
+//
+// Il rouvrait le panneau de gauche au moment où la piste d'initiative
+// s'effaçait, pour que le joueur retrouve sa fiche avant de choisir sa carte.
+// La piste ne s'efface plus jamais : cette bascule n'avait tout simplement plus
+// d'instant où se produire. Le rafraîchissement de la fenêtre sombre, qui
+// voyageait avec elle, est passé dans afficherPisteInitiative — il n'a rien à
+// voir avec le panneau et devait vivre sa propre vie.
 
 // La fiche d'une carte, qu'elle appartienne à un héros (cache du panneau) ou à
 // une créature (cache global alimenté à la génération du monstre).
@@ -4269,10 +4390,10 @@ window.reinitialiserCombat = async function() {
     // sans eux (voir synchroniserCombattantsHorsJeu).
     window.REINITIALISATION_COMBAT_EN_COURS = true;
 
-    // Le relais piste / panneau repart de zéro : le prochain passage à une file
-    // vide doit de nouveau pouvoir rouvrir le panneau, même s'il l'était déjà
-    // avant le reset (sinon la comparaison ne verrait aucun changement d'état).
-    window.PISTE_INITIATIVE_VISIBLE = null;
+    // La piste oublie l'ordre de la manche : celui de la rencontre d'avant n'a
+    // plus rien à montrer, et il ferait apparaître des combattants effacés le
+    // temps que la nouvelle file arrive.
+    window.PISTE_MANCHE = { manche: 0, ordre: [] };
 
     // LE COMBAT DU NOUVEAU RÉGIME SE FERME AUSSI, ET AVANT LE RESTE. Un état
     // publié qui survivrait à une réinitialisation serait pire qu'inutile : les

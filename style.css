@@ -2057,37 +2057,80 @@ textarea.input-texte-parchemin {
 }
 
 /* ========================================================================= */
-/* HALO DORÉ DU TOUR ACTIF (PISTE D'INITIATIVE)                              */
+/* LA PISTE D'INITIATIVE                                                     */
 /* ========================================================================= */
+/*  Trois états, et ils ne se marchent plus dessus.
+ *
+ *  L'ancien « halo du tour actif » faisait respirer l'OPACITÉ de la bulle
+ *  entière. C'est devenu impossible : l'opacité sert maintenant à dire « ce
+ *  combattant a déjà joué ». Les deux se seraient annulés — le combattant qui
+ *  joue est justement celui dont l'opacité doit rester pleine.
+ *
+ *  Le scintillement est donc passé DERRIÈRE le portrait, sur son propre
+ *  calque : une lueur dorée floutée qui respire toute seule. Le portrait, lui,
+ *  ne bouge pas. */
 
-.bulle-initiative-base {
-    filter: drop-shadow(0px 5px 8px rgba(0, 0, 0, 0.8));
-    -webkit-filter: drop-shadow(0px 5px 8px rgba(0, 0, 0, 0.8));
+.piste-tuile {
+    position: absolute;
+    top: 0;
+    /* C'est cette ligne qui fait GLISSER les portraits d'une manche à l'autre
+       au lieu de les faire sauter : la tuile garde son élément d'un tour sur
+       l'autre, seule sa position change. */
+    transition: left 0.45s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.35s ease;
+    filter: drop-shadow(0px 4px 7px rgba(0, 0, 0, 0.8));
+    -webkit-filter: drop-shadow(0px 4px 7px rgba(0, 0, 0, 0.8));
+    cursor: pointer;
 }
 
-.halo-tour-actif {
-    /* Filtre fixe (calcule une seule fois) : l'animation ci-dessous ne touche plus qu'a
-       l'opacite, qui se compose sur le GPU. Un filtre anime devrait etre recalcule pixel
-       par pixel a chaque frame, meme avec le forçage de calque ci-dessous. */
-    -webkit-filter: drop-shadow(0px 5px 8px rgba(0,0,0,0.8)) drop-shadow(0px 0px 10px rgba(225, 191, 146, 0.6));
-    filter: drop-shadow(0px 5px 8px rgba(0,0,0,0.8)) drop-shadow(0px 0px 10px rgba(225, 191, 146, 0.6));
-    animation: respirationHaloDore 2s infinite alternate ease-in-out;
-    -webkit-animation: respirationHaloDore 2s infinite alternate ease-in-out;
-    z-index: 5;
+/* A DÉJÀ JOUÉ CE TOUR-CI : en retrait, mais toujours lisible — ses jauges et
+   ses états restent une information utile. Tout le monde revient à l'opacité
+   pleine quand la manche suivante s'ouvre. */
+.piste-tuile.a-joue {
+    opacity: 0.7;
+}
 
-    /* 🔻 CORRECTIONS IPAD (Forçage GPU et WebKit) 🔻 */
+/* C'EST SON TOUR. La lueur vit sous le portrait, jamais dessus. */
+.piste-scintillement {
+    position: absolute;
+    inset: -7px;
+    z-index: 0;
+    pointer-events: none;
+    background: radial-gradient(circle at 50% 50%,
+                rgba(255, 240, 200, 0.95) 0%,
+                rgba(232, 213, 165, 0.6) 55%,
+                rgba(232, 213, 165, 0) 78%);
+    /* Flou FIXE : un filtre animé se recalcule pixel par pixel à chaque image,
+       et l'iPad ne suit pas. Seules l'opacité et l'échelle respirent — elles se
+       composent sur le GPU. */
+    filter: blur(6px);
+    -webkit-filter: blur(6px);
+    animation: scintillementPiste 1.8s infinite alternate ease-in-out;
+    -webkit-animation: scintillementPiste 1.8s infinite alternate ease-in-out;
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
-    transform: translateZ(0);
 }
 
-@keyframes respirationHaloDore {
-    0% {
-        opacity: 0.7;
-    }
-    100% {
-        opacity: 1;
-    }
+@keyframes scintillementPiste {
+    0%   { opacity: 0.30; transform: scale(0.95); }
+    100% { opacity: 0.85; transform: scale(1.05); }
+}
+
+/* L'OMBRE SOUS LA PISTE, sur toute sa longueur. Un simple bandeau sombre
+   passé au flou gaussien, posé derrière les portraits : il donne à la bande le
+   poids d'un objet posé, sans panneau ni cadre. `left`/`right` négatifs pour
+   qu'elle déborde un peu de part et d'autre, comme une vraie ombre. */
+.piste-ombre-sol {
+    position: absolute;
+    left: -26px;
+    right: -26px;
+    bottom: 2px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.8);
+    filter: blur(16px);
+    -webkit-filter: blur(16px);
+    z-index: -1;
+    pointer-events: none;
 }
 
 /* ========================================================================= */
