@@ -169,6 +169,7 @@ const lirePiste = () => p.evaluate(() => {
     rect: piste.getBoundingClientRect(),
     dansHudBasDroite: !!piste.closest("#combat-hud-bas-droite"),
     ombres: piste.querySelectorAll(".piste-ombre-sol").length,
+    bandeaux: piste.querySelectorAll(".piste-fond").length,
     ordre: tuiles
       .slice()
       .sort((a, b) => parseFloat(a.style.left) - parseFloat(b.style.left))
@@ -205,7 +206,8 @@ await p.waitForTimeout(200);
   const centre = v.rect.left + v.rect.width / 2;
   verifier("et centrée horizontalement", Math.abs(centre - largeurEcran / 2) < 6,
            `(centre ${Math.round(centre)} pour ${largeurEcran / 2})`);
-  verifier("elle porte son ombre floutée, une seule", v.ombres === 1, `(${v.ombres})`);
+  verifier("elle a son bandeau, un seul", v.bandeaux === 1, `(${v.bandeaux})`);
+  verifier("et plus aucun élément d'ombre séparé", v.ombres === 0, `(${v.ombres})`);
   verifier("les quatre combattants y sont", v.ordre.length === 4, JSON.stringify(v.ordre.map(x => x.id)));
   verifier("dans l'ordre d'initiative de la manche",
            v.ordre.map(x => x.id).join(",") === "M1,H1,H2,M2", v.ordre.map(x => x.id).join(","));
@@ -513,25 +515,23 @@ console.log("\n13. L'OMBRE SOUS LE BANDEAU A VRAIMENT UN DÉGRADÉ DOUX");
     await new Promise(r => setTimeout(r, 700));
 
     const fond = document.querySelector(".piste-fond");
-    const ombre = document.querySelector(".piste-ombre-sol");
     const rf = fond.getBoundingClientRect();
-    const ro = ombre.getBoundingClientRect();
-    const style = getComputedStyle(ombre);
+    const style = getComputedStyle(fond);
     return {
       basDuBandeau: Math.round(rf.bottom), centre: Math.round(rf.left + rf.width / 2),
-      basDeLOmbre: Math.round(ro.bottom),
-      filtre: style.filter, ombrePortee: style.boxShadow
+      separee: document.querySelectorAll(".piste-ombre-sol").length,
+      filtre: style.filter, fondFlou: style.backdropFilter || style.webkitBackdropFilter,
+      ombrePortee: style.boxShadow
     };
   });
 
-  verifier("l'ombre épouse le bas du bandeau",
-           Math.abs(cadre.basDeLOmbre - cadre.basDuBandeau) <= 1,
-           `ombre ${cadre.basDeLOmbre}, bandeau ${cadre.basDuBandeau}`);
-  verifier("elle ne passe plus par un filtre (WebKit compose mal ce voisinage)",
-           cadre.filtre === "none", cadre.filtre);
-  verifier("elle est portée par une box-shadow non incrustée",
-           /rgba?\(/.test(cadre.ombrePortee) && !/inset/.test(cadre.ombrePortee),
-           cadre.ombrePortee);
+  verifier("l'ombre est portée par le bandeau lui-même, sans élément à part",
+           cadre.separee === 0, `${cadre.separee} élément(s) séparé(s)`);
+  verifier("LE BANDEAU N'A PLUS DE BACKDROP-FILTER",
+           !cadre.fondFlou || cadre.fondFlou === "none", String(cadre.fondFlou));
+  verifier("il ne passe pas non plus par un filter", cadre.filtre === "none", cadre.filtre);
+  verifier("et son ombre extérieure est bien déclarée",
+           /rgba?\([^)]*\)\s+0px\s+10px/.test(cadre.ombrePortee), cadre.ombrePortee);
 
   // La photo : une colonne d'un pixel, du ras du bandeau jusqu'à 44 px dessous.
   const HAUTEUR = 44;

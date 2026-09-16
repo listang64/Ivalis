@@ -2115,10 +2115,29 @@ textarea.input-texte-parchemin {
     100% { opacity: 0.85; transform: scale(1.05); }
 }
 
-/* LE BANDEAU SOMBRE. Il pend du bord haut de l'écran plutôt que de flotter :
-   seuls ses deux coins du bas sont arrondis. Il déborde de part et d'autre des
-   portraits pour leur laisser une marge, et son creux intérieur lui donne du
-   fond sans l'alourdir. */
+/* LE BANDEAU SOMBRE, ET SON OMBRE — SUR LE MÊME ÉLÉMENT, ET IL A FALLU DEUX
+   TENTATIVES POUR COMPRENDRE POURQUOI.
+
+   L'ombre vivait dans un élément à part, posé derrière le bandeau à z-index -2.
+   Mesurée au pixel dans un Chromium de banc d'essai, elle dessinait un dégradé
+   impeccable. À l'écran, rien : un bord net.
+
+   LE COUPABLE ÉTAIT LE VOISIN. Le bandeau portait un `backdrop-filter`, qui le
+   fait promouvoir en couche de composition à part. Le navigateur peint alors
+   les éléments à z-index négatif DANS le fond que cette couche va ensuite
+   flouter et recouvrir : l'ombre était peinte, puis avalée. Le bandeau, lui, se
+   voyait — il EST la couche. C'est un défaut connu du couple
+   `backdrop-filter` / z-index négatif, et il ne se reproduit pas en rendu
+   logiciel, d'où un banc tout vert devant un écran tout net.
+
+   On a donc retiré les deux causes d'un coup : plus d'élément à z-index
+   négatif pour l'ombre, qui est devenue une `box-shadow` du bandeau lui-même,
+   et plus de `backdrop-filter` du tout. Le flou d'arrière-plan derrière un
+   noir à 62 % ne se voyait de toute façon presque pas, et il coûtait une
+   couche de composition à chaque image sur iPad.
+
+   Il pend du bord haut de l'écran plutôt que de flotter : seuls ses deux coins
+   du bas sont arrondis. */
 .piste-fond {
     position: absolute;
     left: -24px;
@@ -2126,42 +2145,10 @@ textarea.input-texte-parchemin {
     top: -18px;
     bottom: 12px;
     border-radius: 0 0 20px 20px;
-    background: rgba(0, 0, 0, 0.55);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    box-shadow: inset 0 -14px 22px rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.62);
+    box-shadow: inset 0 -14px 22px rgba(0, 0, 0, 0.6),
+                0 10px 22px 2px rgba(0, 0, 0, 0.85);
     z-index: -1;
-    pointer-events: none;
-}
-
-/* L'OMBRE SOUS LA PISTE, ET POURQUOI ON NE LA VOYAIT PAS SUR IPAD.
- *
- * C'était une bande noire de 14 px, floutée au `filter: blur(9px)`, posée à
- * 4 px du bas de la piste (haute de 104 px). Le bandeau, lui, s'arrête à 12 px
- * du bas. Faites le compte : la bande occupait la tranche 86 → 100, le bandeau
- * descendait jusqu'à 92. Il n'en dépassait que HUIT pixels — huit pixels de noir
- * déjà dilué par un flou de 9 px, sur un fond sombre. Il n'y avait pas d'erreur
- * de rendu : l'ombre était bien là, et bien invisible.
- *
- * ELLE NE PORTE PLUS DE `filter`, ET C'EST VOLONTAIRE. Un `filter` sur un
- * élément à z-index négatif, voisin d'un élément à `backdrop-filter` (le
- * bandeau), c'est exactement le genre d'empilement que WebKit compose de
- * travers d'une version à l'autre. `box-shadow` fait le même dégradé gaussien,
- * suit tout seul les coins arrondis, ne coûte pas une couche de composition, et
- * marche partout depuis toujours.
- *
- * L'élément n'a donc PAS de fond : il n'est que le porteur de l'ombre. Il
- * épouse la forme exacte du bandeau, qui vient se poser dessus et masquer le
- * centre ; seul le halo qui déborde en bas et sur les côtés se voit. */
-.piste-ombre-sol {
-    position: absolute;
-    left: -24px;
-    right: -24px;
-    top: -18px;
-    bottom: 12px;
-    border-radius: 0 0 20px 20px;
-    box-shadow: 0 10px 20px 2px rgba(0, 0, 0, 0.8);
-    z-index: -2;
     pointer-events: none;
 }
 
@@ -2959,30 +2946,13 @@ textarea.input-texte-parchemin {
  *  l'énergie à droite en doré. Ils se remplissent par le bas et retombent vers
  *  le bas quand on perd des points — ce qui reste dessous est noir.
  *
- *  LA BOÎTE EST UN CARRÉ CALÉ SUR LE DISQUE DU BOUTON, et il en existe DEUX
- *  exemplaires exactement superposés : l'un écrit avant l'image du bouton pour
- *  porter l'anneau (il passe donc derrière), l'autre écrit après pour porter
- *  les ancres chiffrées (elles se lisent par-dessus). D'où la classe commune :
- *  deux boîtes réglées à la main auraient fini par se décaler d'un pixel. */
-.hud-boite-anneau {
-    position: absolute;
-    /* LES TROIS NOMBRES À RETOUCHER SI L'ANNEAU N'EST PAS BIEN CONCENTRIQUE AU
-       BOUTON : cette marge, ce `top`, et cette largeur. Le disque du bouton est
-       peint dans une image, pas décrit en CSS — sa position exacte dans le
-       bandeau ne se lit nulle part, elle est mesurée à l'œil sur la maquette
-       (bord droit du disque à une vingtaine de pixels du bord, centre à 47 % de
-       la hauteur). Ce sont des réglages, pas des déductions.
-       La marge n'est pas décorative : l'anneau déborde de sa boîte de 3 %
-       (rayon 53 sur 50) plus la moitié de son trait, et l'ancre de droite est
-       centrée SUR ce bord. Collée au bord de l'écran, la moitié de cette ancre
-       et un bout de l'arc doré passaient dans le vide. */
-    right: 19px;
-    top: 47%;
-    width: 136px;
-    height: 136px;
-    transform: translateY(-50%);
-    pointer-events: none;
-}
+ *  LA GÉOMÉTRIE N'EST PAS ICI. Position, diamètre et épaisseur de l'anneau,
+ *  place des ancres, de l'avatar et du nom : tout cela est posé par
+ *  reglages_hud.js, parce que rien de tout cela ne se déduit — le disque du
+ *  bouton est peint dans une image, et sa taille comme sa place ne se lisent
+ *  nulle part. Ce sont des mesures faites à l'écran, avec la boîte de réglage.
+ *  Cette feuille ne garde donc que ce qui ne se règle pas : les couleurs, les
+ *  formes, les transitions. */
 
 /* Le fond des deux jauges : le demi-cercle au complet, en noir. */
 .hud-arc-fond {
@@ -3008,19 +2978,12 @@ textarea.input-texte-parchemin {
    Le `clip-path` découpe la forme et rogne au passage toute bordure : la bordure
    colorée est donc le FOND de l'écusson, sur lequel un second hexagone plus
    petit vient poser le noir. C'est le même principe que les tuiles de la piste. */
-/* LES ANCRES SONT TUCKÉES DANS L'ANNEAU, PAS CENTRÉES DESSUS. Centrée sur le
-   bord de l'anneau, celle de droite passait la moitié de sa largeur hors de
-   l'écran — le bouton est collé au coin. Chacune s'aligne donc par son bord
-   EXTÉRIEUR sur le bord de l'anneau et s'étend vers l'intérieur : c'est aussi
-   ce que montre la maquette, où le chiffre de droite finit pile au bord du
-   cercle. Le décalage horizontal est posé élément par élément dans la page ;
-   la classe ne règle que la mise à mi-hauteur. */
+/* L'ANCRE CHIFFRÉE. Sa place au bout du demi-anneau est posée par
+   reglages_hud.js ; ici, seulement sa forme. */
 .hud-ancre {
     position: absolute;
-    top: 50%;
     width: 42px;
     height: 29px;
-    transform: translateY(-50%);
     clip-path: polygon(24% 0%, 76% 0%, 100% 50%, 76% 100%, 24% 100%, 0% 50%);
     display: flex;
     align-items: center;

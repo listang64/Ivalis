@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20">
+  <link rel="stylesheet" href="style.css?v=21">
 
  
   <!-- ===================================================================== -->
@@ -898,7 +898,34 @@
                  bas : la vitalité à gauche, l'énergie à droite. Ce qui n'est pas
                  rempli reste noir. Le tracé est un arc SVG avec pathLength="100",
                  ce qui rend le remplissage aussi simple qu'un pourcentage. -->
-            <div id="hud-anneau-boite" class="hud-boite-anneau">
+            <!-- L'AVATAR DU HÉROS, posé derrière le bouton. -->
+            <img id="hud-avatar-heros" src="" alt=""
+                 style="position: absolute; width: auto;
+                        object-fit: contain; object-position: bottom center; opacity: 0;
+                        transition: opacity 0.4s ease; pointer-events: none;
+                        filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.9));">
+
+            <!-- L'image de fond (Éteinte par défaut et avec un ID pour la cibler) -->
+            <img id="img-hud-fintour" src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/FinTourEteind_exjtxp.png" style="width: 100%; display: block; pointer-events: none;">
+
+            <!-- LES DEUX ANCRES CHIFFRÉES, aux deux extrémités de l'anneau, chacune
+                 dans la couleur de sa jauge. Leur boîte est la MÊME que celle de
+                 l'anneau (même classe) : les deux ne peuvent pas se décaler. -->
+            <!-- L'ANNEAU DES JAUGES ET SES DEUX ANCRES CHIFFRÉES.
+                 Deux demi-cercles qui se remplissent par le bas : la vitalité à
+                 gauche, l'énergie à droite. Ce qui n'est pas rempli reste noir.
+                 Le tracé est un arc SVG avec pathLength="100", ce qui rend le
+                 remplissage aussi simple qu'un pourcentage.
+
+                 IL EST ÉCRIT APRÈS L'IMAGE DU BOUTON, DONC DEVANT. Placé
+                 derrière, il disparaissait entièrement sous le disque peint dans
+                 l'image — un disque dont on ne connaît ni la taille ni la
+                 position autrement qu'à l'œil. Les arcs se posent donc SUR le
+                 rebord du bouton, comme sur le croquis.
+
+                 Toute sa géométrie est pilotée par REGLAGES_HUD
+                 (reglages_hud.js) : c'est la boîte de réglage qui la fixe. -->
+            <div id="hud-anneau-boite">
                 <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"
                      style="width: 100%; height: 100%; overflow: visible; display: block;">
                     <defs>
@@ -921,37 +948,22 @@
 
                     <!-- LE FOND NOIR : les deux demi-cercles au complet. C'est lui
                          qu'on voit là où la jauge est retombée. -->
-                    <path class="hud-arc-fond" d="M 50 103 A 53 53 0 0 1 50 -3"/>
-                    <path class="hud-arc-fond" d="M 50 103 A 53 53 0 0 0 50 -3"/>
+                    <path class="hud-arc-fond" d="M 50 100 A 50 50 0 0 1 50 0"/>
+                    <path class="hud-arc-fond" d="M 50 100 A 50 50 0 0 0 50 0"/>
 
                     <!-- LES DEUX JAUGES. Même point de départ pour les deux — le bas
                          du cercle — l'une passant par la gauche, l'autre par la
                          droite : elles montent donc toutes les deux vers le haut. -->
                     <path id="hud-arc-gauche" class="hud-arc-jauge" pathLength="100"
-                          d="M 50 103 A 53 53 0 0 1 50 -3"/>
+                          d="M 50 100 A 50 50 0 0 1 50 0"/>
                     <path id="hud-arc-droit" class="hud-arc-jauge" pathLength="100"
-                          d="M 50 103 A 53 53 0 0 0 50 -3"/>
+                          d="M 50 100 A 50 50 0 0 0 50 0"/>
                 </svg>
-            </div>
 
-            <!-- L'AVATAR DU HÉROS, posé derrière le bouton. -->
-            <img id="hud-avatar-heros" src="" alt=""
-                 style="position: absolute; bottom: 44px; right: 4px; height: 376px; width: auto;
-                        object-fit: contain; object-position: bottom center; opacity: 0;
-                        transition: opacity 0.4s ease; pointer-events: none;
-                        filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.9));">
-
-            <!-- L'image de fond (Éteinte par défaut et avec un ID pour la cibler) -->
-            <img id="img-hud-fintour" src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/FinTourEteind_exjtxp.png" style="width: 100%; display: block; pointer-events: none;">
-
-            <!-- LES DEUX ANCRES CHIFFRÉES, aux deux extrémités de l'anneau, chacune
-                 dans la couleur de sa jauge. Leur boîte est la MÊME que celle de
-                 l'anneau (même classe) : les deux ne peuvent pas se décaler. -->
-            <div id="hud-ancres-boite" class="hud-boite-anneau">
-                <div id="hud-ancre-gauche" class="hud-ancre" style="left: -3%;">
+                <div id="hud-ancre-gauche" class="hud-ancre">
                     <div class="hud-ancre-fond"><span id="hud-valeur-gauche">–</span></div>
                 </div>
-                <div id="hud-ancre-droite" class="hud-ancre" style="left: 103%; transform: translate(-100%, -50%);">
+                <div id="hud-ancre-droite" class="hud-ancre">
                     <div class="hud-ancre-fond"><span id="hud-valeur-droite">–</span></div>
                 </div>
             </div>
@@ -964,8 +976,7 @@
                  son relief. Le texte vit donc dans un span qui fait exactement sa
                  taille, et la boîte ne sert plus qu'au calage et à la mesure. -->
             <div id="hud-nom-heros"
-                 style="position: absolute; bottom: 100%; left: 0; width: 78%; margin-bottom: -18px;
-                        padding-left: 6px; box-sizing: border-box; text-align: left;
+                 style="position: absolute; box-sizing: border-box; text-align: left;
                         pointer-events: none; white-space: nowrap; overflow: hidden;">
                 <span id="hud-nom-heros-texte"
                       style="display: inline-block;
@@ -1792,6 +1803,7 @@
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
 <script src="trace_combat.js?v=11"></script>
+<script src="reglages_hud.js?v=1"></script>
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
@@ -1822,7 +1834,7 @@
 <script type="module" src="competences.js?v=22"></script>
 <script src="Plateau.js"></script>
 <script type="module" src="sequence_tour.js?v=21"></script>
-<script type="module" src="combat.js?v=68"></script>
+<script type="module" src="combat.js?v=69"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=22"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->

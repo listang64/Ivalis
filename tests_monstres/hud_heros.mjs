@@ -16,7 +16,8 @@
 //     mourant — avec le chiffre qu'elle avait gardé pendant ce temps ;
 //   • les chiffres des ancres portent la couleur de leur jauge ;
 //   • l'avatar est DERRIÈRE l'image du bouton et dépasse par le haut ;
-//   • le nom rétrécit tout seul quand il est trop long.
+//   • le nom rétrécit tout seul quand il est trop long ;
+//   • la boîte de réglage provisoire bouge bien ce qu'elle dit qu'elle bouge.
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
@@ -169,11 +170,12 @@ console.log("=========================================================");
       boite: svg.getBoundingClientRect().width
     };
   });
+  // Le repère du SVG va de 0 à 100 : le centre du cercle est à 50, 50.
   verifier("les deux demi-cercles noirs sont là", g.nbFonds === 2 && g.fondNoir === true);
-  verifier("LA JAUGE PART DU BAS DU CERCLE", g.debutY > 100, `y = ${g.debutY}`);
-  verifier("et monte jusqu'en haut", g.finY < 0, `y = ${g.finY}`);
-  verifier("celle de vitalité passe bien par la GAUCHE", g.milieuGaucheX < 10, `x = ${g.milieuGaucheX}`);
-  verifier("celle d'énergie par la DROITE", g.milieuDroitX > 90, `x = ${g.milieuDroitX}`);
+  verifier("LA JAUGE PART DU BAS DU CERCLE", g.debutY >= 95, `y = ${g.debutY}`);
+  verifier("et monte jusqu'en haut", g.finY <= 5, `y = ${g.finY}`);
+  verifier("celle de vitalité passe bien par la GAUCHE", g.milieuGaucheX <= 5, `x = ${g.milieuGaucheX}`);
+  verifier("celle d'énergie par la DROITE", g.milieuDroitX >= 95, `x = ${g.milieuDroitX}`);
 }
 
 console.log("\n=========================================================");
@@ -274,7 +276,9 @@ console.log("=========================================================");
       rangAvatar: enfants.indexOf("hud-avatar-heros"),
       rangImage: enfants.indexOf("img-hud-fintour"),
       rangAnneau: enfants.indexOf("hud-anneau-boite"),
-      rangAncres: enfants.indexOf("hud-ancres-boite"),
+      rangNom: enfants.indexOf("hud-nom-heros"),
+      ancresDansLAnneau: !!document.getElementById("hud-ancre-droite")
+                            .closest("#hud-anneau-boite"),
       opacite: getComputedStyle(avatar).opacity,
       hautAvatar: Math.round(ra.top), hautImage: Math.round(ri.top),
       basAvatar: Math.round(ra.bottom), basImage: Math.round(ri.bottom),
@@ -283,11 +287,21 @@ console.log("=========================================================");
   });
   verifier("l'avatar a reçu l'image du héros", a.src.includes("heroine"), a.src.slice(-40));
   verifier("et il est visible", a.opacite === "1", a.opacite);
-  verifier("L'ANNEAU EST ÉCRIT AVANT L'IMAGE (donc derrière)",
-           a.rangAnneau >= 0 && a.rangAnneau < a.rangImage, `${a.rangAnneau} < ${a.rangImage}`);
-  verifier("L'AVATAR AUSSI", a.rangAvatar < a.rangImage, `${a.rangAvatar} < ${a.rangImage}`);
-  verifier("LES ANCRES CHIFFRÉES SONT APRÈS (donc devant)",
-           a.rangAncres > a.rangImage, `${a.rangAncres} > ${a.rangImage}`);
+  // L'ORDRE D'ÉCRITURE EST L'ORDRE D'EMPILEMENT, et il a été retourné.
+  //
+  // L'anneau était écrit AVANT l'image, donc derrière : il a disparu en entier
+  // sous le disque peint dedans — un disque plus grand que ce qu'on avait
+  // estimé, et dont ni la taille ni la place ne se lisent nulle part. Les arcs
+  // se posent donc SUR le rebord du bouton, comme sur le croquis, et l'anneau
+  // est écrit après. L'avatar, lui, reste derrière : il ne doit dépasser que
+  // par le haut.
+  verifier("L'AVATAR EST ÉCRIT AVANT L'IMAGE (donc derrière)",
+           a.rangAvatar >= 0 && a.rangAvatar < a.rangImage, `${a.rangAvatar} < ${a.rangImage}`);
+  verifier("L'ANNEAU EST ÉCRIT APRÈS (donc devant, sinon on ne le voit pas)",
+           a.rangAnneau > a.rangImage, `${a.rangAnneau} > ${a.rangImage}`);
+  verifier("le nom aussi", a.rangNom > a.rangImage, `${a.rangNom} > ${a.rangImage}`);
+  verifier("et les ancres chiffrées vivent DANS l'anneau",
+           a.ancresDansLAnneau === true);
   verifier("IL DÉPASSE FRANCHEMENT PAR LE HAUT",
            a.hautImage - a.hautAvatar > 150, `${a.hautImage - a.hautAvatar}px au-dessus`);
   verifier("et son bas est caché dans le bandeau",
@@ -312,7 +326,7 @@ console.log("=========================================================");
       bordDroit: Math.round(d.right - cx),
       hauteurGauche: Math.round((g.top + g.height / 2) - cy),
       hauteurDroite: Math.round((d.top + d.height / 2) - cy),
-      rayon: Math.round(anneau.width * 0.53),
+      rayon: Math.round(anneau.width * 0.5),
       depasseADroite: Math.round(d.right - hud.right)
     };
   });
@@ -357,6 +371,130 @@ console.log("=========================================================");
 
   const retour = await mesurer("Cybile", "");
   verifier("revenu à un nom court, la taille remonte", retour.taille === 38, `${retour.taille}px`);
+}
+
+console.log("\n=========================================================");
+console.log("  9. LA BOÎTE DE RÉGLAGE BOUGE CE QU'ELLE DIT QU'ELLE BOUGE");
+console.log("=========================================================");
+{
+  // Cette boîte est un outil provisoire, mais c'est celui sur lequel repose tout
+  // le calage du bloc : le disque du bouton est peint dans une image, sa taille
+  // et sa place ne se lisent nulle part, et le premier essai à l'aveugle a visé
+  // quinze pixels trop court — l'anneau avait entièrement disparu derrière le
+  // bouton. Si ses flèches mentent, on règle dans le vide.
+  //
+  // LE PIÈGE EST DANS LES SIGNES. Plusieurs valeurs se comptent depuis le bord
+  // DROIT ou le bord BAS : les augmenter déplace l'élément vers la gauche ou
+  // vers le haut. Une flèche « ◀ » doit montrer ce qu'on VOIT, pas ce que la
+  // valeur fait. On mesure donc des pixels à l'écran, jamais les nombres.
+  const outils = await p.evaluate(() => ({
+    boite: !!document.getElementById("reglage-hud"),
+    poignee: !!document.getElementById("reglage-hud-poignee"),
+    reglages: !!window.REGLAGES_HUD,
+    appliquer: typeof window.appliquerReglagesHud === "function"
+  }));
+  verifier("la boîte de réglage est là", outils.boite === true);
+  verifier("sa poignée aussi", outils.poignee === true);
+  verifier("les réglages sont exposés", outils.reglages === true);
+
+  // Un clic sur une flèche, par le titre de sa ligne et le signe du bouton.
+  const cliquer = (titre, signe, fois = 1) => p.evaluate(async ([t, sg, n]) => {
+    const blocs = [...document.querySelectorAll("#reglage-hud > div")];
+    const bloc = blocs.find(b => (b.firstChild && b.firstChild.textContent || "").startsWith(t));
+    if (!bloc) return "ligne introuvable : " + t;
+    const b = [...bloc.querySelectorAll("button")].find(x => x.textContent === sg);
+    if (!b) return "bouton introuvable : " + sg;
+    for (let i = 0; i < n; i++) b.click();
+    await new Promise(r => setTimeout(r, 120));
+    return "ok";
+  }, [titre, signe, fois]);
+
+  const ou = (id) => p.evaluate((i) => {
+    const r = document.getElementById(i).getBoundingClientRect();
+    return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2),
+             l: Math.round(r.width), h: Math.round(r.height) };
+  }, id);
+
+  // L'AVATAR : sa position se compte depuis le bord droit ET le bord bas, donc
+  // les deux axes sont inversés. C'est exactement là qu'une flèche se trompe.
+  {
+    const avant = await ou("hud-avatar-heros");
+    verifier("clic sur ◀ de l'avatar", (await cliquer("Avatar", "◀", 5)) === "ok");
+    const apres = await ou("hud-avatar-heros");
+    verifier("◀ DÉPLACE BIEN L'AVATAR VERS LA GAUCHE",
+             apres.x < avant.x, `${avant.x} → ${apres.x}`);
+    await cliquer("Avatar", "▶", 5);
+
+    const avantH = await ou("hud-avatar-heros");
+    await cliquer("Avatar", "▲", 5);
+    const apresH = await ou("hud-avatar-heros");
+    verifier("▲ le fait bien monter", apresH.y < avantH.y, `${avantH.y} → ${apresH.y}`);
+    await cliquer("Avatar", "▼", 5);
+
+    const avantT = await ou("hud-avatar-heros");
+    await cliquer("Avatar", "+", 4);
+    const apresT = await ou("hud-avatar-heros");
+    verifier("« + » l'agrandit vraiment", apresT.h > avantT.h, `${avantT.h} → ${apresT.h}px`);
+    await cliquer("Avatar", "−", 4);
+  }
+
+  // L'ANNEAU : diamètre et épaisseur, les deux réglages qui manquaient le plus.
+  {
+    const avant = await ou("hud-anneau-boite");
+    await cliquer("Anneau des jauges", "+", 5);      // premier « + » = diamètre
+    const apres = await ou("hud-anneau-boite");
+    verifier("« + » AGRANDIT L'ANNEAU", apres.l > avant.l, `${avant.l} → ${apres.l}px`);
+    verifier("et il reste centré au même endroit",
+             Math.abs(apres.x - avant.x) <= 1 && Math.abs(apres.y - avant.y) <= 1,
+             `${avant.x},${avant.y} → ${apres.x},${apres.y}`);
+    await cliquer("Anneau des jauges", "−", 5);
+
+    const trait = await p.evaluate(async () => {
+      const lire = () => parseFloat(getComputedStyle(document.getElementById("hud-arc-gauche")).strokeWidth);
+      const avant = lire();
+      const blocs = [...document.querySelectorAll("#reglage-hud > div")];
+      const bloc = blocs.find(b => (b.firstChild && b.firstChild.textContent || "").startsWith("Anneau"));
+      const plus = [...bloc.querySelectorAll("button")].filter(x => x.textContent === "+");
+      for (let i = 0; i < 4; i++) plus[1].click();   // second « + » = épaisseur
+      await new Promise(r => setTimeout(r, 120));
+      return { avant, apres: lire() };
+    });
+    verifier("l'épaisseur du trait se règle aussi",
+             trait.apres > trait.avant, `${trait.avant} → ${trait.apres}`);
+    await p.evaluate(async () => {
+      const blocs = [...document.querySelectorAll("#reglage-hud > div")];
+      const bloc = blocs.find(b => (b.firstChild && b.firstChild.textContent || "").startsWith("Anneau"));
+      const moins = [...bloc.querySelectorAll("button")].filter(x => x.textContent === "−");
+      for (let i = 0; i < 4; i++) moins[1].click();
+      await new Promise(r => setTimeout(r, 120));
+    });
+  }
+
+  // LE CODE À RENVOYER : c'est le seul chemin entre l'écran et le dépôt.
+  {
+    const code = await p.evaluate(() => {
+      window.REGLAGES_HUD.anneau.diametre = 199;
+      return window.codeReglagesHud();
+    });
+    verifier("le code extrait porte les valeurs réglées",
+             code.includes("diametre: 199"), code.split("\n")[1]);
+    verifier("il donne aussi les cinq groupes",
+             ["anneau", "ancreGauche", "ancreDroite", "avatar", "nom"].every(g => code.includes(g)));
+    verifier("et une forme recopiable d'un bloc", code.includes('"diametre":199'));
+  }
+
+  // LE RETOUR AUX VALEURS D'ORIGINE, pour ne jamais rester coincé sur un
+  // réglage raté — les valeurs sont gardées d'une session à l'autre.
+  {
+    await p.evaluate(async () => {
+      const b = [...document.querySelectorAll("#reglage-hud button")]
+        .find(x => x.textContent.includes("Défaut"));
+      b.click();
+      await new Promise(r => setTimeout(r, 150));
+    });
+    const d = await p.evaluate(() => window.REGLAGES_HUD.anneau.diametre);
+    verifier("« Défaut » remet tout en place", d === 176, String(d));
+  }
 }
 
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 2).join(" | "));

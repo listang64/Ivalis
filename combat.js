@@ -1154,7 +1154,12 @@ const HUD_TEINTES = {
     energie:  { trait: "url(#hud-grad-energie)",  chiffre: "#fbf5bd", ecusson: "#c2a878" }
 };
 
-const HUD_NOM_TAILLE_MAX = 38;
+// La taille de départ du nom est un réglage comme un autre : elle vient de la
+// boîte de réglage quand celle-ci est chargée, sinon de cette valeur.
+function hudNomTailleMax() {
+    const r = window.REGLAGES_HUD;
+    return (r && r.nom && r.nom.taille) || 38;
+}
 const HUD_NOM_TAILLE_MIN = 14;
 
 // LE NOM RÉTRÉCIT JUSQU'À TENIR. On descend par paliers de deux pixels tant que
@@ -1162,7 +1167,7 @@ const HUD_NOM_TAILLE_MIN = 14;
 // L'espacement des lettres se resserre en chemin : à 38 px trois pixels d'écart
 // font respirer le mot, à 22 px ils le font déborder pour rien.
 function ajusterNomHudHeros(div, texte) {
-    let taille = HUD_NOM_TAILLE_MAX;
+    let taille = hudNomTailleMax();
     texte.style.fontSize = taille + "px";
     texte.style.letterSpacing = "3px";
     while (taille > HUD_NOM_TAILLE_MIN && div.scrollWidth > div.clientWidth) {
@@ -4183,23 +4188,22 @@ window.afficherPisteInitiative = function(queue, phase) {
     piste.style.height = (PISTE_HAUTEUR_TUILE + PISTE_MARGE_ETATS) + "px";
     piste.style.opacity = visibles.length === 0 ? "0" : "1";
 
-    // LE PANNEAU ET L'OMBRE : deux éléments posés une fois pour toutes, jamais
-    // reconstruits. Ils suivent la largeur de la piste sans qu'on ait à la leur
-    // dire, puisqu'ils sont ancrés à ses deux bords.
-    //
-    // Le panneau descend du bord haut de l'écran : il pend comme un bandeau
+    // LE BANDEAU : un élément posé une fois pour toutes, jamais reconstruit. Il
+    // suit la largeur de la piste sans qu'on ait à la lui dire, puisqu'il est
+    // ancré à ses deux bords. Il descend du bord haut de l'écran : il pend
     // plutôt que de flotter, et ses deux coins du bas sont les seuls arrondis.
+    //
+    // IL PORTE SON OMBRE LUI-MÊME. Elle avait son propre élément, derrière lui
+    // à z-index négatif, et elle restait invisible à l'écran alors qu'un banc la
+    // mesurait très bien : le `backdrop-filter` du bandeau le promeut en couche
+    // de composition, et les éléments à z-index négatif sont peints DANS le fond
+    // que cette couche recouvre ensuite. L'élément a disparu, le
+    // `backdrop-filter` aussi (voir style.css).
     let fond = piste.querySelector(".piste-fond");
     if (!fond) {
         fond = document.createElement("div");
         fond.className = "piste-fond";
         piste.appendChild(fond);
-    }
-    let ombre = piste.querySelector(".piste-ombre-sol");
-    if (!ombre) {
-        ombre = document.createElement("div");
-        ombre.className = "piste-ombre-sol";
-        piste.appendChild(ombre);
     }
 
     // LES TUILES SONT RÉUTILISÉES, jamais reconstruites : c'est ce qui leur
