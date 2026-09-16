@@ -73,7 +73,14 @@ const nom = (t) => res.find(r => r.texte.toLowerCase().startsWith(t));
 // eux, doivent tenir en entier.
 const raisonnables = res.filter(r => r.texte.length <= 40);
 
-verifier("les six bannières sont rendues", res.length === 6, `(${res.length})`);
+// SEPT, ET NON SIX : le repos long a rejoint le deck depuis que le volet des
+// compétences existe. Son bouton du HUD sert maintenant à ouvrir le volet, alors
+// il a pris une bannière comme les autres — et il doit donc, lui aussi, tenir en
+// entier dans son bandeau.
+verifier("les six techniques ET le repos long sont rendus", res.length === 7, `(${res.length})`);
+verifier("le repos long est bien du nombre",
+         res.some(r => r.texte.toLowerCase().startsWith("repos long")),
+         res.map(r => r.texte).join(" | ").slice(0, 100));
 verifier("aucun nom de longueur raisonnable n'est coupé", raisonnables.every(r => !r.coupe),
          `(${raisonnables.filter(r => r.coupe).map(r => r.texte).join(", ") || "aucun"})`);
 const court = nom("estoc");
