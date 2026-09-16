@@ -17,7 +17,8 @@
 //   • d'une manche à l'autre les portraits GLISSENT (le même élément change de
 //     place) au lieu d'être reconstruits ;
 //   • les pastilles d'état restent sous les portraits ;
-//   • et sur le plateau, une créature porte l'image commune des ennemis.
+//   • et sur le plateau, une créature porte l'image commune des ennemis ;
+//   • sous le bandeau, une ombre au dégradé doux — MESURÉE AU PIXEL.
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
@@ -473,6 +474,112 @@ console.log("\n12. BEAUCOUP DE COMBATTANTS : ELLE SE RESSERRE PLUTÔT QUE DE DÉ
   verifier("le pas s'est resserré sous les 90 px d'usage", r.pas < 90 && r.pas >= 28, `(${r.pas.toFixed(1)}px)`);
   verifier("la piste ne déborde pas à gauche", r.gauche >= 0, `(${Math.round(r.gauche)}px)`);
   verifier("ni à droite", r.droite <= r.largeurEcran, `(${Math.round(r.droite)} ≤ ${r.largeurEcran})`);
+}
+
+// =========================================================================
+console.log("\n13. L'OMBRE SOUS LE BANDEAU A VRAIMENT UN DÉGRADÉ DOUX");
+// =========================================================================
+// Sur iPad, le bandeau avait un bord net : aucune ombre. Et il n'y avait pas
+// d'erreur de rendu — l'ombre était là, simplement invisible. C'était une
+// bande de 14 px posée à 4 px du bas de la piste (haute de 104 px) alors que le
+// bandeau descend jusqu'à 12 px du bas : elle n'en dépassait que HUIT pixels,
+// déjà dilués par un flou de 9 px, sur un fond sombre.
+//
+// UN CONTRÔLE QUI LIT LE CSS NE PROUVERAIT RIEN : l'ancienne règle déclarait
+// elle aussi un flou, en bonne et due forme. On regarde donc les VRAIS PIXELS.
+// On pose un fond blanc sous la piste, on photographie une colonne d'un pixel
+// de large juste sous le bandeau, et on renvoie l'image dans la page pour la
+// relire à travers un canvas. Une ombre gaussienne, ça se reconnaît : sombre au
+// ras du bandeau, puis de plus en plus clair, jusqu'au blanc.
+{
+  const cadre = await p.evaluate(async () => {
+    // Le décor s'efface : seul le bandeau et son ombre doivent peindre ici.
+    document.getElementById("conteneur-plateau-vtt").style.display = "none";
+    document.getElementById("panneau-combat-gauche").style.display = "none";
+    document.getElementById("volet-competences").style.display = "none";
+    document.getElementById("fenetre-combat").style.background = "#ffffff";
+
+    // Quatre combattants : un bandeau large, mais pas jusqu'aux bords.
+    const fiche = (id) => ({ idPersonnage: id, prenom: id, camp: id[0] === "M" ? "Ennemi" : "Allié",
+      estMonstre: id[0] === "M", PV_Max: 50, PV_Actuels: 40, Fatigue_Max: 100, fatigueActuelle: 70,
+      Bouclier_Actuel: 0, Etats_Alteres: [], statut: "Vivant" });
+    const ids = ["H1", "H2", "M1", "M2"];
+    window.PERSOS_PARTIE = ids.map(fiche);
+    window.PISTE_MANCHE = { manche: 0, ordre: [] };
+    const file = ids.map((id, i) => ({ idPersonnage: id, idCarte: "X", initiative: 99 - i }));
+    window.PARTIE_DATA.Tour_Combat = 30;
+    window.PARTIE_DATA.File_Attente_Combat = file;
+    window.afficherPisteInitiative(file, "Resolution");
+    await new Promise(r => setTimeout(r, 700));
+
+    const fond = document.querySelector(".piste-fond");
+    const ombre = document.querySelector(".piste-ombre-sol");
+    const rf = fond.getBoundingClientRect();
+    const ro = ombre.getBoundingClientRect();
+    const style = getComputedStyle(ombre);
+    return {
+      basDuBandeau: Math.round(rf.bottom), centre: Math.round(rf.left + rf.width / 2),
+      basDeLOmbre: Math.round(ro.bottom),
+      filtre: style.filter, ombrePortee: style.boxShadow
+    };
+  });
+
+  verifier("l'ombre épouse le bas du bandeau",
+           Math.abs(cadre.basDeLOmbre - cadre.basDuBandeau) <= 1,
+           `ombre ${cadre.basDeLOmbre}, bandeau ${cadre.basDuBandeau}`);
+  verifier("elle ne passe plus par un filtre (WebKit compose mal ce voisinage)",
+           cadre.filtre === "none", cadre.filtre);
+  verifier("elle est portée par une box-shadow non incrustée",
+           /rgba?\(/.test(cadre.ombrePortee) && !/inset/.test(cadre.ombrePortee),
+           cadre.ombrePortee);
+
+  // La photo : une colonne d'un pixel, du ras du bandeau jusqu'à 44 px dessous.
+  const HAUTEUR = 44;
+  const photo = await p.screenshot({ clip: { x: cadre.centre, y: cadre.basDuBandeau, width: 1, height: HAUTEUR } });
+  const lignes = await p.evaluate(async (b64) => {
+    const img = new Image();
+    img.src = "data:image/png;base64," + b64;
+    await img.decode();
+    const toile = document.createElement("canvas");
+    toile.width = img.width; toile.height = img.height;
+    const ctx = toile.getContext("2d");
+    ctx.drawImage(img, 0, 0);
+    const d = ctx.getImageData(0, 0, img.width, img.height).data;
+    const sorties = [];
+    for (let y = 0; y < img.height; y++) {
+      let somme = 0;
+      for (let x = 0; x < img.width; x++) {
+        const i = (y * img.width + x) * 4;
+        somme += (d[i] + d[i + 1] + d[i + 2]) / 3;
+      }
+      sorties.push(Math.round(somme / img.width));
+    }
+    return sorties;
+  }, photo.toString("base64"));
+
+  const hautDeLOmbre = lignes[0];
+  const basDeLaColonne = lignes[lignes.length - 1];
+  // Un dégradé, c'est une descente d'intensité qui ne recule jamais franchement.
+  const reculs = lignes.slice(1).filter((v, i) => v < lignes[i] - 2).length;
+  // Et il doit s'étaler : on compte les lignes ni tout à fait noires ni blanches.
+  const paliers = new Set(lignes.filter(v => v > hautDeLOmbre + 8 && v < 250)).size;
+
+  // LES SEUILS SONT CHOISIS POUR MORDRE. L'ancienne ombre dessinait bien une
+  // pente, elle aussi — Chromium la rendait sans broncher. Son défaut n'était
+  // pas d'être absente, mais d'être trop pâle et trop courte pour se voir sur
+  // un fond sombre : 132/255 au ras du bandeau contre 75 aujourd'hui, et déjà
+  // presque blanche seize pixels plus bas. Ce sont ces deux mesures-là qui
+  // séparent une ombre qu'on voit d'une ombre qui n'existe que dans le CSS.
+  verifier("JUSTE SOUS LE BANDEAU, C'EST FRANCHEMENT SOMBRE",
+           hautDeLOmbre < 110, `${hautDeLOmbre}/255`);
+  verifier("SEIZE PIXELS PLUS BAS, ELLE SE VOIT ENCORE",
+           lignes[16] < 200, `${lignes[16]}/255`);
+  verifier("44 px plus bas, le blanc est revenu", basDeLaColonne > 235, `${basDeLaColonne}/255`);
+  verifier("L'ÉCLAIRCISSEMENT EST PROGRESSIF, JAMAIS UNE MARCHE",
+           reculs === 0, `${reculs} recul(s)`);
+  verifier("et il s'étale sur une vraie pente, pas deux pixels",
+           paliers >= 12, `${paliers} valeurs intermédiaires`);
+  console.log(`     profil mesuré : ${lignes.filter((_, i) => i % 4 === 0).join(" ")}`);
 }
 
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

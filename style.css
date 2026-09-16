@@ -2134,19 +2134,33 @@ textarea.input-texte-parchemin {
     pointer-events: none;
 }
 
-/* L'OMBRE SOUS LA PISTE. Une bande FINE, passée au flou gaussien, qui ne
-   dépasse du bandeau que de quelques pixels : elle pose la piste sur l'écran
-   sans l'épaissir. Elle était haute de 34 px et se voyait comme un halo. */
+/* L'OMBRE SOUS LA PISTE, ET POURQUOI ON NE LA VOYAIT PAS SUR IPAD.
+ *
+ * C'était une bande noire de 14 px, floutée au `filter: blur(9px)`, posée à
+ * 4 px du bas de la piste (haute de 104 px). Le bandeau, lui, s'arrête à 12 px
+ * du bas. Faites le compte : la bande occupait la tranche 86 → 100, le bandeau
+ * descendait jusqu'à 92. Il n'en dépassait que HUIT pixels — huit pixels de noir
+ * déjà dilué par un flou de 9 px, sur un fond sombre. Il n'y avait pas d'erreur
+ * de rendu : l'ombre était bien là, et bien invisible.
+ *
+ * ELLE NE PORTE PLUS DE `filter`, ET C'EST VOLONTAIRE. Un `filter` sur un
+ * élément à z-index négatif, voisin d'un élément à `backdrop-filter` (le
+ * bandeau), c'est exactement le genre d'empilement que WebKit compose de
+ * travers d'une version à l'autre. `box-shadow` fait le même dégradé gaussien,
+ * suit tout seul les coins arrondis, ne coûte pas une couche de composition, et
+ * marche partout depuis toujours.
+ *
+ * L'élément n'a donc PAS de fond : il n'est que le porteur de l'ombre. Il
+ * épouse la forme exacte du bandeau, qui vient se poser dessus et masquer le
+ * centre ; seul le halo qui déborde en bas et sur les côtés se voit. */
 .piste-ombre-sol {
     position: absolute;
-    left: -20px;
-    right: -20px;
-    bottom: 4px;
-    height: 14px;
-    border-radius: 50%;
-    background: rgba(0, 0, 0, 0.85);
-    filter: blur(9px);
-    -webkit-filter: blur(9px);
+    left: -24px;
+    right: -24px;
+    top: -18px;
+    bottom: 12px;
+    border-radius: 0 0 20px 20px;
+    box-shadow: 0 10px 20px 2px rgba(0, 0, 0, 0.8);
     z-index: -2;
     pointer-events: none;
 }
