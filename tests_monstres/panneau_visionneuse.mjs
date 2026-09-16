@@ -250,6 +250,81 @@ console.log("=========================================================");
   verifier("et il n'est pas actionnable", e.peut === false);
 }
 
+console.log("\n=========================================================");
+console.log("  6. EN PRÉPARATION : CHOISIR SA CARTE, PANNEAU DÉTOURNÉ");
+console.log("=========================================================");
+// LE BLOCAGE LE PLUS DUR : le combat ne pouvait même plus commencer. La carte
+// s'affichait bien, mais « choisir compétence » restait mort — parce que
+// competences.js demandait au PANNEAU si la carte était celle d'une créature.
+// À la table, trois minutes d'attente, jusqu'à ce que l'IA renonce à attendre
+// les joueurs et engage les créatures toute seule.
+{
+  const r = await p.evaluate(() => {
+    window.nettoyerCiblage();
+    window.PARTIE_DATA = { Phase_Combat: "Preparation", Tour_Combat: 1,
+                           Ordre_Initiative: ["H1", "M1"], File_Attente_Combat: [] };
+    window.COMBAT_FATIGUE_ACTUELLE = 110;
+    window.MOUVEMENT_COUT_TOTAL = 0;
+    window.APPELS = [];
+    window.jouerCarteCombat = async (id) => {
+      // On rejoue la vraie question que se pose jouerCarteCombat : pour QUI ?
+      const pour = window.herosPourCarte(id);
+      window.APPELS.push({ quoi: "choisir", idCarte: id, pour: pour && pour.idPersonnage });
+    };
+    // Le cache global sait à qui appartient chaque technique : C_CAC est à moi.
+    window.CACHE_COMPETENCES_GLOBAL = { H1: { C_CAC: window.COMPETENCES_CACHE.C_CAC } };
+
+    // LE DÉCOR DU BUG : le panneau montre la créature (l'IA l'y a installée, ou
+    // le joueur a cliqué son portrait), mais le deck affiché est encore le mien.
+    window.afficherDansPanneauGauche("M1");
+    window.CARTE_EN_APERCU = null;
+    window.afficherApercuCarteHD("C_CAC");
+    window.actualiserBoutonFinTour();
+    return {
+      panneau: (window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO] || {}).idPersonnage,
+      apercu: window.CARTE_APERCU,
+      mode: window.MODE_BOUTON_FINTOUR
+    };
+  });
+  verifier("le panneau montre bien la créature", r.panneau === "M1", String(r.panneau));
+  verifier("la carte est bien prévisualisée", !!r.apercu && r.apercu.idCarte === "C_CAC",
+           JSON.stringify(r.apercu));
+  verifier("ELLE RESTE CHOISISSABLE : c'est MA carte", !!r.apercu && r.apercu.choisissable === true,
+           JSON.stringify(r.apercu));
+  verifier("et le bouton le propose", r.mode === "choisir_competence", r.mode);
+
+  const apres = await p.evaluate(async () => {
+    document.getElementById("btn-hud-fintour").click();
+    await new Promise(r => setTimeout(r, 200));
+    return window.APPELS;
+  });
+  verifier("LE CLIC RETIENT LA CARTE", apres.length === 1, JSON.stringify(apres));
+  verifier("et il la retient POUR MON HÉROS, pas pour la créature affichée",
+           apres.length === 1 && apres[0].pour === "H1", JSON.stringify(apres));
+}
+
+console.log("\n=========================================================");
+console.log("  7. MAIS LA CARTE D'UNE CRÉATURE RESTE INJOUABLE");
+console.log("=========================================================");
+{
+  const r = await p.evaluate(async () => {
+    window.COMPETENCES_CACHE.C_M1 = JSON.parse(JSON.stringify(window.COMPETENCES_CACHE.C_CAC));
+    window.COMPETENCES_CACHE.C_M1.Nom = "Cataclysme putride";
+    window.CACHE_COMPETENCES_GLOBAL = { H1: { C_CAC: window.COMPETENCES_CACHE.C_CAC },
+                                        M1: { C_M1: window.COMPETENCES_CACHE.C_M1 } };
+    window.CARTE_EN_APERCU = null;
+    window.afficherApercuCarteHD("C_M1");
+    // Changer de carte alors qu'un aperçu est ouvert passe par un fondu de
+    // 300 ms : lire tout de suite, c'est lire la carte d'avant.
+    await new Promise(r => setTimeout(r, 600));
+    window.actualiserBoutonFinTour();
+    return { apercu: window.CARTE_APERCU, mode: window.MODE_BOUTON_FINTOUR };
+  });
+  verifier("la technique d'une créature n'est pas choisissable",
+           !!r.apercu && r.apercu.choisissable === false, JSON.stringify(r.apercu));
+  verifier("et le bouton reste éteint", r.mode === "eteint", r.mode);
+}
+
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 2).join(" | "));
 
 await b.close();

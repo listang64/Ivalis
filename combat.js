@@ -3191,6 +3191,47 @@ document.addEventListener("DOMContentLoaded", function () {
 // =========================================================================
 
 // 1. Le Joueur choisit sa carte
+// =========================================================================
+//  À QUI EST CETTE CARTE ?
+// =========================================================================
+//  ENCORE LE PANNEAU GAUCHE PRIS POUR L'AUTORITÉ. Deux endroits décidaient du
+//  sort d'une carte d'après le combattant AFFICHÉ : competences.js refusait de
+//  la retenir si le panneau montrait une créature, et jouerCarteCombat
+//  l'inscrivait au nom de ce combattant-là.
+//
+//  Or le panneau est une visionneuse, et l'IA comme le joueur peuvent y
+//  installer une créature (afficherDansPanneauGauche remplace alors
+//  COMBAT_PERSOS_JOUEUR par [elle]). Le deck affiché, lui, met un instant à
+//  suivre : le joueur voyait donc SA carte, la cliquait — et « Choisir »
+//  restait mort, sans un mot. À la table, ça s'est traduit par trois minutes
+//  d'attente, jusqu'à ce que l'IA renonce à attendre les joueurs et engage les
+//  créatures toute seule.
+//
+//  La carte, elle, sait à qui elle appartient : le cache global range les
+//  techniques par combattant. On le lui demande.
+window.proprietaireDeLaCarte = function(idCarte) {
+    if (!idCarte) return null;
+    const cache = window.CACHE_COMPETENCES_GLOBAL || {};
+    return Object.keys(cache).find(id => cache[id] && cache[id][idCarte]) || null;
+};
+
+// Les héros de CE poste — ceux que je commande. Quand le panneau est détourné
+// pour montrer quelqu'un d'autre, la liste est mise de côté dans
+// COMBAT_PERSOS_JOUEUR_BACKUP : c'est elle qui fait foi.
+window.mesHerosDeCombat = function() {
+    return window.COMBAT_PERSOS_JOUEUR_BACKUP || window.COMBAT_PERSOS_JOUEUR || [];
+};
+
+// LE HÉROS POUR QUI CETTE CARTE SE JOUE. Son propriétaire s'il est des miens ;
+// sinon le combattant affiché, comme avant — un cache pas encore rempli ne doit
+// pas empêcher de jouer.
+window.herosPourCarte = function(idCarte) {
+    const proprietaire = window.proprietaireDeLaCarte(idCarte);
+    const mien = window.mesHerosDeCombat().find(h => h && h.idPersonnage === proprietaire);
+    if (mien) return mien;
+    return (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO] || null;
+};
+
 window.jouerCarteCombat = async function(idCarte) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
 
@@ -3210,9 +3251,14 @@ window.jouerCarteCombat = async function(idCarte) {
     const phase = (window.PARTIE_DATA || {}).Phase_Combat || "Preparation";
     if (phase !== "Preparation") return refuser("on n'est pas en préparation", `(phase ${phase})`);
 
-    const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
-    if (!persoActuel) return refuser("aucun héros sélectionné dans le panneau",
+    // LE HÉROS À QUI CETTE CARTE APPARTIENT, pas celui que le panneau montre :
+    // une créature installée dans la visionneuse ne doit pas hériter de la carte
+    // d'un joueur (voir herosPourCarte).
+    const persoActuel = window.herosPourCarte(idCarte);
+    if (!persoActuel) return refuser("aucun héros à qui attribuer cette carte",
                                      `(index ${window.COMBAT_INDEX_PERSO})`);
+    if (persoActuel.estMonstre) return refuser("cette carte est celle d'une créature",
+                                               persoActuel.idPersonnage);
 
     const dataCarte = window.COMPETENCES_CACHE[idCarte];
     if (!dataCarte) return refuser("technique absente du cache", `(${persoActuel.idPersonnage})`);

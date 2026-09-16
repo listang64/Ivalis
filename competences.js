@@ -570,9 +570,22 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     const persoActuelTemp = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
 
     // Les monstres ne se pilotent pas à la main : leurs cartes s'affichent pour
-    // être consultées, mais sans "Choisir" ni "Appliquer". C'est l'IA de combat
-    // (chapitre suivant) qui décidera de ce qu'ils jouent.
-    const estCarteDeMonstre = !!(persoActuelTemp && persoActuelTemp.estMonstre);
+    // être consultées, mais sans « Choisir ». C'est l'IA de combat qui décidera
+    // de ce qu'ils jouent.
+    //
+    // LA QUESTION PORTE SUR LA CARTE, PAS SUR LE PANNEAU. Elle se lisait dans le
+    // combattant AFFICHÉ — et le panneau est une visionneuse : l'IA comme le
+    // joueur peuvent y installer une créature, auquel cas COMBAT_PERSOS_JOUEUR
+    // devient [elle]. Le deck affiché, lui, met un instant à suivre. Le joueur
+    // voyait donc SA carte, la cliquait, et « choisir compétence » restait mort
+    // sans un mot : à la table, trois minutes d'attente, jusqu'à ce que l'IA
+    // renonce à attendre les joueurs et engage les créatures toute seule.
+    //
+    // herosPourCarte (combat.js) répond sur la carte elle-même : son
+    // propriétaire dans le cache global, s'il est des miens.
+    const porteurDeLaCarte = typeof window.herosPourCarte === "function"
+        ? window.herosPourCarte(idCarte) : persoActuelTemp;
+    const estCarteDeMonstre = !!(porteurDeLaCarte && porteurDeLaCarte.estMonstre);
 
     // 🔻 CORRECTION 1 : On bloque le choix de la carte si les combats ont commencé !
     //
