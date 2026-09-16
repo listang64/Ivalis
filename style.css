@@ -2115,6 +2115,25 @@ textarea.input-texte-parchemin {
     100% { opacity: 0.85; transform: scale(1.05); }
 }
 
+/* LE BANDEAU SOMBRE. Il pend du bord haut de l'écran plutôt que de flotter :
+   seuls ses deux coins du bas sont arrondis. Il déborde de part et d'autre des
+   portraits pour leur laisser une marge, et son creux intérieur lui donne du
+   fond sans l'alourdir. */
+.piste-fond {
+    position: absolute;
+    left: -24px;
+    right: -24px;
+    top: -18px;
+    bottom: 12px;
+    border-radius: 0 0 20px 20px;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    box-shadow: inset 0 -14px 22px rgba(0, 0, 0, 0.6);
+    z-index: -1;
+    pointer-events: none;
+}
+
 /* L'OMBRE SOUS LA PISTE, sur toute sa longueur. Un simple bandeau sombre
    passé au flou gaussien, posé derrière les portraits : il donne à la bande le
    poids d'un objet posé, sans panneau ni cadre. `left`/`right` négatifs pour

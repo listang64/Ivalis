@@ -23,6 +23,17 @@ function extraire(src, marqueur, finLigne = '};') {
 const fnCombat = (m) => extraire(combat, m);
 const srcConversion = extraire(app, 'function persoDocVersFront(id, d) {', '}');
 
+// LA PISTE D'INITIATIVE NE TIENT PLUS DANS UNE SEULE FONCTION. Depuis qu'elle
+// vit en haut de l'écran en permanence, elle s'appuie sur sa géométrie
+// (PISTE_LARGEUR_TUILE & co), sur la mémoire de l'ordre de la manche
+// (PISTE_MANCHE) et sur le dessin d'une tuile (contenuTuilePiste). Les extraire
+// une par une par leur nom serait un piège à retardement : on prend le bloc
+// entier, d'un repère à l'autre.
+const blocPiste = combat.slice(
+  combat.indexOf('// La géométrie, en un seul endroit.'),
+  combat.indexOf('// LE RELAIS PISTE → PANNEAU LATÉRAL A DISPARU'));
+
+
 // Une page réduite au panneau gauche et à la piste d'initiative.
 const debutJauges = html.indexOf('<div id="combat-jauges-container"');
 const blocJauges = html.slice(debutJauges, html.indexOf('<!-- FLÈCHES NAVIGATION', debutJauges));
@@ -49,7 +60,7 @@ ${fnCombat('window.chargerCompetencesCombat = function')}
 ${fnCombat('window.afficherPersoCombatActuel = function')}
 ${fnCombat('window.afficherDansPanneauGauche = function')}
 ${fnCombat('window.restaurerPanneauGauche = function')}
-${fnCombat('window.afficherPisteInitiative = function')}
+${blocPiste}
 ${combat.slice(combat.indexOf('function panneauVerrouilleParIA'), combat.indexOf('window.afficherDansPanneauGauche'))}
 </script></body></html>`;
 fs.writeFileSync('/tmp/stats_fiche.html', page);
@@ -130,8 +141,7 @@ const piste = await p.evaluate(() => {
   window.PARTIE_DATA = { Phase_Combat: "Resolution", Tour_Combat: 1,
     File_Attente_Combat: [{ idPersonnage: "J1", idCarte: "C1", initiative: 70 }] };
   window.afficherPisteInitiative(window.PARTIE_DATA.File_Attente_Combat, "Resolution");
-  const bulle = document.getElementById("piste-initiative").firstElementChild;
-  const barres = bulle.querySelectorAll("div[style*='width:']");
+  const bulle = document.querySelector("#piste-initiative .piste-tuile");
   // La jauge d'énergie de la bulle est la seconde des deux petites barres.
   const remplissages = [...bulle.querySelectorAll("div")]
     .map(d => d.style.width).filter(w => w && w.endsWith("%"));

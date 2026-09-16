@@ -3633,10 +3633,10 @@ window.finDeTourCombat = async function(forcer = false, idQuiTermine = null) {
 // états — se déduit de ces trois nombres.
 const PISTE_LARGEUR_TUILE = 68;
 const PISTE_HAUTEUR_TUILE = 78;
-// L'écart n'est pas qu'une question de goût : les deux jauges penchées
-// débordent de six pixels de chaque côté de leur portrait. À douze pixels
-// d'intervalle, celle du voisin venait toucher la sienne.
-const PISTE_ECART = 22;
+// L'écart reprend la proportion du croquis : les portraits y sont serrés, et
+// les deux jauges penchées de deux voisins se frôlent sans se toucher. Elles
+// débordent de six pixels de chaque côté, d'où les seize qui restent.
+const PISTE_ECART = 16;
 const PISTE_PAS = PISTE_LARGEUR_TUILE + PISTE_ECART;
 // De la place sous les portraits pour les pastilles d'état, qui débordent.
 const PISTE_MARGE_ETATS = 26;
@@ -3676,6 +3676,16 @@ window.afficherPisteInitiative = function(queue, phase) {
     const partie = window.PARTIE_DATA || {};
     const manche = parseInt(partie.Tour_Combat) || 1;
     const enResolution = phase === "Resolution" && queue.length > 0;
+
+    // LA MÉMOIRE EST UNE GLOBALE, DONC ON NE LA SUPPOSE PAS. Elle est posée en
+    // haut de ce fichier, mais un fichier n'est pas toujours chargé en entier —
+    // un banc qui n'extrait que cette fonction, un script coupé en plein vol,
+    // une remise à zéro qui passe au mauvais moment. Une piste qui lève une
+    // exception emporte avec elle le bouton de fin de tour et la fenêtre de
+    // tour, qu'elle rafraîchit juste en dessous : ça vaut bien deux lignes.
+    if (!window.PISTE_MANCHE || !Array.isArray(window.PISTE_MANCHE.ordre)) {
+        window.PISTE_MANCHE = { manche: 0, ordre: [] };
+    }
 
     // MÉMORISER L'ORDRE DE LA MANCHE, une fois, à son ouverture. On repère une
     // manche neuve à son numéro ; le test sur la longueur n'est qu'un filet, au
@@ -3735,8 +3745,18 @@ window.afficherPisteInitiative = function(queue, phase) {
     piste.style.height = (PISTE_HAUTEUR_TUILE + PISTE_MARGE_ETATS) + "px";
     piste.style.opacity = visibles.length === 0 ? "0" : "1";
 
-    // L'ombre sous la bande : un seul élément, posé une fois, qui suit la
-    // largeur de la piste puisqu'il est ancré à ses deux bords.
+    // LE PANNEAU ET L'OMBRE : deux éléments posés une fois pour toutes, jamais
+    // reconstruits. Ils suivent la largeur de la piste sans qu'on ait à la leur
+    // dire, puisqu'ils sont ancrés à ses deux bords.
+    //
+    // Le panneau descend du bord haut de l'écran : il pend comme un bandeau
+    // plutôt que de flotter, et ses deux coins du bas sont les seuls arrondis.
+    let fond = piste.querySelector(".piste-fond");
+    if (!fond) {
+        fond = document.createElement("div");
+        fond.className = "piste-fond";
+        piste.appendChild(fond);
+    }
     let ombre = piste.querySelector(".piste-ombre-sol");
     if (!ombre) {
         ombre = document.createElement("div");
