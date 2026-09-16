@@ -995,6 +995,10 @@ window.rafraichirAffichageCombat = function() {
         sansCasser("vitalité", () => window.mettreAJourJaugePV());
     if (typeof window.mettreAJourJaugeFatigue === "function")
         sansCasser("énergie", () => window.mettreAJourJaugeFatigue(0));
+    // Appelé pour lui-même, et pas seulement par les jauges du panneau : si
+    // l'une d'elles casse, son propre redessin est perdu, pas celui du héros.
+    if (typeof window.actualiserHudHeros === "function")
+        sansCasser("bloc du héros", () => window.actualiserHudHeros());
     if (typeof window.afficherPisteInitiative === "function")
         sansCasser("piste", () => window.afficherPisteInitiative());
     if (typeof window.actualiserBoutonFinTour === "function")
@@ -1051,6 +1055,12 @@ window.mettreAJourJaugePV = function() {
         labelActuelle.innerText = actuelle;
         labelActuelle.style.left = pctActuel + '%';
     }
+
+    // Le bloc du héros se greffe sur les deux jauges du panneau plutôt que sur
+    // leurs appelants : elles sont rafraîchies de partout, du tic de poison au
+    // clic sur une carte, et aucun de ces endroits n'a à savoir qu'un second
+    // affichage existe maintenant en bas à droite.
+    if (typeof window.actualiserHudHeros === "function") window.actualiserHudHeros();
 };
 
 // =========================================================================
@@ -1099,6 +1109,169 @@ window.mettreAJourJaugeFatigue = function(coutFatigueBrut) {
         } else {
             labelRestante.style.opacity = '0';
             document.getElementById('barre-fatigue-rouge').style.opacity = '0';
+        }
+    }
+
+    // Le bloc du héros montre l'énergie RÉELLE, jamais l'aperçu du coût d'une
+    // carte : c'est un état, pas une simulation.
+    if (typeof window.actualiserHudHeros === "function") window.actualiserHudHeros();
+};
+
+// =========================================================================
+//  LE BLOC DU HÉROS SUR LE BOUTON DE FIN DE TOUR
+// =========================================================================
+//  Son avatar derrière le bouton, son nom au-dessus, et ses deux jauges en
+//  demi-anneaux : la vitalité à gauche, l'énergie à droite, chacune avec son
+//  ancre chiffrée au bout.
+//
+//  CE BLOC NE SUIT PAS LE PANNEAU LATÉRAL, ET C'EST TOUT SON INTÉRÊT.
+//
+//  Le panneau de gauche est une VISIONNEUSE : cliquer sur un portrait de la
+//  piste d'initiative ou sur un pion du plateau y installe ce combattant-là,
+//  créature comprise (afficherDansPanneauGauche remplace alors
+//  COMBAT_PERSOS_JOUEUR par [la créature] et met la vraie liste de côté dans
+//  COMBAT_PERSOS_JOUEUR_BACKUP). Les jauges du panneau suivent cette
+//  visionneuse, c'est leur rôle. Celles-ci non : elles montrent le héros DE CE
+//  POSTE, en permanence, qu'on regarde un gnoll ou son propre voisin.
+//
+//  C'est la même confusion « qui joue / qui on regarde » qui a déjà désarmé le
+//  bouton de fin de tour et le lancement des cartes. On la traite ici d'entrée
+//  de jeu plutôt que d'attendre qu'elle morde une quatrième fois.
+
+// Le héros de ce poste, tel qu'il est DANS PERSOS_PARTIE (la copie du panneau
+// peut avoir vieilli). On prend le premier : un joueur n'aura bientôt plus
+// qu'un seul personnage, et d'ici là le premier de la liste est le sien.
+window.herosDuPoste = function() {
+    const miens = window.COMBAT_PERSOS_JOUEUR_BACKUP || window.COMBAT_PERSOS_JOUEUR || [];
+    const mien = miens.find(h => h && !h.estMonstre) || miens[0];
+    if (!mien) return null;
+    return (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === mien.idPersonnage) || mien;
+};
+
+const HUD_TEINTES = {
+    vie:      { trait: "url(#hud-grad-vie)",      chiffre: "#ff8b8b", ecusson: "#e63946" },
+    bouclier: { trait: "url(#hud-grad-bouclier)", chiffre: "#bdf6ff", ecusson: "#5be8ff" },
+    energie:  { trait: "url(#hud-grad-energie)",  chiffre: "#fbf5bd", ecusson: "#c2a878" }
+};
+
+const HUD_NOM_TAILLE_MAX = 38;
+const HUD_NOM_TAILLE_MIN = 14;
+
+// LE NOM RÉTRÉCIT JUSQU'À TENIR. On descend par paliers de deux pixels tant que
+// le texte déborde de sa boîte, sans jamais passer sous une taille lisible.
+// L'espacement des lettres se resserre en chemin : à 38 px trois pixels d'écart
+// font respirer le mot, à 22 px ils le font déborder pour rien.
+function ajusterNomHudHeros(div, texte) {
+    let taille = HUD_NOM_TAILLE_MAX;
+    texte.style.fontSize = taille + "px";
+    texte.style.letterSpacing = "3px";
+    while (taille > HUD_NOM_TAILLE_MIN && div.scrollWidth > div.clientWidth) {
+        taille -= 2;
+        texte.style.fontSize = taille + "px";
+        // L'espacement se resserre en chemin, et finit par disparaître : sur un
+        // nom de trente lettres, un pixel entre chacune, c'est trente pixels de
+        // plus à caser — de quoi faire déborder un mot qui tenait tout juste.
+        texte.style.letterSpacing = (taille >= 30 ? "3px" : taille >= 24 ? "2px"
+                                   : taille >= 20 ? "1px" : "0px");
+    }
+}
+
+window.actualiserHudHeros = function() {
+    const arcGauche = document.getElementById("hud-arc-gauche");
+    if (!arcGauche) return;                       // pas en combat : rien à peindre
+    const arcDroit = document.getElementById("hud-arc-droit");
+
+    // Pose une jauge : son arc, son écusson, son chiffre.
+    const poser = (arc, idAncre, idValeur, teinte, valeur, part) => {
+        const pct = Math.min(100, Math.max(0, part * 100));
+        if (arc) {
+            arc.style.stroke = teinte.trait;
+            arc.style.strokeDasharray = pct + " 100";
+            // À zéro, un bout arrondi dessinerait quand même un point de couleur.
+            arc.style.strokeOpacity = pct <= 0 ? "0" : "1";
+        }
+        const ancre = document.getElementById(idAncre);
+        if (ancre) ancre.style.background = teinte.ecusson;
+        const valeurEl = document.getElementById(idValeur);
+        if (valeurEl) {
+            valeurEl.innerText = valeur;
+            valeurEl.style.color = teinte.chiffre;
+        }
+    };
+
+    const heros = window.herosDuPoste();
+    const avatar = document.getElementById("hud-avatar-heros");
+    const divNom = document.getElementById("hud-nom-heros");
+
+    if (!heros) {
+        poser(arcGauche, "hud-ancre-gauche", "hud-valeur-gauche", HUD_TEINTES.vie, "–", 0);
+        poser(arcDroit, "hud-ancre-droite", "hud-valeur-droite", HUD_TEINTES.energie, "–", 0);
+        if (avatar) avatar.style.opacity = "0";
+        if (divNom) {
+            const t = document.getElementById("hud-nom-heros-texte");
+            if (t) t.innerText = "";
+            divNom.dataset.nom = "";
+        }
+        return;
+    }
+
+    const pvMax = (parseInt(heros.PV_Max) || 1) + (parseInt(heros.Dev_Mod_PV) || 0);
+    const pv = heros.PV_Actuels !== undefined ? parseInt(heros.PV_Actuels) || 0 : pvMax;
+
+    const bouclier = parseInt(heros.Bouclier_Actuel) || 0;
+    // Le maximum du bouclier n'a pas toujours été écrit sur la fiche (c'est
+    // récent) : à défaut, le bouclier en cours fait office de plein.
+    const bouclierMax = Math.max(parseInt(heros.Bouclier_Max) || 0, bouclier);
+
+    const energieMax = window.fatigueMaxCombattant(heros) || 1;
+    const energie = heros.fatigueActuelle !== undefined ? parseInt(heros.fatigueActuelle) || 0 : energieMax;
+
+    // À GAUCHE : LA VITALITÉ — SAUF TANT QU'UN BOUCLIER TIENT. Le bouclier
+    // encaisse à la place des points de vie, c'est donc lui qu'il faut lire
+    // pendant qu'il existe. Quand il tombe, la vitalité reprend sa place, avec
+    // le chiffre qu'elle avait pendant tout ce temps.
+    if (bouclier > 0) {
+        poser(arcGauche, "hud-ancre-gauche", "hud-valeur-gauche",
+              HUD_TEINTES.bouclier, bouclier, bouclier / bouclierMax);
+    } else {
+        poser(arcGauche, "hud-ancre-gauche", "hud-valeur-gauche",
+              HUD_TEINTES.vie, pv, pv / pvMax);
+    }
+    poser(arcDroit, "hud-ancre-droite", "hud-valeur-droite",
+          HUD_TEINTES.energie, energie, energie / energieMax);
+
+    // L'AVATAR. On ne réécrit `src` que si l'adresse a changé : sans cette
+    // garde, chaque rafraîchissement relancerait un chargement d'image, et le
+    // portrait clignoterait à chaque battement du combat.
+    if (avatar) {
+        const url = heros.urlCloudinary || "";
+        if (!url) {
+            avatar.style.opacity = "0";
+        } else {
+            const voulue = typeof window.redimensionnerImageCloudinary === "function"
+                ? window.redimensionnerImageCloudinary(url, 900) : url;
+            if (avatar.dataset.url !== voulue) {
+                avatar.dataset.url = voulue;
+                avatar.src = voulue;
+            }
+            avatar.style.opacity = "1";
+        }
+    }
+
+    // LE NOM. Il n'est réajusté que lorsqu'il change, et seulement quand la
+    // boîte a une largeur : mesuré pendant que le combat est encore masqué, il
+    // déborderait d'une boîte large de zéro et tomberait à la taille minimale.
+    const texteNom = document.getElementById("hud-nom-heros-texte");
+    if (divNom && texteNom) {
+        const nom = ((heros.prenom || "") + " " + (heros.nom || "")).trim() || heros.idPersonnage;
+        if (divNom.dataset.nom !== nom) {
+            divNom.dataset.nom = nom;
+            texteNom.innerText = nom;
+            divNom.dataset.ajuste = "0";
+        }
+        if (divNom.dataset.ajuste !== "1" && divNom.clientWidth > 0) {
+            ajusterNomHudHeros(divNom, texteNom);
+            divNom.dataset.ajuste = "1";
         }
     }
 };

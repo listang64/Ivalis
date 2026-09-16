@@ -2951,3 +2951,98 @@ textarea.input-texte-parchemin {
     .fouille-torche, .fouille-points i { animation: none; }
     .fouille-points i { opacity: 1; }
 }
+
+/* ========================================================================= */
+/* LE BLOC DU HÉROS SUR LE BOUTON DE FIN DE TOUR                             */
+/* ========================================================================= */
+/*  Deux demi-anneaux autour du gros bouton : la vitalité à gauche en rouge,
+ *  l'énergie à droite en doré. Ils se remplissent par le bas et retombent vers
+ *  le bas quand on perd des points — ce qui reste dessous est noir.
+ *
+ *  LA BOÎTE EST UN CARRÉ CALÉ SUR LE DISQUE DU BOUTON, et il en existe DEUX
+ *  exemplaires exactement superposés : l'un écrit avant l'image du bouton pour
+ *  porter l'anneau (il passe donc derrière), l'autre écrit après pour porter
+ *  les ancres chiffrées (elles se lisent par-dessus). D'où la classe commune :
+ *  deux boîtes réglées à la main auraient fini par se décaler d'un pixel. */
+.hud-boite-anneau {
+    position: absolute;
+    /* LES TROIS NOMBRES À RETOUCHER SI L'ANNEAU N'EST PAS BIEN CONCENTRIQUE AU
+       BOUTON : cette marge, ce `top`, et cette largeur. Le disque du bouton est
+       peint dans une image, pas décrit en CSS — sa position exacte dans le
+       bandeau ne se lit nulle part, elle est mesurée à l'œil sur la maquette
+       (bord droit du disque à une vingtaine de pixels du bord, centre à 47 % de
+       la hauteur). Ce sont des réglages, pas des déductions.
+       La marge n'est pas décorative : l'anneau déborde de sa boîte de 3 %
+       (rayon 53 sur 50) plus la moitié de son trait, et l'ancre de droite est
+       centrée SUR ce bord. Collée au bord de l'écran, la moitié de cette ancre
+       et un bout de l'arc doré passaient dans le vide. */
+    right: 19px;
+    top: 47%;
+    width: 136px;
+    height: 136px;
+    transform: translateY(-50%);
+    pointer-events: none;
+}
+
+/* Le fond des deux jauges : le demi-cercle au complet, en noir. */
+.hud-arc-fond {
+    fill: none;
+    stroke: #000000;
+    stroke-width: 7;
+    stroke-linecap: round;
+    opacity: 0.82;
+}
+
+/* La jauge elle-même. `pathLength` vaut 100 sur le tracé : le remplissage se
+   règle alors avec un simple pourcentage en stroke-dasharray, sans avoir à
+   connaître la longueur réelle de l'arc. */
+.hud-arc-jauge {
+    fill: none;
+    stroke-width: 6;
+    stroke-linecap: round;
+    stroke-dasharray: 0 100;
+    transition: stroke-dasharray 0.35s ease, stroke 0.35s ease, stroke-opacity 0.35s ease;
+}
+
+/* L'ANCRE CHIFFRÉE. Un petit écusson hexagonal posé au bout de son demi-anneau.
+   Le `clip-path` découpe la forme et rogne au passage toute bordure : la bordure
+   colorée est donc le FOND de l'écusson, sur lequel un second hexagone plus
+   petit vient poser le noir. C'est le même principe que les tuiles de la piste. */
+/* LES ANCRES SONT TUCKÉES DANS L'ANNEAU, PAS CENTRÉES DESSUS. Centrée sur le
+   bord de l'anneau, celle de droite passait la moitié de sa largeur hors de
+   l'écran — le bouton est collé au coin. Chacune s'aligne donc par son bord
+   EXTÉRIEUR sur le bord de l'anneau et s'étend vers l'intérieur : c'est aussi
+   ce que montre la maquette, où le chiffre de droite finit pile au bord du
+   cercle. Le décalage horizontal est posé élément par élément dans la page ;
+   la classe ne règle que la mise à mi-hauteur. */
+.hud-ancre {
+    position: absolute;
+    top: 50%;
+    width: 42px;
+    height: 29px;
+    transform: translateY(-50%);
+    clip-path: polygon(24% 0%, 76% 0%, 100% 50%, 76% 100%, 24% 100%, 0% 50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    background: #c2a878;
+    filter: drop-shadow(0 3px 7px rgba(0, 0, 0, 0.9));
+    transition: background 0.35s ease;
+}
+
+.hud-ancre-fond {
+    width: calc(100% - 4px);
+    height: calc(100% - 4px);
+    clip-path: polygon(24% 0%, 76% 0%, 100% 50%, 76% 100%, 24% 100%, 0% 50%);
+    background: #0d0906;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Cinzel', serif;
+    font-size: 17px;
+    font-weight: bold;
+    line-height: 1;
+    color: #e8d5a5;
+    transition: color 0.35s ease;
+}

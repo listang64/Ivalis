@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=19">
+  <link rel="stylesheet" href="style.css?v=20">
 
  
   <!-- ===================================================================== -->
@@ -878,8 +878,104 @@
         <!-- NOUVEAU : HUD BAS DROITE (Z-index réduit à 5 pour passer sous le panneau gauche) -->
         <div id="combat-hud-bas-droite" style="position: absolute; bottom: 0; right: 0; width: 450px; z-index: 5; pointer-events: none;">
             
+            <!-- =================================================================
+                 LE BLOC DU HÉROS : SON AVATAR, SES DEUX JAUGES, SON NOM
+                 =================================================================
+                 CE SONT LES JAUGES DU HÉROS DU POSTE, ET DE LUI SEUL. Le panneau
+                 latéral est une visionneuse : cliquer sur un portrait de la piste
+                 ou sur un pion du plateau y installe n'importe quel combattant,
+                 créature comprise. Ce bloc-ci ne suit PAS ce que le panneau
+                 montre — il reste sur le héros de ce poste quoi qu'on regarde.
+
+                 CE QUI EST SOUS L'IMAGE DU BOUTON, ET CE QUI EST DESSUS. L'ordre
+                 des éléments ici EST l'ordre d'empilement : l'anneau des jauges
+                 et l'avatar sont écrits AVANT l'image, ils passent donc derrière
+                 elle — l'avatar n'en dépasse que par le haut, comme un buste qui
+                 sort du cadre. Les deux ancres chiffrées et le nom sont écrits
+                 APRÈS : ils se lisent par-dessus. -->
+
+            <!-- L'ANNEAU DES JAUGES. Deux demi-cercles qui se remplissent par le
+                 bas : la vitalité à gauche, l'énergie à droite. Ce qui n'est pas
+                 rempli reste noir. Le tracé est un arc SVG avec pathLength="100",
+                 ce qui rend le remplissage aussi simple qu'un pourcentage. -->
+            <div id="hud-anneau-boite" class="hud-boite-anneau">
+                <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"
+                     style="width: 100%; height: 100%; overflow: visible; display: block;">
+                    <defs>
+                        <linearGradient id="hud-grad-vie" x1="0" y1="1" x2="0" y2="0">
+                            <stop offset="0%" stop-color="#8f1d27"/>
+                            <stop offset="55%" stop-color="#e63946"/>
+                            <stop offset="100%" stop-color="#ff8b8b"/>
+                        </linearGradient>
+                        <linearGradient id="hud-grad-energie" x1="0" y1="1" x2="0" y2="0">
+                            <stop offset="0%" stop-color="#7a6238"/>
+                            <stop offset="55%" stop-color="#c2a878"/>
+                            <stop offset="100%" stop-color="#fbf5bd"/>
+                        </linearGradient>
+                        <linearGradient id="hud-grad-bouclier" x1="0" y1="1" x2="0" y2="0">
+                            <stop offset="0%" stop-color="#1b7f96"/>
+                            <stop offset="55%" stop-color="#5be8ff"/>
+                            <stop offset="100%" stop-color="#e0ffff"/>
+                        </linearGradient>
+                    </defs>
+
+                    <!-- LE FOND NOIR : les deux demi-cercles au complet. C'est lui
+                         qu'on voit là où la jauge est retombée. -->
+                    <path class="hud-arc-fond" d="M 50 103 A 53 53 0 0 1 50 -3"/>
+                    <path class="hud-arc-fond" d="M 50 103 A 53 53 0 0 0 50 -3"/>
+
+                    <!-- LES DEUX JAUGES. Même point de départ pour les deux — le bas
+                         du cercle — l'une passant par la gauche, l'autre par la
+                         droite : elles montent donc toutes les deux vers le haut. -->
+                    <path id="hud-arc-gauche" class="hud-arc-jauge" pathLength="100"
+                          d="M 50 103 A 53 53 0 0 1 50 -3"/>
+                    <path id="hud-arc-droit" class="hud-arc-jauge" pathLength="100"
+                          d="M 50 103 A 53 53 0 0 0 50 -3"/>
+                </svg>
+            </div>
+
+            <!-- L'AVATAR DU HÉROS, posé derrière le bouton. -->
+            <img id="hud-avatar-heros" src="" alt=""
+                 style="position: absolute; bottom: 44px; right: 4px; height: 376px; width: auto;
+                        object-fit: contain; object-position: bottom center; opacity: 0;
+                        transition: opacity 0.4s ease; pointer-events: none;
+                        filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.9));">
+
             <!-- L'image de fond (Éteinte par défaut et avec un ID pour la cibler) -->
             <img id="img-hud-fintour" src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/FinTourEteind_exjtxp.png" style="width: 100%; display: block; pointer-events: none;">
+
+            <!-- LES DEUX ANCRES CHIFFRÉES, aux deux extrémités de l'anneau, chacune
+                 dans la couleur de sa jauge. Leur boîte est la MÊME que celle de
+                 l'anneau (même classe) : les deux ne peuvent pas se décaler. -->
+            <div id="hud-ancres-boite" class="hud-boite-anneau">
+                <div id="hud-ancre-gauche" class="hud-ancre" style="left: -3%;">
+                    <div class="hud-ancre-fond"><span id="hud-valeur-gauche">–</span></div>
+                </div>
+                <div id="hud-ancre-droite" class="hud-ancre" style="left: 103%; transform: translate(-100%, -50%);">
+                    <div class="hud-ancre-fond"><span id="hud-valeur-droite">–</span></div>
+                </div>
+            </div>
+
+            <!-- LE NOM DU HÉROS, au-dessus du bandeau. Il rétrécit tout seul quand
+                 il est trop long (voir ajusterNomHudHeros dans combat.js). -->
+            <!-- LE DÉGRADÉ EST SUR LE MOT, PAS SUR LA BOÎTE. `background-clip: text`
+                 découpe le fond de l'ÉLÉMENT dans les lettres : posé sur une boîte
+                 large, un nom court n'en attrape que le premier quart et perd tout
+                 son relief. Le texte vit donc dans un span qui fait exactement sa
+                 taille, et la boîte ne sert plus qu'au calage et à la mesure. -->
+            <div id="hud-nom-heros"
+                 style="position: absolute; bottom: 100%; left: 0; width: 78%; margin-bottom: -18px;
+                        padding-left: 6px; box-sizing: border-box; text-align: left;
+                        pointer-events: none; white-space: nowrap; overflow: hidden;">
+                <span id="hud-nom-heros-texte"
+                      style="display: inline-block;
+                             font-family: 'Cinzel', serif; font-size: 38px; font-weight: bold;
+                             text-transform: uppercase; letter-spacing: 3px; line-height: 1.1;
+                             background: linear-gradient(135deg, #fbf5bd 0%, #c2a878 25%, #5c3a21 50%, #e8d5a5 75%, #ffffff 100%);
+                             -webkit-background-clip: text; background-clip: text;
+                             -webkit-text-fill-color: transparent;
+                             filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.9));"></span>
+            </div>
 
             <!-- 1. Bouton FIN DE TOUR (Le grand cercle à droite) -->
             <div id="btn-hud-fintour"
@@ -1726,7 +1822,7 @@
 <script type="module" src="competences.js?v=22"></script>
 <script src="Plateau.js"></script>
 <script type="module" src="sequence_tour.js?v=21"></script>
-<script type="module" src="combat.js?v=67"></script>
+<script type="module" src="combat.js?v=68"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=22"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
