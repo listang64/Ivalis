@@ -577,7 +577,102 @@ window.afficherPersoCombatActuel = function() {
 //  CHARGEMENT ET AFFICHAGE DU DECK (ZÉRO LATENCE)
 // =========================================================================
 
+// =========================================================================
+//  LE VOLET DES COMPÉTENCES
+// =========================================================================
+//  Les bannières pendaient en permanence dans le panneau latéral gauche. Elles
+//  pendent maintenant d'une lanière de cuir qui descend du haut de l'écran
+//  quand on la demande, et remonte hors champ le reste du temps : le plateau
+//  reste dégagé pour viser et se déplacer.
+//
+//  LES BANNIÈRES NE BOUGENT PAS D'UN PIXEL, et c'est volontaire : on DÉMÉNAGE
+//  l'élément `combat-liste-competences` au lieu d'en fabriquer un second. Tout
+//  ce qui le peuple (chargerCompetencesCombat), le lit (les boîtes de clic, les
+//  aperçus de carte) ou l'écoute continue de marcher sans rien savoir du volet.
+//  Deux listes concurrentes, elles, auraient divergé au premier tour.
+window.VOLET_COMPETENCES_OUVERT = false;
+
+// Le déménagement n'a lieu qu'une fois, et seulement si les deux éléments sont
+// là : une page à moitié chargée ne doit pas perdre la liste en route.
+//
+// Posée sur `window` À DESSEIN. C'est chargerCompetencesCombat qui l'appelle, et
+// plusieurs bancs extraient cette fonction-là de combat.js PAR SON NOM pour la
+// faire tourner seule. Une fonction locale les aurait fait mourir sur un
+// ReferenceError — c'est arrivé trois fois déjà, avec trois voisines
+// différentes. Sur `window` et appelée avec sa garde, elle se contente de ne
+// rien faire là où le volet n'existe pas.
+window.installerVoletCompetences = function() {
+    const hote = document.getElementById("volet-bannieres");
+    const liste = document.getElementById("combat-liste-competences");
+    if (!hote || !liste || liste.parentNode === hote) return !!hote;
+    hote.appendChild(liste);
+    // Dans le panneau, la liste était posée par le flux ; ici elle occupe toute
+    // la largeur de son hôte, qui est calé sur son ancienne place.
+    liste.style.marginTop = "0px";
+    liste.style.paddingLeft = "0px";
+    return true;
+};
+
+// LE REPOS LONG SE CHOISIT COMME UNE CARTE. Pas d'aperçu en grand — il n'a
+// aucun effet à détailler — mais le même geste : on le retient, le bouton fin
+// de tour passe sur « choisir compétence », et c'est lui qui l'envoie.
+window.choisirReposLongDansVolet = function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD();
+
+    document.querySelectorAll(".banniere-carte-combat").forEach(el => { el.dataset.actif = "false"; });
+    const banniere = document.getElementById("combat-carte-REPOS_LONG");
+    if (banniere) banniere.dataset.actif = "true";
+
+    // Le repos ne coûte rien : la jauge d'énergie ne montre aucune réserve.
+    window.COUT_COMPETENCE_SELECTIONNEE = 0;
+    if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
+
+    window.CARTE_APERCU = { idCarte: "REPOS_LONG", choisissable: true };
+    if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
+};
+
+window.toggleVoletCompetences = function(forcer) {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    const contenu = document.getElementById("volet-contenu");
+    if (!contenu || !window.installerVoletCompetences()) return;
+
+    const ouvrir = (forcer === undefined) ? !window.VOLET_COMPETENCES_OUVERT : !!forcer;
+    if (ouvrir === window.VOLET_COMPETENCES_OUVERT) return;
+    window.VOLET_COMPETENCES_OUVERT = ouvrir;
+
+    contenu.classList.remove("volet-ouvre", "volet-ferme");
+    // Une animation relancée sur le même élément ne rejoue pas toute seule : il
+    // faut que le navigateur reprenne son souffle entre les deux classes.
+    void contenu.offsetWidth;
+    contenu.classList.add(ouvrir ? "volet-ouvre" : "volet-ferme");
+
+    // Replié, le volet ne doit rien intercepter : il couvre tout le flanc
+    // gauche de l'écran, y compris le plateau qu'on veut cliquer.
+    const bannieres = document.getElementById("volet-bannieres");
+    if (bannieres) bannieres.style.pointerEvents = ouvrir ? "auto" : "none";
+
+    // En se refermant, il emporte l'aperçu de carte ouvert : sinon la carte
+    // reste seule au milieu de l'écran, sans la bannière qui l'a appelée.
+    if (!ouvrir && window.CARTE_EN_APERCU && typeof window.masquerApercuCarteHD === "function") {
+        window.masquerApercuCarteHD();
+    }
+};
+
+// LE VOLET S'EFFACE DEVANT LE JEU. Dès qu'on vise une cible ou qu'on trace un
+// chemin, le plateau doit être libre : la lanière remonte d'elle-même, et le
+// clic suivant sur la carte est un clic de ciblage, pas une fermeture.
+window.fermerVoletCompetences = function() {
+    if (!window.VOLET_COMPETENCES_OUVERT) return;
+    window.toggleVoletCompetences(false);
+};
+
 window.chargerCompetencesCombat = function(idPersonnage, couleur) {
+    // LE DÉMÉNAGEMENT SE FAIT AVANT LE REMPLISSAGE, jamais après. Sans cette
+    // ligne, les bannières restaient dans le panneau latéral jusqu'au premier
+    // clic sur le bouton du volet — visibles là où elles ne doivent plus être,
+    // et absentes du volet qu'on vient d'ouvrir.
+    if (typeof window.installerVoletCompetences === "function") window.installerVoletCompetences();
     const listeDiv = document.getElementById("combat-liste-competences");
     
     try {
@@ -663,6 +758,35 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
             </div>
             `;
         });
+
+        // LE REPOS LONG EST UNE TECHNIQUE COMME LES AUTRES, désormais.
+        //
+        // Il vivait sur son propre bouton du HUD — celui-là même qui ouvre et
+        // referme maintenant le volet. Le laisser sans place, c'était supprimer
+        // une action de jeu ; le cacher derrière le bouton fin de tour, c'était
+        // en charger un sixième sens. Il prend donc la dernière bannière : on le
+        // choisit d'un clic comme une carte, le bouton fin de tour le lance, et
+        // la file d'initiative le connaît déjà (idCarte « REPOS_LONG »,
+        // initiative 0, affiché ⏳ sur la piste).
+        //
+        // Il ne coûte rien et ne s'épuise jamais : aucune bannière grisée.
+        htmlDeck += `
+        <div style="position: relative; height: 100px; margin-bottom: ${ESPACEMENT_BANNIERES}px; transition: margin 0.2s ease;">
+            <div onclick="event.stopPropagation(); window.choisirReposLongDansVolet()"
+                 title="Repos long — récupère de l'énergie au lieu de lancer une technique"
+                 onmouseover="document.getElementById('combat-carte-REPOS_LONG').style.transform='scale(0.75) translateX(15px)'; document.getElementById('combat-carte-REPOS_LONG').style.zIndex='100';"
+                 onmouseout="document.getElementById('combat-carte-REPOS_LONG').style.transform='scale(0.75) translateX(0px)'; document.getElementById('combat-carte-REPOS_LONG').style.zIndex='2';"
+                 style="position: absolute; top: 35px; left: 0; width: 335px; height: 40px; z-index: 10; cursor: pointer;">
+            </div>
+            <div id="combat-carte-REPOS_LONG" class="banniere-carte-combat" data-actif="false" data-card-id="REPOS_LONG"
+                 style="position: absolute; top: 0; left: 0; width: 450px; height: 160px; pointer-events: none; transition: filter 0.2s ease, transform 0.2s ease; transform: scale(0.75); transform-origin: left top; z-index: 2;">
+                <div style="position: absolute; top: 49px; bottom: 58px; left: 63px; right: 7px; z-index: 1; border-radius: 0 15px 15px 0; background-color: ${window.COULEUR_PERSO_COURANT};"></div>
+                <div id="cadre-combat-REPOS_LONG" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('${IMAGE_CADRE_NORMAL}'); background-size: contain; background-position: left center; background-repeat: no-repeat; z-index: 2; filter: drop-shadow(0px 6px 4px rgba(0,0,0,0.6)); transition: background-image 0.2s ease;"></div>
+                <div class="texte-init-banniere" style="position: absolute; top: 44%; transform: translateY(-50%); left: 6px; width: 69px; text-align: center; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 30px; font-weight: bold; z-index: 3; text-shadow: 2px 2px 5px black;">⏳</div>
+                <div class="texte-nom-banniere titre-auto-reduit" data-taille-max="17" style="position: absolute; top: 48%; transform: translateY(-50%); left: 76px; right: 120px; text-align: left; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Repos long</div>
+            </div>
+        </div>
+        `;
 
         listeDiv.innerHTML = htmlDeck;
         // Les noms de technique trop longs rétrécissent au lieu d'être coupés.
@@ -1646,7 +1770,18 @@ document.addEventListener("click", async function(event) {
     // d'ouvrir. Du temps où le ciblage partait du bouton « Appliquer », posé
     // sur l'aperçu de la carte, le cas ne pouvait pas se produire.
     if (event.target.closest(".token-vtt") || event.target.closest("#menu-dev-combat")
-        || event.target.closest("#piste-initiative") || event.target.closest("#combat-hud-bas-droite")) return;
+        || event.target.closest("#piste-initiative") || event.target.closest("#combat-hud-bas-droite")
+        || event.target.closest("#volet-competences")
+        || event.target.closest("#apercu-carte-hd-competence")) return;
+
+    // UN CLIC SUR LA CARTE REFERME LE VOLET. C'est la seconde façon de le
+    // ranger, avec son bouton — et la plus naturelle : on a vu ses techniques,
+    // on revient au plateau. Les exclusions ci-dessus comptent autant que la
+    // ligne elle-même : cliquer DANS le volet, sur une bannière ou sur la carte
+    // ouverte en grand, ce n'est pas cliquer sur la carte du monde.
+    if (window.VOLET_COMPETENCES_OUVERT && typeof window.fermerVoletCompetences === "function") {
+        window.fermerVoletCompetences();
+    }
 
     if (window.TOKEN_SELECTIONNE) {
         
@@ -3608,7 +3743,13 @@ window.actionBoutonFinTour = function() {
 
     if (window.MODE_BOUTON_FINTOUR === "choisir_competence") {
         const apercu = window.CARTE_APERCU;
-        if (apercu && apercu.idCarte && typeof window.jouerCarteCombat === "function") {
+        if (!apercu || !apercu.idCarte) return;
+        // Le repos long a sa propre écriture : il n'a pas de fiche de carte, et
+        // jouerCarteCombat en chercherait une dans le cache.
+        if (apercu.idCarte === "REPOS_LONG") {
+            return typeof window.jouerReposLong === "function" ? window.jouerReposLong() : undefined;
+        }
+        if (typeof window.jouerCarteCombat === "function") {
             return window.jouerCarteCombat(apercu.idCarte);
         }
         return;

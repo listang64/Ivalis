@@ -457,7 +457,16 @@ const APPLICATEURS = {
     degats(etat, e) {
         const c = combattant(etat, e.cible);
         if (!c) return;
-        if (e.bouclierApres !== undefined) c.bouclier = Math.max(0, nombre(e.bouclierApres));
+        if (e.bouclierApres !== undefined) {
+            c.bouclier = Math.max(0, nombre(e.bouclierApres));
+            // LA TAILLE DE RÉFÉRENCE DU BOUCLIER SE REJOUE, elle aussi. Elle ne
+            // voyage pas dans l'étape : elle se déduit, exactement comme
+            // resoudreCarte la calcule (moteur_pur.js). Elle grandit avec le
+            // bouclier posé et s'efface quand il casse — sans quoi la barre
+            // sous le pion repartirait pleine à chaque coup sur les postes qui
+            // rejouent, alors qu'elle est juste sur celui qui a calculé.
+            c.bouclierMax = c.bouclier === 0 ? 0 : Math.max(nombre(c.bouclierMax), c.bouclier);
+        }
         if (e.pvApres !== undefined) c.pv = Math.max(0, Math.min(c.pvMax, nombre(e.pvApres)));
         c.aTerre = c.pvMax > 0 && c.pv <= 0;
     },

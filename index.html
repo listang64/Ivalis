@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=16">
+  <link rel="stylesheet" href="style.css?v=18">
 
  
   <!-- ===================================================================== -->
@@ -507,6 +507,41 @@
             </div>
         </div>
 
+        <!-- =================================================================
+             LE VOLET DES COMPÉTENCES
+             =================================================================
+             Les bannières vivaient dans le panneau latéral gauche, toujours
+             visibles. Elles pendent maintenant d'une lanière de cuir qui
+             descend du haut de l'écran quand on la demande, et remonte hors
+             champ le reste du temps : le plateau reste dégagé.
+
+             LES BANNIÈRES NE BOUGENT PAS D'UN PIXEL. C'est la condition posée :
+             même place, même taille, mêmes boîtes de clic. Le volet est calé
+             pour les reprendre exactement là où le panneau les laissait
+             (mesuré : x = 20 px), et `combat-liste-competences` est le MÊME
+             élément, simplement déménagé — tout ce qui le peuple, le lit ou
+             l'écoute continue de fonctionner sans le savoir.
+
+             La lanière déborde par le haut : elle est coupée par le bord de
+             l'écran, comme si elle continuait au-delà. -->
+        <div id="volet-competences" style="position: absolute; top: 0; left: 0; width: 380px;
+                                           height: 100%; z-index: 14; pointer-events: none;">
+            <div id="volet-contenu" style="position: absolute; top: 0; left: 0; width: 100%;
+                                           height: 100%; transform: translateY(-115%);">
+                <img id="volet-laniere"
+                     src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789309135/IMG_2135_vk5wq4.png"
+                     style="position: absolute; top: -40px; left: 122px; width: 86px; height: auto;
+                            pointer-events: none; filter: drop-shadow(3px 4px 10px rgba(0,0,0,0.75));">
+                <!-- `none` au départ, et c'est important : replié, le volet est
+                     hors champ mais il couvre tout le flanc gauche. Il ne doit
+                     rien intercepter tant qu'il n'est pas descendu. -->
+                <div id="volet-bannieres" style="position: absolute; top: 138px; left: 20px;
+                                                 width: 340px; pointer-events: none;">
+                    <!-- combat-liste-competences est déménagée ici au chargement -->
+                </div>
+            </div>
+        </div>
+
         <!-- Bouton pour quitter le mode Combat (Désormais DANS la fenêtre) -->
         <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/menu_omlu8e.png"
              id="btn-fermer-combat"
@@ -851,11 +886,14 @@
                  onmousedown="this.style.transform='scale(0.90)'" onmouseup="this.style.transform='scale(1)'" onmouseleave="this.style.transform='scale(1)'"
                  onclick="window.toggleMenuCombat()" title="Outils Développeur"></div>
 
-            <!-- 3. Bouton REPOS LONG (Le petit cercle à gauche) -->
-            <div id="btn-hud-repos-long"
+            <!-- 3. Bouton DES COMPÉTENCES (Le petit cercle à gauche)
+                 Il déclenchait le repos long, qui est devenu une bannière du
+                 volet comme les autres. Il ouvre et referme maintenant ce
+                 volet. -->
+            <div id="btn-hud-competences"
                  style="position: absolute; top: 40%; right: 70%; width: 16%; height: 30%; border-radius: 50%; background-color: transparent; cursor: pointer; pointer-events: auto; transition: transform 0.1s;"
                  onmousedown="this.style.transform='scale(0.90)'" onmouseup="this.style.transform='scale(1)'" onmouseleave="this.style.transform='scale(1)'"
-                 onclick="window.jouerReposLong()" title="Repos Long (Récupération d'énergie)"></div>
+                 onclick="window.toggleVoletCompetences()" title="Mes compétences"></div>
         </div>
         
     </div>
@@ -1654,10 +1692,10 @@
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
-<script type="module" src="combat_etat.js?v=14"></script>
+<script type="module" src="combat_etat.js?v=15"></script>
 <!-- LE MOTEUR PUR : la chaîne de dégâts et le mouvement, extraits des 5 000
      lignes du moteur actuel et testables sans réseau ni navigateur. -->
-<script type="module" src="moteur_pur.js?v=13"></script>
+<script type="module" src="moteur_pur.js?v=14"></script>
 <script type="module" src="mouvement_pur.js?v=6"></script>
 <script type="module" src="ia_pure.js?v=3"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
@@ -1670,7 +1708,7 @@
 <script type="module" src="depot_firestore.js?v=6"></script>
 <!-- LE PONT : de l'étape à ce qu'on voit. Il traduit un résultat déjà calculé
      vers les animations existantes — il ne recalcule jamais rien. -->
-<script type="module" src="pont_combat.js?v=10"></script>
+<script type="module" src="pont_combat.js?v=11"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. Éteint
      par défaut — regimeCerveau(true) dans la console pour l'allumer. -->
 <script type="module" src="regime_cerveau.js?v=23"></script>
@@ -1681,11 +1719,11 @@
 <script type="module" src="competences.js?v=21"></script>
 <script src="Plateau.js"></script>
 <script type="module" src="sequence_tour.js?v=21"></script>
-<script type="module" src="combat.js?v=62"></script>
+<script type="module" src="combat.js?v=65"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
-<script type="module" src="mouvement.js?v=21"></script>
+<script type="module" src="mouvement.js?v=22"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
-<script type="module" src="moteur_effets.js?v=40"></script>
+<script type="module" src="moteur_effets.js?v=41"></script>
 <script type="module" src="monstres.js?v=20"></script>
 <script type="module" src="monstres_competences.js?v=8"></script>
 <script type="module" src="monstres_ia.js?v=28"></script>

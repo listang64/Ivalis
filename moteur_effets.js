@@ -1798,6 +1798,11 @@ window.demarrerCiblage = async function(idCarte, options) {
     // demande : la carte, sans le ciblage.
     if (extraireSeulement) return carteConstruite;
 
+    // LE VOLET S'EFFACE DEVANT LE CIBLAGE. On va viser sur le plateau : la
+    // lanière remonte d'elle-même, et le clic suivant sur la carte est un clic
+    // de cible, pas une fermeture de volet.
+    if (typeof window.fermerVoletCompetences === "function") window.fermerVoletCompetences();
+
     window.ETAT_CIBLAGE = carteConstruite;
 
     if (configSort) window.surlignerEffetCarteActif(configSort.nom);

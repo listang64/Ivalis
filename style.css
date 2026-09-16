@@ -2134,22 +2134,57 @@ textarea.input-texte-parchemin {
     pointer-events: none;
 }
 
-/* L'OMBRE SOUS LA PISTE, sur toute sa longueur. Un simple bandeau sombre
-   passé au flou gaussien, posé derrière les portraits : il donne à la bande le
-   poids d'un objet posé, sans panneau ni cadre. `left`/`right` négatifs pour
-   qu'elle déborde un peu de part et d'autre, comme une vraie ombre. */
+/* L'OMBRE SOUS LA PISTE. Une bande FINE, passée au flou gaussien, qui ne
+   dépasse du bandeau que de quelques pixels : elle pose la piste sur l'écran
+   sans l'épaissir. Elle était haute de 34 px et se voyait comme un halo. */
 .piste-ombre-sol {
     position: absolute;
-    left: -26px;
-    right: -26px;
-    bottom: 2px;
-    height: 34px;
+    left: -20px;
+    right: -20px;
+    bottom: 4px;
+    height: 14px;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.8);
-    filter: blur(16px);
-    -webkit-filter: blur(16px);
-    z-index: -1;
+    background: rgba(0, 0, 0, 0.85);
+    filter: blur(9px);
+    -webkit-filter: blur(9px);
+    z-index: -2;
     pointer-events: none;
+}
+
+/* ========================================================================= */
+/* LE VOLET DES COMPÉTENCES                                                  */
+/* ========================================================================= */
+/*  Une lanière de cuir qui descend du haut de l'écran, s'arrête, et rebondit
+ *  une fois sur sa longueur avant de se poser — le poids du cuir. Pour se
+ *  refermer elle plonge d'abord un peu vers le bas, comme si on la tirait, puis
+ *  remonte d'un coup hors champ.
+ *
+ *  Tout se joue sur `transform`, jamais sur `top` : c'est la seule propriété
+ *  que le navigateur compose sans redessiner, et le volet porte une pile de
+ *  bannières avec leurs ombres portées. Animé en `top`, l'iPad saccade. */
+
+.volet-ouvre {
+    animation: voletDescend 0.62s cubic-bezier(0.22, 0.9, 0.30, 1) forwards;
+    -webkit-animation: voletDescend 0.62s cubic-bezier(0.22, 0.9, 0.30, 1) forwards;
+}
+
+@keyframes voletDescend {
+    0%   { transform: translateY(-115%); }
+    62%  { transform: translateY(2.2%); }   /* elle dépasse un peu */
+    78%  { transform: translateY(-1.4%); }  /* et remonte */
+    90%  { transform: translateY(0.6%); }   /* redescend, plus doucement */
+    100% { transform: translateY(0); }
+}
+
+.volet-ferme {
+    animation: voletRemonte 0.46s cubic-bezier(0.55, 0, 0.75, 0.2) forwards;
+    -webkit-animation: voletRemonte 0.46s cubic-bezier(0.55, 0, 0.75, 0.2) forwards;
+}
+
+@keyframes voletRemonte {
+    0%   { transform: translateY(0); }
+    20%  { transform: translateY(3.2%); }   /* on la tire vers le bas... */
+    100% { transform: translateY(-115%); }  /* ...et elle file vers le haut */
 }
 
 /* ========================================================================= */

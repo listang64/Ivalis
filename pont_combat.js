@@ -447,6 +447,9 @@ export function fichesDepuisEtat(etat, fichesActuelles) {
             Fatigue_Actuelle: nombre(c.fatigue),
             fatigueActuelle: nombre(c.fatigue),
             Bouclier_Actuel: nombre(c.bouclier),
+            // La taille du bouclier posé descend avec lui : c'est ce que lisent
+            // les jauges de l'ancien monde (moteur_effets.js, maxShield).
+            Bouclier_Max: nombre(c.bouclierMax),
             Etats_Alteres: JSON.parse(JSON.stringify(c.etats || [])),
             statut: c.aTerre ? "Inconscient" : (fiche.statut === "Inconscient" ? "Vivant" : fiche.statut)
         };

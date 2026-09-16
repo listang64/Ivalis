@@ -172,6 +172,10 @@ window.hexDistanceVTT = hexDistance;
 window.calculerCheminVTT = calculerCheminAStar;
 
 window.ajouterEtapeMouvement = function(q, r) {
+    // Le volet des compétences s'efface dès qu'un chemin se trace : on a besoin
+    // du plateau, pas des bannières.
+    if (typeof window.fermerVoletCompetences === "function") window.fermerVoletCompetences();
+
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     
     // 🔻 CORRECTION 2 : Clic d'annulation (Undo / Effaceur) 🔻

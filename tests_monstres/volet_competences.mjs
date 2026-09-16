@@ -1,0 +1,328 @@
+// LE VOLET DES COMPÉTENCES
+//
+// Refonte UI combat, étape 3. Les bannières pendaient en permanence dans le
+// panneau latéral gauche. Elles pendent maintenant d'une lanière de cuir qui
+// descend du haut de l'écran quand on la demande, et remonte hors champ le
+// reste du temps : le plateau reste dégagé pour viser et se déplacer.
+//
+// LA CONDITION POSÉE, ET CE QUI LA GARANTIT : « strictement la même place,
+// même affichage de carte, mêmes boîtes de clic ». On ne fabrique donc PAS une
+// seconde liste : on DÉMÉNAGE l'élément `combat-liste-competences`, et le volet
+// est calé pour le reprendre là où le panneau le laissait (x = 20 px, mesuré).
+// Tout ce qui le peuple, le lit ou l'écoute continue sans savoir qu'il a bougé ;
+// deux listes concurrentes auraient divergé au premier tour.
+//
+// Ce banc ouvre la vraie page et vérifie sur le vrai code :
+//   • le volet est replié au départ, et n'intercepte rien ;
+//   • le bouton l'ouvre, le referme, et un clic sur la carte le referme ;
+//   • un clic DANS le volet ou sur la carte en grand ne le referme pas ;
+//   • il s'efface tout seul devant un ciblage ou un déplacement ;
+//   • les bannières sont au pixel près là où elles étaient ;
+//   • le repos long y a sa bannière, se choisit comme une carte, et part par le
+//     bouton fin de tour ;
+//   • l'ouverture et la fermeture ont bien leur effet de ressort.
+import fs from 'fs';
+import http from 'http';
+import path from 'path';
+
+const EFFETS = JSON.parse(fs.readFileSync('/home/user/Ivalis/tests_monstres/effets_reels.json', 'utf-8'));
+
+let echecs = 0;
+const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(64)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
+
+const RACINE = '/home/user/Ivalis';
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
+                '.css': 'text/css; charset=utf-8', '.json': 'application/json' };
+const serveur = http.createServer((req, res) => {
+  const chemin = path.join(RACINE, decodeURIComponent(req.url.split('?')[0]));
+  if (!chemin.startsWith(RACINE) || !fs.existsSync(chemin) || fs.statSync(chemin).isDirectory()) {
+    res.writeHead(404); res.end('non trouvé'); return;
+  }
+  res.writeHead(200, { 'Content-Type': TYPES[path.extname(chemin)] || 'text/plain' });
+  res.end(fs.readFileSync(chemin));
+});
+await new Promise(r => serveur.listen(0, '127.0.0.1', r));
+const base = `http://127.0.0.1:${serveur.address().port}`;
+
+const FAUX_APP = `export const initializeApp = () => ({});`;
+const FAUX_FIRESTORE = `
+  export const getFirestore = () => ({});
+  export const doc = (_db, col, id) => ({ chemin: col + "/" + id, col, id });
+  export const collection = (_db, col) => ({ col });
+  export const getDoc = async () => ({ exists: () => false, data: () => ({}) });
+  export const getDocs = async () => ({ forEach: () => {}, docs: [], empty: true });
+  export const setDoc = async () => {}; export const updateDoc = async () => {};
+  export const deleteDoc = async () => {}; export const addDoc = async () => ({ id: "n" });
+  export const deleteField = () => "x"; export class FieldPath { constructor(...s){this.s=s;} }
+  export const arrayUnion = (...v) => v; export const arrayRemove = (...v) => v;
+  export const increment = (n) => n; export const serverTimestamp = () => Date.now();
+  export const onSnapshot = () => () => {}; export const query = (...a) => ({a});
+  export const where = (...a) => ({a}); export const orderBy = (...a) => ({a});
+  export const limit = (...a) => ({a});
+  export const writeBatch = () => ({ update(){}, set(){}, delete(){}, commit: async()=>{} });
+  export const runTransaction = async (_d, fn) => fn({ get: async()=>({exists:()=>true,data:()=>({})}), update(){}, set(){} });
+  export const Timestamp = { now: () => Date.now() };
+`;
+
+const { chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs');
+const b = await chromium.launch();
+const p = await b.newPage({ viewport: { width: 1194, height: 834 } });
+await p.route('**', r => r.request().url().startsWith(base) ? r.continue() : r.abort());
+await p.route('**/firebase-app.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_APP }));
+await p.route('**/firebase-firestore.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_FIRESTORE }));
+
+await p.goto(base + '/index.html');
+await p.waitForTimeout(2000);
+
+// Deux cartes réelles : l'une frappe au contact, l'autre porte un mod Distance.
+// Le porteur tient un ARC : son arme donne de la portée à tout ce qu'il lance.
+const preparer = () => p.evaluate((EFFETS) => {
+  document.documentElement.style.setProperty('--app-h', window.innerHeight + 'px');
+  document.getElementById("fenetre-combat").style.display = "block";
+  window.EFFETS_BDD_CACHE = EFFETS;
+  window.jouerSonClic = () => {};
+  window.estCombattantMort = () => false;
+  window.estMonstre = (id) => String(id).startsWith("M");
+  window.PLATEAU_VTT = { getCaseState: () => ({}), hexToPixel: (q, r) => ({ x: 300 + q * 60, y: 300 + r * 60 }),
+                         pixelToHex: () => ({ q: 0, r: 0 }), renderMap: () => {} };
+  window.VTT_SCALE = 1; window.VTT_POS_X = 0; window.VTT_POS_Y = 0;
+  window.PERSOS_PARTIE = [
+    { idPersonnage: "H1", camp: "Allié", prenom: "Cybile", PV_Max: 60, PV_Actuels: 60,
+      Fatigue_Max: 110, fatigueActuelle: 110, Etats_Alteres: [], statut: "Vivant" },
+    { idPersonnage: "M1", camp: "Ennemi", estMonstre: true, prenom: "Gnoll",
+      PV_Max: 40, PV_Actuels: 40, Etats_Alteres: [], statut: "Vivant" }
+  ];
+  window.TOKENS_VTT_DATA = { H1: { q: 0, r: 0 }, M1: { q: 1, r: 0 } };
+  window.TOKEN_SELECTIONNE = "H1";
+  window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[0]];
+  window.COMBAT_INDEX_PERSO = 0;
+  window.REGIME_CERVEAU = true;
+
+  // L'ARC EN MAIN : c'est lui qui rendait tout « à distance ».
+  window.bonusEquip = (perso, cle) => (cle === "portee" ? 1 : 0);
+
+  const carte = (nom, fatigue, actions) => ({
+    Nom: nom, Arme: "Arme légère Distance", Fatigue: fatigue, Initiative: 20,
+    Effets_Compiles: [], Composants: { actions }
+  });
+  window.COMPETENCES_CACHE = {
+    C_CAC: carte("Coup de roc", 25, [
+      { baseEffetId: "EFF_ATTAQUE_LOURDE", count: 1, mods: {}, zoneHexes: [], baseDuree: 0, modsDuree: {} }
+    ]),
+    C_TIR: carte("Trait perçant", 30, [
+      { baseEffetId: "EFF_ATTAQUE_LEGERE", count: 1,
+        mods: { EFF_DISTANCE: 2 }, zoneHexes: [], baseDuree: 0, modsDuree: {} }
+    ])
+  };
+  window.CACHE_COMPETENCES_GLOBAL = { H1: window.COMPETENCES_CACHE };
+  window.PARTIE_DATA = { Phase_Combat: "Resolution", Tour_Combat: 1,
+    File_Attente_Combat: [{ idPersonnage: "H1", idCarte: "C_CAC", initiative: 20 }] };
+  window.CHEMIN_MOUVEMENT = [];
+  window.ZONES_PERSISTANTES = {};
+
+  // Les identifiants réels des effets, retrouvés par leur nom.
+  const parNom = {};
+  Object.entries(EFFETS).forEach(([id, e]) => { parNom[(e.Nom || "").toLowerCase()] = id; });
+  return parNom;
+}, EFFETS);
+
+
+
+await preparer();
+const erreurs = [];
+p.on('pageerror', e => erreurs.push(e.message));
+
+// Un deck complet, et l'écran du jeu réellement visible : le volet se mesure.
+const monde = () => p.evaluate(() => {
+  document.documentElement.style.setProperty('--app-h', window.innerHeight + 'px');
+  document.querySelectorAll('body > div[id^="ecran-"]').forEach(e => { if (e.id !== 'ecran-jeu') e.style.display = 'none'; });
+  document.getElementById('ecran-jeu').style.display = 'block';
+  document.getElementById("fenetre-combat").style.display = "block";
+
+  const noms = ["Dague cachée", "Tir précis", "Pluie de flèches"];
+  const deck = {};
+  noms.forEach((n, i) => {
+    deck["K" + i] = JSON.parse(JSON.stringify(window.COMPETENCES_CACHE.C_CAC));
+    deck["K" + i].Nom = n; deck["K" + i].Initiative = 70 - i * 10; deck["K" + i].Fatigue = 10;
+  });
+  window.PERSOS_PARTIE[0].deckEquipe = noms.map((_, i) => "K" + i);
+  window.CACHE_COMPETENCES_GLOBAL = { H1: deck };
+  Object.assign(window.COMPETENCES_CACHE, deck);
+  window.COMBAT_FATIGUE_ACTUELLE = 110;
+  window.MOUVEMENT_COUT_TOTAL = 0;
+  window.PARTIE_DATA = { Phase_Combat: "Preparation", Tour_Combat: 1,
+                         Ordre_Initiative: ["H1", "M1"], File_Attente_Combat: [] };
+  window.APPELS = [];
+  window.regimeDemande = { actif: () => true, enVol: () => false,
+    carte: async () => {}, finDeTour: async () => {}, mouvement: async () => {} };
+  window.chargerCompetencesCombat("H1", "#2d4a1c");
+});
+
+const lire = () => p.evaluate(() => {
+  const volet = document.getElementById("volet-contenu");
+  const bannieres = document.getElementById("volet-bannieres");
+  const liste = document.getElementById("combat-liste-competences");
+  const prem = liste ? liste.querySelector(".banniere-carte-combat") : null;
+  const r = prem ? prem.getBoundingClientRect() : null;
+  return {
+    ouvert: window.VOLET_COMPETENCES_OUVERT,
+    dansLeVolet: !!(liste && liste.closest("#volet-bannieres")),
+    dansLePanneau: !!(liste && liste.closest("#panneau-combat-gauche")),
+    classes: volet ? volet.className : null,
+    clics: bannieres ? getComputedStyle(bannieres).pointerEvents : null,
+    premiere: r ? { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width) } : null,
+    nbBannieres: liste ? liste.querySelectorAll(".banniere-carte-combat").length : 0,
+    repos: !!document.getElementById("combat-carte-REPOS_LONG"),
+    apercu: window.CARTE_APERCU,
+    mode: window.MODE_BOUTON_FINTOUR
+  };
+});
+
+const cliquerBouton = async () => {
+  await p.evaluate(() => document.getElementById("btn-hud-competences").click());
+  await p.waitForTimeout(800);
+};
+
+await monde();
+
+console.log("\n=========================================================");
+console.log("  1. AU DÉPART : REPLIÉ, ET IL N'INTERCEPTE RIEN");
+console.log("=========================================================");
+{
+  const v = await lire();
+  verifier("le volet est fermé", v.ouvert === false, String(v.ouvert));
+  verifier("LA LISTE A DÉMÉNAGÉ dans le volet", v.dansLeVolet === true);
+  verifier("et elle n'est plus dans le panneau latéral", v.dansLePanneau === false);
+  verifier("replié, il ne prend aucun clic", v.clics === "none", String(v.clics));
+  verifier("les trois techniques sont là", v.nbBannieres === 4, `(${v.nbBannieres} avec le repos long)`);
+  verifier("le repos long a sa bannière", v.repos === true);
+}
+
+console.log("\n=========================================================");
+console.log("  2. LE BOUTON L'OUVRE, ET LES BANNIÈRES NE BOUGENT PAS");
+console.log("=========================================================");
+{
+  await cliquerBouton();
+  const v = await lire();
+  verifier("le volet est ouvert", v.ouvert === true);
+  verifier("il joue l'animation de descente", (v.classes || "").includes("volet-ouvre"), String(v.classes));
+  verifier("il reprend les clics", v.clics === "auto", String(v.clics));
+  verifier("LA PREMIÈRE BANNIÈRE EST À SA PLACE D'ORIGINE (x = 20)",
+           !!v.premiere && v.premiere.x === 20, JSON.stringify(v.premiere));
+  verifier("et elle a gardé sa taille", !!v.premiere && Math.abs(v.premiere.w - 338) <= 2,
+           JSON.stringify(v.premiere));
+  verifier("elle est bien dans l'écran", !!v.premiere && v.premiere.y > 0 && v.premiere.y < 400,
+           JSON.stringify(v.premiere));
+}
+
+console.log("\n=========================================================");
+console.log("  3. CE QUI LE REFERME, ET CE QUI NE LE REFERME PAS");
+console.log("=========================================================");
+{
+  // Un clic DANS le volet ne le referme pas : on y choisit ses cartes.
+  await p.evaluate(() => document.getElementById("volet-bannieres").click());
+  await p.waitForTimeout(400);
+  verifier("un clic sur le volet lui-même ne le referme pas", (await lire()).ouvert === true);
+
+  // Un clic sur la carte du monde, si.
+  await p.evaluate(() => document.getElementById("conteneur-tokens-vtt").click());
+  await p.waitForTimeout(700);
+  let v = await lire();
+  verifier("UN CLIC SUR LA CARTE LE REFERME", v.ouvert === false);
+  verifier("et il joue l'animation de remontée", (v.classes || "").includes("volet-ferme"), String(v.classes));
+
+  // Le bouton le rouvre, puis le referme.
+  await cliquerBouton();
+  verifier("le bouton le rouvre", (await lire()).ouvert === true);
+  await cliquerBouton();
+  verifier("et le referme", (await lire()).ouvert === false);
+}
+
+console.log("\n=========================================================");
+console.log("  4. IL S'EFFACE DEVANT LE JEU");
+console.log("=========================================================");
+{
+  await cliquerBouton();
+  verifier("le volet est ouvert avant le ciblage", (await lire()).ouvert === true);
+  await p.evaluate(async () => {
+    window.PARTIE_DATA.Phase_Combat = "Resolution";
+    window.PARTIE_DATA.File_Attente_Combat = [{ idPersonnage: "H1", idCarte: "K0", initiative: 70 }];
+    await window.demarrerCiblage("K0", { idLanceur: "H1" });
+  });
+  await p.waitForTimeout(700);
+  verifier("OUVRIR UN CIBLAGE LE RANGE TOUT SEUL", (await lire()).ouvert === false);
+
+  await p.evaluate(() => { window.nettoyerCiblage(); });
+  await cliquerBouton();
+  verifier("rouvert", (await lire()).ouvert === true);
+  await p.evaluate(() => {
+    window.TOKEN_SELECTIONNE = "H1";
+    window.CHEMIN_MOUVEMENT = [];
+    if (typeof window.ajouterEtapeMouvement === "function") window.ajouterEtapeMouvement(1, 0);
+  });
+  await p.waitForTimeout(700);
+  verifier("TRACER UN DÉPLACEMENT AUSSI", (await lire()).ouvert === false);
+}
+
+console.log("\n=========================================================");
+console.log("  5. LE REPOS LONG SE CHOISIT COMME UNE CARTE");
+console.log("=========================================================");
+{
+  await p.evaluate(() => {
+    window.PARTIE_DATA.Phase_Combat = "Preparation";
+    window.PARTIE_DATA.File_Attente_Combat = [];
+    window.CHEMIN_MOUVEMENT = [];
+    window.APPELS = [];
+    window.jouerReposLong = async () => { window.APPELS.push("reposLong"); };
+    window.choisirReposLongDansVolet();
+  });
+  await p.waitForTimeout(300);
+  let v = await lire();
+  verifier("il devient la carte retenue", !!v.apercu && v.apercu.idCarte === "REPOS_LONG",
+           JSON.stringify(v.apercu));
+  verifier("et il est choisissable", !!v.apercu && v.apercu.choisissable === true);
+  verifier("le bouton fin de tour propose de le choisir", v.mode === "choisir_competence", v.mode);
+
+  await p.evaluate(() => document.getElementById("btn-hud-fintour").click());
+  await p.waitForTimeout(400);
+  const appels = await p.evaluate(() => window.APPELS);
+  verifier("LE BOUTON FIN DE TOUR LE LANCE", appels.includes("reposLong"), JSON.stringify(appels));
+}
+
+console.log("\n=========================================================");
+console.log("  6. L'EFFET DE RESSORT EST BIEN DÉCLARÉ");
+console.log("=========================================================");
+{
+  // On ne mesure pas une animation image par image : on vérifie que les deux
+  // gestes existent, qu'ils portent un dépassement (le rebond) et que rien
+  // n'anime `top` — seul `transform` se compose sans redessiner, et le volet
+  // porte une pile de bannières avec leurs ombres.
+  const regles = await p.evaluate(() => {
+    const trouve = {};
+    for (const feuille of document.styleSheets) {
+      let regles; try { regles = feuille.cssRules; } catch (e) { continue; }
+      for (const r of regles || []) {
+        if (r.type === CSSRule.KEYFRAMES_RULE && /volet/i.test(r.name)) {
+          trouve[r.name] = [...r.cssRules].map(k => `${k.keyText} ${k.style.transform}`);
+        }
+      }
+    }
+    return trouve;
+  });
+  const descend = regles.voletDescend || [];
+  const remonte = regles.voletRemonte || [];
+  verifier("la descente est déclarée", descend.length >= 4, JSON.stringify(descend));
+  verifier("elle dépasse puis revient (le ressort)",
+           descend.some(k => /translateY\(2\.2%\)/.test(k)) && descend.some(k => /translateY\(-1\.4%\)/.test(k)),
+           JSON.stringify(descend));
+  verifier("la remontée plonge d'abord vers le bas",
+           remonte.some(k => /translateY\(3\.2%\)/.test(k)), JSON.stringify(remonte));
+  verifier("et finit hors écran", remonte.some(k => /translateY\(-115%\)/.test(k)), JSON.stringify(remonte));
+}
+
+verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 2).join(" | "));
+
+await b.close();
+serveur.close();
+console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
+process.exit(echecs === 0 ? 0 : 1);

@@ -933,8 +933,21 @@ export function resoudreCarte(etat, action, plateau) {
             if (attaque.isShield) {
                 const avant = cible.bouclier;
                 const gain = Math.max(0, nombre(attaque.valeurBrute));
-                const plafond = nombre(cible.bouclierMax) || (avant + gain);
-                cible.bouclier = Math.max(0, Math.min(plafond, avant + gain));
+                cible.bouclier = Math.max(0, avant + gain);
+                // LE BOUCLIER RETIENT SA TAILLE, et c'est tout le correctif.
+                //
+                // `bouclierMax` n'était jamais renseigné — ni ici, ni ailleurs
+                // dans le nouveau régime. La barre sous le pion prend alors pour
+                // référence le bouclier COURANT (voir pont_combat.js) : elle
+                // repartait donc pleine à chaque coup, quel qu'il en reste. À la
+                // table, ça se lit « il retape dedans et le bouclier a toute sa
+                // vie » — alors que l'état, lui, retenait bien la bonne valeur.
+                //
+                // Ce champ ne sert PAS de plafond : le `Math.min` qu'il portait
+                // ne s'appliquait jamais (bouclierMax valait toujours zéro), et
+                // le garder ici aurait bridé tout bouclier reposé à la taille du
+                // premier. C'est une TAILLE DE RÉFÉRENCE, rien d'autre.
+                cible.bouclierMax = Math.max(nombre(cible.bouclierMax), cible.bouclier);
                 etapes.push({ type: "degats", cible: idCible, acteur: idLanceur,
                               bouclierApres: cible.bouclier, gainBouclier: cible.bouclier - avant });
                 return;
@@ -984,6 +997,10 @@ export function resoudreCarte(etat, action, plateau) {
 
             if (compte.versBouclier > 0 || compte.bouclierApres !== cible.bouclier) {
                 cible.bouclier = compte.bouclierApres;
+                // Brisé : la taille de référence s'efface avec lui, pour que le
+                // prochain bouclier posé reparte de la sienne et non de celle
+                // d'un bouclier qui n'existe plus.
+                if (cible.bouclier === 0) cible.bouclierMax = 0;
             }
             if (compte.versPv > 0) {
                 cible.pv = Math.max(0, cible.pv - compte.versPv);
