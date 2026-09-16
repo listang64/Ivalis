@@ -3254,7 +3254,12 @@ window.jouerCarteCombat = async function(idCarte) {
     // LE HÉROS À QUI CETTE CARTE APPARTIENT, pas celui que le panneau montre :
     // une créature installée dans la visionneuse ne doit pas hériter de la carte
     // d'un joueur (voir herosPourCarte).
-    const persoActuel = window.herosPourCarte(idCarte);
+    // Le `typeof` n'est pas de la superstition : cette fonction a une longue
+    // histoire de sorties muettes, et une exception y serait pire encore —
+    // elle laisserait le deck grisé et le joueur devant un plateau figé.
+    const persoActuel = typeof window.herosPourCarte === "function"
+        ? window.herosPourCarte(idCarte)
+        : (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
     if (!persoActuel) return refuser("aucun héros à qui attribuer cette carte",
                                      `(index ${window.COMBAT_INDEX_PERSO})`);
     if (persoActuel.estMonstre) return refuser("cette carte est celle d'une créature",

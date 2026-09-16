@@ -17,7 +17,14 @@ function fonction(marqueur) {
   let f = d; for (let i = d + 1; i < lignes.length; i++) { if (lignes[i] === '};') { f = i; break; } }
   return lignes.slice(d, f + 1).join('\n');
 }
-const SRC_CARTE = fonction('window.jouerCarteCombat = async function');
+// jouerCarteCombat ne tient plus seule : elle demande à la CARTE qui la
+// possède, au lieu de le déduire du panneau gauche (voir herosPourCarte,
+// combat.js). Extraire une fonction par son nom sans ses voisines est un piège
+// à retardement — on emporte donc les trois.
+const SRC_PROPRIETAIRE = fonction('window.proprietaireDeLaCarte = function')
+  + '\n' + fonction('window.mesHerosDeCombat = function')
+  + '\n' + fonction('window.herosPourCarte = function');
+const SRC_CARTE = SRC_PROPRIETAIRE + '\n' + fonction('window.jouerCarteCombat = async function');
 const SRC_FIN   = fonction('window.finDeTourCombat = async function');
 // Le verdict « tout le monde a-t-il joué ? » voyage avec la transaction, dans
 // SRC_MODIFIER_PARTIE : sans lui, aucune carte n'entre dans la file.
