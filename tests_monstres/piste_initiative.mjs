@@ -203,6 +203,24 @@ await p.waitForTimeout(200);
   const largeurEcran = await p.evaluate(() => window.innerWidth);
   verifier("la piste n'est plus accrochée au HUD du bas à droite", v.dansHudBasDroite === false);
   verifier("elle est posée dans le haut de l'écran", v.rect.top < 120, `(top ${Math.round(v.rect.top)}px)`);
+
+  // ELLE NE COLLE PLUS AU BORD. Les portraits touchaient le bord haut de
+  // l'écran — sur tablette, la barre d'état passe juste au-dessus. La piste est
+  // descendue, MAIS son bandeau doit continuer de sortir par le haut : c'est ce
+  // qui lui donne l'air de pendre plutôt que de flotter. Les deux vont ensemble,
+  // et c'est pour ça qu'ils sont vérifiés ensemble.
+  {
+    const marges = await p.evaluate(() => {
+      const zone = document.getElementById("piste-initiative-zone");
+      const fond = document.querySelector(".piste-fond");
+      return { zone: Math.round(zone.getBoundingClientRect().top),
+               hautDuBandeau: Math.round(fond.getBoundingClientRect().top) };
+    });
+    verifier("LA PISTE EST DESCENDUE DU BORD HAUT",
+             marges.zone >= 12, `${marges.zone}px`);
+    verifier("mais son bandeau sort toujours par le haut",
+             marges.hautDuBandeau < 0, `haut du bandeau à ${marges.hautDuBandeau}px`);
+  }
   const centre = v.rect.left + v.rect.width / 2;
   verifier("et centrée horizontalement", Math.abs(centre - largeurEcran / 2) < 6,
            `(centre ${Math.round(centre)} pour ${largeurEcran / 2})`);

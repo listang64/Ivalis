@@ -59,8 +59,8 @@
     const PAR_DEFAUT = {
         anneau: {
             centreDroite: 99,    // centre de l'anneau, depuis le bord droit
-            centreBas: 109,      // centre de l'anneau, depuis le bord bas
-            diametre: 174,       // diamètre de la LIGNE MOYENNE des jauges
+            centreBas: 111,      // centre de l'anneau, depuis le bord bas
+            diametre: 180,       // diamètre de la LIGNE MOYENNE des jauges
             epaisseur: 15        // épaisseur du trait des jauges
         },
         ancreGauche: { dx: -14, dy: 0 },
@@ -139,8 +139,14 @@
         // elle N'EST PAS mise à l'échelle : la boîte l'est déjà, et un rapport
         // entre deux longueurs ne dépend pas de l'unité.
         const unites = (r.anneau.epaisseur / d) * 100;
+        // LE FOND NOIR FAIT EXACTEMENT LA LARGEUR DE LA JAUGE, PAS UN POIL DE PLUS.
+        //
+        // Il débordait de 1,6 centième de part et d'autre — trois pixels à
+        // l'écran — et comme il est noir et translucide, ce liseré se lisait
+        // comme une ombre coincée entre l'image du bouton et les jauges. Il n'y
+        // avait aucune ombre : c'était le fond qui dépassait.
         document.querySelectorAll(".hud-arc-fond").forEach(a => {
-            a.style.strokeWidth = (unites + 1.6);
+            a.style.strokeWidth = unites;
         });
         document.querySelectorAll(".hud-arc-jauge").forEach(a => {
             a.style.strokeWidth = unites;
@@ -203,9 +209,18 @@
         const l = (groupe, cles) => cles.map(c => `${c}: ${Math.round(r[groupe][c])}`).join(", ");
         const hud = document.getElementById("combat-hud-bas-droite");
         const largeur = hud ? Math.round(hud.getBoundingClientRect().width) : 0;
+        // LA NOTE DISAIT « RÉFÉRENCE ATTENDUE », ET ÇA SONNAIT COMME UNE ALERTE.
+        // Il n'y a rien à corriger : les nombres sont TOUJOURS rangés dans la
+        // référence de 450, quel que soit l'écran sur lequel on règle — les
+        // flèches touchent la valeur rangée, l'affichage seul est mis à
+        // l'échelle. Régler depuis une tablette de 380 px est donc parfaitement
+        // normal, et le bloc se recopie tel quel. La note le dit maintenant.
+        const note = largeur === LARGEUR_REFERENCE
+            ? "réglé sur un bandeau de " + largeur + " px"
+            : "réglé sur un bandeau de " + largeur + " px, valeurs exprimées dans la "
+              + "référence de " + LARGEUR_REFERENCE + " px — recopiables telles quelles";
         return [
-            "REGLAGES_HUD =  (bandeau mesuré : " + largeur + " px"
-                + (largeur === LARGEUR_REFERENCE ? "" : " — RÉFÉRENCE ATTENDUE : " + LARGEUR_REFERENCE) + ")",
+            "REGLAGES_HUD =  (" + note + ")",
             "    anneau      { " + l("anneau", ["centreDroite", "centreBas", "diametre", "epaisseur"]) + " }",
             "    ancreGauche { " + l("ancreGauche", ["dx", "dy"]) + " }",
             "    ancreDroite { " + l("ancreDroite", ["dx", "dy"]) + " }",

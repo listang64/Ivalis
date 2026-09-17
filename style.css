@@ -2142,7 +2142,11 @@ textarea.input-texte-parchemin {
     position: absolute;
     left: -24px;
     right: -24px;
-    top: -18px;
+    /* Autant que la piste est descendue (PISTE_MARGE_HAUT), plus les 18 px
+       d'origine : le bandeau continue de sortir par le bord haut de l'écran,
+       comme s'il pendait de plus haut. Sans ce report, il se serait décollé du
+       bord et aurait flotté. */
+    top: -34px;
     bottom: 12px;
     border-radius: 0 0 20px 20px;
     background: rgba(0, 0, 0, 0.62);
@@ -2954,13 +2958,18 @@ textarea.input-texte-parchemin {
  *  Cette feuille ne garde donc que ce qui ne se règle pas : les couleurs, les
  *  formes, les transitions. */
 
-/* Le fond des deux jauges : le demi-cercle au complet, en noir. */
+/* LE FOND DES DEUX JAUGES : le demi-cercle au complet, en noir FRANC.
+   Il était à 82 % d'opacité, et ça se voyait : les jauges passent sous l'image
+   du bouton et par-dessus l'avatar, dont l'ombre portée transparaissait donc à
+   travers le fond. Le creux de la jauge ne paraissait pas noir mais sale, comme
+   une ombre prise entre les deux. Un noir opaque, et le creux redevient un
+   creux. */
 .hud-arc-fond {
     fill: none;
     stroke: #000000;
     stroke-width: 7;
     stroke-linecap: round;
-    opacity: 0.82;
+    opacity: 1;
 }
 
 /* La jauge elle-même. `pathLength` vaut 100 sur le tracé : le remplissage se

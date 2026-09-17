@@ -174,6 +174,29 @@ console.log("=========================================================");
   });
   // Le repère du SVG va de 0 à 100 : le centre du cercle est à 50, 50.
   verifier("les deux demi-cercles noirs sont là", g.nbFonds === 2 && g.fondNoir === true);
+
+  // LE FOND NE DÉBORDE PAS DE LA JAUGE, ET IL EST OPAQUE.
+  //
+  // Il était plus large de trois pixels de part et d'autre, et translucide à
+  // 82 %. Résultat : un liseré noirâtre tout autour des arcs, que l'œil lit
+  // comme une ombre coincée entre l'image du bouton et les jauges — alors qu'il
+  // n'y a aucune ombre là. Et là où la jauge est vide, l'ombre portée de
+  // l'avatar, qui passe derrière, transparaissait à travers ce fond : le creux
+  // paraissait sale au lieu d'être noir.
+  {
+    const f = await p.evaluate(() => {
+      const fond = getComputedStyle(document.querySelector(".hud-arc-fond"));
+      const jauge = getComputedStyle(document.getElementById("hud-arc-gauche"));
+      return { largeurFond: parseFloat(fond.strokeWidth),
+               largeurJauge: parseFloat(jauge.strokeWidth),
+               opacite: fond.opacity };
+    });
+    verifier("LE FOND NOIR FAIT EXACTEMENT LA LARGEUR DE LA JAUGE",
+             Math.abs(f.largeurFond - f.largeurJauge) < 0.01,
+             `${f.largeurFond} contre ${f.largeurJauge}`);
+    verifier("ET IL EST OPAQUE (rien ne transparaît par le creux)",
+             parseFloat(f.opacite) === 1, f.opacite);
+  }
   verifier("LA JAUGE PART DU BAS DU CERCLE", g.debutY >= 95, `y = ${g.debutY}`);
   verifier("et monte jusqu'en haut", g.finY <= 5, `y = ${g.finY}`);
   verifier("celle de vitalité passe bien par la GAUCHE", g.milieuGaucheX <= 5, `x = ${g.milieuGaucheX}`);
@@ -345,7 +368,11 @@ console.log("=========================================================");
       hauteurGauche: Math.round((g.top + g.height / 2) - cy),
       hauteurDroite: Math.round((d.top + d.height / 2) - cy),
       rayon: Math.round(arcs.width * 0.5),
-      depasseADroite: Math.round(d.right - hud.right)
+      depasseADroite: Math.round(d.right - hud.right),
+      // La pointe de l'écusson n'est pas son corps : le clip-path la taille
+      // entre 76 % et 100 % de la largeur. C'est le CORPS qui doit rester
+      // lisible, la pointe peut mordre le bord sans que personne ne le voie.
+      largeurAncre: Math.round(d.width)
     };
   });
   verifier("LES DEUX BOÎTES TOMBENT EXACTEMENT L'UNE SUR L'AUTRE",
@@ -357,8 +384,16 @@ console.log("=========================================================");
   verifier("les deux sont à mi-hauteur du cercle",
            Math.abs(m.hauteurGauche) <= 1 && Math.abs(m.hauteurDroite) <= 1,
            `${m.hauteurGauche} / ${m.hauteurDroite}`);
-  verifier("ET AUCUNE NE SORT DE L'ÉCRAN PAR LA DROITE",
-           m.depasseADroite <= 0, `${m.depasseADroite}px au-delà du bandeau`);
+  // LE SEUIL N'EST PAS UN CHIFFRE ROND, IL VIENT DE LA FORME. L'écusson est un
+  // hexagone dont le clip-path taille la pointe droite entre 76 % et 100 % de
+  // sa largeur : les 24 derniers pour cent ne sont qu'un biseau de plus en plus
+  // fin. Le contrôle existe pour attraper « la moitié de l'ancre hors champ »,
+  // pas « la pointe affleure le bord ». Il tolère donc la pointe, et rien de
+  // plus — le corps du chiffre, lui, doit rester entier.
+  const tolerance = Math.round(m.largeurAncre * 0.24);
+  verifier("LE CORPS DE L'ANCRE DE DROITE RESTE DANS L'ÉCRAN",
+           m.depasseADroite <= tolerance,
+           `${m.depasseADroite}px au-delà du bandeau, pointe longue de ${tolerance}px`);
 }
 
 console.log("\n=========================================================");
@@ -513,7 +548,7 @@ console.log("=========================================================");
       await new Promise(r => setTimeout(r, 150));
     });
     const d = await p.evaluate(() => window.REGLAGES_HUD.anneau.diametre);
-    verifier("« Défaut » remet tout en place", d === 174, String(d));
+    verifier("« Défaut » remet tout en place", d === 180, String(d));
   }
 }
 
