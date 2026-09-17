@@ -143,8 +143,19 @@ console.log("=========================================================");
            v.partDroite === 100, `${v.partDroite}%`);
   verifier("le chiffre de gauche est la vitalité", v.valGauche === "45", v.valGauche);
   verifier("celui de droite est l'énergie", v.valDroite === "110", v.valDroite);
-  verifier("le chiffre de vitalité est rouge", v.couleurGauche === "rgb(255, 139, 139)", v.couleurGauche);
-  verifier("celui d'énergie est doré", v.couleurDroite === "rgb(251, 245, 189)", v.couleurDroite);
+  // DU ROUGE ET DU JAUNE FRANCS, SANS DÉGRADÉ. Les trois jauges étaient peintes
+  // d'un dégradé vertical qui, sur un arc de quinze pixels vu par une fenêtre
+  // creusée dans le bouton, ne se lisait pas comme du relief mais comme de la
+  // saleté — et tirait la couleur vers le brun dès qu'on s'éloignait du milieu.
+  // On pointe donc les deux choses : la teinte exacte, et l'absence de renvoi
+  // vers un dégradé (`url(#...)`), qui est la forme que prend la faute.
+  verifier("LA VITALITÉ EST D'UN ROUGE FRANC", v.traitGauche === "rgb(255, 43, 43)", v.traitGauche);
+  verifier("L'ÉNERGIE D'UN JAUNE FRANC", v.traitDroit === "rgb(255, 212, 0)", v.traitDroit);
+  verifier("aucune des deux ne passe par un dégradé",
+           !/url\(/.test(v.traitGauche) && !/url\(/.test(v.traitDroit),
+           `${v.traitGauche} / ${v.traitDroit}`);
+  verifier("le chiffre de vitalité est rouge", v.couleurGauche === "rgb(255, 90, 90)", v.couleurGauche);
+  verifier("celui d'énergie est jaune", v.couleurDroite === "rgb(255, 223, 61)", v.couleurDroite);
 }
 
 console.log("\n=========================================================");
@@ -247,8 +258,8 @@ console.log("=========================================================");
   await p.waitForTimeout(400);
   let v = await lire();
   verifier("LE BOUCLIER S'INSTALLE À GAUCHE", v.valGauche === "20", v.valGauche);
-  verifier("il est bleu clair", v.couleurGauche === "rgb(189, 246, 255)", v.couleurGauche);
-  verifier("son écusson aussi", v.ecussonGauche === "rgb(91, 232, 255)", v.ecussonGauche);
+  verifier("il est bleu clair", v.couleurGauche === "rgb(99, 226, 255)", v.couleurGauche);
+  verifier("son écusson aussi", v.ecussonGauche === "rgb(34, 211, 255)", v.ecussonGauche);
   verifier("et il se lit sur SON maximum, pas sur celui des points de vie",
            Math.abs(v.partGauche - 50) <= 1, `${v.partGauche}% pour 20/40`);
   verifier("l'énergie n'a pas bougé", v.valDroite === "110", v.valDroite);
@@ -261,7 +272,7 @@ console.log("=========================================================");
   await p.waitForTimeout(400);
   v = await lire();
   verifier("LE BOUCLIER MORT, LA VITALITÉ REPREND SA PLACE", v.valGauche === "45", v.valGauche);
-  verifier("avec sa couleur", v.couleurGauche === "rgb(255, 139, 139)", v.couleurGauche);
+  verifier("avec sa couleur", v.couleurGauche === "rgb(255, 90, 90)", v.couleurGauche);
   verifier("et sa part d'anneau", Math.abs(v.partGauche - 64) <= 1, `${v.partGauche}%`);
 }
 

@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=22">
+  <link rel="stylesheet" href="style.css?v=23">
 
  
   <!-- ===================================================================== -->
@@ -929,23 +929,6 @@
             <div id="hud-anneau-boite">
                 <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"
                      style="width: 100%; height: 100%; overflow: visible; display: block;">
-                    <defs>
-                        <linearGradient id="hud-grad-vie" x1="0" y1="1" x2="0" y2="0">
-                            <stop offset="0%" stop-color="#8f1d27"/>
-                            <stop offset="55%" stop-color="#e63946"/>
-                            <stop offset="100%" stop-color="#ff8b8b"/>
-                        </linearGradient>
-                        <linearGradient id="hud-grad-energie" x1="0" y1="1" x2="0" y2="0">
-                            <stop offset="0%" stop-color="#7a6238"/>
-                            <stop offset="55%" stop-color="#c2a878"/>
-                            <stop offset="100%" stop-color="#fbf5bd"/>
-                        </linearGradient>
-                        <linearGradient id="hud-grad-bouclier" x1="0" y1="1" x2="0" y2="0">
-                            <stop offset="0%" stop-color="#1b7f96"/>
-                            <stop offset="55%" stop-color="#5be8ff"/>
-                            <stop offset="100%" stop-color="#e0ffff"/>
-                        </linearGradient>
-                    </defs>
 
                     <!-- LE FOND NOIR : les deux demi-cercles au complet. C'est lui
                          qu'on voit par la fenêtre là où la jauge est retombée. -->
@@ -1816,7 +1799,7 @@
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
 <script src="trace_combat.js?v=11"></script>
-<script src="reglages_hud.js?v=4"></script>
+<script src="reglages_hud.js?v=5"></script>
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
@@ -1847,7 +1830,7 @@
 <script type="module" src="competences.js?v=22"></script>
 <script src="Plateau.js"></script>
 <script type="module" src="sequence_tour.js?v=21"></script>
-<script type="module" src="combat.js?v=70"></script>
+<script type="module" src="combat.js?v=71"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=22"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->

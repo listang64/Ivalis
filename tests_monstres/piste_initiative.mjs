@@ -225,7 +225,7 @@ await p.waitForTimeout(200);
   verifier("et centrée horizontalement", Math.abs(centre - largeurEcran / 2) < 6,
            `(centre ${Math.round(centre)} pour ${largeurEcran / 2})`);
   verifier("elle a son bandeau, un seul", v.bandeaux === 1, `(${v.bandeaux})`);
-  verifier("et plus aucun élément d'ombre séparé", v.ombres === 0, `(${v.ombres})`);
+  verifier("et son ombre, une seule", v.ombres === 1, `(${v.ombres})`);
   verifier("les quatre combattants y sont", v.ordre.length === 4, JSON.stringify(v.ordre.map(x => x.id)));
   verifier("dans l'ordre d'initiative de la manche",
            v.ordre.map(x => x.id).join(",") === "M1,H1,H2,M2", v.ordre.map(x => x.id).join(","));
@@ -533,23 +533,84 @@ console.log("\n13. L'OMBRE SOUS LE BANDEAU A VRAIMENT UN DÉGRADÉ DOUX");
     await new Promise(r => setTimeout(r, 700));
 
     const fond = document.querySelector(".piste-fond");
+    const ombre = document.querySelector(".piste-ombre-sol");
+    const tuile = document.querySelector(".piste-tuile");
     const rf = fond.getBoundingClientRect();
-    const style = getComputedStyle(fond);
+    const ro = ombre.getBoundingClientRect();
+    const rt = tuile.getBoundingClientRect();
+    const piste = document.getElementById("piste-initiative");
+    const sf = getComputedStyle(fond);
+    const so = getComputedStyle(ombre);
     return {
       basDuBandeau: Math.round(rf.bottom), centre: Math.round(rf.left + rf.width / 2),
-      separee: document.querySelectorAll(".piste-ombre-sol").length,
-      filtre: style.filter, fondFlou: style.backdropFilter || style.webkitBackdropFilter,
-      ombrePortee: style.boxShadow
+      hauteurOmbre: Math.round(ro.height), hauteurTuile: Math.round(rt.height),
+      centreOmbre: Math.round(ro.left + ro.width / 2),
+      largeurOmbre: Math.round(ro.width), largeurBandeau: Math.round(rf.width),
+      fondFlou: sf.backdropFilter || sf.webkitBackdropFilter,
+      ombreAvantBandeau: [...piste.children].indexOf(ombre) < [...piste.children].indexOf(fond),
+      // Ce qui doit être absent : tout ce qui dessinerait un contour.
+      filtreOmbre: so.filter,
+      ombrePorteeOmbre: so.boxShadow,
+      bordureOmbre: so.borderTopWidth,
+      fondOmbre: so.backgroundImage,
+      boxShadowBandeau: sf.boxShadow
     };
   });
 
-  verifier("l'ombre est portée par le bandeau lui-même, sans élément à part",
-           cadre.separee === 0, `${cadre.separee} élément(s) séparé(s)`);
   verifier("LE BANDEAU N'A PLUS DE BACKDROP-FILTER",
            !cadre.fondFlou || cadre.fondFlou === "none", String(cadre.fondFlou));
-  verifier("il ne passe pas non plus par un filter", cadre.filtre === "none", cadre.filtre);
-  verifier("et son ombre extérieure est bien déclarée",
-           /rgba?\([^)]*\)\s+0px\s+10px/.test(cadre.ombrePortee), cadre.ombrePortee);
+  verifier("ni d'ombre portée à lui (elle dessinerait son rectangle)",
+           !/\)\s*$/.test(cadre.boxShadowBandeau) || /inset/.test(cadre.boxShadowBandeau),
+           cadre.boxShadowBandeau);
+
+  // LA HAUTEUR EST UNE CONSIGNE, PAS UN GOÛT : la moitié d'un portrait.
+  verifier("L'OMBRE FAIT LA MOITIÉ DE LA HAUTEUR D'UN PORTRAIT",
+           Math.abs(cadre.hauteurOmbre - cadre.hauteurTuile / 2) <= 1,
+           `${cadre.hauteurOmbre}px pour un portrait de ${cadre.hauteurTuile}px`);
+  verifier("elle est centrée sous la piste",
+           Math.abs(cadre.centreOmbre - cadre.centre) <= 1,
+           `${cadre.centreOmbre} contre ${cadre.centre}`);
+  verifier("et elle déborde largement du bandeau, pour s'éteindre dans le vide",
+           cadre.largeurOmbre > cadre.largeurBandeau + 40,
+           `${cadre.largeurOmbre} contre ${cadre.largeurBandeau}`);
+  verifier("elle est posée AVANT le bandeau (sinon elle le noircirait)",
+           cadre.ombreAvantBandeau === true);
+
+  // CE CONTRÔLE PASSAIT TOUT SEUL, ET NE PROUVAIT RIEN. Sur une piste
+  // construite de zéro, l'ombre est créée la première : l'ajouter à la fin ou
+  // l'insérer au début revient au même, et le contrôle était vert quoi qu'on
+  // écrive. Le cas qu'il doit garder est l'AUTRE : une piste déjà à l'écran, où
+  // le bandeau existe et l'ombre non — un joueur qui recharge sur une nouvelle
+  // version, exactement. Ajoutée à la fin, elle se retrouverait alors par-dessus
+  // le bandeau, à le noircir. On reproduit donc ce cas-là.
+  const apresRepose = await p.evaluate(async () => {
+    const piste = document.getElementById("piste-initiative");
+    piste.querySelector(".piste-ombre-sol").remove();
+    window.afficherPisteInitiative(window.PARTIE_DATA.File_Attente_Combat, "Resolution");
+    await new Promise(r => setTimeout(r, 300));
+    const enfants = [...piste.children];
+    const ombre = piste.querySelector(".piste-ombre-sol");
+    const fond = piste.querySelector(".piste-fond");
+    return { existe: !!ombre, avant: enfants.indexOf(ombre) < enfants.indexOf(fond),
+             rang: enfants.indexOf(ombre), rangFond: enfants.indexOf(fond) };
+  });
+  verifier("l'ombre manquante est recréée", apresRepose.existe === true);
+  verifier("ET ELLE SE GLISSE SOUS UN BANDEAU DÉJÀ EN PLACE",
+           apresRepose.avant === true, `ombre ${apresRepose.rang}, bandeau ${apresRepose.rangFond}`);
+
+  // AUCUNE FORME À SUIVRE, DONC AUCUNE BORDURE À VOIR. C'est la consigne, et
+  // c'est la seule façon de la tenir par construction : un dégradé radial dont
+  // l'alpha tombe à zéro avant le bord de la boîte. Ni filtre (WebKit les
+  // compose mal en z-index négatif), ni box-shadow, ni bordure — tous les trois
+  // épouseraient le rectangle et le rendraient visible dans le flou.
+  verifier("L'OMBRE EST UN DÉGRADÉ RADIAL",
+           /radial-gradient/.test(cadre.fondOmbre), cadre.fondOmbre.slice(0, 60));
+  verifier("QUI S'ÉTEINT COMPLÈTEMENT AVANT LE BORD",
+           /rgba\(0,\s*0,\s*0,\s*0\)/.test(cadre.fondOmbre), "alpha 0 en fin de dégradé");
+  verifier("elle n'a ni filtre, ni ombre portée, ni bordure",
+           cadre.filtreOmbre === "none" && cadre.ombrePorteeOmbre === "none"
+           && parseFloat(cadre.bordureOmbre) === 0,
+           `${cadre.filtreOmbre} / ${cadre.ombrePorteeOmbre} / ${cadre.bordureOmbre}`);
 
   // La photo : une colonne d'un pixel, du ras du bandeau jusqu'à 44 px dessous.
   const HAUTEUR = 44;

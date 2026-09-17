@@ -58,7 +58,7 @@
     // quelles. C'est tout l'objet de l'outil.
     const PAR_DEFAUT = {
         anneau: {
-            centreDroite: 99,    // centre de l'anneau, depuis le bord droit
+            centreDroite: 103,   // centre de l'anneau, depuis le bord droit
             centreBas: 111,      // centre de l'anneau, depuis le bord bas
             diametre: 180,       // diamètre de la LIGNE MOYENNE des jauges
             epaisseur: 15        // épaisseur du trait des jauges

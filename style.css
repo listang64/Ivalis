@@ -2150,8 +2150,50 @@ textarea.input-texte-parchemin {
     bottom: 12px;
     border-radius: 0 0 20px 20px;
     background: rgba(0, 0, 0, 0.62);
-    box-shadow: inset 0 -14px 22px rgba(0, 0, 0, 0.6),
-                0 10px 22px 2px rgba(0, 0, 0, 0.85);
+    /* Plus d'ombre portée ici : une box-shadow épouse la forme de sa boîte, et
+       on voyait donc le rectangle arrondi du bandeau se dessiner en creux tout
+       autour. L'ombre est passée dans son propre élément, juste en dessous. */
+    box-shadow: inset 0 -14px 22px rgba(0, 0, 0, 0.6);
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* L'OMBRE SOUS LA PISTE : UNE TACHE, PAS UN CONTOUR.
+ *
+ * Troisième version, et les deux premières ont échoué pour la même raison de
+ * fond : elles dessinaient la FORME du bandeau. Un `filter: blur()` sur une
+ * bande, puis une `box-shadow` — les deux suivent le rectangle arrondi qui les
+ * porte, et l'œil retrouve ce rectangle dans le flou.
+ *
+ * Un dégradé radial n'a pas de forme à suivre. Son alpha tombe à zéro avant
+ * d'atteindre le bord de la boîte : il n'existe aucun pixel où l'ombre
+ * s'arrête, donc aucune bordure à voir, sur aucun navigateur, sans filtre ni
+ * couche de composition. C'est la seule façon d'obtenir « un flou prononcé dont
+ * on ne voit aucune bordure » qui soit vraie par construction et pas par
+ * réglage.
+ *
+ * Sa hauteur vaut la moitié d'un portrait de la piste, et elle est posée en
+ * JavaScript depuis la constante elle-même : les deux ne peuvent pas diverger
+ * le jour où les portraits changeront de taille. */
+.piste-ombre-sol {
+    position: absolute;
+    left: -70px;
+    right: -70px;
+    /* SON CENTRE EST SUR L'ARÊTE DU BANDEAU, et pas plus bas. Descendue de
+       quinze pixels pour allonger la chute, la tache devenait plus sombre EN
+       S'ÉLOIGNANT du bandeau avant de s'éclaircir — le noyau de l'ellipse
+       passait sous l'arête. Une ombre portée est au contraire au plus dense
+       juste sous ce qui la projette, puis ne fait que pâlir. Le banc mesure
+       cette décroissance et refuse le moindre retour en arrière.
+       Le bandeau s'arrête à 12 px du bas de la piste : l'ellipse, haute de la
+       moitié d'un portrait, est donc remontée d'à peu près la moitié de ça. */
+    bottom: -8px;
+    background: radial-gradient(ellipse at 50% 50%,
+                rgba(0, 0, 0, 0.92) 0%,
+                rgba(0, 0, 0, 0.62) 30%,
+                rgba(0, 0, 0, 0.30) 55%,
+                rgba(0, 0, 0, 0.10) 74%,
+                rgba(0, 0, 0, 0) 90%);
     z-index: -1;
     pointer-events: none;
 }

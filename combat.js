@@ -1148,10 +1148,21 @@ window.herosDuPoste = function() {
     return (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === mien.idPersonnage) || mien;
 };
 
+// DU ROUGE ET DU JAUNE FRANCS, SANS UN GRAMME D'OMBRAGE.
+//
+// Les trois jauges étaient peintes avec un dégradé vertical, du sombre en bas
+// vers le clair en haut. Sur un arc de quinze pixels vu à travers une fenêtre
+// creusée dans le bouton, ce dégradé ne se lisait pas comme du relief : il se
+// lisait comme de la saleté, et il tirait la couleur vers le brun dès qu'on
+// s'éloignait du milieu. Une teinte pleine par jauge, et on voit du premier
+// coup d'œil où on en est.
+//
+// Les chiffres et leurs écussons portent la même teinte que leur jauge : c'est
+// la règle posée dès le départ, et elle vaut aussi pour ces couleurs-ci.
 const HUD_TEINTES = {
-    vie:      { trait: "url(#hud-grad-vie)",      chiffre: "#ff8b8b", ecusson: "#e63946" },
-    bouclier: { trait: "url(#hud-grad-bouclier)", chiffre: "#bdf6ff", ecusson: "#5be8ff" },
-    energie:  { trait: "url(#hud-grad-energie)",  chiffre: "#fbf5bd", ecusson: "#c2a878" }
+    vie:      { trait: "#ff2b2b", chiffre: "#ff5a5a", ecusson: "#ff2b2b" },
+    bouclier: { trait: "#22d3ff", chiffre: "#63e2ff", ecusson: "#22d3ff" },
+    energie:  { trait: "#ffd400", chiffre: "#ffdf3d", ecusson: "#ffd400" }
 };
 
 // La taille de départ du nom est un réglage comme un autre : elle vient de la
@@ -4216,12 +4227,30 @@ window.afficherPisteInitiative = function(queue, phase) {
     // ancré à ses deux bords. Il descend du bord haut de l'écran : il pend
     // plutôt que de flotter, et ses deux coins du bas sont les seuls arrondis.
     //
-    // IL PORTE SON OMBRE LUI-MÊME. Elle avait son propre élément, derrière lui
-    // à z-index négatif, et elle restait invisible à l'écran alors qu'un banc la
-    // mesurait très bien : le `backdrop-filter` du bandeau le promeut en couche
-    // de composition, et les éléments à z-index négatif sont peints DANS le fond
-    // que cette couche recouvre ensuite. L'élément a disparu, le
-    // `backdrop-filter` aussi (voir style.css).
+    // SON OMBRE A RETROUVÉ SON PROPRE ÉLÉMENT, et cette fois elle s'y voit.
+    //
+    // Elle en avait déjà un, autrefois, et il était invisible : le
+    // `backdrop-filter` que portait alors le bandeau le promouvait en couche de
+    // composition, et les éléments à z-index négatif étaient peints DANS le fond
+    // que cette couche recouvrait ensuite. Ce `backdrop-filter` a disparu, le
+    // terrain est donc redevenu sain — et il le fallait, car une ombre portée
+    // par le bandeau lui-même ne peut qu'épouser sa forme, alors qu'on veut une
+    // tache sans contour (voir style.css).
+    //
+    // ELLE EST INSÉRÉE EN PREMIER, PAS AJOUTÉE À LA FIN. Le bandeau et elle sont
+    // tous deux à z-index -1 : c'est l'ordre dans la page qui décide lequel
+    // passe devant. Ajoutée après coup sur une piste déjà construite, elle se
+    // serait retrouvée PAR-DESSUS le bandeau, à le noircir.
+    let ombre = piste.querySelector(".piste-ombre-sol");
+    if (!ombre) {
+        ombre = document.createElement("div");
+        ombre.className = "piste-ombre-sol";
+        piste.insertBefore(ombre, piste.firstChild);
+    }
+    // La moitié d'un portrait, prise à la constante : le jour où les portraits
+    // changeront de taille, l'ombre suivra sans qu'on ait à y penser.
+    ombre.style.height = (PISTE_HAUTEUR_TUILE / 2) + "px";
+
     let fond = piste.querySelector(".piste-fond");
     if (!fond) {
         fond = document.createElement("div");
