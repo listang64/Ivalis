@@ -276,9 +276,8 @@ console.log("=========================================================");
       rangAvatar: enfants.indexOf("hud-avatar-heros"),
       rangImage: enfants.indexOf("img-hud-fintour"),
       rangAnneau: enfants.indexOf("hud-anneau-boite"),
+      rangAncres: enfants.indexOf("hud-ancres-boite"),
       rangNom: enfants.indexOf("hud-nom-heros"),
-      ancresDansLAnneau: !!document.getElementById("hud-ancre-droite")
-                            .closest("#hud-anneau-boite"),
       opacite: getComputedStyle(avatar).opacity,
       hautAvatar: Math.round(ra.top), hautImage: Math.round(ri.top),
       basAvatar: Math.round(ra.bottom), basImage: Math.round(ri.bottom),
@@ -287,21 +286,26 @@ console.log("=========================================================");
   });
   verifier("l'avatar a reçu l'image du héros", a.src.includes("heroine"), a.src.slice(-40));
   verifier("et il est visible", a.opacite === "1", a.opacite);
-  // L'ORDRE D'ÉCRITURE EST L'ORDRE D'EMPILEMENT, et il a été retourné.
+  // L'ORDRE D'ÉCRITURE EST L'ORDRE D'EMPILEMENT, et il compte pour chacun.
   //
-  // L'anneau était écrit AVANT l'image, donc derrière : il a disparu en entier
-  // sous le disque peint dedans — un disque plus grand que ce qu'on avait
-  // estimé, et dont ni la taille ni la place ne se lisent nulle part. Les arcs
-  // se posent donc SUR le rebord du bouton, comme sur le croquis, et l'anneau
-  // est écrit après. L'avatar, lui, reste derrière : il ne doit dépasser que
-  // par le haut.
-  verifier("L'AVATAR EST ÉCRIT AVANT L'IMAGE (donc derrière)",
-           a.rangAvatar >= 0 && a.rangAvatar < a.rangImage, `${a.rangAvatar} < ${a.rangImage}`);
-  verifier("L'ANNEAU EST ÉCRIT APRÈS (donc devant, sinon on ne le voit pas)",
-           a.rangAnneau > a.rangImage, `${a.rangAnneau} > ${a.rangImage}`);
+  // L'anneau a fait l'aller-retour. Posé derrière au premier jet, il disparaissait
+  // entièrement sous le disque plein du bouton — un disque plus grand que ce
+  // qu'on avait estimé, et dont ni la taille ni la place ne se lisent nulle part.
+  // Passé devant, il se voyait, mais recouvrait le décor. L'image a depuis été
+  // creusée d'une fenêtre à l'endroit exact des arcs : ils reprennent leur place
+  // dessous, à travers elle.
+  //
+  // L'avatar est au plus profond, DERRIÈRE les jauges : sinon c'est son épaule
+  // qu'on verrait par la fenêtre. Les ancres chiffrées et le nom restent devant
+  // l'image : ce sont des choses à lire, pas des transparences.
+  verifier("L'AVATAR EST LE PLUS AU FOND",
+           a.rangAvatar >= 0 && a.rangAvatar < a.rangAnneau,
+           `${a.rangAvatar} < ${a.rangAnneau}`);
+  verifier("LES JAUGES SONT SOUS L'IMAGE (elles se voient par la fenêtre)",
+           a.rangAnneau < a.rangImage, `${a.rangAnneau} < ${a.rangImage}`);
+  verifier("LES ANCRES CHIFFRÉES SONT DEVANT", a.rangAncres > a.rangImage,
+           `${a.rangAncres} > ${a.rangImage}`);
   verifier("le nom aussi", a.rangNom > a.rangImage, `${a.rangNom} > ${a.rangImage}`);
-  verifier("et les ancres chiffrées vivent DANS l'anneau",
-           a.ancresDansLAnneau === true);
   verifier("IL DÉPASSE FRANCHEMENT PAR LE HAUT",
            a.hautImage - a.hautAvatar > 150, `${a.hautImage - a.hautAvatar}px au-dessus`);
   verifier("et son bas est caché dans le bandeau",
@@ -310,26 +314,40 @@ console.log("=========================================================");
 }
 
 console.log("\n=========================================================");
-console.log("  7. LES ANCRES SONT AUX DEUX BOUTS DE L'ANNEAU");
+console.log("  7. LES DEUX BOÎTES SE SUPERPOSENT, LES ANCRES SONT AUX BOUTS");
 console.log("=========================================================");
 {
+  // DEUX BOÎTES, ET UNE SEULE GÉOMÉTRIE. Les arcs vivent sous l'image du bouton
+  // et les ancres par-dessus : il leur faut deux éléments, de part et d'autre de
+  // l'image dans la page. S'ils se décalaient d'un pixel, les chiffres ne
+  // seraient plus au bout de leur jauge. Le réglage étant unique, on vérifie que
+  // les deux boîtes tombent exactement l'une sur l'autre.
   const m = await p.evaluate(() => {
-    const anneau = document.getElementById("hud-anneau-boite").getBoundingClientRect();
+    const arcs = document.getElementById("hud-anneau-boite").getBoundingClientRect();
+    const ancres = document.getElementById("hud-ancres-boite").getBoundingClientRect();
     const g = document.getElementById("hud-ancre-gauche").getBoundingClientRect();
     const d = document.getElementById("hud-ancre-droite").getBoundingClientRect();
-    const cx = anneau.left + anneau.width / 2, cy = anneau.top + anneau.height / 2;
     const hud = document.getElementById("combat-hud-bas-droite").getBoundingClientRect();
+    const cx = arcs.left + arcs.width / 2, cy = arcs.top + arcs.height / 2;
+    const r = window.REGLAGES_HUD;
     return {
-      // Le BORD EXTÉRIEUR de chaque ancre, pas son centre : elles sont tuckées
-      // dans l'anneau pour que celle de droite ne sorte pas de l'écran.
-      bordGauche: Math.round(cx - g.left),
-      bordDroit: Math.round(d.right - cx),
+      ecartBoites: Math.round(Math.abs(arcs.left - ancres.left))
+                 + Math.round(Math.abs(arcs.top - ancres.top))
+                 + Math.round(Math.abs(arcs.width - ancres.width)),
+      // Le bord EXTÉRIEUR de chaque ancre, décalage réglé compris. Les deux
+      // décalages se comptent vers la DROITE : celui de gauche rapproche donc
+      // l'ancre du centre quand il est positif, celui de droite l'en éloigne —
+      // d'où les deux signes opposés, qui ne sont pas une coquille.
+      bordGauche: Math.round(cx - g.left) + r.ancreGauche.dx,
+      bordDroit: Math.round(d.right - cx) - r.ancreDroite.dx,
       hauteurGauche: Math.round((g.top + g.height / 2) - cy),
       hauteurDroite: Math.round((d.top + d.height / 2) - cy),
-      rayon: Math.round(anneau.width * 0.5),
+      rayon: Math.round(arcs.width * 0.5),
       depasseADroite: Math.round(d.right - hud.right)
     };
   });
+  verifier("LES DEUX BOÎTES TOMBENT EXACTEMENT L'UNE SUR L'AUTRE",
+           m.ecartBoites === 0, `${m.ecartBoites}px d'écart cumulé`);
   verifier("l'ancre de gauche s'aligne sur le bord gauche de l'anneau",
            Math.abs(m.bordGauche - m.rayon) <= 2, `${m.bordGauche} pour un rayon de ${m.rayon}`);
   verifier("celle de droite sur le bord droit",
@@ -493,7 +511,7 @@ console.log("=========================================================");
       await new Promise(r => setTimeout(r, 150));
     });
     const d = await p.evaluate(() => window.REGLAGES_HUD.anneau.diametre);
-    verifier("« Défaut » remet tout en place", d === 176, String(d));
+    verifier("« Défaut » remet tout en place", d === 174, String(d));
   }
 }
 

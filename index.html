@@ -898,33 +898,34 @@
                  bas : la vitalité à gauche, l'énergie à droite. Ce qui n'est pas
                  rempli reste noir. Le tracé est un arc SVG avec pathLength="100",
                  ce qui rend le remplissage aussi simple qu'un pourcentage. -->
-            <!-- L'AVATAR DU HÉROS, posé derrière le bouton. -->
+            <!-- L'AVATAR DU HÉROS, posé au plus profond : derrière le bouton ET
+                 derrière les jauges. Sinon c'est son épaule qu'on verrait par la
+                 fenêtre creusée dans l'image, et non l'arc de vitalité. -->
             <img id="hud-avatar-heros" src="" alt=""
                  style="position: absolute; width: auto;
                         object-fit: contain; object-position: bottom center; opacity: 0;
                         transition: opacity 0.4s ease; pointer-events: none;
                         filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.9));">
 
-            <!-- L'image de fond (Éteinte par défaut et avec un ID pour la cibler) -->
-            <img id="img-hud-fintour" src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/FinTourEteind_exjtxp.png" style="width: 100%; display: block; pointer-events: none;">
-
-            <!-- LES DEUX ANCRES CHIFFRÉES, aux deux extrémités de l'anneau, chacune
-                 dans la couleur de sa jauge. Leur boîte est la MÊME que celle de
-                 l'anneau (même classe) : les deux ne peuvent pas se décaler. -->
-            <!-- L'ANNEAU DES JAUGES ET SES DEUX ANCRES CHIFFRÉES.
+            <!-- L'ANNEAU DES JAUGES, SOUS L'IMAGE DU BOUTON.
+                 =================================================================
                  Deux demi-cercles qui se remplissent par le bas : la vitalité à
                  gauche, l'énergie à droite. Ce qui n'est pas rempli reste noir.
                  Le tracé est un arc SVG avec pathLength="100", ce qui rend le
                  remplissage aussi simple qu'un pourcentage.
 
-                 IL EST ÉCRIT APRÈS L'IMAGE DU BOUTON, DONC DEVANT. Placé
-                 derrière, il disparaissait entièrement sous le disque peint dans
-                 l'image — un disque dont on ne connaît ni la taille ni la
-                 position autrement qu'à l'œil. Les arcs se posent donc SUR le
-                 rebord du bouton, comme sur le croquis.
+                 IL EST ÉCRIT AVANT L'IMAGE, DONC DERRIÈRE — ET C'EST VOULU. Il
+                 a fait l'aller-retour : posé derrière au premier jet, il
+                 disparaissait entièrement sous le disque plein du bouton ; passé
+                 devant, il se voyait mais recouvrait le décor. L'image a depuis
+                 été creusée d'une fenêtre à l'endroit exact des arcs, et ils
+                 reprennent donc leur place dessous, à travers elle.
 
-                 Toute sa géométrie est pilotée par REGLAGES_HUD
-                 (reglages_hud.js) : c'est la boîte de réglage qui la fixe. -->
+                 Les ancres chiffrées, elles, restent DEVANT (plus bas dans la
+                 page) : ce sont des plaques à lire, pas une transparence.
+
+                 Toute la géométrie est pilotée par REGLAGES_HUD
+                 (reglages_hud.js), qui pose les deux boîtes au même endroit. -->
             <div id="hud-anneau-boite">
                 <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"
                      style="width: 100%; height: 100%; overflow: visible; display: block;">
@@ -947,7 +948,7 @@
                     </defs>
 
                     <!-- LE FOND NOIR : les deux demi-cercles au complet. C'est lui
-                         qu'on voit là où la jauge est retombée. -->
+                         qu'on voit par la fenêtre là où la jauge est retombée. -->
                     <path class="hud-arc-fond" d="M 50 100 A 50 50 0 0 1 50 0"/>
                     <path class="hud-arc-fond" d="M 50 100 A 50 50 0 0 0 50 0"/>
 
@@ -959,7 +960,19 @@
                     <path id="hud-arc-droit" class="hud-arc-jauge" pathLength="100"
                           d="M 50 100 A 50 50 0 0 0 50 0"/>
                 </svg>
+            </div>
 
+            <!-- L'image de fond (Éteinte par défaut et avec un ID pour la cibler) -->
+            <img id="img-hud-fintour" src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/FinTourEteind_exjtxp.png" style="width: 100%; display: block; pointer-events: none;">
+
+            <!-- LES DEUX ANCRES CHIFFRÉES, aux deux extrémités de l'anneau, chacune
+                 dans la couleur de sa jauge. Leur boîte est la MÊME que celle de
+                 l'anneau (même classe) : les deux ne peuvent pas se décaler. -->
+            <!-- LES DEUX ANCRES CHIFFRÉES, aux bouts de l'anneau, chacune dans la
+                 couleur de sa jauge. Leur boîte est posée exactement sur celle de
+                 l'anneau par reglages_hud.js : les deux ne peuvent pas se
+                 décaler, quels que soient les réglages. -->
+            <div id="hud-ancres-boite">
                 <div id="hud-ancre-gauche" class="hud-ancre">
                     <div class="hud-ancre-fond"><span id="hud-valeur-gauche">–</span></div>
                 </div>
@@ -1803,7 +1816,7 @@
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
 <script src="trace_combat.js?v=11"></script>
-<script src="reglages_hud.js?v=1"></script>
+<script src="reglages_hud.js?v=2"></script>
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->

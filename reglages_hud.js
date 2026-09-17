@@ -31,17 +31,21 @@
     // « centreDroite » et « centreBas », par exemple, disent où se trouve le
     // CENTRE de l'anneau par rapport au coin bas-droit du bandeau — c'est ce
     // qu'on mesure le plus facilement sur une capture d'écran.
+    //
+    // CES VALEURS-LÀ NE SONT PLUS DES ESTIMATIONS : elles ont été réglées à
+    // l'écran, sur l'appareil, avec cette boîte, puis recopiées ici telles
+    // quelles. C'est tout l'objet de l'outil.
     const PAR_DEFAUT = {
         anneau: {
-            centreDroite: 105,   // centre de l'anneau, depuis le bord droit
-            centreBas: 103,      // centre de l'anneau, depuis le bord bas
-            diametre: 176,       // diamètre de la LIGNE MOYENNE des jauges
-            epaisseur: 9         // épaisseur du trait des jauges
+            centreDroite: 99,    // centre de l'anneau, depuis le bord droit
+            centreBas: 109,      // centre de l'anneau, depuis le bord bas
+            diametre: 174,       // diamètre de la LIGNE MOYENNE des jauges
+            epaisseur: 15        // épaisseur du trait des jauges
         },
-        ancreGauche: { dx: 0, dy: 0 },
-        ancreDroite: { dx: 0, dy: 0 },
-        avatar: { droite: 0, bas: 44, hauteur: 376 },
-        nom: { gauche: 4, bas: 182, largeur: 330, taille: 38 }
+        ancreGauche: { dx: -14, dy: 0 },
+        ancreDroite: { dx: 12, dy: 0 },
+        avatar: { droite: -30, bas: 56, hauteur: 376 },
+        nom: { gauche: 50, bas: 152, largeur: 330, taille: 38 }
     };
 
     function copierProfond(o) { return JSON.parse(JSON.stringify(o)); }
@@ -78,9 +82,16 @@
         // exactement sur le bord de la boîte. Régler le diamètre de la boîte,
         // c'est régler le diamètre de l'anneau — il n'y a pas de conversion
         // cachée entre les deux.
-        const boite = document.getElementById("hud-anneau-boite");
-        if (boite) {
-            const d = r.anneau.diametre;
+        // DEUX BOÎTES, EXACTEMENT SUPERPOSÉES. Les arcs vivent sous l'image du
+        // bouton (ils se voient par la fenêtre creusée dedans), les ancres
+        // chiffrées par-dessus : il leur faut donc deux éléments distincts, de
+        // part et d'autre de l'image dans la page. Elles sont posées ici par la
+        // même boucle, avec les mêmes nombres — deux réglages tenus à la main
+        // auraient fini par se décaler d'un pixel.
+        const d = r.anneau.diametre;
+        ["hud-anneau-boite", "hud-ancres-boite"].forEach(id => {
+            const boite = document.getElementById(id);
+            if (!boite) return;
             boite.style.position = "absolute";
             boite.style.pointerEvents = "none";
             boite.style.width = d + "px";
@@ -89,11 +100,11 @@
             boite.style.bottom = (r.anneau.centreBas - d / 2) + "px";
             boite.style.top = "auto";
             boite.style.transform = "none";
-        }
+        });
 
         // L'épaisseur du trait est donnée en pixels d'écran ; le SVG raisonne en
         // centièmes de sa boîte. La règle de trois vit ici, une seule fois.
-        const unites = (r.anneau.epaisseur / r.anneau.diametre) * 100;
+        const unites = (r.anneau.epaisseur / d) * 100;
         document.querySelectorAll(".hud-arc-fond").forEach(a => {
             a.style.strokeWidth = (unites + 1.6);
         });
