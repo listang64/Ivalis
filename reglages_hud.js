@@ -21,11 +21,32 @@
 //
 //  Les réglages survivent au rechargement (localStorage) : on peut régler,
 //  recharger, continuer.
+//
+//  UNE PARTIE DE CE FICHIER N'EST PAS PROVISOIRE : la mise à l'échelle.
+//  Le bandeau ne fait pas la même largeur partout — une règle de style.css le
+//  passe de 450 à 380 px sur tablette — et des mesures en pixels absolus ne
+//  valent donc que sur l'appareil où elles ont été prises. Tout est rapporté à
+//  la largeur du bandeau au moment du réglage. Le jour où cette boîte
+//  disparaîtra, `appliquerReglagesHud` devra déménager dans combat.js, pas
+//  partir avec elle.
 
 (function () {
     "use strict";
 
     const CLE_MEMOIRE = "REGLAGES_HUD_IVALIS";
+
+    // LA LARGEUR DU BANDEAU AU MOMENT OÙ LES MESURES ONT ÉTÉ PRISES.
+    //
+    // C'est la clé de tout ce fichier. Les valeurs ci-dessous sont des pixels,
+    // et un pixel ne veut rien dire tout seul : sur tablette, style.css réduit
+    // le bandeau à 380 px (@media pointer: coarse), et le bouton avec lui. Des
+    // coordonnées absolues réglées sur un bandeau de 450 y tombaient 15 % trop
+    // loin — l'anneau à côté du bouton, le nom ailleurs, l'avatar décollé.
+    //
+    // Tout est donc multiplié par (largeur réelle / largeur de référence). Le
+    // bouton rétrécit, tout le reste rétrécit avec lui, et les mêmes nombres
+    // valent sur n'importe quel écran.
+    const LARGEUR_REFERENCE = 450;
 
     // TOUTES LES MESURES SONT EN PIXELS, ET TOUTES PARTENT D'UN COIN DU BANDEAU.
     // « centreDroite » et « centreBas », par exemple, disent où se trouve le
@@ -74,8 +95,19 @@
     // =====================================================================
     //  POSER LES RÉGLAGES SUR LES ÉLÉMENTS
     // =====================================================================
+    // L'échelle du bandeau à cet instant. Exposée pour combat.js, qui en a
+    // besoin pour la taille du nom — lui non plus ne doit pas rester en dur.
+    window.echelleHud = function () {
+        const hud = document.getElementById("combat-hud-bas-droite");
+        const largeur = hud ? hud.getBoundingClientRect().width : 0;
+        return largeur > 0 ? largeur / LARGEUR_REFERENCE : 1;
+    };
+
     window.appliquerReglagesHud = function () {
         const r = window.REGLAGES_HUD;
+        const k = window.echelleHud();
+        window.ECHELLE_HUD = k;
+        const px = (v) => (v * k) + "px";
 
         // L'ANNEAU. Sa boîte EST le cercle de la ligne moyenne des jauges : le
         // tracé SVG est dessiné à un rayon de 50 dans un repère de 100, donc
@@ -94,16 +126,18 @@
             if (!boite) return;
             boite.style.position = "absolute";
             boite.style.pointerEvents = "none";
-            boite.style.width = d + "px";
-            boite.style.height = d + "px";
-            boite.style.right = (r.anneau.centreDroite - d / 2) + "px";
-            boite.style.bottom = (r.anneau.centreBas - d / 2) + "px";
+            boite.style.width = px(d);
+            boite.style.height = px(d);
+            boite.style.right = px(r.anneau.centreDroite - d / 2);
+            boite.style.bottom = px(r.anneau.centreBas - d / 2);
             boite.style.top = "auto";
             boite.style.transform = "none";
         });
 
         // L'épaisseur du trait est donnée en pixels d'écran ; le SVG raisonne en
-        // centièmes de sa boîte. La règle de trois vit ici, une seule fois.
+        // centièmes de sa boîte. La règle de trois vit ici, une seule fois — et
+        // elle N'EST PAS mise à l'échelle : la boîte l'est déjà, et un rapport
+        // entre deux longueurs ne dépend pas de l'unité.
         const unites = (r.anneau.epaisseur / d) * 100;
         document.querySelectorAll(".hud-arc-fond").forEach(a => {
             a.style.strokeWidth = (unites + 1.6);
@@ -119,30 +153,41 @@
         if (gauche) {
             gauche.style.left = "0%";
             gauche.style.top = "50%";
-            gauche.style.transform = `translate(${r.ancreGauche.dx}px, calc(-50% + ${r.ancreGauche.dy}px))`;
+            gauche.style.transform = `translate(${px(r.ancreGauche.dx)}, calc(-50% + ${px(r.ancreGauche.dy)}))`;
         }
         const droite = document.getElementById("hud-ancre-droite");
         if (droite) {
             droite.style.left = "100%";
             droite.style.top = "50%";
-            droite.style.transform = `translate(calc(-100% + ${r.ancreDroite.dx}px), calc(-50% + ${r.ancreDroite.dy}px))`;
+            droite.style.transform = `translate(calc(-100% + ${px(r.ancreDroite.dx)}), calc(-50% + ${px(r.ancreDroite.dy)}))`;
         }
+
+        // LES PLAQUES ELLES-MÊMES rétrécissent aussi : une ancre de taille fixe
+        // au bout d'un anneau réduit déborderait du bouton.
+        document.querySelectorAll(".hud-ancre").forEach(a => {
+            a.style.width = px(42);
+            a.style.height = px(29);
+        });
+        document.querySelectorAll(".hud-ancre-fond").forEach(f => {
+            f.style.fontSize = px(17);
+        });
 
         // L'AVATAR.
         const avatar = document.getElementById("hud-avatar-heros");
         if (avatar) {
-            avatar.style.right = r.avatar.droite + "px";
-            avatar.style.bottom = r.avatar.bas + "px";
-            avatar.style.height = r.avatar.hauteur + "px";
+            avatar.style.right = px(r.avatar.droite);
+            avatar.style.bottom = px(r.avatar.bas);
+            avatar.style.height = px(r.avatar.hauteur);
         }
 
         // LE NOM. Changer sa largeur ou sa taille change la façon dont il
         // rétrécit : on redemande donc l'ajustement automatique à combat.js.
         const nom = document.getElementById("hud-nom-heros");
         if (nom) {
-            nom.style.left = r.nom.gauche + "px";
-            nom.style.bottom = r.nom.bas + "px";
-            nom.style.width = r.nom.largeur + "px";
+            nom.style.left = px(r.nom.gauche);
+            nom.style.bottom = px(r.nom.bas);
+            nom.style.width = px(r.nom.largeur);
+            nom.style.paddingLeft = px(6);
             nom.style.top = "auto";
             nom.style.marginBottom = "0px";
             nom.dataset.ajuste = "0";
@@ -156,8 +201,11 @@
     window.codeReglagesHud = function () {
         const r = window.REGLAGES_HUD;
         const l = (groupe, cles) => cles.map(c => `${c}: ${Math.round(r[groupe][c])}`).join(", ");
+        const hud = document.getElementById("combat-hud-bas-droite");
+        const largeur = hud ? Math.round(hud.getBoundingClientRect().width) : 0;
         return [
-            "REGLAGES_HUD =",
+            "REGLAGES_HUD =  (bandeau mesuré : " + largeur + " px"
+                + (largeur === LARGEUR_REFERENCE ? "" : " — RÉFÉRENCE ATTENDUE : " + LARGEUR_REFERENCE) + ")",
             "    anneau      { " + l("anneau", ["centreDroite", "centreBas", "diametre", "epaisseur"]) + " }",
             "    ancreGauche { " + l("ancreGauche", ["dx", "dy"]) + " }",
             "    ancreDroite { " + l("ancreDroite", ["dx", "dy"]) + " }",
@@ -360,7 +408,21 @@
     // régler. On surveille l'affichage de la fenêtre de combat plutôt que de
     // demander à combat.js de nous prévenir — l'outil est provisoire, il ne doit
     // laisser aucune trace dans le code du jeu.
+    // LE BANDEAU PEUT CHANGER DE LARGEUR SANS PRÉVENIR : une rotation de
+    // tablette, une fenêtre qu'on redimensionne, une règle @media qui bascule.
+    // On repose alors tous les réglages à la nouvelle échelle.
+    let derniereLargeur = 0;
+    function suivreLaLargeur() {
+        const hud = document.getElementById("combat-hud-bas-droite");
+        if (!hud) return;
+        const largeur = Math.round(hud.getBoundingClientRect().width);
+        if (largeur === 0 || largeur === derniereLargeur) return;
+        derniereLargeur = largeur;
+        window.appliquerReglagesHud();
+    }
+
     function surveiller() {
+        suivreLaLargeur();
         const fenetre = document.getElementById("fenetre-combat");
         const poignee = document.getElementById("reglage-hud-poignee");
         const boite = document.getElementById("reglage-hud");
@@ -374,6 +436,8 @@
         construire();
         window.appliquerReglagesHud();
         setInterval(surveiller, 600);
+        window.addEventListener("resize", () => window.appliquerReglagesHud());
+        window.addEventListener("orientationchange", () => setTimeout(() => window.appliquerReglagesHud(), 200));
     }
 
     if (document.readyState === "loading") {

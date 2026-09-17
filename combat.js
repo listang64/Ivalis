@@ -1156,28 +1156,51 @@ const HUD_TEINTES = {
 
 // La taille de départ du nom est un réglage comme un autre : elle vient de la
 // boîte de réglage quand celle-ci est chargée, sinon de cette valeur.
+//
+// ELLE SUIT L'ÉCHELLE DU BANDEAU, comme tout le reste du bloc. Sur tablette,
+// style.css réduit le bandeau de 450 à 380 px et le bouton avec lui ; un nom qui
+// garderait ses 38 pixels y paraîtrait deux fois trop gros et déborderait de sa
+// boîte, elle aussi rétrécie.
+function hudEchelle() {
+    return typeof window.echelleHud === "function" ? window.echelleHud() : 1;
+}
 function hudNomTailleMax() {
     const r = window.REGLAGES_HUD;
-    return (r && r.nom && r.nom.taille) || 38;
+    return ((r && r.nom && r.nom.taille) || 38) * hudEchelle();
 }
-const HUD_NOM_TAILLE_MIN = 14;
+function hudNomTailleMin() {
+    return 14 * hudEchelle();
+}
 
 // LE NOM RÉTRÉCIT JUSQU'À TENIR. On descend par paliers de deux pixels tant que
 // le texte déborde de sa boîte, sans jamais passer sous une taille lisible.
 // L'espacement des lettres se resserre en chemin : à 38 px trois pixels d'écart
 // font respirer le mot, à 22 px ils le font déborder pour rien.
 function ajusterNomHudHeros(div, texte) {
-    let taille = hudNomTailleMax();
+    const k = hudEchelle();
+    const depart = hudNomTailleMax();
+    const plancher = hudNomTailleMin();
+    let taille = depart;
+
+    // L'ESPACEMENT SE RESSERRE EN CHEMIN, ET FINIT PAR DISPARAÎTRE : sur un nom
+    // de trente lettres, un pixel entre chacune, c'est trente pixels de plus à
+    // caser — de quoi faire déborder un mot qui tenait tout juste. Les paliers
+    // suivent l'échelle du bandeau comme la taille elle-même : à 380 px de
+    // large, une lettre de 30 px n'existe pas, le premier palier ne serait
+    // jamais franchi et l'espacement resterait à trois pixels jusqu'au bout.
+    const espacement = (t) => {
+        if (t >= 30 * k) return (3 * k) + "px";
+        if (t >= 24 * k) return (2 * k) + "px";
+        if (t >= 20 * k) return (1 * k) + "px";
+        return "0px";
+    };
+
     texte.style.fontSize = taille + "px";
-    texte.style.letterSpacing = "3px";
-    while (taille > HUD_NOM_TAILLE_MIN && div.scrollWidth > div.clientWidth) {
-        taille -= 2;
+    texte.style.letterSpacing = espacement(taille);
+    while (taille > plancher && div.scrollWidth > div.clientWidth) {
+        taille -= 2 * k;
         texte.style.fontSize = taille + "px";
-        // L'espacement se resserre en chemin, et finit par disparaître : sur un
-        // nom de trente lettres, un pixel entre chacune, c'est trente pixels de
-        // plus à caser — de quoi faire déborder un mot qui tenait tout juste.
-        texte.style.letterSpacing = (taille >= 30 ? "3px" : taille >= 24 ? "2px"
-                                   : taille >= 20 ? "1px" : "0px");
+        texte.style.letterSpacing = espacement(taille);
     }
 }
 

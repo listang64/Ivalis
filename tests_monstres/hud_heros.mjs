@@ -17,7 +17,9 @@
 //   • les chiffres des ancres portent la couleur de leur jauge ;
 //   • l'avatar est DERRIÈRE l'image du bouton et dépasse par le haut ;
 //   • le nom rétrécit tout seul quand il est trop long ;
-//   • la boîte de réglage provisoire bouge bien ce qu'elle dit qu'elle bouge.
+//   • la boîte de réglage provisoire bouge bien ce qu'elle dit qu'elle bouge ;
+//   • TOUT SUIT LE BANDEAU quand il rétrécit (la règle tablette le passe de
+//     450 à 380 px), à l'échelle près et sans qu'un seul élément se décale.
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
@@ -513,6 +515,109 @@ console.log("=========================================================");
     const d = await p.evaluate(() => window.REGLAGES_HUD.anneau.diametre);
     verifier("« Défaut » remet tout en place", d === 174, String(d));
   }
+}
+
+console.log("\n=========================================================");
+console.log("  10. LE BANDEAU RÉTRÉCIT, TOUT LE BLOC SUIT");
+console.log("=========================================================");
+{
+  // LE DÉFAUT QUE CE CONTRÔLE GARDE.
+  //
+  // Les réglages du bloc sont des PIXELS, et un pixel ne veut rien dire tout
+  // seul. style.css réduit le bandeau de 450 à 380 px sur tablette
+  // (@media pointer: coarse) — le bouton de fin de tour avec lui. Des
+  // coordonnées absolues réglées sur un bandeau de 450 y tombaient quinze pour
+  // cent trop loin : l'anneau à côté du bouton, le nom ailleurs, l'avatar
+  // décollé du bord. Réglé sur un écran, faux sur l'autre.
+  //
+  // ON NE MESURE DONC PAS DES PIXELS, MAIS DES RAPPORTS. Chaque élément est
+  // repéré par sa distance au coin bas-droit du bandeau, divisée par la largeur
+  // de ce bandeau. Ces rapports-là doivent être les MÊMES aux deux largeurs :
+  // c'est la définition de « tout suit ».
+  const largeurTablette = await p.evaluate(() => {
+    for (const feuille of document.styleSheets) {
+      let regles; try { regles = feuille.cssRules; } catch (e) { continue; }
+      for (const r of regles || []) {
+        if (r.type !== CSSRule.MEDIA_RULE || !/coarse/.test(r.conditionText || "")) continue;
+        for (const interne of r.cssRules || []) {
+          if ((interne.selectorText || "").includes("#combat-hud-bas-droite")) {
+            return parseFloat(interne.style.width);
+          }
+        }
+      }
+    }
+    return 0;
+  });
+  verifier("la règle tablette réduit bien le bandeau", largeurTablette > 0 && largeurTablette < 450,
+           `${largeurTablette}px`);
+
+  // Les rapports de chaque élément, à la largeur courante.
+  const rapports = () => p.evaluate(() => {
+    const hud = document.getElementById("combat-hud-bas-droite").getBoundingClientRect();
+    const L = hud.width;
+    const lire = (id) => {
+      const r = document.getElementById(id).getBoundingClientRect();
+      return {
+        droite: +((hud.right - (r.left + r.width / 2)) / L).toFixed(4),
+        bas: +((hud.bottom - (r.top + r.height / 2)) / L).toFixed(4),
+        large: +(r.width / L).toFixed(4),
+        haut: +(r.height / L).toFixed(4)
+      };
+    };
+    const nom = document.getElementById("hud-nom-heros-texte");
+    return {
+      largeur: Math.round(L),
+      anneau: lire("hud-anneau-boite"),
+      ancreG: lire("hud-ancre-gauche"),
+      ancreD: lire("hud-ancre-droite"),
+      avatar: lire("hud-avatar-heros"),
+      nom: lire("hud-nom-heros"),
+      policeNom: +(parseFloat(getComputedStyle(nom).fontSize) / L).toFixed(4),
+      traitJauge: +(parseFloat(getComputedStyle(document.getElementById("hud-arc-gauche")).strokeWidth)).toFixed(3)
+    };
+  });
+
+  const avant = await rapports();
+  verifier("on part bien de la largeur de référence", avant.largeur === 450, `${avant.largeur}px`);
+
+  // On rétrécit le bandeau comme le fait la règle tablette, ET ON NE PRÉVIENT
+  // PERSONNE : c'est la surveillance de la largeur qui doit s'en apercevoir
+  // toute seule. Une rotation de tablette n'envoie pas toujours d'événement.
+  await p.evaluate((l) => {
+    document.getElementById("combat-hud-bas-droite").style.width = l + "px";
+  }, largeurTablette);
+  await p.waitForTimeout(1100);
+
+  const apres = await rapports();
+  verifier("le bandeau a bien rétréci", apres.largeur === Math.round(largeurTablette),
+           `${avant.largeur} → ${apres.largeur}px`);
+
+  const memeRapport = (a, b, quoi) => {
+    const ecarts = ["droite", "bas", "large", "haut"]
+      .map(k => ({ k, d: Math.abs(a[k] - b[k]) }))
+      .filter(e => e.d > 0.006);
+    verifier(`${quoi} garde exactement sa place et sa taille relatives`,
+             ecarts.length === 0,
+             ecarts.length ? ecarts.map(e => `${e.k} ${a[e.k]} → ${b[e.k]}`).join(", ")
+                           : `droite ${b.droite}, bas ${b.bas}`);
+  };
+  memeRapport(avant.anneau, apres.anneau, "L'ANNEAU");
+  memeRapport(avant.ancreG, apres.ancreG, "l'ancre de gauche");
+  memeRapport(avant.ancreD, apres.ancreD, "l'ancre de droite");
+  memeRapport(avant.avatar, apres.avatar, "L'AVATAR");
+  memeRapport(avant.nom, apres.nom, "la boîte du nom");
+
+  verifier("LA POLICE DU NOM SUIT AUSSI",
+           Math.abs(avant.policeNom - apres.policeNom) <= 0.004,
+           `${avant.policeNom} → ${apres.policeNom}`);
+  // L'épaisseur du trait, elle, est en centièmes de la boîte : elle suit sans
+  // qu'on la touche, et c'est bien ce qu'on vérifie — le chiffre ne bouge pas.
+  verifier("l'épaisseur du trait des jauges n'a pas eu à être recalculée",
+           Math.abs(avant.traitJauge - apres.traitJauge) < 0.01,
+           `${avant.traitJauge} → ${apres.traitJauge}`);
+
+  await p.evaluate(() => { document.getElementById("combat-hud-bas-droite").style.width = "450px"; });
+  await p.waitForTimeout(900);
 }
 
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 2).join(" | "));
