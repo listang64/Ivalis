@@ -19,7 +19,10 @@
 //   • le nom rétrécit tout seul quand il est trop long ;
 //   • la boîte de réglage provisoire bouge bien ce qu'elle dit qu'elle bouge ;
 //   • TOUT SUIT LE BANDEAU quand il rétrécit (la règle tablette le passe de
-//     450 à 380 px), à l'échelle près et sans qu'un seul élément se décale.
+//     450 à 380 px), à l'échelle près et sans qu'un seul élément se décale ;
+//   • LA PISTE DES ÉTATS se comporte en tapis roulant : les nouveaux entrent
+//     par la gauche, ceux qui expirent filent à droite SOUS le bouton, et un
+//     clic annonce les tours restants deux secondes.
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
@@ -664,6 +667,169 @@ console.log("=========================================================");
 
   await p.evaluate(() => { document.getElementById("combat-hud-bas-droite").style.width = "450px"; });
   await p.waitForTimeout(900);
+}
+
+console.log("\n=========================================================");
+console.log("  11. LA PISTE DES ÉTATS : UN TAPIS ROULANT");
+console.log("=========================================================");
+{
+  // Poser des états sur le héros, et laisser la piste se refaire.
+  const poser = (...noms) => p.evaluate(async (ns) => {
+    window.PERSOS_PARTIE[0].Etats_Alteres = ns.map(([nom, duree]) => ({
+      nom, duree, desc: "peu importe",
+      icone: "data:image/svg+xml;utf8," + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#c33"/></svg>')
+    }));
+    window.actualiserHudHeros();
+    await new Promise(r => setTimeout(r, 700));
+  }, noms);
+
+  const lirePiste = () => p.evaluate(() => {
+    const piste = document.getElementById("piste-etats");
+    const voile = document.getElementById("piste-etats-voile");
+    const rp = piste.getBoundingClientRect();
+    const tuiles = [...piste.querySelectorAll(".etat-piste")].map(t => {
+      const r = t.getBoundingClientRect();
+      return { nom: t.dataset.nom || null, sort: t.classList.contains("etat-sort"),
+               x: Math.round(r.left + r.width / 2), l: Math.round(r.width),
+               opacite: +getComputedStyle(t).opacity };
+    }).sort((a, b) => a.x - b.x);
+    return { tuiles, droiteDeLaPiste: Math.round(rp.right),
+             voileLarge: Math.round(voile.getBoundingClientRect().width),
+             voileOpacite: +getComputedStyle(voile).opacity };
+  });
+
+  // --- aucun état : rien ne traîne ---
+  await poser();
+  {
+    const v = await lirePiste();
+    verifier("sans état, la piste est vide", v.tuiles.length === 0, `(${v.tuiles.length})`);
+    verifier("ET SON VOILE EST ÉTEINT", v.voileOpacite === 0, String(v.voileOpacite));
+  }
+
+  // --- deux états ---
+  await poser(["Brûlure", 3], ["Glacé", 2]);
+  let apresDeux;
+  {
+    const v = await lirePiste();
+    apresDeux = v;
+    verifier("deux états, deux icônes", v.tuiles.length === 2, `(${v.tuiles.length})`);
+    verifier("le voile s'allume", v.voileOpacite === 1, String(v.voileOpacite));
+    verifier("et il couvre les deux", v.voileLarge > v.tuiles[0].l * 2, `${v.voileLarge}px`);
+    // Le rang 0 est collé au bouton : le PREMIER arrivé est donc le plus à droite.
+    verifier("LE PREMIER ARRIVÉ EST COLLÉ AU BOUTON",
+             v.tuiles[1].nom === "Brûlure", v.tuiles.map(t => t.nom).join(" | "));
+    verifier("et le second est à sa gauche", v.tuiles[0].nom === "Glacé");
+    verifier("la piste reste à gauche du bouton",
+             v.tuiles[1].x < v.droiteDeLaPiste + 1, `${v.tuiles[1].x} / ${v.droiteDeLaPiste}`);
+  }
+
+  // --- un troisième arrive : IL ENTRE PAR LA GAUCHE, personne ne bouge ---
+  await poser(["Brûlure", 3], ["Glacé", 2], ["Peur", 4]);
+  {
+    const v = await lirePiste();
+    verifier("le nouvel état s'ajoute", v.tuiles.length === 3, `(${v.tuiles.length})`);
+    verifier("IL ENTRE PAR LA GAUCHE", v.tuiles[0].nom === "Peur",
+             v.tuiles.map(t => t.nom).join(" | "));
+    // Les deux déjà là ne doivent pas avoir bougé d'un pixel : c'est le propre
+    // d'un tapis qui s'allonge par le bout, et pas d'une liste qui se recentre.
+    const brulureAvant = apresDeux.tuiles.find(t => t.nom === "Brûlure").x;
+    const brulureApres = v.tuiles.find(t => t.nom === "Brûlure").x;
+    verifier("ET LES AUTRES N'ONT PAS BOUGÉ",
+             Math.abs(brulureAvant - brulureApres) <= 1, `${brulureAvant} → ${brulureApres}`);
+  }
+
+  // --- un état expire : il file à DROITE, les autres se resserrent ---
+  const avantSortie = await lirePiste();
+  await p.evaluate(async () => {
+    window.PERSOS_PARTIE[0].Etats_Alteres =
+      window.PERSOS_PARTIE[0].Etats_Alteres.filter(e => e.nom !== "Brûlure");
+    window.actualiserHudHeros();
+    await new Promise(r => setTimeout(r, 200));   // en plein trajet
+  });
+  {
+    const v = await lirePiste();
+    const sortante = v.tuiles.find(t => t.sort);
+    verifier("l'état expiré est marqué sortant", !!sortante);
+    const xAvant = avantSortie.tuiles.find(t => t.nom === "Brûlure").x;
+    verifier("IL FILE VERS LA DROITE, SOUS LE BOUTON",
+             !!sortante && sortante.x > xAvant + 20, `${xAvant} → ${sortante ? sortante.x : "?"}`);
+    verifier("en s'éteignant", !!sortante && sortante.opacite < 1,
+             String(sortante && sortante.opacite));
+    // Et ceux qui restent glissent vers la droite : leurs rangs ont baissé.
+    const glaceAvant = avantSortie.tuiles.find(t => t.nom === "Glacé").x;
+    const glaceApres = v.tuiles.find(t => t.nom === "Glacé").x;
+    verifier("ET LES AUTRES GLISSENT VERS LA DROITE",
+             glaceApres > glaceAvant + 10, `${glaceAvant} → ${glaceApres}`);
+  }
+  await p.waitForTimeout(800);
+  {
+    const v = await lirePiste();
+    verifier("une fois sorti, il est retiré de la page",
+             v.tuiles.length === 2, `(${v.tuiles.length})`);
+  }
+
+  // --- LE CLIC ANNONCE LES TOURS RESTANTS, DEUX SECONDES ---
+  {
+    const reponse = await p.evaluate(async () => {
+      const t = document.querySelector('.etat-piste[data-nom="Peur"]');
+      t.click();
+      await new Promise(r => setTimeout(r, 400));
+      const b = t.querySelector(".etat-piste-duree");
+      const rb = b.getBoundingClientRect(), rt = t.getBoundingClientRect();
+      return { texte: b.innerText, visible: +getComputedStyle(b).opacity > 0.5,
+               dessous: rb.top >= rt.bottom - 1,
+               centre: Math.abs((rb.left + rb.width / 2) - (rt.left + rt.width / 2)) <= 2 };
+    });
+    verifier("LE CLIC ANNONCE LES TOURS RESTANTS", reponse.texte === "4 Tours", reponse.texte);
+    verifier("il s'affiche", reponse.visible === true);
+    verifier("SOUS L'ICÔNE TOUCHÉE, centré dessus",
+             reponse.dessous === true && reponse.centre === true,
+             `dessous ${reponse.dessous}, centré ${reponse.centre}`);
+
+    // Le singulier n'est pas un détail : « 1 Tours » se voit tout de suite.
+    const singulier = await p.evaluate(async () => {
+      window.PERSOS_PARTIE[0].Etats_Alteres.find(e => e.nom === "Peur").duree = 1;
+      document.querySelector('.etat-piste[data-nom="Peur"]').click();
+      await new Promise(r => setTimeout(r, 300));
+      return document.querySelector('.etat-piste[data-nom="Peur"] .etat-piste-duree').innerText;
+    });
+    verifier("et il accorde le singulier", singulier === "1 Tour", singulier);
+
+    await p.waitForTimeout(2200);
+    const efface = await p.evaluate(() =>
+      +getComputedStyle(document.querySelector('.etat-piste[data-nom="Peur"] .etat-piste-duree')).opacity);
+    verifier("DEUX SECONDES PLUS TARD, IL S'EFFACE", efface < 0.5, String(efface));
+  }
+
+  // --- ELLE EST SOUS L'IMAGE DU BOUTON, sinon la sortie passerait par-dessus ---
+  {
+    const rangs = await p.evaluate(() => {
+      const hud = document.getElementById("combat-hud-bas-droite");
+      const e = [...hud.children].map(x => x.id);
+      return { piste: e.indexOf("piste-etats"), image: e.indexOf("img-hud-fintour") };
+    });
+    verifier("LA PISTE EST ÉCRITE AVANT L'IMAGE (l'icône passe dessous en sortant)",
+             rangs.piste >= 0 && rangs.piste < rangs.image, `${rangs.piste} < ${rangs.image}`);
+  }
+
+  // --- et elle ne montre QUE le héros du poste ---
+  {
+    const v = await p.evaluate(async () => {
+      window.COMBAT_PERSOS_JOUEUR_BACKUP = [window.PERSOS_PARTIE[0]];
+      window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[1]];   // le panneau montre la créature
+      window.PERSOS_PARTIE[1].Etats_Alteres = [{ nom: "Paralysie", duree: 9, icone: "", desc: "" }];
+      window.actualiserHudHeros();
+      await new Promise(r => setTimeout(r, 500));
+      return [...document.querySelectorAll(".etat-piste")].map(t => t.dataset.nom).filter(Boolean);
+    });
+    verifier("ELLE IGNORE LA CRÉATURE QUE LE PANNEAU MONTRE",
+             !v.includes("Paralysie"), v.join(" | "));
+    await p.evaluate(() => {
+      window.COMBAT_PERSOS_JOUEUR = window.COMBAT_PERSOS_JOUEUR_BACKUP;
+      window.COMBAT_PERSOS_JOUEUR_BACKUP = null;
+    });
+  }
 }
 
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 2).join(" | "));

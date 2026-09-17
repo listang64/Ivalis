@@ -3060,3 +3060,94 @@ textarea.input-texte-parchemin {
     color: #e8d5a5;
     transition: color 0.35s ease;
 }
+
+/* ========================================================================= */
+/* LA PISTE DES ÉTATS DU HÉROS                                               */
+/* ========================================================================= */
+/*  À gauche du bouton de fin de tour : les états en cours, sur un voile noir
+ *  ténu. Sa position, la taille des icônes et leur écart sont posés par
+ *  reglages_hud.js — comme tout le bloc du héros, parce que rien de tout cela
+ *  ne se déduit du code : le bouton est une image. */
+
+#piste-etats {
+    position: absolute;
+    pointer-events: none;
+}
+
+/* LE VOILE : UN DÉGRADÉ, PAS UNE BOÎTE FLOUTÉE.
+   Une boîte noire, même très floutée, garde la forme de sa boîte et on la
+   retrouve dans le flou — c'est ce qui a fait échouer deux versions de l'ombre
+   de la piste d'initiative. L'alpha d'un dégradé radial tombe à zéro AVANT le
+   bord : il n'existe aucun pixel où le voile s'arrête. Pas de filtre non plus,
+   donc pas de couche de composition de plus sur tablette. */
+#piste-etats-voile {
+    position: absolute;
+    top: -14px;
+    bottom: -14px;
+    right: -30px;
+    width: 0;
+    opacity: 0;
+    background: radial-gradient(ellipse at 50% 50%,
+                rgba(0, 0, 0, 0.52) 0%,
+                rgba(0, 0, 0, 0.36) 42%,
+                rgba(0, 0, 0, 0.14) 70%,
+                rgba(0, 0, 0, 0) 90%);
+    transition: width 0.45s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.35s ease;
+    pointer-events: none;
+}
+
+/* UNE ICÔNE D'ÉTAT. Elle est ancrée au bord DROIT de la piste et poussée vers
+   la gauche par son rang : le rang 0 est collé au bouton, et un nouvel état,
+   qui prend le rang le plus élevé, entre donc par la gauche. Quand l'un d'eux
+   s'en va, les rangs de ceux qui restent baissent — et ils glissent vers la
+   droite tout seuls, sans qu'on ait à animer quoi que ce soit.
+
+   C'est `transform` qui porte ce déplacement, jamais `right` : seul transform
+   se compose sur le processeur graphique, et l'iPad ne suit pas le reste. */
+.etat-piste {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    cursor: pointer;
+    pointer-events: auto;
+    opacity: 1;
+    transition: transform 0.45s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease;
+}
+
+/* L'ÉTAT EXPIRE : il file vers la droite, passe sous le bouton, et s'éteint.
+   Le z-index le fait passer devant ses voisins le temps du trajet — sinon il
+   les traverserait en clignotant. */
+.etat-piste.etat-sort {
+    opacity: 0;
+    z-index: 4;
+}
+
+/* LE NOMBRE DE TOURS RESTANTS, sous l'icône qu'on vient de toucher. Deux
+   secondes, puis il s'efface. Il ne prend pas les clics : on doit pouvoir
+   toucher l'état d'à côté sans être gêné par lui. */
+.etat-piste-duree {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translate(-50%, 2px);
+    margin-top: 4px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: rgba(8, 5, 3, 0.92);
+    border: 1px solid #8a6a3f;
+    color: #e8d5a5;
+    font-family: 'Cinzel', serif;
+    font-weight: bold;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.etat-piste-duree.visible {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}

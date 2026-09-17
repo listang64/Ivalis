@@ -1215,6 +1215,165 @@ function ajusterNomHudHeros(div, texte) {
     }
 }
 
+// =========================================================================
+//  LA PISTE DES ÉTATS DU HÉROS
+// =========================================================================
+//  À gauche du bouton de fin de tour : ce que le héros du poste subit en ce
+//  moment. Même source que ses jauges — herosDuPoste(), jamais la visionneuse
+//  du panneau latéral.
+//
+//  UN TAPIS ROULANT, ET C'EST TOUT LE MÉCANISME. Chaque icône est ancrée au
+//  bord droit de la piste et poussée vers la gauche par son RANG. Le rang 0 est
+//  collé au bouton ; un état qui arrive prend le rang le plus élevé et entre
+//  donc par la gauche. Quand l'un s'en va, les rangs de ceux qui restent
+//  baissent d'un cran : ils glissent vers la droite d'eux-mêmes, par la seule
+//  transition CSS, sans une ligne d'animation.
+//
+//  L'ORDRE D'ARRIVÉE EST MÉMORISÉ ICI, et il le faut : les fiches ne disent que
+//  quels états sont là, jamais depuis quand. Sans cette mémoire, le tapis se
+//  réordonnerait au premier rafraîchissement venu et les icônes sauteraient de
+//  place sans raison.
+let PISTE_ETATS_ORDRE = [];
+
+// La géométrie vient des réglages, à l'échelle du bandeau — comme le reste du
+// bloc du héros, qui rétrécit avec lui sur tablette.
+function reglagesPisteEtats() {
+    const r = (window.REGLAGES_HUD || {}).etats || {};
+    const k = typeof window.echelleHud === "function" ? window.echelleHud() : 1;
+    const taille = (r.taille || 46) * k;
+    const ecart = (r.ecart === undefined ? 12 : r.ecart) * k;
+    return { taille, ecart, pas: taille + ecart, echelle: k };
+}
+
+// LE MÊME ÉTAT NE COMPTE QU'UNE FOIS. Il ne s'empile jamais sur la fiche non
+// plus — poser deux fois une brûlure allonge sa durée, elle n'en crée pas une
+// seconde — donc deux icônes identiques ne diraient rien de plus qu'une.
+function etatsDuHeros() {
+    const heros = window.herosDuPoste ? window.herosDuPoste() : null;
+    const vus = new Set();
+    return ((heros && heros.Etats_Alteres) || []).filter(e => {
+        if (!e || !e.nom || vus.has(e.nom)) return false;
+        vus.add(e.nom);
+        return true;
+    });
+}
+
+// LE CLIC MONTRE LES TOURS QUI RESTENT, DEUX SECONDES.
+window.montrerDureeEtat = function(nom) {
+    const piste = document.getElementById("piste-etats");
+    if (!piste) return;
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+
+    // Une seule réponse à la fois : toucher un second état efface la première.
+    piste.querySelectorAll(".etat-piste-duree").forEach(d => {
+        d.classList.remove("visible");
+        if (d.dataset.minuterie) { clearTimeout(parseInt(d.dataset.minuterie)); d.dataset.minuterie = ""; }
+    });
+
+    const tuile = piste.querySelector(`.etat-piste[data-nom="${CSS.escape(nom)}"]`);
+    const etat = etatsDuHeros().find(e => e.nom === nom);
+    if (!tuile || !etat) return;
+
+    const tours = Math.max(0, parseInt(etat.duree) || 0);
+    const bulle = tuile.querySelector(".etat-piste-duree");
+    if (!bulle) return;
+    bulle.innerText = tours + (tours > 1 ? " Tours" : " Tour");
+    bulle.classList.add("visible");
+    bulle.dataset.minuterie = String(setTimeout(() => {
+        bulle.classList.remove("visible");
+        bulle.dataset.minuterie = "";
+    }, 2000));
+};
+
+window.actualiserPisteEtats = function() {
+    const piste = document.getElementById("piste-etats");
+    if (!piste) return;                           // pas en combat : rien à peindre
+    const voile = document.getElementById("piste-etats-voile");
+    const { taille, ecart, pas, echelle } = reglagesPisteEtats();
+
+    const etats = etatsDuHeros();
+    const presents = new Set(etats.map(e => e.nom));
+
+    // ─── CEUX QUI VIENNENT DE DISPARAÎTRE ───────────────────────────────
+    // Ils quittent tout de suite l'ordre (pour que les autres se resserrent
+    // sans attendre), mais restent à l'écran le temps de filer vers la droite.
+    PISTE_ETATS_ORDRE.filter(nom => !presents.has(nom)).forEach(nom => {
+        PISTE_ETATS_ORDRE = PISTE_ETATS_ORDRE.filter(n => n !== nom);
+        const tuile = piste.querySelector(`.etat-piste[data-nom="${CSS.escape(nom)}"]`);
+        if (!tuile) return;
+        tuile.removeAttribute("data-nom");        // il ne compte plus comme présent
+        tuile.classList.add("etat-sort");
+        // L'OPACITÉ EST REMISE À LA MAIN, ET IL LE FAUT. La classe `etat-sort`
+        // la met à zéro, mais chaque icône porte un `style.opacity = "1"` en
+        // ligne, posé à sa naissance pour la faire apparaître en fondu — et un
+        // style en ligne l'emporte toujours sur une classe. L'icône filait donc
+        // vers la droite à pleine opacité, puis disparaissait d'un coup.
+        tuile.style.opacity = "0";
+        tuile.style.pointerEvents = "none";
+        // Assez loin vers la droite pour passer franchement sous le bouton.
+        tuile.style.transform = `translateX(${Math.round(160 * echelle)}px)`;
+        setTimeout(() => tuile.remove(), 600);
+    });
+
+    // ─── CEUX QUI ARRIVENT ──────────────────────────────────────────────
+    // Ajoutés en fin d'ordre, donc au rang le plus élevé, donc à gauche.
+    etats.forEach(e => {
+        if (PISTE_ETATS_ORDRE.includes(e.nom)) return;
+        PISTE_ETATS_ORDRE.push(e.nom);
+        const tuile = document.createElement("div");
+        tuile.className = "etat-piste";
+        tuile.dataset.nom = e.nom;
+        tuile.title = e.nom;
+        tuile.onclick = (ev) => { ev.stopPropagation(); window.montrerDureeEtat(e.nom); };
+        // Il naît à sa place puis y glisse : sans ce départ décalé, il
+        // apparaîtrait brutalement au milieu des autres.
+        tuile.style.transform = `translateX(${-Math.round((PISTE_ETATS_ORDRE.length) * pas)}px)`;
+        tuile.style.opacity = "0";
+        piste.appendChild(tuile);
+    });
+
+    // ─── CHACUN À SON RANG ──────────────────────────────────────────────
+    PISTE_ETATS_ORDRE.forEach((nom, rang) => {
+        const tuile = piste.querySelector(`.etat-piste[data-nom="${CSS.escape(nom)}"]`);
+        const etat = etats.find(e => e.nom === nom);
+        if (!tuile || !etat) return;
+        tuile.style.width = taille + "px";
+        tuile.style.height = taille + "px";
+        // L'icône est refaite seulement si elle a changé : la réécrire à chaque
+        // battement du combat relancerait le chargement de l'image.
+        if (tuile.dataset.icone !== (etat.icone || "")) {
+            tuile.dataset.icone = etat.icone || "";
+            tuile.innerHTML = window.imageEtat(etat, Math.round(taille))
+                            + `<div class="etat-piste-duree" style="font-size: ${Math.round(13 * echelle)}px;"></div>`;
+        }
+        const bulle = tuile.querySelector(".etat-piste-duree");
+        if (bulle) bulle.style.fontSize = Math.round(13 * echelle) + "px";
+        requestAnimationFrame(() => {
+            tuile.style.opacity = "1";
+            tuile.style.transform = `translateX(${-Math.round(rang * pas)}px)`;
+        });
+    });
+
+    // ─── LE VOILE SUIT, ET S'EFFACE QUAND IL N'Y A PLUS RIEN ────────────
+    if (voile) {
+        const n = PISTE_ETATS_ORDRE.length;
+        voile.style.width = n === 0 ? "0px"
+            : Math.round((n - 1) * pas + taille + 60 * echelle) + "px";
+        voile.style.opacity = n === 0 ? "0" : "1";
+    }
+    piste.style.height = taille + "px";
+};
+
+// Le combat repart de zéro : la mémoire de l'ordre doit repartir avec lui,
+// sinon la première manche hériterait du tapis de la partie précédente.
+window.oublierPisteEtats = function() {
+    PISTE_ETATS_ORDRE = [];
+    const piste = document.getElementById("piste-etats");
+    if (piste) piste.querySelectorAll(".etat-piste").forEach(t => t.remove());
+    const voile = document.getElementById("piste-etats-voile");
+    if (voile) { voile.style.width = "0px"; voile.style.opacity = "0"; }
+};
+
 window.actualiserHudHeros = function() {
     const arcGauche = document.getElementById("hud-arc-gauche");
     if (!arcGauche) return;                       // pas en combat : rien à peindre
@@ -1300,6 +1459,8 @@ window.actualiserHudHeros = function() {
     // LE NOM. Il n'est réajusté que lorsqu'il change, et seulement quand la
     // boîte a une largeur : mesuré pendant que le combat est encore masqué, il
     // déborderait d'une boîte large de zéro et tomberait à la taille minimale.
+    if (typeof window.actualiserPisteEtats === "function") window.actualiserPisteEtats();
+
     const texteNom = document.getElementById("hud-nom-heros-texte");
     if (divNom && texteNom) {
         const nom = ((heros.prenom || "") + " " + (heros.nom || "")).trim() || heros.idPersonnage;
@@ -4916,6 +5077,10 @@ window.reinitialiserCombat = async function() {
     // plus rien à montrer, et il ferait apparaître des combattants effacés le
     // temps que la nouvelle file arrive.
     window.PISTE_MANCHE = { manche: 0, ordre: [] };
+
+    // Et la piste des états oublie son tapis, pour la même raison : elle garde
+    // l'ordre d'arrivée en mémoire, et cet ordre-là n'a plus d'objet.
+    if (typeof window.oublierPisteEtats === "function") window.oublierPisteEtats();
 
     // LE COMBAT DU NOUVEAU RÉGIME SE FERME AUSSI, ET AVANT LE RESTE. Un état
     // publié qui survivrait à une réinitialisation serait pire qu'inutile : les

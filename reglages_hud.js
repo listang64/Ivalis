@@ -66,7 +66,10 @@
         ancreGauche: { dx: -14, dy: 0 },
         ancreDroite: { dx: 12, dy: 0 },
         avatar: { droite: -30, bas: 56, hauteur: 376 },
-        nom: { gauche: 50, bas: 152, largeur: 330, taille: 38 }
+        nom: { gauche: 50, bas: 152, largeur: 330, taille: 38 },
+        // LA PISTE DES ÉTATS est à GAUCHE du bandeau : sa distance au bord droit
+        // dépasse donc les 450 px de largeur, et c'est normal.
+        etats: { droite: 470, bas: 130, taille: 46, ecart: 12 }
     };
 
     function copierProfond(o) { return JSON.parse(JSON.stringify(o)); }
@@ -186,6 +189,16 @@
             avatar.style.height = px(r.avatar.hauteur);
         }
 
+        // LA PISTE DES ÉTATS. Sa hauteur et l'écart entre les icônes sont posés
+        // par combat.js au moment de la remplir : ici, seulement son ancrage.
+        const etats = document.getElementById("piste-etats");
+        if (etats) {
+            etats.style.right = px(r.etats.droite);
+            etats.style.bottom = px(r.etats.bas);
+            etats.style.height = px(r.etats.taille);
+            if (typeof window.actualiserPisteEtats === "function") window.actualiserPisteEtats();
+        }
+
         // LE NOM. Changer sa largeur ou sa taille change la façon dont il
         // rétrécit : on redemande donc l'ajustement automatique à combat.js.
         const nom = document.getElementById("hud-nom-heros");
@@ -225,6 +238,7 @@
             "    ancreGauche { " + l("ancreGauche", ["dx", "dy"]) + " }",
             "    ancreDroite { " + l("ancreDroite", ["dx", "dy"]) + " }",
             "    avatar      { " + l("avatar", ["droite", "bas", "hauteur"]) + " }",
+            "    etats       { " + l("etats", ["droite", "bas", "taille", "ecart"]) + " }",
             "    nom         { " + l("nom", ["gauche", "bas", "largeur", "taille"]) + " }",
             "",
             JSON.stringify(r)
@@ -246,6 +260,10 @@
         { titre: "Avatar", groupe: "avatar",
           deplacer: { x: "droite", y: "bas", inverseX: true, inverseY: true },
           tailles: [{ cle: "hauteur", nom: "Hauteur", pas: 4 }] },
+        { titre: "Piste des états", groupe: "etats",
+          deplacer: { x: "droite", y: "bas", inverseX: true, inverseY: true },
+          tailles: [{ cle: "taille", nom: "Icônes", pas: 2 },
+                    { cle: "ecart", nom: "Écart", pas: 2 }] },
         { titre: "Nom du héros", groupe: "nom",
           deplacer: { x: "gauche", y: "bas", inverseY: true },
           tailles: [{ cle: "taille", nom: "Police", pas: 1 },

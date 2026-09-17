@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=23">
+  <link rel="stylesheet" href="style.css?v=24">
 
  
   <!-- ===================================================================== -->
@@ -945,6 +945,32 @@
                 </svg>
             </div>
 
+            <!-- =================================================================
+                 LA PISTE DES ÉTATS, À GAUCHE DU BOUTON
+                 =================================================================
+                 Les états que subit le héros du poste — et lui seul, comme les
+                 jauges : le panneau latéral est une visionneuse, pas une source.
+
+                 ELLE EST ÉCRITE AVANT L'IMAGE DU BOUTON, DONC DERRIÈRE, et ce
+                 n'est pas un détail de rangement : c'est ce qui permet à une
+                 icône qui expire de GLISSER VERS LA DROITE ET DE PASSER SOUS LE
+                 BOUTON avant de s'éteindre. Écrite après, elle glisserait
+                 par-dessus et l'effet tomberait à plat.
+
+                 Elle déborde très largement à gauche du bandeau (sa position est
+                 comptée depuis le bord droit, avec une valeur plus grande que la
+                 largeur du bandeau) : le voile noir doit pouvoir s'étendre aussi
+                 loin que le héros a d'états. -->
+            <div id="piste-etats">
+                <!-- LE VOILE. Un dégradé radial, pas une boîte floutée : son
+                     alpha tombe à zéro avant le bord, il n'existe donc aucun
+                     pixel où il s'arrête, et aucune bordure à voir. C'est la
+                     même leçon que l'ombre de la piste d'initiative, apprise
+                     deux fois plutôt qu'une. -->
+                <div id="piste-etats-voile"></div>
+                <!-- Rempli par actualiserPisteEtats (combat.js) -->
+            </div>
+
             <!-- L'image de fond (Éteinte par défaut et avec un ID pour la cibler) -->
             <img id="img-hud-fintour" src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786565146/FinTourEteind_exjtxp.png" style="width: 100%; display: block; pointer-events: none;">
 
@@ -1799,7 +1825,7 @@
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
 <script src="trace_combat.js?v=11"></script>
-<script src="reglages_hud.js?v=5"></script>
+<script src="reglages_hud.js?v=6"></script>
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
@@ -1830,7 +1856,7 @@
 <script type="module" src="competences.js?v=22"></script>
 <script src="Plateau.js"></script>
 <script type="module" src="sequence_tour.js?v=21"></script>
-<script type="module" src="combat.js?v=71"></script>
+<script type="module" src="combat.js?v=72"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=22"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
