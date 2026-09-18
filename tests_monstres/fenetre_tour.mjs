@@ -120,7 +120,13 @@ const res = await p.evaluate(async ({ sVoile, sToggle, sEtatInitial, sSequence }
     fondCarte: carte.style.background || "",
     effetsHtml: effets.innerHTML,
     hexZone: zone.querySelectorAll('polygon').length,
-    opaque: getComputedStyle(voile).backgroundImage
+    // La couche extérieure ne peint plus rien : c'est ce qu'on vérifie
+    // maintenant, à l'exact opposé de ce qu'on vérifiait avant.
+    fondCouche: getComputedStyle(voile).backgroundImage + " " + getComputedStyle(voile).backgroundColor,
+    couleurCarte: getComputedStyle(carte).color,
+    pion: (document.getElementById('voile-tour-pion') || {}).dataset
+        ? document.getElementById('voile-tour-pion').dataset.url || "" : "",
+    encartVisible: !!document.getElementById('voile-tour-encart')
   });
 
   const poser = (queue, phase) => {
@@ -253,13 +259,23 @@ verifier("elle annonce que le tour se prépare, sans OK",
          !res.rienAAnnoncer.okVisible && /se prépare/.test(res.rienAAnnoncer.attente),
          `(${res.rienAAnnoncer.attente})`);
 verifier("le tour à annoncer allume ensuite le OK", res.avecOk.visible && res.avecOk.okVisible);
-verifier("la fenêtre est OPAQUE : rien ne transparaît du tour à venir",
-         !/rgba\([^)]*0\.\d/.test(res.avecOk.opaque), `(${res.avecOk.opaque.slice(0, 70)}…)`);
-verifier("elle s'arrête au bord du panneau latéral",
-         Math.abs(res.avecOk.gauche - res.largeurPanneau) < 2,
-         `(${res.avecOk.gauche}px vs ${res.largeurPanneau}px)`);
-verifier("elle couvre tout le reste de l'écran",
-         Math.abs(res.avecOk.gauche + res.avecOk.largeur - res.largeurEcran) < 2);
+// CE QUI A CHANGÉ DE FOND EN COMBLE : ce n'est plus un écran noir.
+//
+// La fenêtre de tour cachait tout le plateau, et ces contrôles-là vérifiaient
+// justement qu'elle le cachait BIEN — opaque, calée au bord du panneau, et
+// couvrant tout le reste. C'est l'inverse qui est demandé maintenant : un
+// encart posé dans un coin, et la carte visible tout autour, pions et piste
+// d'initiative compris.
+verifier("LA COUCHE NE PEINT PLUS RIEN : le plateau se voit tout autour",
+         !/rgba?\((?!0,\s*0,\s*0,\s*0\))/.test(res.avecOk.fondCouche)
+         && !/gradient/.test(res.avecOk.fondCouche),
+         `(${res.avecOk.fondCouche.trim().slice(0, 60)}…)`);
+verifier("elle couvre bien tout l'écran pour recevoir le clic",
+         res.avecOk.gauche < 2 && Math.abs(res.avecOk.largeur - res.largeurEcran) < 2,
+         `(gauche ${res.avecOk.gauche}, largeur ${res.avecOk.largeur}/${res.largeurEcran})`);
+verifier("L'ENCART EST LÀ, avec le gros pion du combattant",
+         res.avecOk.encartVisible && res.avecOk.pion.length > 0,
+         `encart=${res.avecOk.encartVisible} pion="${res.avecOk.pion}"`);
 verifier("le nom du combattant est affiché", res.avecOk.nom === "Goule putride", `(${res.avecOk.nom})`);
 verifier("dans l'or brossé du panneau latéral", res.memeOr);
 verifier("ses états sont sous son nom", res.avecOk.nbEtats === 2, `(${res.avecOk.nbEtats})`);
@@ -271,19 +287,31 @@ verifier("ses effets sont listés dessous", /Mot de pouvoir/.test(res.avecOk.eff
 verifier("l'initiative n'y figure pas", !/Initiative/.test(res.avecOk.effets));
 verifier("tant qu'aucun événement n'est arrivé, la fenêtre est là mais sans OK",
          res.rienAAnnoncer.visible && !res.rienAAnnoncer.okVisible);
-verifier("panneau replié, la fenêtre prend tout l'écran", res.panneauReplie.gauche < 2,
-         `(${res.panneauReplie.gauche}px)`);
-verifier("le nom de la technique porte la couleur du combattant",
-         /230, 57, 70|#e63946/.test(res.avecOk.fondCarte), `(${res.avecOk.fondCarte.slice(0, 80)}…)`);
-verifier("et garde l'effet brossé (un dégradé, pas un aplat)",
-         /linear-gradient/.test(res.avecOk.fondCarte));
-verifier("les effets sont détaillés : dégâts et pourcentages",
-         /9 dégâts/.test(res.avecOk.effetsHtml) && /45%/.test(res.avecOk.effetsHtml),
-         `(${res.avecOk.effetsHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80)}…)`);
+// LE NOM DE LA TECHNIQUE EST ROUGE POUR TOUT LE MONDE. Il portait la couleur
+// du combattant, en dégradé brossé ; c'est l'attaque qu'on annonce, pas celui
+// qui la lance.
+verifier("LE NOM DE LA TECHNIQUE EST ROUGE", res.avecOk.couleurCarte === "rgb(224, 74, 82)",
+         res.avecOk.couleurCarte);
+verifier("et sans dégradé, un aplat franc",
+         !/gradient/.test(res.avecOk.fondCarte), `(${res.avecOk.fondCarte.slice(0, 50)}…)`);
+
+// PAS DE POURCENTAGES DANS LE DÉTAIL, ET C'EST LE POINT DE CETTE REFONTE.
+//
+// « Peur — 45% de chance » n'apprend rien à qui regarde une animation partir.
+// Le montant de dégâts, si. Le partage se fait sur la description elle-même :
+// celle qui contient un « % » tombe, les autres restent. Ce contrôle vérifie
+// les DEUX côtés du partage — sans le second, on pourrait tout supprimer et
+// passer quand même.
+verifier("LES DÉGÂTS GARDENT LEUR CHIFFRE",
+         /9 dégâts/.test(res.avecOk.effetsHtml),
+         `(${res.avecOk.effetsHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90)}…)`);
+verifier("ET PLUS AUCUN POURCENTAGE N'APPARAÎT",
+         !/%/.test(res.avecOk.effetsHtml),
+         `(${res.avecOk.effetsHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90)}…)`);
+verifier("mais le titre de l'effet à pourcentage reste, lui",
+         /Peur/.test(res.avecOk.effets), `(${res.avecOk.effets.replace(/\s+/g, ' ').trim()})`);
 verifier("la zone de la technique est dessinée à côté", res.avecOk.hexZone === 3,
          `(${res.avecOk.hexZone} hexagone(s))`);
-verifier("la technique d'un héros prend SA couleur, pas le rouge",
-         /74, 163, 223|#4aa3df/.test(res.monTourCouleur || ""), `(${(res.monTourCouleur || "").slice(0, 60)}…)`);
 verifier("l'arrivée d'un événement RETIENT le tour au lieu de le jouer",
          res.enPose.retenu && res.enPose.anims.length === 0, `(${res.enPose.anims.join(">")})`);
 verifier("le gros OK doré s'allume et le clic passe partout sur la fenêtre",
@@ -297,7 +325,19 @@ verifier("une fois touché, l'animation du tour se joue", res.apresClic.anims.jo
 verifier("pendant la relecture, la fenêtre se lève pour laisser voir le plateau",
          res.apresClic.pendantLecture && res.apresClic.pendantLecture.masquee !== false
          || !res.apresClic.visible);
-verifier("au tour de MON héros, aucune fenêtre : le plateau reste dégagé", !res.monTour.visible);
+// L'EXCEPTION DEMANDÉE : LE JOUEUR GARDE SON ENCART TOUT SON TOUR.
+//
+// Il n'en avait aucun, et pour une bonne raison : un écran noir sur son propre
+// tour l'aurait empêché de jouer. L'encart, lui, tient dans un coin — et il a
+// tout intérêt à garder sous les yeux ce que fait la compétence qu'il vient de
+// retenir. La condition est qu'il ne prenne AUCUN clic : sinon il avalerait
+// les clics de ciblage destinés au plateau, et le joueur ne pourrait plus viser.
+verifier("À MON TOUR, L'ENCART RESTE AFFICHÉ", res.monTour.visible);
+verifier("ET IL NE PREND AUCUN CLIC (sinon le ciblage serait avalé)",
+         res.monTour.clicPasse === false);
+verifier("il n'attend personne et n'affiche aucun bouton",
+         res.monTour.attente === "" && res.monTour.okVisible === false,
+         `(« ${res.monTour.attente} »)`);
 verifier("au tour du héros d'un AUTRE JOUEUR aussi, la fenêtre se pose dès le début",
          res.tourDeLautre.visible, `(${res.tourDeLautre.attente})`);
 verifier("mais dès qu'il agit, la fenêtre sombre s'ouvre chez les autres",

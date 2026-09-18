@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=24">
+  <link rel="stylesheet" href="style.css?v=25">
 
  
   <!-- ===================================================================== -->
@@ -817,37 +817,56 @@
              cacher — on ne verra ce tour qu'à sa relecture.
              Elle s'arrête au bord du panneau latéral (380px) et va jusqu'au bord
              de l'écran quand celui-ci est replié. -->
-        <div id="voile-tour-combat" onclick="window.jouerSequenceTour(event)" style="position: absolute; top: 0; bottom: 0; left: 380px; right: 0; z-index: 12; display: none; opacity: 0; pointer-events: none; transition: opacity 0.45s ease, left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); background: radial-gradient(ellipse at 50% 35%, #14100c 0%, #050403 70%, #000000 100%); overflow: hidden;">
+        <!-- =================================================================
+             L'ENCART DE TOUR
+             =================================================================
+             Il remplace l'écran noir qui s'intercalait avant chaque animation.
+             Le plateau reste visible tout autour : on garde les pions et la
+             piste d'initiative à l'œil pendant qu'on lit ce qui va se passer.
 
-            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 5vh 4vw 4vh 4vw; box-sizing: border-box; text-align: center; pointer-events: none;">
+             LA COUCHE EXTÉRIEURE EST TRANSPARENTE, et elle sert encore : c'est
+             elle qui reçoit le clic « n'importe où sur l'écran » qui lance le
+             tour. Elle ne prend les clics que lorsqu'il y a quelque chose à
+             déclencher — et jamais pendant le tour du joueur lui-même, qui doit
+             pouvoir viser et se déplacer par-dessus. -->
+        <div id="voile-tour-combat" onclick="window.jouerSequenceTour(event)"
+             style="position: absolute; top: 0; bottom: 0; left: 0; right: 0; z-index: 12;
+                    display: none; opacity: 0; pointer-events: none;
+                    transition: opacity 0.45s ease; overflow: visible;">
 
-                <!-- Le nom du combattant, dans l'or brossé du panneau latéral -->
-                <div id="voile-tour-nom" style="max-width: 100%; font-family: 'Cinzel', serif; font-size: 46px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; background: linear-gradient(135deg, #fbf5bd 0%, #c2a878 25%, #5c3a21 50%, #e8d5a5 75%, #ffffff 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.9));"></div>
+            <div id="voile-tour-encart">
+                <!-- Le fond. Sa hauteur est LIBRE : l'encart prend celle de
+                     l'image, quelles que soient ses proportions, et tout ce qui
+                     se pose dessus est placé en pourcentages de cette boîte. On
+                     n'a donc pas besoin de connaître le rapport de l'image pour
+                     que la mise en page tombe juste. -->
+                <img id="voile-tour-fond"
+                     src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789309133/IMG_2122_kt97do.png"
+                     alt="">
 
-                <!-- Les états qu'il porte, juste sous son nom -->
-                <div id="voile-tour-etats" style="display: flex; gap: 16px; justify-content: center; align-items: center; margin-top: 12px; min-height: 6px;"></div>
-
-                <!-- La technique qu'il joue, en grand. Sa couleur est celle du
-                     héros — rouge pour une créature — et le dégradé brossé lui
-                     est bâti à la volée par rafraichirVoileTour (combat.js). -->
-                <div id="voile-tour-carte" style="max-width: 100%; margin-top: 4vh; font-family: 'Cinzel', serif; font-size: 38px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; line-height: 1.2; color: #e8d5a5; -webkit-background-clip: text; background-clip: text; filter: drop-shadow(2px 3px 6px rgba(0,0,0,0.95));"></div>
-
-                <!-- Le détail de ses effets, à gauche, et le dessin de la zone
-                     à droite quand la technique en porte une. -->
-                <div style="display: flex; align-items: flex-start; justify-content: center; gap: 34px; margin-top: 16px; max-width: 100%;">
-                    <div id="voile-tour-effets" style="text-align: left; max-width: 46vw; font-family: 'Almendra', serif; font-size: 18px; line-height: 1.35; color: #c2a878; text-shadow: 1px 1px 3px black;"></div>
-                    <div id="voile-tour-zone" style="flex-shrink: 0;"></div>
+                <!-- LE GROS PION DU COMBATTANT, à gauche, et ses états dessous. -->
+                <div id="voile-tour-pion-boite">
+                    <img id="voile-tour-pion" src="" alt="">
+                    <div id="voile-tour-etats"></div>
                 </div>
 
-                <!-- Qui l'on attend encore, ou l'invitation à jouer les animations -->
-                <div id="voile-tour-attente" style="margin-top: 4vh; font-family: 'Almendra', serif; font-size: 16px; font-style: italic; color: #8a8078; text-shadow: 1px 1px 3px black;"></div>
-
-                <!-- Le gros bouton doré n'est plus utilisé : chaque écran rejoue
-                     le journal du combat tout seul, sans attendre les autres. Il
-                     reste ici, masqué, plutôt que d'éparpiller sa mise en page. -->
-                <div id="voile-tour-ok" class="btn-lancer-carte btn-ok-voile" style="display: none;">OK</div>
-                <div id="voile-tour-forcer" style="display: none;"></div>
+                <!-- La colonne centrale : qui joue, ce qu'il lance, ce que ça fait. -->
+                <div id="voile-tour-textes">
+                    <div id="voile-tour-nom"></div>
+                    <div id="voile-tour-carte"></div>
+                    <div id="voile-tour-bas">
+                        <div id="voile-tour-effets"></div>
+                        <div id="voile-tour-zone"></div>
+                    </div>
+                    <div id="voile-tour-attente"></div>
+                </div>
             </div>
+
+            <!-- Le gros bouton doré n'est plus utilisé : chaque écran rejoue le
+                 journal du combat tout seul, sans attendre les autres. Il reste
+                 ici, masqué, plutôt que d'éparpiller sa mise en page. -->
+            <div id="voile-tour-ok" class="btn-lancer-carte btn-ok-voile" style="display: none;">OK</div>
+            <div id="voile-tour-forcer" style="display: none;"></div>
 
             <!-- LA SORTIE DE SECOURS. Une croix rouge qui lève la fenêtre sombre
                  sans rien jouer : on voit le plateau tel qu'il est vraiment, on
@@ -1825,7 +1844,7 @@
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
 <script src="trace_combat.js?v=11"></script>
-<script src="reglages_hud.js?v=6"></script>
+<script src="reglages_hud.js?v=7"></script>
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
@@ -1855,8 +1874,8 @@
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=22"></script>
 <script src="Plateau.js"></script>
-<script type="module" src="sequence_tour.js?v=21"></script>
-<script type="module" src="combat.js?v=72"></script>
+<script type="module" src="sequence_tour.js?v=22"></script>
+<script type="module" src="combat.js?v=73"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=22"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->

@@ -4545,11 +4545,23 @@ window.donneesCarteCombattant = function(idPersonnage, idCarte) {
         || null;
 };
 
-// Les effets d'une carte, en toutes lettres : le nom de l'effet, puis SA
-// DESCRIPTION — les dégâts, les pourcentages, les durées. C'est exactement ce
-// que la carte elle-même affiche en grand format ; il n'y a aucune raison que
-// la fenêtre de tour en dise moins. "Initiative +" n'en fait pas partie : ce
-// n'est pas un effet de jeu, et la carte ne l'affiche pas non plus.
+// Les effets d'une carte, en toutes lettres. "Initiative +" n'en fait pas
+// partie : ce n'est pas un effet de jeu, et la carte ne l'affiche pas non plus.
+//
+// PAS DE POURCENTAGES DANS L'ENCART DE TOUR, ET LA RÈGLE SE LIT DANS LE TEXTE.
+//
+// L'encart annonce ce qui va se passer, en une seconde, pendant qu'on regarde
+// le plateau. « Peur — 6% chance de faire Peur (Max 60%) » n'a rien à y faire :
+// le joueur veut savoir qu'il y a de la Peur, pas jouer aux probabilités. Un
+// montant de dégâts ou un nombre de cases, lui, change ce qu'on va voir.
+//
+// Le partage se fait sur la description elle-même, et pas sur une liste
+// d'effets tenue à la main : toute description qui contient un « % » tombe,
+// toutes les autres restent. C'est exactement le découpage voulu sur les vrais
+// effets du jeu — « 2 dégats physique », « 1 hexagone » et « 2 soins » restent ;
+// « Peur », « Brûlé » et « Bouclier magique » (dont le texte dit « 30% des pv
+// restants ») se réduisent à leur titre — et une nouvelle chance qu'on ajoutera
+// un jour au bestiaire suivra la règle sans qu'on y pense.
 window.ligneEffetsCarte = function(dataCarte) {
     const effets = (dataCarte && dataCarte.Effets_Compiles) || [];
     const lignes = [];
@@ -4560,7 +4572,7 @@ window.ligneEffetsCarte = function(dataCarte) {
         if (typeof eff === "string") {
             const brut = eff.replace(/\s+/g, " ").trim();
             if (!brut || brut.indexOf("Initiative +") >= 0) return;
-            lignes.push(`<div style="margin-top: 6px; color: #e8d5a5;">• ${brut}</div>`);
+            lignes.push(`<div style="margin-top: 6px; color: #f4efe4;">• ${brut}</div>`);
             return;
         }
         if (!eff || !eff.nom) return;
@@ -4569,11 +4581,12 @@ window.ligneEffetsCarte = function(dataCarte) {
         if (eff.isZone) return;
 
         const estMod = !!eff.isMod;
-        const retrait = estMod ? "margin-left: 18px; margin-top: 4px;" : "margin-top: 10px;";
-        const couleur = estMod ? "#c2a878" : "#e8d5a5";
+        const retrait = estMod ? "margin-left: 18px; margin-top: 4px;" : "margin-top: 8px;";
+        const couleur = estMod ? "#ddd4c4" : "#f4efe4";
         const prefixe = estMod ? "↳ " : "• ";
-        const detail = eff.desc
-            ? `<div style="color: #a89f91; font-size: 15px; font-style: italic; line-height: 1.3; margin-left: 14px;">${eff.desc}</div>`
+        const chiffre = eff.desc && !/%/.test(eff.desc);
+        const detail = chiffre
+            ? `<div style="color: #cfc6b6; font-size: 15px; font-style: italic; line-height: 1.3; margin-left: 14px;">${eff.desc}</div>`
             : "";
         lignes.push(`<div style="${retrait}">
                 <div style="color: ${couleur}; font-weight: bold;">${prefixe}${eff.nom}</div>
@@ -4743,18 +4756,36 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
         if (typeof window.estCombattantMort === "function" && window.estCombattantMort(tete.idPersonnage)) return masquer();
     }
 
-    // La fenêtre s'arrête au bord du panneau latéral, et va jusqu'au bord de
-    // l'écran quand celui-ci est replié : elle couvre « le reste de l'écran ».
-    voile.style.left = window.PANNEAU_GAUCHE_OUVERT ? "380px" : "0px";
-
     const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === tete.idPersonnage) || {};
+
+    // LE GROS PION DU COMBATTANT. Une créature porte l'image commune des
+    // ennemis, celle-là même qu'elle a sur le plateau et dans la piste : on
+    // reconnaît qui frappe sans avoir à lire.
+    const elPion = document.getElementById("voile-tour-pion");
+    if (elPion) {
+        const estCreature = !!perso.estMonstre
+            || (typeof window.estMonstre === "function" && window.estMonstre(tete.idPersonnage));
+        // LES DEUX REPLIS NE SONT PAS DÉCORATIFS. Une fiche sans portrait, ça
+        // arrive ; et IMAGE_TOKEN_ENNEMI vit plus haut dans ce même fichier,
+        // donc à portée en vraie page — mais pas forcément dans un banc qui
+        // n'en charge qu'un morceau. Sans repli, `url` valait `undefined`, la
+        // garde « a-t-elle changé ? » comparait undefined à undefined, l'image
+        // n'était jamais posée, et le pion restait vide sans un mot.
+        const url = (estCreature
+            ? window.IMAGE_TOKEN_ENNEMI
+            : perso.urlCloudinary)
+            || "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1786114507/Les_humains_h0ubwh.png";
+        // Réécrire `src` à chaque battement relancerait le chargement de
+        // l'image, et le pion clignoterait pendant tout le tour.
+        if (elPion.dataset.url !== url) { elPion.dataset.url = url; elPion.src = url; }
+    }
 
     const elNom = document.getElementById("voile-tour-nom");
     const nom = ((perso.prenom || "") + " " + (perso.nom || "")).trim() || "Combattant";
     if (elNom && elNom.dataset.nom !== nom) {
         elNom.dataset.nom = nom;
         elNom.textContent = nom;
-        ajusterSurUneLigne(elNom, 46, 22);
+        ajusterSurUneLigne(elNom, 42, 20);
     }
 
     // Les états qu'il porte, dans les mêmes icônes que le panneau latéral.
@@ -4764,19 +4795,19 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
         const signature = etats.map(e => e.nom + ":" + e.duree).join("|");
         if (elEtats.dataset.signature !== signature) {
             elEtats.dataset.signature = signature;
-            elEtats.innerHTML = etats.map(etat => `
-                <div style="position: relative; text-align: center;">
-                    ${window.imageEtat(etat, 58)}
-                    <div style="margin-top: 2px; font-family: 'Almendra', serif; font-size: 12px; color: #a89f91; text-shadow: 1px 1px 3px black;">${etat.nom} (${etat.duree})</div>
-                </div>`).join("");
+            // Les icônes seules, sous le pion : leur nom tiendrait mal dans une
+            // colonne aussi étroite, et il est déjà dans l'infobulle.
+            elEtats.innerHTML = etats.map(etat =>
+                `<div title="${etat.nom} (${etat.duree})" style="line-height: 0;">${window.imageEtat(etat, 32)}</div>`
+            ).join("");
         }
     }
 
     let titre = "";
     let ligne = "";
     let dessinZone = "";
-    // La couleur du héros — le rouge de sang pour une créature — habille le nom
-    // de sa technique. On la sait d'un coup d'œil, sans lire.
+    // La couleur du combattant ne sert plus qu'au dessin de sa zone : le nom de
+    // la technique est rouge pour tout le monde (voir plus bas).
     const couleur = window.couleurCombattant(perso);
     if (tete.idCarte === "REPOS_LONG") {
         titre = "Repos Long";
@@ -4792,16 +4823,9 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
     const elCarte = document.getElementById("voile-tour-carte");
     const elEffets = document.getElementById("voile-tour-effets");
     const elZone = document.getElementById("voile-tour-zone");
-    if (elCarte && (elCarte.textContent !== titre || elCarte.dataset.couleur !== couleur)) {
-        elCarte.dataset.couleur = couleur;
+    if (elCarte && elCarte.textContent !== titre) {
         elCarte.textContent = titre;
-        // Le dégradé brossé du panneau, transposé dans sa couleur : l'effet est
-        // le même, seule la teinte change.
-        elCarte.style.background = window.degradeBrosse(couleur);
-        elCarte.style.webkitBackgroundClip = "text";
-        elCarte.style.backgroundClip = "text";
-        elCarte.style.webkitTextFillColor = "transparent";
-        ajusterSurUneLigne(elCarte, 38, 18);
+        ajusterSurUneLigne(elCarte, 26, 14);
     }
     if (elEffets && elEffets.innerHTML !== ligne) elEffets.innerHTML = ligne;
     if (elZone && elZone.innerHTML !== dessinZone) elZone.innerHTML = dessinZone;
@@ -4811,6 +4835,28 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
     const elOk = document.getElementById("voile-tour-ok");
     const elForcer = document.getElementById("voile-tour-forcer");
     const etape = typeof window.etatSequenceTour === "function" ? window.etatSequenceTour() : null;
+
+    // LE TOUR DU JOUEUR GARDE SON ENCART DU DÉBUT À LA FIN.
+    //
+    // C'est l'exception voulue : celui qui joue doit avoir sous les yeux ce que
+    // fait la compétence qu'il vient de retenir, pendant qu'il vise et qu'il se
+    // déplace. L'encart ne se lève donc pas au milieu de son tour, et surtout il
+    // ne prend AUCUN clic — sans quoi il avalerait les clics de ciblage destinés
+    // au plateau. Il s'en va tout seul quand la tête de file change.
+    if (seq.monTour) {
+        // Ni message d'attente ni bouton : il n'attend personne, c'est son tour.
+        const att = document.getElementById("voile-tour-attente");
+        if (att) att.textContent = "";
+        const ok0 = document.getElementById("voile-tour-ok");
+        if (ok0) ok0.style.display = "none";
+        const fo0 = document.getElementById("voile-tour-forcer");
+        if (fo0) fo0.style.display = "none";
+        voile.style.display = "block";
+        voile.style.pointerEvents = "none";
+        void voile.offsetWidth;
+        voile.style.opacity = "1";
+        return;
+    }
 
     // Le joueur a appuyé sur OK : la fenêtre se lève pour laisser voir les
     // animations. Elle ne revient que si la barrière suivante fait attendre.

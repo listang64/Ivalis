@@ -675,12 +675,22 @@ Object.defineProperty(window, "SEQUENCE_TOUR", {
         // combattant qu'il montre, pas celui que la file a déjà désigné.
         const ev = window.EVENEMENT_EN_COURS || window.EVENEMENT_ATTENDU;
         if (ev && ev.acteur) {
-            return { acteur: ev.acteur, idCarte: ev.idCarte, evenement: true, voile: !estMonHeros(ev.acteur) };
+            return { acteur: ev.acteur, idCarte: ev.idCarte, evenement: true,
+                     voile: true, monTour: estMonHeros(ev.acteur) };
         }
         const tete = window.acteurCourantCombat();
         if (!tete) return null;
         if (typeof window.estCombattantMort === "function" && window.estCombattantMort(tete.idPersonnage)) return null;
-        return { acteur: tete.idPersonnage, idCarte: tete.idCarte, voile: !window.monHerosJoue() };
+        // L'ENCART S'AFFICHE AUSSI QUAND C'EST À MOI, ET C'EST NOUVEAU.
+        //
+        // La fenêtre de tour était un écran noir : la montrer au joueur dont
+        // c'est le tour l'aurait empêché de jouer, d'où ce `voile: false`. Ce
+        // n'est plus un écran noir mais un encart posé dans un coin, et le
+        // joueur a tout intérêt à garder sous les yeux ce que fait la
+        // compétence qu'il vient de retenir. `monTour` dit à l'affichage de le
+        // laisser en place, sans jamais prendre un clic (voir combat.js).
+        return { acteur: tete.idPersonnage, idCarte: tete.idCarte,
+                 voile: true, monTour: window.monHerosJoue() };
     }
 });
 

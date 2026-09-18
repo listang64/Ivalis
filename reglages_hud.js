@@ -69,7 +69,12 @@
         nom: { gauche: 50, bas: 152, largeur: 330, taille: 38 },
         // LA PISTE DES ÉTATS est à GAUCHE du bandeau : sa distance au bord droit
         // dépasse donc les 450 px de largeur, et c'est normal.
-        etats: { droite: 470, bas: 130, taille: 46, ecart: 12 }
+        etats: { droite: 470, bas: 130, taille: 46, ecart: 12 },
+        // L'ENCART DE TOUR N'APPARTIENT PAS AU BANDEAU : il se place par rapport
+        // à l'écran, et il n'est donc PAS mis à l'échelle avec lui. Sa largeur
+        // est bornée par la fenêtre dans la feuille de style, ce qui le protège
+        // déjà des petits écrans.
+        encart: { gauche: 26, bas: 18, largeur: 760 }
     };
 
     function copierProfond(o) { return JSON.parse(JSON.stringify(o)); }
@@ -199,6 +204,15 @@
             if (typeof window.actualiserPisteEtats === "function") window.actualiserPisteEtats();
         }
 
+        // L'ENCART DE TOUR, en pixels d'écran et sans mise à l'échelle : il ne
+        // vit pas dans le bandeau, il se pose dans le coin de la fenêtre.
+        const encart = document.getElementById("voile-tour-encart");
+        if (encart) {
+            encart.style.left = r.encart.gauche + "px";
+            encart.style.bottom = r.encart.bas + "px";
+            encart.style.width = `min(${r.encart.largeur}px, 64vw)`;
+        }
+
         // LE NOM. Changer sa largeur ou sa taille change la façon dont il
         // rétrécit : on redemande donc l'ajustement automatique à combat.js.
         const nom = document.getElementById("hud-nom-heros");
@@ -239,6 +253,7 @@
             "    ancreDroite { " + l("ancreDroite", ["dx", "dy"]) + " }",
             "    avatar      { " + l("avatar", ["droite", "bas", "hauteur"]) + " }",
             "    etats       { " + l("etats", ["droite", "bas", "taille", "ecart"]) + " }",
+            "    encart      { " + l("encart", ["gauche", "bas", "largeur"]) + " }",
             "    nom         { " + l("nom", ["gauche", "bas", "largeur", "taille"]) + " }",
             "",
             JSON.stringify(r)
@@ -264,6 +279,9 @@
           deplacer: { x: "droite", y: "bas", inverseX: true, inverseY: true },
           tailles: [{ cle: "taille", nom: "Icônes", pas: 2 },
                     { cle: "ecart", nom: "Écart", pas: 2 }] },
+        { titre: "Encart de tour", groupe: "encart",
+          deplacer: { x: "gauche", y: "bas", inverseY: true },
+          tailles: [{ cle: "largeur", nom: "Largeur", pas: 10 }] },
         { titre: "Nom du héros", groupe: "nom",
           deplacer: { x: "gauche", y: "bas", inverseY: true },
           tailles: [{ cle: "taille", nom: "Police", pas: 1 },
