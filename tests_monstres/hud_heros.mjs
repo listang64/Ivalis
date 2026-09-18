@@ -22,7 +22,10 @@
 //     450 à 380 px), à l'échelle près et sans qu'un seul élément se décale ;
 //   • LA PISTE DES ÉTATS se comporte en tapis roulant : les nouveaux entrent
 //     par la gauche, ceux qui expirent filent à droite SOUS le bouton, et un
-//     clic annonce les tours restants deux secondes.
+//     clic annonce les tours restants deux secondes ;
+//   • L'ENCART DE TOUR est entièrement LIÉ À SON IMAGE : quand la plaque se
+//     réduit, tout ce qui est posé dessus se réduit dans les mêmes proportions,
+//     polices comprises.
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
@@ -442,41 +445,44 @@ console.log("=========================================================");
   verifier("revenu à un nom court, la taille remonte", retour.taille === 38, `${retour.taille}px`);
 }
 
-console.log("\n=========================================================");
 console.log("  9. LA BOÎTE DE RÉGLAGE BOUGE CE QU'ELLE DIT QU'ELLE BOUGE");
 console.log("=========================================================");
 {
   // Cette boîte est un outil provisoire, mais c'est celui sur lequel repose tout
-  // le calage du bloc : le disque du bouton est peint dans une image, sa taille
-  // et sa place ne se lisent nulle part, et le premier essai à l'aveugle a visé
-  // quinze pixels trop court — l'anneau avait entièrement disparu derrière le
-  // bouton. Si ses flèches mentent, on règle dans le vide.
+  // le calage : le fond de l'encart est une image, sa taille et la place de ce
+  // qu'on pose dessus ne se lisent nulle part. Si ses flèches mentent, on règle
+  // dans le vide.
   //
   // LE PIÈGE EST DANS LES SIGNES. Plusieurs valeurs se comptent depuis le bord
   // DROIT ou le bord BAS : les augmenter déplace l'élément vers la gauche ou
   // vers le haut. Une flèche « ◀ » doit montrer ce qu'on VOIT, pas ce que la
   // valeur fait. On mesure donc des pixels à l'écran, jamais les nombres.
-  const outils = await p.evaluate(() => ({
-    boite: !!document.getElementById("reglage-hud"),
-    poignee: !!document.getElementById("reglage-hud-poignee"),
-    reglages: !!window.REGLAGES_HUD,
-    appliquer: typeof window.appliquerReglagesHud === "function"
-  }));
+  const outils = await p.evaluate(async () => {
+    window.ENCART_FIGE = true;                    // l'encart reste à l'écran
+    document.getElementById("fenetre-combat").style.display = "block";
+    await new Promise(r => setTimeout(r, 900));
+    return {
+      boite: !!document.getElementById("reglage-hud"),
+      poignee: !!document.getElementById("reglage-hud-poignee"),
+      reglages: !!window.REGLAGES_HUD,
+      encartVu: document.getElementById("voile-tour-encart").getBoundingClientRect().width > 100
+    };
+  });
   verifier("la boîte de réglage est là", outils.boite === true);
   verifier("sa poignée aussi", outils.poignee === true);
   verifier("les réglages sont exposés", outils.reglages === true);
+  verifier("et l'encart se laisse figer pour être réglé", outils.encartVu === true);
 
-  // Un clic sur une flèche, par le titre de sa ligne et le signe du bouton.
-  const cliquer = (titre, signe, fois = 1) => p.evaluate(async ([t, sg, n]) => {
+  const cliquer = (titre, signe, fois = 1, rang = 0) => p.evaluate(async ([t, sg, n, k]) => {
     const blocs = [...document.querySelectorAll("#reglage-hud > div")];
     const bloc = blocs.find(b => (b.firstChild && b.firstChild.textContent || "").startsWith(t));
     if (!bloc) return "ligne introuvable : " + t;
-    const b = [...bloc.querySelectorAll("button")].find(x => x.textContent === sg);
+    const b = [...bloc.querySelectorAll("button")].filter(x => x.textContent === sg)[k];
     if (!b) return "bouton introuvable : " + sg;
     for (let i = 0; i < n; i++) b.click();
-    await new Promise(r => setTimeout(r, 120));
+    await new Promise(r => setTimeout(r, 150));
     return "ok";
-  }, [titre, signe, fois]);
+  }, [titre, signe, fois, rang]);
 
   const ou = (id) => p.evaluate((i) => {
     const r = document.getElementById(i).getBoundingClientRect();
@@ -484,72 +490,67 @@ console.log("=========================================================");
              l: Math.round(r.width), h: Math.round(r.height) };
   }, id);
 
-  // L'AVATAR : sa position se compte depuis le bord droit ET le bord bas, donc
-  // les deux axes sont inversés. C'est exactement là qu'une flèche se trompe.
+  // LA PLAQUE : sa position se compte depuis la gauche ET depuis le BAS, donc
+  // seul l'axe vertical est inversé. C'est exactement là qu'une flèche se trompe.
   {
-    const avant = await ou("hud-avatar-heros");
-    verifier("clic sur ◀ de l'avatar", (await cliquer("Avatar", "◀", 5)) === "ok");
-    const apres = await ou("hud-avatar-heros");
-    verifier("◀ DÉPLACE BIEN L'AVATAR VERS LA GAUCHE",
-             apres.x < avant.x, `${avant.x} → ${apres.x}`);
-    await cliquer("Avatar", "▶", 5);
+    const avant = await ou("voile-tour-encart");
+    verifier("clic sur ◀ de la plaque", (await cliquer("Plaque", "◀", 5)) === "ok");
+    const apres = await ou("voile-tour-encart");
+    verifier("◀ DÉPLACE BIEN LA PLAQUE VERS LA GAUCHE", apres.x < avant.x, `${avant.x} → ${apres.x}`);
+    await cliquer("Plaque", "▶", 5);
 
-    const avantH = await ou("hud-avatar-heros");
-    await cliquer("Avatar", "▲", 5);
-    const apresH = await ou("hud-avatar-heros");
-    verifier("▲ le fait bien monter", apresH.y < avantH.y, `${avantH.y} → ${apresH.y}`);
-    await cliquer("Avatar", "▼", 5);
-
-    const avantT = await ou("hud-avatar-heros");
-    await cliquer("Avatar", "+", 4);
-    const apresT = await ou("hud-avatar-heros");
-    verifier("« + » l'agrandit vraiment", apresT.h > avantT.h, `${avantT.h} → ${apresT.h}px`);
-    await cliquer("Avatar", "−", 4);
+    const avantH = await ou("voile-tour-encart");
+    await cliquer("Plaque", "▲", 5);
+    const apresH = await ou("voile-tour-encart");
+    verifier("▲ la fait bien monter", apresH.y < avantH.y, `${avantH.y} → ${apresH.y}`);
+    await cliquer("Plaque", "▼", 5);
   }
 
-  // L'ANNEAU : diamètre et épaisseur, les deux réglages qui manquaient le plus.
+  // LE PION : la demande explicite était de pouvoir aussi l'agrandir et le
+  // réduire, en plus de le déplacer.
   {
-    const avant = await ou("hud-anneau-boite");
-    await cliquer("Anneau des jauges", "+", 5);      // premier « + » = diamètre
-    const apres = await ou("hud-anneau-boite");
-    verifier("« + » AGRANDIT L'ANNEAU", apres.l > avant.l, `${avant.l} → ${apres.l}px`);
-    verifier("et il reste centré au même endroit",
-             Math.abs(apres.x - avant.x) <= 1 && Math.abs(apres.y - avant.y) <= 1,
-             `${avant.x},${avant.y} → ${apres.x},${apres.y}`);
-    await cliquer("Anneau des jauges", "−", 5);
+    const avant = await ou("voile-tour-pion-boite");
+    verifier("clic sur ◀ du pion", (await cliquer("Pion du combattant", "◀", 4)) === "ok");
+    const apres = await ou("voile-tour-pion-boite");
+    verifier("◀ DÉPLACE BIEN LE PION VERS LA GAUCHE", apres.x < avant.x, `${avant.x} → ${apres.x}`);
+    await cliquer("Pion du combattant", "▶", 4);
 
-    const trait = await p.evaluate(async () => {
-      const lire = () => parseFloat(getComputedStyle(document.getElementById("hud-arc-gauche")).strokeWidth);
-      const avant = lire();
-      const blocs = [...document.querySelectorAll("#reglage-hud > div")];
-      const bloc = blocs.find(b => (b.firstChild && b.firstChild.textContent || "").startsWith("Anneau"));
-      const plus = [...bloc.querySelectorAll("button")].filter(x => x.textContent === "+");
-      for (let i = 0; i < 4; i++) plus[1].click();   // second « + » = épaisseur
-      await new Promise(r => setTimeout(r, 120));
-      return { avant, apres: lire() };
-    });
-    verifier("l'épaisseur du trait se règle aussi",
-             trait.apres > trait.avant, `${trait.avant} → ${trait.apres}`);
-    await p.evaluate(async () => {
-      const blocs = [...document.querySelectorAll("#reglage-hud > div")];
-      const bloc = blocs.find(b => (b.firstChild && b.firstChild.textContent || "").startsWith("Anneau"));
-      const moins = [...bloc.querySelectorAll("button")].filter(x => x.textContent === "−");
-      for (let i = 0; i < 4; i++) moins[1].click();
-      await new Promise(r => setTimeout(r, 120));
-    });
+    const avantH = await ou("voile-tour-pion-boite");
+    await cliquer("Pion du combattant", "▲", 4);
+    const apresH = await ou("voile-tour-pion-boite");
+    verifier("▲ le fait bien monter", apresH.y < avantH.y, `${avantH.y} → ${apresH.y}`);
+    await cliquer("Pion du combattant", "▼", 4);
+
+    const avantT = await ou("voile-tour-pion-boite");
+    await cliquer("Pion du combattant", "+", 4);
+    const apresT = await ou("voile-tour-pion-boite");
+    verifier("« + » AGRANDIT VRAIMENT LE PION", apresT.l > avantT.l, `${avantT.l} → ${apresT.l}px`);
+    await cliquer("Pion du combattant", "−", 4);
+    const retour = await ou("voile-tour-pion-boite");
+    verifier("et « − » le réduit d'autant", Math.abs(retour.l - avantT.l) <= 1,
+             `${apresT.l} → ${retour.l} (départ ${avantT.l})`);
+  }
+
+  // LA POLICE DU NOM se règle aussi, et c'est le second bouton de sa ligne.
+  {
+    const police = () => p.evaluate(() =>
+      Math.round(parseFloat(getComputedStyle(document.getElementById("voile-tour-nom")).fontSize) * 10) / 10);
+    const avant = await police();
+    await cliquer("Nom du combattant", "+", 4);
+    const apres = await police();
+    verifier("la police du nom s'agrandit", apres > avant, `${avant} → ${apres}px`);
+    await cliquer("Nom du combattant", "−", 4);
   }
 
   // LE CODE À RENVOYER : c'est le seul chemin entre l'écran et le dépôt.
   {
     const code = await p.evaluate(() => {
-      window.REGLAGES_HUD.anneau.diametre = 199;
+      window.REGLAGES_HUD.encartPion.taille = 31;
       return window.codeReglagesHud();
     });
     verifier("le code extrait porte les valeurs réglées",
-             code.includes("diametre: 199"), code.split("\n")[1]);
-    verifier("il donne aussi les cinq groupes",
-             ["anneau", "ancreGauche", "ancreDroite", "avatar", "nom"].every(g => code.includes(g)));
-    verifier("et une forme recopiable d'un bloc", code.includes('"diametre":199'));
+             code.includes("taille: 31"), (code.split("\n").find(l => l.includes("encartPion")) || "").trim());
+    verifier("et une forme recopiable d'un bloc", code.includes('"encartPion"'));
   }
 
   // LE RETOUR AUX VALEURS D'ORIGINE, pour ne jamais rester coincé sur un
@@ -559,11 +560,12 @@ console.log("=========================================================");
       const b = [...document.querySelectorAll("#reglage-hud button")]
         .find(x => x.textContent.includes("Défaut"));
       b.click();
-      await new Promise(r => setTimeout(r, 150));
+      await new Promise(r => setTimeout(r, 200));
     });
-    const d = await p.evaluate(() => window.REGLAGES_HUD.anneau.diametre);
-    verifier("« Défaut » remet tout en place", d === 180, String(d));
+    const t = await p.evaluate(() => window.REGLAGES_HUD.encartPion.taille);
+    verifier("« Défaut » remet tout en place", t === 24, String(t));
   }
+  await p.evaluate(() => { window.ENCART_FIGE = false; });
 }
 
 console.log("\n=========================================================");
@@ -830,6 +832,170 @@ console.log("=========================================================");
       window.COMBAT_PERSOS_JOUEUR_BACKUP = null;
     });
   }
+}
+
+console.log("\n=========================================================");
+console.log("  12. L'ENCART DE TOUR EST LIÉ À SON IMAGE");
+console.log("=========================================================");
+{
+  // LA SURPRISE QU'ON VEUT ÉVITER, ET ELLE EST CONCRÈTE.
+  //
+  // La plaque de l'encart a sa largeur bornée par la fenêtre : sur un écran
+  // étroit, elle se réduit. Si une seule mesure posée dessus était en pixels —
+  // une taille de police, la largeur du pion — elle tiendrait bon pendant que
+  // la plaque rétrécit autour d'elle, et le texte sortirait du cadre. C'est
+  // exactement ce qui s'est produit sur le bandeau du bouton de fin de tour,
+  // qui passe de 450 à 380 px sur tablette.
+  //
+  // ON NE MESURE DONC PAS DES PIXELS, MAIS DES RAPPORTS : chaque mesure divisée
+  // par la largeur de l'image. Ces rapports doivent être les MÊMES à deux
+  // largeurs de plaque différentes. C'est la définition de « lié à l'image ».
+  const montrer = () => p.evaluate(async () => {
+    window.ENCART_FIGE = true;
+    document.getElementById("fenetre-combat").style.display = "block";
+    await new Promise(r => setTimeout(r, 900));       // la surveillance le repose
+  });
+  await montrer();
+
+  const rapports = () => p.evaluate(() => {
+    const encart = document.getElementById("voile-tour-encart");
+    const boite = encart.getBoundingClientRect();
+    const L = boite.width;
+    if (L <= 0) return null;
+    const lire = (id) => {
+      const el = document.getElementById(id);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return {
+        x: +((r.left - boite.left) / L).toFixed(4),
+        y: +((r.top - boite.top) / L).toFixed(4),
+        large: +(r.width / L).toFixed(4),
+        police: +(parseFloat(getComputedStyle(el).fontSize) / L).toFixed(4)
+      };
+    };
+    return {
+      largeur: Math.round(L),
+      pion: lire("voile-tour-pion-boite"),
+      nom: lire("voile-tour-nom"),
+      carte: lire("voile-tour-carte"),
+      detail: lire("voile-tour-bas"),
+      effets: lire("voile-tour-effets"),
+      attente: lire("voile-tour-attente"),
+      etats: parseInt(document.getElementById("voile-tour-etats").dataset.taille || "0")
+    };
+  });
+
+  const large = await rapports();
+  verifier("l'encart est à l'écran et mesurable", !!large && large.largeur > 200,
+           large ? `${large.largeur}px` : "absent");
+
+  // On rétrécit la plaque comme le ferait un écran étroit.
+  await p.evaluate(async () => {
+    window.REGLAGES_HUD.encart.largeur = 420;
+    window.appliquerReglagesHud();
+    await new Promise(r => setTimeout(r, 400));
+  });
+  const etroit = await rapports();
+  verifier("la plaque a bien rétréci", etroit.largeur < large.largeur - 100,
+           `${large.largeur} → ${etroit.largeur}px`);
+
+  // CHAQUE ÉLÉMENT EST JUGÉ SUR CE QUI LE CONCERNE. Un bloc de texte qui revient
+  // à la ligne n'a pas une largeur RENDUE proportionnelle — c'est son cadre qui
+  // doit l'être, et sa police. Exiger la largeur rendue d'un paragraphe serait
+  // exiger que les mots se coupent au même endroit à deux échelles : faux, et
+  // le contrôle échouerait en annonçant un défaut qui n'existe pas.
+  const memeRapport = (quoi, a, b, cles) => {
+    if (!a || !b) { verifier(`${quoi} est mesurable`, false); return; }
+    const ecarts = cles
+      .map(k => ({ k, d: Math.abs(a[k] - b[k]) }))
+      .filter(e => e.d > 0.006);
+    verifier(`${quoi} garde ses proportions`, ecarts.length === 0,
+             ecarts.length ? ecarts.map(e => `${e.k} ${a[e.k]} → ${b[e.k]}`).join(", ")
+                           : cles.map(k => `${k} ${b[k]}`).join(", "));
+  };
+  const PLACE = ["x", "y", "large"];
+  const TOUT = ["x", "y", "large", "police"];
+  memeRapport("LE PION", large.pion, etroit.pion, PLACE);
+  memeRapport("LE NOM", large.nom, etroit.nom, TOUT);
+  memeRapport("LE NOM DE LA TECHNIQUE", large.carte, etroit.carte, ["x", "y", "police"]);
+  memeRapport("le cadre du détail", large.detail, etroit.detail, PLACE);
+  memeRapport("LA POLICE DU DÉTAIL", large.effets, etroit.effets, ["police"]);
+  memeRapport("la ligne d'attente", large.attente, etroit.attente, ["x", "y", "police"]);
+
+  // LE FILET : tout ce qu'on ajouterait un jour sur la plaque sans lui écrire de
+  // taille hériterait de la sienne. Elle doit suivre comme le reste, sinon le
+  // défaut ne se verrait que le jour où quelqu'un ajoute une ligne.
+  const heritee = await p.evaluate(() => {
+    const e = document.getElementById("voile-tour-encart");
+    return +(parseFloat(getComputedStyle(e).fontSize) / e.getBoundingClientRect().width).toFixed(4);
+  });
+  verifier("LA PLAQUE PORTE UNE POLICE QUI SUIT (filet pour ce qu'on ajoutera)",
+           Math.abs(heritee - large.effets.police) < 0.006,
+           `${heritee} contre ${large.effets.police} pour le détail`);
+
+  // Les icônes d'état ne sont pas du CSS : une image se dimensionne à la
+  // construction. Leur taille est donc calculée, et doit suivre elle aussi.
+  verifier("ET LES ICÔNES D'ÉTAT SUIVENT (elles sont dimensionnées, pas mises en forme)",
+           large.etats > 0 && etroit.etats > 0
+           && Math.abs(large.etats / large.largeur - etroit.etats / etroit.largeur) < 0.006,
+           `${large.etats}px sur ${large.largeur} → ${etroit.etats}px sur ${etroit.largeur}`);
+
+  await p.evaluate(() => {
+    window.REGLAGES_HUD.encart.largeur = 760;
+    window.appliquerReglagesHud();
+    window.ENCART_FIGE = false;
+  });
+}
+
+console.log("\n=========================================================");
+console.log("  13. LA BOÎTE DE RÉGLAGE NE SERT PLUS QU'À L'ENCART");
+console.log("=========================================================");
+{
+  const boite = await p.evaluate(() => {
+    // Les VRAIES lignes de réglage : celles qui portent des flèches ou des
+    // boutons de taille. Le titre de la boîte, son sous-titre et le choix du pas
+    // sont aussi des div, et les compter donnerait trois lignes de trop.
+    const titres = [...document.querySelectorAll("#reglage-hud > div")]
+      .filter(b => [...b.querySelectorAll("button")]
+                     .some(x => ["◀", "▶", "▲", "▼", "−", "+"].includes(x.textContent)))
+      .map(b => (b.firstChild && b.firstChild.textContent || "").trim());
+    const ligne = (debut) => {
+      const blocs = [...document.querySelectorAll("#reglage-hud > div")];
+      const b = blocs.find(x => (x.firstChild && x.firstChild.textContent || "").startsWith(debut));
+      if (!b) return null;
+      return [...b.querySelectorAll("button")].map(x => x.textContent);
+    };
+    return {
+      titres,
+      pion: ligne("Pion du combattant"),
+      figer: [...document.querySelectorAll("#reglage-hud button")].some(b => /Figer/.test(b.textContent)),
+      code: window.codeReglagesHud()
+    };
+  });
+
+  // Les lignes du bloc du héros sont parties : leurs valeurs sont arrêtées et
+  // inscrites dans le code. Le code qui les POSE, lui, reste — c'est lui qui
+  // tient la mise à l'échelle sur tablette, et il n'a rien de provisoire.
+  verifier("plus aucune ligne du bloc du héros",
+           !boite.titres.some(t => /Anneau|Ancre|Avatar|Nom du héros|Piste des états/.test(t)),
+           boite.titres.join(" / "));
+  verifier("SEPT LIGNES POUR L'ENCART", boite.titres.length === 7, `${boite.titres.length} : ${boite.titres.join(" / ")}`);
+
+  // La demande explicite : le pion doit pouvoir être agrandi et réduit.
+  verifier("LE PION A SES QUATRE FLÈCHES",
+           !!boite.pion && ["◀", "▶", "▲", "▼"].every(f => boite.pion.includes(f)),
+           (boite.pion || []).join(" "));
+  verifier("ET SES DEUX BOUTONS DE TAILLE",
+           !!boite.pion && boite.pion.includes("−") && boite.pion.includes("+"),
+           (boite.pion || []).join(" "));
+
+  verifier("un bouton fige l'encart pour pouvoir le régler", boite.figer === true);
+  verifier("le code extrait donne les sept groupes de l'encart",
+           ["encart ", "encartPion", "encartEtats", "encartNom", "encartCarte",
+            "encartDetail", "encartAttente"].every(g => boite.code.includes(g)),
+           boite.code.split("\n").length + " lignes");
+  verifier("et il garde les valeurs du bloc du héros, qui restent posées",
+           boite.code.includes("anneau") && boite.code.includes("avatar"));
 }
 
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 2).join(" | "));

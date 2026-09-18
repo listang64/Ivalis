@@ -3184,20 +3184,22 @@ textarea.input-texte-parchemin {
     filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.85));
 }
 
-/* LE PION DU COMBATTANT. Il déborde de l'encart par la gauche et par le bas,
-   comme sur le croquis : il a l'air posé DEVANT la plaque, pas dedans. */
+/* LE PION DU COMBATTANT, ET TOUT CE QUI SE POSE SUR LA PLAQUE.
+   ON NE TROUVE PLUS UNE SEULE MESURE ICI, et c'est voulu : position, largeur et
+   taille de police sont posées par reglages_hud.js en POURCENTAGES de l'image
+   réellement rendue. C'était la condition pour qu'il n'y ait pas de surprise
+   d'un écran à l'autre — la plaque se réduit sur un écran étroit, et tout doit
+   se réduire avec elle, y compris le texte. Une taille en pixels écrite ici
+   aurait tenu bon pendant que la plaque rétrécissait autour d'elle. */
 #voile-tour-pion-boite {
     position: absolute;
-    left: -3%;
-    top: 14%;
-    width: 27%;
     display: flex;
     flex-direction: column;
     align-items: center;
 }
 
 #voile-tour-pion {
-    width: 88%;
+    width: 100%;
     height: auto;
     aspect-ratio: 1 / 1;
     object-fit: cover;
@@ -3205,43 +3207,25 @@ textarea.input-texte-parchemin {
     filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.9));
 }
 
-/* Les états sous le pion. Ils tiennent sur une ligne et reviennent à la ligne
-   plutôt que de sortir de l'encart quand le combattant en porte beaucoup. */
+/* Les états sous le pion. Ils reviennent à la ligne plutôt que de sortir de la
+   plaque quand le combattant en porte beaucoup. */
 #voile-tour-etats {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
     justify-content: center;
     align-items: center;
-    margin-top: 6px;
+    width: 100%;
     min-height: 4px;
-}
-
-/* La colonne centrale : elle commence après le pion et va jusqu'au bord droit. */
-#voile-tour-textes {
-    position: absolute;
-    left: 27%;
-    right: 4%;
-    top: 8%;
-    bottom: 8%;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    text-align: left;
-    overflow: hidden;
 }
 
 /* LE NOM DU COMBATTANT, dans l'or brossé du reste du jeu. */
 #voile-tour-nom {
-    max-width: 100%;
+    position: absolute;
     font-family: 'Cinzel', serif;
-    font-size: 42px;
     font-weight: bold;
     text-transform: uppercase;
-    letter-spacing: 3px;
+    letter-spacing: 0.06em;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
     line-height: 1.1;
     background: linear-gradient(135deg, #fbf5bd 0%, #c2a878 25%, #5c3a21 50%, #e8d5a5 75%, #ffffff 100%);
     -webkit-background-clip: text;
@@ -3250,31 +3234,25 @@ textarea.input-texte-parchemin {
     filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.9));
 }
 
-/* LE NOM DE LA TECHNIQUE, EN ROUGE. Il l'était dans la couleur du combattant ;
-   il est maintenant rouge pour tout le monde, comme sur le croquis — c'est
+/* LE NOM DE LA TECHNIQUE, EN ROUGE. Il portait la couleur du combattant ; c'est
    l'attaque qu'on annonce, pas celui qui la lance. */
 #voile-tour-carte {
-    max-width: 100%;
-    margin-top: 6px;
+    position: absolute;
     font-family: 'Cinzel', serif;
-    font-size: 26px;
     font-weight: bold;
     text-transform: uppercase;
-    letter-spacing: 2px;
+    letter-spacing: 0.05em;
     line-height: 1.15;
     color: #e04a52;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
     text-shadow: 1px 2px 5px rgba(0, 0, 0, 0.95);
 }
 
 #voile-tour-bas {
+    position: absolute;
     display: flex;
     align-items: flex-start;
-    gap: 20px;
-    margin-top: 10px;
-    max-width: 100%;
+    gap: 3%;
     overflow: hidden;
 }
 
@@ -3282,7 +3260,6 @@ textarea.input-texte-parchemin {
 #voile-tour-effets {
     text-align: left;
     font-family: 'Almendra', serif;
-    font-size: 17px;
     line-height: 1.3;
     color: #f4efe4;
     text-shadow: 1px 1px 3px black;
@@ -3291,10 +3268,11 @@ textarea.input-texte-parchemin {
 #voile-tour-zone { flex-shrink: 0; }
 
 #voile-tour-attente {
-    margin-top: auto;
+    position: absolute;
     font-family: 'Almendra', serif;
-    font-size: 14px;
     font-style: italic;
     color: #a89f91;
     text-shadow: 1px 1px 3px black;
+    white-space: nowrap;
 }
+

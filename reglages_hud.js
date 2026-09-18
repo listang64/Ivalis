@@ -70,11 +70,27 @@
         // LA PISTE DES ÉTATS est à GAUCHE du bandeau : sa distance au bord droit
         // dépasse donc les 450 px de largeur, et c'est normal.
         etats: { droite: 470, bas: 130, taille: 46, ecart: 12 },
-        // L'ENCART DE TOUR N'APPARTIENT PAS AU BANDEAU : il se place par rapport
-        // à l'écran, et il n'est donc PAS mis à l'échelle avec lui. Sa largeur
-        // est bornée par la fenêtre dans la feuille de style, ce qui le protège
-        // déjà des petits écrans.
-        encart: { gauche: 26, bas: 18, largeur: 760 }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  L'ENCART DE TOUR
+        // ─────────────────────────────────────────────────────────────────
+        //  SEULE SA BOÎTE EST EN PIXELS D'ÉCRAN. Tout ce qui se pose DESSUS est
+        //  en pourcentages de l'image : `x` en pourcentage de sa largeur, `y` en
+        //  pourcentage de sa hauteur, `taille` en pourcentage de sa largeur.
+        //
+        //  C'est la seule façon de n'avoir aucune surprise d'un écran à l'autre.
+        //  La largeur de la plaque est bornée par la fenêtre (64vw) : sur un
+        //  iPad, elle se réduit. Tout ce qui est écrit en pourcentages se réduit
+        //  avec elle, dans les mêmes proportions, y compris les polices. Une
+        //  taille en pixels aurait tenu bon pendant que la plaque rétrécissait
+        //  autour d'elle, et le texte serait sorti du cadre.
+        encart:        { gauche: 26, bas: 18, largeur: 760 },
+        encartPion:    { x: -3, y: 12, taille: 24 },
+        encartEtats:   { taille: 5, ecart: 1.4 },
+        encartNom:     { x: 27, y: 8, taille: 5.6 },
+        encartCarte:   { x: 27, y: 31, taille: 3.4 },
+        encartDetail:  { x: 27, y: 47, taille: 2.2, largeur: 68 },
+        encartAttente: { x: 27, y: 87, taille: 1.9 }
     };
 
     function copierProfond(o) { return JSON.parse(JSON.stringify(o)); }
@@ -204,14 +220,7 @@
             if (typeof window.actualiserPisteEtats === "function") window.actualiserPisteEtats();
         }
 
-        // L'ENCART DE TOUR, en pixels d'écran et sans mise à l'échelle : il ne
-        // vit pas dans le bandeau, il se pose dans le coin de la fenêtre.
-        const encart = document.getElementById("voile-tour-encart");
-        if (encart) {
-            encart.style.left = r.encart.gauche + "px";
-            encart.style.bottom = r.encart.bas + "px";
-            encart.style.width = `min(${r.encart.largeur}px, 64vw)`;
-        }
+        window.appliquerReglagesEncart();
 
         // LE NOM. Changer sa largeur ou sa taille change la façon dont il
         // rétrécit : on redemande donc l'ajustement automatique à combat.js.
@@ -229,11 +238,98 @@
     };
 
     // =====================================================================
+    //  L'ENCART DE TOUR — TOUT EST LIÉ À SON IMAGE
+    // =====================================================================
+    //  La boîte se place en pixels d'écran ; TOUT le reste se calcule à partir
+    //  de la largeur RÉELLEMENT RENDUE de la plaque. Positions et largeurs
+    //  partent en pourcentages — le navigateur s'en charge alors tout seul, même
+    //  si la fenêtre change de taille entre deux passages ici. Les tailles de
+    //  police, elles, doivent être calculées : en CSS, un pourcentage de
+    //  `font-size` se rapporte à la police du parent, pas à sa largeur.
+    window.appliquerReglagesEncart = function () {
+        const r = window.REGLAGES_HUD;
+        const encart = document.getElementById("voile-tour-encart");
+        if (!encart) return false;
+
+        encart.style.left = r.encart.gauche + "px";
+        encart.style.bottom = r.encart.bas + "px";
+        encart.style.width = `min(${r.encart.largeur}px, 64vw)`;
+
+        // La largeur rendue de la plaque : c'est l'unité de mesure de tout ce
+        // qui suit. Nulle tant que rien n'est à l'écran — on repassera.
+        const L = encart.getBoundingClientRect().width;
+        if (L <= 0) return false;
+        const pc = (v) => Math.max(1, (v / 100) * L);   // % de la plaque → pixels
+
+        // LA PLAQUE PORTE SA PROPRE POLICE, et c'est un filet plus qu'un
+        // réglage. Tout ce qui se pose dessus a sa taille écrite noir sur blanc
+        // — mais tout ce qu'on AJOUTERA un jour sans y penser héritera de
+        // celle-ci, qui suit la plaque. Sans elle, l'héritage venait du corps du
+        // document : une taille fixe, qui serait restée plantée là pendant que
+        // la plaque rétrécissait autour d'elle. C'est exactement le genre de
+        // détail qui ne se voit que sur l'iPad du joueur.
+        encart.style.fontSize = pc(r.encartDetail.taille) + "px";
+
+        const poser = (id, groupe, extra) => {
+            const el = document.getElementById(id);
+            if (!el || !groupe) return;
+            if (groupe.x !== undefined) el.style.left = groupe.x + "%";
+            if (groupe.y !== undefined) el.style.top = groupe.y + "%";
+            if (groupe.largeur !== undefined) el.style.width = groupe.largeur + "%";
+            if (groupe.taille !== undefined && extra !== "largeur") {
+                el.style.fontSize = pc(groupe.taille) + "px";
+                // La taille de départ est notée sur l'élément : le nom et le nom
+                // de technique se rétrécissent tout seuls quand ils sont trop
+                // longs, et ils doivent repartir de CELLE-CI, pas d'un chiffre
+                // écrit en dur dans combat.js.
+                el.dataset.base = pc(groupe.taille);
+            }
+        };
+
+        // Le pion : sa largeur EST sa taille, et sa hauteur suit (carré).
+        const pion = document.getElementById("voile-tour-pion-boite");
+        if (pion) {
+            pion.style.left = r.encartPion.x + "%";
+            pion.style.top = r.encartPion.y + "%";
+            pion.style.width = r.encartPion.taille + "%";
+        }
+
+        // Les états sous le pion. Leur taille est lue par combat.js au moment
+        // de les dessiner : une image se dimensionne à la construction.
+        const etats = document.getElementById("voile-tour-etats");
+        if (etats) {
+            etats.dataset.taille = Math.round(pc(r.encartEtats.taille));
+            etats.style.gap = pc(r.encartEtats.ecart) + "px";
+            etats.style.marginTop = pc(r.encartEtats.ecart) + "px";
+            // Redessiner à la prochaine occasion : la signature change de forme.
+            etats.dataset.signature = "";
+        }
+
+        poser("voile-tour-nom", r.encartNom);
+        poser("voile-tour-carte", r.encartCarte);
+        poser("voile-tour-attente", r.encartAttente);
+
+        const bas = document.getElementById("voile-tour-bas");
+        if (bas) {
+            bas.style.left = r.encartDetail.x + "%";
+            bas.style.top = r.encartDetail.y + "%";
+            bas.style.width = r.encartDetail.largeur + "%";
+        }
+        const effets = document.getElementById("voile-tour-effets");
+        if (effets) effets.style.fontSize = pc(r.encartDetail.taille) + "px";
+
+        if (typeof window.rafraichirVoileTour === "function") {
+            try { window.rafraichirVoileTour(); } catch (e) {}
+        }
+        return true;
+    };
+
+    // =====================================================================
     //  LE CODE À ME RENVOYER
     // =====================================================================
     window.codeReglagesHud = function () {
         const r = window.REGLAGES_HUD;
-        const l = (groupe, cles) => cles.map(c => `${c}: ${Math.round(r[groupe][c])}`).join(", ");
+        const l = (groupe, cles) => cles.map(c => `${c}: ${arrondir(r[groupe][c])}`).join(", ");
         const hud = document.getElementById("combat-hud-bas-droite");
         const largeur = hud ? Math.round(hud.getBoundingClientRect().width) : 0;
         // LA NOTE DISAIT « RÉFÉRENCE ATTENDUE », ET ÇA SONNAIT COMME UNE ALERTE.
@@ -253,7 +349,15 @@
             "    ancreDroite { " + l("ancreDroite", ["dx", "dy"]) + " }",
             "    avatar      { " + l("avatar", ["droite", "bas", "hauteur"]) + " }",
             "    etats       { " + l("etats", ["droite", "bas", "taille", "ecart"]) + " }",
-            "    encart      { " + l("encart", ["gauche", "bas", "largeur"]) + " }",
+            "",
+            "    ENCART DE TOUR (la boîte en pixels, le reste en % de la plaque)",
+            "    encart        { " + l("encart", ["gauche", "bas", "largeur"]) + " }",
+            "    encartPion    { " + l("encartPion", ["x", "y", "taille"]) + " }",
+            "    encartEtats   { " + l("encartEtats", ["taille", "ecart"]) + " }",
+            "    encartNom     { " + l("encartNom", ["x", "y", "taille"]) + " }",
+            "    encartCarte   { " + l("encartCarte", ["x", "y", "taille"]) + " }",
+            "    encartDetail  { " + l("encartDetail", ["x", "y", "taille", "largeur"]) + " }",
+            "    encartAttente { " + l("encartAttente", ["x", "y", "taille"]) + " }",
             "    nom         { " + l("nom", ["gauche", "bas", "largeur", "taille"]) + " }",
             "",
             JSON.stringify(r)
@@ -263,29 +367,40 @@
     // =====================================================================
     //  LA BOÎTE ELLE-MÊME
     // =====================================================================
+    // LA BOÎTE NE RÈGLE PLUS QUE L'ENCART DE TOUR.
+    //
+    // Les lignes du bloc du héros — anneau, ancres, avatar, nom, piste des états
+    // — ont été retirées : leurs valeurs sont arrêtées et inscrites dans
+    // PAR_DEFAUT, c'était tout l'objet de l'outil. Le code qui les POSE, lui,
+    // reste en place au-dessus : c'est lui qui tient la mise à l'échelle sur
+    // tablette, et il n'a rien de provisoire. Seules les flèches sont parties.
+    //
+    // Les mesures de l'encart sont en POURCENTAGES de sa plaque, pas en pixels :
+    // un pas de 2 déplacerait tout d'un bout à l'autre. D'où `unite`, qui donne
+    // à chaque ligne l'ordre de grandeur de son propre réglage.
     const LIGNES = [
-        { titre: "Anneau des jauges", groupe: "anneau",
-          deplacer: { x: "centreDroite", y: "centreBas", inverseX: true, inverseY: true },
-          tailles: [{ cle: "diametre", nom: "Diamètre", pas: 2 },
-                    { cle: "epaisseur", nom: "Épaisseur", pas: 1 }] },
-        { titre: "Ancre chiffrée gauche", groupe: "ancreGauche",
-          deplacer: { x: "dx", y: "dy", inverseY: true } },
-        { titre: "Ancre chiffrée droite", groupe: "ancreDroite",
-          deplacer: { x: "dx", y: "dy", inverseY: true } },
-        { titre: "Avatar", groupe: "avatar",
-          deplacer: { x: "droite", y: "bas", inverseX: true, inverseY: true },
-          tailles: [{ cle: "hauteur", nom: "Hauteur", pas: 4 }] },
-        { titre: "Piste des états", groupe: "etats",
-          deplacer: { x: "droite", y: "bas", inverseX: true, inverseY: true },
-          tailles: [{ cle: "taille", nom: "Icônes", pas: 2 },
-                    { cle: "ecart", nom: "Écart", pas: 2 }] },
-        { titre: "Encart de tour", groupe: "encart",
+        { titre: "Plaque (boîte entière)", groupe: "encart", unite: 1,
           deplacer: { x: "gauche", y: "bas", inverseY: true },
           tailles: [{ cle: "largeur", nom: "Largeur", pas: 10 }] },
-        { titre: "Nom du héros", groupe: "nom",
-          deplacer: { x: "gauche", y: "bas", inverseY: true },
-          tailles: [{ cle: "taille", nom: "Police", pas: 1 },
-                    { cle: "largeur", nom: "Largeur", pas: 10 }] }
+        { titre: "Pion du combattant", groupe: "encartPion", unite: 0.5,
+          deplacer: { x: "x", y: "y" },
+          tailles: [{ cle: "taille", nom: "Taille", pas: 1, min: 4 }] },
+        { titre: "États sous le pion", groupe: "encartEtats", unite: 0.5,
+          tailles: [{ cle: "taille", nom: "Icônes", pas: 0.5, min: 1 },
+                    { cle: "ecart", nom: "Écart", pas: 0.2, min: 0 }] },
+        { titre: "Nom du combattant", groupe: "encartNom", unite: 0.5,
+          deplacer: { x: "x", y: "y" },
+          tailles: [{ cle: "taille", nom: "Police", pas: 0.2, min: 1 }] },
+        { titre: "Nom de la technique", groupe: "encartCarte", unite: 0.5,
+          deplacer: { x: "x", y: "y" },
+          tailles: [{ cle: "taille", nom: "Police", pas: 0.2, min: 1 }] },
+        { titre: "Détail de l'attaque", groupe: "encartDetail", unite: 0.5,
+          deplacer: { x: "x", y: "y" },
+          tailles: [{ cle: "taille", nom: "Police", pas: 0.2, min: 1 },
+                    { cle: "largeur", nom: "Largeur", pas: 2, min: 5 }] },
+        { titre: "Ligne d'attente", groupe: "encartAttente", unite: 0.5,
+          deplacer: { x: "x", y: "y" },
+          tailles: [{ cle: "taille", nom: "Police", pas: 0.2, min: 1 }] }
     ];
 
     let pas = 2;
@@ -301,8 +416,14 @@
         return b;
     }
 
-    function bouger(groupe, cle, signe) {
-        window.REGLAGES_HUD[groupe][cle] += signe * pas;
+    // ARRONDI À DEUX DÉCIMALES : les pourcentages avancent par pas fractionnaires
+    // et, sans cela, 27 + 0.5 - 0.5 finit par valoir 26.999999999999996 dans le
+    // code extrait. Illisible, et faussement précis.
+    function arrondir(v) { return Math.round(v * 100) / 100; }
+
+    function bouger(groupe, cle, signe, unite) {
+        const r = window.REGLAGES_HUD[groupe];
+        r[cle] = arrondir(r[cle] + signe * pas * (unite || 1));
         window.appliquerReglagesHud();
         retenir();
         rafraichirValeurs();
@@ -327,12 +448,13 @@
         boite.onclick = (e) => e.stopPropagation();
 
         const titre = document.createElement("div");
-        titre.textContent = "RÉGLAGE DU BLOC DU HÉROS";
+        titre.textContent = "RÉGLAGE DE L'ENCART DE TOUR";
         titre.style.cssText = "font-weight: bold; letter-spacing: 1px; margin-bottom: 4px;";
         boite.appendChild(titre);
 
         const sous = document.createElement("div");
-        sous.textContent = "Outil provisoire — les réglages sont gardés d'une session à l'autre.";
+        sous.textContent = "Outil provisoire. Tout est en % de la plaque : ce qui est réglé ici "
+                        + "vaut sur n'importe quel écran. Gardé d'une session à l'autre.";
         sous.style.cssText = "font-size: 11px; color: #a89f91; margin-bottom: 10px;";
         boite.appendChild(sous);
 
@@ -368,7 +490,7 @@
             valeur.style.cssText = "font-family: monospace; font-size: 11px; color: #c2a878;";
             affichages.push({ el: valeur, texte: () => {
                 const o = window.REGLAGES_HUD[ligne.groupe];
-                return Object.keys(o).map(k => `${k} ${Math.round(o[k])}`).join("  ");
+                return Object.keys(o).map(k => `${k} ${arrondir(o[k])}`).join("  ");
             } });
             nom.appendChild(g); nom.appendChild(valeur);
             bloc.appendChild(nom);
@@ -379,23 +501,27 @@
             // Les flèches disent toujours ce qu'on VOIT : « ◀ » déplace
             // l'élément vers la gauche de l'écran, même quand la valeur
             // derrière se compte depuis le bord droit et augmente donc.
-            fleches.appendChild(bouton("◀", "Vers la gauche", () => bouger(ligne.groupe, d.x, d.inverseX ? 1 : -1)));
-            fleches.appendChild(bouton("▶", "Vers la droite", () => bouger(ligne.groupe, d.x, d.inverseX ? -1 : 1)));
-            fleches.appendChild(bouton("▲", "Vers le haut", () => bouger(ligne.groupe, d.y, d.inverseY ? 1 : -1)));
-            fleches.appendChild(bouton("▼", "Vers le bas", () => bouger(ligne.groupe, d.y, d.inverseY ? -1 : 1)));
+            if (d) {
+                fleches.appendChild(bouton("◀", "Vers la gauche", () => bouger(ligne.groupe, d.x, d.inverseX ? 1 : -1, ligne.unite)));
+                fleches.appendChild(bouton("▶", "Vers la droite", () => bouger(ligne.groupe, d.x, d.inverseX ? -1 : 1, ligne.unite)));
+                fleches.appendChild(bouton("▲", "Vers le haut", () => bouger(ligne.groupe, d.y, d.inverseY ? 1 : -1, ligne.unite)));
+                fleches.appendChild(bouton("▼", "Vers le bas", () => bouger(ligne.groupe, d.y, d.inverseY ? -1 : 1, ligne.unite)));
+            }
 
             (ligne.tailles || []).forEach(t => {
                 const etiq = document.createElement("span");
                 etiq.textContent = " " + t.nom;
                 etiq.style.cssText = "margin: 0 4px 0 10px; font-size: 11px; color: #a89f91;";
                 fleches.appendChild(etiq);
+                const plancher = (t.min === undefined) ? 1 : t.min;
                 fleches.appendChild(bouton("−", "Réduire " + t.nom.toLowerCase(), () => {
-                    window.REGLAGES_HUD[ligne.groupe][t.cle] =
-                        Math.max(1, window.REGLAGES_HUD[ligne.groupe][t.cle] - t.pas);
+                    const g = window.REGLAGES_HUD[ligne.groupe];
+                    g[t.cle] = arrondir(Math.max(plancher, g[t.cle] - t.pas));
                     window.appliquerReglagesHud(); retenir(); rafraichirValeurs();
                 }));
                 fleches.appendChild(bouton("+", "Agrandir " + t.nom.toLowerCase(), () => {
-                    window.REGLAGES_HUD[ligne.groupe][t.cle] += t.pas;
+                    const g = window.REGLAGES_HUD[ligne.groupe];
+                    g[t.cle] = arrondir(g[t.cle] + t.pas);
                     window.appliquerReglagesHud(); retenir(); rafraichirValeurs();
                 }));
             });
@@ -423,6 +549,15 @@
                 navigator.clipboard.writeText(code).catch(() => {});
             }
         }));
+        // ON NE RÈGLE PAS CE QU'ON NE VOIT PAS. L'encart ne s'affiche que pendant
+        // le tour d'un combattant : sans ce bouton, il faudrait attendre qu'un
+        // tour se présente, et régler entre deux animations. Le maintien vit
+        // ICI, dans le fichier provisoire, et pas dans le code du jeu : la
+        // surveillance qui tourne déjà le repose à chaque passage.
+        bas.appendChild(bouton("👁  Figer", "Garder l'encart à l'écran pour le régler", () => {
+            window.ENCART_FIGE = !window.ENCART_FIGE;
+            figerLEncart();
+        }));
         bas.appendChild(bouton("↺  Défaut", "Tout remettre aux valeurs d'origine", () => {
             window.REGLAGES_HUD = copierProfond(PAR_DEFAUT);
             window.appliquerReglagesHud(); retenir(); rafraichirValeurs();
@@ -446,6 +581,39 @@
         rafraichirValeurs();
     };
 
+    // L'encart maintenu à l'écran avec un contenu de démonstration, le temps du
+    // réglage. On n'écrit que ce qui est vide : un vrai tour en cours garde tout
+    // ce qu'il a déjà mis.
+    function figerLEncart() {
+        const voile = document.getElementById("voile-tour-combat");
+        const encart = document.getElementById("voile-tour-encart");
+        if (!voile || !encart) return;
+        if (!window.ENCART_FIGE) {
+            if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
+            return;
+        }
+        const poser = (id, texte) => {
+            const el = document.getElementById(id);
+            if (el && !el.textContent.trim()) el.textContent = texte;
+        };
+        poser("voile-tour-nom", "Cybile");
+        poser("voile-tour-carte", "Fureur du roc meurtrier");
+        const eff = document.getElementById("voile-tour-effets");
+        if (eff && !eff.innerHTML.trim()) {
+            eff.innerHTML = '<div style="margin-top: 8px;">'
+                + '<div style="color: #f4efe4; font-weight: bold;">• Attaque lourde</div>'
+                + '<div style="color: #cfc6b6; font-style: italic; margin-left: 14px;">10 dégats physique</div>'
+                + '</div><div style="margin-top: 8px; color: #f4efe4; font-weight: bold;">• Peur</div>';
+        }
+        const pion = document.getElementById("voile-tour-pion");
+        if (pion && !pion.getAttribute("src")) {
+            pion.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1786114507/Les_humains_h0ubwh.png";
+        }
+        voile.style.display = "block";
+        voile.style.opacity = "1";
+        voile.style.pointerEvents = "none";
+    }
+
     window.basculerReglageHud = function () {
         const boite = document.getElementById("reglage-hud");
         const poignee = document.getElementById("reglage-hud-poignee");
@@ -463,6 +631,7 @@
     // tablette, une fenêtre qu'on redimensionne, une règle @media qui bascule.
     // On repose alors tous les réglages à la nouvelle échelle.
     let derniereLargeur = 0;
+    let encartPose = false;
     function suivreLaLargeur() {
         const hud = document.getElementById("combat-hud-bas-droite");
         if (!hud) return;
@@ -474,6 +643,10 @@
 
     function surveiller() {
         suivreLaLargeur();
+        if (window.ENCART_FIGE) figerLEncart();
+        // L'encart n'a pas toujours une largeur au premier passage (il est
+        // masqué au chargement) : on repose ses mesures dès qu'il en a une.
+        if (!encartPose) encartPose = window.appliquerReglagesEncart();
         const fenetre = document.getElementById("fenetre-combat");
         const poignee = document.getElementById("reglage-hud-poignee");
         const boite = document.getElementById("reglage-hud");

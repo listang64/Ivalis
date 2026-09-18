@@ -4785,7 +4785,12 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
     if (elNom && elNom.dataset.nom !== nom) {
         elNom.dataset.nom = nom;
         elNom.textContent = nom;
-        ajusterSurUneLigne(elNom, 42, 20);
+        // LA TAILLE DE DÉPART VIENT DE L'ÉLÉMENT, pas d'un chiffre écrit ici.
+        // Elle est posée en pourcentage de la plaque (reglages_hud.js) pour que
+        // le texte rétrécisse avec elle sur un écran étroit. Un 42 en dur aurait
+        // écrasé ce réglage à chaque rafraîchissement.
+        const baseNom = parseFloat(elNom.dataset.base) || 42;
+        ajusterSurUneLigne(elNom, baseNom, baseNom * 0.5);
     }
 
     // Les états qu'il porte, dans les mêmes icônes que le panneau latéral.
@@ -4797,8 +4802,12 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
             elEtats.dataset.signature = signature;
             // Les icônes seules, sous le pion : leur nom tiendrait mal dans une
             // colonne aussi étroite, et il est déjà dans l'infobulle.
+            // La taille des icônes est posée par reglages_hud.js, en pourcentage
+            // de la plaque : une image se dimensionne à la construction, elle ne
+            // peut pas se contenter d'un pourcentage CSS ici.
+            const tailleEtat = parseInt(elEtats.dataset.taille) || 32;
             elEtats.innerHTML = etats.map(etat =>
-                `<div title="${etat.nom} (${etat.duree})" style="line-height: 0;">${window.imageEtat(etat, 32)}</div>`
+                `<div title="${etat.nom} (${etat.duree})" style="line-height: 0;">${window.imageEtat(etat, tailleEtat)}</div>`
             ).join("");
         }
     }
@@ -4825,7 +4834,8 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
     const elZone = document.getElementById("voile-tour-zone");
     if (elCarte && elCarte.textContent !== titre) {
         elCarte.textContent = titre;
-        ajusterSurUneLigne(elCarte, 26, 14);
+        const baseCarte = parseFloat(elCarte.dataset.base) || 26;
+        ajusterSurUneLigne(elCarte, baseCarte, baseCarte * 0.5);
     }
     if (elEffets && elEffets.innerHTML !== ligne) elEffets.innerHTML = ligne;
     if (elZone && elZone.innerHTML !== dessinZone) elZone.innerHTML = dessinZone;

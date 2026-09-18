@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=25">
+  <link rel="stylesheet" href="style.css?v=26">
 
  
   <!-- ===================================================================== -->
@@ -844,22 +844,32 @@
                      src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789309133/IMG_2122_kt97do.png"
                      alt="">
 
-                <!-- LE GROS PION DU COMBATTANT, à gauche, et ses états dessous. -->
+                <!-- TOUT CE QUI SUIT EST POSÉ EN POURCENTAGES DE L'IMAGE, ET PAS
+                     EN PIXELS. C'est la condition pour qu'il n'y ait aucune
+                     surprise d'un écran à l'autre : quand la plaque se réduit —
+                     et elle se réduit, sa largeur étant bornée par la fenêtre —
+                     le pion, les textes ET leurs tailles de police se réduisent
+                     avec elle, dans les mêmes proportions. Il n'y a pas une
+                     seule mesure en dur ici : c'est reglages_hud.js qui les pose
+                     toutes, à partir de la largeur RÉELLEMENT rendue de l'image.
+
+                     Chaque bloc est indépendant des autres — plus de colonne qui
+                     empile — pour qu'on puisse le déplacer seul depuis la boîte
+                     de réglage. -->
+
+                <!-- LE GROS PION DU COMBATTANT, et ses états dessous. -->
                 <div id="voile-tour-pion-boite">
                     <img id="voile-tour-pion" src="" alt="">
                     <div id="voile-tour-etats"></div>
                 </div>
 
-                <!-- La colonne centrale : qui joue, ce qu'il lance, ce que ça fait. -->
-                <div id="voile-tour-textes">
-                    <div id="voile-tour-nom"></div>
-                    <div id="voile-tour-carte"></div>
-                    <div id="voile-tour-bas">
-                        <div id="voile-tour-effets"></div>
-                        <div id="voile-tour-zone"></div>
-                    </div>
-                    <div id="voile-tour-attente"></div>
+                <div id="voile-tour-nom"></div>
+                <div id="voile-tour-carte"></div>
+                <div id="voile-tour-bas">
+                    <div id="voile-tour-effets"></div>
+                    <div id="voile-tour-zone"></div>
                 </div>
+                <div id="voile-tour-attente"></div>
             </div>
 
             <!-- Le gros bouton doré n'est plus utilisé : chaque écran rejoue le
@@ -1844,7 +1854,7 @@
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
 <script src="trace_combat.js?v=11"></script>
-<script src="reglages_hud.js?v=7"></script>
+<script src="reglages_hud.js?v=8"></script>
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
@@ -1875,7 +1885,7 @@
 <script type="module" src="competences.js?v=22"></script>
 <script src="Plateau.js"></script>
 <script type="module" src="sequence_tour.js?v=22"></script>
-<script type="module" src="combat.js?v=73"></script>
+<script type="module" src="combat.js?v=74"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=22"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
