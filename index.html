@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=26">
+  <link rel="stylesheet" href="style.css?v=27">
 
  
   <!-- ===================================================================== -->
@@ -857,11 +857,21 @@
                      empile — pour qu'on puisse le déplacer seul depuis la boîte
                      de réglage. -->
 
-                <!-- LE GROS PION DU COMBATTANT, et ses états dessous. -->
+                <!-- LE PORTRAIT DU COMBATTANT. Deux formes, une seule image :
+                     le médaillon rond pour une créature ou un héros sans
+                     portrait, et l'avatar EN PIED pour un héros qui en a un —
+                     entier, plus grand, monté du bas de l'écran. La classe
+                     `pion-avatar-entier` fait la bascule (voir combat.js). -->
                 <div id="voile-tour-pion-boite">
                     <img id="voile-tour-pion" src="" alt="">
-                    <div id="voile-tour-etats"></div>
                 </div>
+
+                <!-- LES ÉTATS ONT LEUR PROPRE PLACE, et ils ont quitté la boîte
+                     du portrait pour l'avoir. Posés dessous, ils suivaient le
+                     portrait — et l'avatar en pied, ancré au bas de l'écran, les
+                     aurait emportés hors du champ. Ils se règlent maintenant
+                     tout seuls et ne bougent plus d'une forme à l'autre. -->
+                <div id="voile-tour-etats"></div>
 
                 <div id="voile-tour-nom"></div>
                 <div id="voile-tour-carte"></div>
@@ -1854,7 +1864,7 @@
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
 <script src="trace_combat.js?v=11"></script>
-<script src="reglages_hud.js?v=8"></script>
+<script src="reglages_hud.js?v=9"></script>
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
@@ -1885,7 +1895,7 @@
 <script type="module" src="competences.js?v=22"></script>
 <script src="Plateau.js"></script>
 <script type="module" src="sequence_tour.js?v=22"></script>
-<script type="module" src="combat.js?v=74"></script>
+<script type="module" src="combat.js?v=75"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=22"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->

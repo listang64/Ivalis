@@ -4765,6 +4765,22 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
     if (elPion) {
         const estCreature = !!perso.estMonstre
             || (typeof window.estMonstre === "function" && window.estMonstre(tete.idPersonnage));
+
+        // DEUX FORMES, ET C'EST LE PORTRAIT QUI DÉCIDE.
+        //
+        // Le médaillon taille l'image au carré : parfait pour un pion de
+        // plateau, désastreux pour un portrait en pied — il lui coupait la tête.
+        // Un héros qui a un vrai portrait l'a donc ENTIER, plus grand, monté du
+        // bas de l'écran ; une créature, ou un héros qui n'en a pas, garde son
+        // médaillon. La bascule tient dans cette seule classe, et reglages_hud.js
+        // la lit pour savoir laquelle des deux géométries poser.
+        const enPied = !estCreature && !!perso.urlCloudinary;
+        const boitePion = document.getElementById("voile-tour-pion-boite");
+        if (boitePion && boitePion.classList.contains("pion-avatar-entier") !== enPied) {
+            boitePion.classList.toggle("pion-avatar-entier", enPied);
+            // La forme vient de changer : ses mesures ne sont plus les bonnes.
+            if (typeof window.appliquerReglagesEncart === "function") window.appliquerReglagesEncart();
+        }
         // LES DEUX REPLIS NE SONT PAS DÉCORATIFS. Une fiche sans portrait, ça
         // arrive ; et IMAGE_TOKEN_ENNEMI vit plus haut dans ce même fichier,
         // donc à portée en vraie page — mais pas forcément dans un banc qui

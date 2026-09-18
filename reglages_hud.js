@@ -84,13 +84,20 @@
         //  avec elle, dans les mêmes proportions, y compris les polices. Une
         //  taille en pixels aurait tenu bon pendant que la plaque rétrécissait
         //  autour d'elle, et le texte serait sorti du cadre.
-        encart:        { gauche: 26, bas: 18, largeur: 760 },
-        encartPion:    { x: -3, y: 12, taille: 24 },
-        encartEtats:   { taille: 5, ecart: 1.4 },
-        encartNom:     { x: 27, y: 8, taille: 5.6 },
-        encartCarte:   { x: 27, y: 31, taille: 3.4 },
-        encartDetail:  { x: 27, y: 47, taille: 2.2, largeur: 68 },
-        encartAttente: { x: 27, y: 87, taille: 1.9 }
+        encart:        { gauche: 52, bas: -8, largeur: 760 },
+        encartPion:    { x: -5, y: 34, taille: 29 },
+        // L'AVATAR EN PIED A SES PROPRES MESURES, et il lui en fallait.
+        // Le médaillon se place par son HAUT ; l'avatar monte du bas de l'écran,
+        // donc il se place par son BAS. Ce ne sont pas les mêmes nombres, et les
+        // faire cohabiter dans un seul groupe aurait obligé à régler l'un en
+        // cassant l'autre. `hauteur` est en pourcentage de la LARGEUR de la
+        // plaque, comme toutes les tailles ici : c'est ce qui la fait suivre.
+        encartAvatar:  { x: -8, bas: 0, hauteur: 62 },
+        encartEtats:   { x: 2, y: 78, largeur: 22, taille: 5, ecart: 1.4 },
+        encartNom:     { x: 21, y: 14, taille: 8 },
+        encartCarte:   { x: 27, y: 29, taille: 4 },
+        encartDetail:  { x: 40, y: 39, taille: 2.4, largeur: 74 },
+        encartAttente: { x: 27, y: 87, taille: 1.7 }
     };
 
     function copierProfond(o) { return JSON.parse(JSON.stringify(o)); }
@@ -286,21 +293,47 @@
             }
         };
 
-        // Le pion : sa largeur EST sa taille, et sa hauteur suit (carré).
+        // LE PORTRAIT, DANS L'UNE OU L'AUTRE DE SES DEUX FORMES.
+        //
+        // C'est combat.js qui choisit la forme, en posant (ou non) la classe
+        // `pion-avatar-entier` : un héros qui a un portrait l'a en pied, tout le
+        // reste a son médaillon. On lit donc cette classe plutôt que de refaire
+        // le choix ici — deux endroits qui décident de la même chose finissent
+        // toujours par ne plus être d'accord.
+        //
+        // Les deux formes ne s'ancrent pas pareil : le médaillon par son HAUT,
+        // l'avatar par son BAS (il monte du bas de l'écran). On efface donc
+        // toujours l'ancrage de l'autre, sinon un `top` oublié d'un côté
+        // écraserait le `bottom` de l'autre.
         const pion = document.getElementById("voile-tour-pion-boite");
+        const image = document.getElementById("voile-tour-pion");
         if (pion) {
-            pion.style.left = r.encartPion.x + "%";
-            pion.style.top = r.encartPion.y + "%";
-            pion.style.width = r.encartPion.taille + "%";
+            if (pion.classList.contains("pion-avatar-entier")) {
+                pion.style.left = r.encartAvatar.x + "%";
+                pion.style.top = "auto";
+                pion.style.bottom = r.encartAvatar.bas + "%";
+                pion.style.width = "auto";
+                pion.style.height = "auto";
+                if (image) image.style.height = pc(r.encartAvatar.hauteur) + "px";
+            } else {
+                pion.style.left = r.encartPion.x + "%";
+                pion.style.top = r.encartPion.y + "%";
+                pion.style.bottom = "auto";
+                pion.style.width = r.encartPion.taille + "%";
+                pion.style.height = "auto";
+                if (image) image.style.height = "";
+            }
         }
 
-        // Les états sous le pion. Leur taille est lue par combat.js au moment
-        // de les dessiner : une image se dimensionne à la construction.
+        // Les états, à leur propre place. Leur taille est lue par combat.js au
+        // moment de les dessiner : une image se dimensionne à la construction.
         const etats = document.getElementById("voile-tour-etats");
         if (etats) {
+            etats.style.left = r.encartEtats.x + "%";
+            etats.style.top = r.encartEtats.y + "%";
+            etats.style.width = r.encartEtats.largeur + "%";
             etats.dataset.taille = Math.round(pc(r.encartEtats.taille));
             etats.style.gap = pc(r.encartEtats.ecart) + "px";
-            etats.style.marginTop = pc(r.encartEtats.ecart) + "px";
             // Redessiner à la prochaine occasion : la signature change de forme.
             etats.dataset.signature = "";
         }
@@ -353,7 +386,8 @@
             "    ENCART DE TOUR (la boîte en pixels, le reste en % de la plaque)",
             "    encart        { " + l("encart", ["gauche", "bas", "largeur"]) + " }",
             "    encartPion    { " + l("encartPion", ["x", "y", "taille"]) + " }",
-            "    encartEtats   { " + l("encartEtats", ["taille", "ecart"]) + " }",
+            "    encartAvatar  { " + l("encartAvatar", ["x", "bas", "hauteur"]) + " }",
+            "    encartEtats   { " + l("encartEtats", ["x", "y", "largeur", "taille", "ecart"]) + " }",
             "    encartNom     { " + l("encartNom", ["x", "y", "taille"]) + " }",
             "    encartCarte   { " + l("encartCarte", ["x", "y", "taille"]) + " }",
             "    encartDetail  { " + l("encartDetail", ["x", "y", "taille", "largeur"]) + " }",
@@ -382,11 +416,16 @@
         { titre: "Plaque (boîte entière)", groupe: "encart", unite: 1,
           deplacer: { x: "gauche", y: "bas", inverseY: true },
           tailles: [{ cle: "largeur", nom: "Largeur", pas: 10 }] },
-        { titre: "Pion du combattant", groupe: "encartPion", unite: 0.5,
+        { titre: "Médaillon (créature)", groupe: "encartPion", unite: 0.5,
           deplacer: { x: "x", y: "y" },
           tailles: [{ cle: "taille", nom: "Taille", pas: 1, min: 4 }] },
-        { titre: "États sous le pion", groupe: "encartEtats", unite: 0.5,
+        { titre: "Avatar en pied (héros)", groupe: "encartAvatar", unite: 0.5,
+          deplacer: { x: "x", y: "bas", inverseY: true },
+          tailles: [{ cle: "hauteur", nom: "Hauteur", pas: 2, min: 10 }] },
+        { titre: "États", groupe: "encartEtats", unite: 0.5,
+          deplacer: { x: "x", y: "y" },
           tailles: [{ cle: "taille", nom: "Icônes", pas: 0.5, min: 1 },
+                    { cle: "largeur", nom: "Largeur", pas: 2, min: 4 },
                     { cle: "ecart", nom: "Écart", pas: 0.2, min: 0 }] },
         { titre: "Nom du combattant", groupe: "encartNom", unite: 0.5,
           deplacer: { x: "x", y: "y" },
@@ -608,6 +647,11 @@
         const pion = document.getElementById("voile-tour-pion");
         if (pion && !pion.getAttribute("src")) {
             pion.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1786114507/Les_humains_h0ubwh.png";
+            // Une démonstration de héros : donc l'avatar en pied, la forme qu'on
+            // a le plus de raisons de vouloir régler.
+            const boite = document.getElementById("voile-tour-pion-boite");
+            if (boite) boite.classList.add("pion-avatar-entier");
+            if (typeof window.appliquerReglagesEncart === "function") window.appliquerReglagesEncart();
         }
         voile.style.display = "block";
         voile.style.opacity = "1";

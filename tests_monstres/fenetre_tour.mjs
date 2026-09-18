@@ -71,7 +71,10 @@ const res = await p.evaluate(async ({ sVoile, sToggle, sEtatInitial, sSequence }
 
   const icone = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23c2a878'/%3E%3C/svg%3E";
   window.PERSOS_PARTIE = [
-    { idPersonnage: "H1", prenom: "Pliors", nom: "de Vaubourg", idJoueur: "poste-pc", couleur: "#4aa3df", Etats_Alteres: [] },
+    { idPersonnage: "H1", prenom: "Pliors", nom: "de Vaubourg", idJoueur: "poste-pc", couleur: "#4aa3df",
+      urlCloudinary: "https://res.cloudinary.com/x/pliors.png", Etats_Alteres: [] },
+    // JADE N'A PAS DE PORTRAIT, et c'est volontaire : un héros sans avatar doit
+    // retomber sur le médaillon, pas sur un avatar en pied vide.
     { idPersonnage: "H2", prenom: "Jade", nom: "", idJoueur: "poste-ipad", couleur: "#7bd66a", Etats_Alteres: [] },
     { idPersonnage: "M1", prenom: "Goule", nom: "putride", estMonstre: true, Etats_Alteres: [
         { nom: "Saignement", duree: 2, icone, desc: "3 dégâts par tour" },
@@ -435,6 +438,92 @@ await p.evaluate(async () => {
 });
 await p.waitForTimeout(700);
 await p.screenshot({ path: '/tmp/fenetre_tour.png' });
+
+// =========================================================================
+console.log("\n  LE PORTRAIT : MÉDAILLON OU AVATAR EN PIED");
+// =========================================================================
+// LE DÉFAUT QU'ON CORRIGE : le médaillon taille l'image au CARRÉ. Sur un pion de
+// plateau c'est ce qu'on veut ; sur un portrait en pied, ça lui coupe la tête.
+// Un héros qui a un vrai portrait l'a donc entier, plus grand, monté du bas de
+// l'écran — et c'est la seule exception : une créature et un héros sans portrait
+// gardent leur médaillon.
+//
+// LE CONTRÔLE NE LIT PAS UNE CLASSE, IL LIT CE QUE LE NAVIGATEUR EN FAIT :
+// `object-fit`, l'arrondi, et surtout par quel bord la boîte est ancrée. Une
+// classe posée sans feuille de style derrière passerait un contrôle de classe.
+{
+  const formes = await p.evaluate(async ([sVoile, sSequence]) => {
+    // ON REPART D'UNE TABLE PROPRE. Les épreuves précédentes ont laissé un
+    // événement en cours, et SEQUENCE_TOUR donne alors la priorité à l'ACTEUR DE
+    // CET ÉVÉNEMENT sur la tête de file — c'est voulu, un poste en retard doit
+    // annoncer ce qu'il montre. Sans ce nettoyage, la fenêtre continuait de
+    // parler de Jade pendant qu'on croyait interroger Pliors.
+    window.EVENEMENT_ATTENDU = null;
+    window.EVENEMENT_EN_COURS = null;
+    window.MORTS = [];
+
+    const lire = () => {
+      const boite = document.getElementById("voile-tour-pion-boite");
+      const img = document.getElementById("voile-tour-pion");
+      const sb = getComputedStyle(boite), si = getComputedStyle(img);
+      return {
+        enPied: boite.classList.contains("pion-avatar-entier"),
+        taille: si.objectFit,
+        arrondi: si.borderTopLeftRadius,
+        // `getComputedStyle().top` RÉSOUT `auto` en valeur utilisée sur un élément
+        // positionné : il ne dit jamais « auto », et le lire ne prouve rien. On
+        // lit donc l'ancrage écrit (style en ligne) ET on le vérifie sur la
+        // géométrie — l'écart entre le bas de la boîte et le bas de la plaque.
+        ancreEcrite: boite.style.top === "auto" ? "bas" : "haut",
+        ecartAuBas: Math.round(
+            document.getElementById("voile-tour-encart").getBoundingClientRect().bottom
+            - boite.getBoundingClientRect().bottom),
+        hauteurImg: Math.round(img.getBoundingClientRect().height),
+        source: img.dataset.url || ""
+      };
+    };
+    const poser = (queue) => {
+      window.PARTIE_DATA = { Tour_Combat: 1, File_Attente_Combat: queue, Phase_Combat: "Resolution" };
+      window.rafraichirVoileTour();
+    };
+
+    poser([{ idPersonnage: "M1", idCarte: "CARTE_M", initiative: 55, timestamp: 10 }]);
+    await new Promise(r => setTimeout(r, 200));
+    const creature = lire();
+
+    poser([{ idPersonnage: "H2", idCarte: "CARTE_H", initiative: 70, timestamp: 30 }]);
+    await new Promise(r => setTimeout(r, 200));
+    const sansPortrait = lire();
+
+    poser([{ idPersonnage: "H1", idCarte: "CARTE_H", initiative: 70, timestamp: 20 }]);
+    await new Promise(r => setTimeout(r, 200));
+    const avecPortrait = lire();
+
+    return { creature, sansPortrait, avecPortrait };
+  }, [srcVoile, srcSequence]);
+
+  verifier("une créature garde son médaillon", formes.creature.enPied === false);
+  verifier("taillé au carré", formes.creature.taille === "cover", formes.creature.taille);
+  verifier("et rond", formes.creature.arrondi === "50%", formes.creature.arrondi);
+  verifier("il est ancré par le HAUT", formes.creature.ancreEcrite === "haut", formes.creature.ancreEcrite);
+
+  verifier("un héros SANS portrait garde lui aussi son médaillon",
+           formes.sansPortrait.enPied === false);
+
+  verifier("UN HÉROS AVEC PORTRAIT L'A EN PIED", formes.avecPortrait.enPied === true);
+  verifier("ET IL N'EST PLUS TAILLÉ (plus de tête coupée)",
+           formes.avecPortrait.taille === "contain", formes.avecPortrait.taille);
+  verifier("ni arrondi", parseFloat(formes.avecPortrait.arrondi) === 0, formes.avecPortrait.arrondi);
+  verifier("IL EST ANCRÉ PAR LE BAS (il monte du bas de l'écran)",
+           formes.avecPortrait.ancreEcrite === "bas"
+           && Math.abs(formes.avecPortrait.ecartAuBas) <= 1,
+           `ancrage ${formes.avecPortrait.ancreEcrite}, ${formes.avecPortrait.ecartAuBas}px du bas de la plaque`);
+  verifier("et il est plus grand que le médaillon",
+           formes.avecPortrait.hauteurImg > formes.creature.hauteurImg,
+           `${formes.creature.hauteurImg}px → ${formes.avecPortrait.hauteurImg}px`);
+  verifier("c'est bien SON portrait qui est chargé",
+           /pliors/.test(formes.avecPortrait.source), formes.avecPortrait.source.slice(-30));
+}
 
 await b.close();
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

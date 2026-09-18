@@ -510,22 +510,22 @@ console.log("=========================================================");
   // réduire, en plus de le déplacer.
   {
     const avant = await ou("voile-tour-pion-boite");
-    verifier("clic sur ◀ du pion", (await cliquer("Pion du combattant", "◀", 4)) === "ok");
+    verifier("clic sur ◀ de l'avatar en pied", (await cliquer("Avatar en pied", "◀", 4)) === "ok");
     const apres = await ou("voile-tour-pion-boite");
-    verifier("◀ DÉPLACE BIEN LE PION VERS LA GAUCHE", apres.x < avant.x, `${avant.x} → ${apres.x}`);
-    await cliquer("Pion du combattant", "▶", 4);
+    verifier("◀ DÉPLACE BIEN L'AVATAR VERS LA GAUCHE", apres.x < avant.x, `${avant.x} → ${apres.x}`);
+    await cliquer("Avatar en pied", "▶", 4);
 
     const avantH = await ou("voile-tour-pion-boite");
-    await cliquer("Pion du combattant", "▲", 4);
+    await cliquer("Avatar en pied", "▲", 4);
     const apresH = await ou("voile-tour-pion-boite");
     verifier("▲ le fait bien monter", apresH.y < avantH.y, `${avantH.y} → ${apresH.y}`);
-    await cliquer("Pion du combattant", "▼", 4);
+    await cliquer("Avatar en pied", "▼", 4);
 
     const avantT = await ou("voile-tour-pion-boite");
-    await cliquer("Pion du combattant", "+", 4);
+    await cliquer("Avatar en pied", "+", 4);
     const apresT = await ou("voile-tour-pion-boite");
-    verifier("« + » AGRANDIT VRAIMENT LE PION", apresT.l > avantT.l, `${avantT.l} → ${apresT.l}px`);
-    await cliquer("Pion du combattant", "−", 4);
+    verifier("« + » AGRANDIT VRAIMENT L'AVATAR", apresT.l > avantT.l, `${avantT.l} → ${apresT.l}px`);
+    await cliquer("Avatar en pied", "−", 4);
     const retour = await ou("voile-tour-pion-boite");
     verifier("et « − » le réduit d'autant", Math.abs(retour.l - avantT.l) <= 1,
              `${apresT.l} → ${retour.l} (départ ${avantT.l})`);
@@ -545,12 +545,12 @@ console.log("=========================================================");
   // LE CODE À RENVOYER : c'est le seul chemin entre l'écran et le dépôt.
   {
     const code = await p.evaluate(() => {
-      window.REGLAGES_HUD.encartPion.taille = 31;
+      window.REGLAGES_HUD.encartAvatar.hauteur = 71;
       return window.codeReglagesHud();
     });
     verifier("le code extrait porte les valeurs réglées",
-             code.includes("taille: 31"), (code.split("\n").find(l => l.includes("encartPion")) || "").trim());
-    verifier("et une forme recopiable d'un bloc", code.includes('"encartPion"'));
+             code.includes("hauteur: 71"), (code.split("\n").find(l => l.includes("encartAvatar")) || "").trim());
+    verifier("et une forme recopiable d'un bloc", code.includes('"encartAvatar"'));
   }
 
   // LE RETOUR AUX VALEURS D'ORIGINE, pour ne jamais rester coincé sur un
@@ -562,8 +562,8 @@ console.log("=========================================================");
       b.click();
       await new Promise(r => setTimeout(r, 200));
     });
-    const t = await p.evaluate(() => window.REGLAGES_HUD.encartPion.taille);
-    verifier("« Défaut » remet tout en place", t === 24, String(t));
+    const t = await p.evaluate(() => window.REGLAGES_HUD.encartAvatar.hauteur);
+    verifier("« Défaut » remet tout en place", t === 62, String(t));
   }
   await p.evaluate(() => { window.ENCART_FIGE = false; });
 }
@@ -967,7 +967,8 @@ console.log("=========================================================");
     };
     return {
       titres,
-      pion: ligne("Pion du combattant"),
+      medaillon: ligne("Médaillon"),
+      avatar: ligne("Avatar en pied"),
       figer: [...document.querySelectorAll("#reglage-hud button")].some(b => /Figer/.test(b.textContent)),
       code: window.codeReglagesHud()
     };
@@ -976,18 +977,21 @@ console.log("=========================================================");
   // Les lignes du bloc du héros sont parties : leurs valeurs sont arrêtées et
   // inscrites dans le code. Le code qui les POSE, lui, reste — c'est lui qui
   // tient la mise à l'échelle sur tablette, et il n'a rien de provisoire.
+  // Les intitulés du bloc du héros, à la lettre : « Avatar en pied (héros) »
+  // appartient à l'encart et n'a rien à voir avec l'ancien « Avatar » du HUD.
   verifier("plus aucune ligne du bloc du héros",
-           !boite.titres.some(t => /Anneau|Ancre|Avatar|Nom du héros|Piste des états/.test(t)),
+           !boite.titres.some(t => /^(Anneau des jauges|Ancre chiffrée|Avatar$|Nom du héros|Piste des états)/.test(t)),
            boite.titres.join(" / "));
-  verifier("SEPT LIGNES POUR L'ENCART", boite.titres.length === 7, `${boite.titres.length} : ${boite.titres.join(" / ")}`);
+  verifier("HUIT LIGNES POUR L'ENCART", boite.titres.length === 8, `${boite.titres.length} : ${boite.titres.join(" / ")}`);
 
   // La demande explicite : le pion doit pouvoir être agrandi et réduit.
-  verifier("LE PION A SES QUATRE FLÈCHES",
-           !!boite.pion && ["◀", "▶", "▲", "▼"].every(f => boite.pion.includes(f)),
-           (boite.pion || []).join(" "));
-  verifier("ET SES DEUX BOUTONS DE TAILLE",
-           !!boite.pion && boite.pion.includes("−") && boite.pion.includes("+"),
-           (boite.pion || []).join(" "));
+  // LES DEUX FORMES DU PORTRAIT ONT CHACUNE LEURS RÉGLAGES. Le médaillon se
+  // place par son haut, l'avatar en pied par son bas : ce ne sont pas les mêmes
+  // nombres, et chacun doit pouvoir être déplacé ET redimensionné à part.
+  const complet = (l) => !!l && ["◀", "▶", "▲", "▼", "−", "+"].every(f => l.includes(f));
+  verifier("LE MÉDAILLON A SES FLÈCHES ET SES DEUX TAILLES",
+           complet(boite.medaillon), (boite.medaillon || []).join(" "));
+  verifier("L'AVATAR EN PIED AUSSI", complet(boite.avatar), (boite.avatar || []).join(" "));
 
   verifier("un bouton fige l'encart pour pouvoir le régler", boite.figer === true);
   verifier("le code extrait donne les sept groupes de l'encart",

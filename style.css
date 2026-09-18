@@ -3198,6 +3198,8 @@ textarea.input-texte-parchemin {
     align-items: center;
 }
 
+/* LA FORME PAR DÉFAUT : le médaillon rond. Il taille l'image au carré, ce qui
+   convient à un pion de plateau — et coupe la tête d'un portrait en pied. */
 #voile-tour-pion {
     width: 100%;
     height: auto;
@@ -3207,14 +3209,40 @@ textarea.input-texte-parchemin {
     filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.9));
 }
 
-/* Les états sous le pion. Ils reviennent à la ligne plutôt que de sortir de la
-   plaque quand le combattant en porte beaucoup. */
+/* L'AVATAR EN PIED, quand le héros en a un. Rien n'est plus taillé : l'image
+   garde ses proportions et tient ENTIÈRE dans la boîte (`contain`), posée sur
+   son bord bas. La boîte, elle, est ancrée par le bas — c'est reglages_hud.js
+   qui lui donne sa hauteur et sa place, en pourcentages de la plaque comme tout
+   le reste. */
+#voile-tour-pion-boite.pion-avatar-entier {
+    top: auto;
+    align-items: flex-end;
+}
+
+/* C'EST L'IMAGE QUI PORTE LA HAUTEUR, ET LA BOÎTE QUI S'Y MOULE. L'inverse —
+   une hauteur sur la boîte et `100%` sur l'image — tournait en rond : la largeur
+   de la boîte dépendait de son contenu, et celle de l'image, de sa boîte. En
+   donnant sa hauteur à l'image, sa largeur suit ses propres proportions, et la
+   boîte se moule dessus. C'est aussi ce qui garantit que l'avatar n'est jamais
+   taillé : aucune dimension ne lui est imposée dans les deux sens. */
+#voile-tour-pion-boite.pion-avatar-entier #voile-tour-pion {
+    width: auto;
+    height: auto;          /* posée en pixels par reglages_hud.js */
+    aspect-ratio: auto;
+    object-fit: contain;
+    object-position: bottom center;
+    border-radius: 0;
+    filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.9));
+}
+
+/* Les états, à leur propre place. Ils reviennent à la ligne plutôt que de sortir
+   de la plaque quand le combattant en porte beaucoup. */
 #voile-tour-etats {
+    position: absolute;
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     align-items: center;
-    width: 100%;
     min-height: 4px;
 }
 
