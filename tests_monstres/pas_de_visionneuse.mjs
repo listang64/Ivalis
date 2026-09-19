@@ -1,27 +1,28 @@
-// LE PANNEAU GAUCHE EST UNE VISIONNEUSE, PAS L'AUTORITÉ
+// IL N'Y A PLUS DE VISIONNEUSE — ET IL NE DOIT PLUS JAMAIS Y EN AVOIR.
 //
-// Signalé en partie : « quand je clique sur valider compétence elle ne se lance
-// pas ». Le geste qui déclenche le défaut n'a rien à voir avec le bouton : il
-// suffit d'avoir cliqué, avant, sur le PORTRAIT D'UN ENNEMI — dans la piste
-// d'initiative ou sur un pion du plateau — pour voir de qui il s'agit.
+// Signalé en partie, trois fois, sous trois visages : « quand je clique sur
+// valider compétence elle ne se lance pas », « le bouton fin de tour est
+// éteint », « on ne peut plus démarrer le combat ». Le geste coupable n'avait
+// rien à voir avec le bouton : il suffisait d'avoir cliqué, avant, sur le
+// PORTRAIT D'UN ENNEMI — dans la piste d'initiative ou sur un pion du plateau —
+// pour voir de qui il s'agissait.
 //
-// afficherDansPanneauGauche installe alors ce combattant dans le panneau, et
-// pour cela REMPLACE window.COMBAT_PERSOS_JOUEUR par [lui]. Or sept endroits du
-// moteur lisaient ce tableau pour savoir QUI JOUE :
+// afficherDansPanneauGauche installait alors ce combattant dans le panneau
+// latéral gauche, et pour cela REMPLAÇAIT window.COMBAT_PERSOS_JOUEUR par
+// [lui]. Or sept endroits du moteur lisaient ce tableau pour savoir QUI JOUE :
 //   · actualiserBoutonFinTour comparait la tête de file au combattant affiché —
 //     donc « ce n'est pas ton tour », bouton éteint, clic sans effet ;
 //   · les anneaux de ciblage, les portées, les cibles et la résolution
 //     mesuraient tout depuis la case du combattant affiché.
-// Consulter la fiche d'un ennemi désarmait le tour. Depuis que la piste
-// d'initiative est permanente, en haut, avec un médaillon par créature, ce
-// geste est devenu le plus naturel du monde — mais le défaut, lui, était déjà
-// là, tapi derrière une piste qui disparaissait.
+// Consulter la fiche d'un ennemi désarmait le tour.
 //
-// Deux autorités, deux questions :
-//   · QUI JOUE ? la file d'initiative, lue par estMonHerosCombat ;
+// LE PANNEAU A ÉTÉ SUPPRIMÉ EN ENTIER, visionneuse comprise. Ce banc, qui
+// prouvait que le moteur savait se défendre contre elle, prouve maintenant
+// qu'elle n'existe plus : COMBAT_PERSOS_JOUEUR reste les héros de ce poste quoi
+// qu'on clique, et les deux autorités répondent seules —
+//   · QUI JOUE ? la file d'initiative ;
 //   · QUI LANCE CE CIBLAGE ? le ciblage lui-même, qui retient son lanceur à
 //     l'ouverture (window.lanceurDuCiblage).
-// Le panneau ne répond plus ni à l'une ni à l'autre.
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
@@ -150,7 +151,6 @@ const monTour = () => p.evaluate((idAttaque) => {
     carte: async (a, c) => window.APPELS.push({ quoi: "carte", acteur: a, idCarte: c.idCarte, cout: c.coutFatigue }),
     finDeTour: async (a) => window.APPELS.push({ quoi: "finDeTour", acteur: a }),
     mouvement: async () => {} };
-  window.afficherDansPanneauGauche("H1");
   window.afficherPisteInitiative(window.PARTIE_DATA.File_Attente_Combat, "Resolution");
   window.actualiserBoutonFinTour();
 }, idAttaque);
@@ -158,7 +158,8 @@ const monTour = () => p.evaluate((idAttaque) => {
 const etat = () => p.evaluate(() => ({
   mode: window.MODE_BOUTON_FINTOUR,
   peut: window.PEUT_PASSER_TOUR,
-  panneau: (window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO] || {}).idPersonnage,
+  suivi: (window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO] || {}).idPersonnage,
+  combattantsSuivis: (window.COMBAT_PERSOS_JOUEUR || []).map(h => h && h.idPersonnage),
   ciblage: !!(window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif),
   lanceurCiblage: window.ETAT_CIBLAGE ? window.ETAT_CIBLAGE.idLanceur : null,
   lanceurLu: window.lanceurDuCiblage(),
@@ -173,19 +174,23 @@ await p.waitForTimeout(300);
 {
   const e = await etat();
   verifier("le bouton est sur « lancer »", e.mode === "lancer", e.mode);
-  verifier("et le panneau montre bien mon héros", e.panneau === "H1", String(e.panneau));
+  verifier("et ce poste suit bien mon héros", e.suivi === "H1", String(e.suivi));
 }
 
 console.log("\n=========================================================");
-console.log("  2. JE REGARDE LA FICHE DE L'ENNEMI — ET JE JOUE QUAND MÊME");
+console.log("  2. JE CLIQUE SUR LE PORTRAIT DE L'ENNEMI — RIEN NE BASCULE");
 console.log("=========================================================");
 {
-  // LE GESTE EXACT : un clic sur le portrait de la créature dans la piste.
+  // LE GESTE EXACT QUI DÉSARMAIT LE TOUR : un clic sur le portrait de la
+  // créature dans la piste. Il n'installe plus rien nulle part.
   await p.evaluate(() => document.querySelector('.piste-tuile[data-id="M1"]').click());
   await p.waitForTimeout(300);
   let e = await etat();
-  verifier("le panneau montre maintenant la créature", e.panneau === "M1", String(e.panneau));
-  verifier("LE BOUTON RESTE SUR « LANCER »", e.mode === "lancer", e.mode);
+  verifier("CE POSTE SUIT TOUJOURS MON HÉROS", e.suivi === "H1", String(e.suivi));
+  verifier("et sa liste de héros est intacte",
+           JSON.stringify(e.combattantsSuivis) === JSON.stringify(["H1"]),
+           JSON.stringify(e.combattantsSuivis));
+  verifier("le bouton reste sur « lancer »", e.mode === "lancer", e.mode);
   verifier("et il reste actionnable", e.peut === true);
 
   await p.evaluate(() => document.getElementById("btn-hud-fintour").click());
@@ -224,7 +229,7 @@ console.log("=========================================================");
   const e = await etat();
   const carte = e.appels.find(a => a.quoi === "carte");
   verifier("une carte est partie au cerveau", !!carte, JSON.stringify(e.appels));
-  verifier("AU NOM DE MON HÉROS, pas de la créature affichée",
+  verifier("AU NOM DE MON HÉROS, celui que la file désigne",
            !!carte && carte.acteur === "H1", carte ? String(carte.acteur) : "—");
   verifier("c'est bien la carte retenue dans la file",
            !!carte && carte.idCarte === "C_CAC", carte ? String(carte.idCarte) : "—");
@@ -242,7 +247,6 @@ console.log("=========================================================");
     window.nettoyerCiblage();
     window.PARTIE_DATA.File_Attente_Combat = [{ idPersonnage: "M1", idCarte: "C_M1", initiative: 10 }];
     window.IA_DERNIER_SIGNE = Date.now();
-    window.afficherDansPanneauGauche("H1");   // je regarde mon propre héros
     window.actualiserBoutonFinTour();
     return { mode: window.MODE_BOUTON_FINTOUR, peut: window.PEUT_PASSER_TOUR };
   });
@@ -251,13 +255,14 @@ console.log("=========================================================");
 }
 
 console.log("\n=========================================================");
-console.log("  6. EN PRÉPARATION : CHOISIR SA CARTE, PANNEAU DÉTOURNÉ");
+console.log("  6. EN PRÉPARATION : CHOISIR SA CARTE");
 console.log("=========================================================");
 // LE BLOCAGE LE PLUS DUR : le combat ne pouvait même plus commencer. La carte
 // s'affichait bien, mais « choisir compétence » restait mort — parce que
 // competences.js demandait au PANNEAU si la carte était celle d'une créature.
 // À la table, trois minutes d'attente, jusqu'à ce que l'IA renonce à attendre
-// les joueurs et engage les créatures toute seule.
+// les joueurs et engage les créatures toute seule. La question « à qui est
+// cette carte ? » se pose maintenant au cache des decks, qui la sait vraiment.
 {
   const r = await p.evaluate(() => {
     window.nettoyerCiblage();
@@ -274,19 +279,20 @@ console.log("=========================================================");
     // Le cache global sait à qui appartient chaque technique : C_CAC est à moi.
     window.CACHE_COMPETENCES_GLOBAL = { H1: { C_CAC: window.COMPETENCES_CACHE.C_CAC } };
 
-    // LE DÉCOR DU BUG : le panneau montre la créature (l'IA l'y a installée, ou
-    // le joueur a cliqué son portrait), mais le deck affiché est encore le mien.
-    window.afficherDansPanneauGauche("M1");
+    // LE DÉCOR DU BUG D'ORIGINE : on vient de cliquer le portrait de la créature,
+    // et le deck affiché est le mien.
+    const tuileM1 = document.querySelector('.piste-tuile[data-id="M1"]');
+    if (tuileM1) tuileM1.click();
     window.CARTE_EN_APERCU = null;
     window.afficherApercuCarteHD("C_CAC");
     window.actualiserBoutonFinTour();
     return {
-      panneau: (window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO] || {}).idPersonnage,
+      suivi: (window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO] || {}).idPersonnage,
       apercu: window.CARTE_APERCU,
       mode: window.MODE_BOUTON_FINTOUR
     };
   });
-  verifier("le panneau montre bien la créature", r.panneau === "M1", String(r.panneau));
+  verifier("le poste suit toujours mon héros", r.suivi === "H1", String(r.suivi));
   verifier("la carte est bien prévisualisée", !!r.apercu && r.apercu.idCarte === "C_CAC",
            JSON.stringify(r.apercu));
   verifier("ELLE RESTE CHOISISSABLE : c'est MA carte", !!r.apercu && r.apercu.choisissable === true,
@@ -299,7 +305,7 @@ console.log("=========================================================");
     return window.APPELS;
   });
   verifier("LE CLIC RETIENT LA CARTE", apres.length === 1, JSON.stringify(apres));
-  verifier("et il la retient POUR MON HÉROS, pas pour la créature affichée",
+  verifier("et il la retient POUR MON HÉROS",
            apres.length === 1 && apres[0].pour === "H1", JSON.stringify(apres));
 }
 

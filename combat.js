@@ -419,158 +419,31 @@ window.initialiserPersosCombat = function() {
     window.afficherPersoCombatActuel();
 };
 
-window.changerPersoCombat = function(direction) {
-    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    if (window.COMBAT_PERSOS_JOUEUR.length === 0) return;
+// LES FLÈCHES ◄ ► ONT DISPARU AVEC LE PANNEAU, et changerPersoCombat avec
+// elles : c'étaient ses deux seuls appelants. Un joueur n'aura bientôt plus
+// qu'un personnage, et d'ici là c'est le premier de sa liste qui joue.
 
-    // Fermeture de la carte HD si on change de personnage
-    window.COUT_COMPETENCE_SELECTIONNEE = 0;
-    if (typeof window.masquerApercuCarteHD === "function") {
-        window.masquerApercuCarteHD();
-    }
-
-    window.COMBAT_INDEX_PERSO += direction;
-    
-    if (window.COMBAT_INDEX_PERSO < 0) {
-        window.COMBAT_INDEX_PERSO = window.COMBAT_PERSOS_JOUEUR.length - 1;
-    } else if (window.COMBAT_INDEX_PERSO >= window.COMBAT_PERSOS_JOUEUR.length) {
-        window.COMBAT_INDEX_PERSO = 0;
-    }
-
-    window.afficherPersoCombatActuel();
-};
-
-window.afficherPersoCombatActuel = function() { 
-    const divNom = document.getElementById("combat-nom-perso");
-    const imgPerso = document.getElementById("combat-portrait-perso");
-    
-    if (!divNom) return;
+window.afficherPersoCombatActuel = function() {
+    const liste = document.getElementById("combat-liste-competences");
 
     if (window.COMBAT_PERSOS_JOUEUR.length === 0) {
-        divNom.innerText = "Aucun héros lié";
-        // Enlève l'effet doré si y'a personne pour remettre un gris classique
-        divNom.style.background = "none";
-        divNom.style.webkitTextFillColor = "inherit";
-        divNom.style.color = "#888";
-        // Ce texte est plus long que les prénoms habituels : taille réduite pour ne pas être tronqué
-        divNom.style.fontSize = "24px";
-        divNom.style.letterSpacing = "1px";
-
-        const divTypeVide = document.getElementById("combat-type-monstre");
-        if (divTypeVide) divTypeVide.style.display = "none";
-
-        document.getElementById("combat-liste-competences").innerHTML = "";
-        if (imgPerso) {
-            imgPerso.style.opacity = "0";
-            imgPerso.style.height = "100%"; // Sinon reste figé à 40vh si "Repos Long" était affiché avant
-        }
-
-        // Le panneau "Repos Long" est un aperçu lié au personnage affiché : sans personnage, il ne
-        // doit plus rester visible (sinon il reste figé à l'écran, superposé au texte "Aucun héros lié").
+        if (liste) liste.innerHTML = "";
+        // L'aperçu du repos long est lié au héros : sans héros, il s'efface.
         const divReposVide = document.getElementById("apercu-repos-long-ui");
         if (divReposVide) {
             divReposVide.style.opacity = "0";
             divReposVide.style.left = "50px";
         }
-
-        const jauges = document.getElementById("combat-jauges-container");
-        if (jauges) jauges.style.opacity = "0";
-        const divEtatsVide = document.getElementById("combat-etats-alteres");
-        if (divEtatsVide) divEtatsVide.innerHTML = "";
         return;
     }
 
     const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
-    const prenom = persoActuel.prenom || "";
-    const nom = persoActuel.nom || "";
-    const nomComplet = (prenom + " " + nom).trim();
-
-    divNom.innerText = nomComplet;
-
-    // Type d'ennemi sous le nom : n'a de sens que pour un monstre (DPS CAC, TANK CAC...).
-    const divTypeMonstre = document.getElementById("combat-type-monstre");
-    if (divTypeMonstre) {
-        if (persoActuel.estMonstre && persoActuel.Archetype) {
-            const palier = persoActuel.Palier ? ` — ${persoActuel.Palier}` : "";
-            divTypeMonstre.innerText = persoActuel.Archetype + palier;
-            divTypeMonstre.style.display = "block";
-        } else {
-            divTypeMonstre.style.display = "none";
-        }
-    }
-
-    if (!document.getElementById("combat-etats-alteres")) {
-        const divEtats = document.createElement("div");
-        divEtats.id = "combat-etats-alteres";
-        divNom.parentElement.parentElement.insertBefore(divEtats, divNom.parentElement.nextSibling);
-    }
-
-    // On restaure l'effet doré, au cas où "Aucun héros" l'aurait modifié
-    divNom.style.background = "linear-gradient(135deg, #fbf5bd 0%, #c2a878 25%, #5c3a21 50%, #e8d5a5 75%, #ffffff 100%)";
-    divNom.style.webkitBackgroundClip = "text";
-    divNom.style.webkitTextFillColor = "transparent";
-
-    // Taille et espacement des lettres réduits pour les noms longs (ex: "Illusion de X") : sinon
-    // le texte se tronque avec "..." (white-space: nowrap + text-overflow: ellipsis sur ce bloc).
-    const longueur = nomComplet.length;
-    if (longueur > 26) {
-        divNom.style.fontSize = "22px";
-        divNom.style.letterSpacing = "0.5px";
-    } else if (longueur > 20) {
-        divNom.style.fontSize = "28px";
-        divNom.style.letterSpacing = "1px";
-    } else if (longueur > 14) {
-        divNom.style.fontSize = "36px";
-        divNom.style.letterSpacing = "2px";
-    } else {
-        divNom.style.fontSize = "46px";
-        divNom.style.letterSpacing = "3px";
-    }
-
-    if (imgPerso) {
-        if (persoActuel.urlCloudinary && persoActuel.urlCloudinary !== "") {
-            imgPerso.src = typeof window.redimensionnerImageCloudinary === "function"
-                ? window.redimensionnerImageCloudinary(persoActuel.urlCloudinary, 900)
-                : persoActuel.urlCloudinary;
-            imgPerso.style.opacity = "1"; // Rétablit l'avatar à 100% d'opacité !
-        } else {
-            imgPerso.style.opacity = "0";
-        }
-    }
+    if (!persoActuel) return;
 
     window.chargerCompetencesCombat(persoActuel.idPersonnage, persoActuel.couleur);
-    
-    // NOUVEAU : Met à jour le bouton de fin de tour selon le héros affiché
+
     if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
-
-    // NOUVEAU : Affiche la carte lockée si le perso est dans la file d'attente
     window.actualiserEtatCarteCombat();
-
-    // 🔻 AFFICHAGE DES ÉTATS ALTÉRÉS DANS LA DIV DÉDIÉE 🔻
-    const conteneurEtats = document.getElementById("combat-etats-alteres");
-    if (conteneurEtats) {
-        if (persoActuel.Etats_Alteres && persoActuel.Etats_Alteres.length > 0) {
-            let etatsHtml = `<div style="display: flex; gap: 15px; justify-content: center; margin-top: 5px;">`;
-            persoActuel.Etats_Alteres.forEach(etat => {
-                etatsHtml += `
-                    <div style="position: relative; cursor: pointer;" 
-                         onmouseenter="if(window.matchMedia('(hover: hover)').matches) this.querySelector('.popup-etat').style.display='block'" 
-                         onmouseleave="if(window.matchMedia('(hover: hover)').matches) this.querySelector('.popup-etat').style.display='none'"
-                         onclick="const p = this.querySelector('.popup-etat'); document.querySelectorAll('.popup-etat').forEach(el => { if(el !== p) el.style.display='none'; }); p.style.display = p.style.display === 'block' ? 'none' : 'block'; event.stopPropagation();">
-                        ${window.imageEtat(etat, 72)}
-                        <div class="popup-etat" style="display: none; position: absolute; top: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.95); border: 1px solid #c2a878; padding: 10px; border-radius: 6px; width: max-content; z-index: 1000; color: white; font-size: 13px; font-family: 'Almendra', serif; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.8);">
-                            <strong style="color: #ffaa00; font-family: 'Cinzel', serif;">${etat.nom} (${etat.duree} tours)</strong><br>
-                            <span style="color: #ccc;">${etat.desc}</span>
-                        </div>
-                    </div>
-                `;
-            });
-            etatsHtml += `</div>`;
-            conteneurEtats.innerHTML = etatsHtml;
-        } else {
-            conteneurEtats.innerHTML = "";
-        }
-    }
 };
 
 // =========================================================================
@@ -725,8 +598,6 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
         window.COMBAT_PV_MAX = (parseInt(persoActuel.PV_Max) || 1) + (parseInt(persoActuel.Dev_Mod_PV) || 0);
         window.COMBAT_PV_ACTUELS = persoActuel.PV_Actuels !== undefined ? parseInt(persoActuel.PV_Actuels) : window.COMBAT_PV_MAX;
 
-        document.getElementById("combat-jauges-container").style.opacity = "1";
-        
         window.mettreAJourJaugeFatigue(0);
         window.mettreAJourJaugePV();
 
@@ -838,12 +709,15 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
 };
 
 // =========================================================================
-//  LOGIQUE DE LA JAUGE DE PV
+//  LES GLOBALES DE VITALITÉ ET D'ÉNERGIE
 // =========================================================================
-// Le combattant affiché dans le panneau, tel qu'il est DANS PERSOS_PARTIE.
-// COMBAT_PERSOS_JOUEUR en garde une copie distincte, qui peut avoir vieilli
-// (un monstre injecté temporairement, un objet reconstruit par un snapshot).
-function combattantDuPanneau() {
+// Le combattant dont ce poste suit les compteurs, tel qu'il est DANS
+// PERSOS_PARTIE. Elle s'appelait combattantDuPanneau tant qu'un panneau latéral
+// existait pour l'afficher ; le panneau est parti, la question reste la même :
+// COMBAT_PERSOS_JOUEUR n'en garde qu'une copie, qui peut avoir vieilli (un
+// objet reconstruit par un snapshot), alors que PERSOS_PARTIE porte la fiche
+// vivante. On rend donc celle-ci dès qu'on la retrouve.
+function combattantCourant() {
     const affiche = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
     if (!affiche) return null;
     return (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === affiche.idPersonnage) || affiche;
@@ -965,18 +839,16 @@ window.rafraichirAffichageCombat = function() {
     // nouvelle conversion par snapshot) : la liste du panneau, elle, garde les
     // anciens. On la fait pointer sur les objets frais.
     const frais = (p) => (window.PERSOS_PARTIE || []).find(x => x.idPersonnage === p.idPersonnage) || p;
-    if (Array.isArray(window.COMBAT_PERSOS_JOUEUR_BACKUP)) {
-        window.COMBAT_PERSOS_JOUEUR_BACKUP = window.COMBAT_PERSOS_JOUEUR_BACKUP.map(frais);
-    }
     if (Array.isArray(window.COMBAT_PERSOS_JOUEUR)) {
         window.COMBAT_PERSOS_JOUEUR = window.COMBAT_PERSOS_JOUEUR.map(frais);
     }
 
     // Un héros arrivé (ou reparti) après l'ouverture du combat doit entrer dans
-    // la liste du panneau : sans cela, il n'y apparaît jamais. On ne touche pas
-    // à la sélection tant que le panneau montre une créature (mode forcé).
+    // la liste de ce poste : sans cela, il n'y apparaît jamais. La réserve
+    // « sauf si le panneau montre une créature » est partie avec la visionneuse :
+    // cette liste ne contient plus que mes héros, en toute circonstance.
     const idJoueur = localStorage.getItem("ID_JOUEUR_COURANT");
-    if (idJoueur && !window.COMBAT_PERSOS_JOUEUR_BACKUP) {
+    if (idJoueur) {
         const miens = (window.PERSOS_PARTIE || []).filter(p => p.idJoueur === idJoueur);
         const affiche = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
         const memesHeros = miens.length === (window.COMBAT_PERSOS_JOUEUR || []).length
@@ -1033,7 +905,7 @@ window.mettreAJourJaugePV = function() {
     // mente : le tic de poison, par exemple, baissait les points de vie puis ne
     // redessinait que la jauge de fatigue. On repart donc de la donnée du
     // combattant, et on remet les globales d'accord avec elle.
-    const perso = combattantDuPanneau();
+    const perso = combattantCourant();
     let max = window.COMBAT_PV_MAX || 1;
     let actuelle = window.COMBAT_PV_ACTUELS || 0;
     if (perso) {
@@ -1044,19 +916,15 @@ window.mettreAJourJaugePV = function() {
         window.COMBAT_PV_ACTUELS = actuelle;
     }
     
-    // On bloque entre 0 et 100% visuellement
-    const pctActuel = Math.min(100, Math.max(0, (actuelle / max) * 100));
+    // ELLE NE DESSINE PLUS RIEN, ET ELLE SERT TOUJOURS.
+    //
+    // Les deux barres qu'elle peignait vivaient dans le panneau latéral, qui a
+    // été supprimé. Mais ce sont ces lignes-ci qui remettent COMBAT_PV_MAX et
+    // COMBAT_PV_ACTUELS d'accord avec la fiche du combattant, et une douzaine
+    // d'endroits du moteur lisent ces globales. On garde donc le calcul, et le
+    // bloc du héros se peint juste après.
 
-    const barre = document.getElementById('barre-pv-rouge');
-    if (barre) barre.style.width = pctActuel + '%';
-
-    const labelActuelle = document.getElementById('label-pv-actuel');
-    if (labelActuelle) {
-        labelActuelle.innerText = actuelle;
-        labelActuelle.style.left = pctActuel + '%';
-    }
-
-    // Le bloc du héros se greffe sur les deux jauges du panneau plutôt que sur
+    // Le bloc du héros se greffe sur les deux jauges plutôt que sur
     // leurs appelants : elles sont rafraîchies de partout, du tic de poison au
     // clic sur une carte, et aucun de ces endroits n'a à savoir qu'un second
     // affichage existe maintenant en bas à droite.
@@ -1068,7 +936,7 @@ window.mettreAJourJaugePV = function() {
 // =========================================================================
 window.mettreAJourJaugeFatigue = function(coutFatigueBrut) {
     // Même règle que pour la vitalité : la donnée du combattant fait foi.
-    const perso = combattantDuPanneau();
+    const perso = combattantCourant();
     let max = window.COMBAT_FATIGUE_MAX || 1;
     let actuelle = window.COMBAT_FATIGUE_ACTUELLE || 0;
     if (perso) {
@@ -1083,34 +951,11 @@ window.mettreAJourJaugeFatigue = function(coutFatigueBrut) {
     const coutReel = Math.min(coutFatigue, actuelle); 
     const reste = actuelle - coutReel;
 
-    const pctGris = (reste / max) * 100;
-    const pctRouge = (coutReel / max) * 100;
-    const pctActuel = (actuelle / max) * 100;
-
-    // Mise à jour visuelle des barres avec leurs dégradés
-    document.getElementById('barre-fatigue-grise').style.width = pctGris + '%';
-    document.getElementById('barre-fatigue-rouge').style.width = pctRouge + '%';
-
-    // Mise à jour du texte Doré (Fatigue actuelle)
-    const labelActuelle = document.getElementById('label-fatigue-actuelle');
-    if (labelActuelle) {
-        labelActuelle.innerText = actuelle;
-        labelActuelle.style.left = pctActuel + '%';
-    }
-
-    // Mise à jour du texte Rouge (Fatigue restante si on utilise le sort)
-    const labelRestante = document.getElementById('label-fatigue-restante');
-    if (labelRestante) {
-        if (coutFatigue > 0) {
-            labelRestante.innerText = reste;
-            labelRestante.style.left = pctGris + '%'; 
-            labelRestante.style.opacity = '1';
-            document.getElementById('barre-fatigue-rouge').style.opacity = '1';
-        } else {
-            labelRestante.style.opacity = '0';
-            document.getElementById('barre-fatigue-rouge').style.opacity = '0';
-        }
-    }
+    // ELLE NON PLUS NE DESSINE PLUS RIEN. La barre d'énergie, son aperçu du coût
+    // en rouge et ses deux étiquettes vivaient dans le panneau latéral. Ce qui
+    // reste — la remise d'accord de COMBAT_FATIGUE_MAX et COMBAT_FATIGUE_ACTUELLE
+    // avec la fiche — est lu de partout, et le coût passé en argument sert
+    // toujours à ses appelants.
 
     // Le bloc du héros montre l'énergie RÉELLE, jamais l'aperçu du coût d'une
     // carte : c'est un état, pas une simulation.
@@ -1124,26 +969,32 @@ window.mettreAJourJaugeFatigue = function(coutFatigueBrut) {
 //  demi-anneaux : la vitalité à gauche, l'énergie à droite, chacune avec son
 //  ancre chiffrée au bout.
 //
-//  CE BLOC NE SUIT PAS LE PANNEAU LATÉRAL, ET C'EST TOUT SON INTÉRÊT.
+//  CE BLOC MONTRE LE HÉROS DE CE POSTE, ET LUI SEUL.
 //
-//  Le panneau de gauche est une VISIONNEUSE : cliquer sur un portrait de la
-//  piste d'initiative ou sur un pion du plateau y installe ce combattant-là,
-//  créature comprise (afficherDansPanneauGauche remplace alors
-//  COMBAT_PERSOS_JOUEUR par [la créature] et met la vraie liste de côté dans
-//  COMBAT_PERSOS_JOUEUR_BACKUP). Les jauges du panneau suivent cette
-//  visionneuse, c'est leur rôle. Celles-ci non : elles montrent le héros DE CE
-//  POSTE, en permanence, qu'on regarde un gnoll ou son propre voisin.
+//  Il fut un temps où cette phrase demandait un effort. Le panneau latéral était
+//  une VISIONNEUSE : cliquer sur un portrait y installait ce combattant-là,
+//  créature comprise, en remplaçant COMBAT_PERSOS_JOUEUR par [lui]. Demander à
+//  cette liste « qui est mon héros ? » pouvait donc répondre « le gnoll que tu
+//  regardes », et ça a désarmé le bouton de fin de tour, puis le lancement des
+//  cartes, puis l'aperçu des compétences.
 //
-//  C'est la même confusion « qui joue / qui on regarde » qui a déjà désarmé le
-//  bouton de fin de tour et le lancement des cartes. On la traite ici d'entrée
-//  de jeu plutôt que d'attendre qu'elle morde une quatrième fois.
+//  Le panneau a été supprimé, et l'échange avec lui : cette liste ne contient
+//  plus que mes héros, en toute circonstance. herosDuPoste() reste néanmoins la
+//  bonne porte d'entrée — elle relit la fiche dans PERSOS_PARTIE, où les
+//  chiffres du cerveau sont reversés, plutôt qu'une copie qui peut avoir vieilli.
 
 // Le héros de ce poste, tel qu'il est DANS PERSOS_PARTIE (la copie du panneau
 // peut avoir vieilli). On prend le premier : un joueur n'aura bientôt plus
 // qu'un seul personnage, et d'ici là le premier de la liste est le sien.
 window.herosDuPoste = function() {
-    const miens = window.COMBAT_PERSOS_JOUEUR_BACKUP || window.COMBAT_PERSOS_JOUEUR || [];
-    const mien = miens.find(h => h && !h.estMonstre) || miens[0];
+    const miens = window.COMBAT_PERSOS_JOUEUR || [];
+    // PAS DE REPLI SUR LE PREMIER VENU. Il y en avait un — `|| miens[0]` — du
+    // temps où le panneau latéral pouvait remplacer cette liste par [une
+    // créature] : il fallait bien afficher quelque chose. Le panneau a disparu,
+    // la liste ne contient plus que mes héros, et rendre une créature ici
+    // reviendrait à montrer au joueur la vie d'un gnoll comme si c'était la
+    // sienne. Aucun héros, aucune réponse.
+    const mien = miens.find(h => h && !h.estMonstre);
     if (!mien) return null;
     return (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === mien.idPersonnage) || mien;
 };
@@ -1549,14 +1400,14 @@ document.addEventListener("click", function(event) {
     const btnFermer = document.getElementById('btn-fermer-combat');
     if (!btnFermer || btnFermer.style.display === 'none') return;
 
-    // 🔻 NOUVEAU : Fermeture des popups d'états altérés tactiles si on clique dans le vide
-    if (!event.target.closest('#combat-etats-alteres')) {
-        document.querySelectorAll('.popup-etat').forEach(el => el.style.display = 'none');
-    }
-
     const clicSurBanniere = event.target.closest('.banniere-carte-combat');
     const clicSurCarteHD = event.target.closest('#apercu-carte-hd-competence');
-    const clicSurFleche = event.target.closest('.btn-combat-switch');
+    // Ce garde-fou visait les flèches ◄ ► du panneau latéral, qui changeaient de
+    // héros sans devoir annuler l'aperçu au passage. Le panneau n'est plus là,
+    // mais la classe habille toujours les petits boutons du jeu (menu de
+    // développement, réglages du plateau) : un clic dessus n'est pas « le vide »
+    // non plus. On le garde, sous un nom qui dit ce qu'il couvre vraiment.
+    const clicSurPetitBouton = event.target.closest('.btn-combat-switch');
     // La fenêtre de tour n'est pas "le vide" : le clic qui y lance les animations
     // ne doit pas annuler au passage le ciblage qu'on est en train de préparer.
     const clicSurVoile = event.target.closest('#voile-tour-combat');
@@ -1568,7 +1419,7 @@ document.addEventListener("click", function(event) {
     // produire (clicSurCarteHD couvrait le bouton).
     const clicSurBoutonFinTour = event.target.closest('#btn-hud-fintour');
 
-    if (!clicSurBanniere && !clicSurCarteHD && !clicSurFleche && !clicSurVoile
+    if (!clicSurBanniere && !clicSurCarteHD && !clicSurPetitBouton && !clicSurVoile
         && !clicSurBoutonFinTour && window.CARTE_EN_APERCU) {
         
         // 🔻 NOUVEAU : Annule le ciblage en cours si on clique dans le vide
@@ -1884,11 +1735,6 @@ window.toggleMenuCombat = function() {
     if (menuDev.classList.contains("ouvert")) {
         window.fermerMenusCoulissantsCombat();
     } else {
-        // Fermeture automatique du panneau latéral gauche si ouvert
-        if (window.PANNEAU_GAUCHE_OUVERT && typeof window.togglePanneauGauche === "function") {
-            window.togglePanneauGauche();
-        }
-        
         menuDev.classList.add("ouvert");
         menuDev.style.top = "0"; // Glisse depuis le haut
     }
@@ -2165,7 +2011,6 @@ window.toggleModeDeplacementToken = function() {
             const label = document.getElementById("label-taille-token");
             if (label) label.innerText = "--";
             window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
-            window.restaurerPanneauGauche(); // 🔻 NOUVEAU
         }
     }
 };
@@ -2276,7 +2121,6 @@ document.addEventListener("click", async function(event) {
                     const label = document.getElementById("label-taille-token");
                     if (label) label.innerText = "--";
                     window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
-                    window.restaurerPanneauGauche(); // 🔻 NOUVEAU
 
                     // L'écriture était silencieuse : si elle échouait, le pion
                     // semblait déplacé à l'écran puis revenait à sa case au premier
@@ -2300,7 +2144,6 @@ document.addEventListener("click", async function(event) {
         const label = document.getElementById("label-taille-token");
         if (label) label.innerText = "--";
         window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
-        window.restaurerPanneauGauche(); // 🔻 NOUVEAU
     }
 });
 
@@ -2352,57 +2195,28 @@ window.sauvegarderTailleToken = async function() {
 //  GESTION DU FOCUS ET DE LA CAMÉRA (PANNEAU ET CARTE)
 // =========================================================================
 
-window.COMBAT_PERSOS_JOUEUR_BACKUP = null;
-
-// Le moteur identifie le LANCEUR d'une carte par le combattant affiché dans ce
-// panneau. Pendant qu'une créature joue son tour, il doit donc rester sur elle :
-// un joueur qui tape sur la carte ou sur une bulle d'initiative pendant
-// l'animation faisait basculer le panneau sur son propre personnage, et le sort
-// de la créature partait avec LUI comme lanceur — d'où le "Cible invalide"
-// affiché sur le personnage du joueur, qui devenait à la fois lanceur et cible.
-function panneauVerrouilleParIA(idPersonnage) {
-    return !!window.IA_MONSTRE_EN_COURS
-        && !!window.IA_MONSTRE_ACTEUR
-        && idPersonnage !== window.IA_MONSTRE_ACTEUR;
-}
-
-window.afficherDansPanneauGauche = function(idPersonnage) {
-    if (panneauVerrouilleParIA(idPersonnage)) return;
-    const indexLocal = window.COMBAT_PERSOS_JOUEUR.findIndex(p => p.idPersonnage === idPersonnage);
-    
-    if (indexLocal !== -1) {
-        // C'est un perso du joueur, on se positionne dessus normalement
-        if (window.COMBAT_PERSOS_JOUEUR_BACKUP) {
-            window.COMBAT_PERSOS_JOUEUR = [...window.COMBAT_PERSOS_JOUEUR_BACKUP];
-            window.COMBAT_PERSOS_JOUEUR_BACKUP = null;
-        }
-        window.COMBAT_INDEX_PERSO = indexLocal;
-        window.afficherPersoCombatActuel();
-    } else {
-        // C'est un PNJ ou un autre joueur, on l'injecte temporairement
-        const persoGlobal = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
-        if (persoGlobal) {
-            if (!window.COMBAT_PERSOS_JOUEUR_BACKUP) {
-                window.COMBAT_PERSOS_JOUEUR_BACKUP = [...window.COMBAT_PERSOS_JOUEUR];
-            }
-            window.COMBAT_PERSOS_JOUEUR = [persoGlobal];
-            window.COMBAT_INDEX_PERSO = 0;
-            window.afficherPersoCombatActuel();
-        }
-    }
-};
-
-window.restaurerPanneauGauche = function() {
-    // Pas pendant le tour d'une créature : ce serait lui retirer le panneau,
-    // donc son statut de lanceur, au milieu de son sort.
-    if (window.IA_MONSTRE_EN_COURS && window.IA_MONSTRE_ACTEUR) return;
-    if (window.COMBAT_PERSOS_JOUEUR_BACKUP) {
-        window.COMBAT_PERSOS_JOUEUR = [...window.COMBAT_PERSOS_JOUEUR_BACKUP];
-        window.COMBAT_PERSOS_JOUEUR_BACKUP = null;
-        window.COMBAT_INDEX_PERSO = 0;
-        window.afficherPersoCombatActuel();
-    }
-};
+// LA VISIONNEUSE A ÉTÉ SUPPRIMÉE, ET C'ÉTAIT LE PLUS URGENT DE CE MÉNAGE.
+//
+// Trois fonctions vivaient ici : afficherDansPanneauGauche, qui installait dans
+// le panneau le combattant qu'on venait de cliquer — créature comprise — en
+// REMPLAÇANT window.COMBAT_PERSOS_JOUEUR par [lui] et en mettant la vraie liste
+// de côté dans COMBAT_PERSOS_JOUEUR_BACKUP ; restaurerPanneauGauche, qui
+// défaisait l'échange ; et panneauVerrouilleParIA, qui empêchait une créature
+// de s'y installer au milieu du sort d'une autre.
+//
+// C'ÉTAIT UNE VISIONNEUSE QUI SE FAISAIT PASSER POUR UNE AUTORITÉ, et elle a
+// coûté trois défauts distincts, signalés trois fois par le joueur : le bouton
+// de fin de tour éteint, la carte qui refusait de se lancer, et le combat qu'on
+// ne pouvait plus démarrer. À chaque fois, du code demandait « qui joue ? » ou
+// « à qui est cette carte ? » à COMBAT_PERSOS_JOUEUR, et recevait la réponse
+// « au gnoll qu'on regarde ».
+//
+// Sans le panneau, l'échange n'a plus d'objet : COMBAT_PERSOS_JOUEUR est la
+// liste des héros de ce poste, elle ne bouge plus, et le piège ne peut pas
+// revenir. Les gardes qu'il avait fallu poser (mesHerosDeCombat, herosDuPoste,
+// lanceurDuCiblage) restent justes, mais elles n'ont plus rien à contourner.
+//
+// Cliquer sur un pion le SÉLECTIONNE, et c'est tout ce que ça fait.
 
 window.centrerMapSurToken = function(idPersonnage) {
     if (!window.PLATEAU_VTT || !window.TOKENS_VTT_DATA || !window.TOKENS_VTT_DATA[idPersonnage]) return;
@@ -2453,7 +2267,6 @@ window.selectionnerEtCentrerPerso = function(idPersonnage) {
     }
     
     window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
-    window.afficherDansPanneauGauche(idPersonnage);
 };
 
 // =========================================================================
@@ -2475,7 +2288,6 @@ window.supprimerTokenVTT = async function() {
     // 1. Suppression dans la mémoire locale
     delete window.TOKENS_VTT_DATA[idSupprime];
     window.TOKEN_SELECTIONNE = null;
-    window.restaurerPanneauGauche();
     
     const label = document.getElementById("label-taille-token");
     if (label) label.innerText = "--";
@@ -3063,7 +2875,6 @@ window.appliquerTokensVTT = function(tokensMap) {
             const label = document.getElementById("label-taille-token");
             if (label) label.innerText = taille;
             window.appliquerTokensVTT(window.TOKENS_VTT_DATA); 
-            window.afficherDansPanneauGauche(idPerso);
         };
 
 
@@ -3203,34 +3014,12 @@ window.changerTailleHexa = function(delta) {
     window.PLATEAU_VTT.renderMap();
 };
 
-// =========================================================================
-//  GESTION DU PANNEAU LATÉRAL DE COMBAT (RÉTRACTABLE)
-// =========================================================================
-window.PANNEAU_GAUCHE_OUVERT = true;
-
-// "silencieux" : la fermeture et la réouverture automatiques du panneau suivent
-// l'apparition de la piste d'initiative. Elles ne viennent d'aucun clic, et le
-// bruit de parchemin à chaque tour finirait par lasser.
-window.togglePanneauGauche = function(silencieux) {
-    if (!silencieux && typeof window.jouerSonClic === "function") window.jouerSonClic();
-    const panneau = document.getElementById("panneau-combat-gauche");
-    const fleche = document.getElementById("fleche-toggle-panneau");
-    if (!panneau || !fleche) return;
-    
-    window.PANNEAU_GAUCHE_OUVERT = !window.PANNEAU_GAUCHE_OUVERT;
-    
-    if (window.PANNEAU_GAUCHE_OUVERT) {
-        panneau.style.transform = "translateX(0)";
-        fleche.innerText = "◄";
-    } else {
-        // Rétracte le panneau en laissant dépasser 5px (pour voir un fin liseret) + l'onglet
-        panneau.style.transform = "translateX(calc(-100% + 5px))";
-        fleche.innerText = "►";
-    }
-
-    // La fenêtre de tour s'arrête au bord du panneau : elle doit suivre.
-    if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
-};
+// LA MÉCANIQUE D'OUVERTURE DU PANNEAU LATÉRAL A ÉTÉ SUPPRIMÉE.
+//
+// PANNEAU_GAUCHE_OUVERT et togglePanneauGauche faisaient coulisser le panneau
+// hors champ et le rappelaient, et plusieurs coins du jeu s'en accommodaient :
+// la fenêtre de tour s'arrêtait à son bord, le menu de développement le
+// refermait avant de descendre. Tout cela n'a plus d'objet.
 
 // =========================================================================
 //  GESTION DES PINCEAUX VTT (MURS, GOMME, DIFFICILE) ET EXCLUSIVITÉ
@@ -3747,13 +3536,16 @@ document.addEventListener("DOMContentLoaded", function () {
 //  la retenir si le panneau montrait une créature, et jouerCarteCombat
 //  l'inscrivait au nom de ce combattant-là.
 //
-//  Or le panneau est une visionneuse, et l'IA comme le joueur peuvent y
-//  installer une créature (afficherDansPanneauGauche remplace alors
-//  COMBAT_PERSOS_JOUEUR par [elle]). Le deck affiché, lui, met un instant à
-//  suivre : le joueur voyait donc SA carte, la cliquait — et « Choisir »
-//  restait mort, sans un mot. À la table, ça s'est traduit par trois minutes
-//  d'attente, jusqu'à ce que l'IA renonce à attendre les joueurs et engage les
-//  créatures toute seule.
+//  Or le panneau était une visionneuse, et l'IA comme le joueur pouvaient y
+//  installer une créature — COMBAT_PERSOS_JOUEUR devenait alors [elle]. Le deck
+//  affiché, lui, mettait un instant à suivre : le joueur voyait donc SA carte,
+//  la cliquait, et « Choisir » restait mort, sans un mot. À la table, ça s'est
+//  traduit par trois minutes d'attente, jusqu'à ce que l'IA renonce à attendre
+//  les joueurs et engage les créatures toute seule.
+//
+//  Le panneau a disparu depuis, et l'échange avec lui. Cette fonction n'a donc
+//  plus de piège à déjouer — mais elle reste la bonne réponse à la question,
+//  qui ne dépend d'aucun affichage.
 //
 //  La carte, elle, sait à qui elle appartient : le cache global range les
 //  techniques par combattant. On le lui demande.
@@ -3763,20 +3555,35 @@ window.proprietaireDeLaCarte = function(idCarte) {
     return Object.keys(cache).find(id => cache[id] && cache[id][idCarte]) || null;
 };
 
-// Les héros de CE poste — ceux que je commande. Quand le panneau est détourné
-// pour montrer quelqu'un d'autre, la liste est mise de côté dans
-// COMBAT_PERSOS_JOUEUR_BACKUP : c'est elle qui fait foi.
+// Les héros de CE poste — ceux que je commande. Une seule liste désormais : la
+// mise de côté qu'imposait le panneau latéral n'a plus lieu d'être.
 window.mesHerosDeCombat = function() {
-    return window.COMBAT_PERSOS_JOUEUR_BACKUP || window.COMBAT_PERSOS_JOUEUR || [];
+    return window.COMBAT_PERSOS_JOUEUR || [];
 };
 
-// LE HÉROS POUR QUI CETTE CARTE SE JOUE. Son propriétaire s'il est des miens ;
-// sinon le combattant affiché, comme avant — un cache pas encore rempli ne doit
-// pas empêcher de jouer.
+// LE HÉROS POUR QUI CETTE CARTE SE JOUE.
+//
+// Elle avait un repli qui n'a survécu que parce que le panneau existait : faute
+// de propriétaire des miens, elle rendait LE COMBATTANT AFFICHÉ. Quand la
+// visionneuse montrait la créature dont on venait d'ouvrir la technique, ce
+// repli tombait juste par accident — il rendait la créature, et « Choisir »
+// restait éteint comme il le devait. Le panneau parti, le repli rendait mon
+// propre héros pour la carte d'un gnoll : sa technique devenait choisissable.
+//
+// L'ordre des réponses est donc explicite :
+//   · le propriétaire de la carte s'il est des miens — c'est le cas courant ;
+//   · sinon, le propriétaire quand même, fût-il une créature : c'est LUI que le
+//     reste du moteur doit voir pour refuser le choix ;
+//   · et seulement si la carte n'a aucun propriétaire connu — un cache pas
+//     encore rempli — mon héros courant, pour ne jamais bloquer le joueur.
 window.herosPourCarte = function(idCarte) {
     const proprietaire = window.proprietaireDeLaCarte(idCarte);
-    const mien = window.mesHerosDeCombat().find(h => h && h.idPersonnage === proprietaire);
-    if (mien) return mien;
+    if (proprietaire) {
+        const mien = window.mesHerosDeCombat().find(h => h && h.idPersonnage === proprietaire);
+        if (mien) return mien;
+        const autre = (window.PERSOS_PARTIE || []).find(p => p && p.idPersonnage === proprietaire);
+        if (autre) return autre;
+    }
     return (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO] || null;
 };
 
@@ -3799,9 +3606,8 @@ window.jouerCarteCombat = async function(idCarte) {
     const phase = (window.PARTIE_DATA || {}).Phase_Combat || "Preparation";
     if (phase !== "Preparation") return refuser("on n'est pas en préparation", `(phase ${phase})`);
 
-    // LE HÉROS À QUI CETTE CARTE APPARTIENT, pas celui que le panneau montre :
-    // une créature installée dans la visionneuse ne doit pas hériter de la carte
-    // d'un joueur (voir herosPourCarte).
+    // LE HÉROS À QUI CETTE CARTE APPARTIENT, demandé à la carte elle-même et
+    // non à ce qui est affiché (voir herosPourCarte).
     // Le `typeof` n'est pas de la superstition : cette fonction a une longue
     // histoire de sorties muettes, et une exception y serait pire encore —
     // elle laisserait le deck grisé et le joueur devant un plateau figé.
@@ -3848,16 +3654,6 @@ window.jouerCarteCombat = async function(idCarte) {
     if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD(true);
     if (typeof window.rangerDeckApresChoix === "function") window.rangerDeckApresChoix();
     window.mettreAJourJaugeFatigue(0); // Cache la jauge rouge
-    // 🔻 CORRECTION : Shrink immédiat en "vh"
-    //
-    // APRÈS le masquage, et pas avant : masquer l'aperçu rend au portrait sa
-    // taille pleine, et dans l'autre sens le rétrécissement était annulé dans
-    // la foulée.
-    const imgPerso = document.getElementById("combat-portrait-perso");
-    if (imgPerso) {
-        imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
-        imgPerso.style.height = "40vh"; /* Doit être identique à la valeur au-dessus */
-    }
 
     let etatsApresElectrifie = null;
 
@@ -3942,13 +3738,6 @@ window.jouerReposLong = async function() {
 
     if (typeof window.rangerDeckApresChoix === "function") window.rangerDeckApresChoix();
     window.mettreAJourJaugeFatigue(0);
-    
-    const imgPerso = document.getElementById("combat-portrait-perso");
-    if (imgPerso) {
-        imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
-        imgPerso.style.height = "40vh"; 
-    }
-    
     window.actualiserEtatCarteCombat("REPOS_LONG");
 
     try {
@@ -4067,24 +3856,15 @@ window.actualiserBoutonFinTour = function(queueParam, phaseParam) {
 
     // === LA RÉSOLUTION : NOTRE TOUR, OU PAS ================================
     //
-    // LA FILE DIT QUI JOUE. LE PANNEAU DIT QUI ON REGARDE. Ce sont deux
-    // questions différentes, et les confondre a désarmé des tours entiers.
-    //
-    // Ce test comparait la tête de file au combattant AFFICHÉ DANS LE PANNEAU
-    // GAUCHE. Or ce panneau est une VISIONNEUSE : cliquer sur un portrait —
-    // dans la piste d'initiative, sur un pion du plateau — y installe ce
-    // combattant, créature comprise (afficherDansPanneauGauche remplace alors
-    // COMBAT_PERSOS_JOUEUR par [la créature]). Regarder la fiche d'un ennemi
-    // suffisait donc à répondre « ce n'est pas ton tour » : le bouton
-    // s'éteignait, et le clic ne lançait plus rien. Depuis que la piste est
-    // permanente, en haut, avec un médaillon par créature, ce geste est devenu
-    // le plus naturel du monde — mais le défaut, lui, était déjà là.
+    // LA FILE DIT QUI JOUE. Ce test comparait autrefois la tête de file au
+    // combattant AFFICHÉ DANS LE PANNEAU LATÉRAL — une visionneuse où un clic
+    // sur un portrait installait n'importe quel combattant, créature comprise.
+    // Regarder la fiche d'un ennemi suffisait donc à répondre « ce n'est pas ton
+    // tour » : le bouton s'éteignait, et le clic ne lançait plus rien.
     //
     // La bonne question est « la tête de file est-elle un de MES héros ? », et
-    // la réponse ne se lit pas dans le panneau : elle se lit dans la liste des
-    // héros de ce poste. Quand le panneau est détourné pour montrer quelqu'un
-    // d'autre, cette liste est justement mise de côté dans
-    // COMBAT_PERSOS_JOUEUR_BACKUP — c'est elle qui fait foi.
+    // elle se pose à la liste des héros de ce poste. Le panneau n'existe plus,
+    // cette liste ne se fait plus détourner, mais la question reste la même.
     //
     // On ne passe volontairement PAS par estMonHerosCombat, qui compare
     // l'idJoueur de la fiche au poste courant : une fiche dont ce champ manque
@@ -4092,7 +3872,7 @@ window.actualiserBoutonFinTour = function(queueParam, phaseParam) {
     // remplacerait un défaut par un autre. La liste des héros du poste, elle,
     // est vraie par construction.
     const idQuiJoue = queue.length > 0 ? queue[0].idPersonnage : null;
-    const mesHeros = window.COMBAT_PERSOS_JOUEUR_BACKUP || window.COMBAT_PERSOS_JOUEUR || [];
+    const mesHeros = window.COMBAT_PERSOS_JOUEUR || [];
     const estMonTour = !!idQuiJoue && mesHeros.some(h => h && h.idPersonnage === idQuiJoue);
 
     // Le tour d'un monstre appartient à l'IA, et à elle seule : le bouton reste
@@ -4936,8 +4716,6 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
     }
     
     const deckEl = document.getElementById("combat-liste-competences");
-    const imgPerso = document.getElementById("combat-portrait-perso");
-    
     if (deckEl) deckEl.style.transition = "opacity 0.3s ease, filter 0.3s ease";
 
     let divRepos = document.getElementById("apercu-repos-long-ui");
@@ -4950,8 +4728,10 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
             <div style="font-family: 'Cinzel', serif; font-size: 24px; font-weight: bold; color: #e8d5a5; text-shadow: 2px 2px 5px black; margin-top: 10px; text-transform: uppercase; letter-spacing: 2px;">Repos Long</div>
             <div style="font-family: 'Almendra', serif; font-size: 17px; color: #c2a878; text-shadow: 1px 1px 3px black; margin-top: 10px; text-align: center; max-width: 80%;">Concentration et souffle.<br><br><span style="color:#1b6e3a;">+35% Énergie Max</span> à la fin du tour.</div>
         `;
-        const panneauGauche = document.getElementById("panneau-combat-gauche");
-        if (panneauGauche) panneauGauche.appendChild(divRepos);
+        // Il vivait dans le panneau latéral. Il se pose maintenant dans la
+        // fenêtre de combat, à la place que le panneau occupait.
+        const fenetre = document.getElementById("fenetre-combat");
+        if (fenetre) fenetre.appendChild(divRepos);
     }
 
     if (persoInQueue && persoInQueue.idCarte) {
@@ -4973,11 +4753,6 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
         // l'aperçu rend au portrait sa taille pleine, et l'ordre inverse
         // annulait le rétrécissement dans la foulée — le repos long en
         // souffrait déjà.
-        if (imgPerso) {
-            imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
-            imgPerso.style.height = "40vh"; 
-        }
-
         // Et seulement maintenant : le volet remonte. Ce rafraîchissement-là
         // est le filet du geste immédiat — il rattrape les postes qui
         // apprennent le choix par le réseau plutôt qu'au clic.
@@ -5004,11 +4779,6 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
                 deckEl.style.filter = "none";
             }
         }
-        if (imgPerso && !window.CARTE_EN_APERCU) {
-            imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
-            imgPerso.style.height = "100%";
-        }
-        
         divRepos.style.left = "50px";
         divRepos.style.opacity = "0";
 

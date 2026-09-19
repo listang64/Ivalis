@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=27">
+  <link rel="stylesheet" href="style.css?v=28">
 
  
   <!-- ===================================================================== -->
@@ -517,8 +517,9 @@
 
              LES BANNIÈRES NE BOUGENT PAS D'UN PIXEL. C'est la condition posée :
              même place, même taille, mêmes boîtes de clic. Le volet est calé
-             pour les reprendre exactement là où le panneau les laissait
-             (mesuré : x = 20 px), et `combat-liste-competences` est le MÊME
+             pour les reprendre exactement là où le panneau latéral gauche, depuis
+             supprimé, les laissait (mesuré : x = 20 px), et
+             `combat-liste-competences` est le MÊME
              élément, simplement déménagé — tout ce qui le peuple, le lit ou
              l'écoute continue de fonctionner sans le savoir.
 
@@ -544,7 +545,13 @@
                      rien intercepter tant qu'il n'est pas descendu. -->
                 <div id="volet-bannieres" style="position: absolute; top: 138px; left: 20px;
                                                  width: 340px; pointer-events: none;">
-                    <!-- combat-liste-competences est déménagée ici au chargement -->
+                    <!-- LA LISTE DES BANNIÈRES EST ENFIN CHEZ ELLE.
+                         Elle était déclarée dans le panneau latéral et déménagée
+                         ici au chargement, le temps que les deux coexistent. Le
+                         panneau a disparu : elle est écrite à sa vraie place. -->
+                    <div id="combat-liste-competences" style="display: flex; flex-direction: column; align-items: flex-start; gap: 0; width: 100%;">
+                        <!-- Rempli par chargerCompetencesCombat -->
+                    </div>
                 </div>
             </div>
         </div>
@@ -708,88 +715,13 @@
         </div>
         
         <!-- UI GAUCHE : Panneau latéral assombri -->
-        <div id="panneau-combat-gauche" style="position: absolute; top: 0; bottom: 0; left: 0; width: 380px; border-right: 2px solid #c2a878; box-shadow: 5px 0 20px rgba(0,0,0,0.9); z-index: 10; pointer-events: none; display: flex; flex-direction: column; padding: 3vh 20px 0 20px; box-sizing: border-box; backdrop-filter: blur(3px); transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); transform: translateX(0);">
-            
-            <!-- FOND ANIMÉ : Brume sombre -->
-            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; z-index: -1;">
-                <div class="fond-brumeux-combat"></div>
-            </div>
-            
-            <!-- LE NOUVEAU BOUTON DE RÉTRACTATION (Onglet Trapèze) -->
-            <div onclick="window.togglePanneauGauche()" style="position: absolute; top: 50%; right: -24px; transform: translateY(-50%); width: 24px; height: 80px; cursor: pointer; pointer-events: auto; display: flex; justify-content: center; align-items: center; filter: drop-shadow(4px 0px 4px rgba(0,0,0,0.5)); transition: filter 0.2s ease;" onmouseover="this.style.filter='drop-shadow(4px 0px 6px rgba(194, 168, 120, 0.6))'" onmouseout="this.style.filter='drop-shadow(4px 0px 4px rgba(0,0,0,0.5))'">
-                <svg width="24" height="80" viewBox="0 0 24 80" style="position: absolute; top: 0; left: 0; z-index: -1;">
-                    <!-- La forme exacte de ton croquis qui fusionne avec le liseret ! -->
-                    <path d="M-2,0 L22,20 L22,60 L-2,80" fill="rgba(15, 10, 10, 0.95)" stroke="#c2a878" stroke-width="2"/>
-                </svg>
-                <span id="fleche-toggle-panneau" style="color: #c2a878; font-size: 14px; text-shadow: 1px 1px 2px black;">◄</span>
-            </div>
+        <!-- LE PANNEAU LATÉRAL GAUCHE A ÉTÉ SUPPRIMÉ.
+             Nom, portrait, jauges, états et bannières du héros ont tous trouvé
+             leur place ailleurs : autour du bouton de fin de tour, dans le volet
+             des compétences, dans la piste d'initiative et dans l'encart de
+             tour. Il ne restait qu'un doublon qui occupait un tiers de l'écran
+             — et une visionneuse qui se faisait passer pour une autorité. -->
 
-            <!-- BLOC HAUT : Fixe (Nom, Flèches, Compétences) -->
-            <div style="display: flex; flex-direction: column; align-items: stretch; gap: 8px; flex-shrink: 0; pointer-events: auto;">
-                
-                <!-- EN-TÊTE : Nom centré avec or brossé naturel -->
-                <div style="display: flex; justify-content: center; overflow: hidden; margin-bottom: 15px;">
-                    <div id="combat-nom-perso" style="font-family: 'Cinzel', serif; font-size: 46px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; line-height: 1.2; background: linear-gradient(135deg, #fbf5bd 0%, #c2a878 25%, #5c3a21 50%, #e8d5a5 75%, #ffffff 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.9));">
-                        <!-- Rempli par JavaScript -->
-                    </div>
-                </div>
-
-                <!-- Type d'ennemi (archetype), affiché uniquement pour les monstres -->
-                <div id="combat-type-monstre" style="display: none; text-align: center; margin-top: -12px; margin-bottom: 12px; font-family: 'Cinzel', serif; font-size: 14px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; color: #ff6b6b; text-shadow: 1px 1px 4px black;"></div>
-
-                <!-- Liste des compétences -->
-                <div id="combat-liste-competences" style="margin-top: 15px; display: flex; flex-direction: column; align-items: flex-start; gap: 0; width: 100%; padding-left: 2px;">
-                    <!-- Rempli par JavaScript -->
-                </div>
-            </div>
-
-            <!-- BLOC BAS : Extensible (Avatar dynamique centré) -->
-            <div style="flex-grow: 1; min-height: 0; width: 100%; position: relative; margin-top: 15px; pointer-events: none; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 25px;">
-                <!-- Avatar remis à 100% d'opacité -->
-                <img id="combat-portrait-perso" src="" style="position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); max-width: 100%; height: 100%; object-fit: contain; object-position: bottom center; filter: drop-shadow(0 5px 15px rgba(0,0,0,0.9)); opacity: 1; transition: opacity 0.4s ease; z-index: 1;">
-                
-                <!-- LES JAUGES SUPERPOSÉES -->
-                <div id="combat-jauges-container" style="width: 100%; max-width: 310px; z-index: 2; pointer-events: auto; opacity: 0; transition: opacity 0.3s ease; display: flex; flex-direction: column; gap: 15px; background: rgba(15, 10, 10, 0.7); padding: 15px 20px; border-radius: 12px; border: 1px solid rgba(194, 168, 120, 0.3); box-shadow: 0 5px 15px rgba(0,0,0,0.8); backdrop-filter: blur(4px);">
-                    
-                    <!-- JAUGE PV -->
-                    <div id="combat-jauge-pv-container" style="width: 100%; position: relative;">
-                        <div style="position: relative; height: 18px; font-family: 'Cinzel', serif; font-size: 14px; font-weight: bold;">
-                            <span id="label-pv-actuel" style="position: absolute; color: #ff8b8b; transform: translateX(-50%); bottom: 2px; text-shadow: 1px 1px 3px black; transition: left 0.3s ease;"></span>
-                        </div>
-                        <div style="width: 100%; height: 14px; background-color: #000; border-radius: 7px; border: 1px solid #222; display: flex; overflow: hidden; box-shadow: inset 0 2px 5px rgba(0,0,0,0.8), 0 5px 12px rgba(0,0,0,0.9);">
-                            <div id="barre-pv-rouge" style="height: 100%; background: linear-gradient(to bottom, #ff8b8b 0%, #e63946 100%); width: 100%; transition: width 0.3s ease;"></div>
-                        </div>
-                        <div style="display: flex; align-items: center; margin-top: 4px; width: 100%;">
-                            <span style="font-family: 'Cinzel', serif; font-size: 11px; color: #ff8b8b; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding-right: 8px; text-shadow: 1px 1px 2px black;">Vitalité</span>
-                            <div style="flex-grow: 1; height: 1px; background-color: #ff8b8b; box-shadow: 0 0 5px #ff8b8b, 0 0 2px #ff8b8b; opacity: 0.6;"></div>
-                        </div>
-                    </div>
-
-                    <!-- JAUGE FATIGUE -->
-                    <div id="combat-jauge-fatigue-container" style="width: 100%; position: relative;">
-                        <div style="position: relative; height: 18px; font-family: 'Cinzel', serif; font-size: 14px; font-weight: bold;">
-                            <span id="label-fatigue-restante" style="position: absolute; color: #ff4c4c; transform: translateX(-50%); bottom: 2px; opacity: 0; text-shadow: 1px 1px 3px black; transition: opacity 0.3s ease, left 0.3s ease;"></span>
-                            <span id="label-fatigue-actuelle" style="position: absolute; color: #c2a878; transform: translateX(-50%); bottom: 2px; text-shadow: 1px 1px 3px black; transition: left 0.3s ease;"></span>
-                        </div>
-                        <div style="width: 100%; height: 14px; background-color: #111; border-radius: 7px; border: 1px solid #222; display: flex; overflow: hidden; box-shadow: inset 0 2px 5px rgba(0,0,0,0.8), 0 5px 12px rgba(0,0,0,0.9);">
-                            <div id="barre-fatigue-grise" style="height: 100%; background: linear-gradient(to bottom, #e8d5a5 0%, #c2a878 100%); width: 0%; transition: width 0.3s ease;"></div>
-                            <div id="barre-fatigue-rouge" class="barre-fatigue-cout" style="height: 100%; background: linear-gradient(to bottom, #ff6b6b 0%, #cc0000 100%); width: 0%; opacity: 0; transition: width 0.3s ease, opacity 0.3s ease;"></div>
-                        </div>
-                        <div style="display: flex; align-items: center; margin-top: 4px; width: 100%;">
-                            <span style="font-family: 'Cinzel', serif; font-size: 11px; color: #c2a878; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding-right: 8px; text-shadow: 1px 1px 2px black;">Énergie</span>
-                            <div style="flex-grow: 1; height: 1px; background-color: #c2a878; box-shadow: 0 0 5px #c2a878, 0 0 2px #c2a878; opacity: 0.8;"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- FLÈCHES NAVIGATION (Sous les jauges) -->
-                <div style="display: flex; gap: 15px; z-index: 2; pointer-events: auto; margin-top: 15px;">
-                    <button class="btn-combat-switch" style="padding: 3px 15px; font-size: 11px;" onclick="window.changerPersoCombat(-1)" title="Héros précédent">◄</button>
-                    <button class="btn-combat-switch" style="padding: 3px 15px; font-size: 11px;" onclick="window.changerPersoCombat(1)" title="Héros suivant">►</button>
-                </div>
-            </div>
-            
-        </div>
 
         <!-- PLACEMENT DES POINTS D'APPARITION (début de combat / après réinitialisation).
              Volontairement transparent aux clics : c'est le plateau, dessous, qui les reçoit.
@@ -811,12 +743,10 @@
              Elle n'est pas décorative : c'est la barrière de synchronisation du
              combat. Rien n'avance tant que tous les postes n'ont pas rejoué le
              tour en entier.
-             Elle est OPAQUE, et ce n'est pas un détail : à moitié transparente,
-             on devinait derrière elle les animations et les textes flottants du
-             tour en train de s'écrire, ce qui est exactement ce qu'elle doit
-             cacher — on ne verra ce tour qu'à sa relecture.
-             Elle s'arrête au bord du panneau latéral (380px) et va jusqu'au bord
-             de l'écran quand celui-ci est replié. -->
+             Elle était OPAQUE, et couvrait tout l'écran sauf le panneau latéral
+             gauche : on ne devait rien deviner du tour en train de s'écrire. Le
+             panneau a été supprimé, et l'écran noir avec — voir l'encart de tour
+             juste en dessous, qui laisse le plateau visible tout autour. -->
         <!-- =================================================================
              L'ENCART DE TOUR
              =================================================================
@@ -914,17 +844,19 @@
                         cursor: pointer; pointer-events: auto; user-select: none;">✕</div>
         </div>
 
-        <!-- NOUVEAU : HUD BAS DROITE (Z-index réduit à 5 pour passer sous le panneau gauche) -->
+        <!-- LE BANDEAU DU BAS À DROITE (z-index 5 : il passe sous l'encart de tour) -->
         <div id="combat-hud-bas-droite" style="position: absolute; bottom: 0; right: 0; width: 450px; z-index: 5; pointer-events: none;">
             
             <!-- =================================================================
                  LE BLOC DU HÉROS : SON AVATAR, SES DEUX JAUGES, SON NOM
                  =================================================================
-                 CE SONT LES JAUGES DU HÉROS DU POSTE, ET DE LUI SEUL. Le panneau
-                 latéral est une visionneuse : cliquer sur un portrait de la piste
-                 ou sur un pion du plateau y installe n'importe quel combattant,
-                 créature comprise. Ce bloc-ci ne suit PAS ce que le panneau
-                 montre — il reste sur le héros de ce poste quoi qu'on regarde.
+                 CE SONT LES JAUGES DU HÉROS DU POSTE, ET DE LUI SEUL. La phrase
+                 a coûté cher : le panneau latéral gauche était une VISIONNEUSE,
+                 et cliquer sur un portrait de la piste ou sur un pion du plateau
+                 y installait n'importe quel combattant, créature comprise, en
+                 remplaçant la liste des héros du poste par [lui]. Le panneau a
+                 été supprimé et la liste ne se fait plus détourner ; ce bloc lit
+                 quand même herosDuPoste(), qui refuse de rendre une créature.
 
                  CE QUI EST SOUS L'IMAGE DU BOUTON, ET CE QUI EST DESSUS. L'ordre
                  des éléments ici EST l'ordre d'empilement : l'anneau des jauges
@@ -988,7 +920,7 @@
                  LA PISTE DES ÉTATS, À GAUCHE DU BOUTON
                  =================================================================
                  Les états que subit le héros du poste — et lui seul, comme les
-                 jauges : le panneau latéral est une visionneuse, pas une source.
+                 jauges : c'est herosDuPoste() qui répond, jamais un affichage.
 
                  ELLE EST ÉCRITE AVANT L'IMAGE DU BOUTON, DONC DERRIÈRE, et ce
                  n'est pas un détail de rangement : c'est ce qui permet à une
@@ -1863,7 +1795,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=11"></script>
+<script src="trace_combat.js?v=12"></script>
 <script src="reglages_hud.js?v=9"></script>
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
@@ -1892,15 +1824,15 @@
 <script type="module" src="app.js?v=43"></script>
 <script type="module" src="creation_personnage.js?v=5"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
-<script type="module" src="competences.js?v=22"></script>
+<script type="module" src="competences.js?v=23"></script>
 <script src="Plateau.js"></script>
 <script type="module" src="sequence_tour.js?v=22"></script>
-<script type="module" src="combat.js?v=75"></script>
+<script type="module" src="combat.js?v=76"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=22"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
-<script type="module" src="moteur_effets.js?v=41"></script>
-<script type="module" src="monstres.js?v=21"></script>
+<script type="module" src="moteur_effets.js?v=42"></script>
+<script type="module" src="monstres.js?v=22"></script>
 <script type="module" src="monstres_competences.js?v=8"></script>
 <script type="module" src="monstres_ia.js?v=28"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->

@@ -28,11 +28,10 @@ window.ETAT_CIBLAGE = {
 //  QUI LANCE LA CARTE EN COURS DE CIBLAGE
 // =========================================================================
 //  CE N'EST PAS CELUI QU'ON REGARDE. Six endroits de ce fichier lisaient le
-//  combattant AFFICHÉ DANS LE PANNEAU GAUCHE pour savoir d'où part le sort :
+//  combattant AFFICHÉ DANS LE PANNEAU LATÉRAL pour savoir d'où part le sort :
 //  les anneaux de ciblage, la portée, les cibles, la résolution. Or ce panneau
-//  est une visionneuse — un clic sur un portrait, dans la piste d'initiative ou
-//  sur un pion du plateau, y installe ce combattant, créature comprise
-//  (afficherDansPanneauGauche remplace alors COMBAT_PERSOS_JOUEUR par [lui]).
+//  était une visionneuse — un clic sur un portrait y installait ce
+//  combattant-là, créature comprise, en remplaçant COMBAT_PERSOS_JOUEUR.
 //
 //  Consulter la fiche d'un ennemi au milieu de son tour suffisait donc à
 //  déplacer l'origine du sort sur lui : les anneaux se redessinaient depuis sa

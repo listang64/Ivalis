@@ -180,7 +180,7 @@ const lire = () => p.evaluate(() => {
   return {
     ouvert: window.VOLET_COMPETENCES_OUVERT,
     dansLeVolet: !!(liste && liste.closest("#volet-bannieres")),
-    dansLePanneau: !!(liste && liste.closest("#panneau-combat-gauche")),
+    panneauExiste: !!document.getElementById("panneau-combat-gauche"),
     classes: volet ? volet.className : null,
     clics: bannieres ? getComputedStyle(bannieres).pointerEvents : null,
     premiere: r ? { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width) } : null,
@@ -205,7 +205,10 @@ console.log("=========================================================");
   const v = await lire();
   verifier("le volet est fermé", v.ouvert === false, String(v.ouvert));
   verifier("LA LISTE A DÉMÉNAGÉ dans le volet", v.dansLeVolet === true);
-  verifier("et elle n'est plus dans le panneau latéral", v.dansLePanneau === false);
+  // LE PANNEAU LATÉRAL GAUCHE A ÉTÉ SUPPRIMÉ DE LA PAGE. Demander si la liste
+  // en est sortie ne veut plus rien dire : on demande s'il existe encore.
+  verifier("et le panneau latéral gauche n'existe plus dans la page",
+           v.panneauExiste === false);
   verifier("replié, il ne prend aucun clic", v.clics === "none", String(v.clics));
   verifier("les trois techniques sont là", v.nbBannieres === 4, `(${v.nbBannieres} avec le repos long)`);
   verifier("le repos long a sa bannière", v.repos === true);
@@ -377,7 +380,6 @@ console.log("=========================================================");
 
     return {
       parent: carte.parentNode ? carte.parentNode.id : null,
-      dansPanneau: !!carte.closest("#panneau-combat-gauche"),
       carteX: Math.round(rc.x),
       banDroite: Math.round(rb.right),
       dessus: !vu ? "rien"
@@ -387,7 +389,6 @@ console.log("=========================================================");
     };
   });
 
-  verifier("la carte a quitté le panneau latéral", m.dansPanneau === false, String(m.parent));
   verifier("elle est accrochée à la fenêtre de combat", m.parent === "fenetre-combat", String(m.parent));
   verifier("ELLE SE POSE À DROITE DES BANNIÈRES",
            m.carteX >= m.banDroite, `carte x=${m.carteX}, bannières jusqu'à ${m.banDroite}`);

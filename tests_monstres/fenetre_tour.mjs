@@ -1,11 +1,11 @@
 // LA FENÊTRE SOMBRE DE TOUR, TELLE QU'ELLE S'AFFICHE VRAIMENT.
 //
 // Le protocole des deux barrières est vérifié à part (sequence_tour.mjs). Ici
-// c'est l'écran qu'on regarde, dans la VRAIE page : la fenêtre s'obscurcit à
-// droite du panneau latéral, annonce le nom du combattant dans l'or brossé du
-// panneau, ses états sous son nom, sa technique en grand, ses effets en
-// dessous, sa zone à côté — et fait clignoter le gros OK doré tant que le
-// joueur n'a pas touché l'écran pour ouvrir le tour.
+// c'est l'écran qu'on regarde, dans la VRAIE page : l'encart se pose dans son
+// coin, annonce le nom du combattant dans l'or brossé du jeu, ses états sous son
+// nom, sa technique en grand, ses effets en dessous, sa zone à côté — et fait
+// clignoter le gros OK doré tant que le joueur n'a pas touché l'écran pour
+// ouvrir le tour.
 import fs from 'fs';
 import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 
@@ -27,8 +27,6 @@ function fonction(marqueur) { return bloc(marqueur, marqueur); }
 // seul eval, sinon la fonction interne ajusterSurUneLigne resterait hors de
 // portée du peintre (chaque eval a sa propre portée en module strict).
 const srcVoile  = bloc('window.donneesCarteCombattant = function', 'window.rafraichirVoileTour = function');
-const srcToggle = fonction('window.togglePanneauGauche = function');
-const srcEtatInitial = lignes.find(l => l.startsWith('window.PANNEAU_GAUCHE_OUVERT ='));
 
 const { chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs');
 const b = await chromium.launch();
@@ -45,7 +43,7 @@ await p.evaluate(s => eval(s), fonction('window.imageEtat = function'));
 let echecs = 0;
 const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(60)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
 
-const res = await p.evaluate(async ({ sVoile, sToggle, sEtatInitial, sSequence }) => {
+const res = await p.evaluate(async ({ sVoile, sSequence }) => {
   document.documentElement.style.setProperty('--app-h', window.innerHeight + 'px');
   document.querySelectorAll('body > div[id^="ecran-"]').forEach(e => { if (e.id !== 'ecran-jeu') e.style.display = 'none'; });
   document.getElementById('ecran-jeu').style.display = 'block';
@@ -95,7 +93,7 @@ const res = await p.evaluate(async ({ sVoile, sToggle, sEtatInitial, sSequence }
       { nom: "Peur", desc: "45% — fuite de 2 cases", isMod: true },
       { nom: "Zone", desc: "3 hexagone(s)", isMod: true, isZone: true } ] } } };
 
-  eval(sEtatInitial); eval(sToggle); eval(sVoile);
+  eval(sVoile);
   eval(sSequence);
 
   const voile  = document.getElementById('voile-tour-combat');
@@ -129,7 +127,19 @@ const res = await p.evaluate(async ({ sVoile, sToggle, sEtatInitial, sSequence }
     couleurCarte: getComputedStyle(carte).color,
     pion: (document.getElementById('voile-tour-pion') || {}).dataset
         ? document.getElementById('voile-tour-pion').dataset.url || "" : "",
-    encartVisible: !!document.getElementById('voile-tour-encart')
+    encartVisible: !!document.getElementById('voile-tour-encart'),
+    // QUI REÇOIT LE CLIC AU CENTRE DU BOUTON DE FIN DE TOUR ? La couche de la
+    // fenêtre couvre tout l'écran et passe au-dessus du bloc du héros : c'est
+    // le `pointer-events` posé par rafraichirVoileTour, et lui seul, qui décide.
+    // On ne compare donc pas des z-index, on le demande au navigateur.
+    boutonRecoitLeClic: (() => {
+      const bouton = document.getElementById('btn-hud-fintour');
+      if (!bouton) return null;
+      const b = bouton.getBoundingClientRect();
+      if (b.width < 1) return null;
+      const recoit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+      return !!recoit && (recoit.id === 'btn-hud-fintour' || recoit.closest('#btn-hud-fintour') !== null);
+    })()
   });
 
   const poser = (queue, phase) => {
@@ -164,14 +174,11 @@ const res = await p.evaluate(async ({ sVoile, sToggle, sEtatInitial, sSequence }
   await new Promise(r => setTimeout(r, 200));
   const avecOk = etat();
 
-  // 4. Le panneau replié : la fenêtre couvre tout l'écran.
-  window.togglePanneauGauche();
-  window.rafraichirVoileTour();
-  await new Promise(r => setTimeout(r, 600));   // la fenêtre glisse jusqu'au bord
-  const panneauReplie = etat();
-  window.togglePanneauGauche();
-  window.rafraichirVoileTour();
-  await new Promise(r => setTimeout(r, 600));
+  // 4. LE PANNEAU LATÉRAL GAUCHE A ÉTÉ SUPPRIMÉ, et le scénario qui vivait ici
+  //    avec lui : la fenêtre se calait autrefois à son bord, et il fallait
+  //    vérifier qu'elle couvrait bien tout l'écran une fois le panneau replié.
+  //    La couche ne peint plus rien et l'encart se pose dans un coin : il n'y a
+  //    plus de bord à épouser, ni de repli à suivre.
 
   // 5. Le tour est RETENU, le temps que le joueur lise la technique. Le gros OK
   //    doré clignote, et le clic passe.
@@ -235,22 +242,27 @@ const res = await p.evaluate(async ({ sVoile, sToggle, sEtatInitial, sSequence }
   const horsCombat = etat();
   document.getElementById('fenetre-combat').style.display = 'block';
 
-  // Le nom reprend-il l'or brossé du panneau ? Et le OK clignote-t-il ?
+  // Le nom reprend-il l'or brossé du jeu ? Il se comparait au nom du panneau
+  // latéral ; celui-ci a été supprimé, mais le même or est encore porté par le
+  // nom du héros, en bas à droite, sur le bouton de fin de tour. Le point du
+  // contrôle n'a pas changé : l'encart ne doit pas inventer sa propre dorure.
   const sNom = getComputedStyle(nom);
-  const sPanneau = getComputedStyle(document.getElementById('combat-nom-perso'));
-  const memeOr = sNom.backgroundImage === sPanneau.backgroundImage
-              && sNom.fontFamily === sPanneau.fontFamily
-              && sNom.webkitTextFillColor === sPanneau.webkitTextFillColor;
+  const sRef = getComputedStyle(document.getElementById('hud-nom-heros-texte'));
+  const memeOr = sNom.backgroundImage === sRef.backgroundImage
+              && sNom.fontFamily === sRef.fontFamily
+              && sNom.webkitTextFillColor === sRef.webkitTextFillColor;
   const anim = getComputedStyle(ok, '::before').animationName;
   const zVoile = parseInt(getComputedStyle(voile).zIndex);
-  const zPanneau = parseInt(getComputedStyle(document.getElementById('panneau-combat-gauche')).zIndex);
-  const largeurPanneau = document.getElementById('panneau-combat-gauche').getBoundingClientRect().width;
+  // Le bloc du héros en bas à droite porte le bouton de fin de tour : la couche
+  // de la fenêtre ne doit jamais passer par-dessus, sinon le joueur ne pourrait
+  // plus finir son tour pendant que l'encart est affiché.
+  const zHud = parseInt(getComputedStyle(document.getElementById('combat-hud-bas-droite')).zIndex);
 
-  return { preparation, rienAAnnoncer, avecOk, panneauReplie, enPose, apresClic, monTourCouleur,
+  return { preparation, rienAAnnoncer, avecOk, enPose, apresClic, monTourCouleur,
            tourDunAutreJoueur,
-           monTour, tourDeLautre, mort, horsCombat, memeOr, anim, zVoile, zPanneau, largeurPanneau,
+           monTour, tourDeLautre, mort, horsCombat, memeOr, anim, zVoile, zHud,
            largeurEcran: window.innerWidth };
-}, { sVoile: srcVoile, sToggle: srcToggle, sEtatInitial: srcEtatInitial, sSequence: srcSequence });
+}, { sVoile: srcVoile, sSequence: srcSequence });
 
 console.log("erreurs JS :", erreurs.length ? erreurs : "aucune");
 console.log(`     tour de la goule : « ${res.avecOk.nom} » — « ${res.avecOk.carte} » — ${res.avecOk.effets}`);
@@ -280,7 +292,7 @@ verifier("L'ENCART EST LÀ, avec le gros pion du combattant",
          res.avecOk.encartVisible && res.avecOk.pion.length > 0,
          `encart=${res.avecOk.encartVisible} pion="${res.avecOk.pion}"`);
 verifier("le nom du combattant est affiché", res.avecOk.nom === "Goule putride", `(${res.avecOk.nom})`);
-verifier("dans l'or brossé du panneau latéral", res.memeOr);
+verifier("dans l'or brossé du jeu, celui du nom du héros", res.memeOr);
 verifier("ses états sont sous son nom", res.avecOk.nbEtats === 2, `(${res.avecOk.nbEtats})`);
 verifier("la technique est annoncée en grand", res.avecOk.carte === "Hurlement putride" && res.avecOk.tailleCarte >= 24,
          `(${res.avecOk.carte}, ${res.avecOk.tailleCarte}px)`);
@@ -352,8 +364,20 @@ verifier("et elle annonce bien SON nom", /Jade/.test(res.tourDunAutreJoueur.nom)
          `(${res.tourDunAutreJoueur.nom})`);
 verifier("aucune fenêtre pour un combattant à terre", !res.mort.visible);
 verifier("hors combat, jamais rien", !res.horsCombat.visible);
-verifier("la fenêtre passe au-dessus du plateau mais laisse le panneau",
-         res.zVoile > 5 && res.zVoile >= res.zPanneau, `(${res.zVoile} / ${res.zPanneau})`);
+verifier("la fenêtre passe au-dessus du plateau", res.zVoile > 5, `(${res.zVoile})`);
+
+// LE BOUTON DE FIN DE TOUR DOIT RESTER ATTEIGNABLE SOUS L'ENCART.
+//
+// La couche de la fenêtre couvre tout l'écran et passe au-dessus du bloc du
+// héros (z-index 12 contre 5). À mon tour, l'encart reste affiché tout le tour :
+// si cette couche prenait les clics, le joueur ne pourrait plus finir son tour,
+// ni même viser. C'est un `pointer-events` qui décide, et rien d'autre — le
+// genre d'invariant qui tombe sans bruit. Les deux côtés sont vérifiés, sinon
+// une couche qui ne prendrait JAMAIS le clic passerait aussi.
+verifier("À MON TOUR, LE BOUTON DE FIN DE TOUR REÇOIT LE CLIC",
+         res.monTour.boutonRecoitLeClic === true, `(${res.monTour.boutonRecoitLeClic})`);
+verifier("au tour d'un autre, c'est la fenêtre qui le prend",
+         res.avecOk.boutonRecoitLeClic === false, `(${res.avecOk.boutonRecoitLeClic})`);
 
 // =========================================================================
 // LA SORTIE DE SECOURS DOIT ÊTRE ATTEIGNABLE

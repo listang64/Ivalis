@@ -282,7 +282,7 @@ console.log("\n3. LES ENNEMIS : MÉDAILLON ROND, MÊME TAILLE, MÊME ENCART");
 console.log("\n4. CLIQUER SUR UN PORTRAIT SÉLECTIONNE TOUJOURS SON PION");
 // =========================================================================
 {
-  await p.evaluate(() => { window.afficherDansPanneauGauche = () => {}; window.centrerCameraSurPerso = () => {}; });
+  await p.evaluate(() => { window.centrerCameraSurPerso = () => {}; });
   await p.evaluate(() => document.querySelector('.piste-tuile[data-id="H2"]').click());
   await p.waitForTimeout(150);
   const sel = await p.evaluate(() => window.TOKEN_SELECTIONNE);
@@ -515,7 +515,6 @@ console.log("\n13. L'OMBRE SOUS LE BANDEAU A VRAIMENT UN DÉGRADÉ DOUX");
   const cadre = await p.evaluate(async () => {
     // Le décor s'efface : seul le bandeau et son ombre doivent peindre ici.
     document.getElementById("conteneur-plateau-vtt").style.display = "none";
-    document.getElementById("panneau-combat-gauche").style.display = "none";
     document.getElementById("volet-competences").style.display = "none";
     document.getElementById("fenetre-combat").style.background = "#ffffff";
 

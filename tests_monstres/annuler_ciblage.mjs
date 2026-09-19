@@ -117,7 +117,8 @@ window.PERSOS_PARTIE = [
 ];
 window.TOKENS_VTT_DATA = { J1:{q:0,r:0,taille:55} };
 window.afficherMessageFlottantHex = function(){};
-window.afficherDansPanneauGauche = function(){ window.__panneauOuvertPour = arguments[0]; };
+// Le panneau latéral a été supprimé, et afficherDansPanneauGauche avec lui :
+// cliquer sur un pion le SÉLECTIONNE, sans plus rien installer nulle part.
 // Le halo du pion sélectionné (construireHaloVTT) n'est pas ce que ce banc
 // vérifie : un simple élément vide suffit à ne pas interrompre le clic.
 window.construireHaloVTT = function() { return document.createElement("div"); };
@@ -157,12 +158,12 @@ window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
         window.CIBLES_AJOUTEES = [];
         document.getElementById("token-J1").click();
         return { cibles: [...window.CIBLES_AJOUTEES], selection: window.TOKEN_SELECTIONNE,
-                 panneauOuvert: window.__panneauOuvertPour };
+                 selectionne: window.TOKEN_SELECTIONNE };
     });
     verifier("après annulation, le même clic redevient une sélection de mouvement",
              apresAnnulation.cibles.length === 0 && apresAnnulation.selection === "J1");
-    verifier("le panneau gauche s'ouvre bien sur ce pion (comme un vrai choix de déplacement)",
-             apresAnnulation.panneauOuvert === "J1");
+    verifier("et le pion redevient celui qu'on a sélectionné",
+             apresAnnulation.selectionne === "J1", String(apresAnnulation.selectionne));
 
     await b.close();
 }

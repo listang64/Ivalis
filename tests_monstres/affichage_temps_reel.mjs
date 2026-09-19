@@ -47,14 +47,13 @@ const res = await p.evaluate((src) => {
     document.getElementById = (id) => id === "fenetre-combat" ? { style: { display: "block" } } : null;
 
     // Les fiches telles que le réseau les livre : de NOUVEAUX objets à chaque
-    // notification, jamais les mêmes que ceux du panneau.
+    // notification, jamais les mêmes que ceux que le combat tient en main.
     const fiche = (id, joueur, energie) => ({ idPersonnage: id, idJoueur: joueur, prenom: id,
                                               PV_Max: 60, PV_Actuels: 60, Fatigue_Max: 100,
                                               fatigueActuelle: energie });
     window.PERSOS_PARTIE = [fiche("J1", "P1", 100), fiche("J2", "P2", 100)];
     window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[0]];
     window.COMBAT_INDEX_PERSO = 0;
-    window.COMBAT_PERSOS_JOUEUR_BACKUP = null;
     window.TOKENS_VTT_DATA = {};
     window.ID_PARTIE_COURANTE = "P1";
 
@@ -82,15 +81,6 @@ const res = await p.evaluate((src) => {
     const listeApres = window.COMBAT_PERSOS_JOUEUR.map(x => x.idPersonnage);
     const selection = (window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO] || {}).idPersonnage;
 
-    window.COMBAT_PERSOS_JOUEUR_BACKUP = [window.PERSOS_PARTIE[0]];
-    window.COMBAT_PERSOS_JOUEUR = [{ idPersonnage: "MONSTRE_1", estMonstre: true }];
-    window.COMBAT_INDEX_PERSO = 0;
-    window.rafraichirAffichageCombat();
-    const pendantCreature = (window.COMBAT_PERSOS_JOUEUR[0] || {}).idPersonnage;
-    window.COMBAT_PERSOS_JOUEUR_BACKUP = null;
-    window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[0]];
-    window.COMBAT_INDEX_PERSO = 0;
-
     window.TOKENS_VTT_DATA = { J1: { q: 0, r: 0, taille: 55 }, J2: { q: 5, r: 5, taille: 55 } };
     const arrivee = { J1: { q: 4, r: 0, taille: 55 }, J2: { q: 5, r: 5, taille: 55 } };
 
@@ -116,7 +106,7 @@ const res = await p.evaluate((src) => {
         await window.enregistrerPionsVTT("J1");
         const sansTrajet = journal.ecritures[journal.ecritures.length - 1];
 
-        return { avantRafraichissement, apresRafraichissement, listeApres, selection, pendantCreature,
+        return { avantRafraichissement, apresRafraichissement, listeApres, selection,
                  sansAnnonce: sansAnnonce.J1, avecAnnonce: avecAnnonce.J1,
                  apresAnimation: apresAnimation.J1, pendantMarche: pendantMarche.J1, vieille: vieille.J1,
                  voisinIntact: avecAnnonce.J2,
@@ -133,13 +123,20 @@ verifier("après, il tient la fiche fraîche",
          res.apresRafraichissement === 18, `(${res.apresRafraichissement})`);
 verifier("les jauges sont réellement redessinées",
          res.jauges.length >= 2, `(${res.jauges.length} redessin(s))`);
-verifier("et la piste d'initiative avec elles", res.pistes >= 3, `(${res.pistes})`);
-verifier("un héros qui rejoint en cours de combat entre dans le panneau",
+// Un seuil en dur se périmait au premier scénario ajouté ou retiré. On compare
+// donc ce qui doit rester vrai : chaque rafraîchissement redessine les deux
+// jauges ET la piste, soit une piste pour deux jauges.
+verifier("et la piste d'initiative avec elles, à chaque fois",
+         res.pistes === res.jauges.length / 2, `(${res.pistes} piste(s) pour ${res.jauges.length} jauge(s))`);
+verifier("un héros qui rejoint en cours de combat entre dans la liste du poste",
          res.listeApres.join(",") === "J1,J3", `(${res.listeApres.join(",")})`);
 verifier("sans faire sauter la sélection en cours",
          res.selection === "J1", `(${res.selection})`);
-verifier("et le panneau qui montre une créature n'est pas volé",
-         res.pendantCreature === "MONSTRE_1", `(${res.pendantCreature})`);
+// LE CONTRÔLE « LE PANNEAU QUI MONTRE UNE CRÉATURE N'EST PAS VOLÉ » A DISPARU
+// AVEC SON SUJET. Il vérifiait que le rafraîchissement ne reprenait pas la main
+// sur COMBAT_PERSOS_JOUEUR tant que le panneau latéral y avait installé une
+// créature. Le panneau est supprimé, la liste ne contient plus que mes héros,
+// et cette précaution n'a plus rien à protéger.
 
 console.log("\n2. LE PION NE SE TÉLÉPORTE PLUS AVANT DE MARCHER");
 verifier("sans annonce, la case d'arrivée s'applique aussitôt (le défaut)",

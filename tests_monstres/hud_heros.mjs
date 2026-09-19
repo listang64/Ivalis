@@ -8,8 +8,8 @@
 // et n'en dépasse que par le haut, son nom se lit au-dessus.
 //
 // CE BANC SERT LA VRAIE PAGE ET MESURE LE VRAI RENDU :
-//   • le bloc montre le héros DU POSTE, même quand le panneau latéral a été
-//     détourné pour montrer une créature — c'est la condition posée ;
+//   • le bloc montre le héros DU POSTE, et JAMAIS une créature — c'est la
+//     condition posée, et elle vaut encore que le panneau latéral ait disparu ;
 //   • les deux demi-anneaux se remplissent par le bas, proportionnellement ;
 //   • ce qui n'est pas rempli est noir ;
 //   • un bouclier prend la place de la vitalité, en bleu, et la lui rend en
@@ -221,35 +221,56 @@ console.log("=========================================================");
 }
 
 console.log("\n=========================================================");
-console.log("  3. LE BLOC RESTE SUR MON HÉROS QUAND JE REGARDE AILLEURS");
+console.log("  3. LE BLOC NE MONTRE JAMAIS AUTRE CHOSE QUE MON HÉROS");
 console.log("=========================================================");
 {
   // LA CONDITION POSÉE : « c'est les jauges du personnage du joueur ».
   //
-  // Le panneau latéral est une visionneuse : cliquer sur un portrait de la piste
-  // ou sur un pion du plateau y installe ce combattant-là, créature comprise —
-  // afficherDansPanneauGauche remplace alors COMBAT_PERSOS_JOUEUR par [la
-  // créature] et met la vraie liste de côté dans COMBAT_PERSOS_JOUEUR_BACKUP.
-  // C'est cette même confusion qui a déjà désarmé le bouton de fin de tour et le
-  // lancement des cartes ; ici, elle afficherait la vie du gnoll au joueur.
-  await p.evaluate(() => {
-    window.COMBAT_PERSOS_JOUEUR_BACKUP = [window.PERSOS_PARTIE[0]];
-    window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[1]];   // le panneau montre la créature
+  // Elle a été écrite du temps où le panneau latéral était une VISIONNEUSE :
+  // cliquer sur un portrait de la piste ou sur un pion du plateau y installait
+  // ce combattant-là, créature comprise, en remplaçant COMBAT_PERSOS_JOUEUR par
+  // [la créature]. Le bloc affichait alors la vie du gnoll au joueur. Le panneau
+  // a été supprimé, la liste ne se fait plus détourner — et c'est précisément
+  // pour ça qu'il faut vérifier la garde AUJOURD'HUI : plus rien ne l'exerce en
+  // jeu, donc plus rien ne signalerait sa disparition.
+  //
+  // herosDuPoste avait un repli, `|| miens[0]`, qui rendait le premier venu.
+  // Il a été retiré. Les deux côtés de la garde sont mesurés ici, sinon une
+  // fonction qui ne rendrait JAMAIS rien passerait aussi.
+  const melange = await p.evaluate(async () => {
+    // Une créature glissée DEVANT mon héros dans la liste.
+    window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[1], window.PERSOS_PARTIE[0]];
     window.COMBAT_INDEX_PERSO = 0;
     window.actualiserHudHeros();
+    await new Promise(r => setTimeout(r, 400));
+    return null;
   });
-  await p.waitForTimeout(400);
-  const v = await lire();
+  let v = await lire();
   verifier("LE CHIFFRE RESTE CELUI DU HÉROS, PAS DE LA CRÉATURE",
            v.valGauche === "45", `${v.valGauche} (la créature est à 12)`);
   verifier("son énergie aussi", v.valDroite === "110", `${v.valDroite} (la créature est à 10)`);
   // `innerText` rend le texte TEL QU'IL S'AFFICHE : text-transform le met en
   // capitales. On compare donc sans se soucier de la casse.
   verifier("et le nom ne change pas", v.nom.toLowerCase() === "cybile", v.nom);
-  await p.evaluate(() => {
-    window.COMBAT_PERSOS_JOUEUR = window.COMBAT_PERSOS_JOUEUR_BACKUP;
-    window.COMBAT_PERSOS_JOUEUR_BACKUP = null;
+
+  // Et s'il n'y a QUE la créature : rien du tout, plutôt que sa vie.
+  await p.evaluate(async () => {
+    window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[1]];
+    window.COMBAT_INDEX_PERSO = 0;
+    window.actualiserHudHeros();
+    await new Promise(r => setTimeout(r, 400));
   });
+  v = await lire();
+  verifier("SANS HÉROS, LE BLOC S'EFFACE au lieu de montrer la créature",
+           v.valGauche === "–" && v.valDroite === "–", `${v.valGauche} / ${v.valDroite}`);
+  verifier("et il n'affiche aucun nom", v.nom.trim() === "", `« ${v.nom} »`);
+
+  await p.evaluate(() => {
+    window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[0]];
+    window.COMBAT_INDEX_PERSO = 0;
+    window.actualiserHudHeros();
+  });
+  await p.waitForTimeout(300);
 }
 
 console.log("\n=========================================================");
@@ -817,19 +838,21 @@ console.log("=========================================================");
 
   // --- et elle ne montre QUE le héros du poste ---
   {
+    // La créature est glissée DEVANT mon héros dans la liste : c'est bien mon
+    // héros que la piste doit suivre, et ses états à lui qu'elle doit montrer.
+    // Un repli sur le premier venu ferait passer la paralysie du gnoll pour la
+    // mienne.
     const v = await p.evaluate(async () => {
-      window.COMBAT_PERSOS_JOUEUR_BACKUP = [window.PERSOS_PARTIE[0]];
-      window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[1]];   // le panneau montre la créature
       window.PERSOS_PARTIE[1].Etats_Alteres = [{ nom: "Paralysie", duree: 9, icone: "", desc: "" }];
+      window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[1], window.PERSOS_PARTIE[0]];
       window.actualiserHudHeros();
       await new Promise(r => setTimeout(r, 500));
       return [...document.querySelectorAll(".etat-piste")].map(t => t.dataset.nom).filter(Boolean);
     });
-    verifier("ELLE IGNORE LA CRÉATURE QUE LE PANNEAU MONTRE",
-             !v.includes("Paralysie"), v.join(" | "));
+    verifier("ELLE IGNORE LES ÉTATS D'UNE CRÉATURE", !v.includes("Paralysie"), v.join(" | "));
     await p.evaluate(() => {
-      window.COMBAT_PERSOS_JOUEUR = window.COMBAT_PERSOS_JOUEUR_BACKUP;
-      window.COMBAT_PERSOS_JOUEUR_BACKUP = null;
+      window.PERSOS_PARTIE[1].Etats_Alteres = [];
+      window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[0]];
     });
   }
 }

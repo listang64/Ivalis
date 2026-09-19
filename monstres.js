@@ -237,21 +237,14 @@ window.recomposerCombattants = function() {
     }
     if (typeof window.afficherPisteInitiative === "function") window.afficherPisteInitiative();
 
-    // Le panneau gauche affiche une copie figée du combattant sélectionné. Si
-    // c'est un monstre et que sa fiche vient de changer, il faut le redessiner,
-    // sinon il reste sur des données périmées. Cas concret : les techniques sont
-    // écrites AVANT le Deck_Equipe qui les équipe, donc le panneau affichait
-    // encore "Aucune compétence mémorisée" alors que la forge était terminée.
-    const affiche = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
-    if (affiche && affiche.estMonstre && typeof window.afficherDansPanneauGauche === "function") {
-        const frais = monstres.find(m => m.idPersonnage === affiche.idPersonnage);
-        if (frais) window.afficherDansPanneauGauche(affiche.idPersonnage);
-    }
-
-    // ...et pour les HÉROS, personne ne redessinait rien. Leur panneau gardait
-    // les chiffres du moment où le combat s'était ouvert : on voyait 48
-    // d'énergie là où le poste d'à côté en voyait 18, et il fallait changer de
-    // héros puis revenir pour que l'écran se remette d'accord.
+    // LE REDESSIN D'UNE CRÉATURE A DISPARU AVEC LE PANNEAU LATÉRAL. Il servait
+    // à rafraîchir sa fiche quand ses techniques venaient d'être forgées — le
+    // panneau affichait encore « Aucune compétence mémorisée » alors que la
+    // forge était terminée. Plus aucun écran ne montre le deck d'une créature.
+    //
+    // Pour les HÉROS, en revanche, le rafraîchissement reste indispensable :
+    // sans lui, l'écran gardait les chiffres du moment où le combat s'était
+    // ouvert — on voyait 48 d'énergie là où le poste d'à côté en voyait 18.
     if (typeof window.rafraichirAffichageCombat === "function") {
         window.rafraichirAffichageCombat();
     }

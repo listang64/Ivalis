@@ -56,7 +56,7 @@ node suppression_perso.mjs  # effacer un héros emporte tout ce qui lui est lié
 node occupation_cases.mjs   # qui occupe vraiment une case (morts et fantômes exclus)
 node zone_assombrissement.mjs # où l'on peut poser une zone à distance, et l'écran noirci
 node zones_ia.mjs           # les zones sont posées, orientées et bien placées
-node piste_initiative.mjs   # la piste tient à droite du panneau, bulles réduites
+node piste_initiative.mjs   # la piste tient en haut de l'écran, bulles réduites
 node fenetre_tour.mjs       # la fenêtre de tour : nom coloré, effets détaillés, zone dessinée
 node sequence_tour.mjs      # le journal d'événements : ordre, trous, rattrapage
 node etat_combat.mjs        # LE NOYAU PUR : dés à graine, état du combat, invariants (sans réseau)
@@ -100,7 +100,8 @@ node titres_bannieres.mjs   # les noms de carte rétrécissent au lieu d'être c
 node bouton_forge.mjs       # le + de la Forge devient un sablier pendant l'attente
 node croix_suppression.mjs  # la croix rouge du mode dev efface une technique partout
 node mise_de_cote.mjs       # la case à cocher qui retire un héros du jeu, sans l'effacer
-node jauges_panneau.mjs     # vitalité et énergie du panneau gauche, à chaque étape
+node compteurs_combattant.mjs # vitalité et énergie du combattant suivi, à chaque étape
+node pas_de_visionneuse.mjs # rien ne peut plus détourner « qui joue ? » vers une créature
 node stats_fiche.mjs        # les retouches de la fiche perso suivies jusqu'au combat
 node coup_critique.mjs      # le jet de critique, ses dégâts doublés et ses effets imposés
 node atouts_races.mjs       # les sept peuples et leurs avantages, mesurés un par un
@@ -853,6 +854,57 @@ Cinq pièges refermés en chemin, tous vérifiés par `sequence_tour.mjs` :
   d'arrivée. La case de DÉPART voyage maintenant avec le trajet, et le pion y
   est reposé avant de se mettre en marche (même chose pour le bond, la poussée
   et la traction).
+
+## La suppression du panneau latéral gauche
+
+Le panneau qui occupait le bord gauche de l'écran de combat a été supprimé en
+entier : sa mécanique d'ouverture, son contenu, et surtout **sa visionneuse**.
+
+Il portait le nom et le portrait d'un combattant, ses deux jauges et son deck.
+Cliquer sur un portrait de la piste d'initiative ou sur un pion du plateau y
+installait ce combattant-là, créature comprise — et pour cela
+`afficherDansPanneauGauche` **remplaçait `COMBAT_PERSOS_JOUEUR` par [lui]**, en
+mettant la vraie liste de côté dans `COMBAT_PERSOS_JOUEUR_BACKUP`.
+
+C'était une visionneuse qui se faisait passer pour une autorité, et elle a coûté
+**trois défauts distincts, signalés trois fois en partie** : le bouton de fin de
+tour éteint, la carte qui refusait de se lancer, et le combat qu'on ne pouvait
+plus démarrer. À chaque fois, du code demandait « qui joue ? » ou « à qui est
+cette carte ? » à un affichage.
+
+Ce que le panneau montrait vit ailleurs depuis : les jauges et le nom sur le
+bouton de fin de tour, les états sur leur piste à sa gauche, le deck sous la
+lanière de cuir, et le combattant qui joue dans l'encart de tour.
+
+Trois retouches de fond accompagnent la suppression, parce que trois gardes
+posées CONTRE la visionneuse s'appuyaient sur elle sans qu'on l'ait vu :
+
+- **`herosDuPoste()` n'a plus de repli.** Le `|| miens[0]` existait pour avoir
+  quelque chose à afficher quand la liste avait été remplacée par [une créature].
+  Sans panneau, ce repli montrerait la vie d'un gnoll au joueur comme si c'était
+  la sienne. Aucun héros, aucune réponse — le bloc s'efface.
+- **`herosPourCarte()` rend le propriétaire de la carte, même quand ce n'est pas
+  un des miens.** Son repli rendait « le combattant affiché » : quand la
+  visionneuse montrait la créature dont on venait d'ouvrir la technique, il
+  tombait juste par accident. Le panneau parti, la technique d'un gnoll
+  redevenait choisissable. Le repli ne sert plus qu'au cas qu'il visait : une
+  carte dont le cache ne connaît pas encore le propriétaire.
+- **`combattantDuPanneau()` s'appelle `combattantCourant()`.** Elle ne répondait
+  déjà plus sur un panneau.
+
+Deux bancs changent de nom avec leur sujet :
+
+```sh
+node pas_de_visionneuse.mjs   # (ex panneau_visionneuse) prouvait que le moteur
+                              # savait se défendre contre elle ; prouve maintenant
+                              # qu'elle n'existe plus, et qu'un clic sur le
+                              # portrait d'un ennemi ne change rien
+node compteurs_combattant.mjs # (ex jauges_panneau) mesurait la largeur de deux
+                              # barres ; mesure maintenant les globales
+                              # COMBAT_PV_* / COMBAT_FATIGUE_* que ces deux
+                              # fonctions de jauge tiennent à jour, et que tout
+                              # le moteur lit
+```
 
 ## Fidélité à la Forge
 

@@ -598,13 +598,15 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     // être consultées, mais sans « Choisir ». C'est l'IA de combat qui décidera
     // de ce qu'ils jouent.
     //
-    // LA QUESTION PORTE SUR LA CARTE, PAS SUR LE PANNEAU. Elle se lisait dans le
-    // combattant AFFICHÉ — et le panneau est une visionneuse : l'IA comme le
-    // joueur peuvent y installer une créature, auquel cas COMBAT_PERSOS_JOUEUR
-    // devient [elle]. Le deck affiché, lui, met un instant à suivre. Le joueur
-    // voyait donc SA carte, la cliquait, et « choisir compétence » restait mort
-    // sans un mot : à la table, trois minutes d'attente, jusqu'à ce que l'IA
-    // renonce à attendre les joueurs et engage les créatures toute seule.
+    // LA QUESTION PORTE SUR LA CARTE, PAS SUR CE QUI EST AFFICHÉ. Elle se lisait
+    // dans le combattant montré par le panneau latéral — une visionneuse où
+    // l'IA comme le joueur pouvaient installer une créature, auquel cas
+    // COMBAT_PERSOS_JOUEUR devenait [elle]. Le deck affiché, lui, mettait un
+    // instant à suivre. Le joueur voyait donc SA carte, la cliquait, et
+    // « choisir compétence » restait mort sans un mot : à la table, trois
+    // minutes d'attente, jusqu'à ce que l'IA renonce à attendre les joueurs et
+    // engage les créatures toute seule. Le panneau n'existe plus ; la question
+    // se pose toujours, et elle se pose à la carte.
     //
     // herosPourCarte (combat.js) répond sur la carte elle-même : son
     // propriétaire dans le cache global, s'il est des miens.
@@ -729,13 +731,6 @@ window.masquerApercuCarteHD = function(force = false) {
             conteneurCarte.style.left = APERCU_CARTE_X_CACHE; // Glisse en se cachant
             conteneurCarte.style.opacity = "0";
 
-            // 🔻 NOUVEAU : Restaure la taille de l'avatar
-            const imgPerso = document.getElementById("combat-portrait-perso");
-            if (imgPerso) {
-                imgPerso.style.transition = "height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease";
-                imgPerso.style.height = "100%";
-            }
-            
             setTimeout(() => {
                 if (conteneurCarte.style.opacity === "0") {
                     conteneurCarte.style.display = "none";

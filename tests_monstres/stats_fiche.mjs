@@ -3,9 +3,9 @@
 // ils écrivent leur écart à côté (Dev_Mod_*). La fiche affichait bien la somme,
 // mais le combat lisait la base seule pour l'énergie, la régénération et la
 // vitalité maximale : une Énergie Max portée à 110 retombait à 100 en jeu.
-// Ce banc suit une retouche depuis le document Firestore jusqu'au pixel de la
-// jauge, puis passe le moteur au peigne fin pour qu'aucune lecture n'oublie
-// à nouveau sa retouche.
+// Ce banc suit une retouche depuis le document Firestore jusqu'aux compteurs du
+// combat et à la bulle de la piste d'initiative, puis passe le moteur au peigne
+// fin pour qu'aucune lecture n'oublie à nouveau sa retouche.
 import fs from 'fs';
 import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 
@@ -33,35 +33,31 @@ const blocPiste = combat.slice(
   combat.indexOf('// La géométrie, en un seul endroit.'),
   combat.indexOf('// LE RELAIS PISTE → PANNEAU LATÉRAL A DISPARU'));
 
-
-// Une page réduite au panneau gauche et à la piste d'initiative.
-const debutJauges = html.indexOf('<div id="combat-jauges-container"');
-const blocJauges = html.slice(debutJauges, html.indexOf('<!-- FLÈCHES NAVIGATION', debutJauges));
-
+// LE PANNEAU LATÉRAL GAUCHE A ÉTÉ SUPPRIMÉ, ET AVEC LUI SES DEUX BARRES.
+// Ce banc les interrogeait au pixel ; il interroge maintenant les globales
+// COMBAT_PV_* et COMBAT_FATIGUE_* que les deux fonctions de jauge tiennent à
+// jour. C'est la valeur que l'historique défend : le tic de poison baissait les
+// points de vie sans que personne ne remette ces globales d'accord avec la
+// fiche, et une douzaine d'endroits du moteur les lisent encore.
 const page = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>
 <div id="fenetre-combat" style="display:block">
-<div id="combat-nom-perso"></div><img id="combat-portrait-perso"><div id="combat-type-monstre"></div>
 <div id="combat-liste-competences"></div>
-${blocJauges}
 <div id="piste-initiative"></div>
 </div>
 <script>
 window.COMPETENCES_CACHE = {}; window.CACHE_COMPETENCES_GLOBAL = {};
-window.COMBAT_PERSOS_JOUEUR = []; window.COMBAT_INDEX_PERSO = 0; window.COMBAT_PERSOS_JOUEUR_BACKUP = null;
+window.COMBAT_PERSOS_JOUEUR = []; window.COMBAT_INDEX_PERSO = 0;
 window.actualiserBoutonFinTour = function(){}; window.actualiserEtatCarteCombat = function(){};
 window.ajusterTitresBannieres = function(){}; window.selectionnerEtCentrerPerso = function(){};
 window.estCombattantMort = function(){ return false; };
 ${SRC_STATS_COMMUNES}
 ${srcConversion}
-${combat.slice(combat.indexOf('function combattantDuPanneau'), combat.indexOf('window.mettreAJourJaugePV = function'))}
+${combat.slice(combat.indexOf('function combattantCourant'), combat.indexOf('window.mettreAJourJaugePV = function'))}
 ${fnCombat('window.mettreAJourJaugePV = function')}
 ${fnCombat('window.mettreAJourJaugeFatigue = function')}
 ${fnCombat('window.chargerCompetencesCombat = function')}
 ${fnCombat('window.afficherPersoCombatActuel = function')}
-${fnCombat('window.afficherDansPanneauGauche = function')}
-${fnCombat('window.restaurerPanneauGauche = function')}
 ${blocPiste}
-${combat.slice(combat.indexOf('function panneauVerrouilleParIA'), combat.indexOf('window.afficherDansPanneauGauche'))}
 </script></body></html>`;
 fs.writeFileSync('/tmp/stats_fiche.html', page);
 
@@ -107,33 +103,35 @@ verifier("la vitalité maximale vaut base + retouche", lectures.pvMax === 45, `(
 verifier("l'énergie maximale aussi", lectures.fatigueMax === 110, `(${lectures.fatigueMax})`);
 verifier("la régénération aussi", lectures.regen === 50, `(${lectures.regen}%)`);
 
-console.log("\n2. CE QUE LE PANNEAU AFFICHE");
+console.log("\n2. CE QUE LE COMBAT RETIENT");
 
-const panneau = await p.evaluate((perso) => {
+const retenu = await p.evaluate((perso) => {
   window.PERSOS_PARTIE = [perso];
   window.COMBAT_PERSOS_JOUEUR = [JSON.parse(JSON.stringify(perso))];
   window.COMBAT_INDEX_PERSO = 0;
   window.afficherPersoCombatActuel();
+  // Les deux fonctions de jauge ne dessinent plus rien, mais ce sont elles qui
+  // remettent les globales d'accord avec la fiche : on les appelle comme le
+  // moteur le fait, du tic de poison au clic sur une carte.
+  window.mettreAJourJaugePV();
+  window.mettreAJourJaugeFatigue(0);
   return {
-    fatigueMax: window.COMBAT_FATIGUE_MAX,
-    pvMax: window.COMBAT_PV_MAX,
-    etiquetteEnergie: document.getElementById("label-fatigue-actuelle").innerText,
-    etiquetteVie: document.getElementById("label-pv-actuel").innerText,
-    largeurEnergie: document.getElementById("barre-fatigue-grise").style.width
+    fatigueMax: window.COMBAT_FATIGUE_MAX, fatigueActuelle: window.COMBAT_FATIGUE_ACTUELLE,
+    pvMax: window.COMBAT_PV_MAX, pvActuels: window.COMBAT_PV_ACTUELS
   };
 }, perso);
 
-console.log(`     jauge d'énergie : « ${panneau.etiquetteEnergie} » à ${panneau.largeurEnergie}`);
-console.log(`     jauge de vie    : « ${panneau.etiquetteVie} »`);
+console.log(`     énergie ${retenu.fatigueActuelle} / ${retenu.fatigueMax}`
+          + ` | vitalité ${retenu.pvActuels} / ${retenu.pvMax}`);
 
-verifier("le panneau retient 110 d'énergie maximale, pas 100",
-         panneau.fatigueMax === 110, `(${panneau.fatigueMax})`);
-verifier("et 45 de vitalité maximale", panneau.pvMax === 45, `(${panneau.pvMax})`);
-verifier("l'énergie affichée est celle du combattant", panneau.etiquetteEnergie === "100",
-         `(${panneau.etiquetteEnergie})`);
-verifier("la barre n'est pas pleine : 100 sur 110",
-         panneau.largeurEnergie === (100 / 110 * 100) + "%" || parseFloat(panneau.largeurEnergie) < 100,
-         `(${panneau.largeurEnergie})`);
+verifier("le combat retient 110 d'énergie maximale, pas 100",
+         retenu.fatigueMax === 110, `(${retenu.fatigueMax})`);
+verifier("et 45 de vitalité maximale", retenu.pvMax === 45, `(${retenu.pvMax})`);
+verifier("l'énergie retenue est celle du combattant", retenu.fatigueActuelle === 100,
+         `(${retenu.fatigueActuelle})`);
+verifier("le combattant n'est donc pas à pleine énergie : 100 sur 110",
+         retenu.fatigueActuelle < retenu.fatigueMax,
+         `(${retenu.fatigueActuelle}/${retenu.fatigueMax})`);
 
 console.log("\n3. CE QUE LA PISTE D'INITIATIVE AFFICHE");
 

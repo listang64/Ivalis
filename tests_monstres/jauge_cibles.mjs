@@ -130,9 +130,9 @@ const cadre = await p.evaluate(() => {
     t.style.border = "2px solid #c2a878";
   });
   document.getElementById("fenetre-combat").style.backgroundColor = "#2b2b2b";
-  // Le menu de jeu et le panneau de gauche recouvrent le plateau : on les écarte
-  // le temps de la capture, sinon ils masquent les pions photographiés.
-  document.querySelectorAll("#panneau-combat-gauche, #menu-lateral, #ecran-menu, #menu-navigation-bas, #conteneur-icones-carte")
+  // Le menu de jeu recouvre le plateau : on l'écarte le temps de la capture,
+  // sinon il masque les pions photographiés.
+  document.querySelectorAll("#menu-lateral, #ecran-menu, #menu-navigation-bas, #conteneur-icones-carte")
     .forEach(e => e.style.display = "none");
   const r = document.getElementById("token-M1").getBoundingClientRect();
   return { x: Math.max(0, r.left - 45), y: Math.max(0, r.top - 25),
