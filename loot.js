@@ -20,6 +20,103 @@ import { db } from "./firebase-config.js?v=2";
 import { doc, updateDoc, deleteField } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // =========================================================================
+//  LE MÉNAGE DES IMAGES ABANDONNÉES
+// =========================================================================
+//  CHAQUE OBJET DU JEU EST DESSINÉ, ET CHAQUE DESSIN EST HÉBERGÉ. Un objet
+//  lâché, écrasé par un meilleur, ou qu'aucun héros n'a voulu au partage, s'en
+//  va de la base — mais son image, elle, restait sur Cloudinary pour toujours.
+//  Même chose pour l'avatar habillé : il est redessiné à chaque changement
+//  d'armure, et l'ancien n'était jamais retiré. Au rythme d'une partie, ça
+//  s'accumule en silence.
+//
+//  ON NE SUPPRIME JAMAIS UNE IMAGE ENCORE UTILISÉE, et c'est tout le sujet.
+//  Une URL peut être portée par plus d'un endroit à la fois : une arme à deux
+//  mains occupe les DEUX mains avec le même dessin, un objet du butin est à la
+//  fois dans le lot d'un héros et à l'écran, un objet resté en réserve attend
+//  la rencontre suivante. Effacer l'un, c'est laisser un carré vide ailleurs —
+//  un défaut visible, là où une image orpheline ne se voit pas. En cas de
+//  doute, on garde : le ménage manqué se rattrape, pas l'image effacée.
+window.imagesEncoreUtilisees = function(options) {
+    // `saufPersonnage` : ce héros-là ne compte plus. C'est le cas quand on
+    // l'efface — sa fiche part, mais il est encore dans la liste en mémoire au
+    // moment du ménage, et ses images se protégeraient elles-mêmes.
+    const { avecButin = true, avecReserve = true, saufPersonnage = null } = options || {};
+    const vivantes = new Set();
+    // Les URL voyagent parfois avec des transformations (`q_auto,f_auto`) :
+    // c'est le même fichier hébergé. On compare donc sur l'identifiant public,
+    // que supprimerImageCloudinary sait extraire, et pas sur l'URL brute.
+    const ajouter = (u) => {
+        const id = typeof window.idPublicCloudinary === "function" ? window.idPublicCloudinary(u) : "";
+        if (id) vivantes.add(id);
+    };
+    const ajouterObjet = (o) => { if (o) ajouter(o.image); };
+
+    (window.PERSOS_PARTIE || []).forEach(p => {
+        if (!p || (saufPersonnage && p.idPersonnage === saufPersonnage)) return;
+        ajouter(p.urlCloudinary); ajouter(p.urlPortraitReference);
+        ajouter(p.urlAvatarEquipe); ajouter(p.urlToken);
+        [p.equipArmure, p.equipMainDroite, p.equipMainGauche].forEach(ajouterObjet);
+    });
+
+    // Le butin encore ouvert : ses objets sont à l'écran, et rien n'est joué
+    // tant que le partage n'est pas refermé.
+    const butin = avecButin ? ((window.PARTIE_DATA || {}).Butin || null) : null;
+    if (butin) {
+        Object.values(butin.parPersonnage || {}).forEach(b => (b.items || []).forEach(ajouterObjet));
+        (butin.pool || []).forEach(ajouterObjet);
+    }
+
+    // La réserve tirée d'avance : ses objets sont déjà payés et attendent la
+    // rencontre suivante.
+    if (avecReserve) {
+        Object.values(window.RESERVE_CONNUE || {}).forEach(r =>
+            ((r && r.items) || []).forEach(ajouterObjet));
+    }
+    return vivantes;
+};
+
+// Une seule porte de sortie pour toutes les images qu'on abandonne. Elle rend
+// le nombre réellement effacé — les bancs en ont besoin, et la console aussi.
+window.oublierImages = async function(urls, raison, options) {
+    const candidats = (Array.isArray(urls) ? urls : [urls]).filter(Boolean);
+    if (candidats.length === 0) return 0;
+    if (typeof window.supprimerImageCloudinary !== "function") return 0;
+
+    // SANS LA LECTURE D'IDENTIFIANT, ON N'EFFACE RIEN. Elle vit dans
+    // ia_master.js, avec la suppression elle-même : si ce module n'est pas
+    // chargé, on ne peut pas savoir ce qui est encore utilisé — et on ne
+    // supprime jamais à l'aveugle.
+    if (typeof window.idPublicCloudinary !== "function") return 0;
+
+    const vivantes = window.imagesEncoreUtilisees(options);
+    const aEffacer = [];
+    const vus = new Set();
+    candidats.forEach(url => {
+        const id = window.idPublicCloudinary(url);
+        if (!id || vivantes.has(id) || vus.has(id)) return;
+        vus.add(id);
+        aEffacer.push(url);
+    });
+    if (aEffacer.length === 0) return 0;
+
+    // Sans les clés Cloudinary dans les réglages, la suppression ne fait rien.
+    // On le DIT, plutôt que de laisser croire que le ménage a eu lieu.
+    let aLesCles = false;
+    try { aLesCles = !!localStorage.getItem("ivalis_CLOUDINARY_API_SECRET"); } catch (e) {}
+    if (!aLesCles) {
+        console.warn(`[Cloudinary] ${aEffacer.length} image(s) conservée(s) (${raison || "ménage"})`
+                     + " : clés API absentes des réglages.");
+        return 0;
+    }
+
+    for (const url of aEffacer) {
+        await window.supprimerImageCloudinary(url).catch(e => console.error(e));
+    }
+    console.log(`[Cloudinary] 🧹 ${aEffacer.length} image(s) effacée(s) — ${raison || "ménage"}`);
+    return aEffacer.length;
+};
+
+// =========================================================================
 //  VOCABULAIRE COMMUN DES EMPLACEMENTS
 // =========================================================================
 
@@ -115,6 +212,14 @@ window.equiperObjet = async function(idPersonnage, objet, main) {
         });
     }
 
+    // CE QU'ON ÉCRASE EST PERDU POUR DE BON : il n'existe pas de sac dans
+    // Ivalis. Son dessin n'a donc plus rien à faire sur Cloudinary — mais on le
+    // relève AVANT l'écriture, sinon il a déjà disparu de la fiche.
+    const ecrases = champs
+        .map(champ => (perso || {})[window.champDocVersFront[champ]])
+        .filter(o => o && o.image)
+        .map(o => o.image);
+
     try {
         await updateDoc(doc(db, "Personnages", idPersonnage), maj);
         window.appliquerEquipementEnRam(idPersonnage, maj);
@@ -122,6 +227,13 @@ window.equiperObjet = async function(idPersonnage, objet, main) {
         console.error("Équipement :", e);
         return;
     }
+
+    // Le ménage se fait APRÈS l'écriture, et sans être attendu : le joueur n'a
+    // pas à patienter devant Cloudinary. oublierImages refuse d'elle-même tout
+    // dessin encore porté ailleurs — une arme à deux mains, par exemple, occupe
+    // les deux mains avec la même image.
+    Promise.resolve(window.oublierImages(ecrases, "objet remplacé"))
+        .catch(e => console.error("Ménage des images :", e));
 
     // Une nouvelle armure change l'allure du héros : son avatar est redessiné
     // en arrière-plan, à partir de son portrait de référence et de l'image de
@@ -148,16 +260,31 @@ window.lacherObjet = async function(idPersonnage, champ) {
     const maj = {};
     champs.forEach(c => maj[c] = null);
 
+    // Ce qu'on lâche ne revient jamais : son dessin part avec lui. On le relève
+    // AVANT l'écriture, sinon il a déjà disparu de la fiche.
+    const abandonnes = champs
+        .map(c => (perso || {})[window.champDocVersFront[c]])
+        .filter(o => o && o.image)
+        .map(o => o.image);
+
     // Plus d'armure sur le dos : le héros retrouve son portrait de référence.
-    // Rien à redessiner, donc rien à payer ni à attendre.
-    if (champs.includes("Equip_Armure")) maj.URL_Avatar_Equipe = "";
+    // Rien à redessiner, donc rien à payer ni à attendre. L'avatar habillé,
+    // lui, ne servira plus jamais : il montrait CETTE armure-là.
+    if (champs.includes("Equip_Armure")) {
+        maj.URL_Avatar_Equipe = "";
+        if (perso && perso.urlAvatarEquipe) abandonnes.push(perso.urlAvatarEquipe);
+    }
 
     try {
         await updateDoc(doc(db, "Personnages", idPersonnage), maj);
         window.appliquerEquipementEnRam(idPersonnage, maj);
     } catch (e) {
         console.error("Lâcher l'objet :", e);
+        return;
     }
+
+    Promise.resolve(window.oublierImages(abandonnes, "objet lâché"))
+        .catch(e => console.error("Ménage des images :", e));
 };
 
 // Miroir en mémoire de ce qui vient d'être écrit : la fiche ouverte et les
@@ -1505,8 +1632,30 @@ window.rendreVueFinButin = function(butin, mesIds) {
 // le faire une fois la répartition terminée.
 window.fermerFenetreButin = async function() {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    await window.modifierPartie((data) => {
+
+    // LES OBJETS QUE PERSONNE N'A VOULUS N'EXISTENT PLUS APRÈS CETTE LIGNE.
+    //
+    // Ils ont été tirés, dessinés, hébergés, proposés — et laissés. Leur image
+    // n'a plus aucun endroit où s'afficher. On la relève ici, tant que le butin
+    // est encore lisible ; l'écriture qui suit l'emporte.
+    const butin = (window.PARTIE_DATA || {}).Butin || {};
+    const delaisses = (butin.pool || [])
+        .filter(item => item && item.image && !item.gagnant)
+        .map(item => item.image);
+
+    // LE MÉNAGE N'A LIEU QUE CHEZ CELUI QUI REFERME VRAIMENT. N'importe quel
+    // joueur peut cliquer, et tous peuvent cliquer en même temps : la
+    // transaction n'en laisse passer qu'un — les autres reçoivent `null`. Sans
+    // cette garde, trois postes lanceraient les mêmes suppressions.
+    const referme = await window.modifierPartie((data) => {
         if (!data.Butin || !data.Butin.ouvert) return null;
         return { maj: { "Butin.ouvert": false } };
     });
+    if (!referme) return;
+
+    // Le butin est clos : ses objets ne comptent plus parmi ce qui est utilisé,
+    // sinon chaque image du lot se protégerait elle-même.
+    Promise.resolve(window.oublierImages(delaisses, "objet que personne n'a pris",
+                                         { avecButin: false }))
+        .catch(e => console.error("Ménage des images :", e));
 };

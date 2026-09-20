@@ -1345,18 +1345,28 @@ async function supprimerPersonnageBDD(idPersonnage) {
       console.error("Suppression de la fiche :", e);
   }
 
-  // 6. Ses images sur Cloudinary : le portrait et le pion tactique. Sans les
-  //    clés Cloudinary en réglages, la fonction ne fait rien — on le dit, plutôt
-  //    que de laisser croire que tout est parti.
-  if (data && typeof window.supprimerImageCloudinary === "function") {
-      const aLesCles = !!localStorage.getItem("ivalis_CLOUDINARY_API_SECRET");
-      const images = [data.URL_Cloudinary, data.URL_Token].filter(Boolean);
-      if (images.length > 0 && !aLesCles) {
-          console.warn("   ⚠️ Images Cloudinary conservées : clés API absentes des réglages.");
-      }
-      for (const url of images) {
-          await window.supprimerImageCloudinary(url).catch(e => console.error(e));
-      }
+  // 6. TOUT CE QU'IL LAISSE SUR CLOUDINARY, et pas seulement son portrait.
+  //
+  //    Deux images manquaient à l'appel, et elles se comptent par partie :
+  //    l'AVATAR HABILLÉ (redessiné à chaque armure équipée) et les dessins des
+  //    OBJETS QU'IL PORTE — une armure, deux armes, chacun son fichier. Un héros
+  //    effacé emportait son portrait et son pion, et abandonnait le reste.
+  //
+  //    Le ménage passe par oublierImages, qui refuse d'elle-même tout dessin
+  //    encore utilisé ailleurs : un objet ne peut pas être porté par deux héros
+  //    à la fois, mais une arme à deux mains occupe DEUX emplacements avec la
+  //    même image, et rien ne dit qu'un jour un dessin ne sera pas partagé.
+  if (data && typeof window.oublierImages === "function") {
+      const objets = [data.Equip_Armure, data.Equip_Main_Droite, data.Equip_Main_Gauche]
+          .filter(o => o && o.image).map(o => o.image);
+      const images = [data.URL_Cloudinary, data.URL_Avatar_Equipe, data.URL_Token, ...objets]
+          .filter(Boolean);
+      // LE HÉROS EST ENCORE DANS LA LISTE EN MÉMOIRE à cet instant : elle n'est
+      // nettoyée qu'à l'étape suivante. Sans `saufPersonnage`, ses propres
+      // images se protégeraient elles-mêmes et rien ne partirait.
+      const effacees = await window.oublierImages(images, "personnage supprimé",
+                                                  { saufPersonnage: idPersonnage });
+      console.log(`   ✔️ ${effacees} image(s) retirée(s) de Cloudinary.`);
   }
 
   // 7. Ce qu'il laissait derrière lui dans CE navigateur.

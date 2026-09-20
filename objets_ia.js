@@ -699,6 +699,12 @@ window.rhabillerAvatar = async function(idPersonnage, armure, urlReference) {
 // Écrit (ou efface) l'avatar habillé. Le portrait de référence n'est jamais
 // touché : c'est lui qui repartira au prochain changement d'armure.
 window.poserAvatarEquipe = async function(idPersonnage, url) {
+    // L'AVATAR QU'ON REMPLACE NE SERVIRA PLUS JAMAIS. Il montrait l'armure
+    // d'avant, et rien ne le rappellera : chaque changement d'armure en laissait
+    // un de plus sur Cloudinary. On relève l'ancien avant de poser le nouveau.
+    const avant = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+    const ancien = (avant && avant.urlAvatarEquipe) || "";
+
     try {
         await updateDoc(doc(db, "Personnages", idPersonnage), { URL_Avatar_Equipe: url || "" });
     } catch (e) {
@@ -711,6 +717,13 @@ window.poserAvatarEquipe = async function(idPersonnage, url) {
     if (perso) {
         perso.urlAvatarEquipe = url || "";
         perso.urlCloudinary = url || perso.urlPortraitReference || "";
+    }
+
+    // Le miroir est à jour : l'ancien avatar n'est plus porté par personne, et
+    // oublierImages peut le constater elle-même.
+    if (ancien && ancien !== url && typeof window.oublierImages === "function") {
+        Promise.resolve(window.oublierImages(ancien, "avatar d'une armure précédente"))
+            .catch(e => console.error("Ménage des images :", e));
     }
 };
 

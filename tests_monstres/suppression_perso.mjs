@@ -10,6 +10,26 @@ const debut = src.indexOf('async function supprimerPersonnageBDD(idPersonnage) {
 const fin = src.indexOf('\n}\n', src.indexOf('🧹 [Nettoyage] Terminé', debut)) + 3;
 const fonction = src.slice(debut, fin);
 
+// LE MÉNAGE DES IMAGES N'EST PAS BOUCHONNÉ : c'est lui qu'on met à l'épreuve.
+// On prend donc le VRAI code — la lecture d'identifiant (ia_master.js) et les
+// deux fonctions de ménage (loot.js) — et on ne simule que le seul appel qui
+// parle vraiment au réseau.
+const extraire = (fichier, marqueur, finLigne = '};') => {
+  const lignes = fs.readFileSync('/home/user/Ivalis/' + fichier, 'utf-8').split('\n');
+  const d = lignes.findIndex(l => l.startsWith(marqueur));
+  if (d < 0) throw new Error(`${marqueur} introuvable dans ${fichier}`);
+  let f = d; for (let i = d + 1; i < lignes.length; i++) { if (lignes[i] === finLigne) { f = i; break; } }
+  return lignes.slice(d, f + 1).join('\n');
+};
+const SRC_MENAGE = [
+  extraire('ia_master.js', 'const estTransformationCloudinary = (seg) =>',
+           "    !seg.includes('.') && seg.split(',').every(part => /^[a-z]{1,3}_[^,/]+$/.test(part));"),
+  extraire('ia_master.js', 'function idPublicCloudinary(urlImage) {', '}'),
+  'window.idPublicCloudinary = idPublicCloudinary;',
+  extraire('loot.js', 'window.imagesEncoreUtilisees = function(options) {'),
+  extraire('loot.js', 'window.oublierImages = async function(urls, raison, options) {')
+].join('\n\n');
+
 let echecs = 0;
 const verifier = (l, c, d="") => { if (!c) echecs++; console.log(`  ${l.padEnd(58)} ${c?"OK":"ÉCHEC"} ${d}`); };
 
@@ -17,9 +37,17 @@ const verifier = (l, c, d="") => { if (!c) echecs++; console.log(`  ${l.padEnd(5
 function creerBase() {
   const base = {
     Personnages: {
+      // CE HÉROS PORTE TOUT CE QU'UN HÉROS PEUT PORTER : son portrait de
+      // référence, son avatar dans l'armure du moment, son pion tactique, et
+      // les trois dessins de son équipement. Chacun est un fichier distinct sur
+      // Cloudinary, et chacun était abandonné là.
       PERSO_1: { Prenom_Personnage:"Pliors", ID_Partie:"GAME_1", ID_Joueur:"P_01",
                  URL_Cloudinary:"https://res.cloudinary.com/x/upload/v1/portrait.png",
-                 URL_Token:"https://res.cloudinary.com/x/upload/v1/pion.png" },
+                 URL_Avatar_Equipe:"https://res.cloudinary.com/x/upload/v1/avatar_habille.png",
+                 URL_Token:"https://res.cloudinary.com/x/upload/v1/pion.png",
+                 Equip_Armure: { uid:"o1", nom:"Cotte", image:"https://res.cloudinary.com/x/upload/v1/cotte.png" },
+                 Equip_Main_Droite: { uid:"o2", nom:"Épée", image:"https://res.cloudinary.com/x/upload/v1/epee.png" },
+                 Equip_Main_Gauche: { uid:"o3", nom:"Écu", image:"https://res.cloudinary.com/x/upload/v1/ecu.png" } },
       PERSO_2: { Prenom_Personnage:"Jade", ID_Partie:"GAME_1", ID_Joueur:"P_02" },
       ILLUSION_a: { Est_Illusion:true, ID_Lanceur:"PERSO_1", ID_Partie:"GAME_1", Nom_Personnage:"Pliors" },
       ILLUSION_b: { Est_Illusion:true, ID_Lanceur:"PERSO_2", ID_Partie:"GAME_1", Nom_Personnage:"Jade" }
@@ -84,13 +112,36 @@ async function supprimer({ partieOuverte, avecClesCloudinary = true }) {
   const imagesDetruites = [];
   const w = {
     ID_PARTIE_COURANTE: partieOuverte,
-    PERSOS_PARTIE: [{ idPersonnage:"PERSO_2", statut:"Vivant" }],
+    // LE HÉROS EFFACÉ EST ENCORE DANS LA LISTE EN MÉMOIRE au moment du ménage :
+    // elle n'est nettoyée qu'à l'étape d'après. C'est tout le piège du garde-fou
+    // « ne jamais effacer une image encore utilisée » — sans `saufPersonnage`,
+    // ses propres images se protégeraient elles-mêmes et rien ne partirait.
+    PERSOS_PARTIE: [
+      { idPersonnage:"PERSO_1", statut:"Vivant",
+        urlCloudinary:"https://res.cloudinary.com/x/upload/v1/avatar_habille.png",
+        urlPortraitReference:"https://res.cloudinary.com/x/upload/v1/portrait.png",
+        urlAvatarEquipe:"https://res.cloudinary.com/x/upload/v1/avatar_habille.png",
+        urlToken:"https://res.cloudinary.com/x/upload/v1/pion.png",
+        equipArmure: { uid:"o1", image:"https://res.cloudinary.com/x/upload/v1/cotte.png" },
+        equipMainDroite: { uid:"o2", image:"https://res.cloudinary.com/x/upload/v1/epee.png" },
+        equipMainGauche: { uid:"o3", image:"https://res.cloudinary.com/x/upload/v1/ecu.png" } },
+      // Un camarade porte son propre matériel : rien de tout cela ne doit
+      // partir avec le héros effacé.
+      { idPersonnage:"PERSO_2", statut:"Vivant",
+        urlCloudinary:"https://res.cloudinary.com/x/upload/v1/portrait_jade.png",
+        equipArmure: { uid:"o9", image:"https://res.cloudinary.com/x/upload/v1/robe_jade.png" } }
+    ],
     PERSOS_JOUEURS_PARTIE: [], TOKENS_VTT_DATA: {}, SOURCE_COMBATTANTS: {}, CACHE_COMPETENCES_GLOBAL: {},
+    RESERVE_CONNUE: {}, PARTIE_DATA: {},
     supprimerImageCloudinary: async (url) => { imagesDetruites.push(url); }
   };
   global.window = w;
   global.localStorage = { getItem: (k) => (k === "ivalis_CLOUDINARY_API_SECRET" && avecClesCloudinary) ? "secret" : null,
                           removeItem: () => {} };
+  // Le vrai ménage, posé sur ce window : idPublicCloudinary, imagesEncoreUtilisees
+  // et oublierImages tels qu'ils sont dans le jeu. APRÈS localStorage — il le
+  // capture à la construction, et il en lit les clés Cloudinary.
+  new Function('window', 'localStorage', 'console', SRC_MENAGE)(w, global.localStorage, console);
   const COL = { PERSONNAGES:"Personnages", CARACTERISTIQUES:"Caracteristiques", PARTIES:"Systeme_Parties" };
   const executer = new Function('window','db','COL','doc','getDoc','getDocs','deleteDoc','updateDoc',
                                 'query','collection','where','writeBatch','deleteField',
@@ -119,8 +170,16 @@ console.log("1. AVEC LA PARTIE OUVERTE À L'ÉCRAN");
   verifier("les autres pions restent", !!vtt.Tokens.PERSO_2);
   verifier("ses zones persistantes disparaissent", !vtt.Zones_Persistantes.zp_1);
   verifier("celles des autres restent", !!vtt.Zones_Persistantes.zp_2);
-  verifier("ses deux images Cloudinary sont détruites", imagesDetruites.length === 2,
-           `(${imagesDetruites.length})`);
+  // SIX IMAGES, PAS DEUX. Le portrait et le pion partaient déjà ; l'avatar
+  // habillé (redessiné à chaque armure équipée) et les trois dessins de son
+  // équipement restaient sur Cloudinary pour toujours.
+  const nomsPartis = imagesDetruites.map(u => u.split("/").pop());
+  verifier("TOUTES SES IMAGES SONT DÉTRUITES, pas seulement son portrait",
+           imagesDetruites.length === 6, `(${imagesDetruites.length} : ${nomsPartis.join(", ")})`);
+  ["portrait.png", "avatar_habille.png", "pion.png", "cotte.png", "epee.png", "ecu.png"]
+    .forEach(nom => verifier("  · " + nom, nomsPartis.includes(nom)));
+  verifier("ET RIEN DE CE QUE PORTE UN AUTRE HÉROS",
+           !nomsPartis.some(n => /jade/.test(n)), nomsPartis.join(", "));
   verifier("le personnage épargné garde tout", !!base.Personnages.PERSO_2 && !!base.Caracteristiques.PERSO_2);
 }
 
@@ -137,8 +196,72 @@ console.log("\n2. DEPUIS LE MENU PRINCIPAL, AUCUNE PARTIE OUVERTE");
 
 console.log("\n3. SANS LES CLÉS CLOUDINARY : LE RESTE PART QUAND MÊME");
 {
-  const { base, ok } = await supprimer({ partieOuverte: "GAME_1", avecClesCloudinary: false });
+  const { base, ok, imagesDetruites } = await supprimer({ partieOuverte: "GAME_1", avecClesCloudinary: false });
   verifier("la fiche est effacée malgré tout", ok === true && !base.Personnages.PERSO_1);
+  verifier("et aucune image n'est touchée : on ne peut pas signer la demande",
+           imagesDetruites.length === 0, `(${imagesDetruites.length})`);
+}
+
+console.log("\n4. ON N'EFFACE JAMAIS UNE IMAGE ENCORE UTILISÉE");
+// =========================================================================
+//  C'est la règle qui protège tout le reste, et la seule façon de se tromper
+//  ici laisse un carré vide à l'écran — un défaut visible, là où une image
+//  orpheline ne se voit pas. En cas de doute, on garde.
+{
+  const imagesDetruites = [];
+  const w = {
+    PERSOS_PARTIE: [
+      { idPersonnage:"H1",
+        // Une arme à DEUX MAINS occupe les deux emplacements avec le même
+        // dessin : le relever deux fois ne doit pas l'effacer deux fois.
+        equipMainDroite: { uid:"d", image:"https://res.cloudinary.com/x/upload/v1/hache.png" },
+        equipMainGauche: { uid:"d", image:"https://res.cloudinary.com/x/upload/v1/hache.png" } }
+    ],
+    // Un objet du butin encore ouvert est à l'écran ; un objet resté en réserve
+    // attend la rencontre suivante. Ni l'un ni l'autre n'est perdu.
+    PARTIE_DATA: { Butin: { pool: [{ uid:"p", image:"https://res.cloudinary.com/x/upload/v1/pool.png" }],
+                            parPersonnage: { H1: { items: [{ uid:"i", image:"https://res.cloudinary.com/x/upload/v1/lot.png" }] } } } },
+    RESERVE_CONNUE: { facile: { items: [{ uid:"r", image:"https://res.cloudinary.com/x/upload/v1/reserve.png" }] } },
+    supprimerImageCloudinary: async (url) => { imagesDetruites.push(url); }
+  };
+  global.window = w;
+  global.localStorage = { getItem: (k) => k === "ivalis_CLOUDINARY_API_SECRET" ? "secret" : null };
+  new Function('window', 'localStorage', 'console', SRC_MENAGE)(w, global.localStorage, console);
+
+  const essayer = async (url) => { imagesDetruites.length = 0;
+                                   await w.oublierImages(url, "essai"); return imagesDetruites.length; };
+
+  verifier("une arme encore en main est épargnée",
+           await essayer("https://res.cloudinary.com/x/upload/v1/hache.png") === 0);
+  verifier("un objet du butin à l'écran aussi",
+           await essayer("https://res.cloudinary.com/x/upload/v1/pool.png") === 0);
+  verifier("un objet du lot d'un héros aussi",
+           await essayer("https://res.cloudinary.com/x/upload/v1/lot.png") === 0);
+  verifier("un objet gardé en réserve aussi",
+           await essayer("https://res.cloudinary.com/x/upload/v1/reserve.png") === 0);
+  verifier("mais un dessin que plus personne ne porte s'en va",
+           await essayer("https://res.cloudinary.com/x/upload/v1/orphelin.png") === 1);
+
+  // LA MÊME IMAGE SOUS DEUX URL. Cloudinary sert le même fichier avec ou sans
+  // transformations, avec ou sans numéro de version : comparer les URL brutes
+  // aurait laissé passer une image encore portée.
+  verifier("LA MÊME IMAGE SOUS UNE AUTRE URL EST RECONNUE",
+           await essayer("https://res.cloudinary.com/x/upload/q_auto,f_auto/v1789/hache.png") === 0);
+
+  // Le butin qu'on referme ne protège plus ses objets : sinon chaque image du
+  // lot se protégerait elle-même, et rien ne partirait jamais.
+  imagesDetruites.length = 0;
+  await w.oublierImages("https://res.cloudinary.com/x/upload/v1/pool.png",
+                        "butin refermé", { avecButin: false });
+  verifier("UNE FOIS LE BUTIN REFERMÉ, SES LAISSÉS-POUR-COMPTE PARTENT",
+           imagesDetruites.length === 1, `(${imagesDetruites.length})`);
+
+  // Deux fois la même URL dans un seul appel : une seule demande part.
+  imagesDetruites.length = 0;
+  await w.oublierImages(["https://res.cloudinary.com/x/upload/v1/double.png",
+                         "https://res.cloudinary.com/x/upload/q_auto/v1/double.png"], "doublon");
+  verifier("et un doublon ne se demande qu'une fois", imagesDetruites.length === 1,
+           `(${imagesDetruites.length})`);
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

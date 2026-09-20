@@ -52,7 +52,7 @@ node reveil_ia.mjs          # l'IA se réveille seule, et joue après les joueur
 node lanceur_ia.mjs         # le sort part au nom de la créature, pas du joueur
 node enchainement_ia.mjs    # une créature attend la fin de sa carte avant de passer
 node hors_combat.mjs        # rien ne s'affiche quand la fenêtre de combat est fermée
-node suppression_perso.mjs  # effacer un héros emporte tout ce qui lui est lié
+node suppression_perso.mjs  # effacer un héros emporte tout ce qui lui est lié, images comprises
 node occupation_cases.mjs   # qui occupe vraiment une case (morts et fantômes exclus)
 node zone_assombrissement.mjs # où l'on peut poser une zone à distance, et l'écran noirci
 node zones_ia.mjs           # les zones sont posées, orientées et bien placées
@@ -1082,6 +1082,48 @@ Empoisonnement×2 ». Elles ont disparu.
 La règle porte maintenant sur tous les rôles, pas seulement sur les
 modificateurs : la question « en ai-je déjà un ? » ne dépend pas de la place que
 l'effet occupe sur la carte.
+
+## Le ménage des images abandonnées
+
+Chaque objet du jeu est dessiné, et chaque dessin est hébergé sur Cloudinary.
+Un objet lâché, écrasé par un meilleur, ou qu'aucun héros n'a voulu au partage,
+s'en va de la base — mais son image y restait pour toujours. Même chose pour
+l'avatar habillé, redessiné à **chaque** changement d'armure. Et un personnage
+effacé n'emportait que son portrait et son pion : son avatar habillé et les
+dessins des trois objets qu'il portait restaient derrière lui.
+
+Cinq fuites, une seule porte de sortie : `oublierImages`.
+
+**On ne supprime jamais une image encore utilisée**, et c'est toute la
+difficulté. Une URL peut être portée par plus d'un endroit à la fois : une arme
+à deux mains occupe les DEUX mains avec le même dessin, un objet du butin est à
+la fois dans le lot d'un héros et à l'écran, un objet resté en réserve attend la
+rencontre suivante. Effacer l'un, c'est laisser un carré vide ailleurs — un
+défaut visible, là où une image orpheline ne se voit pas. En cas de doute, on
+garde : le ménage manqué se rattrape, pas l'image effacée.
+
+Deux pièges que le banc a fait remonter, et qu'aucune relecture n'aurait vus :
+
+- **Le garde-fou se retournait contre la suppression d'un personnage.** Au
+  moment du ménage, le héros est encore dans la liste en mémoire — elle n'est
+  nettoyée qu'à l'étape suivante — et ses propres images se protégeaient donc
+  elles-mêmes. D'où `saufPersonnage`.
+- **La lecture de l'identifiant Cloudinary était fausse depuis toujours.** Elle
+  ne reconnaissait une transformation qu'à sa VIRGULE : `q_auto,f_auto` était
+  bien écarté, mais `q_auto` seul se retrouvait dans le chemin, et l'identifiant
+  devenait « q_auto/mon_image ». La suppression ne trouvait alors rien à
+  effacer, en silence. Ça ne s'était jamais vu parce que le jeu écrit toujours
+  ses URL avec les deux transformations à la fois — le ménage, lui, compare des
+  URL venues d'un peu partout. Corrigée en ne retirant que les segments de
+  TÊTE : une URL Cloudinary s'écrit `/upload/<transformations>/<version>/<id>`,
+  et les transformations ne viennent jamais après. Un filtre appliqué à tous les
+  segments mangeait `avatar_habille.png`, qui a exactement la forme d'une
+  transformation.
+
+```sh
+node menage_images.mjs      # les cinq chemins qui abandonnent une image
+node suppression_perso.mjs  # effacer un héros emporte TOUTES ses images
+```
 
 ## Fidélité à la Forge
 

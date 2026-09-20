@@ -1004,6 +1004,52 @@ Si l'action est banale, ne fais rien.`;
 //  NOUVEAU : MIA_MORT (La Faucheuse de PNJ et d'images)
 // =========================================================================
 
+// L'IDENTIFIANT PUBLIC D'UNE IMAGE, ET UNE SEULE FAÇON DE LE LIRE.
+//
+// Une même image se présente sous plusieurs URL : avec ou sans transformations
+// (`q_auto,f_auto`), avec ou sans numéro de version (`v1789...`). C'est le même
+// fichier hébergé, et c'est cet identifiant-là qui le dit. Il sert à DEUX
+// choses — effacer l'image, et savoir si elle est encore utilisée ailleurs
+// (voir imagesEncoreUtilisees, loot.js). Deux lectures différentes de la même
+// URL, et le ménage effacerait une image encore portée par quelqu'un.
+//
+// UNE TRANSFORMATION SEULE N'EST PAS UN DOSSIER, et c'est ce qui clochait.
+// L'ancienne lecture ne reconnaissait une transformation qu'à sa VIRGULE :
+// `q_auto,f_auto` était bien écarté, mais `q_auto` tout seul se retrouvait dans
+// le chemin, et l'identifiant devenait « q_auto/mon_image ». La suppression ne
+// trouvait alors rien à effacer, en silence — ça ne s'est jamais vu parce que
+// le jeu écrit toujours ses URL avec les deux transformations à la fois. Le
+// ménage, lui, compare des URL venues d'un peu partout : il lui faut la vraie
+// règle, pas celle qui marche par chance.
+//
+// ON NE RETIRE QUE LES SEGMENTS DE TÊTE, et c'est ce qui rend la règle sûre.
+// Une URL Cloudinary s'écrit `/upload/<transformations>/<version>/<identifiant>` :
+// les transformations ne viennent JAMAIS après. Un filtre appliqué à tous les
+// segments se trompait de cible — `avatar_habille.png` a exactement la forme
+// d'une transformation (une clé, un tiret bas, une valeur), et se faisait
+// effacer du chemin ; l'identifiant devenait vide, et l'image survivait.
+//
+// Les clés de transformation tiennent en une à trois lettres (`w_2400`,
+// `c_limit`, `q_auto`, `dpr_2`) : un nom de fichier n'a pas cette forme, et un
+// point suffit d'ailleurs à le trahir.
+const estTransformationCloudinary = (seg) =>
+    !seg.includes('.') && seg.split(',').every(part => /^[a-z]{1,3}_[^,/]+$/.test(part));
+
+function idPublicCloudinary(urlImage) {
+    if (!urlImage) return "";
+    const parts = String(urlImage).split('/upload/');
+    if (parts.length < 2) return "";
+    const segments = parts[1].split('/').filter(Boolean);
+    while (segments.length > 1
+           && (estTransformationCloudinary(segments[0]) || /^v\d+$/.test(segments[0]))) {
+        segments.shift();
+    }
+    const cheminComplet = segments.join('/').split('?')[0];   // Ex: "PNJ/mon_image.webp"
+    const point = cheminComplet.lastIndexOf('.');
+    return point > 0 ? cheminComplet.substring(0, point) : cheminComplet;  // Ex: "PNJ/mon_image"
+}
+window.idPublicCloudinary = idPublicCloudinary;
+
 async function supprimerImageCloudinary(urlImage) {
     if (!urlImage) return;
     const cles = {
@@ -1014,14 +1060,9 @@ async function supprimerImageCloudinary(urlImage) {
     if (!cles.cloudName || !cles.cloudKey || !cles.cloudSecret) return;
 
     try {
-        // 1. Isoler l'ID public depuis l'URL Cloudinary (extrêmement robuste)
-        const parts = urlImage.split('/upload/');
-        if (parts.length < 2) return;
-        
-        // On filtre les balises de transformation (q_auto, etc.) et les numéros de version (v178...)
-        const segmentsNettoyes = parts[1].split('/').filter(seg => !seg.includes(',') && !/^v\d+$/.test(seg));
-        const cheminComplet = segmentsNettoyes.join('/'); // Ex: "PNJ/mon_image.webp"
-        const publicId = cheminComplet.substring(0, cheminComplet.lastIndexOf('.')); // Ex: "PNJ/mon_image"
+        // 1. Isoler l'ID public depuis l'URL Cloudinary
+        const publicId = idPublicCloudinary(urlImage);
+        if (!publicId) return;
 
         // 2. Préparer la signature de destruction
         const timestamp = Math.floor(Date.now() / 1000).toString();
