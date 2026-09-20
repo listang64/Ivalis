@@ -527,6 +527,7 @@ window.rouvrirDeckApresEchec = function() {
 // différentes. Sur `window` et appelée avec sa garde, elle se contente de ne
 // rien faire là où le volet n'existe pas.
 window.installerVoletCompetences = function() {
+    window.calerVoletReplie();
     const hote = document.getElementById("volet-bannieres");
     const liste = document.getElementById("combat-liste-competences");
     if (!hote || !liste || liste.parentNode === hote) return !!hote;
@@ -535,6 +536,44 @@ window.installerVoletCompetences = function() {
     // la largeur de son hôte, qui est calé sur son ancienne place.
     liste.style.marginTop = "0px";
     liste.style.paddingLeft = "0px";
+    return true;
+};
+
+// LA POINTE DE LA LANIÈRE DÉPASSE, ET C'EST ELLE QU'ON TIRE.
+//
+// Le volet remontait ENTIÈREMENT hors champ : rien ne disait plus qu'il
+// existait, et le seul moyen de le rappeler était le petit bouton rond du
+// bandeau. On laisse donc pendre le bout de la lanière en haut de l'écran —
+// c'est un objet qu'on tire, pas un menu qu'on ouvre.
+//
+// COMBIEN FAUT-IL REMONTER ? Ça ne peut pas s'écrire en dur. La lanière est une
+// image dont on ne fixe que la LARGEUR : sa hauteur dépend de ses proportions,
+// et un chiffre écrit ici serait faux le jour où l'image change. On la mesure
+// donc, et on en déduit le décalage : remonter tout sauf la pointe.
+//
+// Le résultat est posé en variable CSS parce que c'est une ANIMATION qui s'en
+// sert, avec ses rebonds — et une animation ne se calcule pas en JavaScript
+// sans perdre justement ces rebonds. La valeur de repli d'origine (-115%) reste
+// écrite comme secours dans la feuille de style : un moteur qui ne saurait pas
+// lire une variable dans une image-clé retrouverait l'ancien comportement au
+// lieu d'un volet coincé à mi-hauteur.
+window.POINTE_LANIERE_VISIBLE = 26;   // ce qui dépasse, en pixels d'écran
+
+window.calerVoletReplie = function() {
+    const contenu = document.getElementById("volet-contenu");
+    const laniere = document.getElementById("volet-laniere");
+    if (!contenu || !laniere) return false;
+
+    // Pas encore chargée : on repassera quand elle le sera (voir plus bas).
+    const hauteur = laniere.getBoundingClientRect().height;
+    if (hauteur <= 0) return false;
+
+    // La lanière est posée à `top` dans le contenu ; son bas se trouve donc à
+    // `top + hauteur`. Pour qu'il reste `POINTE_LANIERE_VISIBLE` pixels sous le
+    // bord haut de l'écran, il faut remonter le contenu d'autant.
+    const haut = parseFloat(getComputedStyle(laniere).top) || 0;
+    const replie = window.POINTE_LANIERE_VISIBLE - (haut + hauteur);
+    contenu.style.setProperty("--volet-replie", Math.round(replie) + "px");
     return true;
 };
 
@@ -582,6 +621,13 @@ window.toggleVoletCompetences = function(forcer) {
     // gauche de l'écran, y compris le plateau qu'on veut cliquer.
     const bannieres = document.getElementById("volet-bannieres");
     if (bannieres) bannieres.style.pointerEvents = ouvrir ? "auto" : "none";
+
+    // LA LANIÈRE, C'EST L'INVERSE : elle ne prend les clics que REPLIÉE.
+    // Sa pointe est alors la poignée qu'on tire. Déployée, elle passe au-dessus
+    // de la première bannière — la laisser cliquable lui volerait son clic, et
+    // le joueur croirait que sa technique ne répond pas.
+    const laniere = document.getElementById("volet-laniere");
+    if (laniere) laniere.style.pointerEvents = ouvrir ? "none" : "auto";
 
     // En se refermant, il emporte l'aperçu de carte ouvert : sinon la carte
     // reste seule au milieu de l'écran, sans la bannière qui l'a appelée.

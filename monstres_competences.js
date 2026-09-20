@@ -140,7 +140,20 @@ const MOTS_CLES = {
     // altérations par carte et se retrouvaient, étant bon marché et sans
     // contrainte, sur près d'une carte sur deux.
     controle:    ["poussée", "poussee", "traction", "immobilisation", "bond", "étourdi", "etourdi", "peur", "provocation"],
-    etat:        ["brûl", "brul", "glac", "électri", "electri", "poison", "empoison", "confusion", "saignement", "malédiction", "malediction"]
+    etat:        ["brûl", "brul", "glac", "électri", "electri", "poison", "empoison", "confusion", "saignement", "malédiction", "malediction"],
+
+    // LES QUATRE ÉTATS QUI RONGENT, ET IL N'EN FAUT QU'UN PAR TECHNIQUE.
+    //
+    // Brûlé, Glacé, Électrifié, Empoisonnement : ce sont les quatre mêmes
+    // choses dites de quatre façons — un effet qui s'installe sur la cible et
+    // la grignote tour après tour. Les empiler ne rend pas la technique plus
+    // dangereuse, seulement plus confuse : « brûle ET gèle ET électrocute ET
+    // empoisonne » ne raconte rien, et dépense tout le budget de la carte à
+    // dire quatre fois la même phrase. Une vraie technique a UNE signature.
+    //
+    // La règle existait déjà pour les trois premiers ; l'empoisonnement y
+    // manquait, et se retrouvait donc en plus de n'importe lequel des autres.
+    rongeur:     ["brûl", "brul", "glac", "électri", "electri", "poison", "empoison"]
 };
 
 const contient = (nom, liste) => {
@@ -561,17 +574,28 @@ function effetAutorise(chantier, effet, commeMod) {
     // familles d'effets sans rapport et produit des cartes fourre-tout du genre
     // "brûle + gèle + électrocute + empoisonne + paralyse". Une vraie technique
     // a UNE signature, pas sept.
-    if (commeMod) {
-        const familleElementaire = ["brûl", "brul", "glac", "électri", "electri"];
-        const estElementaire = contient(nom, familleElementaire);
-        if (estElementaire) {
-            // Un seul élément par carte : on ne brûle pas ET ne gèle pas.
-            const dejaElementaire = chantier.actions.some(act =>
-                act.modsEffets.some(m => contient(m.effet.Nom, familleElementaire) &&
-                                         !(m.effet.Nom || "").toLowerCase().includes(nom)));
-            if (dejaElementaire) return false;
-        }
 
+    // UN SEUL ÉTAT QUI RONGE PAR TECHNIQUE — voir MOTS_CLES.rongeur.
+    //
+    // La règle porte sur TOUS les rôles, pas seulement sur les mods : ces quatre
+    // effets sont des altérations, mais rien ne garantit qu'aucun ne devienne un
+    // socle un jour, et la question « en ai-je déjà un ? » ne dépend pas de la
+    // place qu'il occupe.
+    //
+    // ON COMPARE LES NOMS, PAS LEURS MORCEAUX. La version d'avant écartait
+    // l'exemplaire déjà posé avec un `includes` sur le nom candidat — ça marchait
+    // par chance tant que les quatre noms n'avaient aucune racine commune. Une
+    // égalité dit ce qu'on veut vraiment dire : « le même effet, qu'on est en
+    // train d'empiler d'un cran ».
+    if (contient(nom, MOTS_CLES.rongeur)) {
+        const dejaUnRongeur = chantier.actions.some(act =>
+            (contient(act.baseEffet.Nom, MOTS_CLES.rongeur) && act.baseEffet.Nom !== effet.Nom) ||
+            act.modsEffets.some(m => contient(m.effet.Nom, MOTS_CLES.rongeur)
+                                     && m.effet.Nom !== effet.Nom));
+        if (dejaUnRongeur) return false;
+    }
+
+    if (commeMod) {
         // Deux altérations d'état différentes au maximum : au-delà, la carte
         // devient illisible et ne raconte plus rien.
         if (contient(nom, MOTS_CLES.etat) || contient(nom, MOTS_CLES.controle)) {

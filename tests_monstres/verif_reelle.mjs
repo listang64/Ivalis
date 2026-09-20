@@ -31,6 +31,7 @@ corpus.forEach(m => m.cartes.forEach((c, rang) => {
 
   // 2. Règles de la Forge
   const tags = new Set(); let nbAttaques = 0, aAttaque = false, aPoison = false;
+  const rongeurs = new Set();
   d.Composants.actions.forEach(a => {
     const eff = [{ e: EFFETS[a.baseEffetId], n: a.count, racine: true },
                  ...Object.entries(a.mods).map(([id,v]) => ({ e: EFFETS[id], n: v, racine: false }))];
@@ -39,6 +40,7 @@ corpus.forEach(m => m.cartes.forEach((c, rang) => {
       if (e.Modificateur && e.Modificateur !== "AUCUN") tags.add(e.Modificateur.toUpperCase());
       if (estUneAttaqueDeBase(e.Nom)) { nbAttaques++; aAttaque = true; }
       if (/poison/i.test(e.Nom)) aPoison = true;
+      if (/brûl|brul|glac|électri|electri|poison|empoison/i.test(e.Nom)) rongeurs.add(e.Nom);
       if (/provocation/i.test(e.Nom)) inc("provocation sur un monstre (réservée aux joueurs)", desc);
       if (estIncompatibleAvecArme(e.Nom, d.Arme)) inc("effet interdit par l'arme", `${desc} [arme ${d.Arme}]`);
       // plafond d'empilement RÉEL de la Forge
@@ -68,6 +70,15 @@ corpus.forEach(m => m.cartes.forEach((c, rang) => {
   if (tags.size > 2) inc("plus de 2 caractéristiques", `${desc} [${[...tags].join("+")}]`);
   if (nbAttaques > 1) inc("plus d'une attaque de base", desc);
   if (aPoison && !aAttaque) inc("poison sans source de dégâts", desc);
+
+  // UN SEUL ÉTAT QUI RONGE PAR TECHNIQUE : Brûlé, Glacé, Électrifié,
+  // Empoisonnement. Ce sont quatre façons de dire la même chose — un effet qui
+  // s'installe et grignote tour après tour — et les empiler ne rend pas la
+  // technique plus dangereuse, seulement plus confuse. La règle existait pour
+  // les trois premiers ; l'empoisonnement y manquait, et se retrouvait donc en
+  // plus de n'importe lequel des autres.
+  if (rongeurs.size > 1) inc("plusieurs états qui rongent sur la même technique",
+                             `${desc} [${[...rongeurs].join(" + ")}]`);
 
   // 3. Champs du document
   ["Nom","Arme","Element","Fatigue","Initiative","Cout_PC","Effets_Compiles","Composants"].forEach(k => {

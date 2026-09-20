@@ -1028,6 +1028,61 @@ la croix se viserait soi-même), et `VTT_CIBLAGE_CLICK` court en phase de
 **capture**, avant tout le monde, en arrêtant net tout clic tombé dans le
 plateau — la croix y est, il lui faut donc une exception nommée.
 
+## On tire sur la lanière, et le volet descend
+
+Le volet des compétences remontait ENTIÈREMENT hors champ : rien ne disait plus
+qu'il existait, et le seul moyen de le rappeler était le petit bouton rond du
+bandeau. La pointe de la lanière de cuir pend maintenant en haut de l'écran, et
+c'est elle qu'on attrape — le geste que l'objet appelle. Les deux coexistent :
+l'un se trouve du regard, l'autre se connaît.
+
+**Combien remonter ne peut pas s'écrire en dur.** La lanière n'a qu'une largeur
+écrite ; sa hauteur suit ses proportions, et un chiffre serait faux le jour où
+l'image change. Elle est donc mesurée à l'écran, et le décalage posé en variable
+CSS — parce que c'est une *animation* qui s'en sert, avec ses rebonds, et qu'une
+animation ne se calcule pas en JavaScript sans perdre justement ces rebonds. Le
+`-115%` d'origine reste écrit derrière comme secours : un moteur qui ne saurait
+pas lire une variable dans une image-clé retrouve l'ancien repli complet, pas un
+volet coincé à mi-hauteur.
+
+Et la lanière ne prend les clics que **repliée** : déployée, elle passe au-dessus
+de la première bannière et lui volerait son clic.
+
+## Le bandeau rouge ne sort qu'en mode développeur
+
+Le rapporteur d'erreurs existe parce que le jeu se joue sur iPad, où il n'y a
+aucune console : une erreur au chargement d'un module y est invisible. Mais à
+une table de jeu, un bandeau rouge en travers de l'écran, c'est le jeu qui a
+l'air cassé — et la plupart de ce qu'il rapporte est sans conséquence pour la
+partie en cours.
+
+**Il écoute toujours**, en revanche, et c'est tout le sujet : les pannes qu'on
+cherche arrivent au chargement, bien avant qu'on pense à cocher quoi que ce
+soit. Un rapporteur qui ne commencerait à écouter qu'une fois coché ne servirait
+à rien. Les erreurs sont donc gardées de côté, et cocher le mode développeur les
+fait apparaître d'un coup, celles d'avant comprises.
+
+```sh
+node bandeau_erreurs.mjs    # il se tait, il retient, et il déverse quand on coche
+```
+
+## Un seul état qui ronge par technique de créature
+
+Brûlé, Glacé, Électrifié, Empoisonnement : ce sont quatre façons de dire la même
+chose — un effet qui s'installe sur la cible et la grignote tour après tour. Les
+empiler ne rend pas la technique plus dangereuse, seulement plus confuse, et
+dépense tout le budget de la carte à dire quatre fois la même phrase.
+
+La règle existait déjà pour les trois premiers ; **l'empoisonnement y manquait**,
+et se retrouvait donc en plus de n'importe lequel des autres. Mesuré sur 5520
+cartes réelles : **325 cartes, soit 5,89 %**, cumulaient deux de ces états —
+« Attaque Magique×13 + Zone×6 + Persistance terrain + Électrifié×2 +
+Empoisonnement×2 ». Elles ont disparu.
+
+La règle porte maintenant sur tous les rôles, pas seulement sur les
+modificateurs : la question « en ai-je déjà un ? » ne dépend pas de la place que
+l'effet occupe sur la carte.
+
 ## Fidélité à la Forge
 
 ```sh

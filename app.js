@@ -4934,6 +4934,13 @@ window.actualiserDevMode = function() {
         afficherListePersonnages(window.PERSOS_JOUEURS_PARTIE.filter(p => !p.estIllusion));
     }
 
+    // LE RAPPORTEUR D'ERREURS SUIT LE MODE DÉVELOPPEUR. Coché, il déverse tout
+    // ce qu'il a retenu depuis le chargement — c'est là que se trouvent les
+    // pannes de module, bien avant qu'on pense à cocher quoi que ce soit.
+    // Décoché, son bandeau rouge disparaît : à une table de jeu, il donne au jeu
+    // l'air cassé pour des erreurs le plus souvent sans conséquence.
+    if (typeof window.montrerErreursJS === "function") window.montrerErreursJS(isDev);
+
     if (isDev) { console.log("🛠️ Mode Développeur : ACTIVÉ"); } 
     else { console.log("🛠️ Mode Développeur : DÉSACTIVÉ"); }
 };

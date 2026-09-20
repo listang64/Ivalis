@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=30">
+  <link rel="stylesheet" href="style.css?v=31">
 
  
   <!-- ===================================================================== -->
@@ -25,17 +25,39 @@
        rapport cessent de répondre, et il ne reste rien à raconter au
        développeur. Ce bandeau rend l'erreur lisible à l'écran.
 
+       IL NE SE MONTRE QU'EN MODE DÉVELOPPEUR. Un bandeau rouge en travers du
+       bas de l'écran, à une table de jeu, c'est le jeu qui a l'air cassé — et
+       la plupart des erreurs qu'il rapporte sont sans conséquence pour la
+       partie en cours.
+
+       MAIS IL ÉCOUTE TOUJOURS, et c'est le point : les pannes qu'on cherche
+       arrivent AU CHARGEMENT, bien avant qu'on pense à cocher quoi que ce soit.
+       Elles sont donc gardées de côté, et cocher le mode développeur les fait
+       apparaître d'un coup, celles d'avant comprises (voir actualiserDevMode).
+
        Volontairement en clair, tout en haut du document et hors module : il
        doit être en place AVANT le premier <script type="module">, sans quoi il
        manquerait précisément les pannes qu'on cherche.                        -->
   <script>
     (function () {
       var vues = [];
+      var retenues = [];      // tout ce qui est passé, montré ou non
+
+      function enModeDev() {
+        try { return localStorage.getItem("ivalis_DEV_MODE") === "on"; }
+        catch (e) { return false; }   // navigation privée : on se tait
+      }
+
       function afficher(titre, detail) {
         var cle = titre + detail;
         if (vues.indexOf(cle) !== -1) return;   // une même erreur ne se répète pas
         vues.push(cle);
+        retenues.push({ titre: titre, detail: detail });
+        if (!enModeDev()) return;               // gardée de côté, pas perdue
+        peindre(titre, detail);
+      }
 
+      function peindre(titre, detail) {
         var boite = document.getElementById("bandeau-erreurs-js");
         if (!boite) {
           boite = document.createElement("div");
@@ -90,6 +112,18 @@
 
       // Accessible à la main, pour signaler une anomalie sans console.
       window.signalerErreur = afficher;
+
+      // Ce que le mode développeur appelle quand on le coche ou le décoche.
+      // Coché, il déverse tout ce qui est arrivé depuis le chargement ; décoché,
+      // il retire le bandeau sans rien oublier — le recocher le remontrera.
+      window.montrerErreursJS = function (montrer) {
+        var boite = document.getElementById("bandeau-erreurs-js");
+        if (!montrer) { if (boite) boite.remove(); return retenues.length; }
+        if (boite) return retenues.length;       // déjà à l'écran
+        for (var i = 0; i < retenues.length; i++) peindre(retenues[i].titre, retenues[i].detail);
+        return retenues.length;
+      };
+      window.erreursJSRetenues = function () { return retenues.slice(); };
     })();
   </script>
 
@@ -543,8 +577,14 @@
              l'écran, comme si elle continuait au-delà. -->
         <div id="volet-competences" style="position: absolute; top: 0; left: 0; width: 380px;
                                            height: 100%; z-index: 14; pointer-events: none;">
+            <!-- `--volet-replie` est posée par calerVoletReplie (combat.js), qui
+                 mesure la lanière pour laisser sa pointe dépasser. Le -115%
+                 reste comme secours : un moteur qui ne saurait pas lire une
+                 variable retrouve l'ancien repli complet, pas un volet coincé
+                 à mi-hauteur. -->
             <div id="volet-contenu" style="position: absolute; top: 0; left: 0; width: 100%;
-                                           height: 100%; transform: translateY(-115%);">
+                                           height: 100%;
+                                           transform: translateY(var(--volet-replie, -115%));">
                 <!-- DEUX FOIS PLUS GRANDE, ET PAS UN PIXEL DE DÉFORMATION.
                      Seule la largeur est écrite ; la hauteur reste `auto`, donc
                      le navigateur garde les proportions de l'image quoi qu'il
@@ -552,10 +592,22 @@
                      descend d'autant plus bas dans l'écran.
                      Le `left` a été reculé de la moitié du gain (122 - 43 = 79)
                      pour qu'elle grandisse autour de son axe, sans se décaler. -->
+                <!-- ON TIRE SUR LA LANIÈRE, ET LE VOLET DESCEND. C'est le geste
+                     que l'objet appelle : sa pointe pend en haut de l'écran, et
+                     c'est elle qu'on attrape. Le petit bouton rond du bandeau
+                     fait toujours la même chose — les deux coexistent, l'un se
+                     trouve du regard, l'autre se connaît.
+                     `pointer-events: auto` ne vaut que REPLIÉE : déployée, la
+                     lanière passe au-dessus de la première bannière, et
+                     toggleVoletCompetences lui retire les clics. -->
                 <img id="volet-laniere"
                      src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789309135/IMG_2135_vk5wq4.png"
+                     title="Mes compétences"
+                     onload="if (window.calerVoletReplie) window.calerVoletReplie();"
+                     onclick="window.toggleVoletCompetences()"
                      style="position: absolute; top: -40px; left: 79px; width: 172px; height: auto;
-                            pointer-events: none; filter: drop-shadow(3px 4px 10px rgba(0,0,0,0.75));">
+                            pointer-events: auto; cursor: pointer;
+                            filter: drop-shadow(3px 4px 10px rgba(0,0,0,0.75));">
                 <!-- `none` au départ, et c'est important : replié, le volet est
                      hors champ mais il couvre tout le flanc gauche. Il ne doit
                      rien intercepter tant qu'il n'est pas descendu. -->
@@ -1811,7 +1863,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=15"></script>
+<script src="trace_combat.js?v=16"></script>
 <script src="hud_disposition.js?v=1"></script>
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
@@ -1837,19 +1889,19 @@
      par défaut — regimeCerveau(true) dans la console pour l'allumer. -->
 <script type="module" src="regime_cerveau.js?v=23"></script>
 <script type="module" src="ia_master.js?v=5"></script>
-<script type="module" src="app.js?v=44"></script>
+<script type="module" src="app.js?v=45"></script>
 <script type="module" src="creation_personnage.js?v=6"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=24"></script>
 <script src="Plateau.js"></script>
 <script type="module" src="sequence_tour.js?v=22"></script>
-<script type="module" src="combat.js?v=79"></script>
+<script type="module" src="combat.js?v=80"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=24"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
 <script type="module" src="moteur_effets.js?v=44"></script>
 <script type="module" src="monstres.js?v=23"></script>
-<script type="module" src="monstres_competences.js?v=9"></script>
+<script type="module" src="monstres_competences.js?v=10"></script>
 <script type="module" src="monstres_ia.js?v=29"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=7"></script>

@@ -2213,13 +2213,23 @@ textarea.input-texte-parchemin {
  *  que le navigateur compose sans redessiner, et le volet porte une pile de
  *  bannières avec leurs ombres portées. Animé en `top`, l'iPad saccade. */
 
+/* LA POSITION REPLIÉE NE REMONTE PLUS TOUT : LA POINTE DE LA LANIÈRE RESTE.
+   Elle se calcule à l'écran, à partir de la hauteur RÉELLE de l'image (voir
+   calerVoletReplie, combat.js) : la lanière n'a qu'une largeur écrite, sa
+   hauteur suit ses proportions, et un chiffre en dur ici serait faux le jour où
+   l'image change.
+
+   `-115%` reste comme SECOURS, et pas par précaution de style : un moteur qui
+   ne saurait pas lire une variable dans une image-clé retrouverait l'ancien
+   comportement — volet entièrement hors champ — au lieu d'un volet coincé à
+   mi-hauteur. */
 .volet-ouvre {
     animation: voletDescend 0.62s cubic-bezier(0.22, 0.9, 0.30, 1) forwards;
     -webkit-animation: voletDescend 0.62s cubic-bezier(0.22, 0.9, 0.30, 1) forwards;
 }
 
 @keyframes voletDescend {
-    0%   { transform: translateY(-115%); }
+    0%   { transform: translateY(var(--volet-replie, -115%)); }
     62%  { transform: translateY(2.2%); }   /* elle dépasse un peu */
     78%  { transform: translateY(-1.4%); }  /* et remonte */
     90%  { transform: translateY(0.6%); }   /* redescend, plus doucement */
@@ -2234,7 +2244,8 @@ textarea.input-texte-parchemin {
 @keyframes voletRemonte {
     0%   { transform: translateY(0); }
     20%  { transform: translateY(3.2%); }   /* on la tire vers le bas... */
-    100% { transform: translateY(-115%); }  /* ...et elle file vers le haut */
+    /* ...et elle file vers le haut, en laissant sa pointe */
+    100% { transform: translateY(var(--volet-replie, -115%)); }
 }
 
 /* ========================================================================= */

@@ -337,7 +337,14 @@ console.log("=========================================================");
            JSON.stringify(descend));
   verifier("la remontée plonge d'abord vers le bas",
            remonte.some(k => /translateY\(3\.2%\)/.test(k)), JSON.stringify(remonte));
-  verifier("et finit hors écran", remonte.some(k => /translateY\(-115%\)/.test(k)), JSON.stringify(remonte));
+  // ELLE NE FINIT PLUS HORS ÉCRAN : elle finit sur sa POINTE, à un décalage
+  // mesuré à l'exécution (la lanière n'a qu'une largeur écrite, sa hauteur suit
+  // ses proportions). D'où la variable — et le -115% qui reste derrière elle :
+  // un moteur qui ne saurait pas lire une variable dans une image-clé retrouve
+  // l'ancien repli complet, pas un volet coincé à mi-hauteur.
+  verifier("et finit sur la pointe, avec l'ancien repli en secours",
+           remonte.some(k => /translateY\(var\(--volet-replie, ?-115%\)\)/.test(k)),
+           JSON.stringify(remonte));
 }
 
 console.log("\n=========================================================");
@@ -439,11 +446,13 @@ console.log("=========================================================");
            (v.classes || "").includes("volet-ferme"), String(v.classes));
 
   const apres = await p.evaluate(() => {
-    const contenu = document.getElementById("volet-contenu");
+    const laniere = document.getElementById("volet-laniere");
+    const bannieres = document.getElementById("volet-bannieres");
     const deck = document.getElementById("combat-liste-competences");
     const carte = document.getElementById("apercu-carte-hd-competence");
     return {
-      basDuVolet: Math.round(contenu.getBoundingClientRect().bottom),
+      pointe: Math.round(laniere.getBoundingClientRect().bottom),
+      hautDesBannieres: Math.round(bannieres.getBoundingClientRect().top),
       opacite: deck.style.opacity,
       clics: getComputedStyle(deck).pointerEvents,
       gris: deck.style.filter,
@@ -451,8 +460,10 @@ console.log("=========================================================");
       carteVerrouillee: !!carte && carte.dataset.locked === "true"
     };
   });
-  verifier("LA LANIÈRE DE CUIR EST REMONTÉE HORS CHAMP",
-           apres.basDuVolet <= 0, `bas = ${apres.basDuVolet}px`);
+  verifier("LA LANIÈRE EST REMONTÉE, SEULE SA POINTE RESTE",
+           apres.pointe > 0 && apres.pointe <= 40, `pointe à ${apres.pointe}px`);
+  verifier("et les bannières sont bien parties avec elle",
+           apres.hautDesBannieres < 0, `haut = ${apres.hautDesBannieres}px`);
   verifier("le deck est verrouillé, pas effacé", apres.opacite === "0.4", apres.opacite);
   verifier("il est grisé", (apres.gris || "").includes("grayscale"), apres.gris);
   verifier("et il ne répond plus au doigt", apres.clics === "none", apres.clics);
@@ -529,6 +540,73 @@ console.log("=========================================================");
            l.hautDeclare === "-40px", l.hautDeclare);
   verifier("ELLE DESCEND PLUS BAS QUE LES BANNIÈRES QU'ELLE PORTE",
            l.bas > l.basDesBannieres, `lanière jusqu'à ${l.bas}, bannières jusqu'à ${l.basDesBannieres}`);
+}
+
+// =========================================================================
+console.log("\n  LA POINTE DE LA LANIÈRE DÉPASSE, ET C'EST ELLE QU'ON TIRE");
+// =========================================================================
+//  Le volet remontait ENTIÈREMENT hors champ : rien ne disait plus qu'il
+//  existait, et le seul moyen de le rappeler était le petit bouton rond du
+//  bandeau. On laisse donc pendre le bout de la lanière en haut de l'écran.
+//
+//  COMBIEN REMONTER NE PEUT PAS S'ÉCRIRE EN DUR : la lanière n'a qu'une largeur
+//  écrite, sa hauteur suit ses proportions. C'est mesuré à l'écran. Le banc
+//  vérifie donc des PIXELS RENDUS, pas une règle de style.
+{
+  await p.evaluate(() => window.toggleVoletCompetences(false));
+  await p.waitForTimeout(900);
+
+  const replie = await p.evaluate(() => {
+    const img = document.getElementById("volet-laniere");
+    const ban = document.getElementById("volet-bannieres");
+    const r = img.getBoundingClientRect(), b = ban.getBoundingClientRect();
+    return {
+      pointe: Math.round(r.bottom),          // jusqu'où la pointe descend
+      hauteurLaniere: Math.round(r.height),
+      bannieresVisibles: b.bottom > 0,
+      clicsLaniere: getComputedStyle(img).pointerEvents,
+      clicsBannieres: getComputedStyle(ban).pointerEvents,
+      variable: document.getElementById("volet-contenu").style.getPropertyValue("--volet-replie")
+    };
+  });
+
+  verifier("le repli est calculé, pas écrit en dur", /^-?\d+px$/.test(replie.variable.trim()),
+           `"${replie.variable}"`);
+  verifier("LA POINTE DÉPASSE EN HAUT DE L'ÉCRAN",
+           replie.pointe > 0 && replie.pointe <= 40, `${replie.pointe}px sous le bord`);
+  verifier("mais SEULEMENT la pointe : le reste est bien remonté",
+           replie.pointe < replie.hauteurLaniere / 4,
+           `${replie.pointe} sur ${replie.hauteurLaniere}px de lanière`);
+  verifier("et les bannières, elles, sont hors champ", !replie.bannieresVisibles);
+
+  // Repliée, c'est la lanière qui prend le clic ; déployée, c'est l'inverse —
+  // elle passe au-dessus de la première bannière et lui volerait son clic.
+  verifier("REPLIÉE, LA LANIÈRE PREND LES CLICS", replie.clicsLaniere === "auto", replie.clicsLaniere);
+  verifier("et les bannières non", replie.clicsBannieres === "none", replie.clicsBannieres);
+
+  // LE GESTE : on tire sur la pointe, le volet descend.
+  const tire = await p.evaluate(async () => {
+    const img = document.getElementById("volet-laniere");
+    const r = img.getBoundingClientRect();
+    // On vise le pixel visible le plus bas de la pointe, pas le centre de
+    // l'image : celui-ci est hors de l'écran quand le volet est replié.
+    const el = document.elementFromPoint(Math.round(r.x + r.width / 2), Math.max(2, Math.round(r.bottom) - 4));
+    const recuParLaLaniere = el === img;
+    img.click();
+    await new Promise(r2 => setTimeout(r2, 900));
+    return { recuParLaLaniere, quiRecoit: el ? (el.id || el.tagName) : "personne",
+             ouvert: window.VOLET_COMPETENCES_OUVERT,
+             bannieresVisibles: document.getElementById("volet-bannieres").getBoundingClientRect().top > 0 };
+  });
+  verifier("LA POINTE REÇOIT VRAIMENT LE CLIC", tire.recuParLaLaniere, tire.quiRecoit);
+  verifier("ET LE CLIC OUVRE LES COMPÉTENCES", tire.ouvert === true);
+  verifier("les bannières sont descendues avec elle", tire.bannieresVisibles);
+
+  // Déployée, elle rend la main : sinon elle mangerait le clic de la première
+  // bannière, et le joueur croirait que sa technique ne répond pas.
+  const ouverte = await p.evaluate(() =>
+    getComputedStyle(document.getElementById("volet-laniere")).pointerEvents);
+  verifier("DÉPLOYÉE, ELLE NE PREND PLUS AUCUN CLIC", ouverte === "none", ouverte);
 }
 
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 2).join(" | "));

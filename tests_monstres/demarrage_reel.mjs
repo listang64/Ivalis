@@ -276,7 +276,26 @@ console.log("\n4. L'ÉQUIPEMENT DE DÉPART, DANS LA VRAIE PAGE");
 
 console.log("\n5. LE RAPPORTEUR D'ERREURS DONNE À VOIR LA PANNE");
 {
+  // IL NE SE MONTRE QU'EN MODE DÉVELOPPEUR. À une table de jeu, un bandeau
+  // rouge en travers de l'écran, c'est le jeu qui a l'air cassé — et la plupart
+  // de ce qu'il rapporte est sans conséquence pour la partie en cours. Il
+  // ÉCOUTE toujours, en revanche : les pannes qu'on cherche arrivent au
+  // chargement, bien avant qu'on pense à cocher quoi que ce soit (le détail de
+  // cette mise de côté est mesuré par bandeau_erreurs.mjs).
+  const muet = await p.evaluate(() => {
+    document.getElementById("bandeau-erreurs-js")?.remove();
+    try { localStorage.setItem("ivalis_DEV_MODE", "off"); } catch (e) {}
+    window.dispatchEvent(new ErrorEvent("error", {
+      message: "TypeError: rien ne doit paraître", filename: "http://exemple/x.js", lineno: 1
+    }));
+    return { boite: !!document.getElementById("bandeau-erreurs-js"),
+             retenues: window.erreursJSRetenues().length };
+  });
+  verifier("SANS LE MODE DÉVELOPPEUR, aucun bandeau rouge", muet.boite === false);
+  verifier("mais l'erreur est retenue quand même", muet.retenues > 0, String(muet.retenues));
+
   const visible = await p.evaluate(() => {
+    try { localStorage.setItem("ivalis_DEV_MODE", "on"); } catch (e) {}
     document.getElementById("bandeau-erreurs-js")?.remove();
     window.dispatchEvent(new ErrorEvent("error", {
       message: "TypeError: window.machin is not a function",
