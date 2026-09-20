@@ -458,7 +458,13 @@ export function fichesDepuisEtat(etat, fichesActuelles) {
 
 export function fileDepuisEtat(etat) {
     return ((etat && etat.file) || []).map(f => ({
-        idPersonnage: f.id, idCarte: f.carte || null, initiative: nombre(f.initiative)
+        idPersonnage: f.id, idCarte: f.carte || null, initiative: nombre(f.initiative),
+        // Les cases déjà marchées ce tour-ci descendent avec la file : c'est ce
+        // que lit l'écran pour chiffrer la case suivante au bon prix, et c'est
+        // le MÊME compteur que celui sur lequel le cerveau facturera. Deux
+        // comptes séparés finiraient par ne plus être d'accord, et le joueur
+        // verrait un prix qu'on ne lui prend pas.
+        pasParcourus: nombre(f.pas)
     }));
 }
 

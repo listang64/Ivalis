@@ -359,10 +359,24 @@ export function construireEtatCombat(source) {
         phase: partie.Phase_Combat || "Preparation",
         manche: nombre(partie.Tour_Combat, 1),
         ordre: [...(partie.Ordre_Initiative || [])],
+        // LE `pas` D'UNE ENTRÉE DE FILE : COMBIEN DE CASES CE COMBATTANT A DÉJÀ
+        // MARCHÉ DANS CE TOUR-CI.
+        //
+        // Un personnage peut repartir tant qu'il n'a pas lancé sa carte, et le
+        // barème monte avec la distance (2 ⚡ pour les trois premières cases,
+        // 4 jusqu'à la sixième, 6 ensuite). Sans ce compteur, le barème
+        // repartait de zéro à chaque reprise : marcher six cases en deux fois
+        // coûtait 12 au lieu de 18, et le joueur voyait un prix qui n'était pas
+        // celui qu'on lui prenait.
+        //
+        // IL VIT DANS LA FILE, ET C'EST TOUT L'INTÉRÊT : l'entrée disparaît
+        // quand le tour se termine, donc le compteur se remet à zéro tout seul.
+        // Aucune remise à zéro à écrire, aucune à oublier.
         file: (partie.File_Attente_Combat || []).map(f => ({
             id: f.idPersonnage,
             carte: f.idCarte || null,
-            initiative: nombre(f.initiative, 0)
+            initiative: nombre(f.initiative, 0),
+            pas: nombre(f.pasParcourus)
         })),
         ontJoue: [...(partie.Ont_Joue_Ce_Round || [])],
 
@@ -415,6 +429,25 @@ export const occupantDe = (etat, q, r) => {
 //  architecture soustrayait à la lecture, et un rejeu en retard retranchait une
 //  seconde fois — c'est exactement d'où venaient les dégâts doublés.
 
+// LE COMPTEUR DE CASES MARCHÉES DU TOUR, ET LA SEULE RÈGLE QUI LE FAIT AVANCER.
+//
+// Elle est écrite ici, une fois, et appelée des DEUX côtés : par l'applicateur
+// d'étape (un poste qui rejoue le journal) et par le cerveau au moment de
+// fabriquer son pas (celui qui écrit). Les deux doivent arriver au même
+// compteur — sinon l'écran d'un poste annonce un prix que le cerveau ne prendra
+// pas. Deux copies de cette règle auraient fini par diverger.
+//
+// Deux exclusions, et elles se déduisent toutes seules de la condition :
+//   · une poussée, une traction, un bond délèguent à l'applicateur `pas` en
+//     gardant LEUR type — on n'a pas marché, on a été déplacé ;
+//   · la fuite d'une Peur émet bien des pas, mais pour la CIBLE, qui n'est pas
+//     en tête de file. Elle ne compte donc pas non plus.
+export function compterPasMarche(etat, etape) {
+    if (!etape || etape.type !== "pas") return;
+    const tete = (etat && etat.file || [])[0];
+    if (tete && tete.id === etape.acteur) tete.pas = nombre(tete.pas) + 1;
+}
+
 const APPLICATEURS = {
     // Un hexagone franchi. Un pas, un événement : c'est ce qui permet à
     // l'animation de sauter de case en case au lieu de téléporter le pion.
@@ -424,6 +457,9 @@ const APPLICATEURS = {
         c.q = nombre(e.vers.q);
         c.r = nombre(e.vers.r);
         if (e.fatigueApres !== undefined) c.fatigue = nombre(e.fatigueApres);
+
+        // Et le compteur de cases du tour avance — voir compterPasMarche.
+        compterPasMarche(etat, e);
     },
 
     // Un déplacement imposé : poussée, traction, bond. Même effet sur l'état,

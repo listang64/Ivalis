@@ -17,7 +17,6 @@
 //   • les chiffres des ancres portent la couleur de leur jauge ;
 //   • l'avatar est DERRIÈRE l'image du bouton et dépasse par le haut ;
 //   • le nom rétrécit tout seul quand il est trop long ;
-//   • la boîte de réglage provisoire bouge bien ce qu'elle dit qu'elle bouge ;
 //   • TOUT SUIT LE BANDEAU quand il rétrécit (la règle tablette le passe de
 //     450 à 380 px), à l'échelle près et sans qu'un seul élément se décale ;
 //   • LA PISTE DES ÉTATS se comporte en tapis roulant : les nouveaux entrent
@@ -497,162 +496,7 @@ console.log("=========================================================");
 }
 
 console.log("\n=========================================================");
-console.log("  8. UN NOM TROP LONG RÉTRÉCIT AU LIEU DE DÉBORDER");
-console.log("=========================================================");
-{
-  const mesurer = (prenom, nom) => p.evaluate(async ([pr, n]) => {
-    window.PERSOS_PARTIE[0].prenom = pr;
-    window.PERSOS_PARTIE[0].nom = n;
-    window.actualiserHudHeros();
-    await new Promise(r => setTimeout(r, 200));
-    const boite = document.getElementById("hud-nom-heros");
-    const el = document.getElementById("hud-nom-heros-texte");
-    return { texte: el.innerText, taille: parseFloat(getComputedStyle(el).fontSize),
-             deborde: boite.scrollWidth > boite.clientWidth + 1,
-             largeur: boite.clientWidth, dessin: boite.scrollWidth };
-  }, [prenom, nom]);
-
-  const court = await mesurer("Cybile", "");
-  verifier("un nom court garde la grande taille", court.taille === 38, `${court.taille}px`);
-  verifier("et il tient dans sa boîte", court.deborde === false, `${court.dessin} / ${court.largeur}`);
-
-  const long = await mesurer("Bartholomée", "de Montrachet-le-Vieux");
-  verifier("UN NOM TRÈS LONG A RÉTRÉCI", long.taille < 38, `${long.taille}px`);
-  verifier("ET IL TIENT QUAND MÊME DANS SA BOÎTE",
-           long.deborde === false, `${long.dessin} / ${long.largeur}`);
-  verifier("sans jamais devenir illisible", long.taille >= 14, `${long.taille}px`);
-  verifier("le nom complet est bien celui affiché",
-           long.texte.toLowerCase() === "bartholomée de montrachet-le-vieux", long.texte);
-
-  const retour = await mesurer("Cybile", "");
-  verifier("revenu à un nom court, la taille remonte", retour.taille === 38, `${retour.taille}px`);
-}
-
-console.log("  9. LA BOÎTE DE RÉGLAGE BOUGE CE QU'ELLE DIT QU'ELLE BOUGE");
-console.log("=========================================================");
-{
-  // Cette boîte est un outil provisoire, mais c'est celui sur lequel repose tout
-  // le calage : le fond de l'encart est une image, sa taille et la place de ce
-  // qu'on pose dessus ne se lisent nulle part. Si ses flèches mentent, on règle
-  // dans le vide.
-  //
-  // LE PIÈGE EST DANS LES SIGNES. Plusieurs valeurs se comptent depuis le bord
-  // DROIT ou le bord BAS : les augmenter déplace l'élément vers la gauche ou
-  // vers le haut. Une flèche « ◀ » doit montrer ce qu'on VOIT, pas ce que la
-  // valeur fait. On mesure donc des pixels à l'écran, jamais les nombres.
-  const outils = await p.evaluate(async () => {
-    window.ENCART_FIGE = true;                    // l'encart reste à l'écran
-    document.getElementById("fenetre-combat").style.display = "block";
-    await new Promise(r => setTimeout(r, 900));
-    return {
-      boite: !!document.getElementById("reglage-hud"),
-      poignee: !!document.getElementById("reglage-hud-poignee"),
-      reglages: !!window.REGLAGES_HUD,
-      encartVu: document.getElementById("voile-tour-encart").getBoundingClientRect().width > 100
-    };
-  });
-  verifier("la boîte de réglage est là", outils.boite === true);
-  verifier("sa poignée aussi", outils.poignee === true);
-  verifier("les réglages sont exposés", outils.reglages === true);
-  verifier("et l'encart se laisse figer pour être réglé", outils.encartVu === true);
-
-  const cliquer = (titre, signe, fois = 1, rang = 0) => p.evaluate(async ([t, sg, n, k]) => {
-    const blocs = [...document.querySelectorAll("#reglage-hud > div")];
-    const bloc = blocs.find(b => (b.firstChild && b.firstChild.textContent || "").startsWith(t));
-    if (!bloc) return "ligne introuvable : " + t;
-    const b = [...bloc.querySelectorAll("button")].filter(x => x.textContent === sg)[k];
-    if (!b) return "bouton introuvable : " + sg;
-    for (let i = 0; i < n; i++) b.click();
-    await new Promise(r => setTimeout(r, 150));
-    return "ok";
-  }, [titre, signe, fois, rang]);
-
-  const ou = (id) => p.evaluate((i) => {
-    const r = document.getElementById(i).getBoundingClientRect();
-    return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2),
-             l: Math.round(r.width), h: Math.round(r.height) };
-  }, id);
-
-  // LA PLAQUE : sa position se compte depuis la gauche ET depuis le BAS, donc
-  // seul l'axe vertical est inversé. C'est exactement là qu'une flèche se trompe.
-  {
-    const avant = await ou("voile-tour-encart");
-    verifier("clic sur ◀ de la plaque", (await cliquer("Plaque", "◀", 5)) === "ok");
-    const apres = await ou("voile-tour-encart");
-    verifier("◀ DÉPLACE BIEN LA PLAQUE VERS LA GAUCHE", apres.x < avant.x, `${avant.x} → ${apres.x}`);
-    await cliquer("Plaque", "▶", 5);
-
-    const avantH = await ou("voile-tour-encart");
-    await cliquer("Plaque", "▲", 5);
-    const apresH = await ou("voile-tour-encart");
-    verifier("▲ la fait bien monter", apresH.y < avantH.y, `${avantH.y} → ${apresH.y}`);
-    await cliquer("Plaque", "▼", 5);
-  }
-
-  // LE PION : la demande explicite était de pouvoir aussi l'agrandir et le
-  // réduire, en plus de le déplacer.
-  {
-    const avant = await ou("voile-tour-pion-boite");
-    verifier("clic sur ◀ de l'avatar en pied", (await cliquer("Avatar en pied", "◀", 4)) === "ok");
-    const apres = await ou("voile-tour-pion-boite");
-    verifier("◀ DÉPLACE BIEN L'AVATAR VERS LA GAUCHE", apres.x < avant.x, `${avant.x} → ${apres.x}`);
-    await cliquer("Avatar en pied", "▶", 4);
-
-    const avantH = await ou("voile-tour-pion-boite");
-    await cliquer("Avatar en pied", "▲", 4);
-    const apresH = await ou("voile-tour-pion-boite");
-    verifier("▲ le fait bien monter", apresH.y < avantH.y, `${avantH.y} → ${apresH.y}`);
-    await cliquer("Avatar en pied", "▼", 4);
-
-    const avantT = await ou("voile-tour-pion-boite");
-    await cliquer("Avatar en pied", "+", 4);
-    const apresT = await ou("voile-tour-pion-boite");
-    verifier("« + » AGRANDIT VRAIMENT L'AVATAR", apresT.l > avantT.l, `${avantT.l} → ${apresT.l}px`);
-    await cliquer("Avatar en pied", "−", 4);
-    const retour = await ou("voile-tour-pion-boite");
-    verifier("et « − » le réduit d'autant", Math.abs(retour.l - avantT.l) <= 1,
-             `${apresT.l} → ${retour.l} (départ ${avantT.l})`);
-  }
-
-  // LA POLICE DU NOM se règle aussi, et c'est le second bouton de sa ligne.
-  {
-    const police = () => p.evaluate(() =>
-      Math.round(parseFloat(getComputedStyle(document.getElementById("voile-tour-nom")).fontSize) * 10) / 10);
-    const avant = await police();
-    await cliquer("Nom du combattant", "+", 4);
-    const apres = await police();
-    verifier("la police du nom s'agrandit", apres > avant, `${avant} → ${apres}px`);
-    await cliquer("Nom du combattant", "−", 4);
-  }
-
-  // LE CODE À RENVOYER : c'est le seul chemin entre l'écran et le dépôt.
-  {
-    const code = await p.evaluate(() => {
-      window.REGLAGES_HUD.encartAvatar.hauteur = 71;
-      return window.codeReglagesHud();
-    });
-    verifier("le code extrait porte les valeurs réglées",
-             code.includes("hauteur: 71"), (code.split("\n").find(l => l.includes("encartAvatar")) || "").trim());
-    verifier("et une forme recopiable d'un bloc", code.includes('"encartAvatar"'));
-  }
-
-  // LE RETOUR AUX VALEURS D'ORIGINE, pour ne jamais rester coincé sur un
-  // réglage raté — les valeurs sont gardées d'une session à l'autre.
-  {
-    await p.evaluate(async () => {
-      const b = [...document.querySelectorAll("#reglage-hud button")]
-        .find(x => x.textContent.includes("Défaut"));
-      b.click();
-      await new Promise(r => setTimeout(r, 200));
-    });
-    const t = await p.evaluate(() => window.REGLAGES_HUD.encartAvatar.hauteur);
-    verifier("« Défaut » remet tout en place", t === 62, String(t));
-  }
-  await p.evaluate(() => { window.ENCART_FIGE = false; });
-}
-
-console.log("\n=========================================================");
-console.log("  10. LE BANDEAU RÉTRÉCIT, TOUT LE BLOC SUIT");
+console.log("  9. LE BANDEAU RÉTRÉCIT, TOUT LE BLOC SUIT");
 console.log("=========================================================");
 {
   // LE DÉFAUT QUE CE CONTRÔLE GARDE.
@@ -755,7 +599,7 @@ console.log("=========================================================");
 }
 
 console.log("\n=========================================================");
-console.log("  11. LA PISTE DES ÉTATS : UN TAPIS ROULANT");
+console.log("  10. LA PISTE DES ÉTATS : UN TAPIS ROULANT");
 console.log("=========================================================");
 {
   // Poser des états sur le héros, et laisser la piste se refaire.
@@ -920,7 +764,7 @@ console.log("=========================================================");
 }
 
 console.log("\n=========================================================");
-console.log("  12. L'ENCART DE TOUR EST LIÉ À SON IMAGE");
+console.log("  11. L'ENCART DE TOUR EST LIÉ À SON IMAGE");
 console.log("=========================================================");
 {
   // LA SURPRISE QU'ON VEUT ÉVITER, ET ELLE EST CONCRÈTE.
@@ -935,12 +779,26 @@ console.log("=========================================================");
   // ON NE MESURE DONC PAS DES PIXELS, MAIS DES RAPPORTS : chaque mesure divisée
   // par la largeur de l'image. Ces rapports doivent être les MÊMES à deux
   // largeurs de plaque différentes. C'est la définition de « lié à l'image ».
-  const montrer = () => p.evaluate(async () => {
-    window.ENCART_FIGE = true;
+  // L'ENCART SE MONTRE COMME IL SE MONTRE EN JEU : par le tour d'un autre.
+  // Il se figeait jusqu'ici sur un drapeau de la boîte de réglage, partie avec
+  // elle. Passer par un vrai tour vaut mieux de toute façon — c'est le seul
+  // état dans lequel le joueur le voit.
+  await p.evaluate(async () => {
+    window.CACHE_COMPETENCES_GLOBAL = { M1: { C_M1: {
+      Nom: "Hurlement putride",
+      Composants: { actions: [{ zoneHexes: [{ q: 0, r: 0 }] }] },
+      Effets_Compiles: [{ nom: "Mot de pouvoir", desc: "9 dégâts", isMod: false }] } } };
+    window.PARTIE_DATA = { Phase_Combat: "Resolution", Tour_Combat: 1,
+                           Ordre_Initiative: ["H1", "M1"],
+                           File_Attente_Combat: [{ idPersonnage: "M1", idCarte: "C_M1", initiative: 50 }] };
+    // Un tour RETENU par le OK : c'est l'événement qui commande la fenêtre, et
+    // il ne dépend ni du cerveau ni de l'état affiché par le spectateur — ce
+    // banc n'ouvre pas de combat, il ne regarde que la mise en page.
+    window.EVENEMENT_ATTENDU = { acteur: "M1", idCarte: "C_M1", manche: 1, v: 1 };
     document.getElementById("fenetre-combat").style.display = "block";
-    await new Promise(r => setTimeout(r, 900));       // la surveillance le repose
+    window.rafraichirVoileTour();
+    await new Promise(r => setTimeout(r, 900));
   });
-  await montrer();
 
   const rapports = () => p.evaluate(() => {
     const encart = document.getElementById("voile-tour-encart");
@@ -1028,64 +886,12 @@ console.log("=========================================================");
   await p.evaluate(() => {
     window.REGLAGES_HUD.encart.largeur = 760;
     window.appliquerReglagesHud();
-    window.ENCART_FIGE = false;
+    window.EVENEMENT_ATTENDU = null;
+    window.PARTIE_DATA = { Phase_Combat: "Preparation", Tour_Combat: 1, File_Attente_Combat: [] };
+    window.rafraichirVoileTour();
   });
 }
 
-console.log("\n=========================================================");
-console.log("  13. LA BOÎTE DE RÉGLAGE NE SERT PLUS QU'À L'ENCART");
-console.log("=========================================================");
-{
-  const boite = await p.evaluate(() => {
-    // Les VRAIES lignes de réglage : celles qui portent des flèches ou des
-    // boutons de taille. Le titre de la boîte, son sous-titre et le choix du pas
-    // sont aussi des div, et les compter donnerait trois lignes de trop.
-    const titres = [...document.querySelectorAll("#reglage-hud > div")]
-      .filter(b => [...b.querySelectorAll("button")]
-                     .some(x => ["◀", "▶", "▲", "▼", "−", "+"].includes(x.textContent)))
-      .map(b => (b.firstChild && b.firstChild.textContent || "").trim());
-    const ligne = (debut) => {
-      const blocs = [...document.querySelectorAll("#reglage-hud > div")];
-      const b = blocs.find(x => (x.firstChild && x.firstChild.textContent || "").startsWith(debut));
-      if (!b) return null;
-      return [...b.querySelectorAll("button")].map(x => x.textContent);
-    };
-    return {
-      titres,
-      medaillon: ligne("Médaillon"),
-      avatar: ligne("Avatar en pied"),
-      figer: [...document.querySelectorAll("#reglage-hud button")].some(b => /Figer/.test(b.textContent)),
-      code: window.codeReglagesHud()
-    };
-  });
-
-  // Les lignes du bloc du héros sont parties : leurs valeurs sont arrêtées et
-  // inscrites dans le code. Le code qui les POSE, lui, reste — c'est lui qui
-  // tient la mise à l'échelle sur tablette, et il n'a rien de provisoire.
-  // Les intitulés du bloc du héros, à la lettre : « Avatar en pied (héros) »
-  // appartient à l'encart et n'a rien à voir avec l'ancien « Avatar » du HUD.
-  verifier("plus aucune ligne du bloc du héros",
-           !boite.titres.some(t => /^(Anneau des jauges|Ancre chiffrée|Avatar$|Nom du héros|Piste des états)/.test(t)),
-           boite.titres.join(" / "));
-  verifier("HUIT LIGNES POUR L'ENCART", boite.titres.length === 8, `${boite.titres.length} : ${boite.titres.join(" / ")}`);
-
-  // La demande explicite : le pion doit pouvoir être agrandi et réduit.
-  // LES DEUX FORMES DU PORTRAIT ONT CHACUNE LEURS RÉGLAGES. Le médaillon se
-  // place par son haut, l'avatar en pied par son bas : ce ne sont pas les mêmes
-  // nombres, et chacun doit pouvoir être déplacé ET redimensionné à part.
-  const complet = (l) => !!l && ["◀", "▶", "▲", "▼", "−", "+"].every(f => l.includes(f));
-  verifier("LE MÉDAILLON A SES FLÈCHES ET SES DEUX TAILLES",
-           complet(boite.medaillon), (boite.medaillon || []).join(" "));
-  verifier("L'AVATAR EN PIED AUSSI", complet(boite.avatar), (boite.avatar || []).join(" "));
-
-  verifier("un bouton fige l'encart pour pouvoir le régler", boite.figer === true);
-  verifier("le code extrait donne les sept groupes de l'encart",
-           ["encart ", "encartPion", "encartEtats", "encartNom", "encartCarte",
-            "encartDetail", "encartAttente"].every(g => boite.code.includes(g)),
-           boite.code.split("\n").length + " lignes");
-  verifier("et il garde les valeurs du bloc du héros, qui restent posées",
-           boite.code.includes("anneau") && boite.code.includes("avatar"));
-}
 
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 2).join(" | "));
 

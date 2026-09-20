@@ -441,6 +441,22 @@ window.validerMouvement = async function() {
     // hexagone à la fois, comme chez les autres.
     if (window.REGIME_CERVEAU && window.regimeDemande && window.regimeDemande.actif()) {
         const chemin = window.CHEMIN_MOUVEMENT.map(step => ({ q: step.q, r: step.r }));
+
+        // LA COPIE LOCALE EST POSÉE AVANT D'ENVOYER, pas après.
+        //
+        // Le joueur peut repartir dans la seconde qui suit, sans attendre que le
+        // cerveau ait publié le trajet : sans cette copie, la case suivante se
+        // chiffrerait au tarif de la PREMIÈRE case du tour, et le barème
+        // repartirait de zéro à chaque reprise. Elle ne fait que tenir le
+        // compte pendant l'aller-retour ; dès que l'état redescend, c'est le
+        // compteur de la file qui reprend la main (voir pasDejaParcourus).
+        const tourCourant = (window.PARTIE_DATA || {}).Tour_Combat || 0;
+        window.PAS_PARCOURUS_TOUR = {
+            id: idPerso,
+            tour: tourCourant,
+            pas: window.pasDejaParcourus(idPerso) + chemin.length
+        };
+
         const svgR = document.getElementById("svg-chemin-mouvement");
         if (svgR) svgR.innerHTML = "";
         window.CHEMIN_MOUVEMENT = [];

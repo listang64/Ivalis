@@ -14,7 +14,13 @@ import {
     suivreBattement, cerveauSilencieux, regenererPvFinDeManche, regenererFinDeManche,
     ticsDeFinDeManche
 } from '../cerveau_combat.js';
-import { construireEtatCombat, creerDes, verifierEtatCombat, clonerEtat } from '../combat_etat.js';
+import { construireEtatCombat, creerDes, verifierEtatCombat, clonerEtat,
+         appliquerEntree } from '../combat_etat.js';
+
+// Le compteur de cases marchées d'une entrée de file. Lu à travers une fonction
+// pour que « absent » et « zéro » se lisent pareil : une entrée qui n'a jamais
+// bougé peut légitimement ne pas le porter.
+const nombrePas = (entree) => parseInt(entree && entree.pas) || 0;
 import { distance } from '../mouvement_pur.js';
 
 let echecs = 0;
@@ -979,6 +985,102 @@ console.log("\nUNE CRÉATURE AVEC UNE CARTE DE ZONE RAMASSE PLUSIEURS CIBLES");
     verifier("la persistance de terrain laisse bien une nappe dans l'état",
              Object.keys(pas.etat.zones || {}).length === 1,
              JSON.stringify(pas.etat.zones));
+}
+
+// =========================================================================
+console.log("\nMARCHER EN DEUX FOIS NE COÛTE PAS MOINS CHER QUE D'UNE TRAITE");
+// =========================================================================
+//  SIGNALÉ EN PARTIE : « quand je me déplace et que ensuite je refais un
+//  déplacement, il ne prend pas en compte le déplacement déjà effectué pour le
+//  calcul du coût suivant ».
+//
+//  Le barème monte avec la distance : 2 ⚡ pour les trois premières cases, 4
+//  jusqu'à la sixième, 6 ensuite. C'est ce qui rend une longue course
+//  épuisante. Mais un personnage peut repartir tant qu'il n'a pas lancé sa
+//  carte — et le compteur repartait de zéro à chaque reprise. Six cases en deux
+//  fois revenaient à 12 ⚡ au lieu de 18 : il suffisait de valider trois fois
+//  pour marcher au tarif du débutant toute la partie.
+//
+//  Le compteur avait existé, puis disparu avec l'ancien moteur de déplacement
+//  lors de la grande suppression : plus rien n'écrivait ni `pasParcourus` ni sa
+//  copie locale, et les deux valaient donc zéro pour toujours. Il vit
+//  maintenant en TÊTE DE FILE, dans l'état du cerveau — l'entrée disparaît avec
+//  le tour, donc le compteur se remet à zéro tout seul.
+{
+    // appliquerIntention prend le PLATEAU en troisième argument (il tire ses
+    // propres dés de la graine de l'état) : lui passer les dés à cette place
+    // lui ferait chercher `etatCase` sur un générateur.
+    const des = creerDes(7);
+    const ligne = (n) => Array.from({ length: n }, (_, i) => ({ q: i + 1, r: 0 }));
+
+    // La référence : six cases d'une traite.
+    const traite = appliquerIntention(monde(), {
+        id: "i1", type: "mouvement", acteur: "H1", poste: "P_03", chemin: ligne(6)
+    }, null);
+    const coutTraite = traite.entree.etapes.filter(e => e.type === "pas")
+                                           .reduce((t, e) => t + e.cout, 0);
+    verifier("six cases d'une traite coûtent 2+2+2+4+4+4", coutTraite === 18, `${coutTraite} ⚡`);
+
+    // Les mêmes six cases, en deux fois.
+    const premier = appliquerIntention(monde(), {
+        id: "i2", type: "mouvement", acteur: "H1", poste: "P_03", chemin: ligne(3)
+    }, null);
+    const coutPremier = premier.entree.etapes.filter(e => e.type === "pas")
+                                             .reduce((t, e) => t + e.cout, 0);
+    verifier("les trois premières coûtent 2 chacune", coutPremier === 6, `${coutPremier} ⚡`);
+
+    verifier("ET L'ÉTAT RETIENT QU'ON A DÉJÀ MARCHÉ TROIS CASES",
+             premier.etat.file[0].pas === 3, `${premier.etat.file[0].pas} case(s)`);
+
+    const second = appliquerIntention(premier.etat, {
+        id: "i3", type: "mouvement", acteur: "H1", poste: "P_03",
+        chemin: [{ q: 4, r: 0 }, { q: 5, r: 0 }, { q: 6, r: 0 }]
+    }, null);
+    const coutSecond = second.entree.etapes.filter(e => e.type === "pas")
+                                           .reduce((t, e) => t + e.cout, 0);
+    verifier("LES TROIS SUIVANTES COÛTENT 4 CHACUNE, PAS 2", coutSecond === 12, `${coutSecond} ⚡`);
+    verifier("le total est le même que d'une traite",
+             coutPremier + coutSecond === coutTraite, `${coutPremier + coutSecond} contre ${coutTraite}`);
+    verifier("et le compteur a suivi jusqu'à six", second.etat.file[0].pas === 6,
+             `${second.etat.file[0].pas} case(s)`);
+
+    // L'ÉNERGIE RÉELLEMENT PRISE EST CELLE-LÀ, pas celle du barème remis à zéro.
+    const resteTraite = traite.etat.combattants.H1.fatigue;
+    const resteDeuxFois = second.etat.combattants.H1.fatigue;
+    verifier("l'énergie dépensée est la même des deux côtés",
+             resteTraite === resteDeuxFois, `${resteTraite} contre ${resteDeuxFois}`);
+
+    // LE COMPTEUR MEURT AVEC LE TOUR. C'est ce qui dispense d'écrire une remise
+    // à zéro — donc d'oublier de l'écrire.
+    const apres = avancerFile(second.etat, des);
+    verifier("le tour fini, le suivant repart de zéro",
+             apres && apres.etat.file[0] && nombrePas(apres.etat.file[0]) === 0,
+             apres ? String(nombrePas(apres.etat.file[0])) : "pas de file");
+
+    // ET UN REJEU DU JOURNAL ARRIVE AU MÊME COMPTEUR. Il est tenu par l'étape,
+    // pas par le cerveau : un poste qui regarde doit chiffrer la case suivante
+    // exactement comme celui qui écrit, sinon son écran annonce un prix que le
+    // cerveau ne prendra pas.
+    const rejoue = appliquerEntree(monde(), premier.entree);
+    verifier("UN POSTE QUI REJOUE LE JOURNAL COMPTE PAREIL",
+             rejoue.file[0].pas === premier.etat.file[0].pas,
+             `${rejoue.file[0].pas} contre ${premier.etat.file[0].pas}`);
+
+    // Un déplacement IMPOSÉ n'est pas une marche : la poussée ne doit pas
+    // alourdir le barème de celui qui la subit.
+    const pousse = appliquerEntree(monde(), { v: 99, etapes: [
+        { type: "poussee", acteur: "M1", cible: "H1", vers: { q: 1, r: 0 } }
+    ]});
+    verifier("une poussée ne compte pas comme un pas marché",
+             nombrePas(pousse.file[0]) === 0, String(nombrePas(pousse.file[0])));
+
+    // Et la fuite d'une Peur non plus : elle déplace la CIBLE, qui n'est pas en
+    // tête de file.
+    const fuite = appliquerEntree(monde(), { v: 99, etapes: [
+        { type: "pas", acteur: "H2", de: { q: 0, r: 2 }, vers: { q: 0, r: 3 }, cout: 2 }
+    ]});
+    verifier("ni la fuite de quelqu'un d'autre",
+             nombrePas(fuite.file[0]) === 0, String(nombrePas(fuite.file[0])));
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

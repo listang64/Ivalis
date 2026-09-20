@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=29">
+  <link rel="stylesheet" href="style.css?v=30">
 
  
   <!-- ===================================================================== -->
@@ -796,7 +796,7 @@
                      et elle se réduit, sa largeur étant bornée par la fenêtre —
                      le pion, les textes ET leurs tailles de police se réduisent
                      avec elle, dans les mêmes proportions. Il n'y a pas une
-                     seule mesure en dur ici : c'est reglages_hud.js qui les pose
+                     seule mesure en dur ici : c'est hud_disposition.js qui les pose
                      toutes, à partir de la largeur RÉELLEMENT rendue de l'image.
 
                      Chaque bloc est indépendant des autres — plus de colonne qui
@@ -912,7 +912,7 @@
                  page) : ce sont des plaques à lire, pas une transparence.
 
                  Toute la géométrie est pilotée par REGLAGES_HUD
-                 (reglages_hud.js), qui pose les deux boîtes au même endroit. -->
+                 (hud_disposition.js), qui pose les deux boîtes au même endroit. -->
             <div id="hud-anneau-boite">
                 <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"
                      style="width: 100%; height: 100%; overflow: visible; display: block;">
@@ -966,7 +966,7 @@
                  l'anneau (même classe) : les deux ne peuvent pas se décaler. -->
             <!-- LES DEUX ANCRES CHIFFRÉES, aux bouts de l'anneau, chacune dans la
                  couleur de sa jauge. Leur boîte est posée exactement sur celle de
-                 l'anneau par reglages_hud.js : les deux ne peuvent pas se
+                 l'anneau par hud_disposition.js : les deux ne peuvent pas se
                  décaler, quels que soient les réglages. -->
             <div id="hud-ancres-boite">
                 <div id="hud-ancre-gauche" class="hud-ancre">
@@ -1811,19 +1811,19 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=14"></script>
-<script src="reglages_hud.js?v=10"></script>
+<script src="trace_combat.js?v=15"></script>
+<script src="hud_disposition.js?v=1"></script>
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
-<script type="module" src="combat_etat.js?v=15"></script>
+<script type="module" src="combat_etat.js?v=16"></script>
 <!-- LE MOTEUR PUR : la chaîne de dégâts et le mouvement, extraits des 5 000
      lignes du moteur actuel et testables sans réseau ni navigateur. -->
 <script type="module" src="moteur_pur.js?v=14"></script>
 <script type="module" src="mouvement_pur.js?v=6"></script>
 <script type="module" src="ia_pure.js?v=3"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
-<script type="module" src="cerveau_combat.js?v=16"></script>
+<script type="module" src="cerveau_combat.js?v=17"></script>
 <!-- LE SPECTATEUR : la boucle de rejeu. Elle lit le journal du cerveau, ouvre
      la fenêtre de tour, anime PUIS applique, et ne saute jamais un numéro. -->
 <script type="module" src="spectateur_combat.js?v=6"></script>
@@ -1832,7 +1832,7 @@
 <script type="module" src="depot_firestore.js?v=6"></script>
 <!-- LE PONT : de l'étape à ce qu'on voit. Il traduit un résultat déjà calculé
      vers les animations existantes — il ne recalcule jamais rien. -->
-<script type="module" src="pont_combat.js?v=11"></script>
+<script type="module" src="pont_combat.js?v=12"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. Éteint
      par défaut — regimeCerveau(true) dans la console pour l'allumer. -->
 <script type="module" src="regime_cerveau.js?v=23"></script>
@@ -1843,11 +1843,11 @@
 <script type="module" src="competences.js?v=24"></script>
 <script src="Plateau.js"></script>
 <script type="module" src="sequence_tour.js?v=22"></script>
-<script type="module" src="combat.js?v=78"></script>
+<script type="module" src="combat.js?v=79"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
-<script type="module" src="mouvement.js?v=23"></script>
+<script type="module" src="mouvement.js?v=24"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
-<script type="module" src="moteur_effets.js?v=43"></script>
+<script type="module" src="moteur_effets.js?v=44"></script>
 <script type="module" src="monstres.js?v=23"></script>
 <script type="module" src="monstres_competences.js?v=9"></script>
 <script type="module" src="monstres_ia.js?v=29"></script>

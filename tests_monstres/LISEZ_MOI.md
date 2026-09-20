@@ -962,6 +962,72 @@ ils disent où elle passe sans qu'on ait à brancher l'iPad sur un ordinateur.
 node ecran_chargement.mjs   # le transport, le sceau, le préchargement, la playlist
 ```
 
+## L'outil de réglage a fait son travail, et il est parti
+
+La boîte de réglage du bloc du héros (`reglages_hud.js`) est supprimée : ses
+flèches, sa poignée, sa mémoire en `localStorage`, son bouton « Figer » et son
+extracteur de code. Les nombres qu'elle a servi à trouver sont arrêtés.
+
+Ce qui reste vit dans `hud_disposition.js` — 383 lignes au lieu de 739 — et n'a
+rien de provisoire : **la mise à l'échelle**. Le bandeau du bouton de fin de
+tour ne fait pas la même largeur partout (`style.css` le passe de 450 à 380 px
+sur tablette), et toutes les mesures du bloc sont des pixels. Sans ces trois
+fonctions, le bloc serait juste sur un écran et faux sur tous les autres.
+
+## Marcher en deux fois ne coûte pas moins cher que d'une traite
+
+Signalé en partie : « quand je me déplace et que ensuite je refais un
+déplacement, il ne prend pas en compte le déplacement déjà effectué pour le
+calcul du coût suivant ».
+
+Le barème monte avec la distance — 2 ⚡ pour les trois premières cases, 4
+jusqu'à la sixième, 6 ensuite — et c'est ce qui rend une longue course
+épuisante. Mais un personnage peut repartir tant qu'il n'a pas lancé sa carte,
+et le compteur repartait de zéro à chaque reprise : six cases en deux fois
+revenaient à 12 ⚡ au lieu de 18. Il suffisait de valider trois fois pour
+marcher au tarif du débutant toute la partie.
+
+**Le compteur avait existé.** Il a disparu avec l'ancien moteur de déplacement,
+lors de la grande suppression : il vivait dans la branche morte. Plus rien
+n'écrivait ni `pasParcourus` ni sa copie locale, les deux valaient donc zéro
+pour toujours. Le banc, lui, restait vert — il posait ce compteur **à la main**
+pour mesurer le barème, et ne vérifiait nulle part que la production le posait
+encore. C'est la leçon la plus coûteuse de ce commit : un banc qui simule
+l'étape qu'il devrait surveiller ne surveille rien.
+
+Le compteur vit maintenant **en tête de la file du cerveau**, comme avant, mais
+du bon côté de la frontière :
+
+- il est **tenu par l'étape**, pas par le cerveau — le poste qui écrit et celui
+  qui rejoue le journal arrivent au même nombre, avec la même fonction
+  (`compterPasMarche`, écrite une fois et appelée des deux côtés) ;
+- il **meurt avec le tour** : l'entrée de file disparaît, donc il n'y a aucune
+  remise à zéro à écrire, donc aucune à oublier ;
+- une **poussée, une traction, un bond** ne le font pas avancer (on a été
+  déplacé, on n'a pas marché), ni la **fuite d'une Peur** (elle déplace la
+  cible, qui n'est pas en tête de file) ;
+- il **redescend par le pont** jusqu'à l'écran, pour que le prix annoncé soit
+  celui qui sera pris.
+
+## Une croix rouge pour sortir du ciblage
+
+« Quand on lance une compétence et que ça se met en mode ciblage, on ne peut
+plus faire de déplacement. » C'était vrai : le seul renoncement offert était le
+bouton « ANNULER » posé à côté de « RÉSOUDRE », et celui-là n'apparaît qu'une
+fois une cible choisie. Tant qu'on n'avait visé personne, il n'y avait aucune
+sortie, sauf finir son tour pour de bon.
+
+Une croix rouge apparaît donc sous le pion du **lanceur** dès que le ciblage
+s'ouvre : même dessin, même place que celle du déplacement. Les deux ne
+s'affichent jamais ensemble — deux croix identiques côte à côte, on ne saurait
+plus laquelle appuie sur quoi.
+
+Deux pièges, tous deux tenus par le banc : le pion tout entier est une boîte de
+clic qui envoie vers `ajouterCibleCiblage` (sans `stopPropagation`, appuyer sur
+la croix se viserait soi-même), et `VTT_CIBLAGE_CLICK` court en phase de
+**capture**, avant tout le monde, en arrêtant net tout clic tombé dans le
+plateau — la croix y est, il lui faut donc une exception nommée.
+
 ## Fidélité à la Forge
 
 ```sh

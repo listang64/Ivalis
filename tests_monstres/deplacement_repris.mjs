@@ -109,6 +109,33 @@ const res = await p.evaluate(({ src, srcGarde }) => {
   window.PAS_PARCOURUS_TOUR = { id: null, tour: null, pas: 0 };
   const autreCombattant = window.pasDejaParcourus("J1");
 
+  // === CE QUE FAIT VRAIMENT validerMouvement ============================
+  //
+  // Tout ce qui précède mesurait le BARÈME en posant le compteur à la main.
+  // Il l'a fallu : le code qui POSE ce compteur avait disparu avec l'ancien
+  // moteur de déplacement, lors de la grande suppression. Plus rien n'écrivait
+  // ni la copie locale ni la valeur de la file, les deux valaient zéro pour
+  // toujours, et le barème repartait de zéro à chaque reprise — « il ne prend
+  // pas en compte le déplacement déjà effectué ». Le banc, lui, passait au
+  // vert : il simulait ce que la production ne faisait plus.
+  poser(0);
+  window.CHEMIN_START_NODE = { q: 0, r: 0 };
+  for (let i = 1; i <= 3; i++) window.ajouterEtapeMouvement(i, 0);
+  window.REGIME_CERVEAU = true;
+  window.ENVOYE = null;
+  window.regimeDemande = {
+    actif: () => true,
+    mouvement: async (acteur, chemin, reserve) => { window.ENVOYE = { acteur, chemin, reserve }; }
+  };
+  window.appliquerTokensVTT = () => {};
+  window.actualiserBoutonFinTour = () => {};
+  const validation = (async () => {
+    await window.validerMouvement();
+    return { envoye: window.ENVOYE,
+             memoire: { ...window.PAS_PARCOURUS_TOUR },
+             compte: window.pasDejaParcourus("J1") };
+  })();
+
   // Le garde-fou du clic sur le plateau, avec un déplacement déjà validé.
   const garde = (pasParcourus) => {
     const partie = { Phase_Combat: "Resolution",
@@ -124,8 +151,10 @@ const res = await p.evaluate(({ src, srcGarde }) => {
   const gardeAvant = garde(0);
   const gardeApres = garde(3);
 
-  return { dUneTraite, premierTroncon, secondTroncon, memoireLocale, apresRetourBase,
-           apresRechargement, tourSuivant, autreCombattant, gardeAvant, gardeApres };
+  return validation.then(v => ({
+    dUneTraite, premierTroncon, secondTroncon, memoireLocale, apresRetourBase,
+    apresRechargement, tourSuivant, autreCombattant, gardeAvant, gardeApres,
+    validation: v }));
 }, { src: mouvement, srcGarde });
 
 console.log("erreurs JS :", erreurs.length ? erreurs : "aucune");
@@ -150,6 +179,52 @@ verifier("au tour suivant, le compteur repart de zéro", res.tourSuivant === 0, 
 verifier("le compteur d'un autre combattant ne déteint pas", res.autreCombattant === 0, `(${res.autreCombattant})`);
 verifier("le plateau reste cliquable avant tout déplacement", res.gardeAvant === true);
 verifier("et il le reste après un déplacement validé", res.gardeApres === true);
+
+// =========================================================================
+// ET C'EST BIEN validerMouvement QUI POSE LE COMPTEUR
+// =========================================================================
+//  Tous les contrôles ci-dessus posaient ce compteur À LA MAIN — et c'est
+//  exactement pour ça qu'ils sont restés verts pendant que le jeu se trompait.
+//  Le code qui POSAIT ce compteur avait disparu avec l'ancien moteur de
+//  déplacement, lors de la grande suppression : plus rien n'écrivait ni la
+//  copie locale ni la valeur de la file, les deux valaient zéro pour toujours,
+//  et le barème repartait de zéro à chaque reprise.
+{
+  const v = res.validation;
+  verifier("le chemin part bien au cerveau", !!v.envoye && v.envoye.chemin.length === 3,
+           v.envoye ? `${v.envoye.chemin.length} case(s)` : "rien n'est parti");
+  verifier("LA COPIE LOCALE EST POSÉE AU MOMENT DE VALIDER",
+           v.memoire.id === "J1" && v.memoire.tour === 1 && v.memoire.pas === 3,
+           JSON.stringify(v.memoire));
+  verifier("et le compteur répond aussitôt, sans attendre la base",
+           v.compte === 3, `(${v.compte})`);
+}
+
+// =========================================================================
+// LE COMPTEUR DESCEND DE L'ÉTAT DU CERVEAU JUSQU'À L'ÉCRAN
+// =========================================================================
+//  L'écran et le cerveau doivent chiffrer la case suivante au MÊME prix. Le
+//  cerveau tient le compte en tête de sa file ; le pont le fait redescendre
+//  dans PARTIE_DATA, où pasDejaParcourus va le lire. Sans ce relais, l'écran
+//  n'aurait que sa copie locale — perdue au premier rechargement, et inconnue
+//  des autres postes.
+{
+  const { fileDepuisEtat } = await import('../pont_combat.js');
+  const file = fileDepuisEtat({ file: [
+    { id: "J1", carte: "C1", initiative: 70, pas: 4 },
+    { id: "M1", carte: "C2", initiative: 50 }
+  ]});
+  verifier("LE PONT FAIT DESCENDRE LES CASES DÉJÀ MARCHÉES",
+           file[0].pasParcourus === 4, `(${file[0].pasParcourus})`);
+  verifier("et zéro pour qui n'a pas bougé", file[1].pasParcourus === 0,
+           `(${file[1].pasParcourus})`);
+  // C'est bien le nom que lit pasDejaParcourus : les deux bouts du relais
+  // doivent se reconnaître, et un renommage d'un seul côté casserait tout en
+  // silence.
+  const src = fs.readFileSync('/home/user/Ivalis/mouvement.js', 'utf-8');
+  verifier("sous le nom exact que l'écran va chercher",
+           /queue\[0\]\.pasParcourus/.test(src));
+}
 
 await b.close();
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

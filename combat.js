@@ -2807,18 +2807,47 @@ window.appliquerTokensVTT = function(tokensMap) {
         divToken.id = "token-" + idPerso;
         (jaugesEnCours[idPerso] || []).forEach(jauge => divToken.appendChild(jauge));
 
-        // LA CROIX D'ANNULATION DU DÉPLACEMENT, sous le pion qui trace sa route.
-        // Remplace l'ancienne bulle-validation-mouvement (fixe, en haut de l'écran) :
-        // recréée ici à chaque passage, elle survit donc au redessin des pions
-        // (une notification Firestore pendant qu'on réfléchit à son chemin) — le
-        // même principe que jaugesEnCours juste au-dessus.
-        if (idPerso === window.TOKEN_SELECTIONNE && (window.CHEMIN_MOUVEMENT || []).length > 0) {
-            const croixAnnuler = document.createElement("div");
-            croixAnnuler.className = "croix-annuler-deplacement";
-            croixAnnuler.style.cssText = "position: absolute; bottom: -14px; right: -6px; width: 26px; height: 26px; background: #d32f2f; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; border: 2px solid white; box-shadow: 0 0 8px #d32f2f; cursor: pointer; z-index: 6;";
-            croixAnnuler.innerText = "✖";
-            croixAnnuler.onclick = (e) => { e.stopPropagation(); window.annulerMouvement(); };
-            divToken.appendChild(croixAnnuler);
+        // LA CROIX ROUGE SOUS LE PION : ON RENONCE À CE QU'ON ÉTAIT EN TRAIN DE
+        // FAIRE, SANS PERDRE SON TOUR.
+        //
+        // Elle remplace l'ancienne bulle-validation-mouvement (fixe, en haut de
+        // l'écran) : recréée ici à chaque passage, elle survit donc au redessin
+        // des pions (une notification Firestore pendant qu'on réfléchit à son
+        // chemin) — le même principe que jaugesEnCours juste au-dessus.
+        //
+        // Elle sert DEUX renoncements, et jamais les deux à la fois : le chemin
+        // qu'on est en train de tracer, ou le ciblage qu'on vient d'ouvrir. Un
+        // seul dessin pour les deux : deux croix côte à côte qui ne se
+        // ressembleraient pas tout à fait, c'est un détail qui finit par se voir.
+        const poserCroix = (classe, titre, action) => {
+            const croix = document.createElement("div");
+            croix.className = classe;
+            croix.title = titre;
+            croix.style.cssText = "position: absolute; bottom: -14px; right: -6px; width: 26px; height: 26px; background: #d32f2f; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; border: 2px solid white; box-shadow: 0 0 8px #d32f2f; cursor: pointer; z-index: 6;";
+            croix.innerText = "✖";
+            croix.onclick = (e) => { e.stopPropagation(); action(); };
+            divToken.appendChild(croix);
+        };
+
+        // LE CIBLAGE PASSE DEVANT LE DÉPLACEMENT. Signalé en partie : « quand on
+        // lance une compétence et que ça se met en mode ciblage, on ne peut plus
+        // faire de déplacement ». C'était vrai : le seul renoncement offert était
+        // le bouton « ANNULER » à côté de « RÉSOUDRE », et celui-là n'apparaît
+        // qu'une fois une cible choisie. Tant qu'on n'avait visé personne, il n'y
+        // avait aucune sortie — sauf finir son tour.
+        //
+        // La croix est sur le pion du LANCEUR, pas sur celui qui est sélectionné :
+        // pendant un ciblage, la sélection suit ce qu'on vise.
+        const lanceur = (window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif
+                         && typeof window.lanceurDuCiblage === "function")
+            ? window.lanceurDuCiblage() : null;
+        if (lanceur && idPerso === lanceur) {
+            poserCroix("croix-annuler-ciblage", "Annuler le ciblage",
+                       () => { if (typeof window.nettoyerCiblage === "function") window.nettoyerCiblage(); });
+        } else if (!lanceur && idPerso === window.TOKEN_SELECTIONNE
+                   && (window.CHEMIN_MOUVEMENT || []).length > 0) {
+            poserCroix("croix-annuler-deplacement", "Annuler le déplacement",
+                       () => window.annulerMouvement());
         }
 
         // 1️⃣ L'OMBRE PORTÉE : jeton posé à plat sur la table, lumière venant du haut.
@@ -4600,7 +4629,7 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
         // plateau, désastreux pour un portrait en pied — il lui coupait la tête.
         // Un héros qui a un vrai portrait l'a donc ENTIER, plus grand, monté du
         // bas de l'écran ; une créature, ou un héros qui n'en a pas, garde son
-        // médaillon. La bascule tient dans cette seule classe, et reglages_hud.js
+        // médaillon. La bascule tient dans cette seule classe, et hud_disposition.js
         // la lit pour savoir laquelle des deux géométries poser.
         const enPied = !estCreature && !!perso.urlCloudinary;
         const boitePion = document.getElementById("voile-tour-pion-boite");
@@ -4630,7 +4659,7 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
         elNom.dataset.nom = nom;
         elNom.textContent = nom;
         // LA TAILLE DE DÉPART VIENT DE L'ÉLÉMENT, pas d'un chiffre écrit ici.
-        // Elle est posée en pourcentage de la plaque (reglages_hud.js) pour que
+        // Elle est posée en pourcentage de la plaque (hud_disposition.js) pour que
         // le texte rétrécisse avec elle sur un écran étroit. Un 42 en dur aurait
         // écrasé ce réglage à chaque rafraîchissement.
         const baseNom = parseFloat(elNom.dataset.base) || 42;
@@ -4646,7 +4675,7 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
             elEtats.dataset.signature = signature;
             // Les icônes seules, sous le pion : leur nom tiendrait mal dans une
             // colonne aussi étroite, et il est déjà dans l'infobulle.
-            // La taille des icônes est posée par reglages_hud.js, en pourcentage
+            // La taille des icônes est posée par hud_disposition.js, en pourcentage
             // de la plaque : une image se dimensionne à la construction, elle ne
             // peut pas se contenter d'un pourcentage CSS ici.
             const tailleEtat = parseInt(elEtats.dataset.taille) || 32;

@@ -130,6 +130,16 @@ window.positionnerTokenVTT = function(div) {
 };
 window.CIBLES_AJOUTEES = [];
 window.ajouterCibleCiblage = function(id) { window.CIBLES_AJOUTEES.push(id); };
+// Le lanceur du ciblage : c'est SON pion qui porte la croix rouge, pas celui
+// qu'on est en train de viser.
+window.lanceurDuCiblage = function() {
+  return (window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.idLanceur) || null;
+};
+window.NETTOYAGES = 0;
+window.nettoyerCiblage = function() { window.NETTOYAGES++; window.ETAT_CIBLAGE = { actif: false }; };
+window.ANNULATIONS_MOUVEMENT = 0;
+window.annulerMouvement = function() { window.ANNULATIONS_MOUVEMENT++; };
+window.CHEMIN_MOUVEMENT = [];
 ${fonction(combat, 'window.appliquerTokensVTT = function')}
 window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
 </script></body></html>`;
@@ -164,6 +174,127 @@ window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
              apresAnnulation.cibles.length === 0 && apresAnnulation.selection === "J1");
     verifier("et le pion redevient celui qu'on a sélectionné",
              apresAnnulation.selectionne === "J1", String(apresAnnulation.selectionne));
+
+    // =====================================================================
+    console.log("\n4. UNE CROIX ROUGE SOUS LE PION POUR SORTIR DU CIBLAGE");
+    // =====================================================================
+    //  SIGNALÉ EN PARTIE : « quand on lance une compétence et que ça se met en
+    //  mode ciblage, on ne peut plus faire de déplacement ».
+    //
+    //  C'était vrai. Le seul renoncement offert était le bouton « ANNULER »
+    //  posé à côté de « RÉSOUDRE » — et celui-là n'apparaît qu'une fois une
+    //  cible choisie. Tant qu'on n'avait visé personne, il n'y avait aucune
+    //  sortie, sauf finir son tour pour de bon.
+    //
+    //  La croix est le même dessin que celle du déplacement, au même endroit
+    //  sous le pion : c'est le geste que le joueur connaît déjà.
+    const croix = (id) => p.evaluate((i) => {
+        const t = document.getElementById("token-" + i);
+        const c = t && t.querySelector(".croix-annuler-ciblage");
+        const m = t && t.querySelector(".croix-annuler-deplacement");
+        const dessin = (el) => el ? { texte: el.innerText,
+                                      rouge: /d32f2f|211, 47, 47/.test(el.style.background || ""),
+                                      titre: el.title } : null;
+        return { ciblage: dessin(c), deplacement: dessin(m) };
+    }, id);
+
+    // Le décor : deux pions, et c'est J1 qui vise.
+    await p.evaluate(() => {
+        window.PERSOS_PARTIE.push({ idPersonnage: "M1", prenom: "Gnoll", camp: "Ennemi",
+            estMonstre: true, PV_Max: 30, PV_Actuels: 30, Etats_Alteres: [] });
+        window.TOKENS_VTT_DATA = { J1: { q: 0, r: 0, taille: 55 }, M1: { q: 2, r: 0, taille: 55 } };
+        window.TOKEN_SELECTIONNE = "J1";
+        window.CHEMIN_MOUVEMENT = [];
+        window.ETAT_CIBLAGE = { actif: true, idLanceur: "J1" };
+        window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    });
+    const enCiblage = await croix("J1");
+    const surLaCible = await croix("M1");
+    verifier("LA CROIX EST LÀ DÈS QUE LE CIBLAGE S'OUVRE", !!enCiblage.ciblage,
+             JSON.stringify(enCiblage.ciblage));
+    verifier("rouge, avec le même ✖ que celle du déplacement",
+             !!enCiblage.ciblage && enCiblage.ciblage.texte === "✖" && enCiblage.ciblage.rouge,
+             JSON.stringify(enCiblage.ciblage));
+    verifier("elle dit ce qu'elle annule", !!enCiblage.ciblage && /ciblage/i.test(enCiblage.ciblage.titre),
+             enCiblage.ciblage ? enCiblage.ciblage.titre : "—");
+    verifier("ELLE EST SUR LE PION DU LANCEUR, PAS SUR CELUI QU'ON VISE",
+             !surLaCible.ciblage);
+
+    // LE CLIC DOIT ANNULER LE CIBLAGE, PAS VISER LE LANCEUR. Le pion tout
+    // entier est une boîte de clic qui envoie vers ajouterCibleCiblage : sans
+    // stopPropagation, appuyer sur la croix se viserait soi-même.
+    const clic = await p.evaluate(() => {
+        window.CIBLES_AJOUTEES = [];
+        document.querySelector("#token-J1 .croix-annuler-ciblage").click();
+        return { nettoyages: window.NETTOYAGES, cibles: [...window.CIBLES_AJOUTEES],
+                 actif: !!(window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif) };
+    });
+    verifier("LE CLIC REFERME LE CIBLAGE", clic.nettoyages === 1 && clic.actif === false,
+             `${clic.nettoyages} nettoyage(s), actif ${clic.actif}`);
+    verifier("et il ne vise personne au passage", clic.cibles.length === 0,
+             clic.cibles.join());
+
+    // Une fois le ciblage refermé, les pions redessinés ne la portent plus.
+    await p.evaluate(() => window.appliquerTokensVTT(window.TOKENS_VTT_DATA));
+    const apresCroix = await croix("J1");
+    verifier("elle s'en va avec le ciblage", !apresCroix.ciblage);
+
+    // ET LA CROIX DU DÉPLACEMENT REPREND SA PLACE. Les deux ne s'affichent
+    // jamais ensemble : deux croix identiques côte à côte, on ne saurait plus
+    // laquelle appuie sur quoi.
+    await p.evaluate(() => {
+        window.CHEMIN_MOUVEMENT = [{ q: 1, r: 0, cost: 2 }];
+        window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    });
+    const enDeplacement = await croix("J1");
+    verifier("la croix du déplacement revient quand un chemin est tracé",
+             !!enDeplacement.deplacement && !enDeplacement.ciblage,
+             JSON.stringify(enDeplacement));
+
+    const clicMouvement = await p.evaluate(() => {
+        document.querySelector("#token-J1 .croix-annuler-deplacement").click();
+        return window.ANNULATIONS_MOUVEMENT;
+    });
+    verifier("et elle annule bien le déplacement", clicMouvement === 1, String(clicMouvement));
+
+    // LES DEUX ENSEMBLE : le ciblage passe devant. On peut avoir un chemin
+    // tracé ET ouvrir une carte — c'est même le cas courant.
+    await p.evaluate(() => {
+        window.ETAT_CIBLAGE = { actif: true, idLanceur: "J1" };
+        window.CHEMIN_MOUVEMENT = [{ q: 1, r: 0, cost: 2 }];
+        window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    });
+    const lesDeux = await croix("J1");
+    verifier("UNE SEULE CROIX À LA FOIS, et c'est celle du ciblage",
+             !!lesDeux.ciblage && !lesDeux.deplacement, JSON.stringify(lesDeux));
+
+    // =====================================================================
+    console.log("\n5. LE GUETTEUR DU CIBLAGE DE ZONE LAISSE PASSER LA CROIX");
+    // =====================================================================
+    //  VTT_CIBLAGE_CLICK court en phase de CAPTURE, avant tout le monde, et
+    //  arrête net tout clic tombé dans le plateau — c'est ce qui permet de
+    //  poser le centre d'une zone n'importe où. La croix est posée sur le pion
+    //  du lanceur, donc DANS le plateau : sans exception nommée, son clic
+    //  serait avalé et la seule sortie d'un ciblage de zone resterait la fin
+    //  du tour.
+    {
+        const src = fs.readFileSync('/home/user/Ivalis/moteur_effets.js', 'utf-8');
+        const bloc = src.slice(src.indexOf("window.VTT_CIBLAGE_CLICK = function"),
+                               src.indexOf("window.VTT_CIBLAGE_TOUCHSTART"));
+        verifier("le guetteur nomme la croix et la laisse passer",
+                 /croix-annuler-ciblage/.test(bloc));
+        // Et il le fait AVANT de couper le clic, sinon l'exception ne sert à rien.
+        verifier("et il le fait avant d'arrêter la propagation",
+                 bloc.indexOf("croix-annuler-ciblage") < bloc.indexOf("e.stopPropagation()"));
+
+        // L'ouverture et la fermeture du ciblage redessinent les pions : sans
+        // ça, la croix ne naîtrait jamais et ne partirait jamais.
+        verifier("l'ouverture du ciblage redessine les pions",
+                 /window\.ETAT_CIBLAGE = carteConstruite;[\s\S]{0,600}?appliquerTokensVTT/.test(src));
+        const nettoyage = src.slice(src.indexOf("window.nettoyerCiblage = function"),
+                                    src.indexOf("window.nettoyerCiblage = function") + 2500);
+        verifier("et sa fermeture aussi", /appliquerTokensVTT/.test(nettoyage));
+    }
 
     await b.close();
 }

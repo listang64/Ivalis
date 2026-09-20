@@ -2997,7 +2997,7 @@ textarea.input-texte-parchemin {
  *
  *  LA GÉOMÉTRIE N'EST PAS ICI. Position, diamètre et épaisseur de l'anneau,
  *  place des ancres, de l'avatar et du nom : tout cela est posé par
- *  reglages_hud.js, parce que rien de tout cela ne se déduit — le disque du
+ *  hud_disposition.js, parce que rien de tout cela ne se déduit — le disque du
  *  bouton est peint dans une image, et sa taille comme sa place ne se lisent
  *  nulle part. Ce sont des mesures faites à l'écran, avec la boîte de réglage.
  *  Cette feuille ne garde donc que ce qui ne se règle pas : les couleurs, les
@@ -3033,7 +3033,7 @@ textarea.input-texte-parchemin {
    colorée est donc le FOND de l'écusson, sur lequel un second hexagone plus
    petit vient poser le noir. C'est le même principe que les tuiles de la piste. */
 /* L'ANCRE CHIFFRÉE. Sa place au bout du demi-anneau est posée par
-   reglages_hud.js ; ici, seulement sa forme. */
+   hud_disposition.js ; ici, seulement sa forme. */
 .hud-ancre {
     position: absolute;
     width: 42px;
@@ -3069,7 +3069,7 @@ textarea.input-texte-parchemin {
 /* ========================================================================= */
 /*  À gauche du bouton de fin de tour : les états en cours, sur un voile noir
  *  ténu. Sa position, la taille des icônes et leur écart sont posés par
- *  reglages_hud.js — comme tout le bloc du héros, parce que rien de tout cela
+ *  hud_disposition.js — comme tout le bloc du héros, parce que rien de tout cela
  *  ne se déduit du code : le bouton est une image. */
 
 #piste-etats {
@@ -3189,7 +3189,7 @@ textarea.input-texte-parchemin {
 
 /* LE PION DU COMBATTANT, ET TOUT CE QUI SE POSE SUR LA PLAQUE.
    ON NE TROUVE PLUS UNE SEULE MESURE ICI, et c'est voulu : position, largeur et
-   taille de police sont posées par reglages_hud.js en POURCENTAGES de l'image
+   taille de police sont posées par hud_disposition.js en POURCENTAGES de l'image
    réellement rendue. C'était la condition pour qu'il n'y ait pas de surprise
    d'un écran à l'autre — la plaque se réduit sur un écran étroit, et tout doit
    se réduire avec elle, y compris le texte. Une taille en pixels écrite ici
@@ -3214,7 +3214,7 @@ textarea.input-texte-parchemin {
 
 /* L'AVATAR EN PIED, quand le héros en a un. Rien n'est plus taillé : l'image
    garde ses proportions et tient ENTIÈRE dans la boîte (`contain`), posée sur
-   son bord bas. La boîte, elle, est ancrée par le bas — c'est reglages_hud.js
+   son bord bas. La boîte, elle, est ancrée par le bas — c'est hud_disposition.js
    qui lui donne sa hauteur et sa place, en pourcentages de la plaque comme tout
    le reste. */
 #voile-tour-pion-boite.pion-avatar-entier {
@@ -3230,7 +3230,7 @@ textarea.input-texte-parchemin {
    taillé : aucune dimension ne lui est imposée dans les deux sens. */
 #voile-tour-pion-boite.pion-avatar-entier #voile-tour-pion {
     width: auto;
-    height: auto;          /* posée en pixels par reglages_hud.js */
+    height: auto;          /* posée en pixels par hud_disposition.js */
     aspect-ratio: auto;
     object-fit: contain;
     object-position: bottom center;

@@ -38,7 +38,7 @@
 // =========================================================================
 
 import { clonerEtat, combattant, creerDes, combattantIllusion,
-         verifierEtatCombat, FORMAT_ETAT } from './combat_etat.js';
+         verifierEtatCombat, compterPasMarche, FORMAT_ETAT } from './combat_etat.js';
 import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion,
          traverserZones, creerZonePure, poserZone, vieillirZones,
          chaineDeDegats, REGLES_ETATS } from './moteur_pur.js';
@@ -146,8 +146,10 @@ export function validerIntention(etat, intention) {
             if (occupant) return refus(`${occupant} occupe (${vers.q},${vers.r})`);
             de = vers;
         }
-        // Et il doit être payable, au moins en partie.
+        // Et il doit être payable, au moins en partie — au barème de CE tour,
+        // cases déjà marchées comprises (voir le `pas` de la file).
         const plan = planifierTrajet(etat, intention.acteur, chemin, intention.plateau, {
+            pasDejaFaits: nombre(tete.pas),
             reserveCarte: nombre(intention.reserveCarte)
         });
         if (plan.pas.length === 0) return refus("pas assez d'énergie pour un seul pas");
@@ -207,6 +209,16 @@ export function validerIntention(etat, intention) {
 function fabriquerPas(etatAvant, etatApres, etapes, cause, acteur, des) {
     const suivant = etatApres;
     suivant.version = nombre(etatAvant.version) + 1;
+
+    // LE COMPTEUR DE CASES MARCHÉES SUIT LES ÉTAPES, ICI ET POUR TOUS LES PAS.
+    //
+    // Les résolutions du noyau pur travaillent sur l'état et n'ont pas à savoir
+    // qu'une file existe : elles produisent des étapes. C'est donc au seul
+    // endroit par lequel TOUT passe — cette fonction — qu'on applique la même
+    // règle que l'applicateur d'étape, avec la même fonction. Le poste qui écrit
+    // et celui qui rejoue arrivent ainsi au même compteur, sans qu'aucun chemin
+    // (marche d'un joueur, tour d'une créature) ait à y penser.
+    (etapes || []).forEach(e => compterPasMarche(suivant, e));
     // La graine avance à chaque pas, même quand aucun dé n'a été tiré : sans ce
     // cran forcé, deux pas de suite repartiraient du même hasard.
     des.fraction();
@@ -503,7 +515,10 @@ export function ouvrirManche(etat, file, des) {
     // ici on les écarte pour une raison lisible, au lieu de les perdre.
     const propre = file
         .map(f => ({ id: f.id || f.idPersonnage, carte: f.carte || f.idCarte || null,
-                     initiative: nombre(f.initiative, 0) }))
+                     initiative: nombre(f.initiative, 0),
+                     // Une manche qui s'ouvre, c'est un compteur de cases à zéro
+                     // pour tout le monde.
+                     pas: 0 }))
         .filter(f => {
             const c = combattant(suivant, f.id);
             return c && !c.aTerre;
@@ -636,9 +651,15 @@ export function appliquerIntention(etat, intention, plateau) {
     }
 
     if (intention.type === "mouvement") {
+        // LE BARÈME REPREND OÙ IL EN ÉTAIT. Les cases déjà marchées ce tour-ci
+        // sont comptées : repartir en plusieurs fois ne doit pas revenir moins
+        // cher que marcher d'une traite. Le compteur vit en tête de file et
+        // s'efface avec le tour (voir combat_etat.js).
+        const tete = (etat.file || [])[0];
         const r = resoudreMouvement(etat, {
             idLanceur: intention.acteur,
             chemin: intention.chemin,
+            pasDejaFaits: nombre(tete && tete.pas),
             reserveCarte: nombre(intention.reserveCarte)
         }, des, plateau);
         return fabriquerPas(etat, r.etat, r.etapes, intention.id, intention.acteur, des);
@@ -761,8 +782,11 @@ export function jouerCreature(etat, id, carte, plateau) {
 
     // Le déplacement d'abord — un pas, une étape, opportunités comprises.
     if (plan.chemin.length > 0) {
+        const teteIA = (courant.file || [])[0];
         const m = resoudreMouvement(courant, {
-            idLanceur: id, chemin: plan.chemin, reserveCarte: nombre(infos.fatigue)
+            idLanceur: id, chemin: plan.chemin,
+            pasDejaFaits: nombre(teteIA && teteIA.id === id ? teteIA.pas : 0),
+            reserveCarte: nombre(infos.fatigue)
         }, des, plateau);
         courant = m.etat;
         etapes.push(...m.etapes);

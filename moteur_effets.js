@@ -797,6 +797,11 @@ window.VTT_CIBLAGE_WHEEL = function(e) {
 window.VTT_CIBLAGE_CLICK = function(e) {
     const state = window.ETAT_CIBLAGE;
     if (!state || !state.actif || !state.isZone) return;
+    // LA CROIX D'ANNULATION N'EST PAS UNE VISÉE. Elle est posée sur le pion du
+    // lanceur, donc DANS le plateau : sans cette ligne, ce guetteur — qui court
+    // en phase de capture, avant tout le monde — avalerait son clic, et la
+    // seule sortie d'un ciblage de zone resterait la fin du tour.
+    if (e.target && e.target.closest && e.target.closest(".croix-annuler-ciblage")) return;
     const conteneur = document.getElementById("conteneur-plateau-vtt");
     if (!conteneur || !conteneur.contains(e.target)) return;
     e.stopPropagation(); 
@@ -1804,6 +1809,13 @@ window.demarrerCiblage = async function(idCarte, options) {
 
     window.ETAT_CIBLAGE = carteConstruite;
 
+    // LES PIONS SE REDESSINENT : c'est ce qui fait apparaître la croix rouge
+    // sous le lanceur (combat.js, appliquerTokensVTT). Elle ne naît pas toute
+    // seule — les pions ne se refont qu'à la demande.
+    if (typeof window.appliquerTokensVTT === "function" && window.TOKENS_VTT_DATA) {
+        window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    }
+
     if (configSort) window.surlignerEffetCarteActif(configSort.nom);
 
     if (isZone) {
@@ -2377,6 +2389,12 @@ window.nettoyerCiblage = function() {
     const btnAnnuler = document.getElementById("btn-annuler-ciblage");
     if (btnResoudre) btnResoudre.remove();
     if (btnAnnuler) btnAnnuler.remove();
+
+    // Et les pions avec, pour que la croix rouge du lanceur s'en aille en même
+    // temps que le ciblage qu'elle annulait.
+    if (typeof window.appliquerTokensVTT === "function" && window.TOKENS_VTT_DATA) {
+        window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    }
 
     // La fenêtre de tour et le bouton fin de tour suivent le même sort que les
     // boutons de ciblage : ciblage annulé (ou résolu), l'écran doit refléter
