@@ -1126,6 +1126,44 @@ node menage_images.mjs      # les cinq chemins qui abandonnent une image
 node suppression_perso.mjs  # effacer un héros emporte TOUTES ses images
 ```
 
+## La lanière pend plus bas, et le voile de la piste s'efface
+
+Deux retouches d'écran, demandées sur l'iPad, mesurées au pixel.
+
+**La pointe de la lanière** ne dépassait que de 26 px : sur une tablette, on ne
+distinguait pas qu'il pendait quelque chose en haut de l'écran, et le geste — la
+tirer pour ouvrir les compétences — ne venait à personne. Elle en laisse voir 72
+(`window.POINTE_LANIERE_VISIBLE`, combat.js), ce qui reste bien moins qu'un quart
+de sa longueur : on voit un bout de cuir, pas les bannières.
+
+**Le voile sous la piste d'initiative** était un rectangle noir à 62 %, à coins
+arrondis, creusé d'une ombre interne, doublé d'une tache radiale à 92 % de noir.
+Sur l'iPad, ça se lisait comme une masse opaque coupée net — et les chiffres le
+disaient : 5/255 sur blanc au plus sombre, 40 niveaux de gris entre deux pixels
+voisins sous les portraits, **186** sur le côté, c'est-à-dire un bord franc.
+
+Le bandeau est devenu un dégradé radial, comme l'ombre qu'il porte : il s'éteint
+complètement avant le bord de sa boîte, dans toutes les directions — d'où une
+boîte élargie de 110 px de chaque côté et descendue sous la piste, qui est la
+place qu'il lui faut pour s'effacer au lieu de se couper. La tache, elle, est
+passée de 92 % à 26 % de noir, et ses rayons sont désormais écrits (`50% 50%`) :
+sans eux le dégradé prenait l'étendue par défaut — jusqu'au coin le plus
+lointain — et se retrouvait encore à 30 % de noir en atteignant le bas de sa
+boîte, ce qui faisait une coupure de 19 niveaux que personne n'avait vue.
+
+Après : 130/255 au plus sombre, 7 niveaux de marche au pire en descendant, 3 sur
+le côté, éteint en 43 px.
+
+```sh
+node volet_competences.mjs  # la pointe dépasse franchement, et c'est elle qu'on tire
+node piste_initiative.mjs   # le voile est léger, diffus, et sans un seul bord
+```
+
+Le banc de la piste photographie deux traits d'un pixel — une colonne sous les
+portraits, une ligne vers le vide à droite — après avoir effacé tout le reste de
+l'écran de combat, et refuse : un voile trop sombre, la moindre marche, un
+retour en arrière, ou une épaisseur qui s'étale au-delà de 60 px.
+
 ## Le style des paramètres, et le nom de la race
 
 Deux demandes de Nico, deux écrans.

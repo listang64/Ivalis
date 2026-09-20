@@ -546,6 +546,9 @@ console.log("\n13. L'OMBRE SOUS LE BANDEAU A VRAIMENT UN DÉGRADÉ DOUX");
     const so = getComputedStyle(ombre);
     return {
       basDuBandeau: Math.round(rf.bottom), centre: Math.round(rf.left + rf.width / 2),
+      basDesPortraits: Math.round(rt.bottom), hautDesPortraits: Math.round(rt.top),
+      pisteDroite: Math.round(piste.getBoundingClientRect().right),
+      largeurPiste: Math.round(piste.getBoundingClientRect().width),
       hauteurOmbre: Math.round(ro.height), hauteurTuile: Math.round(rt.height),
       centreOmbre: Math.round(ro.left + ro.width / 2),
       largeurOmbre: Math.round(ro.width), largeurBandeau: Math.round(rf.width),
@@ -573,9 +576,12 @@ console.log("\n13. L'OMBRE SOUS LE BANDEAU A VRAIMENT UN DÉGRADÉ DOUX");
   verifier("elle est centrée sous la piste",
            Math.abs(cadre.centreOmbre - cadre.centre) <= 1,
            `${cadre.centreOmbre} contre ${cadre.centre}`);
-  verifier("et elle déborde largement du bandeau, pour s'éteindre dans le vide",
-           cadre.largeurOmbre > cadre.largeurBandeau + 40,
-           `${cadre.largeurOmbre} contre ${cadre.largeurBandeau}`);
+  // Le bandeau déborde lui aussi très largement de la piste depuis qu'il s'éteint
+  // sur ses propres bords : c'est cette marge qui lui donne de la place pour
+  // s'effacer au lieu de se couper net.
+  verifier("le bandeau déborde largement de la piste, pour s'éteindre dans le vide",
+           cadre.largeurBandeau > cadre.largeurPiste + 150,
+           `bandeau ${cadre.largeurBandeau}px pour une piste de ${cadre.largeurPiste}px`);
   verifier("elle est posée AVANT le bandeau (sinon elle le noircirait)",
            cadre.ombreAvantBandeau === true);
 
@@ -615,53 +621,76 @@ console.log("\n13. L'OMBRE SOUS LE BANDEAU A VRAIMENT UN DÉGRADÉ DOUX");
            && parseFloat(cadre.bordureOmbre) === 0,
            `${cadre.filtreOmbre} / ${cadre.ombrePorteeOmbre} / ${cadre.bordureOmbre}`);
 
-  // La photo : une colonne d'un pixel, du ras du bandeau jusqu'à 44 px dessous.
-  const HAUTEUR = 44;
-  const photo = await p.screenshot({ clip: { x: cadre.centre, y: cadre.basDuBandeau, width: 1, height: HAUTEUR } });
-  const lignes = await p.evaluate(async (b64) => {
-    const img = new Image();
-    img.src = "data:image/png;base64," + b64;
-    await img.decode();
-    const toile = document.createElement("canvas");
-    toile.width = img.width; toile.height = img.height;
-    const ctx = toile.getContext("2d");
-    ctx.drawImage(img, 0, 0);
-    const d = ctx.getImageData(0, 0, img.width, img.height).data;
-    const sorties = [];
-    for (let y = 0; y < img.height; y++) {
-      let somme = 0;
-      for (let x = 0; x < img.width; x++) {
-        const i = (y * img.width + x) * 4;
-        somme += (d[i] + d[i + 1] + d[i + 2]) / 3;
+  // LES PHOTOS. Nico, sur son iPad : « l'ombre est trop opaque, les bords trop
+  // nets, l'épaisseur trop grande — je veux quelque chose de beaucoup plus
+  // discret et diffus. » C'était exact, et c'était mesurable : sous les
+  // portraits, le voile tombait à 5/255 sur blanc (presque du noir), il se
+  // coupait d'un coup — 40 niveaux de gris entre deux pixels voisins en bas,
+  // 186 sur le côté — et cette coupure dessinait le rectangle arrondi du
+  // bandeau. C'est ce que la retouche efface, et ce sont ces trois nombres-là
+  // que le banc surveille.
+  //
+  // ON EFFACE TOUT LE RESTE avant de photographier : les portraits eux-mêmes et
+  // les autres pièces de l'écran de combat. La piste garde sa largeur (elle est
+  // posée sur le conteneur, pas sur les tuiles), donc le voile ne bouge pas d'un
+  // pixel — mais plus rien ne vient peindre dans la colonne mesurée.
+  await p.evaluate(async () => {
+    [...document.getElementById("fenetre-combat").children].forEach(e => {
+      if (e.id !== "piste-initiative-zone") e.style.display = "none";
+    });
+    document.querySelectorAll(".piste-tuile").forEach(t => { t.style.visibility = "hidden"; });
+    await new Promise(r => setTimeout(r, 200));
+  });
+
+  const enGris = async (clip) => {
+    const photo = await p.screenshot({ clip });
+    return await p.evaluate(async (b64) => {
+      const img = new Image();
+      img.src = "data:image/png;base64," + b64;
+      await img.decode();
+      const toile = document.createElement("canvas");
+      toile.width = img.width; toile.height = img.height;
+      const ctx = toile.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      const d = ctx.getImageData(0, 0, img.width, img.height).data;
+      const sorties = [];
+      const n = img.width === 1 ? img.height : img.width;
+      for (let k = 0; k < n; k++) {
+        const i = k * 4;
+        sorties.push(Math.round((d[i] + d[i + 1] + d[i + 2]) / 3));
       }
-      sorties.push(Math.round(somme / img.width));
-    }
-    return sorties;
-  }, photo.toString("base64"));
+      return sorties;
+    }, photo.toString("base64"));
+  };
+  const pireMarche = (v) => v.slice(1).reduce((m, x, i) => Math.max(m, Math.abs(x - v[i])), 0);
 
-  const hautDeLOmbre = lignes[0];
-  const basDeLaColonne = lignes[lignes.length - 1];
-  // Un dégradé, c'est une descente d'intensité qui ne recule jamais franchement.
-  const reculs = lignes.slice(1).filter((v, i) => v < lignes[i] - 2).length;
-  // Et il doit s'étaler : on compte les lignes ni tout à fait noires ni blanches.
-  const paliers = new Set(lignes.filter(v => v > hautDeLOmbre + 8 && v < 250)).size;
+  // ① EN DESCENDANT : une colonne d'un pixel, du bas des portraits à 120 px
+  //    dessous. Le voile doit y être léger, s'éclaircir sans à-coup, et avoir
+  //    complètement disparu avant d'être devenu une épaisseur.
+  const colonne = await enGris({ x: cadre.centre, y: cadre.basDesPortraits, width: 1, height: 120 });
+  const plusSombre = Math.min(...colonne);
+  const reculs = colonne.slice(1).filter((v, i) => v < colonne[i] - 2).length;
+  const finDuVoile = colonne.findIndex(v => v >= 250);
 
-  // LES SEUILS SONT CHOISIS POUR MORDRE. L'ancienne ombre dessinait bien une
-  // pente, elle aussi — Chromium la rendait sans broncher. Son défaut n'était
-  // pas d'être absente, mais d'être trop pâle et trop courte pour se voir sur
-  // un fond sombre : 132/255 au ras du bandeau contre 75 aujourd'hui, et déjà
-  // presque blanche seize pixels plus bas. Ce sont ces deux mesures-là qui
-  // séparent une ombre qu'on voit d'une ombre qui n'existe que dans le CSS.
-  verifier("JUSTE SOUS LE BANDEAU, C'EST FRANCHEMENT SOMBRE",
-           hautDeLOmbre < 110, `${hautDeLOmbre}/255`);
-  verifier("SEIZE PIXELS PLUS BAS, ELLE SE VOIT ENCORE",
-           lignes[16] < 200, `${lignes[16]}/255`);
-  verifier("44 px plus bas, le blanc est revenu", basDeLaColonne > 235, `${basDeLaColonne}/255`);
-  verifier("L'ÉCLAIRCISSEMENT EST PROGRESSIF, JAMAIS UNE MARCHE",
-           reculs === 0, `${reculs} recul(s)`);
-  verifier("et il s'étale sur une vraie pente, pas deux pixels",
-           paliers >= 12, `${paliers} valeurs intermédiaires`);
-  console.log(`     profil mesuré : ${lignes.filter((_, i) => i % 4 === 0).join(" ")}`);
+  verifier("SOUS LES PORTRAITS, LE VOILE EST LÉGER, PLUS UNE MASSE NOIRE",
+           plusSombre >= 100, `${plusSombre}/255 au plus sombre`);
+  verifier("IL S'ÉCLAIRCIT SANS LA MOINDRE MARCHE",
+           pireMarche(colonne) <= 12, `${pireMarche(colonne)} niveaux entre deux pixels voisins`);
+  verifier("et sans jamais s'assombrir en descendant", reculs === 0, `${reculs} recul(s)`);
+  verifier("SON ÉPAISSEUR RESTE CONTENUE : éteint en moins de 60 px",
+           finDuVoile > 0 && finDuVoile <= 60, `${finDuVoile} px`);
+  verifier("mais il s'étale vraiment, ce n'est pas un trait",
+           finDuVoile >= 20, `${finDuVoile} px`);
+  console.log(`     profil en descendant : ${colonne.slice(0, 60).filter((_, i) => i % 4 === 0).join(" ")}`);
+
+  // ② SUR LE CÔTÉ : une ligne d'un pixel, du bord droit de la piste vers le
+  //    vide. C'est là que le bandeau se coupait le plus violemment — 186
+  //    niveaux d'un pixel à l'autre, soit le bord franc qu'on voyait à l'œil.
+  const ligne = await enGris({ x: cadre.pisteDroite - 4, y: cadre.hautDesPortraits + 40, width: 120, height: 1 });
+  verifier("SUR LE CÔTÉ AUSSI, LE VOILE S'ÉTEINT SANS BORD",
+           pireMarche(ligne) <= 20, `${pireMarche(ligne)} niveaux entre deux pixels voisins`);
+  verifier("et il y est déjà discret", Math.min(...ligne) >= 120, `${Math.min(...ligne)}/255`);
+  console.log(`     profil sur le côté  : ${ligne.filter((_, i) => i % 6 === 0).join(" ")}`);
 }
 
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

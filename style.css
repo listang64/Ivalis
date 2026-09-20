@@ -2171,24 +2171,43 @@ textarea.input-texte-parchemin {
    noir à 62 % ne se voyait de toute façon presque pas, et il coûtait une
    couche de composition à chaque image sur iPad.
 
-   Il pend du bord haut de l'écran plutôt que de flotter : seuls ses deux coins
-   du bas sont arrondis. */
+   IL N'A PLUS DE FORME DU TOUT, ET C'EST LE POINT. Il a longtemps été un
+   rectangle noir à 62 %, à coins arrondis, creusé d'une ombre interne : sur
+   l'iPad de Nico, ça donnait une masse opaque qui se coupait net sous les
+   portraits et sur les côtés — 5/255 sur blanc au plus sombre, et jusqu'à 186
+   niveaux de gris entre deux pixels voisins au bord. « Trop opaque, les bords
+   trop nets, l'épaisseur trop grande. »
+
+   Le voile est donc devenu un dégradé radial, comme l'ombre qui le suit : une
+   tache dense au-dessus des portraits qui s'éteint COMPLÈTEMENT avant d'avoir
+   atteint le bord de sa boîte, dans toutes les directions. Il n'existe plus un
+   seul pixel où il s'arrête — donc plus aucun bord à voir, sur aucun écran.
+   D'où la boîte élargie de 110 px de chaque côté et descendue sous la piste :
+   c'est la place qu'il lui faut pour s'effacer au lieu de se couper. */
 .piste-fond {
     position: absolute;
-    left: -24px;
-    right: -24px;
+    left: -110px;
+    right: -110px;
     /* Autant que la piste est descendue (PISTE_MARGE_HAUT), plus les 18 px
        d'origine : le bandeau continue de sortir par le bord haut de l'écran,
        comme s'il pendait de plus haut. Sans ce report, il se serait décollé du
-       bord et aurait flotté. */
+       bord et aurait flotté. En bas, il déborde de la piste au lieu de
+       s'arrêter 12 px avant : ces pixels-là sont ceux où il s'éteint. */
     top: -34px;
-    bottom: 12px;
-    border-radius: 0 0 20px 20px;
-    background: rgba(0, 0, 0, 0.62);
-    /* Plus d'ombre portée ici : une box-shadow épouse la forme de sa boîte, et
-       on voyait donc le rectangle arrondi du bandeau se dessiner en creux tout
-       autour. L'ombre est passée dans son propre élément, juste en dessous. */
-    box-shadow: inset 0 -14px 22px rgba(0, 0, 0, 0.6);
+    bottom: -20px;
+    /* Aucun arrondi : il n'y a plus de bord à arrondir. */
+    border-radius: 0;
+    /* Le noyau est au-dessus du milieu des portraits, et la descente est finie
+       avant le bas de la boîte : le 100 % du dégradé tombe pile là. */
+    background: radial-gradient(ellipse 50% 68% at 50% 32%,
+                rgba(0, 0, 0, 0.62) 0%,
+                rgba(0, 0, 0, 0.56) 42%,
+                rgba(0, 0, 0, 0.32) 68%,
+                rgba(0, 0, 0, 0.12) 86%,
+                rgba(0, 0, 0, 0) 100%);
+    /* Plus d'ombre portée ni d'ombre interne : une box-shadow épouse la forme de
+       sa boîte, et c'est exactement ce rectangle qu'on ne veut plus voir. */
+    box-shadow: none;
     z-index: -1;
     pointer-events: none;
 }
@@ -2209,7 +2228,18 @@ textarea.input-texte-parchemin {
  *
  * Sa hauteur vaut la moitié d'un portrait de la piste, et elle est posée en
  * JavaScript depuis la constante elle-même : les deux ne peuvent pas diverger
- * le jour où les portraits changeront de taille. */
+ * le jour où les portraits changeront de taille.
+ *
+ * ELLE EST DEVENUE UN SOUFFLE. Le bandeau au-dessus s'éteint désormais tout
+ * seul : cette tache-ci n'a plus à porter l'ombre à elle seule, elle ne fait
+ * qu'ajouter un peu de profondeur juste sous la piste. Ses noirs sont passés de
+ * 92 % à 26 %.
+ *
+ * ET SES RAYONS SONT ÉCRITS. Sans eux, le dégradé prend l'étendue par défaut —
+ * jusqu'au coin le plus lointain — et comme la boîte est très large et très
+ * basse, il se retrouvait encore à 30 % de noir en atteignant son bord du bas :
+ * une coupure franche de 19 niveaux de gris, que le banc mesurait sans la
+ * comprendre. `50% 50%` le fait mourir dans la boîte, pas sur son bord. */
 .piste-ombre-sol {
     position: absolute;
     left: -70px;
@@ -2223,12 +2253,12 @@ textarea.input-texte-parchemin {
        Le bandeau s'arrête à 12 px du bas de la piste : l'ellipse, haute de la
        moitié d'un portrait, est donc remontée d'à peu près la moitié de ça. */
     bottom: -8px;
-    background: radial-gradient(ellipse at 50% 50%,
-                rgba(0, 0, 0, 0.92) 0%,
-                rgba(0, 0, 0, 0.62) 30%,
-                rgba(0, 0, 0, 0.30) 55%,
-                rgba(0, 0, 0, 0.10) 74%,
-                rgba(0, 0, 0, 0) 90%);
+    background: radial-gradient(ellipse 50% 50% at 50% 45%,
+                rgba(0, 0, 0, 0.26) 0%,
+                rgba(0, 0, 0, 0.19) 32%,
+                rgba(0, 0, 0, 0.09) 58%,
+                rgba(0, 0, 0, 0.03) 78%,
+                rgba(0, 0, 0, 0) 96%);
     z-index: -1;
     pointer-events: none;
 }

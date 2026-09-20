@@ -557,7 +557,11 @@ window.installerVoletCompetences = function() {
 // écrite comme secours dans la feuille de style : un moteur qui ne saurait pas
 // lire une variable dans une image-clé retrouverait l'ancien comportement au
 // lieu d'un volet coincé à mi-hauteur.
-window.POINTE_LANIERE_VISIBLE = 26;   // ce qui dépasse, en pixels d'écran
+// 26 px, c'était la longueur d'un ongle : sur l'iPad de Nico, on ne voyait
+// presque rien pendre, et personne n'avait l'idée de tirer dessus. On en laisse
+// pendre presque trois fois plus — de quoi reconnaître un bout de cuir à
+// l'autre bout de la table, sans pour autant montrer les bannières.
+window.POINTE_LANIERE_VISIBLE = 72;   // ce qui dépasse, en pixels d'écran
 
 window.calerVoletReplie = function() {
     const contenu = document.getElementById("volet-contenu");
