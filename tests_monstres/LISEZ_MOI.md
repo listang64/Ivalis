@@ -106,6 +106,7 @@ node pas_de_visionneuse.mjs # rien ne peut plus détourner « qui joue ? » vers
 node stats_fiche.mjs        # les retouches de la fiche perso suivies jusqu'au combat
 node coup_critique.mjs      # le jet de critique, ses dégâts doublés et ses effets imposés
 node atouts_races.mjs       # les sept peuples et leurs avantages, mesurés un par un
+node ecran_choix_race.mjs   # le titre de l'étape, le nom de la race, et rien qui se chevauche
 node jauge_token.mjs        # la jauge sous le pion survit à un redessin
 node jauge_cibles.mjs       # la vie restante des cibles s'affiche pendant le ciblage
 node butin_loot.mjs         # butin de fin de combat : détection, personnel, partage, tirage au sort
@@ -1124,6 +1125,49 @@ Deux pièges que le banc a fait remonter, et qu'aucune relecture n'aurait vus :
 node menage_images.mjs      # les cinq chemins qui abandonnent une image
 node suppression_perso.mjs  # effacer un héros emporte TOUTES ses images
 ```
+
+## Le style des paramètres, et le nom de la race
+
+Deux demandes de Nico, deux écrans.
+
+**Le butin rendait des objets photoréalistes** alors qu'un style est réglé une
+fois pour toutes dans les paramètres (onglet Cerveau IA, instruction
+`INST_76839` — le même texte qui habille les portraits de héros). La source
+était pourtant la bonne : le butin lit ce document-là. Le défaut était dans la
+FORME du prompt. Le style y était glissé au milieu, juste avant un bloc annoncé
+« 🛑 RÈGLE DE COMPOSITION (PRIORITAIRE SUR TOUT LE RESTE) » : le dessinateur
+lisait la consigne des paramètres, puis s'entendait dire de passer outre. Et
+quand les paramètres étaient vides — document absent, champ effacé, base
+illisible — **aucune** directive de style ne partait du tout, ce qu'un modèle
+d'image interprète toujours de la même façon : une photo.
+
+Désormais le style OUVRE le prompt, c'est lui qui porte la mention de priorité,
+la règle de composition ne prime plus que sur la description de l'objet, et un
+réglage vide laisse quand même partir une consigne d'illustration dessinée qui
+nomme explicitement ce qui est proscrit (photo, rendu 3D, photoréalisme). La
+phrase d'adresse qu'on laisse parfois traîner en tête de la consigne (« Tu fera
+ce dessin dans ce style : ») est retirée, comme le fait déjà la carte du monde.
+
+**L'écran de choix de race** annonçait la race en grand titre (« LES HUMAINS »)
+et son descriptif, au milieu de l'écran, ne disait pas de qui il parlait. Le
+grand titre annonce maintenant l'ÉTAPE (« Choix de Race ») et ne bouge plus ; le
+nom de la race est descendu juste au-dessus de son descriptif, dans le même
+encart. Au passage, l'encart a cessé d'être centré sur l'ÉCRAN : libre de
+grandir dans les deux sens selon la longueur du lore, il passait déjà — avant
+même cette retouche — par-dessus le grand titre et par-dessus les deux symboles
+de genre (60 px pour les Ophiors, les plus bavards). Il est tenu dans une BANDE
+entre les deux, et se centre là-dedans.
+
+```sh
+node images_objets.mjs      # le style ouvre le prompt, et ne manque jamais
+node ecran_choix_race.mjs   # le titre de l'étape, le nom de la race, et rien qui se chevauche
+```
+
+`ecran_choix_race.mjs` mesure les sept races sur les DEUX feuilles de style —
+celle du bureau et la branche tactile de l'iPad, qui ne se ressemblent pas — et
+vérifie les pixels : le nom au-dessus du descriptif et non en dessous, centré
+sur lui, plus gros que le texte qu'il annonce, et zéro chevauchement entre les
+onglets, le titre, l'encart et les boutons de genre.
 
 ## Fidélité à la Forge
 

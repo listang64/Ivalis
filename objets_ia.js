@@ -67,6 +67,16 @@ window.styleGraphiqueIvalis = async function() {
         console.error("[MIA_Objets] Style graphique illisible :", e);
         styleEnCache = "";
     }
+    // La consigne est tapée à la main dans les paramètres : on y laisse parfois
+    // une phrase d'adresse avant le style lui-même. La carte du monde la retire
+    // déjà de son côté ; on fait pareil ici pour que le même texte donne le même
+    // dessin partout dans le jeu.
+    styleEnCache = String(styleEnCache).replace(/Tu fera(?:s)? ce dessin dans ce style\s*:/gi, "").trim();
+    if (!styleEnCache) {
+        console.warn("[MIA_Objets] ⚠️ Aucun style graphique enregistré dans les paramètres "
+                   + "(onglet Cerveau IA, instruction INST_76839) : les objets seront dessinés "
+                   + "en illustration générique, pas dans le style de la partie.");
+    }
     return styleEnCache;
 };
 
@@ -171,8 +181,9 @@ Trois à quatre phrases par objet. Utilise l'outil 'decrireObjets'.` + (options 
 //  ÉTAPE 2 — LE PROMPT ENVOYÉ AU DESSINATEUR
 // =========================================================================
 //  Deux mises en scène, et deux seulement : l'arme est posée à même le sol,
-//  l'armure est étalée au sol, dépliée et VIDE. Le reste (style, cadrage) est
-//  commun, et le style vient de la partie, pas d'ici.
+//  l'armure est étalée au sol, dépliée et VIDE. Le style, lui, ouvre le prompt :
+//  c'est celui réglé dans les paramètres de la partie, et rien de ce qui suit
+//  n'a le droit de le contredire.
 window.promptImageObjet = function(objet, description, style, options) {
     const estArmure = objet.emplacement === "Armure";
     const sansCasque = estArmure && options && options.sansCasque;
@@ -210,7 +221,24 @@ window.promptImageObjet = function(objet, description, style, options) {
         : " ÉPOQUE OBLIGATOIRE : Antiquité méditerranéenne — bronze, fer brut, bois, cuir, os et tendon. "
         + "Aucune forme médiévale ni moderne, aucune garde de rapière, aucun acier poli industriel.";
 
-    let prompt = "Contexte de l'univers : Antique Fantastique (Mythic Ancient Fantasy, Antiquité Magique).\n\n";
+    // LE STYLE PASSE EN PREMIER, ET IL NE MANQUE JAMAIS.
+    //  Il était jusqu'ici glissé au milieu du prompt, juste avant un bloc
+    //  annoncé « PRIORITAIRE SUR TOUT LE RESTE » : le dessinateur lisait donc la
+    //  consigne des paramètres puis se voyait dire de passer outre, et rendait
+    //  des objets photoréalistes. Il ouvre maintenant le prompt, et c'est lui
+    //  qui porte la mention de priorité.
+    //  Et quand les paramètres sont vides (document absent, champ effacé, base
+    //  illisible), on ne laisse surtout pas le champ libre : sans consigne, un
+    //  modèle d'image répond par une photo. On exige au minimum une illustration
+    //  dessinée, en nommant explicitement ce qui est proscrit.
+    const styleDemande = String(style || "").trim();
+    let prompt = "DIRECTIVE DE STYLE VISUEL OBLIGATOIRE (elle prime sur tout le reste du prompt) : "
+        + (styleDemande || "illustration peinte à la main, planche d'artiste, matières traitées au pinceau")
+        + "\n"
+        + "CE N'EST PAS UNE PHOTOGRAPHIE : ni photo, ni rendu 3D, ni image photoréaliste, "
+        + "ni capture de jeu vidéo, ni scan d'objet réel.\n\n---\n\n";
+
+    prompt += "Contexte de l'univers : Antique Fantastique (Mythic Ancient Fantasy, Antiquité Magique).\n\n";
     prompt += "--- OBJET UNIQUE À REPRÉSENTER ---\n";
     prompt += `Il s'agit de : ${objet.nom}`;
     if (objet.rarete) prompt += ` (qualité ${objet.rarete})`;
@@ -218,15 +246,14 @@ window.promptImageObjet = function(objet, description, style, options) {
     if (description) prompt += description + "\n";
     prompt += "\n";
 
-    if (style) prompt += "Directives de style artistique obligatoires : " + style + "\n\n";
-
-    prompt += "🛑 RÈGLE DE COMPOSITION (PRIORITAIRE SUR TOUT LE RESTE) : " + miseEnScene + ancrageAntique + " "
+    prompt += "🛑 RÈGLE DE COMPOSITION (prioritaire sur la description de l'objet, jamais sur le style) : " + miseEnScene + ancrageAntique + " "
             + "Le sol est un sol de champ de bataille sobre — terre battue, pierre ou dalles usées — "
             + "et reste discret : l'objet occupe le centre et la majeure partie de l'image. "
             + "Format strictement carré. L'objet est ENTIÈREMENT visible, avec une petite marge : "
             + "aucune partie ne doit être coupée par le bord de l'image. "
             + "Un seul objet dans l'image, jamais deux, jamais une collection. "
-            + "N'écris aucun texte, aucun chiffre, aucun cadre, aucune interface, aucune bordure décorative.";
+            + "N'écris aucun texte, aucun chiffre, aucun cadre, aucune interface, aucune bordure décorative. "
+            + "Le style imposé en tête de ce prompt s'applique à TOUTE l'image, le sol compris.";
 
     return prompt;
 };

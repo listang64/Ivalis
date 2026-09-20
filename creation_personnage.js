@@ -32,7 +32,9 @@ window.changerRaceSelection = function(race) {
     });
 
     // 2. Ciblage des éléments à modifier
-    const titre = document.getElementById("titre-race-selection");
+    // Le grand titre de l'écran est désormais fixe (« Choix de Race ») : c'est
+    // le petit titre posé au-dessus du descriptif qui prend le nom de la race.
+    const nomRace = document.getElementById("nom-race-selection");
     const description = document.getElementById("description-race-selection");
     const gameplay = document.getElementById("gameplay-race-selection");
     const bgImage = document.getElementById("bg-selection-race");
@@ -85,7 +87,7 @@ window.changerRaceSelection = function(race) {
     bgImage.style.backgroundColor = (bgImage.src === "") ? "#0a0a0a" : "transparent";
     
     // 4. Application des textes
-    if (titre) titre.innerText = "Les " + race + "s";
+    if (nomRace) nomRace.innerText = "Les " + race + "s";
     if (description) description.innerText = texteDesc;
     if (gameplay) gameplay.innerHTML = texteGameplay; 
 };

@@ -33,10 +33,14 @@ const res = await p.evaluate(async (fnSrc) => {
   // --- Faux Firestore -----------------------------------------------------
   const db = { faux: true };
   const doc = (...a) => ({ chemin: a.slice(1).join("/") });
+  // Le style tel qu'il est tapé dans l'onglet dédié des paramètres : c'est CE
+  // document-là, et aucun autre, que le butin doit lire. Le banc en change le
+  // contenu en cours de route pour vérifier le nettoyage de la consigne.
+  let contenuDesParametres = "peinture à l'huile dorée, clair-obscur";
   const getDoc = async (ref) => {
     if (ref.chemin === "Cerveau_IA/INST_76839") {
       journal.styleLu++;
-      return { exists: () => true, data: () => ({ Contenu_Direct: "peinture à l'huile dorée, clair-obscur" }) };
+      return { exists: () => true, data: () => ({ Contenu_Direct: contenuDesParametres }) };
     }
     return { exists: () => false, data: () => ({}) };
   };
@@ -149,6 +153,8 @@ const res = await p.evaluate(async (fnSrc) => {
   // Prompts hors ligne : mise en scène de l'arme et de l'armure.
   const promptArme = window.promptImageObjet(arme, "Une lame usée.", "STYLE_BDD");
   const promptArmure = window.promptImageObjet(armure, "Des mailles ternies.", "STYLE_BDD");
+  // Et le cas qui rendait des photos : les paramètres vides.
+  const promptSansStyle = window.promptImageObjet(arme, "Une lame usée.", "");
 
   // LE RÉGULATEUR DE DÉBIT. Trois créneaux de la minute en cours sont déjà
   // consommés par le butin ci-dessus. On abaisse le plafond à cinq : sur cinq
@@ -160,7 +166,15 @@ const res = await p.evaluate(async (fnSrc) => {
   await new Promise(r => setTimeout(r, 500));
   const lancesMalgreLePlafond = journal.openai.length - openaiApresRelance;
 
+  // LE STYLE TAPÉ DANS LES PARAMÈTRES, RELU APRÈS COUP. On vide le cache comme
+  // le fait le butin, et on y met la consigne telle qu'un joueur l'écrit
+  // parfois : une phrase d'adresse avant le style lui-même.
+  window.oublierStyleGraphique();
+  contenuDesParametres = "Tu fera ce dessin dans ce style : gouache épaisse sur papier grené";
+  const styleRelu = await window.styleGraphiqueIvalis();
+
   return {
+    styleRelu, promptSansStyle,
     avantTout, apresTout, aIllustrer,
     enVolMax: enVolMaxApres1,
     openaiApres1,
@@ -201,6 +215,27 @@ verifier("et surtout : personne dedans",
          /aucun corps/.test(res.promptArmure) && /aucun mannequin/.test(res.promptArmure));
 verifier("le style graphique de la partie est injecté",
          res.promptArme.includes("STYLE_BDD") && res.promptArmure.includes("STYLE_BDD"));
+// CE QUI RENDAIT DES OBJETS PHOTORÉALISTES. Le style des paramètres était
+// glissé au milieu du prompt, juste avant un bloc annoncé « PRIORITAIRE SUR
+// TOUT LE RESTE » : le dessinateur lisait la consigne puis s'entendait dire de
+// passer outre. Il ouvre désormais le prompt, et c'est lui qui prime.
+verifier("il OUVRE le prompt, avant même le nom de l'objet",
+         res.promptArme.indexOf("STYLE_BDD") < res.promptArme.indexOf("Épée courte")
+         && res.promptArme.indexOf("STYLE_BDD") < 120,
+         `(caractère ${res.promptArme.indexOf("STYLE_BDD")})`);
+verifier("et il est annoncé comme prioritaire sur le reste",
+         /DIRECTIVE DE STYLE VISUEL OBLIGATOIRE \(elle prime sur tout le reste/.test(res.promptArme));
+verifier("aucun autre bloc ne se dit prioritaire sur tout le reste",
+         !/PRIORITAIRE SUR TOUT LE RESTE/.test(res.promptArme)
+         && !/PRIORITAIRE SUR TOUT LE RESTE/.test(res.promptArmure));
+verifier("la photographie est interdite même quand un style est donné",
+         /N'EST PAS UNE PHOTOGRAPHIE/.test(res.promptArme) && /photoréaliste/.test(res.promptArme));
+verifier("paramètres vides : le prompt exige quand même une illustration dessinée",
+         /DIRECTIVE DE STYLE VISUEL OBLIGATOIRE/.test(res.promptSansStyle)
+         && /N'EST PAS UNE PHOTOGRAPHIE/.test(res.promptSansStyle)
+         && /peinte à la main/.test(res.promptSansStyle));
+verifier("une phrase d'adresse tapée dans les paramètres est retirée du style",
+         res.styleRelu === "gouache épaisse sur papier grené", `(« ${res.styleRelu} »)`);
 verifier("le cadrage carré est exigé", /Format strictement carré/.test(res.promptArme));
 verifier("un seul objet, aucun texte dessiné",
          /Un seul objet/.test(res.promptArme) && /aucun texte/.test(res.promptArme));
