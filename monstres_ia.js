@@ -26,7 +26,7 @@
 //  verrou se libère tout seul et un autre poste reprend si le premier
 //  disparaît en cours de route.
 // =========================================================================
-import { db } from "./firebase-config.js";
+import { db } from "./firebase-config.js?v=2";
 import {
     doc, getDoc, updateDoc, runTransaction
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";

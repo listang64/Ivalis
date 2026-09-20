@@ -27,7 +27,7 @@
 //  doit être répercutée ici : les endroits concernés sont signalés par
 //  "⚖️ règle Forge".
 // =========================================================================
-import { db } from "./firebase-config.js";
+import { db } from "./firebase-config.js?v=2";
 import {
     collection, doc, setDoc, updateDoc, onSnapshot, writeBatch
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";

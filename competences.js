@@ -1,7 +1,7 @@
 // =========================================================================
 //  IVALIS - MODULE DES COMPÉTENCES DE COMBAT
 // =========================================================================
-import { db } from "./firebase-config.js";
+import { db } from "./firebase-config.js?v=2";
 import { collection, getDocs, doc, setDoc, getDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // Variables globales pour le Deck interactif

@@ -2,7 +2,7 @@
 //  IVALIS - MODULE DE CRÉATION DE HÉROS (WIZARD ÉTAPE 0 & 1)
 // =========================================================================
 
-import { db } from "./firebase-config.js";
+import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 window.RACE_SELECTIONNEE_TEMP = "Humain"; // Par défaut

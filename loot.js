@@ -16,7 +16,7 @@
 //  même instant, exactement comme la file d'attente du combat.
 // =========================================================================
 
-import { db } from "./firebase-config.js";
+import { db } from "./firebase-config.js?v=2";
 import { doc, updateDoc, deleteField } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // =========================================================================

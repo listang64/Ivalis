@@ -33,6 +33,9 @@ await p.route('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js',
   contentType: 'application/javascript',
   headers: { 'Access-Control-Allow-Origin': '*' },
   body: `
+    // firebase-config.js fabrique la base avec des options (le transport sondé
+    // plutôt que subi, pour l'iPad) : le bouchon doit offrir cette porte-là.
+    export const initializeFirestore = () => ({});
     export const doc = (...a) => window.__fs.doc(...a);
     export const getDoc = (...a) => window.__fs.getDoc(...a);
     export const updateDoc = (...a) => window.__fs.updateDoc(...a);

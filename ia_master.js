@@ -2,7 +2,7 @@
 //  IVALIS - MOTEUR IA (Pré-chargement Backend + Mia + Narrateur + Batiment + PNJ)
 // =========================================================================
 
-import { db } from "./firebase-config.js";
+import { db } from "./firebase-config.js?v=2";
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // --- 1. LE BACKEND (Le radar qui scanne la zone avant l'IA) ---

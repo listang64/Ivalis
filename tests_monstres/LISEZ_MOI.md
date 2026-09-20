@@ -100,6 +100,7 @@ node titres_bannieres.mjs   # les noms de carte rétrécissent au lieu d'être c
 node bouton_forge.mjs       # le + de la Forge devient un sablier pendant l'attente
 node croix_suppression.mjs  # la croix rouge du mode dev efface une technique partout
 node mise_de_cote.mjs       # la case à cocher qui retire un héros du jeu, sans l'effacer
+node ecran_chargement.mjs   # le sceau, le préchargement, et le transport Firestore
 node compteurs_combattant.mjs # vitalité et énergie du combattant suivi, à chaque étape
 node pas_de_visionneuse.mjs # rien ne peut plus détourner « qui joue ? » vers une créature
 node stats_fiche.mjs        # les retouches de la fiche perso suivies jusqu'au combat
@@ -904,6 +905,61 @@ node compteurs_combattant.mjs # (ex jauges_panneau) mesurait la largeur de deux
                               # COMBAT_PV_* / COMBAT_FATIGUE_* que ces deux
                               # fonctions de jauge tiennent à jour, et que tout
                               # le moteur lit
+```
+
+## Le chargement sur iPad, et le sceau qui le couvre
+
+« Sur iPad et que sur iPad, au moment où je rentre le mot de passe pour charger
+une partie, ça met toujours au moins une minute avant de charger la page du
+jeu ; sur PC c'est instantané. »
+
+Trois causes, et elles s'additionnaient.
+
+**Le transport de Firestore.** Le client parle par défaut en WebChannel, un flux
+permanent. Quand ce flux ne peut pas s'établir — Safari sur iOS, un réseau
+mobile, un routeur qui coupe les connexions longues — il **ne renonce pas tout
+de suite** : il attend l'expiration du délai avant de retomber sur le long
+polling, qui, lui, passe partout. Cette attente-là, c'est la minute, et elle ne
+se voit pas sur PC où le flux s'établit du premier coup.
+`experimentalAutoDetectLongPolling` inverse l'ordre : le client SONDE la
+connexion et bascule tout de suite sur le transport qui marche. C'est ce que
+Firebase a fini par adopter par défaut dans les versions suivantes du SDK.
+
+**La playlist, en boucle.** Le repli de la musique tenait en une ligne : si
+`play()` est refusé, on passe au titre suivant. Aucun compteur, et la file se
+remplit toute seule quand elle se vide — un refus enchaînait donc les titres
+indéfiniment, et chaque essai appelle `load()`, qui va **chercher** le fichier.
+Mesuré dans un navigateur où la lecture ne peut pas aboutir : **2443 requêtes
+audio en neuf secondes**. Sur iOS, `play()` est refusé dès que le navigateur ne
+reconnaît pas de geste de l'utilisateur — et ce refus tombe pile au clic qui
+fait entrer dans le jeu. La salve partait donc en même temps que la connexion à
+la base et les images de la table. Après correction : 13.
+
+**Le fichier de configuration n'était pas versionné.** Les scripts de la page
+portent un numéro depuis toujours, mais pas ce qu'ILS importent : un module
+chargé par `import` est rangé sous son URL. Une tablette qui a déjà ouvert le
+jeu aurait continué de servir l'ancien `firebase-config.js` — le réglage
+ci-dessus ne serait jamais arrivé sur l'appareil pour lequel il a été écrit.
+
+**Et le reste du temps, on le déplace.** Il reste, sur une tablette, une
+trentaine d'images à décoder dont une carte de 2400 pixels de large. On ne peut
+pas les rendre gratuites ; on peut les décoder ailleurs que devant un joueur qui
+attend. Le **sceau d'Ivalis** — un écran noir au logo centré, cinq secondes en
+fondu, entre le clic d'accueil et l'écran de sélection du joueur — est le seul
+moment du lancement où personne n'attend rien. Les images y sont tirées, et la
+table des effets y trouve sa seconde chance si son premier tirage a échoué.
+
+Le bestiaire, lui, **n'est pas** préchargé : sa lecture amorce les gabarits
+manquants, donc elle écrit. Trois postes qui démarrent ensemble déclencheraient
+trois salves d'écritures à chaque lancement, pour un besoin qui ne se présente
+qu'au combat.
+
+Enfin, trois jalons chronométrés s'affichent dans la console — mot de passe
+vérifié, table de jeu dessinée, premières fiches reçues. Si la minute revient,
+ils disent où elle passe sans qu'on ait à brancher l'iPad sur un ordinateur.
+
+```sh
+node ecran_chargement.mjs   # le transport, le sceau, le préchargement, la playlist
 ```
 
 ## Fidélité à la Forge

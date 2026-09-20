@@ -49,6 +49,10 @@ const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd
 
 const FAUX_APP = `export const initializeApp = () => ({});`;
 const FAUX_FIRESTORE = `
+  // firebase-config.js fabrique la base avec des options (le transport sondé
+  // plutôt que subi, pour l'iPad) : le bouchon doit donc offrir cette porte-là,
+  // sinon le module ne se charge pas et rien du jeu ne s'initialise.
+  export const initializeFirestore = () => ({});
   export const getFirestore = () => ({});
   export const doc = (_db, col, id) => ({ chemin: col + "/" + id, col, id });
   export const collection = (_db, col) => ({ col });

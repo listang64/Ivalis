@@ -19,7 +19,7 @@
 //  toute écriture sur un combattant passe par window.refCombattant(), qui
 //  route vers la bonne collection.
 // =========================================================================
-import { db } from "./firebase-config.js";
+import { db } from "./firebase-config.js?v=2";
 import {
     collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, deleteField,
     onSnapshot, query, where, writeBatch

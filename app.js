@@ -14,7 +14,7 @@
 //  du navigateur, puis lues au moment de generer un portrait.
 // =========================================================================
 
-import { db } from "./firebase-config.js";
+import { db } from "./firebase-config.js?v=2";
 import { playlist } from "./playlist.js";
 import {
   collection,
@@ -2729,6 +2729,13 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
       persos.push(persoDocVersFront(document.id, document.data()));
     });
 
+    if (window.DEBUT_ECOUTE_PARTIE) {
+      console.log("⏱️ premières fiches reçues en "
+                  + (Date.now() - window.DEBUT_ECOUTE_PARTIE) + " ms"
+                  + " (" + persos.length + " personnage(s))");
+      window.DEBUT_ECOUTE_PARTIE = 0;
+    }
+
     window.PERSOS_JOUEURS_PARTIE = persos;
     // Les caractéristiques suivent les héros : c'est d'elles que dépend le droit
     // de porter un objet, et ce droit doit être le même sur tous les écrans.
@@ -3155,6 +3162,26 @@ function melangerPlaylist(tableau) {
   return copie;
 }
 
+// UNE LECTURE QUI ÉCHOUE NE DOIT PAS EMPORTER TOUTE LA PLAYLIST AVEC ELLE.
+//
+// Le repli tenait en une ligne : si `play()` est refusé, on passe au titre
+// suivant. Sauf qu'il n'y avait AUCUN compteur, et que la file se remplit toute
+// seule quand elle se vide. Un refus enchaînait donc les titres sans reprendre
+// son souffle, en boucle, indéfiniment — et chaque essai appelle `load()`, qui
+// va CHERCHER le fichier. Mesuré dans un navigateur où la lecture ne peut pas
+// aboutir : plus de deux mille requêtes audio en neuf secondes.
+//
+// Ce n'est pas une curiosité de banc. Sur iOS, `play()` est refusé dès que le
+// navigateur ne reconnaît pas de geste de l'utilisateur — et ce refus tombe
+// pile au clic qui fait entrer dans le jeu. La salve de téléchargements audio
+// partait donc exactement en même temps que la connexion à la base et les
+// images de la table, sur la liaison la plus lente des trois postes.
+//
+// Deux garde-fous : un refus d'autoplay arrête tout (rien ne marchera tant que
+// le joueur n'aura pas touché l'écran), et un titre illisible ne fait essayer
+// que le suivant, au plus une fois par titre de la playlist.
+let echecsMusiqueDAffilee = 0;
+
 function jouerProchaineMusique() {
   const musique = document.getElementById("musique-ambiance");
   if (!musique) return;
@@ -3170,11 +3197,126 @@ function jouerProchaineMusique() {
   const prochainTitre = fileAttenteMusique.shift();
   musique.src = prochainTitre;
   musique.load();
-  musique.play().catch((e) => {
+  musique.play().then(() => {
+    echecsMusiqueDAffilee = 0;      // ça joue : le compteur repart de zéro
+  }).catch((e) => {
+    // L'AUTOPLAY REFUSÉ N'EST PAS UNE PANNE, et surtout ce n'est pas le titre
+    // qui est en cause : essayer le suivant ne peut que redonner le même refus.
+    // La musique repartira à la prochaine musique demandée, après un vrai geste.
+    if (e && e.name === "NotAllowedError") {
+      console.warn("Musique d'ambiance en attente d'un geste du joueur.");
+      return;
+    }
     console.error("Impossible de lire la musique d'ambiance :", e);
+    echecsMusiqueDAffilee++;
+    if (echecsMusiqueDAffilee >= (playlist ? playlist.length : 1)) {
+      console.warn("Aucun titre de la playlist n'est lisible : on renonce.");
+      echecsMusiqueDAffilee = 0;
+      return;
+    }
     jouerProchaineMusique();
   });
 }
+
+// =========================================================================
+//  LE PRÉCHARGEMENT, DERRIÈRE LE SCEAU
+// =========================================================================
+//  « Sur iPad et que sur iPad, ça met toujours au moins une minute avant de
+//  charger la page du jeu ; sur PC c'est instantané. »
+//
+//  La cause principale était ailleurs (le transport de Firestore, voir
+//  firebase-config.js). Mais il reste, sur une tablette, un vrai travail à
+//  faire avant que la table de jeu s'affiche : décoder une trentaine d'images,
+//  dont la carte en 2400 pixels de large. Un iPad y met plusieurs secondes là
+//  où un PC n'y met rien, et ces secondes-là tombaient au pire moment — juste
+//  après le mot de passe, quand le joueur attend.
+//
+//  On les déplace. Les cinq secondes du sceau sont le seul moment du lancement
+//  où personne n'attend quoi que ce soit : c'est là qu'on décode les images, et
+//  là qu'on redonne sa chance à la table des effets si son premier tirage a
+//  échoué.
+//
+//  RIEN ICI NE DOIT POUVOIR RETARDER OU CASSER L'ENTRÉE DANS LE JEU. Aucun
+//  appel n'est attendu, chaque échec est avalé : au pire, le préchargement n'a
+//  pas eu lieu et le jeu se charge comme avant.
+window.PRECHARGEMENT_FAIT = false;
+// Ce que le préchargement a fait, en clair : combien d'images et en combien de
+// temps. C'est la première chose à lire quand un poste se traîne.
+window.PRECHARGEMENT_INFO = { images: 0, ms: 0 };
+
+// Les images que la page déclare, qu'elles soient dans une balise ou dans une
+// règle de style. On les RAMASSE plutôt que de les lister : une liste écrite à
+// la main serait fausse à la première image ajoutée.
+function imagesDeLaPage() {
+    const urls = new Set();
+    document.querySelectorAll('img[src^="https://res.cloudinary.com"]')
+        .forEach(img => urls.add(img.src));
+    // Les fonds ne sont nulle part dans le DOM : ils vivent dans la feuille de
+    // style, et c'est là que se trouve la plus lourde de toutes (la carte).
+    for (const feuille of document.styleSheets) {
+        let regles;
+        try { regles = feuille.cssRules; } catch (e) { continue; }   // feuille d'un autre domaine
+        if (!regles) continue;
+        for (const regle of regles) {
+            const fond = regle.style && regle.style.backgroundImage;
+            if (!fond) continue;
+            const trouve = fond.match(/url\(["']?(https:\/\/res\.cloudinary\.com[^"')]+)/);
+            if (trouve) urls.add(trouve[1]);
+        }
+    }
+    return [...urls];
+}
+
+// Six à la fois, pas trente. Une tablette qui ouvre trente connexions d'un coup
+// les fait toutes attendre, et la première image utile arrive plus tard que si
+// on avait pris son temps.
+async function prechargerImages(urls, front = 6) {
+    let i = 0;
+    const suivante = async () => {
+        while (i < urls.length) {
+            const url = urls[i++];
+            await new Promise(resolve => {
+                const img = new Image();
+                img.onload = img.onerror = () => resolve();
+                img.src = url;
+            });
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(front, urls.length) }, suivante));
+}
+
+window.prechargerLeJeu = async function() {
+    if (window.PRECHARGEMENT_FAIT) return;
+    window.PRECHARGEMENT_FAIT = true;
+    const depart = Date.now();
+
+    const images = imagesDeLaPage();
+    window.PRECHARGEMENT_INFO.images = images.length;
+    const travaux = [prechargerImages(images).catch(() => {})];
+
+    // LA TABLE DES EFFETS, MAIS SEULEMENT SI ELLE MANQUE. Elle est déjà tirée
+    // au chargement de la page — sauf que ce tirage-là avale ses erreurs sans
+    // rien retenter, et qu'au chargement la connexion à la base n'est pas
+    // toujours établie. Ici, c'est sa seconde chance : on ne redemande que si le
+    // cache est vide, pour ne pas payer une lecture entière à chaque lancement.
+    //
+    // ON NE PRÉCHARGE PAS LE BESTIAIRE, et c'est délibéré : sa lecture AMORCE
+    // les gabarits manquants, donc elle ÉCRIT. Trois postes qui démarrent
+    // ensemble déclencheraient trois salves d'écritures à chaque lancement pour
+    // un besoin qui ne se présente qu'au combat — où il est déjà couvert.
+    const effetsVides = !window.EFFETS_BDD_CACHE
+        || Object.keys(window.EFFETS_BDD_CACHE).length === 0;
+    if (effetsVides && typeof window.chargerCacheEffetsBDD === "function") {
+        travaux.push(Promise.resolve()
+            .then(() => window.chargerCacheEffetsBDD())
+            .catch(e => console.warn("Préchargement des effets :", e)));
+    }
+
+    await Promise.all(travaux);
+    window.PRECHARGEMENT_INFO.ms = Date.now() - depart;
+    console.log("⏳ Préchargement terminé en " + window.PRECHARGEMENT_INFO.ms + " ms"
+                + " (" + window.PRECHARGEMENT_INFO.images + " images)");
+};
 
 function entrerDansLeJeu() {
   const accueil = document.getElementById("ecran-accueil");
@@ -3195,12 +3337,40 @@ function entrerDansLeJeu() {
 
   accueil.style.opacity = "0";
 
-  setTimeout(() => {
-    accueil.style.display = "none";
+  const sceau = document.getElementById("ecran-sceau");
+  const identification = () => {
     document.querySelector(".titre-etranger").classList.add("visible");
     setTimeout(() => {
       document.getElementById("liste-noms-joueurs").classList.add("visible");
     }, 2500);
+  };
+
+  setTimeout(() => {
+    accueil.style.display = "none";
+
+    // Pas de sceau dans la page (un banc, une vieille version en cache) : on
+    // enchaîne comme avant plutôt que de laisser le joueur sur un écran vide.
+    if (!sceau) { identification(); return; }
+
+    // LE TRAVAIL COMMENCE AVANT LE FONDU, pas après. Les cinq secondes sont
+    // pour l'œil du joueur ; la tablette, elle, n'a aucune raison d'attendre.
+    window.prechargerLeJeu();
+
+    sceau.style.display = "flex";
+    // Un reflow avant de monter l'opacité, sinon le fondu d'entrée est sauté :
+    // le navigateur verrait l'affichage et l'opacité changer dans le même
+    // souffle et n'aurait rien à interpoler.
+    void sceau.offsetWidth;
+    sceau.style.opacity = "1";
+
+    // Une seconde de fondu, cinq secondes en face, une seconde pour s'en aller.
+    setTimeout(() => {
+      sceau.style.opacity = "0";
+      setTimeout(() => {
+        sceau.style.display = "none";
+        identification();
+      }, 1000);
+    }, 1000 + 5000);
   }, 1500);
 }
 
@@ -3323,8 +3493,15 @@ async function validerMdpPartie() {
   const btnValider = document.getElementById("btn-valider-mdp-partie");
   const idPartie = window.ID_PARTIE_EN_ATTENTE;
 
+  // LE CHEMIN DE CHARGEMENT SE CHRONOMÈTRE, parce qu'il a déjà coûté une minute
+  // sur un iPad sans qu'on puisse dire OÙ. Ces trois mesures répondent à la
+  // seule question qui compte : est-ce la base qui met du temps à répondre, ou
+  // l'écran qui met du temps à se dessiner ? Elles ne coûtent rien et elles
+  // tiennent en trois lignes de console à recopier.
+  const depart = Date.now();
   btnValider.innerText = "Vérification...";
   const estValide = await verifierMotDePassePartie(idPartie, saisie);
+  console.log("⏱️ mot de passe vérifié en " + (Date.now() - depart) + " ms");
   btnValider.innerText = "Déverrouiller";
 
   if (estValide) {
@@ -3336,13 +3513,16 @@ async function validerMdpPartie() {
 }
 
 function lancerPartieChargee(idChoisi) {
+  const depart = Date.now();
   window.ID_PARTIE_COURANTE = idChoisi;
   fermerModales();
   document.getElementById("ecran-menu").style.display = "none";
   document.getElementById("ecran-jeu").style.display = "block";
   // NOUVEAU : On trace la grille à la seconde où l'écran s'affiche
   window.dessinerGrilleHexagonale();
+  console.log("⏱️ table de jeu dessinée en " + (Date.now() - depart) + " ms");
   // CORRECTION BUG DRAPEAU : On charge immédiatement les données de la partie pour placer le pion !
+  window.DEBUT_ECOUTE_PARTIE = Date.now();
   ecouterPersonnagesDeLaPartie(window.ID_PARTIE_COURANTE);
 }
 

@@ -18,7 +18,7 @@
 //  s'afficheront avec leur icône, comme avant.
 // =========================================================================
 
-import { db } from "./firebase-config.js";
+import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 const dormir = (ms) => new Promise(r => setTimeout(r, ms));
