@@ -22,6 +22,9 @@ function extraire(fichier, marqueur, finLigne = '};') {
     return lignes.slice(d, f + 1).join('\n');
 }
 const SRC = ['window.positionsProtegees = function',
+             // C'est elle qui répond « qui sont mes héros ? », et le
+             // rafraîchissement s'en sert pour refaire la liste du poste.
+             'window.herosDuJoueur = function',
              'window.rafraichirAffichageCombat = function',
              'window.demarrerTicAffichageCombat = function',
              'window.arreterTicAffichageCombat = function',
@@ -81,6 +84,16 @@ const res = await p.evaluate((src) => {
     const listeApres = window.COMBAT_PERSOS_JOUEUR.map(x => x.idPersonnage);
     const selection = (window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO] || {}).idPersonnage;
 
+    // UN LEURRE POSÉ PAR UN DE MES HÉROS ARRIVE PAR LE RÉSEAU. Il porte SON
+    // ID_Joueur — c'est ce qui permet d'effacer ses illusions avec lui — et il
+    // n'est pas une créature. Le filtre « même joueur », seul, le faisait entrer
+    // dans mes héros : le bloc du bouton de fin de tour basculait alors sur le
+    // leurre, avec son avatar, son nom, et 1 point de vie sur 1.
+    const leurre = { ...fiche("ILLUSION_x", "P1", 0), estIllusion: true, PV_Max: 1, PV_Actuels: 1 };
+    window.PERSOS_PARTIE = [fiche("J1", "P1", 18), leurre, fiche("J3", "P1", 90), fiche("J2", "P2", 100)];
+    window.rafraichirAffichageCombat();
+    const avecIllusion = window.COMBAT_PERSOS_JOUEUR.map(x => x.idPersonnage);
+
     window.TOKENS_VTT_DATA = { J1: { q: 0, r: 0, taille: 55 }, J2: { q: 5, r: 5, taille: 55 } };
     const arrivee = { J1: { q: 4, r: 0, taille: 55 }, J2: { q: 5, r: 5, taille: 55 } };
 
@@ -106,7 +119,7 @@ const res = await p.evaluate((src) => {
         await window.enregistrerPionsVTT("J1");
         const sansTrajet = journal.ecritures[journal.ecritures.length - 1];
 
-        return { avantRafraichissement, apresRafraichissement, listeApres, selection,
+        return { avantRafraichissement, apresRafraichissement, listeApres, selection, avecIllusion,
                  sansAnnonce: sansAnnonce.J1, avecAnnonce: avecAnnonce.J1,
                  apresAnimation: apresAnimation.J1, pendantMarche: pendantMarche.J1, vieille: vieille.J1,
                  voisinIntact: avecAnnonce.J2,
@@ -130,6 +143,8 @@ verifier("et la piste d'initiative avec elles, à chaque fois",
          res.pistes === res.jauges.length / 2, `(${res.pistes} piste(s) pour ${res.jauges.length} jauge(s))`);
 verifier("un héros qui rejoint en cours de combat entre dans la liste du poste",
          res.listeApres.join(",") === "J1,J3", `(${res.listeApres.join(",")})`);
+verifier("MAIS UNE ILLUSION N'Y ENTRE PAS, même sous mon nom de joueur",
+         res.avecIllusion.join(",") === "J1,J3", `(${res.avecIllusion.join(",")})`);
 verifier("sans faire sauter la sélection en cours",
          res.selection === "J1", `(${res.selection})`);
 // LE CONTRÔLE « LE PANNEAU QUI MONTRE UNE CRÉATURE N'EST PAS VOLÉ » A DISPARU

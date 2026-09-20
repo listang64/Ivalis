@@ -395,5 +395,63 @@ console.log("\n9. LA CLÉ D'UN TOUR");
              spectateur.enAttente() && spectateur.enAttente().v === 3);
 }
 
+// =========================================================================
+console.log("\n10. UN OK N'ACQUITTE QUE LE TOUR QU'IL OUVRE");
+// =========================================================================
+//  SIGNALÉ EN PARTIE : « un tour d'un ennemi sauté ». Le journal du poste le
+//  montrait noir sur blanc — le n°12 de MONSTRE_2w1c8ag (manche 3) avait reçu
+//  son OK, puis, trente secondes et une ouverture de manche plus tard, son n°14
+//  s'était déroulé SANS AUCUNE FENÊTRE. La créature bougeait sous les yeux du
+//  joueur sans que rien ne l'annonce.
+//
+//  L'acquittement porte sur (acteur, manche) — c'est voulu : un tour se publie
+//  en plusieurs pas, et il serait absurde de redemander le OK entre deux. Mais
+//  il n'était JAMAIS levé. Ce couple-là revient : une manche rouverte sous le
+//  même numéro, une créature qui rejoue. Toutes ses entrées ultérieures
+//  passaient alors en silence, jusqu'à la fin du combat.
+{
+    const { spectateur, vu } = creerEcran("P_03");
+    spectateur.repartirDe(monde(), 0);
+
+    // Le tour de la créature : la fenêtre s'ouvre, le joueur donne le OK.
+    spectateur.recevoir([{ v: 1, acteur: "M1", manche: 3,
+                           etapes: [{ type: "pas", acteur: "M1", vers: { q: 2, r: 0 } }] }]);
+    await spectateur.lire();
+    verifier("la fenêtre s'ouvre sur le tour de la créature",
+             spectateur.enAttente() && spectateur.enAttente().v === 1);
+    await spectateur.ok();
+
+    // Puis un tour à moi, et une ouverture de manche — deux entrées qui ne
+    // demandent pas le OK, et qui séparent les deux tours de la créature.
+    spectateur.recevoir([
+        { v: 2, acteur: "H1", manche: 3, etapes: [{ type: "degats", cible: "M1", pvApres: 30 }] },
+        { v: 3, manche: 3, etapes: [{ type: "file", file: [] }] }
+    ]);
+    await spectateur.lire();
+    verifier("mon tour et l'ouverture de manche passent sans fenêtre",
+             spectateur.vue() === 3 && !spectateur.enAttente(), `(vue ${spectateur.vue()})`);
+
+    // ET LA MÊME CRÉATURE, DANS LA MÊME MANCHE, REJOUE.
+    const avant = vu.fenetres.filter(f => f !== null).length;
+    spectateur.recevoir([{ v: 4, acteur: "M1", manche: 3,
+                           etapes: [{ type: "pas", acteur: "M1", vers: { q: 1, r: 0 } }] }]);
+    await spectateur.lire();
+    verifier("SON SECOND TOUR REDEMANDE LE OK, il ne se joue pas en douce",
+             !!spectateur.enAttente() && spectateur.enAttente().v === 4,
+             spectateur.enAttente() ? "n°" + spectateur.enAttente().v : `joué en silence (vue ${spectateur.vue()})`);
+    verifier("et la fenêtre s'est bien rouverte",
+             vu.fenetres.filter(f => f !== null).length === avant + 1);
+
+    // L'acquittement d'UN tour couvre toujours toutes ses entrées : c'est
+    // l'autre moitié de la règle, et sans elle on redemanderait le OK entre
+    // deux pas du même tour.
+    await spectateur.ok();
+    spectateur.recevoir([{ v: 5, acteur: "M1", manche: 3,
+                           etapes: [{ type: "degats", cible: "H1", pvApres: 20 }] }]);
+    await spectateur.lire();
+    verifier("mais la suite du MÊME tour ne redemande rien",
+             spectateur.vue() === 5 && !spectateur.enAttente(), `(vue ${spectateur.vue()})`);
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

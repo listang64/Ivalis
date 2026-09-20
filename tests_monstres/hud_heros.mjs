@@ -107,8 +107,19 @@ await p.evaluate(() => {
       Bouclier_Actuel: 0, Bouclier_Max: 0, Etats_Alteres: [], statut: "Vivant" },
     { idPersonnage: "M1", camp: "Ennemi", estMonstre: true, prenom: "Gnoll",
       PV_Max: 40, PV_Actuels: 12, Fatigue_Max: 60, fatigueActuelle: 10,
+      Bouclier_Actuel: 0, Etats_Alteres: [], statut: "Vivant" },
+    // UN LEURRE POSÉ PAR MON HÉROS. Il porte SON ID_Joueur — à dessein : c'est
+    // ce qui permet d'effacer ses illusions avec lui. Et il n'est pas une
+    // créature. Tout ce qui demandait « mes héros » par le seul filtre du
+    // joueur le ramassait donc avec eux.
+    { idPersonnage: "ILLUSION_abc", camp: "Allié", idJoueur: "P_01", estIllusion: true,
+      prenom: "Illusion de", nom: "Cybile",
+      urlCloudinary: "https://res.cloudinary.com/dlkjq4kvg/image/upload/leurre.png",
+      PV_Max: 1, PV_Actuels: 1, Fatigue_Max: 0, fatigueActuelle: 0,
       Bouclier_Actuel: 0, Etats_Alteres: [], statut: "Vivant" }
   ];
+  window.PERSOS_PARTIE[0].idJoueur = "P_01";
+  try { localStorage.setItem("ID_JOUEUR_COURANT", "P_01"); } catch (e) {}
   window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[0]];
   window.COMBAT_INDEX_PERSO = 0;
   window.PARTIE_DATA = { Phase_Combat: "Preparation", Tour_Combat: 1,
@@ -264,6 +275,53 @@ console.log("=========================================================");
   verifier("SANS HÉROS, LE BLOC S'EFFACE au lieu de montrer la créature",
            v.valGauche === "–" && v.valDroite === "–", `${v.valGauche} / ${v.valDroite}`);
   verifier("et il n'affiche aucun nom", v.nom.trim() === "", `« ${v.nom} »`);
+
+  await p.evaluate(() => {
+    window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[0]];
+    window.COMBAT_INDEX_PERSO = 0;
+    window.actualiserHudHeros();
+  });
+  await p.waitForTimeout(300);
+
+  // === UNE ILLUSION N'EST PAS UN HÉROS ==================================
+  //
+  // Signalé en partie : « quand j'ai créé une illusion, l'avatar, le nom et les
+  // jauges ont changé au-dessus de mon bouton fin de tour ». Le leurre porte
+  // l'ID_Joueur de son lanceur et n'est pas une créature : le filtre « même
+  // joueur » le faisait entrer dans la liste des héros du poste, et le bloc
+  // basculait sur lui — son avatar, son nom, et 1 point de vie sur 1.
+  const leurre = await p.evaluate(async () => {
+    // La liste se refait exactement comme à l'ouverture du combat.
+    window.initialiserPersosCombat();
+    window.actualiserHudHeros();
+    await new Promise(r => setTimeout(r, 400));
+    return { liste: (window.COMBAT_PERSOS_JOUEUR || []).map(h => h.idPersonnage),
+             herosDuJoueur: window.herosDuJoueur("P_01").map(h => h.idPersonnage) };
+  });
+  verifier("le leurre n'entre pas dans les héros du poste",
+           JSON.stringify(leurre.liste) === JSON.stringify(["H1"]), JSON.stringify(leurre.liste));
+  verifier("ni dans la lecture qui répond « mes héros »",
+           JSON.stringify(leurre.herosDuJoueur) === JSON.stringify(["H1"]),
+           JSON.stringify(leurre.herosDuJoueur));
+
+  v = await lire();
+  verifier("LE BLOC RESTE SUR MON HÉROS, PAS SUR SON ILLUSION",
+           v.valGauche === "45" && v.nom.toLowerCase() === "cybile",
+           `${v.valGauche} / « ${v.nom} » (le leurre est à 1)`);
+
+  // Et même si le leurre force le passage jusque dans la liste, le bloc le
+  // refuse : c'est le seul endroit où l'erreur se VOIT.
+  const force = await p.evaluate(async () => {
+    const illusion = window.PERSOS_PARTIE.find(p => p.estIllusion);
+    window.COMBAT_PERSOS_JOUEUR = [illusion, window.PERSOS_PARTIE[0]];
+    window.COMBAT_INDEX_PERSO = 0;
+    window.actualiserHudHeros();
+    await new Promise(r => setTimeout(r, 400));
+  });
+  v = await lire();
+  verifier("et il le refuse même glissé de force dans la liste",
+           v.valGauche === "45" && v.nom.toLowerCase() === "cybile",
+           `${v.valGauche} / « ${v.nom} »`);
 
   await p.evaluate(() => {
     window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[0]];

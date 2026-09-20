@@ -31,7 +31,19 @@ const srcVoile  = bloc('window.donneesCarteCombattant = function', 'window.rafra
 const { chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs');
 const b = await chromium.launch();
 const p = await b.newPage({ viewport: { width: 1366, height: 1024 }, deviceScaleFactor: 2 });
-await p.route('**', r => r.request().url().startsWith('file:') ? r.continue() : r.abort());
+// Cloudinary est injoignable d'ici, et les proportions des portraits comptent :
+// on sert des images BOUCHONS de dimensions connues, pour pouvoir mesurer ce qui
+// est réellement dessiné et pas seulement ce qui est écrit dans un style.
+const svg = (w, h, c) => ({ contentType: 'image/svg+xml',
+  body: `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="${w}" height="${h}" fill="${c}"/></svg>` });
+await p.route('**', r => {
+  const u = r.request().url();
+  if (u.startsWith('file:')) return r.continue();
+  if (/pliors|naomi/.test(u)) return r.fulfill(svg(300, 800, '#48c'));   // un portrait debout
+  if (/Les_humains|token/i.test(u)) return r.fulfill(svg(200, 200, '#c44')); // un pion carré
+  if (/IMG_2122/.test(u)) return r.fulfill(svg(1520, 520, '#111'));      // la plaque
+  return r.abort();
+});
 const erreurs = []; p.on('pageerror', e => erreurs.push(e.message));
 await p.goto('file:///home/user/Ivalis/index.html');
 await p.waitForTimeout(300);
@@ -74,6 +86,12 @@ const res = await p.evaluate(async ({ sVoile, sSequence }) => {
     // JADE N'A PAS DE PORTRAIT, et c'est volontaire : un héros sans avatar doit
     // retomber sur le médaillon, pas sur un avatar en pied vide.
     { idPersonnage: "H2", prenom: "Jade", nom: "", idJoueur: "poste-ipad", couleur: "#7bd66a", Etats_Alteres: [] },
+    // NAOMI EST LE HÉROS D'UN AUTRE POSTE, ET ELLE A UN PORTRAIT. Signalé en
+    // partie : « mon frère, je ne vois pas son avatar à son tour ». Sans elle,
+    // le seul héros en pied du banc était celui de CE poste, et le cas restait
+    // aveugle.
+    { idPersonnage: "H3", prenom: "Naomi", nom: "", idJoueur: "poste-ipad", couleur: "#d6a06a",
+      urlCloudinary: "https://res.cloudinary.com/x/naomi.png", Etats_Alteres: [] },
     { idPersonnage: "M1", prenom: "Goule", nom: "putride", estMonstre: true, Etats_Alteres: [
         { nom: "Saignement", duree: 2, icone, desc: "3 dégâts par tour" },
         { nom: "Brûlure", duree: 1, icone, desc: "5 dégâts par tour" } ] }
@@ -503,6 +521,12 @@ console.log("\n  LE PORTRAIT : MÉDAILLON OU AVATAR EN PIED");
             document.getElementById("voile-tour-encart").getBoundingClientRect().bottom
             - boite.getBoundingClientRect().bottom),
         hauteurImg: Math.round(img.getBoundingClientRect().height),
+        largeurImg: Math.round(img.getBoundingClientRect().width),
+        // LES MESURES POSÉES, telles quelles. C'est là que se lisait le défaut :
+        // une forme qui portait encore la géométrie de l'autre.
+        hauteurPosee: img.style.height || "",
+        largeurBoite: boite.style.width || "",
+        plaque: Math.round(document.getElementById("voile-tour-encart").getBoundingClientRect().width),
         source: img.dataset.url || ""
       };
     };
@@ -523,7 +547,41 @@ console.log("\n  LE PORTRAIT : MÉDAILLON OU AVATAR EN PIED");
     await new Promise(r => setTimeout(r, 200));
     const avecPortrait = lire();
 
-    return { creature, sansPortrait, avecPortrait };
+    // LE HÉROS D'UN AUTRE POSTE, qui a lui aussi un portrait.
+    poser([{ idPersonnage: "H3", idCarte: "CARTE_H", initiative: 65, timestamp: 40 }]);
+    await new Promise(r => setTimeout(r, 200));
+    const autreJoueur = lire();
+
+    // === LE CAS QUI A CASSÉ, ET QUI ARRIVE À CHAQUE TOUR ==================
+    // Entre deux tours, la fenêtre se retire POUR DE BON : son display repasse
+    // à `none` au bout du fondu. Le tour suivant trouvait donc une plaque sans
+    // largeur mesurable, et tout ce qui se pose dessus est un pourcentage de
+    // cette largeur. La pose échouait en silence et le portrait gardait les
+    // mesures de la forme précédente.
+    const retirer = async () => {
+      window.PARTIE_DATA = { Tour_Combat: 1, File_Attente_Combat: [], Phase_Combat: "Preparation" };
+      window.rafraichirVoileTour();
+      await new Promise(r => setTimeout(r, 700));    // le temps du retrait complet
+    };
+
+    // LES DEUX SENS DU CHANGEMENT DE FORME, chacun sur une plaque froide. Il
+    // faut poser la forme OPPOSÉE avant chaque retrait : sans changement de
+    // forme, il n'y a rien à reposer, et le contrôle passerait à vide.
+    poser([{ idPersonnage: "M1", idCarte: "CARTE_M", initiative: 55, timestamp: 10 }]);
+    await new Promise(r => setTimeout(r, 200));
+    await retirer();
+    const retraitConfirme = document.getElementById("voile-tour-combat").style.display === "none";
+    poser([{ idPersonnage: "H1", idCarte: "CARTE_H", initiative: 70, timestamp: 20 }]);
+    await new Promise(r => setTimeout(r, 300));
+    const herosAFroid = lire();          // médaillon → avatar, plaque non mesurable
+
+    await retirer();
+    poser([{ idPersonnage: "M1", idCarte: "CARTE_M", initiative: 55, timestamp: 10 }]);
+    await new Promise(r => setTimeout(r, 300));
+    const creatureAFroid = lire();       // avatar → médaillon, plaque non mesurable
+
+    return { creature, sansPortrait, avecPortrait, autreJoueur,
+             retraitConfirme, herosAFroid, creatureAFroid };
   }, [srcVoile, srcSequence]);
 
   verifier("une créature garde son médaillon", formes.creature.enPied === false);
@@ -547,6 +605,46 @@ console.log("\n  LE PORTRAIT : MÉDAILLON OU AVATAR EN PIED");
            `${formes.creature.hauteurImg}px → ${formes.avecPortrait.hauteurImg}px`);
   verifier("c'est bien SON portrait qui est chargé",
            /pliors/.test(formes.avecPortrait.source), formes.avecPortrait.source.slice(-30));
+
+  // LE HÉROS D'UN AUTRE POSTE A DROIT AU MÊME TRAITEMENT. « Mon frère, je ne
+  // vois pas son avatar à son tour » : l'encart annonce QUI JOUE, et ce n'est
+  // presque jamais nous.
+  verifier("LE HÉROS D'UN AUTRE POSTE A SON AVATAR EN PIED, LUI AUSSI",
+           formes.autreJoueur.enPied === true);
+  verifier("et c'est bien SON portrait, pas le mien",
+           /naomi/.test(formes.autreJoueur.source), formes.autreJoueur.source.slice(-30));
+
+  // =======================================================================
+  // LA FENÊTRE S'EST RETIRÉE ENTRE LES DEUX TOURS
+  // =======================================================================
+  //  Deux défauts signalés, une seule cause. Tout ce qui se pose sur la plaque
+  //  est un POURCENTAGE de sa largeur rendue ; la fenêtre ne devenait visible
+  //  qu'à la toute fin du rafraîchissement, et le tour suivant trouvait donc une
+  //  plaque de largeur nulle. La pose renonçait, et le portrait gardait les
+  //  mesures de la forme PRÉCÉDENTE : le médaillon d'une créature héritait de la
+  //  hauteur d'un avatar en pied et sortait deux fois trop gros, l'avatar d'un
+  //  héros perdait la sienne et se dessinait à la taille brute de son image.
+  //
+  //  ON NE MESURE PAS UNE CLASSE : on mesure ce que le navigateur dessine, et on
+  //  le compare au même portrait posé à chaud.
+  verifier("la fenêtre s'était bien retirée pour de bon", formes.retraitConfirme);
+  verifier("LE PORTRAIT DU HÉROS GARDE SA TAILLE APRÈS UN RETRAIT",
+           formes.herosAFroid.hauteurImg === formes.avecPortrait.hauteurImg
+           && formes.herosAFroid.largeurImg === formes.avecPortrait.largeurImg,
+           `${formes.herosAFroid.largeurImg}x${formes.herosAFroid.hauteurImg}`
+           + ` au lieu de ${formes.avecPortrait.largeurImg}x${formes.avecPortrait.hauteurImg}`);
+  verifier("LE MÉDAILLON DE LA CRÉATURE AUSSI",
+           formes.creatureAFroid.hauteurImg === formes.creature.hauteurImg
+           && formes.creatureAFroid.largeurImg === formes.creature.largeurImg,
+           `${formes.creatureAFroid.largeurImg}x${formes.creatureAFroid.hauteurImg}`
+           + ` au lieu de ${formes.creature.largeurImg}x${formes.creature.hauteurImg}`);
+  verifier("et aucune des deux formes ne porte les mesures de l'autre",
+           formes.herosAFroid.largeurBoite === "auto"
+           && parseFloat(formes.herosAFroid.hauteurPosee) > 0
+           && formes.creatureAFroid.largeurBoite.endsWith("%")
+           && formes.creatureAFroid.hauteurPosee === "",
+           `héros [${formes.herosAFroid.largeurBoite} / ${formes.herosAFroid.hauteurPosee || "—"}]`
+           + ` créature [${formes.creatureAFroid.largeurBoite} / ${formes.creatureAFroid.hauteurPosee || "—"}]`);
 }
 
 await b.close();

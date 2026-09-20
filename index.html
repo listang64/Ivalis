@@ -1795,8 +1795,8 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=12"></script>
-<script src="reglages_hud.js?v=9"></script>
+<script src="trace_combat.js?v=13"></script>
+<script src="reglages_hud.js?v=10"></script>
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
@@ -1810,7 +1810,7 @@
 <script type="module" src="cerveau_combat.js?v=16"></script>
 <!-- LE SPECTATEUR : la boucle de rejeu. Elle lit le journal du cerveau, ouvre
      la fenêtre de tour, anime PUIS applique, et ne saute jamais un numéro. -->
-<script type="module" src="spectateur_combat.js?v=5"></script>
+<script type="module" src="spectateur_combat.js?v=6"></script>
 <!-- LE DÉPÔT : la seule chose qui écrive pendant un combat. Un pas = un lot,
      et le lot porte l'état, l'entrée de journal et la fermeture de l'intention. -->
 <script type="module" src="depot_firestore.js?v=6"></script>
@@ -1827,7 +1827,7 @@
 <script type="module" src="competences.js?v=23"></script>
 <script src="Plateau.js"></script>
 <script type="module" src="sequence_tour.js?v=22"></script>
-<script type="module" src="combat.js?v=76"></script>
+<script type="module" src="combat.js?v=77"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=22"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->

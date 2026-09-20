@@ -406,15 +406,33 @@ window.fermerCombat = function() {
     if (typeof window.reprendreSynchroCanvas === "function") window.reprendreSynchroCanvas();
 };
 
+// LES HÉROS D'UN POSTE, ET RIEN D'AUTRE.
+//
+// UNE ILLUSION N'EST PAS UN HÉROS, même si elle porte l'ID_Joueur de celui qui
+// l'a lancée — et elle le porte à dessein : c'est ce qui permet d'effacer ses
+// leurres avec lui. Mais le simple filtre « même joueur » la faisait entrer dans
+// la liste des héros de ce poste, et comme elle n'est pas une créature non plus
+// (estMonstre est faux sur un leurre), plus rien ne l'arrêtait : le bloc du
+// héros basculait sur le leurre — son avatar, son nom, et ses jauges à 1 point
+// de vie sur 1, sans énergie. Signalé en partie : « quand j'ai créé une
+// illusion, l'avatar, le nom et les jauges ont changé au-dessus de mon bouton
+// fin de tour ».
+//
+// Une illusion est un leurre posé sur le plateau : le moteur doit la voir dans
+// PERSOS_PARTIE pour qu'on puisse la viser et la faire tomber, mais elle n'a de
+// fiche à montrer nulle part. Une seule lecture répond donc à « qui sont mes
+// héros ? », et tout ce qui se pose la question passe par elle.
+window.herosDuJoueur = function(idJoueur) {
+    if (!idJoueur) return [];
+    return (window.PERSOS_PARTIE || [])
+        .filter(p => p && p.idJoueur === idJoueur && !p.estMonstre && !p.estIllusion);
+};
+
 window.initialiserPersosCombat = function() {
     const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
-    
-    if (window.PERSOS_PARTIE && currentUserId) {
-        window.COMBAT_PERSOS_JOUEUR = window.PERSOS_PARTIE.filter(p => p.idJoueur === currentUserId);
-    } else {
-        window.COMBAT_PERSOS_JOUEUR = [];
-    }
-    
+
+    window.COMBAT_PERSOS_JOUEUR = window.herosDuJoueur(currentUserId);
+
     window.COMBAT_INDEX_PERSO = 0;
     window.afficherPersoCombatActuel();
 };
@@ -849,7 +867,9 @@ window.rafraichirAffichageCombat = function() {
     // cette liste ne contient plus que mes héros, en toute circonstance.
     const idJoueur = localStorage.getItem("ID_JOUEUR_COURANT");
     if (idJoueur) {
-        const miens = (window.PERSOS_PARTIE || []).filter(p => p.idJoueur === idJoueur);
+        // Même lecture qu'à l'ouverture du combat : les héros de ce poste, sans
+        // les leurres qu'ils auraient pu poser (voir herosDuJoueur).
+        const miens = window.herosDuJoueur(idJoueur);
         const affiche = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
         const memesHeros = miens.length === (window.COMBAT_PERSOS_JOUEUR || []).length
             && miens.every((p, i) => p.idPersonnage === window.COMBAT_PERSOS_JOUEUR[i].idPersonnage);
@@ -994,7 +1014,11 @@ window.herosDuPoste = function() {
     // la liste ne contient plus que mes héros, et rendre une créature ici
     // reviendrait à montrer au joueur la vie d'un gnoll comme si c'était la
     // sienne. Aucun héros, aucune réponse.
-    const mien = miens.find(h => h && !h.estMonstre);
+    //
+    // NI UNE ILLUSION. Elle est filtrée en amont, à la construction de la liste
+    // (herosDuJoueur) ; ce second filet est là parce que ce bloc-ci est le seul
+    // endroit où l'erreur se VOIT, et qu'elle s'y est déjà vue une fois.
+    const mien = miens.find(h => h && !h.estMonstre && !h.estIllusion);
     if (!mien) return null;
     return (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === mien.idPersonnage) || mien;
 };
@@ -4537,6 +4561,30 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
     }
 
     const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === tete.idPersonnage) || {};
+
+    // LA PLAQUE DOIT ÊTRE MESURABLE AVANT QU'ON POSE QUOI QUE CE SOIT DESSUS.
+    //
+    // Tout ce qui se pose sur l'encart — la taille du portrait, celle du nom,
+    // celle des icônes d'état — est un POURCENTAGE de la largeur réellement
+    // rendue de la plaque. Or cette fonction ne rendait la fenêtre visible qu'à
+    // sa toute fin : entre deux tours, la fenêtre se retire complètement
+    // (display:none au bout de 460 ms), et le tour suivant trouvait donc une
+    // plaque de largeur nulle. appliquerReglagesEncart renonce dans ce cas — et
+    // le portrait gardait les mesures de la forme PRÉCÉDENTE.
+    //
+    // Deux défauts signalés en partie, une seule cause : le médaillon d'une
+    // créature qui héritait de la hauteur d'un avatar en pied et sortait deux
+    // fois trop gros, et l'avatar d'un héros qui, privé de sa hauteur, se
+    // dessinait à la taille brute de son image et n'était plus lisible.
+    //
+    // On rend donc la fenêtre présente MAINTENANT. Elle reste transparente :
+    // l'opacité ne monte qu'à la fin, après le reflow, et le fondu d'entrée est
+    // intact. Le retrait en attente est annulé, sinon il la reprendrait au
+    // milieu du tour.
+    if (voile.style.display !== "block") {
+        clearTimeout(voile._minuteurRetrait);
+        voile.style.display = "block";
+    }
 
     // LE GROS PION DU COMBATTANT. Une créature porte l'image commune des
     // ennemis, celle-là même qu'elle a sur le plateau et dans la piste : on

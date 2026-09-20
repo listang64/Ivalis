@@ -265,7 +265,10 @@
         // La largeur rendue de la plaque : c'est l'unité de mesure de tout ce
         // qui suit. Nulle tant que rien n'est à l'écran — on repassera.
         const L = encart.getBoundingClientRect().width;
-        if (L <= 0) return false;
+        // Rien n'est à l'écran : on ne peut rien mesurer, donc rien poser. On le
+        // DIT au veilleur, qui repassera — sans quoi la demande se perdrait.
+        if (L <= 0) { window.ENCART_A_REPOSER = true; return false; }
+        window.ENCART_A_REPOSER = false;
         const pc = (v) => Math.max(1, (v / 100) * L);   // % de la plaque → pixels
 
         // LA PLAQUE PORTE SA PROPRE POLICE, et c'est un filet plus qu'un
@@ -675,7 +678,20 @@
     // tablette, une fenêtre qu'on redimensionne, une règle @media qui bascule.
     // On repose alors tous les réglages à la nouvelle échelle.
     let derniereLargeur = 0;
+    // LA POSE DE L'ENCART N'EST PAS ACQUISE UNE FOIS POUR TOUTES.
+    //
+    // Ce drapeau ne valait autrefois que pour le chargement : l'encart est
+    // masqué au démarrage, sa plaque n'a aucune largeur, et il fallait repasser
+    // dès qu'elle en avait une. Une fois posé, on n'y revenait plus jamais.
+    //
+    // Sauf que combat.js redemande une pose à chaque changement de forme du
+    // portrait (médaillon ↔ avatar en pied), et que cette demande peut elle
+    // aussi tomber sur une plaque non mesurable. Elle échouait alors en silence
+    // et plus rien ne réessayait : le portrait gardait les mesures de la forme
+    // précédente pour le reste du combat. On retient donc l'échec, d'où qu'il
+    // vienne, et le veilleur repasse tant qu'il n'a pas réussi.
     let encartPose = false;
+
     function suivreLaLargeur() {
         const hud = document.getElementById("combat-hud-bas-droite");
         if (!hud) return;
@@ -687,10 +703,17 @@
 
     function surveiller() {
         suivreLaLargeur();
-        if (window.ENCART_FIGE) figerLEncart();
         // L'encart n'a pas toujours une largeur au premier passage (il est
         // masqué au chargement) : on repose ses mesures dès qu'il en a une.
-        if (!encartPose) encartPose = window.appliquerReglagesEncart();
+        //
+        // AVANT LE FIGEAGE, ET PAS APRÈS. Poser les mesures se termine par un
+        // appel à rafraichirVoileTour — c'est ce qui redessine le texte à sa
+        // nouvelle taille — et cet appel referme la fenêtre quand aucun tour
+        // n'est en cours. Posé APRÈS le figeage, il défaisait donc aussitôt ce
+        // que le figeage venait de montrer, et l'encart clignotait au rythme de
+        // cette surveillance.
+        if (!encartPose || window.ENCART_A_REPOSER) encartPose = window.appliquerReglagesEncart();
+        if (window.ENCART_FIGE) figerLEncart();
         const fenetre = document.getElementById("fenetre-combat");
         const poignee = document.getElementById("reglage-hud-poignee");
         const boite = document.getElementById("reglage-hud");

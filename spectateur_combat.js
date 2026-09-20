@@ -288,6 +288,26 @@ export function creerSpectateur(contexte) {
                 }
 
                 moi.vue = nombre(entree.v);
+
+                // L'ACQUITTEMENT NE SURVIT PAS AU TOUR QU'IL COUVRE.
+                //
+                // Le OK acquitte un TOUR, pas une entrée : un tour se publie
+                // souvent en plusieurs pas, et il serait absurde de redemander
+                // le OK entre deux. L'acquittement porte donc sur (acteur,
+                // manche)... et il n'était jamais levé. Ce couple-là revient :
+                // une manche rouverte sous le même numéro, une créature qui
+                // rejoue. Toutes les entrées suivantes de ce couple se sont
+                // alors déroulées SANS FENÊTRE — le tour de la créature passait
+                // sous les yeux du joueur sans rien annoncer, et il le voyait
+                // « sauté ». C'est arrivé en partie : le OK donné au n°12 pour
+                // MONSTRE_2w1c8ag (manche 3) a fait jouer son n°14, trente
+                // secondes et une ouverture de manche plus tard, en silence.
+                //
+                // Un acquittement ne vaut donc que tant que c'est ce tour-là
+                // qu'on déroule. La première entrée d'un autre tour le périme —
+                // l'ouverture d'une manche, qui n'a pas d'acteur, comprise.
+                if (cleDuTour(entree) !== moi.tourAcquitte) moi.tourAcquitte = null;
+
                 delete moi.recues[entree.v];
                 surRejeu(null);
                 tracer("⏹️", `${entree.v}`, "");
