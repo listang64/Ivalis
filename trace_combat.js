@@ -43,8 +43,12 @@
 // suffit alors à voir qu'un appareil n'a pas rechargé la page et tourne encore
 // sur du vieux code — ce qui, dans un jeu où deux postes doivent s'entendre sur
 // qui joue, fabrique des bugs impossibles à comprendre autrement.
-// À MONTER À CHAQUE FOIS QUE index.html monte ses ?v=.
-window.VERSION_IVALIS = 97;
+// À MONTER À CHAQUE FOIS QUE index.html monte ses ?v= — ET DANS version.json
+// DU MÊME COUP. C'est en comparant ces deux nombres que le jeu sait qu'un
+// appareil tourne sur une vieille page et se recharge tout seul (mise_a_jour.js).
+// Les laisser diverger, c'est soit un rechargement qui ne vient jamais, soit un
+// appareil qui se recharge sans raison : le banc mise_a_jour.mjs les compare.
+window.VERSION_IVALIS = 98;
 
 window.TRACE_COMBAT_ACTIVE = true;
 // Quand une écriture de points de vie n'est ni un coup ni un rejeu mais une

@@ -1126,6 +1126,52 @@ node menage_images.mjs      # les cinq chemins qui abandonnent une image
 node suppression_perso.mjs  # effacer un héros emporte TOUTES ses images
 ```
 
+## La mise à jour qui n'oblige plus à réinstaller l'application
+
+Sur l'iPad, chaque livraison demandait à Nico de supprimer l'icône de l'écran
+d'accueil et de réinstaller le jeu — puis de retaper ses cinq clés d'API, que la
+désinstallation emportait avec le stockage du site.
+
+**La cause tient en une phrase :** tous les fichiers du jeu portent un `?v=N`
+qu'on monte à chaque livraison, et se rafraîchissent donc tout seuls — tous sauf
+`index.html`, qui n'a pas de `?v=` parce qu'il EST l'adresse. Tant que
+l'appareil sert son ancienne copie de `index.html`, il lit les anciens numéros
+et charge l'ancien jeu en entier. Une webapp d'écran d'accueil a en plus son
+propre cache, séparé de Safari, que relancer par l'icône ne bouscule pas. Et le
+jeu est servi par GitHub Pages, qui ne laisse pas régler les en-têtes de cache :
+le remède ne pouvait être que dans le code.
+
+`mise_a_jour.js` relit donc, au chargement, un `version.json` d'une ligne qu'on
+interdit de mettre en cache (`no-store` **et** un paramètre unique — sur iOS
+l'en-tête seul ne suffit pas toujours, une adresse jamais demandée, si). Si le
+numéro ne correspond pas à celui de la page en train de tourner, la page est
+périmée : elle se recharge sur une adresse que le cache ne connaît pas
+(`index.html?maj=98`). L'adresse inconnue force le réseau, la page qui revient
+est fraîche, ses `?v=` sont les nouveaux, et tout le jeu suit.
+
+**Le localStorage n'est jamais touché** : les clés d'API, les volumes et le mode
+développeur survivent. On ne perdait tout que parce qu'on supprimait l'icône.
+
+Deux précautions qui comptent :
+
+- **jamais de boucle** — si on a déjà rechargé POUR CETTE VERSION-LÀ et qu'on
+  lit encore l'ancien numéro, c'est le serveur qui n'a pas suivi : on s'arrête
+  et on le dit en console. C'est l'adresse elle-même qui sert de mémoire, rien
+  n'est écrit nulle part ;
+- **jamais en plein combat** — la vérification n'a lieu qu'au chargement de la
+  page. Pas de contrôle en arrière-plan, pas de retour d'application qui
+  recharge : une livraison pendant une partie ne coupera jamais un tour.
+
+```sh
+node mise_a_jour.mjs        # un rechargement, un seul, et les clés intactes
+```
+
+⚠️ **Le numéro vit à DEUX endroits** : `window.VERSION_IVALIS` (trace_combat.js)
+et `version.json`. C'est en les comparant que le jeu sait qu'un appareil est
+périmé ; les laisser diverger, c'est soit un rechargement qui ne vient jamais,
+soit un appareil qui se recharge sans raison à chaque démarrage. Le banc les
+compare et refuse le désaccord.
+
 ## La lanière pend plus bas, et le voile de la piste s'efface
 
 Deux retouches d'écran, demandées sur l'iPad, mesurées au pixel.
