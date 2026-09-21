@@ -4445,9 +4445,35 @@ window.donneesCarteCombattant = function(idPersonnage, idCarte) {
 // « Peur », « Brûlé » et « Bouclier magique » (dont le texte dit « 30% des pv
 // restants ») se réduisent à leur titre — et une nouvelle chance qu'on ajoutera
 // un jour au bestiaire suivra la règle sans qu'on y pense.
-window.ligneEffetsCarte = function(dataCarte) {
+window.ligneEffetsCarte = function(dataCarte, lanceur) {
     const effets = (dataCarte && dataCarte.Effets_Compiles) || [];
     const lignes = [];
+
+    // LA MÊME PORTÉE QUE SUR LA CARTE EN GRAND, ET PAR LA MÊME RÈGLE.
+    // L'encart de tour annonce la technique qui va partir : s'il affichait la
+    // portée écrite dans la Forge pendant que la carte en grand affiche celle
+    // que l'arme donne, les deux écrans se contrediraient à un mètre l'un de
+    // l'autre. `distanceAAfficher` et `texteDistanceReelle` vivent dans
+    // moteur_effets.js et servent aux deux.
+    const porteeVraie = (lanceur && typeof window.distanceAAfficher === "function")
+        ? window.distanceAAfficher(dataCarte, lanceur) : null;
+    const reecrireDistance = (texte) => (porteeVraie && typeof window.texteDistanceReelle === "function")
+        ? window.texteDistanceReelle(texte, porteeVraie) : texte;
+    // Le format d'une ligne, à un seul endroit : la ligne de Distance ajoutée
+    // doit être indiscernable des vraies.
+    const ligneEffet = (nom, desc, estMod) => {
+        const retrait = estMod ? "margin-left: 18px; margin-top: 4px;" : "margin-top: 8px;";
+        const couleur = estMod ? "#ddd4c4" : "#f4efe4";
+        const prefixe = estMod ? "↳ " : "• ";
+        const detail = desc
+            ? `<div style="color: #cfc6b6; font-size: 15px; font-style: italic; line-height: 1.3; margin-left: 14px;">${desc}</div>`
+            : "";
+        return `<div style="${retrait}">
+                <div style="color: ${couleur}; font-weight: bold;">${prefixe}${nom}</div>
+                ${detail}
+            </div>`;
+    };
+    let aDejaSaDistance = false;
 
     effets.forEach(eff => {
         // Les vieilles cartes gardent des effets en simple texte : on les
@@ -4455,7 +4481,9 @@ window.ligneEffetsCarte = function(dataCarte) {
         if (typeof eff === "string") {
             const brut = eff.replace(/\s+/g, " ").trim();
             if (!brut || brut.indexOf("Initiative +") >= 0) return;
-            lignes.push(`<div style="margin-top: 6px; color: #f4efe4;">• ${brut}</div>`);
+            const estDistance = brut.indexOf("Distance") >= 0;
+            if (estDistance) aDejaSaDistance = true;
+            lignes.push(`<div style="margin-top: 6px; color: #f4efe4;">• ${estDistance ? reecrireDistance(brut) : brut}</div>`);
             return;
         }
         if (!eff || !eff.nom) return;
@@ -4463,19 +4491,20 @@ window.ligneEffetsCarte = function(dataCarte) {
         // La zone est dessinée à côté, pas décrite en toutes lettres.
         if (eff.isZone) return;
 
-        const estMod = !!eff.isMod;
-        const retrait = estMod ? "margin-left: 18px; margin-top: 4px;" : "margin-top: 8px;";
-        const couleur = estMod ? "#ddd4c4" : "#f4efe4";
-        const prefixe = estMod ? "↳ " : "• ";
+        const estDistance = eff.nom.indexOf("Distance") >= 0;
+        if (estDistance) aDejaSaDistance = true;
         const chiffre = eff.desc && !/%/.test(eff.desc);
-        const detail = chiffre
-            ? `<div style="color: #cfc6b6; font-size: 15px; font-style: italic; line-height: 1.3; margin-left: 14px;">${eff.desc}</div>`
-            : "";
-        lignes.push(`<div style="${retrait}">
-                <div style="color: ${couleur}; font-weight: bold;">${prefixe}${eff.nom}</div>
-                ${detail}
-            </div>`);
+        lignes.push(ligneEffet(eff.nom,
+                               chiffre ? (estDistance ? reecrireDistance(eff.desc) : eff.desc) : "",
+                               !!eff.isMod));
     });
+
+    // La carte ne dit rien de sa portée, et pourtant elle porte : c'est l'arme.
+    // On l'écrit en tête, dans le même format qu'une vraie ligne.
+    if (porteeVraie && !aDejaSaDistance) {
+        lignes.unshift(ligneEffet("Distance",
+                                  reecrireDistance(window.gabaritTexteDistance()), false));
+    }
 
     if (lignes.length === 0) return `<span style="color: #a89f91; font-style: italic;">Aucun effet</span>`;
     return lignes.join("");
@@ -4747,7 +4776,7 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
     } else {
         const dataCarte = window.donneesCarteCombattant(tete.idPersonnage, tete.idCarte);
         titre = dataCarte ? (dataCarte.Nom || "Technique") : "Technique";
-        ligne = dataCarte ? window.ligneEffetsCarte(dataCarte)
+        ligne = dataCarte ? window.ligneEffetsCarte(dataCarte, perso)
                           : `<span style="color: #a89f91; font-style: italic;">Technique inconnue de ce poste</span>`;
         if (dataCarte) dessinZone = window.dessinZoneCarte(dataCarte, couleur, 16);
     }

@@ -1084,7 +1084,8 @@ window.demarrerCiblage = async function(idCarte, options) {
             // portée. Posé ICI, avant que isRanged et rangeMax ne servent :
             // attaques et altérations partent donc avec la bonne portée, et une
             // attaque devenue tir encaisse bien le malus au contact.
-            ({ isRanged, rangeMax } = window.porteeAvecArme(lanceurCarte, isRanged, rangeMax));
+            ({ isRanged, rangeMax } = window.porteeAvecArme(lanceurCarte, isRanged, rangeMax,
+                                                            dataCarte.Arme));
 
             // LA ZONE PORTE SA PROPRE DISTANCE. C'est l'action qui dessine la
             // zone qui dit à quelle distance on peut la poser — pas forcément
@@ -2496,7 +2497,8 @@ window.porteeReelleCarte = function(dataCarte, lanceur) {
         });
 
         const porteeCarte = rangeMax;
-        ({ isRanged, rangeMax } = window.porteeAvecArme(lanceur, isRanged, rangeMax));
+        ({ isRanged, rangeMax } = window.porteeAvecArme(lanceur, isRanged, rangeMax,
+                                                       dataCarte.Arme));
 
         // L'atout de portée magique, comme dans demarrerCiblage : il ne joue
         // que sur une action magique qui a déjà de la distance.
@@ -2511,12 +2513,77 @@ window.porteeReelleCarte = function(dataCarte, lanceur) {
     return meilleure;
 };
 
-window.porteeAvecArme = function(lanceur, isRanged, rangeMax) {
+// LA CATÉGORIE QUI NE SE SERT PAS DE L'ARME PORTÉE.
+//
+// Une technique « Sans arme / Arme rp » se joue à mains nues ou à la dague de
+// ceinture, QUELLE QUE SOIT l'arme équipée — c'est tout son intérêt, et c'est
+// pour ça qu'elle reste jouable quand les autres sont bloquées. Elle n'a donc
+// rien à emprunter à l'arc : un coup de poing ne tire pas à deux cases parce
+// qu'un arc pend dans le dos, et il ne gagne pas non plus l'allonge d'une
+// lance restée à la ceinture.
+//
+// Sans cette règle, le porteur d'arc voyait TOUTES ses cartes devenir des tirs,
+// y compris celle qui décrit un coup de coude — et elle encaissait au passage
+// le malus de tir à bout portant, ce qui est exactement l'inverse de ce qu'une
+// technique de corps-à-corps doit faire.
+window.CARTE_SANS_ARME = "Sans arme / Arme rp";
+
+window.porteeAvecArme = function(lanceur, isRanged, rangeMax, armeDeLaCarte) {
     if (!lanceur || typeof window.bonusEquip !== "function") return { isRanged, rangeMax };
+    if (armeDeLaCarte === window.CARTE_SANS_ARME) return { isRanged, rangeMax };
     const portee = window.bonusEquip(lanceur, "portee");
     const allonge = window.bonusEquip(lanceur, "allonge");
     if (portee > 0) return { isRanged: true, rangeMax: rangeMax + portee + allonge };
     return { isRanged, rangeMax: rangeMax + allonge };
+};
+
+// =========================================================================
+//  CE QU'IL FAUT ÉCRIRE SUR LA LIGNE « DISTANCE » D'UNE CARTE
+// =========================================================================
+//  La portée d'une carte se lisait à DEUX endroits sur le même écran : la
+//  ligne « Distance » de la carte, qui annonçait ce que le joueur avait posé
+//  dans la Forge, et une ligne bleue ajoutée au-dessus, qui annonçait la portée
+//  vraie. Deux nombres différents pour une seule et même chose.
+//
+//  Il n'y en a plus qu'un : la ligne existante est RÉÉCRITE avec la portée que
+//  la carte aura vraiment, arme et atout de peuple compris. Et quand la carte
+//  n'a pas de ligne de Distance alors qu'elle porte loin — c'est l'arme qui le
+//  fait — la ligne est ajoutée, dans le même format que si elle y était.
+//
+//  Les deux fonctions ci-dessous sont la SEULE source de ce texte, et elles
+//  servent aux deux lecteurs : la carte en grand (competences.js) et l'encart
+//  de tour (combat.js). Deux copies finiraient par annoncer deux portées.
+// =========================================================================
+
+// Rien à annoncer quand la carte reste au contact : on ne va pas écrire
+// « 1 hexagone » sur toutes les techniques du jeu.
+window.distanceAAfficher = function(dataCarte, lanceur) {
+    if (typeof window.porteeReelleCarte !== "function") return null;
+    const p = window.porteeReelleCarte(dataCarte, lanceur);
+    if (!p || p.portee <= 1) return null;
+    return p;
+};
+
+// La formulation vient de la base, jamais d'ici : le jour où l'effet Distance
+// dira « 1 case » au lieu de « 1 hexagone », la ligne ajoutée suivra.
+window.gabaritTexteDistance = function() {
+    const effets = window.EFFETS_BDD_CACHE || {};
+    const distance = Object.keys(effets).map(k => effets[k])
+                           .find(e => e && e.Nom === "Distance");
+    return (distance && distance.Effet_Base) || "1 hexagone";
+};
+
+// Le texte d'origine est conservé mot pour mot : on n'y remplace que le NOMBRE.
+// C'est ce qui garantit que la ligne réécrite ressemble à s'y méprendre à celle
+// qu'elle remplace — et que la ligne ajoutée ressemble aux vraies.
+window.texteDistanceReelle = function(texteOrigine, p) {
+    const base = String(texteOrigine || window.gabaritTexteDistance());
+    const avecNombre = /\d/.test(base)
+        ? base.replace(/\d+(?:[.,]\d+)?/, String(p.portee))
+        : (p.portee + " " + base).trim();
+    return p.apportArme > 0
+        ? avecNombre + " (dont " + p.apportArme + " de l'arme)"
+        : avecNombre;
 };
 
 const GABARITS_ETATS_EQUIPEMENT = {

@@ -1126,6 +1126,45 @@ node menage_images.mjs      # les cinq chemins qui abandonnent une image
 node suppression_perso.mjs  # effacer un héros emporte TOUTES ses images
 ```
 
+## Une seule ligne pour la portée, et l'arc ne prête rien aux mains nues
+
+**Deux nombres pour une seule chose.** La carte affichait la portée à deux
+endroits : sa ligne « Distance », gravée par la Forge le jour de sa création, et
+une ligne bleue ajoutée au-dessus — « ◆ Portée : 4 cases » — qui annonçait la
+portée vraie, arme comprise. Le joueur choisissait laquelle croire.
+
+Il n'y en a plus qu'une. La ligne existante est **réécrite** avec la portée
+réelle, en gardant sa formulation mot pour mot (seul le nombre change) et en
+disant ce que l'arme y ajoute. Et quand la carte n'a pas de ligne de Distance
+alors qu'elle porte loin — c'est l'arme qui le fait — la ligne est **ajoutée**,
+par la même fabrique de ligne que les vraies : même puce, mêmes couleurs, même
+taille, et la formulation prise dans la base plutôt qu'écrite en dur.
+
+La règle vit dans `moteur_effets.js` (`distanceAAfficher`, `texteDistanceReelle`,
+`gabaritTexteDistance`) et sert aux **deux** lecteurs : la carte en grand et
+l'encart de tour. Deux écrans à un mètre l'un de l'autre qui annoncent deux
+portées différentes, c'est pire que pas de portée du tout.
+
+**L'arc ne prête rien aux techniques « Sans arme / Arme rp ».** Une technique de
+cette catégorie se joue à mains nues ou à la dague de ceinture, quelle que soit
+l'arme équipée — c'est tout son intérêt, et c'est pour ça qu'elle reste jouable
+quand les autres sont bloquées. Elle héritait pourtant du +1 de portée de l'arc,
+devenait un tir, et encaissait au passage le malus de tir à bout portant : un
+coup de coude qui porte à deux cases et perd trente pour cent au contact.
+`porteeAvecArme` reçoit désormais la catégorie d'arme de la carte et se retire
+devant celle-là.
+
+```sh
+node cout_et_tir.mjs        # une seule ligne de portée, et le coup de coude reste au contact
+```
+
+Le banc joue trois cartes sur un porteur d'arc : une au contact (qui gagne sa
+ligne), une à distance (dont la ligne passe de 3 à 4 hexagones), et une « Sans
+arme / Arme rp » (qui n'en gagne aucune et reste à une case). Il compare la
+ligne ajoutée à une vraie ligne d'effet **sur le rendu** — couleur, taille,
+graisse — parce que « le même format » ne se vérifie pas en relisant deux
+feuilles de style.
+
 ## Le mot de passe d'une partie était relu sur le réseau
 
 « Des fois, sur iPad uniquement, j'ai un temps de chargement très long quand je

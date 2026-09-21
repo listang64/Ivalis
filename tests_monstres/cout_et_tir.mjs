@@ -130,18 +130,28 @@ const preparer = () => p.evaluate((EFFETS) => {
   // L'ARC EN MAIN : c'est lui qui rendait tout « à distance ».
   window.bonusEquip = (perso, cle) => (cle === "portee" ? 1 : 0);
 
-  const carte = (nom, fatigue, actions) => ({
-    Nom: nom, Arme: "Arme légère Distance", Fatigue: fatigue, Initiative: 20,
-    Effets_Compiles: [], Composants: { actions }
+  // Les Effets_Compiles sont ce que la Forge a GRAVÉ sur la carte le jour où
+  // elle a été créée : c'est ce texte-là que l'affichage réécrit.
+  const carte = (nom, fatigue, actions, effetsCompiles, arme) => ({
+    Nom: nom, Arme: arme || "Arme légère Distance", Fatigue: fatigue, Initiative: 20,
+    Effets_Compiles: effetsCompiles || [], Composants: { actions }
   });
   window.COMPETENCES_CACHE = {
     C_CAC: carte("Coup de roc", 25, [
       { baseEffetId: "EFF_ATTAQUE_LOURDE", count: 1, mods: {}, zoneHexes: [], baseDuree: 0, modsDuree: {} }
-    ]),
+    ], [{ nom: "Attaque lourde", desc: "10 dégats physique", isMod: false }]),
     C_TIR: carte("Trait perçant", 30, [
       { baseEffetId: "EFF_ATTAQUE_LEGERE", count: 1,
         mods: { EFF_DISTANCE: 2 }, zoneHexes: [], baseDuree: 0, modsDuree: {} }
-    ])
+    ], [{ nom: "Attaque légère", desc: "6 dégats physique", isMod: false },
+        { nom: "Distance", desc: "3 hexagone", isMod: true }]),
+    // LA TECHNIQUE QUI NE SE SERT PAS DE L'ARME PORTÉE : un coup de coude, une
+    // dague de ceinture. Elle reste jouable quoi qu'on tienne — et elle n'a
+    // donc rien à emprunter à l'arc.
+    C_RP: carte("Coup de coude", 15, [
+      { baseEffetId: "EFF_ATTAQUE_LOURDE", count: 1, mods: {}, zoneHexes: [], baseDuree: 0, modsDuree: {} }
+    ], [{ nom: "Attaque lourde", desc: "4 dégats physique", isMod: false }],
+       "Sans arme / Arme rp")
   };
   window.CACHE_COMPETENCES_GLOBAL = { H1: window.COMPETENCES_CACHE };
   window.PARTIE_DATA = { Phase_Combat: "Resolution", Tour_Combat: 1,
@@ -171,6 +181,7 @@ if (!idAttaque || !idDistance) {
 } else {
   await p.evaluate(({ idAttaque, idDistance }) => {
     window.COMPETENCES_CACHE.C_CAC.Composants.actions[0].baseEffetId = idAttaque;
+    window.COMPETENCES_CACHE.C_RP.Composants.actions[0].baseEffetId = idAttaque;
     window.COMPETENCES_CACHE.C_TIR.Composants.actions[0].baseEffetId = idAttaque;
     window.COMPETENCES_CACHE.C_TIR.Composants.actions[0].mods = { [idDistance]: 2 };
   }, { idAttaque, idDistance });
@@ -205,6 +216,7 @@ if (!idAttaque || !idDistance) {
     const texte = (document.getElementById("apercu-carte-hd-competence") || {}).innerText || "";
     return { cac, tir, cacSansArme, texte };
   });
+
   verifier("le calcul partagé retrouve la portée donnée par l'arme",
            lu.cac.portee === cac.attaques[0].rangeMax,
            `(${lu.cac.portee} contre ${cac.attaques[0].rangeMax} au moteur)`);
@@ -215,9 +227,121 @@ if (!idAttaque || !idDistance) {
            lu.tir.portee === tir.attaques[0].rangeMax,
            `(${lu.tir.portee} contre ${tir.attaques[0].rangeMax})`);
   verifier("LA CARTE AFFICHE SA PORTÉE À L'ÉCRAN",
-           /Port[ée]e\s*:\s*2\s*cases/i.test(lu.texte),
-           lu.texte.replace(/\s+/g, " ").slice(0, 120));
+           /2\s*hexagone/i.test(lu.texte),
+           lu.texte.replace(/\s+/g, " ").slice(0, 160));
   verifier("et elle dit d'où elle vient", /de l'arme/i.test(lu.texte));
+
+  console.log("\n=========================================================");
+  console.log("  2 ter. UNE SEULE LIGNE DE DISTANCE, ET C'EST LA VRAIE");
+  console.log("=========================================================");
+  // Nico : « j'ai pas envie que tu rajoutes une ligne en bleu pour dire la
+  // distance totale, mais que tu modifies dynamiquement la ligne existante — et
+  // s'il n'y en a pas, la rajouter dans le même format que s'il y en avait. »
+  //
+  // Avant, la carte affichait DEUX nombres pour une seule et même chose : sa
+  // ligne « Distance : 3 hexagone », gravée par la Forge, et une ligne bleue
+  // ajoutée au-dessus, « ◆ Portée : 4 cases ». Le joueur choisissait laquelle
+  // croire.
+  // CHANGER DE CARTE PREND 300 ms : la carte affichée s'efface d'abord, puis la
+  // suivante se dessine. Lire tout de suite, c'est relire la précédente — et
+  // croire que la carte à distance affiche le texte de celle du contact.
+  const ecran = (idCarte) => p.evaluate(async (idCarte) => {
+    window.afficherApercuCarteHD(idCarte);
+    await new Promise(r => setTimeout(r, 450));
+    const boite = document.getElementById("apercu-carte-hd-competence");
+    const texte = (boite || {}).innerText || "";
+    const titres = [...(boite || document).querySelectorAll(".titre-effet-hd")].map(t => ({
+      texte: (t.innerText || "").trim(),
+      couleur: getComputedStyle(t).color,
+      taille: getComputedStyle(t).fontSize,
+      graisse: getComputedStyle(t).fontWeight
+    }));
+    return {
+      texte,
+      titres,
+      // Combien de fois la carte parle-t-elle de sa portée ?
+      mentionsDistance: (texte.match(/hexagone/gi) || []).length
+                      + (texte.match(/◆\s*Port[ée]e/gi) || []).length,
+      ligneBleue: /◆/.test(texte) || /Port[ée]e\s*:/i.test(texte)
+    };
+  }, idCarte);
+
+  const vueCac = await ecran("C_CAC");
+  const vueTir = await ecran("C_TIR");
+  const vueRp  = await ecran("C_RP");
+
+  verifier("LA LIGNE BLEUE A DISPARU DE LA CARTE", vueCac.ligneBleue === false && vueTir.ligneBleue === false,
+           vueTir.texte.replace(/\s+/g, " ").slice(0, 140));
+  verifier("une carte sans effet Distance en gagne UNE, et une seule",
+           vueCac.mentionsDistance === 1, `(${vueCac.mentionsDistance})`);
+  verifier("elle annonce la portée que l'arme donne",
+           /2\s*hexagone/.test(vueCac.texte) && /dont 1 de l'arme/.test(vueCac.texte),
+           vueCac.texte.replace(/\s+/g, " ").slice(0, 140));
+
+  // LE MÊME FORMAT QUE SI ELLE Y ÉTAIT : c'est la demande, mot pour mot. On ne
+  // compare pas des styles écrits à la main de part et d'autre — les deux
+  // lignes passent par la même fabrique, et on le vérifie au pixel près sur le
+  // titre rendu.
+  const titreAjoute = vueCac.titres.find(t => /Distance/.test(t.texte));
+  const titreVrai   = vueCac.titres.find(t => !/Distance/.test(t.texte));
+  verifier("elle porte la même puce que les vraies lignes",
+           !!titreAjoute && titreAjoute.texte.startsWith("•"), titreAjoute ? titreAjoute.texte : "(absente)");
+  verifier("ET EXACTEMENT LEUR FORMAT : couleur, taille, graisse",
+           !!titreAjoute && !!titreVrai
+           && titreAjoute.couleur === titreVrai.couleur
+           && titreAjoute.taille === titreVrai.taille
+           && titreAjoute.graisse === titreVrai.graisse,
+           titreAjoute && titreVrai ? `${titreAjoute.couleur}/${titreAjoute.taille} contre ${titreVrai.couleur}/${titreVrai.taille}` : "");
+
+  verifier("UNE CARTE QUI A DÉJÀ SA LIGNE N'EN GAGNE PAS UNE SECONDE",
+           vueTir.mentionsDistance === 1, `(${vueTir.mentionsDistance})`);
+  verifier("ET CETTE LIGNE-LÀ EST RÉÉCRITE AVEC LE TOTAL",
+           /4\s*hexagone/.test(vueTir.texte) && !/3\s*hexagone/.test(vueTir.texte),
+           vueTir.texte.replace(/\s+/g, " ").slice(0, 140));
+  verifier("en disant ce que l'arme y ajoute", /dont 1 de l'arme/.test(vueTir.texte));
+
+  console.log("\n=========================================================");
+  console.log("  2 quater. L'ARC NE PRÊTE RIEN AUX TECHNIQUES SANS ARME");
+  console.log("=========================================================");
+  // Une technique « Sans arme / Arme rp » se joue à mains nues ou à la dague de
+  // ceinture, quelle que soit l'arme équipée — c'est pour ça qu'elle reste
+  // jouable quand les autres sont bloquées. Un coup de coude ne tire donc pas à
+  // deux cases parce qu'un arc pend dans le dos.
+  const rp = await extraire("C_RP");
+  verifier("le coup de coude porte bien une attaque",
+           !!rp && (rp.attaques || []).length > 0);
+  verifier("IL RESTE AU CONTACT, ARC OU PAS",
+           !!rp && rp.attaques[0].isRanged === false, String(((rp||{}).attaques||[{}])[0].isRanged));
+  verifier("et sa portée reste d'une case",
+           !!rp && rp.attaques[0].rangeMax === 1, String(((rp||{}).attaques||[{}])[0].rangeMax));
+
+  const rpLu = await p.evaluate(() => window.porteeReelleCarte(window.COMPETENCES_CACHE.C_RP, window.PERSOS_PARTIE[0]));
+  verifier("le calcul partagé dit la même chose",
+           rpLu.portee === 1 && rpLu.apportArme === 0, `(portée ${rpLu.portee}, apport ${rpLu.apportArme})`);
+  verifier("ET SA CARTE N'AFFICHE AUCUNE LIGNE DE DISTANCE",
+           vueRp.mentionsDistance === 0, vueRp.texte.replace(/\s+/g, " ").slice(0, 140));
+
+  console.log("\n=========================================================");
+  console.log("  2 quinquies. L'ENCART DE TOUR DIT LE MÊME NOMBRE");
+  console.log("=========================================================");
+  // Deux écrans à un mètre l'un de l'autre qui annoncent deux portées
+  // différentes, c'est pire que pas de portée du tout.
+  const encart = await p.evaluate(() => {
+    const perso = window.PERSOS_PARTIE[0];
+    const lire = (id) => {
+      const html = window.ligneEffetsCarte(window.COMPETENCES_CACHE[id], perso);
+      const boite = document.createElement("div");
+      boite.innerHTML = html;
+      return (boite.innerText || boite.textContent || "").replace(/\s+/g, " ");
+    };
+    return { cac: lire("C_CAC"), tir: lire("C_TIR"), rp: lire("C_RP") };
+  });
+  verifier("la carte de contact y annonce ses 2 hexagones",
+           /2 hexagone/.test(encart.cac), encart.cac.slice(0, 110));
+  verifier("la carte à distance y annonce ses 4, pas ses 3",
+           /4 hexagone/.test(encart.tir) && !/3 hexagone/.test(encart.tir), encart.tir.slice(0, 110));
+  verifier("et la technique sans arme n'y parle pas de distance",
+           !/hexagone/.test(encart.rp), encart.rp.slice(0, 110));
 
   console.log("\n=========================================================");
   console.log("  3. LA CARTE PORTE SON PROPRE COÛT EN ÉNERGIE");

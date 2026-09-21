@@ -449,10 +449,35 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     let htmlEffets = "";
     let htmlZoneAbsolue = "";
 
+    // LA PORTÉE RÉELLE DE CETTE CARTE, POUR CE PORTEUR-LÀ.
+    //
+    // Elle est calculée une fois ici, et elle sert à DEUX choses plus bas :
+    // réécrire la ligne « Distance » de la carte avec ce qu'elle vaut vraiment
+    // (l'arme et l'atout de peuple compris), et, s'il n'y a pas de ligne de
+    // Distance alors que la carte porte loin, en ajouter une dans le même
+    // format. Une seule ligne, un seul nombre : il n'y a plus la ligne bleue
+    // qui annonçait la portée vraie à côté de la ligne qui annonçait l'autre.
+    const lanceurDeLaCarte = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO] || null;
+    const porteeVraie = typeof window.distanceAAfficher === "function"
+        ? window.distanceAAfficher(data, lanceurDeLaCarte) : null;
+    const reecrireDistance = (texte) => (porteeVraie && typeof window.texteDistanceReelle === "function")
+        ? window.texteDistanceReelle(texte, porteeVraie) : texte;
+
+    // LE FORMAT D'UNE LIGNE D'EFFET, À UN SEUL ENDROIT. La ligne de Distance
+    // ajoutée doit être indiscernable d'une vraie : elle passe donc par la même
+    // fonction, et non par une copie de son HTML qui finirait par diverger.
+    const ligneEffetHD = (nom, desc, estMod) => `
+                    <div style="${estMod ? "margin-left: 15px; margin-top: 6px;" : "margin-top: 12px;"}">
+                        <div class="titre-effet-hd" style="color: ${estMod ? "#c2a878" : "#e8d5a5"}; font-size: 15px; font-weight: bold; text-shadow: 1px 1px 2px black; transition: all 0.3s;">${estMod ? "↳ " : "• "}${nom}</div>
+                        <div style="color: #a89f91; font-size: 13px; margin-top: 2px; line-height: 1.3; font-style: italic;">${desc}</div>
+                    </div>
+                `;
+
     // 🔻 CORRECTION : On encapsule chaque effet dans une div avec un ID précis pour pouvoir le cibler (Surbrillance Dorée)
     effets.forEach((eff, indexEffet) => {
         let textToCheck = typeof eff === 'string' ? eff : eff.nom;
-        if (textToCheck.includes("Distance")) hasDist = true;
+        const estLigneDistance = (textToCheck || "").includes("Distance");
+        if (estLigneDistance) hasDist = true;
 
         if (typeof eff === 'string' && eff.includes("Initiative +")) return;
         if (typeof eff === 'object' && eff.nom === "Initiative +") return;
@@ -462,24 +487,17 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         if (typeof eff === 'string') {
             if (eff.includes("Zone")) {
             } else if (eff.startsWith("  ↳")) {
-                content = `<div style="margin-left: 20px; color: #a89f91; font-size: 13px; padding: 2px 0;">${eff}</div>`;
+                content = `<div style="margin-left: 20px; color: #a89f91; font-size: 13px; padding: 2px 0;">${estLigneDistance ? reecrireDistance(eff) : eff}</div>`;
             } else {
-                content = `<div style="margin-top: 8px; color: #e8d5a5; font-size: 15px; font-weight: bold;">${eff}</div>`;
+                content = `<div style="margin-top: 8px; color: #e8d5a5; font-size: 15px; font-weight: bold;">${estLigneDistance ? reecrireDistance(eff) : eff}</div>`;
             }
         } 
         else {
             if (eff.isZone) {
             } else {
-                let padding = eff.isMod ? "margin-left: 15px; margin-top: 6px;" : "margin-top: 12px;";
-                let colorNom = eff.isMod ? "#c2a878" : "#e8d5a5";
-                let prefix = eff.isMod ? "↳ " : "• ";
-                
-                content = `
-                    <div style="${padding}">
-                        <div class="titre-effet-hd" style="color: ${colorNom}; font-size: 15px; font-weight: bold; text-shadow: 1px 1px 2px black; transition: all 0.3s;">${prefix}${eff.nom}</div>
-                        <div style="color: #a89f91; font-size: 13px; margin-top: 2px; line-height: 1.3; font-style: italic;">${eff.desc}</div>
-                    </div>
-                `;
+                content = ligneEffetHD(eff.nom,
+                                       estLigneDistance ? reecrireDistance(eff.desc) : eff.desc,
+                                       eff.isMod);
             }
         }
         
@@ -489,27 +507,21 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         }
     });
 
-    // LA PORTÉE, EN TÊTE DE LA LISTE, ET SANS MENTIR.
+    // AUCUNE LIGNE DE DISTANCE, ET POURTANT LA CARTE PORTE LOIN.
     //
-    // Une arme à distance donne une portée de base à CHAQUE technique de son
-    // porteur : une carte écrite au corps à corps devient un tir. La carte n'en
-    // disait rien tant que le joueur n'avait pas posé d'effet « Distance »
-    // dessus — on lisait « attaque lourde, 10 dégâts physiques » sur une
-    // technique qui portait à deux cases et perdait trente pour cent au
-    // contact. Elle le dit maintenant, et elle le dit avec le calcul du moteur
-    // lui-même (porteeReelleCarte), pas avec une copie qui dériverait.
+    // C'est l'arme qui le fait : une arme à distance donne une portée de base à
+    // CHAQUE technique de son porteur, et une carte écrite au corps à corps
+    // devient un tir — avec tout ce que ça implique, elle atteint plus loin et
+    // elle perd trente pour cent au contact. La carte n'en disait pas un mot.
     //
-    // Sur une carte qui porte déjà sa propre Distance, la ligne reste utile :
-    // l'effet annonce ce QU'IL donne, celle-ci annonce ce que la carte FERA,
-    // arme et atout de peuple compris.
-    if (typeof window.porteeReelleCarte === "function") {
-        const lanceur = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO] || null;
-        const p = window.porteeReelleCarte(data, lanceur);
-        if (p.portee > 1) {
-            htmlEffets = `<div style="margin-top: 4px; color: #9fd2ff; font-size: 14px; font-weight: bold; text-shadow: 1px 1px 2px black;">
-                    ◆ Portée : ${p.portee} cases${p.apportArme > 0 ? ` <span style="color: #7fa8c9; font-weight: normal; font-style: italic;">(dont ${p.apportArme} de l'arme)</span>` : ""}
-                </div>` + htmlEffets;
-        }
+    // On l'ajoute donc, en tête, AVEC LA MÊME FABRIQUE DE LIGNE que les vraies :
+    // même puce, mêmes couleurs, même formulation prise dans la base. Elle n'a
+    // pas d'identifiant `effet-hd-ligne-N`, et c'est voulu — ces identifiants
+    // numérotent les effets réels de la carte, que la surbrillance dorée met en
+    // valeur un par un pendant la résolution.
+    if (porteeVraie && !hasDist) {
+        htmlEffets = ligneEffetHD("Distance", reecrireDistance(window.gabaritTexteDistance()), false)
+                   + htmlEffets;
     }
 
     // NOUVEAU : Dessin avec Bounding Box Dynamique (Rognage auto)
