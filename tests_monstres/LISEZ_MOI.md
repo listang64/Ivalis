@@ -1126,6 +1126,42 @@ node menage_images.mjs      # les cinq chemins qui abandonnent une image
 node suppression_perso.mjs  # effacer un héros emporte TOUTES ses images
 ```
 
+## Le mot de passe d'une partie était relu sur le réseau
+
+« Des fois, sur iPad uniquement, j'ai un temps de chargement très long quand je
+fais charger une partie et qu'il vérifie le mot de passe. »
+
+Vérifier un mot de passe, c'est comparer deux chaînes. Mais la fonction allait
+d'abord **redemander à Firestore le document de la partie** — alors que ce
+document était déjà là : `ecouterPartiesEnCours` écoute la collection depuis
+l'ouverture de la page, bien avant que le joueur tape quoi que ce soit, et
+chaque document livré par cette écoute porte TOUS ses champs, mot de passe
+compris. On n'en gardait que le nom et l'identifiant, et on jetait le reste pour
+aller le rechercher au moment précis où quelqu'un attend.
+
+Et un `getDoc` sur un document déjà connu n'est pas gratuit : il part quand même
+au serveur — il ne se rabat sur le cache local que hors ligne. Sur une connexion
+qui se dégrade, il attend. C'est là que passait le temps.
+
+Le mot de passe est donc retenu au passage, dans une table qui ne vit qu'en
+mémoire et qui n'est pas posée sur `window`. L'écoute étant permanente, un mot
+de passe changé depuis un autre poste arrive de lui-même. Le `getDoc` reste en
+filet pour le cas où l'écoute n'a rien livré (première ouverture, réseau coupé
+au démarrage) — mais avec une limite de patience : au-delà de huit secondes, on
+rend la main au joueur en lui disant que la base ne répond pas, au lieu de le
+laisser devant « Vérification... ». Et surtout pas « mot de passe incorrect »,
+qui serait un mensonge coûteux.
+
+```sh
+node mot_de_passe_partie.mjs   # vérifié en mémoire, et jamais figé
+```
+
+Le banc sert la vraie page devant un Firestore de papier dont le `getDoc` est
+**compté et lent à dessein** (une seconde et demie) : si quelqu'un remet un
+aller-retour réseau sur ce chemin, l'écran met une seconde et demie à s'ouvrir
+au lieu de quarante millisecondes, et le contrôle tombe. Mesuré avant/après sur
+le même banc : **1523 ms → 39 ms**.
+
 ## La mise à jour qui n'oblige plus à réinstaller l'application
 
 Sur l'iPad, chaque livraison demandait à Nico de supprimer l'icône de l'écran

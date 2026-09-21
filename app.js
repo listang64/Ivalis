@@ -986,10 +986,58 @@ async function recupererPartiesEnCours() {
   return parties;
 }
 
+// =========================================================================
+//  LE MOT DE PASSE EST DÉJÀ LÀ AVANT QU'ON LE DEMANDE
+// =========================================================================
+//  Sur iPad, et sur iPad seulement, la vérification du mot de passe restait
+//  parfois plantée sur « Vérification... » pendant très longtemps. Ce n'était
+//  pas le calcul — c'est une comparaison de deux chaînes — mais l'aller-retour
+//  réseau : la fonction allait redemander à Firestore le document de la partie.
+//
+//  Or CE DOCUMENT EST DÉJÀ LÀ. `ecouterPartiesEnCours` écoute la collection des
+//  parties en cours depuis l'ouverture de la page, bien avant que le joueur
+//  tape quoi que ce soit, et chaque document qui arrive par cette écoute porte
+//  TOUS ses champs, mot de passe compris — on n'en gardait que le nom et
+//  l'identifiant, et on rejetait le reste pour aller le rechercher ensuite.
+//
+//  Le `getDoc` d'un document déjà connu n'est pas gratuit : il part quand même
+//  au serveur (il ne se rabat sur le cache local que hors ligne), et sur une
+//  connexion qui se dégrade, il attend. C'est là que passait le temps.
+//
+//  Le mot de passe est donc retenu au passage, dans une table qui ne vit qu'en
+//  mémoire et qui n'est pas posée sur `window` : la vérification devient
+//  immédiate et ne demande plus rien à personne. L'écoute étant permanente, un
+//  mot de passe changé depuis un autre poste arrive de lui-même.
+const MDP_PARTIES = new Map();
+
+// Le filet pour le cas où l'écoute n'a rien livré (première ouverture, réseau
+// coupé au démarrage) : on redemande le document, mais on ne reste pas planté
+// indéfiniment devant un serveur muet. Au-delà, on le dit au joueur.
+window.PATIENCE_LECTURE_PARTIE = 8000;
+
+function avecPatience(promesse, ms) {
+  return Promise.race([
+    promesse,
+    new Promise((_, rejeter) => setTimeout(() => rejeter(new Error("délai dépassé")), ms))
+  ]);
+}
+
+// Rend un verdict, pas un booléen : « faux » ne dit pas si le mot de passe est
+// mauvais ou si la base n'a pas répondu, et afficher « mot de passe incorrect »
+// à quelqu'un dont le réseau a lâché est un mensonge qui coûte cher.
 async function verifierMotDePassePartie(idPartie, mdpSaisi) {
-  const snap = await getDoc(doc(db, COL.PARTIES, idPartie));
-  if (!snap.exists()) return false;
-  return nettoyer(snap.data().Mot_De_Passe) === nettoyer(mdpSaisi);
+  if (MDP_PARTIES.has(idPartie)) {
+    return { ok: nettoyer(MDP_PARTIES.get(idPartie)) === nettoyer(mdpSaisi), source: "memoire" };
+  }
+  try {
+    const snap = await avecPatience(getDoc(doc(db, COL.PARTIES, idPartie)),
+                                    window.PATIENCE_LECTURE_PARTIE);
+    if (!snap.exists()) return { ok: false, source: "reseau", raison: "introuvable" };
+    return { ok: nettoyer(snap.data().Mot_De_Passe) === nettoyer(mdpSaisi), source: "reseau" };
+  } catch (e) {
+    console.warn("Lecture de la partie impossible :", e);
+    return { ok: false, source: "reseau", raison: "injoignable" };
+  }
 }
 
 // --- Factions (menu deroulant) ---
@@ -2358,7 +2406,13 @@ function ecouterPartiesEnCours() {
     const parties = [];
     snap.forEach((document) => {
       const d = document.data();
-      parties.push({ id: d.ID_Partie || document.id, nom: d.Nom_Du_Groupe || "" });
+      const id = d.ID_Partie || document.id;
+      // LE MOT DE PASSE VOYAGE AVEC LE DOCUMENT : on le retient au lieu de le
+      // jeter pour aller le rechercher au moment où le joueur attend (voir
+      // verifierMotDePassePartie). Il reste hors de `window`, dans une table
+      // que seul ce module voit.
+      MDP_PARTIES.set(id, d.Mot_De_Passe || "");
+      parties.push({ id, nom: d.Nom_Du_Groupe || "" });
     });
     window.LISTE_PARTIES_CACHE = parties;
   }, (err) => console.error("onSnapshot Parties :", err));
@@ -3510,15 +3564,20 @@ async function validerMdpPartie() {
   // tiennent en trois lignes de console à recopier.
   const depart = Date.now();
   btnValider.innerText = "Vérification...";
-  const estValide = await verifierMotDePassePartie(idPartie, saisie);
-  console.log("⏱️ mot de passe vérifié en " + (Date.now() - depart) + " ms");
+  const verdict = await verifierMotDePassePartie(idPartie, saisie);
+  console.log("⏱️ mot de passe vérifié en " + (Date.now() - depart) + " ms"
+              + " (" + (verdict.source === "memoire" ? "déjà en mémoire" : "lu sur le réseau") + ")");
   btnValider.innerText = "Déverrouiller";
 
-  if (estValide) {
+  if (verdict.ok) {
     document.getElementById("modale-mdp-partie").style.display = "none";
     lancerPartieChargee(idPartie);
   } else {
-    document.getElementById("msg-erreur-partie").style.display = "block";
+    const message = document.getElementById("msg-erreur-partie");
+    message.innerText = verdict.raison === "injoignable"
+      ? "Le Grimoire ne répond pas. Vérifie la connexion, puis réessaie."
+      : "Mot de passe incorrect.";
+    message.style.display = "block";
   }
 }
 
