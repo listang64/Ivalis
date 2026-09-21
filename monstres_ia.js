@@ -676,6 +676,14 @@ async function reclamerVerrouIA(cle) {
     const verrouRef = refVerrouIA(window.ID_PARTIE_COURANTE);
     const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
     for (let essai = 1; essai <= ESSAIS_VERROU; essai++) {
+        // LE VERROU ÉCRIT LUI AUSSI DANS Systeme_Parties/<id> (Verrou_IA, voir
+        // plus bas) — le même document que modifierPartieOuEchec dans combat.js.
+        // Le coupe-circuit qui y vit est PARTAGÉ : si ce document vient de rendre
+        // resource-exhausted côté carte jouée, on attend la même pause ici plutôt
+        // que de retenter aussitôt et d'entretenir la rafale de quota.
+        if (typeof window.attendreCoupeCircuitPartie === "function") {
+            await window.attendreCoupeCircuitPartie();
+        }
         try {
             return await runTransaction(db, async (tx) => {
                 // DEUX EMPLACEMENTS, LUS ET ÉCRITS ENSEMBLE. Le verrou a
@@ -726,7 +734,18 @@ async function reclamerVerrouIA(cle) {
             // Une transaction bousculée n'est pas un refus : c'est un « recommence ».
             // Renoncer ici, c'est laisser la créature sans personne pour la jouer —
             // ou, pire, laisser l'autre poste croire qu'il est seul.
-            if (essai < ESSAIS_VERROU) {
+            if (e && e.code === "resource-exhausted" && typeof window.PAUSE_ECRITURE_PARTIE !== "undefined") {
+                // Le quota du document est dépassé, pas juste une course perdue :
+                // on lève le même coupe-circuit que modifierPartieOuEchec pour que
+                // plus personne ne tape sur Systeme_Parties/<id> pendant la pause.
+                const pause = 1000 * Math.pow(2, essai - 1) + Math.floor(Math.random() * 400);
+                window.PAUSE_ECRITURE_PARTIE = Date.now() + pause;
+                if (typeof window.tracerCombat === "function") {
+                    window.tracerCombat("⛔", `quota Firestore dépassé sur le verrou (essai ${essai})`,
+                                        `coupe-circuit levé ${pause} ms`);
+                }
+                if (essai < ESSAIS_VERROU) continue;
+            } else if (essai < ESSAIS_VERROU) {
                 if (typeof window.tracerCombat === "function") {
                     window.tracerCombat("♻️", `verrou bousculé (essai ${essai})`, cle);
                 }

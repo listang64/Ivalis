@@ -22,7 +22,10 @@ const SRC_HELPERS = ['window.combattantsAttendus = function',
                      'window.modifierPartieOuEchec = async function',
                     'window.modifierPartie = async function',
                      'window.estCombattantMort = function']
-    .map(m => extraire('combat.js', m)).join('\n\n');
+    .map(m => extraire('combat.js', m)).join('\n\n')
+    // Le coupe-circuit partagé dont modifierPartieOuEchec a besoin dès son
+    // premier essai (voir transaction_partie.mjs pour l'explication complète).
+    + '\n\n' + extraire('combat.js', 'window.PAUSE_ECRITURE_PARTIE = window.PAUSE_ECRITURE_PARTIE || 0;', '}');
 
 // =========================================================================
 console.log("1. LE VERDICT NE DÉPEND PLUS DU POSTE QUI LE PREND");

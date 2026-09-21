@@ -40,7 +40,10 @@ const SRC_COMBAT = ['window.enregistrerPionsVTT = async function',
                     'window.reinitialiserCombat = async function']
     .map(m => extraire('combat.js', m)).join('\n\n')
     // Fonction de portée module (pas sur window) dont dépend trouverHexLibreAutour.
-    + '\n\n' + extraire('combat.js', 'function distanceHexVTT(a, b) {', '}');
+    + '\n\n' + extraire('combat.js', 'function distanceHexVTT(a, b) {', '}')
+    // Le coupe-circuit partagé dont modifierPartieOuEchec a besoin dès son
+    // premier essai (voir transaction_partie.mjs pour l'explication complète).
+    + '\n\n' + extraire('combat.js', 'window.PAUSE_ECRITURE_PARTIE = window.PAUSE_ECRITURE_PARTIE || 0;', '}');
 const SRC_CONVERSION = extraire('app.js', 'function persoDocVersFront(id, d) {', '}');
 const SRC_STATS_EQUIP = ['window.bonusEquip = function',
                          'window.paradeCombattant = function',

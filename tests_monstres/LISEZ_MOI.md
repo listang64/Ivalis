@@ -2062,3 +2062,29 @@ que le code va bien.
 ⚠️ `global.window` est unique. Pour comparer deux situations, réactiver le bon
 monde avec `activer(w)` avant chaque mesure, sinon les deux mesures portent sur
 le même monde et donnent évidemment le même résultat.
+
+`coupe_circuit_partie.mjs` répond à un combat qui s'est mis à bug d'un coup :
+la console montrait `Systeme_Parties/<id>` recevoir, à la même poignée de
+secondes et depuis le MÊME poste, des écritures venues de `modifierPartieOuEchec`
+(une carte jouée, un repos long) ET de `reclamerVerrouIA` (le verrou qui
+autorise l'IA à jouer un monstre) — pendant que Firestore rendait
+`resource-exhausted` (quota d'écritures dépassé, HTTP 429, pas une simple
+transaction doublée). Les deux boucles de retente ne se voyaient pas : chacune
+retentait de son côté avec sa propre attente, courte et pensée pour un
+« failed-precondition » ordinaire, et la rafale ne s'est jamais calmée — le
+combat est resté planté plus d'une minute. Les deux fonctions posent maintenant
+un coupe-circuit PARTAGÉ (`window.PAUSE_ECRITURE_PARTIE`, `window.
+attendreCoupeCircuitPartie()`) : dès que l'une des deux voit un
+resource-exhausted, elle lève une pause de plusieurs secondes, et TOUT LE MONDE
+— elle-même au prochain essai, l'autre fonction si elle s'y prend en même temps
+— l'attend avant de retaper le document, plutôt que d'ajouter une écriture de
+plus à un quota qui déborde déjà. Le banc rejoue les deux vraies fonctions sur
+le même faux Firestore scripté (un `resource-exhausted` puis des succès) et
+vérifie qu'aucun essai — ni de la carte, ni du verrou — ne tape le document
+avant la fin du coupe-circuit levé par l'autre. Note pour les autres bancs qui
+extraient `window.modifierPartieOuEchec` directement dans `combat.js`
+(`transaction_partie.mjs`, `tour_synchronise.mjs`, `campagne_complete.mjs`) :
+ils doivent désormais embarquer aussi le bloc du coupe-circuit
+(`window.PAUSE_ECRITURE_PARTIE = ...` jusqu'à `leverCoupeCircuitPartie`), sans
+quoi `modifierPartieOuEchec` plante dès son premier essai avec un
+`TypeError: window.attendreCoupeCircuitPartie is not a function`.

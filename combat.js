@@ -249,6 +249,39 @@ window.synchroniserCombattantsHorsJeu = async function(idsATerre) {
 // invitation à recommencer. On recommence donc, avec une attente qui s'allonge
 // et un grain de hasard pour que deux postes ne repartent pas ensemble.
 //
+// LE COUPE-CIRCUIT DU DOCUMENT DE PARTIE.
+//
+// Une trace de combat a montré ceci : le document Systeme_Parties/<id> reçoit
+// des écritures venues de DEUX endroits à la fois — une carte choisie ou un
+// repos long ici, un verrou d'IA repris dans monstres_ia.js — et les deux
+// retentent chacun de leur côté sur un « failed-precondition ». Tant que
+// Firestore refuse juste une transaction doublée, ce n'est pas grave : la
+// suivante passe. Mais quand le document devient si chaud qu'il rend
+// « resource-exhausted » (HTTP 429 — le quota d'écritures est dépassé, pas
+// juste une course perdue), retenter dans la seconde ne fait qu'ajouter une
+// écriture de plus à une pile qui déborde déjà : les deux boucles s'entretenaient
+// l'une l'autre sans jamais laisser le quota respirer, et le combat restait
+// planté plus d'une minute.
+// On pose donc un coupe-circuit PARTAGÉ entre les deux fichiers (via window,
+// comme modifierPartie l'est déjà pour monstres_ia.js) : quand ce document
+// rend resource-exhausted, tout le monde — nous y compris, la prochaine fois
+// qu'on repasse par ici — attend la fin de la pause avant de retenter quoi
+// que ce soit dessus.
+window.PAUSE_ECRITURE_PARTIE = window.PAUSE_ECRITURE_PARTIE || 0;
+
+window.attendreCoupeCircuitPartie = async function() {
+    const reste = window.PAUSE_ECRITURE_PARTIE - Date.now();
+    if (reste > 0) await new Promise(r => setTimeout(r, reste));
+};
+
+// Une seconde de base, doublée à chaque essai, avec du hasard pour que deux
+// postes ne relèvent pas le coupe-circuit à la même milliseconde.
+function leverCoupeCircuitPartie(essai) {
+    const pause = 1000 * Math.pow(2, essai - 1) + Math.floor(Math.random() * 400);
+    window.PAUSE_ECRITURE_PARTIE = Date.now() + pause;
+    return pause;
+}
+
 // modifierPartieOuEchec rend { ok, resultat } : `ok` faux veut dire que RIEN
 // n'a été écrit, et que l'appelant doit s'en occuper.
 window.modifierPartieOuEchec = async function(modifier) {
@@ -257,6 +290,7 @@ window.modifierPartieOuEchec = async function(modifier) {
     const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
     let derniere = null;
     for (let essai = 1; essai <= ESSAIS; essai++) {
+        await window.attendreCoupeCircuitPartie();
         try {
             const resultat = await runTransaction(db, async (tx) => {
                 const snap = await tx.get(partieRef);
@@ -269,12 +303,16 @@ window.modifierPartieOuEchec = async function(modifier) {
             return { ok: true, resultat };
         } catch (e) {
             derniere = e;
-            if (essai < ESSAIS) {
-                const attente = 150 * Math.pow(2, essai - 1) + Math.floor(Math.random() * 120);
+            if (e && e.code === "resource-exhausted") {
+                const pause = leverCoupeCircuitPartie(essai);
                 if (typeof window.tracerCombat === "function") {
-                    window.tracerCombat("♻️", `écriture de la partie bousculée (essai ${essai})`,
-                                        `on retente dans ${attente} ms`);
+                    window.tracerCombat("⛔", `quota Firestore dépassé sur la partie (essai ${essai})`,
+                                        `coupe-circuit levé ${pause} ms`);
                 }
+            } else if (essai < ESSAIS && typeof window.tracerCombat === "function") {
+                const attente = 150 * Math.pow(2, essai - 1) + Math.floor(Math.random() * 120);
+                window.tracerCombat("♻️", `écriture de la partie bousculée (essai ${essai})`,
+                                    `on retente dans ${attente} ms`);
                 await new Promise(r => setTimeout(r, attente));
             }
         }
