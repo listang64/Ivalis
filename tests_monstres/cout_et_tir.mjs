@@ -127,8 +127,20 @@ const preparer = () => p.evaluate((EFFETS) => {
   window.COMBAT_INDEX_PERSO = 0;
   window.REGIME_CERVEAU = true;
 
-  // L'ARC EN MAIN : c'est lui qui rendait tout « à distance ».
-  window.bonusEquip = (perso, cle) => (cle === "portee" ? 1 : 0);
+  // L'ARC EN MAIN, ET UNE BAGUE AU DOIGT — DE VRAIS OBJETS, pas un bonus de
+  // papier. C'est l'équipement réel qui décide de ce qu'une carte emprunte, et
+  // la règle ne se vérifie qu'avec des objets qu'on peut tenir : l'arc est une
+  // arme en main (il ne prête rien à une technique sans arme), la bague n'en
+  // est pas une (elle compte pour tout le monde).
+  window.PERSOS_PARTIE[0].equipMainDroite = {
+    uid: "arc", nom: "Arc court", type: "Arme légère Distance",
+    bonus: { portee: 1, degats: 3 },
+    etats: [{ etat: "Étourdi", chance: 100 }]
+  };
+  window.PERSOS_PARTIE[0].equipMainGauche = {
+    uid: "bague", nom: "Bague de sang", type: "Magie", bague: true,
+    bonus: { degats: 2 }
+  };
 
   // Les Effets_Compiles sont ce que la Forge a GRAVÉ sur la carte le jour où
   // elle a été créée : c'est ce texte-là que l'affichage réécrit.
@@ -322,6 +334,37 @@ if (!idAttaque || !idDistance) {
            vueRp.mentionsDistance === 0, vueRp.texte.replace(/\s+/g, " ").slice(0, 140));
 
   console.log("\n=========================================================");
+  console.log("  2 sexies. LES DÉGÂTS DE L'ARME NON PLUS");
+  console.log("=========================================================");
+  // Même règle, appliquée aux chiffres : l'épée qu'on ne dégaine pas ne prête
+  // pas ses dégâts plats à un coup de coude, et le gourdin resté à la ceinture
+  // n'étourdit personne. La bague, elle, n'est pas l'arme dont on ne se sert
+  // pas : elle compte dans les deux cas.
+  const equipee = await p.evaluate(() => {
+    const carte = (arme) => {
+      const state = {
+        attaques: [{ nom: "Attaque lourde", typeRes: "Physique", valeurBrute: 10, cibles: ["M1"] }],
+        alterations: []
+      };
+      window.appliquerEquipementALaCarte(state, window.PERSOS_PARTIE[0], arme);
+      return {
+        degats: state.attaques[0].valeurBrute,
+        etats: (state.alterations || []).map(a => a.nom)
+      };
+    };
+    return { normale: carte("Arme légère Distance"), sansArme: carte("Sans arme / Arme rp") };
+  });
+
+  verifier("une technique normale prend l'arc ET la bague (10 + 3 + 2)",
+           equipee.normale.degats === 15, String(equipee.normale.degats));
+  verifier("et l'état que l'arc inflige en frappant",
+           equipee.normale.etats.includes("Étourdi"), JSON.stringify(equipee.normale.etats));
+  verifier("LA TECHNIQUE SANS ARME NE PREND QUE LA BAGUE (10 + 2)",
+           equipee.sansArme.degats === 12, String(equipee.sansArme.degats));
+  verifier("ET ELLE N'ÉTOURDIT PERSONNE",
+           !equipee.sansArme.etats.includes("Étourdi"), JSON.stringify(equipee.sansArme.etats));
+
+  console.log("\n=========================================================");
   console.log("  2 quinquies. L'ENCART DE TOUR DIT LE MÊME NOMBRE");
   console.log("=========================================================");
   // Deux écrans à un mètre l'un de l'autre qui annoncent deux portées
@@ -370,6 +413,30 @@ if (!idAttaque || !idDistance) {
   verifier("AVEC SON COÛT, alors que la globale était à zéro",
            envoye.length === 1 && envoye[0].charge.coutFatigue === 25,
            String(envoye.length === 1 ? envoye[0].charge.coutFatigue : "—"));
+
+  console.log("\n=========================================================");
+  console.log("  4. LA CHAÎNE ENTIÈRE, JUSQU'À CE QUE LE CERVEAU REÇOIT");
+  console.log("=========================================================");
+  // Les contrôles précédents appellent les fonctions une par une. Celui-ci joue
+  // le geste complet — ciblage, résolution, envoi — et regarde le seul chiffre
+  // qui compte vraiment : celui que le cerveau applique. Entre les deux il y a
+  // un piège réel : à la résolution, il n'y a plus de dataCarte sous la main,
+  // et la catégorie d'arme doit donc voyager AVEC l'état de ciblage.
+  const auCerveau = await p.evaluate(async (idCarte) => {
+    window.APPELS = [];
+    await window.demarrerCiblage(idCarte);
+    const arme = window.ETAT_CIBLAGE.armeDeLaCarte;
+    window.ETAT_CIBLAGE.attaques.forEach(a => { a.cibles = ["M1"]; });
+    await window.declencherResolutionAvecBondEventuel("H1", idCarte);
+    const charge = (window.APPELS[0] || {}).charge || {};
+    return { arme, degats: ((charge.attaques || [])[0] || {}).valeurBrute };
+  }, "C_RP");
+
+  verifier("la catégorie d'arme de la carte voyage avec le ciblage",
+           auCerveau.arme === "Sans arme / Arme rp", String(auCerveau.arme));
+  // 2 de base (l'attaque lourde réelle) + 2 de la bague, sans les 3 de l'arc.
+  verifier("ET LE CERVEAU REÇOIT DES DÉGÂTS SANS L'ARME : la bague seule",
+           auCerveau.degats === 4, String(auCerveau.degats));
 }
 
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 2).join(" | "));

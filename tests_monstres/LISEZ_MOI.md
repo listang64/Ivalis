@@ -1167,7 +1167,7 @@ Le reste de la chaîne est tenu ailleurs : `cerveau_combat.mjs` vérifie qu'un
 tour de créature émet bien une étape « pas » par case, et `pont_combat.mjs`
 qu'une étape « pas » appelle l'animation quel que soit le pion.
 
-## Une seule ligne pour la portée, et l'arc ne prête rien aux mains nues
+## Une seule ligne pour la portée, et l'arme ne prête rien aux mains nues
 
 **Deux nombres pour une seule chose.** La carte affichait la portée à deux
 endroits : sa ligne « Distance », gravée par la Forge le jour de sa création, et
@@ -1186,25 +1186,52 @@ La règle vit dans `moteur_effets.js` (`distanceAAfficher`, `texteDistanceReelle
 l'encart de tour. Deux écrans à un mètre l'un de l'autre qui annoncent deux
 portées différentes, c'est pire que pas de portée du tout.
 
-**L'arc ne prête rien aux techniques « Sans arme / Arme rp ».** Une technique de
+**L'arme ne prête RIEN aux techniques « Sans arme / Arme rp ».** Une technique de
 cette catégorie se joue à mains nues ou à la dague de ceinture, quelle que soit
 l'arme équipée — c'est tout son intérêt, et c'est pour ça qu'elle reste jouable
-quand les autres sont bloquées. Elle héritait pourtant du +1 de portée de l'arc,
-devenait un tir, et encaissait au passage le malus de tir à bout portant : un
-coup de coude qui porte à deux cases et perd trente pour cent au contact.
-`porteeAvecArme` reçoit désormais la catégorie d'arme de la carte et se retire
-devant celle-là.
+quand les autres sont bloquées. Elle héritait pourtant de tout : le +1 de portée
+de l'arc (elle devenait un tir, et encaissait au passage le malus de tir à bout
+portant — un coup de coude qui porte à deux cases et perd trente pour cent au
+contact), les dégâts plats de l'épée, et jusqu'à l'état que le gourdin inflige
+en frappant.
+
+La règle vit dans `objets.js`, qui est le seul module à savoir ce qu'est une
+**arme tenue en main** — par opposition à une bague, un bouclier ou une armure :
+
+- `objetsPourLaCarte(perso, armeDeLaCarte)` — les objets dont la carte profite ;
+- `bonusEquipPourCarte(perso, cle, armeDeLaCarte)` — le total de `bonusEquip`,
+  amputé de ce que les armes en main apportent quand la carte ne s'en sert pas.
+  On **soustrait** plutôt que de recalculer : `bonusEquip` additionne aussi les
+  bonus portés par les états (élan d'initiative, bénédictions), et ceux-là ne
+  doivent jamais être perdus en chemin ;
+- `etatsEquipementPourCarte(perso, armeDeLaCarte)` — l'étourdissement du
+  gourdin, mais seulement pour qui s'en sert.
+
+Ce qui reste, donc : l'armure, le bouclier, **les bagues** et les états du
+personnage. Une bague n'est pas l'arme dont on ne se sert pas.
+
+⚠️ La catégorie d'arme doit **voyager avec l'état de ciblage**
+(`ETAT_CIBLAGE.armeDeLaCarte`) : au moment de la résolution, il n'y a plus de
+`dataCarte` sous la main, et c'est pourtant là que l'équipement enrichit la
+carte. C'est exactement le même piège que le coût en énergie, une section plus
+bas.
 
 ```sh
 node cout_et_tir.mjs        # une seule ligne de portée, et le coup de coude reste au contact
 ```
 
-Le banc joue trois cartes sur un porteur d'arc : une au contact (qui gagne sa
-ligne), une à distance (dont la ligne passe de 3 à 4 hexagones), et une « Sans
-arme / Arme rp » (qui n'en gagne aucune et reste à une case). Il compare la
-ligne ajoutée à une vraie ligne d'effet **sur le rendu** — couleur, taille,
-graisse — parce que « le même format » ne se vérifie pas en relisant deux
-feuilles de style.
+Le banc joue trois cartes sur un héros qui porte **de vrais objets** — un arc
+(+1 portée, +3 dégâts, étourdissement) et une bague (+2 dégâts) — et non un
+`bonusEquip` bouchonné : la règle ne se vérifie qu'avec des objets qu'on peut
+tenir. Une carte au contact (qui gagne sa ligne de portée), une à distance (dont
+la ligne passe de 3 à 4 hexagones), et une « Sans arme / Arme rp » qui n'en
+gagne aucune, reste à une case, prend 10 + 2 de dégâts au lieu de 10 + 3 + 2, et
+n'étourdit personne. La chaîne entière est jouée jusqu'à ce que le cerveau
+reçoit, parce que c'est le seul chiffre qui compte vraiment.
+
+Il compare aussi la ligne de portée ajoutée à une vraie ligne d'effet **sur le
+rendu** — couleur, taille, graisse — parce que « le même format » ne se vérifie
+pas en relisant deux feuilles de style.
 
 ## Le mot de passe d'une partie était relu sur le réseau
 

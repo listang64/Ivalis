@@ -783,9 +783,56 @@ window.armesEnMain = function(perso) {
         !o.bague && window.TYPES_ARMES_FORGE.includes(o.type) && o.type !== "Magie");
 };
 
+// =========================================================================
+//  CE QU'UNE CARTE A LE DROIT D'EMPRUNTER À L'ÉQUIPEMENT
+// =========================================================================
+//  Une technique « Sans arme / Arme rp » se joue à mains nues ou à la dague de
+//  ceinture, QUELLE QUE SOIT l'arme équipée — c'est tout son intérêt, et c'est
+//  pour ça qu'elle reste jouable quand les autres sont bloquées. Elle n'a donc
+//  rien à emprunter à l'arme qu'on ne se sert pas : ni sa portée, ni son
+//  allonge, ni ses dégâts plats, ni l'état qu'elle inflige en frappant. Un coup
+//  de coude ne tire pas à deux cases parce qu'un arc pend dans le dos, et il
+//  n'étourdit personne parce qu'un gourdin est resté à la ceinture.
+//
+//  CE QUI RESTE, EN REVANCHE : l'armure, le bouclier, les bagues — rien de
+//  tout cela n'est l'arme dont on ne se sert pas — et les états portés par le
+//  personnage (élan d'initiative, bénédictions), qui ne viennent pas d'un objet
+//  tenu en main.
+window.CARTE_SANS_ARME = "Sans arme / Arme rp";
+
+// Les objets dont une carte donnée profite vraiment.
+window.objetsPourLaCarte = function(perso, armeDeLaCarte) {
+    const tous = window.objetsEquipes(perso);
+    if (armeDeLaCarte !== window.CARTE_SANS_ARME) return tous;
+    const armes = window.armesEnMain(perso);
+    return tous.filter(o => armes.indexOf(o) === -1);
+};
+
+// Le même total que window.bonusEquip, amputé de ce que les armes en main
+// apportent quand la carte ne s'en sert pas. On soustrait plutôt que de
+// recalculer : bonusEquip additionne AUSSI les bonus portés par les états, et
+// ceux-là ne doivent jamais être perdus en chemin.
+window.bonusEquipPourCarte = function(perso, cle, armeDeLaCarte) {
+    const total = typeof window.bonusEquip === "function" ? window.bonusEquip(perso, cle) : 0;
+    if (!perso || armeDeLaCarte !== window.CARTE_SANS_ARME) return total;
+    let desArmes = 0;
+    window.armesEnMain(perso).forEach(o => {
+        desArmes += parseInt((o.bonus || {})[cle]) || 0;
+    });
+    return total - desArmes;
+};
+
+// Les états que l'équipement inflige en frappant, pour une carte donnée.
+window.etatsEquipementPourCarte = function(perso, armeDeLaCarte) {
+    const etats = [];
+    window.objetsPourLaCarte(perso, armeDeLaCarte)
+          .forEach(o => (o.etats || []).forEach(e => etats.push(e)));
+    return etats;
+};
+
 // null = la carte peut partir ; sinon, la phrase à montrer au joueur.
 window.raisonBlocageCarte = function(perso, arme) {
-    if (!perso || !arme || arme === "Sans arme / Arme rp" || arme === "Non spécifié") return null;
+    if (!perso || !arme || arme === window.CARTE_SANS_ARME || arme === "Non spécifié") return null;
 
     // Aucune contrainte de main pour la magie : le sort part toujours.
     if (arme === "Magie") return null;

@@ -1761,6 +1761,12 @@ window.demarrerCiblage = async function(idCarte, options) {
     const carteConstruite = {
         actif: true,
         idCarte: idCarte,
+        // LA CATÉGORIE D'ARME DE LA CARTE VOYAGE AVEC ELLE, pour la même raison
+        // que son coût : au moment de la résolution, il n'y a plus de dataCarte
+        // sous la main, et c'est pourtant là que l'équipement enrichit la carte.
+        // Sans elle, une technique « Sans arme / Arme rp » reprendrait les
+        // dégâts de l'épée qu'elle n'utilise pas (voir objets.js).
+        armeDeLaCarte: dataCarte.Arme || "",
         // LE COÛT DE LA CARTE VOYAGE AVEC LA CARTE, et c'est tout le correctif.
         //
         // Il était lu dans window.COUT_COMPETENCE_SELECTIONNEE, une globale que
@@ -2513,26 +2519,24 @@ window.porteeReelleCarte = function(dataCarte, lanceur) {
     return meilleure;
 };
 
-// LA CATÉGORIE QUI NE SE SERT PAS DE L'ARME PORTÉE.
+// UNE ARME NE PRÊTE RIEN À UNE TECHNIQUE QUI NE S'EN SERT PAS.
 //
-// Une technique « Sans arme / Arme rp » se joue à mains nues ou à la dague de
-// ceinture, QUELLE QUE SOIT l'arme équipée — c'est tout son intérêt, et c'est
-// pour ça qu'elle reste jouable quand les autres sont bloquées. Elle n'a donc
-// rien à emprunter à l'arc : un coup de poing ne tire pas à deux cases parce
-// qu'un arc pend dans le dos, et il ne gagne pas non plus l'allonge d'une
-// lance restée à la ceinture.
+// La règle entière — quels objets profitent à quelle carte — vit dans
+// objets.js (`bonusEquipPourCarte`), parce que c'est le module qui sait ce
+// qu'est une arme tenue en main, par opposition à une bague, un bouclier ou une
+// armure. Ici on ne fait que lire.
 //
-// Sans cette règle, le porteur d'arc voyait TOUTES ses cartes devenir des tirs,
-// y compris celle qui décrit un coup de coude — et elle encaissait au passage
-// le malus de tir à bout portant, ce qui est exactement l'inverse de ce qu'une
+// Sans elle, le porteur d'arc voyait TOUTES ses cartes devenir des tirs, y
+// compris celle qui décrit un coup de coude — et elle encaissait au passage le
+// malus de tir à bout portant, ce qui est exactement l'inverse de ce qu'une
 // technique de corps-à-corps doit faire.
-window.CARTE_SANS_ARME = "Sans arme / Arme rp";
-
 window.porteeAvecArme = function(lanceur, isRanged, rangeMax, armeDeLaCarte) {
     if (!lanceur || typeof window.bonusEquip !== "function") return { isRanged, rangeMax };
-    if (armeDeLaCarte === window.CARTE_SANS_ARME) return { isRanged, rangeMax };
-    const portee = window.bonusEquip(lanceur, "portee");
-    const allonge = window.bonusEquip(lanceur, "allonge");
+    const bonus = (cle) => (typeof window.bonusEquipPourCarte === "function")
+        ? window.bonusEquipPourCarte(lanceur, cle, armeDeLaCarte)
+        : window.bonusEquip(lanceur, cle);
+    const portee = bonus("portee");
+    const allonge = bonus("allonge");
     if (portee > 0) return { isRanged: true, rangeMax: rangeMax + portee + allonge };
     return { isRanged, rangeMax: rangeMax + allonge };
 };
@@ -2605,16 +2609,26 @@ function attaquesFrappantes(state) {
     return (state.attaques || []).filter(a => !a.isHeal && !a.isShield && (a.valeurBrute || 0) > 0);
 }
 
-window.appliquerEquipementALaCarte = function(state, lanceur) {
+// `armeDeLaCarte` est la catégorie d'arme de la technique (dataCarte.Arme).
+// Elle décide de ce que la carte a le droit d'emprunter : une technique
+// « Sans arme / Arme rp » ne prend ni les dégâts plats de l'épée qu'on ne
+// dégaine pas, ni l'état que le gourdin resté à la ceinture inflige en
+// frappant. L'armure, le bouclier, les bagues et les états du personnage, eux,
+// continuent de compter — voir objets.js, qui porte la règle.
+window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
     if (!state || !lanceur || state.equipementApplique) return;
     if (typeof window.bonusEquip !== "function") return;
     state.equipementApplique = true;   // une carte relancée ne doit pas cumuler deux fois
 
-    const degatsTous = window.bonusEquip(lanceur, "degats");
-    const degatsPhys = window.bonusEquip(lanceur, "degatsPhys");
-    const degatsMag  = window.bonusEquip(lanceur, "degatsMag");
-    const soin       = window.bonusEquip(lanceur, "soin");
-    const bonusDegatsPct = window.bonusEquip(lanceur, "degatsPct");
+    const bonus = (cle) => (typeof window.bonusEquipPourCarte === "function")
+        ? window.bonusEquipPourCarte(lanceur, cle, armeDeLaCarte)
+        : window.bonusEquip(lanceur, cle);
+
+    const degatsTous = bonus("degats");
+    const degatsPhys = bonus("degatsPhys");
+    const degatsMag  = bonus("degatsMag");
+    const soin       = bonus("soin");
+    const bonusDegatsPct = bonus("degatsPct");
 
     (state.attaques || []).forEach(attaque => {
         if (attaque.isShield) return;
@@ -2629,8 +2643,11 @@ window.appliquerEquipementALaCarte = function(state, lanceur) {
         if (bonusDegatsPct > 0) attaque.valeurBrute = Math.round(attaque.valeurBrute * (1 + bonusDegatsPct / 100));
     });
 
-    // Les états de l'arme visent exactement ce que la carte a frappé.
-    const etatsArme = typeof window.etatsEquipement === "function" ? window.etatsEquipement(lanceur) : [];
+    // Les états de l'arme visent exactement ce que la carte a frappé — et seule
+    // une carte qui se sert de l'arme y a droit.
+    const etatsArme = typeof window.etatsEquipementPourCarte === "function"
+        ? window.etatsEquipementPourCarte(lanceur, armeDeLaCarte)
+        : (typeof window.etatsEquipement === "function" ? window.etatsEquipement(lanceur) : []);
     if (etatsArme.length === 0) return;
 
     const frappees = attaquesFrappantes(state);
@@ -2762,7 +2779,7 @@ window.declencherResolution = async function() {
     // L'arme et l'armure enrichissent la carte AVANT que les dés ne tombent et
     // avant la diffusion : les dégâts plats et les états ajoutés partent donc
     // dans l'action, identiques pour tous les postes.
-    window.appliquerEquipementALaCarte(state, lanceurCrit);
+    window.appliquerEquipementALaCarte(state, lanceurCrit, state.armeDeLaCarte);
 
     // SOUS LE NOUVEAU RÉGIME : ON DEMANDE, ON NE RÉSOUT PAS.
     //
