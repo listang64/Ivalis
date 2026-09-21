@@ -1126,6 +1126,47 @@ node menage_images.mjs      # les cinq chemins qui abandonnent une image
 node suppression_perso.mjs  # effacer un héros emporte TOUTES ses images
 ```
 
+## Les créatures bondissent-elles comme les héros ?
+
+Question de Nico : « les ennemis, quand ils se déplacent, ont-ils aussi
+l'animation de saut comme les joueurs ? »
+
+**Oui — mesuré, pas déduit, et rien n'a eu besoin d'être ajouté.** Les deux
+passent par la même `jouerAnimationPas`, qui grossit l'image du pion de 12 % à
+chaque case. Profil relevé dans le navigateur, image par image :
+
+```
+héros    : 1.00 1.04 1.07 1.09 1.11 1.12 1.12 1.12 1.12 1.10 1.06 1.03 1.01 1.00
+créature : 1.02 1.06 1.09 1.11 1.12 1.12 1.12 1.12 1.12 1.08 1.05 1.02 1.01 1.00
+```
+
+**Mais la question méritait un banc**, parce que la réponse ne se lisait pas
+dans le code : l'animation agit sur `.token-img-main`, et les pions de créature
+sont construits par une AUTRE branche d'`appliquerTokensVTT` que ceux des
+joueurs — celle qui pose l'image commune des ennemis à la place du portrait.
+Une branche qui aurait oublié cette classe, ou l'aurait nommée autrement, et la
+créature glisserait sans bondir pendant que les héros sautillent. Aucun test de
+logique ne l'aurait vu.
+
+```sh
+node saut_deplacement.mjs   # le héros bondit, la créature bondit autant
+```
+
+Le banc construit de VRAIS pions avec le VRAI code, lance un pas sur chacun, et
+lit l'échelle CALCULÉE par le navigateur pendant l'animation — pas le style
+écrit, qui dirait « scale(1.12) » même si rien ne bougeait à l'écran.
+
+⚠️ Un piège rencontré en l'écrivant, noté ici parce qu'il se reproduira : un
+pion tire son image de **son entrée dans `TOKENS_VTT_DATA`** (`data.url`), pas
+de la fiche du personnage. Sans elle, l'image part sur `src="undefined"`, son
+`onerror` la passe en `display:none` — et une image cachée n'a pas d'échelle
+calculée. Le banc a d'abord annoncé que le héros ne bondissait pas : il ne
+bondissait pas parce qu'il n'était pas là.
+
+Le reste de la chaîne est tenu ailleurs : `cerveau_combat.mjs` vérifie qu'un
+tour de créature émet bien une étape « pas » par case, et `pont_combat.mjs`
+qu'une étape « pas » appelle l'animation quel que soit le pion.
+
 ## Une seule ligne pour la portée, et l'arc ne prête rien aux mains nues
 
 **Deux nombres pour une seule chose.** La carte affichait la portée à deux
