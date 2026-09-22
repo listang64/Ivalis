@@ -596,10 +596,11 @@ window.installerVoletCompetences = function() {
 // lire une variable dans une image-clé retrouverait l'ancien comportement au
 // lieu d'un volet coincé à mi-hauteur.
 // 26 px, c'était la longueur d'un ongle : sur l'iPad de Nico, on ne voyait
-// presque rien pendre, et personne n'avait l'idée de tirer dessus. On en laisse
-// pendre presque trois fois plus — de quoi reconnaître un bout de cuir à
-// l'autre bout de la table, sans pour autant montrer les bannières.
-window.POINTE_LANIERE_VISIBLE = 72;   // ce qui dépasse, en pixels d'écran
+// presque rien pendre, et personne n'avait l'idée de tirer dessus. On en a
+// laissé pendre presque trois fois plus, puis encore un peu plus — de quoi
+// reconnaître un bout de cuir à l'autre bout de la table, sans pour autant
+// montrer les bannières.
+window.POINTE_LANIERE_VISIBLE = 100;   // ce qui dépasse, en pixels d'écran
 
 window.calerVoletReplie = function() {
     const contenu = document.getElementById("volet-contenu");
@@ -4449,24 +4450,22 @@ function contenuTuilePiste(entree, cestSonTour) {
     // UNE CRÉATURE PORTE SON MÉDAILLON ROND, celui-là même qu'elle a sur le
     // plateau, et à la taille des portraits voisins : on reconnaît d'un coup
     // d'œil qui est qui sans avoir à lire un nom.
+    //
+    // LE HÉROS PORTE DÉSORMAIS LE MÊME MÉDAILLON ROND QUE LA CRÉATURE — celui
+    // de son PION sur le plateau (TOKENS_VTT_DATA[id].url), pas le portrait de
+    // sa fiche : c'est ce token-là qu'on reconnaît en un coup d'œil sur la
+    // carte, et la piste doit montrer la même chose. L'hexagone doré n'a plus
+    // de raison de traiter les deux camps différemment.
     const estEnnemi = !!perso.estMonstre && !perso.estIllusion;
     const imgUrl = estEnnemi
         ? window.IMAGE_TOKEN_ENNEMI
-        : (perso.urlCloudinary || "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1786114507/Les_humains_h0ubwh.png");
+        : (((window.TOKENS_VTT_DATA || {})[perso.idPersonnage] || {}).url
+           || perso.urlCloudinary
+           || "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1786114507/Les_humains_h0ubwh.png");
 
-    const hexagone = "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
-    const portrait = estEnnemi
-        ? `<div style="position: absolute; top: ${Math.round((H - L) / 2)}px; left: 0; width: ${L}px; height: ${L}px;
+    const portrait = `<div style="position: absolute; top: ${Math.round((H - L) / 2)}px; left: 0; width: ${L}px; height: ${L}px;
                        border-radius: 50%; overflow: hidden; z-index: 1;">
                <img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: contain;">
-           </div>`
-        : `<div style="position: absolute; inset: 0; z-index: 1;
-                       background: linear-gradient(135deg, #fbf5bd 0%, #c2a878 30%, #5c3a21 50%, #e8d5a5 80%, #ffffff 100%);
-                       clip-path: ${hexagone}; display: flex; align-items: center; justify-content: center;">
-               <div style="width: ${L - 5}px; height: ${H - 5}px; background-color: #1a0f08; clip-path: ${hexagone}; position: relative;">
-                   <img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: cover; object-position: top center;">
-                   <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 40%; background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);"></div>
-               </div>
            </div>`;
 
     // Le chiffre d'initiative, dans le même petit encart pour tout le monde.

@@ -461,7 +461,7 @@ console.log("=========================================================");
     };
   });
   verifier("LA LANIÈRE EST REMONTÉE, SEULE SA POINTE RESTE",
-           apres.pointe >= 55 && apres.pointe <= 95, `pointe à ${apres.pointe}px`);
+           apres.pointe >= 80 && apres.pointe <= 120, `pointe à ${apres.pointe}px`);
   verifier("et les bannières sont bien parties avec elle",
            apres.hautDesBannieres < 0, `haut = ${apres.hautDesBannieres}px`);
   verifier("le deck est verrouillé, pas effacé", apres.opacite === "0.4", apres.opacite);
@@ -576,7 +576,7 @@ console.log("\n  LA POINTE DE LA LANIÈRE DÉPASSE, ET C'EST ELLE QU'ON TIRE");
   // quelque chose, et le geste ne venait à personne : le seuil bas est donc
   // une exigence, pas une tolérance.
   verifier("LA POINTE DÉPASSE FRANCHEMENT EN HAUT DE L'ÉCRAN",
-           replie.pointe >= 55 && replie.pointe <= 95, `${replie.pointe}px sous le bord`);
+           replie.pointe >= 80 && replie.pointe <= 120, `${replie.pointe}px sous le bord`);
   verifier("mais SEULEMENT la pointe : le reste est bien remonté",
            replie.pointe < replie.hauteurLaniere / 4,
            `${replie.pointe} sur ${replie.hauteurLaniere}px de lanière`);

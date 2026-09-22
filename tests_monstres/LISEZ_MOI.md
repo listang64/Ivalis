@@ -2185,3 +2185,19 @@ dû apprendre à fournir son propre `window.regimeDuJeu` minimal (reflétant
 simplement `PARTIE_DATA`) : `acteurCourantCombat` (sequence_tour.js) ne lit
 plus jamais `PARTIE_DATA.File_Attente_Combat` directement, et ce banc n'a
 pas de vrai cerveau à côté de lui.
+
+`piste_initiative.mjs`, section 3 renommée : le héros portait un hexagone
+doré tiré du portrait de sa fiche (`perso.urlCloudinary`) dans la piste
+d'initiative, pendant que les créatures portaient déjà un médaillon rond. Il
+porte maintenant le même médaillon rond, avec l'image de son TOKEN de
+plateau (`TOKENS_VTT_DATA[id].url`, celle qu'on reconnaît déjà sur la carte)
+— pas le portrait de sa fiche, qui reste une image différente. Le monde du
+banc donne à H1 un token ET un portrait de fiche volontairement différents,
+pour vérifier que c'est bien le premier qui apparaît dans la piste. Mordant
+vérifié en remettant temporairement l'hexagone d'origine.
+
+`volet_competences.mjs` : la pointe de la lanière de cuir, repliée, dépasse
+maintenant de 100 px au lieu de 72 — Nico la voulait un peu plus visible.
+Les deux contrôles qui mesuraient sa hauteur exacte repliée (`>= 55 && <=
+95`) ont suivi (`>= 80 && <= 120`). Mordant vérifié en remettant
+temporairement `window.POINTE_LANIERE_VISIBLE` à 72.

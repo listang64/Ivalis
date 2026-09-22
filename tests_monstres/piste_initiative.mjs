@@ -129,7 +129,12 @@ const monde = () => p.evaluate(() => {
     fiche("M1", { camp: "Ennemi", estMonstre: true, prenom: "Invocateur de saignées", PV_Max: 45, PV_Actuels: 45 }),
     fiche("M2", { camp: "Ennemi", estMonstre: true, prenom: "Chien des tombes", PV_Max: 40, PV_Actuels: 20 })
   ];
-  window.TOKENS_VTT_DATA = { H1: { q: 0, r: 0 }, H2: { q: 0, r: 1 }, M1: { q: 2, r: 0 }, M2: { q: 3, r: 0 } };
+  // H1 a un portrait de fiche ET un token de plateau DIFFÉRENTS : c'est ce qui
+  // permet de vérifier que la piste montre bien le second, pas le premier.
+  window.TOKENS_VTT_DATA = {
+    H1: { q: 0, r: 0, url: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1786114507/token_h1_rond.png" },
+    H2: { q: 0, r: 1 }, M1: { q: 2, r: 0 }, M2: { q: 3, r: 0 }
+  };
   window.TOKEN_SELECTIONNE = null;
   window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[0]];
   window.COMBAT_INDEX_PERSO = 0;
@@ -264,14 +269,18 @@ console.log("\n2. QUI JOUE, QUI A JOUÉ");
 }
 
 // =========================================================================
-console.log("\n3. LES ENNEMIS : MÉDAILLON ROND, MÊME TAILLE, MÊME ENCART");
+console.log("\n3. TOUT LE MONDE PORTE LE MÊME MÉDAILLON ROND, MÊME TAILLE, MÊME ENCART");
 // =========================================================================
+// Le héros portait un hexagone doré tiré du portrait de sa fiche ; il porte
+// maintenant le même médaillon rond que les créatures, avec l'image de son
+// TOKEN de plateau — celle qu'on reconnaît déjà sur la carte — et non plus
+// le portrait de sa fiche.
 {
   const v = await lirePiste();
   const m1 = v.ordre.find(x => x.id === "M1");
   const h1 = v.ordre.find(x => x.id === "H1");
   verifier("la créature porte un médaillon rond", m1.rond === true);
-  verifier("le héros garde son hexagone", h1.rond === false);
+  verifier("LE HÉROS AUSSI, DÉSORMAIS — plus d'hexagone", h1.rond === true);
   verifier("et les deux font la même taille", Math.abs(m1.largeur - h1.largeur) < 1,
            `(${Math.round(m1.largeur)} vs ${Math.round(h1.largeur)})`);
   verifier("la créature a son chiffre d'initiative comme les autres", m1.initiative === "75", m1.initiative);
@@ -284,6 +293,14 @@ console.log("\n3. LES ENNEMIS : MÉDAILLON ROND, MÊME TAILLE, MÊME ENCART");
   });
   verifier("son portrait est l'image commune des ennemis",
            !!img && img.includes("IMG_2137"), String(img));
+
+  const imgH1 = await p.evaluate(() => {
+    const t = document.querySelector('.piste-tuile[data-id="H1"] img');
+    return t ? t.src : null;
+  });
+  verifier("LE HÉROS MONTRE L'IMAGE DE SON TOKEN, PAS LE PORTRAIT DE SA FICHE",
+           !!imgH1 && imgH1.includes("token_h1_rond") && !imgH1.includes("Les_humains_h0ubwh"),
+           String(imgH1));
 }
 
 // =========================================================================
