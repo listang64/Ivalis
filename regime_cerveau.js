@@ -14,12 +14,6 @@
 //   2. Le cerveau doit-il tourner maintenant ?
 //   3. Que faire de ce qui arrive du journal ?
 //
-//  LE DRAPEAU
-//  ----------
-//  `REGIME_CERVEAU` est éteint par défaut. Tant qu'il l'est, ce fichier ne fait
-//  strictement rien : le combat tourne exactement comme avant, avec l'ancienne
-//  synchronisation. C'est délibéré — un basculement qui ne se défait pas en une
-//  ligne est un basculement qu'on n'ose pas essayer un soir de partie.
 //
 //  QUI DEVIENT LE CERVEAU
 //  ----------------------
@@ -557,16 +551,7 @@ export function creerRegime(contexte) {
 }
 
 // =========================================================================
-//  2. LE DRAPEAU, ET CE QU'IL COMMANDE
-// =========================================================================
-//  Éteint, tout ce fichier est inerte et le jeu tourne comme avant. Allumé, le
-//  combat passe au nouveau régime. Une ligne dans les deux sens, et rien à
-//  supprimer pour revenir en arrière — c'est la condition pour oser essayer.
-//
-//  En jeu : `regimeCerveau(true)` dans la console, puis on relance un combat.
-
-// =========================================================================
-//  3. LA FABRIQUE — LE RÉGIME BRANCHÉ SUR LE VRAI JEU
+//  2. LA FABRIQUE — LE RÉGIME BRANCHÉ SUR LE VRAI JEU
 // =========================================================================
 //  `creerRegime` ne lit aucune variable globale : c'est ce qui permet au banc
 //  d'en faire tourner trois côte à côte. Cette fonction-ci est l'inverse : elle
@@ -1149,29 +1134,6 @@ function reglesDuJeu() {
 }
 
 if (typeof window !== "undefined") {
-    // LE NOUVEAU RÉGIME EST LE RÉGIME. Il était éteint par défaut le temps de
-    // l'essayer ; il ne l'est plus. L'ancien reste dans le dépôt — on ne
-    // supprime rien tant que le nouveau n'a pas tenu plusieurs vraies parties —
-    // mais il n'est plus le comportement par défaut de personne.
-    window.REGIME_CERVEAU = window.REGIME_CERVEAU !== false;
-
-    window.regimeCerveau = function(actif) {
-        if (actif === undefined) return window.REGIME_CERVEAU;
-        window.REGIME_CERVEAU = !!actif;
-        try { localStorage.setItem("REGIME_CERVEAU", actif ? "1" : "0"); } catch (e) {}
-        console.log(`%cRégime ${actif ? "CERVEAU" : "ANCIEN"} — relance un combat pour qu'il prenne effet.`,
-                    `color:${actif ? "#66ff99" : "#ffaa00"};font-weight:bold`);
-        return window.REGIME_CERVEAU;
-    };
-
-    // Le choix survit au rechargement : sur iPad, rouvrir la console pour
-    // retaper une ligne à chaque essai n'est pas une option.
-    try {
-        const choix = localStorage.getItem("REGIME_CERVEAU");
-        if (choix === "0") window.REGIME_CERVEAU = false;
-        if (choix === "1") window.REGIME_CERVEAU = true;
-    } catch (e) {}
-
     // =====================================================================
     //  LE RÉGIME DU JEU — UN SEUL, ET IL SUIT LA PARTIE
     // =====================================================================
@@ -1188,21 +1150,14 @@ if (typeof window !== "undefined") {
     window.regimeSuivreLaPartie = function(partie) {
         if (!partie) return;
 
-        // ON ANNONCE LE RÉGIME AU DÉBUT DE CHAQUE COMBAT, ALLUMÉ OU NON.
-        //
-        // La première vraie partie d'essai a tourné entièrement en ancien
-        // régime sans que rien ne le dise : la trace montrait des verrous et
-        // des Action_*, et il a fallu la relire ligne à ligne pour comprendre
-        // que le drapeau n'était simplement pas allumé. Une trace qui ne dit
-        // pas dans quel monde elle se trouve fait perdre une soirée.
+        // ON ANNONCE L'OUVERTURE DE CHAQUE COMBAT, dans la trace : ça reste le
+        // repère qui dit que ce poste-ci vient de passer en résolution.
         const phaseVue = partie.Phase_Combat || "Preparation";
         if (phaseVue === "Resolution" && phasePrecedente === "Preparation"
             && typeof window.tracerCombat === "function") {
-            window.tracerCombat("⚙️", `combat en régime ${window.REGIME_CERVEAU ? "CERVEAU" : "ANCIEN"}`,
-                                window.REGIME_CERVEAU ? "(un seul poste écrit)" : "(verrous et Action_*)");
+            window.tracerCombat("⚙️", "combat ouvert", "(un seul poste écrit)");
         }
 
-        if (!window.REGIME_CERVEAU) { phasePrecedente = phaseVue; return; }
         if (!window.ID_PARTIE_COURANTE || !window.ioCombatFirestore) return;
 
         // 1. On a changé de partie : on repart de zéro.
@@ -1470,9 +1425,8 @@ if (typeof window !== "undefined") {
         console.error("Combat arrêté : " + raison
                       + " — la cause est dans la ligne ❌ juste au-dessus de la trace.");
         if (REGIME) { REGIME.debrancher(); REGIME = null; partieSuivie = null; }
-        // Une seule fenêtre, et elle dit quoi faire. Pas de bascule silencieuse
-        // vers l'ancien régime : il est cassé, et le rendre à la table sans
-        // prévenir serait pire que de s'arrêter.
+        // Une seule fenêtre, et elle dit quoi faire. Pas de repli silencieux :
+        // rendre la table sans prévenir serait pire que de s'arrêter.
         try {
             alert("Le combat n'a pas pu démarrer.\n\n" + raison
                   + "\n\nRegarde la console (ligne ❌) pour la cause exacte, "
@@ -1482,10 +1436,9 @@ if (typeof window !== "undefined") {
 
     // LE COMBAT S'ARRÊTE (victoire, fuite, réinitialisation). On range.
     window.regimeFermerLeCombat = async function() {
-        // Même sans régime branché, l'état de la rencontre précédente doit
-        // partir : c'est justement quand il traîne qu'il empêche la suivante de
-        // s'ouvrir. On efface donc dans tous les cas.
-        if (!window.REGIME_CERVEAU) return;
+        // L'état de la rencontre précédente doit partir : c'est justement
+        // quand il traîne qu'il empêche la suivante de s'ouvrir. On efface
+        // donc dans tous les cas.
         if (!REGIME) {
             try {
                 if (window.ioCombatFirestore && window.ID_PARTIE_COURANTE) {
@@ -1536,7 +1489,7 @@ if (typeof window !== "undefined") {
     };
 
     window.regimeDemande = {
-        actif: () => !!(window.REGIME_CERVEAU && REGIME),
+        actif: () => !!REGIME,
         mouvement: (acteur, chemin, reserve) =>
             REGIME ? REGIME.demanderMouvement(acteur, chemin, reserve) : null,
         carte: (acteur, carte) => {

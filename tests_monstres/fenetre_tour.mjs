@@ -114,6 +114,22 @@ const res = await p.evaluate(async ({ sVoile, sSequence }) => {
   eval(sVoile);
   eval(sSequence);
 
+  // acteurCourantCombat (sequence_tour.js) lit désormais l'état AFFICHÉ du
+  // cerveau, plus jamais PARTIE_DATA.File_Attente_Combat directement — ce
+  // banc n'a pas de vrai cerveau (regime_cerveau.js n'est pas chargé ici), on
+  // lui fournit donc un état minimal qui reflète simplement PARTIE_DATA,
+  // reposé à chaque scénario par poser()/ecrireTour().
+  window.regimeDuJeu = () => ({
+    etatAffiche: () => {
+      const p = window.PARTIE_DATA || {};
+      return {
+        combat: p.ID_Rencontre || "",
+        phase: p.Phase_Combat || "Preparation",
+        file: (p.File_Attente_Combat || []).map(f => ({ id: f.idPersonnage, carte: f.idCarte || null }))
+      };
+    }
+  });
+
   const voile  = document.getElementById('voile-tour-combat');
   const nom    = document.getElementById('voile-tour-nom');
   const etats  = document.getElementById('voile-tour-etats');

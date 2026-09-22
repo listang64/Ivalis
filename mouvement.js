@@ -430,16 +430,15 @@ window.validerMouvement = async function() {
     const finalStep = window.CHEMIN_MOUVEMENT[window.CHEMIN_MOUVEMENT.length - 1];
     if (!finalStep) return;
 
-    // SOUS LE NOUVEAU RÉGIME : on envoie le CHEMIN, et rien d'autre.
+    // ON ENVOIE LE CHEMIN, ET RIEN D'AUTRE.
     //
-    // Tout ce qui suit ci-dessous — les attaques d'opportunité tranchées ici,
-    // les zones persistantes franchies, le coût déduit à la main, la position
-    // écrite en base — est calculé par le cerveau, pour tout le monde, à partir
-    // du seul chemin. C'est ce qui garantit que les trois écrans voient le même
-    // trajet : personne n'a plus à recalculer ce que quelqu'un d'autre a déjà
-    // décidé. Le pion ne bouge pas ici : il bougera au rythme du journal, un
-    // hexagone à la fois, comme chez les autres.
-    if (window.REGIME_CERVEAU && window.regimeDemande && window.regimeDemande.actif()) {
+    // Les attaques d'opportunité, les zones persistantes franchies, le coût,
+    // la position écrite en base — tout est calculé par le cerveau, pour tout
+    // le monde, à partir du seul chemin. C'est ce qui garantit que les trois
+    // écrans voient le même trajet : personne n'a plus à recalculer ce que
+    // quelqu'un d'autre a déjà décidé. Le pion ne bouge pas ici : il bougera
+    // au rythme du journal, un hexagone à la fois, comme chez les autres.
+    if (window.regimeDemande && window.regimeDemande.actif()) {
         const chemin = window.CHEMIN_MOUVEMENT.map(step => ({ q: step.q, r: step.r }));
 
         // LA COPIE LOCALE EST POSÉE AVANT D'ENVOYER, pas après.
@@ -469,14 +468,6 @@ window.validerMouvement = async function() {
         return await window.regimeDemande.mouvement(
             idPerso, chemin, window.COUT_COMPETENCE_SELECTIONNEE || 0);
     }
-
-    // Il n'existe plus d'autre chemin : l'ancien moteur (attaques d'opportunité
-    // et zones tranchées ici même, coût déduit à la main, écriture directe
-    // d'Action_Mouvement) a été supprimé une fois le cerveau devenu la seule
-    // vérité du déplacement. Voir declencherResolution (moteur_effets.js) pour
-    // l'explication complète — même situation, même traitement.
-    console.error("Ancien moteur de déplacement indisponible : active le régime cerveau.");
-    alert("Ce combat ne peut plus se jouer sans le régime cerveau (mode développeur → Régime cerveau).");
 };
 
 // =========================================================================

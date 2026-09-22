@@ -1934,8 +1934,7 @@ window.ecouterTerrainVTT = function() {
             // les remette en place. Voir fusionnerPionsVTT (pont_combat.js) :
             // on reprend de Firestore ce que le cerveau ignore (l'apparence),
             // jamais ce qu'il sait mieux (la position).
-            const etatCerveauOuvert = window.REGIME_CERVEAU
-                && typeof window.regimeDuJeu === "function" && window.regimeDuJeu()
+            const etatCerveauOuvert = typeof window.regimeDuJeu === "function" && window.regimeDuJeu()
                 && window.regimeDuJeu().etatPublie();
             const combattantsDuCerveau = etatCerveauOuvert ? etatCerveauOuvert.combattants : null;
 
@@ -4127,15 +4126,10 @@ window.ANIMATION_TOUR_EN_COURS = false;
 window.finDeTourCombat = async function(forcer = false, idQuiTermine = null) {
     if (!window.PEUT_PASSER_TOUR && !forcer) return;
 
-    // SOUS LE NOUVEAU RÉGIME : on ne fait pas avancer la file, on le DEMANDE.
-    // Le cerveau tranche — est-ce bien son tour, ce poste commande-t-il ce
-    // combattant — puis publie la file d'après avec son entrée de journal.
-    //
-    // Tout ce qui suit ci-dessous (la transaction, l'arbitrage du combattant
-    // attendu, les relances) existait pour empêcher deux postes d'avancer la
-    // file en même temps. Un seul l'écrit maintenant : il n'y a plus rien à
-    // empêcher.
-    if (window.REGIME_CERVEAU && window.regimeDemande && window.regimeDemande.actif()) {
+    // ON NE FAIT PAS AVANCER LA FILE, ON LE DEMANDE. Le cerveau tranche —
+    // est-ce bien son tour, ce poste commande-t-il ce combattant — puis
+    // publie la file d'après avec son entrée de journal.
+    if (window.regimeDemande && window.regimeDemande.actif()) {
         const teteNouvelle = ((window.PARTIE_DATA || {}).File_Attente_Combat || [])[0];
         const qui = idQuiTermine || (teteNouvelle ? teteNouvelle.idPersonnage : null);
         if (!qui) return;
@@ -4143,15 +4137,6 @@ window.finDeTourCombat = async function(forcer = false, idQuiTermine = null) {
         window.COUT_COMPETENCE_SELECTIONNEE = 0;
         return await window.regimeDemande.finDeTour(qui);
     }
-
-    // Il n'existe plus d'autre chemin : l'ancien moteur (la file avancée sous
-    // transaction ici même, le repos long et la régénération de fin de round
-    // calculés à la main, les zones décrémentées via sauvegarderZonesPersistantes)
-    // a été supprimé une fois le cerveau devenu la seule vérité du tour. Voir
-    // declencherResolution (moteur_effets.js) pour l'explication complète —
-    // même situation, même traitement.
-    console.error("Ancienne fin de tour indisponible : active le régime cerveau.");
-    alert("Ce combat ne peut plus se jouer sans le régime cerveau (mode développeur → Régime cerveau).");
 };
 
 // =========================================================================
@@ -5096,10 +5081,6 @@ window.actualiserBannieresEpuisees = function() {
     });
 };
 
-// GRANDE SUPPRESSION : window.deduireFatigueCarte n'existe plus. Elle payait
-// une carte en local (mémoire et base) pour l'ancien validerCarteCombat, sans
-// déclencher la fin de tour — le cerveau paie maintenant l'énergie lui-même,
-// au moment de résoudre la carte (coutFatigue, voir regimeDemande.carte).
 window.validerCarteCombat = async function(idCarte, idLanceur) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
 
@@ -5109,18 +5090,12 @@ window.validerCarteCombat = async function(idCarte, idLanceur) {
     const dataCarte = window.COMPETENCES_CACHE[idCarte];
     if (!dataCarte) return;
 
-    // SOUS LE NOUVEAU RÉGIME, MÊME UNE CARTE QUI NE FRAPPE RIEN PASSE PAR LE
-    // CERVEAU. C'est par ici que sortent les cartes qui n'ont personne à
-    // toucher : un lanceur paralysé, une Illusion seule, un Bond seul. Elles
-    // déduisaient leur énergie ICI, en mémoire ET en base, puis envoyaient une
-    // fin de tour toute nue. Résultat, à la table : le cerveau fermait le tour
-    // sans savoir qu'une carte avait été jouée, son état gardait l'énergie
-    // intacte, et la projection suivante EFFAÇAIT la déduction locale. La carte
-    // ne coûtait rien et ne faisait rien — une étape, et le tour est fini.
-    //
-    // On demande donc une carte, sans attaque ni altération : le cerveau paie
-    // l'énergie, ferme le tour, et les trois écrans voient la même chose.
-    if (window.REGIME_CERVEAU && window.regimeDemande && window.regimeDemande.actif()) {
+    // MÊME UNE CARTE QUI NE FRAPPE RIEN PASSE PAR LE CERVEAU. C'est par ici
+    // que sortent les cartes qui n'ont personne à toucher : un lanceur
+    // paralysé, une Illusion seule, un Bond seul. On demande une carte, sans
+    // attaque ni altération : le cerveau paie l'énergie, ferme le tour, et
+    // les trois écrans voient la même chose.
+    if (window.regimeDemande && window.regimeDemande.actif()) {
         const qui = idLanceur || persoActuel.idPersonnage;
         if (typeof window.tracerCombat === "function") {
             window.tracerCombat("🎴", `carte sans cible pour ${qui}`,
@@ -5133,14 +5108,6 @@ window.validerCarteCombat = async function(idCarte, idLanceur) {
             coutFatigue: parseInt(dataCarte.Fatigue) || 0
         });
     }
-
-    // Il n'existe plus d'autre chemin : l'ancien moteur (déduction locale de
-    // l'énergie puis fin de tour toute nue) a été supprimé une fois le cerveau
-    // devenu la seule vérité du tour. Voir declencherResolution
-    // (moteur_effets.js) pour l'explication complète — même situation, même
-    // traitement.
-    console.error("Ancienne carte sans cible indisponible : active le régime cerveau.");
-    alert("Ce combat ne peut plus se jouer sans le régime cerveau (mode développeur → Régime cerveau).");
 };
 
 // =========================================================================

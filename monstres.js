@@ -207,8 +207,7 @@ window.recomposerCombattants = function() {
     // avec le combat (une fiche corrigée, un monstre retouché) reconstruirait
     // sinon ce combattant à sa valeur d'AVANT le combat. Voir
     // fusionnerFichesCombat (pont_combat.js).
-    const etatCerveauOuvert = window.REGIME_CERVEAU
-        && typeof window.regimeDuJeu === "function" && window.regimeDuJeu()
+    const etatCerveauOuvert = typeof window.regimeDuJeu === "function" && window.regimeDuJeu()
         && window.regimeDuJeu().etatPublie();
     window.PERSOS_PARTIE = (etatCerveauOuvert && window.pontCombat
                             && typeof window.pontCombat.fusionnerFichesCombat === "function")

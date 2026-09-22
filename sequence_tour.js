@@ -131,7 +131,7 @@ const pause = (ms) => new Promise(r => setTimeout(r, ms));
 //  lui doit viser et se déplacer, son plateau reste dégagé. Le poste qui fait
 //  jouer une créature la voit donc lui aussi.
 window.acteurCourantCombat = function(partie) {
-    // SOUS LE NOUVEAU RÉGIME, LA FILE DE LA PARTIE NE VEUT PLUS RIEN DIRE.
+    // LA FILE DE LA PARTIE NE VEUT PLUS RIEN DIRE.
     //
     // Le cerveau écrit l'état, pas le document de la partie : File_Attente_Combat
     // y reste figée sur ce que la phase de préparation y a posé. Continuer à la
@@ -142,30 +142,24 @@ window.acteurCourantCombat = function(partie) {
     // On lit donc l'état AFFICHÉ par le spectateur : celui que cet écran montre
     // vraiment, pas celui que la base annonce. Un poste en retard raconte alors
     // son propre retard, ce qui est exactement ce qu'on veut.
-    if (window.REGIME_CERVEAU && typeof window.regimeDuJeu === "function") {
-        const regime = window.regimeDuJeu();
-        const etat = regime && regime.etatAffiche();
-        if (etat) {
-            // UN ÉTAT QUI PARLE D'UN AUTRE COMBAT N'ANNONCE PLUS PERSONNE. Sans
-            // cette ligne, l'écran restait sombre sur « le tour se prépare… »
-            // pour une technique de la rencontre PRÉCÉDENTE : plus rien
-            // n'arrivait jamais, et le joueur était enfermé derrière la fenêtre.
-            // C'est la même règle qu'à l'ouverture du combat — un état qui ne
-            // parle pas de CETTE rencontre est inerte, pas dangereux.
-            const rencontre = (window.PARTIE_DATA || {}).ID_Rencontre || "";
-            if (rencontre && etat.combat && etat.combat !== rencontre) return null;
-            if (etat.phase !== "Resolution") return null;
-            const tete = (etat.file || [])[0];
-            return tete ? { idPersonnage: tete.id, idCarte: tete.carte || null } : null;
-        }
-        // Le régime est allumé mais rien n'est encore publié : il n'y a pas de
-        // tour en cours, et surtout pas celui que la partie garde en mémoire.
+    if (typeof window.regimeDuJeu !== "function") return null;
+    const regime = window.regimeDuJeu();
+    const etat = regime && regime.etatAffiche();
+    if (!etat) {
+        // Rien n'est encore publié : il n'y a pas de tour en cours.
         return null;
     }
-
-    const p = partie || window.PARTIE_DATA || {};
-    if ((p.Phase_Combat || "Preparation") !== "Resolution") return null;
-    return (p.File_Attente_Combat || [])[0] || null;
+    // UN ÉTAT QUI PARLE D'UN AUTRE COMBAT N'ANNONCE PLUS PERSONNE. Sans cette
+    // ligne, l'écran restait sombre sur « le tour se prépare… » pour une
+    // technique de la rencontre PRÉCÉDENTE : plus rien n'arrivait jamais, et
+    // le joueur était enfermé derrière la fenêtre. C'est la même règle qu'à
+    // l'ouverture du combat — un état qui ne parle pas de CETTE rencontre est
+    // inerte, pas dangereux.
+    const rencontre = (window.PARTIE_DATA || {}).ID_Rencontre || "";
+    if (rencontre && etat.combat && etat.combat !== rencontre) return null;
+    if (etat.phase !== "Resolution") return null;
+    const tete = (etat.file || [])[0];
+    return tete ? { idPersonnage: tete.id, idCarte: tete.carte || null } : null;
 };
 
 window.jeJoueCeTour = function(partie) {
@@ -616,13 +610,12 @@ window.lireJournalCombat = async function() {
 
 // GRANDE SUPPRESSION : window.suivreSequenceTour n'existe plus. Elle ouvrait
 // l'écoute Firestore de l'ancien journal (Evenements_Combat) pour un poste qui
-// vient de charger la partie — son seul appelant (app.js) est dans le bloc
-// `if (!window.REGIME_CERVEAU)`, donc déjà inatteignable en pratique : le
-// cerveau publie et écoute son propre état (regime_cerveau.js, surPublication/
-// surFenetre), sans jamais passer par ce vieux journal. lireJournalCombat,
-// l'ANIMATIONS map et les variables partieEcoutee/arreterEcoute/arreterCompteur/
-// journalRepartDeZero restent : window.jouerSequenceTour (le bouton OK) et
-// window.oublierJournalCombat en dépendent encore, hors de ce bloc.
+// vient de charger la partie : le cerveau publie et écoute son propre état
+// (regime_cerveau.js, surPublication/surFenetre), sans jamais passer par ce
+// vieux journal. lireJournalCombat, l'ANIMATIONS map et les variables
+// partieEcoutee/arreterEcoute/arreterCompteur/journalRepartDeZero restent :
+// window.jouerSequenceTour (le bouton OK) et window.oublierJournalCombat en
+// dépendent encore.
 
 // =========================================================================
 //  CE QUE LA FENÊTRE DOIT MONTRER
@@ -731,11 +724,11 @@ window.programmerAnimationTour = function(nom, action, fn) {
 //  regarder deux tours différents à quelques secondes d'écart — ils rejouent
 //  les mêmes numéros, ils finiront au même point.
 window.jouerSequenceTour = function() {
-    // SOUS LE NOUVEAU RÉGIME, le OK appartient au spectateur : c'est lui qui
-    // tient le curseur et la file des entrées reçues. Il reste purement local —
-    // aucun poste n'attend un autre, chacun lit à son rythme et rattrape
-    // ensuite. Rien ne change pour le joueur : c'est le même clic.
-    if (window.REGIME_CERVEAU && window.regimeDemande && window.regimeDemande.actif()) {
+    // Le OK appartient au spectateur : c'est lui qui tient le curseur et la
+    // file des entrées reçues. Il reste purement local — aucun poste n'attend
+    // un autre, chacun lit à son rythme et rattrape ensuite. Rien ne change
+    // pour le joueur : c'est le même clic.
+    if (window.regimeDemande && window.regimeDemande.actif()) {
         if (typeof window.jouerSonClic === "function") window.jouerSonClic();
         const ouvert = window.regimeDemande.ok();
 

@@ -2160,3 +2160,28 @@ vrai bouton « + » de la ligne Constitution, appelle le vrai
 est écrit, pour vérifier la valeur SAUVEGARDÉE et pas seulement prévisualisée)
 et le vrai `afficherStatsFinales()` (l'affichage d'un héros déjà créé).
 Mordant vérifié en remettant temporairement l'ancienne formule.
+
+`drapeau_regime.mjs` a changé de sujet en même temps que le jeu : il
+s'appelait « le drapeau, et la promesse de retour arrière » et vérifiait que
+`window.REGIME_CERVEAU` (éteint par défaut) gardait intact, derrière lui,
+tout l'ancien moteur de synchronisation (verrous, Action_*), au cas où il
+faille y revenir après une soirée ratée. Nico a tranché : « le nouveau
+cerveau doit être le seul et unique solution possible ». Le drapeau, la case
+« Combat : nouveau régime (un seul cerveau) » des paramètres, la fabrique
+console `regimeCerveau(true)`, et tous les blocs `if (!window.
+REGIME_CERVEAU)` (ancienne synchro rejouée dans app.js, anciens moteurs de
+combat/déplacement/carte/fin de tour dans combat.js/mouvement.js/
+moteur_effets.js qui retombaient sur une alerte « active le régime cerveau »)
+ont été supprimés pour de bon — pas débranchés, supprimés. Le banc vérifie
+maintenant l'inverse de ce qu'il vérifiait avant : que REGIME_CERVEAU,
+basculerRegimeCerveau, regimeCerveau et la case à cocher ont bien disparu de
+CHAQUE fichier de production, qu'aucune redirection vers `regimeDemande`
+n'est restée sans sa garde (`window.regimeDemande && window.regimeDemande.
+actif()`, simplifiée puisqu'il n'y a plus qu'un régime à distinguer), et que
+tout ce que le cerveau garde de son ancienne cohabitation (transactions,
+projection, gestion des pannes, reprise après un cerveau mort) reste intact —
+supprimer une chose ne devait pas en abîmer une autre. `fenetre_tour.mjs` a
+dû apprendre à fournir son propre `window.regimeDuJeu` minimal (reflétant
+simplement `PARTIE_DATA`) : `acteurCourantCombat` (sequence_tour.js) ne lit
+plus jamais `PARTIE_DATA.File_Attente_Combat` directement, et ce banc n'a
+pas de vrai cerveau à côté de lui.

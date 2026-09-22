@@ -769,10 +769,10 @@ window.IA_MONSTRE_EN_COURS = false;
 // et window.jouerTourMonstre n'existent plus. Elles déroulaient le tour d'une
 // créature (cible, position, zone, dégâts) depuis ce fichier, en appelant
 // l'ancien moteur — un chemin devenu inaccessible : verifierTourIAMonstres ne
-// dépasse plus jamais la phase de préparation sous REGIME_CERVEAU (voir plus
-// bas), et RESOLUTIONS_LOCALES, dont attendreFinResolution dépendait, n'est
-// plus jamais alimenté. C'est le cerveau qui fait maintenant jouer les
-// créatures lui-même, avec ses propres cible/position/zone (ia_pure.js).
+// dépasse plus jamais la phase de préparation (voir plus bas), et
+// RESOLUTIONS_LOCALES, dont attendreFinResolution dépendait, n'est plus
+// jamais alimenté. C'est le cerveau qui fait maintenant jouer les créatures
+// lui-même, avec ses propres cible/position/zone (ia_pure.js).
 
 // =========================================================================
 //  9. POINT D'ENTRÉE — appelé à chaque changement de la partie
@@ -844,7 +844,7 @@ window.verifierTourIAMonstres = async function() {
     // jamais en résolution, et la piste d'initiative ne se lançait pas.
     //
     // On s'arrête donc ici dès qu'il ne s'agit plus de préparer.
-    if (window.REGIME_CERVEAU === true && !aPreparer) return;
+    if (!aPreparer) return;
 
     // Signe de vie : c'est lui qui garde le bouton "fin de tour" éteint pendant
     // qu'un monstre joue. S'il s'éteint (aucun poste ne fait plus tourner l'IA),
@@ -884,11 +884,11 @@ window.verifierTourIAMonstres = async function() {
     try {
         // GRANDE SUPPRESSION : le passage d'un combattant tombé en tête de file
         // (teteMorte) et le déroulement du tour d'une créature (jouerTourMonstre,
-        // avec son verrou dédié) sont partis. Le garde ci-dessus
-        // (REGIME_CERVEAU === true && !aPreparer) rend les deux cas impossibles :
-        // teteMorte exige phase !== "Preparation", jouer le tour aussi — et on
-        // n'arrive ici qu'avec aPreparer, donc phase === "Preparation". C'est le
-        // cerveau qui fait maintenant jouer les créatures lui-même.
+        // avec son verrou dédié) sont partis. Le garde ci-dessus (!aPreparer)
+        // rend les deux cas impossibles : teteMorte exige phase !== "Preparation",
+        // jouer le tour aussi — et on n'arrive ici qu'avec aPreparer, donc
+        // phase === "Preparation". C'est le cerveau qui fait maintenant jouer
+        // les créatures lui-même.
         if (phase === "Preparation") {
             await window.preparerCartesMonstres();
             // On repasse systématiquement : soit des créatures attendent encore

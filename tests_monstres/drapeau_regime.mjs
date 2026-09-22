@@ -1,20 +1,23 @@
-// LE DRAPEAU, ET LA PROMESSE DE RETOUR ARRIÈRE.
+// LE CERVEAU EST LE SEUL RÉGIME — ET LA SUPPRESSION DE L'ANCIEN EST DÉFINITIVE.
 //
-// Le nouveau régime ne vaut que si on peut l'éteindre. C'est la condition qu'on
-// s'est donnée : un basculement qui ne se défait pas en une ligne est un
-// basculement qu'on n'ose pas essayer un soir de partie, et on jouerait donc
-// toujours avec l'ancien.
+// Ce banc s'appelait « le drapeau, et la promesse de retour arrière » : le
+// nouveau régime vivait derrière `window.REGIME_CERVEAU`, éteint par défaut,
+// avec l'ancienne synchronisation intacte dans le dépôt au cas où il faille
+// y revenir. Cette promesse a été tenue le temps qu'il fallait, puis Nico a
+// tranché : « le nouveau cerveau doit être le seul et unique solution
+// possible ». Le drapeau, la case à cocher des paramètres, la fabrique
+// `regimeCerveau`, et tout ce que l'ancien régime laissait encore debout
+// (les messages « active le régime cerveau », les blocs `if (!window.
+// REGIME_CERVEAU)`) sont partis pour de bon.
 //
 // Ce banc-là ne fait tourner aucun combat : il LIT LE CODE DU JEU et vérifie
 // deux choses que rien d'autre ne peut vérifier.
 //
-//   1. Chaque point d'appel redirigé est bien derrière `window.REGIME_CERVEAU`.
-//      Un seul oubli, et le drapeau éteint ne rendrait pas exactement l'ancien
-//      comportement — la promesse serait fausse, et on ne s'en apercevrait
-//      qu'en jeu, un soir, au milieu d'un combat.
-//   2. L'ancien chemin est toujours là, entier. On DÉBRANCHE, on ne supprime
-//      pas : la suppression, c'est l'étape 7, et elle vient après une vraie
-//      partie jouée jusqu'au bout.
+//   1. Le drapeau et tout ce qui l'entourait ont bel et bien disparu, et n'y
+//      reviennent pas en douce à la prochaine modification.
+//   2. Ce que le cerveau garde de son ancienne cohabitation avec l'ancien
+//      monde (transactions, projection, gestion des pannes) reste intact —
+//      supprimer une chose ne doit pas en abîmer une autre.
 //
 // C'est un banc de structure, pas de comportement. Il attrape la classe
 // d'erreur qu'aucun test de combat ne peut voir.
@@ -32,23 +35,45 @@ const SOURCES = {
     'moteur_effets.js': lire('moteur_effets.js'),
     'sequence_tour.js': lire('sequence_tour.js'),
     'regime_cerveau.js': lire('regime_cerveau.js'),
+    'monstres.js': lire('monstres.js'),
+    'monstres_ia.js': lire('monstres_ia.js'),
     'pont_combat.js': lire('pont_combat.js'),
     'index.html': lire('index.html')
 };
 
 console.log("\n=========================================================");
-console.log("  LE DRAPEAU — CE QU'IL ÉTEINT, ET CE QU'IL LAISSE INTACT");
+console.log("  LE CERVEAU, SEUL RÉGIME — ET CE QU'IL LAISSE INTACT");
 console.log("=========================================================\n");
 
 // =========================================================================
-console.log("1. CHAQUE REDIRECTION EST DERRIÈRE LE DRAPEAU");
+console.log("1. LE DRAPEAU ET LA CASE ONT DISPARU POUR DE BON");
+// =========================================================================
+//  Une régression ici ne se verrait qu'en jeu, un soir, au milieu d'un combat
+//  qui repart soudain vers un chemin qu'on croyait mort.
+{
+    Object.entries(SOURCES).forEach(([fichier, src]) => {
+        verifier(`${fichier} ne connaît plus REGIME_CERVEAU`, !src.includes('REGIME_CERVEAU'));
+    });
+    verifier("window.regimeCerveau (la fabrique console) n'existe plus",
+             !SOURCES['regime_cerveau.js'].includes('window.regimeCerveau = function'));
+    verifier("window.basculerRegimeCerveau n'existe plus",
+             !SOURCES['app.js'].includes('window.basculerRegimeCerveau'));
+    verifier("la case à cocher a disparu des paramètres",
+             !SOURCES['index.html'].includes('toggle-regime-cerveau'));
+    verifier("plus aucun message ne renvoie vers un « régime cerveau » à activer",
+             !SOURCES['combat.js'].includes('active le régime cerveau')
+             && !SOURCES['mouvement.js'].includes('active le régime cerveau')
+             && !SOURCES['moteur_effets.js'].includes('active le régime cerveau'));
+}
+
+// =========================================================================
+console.log("\n2. CHAQUE REDIRECTION VERS LE CERVEAU EST GARDÉE PAREIL");
 // =========================================================================
 //  On cherche l'usage de `window.regimeDemande` dans le jeu, et on vérifie
-//  qu'aucun n'est atteignable sans que le drapeau soit allumé. La garde est
-//  toujours la même phrase — c'est voulu : une seule forme, donc une seule
-//  chose à relire.
+//  qu'aucun appel ne traîne hors de sa garde. La garde est toujours la même
+//  phrase — c'est voulu : une seule forme, donc une seule chose à relire.
 {
-    const GARDE = 'window.REGIME_CERVEAU && window.regimeDemande && window.regimeDemande.actif()';
+    const GARDE = 'window.regimeDemande && window.regimeDemande.actif()';
     const attendus = [
         ['combat.js', 'finDeTour', 'la fin de tour'],
         ['mouvement.js', 'mouvement', 'le déplacement'],
@@ -69,7 +94,7 @@ console.log("1. CHAQUE REDIRECTION EST DERRIÈRE LE DRAPEAU");
         if (fichier === 'regime_cerveau.js' || fichier === 'index.html') return;
         const src = SOURCES[fichier];
         const usages = (src.match(/window\.regimeDemande\.(finDeTour|mouvement|carte|ok)\(/g) || []).length;
-        const gardes = (src.match(/window\.REGIME_CERVEAU && window\.regimeDemande/g) || []).length;
+        const gardes = (src.match(/window\.regimeDemande && window\.regimeDemande\.actif\(\)/g) || []).length;
         if (usages === 0) return;
         verifier(`${fichier} : autant de gardes que d'usages`, gardes >= 1 && usages <= gardes,
                  `${usages} usage(s), ${gardes} garde(s)`);
@@ -77,45 +102,13 @@ console.log("1. CHAQUE REDIRECTION EST DERRIÈRE LE DRAPEAU");
 }
 
 // =========================================================================
-console.log("\n2. L'ANCIENNE SYNCHRONISATION A ÉTÉ DÉBRANCHÉE, PUIS SUPPRIMÉE");
+console.log("\n3. PLUS UNE SEULE TRACE DE L'ANCIENNE SYNCHRONISATION");
 // =========================================================================
-//  Sous le nouveau régime, la séquence de tour rejouerait un second journal
-//  par-dessus le premier, et l'IA ferait jouer les créatures en double — une
-//  fois là, une fois dans le cerveau. C'est très exactement le mécanisme des
-//  tours joués deux fois. Les deux appels sont donc éteints.
-//
-//  CE QUI A CHANGÉ DEPUIS L'ÉCRITURE DE CE BANC : à l'origine (étape 5), le
-//  code de l'ancien monde restait entier derrière le drapeau, pour qu'on
-//  puisse revenir en arrière après une vraie partie jouée au bout. Cette
-//  partie a été jouée, la grande suppression est venue : declencherResolution,
-//  validerMouvement, finDeTourCombat et validerCarteCombat gardent leur garde
-//  (le drapeau ÉTEINT lève toujours une alerte, jamais un silence ou un appel
-//  à du code disparu), mais leur ancien corps est parti. Les Action_Moteur/
-//  Action_Mouvement/Action_Poussee/... n'existent plus nulle part.
+//  L'ancien monde écrivait des champs Action_Moteur / Action_Mouvement /
+//  Action_Poussee / Action_Traction / Action_Peur directement dans le
+//  document de la partie. La grande suppression les a fait disparaître ; ce
+//  contrôle garde la promesse qu'ils ne reviennent pas par mégarde.
 {
-    const app = SOURCES['app.js'];
-    verifier("le nouveau régime a son point d'entrée dans la partie",
-             app.includes('window.regimeSuivreLaPartie(dataPartie)'));
-    verifier("l'ancienne synchro est sous condition", app.includes('if (!window.REGIME_CERVEAU) {'));
-
-    // Les deux appels doivent se trouver APRÈS l'ouverture du bloc, et avant sa
-    // fermeture : c'est ce qui prouve qu'ils sont dedans.
-    const debut = app.indexOf('if (!window.REGIME_CERVEAU) {');
-    const iSeq = app.indexOf('window.suivreSequenceTour(dataPartie)');
-    const iIA = app.indexOf('window.verifierTourIAMonstres();', debut);
-    verifier("la séquence de tour est dedans", debut > 0 && iSeq > debut, `(${debut} < ${iSeq})`);
-    verifier("l'IA des monstres aussi", iIA > debut, `(${iIA})`);
-
-    // La grande suppression (étape 7, annoncée en tête de ce banc) est passée
-    // par là : suivreSequenceTour n'existe plus, mais l'appel resté dans le
-    // bloc éteint est protégé par un typeof — il ne fait rien, il ne casse rien.
-    verifier("suivreSequenceTour est bien parti, et l'appel encore là ne casse rien",
-             !SOURCES['sequence_tour.js'].includes('window.suivreSequenceTour = function')
-             && app.includes('typeof window.suivreSequenceTour === "function"'));
-    verifier("le verrou de l'IA n'a pas bougé", lire('monstres_ia.js').includes('reclamerVerrouIA'));
-
-    // La grande suppression : plus une seule écriture des champs Action_*
-    // nulle part dans le jeu — ni sous l'ancien nom, ni sous un autre.
     ['Action_Moteur', 'Action_Mouvement', 'Action_Poussee', 'Action_Traction', 'Action_Peur']
         .forEach(champ => {
             verifier(`${champ} n'est plus écrit nulle part`,
@@ -123,48 +116,13 @@ console.log("\n2. L'ANCIENNE SYNCHRONISATION A ÉTÉ DÉBRANCHÉE, PUIS SUPPRIM�
                      && !SOURCES['mouvement.js'].includes(`${champ}:`)
                      && !SOURCES['moteur_effets.js'].includes(`${champ}:`));
         });
-    // Chaque point de coupure retombe sur le même message honnête, jamais sur
-    // du code mort ou un silence.
-    [['moteur_effets.js', 'Ancien moteur de combat indisponible'],
-     ['mouvement.js', 'Ancien moteur de déplacement indisponible'],
-     ['combat.js', 'Ancienne fin de tour indisponible'],
-     ['combat.js', 'Ancienne carte sans cible indisponible']]
-        .forEach(([fichier, message]) => {
-            verifier(`${fichier} retombe sur « ${message} »`, SOURCES[fichier].includes(message));
-        });
+    verifier("le verrou de l'IA n'a pas bougé", SOURCES['monstres_ia.js'].includes('reclamerVerrouIA'));
+    verifier("deduireFatigueCarte n'est plus défini nulle part",
+             !SOURCES['combat.js'].includes("window.deduireFatigueCarte ="));
 }
 
 // =========================================================================
-console.log("\n3. LE DRAPEAU EST ÉTEINT PAR DÉFAUT, ET IL SE GARDE");
-// =========================================================================
-//  Éteint par défaut : une page fraîchement rechargée joue comme avant, quoi
-//  qu'il arrive. Et le choix survit au rechargement, parce que rouvrir la
-//  console d'un iPad pour retaper une ligne à chaque essai n'est pas une option.
-{
-    const r = SOURCES['regime_cerveau.js'];
-    verifier("le drapeau naît ALLUMÉ — c'est le régime du jeu maintenant",
-             r.includes('window.REGIME_CERVEAU = window.REGIME_CERVEAU !== false;'));
-    verifier("et la case du panneau est cochée d'emblée",
-             SOURCES['index.html'].includes('id="toggle-regime-cerveau" checked'));
-    verifier("mais un « 0 » enregistré l'éteint toujours",
-             r.includes('if (choix === "0") window.REGIME_CERVEAU = false;'));
-    verifier("on l'allume d'une ligne", r.includes('window.regimeCerveau = function(actif)'));
-    verifier("et le choix survit au rechargement", r.includes('localStorage.setItem("REGIME_CERVEAU"'));
-    // Chaque fonction que l'ancien monde peut appeler doit sortir tout de suite
-    // quand le drapeau est éteint. On les nomme une par une : une garde
-    // manquante ne se verrait qu'en jeu.
-    [['regimeSuivreLaPartie', 'if (!window.REGIME_CERVEAU) { phasePrecedente = phaseVue; return; }'],
-     // Elle nettoie même quand aucun régime n'est branché : c'est justement
-     // quand un état périmé traîne qu'il empêche la rencontre suivante de
-     // s'ouvrir. Sa garde ne porte donc que sur le drapeau.
-     ['regimeFermerLeCombat', 'if (!window.REGIME_CERVEAU) return;\n        if (!REGIME) {']]
-        .forEach(([nom, garde]) => {
-            verifier(`${nom} sort tout de suite si le drapeau est éteint`, r.includes(garde));
-        });
-}
-
-// =========================================================================
-console.log("\n4. LE NOUVEAU RÉGIME N'ÉCRIT DANS L'ANCIEN MONDE QU'À UN SEUL ENDROIT");
+console.log("\n4. LE CERVEAU N'ÉCRIT DANS L'ANCIEN MONDE QU'À UN SEUL ENDROIT");
 // =========================================================================
 //  Le fichier du régime ne doit toucher ni au document de la partie, ni aux
 //  fiches, ni aux Action_*. S'il le faisait, on aurait deux écrivains — et
@@ -243,73 +201,37 @@ console.log("\n5. TOUT EST CHARGÉ PAR LA PAGE");
 }
 
 // =========================================================================
-console.log("\n6. LE DRAPEAU EST ATTEIGNABLE, ET LA TRACE DIT OÙ ON EST");
-// =========================================================================
-//  La première vraie partie d'essai a tourné entièrement en ancien régime sans
-//  que rien ne le dise : il a fallu relire la trace ligne à ligne pour
-//  comprendre que le drapeau n'était pas allumé. Deux corrections, et les deux
-//  sont vérifiées ici plutôt que promises.
-//
-//  Un drapeau qui n'est atteignable que par la console n'existe pas sur iPad :
-//  la console y est au bout d'un câble et d'un Mac. Autant dire qu'il n'était
-//  pas là où il fallait justement l'essayer.
-{
-    const html = SOURCES['index.html'];
-    const app = SOURCES['app.js'];
-    const r = SOURCES['regime_cerveau.js'];
-
-    verifier("le régime se coche depuis l'écran",
-             html.includes('id="toggle-regime-cerveau"'));
-    verifier("la case appelle bien la bascule",
-             html.includes('window.basculerRegimeCerveau(this.checked)'));
-    verifier("et la bascule existe", app.includes('window.basculerRegimeCerveau = function'));
-    verifier("la case reflète l'état réel du drapeau au chargement",
-             app.includes('caseRegime.checked = window.REGIME_CERVEAU === true'));
-
-    verifier("la trace annonce le régime au début d'un combat",
-             r.includes('combat en régime ${window.REGIME_CERVEAU ? "CERVEAU" : "ANCIEN"}'));
-    // Et elle l'annonce même quand le drapeau est ÉTEINT — sinon on retombe
-    // exactement dans le cas qui a coûté la soirée.
-    const iAnnonce = r.indexOf('combat en régime');
-    const iSortie = r.indexOf('if (!window.REGIME_CERVEAU) { phasePrecedente');
-    verifier("y compris quand il est éteint", iAnnonce > 0 && iAnnonce < iSortie,
-             `(annonce ${iAnnonce}, sortie ${iSortie})`);
-}
-
-// =========================================================================
-console.log("\n7. L'IA GARDE SON PREMIER MÉTIER : PRÉPARER LES CARTES");
+console.log("\n6. L'IA GARDE SON PREMIER MÉTIER : PRÉPARER LES CARTES");
 // =========================================================================
 //  verifierTourIAMonstres fait DEUX métiers, et un seul appartient au cerveau.
 //
 //    • Pendant la PRÉPARATION, elle fait choisir aux créatures leur technique
-//      et les inscrit dans la file d'initiative. C'est la phase de préparation,
-//      qui reste dans l'ancien monde — comme les joueurs qui choisissent leur
-//      carte.
+//      et les inscrit dans la file d'initiative — comme les joueurs qui
+//      choisissent leur carte.
 //    • Pendant la RÉSOLUTION, elle leur fait jouer leur tour. Ça, c'est le
-//      cerveau.
+//      cerveau, et elle s'en écarte d'elle-même.
 //
-//  Je l'avais coupée en entier. Les créatures ne posaient donc plus jamais
-//  leur carte, la file restait incomplète, la phase ne passait jamais en
-//  résolution, et la piste d'initiative ne se lançait pas — sans que rien dans
-//  la trace ne dise pourquoi. Ce chapitre existe pour que ça ne se reproduise
-//  pas silencieusement.
+//  Je l'avais coupée en entier une fois : les créatures ne posaient donc plus
+//  jamais leur carte, la file restait incomplète, la phase ne passait jamais
+//  en résolution, et la piste d'initiative ne se lançait pas — sans que rien
+//  dans la trace ne dise pourquoi. Ce chapitre existe pour que ça ne se
+//  reproduise pas silencieusement.
 {
     const app = SOURCES['app.js'];
-    const ia = lire('monstres_ia.js');
+    const ia = SOURCES['monstres_ia.js'];
 
-    // L'appel doit être HORS du bloc qui éteint l'ancienne synchro.
-    const bloc = app.indexOf('if (!window.REGIME_CERVEAU) {');
-    const iSeq = app.indexOf('window.suivreSequenceTour(dataPartie)');
-    const iIA = app.indexOf('window.verifierTourIAMonstres();');
-    verifier("le rejeu de l'ancien journal reste éteint", bloc > 0 && iSeq > bloc, `(${bloc} < ${iSeq})`);
-    verifier("mais l'IA des monstres est toujours appelée", iIA > 0);
-    verifier("et elle l'est dans les DEUX régimes", iIA > iSeq,
-             "l'appel doit venir après le bloc conditionnel, donc hors de lui");
+    // Plus de bloc conditionnel autour : l'appel est inconditionnel désormais.
+    // (window.suivreSequenceTour lui-même reste cité dans deux commentaires
+    // « GRANDE SUPPRESSION » historiques, qui documentent des fonctions déjà
+    // parties — ce n'est plus un appel vivant qu'on cherche ici.)
+    verifier("l'IA des monstres est appelée sans aucune condition de régime",
+             app.includes('window.verifierTourIAMonstres();')
+             && !app.includes('window.suivreSequenceTour('));
 
     // Et c'est monstres_ia.js qui sait lequel de ses deux métiers s'arrête.
-    verifier("l'IA s'écarte d'elle-même quand le cerveau tient la main",
-             ia.includes('if (window.REGIME_CERVEAU === true && !aPreparer) return;'));
-    const iGarde = ia.indexOf('window.REGIME_CERVEAU === true && !aPreparer');
+    verifier("l'IA s'écarte d'elle-même hors préparation",
+             ia.includes('if (!aPreparer) return;'));
+    const iGarde = ia.indexOf('if (!aPreparer) return;');
     const iPrepare = ia.indexOf('await window.preparerCartesMonstres()');
     verifier("la garde passe avant le seul métier qui reste", iGarde > 0 && iGarde < iPrepare,
              `(garde ${iGarde}, préparer ${iPrepare})`);
@@ -325,9 +247,9 @@ console.log("\n7. L'IA GARDE SON PREMIER MÉTIER : PRÉPARER LES CARTES");
 }
 
 // =========================================================================
-console.log("\n8. LE DRAPEAU COCHÉ EN COURS DE COMBAT NE RESTE PAS MUET");
+console.log("\n7. LE DRAPEAU COCHÉ EN COURS DE COMBAT NE RESTE PAS MUET");
 // =========================================================================
-//  Le cerveau se donne à l'OUVERTURE d'un combat. Cocher la case au milieu
+//  Le cerveau se donne à l'OUVERTURE d'un combat. Réclamer la main au milieu
 //  d'une rencontre déjà commencée n'ouvre donc rien — et aucun poste ne prend
 //  la main de son propre chef, ce serait une élection, et c'est précisément ce
 //  qu'on a supprimé. Il faut donc le dire, au lieu de laisser un plateau qui
@@ -350,7 +272,7 @@ console.log("\n8. LE DRAPEAU COCHÉ EN COURS DE COMBAT NE RESTE PAS MUET");
 }
 
 // =========================================================================
-console.log("\n9. UN COMBAT QUI NE PEUT PAS S'OUVRIR S'ARRÊTE, ET LE DIT");
+console.log("\n8. UN COMBAT QUI NE PEUT PAS S'OUVRIR S'ARRÊTE, ET LE DIT");
 // =========================================================================
 //  Refuser de publier un état incohérent est la bonne décision. Ce qui était
 //  faux, c'est ce qui suivait le refus.
@@ -370,9 +292,6 @@ console.log("\n9. UN COMBAT QUI NE PEUT PAS S'OUVRIR S'ARRÊTE, ET LE DIT");
     verifier("l'échec d'ouverture est traité, pas ignoré",
              r.includes('.then(() => REGIME.ouvrir(sourceDuJeu())).then(resultat => {'));
     verifier("un résultat vide est reconnu comme un échec", r.includes('if (resultat) return;'));
-    // ON NE RETOMBE PAS DANS L'ANCIEN RÉGIME. Il est cassé ; le rendre à la
-    // table sans prévenir, au milieu d'une rencontre, c'est offrir une soirée
-    // de bugs à la place d'un message clair. Un échec s'arrête franchement.
     verifier("le combat s'ARRÊTE au lieu de retomber dans l'ancien",
              r.includes('arreterLeCombat("le combat n\'a pas pu s\'ouvrir")'));
     verifier("et on ne rebascule jamais en douce",
@@ -400,19 +319,19 @@ console.log("\n9. UN COMBAT QUI NE PEUT PAS S'OUVRIR S'ARRÊTE, ET LE DIT");
 }
 
 // =========================================================================
-console.log("\n10. UNE SEULE OUVERTURE, ET UNE SEULE TRANSACTION");
+console.log("\n9. UNE SEULE OUVERTURE, ET UNE SEULE TRANSACTION");
 // =========================================================================
 //  Les trois postes voient la même notification au même instant : il faut donc
-//  que la base tranche qui ouvre. C'est la SEULE transaction de tout le nouveau
-//  régime — rien à voir avec le compteur d'événements d'avant, qui s'écrivait à
-//  chaque hexagone parcouru et surchauffait le document de la partie.
+//  que la base tranche qui ouvre. C'est la SEULE transaction de tout le
+//  régime — rien à voir avec le compteur d'événements d'avant, qui s'écrivait
+//  à chaque hexagone parcouru et surchauffait le document de la partie.
 {
     const app = SOURCES['app.js'];
     const depot = lire('depot_firestore.js');
     const spectateur = lire('spectateur_combat.js');
 
     verifier("l'accès Firestore sait réclamer", app.includes('async transaction(chemin, decider)'));
-    verifier("et c'est la seule transaction du nouveau régime",
+    verifier("et c'est la seule transaction du régime",
              (app.match(/runTransaction\(db/g) || []).length
              - (app.match(/runTransaction\(db, async \(tx\) => \{\n        const snap = await tx\.get\(ref\)/g) || []).length >= 0);
     verifier("l'ouverture passe par elle",
@@ -429,7 +348,7 @@ console.log("\n10. UNE SEULE OUVERTURE, ET UNE SEULE TRANSACTION");
 }
 
 // =========================================================================
-console.log("\n11. LA QUESTION QU'ON POSE AVANT D'OUVRIR");
+console.log("\n10. LA QUESTION QU'ON POSE AVANT D'OUVRIR");
 // =========================================================================
 //  « Y a-t-il un état publié ? » était la mauvaise question, et elle a coûté un
 //  essai entier : l'état de la rencontre précédente survivait à la
@@ -463,7 +382,7 @@ console.log("\n11. LA QUESTION QU'ON POSE AVANT D'OUVRIR");
 }
 
 // =========================================================================
-console.log("\n12. L'INTERFACE LIT LA FILE DE L'ÉTAT, ET ELLE Y RESTE");
+console.log("\n11. L'INTERFACE LIT LA FILE DE L'ÉTAT, ET ELLE Y RESTE");
 // =========================================================================
 //  Le combat s'ouvrait, jouait le tour de la première créature, et s'arrêtait :
 //  le joueur suivant ne pouvait rien faire, parce que douze endroits du jeu
@@ -513,7 +432,7 @@ console.log("\n12. L'INTERFACE LIT LA FILE DE L'ÉTAT, ET ELLE Y RESTE");
 }
 
 // =========================================================================
-console.log("\n13. LA CARTE D'UNE CRÉATURE PASSE PAR L'EXTRACTEUR DU JEU");
+console.log("\n12. LA CARTE D'UNE CRÉATURE PASSE PAR L'EXTRACTEUR DU JEU");
 // =========================================================================
 //  Les créatures lançaient une carte VIDE : elles marchaient, « renonçaient »,
 //  et on ne voyait ni animation ni dégât. La cause tenait à un champ qui
@@ -565,7 +484,7 @@ console.log("\n13. LA CARTE D'UNE CRÉATURE PASSE PAR L'EXTRACTEUR DU JEU");
 }
 
 // =========================================================================
-console.log("\n14. PLUS UNE SEULE PANNE MUETTE");
+console.log("\n13. PLUS UNE SEULE PANNE MUETTE");
 // =========================================================================
 //  Trois soirées de test perdues, et la même cause à chaque fois : quelque
 //  chose échouait sans le dire. Ce chapitre interdit les silences qu'on a payés.
@@ -603,18 +522,14 @@ console.log("\n14. PLUS UNE SEULE PANNE MUETTE");
     // 4. UNE CARTE SANS CIBLE PASSE PAR LE CERVEAU. Paralysie, Illusion seule,
     //    Bond seul : elles déduisaient l'énergie en local et en base, puis
     //    envoyaient une fin de tour nue — l'ancien chemin (deduireFatigueCarte,
-    //    l'appel direct à finDeTourCombat) est parti à la grande suppression,
-    //    remplacé par le même message honnête que partout ailleurs.
+    //    l'appel direct à finDeTourCombat) est parti à la grande suppression.
     const valider = c.slice(c.indexOf("window.validerCarteCombat = async function"));
     const finValider = valider.slice(0, valider.indexOf("\n};"));
     verifier("validerCarteCombat demande une carte au cerveau",
              finValider.includes("window.regimeDemande.carte("));
-    verifier("et retombe sur le message honnête, plus sur l'ancien chemin",
-             finValider.includes("Ancienne carte sans cible indisponible")
-             && !finValider.includes("window.deduireFatigueCarte(")
+    verifier("et ne retombe plus sur l'ancien chemin",
+             !finValider.includes("window.deduireFatigueCarte(")
              && !finValider.includes("window.finDeTourCombat("));
-    verifier("deduireFatigueCarte n'est plus défini nulle part",
-             !SOURCES['combat.js'].includes("window.deduireFatigueCarte ="));
 
     // 5. LE REPOS LONG EXISTE DANS LE CERVEAU. Il n'y était nulle part.
     verifier("le cerveau connaît le repos long", cerveau.includes('carte !== "REPOS_LONG"'));
@@ -650,7 +565,7 @@ console.log("\n14. PLUS UNE SEULE PANNE MUETTE");
 }
 
 // =========================================================================
-console.log("\n15. LE CERVEAU PEUT MOURIR, ET LA TABLE DOIT POUVOIR REPRENDRE");
+console.log("\n14. LE CERVEAU PEUT MOURIR, ET LA TABLE DOIT POUVOIR REPRENDRE");
 // =========================================================================
 {
     const r = SOURCES['regime_cerveau.js'];

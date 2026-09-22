@@ -2651,9 +2651,9 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
              window.verifierPointsApparition();
          }
 
-         // LE NOUVEAU RÉGIME, S'IL EST ALLUMÉ. C'est le seul point d'entrée du
-         // cerveau dans l'ancien monde : il regarde la phase, ouvre le combat
-         // quand elle passe en résolution, et publie ce qu'il a à publier.
+         // LE CERVEAU. C'est le seul point d'entrée du régime de combat : il
+         // regarde la phase, ouvre le combat quand elle passe en résolution,
+         // et publie ce qu'il a à publier.
          if (typeof window.regimeSuivreLaPartie === "function") {
              try {
                  window.regimeSuivreLaPartie(dataPartie);
@@ -2662,43 +2662,19 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
              }
          }
 
-         // L'ANCIEN REJEU — débranché, pas supprimé.
-         //
-         // Sous le nouveau régime, la séquence de tour rejouerait un second
-         // journal par-dessus celui du cerveau : deux récits du même combat sur
-         // le même écran. C'est le mécanisme des tours joués deux fois, et il
-         // n'y a aucune raison de le réinviter. Le drapeau éteint, cet appel se
-         // comporte exactement comme avant.
-         if (!window.REGIME_CERVEAU) {
-             // C'est elle qui sait si le tour en cours est déjà calculé et
-             // n'attend plus que les autres postes. Sans ce passage avant l'IA,
-             // la créature rejouerait son tour en boucle pendant l'attente
-             // (voir sequenceTourEnAttente, sequence_tour.js).
-             if (typeof window.suivreSequenceTour === "function") {
-                 try {
-                     window.suivreSequenceTour(dataPartie);
-                 } catch (e) {
-                     console.error("Séquence de tour :", e);
-                 }
-             }
-         }
-
-         // L'IA DES MONSTRES RESTE APPELÉE DANS LES DEUX RÉGIMES, et c'est
-         // volontaire : cette fonction fait DEUX métiers, et un seul appartient
-         // au cerveau.
+         // L'IA DES MONSTRES FAIT DEUX MÉTIERS, et un seul appartient au
+         // cerveau.
          //
          //   • Pendant la PRÉPARATION, elle fait choisir aux créatures leur
-         //     technique et les inscrit dans la file d'initiative. C'est la
-         //     phase de préparation, qui reste dans l'ancien monde — au même
+         //     technique et les inscrit dans la file d'initiative — au même
          //     titre que les joueurs qui choisissent leur carte.
-         //   • Pendant la RÉSOLUTION, elle leur fait jouer leur tour. Ça, c'est
-         //     le travail du cerveau, et verifierTourIAMonstres s'en écarte
-         //     d'elle-même quand le drapeau est levé.
+         //   • Pendant la RÉSOLUTION, elle leur fait jouer leur tour. Ça,
+         //     c'est le travail du cerveau, et verifierTourIAMonstres s'en
+         //     écarte d'elle-même.
          //
-         // La couper en entier, c'était supprimer aussi le premier métier : les
-         // créatures ne posaient plus leur carte, la file restait incomplète,
-         // et la phase ne passait jamais en résolution. La piste d'initiative
-         // ne se lançait pas, et rien dans la trace ne disait pourquoi.
+         // La couper en entier supprimerait aussi le premier métier : les
+         // créatures ne poseraient plus leur carte, la file resterait
+         // incomplète, et la phase ne passerait jamais en résolution.
          if (typeof window.verifierTourIAMonstres === "function") {
              window.verifierTourIAMonstres();
          }
@@ -4950,22 +4926,6 @@ window.basculerAffichageTokens = function(estActive) {
     window.actualiserAffichageTokens();
 };
 
-// LE NOUVEAU RÉGIME DE COMBAT, DEPUIS L'ÉCRAN.
-//
-// Il n'était atteignable que par la console, et c'était une erreur : sur iPad,
-// la console est au bout d'un câble et d'un Mac. Autant dire que le drapeau
-// n'existait pas là où il fallait justement l'essayer. Il se coche maintenant
-// comme le mode développeur, sur chaque appareil.
-window.basculerRegimeCerveau = function(estActive) {
-    if (typeof window.regimeCerveau === "function") window.regimeCerveau(!!estActive);
-    else { window.REGIME_CERVEAU = !!estActive;
-           try { localStorage.setItem("REGIME_CERVEAU", estActive ? "1" : "0"); } catch (e) {} }
-    if (typeof window.tracerCombat === "function") {
-        window.tracerCombat("⚙️", `régime ${estActive ? "CERVEAU" : "ANCIEN"}`,
-                            "relance un combat pour qu'il prenne effet");
-    }
-};
-
 window.basculerDevMode = function(estActive) {
     localStorage.setItem("ivalis_DEV_MODE", estActive ? "on" : "off");
     window.actualiserDevMode();
@@ -4974,12 +4934,6 @@ window.basculerDevMode = function(estActive) {
 window.actualiserDevMode = function() {
     const isDev = localStorage.getItem("ivalis_DEV_MODE") === "on";
 
-    // La case du nouveau régime reflète ce que le drapeau vaut vraiment — pas
-    // ce qu'on croit qu'il vaut. C'est tout l'intérêt de la sortir de la
-    // console : on VOIT dans quel régime on est avant de lancer un combat.
-    const caseRegime = document.getElementById("toggle-regime-cerveau");
-    if (caseRegime) caseRegime.checked = window.REGIME_CERVEAU === true;
-    
     const btnDevSkip = document.getElementById("btn-dev-skip-creation");
     if (btnDevSkip) btnDevSkip.style.display = isDev ? "inline-block" : "none";
     

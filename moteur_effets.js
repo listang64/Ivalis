@@ -489,18 +489,9 @@ window.resoudreBondInteractif = function(idPerso, portee) {
 
             const hexArrivee = { q: cible.q, r: cible.r };
 
-            // SOUS LE NOUVEAU RÉGIME, ON DEMANDE — ON N'ÉCRIT PAS.
-            //
-            // Tout ce qui suit (le pion déplacé à la main, la zone résolue
-            // ici, l'écriture dans le document de la partie) était fait par le
-            // navigateur du seul joueur qui saute, DEPUIS LA PHASE DE CIBLAGE
-            // — partagée par les deux régimes. Le cerveau n'en savait donc
-            // rien : à sa prochaine publication, il reposait le pion là où il
-            // croyait qu'il était. Le saut revenait en arrière, ou ne se
-            // voyait que sur un écran.
-            //
-            // La case choisie, elle, reste choisie ici : c'est du ciblage.
-            if (window.REGIME_CERVEAU && window.regimeDemande && window.regimeDemande.actif()) {
+            // ON DEMANDE — ON N'ÉCRIT PAS. La case choisie, elle, reste
+            // choisie ici : c'est du ciblage.
+            if (window.regimeDemande && window.regimeDemande.actif()) {
                 try {
                     await window.regimeDemande.bond(idPerso, hexArrivee, portee);
                 } catch (err) {
@@ -513,10 +504,6 @@ window.resoudreBondInteractif = function(idPerso, portee) {
                 return resolve(true);
             }
 
-            // Il n'existe plus d'autre chemin : voir declencherResolution plus bas pour
-            // l'explication complète (même situation, même traitement).
-            console.error("Bond indisponible : active le régime cerveau.");
-            alert("Ce combat ne peut plus se jouer sans le régime cerveau (mode développeur → Régime cerveau).");
             resolve(false);
         };
 
@@ -667,7 +654,7 @@ window.creerIllusion = async function(idLanceur, q, r) {
         window.TOKENS_VTT_DATA[idIllusion] = { q, r, url: imgUrl, taille };
         await window.enregistrerPionsVTT(idIllusion);
 
-        if (window.REGIME_CERVEAU && window.regimeDemande && window.regimeDemande.actif()) {
+        if (window.regimeDemande && window.regimeDemande.actif()) {
             await window.regimeDemande.illusion(idLanceur, idIllusion, { q, r });
         }
     } catch (err) {
@@ -2781,7 +2768,7 @@ window.declencherResolution = async function() {
     // dans l'action, identiques pour tous les postes.
     window.appliquerEquipementALaCarte(state, lanceurCrit, state.armeDeLaCarte);
 
-    // SOUS LE NOUVEAU RÉGIME : ON DEMANDE, ON NE RÉSOUT PAS.
+    // ON DEMANDE, ON NE RÉSOUT PAS.
     //
     // Le point de coupure est ici, et il est choisi : la carte est enrichie par
     // l'équipement et ses cibles sont arrêtées (y compris redirigées par la
@@ -2798,7 +2785,7 @@ window.declencherResolution = async function() {
     // la fiche du joueur qui joue sa propre carte, un seul poste l'exécute, et
     // il ne peut donc pas diverger. C'est une couture assumée, à ramener dans
     // le noyau avec le reste.
-    if (window.REGIME_CERVEAU && window.regimeDemande && window.regimeDemande.actif()) {
+    if (window.regimeDemande && window.regimeDemande.actif()) {
         try {
             // LA ZONE PERSISTANTE PART AVEC LA CARTE, elle ne s'écrit plus à
             // côté. creerZonePersistante posait la nappe directement dans
@@ -2849,17 +2836,7 @@ window.declencherResolution = async function() {
             console.error("Demande de carte :", e);
         }
         window.nettoyerCiblage();
-        return;
     }
-
-    // Il n'existe plus d'autre chemin : l'ancien moteur (tirage des dés en
-    // local, écriture d'Action_Moteur, diffusion par consignerEtapeTour) a été
-    // supprimé une fois le cerveau devenu la seule vérité du combat. N'arriver
-    // ici que si REGIME_CERVEAU a été désactivé à la main (mode développeur)
-    // ou qu'un très vieux réglage traîne dans le stockage local d'un appareil —
-    // un silence total aurait été pire qu'un message qui l'explique.
-    console.error("Ancien moteur de combat indisponible : active le régime cerveau.");
-    alert("Ce combat ne peut plus se jouer sans le régime cerveau (mode développeur → Régime cerveau).");
 };
 
 // Si la carte porte un Bond placé APRÈS l'attaque/altération, on le déclenche juste après
