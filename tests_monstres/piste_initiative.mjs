@@ -184,6 +184,10 @@ const lirePiste = () => p.evaluate(() => {
         opacite: parseFloat(getComputedStyle(t).opacity).toFixed(2),
         scintille: !!t.querySelector(".piste-scintillement"),
         initiative: (t.querySelector("span") || {}).innerText,
+        couleurTexte: t.querySelector("span") ? getComputedStyle(t.querySelector("span")).color : null,
+        couleurBordure: t.querySelector('div[style*="border-radius: 50%"][style*="z-index: 3"]')
+          ? getComputedStyle(t.querySelector('div[style*="border-radius: 50%"][style*="z-index: 3"]')).borderTopColor
+          : null,
         jauges: t.querySelectorAll('div[style*="rotate(30deg)"], div[style*="rotate(-30deg)"]').length,
         etats: t.querySelectorAll('img[src*="upload"]').length - (t.querySelector("img[src*='IMG_2137']") ? 1 : 0),
         rond: !!t.querySelector('div[style*="border-radius: 50%"][style*="overflow: hidden"]'),
@@ -691,6 +695,51 @@ console.log("\n13. L'OMBRE SOUS LE BANDEAU A VRAIMENT UN DÉGRADÉ DOUX");
            pireMarche(ligne) <= 20, `${pireMarche(ligne)} niveaux entre deux pixels voisins`);
   verifier("et il y est déjà discret", Math.min(...ligne) >= 120, `${Math.min(...ligne)}/255`);
   console.log(`     profil sur le côté  : ${ligne.filter((_, i) => i % 6 === 0).join(" ")}`);
+}
+
+// =========================================================================
+console.log("\n14. LE CERCLE D'INITIATIVE PREND LA COULEUR DU PALIER");
+// =========================================================================
+// Nico voulait repérer d'un coup d'œil un Boss qui s'apprête à jouer, sans
+// lire son nom : Petit en gris, Normal en blanc, Élite en jaune, Boss en
+// rouge. Un héros n'a pas de palier (voir combat_etat.js) et garde l'or
+// d'origine.
+{
+  const rgb = (hex) => { const n = parseInt(hex.slice(1), 16);
+    return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`; };
+
+  await p.evaluate(() => {
+    const fiche = (id, palier) => ({ idPersonnage: id, prenom: id, camp: "Ennemi", estMonstre: true,
+      Palier: palier, PV_Max: 40, PV_Actuels: 40, Fatigue_Max: 100, fatigueActuelle: 100,
+      Bouclier_Actuel: 0, Etats_Alteres: [], statut: "Vivant" });
+    window.PERSOS_PARTIE = [
+      { idPersonnage: "H1", prenom: "Cybile", camp: "Allié", PV_Max: 60, PV_Actuels: 60,
+        Fatigue_Max: 100, fatigueActuelle: 100, Bouclier_Actuel: 0, Etats_Alteres: [], statut: "Vivant" },
+      fiche("M_PETIT", "Petit"), fiche("M_NORMAL", "Normal"),
+      fiche("M_ELITE", "Élite"), fiche("M_BOSS", "Boss")
+    ];
+    window.TOKENS_VTT_DATA = { H1: { q: 0, r: 0 }, M_PETIT: { q: 1, r: 0 }, M_NORMAL: { q: 2, r: 0 },
+                               M_ELITE: { q: 3, r: 0 }, M_BOSS: { q: 4, r: 0 } };
+    window.PISTE_MANCHE = { manche: 0, ordre: [] };
+    const file = ["H1", "M_PETIT", "M_NORMAL", "M_ELITE", "M_BOSS"]
+      .map((id, i) => ({ idPersonnage: id, idCarte: "X", initiative: 90 - i * 10 }));
+    window.PARTIE_DATA.Tour_Combat = 40;
+    window.PARTIE_DATA.File_Attente_Combat = file;
+    window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    window.afficherPisteInitiative(file, "Resolution");
+  });
+  await p.waitForTimeout(200);
+  const v = await lirePiste();
+  const parId = Object.fromEntries(v.ordre.map(x => [x.id, x]));
+
+  verifier("Petit : cercle gris", parId.M_PETIT.couleurBordure === rgb("#a8a8a8"), parId.M_PETIT.couleurBordure);
+  verifier("Normal : cercle blanc", parId.M_NORMAL.couleurBordure === rgb("#ffffff"), parId.M_NORMAL.couleurBordure);
+  verifier("Élite : cercle jaune", parId.M_ELITE.couleurBordure === rgb("#f4c430"), parId.M_ELITE.couleurBordure);
+  verifier("Boss : cercle rouge", parId.M_BOSS.couleurBordure === rgb("#e63946"), parId.M_BOSS.couleurBordure);
+  verifier("le texte du chiffre suit la même couleur que la bordure (Boss)",
+           parId.M_BOSS.couleurTexte === parId.M_BOSS.couleurBordure, parId.M_BOSS.couleurTexte);
+  verifier("UN HÉROS N'A PAS DE PALIER : IL GARDE L'OR D'ORIGINE",
+           parId.H1.couleurBordure === rgb("#e8d5a5"), parId.H1.couleurBordure);
 }
 
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

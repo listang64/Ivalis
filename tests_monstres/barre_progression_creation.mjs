@@ -28,13 +28,16 @@ function poste() {
     const document = { getElementById: (id) => elements[id] || null };
 
     // De faux minuteurs, pilotés à la main : aucune attente réelle, et le banc
-    // décide exactement quand chaque tic se produit.
+    // décide exactement quand chaque tic se produit. Le délai demandé (ms) est
+    // gardé à côté de chaque fonction : c'est ce qui permet de vérifier que la
+    // rotation d'une phrase attend bien plus longtemps qu'une autre plus courte,
+    // sans avoir à espionner Date.now().
     let prochainId = 1;
     const intervalles = new Map();
     const delais = new Map();
     const setInterval = (fn) => { const id = prochainId++; intervalles.set(id, fn); return id; };
     const clearInterval = (id) => intervalles.delete(id);
-    const setTimeout = (fn, ms) => { const id = prochainId++; delais.set(id, fn); return id; };
+    const setTimeout = (fn, ms) => { const id = prochainId++; delais.set(id, { fn, ms }); return id; };
     const clearTimeout = (id) => delais.delete(id);
 
     new Function('window', 'document', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', src)(
@@ -45,7 +48,22 @@ function poste() {
         // Déclenche TOUS les setInterval actuellement actifs, une fois.
         ticInterval: () => intervalles.forEach(fn => fn()),
         // Déclenche TOUS les setTimeout en attente, une fois (et les vide).
-        ticTimeout: () => { const fns = [...delais.values()]; delais.clear(); fns.forEach(fn => fn()); }
+        ticTimeout: () => { const appels = [...delais.values()]; delais.clear(); appels.forEach(({ fn }) => fn()); },
+        // Les délais actuellement en attente, SANS les déclencher : c'est ce
+        // qui laisse lire « combien de temps la prochaine phrase va-t-elle
+        // rester affichée ? » avant de la faire tourner pour de vrai.
+        delaisEnAttente: () => [...delais.values()].map(({ ms }) => ms),
+        // Un SEUL setTimeout, le plus ancien en attente — pas tous à la fois.
+        // C'est ce qui sépare le fondu d'entrée (200ms) de la rotation qui le
+        // suit (plusieurs secondes) : les déclencher ensemble les confondrait.
+        ticUnSeulTimeout: () => {
+            const it = delais.entries().next();
+            if (it.done) return false;
+            const [id, { fn }] = it.value;
+            delais.delete(id);
+            fn();
+            return true;
+        }
     };
 }
 
@@ -154,6 +172,48 @@ console.log("\n7. LA CRÉATION COMPLÈTE DÉMARRE ET ARRÊTE BIEN LA BARRE");
              /resultatServeur = await window\.sauvegarderFichePersonnage\(donnees\);[\s\S]{0,400}arreterBarreProgressionCreation/.test(src));
     verifier("et aussi en cas d'échec (catch)",
              /catch \(e\) \{[\s\S]{0,300}arreterBarreProgressionCreation/.test(src));
+}
+
+console.log("\n8. LA DURÉE D'AFFICHAGE SUIT LA LONGUEUR DE LA PHRASE");
+// Nico : « les textes rigolos défilent trop vite, on n'a pas le temps de les
+// lire, et certains paraissent tronqués » — un rythme fixe (3200 ms pour
+// toutes) coupait les phrases longues avant la fin de leur lecture. Chaque
+// phrase programme désormais elle-même sa propre durée, proportionnelle à sa
+// longueur, avec un plancher pour les plus courtes.
+{
+    const p = poste();
+    p.w.demarrerBarreProgressionCreation();
+    const phraseEl = p.elements["phrase-humoristique-creation"];
+
+    const releves = [];
+    for (let i = 0; i < 20; i++) {
+        p.ticUnSeulTimeout();                 // le fondu d'entrée : le texte apparaît
+        const texte = phraseEl.innerText;
+        const attentes = p.delaisEnAttente();  // une seule attente en cours : la rotation
+        releves.push({ texte, duree: attentes[0] });
+        p.ticUnSeulTimeout();                 // la rotation : programme la phrase suivante
+    }
+
+    verifier("chaque phrase affichée a bien une seule attente de rotation en cours",
+             releves.every(x => x.duree !== undefined));
+    verifier("AUCUNE PHRASE N'EST EXPÉDIÉE EN MOINS DE 4 SECONDES",
+             releves.every(x => x.duree >= 4000),
+             JSON.stringify(releves.map(x => x.duree)));
+    // Pas une simple tendance : CHAQUE durée observée doit coller pile à la
+    // formule (90 ms/caractère, plancher 4 s) — un contrôle déterministe,
+    // pas soumis au hasard des 20 tirages.
+    verifier("chaque durée colle exactement à la formule (90 ms/caractère, plancher 4 s)",
+             releves.every(x => x.duree === Math.max(4000, x.texte.length * 90)),
+             releves.map(x => `${x.texte.length}c→${x.duree}ms (attendu ${Math.max(4000, x.texte.length * 90)}ms)`).join(", "));
+    // Et donc, mécaniquement : deux phrases de longueurs différentes n'ont
+    // jamais la même durée, ni la plus courte plus longtemps que la plus longue.
+    const paireDifferente = releves.find((a, i) => releves.slice(i + 1).some(b => a.texte.length !== b.texte.length));
+    if (paireDifferente) {
+        const autre = releves.find(b => b.texte.length !== paireDifferente.texte.length);
+        verifier("une phrase plus longue reste affichée plus longtemps",
+                 (paireDifferente.texte.length > autre.texte.length) === (paireDifferente.duree > autre.duree),
+                 `${paireDifferente.texte.length}c→${paireDifferente.duree}ms vs ${autre.texte.length}c→${autre.duree}ms`);
+    }
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} ÉCHEC(S)`);

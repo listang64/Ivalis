@@ -203,7 +203,7 @@ const PHRASES_ATTENTE_CREATION = [
 ];
 
 let intervalleProgressionCreation = null;
-let intervalleFraseCreation = null;
+let delaiRotationPhraseCreation = null;
 
 window.demarrerBarreProgressionCreation = function() {
     const barre = document.getElementById("barre-progression-creation");
@@ -222,28 +222,40 @@ window.demarrerBarreProgressionCreation = function() {
         remplissage.style.width = Math.min(pct, 90) + "%";
     }, 400);
 
+    // LE TEMPS DE LECTURE SUIT LA LONGUEUR DE LA PHRASE. À un rythme fixe
+    // (3200 ms pour toutes), les phrases longues n'étaient pas lisibles —
+    // reprises par le fondu avant la fin de la lecture, elles donnaient
+    // l'impression d'être tronquées — et les courtes traînaient sans raison.
+    // ~90 ms par caractère, avec un plancher à 4 s pour ne jamais expédier
+    // même la plus brève : chaque phrase programme elle-même la suivante au
+    // lieu d'un intervalle fixe qui les ignore toutes.
+    const DUREE_PAR_CARACTERE_MS = 90;
+    const DUREE_MINIMALE_MS = 4000;
+
     let dernierIndex = -1;
     const tirerPhrase = () => {
         let i;
         do { i = Math.floor(Math.random() * PHRASES_ATTENTE_CREATION.length); }
         while (i === dernierIndex && PHRASES_ATTENTE_CREATION.length > 1);
         dernierIndex = i;
+        const texte = PHRASES_ATTENTE_CREATION[i];
         phrase.style.opacity = "0";
         setTimeout(() => {
-            phrase.innerText = PHRASES_ATTENTE_CREATION[i];
+            phrase.innerText = texte;
             phrase.style.opacity = "1";
         }, 400);
+        clearTimeout(delaiRotationPhraseCreation);
+        delaiRotationPhraseCreation = setTimeout(tirerPhrase,
+            Math.max(DUREE_MINIMALE_MS, texte.length * DUREE_PAR_CARACTERE_MS));
     };
     tirerPhrase();
-    clearInterval(intervalleFraseCreation);
-    intervalleFraseCreation = setInterval(tirerPhrase, 3200);
 };
 
 window.arreterBarreProgressionCreation = function() {
     clearInterval(intervalleProgressionCreation);
-    clearInterval(intervalleFraseCreation);
+    clearTimeout(delaiRotationPhraseCreation);
     intervalleProgressionCreation = null;
-    intervalleFraseCreation = null;
+    delaiRotationPhraseCreation = null;
 
     const barre = document.getElementById("barre-progression-creation");
     const remplissage = document.getElementById("barre-progression-creation-remplissage");

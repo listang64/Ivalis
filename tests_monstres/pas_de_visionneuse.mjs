@@ -335,6 +335,57 @@ console.log("=========================================================");
   verifier("et le bouton reste éteint", r.mode === "eteint", r.mode);
 }
 
+console.log("\n=========================================================");
+console.log("  8. LE PETIT BOUTON DU VOLET N'OUVRE JAMAIS QUE MON DECK");
+console.log("=========================================================");
+// Nico voulait être sûr que le bouton rond « compétences » (à côté du bouton
+// fin de tour) n'ouvre jamais que les techniques DE SON PROPRE héros, quoi
+// qu'on ait cliqué juste avant. On rejoue donc le geste au complet : on clique
+// le portrait de la créature — celui-là même qui hébergeait la visionneuse —
+// PUIS on clique le vrai bouton #btn-hud-competences, et on lit ce que le
+// volet affiche vraiment, pas seulement l'état interne.
+{
+  const r = await p.evaluate(async () => {
+    // Chaque combattant a son propre deck, chargé au démarrage du combat
+    // (afficherPersoCombatActuel) : c'est ce qui peuple #combat-liste-competences.
+    window.PERSOS_PARTIE[0].deckEquipe = ["C_CAC"];
+    window.PERSOS_PARTIE[1].deckEquipe = ["C_M1"];
+    window.CACHE_COMPETENCES_GLOBAL = { H1: { C_CAC: window.COMPETENCES_CACHE.C_CAC },
+                                        M1: { C_M1: window.COMPETENCES_CACHE.C_M1 } };
+    window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[0]];
+    window.COMBAT_INDEX_PERSO = 0;
+    window.nettoyerCiblage();
+    window.afficherPersoCombatActuel();
+
+    // LE GESTE EXACT DU BUG D'ORIGINE : cliquer le portrait de l'ennemi avant
+    // de rouvrir le volet.
+    const tuileM1 = document.querySelector('.piste-tuile[data-id="M1"]');
+    if (tuileM1) tuileM1.click();
+    const tokenM1 = document.getElementById("token-M1");
+    if (tokenM1) tokenM1.click();
+
+    // LE VRAI BOUTON, PAS UN APPEL DIRECT À toggleVoletCompetences : c'est lui
+    // que le doigt touche sur l'iPad.
+    document.getElementById("btn-hud-competences").click();
+    await new Promise(r => setTimeout(r, 400));
+
+    const liste = document.getElementById("combat-liste-competences");
+    return {
+      ouvert: window.VOLET_COMPETENCES_OUVERT,
+      suivi: (window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO] || {}).idPersonnage,
+      montreCarteAMoi: !!document.getElementById("combat-carte-C_CAC"),
+      montreCarteEnnemie: !!document.getElementById("combat-carte-C_M1"),
+      html: liste ? liste.innerHTML : ""
+    };
+  });
+  verifier("le volet s'ouvre bien pour de vrai", r.ouvert === true);
+  verifier("le poste suit toujours mon héros après ces clics", r.suivi === "H1", String(r.suivi));
+  verifier("MA carte est bien dans le volet", r.montreCarteAMoi === true);
+  verifier("LA CARTE DE L'ENNEMI N'Y EST JAMAIS", r.montreCarteEnnemie === false);
+  verifier("et son nom n'apparaît nulle part dans le balisage du volet",
+           !r.html.includes("Cataclysme putride"), r.html.length > 300 ? "(balisage trop long, voir montreCarteEnnemie)" : r.html);
+}
+
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 2).join(" | "));
 
 await b.close();

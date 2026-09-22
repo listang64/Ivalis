@@ -4434,6 +4434,18 @@ window.afficherPisteInitiative = function(queue, phase) {
     if (typeof window.actualiserTitrePreparation === "function") window.actualiserTitrePreparation(queue, phase);
 };
 
+// LES QUATRE PALIERS, LES QUATRE COULEURS. Un Petit se repère en gris, un
+// Normal en blanc, un Élite en jaune, un Boss en rouge — les mêmes teintes
+// qu'ailleurs dans le jeu (le rouge du Boss est celui de la jauge de vie).
+// Exposée sur window : le banc de test la lit directement plutôt que de
+// deviner les couleurs depuis le CSS rendu.
+window.COULEURS_PALIER_INITIATIVE = {
+    "Petit": "#a8a8a8",
+    "Normal": "#ffffff",
+    "Élite": "#f4c430",
+    "Boss": "#e63946"
+};
+
 // Le contenu d'une tuile : le portrait (hexagone pour un héros, médaillon rond
 // pour une créature), l'encart d'initiative, les deux jauges penchées, et les
 // pastilles d'état sous le tout.
@@ -4478,6 +4490,13 @@ function contenuTuilePiste(entree, cestSonTour) {
     const affichageInit = entree.idCarte === "REPOS_LONG" ? "⏳"
                         : (entree.initiative === null || entree.initiative === undefined ? "–" : entree.initiative);
 
+    // LA COULEUR DE L'ENCART SUIT LE PALIER DE LA CRÉATURE : d'un coup d'œil,
+    // sans lire son nom ni ouvrir sa fiche, on sait si c'est un Petit, un
+    // Normal, un Élite ou un Boss qui va jouer. Un héros n'a pas de palier
+    // (voir combat_etat.js) : il garde l'or d'origine.
+    const couleurInitiative = (perso.estMonstre && window.COULEURS_PALIER_INITIATIVE[perso.Palier])
+        || "#e8d5a5";
+
     let etatsHtml = "";
     if (perso.Etats_Alteres && perso.Etats_Alteres.length > 0) {
         etatsHtml = `<div style="position: absolute; bottom: -${PISTE_MARGE_ETATS - 4}px; left: 50%; transform: translateX(-50%); display: flex; gap: 2px; justify-content: center; z-index: 5;">`;
@@ -4488,8 +4507,8 @@ function contenuTuilePiste(entree, cestSonTour) {
     return `
         ${cestSonTour ? '<div class="piste-scintillement"></div>' : ''}
         ${portrait}
-        <div style="position: absolute; top: -3px; left: -5px; width: 23px; height: 23px; border-radius: 50%; border: 1px solid #e8d5a5; background: #1a0f08; box-shadow: 0 2px 5px rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 3;">
-            <span style="color: #e8d5a5; font-family: 'Cinzel', serif; font-size: 12px; font-weight: bold; text-shadow: 1px 1px 3px black, 0 0 5px rgba(232, 213, 165, 0.5);">${affichageInit}</span>
+        <div style="position: absolute; top: -3px; left: -5px; width: 23px; height: 23px; border-radius: 50%; border: 1px solid ${couleurInitiative}; background: #1a0f08; box-shadow: 0 2px 5px rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 3;">
+            <span style="color: ${couleurInitiative}; font-family: 'Cinzel', serif; font-size: 12px; font-weight: bold; text-shadow: 1px 1px 3px black, 0 0 5px ${couleurInitiative}80;">${affichageInit}</span>
         </div>
 
         <div style="position: absolute; bottom: 5px; left: -6px; width: 31px; height: 5px; background: #000; border: 1px solid #1a0f08; border-radius: 2px; transform: rotate(30deg); transform-origin: center; box-shadow: 0 2px 4px rgba(0,0,0,0.8); overflow: hidden; z-index: 3;">

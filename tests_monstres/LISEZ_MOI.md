@@ -2106,3 +2106,40 @@ genre de voisin. Le banc sert la vraie page en HTTP (comme
 disparition en résolution, et que le bandeau est bien devant la piste
 (z-index) avec un `backdrop-filter` posé. Mordant vérifié en retirant l'appel
 à `actualiserTitrePreparation` dans `afficherPisteInitiative`.
+
+`pas_de_visionneuse.mjs`, section 8 : Nico voulait être sûr que le petit
+bouton rond « compétences » (à côté du bouton fin de tour,
+`#btn-hud-competences`) n'ouvre jamais que le deck de SON PROPRE héros —
+l'ancienne visionneuse installait n'importe quel combattant cliqué dans
+`COMBAT_PERSOS_JOUEUR`, et si un chemin de ce genre revenait, le volet
+afficherait la technique d'un ennemi. Le banc rejoue le geste exact de
+l'ancien bug (cliquer le portrait de l'ennemi dans la piste ET sur le
+plateau), clique ensuite le VRAI bouton `#btn-hud-competences` (pas un appel
+direct à `toggleVoletCompetences`), et vérifie que `#combat-liste-competences`
+ne contient que la carte du héros du poste, jamais celle de l'ennemi. Mordant
+vérifié en appelant temporairement `chargerCompetencesCombat("M1", ...)`
+juste avant le clic, pour simuler la régression.
+
+`piste_initiative.mjs`, section 14 : le petit cercle qui porte le chiffre
+d'initiative prend maintenant la couleur du palier d'une créature — Petit en
+gris, Normal en blanc, Élite en jaune, Boss en rouge
+(`window.COULEURS_PALIER_INITIATIVE`, lu depuis `perso.Palier` dans
+`contenuTuilePiste`, combat.js) — pour repérer un Boss d'un coup d'œil sans
+lire son nom. Un héros n'a pas de palier et garde l'or d'origine. Le banc lit
+la couleur RÉELLEMENT calculée par le navigateur (`getComputedStyle`, pas le
+CSS écrit en dur) sur la bordure du cercle et sur le texte, pour les quatre
+paliers plus un héros. Mordant vérifié en fixant temporairement la couleur à
+l'or d'origine dans `contenuTuilePiste`.
+
+`barre_progression_creation.mjs`, section 8 : Nico signalait que les phrases
+humoristiques de l'écran de création « défilent trop vite, on n'a pas le
+temps de les lire, et certaines paraissent tronquées ». La cause : un rythme
+FIXE (3200 ms pour toutes) qui reprenait les phrases longues avant la fin de
+leur lecture — d'où l'impression de troncature, une phrase de 72 caractères
+n'ayant pas plus de temps qu'une de 50. Chaque phrase programme désormais
+elle-même sa prochaine rotation, proportionnelle à sa longueur (~90 ms par
+caractère, plancher à 4 s). Le banc pilote les minuteurs à la main (aucune
+attente réelle), lit le délai RÉELLEMENT demandé par le code pour chaque
+phrase tirée, et vérifie qu'il colle pile à la formule pour les seize
+phrases du vrai pool — pas seulement qu'il « semble plus long ». Mordant
+vérifié en remettant temporairement le délai fixe à 3200 ms.
