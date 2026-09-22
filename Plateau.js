@@ -152,6 +152,10 @@ class Plateau {
         const isGommeMode = window.VTT_MODE_EFFACEMENT === true;
         const isMursMode = window.VTT_MODE_MURS === true;
         const isDifficileMode = window.VTT_MODE_DIFFICILE === true;
+        // L'œil d'or ne fait QUE révéler — il n'arme jamais le pinceau, donc
+        // il n'entre pas dans isEditingMode ci-dessous, seulement dans les
+        // deux conditions d'affichage plus bas.
+        const isRevealMode = window.VTT_REVELER_TERRAIN === true;
 
         // 1. GOMME : Si supprimée et qu'aucun outil d'édition n'est actif, on l'efface totalement (invisible).
         // Avec un outil en main (gomme/murs/difficile), on garde la case visible pour pouvoir
@@ -179,11 +183,11 @@ class Plateau {
             this.ctx.fillStyle = 'rgba(255, 50, 50, 0.4)'; 
             this.ctx.fill();
             this.ctx.strokeStyle = `rgba(0, 0, 0, ${this.gridOpacity})`;
-        } else if (state.isBlocked && isMursMode) {
-            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; 
+        } else if (state.isBlocked && (isMursMode || isRevealMode)) {
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
             this.ctx.fill();
-            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; 
-        } else if (state.isDifficult && isDifficileMode) {
+            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        } else if (state.isDifficult && (isDifficileMode || isRevealMode)) {
             // NOUVEAU : Violet translucide avec contour blanc pour le terrain difficile (visible uniquement outil en main)
             this.ctx.fillStyle = 'rgba(155, 89, 182, 0.5)'; 
             this.ctx.fill();

@@ -3211,6 +3211,31 @@ window.toggleModeTerrainDifficileHex = function() {
     if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
 };
 
+// =========================================================================
+//  L'ŒIL D'OR : RÉVÉLER MURS ET TERRAIN DIFFICILE LE TEMPS D'UN APPUI
+// =========================================================================
+// Un drapeau qui ne sert QU'À L'AFFICHAGE, séparé de VTT_MODE_MURS et
+// VTT_MODE_DIFFICILE : ces deux-là arment aussi le pinceau (un tap sur
+// l'hexagone peint un mur ou du terrain difficile, voir plus haut). Le
+// bouton-œil ne doit faire QUE montrer ce qui existe déjà, jamais permettre
+// d'y toucher — réutiliser l'un des deux drapeaux de pinceau l'aurait armé
+// pendant tout l'appui, avec le risque d'une case modifiée par erreur.
+// drawHex (Plateau.js) l'ajoute en OR à ses deux conditions d'affichage,
+// sans jamais le lire pour décider quoi que ce soit d'autre.
+window.VTT_REVELER_TERRAIN = false;
+
+window.activerRevelationTerrain = function() {
+    if (window.VTT_REVELER_TERRAIN) return;
+    window.VTT_REVELER_TERRAIN = true;
+    if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
+};
+
+window.desactiverRevelationTerrain = function() {
+    if (!window.VTT_REVELER_TERRAIN) return;
+    window.VTT_REVELER_TERRAIN = false;
+    if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
+};
+
 // --- SYNC FIREBASE ---
 window.sauvegarderTuilesSupprimees = async function() {
     if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) return;

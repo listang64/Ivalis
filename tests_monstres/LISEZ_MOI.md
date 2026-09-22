@@ -2201,3 +2201,28 @@ maintenant de 100 px au lieu de 72 — Nico la voulait un peu plus visible.
 Les deux contrôles qui mesuraient sa hauteur exacte repliée (`>= 55 && <=
 95`) ont suivi (`>= 80 && <= 120`). Mordant vérifié en remettant
 temporairement `window.POINTE_LANIERE_VISIBLE` à 72.
+
+`reveler_terrain.mjs` (nouveau) couvre l'œil d'or : un petit bouton doré,
+collé au bord droit de l'écran juste au-dessus du bandeau de fin de tour, qui
+révèle les murs et le terrain difficile déjà posés sur le plateau tant qu'on
+le maintient enfoncé. Le piège à éviter était de réutiliser VTT_MODE_MURS ou
+VTT_MODE_DIFFICILE pour ça : ces deux drapeaux ne servent pas qu'à
+l'affichage, ils arment AUSSI le pinceau de peinture des murs/du terrain
+difficile (un tap sur l'hexagone bascule son état) — les allumer pendant tout
+un appui de « juste regarder » aurait exposé n'importe quel joueur curieux au
+risque de modifier la carte par erreur. Un troisième drapeau, purement
+d'affichage (`window.VTT_REVELER_TERRAIN`), a donc été ajouté : `drawHex`
+(Plateau.js) l'ajoute en OU à ses deux conditions de rendu, sans jamais le
+lire ailleurs, et `activerRevelationTerrain`/`desactiverRevelationTerrain`
+(combat.js) ne font rien d'autre que le poser et redessiner. Le banc sert la
+vraie page, instancie le vrai `Plateau`, pose un vrai mur et une vraie case
+difficile, puis appuie et relâche le VRAI bouton du DOM (souris, avec un
+passage par « la souris quitte le bouton en cours d'appui ») — jamais un
+appel direct aux fonctions. Il vérifie que rien n'est visible relâché, que
+tout apparaît pendant l'appui SANS que VTT_MODE_MURS ni VTT_MODE_DIFFICILE ne
+s'allument, que tout redisparaît au relâchement, et que le bouton est bien
+petit, discret, collé à droite et posé au-dessus du bandeau — pas dessus.
+Mordant vérifié deux fois : une fois en retirant `isRevealMode` des deux
+conditions de `drawHex` (les remplissages disparaissent, échec), une fois en
+faisant réutiliser `VTT_MODE_MURS` par `activerRevelationTerrain` (le
+contrôle « le pinceau des murs reste éteint » échoue).

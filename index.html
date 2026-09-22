@@ -1092,8 +1092,37 @@
                  style="position: absolute; top: 40%; right: 70%; width: 16%; height: 30%; border-radius: 50%; background-color: transparent; cursor: pointer; pointer-events: auto; transition: transform 0.1s;"
                  onmousedown="this.style.transform='scale(0.90)'" onmouseup="this.style.transform='scale(1)'" onmouseleave="this.style.transform='scale(1)'"
                  onclick="window.toggleVoletCompetences()" title="Mes compétences"></div>
+
+            <!-- 4. L'ŒIL D'OR : appui maintenu pour révéler les murs et le
+                 terrain difficile déjà posés sur le plateau, sans les toucher.
+                 Posé juste au-dessus du bandeau (bottom: 100% de ce bandeau),
+                 collé à droite — le bandeau lui-même est déjà collé au bord
+                 droit de l'écran (right: 0 plus haut), ce coin partage donc
+                 son ancrage. Petit et discret à dessein : ce n'est pas un
+                 outil de partie, juste un coup d'œil ponctuel du Maître du
+                 Jeu ou d'un joueur curieux. -->
+            <div id="btn-hud-reveler-terrain"
+                 style="position: absolute; bottom: 100%; right: 4%; margin-bottom: 10px;
+                        width: 34px; height: 34px; border-radius: 50%;
+                        background: rgba(20, 15, 5, 0.55); border: 1.5px solid #c9a227;
+                        box-shadow: 0 0 6px rgba(201, 162, 39, 0.35);
+                        display: flex; align-items: center; justify-content: center;
+                        cursor: pointer; pointer-events: auto; transition: transform 0.1s;"
+                 onmousedown="this.style.transform='scale(0.90)'; window.activerRevelationTerrain()"
+                 onmouseup="this.style.transform='scale(1)'; window.desactiverRevelationTerrain()"
+                 onmouseleave="this.style.transform='scale(1)'; window.desactiverRevelationTerrain()"
+                 ontouchstart="event.preventDefault(); this.style.transform='scale(0.90)'; window.activerRevelationTerrain()"
+                 ontouchend="event.preventDefault(); this.style.transform='scale(1)'; window.desactiverRevelationTerrain()"
+                 ontouchcancel="this.style.transform='scale(1)'; window.desactiverRevelationTerrain()"
+                 title="Maintenir : révéler les murs et le terrain difficile">
+                <svg viewBox="0 0 24 24" width="18" height="18" style="pointer-events: none;">
+                    <path d="M12 5c-5 0-9 4-11 7 2 3 6 7 11 7s9-4 11-7c-2-3-6-7-11-7z"
+                          fill="none" stroke="#e8c766" stroke-width="1.6"/>
+                    <circle cx="12" cy="12" r="3" fill="#e8c766"/>
+                </svg>
+            </div>
         </div>
-        
+
     </div>
 
     <div id="menu-navigation-bas">
@@ -1914,7 +1943,7 @@
 <script type="module" src="competences.js?v=25"></script>
 <script src="Plateau.js"></script>
 <script type="module" src="sequence_tour.js?v=23"></script>
-<script type="module" src="combat.js?v=88"></script>
+<script type="module" src="combat.js?v=89"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=25"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
