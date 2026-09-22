@@ -2143,3 +2143,20 @@ attente réelle), lit le délai RÉELLEMENT demandé par le code pour chaque
 phrase tirée, et vérifie qu'il colle pile à la formule pour les seize
 phrases du vrai pool — pas seulement qu'il « semble plus long ». Mordant
 vérifié en remettant temporairement le délai fixe à 3200 ms.
+
+`constitution_pv.mjs` couvre l'écran de création des caractéristiques
+(app.js, achat de points 5e) : les PV max suivent maintenant la Constitution
+POINT PAR POINT. L'ancienne formule (50 + 8 × le modificateur 5e, qui vaut
+floor((con-10)/2)) ne bougeait qu'une fois sur deux — Constitution 8 → 9 ne
+changeait rien, floor((8-10)/2) et floor((9-10)/2) valant tous deux -1 — et
+Nico venait de dépenser un point pour rien à l'écran. La nouvelle formule
+(`pvMaxDepuisConstitution`, app.js) est linéaire, 50 + 4 × (con - 10), et
+reste rigoureusement cohérente avec l'ancienne échelle : les deux donnaient
+déjà 42 PV à Constitution 8 et 74 PV à Constitution 16 (32 PV sur 8 points,
+soit 4 PV par point) — seules les valeurs impaires, jusque-là ignorées,
+changent quelque chose de plus. Le banc sert la vraie page en HTTP, clique le
+vrai bouton « + » de la ligne Constitution, appelle le vrai
+`validerCreationCaracs()` (avec un `updateDoc` qui garde la trace de ce qui
+est écrit, pour vérifier la valeur SAUVEGARDÉE et pas seulement prévisualisée)
+et le vrai `afficherStatsFinales()` (l'affichage d'un héros déjà créé).
+Mordant vérifié en remettant temporairement l'ancienne formule.

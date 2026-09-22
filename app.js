@@ -5064,6 +5064,23 @@ function getModificateur(valeur) {
   return mod; // Sécurisé (renvoie un chiffre pur)
 }
 
+// LES PV MAX SUIVENT LA CONSTITUTION, POINT PAR POINT.
+//
+// La formule d'origine (50 + 8 × modificateur, le modificateur valant
+// floor((con-10)/2)) ne bougeait qu'une fois sur deux : passer Constitution
+// de 8 à 9 ne changeait rien aux PV, puisque floor((8-10)/2) et
+// floor((9-10)/2) valent tous les deux -1. Un joueur qui venait de dépenser
+// un point voyait donc « 0 changement » et croyait le bouton cassé.
+//
+// La nouvelle formule est linéaire, un PV pour chaque point de Constitution,
+// et reste PARFAITEMENT COHÉRENTE avec l'ancienne échelle : les deux
+// donnaient déjà 42 PV à 8 et 74 PV à 16, soit 32 PV sur 8 points — 4 PV par
+// point, exactement ce que fait ce calcul-ci. Seules les valeurs impaires de
+// Constitution, jusque-là ignorées, changent désormais quelque chose.
+function pvMaxDepuisConstitution(con) {
+  return 50 + 4 * (con - 10);
+}
+
 function calculerPointsRestants() {
   let depenses = 0;
   for (let key in window.statsCreation) {
@@ -5144,10 +5161,8 @@ window.actualiserModaleCaracs = function() {
   // =========================================================
   // MISE À JOUR EN TEMPS RÉEL DE LA PRÉVISUALISATION
   // =========================================================
-  const rawModCon = Math.floor((window.statsCreation.con - 10) / 2);
-
   const spanPv = document.getElementById("creation-pv-max");
-  if (spanPv) spanPv.innerText = 50 + (8 * rawModCon);
+  if (spanPv) spanPv.innerText = pvMaxDepuisConstitution(window.statsCreation.con);
   // =========================================================
 
   // NOUVEAU : On scanne si le joueur a déjà une stat à 16
@@ -5212,11 +5227,9 @@ window.validerCreationCaracs = async function() {
     // =========================================================
     // CALCUL ET SAUVEGARDE SÉCURISÉE SUR LA FICHE PERSONNAGE
     // =========================================================
-    const rawModCon = Math.floor((window.statsCreation.con - 10) / 2);
     const rawModForce = Math.floor((window.statsCreation.force - 10) / 2);
 
-    // NOUVELLE FORMULE :
-    const pvMax = 50 + (8 * rawModCon);
+    const pvMax = pvMaxDepuisConstitution(window.statsCreation.con);
     const objetsMax = 3 + rawModForce;
 
     await updateDoc(doc(db, "Personnages", idPersonnage), {
@@ -5270,11 +5283,8 @@ window.afficherStatsFinales = function(dataStats) {
   // =========================================================
   // MISE À JOUR DU BANDEAU FINAL SUR LA FICHE
   // =========================================================
-  const rawModConFiche = Math.floor(((dataStats.con || 8) - 10) / 2);
-
   const affPv = document.getElementById("affichage-pv-max");
-  // NOUVELLE FORMULE :
-  if (affPv) affPv.innerText = 50 + (8 * rawModConFiche);
+  if (affPv) affPv.innerText = pvMaxDepuisConstitution(dataStats.con || 8);
   // =========================================================
 
   NOMS_CARACS.forEach(c => {
