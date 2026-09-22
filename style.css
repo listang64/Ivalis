@@ -2263,6 +2263,43 @@ textarea.input-texte-parchemin {
     pointer-events: none;
 }
 
+/* LE TITRE DE PRÉPARATION, DEVANT LA PISTE.
+ *
+ * Un élément à PART (voir index.html), pas un enfant de #piste-initiative :
+ * celui-ci PEUT porter un backdrop-filter sans risque, puisqu'il n'a aucun
+ * voisin à z-index négatif à faire disparaître — le piège qui a coûté cher à
+ * .piste-fond et .piste-ombre-sol ne s'applique qu'à eux.
+ *
+ * Le fond et le texte sont DEUX éléments, pas un : `background-clip: text`
+ * s'applique à TOUS les arrière-plans de la boîte qui le porte, panneau flouté
+ * compris — sur un seul élément, le panneau translucide aurait lui-même été
+ * découpé à la forme des lettres au lieu de rester un rectangle derrière
+ * elles. */
+#titre-preparation-fond {
+    padding: 14px 40px;
+    border-radius: 16px;
+    background: rgba(10, 6, 3, 0.55);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.7);
+}
+
+#titre-preparation-texte {
+    display: block;
+    font-family: 'Cinzel', serif;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: clamp(18px, 2.8vw, 30px);
+    white-space: nowrap;
+    text-align: center;
+    background: linear-gradient(135deg, #fbf5bd 0%, #c2a878 25%, #5c3a21 50%, #e8d5a5 75%, #ffffff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.9));
+}
+
 /* ========================================================================= */
 /* LE VOLET DES COMPÉTENCES                                                  */
 /* ========================================================================= */

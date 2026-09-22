@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=33">
+  <link rel="stylesheet" href="style.css?v=34">
 
  
   <!-- ===================================================================== -->
@@ -554,6 +554,29 @@
                                               pointer-events: auto;
                                               transition: width 0.45s cubic-bezier(0.25, 0.8, 0.25, 1);">
                 <!-- Rempli par JavaScript -->
+            </div>
+        </div>
+
+        <!-- =================================================================
+             LE TITRE DE PRÉPARATION — DEVANT LA PISTE, JAMAIS DEDANS
+             =================================================================
+             « Sélectionner une compétence » tant que ce poste n'a pas retenu
+             sa carte, « En attente des joueurs » une fois que c'est fait mais
+             que la manche n'est pas bouclée. window.actualiserTitrePreparation
+             (combat.js) pose le texte et bascule l'opacité ; il s'efface tout
+             seul en résolution.
+
+             C'est un élément À PART, PAS un enfant de #piste-initiative :
+             celui-là porte déjà .piste-fond et .piste-ombre-sol, deux
+             éléments à z-index négatif qu'un backdrop-filter voisin fait
+             disparaître (voir le long commentaire dans style.css). Rester en
+             dehors de cette boîte évite d'y retomber. -->
+        <div id="titre-preparation-zone" style="position: absolute; top: 16px; left: 0; right: 0;
+                                                display: flex; justify-content: center;
+                                                z-index: 13; pointer-events: none; opacity: 0;
+                                                transition: opacity 0.35s ease;">
+            <div id="titre-preparation-fond">
+                <span id="titre-preparation-texte"></span>
             </div>
         </div>
 
@@ -1900,7 +1923,7 @@
 <script type="module" src="competences.js?v=25"></script>
 <script src="Plateau.js"></script>
 <script type="module" src="sequence_tour.js?v=22"></script>
-<script type="module" src="combat.js?v=84"></script>
+<script type="module" src="combat.js?v=85"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=24"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->

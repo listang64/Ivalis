@@ -4209,6 +4209,62 @@ function pisteAJoue(id, resteAJouer) {
     return !resteAJouer.has(id);
 }
 
+// =========================================================================
+//  LE TITRE DE PRÉPARATION, AU-DESSUS DE LA PISTE
+// =========================================================================
+// Nico voulait qu'on sache d'un coup d'œil où en est la manche pendant qu'on
+// choisit sa carte : un gros titre, posé devant la piste sur un fond flouté
+// qui la masque en partie — pas un élément DEDANS elle (voir plus haut le
+// long combat contre `backdrop-filter` + z-index négatif sur .piste-fond :
+// mieux vaut rester à l'écart de ce piège que le retenter).
+//
+// Deux titres, et le second ne parle QUE de ce poste-ci : « il me reste une
+// carte à choisir » (mes héros ne sont pas tous dans Ont_Joue_Ce_Round / la
+// file), ou, une fois que c'est fait, « on attend les autres » tant que
+// toutLeMondeAJoue ne dit pas oui. Dès que la phase bascule en résolution, le
+// titre s'efface : la piste redevient entièrement lisible.
+window.actualiserTitrePreparation = function(queueParam, phaseParam) {
+    const zone = document.getElementById("titre-preparation-zone");
+    const texte = document.getElementById("titre-preparation-texte");
+    if (!zone || !texte) return;
+
+    const partie = window.PARTIE_DATA || {};
+    const queue = queueParam !== undefined ? queueParam : (partie.File_Attente_Combat || []);
+    const phase = phaseParam !== undefined ? phaseParam : (partie.Phase_Combat || "Preparation");
+
+    if (phase !== "Preparation") {
+        zone.style.opacity = "0";
+        return;
+    }
+
+    // Mes héros encore en jeu : un combattant à terre n'a plus de carte à
+    // choisir, il ne doit jamais retenir ce titre affiché.
+    const horsJeu = new Set(partie.Combattants_Hors_Jeu || []);
+    const mesHeros = (window.COMBAT_PERSOS_JOUEUR || []).filter(p => !horsJeu.has(p.idPersonnage));
+
+    const aJoue = new Set(partie.Ont_Joue_Ce_Round || []);
+    queue.forEach(f => aJoue.add(f.idPersonnage));
+    const moiPret = mesHeros.every(p => aJoue.has(p.idPersonnage));
+
+    let texteAAfficher;
+    if (!moiPret) {
+        texteAAfficher = "Sélectionner une compétence";
+    } else if (typeof window.toutLeMondeAJoue === "function" && window.toutLeMondeAJoue(partie, queue)) {
+        // Tout le monde a joué : la résolution s'ouvre d'un instant à l'autre,
+        // inutile d'afficher quoi que ce soit entre-temps.
+        texteAAfficher = null;
+    } else {
+        texteAAfficher = "En attente des joueurs";
+    }
+
+    if (!texteAAfficher) {
+        zone.style.opacity = "0";
+        return;
+    }
+    if (texte.textContent !== texteAAfficher) texte.textContent = texteAAfficher;
+    zone.style.opacity = "1";
+};
+
 window.afficherPisteInitiative = function(queue, phase) {
     if (queue === undefined && window.PARTIE_DATA) {
         queue = window.PARTIE_DATA.File_Attente_Combat || [];
@@ -4375,6 +4431,7 @@ window.afficherPisteInitiative = function(queue, phase) {
 
     if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour(queue, phase);
     if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour(queue, phase);
+    if (typeof window.actualiserTitrePreparation === "function") window.actualiserTitrePreparation(queue, phase);
 };
 
 // Le contenu d'une tuile : le portrait (hexagone pour un héros, médaillon rond

@@ -2088,3 +2088,21 @@ ils doivent désormais embarquer aussi le bloc du coupe-circuit
 (`window.PAUSE_ECRITURE_PARTIE = ...` jusqu'à `leverCoupeCircuitPartie`), sans
 quoi `modifierPartieOuEchec` plante dès son premier essai avec un
 `TypeError: window.attendreCoupeCircuitPartie is not a function`.
+
+`titre_preparation.mjs` couvre le gros titre posé devant la piste
+d'initiative pendant la préparation : « Sélectionner une compétence » tant
+que CE poste n'a pas retenu la carte d'un de ses héros, « En attente des
+joueurs » une fois que c'est fait mais que la manche n'est pas bouclée, et
+rien du tout en résolution ou une fois que tout le monde a joué
+(`window.actualiserTitrePreparation`, appelée depuis `afficherPisteInitiative`
+dans combat.js). L'élément est volontairement posé À CÔTÉ de
+`#piste-initiative`, jamais dedans : celle-ci porte déjà `.piste-fond` et
+`.piste-ombre-sol`, deux éléments à z-index négatif qu'un `backdrop-filter`
+voisin fait disparaître (voir le commentaire dans style.css) — le nouveau
+titre, lui, peut porter son propre flou sans risque puisqu'il n'a pas ce
+genre de voisin. Le banc sert la vraie page en HTTP (comme
+`piste_initiative.mjs`) et vérifie les deux textes, leur bascule selon
+`Ont_Joue_Ce_Round`/`File_Attente_Combat`/`Combattants_Hors_Jeu`, la
+disparition en résolution, et que le bandeau est bien devant la piste
+(z-index) avec un `backdrop-filter` posé. Mordant vérifié en retirant l'appel
+à `actualiserTitrePreparation` dans `afficherPisteInitiative`.
