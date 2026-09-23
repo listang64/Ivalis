@@ -30,9 +30,15 @@ import { creerCerveau, estLeCerveau, cerveauPerdu, suivreBattement, cerveauSilen
          ouvrirManche, accueillirCombattant, BATTEMENT_MS } from './cerveau_combat.js';
 import { creerSpectateur } from './spectateur_combat.js';
 import { creerPont, creerProjection, versAnimationDeSaut } from './pont_combat.js';
+// DES NOMS QUI EXISTAIENT DÉJÀ, ET AUCUN AUTRE. Ces imports ne portent pas de
+// numéro de version : un appareil peut donc, quelques minutes après une mise à
+// jour, recevoir ce fichier-ci neuf et depot_firestore.js encore en cache. Un
+// nom qui n'existe pas dans l'ancienne copie ferait échouer le chargement de
+// tout ce fichier — plus de cerveau du tout. requeteIntentions et enAttente,
+// eux, ont toujours été là.
 import {
     creerDepot, ouvrirCombat, effacerLeCombat, ecouterCombat,
-    lireEntree, lireDepuis, envoyerIntention, CHEMINS
+    lireEntree, lireDepuis, envoyerIntention, CHEMINS, requeteIntentions, enAttente
 } from './depot_firestore.js';
 
 const nombre = (v, defaut = 0) => {
@@ -86,6 +92,13 @@ export function creerRegime(contexte) {
         enTrainDeTourner: false,
         branche: false,
         ouvertureAilleurs: false,
+        // L'écoute des intentions en attente — le cerveau seul la tient — et
+        // ce qu'elle a vu : sans intention en attente et sans tour à reprendre,
+        // un battement n'a aucune raison de faire tourner le cerveau.
+        arretIntentions: null,
+        intentionsEnAttente: 0,
+        intentionEnRetard: false,
+        aReprendre: false,
         // Ce qu'on sait du battement du cerveau : sa dernière valeur, et
         // l'heure — la NÔTRE — à laquelle on l'a vue changer.
         suivi: null
@@ -118,6 +131,7 @@ export function creerRegime(contexte) {
         moi.enTrainDeTourner = true;
         try {
             const faits = await moi.cerveau.tournerJusquAuCalme();
+            moi.aReprendre = false;
             // QUAND LE CERVEAU NE PUBLIE RIEN, IL FAUT SAVOIR POURQUOI. Neuf
             // fois sur dix c'est normal — un joueur réfléchit — mais « rien ne
             // se passe » sans explication est précisément ce qui coûte une
@@ -125,6 +139,10 @@ export function creerRegime(contexte) {
             if (faits.length === 0 && moi.etat) {
                 const tete = (moi.etat.file || [])[0];
                 const c = tete && moi.etat.combattants[tete.id];
+                // Une créature en tête qui n'a pas joué, c'est un tour qu'il
+                // faudra retenter au prochain battement — pas un joueur qui
+                // réfléchit.
+                if (c && c.estMonstre && !c.aTerre && moi.etat.phase === "Resolution") moi.aReprendre = true;
                 tracer("⌛", tete ? `le cerveau attend ${tete.id}` : "la file est vide",
                        c ? (c.estMonstre ? "(créature — elle devrait jouer)"
                                          : `(au joueur ${c.joueur || "?"})`)
@@ -133,13 +151,49 @@ export function creerRegime(contexte) {
             return faits;
         } catch (e) {
             // Une écriture qui rate n'est pas un drame : rien n'a bougé, et
-            // l'intention sera reprise. Mais on le DIT — un cerveau muet qui
-            // n'avance plus est exactement ce qu'on ne veut plus jamais voir.
+            // l'intention sera reprise — au prochain battement, que cette
+            // marque autorise à relancer le cerveau. Mais on le DIT — un
+            // cerveau muet qui n'avance plus est exactement ce qu'on ne veut
+            // plus jamais voir.
+            moi.aReprendre = true;
             tracer("❌", "le cerveau n'a pas pu publier", String(e && e.message));
             return [];
         } finally {
             moi.enTrainDeTourner = false;
+            if (moi.intentionEnRetard) {
+                moi.intentionEnRetard = false;
+                programmer(() => { tourner(); }, 0);
+            }
         }
+    }
+
+    // LE CERVEAU ÉCOUTE LES INTENTIONS EN ATTENTE, ET RIEN D'AUTRE.
+    //
+    // Il n'en était prévenu que par son propre battement : toutes les cinq
+    // secondes, l'écho du battement le faisait tourner, et chaque tour relisait
+    // la collection ENTIÈRE des intentions de la rencontre. C'est ce sondage,
+    // multiplié par des centaines d'intentions accumulées, qui a vidé le quota
+    // Firebase du jour en pleine partie — après quoi plus aucune carte choisie
+    // ne s'inscrivait, et le combat ne se lançait plus. Une écoute sur les
+    // seules intentions en attente le réveille au moment où l'une arrive, pour
+    // une lecture chacune.
+    function ecouterLesIntentions() {
+        if (moi.arretIntentions || !io || typeof io.ecouterCollection !== "function") return;
+        moi.arretIntentions = io.ecouterCollection(CHEMINS.intentions(idPartie), requeteIntentions(), (docs) => {
+            const enCours = enAttente(docs || []);
+            moi.intentionsEnAttente = enCours.length;
+            if (enCours.length === 0) return;
+            // Le cerveau tourne déjà : sa boucle a peut-être relu les
+            // intentions juste AVANT celle-ci. On le note, et il repartira
+            // dès qu'il aura fini — sinon elle attendrait le battement.
+            if (moi.enTrainDeTourner) { moi.intentionEnRetard = true; return; }
+            tourner();
+        });
+    }
+    function arreterLesIntentions() {
+        if (moi.arretIntentions) { try { moi.arretIntentions(); } catch (e) {} }
+        moi.arretIntentions = null;
+        moi.intentionsEnAttente = 0;
     }
 
     // =====================================================================
@@ -247,6 +301,7 @@ export function creerRegime(contexte) {
                         tracer("🧹", "le combat a été effacé", "l'écran se dégage");
                         moi.etat = null;
                         moi.cerveau = null;
+                        arreterLesIntentions();
                         spectateur.oublier();
                     }
                     return;
@@ -273,17 +328,26 @@ export function creerRegime(contexte) {
                 //
                 // Repartir n'a de sens qu'à un vrai changement de combat.
                 const changementDeCombat = !moi.etat || moi.etat.combat !== etat.combat;
+                // L'ÉCHO D'UN BATTEMENT : même combat, même version. Le battement
+                // ne réécrit que son propre champ ; rien de ce que le cerveau
+                // sait faire n'a changé, et le faire tourner là-dessus, c'était
+                // payer une relecture complète toutes les cinq secondes.
+                const echoDuBattement = !changementDeCombat
+                    && nombre(moi.etat.version) === nombre(etat.version);
                 moi.etat = etat;
 
                 // On (re)prend la main si l'état nous désigne, on la lâche
                 // sinon. C'est déclaratif : aucune négociation.
                 const aMoi = estLeCerveau(etat, poste);
-                if (aMoi && !moi.cerveau) {
+                const devientCerveau = aMoi && !moi.cerveau;
+                if (devientCerveau) {
                     moi.cerveau = creerCerveau(depot, { poste, plateau, carteDe, maintenant, tracer });
                     tracer("🧠", "ce poste tient le cerveau", `(version ${etat.version})`);
                     battre();
+                    ecouterLesIntentions();
                 } else if (!aMoi && moi.cerveau) {
                     moi.cerveau = null;
+                    arreterLesIntentions();
                     tracer("👀", "ce poste regarde", `(le cerveau est ${etat.cerveau})`);
                 }
 
@@ -322,7 +386,11 @@ export function creerRegime(contexte) {
                                          String(e && e.message)));
                 }
 
-                if (aMoi) tourner();
+                // Un vrai changement d'état, une prise de main, une intention qui
+                // attend ou un tour qui a raté : là, le cerveau a du travail.
+                // L'écho d'un battement, seul, n'en apporte aucun.
+                if (aMoi && (!echoDuBattement || devientCerveau || moi.aReprendre
+                             || moi.intentionsEnAttente > 0)) tourner();
             },
             surEntrees: (entrees) => {
                 spectateur.recevoir(entrees);
@@ -334,6 +402,7 @@ export function creerRegime(contexte) {
     function debrancher() {
         moi.branche = false;
         if (moi.arretEcoutes) { try { moi.arretEcoutes(); } catch (e) {} }
+        arreterLesIntentions();
         if (moi.minuteurBattement) arreterMinuteur(moi.minuteurBattement);
         moi.arretEcoutes = null;
         moi.minuteurBattement = null;

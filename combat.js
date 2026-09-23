@@ -282,8 +282,57 @@ function leverCoupeCircuitPartie(essai) {
     return pause;
 }
 
-// modifierPartieOuEchec rend { ok, resultat } : `ok` faux veut dire que RIEN
-// n'a été écrit, et que l'appelant doit s'en occuper.
+// LE QUOTA FIREBASE ÉPUISÉ, DIT À LA TABLE — PAS SEULEMENT À LA CONSOLE.
+//
+// Signalé en partie : « les joueurs ont choisi leurs compétences et le combat
+// ne se lance pas ». La base répondait « Quota exceeded » : le quota gratuit du
+// jour était parti, et Firestore refusait TOUTES les écritures. Les cartes
+// semblaient retenues à l'écran (le volet se refermait, le deck se grisait),
+// mais aucune n'arrivait dans la file — et rien ne le disait, sauf une ligne
+// ⛔ dans une trace que personne ne lit sur iPad.
+//
+// Ce n'est pas une panne qu'on attend en retentant : le quota ne se recharge
+// qu'une fois par jour, à minuit heure du Pacifique, soit 9 h à Paris. On le
+// dit donc une fois, en clair, sur chaque écran, avec l'heure du retour.
+window.estQuotaFirestore = function(e) {
+    if (!e) return false;
+    return e.code === "resource-exhausted"
+        || /quota exceeded|resource[_ -]exhausted/i.test(String(e.message || e));
+};
+window.QUOTA_FIRESTORE_SIGNALE = false;
+window.signalerQuotaFirestore = function(e) {
+    if (!window.estQuotaFirestore(e)) return false;
+    if (window.QUOTA_FIRESTORE_SIGNALE) return true;
+    window.QUOTA_FIRESTORE_SIGNALE = true;
+    if (typeof window.tracerCombat === "function") {
+        window.tracerCombat("⛔", "QUOTA FIREBASE ÉPUISÉ", "plus aucune écriture ne passe avant la remise à zéro");
+    }
+    if (typeof document === "undefined" || document.getElementById("bandeau-quota-firestore")) return true;
+    const bandeau = document.createElement("div");
+    bandeau.id = "bandeau-quota-firestore";
+    bandeau.style.cssText = "position:fixed; top:12px; left:50%; transform:translateX(-50%);"
+        + "z-index:2147483646; max-width:min(92vw, 720px); box-sizing:border-box;"
+        + "padding:14px 48px 14px 18px; border-radius:10px;"
+        + "background:rgba(60,8,8,0.96); border:2px solid #ff6b6b; color:#ffe9e9;"
+        + "font-family:'Cinzel', serif; font-size:15px; line-height:1.45;"
+        + "box-shadow:0 6px 24px rgba(0,0,0,0.7); pointer-events:auto;";
+    bandeau.innerHTML = "<strong>⛔ La base du jeu a épuisé son quota gratuit du jour.</strong><br>"
+        + "Plus rien ne peut être enregistré — cartes, déplacements, tours : le combat ne peut pas avancer. "
+        + "Le quota se recharge chaque jour vers 9 h (heure de Paris).";
+    const croix = document.createElement("button");
+    croix.textContent = "✕";
+    croix.setAttribute("aria-label", "Fermer");
+    croix.style.cssText = "position:absolute; top:8px; right:8px; width:32px; height:32px;"
+        + "background:transparent; border:1px solid #ffb4b4; color:#ffe9e9; border-radius:6px;"
+        + "font-size:14px; cursor:pointer;";
+    croix.onclick = () => bandeau.remove();
+    bandeau.appendChild(croix);
+    (document.body || document.documentElement).appendChild(bandeau);
+    return true;
+};
+
+// modifierPartieOuEchec rend { ok, resultat, erreur } : `ok` faux veut dire que
+// RIEN n'a été écrit, et que l'appelant doit s'en occuper — `erreur` dit pourquoi.
 window.modifierPartieOuEchec = async function(modifier) {
     if (!window.ID_PARTIE_COURANTE) return { ok: false, resultat: null };
     const ESSAIS = 4;
@@ -304,6 +353,8 @@ window.modifierPartieOuEchec = async function(modifier) {
         } catch (e) {
             derniere = e;
             if (e && e.code === "resource-exhausted") {
+                // Gardé : des bancs extraient cette fonction seule, sans le reste.
+                if (typeof window.signalerQuotaFirestore === "function") window.signalerQuotaFirestore(e);
                 const pause = leverCoupeCircuitPartie(essai);
                 if (typeof window.tracerCombat === "function") {
                     window.tracerCombat("⛔", `quota Firestore dépassé sur la partie (essai ${essai})`,
@@ -322,7 +373,7 @@ window.modifierPartieOuEchec = async function(modifier) {
         window.tracerCombat("❌", "écriture de la partie IMPOSSIBLE",
                             (derniere && derniere.code) || String(derniere));
     }
-    return { ok: false, resultat: null };
+    return { ok: false, resultat: null, erreur: derniere };
 };
 
 window.modifierPartie = async function(modifier) {
@@ -412,26 +463,36 @@ window.fermerCombat = function() {
         window.fermerMenusCoulissantsCombat();
     }
     // Désactive la gomme sans sauvegarder (le MJ doit valider via le losange)
+    //
+    // SANS SAUVEGARDER, MAIS SANS GARDER NON PLUS. Le pinceau reposé, les
+    // cases peintes restaient dans la mémoire de CET appareil : invisibles
+    // (un mur ne se dessine qu'outil en main ou œil d'or pressé), jamais
+    // envoyées aux autres, mais bien réelles pour le calcul des chemins d'ici
+    // — et pour le cerveau, s'il tourne sur ce poste. Des murs que seul le MJ
+    // avait, que l'œil d'or des joueurs ne pouvait pas montrer, et qui
+    // bloquaient pourtant leurs déplacements. On revient donc au terrain
+    // enregistré : ce qui n'a pas été validé n'existe nulle part.
+    const enregistre = window.TERRAIN_VTT_ENREGISTRE || { supprimees: [], murs: [], difficiles: [] };
     if (window.VTT_MODE_EFFACEMENT) {
         window.VTT_MODE_EFFACEMENT = false;
         isPaintingVTT = false;
         const btnGomme = document.getElementById("btn-gomme-vtt");
         if (btnGomme) btnGomme.classList.remove("actif");
-        if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
+        if (window.PLATEAU_VTT) window.appliquerTuilesSupprimees(enregistre.supprimees);
     }
     if (window.VTT_MODE_MURS) {
         window.VTT_MODE_MURS = false;
         isPaintingVTT = false;
         const btnMurs = document.getElementById("btn-murs-vtt");
         if (btnMurs) btnMurs.classList.remove("actif");
-        if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
+        if (window.PLATEAU_VTT) window.appliquerMurs(enregistre.murs);
     }
     if (window.VTT_MODE_DIFFICILE) {
         window.VTT_MODE_DIFFICILE = false;
         isPaintingVTT = false;
         const btnDifficile = document.getElementById("btn-difficile-vtt");
         if (btnDifficile) btnDifficile.classList.remove("actif");
-        if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
+        if (window.PLATEAU_VTT) window.appliquerTerrainDifficile(enregistre.difficiles);
     }
     if (typeof window.fermerToutesLesFenetres === "function") {
         window.fermerToutesLesFenetres();
@@ -1894,19 +1955,37 @@ window.ecouterTerrainVTT = function() {
     window.UNSUBSCRIBE_VTT = onSnapshot(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), (snap) => {
         if (snap.exists()) {
             const data = snap.data();
-            
+
+            // LE TERRAIN TEL QU'IL EST ENREGISTRÉ, gardé de côté : c'est lui
+            // qu'on remet quand un pinceau est reposé sans être validé (voir
+            // fermerCombat).
+            window.TERRAIN_VTT_ENREGISTRE = {
+                supprimees: data.Tuiles_Supprimees || [],
+                murs: data.Tuiles_Murs || [],
+                difficiles: data.Tuiles_Difficiles || []
+            };
+
+            // UNE COUCHE EN COURS DE PEINTURE N'EST PAS ÉCRASÉE. Chaque
+            // instantané de ce document — un pion qui bouge, une Illusion,
+            // l'échelle de la grille — rapporte AUSSI les listes enregistrées,
+            // et les réappliquer remettait toute la couche à zéro : les murs
+            // que le MJ venait de peindre, pas encore validés, s'effaçaient
+            // sous ses yeux, et l'œil d'or ne pouvait plus les montrer à
+            // personne. Tant que son pinceau est en main, c'est ce poste-ci
+            // qui a raison sur cette couche ; il l'enregistre en le reposant.
+
             // NOUVEAU : On applique les trous d'abord...
-            if (data.Tuiles_Supprimees !== undefined) {
+            if (data.Tuiles_Supprimees !== undefined && !window.VTT_MODE_EFFACEMENT) {
                 window.appliquerTuilesSupprimees(data.Tuiles_Supprimees);
             }
 
             // NOUVEAU : ...puis les murs
-            if (data.Tuiles_Murs !== undefined) {
+            if (data.Tuiles_Murs !== undefined && !window.VTT_MODE_MURS) {
                 window.appliquerMurs(data.Tuiles_Murs);
             }
 
             // NOUVEAU : Application du terrain difficile
-            if (data.Tuiles_Difficiles !== undefined) {
+            if (data.Tuiles_Difficiles !== undefined && !window.VTT_MODE_DIFFICILE) {
                 window.appliquerTerrainDifficile(data.Tuiles_Difficiles);
             }
 
@@ -3224,15 +3303,26 @@ window.toggleModeTerrainDifficileHex = function() {
 // sans jamais le lire pour décider quoi que ce soit d'autre.
 window.VTT_REVELER_TERRAIN = false;
 
+// LES PIONS S'EFFACENT À MOITIÉ PENDANT L'APPUI. Le plateau est peint sous
+// eux : une case de terrain difficile où se tient une créature restait
+// cachée derrière son jeton, et l'œil semblait l'avoir oubliée. On les laisse
+// visibles — on doit savoir qui est où — mais assez transparents pour voir
+// le sol à travers.
+const OPACITE_PIONS_REVELATION = "0.35";
+
 window.activerRevelationTerrain = function() {
     if (window.VTT_REVELER_TERRAIN) return;
     window.VTT_REVELER_TERRAIN = true;
+    const pions = document.getElementById("conteneur-tokens-vtt");
+    if (pions) pions.style.opacity = OPACITE_PIONS_REVELATION;
     if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
 };
 
 window.desactiverRevelationTerrain = function() {
     if (!window.VTT_REVELER_TERRAIN) return;
     window.VTT_REVELER_TERRAIN = false;
+    const pions = document.getElementById("conteneur-tokens-vtt");
+    if (pions) pions.style.opacity = "";
     if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
 };
 
@@ -3826,7 +3916,7 @@ window.jouerCarteCombat = async function(idCarte) {
     try {
         // Sous transaction : trois joueurs qui choisissent au même instant ne
         // doivent pas s'effacer mutuellement de la file (cf. modifierPartie).
-        await window.modifierPartie((data) => {
+        const ecriture = await window.modifierPartieOuEchec((data) => {
             let file = data.File_Attente_Combat || [];
             file = file.filter(item => item.idPersonnage !== persoActuel.idPersonnage);
 
@@ -3869,6 +3959,17 @@ window.jouerCarteCombat = async function(idCarte) {
             return { maj: { File_Attente_Combat: file, Phase_Combat: phase, Ont_Joue_Ce_Round: ontJoue } };
         });
 
+        // UNE CARTE QUI N'A PAS PU S'ÉCRIRE N'EST PAS UNE CARTE CHOISIE.
+        //
+        // modifierPartie rendait `null` sans rien lever, et l'échec passait
+        // inaperçu : le volet s'était déjà refermé, le deck grisé, le joueur
+        // croyait sa carte partie — elle n'était jamais arrivée dans la file,
+        // et la manche attendait pour toujours. C'est exactement ce que la
+        // table a vu le soir où le quota Firebase s'est épuisé. On passe donc
+        // par la version qui DIT si l'écriture a eu lieu, et un échec rejoint
+        // le chemin d'erreur : le deck se rouvre, et le joueur le sait.
+        if (!ecriture.ok) throw (ecriture.erreur || new Error("la carte n'a pas pu être inscrite"));
+
         // L'état Électrifié se dissipe une fois la carte réellement inscrite.
         if (etatsApresElectrifie) {
             persoActuel.Etats_Alteres = etatsApresElectrifie;
@@ -3884,6 +3985,12 @@ window.jouerCarteCombat = async function(idCarte) {
         const btn = document.getElementById("btn-choisir-action");
         if (btn) { btn.innerText = "Choisir"; btn.disabled = false; }
         window.mettreAJourJaugeFatigue(0);
+        // Le quota épuisé a son propre bandeau, qui dit quand ça reviendra ;
+        // toute autre panne, on la dit ici — le joueur doit rechoisir.
+        const quota = typeof window.signalerQuotaFirestore === "function" && window.signalerQuotaFirestore(e);
+        if (!quota && typeof alert === "function") {
+            alert("Ta carte n'a pas pu être enregistrée (la connexion a peut-être sauté). Choisis-la à nouveau.");
+        }
     }
 };
 
@@ -3909,7 +4016,8 @@ window.jouerReposLong = async function() {
     try {
         // Même règle que pour une carte ordinaire : sous transaction, sinon un
         // repos long effacerait la carte qu'un autre joueur vient de poser.
-        await window.modifierPartie((data) => {
+        // Et même exigence : un repos qui n'a pas pu s'écrire doit le dire.
+        const ecriture = await window.modifierPartieOuEchec((data) => {
             let file = data.File_Attente_Combat || [];
             
             file = file.filter(item => item.idPersonnage !== persoActuel.idPersonnage);
@@ -3934,9 +4042,15 @@ window.jouerReposLong = async function() {
             return { maj: { File_Attente_Combat: file, Phase_Combat: newPhase,
                             Ont_Joue_Ce_Round: ontJoueRepos } };
         });
+        if (!ecriture.ok) throw (ecriture.erreur || new Error("le repos long n'a pas pu être inscrit"));
     } catch (e) {
         console.error("Erreur jouerReposLong:", e);
+        if (typeof window.rouvrirDeckApresEchec === "function") window.rouvrirDeckApresEchec();
         window.actualiserEtatCarteCombat();
+        const quota = typeof window.signalerQuotaFirestore === "function" && window.signalerQuotaFirestore(e);
+        if (!quota && typeof alert === "function") {
+            alert("Ton repos long n'a pas pu être enregistré (la connexion a peut-être sauté). Choisis-le à nouveau.");
+        }
     }
 };
 

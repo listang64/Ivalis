@@ -1924,33 +1924,35 @@
 <script type="module" src="mouvement_pur.js?v=6"></script>
 <script type="module" src="ia_pure.js?v=3"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
-<script type="module" src="cerveau_combat.js?v=17"></script>
+<script type="module" src="cerveau_combat.js?v=18"></script>
 <!-- LE SPECTATEUR : la boucle de rejeu. Elle lit le journal du cerveau, ouvre
      la fenêtre de tour, anime PUIS applique, et ne saute jamais un numéro. -->
 <script type="module" src="spectateur_combat.js?v=6"></script>
 <!-- LE DÉPÔT : la seule chose qui écrive pendant un combat. Un pas = un lot,
      et le lot porte l'état, l'entrée de journal et la fermeture de l'intention. -->
-<script type="module" src="depot_firestore.js?v=6"></script>
+<script type="module" src="depot_firestore.js?v=7"></script>
 <!-- LE PONT : de l'étape à ce qu'on voit. Il traduit un résultat déjà calculé
      vers les animations existantes — il ne recalcule jamais rien. -->
 <script type="module" src="pont_combat.js?v=12"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
-<script type="module" src="regime_cerveau.js?v=24"></script>
+<script type="module" src="regime_cerveau.js?v=25"></script>
 <script type="module" src="ia_master.js?v=6"></script>
-<script type="module" src="app.js?v=49"></script>
+<script type="module" src="app.js?v=50"></script>
 <script type="module" src="creation_personnage.js?v=8"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=25"></script>
-<script src="Plateau.js"></script>
+<!-- Le plateau porte désormais son ?v= comme les autres : sans lui, un iPad
+     gardait l'ancien dessin en cache après une livraison (l'œil d'or en dépend). -->
+<script src="Plateau.js?v=2"></script>
 <script type="module" src="sequence_tour.js?v=23"></script>
-<script type="module" src="combat.js?v=89"></script>
+<script type="module" src="combat.js?v=90"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=25"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
 <script type="module" src="moteur_effets.js?v=47"></script>
 <script type="module" src="monstres.js?v=24"></script>
 <script type="module" src="monstres_competences.js?v=10"></script>
-<script type="module" src="monstres_ia.js?v=31"></script>
+<script type="module" src="monstres_ia.js?v=32"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=8"></script>
 <script type="module" src="objets_ia.js?v=10"></script>

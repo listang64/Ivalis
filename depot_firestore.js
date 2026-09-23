@@ -77,17 +77,33 @@ const nombre = (v, defaut = 0) => {
 //
 //  D'où deux règles, tenues ici et vérifiées au banc :
 //    • le journal se filtre et se trie sur le SEUL champ `v` ;
-//    • les intentions ne se filtrent PAS du tout — la collection est minuscule,
-//      on la lit entière triée par date d'arrivée et on écarte les traitées en
-//      mémoire. Une requête qu'on ne fait pas est une requête qui ne peut pas
-//      être refusée.
+//    • les intentions se filtrent sur le SEUL champ `traitee`, par égalité, et
+//      ne se trient pas dans la requête — le tri par date d'arrivée se fait en
+//      mémoire. Une égalité sur un seul champ n'a besoin d'aucun index
+//      composite : c'est le tri ou la borne sur un AUTRE champ qui en réclame.
+//
+//  LES INTENTIONS SE LISAIENT ENTIÈRES, ET C'EST CE QUI A VIDÉ LE QUOTA.
+//  L'idée était « la collection est minuscule, on écarte les traitées en
+//  mémoire ». Elle ne l'est pas : chaque pas, chaque carte, chaque fin de tour
+//  y dépose un document que rien ne retire avant la fin de la rencontre. Et le
+//  cerveau la relisait à chaque battement, toutes les cinq secondes, même
+//  quand personne ne jouait. Firestore facture un document lu par document
+//  rendu : au bout d'une heure de combat, chaque battement coûtait des
+//  dizaines de lectures, et le quota gratuit du jour (50 000) partait en une
+//  soirée. Ensuite, plus aucune écriture ne passait — les cartes choisies ne
+//  s'inscrivaient plus, et le combat ne se lançait pas. On ne lit donc plus
+//  que celles qui attendent : en temps normal, aucune.
 
 export const requeteJournal = (depuis) => ({ champ: "v", sup: nombre(depuis), tri: "v" });
-export const requeteIntentions = () => ({ tri: "ts" });
+export const requeteIntentions = () => ({ egal: { champ: "traitee", valeur: false } });
 
-// Une intention en attente : ni traitée, ni refusée. La distinction se fait
-// ici, en mémoire, et jamais dans la requête.
-export const enAttente = (liste) => (liste || []).filter(i => i && !i.traitee);
+// Une intention en attente : ni traitée, ni refusée, rangées par date
+// d'arrivée. La requête ne rend déjà que celles-là ; le filtre reste ici par
+// prudence (un banc, un Firestore qui ignorerait l'égalité), et le tri ne peut
+// vivre qu'ici — le demander à la requête réclamerait un index composite.
+export const enAttente = (liste) => (liste || [])
+    .filter(i => i && !i.traitee)
+    .sort((a, b) => nombre(a.ts) - nombre(b.ts));
 
 // =========================================================================
 //  2. LE DÉPÔT DU CERVEAU

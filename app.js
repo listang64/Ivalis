@@ -620,23 +620,29 @@ document.addEventListener("visibilitychange", () => {
 //
 //  UN LOT, ET PAS UNE SUITE D'ÉCRITURES. `lot` passe par writeBatch : c'est ce
 //  qui rend impossible un état publié sans son entrée de journal.
+//
+//  CHAQUE ÉCHEC PASSE PAR signalerSiQuota AVANT DE REMONTER. Le cerveau et le
+//  spectateur savent déjà quoi faire d'une écriture ratée (rien n'a bougé, on
+//  reprendra) ; ce qu'ils ne savaient pas faire, c'est le DIRE à la table
+//  quand la raison est un quota Firebase épuisé, qui ne se reprendra pas avant
+//  le lendemain.
 window.ioCombatFirestore = {
     async lire(chemin) {
-        const snap = await getDoc(doc(db, ...chemin));
-        return snap.exists() ? snap.data() : null;
+        try {
+            const snap = await getDoc(doc(db, ...chemin));
+            return snap.exists() ? snap.data() : null;
+        } catch (e) { signalerSiQuota(e); throw e; }
     },
 
     // Une seule règle tenue ici : on ne construit JAMAIS une requête qui
-    // filtre par égalité sur un champ et borne ou trie sur un autre. Le dépôt
-    // n'en demande pas, et cette fonction ne saurait pas en fabriquer.
+    // filtre par égalité sur un champ et borne ou trie sur un autre — c'est ce
+    // qui réclame un index composite, et une requête refusée faute d'index ne
+    // livre plus rien à personne. Une égalité SEULE, elle, passe partout.
     async lister(chemin, requete) {
-        const contraintes = [];
-        const r = requete || {};
-        if (r.champ !== undefined && r.sup !== undefined) contraintes.push(where(r.champ, ">", r.sup));
-        if (r.tri) contraintes.push(orderBy(r.tri, "asc"));
-        if (r.limite) contraintes.push(limit(r.limite));
-        const snap = await getDocs(query(collection(db, ...chemin), ...contraintes));
-        return snap.docs.map(d => ({ ...d.data(), __chemin: d.ref.path.split("/") }));
+        try {
+            const snap = await getDocs(query(collection(db, ...chemin), ...contraintesDe(requete)));
+            return snap.docs.map(d => ({ ...d.data(), __chemin: d.ref.path.split("/") }));
+        } catch (e) { signalerSiQuota(e); throw e; }
     },
 
     async lot(operations) {
@@ -647,7 +653,7 @@ window.ioCombatFirestore = {
             else if (o.op === "update") b.update(ref, o.data);
             else b.set(ref, o.data);
         });
-        await b.commit();
+        try { await b.commit(); } catch (e) { signalerSiQuota(e); throw e; }
     },
 
     // LA SEULE TRANSACTION DE TOUT LE NOUVEAU RÉGIME, et elle ne sert qu'à une
@@ -661,32 +667,56 @@ window.ioCombatFirestore = {
     // null pour abandonner. On rend true si on a écrit, false sinon.
     async transaction(chemin, decider) {
         const ref = doc(db, ...chemin);
-        return await runTransaction(db, async (tx) => {
-            const snap = await tx.get(ref);
-            const actuel = snap.exists() ? snap.data() : null;
-            const aEcrire = decider(actuel);
-            if (!aEcrire) return false;
-            tx.set(ref, aEcrire);
-            return true;
-        });
+        try {
+            return await runTransaction(db, async (tx) => {
+                const snap = await tx.get(ref);
+                const actuel = snap.exists() ? snap.data() : null;
+                const aEcrire = decider(actuel);
+                if (!aEcrire) return false;
+                tx.set(ref, aEcrire);
+                return true;
+            });
+        } catch (e) { signalerSiQuota(e); throw e; }
     },
 
     ecouterDoc(chemin, rappel) {
         return onSnapshot(doc(db, ...chemin),
             (snap) => rappel(snap.exists() ? snap.data() : null),
-            (e) => console.error("Écoute de l'état du combat :", e));
+            (e) => { signalerSiQuota(e); console.error("Écoute de l'état du combat :", e); });
     },
 
     ecouterCollection(chemin, requete, rappel) {
-        const contraintes = [];
-        const r = requete || {};
-        if (r.champ !== undefined && r.sup !== undefined) contraintes.push(where(r.champ, ">", r.sup));
-        if (r.tri) contraintes.push(orderBy(r.tri, "asc"));
-        return onSnapshot(query(collection(db, ...chemin), ...contraintes),
+        return onSnapshot(query(collection(db, ...chemin), ...contraintesDe(requete, { sansLimite: true })),
             (snap) => rappel(snap.docs.map(d => ({ ...d.data(), __chemin: d.ref.path.split("/") }))),
-            (e) => console.error("Écoute du journal du combat :", e));
+            (e) => { signalerSiQuota(e); console.error("Écoute du combat :", e); });
     }
 };
+
+// La traduction d'une requête du dépôt en contraintes Firestore, en un seul
+// endroit pour la lecture et pour l'écoute — elles divergeaient déjà d'une
+// ligne (la limite). La règle de l'index composite y est VÉRIFIÉE, pas
+// seulement rappelée : une requête qui la viole échoue ici, tout de suite et
+// sur tous les postes, au lieu d'être refusée en silence par Firestore.
+function contraintesDe(requete, options) {
+    const r = requete || {};
+    const contraintes = [];
+    if (r.egal && ((r.champ !== undefined && r.champ !== r.egal.champ)
+                   || (r.tri && r.tri !== r.egal.champ))) {
+        throw new Error("requête refusée : égalité sur " + r.egal.champ
+                        + " et borne ou tri sur un autre champ (index composite)");
+    }
+    if (r.egal) contraintes.push(where(r.egal.champ, "==", r.egal.valeur));
+    if (r.champ !== undefined && r.sup !== undefined) contraintes.push(where(r.champ, ">", r.sup));
+    if (r.tri) contraintes.push(orderBy(r.tri, "asc"));
+    if (r.limite && !(options && options.sansLimite)) contraintes.push(limit(r.limite));
+    return contraintes;
+}
+
+// UN QUOTA ÉPUISÉ NE DOIT PLUS SE PASSER EN SILENCE. Voir signalerQuotaFirestore
+// (combat.js) : c'est lui qui prévient la table, une fois, à l'écran.
+function signalerSiQuota(e) {
+    if (typeof window.signalerQuotaFirestore === "function") window.signalerQuotaFirestore(e);
+}
 
 // Les caractéristiques des héros de la partie, lues une fois et partagées par
 // tout le jeu. Sans elles, le prérequis d'un objet ne se vérifiait que chez le
@@ -2400,9 +2430,22 @@ function ecouterJoueurs() {
 }
 
 // Liste des parties pré-chargée en temps réel (pour éviter le temps d'attente)
+//
+// ELLE NE SERT QU'AU MENU, ET ELLE RESTAIT OUVERTE PENDANT TOUTE LA PARTIE.
+// Cette écoute porte sur les documents des parties — ceux-là mêmes que le
+// combat réécrit à chaque carte choisie, à chaque manche, à chaque verrou de
+// l'IA. Chaque écriture coûtait donc une lecture de plus à chaque appareil, en
+// double de l'écoute de la partie elle-même : une vingtaine par manche, pour
+// une liste que personne ne regarde. On la coupe en entrant dans une partie, on
+// la rouvre en revenant au menu.
+let unsubscribePartiesEnCours = null;
+function arreterEcoutePartiesEnCours() {
+  if (unsubscribePartiesEnCours) { unsubscribePartiesEnCours(); unsubscribePartiesEnCours = null; }
+}
 function ecouterPartiesEnCours() {
+  if (unsubscribePartiesEnCours) return;
   const q = query(collection(db, COL.PARTIES), where("Statut", "==", "En_cours"));
-  onSnapshot(q, (snap) => {
+  unsubscribePartiesEnCours = onSnapshot(q, (snap) => {
     const parties = [];
     snap.forEach((document) => {
       const d = document.data();
@@ -2537,8 +2580,13 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
       window.UNSUBSCRIBE_VTT();
       window.UNSUBSCRIBE_VTT = null;
     }
+    ecouterPartiesEnCours();
     return;
   }
+
+  // Dans une partie, la liste du menu n'a plus rien à montrer (voir
+  // ecouterPartiesEnCours) : chaque écriture du combat la payait quand même.
+  arreterEcoutePartiesEnCours();
 
   // NOUVEAU : On précharge la carte de combat VTT en cache pour l'iPad
   if (typeof window.ecouterTerrainVTT === "function") {
@@ -3630,6 +3678,8 @@ function confirmerRetourMenu() {
   document.getElementById("ecran-menu").style.display = "block";
   window.ID_PARTIE_COURANTE = null;
   if (unsubscribePersonnages) { unsubscribePersonnages(); unsubscribePersonnages = null; }
+  // De retour au menu : la liste des parties redevient utile.
+  ecouterPartiesEnCours();
   // NOUVEAU : Nettoyage des écouteurs de compétences
   Object.values(window.UNSUBSCRIBE_COMPETENCES).forEach(unsub => unsub());
   window.UNSUBSCRIBE_COMPETENCES = {};

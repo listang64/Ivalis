@@ -734,6 +734,9 @@ async function reclamerVerrouIA(cle) {
             // Une transaction bousculée n'est pas un refus : c'est un « recommence ».
             // Renoncer ici, c'est laisser la créature sans personne pour la jouer —
             // ou, pire, laisser l'autre poste croire qu'il est seul.
+            if (e && e.code === "resource-exhausted" && typeof window.signalerQuotaFirestore === "function") {
+                window.signalerQuotaFirestore(e);
+            }
             if (e && e.code === "resource-exhausted" && typeof window.PAUSE_ECRITURE_PARTIE !== "undefined") {
                 // Le quota du document est dépassé, pas juste une course perdue :
                 // on lève le même coupe-circuit que modifierPartieOuEchec pour que

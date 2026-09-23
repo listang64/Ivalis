@@ -42,6 +42,18 @@ const dormir = (ms) => new Promise(r => setTimeout(r, ms));
 //
 //  Tout le reste (le réseau, la latence, l'authentification) n'a pas d'intérêt
 //  ici : ce qu'on veut, c'est que le dépôt reste correct face à ces trois-là.
+// LA RÈGLE DES INDEX, telle que Firestore l'applique : une égalité sur un champ
+// combinée à une borne ou un tri sur un AUTRE champ réclame un index composite.
+// Une égalité seule, ou une borne et un tri sur le même champ, n'en réclament pas.
+function exigeIndex(r) {
+    if (!r) return false;
+    const egalites = r.egal ? [r.egal.champ] : [];
+    const portees = [];
+    if (r.champ) portees.push(r.champ);       // une borne (>)
+    if (r.tri) portees.push(r.tri);           // un tri
+    return egalites.some(e => portees.some(p => p !== e));
+}
+
 function firestoreDeBanc() {
     const base = new Map();          // chemin -> data
     const ecoutes = [];              // { chemin, requete, rappel, estCollection }
@@ -52,15 +64,7 @@ function firestoreDeBanc() {
 
     const cle = (chemin) => chemin.join("/");
 
-    // LA RÈGLE DES INDEX, telle que Firestore l'applique.
-    const exigeUnIndexComposite = (r) => {
-        if (!r) return false;
-        const egalites = r.egal ? [r.egal.champ] : [];
-        const portees = [];
-        if (r.champ) portees.push(r.champ);       // une borne (>)
-        if (r.tri) portees.push(r.tri);           // un tri
-        return egalites.some(e => portees.some(p => p !== e));
-    };
+    const exigeUnIndexComposite = exigeIndex;
 
     function documentsDe(cheminColl, requete) {
         const prefixe = cle(cheminColl) + "/";
@@ -228,11 +232,24 @@ async function banc() {
                  rj.champ === "v" && rj.tri === "v", `(champ ${rj.champ}, tri ${rj.tri})`);
         verifier("et ne filtre par égalité sur rien", rj.egal === undefined);
 
+        // LES INTENTIONS NE SE LISENT PLUS ENTIÈRES. Ce banc vérifiait
+        // l'inverse — « elles ne filtrent rien du tout, la collection est
+        // minuscule » — et c'était faux en partie : relue à chaque battement,
+        // elle a vidé le quota Firebase du jour. On ne lit plus que celles qui
+        // attendent, par une égalité SEULE (aucun index composite), et le tri
+        // par date d'arrivée se fait en mémoire.
         const ri = requeteIntentions();
-        verifier("les intentions ne filtrent rien du tout",
-                 ri.egal === undefined && ri.champ === undefined, `(tri ${ri.tri})`);
-        verifier("on écarte les traitées en mémoire, pas dans la requête",
-                 enAttente([{ id: "a" }, { id: "b", traitee: true }]).length === 1);
+        verifier("les intentions ne rendent que celles en attente",
+                 !!ri.egal && ri.egal.champ === "traitee" && ri.egal.valeur === false,
+                 JSON.stringify(ri.egal));
+        verifier("par une égalité seule : ni borne, ni tri dans la requête",
+                 ri.champ === undefined && ri.sup === undefined && ri.tri === undefined,
+                 `(champ ${ri.champ}, tri ${ri.tri})`);
+        verifier("donc Firestore n'exige aucun index composite pour elle",
+                 !exigeIndex(ri));
+        const triees = enAttente([{ id: "b", ts: 20 }, { id: "a", ts: 10 }, { id: "c", ts: 5, traitee: true }]);
+        verifier("les traitées restent écartées, les autres rangées par arrivée",
+                 triees.map(i => i.id).join(",") === "a,b", triees.map(i => i.id).join(","));
     }
 
     // =====================================================================

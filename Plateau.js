@@ -160,8 +160,16 @@ class Plateau {
         // 1. GOMME : Si supprimée et qu'aucun outil d'édition n'est actif, on l'efface totalement (invisible).
         // Avec un outil en main (gomme/murs/difficile), on garde la case visible pour pouvoir
         // continuer à y peindre des murs ou du terrain difficile par-dessus.
+        //
+        // L'ŒIL D'OR LA MONTRE AUSSI. Une case gommée est infranchissable,
+        // exactement comme un mur (le cerveau la refuse au même titre, voir
+        // mouvement_pur.js) — et un mur ou un terrain difficile peint
+        // PAR-DESSUS une case gommée restait invisible à l'œil, alors que
+        // l'outil de peinture, lui, le montrait. C'étaient les cases que l'œil
+        // « oubliait ».
         const isEditingMode = isGommeMode || isMursMode || isDifficileMode;
-        if (state.isDeleted && !isEditingMode) return;
+        if (state.isDeleted && !isEditingMode && !isRevealMode) return;
+        const infranchissableRevele = isRevealMode && !isEditingMode && state.isDeleted;
 
         this.ctx.beginPath();
         for (let i = 0; i < 6; i++) {
@@ -183,7 +191,7 @@ class Plateau {
             this.ctx.fillStyle = 'rgba(255, 50, 50, 0.4)'; 
             this.ctx.fill();
             this.ctx.strokeStyle = `rgba(0, 0, 0, ${this.gridOpacity})`;
-        } else if (state.isBlocked && (isMursMode || isRevealMode)) {
+        } else if ((state.isBlocked && (isMursMode || isRevealMode)) || infranchissableRevele) {
             this.ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
             this.ctx.fill();
             this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';

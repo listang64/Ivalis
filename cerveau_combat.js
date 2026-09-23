@@ -55,7 +55,14 @@ const nombre = (v, defaut = 0) => {
 // proposent de reprendre la main. Trente secondes : assez long pour qu'un wifi
 // qui hoquette ne déclenche rien, assez court pour qu'une table ne reste pas
 // bloquée si l'écran du maître s'est fermé.
-export const BATTEMENT_MS = 5000;
+//
+// DIX SECONDES, PAS CINQ. Chaque battement est une écriture, et une lecture
+// par appareil qui écoute l'état — toute la soirée, même quand personne ne
+// joue. À cinq secondes, c'était 720 écritures et plus de 2 000 lectures par
+// heure pour le seul fait d'être vivant, sur un quota gratuit de 20 000
+// écritures et 50 000 lectures par JOUR. Trois battements tiennent encore dans
+// les trente secondes du délai : un cerveau vivant n'est jamais pris pour mort.
+export const BATTEMENT_MS = 10000;
 export const CERVEAU_PERDU_MS = 30000;
 
 // =========================================================================
@@ -81,7 +88,7 @@ export function cerveauPerdu(etat, maintenant) {
 // mort (ou l'inverse). Personne ne règle sa tablette à la seconde près.
 //
 // On ne regarde donc pas L'HEURE du battement : on regarde s'il CHANGE. Le
-// cerveau réécrit ce champ toutes les cinq secondes, ce qui provoque une
+// cerveau réécrit ce champ toutes les dix secondes, ce qui provoque une
 // notification ; tant qu'elles arrivent, il est vivant. Le décompte se fait
 // alors entièrement sur MA montre, et aucune comparaison entre appareils n'a
 // plus lieu.

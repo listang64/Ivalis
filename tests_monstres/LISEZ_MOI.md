@@ -2226,3 +2226,79 @@ Mordant vérifié deux fois : une fois en retirant `isRevealMode` des deux
 conditions de `drawHex` (les remplissages disparaissent, échec), une fois en
 faisant réutiliser `VTT_MODE_MURS` par `activerRevelationTerrain` (le
 contrôle « le pinceau des murs reste éteint » échoue).
+
+`combat_complet.mjs` (nouveau) et `firestore_partage.mjs` (son Firestore)
+répondent enfin à la question que tous les autres bancs laissaient ouverte :
+« trois appareils ouvrent la même rencontre, chacun choisit sa carte — le
+combat se lance-t-il ? ». Nico l'a posée après une soirée où, justement, il ne
+se lançait pas, en soupçonnant la suppression du drapeau REGIME_CERVEAU. Le
+banc ouvre TROIS vraies pages du jeu (Nico, Ben, Adrien), chacune dans son
+propre navigateur — donc sa propre identité — branchées sur UN SEUL Firestore
+tenu par Node : un faux SDK servi à la place de firebase-firestore.js, qui
+parle exactement la langue du vrai (setDoc et son merge, updateDoc et ses
+chemins pointés, writeBatch tout-ou-rien, runTransaction en concurrence
+optimiste, onSnapshot avec une latence propre à chaque page, les requêtes
+triées qui écartent les documents sans le champ du tri). Rien du jeu n'est
+découpé : on rejoint la partie par le mot de passe, on ouvre la fenêtre de
+combat, le MJ génère la rencontre (créatures, techniques forgées), chacun
+touche sa bannière puis le bouton de fin de tour, on tape l'écran pour
+lancer chaque tour annoncé, on vise, on résout — trois manches de bout en
+bout. Verdict : la suppression du drapeau n'y est pour rien, le combat se
+lance et se joue. En revanche, la base réelle répondait ce jour-là « Quota
+exceeded » (RESOURCE_EXHAUSTED) : le quota gratuit du jour était épuisé, et
+Firestore refusait TOUTES les écritures. Le banc compte donc aussi la facture
+exactement comme Firebase (une lecture par document rendu, une par document
+ajouté ou modifié dans une écoute, une écriture par document), par manche et
+à l'arrêt. Mesure avant correction : à l'arrêt, sans que personne ne joue,
+8 640 lectures et 720 écritures PAR HEURE au bout de trois manches — et ça
+grossissait à chaque intention. Après : 1 440 lectures et 360 écritures, et
+ça ne grossit plus. Le banc vérifie ce plafond, puis épuise le quota exprès
+(toute écriture refusée en « resource-exhausted ») : le joueur qui choisit sa
+carte doit voir le bandeau « quota épuisé » avec l'heure du retour (9 h, heure
+de Paris), son deck doit se rouvrir au lieu de faire semblant que la carte
+est partie, rien ne doit entrer dans la file — et le même geste doit
+fonctionner dès que le quota revient. Mordant vérifié en retirant le contrôle
+`if (!ecriture.ok)` de jouerCarteCombat : le volet reste fermé, échec.
+
+`quota_cerveau.mjs` (nouveau) isole la cause de l'épuisement, en quelques
+secondes, sur le VRAI régime (creerRegime) et un Firestore qui facture : le
+cerveau écrit un battement de cœur, l'écho de ce battement le faisait
+TOURNER, et chaque tour relisait la collection ENTIÈRE des intentions —
+chaque pas, chaque carte, chaque fin de tour de la rencontre, jamais
+retirés avant la fin. Plus le combat durait, plus chaque battement coûtait.
+Trois corrections, trois contrôles, trois morsures vérifiées : l'écho d'un
+battement (même combat, même version) ne relance plus le cerveau (morsure :
+5 lectures par battement au lieu de 3) ; les intentions ne se lisent plus
+que lorsqu'elles sont EN ATTENTE, par une égalité seule sur `traitee` — pas
+d'index composite, le tri par arrivée se fait en mémoire (morsure : 300
+intentions traitées relues à chaque battement) ; le cerveau ÉCOUTE les
+intentions en attente au lieu de les sonder au battement, et traite une fin
+de tour en quelques millisecondes même avec un battement d'une minute
+(morsure : jamais traitée). Le battement lui-même passe de cinq à dix
+secondes (trois tiennent encore dans les trente secondes du délai « cerveau
+perdu »). `depot_firestore.mjs` vérifiait l'inverse — « les intentions ne
+filtrent rien du tout, la collection est minuscule » — et a changé de
+contrôle en conséquence. Deux économies de plus, hors du cerveau : l'écoute
+de la liste des parties (utile au seul menu) est coupée quand on entre dans
+une partie, et le choix d'une carte ou d'un repos long passe par
+`modifierPartieOuEchec`, qui dit si l'écriture a eu lieu.
+
+`reveler_terrain.mjs`, chapitres 6 à 9 : Nico a signalé que l'œil d'or
+« ne montre pas tous les murs et terrains difficiles, il en oublie ». Quatre
+raisons, chacune couverte et mordante. Une case GOMMÉE est infranchissable
+comme un mur (le cerveau la refuse au même titre) mais restait invisible à
+l'œil — et un mur ou un terrain difficile peint PAR-DESSUS une case gommée
+aussi, alors que l'outil de peinture les montrait : l'œil les dessine
+maintenant, en noir comme un mur (lu au pixel près sur le vrai canvas). Un
+pion posé sur une case difficile la cachait : pendant l'appui, les pions
+passent à 35 % d'opacité. Un instantané de Combat_VTT (un pion qui bouge sur
+un autre appareil) rapportait la liste des murs ENREGISTRÉE et remettait
+toute la couche à zéro, effaçant le mur que le MJ était en train de peindre :
+tant que son pinceau est en main, la couche qu'il peint n'est plus
+réécrasée. Enfin, fermer la fenêtre de combat pinceau en main reposait
+l'outil « sans sauvegarder », mais laissait les cases peintes dans la
+mémoire du seul appareil du MJ — invisibles, jamais envoyées aux autres,
+mais bloquantes pour les chemins calculés là, et pour le cerveau s'il y
+tourne : des murs que l'œil des joueurs ne pouvait pas montrer. L'appareil
+revient désormais au terrain enregistré. Le faux Firestore du banc garde ses
+écoutes pour livrer lui-même un instantané de Combat_VTT.
