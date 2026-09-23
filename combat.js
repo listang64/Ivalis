@@ -5083,9 +5083,26 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
 // =========================================================================
 window.actualiserEtatCarteCombat = function(simulationAction = null) {
     if (document.getElementById("fenetre-combat")?.style.display !== "block") return;
-    
+
     const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
-    if (!persoActuel) return;
+    if (!persoActuel) {
+        // L'APERÇU DU REPOS LONG NE DOIT JAMAIS SURVIVRE À UN TROU. Signalé en
+        // partie : « quand on fait repos long, y'a encore les traces de texte
+        // avec sablier sur le côté gauche de l'écran ». Le sablier flottant ne
+        // se referme que dans les branches plus bas, qui exigent toutes un
+        // `persoActuel` — un trou (liste de héros vidée puis reconstruite entre
+        // deux combats, un index qui pointe un instant dans le vide) faisait
+        // sortir la fonction ICI, avant d'y arriver, et le sablier d'un repos
+        // long déjà résolu restait affiché jusqu'au prochain appel qui daignait
+        // le corriger — parfois au combat suivant. On le referme donc D'ABORD,
+        // avant tout retour anticipé.
+        const divReposVide = document.getElementById("apercu-repos-long-ui");
+        if (divReposVide) {
+            divReposVide.style.opacity = "0";
+            divReposVide.style.left = "50px";
+        }
+        return;
+    }
 
     const partie = window.PARTIE_DATA || {};
     const queue = partie.File_Attente_Combat || [];

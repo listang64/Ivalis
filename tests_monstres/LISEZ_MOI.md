@@ -91,6 +91,7 @@ node deplacement_journal.mjs # un hexagone = un numéro : publication, ordre, ab
 node illusion_opportunite.mjs # une illusion ne porte aucune attaque d'opportunité
 node file_bousculee.mjs     # le tour sauté et les dégâts en double : écritures concurrentes
 node deplacement_repris.mjs # repartir en cours de tour, sans remise à zéro du barème
+node croix_deplacement_legere.mjs # valider/annuler un déplacement n'attend plus un redessin complet du plateau
 node points_apparition.mjs  # les deux repères d'apparition, et la dispersion des pions
 node reinit_plateau.mjs     # la réinitialisation vide le plateau, puis enchaîne le déploiement
 node ecriture_pions.mjs     # les pions écrits en base atterrissent bien dans la carte Tokens
@@ -2422,3 +2423,38 @@ proposées plutôt que d'empêcher de forger une technique de corps à corps ou
 de tir — même principe que `window.peutEquiper`. `forge_arme_equipee.mjs`
 charge la vraie page (Firebase remplacé par des doublures) et vérifie chaque
 cas ; retirer le filtre ou la détection fait tomber les mêmes contrôles.
+
+### Le sablier du repos long ne restait pas toujours sur sa case
+
+Nico : « quand on fait repos long y'a encore les traces de texte avec sablier
+sur le côté gauche de l'écran qu'il faut virer ». Le sablier flottant («
+Repos Long — Concentration et souffle ») est un `<div>` posé à gauche de
+l'écran (`apercu-repos-long-ui`), montré tant que ce héros reste en tête de
+file avec sa carte « REPOS_LONG », et refermé sinon — mais seulement dans les
+branches d'`actualiserEtatCarteCombat` qui exigent un `persoActuel`. Le moindre
+trou (la liste des héros du poste vidée puis reconstruite entre deux
+combats, un index qui pointe un instant dans le vide) faisait sortir la
+fonction AVANT ces branches, sans y toucher — et le sablier d'un repos déjà
+résolu restait affiché, parfois jusqu'au combat suivant. Il se referme
+maintenant dès l'entrée de la fonction, avant tout retour anticipé. Vérifié
+en rejouant le trou dans un vrai navigateur (morsure : sans le correctif, le
+sablier reste à l'opacité 1 après le trou).
+
+### Le déplacement met moins de temps à démarrer, surtout sur iPad
+
+Nico : « quand on valide le déplacement d'un perso il met un peu de temps
+avant de lancer l'animation — sur iPad, pas sur PC ». Valider (et annuler) un
+déplacement appelait `appliquerTokensVTT` : un redessin ENTIER de tous les
+pions du plateau — ombre, halo de sélection, halo de bouclier magique (des
+filtres SVG animés) pour chacun — dans le seul but d'effacer la petite croix
+rouge d'annulation d'UN SEUL pion. Ce redessin s'exécutait juste avant
+d'envoyer le chemin au cerveau, donc avant tout le reste ; et Safari met bien
+plus de temps que les autres moteurs à reconstruire des filtres SVG (le même
+constat avait déjà fait choisir un dégradé plutôt qu'un flou pour l'ombre au
+sol des pions). `window.retirerCroixDeplacement` retire directement la croix
+du seul pion concerné, sans reconstruire quoi que ce soit d'autre — les
+autres redessins, déclenchés par de vrais changements venus de Firestore,
+continuent comme avant. `croix_deplacement_legere.mjs` vérifie, sur le vrai
+DOM, qu'aucun redessin complet n'a lieu et que le reste du pion (son halo) ne
+bouge pas — même référence DOM avant et après (morsure : sans le correctif,
+la croix reste et un redessin est compté).

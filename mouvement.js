@@ -409,6 +409,25 @@ window.dessinerCheminMouvement = function() {
     });
 };
 
+// LA CROIX DISPARAÎT SEULE, SANS RECONSTRUIRE TOUT LE PLATEAU.
+//
+// Elle vit dans le pion, posée par appliquerTokensVTT (combat.js) : jusqu'ici,
+// la faire disparaître passait donc par un redessin ENTIER de tous les pions —
+// ombre, halo de sélection, halo de bouclier (des filtres SVG animés) compris,
+// pour chacun d'eux. Signalé en partie : « quand on valide le déplacement d'un
+// perso il met un peu de temps avant de lancer l'animation, sur iPad, pas sur
+// PC » — Safari sur iPad met bien plus de temps que les autres moteurs à
+// reconstruire des filtres SVG, et ce redessin s'exécutait juste AVANT
+// d'envoyer le chemin, donc avant tout le reste. Un seul petit rond rouge à
+// retirer ne justifie pas de reconstruire le plateau entier : on le retire
+// directement, sur le seul pion concerné.
+window.retirerCroixDeplacement = function(idPersonnage) {
+    const token = document.getElementById("token-" + idPersonnage);
+    if (!token) return;
+    token.querySelectorAll(".croix-annuler-deplacement, .croix-annuler-ciblage")
+         .forEach(croix => croix.remove());
+};
+
 window.annulerMouvement = function() {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     window.CHEMIN_MOUVEMENT = [];
@@ -417,9 +436,9 @@ window.annulerMouvement = function() {
     const svg = document.getElementById("svg-chemin-mouvement");
     if (svg) svg.innerHTML = "";
 
-    // La croix disparaît avec le chemin (redessin des pions), et le bouton fin
-    // de tour retombe sur son état d'avant le déplacement.
-    if (typeof window.appliquerTokensVTT === "function") window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    // La croix disparaît avec le chemin, et le bouton fin de tour retombe sur
+    // son état d'avant le déplacement.
+    window.retirerCroixDeplacement(window.TOKEN_SELECTIONNE);
     if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
 };
 
@@ -463,7 +482,10 @@ window.validerMouvement = async function() {
         window.MOUVEMENT_COUT_TOTAL = 0;
         // La croix sous le pion disparaît avec le chemin ; le bouton fin de tour
         // repasse en « fin de tour » le temps que le cerveau publie le trajet.
-        if (typeof window.appliquerTokensVTT === "function") window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+        // (retirerCroixDeplacement, pas un redessin complet du plateau — voir
+        // sa raison d'être juste au-dessus : c'est justement ce redessin qui
+        // retardait le lancement de l'animation.)
+        window.retirerCroixDeplacement(idPerso);
         if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
         return await window.regimeDemande.mouvement(
             idPerso, chemin, window.COUT_COMPETENCE_SELECTIONNEE || 0);
