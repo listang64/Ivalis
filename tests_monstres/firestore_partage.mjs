@@ -18,7 +18,11 @@
 //   • un lot s'applique en entier ou pas du tout ;
 //   • updateDoc sur un document absent échoue (« not-found »), setDoc ne découpe
 //     pas ses clés sur les points, updateDoc si ;
-//   • une requête triée écarte les documents qui n'ont pas le champ du tri.
+//   • une requête triée écarte les documents qui n'ont pas le champ du tri ;
+//   • une valeur « undefined », où qu'elle soit (même au fond d'un tableau), fait
+//     refuser l'écriture avec le message exact du SDK — sans ça, un banc laisse
+//     passer ce que la vraie base refuse, et une carte « jouée » au banc n'est
+//     jamais partie à la table.
 //
 // Rien ici ne connaît le jeu : c'est une base, et c'est tout.
 
@@ -148,8 +152,38 @@ export async function getDocs(ref) {
   return instantaneRequete(r.docs, r.docs.map((d, i) => ({ type: "added", chemin: d.chemin, data: d.data, oldIndex: -1, newIndex: i })));
 }
 
+// Le vrai SDK refuse « undefined » AVANT d'envoyer quoi que ce soit, et le dit
+// ainsi : « Function WriteBatch.set() called with invalid data. Unsupported
+// field value: undefined (found in document …) ». On fait pareil, au même
+// moment — synchrone, au premier set/update. (Ce code part dans la page sous
+// forme de texte : ni accent grave, ni dollar-accolade ici.)
+function premierIndefini(valeur, chemin) {
+  if (valeur === undefined) return chemin || "(racine)";
+  if (Array.isArray(valeur)) {
+    for (let i = 0; i < valeur.length; i++) {
+      const trou = premierIndefini(valeur[i], chemin + "[" + i + "]");
+      if (trou) return trou;
+    }
+    return null;
+  }
+  if (valeur && typeof valeur === "object" && Object.getPrototypeOf(valeur) === Object.prototype) {
+    for (const cle of Object.keys(valeur)) {
+      const trou = premierIndefini(valeur[cle], chemin ? chemin + "." + cle : cle);
+      if (trou) return trou;
+    }
+  }
+  return null;
+}
+function refuserIndefini(fonction, ref, valeur) {
+  const trou = premierIndefini(valeur, "");
+  if (trou) {
+    throw erreur("invalid-argument", "Function " + fonction + "() called with invalid data. Unsupported field value: "
+      + "undefined (found in document " + ref.path + ") [champ " + trou + "]");
+  }
+}
+
 // Une écriture = une liste d'opérations, appliquées d'un bloc par la base.
-function opSet(ref, data, options) { return { type: "set", path: ref.path, data, merge: !!(options && (options.merge || options.mergeFields)) }; }
+function opSet(ref, data, options) { refuserIndefini("WriteBatch.set", ref, data); return { type: "set", path: ref.path, data, merge: !!(options && (options.merge || options.mergeFields)) }; }
 function opUpdate(ref, args) {
   let champs = [];
   if (args.length === 1 && args[0] && typeof args[0] === "object" && !(args[0] instanceof FieldPath)) {
@@ -160,6 +194,7 @@ function opUpdate(ref, args) {
       champs.push([cle instanceof FieldPath ? cle.segments : String(cle).split("."), args[i + 1]]);
     }
   }
+  champs.forEach(([segments, v]) => refuserIndefini("WriteBatch.update", ref, { [segments.join(".")]: v }));
   return { type: "update", path: ref.path, champs };
 }
 export async function setDoc(ref, data, options) { await envoyer("ecrire", { ops: [opSet(ref, data, options)] }); }

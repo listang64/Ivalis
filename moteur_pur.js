@@ -501,12 +501,40 @@ export function bonusMonstreDe(c) {
 //       et ce soin compte AVANT que le reste ne frappe ;
 //    4. la résistance, physique ou magique selon l'attaque, réduite à zéro si
 //       l'armure est percée ;
-//    5. l'étalement, qui coupe en deux APRÈS les résistances pour que les deux
-//       moitiés fassent exactement le total d'une attaque normale ;
+//    5. l'étalement, qui divise par le nombre de tours APRÈS les résistances
+//       pour que les parts fassent exactement le total d'une attaque normale ;
 //    6. le bouclier, qui encaisse avant les points de vie.
 //
 //  Elle rend un compte-rendu, pas un état modifié : c'est resoudreCarte qui
 //  décide quoi en faire.
+
+// UN MONTANT DIVISÉ PAR LE NOMBRE DE TOURS, en parts entières dont la somme
+// fait EXACTEMENT le montant : le reste de la division va aux premières parts
+// (10 sur 3 tours → 4, 3, 3). Deux tours au moins — un « étalement » sur un
+// seul tour ne serait qu'un coup retardé —, deux aussi pour une carte qui
+// n'en dit rien (l'étalement d'avant le choix du nombre de tours).
+export function partsEtalees(montant, tours) {
+    const total = Math.max(0, Math.round(nombre(montant)));
+    const n = Math.max(2, Math.round(nombre(tours, 2)) || 2);
+    const base = Math.floor(total / n);
+    const reste = total - base * n;
+    return Array.from({ length: n }, (_, i) => base + (i < reste ? 1 : 0));
+}
+
+// L'état qui porte ce qu'un étalement a encore à rendre. Un second étalement
+// sur une cible déjà touchée s'ajoute PART À PART à ce qui lui reste — il ne
+// l'écrase pas, et il ne le repousse pas non plus au bout de la file.
+function empilerEtalement(cible, nomEtat, tics) {
+    const dejaLa = cible.etats.find(e => e && e.nom === nomEtat);
+    if (dejaLa) {
+        const file = [...(dejaLa.tics || [])];
+        tics.forEach((part, i) => { file[i] = nombre(file[i]) + part; });
+        dejaLa.tics = file;
+        dejaLa.duree = Math.max(nombre(dejaLa.duree), file.length);
+    } else {
+        cible.etats = [...cible.etats, { nom: nomEtat, duree: tics.length, tics: [...tics] }];
+    }
+}
 
 export function chaineDeDegats(cible, attaque, options) {
     const { critique = false, distance = 1, percee = false } = options || {};
@@ -558,15 +586,13 @@ export function chaineDeDegats(cible, attaque, options) {
     let degatsFinaux = Math.max(0, Math.round(degats * (1 - reduction)));
 
     // 5. L'ÉTALEMENT NE FRAPPE PLUS TOUT DE SUITE. Une technique étalée ne fait
-    //    RIEN au moment où elle part : sa première moitié tombe à la fin de la
-    //    manche en cours, la seconde à la fin de la suivante. C'est ce qui
-    //    justifie sa ristourne de fatigue — on paie moins cher, mais il faut
-    //    attendre. Le reste de la division va sur le premier tic, pour que les
-    //    deux moitiés fassent exactement le total d'une attaque normale.
+    //    RIEN au moment où elle part : ses dégâts sont DIVISÉS PAR LE NOMBRE DE
+    //    TOURS de l'étalement, une part à chaque fin de manche. 10 dégâts sur 2
+    //    tours, c'est 5 puis 5 ; sur 3 tours, 4, 3 et 3. C'est ce qui justifie
+    //    sa ristourne de fatigue — on paie moins cher, mais il faut attendre.
     if (attaque.estEtalement && degatsFinaux > 0) {
-        const second = Math.floor(degatsFinaux / 2);
-        compte.tics = [degatsFinaux - second, second];
-        compte.secondTic = second;   // gardé pour qui lit encore l'ancien nom
+        compte.tics = partsEtalees(degatsFinaux, attaque.toursEtalement);
+        compte.secondTic = compte.tics[1] || 0;   // gardé pour qui lit encore l'ancien nom
         degatsFinaux = 0;
     }
     compte.degats = degatsFinaux;
@@ -968,6 +994,16 @@ export function resoudreCarte(etat, action, plateau) {
                 const partSoins = 100 + nombre(cible.atouts && cible.atouts.soinsRecus)
                                       + regleDesEtats(cible, "soinsRecus");
                 soin = Math.max(0, Math.round(soin * (partSoins / 100)));
+
+                // UN SOIN ÉTALÉ ne rend rien au lancement : il est divisé par
+                // le nombre de tours, une part à chaque fin de manche, comme
+                // les dégâts étalés.
+                if (attaque.estEtalement && soin > 0) {
+                    empilerEtalement(cible, "Soin étalé", partsEtalees(soin, attaque.toursEtalement));
+                    etapes.push({ type: "etats", cible: idCible, liste: cible.etats });
+                    return;
+                }
+
                 cible.pv = Math.min(cible.pvMax, avant + soin);
                 etapes.push({ type: "soin", cible: idCible, acteur: idLanceur,
                               montant: cible.pv - avant, pvApres: cible.pv });
@@ -1016,21 +1052,11 @@ export function resoudreCarte(etat, action, plateau) {
                 critique
             });
 
-            // L'ÉTALEMENT : LES DEUX MOITIÉS ATTENDENT. Rien n'a été retiré
-            // au-dessus (compte.degats vaut zéro) ; tout est rangé dans l'état,
-            // une moitié pour la fin de cette manche, l'autre pour la fin de la
-            // suivante. Un second étalement sur une cible déjà touchée rallonge
-            // la file plutôt que d'écraser ce qui lui reste à encaisser.
+            // L'ÉTALEMENT : LES PARTS ATTENDENT. Rien n'a été retiré au-dessus
+            // (compte.degats vaut zéro) ; tout est rangé dans l'état, une part
+            // par fin de manche, autant de parts que de tours.
             if ((compte.tics || []).length > 0) {
-                const dejaLa = cible.etats.find(e => e && e.nom === "Étalement");
-                if (dejaLa) {
-                    dejaLa.tics = [...(dejaLa.tics || []), ...compte.tics];
-                    dejaLa.duree = Math.max(nombre(dejaLa.duree), dejaLa.tics.length);
-                } else {
-                    cible.etats = [...cible.etats,
-                                   { nom: "Étalement", duree: compte.tics.length,
-                                     tics: [...compte.tics] }];
-                }
+                empilerEtalement(cible, "Étalement", compte.tics);
                 etapes.push({ type: "etats", cible: idCible, liste: cible.etats });
             }
 

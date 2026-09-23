@@ -28,6 +28,25 @@ const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd
 // =========================================================================
 //  UN FIRESTORE QUI PREND SON TEMPS
 // =========================================================================
+// Le premier chemin qui mène à une valeur `undefined`, ou null s'il n'y en a pas.
+function premierIndefini(valeur, chemin) {
+    if (valeur === undefined) return chemin || "(racine)";
+    if (Array.isArray(valeur)) {
+        for (let i = 0; i < valeur.length; i++) {
+            const trou = premierIndefini(valeur[i], `${chemin}[${i}]`);
+            if (trou !== null) return trou;
+        }
+        return null;
+    }
+    if (valeur && typeof valeur === "object") {
+        for (const k of Object.keys(valeur)) {
+            const trou = premierIndefini(valeur[k], chemin ? `${chemin}.${k}` : k);
+            if (trou !== null) return trou;
+        }
+    }
+    return null;
+}
+
 function firestoreDeBanc() {
     const base = new Map();
     const ecoutes = [];
@@ -67,6 +86,17 @@ function firestoreDeBanc() {
             },
             async lister(chemin, requete) { return documentsDe(chemin, requete); },
             async lot(operations) {
+                // AUSSI STRICT QUE LE VRAI : une seule valeur `undefined`, où
+                // qu'elle soit, et tout le lot est refusé — avant d'écrire
+                // quoi que ce soit.
+                for (const o of operations) {
+                    if (o.op === "delete") continue;
+                    const trou = premierIndefini(o.data, "");
+                    if (trou !== null) {
+                        throw new Error("Function WriteBatch.set() called with invalid data. Unsupported field value: "
+                            + `undefined (found in document ${cle(o.chemin)}) [champ ${trou}]`);
+                    }
+                }
                 const aVerser = [];
                 for (const o of operations) {
                     const k = cle(o.chemin);
@@ -1053,6 +1083,39 @@ async function banc() {
         verifier("on ne prend pas la main d'un cerveau vivant", refus === false);
         verifier("qui reste donc le cerveau", a.regime.jeSuisLeCerveau());
         verifier("et l'autre reste spectateur", !b.regime.jeSuisLeCerveau());
+    }
+
+    // ---------------------------------------------------------------------
+    console.log("\nUN CHAMP VIDE NE COÛTE JAMAIS UNE TECHNIQUE");
+    // ---------------------------------------------------------------------
+    //  Le soir où Nico a posé sa zone, la console a dit : « WriteBatch.set()
+    //  called with invalid data. Unsupported field value: undefined ». Une
+    //  arme qui brûle ajoutait à la carte un état dont `idProvocateur` valait
+    //  undefined, Firestore refusait l'intention entière, et la technique ne
+    //  partait jamais. Ce chapitre rejoue exactement cette carte, avec une base
+    //  aussi stricte que la vraie.
+    {
+        const f = firestoreDeBanc();
+        const nico = creerPoste(f, "P_03");
+        nico.regime.rejoindre();
+        await nico.regime.ouvrir(SOURCE);
+        await f.livrer();
+        const pvAvant = nico.regime.etatPublie().combattants.M1.pv;
+
+        const id = await nico.regime.demanderCarte("H1", {
+            idCarte: "C_H1", coutFatigue: 5,
+            attaques: [{ valeurBrute: 9, isRanged: true, rangeMax: 8, cibles: ["M1"], typeRes: "Physique" }],
+            alterations: [{ nom: "Brûlé", duree: 2, chance: 0, venuDeLEquipement: true,
+                            idProvocateur: undefined, cibles: ["M1", undefined] }]
+        });
+        verifier("l'intention part malgré le champ vide", typeof id === "string" && id.length > 0, String(id));
+        await f.livrer();
+        await nico.regime.tourner();
+        await f.livrer();
+        const apres = nico.regime.etatPublie();
+        verifier("et la technique est bien jouée : la cible a pris le coup",
+                 apres.combattants.M1.pv < pvAvant, `(${pvAvant} → ${apres.combattants.M1.pv})`);
+        verifier("la file a avancé", (apres.file[0] || {}).id !== "H1", JSON.stringify((apres.file || []).slice(0, 2)));
     }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

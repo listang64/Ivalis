@@ -390,9 +390,10 @@ export function ticsDeFinDeManche(etat) {
             }
         }
 
-        // --- ÉTALEMENT : une moitié par manche, jamais au lancement ----------
-        //  La technique étalée n'a rien fait quand elle est partie : ses deux
-        //  moitiés attendent dans cette file, une par fin de manche. Le
+        // --- ÉTALEMENT : une part par manche, jamais au lancement ------------
+        //  La technique étalée n'a rien fait quand elle est partie : ses parts
+        //  (le montant divisé par le nombre de tours) attendent dans cette
+        //  file, une par fin de manche. Le
         //  bouclier encaisse en priorité, comme pour une attaque ordinaire.
         const etalement = c.etats.find(e => e && e.nom === "Étalement");
         if (etalement) {
@@ -407,6 +408,21 @@ export function ticsDeFinDeManche(etat) {
                                  ? etalement.degatsDifferes : etalement.degatsRestants);
             }
             if (montant > 0) etapes.push(...infligerTic(c, id, montant, "Étalement"));
+        }
+
+        // --- SOIN ÉTALÉ : une part de vie rendue par manche ------------------
+        //  Le pendant de l'étalement pour un soin : ce qu'il a déjà calculé
+        //  (bonus de l'Éthéré, malus d'une brûlure compris) est rendu une part
+        //  par fin de manche, sans jamais dépasser la vie maximum.
+        const soinEtale = c.etats.find(e => e && e.nom === "Soin étalé");
+        if (soinEtale && Array.isArray(soinEtale.tics) && soinEtale.tics.length > 0) {
+            const part = nombre(soinEtale.tics.shift());
+            const pvApres = Math.min(nombre(c.pvMax), nombre(c.pv) + part);
+            if (pvApres > nombre(c.pv)) {
+                const montant = pvApres - nombre(c.pv);
+                c.pv = pvApres;
+                etapes.push({ type: "soin", cible: id, montant, pvApres, tic: "Soin étalé" });
+            }
         }
     });
 

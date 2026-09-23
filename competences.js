@@ -927,6 +927,13 @@ function bonusPorteeDeRace(action) {
 // affichée), la portée tient compte de l'atout de race du personnage — l'Ondari
 // voit donc dans la Forge la portée que son sort aura vraiment en combat.
 function formatterTexteEffet(effet, stacks, action) {
+    // L'Étalement dit son vrai nombre de tours, ⏳ compris : c'est le diviseur.
+    const nomEtal = (effet.Nom || "").toLowerCase().trim();
+    if (nomEtal === "dot" || nomEtal.includes("étalement") || nomEtal.includes("etalement")) {
+        const crans = parseFrenchFloat(((action && action.modsDuree) || {})[effet.id]);
+        const tours = Math.max(2, Math.round(parseFrenchFloat(effet.Tours) || 2) + Math.round(crans));
+        return `Dégâts ou soins divisés par ${tours} : rien au lancement, une part à chaque fin de manche pendant ${tours} tours.`;
+    }
     let texte = effet.Effet_Base || "";
     const val = parseFrenchFloat(effet.Valeur);
     const pBase = parseFrenchFloat(effet.Pourcent_Base);
@@ -1680,18 +1687,23 @@ window.rafraichirForge = function() {
         });
     };
 
-    // L'ÉTALEMENT NE S'ACCROCHE QU'À CE QUI FRAPPE. Il étale des DÉGÂTS dans
-    // le temps : le poser sur un état altéré (un étourdissement, une
-    // provocation) n'a aucun sens — il n'y a rien à couper en deux. Il ne peut
-    // donc se greffer que sur une attaque, une Zone ou une Distance : les
-    // trois actions par lesquelles un coup arrive.
+    // L'ÉTALEMENT NE S'ACCROCHE QU'À UN MONTANT. Il divise des DÉGÂTS ou des
+    // SOINS par un nombre de tours : le poser sur un état altéré (un
+    // étourdissement, une provocation) n'a aucun sens — il n'y a rien à
+    // diviser. Il ne peut donc se greffer que sur une attaque, un soin, une
+    // Zone ou une Distance : les actions par lesquelles un coup ou un soin
+    // arrive. Un bouclier n'est pas un soin, et ne s'étale pas.
     const estUnModEtalement = (nomLower) => {
         const n = (nomLower || "").trim();
         return n === "dot" || n.includes("étalement") || n.includes("etalement");
     };
+    const estUnSoinDeBase = (nom) => {
+        const n = (nom || "").toLowerCase();
+        return (n.includes("soin") || n.includes("guérison") || n.includes("guerison")) && !n.includes("bouclier");
+    };
     const actionAccepteEtalement = (act) => {
         if (!act || !act.baseEffet) return false;
-        if (estUneAttaqueDeBase(act.baseEffet.Nom)) return true;
+        if (estUneAttaqueDeBase(act.baseEffet.Nom) || estUnSoinDeBase(act.baseEffet.Nom)) return true;
         const nom = (act.baseEffet.Nom || "").toLowerCase();
         return nom.includes("zone") || nom.includes("distance");
     };
@@ -1708,6 +1720,8 @@ window.rafraichirForge = function() {
 
         // 🔻 Sécurité pour bloquer les attaques dans les menus déroulants
         const aDejaUneAttaque = window.forgeState.actions.some(act => estUneAttaqueDeBase(act.baseEffet.Nom));
+        // Un soin sur la carte, c'est aussi un montant qu'on peut étaler.
+        const aDejaUnSoin = window.forgeState.actions.some(act => estUnSoinDeBase(act.baseEffet.Nom));
         // L'action sur laquelle ce menu greffe ses sous-effets : certains ne
         // peuvent aller que sur une action qui frappe (voir l'Étalement).
         const actionCourante = window.forgeState.actions.find(a => a.idInst === actionId);
@@ -1731,12 +1745,12 @@ window.rafraichirForge = function() {
                 // Empoisonnement doit toujours être lié à une source de dégât (une attaque
                 // quelque part sur la carte), sinon aucun type de dégât n'est déterminable.
                 const estIncompatiblePoison = !aDejaUneAttaque && nomModLower.includes("poison");
-                // Étalement des dégâts coupe en deux les DÉGÂTS d'une attaque : sur une carte
-                // sans attaque (un soin, un pur contrôle) il n'y a rien à étaler, et sur une
-                // action qui ne porte pas de coup (un état altéré) il n'y a rien à quoi
-                // l'accrocher.
+                // L'étalement divise les DÉGÂTS ou les SOINS de la carte par un nombre de
+                // tours : sur une carte qui ne frappe ni ne soigne (un pur contrôle) il n'y a
+                // rien à étaler, et sur une action qui ne porte ni coup ni soin (un état
+                // altéré) il n'y a rien à quoi l'accrocher.
                 const estIncompatibleEtalement = estUnModEtalement(nomModLower)
-                    && (!aDejaUneAttaque || !actionAccepteEtalement(actionCourante));
+                    && (!(aDejaUneAttaque || aDejaUnSoin) || !actionAccepteEtalement(actionCourante));
                 groupesMods[carac].push(
                     (estIncompatiblePoussee || estIncompatibleIllusion || estIncompatiblePoison || estIncompatibleEtalement)
                         ? `<option value="${mod.id}" disabled style="color: #999;">${nettoyerNomEffet(mod.Nom)} (non compatible)</option>`
@@ -1792,16 +1806,14 @@ window.rafraichirForge = function() {
                 }
 
                 // Même règle que pour la base : pas de bouton Durée + sur Immobilisation,
-                // Empoisonnement, Persistance de terrain ni Étalement des dégâts
-                // (durées figées par leur propre mécanique).
+                // Empoisonnement ni Persistance de terrain (durées figées par leur propre
+                // mécanique). L'Étalement, lui, l'a : chaque cran ⏳ ajoute un tour, et le
+                // montant est divisé par ce nombre de tours.
                 const nomModDuree = (modEff.Nom || "").toLowerCase().trim();
                 const modHasDuree = parseFrenchFloat(modEff.Tours) > 0
                     && !nomModDuree.includes("immobil")
                     && !nomModDuree.includes("poison")
-                    && !nomModDuree.includes("persistance")
-                    && !nomModDuree.includes("étalement")
-                    && !nomModDuree.includes("etalement")
-                    && nomModDuree !== "dot";
+                    && !nomModDuree.includes("persistance");
                 const currentModDuree = (act.modsDuree && act.modsDuree[modId]) || 0;
                 const btnPlusModDureeDisabled = (currentModDuree >= maxDureeStacks || capDepasse) ? `disabled style="opacity: 0.3; cursor: not-allowed; border:none; background:none; font-weight:bold; font-size:16px;"` : `style="color: green; cursor: pointer; border:none; background:none; font-weight:bold; font-size:16px;"`;
 

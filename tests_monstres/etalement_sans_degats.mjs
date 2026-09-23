@@ -1,12 +1,15 @@
-// ÉTALEMENT DES DÉGÂTS : RÉSERVÉ À CE QUI FRAPPE, ET SEULEMENT LÀ.
-// Le mod "Durée étalement dégâts" (alias "DOT") étale les dégâts d'une attaque
-// dans le temps. Deux conditions, et le banc tient les deux sur le VRAI code de
-// competences.js :
-//   • LA CARTE doit frapper quelque part — sur un soin ou un pur contrôle, il
-//     n'y a rien à étaler (c'était déjà la règle) ;
-//   • L'ACTION à laquelle on l'accroche doit être un coup, une Zone ou une
-//     Distance — jamais un état altéré. Étaler un étourdissement ne veut rien
-//     dire : on ne coupe pas un état en deux moitiés de dégâts.
+// ÉTALEMENT : RÉSERVÉ AUX DÉGÂTS ET AUX SOINS, ET SEULEMENT LÀ.
+// Le mod "Durée étalement dégâts" (alias "DOT") divise les dégâts — ou les
+// soins — d'une carte par un nombre de tours. Deux conditions, et le banc tient
+// les deux sur le VRAI code de competences.js :
+//   • LA CARTE doit frapper ou soigner quelque part — sur un pur contrôle, il
+//     n'y a rien à étaler ;
+//   • L'ACTION à laquelle on l'accroche doit être un coup, un soin, une Zone
+//     ou une Distance — jamais un état altéré, jamais un bouclier. Étaler un
+//     étourdissement ne veut rien dire : il n'y a pas de montant à diviser.
+// Et deux choses de plus, demandées par Nico en même temps : le bouton ⏳ est
+// offert sur l'étalement (chaque cran ajoute un tour, donc un diviseur de
+// plus), et le texte de la Forge dit ce diviseur.
 import fs from 'fs';
 
 const src = fs.readFileSync('/home/user/Ivalis/competences.js', 'utf-8');
@@ -43,7 +46,7 @@ if (!SRC_BLOC.includes('estIncompatibleEtalement')) {
 }
 
 // Rejoue exactement l'environnement local que ce bloc trouve dans rafraichirForge.
-function optionsPour({ aDejaUneAttaque, estActionPoussee = false, estActionIllusion = false, mods,
+function optionsPour({ aDejaUneAttaque, aDejaUnSoin = false, estActionPoussee = false, estActionIllusion = false, mods,
                       actionCourante = action("Attaque légère") }) {
     const groupesMods = {};
     const activeTags = new Set();
@@ -59,7 +62,7 @@ function optionsPour({ aDejaUneAttaque, estActionPoussee = false, estActionIllus
 
 const modEtalement = (nom) => ({ id: "M1", Nom: nom, Modificateur: "AUCUN", Cout_PT: "1" });
 
-console.log("1. SANS ATTAQUE SUR LA CARTE : L'ÉTALEMENT EST GRISÉ");
+console.log("1. SANS ATTAQUE NI SOIN SUR LA CARTE : L'ÉTALEMENT EST GRISÉ");
 {
     const html = optionsPour({ aDejaUneAttaque: false, mods: [modEtalement("Durée étalement dégâts")] });
     verifier("le mod apparaît, mais désactivé", /disabled/.test(html) && /non compatible/.test(html), html);
@@ -85,7 +88,7 @@ console.log("\n4. LES AUTRES MODS NE SONT PAS TOUCHÉS PAR CETTE RÈGLE");
     verifier("un mod sans rapport reste disponible même sans attaque", !/disabled/.test(html), html);
 }
 
-console.log("\n5. ET SEULEMENT SUR UNE ACTION QUI FRAPPE, UNE ZONE OU UNE DISTANCE");
+console.log("\n5. ET SEULEMENT SUR UNE ACTION QUI FRAPPE, SOIGNE, UNE ZONE OU UNE DISTANCE");
 // Nouvelle règle : la carte a beau frapper ailleurs, l'étalement ne s'accroche
 // pas à n'importe quelle action. Sur un état altéré, il n'y a rien à étaler.
 {
@@ -108,12 +111,54 @@ console.log("\n5. ET SEULEMENT SUR UNE ACTION QUI FRAPPE, UNE ZONE OU UNE DISTAN
 
     const surSoin = optionsPour({ aDejaUneAttaque: true, mods: [modEtalement("DOT")],
                                   actionCourante: action("Soin") });
-    verifier("sur un soin : grisé aussi", /disabled/.test(surSoin), surSoin);
+    verifier("sur un soin : disponible (un soin s'étale aussi)", !/disabled/.test(surSoin), surSoin);
+
+    const surBouclier = optionsPour({ aDejaUneAttaque: true, mods: [modEtalement("DOT")],
+                                      actionCourante: action("Bouclier magique") });
+    verifier("sur un bouclier : grisé", /disabled/.test(surBouclier), surBouclier);
 
     // Et les autres mods, eux, restent offerts sur une action d'état.
     const autre = optionsPour({ aDejaUneAttaque: true, mods: [modEtalement("Distance")],
                                 actionCourante: action("Étourdit") });
     verifier("un mod sans rapport reste disponible sur un état", !/disabled/.test(autre), autre);
+}
+
+console.log("\n6. UNE CARTE QUI NE FAIT QUE SOIGNER PEUT ÉTALER SON SOIN");
+{
+    const soinSeul = optionsPour({ aDejaUneAttaque: false, aDejaUnSoin: true, mods: [modEtalement("Durée étalement dégâts")],
+                                   actionCourante: action("Soin") });
+    verifier("sur le soin d'une carte sans attaque : disponible", !/disabled/.test(soinSeul), soinSeul);
+    const zoneDeSoin = optionsPour({ aDejaUneAttaque: false, aDejaUnSoin: true, mods: [modEtalement("DOT")],
+                                     actionCourante: action("Zone") });
+    verifier("sur la Zone d'une carte de soin : disponible", !/disabled/.test(zoneDeSoin), zoneDeSoin);
+    const etatDeSoin = optionsPour({ aDejaUneAttaque: false, aDejaUnSoin: true, mods: [modEtalement("DOT")],
+                                     actionCourante: action("Étourdit") });
+    verifier("sur l'état d'une carte de soin : grisé", /disabled/.test(etatDeSoin), etatDeSoin);
+}
+
+console.log("\n7. LE BOUTON ⏳ ET LE TEXTE DE LA FORGE");
+{
+    // La condition réelle du bouton ⏳ d'un sous-effet, telle quelle.
+    const debutDuree = src.indexOf('                const nomModDuree = (modEff.Nom || "").toLowerCase().trim();');
+    const finDuree = src.indexOf('                const currentModDuree = ', debutDuree);
+    if (debutDuree < 0 || finDuree < 0) throw new Error("condition du bouton ⏳ introuvable");
+    const SRC_DUREE = src.slice(debutDuree, finDuree);
+    const aLeBoutonDuree = (modEff) => eval(SRC_PARSE + '\n' + SRC_DUREE + '\n; modHasDuree');
+    verifier("l'étalement a son bouton ⏳ (un cran = un tour de plus)",
+             aLeBoutonDuree({ Nom: "Durée étalement dégâts", Tours: 2 }) === true);
+    verifier("l'empoisonnement, lui, reste sans bouton ⏳",
+             aLeBoutonDuree({ Nom: "Empoisonnement", Tours: 2 }) === false);
+
+    const debutTexte = src.indexOf('function formatterTexteEffet');
+    const finTexte = src.indexOf('\nfunction ', debutTexte + 10);
+    const SRC_TEXTE = src.slice(debutTexte, finTexte);
+    const texte = (action) => eval(SRC_PARSE + '\nconst bonusPorteeDeRace = () => 0;\n' + SRC_TEXTE
+        + '\n; formatterTexteEffet({ id: "M1", Nom: "Durée étalement dégâts", Tours: 2, Valeur: 2,'
+        + ' Effet_Base: "Degats divisés par 2 sur 2 tours" }, 1, action)');
+    const deux = texte({ modsDuree: {} });
+    const trois = texte({ modsDuree: { M1: 1 } });
+    verifier("le texte dit « divisés par 2 » sans cran ⏳", /divisés par 2/.test(deux) && /soins/.test(deux), deux);
+    verifier("et « divisés par 3 » avec un cran", /divisés par 3/.test(trois) && /3 tours/.test(trois), trois);
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} ÉCHEC(S)`);

@@ -54,6 +54,31 @@ const nombre = (v, defaut = 0) => {
 //  de faire tourner TROIS chefs d'orchestre côte à côte sur un même Firestore
 //  en mémoire — et de vérifier que les trois écrans finissent identiques.
 
+// Une copie sans aucune valeur `undefined` — la seule que Firestore refuse.
+// Un champ d'objet qui vaut undefined disparaît ; une case de tableau qui vaut
+// undefined aussi. Les chemins retirés sont notés dans `retires`, pour que la
+// trace dise d'où venait le trou au lieu de le taire.
+function sansIndefinis(valeur, chemin, retires) {
+    if (Array.isArray(valeur)) {
+        const sortie = [];
+        valeur.forEach((v, i) => {
+            if (v === undefined) { retires.push(`${chemin}[${i}]`); return; }
+            sortie.push(sansIndefinis(v, `${chemin}[${i}]`, retires));
+        });
+        return sortie;
+    }
+    if (valeur && typeof valeur === "object" && Object.getPrototypeOf(valeur) === Object.prototype) {
+        const sortie = {};
+        Object.keys(valeur).forEach(cle => {
+            const ici = chemin ? `${chemin}.${cle}` : cle;
+            if (valeur[cle] === undefined) { retires.push(ici); return; }
+            sortie[cle] = sansIndefinis(valeur[cle], ici, retires);
+        });
+        return sortie;
+    }
+    return valeur;
+}
+
 export function creerRegime(contexte) {
     const {
         io,                                  // l'accès Firestore (window.ioCombatFirestore)
@@ -556,7 +581,16 @@ export function creerRegime(contexte) {
     //  puisse diverger du premier.
     async function demander(intention) {
         try {
-            const id = await envoyerIntention(io, idPartie, { ...intention, poste });
+            // Firestore refuse la moindre valeur `undefined`, et l'écriture
+            // tombe alors en entier : la carte n'était jamais jouée, et le
+            // tour restait figé. Un champ vide ne doit jamais coûter une
+            // technique — il est retiré, et la trace dit lequel.
+            const retires = [];
+            const propre = sansIndefinis({ ...intention, poste }, "", retires);
+            if (retires.length > 0) {
+                tracer("🧹", `${intention.type} : champ(s) vide(s) retiré(s)`, retires.slice(0, 6).join(", "));
+            }
+            const id = await envoyerIntention(io, idPartie, propre);
             tracer("✉️", `${intention.type} demandé pour ${intention.acteur}`, id);
             // Le cerveau, s'il est ici, n'attend pas la notification pour
             // travailler : c'est la latence en moins sur son propre écran.

@@ -4109,8 +4109,8 @@ window.MIGRATION_EFFETS = [
                 Notes: "Ne génère pas d'attaque d'opportunité" } },
     { id: "EFF_DUREE_ETALEMENT_DEGATS",
       champs: { Cout_PT: "Cout / 1.3",
-                Effet_Base: "Dégâts coupés en deux : rien au lancement, une moitié à la fin de cette manche, l'autre à la fin de la suivante.",
-                Notes: "Ne se pose que sur une attaque, une Zone ou une Distance — jamais sur un état." } },
+                Effet_Base: "Dégâts ou soins divisés par le nombre de tours : rien au lancement, une part à chaque fin de manche.",
+                Notes: "Ne se pose que sur une attaque, un soin, une Zone ou une Distance — jamais sur un état. Chaque ⏳ ajoute un tour." } },
     // La Paralysie quitte le jeu : elle bloquait tout pendant quatre tours, et
     // un joueur privé de son tour n'a plus de jeu du tout.
     { id: "EFF_PARALYSIE", supprimer: true }
@@ -4352,7 +4352,15 @@ function afficherListePersonnages(persos) {
   conteneur.style.display = "block";
 }
 
-async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPerso) {
+// Montre un onglet de la fiche perso comme si on avait touché son bouton.
+function montrerOngletPerso(nomOnglet) {
+  const bouton = document.querySelector(`button[onclick*='${nomOnglet}']`);
+  if (bouton) changerOngletPerso({ currentTarget: bouton }, nomOnglet);
+}
+
+// `ongletInitial` : l'onglet sur lequel la fiche s'ouvre — les
+// Caractéristiques par défaut, l'Inventaire pour un héros qui vient de naître.
+async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPerso, ongletInitial) {
   const fiche = document.getElementById("fenetre-fiche-perso");
 
   if (window.imageTourActive) window.imageTourActive.style.display = "none";
@@ -4374,8 +4382,7 @@ async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPers
   if (couleurPerso) appliquerCouleurTheme(couleurPerso);
 
   // Ouverture par défaut sur les Caractéristiques
-  const btnCaracs = document.querySelector("button[onclick*='onglet-caracs']");
-  if (btnCaracs) changerOngletPerso({ currentTarget: btnCaracs }, 'onglet-caracs');
+  montrerOngletPerso(ongletInitial || 'onglet-caracs');
 
   document.getElementById("titre-nom-personnage").innerText = prenomPerso + " " + nomPerso;
 
@@ -5259,8 +5266,10 @@ window.validerCreationCaracs = async function() {
     window.chargerCaracteristiques(idPersonnage);
 
     // =========================================================
-    // NOUVEAU : PASSAGE À L'ÉTAPE 3 (OUVERTURE DE LA FICHE)
-    // Si la fiche n'est pas déjà ouverte, on l'ouvre !
+    // PASSAGE À L'ÉTAPE 3 (OUVERTURE DE LA FICHE), SUR L'INVENTAIRE.
+    // Un héros qui vient de naître se découvre par ce qu'il porte : son arme
+    // et sa tenue de départ. La fiche s'ouvre donc sur l'Inventaire — ou y
+    // bascule, si elle était déjà ouverte.
     // =========================================================
     const fiche = document.getElementById("fenetre-fiche-perso");
     if (fiche.style.display === "none" || fiche.style.display === "") {
@@ -5269,7 +5278,9 @@ window.validerCreationCaracs = async function() {
         const nom = prenomNom.substring(prenom.length).trim() || "";
         const couleur = document.getElementById("champ-couleur-token").value || "#2a1a0f";
         
-        window.ouvrirFichePerso(idPersonnage, prenom, nom, couleur);
+        window.ouvrirFichePerso(idPersonnage, prenom, nom, couleur, 'onglet-inventaire');
+    } else {
+        montrerOngletPerso('onglet-inventaire');
     }
   } catch (e) {
     console.error(e);

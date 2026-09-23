@@ -1058,7 +1058,7 @@ function chantierVersDocument(carte, nom, arme, palette) {
             } else {
                 effetsCompiles.push({
                     nom: m.effet.Nom,
-                    desc: texteEffet(m.effet, m.count) + marqueurDuree(m.duree || 0),
+                    desc: texteEffet(m.effet, m.count, m.duree) + marqueurDuree(m.duree || 0),
                     isMod: true
                 });
             }
@@ -1089,7 +1089,13 @@ function chantierVersDocument(carte, nom, arme, palette) {
 // "10 % de chance de pousser de 2 hexagones" devenait "2 % de chance", et la
 // traction "6 %". Le lookahead (?!\s*%) protège le pourcentage, exactement
 // comme dans la Forge.
-function texteEffet(effet, empilements) {
+function texteEffet(effet, empilements, crans) {
+    // L'Étalement dit son diviseur, comme dans la Forge : ses tours, ⏳ compris.
+    const nomEtal = (effet.Nom || "").toLowerCase().trim();
+    if (nomEtal === "dot" || nomEtal.includes("étalement") || nomEtal.includes("etalement")) {
+        const tours = Math.max(2, Math.round(nombreFr(effet.Tours) || 2) + Math.round(nombreFr(crans)));
+        return `Dégâts ou soins divisés par ${tours} : rien au lancement, une part à chaque fin de manche pendant ${tours} tours.`;
+    }
     let texte = effet.Effet_Base || effet.Nom || "";
     const val = nombreFr(effet.Valeur);
     const pBase = nombreFr(effet.Pourcent_Base);

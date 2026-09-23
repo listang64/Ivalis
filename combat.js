@@ -2827,6 +2827,7 @@ window.COULEUR_ETAT = {
     "Provocation":    "#c62828",   // rouge sombre — la rage qu'on impose
     "Absorption":     "#1e88e5",   // bleu profond — le bouclier qui draine
     "Étalement":      "#ad1457",   // bordeaux — la blessure qui continue de saigner
+    "Soin étalé":     "#43a047",   // vert franc — la vie qui revient peu à peu
     "Élan":           "#26a69a",   // turquoise — la vitesse gagnée
     "Béni":           "#ffe082",   // or pâle — la bénédiction
     "Repli":          "#78909c"    // gris bleuté — le pas de recul défensif

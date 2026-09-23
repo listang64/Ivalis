@@ -951,6 +951,11 @@ window.demarrerCiblage = async function(idCarte, options) {
     // Persistance de terrain : le sort laisse derrière lui une zone dangereuse sur la ou les
     // cases visées (voir creerZonePersistante). Détecté ici, appliqué après la résolution.
     let aPersistanceTerrain = false;
+    // Un Étalement posé sur une action Distance ou Zone ne frappe ni ne soigne
+    // lui-même : il étale ce que CETTE CARTE fait passer par sa portée ou sa
+    // zone. On le retient ici, et il se reporte sur les dégâts et les soins de
+    // la carte une fois toutes les actions lues (plus bas).
+    let toursEtalementDeLaCarte = 0;
 
     const parseFrFloat = (val) => {
         if (val === undefined || val === null || val === "") return 0;
@@ -1105,27 +1110,36 @@ window.demarrerCiblage = async function(idCarte, options) {
 
             let isShield = nomLower.includes("bouclier");
 
-            // Étalement des dégâts (mod "DOT" / "Durée étalement dégâts") : la carte coûte moins
-            // de fatigue (déjà géré par la Forge, coutActionTotale /= 1.2) mais ses dégâts sont
-            // coupés en deux — une moitié tout de suite, l'autre au début du tour suivant.
-            let aEtalement = false;
+            // Étalement (mod "DOT" / "Durée étalement dégâts") : la carte coûte moins de
+            // fatigue (déjà géré par la Forge, coutActionTotale /= 1.3), mais ses dégâts — ou
+            // ses soins — ne tombent plus d'un coup : ils sont DIVISÉS PAR LE NOMBRE DE TOURS
+            // de l'étalement, une part à chaque fin de manche. 10 dégâts étalés sur 2 tours,
+            // c'est 5 puis 5. Le nombre de tours est celui de l'effet (colonne Tours, 2), plus
+            // les crans du bouton ⏳ posés dessus dans la Forge.
+            let toursEtalement = 0;
             const estModEtalement = (nom) => {
                 const n = (nom || "").toLowerCase().trim();
                 return n === "dot" || n.includes("étalement") || n.includes("etalement");
             };
-            if (estModEtalement(effBase.Nom)) aEtalement = true;
+            const toursDe = (eff, crans) => Math.max(2, Math.round(parseFrFloat(eff.Tours) || 2) + Math.round(parseFrFloat(crans)));
+            if (estModEtalement(effBase.Nom)) toursEtalement = Math.max(toursEtalement, toursDe(effBase, act.baseDuree));
             listeMods.forEach(m => {
                 const modEff = window.EFFETS_BDD_CACHE[m.id];
-                if (modEff && estModEtalement(modEff.Nom)) aEtalement = true;
+                if (modEff && estModEtalement(modEff.Nom)) toursEtalement = Math.max(toursEtalement, toursDe(modEff, modsDuree[m.id]));
             });
+            if (toursEtalement > 0 && (effBase.Nom === "Distance" || nomLower.includes("zone")
+                    || listeMods.some(m => ((window.EFFETS_BDD_CACHE[m.id] || {}).Nom || "") === "Zone")
+                    || (act.zoneHexes && act.zoneHexes.length > 0))) {
+                toursEtalementDeLaCarte = Math.max(toursEtalementDeLaCarte, toursEtalement);
+            }
 
             if (nomLower.includes("attaque") || nomLower.includes("pouvoir") || nomLower.includes("soin") || nomLower.includes("guérison") || isPurification || isShield) {
                 let isHeal = nomLower.includes("soin") || nomLower.includes("guérison") || isPurification || isShield;
-                // Un soin ou un bouclier ne s'étale pas : seuls les dégâts sont concernés. La
-                // coupe en deux se fait sur les dégâts FINAUX (après résistances), pas ici :
-                // diviser la valeur brute gonflerait le total sur les valeurs impaires
-                // (5 → 3 + 3 = 6 après arrondi de chaque moitié).
-                const etalementActif = aEtalement && !isHeal;
+                // Les dégâts et les SOINS s'étalent ; un bouclier ou une purification, non —
+                // ce ne sont pas des montants qui tombent sur la vie. La division se fait sur le
+                // montant FINAL (après résistances, ou après ce que la cible fait d'un soin),
+                // pas ici : diviser la valeur brute gonflerait le total à l'arrondi.
+                const etalementActif = toursEtalement > 0 && !isShield && !isPurification;
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 if (indexPremiereAttaque === -1) indexPremiereAttaque = idxAction;
@@ -1148,6 +1162,7 @@ window.demarrerCiblage = async function(idCarte, options) {
                     isShield: isShield,
                     purifChance: purifChance,
                     estEtalement: etalementActif,
+                    toursEtalement: etalementActif ? toursEtalement : 0,
                     cibles: []
                 });
             }
@@ -1670,6 +1685,16 @@ window.demarrerCiblage = async function(idCarte, options) {
     // maintenant ; s'il est après une attaque/altération, on le reporte après leur résolution
     // (voir declencherResolutionAvecBondEventuel plus bas). Dans tous les cas la carte reste
     // consommée, saut annulé ou pas.
+    // L'étalement posé sur la Distance ou la Zone gagne tous les dégâts et soins
+    // de la carte (jamais un bouclier, une purification, ni un état).
+    if (toursEtalementDeLaCarte > 0) {
+        attaquesExtraites.forEach(a => {
+            if (a.isShield || a.purifChance > 0) return;
+            a.estEtalement = true;
+            a.toursEtalement = Math.max(a.toursEtalement || 0, toursEtalementDeLaCarte);
+        });
+    }
+
     const idLanceurBond = (persoLanceur || {}).idPersonnage;
     const bondEnPremier = isBond && (indexPremierAutreEffet === -1 || indexBond < indexPremierAutreEffet);
     const bondApresLeReste = isBond && !bondEnPremier;
@@ -2653,14 +2678,18 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
             dejaLa.chance = Math.max(dejaLa.chance || 0, e.chance || 0);
             return;
         }
-        state.alterations.push({
+        const alteration = {
             nom: e.etat, ...gabarit, chance: e.chance || 0,
             venuDeLEquipement: true, isRanged: false, rangeMax: 1,
-            // La provocation retient QUI a provoqué : c'est ce que l'IA lit
-            // pour n'avoir plus d'yeux que pour lui (monstres_ia.js).
-            idProvocateur: e.etat === "Provocation" ? lanceur.idPersonnage : undefined,
             cibles: [...cibles]
-        });
+        };
+        // La provocation retient QUI a provoqué : c'est ce que l'IA lit pour
+        // n'avoir plus d'yeux que pour lui (monstres_ia.js). Pour tout autre
+        // état, le champ n'existe PAS — surtout pas « undefined » : Firestore
+        // refuse toute valeur undefined, et l'intention de la carte partait
+        // en erreur. Une arme qui brûle ou qui gèle empêchait de jouer.
+        if (e.etat === "Provocation") alteration.idProvocateur = lanceur.idPersonnage;
+        state.alterations.push(alteration);
     });
 };
 

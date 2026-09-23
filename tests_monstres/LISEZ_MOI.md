@@ -128,7 +128,10 @@ node provocation.mjs        # l'effet Provocation (portée moteur), réservé au
 node barre_progression_creation.mjs # la barre de progression et les phrases humoristiques à la création
 node reveil_arriere_plan.mjs # un onglet iPad endormi en pleine animation ne bloque plus la sync pour de bon
 node poussee_traction_allies.mjs # Poussée/Traction peuvent viser un allié, sauf combinées à une attaque
-node etalement_sans_degats.mjs # Durée étalement dégâts grisée sur une carte sans attaque
+node etalement_sans_degats.mjs # l'étalement ne se pose que sur une attaque, un soin, une Zone ou une Distance
+node etalement_tours.mjs    # l'étalement divise dégâts ET soins par son nombre de tours, ⏳ compris
+node carte_sans_trou.mjs    # une arme qui porte un état n'ajoute plus de champ undefined à la carte
+node ouverture_inventaire.mjs # un héros tout juste créé ouvre sa fiche sur l'Inventaire
 node zone_soin_verte_carte.mjs # la zone persistante de soin se dessine en vert, jamais en rouge
 node annuler_ciblage.mjs # un bouton ANNULER reprend la main sur le déplacement en plein ciblage
 node carte_grisee_sans_message.mjs # cliquer une carte trop chère l'affiche sans message d'erreur
@@ -2333,3 +2336,57 @@ mais bloquantes pour les chemins calculés là, et pour le cerveau s'il y
 tourne : des murs que l'œil des joueurs ne pouvait pas montrer. L'appareil
 revient désormais au terrain enregistré. Le faux Firestore du banc garde ses
 écoutes pour livrer lui-même un instantané de Combat_VTT.
+
+### Une arme qui brûle ne doit pas empêcher de jouer
+
+Nico a posé sa zone, et plus rien. La console disait tout : « WriteBatch.set()
+called with invalid data. Unsupported field value: undefined ». Firestore
+refuse la moindre valeur `undefined`, et c'est l'intention ENTIÈRE de la carte
+qui tombait : la technique n'arrivait jamais au cerveau, le tour restait figé.
+Le trou venait de l'arme. Quand elle porte un état (brûler, geler, étourdir…),
+`appliquerEquipementALaCarte` l'ajoute aux cibles de la carte — et y posait
+`idProvocateur: undefined` dès que l'état n'était pas une Provocation. Le champ
+n'existe plus que pour la Provocation. `carte_sans_trou.mjs` passe chacun des
+neuf états qu'une arme peut porter dans le vrai code, et fouille le résultat
+jusqu'au fond des tableaux (morsure : huit états sur neuf troués). Et parce
+qu'un champ vide ne doit plus jamais coûter une technique, le régime retire
+toute valeur `undefined` d'une intention avant de l'envoyer, et la trace dit
+laquelle (🧹). Le chapitre « un champ vide ne coûte jamais une technique » de
+`regime_cerveau.mjs` rejoue la carte de Nico avec une base aussi stricte que la
+vraie : l'intention part, la cible prend le coup, la file avance (morsure :
+intention refusée, cible intacte, file bloquée). Pourquoi aucun banc ne l'avait
+vu : leurs faux Firestore acceptaient `undefined`. Celui de `regime_cerveau.mjs`
+et celui de `firestore_partage.mjs` le refusent désormais avec le message exact
+du SDK — `combat_complet.mjs` joue donc un combat entier sous cette règle.
+
+### L'étalement divise par le nombre de tours — dégâts et soins, jamais un état
+
+Nico : « 10 dégâts étalés sur 2 tours, c'est 5 dégâts sur chacun de ces
+tours », et l'étalement « ne doit pas s'appliquer sur les effets, uniquement
+sur les dégâts, les soins, la distance, les zones ». Trois étages bougent.
+**La Forge** (`etalement_sans_degats.mjs`) offre l'étalement sur une attaque,
+un SOIN, une Zone ou une Distance, et le grise sur un état ou un bouclier ; une
+carte qui ne fait que soigner peut désormais étaler son soin. Le bouton ⏳ est
+offert sur l'étalement : chaque cran ajoute un tour, donc un diviseur de plus,
+et le texte le dit (« divisés par 3 … pendant 3 tours ») — le générateur de
+monstres écrit le même texte, `textes_reels.mjs` y veille. **L'extraction**
+(`moteur_effets.js`) lit le nombre de tours (colonne Tours, 2, plus les crans
+⏳) ; posé sur une Distance ou une Zone, l'étalement gagne les dégâts et les
+soins de toute la carte ; posé sur un état, il n'étale rien. **Le noyau**
+(`partsEtalees`, `moteur_pur.js`) divise le montant final en N parts entières
+qui font exactement le total (10 sur 3 tours : 4, 3, 3) ; rien au lancement,
+une part par fin de manche, et l'état s'en va avec la dernière. Un second
+étalement s'ajoute part à part à ce qui reste au lieu de s'allonger au bout de
+la file. Un soin étalé pose « Soin étalé » (vert sur le pion), que le cerveau
+rend une part par manche sans dépasser la vie maximum. `etalement_tours.mjs`
+tient les trois étages ; treize morsures, une par règle, font chacune tomber au
+moins un contrôle.
+
+### Un héros qui vient de naître se découvre par ce qu'il porte
+
+À la validation des caractéristiques, la fiche du nouveau héros s'ouvre sur
+l'onglet Inventaire — son arme et sa tenue de départ — ou y bascule si elle
+était déjà ouverte. Une fiche ouverte depuis la liste des héros garde les
+Caractéristiques. `ouverture_inventaire.mjs` charge la vraie page, valide la
+création pour de vrai et lit l'onglet allumé (morsures : fiche neuve sur les
+Caractéristiques ; fiche déjà ouverte qui ne bascule pas).
