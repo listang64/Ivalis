@@ -1058,7 +1058,13 @@
                  découpe le fond de l'ÉLÉMENT dans les lettres : posé sur une boîte
                  large, un nom court n'en attrape que le premier quart et perd tout
                  son relief. Le texte vit donc dans un span qui fait exactement sa
-                 taille, et la boîte ne sert plus qu'au calage et à la mesure. -->
+                 taille, et la boîte ne sert plus qu'au calage et à la mesure.
+
+                 DEUX OMBRES, PAS UNE : la première, serrée et presque sans flou,
+                 pose une ombre nette juste SOUS les lettres (l'effet demandé par
+                 Nico) ; la seconde, plus large et plus floue, ajoute le relief
+                 qu'un dégradé clair sur fond clair perdrait sinon. `filter`
+                 empile les deux `drop-shadow` sans que l'une efface l'autre. -->
             <div id="hud-nom-heros"
                  style="position: absolute; box-sizing: border-box; text-align: left;
                         pointer-events: none; white-space: nowrap; overflow: hidden;">
@@ -1069,7 +1075,7 @@
                              background: linear-gradient(135deg, #fbf5bd 0%, #c2a878 25%, #5c3a21 50%, #e8d5a5 75%, #ffffff 100%);
                              -webkit-background-clip: text; background-clip: text;
                              -webkit-text-fill-color: transparent;
-                             filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.9));"></span>
+                             filter: drop-shadow(0 3px 1px rgba(0,0,0,0.75)) drop-shadow(2px 4px 6px rgba(0,0,0,0.9));"></span>
             </div>
 
             <!-- 1. Bouton FIN DE TOUR (Le grand cercle à droite) -->
@@ -1907,7 +1913,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=24"></script>
+<script src="trace_combat.js?v=25"></script>
 <!-- LA MISE À JOUR AUTOMATIQUE. Juste après la trace, parce qu'elle a besoin du
      numéro de version qu'elle y trouve, et avant tout le reste : si la page est
      périmée, autant s'en apercevoir avant d'avoir chargé le jeu entier.
@@ -1940,7 +1946,7 @@
 <script type="module" src="app.js?v=52"></script>
 <script type="module" src="creation_personnage.js?v=8"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
-<script type="module" src="competences.js?v=26"></script>
+<script type="module" src="competences.js?v=27"></script>
 <!-- Le plateau porte désormais son ?v= comme les autres : sans lui, un iPad
      gardait l'ancien dessin en cache après une livraison (l'œil d'or en dépend). -->
 <script src="Plateau.js?v=2"></script>
@@ -2412,10 +2418,10 @@
       <p style="font-size: 16px; color: #5c3a21; margin-bottom: 20px;">Sélectionnez le type d'arme ou de magie pour forger cette technique.</p>
       
       <div style="display: flex; flex-direction: column; gap: 12px;">
-          <button class="btn-parametres" style="width: 100%; font-size: 18px;" onclick="jouerSonClic(); window.selectionnerArme('Arme légère CAC')">🗡️ Arme légère CAC</button>
-          <button class="btn-parametres" style="width: 100%; font-size: 18px;" onclick="jouerSonClic(); window.selectionnerArme('Arme lourde CAC')">🪓 Arme lourde CAC</button>
-          <button class="btn-parametres" style="width: 100%; font-size: 18px;" onclick="jouerSonClic(); window.selectionnerArme('Arme polyvalente')">⚔️ Arme polyvalente</button>
-          <button class="btn-parametres" style="width: 100%; font-size: 18px;" onclick="jouerSonClic(); window.selectionnerArme('Arme légère Distance')">🏹 Arme légère Distance</button>
+          <button id="btn-arme-legere-cac" class="btn-parametres" style="width: 100%; font-size: 18px;" onclick="jouerSonClic(); window.selectionnerArme('Arme légère CAC')">🗡️ Arme légère CAC</button>
+          <button id="btn-arme-lourde-cac" class="btn-parametres" style="width: 100%; font-size: 18px;" onclick="jouerSonClic(); window.selectionnerArme('Arme lourde CAC')">🪓 Arme lourde CAC</button>
+          <button id="btn-arme-polyvalente" class="btn-parametres" style="width: 100%; font-size: 18px;" onclick="jouerSonClic(); window.selectionnerArme('Arme polyvalente')">⚔️ Arme polyvalente</button>
+          <button id="btn-arme-legere-distance" class="btn-parametres" style="width: 100%; font-size: 18px;" onclick="jouerSonClic(); window.selectionnerArme('Arme légère Distance')">🏹 Arme légère Distance</button>
           <button class="btn-parametres" style="width: 100%; font-size: 18px; background-color: #5c1e16; color: white;" onclick="jouerSonClic(); window.selectionnerArme('Magie')">✨ Magie</button>
           <button class="btn-parametres" style="width: 100%; font-size: 18px; background-color: #4a5568; color: white;" onclick="jouerSonClic(); window.selectionnerArme('Sans arme / Arme rp')">✊ Sans arme / Arme rp</button>
       </div>

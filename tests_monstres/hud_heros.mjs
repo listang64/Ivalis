@@ -893,6 +893,32 @@ console.log("=========================================================");
 }
 
 
+console.log("\n=========================================================");
+console.log("  12. LE NOM DU HÉROS PORTE UNE OMBRE, ET PAS QU'UNE");
+console.log("=========================================================");
+{
+  // Nico : « rajouter une ombre sous le nom du personnage au-dessus du bouton
+  // fin de tour ». Le texte est un dégradé clair posé en background-clip:text —
+  // sans ombre, il se fond dans un fond clair. Deux drop-shadow empilés : une
+  // ombre nette et serrée juste SOUS les lettres, et l'ombre large déjà là pour
+  // le relief. `filter` ne doit perdre ni l'une ni l'autre.
+  await p.evaluate(() => {
+    window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[0]];
+    window.actualiserHudHeros();
+  });
+  const r = await p.evaluate(() => {
+    const texte = document.getElementById("hud-nom-heros-texte");
+    return { style: texte.getAttribute("style"), filtreCalcule: getComputedStyle(texte).filter };
+  });
+  const nbOmbres = (r.filtreCalcule.match(/drop-shadow\(/g) || []).length;
+  verifier("le nom porte AU MOINS deux ombres empilées", nbOmbres >= 2, `(${nbOmbres} — ${r.filtreCalcule})`);
+  verifier("une ombre nette et serrée est posée directement SOUS le texte (peu ou pas de flou)",
+           /0px 3px 1px/.test(r.filtreCalcule), r.filtreCalcule);
+  verifier("l'ombre large de relief est toujours là", /2px 4px 6px/.test(r.filtreCalcule), r.filtreCalcule);
+  verifier("le navigateur calcule bien un filtre (pas de règle invalide qui l'aurait annulé)",
+           r.filtreCalcule && r.filtreCalcule !== "none", r.filtreCalcule);
+}
+
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 2).join(" | "));
 
 await b.close();

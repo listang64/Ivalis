@@ -1151,7 +1151,48 @@ window.fermerForgeCompetence = function() {
     document.getElementById("overlay-jeu-modale").style.display = "none";
 };
 
+// LES QUATRE ARMES PHYSIQUES DU MENU, chacune reliée au bouton qui la propose.
+// Magie et Sans arme / Arme rp n'y figurent pas : elles restent toujours
+// proposées, quelle que soit l'arme réellement en main (voir plus bas).
+const BOUTONS_TYPE_ARME = {
+    "Arme légère CAC": "btn-arme-legere-cac",
+    "Arme lourde CAC": "btn-arme-lourde-cac",
+    "Arme polyvalente": "btn-arme-polyvalente",
+    "Arme légère Distance": "btn-arme-legere-distance"
+};
+
+// Les types d'armes physiques que le héros porte VRAIMENT, d'après la fiche
+// chargée à l'ouverture de la Forge (forgeState.statsPerso, un document brut
+// "Personnages" — d'où le passage par persoDocVersFront avant armesEnMain, qui
+// attend le format front-end). `null` dit "on ne sait pas" : sur une fiche
+// absente ou une lecture ratée, mieux vaut proposer les quatre plutôt que de
+// bloquer tout net la création d'une technique de corps à corps ou de tir —
+// même principe que window.peutEquiper (objets.js).
+function typesArmesEquipeesPourForge() {
+    const brut = window.forgeState.statsPerso;
+    if (!brut || typeof window.persoDocVersFront !== "function" || typeof window.armesEnMain !== "function") {
+        return null;
+    }
+    try {
+        const perso = window.persoDocVersFront(window.forgeState.idPersonnage, brut);
+        return new Set(window.armesEnMain(perso).map(o => o.type));
+    } catch (e) {
+        return null;
+    }
+}
+
+// Nico : « n'afficher que le type d'arme qui correspond avec l'arme que l'on
+// a équipé ». Une arme légère CAC en main ne propose donc plus de forger une
+// technique d'arme lourde ou de tir — Magie et Sans arme, elles, restent
+// toujours là, l'une ne dépendant d'aucune arme et l'autre étant justement
+// faite pour s'en passer.
 window.ouvrirMenuArme = function() {
+    const typesEquipes = typesArmesEquipeesPourForge();
+    Object.keys(BOUTONS_TYPE_ARME).forEach(type => {
+        const bouton = document.getElementById(BOUTONS_TYPE_ARME[type]);
+        if (!bouton) return;
+        bouton.style.display = (!typesEquipes || typesEquipes.has(type)) ? "block" : "none";
+    });
     document.getElementById("modale-menu-arme").style.display = "block";
 };
 

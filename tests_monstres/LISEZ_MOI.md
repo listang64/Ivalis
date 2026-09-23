@@ -98,10 +98,12 @@ node fin_de_tour.mjs        # un document introuvable ne fait plus tomber tout l
 node regeneration_fin_de_tour.mjs # la régénération ne tombe qu'au passage au tour suivant, jamais avant
 node titres_bannieres.mjs   # les noms de carte rétrécissent au lieu d'être coupés
 node bouton_forge.mjs       # le + de la Forge devient un sablier pendant l'attente
+node forge_arme_equipee.mjs # le menu « Type d'Attaque » ne propose que l'arme vraiment équipée
 node croix_suppression.mjs  # la croix rouge du mode dev efface une technique partout
 node mise_de_cote.mjs       # la case à cocher qui retire un héros du jeu, sans l'effacer
 node ecran_chargement.mjs   # le sceau, le préchargement, et le transport Firestore
 node compteurs_combattant.mjs # vitalité et énergie du combattant suivi, à chaque étape
+node hud_heros.mjs          # l'anneau vie/énergie, l'avatar, le nom du héros et son ombre
 node pas_de_visionneuse.mjs # rien ne peut plus détourner « qui joue ? » vers une créature
 node stats_fiche.mjs        # les retouches de la fiche perso suivies jusqu'au combat
 node coup_critique.mjs      # le jet de critique, ses dégâts doublés et ses effets imposés
@@ -2390,3 +2392,33 @@ l'onglet Inventaire — son arme et sa tenue de départ — ou y bascule si elle
 Caractéristiques. `ouverture_inventaire.mjs` charge la vraie page, valide la
 création pour de vrai et lit l'onglet allumé (morsures : fiche neuve sur les
 Caractéristiques ; fiche déjà ouverte qui ne bascule pas).
+
+### Le nom du héros porte enfin une ombre nette
+
+Nico : « rajouter une ombre sous le nom du personnage au-dessus du bouton fin
+de tour ». Le nom vit dans un `<span>` en `background-clip: text` — un dégradé
+clair qui se fond dans un fond clair sans un relief net dessous. Une seule
+ombre large et floue y était déjà posée (`filter: drop-shadow`), mais trop
+diffuse pour se lire comme une ombre PORTÉE. Un second `drop-shadow`, quasi
+sans flou et collé aux lettres, s'empile sur le premier — les deux tiennent
+dans le même `filter`, l'un n'efface pas l'autre. Le chapitre 12 de
+`hud_heros.mjs` lit le `filter` calculé par le navigateur et vérifie les deux
+ombres (morsure : sans la nouvelle, une seule reste, l'ombre nette manque).
+
+### La Forge ne propose que l'arme qu'on tient vraiment en main
+
+Nico : dans le menu « Type d'Attaque », les quatre armes physiques (légère
+CAC, lourde CAC, polyvalente, légère Distance) ne doivent montrer que celle
+qui correspond à l'arme réellement équipée ; Magie et Sans arme restent
+proposées en toutes circonstances, l'une ne dépendant d'aucune arme, l'autre
+étant justement faite pour s'en passer. `window.ouvrirMenuArme` (competences.js)
+lit désormais l'équipement du héros (`armesEnMain`, via `persoDocVersFront` sur
+la fiche chargée à l'ouverture de la Forge) et masque les boutons des trois
+autres types. Une arme à deux mains ne compte qu'une fois (même identifiant
+dans les deux mains) ; deux armes d'une main de types différents montrent
+les deux ; un bouclier seul, ou toute autre absence d'arme physique, masque
+les quatre. Une fiche introuvable ne bloque rien : les quatre restent
+proposées plutôt que d'empêcher de forger une technique de corps à corps ou
+de tir — même principe que `window.peutEquiper`. `forge_arme_equipee.mjs`
+charge la vraie page (Firebase remplacé par des doublures) et vérifie chaque
+cas ; retirer le filtre ou la détection fait tomber les mêmes contrôles.
