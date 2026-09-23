@@ -31,6 +31,9 @@ const SRC = [
   extraire('loot.js', 'window.imagesEncoreUtilisees = function(options) {'),
   extraire('loot.js', 'window.oublierImages = async function(urls, raison, options) {'),
   extraire('loot.js', 'window.champsPourObjet = function(objet, main) {'),
+  // equiperObjet refuse un second bouclier : il s'appuie sur ces deux-là.
+  extraire('loot.js', 'window.estBouclier = function(objet) {'),
+  extraire('loot.js', 'window.mainsPossibles = function(perso, objet) {'),
   extraire('loot.js', 'window.equiperObjet = async function(idPersonnage, objet, main) {'),
   extraire('loot.js', 'window.lacherObjet = async function(idPersonnage, champ) {'),
   extraire('loot.js', 'window.appliquerEquipementEnRam = function(idPersonnage, maj) {'),

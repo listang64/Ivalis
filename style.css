@@ -2935,6 +2935,18 @@ textarea.input-texte-parchemin {
     text-shadow: 0 1px 1px rgba(0,0,0,0.25);
 }
 
+/* La carac qui modifie l'objet suit son type, en petit et en marron : une
+   précision, pas un titre — elle ne prend ni la couleur de la rareté ni les
+   majuscules de l'étiquette. */
+.etiquette-rarete .carac-objet {
+    color: #7a4a1e;
+    font-size: 0.85em;
+    text-transform: none;
+    letter-spacing: 0.5px;
+    text-shadow: none;
+    white-space: nowrap;
+}
+
 /* Un prérequis non rempli : jamais discret, c'est ce qui empêche d'équiper. */
 .prerequis-objet {
     font-family: 'Almendra', serif;

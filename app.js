@@ -261,12 +261,13 @@ window.afficherEmplacementEquipement = function(suffixe, objet) {
     // valeur d'un objet, et elle reprend les couleurs du tableau (gris, vert,
     // bleu, violet). Le type (Arme légère, Armure moyenne...) et une arme à
     // deux mains se disent ici aussi.
+    // La carac qui modifie l'objet suit son type, en petit et en marron
+    // (window.etiquetteObjetHTML, objets.js) : d'où innerHTML.
     if (rarete) {
-        const type = rempli && typeof window.libelleTypeObjet === "function"
-            ? window.libelleTypeObjet(objet.type) : "";
-        const mots = rempli ? [objet.rarete, type, objet.deuxMains ? "deux mains" : null].filter(Boolean) : [];
-        rarete.innerText = mots.join(" · ");
-        rarete.style.display = mots.length ? "block" : "none";
+        const etiquette = rempli && typeof window.etiquetteObjetHTML === "function"
+            ? window.etiquetteObjetHTML(objet) : "";
+        rarete.innerHTML = etiquette;
+        rarete.style.display = etiquette ? "block" : "none";
         rarete.style.color = (rempli && window.COULEUR_RARETE && window.COULEUR_RARETE[objet.rarete]) || "#5c3a21";
     }
 

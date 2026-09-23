@@ -1432,6 +1432,7 @@ le bestiaire réel aucune carte ne sort de sa tranche.
 ```sh
 node butin_loot.mjs         # détection de victoire, fenêtre personnelle, partage, tirage au sort
 node clics_butin.mjs        # on clique VRAIMENT dans la fenêtre : croix, prendre, laisser
+node choix_emplacement_butin.mjs  # la carac sur l'étiquette, le choix de la main, jamais deux boucliers
 node demarrage_reel.mjs     # la VRAIE page se charge-t-elle ? (les 12 modules, le parcours complet)
 node objets_tableau.mjs     # le catalogue d'équipement, confronté au tableau de Nico
 node equipement_combat.mjs  # ce que les objets font une fois portés, en combat
@@ -1506,6 +1507,36 @@ en appelant les fonctions à la main. Il joue la séquence complète (laisser,
 prendre, confirmer, équiper, refermer), vérifie que le menu de combat
 redevient cliquable une fois la fenêtre fermée, et surtout qu'un DOM incomplet
 ne fait plus tomber le reste du combat.
+
+`choix_emplacement_butin.mjs` clique lui aussi pour de vrai, sur trois demandes
+de Nico. **L'étiquette d'un objet dit sa carac** : juste après le type, en petit
+et en marron, la caractéristique qui modifie l'objet (« Commun · Arme légère
+(corps à corps) Dextérité »). Une seule fonction la fabrique,
+`etiquetteObjetHTML` (objets.js), pour la fiche du héros comme pour les trois
+vues du butin et la fenêtre de comparaison ; le banc la lit sur les 23 modèles
+du catalogue, puis mesure le vrai rendu — couleur marron et non celle de la
+rareté, taille plus petite que l'étiquette, pas de majuscules — et vérifie que
+la fiche (app.js) la pose en HTML : en `innerText`, on lisait la balise à
+l'écran. **Se placer, c'est choisir sa main** : au partage commun, « Se placer »
+sur un objet qui peut aller dans l'une ou l'autre main ouvre la fenêtre de
+comparaison du butin personnel, titrée « Dans quelle main, si tu le
+remportes ? », avec ce que chaque main remplacerait. Rien n'est équipé avant le
+tirage : la main voyage avec la candidature (`pool[i].mains`), s'affiche sur la
+carte (« Pliors (main gauche) »), s'efface avec « Se retirer », et c'est là que
+l'objet atterrit une fois gagné — la fiche ne reçoit que l'objet, sans les
+candidats ni le gagnant qui s'y glissaient jusqu'ici. Une armure, une arme à
+deux mains n'ont qu'une place : pas de question. Au butin personnel (les deux
+objets du début), « Prendre » posait déjà la question ; le banc le vérifie d'un
+vrai clic. **Jamais deux boucliers** : un bouclier ne peut aller que dans une
+main dont la voisine n'en tient pas déjà un — un second bouclier ne peut que
+remplacer le premier (`mainsPossibles`, loot.js). La règle tient à toutes les
+portes : la fenêtre ne propose que cette main et dit pourquoi, le partage la
+retient d'office, l'équipement automatique (une vieille candidature sans main)
+ne prend plus « la main libre d'abord », et `equiperObjet` lui-même redresse
+une main interdite. Le banc vérifie aussi ce que la règle ne doit PAS gêner :
+un bouclier à côté d'une arme, après une arme à deux mains, une arme à côté
+d'un bouclier. Chaque correctif a été retiré à tour de rôle : chaque fois, au
+moins un contrôle tombe.
 
 `demarrage_reel.mjs` répond à la question que AUCUN autre banc ne posait : est-ce
 que le jeu **démarre** ? Tous les autres découpent une fonction et la font

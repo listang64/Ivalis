@@ -183,9 +183,57 @@ window.objetsEcrasesPar = function(perso, objet, main) {
         .filter(o => o && o.nom);
 };
 
+// =========================================================================
+//  UN SEUL BOUCLIER À LA FOIS
+// =========================================================================
+//  Deux boucliers, c'est deux parades qui s'additionnent et aucune arme : la
+//  règle l'interdit. Un bouclier ne peut donc aller QUE dans une main dont la
+//  voisine ne tient pas déjà un bouclier — autrement dit, un second bouclier
+//  ne peut que REMPLACER le premier, à sa place.
+//
+//  Toutes les portes d'entrée passent par ici : la fenêtre du butin personnel,
+//  le choix de main au partage commun, l'équipement automatique, et en dernier
+//  ressort equiperObjet lui-même, qui redresse une main interdite plutôt que
+//  d'écrire le second bouclier.
+window.estBouclier = function(objet) {
+    return !!(objet && objet.nom && objet.type === "Bouclier");
+};
+
+// Les mains où cet objet peut aller, pour ce héros-là : ["Droite", "Gauche"],
+// une seule des deux (le bouclier), ou [null] quand la question ne se pose pas
+// (une armure, une arme à deux mains, un vieil objet à main imposée).
+window.mainsPossibles = function(perso, objet) {
+    if (!objet) return [null];
+    if (objet.emplacement === "Armure" || objet.deuxMains
+        || objet.emplacement === "Main_Gauche" || objet.emplacement === "Main_Droite") return [null];
+    const mains = ["Droite", "Gauche"];
+    if (!window.estBouclier(objet)) return mains;
+    const voisine = { Droite: perso && perso.equipMainGauche, Gauche: perso && perso.equipMainDroite };
+    const permises = mains.filter(m => !window.estBouclier(voisine[m]) || voisine[m].uid === objet.uid);
+    // Une vieille fiche qui porterait déjà DEUX boucliers : aucune main n'est
+    // « propre », remplacer l'un ou l'autre ne peut rien aggraver.
+    return permises.length ? permises : mains;
+};
+
+// Le nom lisible d'une main, pour les boutons et la liste des convoitises.
+window.libelleMain = function(main) {
+    return main === "Gauche" ? "Main gauche" : main === "Droite" ? "Main droite" : "";
+};
+
 // Écrit un objet dans le ou les emplacements qui lui reviennent. L'ancien
 // occupant n'est conservé nulle part : c'est voulu, il n'existe pas de sac.
 window.equiperObjet = async function(idPersonnage, objet, main) {
+    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+
+    // Le garde-fou du bouclier : une main interdite (l'autre tient déjà un
+    // bouclier) est redressée vers la seule permise — le nouveau bouclier
+    // remplace l'ancien au lieu de s'installer à côté.
+    if (window.estBouclier(objet)) {
+        const permises = window.mainsPossibles(perso, objet);
+        const demandee = main === "Gauche" ? "Gauche" : "Droite";
+        if (permises[0] !== null && !permises.includes(demandee)) main = permises[0];
+    }
+
     const champs = window.champsPourObjet(objet, main);
     if (champs.length === 0) return;
 
@@ -200,7 +248,6 @@ window.equiperObjet = async function(idPersonnage, objet, main) {
     // arme à une main n'écrasait qu'une des deux : la moitié orpheline restait
     // dans l'autre main, et comme les bonus sont dédoublonnés par identifiant,
     // l'arme rendue continuait tranquillement de compter ses points.
-    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
     if (perso) {
         const uidsRemplaces = champs
             .map(champ => (perso[window.champDocVersFront[champ]] || {}).uid)
@@ -317,13 +364,17 @@ window.appliquerEquipementEnRam = function(idPersonnage, maj) {
     }
 };
 
-// Ancien nom, conservé le temps que le butin bascule entièrement : équipe dans
-// la main libre s'il y en a une, sinon la droite.
+// L'équipement du partage commun. La main choisie en se plaçant sur l'objet
+// est respectée ; sans choix (un placement d'avant cette règle), on prend la
+// main libre s'il y en a une, sinon la droite — toujours parmi les mains
+// permises, pour qu'un bouclier gagné ne rejoigne jamais un autre bouclier.
 window.equiperObjetButin = async function(idPersonnage, item, main) {
     const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+    const permises = window.mainsPossibles(perso, item);
     let mainChoisie = main;
-    if (!mainChoisie && perso && !item.deuxMains && item.emplacement !== "Armure") {
-        mainChoisie = !perso.equipMainDroite ? "Droite" : (!perso.equipMainGauche ? "Gauche" : "Droite");
+    if (permises[0] !== null && !permises.includes(mainChoisie)) {
+        const libre = (m) => !(perso && perso["equipMain" + m] && perso["equipMain" + m].nom);
+        mainChoisie = permises.find(libre) || permises[0];
     }
     await window.equiperObjet(idPersonnage, item, mainChoisie);
 };
@@ -1099,14 +1150,12 @@ window.afficherDetailObjetEquipe = function(index) {
     const image = objet.image ? `<img src="${objet.image}" alt="${objet.nom}" style="display:block;">`
                                : `<div class="icone-emplacement-vide">${icone}</div>`;
     const couleur = (window.COULEUR_RARETE && window.COULEUR_RARETE[objet.rarete]) || "#5c3a21";
-    const type = typeof window.libelleTypeObjet === "function" ? window.libelleTypeObjet(objet.type) : (objet.type || "");
-    const mots = [objet.rarete, type, objet.deuxMains ? "deux mains" : null].filter(Boolean);
 
     const conteneur = document.getElementById("detail-objet-equipe-contenu");
     if (conteneur) conteneur.innerHTML = `
         <div class="carre-equipement">${image}</div>
         <div class="nom-objet-equipe">${objet.nom}</div>
-        <div class="etiquette-rarete" style="color:${couleur};">${mots.join(" · ")}</div>
+        <div class="etiquette-rarete" style="color:${couleur};">${window.etiquetteObjetDuButin(objet)}</div>
         <div class="effet-objet-equipe">${objet.effetTexte || "Aucun effet particulier."}</div>`;
 
     const popup = document.getElementById("popup-detail-objet-equipe");
@@ -1194,13 +1243,18 @@ window.passerLaFouille = function() {
 //  VUE 1 : LE BUTIN PERSONNEL
 // =========================================================================
 
+// « Rareté · Type Carac · deux mains » : l'étiquette commune d'objets.js. Le
+// repli (objets.js pas encore chargé) garde au moins la rareté et le type.
+window.etiquetteObjetDuButin = function(objet, options) {
+    if (typeof window.etiquetteObjetHTML === "function") return window.etiquetteObjetHTML(objet, options);
+    return [objet.rarete, objet.type].filter(Boolean).join(" · ");
+};
+
 // L'étiquette de rareté et, s'il manque la carac, l'avertissement de prérequis
 // — les deux mêmes lignes dans les trois vues du butin.
 window.bandeauObjetButin = function(item, idPersonnage) {
     const couleur = (window.COULEUR_RARETE && window.COULEUR_RARETE[item.rarete]) || "#5c3a21";
-    const type = typeof window.libelleTypeObjet === "function" ? window.libelleTypeObjet(item.type) : (item.type || "");
-    const mots = [item.rarete, type, item.deuxMains ? "deux mains" : null].filter(Boolean);
-    let html = `<div class="etiquette-rarete" style="color:${couleur};">${mots.join(" · ")}</div>`;
+    let html = `<div class="etiquette-rarete" style="color:${couleur};">${window.etiquetteObjetDuButin(item)}</div>`;
     if (idPersonnage && typeof window.peutEquiper === "function") {
         const test = window.peutEquiper(idPersonnage, item);
         if (!test.possible) {
@@ -1309,32 +1363,48 @@ window.choisirLootPersonnel = function(idPersonnage, uid, prendre) {
 // l'objet apporte, ce qu'il DÉTRUIT (une arme à deux mains en écrase deux), et
 // dans quelle main le mettre. Un objet dont on n'a pas la carac s'affiche
 // quand même, mais sans bouton pour l'équiper : le joueur voit ce qu'il rate.
-window.ouvrirConfirmationEquip = function(idPersonnage, item, uid) {
+//
+// La MÊME fenêtre sert au partage commun (mode "pool") : se placer sur un
+// objet, c'est dire d'avance où il ira si le tirage le donne. Rien n'est
+// équipé tout de suite ; la main choisie voyage avec la candidature.
+window.ouvrirConfirmationEquip = function(idPersonnage, item, uid, mode) {
     const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
-    window.BUTIN_CHOIX_EN_ATTENTE = { idPersonnage, uid, item };
+    const auPartage = mode === "pool";
+    window.BUTIN_CHOIX_EN_ATTENTE = { idPersonnage, uid, item, mode: auPartage ? "pool" : "personnel" };
 
     const test = typeof window.peutEquiper === "function"
         ? window.peutEquiper(idPersonnage, item) : { possible: true };
 
     // Les mains proposées : une seule pour une armure ou une arme à deux mains,
-    // les deux pour le reste.
+    // les deux pour le reste — sauf un bouclier quand l'autre main en tient
+    // déjà un : il ne peut que le remplacer (window.mainsPossibles).
+    const mains = window.mainsPossibles(perso, item);
     let choix;
-    if (item.emplacement === "Armure") {
-        choix = [{ libelle: "Équiper", main: null }];
-    } else if (item.deuxMains) {
-        choix = [{ libelle: "Équiper à deux mains", main: null }];
+    if (mains[0] === null) {
+        choix = [{ libelle: item.deuxMains ? "Équiper à deux mains" : "Équiper", main: null }];
     } else {
-        choix = [{ libelle: "Main droite", main: "Droite" }, { libelle: "Main gauche", main: "Gauche" }];
+        choix = mains.map(m => ({ libelle: window.libelleMain(m), main: m }));
     }
 
     // La comparaison montre, pour le premier choix, ce qui serait perdu.
     window.remplirComparaisonEquip(window.objetsEcrasesPar(perso, item, choix[0].main), item);
 
+    const titre = document.getElementById("titre-confirmation-equip");
+    if (titre) titre.innerText = auPartage ? "Dans quelle main, si tu le remportes ?" : "Équiper cet objet ?";
+
+    // Un seul bouclier : si une main a été retirée du choix, on dit pourquoi.
+    const bouclierPorte = window.estBouclier(item) && mains[0] !== null && mains.length === 1
+        ? perso && perso["equipMain" + mains[0]] : null;
+    const lignes = [];
+    if (!test.possible) {
+        lignes.push(`Il te faut ${item.prerequis} en ${item.carac} pour porter cet objet (tu as ${test.valeur}).`);
+    } else if (bouclierPorte && bouclierPorte.nom) {
+        lignes.push(`Un seul bouclier à la fois : celui-ci ne peut que remplacer ${bouclierPorte.nom}.`);
+    }
     const message = document.getElementById("message-confirmation-equip");
     if (message) {
-        message.innerText = test.possible ? ""
-            : `Il te faut ${item.prerequis} en ${item.carac} pour porter cet objet (tu as ${test.valeur}).`;
-        message.style.display = test.possible ? "none" : "block";
+        message.innerText = lignes.join(" ");
+        message.style.display = lignes.length ? "block" : "none";
     }
 
     const actions = document.getElementById("actions-confirmation-equip");
@@ -1369,11 +1439,9 @@ window.remplirComparaisonEquip = function(actuels, nouveau) {
         const image = objet.image ? `<img src="${objet.image}" alt="${objet.nom}" style="display:block;">`
                                    : `<div class="icone-emplacement-vide">${icone}</div>`;
         const couleur = (window.COULEUR_RARETE && window.COULEUR_RARETE[objet.rarete]) || "#5c3a21";
-        const type = typeof window.libelleTypeObjet === "function" ? window.libelleTypeObjet(objet.type) : (objet.type || "");
-        const mots = [objet.rarete, type].filter(Boolean);
         return `<div class="carre-equipement">${image}</div>
                 <div class="nom-objet-equipe">${objet.nom}</div>
-                <div class="etiquette-rarete" style="color:${couleur};">${mots.join(" · ")}</div>
+                <div class="etiquette-rarete" style="color:${couleur};">${window.etiquetteObjetDuButin(objet, { deuxMains: false })}</div>
                 <div class="effet-objet-equipe">${objet.effetTexte || ""}</div>`;
     };
     const liste = Array.isArray(actuels) ? actuels : (actuels ? [actuels] : []);
@@ -1392,7 +1460,10 @@ window.confirmerChoixButin = async function(confirme, main) {
     window.BUTIN_CHOIX_EN_ATTENTE = null;
     if (!attente) return;
 
-    if (confirme) {
+    if (confirme && attente.mode === "pool") {
+        // Au partage, confirmer c'est se placer — avec la main choisie.
+        await window.ecrirePlacementPool(attente.idPersonnage, attente.uid, main || null);
+    } else if (confirme) {
         await window.equiperObjet(attente.idPersonnage, attente.item, main);
         await window.enregistrerDecisionButin(attente.idPersonnage, attente.uid, true);
     }
@@ -1482,9 +1553,11 @@ window.rendreCarteLootPool = function(item, mesIds, dejaValide) {
                               : `<div class="icone-emplacement-vide">${icone}</div>`;
     const candidats = item.candidats || [];
     const jeSuisDedans = mesIds.some(id => candidats.includes(id));
+    const mainsVoulues = item.mains || {};
     const nomsCandidats = candidats.map(id => {
         const p = (window.PERSOS_PARTIE || []).find(x => x.idPersonnage === id);
-        return p ? p.prenom : id;
+        const main = window.libelleMain(mainsVoulues[id]);
+        return (p ? p.prenom : id) + (main ? ` (${main.toLowerCase()})` : "");
     });
 
     let actions;
@@ -1504,7 +1577,7 @@ window.rendreCarteLootPool = function(item, mesIds, dejaValide) {
                     title="${item.carac} ${item.prerequis} requis">Hors de portée${suffixeNom}</button>`;
             }
             return `<button class="btn-loot-mini ${dedans ? "retirer" : "place"}"
-                onclick="window.togglePlacementPool('${id}','${item.uid}')">${dedans ? "Se retirer" : "Se placer"}${suffixeNom}</button>`;
+                onclick="window.choisirPlacementPool('${id}','${item.uid}')">${dedans ? "Se retirer" : "Se placer"}${suffixeNom}</button>`;
         }).join("") + `</div>`;
     }
 
@@ -1519,18 +1592,52 @@ window.rendreCarteLootPool = function(item, mesIds, dejaValide) {
     </div>`;
 };
 
+// « Se placer » : quand l'objet peut aller dans l'une OU l'autre main, le
+// joueur choisit d'abord laquelle — la fenêtre de comparaison du butin
+// personnel, en mode partage. Une armure, une arme à deux mains ou un bouclier
+// qui ne peut que remplacer l'autre n'ont qu'une place : pas de question.
+// « Se retirer » reste immédiat.
+window.choisirPlacementPool = function(idPersonnage, uid) {
+    const butin = (window.PARTIE_DATA || {}).Butin;
+    const item = butin && (butin.pool || []).find(it => it.uid === uid);
+    if (!item) return;
+    if ((item.candidats || []).includes(idPersonnage)) return window.togglePlacementPool(idPersonnage, uid);
+
+    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+    const mains = window.mainsPossibles(perso, item);
+    if (mains.length < 2) return window.togglePlacementPool(idPersonnage, uid, mains[0]);
+
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    window.ouvrirConfirmationEquip(idPersonnage, item, uid, "pool");
+};
+
 // Un héros peut se placer sur PLUSIEURS objets à la fois (bascule simple par
 // objet), et changer d'avis librement tant que le partage n'est pas résolu.
-window.togglePlacementPool = async function(idPersonnage, uid) {
+// Avec une main ("Droite" / "Gauche"), le héros est placé — jamais retiré —
+// et cette main est retenue pour le jour où il gagne l'objet.
+window.togglePlacementPool = async function(idPersonnage, uid, main) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    await window.ecrirePlacementPool(idPersonnage, uid, main);
+};
+
+window.ecrirePlacementPool = async function(idPersonnage, uid, main) {
+    const avecMain = main === "Droite" || main === "Gauche";
     await window.modifierPartie((data) => {
         const butin = data.Butin;
         if (!butin || butin.etape !== "partage" || butin.resolu) return null;
         const pool = (butin.pool || []).map(item => {
             if (item.uid !== uid) return item;
             const candidats = item.candidats || [];
-            const dedans = candidats.includes(idPersonnage);
-            return { ...item, candidats: dedans ? candidats.filter(id => id !== idPersonnage) : [...candidats, idPersonnage] };
+            const mains = { ...(item.mains || {}) };
+            const retirer = candidats.includes(idPersonnage) && !avecMain;
+            if (retirer) {
+                delete mains[idPersonnage];
+                return { ...item, candidats: candidats.filter(id => id !== idPersonnage), mains };
+            }
+            if (avecMain) mains[idPersonnage] = main;
+            return { ...item,
+                     candidats: candidats.includes(idPersonnage) ? candidats : [...candidats, idPersonnage],
+                     mains };
         });
         return { maj: { "Butin.pool": pool } };
     });
@@ -1589,7 +1696,11 @@ window.validerButinPool = async function() {
             // en retard suffirait à passer au travers).
             const test = typeof window.peutEquiper === "function"
                 ? window.peutEquiper(item.gagnant, item) : { possible: true };
-            if (test.possible) await window.equiperObjetButin(item.gagnant, item);
+            // Le gagnant reçoit l'objet dans la main qu'il a choisie en se
+            // plaçant. Ce qui ne concernait que le partage (candidats, mains,
+            // gagnant) reste au partage : la fiche ne reçoit que l'objet.
+            const { candidats, mains, gagnant, ...objet } = item;
+            if (test.possible) await window.equiperObjetButin(gagnant, objet, (mains || {})[gagnant]);
         }
     }
 };

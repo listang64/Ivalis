@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=34">
+  <link rel="stylesheet" href="style.css?v=35">
 
  
   <!-- ===================================================================== -->
@@ -1874,7 +1874,7 @@
 <!-- Popup de confirmation : compare l'objet actuel et le nouveau avant d'équiper -->
 <div id="popup-confirmation-equip" style="display: none;">
   <div class="carte-confirmation-equip">
-    <h3>Équiper cet objet ?</h3>
+    <h3 id="titre-confirmation-equip">Équiper cet objet ?</h3>
     <div class="comparaison-equip">
       <div class="colonne-comparaison">
         <div class="entete-comparaison">Actuellement</div>
@@ -1907,7 +1907,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=22"></script>
+<script src="trace_combat.js?v=23"></script>
 <!-- LA MISE À JOUR AUTOMATIQUE. Juste après la trace, parce qu'elle a besoin du
      numéro de version qu'elle y trouve, et avant tout le reste : si la page est
      périmée, autant s'en apercevoir avant d'avoir chargé le jeu entier.
@@ -1937,7 +1937,7 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=25"></script>
 <script type="module" src="ia_master.js?v=6"></script>
-<script type="module" src="app.js?v=50"></script>
+<script type="module" src="app.js?v=51"></script>
 <script type="module" src="creation_personnage.js?v=8"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=25"></script>
@@ -1954,9 +1954,9 @@
 <script type="module" src="monstres_competences.js?v=10"></script>
 <script type="module" src="monstres_ia.js?v=32"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
-<script type="module" src="objets.js?v=8"></script>
+<script type="module" src="objets.js?v=9"></script>
 <script type="module" src="objets_ia.js?v=10"></script>
-<script type="module" src="loot.js?v=15"></script>
+<script type="module" src="loot.js?v=16"></script>
 
 <!-- ============================================================= -->
 <!--  GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)  -->

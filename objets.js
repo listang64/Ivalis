@@ -46,6 +46,32 @@ window.libelleTypeObjet = function(type) {
     return window.LIBELLE_TYPE_OBJET[type] || type || "";
 };
 
+// La caractéristique qui MODIFIE l'objet (colonne "Modificateur" du tableau),
+// écrite comme un mot et non comme un cri : "DEXTÉRITÉ" devient "Dextérité".
+window.libelleCaracObjet = function(carac) {
+    const brut = String(carac || "").trim();
+    if (!brut) return "";
+    const minuscules = brut.toLocaleLowerCase("fr");
+    return minuscules.charAt(0).toLocaleUpperCase("fr") + minuscules.slice(1);
+};
+
+// L'ÉTIQUETTE D'UN OBJET, LA MÊME PARTOUT : « Rare · Arme légère (corps à
+// corps) Dextérité · deux mains ». La carac suit le type, en petit et en
+// marron : on voit du même coup d'œil quelle caractéristique fait mordre
+// l'arme — et laquelle il faudra avoir pour la porter. Les armures, boucliers
+// et bagues la portent de la même façon. Rendue en HTML (la carac a son
+// propre style) : elle se pose avec innerHTML, jamais innerText.
+window.etiquetteObjetHTML = function(objet, options) {
+    if (!objet) return "";
+    const avecDeuxMains = !options || options.deuxMains !== false;
+    const type = window.libelleTypeObjet(objet.type);
+    const carac = window.libelleCaracObjet(objet.carac);
+    const typeEtCarac = [type, carac ? `<span class="carac-objet">${carac}</span>` : ""]
+        .filter(Boolean).join(" ");
+    return [objet.rarete, typeEtCarac, avecDeuxMains && objet.deuxMains ? "deux mains" : null]
+        .filter(Boolean).join(" · ");
+};
+
 // Loot_Ivalis.xlsx — % de chance de loot par catégorie, selon la difficulté.
 // L'épique ne tombe que sur un boss (ligne "TRÈS DIFFICILE").
 window.CHANCES_RARETE = {
