@@ -92,6 +92,7 @@ node illusion_opportunite.mjs # une illusion ne porte aucune attaque d'opportuni
 node file_bousculee.mjs     # le tour sauté et les dégâts en double : écritures concurrentes
 node deplacement_repris.mjs # repartir en cours de tour, sans remise à zéro du barème
 node croix_deplacement_legere.mjs # valider/annuler un déplacement n'attend plus un redessin complet du plateau
+node ciblage_soutien_bond.mjs # attaque puis soin : deux ciblages ; bond puis zone : la zone part de l'arrivée
 node points_apparition.mjs  # les deux repères d'apparition, et la dispersion des pions
 node reinit_plateau.mjs     # la réinitialisation vide le plateau, puis enchaîne le déploiement
 node ecriture_pions.mjs     # les pions écrits en base atterrissent bien dans la carte Tokens
@@ -2458,3 +2459,36 @@ continuent comme avant. `croix_deplacement_legere.mjs` vérifie, sur le vrai
 DOM, qu'aucun redessin complet n'a lieu et que le reste du pion (son halo) ne
 bouge pas — même référence DOM avant et après (morsure : sans le correctif,
 la croix reste et un redessin est compté).
+
+### Une carte qui frappe et soigne se vise en deux temps
+
+Nico : « quand on met un soin sur une compétence après une attaque, il soigne
+la cible de l'attaque ; ça devrait soigner soi-même ou un allié ». Le ciblage
+n'avait qu'une cible pour toute la carte : viser l'ennemi la posait sur
+l'attaque ET sur le soin. Il a désormais deux phases. La première vise ce qui
+frappe (attaques, états) ; au moment de résoudre, si la carte porte aussi un
+soutien (soin, bouclier, absorption) resté sans cible, `passerAuCiblageDuSoutien`
+démonte le ciblage de l'attaque — zone comprise — et ouvre celui du soutien :
+« Qui reçoit le soin ? Toi-même ou un allié. », le lanceur présélectionné (un
+tap sur ✔ suffit), un allié au choix, un ennemi refusé. Une seule carte part
+ensuite au cerveau, chaque effet avec sa propre cible. Un soin posé DANS la
+zone ne demande pas de second geste : la zone blesse ce qu'elle couvre et ne
+soigne que les alliés qu'elle couvre (`validerZoneAoE` trie désormais par
+effet). Chaque effet extrait retient pour cela si son action porte la zone
+(`enZone`). Une carte qui ne fait que frapper, ou que soigner, n'a qu'une
+phase, comme avant. Même règle chez les créatures (`jouerCreature`) : le soin
+d'une carte mixte revient à la créature, jamais à sa victime.
+
+### Après un Bond, le sort part de la case d'arrivée
+
+Nico : « une compétence avec bond puis une zone : la sélection de zone s'est
+faite sur mon emplacement d'avant le bond ». Le Bond est une demande au
+cerveau : le pion ne rejoint sa case qu'une fois le cerveau revenu (sur iPad,
+bien après les 750 ms d'attente), et tout le ciblage se mesurait depuis le
+pion. `resoudreBondInteractif` rend maintenant la case d'atterrissage, que le
+ciblage retient (`origineLanceur`) ; `positionCiblage` la sert pour le lanceur
+partout — zone collée à lui, cases où poser une zone à distance, portée,
+ligne de vue, anneaux, soin sur soi. `ciblage_soutien_bond.mjs` joue les deux
+signalements sur le vrai moteur_effets.js, du premier clic à l'intention
+envoyée, plus le cas des créatures dans le cerveau ; sept morsures, une par
+correctif, font chacune tomber au moins un contrôle.

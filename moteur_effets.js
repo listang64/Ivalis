@@ -49,6 +49,66 @@ window.lanceurDuCiblage = function() {
     return (affiche && affiche.idPersonnage) || null;
 };
 
+// D'OÙ PART LE SORT. Après un Bond joué en tête de carte, le lanceur n'est
+// plus sur sa case — mais son pion, lui, y est encore : le saut est une
+// demande au cerveau, et le plateau ne le montre qu'une fois le cerveau revenu
+// (sur iPad, bien après). Tout le ciblage se mesurait pourtant depuis ce pion :
+// signalé en partie, « compétence avec bond puis une zone, la sélection de
+// zone s'est faite sur mon emplacement avant le bond ». Le ciblage retient
+// donc la case d'atterrissage (origineLanceur), et c'est elle qu'on lit pour
+// le lanceur — portée, ligne de vue, zone collée à lui, soin sur soi.
+window.positionCiblage = function(idCombattant) {
+    const state = window.ETAT_CIBLAGE;
+    if (state && state.origineLanceur && idCombattant && idCombattant === state.idLanceur) {
+        return state.origineLanceur;
+    }
+    return (window.TOKENS_VTT_DATA || {})[idCombattant];
+};
+
+// UNE CARTE QUI FRAPPE ET SOUTIENT SE VISE EN DEUX TEMPS. Un soin, un bouclier
+// ou une absorption posés sur la même technique qu'une attaque prenaient la
+// cible de l'attaque — on soignait l'ennemi qu'on venait de frapper. Signalé en
+// partie : « ça devrait soigner soi-même ou un allié après avoir attaqué ».
+//
+// Le ciblage a donc deux phases. La première vise ce qui frappe (attaques,
+// états) — et, sur une zone, le soutien posé DANS la zone, qui soigne les
+// alliés qu'elle couvre. La seconde vise le soutien restant : soi-même ou un
+// allié. Une carte qui ne fait que l'un ou l'autre n'a qu'une phase, comme avant.
+const estEffetDeSoutien = (e) => !!(e && e.isHeal);
+const effetDeLaPhaseSoutien = (state, e) =>
+    estEffetDeSoutien(e) && !(state.isZone && e.enZone);
+
+window.effetsDeLaPhase = function(state) {
+    state = state || window.ETAT_CIBLAGE;
+    if (!state) return { attaques: [], alterations: [] };
+    const attaques = state.attaques || [], alterations = state.alterations || [];
+    if (!state.soutienDiffere) return { attaques, alterations };
+    const enSoutien = state.phaseCiblage === "soutien";
+    const garder = (e) => effetDeLaPhaseSoutien(state, e) === enSoutien;
+    return { attaques: attaques.filter(garder), alterations: alterations.filter(garder) };
+};
+
+// L'effet qui dicte les règles de la phase (portée, camp visé, couleur).
+window.configCiblage = function(state) {
+    state = state || window.ETAT_CIBLAGE;
+    const e = window.effetsDeLaPhase(state);
+    // En phase d'attaque, c'est l'attaque qui commande — même si un soin posé
+    // dans la zone la précède sur la carte.
+    if (state && state.soutienDiffere && state.phaseCiblage !== "soutien") {
+        return [...e.attaques, ...e.alterations].find(x => !estEffetDeSoutien(x))
+            || e.attaques[0] || e.alterations[0];
+    }
+    return e.attaques[0] || e.alterations[0];
+};
+
+// Une carte a-t-elle besoin de la seconde phase ?
+window.soutienADiffere = function(state) {
+    const tous = [...(state.attaques || []), ...(state.alterations || [])];
+    const seconde = tous.filter(e => effetDeLaPhaseSoutien(state, e));
+    const offensifs = tous.filter(e => !estEffetDeSoutien(e));
+    return offensifs.length > 0 && seconde.length > 0;
+};
+
 // --- OUTILS MATHÉMATIQUES ---
 function getHexDistance(a, b) {
     return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
@@ -326,7 +386,7 @@ function verifierLigneDeVue(hexA, hexB) {
 // Les cases où l'on peut poser une zone à distance : c'est la règle du survol
 // (VTT_CIBLAGE_MOUSEMOVE), mise au propre pour pouvoir aussi la DESSINER.
 window.casesPosablesZone = function(idLanceur, configSort) {
-    const tkLanceur = (window.TOKENS_VTT_DATA || {})[idLanceur];
+    const tkLanceur = window.positionCiblage(idLanceur);
     const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
     if (!tkLanceur || !lanceurData || !window.PLATEAU_VTT || !configSort) return [];
 
@@ -501,7 +561,10 @@ window.resoudreBondInteractif = function(idPerso, portee) {
                 // comprise : on attend le même temps qu'avant pour que la suite
                 // de la carte ne construise pas son ciblage par-dessus.
                 await new Promise(r => setTimeout(r, 750));
-                return resolve(true);
+                // On rend la case d'arrivée : la suite de la carte se vise
+                // depuis là (voir positionCiblage), sans attendre que le pion
+                // l'ait rejointe à l'écran.
+                return resolve(hexArrivee);
             }
 
             resolve(false);
@@ -724,12 +787,12 @@ window.hexDistanceCiblage = getHexDistance;
 window.VTT_CIBLAGE_MOUSEMOVE = function(e) {
     if (window.matchMedia("(hover: none) and (pointer: coarse)").matches) return;
     const state = window.ETAT_CIBLAGE;
-    if (!state || !state.actif || !state.isZone) return;
+    if (!state || !state.actif || !state.isZone || state.phaseCiblage === "soutien") return;
 
     const idLanceur = window.lanceurDuCiblage();
-    const tkLanceur = window.TOKENS_VTT_DATA[idLanceur];
+    const tkLanceur = window.positionCiblage(idLanceur);
     const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
-    const configSort = state.attaques[0] || state.alterations[0]; 
+    const configSort = window.configCiblage(state);
 
     const canvasX = (e.clientX - window.VTT_POS_X) / window.VTT_SCALE;
     const canvasY = (e.clientY - window.VTT_POS_Y) / window.VTT_SCALE;
@@ -769,8 +832,8 @@ window.VTT_CIBLAGE_MOUSEMOVE = function(e) {
 
 window.VTT_CIBLAGE_WHEEL = function(e) {
     const state = window.ETAT_CIBLAGE;
-    if (!state || !state.actif || !state.isZone) return;
-    const configSort = state.attaques[0] || state.alterations[0];
+    if (!state || !state.actif || !state.isZone || state.phaseCiblage === "soutien") return;
+    const configSort = window.configCiblage(state);
     
     if (configSort && configSort.isRanged) {
         e.preventDefault();
@@ -783,7 +846,7 @@ window.VTT_CIBLAGE_WHEEL = function(e) {
 
 window.VTT_CIBLAGE_CLICK = function(e) {
     const state = window.ETAT_CIBLAGE;
-    if (!state || !state.actif || !state.isZone) return;
+    if (!state || !state.actif || !state.isZone || state.phaseCiblage === "soutien") return;
     // LA CROIX D'ANNULATION N'EST PAS UNE VISÉE. Elle est posée sur le pion du
     // lanceur, donc DANS le plateau : sans cette ligne, ce guetteur — qui court
     // en phase de capture, avant tout le monde — avalerait son clic, et la
@@ -793,7 +856,7 @@ window.VTT_CIBLAGE_CLICK = function(e) {
     if (!conteneur || !conteneur.contains(e.target)) return;
     e.stopPropagation(); 
 
-    const configSort = state.attaques[0] || state.alterations[0];
+    const configSort = window.configCiblage(state);
 
     if (configSort && configSort.isRanged) {
         const canvasX = (e.clientX - window.VTT_POS_X) / window.VTT_SCALE;
@@ -801,7 +864,7 @@ window.VTT_CIBLAGE_CLICK = function(e) {
         const targetHex = window.PLATEAU_VTT.pixelToHex(canvasX, canvasY);
         
         const idLanceur = window.lanceurDuCiblage();
-        const tkLanceur = window.TOKENS_VTT_DATA[idLanceur];
+        const tkLanceur = window.positionCiblage(idLanceur);
         const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
         const dist = getHexDistance(tkLanceur, targetHex);
         
@@ -829,7 +892,7 @@ window.VTT_CIBLAGE_CLICK = function(e) {
 
 window.VTT_CIBLAGE_TOUCHSTART = function(e) {
     const state = window.ETAT_CIBLAGE;
-    if (!state || !state.actif || !state.isZone) return;
+    if (!state || !state.actif || !state.isZone || state.phaseCiblage === "soutien") return;
     if (e.touches.length === 2) {
         e.preventDefault();
         e.stopPropagation();
@@ -842,7 +905,7 @@ window.VTT_CIBLAGE_TOUCHSTART = function(e) {
 
 window.VTT_CIBLAGE_TOUCHMOVE = function(e) {
     const state = window.ETAT_CIBLAGE;
-    if (!state || !state.actif || !state.isZone) return;
+    if (!state || !state.actif || !state.isZone || state.phaseCiblage === "soutien") return;
     if (e.touches.length === 2) {
         e.preventDefault(); 
         e.stopPropagation();
@@ -1000,7 +1063,11 @@ window.demarrerCiblage = async function(idCarte, options) {
     };
 
     if (dataCarte.Composants && dataCarte.Composants.actions) {
-        dataCarte.Composants.actions.forEach((act, idxAction) => {
+        // Chaque effet retient si l'action qui l'a produit porte la zone. C'est
+        // ce qui départage, sur une carte qui frappe ET soigne, un soin posé
+        // DANS la zone (il soigne les alliés qu'elle couvre) d'un soin posé à
+        // côté (il se vise à part, une fois l'attaque ciblée).
+        const lireAction = (act, idxAction) => {
             if (act.zoneHexes && act.zoneHexes.length > 0) {
                 isZone = true;
                 zoneHexesBase = act.zoneHexes;
@@ -1677,6 +1744,13 @@ window.demarrerCiblage = async function(idCarte, options) {
                     cibles: []
                 });
             }
+        };
+        dataCarte.Composants.actions.forEach((act, idxAction) => {
+            const avantA = attaquesExtraites.length, avantAlt = alterationsExtraites.length;
+            lireAction(act, idxAction);
+            const enZone = !!(act.zoneHexes && act.zoneHexes.length > 0);
+            attaquesExtraites.slice(avantA).forEach(a => { a.enZone = enZone; });
+            alterationsExtraites.slice(avantAlt).forEach(a => { a.enZone = enZone; });
         });
     }
 
@@ -1711,9 +1785,11 @@ window.demarrerCiblage = async function(idCarte, options) {
     // Bond en tête de carte est un cas parmi d'autres, comme une Paralysie ou
     // une technique sans effet : « pas de carte jouable ce tour-ci », pas un
     // blocage pour tout le monde.
+    let arriveeBond = null;
     if (bondEnPremier) {
         if (extraireSeulement) return null;
-        await window.resoudreBondInteractif(idLanceurBond, porteeBond);
+        const saut = await window.resoudreBondInteractif(idLanceurBond, porteeBond);
+        if (saut && typeof saut === "object" && saut.q !== undefined) arriveeBond = { q: saut.q, r: saut.r };
     }
 
     if (attaquesExtraites.length === 0 && alterationsExtraites.length === 0) {
@@ -1727,7 +1803,13 @@ window.demarrerCiblage = async function(idCarte, options) {
         return;
     }
 
-    const configSort = attaquesExtraites[0] || alterationsExtraites[0];
+    // La phase de l'attaque dicte la portée et le placement de la zone : sur une
+    // carte qui frappe ET soigne, c'est l'attaque qui se vise d'abord.
+    const enDeuxTemps = window.soutienADiffere({ attaques: attaquesExtraites,
+                                                 alterations: alterationsExtraites, isZone });
+    const configSort = enDeuxTemps
+        ? (attaquesExtraites.find(e => !e.isHeal) || alterationsExtraites.find(e => !e.isHeal))
+        : (attaquesExtraites[0] || alterationsExtraites[0]);
 
     // La portée de la zone l'emporte sur celle de l'effet, quand elle est plus
     // longue. Pour une carte de zone, `rangeMax` ne sert QU'au placement — la
@@ -1758,7 +1840,8 @@ window.demarrerCiblage = async function(idCarte, options) {
         zoneHexesBase = zoneHexesBase.map(h => ({ q: h.q - rq, r: h.r - rr }));
     }
 
-    const tkLanceur = window.TOKENS_VTT_DATA[(persoLanceur || {}).idPersonnage] || { q: 0, r: 0 };
+    // Après un Bond en tête de carte, le sort part de la case d'arrivée.
+    const tkLanceur = arriveeBond || window.TOKENS_VTT_DATA[(persoLanceur || {}).idPersonnage] || { q: 0, r: 0 };
 
     // Traction impose sa propre portée (3, ligne de vue dégagée) à toute la carte, même si
     // l'attaque qui l'accompagne est en mêlée : comme les deux visent obligatoirement la même
@@ -1799,6 +1882,9 @@ window.demarrerCiblage = async function(idCarte, options) {
         // gauche — le combattant qu'on REGARDE — et un clic sur le portrait
         // d'un ennemi déplaçait l'origine du sort sur lui.
         idLanceur: (persoLanceur || {}).idPersonnage || null,
+        // La case d'où part le sort quand un Bond vient de la changer
+        // (null sinon : on lit alors le pion). Voir positionCiblage.
+        origineLanceur: arriveeBond,
         attaques: attaquesExtraites,
         alterations: alterationsExtraites,
         cibleUnique: null,
@@ -1813,8 +1899,12 @@ window.demarrerCiblage = async function(idCarte, options) {
         tractionAvantAttaque: tractionAvantAttaque,
         illusionEnAttente: isIllusion ? { idLanceur: idLanceurBond, portee: porteeIllusion } : null,
         persistanceTerrain: aPersistanceTerrain,
-        zoneHexesFinaux: null
+        zoneHexesFinaux: null,
+        // Attaque ET soutien sur la même carte : deux phases de ciblage.
+        phaseCiblage: "offensive",
+        soutienDiffere: false
     };
+    carteConstruite.soutienDiffere = window.soutienADiffere(carteConstruite);
 
     // ICI, ET NULLE PART AILLEURS. La carte est lue, ses effets sont extraits,
     // et rien n'a encore touché l'écran. C'est exactement ce que le cerveau
@@ -1891,59 +1981,127 @@ window.demarrerCiblage = async function(idCarte, options) {
         window.addEventListener("touchmove", window.VTT_CIBLAGE_TOUCHMOVE, {capture: true, passive: false});
 
     } else {
-        // LES DEUX BOUTONS VIVENT SUR L'APERÇU DE LA CARTE, et cet aperçu naît
-        // paresseusement (competences.js) : il peut ne pas être là. Il l'était
-        // forcément du temps où l'on cliquait « Appliquer », qui était posé
-        // dessus ; depuis que c'est le bouton fin de tour qui lance le ciblage,
-        // plus rien ne le garantit. Un appendChild sur `null` levait alors une
-        // exception EN PLEIN MILIEU du ciblage : l'état était posé, mais ni les
-        // anneaux ni les boutons n'arrivaient — la carte ne partait jamais et
-        // rien à l'écran ne disait pourquoi.
-        const hoteBoutons = document.getElementById("apercu-carte-hd-competence");
-        if (!hoteBoutons) {
-            console.error("Ciblage : l'aperçu de la carte est absent, RÉSOUDRE et ANNULER n'ont nulle part où se poser.");
-            if (typeof window.tracerCombat === "function") {
-                window.tracerCombat("🧊", `ciblage sans aperçu de carte (${idCarte})`,
-                                    "RÉSOUDRE/ANNULER introuvables — la carte ne peut pas être résolue");
-            }
-        } else {
-            let btnResoudre = document.getElementById("btn-resoudre-carte");
-            if (!btnResoudre) {
-                btnResoudre = document.createElement("div");
-                btnResoudre.id = "btn-resoudre-carte";
-                btnResoudre.style.cssText = "position: absolute; bottom: -30px; left: 50%; transform: translateX(10px); z-index: 5; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 2px black, 0 0 10px #00ffff; color: #00ffff; transition: transform 0.2s;";
-                btnResoudre.onmouseover = () => btnResoudre.style.transform = "translateX(10px) scale(1.1)";
-                btnResoudre.onmouseout = () => btnResoudre.style.transform = "translateX(10px) scale(1)";
-                hoteBoutons.appendChild(btnResoudre);
-            }
-            btnResoudre.innerText = "RÉSOUDRE";
-            btnResoudre.style.pointerEvents = "auto";
-            btnResoudre.onclick = () => window.declencherResolutionAvecBondEventuel();
-
-            // Annuler le ciblage sans perdre son tour : la carte revient au repos et le
-            // joueur peut continuer son déplacement, exactement comme le ✖ déjà offert
-            // en mode zone (bulle-validation-zone, plus haut). À ne pas confondre avec
-            // le bouton fin de tour, qui affiche « fin de tour » pendant le ciblage et
-            // termine le tour pour de bon (voir combat.js, actionBoutonFinTour).
-            let btnAnnuler = document.getElementById("btn-annuler-ciblage");
-            if (!btnAnnuler) {
-                btnAnnuler = document.createElement("div");
-                btnAnnuler.id = "btn-annuler-ciblage";
-                btnAnnuler.style.cssText = "position: absolute; bottom: -30px; left: 50%; transform: translateX(calc(-100% - 10px)); z-index: 5; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 2px black, 0 0 10px #ff4c4c; color: #ff4c4c; transition: transform 0.2s;";
-                btnAnnuler.onmouseover = () => btnAnnuler.style.transform = "translateX(calc(-100% - 10px)) scale(1.1)";
-                btnAnnuler.onmouseout = () => btnAnnuler.style.transform = "translateX(calc(-100% - 10px)) scale(1)";
-                hoteBoutons.appendChild(btnAnnuler);
-            }
-            btnAnnuler.innerText = "ANNULER";
-            btnAnnuler.style.pointerEvents = "auto";
-            btnAnnuler.onclick = () => window.nettoyerCiblage();
-        }
+        window.poserBoutonsCibleUnique(idCarte);
     }
 
     // Le ciblage est ouvert : le bouton fin de tour passe en « fin de tour » —
     // la seule chose qu'il propose encore est de renoncer à la carte.
     if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
     window.actualiserVisuelCiblage();
+};
+
+// RÉSOUDRE et ANNULER, posés sur l'aperçu de la carte : le ciblage d'une cible
+// unique les ouvre, et la phase du soin (voir passerAuCiblageDuSoutien) aussi —
+// même quand l'attaque, elle, s'est visée en zone et ne les avait pas posés.
+window.poserBoutonsCibleUnique = function(idCarte) {
+    // LES DEUX BOUTONS VIVENT SUR L'APERÇU DE LA CARTE, et cet aperçu naît
+    // paresseusement (competences.js) : il peut ne pas être là. Il l'était
+    // forcément du temps où l'on cliquait « Appliquer », qui était posé
+    // dessus ; depuis que c'est le bouton fin de tour qui lance le ciblage,
+    // plus rien ne le garantit. Un appendChild sur `null` levait alors une
+    // exception EN PLEIN MILIEU du ciblage : l'état était posé, mais ni les
+    // anneaux ni les boutons n'arrivaient — la carte ne partait jamais et
+    // rien à l'écran ne disait pourquoi.
+    const hoteBoutons = document.getElementById("apercu-carte-hd-competence");
+    if (!hoteBoutons) {
+        console.error("Ciblage : l'aperçu de la carte est absent, RÉSOUDRE et ANNULER n'ont nulle part où se poser.");
+        if (typeof window.tracerCombat === "function") {
+            window.tracerCombat("🧊", `ciblage sans aperçu de carte (${idCarte})`,
+                                "RÉSOUDRE/ANNULER introuvables — la carte ne peut pas être résolue");
+        }
+    } else {
+        let btnResoudre = document.getElementById("btn-resoudre-carte");
+        if (!btnResoudre) {
+            btnResoudre = document.createElement("div");
+            btnResoudre.id = "btn-resoudre-carte";
+            btnResoudre.style.cssText = "position: absolute; bottom: -30px; left: 50%; transform: translateX(10px); z-index: 5; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 2px black, 0 0 10px #00ffff; color: #00ffff; transition: transform 0.2s;";
+            btnResoudre.onmouseover = () => btnResoudre.style.transform = "translateX(10px) scale(1.1)";
+            btnResoudre.onmouseout = () => btnResoudre.style.transform = "translateX(10px) scale(1)";
+            hoteBoutons.appendChild(btnResoudre);
+        }
+        btnResoudre.innerText = "RÉSOUDRE";
+        btnResoudre.style.pointerEvents = "auto";
+        btnResoudre.onclick = () => window.declencherResolutionAvecBondEventuel();
+
+        // Annuler le ciblage sans perdre son tour : la carte revient au repos et le
+        // joueur peut continuer son déplacement, exactement comme le ✖ déjà offert
+        // en mode zone (bulle-validation-zone, plus haut). À ne pas confondre avec
+        // le bouton fin de tour, qui affiche « fin de tour » pendant le ciblage et
+        // termine le tour pour de bon (voir combat.js, actionBoutonFinTour).
+        let btnAnnuler = document.getElementById("btn-annuler-ciblage");
+        if (!btnAnnuler) {
+            btnAnnuler = document.createElement("div");
+            btnAnnuler.id = "btn-annuler-ciblage";
+            btnAnnuler.style.cssText = "position: absolute; bottom: -30px; left: 50%; transform: translateX(calc(-100% - 10px)); z-index: 5; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 2px black, 0 0 10px #ff4c4c; color: #ff4c4c; transition: transform 0.2s;";
+            btnAnnuler.onmouseover = () => btnAnnuler.style.transform = "translateX(calc(-100% - 10px)) scale(1.1)";
+            btnAnnuler.onmouseout = () => btnAnnuler.style.transform = "translateX(calc(-100% - 10px)) scale(1)";
+            hoteBoutons.appendChild(btnAnnuler);
+        }
+        btnAnnuler.innerText = "ANNULER";
+        btnAnnuler.style.pointerEvents = "auto";
+        btnAnnuler.onclick = () => window.nettoyerCiblage();
+    }
+};
+
+// LA SECONDE PHASE : LE SOUTIEN SE VISE À PART. Appelée juste avant de
+// résoudre ; si la carte porte un soin (ou un bouclier, une absorption) resté
+// sans cible pendant l'attaque, on démonte le ciblage de l'attaque — zone
+// comprise — et on ouvre celui du soin : soi-même ou un allié. Le lanceur est
+// présélectionné (un tap sur ✔ se soigne soi-même), un tap sur un allié
+// change la cible. Rend `true` si la phase s'est ouverte : la résolution
+// attend alors le prochain ✔.
+window.passerAuCiblageDuSoutien = function() {
+    const state = window.ETAT_CIBLAGE;
+    if (!state || !state.actif || !state.soutienDiffere || state.phaseCiblage === "soutien") return false;
+
+    state.phaseCiblage = "soutien";
+    state.cibleUnique = null;
+
+    // Le ciblage de zone s'efface : son dessin, son voile, son message, ses
+    // écoutes. Ce qui a été touché par la zone, lui, reste retenu.
+    if (state.isZone) {
+        const svgZone = document.getElementById("svg-zone-ciblage");
+        if (svgZone) svgZone.remove();
+        window.retirerAssombrissement("svg-zone-assombrissement");
+        const msgZone = document.getElementById("msg-zone-ciblage");
+        if (msgZone) msgZone.remove();
+        const bulleZone = document.getElementById("bulle-validation-zone");
+        if (bulleZone) bulleZone.style.display = "none";
+        window.removeEventListener("mousemove", window.VTT_CIBLAGE_MOUSEMOVE, {capture: true});
+        window.removeEventListener("wheel", window.VTT_CIBLAGE_WHEEL, {capture: true});
+        window.removeEventListener("click", window.VTT_CIBLAGE_CLICK, {capture: true});
+        window.removeEventListener("touchstart", window.VTT_CIBLAGE_TOUCHSTART, {capture: true, passive: false});
+        window.removeEventListener("touchmove", window.VTT_CIBLAGE_TOUCHMOVE, {capture: true, passive: false});
+    }
+    document.querySelectorAll(".anneau-ciblage, .bulle-validation-cible, .jauge-cible-ciblage").forEach(el => el.remove());
+
+    window.poserBoutonsCibleUnique(state.idCarte);
+    const config = window.configCiblage(state);
+    if (config) window.surlignerEffetCarteActif(config.nom);
+
+    const hote = document.getElementById("conteneur-plateau-vtt");
+    if (hote) {
+        let msg = document.getElementById("msg-ciblage-soutien");
+        if (!msg) {
+            msg = document.createElement("div");
+            msg.id = "msg-ciblage-soutien";
+            msg.style.cssText = "position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; font-family: 'Cinzel', serif; font-size: 18px; color: #7bd66a; font-weight: bold; text-shadow: 1px 1px 3px black, 0 0 10px #1b6e3a; background: rgba(0,0,0,0.8); padding: 10px 20px; border-radius: 12px; pointer-events: none; text-align: center;";
+            hote.appendChild(msg);
+        }
+        msg.innerText = "Qui reçoit le soin ? Toi-même ou un allié.";
+    }
+
+    // Le lanceur d'abord : c'est le cas le plus courant, un seul tap le confirme.
+    const idLanceur = state.idLanceur || window.lanceurDuCiblage();
+    if (idLanceur) {
+        state.cibleUnique = idLanceur;
+        const phase = window.effetsDeLaPhase(state);
+        phase.attaques.forEach(a => a.cibles = [idLanceur]);
+        phase.alterations.forEach(alt => alt.cibles = [idLanceur]);
+    }
+    if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
+    window.actualiserVisuelCiblage();
+    return true;
 };
 
 window.validerZoneAoE = function() {
@@ -1961,32 +2119,35 @@ window.validerZoneAoE = function() {
     // résiduelle, sans avoir à refaire le calcul de rotation ailleurs.
     state.zoneHexesFinaux = finalHexes;
 
-    let ciblesTouchees = [];
     const idLanceur = window.lanceurDuCiblage();
-    const configSort = state.attaques[0] || state.alterations[0];
+    const configSort = window.configCiblage(state);
     const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
+    const phase = window.effetsDeLaPhase(state);
 
     // Une Illusion encaisse les dégâts (même en zone) mais reste insensible à tout le reste.
     const carteEstAttaqueSimple = !!configSort && !configSort.isHeal && !configSort.isShield
-        && (state.alterations || []).length === 0;
+        && phase.alterations.length === 0 && phase.attaques.every(a => !a.isHeal);
 
+    // DEUX LISTES, UNE PAR SORTE D'EFFET. Ce qui frappe touche tout ce que la
+    // zone couvre, sauf le lanceur ; ce qui soutient (soin, bouclier,
+    // absorption) ne touche que son camp, lanceur compris. Une zone qui frappe
+    // ET soigne blesse donc les ennemis et soigne les alliés — elle ne soigne
+    // plus jamais un ennemi parce que l'attaque passait en premier.
+    const touchesFrappe = [], touchesSoutien = [];
     for (let idToken in window.TOKENS_VTT_DATA) {
         const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idToken);
         if (!cibleData || cibleData.statut === "Mort") continue;
-        if (cibleData.estIllusion && !carteEstAttaqueSimple) continue;
 
-        if (configSort && configSort.isHeal) {
-            if (cibleData.camp !== lanceurData.camp) continue;
-        } else if (idToken === idLanceur) {
-            continue;
-        }
+        const tk = window.positionCiblage(idToken);
+        if (!tk || !finalHexes.some(h => h.q === tk.q && h.r === tk.r)) continue;
 
-        const tk = window.TOKENS_VTT_DATA[idToken];
-        if (finalHexes.some(h => h.q === tk.q && h.r === tk.r)) ciblesTouchees.push(idToken);
+        if (cibleData.camp === lanceurData.camp && !cibleData.estIllusion) touchesSoutien.push(idToken);
+        if (idToken !== idLanceur && (!cibleData.estIllusion || carteEstAttaqueSimple)) touchesFrappe.push(idToken);
     }
 
-    state.attaques.forEach(a => a.cibles = ciblesTouchees);
-    state.alterations.forEach(alt => alt.cibles = ciblesTouchees);
+    const ciblesPour = (e) => e.isHeal ? [...touchesSoutien] : [...touchesFrappe];
+    phase.attaques.forEach(a => a.cibles = ciblesPour(a));
+    phase.alterations.forEach(alt => alt.cibles = ciblesPour(alt));
     window.declencherResolutionAvecBondEventuel();
 };
 
@@ -1995,7 +2156,7 @@ window.actualiserVisuelCiblage = function() {
     // Pendant qu'une créature CALCULE son tour, viser ne se voit pas : le
     // spectacle appartient à la relecture du journal, à son tour de jouer.
     if (window.CALCUL_IA_SILENCIEUX) return;
-    if (window.ETAT_CIBLAGE.isZone) window.dessinerZoneAoE();
+    if (window.ETAT_CIBLAGE.isZone && window.ETAT_CIBLAGE.phaseCiblage !== "soutien") window.dessinerZoneAoE();
     else window.dessinerAnneauxCiblage();
 };
 
@@ -2021,7 +2182,7 @@ window.dessinerZoneAoE = function() {
     if (!state.zoneCenterHex) return;
     const hexRadius = window.PLATEAU_VTT.hexSize;
 
-    const configSort = state.attaques[0] || state.alterations[0];
+    const configSort = window.configCiblage(state);
     const estSoin = configSort && configSort.isHeal;
     const couleurRemplissage = estSoin ? "rgba(27, 110, 58, 0.35)" : "rgba(255, 76, 76, 0.35)";
     const couleurBordure = estSoin ? "#1b6e3a" : "#ff4c4c";
@@ -2131,11 +2292,12 @@ window.dessinerAnneauxCiblage = function() {
         return;
     }
 
-    const configSort = window.ETAT_CIBLAGE.attaques[0] || window.ETAT_CIBLAGE.alterations[0];
+    const configSort = window.configCiblage(window.ETAT_CIBLAGE);
     if (!configSort) return;
+    const phase = window.effetsDeLaPhase(window.ETAT_CIBLAGE);
 
     const idLanceur = window.lanceurDuCiblage();
-    const tkLanceur = window.TOKENS_VTT_DATA[idLanceur];
+    const tkLanceur = window.positionCiblage(idLanceur);
     const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
 
     if (!tkLanceur || !lanceurData) return;
@@ -2144,7 +2306,7 @@ window.dessinerAnneauxCiblage = function() {
     // soin, ni bouclier, ni aucune autre altération accrochée à la carte (Poussée, Traction, Peur,
     // Étourdi...). La zone en elle-même n'est donc plus disqualifiante, seulement ces effets-là.
     const carteEstAttaqueSimple = !configSort.isHeal && !configSort.isShield
-        && (window.ETAT_CIBLAGE.alterations || []).length === 0;
+        && phase.alterations.length === 0;
 
     let estEngage = false;
     for (let idToken in window.TOKENS_VTT_DATA) {
@@ -2162,8 +2324,8 @@ window.dessinerAnneauxCiblage = function() {
     // Poussée et Traction peuvent aussi viser un allié (l'écarter d'un danger, le
     // ramener vers soi) : seule une carte SANS attaque qui les porte l'autorise —
     // une carte qui frappe ET pousse reste une agression, donc réservée aux ennemis.
-    const cartePousseeOuTraction = (window.ETAT_CIBLAGE.attaques || []).length === 0
-        && (window.ETAT_CIBLAGE.alterations || []).some(a => a.estPoussee || a.estTraction);
+    const cartePousseeOuTraction = phase.attaques.length === 0
+        && phase.alterations.some(a => a.estPoussee || a.estTraction);
 
     const ciblesValides = new Set();
     for (let idToken in window.TOKENS_VTT_DATA) {
@@ -2180,7 +2342,7 @@ window.dessinerAnneauxCiblage = function() {
             if (cibleData.camp === lanceurData.camp) continue;
         }
 
-        const tk = window.TOKENS_VTT_DATA[idToken];
+        const tk = window.positionCiblage(idToken);
         const dist = getHexDistance(tkLanceur, tk);
 
         // Traction impose sa portée de 3 à toute la carte (même cible unique pour l'attaque
@@ -2218,7 +2380,7 @@ window.dessinerAnneauxCiblage = function() {
             }
 
             let malusLabel = anneau.querySelector(".malus-cac");
-            if (configSort.isRanged && dist === 1 && window.ETAT_CIBLAGE.attaques.length > 0 && !configSort.isHeal) {
+            if (configSort.isRanged && dist === 1 && phase.attaques.length > 0 && !configSort.isHeal) {
                 if (!malusLabel) {
                     malusLabel = document.createElement("div");
                     malusLabel.className = "malus-cac";
@@ -2295,11 +2457,13 @@ window.dessinerAnneauxCiblage = function() {
 window.ajouterCibleCiblage = function(idCible) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     const state = window.ETAT_CIBLAGE;
-    const configSort = state.attaques[0] || state.alterations[0];
+    const configSort = window.configCiblage(state);
+    const phase = window.effetsDeLaPhase(state);
+    if (!configSort) return;
     
     const idLanceur = window.lanceurDuCiblage();
-    const tkLanceur = window.TOKENS_VTT_DATA[idLanceur];
-    const tkCible = window.TOKENS_VTT_DATA[idCible];
+    const tkLanceur = window.positionCiblage(idLanceur);
+    const tkCible = window.positionCiblage(idCible);
 
     const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
     const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idCible);
@@ -2314,7 +2478,7 @@ window.ajouterCibleCiblage = function(idCible) {
     // Une Illusion encaisse les dégâts (même en zone) mais reste insensible à tout le reste : ni
     // soin, ni bouclier, ni aucune autre altération accrochée à la carte.
     const carteEstAttaqueSimple = !configSort.isHeal && !configSort.isShield
-        && (state.alterations || []).length === 0;
+        && phase.alterations.length === 0;
     if (cibleData.estIllusion && !carteEstAttaqueSimple) {
         window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Cible invalide", "#aaaaaa");
         return;
@@ -2322,8 +2486,8 @@ window.ajouterCibleCiblage = function(idCible) {
 
     // Poussée et Traction peuvent aussi viser un allié (voir dessinerAnneauxCiblage) :
     // seule une carte SANS attaque qui les porte l'autorise.
-    const cartePousseeOuTraction = (state.attaques || []).length === 0
-        && (state.alterations || []).some(a => a.estPoussee || a.estTraction);
+    const cartePousseeOuTraction = phase.attaques.length === 0
+        && phase.alterations.some(a => a.estPoussee || a.estTraction);
 
     if (configSort.isHeal) {
         if (cibleData.camp !== lanceurData.camp) {
@@ -2373,14 +2537,16 @@ window.ajouterCibleCiblage = function(idCible) {
         return;
     }
 
+    // Seuls les effets de la phase en cours prennent cette cible : en phase
+    // d'attaque, le soin de la carte n'est pas concerné (il se vise ensuite).
     if (state.cibleUnique === idCible) {
         state.cibleUnique = null; 
-        state.attaques.forEach(a => a.cibles = []);
-        state.alterations.forEach(alt => alt.cibles = []);
+        phase.attaques.forEach(a => a.cibles = []);
+        phase.alterations.forEach(alt => alt.cibles = []);
     } else {
         state.cibleUnique = idCible; 
-        state.attaques.forEach(a => a.cibles = [idCible]);
-        state.alterations.forEach(alt => alt.cibles = [idCible]);
+        phase.attaques.forEach(a => a.cibles = [idCible]);
+        phase.alterations.forEach(alt => alt.cibles = [idCible]);
     }
     window.dessinerAnneauxCiblage();
 };
@@ -2395,6 +2561,8 @@ window.nettoyerCiblage = function() {
     window.retirerAssombrissement("svg-zone-assombrissement");
     const msgZone = document.getElementById("msg-zone-ciblage");
     if (msgZone) msgZone.remove();
+    const msgSoutien = document.getElementById("msg-ciblage-soutien");
+    if (msgSoutien) msgSoutien.remove();
     const bulleZone = document.getElementById("bulle-validation-zone");
     if (bulleZone) bulleZone.style.display = "none";
 
@@ -2872,6 +3040,9 @@ window.declencherResolution = async function() {
 // avoir lancé la résolution de celle-ci (le jet est déjà figé côté serveur) : l'ordre de la
 // carte est respecté, et le saut interactif ne bloque jamais le lancement de l'attaque.
 window.declencherResolutionAvecBondEventuel = async function() {
+    // L'attaque est visée, mais la carte porte aussi un soin à viser à part :
+    // on ouvre la seconde phase au lieu de résoudre.
+    if (window.passerAuCiblageDuSoutien()) return;
     const bondEnAttente = window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.bondApresAttaque;
     const illusionEnAttente = window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.illusionEnAttente;
     await window.declencherResolution();

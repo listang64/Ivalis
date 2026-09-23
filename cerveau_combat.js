@@ -835,10 +835,18 @@ export function jouerCreature(etat, id, carte, plateau) {
 
     if (aPortee && carte && carte.idCarte) {
         const critique = tirerCritique(courant, id, des);
+        // UNE CARTE QUI FRAPPE ET SOUTIENT ne soigne pas sa victime. Le soin,
+        // le bouclier ou l'absorption posés à côté d'une attaque reviennent à
+        // la créature elle-même — la même règle que la seconde phase de
+        // ciblage d'un joueur (moteur_effets.js, passerAuCiblageDuSoutien).
+        // Une carte qui ne fait que soutenir garde sa cible, comme avant.
+        const tous = [...(carte.attaques || []), ...(carte.alterations || [])];
+        const mixte = tous.some(e => e && e.isHeal) && tous.some(e => e && !e.isHeal);
+        const ciblesDe = (e) => (mixte && e && e.isHeal) ? [id] : ciblesFrappees;
         const brute = {
             type: "carte", idLanceur: id, idCarte: carte.idCarte,
-            attaques: (carte.attaques || []).map(a => ({ ...a, cibles: ciblesFrappees })),
-            alterations: (carte.alterations || []).map(a => ({ ...a, cibles: ciblesFrappees })),
+            attaques: (carte.attaques || []).map(a => ({ ...a, cibles: ciblesDe(a) })),
+            alterations: (carte.alterations || []).map(a => ({ ...a, cibles: ciblesDe(a) })),
             coutFatigue: nombre(infos.fatigue), critique
         };
         // UNE CRÉATURE CONFUSE SE TROMPE AUSSI DE CIBLE. La confusion ne vivait
