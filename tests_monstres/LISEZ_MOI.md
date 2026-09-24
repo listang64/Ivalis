@@ -131,6 +131,7 @@ node poussee_forge_avatar.mjs  # la Forge annonce toujours 2 cases de Poussée ;
 node reglage_encart.mjs     # le OK sous la piste d'initiative ; l'outil provisoire « ⚙ HUD » de l'encart de tour
 node purification.mjs       # la Purification du grimoire : 1 état néfaste retiré à coup sûr, sans soin
 node repli.mjs              # le Repli : frapper puis marcher 3 cases, 60 % d'éviter chaque opportunité
+node bond_apres_attaque.mjs  # un Bond placé après l'attaque saute enfin (il part avec la carte)
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -2712,3 +2713,19 @@ réelle de la carte, parcours du joueur jusqu'à l'intention envoyée (vrai clic
 qu'un Repli réglé à la main n'est jamais écrasé. Morsures : chacun des fichiers
 d'avant (mouvement_pur, cerveau_combat, ia_pure, moteur_effets, pont_combat,
 monstres_competences, mouvement, regime_cerveau) fait tomber des contrôles.
+
+### Le Bond placé après l'attaque saute enfin
+
+Trouvé en construisant le Repli, qui avait le même problème. Une carte
+« Attaque, puis Bond » visait, envoyait la carte au cerveau, PUIS demandait le
+saut. Mais la carte clôt le tour de son lanceur : la demande de saut arrivait
+sur un tour déjà passé, le cerveau la refusait (« c'est au tour de X ») et le
+pion ne sautait jamais. Même remède que le Repli : la case d'atterrissage se
+choisit avant l'envoi (`resoudreBondInteractif` avec `choisirSeulement`), voyage
+dans l'intention de carte (`bond: { vers, portee }`), et le cerveau joue
+l'attaque, le saut (`resoudreBond`, même géométrie qu'avant), puis la clôture.
+Avec un Repli sur la même carte, le repli part de la case d'atterrissage. Le
+Bond EN TÊTE de carte ne change pas : il se joue avant, pendant que le tour est
+encore ouvert. `bond_apres_attaque.mjs` montre l'ancien refus, puis le nouveau
+chemin dans le cerveau et dans le vrai parcours du joueur ; les anciens
+cerveau_combat.js, moteur_effets.js et regime_cerveau.js y échouent.

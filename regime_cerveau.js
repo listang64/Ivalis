@@ -619,7 +619,11 @@ export function creerRegime(contexte) {
                    // refusée. Absente, la carte ne se replie pas.
                    ...(carte.repli && carte.repli.vers ? { repli: {
                        vers: { q: nombre(carte.repli.vers.q), r: nombre(carte.repli.vers.r) },
-                       portee: nombre(carte.repli.portee, 3), chance: nombre(carte.repli.chance, 60) } } : {}) });
+                       portee: nombre(carte.repli.portee, 3), chance: nombre(carte.repli.chance, 60) } } : {}),
+                   // Le Bond placé après l'attaque : même raison que le repli.
+                   ...(carte.bond && carte.bond.vers ? { bond: {
+                       vers: { q: nombre(carte.bond.vers.q), r: nombre(carte.bond.vers.r) },
+                       portee: nombre(carte.bond.portee, 2) } } : {}) });
 
     // Le saut. La case a été choisie à l'écran ; ce qui part d'ici est une
     // intention, pas un déplacement déjà fait.

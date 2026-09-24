@@ -767,6 +767,23 @@ export function appliquerIntention(etat, intention, plateau) {
             if (zone) etapes.push(...poserZone(suivant, zone));
         }
 
+        // LE BOND PLACÉ APRÈS L'ATTAQUE. Même raison que le repli juste en
+        // dessous : demandé après la carte, il arrivait sur un tour clos et
+        // était refusé. Il part donc avec elle et se joue ici, après
+        // l'attaque ; la géométrie (portée, murs, cases libres) reste celle
+        // de resoudreBond.
+        if (intention.bond && intention.bond.vers) {
+            const lanceurBond = combattant(suivant, intention.acteur);
+            if (lanceurBond && !lanceurBond.aTerre) {
+                const rb = resoudreBond(suivant, {
+                    idLanceur: intention.acteur, vers: intention.bond.vers,
+                    portee: Math.min(6, Math.max(1, nombre(intention.bond.portee, 1)))
+                }, des, plateau);
+                Object.assign(suivant, rb.etat);
+                etapes.push(...rb.etapes);
+            }
+        }
+
         // LE REPLI : LA MARCHE QUI SUIT L'ATTAQUE. La case d'arrivée voyage
         // avec la carte — une demande envoyée APRÈS serait refusée, puisque la
         // carte clôt le tour juste en dessous. Le chemin est recalculé depuis

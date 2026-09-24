@@ -458,7 +458,10 @@ window.retirerAssombrissement = function(idOverlay) {
 //  déclenche jamais d'attaque d'opportunité et n'y est jamais sujet (cf. mouvement.js, qui
 //  n'appelle pas resoudreAttaqueOpportunite pour ce type d'action).
 // =========================================================================
-window.resoudreBondInteractif = function(idPerso, portee) {
+// `options.choisirSeulement` : on rend la case choisie SANS rien demander au
+// cerveau. C'est le cas du Bond placé APRÈS une attaque : la carte clôt le
+// tour, donc le saut doit partir avec elle (voir declencherResolutionAvecBondEventuel).
+window.resoudreBondInteractif = function(idPerso, portee, options) {
     return new Promise((resolve) => {
         const tkDepart = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idPerso] : null;
         if (!tkDepart || !window.PLATEAU_VTT) return resolve(false);
@@ -551,6 +554,7 @@ window.resoudreBondInteractif = function(idPerso, portee) {
             nettoyer();
 
             const hexArrivee = { q: cible.q, r: cible.r };
+            if (options && options.choisirSeulement) return resolve(hexArrivee);
 
             // ON DEMANDE — ON N'ÉCRIT PAS. La case choisie, elle, reste
             // choisie ici : c'est du ciblage.
@@ -2103,6 +2107,7 @@ window.demarrerCiblage = async function(idCarte, options) {
         initialTwistAngle: 0,
         initialZoneStep: 0,
         bondApresAttaque: bondApresLeReste ? { idLanceur: idLanceurBond, portee: porteeBond } : null,
+        bondChoisi: null,
         porteeMinTraction: porteeMinTraction,
         tractionAvantAttaque: tractionAvantAttaque,
         illusionEnAttente: isIllusion ? { idLanceur: idLanceurBond, portee: porteeIllusion } : null,
@@ -3241,7 +3246,9 @@ window.declencherResolution = async function() {
                 persistanceTerrain: !!state.persistanceTerrain,
                 zoneHexes,
                 repli: (state.repli && state.repliChoisi)
-                    ? { ...state.repli, vers: state.repliChoisi } : null
+                    ? { ...state.repli, vers: state.repliChoisi } : null,
+                bond: (state.bondApresAttaque && state.bondChoisi)
+                    ? { vers: state.bondChoisi, portee: state.bondApresAttaque.portee } : null
             });
         } catch (e) {
             console.error("Demande de carte :", e);
@@ -3263,16 +3270,23 @@ window.declencherResolutionAvecBondEventuel = async function() {
     // mais la carte clôt le tour : une demande envoyée après elle serait
     // refusée. La case part donc avec la carte, et le cerveau fait marcher le
     // lanceur une fois l'attaque jouée.
+    // LE BOND APRÈS L'ATTAQUE, MÊME RÈGLE QUE LE REPLI. Il était demandé au
+    // cerveau APRÈS la carte — qui venait de clore le tour : « c'est au tour
+    // de X », refusé, et le saut n'avait jamais lieu. La case se choisit
+    // maintenant avant l'envoi et part avec la carte.
     const etatRepli = window.ETAT_CIBLAGE;
+    if (etatRepli && bondEnAttente && !etatRepli.bondChoisi) {
+        const saut = await window.resoudreBondInteractif(bondEnAttente.idLanceur, bondEnAttente.portee,
+                                                         { choisirSeulement: true });
+        etatRepli.bondChoisi = (saut && saut.q !== undefined) ? { q: saut.q, r: saut.r } : null;
+    }
     if (etatRepli && etatRepli.repli && !etatRepli.repliChoisi) {
         const idRepli = etatRepli.idLanceur;
+        // Après un Bond de fin de carte, le repli part de la case d'atterrissage.
         etatRepli.repliChoisi = await window.choisirCaseRepli(idRepli, etatRepli.repli.portee,
-                                                              etatRepli.origineLanceur);
+                                                              etatRepli.bondChoisi || etatRepli.origineLanceur);
     }
     await window.declencherResolution();
-    if (bondEnAttente) {
-        await window.resoudreBondInteractif(bondEnAttente.idLanceur, bondEnAttente.portee);
-    }
     // L'Illusion se crée toujours en dernier sur la carte, après tout le reste (attaque, Bond...).
     if (illusionEnAttente) {
         await window.resoudreIllusionInteractif(illusionEnAttente.idLanceur, illusionEnAttente.portee);
