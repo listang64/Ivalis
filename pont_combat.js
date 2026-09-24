@@ -233,7 +233,15 @@ const SCENES = {
     //  Un état posé, une énergie dépensée : rien à animer, mais l'écran doit
     //  se rafraîchir. C'est le spectateur qui s'en charge après chaque étape ;
     //  ici on dit simplement « il n'y a pas de geste ».
-    etats(e)   { return { geste: "etats", pion: e.cible, liste: e.liste || [], pose: e.pose || null }; },
+    etats(e)   {
+        // Une purification se dit : l'état disparaît du pion, et sans un mot
+        // personne ne saurait lequel est parti.
+        if (e.purifie && (e.retires || []).length) {
+            return { geste: "message", pion: e.cible, texte: `✨ Purifié : ${e.retires.join(", ")}`,
+                     couleur: COULEURS.soin, duree: RYTHME.message };
+        }
+        return { geste: "etats", pion: e.cible, liste: e.liste || [], pose: e.pose || null };
+    },
     fatigue()  { return { geste: "rien" }; },
     tour()     { return { geste: "rien" }; },
     manche(e)  { return { geste: "manche", numero: nombre(e.numero) }; },

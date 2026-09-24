@@ -129,6 +129,7 @@ node objets_sans_undefined.mjs  # aucun objet fabriqué ne contient de valeur un
 node bouclier_absorption_contre.mjs  # bouclier en % des PV restants, Absorption magique, Contre physique, soin de zone au contact
 node poussee_forge_avatar.mjs  # la Forge annonce toujours 2 cases de Poussée ; l'avatar du bouton de fin de tour grandit
 node reglage_encart.mjs     # le OK sous la piste d'initiative ; l'outil provisoire « ⚙ HUD » de l'encart de tour
+node purification.mjs       # la Purification du grimoire : 1 état néfaste retiré à coup sûr, sans soin
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -2634,3 +2635,31 @@ créature la pose, le héros la manque). Le contrôle du soin partait jusqu'ici
 d'une créature presque à son maximum : l'ancien et le nouveau bonus butaient
 tous deux sur le plafond de 70 PV, et le test ne mesurait rien. Il part
 maintenant de 40 PV.
+
+### La Purification : un état en moins, à coup sûr
+
+Nico a changé la fiche dans le grimoire : « Enlève un état aléatoire sur la
+cible », Valeur 1, Pourcentage de base 0, Pourcentage max 1, coût fixe de 6.
+Avant : « 50 % de chance d'enlever tous les effets négatifs ». Lue par l'ancien
+code, la nouvelle fiche donnait une purification qui ne se déclenchait JAMAIS
+(la chance était le Pourcentage de base, désormais 0) et qui soignait 1 PV (la
+Valeur lue comme un montant de soin).
+
+L'extraction (moteur_effets.js) lit maintenant la Valeur comme un NOMBRE
+d'états (`purifNombre`) et fixe la chance à 100 % — un Pourcentage de base
+encore renseigné resterait lu comme une chance. Une Purification ne soigne
+rien ; posée en modificateur d'un Soin, elle laisse le Soin soigner.
+
+Le noyau (moteur_pur.js) retire un état NÉFASTE tiré au hasard, et plus toute
+la liste : l'ancien code effaçait aussi l'Absorption, le Contre, l'Élan et les
+bénédictions — purifier un allié lui ôtait ses protections. `estEtatNefaste`
+épargne ces états-là (et tout ce que l'équipement pose). Le dé du choix est
+tiré avec les autres (`purifJet`, dans tirerDesCarte) : tous les postes
+retirent le même. L'écran dit ce qui est parti : « ✨ Purifié : Glacé »
+(pont_combat.js).
+
+`purification.mjs` passe la vraie fiche au vrai moteur_effets.js, puis vérifie
+le jet, la résolution et le message ; les anciens moteur_effets.js,
+moteur_pur.js et pont_combat.js y font chacun tomber des contrôles.
+`moteur_pur.mjs` (chapitre 7) vérifie le choix au dé, les états épargnés et
+une carte qui en retire deux.

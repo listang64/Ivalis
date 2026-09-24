@@ -397,6 +397,9 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
             if (c.esquive === undefined) c.esquive = attaque.isHeal ? false : jetDeDefense(id);
             if ((attaque.purifChance || 0) > 0 && c.purifie === undefined) {
                 c.purifie = critique || des.d100() <= attaque.purifChance;
+                // Le tirage de l'état retiré se fait ICI, avec les autres dés :
+                // tous les postes retirent ainsi le même.
+                if (c.purifie) c.purifJet = des.d100();
             }
         });
     });
@@ -490,6 +493,15 @@ const TABLE_BONUS_MONSTRE = { "Petit": 0, "Normal": 1, "Élite": 2, "Boss": 3 };
 export function bonusMonstreDe(c) {
     if (!c || !c.estMonstre) return 0;
     return TABLE_BONUS_MONSTRE[c.palier] || 0;
+}
+
+// CE QUE LA PURIFICATION PEUT ENLEVER : tout état, SAUF ceux qui protègent ou
+// aident celui qui les porte — l'Absorption et le Contre qu'un allié lui a
+// offerts, l'Élan et les bénédictions de l'équipement, un soin étalé qui n'a
+// pas fini de tomber.
+export const ETATS_BIENFAISANTS = new Set(["Absorption", "Contre", "Élan", "Soin étalé"]);
+export function estEtatNefaste(e) {
+    return !!e && !ETATS_BIENFAISANTS.has(e.nom) && !e.bonusEquip;
 }
 
 // L'AUTRE TRICHE : deux états seulement, la Peur et l'Étourdi, prennent huit
@@ -1284,16 +1296,31 @@ export function resoudreCarte(etat, action, plateau) {
     });
 
     // --- LA PURIFICATION --------------------------------------------------
-    //  Certaines cartes lèvent les états altérés de leur cible. Le jet est déjà
-    //  tranché ; on ne fait que l'appliquer.
+    //  Elle enlève UN état néfaste de sa cible (ou autant que la carte en
+    //  annonce), tiré au hasard parmi ceux qu'elle porte. Elle vidait autrefois
+    //  toute la liste — bénédictions, Absorption et Contre compris : purifier
+    //  un allié lui retirait ses propres protections. Le dé est déjà tiré
+    //  (tirerDesCarte) ; on ne fait que l'appliquer.
     (action.attaques || []).forEach(attaque => {
         if (!(attaque.purifChance > 0)) return;
         (attaque.cibles || []).forEach(idCible => {
             const cible = combattant(suivant, idCible);
-            if (!cible || !desDe(idCible).purifie) return;
-            if (!cible.etats.length) return;
-            cible.etats = [];
-            etapes.push({ type: "etats", cible: idCible, purifie: true, liste: [] });
+            const jet = desDe(idCible);
+            if (!cible || !jet.purifie) return;
+            const retires = [];
+            let restant = Math.max(1, Math.round(nombre(attaque.purifNombre, 1)));
+            let tirage = nombre(jet.purifJet, 1);
+            while (restant > 0) {
+                const nefastes = cible.etats.filter(estEtatNefaste);
+                if (!nefastes.length) break;
+                const vise = nefastes[(Math.max(1, tirage) - 1) % nefastes.length];
+                cible.etats = cible.etats.filter(e => e !== vise);
+                retires.push(vise.nom);
+                restant--;
+                tirage += 37;   // un pas fixe : le second retrait vise un autre état
+            }
+            if (!retires.length) return;
+            etapes.push({ type: "etats", cible: idCible, purifie: true, retires, liste: cible.etats });
         });
     });
 

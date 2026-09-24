@@ -275,16 +275,39 @@ console.log("\n7. SOIN, BOUCLIER, PURIFICATION");
     });
     verifier("un bouclier se pose", bouclier.etat.combattants.H1.bouclier === 12);
 
-    // Purification : la cible perd tous ses états.
-    let malade = clonerEtat(etat);
-    malade.combattants.H1.etats = [{ nom: "Poison", tours: 3 }, { nom: "Glacé", tours: 2 }];
-    const pur = resoudreCarte(malade, {
-        type: "carte", idLanceur: "H2", idCarte: "CP",
-        attaques: [{ valeurBrute: 0, isHeal: true, purifChance: 100, cibles: ["H1"] }],
-        alterations: [],
-        jets: { parCible: { H1: { esquive: false, purifie: true, etats: {} } } }
-    });
-    verifier("la purification lève tous les états", pur.etat.combattants.H1.etats.length === 0);
+    // PURIFICATION : UN état néfaste en moins, tiré au hasard — jamais une
+    // protection (Absorption, Contre, Élan, bénédiction d'équipement).
+    const purifier = (etats, purifJet, extra = {}) => {
+        const malade = clonerEtat(etat);
+        malade.combattants.H1.etats = etats;
+        return resoudreCarte(malade, {
+            type: "carte", idLanceur: "H2", idCarte: "CP",
+            attaques: [{ valeurBrute: 0, isHeal: true, purifChance: 100, purifNombre: 1, cibles: ["H1"], ...extra }],
+            alterations: [],
+            jets: { parCible: { H1: { esquive: false, purifie: true, purifJet, etats: {} } } }
+        });
+    };
+    const noms = (r) => r.etat.combattants.H1.etats.map(e => e.nom);
+    const deux = [{ nom: "Poison", duree: 3 }, { nom: "Glacé", duree: 2 }];
+    const p1 = purifier(deux, 1), p2 = purifier(deux, 2);
+    verifier("la purification lève UN état, pas tous", noms(p1).length === 1 && noms(p2).length === 1,
+             `${noms(p1)} / ${noms(p2)}`);
+    verifier("le dé choisit lequel (1 → Poison, 2 → Glacé)",
+             noms(p1)[0] === "Glacé" && noms(p2)[0] === "Poison", `${noms(p1)} / ${noms(p2)}`);
+    const protege = purifier([{ nom: "Absorption", duree: 1, valeurAbs: 20 }, { nom: "Contre", duree: 1 },
+                              { nom: "Élan", duree: 2, bonusEquip: { initiative: 5 } },
+                              { nom: "Bénédiction", duree: 1, bonusEquip: { resPhys: 8 } },
+                              { nom: "Brûlé", duree: 2 }], 1);
+    verifier("elle épargne Absorption, Contre, Élan et bénédiction : c'est la Brûlure qui part",
+             !noms(protege).includes("Brûlé") && noms(protege).length === 4, String(noms(protege)));
+    const rienANettoyer = purifier([{ nom: "Absorption", duree: 1 }], 1);
+    verifier("sans état néfaste, elle ne retire rien", noms(rienANettoyer).join() === "Absorption");
+    const etape = protege.etapes.find(e => e.purifie);
+    verifier("l'étape dit ce qui est parti", !!etape && etape.retires.join() === "Brûlé", JSON.stringify(etape));
+    const pvAvant = etat.combattants.H1.pv;
+    verifier("et elle ne soigne rien au passage", p1.etat.combattants.H1.pv === pvAvant);
+    const deuxCrans = purifier([{ nom: "Poison", duree: 3 }, { nom: "Glacé", duree: 2 }, { nom: "Brûlé", duree: 2 }], 1, { purifNombre: 2 });
+    verifier("une carte qui en annonce deux en retire deux, différents", noms(deuxCrans).length === 1, String(noms(deuxCrans)));
 }
 
 // =========================================================================

@@ -1162,19 +1162,30 @@ window.demarrerCiblage = async function(idCarte, options) {
             if (isRanged) porteeDeLaCarte = Math.max(porteeDeLaCarte, rangeMax);
 
             // A. Détection Attaques, Soins & Purifications
+            //
+            // LA PURIFICATION ENLÈVE UN NOMBRE D'ÉTATS, À COUP SÛR. Le grimoire
+            // la décrit ainsi (« Enlève un état aléatoire sur la cible ») : sa
+            // Valeur est le nombre d'états retirés (1), sans pourcentage, pour
+            // un coût fixe. Elle se lisait autrefois comme une CHANCE de tout
+            // purger (Pourcent_Base) — avec la base actuelle, ce pourcentage
+            // vaut 0 et la purification ne se serait plus jamais déclenchée.
+            // Un Pourcent_Base encore renseigné reste lu comme une chance.
             let isPurification = false;
             let purifChance = 0;
-
-            if (nomLower.includes("purification")) {
+            let purifNombre = 0;
+            const lirePurification = (eff, n) => {
                 isPurification = true;
-                purifChance += (parseFrFloat(effBase.Pourcent_Base) || 0) * (act.count || 1);
-            }
-            
+                const pct = parseFrFloat(eff.Pourcent_Base) || 0;
+                purifChance = Math.min(100, purifChance + (pct > 0 ? pct * n : 100));
+                purifNombre += Math.max(1, Math.round(parseFrFloat(eff.Valeur) || 1)) * n;
+            };
+
+            if (nomLower.includes("purification")) lirePurification(effBase, act.count || 1);
+
             listeMods.forEach(m => {
                 const modEff = window.EFFETS_BDD_CACHE[m.id];
                 if (modEff && (modEff.Nom || "").toLowerCase().includes("purification")) {
-                    isPurification = true;
-                    purifChance += (parseFrFloat(modEff.Pourcent_Base) || 0) * m.count;
+                    lirePurification(modEff, m.count || 1);
                 }
             });
 
@@ -1239,13 +1250,17 @@ window.demarrerCiblage = async function(idCarte, options) {
                 attaquesExtraites.push({
                     nom: effBase.Nom,
                     typeRes: typeRes,
-                    valeurBrute: (parseFrFloat(effBase.Valeur) || 0) * (act.count || 1),
+                    // La Valeur d'une Purification est un nombre d'états, pas
+                    // des points de vie : elle ne soigne rien.
+                    valeurBrute: nomLower.includes("purification")
+                        ? 0 : (parseFrFloat(effBase.Valeur) || 0) * (act.count || 1),
                     pourcentPV: pourcentPV,
                     isRanged: isRanged,
                     rangeMax: porteeReelle,
                     isHeal: isHeal,
                     isShield: isShield,
                     purifChance: purifChance,
+                    purifNombre: purifNombre,
                     estEtalement: etalementActif,
                     toursEtalement: etalementActif ? toursEtalement : 0,
                     cibles: []
