@@ -5067,7 +5067,17 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
         const texte = etape.message || "";
         if (elAttente.textContent !== texte) elAttente.textContent = texte;
     }
-    if (elOk) elOk.style.display = (etape && etape.okVisible) ? "inline-flex" : "none";
+    if (elOk) {
+        elOk.style.display = (etape && etape.okVisible) ? "inline-flex" : "none";
+        // Juste sous la piste d'initiative, quelle que soit sa hauteur sur cet
+        // écran : on lit son bas réel, relatif au voile qui porte le bouton.
+        if (elOk.style.display !== "none") {
+            const piste = document.getElementById("piste-initiative");
+            const basPiste = piste ? piste.getBoundingClientRect().bottom : 0;
+            const hautVoile = voile.getBoundingClientRect().top;
+            if (basPiste > 0) elOk.style.top = Math.round(basPiste - hautVoile + 10) + "px";
+        }
+    }
     if (elForcer) elForcer.style.display = (etape && etape.forcerVisible) ? "block" : "none";
 
     voile.style.display = "block";

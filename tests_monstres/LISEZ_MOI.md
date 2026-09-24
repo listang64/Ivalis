@@ -128,6 +128,7 @@ node apercu_butin.mjs       # onglet Inventaire et fenêtres de butin, capturés
 node objets_sans_undefined.mjs  # aucun objet fabriqué ne contient de valeur undefined (Firestore la refuse)
 node bouclier_absorption_contre.mjs  # bouclier en % des PV restants, Absorption magique, Contre physique, soin de zone au contact
 node poussee_forge_avatar.mjs  # la Forge annonce toujours 2 cases de Poussée ; l'avatar du bouton de fin de tour grandit
+node reglage_encart.mjs     # le OK sous la piste d'initiative ; l'outil provisoire « ⚙ HUD » de l'encart de tour
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -2569,3 +2570,46 @@ haut, et son bord droit recule de 10 px pour qu'il reste centré sur le bouton.
 ce que la carte extrait (vrai moteur_effets.js) et la taille posée sur la page
 (vrai hud_disposition.js) ; chacun des trois fichiers d'avant fait tomber au
 moins un contrôle.
+
+### Le bouton OK, petit, sous la piste d'initiative
+
+Nico : « le bouton OK pour voir l'animation du personnage en cours, fais-le plus
+petit et mets-le en dessous de la barre d'initiative ». Il n'avait aucune
+position à lui : posé dans le voile sans ancrage, il tombait dans le coin
+haut-gauche, sous la croix rouge, en police de 30. Il est maintenant centré,
+en police de 15, et `rafraichirVoileTour` lui donne son `top` au moment de
+l'afficher, d'après le bas RÉEL de `#piste-initiative` plus 10 px : la piste
+change de hauteur selon l'écran, un nombre appris par cœur aurait fini dessus
+ou loin d'elle. Le banc donne à la piste une hauteur inhabituelle (150 px) pour
+s'assurer que le bouton la suit vraiment.
+
+### L'outil provisoire « ⚙ HUD » revient, pour l'encart de tour
+
+Nico veut régler lui-même, à l'écran, la plaque qui montre la technique qui va
+être lancée, « de l'image de fond au texte ». `reglage_encart.js` — un fichier
+à part, avec sa propre ligne dans index.html, pour partir d'un seul coup quand
+les nombres seront recopiés — ajoute en combat une poignée « ⚙ HUD » (à gauche,
+à mi-hauteur) qui ouvre une boîte de flèches : plaque entière, image de fond
+seule, médaillon, avatar en pied, états, nom du combattant, nom de la
+technique, détail de l'attaque, ligne d'attente. Chaque ligne a ses quatre
+flèches et ses boutons de taille ; un appui long répète (sur iPad, taper vingt
+fois serait interminable). « Figer » garde l'encart à l'écran avec un exemple,
+« Portrait » bascule le portrait affiché entre avatar en pied et médaillon —
+les deux formes n'ont pas les mêmes mesures —, « ⇄ » change la boîte de côté,
+« Défaut » revient aux valeurs du code, et « 📋 Extraire le code » affiche (et
+copie) un bloc prêt à recopier dans `REGLAGES_HUD`.
+
+L'outil ne pose rien lui-même : il modifie `window.REGLAGES_HUD` et redemande
+la pose à `hud_disposition.js`. Ce qui se voit pendant le réglage est donc
+exactement ce que le jeu fera avec les mêmes nombres. Seul ajout permanent :
+`encartFond` { x, y, echelle }, qui déplace et agrandit l'image de fond SEULE
+par `transform` — sans toucher à la boîte, donc sans rien décaler de ce qui se
+mesure en pourcentage d'elle. Ses valeurs par défaut ne changent rien.
+
+`reglage_encart.mjs` sert la vraie page : chaque flèche est cliquée et on
+mesure à l'écran que l'élément visé bouge dans le bon sens, et lui seul ; le
+code extrait est relu comme du JavaScript ; un rechargement garde les
+réglages ; hors combat, poignée et boîte disparaissent. Morsures : l'ancien
+combat.js (bouton non recalé sur la piste), l'ancien style.css (gros, dans le
+coin), l'ancien hud_disposition.js (le fond ne bouge pas) et la page sans
+l'outil font chacun tomber des contrôles.

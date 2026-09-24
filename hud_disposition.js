@@ -82,6 +82,11 @@
         //  taille en pixels aurait tenu bon pendant que la plaque rétrécissait
         //  autour d'elle, et le texte serait sorti du cadre.
         encart:        { gauche: 52, bas: -8, largeur: 760 },
+        // L'IMAGE DE FOND SEULE, sans ce qui est posé dessus : un décalage en %
+        // de la plaque et une échelle en %. Elle bouge par `transform`, donc
+        // sans toucher à la boîte : la plaque garde sa taille, et tout ce qui
+        // se mesure en % d'elle ne bouge pas quand on déplace le fond.
+        encartFond:    { x: 0, y: 0, echelle: 100 },
         encartPion:    { x: -5, y: 34, taille: 29 },
         // L'AVATAR EN PIED A SES PROPRES MESURES, et il lui en fallait.
         // Le médaillon se place par son HAUT ; l'avatar monte du bas de l'écran,
@@ -253,6 +258,15 @@
         // la plaque rétrécissait autour d'elle. C'est exactement le genre de
         // détail qui ne se voit que sur l'iPad du joueur.
         encart.style.fontSize = pc(r.encartDetail.taille) + "px";
+
+        const fond = document.getElementById("voile-tour-fond");
+        if (fond && r.encartFond) {
+            const f = r.encartFond;
+            fond.style.transformOrigin = "center center";
+            fond.style.transform = (f.x || f.y || (f.echelle && f.echelle !== 100))
+                ? `translate(${f.x || 0}%, ${f.y || 0}%) scale(${(f.echelle || 100) / 100})`
+                : "";
+        }
 
         const poser = (id, groupe, extra) => {
             const el = document.getElementById(id);
