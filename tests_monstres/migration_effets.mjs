@@ -81,9 +81,9 @@ console.log("1. ELLE VISE LES EFFETS QUE NICO A DEMANDÉ DE CHANGER");
 {
     const { table } = fausseBase(EFFETS_REELS);
     const vises = table.map(r => r.id).sort();
-    const attendus = ["EFF_BRULE", "EFF_DUREE_ETALEMENT_DEGATS", "EFF_ELECTRIFIE",
+    const attendus = ["EFF_BOUCLIER_MAGIQUE", "EFF_BRULE", "EFF_DUREE_ETALEMENT_DEGATS", "EFF_ELECTRIFIE",
                       "EFF_ETOURDIT", "EFF_GLACE", "EFF_PARALYSIE", "EFF_POUSSEE"].sort();
-    verifier("les sept effets concernés, ni plus ni moins",
+    verifier("les huit effets concernés, ni plus ni moins",
              JSON.stringify(vises) === JSON.stringify(attendus), vises.join(", "));
     verifier("et chacun existe vraiment dans la base",
              table.every(r => EFFETS_REELS[r.id] !== undefined),
@@ -155,7 +155,7 @@ console.log("\n3. RELANCÉE, ELLE N'ÉCRIT PLUS RIEN");
     verifier("et ne resupprime rien", m.journal.suppressions.length === suppressionsPremier);
     verifier("le rapport le dit clairement", second.faits.length === 0,
              JSON.stringify(second.faits));
-    verifier("en listant ce qui était déjà à jour", second.inchanges.length === 7,
+    verifier("en listant ce qui était déjà à jour", second.inchanges.length === 8,
              JSON.stringify(second.inchanges));
 }
 

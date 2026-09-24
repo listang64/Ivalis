@@ -125,6 +125,8 @@ node affichage_temps_reel.mjs # les jauges qui suivent la base, le tic, et le pi
 node objets_tableau.mjs     # le catalogue d'équipement, confronté au tableau de Nico
 node equipement_combat.mjs  # ce que les objets font une fois portés, en combat
 node apercu_butin.mjs       # onglet Inventaire et fenêtres de butin, capturés à l'écran
+node objets_sans_undefined.mjs  # aucun objet fabriqué ne contient de valeur undefined (Firestore la refuse)
+node bouclier_absorption_contre.mjs  # bouclier en % des PV restants, Absorption magique, Contre physique, soin de zone au contact
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -2492,3 +2494,47 @@ ligne de vue, anneaux, soin sur soi. `ciblage_soutien_bond.mjs` joue les deux
 signalements sur le vrai moteur_effets.js, du premier clic à l'intention
 envoyée, plus le cas des créatures dans le cerveau ; sept morsures, une par
 correctif, font chacune tomber au moins un contrôle.
+
+### Le soin de zone porte à deux cases même au contact d'un ennemi
+
+Nico : « j'ai un soin à distance deux, mais la sélection ne se fait qu'autour
+de moi ». Le soin à cible unique portait déjà à deux cases ; c'était la ZONE de
+soin qui se trouvait ramenée à une case par la règle de l'engagement (un
+lanceur collé à un ennemi ne pose ses zones qu'à son contact). Cette règle
+empêche de bombarder de loin quand on est au corps à corps : elle n'a pas de
+sens pour un soin. `casesPosablesZone` et les deux gestes de la souris (survol
+et clic) laissent désormais un soin de zone à sa pleine portée, engagé ou non ;
+une zone offensive engagée reste, elle, collée au lanceur.
+
+### Bouclier, Absorption, Contre : des pourcentages, chacun sur sa nature de dégâts
+
+Le grimoire dit « créer un bouclier de 25 % des PV restants de la cible » ; le
+code lisait la Valeur comme des POINTS, d'où un bouclier de 30 PV tout rond. La
+Valeur est maintenant un pourcentage des PV actuels de la cible, par cran,
+plafonné par le Pourcentage max du grimoire (un bouclier posé sur une cible à
+40 PV en donne 10). La migration de la base (bouton « Mettre la BDD à jour »)
+passe la Valeur de EFF_BOUCLIER_MAGIQUE de 30 à 25 ; les anciennes cartes qui
+ne portent que des points gardent leur comportement.
+
+L'Absorption était bien un pourcentage, mais elle rognait TOUS les dégâts : elle
+ne touche plus que les dégâts magiques, comme le dit son texte, et son plafond
+est lu dans le grimoire. Le Contre, lui, n'existait tout simplement pas : il
+est désormais extrait des cartes, posé comme état sur l'allié visé, et annule
+sa part des dégâts PHYSIQUES en renvoyant 10 % de la frappe à l'attaquant
+(bouclier de l'attaquant d'abord, chute s'il tombe à zéro). Un effet de soutien
+ne peut plus être « esquivé » par celui qui le reçoit. `bouclier_absorption_contre.mjs`
+joue tout cela sur le vrai moteur_pur.js et le vrai moteur_effets.js ; huit
+morsures font chacune tomber au moins un contrôle.
+
+### Un objet à bénédiction de soin cassait la réserve de butin
+
+En faisant tourner la suite, `combat_complet.mjs` a une fois échoué sur
+« WriteBatch.set() called with invalid data. Unsupported field value: undefined
+(… Combat_Butin/reserve_normale … items[1].effets[0].buffSoi) ». Un objet Très
+rare ou Épique qui tirait une bénédiction de soin recopiait aussi « buff »,
+« buffSoi » et « chance » — vides — et Firestore refuse alors le document
+ENTIER : la réserve de butin préparée à l'avance ne s'écrivait pas.
+`fabriquerObjet` ne recopie plus que les champs présents.
+`objets_sans_undefined.mjs` fabrique des milliers d'objets, sur chaque modèle
+et chaque rareté, et les fouille jusqu'au fond (morsure : l'ancien code tombe
+dès le premier tirage à bénédiction).

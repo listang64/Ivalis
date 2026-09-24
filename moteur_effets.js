@@ -400,7 +400,10 @@ window.casesPosablesZone = function(idLanceur, configSort) {
         if (!autre || autre.camp === lanceurData.camp || autre.statut === "Mort") continue;
         if (getHexDistance(tkLanceur, window.TOKENS_VTT_DATA[idAutre]) === 1) { estEngage = true; break; }
     }
-    const limite = estEngage ? 1 : portee;
+    // Le corps-à-corps n'empêche que de FRAPPER plus loin : un soin, un
+    // bouclier se posent à leur pleine portée même avec un ennemi au contact
+    // (la règle est déjà celle du ciblage d'une cible unique).
+    const limite = (estEngage && !configSort.isHeal) ? 1 : portee;
 
     return window.PLATEAU_VTT.getHexesInRadius(tkLanceur.q, tkLanceur.r, limite)
         .filter(h => getHexDistance(tkLanceur, h) <= limite && verifierLigneDeVue(tkLanceur, h));
@@ -810,7 +813,7 @@ window.VTT_CIBLAGE_MOUSEMOVE = function(e) {
             }
         }
 
-        if (estEngage && dist > 1) state.zoneCenterHex = null; 
+        if (estEngage && dist > 1 && !configSort.isHeal) state.zoneCenterHex = null; 
         else if (dist > configSort.rangeMax) state.zoneCenterHex = null; 
         else if (!verifierLigneDeVue(tkLanceur, hoverHex)) state.zoneCenterHex = null; 
         else state.zoneCenterHex = hoverHex; 
@@ -877,7 +880,7 @@ window.VTT_CIBLAGE_CLICK = function(e) {
             }
         }
 
-        if (estEngage && dist > 1) state.zoneCenterHex = null; 
+        if (estEngage && dist > 1 && !configSort.isHeal) state.zoneCenterHex = null; 
         else if (dist > configSort.rangeMax) state.zoneCenterHex = null; 
         else if (!verifierLigneDeVue(tkLanceur, targetHex)) state.zoneCenterHex = null; 
         else state.zoneCenterHex = targetHex; 
@@ -1219,10 +1222,25 @@ window.demarrerCiblage = async function(idCarte, options) {
                 const porteeReelle = rangeMax + window.bonusPorteeMagique(
                     lanceurCarte, typeRes === "Magique", isRanged);
 
+                // LE BOUCLIER EST UN POURCENTAGE, PAS UN NOMBRE DE POINTS. Sa
+                // « Valeur » dans le grimoire est la part des PV RESTANTS de la
+                // cible qu'il couvre, par cran (« Créer un bouclier de X % des
+                // pv restants »), plafonnée par son « Pourcentage max ». Le
+                // moteur la lisait comme des points : 30 de bouclier, quelle
+                // que soit la cible. Le calcul se fait à la résolution, sur les
+                // PV de la cible à cet instant (moteur_pur.js).
+                let pourcentPV = 0;
+                if (isShield) {
+                    pourcentPV = (parseFrFloat(effBase.Valeur) || 0) * (act.count || 1);
+                    const plafond = parseFrFloat(effBase.Pourcent_Max);
+                    if (plafond > 0) pourcentPV = Math.min(pourcentPV, plafond);
+                }
+
                 attaquesExtraites.push({
                     nom: effBase.Nom,
                     typeRes: typeRes,
                     valeurBrute: (parseFrFloat(effBase.Valeur) || 0) * (act.count || 1),
+                    pourcentPV: pourcentPV,
                     isRanged: isRanged,
                     rangeMax: porteeReelle,
                     isHeal: isHeal,
@@ -1727,20 +1745,64 @@ window.demarrerCiblage = async function(idCarte, options) {
                 }
             });
 
+            // Le plafond est celui du grimoire (« Pourcentage max »), jamais
+            // plus de 100 % de toute façon.
+            const plafondDe = (nom) => {
+                const e = Object.values(window.EFFETS_BDD_CACHE || {})
+                    .find(x => x && (x.Nom || "").toLowerCase().includes(nom));
+                const p = e ? parseFrFloat(e.Pourcent_Max) : 0;
+                return p > 0 ? Math.min(100, p) : 100;
+            };
+
             if (isAbsorption) {
-                if (absorptionValeur > 100) absorptionValeur = 100; // Cap à 100% d'annulation
+                absorptionValeur = Math.min(absorptionValeur, plafondDe("absorption"));
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 alterationsExtraites.push({
                     nom: "Absorption",
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", // NOTE: Remplace par le lien d'une belle icône Cloudinary !
-                    desc: `Annule ${absorptionValeur}% des dégâts subis et soigne de 10% de la frappe.`,
+                    desc: `Annule ${absorptionValeur}% des dégâts magiques subis et soigne de 10% de la frappe.`,
                     chance: 100, // Toujours 100% d'application pour un buff
                     duree: 1, // Dure uniquement le tour en cours !
                     valeurAbs: absorptionValeur,
                     isRanged: isRanged,
                     rangeMax: rangeMax,
                     isHeal: true, // ✅ IMPORTANT : Permet de cibler un allié ou soi-même
+                    cibles: []
+                });
+            }
+
+            // CONTRE — le pendant physique de l'Absorption. Il n'existait nulle
+            // part dans le moteur : une carte « Contre » ne faisait rien. Il
+            // annule sa part des dégâts PHYSIQUES reçus, et renvoie 10 % de la
+            // frappe à celui qui l'a portée (moteur_pur.js, chaineDeDegats).
+            let isContre = false;
+            let contreValeur = 0;
+            const estContre = (nom) => (nom || "").toLowerCase().trim() === "contre";
+            if (estContre(effBase.Nom)) {
+                isContre = true;
+                contreValeur += (parseFrFloat(effBase.Valeur) || 20) * (act.count || 1);
+            }
+            listeMods.forEach(m => {
+                const modEff = window.EFFETS_BDD_CACHE[m.id];
+                if (modEff && estContre(modEff.Nom)) {
+                    isContre = true;
+                    contreValeur += (parseFrFloat(modEff.Valeur) || 20) * m.count;
+                }
+            });
+            if (isContre) {
+                contreValeur = Math.min(contreValeur, plafondDe("contre"));
+                if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
+                alterationsExtraites.push({
+                    nom: "Contre",
+                    icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png",
+                    desc: `Annule ${contreValeur}% des dégâts physiques subis et renvoie 10% de la frappe à l'attaquant.`,
+                    chance: 100,
+                    duree: 1,
+                    valeurContre: contreValeur,
+                    isRanged: isRanged,
+                    rangeMax: rangeMax,
+                    isHeal: true, // se pose sur soi ou un allié, comme l'Absorption
                     cibles: []
                 });
             }

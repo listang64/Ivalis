@@ -87,10 +87,10 @@ console.log("\n1. LA CHAÎNE DE DÉGÂTS, MAILLON PAR MAILLON");
     verifier("et les deux moitiés font exactement le total",
              c.tics.reduce((a, b) => a + b, 0) === 15);
 
-    // Absorption : 20 % annulés, drain de 10 % du brut.
+    // Absorption : 20 % des dégâts MAGIQUES annulés, drain de 10 % du brut.
     const absorbant = { pv: 40, pvMax: 60, bouclier: 0,
                         etats: [{ nom: "Absorption", valeurAbs: 20 }], def: {} };
-    c = chaineDeDegats(absorbant, { valeurBrute: 30 }, {});
+    c = chaineDeDegats(absorbant, { valeurBrute: 30, typeRes: "Magique" }, {});
     verifier("l'absorption annule sa part", c.degats === 24, `(${c.degats})`);
     verifier("et draine dix pour cent du brut", c.soinAbsorption === 3, `(${c.soinAbsorption})`);
 

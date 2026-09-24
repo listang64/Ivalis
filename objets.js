@@ -548,9 +548,14 @@ window.fabriquerObjet = function(modele, rarete) {
         etats: etats,
         // Les effets qui ne se résument pas à un bonus chiffré ni à un état
         // (élan d'initiative, bénédictions de soin) restent listés tels quels.
-        effets: effets.filter(e => e.buff || e.buffSoi || e.beniSoin).map(e => ({
-            cle: e.cle, chance: e.chance, buff: e.buff, buffSoi: e.buffSoi, beniSoin: e.beniSoin
-        })),
+        // Seuls les champs présents sont recopiés : Firestore refuse toute
+        // valeur undefined, et un butin avec « buffSoi: undefined » faisait
+        // échouer l'écriture de la réserve entière.
+        effets: effets.filter(e => e.buff || e.buffSoi || e.beniSoin).map(e => {
+            const copie = { cle: e.cle };
+            ["chance", "buff", "buffSoi", "beniSoin"].forEach(k => { if (e[k] !== undefined) copie[k] = e[k]; });
+            return copie;
+        }),
         image: ""
     };
     objet.effetTexte = window.decrireObjet(objet);

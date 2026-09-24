@@ -191,6 +191,7 @@ const SCENES = {
 
         const montant = nombre(e.montant);
         const texte = e.opportunite ? `-${montant} ⚔️`
+                    : e.renvoi ? `-${montant} ↩️`     // le Contre rend le coup
                     : e.critique ? `-${montant} !`
                     : `-${montant}`;
 

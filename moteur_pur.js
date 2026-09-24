@@ -405,7 +405,10 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
         (alt.cibles || []).forEach(id => {
             const c = pourCible(id);
             // Carte sans dégâts : c'est ici que se joue l'esquive de la cible.
-            if (c.esquive === undefined) c.esquive = jetDeDefense(id);
+            // Un soutien (Absorption, Contre) ne s'esquive pas : on ne se dérobe
+            // pas au bouclier que l'on reçoit, qu'on se le pose ou qu'un allié
+            // nous l'offre.
+            if (c.esquive === undefined) c.esquive = alt.isHeal ? false : jetDeDefense(id);
             // Un coup critique impose les effets de la carte, sans jet.
             if (c.etats[alt.nom] === undefined) {
                 c.etats[alt.nom] = critique || des.d100() <= (alt.chance || 0);
@@ -568,12 +571,25 @@ export function chaineDeDegats(cible, attaque, options) {
     if (attaque.typeRes === "Magique") vulnerabilite += regleDesEtats(cible, "degatsMagiquesSubis");
     if (vulnerabilite !== 0) degats = Math.max(0, Math.round(degats * (1 + vulnerabilite / 100)));
 
-    // 3. Absorption réactive : la cible annule une part du coup et draine.
-    const abs = (cible.etats || []).find(e => e && e.nom === "Absorption");
+    // 3. Absorption et Contre : la cible annule une part du coup — un
+    //    POURCENTAGE de ce qui arrive, jamais un nombre fixe. Le grimoire les
+    //    sépare par type : l'Absorption ne boit que la magie (et en soigne 10 %
+    //    du brut), le Contre ne pare que le physique (et en renvoie 10 % à
+    //    l'attaquant — voir compte.renvoi dans resoudreCarte). L'Absorption
+    //    s'appliquait jusqu'ici à TOUS les dégâts, et le Contre n'existait pas.
+    const estMagique = attaque.typeRes === "Magique";
+    const abs = estMagique && (cible.etats || []).find(e => e && e.nom === "Absorption");
     if (abs) {
         const pctAnnule = nombre(abs.valeurAbs, 20);
         const aAnnuler = Math.floor(degats * (pctAnnule / 100));
         compte.soinAbsorption = Math.floor(degats * 0.10);   // toujours 10 % du brut
+        degats = Math.max(0, degats - aAnnuler);
+    }
+    const contre = !estMagique && (cible.etats || []).find(e => e && e.nom === "Contre");
+    if (contre) {
+        const pctAnnule = nombre(contre.valeurContre, 20);
+        const aAnnuler = Math.floor(degats * (pctAnnule / 100));
+        compte.renvoi = Math.floor(degats * 0.10);           // toujours 10 % du brut
         degats = Math.max(0, degats - aAnnuler);
     }
 
@@ -958,7 +974,13 @@ export function resoudreCarte(etat, action, plateau) {
             // jamais grandir sur la fiche, et ne posait jamais le bouclier.
             if (attaque.isShield) {
                 const avant = cible.bouclier;
-                const gain = Math.max(0, nombre(attaque.valeurBrute));
+                // Un pourcentage des PV RESTANTS de la cible, à cet instant
+                // (voir l'extraction dans moteur_effets.js). Une carte d'avant
+                // ce calcul, sans pourcentage, garde son nombre de points.
+                const pct = nombre(attaque.pourcentPV);
+                const gain = pct > 0
+                    ? Math.max(0, Math.round(nombre(cible.pv) * pct / 100))
+                    : Math.max(0, nombre(attaque.valeurBrute));
                 cible.bouclier = Math.max(0, avant + gain);
                 // LE BOUCLIER RETIENT SA TAILLE, et c'est tout le correctif.
                 //
@@ -1051,6 +1073,25 @@ export function resoudreCarte(etat, action, plateau) {
                 pvApres: cible.pv,
                 critique
             });
+
+            // LE CONTRE RENVOIE SA PART À L'ATTAQUANT : bouclier d'abord, vie
+            // ensuite, comme n'importe quel coup — sans résistance, c'est la
+            // force du coup reçu qui repart.
+            if (nombre(compte.renvoi) > 0 && lanceur && !lanceur.aTerre && idCible !== idLanceur) {
+                const renvoi = nombre(compte.renvoi);
+                const bouclierAvant = nombre(lanceur.bouclier);
+                const surBouclier = Math.min(bouclierAvant, renvoi);
+                lanceur.bouclier = bouclierAvant - surBouclier;
+                if (lanceur.bouclier === 0) lanceur.bouclierMax = 0;
+                lanceur.pv = Math.max(0, nombre(lanceur.pv) - (renvoi - surBouclier));
+                etapes.push({ type: "degats", cible: idLanceur, acteur: idCible, montant: renvoi,
+                              surBouclier, bouclierApres: lanceur.bouclier, pvApres: lanceur.pv,
+                              renvoi: true });
+                if (lanceur.pvMax > 0 && lanceur.pv <= 0 && !lanceur.aTerre) {
+                    lanceur.aTerre = true;
+                    etapes.push({ type: "chute", cible: idLanceur, acteur: idCible });
+                }
+            }
 
             // L'ÉTALEMENT : LES PARTS ATTENDENT. Rien n'a été retiré au-dessus
             // (compte.degats vaut zéro) ; tout est rangé dans l'état, une part
@@ -1209,6 +1250,7 @@ export function resoudreCarte(etat, action, plateau) {
                     ...(alt.icone ? { icone: alt.icone } : {}),
                     ...(alt.desc ? { desc: alt.desc } : {}),
                     ...(alt.valeurAbs !== undefined ? { valeurAbs: alt.valeurAbs } : {}),
+                    ...(alt.valeurContre !== undefined ? { valeurContre: alt.valeurContre } : {}),
                     ...(alt.bonusEquip ? { bonusEquip: alt.bonusEquip } : {}),
                     // QUI A PROVOQUÉ. Sans ce nom, la Provocation ne provoque
                     // rien : l'IA (ia_pure.js) cherche l'état, lit
