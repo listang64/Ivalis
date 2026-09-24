@@ -1261,6 +1261,18 @@ window.demarrerCiblage = async function(idCarte, options) {
         });
     };
 
+    // LE PLAFOND DE CHANCE D'UN ÉTAT VIENT DU GRIMOIRE. Il était écrit en dur,
+    // effet par effet (40 %, 60 %…), et ne suivait plus la base quand Nico
+    // rééquilibrait : l'Immobilisation montée à 50 % restait bloquée à 40 en
+    // combat alors que la Forge en annonçait 50. Le chiffre d'avant ne sert
+    // plus que de secours, si la base n'en donne pas.
+    const plafondDuGrimoire = (motCle, defaut) => {
+        const e = Object.values(window.EFFETS_BDD_CACHE || {})
+            .find(x => x && (x.Nom || "").toLowerCase().includes(motCle));
+        const p = e ? parseFrFloat(e.Pourcent_Max) : 0;
+        return p > 0 ? Math.min(100, p) : defaut;
+    };
+
     // Même principe que estEtatEtourdi, pour l'état Confusion.
     const estEtatConfusion = (eff) => {
         if (!eff) return false;
@@ -1416,7 +1428,7 @@ window.demarrerCiblage = async function(idCarte, options) {
             let isShield = nomLower.includes("bouclier");
 
             // Étalement (mod "DOT" / "Durée étalement dégâts") : la carte coûte moins de
-            // fatigue (déjà géré par la Forge, coutActionTotale /= 1.3), mais ses dégâts — ou
+            // fatigue (déjà géré par la Forge : divisée par la ristourne du grimoire, « Cout / 1.x »), mais ses dégâts — ou
             // ses soins — ne tombent plus d'un coup : ils sont DIVISÉS PAR LE NOMBRE DE TOURS
             // de l'étalement, une part à chaque fin de manche. 10 dégâts étalés sur 2 tours,
             // c'est 5 puis 5. Le nombre de tours est celui de l'effet (colonne Tours, 2), plus
@@ -1590,7 +1602,7 @@ window.demarrerCiblage = async function(idCarte, options) {
             });
 
             if (isImmobilisation) {
-                if (immobilisationChance > 40) immobilisationChance = 40; // Cap à 40%
+                immobilisationChance = Math.min(immobilisationChance, plafondDuGrimoire("immobil", 40)); // plafond du grimoire
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 alterationsExtraites.push({
@@ -1636,7 +1648,7 @@ window.demarrerCiblage = async function(idCarte, options) {
             });
 
             if (isConfusion) {
-                if (confusionChance > 40) confusionChance = 40; // Cap à 40%
+                confusionChance = Math.min(confusionChance, plafondDuGrimoire("confus", 40)); // plafond du grimoire
                 if (confusionDuree <= 0) confusionDuree = 2; // Sécurité si la BDD n'a pas de durée
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
@@ -1678,7 +1690,7 @@ window.demarrerCiblage = async function(idCarte, options) {
             });
 
             if (isPoison) {
-                if (poisonChance > 70) poisonChance = 70; // Cap à 70%
+                poisonChance = Math.min(poisonChance, plafondDuGrimoire("poison", 70)); // plafond du grimoire
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 alterationsExtraites.push({
                     nom: "Empoisonnement",
@@ -1727,7 +1739,7 @@ window.demarrerCiblage = async function(idCarte, options) {
             });
 
             if (isBrule) {
-                if (bruleChance > 60) bruleChance = 60; // Cap à 60%
+                bruleChance = Math.min(bruleChance, plafondDuGrimoire("brûl", 60)); // plafond du grimoire
                 if (bruleDuree <= 0) bruleDuree = 2; // Sécurité si la BDD n'a pas de durée
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
@@ -1774,7 +1786,7 @@ window.demarrerCiblage = async function(idCarte, options) {
             });
 
             if (isGlace) {
-                if (glaceChance > 60) glaceChance = 60; // Cap à 60%
+                glaceChance = Math.min(glaceChance, plafondDuGrimoire("glac", 60)); // plafond du grimoire
                 if (glaceDuree <= 0) glaceDuree = 2; // Sécurité si la BDD n'a pas de durée
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
@@ -1822,7 +1834,7 @@ window.demarrerCiblage = async function(idCarte, options) {
             });
 
             if (isElectrifie) {
-                if (electrifieChance > 60) electrifieChance = 60; // Cap à 60%
+                electrifieChance = Math.min(electrifieChance, plafondDuGrimoire("électri", 60)); // plafond du grimoire
                 if (electrifieDuree <= 0) electrifieDuree = 2; // Sécurité si la BDD n'a pas de durée
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
@@ -1907,7 +1919,7 @@ window.demarrerCiblage = async function(idCarte, options) {
             });
 
             if (isTraction) {
-                if (tractionChance > 60) tractionChance = 60; // Cap à 60%
+                tractionChance = Math.min(tractionChance, plafondDuGrimoire("traction", 60)); // plafond du grimoire
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 indexTraction = idxAction;
@@ -1948,7 +1960,7 @@ window.demarrerCiblage = async function(idCarte, options) {
             });
 
             if (isPeur) {
-                if (peurChance > 60) peurChance = 60; // Cap à 60%
+                peurChance = Math.min(peurChance, plafondDuGrimoire("peur", 60)); // plafond du grimoire
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 alterationsExtraites.push({
@@ -1988,7 +2000,7 @@ window.demarrerCiblage = async function(idCarte, options) {
             });
 
             if (isProvocation) {
-                if (provocationChance > 40) provocationChance = 40; // Cap à 40%
+                provocationChance = Math.min(provocationChance, plafondDuGrimoire("provoc", 40)); // plafond du grimoire
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 alterationsExtraites.push({

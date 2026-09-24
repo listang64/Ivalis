@@ -16,6 +16,10 @@ const debut = src.indexOf('// 🔻 NOUVEAU : DÉTECTION PROVOCATION 🔻');
 const fin = src.indexOf('// 🔻 NOUVEAU : DÉTECTION ABSORPTION 🔻');
 if (debut === -1 || fin === -1) throw new Error("bloc Provocation introuvable dans moteur_effets.js");
 const blocProvocation = src.slice(debut, fin);
+// Le plafond vient désormais du grimoire (plafondDuGrimoire, dans demarrerCiblage) :
+// on l'extrait lui aussi, tel quel.
+const dPlafond = src.indexOf('const plafondDuGrimoire = ');
+const blocPlafond = src.slice(dPlafond, src.indexOf('};', dPlafond) + 2);
 
 let echecs = 0;
 const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(60)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
@@ -25,14 +29,14 @@ global.window = { EFFETS_BDD_CACHE: {} };
 // Rejoue exactement l'environnement local que le bloc trouve dans demarrerCiblage :
 // effBase/listeMods/act/isRanged/rangeMax/lanceurCarte, plus les deux compteurs
 // d'ordre qu'il touche (indexPremierAutreEffet, idxAction).
-function executerBloc({ effBase, mods = [], count = 1, isRanged = false, rangeMax = 1, idCaster = "J1" }) {
+function executerBloc({ effBase, mods = [], count = 1, isRanged = false, rangeMax = 1, idCaster = "J1", grimoire = {} }) {
     const alterationsExtraites = [];
     let indexPremierAutreEffet = -1;
     const idxAction = 0;
     const nomLower = (effBase.Nom || "").toLowerCase();
     const act = { count };
     const listeMods = mods.map(m => ({ id: m.id, count: m.count || 1 }));
-    window.EFFETS_BDD_CACHE = {};
+    window.EFFETS_BDD_CACHE = { ...grimoire };
     mods.forEach(m => { window.EFFETS_BDD_CACHE[m.id] = m.eff; });
     const parseFrFloat = (val) => {
         if (val === undefined || val === null || val === "") return 0;
@@ -40,7 +44,7 @@ function executerBloc({ effBase, mods = [], count = 1, isRanged = false, rangeMa
         return isNaN(res) ? 0 : res;
     };
     const lanceurCarte = { idPersonnage: idCaster };
-    eval(blocProvocation);
+    eval(blocPlafond + "\n" + blocProvocation);
     return alterationsExtraites;
 }
 
@@ -53,10 +57,13 @@ console.log("1. DÉTECTION SUR L'EFFET DE BASE (le vrai nom en base : « Provoca
     verifier("la chance suit le pourcentage de base", alts[0] && alts[0].chance === 10, `(${alts[0] && alts[0].chance}%)`);
 }
 
-console.log("\n2. PLAFOND DE CHANCE À 40 %");
+console.log("\n2. PLAFOND DE CHANCE : CELUI DU GRIMOIRE (40 % À DÉFAUT)");
 {
     const alts = executerBloc({ effBase: { Nom: "Provocations", Pourcent_Base: "90" }, count: 2 });
-    verifier("la chance est plafonnée à 40 %, même à 90×2", alts[0] && alts[0].chance === 40, `(${alts[0] && alts[0].chance}%)`);
+    verifier("sans plafond dans la base : 40 %, même à 90×2", alts[0] && alts[0].chance === 40, `(${alts[0] && alts[0].chance}%)`);
+    const grimoire = { EFF_PROVOCATIONS: { Nom: "Provocations", Pourcent_Base: 20, Pourcent_Max: 60 } };
+    const regle = executerBloc({ effBase: { Nom: "Provocations", Pourcent_Base: "90" }, count: 2, grimoire });
+    verifier("le grimoire dit 60 % : c'est 60 % en combat", regle[0] && regle[0].chance === 60, `(${regle[0] && regle[0].chance}%)`);
 }
 
 console.log("\n3. DÉTECTION EN MOD (posé sur une autre action que l'attaque)");

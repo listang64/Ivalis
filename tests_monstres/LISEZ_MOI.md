@@ -133,6 +133,7 @@ node purification.mjs       # la Purification du grimoire : 1 état néfaste ret
 node repli.mjs              # le Repli : frapper puis marcher 3 cases, 60 % d'éviter chaque opportunité
 node bond_apres_attaque.mjs  # un Bond placé après l'attaque saute enfin (il part avec la carte)
 node aveuglement.mjs        # l'Aveuglement : 3 cases de noir fixes, ciblage interdit (sauf zones), brouillard chez l'aveuglé
+node equilibrage_base.mjs    # la vraie base : Contre physique / Absorption magique, plafonds de chance du grimoire
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -2805,3 +2806,47 @@ pourcentage réglé à la main dans le grimoire n'est pas touché.
 `aveuglement.mjs` et `migration_effets.mjs` le vérifient (vingt tirages sur
 vingt : Naomi, dans le noir, n'est jamais visée et la goule marche vers Ben) ;
 morsures sur moteur_pur, moteur_effets, ia_pure, combat.js et app.js.
+
+### Le rééquilibrage de Nico, suivi partout — y compris par les monstres
+
+Nico a rééquilibré les techniques dans le grimoire : attaques et soins à 3 pour
+2 PC, Absorption et Contre à 6 PC plafonnés à 60 %, Confusion 6 %/48 %,
+Immobilisation 10 %/50 %, Peur 10 %, Poussée 15 %/60 %, Provocation plafonnée à
+60 %, Étalement « Cout / 1.2 »… La base est lue en direct par la Forge ET par le
+générateur de monstres ; ce qui ne suivait pas, c'était ce que le code écrivait
+en dur :
+
+- **les plafonds de chance** des états dans l'extraction de carte
+  (moteur_effets.js) : Immobilisation, Confusion et Provocation restaient
+  bloquées à 40 % en combat alors que la Forge annonçait 50, 48 et 60. Chaque
+  plafond vient maintenant du Pourcentage max du grimoire
+  (`plafondDuGrimoire`), l'ancien chiffre ne servant plus que de secours ;
+- **la ristourne de l'Étalement** : la Forge (competences.js) et le générateur
+  (monstres_competences.js) divisaient toujours par 1,3. Elle se lit dans le coût
+  au grimoire (« Cout / 1.2 ») — `diviseurEtalement`, secours à 1,3.
+
+**Le bouton « Mettre la BDD à jour » n'écrase plus l'équilibrage.** Sa règle
+remettait le coût de l'Étalement à « Cout / 1.3 » et la Valeur du Bouclier à 25 :
+ces deux champs ne sont plus touchés (seuls les textes et notes le sont).
+
+**Contre et Absorption, vérifiés sur la vraie base** : chaque attaque réelle part
+avec le bon type (légère et lourde en physique, magique et mots de pouvoir en
+magique) ; le Contre annule sa part des dégâts physiques et renvoie 10 %, sans
+toucher à la magie ; l'Absorption annule sa part des dégâts magiques et soigne de
+10 %, sans toucher au physique ; un cran vaut la Valeur du grimoire (20 %),
+plafonné à son Pourcentage max (60 %).
+
+L'instantané de la base utilisé par les bancs (effets_reels.json) a été relu
+depuis Firestore, en lecture seule. Sur 4 140 cartes de monstres générées avec,
+le coût (fatigue, initiative, PC) est identique à celui de la vraie Forge —
+`cout_reel.mjs`, qui fait désormais tomber la suite en cas d'écart (il ne
+faisait que l'afficher). À budget égal, une technique de monstre frappe un peu
+moins fort qu'avant (Normal : 7,9 → 6,4 dégâts de socle par carte ; Boss :
+9,3 → 8,1) : c'est l'équilibrage voulu — une attaque rend 1,5 dégât par PC au
+lieu de 2 —, le même pour les joueurs.
+
+Bancs mis à jour pour la nouvelle base : `cout_et_tir.mjs` (valeur de l'attaque
+lourde lue dans la base), `provocation.mjs` (le vrai `plafondDuGrimoire`, et un
+grimoire à 60 %), `migration_effets.mjs` (Paralysie déjà partie, coût de
+l'Étalement et Bouclier intacts). Morsures : l'ancien moteur_effets.js rebloque
+trois plafonds à 40 % ; un générateur resté à 1,3 fait diverger 484 cartes.

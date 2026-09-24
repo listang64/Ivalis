@@ -4108,15 +4108,16 @@ window.MIGRATION_EFFETS = [
       champs: { Effet_Base: "10% chance de poussée la cible de 2 hexagones en ligne droite. Peut se déplacer ensuite. 15% de chance de la bousculer : -20% d'énergie.",
                 Notes: "Ne génère pas d'attaque d'opportunité. La distance (Valeur = 2 hexagones) est fixe : les points ajoutés dans la Forge n'augmentent que la chance." } },
     { id: "EFF_DUREE_ETALEMENT_DEGATS",
-      champs: { Cout_PT: "Cout / 1.3",
-                Effet_Base: "Dégâts ou soins divisés par le nombre de tours : rien au lancement, une part à chaque fin de manche.",
+      // Le coût (« Cout / 1.x ») n'est PAS touché : c'est un réglage d'équilibrage
+      // de Nico, lu tel quel par la Forge et par le générateur de monstres.
+      champs: { Effet_Base: "Dégâts ou soins divisés par le nombre de tours : rien au lancement, une part à chaque fin de manche.",
                 Notes: "Ne se pose que sur une attaque, un soin, une Zone ou une Distance — jamais sur un état. Chaque ⏳ ajoute un tour." } },
     // Le bouclier couvre une part des PV RESTANTS de la cible : sa Valeur est
     // ce pourcentage (par cran), plafonné par le Pourcentage max. 25 %.
+    // La Valeur (le pourcentage) et le texte restent ceux du grimoire : c'est
+    // l'équilibrage de Nico (30 % aujourd'hui). Seule la note explique la règle.
     { id: "EFF_BOUCLIER_MAGIQUE",
-      champs: { Valeur: 25,
-                Effet_Base: "Créer un bouclier de 25% des pv restants de la cible.",
-                Notes: "Valeur = % des PV restants de la cible, par cran ; plafonné par le Pourcentage max." } },
+      champs: { Notes: "Valeur = % des PV restants de la cible, par cran ; plafonné par le Pourcentage max." } },
     // La Paralysie quitte le jeu : elle bloquait tout pendant quatre tours, et
     // un joueur privé de son tour n'a plus de jeu du tout.
     { id: "EFF_PARALYSIE", supprimer: true },

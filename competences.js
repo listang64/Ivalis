@@ -895,6 +895,16 @@ function estUneAttaqueDeBase(nom) {
            n.includes("mot de pouvoir");
 }
 
+// LA RISTOURNE DE L'ÉTALEMENT se lit dans son coût au grimoire : « Cout / 1.2 »
+// divise le coût de l'action par 1,2. Elle était écrite en dur (1,3) et ne
+// suivait plus la base. 1,3 reste le secours si la base ne dit rien de lisible.
+function diviseurEtalement(effet) {
+    const m = /\/\s*([\d.,]+)/.exec(String((effet && effet.Cout_PT) || ""));
+    const d = m ? parseFloat(m[1].replace(",", ".")) : NaN;
+    return d > 1 ? d : 1.3;
+}
+window.diviseurEtalement = diviseurEtalement;
+
 function getMaxStacks(effet) {
     const pBase = parseFrenchFloat(effet.Pourcent_Base);
     const pMax = parseFrenchFloat(effet.Pourcent_Max);
@@ -1612,6 +1622,7 @@ window.rafraichirForge = function() {
         
         let coutMods = 0;
         let aDOT = false;
+        let diviseurDOT = 1.3;
 
         if (act.baseEffet.Nom === "Initiative +") {
             const baseVal = parseFrenchFloat(act.baseEffet.Valeur) || 8;
@@ -1642,6 +1653,7 @@ window.rafraichirForge = function() {
                     coutMods += parseFrenchFloat(modEff.Cout_PT) * Math.max(0, zoneLen - 1);
                 } else if (modEff.Nom === "DOT" || modEff.Nom === "Durée étalement dégâts") {
                     aDOT = true;
+                    diviseurDOT = diviseurEtalement(modEff);
                 } else {
                     coutMods += parseFrenchFloat(modEff.Cout_PT) * modCount;
                 }
@@ -1653,7 +1665,7 @@ window.rafraichirForge = function() {
         });
 
         let coutActionTotale = baseActionCost + coutDureeBase + coutMods;
-        if (aDOT) coutActionTotale /= 1.3;
+        if (aDOT) coutActionTotale /= diviseurDOT;
         totalPC += coutActionTotale;
     });
 

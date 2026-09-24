@@ -434,9 +434,11 @@ if (!idAttaque || !idDistance) {
 
   verifier("la catégorie d'arme de la carte voyage avec le ciblage",
            auCerveau.arme === "Sans arme / Arme rp", String(auCerveau.arme));
-  // 2 de base (l'attaque lourde réelle) + 2 de la bague, sans les 3 de l'arc.
+  // La valeur de l'attaque lourde réelle (lue dans la base : l'équilibrage
+  // change) + 2 de la bague, sans les 3 de l'arc.
+  const baseLourde = parseFloat(String((EFFETS.EFF_ATTAQUE_LOURDE || {}).Valeur).replace(",", ".")) || 0;
   verifier("ET LE CERVEAU REÇOIT DES DÉGÂTS SANS L'ARME : la bague seule",
-           auCerveau.degats === 4, String(auCerveau.degats));
+           auCerveau.degats === baseLourde + 2, `${auCerveau.degats} (attendu ${baseLourde} + 2)`);
 }
 
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 2).join(" | "));

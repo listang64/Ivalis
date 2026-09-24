@@ -659,6 +659,12 @@ function poserMod(chantier, act, effetMod, count) {
 // C'est lui qui détermine la fatigue (fatigue = plancher(PC × 5)), donc il ne
 // doit jamais diverger de la Forge, sinon les cartes des monstres coûteraient
 // autre chose que ce qu'elles affichent.
+function diviseurEtalementMonstre(effet) {
+    const m = /\/\s*([\d.,]+)/.exec(String((effet && effet.Cout_PT) || ""));
+    const d = m ? parseFloat(m[1].replace(",", ".")) : NaN;
+    return d > 1 ? d : 1.3;
+}
+
 function coutPCChantier(chantier, palette) {
     const effetDureePlus = palette.find(e => e.Nom === "Durée +");
     const coutDureePlus = effetDureePlus ? coutPC(effetDureePlus) : 5;
@@ -669,6 +675,7 @@ function coutPCChantier(chantier, palette) {
         let coutDuree = (act.baseDuree || 0) * coutDureePlus;
         let coutMods = 0;
         let aEtalement = false;
+        let diviseur = 1.3;
 
         act.modsEffets.forEach(m => {
             const nom = m.effet.Nom || "";
@@ -678,6 +685,9 @@ function coutPCChantier(chantier, palette) {
                 coutMods += coutPC(m.effet) * Math.max(0, taille - 1);
             } else if (nom === "DOT" || nom === "Durée étalement dégâts") {
                 aEtalement = true;
+                // ⚖️ règle Forge : la ristourne se lit dans le coût au grimoire
+                // (« Cout / 1.2 »), comme dans la Forge (diviseurEtalement).
+                diviseur = diviseurEtalementMonstre(m.effet);
             } else {
                 coutMods += coutPC(m.effet) * m.count;
             }
@@ -685,7 +695,7 @@ function coutPCChantier(chantier, palette) {
         });
 
         let coutAction = coutBase + coutDuree + coutMods;
-        if (aEtalement) coutAction /= 1.3;
+        if (aEtalement) coutAction /= diviseur;
         totalPC += coutAction;
     });
     return totalPC;

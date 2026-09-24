@@ -86,9 +86,10 @@ console.log("1. ELLE VISE LES EFFETS QUE NICO A DEMANDÉ DE CHANGER");
     verifier("les dix effets concernés, ni plus ni moins",
              JSON.stringify(vises) === JSON.stringify(attendus), vises.join(", "));
     // Ceux qu'on modifie existent ; ceux qu'on crée (le Repli), pas encore.
+    // (La Paralysie, elle, est à supprimer : déjà partie de la vraie base, c'est normal.)
     verifier("chaque effet modifié existe vraiment dans la base",
-             table.filter(r => !r.creer).every(r => EFFETS_REELS[r.id] !== undefined),
-             table.filter(r => !r.creer && !EFFETS_REELS[r.id]).map(r => r.id).join(", "));
+             table.filter(r => !r.creer && !r.supprimer).every(r => EFFETS_REELS[r.id] !== undefined),
+             table.filter(r => !r.creer && !r.supprimer && !EFFETS_REELS[r.id]).map(r => r.id).join(", "));
     verifier("et les effets créés (Repli, Aveuglement) n'y sont pas encore",
              table.filter(r => r.creer).map(r => r.id).join() === "EFF_REPLI,EFF_AVEUGLEMENT"
              && EFFETS_REELS.EFF_REPLI === undefined && EFFETS_REELS.EFF_AVEUGLEMENT === undefined);
@@ -98,7 +99,8 @@ console.log("1. ELLE VISE LES EFFETS QUE NICO A DEMANDÉ DE CHANGER");
 console.log("\n2. UN PASSAGE : LA BASE DIT CE QUE LE MOTEUR FAIT");
 // =========================================================================
 {
-    const m = fausseBase(EFFETS_REELS);
+    // Une base où traîne encore la Paralysie, pour voir la suppression se faire.
+    const m = fausseBase({ ...EFFETS_REELS, EFF_PARALYSIE: EFFETS_REELS.EFF_PARALYSIE || { Nom: "Paralysie" } });
     const resultat = await m.lancer();
 
     verifier("la Paralysie disparaît de la base",
@@ -119,9 +121,15 @@ console.log("\n2. UN PASSAGE : LA BASE DIT CE QUE LE MOTEUR FAIT");
              /15% de chance de la bousculer/.test(m.base.EFF_POUSSEE.Effet_Base)
              && /20% d'énergie/.test(m.base.EFF_POUSSEE.Effet_Base),
              m.base.EFF_POUSSEE.Effet_Base);
-    verifier("l'Étalement coûte désormais Cout / 1.3",
-             m.base.EFF_DUREE_ETALEMENT_DEGATS.Cout_PT === "Cout / 1.3",
+    // L'ÉQUILIBRAGE DE NICO N'EST PAS TOUCHÉ : le coût de l'Étalement (« Cout /
+    // 1.2 » aujourd'hui) et le pourcentage du Bouclier restent ceux du grimoire.
+    verifier("le coût de l'Étalement reste celui du grimoire",
+             m.base.EFF_DUREE_ETALEMENT_DEGATS.Cout_PT === EFFETS_REELS.EFF_DUREE_ETALEMENT_DEGATS.Cout_PT,
              m.base.EFF_DUREE_ETALEMENT_DEGATS.Cout_PT);
+    verifier("la Valeur et le texte du Bouclier restent ceux du grimoire",
+             m.base.EFF_BOUCLIER_MAGIQUE.Valeur === EFFETS_REELS.EFF_BOUCLIER_MAGIQUE.Valeur
+             && m.base.EFF_BOUCLIER_MAGIQUE.Effet_Base === EFFETS_REELS.EFF_BOUCLIER_MAGIQUE.Effet_Base,
+             `${m.base.EFF_BOUCLIER_MAGIQUE.Valeur} / ${m.base.EFF_BOUCLIER_MAGIQUE.Effet_Base}`);
     verifier("et dit que rien ne tombe au lancement",
              /rien au lancement/.test(m.base.EFF_DUREE_ETALEMENT_DEGATS.Effet_Base),
              m.base.EFF_DUREE_ETALEMENT_DEGATS.Effet_Base);

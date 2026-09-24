@@ -29,3 +29,5 @@ console.log("  fatigue identique    :", ecartF===0?"OK":"ÉCHEC ("+ecartF+")");
 console.log("  initiative identique :", ecartI===0?"OK":"ÉCHEC ("+ecartI+")");
 console.log("  coût PC identique    :", ecartPC===0?"OK":"ÉCHEC ("+ecartPC+")");
 ex.forEach(e=>console.log("   ",e));
+// Un écart doit faire tomber la suite, pas seulement s'afficher.
+process.exit(ecartF + ecartI + ecartPC === 0 ? 0 : 1);
