@@ -60,7 +60,8 @@ export const RYTHME = {
     esquive:    1000,
     chute:      1200,
     carte:       260,
-    jauge:       650
+    jauge:       650,
+    repli:       450
 };
 
 // =========================================================================
@@ -80,7 +81,13 @@ const SCENES = {
     // --- LE MOUVEMENT ----------------------------------------------------
     pas(e) {
         return { geste: "pas", pion: e.acteur, de: e.de, vers: e.vers,
-                 cout: nombre(e.cout) };
+                 cout: nombre(e.cout), ...(e.repli ? { repli: true } : {}) };
+    },
+    // Le repli s'annonce, puis ses pas (marqués `repli`) filent plus vite, en
+    // laissant une traînée derrière le pion.
+    repli(e) {
+        return { geste: "message", pion: e.acteur, texte: "↩️ Repli !",
+                 couleur: COULEURS.attention, duree: RYTHME.repli };
     },
     // Un déplacement imposé. Même géométrie, autre gestuelle : un pion poussé
     // ne marche pas, il glisse ; un bond est un saut à vol d'oiseau.
@@ -222,7 +229,9 @@ const SCENES = {
     // s'en va. Les dégâts eux-mêmes arrivent dans l'étape suivante.
     opportunite(e) {
         if (e.evitee) {
-            return { geste: "message", pion: e.cible, texte: "Esquivé 💨",
+            // Le mot dit CE qui a sauvé : le repli, la dérobade du Vargen, la
+            // parade ou l'esquive.
+            return { geste: "message", pion: e.cible, texte: e.mot || "Esquivé 💨",
                      couleur: COULEURS.neutre, duree: RYTHME.esquive };
         }
         return { geste: "opportunite", pion: e.acteur, cible: e.cible, hex: e.hex,
@@ -335,7 +344,8 @@ export function creerPont(effets) {
     async function jouerLeGeste(scene) {
         switch (scene.geste) {
             case "pas":
-                await pas({ idToken: scene.pion, de: scene.de, vers: scene.vers });
+                await pas({ idToken: scene.pion, de: scene.de, vers: scene.vers,
+                            ...(scene.repli ? { repli: true } : {}) });
                 break;
 
             case "poussee":

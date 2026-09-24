@@ -42,9 +42,9 @@ import { clonerEtat, combattant, creerDes, combattantIllusion,
 import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion,
          traverserZones, creerZonePure, poserZone, vieillirZones,
          chaineDeDegats, REGLES_ETATS } from './moteur_pur.js';
-import { resoudreMouvement, resoudreBond, resoudrePeur, distance, planifierTrajet,
+import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant } from './mouvement_pur.js';
-import { deciderTourCreature, choisirZone } from './ia_pure.js';
+import { deciderTourCreature, choisirZone, choisirRepli } from './ia_pure.js';
 
 const nombre = (v, defaut = 0) => {
     const n = parseInt(v);
@@ -767,6 +767,18 @@ export function appliquerIntention(etat, intention, plateau) {
             if (zone) etapes.push(...poserZone(suivant, zone));
         }
 
+        // LE REPLI : LA MARCHE QUI SUIT L'ATTAQUE. La case d'arrivée voyage
+        // avec la carte — une demande envoyée APRÈS serait refusée, puisque la
+        // carte clôt le tour juste en dessous. Le chemin est recalculé depuis
+        // la position du lanceur une fois l'attaque jouée, et les dés
+        // d'esquive sont ceux du cerveau.
+        if (intention.repli && intention.repli.vers) {
+            etapes.push(...resoudreRepli(suivant, intention.acteur, intention.repli.vers, des, plateau, {
+                portee: Math.min(6, Math.max(0, nombre(intention.repli.portee, 3))),
+                chance: Math.min(100, Math.max(0, nombre(intention.repli.chance, 60)))
+            }));
+        }
+
         // UNE CARTE TERMINE LE TOUR, et c'est la règle du jeu depuis toujours :
         // validerCarteCombat enchaîne sur finDeTourCombat. Le cerveau ne le
         // faisait pas, et ça se voyait de deux façons à la table — le tour ne
@@ -884,6 +896,19 @@ export function jouerCreature(etat, id, carte, plateau) {
                 etapes.push(...resoudrePeur(courant, id, idCible, des, plateau));
             });
         });
+
+        // SA CARTE PORTE UN REPLI : elle décroche après avoir frappé, vers la
+        // case qui l'éloigne le plus de l'adversaire (ia_pure.js, choisirRepli),
+        // et marche comme un joueur qui se replie — mêmes dés, même règle.
+        if (carte.repli) {
+            const portee = Math.min(6, Math.max(0, nombre(carte.repli.portee, 3)));
+            const vers = choisirRepli(courant, id, portee, plateau);
+            if (vers) {
+                etapes.push(...resoudreRepli(courant, id, vers, des, plateau, {
+                    portee, chance: Math.min(100, Math.max(0, nombre(carte.repli.chance, 60)))
+                }));
+            }
+        }
     } else if (!aPortee) {
         // Pourquoi elle n'a rien lancé. Dans la trace, cette ligne vaut de l'or :
         // « tour de 20 millisecondes sans rien faire » restait inexplicable.

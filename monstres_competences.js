@@ -296,6 +296,9 @@ function affinitesParDefaut(monstre) {
         // arcanique.
         if (nom.toLowerCase().includes("magique") && !magique)             note = Math.min(note, 1);
         if (nom.toLowerCase().includes("illusion")) note = magique ? 6 : 0;
+        // LE REPLI : frapper puis décrocher. C'est le jeu d'un tireur ou d'un
+        // soutien qui garde ses distances ; un tank, lui, reste au contact.
+        if (nom.trim().toLowerCase() === "repli") note = (distance || soutien) ? 8 : (tank ? 1 : 5);
 
         notes[nom] = note;
     });
@@ -757,6 +760,23 @@ function fabriquerCarte(monstre, affinites, patron, tranche, palette, rang) {
 
     const effetBase = tirerPondere(candidatsBase, note) || candidatsBase[0];
     const action = poserAction(chantier, effetBase, 1);
+
+    // --- 1 bis. Le repli après la frappe ---
+    // Une créature qui garde ses distances (tireur, mage à distance, soutien)
+    // pose parfois un Repli juste après son attaque : elle frappe, puis
+    // décroche. Seulement si la tranche peut se l'offrir — sinon on le retire.
+    const gardeSesDistances = /DISTANCE|SOUTIEN/.test(monstre.archetype || "");
+    const effetRepli = racines.find(e => (e.Nom || "").trim().toLowerCase() === "repli");
+    if (effetRepli && gardeSesDistances && patron !== "soutien" && patron !== "brute"
+        && estAttaqueDeBase(effetBase.Nom)
+        && effetAutorise(chantier, effetRepli, false) && Math.random() < 0.35) {
+        const tagsAvant = new Set(chantier.tags);
+        const actionRepli = poserAction(chantier, effetRepli, 1);
+        if (fatigueDe(chantier, palette) > fatiguePlafond) {
+            chantier.actions = chantier.actions.filter(a => a !== actionRepli);
+            chantier.tags = tagsAvant;   // sa caractéristique ne doit pas rester comptée
+        }
+    }
 
     // --- 2. Les mods imposés par le patron ---
     const trouverMod = (motsCles) => {

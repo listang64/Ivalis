@@ -578,6 +578,100 @@ window.resoudreBondInteractif = function(idPerso, portee) {
 };
 
 // =========================================================================
+//  REPLI — OÙ SE REPLIER ?
+//  Même écran que le Bond : tout s'assombrit, sauf la case du lanceur et les
+//  cases qu'il peut atteindre à pied en `portee` pas (ni mur, ni vivant
+//  traversé — la marche, pas le saut). Un tap sur une case éclairée la choisit ;
+//  un tap sur son propre pion renonce au repli (la carte part quand même).
+//  Les cases viennent de la même fonction que celle du cerveau
+//  (mouvementPur.cheminsDeRepli), appliquée à ce que l'écran connaît.
+// =========================================================================
+window.casesDeRepliEcran = function(idPerso, portee, depart) {
+    const mp = window.mouvementPur;
+    const tk = depart || (window.TOKENS_VTT_DATA || {})[idPerso];
+    if (!mp || typeof mp.cheminsDeRepli !== "function" || !tk) return [];
+    const combattants = {};
+    Object.entries(window.TOKENS_VTT_DATA || {}).forEach(([id, t]) => {
+        const p = (window.PERSOS_PARTIE || []).find(x => x.idPersonnage === id);
+        const aTerre = !!(p && (p.statut === "Mort" || p.statut === "KO"));
+        combattants[id] = { id, q: Number(t.q), r: Number(t.r), aTerre };
+    });
+    combattants[idPerso] = { ...(combattants[idPerso] || { id: idPerso }), q: Number(tk.q), r: Number(tk.r), aTerre: false };
+    const plateau = { etatCase: (q, r) => {
+        const e = (window.PLATEAU_VTT && window.PLATEAU_VTT.getCaseState) ? (window.PLATEAU_VTT.getCaseState(q, r) || {}) : {};
+        return { bloquee: !!e.isBlocked, supprimee: !!e.isDeleted, difficile: !!e.isDifficult };
+    } };
+    const chemins = mp.cheminsDeRepli({ combattants }, idPerso, portee, plateau);
+    return [...chemins.keys()].map(k => { const [q, r] = k.split(",").map(Number); return { q, r }; });
+};
+
+window.choisirCaseRepli = function(idPerso, portee, depart) {
+    return new Promise((resolve) => {
+        const tk = depart || (window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idPerso] : null);
+        if (!tk || !window.PLATEAU_VTT) return resolve(null);
+        const hexDepart = { q: Number(tk.q), r: Number(tk.r) };
+
+        const lanceur = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPerso);
+        if (lanceur && (lanceur.Etats_Alteres || []).some(e => e.nom === "Immobilisation")) {
+            if (typeof window.afficherMessageFlottantHex === "function") {
+                window.afficherMessageFlottantHex(hexDepart.q, hexDepart.r, "Immobilisé !", "#aaaaaa");
+            }
+            return resolve(null);
+        }
+
+        const cases = window.casesDeRepliEcran(idPerso, portee, hexDepart);
+        if (cases.length === 0) {
+            if (typeof window.afficherMessageFlottantHex === "function") {
+                window.afficherMessageFlottantHex(hexDepart.q, hexDepart.r, "Aucune case de repli", "#aaaaaa");
+            }
+            return resolve(null);
+        }
+
+        const conteneur = document.getElementById("conteneur-plateau-vtt");
+        if (!conteneur || typeof window.assombrirCasesJouables !== "function") return resolve(null);
+        const overlay = window.assombrirCasesJouables("svg-repli-assombrissement", [hexDepart, ...cases]);
+        if (!overlay) return resolve(null);
+        if (typeof window.surlignerEffetCarteActif === "function") window.surlignerEffetCarteActif("Repli");
+        if (typeof window.afficherMessageFlottantHex === "function") {
+            window.afficherMessageFlottantHex(hexDepart.q, hexDepart.r, "↩️ Où te replier ?", "#ffaa00");
+        }
+
+        const nettoyer = () => {
+            overlay.remove();
+            if (typeof window.surlignerEffetCarteActif === "function") window.surlignerEffetCarteActif(null);
+            window.removeEventListener("click", onClick, { capture: true });
+        };
+
+        const onClick = (e) => {
+            if (!conteneur.contains(e.target)) return;
+            e.stopPropagation();
+
+            const tokenClique = e.target.closest ? e.target.closest(".token-vtt") : null;
+            if (tokenClique) {
+                const idClique = tokenClique.id.replace("token-", "");
+                if (idClique === idPerso) { nettoyer(); return resolve(null); }   // on reste
+                const t = window.TOKENS_VTT_DATA[idClique];
+                if (t && typeof window.afficherMessageFlottantHex === "function") {
+                    window.afficherMessageFlottantHex(t.q, t.r, "Case occupée", "#aaaaaa");
+                }
+                return;
+            }
+
+            const x = (e.clientX - window.VTT_POS_X) / window.VTT_SCALE;
+            const y = (e.clientY - window.VTT_POS_Y) / window.VTT_SCALE;
+            const hex = window.PLATEAU_VTT.pixelToHex(x, y);
+            if (hex.q === hexDepart.q && hex.r === hexDepart.r) { nettoyer(); return resolve(null); }
+            const choisie = cases.find(h => h.q === hex.q && h.r === hex.r);
+            if (!choisie) return;   // hors d'atteinte : on attend
+            nettoyer();
+            resolve({ q: choisie.q, r: choisie.r });
+        };
+
+        window.addEventListener("click", onClick, { capture: true });
+    });
+};
+
+// =========================================================================
 //  ILLUSION
 //  Crée un leurre statique de 1 PV, avec l'image du lanceur (affichée à 50% d'opacité, voir
 //  appliquerTokensVTT), sur une case libre choisie interactivement (même écran assombri que le
@@ -1005,6 +1099,10 @@ window.demarrerCiblage = async function(idCarte, options) {
     let porteeDeLaCarte = 0;
     let isBond = false;
     let porteeBond = 2;
+    // LE REPLI : une marche de quelques cases APRÈS l'attaque. Il ne frappe ni
+    // ne soigne ; la carte l'emporte avec elle jusqu'au cerveau, case d'arrivée
+    // choisie juste avant l'envoi (voir choisirCaseRepli).
+    let repliCarte = null;
     // Pour que la carte se résolve dans l'ordre où elle est construite : on retient à quel
     // rang du tableau se trouve le Bond, et à quel rang apparaît le premier autre effet
     // (attaque/soin/altération). Si le Bond est après, on le joue après la résolution de l'attaque.
@@ -1091,6 +1189,27 @@ window.demarrerCiblage = async function(idCarte, options) {
                 const modEff = window.EFFETS_BDD_CACHE[m.id];
                 if (modEff && (modEff.Nom || "").toLowerCase().includes("persistance")) aPersistanceTerrain = true;
             });
+
+            // Repli : sa Valeur est le nombre de cases, son Pourcentage de base
+            // la chance d'éviter chaque attaque d'opportunité (un seul cran,
+            // plafonné par le Pourcentage max). Posé en modificateur d'une
+            // attaque, l'attaque reste ; posé en effet de base, il n'est que ça.
+            const lireRepli = (eff, n) => {
+                const portee = Math.max(1, Math.round(parseFrFloat(eff.Valeur) || 3));
+                let chance = (parseFrFloat(eff.Pourcent_Base) || 60) * (n || 1);
+                const plafond = parseFrFloat(eff.Pourcent_Max);
+                if (plafond > 0) chance = Math.min(chance, plafond);
+                repliCarte = { portee: Math.max((repliCarte || {}).portee || 0, portee),
+                               chance: Math.min(100, Math.max((repliCarte || {}).chance || 0, chance)) };
+            };
+            listeMods.forEach(m => {
+                const modEff = window.EFFETS_BDD_CACHE[m.id];
+                if (modEff && (modEff.Nom || "").trim().toLowerCase() === "repli") lireRepli(modEff, m.count);
+            });
+            if (nomLower.trim() === "repli") {
+                lireRepli(effBase, act.count);
+                return;
+            }
 
             // Bond : pas une attaque/alteration, traité à part avant tout le reste de la carte.
             if (nomLower.includes("bond")) {
@@ -1882,7 +2001,13 @@ window.demarrerCiblage = async function(idCarte, options) {
         if (isIllusion) {
             await window.resoudreIllusionInteractif(idLanceurBond, porteeIllusion);
         }
-        window.validerCarteCombat(idCarte);
+        // Un Repli seul sur la carte : on choisit quand même où se replier.
+        let repliSeul = null;
+        if (repliCarte) {
+            const vers = await window.choisirCaseRepli(idLanceurBond, repliCarte.portee, arriveeBond);
+            if (vers) repliSeul = { ...repliCarte, vers };
+        }
+        window.validerCarteCombat(idCarte, undefined, repliSeul ? { repli: repliSeul } : undefined);
         return;
     }
 
@@ -1981,6 +2106,10 @@ window.demarrerCiblage = async function(idCarte, options) {
         porteeMinTraction: porteeMinTraction,
         tractionAvantAttaque: tractionAvantAttaque,
         illusionEnAttente: isIllusion ? { idLanceur: idLanceurBond, portee: porteeIllusion } : null,
+        // { portee, chance } si la carte porte un Repli ; la case, elle, est
+        // choisie au moment de résoudre (repliChoisi).
+        repli: repliCarte,
+        repliChoisi: null,
         persistanceTerrain: aPersistanceTerrain,
         zoneHexesFinaux: null,
         // Attaque ET soutien sur la même carte : deux phases de ciblage.
@@ -3110,7 +3239,9 @@ window.declencherResolution = async function() {
                                       ? state.coutFatigue
                                       : (state.fatigue || window.COUT_COMPETENCE_SELECTIONNEE)) || 0,
                 persistanceTerrain: !!state.persistanceTerrain,
-                zoneHexes
+                zoneHexes,
+                repli: (state.repli && state.repliChoisi)
+                    ? { ...state.repli, vers: state.repliChoisi } : null
             });
         } catch (e) {
             console.error("Demande de carte :", e);
@@ -3128,6 +3259,16 @@ window.declencherResolutionAvecBondEventuel = async function() {
     if (window.passerAuCiblageDuSoutien()) return;
     const bondEnAttente = window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.bondApresAttaque;
     const illusionEnAttente = window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.illusionEnAttente;
+    // LE REPLI SE CHOISIT AVANT D'ENVOYER LA CARTE. Il se joue après l'attaque,
+    // mais la carte clôt le tour : une demande envoyée après elle serait
+    // refusée. La case part donc avec la carte, et le cerveau fait marcher le
+    // lanceur une fois l'attaque jouée.
+    const etatRepli = window.ETAT_CIBLAGE;
+    if (etatRepli && etatRepli.repli && !etatRepli.repliChoisi) {
+        const idRepli = etatRepli.idLanceur;
+        etatRepli.repliChoisi = await window.choisirCaseRepli(idRepli, etatRepli.repli.portee,
+                                                              etatRepli.origineLanceur);
+    }
     await window.declencherResolution();
     if (bondEnAttente) {
         await window.resoudreBondInteractif(bondEnAttente.idLanceur, bondEnAttente.portee);

@@ -82,12 +82,15 @@ console.log("1. ELLE VISE LES EFFETS QUE NICO A DEMANDÉ DE CHANGER");
     const { table } = fausseBase(EFFETS_REELS);
     const vises = table.map(r => r.id).sort();
     const attendus = ["EFF_BOUCLIER_MAGIQUE", "EFF_BRULE", "EFF_DUREE_ETALEMENT_DEGATS", "EFF_ELECTRIFIE",
-                      "EFF_ETOURDIT", "EFF_GLACE", "EFF_PARALYSIE", "EFF_POUSSEE"].sort();
-    verifier("les huit effets concernés, ni plus ni moins",
+                      "EFF_ETOURDIT", "EFF_GLACE", "EFF_PARALYSIE", "EFF_POUSSEE", "EFF_REPLI"].sort();
+    verifier("les neuf effets concernés, ni plus ni moins",
              JSON.stringify(vises) === JSON.stringify(attendus), vises.join(", "));
-    verifier("et chacun existe vraiment dans la base",
-             table.every(r => EFFETS_REELS[r.id] !== undefined),
-             table.filter(r => !EFFETS_REELS[r.id]).map(r => r.id).join(", "));
+    // Ceux qu'on modifie existent ; ceux qu'on crée (le Repli), pas encore.
+    verifier("chaque effet modifié existe vraiment dans la base",
+             table.filter(r => !r.creer).every(r => EFFETS_REELS[r.id] !== undefined),
+             table.filter(r => !r.creer && !EFFETS_REELS[r.id]).map(r => r.id).join(", "));
+    verifier("et l'effet créé (Repli) n'y est pas encore",
+             table.filter(r => r.creer).map(r => r.id).join() === "EFF_REPLI" && EFFETS_REELS.EFF_REPLI === undefined);
 }
 
 // =========================================================================
@@ -122,6 +125,24 @@ console.log("\n2. UN PASSAGE : LA BASE DIT CE QUE LE MOTEUR FAIT");
              /rien au lancement/.test(m.base.EFF_DUREE_ETALEMENT_DEGATS.Effet_Base),
              m.base.EFF_DUREE_ETALEMENT_DEGATS.Effet_Base);
 
+    // LE REPLI NAÎT, ENTIER : tout ce que la Forge et le moteur lisent.
+    const repli = m.base.EFF_REPLI || {};
+    verifier("le Repli est créé dans la base", !!m.base.EFF_REPLI && resultat.faits.some(f => /EFF_REPLI — créé/.test(f)),
+             resultat.faits.join(" | "));
+    verifier("avec 3 cases, 60 %, un seul cran, coût 6, Dextérité",
+             repli.Nom === "Repli" && repli.Valeur === 3 && repli.Pourcent_Base === 60 && repli.Pourcent_Max === 60
+             && repli.Cout_PT === "6" && repli.Modificateur === "DEXTÉRITÉ" && repli.Type_Mecanique === "Action/Global",
+             JSON.stringify(repli));
+    verifier("et le texte que la Forge affiche",
+             /3 cases après avoir attaqué/.test(repli.Effet_Base || "") && /60%/.test(repli.Effet_Base || ""));
+
+    // Un Repli déjà réglé à la main (4 cases, 50 %) n'est jamais réécrit.
+    const regle = fausseBase({ ...EFFETS_REELS, EFF_REPLI: { Nom: "Repli", Valeur: 4, Pourcent_Base: 50 } });
+    const rRegle = await regle.lancer();
+    verifier("un Repli déjà réglé dans le grimoire n'est pas écrasé",
+             regle.base.EFF_REPLI.Valeur === 4 && regle.base.EFF_REPLI.Pourcent_Base === 50
+             && rRegle.inchanges.includes("EFF_REPLI (déjà présent)"), JSON.stringify(regle.base.EFF_REPLI));
+
     verifier("tout est rapporté, rien n'a raté", resultat.rates.length === 0,
              resultat.rates.join(" | "));
 
@@ -155,7 +176,7 @@ console.log("\n3. RELANCÉE, ELLE N'ÉCRIT PLUS RIEN");
     verifier("et ne resupprime rien", m.journal.suppressions.length === suppressionsPremier);
     verifier("le rapport le dit clairement", second.faits.length === 0,
              JSON.stringify(second.faits));
-    verifier("en listant ce qui était déjà à jour", second.inchanges.length === 8,
+    verifier("en listant ce qui était déjà à jour", second.inchanges.length === 9,
              JSON.stringify(second.inchanges));
 }
 

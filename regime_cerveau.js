@@ -613,7 +613,13 @@ export function creerRegime(contexte) {
                    // couvre. Du ciblage, pas un résultat : le joueur les a
                    // désignées, le cerveau en fait une zone.
                    persistanceTerrain: !!carte.persistanceTerrain,
-                   zoneHexes: carte.zoneHexes || [] });
+                   zoneHexes: carte.zoneHexes || [],
+                   // La case de repli, choisie à l'écran avant l'envoi : la
+                   // carte clôt le tour, une demande envoyée après serait
+                   // refusée. Absente, la carte ne se replie pas.
+                   ...(carte.repli && carte.repli.vers ? { repli: {
+                       vers: { q: nombre(carte.repli.vers.q), r: nombre(carte.repli.vers.r) },
+                       portee: nombre(carte.repli.portee, 3), chance: nombre(carte.repli.chance, 60) } } : {}) });
 
     // Le saut. La case a été choisie à l'écran ; ce qui part d'ici est une
     // intention, pas un déplacement déjà fait.
@@ -1173,7 +1179,10 @@ async function preparerLesCartes(file) {
                 attaques: carte.attaques || [],
                 alterations: carte.alterations || [],
                 isZone: !!carte.isZone,
-                zoneHexesBase: carte.zoneHexesBase || []
+                zoneHexesBase: carte.zoneHexesBase || [],
+                // Le repli de la carte ({ portee, chance }) : c'est l'IA qui
+                // choisira où, au moment de jouer (voir jouerCreature).
+                repli: carte.repli || null
             };
         } catch (e) {
             tracer("❌", `carte de ${id} illisible`, String(e && e.message));

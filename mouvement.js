@@ -606,6 +606,25 @@ window.jouerAnimationMouvement = async function(actionMouvement) {
 //
 //  Et surtout, elle ne rend la main qu'une fois le pas VRAIMENT terminé — c'est
 //  ce que le journal attend pour passer au numéro suivant.
+// L'ombre que le repli laisse derrière lui : une copie inerte du pion, posée
+// là où il était, qui s'efface pendant qu'il s'éloigne.
+function laisserTraceRepli(tokenDiv) {
+    try {
+        const trace = tokenDiv.cloneNode(true);
+        trace.removeAttribute("id");
+        trace.querySelectorAll("[id]").forEach(el => el.removeAttribute("id"));
+        trace.classList.add("trace-repli");
+        trace.style.transition = "opacity 0.45s ease-out";
+        trace.style.pointerEvents = "none";
+        trace.style.opacity = "0.5";
+        trace.style.filter = "grayscale(0.4) blur(1px)";
+        tokenDiv.parentNode.insertBefore(trace, tokenDiv);
+        void trace.offsetWidth;
+        trace.style.opacity = "0";
+        setTimeout(() => trace.remove(), 500);
+    } catch (e) {}
+}
+
 window.jouerAnimationPas = async function(pas) {
     if (!pas || !pas.vers) return;
     const tokenDiv = document.getElementById("token-" + pas.idToken);
@@ -649,17 +668,23 @@ window.jouerAnimationPas = async function(pas) {
         //    posées AVANT le déplacement, avec un reflow entre les deux : sans
         //    lui, le navigateur regroupe « pose la transition » et « change la
         //    position » en un seul calcul, et le bond n'a jamais lieu.
-        tokenDiv.style.transition = "left 0.4s linear, top 0.4s linear";
+        //    LE REPLI file plus vite, sans bond, et laisse sur chaque case
+        //    quittée une ombre du pion qui s'efface : on voit le combattant
+        //    décrocher, pas se promener.
+        const repli = !!pas.repli;
+        if (repli) laisserTraceRepli(tokenDiv);
+        const duree = repli ? 0.2 : 0.4;
+        tokenDiv.style.transition = `left ${duree}s ${repli ? "ease-out" : "linear"}, top ${duree}s ${repli ? "ease-out" : "linear"}`;
         if (imgMain) imgMain.style.transition = "transform 0.15s ease-out";
         void tokenDiv.offsetWidth;
 
-        if (imgMain) imgMain.style.transform = "scale(1.12)";
+        if (imgMain) imgMain.style.transform = repli ? "scale(0.94)" : "scale(1.12)";
         tokenDiv.dataset.q = pas.vers.q;
         tokenDiv.dataset.r = pas.vers.r;
         window.positionnerTokenVTT(tokenDiv, true);
-        await new Promise(r => setTimeout(r, 250));
+        await new Promise(r => setTimeout(r, repli ? 130 : 250));
         if (imgMain) imgMain.style.transform = "scale(1)";
-        await new Promise(r => setTimeout(r, 150));
+        await new Promise(r => setTimeout(r, repli ? 80 : 150));
 
         // 4. La zone persistante se déclenche une fois ARRIVÉ sur la case.
         for (const entree of (pas.zones || [])) {

@@ -93,8 +93,9 @@ console.log("1. AUCUN TYPE D'ÉTAPE N'EST LAISSÉ SANS MISE EN SCÈNE");
     // serait du code mort. Ceux-là sont les étapes purement narratives —
     // esquive, échec, renoncement — que le moteur produit sans qu'elles
     // changent l'état. On les nomme, pour que la liste reste honnête.
+    // « repli » annonce la marche de repli : ce sont ses pas qui déplacent.
     const narratives = ["esquive", "echec", "etatRate", "trajetEcourte", "renonce", "opportunite",
-                        "manche", "message"];
+                        "manche", "message", "repli"];
     const inconnus = TYPES_MIS_EN_SCENE.filter(t => !TYPES_ETAPES.includes(t) && !narratives.includes(t));
     verifier("et le pont n'invente pas de types", inconnus.length === 0, inconnus.join(", "));
 

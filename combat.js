@@ -5248,7 +5248,7 @@ window.actualiserBannieresEpuisees = function() {
     });
 };
 
-window.validerCarteCombat = async function(idCarte, idLanceur) {
+window.validerCarteCombat = async function(idCarte, idLanceur, options) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
 
     const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
@@ -5272,7 +5272,9 @@ window.validerCarteCombat = async function(idCarte, idLanceur) {
             idCarte,
             attaques: [],
             alterations: [],
-            coutFatigue: parseInt(dataCarte.Fatigue) || 0
+            coutFatigue: parseInt(dataCarte.Fatigue) || 0,
+            // Une carte qui ne fait que se replier emporte sa case.
+            repli: (options && options.repli) || null
         });
     }
 };

@@ -4119,7 +4119,18 @@ window.MIGRATION_EFFETS = [
                 Notes: "Valeur = % des PV restants de la cible, par cran ; plafonné par le Pourcentage max." } },
     // La Paralysie quitte le jeu : elle bloquait tout pendant quatre tours, et
     // un joueur privé de son tour n'a plus de jeu du tout.
-    { id: "EFF_PARALYSIE", supprimer: true }
+    { id: "EFF_PARALYSIE", supprimer: true },
+    // LE REPLI ENTRE DANS LE GRIMOIRE. `creer` : la fiche n'existe pas encore,
+    // elle est écrite en entier la première fois — et jamais réécrite ensuite,
+    // pour que les réglages faits à la main dans le grimoire tiennent. Valeur =
+    // cases de marche ; Pourcentage de base = chance d'éviter chaque attaque
+    // d'opportunité pendant le repli. Un seul cran (Pourcentage max = base).
+    { id: "EFF_REPLI", creer: true,
+      champs: { Nom: "Repli", Cout_PT: "6", Modificateur: "DEXTÉRITÉ",
+                Type_Mecanique: "Action/Global", Type_Mecanique_2: "Aucun",
+                Valeur: 3, Pourcent_Base: 60, Pourcent_Max: 60, Tours: 0, Cible_Etat: "repli",
+                Effet_Base: "Se déplace de 3 cases après avoir attaqué, avec 60% chance d'éviter les attaques d'opportunités.",
+                Notes: "Après l'attaque, le lanceur choisit une case à 3 pas de marche (ni mur, ni vivant traversé). Chaque ennemi quitté a 60% de chance d'être évité avant le jet de défense. Marche gratuite." } }
 ];
 
 window.appliquerMigrationEffets = async function() {
@@ -4140,6 +4151,16 @@ window.appliquerMigrationEffets = async function() {
                     if (!snap.exists()) { inchanges.push(regle.id + " (déjà absent)"); continue; }
                     await deleteDoc(ref);
                     faits.push(regle.id + " — supprimé");
+                    continue;
+                }
+
+                // UN NOUVEL EFFET s'écrit en entier la première fois, puis on
+                // n'y touche plus : ce qui a été réglé dans le grimoire depuis
+                // appartient à celui qui l'a réglé.
+                if (regle.creer) {
+                    if (snap.exists()) { inchanges.push(regle.id + " (déjà présent)"); continue; }
+                    await setDoc(ref, { ...regle.champs });
+                    faits.push(regle.id + " — créé");
                     continue;
                 }
 

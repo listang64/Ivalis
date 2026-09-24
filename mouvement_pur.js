@@ -513,10 +513,125 @@ export function resoudrePeur(etat, idLanceur, idCible, des, plateau) {
     return etapes;
 }
 
+// =========================================================================
+//  7. LE REPLI
+// =========================================================================
+//  « Se déplace de 3 cases après avoir attaqué, avec 60 % de chance d'éviter
+//  les attaques d'opportunité. » C'est une MARCHE, pas un saut : on ne passe
+//  ni à travers un mur, ni à travers un vivant, et chaque ennemi quitté porte
+//  son coup — mais le repli a 60 % de chance de s'y dérober avant même le jet
+//  de défense ordinaire. La marche est offerte : la carte l'a déjà payée.
+//
+//  La case d'arrivée est choisie à l'écran (c'est du ciblage) ; le CHEMIN, lui,
+//  est recalculé ici depuis la position du lanceur au moment du repli — après
+//  l'attaque —, pour qu'aucun poste ne puisse envoyer un trajet de fantaisie.
+
+export const PORTEE_REPLI = 3;
+export const CHANCE_REPLI_OPPORTUNITE = 60;
+
+// Les cases atteignables en `portee` pas de marche, chacune avec le plus court
+// chemin qui y mène. UNE SEULE DÉFINITION, lue par l'écran qui les éclaire, par
+// l'IA des créatures et par le cerveau qui valide.
+export function cheminsDeRepli(etat, id, portee, plateau, depart) {
+    const c = combattant(etat, id);
+    const origine = depart || (c ? { q: nombre(c.q), r: nombre(c.r) } : null);
+    if (!c || !origine) return new Map();
+    const carte = plateau || PLAINE;
+    const max = Math.max(0, Math.round(nombre(portee, PORTEE_REPLI)));
+    const cle = (h) => `${h.q},${h.r}`;
+    const chemins = new Map();
+    const vus = new Set([cle(origine)]);
+    let front = [{ hex: origine, chemin: [] }];
+    for (let pas = 1; pas <= max; pas++) {
+        const suivant = [];
+        for (const { hex, chemin } of front) {
+            for (const v of voisinsDe(hex)) {
+                if (vus.has(cle(v))) continue;
+                vus.add(cle(v));
+                const dessus = (carte.etatCase ? carte.etatCase(v.q, v.r) : null) || {};
+                if (dessus.bloquee || dessus.supprimee) continue;
+                if (occupantVivant(etat, v.q, v.r, id)) continue;
+                const route = [...chemin, { q: v.q, r: v.r }];
+                chemins.set(cle(v), route);
+                suivant.push({ hex: v, chemin: route });
+            }
+        }
+        front = suivant;
+    }
+    return chemins;
+}
+
+// Mute l'état qu'on lui passe (comme resoudrePeur) et rend les étapes.
+export function resoudreRepli(etat, idLanceur, vers, des, plateau, options) {
+    const { portee = PORTEE_REPLI, chance = CHANCE_REPLI_OPPORTUNITE } = options || {};
+    const etapes = [];
+    const c = combattant(etat, idLanceur);
+    if (!c || c.aTerre || !vers || vers.q === undefined || vers.r === undefined) return etapes;
+    if (aLEtat(c, "Immobilisation")) {
+        etapes.push({ type: "echec", acteur: idLanceur, raison: "Immobilisation" });
+        return etapes;
+    }
+    const depart = { q: nombre(c.q), r: nombre(c.r) };
+    if (depart.q === nombre(vers.q) && depart.r === nombre(vers.r)) return etapes;   // on reste
+
+    const chemin = cheminsDeRepli(etat, idLanceur, portee, plateau).get(`${nombre(vers.q)},${nombre(vers.r)}`);
+    if (!chemin || !chemin.length) {
+        etapes.push({ type: "message", cible: idLanceur, acteur: idLanceur, texte: "Repli (bloqué)" });
+        return etapes;
+    }
+
+    etapes.push({ type: "repli", acteur: idLanceur, de: depart, vers: chemin[chemin.length - 1],
+                  chemin: chemin.map(h => ({ q: h.q, r: h.r })) });
+
+    let contactAvant = new Set(ennemisAuContact(etat, idLanceur, depart));
+    for (const pas of chemin) {
+        const de = { q: c.q, r: c.r };
+        c.q = pas.q;
+        c.r = pas.r;
+        etapes.push({ type: "pas", acteur: idLanceur, de, vers: { q: pas.q, r: pas.r },
+                      cout: 0, fatigueApres: c.fatigue, repli: true });
+
+        const contactApres = new Set(ennemisAuContact(etat, idLanceur, pas));
+        for (const ennemi of contactAvant) {
+            if (contactApres.has(ennemi)) continue;
+            const a = combattant(etat, ennemi);
+            if (!a || a.aTerre || a.estIllusion) continue;
+            // LE REPLI SE DÉROBE D'ABORD : un dé à lui, avant la défense.
+            if (des.d100() <= chance) {
+                etapes.push({ type: "opportunite", attaquant: ennemi, cible: idLanceur, evitee: true,
+                              mot: "Repli 💨", montant: 0, hex: pas });
+                continue;
+            }
+            const coup = resoudreOpportunite(etat, ennemi, idLanceur, des);
+            if (!coup) continue;
+            if (coup.evitee) {
+                etapes.push({ type: "opportunite", ...coup, hex: pas });
+                continue;
+            }
+            if (c.bouclier > 0) c.bouclier = Math.max(0, c.bouclier - coup.montant);
+            else c.pv = Math.max(0, c.pv - coup.montant);
+            etapes.push({ type: "opportunite", ...coup, hex: pas, bouclierApres: c.bouclier, pvApres: c.pv });
+            etapes.push({ type: "degats", cible: idLanceur, acteur: ennemi, montant: coup.montant,
+                          opportunite: true, bouclierApres: c.bouclier, pvApres: c.pv });
+            if (c.pvMax > 0 && c.pv <= 0 && !c.aTerre) {
+                c.aTerre = true;
+                etapes.push({ type: "chute", cible: idLanceur, acteur: ennemi });
+            }
+        }
+        contactAvant = contactApres;
+        if (c.aTerre) { etapes.push({ type: "trajetEcourte", acteur: idLanceur, raison: "à terre" }); break; }
+
+        etapes.push(...traverserZones(etat, idLanceur, pas, des));
+        if (c.aTerre) break;
+    }
+    return etapes;
+}
+
 if (typeof window !== "undefined") {
     window.mouvementPur = {
         distance, voisinsDe, trouverChemin, coutDuPas, planifierTrajet,
         ennemisAuContact, resoudreOpportunite, resoudreMouvement,
-        casesDeBond, resoudreBond, resoudrePeur, DEGATS_OPPORTUNITE
+        casesDeBond, resoudreBond, resoudrePeur, DEGATS_OPPORTUNITE,
+        cheminsDeRepli, resoudreRepli, PORTEE_REPLI, CHANCE_REPLI_OPPORTUNITE
     };
 }

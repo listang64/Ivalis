@@ -25,7 +25,7 @@
 
 import { combattant } from './combat_etat.js';
 import { aLEtat, ligneDeVue } from './moteur_pur.js';
-import { distance, voisinsDe, occupantVivant, coutDuPas } from './mouvement_pur.js';
+import { distance, voisinsDe, occupantVivant, coutDuPas, cheminsDeRepli } from './mouvement_pur.js';
 
 const nombre = (v, defaut = 0) => {
     const n = parseInt(v);
@@ -516,4 +516,37 @@ if (typeof window !== "undefined") {
         ennemiLePlusProche, casesAccessibles, choisirCible, choisirPosition, choisirZone,
         deciderTourCreature
     };
+}
+
+// =========================================================================
+//  LE REPLI D'UNE CRÉATURE
+// =========================================================================
+//  Après avoir frappé, une créature dont la carte porte un Repli décroche : elle
+//  choisit, parmi les cases qu'elle atteint à pied, celle qui la met le plus
+//  loin de l'adversaire le plus proche, en évitant de finir collée à un ennemi
+//  ou dans une zone qui brûle. Rester sur place n'est retenu que si aucune
+//  case ne fait mieux. Déterministe : même état, même choix (pas de dé ici —
+//  les dés du repli, ce sont ceux des attaques d'opportunité).
+export function choisirRepli(etat, id, portee, plateau) {
+    const moi = combattant(etat, id);
+    if (!moi || moi.aTerre || moi.q === null || moi.q === undefined) return null;
+    const ennemis = Object.values(etat.combattants || {})
+        .filter(c => c && c.camp !== moi.camp && !c.aTerre && !c.estIllusion && c.q !== null && c.q !== undefined);
+    if (ennemis.length === 0) return null;
+    const note = (q, r) => {
+        const plusProche = Math.min(...ennemis.map(e => distance({ q, r }, e)));
+        return plusProche * 10 - ennemisAuContactDepuis(etat, q, r, moi.camp) * 15
+               - dangerDeLaCase(etat, q, r) * 20;
+    };
+    let meilleure = null;
+    let meilleurScore = note(moi.q, moi.r);
+    const chemins = cheminsDeRepli(etat, id, portee, plateau);
+    [...chemins.entries()]
+        .sort((a, b) => a[1].length - b[1].length || (a[0] < b[0] ? -1 : 1))
+        .forEach(([cle, chemin]) => {
+            const arrivee = chemin[chemin.length - 1];
+            const score = note(arrivee.q, arrivee.r);
+            if (score > meilleurScore) { meilleurScore = score; meilleure = { q: arrivee.q, r: arrivee.r }; }
+        });
+    return meilleure;
 }

@@ -130,6 +130,7 @@ node bouclier_absorption_contre.mjs  # bouclier en % des PV restants, Absorption
 node poussee_forge_avatar.mjs  # la Forge annonce toujours 2 cases de Poussée ; l'avatar du bouton de fin de tour grandit
 node reglage_encart.mjs     # le OK sous la piste d'initiative ; l'outil provisoire « ⚙ HUD » de l'encart de tour
 node purification.mjs       # la Purification du grimoire : 1 état néfaste retiré à coup sûr, sans soin
+node repli.mjs              # le Repli : frapper puis marcher 3 cases, 60 % d'éviter chaque opportunité
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -2663,3 +2664,51 @@ le jet, la résolution et le message ; les anciens moteur_effets.js,
 moteur_pur.js et pont_combat.js y font chacun tomber des contrôles.
 `moteur_pur.mjs` (chapitre 7) vérifie le choix au dé, les états épargnés et
 une carte qui en retire deux.
+
+### Le Repli : frapper, puis décrocher
+
+Nouvel effet demandé par Nico : « Repli — coût 6 — Dextérité — se déplace de 3
+cases après avoir attaqué, avec 60 % de chance d'éviter les attaques
+d'opportunité ». Il existe maintenant partout.
+
+**La base.** La migration (« Mettre la BDD à jour ») sait désormais CRÉER un
+effet (`creer: true`) : EFF_REPLI est écrit en entier la première fois, puis
+jamais réécrit, pour que les réglages faits à la main dans le grimoire tiennent.
+Valeur 3 = cases de marche ; Pourcentage de base 60 = chance d'éviter ; un seul
+cran (Pourcentage max 60). La fenêtre des effets (Paramètres) et la Forge le
+lisent comme les autres : c'est une action « Action/Global », comme le Bond.
+
+**La règle** (mouvement_pur.js, `resoudreRepli`). Une MARCHE, pas un saut : ni
+mur, ni vivant traversé (`cheminsDeRepli`, un parcours en largeur de 3 pas au
+plus, la seule définition des cases atteignables — pour l'écran, pour l'IA et
+pour le cerveau). Elle est gratuite (la carte l'a payée). Chaque ennemi quitté
+porte son attaque d'opportunité, mais le repli tire d'abord un dé à lui : 60 %
+et le coup est évité (« Repli 💨 »), sinon la défense ordinaire joue. Immobilisé
+ou à terre, on ne se replie pas.
+
+**Pourquoi la case part AVEC la carte.** Dans le cerveau, une carte clôt le
+tour de son lanceur ; une demande de déplacement envoyée après elle serait
+refusée (« c'est au tour de X »). Le joueur choisit donc sa case de repli juste
+après avoir visé (`choisirCaseRepli`, même écran assombri que le Bond ; taper
+son propre pion = rester), la case voyage dans l'intention de carte, et le
+cerveau joue l'attaque, puis la marche de repli, puis la clôture — dans la même
+entrée de journal. La portée et la chance reçues sont bornées (6 cases, 100 %).
+
+**Les créatures.** Leur carte transporte son repli (regime_cerveau.js) ; après
+avoir frappé, `choisirRepli` (ia_pure.js) les emmène vers la case la plus
+éloignée de l'adversaire le plus proche, en évitant le contact et les zones
+qui brûlent. Le générateur (monstres_competences.js) donne une affinité au
+Repli selon l'archétype (8 pour un tireur ou un soutien, 1 pour un tank) et pose
+parfois, chez ceux qui gardent leurs distances, un Repli juste après l'attaque.
+
+**L'écran.** « ↩️ Repli ! » s'annonce, puis les pas du repli filent plus vite,
+sans petit bond, en laissant sur chaque case quittée une ombre du pion qui
+s'efface (mouvement.js, `laisserTraceRepli`). Une opportunité évitée dit
+maintenant CE qui l'a évitée (le repli, la dérobade du Vargen, la parade…).
+
+`repli.mjs` suit tout cela sur le vrai code — noyau, cerveau, IA, extraction
+réelle de la carte, parcours du joueur jusqu'à l'intention envoyée (vrai clic),
+écran, générateur — ; `migration_effets.mjs` vérifie la création de la fiche et
+qu'un Repli réglé à la main n'est jamais écrasé. Morsures : chacun des fichiers
+d'avant (mouvement_pur, cerveau_combat, ia_pure, moteur_effets, pont_combat,
+monstres_competences, mouvement, regime_cerveau) fait tomber des contrôles.
