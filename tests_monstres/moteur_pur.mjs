@@ -12,7 +12,7 @@
 // jeu — et sans ce banc, personne ne s'en apercevrait.
 import {
     jouer, resoudreCarte, chaineDeDegats, tirerDesCarte, tirerCritique,
-    esquiveDe, paradeDe, defPhysiqueDe, distanceHex, bonusMonstreDe,
+    esquiveDe, paradeDe, defPhysiqueDe, distanceHex, bonusMonstreDe, chanceEtatDe, creerZonePure,
     REGLES_ETATS, CHANCE_BOUSCULADE_POUSSEE, FATIGUE_BOUSCULADE_POUSSEE
 } from '../moteur_pur.js';
 import { construireEtatCombat, creerDes, verifierEtatCombat, clonerEtat } from '../combat_etat.js';
@@ -477,7 +477,7 @@ console.log("\n13. LA DISTANCE, ET LE MALUS DE BOUT PORTANT EN SITUATION");
 // =========================================================================
 console.log("\n14. LA TRICHE DES CRÉATURES : UN BONUS SELON LA STATURE");
 // =========================================================================
-//  Petit +3, Normal +4, Élite +5, Boss +6, sur ce qu'une créature inflige ET
+//  Petit +0, Normal +1, Élite +2, Boss +3, sur ce qu'une créature inflige ET
 //  sur ce qu'elle soigne — jamais sur un héros, jamais sur un gain de
 //  bouclier. C'est un réglage brut, posé comme tel : le tableau est le seul
 //  endroit à toucher s'il change.
@@ -485,34 +485,36 @@ console.log("\n14. LA TRICHE DES CRÉATURES : UN BONUS SELON LA STATURE");
     verifier("un héros n'a droit à rien", bonusMonstreDe({ estMonstre: false, palier: "Boss" }) === 0);
     verifier("une créature sans palier connu non plus",
              bonusMonstreDe({ estMonstre: true, palier: "" }) === 0);
-    verifier("Petit vaut +3", bonusMonstreDe({ estMonstre: true, palier: "Petit" }) === 3);
-    verifier("Normal vaut +4", bonusMonstreDe({ estMonstre: true, palier: "Normal" }) === 4);
-    verifier("Élite vaut +5", bonusMonstreDe({ estMonstre: true, palier: "Élite" }) === 5);
-    verifier("Boss vaut +6", bonusMonstreDe({ estMonstre: true, palier: "Boss" }) === 6);
+    verifier("Petit vaut +0", bonusMonstreDe({ estMonstre: true, palier: "Petit" }) === 0);
+    verifier("Normal vaut +1", bonusMonstreDe({ estMonstre: true, palier: "Normal" }) === 1);
+    verifier("Élite vaut +2", bonusMonstreDe({ estMonstre: true, palier: "Élite" }) === 2);
+    verifier("Boss vaut +3", bonusMonstreDe({ estMonstre: true, palier: "Boss" }) === 3);
 
     // Le vrai chemin : une goule (M1) devenue Élite, sur une vraie carte.
     let etat = neuf();
     etat.combattants.M1.palier = "Élite";
 
-    // DÉGÂTS : 20 de brut + 5 de triche = 25, contre une cible sans défense.
+    // DÉGÂTS : 20 de brut + 2 de triche = 22, contre une cible sans défense.
     const coup = resoudreCarte(etat, frappe("H1", 20));
     verifier("le bonus s'ajoute au brut, AVANT les résistances",
-             coup.etat.combattants.H1.pv === 35, `(${coup.etat.combattants.H1.pv})`);
+             coup.etat.combattants.H1.pv === 38, `(${coup.etat.combattants.H1.pv})`);
 
     // Et il traverse la résistance comme un dégât ordinaire : H2 a 25 % de
-    // résistance physique — (20+5) × 0.75 = 18.75, arrondi à 19.
+    // résistance physique — (20+2) × 0.75 = 16.5, arrondi à 17.
     const coupBlinde = resoudreCarte(etat, frappe("H2", 20));
     verifier("il n'ignore pas l'armure pour autant",
-             coupBlinde.etat.combattants.H2.pv === 31, `(${coupBlinde.etat.combattants.H2.pv})`);
+             coupBlinde.etat.combattants.H2.pv === 33, `(${coupBlinde.etat.combattants.H2.pv})`);
 
-    // SOIN : une Élite qui soigne un allié ajoute aussi ses +5.
+    // SOIN : une Élite qui soigne un allié ajoute aussi ses +2. Elle part de
+    // 40 PV : assez loin de son maximum pour que le plafond ne cache rien.
+    etat.combattants.M1.pv = 40;
     const soigneuse = resoudreCarte(etat, {
         type: "carte", idLanceur: "M1", idCarte: "CS",
         attaques: [{ valeurBrute: 10, isHeal: true, cibles: ["M1"] }], alterations: [],
         jets: { parCible: { M1: { esquive: false, etats: {} } } }
     });
     verifier("le soin d'une créature profite aussi du bonus",
-             soigneuse.etat.combattants.M1.pv === 70, `(${soigneuse.etat.combattants.M1.pv})`);
+             soigneuse.etat.combattants.M1.pv === 52, `(${soigneuse.etat.combattants.M1.pv})`);
 
     // BOUCLIER : ni dégât ni soin — pas de triche dessus.
     const bouclier = resoudreCarte(etat, {
@@ -532,6 +534,42 @@ console.log("\n14. LA TRICHE DES CRÉATURES : UN BONUS SELON LA STATURE");
     });
     verifier("un héros ne touche que ce que sa carte annonce (20 × 0.75 = 15)",
              coupHeros.etat.combattants.H2.pv === 35, `(${coupHeros.etat.combattants.H2.pv})`);
+}
+
+// =========================================================================
+console.log("\n14 bis. LA TRICHE DES CRÉATURES SUR LA PEUR ET L'ÉTOURDI : +8 %");
+// =========================================================================
+//  Deux états seulement, quelle que soit la stature, et jamais pour un héros.
+{
+    const monstre = { estMonstre: true, palier: "Petit" }, heros = { estMonstre: false };
+    verifier("Peur 40 % lancée par une créature : 48 %", chanceEtatDe(monstre, { nom: "Peur", chance: 40 }) === 48);
+    verifier("Étourdi 30 % : 38 %", chanceEtatDe(monstre, { nom: "Étourdi", chance: 30 }) === 38);
+    verifier("jamais au-delà de 100 %", chanceEtatDe(monstre, { nom: "Étourdi", chance: 96 }) === 100);
+    verifier("les autres états ne bougent pas", chanceEtatDe(monstre, { nom: "Brûlé", chance: 40 }) === 40
+             && chanceEtatDe(monstre, { nom: "Glacé", chance: 40 }) === 40);
+    verifier("un héros n'y a pas droit", chanceEtatDe(heros, { nom: "Peur", chance: 40 }) === 40);
+
+    // Le vrai jet : un dé à 45 contre une Peur à 40 %. La créature la pose
+    // (48 %), le héros la manque.
+    const desFixe = (suite) => { const f = [...suite]; return { d100: () => f.length ? f.shift() : 99 }; };
+    const etat = neuf();
+    const plan = (cible) => ({ attaques: [], alterations: [{ nom: "Peur", chance: 40, cibles: [cible] }] });
+    // Premier dé : la défense de la cible (99 = elle n'esquive pas) ; second : la Peur.
+    const parMonstre = tirerDesCarte(etat, plan("H1"), "M1", false, desFixe([99, 45]));
+    verifier("dé 45 : la Peur d'une créature prend", parMonstre.parCible.H1.etats.Peur === true,
+             JSON.stringify(parMonstre.parCible.H1));
+    const parHeros = tirerDesCarte(etat, plan("M1"), "H1", false, desFixe([99, 45]));
+    verifier("le même dé ne suffit pas à un héros", parHeros.parCible.M1.etats.Peur === false,
+             JSON.stringify(parHeros.parCible.M1));
+    const etourdi = tirerDesCarte(etat, { attaques: [], alterations: [{ nom: "Étourdi", chance: 40, duree: 1, cibles: ["H1"] }] },
+                                  "M1", false, desFixe([99, 48]));
+    verifier("dé 48 : l'Étourdi d'une créature prend aussi", etourdi.parCible.H1.etats["Étourdi"] === true);
+
+    // La zone persistante d'une créature fige sa chance avec le bonus.
+    const zone = creerZonePure(etat, { attaques: [], alterations: [{ nom: "Étourdi", chance: 20, duree: 1, persistante: true }] },
+                               [{ q: 0, r: 0 }], "M1");
+    verifier("une zone d'Étourdi posée par une créature garde 28 %", zone && zone.etat.chance === 28,
+             zone ? String(zone.etat.chance) : "pas de zone");
 }
 
 // =========================================================================
@@ -613,9 +651,9 @@ console.log("\n17. LA TRICHE DES CRÉATURES ET L'IMMUNITÉ VIVENT CHACUNE LEUR V
         } }
     };
     const r = resoudreCarte(etat, carte);
-    // 10 de brut + 6 de triche (Boss) contre H1, sans défense : 16.
+    // 10 de brut + 3 de triche (Boss) contre H1, sans défense : 13.
     verifier("le Boss inflige toujours son bonus de dégâts",
-             r.etat.combattants.H1.pv === 44, `(${r.etat.combattants.H1.pv})`);
+             r.etat.combattants.H1.pv === 47, `(${r.etat.combattants.H1.pv})`);
     verifier("et H2 reste immunisé à l'Étourdi malgré le Boss qui frappe ailleurs",
              !r.etat.combattants.H2.etats.some(e => e.nom === "Étourdi"),
              JSON.stringify(r.etat.combattants.H2.etats));

@@ -411,7 +411,7 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
             if (c.esquive === undefined) c.esquive = alt.isHeal ? false : jetDeDefense(id);
             // Un coup critique impose les effets de la carte, sans jet.
             if (c.etats[alt.nom] === undefined) {
-                c.etats[alt.nom] = critique || des.d100() <= (alt.chance || 0);
+                c.etats[alt.nom] = critique || des.d100() <= chanceEtatDe(lanceur, alt);
             }
             // LA BOUSCULADE DE LA POUSSÉE. Une cible poussée peut en plus perdre
             // pied : un second jet, sur la seule Poussée, qui lui coûte une part
@@ -484,12 +484,23 @@ export function tirerCritique(etat, idLanceur, des) {
 // sans qu'aucune règle de fiche ne l'explique — c'est délibéré, pour que le
 // combat reste dur sans multiplier les points de vie des monstres. Nico l'a
 // posé comme un réglage provisoire ; s'il change, ce tableau est le seul
-// endroit à toucher.
-const TABLE_BONUS_MONSTRE = { "Petit": 3, "Normal": 4, "Élite": 5, "Boss": 6 };
+// endroit à toucher. (Revu par Nico : 0 / 1 / 2 / 3, au lieu de 3 / 4 / 5 / 6.)
+const TABLE_BONUS_MONSTRE = { "Petit": 0, "Normal": 1, "Élite": 2, "Boss": 3 };
 
 export function bonusMonstreDe(c) {
     if (!c || !c.estMonstre) return 0;
     return TABLE_BONUS_MONSTRE[c.palier] || 0;
+}
+
+// L'AUTRE TRICHE : deux états seulement, la Peur et l'Étourdi, prennent huit
+// points de chance de plus quand c'est une créature qui les lance — quelle que
+// soit sa stature. Ils s'ajoutent à la chance de la carte, plafonnés à 100.
+export const BONUS_CHANCE_ETAT_MONSTRE = { "Peur": 8, "Étourdi": 8 };
+
+export function chanceEtatDe(lanceur, alt) {
+    const base = nombre(alt && alt.chance);
+    const bonus = (lanceur && lanceur.estMonstre) ? (BONUS_CHANCE_ETAT_MONSTRE[alt && alt.nom] || 0) : 0;
+    return Math.min(100, base + bonus);
 }
 
 // =========================================================================
@@ -786,7 +797,8 @@ export function creerZonePure(etat, action, hexes, idLanceur) {
     const soin = soigne ? { valeurBrute: nombre(soigne.valeurBrute) } : null;
     const etatDeZone = alt ? {
         nom: alt.nom, icone: alt.icone, desc: alt.desc || "",
-        chance: nombre(alt.chance), duree: nombre(alt.duree),
+        // La chance est figée au lancement, triche des créatures comprise.
+        chance: chanceEtatDe(combattant(etat, idLanceur), alt), duree: nombre(alt.duree),
         estPoison: !!alt.estPoison, tickFait: false
     } : null;
 

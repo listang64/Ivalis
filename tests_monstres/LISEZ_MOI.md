@@ -2613,3 +2613,24 @@ réglages ; hors combat, poignée et boîte disparaissent. Morsures : l'ancien
 combat.js (bouton non recalé sur la piste), l'ancien style.css (gros, dans le
 coin), l'ancien hud_disposition.js (le fond ne bouge pas) et la page sans
 l'outil font chacun tomber des contrôles.
+
+### La triche des créatures, revue à la baisse, et +8 % de Peur et d'Étourdi
+
+Nico a revu le bonus fixe que les créatures ajoutent à ce qu'elles infligent
+et soignent : Petit 0, Normal 1, Élite 2, Boss 3 (au lieu de 3, 4, 5, 6). Le
+tableau `TABLE_BONUS_MONSTRE` (moteur_pur.js) reste le seul endroit à toucher ;
+le bonus s'ajoute toujours au brut de la carte, avant les résistances.
+
+Nouvelle triche, sur deux états seulement : la Peur et l'Étourdi lancés par une
+créature prennent 8 points de chance de plus, quelle que soit sa stature,
+plafonnés à 100 (`chanceEtatDe`). Le bonus vaut au jet de la carte
+(`tirerDesCarte`) comme pour une zone persistante, dont la chance est figée
+au lancement (`creerZonePure`). Un héros n'y a jamais droit, et aucun autre
+état ne bouge.
+
+`moteur_pur.mjs` (chapitres 14, 14 bis et 17) vérifie le tableau, les dégâts
+et les soins réels, et le jet sur un dé fixe (45 contre une Peur à 40 % : la
+créature la pose, le héros la manque). Le contrôle du soin partait jusqu'ici
+d'une créature presque à son maximum : l'ancien et le nouveau bonus butaient
+tous deux sur le plafond de 70 PV, et le test ne mesurait rien. Il part
+maintenant de 40 PV.
