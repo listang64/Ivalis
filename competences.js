@@ -951,7 +951,13 @@ function formatterTexteEffet(effet, stacks, action) {
     }
     
     // 2. Remplacement de la Valeur (Dégâts, Initiative, etc.)
-    if (val > 0) {
+    // Poussée et Traction font exception : leur Valeur est une DISTANCE fixe
+    // (2 cases pour la Poussée, 3 pour la Traction), que le moteur applique telle
+    // quelle quel que soit le nombre de points. Les points n'augmentent que la
+    // chance ; la Forge ne doit donc jamais annoncer 4 ou 6 hexagones.
+    const nomFixe = (effet.Nom || "").toLowerCase();
+    const valeurEstDistanceFixe = nomFixe.includes("pouss") || nomFixe.includes("traction");
+    if (val > 0 && !valeurEstDistanceFixe) {
         let calcV = val * stacks;
         
         // 🔻 NOUVEAU : Si c'est l'effet Distance, on affiche +1 case (car 1 = CAC)

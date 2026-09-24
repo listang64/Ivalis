@@ -127,6 +127,7 @@ node equipement_combat.mjs  # ce que les objets font une fois portés, en combat
 node apercu_butin.mjs       # onglet Inventaire et fenêtres de butin, capturés à l'écran
 node objets_sans_undefined.mjs  # aucun objet fabriqué ne contient de valeur undefined (Firestore la refuse)
 node bouclier_absorption_contre.mjs  # bouclier en % des PV restants, Absorption magique, Contre physique, soin de zone au contact
+node poussee_forge_avatar.mjs  # la Forge annonce toujours 2 cases de Poussée ; l'avatar du bouton de fin de tour grandit
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -2538,3 +2539,33 @@ ENTIER : la réserve de butin préparée à l'avance ne s'écrivait pas.
 `objets_sans_undefined.mjs` fabrique des milliers d'objets, sur chaque modèle
 et chaque rareté, et les fouille jusqu'au fond (morsure : l'ancien code tombe
 dès le premier tirage à bénédiction).
+
+### La Poussée reste à deux cases, quel que soit le nombre de points
+
+Nico : « dans la Forge, mettre des points à Pousser augmente le pourcentage ET
+le nombre d'hexagones ». Le moteur a toujours poussé de 2 cases ; c'est le
+texte de la Forge qui mentait. `formatterTexteEffet` multiplie la Valeur du
+grimoire par le nombre de points — juste pour des dégâts, faux pour la Poussée,
+dont la Valeur (2) est une DISTANCE : 4 points annonçaient « 8 hexagones ».
+Même travers pour la Traction (3 cases, « 9 hexagones » à 3 points). Pour ces
+deux effets, la Valeur n'est plus multipliée : seul le pourcentage grimpe.
+Les cartes des monstres (`texteEffet`, monstres_competences.js) écrivaient
+le même mensonge et suivent la même règle ; `textes_reels.mjs` ne se contente
+plus d'afficher « le piège » : il échoue si la distance grandit.
+
+Au passage, le plafond de chance de la Poussée côté moteur était écrit en dur
+à 50 %, alors que le grimoire dit 60 % et que la Forge laisse monter jusque-là :
+il est maintenant lu dans le grimoire (50 % si la base n'en donne pas). La note
+de EFF_POUSSEE dans la migration dit désormais que la distance est fixe. Rien
+d'autre à changer dans la base.
+
+### L'avatar au-dessus du bouton de fin de tour, un peu plus grand
+
+`REGLAGES_HUD.avatar` passe de 376 à 410 px de haut (environ +9 %, à l'échelle
+du bandeau comme tout le reste). Son pied ne bouge pas : il grandit vers le
+haut, et son bord droit recule de 10 px pour qu'il reste centré sur le bouton.
+
+`poussee_forge_avatar.mjs` vérifie le texte de la Forge (vrai competences.js),
+ce que la carte extrait (vrai moteur_effets.js) et la taille posée sur la page
+(vrai hud_disposition.js) ; chacun des trois fichiers d'avant fait tomber au
+moins un contrôle.

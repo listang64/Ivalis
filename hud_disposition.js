@@ -60,7 +60,9 @@
         },
         ancreGauche: { dx: -14, dy: 0 },
         ancreDroite: { dx: 12, dy: 0 },
-        avatar: { droite: -30, bas: 56, hauteur: 376 },
+        // Agrandi d'environ 9 % (376 → 410) : il grandit vers le haut, et le
+        // bord droit recule d'une dizaine de pixels pour qu'il reste centré.
+        avatar: { droite: -40, bas: 56, hauteur: 410 },
         nom: { gauche: 50, bas: 152, largeur: 330, taille: 38 },
         // LA PISTE DES ÉTATS est à GAUCHE du bandeau : sa distance au bord droit
         // dépasse donc les 450 px de largeur, et c'est normal.

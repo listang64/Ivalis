@@ -4106,7 +4106,7 @@ window.MIGRATION_EFFETS = [
       champs: { Notes: "-50% de soins reçus, et 3 dégâts à chaque fin de manche (du type de l'attaque qui a brûlé)" } },
     { id: "EFF_POUSSEE",
       champs: { Effet_Base: "10% chance de poussée la cible de 2 hexagones en ligne droite. Peut se déplacer ensuite. 15% de chance de la bousculer : -20% d'énergie.",
-                Notes: "Ne génère pas d'attaque d'opportunité" } },
+                Notes: "Ne génère pas d'attaque d'opportunité. La distance (Valeur = 2 hexagones) est fixe : les points ajoutés dans la Forge n'augmentent que la chance." } },
     { id: "EFF_DUREE_ETALEMENT_DEGATS",
       champs: { Cout_PT: "Cout / 1.3",
                 Effet_Base: "Dégâts ou soins divisés par le nombre de tours : rien au lancement, une part à chaque fin de manche.",

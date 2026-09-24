@@ -1111,8 +1111,12 @@ function texteEffet(effet, empilements, crans) {
     }
 
     // 2. La valeur (dégâts, soins, hexagones...). Distance affiche +1 case,
-    //    parce que 1 correspond déjà au corps-à-corps.
-    if (val > 0) {
+    //    parce que 1 correspond déjà au corps-à-corps. Poussée et Traction
+    //    font exception, comme dans la Forge : leur valeur est une distance
+    //    fixe (2 et 3 cases) que les empilements ne multiplient pas.
+    const nomFixe = (effet.Nom || "").toLowerCase();
+    const valeurEstDistanceFixe = nomFixe.includes("pouss") || nomFixe.includes("traction");
+    if (val > 0 && !valeurEstDistanceFixe) {
         let calc = val * empilements;
         if (effet.Nom === "Distance") calc += 1;
         texte = (pBase === 0)

@@ -34,7 +34,13 @@ console.log("\n2. LES DEUX EFFETS À POURCENTAGE *ET* VALEUR (le piège)");
 [["EFF_POUSSEE", "Poussée"], ["EFF_TRACTION_MAGIQUE", "Traction magique"]].forEach(([id, nom]) => {
   const e = EFFETS[id];
   console.log(`   ${nom} (base ${e.Pourcent_Base}%, max ${e.Pourcent_Max}%, ${e.Valeur} hex)`);
-  for (let n = 1; n <= 4; n++) console.log(`     ×${n} : ${fenetre.texteEffetMonstre(e, n)}`);
+  for (let n = 1; n <= 4; n++) {
+    // La distance est fixe : seuls les points de pourcentage grimpent.
+    const t = fenetre.texteEffetMonstre(e, n);
+    const bon = new RegExp(`\\b${e.Valeur} hexagone`).test(t) && t.startsWith(`${e.Pourcent_Base * n}%`);
+    if (!bon) echecs++;
+    console.log(`     ×${n} : ${t}${bon ? "" : "   ← ÉCHEC : la distance doit rester " + e.Valeur}`);
+  }
 });
 
 console.log("\n3. SUR DES CARTES RÉELLEMENT GÉNÉRÉES");

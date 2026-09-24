@@ -1590,7 +1590,13 @@ window.demarrerCiblage = async function(idCarte, options) {
             });
 
             if (isPoussee) {
-                if (pousseeChance > 50) pousseeChance = 50; // Cap à 50%
+                // Plafond de chance : celui du grimoire (Pourcentage max), que la
+                // Forge affiche aussi ; 50 % si la base n'en donne pas. La distance,
+                // elle, reste de 2 cases quel que soit le nombre de points.
+                const effPoussee = Object.values(window.EFFETS_BDD_CACHE || {})
+                    .find(x => x && (x.Nom || "").toLowerCase().includes("pouss"));
+                const plafondPoussee = effPoussee ? parseFrFloat(effPoussee.Pourcent_Max) : 0;
+                pousseeChance = Math.min(pousseeChance, plafondPoussee > 0 ? Math.min(100, plafondPoussee) : 50);
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 alterationsExtraites.push({

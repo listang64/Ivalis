@@ -1913,13 +1913,13 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=28"></script>
+<script src="trace_combat.js?v=29"></script>
 <!-- LA MISE À JOUR AUTOMATIQUE. Juste après la trace, parce qu'elle a besoin du
      numéro de version qu'elle y trouve, et avant tout le reste : si la page est
      périmée, autant s'en apercevoir avant d'avoir chargé le jeu entier.
      Elle ne touche jamais au localStorage — les clés d'API restent en place. -->
 <script src="mise_a_jour.js?v=1"></script>
-<script src="hud_disposition.js?v=1"></script>
+<script src="hud_disposition.js?v=2"></script>
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
@@ -1943,10 +1943,10 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=26"></script>
 <script type="module" src="ia_master.js?v=6"></script>
-<script type="module" src="app.js?v=53"></script>
+<script type="module" src="app.js?v=54"></script>
 <script type="module" src="creation_personnage.js?v=8"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
-<script type="module" src="competences.js?v=27"></script>
+<script type="module" src="competences.js?v=28"></script>
 <!-- Le plateau porte désormais son ?v= comme les autres : sans lui, un iPad
      gardait l'ancien dessin en cache après une livraison (l'œil d'or en dépend). -->
 <script src="Plateau.js?v=2"></script>
@@ -1955,9 +1955,9 @@
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=26"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
-<script type="module" src="moteur_effets.js?v=50"></script>
+<script type="module" src="moteur_effets.js?v=51"></script>
 <script type="module" src="monstres.js?v=24"></script>
-<script type="module" src="monstres_competences.js?v=11"></script>
+<script type="module" src="monstres_competences.js?v=12"></script>
 <script type="module" src="monstres_ia.js?v=32"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=10"></script>
