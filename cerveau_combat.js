@@ -41,7 +41,7 @@ import { clonerEtat, combattant, creerDes, combattantIllusion,
          verifierEtatCombat, compterPasMarche, FORMAT_ETAT } from './combat_etat.js';
 import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion,
          traverserZones, creerZonePure, poserZone, vieillirZones,
-         chaineDeDegats, REGLES_ETATS } from './moteur_pur.js';
+         chaineDeDegats, REGLES_ETATS, estDansLeNoir } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli } from './ia_pure.js';
@@ -849,7 +849,10 @@ export function jouerCreature(etat, id, carte, plateau) {
     // chemin, et un mort ne lance rien.
     const moi = combattant(courant, id);
     const cible = plan.cible ? combattant(courant, plan.cible) : null;
-    const aPortee = moi && !moi.aTerre && cible && !cible.aTerre
+    // Aveuglée, une créature ne vise pas ce qui se tient dans son noir (une
+    // zone, si : elle frappe ce qu'elle couvre sans avoir à le voir).
+    const dansLeNoir = !!(moi && cible && !infos.estZone && estDansLeNoir(moi, cible));
+    const aPortee = moi && !moi.aTerre && cible && !cible.aTerre && !dansLeNoir
                     && distance(moi, cible) <= nombre(infos.portee, 1);
 
     // UNE CARTE DE ZONE ne ramasse pas la cible unique choisie plus haut — elle
@@ -930,7 +933,8 @@ export function jouerCreature(etat, id, carte, plateau) {
         // Pourquoi elle n'a rien lancé. Dans la trace, cette ligne vaut de l'or :
         // « tour de 20 millisecondes sans rien faire » restait inexplicable.
         etapes.push({ type: "renonce", acteur: id,
-                      raison: plan.raison || (moi && moi.aTerre ? "tombée en chemin" : "hors de portée") });
+                      raison: dansLeNoir ? "aveuglée : sa cible est dans le noir"
+                              : (plan.raison || (moi && moi.aTerre ? "tombée en chemin" : "hors de portée")) });
     }
 
     // ET SON TOUR SE CLÔT DANS LA MÊME ENTRÉE. Une créature ne clique pas « fin

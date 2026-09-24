@@ -409,6 +409,108 @@ window.casesPosablesZone = function(idLanceur, configSort) {
         .filter(h => getHexDistance(tkLanceur, h) <= limite && verifierLigneDeVue(tkLanceur, h));
 };
 
+// =========================================================================
+//  L'AVEUGLEMENT, CÔTÉ ÉCRAN
+// =========================================================================
+//  L'icône de l'état : un œil barré, dessiné ici plutôt qu'hébergé ailleurs.
+const ICONE_AVEUGLE = "data:image/svg+xml;utf8," + encodeURIComponent(
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'>"
+    + "<circle cx='32' cy='32' r='30' fill='#141414' stroke='#6b6b6b' stroke-width='3'/>"
+    + "<path d='M12 32 Q32 14 52 32 Q32 50 12 32Z' fill='none' stroke='#d8d8d8' stroke-width='4'/>"
+    + "<circle cx='32' cy='32' r='6' fill='#d8d8d8'/>"
+    + "<line x1='15' y1='49' x2='49' y2='15' stroke='#d33' stroke-width='5' stroke-linecap='round'/></svg>");
+window.ICONE_AVEUGLE = ICONE_AVEUGLE;
+
+// Les cases que ce personnage ne voit pas, depuis `depuis` (sa case, ou celle
+// d'où part le sort). Même règle que le noyau (moteur_pur.js, casesDansLeNoir) :
+// l'état « Aveuglé » porte 4 directions, le noir suit le personnage.
+window.casesDansLeNoirEcran = function(perso, depuis) {
+    if (!perso || !depuis) return [];
+    const etat = (perso.Etats_Alteres || []).find(e => e && e.nom === "Aveuglé" && (parseInt(e.duree) || 1) > 0);
+    if (!etat || !Array.isArray(etat.directions)) return [];
+    return etat.directions.map(d => ({ q: Number(depuis.q) + Number(d.q), r: Number(depuis.r) + Number(d.r) }));
+};
+window.cibleDansLeNoir = function(perso, depuis, hexCible) {
+    if (!hexCible) return false;
+    return window.casesDansLeNoirEcran(perso, depuis)
+        .some(h => h.q === Number(hexCible.q) && h.r === Number(hexCible.r));
+};
+
+// LE BROUILLARD DE L'AVEUGLÉ. Il n'existe QUE sur l'écran de celui qui ne voit
+// pas : on ne le dessine que pour les héros de CET appareil
+// (COMBAT_PERSOS_JOUEUR). Un noir épais qui ondule, posé AU-DESSUS des pions
+// (z-index 20 contre 10) : ce qui se tient là disparaît à ses yeux. Il suit
+// son pion et s'efface avec l'état. Redessiné seulement quand les cases
+// changent (signature), pour ne pas relancer l'animation à chaque passage.
+window.dessinerBrouillardAveuglement = function() {
+    const conteneur = document.getElementById("transform-plateau");
+    const fenetre = document.getElementById("fenetre-combat");
+    const enCombat = !!fenetre && fenetre.style.display === "block";
+    const cases = [];
+    if (enCombat && conteneur && window.PLATEAU_VTT) {
+        (window.COMBAT_PERSOS_JOUEUR || []).forEach(h => {
+            if (!h) return;
+            const frais = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === h.idPersonnage) || h;
+            const tk = (window.TOKENS_VTT_DATA || {})[h.idPersonnage];
+            if (!tk || frais.statut === "Mort") return;
+            window.casesDansLeNoirEcran(frais, tk).forEach(c => cases.push(c));
+        });
+    }
+    const signature = cases.map(c => c.q + "," + c.r).sort().join("|");
+    let svg = document.getElementById("svg-brouillard-aveugle");
+    if (!signature) { if (svg) svg.remove(); return null; }
+    if (svg && svg.dataset.signature === signature && svg.parentNode === conteneur) return svg;
+    if (svg) svg.remove();
+
+    const hexSize = window.PLATEAU_VTT.hexSize;
+    const pointsHex = (q, r) => {
+        const px = window.PLATEAU_VTT.hexToPixel(q, r);
+        let pts = "";
+        for (let i = 0; i < 6; i++) {
+            const a = Math.PI / 180 * (60 * i);
+            pts += (px.x + hexSize * Math.cos(a)) + "," + (px.y + hexSize * Math.sin(a)) + " ";
+        }
+        return pts.trim();
+    };
+    const volutes = cases.map((c, i) => {
+        const px = window.PLATEAU_VTT.hexToPixel(c.q, c.r);
+        const d = (6 + (i % 3) * 1.7).toFixed(1);
+        return `<g class="brouillard-case">
+            <polygon points="${pointsHex(c.q, c.r)}" fill="rgba(4,4,8,0.98)" filter="url(#fumee-aveugle)"/>
+            <circle cx="${px.x - hexSize * 0.3}" cy="${px.y}" r="${hexSize * 0.45}" fill="rgba(70,70,85,0.35)" filter="url(#flou-aveugle)">
+                <animate attributeName="cx" values="${px.x - hexSize * 0.3};${px.x + hexSize * 0.3};${px.x - hexSize * 0.3}" dur="${d}s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="${px.x}" cy="${px.y + hexSize * 0.25}" r="${hexSize * 0.35}" fill="rgba(40,40,55,0.4)" filter="url(#flou-aveugle)">
+                <animate attributeName="cy" values="${px.y + hexSize * 0.25};${px.y - hexSize * 0.25};${px.y + hexSize * 0.25}" dur="${(d * 1.3).toFixed(1)}s" repeatCount="indefinite"/>
+            </circle>
+        </g>`;
+    }).join("");
+
+    svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.id = "svg-brouillard-aveugle";
+    svg.dataset.signature = signature;
+    svg.style.cssText = "position:absolute; top:0; left:0; overflow:visible; z-index:20; pointer-events:none;";
+    svg.innerHTML = `
+        <defs>
+            <filter id="fumee-aveugle" x="-30%" y="-30%" width="160%" height="160%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="3" seed="7" result="bruit">
+                    <animate attributeName="baseFrequency" values="0.03;0.045;0.03" dur="9s" repeatCount="indefinite"/>
+                </feTurbulence>
+                <feDisplacementMap in="SourceGraphic" in2="bruit" scale="14"/>
+                <feGaussianBlur stdDeviation="2.5"/>
+            </filter>
+            <filter id="flou-aveugle"><feGaussianBlur stdDeviation="5"/></filter>
+        </defs>
+        ${volutes}`;
+    conteneur.appendChild(svg);
+    return svg;
+};
+if (typeof window !== "undefined" && typeof setInterval === "function" && !window.__brouillardAveugleVeille) {
+    window.__brouillardAveugleVeille = setInterval(() => {
+        try { window.dessinerBrouillardAveuglement(); } catch (e) {}
+    }, 400);
+}
+
 window.assombrirCasesJouables = function(idOverlay, hexes) {
     const conteneurTransform = document.getElementById("transform-plateau");
     if (!conteneurTransform || !window.PLATEAU_VTT || !Array.isArray(hexes)) return null;
@@ -1429,6 +1531,37 @@ window.demarrerCiblage = async function(idCarte, options) {
                     desc: "-30% Esquive/Parade, 20% de chance d'échec d'attaque.",
                     chance: stunChance,
                     duree: stunDuree,
+                    isRanged: isRanged,
+                    rangeMax: rangeMax,
+                    cibles: []
+                });
+            }
+
+            // L'AVEUGLEMENT : un état comme l'Étourdi — chance par cran plafonnée
+            // par le Pourcentage max du grimoire (70 %), durée = Tours + ⏳. Les
+            // 4 cases de noir se tirent au moment où il prend (moteur_pur.js,
+            // tirerDesCarte), pas ici.
+            let aveugleChance = 0, aveugleDuree = 0, aveuglePlafond = 0, estAveuglement = false;
+            const lireAveuglement = (eff, n, crans) => {
+                estAveuglement = true;
+                aveugleChance += (parseFrFloat(eff.Pourcent_Base) || 0) * (n || 1);
+                aveuglePlafond = Math.max(aveuglePlafond, parseFrFloat(eff.Pourcent_Max) || 0);
+                aveugleDuree = Math.max(aveugleDuree, (parseFrFloat(eff.Tours) || 2) + (parseFrFloat(crans) || 0));
+            };
+            if (nomLower.includes("aveugl")) lireAveuglement(effBase, act.count, act.baseDuree);
+            listeMods.forEach(m => {
+                const modEff = window.EFFETS_BDD_CACHE[m.id];
+                if (modEff && (modEff.Nom || "").toLowerCase().includes("aveugl")) lireAveuglement(modEff, m.count, modsDuree[m.id]);
+            });
+            if (estAveuglement) {
+                if (aveuglePlafond > 0) aveugleChance = Math.min(aveugleChance, aveuglePlafond);
+                if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
+                alterationsExtraites.push({
+                    nom: "Aveuglé",
+                    icone: ICONE_AVEUGLE,
+                    desc: "4 cases autour de lui sont dans le noir : il ne peut y cibler personne (les zones y frappent quand même).",
+                    chance: Math.min(100, aveugleChance),
+                    duree: aveugleDuree || 2,
                     isRanged: isRanged,
                     rangeMax: rangeMax,
                     cibles: []
@@ -2549,6 +2682,8 @@ window.dessinerAnneauxCiblage = function() {
         const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idToken);
         if (!cibleData || cibleData.statut === "Mort") continue;
         if (cibleData.estIllusion && !carteEstAttaqueSimple) continue;
+        // Pas d'anneau dans le noir d'un aveuglé : il ne peut pas y viser.
+        if (window.cibleDansLeNoir(lanceurData, tkLanceur, window.positionCiblage(idToken))) continue;
 
         if (configSort.isHeal) {
             if (cibleData.camp !== lanceurData.camp) continue;
@@ -2689,6 +2824,13 @@ window.ajouterCibleCiblage = function(idCible) {
 
     if (cibleData.statut === "Mort") {
         window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Cible invalide", "#aaaaaa");
+        return;
+    }
+
+    // AVEUGLÉ : ce qui se tient dans son noir ne se vise pas — ni ennemi, ni
+    // allié. (Une zone, elle, frappe quand même : elle ne passe pas par ici.)
+    if (window.cibleDansLeNoir(lanceurData, tkLanceur, tkCible)) {
+        window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Dans le noir 🌫️", "#aaaaaa");
         return;
     }
 

@@ -212,7 +212,7 @@ function allesAdjacents(q, r, campMonstre, idMonstre) {
 // mais un joueur le peut) : cette liste doit rester en phase avec le moteur.
 const ALTERATIONS_MOTEUR = ["brûl", "brul", "glac", "électri", "electri", "empoison", "poison",
     "confusion", "immobilis", "peur", "pouss", "traction", "étourd", "etourd", "absorption",
-    "provocation"];
+    "provocation", "aveugl"];
 
 window.analyserCarteMonstre = function(dataCarte) {
     const infos = { portee: 1, estSoin: false, estZone: false, degats: 0, aAlteration: false,

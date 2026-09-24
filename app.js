@@ -4130,7 +4130,15 @@ window.MIGRATION_EFFETS = [
                 Type_Mecanique: "Action/Global", Type_Mecanique_2: "Aucun",
                 Valeur: 3, Pourcent_Base: 60, Pourcent_Max: 60, Tours: 0, Cible_Etat: "repli",
                 Effet_Base: "Se déplace de 3 cases après avoir attaqué, avec 60% chance d'éviter les attaques d'opportunités.",
-                Notes: "Après l'attaque, le lanceur choisit une case à 3 pas de marche (ni mur, ni vivant traversé). Chaque ennemi quitté a 60% de chance d'être évité avant le jet de défense. Marche gratuite." } }
+                Notes: "Après l'attaque, le lanceur choisit une case à 3 pas de marche (ni mur, ni vivant traversé). Chaque ennemi quitté a 60% de chance d'être évité avant le jet de défense. Marche gratuite." } },
+    // L'AVEUGLEMENT ENTRE DANS LE GRIMOIRE, même principe que le Repli : un
+    // état comme l'Étourdi (Physique, crans de 10 %, plafond 70 %, 2 tours).
+    { id: "EFF_AVEUGLEMENT", creer: true,
+      champs: { Nom: "Aveuglement", Cout_PT: "1", Modificateur: "DEXTÉRITÉ",
+                Type_Mecanique: "Physique", Type_Mecanique_2: "Aucun",
+                Valeur: 0, Pourcent_Base: 10, Pourcent_Max: 70, Tours: 2, Cible_Etat: "aveuglement",
+                Effet_Base: "10% chance (max 70%) d'aveugler la cible, sur 2 tours",
+                Notes: "Aveuglement : 4 hexagones autour de la cible sont dans le noir. Impossible d'y cibler un ennemi ou un allié (les sorts de zone les touchent quand même). Le noir suit l'aveuglé et n'est visible que de lui." } }
 ];
 
 window.appliquerMigrationEffets = async function() {

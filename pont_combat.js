@@ -249,6 +249,12 @@ const SCENES = {
             return { geste: "message", pion: e.cible, texte: `✨ Purifié : ${e.retires.join(", ")}`,
                      couleur: COULEURS.soin, duree: RYTHME.message };
         }
+        // L'aveuglement se dit à tout le monde ; le noir, lui, n'est vu que par
+        // l'aveuglé (moteur_effets.js, dessinerBrouillardAveuglement).
+        if (e.pose === "Aveuglé") {
+            return { geste: "message", pion: e.cible, texte: "Aveuglé 🌫️",
+                     couleur: COULEURS.neutre, duree: RYTHME.message };
+        }
         return { geste: "etats", pion: e.cible, liste: e.liste || [], pose: e.pose || null };
     },
     fatigue()  { return { geste: "rien" }; },

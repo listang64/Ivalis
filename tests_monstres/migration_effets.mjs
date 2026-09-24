@@ -82,15 +82,16 @@ console.log("1. ELLE VISE LES EFFETS QUE NICO A DEMANDÉ DE CHANGER");
     const { table } = fausseBase(EFFETS_REELS);
     const vises = table.map(r => r.id).sort();
     const attendus = ["EFF_BOUCLIER_MAGIQUE", "EFF_BRULE", "EFF_DUREE_ETALEMENT_DEGATS", "EFF_ELECTRIFIE",
-                      "EFF_ETOURDIT", "EFF_GLACE", "EFF_PARALYSIE", "EFF_POUSSEE", "EFF_REPLI"].sort();
-    verifier("les neuf effets concernés, ni plus ni moins",
+                      "EFF_ETOURDIT", "EFF_GLACE", "EFF_PARALYSIE", "EFF_POUSSEE", "EFF_REPLI", "EFF_AVEUGLEMENT"].sort();
+    verifier("les dix effets concernés, ni plus ni moins",
              JSON.stringify(vises) === JSON.stringify(attendus), vises.join(", "));
     // Ceux qu'on modifie existent ; ceux qu'on crée (le Repli), pas encore.
     verifier("chaque effet modifié existe vraiment dans la base",
              table.filter(r => !r.creer).every(r => EFFETS_REELS[r.id] !== undefined),
              table.filter(r => !r.creer && !EFFETS_REELS[r.id]).map(r => r.id).join(", "));
-    verifier("et l'effet créé (Repli) n'y est pas encore",
-             table.filter(r => r.creer).map(r => r.id).join() === "EFF_REPLI" && EFFETS_REELS.EFF_REPLI === undefined);
+    verifier("et les effets créés (Repli, Aveuglement) n'y sont pas encore",
+             table.filter(r => r.creer).map(r => r.id).join() === "EFF_REPLI,EFF_AVEUGLEMENT"
+             && EFFETS_REELS.EFF_REPLI === undefined && EFFETS_REELS.EFF_AVEUGLEMENT === undefined);
 }
 
 // =========================================================================
@@ -136,6 +137,13 @@ console.log("\n2. UN PASSAGE : LA BASE DIT CE QUE LE MOTEUR FAIT");
     verifier("et le texte que la Forge affiche",
              /3 cases après avoir attaqué/.test(repli.Effet_Base || "") && /60%/.test(repli.Effet_Base || ""));
 
+    const aveu = m.base.EFF_AVEUGLEMENT || {};
+    verifier("l'Aveuglement est créé : 10 %, max 70 %, 2 tours, coût 1, Dextérité",
+             resultat.faits.some(f => /EFF_AVEUGLEMENT — créé/.test(f)) && aveu.Nom === "Aveuglement"
+             && aveu.Pourcent_Base === 10 && aveu.Pourcent_Max === 70 && aveu.Tours === 2 && aveu.Cout_PT === "1"
+             && aveu.Modificateur === "DEXTÉRITÉ" && aveu.Type_Mecanique === "Physique", JSON.stringify(aveu));
+    verifier("et ses notes disent la règle du noir", /4 hexagones/.test(aveu.Notes || "") && /zone/.test(aveu.Notes || ""));
+
     // Un Repli déjà réglé à la main (4 cases, 50 %) n'est jamais réécrit.
     const regle = fausseBase({ ...EFFETS_REELS, EFF_REPLI: { Nom: "Repli", Valeur: 4, Pourcent_Base: 50 } });
     const rRegle = await regle.lancer();
@@ -176,7 +184,7 @@ console.log("\n3. RELANCÉE, ELLE N'ÉCRIT PLUS RIEN");
     verifier("et ne resupprime rien", m.journal.suppressions.length === suppressionsPremier);
     verifier("le rapport le dit clairement", second.faits.length === 0,
              JSON.stringify(second.faits));
-    verifier("en listant ce qui était déjà à jour", second.inchanges.length === 9,
+    verifier("en listant ce qui était déjà à jour", second.inchanges.length === 10,
              JSON.stringify(second.inchanges));
 }
 

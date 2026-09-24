@@ -132,6 +132,7 @@ node reglage_encart.mjs     # le OK sous la piste d'initiative ; l'outil proviso
 node purification.mjs       # la Purification du grimoire : 1 état néfaste retiré à coup sûr, sans soin
 node repli.mjs              # le Repli : frapper puis marcher 3 cases, 60 % d'éviter chaque opportunité
 node bond_apres_attaque.mjs  # un Bond placé après l'attaque saute enfin (il part avec la carte)
+node aveuglement.mjs        # l'Aveuglement : 4 cases de noir, ciblage interdit (sauf zones), brouillard chez l'aveuglé
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -2729,3 +2730,51 @@ Bond EN TÊTE de carte ne change pas : il se joue avant, pendant que le tour est
 encore ouvert. `bond_apres_attaque.mjs` montre l'ancien refus, puis le nouveau
 chemin dans le cerveau et dans le vrai parcours du joueur ; les anciens
 cerveau_combat.js, moteur_effets.js et regime_cerveau.js y échouent.
+
+### L'Aveuglement : quatre cases de noir
+
+Deuxième effet demandé par Nico : « Aveuglement — coût 1 — Dextérité — 10 % de
+chance (max 70 %) d'aveugler la cible, sur 2 tours. 4 hexagones autour de la
+cible sont dans le noir : impossible d'y cibler un ennemi. » Précisions : les
+4 cases sont tirées au hasard ; un monstre aveuglé ne choisit pas ce qui s'y
+tient ; un joueur aveuglé voit un brouillard noir sur ces cases — lui seul — et
+ne peut y viser ni ennemi ni allié ; une zone les touche quand même ; l'effet
+dure son temps.
+
+**La base.** EFF_AVEUGLEMENT est créé par la migration (`creer`), comme le
+Repli : état « Physique », crans de 10 %, plafond 70 %, 2 tours. La Forge le
+range avec les autres états (bouton ⏳ compris).
+
+**La règle** (moteur_pur.js). L'état s'appelle « Aveuglé ». Quand il prend,
+`tirerDesCarte` tire 4 directions parmi les 6 voisines (`tirerDirectionsAveugle`),
+avec les autres dés : tous les postes voient le même noir, et les cartes sans
+Aveuglement gardent exactement leur suite de dés. L'état retient des
+DIRECTIONS, pas des cases : le noir suit l'aveuglé quand il bouge — c'est sa vue
+qui est atteinte, pas le sol. Aveuglé de nouveau, le nouveau coup choisit un
+nouveau noir. `casesDansLeNoir` / `estDansLeNoir` disent ce qui est caché.
+C'est un état néfaste : la Purification peut l'ôter.
+
+**Le joueur aveuglé** (moteur_effets.js). `ajouterCibleCiblage` refuse toute
+cible — ennemi comme allié, attaque comme soin — qui se tient dans son noir
+(« Dans le noir 🌫️ »), et aucun anneau de ciblage ne s'y dessine. Une zone,
+elle, passe par `validerZoneAoE` et frappe ce qu'elle couvre. Le brouillard
+(`dessinerBrouillardAveuglement`) n'est dessiné QUE pour les héros de l'appareil
+(`COMBAT_PERSOS_JOUEUR`) : un noir épais qui ondule (turbulence SVG animée et
+volutes), posé au-dessus des pions (z-index 20 contre 10), qui suit le pion et
+s'efface avec l'état. Tout le monde lit « Aveuglé 🌫️ » quand l'état prend.
+
+**Les créatures.** `choisirPosition` (ia_pure.js) pénalise les cases d'où sa
+cible serait dans son noir (sauf carte de zone) ; `jouerCreature` refuse de
+lancer une carte à cible unique sur ce qui est dans le noir et le dit
+(« aveuglée : sa cible est dans le noir »). Le générateur range l'Aveuglement
+parmi les états (limite de deux altérations par carte comprise) avec une
+affinité de 7 pour les tireurs et les combattants au contact ; l'IA le compte
+parmi les altérations (une illusion le refuse).
+
+`aveuglement.mjs` suit tout cela sur le vrai code : tirage et pose, noir qui
+suit, renouvellement, créature immobile qui renonce, créature libre qui se
+place pour voir (vingt tirages sur vingt), zone qui frappe quand même,
+extraction réelle (crans, plafond 70 %, ⏳), ciblage refusé (ennemi et allié),
+anneaux, zone, brouillard chez l'aveuglé et pas ailleurs, générateur. Morsures
+sur moteur_pur, moteur_effets, ia_pure, cerveau_combat, pont_combat,
+monstres_competences et monstres_ia.

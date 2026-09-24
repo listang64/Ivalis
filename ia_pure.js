@@ -24,7 +24,7 @@
 // =========================================================================
 
 import { combattant } from './combat_etat.js';
-import { aLEtat, ligneDeVue } from './moteur_pur.js';
+import { aLEtat, ligneDeVue, estDansLeNoir } from './moteur_pur.js';
 import { distance, voisinsDe, occupantVivant, coutDuPas, cheminsDeRepli } from './mouvement_pur.js';
 
 const nombre = (v, defaut = 0) => {
@@ -275,7 +275,13 @@ export function choisirPosition(etat, id, cible, infosCarte, plateau, des) {
             if (couverture <= 0 && cible) score -= distance(c, cible) * 2.5;
         } else if (cible) {
             const d = distance(c, cible);
-            if (d <= portee) {
+            // AVEUGLÉE, elle ne voit pas ce qui se tient dans son noir : une
+            // case d'où la cible y tomberait ne la met pas « à portée ». Une
+            // zone, elle, frapperait quand même.
+            const cachee = !infos.estZone && estDansLeNoir(moi, cible, c);
+            if (cachee) {
+                score -= 18;
+            } else if (d <= portee) {
                 score += 25;           // à portée : c'est l'objectif premier
                 // Un tireur ne veut pas coller sa cible : il garde ses distances.
                 if (t.tientDistance > 0 && portee > 1) {

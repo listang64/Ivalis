@@ -416,6 +416,13 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
             if (c.etats[alt.nom] === undefined) {
                 c.etats[alt.nom] = critique || des.d100() <= chanceEtatDe(lanceur, alt);
             }
+            // L'AVEUGLEMENT tire ICI les 4 cases de noir autour de sa cible —
+            // avec les autres dés, pour que tous les postes voient le même noir.
+            // Les dés ne sont tirés que pour cet état et seulement s'il prend :
+            // les autres cartes gardent exactement la même suite de dés.
+            if (alt.nom === ETAT_AVEUGLE && c.etats[alt.nom] === true && c.aveugle === undefined) {
+                c.aveugle = tirerDirectionsAveugle(des);
+            }
             // LA BOUSCULADE DE LA POUSSÉE. Une cible poussée peut en plus perdre
             // pied : un second jet, sur la seule Poussée, qui lui coûte une part
             // de son énergie. Le dé n'est tiré QUE pour cet état-là — ajouter un
@@ -493,6 +500,48 @@ const TABLE_BONUS_MONSTRE = { "Petit": 0, "Normal": 1, "Élite": 2, "Boss": 3 };
 export function bonusMonstreDe(c) {
     if (!c || !c.estMonstre) return 0;
     return TABLE_BONUS_MONSTRE[c.palier] || 0;
+}
+
+// =========================================================================
+//  L'AVEUGLEMENT
+// =========================================================================
+//  « 4 hexagones autour de la cible sont dans le noir : impossible d'y cibler
+//  qui que ce soit. » Les 4 cases sont tirées parmi les 6 voisines au moment
+//  où l'état prend, et retenues comme DIRECTIONS (des décalages) : le noir
+//  suit l'aveuglé s'il bouge — c'est sa vue qui est atteinte, pas le sol.
+//  Un sort de zone, lui, touche quand même ce qui s'y cache : seul le ciblage
+//  d'une cible précise est empêché.
+export const ETAT_AVEUGLE = "Aveuglé";
+export const DIRECTIONS_HEX = [
+    { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
+    { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 }
+];
+export const CASES_AVEUGLEES = 4;
+
+export function tirerDirectionsAveugle(des) {
+    const reste = DIRECTIONS_HEX.map(d => ({ ...d }));
+    const choisies = [];
+    for (let i = 0; i < CASES_AVEUGLEES && reste.length; i++) {
+        const k = (Math.max(1, nombre(des.d100(), 1)) - 1) % reste.length;
+        choisies.push(reste.splice(k, 1)[0]);
+    }
+    return choisies;
+}
+
+// Les cases dans le noir pour ce combattant, là où il se tient (ou depuis
+// `depuis`, s'il va jouer d'ailleurs). Vide s'il n'est pas aveuglé.
+export function casesDansLeNoir(c, depuis) {
+    if (!c) return [];
+    const origine = depuis || c;
+    const etat = (c.etats || c.Etats_Alteres || []).find(e => e && e.nom === ETAT_AVEUGLE && nombre(e.duree, 1) > 0);
+    if (!etat || !Array.isArray(etat.directions)) return [];
+    return etat.directions.map(d => ({ q: nombre(origine.q) + nombre(d.q), r: nombre(origine.r) + nombre(d.r) }));
+}
+
+// Cette case est-elle cachée aux yeux de ce combattant ?
+export function estDansLeNoir(c, hex, depuis) {
+    if (!hex) return false;
+    return casesDansLeNoir(c, depuis).some(h => h.q === nombre(hex.q) && h.r === nombre(hex.r));
 }
 
 // CE QUE LA PURIFICATION PEUT ENLEVER : tout état, SAUF ceux qui protègent ou
@@ -1267,6 +1316,8 @@ export function resoudreCarte(etat, action, plateau) {
                 // Même principe pour la Provocation : provoqué une seconde fois,
                 // c'est le dernier qui a crié qu'on doit aller frapper.
                 if (alt.idProvocateur) existant.idProvocateur = alt.idProvocateur;
+                // Aveuglé de nouveau : le nouveau coup choisit un nouveau noir.
+                if (alt.nom === ETAT_AVEUGLE && Array.isArray(des.aveugle)) existant.directions = des.aveugle;
             } else {
                 cible.etats = [...cible.etats, {
                     nom: alt.nom,
@@ -1276,6 +1327,7 @@ export function resoudreCarte(etat, action, plateau) {
                     ...(alt.valeurAbs !== undefined ? { valeurAbs: alt.valeurAbs } : {}),
                     ...(alt.valeurContre !== undefined ? { valeurContre: alt.valeurContre } : {}),
                     ...(alt.bonusEquip ? { bonusEquip: alt.bonusEquip } : {}),
+                    ...(alt.nom === ETAT_AVEUGLE && Array.isArray(des.aveugle) ? { directions: des.aveugle } : {}),
                     // QUI A PROVOQUÉ. Sans ce nom, la Provocation ne provoque
                     // rien : l'IA (ia_pure.js) cherche l'état, lit
                     // `idProvocateur` pour se retourner vers celui qui l'a
@@ -1444,6 +1496,7 @@ export function jouer(etat, action) {
 if (typeof window !== "undefined") {
     window.moteurPur = {
         jouer, resoudreCarte, chaineDeDegats, tirerDesCarte, tirerCritique,
-        esquiveDe, paradeDe, defPhysiqueDe, defMagiqueDe, critiqueDe, distanceHex
+        esquiveDe, paradeDe, defPhysiqueDe, defMagiqueDe, critiqueDe, distanceHex,
+        casesDansLeNoir, estDansLeNoir, ETAT_AVEUGLE
     };
 }
