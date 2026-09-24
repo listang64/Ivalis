@@ -4133,12 +4133,14 @@ window.MIGRATION_EFFETS = [
                 Notes: "Après l'attaque, le lanceur choisit une case à 3 pas de marche (ni mur, ni vivant traversé). Chaque ennemi quitté a 60% de chance d'être évité avant le jet de défense. Marche gratuite." } },
     // L'AVEUGLEMENT ENTRE DANS LE GRIMOIRE, même principe que le Repli : un
     // état comme l'Étourdi (Physique, crans de 10 %, plafond 70 %, 2 tours).
-    { id: "EFF_AVEUGLEMENT", creer: true,
+    // `majSiPresent` : si la fiche existe déjà (bouton déjà pressé), seules ces
+    // colonnes sont remises à jour — la règle est passée de 4 à 3 cases.
+    { id: "EFF_AVEUGLEMENT", creer: true, majSiPresent: ["Notes"],
       champs: { Nom: "Aveuglement", Cout_PT: "1", Modificateur: "DEXTÉRITÉ",
                 Type_Mecanique: "Physique", Type_Mecanique_2: "Aucun",
                 Valeur: 0, Pourcent_Base: 10, Pourcent_Max: 70, Tours: 2, Cible_Etat: "aveuglement",
                 Effet_Base: "10% chance (max 70%) d'aveugler la cible, sur 2 tours",
-                Notes: "Aveuglement : 4 hexagones autour de la cible sont dans le noir. Impossible d'y cibler un ennemi ou un allié (les sorts de zone les touchent quand même). Le noir suit l'aveuglé et n'est visible que de lui." } }
+                Notes: "Aveuglement : 3 hexagones autour de la cible sont dans le noir, fixés là où elle a été aveuglée. Impossible d'y cibler un ennemi ou un allié (les sorts de zone les touchent quand même). Le noir n'est visible que de l'aveuglé." } }
 ];
 
 window.appliquerMigrationEffets = async function() {
@@ -4166,7 +4168,17 @@ window.appliquerMigrationEffets = async function() {
                 // n'y touche plus : ce qui a été réglé dans le grimoire depuis
                 // appartient à celui qui l'a réglé.
                 if (regle.creer) {
-                    if (snap.exists()) { inchanges.push(regle.id + " (déjà présent)"); continue; }
+                    if (snap.exists()) {
+                        const actuel = snap.data() || {};
+                        const aJour = {};
+                        (regle.majSiPresent || []).forEach(cle => {
+                            if (actuel[cle] !== regle.champs[cle]) aJour[cle] = regle.champs[cle];
+                        });
+                        if (Object.keys(aJour).length === 0) { inchanges.push(regle.id + " (déjà présent)"); continue; }
+                        await setDoc(ref, aJour, { merge: true });
+                        faits.push(`${regle.id} — ${Object.keys(aJour).join(", ")}`);
+                        continue;
+                    }
                     await setDoc(ref, { ...regle.champs });
                     faits.push(regle.id + " — créé");
                     continue;

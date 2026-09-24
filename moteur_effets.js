@@ -421,26 +421,26 @@ const ICONE_AVEUGLE = "data:image/svg+xml;utf8," + encodeURIComponent(
     + "<line x1='15' y1='49' x2='49' y2='15' stroke='#d33' stroke-width='5' stroke-linecap='round'/></svg>");
 window.ICONE_AVEUGLE = ICONE_AVEUGLE;
 
-// Les cases que ce personnage ne voit pas, depuis `depuis` (sa case, ou celle
-// d'où part le sort). Même règle que le noyau (moteur_pur.js, casesDansLeNoir) :
-// l'état « Aveuglé » porte 4 directions, le noir suit le personnage.
-window.casesDansLeNoirEcran = function(perso, depuis) {
-    if (!perso || !depuis) return [];
+// Les cases que ce personnage ne voit pas. Même règle que le noyau
+// (moteur_pur.js, casesDansLeNoir) : l'état « Aveuglé » porte ses 3 cases,
+// FIXES sur le plateau — tirées autour de là où il a été aveuglé.
+window.casesDansLeNoirEcran = function(perso) {
+    if (!perso) return [];
     const etat = (perso.Etats_Alteres || []).find(e => e && e.nom === "Aveuglé" && (parseInt(e.duree) || 1) > 0);
-    if (!etat || !Array.isArray(etat.directions)) return [];
-    return etat.directions.map(d => ({ q: Number(depuis.q) + Number(d.q), r: Number(depuis.r) + Number(d.r) }));
+    if (!etat || !Array.isArray(etat.cases)) return [];
+    return etat.cases.map(h => ({ q: Number(h.q), r: Number(h.r) }));
 };
-window.cibleDansLeNoir = function(perso, depuis, hexCible) {
+window.cibleDansLeNoir = function(perso, _depuis, hexCible) {
     if (!hexCible) return false;
-    return window.casesDansLeNoirEcran(perso, depuis)
+    return window.casesDansLeNoirEcran(perso)
         .some(h => h.q === Number(hexCible.q) && h.r === Number(hexCible.r));
 };
 
 // LE BROUILLARD DE L'AVEUGLÉ. Il n'existe QUE sur l'écran de celui qui ne voit
 // pas : on ne le dessine que pour les héros de CET appareil
 // (COMBAT_PERSOS_JOUEUR). Un noir épais qui ondule, posé AU-DESSUS des pions
-// (z-index 20 contre 10) : ce qui se tient là disparaît à ses yeux. Il suit
-// son pion et s'efface avec l'état. Redessiné seulement quand les cases
+// (z-index 20 contre 10) : ce qui se tient là disparaît à ses yeux. Il reste
+// sur ses cases de départ et s'efface avec l'état. Redessiné seulement quand les cases
 // changent (signature), pour ne pas relancer l'animation à chaque passage.
 window.dessinerBrouillardAveuglement = function() {
     const conteneur = document.getElementById("transform-plateau");
@@ -451,9 +451,8 @@ window.dessinerBrouillardAveuglement = function() {
         (window.COMBAT_PERSOS_JOUEUR || []).forEach(h => {
             if (!h) return;
             const frais = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === h.idPersonnage) || h;
-            const tk = (window.TOKENS_VTT_DATA || {})[h.idPersonnage];
-            if (!tk || frais.statut === "Mort") return;
-            window.casesDansLeNoirEcran(frais, tk).forEach(c => cases.push(c));
+            if (frais.statut === "Mort") return;
+            window.casesDansLeNoirEcran(frais).forEach(c => cases.push(c));
         });
     }
     const signature = cases.map(c => c.q + "," + c.r).sort().join("|");
@@ -1539,7 +1538,7 @@ window.demarrerCiblage = async function(idCarte, options) {
 
             // L'AVEUGLEMENT : un état comme l'Étourdi — chance par cran plafonnée
             // par le Pourcentage max du grimoire (70 %), durée = Tours + ⏳. Les
-            // 4 cases de noir se tirent au moment où il prend (moteur_pur.js,
+            // 3 cases de noir se tirent au moment où il prend (moteur_pur.js,
             // tirerDesCarte), pas ici.
             let aveugleChance = 0, aveugleDuree = 0, aveuglePlafond = 0, estAveuglement = false;
             const lireAveuglement = (eff, n, crans) => {
@@ -1559,7 +1558,7 @@ window.demarrerCiblage = async function(idCarte, options) {
                 alterationsExtraites.push({
                     nom: "Aveuglé",
                     icone: ICONE_AVEUGLE,
-                    desc: "4 cases autour de lui sont dans le noir : il ne peut y cibler personne (les zones y frappent quand même).",
+                    desc: "3 cases autour de lui sont dans le noir : il ne peut y cibler personne (les zones y frappent quand même).",
                     chance: Math.min(100, aveugleChance),
                     duree: aveugleDuree || 2,
                     isRanged: isRanged,

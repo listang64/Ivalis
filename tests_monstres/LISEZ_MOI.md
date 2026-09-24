@@ -132,7 +132,7 @@ node reglage_encart.mjs     # le OK sous la piste d'initiative ; l'outil proviso
 node purification.mjs       # la Purification du grimoire : 1 état néfaste retiré à coup sûr, sans soin
 node repli.mjs              # le Repli : frapper puis marcher 3 cases, 60 % d'éviter chaque opportunité
 node bond_apres_attaque.mjs  # un Bond placé après l'attaque saute enfin (il part avec la carte)
-node aveuglement.mjs        # l'Aveuglement : 4 cases de noir, ciblage interdit (sauf zones), brouillard chez l'aveuglé
+node aveuglement.mjs        # l'Aveuglement : 3 cases de noir fixes, ciblage interdit (sauf zones), brouillard chez l'aveuglé
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -2778,3 +2778,30 @@ extraction réelle (crans, plafond 70 %, ⏳), ciblage refusé (ennemi et allié
 anneaux, zone, brouillard chez l'aveuglé et pas ailleurs, générateur. Morsures
 sur moteur_pur, moteur_effets, ia_pure, cerveau_combat, pont_combat,
 monstres_competences et monstres_ia.
+
+### L'Aveuglement revu : trois cases, fixes, point noir
+
+Nico a tranché après le premier essai : le noir RESTE sur les cases de départ
+(il ne suit plus l'aveuglé), il ne couvre que 3 cases, et le point de l'état
+sur le pion est noir (#000000, libre jusque-là). L'icône de l'état sera fournie
+plus tard : l'œil barré dessiné en SVG tient la place en attendant.
+
+L'état « Aveuglé » ne retient donc plus des directions mais des CASES
+(`casesDuNoir`, calculées autour de la case de la cible au moment où il prend) ;
+`casesDansLeNoir` / `estDansLeNoir` ne dépendent plus de là où se tient
+l'aveuglé, et le brouillard ne bouge plus quand il s'éloigne. Aveuglé de
+nouveau, le nouveau noir se tire autour de sa nouvelle case.
+
+Conséquence pour les créatures : puisque le noir ne se déplace plus avec elles,
+changer de case ne rend pas visible une cible qui s'y tient. `choisirCible`
+(ia_pure.js) écarte donc d'emblée tout ce qui est dans le noir (sauf carte de
+zone) : la créature va vers ce qu'elle voit. La garde de `jouerCreature`
+(cerveau_combat.js) reste en second rideau.
+
+La migration sait maintenant remettre à jour une fiche déjà créée
+(`majSiPresent`) : si le bouton avait déjà été pressé avec l'ancienne règle,
+seules les Notes d'EFF_AVEUGLEMENT passent à « 3 hexagones… fixés » ; un
+pourcentage réglé à la main dans le grimoire n'est pas touché.
+`aveuglement.mjs` et `migration_effets.mjs` le vérifient (vingt tirages sur
+vingt : Naomi, dans le noir, n'est jamais visée et la goule marche vers Ben) ;
+morsures sur moteur_pur, moteur_effets, ia_pure, combat.js et app.js.

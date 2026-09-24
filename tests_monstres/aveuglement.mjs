@@ -1,9 +1,9 @@
-// L'AVEUGLEMENT : QUATRE CASES DE NOIR AUTOUR DE L'AVEUGLÉ.
+// L'AVEUGLEMENT : TROIS CASES DE NOIR AUTOUR DE L'AVEUGLÉ, FIXES.
 //
 // Nouvel effet demandé par Nico : « Aveuglement — 1 — DEXTÉRITÉ — 10 % de chance
-// (max 70 %) d'aveugler la cible, sur 2 tours. 4 hexagones autour de la cible
-// sont dans le noir : impossible d'y cibler un ennemi. » Précisions : les 4
-// cases sont tirées au hasard ; un monstre aveuglé ne choisit pas ce qui s'y
+// (max 70 %) d'aveugler la cible, sur 2 tours. » Précisions : 3 hexagones
+// autour de la cible (tirés au hasard) sont dans le noir, FIXÉS là où elle a été
+// aveuglée ; un monstre aveuglé ne choisit pas ce qui s'y
 // tient ; un joueur aveuglé voit un brouillard noir sur ces cases — lui seul —
 // et ne peut y viser ni ennemi ni allié ; une ZONE les touche quand même.
 //
@@ -41,48 +41,50 @@ const monde = (positions = {}) => construireEtatCombat({
 });
 
 // =========================================================================
-console.log("\n1. LE NOYAU : QUATRE DIRECTIONS TIRÉES, UN NOIR QUI SUIT");
+console.log("\n1. LE NOYAU : TROIS CASES TIRÉES, UN NOIR QUI RESTE");
 // =========================================================================
 {
-  const dirs = tirerDirectionsAveugle(desFixe([1, 1, 1, 1]));
+  const dirs = tirerDirectionsAveugle(desFixe([1, 1, 1]));
   const cles = new Set(dirs.map(d => `${d.q},${d.r}`));
-  verifier("4 directions, toutes différentes, parmi les 6 voisines",
-           dirs.length === 4 && cles.size === 4 && dirs.every(d => DIRECTIONS_HEX.some(h => h.q === d.q && h.r === d.r)),
+  verifier("3 directions, toutes différentes, parmi les 6 voisines",
+           dirs.length === 3 && cles.size === 3 && dirs.every(d => DIRECTIONS_HEX.some(h => h.q === d.q && h.r === d.r)),
            JSON.stringify(dirs));
-  const autres = tirerDirectionsAveugle(desFixe([6, 5, 4, 3]));
+  const autres = tirerDirectionsAveugle(desFixe([6, 5, 4]));
   verifier("d'autres dés, un autre noir", JSON.stringify(autres) !== JSON.stringify(dirs), JSON.stringify(autres));
 
-  // Le jet de la carte : la Peur n'y tire rien de plus, l'Aveuglement tire ses 4 dés.
   const etat = monde();
   const alt = { nom: ETAT_AVEUGLE, chance: 30, duree: 2, cibles: ["H1"] };
-  // dés : défense H1 (99 = touché), chance (20 ≤ 30 = pris), puis les 4 directions.
-  const jets = tirerDesCarte(etat, { attaques: [], alterations: [alt] }, "M1", false, desFixe([99, 20, 1, 1, 1, 1]));
-  verifier("l'état prend, et le jet emporte 4 directions", jets.parCible.H1.etats[ETAT_AVEUGLE] === true
-           && (jets.parCible.H1.aveugle || []).length === 4, JSON.stringify(jets.parCible.H1));
+  // dés : défense H1 (99 = touché), chance (20 ≤ 30 = pris), puis les 3 directions.
+  const jets = tirerDesCarte(etat, { attaques: [], alterations: [alt] }, "M1", false, desFixe([99, 20, 1, 1, 1]));
+  verifier("l'état prend, et le jet emporte 3 directions", jets.parCible.H1.etats[ETAT_AVEUGLE] === true
+           && (jets.parCible.H1.aveugle || []).length === 3, JSON.stringify(jets.parCible.H1));
   const rate = tirerDesCarte(etat, { attaques: [], alterations: [alt] }, "M1", false, desFixe([99, 90]));
   verifier("raté (dé 90) : aucun dé de noir n'est tiré", rate.parCible.H1.aveugle === undefined);
 
   const r = resoudreCarte(etat, { type: "carte", idLanceur: "M1", idCarte: "CM", attaques: [], alterations: [alt], jets });
   const pose = r.etat.combattants.H1.etats.find(e => e.nom === ETAT_AVEUGLE);
-  verifier("l'état « Aveuglé » est posé 2 tours, avec ses directions",
-           pose && pose.duree === 2 && (pose.directions || []).length === 4, JSON.stringify(pose));
+  verifier("l'état « Aveuglé » est posé 2 tours, avec ses 3 cases",
+           pose && pose.duree === 2 && (pose.cases || []).length === 3, JSON.stringify(pose));
   const h1 = r.etat.combattants.H1;
   const noir = casesDansLeNoir(h1);
-  verifier("4 cases de noir, toutes collées à l'aveuglé",
-           noir.length === 4 && noir.every(c => (Math.abs(c.q) + Math.abs(c.q + c.r) + Math.abs(c.r)) / 2 === 1), JSON.stringify(noir));
+  verifier("3 cases de noir, toutes collées à l'endroit où il a été aveuglé",
+           noir.length === 3 && noir.every(c => (Math.abs(c.q) + Math.abs(c.q + c.r) + Math.abs(c.r)) / 2 === 1), JSON.stringify(noir));
   const bouge = { ...h1, q: 5, r: 5 };
-  verifier("le noir SUIT l'aveuglé quand il bouge",
-           casesDansLeNoir(bouge).every(c => (Math.abs(c.q - 5) + Math.abs(c.q + c.r - 10) + Math.abs(c.r - 5)) / 2 === 1));
+  verifier("le noir RESTE sur ses cases de départ quand l'aveuglé bouge",
+           JSON.stringify(casesDansLeNoir(bouge)) === JSON.stringify(noir) && estDansLeNoir(bouge, noir[0]));
   const visible = DIRECTIONS_HEX.find(d => !noir.some(c => c.q === d.q && c.r === d.r));
   verifier("une case voisine hors du noir reste visible", !estDansLeNoir(h1, visible) && estDansLeNoir(h1, noir[0]));
   verifier("sans l'état, rien n'est dans le noir", casesDansLeNoir(r.etat.combattants.M1).length === 0);
   verifier("la Purification peut l'ôter (état néfaste)", estEtatNefaste(pose));
 
-  const encore = resoudreCarte(r.etat, { type: "carte", idLanceur: "M1", idCarte: "CM", attaques: [], alterations: [alt],
+  // Aveuglé de nouveau ailleurs : le nouveau noir se tire autour de sa nouvelle case.
+  const ailleurs = clonerEtat(r.etat);
+  ailleurs.combattants.H1.q = 4; ailleurs.combattants.H1.r = 0;
+  const encore = resoudreCarte(ailleurs, { type: "carte", idLanceur: "M1", idCarte: "CM", attaques: [], alterations: [alt],
     jets: { parCible: { H1: { esquive: false, etats: { [ETAT_AVEUGLE]: true }, aveugle: [DIRECTIONS_HEX[0]] } } } });
   const renouvele = encore.etat.combattants.H1.etats.filter(e => e.nom === ETAT_AVEUGLE);
-  verifier("aveuglé de nouveau : un seul état, le noir du nouveau coup",
-           renouvele.length === 1 && renouvele[0].directions.length === 1, JSON.stringify(renouvele));
+  verifier("aveuglé de nouveau : un seul état, le nouveau noir autour de sa nouvelle case",
+           renouvele.length === 1 && JSON.stringify(renouvele[0].cases) === '[{"q":5,"r":0}]', JSON.stringify(renouvele));
   const scene = misEnScene(r.etapes.find(e => e.pose === ETAT_AVEUGLE), r.etat);
   verifier("l'écran annonce « Aveuglé 🌫️ »", scene.geste === "message" && /Aveuglé/.test(scene.texte), JSON.stringify(scene));
 }
@@ -91,34 +93,42 @@ console.log("\n1. LE NOYAU : QUATRE DIRECTIONS TIRÉES, UN NOIR QUI SUIT");
 console.log("\n2. LES CRÉATURES NE VISENT PAS DANS LE NOIR");
 // =========================================================================
 {
-  // La goule M1 (1,0) est au contact de Naomi (0,0) ; direction goule → Naomi : (-1,0).
-  const aveugler = (etat, dirs) => { etat.combattants.M1.etats = [{ nom: ETAT_AVEUGLE, duree: 2, directions: dirs }]; return etat; };
+  // La goule M1 (1,0), au contact de Naomi (0,0), a été aveuglée : Naomi est
+  // sur l'une de ses 3 cases de noir. Ben (-3,3) est loin, mais visible.
+  const aveugler = (etat, cases) => { etat.combattants.M1.etats = [{ nom: ETAT_AVEUGLE, duree: 2, cases }]; return etat; };
+  const NOIR = [{ q: 0, r: 0 }, { q: 1, r: -1 }, { q: 1, r: 1 }];
   const carte = { idCarte: "CM", infos: { portee: 1, fatigue: 10 }, attaques: [{ valeurBrute: 9 }], alterations: [] };
 
-  const figee = aveugler(monde(), [{ q: -1, r: 0 }, { q: 0, r: -1 }, { q: 0, r: 1 }, { q: 1, r: -1 }]);
-  figee.combattants.M1.etats.push({ nom: "Immobilisation", duree: 2 });
-  const p1 = jouerCreature(figee, "M1", carte, null);
-  const renonce = p1.entree.etapes.find(e => e.type === "renonce");
-  verifier("immobile, Naomi dans son noir : elle renonce (« aveuglée »)",
-           !p1.entree.etapes.some(e => e.type === "carte") && renonce && /aveugl/.test(renonce.raison),
-           JSON.stringify(renonce));
-  verifier("et Naomi ne perd rien", p1.etat.combattants.H1.pv === 60);
-
-  // Libre de bouger : sur vingt tirages du hasard, elle se place à chaque fois
-  // d'où Naomi est VISIBLE, et frappe. (Sans la règle, rester collée à sa case
-  // — d'où Naomi est dans le noir — reste souvent son meilleur choix.)
-  let frappes = 0, visibles = 0;
+  // Sur vingt tirages du hasard : jamais Naomi. Elle va vers Ben, le seul qu'elle voit.
+  let naomiTouchee = 0, versBen = 0;
   for (let g = 1; g <= 20; g++) {
-    const libre = aveugler(monde(), [{ q: -1, r: 0 }, { q: 0, r: -1 }, { q: 0, r: 1 }, { q: 1, r: -1 }]);
-    libre.graine = g * 7919;
-    const p2 = jouerCreature(libre, "M1", carte, null);
-    if (p2.entree.etapes.some(e => e.type === "carte") && p2.etat.combattants.H1.pv < 60) frappes++;
-    if (!estDansLeNoir(p2.etat.combattants.M1, p2.etat.combattants.H1)) visibles++;
+    const e = aveugler(monde(), NOIR);
+    e.graine = g * 7919;
+    const p = jouerCreature(e, "M1", carte, null);
+    if (p.etat.combattants.H1.pv < 60) naomiTouchee++;
+    const m = p.etat.combattants.M1, ben = p.etat.combattants.H2;
+    const d = (Math.abs(m.q - ben.q) + Math.abs(m.q + m.r - ben.q - ben.r) + Math.abs(m.r - ben.r)) / 2;
+    if (d < 4) versBen++;          // elle partait à 4 cases de Ben : elle doit s'en rapprocher
   }
-  verifier("libre de bouger : elle se place d'où Naomi est VISIBLE, et frappe (20 tirages sur 20)",
-           frappes === 20 && visibles === 20, `${frappes} frappes, ${visibles} visibles`);
+  verifier("Naomi, dans son noir, n'est jamais visée (20 tirages sur 20)", naomiTouchee === 0, `${naomiTouchee} fois touchée`);
+  verifier("elle marche vers Ben, le seul qu'elle voit (20 tirages sur 20)", versBen === 20, `${versBen}/20`);
+  const couleurs = fs.readFileSync('/home/user/Ivalis/combat.js', 'utf-8');
+  verifier("le point de l'état sur le pion est noir", /"Aveuglé":\s*"#000000"/.test(couleurs));
 
-  const zoneFigee = aveugler(monde(), [{ q: -1, r: 0 }, { q: 0, r: -1 }, { q: 0, r: 1 }, { q: 1, r: -1 }]);
+  // Seule cible au monde, et dans le noir : elle ne lance rien.
+  const seule = aveugler(monde({ H2: { q: 9, r: -9 } }), NOIR);
+  seule.combattants.H2.aTerre = true;
+  const p1 = jouerCreature(seule, "M1", carte, null);
+  verifier("sa seule cible est dans le noir : aucune technique lancée", !p1.entree.etapes.some(e => e.type === "carte")
+           && p1.etat.combattants.H1.pv === 60, p1.entree.etapes.map(e => e.type).join(","));
+
+  // Même garde au moment de frapper (cerveau_combat.js) : une cible choisie
+  // quand même se retrouve dans le noir — la carte n'est pas lancée.
+  const src = fs.readFileSync('/home/user/Ivalis/cerveau_combat.js', 'utf-8');
+  verifier("le cerveau refuse de frapper dans le noir (garde de jouerCreature)",
+           /dansLeNoir = !!\(moi && cible && !infos\.estZone && estDansLeNoir\(moi, cible\)\)/.test(src));
+
+  const zoneFigee = aveugler(monde(), NOIR);
   zoneFigee.combattants.M1.etats.push({ nom: "Immobilisation", duree: 2 });
   const carteZone = { idCarte: "CZ", infos: { portee: 1, fatigue: 10, estZone: true, zoneHexes: [{ q: 0, r: 0 }, { q: -1, r: 0 }] },
                       attaques: [{ valeurBrute: 9 }], alterations: [] };
@@ -162,12 +172,12 @@ await pg.evaluate(async ({ src, fiche }) => {
   new Function('window', 'db', 'doc', 'updateDoc', 'setDoc', 'deleteDoc', 'deleteField', src)(
     window, {}, () => ({}), async () => {}, async () => {}, async () => {}, () => ({}));
   window.regimeDemande = { actif: () => true, carte: async (a, c) => { window.__envoyees.push(JSON.parse(JSON.stringify(c))); } };
-  // Naomi (J1) en (0,0) est aveuglée : noir à l'est (1,0) et au nord-est (1,-1), au sud (0,1), à l'ouest (-1,0).
+  // Naomi (J1) en (0,0) est aveuglée : noir à l'est (1,0), au sud (0,1), à l'ouest (-1,0).
   window.__poser = (aveuglee = true) => {
     window.__envoyees = []; window.__messages = []; window.ETAT_CIBLAGE = null;
-    const noir = [{ q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: 1 }, { q: -1, r: 0 }];
+    const noir = [{ q: 1, r: 0 }, { q: 0, r: 1 }, { q: -1, r: 0 }];
     const j1 = { idPersonnage: "J1", camp: "Allié", statut: "Vivant",
-                 Etats_Alteres: aveuglee ? [{ nom: "Aveuglé", duree: 2, directions: noir }] : [] };
+                 Etats_Alteres: aveuglee ? [{ nom: "Aveuglé", duree: 2, cases: noir }] : [] };
     window.PERSOS_PARTIE = [j1,
       { idPersonnage: "J2", camp: "Allié", statut: "Vivant", Etats_Alteres: [] },
       { idPersonnage: "M1", camp: "Ennemi", statut: "Vivant", Etats_Alteres: [] },
@@ -246,6 +256,10 @@ await pg.evaluate(async ({ src, fiche }) => {
     const svg = window.dessinerBrouillardAveuglement();
     const chezLui = svg ? { cases: svg.querySelectorAll("polygon").length, z: svg.style.zIndex,
                            anime: !!svg.querySelector("animate"), sig: svg.dataset.signature } : null;
+    // Naomi s'éloigne : le brouillard reste sur les cases de départ.
+    window.TOKENS_VTT_DATA.J1 = { q: -3, r: 2 };
+    const apresDepart = window.dessinerBrouillardAveuglement();
+    const reste = apresDepart && apresDepart.dataset.signature === (chezLui || {}).sig;
     // Le même état, mais sur l'appareil d'un AUTRE joueur (son héros n'est pas aveuglé).
     window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[1]];
     const ailleurs = window.dessinerBrouillardAveuglement();
@@ -254,11 +268,12 @@ await pg.evaluate(async ({ src, fiche }) => {
     window.__poser(false);
     document.getElementById("fenetre-combat").style.display = "block";
     window.dessinerBrouillardAveuglement();
-    return { chezLui, ailleurs: !!ailleurs, resteAilleurs, parti: !document.getElementById("svg-brouillard-aveugle") };
+    return { chezLui, reste, ailleurs: !!ailleurs, resteAilleurs, parti: !document.getElementById("svg-brouillard-aveugle") };
   });
-  verifier("chez l'aveuglé : un brouillard sur ses 4 cases, animé, au-dessus des pions",
-           brouillard.chezLui && brouillard.chezLui.cases === 4 && brouillard.chezLui.anime && Number(brouillard.chezLui.z) > 10,
+  verifier("chez l'aveuglé : un brouillard sur ses 3 cases, animé, au-dessus des pions",
+           brouillard.chezLui && brouillard.chezLui.cases === 3 && brouillard.chezLui.anime && Number(brouillard.chezLui.z) > 10,
            JSON.stringify(brouillard.chezLui));
+  verifier("il s'éloigne : le brouillard reste sur les cases de départ", brouillard.reste);
   verifier("chez un autre joueur : aucun brouillard", !brouillard.ailleurs && !brouillard.resteAilleurs);
   verifier("l'état fini, le brouillard disparaît", brouillard.parti);
 }

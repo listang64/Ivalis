@@ -142,7 +142,17 @@ console.log("\n2. UN PASSAGE : LA BASE DIT CE QUE LE MOTEUR FAIT");
              resultat.faits.some(f => /EFF_AVEUGLEMENT — créé/.test(f)) && aveu.Nom === "Aveuglement"
              && aveu.Pourcent_Base === 10 && aveu.Pourcent_Max === 70 && aveu.Tours === 2 && aveu.Cout_PT === "1"
              && aveu.Modificateur === "DEXTÉRITÉ" && aveu.Type_Mecanique === "Physique", JSON.stringify(aveu));
-    verifier("et ses notes disent la règle du noir", /4 hexagones/.test(aveu.Notes || "") && /zone/.test(aveu.Notes || ""));
+    verifier("et ses notes disent la règle du noir (3 cases fixes)", /3 hexagones/.test(aveu.Notes || "")
+             && /fixés/.test(aveu.Notes || "") && /zone/.test(aveu.Notes || ""));
+
+    // Fiche déjà créée (bouton déjà pressé, avec l'ancienne règle à 4 cases,
+    // et un pourcentage retouché à la main) : seules les Notes sont remises.
+    const deja = fausseBase({ ...EFFETS_REELS, EFF_AVEUGLEMENT: { Nom: "Aveuglement", Pourcent_Base: 15,
+      Notes: "Aveuglement : 4 hexagones autour de la cible sont dans le noir." } });
+    await deja.lancer();
+    verifier("fiche déjà là : les Notes passent à 3 cases, le réglage à la main reste",
+             /3 hexagones/.test(deja.base.EFF_AVEUGLEMENT.Notes) && deja.base.EFF_AVEUGLEMENT.Pourcent_Base === 15,
+             JSON.stringify(deja.base.EFF_AVEUGLEMENT));
 
     // Un Repli déjà réglé à la main (4 cases, 50 %) n'est jamais réécrit.
     const regle = fausseBase({ ...EFFETS_REELS, EFF_REPLI: { Nom: "Repli", Valeur: 4, Pourcent_Base: 50 } });

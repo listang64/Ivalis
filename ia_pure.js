@@ -183,6 +183,9 @@ export function choisirCible(etat, id, infosCarte, des) {
         // illusion — mais seulement quand le coup partira pour de bon.
         if (c.estIllusion && !infos.estAttaqueSimple) continue;
         if (infos.estSoin ? (c.camp !== moi.camp) : (c.camp === moi.camp)) continue;
+        // AVEUGLÉE, elle ne voit pas ce qui se tient dans son noir : elle ne le
+        // choisit pas. Une zone, si — elle frappe ce qu'elle couvre.
+        if (!infos.estZone && estDansLeNoir(moi, c)) continue;
         candidats.push(c);
     }
     if (candidats.length === 0) return null;
@@ -275,10 +278,10 @@ export function choisirPosition(etat, id, cible, infosCarte, plateau, des) {
             if (couverture <= 0 && cible) score -= distance(c, cible) * 2.5;
         } else if (cible) {
             const d = distance(c, cible);
-            // AVEUGLÉE, elle ne voit pas ce qui se tient dans son noir : une
-            // case d'où la cible y tomberait ne la met pas « à portée ». Une
-            // zone, elle, frapperait quand même.
-            const cachee = !infos.estZone && estDansLeNoir(moi, cible, c);
+            // AVEUGLÉE, elle ne voit pas ce qui se tient dans son noir (des
+            // cases fixes) : une cible qui s'y tient n'est jamais « à portée ».
+            // Une zone, elle, frapperait quand même.
+            const cachee = !infos.estZone && estDansLeNoir(moi, cible);
             if (cachee) {
                 score -= 18;
             } else if (d <= portee) {
