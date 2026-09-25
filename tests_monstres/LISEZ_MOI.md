@@ -128,7 +128,7 @@ node apercu_butin.mjs       # onglet Inventaire et fenêtres de butin, capturés
 node objets_sans_undefined.mjs  # aucun objet fabriqué ne contient de valeur undefined (Firestore la refuse)
 node bouclier_absorption_contre.mjs  # bouclier en % des PV restants, Absorption magique, Contre physique, soin de zone au contact
 node poussee_forge_avatar.mjs  # la Forge annonce toujours 2 cases de Poussée ; l'avatar du bouton de fin de tour grandit
-node reglage_encart.mjs     # le OK sous la piste d'initiative ; l'outil provisoire « ⚙ HUD » de l'encart de tour
+node encart_fige.mjs        # le OK sous la piste d'initiative ; l'encart de tour figé aux nombres de Nico, sans bouton « ⚙ HUD »
 node purification.mjs       # la Purification du grimoire : 1 état néfaste retiré à coup sûr, sans soin
 node repli.mjs              # le Repli : frapper puis marcher 3 cases, 60 % d'éviter chaque opportunité
 node bond_apres_attaque.mjs  # un Bond placé après l'attaque saute enfin (il part avec la carte)
@@ -2909,3 +2909,28 @@ ne laisse pas de nappe et qu'un DOT avec un état ne garde au sol que l'état.
 l'ancienne Forge laisse les deux sélectionnables (6 échecs), l'ancien noyau pose
 une nappe de dégâts étalés (2 échecs), l'ancien générateur accepte les deux
 (2 échecs).
+
+### L'encart de tour figé, le bouton « ⚙ HUD » retiré
+
+Nico a réglé l'encart à l'écran avec l'outil provisoire, sur une plaque de
+740 px de large (écran 1366×1024), puis a renvoyé le code extrait : « c'est bon,
+tu peux figer ça et virer le bouton HUD ». Ses nombres sont recopiés tels quels
+dans `REGLAGES_HUD` (hud_disposition.js) : plaque 740 px ; fond décalé
+(-1,5 ; 16) et ramené à 68 % ; médaillon plus grand (41 %) ; nom du combattant
+passé en bas à gauche (-5 ; 85) ; technique au milieu (33 ; 46, police 3,6) ;
+détail juste dessous (40 ; 53, police 2,1) ; ligne d'attente en bas
+(39,5 ; 90, police 2,5).
+
+L'outil part comme prévu d'un seul coup : `reglage_encart.js` et sa ligne dans
+index.html sont supprimés. Les réglages qu'il gardait dans le localStorage de
+l'appareil ne sont plus lus par personne : c'est le code qui fait foi.
+
+`reglage_encart.mjs` devient `encart_fige.mjs` : il garde les contrôles du bouton
+OK (petit, centré, sous la piste), vérifie que les neuf groupes du code sont
+exactement ceux de Nico, puis MESURE à l'écran, en 1366×1024, que la plaque fait
+740 px et que le nom, la technique, le détail et la ligne d'attente tombent à
+leurs pourcentages ; enfin, qu'il n'y a plus ni poignée, ni boîte, ni fonction,
+ni fichier, ni ligne dans index.html. Morsures : les anciens nombres font tomber
+15 contrôles, l'outil remis en place en fait tomber 4. `hud_heros.mjs`, qui
+rétrécit la plaque pour vérifier les proportions, la rend désormais à la
+largeur réglée dans le code au lieu de 760 px écrits en dur.

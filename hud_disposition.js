@@ -81,25 +81,28 @@
         //  avec elle, dans les mêmes proportions, y compris les polices. Une
         //  taille en pixels aurait tenu bon pendant que la plaque rétrécissait
         //  autour d'elle, et le texte serait sorti du cadre.
-        encart:        { gauche: 52, bas: -8, largeur: 760 },
+        //
+        //  NOMBRES FIGÉS par Nico avec l'outil « ⚙ HUD » (depuis retiré), sur
+        //  une plaque de 740 px de large, écran 1366×1024.
+        encart:        { gauche: 52, bas: -8, largeur: 740 },
         // L'IMAGE DE FOND SEULE, sans ce qui est posé dessus : un décalage en %
         // de la plaque et une échelle en %. Elle bouge par `transform`, donc
         // sans toucher à la boîte : la plaque garde sa taille, et tout ce qui
         // se mesure en % d'elle ne bouge pas quand on déplace le fond.
-        encartFond:    { x: 0, y: 0, echelle: 100 },
-        encartPion:    { x: -5, y: 34, taille: 29 },
+        encartFond:    { x: -1.5, y: 16, echelle: 68 },
+        encartPion:    { x: -2.5, y: 34, taille: 41 },
         // L'AVATAR EN PIED A SES PROPRES MESURES, et il lui en fallait.
         // Le médaillon se place par son HAUT ; l'avatar monte du bas de l'écran,
         // donc il se place par son BAS. Ce ne sont pas les mêmes nombres, et les
         // faire cohabiter dans un seul groupe aurait obligé à régler l'un en
         // cassant l'autre. `hauteur` est en pourcentage de la LARGEUR de la
         // plaque, comme toutes les tailles ici : c'est ce qui la fait suivre.
-        encartAvatar:  { x: -8, bas: 0, hauteur: 62 },
-        encartEtats:   { x: 2, y: 78, largeur: 22, taille: 5, ecart: 1.4 },
-        encartNom:     { x: 21, y: 14, taille: 8 },
-        encartCarte:   { x: 27, y: 29, taille: 4 },
-        encartDetail:  { x: 40, y: 39, taille: 2.4, largeur: 74 },
-        encartAttente: { x: 27, y: 87, taille: 1.7 }
+        encartAvatar:  { x: -8.5, bas: 0, hauteur: 62 },
+        encartEtats:   { x: -3.5, y: 78, largeur: 22, taille: 5, ecart: 1.4 },
+        encartNom:     { x: -5, y: 85, taille: 8 },
+        encartCarte:   { x: 33, y: 46, taille: 3.6 },
+        encartDetail:  { x: 40, y: 53, taille: 2.1, largeur: 74 },
+        encartAttente: { x: 39.5, y: 90, taille: 2.5 }
     };
 
     // =====================================================================

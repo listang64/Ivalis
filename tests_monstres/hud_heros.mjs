@@ -832,7 +832,9 @@ console.log("=========================================================");
   verifier("l'encart est à l'écran et mesurable", !!large && large.largeur > 200,
            large ? `${large.largeur}px` : "absent");
 
-  // On rétrécit la plaque comme le ferait un écran étroit.
+  // On rétrécit la plaque comme le ferait un écran étroit (et on la remettra
+  // ensuite à la largeur réglée dans le code, quelle qu'elle soit).
+  const largeurReglee = await p.evaluate(() => window.REGLAGES_HUD.encart.largeur);
   await p.evaluate(async () => {
     window.REGLAGES_HUD.encart.largeur = 420;
     window.appliquerReglagesHud();
@@ -883,13 +885,13 @@ console.log("=========================================================");
            && Math.abs(large.etats / large.largeur - etroit.etats / etroit.largeur) < 0.006,
            `${large.etats}px sur ${large.largeur} → ${etroit.etats}px sur ${etroit.largeur}`);
 
-  await p.evaluate(() => {
-    window.REGLAGES_HUD.encart.largeur = 760;
+  await p.evaluate((largeur) => {
+    window.REGLAGES_HUD.encart.largeur = largeur;   // la largeur réglée, remise telle quelle
     window.appliquerReglagesHud();
     window.EVENEMENT_ATTENDU = null;
     window.PARTIE_DATA = { Phase_Combat: "Preparation", Tour_Combat: 1, File_Attente_Combat: [] };
     window.rafraichirVoileTour();
-  });
+  }, largeurReglee);
 }
 
 
