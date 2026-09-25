@@ -1085,7 +1085,7 @@ export function creerCerveau(depot, contexte) {
     async function battre() {
         if (!depot.battre) return;
         const etat = await depot.lireEtat();
-        if (etat && estLeCerveau(etat, poste)) await depot.battre(maintenant());
+        if (etat && estLeCerveau(etat, poste)) await depot.battre(maintenant(), poste);
     }
 
     // Tourner jusqu'à ce qu'il n'y ait plus rien à faire. Un tour de créature en

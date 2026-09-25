@@ -1913,7 +1913,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=43"></script>
+<script src="trace_combat.js?v=44"></script>
 <!-- LA MISE À JOUR AUTOMATIQUE. Juste après la trace, parce qu'elle a besoin du
      numéro de version qu'elle y trouve, et avant tout le reste : si la page est
      périmée, autant s'en apercevoir avant d'avoir chargé le jeu entier.
@@ -1930,20 +1930,20 @@
 <script type="module" src="mouvement_pur.js?v=9"></script>
 <script type="module" src="ia_pure.js?v=6"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
-<script type="module" src="cerveau_combat.js?v=23"></script>
+<script type="module" src="cerveau_combat.js?v=24"></script>
 <!-- LE SPECTATEUR : la boucle de rejeu. Elle lit le journal du cerveau, ouvre
      la fenêtre de tour, anime PUIS applique, et ne saute jamais un numéro. -->
 <script type="module" src="spectateur_combat.js?v=6"></script>
 <!-- LE DÉPÔT : la seule chose qui écrive pendant un combat. Un pas = un lot,
      et le lot porte l'état, l'entrée de journal et la fermeture de l'intention. -->
-<script type="module" src="depot_firestore.js?v=7"></script>
+<script type="module" src="depot_firestore.js?v=8"></script>
 <!-- LE PONT : de l'étape à ce qu'on voit. Il traduit un résultat déjà calculé
      vers les animations existantes — il ne recalcule jamais rien. -->
 <script type="module" src="pont_combat.js?v=16"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=28"></script>
 <script type="module" src="ia_master.js?v=6"></script>
-<script type="module" src="app.js?v=59"></script>
+<script type="module" src="app.js?v=60"></script>
 <script type="module" src="creation_personnage.js?v=8"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=32"></script>

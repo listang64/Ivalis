@@ -138,6 +138,7 @@ node persistance_soin.mjs    # pas de Persistance terrain sur un soin (la Zone, 
 node traction_en_tete.mjs    # Traction écrite avant l'attaque : on vise à 3 cases, le cerveau tire PUIS frappe (joueurs et monstres)
 node initiative_hors_effets.mjs  # Contre, Aveuglement, Brûlure, Poison, Glacé, Électrifié, Peur, Confusion ne retardent pas la carte
 node traction_monstres.mjs   # pas de Traction sur une technique de monstre qui frappe au contact
+node cerveau_destitue.mjs    # un cerveau qui a perdu le réseau n'écrase plus ce que le nouveau cerveau a publié
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -3039,3 +3040,40 @@ l'esquive, la parade et le bouclier jouent comme avant. `mouvement_pur.mjs`
 (section 6) : 8 sans armure, 6 à 25 % d'armure, 0 à 100 %, 8 malgré 50 % de
 résistance magique ; section 8 et `repli.mjs` suivent (60 → 52). Morsure :
 l'ancien calcul fait tomber les contrôles de l'armure.
+
+### Désynchronisation PC / iPads : le cerveau destitué écrasait le journal
+
+Trace du PC (P_01) à la table : erreurs `ERR_QUIC_PROTOCOL_ERROR` sur les canaux
+Listen et Write de Firestore, puis « 📥 29 MONSTRE_z6024he (20 étapes) »…
+et « ▶️ 29 MONSTRE_z6024he (8 étapes) ». La même entrée n°29 a changé de contenu
+entre sa réception et son rejeu : DEUX postes l'avaient publiée.
+
+La mécanique : `publier` (depot_firestore.js) écrivait l'état et l'entrée par un
+writeBatch « à l'aveugle ». Un poste qui perd le réseau continue de lire son
+cache — qui le dit toujours cerveau —, calcule son pas et publie ; le SDK met le
+lot EN ATTENTE et l'applique à la reconnexion. Entre-temps un iPad a constaté le
+silence, repris la main et publié son propre n°29. À la reconnexion, le lot en
+attente écrase l'entrée ET l'état (qui redit « le cerveau, c'est le PC ») : les
+écrans ont rejoué deux n°29 différents, et la suite divergeait.
+
+La correction : `publier` passe par `io.lotSousCondition` (app.js, sur
+runTransaction), qui relit le document d'état AU MOMENT D'ÉCRIRE et n'écrit que
+si ce poste tient encore le cerveau et que la base est exactement à la version
+dont le pas est parti (v − 1). Une transaction ne se met jamais en attente hors
+ligne : elle échoue, rien ne bouge, et le poste redevient spectateur dès que
+l'écoute lui montre le nouveau cerveau. Le battement de cœur suit la même règle
+(il ne bat plus au nom d'un cerveau destitué). Les autres bancs, dont l'accès
+de test n'a pas `lotSousCondition`, gardent le lot simple.
+
+`cerveau_destitue.mjs` simule deux postes sur une même base, dont un qui perd le
+réseau comme le vrai SDK (cache, lots en attente, transactions refusées) : sans
+la condition, la scène de la table se reproduit (entrée n°1 écrasée, état rendu
+au PC) ; avec, le PC échoue proprement, l'entrée et l'état restent ceux de
+l'iPad ; une publication depuis un état périmé, un numéro republié et un
+battement d'ancien cerveau sont refusés. Morsure : l'ancien dépôt fait tomber 7
+contrôles.
+
+L'erreur `400 … documents:commit … failed-precondition` sur `Verrou_IA` dans la
+même trace est autre chose, et sans gravité : c'est la réclamation du verrou de
+préparation des créatures qui a perdu la course contre un autre poste ; la
+transaction se relance d'elle-même (monstres_ia.js, `reclamerVerrouIA`).

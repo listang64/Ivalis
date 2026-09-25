@@ -657,8 +657,8 @@ window.ioCombatFirestore = {
         try { await b.commit(); } catch (e) { signalerSiQuota(e); throw e; }
     },
 
-    // LA SEULE TRANSACTION DE TOUT LE NOUVEAU RÉGIME, et elle ne sert qu'à une
-    // chose : réclamer l'ouverture d'un combat. Les trois postes voient la même
+    // LA TRANSACTION DE RÉCLAMATION : réclamer l'ouverture d'un combat, ou
+    // reprendre la main d'un cerveau silencieux. Les trois postes voient la même
     // notification au même instant ; il faut donc que Firestore tranche, une
     // fois, qui ouvre. Ce n'est pas le compteur d'événements d'avant, qui
     // s'écrivait à chaque hexagone parcouru : celle-ci ne part qu'au début
@@ -675,6 +675,30 @@ window.ioCombatFirestore = {
                 const aEcrire = decider(actuel);
                 if (!aEcrire) return false;
                 tx.set(ref, aEcrire);
+                return true;
+            });
+        } catch (e) { signalerSiQuota(e); throw e; }
+    },
+
+    // UN LOT SOUS CONDITION : on relit un document DANS une transaction, et le
+    // lot ne part que si `decider` le rend (il reçoit ce document tel qu'il est
+    // vraiment en base). C'est ce qui empêche un cerveau destitué — un poste
+    // qui a perdu le réseau pendant qu'un autre reprenait la main — d'écraser
+    // à sa reconnexion ce que le nouveau cerveau a publié : une transaction,
+    // contrairement à un writeBatch, ne se met jamais en attente hors ligne.
+    async lotSousCondition(chemin, decider) {
+        const ref = doc(db, ...chemin);
+        try {
+            return await runTransaction(db, async (tx) => {
+                const snap = await tx.get(ref);
+                const ops = decider(snap.exists() ? snap.data() : null);
+                if (!ops) return false;
+                ops.forEach(o => {
+                    const r = doc(db, ...o.chemin);
+                    if (o.op === "delete") tx.delete(r);
+                    else if (o.op === "update") tx.update(r, o.data);
+                    else tx.set(r, o.data);
+                });
                 return true;
             });
         } catch (e) { signalerSiQuota(e); throw e; }

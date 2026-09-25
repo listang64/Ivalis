@@ -20,8 +20,10 @@
 //
 //  Un seul poste écrit, désormais. Le numéro d'une entrée, c'est la version de
 //  l'état qu'elle produit — `etat.version`, qui avance de un à chaque pas. Il
-//  n'y a plus rien à réserver, donc plus rien à arbitrer, donc plus aucune
-//  transaction. Zéro contention par construction, et non par réglage.
+//  n'y a plus rien à réserver, donc plus rien à arbitrer. La publication passe
+//  bien par une transaction (voir `publier`), mais elle ne réserve rien : elle
+//  vérifie seulement, au moment d'écrire, que ce poste tient encore le cerveau.
+//  Un seul écrivain, donc aucune contention en temps normal.
 //
 //  LA GARANTIE QUI TIENT TOUT
 //  --------------------------
@@ -144,6 +146,39 @@ export function creerDepot(io, idPartie, options) {
             ops.push({ op: "update", chemin: CHEMINS.intention(idPartie, id),
                        data: { traitee: true, v: entree.v } });
         });
+
+        // UN CERVEAU DESTITUÉ NE PUBLIE PLUS — et c'est ce qui manquait.
+        //
+        // Le lot s'écrivait « à l'aveugle ». Or un poste qui perd le réseau
+        // continue de lire son cache (qui le dit toujours cerveau), de calculer,
+        // et de publier : Firestore MET CES ÉCRITURES EN ATTENTE et les applique
+        // à la reconnexion. Pendant ce temps, un autre poste a constaté le
+        // silence et repris la main. Arrivé à la table : le PC publie son n°29
+        // hors ligne, un iPad reprend et publie SON n°29 (20 étapes), le PC se
+        // reconnecte et son lot en attente ÉCRASE l'entrée n°29 (8 étapes) et
+        // l'état. Chacun a rejoué un n°29 différent : désynchronisation.
+        //
+        // Le lot passe donc par une transaction sur le document d'état, qui
+        // relit la base AU MOMENT D'ÉCRIRE et n'écrit que si ce poste tient
+        // toujours le cerveau ET que la base est exactement à la version dont
+        // le pas est parti. Une transaction ne se met pas en attente hors
+        // ligne : elle échoue, et rien n'a bougé.
+        if (typeof io.lotSousCondition === "function") {
+            const base = nombre(entree.v) - 1;
+            const ecrit = await io.lotSousCondition(CHEMINS.etat(idPartie), (actuel) => {
+                if (!actuel) return null;
+                if ((actuel.cerveau || "") !== (etat.cerveau || "")) return null;
+                if (nombre(actuel.version) !== base) return null;
+                return ops;
+            });
+            if (!ecrit) {
+                const err = new Error(`publication du n°${entree.v} refusée : ce poste ne tient plus le cerveau,`
+                                      + " ou la base a avancé sans lui");
+                err.code = "cerveau-destitue";
+                throw err;
+            }
+            return;
+        }
         await io.lot(ops);
     }
 
@@ -162,9 +197,18 @@ export function creerDepot(io, idPartie, options) {
 
     // Le battement de cœur. Il n'écrit QUE ce champ — jamais l'état entier — pour
     // ne pas entrer en concurrence avec un pas en cours de publication.
-    async function battre(quand) {
-        await io.lot([{ op: "update", chemin: CHEMINS.etat(idPartie),
-                        data: { battement: nombre(quand) } }]);
+    //
+    // Avec le poste, il ne bat que si ce poste tient ENCORE le cerveau en base :
+    // un battement mis en attente hors ligne, appliqué à la reconnexion, ferait
+    // croire le nouveau cerveau vivant au nom de l'ancien.
+    async function battre(quand, poste) {
+        const op = { op: "update", chemin: CHEMINS.etat(idPartie), data: { battement: nombre(quand) } };
+        if (poste && typeof io.lotSousCondition === "function") {
+            await io.lotSousCondition(CHEMINS.etat(idPartie),
+                (actuel) => (actuel && actuel.cerveau === poste) ? [op] : null);
+            return;
+        }
+        await io.lot([op]);
     }
 
     // REPRENDRE LA MAIN, ET UN SEUL PEUT LA PRENDRE.
