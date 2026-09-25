@@ -189,6 +189,51 @@ console.log("\n3. EN LIGNE MAIS EN RETARD : LA BASE TRANCHE AU MOMENT D'ÉCRIRE"
            `${avant} → ${b.lire(CHEMINS.etat(P)).battement}`);
 }
 
+console.log("\n4 bis. UNE TRANSACTION N'ARRIVE PAS TOUT DE SUITE DANS LE CACHE");
+{
+  // Le combat bloqué de la table : « pas 62 publié », puis aussitôt
+  // « publication du n°62 refusée ». Une écriture par transaction n'est pas
+  // recopiée dans le cache local : elle n'y arrive qu'avec l'écoute. Ce poste-ci
+  // simule exactement ça — ses lectures lui rendent le cache, que seule
+  // `livrer()` remet à jour.
+  const b = creerBase();
+  const base = b.base;
+  let cache = new Map();
+  const livrer = () => { cache = new Map([...base.entries()].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])); };
+  const cle = (c) => c.join("/");
+  const vue = { base, lire: async (c) => { const d = cache.get(cle(c)); return d ? JSON.parse(JSON.stringify(d)) : null; } };
+  const ipad = b.poste();
+  await ouvrirCombat(ipad.io, P, monde());
+  const io = { ...ipad.io,
+    lire: vue.lire,
+    lister: async (chemin, requete) => {
+      const prefixe = cle(chemin) + "/";
+      return [...cache.entries()].filter(([c]) => c.startsWith(prefixe) && !c.slice(prefixe.length).includes("/"))
+        .map(([c, d]) => ({ ...JSON.parse(JSON.stringify(d)), __chemin: c.split("/") }))
+        .filter(d => !requete || !requete.egal || d[requete.egal.champ] === requete.egal.valeur);
+    } };
+  await envoyerIntention(ipad.io, P, { type: "mouvement", acteur: "H1", poste: "P_03", chemin: [{ q: 1, r: 0 }], id: "INT_1" });
+  await envoyerIntention(ipad.io, P, { type: "finTour", acteur: "H1", poste: "P_03", id: "INT_2" });
+  livrer();
+  const cerv = creerCerveau(creerDepot(io, P), { poste: "P_01", carteDe });
+  let erreur = null, faits = [];
+  try { faits = await cerv.tournerJusquAuCalme(); } catch (e) { erreur = e; }
+  const v = b.lire(CHEMINS.etat(P)).version;
+  verifier("le cerveau enchaîne ses pas malgré un cache en retard (aucun refus)", !erreur,
+           String(erreur && erreur.message));
+  verifier("les deux intentions sont jouées, dans l'ordre, sans doublon", faits.length >= 2 && v >= 2
+           && !!b.lire(CHEMINS.entree(P, 1)) && !!b.lire(CHEMINS.entree(P, 2)), `${faits.length} pas, version ${v}`);
+}
+
+console.log("\n4 ter. UN RÉVEIL PENDANT UN TOUR N'EST PLUS PERDU (regime_cerveau.js)");
+{
+  const fs = await import('fs');
+  const src = fs.readFileSync('/home/user/Ivalis/regime_cerveau.js', 'utf-8');
+  const t = src.slice(src.indexOf('async function tourner()'), src.indexOf('// LE CERVEAU ÉCOUTE LES INTENTIONS EN ATTENTE'));
+  verifier("un appel pendant la boucle est noté, pas jeté", /if \(moi\.enTrainDeTourner\) \{ moi\.reveilEnAttente = true; return \[\]; \}/.test(t));
+  verifier("et la boucle repasse dès qu'elle a fini", /moi\.reveilEnAttente\)\s*\{[\s\S]*programmer\(\(\) => \{ tourner\(\); \}, 0\)/.test(t));
+}
+
 console.log("\n4. LE VRAI ACCÈS FIRESTORE (app.js) SAIT FAIRE UN LOT SOUS CONDITION");
 {
   const fs = await import('fs');

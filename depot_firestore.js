@@ -115,13 +115,49 @@ export const enAttente = (liste) => (liste || [])
 export function creerDepot(io, idPartie, options) {
     const { tracer = () => {}, maintenant = () => Date.now() } = options || {};
 
+    // CE QUE CE POSTE VIENT DE PUBLIER, GARDÉ EN MÉMOIRE.
+    //
+    // La publication passe par une transaction (voir `publier`), et une
+    // transaction, contrairement à un writeBatch, N'EST PAS recopiée dans le
+    // cache local : elle n'y arrive qu'au retour de l'écoute, quelques dizaines
+    // de millisecondes plus tard. Le cerveau, qui enchaîne ses pas sans
+    // attendre, relisait donc l'état d'AVANT : il recalculait le même pas, se le
+    // faisait refuser (« publication du n°62 refusée »), et sa boucle s'arrêtait
+    // là — le tour de la créature suivante ne partait jamais. C'est le combat
+    // bloqué de la table.
+    //
+    // On garde donc le dernier état publié, et les intentions qu'il a fermées :
+    // une lecture qui rend une version plus ANCIENNE du même combat est
+    // simplement en retard, on lui préfère ce qu'on sait. À version égale, la
+    // base l'emporte toujours — c'est elle qui dit si un autre poste a repris
+    // la main.
+    let dernierPublie = null;
+    const fermeesIci = new Set();
+    const copie = (v) => v == null ? v : JSON.parse(JSON.stringify(v));
+
     async function lireEtat() {
-        return await io.lire(CHEMINS.etat(idPartie));
+        const lu = await io.lire(CHEMINS.etat(idPartie));
+        if (lu && dernierPublie && (lu.combat || "") === (dernierPublie.combat || "")
+            && nombre(dernierPublie.version) > nombre(lu.version)) {
+            return copie(dernierPublie);
+        }
+        return lu;
     }
 
     async function lireIntentions() {
         const toutes = await io.lister(CHEMINS.intentions(idPartie), requeteIntentions());
-        return enAttente(toutes);
+        return enAttente(toutes).filter(i => !fermeesIci.has(intentionId(i)));
+    }
+
+    // L'identifiant d'une intention, qu'elle le porte en champ ou seulement
+    // dans son chemin de document.
+    const intentionId = (i) => (i && (i.id || (i.__chemin && i.__chemin[i.__chemin.length - 1]))) || "";
+
+    function retenir(etat, traitees) {
+        dernierPublie = copie(etat);
+        (traitees || []).forEach(id => { if (id) fermeesIci.add(id); });
+        // Borné : ce n'est qu'un pont en attendant l'écoute, pas une archive.
+        if (fermeesIci.size > 400) fermeesIci.delete(fermeesIci.values().next().value);
     }
 
     // LE SEUL ENDROIT DU JEU QUI ÉCRIT PENDANT UN COMBAT.
@@ -177,9 +213,11 @@ export function creerDepot(io, idPartie, options) {
                 err.code = "cerveau-destitue";
                 throw err;
             }
+            retenir(etat, traitees);
             return;
         }
         await io.lot(ops);
+        retenir(etat, traitees);
     }
 
     // Un refus se marque comme un traitement — sinon l'intention reviendrait à
@@ -193,6 +231,7 @@ export function creerDepot(io, idPartie, options) {
         // renseignée que l'autre, se lisent comme deux refus.
         await io.lot([{ op: "update", chemin: CHEMINS.intention(idPartie, id),
                         data: { traitee: true, refus: raison || "refusée" } }]);
+        fermeesIci.add(id);
     }
 
     // Le battement de cœur. Il n'écrit QUE ce champ — jamais l'état entier — pour

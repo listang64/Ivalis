@@ -123,6 +123,7 @@ export function creerRegime(contexte) {
         arretIntentions: null,
         intentionsEnAttente: 0,
         intentionEnRetard: false,
+        reveilEnAttente: false,
         aReprendre: false,
         // Ce qu'on sait du battement du cerveau : sa dernière valeur, et
         // l'heure — la NÔTRE — à laquelle on l'a vue changer.
@@ -152,8 +153,17 @@ export function creerRegime(contexte) {
     //  qui n'a pas la main sort à la première ligne : c'est cette ligne, et
     //  elle seule, qui remplace tout l'appareillage de verrous d'avant.
     async function tourner() {
-        if (!moi.cerveau || moi.enTrainDeTourner) return [];
+        if (!moi.cerveau) return [];
+        // UN RÉVEIL PENDANT UN TOUR N'EST PLUS PERDU. Il était simplement
+        // ignoré : si l'état publié revenait pendant que la boucle tournait
+        // encore, et que cette boucle finissait sur une lecture en retard
+        // (« rien à faire »), plus personne ne la relançait — le battement,
+        // lui, ne relance qu'après une erreur. La créature suivante ne jouait
+        // jamais : le combat restait bloqué. On note le réveil, et on repasse
+        // dès la fin du tour en cours.
+        if (moi.enTrainDeTourner) { moi.reveilEnAttente = true; return []; }
         moi.enTrainDeTourner = true;
+        moi.reveilEnAttente = false;
         try {
             const faits = await moi.cerveau.tournerJusquAuCalme();
             moi.aReprendre = false;
@@ -185,8 +195,9 @@ export function creerRegime(contexte) {
             return [];
         } finally {
             moi.enTrainDeTourner = false;
-            if (moi.intentionEnRetard) {
+            if (moi.intentionEnRetard || moi.reveilEnAttente) {
                 moi.intentionEnRetard = false;
+                moi.reveilEnAttente = false;
                 programmer(() => { tourner(); }, 0);
             }
         }

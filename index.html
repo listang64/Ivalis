@@ -1913,7 +1913,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=45"></script>
+<script src="trace_combat.js?v=46"></script>
 <!-- LA MISE À JOUR AUTOMATIQUE. Juste après la trace, parce qu'elle a besoin du
      numéro de version qu'elle y trouve, et avant tout le reste : si la page est
      périmée, autant s'en apercevoir avant d'avoir chargé le jeu entier.
@@ -1936,12 +1936,12 @@
 <script type="module" src="spectateur_combat.js?v=6"></script>
 <!-- LE DÉPÔT : la seule chose qui écrive pendant un combat. Un pas = un lot,
      et le lot porte l'état, l'entrée de journal et la fermeture de l'intention. -->
-<script type="module" src="depot_firestore.js?v=8"></script>
+<script type="module" src="depot_firestore.js?v=9"></script>
 <!-- LE PONT : de l'étape à ce qu'on voit. Il traduit un résultat déjà calculé
      vers les animations existantes — il ne recalcule jamais rien. -->
 <script type="module" src="pont_combat.js?v=17"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
-<script type="module" src="regime_cerveau.js?v=28"></script>
+<script type="module" src="regime_cerveau.js?v=29"></script>
 <script type="module" src="ia_master.js?v=6"></script>
 <script type="module" src="app.js?v=60"></script>
 <script type="module" src="creation_personnage.js?v=8"></script>

@@ -3130,3 +3130,34 @@ sur les dégâts. `moteur_pur.mjs` (section 30) : 100 % de résistances, mêmes
 **La triche des créatures, +1 partout** (demande de Nico) : Petit 1, Normal 2,
 Élite 3, Boss 4 (`TABLE_BONUS_MONSTRE`, moteur_pur.js). `moteur_pur.mjs`
 (section 14) suit.
+
+### Combat bloqué : le cerveau relisait l'état d'avant sa propre publication
+
+Trace de la table : « 🧠 pas 62 publié », puis 70 ms plus tard « ❌ publication
+du n°62 refusée » ; même chose au n°63 ; et après le n°65 (la carte d'un héros),
+plus rien — la créature suivante ne jouait jamais.
+
+C'est la conséquence de la correction précédente (la publication par
+transaction, pour qu'un cerveau destitué n'écrase plus rien). Une transaction,
+contrairement à un writeBatch, N'EST PAS recopiée dans le cache local : elle n'y
+arrive qu'au retour de l'écoute. Le cerveau enchaîne ses pas sans attendre ; il
+relisait donc l'état d'AVANT, recalculait le même pas et se le faisait refuser.
+Et le blocage venait d'un second défaut, plus ancien : si l'état publié revenait
+PENDANT que la boucle tournait encore, `tourner()` (regime_cerveau.js) ignorait ce
+réveil ; la boucle finissait sur sa lecture en retard (« rien à faire »), et
+personne ne la relançait — le battement ne relance qu'après une erreur.
+
+Deux corrections, qui tiennent l'une sans l'autre :
+- le dépôt (depot_firestore.js) garde en mémoire le dernier état qu'il a publié
+  et les intentions qu'il a fermées. Une lecture qui rend une version plus
+  ANCIENNE du même combat est simplement en retard : on lui préfère ce qu'on
+  sait. À version égale, la base l'emporte toujours (c'est elle qui dit si un
+  autre poste a repris la main) ;
+- un réveil arrivé pendant un tour est noté (`reveilEnAttente`) et la boucle
+  repasse dès qu'elle a fini, au lieu d'être jeté.
+
+`cerveau_destitue.mjs` (sections 4 bis et 4 ter) simule un poste dont le cache
+ne suit une transaction qu'à la livraison de l'écoute : le cerveau enchaîne
+maintenant mouvement, fin de tour et tour de la créature (3 pas, aucun refus) ;
+l'ancien dépôt se fait refuser dès le deuxième pas, comme à la table (4
+morsures).
