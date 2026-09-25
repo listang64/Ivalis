@@ -861,7 +861,12 @@ export function creerZonePure(etat, action, hexes, idLanceur) {
     const alt = (action.alterations || []).find(a => a && a.persistante);
 
     const degats = frappe ? { valeurBrute: nombre(frappe.valeurBrute), typeRes: frappe.typeRes } : null;
-    const soin = soigne ? { valeurBrute: nombre(soigne.valeurBrute) } : null;
+    // PLUS DE NAPPE QUI SOIGNE (règle de Nico) : la Persistance terrain ne se
+    // pose pas sur un soin. La Forge la grise ; ici, une carte qui en porterait
+    // quand même (ancienne carte, soin posé à côté d'une attaque persistante)
+    // ne laisse au sol que ses dégâts et son état — jamais le soin.
+    void soigne;
+    const soin = null;
     const etatDeZone = alt ? {
         nom: alt.nom, icone: alt.icone, desc: alt.desc || "",
         // La chance est figée au lancement, triche des créatures comprise.

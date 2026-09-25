@@ -230,17 +230,20 @@ console.log("\n8. LA NAISSANCE D'UNE ZONE, DANS L'ÉTAT");
     verifier("et sans case visée non plus",
              creerZonePure(etat, action, [], "LANCEUR") === null);
 
-    // Une carte de SOIN laisse aussi sa nappe (repris de
-    // zone_persistante_soin.mjs, grande suppression de l'ancien moteur) : le
-    // remous testé en section 5 ne tombe pas du ciel, il naît d'ici.
+    // PLUS DE NAPPE QUI SOIGNE (règle de Nico) : la Persistance terrain ne se
+    // pose plus sur un soin. La Forge la grise ; le noyau, lui, ne met jamais
+    // le soin d'une carte dans la zone qu'elle laisse.
     const carteDeSoin = { attaques: [{ isHeal: true, isShield: false, valeurBrute: 20, cibles: ["MARCHEUR"] }],
                           alterations: [] };
-    const zoneSoin = creerZonePure(etat, carteDeSoin, [{ q: 2, r: 3 }], "LANCEUR");
-    verifier("une zone de soin se crée aussi (avant : les soins étaient exclus)", !!zoneSoin);
-    verifier("elle est de type « soin » (verte)", zoneSoin && zoneSoin.type === "soin");
-    verifier("elle porte le montant de soin de la carte",
-             zoneSoin && zoneSoin.soin && zoneSoin.soin.valeurBrute === 20);
-    verifier("elle ne porte aucun dégât", zoneSoin && zoneSoin.degats === null);
+    verifier("une carte de soin ne laisse pas de nappe",
+             creerZonePure(etat, carteDeSoin, [{ q: 2, r: 3 }], "LANCEUR") === null);
+    const frappeEtSoin = { attaques: [{ valeurBrute: 9, typeRes: "Physique", cibles: ["MARCHEUR"] },
+                                      { isHeal: true, isShield: false, valeurBrute: 20, cibles: ["LANCEUR"] }],
+                           alterations: [] };
+    const zoneMixte = creerZonePure(etat, frappeEtSoin, [{ q: 2, r: 3 }], "LANCEUR");
+    verifier("attaque + soin : la nappe garde les dégâts, jamais le soin",
+             !!zoneMixte && zoneMixte.degats && zoneMixte.degats.valeurBrute === 9 && zoneMixte.soin === null
+             && zoneMixte.type !== "soin", JSON.stringify(zoneMixte && { type: zoneMixte.type, soin: zoneMixte.soin }));
 
     // Un bouclier seul (isShield, valeurBrute non nulle) ne laisse rien non
     // plus : ce n'est ni un dégât, ni un soin, au sens de la zone.

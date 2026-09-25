@@ -134,6 +134,7 @@ node repli.mjs              # le Repli : frapper puis marcher 3 cases, 60 % d'é
 node bond_apres_attaque.mjs  # un Bond placé après l'attaque saute enfin (il part avec la carte)
 node aveuglement.mjs        # l'Aveuglement : 3 cases de noir fixes, ciblage interdit (sauf zones), brouillard chez l'aveuglé
 node equilibrage_base.mjs    # la vraie base : Contre physique / Absorption magique, plafonds de chance du grimoire
+node persistance_soin.mjs    # pas de Persistance terrain sur un soin (la Zone, oui) — Forge, moteur, monstres
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -2850,3 +2851,27 @@ lourde lue dans la base), `provocation.mjs` (le vrai `plafondDuGrimoire`, et un
 grimoire à 60 %), `migration_effets.mjs` (Paralysie déjà partie, coût de
 l'Étalement et Bouclier intacts). Morsures : l'ancien moteur_effets.js rebloque
 trois plafonds à 40 % ; un générateur resté à 1,3 fait diverger 484 cartes.
+
+### Pas de Persistance terrain sur un soin
+
+Nico : « fais en sorte qu'on ne puisse pas mettre de persistance sur les soins.
+Zone oui, mais grise la persistance. » C'est le contraire d'une règle posée
+plus tôt (la nappe verte qui soigne), et il faut qu'elle tienne partout :
+
+- **la Forge** (competences.js) : sur une action de Soin (ou Guérison),
+  « Persistance terrain » apparaît grisée « (non compatible) » ; la Zone reste
+  disponible, et rien ne change sur une attaque ;
+- **le moteur** (moteur_pur.js, `creerZonePure`) : une nappe ne porte plus
+  jamais de soin. Sans cela, une carte « Attaque + Persistance » avec un Soin sur
+  une autre action laissait quand même une zone… qui soignait — l'ancien noyau
+  donnait même la priorité au soin sur les dégâts pour le type de la zone. Une
+  ancienne carte qui portait une persistance sur un soin ne laisse donc plus
+  rien au sol ;
+- **les monstres** (monstres_competences.js, `effetAutorise`) : le générateur ne
+  pose pas de Persistance sur une action de soin.
+
+`persistance_soin.mjs` rejoue le vrai bloc du menu de la Forge et le
+générateur ; `zones_cerveau.mjs` (section 8) vérifie qu'un soin ne laisse pas de
+nappe et qu'une carte attaque + soin ne garde au sol que ses dégâts. Morsures :
+l'ancienne Forge laisse la persistance sélectionnable, l'ancien noyau crée une
+nappe de soin.

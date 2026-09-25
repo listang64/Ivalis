@@ -543,6 +543,13 @@ function effetAutorise(chantier, effet, commeMod) {
             incompatiblesPoussee.includes((m.effet.Nom || "").toLowerCase().trim())))) return false;
     }
 
+    // ⚖️ règle Forge : pas de Persistance terrain sur un soin (la Zone, oui).
+    if (commeMod && nom.includes("persistance")) {
+        const act = chantier.actions[chantier.actions.length - 1];
+        const base = ((act && act.baseEffet && act.baseEffet.Nom) || "").toLowerCase();
+        if ((base.includes("soin") || base.includes("guérison") || base.includes("guerison")) && !base.includes("bouclier")) return false;
+    }
+
     // Une illusion ne peut pas porter de zone.
     if (commeMod && nom === "zone" && chantierContientMotCle(chantier, "illusion")) return false;
 

@@ -1810,8 +1810,14 @@ window.rafraichirForge = function() {
                 // altéré) il n'y a rien à quoi l'accrocher.
                 const estIncompatibleEtalement = estUnModEtalement(nomModLower)
                     && (!(aDejaUneAttaque || aDejaUnSoin) || !actionAccepteEtalement(actionCourante));
+                // PAS DE PERSISTANCE SUR UN SOIN (règle de Nico) : un soin peut
+                // porter une Zone, jamais une Persistance terrain — il n'y a plus
+                // de nappe qui soigne au sol.
+                const estIncompatiblePersistanceSoin = nomModLower.includes("persistance")
+                    && !!actionCourante && estUnSoinDeBase(actionCourante.baseEffet.Nom);
                 groupesMods[carac].push(
-                    (estIncompatiblePoussee || estIncompatibleIllusion || estIncompatiblePoison || estIncompatibleEtalement)
+                    (estIncompatiblePoussee || estIncompatibleIllusion || estIncompatiblePoison || estIncompatibleEtalement
+                     || estIncompatiblePersistanceSoin)
                         ? `<option value="${mod.id}" disabled style="color: #999;">${nettoyerNomEffet(mod.Nom)} (non compatible)</option>`
                         : `<option value="${mod.id}">${nettoyerNomEffet(mod.Nom)} (⚡ ${coutFatigue})</option>`
                 );
