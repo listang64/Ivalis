@@ -545,12 +545,6 @@ window.afficherPersoCombatActuel = function() {
 
     if (window.COMBAT_PERSOS_JOUEUR.length === 0) {
         if (liste) liste.innerHTML = "";
-        // L'aperçu du repos long est lié au héros : sans héros, il s'efface.
-        const divReposVide = document.getElementById("apercu-repos-long-ui");
-        if (divReposVide) {
-            divReposVide.style.opacity = "0";
-            divReposVide.style.left = "50px";
-        }
         return;
     }
 
@@ -5097,24 +5091,7 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
     if (document.getElementById("fenetre-combat")?.style.display !== "block") return;
 
     const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
-    if (!persoActuel) {
-        // L'APERÇU DU REPOS LONG NE DOIT JAMAIS SURVIVRE À UN TROU. Signalé en
-        // partie : « quand on fait repos long, y'a encore les traces de texte
-        // avec sablier sur le côté gauche de l'écran ». Le sablier flottant ne
-        // se referme que dans les branches plus bas, qui exigent toutes un
-        // `persoActuel` — un trou (liste de héros vidée puis reconstruite entre
-        // deux combats, un index qui pointe un instant dans le vide) faisait
-        // sortir la fonction ICI, avant d'y arriver, et le sablier d'un repos
-        // long déjà résolu restait affiché jusqu'au prochain appel qui daignait
-        // le corriger — parfois au combat suivant. On le referme donc D'ABORD,
-        // avant tout retour anticipé.
-        const divReposVide = document.getElementById("apercu-repos-long-ui");
-        if (divReposVide) {
-            divReposVide.style.opacity = "0";
-            divReposVide.style.left = "50px";
-        }
-        return;
-    }
+    if (!persoActuel) return;
 
     const partie = window.PARTIE_DATA || {};
     const queue = partie.File_Attente_Combat || [];
@@ -5141,21 +5118,10 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
     const deckEl = document.getElementById("combat-liste-competences");
     if (deckEl) deckEl.style.transition = "opacity 0.3s ease, filter 0.3s ease";
 
-    let divRepos = document.getElementById("apercu-repos-long-ui");
-    if (!divRepos) {
-        divRepos = document.createElement("div");
-        divRepos.id = "apercu-repos-long-ui";
-        divRepos.style.cssText = "position: absolute; top: 9vh; left: 50px; width: 340px; height: 300px; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; opacity: 0; transition: opacity 0.3s ease, left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); pointer-events: none;";
-        divRepos.innerHTML = `
-            <div style="font-size: 72px; filter: drop-shadow(0 0 20px rgba(194, 168, 120, 0.8)); animation: levitation 3s infinite alternate ease-in-out;">⏳</div>
-            <div style="font-family: 'Cinzel', serif; font-size: 24px; font-weight: bold; color: #e8d5a5; text-shadow: 2px 2px 5px black; margin-top: 10px; text-transform: uppercase; letter-spacing: 2px;">Repos Long</div>
-            <div style="font-family: 'Almendra', serif; font-size: 17px; color: #c2a878; text-shadow: 1px 1px 3px black; margin-top: 10px; text-align: center; max-width: 80%;">Concentration et souffle.<br><br><span style="color:#1b6e3a;">+35% Énergie Max</span> à la fin du tour.</div>
-        `;
-        // Il vivait dans le panneau latéral. Il se pose maintenant dans la
-        // fenêtre de combat, à la place que le panneau occupait.
-        const fenetre = document.getElementById("fenetre-combat");
-        if (fenetre) fenetre.appendChild(divRepos);
-    }
+    // PLUS DE GRAND SABLIER À GAUCHE (demande de Nico) : le repos long
+    // s'annonçait par un sablier géant, un titre et un texte posés sur le
+    // côté gauche de l'écran. Il n'y a plus rien : la piste d'initiative
+    // affiche déjà ⏳ pour ce tour-là.
 
     if (persoInQueue && persoInQueue.idCarte) {
         window.mettreAJourJaugeFatigue(0);
@@ -5163,14 +5129,6 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
         // La carte retenue quitte l'écran, quelle qu'elle soit — c'était déjà
         // le cas du repos long, ça l'est maintenant de toutes les techniques.
         if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD(true);
-
-        if (persoInQueue.idCarte === "REPOS_LONG") {
-            divRepos.style.left = "20px";
-            divRepos.style.opacity = "1";
-        } else {
-            divRepos.style.left = "50px";
-            divRepos.style.opacity = "0";
-        }
 
         // Le portrait rapetisse APRÈS le rangement de la carte : masquer
         // l'aperçu rend au portrait sa taille pleine, et l'ordre inverse
@@ -5202,9 +5160,6 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
                 deckEl.style.filter = "none";
             }
         }
-        divRepos.style.left = "50px";
-        divRepos.style.opacity = "0";
-
         const conteneurCarte = document.getElementById("apercu-carte-hd-competence");
         if (conteneurCarte && conteneurCarte.dataset.locked === "true") {
             conteneurCarte.dataset.locked = "false";

@@ -4099,7 +4099,7 @@ window.MIGRATION_EFFETS = [
     { id: "EFF_ETOURDIT",
       champs: { Notes: "EFFET ETAT ÉTOURDIT = -30% d'esquive / parade ET 20% de chance de louper sa technique" } },
     { id: "EFF_GLACE",
-      champs: { Notes: "Mouvement coût doublé, et la cible reçoit 20% de dégâts en plus" } },
+      champs: { Notes: "Mouvement coût doublé, et la cible reçoit 20% de dégâts PHYSIQUES en plus" } },
     { id: "EFF_ELECTRIFIE",
       champs: { Notes: "Baisse d'initiative sur la prochaine carte, et 20% de dégâts MAGIQUES en plus subis" } },
     { id: "EFF_BRULE",

@@ -109,8 +109,8 @@ console.log("\n2. UN PASSAGE : LA BASE DIT CE QUE LE MOTEUR FAIT");
     verifier("l'Étourdi annonce -30% et 20% d'échec",
              /-30%/.test(m.base.EFF_ETOURDIT.Notes) && /20%/.test(m.base.EFF_ETOURDIT.Notes),
              m.base.EFF_ETOURDIT.Notes);
-    verifier("le Glacé annonce ses 20% de dégâts subis en plus",
-             /20% de dégâts en plus/.test(m.base.EFF_GLACE.Notes), m.base.EFF_GLACE.Notes);
+    verifier("le Glacé annonce ses 20% de dégâts PHYSIQUES en plus (pas la magie)",
+             /20% de dégâts PHYSIQUES en plus/.test(m.base.EFF_GLACE.Notes), m.base.EFF_GLACE.Notes);
     verifier("l'Électrifié annonce ses 20% de dégâts magiques",
              /20% de dégâts MAGIQUES/.test(m.base.EFF_ELECTRIFIE.Notes), m.base.EFF_ELECTRIFIE.Notes);
     verifier("la Brûlure annonce ses 3 dégâts par manche",

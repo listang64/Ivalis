@@ -80,6 +80,7 @@ export function bonusDesEtats(c, cle) {
 //    esquive / parade        points de défense retirés tant que l'état dure
 //    echecTechnique          % de chance de rater complètement sa technique
 //    degatsSubis             % de dégâts EN PLUS encaissés, tous types
+//    degatsPhysiquesSubis    % de dégâts EN PLUS, seulement en physique
 //    degatsMagiquesSubis     % de dégâts EN PLUS, seulement en magique
 //    degatsParTour           dégâts pris à chaque fin de manche tant qu'il dure
 //    soinsRecus              % ajouté (ou retiré) à tout soin reçu
@@ -88,7 +89,7 @@ export function bonusDesEtats(c, cle) {
 //  il ne se mesure pas en pourcentage mais en règle de chemin.
 export const REGLES_ETATS = {
     "Étourdi":    { esquive: -30, parade: -30, echecTechnique: 20 },
-    "Glacé":      { degatsSubis: 20 },
+    "Glacé":      { degatsPhysiquesSubis: 20 },
     "Électrifié": { degatsMagiquesSubis: 20 },
     "Brûlé":      { degatsParTour: 3, soinsRecus: -50 }
 };
@@ -641,12 +642,14 @@ export function chaineDeDegats(cible, attaque, options) {
     if (attaque.isRanged && distance === 1) degats = Math.floor(degats * 0.7);
 
     // 2 bis. LES VULNÉRABILITÉS DE LA CIBLE. Un corps gelé casse plus
-    //    facilement (+20 % de tout), un corps électrifié conduit la magie
+    //    facilement (+20 % de PHYSIQUE, règle de Nico : la glace casse sous
+    //    les coups, pas sous les sorts), un corps électrifié conduit la magie
     //    (+20 % de magique en plus). Elles s'ajoutent l'une à l'autre, et se
     //    posent AVANT l'absorption et les résistances : c'est le coup qui
     //    arrive plus fort, pas l'armure qui protège moins.
     let vulnerabilite = regleDesEtats(cible, "degatsSubis");
     if (attaque.typeRes === "Magique") vulnerabilite += regleDesEtats(cible, "degatsMagiquesSubis");
+    else vulnerabilite += regleDesEtats(cible, "degatsPhysiquesSubis");
     if (vulnerabilite !== 0) degats = Math.max(0, Math.round(degats * (1 + vulnerabilite / 100)));
 
     // 3. Absorption et Contre : la cible annule une part du coup — un
@@ -1031,6 +1034,46 @@ export function resoudreCarte(etat, action, plateau) {
         return { etat: suivant, etapes };
     }
 
+    // --- LA TRACTION : UN EFFET, PAS UN ÉTAT ------------------------------
+    //  Symétrique de la Poussée : elle tire la cible vers le lanceur. Elle ne
+    //  pose pas de fantôme de durée zéro. Écrite AVANT l'attaque sur la carte
+    //  (drapeau avantAttaque, posé par l'extraction), elle se joue AVANT elle :
+    //  on tire la cible, PUIS on la frappe. Sinon, à sa place parmi les états.
+    const tirer = (alt, idCible, cible) => {
+        const depart = { q: nombre(cible.q), r: nombre(cible.r) };
+        const arrivee = destinationTraction(lanceur, cible, nombre(alt.cases, 3),
+                                            (q, r) => caseLibre(suivant, carte, q, r, idCible));
+        if (arrivee) {
+            cible.q = arrivee.q;
+            cible.r = arrivee.r;
+            etapes.push({ type: "traction", cible: idCible, acteur: idLanceur,
+                          de: depart, vers: arrivee });
+        } else {
+            etapes.push({ type: "message", cible: idCible, acteur: idLanceur,
+                          texte: "Traction bloquée" });
+        }
+    };
+    const tractionEnTete = (alt) => !!alt && alt.nom === "Traction" && !!alt.avantAttaque;
+    const tractionsEnTete = (action.alterations || []).filter(tractionEnTete);
+    tractionsEnTete.forEach(alt => {
+        (alt.cibles || []).forEach(idCible => {
+            const cible = combattant(suivant, idCible);
+            if (!cible || cible.aTerre) return;
+            const immunites = (cible.atouts && cible.atouts.immunites) || [];
+            if (immunites.includes(alt.nom)) {
+                etapes.push({ type: "etatRate", cible: idCible, nom: alt.nom, immunise: true });
+                return;
+            }
+            const des = desDe(idCible);
+            if (des.esquive) return;      // l'esquive de la carte se dira avec l'attaque
+            if (!des.etats || des.etats[alt.nom] !== true) {
+                etapes.push({ type: "etatRate", cible: idCible, nom: alt.nom });
+                return;
+            }
+            tirer(alt, idCible, cible);
+        });
+    });
+
     // --- LES ATTAQUES, DANS L'ORDRE DE LA CARTE --------------------------
     const touchees = new Set();
     const bonusMonstre = bonusMonstreDe(lanceur);
@@ -1040,6 +1083,16 @@ export function resoudreCarte(etat, action, plateau) {
             const cible = combattant(suivant, idCible);
             if (!cible || cible.aTerre) return;
             const des = desDe(idCible);
+
+            // TIRÉE PUIS FRAPPÉE : la carte a visé à la portée de la Traction.
+            // Si la cible n'a pas été ramenée à portée du coup (jet raté,
+            // chemin bloqué), le coup ne l'atteint pas — une attaque de
+            // contact ne frappe pas à trois cases.
+            if (tractionsEnTete.some(t => t.coupAPortee) && !des.esquive
+                && distanceHex(lanceur, cible) > Math.max(1, nombre(attaque.rangeMax, 1))) {
+                etapes.push({ type: "message", cible: idCible, acteur: idLanceur, texte: "Hors de portée" });
+                return;
+            }
 
             // Une esquive vaut pour toute la carte : la cible n'esquive pas
             // chaque effet séparément, elle esquive le coup.
@@ -1206,6 +1259,7 @@ export function resoudreCarte(etat, action, plateau) {
         .find(a => !a.isHeal && !a.isShield && (a.valeurBrute || 0) > 0) || {}).typeRes || "Magique";
 
     (action.alterations || []).forEach(alt => {
+        if (tractionEnTete(alt)) return;      // déjà jouée, avant l'attaque
         const regleAlt = REGLES_ETATS[alt.nom] || {};
         const typeDegatsDeLEtat = regleAlt.degatsParTour > 0 ? typeDeLaCarte : null;
         (alt.cibles || []).forEach(idCible => {
@@ -1267,18 +1321,7 @@ export function resoudreCarte(etat, action, plateau) {
             //  lanceur au lieu de la repousser. Un effet, pas un état — elle
             //  ne pose plus, elle non plus, de fantôme de durée zéro.
             if (alt.nom === "Traction") {
-                const depart = { q: nombre(cible.q), r: nombre(cible.r) };
-                const arrivee = destinationTraction(lanceur, cible, nombre(alt.cases, 3),
-                                                    (q, r) => caseLibre(suivant, carte, q, r, idCible));
-                if (arrivee) {
-                    cible.q = arrivee.q;
-                    cible.r = arrivee.r;
-                    etapes.push({ type: "traction", cible: idCible, acteur: idLanceur,
-                                  de: depart, vers: arrivee });
-                } else {
-                    etapes.push({ type: "message", cible: idCible, acteur: idLanceur,
-                                  texte: "Traction bloquée" });
-                }
+                tirer(alt, idCible, cible);
                 return;
             }
 

@@ -135,6 +135,8 @@ node bond_apres_attaque.mjs  # un Bond placé après l'attaque saute enfin (il p
 node aveuglement.mjs        # l'Aveuglement : 3 cases de noir fixes, ciblage interdit (sauf zones), brouillard chez l'aveuglé
 node equilibrage_base.mjs    # la vraie base : Contre physique / Absorption magique, plafonds de chance du grimoire
 node persistance_soin.mjs    # pas de Persistance terrain sur un soin (la Zone, oui) ni sur une carte étalée (DOT) — Forge, moteur, monstres
+node traction_en_tete.mjs    # Traction écrite avant l'attaque : on vise à 3 cases, le cerveau tire PUIS frappe (joueurs et monstres)
+node initiative_hors_effets.mjs  # Contre, Aveuglement, Brûlure, Poison, Glacé, Électrifié, Peur, Confusion ne retardent pas la carte
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -2934,3 +2936,63 @@ ni fichier, ni ligne dans index.html. Morsures : les anciens nombres font tomber
 15 contrôles, l'outil remis en place en fait tomber 4. `hud_heros.mjs`, qui
 rétrécit la plaque pour vérifier les proportions, la rend désormais à la
 largeur réglée dans le code au lieu de 760 px écrits en dur.
+
+### Glacé physique, œil d'or à 50 %, Traction en tête, repos long sans sablier, initiative
+
+Six demandes de Nico d'un coup.
+
+**Électrifié : vérifié.** Le noyau (`chaineDeDegats`, moteur_pur.js) ajoutait
+déjà 20 % aux seuls dégâts MAGIQUES encaissés par une cible électrifiée ; rien
+à changer.
+
+**Glacé : +20 % sur le PHYSIQUE seulement.** La ligne de `REGLES_ETATS` passe
+de `degatsSubis` (tous types) à une nouvelle clé `degatsPhysiquesSubis`, lue
+uniquement pour un coup non magique. Gelé ET électrifié, un coup ne prend donc
+plus jamais les deux : +20 % en physique par la glace, +20 % en magique par la
+foudre. Les deux descriptions de l'état (moteur_effets.js) et la note de la
+migration de la base (EFF_GLACE, app.js — à appliquer par le bouton, la base
+n'est jamais écrite depuis ici) le disent. `moteur_pur.mjs` (section 18) et
+`migration_effets.mjs` suivent ; morsure : l'ancien noyau fait 24 sur un sort
+contre un corps gelé, et 28 gelé-électrifié.
+
+**L'œil d'or à 50 %.** Les murs révélés passaient en noir à 85 % et cachaient
+le décor. Ils sont maintenant à 50 %, comme le terrain difficile
+(`OPACITE_REVELATION`, Plateau.js). Le pinceau du MJ garde son noir presque
+plein, pour qu'on voie ce qu'on peint. `reveler_terrain.mjs` mesure les deux
+(alpha 128 à l'œil, 0.85 au pinceau).
+
+**Traction en premier, puis des dégâts.** Nico ne pouvait pas viser une cible
+à 3 cases avec une carte « Traction, puis attaque » sans Distance. Deux trous :
+le ciblage prenait comme « portée de la Traction » la portée de l'action (1 case
+sans Distance), et le cerveau jouait de toute façon les attaques AVANT les états
+— le drapeau `tractionAvantAttaque` était calculé et lu par personne. Désormais :
+- l'extraction (moteur_effets.js) marque l'altération Traction `avantAttaque`
+  (et `coupAPortee` hors zone) quand elle précède la première attaque, lui donne
+  ses `cases` (Valeur du grimoire, 3), et la carte vise jusqu'à 3 cases ;
+- le cerveau (resoudreCarte, moteur_pur.js) joue cette Traction EN TÊTE : il
+  tire, puis frappe. Si le jet de traction rate ou que le chemin est bloqué, le
+  coup de contact ne part pas à 3 cases (« Hors de portée ») ;
+- l'IA des monstres (`analyserCarteMonstre`, monstres_ia.js) lit la même
+  portée pour une carte qui tire en tête.
+Traction APRÈS l'attaque (ou en sous-effet de l'attaque) : rien ne change, la
+portée reste celle du coup. `traction_en_tete.mjs` vérifie le cerveau, le vrai
+ciblage (3 cases oui, 4 non) et l'IA ; chaque fichier retiré fait tomber ses
+contrôles (cerveau 2, extraction 3, IA 1).
+
+**Repos long : plus de grand sablier à gauche.** Le panneau
+`apercu-repos-long-ui` (sablier géant, « Repos Long », texte) est supprimé de
+combat.js : la piste d'initiative affiche déjà ⏳ pour ce tour. La bannière du
+repos long dans le volet des compétences, elle, reste.
+`volet_competences.mjs` (section 5) vérifie qu'une fois le repos long retenu,
+aucun sablier ni texte « Repos Long » n'est visible hors du volet.
+
+**Initiative.** L'initiative d'une carte est ce qui reste de 100 après la
+fatigue. L'Absorption était déjà « remboursée » ; la liste s'étend au Contre, à
+l'Aveuglement, à la Brûlure, à l'Empoisonnement, au Glacé, à l'Électrifié, à la
+Peur et à la Confusion (`window.MOTS_HORS_INITIATIVE`, competences.js ; même
+liste dans `initiativeChantier`, monstres_competences.js). Ils coûtent toujours
+leur fatigue, mais ne retardent plus la carte. `initiative_hors_effets.mjs` le
+mesure sur la vraie Forge et sur le vrai générateur (morsures : 10 et 7
+échecs), et `cout_reel.mjs` confirme que Forge et monstres tombent d'accord sur
+4140 cartes. Les cartes déjà forgées gardent l'initiative écrite en base
+jusqu'à ce qu'on les réenregistre dans la Forge.

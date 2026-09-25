@@ -719,7 +719,13 @@ function coutPCChantier(chantier, palette) {
 }
 
 // ⚖️ règle Forge : initiative = ce qui reste de 100 après la fatigue, plus les
-// bonus d'Initiative + et le remboursement de l'Absorption.
+// bonus d'Initiative + et le remboursement des effets hors initiative — la
+// MÊME liste que la Forge (window.MOTS_HORS_INITIATIVE, competences.js) :
+// Absorption, Contre, Aveuglement, Brûlure, Empoisonnement, Glacé,
+// Électrifié, Peur, Confusion.
+const MOTS_HORS_INITIATIVE = ["absorption", "contre", "aveugl", "brûl", "brul", "empoison",
+                              "glac", "électrifi", "electrifi", "peur", "confusion"];
+const horsInitiative = (nom) => MOTS_HORS_INITIATIVE.some(mot => (nom || "").toLowerCase().includes(mot));
 function initiativeChantier(chantier, palette, fatigue) {
     let bonus = 0;
     chantier.actions.forEach(act => {
@@ -727,14 +733,14 @@ function initiativeChantier(chantier, palette, fatigue) {
         if (act.baseEffet.Nom === "Initiative +") {
             bonus += act.count * ((nombreFr(act.baseEffet.Valeur) || 8) + coutPC(act.baseEffet) * 5);
         }
-        if (nomBase.includes("absorption")) bonus += coutPC(act.baseEffet) * act.count * 5;
+        if (horsInitiative(nomBase)) bonus += coutPC(act.baseEffet) * act.count * 5;
 
         act.modsEffets.forEach(m => {
             const nomMod = (m.effet.Nom || "").toLowerCase();
             if (m.effet.Nom === "Initiative +") {
                 bonus += m.count * ((nombreFr(m.effet.Valeur) || 8) + coutPC(m.effet) * 5);
             }
-            if (nomMod.includes("absorption")) bonus += coutPC(m.effet) * m.count * 5;
+            if (horsInitiative(nomMod)) bonus += coutPC(m.effet) * m.count * 5;
         });
     });
     return Math.max(0, 100 - fatigue) + bonus;

@@ -701,10 +701,14 @@ console.log("\n18. CE QUE CHAQUE ÉTAT FAIT, MAINTENANT QU'IL EST ÉCRIT EN UN S
              && REGLES_ETATS["Étourdi"].echecTechnique === 20,
              JSON.stringify(REGLES_ETATS["Étourdi"]));
 
-    // GLACÉ : +20 % de dégâts subis, tous types confondus.
-    verifier("un corps gelé encaisse 20 % de plus (20 → 24)",
-             chaineDeDegats(gele, { valeurBrute: 20 }, {}).degats === 24,
-             String(chaineDeDegats(gele, { valeurBrute: 20 }, {}).degats));
+    // GLACÉ : +20 % de dégâts subis, mais SEULEMENT en physique (règle de
+    // Nico : la glace casse sous les coups, pas sous les sorts).
+    verifier("un corps gelé encaisse 20 % de plus d'un coup physique (20 → 24)",
+             chaineDeDegats(gele, { valeurBrute: 20, typeRes: "Physique" }, {}).degats === 24,
+             String(chaineDeDegats(gele, { valeurBrute: 20, typeRes: "Physique" }, {}).degats));
+    verifier("mais pas d'un sort (20 reste 20)",
+             chaineDeDegats(gele, { valeurBrute: 20, typeRes: "Magique" }, {}).degats === 20,
+             String(chaineDeDegats(gele, { valeurBrute: 20, typeRes: "Magique" }, {}).degats));
     verifier("et un corps ordinaire, non", chaineDeDegats(nu, { valeurBrute: 20 }, {}).degats === 20);
 
     // ÉLECTRIFIÉ : +20 %, mais SEULEMENT en magique.
@@ -713,11 +717,12 @@ console.log("\n18. CE QUE CHAQUE ÉTAT FAIT, MAINTENANT QU'IL EST ÉCRIT EN UN S
     verifier("mais pas l'acier (20 reste 20)",
              chaineDeDegats(foudroye, { valeurBrute: 20, typeRes: "Physique" }, {}).degats === 20);
 
-    // LES DEUX ENSEMBLE s'additionnent : +40 % sur un coup magique.
-    verifier("gelé ET électrifié, un sort fait 40 % de plus (20 → 28)",
-             chaineDeDegats(lesDeux, { valeurBrute: 20, typeRes: "Magique" }, {}).degats === 28,
+    // LES DEUX ENSEMBLE : chacun ne joue que sur son type, ils ne
+    // s'additionnent donc plus jamais sur un même coup.
+    verifier("gelé ET électrifié, un sort ne prend que l'Électrifié (20 → 24)",
+             chaineDeDegats(lesDeux, { valeurBrute: 20, typeRes: "Magique" }, {}).degats === 24,
              String(chaineDeDegats(lesDeux, { valeurBrute: 20, typeRes: "Magique" }, {}).degats));
-    verifier("et un coup physique n'en prend que vingt (20 → 24)",
+    verifier("et un coup physique ne prend que le Glacé (20 → 24)",
              chaineDeDegats(lesDeux, { valeurBrute: 20, typeRes: "Physique" }, {}).degats === 24);
 
     // LA VULNÉRABILITÉ PASSE AVANT L'ARMURE, pas après : elle fait arriver le

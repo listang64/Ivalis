@@ -1793,7 +1793,7 @@ window.demarrerCiblage = async function(idCarte, options) {
                 alterationsExtraites.push({
                     nom: "Glacé",
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181888/IMG_2089_isgcrs.png",
-                    desc: "Coût en fatigue du mouvement doublé, et 20% de dégâts subis en plus.",
+                    desc: "Coût en fatigue du mouvement doublé, et 20% de dégâts physiques subis en plus.",
                     chance: glaceChance,
                     duree: glaceDuree,
                     isRanged: isRanged,
@@ -1904,10 +1904,14 @@ window.demarrerCiblage = async function(idCarte, options) {
             // declencherTractionCible / jouerAnimationPoussee.
             let isTraction = false;
             let tractionChance = 0;
+            // Le nombre de cases tirées : la Valeur du grimoire (3), jamais
+            // multipliée par les crans — les crans n'achètent que la chance.
+            let tractionCases = 0;
 
             if (nomLower.includes("traction")) {
                 isTraction = true;
                 tractionChance += (parseFrFloat(effBase.Pourcent_Base) || 0) * (act.count || 1);
+                tractionCases = Math.max(tractionCases, Math.round(parseFrFloat(effBase.Valeur)) || 3);
             }
 
             listeMods.forEach(m => {
@@ -1915,6 +1919,7 @@ window.demarrerCiblage = async function(idCarte, options) {
                 if (modEff && (modEff.Nom || "").toLowerCase().includes("traction")) {
                     isTraction = true;
                     tractionChance += (parseFrFloat(modEff.Pourcent_Base) || 0) * m.count;
+                    tractionCases = Math.max(tractionCases, Math.round(parseFrFloat(modEff.Valeur)) || 3);
                 }
             });
 
@@ -1926,11 +1931,12 @@ window.demarrerCiblage = async function(idCarte, options) {
                 alterationsExtraites.push({
                     nom: "Traction",
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png",
-                    desc: `${tractionChance}% de chance de tirer la cible de 3 cases vers soi.`,
+                    desc: `${tractionChance}% de chance de tirer la cible de ${tractionCases || 3} cases vers soi.`,
                     chance: tractionChance,
                     duree: 0, // Instantané : jamais ajouté à Etats_Alteres
                     isRanged: isRanged,
                     rangeMax: rangeMax,
+                    cases: tractionCases || 3,
                     cibles: [],
                     estTraction: true
                 });
@@ -2203,11 +2209,24 @@ window.demarrerCiblage = async function(idCarte, options) {
     // l'attaque qui l'accompagne est en mêlée : comme les deux visent obligatoirement la même
     // cible unique, la portée effective de ciblage doit être au moins celle de Traction.
     const tractionAlt = alterationsExtraites.find(a => a.estTraction);
-    const porteeMinTraction = tractionAlt ? tractionAlt.rangeMax : 0;
-    // Si Traction est écrite avant la première attaque sur la carte, elle doit se résoudre avant
-    // elle (on tire la cible avant de la frapper) au lieu de toujours s'appliquer après, comme le
-    // fait une altération classique. Voir jouerAnimationMoteur qui lit ce drapeau.
+    // Si Traction est écrite avant la première attaque sur la carte, elle se résout AVANT elle
+    // (on tire la cible, PUIS on la frappe) : le drapeau voyage sur l'altération elle-même
+    // jusqu'au cerveau (resoudreCarte, moteur_pur.js), qui la joue en tête.
     const tractionAvantAttaque = !!tractionAlt && (indexPremiereAttaque === -1 || indexTraction < indexPremiereAttaque);
+    if (tractionAvantAttaque) {
+        tractionAlt.avantAttaque = true;
+        // Carte à cible unique : le coup qui suit n'atteint que si la cible a
+        // bien été ramenée à sa portée. Une zone, elle, frappe son emprise.
+        if (!isZone) tractionAlt.coupAPortee = true;
+    }
+    // LA PORTÉE DE CIBLAGE. Traction en tête : on vise aussi loin qu'elle tire
+    // (3 cases), même sans Distance — c'est tout l'intérêt de tirer avant de
+    // frapper (demande de Nico : « traction est censée la tracter »). Traction
+    // après l'attaque : la portée reste celle de l'attaque, sinon un coup de
+    // contact partirait à trois cases.
+    const porteeMinTraction = !tractionAlt ? 0
+        : tractionAvantAttaque ? Math.max(tractionAlt.rangeMax || 1, tractionAlt.cases || 3)
+        : (tractionAlt.rangeMax || 1);
 
     const carteConstruite = {
         actif: true,
@@ -3145,7 +3164,7 @@ const GABARITS_ETATS_EQUIPEMENT = {
     "Immobilisation": { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788081285/IMG_2076_vze0an.png", desc: "Ne peut plus se déplacer volontairement, gagne 20 fatigue par tour immobilisé." },
     "Empoisonnement": { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788096401/IMG_2083_pebnup.png", desc: "15 fatigue et 8% des PV max perdus immédiatement, puis à nouveau au début du tour suivant. Pas de cumul.", estPoison: true, estDot: true },
     "Brûlé":          { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181101/IMG_2087_q6chof.png", desc: "-50% de soins reçus, et 3 dégâts par manche." },
-    "Glacé":          { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181888/IMG_2089_isgcrs.png", desc: "Coût en fatigue du mouvement doublé, et 20% de dégâts subis en plus." },
+    "Glacé":          { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181888/IMG_2089_isgcrs.png", desc: "Coût en fatigue du mouvement doublé, et 20% de dégâts physiques subis en plus." },
     "Poussée":        { duree: 0, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", desc: "", estPoussee: true },
     "Traction":       { duree: 0, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", desc: "", estTraction: true },
     "Peur":           { duree: 0, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", desc: "", estPeur: true },

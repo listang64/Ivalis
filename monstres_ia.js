@@ -221,10 +221,21 @@ window.analyserCarteMonstre = function(dataCarte) {
     const cache = window.EFFETS_BDD_CACHE || {};
     if (!dataCarte || !dataCarte.Composants || !dataCarte.Composants.actions) return infos;
 
-    dataCarte.Composants.actions.forEach(act => {
+    // TRACTION EN TÊTE (même règle que moteur_effets.js) : une carte qui tire
+    // avant de frapper vise aussi loin que la traction tire (3 cases).
+    let indexTraction = -1, indexAttaque = -1, casesTraction = 0;
+    dataCarte.Composants.actions.forEach((act, idx) => {
         const base = cache[act.baseEffetId];
         if (!base) return;
         const nomBase = (base.Nom || "").toLowerCase();
+        const tractionIci = [base, ...Object.keys(act.mods || {}).map(id => cache[id])]
+            .find(e => e && (e.Nom || "").toLowerCase().includes("traction"));
+        if (tractionIci && indexTraction === -1) {
+            indexTraction = idx;
+            casesTraction = Math.round(parseFloat(String(tractionIci.Valeur).replace(",", "."))) || 3;
+        }
+        if (indexAttaque === -1 && (nomBase.includes("attaque") || nomBase.includes("mot de pouvoir")
+            || nomBase.includes("mots de pouvoir"))) indexAttaque = idx;
 
         if (nomBase.includes("soin") || nomBase.includes("guérison") || nomBase.includes("bouclier")
             || nomBase.includes("purification") || nomBase.includes("absorption")) {
@@ -280,6 +291,9 @@ window.analyserCarteMonstre = function(dataCarte) {
     // un soin ou un bouclier se voit répondre "Cible invalide" et le tour est
     // perdu — d'où ce drapeau, que le choix de cible consulte.
     infos.estAttaqueSimple = !infos.estSoin && !infos.aAlteration && infos.degats > 0;
+    if (indexTraction !== -1 && (indexAttaque === -1 || indexTraction < indexAttaque)) {
+        infos.portee = Math.max(infos.portee, casesTraction);
+    }
     return infos;
 };
 

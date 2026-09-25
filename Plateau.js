@@ -1,3 +1,7 @@
+// Opacité des murs et du terrain difficile quand l'œil d'or les révèle :
+// assez pour les voir, pas assez pour cacher le décor de la carte.
+const OPACITE_REVELATION = 0.5;
+
 class Plateau {
     constructor(canvasId) {
         this.canvas = document.getElementById(canvasId);
@@ -192,12 +196,15 @@ class Plateau {
             this.ctx.fill();
             this.ctx.strokeStyle = `rgba(0, 0, 0, ${this.gridOpacity})`;
         } else if ((state.isBlocked && (isMursMode || isRevealMode)) || infranchissableRevele) {
-            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            // L'ŒIL D'OR MONTRE À 50 % (demande de Nico) : on doit voir le
+            // décor de la carte à travers. Le pinceau du MJ garde son noir
+            // presque plein, pour qu'on voie bien ce qu'on peint.
+            this.ctx.fillStyle = isMursMode ? 'rgba(0, 0, 0, 0.85)' : `rgba(0, 0, 0, ${OPACITE_REVELATION})`;
             this.ctx.fill();
             this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
         } else if (state.isDifficult && (isDifficileMode || isRevealMode)) {
             // NOUVEAU : Violet translucide avec contour blanc pour le terrain difficile (visible uniquement outil en main)
-            this.ctx.fillStyle = 'rgba(155, 89, 182, 0.5)'; 
+            this.ctx.fillStyle = `rgba(155, 89, 182, ${OPACITE_REVELATION})`; 
             this.ctx.fill();
             this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
         } else {

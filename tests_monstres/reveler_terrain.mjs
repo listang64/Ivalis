@@ -106,8 +106,11 @@ await p.evaluate(() => {
   ctx.fill = function (...args) { window.__FILLS.push(ctx.fillStyle); return fillOrig(...args); };
 });
 
-const COULEUR_MUR = 'rgba(0, 0, 0, 0.85)';
+// L'œil d'or montre murs et terrain difficile à 50 % d'opacité (demande de
+// Nico : on doit voir le décor à travers).
+const COULEUR_MUR = 'rgba(0, 0, 0, 0.5)';
 const COULEUR_DIFFICILE = 'rgba(155, 89, 182, 0.5)';
+const COULEUR_MUR_PINCEAU = 'rgba(0, 0, 0, 0.85)';
 
 const dessiner = () => p.evaluate(() => {
   window.__FILLS.length = 0;
@@ -150,6 +153,7 @@ console.log("=========================================================");
   const fills = await p.evaluate(() => { window.__FILLS.length = 0; window.PLATEAU_VTT.renderMap(); return window.__FILLS.slice(); });
   verifier("le mur est bien peint pendant l'appui", fills.includes(COULEUR_MUR), JSON.stringify(fills));
   verifier("le terrain difficile aussi", fills.includes(COULEUR_DIFFICILE), JSON.stringify(fills));
+  verifier("et le mur l'est à 50 %, pas en noir presque plein", !fills.includes(COULEUR_MUR_PINCEAU), JSON.stringify(fills));
 
   await p.mouse.up();
   await p.waitForTimeout(100);
@@ -250,9 +254,9 @@ console.log("=========================================================");
 
   await appuyer();
   const presse = { gomme: await couleurCase(4, 0), murGomme: await couleurCase(5, 0), difficileGomme: await couleurCase(6, 0) };
-  verifier("l'œil montre la case gommée, infranchissable", presse.gomme > 150, `alpha ${presse.gomme}`);
-  verifier("et le mur peint par-dessus une case gommée", presse.murGomme > 150, `alpha ${presse.murGomme}`);
-  verifier("et la case difficile gommée (infranchissable, elle aussi)", presse.difficileGomme > 150,
+  verifier("l'œil montre la case gommée, infranchissable", Math.abs(presse.gomme - 128) <= 8, `alpha ${presse.gomme} (50 % ≈ 128)`);
+  verifier("et le mur peint par-dessus une case gommée", Math.abs(presse.murGomme - 128) <= 8, `alpha ${presse.murGomme}`);
+  verifier("et la case difficile gommée (infranchissable, elle aussi)", presse.difficileGomme >= 120,
            `alpha ${presse.difficileGomme}`);
 
   console.log("\n=========================================================");
@@ -322,6 +326,14 @@ console.log("=========================================================");
   verifier("le mur enregistré, lui, reste", r.enregistre);
 }
 
+// Le pinceau du MJ, lui, garde son noir presque plein : on doit voir ce qu'on peint.
+{
+  const fillsPinceau = await p.evaluate(() => { window.VTT_MODE_MURS = true; window.__FILLS.length = 0;
+    window.PLATEAU_VTT.renderMap(); const f = window.__FILLS.slice(); window.VTT_MODE_MURS = false;
+    window.PLATEAU_VTT.renderMap(); return f; });
+  verifier("le pinceau des murs du MJ reste en noir presque plein (0.85)", fillsPinceau.includes(COULEUR_MUR_PINCEAU),
+           JSON.stringify(fillsPinceau.slice(0, 4)));
+}
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 2).join(" | "));
 
 await b.close();

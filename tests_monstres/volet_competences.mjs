@@ -307,6 +307,26 @@ console.log("=========================================================");
   await p.waitForTimeout(400);
   const appels = await p.evaluate(() => window.APPELS);
   verifier("LE BOUTON FIN DE TOUR LE LANCE", appels.includes("reposLong"), JSON.stringify(appels));
+
+  // PLUS DE GRAND SABLIER À GAUCHE (demande de Nico) : une fois le repos long
+  // retenu, aucun sablier géant ni texte « Repos Long » ne s'affiche sur le
+  // côté gauche de l'écran.
+  const reste = await p.evaluate(async () => {
+    const moi = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+    window.PARTIE_DATA.File_Attente_Combat = [{ idPersonnage: moi.idPersonnage, idCarte: "REPOS_LONG", initiative: 0 }];
+    window.actualiserEtatCarteCombat();
+    window.actualiserEtatCarteCombat("REPOS_LONG");
+    await new Promise(r => setTimeout(r, 400));
+    const visibles = [...document.querySelectorAll("#fenetre-combat div")].filter(el => {
+      const st = getComputedStyle(el);
+      return el.children.length === 0 && st.display !== "none" && parseFloat(st.opacity) > 0
+        && (/Repos Long/i.test(el.textContent) || (el.textContent.trim() === "⏳" && parseFloat(st.fontSize) >= 40));
+    }).filter(el => !el.closest("#combat-liste-competences"))   // sa bannière dans le volet, elle, reste
+      .map(el => el.textContent.trim().slice(0, 30));
+    return { panneau: !!document.getElementById("apercu-repos-long-ui"), visibles };
+  });
+  verifier("repos long retenu : plus de panneau sablier à gauche", !reste.panneau && reste.visibles.length === 0,
+           JSON.stringify(reste));
 }
 
 console.log("\n=========================================================");

@@ -4,7 +4,9 @@ const fenetre = chargerGenerateur();
 
 const src = fs.readFileSync('/home/user/Ivalis/competences.js','utf-8');
 const aux = src.slice(src.indexOf('function parseFrenchFloat'), src.indexOf('function formatterTexteEffet'))
-          + src.slice(src.indexOf('function getActiveTags'), src.indexOf('function compilerEffetsTexte'));
+          + src.slice(src.indexOf('function getActiveTags'), src.indexOf('function compilerEffetsTexte'))
+          // La liste des effets hors initiative, juste avant rafraichirForge.
+          + src.slice(src.indexOf('window.MOTS_HORS_INITIATIVE = '), src.indexOf('window.rafraichirForge = function() {'));
 const corps = src.slice(src.indexOf('{', src.indexOf('window.rafraichirForge = function() {')) + 1,
                         src.indexOf('    const caracs = window.forgeState.caracs || {};'));
 const coutForge = eval(`(function(fs2){ ${aux} window.forgeState = fs2; ${corps} return { totalPC, initBonusNet }; })`);

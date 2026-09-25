@@ -1606,6 +1606,21 @@ window.capFatigueDeCarac = function(caracMoyenne, perso) {
     return base + bonusRace;
 };
 
+// CE QUI NE COMPTE PAS DANS L'INITIATIVE. L'initiative d'une carte, c'est ce
+// qui reste de 100 une fois la fatigue payée : plus une carte coûte, plus elle
+// part tard. Certains effets en sont exemptés — leur coût est « remboursé » à
+// l'initiative : l'Absorption depuis toujours, et (règle de Nico) le Contre,
+// l'Aveuglement, la Brûlure, l'Empoisonnement, le Glacé, l'Électrifié, la Peur
+// et la Confusion. Ils coûtent toujours leur fatigue, mais ne retardent pas
+// la carte. Le générateur de monstres suit la même liste
+// (initiativeChantier, monstres_competences.js).
+window.MOTS_HORS_INITIATIVE = ["absorption", "contre", "aveugl", "brûl", "brul", "empoison",
+                               "glac", "électrifi", "electrifi", "peur", "confusion"];
+window.horsInitiative = function(nom) {
+    const n = (nom || "").toLowerCase();
+    return window.MOTS_HORS_INITIATIVE.some(mot => n.includes(mot));
+};
+
 window.rafraichirForge = function() {
     let totalPC = 0;
     let initBonusNet = 0;
@@ -1628,8 +1643,9 @@ window.rafraichirForge = function() {
             const baseVal = parseFrenchFloat(act.baseEffet.Valeur) || 8;
             initBonusNet += act.count * (baseVal + parseFrenchFloat(act.baseEffet.Cout_PT) * 5);
         }
-        // 🔻 NOUVEAU : On rembourse la perte d'initiative pour l'Absorption (Action de base) 🔻
-        if ((act.baseEffet.Nom || "").toLowerCase().includes("absorption")) {
+        // Le coût d'un effet hors initiative (Absorption, Contre, états…) est
+        // rendu à l'initiative : il ne retarde pas la carte.
+        if (window.horsInitiative(act.baseEffet.Nom)) {
             initBonusNet += baseActionCost * 5;
         }
 
@@ -1642,8 +1658,8 @@ window.rafraichirForge = function() {
                     const baseVal = parseFrenchFloat(modEff.Valeur) || 8;
                     initBonusNet += modCount * (baseVal + parseFrenchFloat(modEff.Cout_PT) * 5);
                 }
-                // 🔻 NOUVEAU : On rembourse la perte d'initiative pour l'Absorption (Modificateur) 🔻
-                if ((modEff.Nom || "").toLowerCase().includes("absorption")) {
+                // Même remboursement pour un sous-effet hors initiative.
+                if (window.horsInitiative(modEff.Nom)) {
                     initBonusNet += (parseFrenchFloat(modEff.Cout_PT) * modCount) * 5;
                 }
 
