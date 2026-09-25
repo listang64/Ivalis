@@ -224,6 +224,34 @@ console.log("\n4. LE BOUTON « ⚙ HUD » A DISPARU");
   verifier("et le fichier est parti", !fs.existsSync(`${RACINE}/reglage_encart.js`));
 }
 
+// =========================================================================
+console.log("\n5. LES ÉTATS SOUS LE PORTRAIT SUIVENT LA FICHE, EN DIRECT");
+// =========================================================================
+//  Nico voyait son héros « en feu » sur l'encart alors qu'il n'avait plus
+//  aucun état : les icônes n'étaient redessinées qu'à l'ouverture du tour.
+{
+  const BRULE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181101/IMG_2087_q6chof.png";
+  const icones = () => p.evaluate(() => document.querySelectorAll("#voile-tour-etats img").length);
+  await p.evaluate((icone) => {
+    const h = window.PERSOS_PARTIE.find(x => x.idPersonnage === "H1");
+    h.Etats_Alteres = [{ nom: "Brûlé", duree: 1, icone }, { nom: "Brûlé", duree: 1, icone }];
+    window.PARTIE_DATA = { Phase_Combat: "Resolution", Tour_Combat: 1, Ordre_Initiative: ["H1", "M1"],
+      File_Attente_Combat: [{ idPersonnage: "H1", idCarte: "C_H1", initiative: 60 }] };
+    window.EVENEMENT_ATTENDU = { acteur: "H1", idCarte: "C_H1", manche: 1, v: 2 };
+    window.rafraichirVoileTour();
+  }, BRULE);
+  await p.waitForTimeout(700);
+  verifier("héros brûlé : une seule icône de feu sous son portrait (pas deux)", (await icones()) === 1, String(await icones()));
+
+  // La brûlure tombe (fin de manche) : la fiche change, l'encart n'est PAS rouvert.
+  await p.evaluate(() => {
+    window.PERSOS_PARTIE.find(x => x.idPersonnage === "H1").Etats_Alteres = [];
+    window.rafraichirAffichageCombat();
+  });
+  await p.waitForTimeout(200);
+  verifier("la brûlure tombe : l'icône disparaît sans rouvrir le tour", (await icones()) === 0, String(await icones()));
+}
+
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
 await b.close(); serveur.close();
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

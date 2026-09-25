@@ -208,10 +208,11 @@ export function ennemisAuContact(etat, id, hex) {
     return liste;
 }
 
-// Le coup lui-même : dix points, fixes. Il ignore l'armure et les compétences —
-// c'est un réflexe, pas une technique. Le bouclier l'encaisse en premier, et le
-// surplus part dans le vide comme pour n'importe quelle attaque.
-export const DEGATS_OPPORTUNITE = 10;
+// Le coup lui-même : six points bruts, fixes (dix avant — Nico l'a baissé). Il
+// ignore l'armure et les compétences — c'est un réflexe, pas une technique. Le
+// bouclier l'encaisse en premier, et le surplus part dans le vide comme pour
+// n'importe quelle attaque.
+export const DEGATS_OPPORTUNITE = 6;
 
 export function resoudreOpportunite(etat, idAttaquant, idCible, des) {
     const a = combattant(etat, idAttaquant);

@@ -560,6 +560,15 @@ function effetAutorise(chantier, effet, commeMod) {
     if (nom.includes("persistance") && carteEtalee) return false;
     if (estEtalement(nom) && chantierContientMotCle(chantier, "persistance")) return false;
 
+    // 🧟 règle des monstres (Nico) : PAS DE TRACTION SUR UNE CARTE QUI FRAPPE
+    // AU CONTACT. Une carte « au contact » n'a ni Distance, ni une arme qui
+    // tire (l'arc d'un archer lui donne déjà sa portée). Dans les deux sens :
+    // pas de Traction si la carte frappe déjà au contact, pas d'attaque sur
+    // une carte au contact qui porte déjà une Traction.
+    const auContact = !chantierContientMotCle(chantier, "distance") && !/distance/i.test(chantier.arme || "");
+    if (auContact && nom.includes("traction") && chantierAUneAttaque(chantier)) return false;
+    if (auContact && estAttaqueDeBase(effet.Nom) && chantierContientMotCle(chantier, "traction")) return false;
+
     // Une illusion ne peut pas porter de zone.
     if (commeMod && nom === "zone" && chantierContientMotCle(chantier, "illusion")) return false;
 

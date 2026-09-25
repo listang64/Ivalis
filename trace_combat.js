@@ -48,7 +48,7 @@
 // appareil tourne sur une vieille page et se recharge tout seul (mise_a_jour.js).
 // Les laisser diverger, c'est soit un rechargement qui ne vient jamais, soit un
 // appareil qui se recharge sans raison : le banc mise_a_jour.mjs les compare.
-window.VERSION_IVALIS = 129;
+window.VERSION_IVALIS = 130;
 
 window.TRACE_COMBAT_ACTIVE = true;
 // Quand une écriture de points de vie n'est ni un coup ni un rejeu mais une

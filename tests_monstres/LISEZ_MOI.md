@@ -137,6 +137,7 @@ node equilibrage_base.mjs    # la vraie base : Contre physique / Absorption magi
 node persistance_soin.mjs    # pas de Persistance terrain sur un soin (la Zone, oui) ni sur une carte étalée (DOT) — Forge, moteur, monstres
 node traction_en_tete.mjs    # Traction écrite avant l'attaque : on vise à 3 cases, le cerveau tire PUIS frappe (joueurs et monstres)
 node initiative_hors_effets.mjs  # Contre, Aveuglement, Brûlure, Poison, Glacé, Électrifié, Peur, Confusion ne retardent pas la carte
+node traction_monstres.mjs   # pas de Traction sur une technique de monstre qui frappe au contact
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -2996,3 +2997,32 @@ mesure sur la vraie Forge et sur le vrai générateur (morsures : 10 et 7
 échecs), et `cout_reel.mjs` confirme que Forge et monstres tombent d'accord sur
 4140 cartes. Les cartes déjà forgées gardent l'initiative écrite en base
 jusqu'à ce qu'on les réenregistre dans la Forge.
+
+### Monstres sans Traction au contact, encart sans état fantôme, opportunités à 6
+
+**Pas de Traction sur une technique de monstre qui frappe au contact.** Règle de
+Nico, posée dans `effetAutorise` (monstres_competences.js), dans les deux sens :
+une carte « au contact » (ni Distance, ni arme qui tire — l'arc d'un archer
+donne déjà sa portée) refuse la Traction si elle frappe déjà, et refuse
+l'attaque si elle porte déjà une Traction. Une carte de pure Traction, ou une
+carte à distance, garde le droit de tirer. `traction_monstres.mjs` vérifie la
+règle à la main puis sur 1656 cartes du vrai générateur : 0 fautive, alors que
+l'ancien générateur en fabriquait 127 (Estocade, Fracasse…), et il reste 72
+Tractions légitimes. Les créatures déjà en base gardent leurs cartes jusqu'à
+leur prochaine génération.
+
+**Les états sous le portrait de l'encart.** Nico voyait son héros « en feu »
+sous son portrait alors qu'il n'avait plus aucun état. La base, relue en
+lecture seule, ne porte aucun état fantôme sur les personnages ; la cause
+exacte n'a pas été reproduite. Deux choses sont corrigées côté écran : les
+icônes passent par une seule fonction, `actualiserEtatsEncart` (combat.js),
+relancée à chaque redessin du combat et à chaque mise à jour de la piste des
+états du héros — l'encart et la piste lisent donc la même fiche au même
+instant ; et un même état n'y compte qu'une fois (deux Brûlé donnaient deux
+flammes). `encart_fige.mjs` (section 5) : une seule flamme pour deux Brûlé, et
+elle disparaît dès que la fiche n'a plus d'état, sans rouvrir le tour.
+
+**Les attaques d'opportunité tombent à 6 dégâts bruts** (10 avant) :
+`DEGATS_OPPORTUNITE` (mouvement_pur.js), toujours sans armure, toujours arrêtés
+par une esquive, une parade ou un bouclier. `mouvement_pur.mjs` (sections 6 et
+8) et `repli.mjs` suivent.

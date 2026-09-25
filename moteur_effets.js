@@ -290,7 +290,7 @@ window.jouerAnimationZonePersistante = async function(res, hexPosition) {
 // =========================================================================
 //  ATTAQUES D'OPPORTUNITÉ
 //  Déclenchées depuis mouvement.js quand un personnage quitte le corps-à-corps
-//  d'un adversaire (camp opposé uniquement). 10 dégâts fixes, ignorant l'armure
+//  d'un adversaire (camp opposé uniquement). 6 dégâts bruts fixes, ignorant l'armure
 //  et les compétences équipées, mais toujours soumis à un jet d'esquive/parade
 //  et absorbés par un bouclier magique actif comme une attaque normale.
 // =========================================================================

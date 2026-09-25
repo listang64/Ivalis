@@ -1037,6 +1037,8 @@ window.rafraichirAffichageCombat = function() {
         sansCasser("bloc du héros", () => window.actualiserHudHeros());
     if (typeof window.afficherPisteInitiative === "function")
         sansCasser("piste", () => window.afficherPisteInitiative());
+    if (typeof window.actualiserEtatsEncart === "function")
+        sansCasser("états de l'encart", () => window.actualiserEtatsEncart());
     if (typeof window.actualiserBoutonFinTour === "function")
         sansCasser("bouton de fin de tour", () => window.actualiserBoutonFinTour());
     if (typeof window.actualiserEtatCarteCombat === "function")
@@ -1479,6 +1481,8 @@ window.actualiserHudHeros = function() {
     // boîte a une largeur : mesuré pendant que le combat est encore masqué, il
     // déborderait d'une boîte large de zéro et tomberait à la taille minimale.
     if (typeof window.actualiserPisteEtats === "function") window.actualiserPisteEtats();
+    // L'encart du tour montre les mêmes états : il suit la piste au même instant.
+    if (typeof window.actualiserEtatsEncart === "function") window.actualiserEtatsEncart();
 
     const texteNom = document.getElementById("hud-nom-heros-texte");
     if (divNom && texteNom) {
@@ -4845,6 +4849,37 @@ function ajusterSurUneLigne(element, tailleMax, tailleMin) {
 //  quel effet. Le tout est ici plutôt que là-bas parce que la mise à la bonne
 //  taille (ajusterSurUneLigne) et la lecture des cartes appartiennent à ce
 //  fichier depuis toujours.
+// LES ÉTATS SOUS LE PORTRAIT DE L'ENCART, TOUJOURS À JOUR. Ils n'étaient
+// redessinés qu'à l'ouverture du tour : un état qui tombait ensuite (brûlure
+// arrivée à son terme, purification) restait sous le portrait — Nico voyait
+// son héros « en feu » alors qu'il n'avait plus rien. Ils se relisent donc à
+// chaque redessin de l'écran de combat (rafraichirAffichageCombat), sur la
+// même fiche que la piste des états du héros, et un même état ne compte
+// qu'une fois, comme là-bas.
+window.actualiserEtatsEncart = function() {
+    const elEtats = document.getElementById("voile-tour-etats");
+    if (!elEtats || !elEtats.dataset.acteur) return;
+    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === elEtats.dataset.acteur) || {};
+    const vus = new Set();
+    const etats = (perso.Etats_Alteres || []).filter(e => {
+        if (!e || !e.nom || vus.has(e.nom)) return false;
+        vus.add(e.nom);
+        return true;
+    });
+    const signature = elEtats.dataset.acteur + "#" + etats.map(e => e.nom + ":" + e.duree).join("|");
+    if (elEtats.dataset.signature === signature) return;
+    elEtats.dataset.signature = signature;
+    // Les icônes seules, sous le pion : leur nom tiendrait mal dans une
+    // colonne aussi étroite, et il est déjà dans l'infobulle.
+    // La taille des icônes est posée par hud_disposition.js, en pourcentage
+    // de la plaque : une image se dimensionne à la construction, elle ne
+    // peut pas se contenter d'un pourcentage CSS ici.
+    const tailleEtat = parseInt(elEtats.dataset.taille) || 32;
+    elEtats.innerHTML = etats.map(etat =>
+        `<div title="${etat.nom} (${etat.duree})" style="line-height: 0;">${window.imageEtat(etat, tailleEtat)}</div>`
+    ).join("");
+};
+
 window.rafraichirVoileTour = function(queueParam, phaseParam) {
     const voile = document.getElementById("voile-tour-combat");
     if (!voile) return;
@@ -4981,22 +5016,8 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
 
     // Les états qu'il porte, dans les mêmes icônes que le panneau latéral.
     const elEtats = document.getElementById("voile-tour-etats");
-    if (elEtats) {
-        const etats = perso.Etats_Alteres || [];
-        const signature = etats.map(e => e.nom + ":" + e.duree).join("|");
-        if (elEtats.dataset.signature !== signature) {
-            elEtats.dataset.signature = signature;
-            // Les icônes seules, sous le pion : leur nom tiendrait mal dans une
-            // colonne aussi étroite, et il est déjà dans l'infobulle.
-            // La taille des icônes est posée par hud_disposition.js, en pourcentage
-            // de la plaque : une image se dimensionne à la construction, elle ne
-            // peut pas se contenter d'un pourcentage CSS ici.
-            const tailleEtat = parseInt(elEtats.dataset.taille) || 32;
-            elEtats.innerHTML = etats.map(etat =>
-                `<div title="${etat.nom} (${etat.duree})" style="line-height: 0;">${window.imageEtat(etat, tailleEtat)}</div>`
-            ).join("");
-        }
-    }
+    if (elEtats) elEtats.dataset.acteur = tete.idPersonnage;
+    window.actualiserEtatsEncart();
 
     let titre = "";
     let ligne = "";
