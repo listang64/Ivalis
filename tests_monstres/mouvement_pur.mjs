@@ -209,15 +209,28 @@ console.log("\n5. QUI FRAPPE QUAND ON S'ENFUIT, ET À QUEL HEXAGONE");
 }
 
 // =========================================================================
-console.log("\n6. LE COUP D'OPPORTUNITÉ : SIX POINTS BRUTS, FIXES");
+console.log("\n6. LE COUP D'OPPORTUNITÉ : HUIT DÉGÂTS PHYSIQUES FIXES, CONTRE L'ARMURE");
 // =========================================================================
 //  Il ignore l'armure et les compétences — c'est un réflexe, pas une technique.
 {
     const etat = neuf();
     // Une cible sans défense : le coup passe forcément.
     const coup = resoudreOpportunite(etat, "M1", "H1", creerDes(7));
-    verifier("il porte six points bruts (Nico l'a baissé de 10 à 6)", DEGATS_OPPORTUNITE === 6
-             && coup.montant === 6 && !coup.evitee, String(coup.montant));
+    verifier("sans armure, il porte huit points", DEGATS_OPPORTUNITE === 8
+             && coup.montant === 8 && !coup.evitee, String(coup.montant));
+
+    // L'ARMURE COMPTE (règle de Nico) : ce sont des dégâts PHYSIQUES.
+    const cuirasse = clonerEtat(etat);
+    cuirasse.combattants.H1.def.physique = 25;
+    const amorti = resoudreOpportunite(cuirasse, "M1", "H1", creerDes(7));
+    verifier("25 % d'armure physique : 8 → 6", amorti.montant === 6, String(amorti.montant));
+    const plaque = clonerEtat(etat);
+    plaque.combattants.H1.def.physique = 100;
+    verifier("armure totale : rien ne passe", resoudreOpportunite(plaque, "M1", "H1", creerDes(7)).montant === 0);
+    // La résistance MAGIQUE, elle, n'y change rien.
+    const mage = clonerEtat(etat);
+    mage.combattants.H1.def.magique = 50;
+    verifier("la résistance magique ne le réduit pas", resoudreOpportunite(mage, "M1", "H1", creerDes(7)).montant === 8);
 
     // Une cible qui esquive toujours ne le prend jamais.
     const agile = clonerEtat(etat);
@@ -283,10 +296,10 @@ console.log("\n8. LE COUP D'OPPORTUNITÉ FRAPPE VRAIMENT");
     const action = { idLanceur: "H1", chemin: [{ q: 0, r: -1 }] };
 
     const { etat: apres, etapes } = resoudreMouvement(etat, action, creerDes(7), null);
-    verifier("les points de vie ont bien baissé de six",
-             apres.combattants.H1.pv === 54, `(${apres.combattants.H1.pv})`);
+    verifier("les points de vie ont bien baissé de huit",
+             apres.combattants.H1.pv === 52, `(${apres.combattants.H1.pv})`);
     verifier("et l'étape de dégâts le dit",
-             etapes.some(e => e.type === "degats" && e.opportunite && e.pvApres === 54));
+             etapes.some(e => e.type === "degats" && e.opportunite && e.pvApres === 52));
 
     // Avec un bouclier, c'est lui qui prend — et le surplus part dans le vide.
     const protege = clonerEtat(etat);

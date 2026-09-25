@@ -290,8 +290,8 @@ window.jouerAnimationZonePersistante = async function(res, hexPosition) {
 // =========================================================================
 //  ATTAQUES D'OPPORTUNITÉ
 //  Déclenchées depuis mouvement.js quand un personnage quitte le corps-à-corps
-//  d'un adversaire (camp opposé uniquement). 6 dégâts bruts fixes, ignorant l'armure
-//  et les compétences équipées, mais toujours soumis à un jet d'esquive/parade
+//  d'un adversaire (camp opposé uniquement). 8 dégâts physiques fixes (l'arme ne
+//  compte pas), réduits par l'armure de la cible, soumis à un jet d'esquive/parade
 //  et absorbés par un bouclier magique actif comme une attaque normale.
 // =========================================================================
 // GRANDE SUPPRESSION : window.resoudreAttaqueOpportunite (le jet et les dégâts fixes, tranchés

@@ -88,16 +88,16 @@ console.log("\n1. LE NOYAU PUR : UNE MARCHE DE 3 CASES, GRATUITE");
            JSON.stringify(opp));
   verifier("aucun PV perdu", s.combattants.H1.pv === 60);
 
-  // Dé 61 : le repli ne se dérobe pas ; la défense (Esquive 0) ne sauve pas non plus → 6 dégâts.
+  // Dé 61 : le repli ne se dérobe pas ; la défense (Esquive 0) ne sauve pas non plus → 8 dégâts.
   const s2 = clonerEtat(etat);
   const e2 = resoudreRepli(s2, "H1", { q: 0, r: -3 }, desFixe([61, 99]), plateau);
-  verifier("dé 61 : l'attaque d'opportunité porte (6 dégâts)", s2.combattants.H1.pv === 54,
+  verifier("dé 61 : l'attaque d'opportunité porte (8 dégâts)", s2.combattants.H1.pv === 52,
            JSON.stringify(e2.filter(e => e.type === "opportunite" || e.type === "degats")));
 
   // La chance se règle : 0 % = jamais évité par le repli.
   const s3 = clonerEtat(etat);
   resoudreRepli(s3, "H1", { q: 0, r: -3 }, desFixe([1, 99]), plateau, { chance: 0 });
-  verifier("avec 0 % de chance, même un dé de 1 ne sauve pas", s3.combattants.H1.pv === 54);
+  verifier("avec 0 % de chance, même un dé de 1 ne sauve pas", s3.combattants.H1.pv === 52);
 
   // Hors d'atteinte / immobilisé / à terre.
   const loin = clonerEtat(etat);

@@ -3026,3 +3026,16 @@ elle disparaît dès que la fiche n'a plus d'état, sans rouvrir le tour.
 `DEGATS_OPPORTUNITE` (mouvement_pur.js), toujours sans armure, toujours arrêtés
 par une esquive, une parade ou un bouclier. `mouvement_pur.mjs` (sections 6 et
 8) et `repli.mjs` suivent.
+
+### Les attaques d'opportunité deviennent 8 dégâts physiques, armure comprise
+
+Nouvelle règle de Nico, qui remplace les 6 dégâts bruts : « 8 dégâts physiques
+fixes (ne prend pas en compte les armes) — du coup l'armure rentre en compte ».
+`DEGATS_OPPORTUNITE` vaut 8 et `degatsOpportuniteContre(cible)` (mouvement_pur.js)
+applique la résistance PHYSIQUE de la cible, avec la même formule qu'un coup
+physique ordinaire (pourcentage, arrondi). Ni l'arme ni les compétences de
+l'attaquant n'y ajoutent rien ; la résistance magique n'y change rien ;
+l'esquive, la parade et le bouclier jouent comme avant. `mouvement_pur.mjs`
+(section 6) : 8 sans armure, 6 à 25 % d'armure, 0 à 100 %, 8 malgré 50 % de
+résistance magique ; section 8 et `repli.mjs` suivent (60 → 52). Morsure :
+l'ancien calcul fait tomber les contrôles de l'armure.

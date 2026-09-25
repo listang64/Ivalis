@@ -27,7 +27,7 @@
 // =========================================================================
 
 import { clonerEtat, combattant } from './combat_etat.js';
-import { esquiveDe, paradeDe, bonusDesEtats, aLEtat, traverserZones,
+import { esquiveDe, paradeDe, defPhysiqueDe, bonusDesEtats, aLEtat, traverserZones,
          ligneDeVue, caseLibre } from './moteur_pur.js';
 
 const nombre = (v, defaut = 0) => {
@@ -208,11 +208,17 @@ export function ennemisAuContact(etat, id, hex) {
     return liste;
 }
 
-// Le coup lui-même : six points bruts, fixes (dix avant — Nico l'a baissé). Il
-// ignore l'armure et les compétences — c'est un réflexe, pas une technique. Le
-// bouclier l'encaisse en premier, et le surplus part dans le vide comme pour
-// n'importe quelle attaque.
-export const DEGATS_OPPORTUNITE = 6;
+// Le coup lui-même : HUIT DÉGÂTS PHYSIQUES FIXES (règle de Nico). Fixes : ni
+// l'arme de l'attaquant ni ses compétences n'y ajoutent rien — c'est un
+// réflexe, pas une technique. Physiques : l'ARMURE de la cible les réduit,
+// exactement comme pour un coup physique ordinaire (résistance physique en %,
+// arrondie — voir chaineDeDegats, moteur_pur.js). Le bouclier encaisse ce qui
+// reste en premier, et le surplus part dans le vide.
+export const DEGATS_OPPORTUNITE = 8;
+export const degatsOpportuniteContre = (cible) => {
+    const reduction = Math.min(1, Math.max(0, defPhysiqueDe(cible)) / 100);
+    return Math.max(0, Math.round(DEGATS_OPPORTUNITE * (1 - reduction)));
+};
 
 export function resoudreOpportunite(etat, idAttaquant, idCible, des) {
     const a = combattant(etat, idAttaquant);
@@ -232,7 +238,7 @@ export function resoudreOpportunite(etat, idAttaquant, idCible, des) {
     if (evitee) return { attaquant: idAttaquant, cible: idCible, evitee: true, mot, montant: 0 };
 
     return { attaquant: idAttaquant, cible: idCible, evitee: false, mot: "",
-             montant: DEGATS_OPPORTUNITE };
+             montant: degatsOpportuniteContre(cible) };
 }
 
 // =========================================================================
@@ -632,7 +638,7 @@ if (typeof window !== "undefined") {
     window.mouvementPur = {
         distance, voisinsDe, trouverChemin, coutDuPas, planifierTrajet,
         ennemisAuContact, resoudreOpportunite, resoudreMouvement,
-        casesDeBond, resoudreBond, resoudrePeur, DEGATS_OPPORTUNITE,
+        casesDeBond, resoudreBond, resoudrePeur, DEGATS_OPPORTUNITE, degatsOpportuniteContre,
         cheminsDeRepli, resoudreRepli, PORTEE_REPLI, CHANCE_REPLI_OPPORTUNITE
     };
 }
