@@ -1039,6 +1039,8 @@ window.rafraichirAffichageCombat = function() {
         sansCasser("piste", () => window.afficherPisteInitiative());
     if (typeof window.actualiserEtatsEncart === "function")
         sansCasser("états de l'encart", () => window.actualiserEtatsEncart());
+    if (typeof window.actualiserCoupeButin === "function")
+        sansCasser("coupe du butin", () => window.actualiserCoupeButin());
     if (typeof window.actualiserBoutonFinTour === "function")
         sansCasser("bouton de fin de tour", () => window.actualiserBoutonFinTour());
     if (typeof window.actualiserEtatCarteCombat === "function")

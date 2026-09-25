@@ -310,6 +310,54 @@ console.log("\n6. LE DÉTAIL DE L'ÉQUIPEMENT ACTUEL, D'UN VRAI CLIC");
 // ici les emportait TOUTES, à chaque notification — d'où « le mode combat est
 // complètement bugué ». Un index.html servi depuis le cache du navigateur
 // (seul fichier sans ?v=) suffit à faire manquer un élément.
+console.log("\n6 bis. LA COUPE RAMÈNE AU BUTIN QU'ON A QUITTÉ");
+{
+  // Nico : « quand le combat est gagné, mets une coupe sur le côté gauche ; un
+  // clic ramène aux fenêtres de butin en cours ». On ferme la fenêtre par la
+  // vraie croix, on clique la vraie coupe.
+  const etat = () => p.evaluate(() => {
+    const c = document.getElementById("coupe-butin"), f = document.getElementById("fenetre-butin");
+    const r = c ? c.getBoundingClientRect() : null;
+    return { coupe: !!c && c.style.display !== "none", fenetre: f.style.display !== "none",
+             gauche: r ? r.left : null, milieu: r ? r.top + r.height / 2 : null, hauteur: window.innerHeight };
+  });
+  await p.evaluate(() => { window.BUTIN_MASQUE_LOCALEMENT = null; window.afficherFenetreButin(window.PARTIE_DATA.Butin); });
+  const ouverte = await etat();
+  verifier("fenêtre ouverte : pas de coupe (on y est déjà)", ouverte.fenetre && !ouverte.coupe);
+  await p.click('#fenetre-butin button[onclick*="fermerButinLocalement"]');
+  const fermee = await etat();
+  verifier("la croix referme la fenêtre, et la coupe apparaît", !fermee.fenetre && fermee.coupe, JSON.stringify(fermee));
+  verifier("sur le côté gauche de l'écran, vers le milieu", fermee.gauche !== null && fermee.gauche < 60
+           && Math.abs(fermee.milieu - fermee.hauteur * 0.45) < 40, JSON.stringify(fermee));
+  // Une notification de la partie ne la fait pas disparaître.
+  await p.evaluate(() => window.afficherFenetreButin(window.PARTIE_DATA.Butin));
+  verifier("une notification de la partie la laisse en place", (await etat()).coupe && !(await etat()).fenetre);
+  await p.click('#coupe-butin', { force: true });   // elle lévite : jamais « stable » pour Playwright
+  const rouverte = await etat();
+  verifier("un clic sur la coupe rouvre le butin là où on en était", rouverte.fenetre && !rouverte.coupe, JSON.stringify(rouverte));
+  // Un ennemi debout : pas de victoire, pas de coupe.
+  const debout = await p.evaluate(() => {
+    window.fermerButinLocalement();
+    window.MONSTRES_PARTIE[0].statut = "Vivant";
+    window.actualiserCoupeButin();
+    const vue = document.getElementById("coupe-butin").style.display !== "none";
+    window.MONSTRES_PARTIE[0].statut = "Mort";
+    window.BUTIN_MASQUE_LOCALEMENT = null;
+    window.afficherFenetreButin(window.PARTIE_DATA.Butin);
+    return vue;
+  });
+  verifier("tant qu'un ennemi est debout, pas de coupe", debout === false);
+  // Le butin refermé pour de bon (tout le monde a fini) : la coupe s'en va.
+  const clos = await p.evaluate(() => {
+    const b = { ...window.PARTIE_DATA.Butin, ouvert: false };
+    window.afficherFenetreButin(b);
+    const vue = document.getElementById("coupe-butin").style.display !== "none";
+    window.afficherFenetreButin(window.PARTIE_DATA.Butin);
+    return vue;
+  });
+  verifier("butin clos : plus de coupe", clos === false);
+}
+
 console.log("\n7. UN BUTIN EN PANNE N'EMPORTE PLUS LE COMBAT");
 {
   const resultat = await p.evaluate(() => {

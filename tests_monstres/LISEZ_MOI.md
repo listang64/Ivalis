@@ -142,6 +142,7 @@ node cerveau_destitue.mjs    # un cerveau qui a perdu le réseau n'écrase plus 
 node ia_opportunites.mjs     # les créatures ne prennent plus d'attaque d'opportunité pour rien
 node tir_monstre_contact.mjs # une créature qui tire au contact perd 30 % (portée = mod Distance)
 node zones_geometrie.mjs     # les zones des sorts ont la forme des hexagones de la map
+node dev_reinit_caracs.mjs   # onglet DEV : réinitialiser les caractéristiques d'un héros
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -3161,3 +3162,26 @@ ne suit une transaction qu'à la livraison de l'écoute : le cerveau enchaîne
 maintenant mouvement, fin de tour et tour de la créature (3 pas, aucun refus) ;
 l'ancien dépôt se fait refuser dès le deuxième pas, comme à la table (4
 morsures).
+
+### La coupe du butin, et la réinitialisation des caractéristiques
+
+**La coupe.** Nico : « quand le combat est gagné, mets une coupe sur le côté
+gauche de l'écran ; un clic ramène aux fenêtres de butin en cours — si on les
+quitte sans faire exprès, on peut y revenir. » La croix, Échap et le clic sur le
+fond referment la fenêtre de butin pour ce poste seulement (le butin reste en
+base) ; seul l'événement suivant la rouvrait. Une coupe 🏆 (loot.js,
+`actualiserCoupeButin`) se montre dans la fenêtre de combat, à gauche, dès que
+le combat est gagné, qu'un butin est ouvert et que sa fenêtre n'est pas à
+l'écran ; un clic (`rouvrirButin`) lève le masquage local et rouvre l'étape en
+cours. Elle se met à jour à chaque affichage du butin, à chaque fermeture locale
+et à chaque redessin du combat. `clics_butin.mjs` (section 6 bis) la clique pour
+de vrai : elle apparaît à la croix, tient à une notification, rouvre la fenêtre,
+disparaît tant qu'un ennemi est debout et quand le butin est clos.
+
+**Réinitialiser les caractéristiques.** Un bouton dans l'onglet DEV de la fiche
+(`reinitialiserCaracsDev`, creation_personnage.js) retire, après confirmation,
+le document Caracteristiques/<id> du héros et vide les caches qui le gardaient
+(celui de la fiche, `CARACS_PARTIE`) : la fiche repropose « Créer les
+caractéristiques », avec tous les points de départ. La nouvelle répartition
+réécrit elle-même ce qui en découle (PV max, objets portables).
+`dev_reinit_caracs.mjs` le vérifie sur la vraie page avec un Firestore bouchonné.

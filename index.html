@@ -1808,6 +1808,14 @@
       </div>
       <!-- ======================================================= -->
 
+      <!-- Réinitialiser les caractéristiques : le héros repart de sa
+           répartition de points, comme à sa création. -->
+      <div style="background-color: rgba(92, 30, 22, 0.1); border: 2px dashed #ff4c4c; padding: 15px; border-radius: 8px; margin-bottom: 30px; text-align: center;">
+          <h4 style="margin-top: 0; color: #5c1e16;">Caractéristiques</h4>
+          <p style="font-size: 14px; margin-bottom: 15px; color: #4a2e1b;">Efface la répartition des caractéristiques : il faudra les répartir à nouveau depuis l'onglet des caractéristiques.</p>
+          <button id="btn-dev-reinit-caracs" class="btn-parametres" style="background-color: #5c1e16; border-color: #ff4c4c;" onclick="jouerSonClic(); window.reinitialiserCaracsDev()">Réinitialiser les caractéristiques</button>
+      </div>
+
       <button id="btn-supprimer-perso" class="btn-parametres btn-supprimer" style="padding: 15px 30px; font-size: 18px;" onclick="jouerSonClic(); ouvrirConfirmationSuppressionPerso()">Détruire le Héros</button>
     </div>
   </div>  <div id="fenetre-chatbox">
@@ -1913,7 +1921,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=46"></script>
+<script src="trace_combat.js?v=47"></script>
 <!-- LA MISE À JOUR AUTOMATIQUE. Juste après la trace, parce qu'elle a besoin du
      numéro de version qu'elle y trouve, et avant tout le reste : si la page est
      périmée, autant s'en apercevoir avant d'avoir chargé le jeu entier.
@@ -1944,14 +1952,14 @@
 <script type="module" src="regime_cerveau.js?v=29"></script>
 <script type="module" src="ia_master.js?v=6"></script>
 <script type="module" src="app.js?v=60"></script>
-<script type="module" src="creation_personnage.js?v=8"></script>
+<script type="module" src="creation_personnage.js?v=9"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=33"></script>
 <!-- Le plateau porte désormais son ?v= comme les autres : sans lui, un iPad
      gardait l'ancien dessin en cache après une livraison (l'œil d'or en dépend). -->
 <script src="Plateau.js?v=3"></script>
 <script type="module" src="sequence_tour.js?v=23"></script>
-<script type="module" src="combat.js?v=100"></script>
+<script type="module" src="combat.js?v=101"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=27"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
@@ -1962,7 +1970,7 @@
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=10"></script>
 <script type="module" src="objets_ia.js?v=10"></script>
-<script type="module" src="loot.js?v=16"></script>
+<script type="module" src="loot.js?v=17"></script>
 
 <!-- ============================================================= -->
 <!--  GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)  -->

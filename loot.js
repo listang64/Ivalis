@@ -962,6 +962,8 @@ window.fermerButinLocalement = function() {
         || window.signatureEtapeButin((window.PARTIE_DATA || {}).Butin);
     const fenetre = document.getElementById("fenetre-butin");
     if (fenetre) fenetre.style.display = "none";
+    // La coupe apparaît : c'est par elle qu'on revient.
+    if (typeof window.actualiserCoupeButin === "function") window.actualiserCoupeButin();
 };
 
 // La touche Échap et un clic sur le fond sombre ferment aussi : trois sorties
@@ -1110,6 +1112,69 @@ window.afficherFenetreButin = function(butin) {
 // lui-même dans le onclick, pour ne pas avoir à échapper des guillemets et des
 // apostrophes de noms d'objets dans un attribut HTML.
 window.OBJETS_DETAIL_BUTIN = [];
+
+// =========================================================================
+//  LA COUPE : REVENIR AU BUTIN QU'ON A QUITTÉ
+// =========================================================================
+//  Demande de Nico : « quand le combat est gagné, mets une coupe sur le côté
+//  gauche de l'écran ; un clic ramène aux fenêtres de butin en cours — si on
+//  les quitte sans faire exprès, on peut y revenir. » La croix, Échap et un
+//  clic sur le fond referment la fenêtre pour ce poste seulement (le butin
+//  reste en base) ; seul un nouvel événement la rouvrait. La coupe se montre
+//  dès que le combat est gagné et qu'un butin est encore ouvert, tant que sa
+//  fenêtre n'est pas à l'écran ; un clic lève le masquage local et la rouvre
+//  sur l'étape en cours.
+window.butinARetrouver = function(butin) {
+    if (!butin || !butin.ouvert) return false;
+    if (document.getElementById("fenetre-combat")?.style.display !== "block") return false;
+    if (typeof window.combatGagne === "function" && !window.combatGagne()) return false;
+    const fenetre = document.getElementById("fenetre-butin");
+    return !fenetre || fenetre.style.display === "none";
+};
+
+window.actualiserCoupeButin = function(butin) {
+    if (typeof document === "undefined") return;
+    const b = butin !== undefined ? butin : ((window.PARTIE_DATA || {}).Butin || null);
+    let coupe = document.getElementById("coupe-butin");
+    const montrer = window.butinARetrouver(b);
+    if (!coupe) {
+        if (!montrer) return;
+        const hote = document.getElementById("fenetre-combat");
+        if (!hote) return;
+        coupe = document.createElement("button");
+        coupe.id = "coupe-butin";
+        coupe.type = "button";
+        coupe.title = "Revenir au butin";
+        coupe.setAttribute("aria-label", "Revenir au butin");
+        coupe.textContent = "🏆";
+        // Centrée par calc(), pas par transform : l'animation de lévitation
+        // réécrit transform et la décalerait.
+        coupe.style.cssText = "position: absolute; left: 18px; top: calc(45% - 32px);"
+            + " z-index: 1500; width: 64px; height: 64px; border-radius: 50%; cursor: pointer;"
+            + " font-size: 36px; line-height: 1; padding: 0; color: #ffd700;"
+            + " background: radial-gradient(circle, #3a2a12 0%, #1a1208 100%);"
+            + " border: 2px solid #c2a878; box-shadow: 0 0 18px rgba(255, 215, 0, 0.55), 0 4px 10px rgba(0,0,0,0.8);"
+            + " animation: levitation 3s infinite alternate ease-in-out;";
+        coupe.onclick = () => window.rouvrirButin();
+        hote.appendChild(coupe);
+    }
+    coupe.style.display = montrer ? "block" : "none";
+};
+
+window.rouvrirButin = function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    window.BUTIN_MASQUE_LOCALEMENT = null;
+    window.afficherFenetreButin((window.PARTIE_DATA || {}).Butin || null);
+};
+
+// Toute mise à jour de la fenêtre de butin met la coupe à jour dans la foulée.
+{
+    const afficherSansCoupe = window.afficherFenetreButin;
+    window.afficherFenetreButin = function(butin) {
+        try { return afficherSansCoupe(butin); }
+        finally { try { window.actualiserCoupeButin(butin); } catch (e) {} }
+    };
+}
 
 window.afficherEquipementActuelButin = function(mesPersonnages) {
     const conteneur = document.getElementById("butin-equipement-actuel");

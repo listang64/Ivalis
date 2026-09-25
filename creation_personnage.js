@@ -3,7 +3,7 @@
 // =========================================================================
 
 import { db } from "./firebase-config.js?v=2";
-import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { doc, getDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 window.RACE_SELECTIONNEE_TEMP = "Humain"; // Par défaut
 
@@ -519,5 +519,40 @@ window.appliquerModificateursDev = async function() {
         alert("Échec de l'altération des stats.");
         btn.innerText = txtOriginal;
         btn.style.pointerEvents = "auto";
+    }
+};
+
+// RÉINITIALISER LES CARACTÉRISTIQUES (onglet DEV, demande de Nico).
+//
+// Les caractéristiques vivent dans leur propre document (Caracteristiques/<id>).
+// Le retirer remet le héros exactement où il était avant sa répartition de
+// points : la fiche repropose « Créer les caractéristiques », avec les points
+// de départ au complet — et cette création réécrit elle-même ce qui en découle
+// sur la fiche (PV max, objets portables). Les caches qui gardent les valeurs
+// (celui de la fiche, celui de la partie) sont vidés avec.
+window.reinitialiserCaracsDev = async function() {
+    const idPersonnage = document.getElementById("champ-id-personnage").value;
+    if (!idPersonnage) {
+        alert("Ouvrez d'abord la fiche d'un héros existant.");
+        return;
+    }
+    const nom = (document.getElementById("champ-nom") || {}).value || "ce héros";
+    if (!confirm(`Réinitialiser les caractéristiques de ${nom} ? Il faudra les répartir à nouveau.`)) return;
+
+    const btn = document.getElementById("btn-dev-reinit-caracs");
+    const txtOriginal = btn ? btn.innerText : "";
+    if (btn) { btn.innerText = "Réinitialisation..."; btn.style.pointerEvents = "none"; }
+    try {
+        await deleteDoc(doc(db, "Caracteristiques", idPersonnage));
+        try { localStorage.removeItem("ivalis_caracs_" + idPersonnage); } catch (e) {}
+        if (window.CARACS_PARTIE) delete window.CARACS_PARTIE[idPersonnage];
+        if (typeof window.chargerCaracteristiques === "function") await window.chargerCaracteristiques(idPersonnage);
+        if (btn) btn.innerText = "Caractéristiques réinitialisées ✔️";
+    } catch (e) {
+        console.error("Réinitialisation des caractéristiques :", e);
+        alert("Échec de la réinitialisation des caractéristiques.");
+        if (btn) btn.innerText = txtOriginal;
+    } finally {
+        if (btn) setTimeout(() => { btn.innerText = txtOriginal; btn.style.pointerEvents = "auto"; }, 2000);
     }
 };
