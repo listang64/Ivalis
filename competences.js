@@ -544,8 +544,11 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
 
                 if (!isSelected && !isPlayer) continue;
 
-                const x = cx + hexRadius * Math.sqrt(3) * (q + r / 2.0);
-                const y = cy + hexRadius * 3.0 / 2.0 * r;
+                // MÊME GÉOMÉTRIE QUE LA MAP DE COMBAT (Plateau.js, hexToPixel) :
+                // hexagones à bord plat en haut. La zone dessinée ici a donc
+                // exactement la forme qu'elle aura sur le plateau.
+                const x = cx + hexRadius * 1.5 * q;
+                const y = cy + hexRadius * Math.sqrt(3) * (r + q / 2.0);
 
                 let fillColor = "rgba(255, 76, 76, 0.8)";
                 if (isPlayer && !isSelected) {
@@ -554,7 +557,7 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
 
                 let points = "";
                 for(let i=0; i<6; i++) {
-                    let angle = Math.PI / 3 * i - Math.PI / 6;
+                    let angle = Math.PI / 3 * i;          // coins à 0°, 60°… : bord plat en haut
                     let px = x + hexRadius * Math.cos(angle);
                     let py = y + hexRadius * Math.sin(angle);
                     points += `${px},${py} `;
@@ -1535,8 +1538,11 @@ window.dessinerGrilleZone = function() {
             const isPlayer = isCenter && !hasDist;
             const isSelected = window.forgeState.selectedZoneHexes.some(h => h.q === q && h.r === r);
 
-            const x = cx + hexRadius * Math.sqrt(3) * (q + r / 2.0);
-            const y = cy + hexRadius * 3.0 / 2.0 * r;
+            // MÊME GÉOMÉTRIE QUE LA MAP DE COMBAT (Plateau.js, hexToPixel) :
+            // hexagones à bord plat en haut. On choisit la zone sur la forme
+            // exacte qu'elle aura sur le plateau.
+            const x = cx + hexRadius * 1.5 * q;
+            const y = cy + hexRadius * Math.sqrt(3) * (r + q / 2.0);
 
             let fillColor = "transparent";
             if (isPlayer) fillColor = "gray";
@@ -1547,7 +1553,7 @@ window.dessinerGrilleZone = function() {
             
             let points = "";
             for(let i=0; i<6; i++) {
-                let angle = Math.PI / 3 * i - Math.PI / 6;
+                let angle = Math.PI / 3 * i;          // coins à 0°, 60°… : bord plat en haut
                 points += `${x + hexRadius * Math.cos(angle)},${y + hexRadius * Math.sin(angle)} `;
             }
             

@@ -139,6 +139,9 @@ node traction_en_tete.mjs    # Traction écrite avant l'attaque : on vise à 3 c
 node initiative_hors_effets.mjs  # Contre, Aveuglement, Brûlure, Poison, Glacé, Électrifié, Peur, Confusion ne retardent pas la carte
 node traction_monstres.mjs   # pas de Traction sur une technique de monstre qui frappe au contact
 node cerveau_destitue.mjs    # un cerveau qui a perdu le réseau n'écrase plus ce que le nouveau cerveau a publié
+node ia_opportunites.mjs     # les créatures ne prennent plus d'attaque d'opportunité pour rien
+node tir_monstre_contact.mjs # une créature qui tire au contact perd 30 % (portée = mod Distance)
+node zones_geometrie.mjs     # les zones des sorts ont la forme des hexagones de la map
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -3077,3 +3080,53 @@ L'erreur `400 … documents:commit … failed-precondition` sur `Verrou_IA` dans
 même trace est autre chose, et sans gravité : c'est la réclamation du verrou de
 préparation des créatures qui a perdu la course contre un autre poste ; la
 transaction se relance d'elle-même (monstres_ia.js, `reclamerVerrouIA`).
+
+### Zones à la forme de la map, créatures plus fines, opportunité propre, triche +1
+
+**Les zones ont la forme des hexagones de la map.** La map (Plateau.js,
+`hexToPixel`) pose des hexagones à bord plat en haut ; la carte en grand et le
+choix de zone de la Forge (competences.js) et l'encart du tour
+(`dessinZoneCarte`, combat.js) les dessinaient pointe en haut, avec l'autre
+formule axiale : mêmes coordonnées, autre dessin. Les trois utilisent
+désormais la formule de la map. `zones_geometrie.mjs` compare, sur la vraie
+page, chaque hexagone dessiné au `hexToPixel` de la map (6 morsures).
+
+**Pas d'Étalement des dégâts chez les créatures.** `effetAutorise` le refuse
+toujours, et le patron « etalement » quitte les plans des archetypes (remplacé
+par une frappe ou un état). `traction_monstres.mjs` (section 3) : 0 carte étalée
+sur 1656 (194 avant).
+
+**L'attaque d'opportunité : « -7 undefined ».** Le pont passait `montant` à
+`jouerAnimationOpportunite`, qui lisait `degats` ; et l'étape de dégâts qui suit
+affichait déjà « -7 ⚔️ ». L'annonce ne fait plus que l'annonce
+(`annonceSeule`), et part enfin du bon pion (`attaquant`, pas `acteur`). Pas de
+critique possible : `resoudreOpportunite` ne tire aucun dé de critique
+(`mouvement_pur.mjs` le vérifie à 100 % de critique). Le « -7 » vu à la table
+est bien 8 réduit par l'armure de la cible.
+
+**Les créatures ne prennent plus d'attaque d'opportunité pour rien.**
+`choisirPosition` (ia_pure.js) ne comparait que le NOMBRE d'ennemis au contact au
+départ et à l'arrivée : ni le héros longé puis quitté en chemin, ni l'adversaire
+lâché pour en coller un autre n'étaient vus, et une brute les ignorait tout à
+fait. Désormais `opportunitesSurLeChemin` les compte pas à pas comme le moteur,
+`casesAccessibles` garde pour chaque case le chemin qui en déclenche le moins,
+et chacune coûte au moins `EVITE_AO_MINIMUM` (0,6) à tout caractère.
+`ia_opportunites.mjs` : compte identique au moteur sur 2783 chemins, et 0
+attaque « pour rien » sur 1080 situations (40 avec le plancher à zéro).
+
+**Le malus de tir au contact des créatures : vérifié.** `tir_monstre_contact.mjs`
+prépare une carte de créature comme le cerveau (vrai moteur_effets.js, grimoire
+réel) : avec Distance, elle perd 30 % au contact. Découverte au passage : l'arc
+d'un archer ne donne AUCUNE portée à une créature (la portée d'arme vient de
+l'équipement porté) — sans Distance, sa carte est une attaque de contact. La
+règle « pas de Traction au contact » ne fait donc plus d'exception pour les
+archers.
+
+**Les résistances et les états : vérifié.** La chance d'un état ne dépend que de
+la carte (et du bonus des créatures) ; l'armure et les résistances ne jouent que
+sur les dégâts. `moteur_pur.mjs` (section 30) : 100 % de résistances, mêmes
+états posés jet pour jet sur 200 graines.
+
+**La triche des créatures, +1 partout** (demande de Nico) : Petit 1, Normal 2,
+Élite 3, Boss 4 (`TABLE_BONUS_MONSTRE`, moteur_pur.js). `moteur_pur.mjs`
+(section 14) suit.

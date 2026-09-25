@@ -25,7 +25,7 @@
 
 import { combattant } from './combat_etat.js';
 import { aLEtat, ligneDeVue, estDansLeNoir } from './moteur_pur.js';
-import { distance, voisinsDe, occupantVivant, coutDuPas, cheminsDeRepli } from './mouvement_pur.js';
+import { distance, voisinsDe, occupantVivant, coutDuPas, cheminsDeRepli, ennemisAuContact } from './mouvement_pur.js';
 
 const nombre = (v, defaut = 0) => {
     const n = parseInt(v);
@@ -54,6 +54,10 @@ export const PERSONNALITES = {
 };
 
 export const traitsDe = (c) => PERSONNALITES[c && c.personnalite] || PERSONNALITES.brutal;
+
+// Le prix plancher d'une attaque d'opportunité, quel que soit le caractère.
+// À zéro, une brute s'en prenait une pour gagner un point de hasard.
+export const EVITE_AO_MINIMUM = 0.6;
 
 // La part d'imprévu, tirée des dés de l'état : centrée sur zéro, d'amplitude
 // choisie. C'est elle qui empêche deux tours identiques de se ressembler.
@@ -132,32 +136,67 @@ export function ennemiLePlusProche(etat, id) {
 const PLAINE = { etatCase: () => ({ bloquee: false, supprimee: false, difficile: false }) };
 export const PAS_MAX_CREATURE = 3;
 
+// LES ATTAQUES D'OPPORTUNITÉ QU'UN CHEMIN DÉCLENCHE, comptées EXACTEMENT comme
+// le moteur les déclenche (resoudreMouvement, mouvement_pur.js) : à chaque pas,
+// chaque ennemi qui était au contact et ne l'est plus frappe. L'IA comparait
+// seulement le nombre d'ennemis au contact au départ et à l'arrivée : elle ne
+// voyait ni le héros qu'on longe en chemin puis qu'on quitte, ni l'adversaire
+// qu'on lâche pour en coller un autre (un contre un, « rien ne change »). Les
+// créatures déclenchaient donc des attaques d'opportunité sans raison.
+export function opportunitesSurLeChemin(etat, id, chemin) {
+    const moi = combattant(etat, id);
+    if (!moi || moi.q === null) return 0;
+    let avant = new Set(ennemisAuContact(etat, id, { q: moi.q, r: moi.r }));
+    let n = 0;
+    for (const pas of (chemin || [])) {
+        const apres = new Set(ennemisAuContact(etat, id, pas));
+        avant.forEach(e => { if (!apres.has(e)) n++; });
+        avant = apres;
+    }
+    return n;
+}
+
+// Toutes les cases atteignables en `pasMax` pas, et pour chacune LE MEILLEUR
+// CHEMIN : celui qui déclenche le moins d'attaques d'opportunité, puis le plus
+// court. Le premier chemin trouvé (un parcours en largeur) frôlait volontiers
+// un héros alors qu'un détour de même longueur l'évitait. Trois pas au plus :
+// quelques centaines de chemins, rien du tout à énumérer.
 export function casesAccessibles(etat, id, plateau, pasMax = PAS_MAX_CREATURE) {
     const moi = combattant(etat, id);
     if (!moi || moi.q === null) return [];
     const carte = plateau || PLAINE;
 
     const cle = (h) => `${h.q},${h.r}`;
-    const depart = { q: moi.q, r: moi.r, chemin: [] };
-    const vues = new Map([[cle(depart), depart]]);
-    let frontiere = [depart];
+    const contact = new Map();
+    const contactDe = (h) => {
+        const k = cle(h);
+        if (!contact.has(k)) contact.set(k, new Set(ennemisAuContact(etat, id, h)));
+        return contact.get(k);
+    };
+    const depart = { q: moi.q, r: moi.r, chemin: [], ao: 0 };
+    const meilleurs = new Map([[cle(depart), depart]]);
+    const meilleur = (a, b) => a.ao !== b.ao ? a.ao < b.ao : a.chemin.length < b.chemin.length;
 
-    for (let pas = 0; pas < pasMax; pas++) {
-        const suivante = [];
-        frontiere.forEach(courante => {
-            voisinsDe(courante).forEach(v => {
-                if (vues.has(cle(v))) return;
-                const etatCase = carte.etatCase(v.q, v.r) || {};
-                if (etatCase.bloquee || etatCase.supprimee) return;
-                if (occupantVivant(etat, v.q, v.r, id)) return;
-                const noeud = { q: v.q, r: v.r, chemin: [...courante.chemin, { q: v.q, r: v.r }] };
-                vues.set(cle(v), noeud);
-                suivante.push(noeud);
-            });
+    const explorer = (courante, visites) => {
+        if (courante.chemin.length >= pasMax) return;
+        voisinsDe(courante).forEach(v => {
+            const k = cle(v);
+            if (visites.has(k)) return;
+            const etatCase = carte.etatCase(v.q, v.r) || {};
+            if (etatCase.bloquee || etatCase.supprimee) return;
+            if (occupantVivant(etat, v.q, v.r, id)) return;
+            const quittes = [...contactDe(courante)].filter(e => !contactDe(v).has(e)).length;
+            const noeud = { q: v.q, r: v.r, chemin: [...courante.chemin, { q: v.q, r: v.r }],
+                            ao: courante.ao + quittes };
+            const connu = meilleurs.get(k);
+            if (!connu || meilleur(noeud, connu)) meilleurs.set(k, noeud);
+            visites.add(k);
+            explorer(noeud, visites);
+            visites.delete(k);
         });
-        frontiere = suivante;
-    }
-    return [...vues.values()];
+    };
+    explorer(depart, new Set([cle(depart)]));
+    return [...meilleurs.values()];
 }
 
 // =========================================================================
@@ -242,7 +281,6 @@ export function choisirPosition(etat, id, cible, infosCarte, plateau, des) {
     // L'énergie réellement disponible pour marcher : la carte est payée d'abord.
     // Sans cette réserve, la créature arrive à portée sans pouvoir frapper.
     const budget = Math.max(0, moi.fatigue - nombre(infos.fatigue));
-    const contactDepart = ennemisAuContactDepuis(etat, moi.q, moi.r, moi.camp);
     const portee = nombre(infos.portee, 1);
 
     // CARTE DE ZONE AU CORPS-À-CORPS : l'emprise est centrée sur la créature,
@@ -305,11 +343,12 @@ export function choisirPosition(etat, id, cible, infosCarte, plateau, des) {
         score -= t.peurZones * dangerDeLaCase(etat, c.q, c.r) * 45;
         c.chemin.forEach(step => { score -= t.peurZones * dangerDeLaCase(etat, step.q, step.r) * 8; });
 
-        // Quitter un corps-à-corps se paie en attaques d'opportunité.
+        // Chaque attaque d'opportunité que le CHEMIN déclenche se paie — même
+        // pour une brute, qui ne fait que les redouter moins : elle en encaisse
+        // une pour atteindre sa proie, jamais pour rien.
         const contactArrivee = ennemisAuContactDepuis(etat, c.q, c.r, moi.camp);
-        if (contactDepart > 0 && contactArrivee < contactDepart) {
-            score -= t.eviteAO * (contactDepart - contactArrivee) * 12;
-        }
+        const ao = c.ao !== undefined ? c.ao : opportunitesSurLeChemin(etat, id, c.chemin);
+        if (ao > 0) score -= Math.max(t.eviteAO, EVITE_AO_MINIMUM) * ao * 12;
         // Un combattant à distance cherche à se dégager ; un bagarreur veut le
         // contact. Le même trait, lu dans les deux sens.
         if (portee > 1 && contactArrivee > 0) score -= t.tientDistance * 10;

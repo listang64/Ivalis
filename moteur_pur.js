@@ -495,8 +495,9 @@ export function tirerCritique(etat, idLanceur, des) {
 // sans qu'aucune règle de fiche ne l'explique — c'est délibéré, pour que le
 // combat reste dur sans multiplier les points de vie des monstres. Nico l'a
 // posé comme un réglage provisoire ; s'il change, ce tableau est le seul
-// endroit à toucher. (Revu par Nico : 0 / 1 / 2 / 3, au lieu de 3 / 4 / 5 / 6.)
-const TABLE_BONUS_MONSTRE = { "Petit": 0, "Normal": 1, "Élite": 2, "Boss": 3 };
+// endroit à toucher. (Revu par Nico : 0 / 1 / 2 / 3, au lieu de 3 / 4 / 5 / 6 ;
+// puis +1 partout : 1 / 2 / 3 / 4.)
+const TABLE_BONUS_MONSTRE = { "Petit": 1, "Normal": 2, "Élite": 3, "Boss": 4 };
 
 export function bonusMonstreDe(c) {
     if (!c || !c.estMonstre) return 0;

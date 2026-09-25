@@ -375,6 +375,16 @@ console.log("\n4. LE SOIN, LE DRAIN ET LE CRITIQUE ONT CHACUN LEUR LANGAGE");
     const opp = misEnScene({ type: "degats", cible: "H1", montant: 10,
                              opportunite: true, pvApres: 20 }, etat);
     verifier("une attaque d'opportunité aussi", /⚔️/.test(opp.texte), opp.texte);
+    verifier("et elle n'est jamais critique", !opp.critique && !/!/.test(opp.texte));
+
+    // L'ÉTAPE « opportunite » TELLE QUE LE NOYAU L'ÉCRIT (resoudreOpportunite :
+    // `attaquant`, pas `acteur`). À la table : « -7 undefined ». Le pont passait
+    // `montant` à une animation qui lisait `degats`, et le chiffre se doublait
+    // avec celui de l'étape de dégâts qui suit.
+    const coup = misEnScene({ type: "opportunite", attaquant: "M1", cible: "H1", evitee: false,
+                              mot: "", montant: 7, hex: { q: 0, r: -1 } }, etat);
+    verifier("l'annonce part bien du pion qui frappe", coup.pion === "M1", String(coup.pion));
+    verifier("et elle n'affiche QUE l'annonce (le chiffre est à l'étape de dégâts)", coup.annonceSeule === true);
 }
 
 // =========================================================================

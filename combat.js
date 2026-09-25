@@ -4802,13 +4802,16 @@ window.dessinZoneCarte = function(dataCarte, couleur, rayonHex) {
             const estPrise = hexesZone.some(h => h.q === q && h.r === r);
             if (!estPrise && !estLanceur) continue;
 
-            const x = rayon * Math.sqrt(3) * (q + r / 2.0);
-            const y = rayon * 1.5 * r;
+            // MÊME GÉOMÉTRIE QUE LA MAP DE COMBAT (Plateau.js, hexToPixel) :
+            // hexagones à bord plat en haut, pour que la zone annoncée ait la
+            // forme de celle qui tombera sur le plateau.
+            const x = rayon * 1.5 * q;
+            const y = rayon * Math.sqrt(3) * (r + q / 2.0);
             const remplissage = (estLanceur && !estPrise) ? "rgba(160, 160, 160, 0.75)" : couleur;
 
             let points = "";
             for (let i = 0; i < 6; i++) {
-                const angle = Math.PI / 3 * i - Math.PI / 6;
+                const angle = Math.PI / 3 * i;   // coins à 0°, 60°… : bord plat en haut
                 const px = x + rayon * Math.cos(angle);
                 const py = y + rayon * Math.sin(angle);
                 points += `${px.toFixed(1)},${py.toFixed(1)} `;

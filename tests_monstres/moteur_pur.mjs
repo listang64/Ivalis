@@ -500,7 +500,7 @@ console.log("\n13. LA DISTANCE, ET LE MALUS DE BOUT PORTANT EN SITUATION");
 // =========================================================================
 console.log("\n14. LA TRICHE DES CRÉATURES : UN BONUS SELON LA STATURE");
 // =========================================================================
-//  Petit +0, Normal +1, Élite +2, Boss +3, sur ce qu'une créature inflige ET
+//  Petit +1, Normal +2, Élite +3, Boss +4 (+1 partout, demande de Nico), sur ce qu'une créature inflige ET
 //  sur ce qu'elle soigne — jamais sur un héros, jamais sur un gain de
 //  bouclier. C'est un réglage brut, posé comme tel : le tableau est le seul
 //  endroit à toucher s'il change.
@@ -508,27 +508,27 @@ console.log("\n14. LA TRICHE DES CRÉATURES : UN BONUS SELON LA STATURE");
     verifier("un héros n'a droit à rien", bonusMonstreDe({ estMonstre: false, palier: "Boss" }) === 0);
     verifier("une créature sans palier connu non plus",
              bonusMonstreDe({ estMonstre: true, palier: "" }) === 0);
-    verifier("Petit vaut +0", bonusMonstreDe({ estMonstre: true, palier: "Petit" }) === 0);
-    verifier("Normal vaut +1", bonusMonstreDe({ estMonstre: true, palier: "Normal" }) === 1);
-    verifier("Élite vaut +2", bonusMonstreDe({ estMonstre: true, palier: "Élite" }) === 2);
-    verifier("Boss vaut +3", bonusMonstreDe({ estMonstre: true, palier: "Boss" }) === 3);
+    verifier("Petit vaut +1", bonusMonstreDe({ estMonstre: true, palier: "Petit" }) === 1);
+    verifier("Normal vaut +2", bonusMonstreDe({ estMonstre: true, palier: "Normal" }) === 2);
+    verifier("Élite vaut +3", bonusMonstreDe({ estMonstre: true, palier: "Élite" }) === 3);
+    verifier("Boss vaut +4", bonusMonstreDe({ estMonstre: true, palier: "Boss" }) === 4);
 
     // Le vrai chemin : une goule (M1) devenue Élite, sur une vraie carte.
     let etat = neuf();
     etat.combattants.M1.palier = "Élite";
 
-    // DÉGÂTS : 20 de brut + 2 de triche = 22, contre une cible sans défense.
+    // DÉGÂTS : 20 de brut + 3 de triche = 23, contre une cible sans défense.
     const coup = resoudreCarte(etat, frappe("H1", 20));
     verifier("le bonus s'ajoute au brut, AVANT les résistances",
-             coup.etat.combattants.H1.pv === 38, `(${coup.etat.combattants.H1.pv})`);
+             coup.etat.combattants.H1.pv === 37, `(${coup.etat.combattants.H1.pv})`);
 
     // Et il traverse la résistance comme un dégât ordinaire : H2 a 25 % de
-    // résistance physique — (20+2) × 0.75 = 16.5, arrondi à 17.
+    // résistance physique — (20+3) × 0.75 = 17.25, arrondi à 17.
     const coupBlinde = resoudreCarte(etat, frappe("H2", 20));
     verifier("il n'ignore pas l'armure pour autant",
              coupBlinde.etat.combattants.H2.pv === 33, `(${coupBlinde.etat.combattants.H2.pv})`);
 
-    // SOIN : une Élite qui soigne un allié ajoute aussi ses +2. Elle part de
+    // SOIN : une Élite qui soigne un allié ajoute aussi ses +3. Elle part de
     // 40 PV : assez loin de son maximum pour que le plafond ne cache rien.
     etat.combattants.M1.pv = 40;
     const soigneuse = resoudreCarte(etat, {
@@ -537,7 +537,7 @@ console.log("\n14. LA TRICHE DES CRÉATURES : UN BONUS SELON LA STATURE");
         jets: { parCible: { M1: { esquive: false, etats: {} } } }
     });
     verifier("le soin d'une créature profite aussi du bonus",
-             soigneuse.etat.combattants.M1.pv === 52, `(${soigneuse.etat.combattants.M1.pv})`);
+             soigneuse.etat.combattants.M1.pv === 53, `(${soigneuse.etat.combattants.M1.pv})`);
 
     // BOUCLIER : ni dégât ni soin — pas de triche dessus.
     const bouclier = resoudreCarte(etat, {
@@ -674,9 +674,9 @@ console.log("\n17. LA TRICHE DES CRÉATURES ET L'IMMUNITÉ VIVENT CHACUNE LEUR V
         } }
     };
     const r = resoudreCarte(etat, carte);
-    // 10 de brut + 3 de triche (Boss) contre H1, sans défense : 13.
+    // 10 de brut + 4 de triche (Boss) contre H1, sans défense : 14.
     verifier("le Boss inflige toujours son bonus de dégâts",
-             r.etat.combattants.H1.pv === 47, `(${r.etat.combattants.H1.pv})`);
+             r.etat.combattants.H1.pv === 46, `(${r.etat.combattants.H1.pv})`);
     verifier("et H2 reste immunisé à l'Étourdi malgré le Boss qui frappe ailleurs",
              !r.etat.combattants.H2.etats.some(e => e.nom === "Étourdi"),
              JSON.stringify(r.etat.combattants.H2.etats));
@@ -965,6 +965,30 @@ console.log("\n23. LE JET DE PERCÉE D'ARMURE VOYAGE AVEC LES AUTRES DÉS DE LA 
     const jetsSansArme = tirerDesCarte(sansPercee, plan, "H2", false, desFixe([99]));
     verifier("une arme sans percée ne tire aucun jet inutile",
              !jetsSansArme.parCible.H1.equip || jetsSansArme.parCible.H1.equip.ignoreArmure === undefined);
+}
+
+// =========================================================================
+console.log("\n30. LES RÉSISTANCES NE PROTÈGENT PAS D'UN ÉTAT");
+// =========================================================================
+//  Demande de vérification de Nico : l'armure et les résistances réduisent
+//  des DÉGÂTS, jamais la chance de poser un empoisonnement, une brûlure… La
+//  chance vient de la carte (et de la triche des créatures), point.
+{
+    const plan = { attaques: [], alterations: ["Empoisonnement", "Brûlé", "Glacé", "Étourdi", "Peur"]
+        .map(nom => ({ nom, chance: 40, duree: 2, cibles: ["H1"] })) };
+    let nu = neuf(), blinde = neuf();
+    nu.combattants.H1.def = { ...nu.combattants.H1.def, physique: 0, magique: 0, esquive: 0, parade: 0 };
+    blinde.combattants.H1.def = { ...blinde.combattants.H1.def, physique: 100, magique: 100, esquive: 0, parade: 0 };
+    let identiques = 0, poses = 0;
+    for (let g = 1; g <= 200; g++) {
+        const a = tirerDesCarte(nu, plan, "H2", false, creerDes(g)).parCible.H1.etats;
+        const b = tirerDesCarte(blinde, plan, "H2", false, creerDes(g)).parCible.H1.etats;
+        if (JSON.stringify(a) === JSON.stringify(b)) identiques++;
+        poses += Object.values(b).filter(Boolean).length;
+    }
+    verifier("100 % de résistances : les mêmes états passent, jet pour jet (200 graines)",
+             identiques === 200, `${identiques}/200`);
+    verifier("et ils passent bien (≈ 40 % de 1000 jets)", poses > 300 && poses < 500, String(poses));
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

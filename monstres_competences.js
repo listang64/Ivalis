@@ -56,13 +56,15 @@ const ARME_PAR_ARCHETYPE = {
 
 // Combien de cartes de chaque patron on cherche à obtenir, par archetype.
 // L'ordre n'a pas d'importance : les patrons sont tirés puis mélangés.
+// 🧟 Pas de patron « etalement » (règle de Nico) : les créatures ne font
+// jamais d'étalement des dégâts. Sa place revient à une frappe ou un état.
 const PATRONS_PAR_ARCHETYPE = {
-    "DPS CAC":           ["brute", "frappe", "etat", "etalement", "zone", "controle"],
+    "DPS CAC":           ["brute", "frappe", "etat", "frappe", "zone", "controle"],
     "TANK CAC":          ["brute", "frappe", "controle", "soutien", "etat", "zone"],
     "SOUTIEN":           ["soutien", "soutien", "etat", "frappe", "zone", "brute"],
-    "DPS MAGE CAC":      ["brute", "frappe", "etat", "zone", "persistance", "etalement"],
-    "DPS DISTANCE":      ["brute", "frappe", "etat", "zone", "etalement", "controle"],
-    "DPS MAGE DISTANCE": ["brute", "frappe", "zone", "persistance", "etat", "etalement"]
+    "DPS MAGE CAC":      ["brute", "frappe", "etat", "zone", "persistance", "etat"],
+    "DPS DISTANCE":      ["brute", "frappe", "etat", "zone", "frappe", "controle"],
+    "DPS MAGE DISTANCE": ["brute", "frappe", "zone", "persistance", "etat", "frappe"]
 };
 
 // Quelle PART de la tranche part dans le socle lui-même (l'attaque, ou le soin
@@ -524,10 +526,9 @@ function effetAutorise(chantier, effet, commeMod) {
     // L'empoisonnement a besoin d'une source de dégâts pour exister.
     if (nom.includes("poison") && !chantierAUneAttaque(chantier)) return false;
 
-    // Étalement des dégâts coupe en deux les dégâts d'une attaque : sans attaque
-    // sur la carte, il n'y a rien à étaler.
-    if ((nom.trim() === "dot" || nom.includes("étalement") || nom.includes("etalement"))
-        && !chantierAUneAttaque(chantier)) return false;
+    // 🧟 PAS D'ÉTALEMENT DES DÉGÂTS CHEZ LES CRÉATURES (règle de Nico) : ni en
+    // patron, ni en remplissage, ni en socle. Un monstre frappe d'un coup.
+    if (nom.trim() === "dot" || nom.includes("étalement") || nom.includes("etalement")) return false;
 
     // Provocation force la cible à attaquer le lanceur : réservée aux joueurs,
     // un monstre ne peut jamais la lancer sur lui-même ni la poser sur un allié.
@@ -561,11 +562,13 @@ function effetAutorise(chantier, effet, commeMod) {
     if (estEtalement(nom) && chantierContientMotCle(chantier, "persistance")) return false;
 
     // 🧟 règle des monstres (Nico) : PAS DE TRACTION SUR UNE CARTE QUI FRAPPE
-    // AU CONTACT. Une carte « au contact » n'a ni Distance, ni une arme qui
-    // tire (l'arc d'un archer lui donne déjà sa portée). Dans les deux sens :
-    // pas de Traction si la carte frappe déjà au contact, pas d'attaque sur
-    // une carte au contact qui porte déjà une Traction.
-    const auContact = !chantierContientMotCle(chantier, "distance") && !/distance/i.test(chantier.arme || "");
+    // AU CONTACT. Une carte « au contact » n'a pas de Distance — l'arc d'un
+    // archer, lui, ne donne AUCUNE portée à une créature (la portée d'arme vient
+    // de l'équipement porté, qu'une créature n'a pas : voir porteeAvecArme,
+    // moteur_effets.js). Dans les deux sens : pas de Traction si la carte frappe
+    // déjà au contact, pas d'attaque sur une carte au contact qui porte déjà
+    // une Traction.
+    const auContact = !chantierContientMotCle(chantier, "distance");
     if (auContact && nom.includes("traction") && chantierAUneAttaque(chantier)) return false;
     if (auContact && estAttaqueDeBase(effet.Nom) && chantierContientMotCle(chantier, "traction")) return false;
 
@@ -1365,7 +1368,7 @@ window.genererCompetencesMonstre = async function(monstreBrut) {
     };
 
     const fatigueMaxMonstre = parseInt(monstre.fatigueMax) || 100;
-    const tousLesPatrons = ["brute", "frappe", "etat", "zone", "persistance", "etalement", "soutien", "controle"];
+    const tousLesPatrons = ["brute", "frappe", "etat", "zone", "persistance", "soutien", "controle"];
 
     // Un seul terrain persistant par créature. Le patron "persistance" n'est déjà
     // prévu qu'une fois dans le plan de chaque archetype, mais les essais de repli

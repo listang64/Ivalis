@@ -231,6 +231,11 @@ console.log("\n6. LE COUP D'OPPORTUNITÉ : HUIT DÉGÂTS PHYSIQUES FIXES, CONTRE
     const mage = clonerEtat(etat);
     mage.combattants.H1.def.magique = 50;
     verifier("la résistance magique ne le réduit pas", resoudreOpportunite(mage, "M1", "H1", creerDes(7)).montant === 8);
+    // JAMAIS DE CRITIQUE : même un attaquant à 100 % de critique frappe 8.
+    const fine = clonerEtat(etat);
+    fine.combattants.M1.def.critique = 100;
+    const rc = resoudreOpportunite(fine, "M1", "H1", creerDes(7));
+    verifier("jamais de critique, même à 100 % de critique", rc.montant === 8 && !rc.critique, JSON.stringify(rc));
 
     // Une cible qui esquive toujours ne le prend jamais.
     const agile = clonerEtat(etat);

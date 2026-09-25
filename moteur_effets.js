@@ -307,6 +307,10 @@ window.jouerAnimationOpportunite = async function(data) {
 
     window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "⚔️ Attaque d'opportunité !", "#ffaa00");
     await new Promise(r => setTimeout(r, 500));
+    // Sous le cerveau, le chiffre vient de l'étape de dégâts qui suit : ici,
+    // l'annonce seule, sinon « -7 » s'affichait deux fois.
+    if (data.annonceSeule) return;
+    if (data.degats === undefined) data = { ...data, degats: Number(data.montant) || 0 };
 
     if (data.dodged) {
         window.afficherMessageFlottantHex(tkCible.q, tkCible.r, data.motDef, "#cccccc");

@@ -234,8 +234,13 @@ const SCENES = {
             return { geste: "message", pion: e.cible, texte: e.mot || "Esquivé 💨",
                      couleur: COULEURS.neutre, duree: RYTHME.esquive };
         }
-        return { geste: "opportunite", pion: e.acteur, cible: e.cible, hex: e.hex,
-                 montant: nombre(e.montant) };
+        // L'ANNONCE SEULE. Le chiffre et la barre qui se vide viennent de
+        // l'étape « degats » qui suit (« -7 ⚔️ ») : les montrer ici aussi les
+        // doublait — et l'animation lisait `degats` là où on lui passait
+        // `montant`, d'où le « -undefined » vu à la table. L'attaquant s'appelle
+        // `attaquant` dans l'étape (resoudreOpportunite), pas `acteur`.
+        return { geste: "opportunite", pion: e.acteur || e.attaquant, cible: e.cible, hex: e.hex,
+                 montant: nombre(e.montant), annonceSeule: true };
     },
 
     // --- CE QUI CHANGE SANS BOUGER --------------------------------------
@@ -405,7 +410,8 @@ export function creerPont(effets) {
 
             case "opportunite":
                 await opportunite({ idAttaquant: scene.pion, idCible: scene.cible,
-                                    montant: scene.montant, hexPosition: scene.hex });
+                                    montant: scene.montant, degats: scene.montant,
+                                    annonceSeule: !!scene.annonceSeule, hexPosition: scene.hex });
                 break;
 
             case "chute":

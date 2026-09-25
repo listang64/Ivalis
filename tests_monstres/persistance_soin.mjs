@@ -174,9 +174,9 @@ console.log("\n7. LES MONSTRES NON PLUS NE MÉLANGENT PAS DOT ET PERSISTANCE");
              fenetre.__effetAutorise(chantier(["Durée étalement dégâts"]), effet("Persistance terrain"), true) === false);
     verifier("générateur : pas d'Étalement sur une carte déjà persistante",
              fenetre.__effetAutorise(chantier(["Persistance terrain"]), effet("Durée étalement dégâts"), true) === false);
-    verifier("générateur : sur une carte nue, les deux restent permis",
-             fenetre.__effetAutorise(chantier([]), effet("Persistance terrain"), true) !== false
-             && fenetre.__effetAutorise(chantier([]), effet("Durée étalement dégâts"), true) !== false);
+    // (L'Étalement, lui, est désormais refusé à toute créature : traction_monstres.mjs.)
+    verifier("générateur : sur une carte nue, la Persistance reste permise",
+             fenetre.__effetAutorise(chantier([]), effet("Persistance terrain"), true) !== false);
     let fautives = 0, cartes = 0;
     for (const archetype of ["DPS MAGE DISTANCE", "DPS MAGE CAC"]) {
         for (let i = 0; i < 15; i++) {
