@@ -1784,6 +1784,17 @@ window.rafraichirForge = function() {
         // L'action sur laquelle ce menu greffe ses sous-effets : certains ne
         // peuvent aller que sur une action qui frappe (voir l'Étalement).
         const actionCourante = window.forgeState.actions.find(a => a.idInst === actionId);
+        // Ce que la carte porte déjà, toutes actions confondues (socle ou sous-effet).
+        const nomsSurLaCarte = [];
+        window.forgeState.actions.forEach(act => {
+            nomsSurLaCarte.push(((act.baseEffet && act.baseEffet.Nom) || "").toLowerCase());
+            Object.keys(act.mods || {}).forEach(id => {
+                const eff = window.forgeState.effetsBDD.find(e => e.id === id);
+                if (eff) nomsSurLaCarte.push((eff.Nom || "").toLowerCase());
+            });
+        });
+        const carteADejaUnEtalement = nomsSurLaCarte.some(n => estUnModEtalement(n));
+        const carteADejaUnePersistance = nomsSurLaCarte.some(n => n.includes("persistance"));
 
         modsDispos.forEach(mod => {
             const isLocked = activeTags.size >= 2 && mod.Modificateur !== "AUCUN" && !activeTags.has(mod.Modificateur.toUpperCase());
@@ -1815,9 +1826,15 @@ window.rafraichirForge = function() {
                 // de nappe qui soigne au sol.
                 const estIncompatiblePersistanceSoin = nomModLower.includes("persistance")
                     && !!actionCourante && estUnSoinDeBase(actionCourante.baseEffet.Nom);
+                // PAS DE PERSISTANCE SUR UN DOT (règle de Nico) : des dégâts
+                // étalés ne se reposent pas en nappe au sol. La carte choisit
+                // l'un ou l'autre : l'Étalement grise la Persistance, et
+                // réciproquement, où qu'ils soient posés sur la carte.
+                const estIncompatiblePersistanceDot = (nomModLower.includes("persistance") && carteADejaUnEtalement)
+                    || (estUnModEtalement(nomModLower) && carteADejaUnePersistance);
                 groupesMods[carac].push(
                     (estIncompatiblePoussee || estIncompatibleIllusion || estIncompatiblePoison || estIncompatibleEtalement
-                     || estIncompatiblePersistanceSoin)
+                     || estIncompatiblePersistanceSoin || estIncompatiblePersistanceDot)
                         ? `<option value="${mod.id}" disabled style="color: #999;">${nettoyerNomEffet(mod.Nom)} (non compatible)</option>`
                         : `<option value="${mod.id}">${nettoyerNomEffet(mod.Nom)} (⚡ ${coutFatigue})</option>`
                 );

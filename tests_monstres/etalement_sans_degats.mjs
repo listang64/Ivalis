@@ -41,14 +41,24 @@ const debutBloc = src.indexOf('modsDispos.forEach(mod => {');
 const finBloc = src.indexOf('ORDRE_MODS.forEach(carac => {');
 if (debutBloc < 0 || finBloc < 0) throw new Error("bloc modsDispos.forEach introuvable");
 const SRC_BLOC = src.slice(debutBloc, finBloc);
+// Ce que la carte porte déjà (toutes actions confondues), lu juste avant le
+// bloc : c'est là que la Forge décide si l'Étalement et la Persistance se
+// croisent déjà sur la carte.
+const debutCarte = src.indexOf('        const nomsSurLaCarte = [];');
+if (debutCarte < 0 || debutCarte > debutBloc) throw new Error("inventaire de la carte introuvable avant le bloc");
+const SRC_CARTE = src.slice(debutCarte, debutBloc);
 if (!SRC_BLOC.includes('estIncompatibleEtalement')) {
     throw new Error("la protection étalement n'est plus dans le bloc extrait (repères à revoir)");
 }
 
 // Rejoue exactement l'environnement local que ce bloc trouve dans rafraichirForge.
 function optionsPour({ aDejaUneAttaque, aDejaUnSoin = false, estActionPoussee = false, estActionIllusion = false, mods,
-                      actionCourante = action("Attaque légère") }) {
+                      actionCourante = action("Attaque légère"), autres = [] }) {
     const groupesMods = {};
+    // La Forge telle que le menu la voit : l'action courante, les autres
+    // actions de la carte, et le grimoire (pour relire le nom des sous-effets).
+    const window = { forgeState: { actions: [actionCourante, ...autres].filter(Boolean),
+                                   effetsBDD: [...mods, ...autres.flatMap(a => a.effetsMods || [])] } };
     const activeTags = new Set();
     const NOMS_INCOMPATIBLES_POUSSEE = ["persistance terrain", "zone", "durée étalement dégâts"];
     const modsDispos = mods;
@@ -56,7 +66,7 @@ function optionsPour({ aDejaUneAttaque, aDejaUnSoin = false, estActionPoussee = 
     // ne fuient jamais vers l'appelant, mais restent visibles ENTRE ELLES à
     // l'intérieur d'un même bloc évalué.
     eval(SRC_PARSE + '\n' + SRC_NETTOIE + '\n' + SRC_ATTAQUE_FN + '\n'
-         + SRC_REGLES_ETALEMENT + '\n' + SRC_BLOC);
+         + SRC_REGLES_ETALEMENT + '\n' + SRC_CARTE + '\n' + SRC_BLOC);
     return Object.values(groupesMods).flat().join("");
 }
 

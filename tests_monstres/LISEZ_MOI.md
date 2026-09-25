@@ -134,7 +134,7 @@ node repli.mjs              # le Repli : frapper puis marcher 3 cases, 60 % d'é
 node bond_apres_attaque.mjs  # un Bond placé après l'attaque saute enfin (il part avec la carte)
 node aveuglement.mjs        # l'Aveuglement : 3 cases de noir fixes, ciblage interdit (sauf zones), brouillard chez l'aveuglé
 node equilibrage_base.mjs    # la vraie base : Contre physique / Absorption magique, plafonds de chance du grimoire
-node persistance_soin.mjs    # pas de Persistance terrain sur un soin (la Zone, oui) — Forge, moteur, monstres
+node persistance_soin.mjs    # pas de Persistance terrain sur un soin (la Zone, oui) ni sur une carte étalée (DOT) — Forge, moteur, monstres
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -2875,3 +2875,37 @@ générateur ; `zones_cerveau.mjs` (section 8) vérifie qu'un soin ne laisse pas
 nappe et qu'une carte attaque + soin ne garde au sol que ses dégâts. Morsures :
 l'ancienne Forge laisse la persistance sélectionnable, l'ancien noyau crée une
 nappe de soin.
+
+### Pas de Persistance terrain sur un DOT
+
+Nico, juste après : « Et fais aussi pas de persistance pour les dot. » Le DOT,
+c'est l'Étalement (le mod « Durée étalement dégâts », que la Forge appelle aussi
+DOT) : des dégâts qui ne tombent plus d'un coup mais en parts, une à chaque fin
+de manche. Les reposer en plus en nappe au sol faisait payer deux fois la même
+frappe, étalée dans le temps ET dans l'espace. Désormais une carte choisit :
+
+- **la Forge** (competences.js) : dès qu'un Étalement est posé quelque part sur
+  la carte, « Persistance terrain » apparaît grisée « (non compatible) » ; et
+  dans l'autre sens, dès qu'une Persistance est posée, l'Étalement (DOT) est
+  grisé. La règle regarde toute la carte, pas seulement l'action courante,
+  parce que la persistance est un drapeau de carte et qu'un Étalement posé sur
+  la Zone ou la Distance s'étend à tous les dégâts de la carte. La Zone, elle,
+  reste disponible ;
+- **le moteur** (moteur_pur.js, `creerZonePure`) : des dégâts étalés
+  (`estEtalement`) n'entrent jamais dans une nappe. Une ancienne carte qui
+  portait les deux ne laisse au sol que son état élémentaire, s'il y en a un —
+  sinon rien ;
+- **les monstres** (monstres_competences.js, `effetAutorise`) : le générateur
+  refuse la Persistance sur une carte déjà étalée, et l'Étalement sur une carte
+  déjà persistante.
+
+`persistance_soin.mjs` (sections 5 à 7) rejoue le vrai bloc du menu de la Forge,
+avec cette fois l'inventaire réel de la carte qui le précède, puis la vraie
+fonction `effetAutorise` du générateur sur des chantiers construits à la main
+(la génération aléatoire croise trop rarement les deux pour mordre à coup sûr) et
+sur 30 fournées de Boss mages. `zones_cerveau.mjs` (section 8) vérifie qu'un DOT
+ne laisse pas de nappe et qu'un DOT avec un état ne garde au sol que l'état.
+`etalement_sans_degats.mjs` extrait le même inventaire. Morsures, fix par fix :
+l'ancienne Forge laisse les deux sélectionnables (6 échecs), l'ancien noyau pose
+une nappe de dégâts étalés (2 échecs), l'ancien générateur accepte les deux
+(2 échecs).

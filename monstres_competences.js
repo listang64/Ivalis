@@ -550,6 +550,16 @@ function effetAutorise(chantier, effet, commeMod) {
         if ((base.includes("soin") || base.includes("guérison") || base.includes("guerison")) && !base.includes("bouclier")) return false;
     }
 
+    // ⚖️ règle Forge : pas de Persistance terrain sur un DOT. Des dégâts
+    // étalés ne se reposent pas en nappe au sol : la carte choisit l'un ou
+    // l'autre, jamais les deux (dans un sens comme dans l'autre).
+    const estEtalement = (n) => n.trim() === "dot" || n.includes("étalement") || n.includes("etalement");
+    const carteEtalee = chantier.actions.some(act =>
+        estEtalement((act.baseEffet.Nom || "").toLowerCase()) ||
+        act.modsEffets.some(m => estEtalement((m.effet.Nom || "").toLowerCase())));
+    if (nom.includes("persistance") && carteEtalee) return false;
+    if (estEtalement(nom) && chantierContientMotCle(chantier, "persistance")) return false;
+
     // Une illusion ne peut pas porter de zone.
     if (commeMod && nom === "zone" && chantierContientMotCle(chantier, "illusion")) return false;
 

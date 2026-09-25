@@ -245,6 +245,18 @@ console.log("\n8. LA NAISSANCE D'UNE ZONE, DANS L'ÉTAT");
              !!zoneMixte && zoneMixte.degats && zoneMixte.degats.valeurBrute === 9 && zoneMixte.soin === null
              && zoneMixte.type !== "soin", JSON.stringify(zoneMixte && { type: zoneMixte.type, soin: zoneMixte.soin }));
 
+    // PAS DE NAPPE POUR UN DOT (règle de Nico) : des dégâts étalés tombent en
+    // parts sur les tours suivants, ils ne se reposent pas EN PLUS au sol.
+    const dotSeul = { attaques: [{ valeurBrute: 12, typeRes: "Magique", estEtalement: true, toursEtalement: 2,
+                                   cibles: ["MARCHEUR"] }], alterations: [] };
+    verifier("des dégâts étalés (DOT) ne laissent pas de nappe",
+             creerZonePure(etat, dotSeul, [{ q: 2, r: 3 }], "LANCEUR") === null);
+    const dotEtFeu = { ...dotSeul, alterations: [{ nom: "Brûlé", persistante: true, typeZone: "feu", chance: 40, duree: 2 }] };
+    const zoneDot = creerZonePure(etat, dotEtFeu, [{ q: 2, r: 3 }], "LANCEUR");
+    verifier("DOT + état élémentaire : la nappe garde l'état, jamais les dégâts étalés",
+             !!zoneDot && zoneDot.degats === null && zoneDot.etat && zoneDot.etat.nom === "Brûlé",
+             JSON.stringify(zoneDot && zoneDot.degats));
+
     // Un bouclier seul (isShield, valeurBrute non nulle) ne laisse rien non
     // plus : ce n'est ni un dégât, ni un soin, au sens de la zone.
     const carteBouclier = { attaques: [{ isHeal: false, isShield: true, valeurBrute: 15, cibles: ["MARCHEUR"] }],

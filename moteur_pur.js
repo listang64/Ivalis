@@ -856,7 +856,9 @@ export function creerZonePure(etat, action, hexes, idLanceur) {
     if (emprise.length === 0) return null;
 
     const attaques = action.attaques || [];
-    const frappe = attaques.find(a => !a.isHeal && !a.isShield && nombre(a.valeurBrute) > 0);
+    // PAS DE NAPPE POUR UN DOT (règle de Nico) : des dégâts étalés tombent
+    // en parts sur les tours suivants, ils ne se reposent pas en plus au sol.
+    const frappe = attaques.find(a => !a.isHeal && !a.isShield && !a.estEtalement && nombre(a.valeurBrute) > 0);
     const soigne = attaques.find(a => a.isHeal && nombre(a.valeurBrute) > 0);
     const alt = (action.alterations || []).find(a => a && a.persistante);
 
