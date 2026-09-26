@@ -49,6 +49,12 @@ console.log("\n1. LE TEXTE DE LA FORGE (vrai competences.js)");
   const tr = t(TRACTION, 3);
   verifier("la Traction reste à 3 hexagones avec 3 points", /sur 3 hexagone/.test(tr) && tr.startsWith("45%"), tr);
   verifier("une attaque, elle, multiplie toujours sa Valeur", /Inflige 18 dégâts/.test(t(DEGATS, 3)), t(DEGATS, 3));
+  // L'ÉLECTRIFIÉ : l'initiative retirée est fixe (35), seule la chance monte.
+  const ELEC = { id: "EFF_ELECTRIFIE", Nom: "Électrifié", Valeur: 35, Pourcent_Base: 10, Pourcent_Max: 60,
+                 Effet_Base: "10% chance de baisser Initiative de 35 (max 60)" };
+  const el = t(ELEC, 3);
+  verifier("Électrifié à 3 points : 30 % de chance, toujours -35 d'initiative",
+           el.startsWith("30%") && /Initiative de 35\b/.test(el) && !/105/.test(el), el);
 }
 
 // =========================================================================

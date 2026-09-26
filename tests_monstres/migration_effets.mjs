@@ -82,8 +82,8 @@ console.log("1. ELLE VISE LES EFFETS QUE NICO A DEMANDÉ DE CHANGER");
     const { table } = fausseBase(EFFETS_REELS);
     const vises = table.map(r => r.id).sort();
     const attendus = ["EFF_BOUCLIER_MAGIQUE", "EFF_BRULE", "EFF_DUREE_ETALEMENT_DEGATS", "EFF_ELECTRIFIE",
-                      "EFF_ETOURDIT", "EFF_GLACE", "EFF_PARALYSIE", "EFF_POUSSEE", "EFF_REPLI", "EFF_AVEUGLEMENT"].sort();
-    verifier("les dix effets concernés, ni plus ni moins",
+                      "EFF_ETOURDIT", "EFF_GLACE", "EFF_PARALYSIE", "EFF_POUSSEE", "EFF_REPLI", "EFF_AVEUGLEMENT", "EFF_CONFUSION"].sort();
+    verifier("les onze effets concernés, ni plus ni moins",
              JSON.stringify(vises) === JSON.stringify(attendus), vises.join(", "));
     // Ceux qu'on modifie existent ; ceux qu'on crée (le Repli), pas encore.
     // (La Paralysie, elle, est à supprimer : déjà partie de la vraie base, c'est normal.)
@@ -202,7 +202,7 @@ console.log("\n3. RELANCÉE, ELLE N'ÉCRIT PLUS RIEN");
     verifier("et ne resupprime rien", m.journal.suppressions.length === suppressionsPremier);
     verifier("le rapport le dit clairement", second.faits.length === 0,
              JSON.stringify(second.faits));
-    verifier("en listant ce qui était déjà à jour", second.inchanges.length === 10,
+    verifier("en listant ce qui était déjà à jour", second.inchanges.length === 11,
              JSON.stringify(second.inchanges));
 }
 

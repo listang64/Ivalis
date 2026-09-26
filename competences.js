@@ -969,7 +969,11 @@ function formatterTexteEffet(effet, stacks, action) {
     // quelle quel que soit le nombre de points. Les points n'augmentent que la
     // chance ; la Forge ne doit donc jamais annoncer 4 ou 6 hexagones.
     const nomFixe = (effet.Nom || "").toLowerCase();
-    const valeurEstDistanceFixe = nomFixe.includes("pouss") || nomFixe.includes("traction");
+    // L'Électrifié aussi : l'initiative qu'il retire est FIXE (35, la Valeur du
+    // grimoire) — le moteur ne la multiplie jamais par les crans, seule la
+    // chance monte. La Forge l'annonçait multipliée (Nico l'a vu).
+    const valeurEstDistanceFixe = nomFixe.includes("pouss") || nomFixe.includes("traction")
+        || nomFixe.includes("électrif") || nomFixe.includes("electrif");
     if (val > 0 && !valeurEstDistanceFixe) {
         let calcV = val * stacks;
         

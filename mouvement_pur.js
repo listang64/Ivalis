@@ -438,7 +438,11 @@ export function resoudreBond(etat, action, des, plateau) {
 //
 //  Mute directement l'état qu'on lui passe (comme traverserZones) et rend
 //  les étapes à publier.
-export function resoudrePeur(etat, idLanceur, idCible, des, plateau) {
+// `options.exempte` : qui ne frappe PAS le fuyard en opportunité (par défaut
+// le lanceur de la Peur, qui n'en profite pas d'un coup en plus). La fuite
+// d'un confus (règle de Nico) n'exempte personne : `exempte: null`.
+export function resoudrePeur(etat, idLanceur, idCible, des, plateau, options) {
+    const exempte = (options && "exempte" in options) ? options.exempte : idLanceur;
     const etapes = [];
     const cible = combattant(etat, idCible);
     if (!cible || cible.aTerre) return etapes;
@@ -473,7 +477,7 @@ export function resoudrePeur(etat, idLanceur, idCible, des, plateau) {
 
     // Attaques d'opportunité déclenchées en fuyant, case par case (même
     // principe qu'un déplacement volontaire), sauf de la part du lanceur.
-    let contactAvant = new Set(ennemisAuContact(etat, idCible, depart).filter(id => id !== idLanceur));
+    let contactAvant = new Set(ennemisAuContact(etat, idCible, depart).filter(id => id !== exempte));
     for (const pas of chemin) {
         const de = { q: cible.q, r: cible.r };
         cible.q = pas.q;
@@ -481,7 +485,7 @@ export function resoudrePeur(etat, idLanceur, idCible, des, plateau) {
         cible.fatigue = Math.max(0, nombre(cible.fatigue) - 2);
         etapes.push({ type: "pas", acteur: idCible, de, vers: pas, cout: 2, fatigueApres: cible.fatigue });
 
-        const contactApres = new Set(ennemisAuContact(etat, idCible, pas).filter(id => id !== idLanceur));
+        const contactApres = new Set(ennemisAuContact(etat, idCible, pas).filter(id => id !== exempte));
         for (const ennemi of contactAvant) {
             if (contactApres.has(ennemi)) continue;
             const coup = resoudreOpportunite(etat, ennemi, idCible, des);

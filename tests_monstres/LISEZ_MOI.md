@@ -3185,3 +3185,48 @@ le document Caracteristiques/<id> du héros et vide les caches qui le gardaient
 caractéristiques », avec tous les points de départ. La nouvelle répartition
 réécrit elle-même ce qui en découle (PV max, objets portables).
 `dev_reinit_caracs.mjs` le vérifie sur la vraie page avec un Firestore bouchonné.
+
+### Confusion en quatre jets, Électrifié fixe, butin 75/25, nouveaux prérequis
+
+**La Confusion : quatre effets indépendants, chacun à 30 %** (règle de Nico).
+Quand un confus lance une technique, quatre jets, dans cet ordre : il s'attaque
+lui-même ; il attaque au hasard autour de lui (quelqu'un d'autre à portée de la
+carte) ; il s'enfuit comme sous la Peur ; en fin de boucle, il n'est plus
+confus. Les deux premiers peuvent sortir ensemble — la carte touche alors le
+confus ET sa cible de hasard. Avant, un seul dé choisissait une seule bande
+(20 % soi, 20 % hasard, 10 % dissipation).
+- `appliquerConfusion` (moteur_pur.js) tire les quatre jets, détourne les
+  cibles et note fuite et dissipation ; `resoudreCarte` annonce ce qui est
+  détourné. Une carte sans attaque, ou sans personne à portée, revient sur le
+  confus ; une poussée ne se retourne jamais sur lui.
+- `suitesDeConfusion` (cerveau_combat.js) joue, après la carte, la fuite
+  (`resoudrePeur`, loin de l'ennemi le plus proche ; tout ennemi quitté frappe,
+  option `exempte: null`) puis la dissipation (`dissiperConfusion`) — pour un
+  joueur comme pour une créature.
+- Les dés ne sont tirés que si le lanceur est confus. La note de la base
+  (EFF_CONFUSION) et la description de l'état suivent.
+`confusion_cerveau.mjs` est réécrit : jets forcés, 6000 cartes (≈ 30 % chacun,
+≈ 9 % pour deux à la fois : ils sont indépendants), cas particuliers, et le vrai
+cerveau (la carte, la fuite, puis la dissipation, dans cet ordre ; une créature
+confuse s'enfuit aussi).
+
+**Électrifié : l'initiative retirée est fixe.** Le combat retirait déjà 35,
+quelle que soit la mise ; c'est la Forge qui multipliait le chiffre par les
+crans (« -105 » à 3 points). `formatterTexteEffet` le traite désormais comme la
+distance de la Poussée : seule la chance monte (competences.js, et le même texte
+côté créatures). `poussee_forge_avatar.mjs` le vérifie.
+
+**Butin : 75 % d'armes, 25 % d'armures ou boucliers** (`PART_ARMES_BUTIN`,
+objets.js ; c'était 60/40). `butin_loot.mjs` le mesure sur 3000 objets.
+
+**Prérequis d'équipement** (objets.js) :
+- 10 / 11 / 12 / 13 selon la rareté (c'était 0 / 10 / 12 / 12) ;
+- une armure accepte plusieurs caractéristiques et UNE SEULE au prérequis suffit :
+  légère = Intelligence ou Charisme, intermédiaire = Dextérité ou Sagesse,
+  lourde = Force (`CARACS_ARMURE`, lu par type : les armures déjà portées suivent) ;
+- l'équipement de départ n'a aucun prérequis (armes comprises, pour qu'un héros
+  puisse porter ce qu'on lui donne), et l'armure de départ prend le plus bas de
+  chacune de ses fourchettes.
+Les messages de prérequis (fiche, butin) écrivent « Intelligence ou Charisme ».
+Les objets déjà en jeu gardent le prérequis écrit à leur création.
+`objets_tableau.mjs` (sections 5 et 7) le vérifie.

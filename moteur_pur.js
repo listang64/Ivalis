@@ -258,98 +258,101 @@ export function ligneDeVue(plateau, a, b) {
 // =========================================================================
 //  LA CONFUSION — QUAND LA CARTE PART DE TRAVERS
 // =========================================================================
-//  Un combattant confus ne maîtrise plus ce qu'il lance. Un dé, tiré une fois
-//  pour toute la carte, décide :
+//  Règle de Nico : QUATRE EFFETS INDÉPENDANTS, chacun son propre jet de 30 %,
+//  tirés dans cet ordre quand le confus lance une carte :
 //
-//    1-20   il se l'inflige à lui-même ;
-//    21-40  il vise quelqu'un d'autre au hasard, ami ou ennemi, à portée ;
-//    41-50  la confusion se dissipe, et la carte part normalement ;
-//    51-100 rien ne change.
+//    1. il s'attaque lui-même          (la carte le prend pour cible) ;
+//    2. il attaque au hasard autour de lui (quelqu'un d'autre à portée,
+//       ami ou ennemi) ;
+//    3. il s'enfuit, comme sous la Peur (joué par le cerveau, qui a les dés
+//       de la fuite : voir suitesDeConfusion, cerveau_combat.js) ;
+//    4. en fin de boucle, il n'est plus confus.
 //
-//  UNE CARTE SANS ATTAQUE NE PEUT PAS PARTIR AU HASARD. Un soin, un bouclier,
-//  une pose d'état : la bande 21-40 rejoint la bande 1-20 et se retourne sur
-//  le lanceur. C'est la règle de l'ancien moteur, et elle a sa logique — on ne
-//  « rate » pas un soin sur un inconnu, on se le donne à soi.
+//  Indépendants : rien n'empêche 1 et 2 à la fois — la carte touche alors le
+//  confus ET sa cible de hasard —, ni la fuite après un coup parti de travers.
+//  Si ni 1 ni 2 ne sortent, la carte part comme le joueur l'a voulue.
 //
-//  POURQUOI CE TIRAGE VIT ICI, ET PLUS CHEZ LE JOUEUR. Il était fait dans le
-//  navigateur du lanceur, avec Math.random(), avant l'envoi de la carte. Deux
-//  conséquences : le résultat ne pouvait pas être vérifié (un poste envoyait
-//  un dé que les autres devaient croire), et surtout la DISSIPATION était
-//  purement et simplement désactivée sous le régime du cerveau — la bande
-//  41-50 y était sautée, faute d'un chemin pour effacer un état sans écrire
-//  par-dessus le cerveau. Tiré ici, le dé est le même pour tout le monde, et
-//  la dissipation redevient une étape comme une autre.
+//  UNE CARTE SANS ATTAQUE NE PART PAS AU HASARD : un soin, un bouclier, une
+//  pose d'état qui « partirait au hasard » se retourne sur le confus — on ne
+//  rate pas un soin sur un inconnu, on se le donne à soi. Idem si personne
+//  n'est à portée.
 //
-//  LE DÉ N'EST TIRÉ QUE SI LE LANCEUR EST CONFUS. C'est la règle de toute la
-//  maison : un dé consommé par condition décalerait la suite du tirage pour
-//  tous les autres effets de la carte, et deux postes qui rejouent le même
-//  tour n'auraient plus la même partie.
-export const CHANCE_CONFUSION_AUTO      = 20;
-export const CHANCE_CONFUSION_ALEATOIRE = 40;
-export const CHANCE_CONFUSION_DISSIPEE  = 50;
+//  Les dés sont tirés ICI, par le cerveau, avec ceux de la carte : le même
+//  résultat pour tous les postes. Ils ne sont tirés QUE si le lanceur est
+//  confus — une carte ordinaire consomme exactement les mêmes dés qu'avant.
+export const CHANCE_CONFUSION_SOI       = 30;
+export const CHANCE_CONFUSION_HASARD    = 30;
+export const CHANCE_CONFUSION_FUITE     = 30;
+export const CHANCE_CONFUSION_DISSIPEE  = 30;
 
 export function appliquerConfusion(etat, action, plateau, des) {
     const lanceur = combattant(etat, action.idLanceur);
     if (!lanceur || !aLEtat(lanceur, "Confusion")) return action;
 
-    const jet = des.d100();
+    const jetSoi = des.d100() <= CHANCE_CONFUSION_SOI;
+    const jetHasard = des.d100() <= CHANCE_CONFUSION_HASARD;
+    const fuite = des.d100() <= CHANCE_CONFUSION_FUITE;
+    const dissipee = des.d100() <= CHANCE_CONFUSION_DISSIPEE;
+
     const attaques = action.attaques || [];
     const alterations = action.alterations || [];
     const carteAUneAttaque = attaques.length > 0;
 
-    // Se viser soi-même. Les déplacements forcés n'ont aucun sens sur place
-    // (la distance est nulle, la géométrie ne donne aucune direction) : on les
-    // éteint plutôt que de les retourner sur le lanceur.
-    const versSoi = () => ({
+    // Le hasard « autour de lui » : quelqu'un d'autre, à portée de la carte.
+    let idCible = null;
+    let hasardSurSoi = false;
+    if (jetHasard) {
+        if (!carteAUneAttaque) {
+            hasardSurSoi = true;
+        } else {
+            const config = attaques[0] || alterations[0] || {};
+            const portee = Math.max(nombre(config.rangeMax, 1), nombre(action.porteeMinTraction, 0));
+            // Une illusion ne se fait leurrer que par une attaque nue.
+            const attaqueSimple = !config.isHeal && !config.isShield && alterations.length === 0;
+            const table = etat.combattants || {};
+            const possibles = Object.keys(table).filter(id => {
+                if (id === action.idLanceur) return false;
+                const c = table[id];
+                if (!c || c.aTerre) return false;
+                if (c.estIllusion && !attaqueSimple) return false;
+                if (distanceHex(lanceur, c) > portee) return false;
+                return ligneDeVue(plateau, lanceur, c);
+            }).sort();
+            if (possibles.length === 0) hasardSurSoi = true;   // personne : la carte revient sur lui
+            else idCible = des.parmi(possibles);
+        }
+    }
+
+    const surSoi = jetSoi || hasardSurSoi;
+    const confusion = { soi: surSoi, hasard: !!idCible, idCible, fuite, dissipee };
+    if (!surSoi && !idCible) return { ...action, confusion };
+
+    const cibles = [...(surSoi ? [action.idLanceur] : []), ...(idCible ? [idCible] : [])];
+    // Les déplacements forcés n'ont aucun sens sur place : on ne se pousse pas
+    // soi-même. Ils ne gardent que la cible de hasard, s'il y en a une.
+    const ciblesDeplacement = idCible ? [idCible] : [];
+    return {
         ...action,
-        attaques: attaques.map(a => ({ ...a, cibles: [action.idLanceur] })),
+        attaques: attaques.map(a => ({ ...a, cibles })),
         alterations: alterations.map(alt => ({
             ...alt,
-            cibles: (alt.estPoussee || alt.estTraction || alt.estPeur) ? [] : [action.idLanceur]
+            cibles: (alt.estPoussee || alt.estTraction || alt.estPeur) ? ciblesDeplacement : cibles
         })),
         isZone: false,
-        confusion: { type: "auto" }
-    });
+        confusion
+    };
+}
 
-    if (jet <= CHANCE_CONFUSION_AUTO || (jet <= CHANCE_CONFUSION_ALEATOIRE && !carteAUneAttaque)) {
-        return versSoi();
-    }
-
-    if (jet <= CHANCE_CONFUSION_ALEATOIRE) {
-        const config = attaques[0] || alterations[0] || {};
-        const portee = Math.max(nombre(config.rangeMax, 1), nombre(action.porteeMinTraction, 0));
-        // Une illusion ne se fait leurrer que par une attaque nue : un soin ou
-        // un état lancé sur un mirage serait perdu pour rien.
-        const attaqueSimple = !config.isHeal && !config.isShield && alterations.length === 0;
-
-        const table = etat.combattants || {};
-        const possibles = Object.keys(table).filter(id => {
-            if (id === action.idLanceur) return false;
-            const c = table[id];
-            if (!c || c.aTerre) return false;
-            if (c.estIllusion && !attaqueSimple) return false;
-            if (distanceHex(lanceur, c) > portee) return false;
-            return ligneDeVue(plateau, lanceur, c);
-        }).sort();
-
-        // Personne d'autre à portée : la carte se retourne sur son lanceur.
-        if (possibles.length === 0) return versSoi();
-
-        const idCible = des.parmi(possibles);
-        return {
-            ...action,
-            attaques: attaques.map(a => ({ ...a, cibles: [idCible] })),
-            alterations: alterations.map(alt => ({ ...alt, cibles: [idCible] })),
-            isZone: false,
-            confusion: { type: "aleatoire", idCible }
-        };
-    }
-
-    if (jet <= CHANCE_CONFUSION_DISSIPEE) {
-        return { ...action, confusion: { type: "annulee" } };
-    }
-
-    return action;  // 51-100 : la carte part comme le joueur l'a voulue.
+// LA FIN DE LA BOUCLE : le confus s'en remet (4e jet). Rend les étapes — le
+// cerveau l'appelle APRÈS la carte et la fuite (suitesDeConfusion).
+export function dissiperConfusion(etat, idLanceur) {
+    const c = combattant(etat, idLanceur);
+    if (!c || !aLEtat(c, "Confusion")) return [];
+    c.etats = (c.etats || []).filter(e => e && e.nom !== "Confusion");
+    return [
+        { type: "message", cible: idLanceur, acteur: idLanceur, texte: "Confusion dissipée !", couleur: "#33cc66" },
+        { type: "etats", cible: idLanceur, liste: c.etats }
+    ];
 }
 
 // =========================================================================
@@ -1006,26 +1009,15 @@ export function resoudreCarte(etat, action, plateau) {
     });
 
     // LA CONFUSION SE DIT AVANT DE SE VOIR. Sans ce mot, le joueur regarde sa
-    // carte partir sur son propre camp sans comprendre, et croit à un bug :
-    // l'ancien moteur l'affichait (jouerAnimationMoteur), le cerveau ne le
-    // faisait pas. Les cibles, elles, ont déjà été détournées en amont par
-    // appliquerConfusion — ici on ne fait qu'annoncer, et dissiper s'il y a
-    // lieu.
+    // carte partir sur son propre camp sans comprendre, et croit à un bug. Les
+    // cibles ont déjà été détournées en amont (appliquerConfusion) ; la fuite
+    // et la dissipation se jouent après la carte, dans le cerveau.
     if (action.confusion) {
-        const dit = {
-            auto:      "Confus : s'inflige sa propre compétence !",
-            aleatoire: "Confus : cible au hasard !",
-            annulee:   "Confusion dissipée !"
-        }[action.confusion.type];
-        if (dit) {
-            etapes.push({ type: "message", cible: idLanceur, acteur: idLanceur,
-                          texte: dit,
-                          couleur: action.confusion.type === "annulee" ? "#33cc66" : "#cc66ff" });
-        }
-        if (action.confusion.type === "annulee") {
-            lanceur.etats = (lanceur.etats || []).filter(e => e && e.nom !== "Confusion");
-            etapes.push({ type: "etats", cible: idLanceur, liste: lanceur.etats });
-        }
+        const dits = [];
+        if (action.confusion.soi) dits.push("Confus : s'inflige sa propre compétence !");
+        if (action.confusion.hasard) dits.push("Confus : cible au hasard !");
+        dits.forEach(texte => etapes.push({ type: "message", cible: idLanceur, acteur: idLanceur,
+                                             texte, couleur: "#cc66ff" }));
     }
 
     // Le lanceur étourdi rate parfois complètement sa technique. Le jet a été

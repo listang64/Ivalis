@@ -189,9 +189,12 @@ function chiffresEffet(effet) {
 
 // =========================================================================
 console.log("\n5. PRÉREQUIS ET CHANCES DE RARETÉ");
+// Le tableau disait 0 / 10 / 12 / 12 ; Nico a revu les prérequis :
+// 10 / 11 / 12 / 13. C'est sa règle qui fait foi, plus la colonne du tableau.
+const PREREQUIS_NICO = { "Commun": 10, "Rare": 11, "Très rare": 12, "Épique": 13 };
 ["Commun", "Rare", "Très rare", "Épique"].forEach(r => {
-    verifier(`prérequis ${r} = ${REF.prerequis[r]}`, w.PREREQUIS_RARETE[r] === REF.prerequis[r],
-             `(${w.PREREQUIS_RARETE[r]})`);
+    verifier(`prérequis ${r} = ${PREREQUIS_NICO[r]} (règle de Nico)`, w.PREREQUIS_RARETE[r] === PREREQUIS_NICO[r],
+             `(${w.PREREQUIS_RARETE[r]}, le tableau disait ${REF.prerequis[r]})`);
 });
 Object.keys(REF.chancesRarete).forEach(diff => {
     const attendu = REF.chancesRarete[diff];
@@ -219,6 +222,48 @@ Object.keys(w.CHANCES_RARETE).forEach(diff => {
     verifier("une difficulté inconnue retombe sur la ligne NORMAL",
              Math.abs(comptes["Commun"] / 200 - 75) < 2, `(${(comptes["Commun"] / 200).toFixed(1)}% de communs)`);
     verifier("et ne sort donc jamais d'épique", comptes["Épique"] === 0);
+}
+
+// =========================================================================
+console.log("\n7. LES ARMURES : UNE CARAC PARMI PLUSIEURS, ET L'ARMURE DE DÉPART");
+// =========================================================================
+//  Règle de Nico : légère = Intelligence OU Charisme, intermédiaire = Dextérité
+//  OU Sagesse, lourde = Force seule ; il suffit d'UNE stat au prérequis.
+//  L'armure de départ n'a pas de prérequis, et ses résistances sont au plus
+//  bas de leurs fourchettes. Les armes de départ n'ont pas de prérequis non plus.
+{
+    w.CARACS_PARTIE = { H: { force: 8, dex: 8, con: 10, int: 8, sag: 8, cha: 13 } };
+    const armure = (type, rarete = "Rare") => w.fabriquerObjet(w.MODELES_OBJETS.find(m => m.type === type), rarete);
+    const legere = armure("Armure légère"), inter = armure("Armure intermédiaire"), lourde = armure("Armure lourde");
+    verifier("armure légère Rare : 11 requis", legere.prerequis === 11, String(legere.prerequis));
+    verifier("légère : Intelligence OU Charisme", w.texteCaracsObjet(legere) === "Intelligence ou Charisme", w.texteCaracsObjet(legere));
+    verifier("intermédiaire : Dextérité OU Sagesse", w.texteCaracsObjet(inter) === "Dextérité ou Sagesse", w.texteCaracsObjet(inter));
+    verifier("lourde : Force seule", w.texteCaracsObjet(lourde) === "Force", w.texteCaracsObjet(lourde));
+    verifier("Charisme 13 suffit pour une légère Rare (Intelligence 8)", w.peutEquiper("H", legere).possible === true);
+    verifier("mais ni l'intermédiaire (Dex 8, Sag 8)", w.peutEquiper("H", inter).possible === false);
+    verifier("ni la lourde (Force 8)", w.peutEquiper("H", lourde).possible === false);
+    w.CARACS_PARTIE.H.sag = 11;
+    verifier("Sagesse 11 ouvre l'intermédiaire Rare", w.peutEquiper("H", inter).possible === true);
+    // Une armure déjà portée (écrite avant la règle) suit la même logique : la
+    // carac se lit par TYPE, pas dans l'objet.
+    const ancienne = { ...legere, carac: "INTELLIGENCE", prerequis: 10 };
+    verifier("une armure d'avant la règle accepte aussi le Charisme", w.peutEquiper("H", ancienne).possible === true);
+    // Les armes, elles, gardent leur carac unique.
+    const epee = w.fabriquerObjet(w.MODELES_OBJETS.find(m => m.type === "Arme lourde CAC"), "Commun");
+    verifier("une arme Commune demande 10 dans SA carac", epee.prerequis === 10 && w.caracsRequisesObjet(epee).length === 1);
+
+    const depart = w.equipementDeDepart("Arme lourde CAC", "Armure intermédiaire");
+    verifier("équipement de départ : aucun prérequis (arme et armure)", depart.arme.prerequis === 0 && depart.armure.prerequis === 0,
+             `${depart.arme.prerequis}/${depart.armure.prerequis}`);
+    const bas = w.MODELES_OBJETS.find(m => m.type === "Armure intermédiaire").paliers.Commun;
+    verifier("armure de départ au plus bas de ses fourchettes", depart.armure.bonus.resPhys === bas.resPhys[0]
+             && depart.armure.bonus.resMag === bas.resMag[0], JSON.stringify(depart.armure.bonus));
+    const ab = w.equipementDeDepart("Arme + Bouclier", "Armure lourde");
+    verifier("arme + bouclier de départ : aucun prérequis", ab.arme.prerequis === 0 && ab.bouclier.prerequis === 0);
+    // Une armure trouvée, elle, tire toujours dans sa fourchette.
+    let variees = new Set();
+    for (let i = 0; i < 40; i++) variees.add(armure("Armure intermédiaire", "Commun").bonus.resPhys);
+    verifier("une armure de butin tire toujours au hasard dans sa fourchette", variees.size > 1, [...variees].join(","));
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

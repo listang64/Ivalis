@@ -278,7 +278,7 @@ window.afficherEmplacementEquipement = function(suffixe, objet) {
         const idPersonnage = document.getElementById("champ-id-personnage")?.value;
         if (rempli && objet.prerequis > 0 && typeof window.peutEquiper === "function") {
             const test = window.peutEquiper(idPersonnage, objet);
-            if (!test.possible) texte = `⚠ ${objet.carac} ${objet.prerequis} requis (tu as ${test.valeur})`;
+            if (!test.possible) texte = `⚠ ${window.texteCaracsObjet(objet)} ${objet.prerequis} requis (tu as ${test.valeur})`;
         }
         prerequis.innerText = texte;
         prerequis.style.display = texte ? "block" : "none";
@@ -4126,6 +4126,8 @@ window.MIGRATION_EFFETS = [
       champs: { Notes: "Mouvement coût doublé, et la cible reçoit 20% de dégâts PHYSIQUES en plus" } },
     { id: "EFF_ELECTRIFIE",
       champs: { Notes: "Baisse d'initiative sur la prochaine carte, et 20% de dégâts MAGIQUES en plus subis" } },
+    { id: "EFF_CONFUSION",
+      champs: { Notes: "À chaque technique lancée, 4 jets indépendants de 30% : s'attaquer soi-même, attaquer au hasard autour de soi, s'enfuir (comme la Peur), et ne plus être confus (en fin de boucle)" } },
     { id: "EFF_BRULE",
       champs: { Notes: "-50% de soins reçus, et 3 dégâts à chaque fin de manche (du type de l'attaque qui a brûlé)" } },
     { id: "EFF_POUSSEE",

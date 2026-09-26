@@ -1659,7 +1659,7 @@ window.demarrerCiblage = async function(idCarte, options) {
                 alterationsExtraites.push({
                     nom: "Confusion",
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788081823/IMG_2078_mi79mz.png",
-                    desc: "20% de s'infliger sa propre compétence, 20% de cibler au hasard à portée, 10% de dissiper la confusion.",
+                    desc: "À chaque technique, 4 jets indépendants de 30% : s'infliger sa propre compétence, viser au hasard autour de soi, s'enfuir (comme la Peur), et ne plus être confus.",
                     chance: confusionChance,
                     duree: confusionDuree,
                     isRanged: isRanged,

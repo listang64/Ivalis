@@ -65,7 +65,8 @@ window.etiquetteObjetHTML = function(objet, options) {
     if (!objet) return "";
     const avecDeuxMains = !options || options.deuxMains !== false;
     const type = window.libelleTypeObjet(objet.type);
-    const carac = window.libelleCaracObjet(objet.carac);
+    const carac = typeof window.texteCaracsObjet === "function"
+        ? window.texteCaracsObjet(objet) : window.libelleCaracObjet(objet.carac);
     const typeEtCarac = [type, carac ? `<span class="carac-objet">${carac}</span>` : ""]
         .filter(Boolean).join(" ");
     return [objet.rarete, typeEtCarac, avecDeuxMains && objet.deuxMains ? "deux mains" : null]
@@ -80,10 +81,30 @@ window.CHANCES_RARETE = {
     "Très difficile": { "Commun": 20, "Rare": 40, "Très rare": 35, "Épique": 5 }
 };
 
-// Armes_Ivalis.xlsx, dernière ligne : la caractéristique minimale exigée pour
-// PORTER l'objet. La carac concernée est celle du modèle (colonne
-// "Modificateur"), pas une carac au choix.
-window.PREREQUIS_RARETE = { "Commun": 0, "Rare": 10, "Très rare": 12, "Épique": 12 };
+// La caractéristique minimale exigée pour PORTER l'objet, selon sa rareté.
+// Revu par Nico : 10 / 11 / 12 / 13 (c'était 0 / 10 / 12 / 12). L'équipement
+// de départ, lui, n'en a aucune (voir equipementDeDepart).
+window.PREREQUIS_RARETE = { "Commun": 10, "Rare": 11, "Très rare": 12, "Épique": 13 };
+
+// QUELLE(S) CARACTÉRISTIQUE(S) OUVRENT UNE ARMURE. Une arme, un bouclier, une
+// bague n'en ont qu'une (celle du modèle). Une armure en accepte plusieurs, et
+// UNE SEULE qui atteint le prérequis suffit (règle de Nico) : la légère
+// l'intelligence OU le charisme, l'intermédiaire la dextérité OU la sagesse,
+// la lourde la force seule. Lue par TYPE, pour que les armures déjà portées
+// suivent la règle elles aussi.
+window.CARACS_ARMURE = {
+    "Armure légère":        ["INTELLIGENCE", "CHARISME"],
+    "Armure intermédiaire": ["DEXTÉRITÉ", "SAGESSE"],
+    "Armure lourde":        ["FORCE"]
+};
+window.caracsRequisesObjet = function(objet) {
+    if (!objet) return [];
+    return window.CARACS_ARMURE[objet.type] || (objet.carac ? [objet.carac] : []);
+};
+// « Intelligence ou Charisme », prêt à écrire dans une phrase.
+window.texteCaracsObjet = function(objet) {
+    return window.caracsRequisesObjet(objet).map(c => window.libelleCaracObjet(c)).join(" ou ");
+};
 
 // -------------------------------------------------------------------------
 //  Les bonus qu'un objet peut porter. Toute la mécanique de combat ne lit
@@ -448,7 +469,9 @@ function entier(min, max) { return min + Math.floor(Math.random() * (max - min +
 
 // Une valeur de palier est soit un nombre, soit une fourchette [min, max] à
 // tirer (les armures). Tout le reste du code ne voit que des nombres.
-function valeurPalier(v) { return Array.isArray(v) ? entier(v[0], v[1]) : v; }
+// `auPlusBas` : la valeur la plus basse de la fourchette, sans tirage — c'est
+// l'armure de départ (règle de Nico).
+function valeurPalier(v, auPlusBas) { return Array.isArray(v) ? (auPlusBas ? v[0] : entier(v[0], v[1])) : v; }
 
 // La rareté, tirée selon la difficulté de la rencontre. Une difficulté inconnue
 // retombe sur "Normale" : c'est le cas quand le MJ a posé ses monstres à la
@@ -502,7 +525,10 @@ window.tirerEffetsObjet = function(modele, rarete) {
 };
 
 // Assemble un objet complet à partir d'un modèle et d'une rareté.
-window.fabriquerObjet = function(modele, rarete) {
+// `options.depart` : un objet de l'équipement de départ — aucun prérequis.
+// `options.auPlusBas` : chaque fourchette prend sa valeur la plus basse.
+window.fabriquerObjet = function(modele, rarete, options) {
+    const opts = options || {};
     const palier = modele.paliers[rarete] || {};
     const bonus = {};
     const etats = [];
@@ -511,7 +537,7 @@ window.fabriquerObjet = function(modele, rarete) {
         if (cle === "etatsPropres") {
             (palier[cle] || []).forEach(e => etats.push({ etat: e.etat, chance: e.chance }));
         } else if (cle !== "aRepartir") {
-            bonus[cle] = valeurPalier(palier[cle]);
+            bonus[cle] = valeurPalier(palier[cle], !!opts.auPlusBas);
         }
     });
 
@@ -543,7 +569,7 @@ window.fabriquerObjet = function(modele, rarete) {
         deuxMains: !!modele.deuxMains,
         bague: !!modele.bague,
         carac: modele.carac,
-        prerequis: window.PREREQUIS_RARETE[rarete] || 0,
+        prerequis: opts.depart ? 0 : (window.PREREQUIS_RARETE[rarete] || 0),
         bonus: bonus,
         etats: etats,
         // Les effets qui ne se résument pas à un bonus chiffré ni à un état
@@ -571,10 +597,10 @@ window.fabriquerObjet = function(modele, rarete) {
 //  distance » à la seule fronde, et un joueur qui choisit une arme lourde
 //  accepte très bien d'avoir les deux mains prises. Elles occupent alors les
 //  deux emplacements, comme partout ailleurs dans le jeu.
-window.objetDeDepart = function(typeObjet, rarete) {
+window.objetDeDepart = function(typeObjet, rarete, options) {
     const modeles = (window.MODELES_OBJETS || []).filter(m => m.type === typeObjet);
     if (modeles.length === 0) return null;
-    return window.fabriquerObjet(auHasard(modeles), rarete || "Commun");
+    return window.fabriquerObjet(auHasard(modeles), rarete || "Commun", { depart: true, ...(options || {}) });
 };
 
 // « Arme + Bouclier » n'est pas une famille du catalogue : c'est un CHOIX
@@ -589,7 +615,7 @@ window.objetDeDepartUneMain = function(familles, rarete) {
     const modeles = (window.MODELES_OBJETS || [])
         .filter(m => familles.includes(m.type) && !m.deuxMains);
     if (modeles.length === 0) return null;
-    return window.fabriquerObjet(auHasard(modeles), rarete || "Commun");
+    return window.fabriquerObjet(auHasard(modeles), rarete || "Commun", { depart: true });
 };
 
 // Les deux (ou trois, avec le bouclier) objets qu'un héros porte à sa création.
@@ -601,7 +627,11 @@ window.equipementDeDepart = function(typeArme, typeArmure) {
         arme: estArmeBouclier ? window.objetDeDepartUneMain(FAMILLES_UNE_MAIN_CAC)
               : typeArme ? window.objetDeDepart(typeArme) : null,
         bouclier: estArmeBouclier ? window.objetDeDepart("Bouclier") : null,
-        armure: typeArmure ? window.objetDeDepart(typeArmure) : null
+        // L'armure de départ : aucun prérequis, et ses résistances au plus bas
+        // de leur fourchette (règle de Nico). Les armes de départ n'ont pas de
+        // prérequis non plus : personne ne doit naître sans pouvoir porter
+        // ce qu'on lui donne.
+        armure: typeArmure ? window.objetDeDepart(typeArmure, "Commun", { auPlusBas: true }) : null
     };
 };
 
@@ -615,17 +645,20 @@ function estBouclierOuArmure(modele) {
 // Tire un objet complet pour une difficulté donnée. C'est l'unique porte
 // d'entrée utilisée par le butin.
 //
-// 60% de chance une arme, 40% un bouclier ou une armure — une pondération
-// voulue par Nico plutôt qu'un tirage brut sur tout le catalogue, où le
+// 75% de chance une arme, 25% un bouclier ou une armure (Nico, revu : c'était
+// 60/40) — une pondération voulue plutôt qu'un tirage brut sur tout le
+// catalogue, où le
 // nombre de modèles de chaque famille faussait les proportions sans le
 // vouloir (beaucoup plus d'armes que d'armures dans le tableau).
+window.PART_ARMES_BUTIN = 0.75;
+
 window.tirerObjetPourDifficulte = function(difficulte) {
     const rarete = window.tirerRarete(difficulte);
     const catalogue = window.MODELES_OBJETS || [];
     const poolArmes = catalogue.filter(m => !estBouclierOuArmure(m));
     const poolDefense = catalogue.filter(estBouclierOuArmure);
 
-    const veutUneArme = Math.random() < 0.6;
+    const veutUneArme = Math.random() < window.PART_ARMES_BUTIN;
     let pool = veutUneArme ? poolArmes : poolDefense;
     // Si la famille visée est vide (catalogue incomplet), on retombe sur
     // l'autre plutôt que de renvoyer un objet inexistant.
@@ -784,12 +817,17 @@ window.caracDuPersonnage = function(idPersonnage, nomCarac) {
 
 // { possible, valeur, manque } — "possible" reste vrai si la carac est
 // inconnue : on ne bloque jamais sur une donnée qu'on n'a pas pu lire.
+// Une armure accepte plusieurs caractéristiques (CARACS_ARMURE) : UNE SEULE
+// qui atteint le prérequis suffit, et c'est la meilleure qu'on rapporte.
 window.peutEquiper = function(idPersonnage, objet) {
     if (!objet) return { possible: false };
     const requis = parseInt(objet.prerequis) || 0;
     if (requis <= 0) return { possible: true, valeur: null, manque: 0 };
-    const valeur = window.caracDuPersonnage(idPersonnage, objet.carac);
-    if (valeur === null || isNaN(valeur)) return { possible: true, valeur: null, manque: 0 };
+    const valeurs = window.caracsRequisesObjet(objet)
+        .map(c => window.caracDuPersonnage(idPersonnage, c))
+        .filter(v => v !== null && !isNaN(v));
+    if (valeurs.length === 0) return { possible: true, valeur: null, manque: 0 };
+    const valeur = Math.max(...valeurs);
     return { possible: valeur >= requis, valeur: valeur, manque: Math.max(0, requis - valeur) };
 };
 

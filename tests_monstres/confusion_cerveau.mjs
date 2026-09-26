@@ -1,38 +1,28 @@
-// LA CONFUSION, RAMENÉE DANS LE CERVEAU.
+// LA CONFUSION : QUATRE EFFETS INDÉPENDANTS, CHACUN À 30 %.
 //
-// Un combattant confus ne maîtrise plus ce qu'il lance : un dé, tiré une fois
-// pour toute la carte, décide s'il se l'inflige (1-20), s'il vise n'importe qui
-// à portée (21-40), si la confusion se dissipe (41-50), ou si rien ne change
-// (51-100).
+// Règle de Nico : quand un confus lance une technique, quatre jets
+// indépendants, dans cet ordre :
+//    1. 30 % de s'attaquer lui-même ;
+//    2. 30 % d'attaquer au hasard autour de lui ;
+//    3. 30 % de s'enfuir (comme la Peur) ;
+//    4. 30 % de n'être plus confus (en fin de boucle).
+// Indépendants : 1 et 2 peuvent sortir ensemble (la carte touche les deux),
+// la fuite peut suivre un coup parti de travers. Avant, UN seul dé choisissait
+// une seule bande (20 % soi, 20 % hasard, 10 % dissipation).
 //
-// CE QUI ÉTAIT CASSÉ, ET QUE CE BANC GARDE FERMÉ.
-//
-//   UN. Le dé était tiré dans le navigateur du lanceur, avec Math.random(),
-//       avant même l'envoi de la carte. Un poste envoyait donc un RÉSULTAT que
-//       les autres devaient croire sur parole — exactement ce que le cerveau
-//       existe pour supprimer.
-//   DEUX. La dissipation (41-50) était purement désactivée sous le nouveau
-//       régime : elle aurait dû effacer un état, et seul le cerveau a le droit
-//       d'écrire un état. La bande était donc sautée, et la confusion durait
-//       un tour de trop — en silence.
-//   TROIS. Le mot qui explique tout — « Confus : cible au hasard ! » — vivait
-//       dans jouerAnimationMoteur, que le nouveau régime ne traverse jamais.
-//       Le joueur voyait sa carte partir sur son propre camp sans la moindre
-//       explication, et appelait ça un bug. Il avait raison de le croire.
-//
-// Et une règle de la maison qu'on vérifie ici aussi : LE DÉ N'EST TIRÉ QUE SI
-// LE LANCEUR EST CONFUS. Un dé consommé par condition décalerait toute la suite
-// du tirage, et deux postes qui rejouent le même tour ne verraient plus la même
-// partie.
+// Et les règles de la maison, toujours tenues : les dés sont ceux du cerveau
+// (le même résultat pour tous les postes) et ne sont tirés QUE si le lanceur
+// est confus.
 import {
-    appliquerConfusion, resoudreCarte, ligneDeVue, tirerDesCarte,
-    CHANCE_CONFUSION_AUTO, CHANCE_CONFUSION_ALEATOIRE, CHANCE_CONFUSION_DISSIPEE
+    appliquerConfusion, resoudreCarte, tirerDesCarte, dissiperConfusion,
+    CHANCE_CONFUSION_SOI, CHANCE_CONFUSION_HASARD, CHANCE_CONFUSION_FUITE, CHANCE_CONFUSION_DISSIPEE
 } from '../moteur_pur.js';
-import { construireEtatCombat, creerDes, clonerEtat, verifierEtatCombat } from '../combat_etat.js';
-import { jouerCreature } from '../cerveau_combat.js';
+import { construireEtatCombat, creerDes } from '../combat_etat.js';
+import { appliquerIntention, jouerCreature } from '../cerveau_combat.js';
+import { distance } from '../mouvement_pur.js';
 
 let echecs = 0;
-const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(64)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
+const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(70)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
 
 const fiche = (id, camp, extra = {}) => ({
     idPersonnage: id, camp, prenom: id, PV_Max: 60, PV_Actuels: 60,
@@ -40,338 +30,163 @@ const fiche = (id, camp, extra = {}) => ({
     Def_Physique: 0, Def_Magique: 0, Bouclier_Actuel: 0, Bouclier_Max: 0,
     Etats_Alteres: [], statut: "Vivant", ...extra
 });
-
 const CONFUS = [{ nom: "Confusion", duree: 3 }];
 
 // Le confus en (0,0), un allié tout près, deux ennemis à portée.
-const monde = (etatsDuLanceur = CONFUS) => construireEtatCombat({
-    idPartie: "P1", cerveau: "P_01", graine: 9,
+const monde = (graine = 9, etatsDuLanceur = CONFUS, positions) => construireEtatCombat({
+    idPartie: "P1", cerveau: "P_01", graine,
     combattants: [
-        fiche("MOI", "Allié", { Etats_Alteres: etatsDuLanceur }),
-        fiche("AMI", "Allié"),
-        fiche("GOB", "Ennemi"),
-        fiche("ORC", "Ennemi")
+        fiche("MOI", "Allié", { idJoueur: "P_01", Etats_Alteres: etatsDuLanceur }),
+        fiche("AMI", "Allié", { idJoueur: "P_02" }),
+        fiche("GOB", "Ennemi", { estMonstre: true }),
+        fiche("ORC", "Ennemi", { estMonstre: true })
     ],
-    positions: { MOI: { q: 0, r: 0 }, AMI: { q: 1, r: 0 },
-                 GOB: { q: 2, r: 0 }, ORC: { q: 0, r: 2 } },
-    partie: { Tour_Combat: 1 }
+    positions: positions || { MOI: { q: 0, r: 0 }, AMI: { q: 1, r: 0 }, GOB: { q: 2, r: 0 }, ORC: { q: 0, r: 2 } },
+    partie: { Phase_Combat: "Resolution", Tour_Combat: 1, Ordre_Initiative: ["MOI", "GOB", "ORC", "AMI"],
+              File_Attente_Combat: [{ idPersonnage: "MOI", idCarte: "C1" }, { idPersonnage: "GOB", idCarte: "CG" }] }
 });
-
-// Une carte d'attaque ordinaire, visant l'orc, portée 3.
 const carte = (extra = {}) => ({
     type: "carte", idLanceur: "MOI", idCarte: "C1",
     attaques: [{ valeurBrute: 10, cibles: ["ORC"], rangeMax: 3, typeRes: "Physique" }],
-    alterations: [],
-    ...extra
+    alterations: [], ...extra
 });
-
-// Un dé truqué : il rend le jet qu'on lui demande, puis se comporte
-// normalement. C'est la seule façon d'attaquer les quatre bandes du tirage
-// sans chercher une graine par bande à la main.
-const deTruque = (premierJet) => {
+// Des truqués : les quatre premiers jets sont imposés, le reste est normal.
+const desTruques = (jets) => {
     const vrai = creerDes(123);
-    let rendu = false;
-    return {
-        ...vrai,
-        d100: () => { if (!rendu) { rendu = true; return premierJet; } return vrai.d100(); },
-        parmi: vrai.parmi
-    };
+    const file = [...jets];
+    return { ...vrai, d100: () => file.length ? file.shift() : vrai.d100(), parmi: vrai.parmi, fraction: vrai.fraction };
 };
+const OUI = 5, NON = 95;
 
-console.log("\n=========================================================");
-console.log("  LA CONFUSION DANS LE CERVEAU");
-console.log("=========================================================");
-
-// =========================================================================
-console.log("\n1. LES QUATRE BANDES DU DÉ");
-// =========================================================================
+console.log("\n1. LES QUATRE JETS, UN PAR EFFET");
 {
-    const etat = monde();
-
-    const auto = appliquerConfusion(etat, carte(), null, deTruque(CHANCE_CONFUSION_AUTO));
-    verifier("1-20 : la carte se retourne sur son lanceur",
-             auto.confusion && auto.confusion.type === "auto"
-             && auto.attaques[0].cibles[0] === "MOI",
-             JSON.stringify(auto.attaques[0].cibles));
-
-    const hasard = appliquerConfusion(etat, carte(), null, deTruque(CHANCE_CONFUSION_ALEATOIRE));
-    verifier("21-40 : elle part sur quelqu'un d'autre, à portée",
-             hasard.confusion && hasard.confusion.type === "aleatoire"
-             && hasard.attaques[0].cibles[0] !== "MOI",
-             `${hasard.attaques[0].cibles[0]}`);
-    verifier("et ce quelqu'un peut être un allié (ami OU ennemi)",
-             ["AMI", "GOB", "ORC"].includes(hasard.attaques[0].cibles[0]));
-
-    const dissipee = appliquerConfusion(etat, carte(), null, deTruque(CHANCE_CONFUSION_DISSIPEE));
-    verifier("41-50 : la confusion se dissipe",
-             dissipee.confusion && dissipee.confusion.type === "annulee");
-    verifier("et la carte garde la cible choisie par le joueur",
-             dissipee.attaques[0].cibles[0] === "ORC", dissipee.attaques[0].cibles[0]);
-
-    const normale = appliquerConfusion(etat, carte(), null, deTruque(CHANCE_CONFUSION_DISSIPEE + 1));
-    verifier("51-100 : rien ne change", !normale.confusion
-             && normale.attaques[0].cibles[0] === "ORC");
+    verifier("chacun vaut 30 %", [CHANCE_CONFUSION_SOI, CHANCE_CONFUSION_HASARD, CHANCE_CONFUSION_FUITE,
+                                  CHANCE_CONFUSION_DISSIPEE].every(c => c === 30));
+    const rien = appliquerConfusion(monde(), carte(), null, desTruques([NON, NON, NON, NON]));
+    verifier("aucun jet : la carte part comme voulue", JSON.stringify(rien.attaques[0].cibles) === '["ORC"]'
+             && !rien.confusion.soi && !rien.confusion.hasard && !rien.confusion.fuite && !rien.confusion.dissipee);
+    const soi = appliquerConfusion(monde(), carte(), null, desTruques([OUI, NON, NON, NON]));
+    verifier("1er jet : il se vise lui-même", JSON.stringify(soi.attaques[0].cibles) === '["MOI"]' && soi.confusion.soi);
+    const hasard = appliquerConfusion(monde(), carte(), null, desTruques([NON, OUI, NON, NON]));
+    const c = hasard.attaques[0].cibles;
+    verifier("2e jet : quelqu'un d'autre, au hasard, à portée", c.length === 1 && c[0] !== "MOI"
+             && ["AMI", "GOB", "ORC"].includes(c[0]) && hasard.confusion.hasard, JSON.stringify(c));
+    const lesDeux = appliquerConfusion(monde(), carte(), null, desTruques([OUI, OUI, NON, NON]));
+    const c2 = lesDeux.attaques[0].cibles;
+    verifier("1er ET 2e : la carte touche le confus ET sa cible de hasard",
+             c2.length === 2 && c2.includes("MOI") && c2.some(x => x !== "MOI"), JSON.stringify(c2));
+    const fuite = appliquerConfusion(monde(), carte(), null, desTruques([NON, NON, OUI, OUI]));
+    verifier("3e et 4e jets : la carte part normalement, fuite et dissipation notées",
+             JSON.stringify(fuite.attaques[0].cibles) === '["ORC"]' && fuite.confusion.fuite && fuite.confusion.dissipee);
 }
 
-// =========================================================================
-console.log("\n2. UN COMBATTANT SAIN NE TIRE PAS LE DÉ");
-// =========================================================================
-//  C'est la règle qui protège tout le reste : si la confusion consommait un dé
-//  même chez les non-confus, chaque carte décalerait la suite du tirage et deux
-//  postes rejouant le même tour ne verraient plus la même partie.
+console.log("\n2. INDÉPENDANTS, SUR 6000 CARTES");
 {
-    const sain = monde([]);
-    const des = creerDes(4242);
-    const graineAvant = des.graine();
-    const rendu = appliquerConfusion(sain, carte(), null, des);
-
-    verifier("aucune confusion posée sur une carte ordinaire", !rendu.confusion);
-    verifier("la cible du joueur est intacte", rendu.attaques[0].cibles[0] === "ORC");
-    verifier("ET LE DÉ N'A PAS BOUGÉ D'UN CRAN",
-             des.graine() === graineAvant, `${graineAvant} → ${des.graine()}`);
-}
-
-// =========================================================================
-console.log("\n3. LA DISSIPATION EFFACE VRAIMENT L'ÉTAT");
-// =========================================================================
-//  La bande qui n'existait pas sous ce régime. Elle ne peut pas se contenter
-//  d'un message : l'état doit quitter la fiche, sinon la confusion revient au
-//  prochain rafraîchissement.
-{
-    const etat = monde();
-    const action = appliquerConfusion(etat, carte(), null, deTruque(CHANCE_CONFUSION_DISSIPEE));
-    action.jets = { attaqueRatee: false, parCible: { ORC: { esquive: false, etats: {} } } };
-    const { etat: apres, etapes } = resoudreCarte(etat, action);
-
-    const restant = (apres.combattants.MOI.etats || []).some(e => e && e.nom === "Confusion");
-    verifier("la Confusion a quitté la fiche du lanceur", !restant,
-             JSON.stringify(apres.combattants.MOI.etats));
-    verifier("une étape d'états le dit, pour que l'écran suive",
-             etapes.some(e => e.type === "etats" && e.cible === "MOI"));
-    verifier("et le mot « Confusion dissipée ! » est annoncé",
-             etapes.some(e => e.type === "message" && /dissipée/.test(e.texte || "")),
-             JSON.stringify(etapes.filter(e => e.type === "message").map(e => e.texte)));
-    verifier("en vert : c'est une bonne nouvelle",
-             etapes.some(e => e.type === "message" && e.couleur === "#33cc66"));
-}
-
-// =========================================================================
-console.log("\n4. LE JOUEUR EST PRÉVENU, TOUJOURS");
-// =========================================================================
-//  Le trou le plus bête et le plus coûteux : la carte partait de travers sans
-//  un mot. Chaque détournement doit produire son message, chez tout le monde.
-{
-    const etat = monde();
-    const jouer = (jet) => {
-        const action = appliquerConfusion(etat, carte(), null, deTruque(jet));
-        const cible = action.attaques[0].cibles[0];
-        action.jets = { attaqueRatee: false, parCible: { [cible]: { esquive: false, etats: {} } } };
-        return resoudreCarte(etat, action).etapes;
-    };
-
-    const motsAuto = jouer(CHANCE_CONFUSION_AUTO).filter(e => e.type === "message");
-    verifier("« s'inflige sa propre compétence » est dit",
-             motsAuto.some(e => /propre compétence/.test(e.texte || "")),
-             JSON.stringify(motsAuto.map(e => e.texte)));
-
-    const motsHasard = jouer(CHANCE_CONFUSION_ALEATOIRE).filter(e => e.type === "message");
-    verifier("« cible au hasard » est dit",
-             motsHasard.some(e => /au hasard/.test(e.texte || "")),
-             JSON.stringify(motsHasard.map(e => e.texte)));
-
-    // Le message doit sortir du pion du lanceur : c'est lui qui est confus.
-    verifier("le mot sort bien du pion du confus",
-             motsHasard.every(e => e.cible === "MOI"));
-}
-
-// =========================================================================
-console.log("\n5. LES DÉGÂTS TOMBENT SUR LA CIBLE DÉTOURNÉE, PAS SUR L'AUTRE");
-// =========================================================================
-//  C'est la raison pour laquelle le tirage de confusion passe AVANT
-//  tirerDesCarte : les jets sont rangés par cible. Tiré après, la carte aurait
-//  des dés pour une cible qu'elle ne touche plus, et aucun pour celle qu'elle
-//  frappe vraiment.
-{
-    const etat = monde();
-    const action = appliquerConfusion(etat, carte(), null, deTruque(CHANCE_CONFUSION_AUTO));
-    action.critique = false;
-    action.jets = tirerDesCarte(etat, action, "MOI", false, creerDes(7));
-
-    verifier("les dés sont tirés pour le lanceur devenu sa propre cible",
-             action.jets.parCible && action.jets.parCible.MOI !== undefined,
-             JSON.stringify(Object.keys(action.jets.parCible || {})));
-
-    const { etat: apres } = resoudreCarte(etat, action);
-    verifier("et c'est bien lui qui encaisse",
-             apres.combattants.MOI.pv < 60, `${apres.combattants.MOI.pv} PV`);
-    verifier("l'orc visé au départ est indemne",
-             apres.combattants.ORC.pv === 60, `${apres.combattants.ORC.pv} PV`);
-}
-
-// =========================================================================
-console.log("\n6. PERSONNE À PORTÉE : LA CARTE REVIENT SUR SON LANCEUR");
-// =========================================================================
-{
-    const seul = construireEtatCombat({
-        idPartie: "P1", cerveau: "P_01", graine: 9,
-        combattants: [fiche("MOI", "Allié", { Etats_Alteres: CONFUS }),
-                      fiche("LOIN", "Ennemi")],
-        positions: { MOI: { q: 0, r: 0 }, LOIN: { q: 9, r: 0 } },
-        partie: { Tour_Combat: 1 }
-    });
-    const action = appliquerConfusion(seul, carte(), null, deTruque(CHANCE_CONFUSION_ALEATOIRE));
-    verifier("hors de portée, le hasard se rabat sur soi-même",
-             action.confusion && action.confusion.type === "auto"
-             && action.attaques[0].cibles[0] === "MOI",
-             JSON.stringify(action.attaques[0].cibles));
-}
-
-// =========================================================================
-console.log("\n7. UNE CARTE SANS ATTAQUE NE PART JAMAIS AU HASARD");
-// =========================================================================
-//  Règle de l'ancien moteur, reprise telle quelle : on ne « rate » pas un soin
-//  sur un inconnu, on se le donne à soi.
-{
-    const etat = monde();
-    const soin = {
-        type: "carte", idLanceur: "MOI", idCarte: "C_SOIN",
-        attaques: [{ valeurBrute: 10, isHeal: true, cibles: ["AMI"], rangeMax: 3 }],
-        alterations: []
-    };
-    // Un soin EST une attaque au sens de la carte : la bande 21-40 s'applique.
-    // C'est une carte SANS aucune attaque — une pose d'état pure — qui bascule.
-    const posePure = {
-        type: "carte", idLanceur: "MOI", idCarte: "C_ETAT",
-        attaques: [],
-        alterations: [{ nom: "Glacé", duree: 2, chance: 100, cibles: ["GOB"], rangeMax: 3 }]
-    };
-
-    const rendu = appliquerConfusion(etat, posePure, null, deTruque(CHANCE_CONFUSION_ALEATOIRE));
-    verifier("une pose d'état seule se retourne sur le lanceur",
-             rendu.confusion && rendu.confusion.type === "auto"
-             && rendu.alterations[0].cibles[0] === "MOI",
-             JSON.stringify(rendu.alterations[0].cibles));
-
-    const renduSoin = appliquerConfusion(etat, soin, null, deTruque(CHANCE_CONFUSION_ALEATOIRE));
-    verifier("un soin, lui, peut partir sur n'importe qui",
-             renduSoin.confusion && renduSoin.confusion.type === "aleatoire",
-             renduSoin.confusion && renduSoin.confusion.type);
-}
-
-// =========================================================================
-console.log("\n8. LES DÉPLACEMENTS FORCÉS NE SE RETOURNENT PAS SUR SOI");
-// =========================================================================
-//  Se pousser soi-même n'a aucun sens : la distance est nulle, la géométrie ne
-//  donne aucune direction. L'ancien moteur les éteignait ; on fait pareil.
-{
-    const etat = monde();
-    const pousse = {
-        type: "carte", idLanceur: "MOI", idCarte: "C_POUSSEE",
-        attaques: [{ valeurBrute: 5, cibles: ["GOB"], rangeMax: 3 }],
-        alterations: [{ nom: "Poussée", duree: 0, chance: 100, cibles: ["GOB"],
-                        estPoussee: true, cases: 2 }]
-    };
-    const rendu = appliquerConfusion(etat, pousse, null, deTruque(CHANCE_CONFUSION_AUTO));
-    verifier("l'attaque, elle, se retourne bien sur le lanceur",
-             rendu.attaques[0].cibles[0] === "MOI");
-    verifier("mais la poussée est éteinte, pas retournée",
-             rendu.alterations[0].cibles.length === 0,
-             JSON.stringify(rendu.alterations[0].cibles));
-}
-
-// =========================================================================
-console.log("\n9. LA LIGNE DE VUE : UN MUR CACHE UNE CIBLE");
-// =========================================================================
-//  Portage de verifierLigneDeVue. Seules les cases BLOQUÉES arrêtent le
-//  regard — un trou dans le sol se survole des yeux.
-{
-    const mur = { etatCase: (q, r) => ({ bloquee: q === 1 && r === 0, supprimee: false }) };
-    const trou = { etatCase: (q, r) => ({ bloquee: false, supprimee: q === 1 && r === 0 }) };
-
-    verifier("sans obstacle, on voit", ligneDeVue(null, { q: 0, r: 0 }, { q: 2, r: 0 }));
-    verifier("un mur sur le trajet coupe la vue",
-             !ligneDeVue(mur, { q: 0, r: 0 }, { q: 2, r: 0 }));
-    verifier("un trou ne la coupe pas",
-             ligneDeVue(trou, { q: 0, r: 0 }, { q: 2, r: 0 }));
-    verifier("au contact, on voit toujours",
-             ligneDeVue(mur, { q: 0, r: 0 }, { q: 1, r: 0 }));
-
-    // Et le détournement au hasard en tient compte : l'orc est derrière le mur.
-    const etat = monde();
-    const murDevantGob = { etatCase: (q, r) => ({ bloquee: q === 1 && r === 0 }) };
-    const rendu = appliquerConfusion(etat, carte(), murDevantGob, deTruque(CHANCE_CONFUSION_ALEATOIRE));
-    verifier("une cible cachée par un mur n'est pas tirée au sort",
-             rendu.attaques[0].cibles[0] !== "GOB", rendu.attaques[0].cibles[0]);
-}
-
-// =========================================================================
-console.log("\n10. MÊME GRAINE, MÊME CONFUSION — SUR TROIS POSTES");
-// =========================================================================
-//  Le cœur du régime : trois navigateurs qui rejouent le même tour doivent
-//  détourner la carte vers exactement la même cible.
-{
-    const resultats = [1, 2, 3].map(() => {
-        const etat = monde();
-        const des = creerDes(31337);
-        des.d100();  // le critique, tiré avant, comme dans le cerveau
-        const action = appliquerConfusion(etat, carte(), null, des);
-        return JSON.stringify({ conf: action.confusion,
-                                cibles: action.attaques[0].cibles });
-    });
-    verifier("les trois postes tombent sur le même résultat",
-             resultats[0] === resultats[1] && resultats[1] === resultats[2],
-             resultats[0]);
-
-    // Et l'état de départ n'a pas été touché au passage : appliquerConfusion
-    // rend une NOUVELLE action, il ne mute pas celle qu'on lui donne.
-    const origine = carte();
-    appliquerConfusion(monde(), origine, null, deTruque(CHANCE_CONFUSION_AUTO));
-    verifier("l'action d'origine n'est pas modifiée en douce",
-             origine.attaques[0].cibles[0] === "ORC", origine.attaques[0].cibles[0]);
-}
-
-// =========================================================================
-console.log("\n11. UNE CRÉATURE CONFUSE SE TROMPE AUSSI");
-// =========================================================================
-//  La confusion ne vivait que du côté des joueurs : elle était tirée dans le
-//  navigateur du lanceur, juste avant d'envoyer la carte. Une créature, elle,
-//  est jouée par le cerveau — elle ne passait donc jamais par ce code et visait
-//  tranquillement qui elle voulait, confuse ou non. Même dé, même règle.
-{
-    const plateau = construireEtatCombat({
-        idPartie: "P1", cerveau: "P_01", graine: 5,
-        combattants: [
-            fiche("BRUTE", "Ennemi", { estMonstre: true, Personnalite: "brutal",
-                                       Etats_Alteres: CONFUS }),
-            fiche("HEROS", "Allié")
-        ],
-        positions: { BRUTE: { q: 0, r: 0 }, HEROS: { q: 1, r: 0 } },
-        partie: { Tour_Combat: 1, Ordre_Initiative: ["BRUTE", "HEROS"] }
-    });
-    plateau.file = [{ id: "BRUTE", carte: "C_B" }];
-
-    const carteBrute = { idCarte: "C_B", infos: { portee: 1, fatigue: 10 },
-                         attaques: [{ valeurBrute: 15 }], alterations: [] };
-
-    // On cherche, parmi plusieurs graines, un tour où la confusion a frappé :
-    // elle ne se déclenche qu'une fois sur deux, par construction.
-    let tourConfus = null;
-    for (let g = 1; g <= 40 && !tourConfus; g++) {
-        const pas = jouerCreature({ ...plateau, graine: g }, "BRUTE", carteBrute, null);
-        if (!pas) continue;
-        const mots = pas.entree.etapes.filter(e => e.type === "message" && /Confus/.test(e.texte || ""));
-        if (mots.length > 0) tourConfus = pas;
+    let n = 0, s = 0, h = 0, f = 0, d = 0, sh = 0, fd = 0;
+    for (let g = 1; g <= 6000; g++) {
+        const a = appliquerConfusion(monde(), carte(), null, creerDes(g));
+        n++;
+        if (a.confusion.soi) s++;
+        if (a.confusion.hasard) h++;
+        if (a.confusion.fuite) f++;
+        if (a.confusion.dissipee) d++;
+        if (a.confusion.soi && a.confusion.hasard) sh++;
+        if (a.confusion.fuite && a.confusion.dissipee) fd++;
     }
+    const pc = (x) => x / n * 100;
+    const pres = (x, cible, marge = 2.5) => Math.abs(pc(x) - cible) < marge;
+    verifier("≈ 30 % se visent eux-mêmes", pres(s, 30), pc(s).toFixed(1) + " %");
+    verifier("≈ 30 % visent au hasard", pres(h, 30), pc(h).toFixed(1) + " %");
+    verifier("≈ 30 % s'enfuient", pres(f, 30), pc(f).toFixed(1) + " %");
+    verifier("≈ 30 % s'en remettent", pres(d, 30), pc(d).toFixed(1) + " %");
+    verifier("les deux premiers ensemble ≈ 9 % (indépendants : 30 % × 30 %)", pres(sh, 9, 2), pc(sh).toFixed(1) + " %");
+    verifier("fuite ET guérison ≈ 9 %", pres(fd, 9, 2), pc(fd).toFixed(1) + " %");
+}
 
-    verifier("une créature confuse finit par se tromper", !!tourConfus,
-             tourConfus ? "trouvé" : "aucun tour confus sur 40 graines");
-    if (tourConfus) {
-        verifier("et le mot est dit, comme pour un héros",
-                 tourConfus.entree.etapes.some(e => e.type === "message" && /Confus/.test(e.texte || "")));
-        verifier("l'état du combat reste cohérent",
-                 verifierEtatCombat(tourConfus.etat).length === 0,
-                 verifierEtatCombat(tourConfus.etat).join(" | "));
+console.log("\n3. UN COMBATTANT SAIN NE TIRE AUCUN DÉ");
+{
+    const des = creerDes(77), temoin = creerDes(77);
+    const a = appliquerConfusion(monde(9, []), carte(), null, des);
+    verifier("sa carte ne change pas", !a.confusion && JSON.stringify(a.attaques[0].cibles) === '["ORC"]');
+    verifier("et la suite des dés est intacte", des.d100() === temoin.d100());
+}
+
+console.log("\n4. LES CAS PARTICULIERS");
+{
+    const soin = carte({ attaques: [], alterations: [{ nom: "Étourdi", chance: 100, duree: 2, cibles: ["ORC"] }] });
+    const s = appliquerConfusion(monde(), soin, null, desTruques([NON, OUI, NON, NON]));
+    verifier("une carte sans attaque ne part pas au hasard : elle revient sur lui",
+             JSON.stringify(s.alterations[0].cibles) === '["MOI"]');
+    const seul = monde(9, CONFUS, { MOI: { q: 0, r: 0 }, AMI: { q: 9, r: 0 }, GOB: { q: 9, r: -3 }, ORC: { q: -9, r: 0 } });
+    const perdu = appliquerConfusion(seul, carte({ attaques: [{ valeurBrute: 10, cibles: ["ORC"], rangeMax: 1 }] }),
+                                     null, desTruques([NON, OUI, NON, NON]));
+    verifier("personne à portée : la carte revient sur lui", JSON.stringify(perdu.attaques[0].cibles) === '["MOI"]');
+    const pousse = carte({ alterations: [{ nom: "Poussée", estPoussee: true, chance: 100, cibles: ["ORC"] }] });
+    const p = appliquerConfusion(monde(), pousse, null, desTruques([OUI, NON, NON, NON]));
+    verifier("une poussée ne se retourne jamais sur soi", p.alterations[0].cibles.length === 0);
+    const r = resoudreCarte(monde(), { ...appliquerConfusion(monde(), carte(), null, desTruques([OUI, OUI, NON, NON])),
+                                       jets: { parCible: { MOI: { esquive: false, etats: {} }, AMI: { esquive: false, etats: {} },
+                                                           GOB: { esquive: false, etats: {} }, ORC: { esquive: false, etats: {} } } } });
+    const textes = r.etapes.filter(e => e.type === "message").map(e => e.texte);
+    verifier("le joueur est prévenu des deux", textes.includes("Confus : s'inflige sa propre compétence !")
+             && textes.includes("Confus : cible au hasard !"), textes.join(" | "));
+    verifier("et les deux sont frappés", r.etat.combattants.MOI.pv === 50
+             && Object.values(r.etat.combattants).filter(c => c.pv === 50).length === 2);
+}
+
+console.log("\n5. DANS LE CERVEAU : LA FUITE, PUIS LA FIN DE LA BOUCLE (joueur)");
+{
+    // On cherche, graine par graine, un tour où les jets 3 et 4 sortent tous
+    // les deux : c'est le cerveau qui tire, on ne triche pas ici.
+    let trouve = null;
+    for (let g = 1; g <= 400 && !trouve; g++) {
+        const pas = appliquerIntention(monde(g), { id: "I1", type: "carte", acteur: "MOI", poste: "P_01", idCarte: "C1",
+            attaques: [{ valeurBrute: 10, cibles: ["ORC"], rangeMax: 3, typeRes: "Physique" }], alterations: [], coutFatigue: 5 }, null);
+        const t = pas.entree.etapes.map(e => e.texte || e.type);
+        if (t.includes("Confus : s'enfuit !") && t.includes("Confusion dissipée !")) trouve = { g, pas, t };
     }
+    verifier("le cerveau fait fuir ET guérir (une graine suffit à le montrer)", !!trouve, trouve ? `graine ${trouve.g}` : "");
+    if (trouve) {
+        const e = trouve.pas.entree.etapes;
+        const iFuite = trouve.t.indexOf("Confus : s'enfuit !"), iFin = trouve.t.indexOf("Confusion dissipée !");
+        const iCarte = e.findIndex(x => x.type === "carte");
+        const pasFuite = e.slice(iFuite).filter(x => x.type === "pas" && x.acteur === "MOI");
+        verifier("dans l'ordre : la carte, la fuite, la dissipation", iCarte < iFuite && iFuite < iFin, trouve.t.join(","));
+        verifier("il fuit vraiment (des pas après l'annonce)", pasFuite.length > 0, String(pasFuite.length));
+        const moi = trouve.pas.etat.combattants.MOI;
+        verifier("et il n'est plus confus à la fin", !moi.etats.some(x => x.nom === "Confusion"));
+        const avant = monde(trouve.g).combattants;
+        verifier("il s'éloigne de l'ennemi le plus proche", distance(moi, avant.GOB) >= distance(avant.MOI, avant.GOB),
+                 `${distance(avant.MOI, avant.GOB)} → ${distance(moi, avant.GOB)}`);
+    }
+    // Et une graine où la dissipation ne sort pas : il reste confus.
+    let reste = null;
+    for (let g = 1; g <= 200 && !reste; g++) {
+        const pas = appliquerIntention(monde(g), { id: "I1", type: "carte", acteur: "MOI", poste: "P_01", idCarte: "C1",
+            attaques: [{ valeurBrute: 10, cibles: ["ORC"], rangeMax: 3, typeRes: "Physique" }], alterations: [], coutFatigue: 5 }, null);
+        if (!pas.entree.etapes.some(x => x.texte === "Confusion dissipée !")) reste = pas;
+    }
+    verifier("sans le 4e jet, la confusion demeure", !!reste && reste.etat.combattants.MOI.etats.some(x => x.nom === "Confusion"));
+}
+
+console.log("\n6. UNE CRÉATURE CONFUSE AUSSI");
+{
+    let vu = null;
+    for (let g = 1; g <= 400 && !vu; g++) {
+        const etat = construireEtatCombat({
+            idPartie: "P1", cerveau: "P_01", graine: g,
+            combattants: [fiche("H1", "Allié", { idJoueur: "P_01" }),
+                          fiche("M1", "Ennemi", { estMonstre: true, Etats_Alteres: CONFUS })],
+            positions: { H1: { q: 0, r: 0 }, M1: { q: 1, r: 0 } },
+            partie: { Phase_Combat: "Resolution", Tour_Combat: 1, Ordre_Initiative: ["M1", "H1"],
+                      File_Attente_Combat: [{ idPersonnage: "M1", idCarte: "CM" }] } });
+        const carteM = { idCarte: "CM", infos: { portee: 1, fatigue: 5 },
+                         attaques: [{ valeurBrute: 8, rangeMax: 1, typeRes: "Physique" }], alterations: [] };
+        const pas = jouerCreature(etat, "M1", carteM, null);
+        const t = (pas && pas.entree ? pas.entree.etapes : []).map(e => e.texte || e.type);
+        if (t.includes("Confus : s'enfuit !")) vu = t;
+    }
+    verifier("une créature confuse s'enfuit elle aussi", !!vu, vu ? vu.join(",") : "");
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

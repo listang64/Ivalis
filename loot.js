@@ -1323,7 +1323,7 @@ window.bandeauObjetButin = function(item, idPersonnage) {
     if (idPersonnage && typeof window.peutEquiper === "function") {
         const test = window.peutEquiper(idPersonnage, item);
         if (!test.possible) {
-            html += `<div class="prerequis-objet">⚠ ${item.carac} ${item.prerequis} requis (tu as ${test.valeur})</div>`;
+            html += `<div class="prerequis-objet">⚠ ${window.texteCaracsObjet(item)} ${item.prerequis} requis (tu as ${test.valeur})</div>`;
         }
     }
     return html;
@@ -1462,7 +1462,7 @@ window.ouvrirConfirmationEquip = function(idPersonnage, item, uid, mode) {
         ? perso && perso["equipMain" + mains[0]] : null;
     const lignes = [];
     if (!test.possible) {
-        lignes.push(`Il te faut ${item.prerequis} en ${item.carac} pour porter cet objet (tu as ${test.valeur}).`);
+        lignes.push(`Il te faut ${item.prerequis} en ${window.texteCaracsObjet(item)} pour porter cet objet (tu as ${test.valeur}).`);
     } else if (bouclierPorte && bouclierPorte.nom) {
         lignes.push(`Un seul bouclier à la fois : celui-ci ne peut que remplacer ${bouclierPorte.nom}.`);
     }
@@ -1639,7 +1639,7 @@ window.rendreCarteLootPool = function(item, mesIds, dejaValide) {
                 ? window.peutEquiper(id, item) : { possible: true };
             if (!test.possible) {
                 return `<button class="btn-loot-mini place" disabled style="opacity:0.4; cursor:not-allowed;"
-                    title="${item.carac} ${item.prerequis} requis">Hors de portée${suffixeNom}</button>`;
+                    title="${window.texteCaracsObjet(item)} ${item.prerequis} requis">Hors de portée${suffixeNom}</button>`;
             }
             return `<button class="btn-loot-mini ${dedans ? "retirer" : "place"}"
                 onclick="window.choisirPlacementPool('${id}','${item.uid}')">${dedans ? "Se retirer" : "Se placer"}${suffixeNom}</button>`;

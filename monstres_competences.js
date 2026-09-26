@@ -1183,7 +1183,11 @@ function texteEffet(effet, empilements, crans) {
     //    font exception, comme dans la Forge : leur valeur est une distance
     //    fixe (2 et 3 cases) que les empilements ne multiplient pas.
     const nomFixe = (effet.Nom || "").toLowerCase();
-    const valeurEstDistanceFixe = nomFixe.includes("pouss") || nomFixe.includes("traction");
+    // L'Électrifié aussi : l'initiative qu'il retire est FIXE (35, la Valeur du
+    // grimoire) — le moteur ne la multiplie jamais par les crans, seule la
+    // chance monte. La Forge l'annonçait multipliée (Nico l'a vu).
+    const valeurEstDistanceFixe = nomFixe.includes("pouss") || nomFixe.includes("traction")
+        || nomFixe.includes("électrif") || nomFixe.includes("electrif");
     if (val > 0 && !valeurEstDistanceFixe) {
         let calc = val * empilements;
         if (effet.Nom === "Distance") calc += 1;

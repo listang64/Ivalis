@@ -422,7 +422,7 @@ console.log("\n7. LE TIRAGE PUISE DANS LE TABLEAU D'ÉQUIPEMENT");
   const vide = p1.w.tirerObjetsAleatoires.call(null, "Normale", 2);
   verifier("le tirage rend toujours une liste (jamais d'exception)", Array.isArray(vide));
 
-  // 60% arme / 40% bouclier-armure : une pondération voulue par Nico, pas le
+  // 75% arme / 25% bouclier-armure (revu par Nico, c'était 60/40) : une pondération voulue, pas le
   // tirage brut sur tout le catalogue d'avant (qui suivait le nombre de
   // modèles de chaque famille, jamais réglé à une proportion précise).
   const grosTirage = [];
@@ -430,11 +430,11 @@ console.log("\n7. LE TIRAGE PUISE DANS LE TABLEAU D'ÉQUIPEMENT");
   const estDefense = (o) => o.type === "Bouclier" || o.emplacement === "Armure";
   const nbDefense = grosTirage.filter(estDefense).length;
   const partDefense = nbDefense / grosTirage.length;
-  verifier("environ 40% de boucliers/armures sur un grand tirage",
-           partDefense > 0.34 && partDefense < 0.46,
+  verifier("environ 25% de boucliers/armures sur un grand tirage",
+           partDefense > 0.20 && partDefense < 0.30,
            `(${(partDefense * 100).toFixed(1)}% sur ${grosTirage.length})`);
-  verifier("et donc environ 60% d'armes",
-           (1 - partDefense) > 0.54 && (1 - partDefense) < 0.66,
+  verifier("et donc environ 75% d'armes",
+           (1 - partDefense) > 0.70 && (1 - partDefense) < 0.80,
            `(${((1 - partDefense) * 100).toFixed(1)}%)`);
   verifier("les deux familles sortent bien : boucliers et armures apparaissent",
            grosTirage.some(o => o.type === "Bouclier") && grosTirage.some(o => o.emplacement === "Armure"));

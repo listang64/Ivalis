@@ -138,7 +138,9 @@ console.log("\n1. L'ÉTIQUETTE : LE TYPE, PUIS LA CARAC EN PETIT ET EN MARRON");
     div.innerHTML = window.etiquetteObjetHTML(o);
     const span = div.querySelector(".carac-objet");
     return { modele: m.modele, texte: div.textContent, carac: span ? span.textContent : null,
-             attendue: window.libelleCaracObjet(m.carac), type: window.libelleTypeObjet(m.type) };
+             // Une armure en affiche plusieurs (« Intelligence ou Charisme ») :
+             // c'est window.texteCaracsObjet qui les écrit.
+             attendue: window.texteCaracsObjet(m), type: window.libelleTypeObjet(m.type) };
   }));
   const sansCarac = catalogue.filter(c => !c.carac || c.carac !== c.attendue);
   verifier("les " + catalogue.length + " modèles du catalogue affichent leur carac", sansCarac.length === 0,

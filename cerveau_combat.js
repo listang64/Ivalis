@@ -39,12 +39,33 @@
 
 import { clonerEtat, combattant, creerDes, combattantIllusion,
          verifierEtatCombat, compterPasMarche, FORMAT_ETAT } from './combat_etat.js';
-import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion,
+import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissiperConfusion,
          traverserZones, creerZonePure, poserZone, vieillirZones,
          chaineDeDegats, REGLES_ETATS, estDansLeNoir } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant } from './mouvement_pur.js';
-import { deciderTourCreature, choisirZone, choisirRepli } from './ia_pure.js';
+import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche } from './ia_pure.js';
+
+// LES SUITES D'UNE CARTE LANCÉE EN ÉTAT DE CONFUSION (règle de Nico, voir
+// appliquerConfusion) : après la carte, le 3e jet le fait FUIR comme sous la
+// Peur — loin de l'adversaire le plus proche, et chaque ennemi quitté frappe —
+// puis, en fin de boucle, le 4e jet dissipe la confusion. Ici et pas dans
+// resoudreCarte : la fuite tire un dé à chaque case, et seul le cerveau en a.
+function suitesDeConfusion(etat, action, des, plateau) {
+    const conf = action && action.confusion;
+    if (!conf) return [];
+    const id = action.idLanceur;
+    const etapes = [];
+    const moi = combattant(etat, id);
+    if (conf.fuite && moi && !moi.aTerre) {
+        etapes.push({ type: "message", cible: id, acteur: id, texte: "Confus : s'enfuit !", couleur: "#cc66ff" });
+        const menace = ennemiLePlusProche(etat, id);
+        etapes.push(...resoudrePeur(etat, menace ? menace.id : id, id, des, plateau, { exempte: null }));
+    }
+    const apres = combattant(etat, id);
+    if (conf.dissipee && apres && !apres.aTerre) etapes.push(...dissiperConfusion(etat, id));
+    return etapes;
+}
 
 const nombre = (v, defaut = 0) => {
     const n = parseInt(v);
@@ -752,6 +773,9 @@ export function appliquerIntention(etat, intention, plateau) {
             });
         });
 
+        // Lancée en état de confusion : la fuite, puis la fin de la boucle.
+        etapes.push(...suitesDeConfusion(suivant, action, des, plateau));
+
         // LA ZONE QUE LA CARTE LAISSE DERRIÈRE ELLE. Elle se posait jusqu'ici
         // hors du cerveau (creerZonePersistante écrivait dans Combat_VTT et
         // dans une variable globale), donc l'état du combat ne la connaissait
@@ -916,6 +940,9 @@ export function jouerCreature(etat, id, carte, plateau) {
                 etapes.push(...resoudrePeur(courant, id, idCible, des, plateau));
             });
         });
+
+        // Une créature confuse s'enfuit, et s'en remet, comme un joueur.
+        etapes.push(...suitesDeConfusion(courant, action, des, plateau));
 
         // SA CARTE PORTE UN REPLI : elle décroche après avoir frappé, vers la
         // case qui l'éloigne le plus de l'adversaire (ia_pure.js, choisirRepli),
