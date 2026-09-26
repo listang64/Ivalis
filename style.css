@@ -3437,3 +3437,86 @@ textarea.input-texte-parchemin {
     white-space: nowrap;
 }
 
+
+/* =====================================================================
+   CHOIX DE CLASSE (classes.js)
+   Toutes les images en object-fit: cover — JAMAIS fill, qui les étire.
+   ===================================================================== */
+#ecran-choix-classe {
+  position: fixed; top: 0; left: 0; width: 100vw; height: var(--app-h, 100vh);
+  z-index: 10000; background: radial-gradient(circle at 50% 30%, #1d140c 0%, #0a0a0a 70%);
+  overflow: hidden;
+}
+
+/* Le bouton rond à la flèche coudée, coin haut gauche. */
+#btn-retour-classe {
+  position: absolute; top: 20px; left: 20px; z-index: 5;
+  width: 58px; height: 58px; border-radius: 50%; padding: 0;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  color: #f3dfa6; background: radial-gradient(circle, #3a2a12 0%, #1a1208 100%);
+  border: 2px solid #c9a24a; box-shadow: 0 0 14px rgba(212, 175, 55, 0.45), 0 4px 10px rgba(0,0,0,0.8);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+#btn-retour-classe:hover { transform: scale(1.06); box-shadow: 0 0 22px rgba(212, 175, 55, 0.7), 0 4px 10px rgba(0,0,0,0.8); }
+
+/* Les beaux titres : or gravé, en Cinzel. */
+.titre-choix-classe, .titre-fiche-classe {
+  font-family: 'Cinzel', serif; text-transform: uppercase; letter-spacing: 5px; text-align: center;
+  background: linear-gradient(180deg, #fff3c4 0%, #e8c46a 45%, #a8781f 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(2px 3px 6px rgba(0,0,0,0.9));
+}
+.titre-choix-classe { font-size: clamp(34px, 5vw, 62px); margin: 0 0 3vh; }
+
+/* La grille : rangées de 4, défilement vertical si l'écran est court. */
+#vue-grille-classes {
+  position: absolute; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 5vh 16px 6vh; box-sizing: border-box;
+}
+#grille-classes {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(12px, 2.2vw, 28px); width: 100%; max-width: 920px;
+}
+@media (max-width: 520px) { #grille-classes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* La carte de tarot : 7:12, bordure dorée, nom en bas. */
+.carte-classe {
+  position: relative; aspect-ratio: 7 / 12; padding: 0; cursor: pointer; overflow: hidden;
+  border-radius: 10px; background: #120c06;
+  border: 3px solid #d4af37;
+  box-shadow: 0 0 0 1px #6b4d12, inset 0 0 0 2px rgba(255, 233, 160, 0.35), 0 8px 18px rgba(0,0,0,0.75);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.carte-classe:hover, .carte-classe:focus-visible {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 0 0 1px #6b4d12, inset 0 0 0 2px rgba(255, 233, 160, 0.5), 0 0 22px rgba(212, 175, 55, 0.55), 0 12px 24px rgba(0,0,0,0.8);
+}
+.carte-classe-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
+.carte-classe-nom {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 22% 6px 8%;
+  background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.78) 55%, rgba(0,0,0,0.92) 100%);
+  font-family: 'Cinzel', serif; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
+  font-size: clamp(11px, 1.45vw, 17px); line-height: 1.15; color: #f3dfa6;
+  text-shadow: 0 0 6px rgba(212, 175, 55, 0.6), 1px 1px 3px black; text-align: center;
+}
+
+/* La fiche : l'image de fond en plein écran, le titre, la validation. */
+#vue-fiche-classe { position: absolute; inset: 0; }
+#fond-fiche-classe { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; z-index: 1; }
+.voile-fiche-classe {
+  position: absolute; inset: 0; z-index: 2;
+  background: linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0) 62%, rgba(0,0,0,0.8) 100%);
+}
+.titre-fiche-classe {
+  position: absolute; top: 9vh; left: 50%; transform: translateX(-50%); z-index: 3;
+  width: 92%; margin: 0; font-size: clamp(38px, 6.5vw, 78px);
+}
+.btn-valider-classe {
+  position: absolute; bottom: 7vh; left: 50%; transform: translateX(-50%); z-index: 3;
+  padding: 16px 44px; cursor: pointer; border-radius: 40px;
+  font-family: 'Cinzel', serif; font-weight: bold; font-size: 20px; letter-spacing: 2px; text-transform: uppercase;
+  color: #1a1208; background: linear-gradient(180deg, #fff0b8 0%, #e2b84f 55%, #b3862a 100%);
+  border: 2px solid #fff3c4; box-shadow: 0 0 18px rgba(212, 175, 55, 0.6), 0 6px 14px rgba(0,0,0,0.8);
+}
+.btn-valider-classe:hover { filter: brightness(1.08); }

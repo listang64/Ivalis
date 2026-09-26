@@ -184,6 +184,7 @@
          aux calques transformes (la carte du monde est zoomee et deplacee), dont on
          recopie la position exacte a l'ecran pour que la bande soit dans la continuite. */
       var scenes = [
+        { cible: '#ecran-choix-classe' },
         { cible: '#ecran-selection-race' },
         { cible: '#ecran-recit-dynamique' },
         { cible: '#ecran-accueil' },
@@ -1400,6 +1401,7 @@
           <!-- Met la base au niveau des règles écrites dans le code. Sans danger
                à relancer : ce qui est déjà à jour n'est pas réécrit. -->
           <button id="btn-migration-effets" class="btn-parametres" style="background-color: #1b6e3a; border-color: #14532d;" onclick="jouerSonClic(); window.appliquerMigrationEffets()" title="Aligne les effets de la base sur les règles actuelles du moteur">Mettre la BDD à jour</button>
+          <button id="btn-installer-classes" class="btn-parametres" style="background-color: #5c3a21; border-color: #3b2412;" onclick="jouerSonClic(); window.installerClasses()" title="Recopie les 14 classes (noms et images) dans la collection Classes, sans écraser ce qui y a été ajouté">Installer les classes</button>
           
           <button class="btn-parametres" onclick="jouerSonClic(); window.fermerGestionEffets()">Retour</button>
         </div>
@@ -1921,7 +1923,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=48"></script>
+<script src="trace_combat.js?v=49"></script>
 <!-- LA MISE À JOUR AUTOMATIQUE. Juste après la trace, parce qu'elle a besoin du
      numéro de version qu'elle y trouve, et avant tout le reste : si la page est
      périmée, autant s'en apercevoir avant d'avoir chargé le jeu entier.
@@ -1951,8 +1953,9 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=29"></script>
 <script type="module" src="ia_master.js?v=6"></script>
-<script type="module" src="app.js?v=61"></script>
-<script type="module" src="creation_personnage.js?v=9"></script>
+<script type="module" src="app.js?v=62"></script>
+<script type="module" src="creation_personnage.js?v=10"></script>
+<script type="module" src="classes.js?v=1"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=34"></script>
 <!-- Le plateau porte désormais son ?v= comme les autres : sans lui, un iPad
@@ -2077,8 +2080,9 @@
   <!-- WIZARD CREATION ETAPE 0 (SÉLECTION RACE ET GENRE)       -->
   <!-- ======================================================= -->
   <div id="ecran-selection-race" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: var(--app-h); z-index: 10000; background-color: #0a0a0a;">
-      <!-- L'image de fond déformable (object-fit: fill) -->
-      <img id="bg-selection-race" src="" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: fill; z-index: 1;">
+      <!-- L'image de fond : object-fit: cover, JAMAIS fill — fill étirait l'image
+           (fonds déformés sur tablette). cover la rogne sans la déformer. -->
+      <img id="bg-selection-race" src="" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; z-index: 1;">
       
       <!-- Léger voile dégradé pour que les boutons et onglets restent bien lisibles -->
       <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, rgba(0,0,0,0) 40%, rgba(0,0,0,0.85) 100%); z-index: 2;"></div>
@@ -2116,6 +2120,39 @@
   </div>
 
   <!-- ======================================================= -->
+  <!-- CHOIX DE CLASSE (classes.js) : après la race et le genre -->
+  <!-- ======================================================= -->
+  <!-- Toutes les images en object-fit: cover, jamais fill (fill les étire). -->
+  <div id="ecran-choix-classe" style="display: none;">
+      <!-- Le bouton rond à la flèche coudée : de la fiche à la grille, de la
+           grille à l'écran des races. -->
+      <button id="btn-retour-classe" type="button" title="Retour" aria-label="Retour"
+              onclick="jouerSonClic(); window.retourChoixClasse()">
+          <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.4"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="9 14 4 9 9 4"></polyline>
+              <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
+          </svg>
+      </button>
+
+      <!-- La grille : cartes de tarot 7:12, bordure dorée, rangées de 4. -->
+      <div id="vue-grille-classes">
+          <h1 class="titre-choix-classe">Choix de Classe</h1>
+          <div id="grille-classes"></div>
+      </div>
+
+      <!-- La fiche : l'image de fond, le grand titre, la validation. Les
+           effets des classes viendront ici plus tard. -->
+      <div id="vue-fiche-classe" style="display: none;">
+          <img id="fond-fiche-classe" src="" alt="">
+          <div class="voile-fiche-classe"></div>
+          <h2 id="titre-fiche-classe" class="titre-fiche-classe"></h2>
+          <button id="btn-valider-classe" type="button" class="btn-valider-classe"
+                  onclick="window.validerClasse()">Choisir cette classe</button>
+      </div>
+  </div>
+
+  <!-- ======================================================= -->
   <!-- NOUVEAU : WIZARD CREATION ETAPE 1 (DESCRIPTIF)          -->
   <!-- ======================================================= -->
   <div id="modale-creation-hero" class="modale-parchemin-jeu" style="display: none; z-index: 200; width: 850px; max-width: 95vw; max-height: 85vh; overflow-y: auto; overflow-x: hidden;">
@@ -2124,6 +2161,7 @@
     <input type="hidden" id="champ-id-personnage" value="">
     <input type="hidden" id="champ-statut-personnage" value="">
     <input type="hidden" id="champ-id-joueur-perso" value="">
+    <input type="hidden" id="champ-classe" value="">
 
     <div class="grille-descriptif">
       <div>

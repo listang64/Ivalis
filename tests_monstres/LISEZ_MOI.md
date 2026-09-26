@@ -143,6 +143,7 @@ node ia_opportunites.mjs     # les créatures ne prennent plus d'attaque d'oppor
 node tir_monstre_contact.mjs # une créature qui tire au contact perd 30 % (portée = mod Distance)
 node zones_geometrie.mjs     # les zones des sorts ont la forme des hexagones de la map
 node dev_reinit_caracs.mjs   # onglet DEV : réinitialiser les caractéristiques d'un héros
+node choix_classe.mjs        # le choix de classe après la race : grille de tarots, fiche, retour, validation, base
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -3230,3 +3231,38 @@ objets.js ; c'était 60/40). `butin_loot.mjs` le mesure sur 3000 objets.
 Les messages de prérequis (fiche, butin) écrivent « Intelligence ou Charisme ».
 Les objets déjà en jeu gardent le prérequis écrit à leur création.
 `objets_tableau.mjs` (sections 5 et 7) le vérifie.
+
+### Le choix de classe, après la race (architecture et base)
+
+Nico : après le choix de la race, un panneau « Choix de Classe ». Pour
+l'instant l'architecture et le lien avec la base ; les effets des classes
+viendront après. Une condition de code : `object-fit: cover`, jamais `fill`.
+
+- **Le parcours** : races → genre → **grille des classes** → **fiche de la
+  classe** → « Choisir cette classe » → fenêtre d'identité, comme avant.
+  `validerRaceEtGenre` (creation_personnage.js) ouvre désormais le choix de
+  classe ; l'ancienne suite est devenue `ouvrirEtapeIdentite`, que la validation
+  de la classe appelle. Si classes.js manquait (page en cache), la création
+  passe directement à l'identité plutôt que de bloquer.
+- **La grille** (classes.js, style.css) : 14 cartes de tarot au format 7:12,
+  bordure dorée, rangées de 4 (2 sur un écran de téléphone), le nom en bas de
+  chaque carte, le titre « Choix de Classe » en haut ; défilement vertical si
+  l'écran est court.
+- **La fiche** : l'image de fond de la classe en plein écran, un grand titre
+  doré, le bouton de validation. Le bouton rond à la flèche coudée, coin haut
+  gauche : de la fiche à la grille, de la grille à l'écran des races.
+- **Les images** sont toutes en `object-fit: cover`. L'écran des races, qui
+  étirait ses fonds (`fill`), passe aussi en `cover`.
+- **La base** : collection « Classes » (Nom, Image_Tarot, Image_Fond, Ordre ;
+  les effets s'y ajouteront). L'écran lit la base et, si elle est vide ou
+  illisible, affiche la liste écrite dans classes.js — il ne dépend jamais du
+  réseau pour exister. Le bouton « Installer les classes » des Paramètres
+  recopie cette liste dans la base en fusion (rien d'ajouté à la main n'est
+  écrasé). Le héros garde sa classe dans le champ « Classe » de sa fiche
+  (`frontVersPersoDoc` / `persoDocVersFront`, app.js), transmis par la création
+  complète et la création rapide.
+
+`choix_classe.mjs` joue tout le parcours sur la vraie page : format 7:12,
+rangées de 4, bordure, `cover`, nom en bas, fiche et fond, retour en deux temps,
+validation vers l'identité avec la classe retenue, installation en base (14
+documents, en fusion).

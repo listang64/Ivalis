@@ -92,11 +92,26 @@ window.changerRaceSelection = function(race) {
     if (gameplay) gameplay.innerHTML = texteGameplay; 
 };
 
+window.GENRE_SELECTIONNE_TEMP = null;
+
+// Le genre choisi clôt l'écran des races : place au CHOIX DE CLASSE
+// (classes.js), qui rendra la main à ouvrirEtapeIdentite une fois validé.
 window.validerRaceEtGenre = function(genre) {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    
-    // 1. On ferme le grand écran de sélection des races
+    window.GENRE_SELECTIONNE_TEMP = genre;
     window.fermerSelectionRace();
+    if (typeof window.ouvrirChoixClasse === "function") {
+        window.ouvrirChoixClasse();
+    } else {
+        // classes.js absent (page servie depuis un cache ancien) : on ne
+        // bloque pas la création pour autant.
+        window.ouvrirEtapeIdentite();
+    }
+};
+
+// L'étape d'identité (apparence, nom, équipement), après race, genre et classe.
+window.ouvrirEtapeIdentite = function() {
+    const genre = window.GENRE_SELECTIONNE_TEMP;
 
     // 2. Nettoyage de la modale descriptive (Étape 1 classique)
     const modale = document.getElementById("modale-creation-hero");
@@ -110,6 +125,8 @@ window.validerRaceEtGenre = function(genre) {
     // --- AUTO-REMPLISSAGE DES CHAMPS SELECTIONNÉS ---
     document.getElementById("champ-race").value = window.RACE_SELECTIONNEE_TEMP;
     document.getElementById("champ-genre").value = genre;
+    const champClasse = document.getElementById("champ-classe");
+    if (champClasse) champClasse.value = window.CLASSE_SELECTIONNEE_TEMP || "";
 
     // --- NOUVEAU : PRÉPARATION DU TERRAIN (ON CACHE LES CHAMPS INUTILES) ---
     window.adapterFormulaireRace(window.RACE_SELECTIONNEE_TEMP);
@@ -326,6 +343,7 @@ window.validerEtapeDescriptif = async function() {
         age: document.getElementById("champ-age").value,
         race: document.getElementById("champ-race").value,
         genre: document.getElementById("champ-genre").value,
+        classe: document.getElementById("champ-classe") ? document.getElementById("champ-classe").value : "",
         cheveux: document.getElementById("champ-cheveux") ? document.getElementById("champ-cheveux").value.trim() : "",
         yeux: document.getElementById("champ-yeux") ? document.getElementById("champ-yeux").value.trim() : "",
         pilosite: document.getElementById("champ-pilosite") ? document.getElementById("champ-pilosite").value.trim() : "",
@@ -388,6 +406,7 @@ window.validerEtapeDescriptifRapide = async function() {
         age: document.getElementById("champ-age").value,
         race: document.getElementById("champ-race").value,
         genre: document.getElementById("champ-genre").value,
+        classe: document.getElementById("champ-classe") ? document.getElementById("champ-classe").value : "",
         couleur: document.getElementById("champ-couleur-token").value || "#ff4c4c",
         
         // Même équipement de départ que la création complète : les deux listes

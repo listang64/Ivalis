@@ -137,6 +137,8 @@ function persoDocVersFront(id, d) {
     prenom: d.Prenom_Personnage || "",
     nom: d.Nom_Personnage || "",
     race: d.Race || "",
+    // La classe choisie à la création (classes.js). Vide pour un héros d'avant.
+    classe: d.Classe || "",
     // DEUX AVATARS, UN SEUL POINT DE BASCULE.
     //  URL_Cloudinary est le portrait de RÉFÉRENCE : il ne bouge jamais, et
     //  c'est lui qu'on renvoie au dessinateur à chaque changement d'armure.
@@ -950,6 +952,7 @@ function frontVersPersoDoc(donnees, idPersonnage) {
     Prenom_Personnage: donnees.prenom || "",
     Nom_Personnage: donnees.nom || "",
     Race: donnees.race || "",
+    Classe: donnees.classe || "",
     // Le portrait de référence : celui d'où repartent toutes les régénérations.
     URL_Cloudinary: donnees.urlPortraitReference || donnees.urlCloudinary || "",
     URL_Avatar_Equipe: donnees.urlAvatarEquipe || "",
