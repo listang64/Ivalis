@@ -450,14 +450,12 @@ export function choisirZone(etat, id, infosCarte, plateau, des, depart) {
 
     // Une zone de corps-à-corps est centrée sur le lanceur : seule
     // l'orientation se choisit. Une zone à distance se pose où l'on veut, dans
-    // la limite de la portée, de la ligne de vue, et de la règle d'engagement
-    // (au contact d'un ennemi, on ne vise plus qu'à une case — mêmes règles
-    // que pour une carte à cible unique).
+    // la limite de la portée et de la ligne de vue — engagé ou non, comme
+    // pour les héros (la règle de l'engagement ne vaut que pour une cible
+    // unique ; voir casesPosablesZone, moteur_effets.js).
     let ancres = [{ q: origine.q, r: origine.r }];
     if (infos.zoneEstADistance) {
-        const portee = Math.max(1, Math.min(8, nombre(infos.zonePortee, 1)));
-        const engage = occupants.some(o => o.valeur > 0 && distance(origine, o) === 1);
-        const limite = engage ? 1 : portee;
+        const limite = Math.max(1, Math.min(8, nombre(infos.zonePortee, 1)));
         ancres = [];
         for (let dq = -limite; dq <= limite; dq++) {
             for (let dr = -limite; dr <= limite; dr++) {

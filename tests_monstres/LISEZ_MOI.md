@@ -145,7 +145,7 @@ node zones_geometrie.mjs     # les zones des sorts ont la forme des hexagones de
 node dev_reinit_caracs.mjs   # onglet DEV : réinitialiser les caractéristiques d'un héros
 node choix_classe.mjs        # le choix de classe après la race : grille de tarots, fiche, retour, validation, base ; pleine largeur, cartes collées, titre à gauche, q_auto,f_auto
 node illusions_multiples.mjs # deux Illusions sur une carte : deux leurres, sur deux cases choisies l'une après l'autre
-node engagement_tombe.mjs    # un ennemi à terre (Inconscient, 0 PV) ne tient plus au corps-à-corps : zone et tir à pleine portée
+node engagement_tombe.mjs    # un ennemi à terre ne tient plus au corps-à-corps ; une ZONE n'est plus soumise à l'engagement du tout
 node soin_et_poussee.mjs     # soin + poussée : le ciblage envoie les deux, le cerveau pousse quand le jet passe (15 % par cran)
 node marche_anticipee.mjs    # le pion part dès la validation sur l'écran de celui qui joue ; le journal confirme ou corrige
 node fiche_race_classe.mjs   # race et classe dans l'onglet Statistiques ; portraits au soleil, sans reflet violacé
@@ -3367,3 +3367,18 @@ Huit remarques de Nico après une partie.
   cache technique qui n'éclaire rien, interdisent tout reflet, liseré, halo ou
   teinte violacé, rose ou magenta sur le personnage, et posent la lumière d'un
   soleil. `fiche_race_classe.mjs`.
+
+### Une zone à distance se pose à sa pleine portée, même au contact
+
+Nico, capture à l'appui : « tu n'as pas réglé le problème de distance sur une
+attaque en zone : j'ai 3 de distance et je ne peux lancer qu'au cac ». Sa
+lanceuse avait un orc DEBOUT au contact. Le correctif précédent n'écartait de
+la règle de l'engagement que les ennemis tombés ; or c'est la règle elle-même
+qui gênait : au contact d'un ennemi, elle ramenait toute zone offensive à une
+case. Elle ne s'applique plus aux zones — ni chez les héros
+(`casesPosablesZone`, survol et clic), ni chez les créatures (`choisirZone`,
+ia_pure.js), pour que les deux camps jouent la même règle. Elle reste pour une
+cible unique (anneaux, `ajouterCibleCiblage`), avec son malus de tir au
+contact. `engagement_tombe.mjs` rejoue la carte de la partie (Attaque Magique,
+Distance 3, zone de 7 cases, orc au contact) du clic à la zone posée à 3 cases ;
+`zone_assombrissement.mjs` et `ia_pure.mjs` suivent la nouvelle règle.

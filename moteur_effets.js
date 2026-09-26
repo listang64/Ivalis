@@ -415,14 +415,13 @@ window.casesPosablesZone = function(idLanceur, configSort) {
     const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
     if (!tkLanceur || !lanceurData || !window.PLATEAU_VTT || !configSort) return [];
 
-    const portee = Math.max(1, parseInt(configSort.rangeMax) || 1);
-
-    // Au corps-à-corps, on ne vise plus qu'à une case : c'est déjà la règle du jeu.
-    const estEngage = window.estEngageAuContact(idLanceur, tkLanceur, lanceurData);
-    // Le corps-à-corps n'empêche que de FRAPPER plus loin : un soin, un
-    // bouclier se posent à leur pleine portée même avec un ennemi au contact
-    // (la règle est déjà celle du ciblage d'une cible unique).
-    const limite = (estEngage && !configSort.isHeal) ? 1 : portee;
+    // UNE ZONE SE POSE À SA PLEINE PORTÉE, ENGAGÉ OU NON. La règle de
+    // l'engagement (au contact d'un ennemi, on ne frappe qu'au contact) la
+    // ramenait à une case : Nico, collée à un orc, ne pouvait lancer sa zone
+    // de foudre à distance 3 qu'à côté d'elle — « j'ai 3 de distance et je ne
+    // peux lancer qu'au cac ». La règle reste pour une cible unique ; une
+    // zone, elle, part où sa portée l'autorise.
+    const limite = Math.max(1, parseInt(configSort.rangeMax) || 1);
 
     return window.PLATEAU_VTT.getHexesInRadius(tkLanceur.q, tkLanceur.r, limite)
         .filter(h => getHexDistance(tkLanceur, h) <= limite && verifierLigneDeVue(tkLanceur, h));
@@ -1041,10 +1040,8 @@ window.VTT_CIBLAGE_MOUSEMOVE = function(e) {
     if (configSort && configSort.isRanged) {
         const dist = getHexDistance(tkLanceur, hoverHex);
         
-        const estEngage = window.estEngageAuContact(idLanceur, tkLanceur, lanceurData);
-
-        if (estEngage && dist > 1 && !configSort.isHeal) state.zoneCenterHex = null; 
-        else if (dist > configSort.rangeMax) state.zoneCenterHex = null; 
+        // Pas de règle d'engagement pour une zone (voir casesPosablesZone).
+        if (dist > configSort.rangeMax) state.zoneCenterHex = null; 
         else if (!verifierLigneDeVue(tkLanceur, hoverHex)) state.zoneCenterHex = null; 
         else state.zoneCenterHex = hoverHex; 
 
@@ -1101,10 +1098,8 @@ window.VTT_CIBLAGE_CLICK = function(e) {
         const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
         const dist = getHexDistance(tkLanceur, targetHex);
         
-        const estEngage = window.estEngageAuContact(idLanceur, tkLanceur, lanceurData);
-
-        if (estEngage && dist > 1 && !configSort.isHeal) state.zoneCenterHex = null; 
-        else if (dist > configSort.rangeMax) state.zoneCenterHex = null; 
+        // Pas de règle d'engagement pour une zone (voir casesPosablesZone).
+        if (dist > configSort.rangeMax) state.zoneCenterHex = null; 
         else if (!verifierLigneDeVue(tkLanceur, targetHex)) state.zoneCenterHex = null; 
         else state.zoneCenterHex = targetHex; 
     }

@@ -190,7 +190,9 @@ console.log("\n6. UNE ZONE DE SOIN À DISTANCE, MÊME ENNEMI AU CONTACT");
   verifier("sans ennemi au contact : la zone se pose à 2 cases", r.libre.plusLoin === 2, JSON.stringify(r.libre));
   verifier("AVEC un ennemi au contact : toujours à 2 cases (c'est un soin)", r.engage.plusLoin === 2,
            JSON.stringify(r.engage));
-  verifier("une zone d'ATTAQUE engagée, elle, reste bridée à 1", r.attaqueEngagee === 1, `(${r.attaqueEngagee})`);
+  // Règle changée depuis : une zone d'attaque garde elle aussi sa pleine
+  // portée au contact (« j'ai 3 de distance et je ne peux lancer qu'au cac »).
+  verifier("une zone d'ATTAQUE engagée garde aussi sa portée", r.attaqueEngagee === 2, `(${r.attaqueEngagee})`);
 }
 
 verifier("aucune erreur JavaScript", erreurs.length === 0, erreurs.slice(0, 2).join(" | "));

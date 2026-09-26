@@ -80,13 +80,16 @@ console.log("\n2. UN MUR COUPE LA LIGNE DE VUE");
   verifier("celles qu'on voit encore le sont", r.surLesCotes);
 }
 
-console.log("\n3. AU CORPS-À-CORPS, ON NE VISE PLUS QU'À UNE CASE");
+// La règle a changé : une ZONE se pose à sa pleine portée même au contact
+// d'un ennemi (Nico : « j'ai 3 de distance et je ne peux lancer qu'au cac »).
+// L'engagement ne limite plus que la cible unique.
+console.log("\n3. AU CORPS-À-CORPS, UNE ZONE GARDE SA PLEINE PORTÉE");
 {
   const r = await mesurer({ portee: 6, tokens:{ J1:{q:0,r:0}, M1:{q:1,r:0} },
     persos:[{ idPersonnage:"J1", camp:"Allié", statut:"Vivant" },
             { idPersonnage:"M1", camp:"Ennemi", statut:"Vivant" }] });
-  verifier("la portée retombe à une case", r.distMax === 1, `(portée max ${r.distMax})`);
-  verifier("le voile suit cette règle", r.trous === r.nbPosables && r.nbPosables <= 7,
+  verifier("la portée reste celle de la carte", r.distMax === 6, `(portée max ${r.distMax})`);
+  verifier("le voile suit cette règle", r.trous === r.nbPosables && r.nbPosables > 7,
            `(${r.nbPosables} cases)`);
 }
 

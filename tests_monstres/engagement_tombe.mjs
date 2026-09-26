@@ -1,4 +1,5 @@
-// UN ENNEMI À TERRE NE « TIENT » PLUS PERSONNE AU CORPS-À-CORPS.
+// UN ENNEMI À TERRE NE « TIENT » PLUS PERSONNE AU CORPS-À-CORPS — ET UNE ZONE
+// N'Y EST PLUS SOUMISE DU TOUT.
 //
 // Nico : « j'ai une compétence avec dégâts zone à distance de 2, et dans le
 // choix du placement je ne peux cliquer que sur un hexagone au contact, alors
@@ -126,12 +127,15 @@ const zone = () => p.evaluate(() => {
 });
 
 // =========================================================================
-console.log("1. UN ENNEMI DEBOUT AU CONTACT : LA RÈGLE TIENT");
+console.log("1. UN ENNEMI DEBOUT AU CONTACT : ENGAGÉ, MAIS LA ZONE PART QUAND MÊME");
 {
+  // Nico, collée à un orc : « j'ai 3 de distance et je ne peux lancer qu'au
+  // cac ». Une ZONE n'est plus soumise à l'engagement ; la cible unique, si
+  // (section 3).
   await monde({ statut: "Vivant" });
   const z = await zone();
   verifier("le lanceur est engagé", z.engage === true);
-  verifier("la zone offensive reste collée à lui (aucune case à 2)", z.loin === false, `${z.nb} cases`);
+  verifier("la zone offensive se pose quand même à sa pleine portée", z.loin === true, `${z.nb} cases`);
 }
 
 // =========================================================================
@@ -169,6 +173,34 @@ console.log("\n3. MÊME RÈGLE POUR UNE CIBLE UNIQUE À DISTANCE");
   const tombe = await vise({ statut: "Inconscient", PV_Actuels: 0 });
   verifier("ennemi tombé au contact : la cible à 2 est acceptée", tombe.cible === "M2",
            JSON.stringify(tombe));
+}
+
+// =========================================================================
+console.log("\n4. LE CAS DE LA PARTIE : ZONE DE FOUDRE À DISTANCE 3, COLLÉE À UN ORC");
+{
+  // La carte de la capture : Attaque Magique + Distance (3 hexagones) +
+  // Électrifié, sur une zone de 7 cases ; la lanceuse a un orc debout au
+  // contact. Un clic à 3 cases doit poser la zone là.
+  const r = await p.evaluate(async () => {
+    window.__poser({ J1: { q: 0, r: 0 }, J2: { q: 0, r: 3 }, M1: { q: 1, r: 0 }, M2: { q: -3, r: 0 } });
+    const m1 = window.PERSOS_PARTIE.find(x => x.idPersonnage === "M1");
+    Object.assign(m1, { PV_Max: 30, PV_Actuels: 30 });
+    const ZONE7 = [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
+                   { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 }];
+    const id = window.__carte([{ baseEffetId: "ATT", mods: { DIST: 2 }, zoneHexes: ZONE7 }]);
+    await window.demarrerCiblage(id, { idLanceur: "J1" });
+    const st = window.ETAT_CIBLAGE;
+    const config = window.configCiblage(st);
+    window.__caseCliquee = { q: -3, r: 0 };
+    const hote = document.getElementById("conteneur-plateau-vtt");
+    hote.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: 10, clientY: 10 }));
+    return { zone: st.isZone, portee: config && config.rangeMax, aDistance: config && config.isRanged,
+             centre: st.zoneCenterHex, posables: window.casesPosablesZone("J1", config).length };
+  });
+  verifier("la carte est une zone à distance 3", r.zone && r.aDistance && r.portee === 3, JSON.stringify(r));
+  verifier("un clic à 3 cases pose la zone là, malgré l'orc au contact",
+           r.centre && r.centre.q === -3 && r.centre.r === 0, JSON.stringify(r.centre));
+  verifier("les 37 cases à 3 de portée sont proposées", r.posables === 37, String(r.posables));
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

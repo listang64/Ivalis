@@ -490,7 +490,7 @@ console.log("\n13. OÙ POSER UNE ZONE — L'EMPRISE QUI SE CHOISIT SEULE");
         }
         verifier("l'ancre reste dans la portée de la carte", horsPortee === 0, `(${horsPortee}/40)`);
 
-        let tropLoin = 0;
+        let tropLoin = 0, auLoin = 0;
         for (let s = 0; s < 40; s++) {
             const etat = construireEtatCombat({
                 idPartie: "P1", cerveau: "P_03", graine: s,
@@ -502,9 +502,13 @@ console.log("\n13. OÙ POSER UNE ZONE — L'EMPRISE QUI SE CHOISIT SEULE");
             const plan = choisirZone(etat, "M1",
                 { estZone: true, zoneHexes: PATE, zoneEstADistance: true, zonePortee: 6, estAttaqueSimple: true },
                 null, creerDes(s));
-            if (plan && distance({ q: 0, r: 0 }, plan.centre) > 1) tropLoin++;
+            if (plan && distance({ q: 0, r: 0 }, plan.centre) > 6) tropLoin++;
+            if (plan && distance({ q: 0, r: 0 }, plan.centre) > 1) auLoin++;
         }
-        verifier("au corps-à-corps, elle ne vise plus au loin", tropLoin === 0, `(${tropLoin}/40)`);
+        // Une zone garde sa pleine portée même au contact (même règle que les
+        // héros) : elle peut aller chercher J2, à 5 cases, sans dépasser 6.
+        verifier("au corps-à-corps, la zone reste dans sa portée", tropLoin === 0, `(${tropLoin}/40)`);
+        verifier("et peut viser au-delà du contact", auLoin > 0, `(${auLoin}/40)`);
 
         let derriereLeMur = 0;
         const mur = { etatCase: (q, r) => ({ bloquee: q === 2 && r >= -1 && r <= 1, supprimee: false, difficile: false }) };
