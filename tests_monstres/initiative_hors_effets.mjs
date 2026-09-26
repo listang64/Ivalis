@@ -118,6 +118,30 @@ console.log("\n1. LA VRAIE FORGE");
   }
 }
 
+console.log("\n1 bis. L'ÉTALEMENT NE REMISE QUE LA ZONE, LES DÉGÂTS ET LA DISTANCE");
+{
+  // Règle de Nico : la ristourne de fatigue de l'Étalement (« Cout / 1.2 »)
+  // ne s'applique qu'à la zone, aux dégâts et à la distance — pas aux effets
+  // associés. Attaque légère ×2 (2 PC chacune), Étalement, Brûlé ×2 (1 PC).
+  const pc = await p.evaluate(({ effets, attaque, dot, brule, dist }) => {
+    const base = effets.find(e => e.id === attaque);
+    window.forgeState.effetsBDD = effets;
+    window.forgeState.actions = [{ idInst: "A1", baseEffet: base, count: 2, baseDuree: 0,
+                                   mods: { [dot]: 1, [brule]: 2 }, modsDuree: {}, zoneHexes: [] }];
+    window.rafraichirForge();
+    const avecEtat = parseFloat(document.getElementById("forge-cout-pc").innerText);
+    window.forgeState.actions[0].mods = { [dot]: 1, [dist]: 2 };
+    window.rafraichirForge();
+    const avecDistance = parseFloat(document.getElementById("forge-cout-pc").innerText);
+    return { avecEtat, avecDistance };
+  }, { effets, attaque: id("Attaque légère"), dot: id("Durée étalement dégâts"), brule: id("Brûlé"), dist: id("Distance") });
+  const coutDist = parseFloat(String(effets.find(e => e.Nom === "Distance").Cout_PT).replace(",", "."));
+  verifier("attaque + étalement + Brûlé : 4/1,2 + 2 (l'état se paie plein pot)", Math.abs(pc.avecEtat - (4 / 1.2 + 2)) < 0.06,
+           `${pc.avecEtat} PC (avant : ${(6 / 1.2).toFixed(1)})`);
+  verifier("attaque + étalement + Distance : tout est remisé", Math.abs(pc.avecDistance - (4 + 2 * coutDist) / 1.2) < 0.06,
+           `${pc.avecDistance} PC`);
+}
+
 console.log("\n2. LE GÉNÉRATEUR DE MONSTRES SUIT LA MÊME LISTE");
 {
   const forge = await p.evaluate(() => window.MOTS_HORS_INITIATIVE);

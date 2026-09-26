@@ -136,14 +136,14 @@ node aveuglement.mjs        # l'Aveuglement : 3 cases de noir fixes, ciblage int
 node equilibrage_base.mjs    # la vraie base : Contre physique / Absorption magique, plafonds de chance du grimoire
 node persistance_soin.mjs    # pas de Persistance terrain sur un soin (la Zone, oui) ni sur une carte étalée (DOT) — Forge, moteur, monstres
 node traction_en_tete.mjs    # Traction écrite avant l'attaque : on vise à 3 cases, le cerveau tire PUIS frappe (joueurs et monstres)
-node initiative_hors_effets.mjs  # Contre, Aveuglement, Brûlure, Poison, Glacé, Électrifié, Peur, Confusion ne retardent pas la carte
+node initiative_hors_effets.mjs  # Contre, Aveuglement, Brûlure, Poison, Glacé, Électrifié, Peur, Confusion ne retardent pas la carte ; l'étalement ne remise que zone, dégâts et distance
 node traction_monstres.mjs   # pas de Traction sur une technique de monstre qui frappe au contact
 node cerveau_destitue.mjs    # un cerveau qui a perdu le réseau n'écrase plus ce que le nouveau cerveau a publié
 node ia_opportunites.mjs     # les créatures ne prennent plus d'attaque d'opportunité pour rien
 node tir_monstre_contact.mjs # une créature qui tire au contact perd 30 % (portée = mod Distance)
 node zones_geometrie.mjs     # les zones des sorts ont la forme des hexagones de la map
 node dev_reinit_caracs.mjs   # onglet DEV : réinitialiser les caractéristiques d'un héros
-node choix_classe.mjs        # le choix de classe après la race : grille de tarots, fiche, retour, validation, base
+node choix_classe.mjs        # le choix de classe après la race : grille de tarots, fiche, retour, validation, base ; pleine largeur, cartes collées, titre à gauche, q_auto,f_auto
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -3266,3 +3266,41 @@ viendront après. Une condition de code : `object-fit: cover`, jamais `fill`.
 rangées de 4, bordure, `cover`, nom en bas, fiche et fond, retour en deux temps,
 validation vers l'identité avec la classe retenue, installation en base (14
 documents, en fusion).
+
+### Les cartes de classe sur toute la largeur, et l'étalement qui ne remise plus les effets associés
+
+Nico : « que ça prenne toute la largeur de la page, les cartes quasiment
+collées, les bordures un peu plus sombres, la barre de défilement invisible ;
+le titre de la fiche au milieu de la partie gauche de l'image ; q_auto,f_auto
+dans les liens des classes ; et l'Étalement des dégâts : la réduction de
+fatigue seulement sur zone, dégâts, distance — pas les effets associés. »
+
+- **La grille** (style.css) : plus de largeur maximale — 4 colonnes qui
+  suivent la largeur de l'écran, 4 px de marge sur les côtés, 3 px entre deux
+  cartes. La bordure passe de l'or vif (#d4af37) à un or plus sombre
+  (#a8841f). Au survol la carte ne grossit plus (elle déborderait sur ses
+  voisines désormais collées) : elle se soulève et s'illumine. Le nom en bas
+  grandit avec la carte.
+- **La barre de défilement** de la grille est masquée (`scrollbar-width: none`
+  et `::-webkit-scrollbar`) ; le défilement au doigt et à la molette reste.
+- **La fiche** : le titre est centré sur la moitié gauche de l'image (46 % de
+  large, il passe à la ligne au besoin — « Chasseur de mages »). Le voile
+  s'assombrit un peu à gauche pour qu'il reste lisible sur un fond clair.
+- **Les images** : `q_auto,f_auto/` inséré juste après `/image/upload/` dans les
+  28 liens de classes.js (Cloudinary choisit alors le format et la qualité selon
+  l'appareil). Une classe DÉJÀ installée en base garde son ancien lien : la
+  lecture (`classeDepuisDocument` → `optimiserImageClasse`) l'ajoute à la volée,
+  sans toucher un lien qui l'a déjà. Recliquer « Installer les classes »
+  réécrit de toute façon les liens propres. L'écran des races était déjà en
+  `cover`, avec des liens optimisés.
+- **L'étalement** (Forge, `rafraichirForge` ; générateur, `coutPCChantier`) :
+  la division de la fatigue ne porte plus que sur l'attaque de base, la Zone et
+  la Distance (avec leurs crans de durée). Les effets associés (états, Soin,
+  Bouclier, Poussée…) se paient plein pot. Exemple : Attaque légère ×2 +
+  Étalement + Brûlé ×2 coûtait 5,0 PC ; c'est 4 / 1,2 + 2 ≈ 5,3 PC.
+
+`initiative_hors_effets.mjs` (section 1 bis) le mesure sur la vraie Forge ;
+`choix_classe.mjs` vérifie la pleine largeur, l'écart ≤ 4 px, la teinte plus
+sombre, l'absence de barre, le titre au centre de la moitié gauche et les liens
+`q_auto,f_auto` (y compris un lien ancien relu depuis la base). Les nouveaux
+contrôles échouent tous sur la version précédente.

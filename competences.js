@@ -1648,6 +1648,13 @@ window.rafraichirForge = function() {
         let coutMods = 0;
         let aDOT = false;
         let diviseurDOT = 1.3;
+        // LA RISTOURNE DE L'ÉTALEMENT NE VAUT QUE POUR LA ZONE, LES DÉGÂTS ET
+        // LA DISTANCE (règle de Nico) — pas pour les effets associés (états,
+        // Durée +, etc.). On met donc de côté la part « étalable » du coût :
+        // le socle s'il frappe (ou s'il est lui-même une Zone ou une Distance),
+        // et les sous-effets Zone et Distance.
+        const estPartEtalable = (nom) => estUneAttaqueDeBase(nom) || nom === "Zone" || nom === "Distance";
+        let coutEtalable = estPartEtalable(act.baseEffet.Nom) ? baseActionCost + coutDureeBase : 0;
 
         if (act.baseEffet.Nom === "Initiative +") {
             const baseVal = parseFrenchFloat(act.baseEffet.Valeur) || 8;
@@ -1673,25 +1680,29 @@ window.rafraichirForge = function() {
                     initBonusNet += (parseFrenchFloat(modEff.Cout_PT) * modCount) * 5;
                 }
 
+                let coutCeMod = 0;
                 if (modEff.Nom === "Zone") {
                     let zoneLen = (act.zoneHexes && act.zoneHexes.length > 0) ? act.zoneHexes.length : modCount;
                     // On remet le premier hexagone gratuit ici aussi !
-                    coutMods += parseFrenchFloat(modEff.Cout_PT) * Math.max(0, zoneLen - 1);
+                    coutCeMod = parseFrenchFloat(modEff.Cout_PT) * Math.max(0, zoneLen - 1);
                 } else if (modEff.Nom === "DOT" || modEff.Nom === "Durée étalement dégâts") {
                     aDOT = true;
                     diviseurDOT = diviseurEtalement(modEff);
                 } else {
-                    coutMods += parseFrenchFloat(modEff.Cout_PT) * modCount;
+                    coutCeMod = parseFrenchFloat(modEff.Cout_PT) * modCount;
                 }
 
                 // Surcoût lié au bouton ⏳ de CE sous-effet
                 let currentModDuree = (act.modsDuree && act.modsDuree[modId]) || 0;
-                coutMods += currentModDuree * coutDureePlus;
+                coutCeMod += currentModDuree * coutDureePlus;
+                coutMods += coutCeMod;
+                if (estPartEtalable(modEff.Nom)) coutEtalable += coutCeMod;
             }
         });
 
         let coutActionTotale = baseActionCost + coutDureeBase + coutMods;
-        if (aDOT) coutActionTotale /= diviseurDOT;
+        // Seule la part étalable est divisée ; le reste se paie plein pot.
+        if (aDOT) coutActionTotale = (coutActionTotale - coutEtalable) + coutEtalable / diviseurDOT;
         totalPC += coutActionTotale;
     });
 

@@ -3468,15 +3468,18 @@ textarea.input-texte-parchemin {
 }
 .titre-choix-classe { font-size: clamp(34px, 5vw, 62px); margin: 0 0 3vh; }
 
-/* La grille : rangées de 4, défilement vertical si l'écran est court. */
+/* La grille : rangées de 4 sur TOUTE la largeur de l'écran, les cartes
+   presque bord à bord ; défilement vertical, sans barre visible. */
 #vue-grille-classes {
   position: absolute; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
   display: flex; flex-direction: column; align-items: center;
-  padding: 5vh 16px 6vh; box-sizing: border-box;
+  padding: 5vh 4px 6vh; box-sizing: border-box;
+  scrollbar-width: none; -ms-overflow-style: none;
 }
+#vue-grille-classes::-webkit-scrollbar { display: none; width: 0; height: 0; }
 #grille-classes {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: clamp(12px, 2.2vw, 28px); width: 100%; max-width: 920px;
+  gap: 3px; width: 100%;
 }
 @media (max-width: 520px) { #grille-classes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
@@ -3484,20 +3487,20 @@ textarea.input-texte-parchemin {
 .carte-classe {
   position: relative; aspect-ratio: 7 / 12; padding: 0; cursor: pointer; overflow: hidden;
   border-radius: 10px; background: #120c06;
-  border: 3px solid #d4af37;
-  box-shadow: 0 0 0 1px #6b4d12, inset 0 0 0 2px rgba(255, 233, 160, 0.35), 0 8px 18px rgba(0,0,0,0.75);
+  border: 3px solid #a8841f;
+  box-shadow: inset 0 0 0 1px rgba(255, 225, 140, 0.28), 0 6px 14px rgba(0,0,0,0.75);
   transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
 .carte-classe:hover, .carte-classe:focus-visible {
-  transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 0 0 1px #6b4d12, inset 0 0 0 2px rgba(255, 233, 160, 0.5), 0 0 22px rgba(212, 175, 55, 0.55), 0 12px 24px rgba(0,0,0,0.8);
+  transform: translateY(-4px); z-index: 1; outline: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 225, 140, 0.45), 0 0 18px rgba(212, 175, 55, 0.5), 0 12px 24px rgba(0,0,0,0.8);
 }
 .carte-classe-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
 .carte-classe-nom {
   position: absolute; left: 0; right: 0; bottom: 0; padding: 22% 6px 8%;
   background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.78) 55%, rgba(0,0,0,0.92) 100%);
   font-family: 'Cinzel', serif; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
-  font-size: clamp(11px, 1.45vw, 17px); line-height: 1.15; color: #f3dfa6;
+  font-size: clamp(11px, 2.1vw, 26px); line-height: 1.15; color: #f3dfa6;
   text-shadow: 0 0 6px rgba(212, 175, 55, 0.6), 1px 1px 3px black; text-align: center;
 }
 
@@ -3506,11 +3509,15 @@ textarea.input-texte-parchemin {
 #fond-fiche-classe { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; z-index: 1; }
 .voile-fiche-classe {
   position: absolute; inset: 0; z-index: 2;
-  background: linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0) 62%, rgba(0,0,0,0.8) 100%);
+  background:
+    linear-gradient(90deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.25) 38%, rgba(0,0,0,0) 55%),
+    linear-gradient(180deg, rgba(0,0,0,0) 62%, rgba(0,0,0,0.8) 100%);
 }
+/* Le titre : au milieu de la moitié GAUCHE de l'image. */
 .titre-fiche-classe {
-  position: absolute; top: 9vh; left: 50%; transform: translateX(-50%); z-index: 3;
-  width: 92%; margin: 0; font-size: clamp(38px, 6.5vw, 78px);
+  position: absolute; top: 50%; left: 25%; transform: translate(-50%, -50%); z-index: 3;
+  width: 46%; margin: 0; font-size: clamp(30px, 5vw, 72px); line-height: 1.1;
+  overflow-wrap: break-word;
 }
 .btn-valider-classe {
   position: absolute; bottom: 7vh; left: 50%; transform: translateX(-50%); z-index: 3;

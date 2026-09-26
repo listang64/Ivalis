@@ -705,26 +705,33 @@ function coutPCChantier(chantier, palette) {
         let coutMods = 0;
         let aEtalement = false;
         let diviseur = 1.3;
+        // ⚖️ règle Forge : la ristourne de l'Étalement ne vaut que pour la
+        // Zone, les dégâts et la Distance, pas pour les effets associés.
+        const etalable = (nom) => estAttaqueDeBase(nom) || nom === "Zone" || nom === "Distance";
+        let coutEtalable = etalable(act.baseEffet.Nom) ? coutBase + coutDuree : 0;
 
         act.modsEffets.forEach(m => {
             const nom = m.effet.Nom || "";
+            let coutCeMod = 0;
             if (nom === "Zone") {
                 // Le premier hexagone est offert.
                 const taille = act.zoneHexes.length > 0 ? act.zoneHexes.length : m.count;
-                coutMods += coutPC(m.effet) * Math.max(0, taille - 1);
+                coutCeMod = coutPC(m.effet) * Math.max(0, taille - 1);
             } else if (nom === "DOT" || nom === "Durée étalement dégâts") {
                 aEtalement = true;
                 // ⚖️ règle Forge : la ristourne se lit dans le coût au grimoire
                 // (« Cout / 1.2 »), comme dans la Forge (diviseurEtalement).
                 diviseur = diviseurEtalementMonstre(m.effet);
             } else {
-                coutMods += coutPC(m.effet) * m.count;
+                coutCeMod = coutPC(m.effet) * m.count;
             }
-            coutMods += (m.duree || 0) * coutDureePlus;
+            coutCeMod += (m.duree || 0) * coutDureePlus;
+            coutMods += coutCeMod;
+            if (etalable(nom)) coutEtalable += coutCeMod;
         });
 
         let coutAction = coutBase + coutDuree + coutMods;
-        if (aEtalement) coutAction /= diviseur;
+        if (aEtalement) coutAction = (coutAction - coutEtalable) + coutEtalable / diviseur;
         totalPC += coutAction;
     });
     return totalPC;

@@ -38,35 +38,45 @@ const C = (ordre, nom, imageTarot, imageFond) =>
     ({ id: identifiantClasse(nom), ordre, nom, imageTarot, imageFond });
 
 window.CLASSES_PAR_DEFAUT = [
-    C(1,  "Pisteur",           "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790440203/IMG_2165_a6htgd.jpg",
-                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790438698/Pisteur_fond_lpv2kp.png"),
-    C(2,  "Assassin",          "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790440203/IMG_2162_jo6qyh.jpg",
-                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790438697/assassin_fond_ztints.png"),
-    C(3,  "Chasseur de mages", "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790440203/IMG_2161_t3uyul.jpg",
-                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790438697/Chasseur_de_mage_fond_hnp2gf.png"),
-    C(4,  "Sentinelle",        "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790440202/IMG_2160_vbqfus.jpg",
-                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790438697/sentinelle_fond_k7utrw.png"),
-    C(5,  "Ensorceleur",       "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790440202/IMG_2170_ivs67e.jpg",
-                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790438697/Ensorceleur_fond_mwokvi.png"),
-    C(6,  "Profanateur",       "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790440202/IMG_2172_m1dgfp.jpg",
-                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790438696/Profanateur_fond_c3yyaz.png"),
-    C(7,  "Géomancien",        "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790440202/IMG_2168_fmgyk1.jpg",
-                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790438698/G%C3%A9omancien_fond_b72j1c.png"),
-    C(8,  "Hoplite",           "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790440202/IMG_2159_iligqv.jpg",
-                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790438697/Hoplite_fond_jzi0f3.png"),
-    C(9,  "Oracle",            "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790440202/IMG_2169_hbb5xu.jpg",
-                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790438698/Oracle_fond_n7togf.png"),
-    C(10, "Vampire",           "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790440202/IMG_2173_yygc0q.jpg",
-                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790438696/Vampire_fond_wapbww.png"),
-    C(11, "Nécromancien",      "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790440202/IMG_2171_u2hda6.jpg",
-                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790438696/Necromancien_fond_duglq6.png"),
-    C(12, "Mage du chaos",     "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790440202/IMG_2174_myjwel.jpg",
-                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790438697/Mage_Chaos_fond_mtfs6i.png"),
-    C(13, "Médicus",           "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790440201/IMG_2166_xcmkfp.jpg",
-                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790438697/Medicus_fond_nc0sv3.png"),
-    C(14, "Élémentariste",     "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790440202/IMG_2167_efk77h.jpg",
-                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790438696/Elementariste_fond_xhhnlj.png")
+    C(1,  "Pisteur",           "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440203/IMG_2165_a6htgd.jpg",
+                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438698/Pisteur_fond_lpv2kp.png"),
+    C(2,  "Assassin",          "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440203/IMG_2162_jo6qyh.jpg",
+                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438697/assassin_fond_ztints.png"),
+    C(3,  "Chasseur de mages", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440203/IMG_2161_t3uyul.jpg",
+                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438697/Chasseur_de_mage_fond_hnp2gf.png"),
+    C(4,  "Sentinelle",        "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2160_vbqfus.jpg",
+                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438697/sentinelle_fond_k7utrw.png"),
+    C(5,  "Ensorceleur",       "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2170_ivs67e.jpg",
+                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438697/Ensorceleur_fond_mwokvi.png"),
+    C(6,  "Profanateur",       "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2172_m1dgfp.jpg",
+                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438696/Profanateur_fond_c3yyaz.png"),
+    C(7,  "Géomancien",        "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2168_fmgyk1.jpg",
+                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438698/G%C3%A9omancien_fond_b72j1c.png"),
+    C(8,  "Hoplite",           "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2159_iligqv.jpg",
+                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438697/Hoplite_fond_jzi0f3.png"),
+    C(9,  "Oracle",            "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2169_hbb5xu.jpg",
+                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438698/Oracle_fond_n7togf.png"),
+    C(10, "Vampire",           "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2173_yygc0q.jpg",
+                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438696/Vampire_fond_wapbww.png"),
+    C(11, "Nécromancien",      "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2171_u2hda6.jpg",
+                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438696/Necromancien_fond_duglq6.png"),
+    C(12, "Mage du chaos",     "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2174_myjwel.jpg",
+                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438697/Mage_Chaos_fond_mtfs6i.png"),
+    C(13, "Médicus",           "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440201/IMG_2166_xcmkfp.jpg",
+                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438697/Medicus_fond_nc0sv3.png"),
+    C(14, "Élémentariste",     "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2167_efk77h.jpg",
+                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438696/Elementariste_fond_xhhnlj.png")
 ];
+
+// Cloudinary : « q_auto,f_auto » juste après « /upload/ » — qualité et format
+// choisis selon l'appareil (webp/avif), des images bien plus légères. Un lien
+// venu de la base sans ce réglage le reçoit ici ; un lien qui l'a déjà (ou qui
+// porte d'autres transformations) ne bouge pas.
+window.optimiserImageClasse = (url) => {
+    const u = String(url || "");
+    if (!/res\.cloudinary\.com\/[^/]+\/image\/upload\//.test(u)) return u;
+    return u.replace(/\/image\/upload\/(?!q_auto|f_auto)(v\d+\/)/, "/image/upload/q_auto,f_auto/$1");
+};
 
 // Document de la base → classe du jeu. Un champ absent retombe sur la liste
 // écrite ici : une classe à moitié remplie en base s'affiche quand même.
@@ -76,8 +86,8 @@ window.classeDepuisDocument = function(id, d) {
         id,
         ordre: Number(d && d.Ordre) || connue.ordre || 99,
         nom: (d && d.Nom) || connue.nom || id,
-        imageTarot: (d && d.Image_Tarot) || connue.imageTarot || "",
-        imageFond: (d && d.Image_Fond) || connue.imageFond || ""
+        imageTarot: window.optimiserImageClasse((d && d.Image_Tarot) || connue.imageTarot || ""),
+        imageFond: window.optimiserImageClasse((d && d.Image_Fond) || connue.imageFond || "")
     };
 };
 window.documentDepuisClasse = (c) => ({ Nom: c.nom, Image_Tarot: c.imageTarot, Image_Fond: c.imageFond, Ordre: c.ordre });
