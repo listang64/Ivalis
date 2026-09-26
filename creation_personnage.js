@@ -441,6 +441,15 @@ window.afficherStatsCombat = function(donnees) {
         nomElement.innerText = (prenom + " " + nom).trim();
     }
 
+    // La race et la classe du héros, en tête des statistiques. Un héros créé
+    // avant les classes n'en a pas : un tiret plutôt qu'une case vide.
+    const race = donnees.race || donnees.Race || "";
+    const classe = donnees.classe || donnees.Classe || "";
+    const elRace = document.getElementById("stat-race");
+    if (elRace) elRace.innerText = race || "—";
+    const elClasse = document.getElementById("stat-classe");
+    if (elClasse) elClasse.innerText = classe || "—";
+
     const modPv = donnees.Dev_Mod_PV || 0;
     const modFatigue = donnees.Dev_Mod_Fatigue || 0;
     const modRegen = donnees.Dev_Mod_Regen || 0;

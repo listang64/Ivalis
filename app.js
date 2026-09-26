@@ -1900,7 +1900,9 @@ async function genererEtStockerTokenBackground(donnees, idPersonnage, urlPortrai
                        "The head's hair, headwear and specific details (like jewelry or facial textures) are faithfully translated into sculpted wood forms, matching the depth " +
                        "and detail level of the reference. The background is a clean, isolated pure fluorescent magenta (#FF00FF), used as a chroma key backdrop, " +
                        "with absolutely no cast shadows or drop shadows. " +
-                       "The lighting is precise, studio-quality, enhancing the forms and textures, identical in quality to the reference image. " +
+                       "The lighting is natural sunlight — warm, clear daylight from a sun — precise, enhancing the forms and textures. " +
+                       "The magenta backdrop is only a chroma key and casts NO light: there must be absolutely no purple, violet, pink or magenta " +
+                       "reflections, rim light, glow or colour spill anywhere on the medallion or the head. " +
                        "The image must be in a perfectly square format, with the medallion token scaled as large as possible while leaving a small margin from the edges. " +
                        "The entire medallion, including any protruding details such as horns, ears or headwear, must be fully visible inside the frame — " +
                        "nothing may be cropped or cut off by the image border.";
@@ -2132,6 +2134,10 @@ async function genererEtStockerPortrait(donnees) {
                   "Il est STRICTEMENT INTERDIT de dessiner un décor, un paysage, un intérieur, une ombre au sol ou un dégradé. " +
                   "Même si la description du personnage mentionne un lieu ou des objets environnants, IGNORE LE DÉCOR. " +
                   "Remplis tout l'espace vide autour et derrière le personnage avec du magenta fluo pur. " +
+                  "💡 LUMIÈRE : le personnage est éclairé par la lumière naturelle d'un soleil, chaude et franche. " +
+                  "Le fond magenta n'est qu'un cache technique, il n'éclaire RIEN : il est STRICTEMENT INTERDIT de faire apparaître " +
+                  "des reflets, des liserés, des halos ou des teintes violacés, roses ou magenta sur le personnage lui-même " +
+                  "(peau, cheveux, tenue, métal, contours). Ses couleurs sont celles qu'il aurait en plein soleil. " +
                   "Le personnage doit être vu de trois quart, regardant vers la gauche, cadré en plan américain (coupé aux genoux). Ne dessine aucun texte.";
 
   // 4. APPEL À L'API — DEUX CHEMINS.

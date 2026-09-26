@@ -1129,6 +1129,14 @@ function contexteDuJeu() {
         // etatSequenceTour pour lever la fenêtre pendant la relecture) ; le
         // nouveau régime ne la renseignait simplement plus.
         surRejeu: (entree) => {
+            // Le pion anticipé (mouvement.js) : le journal en parle — on le
+            // note ; l'entrée est finie — on referme l'anticipation.
+            if (entree && typeof window.noterEntreeAnticipation === "function") {
+                window.noterEntreeAnticipation(entree);
+            } else if (!entree && window.ANTICIPATION_MARCHE && window.ANTICIPATION_MARCHE.entreeVue
+                       && typeof window.fermerAnticipationMarche === "function") {
+                window.fermerAnticipationMarche();
+            }
             window.EVENEMENT_EN_COURS = entree
                 ? { acteur: entree.acteur, tour: entree.manche, n: entree.v,
                     idCarte: entree.carte || null, type: "tour" }

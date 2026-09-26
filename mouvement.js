@@ -487,6 +487,9 @@ window.validerMouvement = async function() {
         // retardait le lancement de l'animation.)
         window.retirerCroixDeplacement(idPerso);
         if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
+        // Le pion part TOUT DE SUITE sur cet écran, sans attendre l'aller-retour
+        // du cerveau (voir anticiperMarche, plus bas).
+        window.anticiperMarche(idPerso, chemin);
         return await window.regimeDemande.mouvement(
             idPerso, chemin, window.COUT_COMPETENCE_SELECTIONNEE || 0);
     }
@@ -627,6 +630,9 @@ function laisserTraceRepli(tokenDiv) {
 
 window.jouerAnimationPas = async function(pas) {
     if (!pas || !pas.vers) return;
+    // Un pas que cet écran a DÉJÀ joué en avance (anticiperMarche) n'est pas
+    // rejoué : le pion y est déjà. On attend seulement qu'il ait fini d'y aller.
+    if (!pas.anticipe && await window.consommerPasAnticipe(pas)) return;
     const tokenDiv = document.getElementById("token-" + pas.idToken);
     if (!tokenDiv) return;
 
@@ -702,10 +708,173 @@ window.jouerAnimationPas = async function(pas) {
         // redessine PAS le plateau ici : appliquerTokensVTT reconstruit tous les
         // pions, donc détruit l'élément qu'on vient d'animer — à chaque case.
         // Le redessin a lieu une fois, à la fin de la relecture.
-        if (window.PIONS_EN_MOUVEMENT) delete window.PIONS_EN_MOUVEMENT[pas.idToken];
+        // Un pas ANTICIPÉ garde sa protection : le cerveau n'a pas encore
+        // répondu, et la première notification venue ramènerait sinon le pion
+        // à sa case de départ. Elle tombe quand l'anticipation se referme.
+        if (window.PIONS_EN_MOUVEMENT) {
+            const enCours = window.ANTICIPATION_MARCHE;
+            if (pas.anticipe && enCours && enCours.idToken === pas.idToken) {
+                window.PIONS_EN_MOUVEMENT[pas.idToken] = Date.now();
+            } else {
+                delete window.PIONS_EN_MOUVEMENT[pas.idToken];
+            }
+        }
         window.ANIMATION_VTT_EN_COURS = false;
     }
 };
+
+// =========================================================================
+//  LE PION PART TOUT DE SUITE, SUR L'ÉCRAN DE CELUI QUI JOUE
+// =========================================================================
+//  Signalé sur iPad : « quand je valide un déplacement, il met beaucoup de
+//  temps avant de jouer l'animation ». Le pion attendait le journal : la
+//  demande part en base, le cerveau (souvent un autre appareil) la lit, la
+//  tranche, la publie par transaction, et le journal redescend — trois ou
+//  quatre allers-retours réseau avant le premier pas, bien plus longs sur
+//  Safari, qui passe par un transport plus lent.
+//
+//  L'écran de celui qui joue n'attend plus pour les pas SÛRS : ceux que rien
+//  ne peut contredire — aucun ennemi debout au contact de la case qu'on
+//  quitte (pas d'attaque d'opportunité possible), aucune zone au sol sur la
+//  case où l'on pose le pied, pas d'Immobilisation. Le pion les parcourt dès
+//  la validation. Le cerveau reste seul juge : quand son journal arrive,
+//  chaque pas identique est reconnu et PAS rejoué ; au premier pas qui
+//  diffère, l'anticipation s'arrête et le journal reprend la main comme
+//  avant. Si le trajet publié est plus court (énergie, chute) ou si rien
+//  n'arrive (demande refusée), le pion est reposé sur la case que la base
+//  lui donne. Les autres écrans ne changent pas : ils rejouent le journal.
+window.ANTICIPATION_MARCHE = null;
+// Réglable (un banc le raccourcit) ; dix secondes couvrent un réseau très lent.
+window.DELAI_ANTICIPATION_MS = window.DELAI_ANTICIPATION_MS || 10000;
+const memeCaseMarche = (a, b) => !!a && !!b && Number(a.q) === Number(b.q) && Number(a.r) === Number(b.r);
+const distanceMarche = (a, b) =>
+    (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
+
+// Les pas qu'on peut jouer sans attendre le cerveau, dans l'ordre, jusqu'au
+// premier qui pourrait être contredit.
+window.pasAnticipables = function(idPerso, depart, chemin) {
+    const persos = window.PERSOS_PARTIE || [];
+    const moi = persos.find(p => p.idPersonnage === idPerso);
+    if (!moi || !depart || !Array.isArray(chemin)) return [];
+    const etats = moi.Etats_Alteres || [];
+    if (etats.some(e => e && /immobilis/i.test(e.nom || ""))) return [];
+
+    const tokens = window.TOKENS_VTT_DATA || {};
+    const tombe = (id, p) => (typeof window.estCombattantMort === "function")
+        ? window.estCombattantMort(id) : p.statut === "Mort";
+    const ennemiAuContact = (hex) => Object.keys(tokens).some(id => {
+        if (id === idPerso) return false;
+        const p = persos.find(x => x.idPersonnage === id);
+        if (!p || p.camp === moi.camp || tombe(id, p)) return false;
+        return distanceMarche(tokens[id], hex) === 1;
+    });
+    const zoneSur = (hex) => Object.values(window.ZONES_PERSISTANTES || {}).some(z =>
+        z && Array.isArray(z.hexes) && z.hexes.some(h => memeCaseMarche(h, hex)));
+
+    const surs = [];
+    let de = { q: Number(depart.q), r: Number(depart.r) };
+    for (const vers of chemin) {
+        if (!vers || distanceMarche(de, vers) !== 1) break;
+        if (ennemiAuContact(de) || zoneSur(vers)) break;
+        surs.push({ de, vers: { q: Number(vers.q), r: Number(vers.r) } });
+        de = surs[surs.length - 1].vers;
+    }
+    return surs;
+};
+
+window.anticiperMarche = function(idPerso, chemin) {
+    window.fermerAnticipationMarche();
+    const token = document.getElementById("token-" + idPerso);
+    const tk = (window.TOKENS_VTT_DATA || {})[idPerso];
+    const depart = token && token.dataset && token.dataset.q !== undefined && token.dataset.q !== ""
+        ? { q: parseFloat(token.dataset.q), r: parseFloat(token.dataset.r) } : tk;
+    const pas = window.pasAnticipables(idPerso, depart, chemin);
+    if (pas.length === 0) return null;
+
+    // Une promesse par pas : elle dit, quand le journal arrive, si ce pas a
+    // bien été joué d'avance (true) ou abandonné avant (false).
+    const fins = pas.map(() => { let r; const pr = new Promise(ok => { r = ok; }); pr.tenir = r; return pr; });
+    const a = { idToken: idPerso, pas, fins, joues: 0, consommes: 0, annulee: false,
+                entreeVue: false, debut: Date.now() };
+    window.ANTICIPATION_MARCHE = a;
+    window.PIONS_EN_MOUVEMENT = window.PIONS_EN_MOUVEMENT || {};
+    window.PIONS_EN_MOUVEMENT[idPerso] = Date.now();
+
+    (async () => {
+        for (let i = 0; i < pas.length; i++) {
+            if (a.annulee) { for (let j = i; j < pas.length; j++) fins[j].tenir(false); return; }
+            try {
+                await window.jouerAnimationPas({ idToken: idPerso, de: pas[i].de, vers: pas[i].vers, anticipe: true });
+                a.joues = i + 1;
+                fins[i].tenir(true);
+                // Refermée pendant ce pas, et ce pas n'a pas été confirmé : le
+                // pion retourne où la base le voit.
+                if (a.fermee) remettreSurLaVerite(idPerso);
+            } catch (e) {
+                for (let j = i; j < pas.length; j++) fins[j].tenir(false);
+                return;
+            }
+        }
+    })();
+
+    // Le filet : une demande refusée ne publie rien. Passé ce délai sans
+    // que le journal ait parlé de ce pion, il retourne où la base le voit.
+    a.guet = setTimeout(() => {
+        if (window.ANTICIPATION_MARCHE === a && !a.entreeVue) window.fermerAnticipationMarche();
+    }, window.DELAI_ANTICIPATION_MS || 10000);
+    return a;
+};
+
+// Appelée par jouerAnimationPas pour chaque pas venu du journal. Rend true
+// si ce pas a déjà été joué d'avance (rien à faire), false sinon.
+window.consommerPasAnticipe = async function(pas) {
+    const a = window.ANTICIPATION_MARCHE;
+    if (!a || !pas || a.idToken !== pas.idToken) return false;
+    const attendu = a.pas[a.consommes];
+    if (!pas.repli && !a.annulee && attendu
+        && memeCaseMarche(attendu.de, pas.de) && memeCaseMarche(attendu.vers, pas.vers)) {
+        const i = a.consommes++;
+        return await a.fins[i];
+    }
+    // Le cerveau a tranché autrement : on arrête d'anticiper — après le pas
+    // anticipé en cours, s'il y en a un, pour ne pas animer le même pion deux
+    // fois à la fois. Le journal reprend alors la main, et jouerAnimationPas
+    // repose le pion sur la case de départ de ce pas s'il n'y est pas.
+    a.annulee = true;
+    if (a.joues < a.pas.length) await a.fins[a.joues];
+    return false;
+};
+
+// Le journal a joué une entrée de ce pion : noté, pour refermer à la fin.
+window.noterEntreeAnticipation = function(entree) {
+    const a = window.ANTICIPATION_MARCHE;
+    if (a && entree && entree.acteur === a.idToken) a.entreeVue = true;
+};
+
+// Refermer : plus d'anticipation, plus de protection, et si le pion a été
+// joué plus loin que ce que le journal a confirmé, il retourne sur la case
+// que la base lui donne.
+window.fermerAnticipationMarche = function() {
+    const a = window.ANTICIPATION_MARCHE;
+    if (!a) return;
+    a.annulee = true;
+    a.fermee = true;
+    if (a.guet) clearTimeout(a.guet);
+    window.ANTICIPATION_MARCHE = null;
+    if (window.PIONS_EN_MOUVEMENT) delete window.PIONS_EN_MOUVEMENT[a.idToken];
+    remettreSurLaVerite(a.idToken);
+};
+
+// Le pion est-il là où la base le voit ? Sinon — trajet publié plus court,
+// demande refusée, ou redessin passé entre-temps (un tap sur un pion redessine
+// le plateau et ramenait le pion anticipé à son départ) — on redessine.
+function remettreSurLaVerite(idPerso) {
+    const div = document.getElementById("token-" + idPerso);
+    const t = (window.TOKENS_VTT_DATA || {})[idPerso];
+    if (!div || !t) return;
+    const ici = { q: parseFloat(div.dataset.q), r: parseFloat(div.dataset.r) };
+    if (!memeCaseMarche(ici, t) && typeof window.redessinerPions === "function") window.redessinerPions();
+}
 
 // =========================================================================
 //  LA RUÉE — MONTRER UNE CARTE PARTIR, SANS LA RÉSOUDRE

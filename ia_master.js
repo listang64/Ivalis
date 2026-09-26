@@ -459,6 +459,10 @@ async function genererEtStockerImagePNJ(descriptionPhysique, racePNJ = "Humain")
                     "Il est STRICTEMENT INTERDIT de dessiner un décor, un paysage, un intérieur, une ombre au sol ou un dégradé. " +
                     "Même si la description du personnage mentionne un lieu ou des objets environnants, IGNORE LE DÉCOR. " +
                     "Remplis tout l'espace vide autour et derrière le personnage avec du magenta fluo pur. " +
+                    "💡 LUMIÈRE : le personnage est éclairé par la lumière naturelle d'un soleil, chaude et franche. " +
+                    "Le fond magenta n'est qu'un cache technique, il n'éclaire RIEN : il est STRICTEMENT INTERDIT de faire apparaître " +
+                    "des reflets, des liserés, des halos ou des teintes violacés, roses ou magenta sur le personnage lui-même " +
+                    "(peau, cheveux, tenue, métal, contours). Ses couleurs sont celles qu'il aurait en plein soleil. " +
                     "Le personnage doit être vu de trois quart, regardant vers la gauche, cadré en plan américain (coupé aux genoux). Ne dessine aucun texte.";
 
     // LE PAYLOAD (gpt-image-2 + PNG)

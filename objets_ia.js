@@ -558,6 +558,10 @@ window.PROMPT_AVATAR_ARMURE =
   + "Le personnage DOIT ÊTRE PLACÉ SUR UN FOND TOTALEMENT MAGENTA FLUO UNI (#FF00FF). "
   + "Il est STRICTEMENT INTERDIT de dessiner un décor, un paysage, un intérieur, une ombre au sol ou "
   + "un dégradé. Remplis tout l'espace autour et derrière le personnage avec du magenta fluo pur. "
+  + "💡 LUMIÈRE : le personnage est éclairé par la lumière naturelle d'un soleil, chaude et franche. "
+  + "Le fond magenta n'est qu'un cache technique, il n'éclaire RIEN : il est STRICTEMENT INTERDIT de faire apparaître "
+  + "des reflets, des liserés, des halos ou des teintes violacés, roses ou magenta sur le personnage lui-même "
+  + "(peau, cheveux, tenue, métal, contours). Ses couleurs sont celles qu'il aurait en plein soleil. "
   + "Le personnage est vu de trois quarts, regardant vers la gauche, cadré en plan américain (coupé "
   + "aux genoux), exactement comme sur l'image de référence. Ne dessine aucun texte.";
 

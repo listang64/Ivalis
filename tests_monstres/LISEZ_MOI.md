@@ -144,6 +144,11 @@ node tir_monstre_contact.mjs # une créature qui tire au contact perd 30 % (port
 node zones_geometrie.mjs     # les zones des sorts ont la forme des hexagones de la map
 node dev_reinit_caracs.mjs   # onglet DEV : réinitialiser les caractéristiques d'un héros
 node choix_classe.mjs        # le choix de classe après la race : grille de tarots, fiche, retour, validation, base ; pleine largeur, cartes collées, titre à gauche, q_auto,f_auto
+node illusions_multiples.mjs # deux Illusions sur une carte : deux leurres, sur deux cases choisies l'une après l'autre
+node engagement_tombe.mjs    # un ennemi à terre (Inconscient, 0 PV) ne tient plus au corps-à-corps : zone et tir à pleine portée
+node soin_et_poussee.mjs     # soin + poussée : le ciblage envoie les deux, le cerveau pousse quand le jet passe (15 % par cran)
+node marche_anticipee.mjs    # le pion part dès la validation sur l'écran de celui qui joue ; le journal confirme ou corrige
+node fiche_race_classe.mjs   # race et classe dans l'onglet Statistiques ; portraits au soleil, sans reflet violacé
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -3304,3 +3309,61 @@ fatigue seulement sur zone, dégâts, distance — pas les effets associés. »
 sombre, l'absence de barre, le titre au centre de la moitié gauche et les liens
 `q_auto,f_auto` (y compris un lien ancien relu depuis la base). Les nouveaux
 contrôles échouent tous sur la version précédente.
+
+### Illusions multiples, engagement fantôme, marche immédiate, triche baissée
+
+Huit remarques de Nico après une partie.
+
+- **Deux Illusions, deux endroits.** « Une compétence avec deux fois Illusion :
+  il ne s'en est fait qu'une, ou deux au même endroit. » L'extraction ne
+  retenait qu'un drapeau `isIllusion` : une seule pose, quel que soit le nombre
+  d'Illusions. Elle compte désormais les leurres (`nbIllusions` : chaque action
+  Illusion et chaque Illusion posée en mod), et `poserIllusions` les pose l'un
+  après l'autre. Entre deux poses, la case du leurre tout juste posé n'est plus
+  proposée : son pion n'est pas encore dans `PERSOS_PARTIE` (il arrive par
+  l'écouteur), la case passait pour libre, le second leurre s'y posait et le
+  cerveau le refusait. `illusions_multiples.mjs`.
+- **La zone à distance 2 collée au lanceur.** La portée extraite était juste ;
+  c'est la règle de l'ENGAGEMENT (un lanceur au contact d'un ennemi ne frappe
+  qu'au contact) qui la ramenait à une case. Elle ne regardait que le statut
+  « Mort ». Or un combattant tombé sous le cerveau est « Inconscient », à 0 PV,
+  et son pion reste dans `TOKENS_VTT_DATA` — invisible, puisque le plateau ne
+  dessine plus les tombés. Le monstre qu'on venait d'abattre au contact tenait
+  donc encore le lanceur, sans qu'on voie pourquoi. Les cinq copies de la règle
+  (cases posables, survol, clic, anneaux, cible unique) passent par une seule,
+  `estEngageAuContact`, qui lit la même chose que la case occupée :
+  `estCombattantMort` (statut Mort OU 0 PV). `engagement_tombe.mjs`.
+- **Soin + Poussée.** Vérifié de bout en bout sans trouver de perte : le ciblage
+  vise la Poussée puis le soin, l'intention porte les deux, le cerveau pousse
+  quand le jet passe. Ce jet est de 15 % par cran (grimoire : Pourcent_Base 15,
+  plafond 60), et une cible ennemie peut encore l'esquiver — à un cran, la
+  Poussée échoue presque six fois sur sept (« Poussée résisté »).
+  `soin_et_poussee.mjs` fige ce comportement.
+- **Le déplacement démarre tout de suite sur iPad.** Le pion attendait le
+  journal : demande en base, lecture par le cerveau (souvent un autre
+  appareil), transaction, retour du journal — trois ou quatre allers-retours,
+  plus lents encore sur Safari. `anticiperMarche` (mouvement.js) fait partir le
+  pion dès la validation, sur l'écran de celui qui joue, pour les pas SÛRS :
+  aucun ennemi debout au contact de la case quittée (pas d'attaque
+  d'opportunité possible), aucune zone au sol sur la case d'arrivée, pas
+  d'Immobilisation. Le cerveau reste seul juge : quand son journal arrive,
+  chaque pas identique est reconnu et n'est pas rejoué (`consommerPasAnticipe`) ;
+  au premier pas qui diffère, l'anticipation s'arrête et le journal reprend la
+  main. En fin d'entrée (`surRejeu(null)`), ou au bout de dix secondes sans
+  journal (demande refusée), le pion est remis sur la case que la base lui
+  donne s'il n'y est pas. Les autres écrans rejouent le journal comme avant.
+  `marche_anticipee.mjs`.
+- **Dégâts des monstres et armures.** L'armure est bien lue (`defPhysiqueCombattant`,
+  équipement compris, injectée au cerveau) ; mais c'est un POURCENTAGE, appliqué
+  au brut triche comprise puis arrondi — sur un petit coup, il s'efface : 3 + 1
+  de triche = 4, moins 5 % d'une armure légère = 3,8, arrondi à 4. D'où
+  l'impression d'une armure ignorée. La triche baisse d'un cran partout, comme
+  demandé : Petit 0, Normal 1, Élite 2, Boss 3 (`TABLE_BONUS_MONSTRE`).
+- **Race et classe** en tête de l'onglet Statistiques de la fiche (deux
+  tuiles), lues sur la fiche convertie ou le document brut ; un tiret pour un
+  héros d'avant les classes.
+- **Portraits au soleil.** Les prompts qui demandent le fond magenta (portrait
+  du héros, PNJ, avatar habillé, pion) disent désormais que ce fond n'est qu'un
+  cache technique qui n'éclaire rien, interdisent tout reflet, liseré, halo ou
+  teinte violacé, rose ou magenta sur le personnage, et posent la lumière d'un
+  soleil. `fiche_race_classe.mjs`.

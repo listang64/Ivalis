@@ -114,6 +114,27 @@ function getHexDistance(a, b) {
     return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
 }
 
+// ENGAGÉ AU CORPS-À-CORPS : un ennemi ENCORE DEBOUT sur une case voisine.
+// La règle ne lisait que le statut « Mort » — or un combattant tombé sous le
+// cerveau est « Inconscient », à 0 PV, et son pion reste sur le plateau. Un
+// monstre qu'on venait d'abattre au contact « tenait » donc encore le lanceur :
+// sa zone à distance 2 ne se posait plus qu'à côté de lui, son tir ne partait
+// plus qu'au contact. Même lecture que la case occupée (estCombattantMort) :
+// statut Mort OU plus un seul PV.
+window.estEngageAuContact = function(idLanceur, tkLanceur, lanceurData) {
+    if (!tkLanceur || !lanceurData) return false;
+    const tombe = (p) => (typeof window.estCombattantMort === "function")
+        ? window.estCombattantMort(p.idPersonnage)
+        : p.statut === "Mort";
+    for (let idToken in (window.TOKENS_VTT_DATA || {})) {
+        if (idToken === idLanceur) continue;
+        const d = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idToken);
+        if (!d || d.camp === lanceurData.camp || tombe(d)) continue;
+        if (getHexDistance(tkLanceur, window.TOKENS_VTT_DATA[idToken]) === 1) return true;
+    }
+    return false;
+};
+
 // Affiche le message flottant de dégâts/soin + le flash coloré + la mini-barre qui se vide (ou se
 // remplit) sur le pion, exactement comme pour une attaque classique (voir jouerAnimationMoteur).
 // Réutilisée par les attaques d'opportunité et les tics d'Empoisonnement, qui n'avaient jusqu'ici
@@ -397,13 +418,7 @@ window.casesPosablesZone = function(idLanceur, configSort) {
     const portee = Math.max(1, parseInt(configSort.rangeMax) || 1);
 
     // Au corps-à-corps, on ne vise plus qu'à une case : c'est déjà la règle du jeu.
-    let estEngage = false;
-    for (let idAutre in window.TOKENS_VTT_DATA) {
-        if (idAutre === idLanceur) continue;
-        const autre = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idAutre);
-        if (!autre || autre.camp === lanceurData.camp || autre.statut === "Mort") continue;
-        if (getHexDistance(tkLanceur, window.TOKENS_VTT_DATA[idAutre]) === 1) { estEngage = true; break; }
-    }
+    const estEngage = window.estEngageAuContact(idLanceur, tkLanceur, lanceurData);
     // Le corps-à-corps n'empêche que de FRAPPER plus loin : un soin, un
     // bouclier se posent à leur pleine portée même avec un ennemi au contact
     // (la règle est déjà celle du ciblage d'une cible unique).
@@ -788,7 +803,24 @@ window.choisirCaseRepli = function(idPerso, portee, depart) {
 //  N'entre jamais dans la file d'initiative : c'est un pion purement statique, jamais son tour.
 //  Toujours résolue en dernier sur la carte (voir demarrerCiblage / declencherResolutionAvecBondEventuel).
 // =========================================================================
-window.resoudreIllusionInteractif = function(idLanceur, portee) {
+// PLUSIEURS ILLUSIONS SUR UNE CARTE : autant de poses que de leurres, une case
+// chacune, et jamais deux fois la même. La case d'un leurre qu'on vient de
+// poser n'apparaît plus parmi les choix du suivant — sans cela, le pion tout
+// juste créé n'était pas encore dans la liste des combattants (elle arrive par
+// l'écouteur, plus tard), sa case restait « libre », et le second leurre s'y
+// posait par-dessus : le cerveau le refusait, on n'en voyait qu'un.
+window.poserIllusions = async function(idLanceur, portee, nombre) {
+    const exclues = [];
+    const n = Math.max(1, Math.round(nombre || 1));
+    for (let i = 0; i < n; i++) {
+        const cible = await window.resoudreIllusionInteractif(idLanceur, portee, exclues);
+        if (!cible) break;
+        exclues.push(cible);
+    }
+    return exclues.length;
+};
+
+window.resoudreIllusionInteractif = function(idLanceur, portee, exclues = []) {
     return new Promise((resolve) => {
         const tkLanceur = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idLanceur] : null;
         if (!tkLanceur || !window.PLATEAU_VTT) return resolve(false);
@@ -796,6 +828,7 @@ window.resoudreIllusionInteractif = function(idLanceur, portee) {
         const candidats = window.PLATEAU_VTT.getHexesInRadius(tkLanceur.q, tkLanceur.r, portee);
         const hexesValides = candidats.filter(h => {
             if (h.q === tkLanceur.q && h.r === tkLanceur.r) return false;
+            if ((exclues || []).some(x => x && x.q === h.q && x.r === h.r)) return false;
 
             const state = window.PLATEAU_VTT.getCaseState(h.q, h.r);
             if (state.isBlocked || state.isDeleted) return false;
@@ -854,7 +887,8 @@ window.resoudreIllusionInteractif = function(idLanceur, portee) {
                 await window.creerIllusion(idLanceur, cible.q, cible.r);
             }
 
-            resolve(true);
+            // La case posée : l'appelant l'écarte des choix du leurre suivant.
+            resolve({ q: cible.q, r: cible.r });
         };
 
         window.addEventListener("click", onClick, { capture: true });
@@ -1007,14 +1041,7 @@ window.VTT_CIBLAGE_MOUSEMOVE = function(e) {
     if (configSort && configSort.isRanged) {
         const dist = getHexDistance(tkLanceur, hoverHex);
         
-        let estEngage = false;
-        for (let idToken in window.TOKENS_VTT_DATA) {
-            if (idToken === idLanceur) continue; 
-            const d = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idToken);
-            if (d && d.camp !== lanceurData.camp && d.statut !== "Mort" && getHexDistance(tkLanceur, window.TOKENS_VTT_DATA[idToken]) === 1) {
-                estEngage = true; break;
-            }
-        }
+        const estEngage = window.estEngageAuContact(idLanceur, tkLanceur, lanceurData);
 
         if (estEngage && dist > 1 && !configSort.isHeal) state.zoneCenterHex = null; 
         else if (dist > configSort.rangeMax) state.zoneCenterHex = null; 
@@ -1074,14 +1101,7 @@ window.VTT_CIBLAGE_CLICK = function(e) {
         const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
         const dist = getHexDistance(tkLanceur, targetHex);
         
-        let estEngage = false;
-        for (let idToken in window.TOKENS_VTT_DATA) {
-            if (idToken === idLanceur) continue; 
-            const d = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idToken);
-            if (d && d.camp !== lanceurData.camp && d.statut !== "Mort" && getHexDistance(tkLanceur, window.TOKENS_VTT_DATA[idToken]) === 1) {
-                estEngage = true; break;
-            }
-        }
+        const estEngage = window.estEngageAuContact(idLanceur, tkLanceur, lanceurData);
 
         if (estEngage && dist > 1 && !configSort.isHeal) state.zoneCenterHex = null; 
         else if (dist > configSort.rangeMax) state.zoneCenterHex = null; 
@@ -1221,6 +1241,9 @@ window.demarrerCiblage = async function(idCarte, options) {
     let indexPremiereAttaque = -1;
     let isIllusion = false;
     let porteeIllusion = 1;
+    // Combien de leurres la carte pose : deux actions Illusion, ou une Illusion
+    // ×2, c'est DEUX leurres, sur deux cases choisies l'une après l'autre.
+    let nbIllusions = 0;
     // Persistance de terrain : le sort laisse derrière lui une zone dangereuse sur la ou les
     // cases visées (voir creerZonePersistante). Détecté ici, appliqué après la résolution.
     let aPersistanceTerrain = false;
@@ -1376,9 +1399,20 @@ window.demarrerCiblage = async function(idCarte, options) {
             // traité à part, comme le Bond, mais toujours résolu en DERNIER sur la carte (voir plus
             // bas). Sa portée de placement suit la portée normale de l'action (1 par défaut, plus
             // si un mod Distance est posé dessus).
+            // Une Illusion posée en MOD sur une autre action compte aussi : un
+            // leurre de plus, l'action qui la porte se joue normalement.
+            listeMods.forEach(m => {
+                const modEff = window.EFFETS_BDD_CACHE[m.id];
+                if (modEff && (modEff.Nom || "").toLowerCase().includes("illusion")) {
+                    isIllusion = true;
+                    porteeIllusion = Math.max(porteeIllusion, rangeMax);
+                    nbIllusions += Math.max(1, Math.round(m.count || 1));
+                }
+            });
             if (nomLower.includes("illusion")) {
                 isIllusion = true;
-                porteeIllusion = rangeMax;
+                porteeIllusion = Math.max(porteeIllusion, rangeMax);
+                nbIllusions += Math.max(1, Math.round(act.count || 1));
                 return;
             }
 
@@ -2157,7 +2191,7 @@ window.demarrerCiblage = async function(idCarte, options) {
         // ici, immédiatement, puisqu'il n'y a rien d'autre après elle.
         if (extraireSeulement) return null;   // rien à frapper : pas de carte
         if (isIllusion) {
-            await window.resoudreIllusionInteractif(idLanceurBond, porteeIllusion);
+            await window.poserIllusions(idLanceurBond, porteeIllusion, nbIllusions);
         }
         // Un Repli seul sur la carte : on choisit quand même où se replier.
         let repliSeul = null;
@@ -2277,7 +2311,7 @@ window.demarrerCiblage = async function(idCarte, options) {
         bondChoisi: null,
         porteeMinTraction: porteeMinTraction,
         tractionAvantAttaque: tractionAvantAttaque,
-        illusionEnAttente: isIllusion ? { idLanceur: idLanceurBond, portee: porteeIllusion } : null,
+        illusionEnAttente: isIllusion ? { idLanceur: idLanceurBond, portee: porteeIllusion, nombre: nbIllusions } : null,
         // { portee, chance } si la carte porte un Repli ; la case, elle, est
         // choisie au moment de résoudre (repliChoisi).
         repli: repliCarte,
@@ -2692,16 +2726,7 @@ window.dessinerAnneauxCiblage = function() {
     const carteEstAttaqueSimple = !configSort.isHeal && !configSort.isShield
         && phase.alterations.length === 0;
 
-    let estEngage = false;
-    for (let idToken in window.TOKENS_VTT_DATA) {
-        if (idToken === idLanceur) continue; 
-        const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idToken);
-        if (cibleData && cibleData.camp !== lanceurData.camp && cibleData.statut !== "Mort") {
-            if (getHexDistance(tkLanceur, window.TOKENS_VTT_DATA[idToken]) === 1) {
-                estEngage = true; break;
-            }
-        }
-    }
+    const estEngage = window.estEngageAuContact(idLanceur, tkLanceur, lanceurData);
 
     const couleurAnneau = configSort.isHeal ? '#1b6e3a' : '#ff4c4c';
 
@@ -2909,16 +2934,7 @@ window.ajouterCibleCiblage = function(idCible) {
         return;
     }
 
-    let estEngage = false;
-    for (let idToken in window.TOKENS_VTT_DATA) {
-        if (idToken === idLanceur) continue; 
-        const d = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idToken);
-        if (d && d.camp !== lanceurData.camp && d.statut !== "Mort") {
-            if (getHexDistance(tkLanceur, window.TOKENS_VTT_DATA[idToken]) === 1) {
-                estEngage = true; break;
-            }
-        }
-    }
+    const estEngage = window.estEngageAuContact(idLanceur, tkLanceur, lanceurData);
 
     if (!configSort.isHeal && estEngage && dist > 1) {
         window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Engagé au CAC !", "#aaaaaa");
@@ -3465,7 +3481,7 @@ window.declencherResolutionAvecBondEventuel = async function() {
     await window.declencherResolution();
     // L'Illusion se crée toujours en dernier sur la carte, après tout le reste (attaque, Bond...).
     if (illusionEnAttente) {
-        await window.resoudreIllusionInteractif(illusionEnAttente.idLanceur, illusionEnAttente.portee);
+        await window.poserIllusions(illusionEnAttente.idLanceur, illusionEnAttente.portee, illusionEnAttente.nombre);
     }
 };
 
