@@ -149,7 +149,7 @@ node engagement_tombe.mjs    # un ennemi à terre ne tient plus au corps-à-corp
 node soin_et_poussee.mjs     # soin + poussée : le ciblage envoie les deux, le cerveau pousse quand le jet passe (15 % par cran)
 node marche_anticipee.mjs    # le pion part dès la validation sur l'écran de celui qui joue ; le journal confirme ou corrige
 node fiche_race_classe.mjs   # race et classe dans l'onglet Statistiques ; portraits au soleil, sans reflet violacé
-node jet_d20.mjs            # la scène du d20 : fondu, avatar, défilement qui ralentit, modificateur égrené, lueurs, rouge/violet
+node jet_d20.mjs            # la scène du d20 : fondu, avatar, défilement qui ralentit, modificateur égrené, lueurs, rouge/violet ; chez tous les joueurs ; sons ; pas de monstres dans les bulles du chat
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -3436,3 +3436,26 @@ dans son champ `id`). Deux bancs supposaient l'ancienne copie :
 héros réel qui a une image) et `migration_effets.mjs` (la base est déjà migrée :
 il repart d'une base sans Repli ni Aveuglement, et sa panne simulée tombe sur la
 création du Repli, une écriture qui a forcément lieu).
+
+### Le d20 chez tous les joueurs, ses sons, et les monstres hors des bulles du chat
+
+- **Chez tous les joueurs** : c'était déjà le cas — le jet est écrit dans le
+  document de la partie (`Action_Des`), que chaque poste écoute, et chaque
+  poste joue la scène dès qu'un nouveau jet y paraît. `jet_d20.mjs` le prouve
+  désormais : il ouvre l'écoute de la partie sur un poste qui N'A PAS lancé
+  (`ouvrirChatbox`), lui livre le jet d'un autre poste, et la scène s'y ouvre
+  et se déroule jusqu'au total — sans que ce poste-là poste le message du chat.
+- **Les sons**, fabriqués sur place avec Web Audio (aucun fichier à héberger,
+  `SONS_D20` dans jet_d20.js) : un « tic » sec à chaque chiffre qui défile,
+  jamais tout à fait le même ; un coup sourd quand le dé se pose ; une note de
+  cloche à chaque cran du modificateur (grave pour un malus) ; un accord au
+  résultat — doré, sombre sur un 1 naturel, plus étrange sur un 20. Le volume
+  suit « Interface » × « Général ». Safari n'ouvre le son qu'après un geste :
+  le contexte audio se réveille au premier toucher dans le jeu, pour être prêt
+  chez les joueurs qui n'ont pas lancé. L'ancienne boucle (`audio-roulette`) est
+  retirée.
+- **Les monstres dans les bulles du chat** : pendant un combat, la liste des
+  combattants de la partie contient les créatures, et l'écoute de la partie la
+  passait telle quelle à `afficherBullesPersonnages` — seuls les leurres étaient
+  écartés. Le filtre vit maintenant dans la fonction elle-même, pour tous les
+  appelants : ni créature, ni leurre, ni leur portrait au survol.

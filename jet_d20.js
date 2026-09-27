@@ -143,25 +143,124 @@
         return (p && (p.urlCloudinary || p.URL_Cloudinary)) || "";
     }
 
-    function son(jouer) {
-        const audio = document.getElementById("audio-roulette");
-        if (!audio) return;
-        if (jouer) {
-            const reglages = window.PARAMETRES_AUDIO || { interface: 1, general: 1 };
-            audio.volume = Math.max(0, Math.min(1, (reglages.interface || 0) * (reglages.general || 0)));
-            audio.currentTime = 0;
-            audio.play().catch(() => {});
-        } else {
-            audio.pause();
-            audio.currentTime = 0;
-        }
+    // ---------------------------------------------------------------------
+    //  LES SONS, FABRIQUÉS SUR PLACE (Web Audio) : aucun fichier à héberger.
+    // ---------------------------------------------------------------------
+    //  Un « tic » sec à chaque chiffre qui défile (un clic d'os sur du bois,
+    //  jamais tout à fait le même), un coup sourd quand le dé se pose, une
+    //  note de cloche à chaque cran du modificateur (grave pour un malus),
+    //  puis un accord au résultat final — lumineux, sombre sur un 1, plus
+    //  mystérieux sur un 20. Le volume suit les réglages « Interface » et
+    //  « Général » du jeu.
+    //
+    //  SAFARI N'OUVRE LE SON QU'APRÈS UN GESTE. Le joueur qui lance a touché
+    //  l'écran ; les autres non — leur contexte audio est donc réveillé au
+    //  premier toucher venu dans le jeu, pour être prêt quand un jet arrive.
+    let contexteAudio = null;
+    function audio() {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return null;
+        if (!contexteAudio) { try { contexteAudio = new Ctx(); } catch (e) { return null; } }
+        if (contexteAudio.state === "suspended") contexteAudio.resume().catch(() => {});
+        return contexteAudio;
     }
+    const reveiller = () => { audio(); };
+    ["pointerdown", "touchend", "keydown"].forEach(ev =>
+        window.addEventListener(ev, reveiller, { capture: true, passive: true }));
+
+    function volume() {
+        const r = window.PARAMETRES_AUDIO || { interface: 1, general: 1 };
+        const v = (Number(r.interface) || 0) * (Number(r.general) || 0);
+        return Math.max(0, Math.min(1, isNaN(v) ? 0 : v));
+    }
+
+    // Une note : oscillateur + enveloppe (attaque courte, chute exponentielle).
+    function note(ctx, sortie, { freq, type = "sine", debut = 0, duree = 0.3, gain = 0.3, glisse = null }) {
+        const t = ctx.currentTime + debut;
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, t);
+        if (glisse) osc.frequency.exponentialRampToValueAtTime(glisse, t + duree);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(gain, t + 0.008);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + duree);
+        osc.connect(g).connect(sortie);
+        osc.start(t);
+        osc.stop(t + duree + 0.02);
+    }
+    // Un souffle filtré : la matière du clic et du choc.
+    function bruit(ctx, sortie, { duree = 0.04, freq = 2500, q = 6, gain = 0.4, debut = 0 }) {
+        const t = ctx.currentTime + debut;
+        const n = Math.max(1, Math.floor(ctx.sampleRate * duree));
+        const tampon = ctx.createBuffer(1, n, ctx.sampleRate);
+        const d = tampon.getChannelData(0);
+        for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
+        const src = ctx.createBufferSource();
+        src.buffer = tampon;
+        const filtre = ctx.createBiquadFilter();
+        filtre.type = "bandpass";
+        filtre.frequency.value = freq;
+        filtre.Q.value = q;
+        const g = ctx.createGain();
+        g.gain.value = gain;
+        src.connect(filtre).connect(g).connect(sortie);
+        src.start(t);
+    }
+    function jouerSon(fabriquer) {
+        const v = volume();
+        if (v <= 0) return;
+        const ctx = audio();
+        if (!ctx) return;
+        try {
+            const sortie = ctx.createGain();
+            sortie.gain.value = v;
+            sortie.connect(ctx.destination);
+            fabriquer(ctx, sortie);
+        } catch (e) { /* un son raté ne coupe jamais la scène */ }
+    }
+    const SONS_D20 = {
+        tic() {
+            jouerSon((ctx, s) => {
+                bruit(ctx, s, { duree: 0.035, freq: 2200 + Math.random() * 1400, q: 7, gain: 0.55 });
+                note(ctx, s, { freq: 1500 + Math.random() * 500, type: "triangle", duree: 0.04, gain: 0.08 });
+            });
+        },
+        pose() {
+            jouerSon((ctx, s) => {
+                bruit(ctx, s, { duree: 0.12, freq: 700, q: 2.5, gain: 0.7 });
+                note(ctx, s, { freq: 170, glisse: 90, duree: 0.2, gain: 0.35 });
+            });
+        },
+        cran(bonus) {
+            jouerSon((ctx, s) => {
+                const f = bonus ? 988 : 330;
+                note(ctx, s, { freq: f, duree: 0.45, gain: 0.18 });
+                note(ctx, s, { freq: f * 2.01, duree: 0.3, gain: 0.05 });
+                if (bonus) note(ctx, s, { freq: f * 3, debut: 0.03, duree: 0.25, gain: 0.03 });
+            });
+        },
+        final(theme) {
+            jouerSon((ctx, s) => {
+                const accords = {
+                    or:     [523.3, 659.3, 784.0, 1046.5],     // do majeur, qui monte
+                    rouge:  [196.0, 233.1, 277.2],             // grave et dissonant
+                    violet: [392.0, 493.9, 587.3, 740.0, 987.8] // plus lumineux, étrange
+                };
+                (accords[theme] || accords.or).forEach((f, i) =>
+                    note(ctx, s, { freq: f, type: theme === "rouge" ? "sawtooth" : "sine",
+                                   debut: i * 0.07, duree: 1.3, gain: theme === "rouge" ? 0.05 : 0.11 }));
+            });
+        }
+    };
+    // Exposés : un banc peut les compter, et on pourra les remplacer par des
+    // fichiers un jour sans toucher à la scène.
+    window.SONS_D20 = SONS_D20;
 
     function fermer() {
         const s = scene;
         numeroScene++;
         if (minuterieFermeture) { clearTimeout(minuterieFermeture); minuterieFermeture = null; }
-        son(false);
         if (!s) return;
         s.hote.classList.remove("d20-visible");
         setTimeout(() => {
@@ -215,7 +314,6 @@
 
         // --- 2. LE DÉ ROULE ---------------------------------------------
         h.classList.add("d20-roule");
-        son(true);
         let precedent = parseInt(s.chiffre.textContent);
         const intervalles = window.intervallesDefilementD20();
         for (let i = 0; i < intervalles.length; i++) {
@@ -224,6 +322,7 @@
             if (!dernier && n === precedent) n = (n % 20) + 1;
             precedent = n;
             s.chiffre.textContent = String(n);
+            if (!dernier) window.SONS_D20.tic();
             // Le dé tangue un peu à chaque chiffre, de moins en moins.
             const amplitude = 12 * (1 - i / intervalles.length);
             s.de.style.transform = dernier ? "" :
@@ -231,9 +330,9 @@
             await attendre(intervalles[i]);
             if (!encore()) return;
         }
-        son(false);
         h.classList.remove("d20-roule");
         h.classList.add("d20-pose");
+        window.SONS_D20.pose();
         const theme = window.themeJetD20(brut);
         if (theme !== "or") { h.classList.remove("theme-or"); h.classList.add("theme-" + theme); }
 
@@ -256,6 +355,7 @@
                 s.de.classList.remove("d20-cran-haut", "d20-cran-bas");
                 void s.de.offsetWidth;
                 s.de.classList.add(signe > 0 ? "d20-cran-haut" : "d20-cran-bas");
+                window.SONS_D20.cran(signe > 0);
                 await attendre(RYTHME_D20.cran * 0.35);
                 if (!encore()) return;
                 valeur += signe;
@@ -269,6 +369,7 @@
         // --- 4. LE RÉSULTAT FINAL ----------------------------------------
         s.chiffre.textContent = String(total);
         h.classList.add("d20-final");
+        window.SONS_D20.final(theme);
         if (typeof window.posterJetDansLeChat === "function") {
             try { window.posterJetDansLeChat(donnees); } catch (e) { console.error("Jet de dé → chat :", e); }
         }

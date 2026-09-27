@@ -52,7 +52,8 @@ const FAUX_FIRESTORE = `
   export const deleteField = () => "x"; export class FieldPath { constructor(...s){this.s=s;} }
   export const arrayUnion = (...v) => v; export const arrayRemove = (...v) => v;
   export const increment = (n) => n; export const serverTimestamp = () => Date.now();
-  export const onSnapshot = () => () => {}; export const query = (...a) => ({a});
+  export const onSnapshot = (ref, cb) => { (window.__ecoutes = window.__ecoutes || []).push({ ref, cb }); return () => {}; };
+  export const query = (...a) => ({a});
   export const where = (...a) => ({a}); export const orderBy = (...a) => ({a});
   export const limit = (...a) => ({a});
   export const writeBatch = () => ({ update(){}, set(){}, delete(){}, commit: async()=>{} });
@@ -87,6 +88,14 @@ const R_DEFAUT = await p.evaluate(() => ({ ...window.RYTHME_D20, intervalles: wi
 // On accélère la scène pour le banc (les proportions restent les mêmes).
 await p.evaluate(() => Object.assign(window.RYTHME_D20,
   { entree: 120, tics: 10, ticMin: 12, ticMax: 60, pauseAvantMod: 120, cran: 260, fermetureAuto: 60000 }));
+// Les sons : on les compte, sans les jouer (le banc n'a pas de haut-parleur).
+await p.evaluate(() => {
+  window.__sons = { tic: 0, pose: 0, cran: [], final: [] };
+  window.SONS_D20.tic = () => { window.__sons.tic++; };
+  window.SONS_D20.pose = () => { window.__sons.pose++; };
+  window.SONS_D20.cran = (bonus) => { window.__sons.cran.push(bonus); };
+  window.SONS_D20.final = (theme) => { window.__sons.final.push(theme); };
+});
 await p.evaluate(() => {
   window.PERSOS_PARTIE = [{ idPersonnage: "P1", prenom: "Cybile", nom: "Ardente", couleur: "#c2a878",
                             urlCloudinary: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1/portrait_cybile.png" }];
@@ -158,6 +167,7 @@ console.log("\n1. LE DÉFILEMENT RALENTIT JUSQU'À L'ARRÊT");
 
 console.log("\n2. UN JET DE 12 AVEC +3 : FONDU, AVATAR, DÉ, MODIFICATEUR, FINAL");
 {
+  await p.evaluate(() => { window.__sons = { tic: 0, pose: 0, cran: [], final: [] }; });
   const r = await jouer({ idLancer: "L1", idPerso: "P1", nomPerso: "Cybile Ardente", caract: "Force",
                           resultatBrut: 12, modificateur: 3, totalFinal: 15, timestamp: 1 });
   await p.screenshot({ path: "/tmp/claude-0/d20_final.png" });
@@ -182,6 +192,11 @@ console.log("\n2. UN JET DE 12 AVEC +3 : FONDU, AVATAR, DÉ, MODIFICATEUR, FINAL
            `${r.lueurs} / ${r.sol}`);
   const [cr, cg, cb] = rgb(r.centre);
   verifier("le dé est doré", cr > 200 && cg > 150 && cb < 120 && /theme-or/.test(r.classes), r.centre);
+  const sons = await p.evaluate(() => ({ ...window.__sons, attendus: window.intervallesDefilementD20().length - 1 }));
+  verifier("un « tic » à chaque chiffre qui défile", sons.tic === sons.attendus && sons.tic > 0, `${sons.tic}/${sons.attendus}`);
+  verifier("un coup sourd quand il se pose", sons.pose === 1, String(sons.pose));
+  verifier("une note à chacun des trois crans (aiguë : bonus)", JSON.stringify(sons.cran) === "[true,true,true]", JSON.stringify(sons.cran));
+  verifier("et un accord doré au résultat", JSON.stringify(sons.final) === '["or"]', JSON.stringify(sons.final));
   verifier("le message part dans le chat, une fois, depuis le lanceur",
            r.messages.length === 1 && /Résultat : 12 \+3 = \*\*15\*\*/.test(r.messages[0]), JSON.stringify(r.messages));
 }
@@ -272,12 +287,63 @@ console.log("\n6. LE LANCER DEPUIS LA FICHE DIT QUI LANCE");
   verifier("et un jet cohérent", a && a.totalFinal === a.resultatBrut + 3 && a.resultatBrut >= 1 && a.resultatBrut <= 20);
 }
 
+console.log("\n6 bis. LA SCÈNE SE JOUE CHEZ TOUS LES JOUEURS — ET LES MONSTRES RESTENT HORS DES BULLES");
+{
+  // Un poste qui N'A PAS lancé : il écoute la partie (ouvrirChatbox → écoute
+  // du document de la partie), et c'est ce document qui porte le jet.
+  const r = await p.evaluate(async () => {
+    window.fermerJetD20();
+    await new Promise(r => setTimeout(r, 700));
+    window.ID_MON_LANCER = "";
+    window.__messages = [];
+    window.__ecoutes = [];
+    window.ID_PARTIE_COURANTE = "PARTIE_X";
+    document.getElementById("fenetre-chatbox").style.display = "none";
+    window.ouvrirChatbox();
+    const ecoute = (window.__ecoutes || []).find(e => e.ref && e.ref.chemin === "Systeme_Parties/PARTIE_X");
+    if (!ecoute) return { ecoute: false };
+    // Pendant un combat : les monstres sont dans la liste des combattants.
+    window.PERSOS_PARTIE = [
+      { idPersonnage: "P1", prenom: "Cybile", camp: "Allié", couleur: "#c2a878", urlCloudinary: "" },
+      { idPersonnage: "M1", prenom: "Goule", camp: "Ennemi", estMonstre: true, urlCloudinary: "https://exemple/goule.png" },
+      { idPersonnage: "ILL", prenom: "Illusion de", camp: "Allié", estIllusion: true }
+    ];
+    const snap = (data) => ({ exists: () => true, data: () => data, id: "PARTIE_X" });
+    const base = { Ordre_Initiative: ["P1"], Index_Initiative: 0, Tour_Combat: 1 };
+    let erreur = null;
+    try { ecoute.cb(snap(base)); } catch (e) { erreur = "scan 1 : " + e.message; }
+    const bulles = [...document.querySelectorAll("#zone-noms-bulles .bulle-personnage")].map(b => b.innerText);
+    const portraits = [...document.querySelectorAll(".bulle-portrait-hover-joueur")].map(i => i.getAttribute("src"));
+    try {
+      ecoute.cb(snap({ ...base, Action_Des: { idLancer: "UN_AUTRE_POSTE", idPerso: "P1", nomPerso: "Cybile",
+        caract: "Force", resultatBrut: 8, modificateur: 2, totalFinal: 10, timestamp: 12345 } }));
+    } catch (e) { erreur = "scan 2 : " + e.message; }
+    const h = document.getElementById("overlay-jet-des");
+    await new Promise(r => setTimeout(r, 200));
+    const ouverte = h.classList.contains("d20-visible");
+    for (let i = 0; i < 60 && !h.classList.contains("d20-final"); i++) await new Promise(r => setTimeout(r, 100));
+    return { ecoute: true, erreur, bulles, portraits, ouverte,
+             final: h.querySelector(".d20-chiffre").textContent, messages: window.__messages.length };
+  });
+  verifier("ce poste écoute bien la partie", r.ecoute === true);
+  verifier("sans erreur dans l'écoute", !r.erreur, r.erreur || "");
+  verifier("le jet d'un AUTRE poste ouvre la scène ici aussi", r.ouverte === true);
+  verifier("et la déroule jusqu'au résultat (8 + 2 = 10)", r.final === "10", r.final);
+  verifier("ce poste ne poste pas le message (ce n'est pas lui qui a lancé)", r.messages === 0, String(r.messages));
+  verifier("les bulles du chat : les héros (et le MJ), pas le monstre ni le leurre",
+           JSON.stringify(r.bulles.filter(n => n !== "MJ")) === '["Cybile"]',
+           JSON.stringify(r.bulles));
+  verifier("ni son portrait au survol", !r.portraits.some(u => /goule/.test(u || "")), JSON.stringify(r.portraits));
+  await p.evaluate(() => window.fermerJetD20());
+}
+
 console.log("\n7. L'ANCIEN PARCHEMIN EST PARTI");
 {
   const html = fs.readFileSync(`${RACINE}/index.html`, "utf-8");
   const app = fs.readFileSync(`${RACINE}/app.js`, "utf-8");
   verifier("plus de rouleau ni de flash dans la page", !/rouleau-parchemin|flash-resultat-des/.test(html));
   verifier("app.js ne définit plus sa propre animation", !/window\.jouerAnimationDesGlobal\s*=/.test(app));
+  verifier("ni la boucle audio de la roulette (les sons sont fabriqués sur place)", !/audio-roulette/.test(html));
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

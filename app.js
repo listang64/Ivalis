@@ -2913,6 +2913,11 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
 function afficherBullesPersonnages(persos) {
   const conteneur = document.getElementById("zone-noms-bulles");
   if (!conteneur) return;
+  // LES BULLES DU CHAT SONT CELLES DES HÉROS. Pendant un combat, la liste des
+  // combattants de la partie (PERSOS_PARTIE) contient aussi les monstres : ils
+  // s'invitaient dans la barre du chat, avec leur portrait au survol. Le
+  // filtre vit ici, pour tous les appelants : ni créature, ni leurre.
+  persos = (persos || []).filter(p => p && !p.estMonstre && !p.estIllusion);
   conteneur.innerHTML = "";
 
   document.querySelectorAll('.bulle-portrait-hover-joueur, .bulle-portrait-hover-mj').forEach(el => el.remove());

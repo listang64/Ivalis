@@ -1940,7 +1940,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=53"></script>
+<script src="trace_combat.js?v=54"></script>
 <!-- LA MISE À JOUR AUTOMATIQUE. Juste après la trace, parce qu'elle a besoin du
      numéro de version qu'elle y trouve, et avant tout le reste : si la page est
      périmée, autant s'en apercevoir avant d'avoir chargé le jeu entier.
@@ -1970,8 +1970,8 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=30"></script>
 <script type="module" src="ia_master.js?v=7"></script>
-<script type="module" src="app.js?v=64"></script>
-<script src="jet_d20.js?v=1"></script>
+<script type="module" src="app.js?v=65"></script>
+<script src="jet_d20.js?v=2"></script>
 <script type="module" src="creation_personnage.js?v=11"></script>
 <script type="module" src="classes.js?v=2"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
@@ -2041,9 +2041,8 @@
 
 <!-- LA SCÈNE DU D20 (jet_d20.js) : fondu pour toute la table, avatar du
      lanceur à droite, d20 qui roule, modificateur égrené, lueurs. Le contenu
-     est construit par le script ; ne restent ici que l'hôte et le son. -->
+     est construit par le script, les sons fabriqués sur place (Web Audio). -->
 <div id="overlay-jet-des" style="display: none;"></div>
-  <audio id="audio-roulette" src="https://res.cloudinary.com/dlkjq4kvg/video/upload/q_auto,f_auto/v1781420565/clik_bouton_aniy88.mp3" loop></audio>
 
   <div id="overlay-jeu-modale"></div>
 
