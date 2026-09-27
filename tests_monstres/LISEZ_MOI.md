@@ -149,6 +149,7 @@ node engagement_tombe.mjs    # un ennemi à terre ne tient plus au corps-à-corp
 node soin_et_poussee.mjs     # soin + poussée : le ciblage envoie les deux, le cerveau pousse quand le jet passe (15 % par cran)
 node marche_anticipee.mjs    # le pion part dès la validation sur l'écran de celui qui joue ; le journal confirme ou corrige
 node fiche_race_classe.mjs   # race et classe dans l'onglet Statistiques ; portraits au soleil, sans reflet violacé
+node jet_d20.mjs            # la scène du d20 : fondu, avatar, défilement qui ralentit, modificateur égrené, lueurs, rouge/violet
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -3382,3 +3383,56 @@ cible unique (anneaux, `ajouterCibleCiblage`), avec son malus de tir au
 contact. `engagement_tombe.mjs` rejoue la carte de la partie (Attaque Magique,
 Distance 3, zone de 7 cases, orc au contact) du clic à la zone posée à 3 cases ;
 `zone_assombrissement.mjs` et `ia_pure.mjs` suivent la nouvelle règle.
+
+### Le jet de d20 devient une scène
+
+Nico : « la fenêtre s'assombrit en fondu pour tous les joueurs, avec l'avatar
+en grand côté droit par-dessus tout ; un dé 20 au milieu de l'écran, des
+chiffres qui défilent et s'arrêtent sur le bon, de moins en moins vite ; un
+modificateur (+3) s'affiche en doré juste à côté et s'égrène — +2, le dé
+grossit légèrement dans une lueur dorée et s'incrémente de 1 — pour tous les
++ ; enfin le résultat, avec des lueurs dorées qui dansent autour et sous le
+dé. Un 1 : dé, chiffre et lueur en rouge ; un 20 (résultat initial) : tout en
+violet. » Ses réponses : dé dessiné en code, rouge sur un 1 NATUREL, un malus
+descend de la même façon, fermeture au toucher.
+
+- **Le déclenchement ne change pas** : le clic sur le d20 d'une caractéristique
+  écrit le jet dans la partie (`Action_Des`), et chaque poste joue la même
+  scène avec la même valeur. Le jet porte maintenant `idPerso`, pour retrouver
+  à coup sûr l'avatar du lanceur (repli sur le nom pour un jet ancien).
+- **La scène** (`jet_d20.js`, style « LA SCÈNE DU D20 ») : voile en fondu,
+  avatar (le portrait de la fiche) en grand à droite, au-dessus de tout
+  (z-index 30000) ; au centre, un icosaèdre vu de face dessiné en SVG. Les
+  chiffres défilent sur 22 intervalles qui s'allongent (38 → 368 ms, environ
+  3 s), le dé tangue de moins en moins, puis se pose avec un rebond sur le
+  résultat tiré. Le modificateur apparaît à côté : doré pour un bonus, gris-bleu
+  pour un malus ; à chaque cran, l'étiquette perd 1, le dé grossit (ou rétrécit)
+  dans une lueur puis reprend sa taille, et son chiffre gagne (ou perd) 1 ; au
+  dernier cran, l'étiquette s'efface. Au résultat final, sept lueurs tournent
+  autour du dé et une nappe de lumière pulse dessous.
+- **Les thèmes** : tout (faces, chiffre, lueurs, modificateur) suit des
+  variables CSS — or par défaut, rouge dès que le dé se pose sur un 1 naturel,
+  violet sur un 20 naturel. Un 20 obtenu grâce au modificateur reste doré.
+- **La fin** : un toucher ferme la scène une fois le résultat affiché (un
+  toucher pendant le roulement ne coupe rien) ; sinon elle se ferme seule au
+  bout de dix secondes. Le message du chat part au résultat final, depuis le
+  seul poste qui a lancé (`posterJetDansLeChat`, app.js). L'ancien parchemin
+  (rouleau, flash, leurs styles) est retiré.
+
+`jet_d20.mjs` joue la scène dans la vraie page : fondu, avatar à droite, dé au
+centre, chiffres qui défilent puis s'arrêtent, +3 égrené (12 → 13 → 14 → 15, le
+dé grossit), −2 égrené (7 → 6 → 5, le dé rétrécit), lueurs finales, rouge sur
+un 1 avec +2, violet sur un 20, doré sur un 20 obtenu par le bonus, fermeture
+au toucher et d'elle-même, message du chat posté une seule fois et seulement par
+le lanceur, et `idPerso` écrit par le lancer depuis la fiche.
+
+Au passage : les copies locales de la base (`effets_reels.json`,
+`gabarits_reels.json`, `persos_reels.json`, `joueurs.json` — non versionnées)
+avaient disparu avec l'ancien conteneur. Elles ont été reprises en lecture
+seule (`node tirer_effets.mjs <Collection> <fichier>` : Combat_Effets,
+Monstres_Modeles, Personnages, Joueurs ; la clé de chaque effet est recopiée
+dans son champ `id`). Deux bancs supposaient l'ancienne copie :
+`gouttes_etat.mjs` (le héros Pliors n'est plus en base : il prend le premier
+héros réel qui a une image) et `migration_effets.mjs` (la base est déjà migrée :
+il repart d'une base sans Repli ni Aveuglement, et sa panne simulée tombe sur la
+création du Repli, une écriture qui a forcément lieu).

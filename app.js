@@ -5617,6 +5617,9 @@ window.lancerJetDeCaracteristique = async function(idCarac, nomCarac, valeurCara
     await updateDoc(doc(db, COL.PARTIES, window.ID_PARTIE_COURANTE), {
         Action_Des: {
             idLancer: window.ID_MON_LANCER,
+            // Qui lance : c'est ce qui retrouve son avatar pour la scène du dé
+            // (jet_d20.js), sans dépendre d'un nom qui pourrait être partagé.
+            idPerso: idPersonnageFiche || "",
             nomPerso: nomPersonnage,
             caract: nomCarac,
             resultatBrut: resultatD20,
@@ -5629,143 +5632,45 @@ window.lancerJetDeCaracteristique = async function(idCarac, nomCarac, valeurCara
     fermerFichePerso();
 };
 
-window.jouerAnimationDesGlobal = function(donnees) {
-    const overlay = document.getElementById("overlay-jet-des");
-    const rouleau = document.getElementById("rouleau-parchemin");
-    const titre = document.getElementById("titre-jet-des");
-    const flash = document.getElementById("flash-resultat-des");
-    const audio = document.getElementById("audio-roulette");
-    
-    titre.innerText = `Jet de ${donnees.caract} pour ${donnees.nomPerso}`;
-    flash.classList.remove("flash-des-actif");
-    rouleau.innerHTML = "";
-    
-    // 1. CRÉATION DU PARCHEMIN PHYSIQUE
-    let sequence = [];
-    
-    for (let i = 0; i < 4; i++) { sequence.push(""); }
-    for (let i = 20; i >= 1; i--) { sequence.push(i); }
-    for (let i = 0; i < 2; i++) { sequence.push(""); }
-    
-    // On dessine tout ça dans le HTML
-    sequence.forEach((num) => {
-        if (num === "") {
-            // Espace vierge
-            rouleau.insertAdjacentHTML('beforeend', `<div class="chiffre-roulette"></div>`);
-        } else if (num === 20) {
-            // NOUVEAU : Le 20 en doré avec un bel effet de brillance
-            rouleau.insertAdjacentHTML('beforeend', `<div class="chiffre-roulette" style="color: #ffd700; text-shadow: 0 0 10px rgba(255, 215, 0, 0.8), 1px 1px 2px #5c3a21;">${num}</div>`);
-        } else if (num === 1) {
-            // NOUVEAU : Le 1 en rouge sang
-            rouleau.insertAdjacentHTML('beforeend', `<div class="chiffre-roulette" style="color: #d32f2f; text-shadow: 0 0 5px rgba(211, 47, 47, 0.5);">${num}</div>`);
-        } else {
-            // Les autres chiffres normaux
-            rouleau.insertAdjacentHTML('beforeend', `<div class="chiffre-roulette">${num}</div>`);
+// LA SCÈNE DU DÉ vit dans jet_d20.js (window.jouerAnimationDesGlobal) : le
+// fondu pour toute la table, l'avatar du lanceur, le d20 qui roule, le
+// modificateur égrené, les lueurs. Ce qui reste ici, c'est ce qui parle à la
+// base : le message du jet dans le chat, posté par le SEUL poste qui a lancé,
+// au moment où le résultat final s'affiche.
+window.posterJetDansLeChat = function(donnees) {
+    if (!donnees || donnees.idLancer !== window.ID_MON_LANCER) return;
+    const modTexte = donnees.modificateur >= 0 ? `+${donnees.modificateur}` : donnees.modificateur;
+    const texteFormatte = `🎲 Jet de **${donnees.caract}** pour **${donnees.nomPerso}** : Résultat : ${donnees.resultatBrut} ${modTexte} = **${donnees.totalFinal}**`;
+
+    const jourEnJeu = window.DATE_EN_JEU_ACTUELLE ? window.DATE_EN_JEU_ACTUELLE.jour : "";
+    const anEnJeu = window.DATE_EN_JEU_ACTUELLE ? window.DATE_EN_JEU_ACTUELLE.annee : "";
+
+    let auteurCouleur = "#ffffff";
+    let idAuteur = "MJ";
+    if (window.PERSOS_PARTIE) {
+        const persoTrouve = window.PERSOS_PARTIE.find(p => (donnees.idPerso && p.idPersonnage === donnees.idPerso)
+            || `${p.prenom} ${p.nom}`.trim() === donnees.nomPerso.trim() || p.prenom === donnees.nomPerso);
+        if (persoTrouve) {
+            auteurCouleur = persoTrouve.couleur;
+            idAuteur = persoTrouve.idPersonnage;
         }
-    });
-
-    // 2. MATHÉMATIQUES D'ALIGNEMENT
-    const hauteurChiffre = 70;
-    const offsetFleche = 110; 
-    
-    const indexDepart = sequence.length - 2; 
-    const positionDepart = offsetFleche - (indexDepart * hauteurChiffre);
-    
-    const indexFin = sequence.indexOf(donnees.resultatBrut);
-    const positionFin = offsetFleche - (indexFin * hauteurChiffre);
-
-    const distanceParcourue = indexDepart - indexFin;
-    const dureeAnimation = 1.5 + (distanceParcourue * 0.18); 
-
-    // 3. INITIALISATION VISUELLE
-    rouleau.style.transition = "none";
-    rouleau.style.transform = `translateY(${positionDepart}px)`;
-    
-    overlay.style.display = "flex";
-    
-    // Lancement de l'audio en boucle
-    if (audio) { 
-        audio.volume = window.PARAMETRES_AUDIO.interface * window.PARAMETRES_AUDIO.general;
-        audio.currentTime = 0; 
-        audio.play().catch(()=>{}); 
     }
 
-    void rouleau.offsetWidth;
-
-    // 4. L'ANIMATION À VITESSE CONSTANTE ("linear")
-    rouleau.style.transition = `transform ${dureeAnimation}s linear`;
-    rouleau.style.transform = `translateY(${positionFin}px)`;
-
-    // 5. LA FIN DU SPECTACLE
-    setTimeout(() => {
-        // Coupure de l'audio
-        if (audio) {
-            audio.pause();
-            audio.currentTime = 0;
-        }
-        
-        // NOUVEAU : Application des couleurs sur l'explosion du résultat
-        if (donnees.resultatBrut === 20) {
-            flash.style.color = "#ffd700"; // Doré
-            flash.style.textShadow = "0 0 20px #ffd700, 0 0 40px #ffaa00, 2px 2px 10px black";
-        } else if (donnees.resultatBrut === 1) {
-            flash.style.color = "#ff4c4c"; // Rouge vif
-            flash.style.textShadow = "0 0 20px #ff4c4c, 0 0 40px #8b0000, 2px 2px 10px black";
-        } else {
-            flash.style.color = "white"; // Normal
-            flash.style.textShadow = "0 0 20px white, 0 0 40px #00ffff, 2px 2px 10px black";
-        }
-
-        flash.innerText = donnees.resultatBrut;
-        flash.classList.add("flash-des-actif");
-
-        setTimeout(() => {
-            overlay.style.display = "none";
-            
-            if (donnees.idLancer === window.ID_MON_LANCER) {
-                const chatInput = document.getElementById("input-chat");
-                const modTexte = donnees.modificateur >= 0 ? `+${donnees.modificateur}` : donnees.modificateur;
-                
-                // Le message dans le chat
-                const texteFormatte = `🎲 Jet de **${donnees.caract}** pour **${donnees.nomPerso}** : Résultat : ${donnees.resultatBrut} ${modTexte} = **${donnees.totalFinal}**`;
-                
-                const jourEnJeu = window.DATE_EN_JEU_ACTUELLE ? window.DATE_EN_JEU_ACTUELLE.jour : "";
-                const anEnJeu = window.DATE_EN_JEU_ACTUELLE ? window.DATE_EN_JEU_ACTUELLE.annee : "";
-                
-                let auteurCouleur = "#ffffff";
-                let idAuteur = "MJ";
-                
-                if (window.PERSOS_PARTIE) {
-                    const persoTrouve = window.PERSOS_PARTIE.find(p => `${p.prenom} ${p.nom}`.trim() === donnees.nomPerso.trim() || p.prenom === donnees.nomPerso);
-                    if (persoTrouve) {
-                        auteurCouleur = persoTrouve.couleur;
-                        idAuteur = persoTrouve.idPersonnage;
-                    }
-                }
-
-                const nouveauMsgDes = {
-                    ID_Partie: window.ID_PARTIE_COURANTE,
-                    Auteur_ID: idAuteur,
-                    Auteur_Nom: donnees.nomPerso,
-                    Auteur_Couleur: auteurCouleur,
-                    Texte: texteFormatte,
-                    Date_Jour: jourEnJeu,
-                    Date_An: anEnJeu,
-                    Timestamp: new Date().getTime()
-                };
-
-                try {
-                    addDoc(collection(db, COL.MESSAGES), nouveauMsgDes);
-                } catch (e) {
-                    console.error("Erreur lors de l'envoi automatique du dé :", e);
-                }
-                
-                window.ID_MON_LANCER = ""; 
-                if (chatInput) chatInput.focus();
-            }
-        }, 2500);
-
-    }, dureeAnimation * 1000);
+    try {
+        addDoc(collection(db, COL.MESSAGES), {
+            ID_Partie: window.ID_PARTIE_COURANTE,
+            Auteur_ID: idAuteur,
+            Auteur_Nom: donnees.nomPerso,
+            Auteur_Couleur: auteurCouleur,
+            Texte: texteFormatte,
+            Date_Jour: jourEnJeu,
+            Date_An: anEnJeu,
+            Timestamp: new Date().getTime()
+        });
+    } catch (e) {
+        console.error("Erreur lors de l'envoi automatique du dé :", e);
+    }
+    window.ID_MON_LANCER = "";
 };
 
 // =========================================================================

@@ -1557,27 +1557,167 @@ textarea.input-texte-parchemin {
     filter: drop-shadow(0px 6px 8px rgba(0,0,0,0.8)) brightness(1.2);
 }
 
-/* ========================================================================= */
-/* ANIMATION JET DE DÉS                                                      */
-/* ========================================================================= */
+/* =========================================================================
+   LA SCÈNE DU D20 (jet_d20.js)
+   Fondu pour toute la table, avatar du lanceur à droite, d20 dessiné en SVG
+   au centre. Le thème (or / rouge sur un 1 naturel / violet sur un 20
+   naturel) ne change que des variables : faces, chiffre, lueurs et
+   modificateur les suivent ensemble.
+   ========================================================================= */
+.scene-d20 {
+    position: fixed; top: 0; left: 0; width: 100vw; height: var(--app-h, 100vh);
+    z-index: 30000; overflow: hidden; -webkit-tap-highlight-color: transparent;
+    --d20-a: #fff0b3; --d20-b: #e6b84a; --d20-c: #b3821c; --d20-d: #6f4a0c;
+    --d20-trait: #3f2805; --d20-lueur: 255, 196, 70;
+    --d20-texte: #2b1a03; --d20-texte-bord: rgba(255, 238, 180, 0.9);
+}
+.scene-d20.theme-rouge {
+    --d20-a: #ffc1b6; --d20-b: #e0453a; --d20-c: #a3211a; --d20-d: #560a06;
+    --d20-trait: #2a0302; --d20-lueur: 255, 58, 42;
+    --d20-texte: #fff5f2; --d20-texte-bord: rgba(80, 0, 0, 0.95);
+}
+.scene-d20.theme-violet {
+    --d20-a: #efd9ff; --d20-b: #ad62ea; --d20-c: #742cba; --d20-d: #3a0d68;
+    --d20-trait: #20053c; --d20-lueur: 186, 96, 255;
+    --d20-texte: #fffaff; --d20-texte-bord: rgba(45, 0, 85, 0.95);
+}
+.scene-d20.d20-final { cursor: pointer; }
 
-.chiffre-roulette {
-    font-size: 45px;
-    font-weight: bold;
-    color: #5c3a21;
-    height: 70px; /* Chaque chiffre prend 70px de haut */
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    border-bottom: 1px dashed rgba(92, 58, 33, 0.2);
+/* L'écran s'assombrit en fondu. */
+.scene-d20-voile {
+    position: absolute; inset: 0; opacity: 0; transition: opacity 0.6s ease;
+    background: radial-gradient(ellipse at 45% 50%, rgba(12, 7, 2, 0.74) 0%, rgba(0, 0, 0, 0.92) 75%);
+}
+.scene-d20.d20-visible .scene-d20-voile { opacity: 1; }
+
+/* L'avatar du lanceur, en grand, côté droit, par-dessus tout. */
+.scene-d20-avatar {
+    position: absolute; right: 0; bottom: 0; z-index: 1; height: 94%; max-width: 46vw;
+    object-fit: contain; object-position: right bottom; pointer-events: none;
+    opacity: 0; transform: translateX(8%);
+    transition: opacity 0.7s ease 0.15s, transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.15s;
+    filter: drop-shadow(-14px 0 30px rgba(0, 0, 0, 0.85));
+}
+.scene-d20.d20-visible .scene-d20-avatar { opacity: 1; transform: none; }
+
+/* Le centre : titre, dé, modificateur, lueur au sol. */
+.scene-d20-centre {
+    position: absolute; left: 50%; top: 50%; z-index: 2; transform: translate(-50%, -50%);
+    display: flex; flex-direction: column; align-items: center;
+}
+.scene-d20-titre {
+    font-family: 'Cinzel', serif; font-weight: bold; text-transform: uppercase; text-align: center;
+    letter-spacing: 3px; font-size: clamp(16px, 2.4vw, 28px); margin-bottom: 4vh; white-space: nowrap;
+    background: linear-gradient(180deg, #fff3c4 0%, #e8c46a 50%, #a8781f 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(2px 3px 5px rgba(0, 0, 0, 0.9));
+    opacity: 0; transform: translateY(-10px); transition: opacity 0.5s ease 0.2s, transform 0.5s ease 0.2s;
+}
+.scene-d20.d20-visible .scene-d20-titre { opacity: 1; transform: none; }
+.scene-d20-piste {
+    position: relative; width: clamp(170px, 27vmin, 290px); aspect-ratio: 1;
+    opacity: 0; transform: scale(0.55);
+    transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.scene-d20.d20-visible .scene-d20-piste { opacity: 1; transform: none; }
+
+/* Le dé. */
+.scene-d20-de { position: absolute; inset: 0; z-index: 2; transition: transform 0.12s ease-out; }
+.d20-svg {
+    width: 100%; height: 100%; overflow: visible;
+    filter: drop-shadow(0 0 14px rgba(var(--d20-lueur), 0.45)) drop-shadow(0 12px 18px rgba(0, 0, 0, 0.8));
+    transition: filter 0.45s ease;
+}
+.d20-f { stroke: var(--d20-trait); stroke-width: 1.6; stroke-linejoin: round; transition: fill 0.45s ease, stroke 0.45s ease; }
+.d20-haut     { fill: var(--d20-a); }
+.d20-centre   { fill: var(--d20-b); }
+.d20-bord     { fill: var(--d20-c); }
+.d20-cote     { fill: var(--d20-c); }
+.d20-bord-bas { fill: var(--d20-d); }
+.d20-bas      { fill: var(--d20-d); }
+.d20-reflet   { fill: rgba(255, 255, 255, 0.16); stroke: none; pointer-events: none; }
+.d20-contour  { fill: none; stroke: var(--d20-trait); stroke-width: 3.2; stroke-linejoin: round; transition: stroke 0.45s ease; }
+.d20-chiffre {
+    font-family: 'Cinzel', serif; font-weight: 700; font-size: 46px;
+    fill: var(--d20-texte); stroke: var(--d20-texte-bord); stroke-width: 3px; paint-order: stroke;
+    transition: fill 0.45s ease, stroke 0.45s ease;
 }
 
-.flash-des-actif {
-    display: block !important;
-    opacity: 1 !important;
-    transform: translate(-50%, -50%) scale(1) !important;
+/* Il se pose : un petit rebond. */
+.scene-d20.d20-pose .scene-d20-de { animation: d20-atterrit 0.45s ease-out; }
+@keyframes d20-atterrit { 0% { transform: scale(1.18); } 55% { transform: scale(0.95); } 100% { transform: scale(1); } }
+
+/* Un cran de bonus : il grossit dans une lueur, puis reprend sa taille.
+   (Même spécificité que le rebond, et écrit après lui : c'est le cran qui
+   gagne tant que le dé reste « posé ».) */
+.scene-d20 .scene-d20-de.d20-cran-haut { animation: d20-cran-haut 0.52s ease-out; }
+@keyframes d20-cran-haut {
+    0%   { transform: scale(1);    filter: none; }
+    35%  { transform: scale(1.14); filter: brightness(1.25) drop-shadow(0 0 26px rgba(var(--d20-lueur), 0.95)); }
+    100% { transform: scale(1);    filter: none; }
 }
+/* Un cran de malus : il rétrécit et s'éteint un instant. */
+.scene-d20 .scene-d20-de.d20-cran-bas { animation: d20-cran-bas 0.52s ease-out; }
+@keyframes d20-cran-bas {
+    0%   { transform: scale(1);    filter: none; }
+    35%  { transform: scale(0.88); filter: brightness(0.75) saturate(0.7); }
+    100% { transform: scale(1);    filter: none; }
+}
+
+/* Le modificateur, juste à côté du dé. */
+.scene-d20-mod {
+    position: absolute; left: 100%; top: 50%; z-index: 3; white-space: nowrap;
+    font-family: 'Cinzel', serif; font-weight: 700; font-size: clamp(34px, 6.5vmin, 66px);
+    opacity: 0; transform: translate(4px, -50%) scale(0.6);
+    transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.scene-d20-mod.d20-mod-visible { opacity: 1; transform: translate(16px, -50%) scale(1); }
+.scene-d20-mod.d20-mod-bonus {
+    background: linear-gradient(180deg, var(--d20-a) 0%, var(--d20-b) 55%, var(--d20-c) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 10px rgba(var(--d20-lueur), 0.8)) drop-shadow(2px 3px 4px rgba(0, 0, 0, 0.9));
+}
+.scene-d20-mod.d20-mod-malus { color: #9fb3cf; text-shadow: 0 0 10px rgba(120, 150, 200, 0.6), 2px 3px 4px rgba(0, 0, 0, 0.9); }
+.scene-d20-mod.d20-mod-epuise { opacity: 0; transform: translate(34px, -50%) scale(0.7); }
+
+/* Le résultat final : il éclate, puis des lueurs dansent autour et sous lui. */
+.scene-d20.d20-final .scene-d20-de { animation: d20-final 0.6s ease-out; }
+@keyframes d20-final { 0% { transform: scale(1); } 40% { transform: scale(1.22); } 100% { transform: scale(1); } }
+.scene-d20.d20-final .d20-svg {
+    filter: drop-shadow(0 0 24px rgba(var(--d20-lueur), 0.85)) drop-shadow(0 12px 18px rgba(0, 0, 0, 0.8));
+}
+.scene-d20-lueurs { position: absolute; inset: -38%; z-index: 1; pointer-events: none; opacity: 0; transition: opacity 0.7s ease; }
+.scene-d20.d20-final .scene-d20-lueurs { opacity: 1; }
+.scene-d20-lueurs span {
+    position: absolute; left: 50%; top: 50%; width: 34%; height: 34%; margin: -17% 0 0 -17%;
+    border-radius: 50%; filter: blur(5px);
+    background: radial-gradient(circle, rgba(var(--d20-lueur), 0.8) 0%, rgba(var(--d20-lueur), 0.25) 40%, rgba(var(--d20-lueur), 0) 70%);
+    animation: d20-danse var(--duree, 3.2s) ease-in-out var(--retard, 0s) infinite;
+}
+.scene-d20-lueurs span:nth-child(1) { --depart: 0deg;   --rayon: 88%;  --duree: 3.4s; }
+.scene-d20-lueurs span:nth-child(2) { --depart: 51deg;  --rayon: 104%; --duree: 4.1s; --retard: -0.7s; }
+.scene-d20-lueurs span:nth-child(3) { --depart: 103deg; --rayon: 80%;  --duree: 2.9s; --retard: -1.3s; }
+.scene-d20-lueurs span:nth-child(4) { --depart: 154deg; --rayon: 98%;  --duree: 3.7s; --retard: -0.4s; }
+.scene-d20-lueurs span:nth-child(5) { --depart: 206deg; --rayon: 86%;  --duree: 4.4s; --retard: -2.1s; }
+.scene-d20-lueurs span:nth-child(6) { --depart: 257deg; --rayon: 108%; --duree: 3.1s; --retard: -1.6s; }
+.scene-d20-lueurs span:nth-child(7) { --depart: 309deg; --rayon: 92%;  --duree: 3.9s; --retard: -2.6s; }
+@keyframes d20-danse {
+    0%   { transform: rotate(var(--depart)) translateX(var(--rayon)) scale(0.75); opacity: 0.55; }
+    50%  { transform: rotate(calc(var(--depart) + 180deg)) translateX(calc(var(--rayon) * 1.15)) scale(1.2); opacity: 1; }
+    100% { transform: rotate(calc(var(--depart) + 360deg)) translateX(var(--rayon)) scale(0.75); opacity: 0.55; }
+}
+.scene-d20-sol {
+    width: clamp(210px, 34vmin, 360px); height: clamp(26px, 4vmin, 44px); margin-top: -1.5vmin;
+    border-radius: 50%; filter: blur(8px); opacity: 0; transition: opacity 0.7s ease;
+    background: radial-gradient(ellipse at center, rgba(var(--d20-lueur), 0.85) 0%, rgba(var(--d20-lueur), 0.3) 45%, rgba(var(--d20-lueur), 0) 72%);
+}
+.scene-d20.d20-final .scene-d20-sol { opacity: 1; animation: d20-sol 2.4s ease-in-out infinite; }
+@keyframes d20-sol { 0%, 100% { transform: scaleX(0.88); opacity: 0.7; } 50% { transform: scaleX(1.12); opacity: 1; } }
+.scene-d20-indice {
+    margin-top: 3vh; font-family: 'Cinzel', serif; font-size: 13px; letter-spacing: 3px; text-transform: uppercase;
+    color: rgba(255, 240, 200, 0.55); opacity: 0; transition: opacity 0.6s ease;
+}
+.scene-d20.d20-final .scene-d20-indice { opacity: 1; transition-delay: 0.9s; }
 
 /* =========================================================================
    GRILLE HEXAGONALE

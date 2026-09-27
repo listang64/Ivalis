@@ -32,7 +32,12 @@ let echecs = 0;
 const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(62)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
 
 // L'état réel de la base avant la migration : le vrai instantané Firestore.
+// La base telle qu'elle était AVANT la migration : la copie réelle, moins les
+// effets que la migration crée (Nico a lancé la migration depuis ; une copie
+// fraîche les contient déjà, et le banc doit pouvoir les voir naître).
 const EFFETS_REELS = JSON.parse(fs.readFileSync('/home/user/Ivalis/tests_monstres/effets_reels.json', 'utf-8'));
+delete EFFETS_REELS.EFF_REPLI;
+delete EFFETS_REELS.EFF_AVEUGLEMENT;
 
 // Un Firestore de papier : il compte ses écritures, et sait tomber en panne.
 function fausseBase(donnees, { panneSur = null } = {}) {
@@ -210,14 +215,17 @@ console.log("\n3. RELANCÉE, ELLE N'ÉCRIT PLUS RIEN");
 console.log("\n4. UNE PANNE N'EMPORTE PAS LE RESTE, ET NE SE TAIT PAS");
 // =========================================================================
 {
-    const m = fausseBase(EFFETS_REELS, { panneSur: "EFF_GLACE" });
+    // La panne tombe sur une écriture qui a FORCÉMENT lieu — la création du
+    // Repli : la vraie base a déjà reçu les autres retouches (Nico a lancé la
+    // migration), si bien qu'une panne posée sur l'une d'elles ne se
+    // déclencherait jamais.
+    const m = fausseBase(EFFETS_REELS, { panneSur: "EFF_REPLI" });
     const resultat = await m.lancer();
 
     verifier("l'effet en panne est nommé dans le rapport",
-             resultat.rates.some(r => /EFF_GLACE/.test(r)), JSON.stringify(resultat.rates));
+             resultat.rates.some(r => /EFF_REPLI/.test(r)), JSON.stringify(resultat.rates));
     verifier("et les autres sont quand même passés",
-             m.base.EFF_ETOURDIT.Notes !== EFFETS_REELS.EFF_ETOURDIT.Notes
-             && m.base.EFF_PARALYSIE === undefined);
+             !!m.base.EFF_AVEUGLEMENT && m.base.EFF_REPLI === undefined && m.base.EFF_PARALYSIE === undefined);
 
     // Un effet absent de la base : on le dit, on ne le crée pas de nulle part.
     const sansEtourdi = JSON.parse(JSON.stringify(EFFETS_REELS));

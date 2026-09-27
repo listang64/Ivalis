@@ -53,7 +53,9 @@ const SRC_APPLIQUER = fonction(combat, 'window.appliquerTokensVTT = function');
 // Un vrai token de la base : Pliors, un des héros de la partie GAME_63650,
 // avec sa vraie image Cloudinary.
 const persos = JSON.parse(fs.readFileSync('/home/user/Ivalis/tests_monstres/persos_reels.json', 'utf-8'));
-const PLIORS = persos['PERSO_545407'];
+// Les héros de la base changent d'une partie à l'autre : Pliors s'il est
+// encore là, sinon le premier héros réel qui a une image.
+const PLIORS = persos['PERSO_545407'] || Object.values(persos).find(p => p && p.URL_Cloudinary);
 if (!PLIORS || !PLIORS.URL_Cloudinary) throw new Error("token réel introuvable dans persos_reels.json");
 
 const page = `<!DOCTYPE html><html><head><meta charset="utf-8">
