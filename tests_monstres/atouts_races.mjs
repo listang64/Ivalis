@@ -202,11 +202,51 @@ console.log("\n6. L'ONDARI : LA PORTÉE DE SES SORTS");
 }
 
 // ------------------------------------------------------------------
-// La section 7 (« le repos long de l'Humain », dont la formule vivait dans
-// finDeTourCombat) est partie à la grande suppression de l'ancien moteur : le
-// repos long se calcule désormais dans le cerveau (reposLongDuTour,
-// cerveau_combat.js), déjà testé — base 35 %, atout de l'Humain compris —
-// dans tests_monstres/cerveau_combat.mjs (« LE REPOS LONG »).
+// 7. LE REPOS LONG DE L'HUMAIN : PLUS DE BONUS
+// ------------------------------------------------------------------
+// Nico : « enlève le bonus humain uniquement sur le repos long, et dans le jeu
+// et dans la créa perso ». L'Humain garde sa jauge de 110 ; son +10 au repos
+// long disparaît. Joué ici de bout en bout : la VRAIE table des atouts
+// (app.js), le VRAI état de combat, le VRAI cerveau (reposLongDuTour), et le
+// texte de l'écran de création.
+console.log("\n7. LE REPOS LONG DE L'HUMAIN : PLUS DE BONUS");
+{
+  const p = poste();
+  const w = p.w;
+  const { construireEtatCombat, creerDes } = await import('../combat_etat.js');
+  const { avancerFile } = await import('../cerveau_combat.js');
+  verifier("l'atout Humain : la jauge plus grande, rien d'autre",
+           JSON.stringify(w.ATOUTS_RACES.Humain) === '{"fatigueMax":10}', JSON.stringify(w.ATOUTS_RACES.Humain));
+
+  const reposDe = (race) => {
+    const etat = construireEtatCombat({
+      idPartie: "P1", cerveau: "P_01", graine: 7,
+      combattants: [combattant(race, { fatigueActuelle: 30, Fatigue_Actuelle: 30 })],
+      positions: { H1: { q: 0, r: 0 } },
+      partie: { Phase_Combat: "Resolution", Tour_Combat: 1, Ordre_Initiative: ["H1"],
+                File_Attente_Combat: [{ idPersonnage: "H1", idCarte: "REPOS_LONG", initiative: 0 }] },
+      regles: { pvMax: w.pvMaxCombattant, fatigueMax: w.fatigueMaxCombattant,
+                esquive: w.esquiveCombattant, parade: w.paradeCombattant,
+                defPhysique: w.defPhysiqueCombattant, defMagique: w.defMagiqueCombattant,
+                critique: w.critiqueCombattant, atouts: w.atoutRace, bonusEquip: w.bonusEquip }
+    });
+    etat.file[0] = { id: "H1", carte: "REPOS_LONG", initiative: 0 };
+    const pas = avancerFile(etat, creerDes(etat.graine));
+    const repos = pas && pas.entree.etapes.find(e => e.type === "fatigue" && e.repos);
+    return { max: etat.combattants.H1.fatigueMax, apres: repos ? repos.fatigueApres : null };
+  };
+  const humain = reposDe("Humain"), gob = reposDe("Gob");
+  console.log(`     Humain : jauge ${humain.max}, 30 → ${humain.apres} ; Gob : jauge ${gob.max}, 30 → ${gob.apres}`);
+  verifier("l'Humain garde sa jauge de 110", humain.max === 110, `(${humain.max})`);
+  verifier("son repos long rend 35 % de 110, sans +10 (30 → 68)", humain.apres === 68, `(${humain.apres})`);
+  verifier("comme tout le monde : un Gob rend 35 % de 100 (30 → 65)", gob.apres === 65, `(${gob.apres})`);
+
+  const creation = fs.readFileSync('/home/user/Ivalis/creation_personnage.js', 'utf-8');
+  const blocHumain = creation.slice(creation.indexOf('if (race === "Humain")'), creation.indexOf('} else if (race === "Ondari")'));
+  verifier("l'écran de création annonce toujours la jauge de 110", /Fatigue de base : 110/.test(blocHumain));
+  verifier("et ne promet plus rien au repos long", !/repos/i.test(blocHumain), blocHumain.match(/[^">]{0,50}repos[^"<]{0,40}/i)?.[0] || "");
+  p.rendreLeHasard();
+}
 
 // ------------------------------------------------------------------
 console.log("\n8. LA FORGE ANNONCE LA PORTÉE RÉELLE");

@@ -535,8 +535,10 @@ console.log("\n13. PLUS UNE SEULE PANNE MUETTE");
     verifier("le cerveau connaît le repos long", cerveau.includes('carte !== "REPOS_LONG"'));
     verifier("et il le paie à la fermeture du tour",
              cerveau.includes("reposLongDuTour(suivant)"));
-    verifier("l'atout de l'Humain voyage jusqu'à lui",
-             lire('combat_etat.js').includes("bonusReposLong"));
+    // Le +10 de l'Humain au repos long a été retiré (demande de Nico) : plus
+    // aucun atout de race ne voyage jusqu'au repos long.
+    verifier("et plus aucun atout de race ne s'y ajoute",
+             !lire('combat_etat.js').includes("bonusReposLong") && !cerveau.includes("bonusReposLong"));
 
     // 6. UN CLIC DE CARTE REFUSÉ EN PRÉPARATION LE DIT AUSSI.
     verifier("les refus du choix de carte sont nommés",

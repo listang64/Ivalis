@@ -3459,3 +3459,23 @@ création du Repli, une écriture qui a forcément lieu).
   passait telle quelle à `afficherBullesPersonnages` — seuls les leurres étaient
   écartés. Le filtre vit maintenant dans la fonction elle-même, pour tous les
   appelants : ni créature, ni leurre, ni leur portrait au survol.
+
+### L'Humain perd son bonus de repos long (et le garde sur sa jauge)
+
+Nico : « enlève le bonus humain uniquement sur le bonus repos long, et dans le
+jeu et dans la créa perso ». L'atout Humain ne porte plus que sa jauge plus
+grande (`fatigueMax: 10`, soit 110 au lieu de 100) ; le `bonusReposLong: 10`
+est retiré de `ATOUTS_RACES` (app.js). Comme l'Humain était le seul à s'en
+servir, tout le mécanisme part avec lui : le champ ne voyage plus dans l'état
+du combat (combat_etat.js) et `reposLongDuTour` (cerveau_combat.js) n'y ajoute
+plus rien — un Humain récupère 35 % de sa jauge comme tout le monde, soit 38
+sur 110 au lieu de 48. L'écran de création ne dit plus « +10 de fatigue
+récupérée par repos long » ni que sa réserve « se renforce avec le repos » :
+l'atout affiché est « Fatigue de base : 110 ».
+
+`atouts_races.mjs` (section 7) joue le repos long d'un Humain et d'un Gob avec
+la vraie table des atouts, le vrai état de combat et le vrai cerveau (30 → 68
+et 30 → 65), et lit le texte de l'écran de création ; `cerveau_combat.mjs`
+vérifie qu'un ancien `bonusReposLong` resté dans un état publié n'ajoute plus
+rien ; `drapeau_regime.mjs` qu'aucun atout de race ne rejoint plus le repos
+long. Les trois échouent sur l'ancien code.

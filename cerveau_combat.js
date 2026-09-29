@@ -633,8 +633,10 @@ export function avancerFile(etat, des) {
 
 // Le combattant en tête de file a-t-il choisi de souffler ? La règle est celle
 // du jeu, mot pour mot : le rendement propre à la créature (Repos_Long, en % de
-// sa jauge) ou 35% pour un héros, plus l'atout de l'Humain. Et comme toute
-// étape, celle-ci porte le RÉSULTAT, jamais l'opération.
+// sa jauge) ou 35% pour un héros. Plus aucun atout de race ne s'y ajoute : le
+// +10 de l'Humain a été retiré (demande de Nico) — il ne garde que sa jauge
+// plus grande. Et comme toute étape, celle-ci porte le RÉSULTAT, jamais
+// l'opération.
 export function reposLongDuTour(etat) {
     const tete = (etat.file || [])[0];
     if (!tete || tete.carte !== "REPOS_LONG") return [];
@@ -642,9 +644,8 @@ export function reposLongDuTour(etat) {
     if (!c) return [];
     const pct = nombre(c.stats && c.stats.Repos_Long);
     const taux = pct > 0 ? pct / 100 : 0.35;
-    const bonus = nombre(c.atouts && c.atouts.bonusReposLong);
     const apres = Math.min(nombre(c.fatigueMax),
-                           nombre(c.fatigue) + Math.floor(nombre(c.fatigueMax) * taux) + bonus);
+                           nombre(c.fatigue) + Math.floor(nombre(c.fatigueMax) * taux));
     if (apres === nombre(c.fatigue)) return [];
     c.fatigue = apres;
     return [{ type: "fatigue", cible: tete.id, fatigueApres: apres, repos: true }];

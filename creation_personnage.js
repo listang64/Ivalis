@@ -46,7 +46,7 @@ window.changerRaceSelection = function(race) {
     if (race === "Humain") {
         bgImage.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786114507/Les_humains_h0ubwh.png";
         texteDesc = "Peuple le plus répandu d'Elyria, les Humains vivent sur presque tout le continent. Héritiers de l'ancienne humanité, ils sont aujourd'hui présents dans toutes les cultures et tous les milieux.";
-        texteGameplay = "Adaptables et endurants, les Humains disposent d'une réserve de fatigue supérieure qui se renforce avec le repos.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> Fatigue de base : 110 • +10 de fatigue récupérée par repos long</div>";
+        texteGameplay = "Adaptables et endurants, les Humains disposent d'une réserve de fatigue supérieure à celle des autres peuples.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> Fatigue de base : 110</div>";
     
     } else if (race === "Ondari") {
         bgImage.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786218901/Ondaris_i6uxhm.png";

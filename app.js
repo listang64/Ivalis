@@ -831,7 +831,10 @@ window.ATOUTS_RACES = {
     // la jauge de vie — un mécanisme qui n'existait pour personne d'autre.
     "Ophior":  { defMagique: 8, regenPv: 3 },
     "Ethéré":  { soinsRecus: 30, immunites: ["Empoisonnement"] },
-    "Humain":  { fatigueMax: 10, bonusReposLong: 10 }
+    // L'Humain garde sa réserve plus grande (110 au lieu de 100). Son bonus de
+    // repos long (+10) a été retiré à la demande de Nico : il récupère comme
+    // tout le monde, 35 % de sa jauge.
+    "Humain":  { fatigueMax: 10 }
 };
 
 // La fiche front-end porte "race", le document Firestore porte "Race" : la

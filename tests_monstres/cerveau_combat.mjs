@@ -583,14 +583,16 @@ console.log("\nUN TOUR QUI NE FRAPPE RIEN COMPTE QUAND MÊME");
              pasC.entree.etapes.find(e => e.repos).fatigueApres === 40,
              String(pasC.entree.etapes.find(e => e.repos).fatigueApres));
 
-    // L'atout de l'Humain s'ajoute par-dessus.
+    // PLUS D'ATOUT DE RACE AU REPOS LONG. Le +10 de l'Humain a été retiré
+    // (demande de Nico). Un état publié avant ce changement peut encore porter
+    // le champ `bonusReposLong` : il ne doit plus rien ajouter.
     const humain = monde();
     humain.file[0] = { id: "H1", carte: "REPOS_LONG", initiative: 0 };
     humain.combattants.H1.atouts.bonusReposLong = 10;
     humain.combattants.H1.fatigue = 30;
     const pasH = avancerFile(humain, creerDes(humain.graine));
-    verifier("et l'atout de l'Humain s'ajoute par-dessus",
-             pasH.entree.etapes.find(e => e.repos).fatigueApres === 75,
+    verifier("un ancien bonus de repos long qui traîne n'ajoute plus rien",
+             pasH.entree.etapes.find(e => e.repos).fatigueApres === 65,
              String(pasH.entree.etapes.find(e => e.repos).fatigueApres));
 
     // Une jauge presque pleine ne dépasse jamais son maximum.
