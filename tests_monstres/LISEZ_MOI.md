@@ -150,7 +150,7 @@ node soin_et_poussee.mjs     # soin + poussée : le ciblage envoie les deux, le 
 node marche_anticipee.mjs    # le pion part dès la validation sur l'écran de celui qui joue ; le journal confirme ou corrige
 node fiche_race_classe.mjs   # race et classe dans l'onglet Statistiques ; portraits au soleil, sans reflet violacé
 node jet_d20.mjs            # la scène du d20 : fondu, avatar, défilement qui ralentit, modificateur égrené, lueurs, rouge/violet ; chez tous les joueurs ; sons ; pas de monstres dans les bulles du chat
-node fabrique_sons.mjs      # Paramètres → La Fabrique : dix boutons, dix sons d'interface rendus et comparés
+node fabrique_sons.mjs      # Paramètres → La Fabrique : dix boutons, dix « ding » de clic de menu rendus et comparés
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -3512,3 +3512,25 @@ ressemble à un autre (durée, hauteur mesurée sur les tranches audibles, force
 direction), la validation et l'ouverture montent, le retour et la fermeture
 descendent, le refus est grave et la pièce d'or aiguë. Il vérifie aussi le
 volume à zéro et le retour au menu.
+
+### La Fabrique : dix « ding » de clic de menu
+
+Nico, après écoute : « ça ne va pas, remplace tous ces sons par des exemples de
+clic de menu sur un bouton — un léger ding, et des variations pour les dix
+boutons ». Les dix sons de la première version (validation, refus, fenêtres,
+parchemin, pièce…) sont remplacés par dix variations d'un même geste, bâties
+sur une seule fonction `ding` (fabrique_sons.js) : une attaque minuscule (le
+doigt qui touche) et une note claire qui s'éteint vite, dont les partiels
+décident le timbre. 1. Ding clair (mi, le clic de base), 2. Ding doux (la,
+rond, sans pointe), 3. Ding cristal (partiels de verre), 4. Ding boisé (court
+et mat), 5. Ding double (do puis sol), 6. Ding feutré (le plus grave, étouffé),
+7. Ding perle (le plus aigu, minuscule), 8. Ding clochette (qui tinte un peu
+plus), 9. Ding écho (le ding puis son écho), 10. Ding scintillant (deux voix à
+peine décalées qui miroitent).
+
+`fabrique_sons.mjs` vérifie désormais que ce sont bien des dings : tous brefs
+(moins d'une demi-seconde), légers (crête sous 0,5), qui frappent tout de suite
+(crête dans les 80 premières millisecondes), avec une note entre 600 et 3 000 Hz,
+tous différents ; le ding double monte (≈ 1 050 → 1 560 Hz, mesuré après
+l'attaque), la perle est le plus aigu, le feutré le plus grave, la clochette
+tinte plus longtemps que la perle.

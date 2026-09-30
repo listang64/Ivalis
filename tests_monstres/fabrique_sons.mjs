@@ -1,9 +1,9 @@
 // LA FABRIQUE : DIX SONS D'INTERFACE, DANS LES PARAMÈTRES.
 //
 // Nico : « dans les paramètres, crée-moi un bouton qu'on va appeler la
-// Fabrique. Dedans, dix boutons qui jouent un son quand on appuie — dix sons
-// différents, qui iraient bien pour les boutons de menu du jeu, les
-// validations, etc. »
+// Fabrique. Dedans, dix boutons qui jouent un son quand on appuie. » Puis :
+// « remplace tous ces sons par des exemples de clic de menu sur un bouton —
+// un léger ding, et des variations pour les dix boutons. »
 //
 // Les sons sont fabriqués sur place (Web Audio, fabrique_sons.js). Ce banc
 // ouvre la Fabrique dans la vraie page, clique les dix boutons, et REND chaque
@@ -156,10 +156,10 @@ console.log("\n3. LES DIX SONS, RENDUS HORS LIGNE");
       son.fabriquer(ctx, sortie);
       const rendu = await ctx.startRendering();
       const d = rendu.getChannelData(0);
-      let crete = 0, somme = 0, dernier = 0;
+      let crete = 0, somme = 0, dernier = 0, iCrete = 0;
       for (let i = 0; i < d.length; i++) {
         const a = Math.abs(d[i]);
-        if (a > crete) crete = a;
+        if (a > crete) { crete = a; iCrete = i; }
         somme += d[i] * d[i];
         if (a > 0.003) dernier = i;
       }
@@ -180,7 +180,11 @@ console.log("\n3. LES DIX SONS, RENDUS HORS LIGNE");
         return actif ? n / (actif / taux) : 0;
       };
       const milieu = Math.floor(dernier / 2);
-      mesures.push({ id: son.id, crete, rms: Math.sqrt(somme / Math.max(1, dernier)), duree,
+      mesures.push({ id: son.id, crete, rms: Math.sqrt(somme / Math.max(1, dernier)), duree, tCrete: iCrete / taux,
+                     // Pour le ding double : la première note (de 15 à 55 ms, après
+                     // le petit souffle d'attaque), la seconde (après 75 ms).
+                     zcrNote1: zcr(Math.floor(0.015 * taux), Math.floor(0.055 * taux)),
+                     zcrNote2: zcr(Math.floor(0.075 * taux), dernier),
                      zcr1: zcr(0, milieu), zcr2: zcr(milieu, dernier), zcr: zcr(0, dernier) });
     }
     return mesures;
@@ -188,8 +192,13 @@ console.log("\n3. LES DIX SONS, RENDUS HORS LIGNE");
   sons.forEach(m => console.log(`     ${m.id.padEnd(18)} crête ${m.crete.toFixed(2)}  durée ${m.duree.toFixed(2)} s  hauteur ~${Math.round(m.zcr / 2)} Hz`));
   verifier("aucun n'est muet", sons.every(m => m.crete > 0.02), sons.filter(m => m.crete <= 0.02).map(m => m.id).join());
   verifier("aucun ne sature", sons.every(m => m.crete < 1), sons.filter(m => m.crete >= 1).map(m => m.id).join());
-  verifier("tous brefs, comme il sied à un bouton (moins d'une seconde)", sons.every(m => m.duree < 1.0),
+  verifier("tous brefs, comme un clic de menu (moins d'une demi-seconde)", sons.every(m => m.duree < 0.5),
            sons.map(m => m.duree.toFixed(2)).join(" "));
+  verifier("tous légers (crête sous 0,5)", sons.every(m => m.crete < 0.5), sons.map(m => m.crete.toFixed(2)).join(" "));
+  verifier("des « ding » : l'attaque frappe tout de suite (crête dans les 80 premières ms)",
+           sons.every(m => m.tCrete < 0.08), sons.map(m => Math.round(m.tCrete * 1000) + "ms").join(" "));
+  verifier("une note claire, dans la hauteur d'un ding (entre 600 et 3 000 Hz)",
+           sons.every(m => m.zcr / 2 > 600 && m.zcr / 2 < 3000), sons.map(m => Math.round(m.zcr / 2)).join(" "));
   // Deux sons « se ressemblent » si leur durée, leur hauteur, leur force ET
   // leur direction (qui monte, qui descend) sont toutes proches à 12 % près.
   // Les souffles sont tirés au hasard : la direction est ce qui distingue le
@@ -205,14 +214,12 @@ console.log("\n3. LES DIX SONS, RENDUS HORS LIGNE");
   }
   verifier("dix sons vraiment différents", jumeaux.length === 0, jumeaux.join(", "));
   const s = Object.fromEntries(sons.map(m => [m.id, m]));
-  verifier("la validation monte", s.validation.zcr2 > s.validation.zcr1 * 1.2, `${Math.round(s.validation.zcr1)} → ${Math.round(s.validation.zcr2)}`);
-  verifier("le retour redescend", s.retour.zcr2 < s.retour.zcr1 * 0.9, `${Math.round(s.retour.zcr1)} → ${Math.round(s.retour.zcr2)}`);
-  verifier("la fenêtre qui s'ouvre monte", s.ouverture.zcr2 > s.ouverture.zcr1 * 1.2,
-           `${Math.round(s.ouverture.zcr1)} → ${Math.round(s.ouverture.zcr2)}`);
-  verifier("celle qui se ferme redescend", s.fermeture.zcr2 < s.fermeture.zcr1 * 0.85,
-           `${Math.round(s.fermeture.zcr1)} → ${Math.round(s.fermeture.zcr2)}`);
-  verifier("le refus est grave, la pièce d'or aiguë", s.refus.zcr < 1000 && s["piece"].zcr > 3000,
-           `${Math.round(s.refus.zcr / 2)} Hz / ${Math.round(s["piece"].zcr / 2)} Hz`);
+  verifier("le ding double monte", s["ding-double"].zcrNote2 > s["ding-double"].zcrNote1 * 1.15,
+           `${Math.round(s["ding-double"].zcrNote1 / 2)} → ${Math.round(s["ding-double"].zcrNote2 / 2)} Hz`);
+  verifier("la perle est le plus aigu, le feutré le plus grave",
+           sons.every(m => m.zcr <= s["ding-perle"].zcr) && sons.every(m => m.zcr >= s["ding-feutre"].zcr));
+  verifier("la clochette tinte plus longtemps que la perle", s["ding-cloche"].duree > 2 * s["ding-perle"].duree,
+           `${s["ding-cloche"].duree.toFixed(2)} s / ${s["ding-perle"].duree.toFixed(2)} s`);
 }
 
 console.log("\n4. LE VOLUME DU JEU FAIT LOI, ET LE RETOUR RAMÈNE AU MENU");

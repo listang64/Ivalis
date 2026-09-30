@@ -1,11 +1,10 @@
 // =========================================================================
 //  IVALIS — LA FABRIQUE (Paramètres → La Fabrique)
 // =========================================================================
-//  Dix sons d'interface, fabriqués sur place avec Web Audio : aucun fichier à
-//  héberger, aucun réseau. Chacun a sa fonction — un clic de menu, un
-//  effleurement, une validation, une grande validation, un retour, un refus,
-//  une fenêtre qui s'ouvre, une qui se ferme, une page de parchemin, une
-//  pièce d'or — pour qu'on les écoute ici avant de choisir où les poser.
+//  Dix sons de clic de menu, fabriqués sur place avec Web Audio : aucun
+//  fichier à héberger, aucun réseau. Tous sont un léger « ding » — clair,
+//  doux, cristal, boisé, double, feutré, perle, clochette, écho, scintillant —
+//  pour qu'on les écoute ici avant de choisir celui des boutons du jeu.
 //
 //  Chaque son est une fonction (ctx, sortie) : elle ne fait que brancher des
 //  oscillateurs et des souffles filtrés sur `sortie`. C'est ce qui permet de
@@ -75,105 +74,108 @@
         src.start(t);
     }
 
-    // --- LES DIX SONS ------------------------------------------------------
+    // --- UN DING, ET SES DIX VARIATIONS ---------------------------------
+    //  Nico : « remplace tous ces sons par des exemples de clic de menu sur un
+    //  bouton — un léger ding, et des variations pour les dix boutons ». Un
+    //  ding, c'est une toute petite attaque (le doigt qui touche) et une note
+    //  claire qui s'éteint vite ; ses partiels (les harmoniques au-dessus)
+    //  décident s'il sonne verre, cloche, bois ou métal.
+    function ding(ctx, s, o) {
+        const f = o.freq;
+        const debut = o.debut || 0;
+        const duree = o.duree || 0.25;
+        const force = o.force || 1;
+        // L'attaque : un souffle minuscule, pour que le ding « se touche ».
+        if (o.clic !== false) {
+            bruit(ctx, s, { debut, duree: 0.012, freq: Math.min(9000, f * 3), q: 2,
+                            gain: 0.12 * force * (o.clic || 1) });
+        }
+        // La note, et ses partiels : [rapport de fréquence, part du volume, part de la durée].
+        (o.partiels || [[1, 1, 1], [2, 0.18, 0.5]]).forEach(([k, part, tenue]) => {
+            note(ctx, s, { freq: f * k, debut, duree: duree * tenue, gain: 0.16 * force * part,
+                           type: o.type || "sine", attaque: o.attaque || 0.004,
+                           desaccord: o.desaccord || 0, passeBas: o.passeBas });
+        });
+    }
+
     const SONS = [
         {
-            id: "clic-menu", nom: "Clic de menu",
-            usage: "Les boutons de menu, les onglets du jeu",
+            id: "ding-clair", nom: "Ding clair",
+            usage: "Net et lumineux — le clic de menu de base",
+            fabriquer(ctx, s) { ding(ctx, s, { freq: 1318.5, duree: 0.22 }); }
+        },
+        {
+            id: "ding-doux", nom: "Ding doux",
+            usage: "Plus bas et plus rond, sans aucune pointe",
             fabriquer(ctx, s) {
-                // Un petit coup de bois : un souffle court, une note qui tombe.
-                bruit(ctx, s, { duree: 0.03, freq: 1800, q: 4, gain: 0.5 });
-                note(ctx, s, { freq: 880, glisse: 560, duree: 0.07, gain: 0.12, type: "triangle" });
+                ding(ctx, s, { freq: 880, duree: 0.3, clic: 0.4, attaque: 0.012,
+                               partiels: [[1, 1, 1], [2, 0.08, 0.4]] });
             }
         },
         {
-            id: "effleurement", nom: "Effleurement",
-            usage: "Le survol d'un bouton, un choix qu'on parcourt",
+            id: "ding-cristal", nom: "Ding cristal",
+            usage: "Un verre qu'on effleure, très pur",
             fabriquer(ctx, s) {
-                // Presque rien : un éclat aigu et un souffle de soie.
-                note(ctx, s, { freq: 2350, duree: 0.05, gain: 0.05 });
-                bruit(ctx, s, { duree: 0.02, freq: 6000, filtre: "highpass", q: 0.7, gain: 0.12 });
+                ding(ctx, s, { freq: 1760, duree: 0.28, force: 0.8,
+                               partiels: [[1, 1, 1], [2.76, 0.22, 0.45], [5.4, 0.06, 0.2]] });
             }
         },
         {
-            id: "validation", nom: "Validation",
-            usage: "Valider, confirmer un choix ordinaire",
+            id: "ding-bois", nom: "Ding boisé",
+            usage: "Court et mat, un petit coup sur du bois",
             fabriquer(ctx, s) {
-                // Deux notes qui montent (mi → si), claires et brèves.
-                note(ctx, s, { freq: 659.3, duree: 0.22, gain: 0.17, type: "triangle" });
-                note(ctx, s, { freq: 987.8, debut: 0.08, duree: 0.3, gain: 0.17, type: "triangle" });
-                note(ctx, s, { freq: 1975.5, debut: 0.08, duree: 0.2, gain: 0.03 });
+                bruit(ctx, s, { duree: 0.025, freq: 1400, q: 3, gain: 0.35 });
+                ding(ctx, s, { freq: 1046.5, duree: 0.11, clic: false, type: "triangle",
+                               partiels: [[1, 1, 1], [3, 0.1, 0.4]] });
             }
         },
         {
-            id: "grande-validation", nom: "Grande validation",
-            usage: "Créer un héros, lancer une partie, choisir sa classe",
+            id: "ding-double", nom: "Ding double",
+            usage: "Deux petites notes qui montent, vives",
             fabriquer(ctx, s) {
-                // Un arpège doré qui s'élève (do, mi, sol, do), avec son harmonique.
-                [523.3, 659.3, 784.0, 1046.5].forEach((f, i) => {
-                    note(ctx, s, { freq: f, debut: i * 0.07, duree: 0.7, gain: 0.12 });
-                    note(ctx, s, { freq: f * 2, debut: i * 0.07, duree: 0.4, gain: 0.025 });
-                });
+                // Do puis sol : une quinte, pour que la montée s'entende.
+                ding(ctx, s, { freq: 1046.5, duree: 0.13, force: 0.8 });
+                ding(ctx, s, { freq: 1568, debut: 0.065, duree: 0.2, force: 0.8, clic: 0.5 });
             }
         },
         {
-            id: "retour", nom: "Retour",
-            usage: "Retour, annuler, revenir à l'écran d'avant",
+            id: "ding-feutre", nom: "Ding feutré",
+            usage: "Très discret, comme étouffé sous un tissu",
             fabriquer(ctx, s) {
-                // Deux notes qui redescendent (sol → ré), plus douces.
-                note(ctx, s, { freq: 784.0, duree: 0.18, gain: 0.13, type: "triangle" });
-                note(ctx, s, { freq: 587.3, debut: 0.08, duree: 0.26, gain: 0.13, type: "triangle" });
+                ding(ctx, s, { freq: 698.5, duree: 0.2, force: 0.75, clic: 0.15, passeBas: 1100,
+                               attaque: 0.012, partiels: [[1, 1, 1], [2, 0.06, 0.4]] });
             }
         },
         {
-            id: "refus", nom: "Refus",
-            usage: "Action impossible, erreur, pas assez d'énergie",
+            id: "ding-perle", nom: "Ding perle",
+            usage: "Minuscule et aigu, pour un petit bouton",
             fabriquer(ctx, s) {
-                // Deux bourdonnements graves et un peu faux, étouffés.
-                [0, 0.13].forEach(d => {
-                    note(ctx, s, { freq: 116, debut: d, duree: 0.11, gain: 0.12, type: "sawtooth", passeBas: 900 });
-                    note(ctx, s, { freq: 123, debut: d, duree: 0.11, gain: 0.12, type: "sawtooth", passeBas: 900 });
-                });
+                ding(ctx, s, { freq: 2093, duree: 0.1, force: 0.7, clic: 0.6,
+                               partiels: [[1, 1, 1], [2, 0.1, 0.5]] });
             }
         },
         {
-            id: "ouverture", nom: "Ouverture de fenêtre",
-            usage: "Une fenêtre, une fiche ou un panneau qui s'ouvre",
+            id: "ding-cloche", nom: "Ding clochette",
+            usage: "Une petite clochette, qui tinte un peu plus",
             fabriquer(ctx, s) {
-                // Un souffle qui monte, et une note qui s'élève avec lui.
-                bruit(ctx, s, { duree: 0.34, balayage: [350, 2600], q: 1.4, gain: 0.35, forme: "cloche" });
-                note(ctx, s, { freq: 440, glisse: 660, duree: 0.34, gain: 0.07, attaque: 0.08 });
+                ding(ctx, s, { freq: 987.8, duree: 0.45, force: 0.85,
+                               partiels: [[1, 1, 1], [2.0, 0.3, 0.7], [2.76, 0.18, 0.5], [5.4, 0.06, 0.25]] });
             }
         },
         {
-            id: "fermeture", nom: "Fermeture de fenêtre",
-            usage: "Une fenêtre qui se referme, un panneau qu'on range",
+            id: "ding-echo", nom: "Ding écho",
+            usage: "Le ding, puis son écho plus faible",
             fabriquer(ctx, s) {
-                // Le même souffle, qui redescend, et se pose.
-                bruit(ctx, s, { duree: 0.3, balayage: [2600, 350], q: 1.4, gain: 0.3, forme: "cloche" });
-                note(ctx, s, { freq: 620, glisse: 390, duree: 0.3, gain: 0.07, attaque: 0.05 });
+                ding(ctx, s, { freq: 1174.7, duree: 0.18 });
+                ding(ctx, s, { freq: 1174.7, debut: 0.12, duree: 0.2, force: 0.35, clic: false });
             }
         },
         {
-            id: "parchemin", nom: "Page de parchemin",
-            usage: "Tourner une page, changer d'onglet dans une fiche",
+            id: "ding-scintillant", nom: "Ding scintillant",
+            usage: "Deux voix à peine décalées qui miroitent",
             fabriquer(ctx, s) {
-                // Le papier qu'on froisse en le tournant, puis qui se pose.
-                bruit(ctx, s, { duree: 0.09, freq: 3800, filtre: "highpass", q: 0.8, gain: 0.25, forme: "cloche" });
-                bruit(ctx, s, { debut: 0.07, duree: 0.05, freq: 2600, q: 1.2, gain: 0.3 });
-                note(ctx, s, { freq: 160, debut: 0.1, duree: 0.08, gain: 0.08 });
-            }
-        },
-        {
-            id: "piece", nom: "Pièce d'or",
-            usage: "Or gagné, achat, butin, récompense",
-            fabriquer(ctx, s) {
-                // Deux tintements métalliques (partiels inharmoniques), le second un peu plus haut.
-                [[0, 1], [0.09, 1.12]].forEach(([d, k]) => {
-                    note(ctx, s, { freq: 2093 * k, debut: d, duree: 0.45, gain: 0.08 });
-                    note(ctx, s, { freq: 2637 * k * 1.01, debut: d, duree: 0.3, gain: 0.05 });
-                    note(ctx, s, { freq: 3950 * k, debut: d, duree: 0.18, gain: 0.03 });
-                });
+                ding(ctx, s, { freq: 1396.9, duree: 0.32, force: 0.65, desaccord: -9 });
+                ding(ctx, s, { freq: 1396.9, duree: 0.32, force: 0.65, desaccord: 9, clic: false });
             }
         }
     ];

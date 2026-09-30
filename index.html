@@ -1223,12 +1223,12 @@
       <button class="btn-parametres" onclick="jouerSonClic(); fermerParametres()">Fermer</button>
     </div>
 
-    <!-- LA FABRIQUE (fabrique_sons.js) : dix sons d'interface fabriqués sur
-         place, à écouter avant de choisir où les poser. Les boutons sont
+    <!-- LA FABRIQUE (fabrique_sons.js) : dix variations d'un « ding » de clic
+         de menu, fabriquées sur place, à écouter avant de choisir. Les boutons sont
          construits par le script à partir de sa liste de sons. -->
     <div id="etape-fabrique" class="fenetre-volante-parchemin fondu-interne fenetre-fabrique" style="display: none; opacity: 0;">
       <h2>La Fabrique</h2>
-      <p style="font-size: 14px; margin-top: -10px; color: #5c3a21;">Dix sons pour l'interface — touche un bouton pour l'écouter.</p>
+      <p style="font-size: 14px; margin-top: -10px; color: #5c3a21;">Dix « ding » de clic de menu — touche un bouton pour l'écouter.</p>
       <p id="fabrique-muet" style="display: none; font-size: 13px; color: #8b1c1c; font-weight: bold;">Le volume de l'interface est à zéro : monte-le pour entendre les sons.</p>
       <div id="grille-fabrique" class="grille-fabrique"></div>
       <br>
@@ -1956,7 +1956,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=56"></script>
+<script src="trace_combat.js?v=57"></script>
 <!-- LA MISE À JOUR AUTOMATIQUE. Juste après la trace, parce qu'elle a besoin du
      numéro de version qu'elle y trouve, et avant tout le reste : si la page est
      périmée, autant s'en apercevoir avant d'avoir chargé le jeu entier.
@@ -1988,7 +1988,7 @@
 <script type="module" src="ia_master.js?v=7"></script>
 <script type="module" src="app.js?v=66"></script>
 <script src="jet_d20.js?v=2"></script>
-<script src="fabrique_sons.js?v=1"></script>
+<script src="fabrique_sons.js?v=2"></script>
 <script type="module" src="creation_personnage.js?v=12"></script>
 <script type="module" src="classes.js?v=2"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
