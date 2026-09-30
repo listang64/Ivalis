@@ -1,20 +1,22 @@
-// METTRE LA BASE AU NIVEAU DES RÈGLES DU CODE — ET SEULEMENT CE QU'IL FAUT.
+// LE BOUTON « INSTALLER TÉNÈBRES » — ET RIEN D'AUTRE.
 //
-// Un effet vit à DEUX endroits : sa mécanique dans le moteur, et sa fiche dans
-// la base (Combat_Effets) — les chiffres, le texte que le joueur lit, le coût.
-// Quand une règle change, les deux doivent bouger ensemble, sans quoi la Forge
-// annonce une chose et le combat en fait une autre.
+// Nico : « Mettre la BDD à jour, j'ai modifié des trucs manuellement, ça va pas
+// m'écraser tous mes changements ? Fais en sorte que ça marche que sur
+// Ténèbres. » Il avait raison de s'inquiéter : le bouton réécrivait encore les
+// textes de huit effets et en supprimait un. Sur la base réelle du 30 septembre,
+// il aurait remplacé la note de la Brûlure retouchée à la main (« 8% de dégâts
+// physiques des PV max ») et rempli celle de la Confusion.
 //
-// Le bouton « Mettre la BDD à jour » (app.js) fait la moitié « base ». Ce banc
-// le fait tourner sur une FAUSSE base en mémoire — le vrai code, un Firestore
-// de papier — et vérifie les trois choses qui comptent :
+// Le bouton ne sait plus que CRÉER un effet absent (Ténèbres). Ce banc fait
+// tourner le vrai code (app.js) sur une FAUSSE base en mémoire, qui porte des
+// retouches faites à la main, et vérifie :
 //
-//   UN. Il vise les bons effets, avec les bonnes valeurs (celles des règles
-//       qu'on vient d'écrire dans le moteur, pas d'autres).
-//   DEUX. Il est SANS DANGER À RELANCER : la seconde fois, il n'écrit rien.
-//         Un bouton qu'on n'ose pas cliquer deux fois n'est pas un outil.
-//   TROIS. Un effet manquant ou un réseau qui lâche ne fait pas tomber le
-//         reste : la migration continue et DIT ce qui a raté.
+//   UN.   Il ne vise que Ténèbres.
+//   DEUX. Il le crée, et ne touche à AUCUN autre effet (ni écriture, ni
+//         suppression) : la base d'après est celle d'avant, plus Ténèbres.
+//   TROIS. Un Ténèbres déjà présent — même retouché — n'est jamais réécrit ;
+//         relancer le bouton n'écrit rien.
+//   QUATRE. Une panne se dit, sans rien casser.
 import fs from 'fs';
 
 const src = fs.readFileSync('/home/user/Ivalis/app.js', 'utf-8');
@@ -25,30 +27,28 @@ function bloc(debut, finExclue) {
     if (i < 0 || j < 0) throw new Error("bloc introuvable : " + debut);
     return src.slice(i, j);
 }
-// Le VRAI tableau de migration et la VRAIE fonction, extraits ligne pour ligne.
+// Le VRAI tableau et la VRAIE fonction, extraits ligne pour ligne.
 const SRC_MIGRATION = bloc('window.MIGRATION_EFFETS = [', 'window.chargerCacheEffetsBDD = async function');
 
 let echecs = 0;
-const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(62)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
+const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(66)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
 
-// L'état réel de la base avant la migration : le vrai instantané Firestore.
-// La base telle qu'elle était AVANT la migration : la copie réelle, moins les
-// effets que la migration crée (Nico a lancé la migration depuis ; une copie
-// fraîche les contient déjà, et le banc doit pouvoir les voir naître).
+// La base réelle, sans Ténèbres, avec les retouches que Nico fait à la main.
 const EFFETS_REELS = JSON.parse(fs.readFileSync('/home/user/Ivalis/tests_monstres/effets_reels.json', 'utf-8'));
-delete EFFETS_REELS.EFF_REPLI;
-delete EFFETS_REELS.EFF_AVEUGLEMENT;
 delete EFFETS_REELS.EFF_TENEBRES;
+const RETOUCHEE = JSON.parse(JSON.stringify(EFFETS_REELS));
+RETOUCHEE.EFF_BRULE = { ...RETOUCHEE.EFF_BRULE, Notes: "-50% de soins reçus, et 8% de dégats physique des pv max de la cible" };
+RETOUCHEE.EFF_CONFUSION = { ...RETOUCHEE.EFF_CONFUSION, Notes: "" };
+RETOUCHEE.EFF_ETOURDIT = { ...RETOUCHEE.EFF_ETOURDIT, Pourcent_Base: 15, Notes: "réglé à la main" };
+RETOUCHEE.EFF_PARALYSIE = { Nom: "Paralysie", Notes: "un effet que Nico a remis" };
+RETOUCHEE.EFF_REPLI = { ...(RETOUCHEE.EFF_REPLI || {}), Nom: "Repli", Valeur: 4 };
+RETOUCHEE.EFF_AVEUGLEMENT = { ...(RETOUCHEE.EFF_AVEUGLEMENT || {}), Nom: "Aveuglement", Notes: "à ma façon" };
 
 // Un Firestore de papier : il compte ses écritures, et sait tomber en panne.
 function fausseBase(donnees, { panneSur = null } = {}) {
     const base = JSON.parse(JSON.stringify(donnees));
     const journal = { lectures: 0, ecritures: [], suppressions: [] };
-    const fenetre = {
-        alert: () => {},
-        document: { getElementById: () => null },
-        console: { log: () => {} }
-    };
+    const fenetre = { alert: () => {}, document: { getElementById: () => null }, console: { log: () => {} } };
     const ctx = {
         db: {},
         doc: (_db, coll, id) => ({ coll, id }),
@@ -62,199 +62,105 @@ function fausseBase(donnees, { panneSur = null } = {}) {
             journal.ecritures.push({ id: ref.id, champs });
             base[ref.id] = { ...(base[ref.id] || {}), ...champs };
         },
-        deleteDoc: async (ref) => {
-            if (panneSur === ref.id) throw new Error("réseau coupé");
-            journal.suppressions.push(ref.id);
-            delete base[ref.id];
-        }
+        deleteDoc: async (ref) => { journal.suppressions.push(ref.id); delete base[ref.id]; }
     };
-
     const fn = new Function('window', 'document', 'alert', 'console', 'db', 'doc',
-                            'getDoc', 'setDoc', 'deleteDoc',
-                            SRC_MIGRATION + '\nreturn window;');
+                            'getDoc', 'setDoc', 'deleteDoc', SRC_MIGRATION + '\nreturn window;');
     const w = fn(fenetre, fenetre.document, fenetre.alert, fenetre.console,
                  ctx.db, ctx.doc, ctx.getDoc, ctx.setDoc, ctx.deleteDoc);
-    return { base, journal, lancer: () => w.appliquerMigrationEffets(), table: w.MIGRATION_EFFETS };
+    return { base, journal, lancer: () => w.appliquerMigrationEffets(), table: w.MIGRATION_EFFETS, w };
 }
 
+const sansTenebres = (b) => { const c = { ...b }; delete c.EFF_TENEBRES; return c; };
+
 console.log("\n=========================================================");
-console.log("  LA MISE À JOUR DE LA BASE DES EFFETS");
+console.log("  LE BOUTON « INSTALLER TÉNÈBRES »");
 console.log("=========================================================\n");
 
 // =========================================================================
-console.log("1. ELLE VISE LES EFFETS QUE NICO A DEMANDÉ DE CHANGER");
+console.log("1. IL NE VISE QUE TÉNÈBRES");
 // =========================================================================
 {
-    const { table } = fausseBase(EFFETS_REELS);
-    const vises = table.map(r => r.id).sort();
-    const attendus = ["EFF_BOUCLIER_MAGIQUE", "EFF_BRULE", "EFF_DUREE_ETALEMENT_DEGATS", "EFF_ELECTRIFIE",
-                      "EFF_ETOURDIT", "EFF_GLACE", "EFF_PARALYSIE", "EFF_POUSSEE", "EFF_REPLI", "EFF_AVEUGLEMENT", "EFF_CONFUSION",
-                      "EFF_TENEBRES"].sort();
-    verifier("les douze effets concernés (Ténèbres compris), ni plus ni moins",
-             JSON.stringify(vises) === JSON.stringify(attendus), vises.join(", "));
-    // Ceux qu'on modifie existent ; ceux qu'on crée (le Repli), pas encore.
-    // (La Paralysie, elle, est à supprimer : déjà partie de la vraie base, c'est normal.)
-    verifier("chaque effet modifié existe vraiment dans la base",
-             table.filter(r => !r.creer && !r.supprimer).every(r => EFFETS_REELS[r.id] !== undefined),
-             table.filter(r => !r.creer && !r.supprimer && !EFFETS_REELS[r.id]).map(r => r.id).join(", "));
-    verifier("et les effets créés (Repli, Aveuglement, Ténèbres) n'y sont pas encore",
-             table.filter(r => r.creer).map(r => r.id).join() === "EFF_REPLI,EFF_AVEUGLEMENT,EFF_TENEBRES"
-             && EFFETS_REELS.EFF_REPLI === undefined && EFFETS_REELS.EFF_AVEUGLEMENT === undefined
-             && EFFETS_REELS.EFF_TENEBRES === undefined);
+    const { table } = fausseBase(RETOUCHEE);
+    verifier("un seul effet dans la table : EFF_TENEBRES", table.length === 1 && table[0].id === "EFF_TENEBRES",
+             table.map(r => r.id).join(", "));
+    verifier("aucune règle de modification ni de suppression",
+             table.every(r => !r.supprimer && !r.majSiPresent), JSON.stringify(table.map(r => Object.keys(r))));
+    verifier("le code ne sait plus supprimer (aucun deleteDoc)", !/deleteDoc\(/.test(SRC_MIGRATION));
+    verifier("ni fusionner dans un effet existant (aucun merge)", !/merge:\s*true/.test(SRC_MIGRATION));
+    const bouton = fs.readFileSync('/home/user/Ivalis/index.html', 'utf-8')
+        .match(/<button id="btn-migration-effets"[^>]*>([^<]*)<\/button>/);
+    verifier("le bouton dit ce qu'il fait : « Installer Ténèbres »", !!bouton && bouton[1] === "Installer Ténèbres",
+             bouton ? bouton[1] : "(introuvable)");
 }
 
 // =========================================================================
-console.log("\n2. UN PASSAGE : LA BASE DIT CE QUE LE MOTEUR FAIT");
+console.log("\n2. IL CRÉE TÉNÈBRES, ET NE TOUCHE À RIEN D'AUTRE");
 // =========================================================================
 {
-    // Une base où traîne encore la Paralysie, pour voir la suppression se faire.
-    const m = fausseBase({ ...EFFETS_REELS, EFF_PARALYSIE: EFFETS_REELS.EFF_PARALYSIE || { Nom: "Paralysie" } });
+    const m = fausseBase(RETOUCHEE);
     const resultat = await m.lancer();
-
-    verifier("la Paralysie disparaît de la base",
-             m.base.EFF_PARALYSIE === undefined && m.journal.suppressions.includes("EFF_PARALYSIE"));
-
-    verifier("l'Étourdi annonce -30% et 20% d'échec",
-             /-30%/.test(m.base.EFF_ETOURDIT.Notes) && /20%/.test(m.base.EFF_ETOURDIT.Notes),
-             m.base.EFF_ETOURDIT.Notes);
-    verifier("le Glacé annonce ses 20% de dégâts PHYSIQUES en plus (pas la magie)",
-             /20% de dégâts PHYSIQUES en plus/.test(m.base.EFF_GLACE.Notes), m.base.EFF_GLACE.Notes);
-    verifier("l'Électrifié annonce ses 20% de dégâts magiques",
-             /20% de dégâts MAGIQUES/.test(m.base.EFF_ELECTRIFIE.Notes), m.base.EFF_ELECTRIFIE.Notes);
-    verifier("la Brûlure annonce ses 3 dégâts par manche",
-             /3 dégâts/.test(m.base.EFF_BRULE.Notes), m.base.EFF_BRULE.Notes);
-    verifier("et garde ses -50% de soins reçus",
-             /-50% de soins/.test(m.base.EFF_BRULE.Notes));
-    verifier("la Poussée annonce sa bousculade (15% / -20% d'énergie)",
-             /15% de chance de la bousculer/.test(m.base.EFF_POUSSEE.Effet_Base)
-             && /20% d'énergie/.test(m.base.EFF_POUSSEE.Effet_Base),
-             m.base.EFF_POUSSEE.Effet_Base);
-    // L'ÉQUILIBRAGE DE NICO N'EST PAS TOUCHÉ : le coût de l'Étalement (« Cout /
-    // 1.2 » aujourd'hui) et le pourcentage du Bouclier restent ceux du grimoire.
-    verifier("le coût de l'Étalement reste celui du grimoire",
-             m.base.EFF_DUREE_ETALEMENT_DEGATS.Cout_PT === EFFETS_REELS.EFF_DUREE_ETALEMENT_DEGATS.Cout_PT,
-             m.base.EFF_DUREE_ETALEMENT_DEGATS.Cout_PT);
-    verifier("la Valeur et le texte du Bouclier restent ceux du grimoire",
-             m.base.EFF_BOUCLIER_MAGIQUE.Valeur === EFFETS_REELS.EFF_BOUCLIER_MAGIQUE.Valeur
-             && m.base.EFF_BOUCLIER_MAGIQUE.Effet_Base === EFFETS_REELS.EFF_BOUCLIER_MAGIQUE.Effet_Base,
-             `${m.base.EFF_BOUCLIER_MAGIQUE.Valeur} / ${m.base.EFF_BOUCLIER_MAGIQUE.Effet_Base}`);
-    verifier("et dit que rien ne tombe au lancement",
-             /rien au lancement/.test(m.base.EFF_DUREE_ETALEMENT_DEGATS.Effet_Base),
-             m.base.EFF_DUREE_ETALEMENT_DEGATS.Effet_Base);
-
-    // LE REPLI NAÎT, ENTIER : tout ce que la Forge et le moteur lisent.
-    const repli = m.base.EFF_REPLI || {};
-    verifier("le Repli est créé dans la base", !!m.base.EFF_REPLI && resultat.faits.some(f => /EFF_REPLI — créé/.test(f)),
-             resultat.faits.join(" | "));
-    verifier("avec 3 cases, 60 %, un seul cran, coût 6, Dextérité",
-             repli.Nom === "Repli" && repli.Valeur === 3 && repli.Pourcent_Base === 60 && repli.Pourcent_Max === 60
-             && repli.Cout_PT === "6" && repli.Modificateur === "DEXTÉRITÉ" && repli.Type_Mecanique === "Action/Global",
-             JSON.stringify(repli));
-    verifier("et le texte que la Forge affiche",
-             /3 cases après avoir attaqué/.test(repli.Effet_Base || "") && /60%/.test(repli.Effet_Base || ""));
-
-    const aveu = m.base.EFF_AVEUGLEMENT || {};
-    verifier("l'Aveuglement est créé : 10 %, max 70 %, 2 tours, coût 1, Dextérité",
-             resultat.faits.some(f => /EFF_AVEUGLEMENT — créé/.test(f)) && aveu.Nom === "Aveuglement"
-             && aveu.Pourcent_Base === 10 && aveu.Pourcent_Max === 70 && aveu.Tours === 2 && aveu.Cout_PT === "1"
-             && aveu.Modificateur === "DEXTÉRITÉ" && aveu.Type_Mecanique === "Physique", JSON.stringify(aveu));
-    verifier("et ses notes disent la règle du noir (3 cases fixes)", /3 hexagones/.test(aveu.Notes || "")
-             && /fixés/.test(aveu.Notes || "") && /zone/.test(aveu.Notes || ""));
-
-    // TÉNÈBRES, le sort du Nécromancien : créé comme le Repli, et réservé.
     const ten = m.base.EFF_TENEBRES || {};
     verifier("Ténèbres est créé : 2 pts, Intelligence, 3, racine, réservé au Nécromancien niv. 5",
              resultat.faits.some(f => /EFF_TENEBRES — créé/.test(f)) && ten.Nom === "Ténèbres"
              && ten.Cout_PT === "2" && ten.Modificateur === "INTELLIGENCE" && ten.Valeur === 3
              && ten.Type_Mecanique === "Action/Global" && ten.Classe === "Nécromancien" && ten.Niveau_Requis === 5,
-             JSON.stringify(ten).slice(0, 160));
-
-    // Fiche déjà créée (bouton déjà pressé, avec l'ancienne règle à 4 cases,
-    // et un pourcentage retouché à la main) : seules les Notes sont remises.
-    const deja = fausseBase({ ...EFFETS_REELS, EFF_AVEUGLEMENT: { Nom: "Aveuglement", Pourcent_Base: 15,
-      Notes: "Aveuglement : 4 hexagones autour de la cible sont dans le noir." } });
-    await deja.lancer();
-    verifier("fiche déjà là : les Notes passent à 3 cases, le réglage à la main reste",
-             /3 hexagones/.test(deja.base.EFF_AVEUGLEMENT.Notes) && deja.base.EFF_AVEUGLEMENT.Pourcent_Base === 15,
-             JSON.stringify(deja.base.EFF_AVEUGLEMENT));
-
-    // Un Repli déjà réglé à la main (4 cases, 50 %) n'est jamais réécrit.
-    const regle = fausseBase({ ...EFFETS_REELS, EFF_REPLI: { Nom: "Repli", Valeur: 4, Pourcent_Base: 50 } });
-    const rRegle = await regle.lancer();
-    verifier("un Repli déjà réglé dans le grimoire n'est pas écrasé",
-             regle.base.EFF_REPLI.Valeur === 4 && regle.base.EFF_REPLI.Pourcent_Base === 50
-             && rRegle.inchanges.includes("EFF_REPLI (déjà présent)"), JSON.stringify(regle.base.EFF_REPLI));
-
-    verifier("tout est rapporté, rien n'a raté", resultat.rates.length === 0,
-             resultat.rates.join(" | "));
-
-    // ET CE QU'ELLE NE TOUCHE PAS : un effet hors de la liste garde tout.
-    verifier("un effet hors liste n'est pas effleuré",
-             JSON.stringify(m.base.EFF_SOIN) === JSON.stringify(EFFETS_REELS.EFF_SOIN));
-    verifier("et les champs non visés d'un effet migré non plus",
-             m.base.EFF_GLACE.Pourcent_Base === EFFETS_REELS.EFF_GLACE.Pourcent_Base
-             && m.base.EFF_GLACE.Tours === EFFETS_REELS.EFF_GLACE.Tours,
-             JSON.stringify({ p: m.base.EFF_GLACE.Pourcent_Base, t: m.base.EFF_GLACE.Tours }));
+             JSON.stringify(ten).slice(0, 140));
+    verifier("une seule écriture, sur Ténèbres", m.journal.ecritures.length === 1
+             && m.journal.ecritures[0].id === "EFF_TENEBRES", JSON.stringify(m.journal.ecritures.map(e => e.id)));
+    verifier("aucune suppression (la Paralysie remise à la main reste)", m.journal.suppressions.length === 0
+             && !!m.base.EFF_PARALYSIE);
+    verifier("la base d'après = celle d'avant, plus Ténèbres, au caractère près",
+             JSON.stringify(sansTenebres(m.base)) === JSON.stringify(RETOUCHEE));
+    verifier("la note de la Brûlure retouchée à la main est intacte",
+             m.base.EFF_BRULE.Notes === "-50% de soins reçus, et 8% de dégats physique des pv max de la cible");
+    verifier("la note vide de la Confusion reste vide", m.base.EFF_CONFUSION.Notes === "");
+    verifier("les réglages de l'Étourdi, du Repli, de l'Aveuglement aussi",
+             m.base.EFF_ETOURDIT.Pourcent_Base === 15 && m.base.EFF_REPLI.Valeur === 4
+             && m.base.EFF_AVEUGLEMENT.Notes === "à ma façon");
 }
 
 // =========================================================================
-console.log("\n3. RELANCÉE, ELLE N'ÉCRIT PLUS RIEN");
+console.log("\n3. UN TÉNÈBRES DÉJÀ LÀ N'EST JAMAIS RÉÉCRIT");
 // =========================================================================
-//  C'est ce qui rend le bouton cliquable sans angoisse. Une migration qui
-//  réécrit à chaque clic use le quota et masque, dans le rapport, ce qui a
-//  vraiment changé.
 {
-    const m = fausseBase(EFFETS_REELS);
-    await m.lancer();
-    const ecrituresPremierPassage = m.journal.ecritures.length;
-    const suppressionsPremier = m.journal.suppressions.length;
+    const regle = { Nom: "Ténèbres", Valeur: 4, Cout_PT: "3", Notes: "Nico l'a rééquilibré" };
+    const m = fausseBase({ ...RETOUCHEE, EFF_TENEBRES: regle });
+    const r = await m.lancer();
+    verifier("retouché à la main : laissé tel quel", JSON.stringify(m.base.EFF_TENEBRES) === JSON.stringify(regle)
+             && r.inchanges.some(x => /EFF_TENEBRES/.test(x)), JSON.stringify(m.base.EFF_TENEBRES));
+    verifier("et rien n'est écrit", m.journal.ecritures.length === 0 && r.faits.length === 0);
 
-    const second = await m.lancer();
-    verifier("le premier passage a bien écrit", ecrituresPremierPassage > 0,
-             String(ecrituresPremierPassage));
-    verifier("le second n'écrit plus une seule fois",
-             m.journal.ecritures.length === ecrituresPremierPassage,
-             `(${m.journal.ecritures.length - ecrituresPremierPassage} de plus)`);
-    verifier("et ne resupprime rien", m.journal.suppressions.length === suppressionsPremier);
-    verifier("le rapport le dit clairement", second.faits.length === 0,
-             JSON.stringify(second.faits));
-    verifier("en listant ce qui était déjà à jour", second.inchanges.length === 12,
-             JSON.stringify(second.inchanges));
+    const deux = fausseBase(RETOUCHEE);
+    await deux.lancer();
+    const avant = deux.journal.ecritures.length;
+    const second = await deux.lancer();
+    verifier("relancé : pas une écriture de plus", deux.journal.ecritures.length === avant && second.faits.length === 0,
+             `(${deux.journal.ecritures.length - avant} de plus)`);
 }
 
 // =========================================================================
-console.log("\n4. UNE PANNE N'EMPORTE PAS LE RESTE, ET NE SE TAIT PAS");
+console.log("\n4. UNE PANNE SE DIT, SANS RIEN CASSER");
 // =========================================================================
 {
-    // La panne tombe sur une écriture qui a FORCÉMENT lieu — la création du
-    // Repli : la vraie base a déjà reçu les autres retouches (Nico a lancé la
-    // migration), si bien qu'une panne posée sur l'une d'elles ne se
-    // déclencherait jamais.
-    const m = fausseBase(EFFETS_REELS, { panneSur: "EFF_REPLI" });
-    const resultat = await m.lancer();
+    const m = fausseBase(RETOUCHEE, { panneSur: "EFF_TENEBRES" });
+    const r = await m.lancer();
+    verifier("la panne est nommée dans le rapport", r.rates.some(x => /EFF_TENEBRES/.test(x)), JSON.stringify(r.rates));
+    verifier("et la base n'a pas bougé", JSON.stringify(m.base) === JSON.stringify(RETOUCHEE));
+}
 
-    verifier("l'effet en panne est nommé dans le rapport",
-             resultat.rates.some(r => /EFF_REPLI/.test(r)), JSON.stringify(resultat.rates));
-    verifier("et les autres sont quand même passés",
-             !!m.base.EFF_AVEUGLEMENT && m.base.EFF_REPLI === undefined && m.base.EFF_PARALYSIE === undefined);
-
-    // Un effet absent de la base : on le dit, on ne le crée pas de nulle part.
-    const sansEtourdi = JSON.parse(JSON.stringify(EFFETS_REELS));
-    delete sansEtourdi.EFF_ETOURDIT;
-    const m2 = fausseBase(sansEtourdi);
-    const r2 = await m2.lancer();
-    verifier("un effet introuvable est signalé",
-             r2.rates.some(r => /EFF_ETOURDIT.*introuvable/.test(r)), JSON.stringify(r2.rates));
-    verifier("et n'est surtout pas inventé", m2.base.EFF_ETOURDIT === undefined);
-
-    // Une Paralysie déjà supprimée : rien à faire, et c'est dit.
-    const sansParalysie = JSON.parse(JSON.stringify(EFFETS_REELS));
-    delete sansParalysie.EFF_PARALYSIE;
-    const m3 = fausseBase(sansParalysie);
-    const r3 = await m3.lancer();
-    verifier("une Paralysie déjà partie ne fait pas d'erreur",
-             r3.rates.length === 0 && r3.inchanges.some(s => /EFF_PARALYSIE/.test(s)),
-             JSON.stringify(r3.inchanges));
+// =========================================================================
+console.log("\n5. EN ATTENDANT LE BOUTON, LE JEU A SA COPIE");
+// =========================================================================
+{
+    const { w } = fausseBase(RETOUCHEE);
+    const cache = JSON.parse(JSON.stringify(RETOUCHEE));
+    w.completerEffetsDeSecours(cache);
+    verifier("le cache reçoit Ténèbres s'il manque", cache.EFF_TENEBRES && cache.EFF_TENEBRES.Nom === "Ténèbres");
+    verifier("et rien d'autre ne change dans le cache", JSON.stringify(sansTenebres(cache)) === JSON.stringify(RETOUCHEE));
+    const avecLeSien = { ...RETOUCHEE, EFF_TENEBRES: { Nom: "Ténèbres", Valeur: 4 } };
+    w.completerEffetsDeSecours(avecLeSien);
+    verifier("une fois dans la base, c'est la version de la base qui compte", avecLeSien.EFF_TENEBRES.Valeur === 4);
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

@@ -4215,75 +4215,27 @@ window.ajouterLigneEffetVide = function() {
 };
 
 // =========================================================================
-//  METTRE LA BASE AU NIVEAU DES RÈGLES DU CODE
+//  INSTALLER LES EFFETS QUI MANQUENT À LA BASE (aujourd'hui : Ténèbres)
 // =========================================================================
-//  Un effet vit à DEUX endroits : sa mécanique dans le moteur, et sa fiche
-//  dans la base (Combat_Effets) — chiffres, texte lu par le joueur, coût. Quand
-//  une règle change, les deux doivent bouger ensemble, sans quoi la Forge
-//  annonce une chose et le combat en fait une autre.
+//  Le bouton des Paramètres CRÉE un effet qui n'existe pas encore dans la base
+//  (Combat_Effets), et c'est TOUT ce qu'il sait faire. Il ne modifie jamais un
+//  effet existant, n'en supprime jamais un : le grimoire appartient à Nico, qui
+//  le règle à la main. Si l'effet est déjà là — même retouché depuis — il n'y
+//  touche pas.
 //
-//  Ce bouton fait la moitié « base » du travail, une fois, en un clic. Il est
-//  SANS DANGER À RELANCER : il ne réécrit que ce qui diffère, et dit exactement
-//  ce qu'il a touché. Un effet déjà à jour n'est même pas envoyé au réseau.
-//
-//  Chaque ligne est datée de la règle qu'elle accompagne, pour qu'on sache, en
-//  relisant, pourquoi elle est là.
+//  Il servait autrefois aussi à réécrire les textes de plusieurs effets pour
+//  suivre le moteur. Ces réécritures sont faites depuis longtemps, et relancer
+//  le bouton aurait écrasé les réglages faits à la main depuis (la note de la
+//  Brûlure, celle de la Confusion) : elles ont été retirées, et la fonction ne
+//  sait plus écrire que des créations.
 window.MIGRATION_EFFETS = [
-    { id: "EFF_ETOURDIT",
-      champs: { Notes: "EFFET ETAT ÉTOURDIT = -30% d'esquive / parade ET 20% de chance de louper sa technique" } },
-    { id: "EFF_GLACE",
-      champs: { Notes: "Mouvement coût doublé, et la cible reçoit 20% de dégâts PHYSIQUES en plus" } },
-    { id: "EFF_ELECTRIFIE",
-      champs: { Notes: "Baisse d'initiative sur la prochaine carte, et 20% de dégâts MAGIQUES en plus subis" } },
-    { id: "EFF_CONFUSION",
-      champs: { Notes: "À chaque technique lancée, 4 jets indépendants de 30% : s'attaquer soi-même, attaquer au hasard autour de soi, s'enfuir (comme la Peur), et ne plus être confus (en fin de boucle)" } },
-    { id: "EFF_BRULE",
-      champs: { Notes: "-50% de soins reçus, et 3 dégâts à chaque fin de manche (du type de l'attaque qui a brûlé)" } },
-    { id: "EFF_POUSSEE",
-      champs: { Effet_Base: "10% chance de poussée la cible de 2 hexagones en ligne droite. Peut se déplacer ensuite. 15% de chance de la bousculer : -20% d'énergie.",
-                Notes: "Ne génère pas d'attaque d'opportunité. La distance (Valeur = 2 hexagones) est fixe : les points ajoutés dans la Forge n'augmentent que la chance." } },
-    { id: "EFF_DUREE_ETALEMENT_DEGATS",
-      // Le coût (« Cout / 1.x ») n'est PAS touché : c'est un réglage d'équilibrage
-      // de Nico, lu tel quel par la Forge et par le générateur de monstres.
-      champs: { Effet_Base: "Dégâts ou soins divisés par le nombre de tours : rien au lancement, une part à chaque fin de manche.",
-                Notes: "Ne se pose que sur une attaque, un soin, une Zone ou une Distance — jamais sur un état. Chaque ⏳ ajoute un tour." } },
-    // Le bouclier couvre une part des PV RESTANTS de la cible : sa Valeur est
-    // ce pourcentage (par cran), plafonné par le Pourcentage max. 25 %.
-    // La Valeur (le pourcentage) et le texte restent ceux du grimoire : c'est
-    // l'équilibrage de Nico (30 % aujourd'hui). Seule la note explique la règle.
-    { id: "EFF_BOUCLIER_MAGIQUE",
-      champs: { Notes: "Valeur = % des PV restants de la cible, par cran ; plafonné par le Pourcentage max." } },
-    // La Paralysie quitte le jeu : elle bloquait tout pendant quatre tours, et
-    // un joueur privé de son tour n'a plus de jeu du tout.
-    { id: "EFF_PARALYSIE", supprimer: true },
-    // LE REPLI ENTRE DANS LE GRIMOIRE. `creer` : la fiche n'existe pas encore,
-    // elle est écrite en entier la première fois — et jamais réécrite ensuite,
-    // pour que les réglages faits à la main dans le grimoire tiennent. Valeur =
-    // cases de marche ; Pourcentage de base = chance d'éviter chaque attaque
-    // d'opportunité pendant le repli. Un seul cran (Pourcentage max = base).
-    { id: "EFF_REPLI", creer: true,
-      champs: { Nom: "Repli", Cout_PT: "6", Modificateur: "DEXTÉRITÉ",
-                Type_Mecanique: "Action/Global", Type_Mecanique_2: "Aucun",
-                Valeur: 3, Pourcent_Base: 60, Pourcent_Max: 60, Tours: 0, Cible_Etat: "repli",
-                Effet_Base: "Se déplace de 3 cases après avoir attaqué, avec 60% chance d'éviter les attaques d'opportunités.",
-                Notes: "Après l'attaque, le lanceur choisit une case à 3 pas de marche (ni mur, ni vivant traversé). Chaque ennemi quitté a 60% de chance d'être évité avant le jet de défense. Marche gratuite." } },
-    // L'AVEUGLEMENT ENTRE DANS LE GRIMOIRE, même principe que le Repli : un
-    // état comme l'Étourdi (Physique, crans de 10 %, plafond 70 %, 2 tours).
-    // `majSiPresent` : si la fiche existe déjà (bouton déjà pressé), seules ces
-    // colonnes sont remises à jour — la règle est passée de 4 à 3 cases.
-    { id: "EFF_AVEUGLEMENT", creer: true, majSiPresent: ["Notes"],
-      champs: { Nom: "Aveuglement", Cout_PT: "1", Modificateur: "DEXTÉRITÉ",
-                Type_Mecanique: "Physique", Type_Mecanique_2: "Aucun",
-                Valeur: 0, Pourcent_Base: 10, Pourcent_Max: 70, Tours: 2, Cible_Etat: "aveuglement",
-                Effet_Base: "10% chance (max 70%) d'aveugler la cible, sur 2 tours",
-                Notes: "Aveuglement : 3 hexagones autour de la cible sont dans le noir, fixés là où elle a été aveuglée. Impossible d'y cibler un ennemi ou un allié (les sorts de zone les touchent quand même). Le noir n'est visible que de l'aveuglé." } },
     // TÉNÈBRES, LE SORT DU NÉCROMANCIEN (niveau 5). Un effet de base comme
     // l'Attaque Magique (2 pts, Intelligence, 3 dégâts magiques), réservé à la
     // classe : `Classe` et `Niveau_Requis` le cachent à tous les autres dans la
     // Forge, et le générateur de monstres ne le pioche jamais. `secoursLocal` :
     // tant que la base ne l'a pas, le jeu en garde cette copie en mémoire —
     // le sort marche avant même qu'on ait pressé le bouton.
-    { id: "EFF_TENEBRES", creer: true, secoursLocal: true,
+    { id: "EFF_TENEBRES", secoursLocal: true,
       champs: { Nom: "Ténèbres", Cout_PT: "2", Modificateur: "INTELLIGENCE",
                 Type_Mecanique: "Action/Global", Type_Mecanique_2: "Aucun",
                 Valeur: 3, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Cible_Etat: "tenebres",
@@ -4321,7 +4273,7 @@ window.effetAccessible = function(id, effet, perso) {
 window.appliquerMigrationEffets = async function() {
     const btn = document.getElementById("btn-migration-effets");
     const texteOrigine = btn ? btn.innerText : "";
-    if (btn) { btn.innerText = "⏳ Mise à jour..."; btn.style.pointerEvents = "none"; }
+    if (btn) { btn.innerText = "⏳ Installation..."; btn.style.pointerEvents = "none"; }
 
     const faits = [];
     const inchanges = [];
@@ -4330,70 +4282,32 @@ window.appliquerMigrationEffets = async function() {
         for (const regle of window.MIGRATION_EFFETS) {
             const ref = doc(db, "Combat_Effets", regle.id);
             try {
+                // DÉJÀ LÀ : on n'y touche pas, quoi qu'il contienne.
                 const snap = await getDoc(ref);
-
-                if (regle.supprimer) {
-                    if (!snap.exists()) { inchanges.push(regle.id + " (déjà absent)"); continue; }
-                    await deleteDoc(ref);
-                    faits.push(regle.id + " — supprimé");
-                    continue;
-                }
-
-                // UN NOUVEL EFFET s'écrit en entier la première fois, puis on
-                // n'y touche plus : ce qui a été réglé dans le grimoire depuis
-                // appartient à celui qui l'a réglé.
-                if (regle.creer) {
-                    if (snap.exists()) {
-                        const actuel = snap.data() || {};
-                        const aJour = {};
-                        (regle.majSiPresent || []).forEach(cle => {
-                            if (actuel[cle] !== regle.champs[cle]) aJour[cle] = regle.champs[cle];
-                        });
-                        if (Object.keys(aJour).length === 0) { inchanges.push(regle.id + " (déjà présent)"); continue; }
-                        await setDoc(ref, aJour, { merge: true });
-                        faits.push(`${regle.id} — ${Object.keys(aJour).join(", ")}`);
-                        continue;
-                    }
-                    await setDoc(ref, { ...regle.champs });
-                    faits.push(regle.id + " — créé");
-                    continue;
-                }
-
-                if (!snap.exists()) { rates.push(regle.id + " : introuvable en base"); continue; }
-
-                // On ne renvoie QUE ce qui diffère : relancer la migration sur
-                // une base déjà à jour ne doit toucher à rien.
-                const actuel = snap.data() || {};
-                const aEcrire = {};
-                Object.keys(regle.champs).forEach(cle => {
-                    if (actuel[cle] !== regle.champs[cle]) aEcrire[cle] = regle.champs[cle];
-                });
-                if (Object.keys(aEcrire).length === 0) { inchanges.push(regle.id); continue; }
-
-                await setDoc(ref, aEcrire, { merge: true });
-                faits.push(`${regle.id} — ${Object.keys(aEcrire).join(", ")}`);
+                if (snap.exists()) { inchanges.push(regle.id + " (déjà présent)"); continue; }
+                await setDoc(ref, { ...regle.champs });
+                faits.push(regle.id + " — créé");
             } catch (e) {
                 rates.push(`${regle.id} : ${e && e.message}`);
             }
         }
 
-        // Le cache du jeu doit repartir de la base, sinon la Forge continuerait
-        // d'afficher les anciens textes jusqu'au prochain rechargement.
+        // Le cache du jeu repart de la base : la Forge voit l'effet installé.
         if (typeof window.chargerCacheEffetsBDD === "function") await window.chargerCacheEffetsBDD();
         if (document.getElementById("conteneur-table-effets")
             && typeof window.chargerTableauEffets === "function") {
             await window.chargerTableauEffets();
         }
     } finally {
-        if (btn) { btn.innerText = texteOrigine || "Mettre la BDD à jour"; btn.style.pointerEvents = "auto"; }
+        if (btn) { btn.innerText = texteOrigine || "Installer Ténèbres"; btn.style.pointerEvents = "auto"; }
     }
 
     const lignes = [];
-    lignes.push(faits.length ? `Mis à jour (${faits.length}) :\n  • ` + faits.join("\n  • ")
-                             : "Rien à mettre à jour.");
-    if (inchanges.length) lignes.push(`Déjà à jour (${inchanges.length}) : ${inchanges.join(", ")}`);
+    lignes.push(faits.length ? `Installé (${faits.length}) :\n  • ` + faits.join("\n  • ")
+                             : "Rien à installer.");
+    if (inchanges.length) lignes.push(`Déjà dans la base, laissé tel quel : ${inchanges.join(", ")}`);
     if (rates.length) lignes.push(`⚠️ Échecs (${rates.length}) :\n  • ` + rates.join("\n  • "));
-    console.log("🧪 Migration des effets :", { faits, inchanges, rates });
+    console.log("🧪 Installation des effets :", { faits, inchanges, rates });
     alert(lignes.join("\n\n"));
     return { faits, inchanges, rates };
 };

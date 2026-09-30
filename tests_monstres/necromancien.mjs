@@ -357,7 +357,7 @@ console.log("\n5. TÉNÈBRES DANS LE GRIMOIRE ET LA FORGE");
     const necro4 = await forgePour({ Classe: "Nécromancien", XP: 1800, Race: "Humain" });
     const oracle = await forgePour({ Classe: "Oracle", XP: 9000, Race: "Humain" });
     const monstres = window.paletteEffetsMonstres().map(e => e.id);
-    return { avant, t, creer: !!regle.creer, secours: !!regle.secoursLocal,
+    return { avant, t, installe: !!regle.champs && window.MIGRATION_EFFETS.length === 1, secours: !!regle.secoursLocal,
              necro5: necro5.includes("EFF_TENEBRES"), necro4: necro4.includes("EFF_TENEBRES"),
              oracle: oracle.includes("EFF_TENEBRES"), attaqueMagique: oracle.includes("EFF_ATTAQUE_MAGIQUE"),
              monstres: monstres.includes("EFF_TENEBRES"), monstresAutres: monstres.length,
@@ -367,7 +367,7 @@ console.log("\n5. TÉNÈBRES DANS LE GRIMOIRE ET LA FORGE");
   verifier("le secours local le fournit : 2 pts, Intelligence, 3, racine", r.t.Nom === "Ténèbres" && r.t.Cout_PT === "2"
            && r.t.Modificateur === "INTELLIGENCE" && r.t.Valeur === 3 && r.t.Type_Mecanique === "Action/Global",
            JSON.stringify(r.t).slice(0, 120));
-  verifier("« Mettre la BDD à jour » le crée (sans jamais l'écraser ensuite)", r.creer && r.secours);
+  verifier("« Installer Ténèbres » le crée, et c'est tout ce qu'il fait", r.installe && r.secours);
   verifier("la Forge le propose au Nécromancien de niveau 5", r.necro5);
   verifier("pas au niveau 4", !r.necro4);
   verifier("jamais à une autre classe (même de haut niveau)", !r.oracle && r.attaqueMagique);

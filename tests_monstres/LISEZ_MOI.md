@@ -65,7 +65,7 @@ node cap_fatigue.mjs        # le CAP de fatigue d'une compétence, table de Nico
 node gouttes_etat.mjs       # les gouttes de couleur sous un pion, un vrai token de la base, capture à l'appui
 node equipement_cerveau.mjs # percer une armure, l'élan, la bénédiction, le pas de retraite — reliés au cerveau
 node durees_etats.mjs       # la durée d'un état, de la Forge (⏳ Durée +) jusqu'à sa dernière manche
-node migration_effets.mjs   # la mise à jour de la base des effets : bonne cible, sans danger à relancer
+node migration_effets.mjs   # « Installer Ténèbres » : crée Ténèbres s'il manque, ne touche à AUCUN autre effet (retouches à la main intactes)
 node mouvement_pur.mjs      # chemin, coût des cases, attaques d'opportunité (1 000 trajets)
 node confusion_cerveau.mjs  # les quatre bandes du dé, la dissipation, et le mot qui prévient le joueur
 node zones_cerveau.mjs      # une nappe au sol : elle naît dans l'état, elle brûle, elle vieillit, elle meurt
@@ -3639,8 +3639,8 @@ nécromancien est immunisé au feu ET au gel.
   (« Ténèbres étalées ») et suivent la même règle en fin de manche. À l'écran :
   « -3 ⚡🌑 » pour l'énergie bue, « -6 🌑 » pour le surplus.
   La fiche de l'effet (`EFF_TENEBRES`) est dans `MIGRATION_EFFETS` : le bouton
-  « Mettre la BDD à jour » des Paramètres la crée une fois, sans jamais
-  l'écraser ensuite. En attendant, le jeu en garde une copie en mémoire
+  « Installer Ténèbres » des Paramètres (l'ancien « Mettre la BDD à jour ») la
+  crée une fois, sans jamais l'écraser ensuite. En attendant, le jeu en garde une copie en mémoire
   (`secoursLocal`). Elle porte `Classe` et `Niveau_Requis` : la Forge ne la
   propose qu'au Nécromancien de niveau 5 et plus (`effetAccessible`), et le
   générateur de monstres ne la pioche jamais.
@@ -3677,3 +3677,26 @@ tours puis KO, tour entamé, une seule fois, niveau 9, tics, rejeu), puis dans
 la vraie page : le secours local, la Forge (niveau 5 oui, 4 non, autre classe
 non), la palette des monstres, l'extraction d'une carte forgée, la fiche de
 classe (placement, téléphone, captures) et la fiche en sursis.
+
+### « Installer Ténèbres » : le bouton ne sait plus que créer
+
+Nico : « Mettre la BDD à jour, j'ai modifié des trucs manuellement, ça va pas
+m'écraser tous mes changements ? Fais en sorte que ça marche que sur
+Ténèbres. » Il avait raison : le bouton réécrivait encore, s'ils différaient,
+les textes de huit effets (Étourdi, Glacé, Électrifié, Confusion, Brûlé,
+Poussée, Étalement, Bouclier), supprimait la Paralysie et remettait la note de
+l'Aveuglement. Relu en lecture seule le 30 septembre, la base réelle aurait
+perdu la note de la Brûlure retouchée à la main (« 8% de dégâts physiques des
+PV max ») et vu celle de la Confusion remplie.
+
+Ces anciennes réécritures (faites depuis longtemps) sont retirées. La table ne
+contient plus que Ténèbres, et `appliquerMigrationEffets` ne sait plus que
+CRÉER un effet absent : plus de suppression, plus de fusion dans un effet
+existant. Un Ténèbres déjà en base — même retouché — est laissé tel quel. Le
+bouton s'appelle désormais « Installer Ténèbres ».
+
+`migration_effets.mjs` est réécrit pour le prouver sur une base qui porte des
+retouches faites à la main : une seule écriture (Ténèbres), aucune suppression,
+la base d'après égale à celle d'avant plus Ténèbres au caractère près, un
+Ténèbres retouché jamais réécrit, un second passage qui n'écrit rien, une panne
+qui se dit sans rien casser.
