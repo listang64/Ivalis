@@ -81,6 +81,8 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
                 const dataPerso = persoSnap.data();
                 window.COULEUR_PERSO_COURANT = dataPerso.Couleur || "#4a1c1c";
                 window.CARTES_SELECTIONNEES = dataPerso.Deck_Equipe || [];
+                // Son expérience, pour les compétences que son niveau permet de créer.
+                persoData = { idPersonnage, XP: dataPerso.XP };
             }
         }
 
@@ -115,8 +117,24 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
             return initB - initA;
         });
 
+        // LE NIVEAU DONNE DES COMPÉTENCES À CRÉER, PAS DE LA PLACE EN MAIN.
+        // Chaque « +1 compétence » de la grille d'expérience (experience.js)
+        // ouvre une création de plus dans la Forge ; la limite des cartes
+        // mémorisées pour le combat (competencesMax) ne bouge pas.
+        const fichePerso = persoData || (window.PERSOS_JOUEURS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+        const niveauPerso = (typeof window.niveauDepuisXP === "function")
+            ? window.niveauDepuisXP(window.xpDuPerso(fichePerso || {})) : 1;
+        const bonusNiveau = (typeof window.competencesDeNiveau === "function")
+            ? window.competencesDeNiveau(niveauPerso) : 0;
+        window.CREATIONS_MAX_PERSO = competencesMax + bonusNiveau;
+        const detailNiveau = document.getElementById("affichage-competences-niveau");
+        if (detailNiveau) {
+            detailNiveau.textContent = bonusNiveau > 0
+                ? `dont ${bonusNiveau} gagnée${bonusNiveau > 1 ? "s" : ""} au niveau ${niveauPerso}` : "";
+        }
+
         const nbCreees = competencesArray.length;
-        const nbRestantes = competencesMax - nbCreees;
+        const nbRestantes = window.CREATIONS_MAX_PERSO - nbCreees;
 
         // Gestion du bouton de Forge
         if (spanRestantes) {

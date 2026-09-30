@@ -17,7 +17,7 @@
 // =========================================================================
 
 import { db } from "./firebase-config.js?v=2";
-import { doc, updateDoc, deleteField } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { doc, updateDoc, deleteField, increment } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // =========================================================================
 //  LE MÉNAGE DES IMAGES ABANDONNÉES
@@ -763,6 +763,12 @@ window.demarrerButin = async function() {
     const participants = window.participantsAuButin();
     if (participants.length === 0) return;
 
+    // L'EXPÉRIENCE DE LA VICTOIRE : chaque créature tombée rapporte son « XP
+    // pour le groupe » à CHAQUE héros de l'équipe (grille de Nico, bestiaire).
+    // Elle voyage avec le butin, donc sous la même transaction : un seul poste
+    // la distribue, une seule fois par combat.
+    const xpVictoire = window.xpDeLaVictoire();
+
     // LA RÉSERVE SE LIT AVANT LA TRANSACTION, parce qu'elle vit dans son propre
     // document (voir plus haut : le butin n'a rien à faire sur le document que
     // le combat se dispute). Deux postes peuvent donc lire la même réserve au
@@ -846,7 +852,7 @@ window.demarrerButin = async function() {
         const service = window.servirDepuisLaReserve(reserveLue, participants, difficulte);
         const parPersonnage = service.parPersonnage;
 
-        return { resultat: { restants: service.restants, utilise: service.utilise },
+        return { resultat: { restants: service.restants, utilise: service.utilise, xp: xpVictoire },
                  maj: { Butin: {
             ouvert: true,
             etape: "personnel",
@@ -859,6 +865,8 @@ window.demarrerButin = async function() {
             difficulte,
             participants,
             parPersonnage,
+            // L'XP que chaque héros vient de gagner (annoncée dans la fenêtre).
+            xp: xpVictoire,
             pool: [],
             poolValides: [],
             resolu: false
@@ -872,6 +880,31 @@ window.demarrerButin = async function() {
     if (servi && servi.utilise && reserveLue) {
         await window.reglerLaReserveApresPartage(cheminReserve, reserveLue, servi.restants || []);
     }
+
+    // Le poste qui a gagné la course distribue l'expérience ; les autres n'ont
+    // rien écrit (servi vaut null) et ne touchent à rien.
+    if (servi && servi.xp > 0) await window.distribuerXP(participants, servi.xp);
+};
+
+// L'XP que rapporte la victoire, à chaque héros : la somme de l'« XP pour le
+// groupe » des créatures tombées (experience.js, xpDeLaCreature). Un leurre
+// n'en rapporte pas ; une créature encore debout non plus.
+window.xpDeLaVictoire = function() {
+    const tombee = (m) => m.statut === "Mort"
+        || (typeof window.estCombattantMort === "function" && window.estCombattantMort(m.idPersonnage));
+    return (window.MONSTRES_PARTIE || [])
+        .filter(m => m && !m.estIllusion && tombee(m))
+        .reduce((total, m) => total + (typeof window.xpDeLaCreature === "function" ? window.xpDeLaCreature(m) : 0), 0);
+};
+
+// Ajoute cette XP à chaque héros. Un incrément, pas une réécriture : deux
+// écritures qui se croiseraient s'additionnent au lieu de s'écraser.
+window.distribuerXP = async function(ids, montant) {
+    const xp = Math.max(0, Math.round(Number(montant) || 0));
+    if (xp <= 0) return;
+    await Promise.all((ids || []).map(id =>
+        updateDoc(doc(db, "Personnages", id), { XP: increment(xp) })
+            .catch(e => console.error(`XP de ${id} :`, e))));
 };
 
 // Un butin est périmé quand il ne concerne plus le combat en cours : soit il
@@ -1058,6 +1091,14 @@ window.afficherFenetreButin = function(butin) {
     if (vueFin) vueFin.style.display = "none";
     const ecrire = (el, texte) => { if (el) el.innerText = texte; };
     const montrer = (el) => { if (el) el.style.display = "block"; };
+
+    // L'expérience gagnée, rappelée tant que le butin est ouvert.
+    const ligneXP = document.getElementById("butin-xp");
+    if (ligneXP) {
+        const xp = Number(butin.xp) || 0;
+        ligneXP.style.display = xp > 0 ? "block" : "none";
+        ligneXP.innerText = xp > 0 ? `✨ +${xp.toLocaleString("fr-FR")} XP pour chaque héros` : "";
+    }
 
     // Les objets de mes héros partent se faire dessiner dès l'ouverture du
     // butin. L'appel ne travaille qu'une fois par butin, et rend la main tout

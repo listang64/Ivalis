@@ -3692,3 +3692,58 @@ textarea.input-texte-parchemin {
     30%  { box-shadow: 0 0 0 6px rgba(212, 175, 55, 0.35); transform: scale(1.03); }
     100% { box-shadow: 0 0 0 12px rgba(212, 175, 55, 0); transform: scale(1); }
 }
+
+/* =====================================================================
+   LE NIVEAU ET L'EXPÉRIENCE (experience.js) — en tête de la fiche perso
+   ===================================================================== */
+.bandeau-xp {
+    flex-shrink: 0; text-align: center; padding: 8px 18px 7px;
+    background: linear-gradient(180deg, #24160c 0%, #140b05 100%);
+    border-bottom: 2px solid #2a1a0f;
+}
+.xp-niveau { font-family: 'Cinzel', serif; text-transform: uppercase; line-height: 1; margin-bottom: 6px; }
+.xp-niveau-mot { font-size: 12px; letter-spacing: 3px; color: #c2a878; margin-right: 8px; vertical-align: middle; }
+.xp-niveau-chiffre {
+    font-size: 24px; font-weight: bold; vertical-align: middle;
+    background: linear-gradient(180deg, #fff3c4 0%, #e8c46a 50%, #a8781f 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.55));
+}
+.xp-jauge {
+    position: relative; height: 16px; border-radius: 9px; overflow: hidden;
+    background: #0d0704; border: 1px solid #8c6a2a;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8), 0 0 6px rgba(212, 175, 55, 0.2);
+}
+.xp-jauge-remplissage {
+    position: absolute; top: 0; bottom: 0; left: 0; width: 0; border-radius: 9px;
+    background: linear-gradient(180deg, #fff0b8 0%, #e2b84f 45%, #a8781f 100%);
+    box-shadow: 0 0 10px rgba(255, 200, 80, 0.6);
+    transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* Un reflet qui passe sur l'or, de loin en loin. */
+.xp-jauge-remplissage::after {
+    content: ""; position: absolute; inset: 0; border-radius: 9px;
+    background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.55) 50%, transparent 70%);
+    background-size: 250% 100%; animation: xp-reflet 3.4s linear infinite;
+}
+@keyframes xp-reflet { from { background-position: 150% 0; } to { background-position: -150% 0; } }
+.xp-jauge-texte {
+    position: relative; z-index: 1; display: block; line-height: 16px;
+    font-size: 11px; font-weight: bold; letter-spacing: 1px; color: #fff7de;
+    text-shadow: 0 1px 2px #000, 0 0 4px #000;
+}
+.xp-prochain { font-size: 11.5px; color: #c2a878; margin-top: 4px; font-style: italic; }
+
+/* L'onglet DEV : les deux flèches de niveau. */
+.dev-niveau { display: flex; align-items: center; justify-content: center; gap: 18px; }
+.btn-fleche-niveau {
+    width: 52px; height: 52px; padding: 0; margin: 0; font-size: 22px; line-height: 1;
+    background-color: #5c1e16; border-color: #ff4c4c;
+}
+.dev-niveau-actuel { font-family: 'Cinzel', serif; font-size: 22px; font-weight: bold; color: #5c1e16; min-width: 120px; }
+
+/* Le butin rappelle l'expérience gagnée. */
+.butin-xp {
+    text-align: center; margin: 2px 0 10px; font-family: 'Cinzel', serif; font-weight: bold; font-size: 17px;
+    color: #f3dfa6; text-shadow: 0 0 8px rgba(212, 175, 55, 0.7), 1px 1px 2px #000;
+}

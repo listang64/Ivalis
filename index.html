@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=39">
+  <link rel="stylesheet" href="style.css?v=40">
 
  
   <!-- ===================================================================== -->
@@ -1573,6 +1573,17 @@
       <button class="btn-fermer-fiche" title="Fermer la fiche" onclick="jouerSonClic(); fermerFichePerso()">X</button>
     </div>
 
+    <!-- LE NIVEAU ET L'EXPÉRIENCE (experience.js) : visibles sur tous les
+         onglets de la fiche. Rempli par afficherJaugeXP. -->
+    <div id="bandeau-xp-perso" class="bandeau-xp">
+      <div class="xp-niveau"><span class="xp-niveau-mot">Niveau</span><span class="xp-niveau-chiffre">1</span></div>
+      <div class="xp-jauge" role="progressbar" aria-label="Expérience">
+        <div class="xp-jauge-remplissage"></div>
+        <span class="xp-jauge-texte">0 / 700 XP</span>
+      </div>
+      <div class="xp-prochain"></div>
+    </div>
+
     <div class="conteneur-onglets">
       <button class="onglet-btn actif" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-caracs')">Caractéristiques</button>
       <button class="onglet-btn" onclick="jouerSonClic(); changerOngletPerso(event, 'onglet-stats')">Statistiques</button>
@@ -1744,6 +1755,7 @@
         <span style="font-size: 18px; font-weight: bold; color: #4a2e1b;">
           Compétences restantes à créer : 
           <span id="affichage-competences-restantes" style="font-size: 24px; color: #1b6e3a; margin-left: 10px;">X</span>
+          <span id="affichage-competences-niveau" style="display: block; font-size: 13px; font-weight: normal; color: #7a5a1c; font-style: italic;"></span>
         </span>
         
         <!-- Le fameux bouton + -->
@@ -1849,6 +1861,17 @@
           <button id="btn-dev-reinit-caracs" class="btn-parametres" style="background-color: #5c1e16; border-color: #ff4c4c;" onclick="jouerSonClic(); window.reinitialiserCaracsDev()">Réinitialiser les caractéristiques</button>
       </div>
 
+      <!-- Le niveau, en triche : l'XP est posée au seuil du niveau visé. -->
+      <div style="background-color: rgba(92, 30, 22, 0.1); border: 2px dashed #ff4c4c; padding: 15px; border-radius: 8px; margin-bottom: 30px; text-align: center;">
+          <h4 style="margin-top: 0; color: #5c1e16;">Niveau (triche)</h4>
+          <p style="font-size: 14px; margin-bottom: 15px; color: #4a2e1b;">Monte ou descend d'un niveau : l'expérience du héros est posée au seuil du niveau choisi.</p>
+          <div class="dev-niveau">
+              <button id="btn-dev-niveau-moins" class="btn-parametres btn-fleche-niveau" title="Baisser d'un niveau" onclick="jouerSonClic(); window.changerNiveauDev(-1)">▼</button>
+              <span id="dev-niveau-actuel" class="dev-niveau-actuel">Niveau 1</span>
+              <button id="btn-dev-niveau-plus" class="btn-parametres btn-fleche-niveau" title="Monter d'un niveau" onclick="jouerSonClic(); window.changerNiveauDev(1)">▲</button>
+          </div>
+      </div>
+
       <button id="btn-supprimer-perso" class="btn-parametres btn-supprimer" style="padding: 15px 30px; font-size: 18px;" onclick="jouerSonClic(); ouvrirConfirmationSuppressionPerso()">Détruire le Héros</button>
     </div>
   </div>  <div id="fenetre-chatbox">
@@ -1878,6 +1901,7 @@
             onclick="window.fermerButinLocalement()">✕</button>
     <h2 id="butin-titre">Butin de guerre</h2>
     <div id="butin-sous-titre" class="butin-soustitre"></div>
+    <div id="butin-xp" class="butin-xp" style="display: none;"></div>
 
     <!-- Rappel de l'équipement actuel du/des héros de ce joueur, pour comparer -->
     <div id="butin-equipement-actuel" class="butin-equipement-actuel"></div>
@@ -1954,7 +1978,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=58"></script>
+<script src="trace_combat.js?v=59"></script>
 <!-- LA MISE À JOUR AUTOMATIQUE. Juste après la trace, parce qu'elle a besoin du
      numéro de version qu'elle y trouve, et avant tout le reste : si la page est
      périmée, autant s'en apercevoir avant d'avoir chargé le jeu entier.
@@ -1984,13 +2008,14 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=30"></script>
 <script type="module" src="ia_master.js?v=7"></script>
-<script type="module" src="app.js?v=67"></script>
+<script type="module" src="app.js?v=68"></script>
 <script src="jet_d20.js?v=2"></script>
 <script src="fabrique_sons.js?v=3"></script>
-<script type="module" src="creation_personnage.js?v=12"></script>
+<script src="experience.js?v=1"></script>
+<script type="module" src="creation_personnage.js?v=13"></script>
 <script type="module" src="classes.js?v=2"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
-<script type="module" src="competences.js?v=35"></script>
+<script type="module" src="competences.js?v=36"></script>
 <!-- Le plateau porte désormais son ?v= comme les autres : sans lui, un iPad
      gardait l'ancien dessin en cache après une livraison (l'œil d'or en dépend). -->
 <script src="Plateau.js?v=3"></script>
@@ -2006,7 +2031,7 @@
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=11"></script>
 <script type="module" src="objets_ia.js?v=11"></script>
-<script type="module" src="loot.js?v=18"></script>
+<script type="module" src="loot.js?v=19"></script>
 
 <!-- ============================================================= -->
 <!--  GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)  -->

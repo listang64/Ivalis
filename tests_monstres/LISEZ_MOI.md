@@ -151,6 +151,7 @@ node marche_anticipee.mjs    # le pion part dès la validation sur l'écran de c
 node fiche_race_classe.mjs   # race et classe dans l'onglet Statistiques ; portraits au soleil, sans reflet violacé
 node jet_d20.mjs            # la scène du d20 : fondu, avatar, défilement qui ralentit, modificateur égrené, lueurs, rouge/violet ; chez tous les joueurs ; sons ; pas de monstres dans les bulles du chat
 node fabrique_sons.mjs      # Paramètres → La Fabrique : dix « ding » rendus et comparés ; le ding perle remplace le parchemin dans tout le jeu
+node experience.mjs          # l'expérience : grille des niveaux, jauge de la fiche, flèches de triche (DEV), compétences à créer par niveau (la main ne bouge pas), XP de la victoire à chaque héros
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -3554,3 +3555,55 @@ contexte audio se réveille au premier geste pour qu'un survol sonne ensuite.
 jouerSonClic et jouerSonSurvolParchemin jouent le ding perle (plein et
 mi-volume), qu'un vrai bouton de la page et un vrai bouton du menu latéral
 survolé le déclenchent, et qu'un volume nul le fait taire.
+
+### L'expérience et les niveaux
+
+Nico a donné la grille : niveau 2 à 700 XP, 3 à 1 200, 4 à 1 800, 5 à 2 500,
+6 à 3 300, 7 à 4 200, 8 à 5 200, 9 à 6 400, 10 à 7 900, puis 1 500 de plus par
+niveau. Les niveaux pairs (et tous ceux après le 10) donnent « +1 compétence »,
+les 3, 5 et 7 un talent mineur, le 9 un talent majeur — les talents viendront
+plus tard, la grille les annonce déjà dans la jauge.
+
+Tout tient dans `experience.js` (script classique, chargé avant les modules) :
+`xpPourNiveau`, `niveauDepuisXP`, `competencesDeNiveau`, `progressionXP`,
+`xpDeLaCreature`, `afficherJaugeXP`. Le héros ne garde qu'un chiffre, son XP
+TOTALE (champ `XP` de sa fiche Personnages) ; le niveau s'en déduit toujours,
+jamais écrit à part : deux chiffres qui pourraient se contredire, c'est un de
+trop.
+
+**La jauge.** Sous l'en-tête de la fiche perso, au-dessus des onglets : le
+niveau en grand, la jauge dorée (reflet qui passe) avec « 1 450 / 1 800 XP »,
+et dessous ce qui attend au niveau suivant (« Niveau 4 dans 350 XP : +1
+compétence »). Elle se remplit sur la tranche du niveau en cours, pas depuis
+zéro. Elle se met à jour d'elle-même quand la fiche change en base (victoire,
+triche).
+
+**La triche (onglet DEV).** Deux flèches ▲ ▼ autour de « Niveau N » : elles
+posent l'XP exacte du niveau voisin (jamais sous le niveau 1) et recomptent
+les compétences à créer.
+
+**Une compétence gagnée, c'est une compétence de plus à créer.** La Forge
+permettait autant de créations que la limite en main (6, 7 pour un gobelin) ;
+elle en permet désormais `CREATIONS_MAX_PERSO` = la main + les compétences de
+niveau (« dont 2 gagnées au niveau 4 »). La limite en main, elle
+(`CARTES_MAX_PERSO`, le « en combat »), ne bouge pas : on choisit ses cartes
+parmi plus de techniques, on n'en tient pas plus.
+
+**L'XP de la victoire.** La seconde image de Nico : chaque créature tombée
+rapporte à CHAQUE membre de l'équipe son « XP pour le groupe » — Petit 40,
+Normal 100, Élite 240, Boss 800, tous types confondus. Le bestiaire porte déjà
+ce chiffre (`XP_Groupe`) ; à défaut, la grille selon le palier. Les leurres
+(illusions) ne rapportent rien. Le total se calcule dans `demarrerButin` et
+voyage DANS la transaction du butin (`Butin.xp`) : seul le poste qui l'écrit
+distribue (`increment` sur le champ XP de chaque participant), le poste qui
+perd la course n'ajoute rien — pas de double XP. Les participants sont ceux du
+butin : les héros de l'équipe, y compris ceux tombés au combat. La fenêtre du
+butin l'annonce : « ✨ +380 XP pour chaque héros ».
+
+`experience.mjs` vérifie la grille (seuils, niveaux 11 et 12, compétences
+gagnées), la jauge (niveau, 41,67 % pour 1 450 XP, texte, prochain gain, place
+entre l'en-tête et les onglets, capture), les flèches (▲ 1 800, ▼ jusqu'à 0,
+jamais sous le niveau 1, écriture sur la bonne fiche), la Forge (niveau 1 : 0
+à créer ; niveau 4 : 2 ; niveau 11 : 6 ; la main reste à 6) et la victoire
+(40 + 240 + 100 = 380, leurre exclu, chaque héros y compris le tombé, le poste
+perdant n'écrit rien, la ligne du butin).

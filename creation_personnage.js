@@ -450,6 +450,14 @@ window.afficherStatsCombat = function(donnees) {
     const elClasse = document.getElementById("stat-classe");
     if (elClasse) elClasse.innerText = classe || "—";
 
+    // Le niveau et la jauge d'expérience, en tête de fiche (experience.js),
+    // et le niveau affiché entre les flèches de triche de l'onglet DEV.
+    if (typeof window.afficherJaugeXP === "function") window.afficherJaugeXP(donnees);
+    const elNiveauDev = document.getElementById("dev-niveau-actuel");
+    if (elNiveauDev && typeof window.niveauDepuisXP === "function") {
+        elNiveauDev.innerText = "Niveau " + window.niveauDepuisXP(window.xpDuPerso(donnees));
+    }
+
     const modPv = donnees.Dev_Mod_PV || 0;
     const modFatigue = donnees.Dev_Mod_Fatigue || 0;
     const modRegen = donnees.Dev_Mod_Regen || 0;
@@ -547,6 +555,56 @@ window.appliquerModificateursDev = async function() {
         alert("Échec de l'altération des stats.");
         btn.innerText = txtOriginal;
         btn.style.pointerEvents = "auto";
+    }
+};
+
+// MONTER OU DESCENDRE D'UN NIVEAU, EN TRICHE (onglet DEV, demande de Nico).
+//
+// Le niveau n'est jamais écrit : il se déduit de l'XP (experience.js). Changer
+// de niveau, c'est donc poser l'XP du héros au SEUIL du niveau visé — jamais
+// sous le niveau 1. La jauge, le compteur de l'onglet DEV et les compétences
+// à créer suivent aussitôt, sans attendre le retour de la base.
+window.changerNiveauDev = async function(delta) {
+    const idPersonnage = document.getElementById("champ-id-personnage").value;
+    if (!idPersonnage) {
+        alert("Ouvrez d'abord la fiche d'un héros existant.");
+        return;
+    }
+    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage)
+        || (window.PERSOS_JOUEURS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+    let xpActuelle = perso ? window.xpDuPerso(perso) : 0;
+    if (!perso) {
+        try {
+            const snap = await getDoc(doc(db, "Personnages", idPersonnage));
+            if (snap.exists()) xpActuelle = window.xpDuPerso(snap.data());
+        } catch (e) { console.error("Lecture de l'XP :", e); }
+    }
+    const niveauActuel = window.niveauDepuisXP(xpActuelle);
+    const niveauVise = Math.max(1, niveauActuel + (delta > 0 ? 1 : -1));
+    if (niveauVise === niveauActuel) return;
+    const xpVisee = window.xpPourNiveau(niveauVise);
+
+    const boutons = ["btn-dev-niveau-moins", "btn-dev-niveau-plus"].map(id => document.getElementById(id)).filter(Boolean);
+    boutons.forEach(b => { b.style.pointerEvents = "none"; });
+    try {
+        await updateDoc(doc(db, "Personnages", idPersonnage), { XP: xpVisee });
+        // Tout de suite à l'écran, sans attendre l'écouteur.
+        [window.PERSOS_PARTIE, window.PERSOS_JOUEURS_PARTIE].forEach(liste => {
+            const p = (liste || []).find(x => x.idPersonnage === idPersonnage);
+            if (p) { p.xp = xpVisee; p.XP = xpVisee; }
+        });
+        const fiche = perso || { idPersonnage };
+        window.afficherJaugeXP({ ...fiche, xp: xpVisee });
+        const elNiveauDev = document.getElementById("dev-niveau-actuel");
+        if (elNiveauDev) elNiveauDev.innerText = "Niveau " + niveauVise;
+        if (typeof window.chargerOngletCompetences === "function" && typeof window.competencesMaxCombattant === "function") {
+            window.chargerOngletCompetences(idPersonnage, window.competencesMaxCombattant(fiche));
+        }
+    } catch (e) {
+        console.error("Changement de niveau :", e);
+        alert("Échec du changement de niveau.");
+    } finally {
+        boutons.forEach(b => { b.style.pointerEvents = "auto"; });
     }
 };
 

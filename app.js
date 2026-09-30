@@ -184,6 +184,8 @@ function persoDocVersFront(id, d) {
     Dev_Mod_DefPhys: d.Dev_Mod_DefPhys || 0,
     Dev_Mod_DefMag: d.Dev_Mod_DefMag || 0,
     Competences_Max: d.Competences_Max !== undefined ? d.Competences_Max : 6,
+    // L'expérience TOTALE du héros (experience.js en déduit son niveau).
+    xp: Math.max(0, parseInt(d.XP) || 0),
     Etats_Alteres: etatsAlteres,
     Bouclier_Max: d.Bouclier_Max || 0,
     Bouclier_Actuel: d.Bouclier_Actuel || 0,
@@ -2862,6 +2864,11 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
     }
 
     window.PERSOS_JOUEURS_PARTIE = persos;
+    // La fiche ouverte suit son héros : une victoire ou une triche de niveau
+    // fait bouger sa jauge d'XP sans qu'on la rouvre.
+    if (typeof window.rafraichirJaugeXPOuverte === "function") {
+      setTimeout(() => window.rafraichirJaugeXPOuverte(), 0);
+    }
     // Les caractéristiques suivent les héros : c'est d'elles que dépend le droit
     // de porter un objet, et ce droit doit être le même sur tous les écrans.
     chargerCaracsPartie(persos.map(p => p.idPersonnage));
