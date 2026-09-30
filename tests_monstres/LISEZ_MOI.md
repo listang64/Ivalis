@@ -150,6 +150,7 @@ node soin_et_poussee.mjs     # soin + poussée : le ciblage envoie les deux, le 
 node marche_anticipee.mjs    # le pion part dès la validation sur l'écran de celui qui joue ; le journal confirme ou corrige
 node fiche_race_classe.mjs   # race et classe dans l'onglet Statistiques ; portraits au soleil, sans reflet violacé
 node jet_d20.mjs            # la scène du d20 : fondu, avatar, défilement qui ralentit, modificateur égrené, lueurs, rouge/violet ; chez tous les joueurs ; sons ; pas de monstres dans les bulles du chat
+node fabrique_sons.mjs      # Paramètres → La Fabrique : dix boutons, dix sons d'interface rendus et comparés
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -3479,3 +3480,35 @@ et 30 → 65), et lit le texte de l'écran de création ; `cerveau_combat.mjs`
 vérifie qu'un ancien `bonusReposLong` resté dans un état publié n'ajoute plus
 rien ; `drapeau_regime.mjs` qu'aucun atout de race ne rejoint plus le repos
 long. Les trois échouent sur l'ancien code.
+
+### La Fabrique : dix sons d'interface dans les Paramètres
+
+Nico : « dans les paramètres, crée-moi un bouton qu'on va appeler la Fabrique.
+Dedans, dix boutons qui jouent un son quand on appuie — dix sons différents,
+qui iraient bien pour les boutons de menu du jeu, les validations, etc. »
+
+- **Le bouton** « La Fabrique » rejoint le menu des Paramètres (après Outils) ;
+  il ouvre l'étape `etape-fabrique`, avec un bouton Retour vers le menu.
+- **Les dix sons** (`fabrique_sons.js`, `SONS_FABRIQUE`), fabriqués sur place
+  en Web Audio — aucun fichier à héberger : 1. Clic de menu (un petit coup de
+  bois), 2. Effleurement (le survol), 3. Validation (deux notes qui montent),
+  4. Grande validation (un arpège doré), 5. Retour (deux notes qui
+  redescendent), 6. Refus (deux bourdonnements graves), 7. Ouverture de
+  fenêtre (un souffle qui monte), 8. Fermeture (le même, qui redescend),
+  9. Page de parchemin (le papier qu'on tourne), 10. Pièce d'or (deux
+  tintements métalliques). Chaque bouton dit à quoi le son pourrait servir et
+  s'illumine quand il joue. Le volume suit « Interface » × « Général » ; à
+  zéro, l'écran le dit au lieu de rester muet sans explication.
+- **Chaque son est une fonction (ctx, sortie)** : le même code joue en vrai et
+  se rend hors ligne. Les boutons sont construits à partir de la liste ; en
+  ajouter un, c'est ajouter une entrée. `jouerSonFabrique(n)` (1 à 10, ou
+  l'identifiant) permettra de les poser ensuite sur les vrais boutons du jeu.
+
+`fabrique_sons.mjs` ouvre la Fabrique dans la vraie page (depuis le menu des
+Paramètres, dans l'écran de jeu), vérifie qu'elle se voit vraiment, clique les
+dix boutons, puis REND chaque son hors ligne (OfflineAudioContext) : aucun
+n'est muet, aucun ne sature, tous durent moins d'une seconde, aucun ne
+ressemble à un autre (durée, hauteur mesurée sur les tranches audibles, force,
+direction), la validation et l'ouverture montent, le retour et la fermeture
+descendent, le refus est grave et la pièce d'or aiguë. Il vérifie aussi le
+volume à zéro et le retour au menu.

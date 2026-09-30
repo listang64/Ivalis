@@ -1,0 +1,244 @@
+// LA FABRIQUE : DIX SONS D'INTERFACE, DANS LES PARAMÈTRES.
+//
+// Nico : « dans les paramètres, crée-moi un bouton qu'on va appeler la
+// Fabrique. Dedans, dix boutons qui jouent un son quand on appuie — dix sons
+// différents, qui iraient bien pour les boutons de menu du jeu, les
+// validations, etc. »
+//
+// Les sons sont fabriqués sur place (Web Audio, fabrique_sons.js). Ce banc
+// ouvre la Fabrique dans la vraie page, clique les dix boutons, et REND chaque
+// son hors ligne (OfflineAudioContext) pour vérifier qu'il sonne, qu'il ne
+// sature pas, qu'il est bref, et qu'aucun ne ressemble à un autre.
+import fs from 'fs';
+import http from 'http';
+import path from 'path';
+
+const RACINE = '/home/user/Ivalis';
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
+                '.css': 'text/css; charset=utf-8', '.json': 'application/json' };
+const serveur = http.createServer((req, res) => {
+  const chemin = path.join(RACINE, decodeURIComponent(req.url.split('?')[0]));
+  if (!chemin.startsWith(RACINE) || !fs.existsSync(chemin) || fs.statSync(chemin).isDirectory()) {
+    res.writeHead(404); res.end('non trouvé'); return;
+  }
+  res.writeHead(200, { 'Content-Type': TYPES[path.extname(chemin)] || 'text/plain' });
+  res.end(fs.readFileSync(chemin));
+});
+await new Promise(r => serveur.listen(0, '127.0.0.1', r));
+const base = `http://127.0.0.1:${serveur.address().port}`;
+
+let echecs = 0;
+const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(64)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
+
+const FAUX_APP = `export const initializeApp = () => ({});`;
+const FAUX_FIRESTORE = `
+  // firebase-config.js fabrique la base avec des options (le transport sondé
+  // plutôt que subi, pour l'iPad) : le bouchon doit donc offrir cette porte-là,
+  // sinon le module ne se charge pas et rien du jeu ne s'initialise.
+  export const initializeFirestore = () => ({});
+  export const getFirestore = () => ({});
+  export const doc = (_db, col, id) => ({ chemin: col + "/" + id, col, id });
+  export const collection = (_db, col) => ({ col });
+  export const getDoc = async () => ({ exists: () => false, data: () => ({}) });
+  export const getDocs = async () => ({ forEach: () => {}, docs: [], empty: true });
+  export const setDoc = async (ref, data, options) => { (window.__ecrits = window.__ecrits || []).push({ chemin: ref.chemin, data, options }); }; export const updateDoc = async () => {};
+  export const deleteDoc = async () => {}; export const addDoc = async () => ({ id: "n" });
+  export const deleteField = () => "x"; export class FieldPath { constructor(...s){this.s=s;} }
+  export const arrayUnion = (...v) => v; export const arrayRemove = (...v) => v;
+  export const increment = (n) => n; export const serverTimestamp = () => Date.now();
+  export const onSnapshot = () => () => {}; export const query = (...a) => ({a});
+  export const where = (...a) => ({a}); export const orderBy = (...a) => ({a});
+  export const limit = (...a) => ({a});
+  export const writeBatch = () => ({ update(){}, set(){}, delete(){}, commit: async()=>{} });
+  export const runTransaction = async (_d, fn) => fn({ get: async()=>({exists:()=>true,data:()=>({})}), update(){}, set(){} });
+  export const Timestamp = { now: () => Date.now() };
+`;
+
+const { chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs');
+const b = await chromium.launch();
+const p = await b.newPage({ viewport: { width: 1194, height: 834 } });
+await p.route('**res.cloudinary.com**', r => r.fulfill({ contentType: 'image/svg+xml', headers: {'Access-Control-Allow-Origin':'*'}, body: '<svg xmlns="http://www.w3.org/2000/svg" width="700" height="1200"><rect width="700" height="1200" fill="#553311"/></svg>' }));
+await p.route('**', r => r.request().url().startsWith(base) ? r.continue() : r.abort());
+await p.route('**/firebase-app.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_APP }));
+await p.route('**/firebase-firestore.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_FIRESTORE }));
+
+// Les images du décor sont injoignables depuis le bac à sable. On sert un
+// rectangle connu à la place : l'avatar doit avoir une taille pour qu'on puisse
+// dire s'il dépasse du bouton, et le bandeau une hauteur pour que la boîte de
+// l'anneau se pose quelque part.
+await p.route('**res.cloudinary.com**', r => r.fulfill({ contentType: 'image/svg+xml',
+  headers: {'Access-Control-Allow-Origin':'*'},
+  body: `<svg xmlns="http://www.w3.org/2000/svg" width="450" height="132" viewBox="0 0 450 132"><rect width="450" height="132" fill="#2a1d12"/></svg>` }));
+
+const erreurs = [];
+p.on('pageerror', e => erreurs.push(e.message));
+
+await p.goto(base + '/index.html');
+await p.waitForTimeout(2000);
+
+
+console.log("\n1. LE BOUTON DANS LES PARAMÈTRES, ET SON ÉCRAN");
+{
+  const r = await p.evaluate(async () => {
+    const menu = document.getElementById("etape-menu-parametres");
+    // Les Paramètres vivent dans l'écran de jeu : on y entre, comme à la table.
+    document.querySelectorAll('body > div[id^="ecran-"]').forEach(e => {
+      e.style.display = e.id === "ecran-jeu" ? "block" : "none";
+    });
+    // Comme ouvrirParametres : le conteneur s'affiche, puis prend la classe
+    // « ouvert » qui le fait apparaître.
+    const conteneur = document.getElementById("conteneur-parametres");
+    conteneur.style.display = "block";
+    conteneur.classList.add("ouvert");
+    document.getElementById("etape-mdp-parametres").style.display = "none";
+    menu.style.display = "block"; menu.style.opacity = "1";
+    const bouton = document.getElementById("btn-ouvrir-fabrique");
+    const texte = bouton ? bouton.textContent.trim() : null;
+    const dansLeMenu = !!bouton && menu.contains(bouton);
+    bouton.click();
+    await new Promise(r => setTimeout(r, 1100));
+    const f = document.getElementById("etape-fabrique");
+    const boutons = [...f.querySelectorAll(".btn-fabrique")];
+    const rect = f.getBoundingClientRect();
+    const auCentre = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    return { texte, dansLeMenu, opaciteConteneur: getComputedStyle(conteneur).opacity,
+             vraimentVue: rect.width > 200 && rect.height > 300 && !!auCentre && f.contains(auCentre),
+             taille: [Math.round(rect.width), Math.round(rect.height)], visible: getComputedStyle(f).display !== "none" && getComputedStyle(f).opacity === "1",
+             menuCache: getComputedStyle(menu).display === "none",
+             titre: f.querySelector("h2").textContent.trim(),
+             noms: boutons.map(b => b.querySelector(".fabrique-nom").textContent.trim()),
+             usages: boutons.map(b => b.querySelector(".fabrique-usage").textContent.trim()) };
+  });
+  await p.screenshot({ path: "/tmp/claude-0/fabrique.png" });
+  verifier("un bouton « La Fabrique » dans le menu des Paramètres", r.dansLeMenu && r.texte === "La Fabrique", r.texte);
+  verifier("il ouvre l'écran de la Fabrique", r.visible && r.menuCache && r.titre === "La Fabrique"
+           && r.opaciteConteneur === "1", `opacité ${r.opaciteConteneur}`);
+  verifier("et elle se voit vraiment, au-dessus de l'écran de jeu", r.vraimentVue, JSON.stringify(r.taille));
+  verifier("dix boutons", r.noms.length === 10, String(r.noms.length));
+  verifier("dix noms différents", new Set(r.noms).size === 10, r.noms.join(", "));
+  verifier("chacun dit à quoi il sert", r.usages.every(u => u.length > 10));
+}
+
+console.log("\n2. CHAQUE BOUTON JOUE SON SON");
+{
+  const r = await p.evaluate(async () => {
+    const appels = [];
+    const vrai = window.jouerSonFabrique;
+    window.jouerSonFabrique = (quel) => { appels.push(quel); return vrai(quel); };
+    const retours = [];
+    const boutons = [...document.querySelectorAll("#grille-fabrique .btn-fabrique")];
+    for (const b of boutons) {
+      b.click();
+      retours.push(b.classList.contains("fabrique-joue"));
+      await new Promise(r => setTimeout(r, 30));
+    }
+    window.jouerSonFabrique = vrai;
+    // Le vrai joueur, dans un vrai contexte audio : il rend true s'il a joué.
+    const joue = window.jouerSonFabrique(3);
+    return { appels, retours, joue };
+  });
+  verifier("les dix boutons jouent chacun le leur, dans l'ordre", JSON.stringify(r.appels) === "[1,2,3,4,5,6,7,8,9,10]",
+           JSON.stringify(r.appels));
+  verifier("le bouton s'illumine quand il joue", r.retours.every(Boolean));
+  verifier("le son part pour de vrai (contexte audio du navigateur)", r.joue === true);
+}
+
+console.log("\n3. LES DIX SONS, RENDUS HORS LIGNE");
+{
+  const sons = await p.evaluate(async () => {
+    const taux = 44100;
+    const mesures = [];
+    for (const son of window.SONS_FABRIQUE) {
+      const ctx = new OfflineAudioContext(1, Math.floor(taux * 1.3), taux);
+      const sortie = ctx.createGain();
+      sortie.gain.value = 1;
+      sortie.connect(ctx.destination);
+      son.fabriquer(ctx, sortie);
+      const rendu = await ctx.startRendering();
+      const d = rendu.getChannelData(0);
+      let crete = 0, somme = 0, dernier = 0;
+      for (let i = 0; i < d.length; i++) {
+        const a = Math.abs(d[i]);
+        if (a > crete) crete = a;
+        somme += d[i] * d[i];
+        if (a > 0.003) dernier = i;
+      }
+      const duree = dernier / taux;
+      // La hauteur, grossièrement : passages par zéro par seconde, comptés
+      // SEULEMENT dans les tranches de 10 ms où le son est vraiment audible —
+      // sans quoi les silences entre deux notes et les queues presque muettes
+      // faussent tout.
+      const zcr = (de, a) => {
+        const tranche = Math.floor(taux / 100);
+        let n = 0, actif = 0;
+        for (let t0 = de; t0 + tranche <= a; t0 += tranche) {
+          let e = 0; for (let i = t0; i < t0 + tranche; i++) e += d[i] * d[i];
+          if (Math.sqrt(e / tranche) < 0.01) continue;
+          actif += tranche;
+          for (let i = t0 + 1; i < t0 + tranche; i++) if ((d[i - 1] < 0) !== (d[i] < 0)) n++;
+        }
+        return actif ? n / (actif / taux) : 0;
+      };
+      const milieu = Math.floor(dernier / 2);
+      mesures.push({ id: son.id, crete, rms: Math.sqrt(somme / Math.max(1, dernier)), duree,
+                     zcr1: zcr(0, milieu), zcr2: zcr(milieu, dernier), zcr: zcr(0, dernier) });
+    }
+    return mesures;
+  });
+  sons.forEach(m => console.log(`     ${m.id.padEnd(18)} crête ${m.crete.toFixed(2)}  durée ${m.duree.toFixed(2)} s  hauteur ~${Math.round(m.zcr / 2)} Hz`));
+  verifier("aucun n'est muet", sons.every(m => m.crete > 0.02), sons.filter(m => m.crete <= 0.02).map(m => m.id).join());
+  verifier("aucun ne sature", sons.every(m => m.crete < 1), sons.filter(m => m.crete >= 1).map(m => m.id).join());
+  verifier("tous brefs, comme il sied à un bouton (moins d'une seconde)", sons.every(m => m.duree < 1.0),
+           sons.map(m => m.duree.toFixed(2)).join(" "));
+  // Deux sons « se ressemblent » si leur durée, leur hauteur, leur force ET
+  // leur direction (qui monte, qui descend) sont toutes proches à 12 % près.
+  // Les souffles sont tirés au hasard : la direction est ce qui distingue le
+  // plus sûrement deux sons de même longueur.
+  const proche = (a, b) => Math.abs(a - b) / Math.max(a, b, 1e-9) < 0.12;
+  const pente = (m) => m.zcr2 / Math.max(1, m.zcr1);
+  const jumeaux = [];
+  for (let i = 0; i < sons.length; i++) for (let j = i + 1; j < sons.length; j++) {
+    const a = sons[i], b = sons[j];
+    if (proche(a.duree, b.duree) && proche(a.zcr, b.zcr) && proche(a.rms, b.rms) && proche(pente(a), pente(b))) {
+      jumeaux.push(a.id + "/" + b.id);
+    }
+  }
+  verifier("dix sons vraiment différents", jumeaux.length === 0, jumeaux.join(", "));
+  const s = Object.fromEntries(sons.map(m => [m.id, m]));
+  verifier("la validation monte", s.validation.zcr2 > s.validation.zcr1 * 1.2, `${Math.round(s.validation.zcr1)} → ${Math.round(s.validation.zcr2)}`);
+  verifier("le retour redescend", s.retour.zcr2 < s.retour.zcr1 * 0.9, `${Math.round(s.retour.zcr1)} → ${Math.round(s.retour.zcr2)}`);
+  verifier("la fenêtre qui s'ouvre monte", s.ouverture.zcr2 > s.ouverture.zcr1 * 1.2,
+           `${Math.round(s.ouverture.zcr1)} → ${Math.round(s.ouverture.zcr2)}`);
+  verifier("celle qui se ferme redescend", s.fermeture.zcr2 < s.fermeture.zcr1 * 0.85,
+           `${Math.round(s.fermeture.zcr1)} → ${Math.round(s.fermeture.zcr2)}`);
+  verifier("le refus est grave, la pièce d'or aiguë", s.refus.zcr < 1000 && s["piece"].zcr > 3000,
+           `${Math.round(s.refus.zcr / 2)} Hz / ${Math.round(s["piece"].zcr / 2)} Hz`);
+}
+
+console.log("\n4. LE VOLUME DU JEU FAIT LOI, ET LE RETOUR RAMÈNE AU MENU");
+{
+  const r = await p.evaluate(async () => {
+    const avant = { ...window.PARAMETRES_AUDIO };
+    window.PARAMETRES_AUDIO.interface = 0;
+    window.rendreFabrique();
+    const muet = getComputedStyle(document.getElementById("fabrique-muet")).display !== "none";
+    const joue = window.jouerSonFabrique(1);
+    Object.assign(window.PARAMETRES_AUDIO, avant);
+    window.rendreFabrique();
+    const muetApres = getComputedStyle(document.getElementById("fabrique-muet")).display !== "none";
+    const retour = [...document.querySelectorAll("#etape-fabrique > button")].find(b => b.textContent.trim() === "Retour");
+    retour.click();
+    await new Promise(r => setTimeout(r, 1100));
+    return { muet, joue, muetApres,
+             menu: getComputedStyle(document.getElementById("etape-menu-parametres")).display !== "none",
+             fabrique: getComputedStyle(document.getElementById("etape-fabrique")).display !== "none" };
+  });
+  verifier("volume de l'interface à zéro : on le dit, et rien ne joue", r.muet && r.joue === false);
+  verifier("volume rendu : l'avertissement disparaît", !r.muetApres);
+  verifier("« Retour » ramène au menu des Paramètres", r.menu && !r.fabrique);
+}
+
+verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
+await b.close(); serveur.close();
+console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
+process.exit(echecs === 0 ? 0 : 1);
