@@ -647,7 +647,7 @@ window.ioCombatFirestore = {
     async lister(chemin, requete) {
         try {
             const snap = await getDocs(query(collection(db, ...chemin), ...contraintesDe(requete)));
-            return snap.docs.map(d => ({ ...d.data(), __chemin: d.ref.path.split("/") }));
+            return snap.docs.map(documentDuDepot);
         } catch (e) { signalerSiQuota(e); throw e; }
     },
 
@@ -717,10 +717,22 @@ window.ioCombatFirestore = {
 
     ecouterCollection(chemin, requete, rappel) {
         return onSnapshot(query(collection(db, ...chemin), ...contraintesDe(requete, { sansLimite: true })),
-            (snap) => rappel(snap.docs.map(d => ({ ...d.data(), __chemin: d.ref.path.split("/") }))),
+            (snap) => rappel(snap.docs.map(documentDuDepot)),
             (e) => { signalerSiQuota(e); console.error("Écoute du combat :", e); });
     }
 };
+
+// Un document tel que le dépôt le reçoit : ses champs, son chemin, et s'il
+// n'existe encore QUE dans le cache de ce poste. Firestore montre tout de suite
+// ce qu'on vient d'écrire (compensation de latence), avant que la base ne l'ait
+// reçu : une intention envoyée par le poste qui tient le cerveau lui apparaît
+// donc avant d'exister en base. La traiter à ce moment-là faisait échouer la
+// publication entière (« No document to update » sur l'intention à fermer) —
+// voir enAttente, depot_firestore.js.
+function documentDuDepot(d) {
+    return { ...d.data(), __chemin: d.ref.path.split("/"),
+             ...(d.metadata && d.metadata.hasPendingWrites ? { __pasEncoreEnBase: true } : {}) };
+}
 
 // La traduction d'une requête du dépôt en contraintes Firestore, en un seul
 // endroit pour la lecture et pour l'écoute — elles divergeaient déjà d'une

@@ -103,8 +103,16 @@ export const requeteIntentions = () => ({ egal: { champ: "traitee", valeur: fals
 // d'arrivée. La requête ne rend déjà que celles-là ; le filtre reste ici par
 // prudence (un banc, un Firestore qui ignorerait l'égalité), et le tri ne peut
 // vivre qu'ici — le demander à la requête réclamerait un index composite.
+//
+// UNE INTENTION PAS ENCORE EN BASE N'EST PAS ENCORE EN ATTENTE. Le poste qui
+// l'envoie la voit dans son cache avant que Firestore l'ait reçue
+// (`__pasEncoreEnBase`, app.js). Si ce poste tient aussi le cerveau, il la
+// traitait tout de suite, et la publication — qui la marque « traitée » dans le
+// même lot que l'état — échouait en entier : « No document to update ». Le
+// combat repartait à la tentative suivante, mais après un raté et un message
+// d'erreur. On l'attend : dès que la base l'a, `demander` relance le cerveau.
 export const enAttente = (liste) => (liste || [])
-    .filter(i => i && !i.traitee)
+    .filter(i => i && !i.traitee && !i.__pasEncoreEnBase)
     .sort((a, b) => nombre(a.ts) - nombre(b.ts));
 
 // =========================================================================

@@ -3744,3 +3744,28 @@ la carte garde la valeur de base : la ligne de surpuissance dit le reste.
 `surpuissance.mjs` vérifie les paliers (69, 70, 99, 100), l'extraction (attaque,
 soin, arrondi, bouclier inchangé, créature exclue), la Forge (annonce, valeur
 réelle, capture) et la carte en grand.
+
+### « No document to update » : une intention traitée avant d'être en base
+
+Vu à la table (poste P_03, qui tenait aussi le cerveau) : un gros temps mort
+après le choix d'une carte, et dans la console `RPC 'Commit' … not-found` puis
+« le cerveau n'a pas pu publier — No document to update : …/Combat_Intentions/… ».
+
+Firestore montre tout de suite à un poste ce qu'il vient d'écrire, avant que
+la base ne l'ait reçu (compensation de latence). L'intention « carte » de P_03
+est donc apparue dans son propre cache, et le cerveau — sur ce même poste — l'a
+traitée aussitôt. Sa publication la marque « traitée » dans le MÊME lot que
+l'état : l'intention n'existant pas encore en base, tout le lot a été refusé.
+Le cerveau a réussi au passage suivant, une fois l'intention arrivée (environ
+5 s plus tard ce soir-là : c'est la lenteur du réseau qui a fait le temps mort,
+l'erreur n'en était qu'une conséquence).
+
+Désormais l'adaptateur Firestore (app.js, `documentDuDepot`) marque un document
+qui n'existe encore que dans le cache (`__pasEncoreEnBase`, d'après
+`metadata.hasPendingWrites`), et `enAttente` (depot_firestore.js) l'écarte : le
+cerveau attend que la base ait l'intention, puis `demander` le relance
+aussitôt. Plus de publication ratée ni de message d'erreur. Le délai du réseau,
+lui, reste le même.
+
+`depot_firestore.mjs` (dernière section) vérifie le filtre, la lecture du dépôt
+avant et après l'arrivée en base, et le drapeau posé par le vrai adaptateur.

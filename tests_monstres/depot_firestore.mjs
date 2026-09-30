@@ -591,6 +591,41 @@ async function banc() {
         verifier("un poste qui n'a pas la main ne bat pas", encore.battement === 777);
     }
 
+    // =====================================================================
+    console.log("\nUNE INTENTION PAS ENCORE EN BASE N'EST PAS TRAITÉE");
+    // =====================================================================
+    //  À la table : « No document to update … Combat_Intentions/P_03_… ». Le
+    //  poste qui tenait le cerveau voyait sa propre carte dans son cache avant
+    //  que Firestore l'ait reçue, la traitait, et la publication — qui la
+    //  ferme dans le même lot que l'état — échouait en entier.
+    {
+        const liste = [{ id: "A", traitee: false, ts: 2 },
+                       { id: "B", traitee: false, ts: 1, __pasEncoreEnBase: true }];
+        verifier("enAttente écarte celle qui n'existe que dans le cache",
+                 JSON.stringify(enAttente(liste).map(i => i.id)) === '["A"]');
+
+        const docs = [{ id: "B", traitee: false, ts: 1, __pasEncoreEnBase: true }];
+        const io = { async lister() { return JSON.parse(JSON.stringify(docs)); } };
+        const depot = creerDepot(io, PARTIE);
+        const avant = await depot.lireIntentions();
+        delete docs[0].__pasEncoreEnBase;
+        const apres = await depot.lireIntentions();
+        verifier("le cerveau ne la lit pas tant que la base ne l'a pas", avant.length === 0);
+        verifier("et la lit dès qu'elle y est", apres.length === 1 && apres[0].id === "B");
+
+        // Le vrai adaptateur (app.js) pose le drapeau d'après Firestore.
+        const fs = await import('fs');
+        const app = fs.readFileSync('/home/user/Ivalis/app.js', 'utf-8');
+        const d = app.indexOf('function documentDuDepot(d)'), f = app.indexOf('\n}\n', d) + 3;
+        const documentDuDepot = new Function(app.slice(d, f) + '\nreturn documentDuDepot;')();
+        const faux = (pending) => ({ data: () => ({ id: "X", traitee: false }), ref: { path: "a/b/c" },
+                                     metadata: { hasPendingWrites: pending } });
+        verifier("app.js : hasPendingWrites → __pasEncoreEnBase",
+                 documentDuDepot(faux(true)).__pasEncoreEnBase === true
+                 && documentDuDepot(faux(false)).__pasEncoreEnBase === undefined
+                 && documentDuDepot(faux(false)).__chemin.join("/") === "a/b/c");
+    }
+
     console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
     process.exit(echecs === 0 ? 0 : 1);
 }
