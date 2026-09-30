@@ -134,7 +134,14 @@ console.log("\n2. LA JAUGE DE LA FICHE, LE NIVEAU AU-DESSUS");
       avantOnglets: ordre.indexOf("bandeau-xp-perso") > ordre.indexOf("fiche-perso-header")
                     && ordre.indexOf("bandeau-xp-perso") < ordre.indexOf("conteneur-onglets"),
       niveauAuDessus: rN.bottom <= rJ.top + 1,
-      jaugeVisible: rJ.width > 200 && rJ.height >= 12
+      jaugeVisible: rJ.width > 200 && rJ.height >= 12,
+      // Le nom du héros, centré en haut de la fiche et plus gros ; le niveau aussi plus gros.
+      nomCentre: (() => { const t = document.getElementById("titre-nom-personnage").getBoundingClientRect();
+                          const f = fiche.getBoundingClientRect();
+                          return Math.abs((t.left + t.right) / 2 - (f.left + f.right) / 2); })(),
+      tailleNom: parseFloat(getComputedStyle(document.getElementById("titre-nom-personnage")).fontSize),
+      tailleNiveau: parseFloat(getComputedStyle(b.querySelector(".xp-niveau-chiffre")).fontSize),
+      tailleMot: parseFloat(getComputedStyle(b.querySelector(".xp-niveau-mot")).fontSize)
     };
   });
   await p.screenshot({ path: "/tmp/claude-0/xp_fiche.png" });
@@ -146,6 +153,10 @@ console.log("\n2. LA JAUGE DE LA FICHE, LE NIVEAU AU-DESSUS");
   verifier("sous l'en-tête, au-dessus des onglets (visible sur tous)", r.avantOnglets);
   verifier("une vraie jauge, bien visible", r.jaugeVisible);
   verifier("l'onglet DEV affiche le même niveau", r.dev === "Niveau 3", r.dev);
+  verifier("le nom du héros est centré en haut de la fiche", r.nomCentre <= 2, `${r.nomCentre.toFixed(1)} px du centre`);
+  verifier("et plus gros (24 px au lieu de 18)", r.tailleNom >= 24, `${r.tailleNom} px`);
+  verifier("« Niveau 3 » plus gros (32 px / 16 px)", r.tailleNiveau >= 32 && r.tailleMot >= 16,
+           `${r.tailleNiveau} / ${r.tailleMot}`);
 }
 
 console.log("\n3. LES FLÈCHES DE TRICHE DE L'ONGLET DEV");

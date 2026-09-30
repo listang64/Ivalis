@@ -435,7 +435,14 @@ console.log("\n7. LA FICHE DE CLASSE : LE DESCRIPTIF À GAUCHE");
       aGauche: rd.right <= window.innerWidth / 2 + 4 && rd.left >= 0,
       sousLeTitre: rd.top >= titre.bottom - 2, auDessusDuBouton: rd.bottom <= btn.top + 2,
       sousLeRetour: titre.top >= document.getElementById("btn-retour-classe").getBoundingClientRect().bottom - 2,
-      titreAGauche: titre.right <= window.innerWidth / 2 + 4 };
+      titreAGauche: titre.right <= window.innerWidth / 2 + 4,
+      // Chaque boîte centrée, son « Niv. N » au-dessus, au milieu du descriptif.
+      paliers: [...d.querySelectorAll(".palier-classe")].map(li => {
+        const boite = li.getBoundingClientRect(), niv = li.querySelector(".palier-classe-niveau").getBoundingClientRect();
+        const corps = li.querySelector(".palier-classe-corps").getBoundingClientRect();
+        return { ecart: Math.abs((niv.left + niv.right) / 2 - (boite.left + boite.right) / 2),
+                 auDessus: niv.bottom <= corps.top + 1, centre: getComputedStyle(li).textAlign === "center" };
+      }) };
     window.retourChoixClasse();
     window.ouvrirFicheClasse("CLASSE_ORACLE");
     const oracle = { visible: getComputedStyle(d).display !== "none",
@@ -454,6 +461,9 @@ console.log("\n7. LA FICHE DE CLASSE : LE DESCRIPTIF À GAUCHE");
            && /Gel/.test(r.necro.texte) && /\+5 PV/.test(r.necro.texte));
   verifier("à gauche, sous le titre, au-dessus du bouton",
            r.necro.aGauche && r.necro.sousLeTitre && r.necro.auDessusDuBouton && r.necro.titreAGauche && r.necro.sousLeRetour, JSON.stringify(r.necro).slice(-120));
+  verifier("chaque palier : « Niv. N » centré au-dessus de son descriptif, boîte centrée",
+           r.necro.paliers.length === 3 && r.necro.paliers.every(x => x.ecart <= 2 && x.auDessus && x.centre),
+           JSON.stringify(r.necro.paliers));
   verifier("les autres classes : rien pour le moment", !r.oracle.visible && !r.oracle.classe);
 
   // Sur un téléphone : pleine largeur, lisible, sans débordement horizontal.

@@ -3700,3 +3700,22 @@ retouches faites à la main : une seule écriture (Ténèbres), aucune suppressi
 la base d'après égale à celle d'avant plus Ténèbres au caractère près, un
 Ténèbres retouché jamais réécrit, un second passage qui n'écrit rien, une panne
 qui se dit sans rien casser.
+
+### Mise en page : le nom au centre, le niveau plus gros, les paliers centrés
+
+Nico : « dans la fiche personnage, le nom du personnage en haut au milieu de la
+fenêtre et un peu plus gros ; le niveau X un peu plus gros. Dans la création de
+personnage, classe : le Niv. 1, 5 et 10 centré au-dessus, au milieu du
+descriptif, et chaque boîte en mode centré. »
+
+- En-tête de la fiche : le nom est centré (24 px au lieu de 18), coupé par des
+  points de suspension s'il est trop long ; la croix sort du flux et reste
+  dans le coin droit, pour ne pas décentrer le nom.
+- Bandeau d'XP : « NIVEAU » passe à 16 px, le chiffre à 32 px.
+- Fiche de classe : chaque palier est une boîte centrée (bordure dorée fine,
+  liseré en haut), le badge « Niv. N » au-dessus, au milieu, puis le titre et
+  les lignes, centrés, sans puces.
+
+`experience.mjs` (section 2) mesure le nom (centré à 2 px près, 24 px) et le
+niveau (32 / 16 px) ; `necromancien.mjs` (section 7) mesure chaque badge au
+milieu de sa boîte, au-dessus du descriptif, et le texte centré.
