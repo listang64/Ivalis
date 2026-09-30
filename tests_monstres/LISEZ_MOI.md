@@ -150,7 +150,7 @@ node soin_et_poussee.mjs     # soin + poussée : le ciblage envoie les deux, le 
 node marche_anticipee.mjs    # le pion part dès la validation sur l'écran de celui qui joue ; le journal confirme ou corrige
 node fiche_race_classe.mjs   # race et classe dans l'onglet Statistiques ; portraits au soleil, sans reflet violacé
 node jet_d20.mjs            # la scène du d20 : fondu, avatar, défilement qui ralentit, modificateur égrené, lueurs, rouge/violet ; chez tous les joueurs ; sons ; pas de monstres dans les bulles du chat
-node fabrique_sons.mjs      # Paramètres → La Fabrique : dix boutons, dix « ding » de clic de menu rendus et comparés
+node fabrique_sons.mjs      # Paramètres → La Fabrique : dix « ding » rendus et comparés ; le ding perle remplace le parchemin dans tout le jeu
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -3534,3 +3534,23 @@ peine décalées qui miroitent).
 tous différents ; le ding double monte (≈ 1 050 → 1 560 Hz, mesuré après
 l'attaque), la perle est le plus aigu, le feutré le plus grave, la clochette
 tinte plus longtemps que la perle.
+
+### Le ding perle remplace le bruit de parchemin dans tout le jeu
+
+Nico : « je choisis le ding perle ; remplace tous les bruits de parchemin
+actuels dans le jeu par ce ding perle ». Le parchemin était un seul fichier,
+`clik_bouton_aniy88.mp3`, chargé par deux lecteurs (`son-clic` et
+`audio-survol-parchemin`, index.html) et joué par deux fonctions d'app.js :
+`jouerSonClic` (tous les boutons du jeu, plus de deux cents appels) et
+`jouerSonSurvolParchemin` (survol du menu latéral, ouverture et fermeture du
+chat, fermeture du combat). Les deux jouent désormais le ding perle de la
+Fabrique (`jouerSonFabrique`) ; le survol garde sa moitié de volume. Les deux
+lecteurs et le fichier ne sont plus chargés. Le son du jeu tient dans une seule
+ligne, `window.SON_CLIC_JEU = "ding-perle"` (fabrique_sons.js) : en changer,
+c'est la changer. `jouerSonFabrique` accepte un facteur de volume, et le
+contexte audio se réveille au premier geste pour qu'un survol sonne ensuite.
+
+`fabrique_sons.mjs` (section 5) vérifie que le fichier n'est plus chargé, que
+jouerSonClic et jouerSonSurvolParchemin jouent le ding perle (plein et
+mi-volume), qu'un vrai bouton de la page et un vrai bouton du menu latéral
+survolé le déclenchent, et qu'un volume nul le fait taire.

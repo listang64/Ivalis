@@ -3273,12 +3273,12 @@ function validerIdentification(idJoueur) {
   setTimeout(() => { ecranIdentification.style.display = "none"; }, 1500);
 }
 
+// LE CLIC DES BOUTONS : le ding perle de la Fabrique (fabrique_sons.js), à la
+// place de l'ancien bruit de parchemin. Le volume suit Interface × Général.
 function jouerSonClic() {
-  const son = document.getElementById("son-clic");
-  if (!son) return;
-  son.volume = window.PARAMETRES_AUDIO.interface * window.PARAMETRES_AUDIO.general;
-  son.currentTime = 0;
-  son.play().catch(() => {});
+  if (typeof window.jouerSonFabrique === "function") {
+    window.jouerSonFabrique(window.SON_CLIC_JEU || "ding-perle");
+  }
 }
 
 let fileAttenteMusique = [];
@@ -3664,13 +3664,11 @@ function lancerPartieChargee(idChoisi) {
 // =========================================================================
 //  ECRAN DE JEU : son, volume, pop-ups
 // =========================================================================
+// Le survol des menus (et l'ouverture/fermeture du chat et du combat) : le
+// même ding perle, à mi-volume comme l'était l'ancien bruit de parchemin.
 function jouerSonSurvolParchemin() {
-  const sonParchemin = document.getElementById("audio-survol-parchemin");
-  if (sonParchemin && sonParchemin.src.includes("http")) {
-    // On garde le multiplicateur 0.5 car ce son spécifique tape très fort
-    sonParchemin.volume = (window.PARAMETRES_AUDIO.interface * window.PARAMETRES_AUDIO.general) * 0.5;
-    sonParchemin.currentTime = 0;
-    sonParchemin.play().catch(() => {});
+  if (typeof window.jouerSonFabrique === "function") {
+    window.jouerSonFabrique(window.SON_CLIC_JEU || "ding-perle", 0.5);
   }
 }
 

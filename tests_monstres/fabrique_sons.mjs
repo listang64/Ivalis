@@ -245,6 +245,42 @@ console.log("\n4. LE VOLUME DU JEU FAIT LOI, ET LE RETOUR RAMÈNE AU MENU");
   verifier("« Retour » ramène au menu des Paramètres", r.menu && !r.fabrique);
 }
 
+console.log("\n5. LE DING PERLE REMPLACE LE BRUIT DE PARCHEMIN DANS TOUT LE JEU");
+{
+  // Nico : « je choisis le ding perle ; remplace tous les bruits de parchemin
+  // actuels dans le jeu par ce ding perle ». Le parchemin était un seul
+  // fichier (clik_bouton_aniy88.mp3), joué par jouerSonClic (tous les
+  // boutons) et jouerSonSurvolParchemin (survol des menus, chat, combat).
+  const html = fs.readFileSync(`${RACINE}/index.html`, "utf-8");
+  const app = fs.readFileSync(`${RACINE}/app.js`, "utf-8");
+  verifier("le fichier du parchemin n'est plus chargé nulle part",
+           !/clik_bouton/.test(html) && !/clik_bouton/.test(app) && !/id="son-clic"|audio-survol-parchemin/.test(html));
+  const r = await p.evaluate(async () => {
+    const appels = [];
+    const vrai = window.jouerSonFabrique;
+    window.jouerSonFabrique = (quel, facteur) => { appels.push([quel, facteur === undefined ? 1 : facteur]); return true; };
+    const suivre = async (geste) => { appels.length = 0; await geste(); return appels.slice(); };
+    const clic = await suivre(() => window.jouerSonClic());
+    const survol = await suivre(() => window.jouerSonSurvolParchemin());
+    // Un vrai bouton de la page, avec son onclick « jouerSonClic(); … ».
+    const bouton = await suivre(() => document.getElementById("btn-ouvrir-fabrique").click());
+    // Un vrai bouton du menu latéral, survolé.
+    const lateral = document.querySelector(".conteneur-bouton-lateral");
+    const menu = await suivre(() => lateral.dispatchEvent(new MouseEvent("mouseenter")));
+    window.jouerSonFabrique = vrai;
+    return { clic, survol, bouton, menu, choisi: window.SON_CLIC_JEU,
+             aMoitie: vrai("ding-perle", 0.5), aZero: vrai("ding-perle", 0) };
+  });
+  verifier("le son choisi pour le jeu est le ding perle", r.choisi === "ding-perle", r.choisi);
+  verifier("un clic de bouton joue le ding perle", JSON.stringify(r.clic) === '[["ding-perle",1]]', JSON.stringify(r.clic));
+  verifier("le survol des menus aussi, à mi-volume comme avant", JSON.stringify(r.survol) === '[["ding-perle",0.5]]',
+           JSON.stringify(r.survol));
+  verifier("un vrai bouton de la page le joue", r.bouton.some(a => a[0] === "ding-perle"), JSON.stringify(r.bouton));
+  verifier("un vrai bouton du menu latéral, au survol, aussi", JSON.stringify(r.menu) === '[["ding-perle",0.5]]',
+           JSON.stringify(r.menu));
+  verifier("à mi-volume il joue, à volume nul il se tait", r.aMoitie === true && r.aZero === false);
+}
+
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
 await b.close(); serveur.close();
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

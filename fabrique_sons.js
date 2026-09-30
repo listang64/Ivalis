@@ -199,11 +199,25 @@
 
     window.SONS_FABRIQUE = SONS;
 
+    // LE SON DES BOUTONS DU JEU, choisi par Nico dans la Fabrique : le ding
+    // perle. Il remplace le bruit de parchemin (clik_bouton_aniy88.mp3) qui
+    // jouait à chaque clic (jouerSonClic) et au survol des menus
+    // (jouerSonSurvolParchemin, app.js). Changer de son pour tout le jeu,
+    // c'est changer cette seule ligne.
+    window.SON_CLIC_JEU = "ding-perle";
+
+    // Safari et Chrome n'ouvrent le son qu'après un geste : le contexte se
+    // réveille au premier toucher, pour que même un survol sonne ensuite.
+    ["pointerdown", "touchend", "keydown"].forEach(ev =>
+        window.addEventListener(ev, () => { audio(); }, { capture: true, passive: true }));
+
     // Jouer un son de la Fabrique, par son rang (1 à 10) ou son identifiant.
-    window.jouerSonFabrique = function (quel) {
+    // `facteur` règle le volume par-dessus les réglages du jeu (le survol des
+    // menus joue à moitié, comme l'ancien bruit de parchemin).
+    window.jouerSonFabrique = function (quel, facteur) {
         const son = typeof quel === "number" ? SONS[quel - 1] : SONS.find(x => x.id === quel);
         if (!son) return false;
-        const v = volume();
+        const v = volume() * (facteur === undefined ? 1 : Math.max(0, Number(facteur) || 0));
         if (v <= 0) return false;
         const ctx = audio();
         if (!ctx) return false;

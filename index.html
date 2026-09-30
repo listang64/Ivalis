@@ -293,9 +293,8 @@
 <body>
 
   <audio id="musique-ambiance"></audio>
-  <audio id="son-clic">
-    <source src="https://res.cloudinary.com/dlkjq4kvg/video/upload/q_auto,f_auto/v1781420565/clik_bouton_aniy88.mp3" type="audio/mpeg">
-  </audio>
+  <!-- Le clic des boutons n'est plus un fichier : c'est le ding perle de la
+       Fabrique (fabrique_sons.js, window.SON_CLIC_JEU), joué par jouerSonClic. -->
 
   <div class="preload-images">
     <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781375437/nouvelle_partie_brillle_hpnomi.png" alt="preload">
@@ -1155,7 +1154,6 @@
     </div>
 
   <!-- LE SON DU PARCHEMIN AU SURVOL (remplacer le src par ton lien Cloudinary) -->
-  <audio id="audio-survol-parchemin" src="https://res.cloudinary.com/dlkjq4kvg/video/upload/q_auto,f_auto/v1781420565/clik_bouton_aniy88.mp3" preload="auto"></audio>
 
   <!-- =========================================================
        GESTION DU TEMPS (PARCHEMIN DE DATE)
@@ -1956,7 +1954,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=57"></script>
+<script src="trace_combat.js?v=58"></script>
 <!-- LA MISE À JOUR AUTOMATIQUE. Juste après la trace, parce qu'elle a besoin du
      numéro de version qu'elle y trouve, et avant tout le reste : si la page est
      périmée, autant s'en apercevoir avant d'avoir chargé le jeu entier.
@@ -1986,9 +1984,9 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=30"></script>
 <script type="module" src="ia_master.js?v=7"></script>
-<script type="module" src="app.js?v=66"></script>
+<script type="module" src="app.js?v=67"></script>
 <script src="jet_d20.js?v=2"></script>
-<script src="fabrique_sons.js?v=2"></script>
+<script src="fabrique_sons.js?v=3"></script>
 <script type="module" src="creation_personnage.js?v=12"></script>
 <script type="module" src="classes.js?v=2"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
