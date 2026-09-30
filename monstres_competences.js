@@ -241,7 +241,11 @@ function normaliserType(type, defaut = "Aucun") {
 
 window.paletteEffetsMonstres = function() {
     const cache = window.EFFETS_BDD_CACHE || {};
-    return Object.keys(cache).map(id => {
+    // Un effet de classe (Ténèbres du Nécromancien) n'est pas pour les monstres.
+    return Object.keys(cache)
+        .filter(id => !(typeof window.effetReserveAUneClasse === "function"
+                        && window.effetReserveAUneClasse(id, cache[id])))
+        .map(id => {
         const d = cache[id];
         return {
             id,

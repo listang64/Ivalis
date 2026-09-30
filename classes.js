@@ -68,6 +68,47 @@ window.CLASSES_PAR_DEFAUT = [
                                "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438696/Elementariste_fond_xhhnlj.png")
 ];
 
+// =========================================================================
+//  LE DESCRIPTIF D'UNE CLASSE (moitié gauche de sa fiche)
+// =========================================================================
+//  Une brève présentation, puis ce que la classe donne palier par palier. Les
+//  RÈGLES elles-mêmes vivent dans app.js (ATOUTS_CLASSES) ; ce texte les dit
+//  au joueur. Une classe sans descriptif garde sa fiche d'avant : le titre
+//  seul, au milieu de la moitié gauche.
+window.DESCRIPTIFS_CLASSES = {
+    CLASSE_NECROMANCIEN: {
+        presentation: "Maître des morts et des ombres, le Nécromancien puise sa force dans ce que "
+            + "les autres redoutent. Le froid de la tombe ne l'atteint plus, et ses sorts vident "
+            + "l'énergie de ses ennemis avant de s'en prendre à leur chair.",
+        paliers: [
+            { niveau: 1, titre: "Enfant de la tombe",
+              points: ["Insensible au Gel (jamais Glacé)", "+1 compétence", "+5 PV"] },
+            { niveau: 5, titre: "Sort : Ténèbres",
+              points: ["2 pts · Intelligence · 3 dégâts magiques",
+                       "Les dégâts frappent la fatigue de la cible au lieu de ses PV",
+                       "Plus de fatigue ? Le reste frappe ses PV ×1,5"] },
+            { niveau: 10, titre: "Sursis",
+              points: ["À 0 PV, sa vie reste bloquée : il joue encore deux tours avant d'être mis KO",
+                       "Une fois par combat, aucun soin possible"] }
+        ]
+    }
+};
+
+window.rendreDescriptifClasse = function(idClasse) {
+    const d = window.DESCRIPTIFS_CLASSES[idClasse];
+    if (!d) return "";
+    const paliers = (d.paliers || []).map(p => `
+        <li class="palier-classe">
+            <span class="palier-classe-niveau">Niv. ${p.niveau}</span>
+            <div class="palier-classe-corps">
+                <strong class="palier-classe-titre">${echapper(p.titre)}</strong>
+                <ul class="palier-classe-points">${(p.points || []).map(t => `<li>${echapper(t)}</li>`).join("")}</ul>
+            </div>
+        </li>`).join("");
+    return `<p class="descriptif-classe-presentation">${echapper(d.presentation)}</p>
+            <ul class="paliers-classe">${paliers}</ul>`;
+};
+
 // Cloudinary : « q_auto,f_auto » juste après « /upload/ » — qualité et format
 // choisis selon l'appareil (webp/avif), des images bien plus légères. Un lien
 // venu de la base sans ce réglage le reçoit ici ; un lien qui l'a déjà (ou qui
@@ -183,8 +224,17 @@ window.ouvrirFicheClasse = function(id) {
     const titre = document.getElementById("titre-fiche-classe");
     if (fond) { fond.src = c.imageFond || c.imageTarot || ""; fond.alt = c.nom; }
     if (titre) titre.innerText = c.nom;
+    const descriptif = document.getElementById("descriptif-fiche-classe");
+    const html = window.rendreDescriptifClasse(c.id);
+    if (descriptif) {
+        descriptif.innerHTML = html;
+        descriptif.style.display = html ? "block" : "none";
+        descriptif.scrollTop = 0;
+    }
+    const vue = document.getElementById("vue-fiche-classe");
+    vue.classList.toggle("avec-descriptif", !!html);
     document.getElementById("vue-grille-classes").style.display = "none";
-    document.getElementById("vue-fiche-classe").style.display = "block";
+    vue.style.display = "block";
 };
 
 // La flèche coudée : de la fiche à la grille, de la grille aux races.

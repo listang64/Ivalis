@@ -757,7 +757,7 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
         window.COMBAT_FATIGUE_MAX = window.fatigueMaxCombattant(persoActuel);
         window.COMBAT_FATIGUE_ACTUELLE = persoActuel.fatigueActuelle !== undefined ? parseInt(persoActuel.fatigueActuelle) : window.COMBAT_FATIGUE_MAX;
         
-        window.COMBAT_PV_MAX = (parseInt(persoActuel.PV_Max) || 1) + (parseInt(persoActuel.Dev_Mod_PV) || 0);
+        window.COMBAT_PV_MAX = ((window.pvMaxCombattant ? window.pvMaxCombattant(persoActuel) : (parseInt(persoActuel.PV_Max) || 0) + (parseInt(persoActuel.Dev_Mod_PV) || 0)) || 1);
         window.COMBAT_PV_ACTUELS = persoActuel.PV_Actuels !== undefined ? parseInt(persoActuel.PV_Actuels) : window.COMBAT_PV_MAX;
 
         window.mettreAJourJaugeFatigue(0);
@@ -1077,7 +1077,7 @@ window.mettreAJourJaugePV = function() {
     let max = window.COMBAT_PV_MAX || 1;
     let actuelle = window.COMBAT_PV_ACTUELS || 0;
     if (perso) {
-        const maxReel = (parseInt(perso.PV_Max) || 0) + (parseInt(perso.Dev_Mod_PV) || 0);
+        const maxReel = (window.pvMaxCombattant ? window.pvMaxCombattant(perso) : (parseInt(perso.PV_Max) || 0) + (parseInt(perso.Dev_Mod_PV) || 0));
         if (maxReel > 0) max = maxReel;
         if (perso.PV_Actuels !== undefined) actuelle = parseInt(perso.PV_Actuels) || 0;
         window.COMBAT_PV_MAX = max;
@@ -1436,7 +1436,7 @@ window.actualiserHudHeros = function() {
         return;
     }
 
-    const pvMax = (parseInt(heros.PV_Max) || 1) + (parseInt(heros.Dev_Mod_PV) || 0);
+    const pvMax = ((window.pvMaxCombattant ? window.pvMaxCombattant(heros) : (parseInt(heros.PV_Max) || 0) + (parseInt(heros.Dev_Mod_PV) || 0)) || 1);
     const pv = heros.PV_Actuels !== undefined ? parseInt(heros.PV_Actuels) || 0 : pvMax;
 
     const bouclier = parseInt(heros.Bouclier_Actuel) || 0;
@@ -2782,6 +2782,8 @@ window.estCombattantMort = function(idCombattant) {
     // encore chargés vaut 0 et passerait à tort pour un cadavre.
     const pvMax = window.pvMaxCombattant(p);
     const pv = parseInt(p.PV_Actuels) || 0;
+    // En sursis (Nécromancien, niveau 10), zéro PV ne veut pas dire à terre.
+    if (p.statut !== "Mort" && p.sursis && (parseInt(p.sursis.tours) || 0) > 0) return false;
     return p.statut === "Mort" || (pvMax > 0 && pv <= 0);
 };
 
@@ -4581,7 +4583,7 @@ function contenuTuilePiste(entree, cestSonTour) {
     const perso = entree.perso;
     const L = PISTE_LARGEUR_TUILE, H = PISTE_HAUTEUR_TUILE;
 
-    const pvMax = (parseInt(perso.PV_Max) || 1) + (parseInt(perso.Dev_Mod_PV) || 0);
+    const pvMax = ((window.pvMaxCombattant ? window.pvMaxCombattant(perso) : (parseInt(perso.PV_Max) || 0) + (parseInt(perso.Dev_Mod_PV) || 0)) || 1);
     const pvActuels = perso.PV_Actuels !== undefined ? parseInt(perso.PV_Actuels) : pvMax;
     const pctPv = Math.min(100, Math.max(0, (pvActuels / pvMax) * 100));
 
@@ -5461,7 +5463,7 @@ window.reinitialiserCombat = async function() {
                 // sans soin. On les saute donc explicitement.
                 if (perso.estIllusion) continue;
 
-                const pvMax = (parseInt(perso.PV_Max) || 1) + (parseInt(perso.Dev_Mod_PV) || 0);
+                const pvMax = ((window.pvMaxCombattant ? window.pvMaxCombattant(perso) : (parseInt(perso.PV_Max) || 0) + (parseInt(perso.Dev_Mod_PV) || 0)) || 1);
                 const fatigueMax = window.fatigueMaxCombattant(perso);
 
                 // Mise à jour locale immédiate (évite d'attendre le snapshot)

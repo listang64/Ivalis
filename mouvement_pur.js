@@ -26,7 +26,7 @@
 //  lui passe en argument.
 // =========================================================================
 
-import { clonerEtat, combattant } from './combat_etat.js';
+import { clonerEtat, combattant, tomber } from './combat_etat.js';
 import { esquiveDe, paradeDe, defPhysiqueDe, bonusDesEtats, aLEtat, traverserZones,
          ligneDeVue, caseLibre } from './moteur_pur.js';
 
@@ -301,10 +301,7 @@ export function resoudreMouvement(etat, action, des, plateau) {
                               montant: coup.montant, opportunite: true,
                               bouclierApres: c.bouclier, pvApres: c.pv });
 
-                if (c.pvMax > 0 && c.pv <= 0 && !c.aTerre) {
-                    c.aTerre = true;
-                    etapes.push({ type: "chute", cible: id, acteur: ennemi });
-                }
+                etapes.push(...tomber(suivant, id, ennemi));
             }
         }
         contactAvant = contactApres;
@@ -505,10 +502,7 @@ export function resoudrePeur(etat, idLanceur, idCible, des, plateau, options) {
                               montant: coup.montant, opportunite: true,
                               bouclierApres: cible.bouclier, pvApres: cible.pv });
 
-                if (cible.pvMax > 0 && cible.pv <= 0 && !cible.aTerre) {
-                    cible.aTerre = true;
-                    etapes.push({ type: "chute", cible: idCible, acteur: ennemi });
-                }
+                etapes.push(...tomber(etat, idCible, ennemi));
             }
         }
         contactAvant = contactApres;
@@ -624,10 +618,7 @@ export function resoudreRepli(etat, idLanceur, vers, des, plateau, options) {
             etapes.push({ type: "opportunite", ...coup, hex: pas, bouclierApres: c.bouclier, pvApres: c.pv });
             etapes.push({ type: "degats", cible: idLanceur, acteur: ennemi, montant: coup.montant,
                           opportunite: true, bouclierApres: c.bouclier, pvApres: c.pv });
-            if (c.pvMax > 0 && c.pv <= 0 && !c.aTerre) {
-                c.aTerre = true;
-                etapes.push({ type: "chute", cible: idLanceur, acteur: ennemi });
-            }
+            etapes.push(...tomber(etat, idLanceur, ennemi));
         }
         contactAvant = contactApres;
         if (c.aTerre) { etapes.push({ type: "trajetEcourte", acteur: idLanceur, raison: "à terre" }); break; }

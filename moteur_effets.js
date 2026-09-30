@@ -279,7 +279,7 @@ window.jouerAnimationZonePersistante = async function(res, hexPosition) {
                 const newShield = parseInt(cibleData.Bouclier_Actuel) || 0;
                 window.afficherFlashDegatToken(res.idCible, newShield + res.degats, newShield, maxShield, texte, couleur, "#00ffff");
             } else {
-                const maxPv = (parseInt(cibleData.PV_Max) || 1) + (parseInt(cibleData.Dev_Mod_PV) || 0);
+                const maxPv = ((window.pvMaxCombattant ? window.pvMaxCombattant(cibleData) : (parseInt(cibleData.PV_Max) || 0) + (parseInt(cibleData.Dev_Mod_PV) || 0)) || 1);
                 const newPv = parseInt(cibleData.PV_Actuels) || 0;
                 window.afficherFlashDegatToken(res.idCible, newPv + res.degats, newPv, maxPv, texte, couleur);
             }
@@ -293,7 +293,7 @@ window.jouerAnimationZonePersistante = async function(res, hexPosition) {
         const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === res.idCible);
         const texte = `+${res.soin} ✚`;
         if (cibleData && typeof window.afficherFlashDegatToken === "function") {
-            const maxPv = (parseInt(cibleData.PV_Max) || 1) + (parseInt(cibleData.Dev_Mod_PV) || 0);
+            const maxPv = ((window.pvMaxCombattant ? window.pvMaxCombattant(cibleData) : (parseInt(cibleData.PV_Max) || 0) + (parseInt(cibleData.Dev_Mod_PV) || 0)) || 1);
             const newPv = parseInt(cibleData.PV_Actuels) || 0;
             window.afficherFlashDegatToken(res.idCible, newPv - res.soin, newPv, maxPv, texte, "#1b6e3a", "#1b6e3a");
         } else {
@@ -352,7 +352,7 @@ window.jouerAnimationOpportunite = async function(data) {
             const newShield = parseInt(cibleData.Bouclier_Actuel) || 0;
             window.afficherFlashDegatToken(data.idCible, newShield + data.degats, newShield, maxShield, texte, couleur, "#00ffff");
         } else {
-            const maxPv = (parseInt(cibleData.PV_Max) || 1) + (parseInt(cibleData.Dev_Mod_PV) || 0);
+            const maxPv = ((window.pvMaxCombattant ? window.pvMaxCombattant(cibleData) : (parseInt(cibleData.PV_Max) || 0) + (parseInt(cibleData.Dev_Mod_PV) || 0)) || 1);
             const newPv = parseInt(cibleData.PV_Actuels) || 0;
             window.afficherFlashDegatToken(data.idCible, newPv + data.degats, newPv, maxPv, texte, couleur);
         }
@@ -1483,7 +1483,9 @@ window.demarrerCiblage = async function(idCarte, options) {
                 toursEtalementDeLaCarte = Math.max(toursEtalementDeLaCarte, toursEtalement);
             }
 
-            if (nomLower.includes("attaque") || nomLower.includes("pouvoir") || nomLower.includes("soin") || nomLower.includes("guérison") || isPurification || isShield) {
+            // Ténèbres (Nécromancien) : une attaque magique qui boit l'énergie.
+            const estTenebres = typeof window.estEffetTenebres === "function" && window.estEffetTenebres(effBase.Nom);
+            if (nomLower.includes("attaque") || nomLower.includes("pouvoir") || estTenebres || nomLower.includes("soin") || nomLower.includes("guérison") || isPurification || isShield) {
                 let isHeal = nomLower.includes("soin") || nomLower.includes("guérison") || isPurification || isShield;
                 // Les dégâts et les SOINS s'étalent ; un bouclier ou une purification, non —
                 // ce ne sont pas des montants qui tombent sur la vie. La division se fait sur le
@@ -1493,7 +1495,7 @@ window.demarrerCiblage = async function(idCarte, options) {
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 if (indexPremiereAttaque === -1) indexPremiereAttaque = idxAction;
-                const typeRes = (nomLower.includes("magique") || nomLower.includes("pouvoir") || isHeal)
+                const typeRes = (nomLower.includes("magique") || nomLower.includes("pouvoir") || estTenebres || isHeal)
                     ? "Magique" : "Physique";
                 // Atout de l'Ondari : ses sorts magiques portent une case plus loin,
                 // dès lors qu'un cran de Distance est posé dessus.
@@ -1532,6 +1534,8 @@ window.demarrerCiblage = async function(idCarte, options) {
                     purifNombre: purifNombre,
                     estEtalement: etalementActif,
                     toursEtalement: etalementActif ? toursEtalement : 0,
+                    // Ses dégâts vont à l'énergie d'abord (moteur_pur.js).
+                    ...(estTenebres ? { versEnergie: true } : {}),
                     cibles: []
                 });
             }
@@ -2666,7 +2670,7 @@ window.surlignerEffetCarteActif = function(nomEffet) {
 // que la jauge qui apparaît quand un coup porte, mais celle-ci reste affichée
 // tant qu'on choisit sa cible.
 function dessinerJaugeCible(divToken, cibleData) {
-    const pvMax = (parseInt(cibleData.PV_Max) || 0) + (parseInt(cibleData.Dev_Mod_PV) || 0);
+    const pvMax = (window.pvMaxCombattant ? window.pvMaxCombattant(cibleData) : (parseInt(cibleData.PV_Max) || 0) + (parseInt(cibleData.Dev_Mod_PV) || 0));
     if (pvMax <= 0) return;
     const pv = cibleData.PV_Actuels !== undefined ? parseInt(cibleData.PV_Actuels) : pvMax;
     const pct = Math.max(0, Math.min(100, (pv / pvMax) * 100));
@@ -3092,7 +3096,8 @@ window.porteeReelleCarte = function(dataCarte, lanceur) {
 
         // L'atout de portée magique, comme dans demarrerCiblage : il ne joue
         // que sur une action magique qui a déjà de la distance.
-        const estMagique = nomLower.includes("magique") || nomLower.includes("pouvoir");
+        const estMagique = nomLower.includes("magique") || nomLower.includes("pouvoir")
+            || (typeof window.estEffetTenebres === "function" && window.estEffetTenebres(nomLower));
         const totale = rangeMax + (typeof window.bonusPorteeMagique === "function"
             ? window.bonusPorteeMagique(lanceur, estMagique, isRanged) : 0);
 

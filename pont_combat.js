@@ -48,7 +48,8 @@ export const COULEURS = {
     soin:      "#1b6e3a",
     neutre:    "#cccccc",
     attention: "#ffaa00",
-    critique:  "#ff2d2d"
+    critique:  "#ff2d2d",
+    tenebres:  "#b388ff"     // Ténèbres : l'énergie bue, en violet
 };
 
 // Le rythme. Il est ici, en un seul endroit, pour qu'on puisse le régler sans
@@ -200,6 +201,7 @@ const SCENES = {
         const texte = e.opportunite ? `-${montant} ⚔️`
                     : e.renvoi ? `-${montant} ↩️`     // le Contre rend le coup
                     : e.critique ? `-${montant} !`
+                    : e.tenebres ? `-${montant} 🌑`   // le surplus de Ténèbres, ×1,5
                     : `-${montant}`;
 
         return { geste: "jauge", pion: e.cible, champ,
@@ -262,7 +264,15 @@ const SCENES = {
         }
         return { geste: "etats", pion: e.cible, liste: e.liste || [], pose: e.pose || null };
     },
-    fatigue()  { return { geste: "rien" }; },
+    // L'énergie qui monte ou descend ne s'anime pas — sauf quand TÉNÈBRES la
+    // boit : c'est le coup lui-même, il doit se voir sur le pion.
+    fatigue(e) {
+        if (e.tenebres && nombre(e.montant) > 0) {
+            return { geste: "message", pion: e.cible, texte: `-${nombre(e.montant)} ⚡🌑`,
+                     couleur: COULEURS.tenebres, duree: RYTHME.message };
+        }
+        return { geste: "rien" };
+    },
     tour()     { return { geste: "rien" }; },
     manche(e)  { return { geste: "manche", numero: nombre(e.numero) }; },
     arrivee(e) { return { geste: "arrivee", pion: e.combattant && e.combattant.id }; },
@@ -270,6 +280,16 @@ const SCENES = {
 
     chute(e) {
         return { geste: "chute", pion: e.cible, duree: RYTHME.chute };
+    },
+
+    // Le sursis du Nécromancien : il ne tombe pas, il le dit — et il dit
+    // combien de tours il lui reste.
+    sursis(e) {
+        const tours = nombre(e.tours);
+        if (tours <= 0) return { geste: "rien" };
+        return { geste: "message", pion: e.cible,
+                 texte: `💀 Sursis : ${tours} tour${tours > 1 ? "s" : ""}`,
+                 couleur: COULEURS.tenebres, duree: RYTHME.message };
     }
 };
 
@@ -465,7 +485,13 @@ export function fichesDepuisEtat(etat, fichesActuelles) {
         return {
             ...fiche,
             PV_Actuels: nombre(c.pv),
-            PV_Max: nombre(c.pvMax, fiche.PV_Max),
+            // LA VALEUR DE BASE DE LA FICHE, PAS LE MAXIMUM CALCULÉ. c.pvMax porte
+            // déjà ce qui s'ajoute à la lecture (retouche DEV, PV de classe du
+            // Nécromancien) : le recopier dans PV_Max le faisait compter deux
+            // fois à la lecture suivante (pvMaxCombattant). On ne le prend que
+            // si la fiche n'a pas de base à elle.
+            PV_Max: (fiche.PV_Max !== undefined && fiche.PV_Max !== null && fiche.PV_Max !== "")
+                ? fiche.PV_Max : nombre(c.pvMax),
             // DEUX NOMS POUR LA MÊME ÉNERGIE, et il faut écrire les deux.
             // Le document de base dit `Fatigue_Actuelle`, tout le jeu en
             // mémoire dit `fatigueActuelle` (app.js le renomme au chargement).
@@ -482,7 +508,10 @@ export function fichesDepuisEtat(etat, fichesActuelles) {
             // les jauges de l'ancien monde (moteur_effets.js, maxShield).
             Bouclier_Max: nombre(c.bouclierMax),
             Etats_Alteres: JSON.parse(JSON.stringify(c.etats || [])),
-            statut: c.aTerre ? "Inconscient" : (fiche.statut === "Inconscient" ? "Vivant" : fiche.statut)
+            statut: c.aTerre ? "Inconscient" : (fiche.statut === "Inconscient" ? "Vivant" : fiche.statut),
+            // Le sursis voyage sur la fiche : à zéro PV, le Nécromancien reste
+            // debout (estCombattantMort, combat.js) et son pion le montre.
+            sursis: c.sursis ? { tours: nombre(c.sursis.tours) } : null
         };
     });
 }
@@ -603,7 +632,10 @@ export function fusionnerPionsVTT(pionsFirestore, pionsLocaux, combattantsDuCerv
 //  combattants gardent les chiffres qu'il leur connaît, quelle que soit la
 //  raison de l'instantané.
 const CHAMPS_COMBAT_PROTEGES = [
-    "PV_Actuels", "Bouclier_Actuel", "Etats_Alteres", "Fatigue_Actuelle", "fatigueActuelle"
+    "PV_Actuels", "Bouclier_Actuel", "Etats_Alteres", "Fatigue_Actuelle", "fatigueActuelle",
+    // Le sursis du Nécromancien : sans lui, une fiche rafraîchie à zéro PV
+    // le ferait passer pour tombé.
+    "sursis"
 ];
 
 export function fusionnerFichesCombat(fichesFraiches, fichesActuelles, combattantsDuCerveau) {

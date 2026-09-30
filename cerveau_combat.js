@@ -38,10 +38,11 @@
 // =========================================================================
 
 import { clonerEtat, combattant, creerDes, combattantIllusion,
-         verifierEtatCombat, compterPasMarche, FORMAT_ETAT } from './combat_etat.js';
+         verifierEtatCombat, compterPasMarche, FORMAT_ETAT, tomber, enSursis } from './combat_etat.js';
 import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissiperConfusion,
          traverserZones, creerZonePure, poserZone, vieillirZones,
-         chaineDeDegats, REGLES_ETATS, estDansLeNoir } from './moteur_pur.js';
+         chaineDeDegats, REGLES_ETATS, estDansLeNoir,
+         partageTenebres, ETAT_TENEBRES_ETALEES } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche } from './ia_pure.js';
@@ -293,6 +294,29 @@ export function cloturerTour(etat) {
     const partie = (etat.file || [])[0];
     if (!partie) return null;
 
+    // LE SURSIS SE DÉCOMPTE AU BOUT DE CHACUN DE SES TOURS. Le tour où il a
+    // été entamé ne compte pas ; au bout du dernier, le Nécromancien tombe.
+    const etapesSursis = [];
+    const enFin = combattant(etat, partie.id);
+    if (enSursis(enFin)) {
+        if (enFin.sursis.entame) {
+            enFin.sursis = { ...enFin.sursis, entame: false };
+            etapesSursis.push({ type: "sursis", cible: partie.id, tours: enFin.sursis.tours, entame: false, pvApres: 0 });
+        } else {
+            const reste = nombre(enFin.sursis.tours) - 1;
+            if (reste > 0) {
+                enFin.sursis = { tours: reste, entame: false };
+                etapesSursis.push({ type: "sursis", cible: partie.id, tours: reste, entame: false, pvApres: 0 });
+            } else {
+                enFin.sursis = null;
+                enFin.aTerre = true;
+                enFin.pv = 0;
+                etapesSursis.push({ type: "sursis", cible: partie.id, tours: 0, pvApres: 0 },
+                                  { type: "chute", cible: partie.id, acteur: partie.id, finSursis: true });
+            }
+        }
+    }
+
     const file = etat.file.slice(1).filter(f => {
         const c = combattant(etat, f.id);
         return c && !c.aTerre;
@@ -308,7 +332,8 @@ export function cloturerTour(etat) {
     }
     etat.file = file;
 
-    const etapes = [{ type: "tour", fini: partie.id, file, phase: etat.phase,
+    const etapes = [...etapesSursis,
+                    { type: "tour", fini: partie.id, file, phase: etat.phase,
                       manche: etat.manche, ontJoue: etat.ontJoue }];
     if (finDeManche) {
         // LA RÉGÉNÉRATION DE FIN DE MANCHE. Sans elle, l'énergie ne remonte
@@ -384,13 +409,13 @@ export function ticsDeFinDeManche(etat) {
             }
 
             const morsure = Math.ceil(nombre(c.pvMax) * 0.08);
-            if (morsure > 0) {
+            if (morsure > 0 && !enSursis(c)) {      // en sursis : la vie ne bouge plus
                 const pvApres = Math.max(0, nombre(c.pv) - morsure);
                 c.pv = pvApres;
-                c.aTerre = nombre(c.pvMax) > 0 && pvApres <= 0;
                 etapes.push({ type: "degats", cible: id, montant: morsure,
                               pvApres, bouclierApres: nombre(c.bouclier),
                               tic: "Empoisonnement" });
+                etapes.push(...tomber(etat, id, id));
             }
         }
 
@@ -407,7 +432,7 @@ export function ticsDeFinDeManche(etat) {
             const typeRes = brulure.typeDegats === "Physique" ? "Physique" : "Magique";
             const compte = chaineDeDegats(c, { valeurBrute: parTour, typeRes }, {});
             if (compte.degats > 0) {
-                etapes.push(...infligerTic(c, id, compte.degats, "Brûlure"));
+                etapes.push(...infligerTic(c, id, compte.degats, "Brûlure", etat));
             }
         }
 
@@ -428,7 +453,25 @@ export function ticsDeFinDeManche(etat) {
                 montant = nombre(etalement.degatsDifferes !== undefined
                                  ? etalement.degatsDifferes : etalement.degatsRestants);
             }
-            if (montant > 0) etapes.push(...infligerTic(c, id, montant, "Étalement"));
+            if (montant > 0) etapes.push(...infligerTic(c, id, montant, "Étalement", etat));
+        }
+
+        // --- TÉNÈBRES ÉTALÉES : la même part, selon la règle de Ténèbres -----
+        //  L'énergie boit la part ; ce qu'elle ne peut plus boire frappe la vie
+        //  à ×1,5, bouclier d'abord (partageTenebres, moteur_pur.js).
+        const tenebres = c.etats.find(e => e && e.nom === ETAT_TENEBRES_ETALEES);
+        if (tenebres && Array.isArray(tenebres.tics) && tenebres.tics.length > 0) {
+            const part = nombre(tenebres.tics.shift());
+            if (part > 0) {
+                const partage = partageTenebres(c.fatigue, part);
+                if (partage.surEnergie > 0) {
+                    c.fatigue = partage.energieApres;
+                    etapes.push({ type: "fatigue", cible: id, fatigueApres: c.fatigue,
+                                  tenebres: true, montant: partage.surEnergie,
+                                  tic: ETAT_TENEBRES_ETALEES });
+                }
+                if (partage.surplus > 0) etapes.push(...infligerTic(c, id, partage.surplus, ETAT_TENEBRES_ETALEES, etat));
+            }
         }
 
         // --- SOIN ÉTALÉ : une part de vie rendue par manche ------------------
@@ -437,7 +480,8 @@ export function ticsDeFinDeManche(etat) {
         //  par fin de manche, sans jamais dépasser la vie maximum.
         const soinEtale = c.etats.find(e => e && e.nom === "Soin étalé");
         if (soinEtale && Array.isArray(soinEtale.tics) && soinEtale.tics.length > 0) {
-            const part = nombre(soinEtale.tics.shift());
+            const part = enSursis(c) ? (soinEtale.tics.shift(), 0)   // en sursis : aucun soin
+                                     : nombre(soinEtale.tics.shift());
             const pvApres = Math.min(nombre(c.pvMax), nombre(c.pv) + part);
             if (pvApres > nombre(c.pv)) {
                 const montant = pvApres - nombre(c.pv);
@@ -454,8 +498,9 @@ export function ticsDeFinDeManche(etat) {
 // ensuite, et la chute si la vie tombe à zéro. Trois états s'en servent (la
 // brûlure, l'étalement, et demain ce qu'on ajoutera) — l'écrire une fois
 // évite qu'ils divergent.
-function infligerTic(c, id, montant, nomDuTic) {
+function infligerTic(c, id, montant, nomDuTic, etat) {
     const etapes = [];
+    if (enSursis(c)) return etapes;             // en sursis : les coups sont ignorés
     const bouclierAvant = nombre(c.bouclier);
     if (bouclierAvant > 0) {
         c.bouclier = Math.max(0, bouclierAvant - montant);
@@ -465,9 +510,9 @@ function infligerTic(c, id, montant, nomDuTic) {
     } else {
         const pvApres = Math.max(0, nombre(c.pv) - montant);
         c.pv = pvApres;
-        c.aTerre = nombre(c.pvMax) > 0 && pvApres <= 0;
         etapes.push({ type: "degats", cible: id, montant, pvApres,
                       bouclierApres: 0, tic: nomDuTic });
+        etapes.push(...tomber(etat, id, id));
     }
     return etapes;
 }
@@ -522,7 +567,7 @@ export function regenererPvFinDeManche(etat) {
     const etapes = [];
     (etat.ordre || Object.keys(etat.combattants || {})).forEach(id => {
         const c = combattant(etat, id);
-        if (!c || c.aTerre) return;
+        if (!c || c.aTerre || enSursis(c)) return;
         const gagne = nombre(c.atouts && c.atouts.regenPv);
         if (gagne <= 0) return;
         const avant = nombre(c.pv);

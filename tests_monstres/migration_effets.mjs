@@ -38,6 +38,7 @@ const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd
 const EFFETS_REELS = JSON.parse(fs.readFileSync('/home/user/Ivalis/tests_monstres/effets_reels.json', 'utf-8'));
 delete EFFETS_REELS.EFF_REPLI;
 delete EFFETS_REELS.EFF_AVEUGLEMENT;
+delete EFFETS_REELS.EFF_TENEBRES;
 
 // Un Firestore de papier : il compte ses écritures, et sait tomber en panne.
 function fausseBase(donnees, { panneSur = null } = {}) {
@@ -87,17 +88,19 @@ console.log("1. ELLE VISE LES EFFETS QUE NICO A DEMANDÉ DE CHANGER");
     const { table } = fausseBase(EFFETS_REELS);
     const vises = table.map(r => r.id).sort();
     const attendus = ["EFF_BOUCLIER_MAGIQUE", "EFF_BRULE", "EFF_DUREE_ETALEMENT_DEGATS", "EFF_ELECTRIFIE",
-                      "EFF_ETOURDIT", "EFF_GLACE", "EFF_PARALYSIE", "EFF_POUSSEE", "EFF_REPLI", "EFF_AVEUGLEMENT", "EFF_CONFUSION"].sort();
-    verifier("les onze effets concernés, ni plus ni moins",
+                      "EFF_ETOURDIT", "EFF_GLACE", "EFF_PARALYSIE", "EFF_POUSSEE", "EFF_REPLI", "EFF_AVEUGLEMENT", "EFF_CONFUSION",
+                      "EFF_TENEBRES"].sort();
+    verifier("les douze effets concernés (Ténèbres compris), ni plus ni moins",
              JSON.stringify(vises) === JSON.stringify(attendus), vises.join(", "));
     // Ceux qu'on modifie existent ; ceux qu'on crée (le Repli), pas encore.
     // (La Paralysie, elle, est à supprimer : déjà partie de la vraie base, c'est normal.)
     verifier("chaque effet modifié existe vraiment dans la base",
              table.filter(r => !r.creer && !r.supprimer).every(r => EFFETS_REELS[r.id] !== undefined),
              table.filter(r => !r.creer && !r.supprimer && !EFFETS_REELS[r.id]).map(r => r.id).join(", "));
-    verifier("et les effets créés (Repli, Aveuglement) n'y sont pas encore",
-             table.filter(r => r.creer).map(r => r.id).join() === "EFF_REPLI,EFF_AVEUGLEMENT"
-             && EFFETS_REELS.EFF_REPLI === undefined && EFFETS_REELS.EFF_AVEUGLEMENT === undefined);
+    verifier("et les effets créés (Repli, Aveuglement, Ténèbres) n'y sont pas encore",
+             table.filter(r => r.creer).map(r => r.id).join() === "EFF_REPLI,EFF_AVEUGLEMENT,EFF_TENEBRES"
+             && EFFETS_REELS.EFF_REPLI === undefined && EFFETS_REELS.EFF_AVEUGLEMENT === undefined
+             && EFFETS_REELS.EFF_TENEBRES === undefined);
 }
 
 // =========================================================================
@@ -158,6 +161,14 @@ console.log("\n2. UN PASSAGE : LA BASE DIT CE QUE LE MOTEUR FAIT");
     verifier("et ses notes disent la règle du noir (3 cases fixes)", /3 hexagones/.test(aveu.Notes || "")
              && /fixés/.test(aveu.Notes || "") && /zone/.test(aveu.Notes || ""));
 
+    // TÉNÈBRES, le sort du Nécromancien : créé comme le Repli, et réservé.
+    const ten = m.base.EFF_TENEBRES || {};
+    verifier("Ténèbres est créé : 2 pts, Intelligence, 3, racine, réservé au Nécromancien niv. 5",
+             resultat.faits.some(f => /EFF_TENEBRES — créé/.test(f)) && ten.Nom === "Ténèbres"
+             && ten.Cout_PT === "2" && ten.Modificateur === "INTELLIGENCE" && ten.Valeur === 3
+             && ten.Type_Mecanique === "Action/Global" && ten.Classe === "Nécromancien" && ten.Niveau_Requis === 5,
+             JSON.stringify(ten).slice(0, 160));
+
     // Fiche déjà créée (bouton déjà pressé, avec l'ancienne règle à 4 cases,
     // et un pourcentage retouché à la main) : seules les Notes sont remises.
     const deja = fausseBase({ ...EFFETS_REELS, EFF_AVEUGLEMENT: { Nom: "Aveuglement", Pourcent_Base: 15,
@@ -207,7 +218,7 @@ console.log("\n3. RELANCÉE, ELLE N'ÉCRIT PLUS RIEN");
     verifier("et ne resupprime rien", m.journal.suppressions.length === suppressionsPremier);
     verifier("le rapport le dit clairement", second.faits.length === 0,
              JSON.stringify(second.faits));
-    verifier("en listant ce qui était déjà à jour", second.inchanges.length === 11,
+    verifier("en listant ce qui était déjà à jour", second.inchanges.length === 12,
              JSON.stringify(second.inchanges));
 }
 

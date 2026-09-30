@@ -171,7 +171,11 @@ export function combattantDepuisFiche(fiche, position, regles) {
         // L'Éthéré tire trente pour cent de plus de chaque soin reçu. Le noyau
         // applique ce pourcentage au moment de soigner (moteur_pur.js) : sans
         // ce champ, l'atout restait dans l'ancien moteur et ne servait à rien.
-        soinsRecus: nombre(race.soinsRecus)
+        soinsRecus: nombre(race.soinsRecus),
+        // Le Nécromancien de niveau 10 : tombé à zéro, il tient encore ce
+        // nombre de tours avant d'être mis KO — une fois par combat (tomber,
+        // plus bas). Zéro pour tous les autres.
+        sursis: nombre(race.sursis)
     };
     const mod = {
         // Ce que l'ÉQUIPEMENT change EN PERMANENCE, hors états altérés : le
@@ -389,6 +393,44 @@ export function clonerEtat(etat) {
 
 export const combattant = (etat, id) => (etat && etat.combattants) ? etat.combattants[id] : undefined;
 
+// =========================================================================
+//  TOMBER — OU TENIR ENCORE (le sursis du Nécromancien)
+// =========================================================================
+//  Toutes les façons de perdre ses derniers points de vie (une carte, une zone,
+//  une attaque d'opportunité, un poison, une brûlure, un étalement) passent par
+//  ici. Un combattant à zéro tombe — SAUF s'il a le sursis (atout de classe du
+//  Nécromancien, niveau 10) et ne l'a pas encore usé dans ce combat : sa vie
+//  reste alors BLOQUÉE À ZÉRO, il reste debout et joue encore `tours` tours ;
+//  à la fin du dernier, il est mis KO (cloturerTour, cerveau_combat.js).
+//
+//  Pendant le sursis, rien ne le fait tomber plus tôt (les dégâts sont
+//  ignorés) et rien ne le relève (aucun soin possible). Un sursis entamé
+//  PENDANT son propre tour ne compte pas ce tour-là : il a bien deux tours
+//  pleins devant lui.
+//
+//  Rend les étapes à jouer ; modifie le combattant sur place, comme les
+//  fonctions du moteur qui l'appellent.
+export function tomber(etat, id, acteur) {
+    const c = combattant(etat, id);
+    if (!c || c.aTerre) return [];
+    if (!(nombre(c.pvMax) > 0 && nombre(c.pv) <= 0)) return [];
+    c.pv = 0;
+    if (c.sursis) return [];                      // déjà en sursis : il tient
+    const tours = nombre(c.atouts && c.atouts.sursis);
+    if (tours > 0 && !c.sursisUtilise) {
+        const entame = ((etat.file || [])[0] || {}).id === id;
+        c.sursis = { tours, entame };
+        c.sursisUtilise = true;
+        c.aTerre = false;
+        return [{ type: "sursis", cible: id, acteur: acteur || id, tours, entame, pvApres: 0 }];
+    }
+    c.aTerre = true;
+    return [{ type: "chute", cible: id, acteur: acteur || id }];
+}
+
+// Un combattant en sursis : debout, la vie bloquée à zéro.
+export const enSursis = (c) => !!(c && c.sursis && nombre(c.sursis.tours) > 0);
+
 export const estADroit = (etat, id) => {
     const c = combattant(etat, id);
     return !!c && !c.aTerre;
@@ -500,7 +542,24 @@ const APPLICATEURS = {
             c.bouclierMax = c.bouclier === 0 ? 0 : Math.max(nombre(c.bouclierMax), c.bouclier);
         }
         if (e.pvApres !== undefined) c.pv = Math.max(0, Math.min(c.pvMax, nombre(e.pvApres)));
-        c.aTerre = c.pvMax > 0 && c.pv <= 0;
+        // En sursis, la vie reste bloquée à zéro et le combattant debout.
+        if (c.sursis) c.pv = 0;
+        c.aTerre = c.pvMax > 0 && c.pv <= 0 && !c.sursis;
+    },
+
+    // Le sursis commence, se décompte, ou (tours à zéro) s'achève sur la
+    // chute qui suit. Le RÉSULTAT, comme partout : les tours qui restent.
+    sursis(etat, e) {
+        const c = combattant(etat, e.cible);
+        if (!c) return;
+        c.pv = 0;
+        c.sursisUtilise = true;
+        if (nombre(e.tours) > 0) {
+            c.sursis = { tours: nombre(e.tours), entame: !!e.entame };
+            c.aTerre = false;
+        } else {
+            c.sursis = null;
+        }
     },
 
     soin(etat, e) { APPLICATEURS.degats(etat, e); },
@@ -528,6 +587,7 @@ const APPLICATEURS = {
         if (!c) return;
         c.aTerre = true;
         c.pv = 0;
+        c.sursis = null;
     },
 
     // Une zone posée, réduite ou dissipée.
@@ -631,7 +691,9 @@ export function verifierEtatCombat(etat) {
         // « À terre » et « zéro point de vie » disent la même chose. Les
         // laisser diverger, c'est le héros vivant rayé de la file d'initiative.
         const devraitEtreATerre = c.pvMax > 0 && c.pv <= 0;
-        if (devraitEtreATerre && !c.aTerre) soucis.push(`${id} : à zéro pv mais pas marqué à terre`);
+        // Seule exception : le sursis du Nécromancien, debout à zéro.
+        if (devraitEtreATerre && !c.aTerre && !enSursis(c)) soucis.push(`${id} : à zéro pv mais pas marqué à terre`);
+        if (enSursis(c) && c.pv !== 0) soucis.push(`${id} : en sursis avec ${c.pv} pv`);
         if (!devraitEtreATerre && c.aTerre && c.pv > 0) {
             soucis.push(`${id} : marqué à terre avec ${c.pv} pv`);
         }

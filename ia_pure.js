@@ -229,6 +229,11 @@ export function choisirCible(etat, id, infosCarte, des) {
     }
     if (candidats.length === 0) return null;
 
+    // UN NÉCROMANCIEN EN SURSIS ne perd plus rien sous les coups : le frapper,
+    // c'est gâcher son tour. On le laisse de côté tant qu'il y a mieux à faire.
+    const utiles = candidats.filter(c => !(c.sursis && Number(c.sursis.tours) > 0));
+    if (utiles.length > 0 && utiles.length < candidats.length) candidats.splice(0, candidats.length, ...utiles);
+
     // Provoquée, la créature ne voit plus que celui qui l'a défiée, tant que
     // l'état dure — sauf pour ses soins, qui vont toujours aux siens. Si le
     // provocateur est tombé entre-temps, la contrainte s'efface d'elle-même.

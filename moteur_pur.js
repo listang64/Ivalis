@@ -41,7 +41,7 @@
 //  venaient les dégâts comptés deux fois.
 // =========================================================================
 
-import { clonerEtat, combattant, creerDes } from './combat_etat.js';
+import { clonerEtat, combattant, creerDes, tomber, enSursis } from './combat_etat.js';
 
 const nombre = (v, defaut = 0) => {
     const n = parseInt(v);
@@ -622,6 +622,27 @@ function empilerEtalement(cible, nomEtat, tics) {
     }
 }
 
+// =========================================================================
+//  TÉNÈBRES (le sort du Nécromancien, niveau 5)
+// =========================================================================
+//  Ses dégâts — magiques, donc déjà passés par la défense magique — tombent
+//  sur l'ÉNERGIE de la cible (sa jauge de fatigue) au lieu de sa vie. Ce que
+//  l'énergie ne peut plus boire frappe la vie à ×1,5, arrondi à l'unité
+//  inférieure. Le bouclier ne protège pas l'énergie : Ténèbres passe au
+//  travers ; il n'absorbe que ce surplus qui frappe la vie (règle de Nico).
+export const MULTIPLICATEUR_TENEBRES = 1.5;
+// Une Ténèbres étalée range ses parts dans son propre état : ses parts suivent
+// la règle de l'énergie, celles d'un Étalement ordinaire frappent la vie.
+export const ETAT_TENEBRES_ETALEES = "Ténèbres étalées";
+export function partageTenebres(energie, montant) {
+    const e = Math.max(0, nombre(energie));
+    const m = Math.max(0, nombre(montant));
+    const surEnergie = Math.min(e, m);
+    const reste = m - surEnergie;
+    return { surEnergie, energieApres: e - surEnergie,
+             surplus: reste > 0 ? Math.floor(reste * MULTIPLICATEUR_TENEBRES) : 0 };
+}
+
 export function chaineDeDegats(cible, attaque, options) {
     const { critique = false, distance = 1, percee = false } = options || {};
     const compte = { soinAbsorption: 0, degats: 0, secondTic: 0, versBouclier: 0, versPv: 0 };
@@ -695,6 +716,15 @@ export function chaineDeDegats(cible, attaque, options) {
         compte.tics = partsEtalees(degatsFinaux, attaque.toursEtalement);
         compte.secondTic = compte.tics[1] || 0;   // gardé pour qui lit encore l'ancien nom
         degatsFinaux = 0;
+    }
+    // 5 bis. TÉNÈBRES : l'énergie boit d'abord, le reste frappe la vie à ×1,5.
+    //    Une Ténèbres étalée garde ses parts telles quelles (compte.tics) : la
+    //    règle se joue à chaque part, en fin de manche (cerveau_combat.js).
+    if (attaque.versEnergie && degatsFinaux > 0) {
+        const partage = partageTenebres(cible.fatigue, degatsFinaux);
+        compte.tenebres = { brut: degatsFinaux, surEnergie: partage.surEnergie,
+                            energieApres: partage.energieApres, surplus: partage.surplus };
+        degatsFinaux = partage.surplus;
     }
     compte.degats = degatsFinaux;
 
@@ -782,7 +812,7 @@ export function traverserZones(etat, id, hex, des) {
             return;
         }
 
-        if (zone.degats) {
+        if (zone.degats && !enSursis(cible)) {   // en sursis : les coups sont ignorés
             const resistance = zone.degats.typeRes === "Magique"
                 ? defMagiqueDe(cible) : defPhysiqueDe(cible);
             const part = Math.min(Math.max(resistance, 0), 100) / 100;
@@ -800,18 +830,17 @@ export function traverserZones(etat, id, hex, des) {
                               montant, surBouclier, zone: zone.id,
                               bouclierApres: cible.bouclier, pvApres: cible.pv });
 
-                if (cible.pvMax > 0 && cible.pv <= 0 && !cible.aTerre) {
-                    cible.aTerre = true;
-                    etapes.push({ type: "chute", cible: id, acteur: zone.idLanceur || id });
-                    return;   // Tombé dans le feu : le reste de la zone ne le concerne plus.
-                }
+                const chute = tomber(etat, id, zone.idLanceur || id);
+                etapes.push(...chute);
+                // Tombé dans le feu : le reste de la zone ne le concerne plus.
+                if (cible.aTerre) return;
             }
         }
 
         // Un remous bienfaisant ne distingue pas les camps — la Persistance de
         // terrain n'a jamais fait le tri, pas plus pour un soin que pour un
         // brasier.
-        if (zone.soin) {
+        if (zone.soin && !enSursis(cible)) {     // en sursis : aucun soin
             const avant = cible.pv;
             cible.pv = Math.min(cible.pvMax, cible.pv + nombre(zone.soin.valeurBrute));
             if (cible.pv !== avant) {
@@ -1077,6 +1106,15 @@ export function resoudreCarte(etat, action, plateau) {
             if (!cible || cible.aTerre) return;
             const des = desDe(idCible);
 
+            // EN SURSIS (Nécromancien, niveau 10) : la vie est bloquée à zéro.
+            // Les coups n'y changent rien, et aucun soin ne le relève.
+            if (enSursis(cible)) {
+                etapes.push({ type: "message", cible: idCible, acteur: idLanceur,
+                              texte: attaque.isHeal ? "Sursis : aucun soin 💀" : "Sursis 💀",
+                              couleur: "#b388ff" });
+                return;
+            }
+
             // TIRÉE PUIS FRAPPÉE : la carte a visé à la portée de la Traction.
             // Si la cible n'a pas été ramenée à portée du coup (jet raté,
             // chemin bloqué), le coup ne l'atteint pas — une attaque de
@@ -1185,6 +1223,15 @@ export function resoudreCarte(etat, action, plateau) {
                               montant: compte.soinAbsorption, pvApres: cible.pv });
             }
 
+            // TÉNÈBRES : l'énergie d'abord, dite à part — un « -4 🌑 » sur le
+            // pion — avant le surplus qui frappe la vie.
+            if (compte.tenebres && compte.tenebres.surEnergie > 0) {
+                cible.fatigue = compte.tenebres.energieApres;
+                etapes.push({ type: "fatigue", cible: idCible, acteur: idLanceur,
+                              fatigueApres: cible.fatigue, tenebres: true,
+                              montant: compte.tenebres.surEnergie });
+            }
+
             if (compte.versBouclier > 0 || compte.bouclierApres !== cible.bouclier) {
                 cible.bouclier = compte.bouclierApres;
                 // Brisé : la taille de référence s'efface avec lui, pour que le
@@ -1196,20 +1243,23 @@ export function resoudreCarte(etat, action, plateau) {
                 cible.pv = Math.max(0, cible.pv - compte.versPv);
             }
 
-            etapes.push({
+            // Une Ténèbres que l'énergie a bue en entier ne touche pas la vie :
+            // pas de « -0 » sur le pion, l'étape d'énergie a tout dit.
+            if (!compte.tenebres || compte.degats > 0) etapes.push({
                 type: "degats", cible: idCible, acteur: idLanceur,
                 montant: compte.degats,
                 surBouclier: compte.versBouclier,
                 bouclierBrise: !!compte.bouclierBrise,
                 bouclierApres: cible.bouclier,
                 pvApres: cible.pv,
-                critique
+                critique,
+                ...(compte.tenebres ? { tenebres: true } : {})
             });
 
             // LE CONTRE RENVOIE SA PART À L'ATTAQUANT : bouclier d'abord, vie
             // ensuite, comme n'importe quel coup — sans résistance, c'est la
             // force du coup reçu qui repart.
-            if (nombre(compte.renvoi) > 0 && lanceur && !lanceur.aTerre && idCible !== idLanceur) {
+            if (nombre(compte.renvoi) > 0 && lanceur && !lanceur.aTerre && !enSursis(lanceur) && idCible !== idLanceur) {
                 const renvoi = nombre(compte.renvoi);
                 const bouclierAvant = nombre(lanceur.bouclier);
                 const surBouclier = Math.min(bouclierAvant, renvoi);
@@ -1219,24 +1269,18 @@ export function resoudreCarte(etat, action, plateau) {
                 etapes.push({ type: "degats", cible: idLanceur, acteur: idCible, montant: renvoi,
                               surBouclier, bouclierApres: lanceur.bouclier, pvApres: lanceur.pv,
                               renvoi: true });
-                if (lanceur.pvMax > 0 && lanceur.pv <= 0 && !lanceur.aTerre) {
-                    lanceur.aTerre = true;
-                    etapes.push({ type: "chute", cible: idLanceur, acteur: idCible });
-                }
+                etapes.push(...tomber(suivant, idLanceur, idCible));
             }
 
             // L'ÉTALEMENT : LES PARTS ATTENDENT. Rien n'a été retiré au-dessus
             // (compte.degats vaut zéro) ; tout est rangé dans l'état, une part
             // par fin de manche, autant de parts que de tours.
             if ((compte.tics || []).length > 0) {
-                empilerEtalement(cible, "Étalement", compte.tics);
+                empilerEtalement(cible, attaque.versEnergie ? ETAT_TENEBRES_ETALEES : "Étalement", compte.tics);
                 etapes.push({ type: "etats", cible: idCible, liste: cible.etats });
             }
 
-            if (cible.pvMax > 0 && cible.pv <= 0 && !cible.aTerre) {
-                cible.aTerre = true;
-                etapes.push({ type: "chute", cible: idCible, acteur: idLanceur });
-            }
+            etapes.push(...tomber(suivant, idCible, idLanceur));
         });
     });
 

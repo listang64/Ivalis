@@ -152,6 +152,7 @@ node fiche_race_classe.mjs   # race et classe dans l'onglet Statistiques ; portr
 node jet_d20.mjs            # la scène du d20 : fondu, avatar, défilement qui ralentit, modificateur égrené, lueurs, rouge/violet ; chez tous les joueurs ; sons ; pas de monstres dans les bulles du chat
 node fabrique_sons.mjs      # Paramètres → La Fabrique : dix « ding » rendus et comparés ; le ding perle remplace le parchemin dans tout le jeu
 node experience.mjs          # l'expérience : grille des niveaux, jauge de la fiche, flèches de triche (DEV), compétences à créer par niveau (la main ne bouge pas), XP de la victoire à chaque héros
+node necromancien.mjs        # la classe Nécromancien : Glacé/+1 compétence/+5 PV (niv. 1), Ténèbres (niv. 5, énergie puis PV ×1,5), sursis (niv. 10) ; Forge, extraction, fiche de classe
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -3607,3 +3608,72 @@ jamais sous le niveau 1, écriture sur la bonne fiche), la Forge (niveau 1 : 0
 à créer ; niveau 4 : 2 ; niveau 11 : 6 ; la main reste à 6) et la victoire
 (40 + 240 + 100 = 380, leurre exclu, chaque héros y compris le tombé, le poste
 perdant n'écrit rien, la ligne du butin).
+
+### La classe Nécromancien
+
+Première classe à porter des effets. Nico : « Lvl1 : devient insensible au Gel
+/ +1 compétence / +5 PV. Lvl5 : SKILL Ténèbres. Lvl10 : sa jauge de vie une
+fois atteint 0 est bloquée et il dispose de deux tours avant d'être mis KO. »
+Et, dans la fiche de la classe à la création, une brève présentation puis les
+paliers.
+
+**Les atouts de classe.** Ils vivent dans `app.js` (`ATOUTS_CLASSES`), palier
+par palier, à côté des atouts de race, et s'ajoutent à la lecture comme eux :
+rien n'est recopié dans la fiche. Le niveau vient de l'XP (`experience.js`).
+Tout le jeu lisait déjà `atoutRace` (défenses, immunités, cartes en main,
+combat) : c'est donc là que peuple et classe se rejoignent (`atoutPeuple` pour
+le peuple seul, `atoutClasse` pour la classe seule). Les nombres s'additionnent,
+les listes se rejoignent : un Gob nécromancien a 8 cartes, un Ondari
+nécromancien est immunisé au feu ET au gel.
+
+- **Niveau 1** : immunité au Glacé (le chemin de l'Ondari et du feu), +1
+  compétence (en main et à forger, comme le Gob), +5 PV (`pvMaxCombattant`, par
+  où passent désormais toutes les lectures de PV max de combat.js et de
+  l'ancien moteur).
+- **Niveau 5 : Ténèbres.** Un effet de base comme l'Attaque Magique (2 pts,
+  Intelligence, 3 dégâts magiques). La défense magique réduit d'abord ; les
+  dégâts vont ensuite à l'énergie (la jauge de fatigue) ; ce que l'énergie ne
+  peut plus boire frappe les PV ×1,5, arrondi à l'inférieur
+  (`partageTenebres`, moteur_pur.js). Le bouclier ne protège pas l'énergie, il
+  n'absorbe que ce surplus. Étalée, ses parts attendent dans leur propre état
+  (« Ténèbres étalées ») et suivent la même règle en fin de manche. À l'écran :
+  « -3 ⚡🌑 » pour l'énergie bue, « -6 🌑 » pour le surplus.
+  La fiche de l'effet (`EFF_TENEBRES`) est dans `MIGRATION_EFFETS` : le bouton
+  « Mettre la BDD à jour » des Paramètres la crée une fois, sans jamais
+  l'écraser ensuite. En attendant, le jeu en garde une copie en mémoire
+  (`secoursLocal`). Elle porte `Classe` et `Niveau_Requis` : la Forge ne la
+  propose qu'au Nécromancien de niveau 5 et plus (`effetAccessible`), et le
+  générateur de monstres ne la pioche jamais.
+- **Niveau 10 : le sursis.** Toutes les façons de perdre ses derniers PV (carte,
+  renvoi du Contre, zone, attaque d'opportunité, poison, brûlure, étalement)
+  passent désormais par une seule fonction, `tomber` (combat_etat.js). Un
+  Nécromancien de niveau 10 qui n'a pas encore usé son sursis ne tombe pas :
+  sa vie reste bloquée à 0, il reste debout, joue normalement, les coups sont
+  ignorés (« Sursis 💀 ») et aucun soin ne le relève. Le sursis se décompte à
+  la fin de chacun de ses tours (`cloturerTour`) ; au bout du second, il est
+  mis KO. Un sursis entamé pendant son propre tour ne compte pas ce tour-là.
+  Une seule fois par combat. Les étapes (`sursis`, puis `chute`) portent le
+  résultat : le journal se rejoue à l'identique. La fiche porte le sursis
+  (`estCombattantMort` ne le croit pas mort), et les créatures préfèrent une
+  autre cible tant qu'elles en ont une.
+
+Au passage : `fichesDepuisEtat` (pont_combat.js) recopiait le maximum CALCULÉ
+dans `PV_Max`, qui était ensuite relu avec ses bonus : la retouche DEV (et
+maintenant les +5 du Nécromancien) comptait deux fois. La fiche garde désormais
+sa valeur de base.
+
+**La fiche de la classe.** Quand une classe a un descriptif
+(`DESCRIPTIFS_CLASSES`, classes.js), le titre monte sous le bouton retour, et
+la moitié gauche reçoit la présentation puis les paliers (Niv. 1, 5, 10), sur
+un voile plus sombre. Sur téléphone, le texte prend toute la largeur (marges de
+16 px) et le bouton « Choisir cette classe » tient sur une ligne. Les autres
+classes gardent leur fiche d'avant.
+
+`necromancien.mjs` vérifie les paliers (niveaux 1, 4, 5, 9, 10), la fusion avec
+les races, les PV et les cartes, l'immunité même sur un critique, chaque cas de
+Ténèbres (énergie, surplus ×1,5, arrondi, bouclier, défense magique, rejeu,
+étalement, affichage), le sursis (debout à 0, coups et soins ignorés, deux
+tours puis KO, tour entamé, une seule fois, niveau 9, tics, rejeu), puis dans
+la vraie page : le secours local, la Forge (niveau 5 oui, 4 non, autre classe
+non), la palette des monstres, l'extraction d'une carte forgée, la fiche de
+classe (placement, téléphone, captures) et la fiche en sursis.

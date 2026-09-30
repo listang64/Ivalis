@@ -167,7 +167,8 @@ function persoDocVersFront(id, d) {
     idFaction: d.ID_Faction || "",
     PV_Max: d.PV_Max || 0,
     PV_Actuels: d.PV_Actuels !== undefined ? d.PV_Actuels
-        : ((parseInt(d.PV_Max) || 0) + (parseInt(d.Dev_Mod_PV) || 0)),
+        : (window.pvMaxCombattant ? window.pvMaxCombattant(d)
+                                  : (parseInt(d.PV_Max) || 0) + (parseInt(d.Dev_Mod_PV) || 0)),
     Fatigue_Max: d.Fatigue_Max !== undefined ? d.Fatigue_Max : 100,
     Regeneration: d.Regeneration !== undefined ? d.Regeneration : 35,
     Esquive: esquiveCalc, // 🔻 Calculé avec le malus
@@ -786,7 +787,10 @@ async function chargerCaracsPartie(ids) {
 
 window.pvMaxCombattant = function(perso) {
     if (!perso) return 0;
-    return (parseInt(perso.PV_Max) || 0) + (parseInt(perso.Dev_Mod_PV) || 0);
+    // Les PV que la classe ajoute (Nécromancien : +5) s'ajoutent à la lecture,
+    // comme l'énergie de l'Humain : la fiche garde sa valeur de création.
+    const bonus = window.atoutRace ? (Number(window.atoutRace(perso).pvMax) || 0) : 0;
+    return (parseInt(perso.PV_Max) || 0) + (parseInt(perso.Dev_Mod_PV) || 0) + bonus;
 };
 
 // Un monstre porte "fatigueMax", un personnage "Fatigue_Max" : les deux noms
@@ -841,9 +845,82 @@ window.ATOUTS_RACES = {
 
 // La fiche front-end porte "race", le document Firestore porte "Race" : la
 // Forge lit l'un, le combat l'autre. On accepte les deux.
-window.atoutRace = function(perso) {
+window.atoutPeuple = function(perso) {
     if (!perso || perso.estMonstre) return {};
     return window.ATOUTS_RACES[perso.race] || window.ATOUTS_RACES[perso.Race] || {};
+};
+
+// =========================================================================
+//  LES ATOUTS DE CLASSE
+// =========================================================================
+//  Même principe que ceux du peuple : rien n'est recopié dans la fiche, tout
+//  s'ajoute à la lecture. Une classe donne ses atouts PALIER PAR PALIER, selon
+//  le niveau du héros (tiré de son XP, experience.js) : un Nécromancien de
+//  niveau 4 a ceux du niveau 1, pas encore ceux du 5.
+//
+//    immunites   états qu'il n'attrape jamais (comme l'Ondari et le feu)
+//    competences une carte de plus en main ET à forger (comme le Gob)
+//    pvMax       points de vie maximum en plus
+//    effets      effets de la Forge réservés à la classe (Ténèbres)
+//    sursis      tombé à 0 PV, il tient encore ce nombre de tours (une fois
+//                par combat, sans soin possible) avant d'être mis KO
+window.ATOUTS_CLASSES = {
+    "Nécromancien": [
+        { niveau: 1,  immunites: ["Glacé"], competences: 1, pvMax: 5 },
+        { niveau: 5,  effets: ["EFF_TENEBRES"] },
+        { niveau: 10, sursis: 2 }
+    ]
+};
+
+// Le nom d'une classe sans accents ni majuscules : la fiche garde le nom tel
+// qu'il a été choisi (« Nécromancien »), la base pourrait l'écrire autrement.
+const cleClasse = (nom) => String(nom || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().trim();
+
+window.paliersDeClasse = function(nomClasse) {
+    const cle = cleClasse(nomClasse);
+    const nom = Object.keys(window.ATOUTS_CLASSES).find(n => cleClasse(n) === cle);
+    return nom ? window.ATOUTS_CLASSES[nom] : [];
+};
+
+window.niveauDuPerso = function(perso) {
+    if (!perso || typeof window.niveauDepuisXP !== "function") return 1;
+    return window.niveauDepuisXP(window.xpDuPerso(perso));
+};
+
+// Ce que la classe donne À CE NIVEAU : les paliers atteints, additionnés.
+window.atoutClasse = function(perso) {
+    if (!perso || perso.estMonstre || perso.estIllusion) return {};
+    const paliers = window.paliersDeClasse(perso.classe || perso.Classe);
+    if (paliers.length === 0) return {};
+    const niveau = window.niveauDuPerso(perso);
+    return paliers.filter(p => niveau >= p.niveau).reduce(fusionnerAtouts, {});
+};
+
+// Deux jeux d'atouts en un : les nombres s'additionnent, les listes se
+// rejoignent, le reste se garde.
+function fusionnerAtouts(a, b) {
+    const r = { ...a };
+    Object.keys(b || {}).forEach(k => {
+        if (k === "niveau") return;
+        const v = b[k];
+        if (typeof v === "number") r[k] = (Number(r[k]) || 0) + v;
+        else if (Array.isArray(v)) r[k] = [...new Set([...(r[k] || []), ...v])];
+        else r[k] = v;
+    });
+    return r;
+}
+
+// TOUT LE JEU LIT `atoutRace` (défenses, immunités, cartes en main, combat) :
+// c'est donc là que le peuple et la classe se rejoignent. Un seul point
+// d'entrée, et chaque règle écrite pour les races vaut aussitôt pour les
+// classes — l'immunité au Glacé du Nécromancien passe par le même chemin que
+// celle de l'Ondari au feu.
+window.atoutRace = function(perso) {
+    const peuple = window.atoutPeuple(perso);
+    const classe = window.atoutClasse(perso);
+    if (Object.keys(classe).length === 0) return peuple;
+    return fusionnerAtouts(fusionnerAtouts({}, peuple), classe);
 };
 
 // L'équipement (objets.js) s'ajoute aux stats exactement comme les atouts de
@@ -931,9 +1008,19 @@ window.multiplicateurSoinsRecus = function(perso) {
 // moteur, qui range soins, purifications et boucliers du côté magique. La Forge
 // et le combat s'appuient tous deux dessus : c'est ce qui garantit que la carte
 // affiche la portée que le sort aura réellement.
+// TÉNÈBRES, le sort du Nécromancien : des dégâts magiques qui boivent
+// l'énergie avant la vie. Reconnu à son nom (avec ou sans accents), comme tous
+// les effets du grimoire — la Forge, l'extraction et le moteur lisent CETTE
+// fonction, pour ne jamais diverger.
+window.estEffetTenebres = function(nom) {
+    const n = String(nom || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    return n.includes("tenebres");
+};
+
 window.actionEstMagique = function(nomEffetBase) {
     const n = (nomEffetBase || "").toLowerCase();
     return n.includes("magique") || n.includes("pouvoir") || n.includes("soin")
+        || window.estEffetTenebres(n)
         || n.includes("guérison") || n.includes("guerison")
         || n.includes("purification") || n.includes("bouclier");
 };
@@ -4189,8 +4276,47 @@ window.MIGRATION_EFFETS = [
                 Type_Mecanique: "Physique", Type_Mecanique_2: "Aucun",
                 Valeur: 0, Pourcent_Base: 10, Pourcent_Max: 70, Tours: 2, Cible_Etat: "aveuglement",
                 Effet_Base: "10% chance (max 70%) d'aveugler la cible, sur 2 tours",
-                Notes: "Aveuglement : 3 hexagones autour de la cible sont dans le noir, fixés là où elle a été aveuglée. Impossible d'y cibler un ennemi ou un allié (les sorts de zone les touchent quand même). Le noir n'est visible que de l'aveuglé." } }
+                Notes: "Aveuglement : 3 hexagones autour de la cible sont dans le noir, fixés là où elle a été aveuglée. Impossible d'y cibler un ennemi ou un allié (les sorts de zone les touchent quand même). Le noir n'est visible que de l'aveuglé." } },
+    // TÉNÈBRES, LE SORT DU NÉCROMANCIEN (niveau 5). Un effet de base comme
+    // l'Attaque Magique (2 pts, Intelligence, 3 dégâts magiques), réservé à la
+    // classe : `Classe` et `Niveau_Requis` le cachent à tous les autres dans la
+    // Forge, et le générateur de monstres ne le pioche jamais. `secoursLocal` :
+    // tant que la base ne l'a pas, le jeu en garde cette copie en mémoire —
+    // le sort marche avant même qu'on ait pressé le bouton.
+    { id: "EFF_TENEBRES", creer: true, secoursLocal: true,
+      champs: { Nom: "Ténèbres", Cout_PT: "2", Modificateur: "INTELLIGENCE",
+                Type_Mecanique: "Action/Global", Type_Mecanique_2: "Aucun",
+                Valeur: 3, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Cible_Etat: "tenebres",
+                Classe: "Nécromancien", Niveau_Requis: 5,
+                Effet_Base: "3 dégâts magiques, appliqués à la fatigue à la place des points de vie",
+                Notes: "Réservé au Nécromancien (niveau 5). Les dégâts vont à l'énergie (fatigue) de la cible au lieu de ses PV. Si elle n'a plus d'énergie, le reste frappe ses PV ×1,5 (arrondi à l'inférieur). Le bouclier ne protège pas l'énergie ; il n'absorbe que ce qui frappe les PV." } }
 ];
+
+// Les effets que le jeu sait jouer même quand la base ne les a pas encore
+// (bouton « Mettre la BDD à jour » pas encore pressé).
+window.completerEffetsDeSecours = function(cache) {
+    (window.MIGRATION_EFFETS || []).forEach(regle => {
+        if (regle.secoursLocal && !cache[regle.id]) cache[regle.id] = { ...regle.champs };
+    });
+    return cache;
+};
+
+// LES EFFETS RÉSERVÉS À UNE CLASSE. Un effet l'est quand sa fiche le dit
+// (`Classe`), ou quand une classe le range dans ses atouts (ATOUTS_CLASSES) —
+// les deux, pour qu'un grimoire retouché à la main ne le rende pas public.
+window.effetReserveAUneClasse = function(id, effet) {
+    if (effet && effet.Classe) return true;
+    return Object.values(window.ATOUTS_CLASSES || {}).some(paliers =>
+        paliers.some(p => (p.effets || []).includes(id)));
+};
+
+// Ce héros a-t-il droit à cet effet dans la Forge ? Oui pour tout effet
+// public ; pour un effet de classe, seulement si sa classe l'a débloqué à son
+// niveau (Ténèbres : Nécromancien de niveau 5).
+window.effetAccessible = function(id, effet, perso) {
+    if (!window.effetReserveAUneClasse(id, effet)) return true;
+    return (window.atoutRace(perso || {}).effets || []).includes(id);
+};
 
 window.appliquerMigrationEffets = async function() {
     const btn = document.getElementById("btn-migration-effets");
@@ -4278,6 +4404,7 @@ window.chargerCacheEffetsBDD = async function() {
         window.EFFETS_BDD_CACHE = {};
         snap.forEach(d => window.EFFETS_BDD_CACHE[d.id] = d.data());
     } catch(e) { console.error("Erreur cache effets :", e); }
+    window.completerEffetsDeSecours(window.EFFETS_BDD_CACHE || (window.EFFETS_BDD_CACHE = {}));
 };
 
 window.exporterEffetsBDD = async function() {

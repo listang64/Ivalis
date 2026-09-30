@@ -909,6 +909,7 @@ function estUneAttaqueDeBase(nom) {
     if (!nom) return false;
     const n = nom.toLowerCase();
     return n.includes("attaque magique") || 
+           n.includes("ténèbres") || n.includes("tenebres") ||   // Nécromancien
            n.includes("attaque légère") || 
            n.includes("attaque legere") || 
            n.includes("attaque lourde") || 
@@ -1022,8 +1023,11 @@ function estIncompatibleAvecArme(nomEffet, arme) {
     if (!arme || !nomEffet) return false;
     const nom = nomEffet.toLowerCase();
     
+    // Ténèbres suit la règle de l'Attaque Magique : un sort, qui ne se lance
+    // pas « sans arme ».
+    const tenebres = typeof window.estEffetTenebres === "function" && window.estEffetTenebres(nom);
     if (arme === "Sans arme / Arme rp") {
-        if (nom.includes("attaque magique") || nom.includes("mot de pouvoir") || nom.includes("mots de pouvoir") || nom.includes("attaque légère") || nom.includes("attaque legere")) return true;
+        if (tenebres || nom.includes("attaque magique") || nom.includes("mot de pouvoir") || nom.includes("mots de pouvoir") || nom.includes("attaque légère") || nom.includes("attaque legere")) return true;
     } else if (arme === "Arme légère CAC") {
         if (nom.includes("attaque lourde")) return true;
     } else if (arme === "Arme lourde CAC") {
@@ -1158,7 +1162,11 @@ window.ouvrirCreationCompetence = async function() {
         if (snapPerso.exists()) window.forgeState.statsPerso = snapPerso.data();
         window.forgeState.caracs = snapCaracs.exists() ? snapCaracs.data() : {};
 
-        window.forgeState.effetsBDD = Object.keys(window.EFFETS_BDD_CACHE || {}).map(id => {
+        // Un effet de classe (Ténèbres) n'apparaît qu'au héros qui y a droit.
+        window.forgeState.effetsBDD = Object.keys(window.EFFETS_BDD_CACHE || {})
+            .filter(id => typeof window.effetAccessible !== "function"
+                || window.effetAccessible(id, window.EFFETS_BDD_CACHE[id], window.forgeState.statsPerso))
+            .map(id => {
             const data = window.EFFETS_BDD_CACHE[id];
             return {
                 id: id,
