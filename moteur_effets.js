@@ -2157,6 +2157,22 @@ window.demarrerCiblage = async function(idCarte, options) {
         });
     }
 
+    // LA PERSISTANCE DE TERRAIN SE POSE COMME UNE ZONE (demande de Nico). Une
+    // carte « 8 dégâts + Persistance » sans mod Zone visait une CRÉATURE, et la
+    // nappe naissait sous elle : impossible de la poser sur une case vide. Elle
+    // devient une zone d'UNE case : au contact, l'une des six cases voisines
+    // (on tourne autour du lanceur, comme une zone de mêlée) ; avec de la
+    // Distance, n'importe quelle case à portée. Ce qui s'y trouve est frappé,
+    // et la nappe reste — créature ou pas. Tous les effets de la carte vont
+    // dans cette case (enZone), un soin compris : c'est un remous qui soigne.
+    // Les créatures, elles, gardent leur façon de viser (analyserCarteMonstre).
+    if (aPersistanceTerrain && !isZone && !(persoLanceur && persoLanceur.estMonstre)) {
+        isZone = true;
+        zoneHexesBase = [{ q: 1, r: 0 }];
+        attaquesExtraites.forEach(a => { a.enZone = true; });
+        alterationsExtraites.forEach(a => { a.enZone = true; });
+    }
+
     // Bond : résolu à part (choix de la case, animation). On respecte l'ordre de la carte :
     // si le Bond est avant le premier autre effet (ou qu'il n'y a rien d'autre), il se joue
     // maintenant ; s'il est après une attaque/altération, on le reporte après leur résolution

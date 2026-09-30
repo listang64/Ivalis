@@ -911,3 +911,15 @@ window.raisonBlocageCarte = function(perso, arme) {
     if (portees.some(o => o.type === arme)) return null;
     return `${portees.map(o => o.nom).join(" et ")} ne permet pas une technique « ${arme} ».`;
 };
+
+// Les techniques de ce héros que ses armes en main empêchent de lancer, avec
+// leur raison. La même règle qu'en combat (raisonBlocageCarte) : la fiche, le
+// combat et l'alerte au changement d'arme ne peuvent donc jamais diverger.
+window.competencesBloqueesParArme = function(perso) {
+    if (!perso || !perso.idPersonnage) return [];
+    const cartes = (window.CACHE_COMPETENCES_GLOBAL || {})[perso.idPersonnage] || {};
+    return Object.keys(cartes)
+        .map(id => ({ id, nom: (cartes[id] && cartes[id].Nom) || "Technique", arme: (cartes[id] || {}).Arme || "",
+                      raison: window.raisonBlocageCarte(perso, (cartes[id] || {}).Arme) }))
+        .filter(c => c.raison);
+};

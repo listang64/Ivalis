@@ -267,12 +267,21 @@ window.equiperObjet = async function(idPersonnage, objet, main) {
         .filter(o => o && o.image)
         .map(o => o.image);
 
+    // Les techniques que l'arme d'avant laissait passer, pour dire ensuite
+    // lesquelles la nouvelle bloque.
+    const bloqueesAvant = new Set((typeof window.competencesBloqueesParArme === "function" && perso
+        ? window.competencesBloqueesParArme(perso) : []).map(c => c.id));
+
     try {
         await updateDoc(doc(db, "Personnages", idPersonnage), maj);
         window.appliquerEquipementEnRam(idPersonnage, maj);
     } catch (e) {
         console.error("Équipement :", e);
         return;
+    }
+
+    if (typeof window.signalerCompetencesBloquees === "function") {
+        await window.signalerCompetencesBloquees(idPersonnage, objet, bloqueesAvant);
     }
 
     // Le ménage se fait APRÈS l'écriture, et sans être attendu : le joueur n'a
@@ -290,6 +299,45 @@ window.equiperObjet = async function(idPersonnage, objet, main) {
     if (objet && objet.emplacement === "Armure" && typeof window.suivreArmureEquipee === "function") {
         Promise.resolve(window.suivreArmureEquipee(idPersonnage, objet))
             .catch(e => console.error("Rhabillage de l'avatar :", e));
+    }
+};
+
+// UN NOUVEAU TYPE D'ARME PEUT RENDRE DES TECHNIQUES INUTILISABLES (demande de
+// Nico). Juste après l'équipement : les techniques que l'arme bloque sortent
+// des compétences mémorisées, une alerte nomme celles qui viennent de devenir
+// inutilisables (au joueur du héros seulement), et la fiche ouverte se
+// redessine avec leurs bannières grisées.
+window.signalerCompetencesBloquees = async function(idPersonnage, objet, bloqueesAvant) {
+    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+    if (!perso || typeof window.competencesBloqueesParArme !== "function") return [];
+    const nouvelles = window.competencesBloqueesParArme(perso).filter(c => !(bloqueesAvant || new Set()).has(c.id));
+    const retirees = typeof window.retirerCartesBloqueesDuDeck === "function"
+        ? await window.retirerCartesBloqueesDuDeck(idPersonnage) : [];
+
+    const moi = localStorage.getItem("ID_JOUEUR_COURANT");
+    const aMoi = !perso.idJoueur || !moi || perso.idJoueur === moi;
+    if (nouvelles.length > 0 && aMoi) {
+        const nomHeros = perso.prenom || "Ce héros";
+        const lignes = nouvelles.map(c => `  • ${c.nom}${c.arme ? ` (${c.arme})` : ""}`).join("\n");
+        const retireesTxt = retirees.length > 0
+            ? `\n\nRetirée${retirees.length > 1 ? "s" : ""} des compétences mémorisées : ${retirees.map(c => c.nom).join(", ")}.`
+            : "";
+        window.alert(`⚠️ Avec « ${(objet && objet.nom) || "cette arme"} », ${nomHeros} ne peut plus utiliser :\n${lignes}`
+                     + `\n\nCes compétences sont grisées dans sa fiche.` + retireesTxt);
+    }
+    window.rafraichirCompetencesSiOuvertes(idPersonnage);
+    return nouvelles;
+};
+
+// La fiche de ce héros montre ses compétences : on les redessine (grisées,
+// dégrisées) sans attendre une réouverture.
+window.rafraichirCompetencesSiOuvertes = function(idPersonnage) {
+    if (window.ID_PERSONNAGE_DECK !== idPersonnage) return;
+    if (document.getElementById("champ-id-personnage")?.value !== idPersonnage) return;
+    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+    if (typeof window.chargerOngletCompetences === "function") {
+        window.chargerOngletCompetences(idPersonnage, typeof window.competencesMaxCombattant === "function"
+            ? window.competencesMaxCombattant(perso) : (window.CARTES_MAX_PERSO || 6));
     }
 };
 
@@ -329,6 +377,8 @@ window.lacherObjet = async function(idPersonnage, champ) {
         console.error("Lâcher l'objet :", e);
         return;
     }
+    // Une arme lâchée peut dégriser des techniques.
+    if (typeof window.rafraichirCompetencesSiOuvertes === "function") window.rafraichirCompetencesSiOuvertes(idPersonnage);
 
     Promise.resolve(window.oublierImages(abandonnes, "objet lâché"))
         .catch(e => console.error("Ménage des images :", e));

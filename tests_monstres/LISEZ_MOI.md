@@ -154,6 +154,7 @@ node fabrique_sons.mjs      # Paramètres → La Fabrique : dix « ding » rendu
 node experience.mjs          # l'expérience : grille des niveaux, jauge de la fiche, flèches de triche (DEV), compétences à créer par niveau (la main ne bouge pas), XP de la victoire à chaque héros
 node necromancien.mjs        # la classe Nécromancien : Glacé/+1 compétence/+5 PV (niv. 1), Ténèbres (niv. 5, énergie puis PV ×1,5), sursis (niv. 10) ; Forge, extraction, fiche de classe
 node surpuissance.mjs        # la surpuissance : ×1,25 dès 70 de fatigue, ×1,35 dès 100 (dégâts et soins, pas les boucliers) ; extraction, Forge, carte
+node armes_et_zones.mjs      # persistance posée comme une zone d'une case ; Distance réservée (polyvalente, distance, magie, soin) ; arme qui bloque des techniques : alerte, grisées, retirées du deck
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -3769,3 +3770,42 @@ lui, reste le même.
 
 `depot_firestore.mjs` (dernière section) vérifie le filtre, la lecture du dépôt
 avant et après l'arrivée en base, et le drapeau posé par le vrai adaptateur.
+
+### Persistance en zone, Distance réservée, armes qui bloquent des techniques
+
+Trois demandes de Nico.
+
+**La Persistance de terrain se pose comme une zone.** « Une compétence avec
+par exemple 8 dégâts et persistance terrain doit pouvoir se lancer où on veut
+au cac, sans faire de ciblage. » Sans mod Zone, une telle carte visait une
+créature et la nappe naissait sous elle. À l'extraction (moteur_effets.js),
+une carte de héros qui porte une Persistance sans Zone devient une zone d'UNE
+case : au contact, l'une des six cases voisines (on tourne autour du lanceur,
+comme une zone de mêlée) ; avec de la Distance, n'importe quelle case à
+portée. Ce qui s'y trouve est frappé, et la nappe reste même sur une case vide.
+Les créatures gardent leur façon de viser.
+
+**Le sous-effet Distance** ne se pose plus que sur une technique d'arme
+polyvalente, d'arme à distance ou de magie — ou, quelle que soit l'arme, sur
+une action de soin (`armePermetDistance`, competences.js). Ailleurs il est
+proposé grisé « (non compatible) ». Changer l'arme de la technique retire une
+Distance devenue interdite (sauf sur un soin). Les techniques déjà forgées ne
+sont pas modifiées.
+
+**Une nouvelle arme peut bloquer des techniques.** La règle est celle du combat
+(`raisonBlocageCarte`, objets.js) : `competencesBloqueesParArme` liste ce que
+les armes en main empêchent. Après `equiperObjet` (loot.js) :
+- une alerte nomme les techniques qui DEVIENNENT inutilisables (au joueur du
+  héros seulement) ;
+- elles sortent des compétences mémorisées (`retirerCartesBloqueesDuDeck`,
+  écrit en base) ;
+- la fiche ouverte se redessine : leurs bannières prennent le cadre grisé du
+  combat (`banniere-epuisee`), la raison au survol, et on ne peut plus les
+  remettre en main (« Arme inadaptée »).
+Lâcher l'arme redessine la fiche : ce qu'elle bloquait redevient jouable.
+
+`armes_et_zones.mjs` vérifie les trois : zone d'une case au contact et à
+distance, nappe posée sur une case vide, cartes sans persistance et créatures
+inchangées ; Distance proposée ou grisée selon l'arme et le soin, retirée au
+changement d'arme ; l'alerte, le cadre grisé, le deck réécrit, le refus de la
+remettre en main, et le dégrisage quand on lâche l'arme.

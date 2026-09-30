@@ -52,6 +52,31 @@ window.CARTE_EN_APERCU = null;
 
 const IMAGE_CADRE_NORMAL = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png";
 const IMAGE_CADRE_SELECTIONNE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1783286721/ban_cible_pdpnad.png";
+// La bannière grisée du combat (combat.js) : une technique que l'arme en main
+// empêche de lancer.
+const IMAGE_CADRE_EPUISE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1783286721/ban_epuis%C3%A9_otc70l.png";
+
+// UNE TECHNIQUE QUE L'ARME EMPÊCHE NE RESTE PAS MÉMORISÉE. Retire du deck
+// équipé de ce héros toutes celles que ses armes en main bloquent, l'écrit en
+// base et en mémoire, et rend ce qui a été retiré ({ id, nom, arme, raison }).
+window.retirerCartesBloqueesDuDeck = async function(idPersonnage) {
+    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+    if (!perso || typeof window.competencesBloqueesParArme !== "function") return [];
+    const bloquees = window.competencesBloqueesParArme(perso);
+    const ficheOuverte = window.ID_PERSONNAGE_DECK === idPersonnage && Array.isArray(window.CARTES_SELECTIONNEES);
+    const deck = ficheOuverte ? window.CARTES_SELECTIONNEES : (perso.deckEquipe || []);
+    const retirees = bloquees.filter(c => deck.includes(c.id));
+    if (retirees.length === 0) return [];
+    const reste = deck.filter(id => !retirees.some(c => c.id === id));
+    perso.deckEquipe = reste;
+    if (ficheOuverte) window.CARTES_SELECTIONNEES = [...reste];
+    try {
+        await updateDoc(doc(db, "Personnages", idPersonnage), { Deck_Equipe: reste });
+    } catch (e) {
+        console.error("Deck après changement d'arme :", e);
+    }
+    return retirees;
+};
 
 window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 6) {
     const spanMax = document.getElementById("affichage-competences-max");
@@ -133,6 +158,17 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
                 ? `dont ${bonusNiveau} gagnée${bonusNiveau > 1 ? "s" : ""} au niveau ${niveauPerso}` : "";
         }
 
+        // LES TECHNIQUES QUE L'ARME EN MAIN EMPÊCHE : grisées comme en combat,
+        // et retirées des compétences mémorisées si elles l'étaient.
+        const persoArmes = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+        const bloqueesParArme = new Map((typeof window.competencesBloqueesParArme === "function" && persoArmes
+            ? window.competencesBloqueesParArme(persoArmes) : []).map(c => [c.id, c.raison]));
+        // Pas attendu : le deck est corrigé en mémoire tout de suite (avant le
+        // premier await de la fonction), l'écriture en base suit.
+        if (window.CARTES_SELECTIONNEES.some(id => bloqueesParArme.has(id))) {
+            window.retirerCartesBloqueesDuDeck(idPersonnage);
+        }
+
         const nbCreees = competencesArray.length;
         const nbRestantes = window.CREATIONS_MAX_PERSO - nbCreees;
 
@@ -203,9 +239,12 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
             const initiative = data.Initiative || 0;
 
             const estSelectionnee = window.CARTES_SELECTIONNEES.includes(idCarte);
+            const raisonArme = bloqueesParArme.get(idCarte) || null;
             let isSelStr = estSelectionnee ? "true" : "false";
             let decalageX = estSelectionnee ? "80px" : "0px";
-            let urlCadre = estSelectionnee ? IMAGE_CADRE_SELECTIONNE : IMAGE_CADRE_NORMAL;
+            let urlCadre = raisonArme ? IMAGE_CADRE_EPUISE : (estSelectionnee ? IMAGE_CADRE_SELECTIONNE : IMAGE_CADRE_NORMAL);
+            const classeArme = raisonArme ? " banniere-epuisee banniere-bloquee-arme" : "";
+            const survolArme = raisonArme ? ` title="${raisonArme.replace(/"/g, "&quot;")}"` : "";
 
             const zIndexBase = 2;
 
@@ -217,7 +256,7 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
             // calque de clic réel (dimensions exactes du rectangle de couleur), seul ce calque
             // peut être touché : plus aucun risque qu'une carte en vole une autre.
             htmlDeck += `
-                <div id="ui-carte-${idCarte}" class="banniere-carte" data-selectionnee="${isSelStr}"
+                <div id="ui-carte-${idCarte}" class="banniere-carte${classeArme}" data-selectionnee="${isSelStr}"${raisonArme ? ` data-bloquee-arme="true"` : ""}
                      style="position: relative; width: 100%; height: 160px; display: flex; align-items: center; transition: transform 0.2s ease; margin-bottom: ${window.ESPACEMENT_BANNIERES_COMBAT}px; z-index: ${zIndexBase}; transform: translateX(${decalageX}); pointer-events: none;"
                      onmouseover="this.style.transform = this.dataset.selectionnee === 'true' ? 'translateX(95px)' : 'translateX(12px)';"
                      onmouseout="this.style.transform = this.dataset.selectionnee === 'true' ? 'translateX(80px)' : 'translateX(0px)';">
@@ -230,7 +269,7 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
 
                     <div class="titre-auto-reduit" data-taille-max="17" style="position: absolute; top: 48%; transform: translateY(-50%); left: 120px; right: 20px; text-align: center; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;">${titre}</div>
 
-                    <div onclick="window.gererClicCarte('${idCarte}')" style="position: absolute; top: 47px; bottom: 55px; left: 115px; right: 57px; z-index: 4; cursor: pointer; pointer-events: auto;"></div>
+                    <div onclick="window.gererClicCarte('${idCarte}')"${survolArme} style="position: absolute; top: 47px; bottom: 55px; left: 115px; right: 57px; z-index: 4; cursor: pointer; pointer-events: auto;"></div>
                     ${croixSuppression(idCarte)}
                 </div>
             `;
@@ -810,7 +849,24 @@ window.basculerSelectionCarte = async function(idCarte) {
         elementBanniere.style.transform = "translateX(0px)";
         elementCadre.style.backgroundImage = `url('${IMAGE_CADRE_NORMAL}')`;
     } else {
-        // ACTION : AJOUTER LA CARTE
+        // ACTION : AJOUTER LA CARTE — pas si l'arme en main l'empêche.
+        if (elementBanniere.dataset.bloqueeArme === "true") {
+            let msgArme = document.getElementById("erreur-deck-arme");
+            if (!msgArme) {
+                msgArme = document.createElement("div");
+                msgArme.id = "erreur-deck-arme";
+                msgArme.style.cssText = "position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(40, 10, 10, 0.95); color: #e8d5a5; padding: 20px 34px; border: 2px solid #ff4c4c; border-radius: 12px; font-weight: bold; font-size: 20px; text-shadow: 0 0 10px red; box-shadow: 0 0 40px rgba(255, 0, 0, 0.9); z-index: 2000; text-align: center; pointer-events: none; opacity: 0; transition: opacity 0.3s ease; max-width: 80vw;";
+                document.body.appendChild(msgArme);
+            }
+            const raison = (elementBanniere.querySelector("[title]") || {}).title || "L'arme en main ne permet pas cette technique.";
+            msgArme.innerHTML = `Arme inadaptée<br><span style="font-size: 15px; color: #e8d5a5;">${raison}</span>`;
+            msgArme.style.opacity = "1";
+            setTimeout(() => { if (msgArme) msgArme.style.opacity = "0"; }, 2500);
+            elementBanniere.style.transform = "translateX(-5px)";
+            setTimeout(() => elementBanniere.style.transform = "translateX(5px)", 50);
+            setTimeout(() => elementBanniere.style.transform = "translateX(0px)", 100);
+            return;
+        }
         if (window.CARTES_SELECTIONNEES.length >= window.CARTES_MAX_PERSO) {
             // Limite Max Atteinte (Message immersif)
             let msgErreur = document.getElementById("erreur-deck-immersif");
@@ -1350,6 +1406,20 @@ function isEffetPhysique(effet) {
     return effet && (effet.Type_Mecanique === "Physique" || effet.Type_Mecanique_2 === "Physique");
 }
 
+// LE SOUS-EFFET DISTANCE N'EST PAS POUR TOUTES LES ARMES (règle de Nico) :
+// seulement une arme polyvalente, une arme à distance, la magie — ou, quelle
+// que soit l'arme, une action de soin (un soin se lance de loin).
+window.armePermetDistance = function(arme) {
+    const a = String(arme || "");
+    return a === "Arme polyvalente" || a === "Magie" || a.includes("Distance");
+};
+window.distancePermiseSurAction = function distancePermiseSurAction(act, arme) {
+    if (window.armePermetDistance(arme)) return true;
+    const nom = ((act && act.baseEffet && act.baseEffet.Nom) || "").toLowerCase();
+    return (nom.includes("soin") || nom.includes("guérison") || nom.includes("guerison")) && !nom.includes("bouclier");
+};
+const distancePermiseSurAction = window.distancePermiseSurAction;
+
 function purgerIncompatibilitesArme() {
     if (!window.forgeState.armePrincipale) return;
 
@@ -1365,6 +1435,19 @@ function purgerIncompatibilitesArme() {
             });
         });
     }
+
+    // Une Distance posée avant de changer d'arme tombe si la nouvelle ne la
+    // permet pas (sauf sur un soin).
+    window.forgeState.actions.forEach(act => {
+        if (distancePermiseSurAction(act, window.forgeState.armePrincipale)) return;
+        Object.keys(act.mods).forEach(modId => {
+            const modEff = window.forgeState.effetsBDD.find(e => e.id === modId);
+            if (modEff && modEff.Nom === "Distance") {
+                delete act.mods[modId];
+                if (act.modsDuree) delete act.modsDuree[modId];
+            }
+        });
+    });
 }
 
 window.selectionnerArme = function(arme) {
@@ -1452,6 +1535,12 @@ window.attacherModificateur = function(selectElement, idInst) {
     const modId = selectElement.value;
     if (!modId) return;
     if (window.forgeState.isCapReached) { selectElement.value = ""; return; }
+    // La Distance refusée par l'arme ne passe pas, même par un menu d'avant.
+    const modEff = window.forgeState.effetsBDD.find(e => e.id === modId);
+    const act = window.forgeState.actions.find(a => a.idInst === idInst);
+    if (modEff && modEff.Nom === "Distance" && !distancePermiseSurAction(act, window.forgeState.armePrincipale)) {
+        selectElement.value = ""; return;
+    }
     window.modifierModCount(idInst, modId, 1);
     selectElement.value = "";
 };
@@ -1931,9 +2020,13 @@ window.rafraichirForge = function() {
                 // réciproquement, où qu'ils soient posés sur la carte.
                 const estIncompatiblePersistanceDot = (nomModLower.includes("persistance") && carteADejaUnEtalement)
                     || (estUnModEtalement(nomModLower) && carteADejaUnePersistance);
+                // LA DISTANCE : arme polyvalente, à distance, magie — ou un soin.
+                const estIncompatibleDistance = mod.Nom === "Distance"
+                    && typeof window.distancePermiseSurAction === "function"
+                    && !window.distancePermiseSurAction(actionCourante, window.forgeState.armePrincipale);
                 groupesMods[carac].push(
                     (estIncompatiblePoussee || estIncompatibleIllusion || estIncompatiblePoison || estIncompatibleEtalement
-                     || estIncompatiblePersistanceSoin || estIncompatiblePersistanceDot)
+                     || estIncompatiblePersistanceSoin || estIncompatiblePersistanceDot || estIncompatibleDistance)
                         ? `<option value="${mod.id}" disabled style="color: #999;">${nettoyerNomEffet(mod.Nom)} (non compatible)</option>`
                         : `<option value="${mod.id}">${nettoyerNomEffet(mod.Nom)} (⚡ ${coutFatigue})</option>`
                 );
