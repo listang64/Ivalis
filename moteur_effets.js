@@ -1518,13 +1518,23 @@ window.demarrerCiblage = async function(idCarte, options) {
                     if (plafond > 0) pourcentPV = Math.min(pourcentPV, plafond);
                 }
 
+                // LA SURPUISSANCE (app.js) : une technique de héros qui coûte 70
+                // de fatigue ou plus frappe et soigne plus fort. Ni bouclier ni
+                // purification. Posée ICI, sur la valeur de la carte, avant ce
+                // que l'équipement y ajoute.
+                const valeurDeLaCarte = nomLower.includes("purification")
+                    ? 0 : (parseFrFloat(effBase.Valeur) || 0) * (act.count || 1);
+                const surpuissance = (!isShield && !isPurification && !(lanceurCarte && lanceurCarte.estMonstre)
+                                      && typeof window.multiplicateurSurpuissance === "function")
+                    ? window.multiplicateurSurpuissance(dataCarte.Fatigue) : 1;
+
                 attaquesExtraites.push({
                     nom: effBase.Nom,
                     typeRes: typeRes,
                     // La Valeur d'une Purification est un nombre d'états, pas
                     // des points de vie : elle ne soigne rien.
-                    valeurBrute: nomLower.includes("purification")
-                        ? 0 : (parseFrFloat(effBase.Valeur) || 0) * (act.count || 1),
+                    valeurBrute: surpuissance > 1 ? Math.round(valeurDeLaCarte * surpuissance) : valeurDeLaCarte,
+                    ...(surpuissance > 1 ? { surpuissance } : {}),
                     pourcentPV: pourcentPV,
                     isRanged: isRanged,
                     rangeMax: porteeReelle,

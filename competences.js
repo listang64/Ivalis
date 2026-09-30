@@ -542,6 +542,15 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
                    + htmlEffets;
     }
 
+    // LA SURPUISSANCE (app.js) : une technique de 70 de fatigue ou plus frappe
+    // et soigne plus fort. Dite sur la carte, dans le format des autres lignes,
+    // et calculée à l'affichage : une carte forgée avant la règle la montre aussi.
+    const surpuissance = typeof window.texteSurpuissance === "function" ? window.texteSurpuissance(fatigue) : "";
+    if (surpuissance) {
+        htmlEffets += `<div class="ligne-surpuissance">${ligneEffetHD("Surpuissance " + surpuissance,
+            `Dégâts et soins ${surpuissance} (technique à ${fatigue} de fatigue)`, false)}</div>`;
+    }
+
     // NOUVEAU : Dessin avec Bounding Box Dynamique (Rognage auto)
     if (allZoneHexes.length > 0) {
         let svgPolygons = "";
@@ -1040,6 +1049,20 @@ function estIncompatibleAvecArme(nomEffet, arme) {
         if (nom.includes("attaque lourde") || nom.includes("attaque légère") || nom.includes("attaque legere")) return true;
     }
     return false;
+}
+
+// LA VALEUR QU'AURA VRAIMENT L'ACTION EN COMBAT, surpuissance comprise
+// (app.js) : « → 26 avec la surpuissance ». Dégâts et soins seulement — ni
+// bouclier ni purification, comme au moment de l'extraction (moteur_effets.js).
+function texteValeurSurpuissante(act, fatigue) {
+    if (typeof window.multiplicateurSurpuissance !== "function") return "";
+    const m = window.multiplicateurSurpuissance(fatigue);
+    const nom = ((act && act.baseEffet && act.baseEffet.Nom) || "").toLowerCase();
+    const soigne = nom.includes("soin") || nom.includes("guérison");
+    if (m <= 1 || !(estUneAttaqueDeBase(nom) || soigne) || nom.includes("bouclier") || nom.includes("purification")) return "";
+    const valeur = (parseFrenchFloat(act.baseEffet.Valeur) || 0) * (act.count || 1);
+    if (valeur <= 0) return "";
+    return `<br><span class="forge-valeur-surpuissante">→ ${Math.round(valeur * m)} ${soigne ? "de soin" : "de dégâts"} avec la surpuissance</span>`;
 }
 
 // === OUTILS POUR LA ZONE ===
@@ -1781,6 +1804,19 @@ window.rafraichirForge = function() {
     document.getElementById("forge-fatigue-val").innerText = fatigueConsommee;
 
     document.getElementById("forge-fatigue-val").style.color = capErreur ? "red" : "#d97706";
+
+    // La surpuissance que la fatigue de la carte lui donne (app.js), et le
+    // prochain palier tant qu'il en reste un.
+    const surpuissance = document.getElementById("forge-surpuissance");
+    if (surpuissance && typeof window.multiplicateurSurpuissance === "function") {
+        const texte = window.texteSurpuissance(fatigueConsommee);
+        const prochain = [...window.PALIERS_SURPUISSANCE].reverse().find(p => fatigueConsommee < p.fatigue);
+        surpuissance.classList.toggle("active", !!texte);
+        surpuissance.textContent = texte
+            ? `💥 Surpuissance ${texte} : dégâts et soins`
+              + (prochain ? ` (×${String(prochain.multiplicateur).replace(".", ",")} dès ${prochain.fatigue})` : "")
+            : `Surpuissance ×${String(prochain.multiplicateur).replace(".", ",")} dès ${prochain.fatigue} de fatigue`;
+    }
     document.getElementById("forge-cap-fatigue").innerText = capFatigue;
     document.getElementById("forge-initiative-val").innerText = initiative;
 
@@ -1996,6 +2032,7 @@ window.rafraichirForge = function() {
                             <b style="font-size: 16px;">• ${nettoyerNomEffet(act.baseEffet.Nom)}</b> ${act.baseEffet.Modificateur !== "AUCUN" ? `<span style="font-size: 12px; color: #9333ea; font-weight: bold; margin-left: 4px;">[${act.baseEffet.Modificateur}]</span>` : ""}
                             <div style="font-size: 13px; color: gray; margin-left: 10px; margin-top: 2px;">
                                 ${formatterTexteEffet(act.baseEffet, act.count, act)}
+                                ${texteValeurSurpuissante(act, fatigueConsommee)}
                                 ${currentBaseDuree > 0 ? `<br><span style="color: #9333ea;">↳ ⏳ +${currentBaseDuree} Tour(s) (+${(currentBaseDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}
                             </div>
                         </div>

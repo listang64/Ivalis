@@ -1008,6 +1008,31 @@ window.multiplicateurSoinsRecus = function(perso) {
 // moteur, qui range soins, purifications et boucliers du côté magique. La Forge
 // et le combat s'appuient tous deux dessus : c'est ce qui garantit que la carte
 // affiche la portée que le sort aura réellement.
+// =========================================================================
+//  LA SURPUISSANCE : UNE TECHNIQUE COÛTEUSE FRAPPE ET SOIGNE PLUS FORT
+// =========================================================================
+//  Règle de Nico, à la création de compétence : selon la fatigue que coûte la
+//  carte, ses dégâts et ses soins sont multipliés.
+//      70 de fatigue et plus  → ×1,25
+//      100 de fatigue et plus → ×1,35 (à la place, pas en plus)
+//  Ni les boucliers ni les purifications : ce ne sont ni des dégâts ni des
+//  soins. Le montant multiplié est arrondi au plus proche. Les techniques des
+//  héros seulement : celles des créatures ne sont pas forgées.
+window.PALIERS_SURPUISSANCE = [
+    { fatigue: 100, multiplicateur: 1.35 },
+    { fatigue: 70,  multiplicateur: 1.25 }
+];
+window.multiplicateurSurpuissance = function(fatigue) {
+    const f = Number(fatigue) || 0;
+    const palier = window.PALIERS_SURPUISSANCE.find(p => f >= p.fatigue);
+    return palier ? palier.multiplicateur : 1;
+};
+// « ×1,25 » — le texte que la Forge et la carte affichent.
+window.texteSurpuissance = function(fatigue) {
+    const m = window.multiplicateurSurpuissance(fatigue);
+    return m > 1 ? "×" + String(m).replace(".", ",") : "";
+};
+
 // TÉNÈBRES, le sort du Nécromancien : des dégâts magiques qui boivent
 // l'énergie avant la vie. Reconnu à son nom (avec ou sans accents), comme tous
 // les effets du grimoire — la Forge, l'extraction et le moteur lisent CETTE

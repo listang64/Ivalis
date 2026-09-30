@@ -153,6 +153,7 @@ node jet_d20.mjs            # la scène du d20 : fondu, avatar, défilement qui 
 node fabrique_sons.mjs      # Paramètres → La Fabrique : dix « ding » rendus et comparés ; le ding perle remplace le parchemin dans tout le jeu
 node experience.mjs          # l'expérience : grille des niveaux, jauge de la fiche, flèches de triche (DEV), compétences à créer par niveau (la main ne bouge pas), XP de la victoire à chaque héros
 node necromancien.mjs        # la classe Nécromancien : Glacé/+1 compétence/+5 PV (niv. 1), Ténèbres (niv. 5, énergie puis PV ×1,5), sursis (niv. 10) ; Forge, extraction, fiche de classe
+node surpuissance.mjs        # la surpuissance : ×1,25 dès 70 de fatigue, ×1,35 dès 100 (dégâts et soins, pas les boucliers) ; extraction, Forge, carte
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -3719,3 +3720,27 @@ descriptif, et chaque boîte en mode centré. »
 `experience.mjs` (section 2) mesure le nom (centré à 2 px près, 24 px) et le
 niveau (32 / 16 px) ; `necromancien.mjs` (section 7) mesure chaque badge au
 milieu de sa boîte, au-dessus du descriptif, et le texte centré.
+
+### La surpuissance : une technique coûteuse frappe et soigne plus fort
+
+Nico : « pour la création de compétence, un boost pour les dégâts et soins en
+fonction du montant en fatigue : 70+ → ×1,25 ; 100+ → ×1,35 ».
+
+La règle vit dans `app.js` (`PALIERS_SURPUISSANCE`, `multiplicateurSurpuissance`) :
+70 de fatigue et plus donne ×1,25, 100 et plus ×1,35 (à la place, pas en plus).
+Elle s'applique à l'extraction de la carte (`demarrerCiblage`, moteur_effets.js),
+sur la valeur de la carte avant ce que l'équipement y ajoute, arrondie au plus
+proche : dégâts (Ténèbres compris) et soins, jamais un bouclier ni une
+purification. Les techniques des héros seulement : les créatures ne forgent pas
+leurs cartes. Elle se lit sur la fatigue de la carte, donc une technique forgée
+avant la règle en profite aussi.
+
+À l'écran : la Forge annonce le palier sous la fatigue (« 💥 Surpuissance ×1,25 :
+dégâts et soins (×1,35 dès 100) », ou le seuil à atteindre), et écrit sous
+chaque dégât ou soin la valeur réelle (« → 26 de dégâts avec la surpuissance »).
+La carte en grand ajoute une ligne « Surpuissance ×1,25 ». Le texte enregistré de
+la carte garde la valeur de base : la ligne de surpuissance dit le reste.
+
+`surpuissance.mjs` vérifie les paliers (69, 70, 99, 100), l'extraction (attaque,
+soin, arrondi, bouclier inchangé, créature exclue), la Forge (annonce, valeur
+réelle, capture) et la carte en grand.

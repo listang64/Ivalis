@@ -3806,3 +3806,18 @@ textarea.input-texte-parchemin {
     text-align: center; margin: 2px 0 10px; font-family: 'Cinzel', serif; font-weight: bold; font-size: 17px;
     color: #f3dfa6; text-shadow: 0 0 8px rgba(212, 175, 55, 0.7), 1px 1px 2px #000;
 }
+
+/* =====================================================================
+   LA SURPUISSANCE (Forge) — ×1,25 dès 70 de fatigue, ×1,35 dès 100
+   ===================================================================== */
+.forge-surpuissance {
+    margin-top: 6px; max-width: 190px; text-align: center; line-height: 1.25;
+    font-size: 11.5px; font-style: italic; color: #8a7050;
+}
+.forge-surpuissance.active {
+    font-style: normal; font-weight: bold; font-size: 12.5px; color: #b91c1c;
+    padding: 3px 8px; border-radius: 10px; background: rgba(217, 119, 6, 0.14);
+    border: 1px solid rgba(185, 28, 28, 0.35);
+}
+.ligne-surpuissance .titre-effet-hd { color: #ffb347 !important; }
+.forge-valeur-surpuissante { color: #b91c1c; font-weight: bold; font-style: normal; }
