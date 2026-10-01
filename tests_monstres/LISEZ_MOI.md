@@ -3891,3 +3891,23 @@ Elles sont là pour information, on ne les sélectionne pas.
 usage unique, rejeu), le partage des coups (pair, impair, armure, critique,
 états, éloignement, chute de l'Hoplite, opportunité, brûlure non partagée),
 la section de la fiche, les bannières du volet de combat et le descriptif.
+
+## Techniques de classe : les bannières des joueurs (version 156)
+
+Les techniques de classe portent maintenant exactement les mêmes bannières
+que les compétences forgées par le joueur, au lieu d'une carte dorée à part.
+
+- **Fiche perso** (competences.js `htmlTechniquesDeClasse`) : sous la
+  séparation « Techniques de classe », chaque technique est une bannière
+  `banniere-carte` : cadre normal, couleur du héros, initiative et titre au
+  même endroit. Une technique d'un palier pas encore atteint prend le cadre
+  épuisé (grisé) et annonce « Niveau N requis » au survol. Un clic la met en
+  avant et ouvre la carte en grand (`window.apercuTechniqueClasse`) ; le
+  second clic, qui mémorise une technique forgée, n'existe pas pour elle.
+- **En combat** (combat.js) : le titre n'a plus le bouclier 🛡️ ni la couleur
+  dorée, il est identique à celui des autres bannières. Une fois servie, la
+  technique garde le cadre épuisé.
+
+Les styles `.technique-classe*` de l'ancienne carte sont retirés de
+style.css. `hoplite.mjs` vérifie le cadre, la couleur et le nom des
+bannières de classe, et qu'un double clic dans la fiche ne la mémorise pas.

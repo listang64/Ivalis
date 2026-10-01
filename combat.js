@@ -844,7 +844,7 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
             window.COMPETENCES_CACHE[idCarte] = data;
             const dejaJouee = utiliseesCeCombat.includes(idCarte);
             const urlCadreClasse = dejaJouee ? IMAGE_CADRE_EPUISE : IMAGE_CADRE_NORMAL;
-            const couleurTexteClasse = dejaJouee ? "#888888" : "#f3d27a";
+            const couleurTexteClasse = dejaJouee ? "#888888" : "#e0d0b0";
             const survol = dejaJouee ? ` title="Déjà utilisée dans ce combat"` : ` title="Technique de classe — une fois par combat"`;
             htmlDeck += `
             <div style="position: relative; height: 100px; margin-bottom: ${ESPACEMENT_BANNIERES}px; transition: margin 0.2s ease;">
@@ -858,7 +858,7 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
                     <div style="position: absolute; top: 49px; bottom: 58px; left: 63px; right: 7px; z-index: 1; border-radius: 0 15px 15px 0; background-color: ${window.COULEUR_PERSO_COURANT};"></div>
                     <div id="cadre-combat-${idCarte}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('${urlCadreClasse}'); background-size: contain; background-position: left center; background-repeat: no-repeat; z-index: 2; filter: drop-shadow(0px 6px 4px rgba(0,0,0,0.6)); transition: background-image 0.2s ease;"></div>
                     <div class="texte-init-banniere" style="position: absolute; top: 44%; transform: translateY(-50%); left: 6px; width: 69px; text-align: center; color: ${couleurTexteClasse}; font-family: 'Cinzel', serif; font-size: 30px; font-weight: bold; z-index: 3; text-shadow: 2px 2px 5px black;">${data.Initiative}</div>
-                    <div class="texte-nom-banniere titre-auto-reduit" data-taille-max="17" style="position: absolute; top: 48%; transform: translateY(-50%); left: 76px; right: 120px; text-align: left; color: ${couleurTexteClasse}; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">🛡️ ${data.Nom}</div>
+                    <div class="texte-nom-banniere titre-auto-reduit" data-taille-max="17" style="position: absolute; top: 48%; transform: translateY(-50%); left: 76px; right: 120px; text-align: left; color: ${couleurTexteClasse}; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${data.Nom}</div>
                 </div>
             </div>
             `;

@@ -291,12 +291,21 @@ console.log("\n5. LA FICHE PERSO : LES TECHNIQUES DE CLASSE À PART");
     const lire = () => ({
       section: !!document.getElementById("section-techniques-classe"),
       techniques: [...document.querySelectorAll(".technique-classe")].map(x => ({ id: x.dataset.technique,
-          verrouillee: x.classList.contains("technique-classe-verrouillee"), badge: x.querySelector(".technique-classe-badge").textContent })),
+          verrouillee: x.classList.contains("technique-classe-verrouillee"), badge: x.dataset.statut,
+          cadre: document.getElementById("cadre-carte-" + x.dataset.technique)?.style.backgroundImage || "",
+          banniere: x.classList.contains("banniere-carte") })),
+      cadreJoueur: document.getElementById("cadre-carte-C1")?.style.backgroundImage || "",
       memorisees: document.getElementById("compteur-cartes-actuel")?.textContent,
       apresLeGrimoire: (() => { const s = document.getElementById("section-techniques-classe"); const ban = document.getElementById("ui-carte-C1");
                                  return !!s && !!ban && (ban.compareDocumentPosition(s) & Node.DOCUMENT_POSITION_FOLLOWING) > 0; })()
     });
     const niv5 = lire();
+    // Le premier clic d'une technique forgée met en avant et ouvre la carte ;
+    // sur une technique de classe, deux clics ne la mémorisent jamais.
+    const calque = document.querySelector('#ui-carte-CLASSE_MUR_BOUCLIER [onclick]');
+    calque.click(); calque.click();
+    niv5.apercu = document.getElementById("apercu-carte-hd-competence")?.dataset.cardId || null;
+    niv5.deckApres = [...window.CARTES_SELECTIONNEES];
     const sec = document.getElementById("section-techniques-classe");
     if (sec) sec.scrollIntoView();
     return niv5;
@@ -307,6 +316,11 @@ console.log("\n5. LA FICHE PERSO : LES TECHNIQUES DE CLASSE À PART");
            JSON.stringify(r.techniques.map(t => [t.id, t.verrouillee])) === '[["CLASSE_MUR_BOUCLIER",false],["CLASSE_REMPART",true]]'
            && /Niveau 10 requis/.test(r.techniques[1].badge), JSON.stringify(r.techniques));
   verifier("elles ne comptent pas dans les mémorisées (1 / 6)", r.memorisees === "1", r.memorisees);
+  verifier("mêmes bannières que les techniques forgées (même cadre)",
+           r.techniques.every(t => t.banniere) && /ban_cible/.test(r.cadreJoueur) && /bandeau_carte_normal/.test(r.techniques[0].cadre), r.techniques[0].cadre);
+  verifier("la verrouillée prend le cadre épuisé", /ban_epuis/.test(r.techniques[1].cadre), r.techniques[1].cadre);
+  verifier("un clic ouvre la carte en grand, sans la mémoriser",
+           r.apercu === "CLASSE_MUR_BOUCLIER" && JSON.stringify(r.deckApres) === '["C1"]', JSON.stringify([r.apercu, r.deckApres]));
   const necro = await p.evaluate(async () => {
     window.PERSOS_PARTIE[0].classe = "Nécromancien";
     await window.chargerOngletCompetences("H1", 7);
@@ -343,6 +357,9 @@ console.log("\n6. EN COMBAT : LES BANNIÈRES, LE CHOIX, LE LANCEMENT");
     const murGrise = ban("CLASSE_MUR_BOUCLIER").classList.contains("banniere-epuisee");
     const rempartLibre = !ban("CLASSE_REMPART").classList.contains("banniere-epuisee");
     const ordre = [...document.querySelectorAll("#combat-liste-competences .banniere-carte-combat")].map(x => x.dataset.cardId);
+    const look = (id) => { const b = ban(id); const nom = b.querySelector(".texte-nom-banniere");
+        return { cadre: document.getElementById("cadre-combat-" + id).style.backgroundImage, couleur: nom.style.color, nom: nom.textContent }; };
+    const lookJoueur = look("C1"), lookRempart = look("CLASSE_REMPART");
 
     const alertes = []; window.alert = (m) => alertes.push(m);
     let ecrit = null;
@@ -363,12 +380,15 @@ console.log("\n6. EN COMBAT : LES BANNIÈRES, LE CHOIX, LE LANCEMENT");
     const visible = getComputedStyle(fen).display !== "none";
     fen.querySelector(".choix-rempart-allie").click();
     window.lancerTechniqueClasse("CLASSE_MUR_BOUCLIER", "H1");
-    return { bannieres, murGrise, rempartLibre, ordre, refusMur, file, proposes, visible, demandes,
+    return { lookJoueur, lookRempart, bannieres, murGrise, rempartLibre, ordre, refusMur, file, proposes, visible, demandes,
              donnees: window.donneesCarteCombattant("H1", "CLASSE_REMPART").Nom };
   });
   verifier("le volet montre le deck, puis les deux techniques, puis le repos long",
            !r.erreur && JSON.stringify(r.ordre) === '["C1","CLASSE_MUR_BOUCLIER","CLASSE_REMPART","REPOS_LONG"]', JSON.stringify(r.ordre || r.erreur));
   verifier("Mur de bouclier déjà joué : grisé ; Rempart : libre", r.murGrise && r.rempartLibre);
+  verifier("en combat, même bannière que les techniques du joueur (cadre, couleur, nom nu)",
+           r.lookRempart && r.lookRempart.cadre === r.lookJoueur.cadre && r.lookRempart.couleur === r.lookJoueur.couleur
+           && r.lookRempart.nom === "Rempart", JSON.stringify([r.lookJoueur, r.lookRempart]));
   verifier("choisir le Mur déjà joué : refusé, avec un message", r.refusMur.length === 1 && /déjà servi/.test(r.refusMur[0]), JSON.stringify(r.refusMur));
   verifier("choisir le Rempart : inscrit dans la file à l'initiative 105",
            Array.isArray(r.file) && r.file.length === 1 && r.file[0].idCarte === "CLASSE_REMPART" && r.file[0].initiative === 105,

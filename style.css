@@ -3833,29 +3833,6 @@ textarea.input-texte-parchemin {
     content: ""; flex: 1; height: 2px; background: linear-gradient(90deg, transparent, #5c3a21, transparent);
 }
 .techniques-classe-aide { margin: 0 0 12px; text-align: center; font-size: 13px; font-style: italic; color: #5c3a21; }
-.technique-classe {
-    display: flex; align-items: stretch; gap: 0; margin: 0 0 10px; border-radius: 10px; overflow: hidden;
-    background: linear-gradient(90deg, #2a1a0f, #3a2614); border: 2px solid #c9a24a;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.35);
-}
-.technique-classe-init {
-    flex-shrink: 0; width: 64px; display: flex; align-items: center; justify-content: center;
-    font-family: 'Cinzel', serif; font-size: 26px; font-weight: bold; color: #f3d27a;
-    background: rgba(0,0,0,0.35); border-right: 1px solid rgba(201,162,74,0.5);
-}
-.technique-classe-corps { padding: 8px 12px; min-width: 0; }
-.technique-classe-nom {
-    font-family: 'Cinzel', serif; font-weight: bold; font-size: 15px; letter-spacing: 1px; color: #f3d27a;
-    text-transform: uppercase; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-}
-.technique-classe-badge {
-    font-family: Georgia, serif; text-transform: none; letter-spacing: 0; font-size: 11px; font-weight: normal;
-    color: #1a1208; background: #e2b84f; border-radius: 10px; padding: 1px 8px;
-}
-.technique-classe-desc { margin-top: 3px; font-size: 13px; line-height: 1.35; color: #e8d5a5; }
-.technique-classe-verrouillee { filter: grayscale(100%) brightness(0.85); opacity: 0.75; }
-.technique-classe-verrouillee .technique-classe-badge { background: #888; color: #fff; }
-
 /* Le choix de l'allié du Rempart. */
 .fenetre-choix-rempart {
     position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 20050;

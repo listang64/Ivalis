@@ -201,6 +201,7 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
 
         if (nbCreees === 0) {
             listeDiv.innerHTML = `<p style="text-align: center; font-style: italic; color: #5c3a21; margin-top: 20px;">Le héros n'a pas encore forgé ses techniques de combat.</p>` + sectionClasse;
+            if (sectionClasse && typeof window.ajusterTitresBannieres === "function") window.ajusterTitresBannieres(listeDiv);
             return;
         }
 
@@ -290,24 +291,31 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
 };
 
 // La section « Techniques de classe » de l'onglet Compétences : vide pour une
-// classe qui n'en a pas.
+// classe qui n'en a pas. Mêmes bannières que les techniques forgées (cadre,
+// couleur du héros, initiative, titre) ; celles d'un palier pas encore atteint
+// prennent le cadre grisé et disent leur niveau au survol. Elles ne se
+// mémorisent pas : un clic ouvre seulement la carte en grand.
 function htmlTechniquesDeClasse(perso) {
     if (!perso || typeof window.toutesTechniquesDeClasse !== "function") return "";
     const toutes = window.toutesTechniquesDeClasse(perso);
     if (toutes.length === 0) return "";
     const acquises = window.techniquesDeClasse(perso);
     const echapper = (t) => String(t || "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
-    const lignes = toutes.map(({ id, niveau }) => {
+    const espacement = window.ESPACEMENT_BANNIERES_COMBAT || -85;
+    const bannieres = toutes.map(({ id, niveau }) => {
         const t = window.TECHNIQUES_CLASSE[id];
         const acquise = acquises.includes(id);
+        const statut = acquise ? "Une fois par combat" : `Niveau ${niveau} requis`;
+        const couleurTexte = acquise ? "#e0d0b0" : "#888888";
         return `
-            <div class="technique-classe${acquise ? "" : " technique-classe-verrouillee"}" data-technique="${id}">
-                <div class="technique-classe-init">${t.Initiative}</div>
-                <div class="technique-classe-corps">
-                    <div class="technique-classe-nom">🛡️ ${echapper(t.Nom)}
-                        <span class="technique-classe-badge">${acquise ? "Une fois par combat" : `Niveau ${niveau} requis`}</span></div>
-                    <div class="technique-classe-desc">${echapper(t.desc)}</div>
-                </div>
+            <div id="ui-carte-${id}" class="banniere-carte technique-classe${acquise ? "" : " banniere-epuisee technique-classe-verrouillee"}" data-technique="${id}" data-statut="${statut}"
+                 style="position: relative; width: 100%; height: 160px; display: flex; align-items: center; transition: transform 0.2s ease; margin-bottom: ${espacement}px; z-index: 2; pointer-events: none;"
+                 onmouseover="this.style.transform='translateX(12px)';" onmouseout="this.style.transform='translateX(0px)';">
+                <div style="position: absolute; top: 47px; bottom: 55px; left: 115px; right: 57px; z-index: 1; border-radius: 0 15px 15px 0; background-color: ${window.COULEUR_PERSO_COURANT};"></div>
+                <div id="cadre-carte-${id}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('${acquise ? IMAGE_CADRE_NORMAL : IMAGE_CADRE_EPUISE}'); background-size: contain; background-position: center; background-repeat: no-repeat; z-index: 2; filter: drop-shadow(0px 6px 4px rgba(0,0,0,0.6));"></div>
+                <div style="position: absolute; top: 44%; transform: translateY(-50%); left: 57px; width: 69px; text-align: center; color: ${couleurTexte}; font-family: 'Cinzel', serif; font-size: 30px; font-weight: bold; z-index: 3; text-shadow: 2px 2px 5px black; pointer-events: none;">${t.Initiative}</div>
+                <div class="titre-auto-reduit" data-taille-max="17" style="position: absolute; top: 48%; transform: translateY(-50%); left: 120px; right: 20px; text-align: center; color: ${couleurTexte}; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;">${echapper(t.Nom)}</div>
+                <div onclick="window.apercuTechniqueClasse('${id}')" title="${echapper(t.Nom)} — ${statut}" style="position: absolute; top: 47px; bottom: 55px; left: 115px; right: 57px; z-index: 4; cursor: pointer; pointer-events: auto;"></div>
             </div>`;
     }).join("");
     return `
@@ -315,8 +323,18 @@ function htmlTechniquesDeClasse(perso) {
             <span>Techniques de classe</span>
         </div>
         <p class="techniques-classe-aide">Données par la classe : toujours disponibles en combat, sans compter dans les compétences mémorisées.</p>
-        ${lignes}`;
+        ${bannieres}`;
 }
+
+// Un clic sur une technique de classe : la même mise en avant et la même
+// carte en grand qu'une technique forgée, sans le second clic qui mémorise.
+window.apercuTechniqueClasse = function(idCarte) {
+    window.CARTE_EN_APERCU = idCarte;
+    document.querySelectorAll('.banniere-carte').forEach(el => { el.style.filter = "none"; });
+    const carteDiv = document.getElementById(`ui-carte-${idCarte}`);
+    if (carteDiv) carteDiv.style.filter = "drop-shadow(0px 0px 8px rgba(0, 255, 255, 0.8)) brightness(1.1)";
+    window.afficherApercuCarteHD(idCarte);
+};
 
 // =========================================================================
 //  EFFACER UNE TECHNIQUE (OUTIL DE DÉVELOPPEMENT)
