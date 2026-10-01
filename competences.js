@@ -1849,12 +1849,17 @@ window.rafraichirForge = function() {
         let coutMods = 0;
         let aDOT = false;
         let diviseurDOT = 1.3;
-        // LA RISTOURNE DE L'ÉTALEMENT NE VAUT QUE POUR LA ZONE, LES DÉGÂTS ET
-        // LA DISTANCE (règle de Nico) — pas pour les effets associés (états,
-        // Durée +, etc.). On met donc de côté la part « étalable » du coût :
-        // le socle s'il frappe (ou s'il est lui-même une Zone ou une Distance),
-        // et les sous-effets Zone et Distance.
-        const estPartEtalable = (nom) => estUneAttaqueDeBase(nom) || nom === "Zone" || nom === "Distance";
+        // LA RISTOURNE DE L'ÉTALEMENT NE VAUT QUE POUR LA ZONE, LES DÉGÂTS, LES
+        // SOINS ET LA DISTANCE (règle de Nico) — pas pour les effets associés
+        // (états, Durée +, etc.). On met donc de côté la part « étalable » du
+        // coût : le socle s'il frappe ou soigne (ou s'il est lui-même une Zone
+        // ou une Distance), et les sous-effets Zone et Distance. Un bouclier
+        // n'est pas un soin : il ne s'étale pas.
+        const soigne = (nom) => {
+            const n = (nom || "").toLowerCase();
+            return (n.includes("soin") || n.includes("guérison") || n.includes("guerison")) && !n.includes("bouclier");
+        };
+        const estPartEtalable = (nom) => estUneAttaqueDeBase(nom) || soigne(nom) || nom === "Zone" || nom === "Distance";
         let coutEtalable = estPartEtalable(act.baseEffet.Nom) ? baseActionCost + coutDureeBase : 0;
 
         if (act.baseEffet.Nom === "Initiative +") {

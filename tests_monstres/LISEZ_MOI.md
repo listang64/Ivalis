@@ -3911,3 +3911,17 @@ que les compétences forgées par le joueur, au lieu d'une carte dorée à part.
 Les styles `.technique-classe*` de l'ancienne carte sont retirés de
 style.css. `hoplite.mjs` vérifie le cadre, la couleur et le nom des
 bannières de classe, et qu'un double clic dans la fiche ne la mémorise pas.
+
+## L'étalement remise aussi les soins (version 157)
+
+Un soin pouvait déjà porter le sous-effet « Durée étalement dégâts » dans la
+Forge, et le combat le jouait bien en « Soin étalé » (une part rendue par fin
+de manche). Mais la ristourne de fatigue de l'étalement (« Cout / 1.2 ») ne
+valait que pour les dégâts, la Zone et la Distance : un soin étalé coûtait
+autant qu'un soin qui tombe d'un coup. Elle vaut maintenant aussi pour les
+soins (competences.js `rafraichirForge`, `estPartEtalable` ; même règle
+recopiée dans monstres_competences.js). Un bouclier n'est pas un soin et ne
+s'étale pas ; les états posés à côté se paient toujours plein pot.
+
+`initiative_hors_effets.mjs` vérifie : Soin ×2 = 4 PC, étalé 4/1,2 ;
+étalé avec Brûlé ×2 : 4/1,2 + 2.

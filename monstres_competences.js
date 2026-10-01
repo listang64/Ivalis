@@ -710,8 +710,10 @@ function coutPCChantier(chantier, palette) {
         let aEtalement = false;
         let diviseur = 1.3;
         // ⚖️ règle Forge : la ristourne de l'Étalement ne vaut que pour la
-        // Zone, les dégâts et la Distance, pas pour les effets associés.
-        const etalable = (nom) => estAttaqueDeBase(nom) || nom === "Zone" || nom === "Distance";
+        // Zone, les dégâts, les soins et la Distance, pas pour les effets associés.
+        const soigne = (nom) => { const n = (nom || "").toLowerCase();
+            return (n.includes("soin") || n.includes("guérison") || n.includes("guerison")) && !n.includes("bouclier"); };
+        const etalable = (nom) => estAttaqueDeBase(nom) || soigne(nom) || nom === "Zone" || nom === "Distance";
         let coutEtalable = etalable(act.baseEffet.Nom) ? coutBase + coutDuree : 0;
 
         act.modsEffets.forEach(m => {
