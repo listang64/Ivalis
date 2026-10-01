@@ -42,7 +42,7 @@ import { clonerEtat, combattant, creerDes, combattantIllusion,
 import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissiperConfusion,
          traverserZones, creerZonePure, poserZone, vieillirZones,
          chaineDeDegats, REGLES_ETATS, estDansLeNoir,
-         partageTenebres, ETAT_TENEBRES_ETALEES } from './moteur_pur.js';
+         partageTenebres, ETAT_TENEBRES_ETALEES, POISON } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche } from './ia_pure.js';
@@ -394,43 +394,42 @@ export function ticsDeFinDeManche(etat) {
         }
 
         // --- EMPOISONNEMENT : un seul tic, jamais retenté --------------------
-        //  15 d'énergie et 8% des points de vie maximum. `tickFait` reste sur
-        //  l'état : il voyage avec lui dans l'étape de vieillissement qui suit,
-        //  donc le poison ne mord pas deux fois même s'il dure encore.
+        //  Règle de Nico (tableau des effets) : 10 % de l'énergie MAXIMUM, et
+        //  8 % des points de vie maximum en dégâts MAGIQUES — défense magique,
+        //  absorption et bouclier compris (« réductions appliquées »). Il
+        //  frappait 15 d'énergie fixes et 8 % des PV droit dans la vie.
+        //  `tickFait` reste sur l'état : il voyage avec lui dans l'étape de
+        //  vieillissement qui suit, donc le poison ne mord pas deux fois.
         const poison = c.etats.find(e => e && e.nom === "Empoisonnement" && !e.tickFait);
         if (poison) {
             poison.tickFait = true;
 
-            const fatigueApres = Math.max(0, nombre(c.fatigue) - 15);
+            const energie = Math.ceil(nombre(c.fatigueMax) * (POISON.energiePct / 100));
+            const fatigueApres = Math.max(0, nombre(c.fatigue) - energie);
             if (fatigueApres !== nombre(c.fatigue)) {
                 c.fatigue = fatigueApres;
                 etapes.push({ type: "fatigue", cible: id, fatigueApres,
                               tic: "Empoisonnement" });
             }
 
-            const morsure = Math.ceil(nombre(c.pvMax) * 0.08);
-            if (morsure > 0 && !enSursis(c)) {      // en sursis : la vie ne bouge plus
-                const pvApres = Math.max(0, nombre(c.pv) - morsure);
-                c.pv = pvApres;
-                etapes.push({ type: "degats", cible: id, montant: morsure,
-                              pvApres, bouclierApres: nombre(c.bouclier),
-                              tic: "Empoisonnement" });
-                etapes.push(...tomber(etat, id, id));
+            const morsure = Math.ceil(nombre(c.pvMax) * (POISON.pvMaxPct / 100));
+            if (morsure > 0) {
+                const compte = chaineDeDegats(c, { valeurBrute: morsure, typeRes: POISON.typeRes }, {});
+                if (compte.degats > 0) etapes.push(...infligerTic(c, id, compte.degats, "Empoisonnement", etat));
             }
         }
 
         // --- BRÛLURE : elle ronge tant qu'elle dure --------------------------
-        //  Trois dégâts par manche, du TYPE de l'attaque qui a allumé la
-        //  flamme (le noyau l'a retenu au moment de poser l'état) : une brûlure
-        //  magique se heurte à la résistance magique, une torche plantée dans
-        //  la plaie à l'armure. Contrairement au poison, elle mord à CHAQUE
-        //  manche, pas une seule fois — c'est ce qui la rend dangereuse quand
-        //  on la laisse durer.
+        //  Règle de Nico (tableau des effets) : 8 % des points de vie maximum
+        //  en dégâts PHYSIQUES à chaque fin de manche, l'armure réduisant le
+        //  coup (défense physique, puis bouclier). Elle faisait 3 dégâts du
+        //  type de l'attaque qui l'avait allumée. Contrairement au poison, elle
+        //  mord à CHAQUE manche tant qu'elle dure.
         const brulure = c.etats.find(e => e && e.nom === "Brûlé");
         if (brulure) {
-            const parTour = nombre((REGLES_ETATS["Brûlé"] || {}).degatsParTour);
-            const typeRes = brulure.typeDegats === "Physique" ? "Physique" : "Magique";
-            const compte = chaineDeDegats(c, { valeurBrute: parTour, typeRes }, {});
+            const regle = REGLES_ETATS["Brûlé"] || {};
+            const brut = Math.ceil(nombre(c.pvMax) * (nombre(regle.pvMaxParTour) / 100));
+            const compte = chaineDeDegats(c, { valeurBrute: brut, typeRes: regle.typeParTour || "Physique" }, {});
             if (compte.degats > 0) {
                 etapes.push(...infligerTic(c, id, compte.degats, "Brûlure", etat));
             }

@@ -82,7 +82,7 @@
    "type": "Arme lourde CAC",
    "modele": "Lance courte",
    "carac": "FORCE",
-   "Commun": "+1 dégâts physique",
+   "Commun": "+5% de parade",
    "Rare": "+1dégâts physique + 5% de chance de parade",
    "Très rare": "+2 dégâts physique + 5% de chance de parade + 1 Effet A",
    "Épique": "+2 dégâts physique + 5% de chance de parade+ 2XEffet A",
@@ -150,7 +150,7 @@
    "carac": "FORCE",
    "Commun": "+2 dégâts physique",
    "Rare": "+4 dégâts physique",
-   "Très rare": "+6 dégâts physique + 2 Effet A",
+   "Très rare": "+5 dégâts physique + 2 Effet A",
    "Épique": "+6 dégâts physique +2X (2 Effet A)",
    "noms": "Hache a deux mains"
   },
@@ -285,7 +285,7 @@
   },
   {
    "ligne": 10,
-   "texte": "10% chance de repousser"
+   "texte": "15% chance de repousser"
   },
   {
    "ligne": 12,
@@ -297,11 +297,11 @@
   },
   {
    "ligne": 14,
-   "texte": "10% chance de provoquer"
+   "texte": "15% chance de provoquer"
   },
   {
    "ligne": 15,
-   "texte": "+3 initiative"
+   "texte": "+5 initiative"
   },
   {
    "ligne": 16,
@@ -343,11 +343,11 @@
   },
   {
    "ligne": 11,
-   "texte": "10% chance de repousser"
+   "texte": "15% chance de repousser"
   },
   {
    "ligne": 12,
-   "texte": "10% chance de tracter"
+   "texte": "15% chance de tracter"
   },
   {
    "ligne": 13,
@@ -359,7 +359,7 @@
   },
   {
    "ligne": 15,
-   "texte": "10% chance de provoquer"
+   "texte": "15% chance de provoquer"
   },
   {
    "ligne": 16,
@@ -367,7 +367,7 @@
   },
   {
    "ligne": 18,
-   "texte": "+3 initiative"
+   "texte": "+5 initiative"
   },
   {
    "ligne": 19,
@@ -394,10 +394,6 @@
   {
    "ligne": 8,
    "texte": "+10 initiative pendant 3 tours sur lui"
-  },
-  {
-   "ligne": 9,
-   "texte": "+10% de chance d’ignorer les résistances"
   }
  ],
  "prerequis": {
@@ -427,6 +423,7 @@
   }
  },
  "_corrections": {
-  "Javelots / Épique": "Le classeur d'origine portait 12% d'ignore-armure, sous les 15% du palier Très rare. Coquille confirmée par Nico le 03/09 : l'épique garde 15%. Seule retouche apportée à la transcription du classeur."
+  "Javelots / Épique": "Le classeur d'origine portait 12% d'ignore-armure, sous les 15% du palier Très rare. Coquille confirmée par Nico le 03/09 : l'épique garde 15%. Seule retouche apportée à la transcription du classeur.",
+  "Tableau de Nico (octobre)": "Cellules en rouge du nouveau classeur : Lance courte commune +5 parade ; Hache à deux mains très rare +5 dégâts ; effets A/B : repousser, tracter, provoquer à 15 %, initiative +5 ; effet C « +10 % d'ignorer les résistances » supprimé."
  }
 }

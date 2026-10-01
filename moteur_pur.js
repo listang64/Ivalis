@@ -82,7 +82,9 @@ export function bonusDesEtats(c, cle) {
 //    degatsSubis             % de dégâts EN PLUS encaissés, tous types
 //    degatsPhysiquesSubis    % de dégâts EN PLUS, seulement en physique
 //    degatsMagiquesSubis     % de dégâts EN PLUS, seulement en magique
-//    degatsParTour           dégâts pris à chaque fin de manche tant qu'il dure
+//    pvMaxParTour            % des PV max pris à chaque fin de manche tant
+//                            qu'il dure, du type `typeParTour` (réductions
+//                            appliquées : défense, puis bouclier)
 //    soinsRecus              % ajouté (ou retiré) à tout soin reçu
 //
 //  Le coût de déplacement doublé du Glacé, lui, reste dans mouvement_pur.js :
@@ -91,8 +93,15 @@ export const REGLES_ETATS = {
     "Étourdi":    { esquive: -30, parade: -30, echecTechnique: 20 },
     "Glacé":      { degatsPhysiquesSubis: 20 },
     "Électrifié": { degatsMagiquesSubis: 20 },
-    "Brûlé":      { degatsParTour: 3, soinsRecus: -50 }
+    // Tableau de Nico : « -50 % de soins reçus + 8 % des PV max en dégâts
+    // physiques », l'armure réduisant le coup.
+    "Brûlé":      { pvMaxParTour: 8, typeParTour: "Physique", soinsRecus: -50 }
 };
+
+// L'EMPOISONNEMENT (tableau de Nico) : 10 % de l'énergie maximum et 8 % des
+// PV maximum en dégâts magiques, réductions appliquées. Un seul tic
+// (cerveau_combat.js, ticsDeFinDeManche).
+export const POISON = { energiePct: 10, pvMaxPct: 8, typeRes: "Magique" };
 
 // LA BOUSCULADE. Une poussée qui aboutit peut, en plus, faire perdre pied :
 // la cible se rattrape, et ça lui coûte de l'énergie. C'est ce qui remplace la
@@ -643,6 +652,13 @@ export function partageTenebres(energie, montant) {
              surplus: reste > 0 ? Math.floor(reste * MULTIPLICATEUR_TENEBRES) : 0 };
 }
 
+// LA PART QU'UN CONTRE RENVOIE (ou qu'une ABSORPTION soigne), en % du coup :
+// la moitié de ce qui est annulé, jamais plus de 30 %.
+export const PART_RENDUE_MAX = 30;
+export function partRendue(pctAnnule) {
+    return Math.min(PART_RENDUE_MAX, Math.max(0, nombre(pctAnnule)) / 2);
+}
+
 export function chaineDeDegats(cible, attaque, options) {
     const { critique = false, distance = 1, percee = false } = options || {};
     const compte = { soinAbsorption: 0, degats: 0, secondTic: 0, versBouclier: 0, versPv: 0 };
@@ -679,23 +695,27 @@ export function chaineDeDegats(cible, attaque, options) {
 
     // 3. Absorption et Contre : la cible annule une part du coup — un
     //    POURCENTAGE de ce qui arrive, jamais un nombre fixe. Le grimoire les
-    //    sépare par type : l'Absorption ne boit que la magie (et en soigne 10 %
-    //    du brut), le Contre ne pare que le physique (et en renvoie 10 % à
-    //    l'attaquant — voir compte.renvoi dans resoudreCarte). L'Absorption
-    //    s'appliquait jusqu'ici à TOUS les dégâts, et le Contre n'existait pas.
+    //    sépare par type : l'Absorption ne boit que la magie (et en soigne une
+    //    part), le Contre ne pare que le physique (et en renvoie une part à
+    //    l'attaquant — voir compte.renvoi dans resoudreCarte).
+    //
+    //    CETTE PART MONTE AVEC LA PROTECTION (tableau de Nico) : la moitié de
+    //    ce qui est annulé, plafonnée à 30 % — 20 % annulés en rendent 10, 40
+    //    en rendent 20, 60 (le maximum) en rendent 30. Toujours calculée sur
+    //    le coup AVANT l'armure.
     const estMagique = attaque.typeRes === "Magique";
     const abs = estMagique && (cible.etats || []).find(e => e && e.nom === "Absorption");
     if (abs) {
         const pctAnnule = nombre(abs.valeurAbs, 20);
         const aAnnuler = Math.floor(degats * (pctAnnule / 100));
-        compte.soinAbsorption = Math.floor(degats * 0.10);   // toujours 10 % du brut
+        compte.soinAbsorption = Math.floor(degats * (partRendue(pctAnnule) / 100));
         degats = Math.max(0, degats - aAnnuler);
     }
     const contre = !estMagique && (cible.etats || []).find(e => e && e.nom === "Contre");
     if (contre) {
         const pctAnnule = nombre(contre.valeurContre, 20);
         const aAnnuler = Math.floor(degats * (pctAnnule / 100));
-        compte.renvoi = Math.floor(degats * 0.10);           // toujours 10 % du brut
+        compte.renvoi = Math.floor(degats * (partRendue(pctAnnule) / 100));
         degats = Math.max(0, degats - aAnnuler);
     }
 
@@ -1287,18 +1307,11 @@ export function resoudreCarte(etat, action, plateau) {
     // --- LES ÉTATS ALTÉRÉS -----------------------------------------------
     //  Ils se posent sur les cibles qui n'ont pas esquivé, et seulement si leur
     //  jet est passé — jet tiré au lancement, comme tout le reste.
-    //
-    //  Le type de dégâts de la carte sert aux états qui rongent (la brûlure) :
-    //  ils frapperont du même type que le coup qui les a posés. Une carte qui
-    //  ne fait que poser l'état, sans frapper, allume une flamme magique — un
-    //  état altéré est un effet magique dans la Forge.
-    const typeDeLaCarte = ((action.attaques || [])
-        .find(a => !a.isHeal && !a.isShield && (a.valeurBrute || 0) > 0) || {}).typeRes || "Magique";
-
+    //  (La brûlure retenait le type du coup qui l'avait allumée ; elle frappe
+    //  désormais toujours en physique, voir REGLES_ETATS.)
     (action.alterations || []).forEach(alt => {
         if (tractionEnTete(alt)) return;      // déjà jouée, avant l'attaque
-        const regleAlt = REGLES_ETATS[alt.nom] || {};
-        const typeDegatsDeLEtat = regleAlt.degatsParTour > 0 ? typeDeLaCarte : null;
+        const typeDegatsDeLEtat = null;
         (alt.cibles || []).forEach(idCible => {
             const cible = combattant(suivant, idCible);
             if (!cible || cible.aTerre) return;
@@ -1429,11 +1442,8 @@ export function resoudreCarte(etat, action, plateau) {
                     // rien n'était. L'extraction le posait, ce tri le jetait —
                     // l'effet phare du tank était décoratif sous ce régime.
                     ...(alt.idProvocateur ? { idProvocateur: alt.idProvocateur } : {}),
-                    // LA BRÛLURE SE SOUVIENT DE CE QUI L'A ALLUMÉE. Elle ronge
-                    // à chaque manche (REGLES_ETATS.Brûlé.degatsParTour), et
-                    // ces dégâts-là sont du type de l'attaque qui l'a posée :
-                    // une flamme magique se heurte à la résistance magique,
-                    // une torche plantée dans la plaie à l'armure.
+                    // (La brûlure retenait ici le type du coup qui l'avait
+                    // allumée ; elle frappe désormais toujours en physique.)
                     ...(typeDegatsDeLEtat ? { typeDegats: typeDegatsDeLEtat } : {})
                 }];
             }

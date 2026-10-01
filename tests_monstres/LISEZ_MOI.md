@@ -155,6 +155,7 @@ node experience.mjs          # l'expérience : grille des niveaux, jauge de la f
 node necromancien.mjs        # la classe Nécromancien : Glacé/+1 compétence/+5 PV (niv. 1), Ténèbres (niv. 5, énergie puis PV ×1,5), sursis (niv. 10) ; Forge, extraction, fiche de classe
 node surpuissance.mjs        # la surpuissance : ×1,25 dès 70 de fatigue, ×1,35 dès 100 (dégâts et soins, pas les boucliers) ; extraction, Forge, carte
 node armes_et_zones.mjs      # persistance posée comme une zone d'une case ; Distance réservée (polyvalente, distance, magie, soin) ; arme qui bloque des techniques : alerte, grisées, retirées du deck
+node tableaux_nico.mjs        # les cellules rouges des deux tableaux : brûlure 8 % PV max physique, poison 10 % énergie + 8 % PV magique, Contre/Absorption jusqu'à 30 %, armes et effets bonus
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -3809,3 +3810,38 @@ distance, nappe posée sur une case vide, cartes sans persistance et créatures
 inchangées ; Distance proposée ou grisée selon l'arme et le soin, retirée au
 changement d'arme ; l'alerte, le cadre grisé, le deck réécrit, le refus de la
 remettre en main, et le dégrisage quand on lâche l'arme.
+
+### Les deux tableaux de Nico (octobre) : ce qui était en rouge
+
+Nico a envoyé ses deux classeurs (effets de combat ; armes et armures) avec en
+rouge ce qu'il fallait changer. Ses réponses aux questions : l'armure réduit la
+brûlure ; le poison passe en magique avec réductions ; le renvoi du Contre et
+le soin de l'Absorption montent jusqu'à 30 % ; l'Illusion reste comme elle est.
+
+**Effets de combat.**
+- **Brûlé** (moteur_pur.js `REGLES_ETATS`, cerveau_combat.js) : -50 % de soins
+  reçus et 8 % des PV max en dégâts PHYSIQUES à chaque fin de manche, armure
+  puis bouclier appliqués. Elle faisait 3 dégâts du type du coup qui l'avait
+  allumée ; elle ne retient plus ce type.
+- **Empoisonnement** (`POISON`) : 10 % de l'énergie MAXIMUM et 8 % des PV max
+  en dégâts MAGIQUES (défense magique, absorption, bouclier appliqués), une
+  fois. Il prenait 15 d'énergie fixes et 8 % des PV droit dans la vie.
+- **Contre / Absorption** (`partRendue`) : la part renvoyée (ou soignée) est la
+  moitié de ce qui est annulé, plafonnée à 30 % : 20 % annulés → 10 %, 40 → 20,
+  60 → 30. Elle était toujours de 10 %. Calculée avant l'armure, comme avant.
+  Les cartes l'annoncent.
+
+**Armes** (objets.js). Lance courte commune : +5 parade au lieu d'un dégât ;
+Hache à deux mains très rare : +5 dégâts (l'épique garde +6). Le Gourdin (10 /
+15 / 20 / 20 % d'étourdissement) et les Javelots épiques (15 % d'ignorer
+l'armure), en rouge aussi, avaient déjà ces valeurs. Dans les effets bonus (les
+colonnes K, L, M du classeur sont les réserves A, B et C, pas des effets
+propres à chaque arme) : Poussée, Provocation et Traction à 15 %, initiative
++5 ; l'effet de soin « +10 % d'ignorer les résistances » est supprimé. Ces
+valeurs valent pour les objets tirés désormais ; ceux déjà portés gardent les
+leurs.
+
+`tableau_objets.json` (la copie figée du classeur que relit
+`objets_tableau.mjs`) porte ces cellules rouges ; `cerveau_combat.mjs` et
+`moteur_pur.mjs` vérifient les nouvelles brûlure et empoisonnement ;
+`tableaux_nico.mjs` vérifie chaque cellule rouge.

@@ -147,15 +147,17 @@ verifier("nombre d'effets, réservoir et doublement conformes au tableau", ecart
     for (let i = 0; i < 400; i++) {
         w.tirerEffetsObjet(dague, "Épique").forEach(e => { if (e.chance) chances.push(e.chance); });
     }
-    verifier("les effets à chance d'un épique valent bien le double (20% au lieu de 10%)",
-             chances.length > 0 && chances.every(c => c === 20), `(${[...new Set(chances)].join(",")})`);
+    // Les effets à 10 % passent à 20, ceux à 15 % (repousser, provoquer) à 30.
+    verifier("les effets à chance d'un épique valent bien le double (20 ou 30 %)",
+             chances.length > 0 && chances.every(c => c === 20 || c === 30) && chances.includes(30),
+             `(${[...new Set(chances)].join(",")})`);
 
     const simples = [];
     for (let i = 0; i < 400; i++) {
         w.tirerEffetsObjet(dague, "Très rare").forEach(e => { if (e.chance) simples.push(e.chance); });
     }
-    verifier("et ceux d'un très rare restent à leur valeur de base (10%)",
-             simples.length > 0 && simples.every(c => c === 10), `(${[...new Set(simples)].join(",")})`);
+    verifier("et ceux d'un très rare restent à leur valeur de base (10 ou 15 %)",
+             simples.length > 0 && simples.every(c => c === 10 || c === 15), `(${[...new Set(simples)].join(",")})`);
 }
 
 // =========================================================================

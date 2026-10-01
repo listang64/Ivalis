@@ -665,7 +665,8 @@ console.log("\nUN TOUR QUI NE FRAPPE RIEN COMPTE QUAND MÊME");
 
     verifier("l'immobilisation coûte 20 d'énergie", apres.H1.fatigue === 100,
              `(80 → ${apres.H1.fatigue})`);
-    verifier("le poison prend 15 d'énergie", apres.H2.fatigue === 35, `(50 → ${apres.H2.fatigue})`);
+    // Tableau de Nico : 10 % de l'énergie MAXIMUM (100 → 10).
+    verifier("le poison prend 10 % de l'énergie max", apres.H2.fatigue === 40, `(50 → ${apres.H2.fatigue})`);
     // 8% de 60 PV max = 4,8, arrondi au supérieur : 5.
     verifier("et 8% des points de vie maximum", apres.H2.pv === 35, `(40 → ${apres.H2.pv})`);
     verifier("l'étalement tape le bouclier en priorité",
@@ -828,30 +829,32 @@ console.log("\nCE QUE LES ÉTATS FONT À CHAQUE FIN DE MANCHE");
 //  moment de lancer la carte : la brûlure qui ronge, et l'étalement qui ne
 //  frappe plus au lancement du tout.
 {
-    // --- LA BRÛLURE : 3 dégâts par manche, du type de ce qui l'a allumée ----
+    // --- LA BRÛLURE : 8 % des PV max par manche, en physique (tableau de Nico)
+    //     60 PV max → 4,8, arrondi au supérieur : 5.
     let etat = monde();
     etat.combattants.H1.etats = [{ nom: "Brûlé", duree: 3, typeDegats: "Magique" }];
     const avant = etat.combattants.H1.pv;
     let etapes = ticsDeFinDeManche(etat);
-    verifier("une brûlure ronge de trois points", etat.combattants.H1.pv === avant - 3,
+    verifier("une brûlure ronge de 8 % des PV max", etat.combattants.H1.pv === avant - 5,
              `(${avant} → ${etat.combattants.H1.pv})`);
     verifier("et le dit avec son nom", etapes.some(e => e.tic === "Brûlure"),
              JSON.stringify(etapes.map(e => e.tic)));
 
     // Contrairement au poison, elle mord à CHAQUE manche.
     ticsDeFinDeManche(etat);
-    verifier("elle mord encore à la manche suivante", etat.combattants.H1.pv === avant - 6,
+    verifier("elle mord encore à la manche suivante", etat.combattants.H1.pv === avant - 10,
              String(etat.combattants.H1.pv));
 
-    // Elle passe par les résistances du type retenu : une armure ne protège
-    // pas d'une flamme magique, une résistance magique si.
+    // Elle frappe en PHYSIQUE, quel que soit le coup qui l'a allumée (même
+    // un ancien état qui retenait « Magique ») : la résistance magique ne la
+    // stoppe plus, l'armure si.
     let resistant = monde();
     resistant.combattants.H1.def = { ...resistant.combattants.H1.def, magique: 100 };
     resistant.combattants.H1.etats = [{ nom: "Brûlé", duree: 2, typeDegats: "Magique" }];
     const pvAvant = resistant.combattants.H1.pv;
     ticsDeFinDeManche(resistant);
-    verifier("une résistance magique totale éteint une flamme magique",
-             resistant.combattants.H1.pv === pvAvant, String(resistant.combattants.H1.pv));
+    verifier("une résistance magique totale ne l'éteint pas (physique)",
+             resistant.combattants.H1.pv === pvAvant - 5, String(resistant.combattants.H1.pv));
 
     let blinde = monde();
     blinde.combattants.H1.def = { ...blinde.combattants.H1.def, physique: 100 };
@@ -868,7 +871,7 @@ console.log("\nCE QUE LES ÉTATS FONT À CHAQUE FIN DE MANCHE");
     const pvProtege = protege.combattants.H1.pv;
     ticsDeFinDeManche(protege);
     verifier("le bouclier prend la brûlure avant la chair",
-             protege.combattants.H1.bouclier === 7 && protege.combattants.H1.pv === pvProtege,
+             protege.combattants.H1.bouclier === 5 && protege.combattants.H1.pv === pvProtege,   // 10 - 5
              `(bouclier ${protege.combattants.H1.bouclier})`);
 
     // --- L'ÉTALEMENT : une moitié par manche, jamais au lancement -----------

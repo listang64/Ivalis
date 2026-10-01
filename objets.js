@@ -142,7 +142,9 @@ window.CLES_BONUS = [
 
 const ETAT_EFFET = (nom, chance, libelle) => ({ cle: "etat_" + nom, etat: nom, chance, libelle });
 
-// Colonne J — EFFET A (arme de contact)
+// Colonne J — EFFET A (arme de contact). Tableau de Nico (octobre) : Poussée,
+// Provocation (et Traction en B) à 15 %, initiative +5.
+
 window.EFFETS_A = [
     { cle: "degats",            bonus: { degats: 1 },            libelle: "dégât" },
     ETAT_EFFET("Empoisonnement", 10, "empoisonnement"),
@@ -151,11 +153,11 @@ window.EFFETS_A = [
     ETAT_EFFET("Brûlé",          10, "brûlure"),
     ETAT_EFFET("Immobilisation", 10, "immobilisation"),
     ETAT_EFFET("Peur",           10, "peur"),
-    ETAT_EFFET("Poussée",        10, "poussée"),
+    ETAT_EFFET("Poussée",        15, "poussée"),
     { cle: "initTemporaire",    chance: 10, buff: { initiative: 15, tours: 2 }, libelle: "élan" },
     { cle: "hexApresAttaque",   bonus: { hexApresAttaque: 1 },   libelle: "repli" },
-    ETAT_EFFET("Provocation",    10, "provocation"),
-    { cle: "initiative",        bonus: { initiative: 3 },        libelle: "initiative" },
+    ETAT_EFFET("Provocation",    15, "provocation"),
+    { cle: "initiative",        bonus: { initiative: 5 },        libelle: "initiative" },
     { cle: "critique",          bonus: { critique: 3 },          libelle: "critique" },
     { cle: "ignoreResistances", bonus: { ignoreResistances: 10 }, libelle: "perce-résistances" }
 ];
@@ -170,13 +172,13 @@ window.EFFETS_B = [
     ETAT_EFFET("Brûlé",          10, "brûlure"),
     ETAT_EFFET("Immobilisation", 10, "immobilisation"),
     ETAT_EFFET("Peur",           10, "peur"),
-    ETAT_EFFET("Poussée",        10, "poussée"),
-    ETAT_EFFET("Traction",       10, "traction"),
+    ETAT_EFFET("Poussée",        15, "poussée"),
+    ETAT_EFFET("Traction",       15, "traction"),
     { cle: "initTemporaire",    chance: 10, buff: { initiative: 15, tours: 2 }, libelle: "élan" },
     { cle: "hexApresAttaque",   bonus: { hexApresAttaque: 1 },   libelle: "repli" },
-    ETAT_EFFET("Provocation",    10, "provocation"),
+    ETAT_EFFET("Provocation",    15, "provocation"),
     { cle: "critique",          bonus: { critique: 3 },          libelle: "critique" },
-    { cle: "initiative",        bonus: { initiative: 3 },        libelle: "initiative" },
+    { cle: "initiative",        bonus: { initiative: 5 },        libelle: "initiative" },
     { cle: "ignoreResistances", bonus: { ignoreResistances: 10 }, libelle: "perce-résistances" }
 ];
 
@@ -187,8 +189,8 @@ window.EFFETS_C = [
     { cle: "beniMag",        beniSoin: { resMag: 8, tours: 1 },                     libelle: "bénédiction magique" },
     { cle: "beniPhys",       beniSoin: { resPhys: 8, tours: 1 },                    libelle: "bénédiction physique" },
     { cle: "beniDegats",     beniSoin: { degatsPct: 8, tours: 1 },                  libelle: "bénédiction offensive" },
-    { cle: "initSoi",        buffSoi: { initiative: 10, tours: 3 },                 libelle: "hâte" },
-    { cle: "ignoreResistances", bonus: { ignoreResistances: 10 },                   libelle: "perce-résistances" }
+    { cle: "initSoi",        buffSoi: { initiative: 10, tours: 3 },                 libelle: "hâte" }
+    // (« +10 % d'ignorer les résistances » retiré des effets de soin : tableau de Nico.)
 ];
 
 window.RESERVOIRS_EFFETS = { A: window.EFFETS_A, B: window.EFFETS_B, C: window.EFFETS_C };
@@ -279,7 +281,8 @@ window.MODELES_OBJETS = [
         modele: "Lance courte", type: "Arme lourde CAC", emplacement: "Main", deuxMains: false,
         carac: "FORCE", noms: ["Doratium"], effets: { reservoir: "A", nombre: 1 },
         paliers: {
-            "Commun":    { degatsPhys: 1 },
+            // Tableau de Nico : la lance commune donne la parade, pas le dégât.
+            "Commun":    { parade: 5 },
             "Rare":      { degatsPhys: 1, parade: 5 },
             "Très rare": { degatsPhys: 2, parade: 5 },
             "Épique":    { degatsPhys: 2, parade: 5 }
@@ -345,7 +348,7 @@ window.MODELES_OBJETS = [
         paliers: {
             "Commun":    { degatsPhys: 2 },
             "Rare":      { degatsPhys: 4 },
-            "Très rare": { degatsPhys: 6 },
+            "Très rare": { degatsPhys: 5 },      // tableau de Nico : +5 (l'Épique garde +6)
             "Épique":    { degatsPhys: 6 }
         }
     },

@@ -753,8 +753,10 @@ console.log("\n18. CE QUE CHAQUE ÉTAT FAIT, MAINTENANT QU'IL EST ÉCRIT EN UN S
 }
 
 // =========================================================================
-console.log("\n19. LA BRÛLURE RONGE, ET RETIENT CE QUI L'A ALLUMÉE");
+console.log("\n19. LA BRÛLURE RONGE EN PHYSIQUE, QUOI QUI L'AIT ALLUMÉE");
 // =========================================================================
+//  Tableau de Nico : « -50 % de soins reçus + 8 % des PV max en dégâts
+//  physiques ». Elle ne retient plus le type du coup qui l'a posée.
 {
     let etat = neuf();
     const brulerAvec = (typeRes) => resoudreCarte(etat, {
@@ -765,13 +767,14 @@ console.log("\n19. LA BRÛLURE RONGE, ET RETIENT CE QUI L'A ALLUMÉE");
     });
 
     const magique = brulerAvec("Magique").etat.combattants.H1.etats.find(e => e.nom === "Brûlé");
-    verifier("une flamme magique retient son type", magique && magique.typeDegats === "Magique",
+    verifier("posée par un sort : plus de type retenu", magique && magique.typeDegats === undefined,
              magique && magique.typeDegats);
     const physique = brulerAvec("Physique").etat.combattants.H1.etats.find(e => e.nom === "Brûlé");
-    verifier("une torche plantée dans la plaie aussi", physique && physique.typeDegats === "Physique",
+    verifier("posée par une torche : pareil", physique && physique.typeDegats === undefined,
              physique && physique.typeDegats);
 
-    verifier("et le tableau dit combien elle ronge", REGLES_ETATS["Brûlé"].degatsParTour === 3);
+    verifier("et le tableau dit combien elle ronge (8 % des PV max, physique)",
+             REGLES_ETATS["Brûlé"].pvMaxParTour === 8 && REGLES_ETATS["Brûlé"].typeParTour === "Physique");
     verifier("et de combien elle ampute les soins", REGLES_ETATS["Brûlé"].soinsRecus === -50);
 }
 
