@@ -42,7 +42,8 @@ import { clonerEtat, combattant, creerDes, combattantIllusion,
 import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissiperConfusion,
          traverserZones, creerZonePure, poserZone, vieillirZones,
          chaineDeDegats, REGLES_ETATS, estDansLeNoir,
-         partageTenebres, ETAT_TENEBRES_ETALEES, POISON } from './moteur_pur.js';
+         partageTenebres, ETAT_TENEBRES_ETALEES, POISON,
+         resoudreTechniqueClasse } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche } from './ia_pure.js';
@@ -137,7 +138,7 @@ export function cerveauSilencieux(suivi, maintenant) {
 //  cerveau qui tranche — et il refuse en disant pourquoi, pour que l'écran
 //  puisse l'afficher au lieu de rester muet.
 
-export const TYPES_INTENTION = ["mouvement", "carte", "bond", "illusion", "finTour"];
+export const TYPES_INTENTION = ["mouvement", "carte", "bond", "illusion", "finTour", "classe"];
 
 export function validerIntention(etat, intention) {
     const refus = (raison) => ({ ok: false, raison });
@@ -214,6 +215,26 @@ export function validerIntention(etat, intention) {
         }
         const occupant = occupantVivant(etat, vers.q, vers.r, intention.idIllusion);
         if (occupant) return refus(`${occupant} occupe (${vers.q},${vers.r})`);
+    }
+
+    // UNE TECHNIQUE DE CLASSE (Hoplite) : la sienne, à son niveau, pas encore
+    // jouée dans ce combat, et choisie pour CETTE manche. Le Rempart vise un
+    // allié debout, à côté de lui.
+    if (intention.type === "classe") {
+        const idCarte = intention.idCarte;
+        if (!idCarte) return refus("technique sans identité");
+        if (!((acteur.atouts && acteur.atouts.techniques) || []).includes(idCarte)) {
+            return refus(`${intention.acteur} n'a pas la technique ${idCarte}`);
+        }
+        if ((acteur.techniquesUtilisees || []).includes(idCarte)) return refus(`${idCarte} déjà utilisée dans ce combat`);
+        if (tete.carte && tete.carte !== idCarte) return refus(`la carte de ce tour est ${tete.carte}`);
+        if (idCarte === "CLASSE_REMPART") {
+            const allie = combattant(etat, intention.cible);
+            if (!allie) return refus("Rempart sans allié");
+            if (allie.id === acteur.id) return refus("le Rempart protège un autre que soi");
+            if (allie.aTerre || allie.estIllusion || allie.camp !== acteur.camp) return refus("Rempart : allié invalide");
+            if (distance(acteur, allie) > 1) return refus("Rempart : l'allié doit être adjacent");
+        }
     }
 
     if (intention.type === "carte") {
@@ -752,6 +773,18 @@ export function appliquerIntention(etat, intention, plateau) {
             reserveCarte: nombre(intention.reserveCarte)
         }, des, plateau);
         return fabriquerPas(etat, r.etat, r.etapes, intention.id, intention.acteur, des);
+    }
+
+    // UNE TECHNIQUE DE CLASSE : son effet, puis la fin du tour — comme une
+    // carte, elle occupe le tour du héros.
+    if (intention.type === "classe") {
+        const r = resoudreTechniqueClasse(etat, { idLanceur: intention.acteur, idCarte: intention.idCarte,
+                                                  cible: intention.cible });
+        const suivant = clonerEtat(r.etat);
+        const etapes = [...r.etapes];
+        const clot = cloturerTour(suivant);
+        if (clot) etapes.push(...clot.etapes);
+        return fabriquerPas(etat, suivant, etapes, intention.id, intention.acteur, des);
     }
 
     if (intention.type === "carte") {

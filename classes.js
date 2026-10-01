@@ -91,6 +91,23 @@ window.DESCRIPTIFS_CLASSES = {
               points: ["À 0 PV, sa vie reste bloquée : il joue encore deux tours avant d'être mis KO",
                        "Une fois par combat, aucun soin possible"] }
         ]
+    },
+    CLASSE_HOPLITE: {
+        presentation: "Lance au poing et bouclier levé, l'Hoplite est le mur sur lequel la troupe "
+            + "s'appuie. Il ne recule pas : il encaisse, il tient la ligne, et il couvre de son "
+            + "bouclier le camarade qui combat à ses côtés.",
+        paliers: [
+            { niveau: 1, titre: "Discipline de la phalange",
+              points: ["+5 % de parade", "+5 % de résistance physique"] },
+            { niveau: 5, titre: "Technique : Mur de bouclier",
+              points: ["Initiative 100 · aucune fatigue",
+                       "+60 % de parade sur soi jusqu'à la fin de la manche",
+                       "Une fois par combat"] },
+            { niveau: 10, titre: "Technique : Rempart",
+              points: ["Initiative 105 · aucune fatigue · sur un allié adjacent, 3 manches",
+                       "Chaque attaque qu'il reçoit est partagée : moitié pour lui, moitié pour l'Hoplite",
+                       "Il faut rester côte à côte · une fois par combat"] }
+        ]
     }
 };
 

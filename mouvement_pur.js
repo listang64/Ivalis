@@ -27,7 +27,7 @@
 // =========================================================================
 
 import { clonerEtat, combattant, tomber } from './combat_etat.js';
-import { esquiveDe, paradeDe, defPhysiqueDe, bonusDesEtats, aLEtat, traverserZones,
+import { esquiveDe, paradeDe, defPhysiqueDe, bonusDesEtats, aLEtat, traverserZones, protecteurRempart,
          ligneDeVue, caseLibre } from './moteur_pur.js';
 
 const nombre = (v, defaut = 0) => {
@@ -215,10 +215,45 @@ export function ennemisAuContact(etat, id, hex) {
 // arrondie — voir chaineDeDegats, moteur_pur.js). Le bouclier encaisse ce qui
 // reste en premier, et le surplus part dans le vide.
 export const DEGATS_OPPORTUNITE = 8;
-export const degatsOpportuniteContre = (cible) => {
+const reduireParArmure = (cible, brut) => {
     const reduction = Math.min(1, Math.max(0, defPhysiqueDe(cible)) / 100);
-    return Math.max(0, Math.round(DEGATS_OPPORTUNITE * (1 - reduction)));
+    return Math.max(0, Math.round(brut * (1 - reduction)));
 };
+export const degatsOpportuniteContre = (cible) => reduireParArmure(cible, DEGATS_OPPORTUNITE);
+
+// LE COUP D'OPPORTUNITÉ QUI PORTE : le bouclier d'abord (le surplus part dans
+// le vide), la vie ensuite, la chute éventuelle. Une seule écriture pour les
+// trois marches (déplacement, Peur, Repli), et le REMPART de l'Hoplite : si la
+// cible en a un actif, les 8 dégâts bruts sont partagés en deux attaques
+// indépendantes, chacun avec sa propre armure (moteur_pur.js, protecteurRempart).
+export function infligerOpportunite(etat, idCible, ennemi, coup, hex) {
+    const etapes = [];
+    const cible = combattant(etat, idCible);
+    if (!cible) return etapes;
+    const appliquer = (id, c, montant) => {
+        if (c.bouclier > 0) c.bouclier = Math.max(0, c.bouclier - montant);
+        else c.pv = Math.max(0, c.pv - montant);
+        etapes.push({ type: "degats", cible: id, acteur: ennemi, montant, opportunite: true,
+                      bouclierApres: c.bouclier, pvApres: c.pv });
+        etapes.push(...tomber(etat, id, ennemi));
+    };
+    const protecteur = protecteurRempart(etat, cible);
+    if (protecteur) {
+        const partHoplite = Math.ceil(DEGATS_OPPORTUNITE / 2);
+        etapes.push({ type: "opportunite", ...coup, hex });
+        etapes.push({ type: "message", cible: protecteur.id, acteur: ennemi, texte: "🛡️ Rempart", couleur: "#e8c46a" });
+        appliquer(idCible, cible, reduireParArmure(cible, DEGATS_OPPORTUNITE - partHoplite));
+        appliquer(protecteur.id, protecteur, reduireParArmure(protecteur, partHoplite));
+        return etapes;
+    }
+    if (cible.bouclier > 0) cible.bouclier = Math.max(0, cible.bouclier - coup.montant);
+    else cible.pv = Math.max(0, cible.pv - coup.montant);
+    etapes.push({ type: "opportunite", ...coup, hex, bouclierApres: cible.bouclier, pvApres: cible.pv });
+    etapes.push({ type: "degats", cible: idCible, acteur: ennemi, montant: coup.montant, opportunite: true,
+                  bouclierApres: cible.bouclier, pvApres: cible.pv });
+    etapes.push(...tomber(etat, idCible, ennemi));
+    return etapes;
+}
 
 export function resoudreOpportunite(etat, idAttaquant, idCible, des) {
     const a = combattant(etat, idAttaquant);
@@ -289,19 +324,7 @@ export function resoudreMouvement(etat, action, des, plateau) {
             if (coup.evitee) {
                 etapes.push({ type: "opportunite", ...coup, hex: pas.vers });
             } else {
-                // Le bouclier d'abord ; le surplus part dans le vide.
-                if (c.bouclier > 0) {
-                    c.bouclier = Math.max(0, c.bouclier - coup.montant);
-                } else {
-                    c.pv = Math.max(0, c.pv - coup.montant);
-                }
-                etapes.push({ type: "opportunite", ...coup, hex: pas.vers,
-                              bouclierApres: c.bouclier, pvApres: c.pv });
-                etapes.push({ type: "degats", cible: id, acteur: ennemi,
-                              montant: coup.montant, opportunite: true,
-                              bouclierApres: c.bouclier, pvApres: c.pv });
-
-                etapes.push(...tomber(suivant, id, ennemi));
+                etapes.push(...infligerOpportunite(suivant, id, ennemi, coup, pas.vers));
             }
         }
         contactAvant = contactApres;
@@ -491,18 +514,7 @@ export function resoudrePeur(etat, idLanceur, idCible, des, plateau, options) {
             if (coup.evitee) {
                 etapes.push({ type: "opportunite", ...coup, hex: pas });
             } else {
-                if (cible.bouclier > 0) {
-                    cible.bouclier = Math.max(0, cible.bouclier - coup.montant);
-                } else {
-                    cible.pv = Math.max(0, cible.pv - coup.montant);
-                }
-                etapes.push({ type: "opportunite", ...coup, hex: pas,
-                              bouclierApres: cible.bouclier, pvApres: cible.pv });
-                etapes.push({ type: "degats", cible: idCible, acteur: ennemi,
-                              montant: coup.montant, opportunite: true,
-                              bouclierApres: cible.bouclier, pvApres: cible.pv });
-
-                etapes.push(...tomber(etat, idCible, ennemi));
+                etapes.push(...infligerOpportunite(etat, idCible, ennemi, coup, pas));
             }
         }
         contactAvant = contactApres;
@@ -613,12 +625,7 @@ export function resoudreRepli(etat, idLanceur, vers, des, plateau, options) {
                 etapes.push({ type: "opportunite", ...coup, hex: pas });
                 continue;
             }
-            if (c.bouclier > 0) c.bouclier = Math.max(0, c.bouclier - coup.montant);
-            else c.pv = Math.max(0, c.pv - coup.montant);
-            etapes.push({ type: "opportunite", ...coup, hex: pas, bouclierApres: c.bouclier, pvApres: c.pv });
-            etapes.push({ type: "degats", cible: idLanceur, acteur: ennemi, montant: coup.montant,
-                          opportunite: true, bouclierApres: c.bouclier, pvApres: c.pv });
-            etapes.push(...tomber(etat, idLanceur, ennemi));
+            etapes.push(...infligerOpportunite(etat, idLanceur, ennemi, coup, pas));
         }
         contactAvant = contactApres;
         if (c.aTerre) { etapes.push({ type: "trajetEcourte", acteur: idLanceur, raison: "à terre" }); break; }

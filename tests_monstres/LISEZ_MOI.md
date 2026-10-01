@@ -156,6 +156,7 @@ node necromancien.mjs        # la classe Nécromancien : Glacé/+1 compétence/+
 node surpuissance.mjs        # la surpuissance : ×1,25 dès 70 de fatigue, ×1,35 dès 100 (dégâts et soins, pas les boucliers) ; extraction, Forge, carte
 node armes_et_zones.mjs      # persistance posée comme une zone d'une case ; Distance réservée (polyvalente, distance, magie, soin) ; arme qui bloque des techniques : alerte, grisées, retirées du deck
 node tableaux_nico.mjs        # les cellules rouges des deux tableaux : brûlure 8 % PV max physique, poison 10 % énergie + 8 % PV magique, Contre/Absorption jusqu'à 30 %, armes et effets bonus
+node hoplite.mjs              # la classe Hoplite : +5 parade / +5 déf. physique, Mur de bouclier (+60 % parade, une fois), Rempart (coups partagés en deux avec l'allié adjacent, 3 manches), section « Techniques de classe » de la fiche
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -3845,3 +3846,48 @@ leurs.
 `objets_tableau.mjs`) porte ces cellules rouges ; `cerveau_combat.mjs` et
 `moteur_pur.mjs` vérifient les nouvelles brûlure et empoisonnement ;
 `tableaux_nico.mjs` vérifie chaque cellule rouge.
+
+## La classe Hoplite (version 155)
+
+L'Hoplite tient la ligne : il pare mieux, encaisse mieux, et à partir du
+niveau 5 il gagne des techniques de classe qui s'ajoutent au deck du joueur
+sans compter dans sa limite de compétences mémorisées.
+
+**Paliers** (app.js `ATOUTS_CLASSES`, classes.js `DESCRIPTIFS_CLASSES`).
+- Niveau 1 : +5 % de parade et +5 % de résistance physique.
+- Niveau 5 : technique **Mur de bouclier**.
+- Niveau 10 : technique **Rempart**.
+
+**Techniques de classe** (app.js `TECHNIQUES_CLASSE`, `carteTechniqueClasse`,
+`techniquesDeClasse`). Ce sont des cartes synthétiques (`CLASSE_MUR_BOUCLIER`,
+`CLASSE_REMPART`), sans fatigue, utilisables une fois par combat. En combat
+elles apparaissent après le deck, avant le Repos long, et se choisissent comme
+une carte (elles prennent leur place dans la file à leur initiative : 100 et
+105). Au moment de les lancer, elles remplacent le tour. Une fois servies,
+leur bannière est grisée et le serveur les refuse (`c.techniquesUtilisees`,
+étape `techniqueClasse`, intention `type: "classe"` dans cerveau_combat.js).
+
+- **Mur de bouclier** : +60 % de parade sur l'Hoplite jusqu'à la fin de la
+  manche où il est lancé (état « Mur de bouclier », durée 1).
+- **Rempart** : sur un allié adjacent, pour 3 manches (état « Rempart » qui
+  retient `idProtecteur`). Chaque coup qui touche cet allié (carte, zone,
+  attaque d'opportunité) est coupé en deux attaques indépendantes : l'Hoplite
+  prend la moitié arrondie au supérieur, l'allié le reste, chacun avec ses
+  propres défenses (armure, bouclier…). L'Hoplite n'a pas de jet de parade
+  sur sa moitié ; les altérations d'état ne touchent que l'allié. Les tics de
+  fin de manche (brûlure, poison…) et les zones au sol ne sont pas partagés.
+  Le Rempart dort quand les deux ne sont plus adjacents et se réveille dès
+  qu'ils le redeviennent ; il s'arrête si l'Hoplite tombe
+  (`protecteurRempart` dans moteur_pur.js, `infligerOpportunite` dans
+  mouvement_pur.js). Au lancement, une petite fenêtre propose les alliés
+  adjacents vivants.
+
+**Fiche personnage** (competences.js `htmlTechniquesDeClasse`). Sous le
+grimoire, un séparateur « Techniques de classe » liste les techniques de la
+classe : celles acquises, et celles encore verrouillées (« Niveau N requis »).
+Elles sont là pour information, on ne les sélectionne pas.
+
+`hoplite.mjs` vérifie les paliers, les deux techniques (validation, durée,
+usage unique, rejeu), le partage des coups (pair, impair, armure, critique,
+états, éloignement, chute de l'Hoplite, opportunité, brûlure non partagée),
+la section de la fiche, les bannières du volet de combat et le descriptif.

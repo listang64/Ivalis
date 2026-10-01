@@ -881,7 +881,63 @@ window.ATOUTS_CLASSES = {
         { niveau: 1,  immunites: ["Glacé"], competences: 1, pvMax: 5 },
         { niveau: 5,  effets: ["EFF_TENEBRES"] },
         { niveau: 10, sursis: 2 }
+    ],
+    // L'HOPLITE : le mur de la troupe. +5 de parade et +5 de défense physique
+    // dès le niveau 1 ; deux techniques de classe (TECHNIQUES_CLASSE, plus bas)
+    // aux niveaux 5 et 10.
+    "Hoplite": [
+        { niveau: 1,  parade: 5, defPhysique: 5 },
+        { niveau: 5,  techniques: ["CLASSE_MUR_BOUCLIER"] },
+        { niveau: 10, techniques: ["CLASSE_REMPART"] }
     ]
+};
+
+// =========================================================================
+//  LES TECHNIQUES DE CLASSE
+// =========================================================================
+//  Des techniques qui ne se forgent pas : la classe les donne à son niveau.
+//  Elles s'AJOUTENT aux compétences mémorisées, sans compter dans la limite,
+//  et se jouent comme une carte — choisies en préparation, à leur initiative,
+//  elles occupent le tour du héros. Gratuites, mais une seule fois par combat.
+//  Leur effet est tranché par le cerveau (intention « classe »,
+//  cerveau_combat.js ; resoudreTechniqueClasse, moteur_pur.js).
+//
+//    cible    "soi" (Mur de bouclier) ou "allieAdjacent" (Rempart)
+window.TECHNIQUES_CLASSE = {
+    CLASSE_MUR_BOUCLIER: {
+        Nom: "Mur de bouclier", classe: "Hoplite", niveau: 5, Initiative: 100, Fatigue: 0, cible: "soi",
+        desc: "+60 % de parade sur soi jusqu'à la fin de la manche. Une fois par combat."
+    },
+    CLASSE_REMPART: {
+        Nom: "Rempart", classe: "Hoplite", niveau: 10, Initiative: 105, Fatigue: 0, cible: "allieAdjacent",
+        desc: "Sur un allié adjacent, pour 3 manches : chaque attaque qu'il reçoit est partagée en deux, "
+            + "moitié des dégâts pour lui, moitié pour l'Hoplite, chacun avec ses défenses. Il faut rester "
+            + "côte à côte. Pas les états altérés. Une fois par combat."
+    }
+};
+window.estTechniqueClasse = (idCarte) => !!(idCarte && window.TECHNIQUES_CLASSE[idCarte]);
+
+// La « carte » d'une technique de classe, au format des cartes forgées : c'est
+// ce qui lui permet de passer par les mêmes chemins (aperçu en grand, choix en
+// préparation, file d'initiative). Elle n'a ni arme ni composants.
+window.carteTechniqueClasse = function(idCarte) {
+    const t = window.TECHNIQUES_CLASSE[idCarte];
+    if (!t) return null;
+    return { Nom: t.Nom, Fatigue: t.Fatigue, Initiative: t.Initiative, Arme: "",
+             Effets_Compiles: [{ nom: t.Nom, desc: t.desc, isMod: false },
+                               { nom: "Technique de classe", desc: `${t.classe}, niveau ${t.niveau}`, isMod: true }],
+             Composants: { actions: [] }, techniqueClasse: idCarte };
+};
+
+// Les techniques de classe que ce héros possède À SON NIVEAU.
+window.techniquesDeClasse = function(perso) {
+    return (window.atoutRace(perso || {}).techniques || []).filter(id => window.TECHNIQUES_CLASSE[id]);
+};
+// Toutes celles de sa classe, débloquées ou non (la fiche les montre toutes).
+window.toutesTechniquesDeClasse = function(perso) {
+    const paliers = window.paliersDeClasse((perso || {}).classe || (perso || {}).Classe);
+    return paliers.flatMap(p => (p.techniques || []).map(id => ({ id, niveau: p.niveau })))
+                  .filter(t => window.TECHNIQUES_CLASSE[t.id]);
 };
 
 // Le nom d'une classe sans accents ni majuscules : la fiche garde le nom tel

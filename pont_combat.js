@@ -282,6 +282,13 @@ const SCENES = {
         return { geste: "chute", pion: e.cible, duree: RYTHME.chute };
     },
 
+    // Une technique de classe jouée : son nom sur le pion.
+    techniqueClasse(e) {
+        const noms = { CLASSE_MUR_BOUCLIER: "🛡️ Mur de bouclier", CLASSE_REMPART: "🛡️ Rempart" };
+        return { geste: "message", pion: e.acteur, texte: noms[e.idCarte] || "Technique de classe",
+                 couleur: "#e8c46a", duree: RYTHME.message };
+    },
+
     // Le sursis du Nécromancien : il ne tombe pas, il le dit — et il dit
     // combien de tours il lui reste.
     sursis(e) {
@@ -511,7 +518,10 @@ export function fichesDepuisEtat(etat, fichesActuelles) {
             statut: c.aTerre ? "Inconscient" : (fiche.statut === "Inconscient" ? "Vivant" : fiche.statut),
             // Le sursis voyage sur la fiche : à zéro PV, le Nécromancien reste
             // debout (estCombattantMort, combat.js) et son pion le montre.
-            sursis: c.sursis ? { tours: nombre(c.sursis.tours) } : null
+            sursis: c.sursis ? { tours: nombre(c.sursis.tours) } : null,
+            // Les techniques de classe déjà jouées dans ce combat (Hoplite) :
+            // le volet les grise d'après la fiche.
+            techniquesUtilisees: [...(c.techniquesUtilisees || [])]
         };
     });
 }
@@ -635,7 +645,7 @@ const CHAMPS_COMBAT_PROTEGES = [
     "PV_Actuels", "Bouclier_Actuel", "Etats_Alteres", "Fatigue_Actuelle", "fatigueActuelle",
     // Le sursis du Nécromancien : sans lui, une fiche rafraîchie à zéro PV
     // le ferait passer pour tombé.
-    "sursis"
+    "sursis", "techniquesUtilisees"
 ];
 
 export function fusionnerFichesCombat(fichesFraiches, fichesActuelles, combattantsDuCerveau) {

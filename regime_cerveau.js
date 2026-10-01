@@ -650,6 +650,10 @@ export function creerRegime(contexte) {
 
     const demanderFinDeTour = (acteur) => demander({ type: "finTour", acteur });
 
+    // Une technique de classe (Hoplite) : laquelle, et pour le Rempart, l'allié.
+    const demanderTechniqueClasse = (acteur, idCarte, cible) =>
+        demander({ type: "classe", acteur, idCarte, ...(cible ? { cible } : {}) });
+
     // Le OK de la fenêtre sombre. Purement local, comme avant : chacun lit à
     // son rythme et rattrape ensuite. Aucun poste n'attend un autre.
     const ok = () => spectateur.ok();
@@ -659,7 +663,7 @@ export function creerRegime(contexte) {
         accueillirLesNouveaux,
         reprendreLaMain,
         demander, demanderMouvement, demanderCarte, demanderBond, demanderIllusion,
-        demanderFinDeTour,
+        demanderFinDeTour, demanderTechniqueClasse,
         // De quoi regarder l'intérieur, pour la trace et les bancs.
         spectateur,
         etatPublie: () => moi.etat,
@@ -1647,6 +1651,12 @@ if (typeof window !== "undefined") {
             if (!REGIME) return null;
             marquerDemande(acteur);
             return REGIME.demanderFinDeTour(acteur);
+        },
+        // La technique de classe clôt le tour comme une carte : on marque.
+        techniqueClasse: (acteur, idCarte, cible) => {
+            if (!REGIME) return null;
+            marquerDemande(acteur);
+            return REGIME.demanderTechniqueClasse(acteur, idCarte, cible);
         },
         ok: () => REGIME ? REGIME.ok() : null,
         // « Ce combattant a-t-il déjà demandé quelque chose pour ce tour ? »

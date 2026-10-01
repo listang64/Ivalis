@@ -175,7 +175,10 @@ export function combattantDepuisFiche(fiche, position, regles) {
         // Le Nécromancien de niveau 10 : tombé à zéro, il tient encore ce
         // nombre de tours avant d'être mis KO — une fois par combat (tomber,
         // plus bas). Zéro pour tous les autres.
-        sursis: nombre(race.sursis)
+        sursis: nombre(race.sursis),
+        // Les techniques de classe que ce héros possède à son niveau (Hoplite :
+        // Mur de bouclier, Rempart). Le cerveau refuse celles qu'il n'a pas.
+        techniques: Array.isArray(race.techniques) ? [...race.techniques] : []
     };
     const mod = {
         // Ce que l'ÉQUIPEMENT change EN PERMANENCE, hors états altérés : le
@@ -545,6 +548,14 @@ const APPLICATEURS = {
         // En sursis, la vie reste bloquée à zéro et le combattant debout.
         if (c.sursis) c.pv = 0;
         c.aTerre = c.pvMax > 0 && c.pv <= 0 && !c.sursis;
+    },
+
+    // Une technique de classe jouée : elle ne resservira plus de ce combat.
+    techniqueClasse(etat, e) {
+        const c = combattant(etat, e.acteur);
+        if (!c) return;
+        c.techniquesUtilisees = Array.isArray(e.utilisees) ? [...e.utilisees]
+            : [...new Set([...(c.techniquesUtilisees || []), e.idCarte])];
     },
 
     // Le sursis commence, se décompte, ou (tours à zéro) s'achève sur la

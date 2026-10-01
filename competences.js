@@ -107,7 +107,7 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
                 window.COULEUR_PERSO_COURANT = dataPerso.Couleur || "#4a1c1c";
                 window.CARTES_SELECTIONNEES = dataPerso.Deck_Equipe || [];
                 // Son expérience, pour les compétences que son niveau permet de créer.
-                persoData = { idPersonnage, XP: dataPerso.XP };
+                persoData = { idPersonnage, XP: dataPerso.XP, Classe: dataPerso.Classe, Race: dataPerso.Race };
             }
         }
 
@@ -193,9 +193,14 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
         }
 
         listeDiv.innerHTML = "";
-        
+
+        // LES TECHNIQUES DE CLASSE (Hoplite), sous une séparation : elles ne
+        // se forgent ni ne se mémorisent — la classe les donne, hors limite.
+        // Celles d'un palier pas encore atteint restent grisées, avec leur niveau.
+        const sectionClasse = typeof htmlTechniquesDeClasse === "function" ? htmlTechniquesDeClasse(fichePerso) : "";
+
         if (nbCreees === 0) {
-            listeDiv.innerHTML = `<p style="text-align: center; font-style: italic; color: #5c3a21; margin-top: 20px;">Le héros n'a pas encore forgé ses techniques de combat.</p>`;
+            listeDiv.innerHTML = `<p style="text-align: center; font-style: italic; color: #5c3a21; margin-top: 20px;">Le héros n'a pas encore forgé ses techniques de combat.</p>` + sectionClasse;
             return;
         }
 
@@ -275,7 +280,7 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
             `;
         });
 
-        htmlDeck += `</div>`;
+        htmlDeck += sectionClasse + `</div>`;
         listeDiv.innerHTML = htmlDeck;
         window.ajusterTitresBannieres(listeDiv);
 
@@ -283,6 +288,35 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
         console.error("Erreur de lecture des compétences :", e);
     }
 };
+
+// La section « Techniques de classe » de l'onglet Compétences : vide pour une
+// classe qui n'en a pas.
+function htmlTechniquesDeClasse(perso) {
+    if (!perso || typeof window.toutesTechniquesDeClasse !== "function") return "";
+    const toutes = window.toutesTechniquesDeClasse(perso);
+    if (toutes.length === 0) return "";
+    const acquises = window.techniquesDeClasse(perso);
+    const echapper = (t) => String(t || "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+    const lignes = toutes.map(({ id, niveau }) => {
+        const t = window.TECHNIQUES_CLASSE[id];
+        const acquise = acquises.includes(id);
+        return `
+            <div class="technique-classe${acquise ? "" : " technique-classe-verrouillee"}" data-technique="${id}">
+                <div class="technique-classe-init">${t.Initiative}</div>
+                <div class="technique-classe-corps">
+                    <div class="technique-classe-nom">🛡️ ${echapper(t.Nom)}
+                        <span class="technique-classe-badge">${acquise ? "Une fois par combat" : `Niveau ${niveau} requis`}</span></div>
+                    <div class="technique-classe-desc">${echapper(t.desc)}</div>
+                </div>
+            </div>`;
+    }).join("");
+    return `
+        <div class="separation-techniques-classe" id="section-techniques-classe">
+            <span>Techniques de classe</span>
+        </div>
+        <p class="techniques-classe-aide">Données par la classe : toujours disponibles en combat, sans compter dans les compétences mémorisées.</p>
+        ${lignes}`;
+}
 
 // =========================================================================
 //  EFFACER UNE TECHNIQUE (OUTIL DE DÉVELOPPEMENT)
@@ -476,6 +510,11 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         for (const idPerso of Object.keys(global)) {
             if (global[idPerso] && global[idPerso][idCarte]) { data = global[idPerso][idCarte]; break; }
         }
+        if (data) window.COMPETENCES_CACHE[idCarte] = data;
+    }
+    // Une technique de classe n'est dans aucun deck : elle se fabrique.
+    if (!data && typeof window.carteTechniqueClasse === "function") {
+        data = window.carteTechniqueClasse(idCarte);
         if (data) window.COMPETENCES_CACHE[idCarte] = data;
     }
     if (!data) {
@@ -710,6 +749,12 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
             boutonChoisirHtml = `
             <div style="position: absolute; bottom: -65px; left: 50%; transform: translateX(-50%); z-index: 5; color: #a89f91; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; text-transform: uppercase; white-space: nowrap; text-shadow: 2px 2px 4px black; letter-spacing: 1px;">
                 Combat en cours
+            </div>`;
+        } else if (data.techniqueClasse && typeof window.techniqueClasseUtilisee === "function"
+                   && window.techniqueClasseUtilisee(porteurDeLaCarte, idCarte)) {
+            boutonChoisirHtml = `
+            <div style="position: absolute; bottom: -65px; left: 50%; transform: translateX(-50%); z-index: 5; color: #a89f91; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; text-transform: uppercase; white-space: nowrap; text-shadow: 2px 2px 4px black; letter-spacing: 1px;">
+                Déjà utilisée ce combat
             </div>`;
         } else if (estEpuise) {
             boutonChoisirHtml = `

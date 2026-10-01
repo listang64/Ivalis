@@ -1024,6 +1024,61 @@ export function projectileDe(action) {
 //  aucun message flottant. Ces choses-là se déduisent des étapes, sur chaque
 //  écran, au rythme de chaque écran.
 
+// =========================================================================
+//  LES TECHNIQUES DE CLASSE (Hoplite)
+// =========================================================================
+//  Mur de bouclier : +60 de parade sur soi jusqu'à la fin de la manche.
+//  Rempart : sur un allié adjacent, pour 3 manches ; tant que l'Hoplite est
+//  debout et à côté de lui, chaque attaque reçue est partagée en deux (voir
+//  resoudreCarte et l'attaque d'opportunité, mouvement_pur.js). Les deux sont
+//  gratuites et ne servent qu'une fois par combat (`techniquesUtilisees`).
+export const ETAT_MUR_BOUCLIER = "Mur de bouclier";
+export const ETAT_REMPART = "Rempart";
+export const PARADE_MUR_BOUCLIER = 60;
+export const MANCHES_REMPART = 3;
+
+// Le protecteur qui partage ce coup avec la cible, ou null : un Rempart posé
+// sur elle, un Hoplite debout (ni à terre, ni en sursis), et côte à côte À CET
+// INSTANT — éloignés, le Rempart dort ; rapprochés, il se réveille.
+export function protecteurRempart(etat, cible) {
+    if (!cible || !Array.isArray(cible.etats)) return null;
+    const rempart = cible.etats.find(e => e && e.nom === ETAT_REMPART && e.idProtecteur);
+    if (!rempart) return null;
+    const p = combattant(etat, rempart.idProtecteur);
+    if (!p || p.aTerre || enSursis(p) || p.id === cible.id) return null;
+    if (p.q === null || p.q === undefined || cible.q === null || cible.q === undefined) return null;
+    return distanceHex(p, cible) <= 1 ? p : null;
+}
+
+// Ce qu'une technique de classe fait à l'état. Rend { etat, etapes } comme
+// resoudreCarte ; ne clôt pas le tour (le cerveau s'en charge).
+export function resoudreTechniqueClasse(etat, action) {
+    const suivant = clonerEtat(etat);
+    const etapes = [];
+    const id = action.idLanceur;
+    const c = combattant(suivant, id);
+    if (!c) return { etat: suivant, etapes };
+
+    const utilisees = [...(c.techniquesUtilisees || []), action.idCarte];
+    c.techniquesUtilisees = utilisees;
+    etapes.push({ type: "techniqueClasse", acteur: id, idCarte: action.idCarte,
+                  cible: action.cible || id, utilisees });
+
+    if (action.idCarte === "CLASSE_MUR_BOUCLIER") {
+        c.etats = [...(c.etats || []).filter(e => e && e.nom !== ETAT_MUR_BOUCLIER),
+                   { nom: ETAT_MUR_BOUCLIER, duree: 1, bonusEquip: { parade: PARADE_MUR_BOUCLIER } }];
+        etapes.push({ type: "etats", cible: id, liste: c.etats, pose: ETAT_MUR_BOUCLIER });
+    } else if (action.idCarte === "CLASSE_REMPART") {
+        const allie = combattant(suivant, action.cible);
+        if (allie) {
+            allie.etats = [...(allie.etats || []).filter(e => e && e.nom !== ETAT_REMPART),
+                           { nom: ETAT_REMPART, duree: MANCHES_REMPART, idProtecteur: id }];
+            etapes.push({ type: "etats", cible: allie.id, liste: allie.etats, pose: ETAT_REMPART });
+        }
+    }
+    return { etat: suivant, etapes };
+}
+
 export function resoudreCarte(etat, action, plateau) {
     const suivant = clonerEtat(etat);
     const etapes = [];
@@ -1223,7 +1278,6 @@ export function resoudreCarte(etat, action, plateau) {
             }
 
             // --- DÉGÂTS -------------------------------------------------
-            const distance = distanceHex(lanceur, cible);
             const equip = des.equip || {};
             const percee = equip.ignoreResistances === true
                         || (equip.ignoreArmure === true && attaque.typeRes !== "Magique");
@@ -1234,73 +1288,97 @@ export function resoudreCarte(etat, action, plateau) {
             const attaqueAvecBonus = bonusMonstre
                 ? { ...attaque, valeurBrute: nombre(attaque.valeurBrute) + bonusMonstre }
                 : attaque;
-            const compte = chaineDeDegats(cible, attaqueAvecBonus, { critique, distance, percee });
 
-            // Le drain de l'absorption soigne AVANT que le reste ne frappe.
-            if (compte.soinAbsorption > 0) {
-                cible.pv = Math.min(cible.pvMax, cible.pv + compte.soinAbsorption);
-                etapes.push({ type: "soin", cible: idCible, acteur: idLanceur, drain: true,
-                              montant: compte.soinAbsorption, pvApres: cible.pv });
+            // UNE CIBLE FRAPPÉE : la chaîne de dégâts, puis tout ce qu'elle
+            // déclenche (drain, énergie bue, bouclier, renvoi, étalement,
+            // chute). Une fonction, parce que le REMPART frappe deux cibles
+            // avec une seule attaque (plus bas).
+            const frapper = (idCible, cible, attaqueFrappe) => {
+                const compte = chaineDeDegats(cible, attaqueFrappe, { critique, distance: distanceHex(lanceur, cible), percee });
+
+                // Le drain de l'absorption soigne AVANT que le reste ne frappe.
+                if (compte.soinAbsorption > 0) {
+                    cible.pv = Math.min(cible.pvMax, cible.pv + compte.soinAbsorption);
+                    etapes.push({ type: "soin", cible: idCible, acteur: idLanceur, drain: true,
+                                  montant: compte.soinAbsorption, pvApres: cible.pv });
+                }
+
+                // TÉNÈBRES : l'énergie d'abord, dite à part — un « -4 🌑 » sur le
+                // pion — avant le surplus qui frappe la vie.
+                if (compte.tenebres && compte.tenebres.surEnergie > 0) {
+                    cible.fatigue = compte.tenebres.energieApres;
+                    etapes.push({ type: "fatigue", cible: idCible, acteur: idLanceur,
+                                  fatigueApres: cible.fatigue, tenebres: true,
+                                  montant: compte.tenebres.surEnergie });
+                }
+
+                if (compte.versBouclier > 0 || compte.bouclierApres !== cible.bouclier) {
+                    cible.bouclier = compte.bouclierApres;
+                    // Brisé : la taille de référence s'efface avec lui, pour que le
+                    // prochain bouclier posé reparte de la sienne et non de celle
+                    // d'un bouclier qui n'existe plus.
+                    if (cible.bouclier === 0) cible.bouclierMax = 0;
+                }
+                if (compte.versPv > 0) {
+                    cible.pv = Math.max(0, cible.pv - compte.versPv);
+                }
+
+                // Une Ténèbres que l'énergie a bue en entier ne touche pas la vie :
+                // pas de « -0 » sur le pion, l'étape d'énergie a tout dit.
+                if (!compte.tenebres || compte.degats > 0) etapes.push({
+                    type: "degats", cible: idCible, acteur: idLanceur,
+                    montant: compte.degats,
+                    surBouclier: compte.versBouclier,
+                    bouclierBrise: !!compte.bouclierBrise,
+                    bouclierApres: cible.bouclier,
+                    pvApres: cible.pv,
+                    critique,
+                    ...(compte.tenebres ? { tenebres: true } : {})
+                });
+
+                // LE CONTRE RENVOIE SA PART À L'ATTAQUANT : bouclier d'abord, vie
+                // ensuite, comme n'importe quel coup — sans résistance, c'est la
+                // force du coup reçu qui repart.
+                if (nombre(compte.renvoi) > 0 && lanceur && !lanceur.aTerre && !enSursis(lanceur) && idCible !== idLanceur) {
+                    const renvoi = nombre(compte.renvoi);
+                    const bouclierAvant = nombre(lanceur.bouclier);
+                    const surBouclier = Math.min(bouclierAvant, renvoi);
+                    lanceur.bouclier = bouclierAvant - surBouclier;
+                    if (lanceur.bouclier === 0) lanceur.bouclierMax = 0;
+                    lanceur.pv = Math.max(0, nombre(lanceur.pv) - (renvoi - surBouclier));
+                    etapes.push({ type: "degats", cible: idLanceur, acteur: idCible, montant: renvoi,
+                                  surBouclier, bouclierApres: lanceur.bouclier, pvApres: lanceur.pv,
+                                  renvoi: true });
+                    etapes.push(...tomber(suivant, idLanceur, idCible));
+                }
+
+                // L'ÉTALEMENT : LES PARTS ATTENDENT. Rien n'a été retiré au-dessus
+                // (compte.degats vaut zéro) ; tout est rangé dans l'état, une part
+                // par fin de manche, autant de parts que de tours.
+                if ((compte.tics || []).length > 0) {
+                    empilerEtalement(cible, attaque.versEnergie ? ETAT_TENEBRES_ETALEES : "Étalement", compte.tics);
+                    etapes.push({ type: "etats", cible: idCible, liste: cible.etats });
+                }
+
+                etapes.push(...tomber(suivant, idCible, idLanceur));
+            };
+
+            // LE REMPART (Hoplite, niveau 10) : la cible a un protecteur debout
+            // à côté d'elle. L'attaque est partagée en deux attaques
+            // indépendantes — moitié des dégâts chacune, chacun avec ses
+            // propres défenses (pas de jet d'esquive pour l'Hoplite : le coup a
+            // déjà porté). L'Hoplite prend la moitié arrondie au-dessus.
+            const protecteur = protecteurRempart(suivant, cible);
+            if (protecteur) {
+                const brut = nombre(attaqueAvecBonus.valeurBrute);
+                const partHoplite = Math.ceil(brut / 2);
+                etapes.push({ type: "message", cible: protecteur.id, acteur: idLanceur,
+                              texte: "🛡️ Rempart", couleur: "#e8c46a" });
+                frapper(idCible, cible, { ...attaqueAvecBonus, valeurBrute: brut - partHoplite });
+                frapper(protecteur.id, protecteur, { ...attaqueAvecBonus, valeurBrute: partHoplite });
+            } else {
+                frapper(idCible, cible, attaqueAvecBonus);
             }
-
-            // TÉNÈBRES : l'énergie d'abord, dite à part — un « -4 🌑 » sur le
-            // pion — avant le surplus qui frappe la vie.
-            if (compte.tenebres && compte.tenebres.surEnergie > 0) {
-                cible.fatigue = compte.tenebres.energieApres;
-                etapes.push({ type: "fatigue", cible: idCible, acteur: idLanceur,
-                              fatigueApres: cible.fatigue, tenebres: true,
-                              montant: compte.tenebres.surEnergie });
-            }
-
-            if (compte.versBouclier > 0 || compte.bouclierApres !== cible.bouclier) {
-                cible.bouclier = compte.bouclierApres;
-                // Brisé : la taille de référence s'efface avec lui, pour que le
-                // prochain bouclier posé reparte de la sienne et non de celle
-                // d'un bouclier qui n'existe plus.
-                if (cible.bouclier === 0) cible.bouclierMax = 0;
-            }
-            if (compte.versPv > 0) {
-                cible.pv = Math.max(0, cible.pv - compte.versPv);
-            }
-
-            // Une Ténèbres que l'énergie a bue en entier ne touche pas la vie :
-            // pas de « -0 » sur le pion, l'étape d'énergie a tout dit.
-            if (!compte.tenebres || compte.degats > 0) etapes.push({
-                type: "degats", cible: idCible, acteur: idLanceur,
-                montant: compte.degats,
-                surBouclier: compte.versBouclier,
-                bouclierBrise: !!compte.bouclierBrise,
-                bouclierApres: cible.bouclier,
-                pvApres: cible.pv,
-                critique,
-                ...(compte.tenebres ? { tenebres: true } : {})
-            });
-
-            // LE CONTRE RENVOIE SA PART À L'ATTAQUANT : bouclier d'abord, vie
-            // ensuite, comme n'importe quel coup — sans résistance, c'est la
-            // force du coup reçu qui repart.
-            if (nombre(compte.renvoi) > 0 && lanceur && !lanceur.aTerre && !enSursis(lanceur) && idCible !== idLanceur) {
-                const renvoi = nombre(compte.renvoi);
-                const bouclierAvant = nombre(lanceur.bouclier);
-                const surBouclier = Math.min(bouclierAvant, renvoi);
-                lanceur.bouclier = bouclierAvant - surBouclier;
-                if (lanceur.bouclier === 0) lanceur.bouclierMax = 0;
-                lanceur.pv = Math.max(0, nombre(lanceur.pv) - (renvoi - surBouclier));
-                etapes.push({ type: "degats", cible: idLanceur, acteur: idCible, montant: renvoi,
-                              surBouclier, bouclierApres: lanceur.bouclier, pvApres: lanceur.pv,
-                              renvoi: true });
-                etapes.push(...tomber(suivant, idLanceur, idCible));
-            }
-
-            // L'ÉTALEMENT : LES PARTS ATTENDENT. Rien n'a été retiré au-dessus
-            // (compte.degats vaut zéro) ; tout est rangé dans l'état, une part
-            // par fin de manche, autant de parts que de tours.
-            if ((compte.tics || []).length > 0) {
-                empilerEtalement(cible, attaque.versEnergie ? ETAT_TENEBRES_ETALEES : "Étalement", compte.tics);
-                etapes.push({ type: "etats", cible: idCible, liste: cible.etats });
-            }
-
-            etapes.push(...tomber(suivant, idCible, idLanceur));
         });
     });
 

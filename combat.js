@@ -764,8 +764,11 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
         window.mettreAJourJaugePV();
 
         const deck = persoActuel.deckEquipe || [];
+        // Les techniques de classe (Hoplite) s'ajoutent au deck, hors limite.
+        const techniquesClasse = typeof window.techniquesDeClasse === "function"
+            ? window.techniquesDeClasse(persoActuel) : [];
 
-        if (deck.length === 0) {
+        if (deck.length === 0 && techniquesClasse.length === 0) {
             listeDiv.innerHTML = "<div style='color:#a89f91; font-family: Almendra, serif; font-size:16px; margin-top: 10px; font-style: italic;'>Aucune compétence mémorisée.</div>";
             return;
         }
@@ -827,6 +830,35 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
                     <div id="cadre-combat-${idCarte}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('${urlCadre}'); background-size: contain; background-position: left center; background-repeat: no-repeat; z-index: 2; filter: drop-shadow(0px 6px 4px rgba(0,0,0,0.6)); transition: background-image 0.2s ease;"></div>
                     <div class="texte-init-banniere" style="position: absolute; top: 44%; transform: translateY(-50%); left: 6px; width: 69px; text-align: center; color: ${couleurTexte}; font-family: 'Cinzel', serif; font-size: 30px; font-weight: bold; z-index: 3; text-shadow: 2px 2px 5px black;">${initiative}</div>
                     <div class="texte-nom-banniere titre-auto-reduit" data-taille-max="17" style="position: absolute; top: 48%; transform: translateY(-50%); left: 76px; right: 120px; text-align: left; color: ${couleurTexte}; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${titre}</div>
+                </div>
+            </div>
+            `;
+        });
+
+        // LES TECHNIQUES DE CLASSE, après les cartes mémorisées : même bannière,
+        // même geste (aperçu, choix, lancement). Une fois jouée dans ce combat,
+        // la bannière reste grisée (`techniquesUtilisees`, posé par le cerveau).
+        const utiliseesCeCombat = persoActuel.techniquesUtilisees || [];
+        techniquesClasse.forEach(idCarte => {
+            const data = window.carteTechniqueClasse(idCarte);
+            window.COMPETENCES_CACHE[idCarte] = data;
+            const dejaJouee = utiliseesCeCombat.includes(idCarte);
+            const urlCadreClasse = dejaJouee ? IMAGE_CADRE_EPUISE : IMAGE_CADRE_NORMAL;
+            const couleurTexteClasse = dejaJouee ? "#888888" : "#f3d27a";
+            const survol = dejaJouee ? ` title="Déjà utilisée dans ce combat"` : ` title="Technique de classe — une fois par combat"`;
+            htmlDeck += `
+            <div style="position: relative; height: 100px; margin-bottom: ${ESPACEMENT_BANNIERES}px; transition: margin 0.2s ease;">
+                <div onclick="event.stopPropagation(); window.gererClicCarteCombat('${idCarte}')"${survol}
+                     onmouseover="document.getElementById('combat-carte-${idCarte}').style.transform='scale(0.75) translateX(15px)'; document.getElementById('combat-carte-${idCarte}').style.zIndex='100';"
+                     onmouseout="document.getElementById('combat-carte-${idCarte}').style.transform='scale(0.75) translateX(0px)'; document.getElementById('combat-carte-${idCarte}').style.zIndex='2';"
+                     style="position: absolute; top: 35px; left: 0; width: 335px; height: 40px; z-index: 10; cursor: pointer;">
+                </div>
+                <div id="combat-carte-${idCarte}" class="banniere-carte-combat banniere-technique-classe ${dejaJouee ? "banniere-epuisee" : ""}" data-actif="false" data-card-id="${idCarte}" data-technique-utilisee="${dejaJouee}"
+                     style="position: absolute; top: 0; left: 0; width: 450px; height: 160px; pointer-events: none; transition: filter 0.2s ease, transform 0.2s ease; transform: scale(0.75); transform-origin: left top; z-index: 2;">
+                    <div style="position: absolute; top: 49px; bottom: 58px; left: 63px; right: 7px; z-index: 1; border-radius: 0 15px 15px 0; background-color: ${window.COULEUR_PERSO_COURANT};"></div>
+                    <div id="cadre-combat-${idCarte}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('${urlCadreClasse}'); background-size: contain; background-position: left center; background-repeat: no-repeat; z-index: 2; filter: drop-shadow(0px 6px 4px rgba(0,0,0,0.6)); transition: background-image 0.2s ease;"></div>
+                    <div class="texte-init-banniere" style="position: absolute; top: 44%; transform: translateY(-50%); left: 6px; width: 69px; text-align: center; color: ${couleurTexteClasse}; font-family: 'Cinzel', serif; font-size: 30px; font-weight: bold; z-index: 3; text-shadow: 2px 2px 5px black;">${data.Initiative}</div>
+                    <div class="texte-nom-banniere titre-auto-reduit" data-taille-max="17" style="position: absolute; top: 48%; transform: translateY(-50%); left: 76px; right: 120px; text-align: left; color: ${couleurTexteClasse}; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">🛡️ ${data.Nom}</div>
                 </div>
             </div>
             `;
@@ -1535,7 +1567,7 @@ window.gererClicCarteCombat = function(idCarte) {
         el.dataset.actif = "false";
         const cId = el.id.replace("combat-carte-", "");
         const cData = window.COMPETENCES_CACHE[cId];
-        const estEp = cData && (parseInt(cData.Fatigue) || 0) > fatiguePerso;
+        const estEp = (cData && (parseInt(cData.Fatigue) || 0) > fatiguePerso) || el.dataset.techniqueUtilisee === "true";
         const cadre = document.getElementById(`cadre-combat-${cId}`);
         if (cadre) cadre.style.backgroundImage = `url('${estEp ? IMAGE_CADRE_EPUISE : IMAGE_CADRE_NORMAL}')`;
     });
@@ -2834,7 +2866,10 @@ window.COULEUR_ETAT = {
     "Soin étalé":     "#43a047",   // vert franc — la vie qui revient peu à peu
     "Élan":           "#26a69a",   // turquoise — la vitesse gagnée
     "Béni":           "#ffe082",   // or pâle — la bénédiction
-    "Repli":          "#78909c"    // gris bleuté — le pas de recul défensif
+    "Repli":          "#78909c",   // gris bleuté — le pas de recul défensif
+    "Ténèbres étalées": "#7e57c2", // violet — l'énergie bue peu à peu
+    "Mur de bouclier": "#c9a24a",  // bronze — l'Hoplite derrière son bouclier
+    "Rempart":        "#e8c46a"    // or — protégé par un Hoplite à ses côtés
 };
 window.COULEUR_ETAT_DEFAUT = "#9e9e9e";
 
@@ -3880,8 +3915,16 @@ window.jouerCarteCombat = async function(idCarte) {
     if (persoActuel.estMonstre) return refuser("cette carte est celle d'une créature",
                                                persoActuel.idPersonnage);
 
-    const dataCarte = window.COMPETENCES_CACHE[idCarte];
+    const dataCarte = window.COMPETENCES_CACHE[idCarte]
+        || (typeof window.carteTechniqueClasse === "function" ? window.carteTechniqueClasse(idCarte) : null);
     if (!dataCarte) return refuser("technique absente du cache", `(${persoActuel.idPersonnage})`);
+
+    // Une technique de classe ne sert qu'une fois par combat.
+    if (dataCarte.techniqueClasse && window.techniqueClasseUtilisee(persoActuel, idCarte)) {
+        refuser("technique de classe déjà utilisée dans ce combat");
+        alert(`${dataCarte.Nom} a déjà servi dans ce combat.`);
+        return;
+    }
 
     // Ce qu'on tient en main peut interdire la technique : pas d'attaque légère
     // avec une hache, pas de sort les deux mains prises. Contrôlé ici, au
@@ -4238,6 +4281,10 @@ window.actionBoutonFinTour = function() {
     if (window.MODE_BOUTON_FINTOUR === "lancer") {
         const queue = (window.PARTIE_DATA || {}).File_Attente_Combat || [];
         const idCarte = queue[0] && queue[0].idCarte;
+        // Une technique de classe ne se vise pas comme une carte forgée.
+        if (idCarte && typeof window.estTechniqueClasse === "function" && window.estTechniqueClasse(idCarte)) {
+            return window.lancerTechniqueClasse(idCarte, idQuiJoue);
+        }
         if (!idCarte || typeof window.demarrerCiblage !== "function") return;
 
         // LA CARTE DOIT ÊTRE À L'ÉCRAN AVANT DE VISER. RÉSOUDRE et ANNULER se
@@ -4667,7 +4714,68 @@ function contenuTuilePiste(entree, cestSonTour) {
 window.donneesCarteCombattant = function(idPersonnage, idCarte) {
     return (window.COMPETENCES_CACHE || {})[idCarte]
         || ((window.CACHE_COMPETENCES_GLOBAL || {})[idPersonnage] || {})[idCarte]
+        || (typeof window.carteTechniqueClasse === "function" ? window.carteTechniqueClasse(idCarte) : null)
         || null;
+};
+
+// Cette technique de classe a-t-elle déjà servi dans ce combat, pour ce héros ?
+window.techniqueClasseUtilisee = function(perso, idCarte) {
+    if (!perso || !idCarte) return false;
+    const enRam = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === perso.idPersonnage) || perso;
+    return (enRam.techniquesUtilisees || perso.techniquesUtilisees || []).includes(idCarte);
+};
+
+// =========================================================================
+//  LANCER UNE TECHNIQUE DE CLASSE (son tour venu)
+// =========================================================================
+//  Le Mur de bouclier part tel quel, sur soi. Le Rempart demande un allié
+//  ADJACENT : une petite fenêtre propose ceux qui sont à côté ; s'il n'y en a
+//  aucun, rien ne part — le héros peut finir son tour autrement.
+window.lancerTechniqueClasse = function(idCarte, idLanceur) {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    const demande = window.regimeDemande;
+    if (!demande || typeof demande.techniqueClasse !== "function") return;
+    const t = (window.TECHNIQUES_CLASSE || {})[idCarte];
+    if (!t) return;
+    if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD(true);
+
+    if (t.cible !== "allieAdjacent") return demande.techniqueClasse(idLanceur, idCarte);
+
+    const lanceur = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
+    const pos = (id) => (window.TOKENS_VTT_DATA || {})[id];
+    const ici = pos(idLanceur);
+    const dist = (a, b) => (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
+    const allies = (window.PERSOS_PARTIE || []).filter(p => p && p.idPersonnage !== idLanceur
+        && !p.estMonstre && !p.estIllusion && (p.camp || "Allié") === ((lanceur || {}).camp || "Allié")
+        && !(typeof window.estCombattantMort === "function" && window.estCombattantMort(p.idPersonnage))
+        && ici && pos(p.idPersonnage) && dist(ici, pos(p.idPersonnage)) === 1);
+
+    let fenetre = document.getElementById("fenetre-choix-rempart");
+    if (!fenetre) {
+        fenetre = document.createElement("div");
+        fenetre.id = "fenetre-choix-rempart";
+        fenetre.className = "fenetre-choix-rempart";
+        document.body.appendChild(fenetre);
+    }
+    const fermer = () => { fenetre.style.display = "none"; };
+    window.fermerChoixRempart = fermer;
+    window.choisirAllieRempart = (idAllie) => {
+        fermer();
+        if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+        demande.techniqueClasse(idLanceur, idCarte, idAllie);
+    };
+    const echapper = (v) => String(v || "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+    fenetre.innerHTML = `
+        <div class="choix-rempart-titre">🛡️ Rempart</div>
+        <div class="choix-rempart-texte">${allies.length
+            ? "Quel allié protéger pendant 3 manches ?"
+            : "Aucun allié n'est à côté de vous. Rapprochez-vous, ou finissez votre tour."}</div>
+        <div class="choix-rempart-liste">${allies.map(a => `
+            <button type="button" class="choix-rempart-allie" onclick="window.choisirAllieRempart('${echapper(a.idPersonnage)}')">
+                ${a.urlCloudinary ? `<img src="${echapper(a.urlCloudinary)}" alt="">` : ""}<span>${echapper(a.prenom || a.idPersonnage)}</span>
+            </button>`).join("")}</div>
+        <button type="button" class="choix-rempart-annuler" onclick="window.fermerChoixRempart()">Annuler</button>`;
+    fenetre.style.display = "flex";
 };
 
 // Les effets d'une carte, en toutes lettres. "Initiative +" n'en fait pas
@@ -5221,7 +5329,8 @@ window.actualiserBannieresEpuisees = function() {
             const coutFatigue = parseInt(dataCarte.Fatigue) || 0;
             const cadre = document.getElementById(`cadre-combat-${idCarte}`);
             
-            if (coutFatigue > fatiguePerso) {
+            // Une technique de classe déjà jouée reste grisée, quel que soit le coût.
+            if (coutFatigue > fatiguePerso || ban.dataset.techniqueUtilisee === "true") {
                 ban.classList.add("banniere-epuisee");
                 if (cadre) cadre.style.backgroundImage = `url('${IMAGE_CADRE_EPUISE}')`;
             } else {

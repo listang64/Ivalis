@@ -3821,3 +3821,57 @@ textarea.input-texte-parchemin {
 }
 .ligne-surpuissance .titre-effet-hd { color: #ffb347 !important; }
 .forge-valeur-surpuissante { color: #b91c1c; font-weight: bold; font-style: normal; }
+
+/* =====================================================================
+   LES TECHNIQUES DE CLASSE (fiche perso, onglet Compétences)
+   ===================================================================== */
+.separation-techniques-classe {
+    display: flex; align-items: center; gap: 12px; margin: 110px 0 6px;
+    font-family: 'Cinzel', serif; font-weight: bold; font-size: 17px; letter-spacing: 1px; color: #2c1e16;
+}
+.separation-techniques-classe::before, .separation-techniques-classe::after {
+    content: ""; flex: 1; height: 2px; background: linear-gradient(90deg, transparent, #5c3a21, transparent);
+}
+.techniques-classe-aide { margin: 0 0 12px; text-align: center; font-size: 13px; font-style: italic; color: #5c3a21; }
+.technique-classe {
+    display: flex; align-items: stretch; gap: 0; margin: 0 0 10px; border-radius: 10px; overflow: hidden;
+    background: linear-gradient(90deg, #2a1a0f, #3a2614); border: 2px solid #c9a24a;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+}
+.technique-classe-init {
+    flex-shrink: 0; width: 64px; display: flex; align-items: center; justify-content: center;
+    font-family: 'Cinzel', serif; font-size: 26px; font-weight: bold; color: #f3d27a;
+    background: rgba(0,0,0,0.35); border-right: 1px solid rgba(201,162,74,0.5);
+}
+.technique-classe-corps { padding: 8px 12px; min-width: 0; }
+.technique-classe-nom {
+    font-family: 'Cinzel', serif; font-weight: bold; font-size: 15px; letter-spacing: 1px; color: #f3d27a;
+    text-transform: uppercase; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+}
+.technique-classe-badge {
+    font-family: Georgia, serif; text-transform: none; letter-spacing: 0; font-size: 11px; font-weight: normal;
+    color: #1a1208; background: #e2b84f; border-radius: 10px; padding: 1px 8px;
+}
+.technique-classe-desc { margin-top: 3px; font-size: 13px; line-height: 1.35; color: #e8d5a5; }
+.technique-classe-verrouillee { filter: grayscale(100%) brightness(0.85); opacity: 0.75; }
+.technique-classe-verrouillee .technique-classe-badge { background: #888; color: #fff; }
+
+/* Le choix de l'allié du Rempart. */
+.fenetre-choix-rempart {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 20050;
+    display: none; flex-direction: column; align-items: center; gap: 12px;
+    width: min(420px, calc(100vw - 32px)); padding: 18px 20px; box-sizing: border-box;
+    background: linear-gradient(180deg, #2a1a0f, #1a0f08); border: 2px solid #c9a24a; border-radius: 14px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.85); color: #e8d5a5; text-align: center;
+}
+.choix-rempart-titre { font-family: 'Cinzel', serif; font-size: 22px; font-weight: bold; color: #f3d27a; }
+.choix-rempart-texte { font-size: 14px; }
+.choix-rempart-liste { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.choix-rempart-allie {
+    display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer;
+    background: #3a2614; color: #f3d27a; border: 1px solid #c9a24a; border-radius: 10px; padding: 8px 12px;
+    font-family: 'Cinzel', serif; font-weight: bold;
+}
+.choix-rempart-allie img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; }
+.choix-rempart-allie:hover { background: #4a3018; }
+.choix-rempart-annuler { background: transparent; color: #c2a878; border: 1px solid #5c3a21; border-radius: 16px; padding: 6px 18px; cursor: pointer; }
