@@ -158,6 +158,7 @@ node armes_et_zones.mjs      # persistance posée comme une zone d'une case ; Di
 node tableaux_nico.mjs        # les cellules rouges des deux tableaux : brûlure 8 % PV max physique, poison 10 % énergie + 8 % PV magique, Contre/Absorption jusqu'à 30 %, armes et effets bonus
 node hoplite.mjs              # la classe Hoplite : +5 parade / +5 déf. physique, Mur de bouclier (+60 % parade, une fois), Rempart (coups partagés en deux avec l'allié adjacent, 3 manches), section « Techniques de classe » de la fiche
 node assassin.mjs             # la classe Assassin : Instinct du tueur (+15 critique 2 manches sur tout KO), Assaut mortel (zone de 2 au contact, 10 phys + poison même esquivé), Maître des poisons (18 % énergie + 10 % PV par manche, 2 manches)
+node medicus.mjs              # la classe Médicus : +5 % régénération de fatigue et +1 compétence, Soin d'urgence (12 PV à tous les alliés), Prise en charge (relève un allié KO adjacent à 30 %, repousse les ennemis), fantômes des alliés KO pour le seul Médicus
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -3972,3 +3973,46 @@ opportunité, durée, sans cumul, ni allié ni autre héros), le poison du maît
 (validation, dégâts, poison malgré l'esquive, armure, niveau 10, rejeu), la
 demande envoyée avec ses cibles, le ciblage de zone dans la vraie page, la
 fiche perso et le descriptif.
+
+## La classe Médicus (version 159)
+
+**Paliers** (app.js `ATOUTS_CLASSES`, classes.js `DESCRIPTIFS_CLASSES`).
+- Niveau 1 : **Régénération naturelle** : +5 % de régénération de fatigue en
+  fin de manche (`regenFatigue`, lu par `regenerationCombattant` pour la fiche
+  et par `regenerationDe` dans cerveau_combat.js), et +1 compétence comme le
+  Nécromancien (`competences: 1`).
+- Niveau 5 : technique **Soin d'urgence** (initiative 70, fatigue 0).
+- Niveau 10 : technique **Prise en charge par Médicus** (initiative 0, fatigue 0).
+
+**Soin d'urgence** (moteur_pur.js `resoudreTechniqueClasse`, `SOIN_URGENCE`).
+12 PV à chaque allié debout, où qu'il soit, le Médicus compris. Les règles de
+tout soin s'appliquent : l'Ethéré en tire 30 % de plus, une brûlure en mange
+la moitié, jamais au-delà des PV max. Rien pour les KO, les illusions, ni pour
+un Nécromancien en sursis.
+
+**Prise en charge**. Le Médicus choisit (fenêtre du Rempart, combat.js
+`lancerTechniqueClasse`, cible « allieKO ») un allié KO sur une case voisine.
+Le cerveau vérifie qu'il est bien à terre, de son camp et adjacent. L'allié se
+relève (étape `reanimation`, applicateur dans combat_etat.js) avec 30 % de ses
+PV max arrondis au-dessus, ses états effacés, sur sa case, ou sur la case
+libre la plus proche si quelqu'un s'y tient (un KO libère sa case). Puis
+chaque ennemi qui l'entoure recule d'une case à l'opposé, comme une Poussée :
+un mur ou un pion l'arrête (« Poussée bloquée »), une nappe au sol s'applique.
+Sans allié KO à côté, rien ne part : la technique n'est pas consommée.
+
+**Retour dans le jeu**. Un KO entre dans `Combattants_Hors_Jeu` (qui décide
+qui doit choisir sa carte en préparation). `synchroniserCombattantsHorsJeu`
+reçoit maintenant aussi les combattants que le cerveau dit debout
+(regime_cerveau.js) et les en retire : l'allié relevé choisit sa carte et
+rejoue à la manche suivante, même si la fiche locale le dit encore à zéro.
+
+**Les fantômes** (combat.js `voitLeFantome`, `fantomeAllieKO`). Le pion d'un
+KO disparaît du plateau, pour tout le monde. Seul le poste qui commande un
+Médicus voit, sur leur case, les alliés tombés de son camp, à 20 % d'opacité,
+en gris, impossibles à cliquer : c'est là qu'il doit aller pour les relever.
+
+`medicus.mjs` vérifie les paliers et la régénération, le Soin d'urgence
+(brûlure, Ethéré, plafond, sursis, KO, ennemis, rejeu), la Prise en charge
+(validation, 30 % arrondi, états, recul, mur, case occupée, rejeu), la
+fenêtre de choix, les fantômes, le retour hors des hors-jeu, la fiche et le
+descriptif.

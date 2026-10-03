@@ -183,7 +183,10 @@ export function combattantDepuisFiche(fiche, position, regles) {
         // met un ennemi KO (tomber, plus bas), et son poison de maître
         // (niveau 10, ticsDeFinDeManche dans cerveau_combat.js).
         critiqueSurKO: nombre(race.critiqueSurKO),
-        maitrePoisons: !!race.maitrePoisons
+        maitrePoisons: !!race.maitrePoisons,
+        // Le Médicus : des points de régénération de fatigue en plus, à chaque
+        // fin de manche (regenererFinDeManche, cerveau_combat.js).
+        regenFatigue: nombre(race.regenFatigue)
     };
     const mod = {
         // Ce que l'ÉQUIPEMENT change EN PERMANENCE, hors états altérés : le
@@ -630,6 +633,19 @@ const APPLICATEURS = {
         c.aTerre = true;
         c.pv = 0;
         c.sursis = null;
+    },
+
+    // Un allié relevé par le Médicus (Prise en charge) : debout, ses PV, ses
+    // états effacés, et la case où il se relève (la sienne, ou la plus proche
+    // si quelqu'un s'y tient).
+    reanimation(etat, e) {
+        const c = combattant(etat, e.cible);
+        if (!c) return;
+        c.aTerre = false;
+        c.pv = nombre(e.pvApres);
+        c.sursis = null;
+        c.etats = [];
+        if (e.q !== undefined && e.r !== undefined) { c.q = e.q; c.r = e.r; }
     },
 
     // Une zone posée, réduite ou dissipée.

@@ -1079,9 +1079,40 @@ export function actionAssautMortel(idLanceur, cibles) {
     };
 }
 
+// LE MÉDICUS. Soin d'urgence (niveau 5) : 12 PV à chaque allié debout, où
+// qu'il soit — le Médicus compris — selon les règles de tout soin (l'Éthéré en
+// tire plus, une brûlure en mange la moitié, jamais au-delà des PV max, rien
+// pour un Nécromancien en sursis). Prise en charge (niveau 10) : un allié KO
+// adjacent se relève avec 30 % de ses PV, ses états effacés — sur sa case, ou
+// la plus proche libre si quelqu'un s'y tient — et chaque ennemi qui l'entoure
+// recule d'une case, comme une Poussée (un mur ou un pion l'arrête).
+export const SOIN_URGENCE = 12;
+export const PART_REANIMATION = 30;
+
+function casePlusProcheLibre(etat, plateau, depart, idIgnore) {
+    const vues = new Set([`${depart.q},${depart.r}`]);
+    let anneau = [depart];
+    for (let rayon = 1; rayon <= 6; rayon++) {
+        const suivant = [];
+        for (const h of anneau) {
+            for (const d of DIRECTIONS_HEX) {
+                const v = { q: h.q + d.q, r: h.r + d.r };
+                const cle = `${v.q},${v.r}`;
+                if (vues.has(cle)) continue;
+                vues.add(cle);
+                suivant.push(v);
+            }
+        }
+        const libre = suivant.find(v => caseLibre(etat, plateau, v.q, v.r, idIgnore));
+        if (libre) return libre;
+        anneau = suivant;
+    }
+    return null;
+}
+
 // Ce qu'une technique de classe fait à l'état. Rend { etat, etapes } comme
 // resoudreCarte ; ne clôt pas le tour (le cerveau s'en charge).
-export function resoudreTechniqueClasse(etat, action) {
+export function resoudreTechniqueClasse(etat, action, plateau) {
     const suivant = clonerEtat(etat);
     const etapes = [];
     const id = action.idLanceur;
@@ -1104,6 +1135,50 @@ export function resoudreTechniqueClasse(etat, action) {
             allie.etats = [...(allie.etats || []).filter(e => e && e.nom !== ETAT_REMPART),
                            { nom: ETAT_REMPART, duree: MANCHES_REMPART, idProtecteur: id }];
             etapes.push({ type: "etats", cible: allie.id, liste: allie.etats, pose: ETAT_REMPART });
+        }
+    } else if (action.idCarte === "CLASSE_SOIN_URGENCE") {
+        (suivant.ordre || Object.keys(suivant.combattants || {})).forEach(idAllie => {
+            const allie = combattant(suivant, idAllie);
+            if (!allie || allie.aTerre || allie.estIllusion || enSursis(allie)) return;
+            if ((allie.camp || "Allié") !== (c.camp || "Allié")) return;
+            const partSoins = 100 + nombre(allie.atouts && allie.atouts.soinsRecus) + regleDesEtats(allie, "soinsRecus");
+            const soin = Math.max(0, Math.round(SOIN_URGENCE * (partSoins / 100)));
+            const avant = nombre(allie.pv);
+            allie.pv = Math.min(nombre(allie.pvMax), avant + soin);
+            if (allie.pv === avant) return;
+            etapes.push({ type: "soin", cible: idAllie, acteur: id, montant: allie.pv - avant, pvApres: allie.pv });
+        });
+    } else if (action.idCarte === "CLASSE_PRISE_EN_CHARGE") {
+        const carte = plateau || PLAINE;
+        const allie = combattant(suivant, action.cible);
+        if (allie && allie.aTerre) {
+            let place = { q: allie.q, r: allie.r };
+            if (!caseLibre(suivant, carte, place.q, place.r, allie.id)) {
+                place = casePlusProcheLibre(suivant, carte, place, allie.id) || place;
+            }
+            allie.aTerre = false;
+            allie.sursis = null;
+            allie.etats = [];
+            allie.pv = Math.max(1, Math.ceil(nombre(allie.pvMax) * (PART_REANIMATION / 100)));
+            allie.q = place.q;
+            allie.r = place.r;
+            etapes.push({ type: "reanimation", cible: allie.id, acteur: id, pvApres: allie.pv, q: place.q, r: place.r });
+
+            (suivant.ordre || Object.keys(suivant.combattants || {})).forEach(idEnnemi => {
+                const ennemi = combattant(suivant, idEnnemi);
+                if (!ennemi || ennemi.aTerre || (ennemi.camp || "Allié") === (allie.camp || "Allié")) return;
+                if (distanceHex(allie, ennemi) !== 1) return;
+                const depart = { q: nombre(ennemi.q), r: nombre(ennemi.r) };
+                const arrivee = destinationPoussee(allie, ennemi, 1,
+                                                   (q, r) => caseLibre(suivant, carte, q, r, idEnnemi));
+                if (arrivee) {
+                    ennemi.q = arrivee.q;
+                    ennemi.r = arrivee.r;
+                    etapes.push({ type: "poussee", cible: idEnnemi, acteur: id, de: depart, vers: arrivee });
+                } else {
+                    etapes.push({ type: "message", cible: idEnnemi, acteur: id, texte: "Poussée bloquée" });
+                }
+            });
         }
     }
     return { etat: suivant, etapes };

@@ -235,6 +235,14 @@ export function validerIntention(etat, intention) {
             if (allie.aTerre || allie.estIllusion || allie.camp !== acteur.camp) return refus("Rempart : allié invalide");
             if (distance(acteur, allie) > 1) return refus("Rempart : l'allié doit être adjacent");
         }
+        // La Prise en charge (Médicus) : un allié À TERRE, à côté de lui.
+        if (idCarte === "CLASSE_PRISE_EN_CHARGE") {
+            const allie = combattant(etat, intention.cible);
+            if (!allie) return refus("Prise en charge sans allié");
+            if (allie.id === acteur.id || allie.estIllusion || allie.camp !== acteur.camp) return refus("Prise en charge : allié invalide");
+            if (!allie.aTerre) return refus("Prise en charge : l'allié n'est pas KO");
+            if (distance(acteur, allie) > 1) return refus("Prise en charge : l'allié doit être adjacent");
+        }
         // L'Assaut mortel : un ou deux ennemis debout, au contact, et côte à
         // côte s'ils sont deux — la zone de deux cases qui tourne autour de lui.
         if (idCarte === "CLASSE_ASSAUT_MORTEL") {
@@ -399,7 +407,8 @@ export function cloturerTour(etat) {
 // du modèle plus la retouche du mode développeur.
 function regenerationDe(c) {
     const stats = (c && c.stats) || {};
-    return nombre(stats.Regeneration) + nombre(stats.Dev_Mod_Regen);
+    // + l'atout du Médicus (regenFatigue).
+    return nombre(stats.Regeneration) + nombre(stats.Dev_Mod_Regen) + nombre(c && c.atouts && c.atouts.regenFatigue);
 }
 
 // CE QUE LES ÉTATS FONT EN FIN DE MANCHE, avant de vieillir.
@@ -802,9 +811,13 @@ export function appliquerIntention(etat, intention, plateau) {
     if (intention.type === "classe") {
         const cibles = Array.isArray(intention.cibles) ? [...new Set(intention.cibles)] : undefined;
         const r = resoudreTechniqueClasse(etat, { idLanceur: intention.acteur, idCarte: intention.idCarte,
-                                                  cible: intention.cible, cibles });
+                                                  cible: intention.cible, cibles }, plateau);
         let suivant = clonerEtat(r.etat);
         const etapes = [...r.etapes];
+        // Repoussé dans le feu par la Prise en charge : ça brûle aussi.
+        r.etapes.filter(e => e.type === "poussee" && e.vers).forEach(e => {
+            etapes.push(...traverserZones(suivant, e.cible, e.vers, des));
+        });
         // L'ASSAUT MORTEL se joue comme une carte : les dés ici, chez le
         // cerveau (critique, esquive des deux cibles), puis la résolution.
         if (intention.idCarte === "CLASSE_ASSAUT_MORTEL") {

@@ -282,10 +282,16 @@ const SCENES = {
         return { geste: "chute", pion: e.cible, duree: RYTHME.chute };
     },
 
+    // Un allié relevé par le Médicus : il le dit, sur son pion.
+    reanimation(e) {
+        return { geste: "message", pion: e.cible, texte: "✚ Relevé !", couleur: "#43a047", duree: RYTHME.message };
+    },
+
     // Une technique de classe jouée : son nom sur le pion.
     techniqueClasse(e) {
         const noms = { CLASSE_MUR_BOUCLIER: "🛡️ Mur de bouclier", CLASSE_REMPART: "🛡️ Rempart",
-                       CLASSE_ASSAUT_MORTEL: "🗡️ Assaut mortel" };
+                       CLASSE_ASSAUT_MORTEL: "🗡️ Assaut mortel",
+                       CLASSE_SOIN_URGENCE: "✚ Soin d'urgence", CLASSE_PRISE_EN_CHARGE: "✚ Prise en charge" };
         return { geste: "message", pion: e.acteur, texte: noms[e.idCarte] || "Technique de classe",
                  couleur: "#e8c46a", duree: RYTHME.message };
     },

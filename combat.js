@@ -195,7 +195,7 @@ window.avecCarteJouee = function(data, idPersonnage) {
 //
 //  Trois postes qui constatent la même chute écrivent la même liste : la
 //  deuxième écriture ne voit plus de différence et n'a pas lieu.
-window.synchroniserCombattantsHorsJeu = async function(idsATerre) {
+window.synchroniserCombattantsHorsJeu = async function(idsATerre, idsDebout) {
     if (!window.ID_PARTIE_COURANTE) return false;
     // Le combat est en train d'être remis à zéro : les fiches traversent un
     // instant où elles valent zéro point de vie sans que personne ne soit tombé.
@@ -210,8 +210,15 @@ window.synchroniserCombattantsHorsJeu = async function(idsATerre) {
     const voulue = new Set(data.Combattants_Hors_Jeu || []);
     let change = false;
 
+    // CEUX QUE LE CERVEAU DÉCLARE DEBOUT, d'abord : un allié relevé par le
+    // Médicus (Prise en charge) revient dans le jeu, même si la fiche locale,
+    // en retard d'une projection, le dit encore à zéro point de vie.
+    const debout = new Set(idsDebout || []);
+    debout.forEach(id => { if (voulue.has(id)) { voulue.delete(id); change = true; } });
+
     ordre.forEach(id => {
         if (!connus.has(id)) return;              // pas encore chargé : on ne juge pas
+        if (debout.has(id)) return;
         if (window.estCombattantMort(id) && !voulue.has(id)) { voulue.add(id); change = true; }
     });
 
@@ -223,7 +230,7 @@ window.synchroniserCombattantsHorsJeu = async function(idsATerre) {
         voulue.add(id); change = true;
     });
 
-    // Seul retrait admis : un combattant qui n'est plus dans l'ordre
+    // Autre retrait : un combattant qui n'est plus dans l'ordre
     // d'initiative. Il a été effacé du combat, il n'y a plus rien à attendre
     // de lui — et cette information-là, elle, vient de la partie partagée.
     voulue.forEach(id => {
@@ -2940,6 +2947,35 @@ window.construireIndicateursEtatsToken = function(etats, taille) {
 // une donnée de la créature, c'est une décision d'affichage.
 window.IMAGE_TOKEN_ENNEMI = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789309136/IMG_2137_mxyexl.png";
 
+// LES FANTÔMES DES ALLIÉS KO, pour le seul Médicus. Le poste qui commande un
+// Médicus voit, à très faible opacité, les alliés tombés de son camp ; les
+// autres postes ne voient rien (leur pion disparaît, comme toujours).
+window.OPACITE_FANTOME_KO = 0.2;
+window.voitLeFantome = function(pMort) {
+    if (!pMort || pMort.estMonstre || pMort.estIllusion) return false;
+    return (window.COMBAT_PERSOS_JOUEUR || []).some(p => p && p.idPersonnage !== pMort.idPersonnage
+        && typeof window.estDeLaClasse === "function" && window.estDeLaClasse(p, "Médicus")
+        && (p.camp || "Allié") === (pMort.camp || "Allié"));
+};
+window.fantomeAllieKO = function(idPerso, data, taille) {
+    const div = document.createElement("div");
+    div.className = "token-vtt token-fantome-ko";
+    div.id = "fantome-" + idPerso;
+    div.dataset.q = data.q;
+    div.dataset.r = data.r;
+    div.dataset.taille = taille;
+    div.style.cssText = `position: absolute; transform: translate(-50%, -50%); pointer-events: none; z-index: 5;
+                         border-radius: 50%; opacity: ${window.OPACITE_FANTOME_KO}; filter: grayscale(70%);`;
+    const img = document.createElement("img");
+    img.src = typeof window.redimensionnerImageCloudinary === "function"
+        ? window.redimensionnerImageCloudinary(data.url, 700) : data.url;
+    img.style.cssText = "position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;";
+    img.onerror = () => { img.style.display = "none"; };
+    div.appendChild(img);
+    window.positionnerTokenVTT(div, true);
+    return div;
+};
+
 window.appliquerTokensVTT = function(tokensMap) {
     if (!window.PLATEAU_VTT) return;
     
@@ -2987,7 +3023,12 @@ window.appliquerTokensVTT = function(tokensMap) {
         // donc rien à cliquer et rien qui barre le passage. Son entrée reste dans les Tokens
         // (sa case est mémorisée) mais elle n'est plus dessinée. Toutes les animations qui
         // cherchent un pion par son id gèrent déjà son absence.
-        if (window.estCombattantMort(idPerso)) continue;
+        // SEUL LE MÉDICUS VOIT SES ALLIÉS TOMBÉS : leur fantôme, très pâle, sur
+        // la case où ils gisent — c'est là qu'il doit aller pour les relever.
+        if (window.estCombattantMort(idPerso)) {
+            if (pData && window.voitLeFantome(pData)) conteneur.appendChild(window.fantomeAllieKO(idPerso, data, taille));
+            continue;
+        }
 
         // Pion fantôme : son combattant n'existe plus (fiche supprimée, monstre
         // effacé). On ne le dessine pas — il resterait un jeton vide et cliquable
@@ -4746,15 +4787,19 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
         if (typeof window.demarrerCiblage === "function") window.demarrerCiblage(idCarte, { idLanceur });
         return;
     }
-    if (t.cible !== "allieAdjacent") return demande.techniqueClasse(idLanceur, idCarte);
+    if (t.cible !== "allieAdjacent" && t.cible !== "allieKO") return demande.techniqueClasse(idLanceur, idCarte);
 
+    // Rempart : un allié DEBOUT à côté. Prise en charge (Médicus) : un allié
+    // KO à côté — son pion n'est plus dessiné, mais sa case est retenue.
+    const relever = t.cible === "allieKO";
     const lanceur = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
     const pos = (id) => (window.TOKENS_VTT_DATA || {})[id];
     const ici = pos(idLanceur);
     const dist = (a, b) => (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
+    const estKO = (id) => typeof window.estCombattantMort === "function" && window.estCombattantMort(id);
     const allies = (window.PERSOS_PARTIE || []).filter(p => p && p.idPersonnage !== idLanceur
         && !p.estMonstre && !p.estIllusion && (p.camp || "Allié") === ((lanceur || {}).camp || "Allié")
-        && !(typeof window.estCombattantMort === "function" && window.estCombattantMort(p.idPersonnage))
+        && estKO(p.idPersonnage) === relever
         && ici && pos(p.idPersonnage) && dist(ici, pos(p.idPersonnage)) === 1);
 
     let fenetre = document.getElementById("fenetre-choix-rempart");
@@ -4772,11 +4817,16 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
         demande.techniqueClasse(idLanceur, idCarte, idAllie);
     };
     const echapper = (v) => String(v || "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+    // Personne à relever : la Prise en charge ne part pas, elle n'est pas
+    // consommée — elle resservira une autre manche.
+    const titre = relever ? "✚ Prise en charge" : "🛡️ Rempart";
+    const question = relever ? "Quel allié relever ?" : "Quel allié protéger pendant 3 manches ?";
+    const personne = relever
+        ? "Aucun allié KO n'est à côté de vous. La technique n'est pas utilisée : finissez votre tour, elle resservira."
+        : "Aucun allié n'est à côté de vous. Rapprochez-vous, ou finissez votre tour.";
     fenetre.innerHTML = `
-        <div class="choix-rempart-titre">🛡️ Rempart</div>
-        <div class="choix-rempart-texte">${allies.length
-            ? "Quel allié protéger pendant 3 manches ?"
-            : "Aucun allié n'est à côté de vous. Rapprochez-vous, ou finissez votre tour."}</div>
+        <div class="choix-rempart-titre">${titre}</div>
+        <div class="choix-rempart-texte">${allies.length ? question : personne}</div>
         <div class="choix-rempart-liste">${allies.map(a => `
             <button type="button" class="choix-rempart-allie" onclick="window.choisirAllieRempart('${echapper(a.idPersonnage)}')">
                 ${a.urlCloudinary ? `<img src="${echapper(a.urlCloudinary)}" alt="">` : ""}<span>${echapper(a.prenom || a.idPersonnage)}</span>

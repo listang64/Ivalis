@@ -125,6 +125,24 @@ window.DESCRIPTIFS_CLASSES = {
               points: ["Ses empoisonnements mordent à chaque fin de manche, 2 manches durant",
                        "-18 % de fatigue (énergie max) et -10 % des PV max à chaque fois"] }
         ]
+    },
+    CLASSE_MEDICUS: {
+        presentation: "Trousse en bandoulière et sang-froid à toute épreuve, le Médicus garde la troupe "
+            + "debout. Il panse, il recoud, et là où les autres ne voient plus qu'un corps tombé, "
+            + "il voit un compagnon à relever.",
+        paliers: [
+            { niveau: 1, titre: "Régénération naturelle",
+              points: ["+5 % de régénération de fatigue en fin de manche", "+1 compétence à créer"] },
+            { niveau: 5, titre: "Technique : Soin d'urgence",
+              points: ["Initiative 70 · aucune fatigue",
+                       "Soigne de 12 PV tous les alliés debout, où qu'ils soient",
+                       "Une fois par combat"] },
+            { niveau: 10, titre: "Technique : Prise en charge par Médicus",
+              points: ["Initiative 0 · aucune fatigue",
+                       "Réanime un allié KO adjacent avec 30 % de ses PV",
+                       "Repousse d'une case tous les ennemis qui l'entourent · une fois par combat",
+                       "Lui seul voit, très pâles, ses alliés tombés sur le plateau"] }
+        ]
     }
 };
 

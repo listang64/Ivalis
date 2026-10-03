@@ -1074,7 +1074,8 @@ function contexteDuJeu() {
                     const tombes = Object.values(etat.combattants).filter(c => c && c.aTerre);
 
                     if (typeof window.synchroniserCombattantsHorsJeu === "function") {
-                        Promise.resolve(window.synchroniserCombattantsHorsJeu(tombes.map(c => c.id)))
+                        const debout = Object.values(etat.combattants).filter(c => c && !c.aTerre);
+                        Promise.resolve(window.synchroniserCombattantsHorsJeu(tombes.map(c => c.id), debout.map(c => c.id)))
                             .catch(e => signalerPanne("synchroniserCombattantsHorsJeu", e));
                     }
 

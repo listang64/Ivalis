@@ -822,7 +822,9 @@ window.fatigueMaxCombattant = function(perso, defaut = 100) {
 
 window.regenerationCombattant = function(perso) {
     if (!perso) return 0;
-    return (parseInt(perso.Regeneration) || 0) + (parseInt(perso.Dev_Mod_Regen) || 0);
+    // Le Médicus régénère 5 de plus (atout de classe, ATOUTS_CLASSES).
+    const atout = typeof window.atoutRace === "function" ? (parseInt(window.atoutRace(perso).regenFatigue) || 0) : 0;
+    return (parseInt(perso.Regeneration) || 0) + (parseInt(perso.Dev_Mod_Regen) || 0) + atout;
 };
 
 // =========================================================================
@@ -897,6 +899,14 @@ window.ATOUTS_CLASSES = {
         { niveau: 1,  critiqueSurKO: 15 },
         { niveau: 5,  techniques: ["CLASSE_ASSAUT_MORTEL"] },
         { niveau: 10, maitrePoisons: true }
+    ],
+    // LE MÉDICUS : +5 de régénération de fatigue en fin de manche (lue par
+    // regenerationCombattant ici, et par le cerveau) et une création de plus
+    // dans la Forge ; Soin d'urgence au niveau 5, Prise en charge au niveau 10.
+    "Médicus": [
+        { niveau: 1,  regenFatigue: 5, competences: 1 },
+        { niveau: 5,  techniques: ["CLASSE_SOIN_URGENCE"] },
+        { niveau: 10, techniques: ["CLASSE_PRISE_EN_CHARGE"] }
     ]
 };
 
@@ -911,7 +921,8 @@ window.ATOUTS_CLASSES = {
 //  cerveau_combat.js ; resoudreTechniqueClasse, moteur_pur.js).
 //
 //    cible    "soi" (Mur de bouclier), "allieAdjacent" (Rempart) ou
-//             "zoneDeux" (Assaut mortel : une zone de deux cases au contact)
+//             "zoneDeux" (Assaut mortel : une zone de deux cases au contact),
+//             "allies" (Soin d'urgence) ou "allieKO" (Prise en charge)
 window.TECHNIQUES_CLASSE = {
     CLASSE_MUR_BOUCLIER: {
         Nom: "Mur de bouclier", classe: "Hoplite", niveau: 5, Initiative: 100, Fatigue: 0, cible: "soi",
@@ -927,6 +938,15 @@ window.TECHNIQUES_CLASSE = {
         Nom: "Assaut mortel", classe: "Assassin", niveau: 5, Initiative: 100, Fatigue: 0, cible: "zoneDeux",
         desc: "Une zone de deux cases au contact : chaque ennemi qui s'y trouve prend 10 dégâts physiques "
             + "et 100 % d'empoisonnement, même s'il esquive le coup. Une fois par combat."
+    },
+    CLASSE_SOIN_URGENCE: {
+        Nom: "Soin d'urgence", classe: "Médicus", niveau: 5, Initiative: 70, Fatigue: 0, cible: "allies",
+        desc: "Soigne de 12 PV tous les alliés debout, où qu'ils soient (le Médicus compris). Une fois par combat."
+    },
+    CLASSE_PRISE_EN_CHARGE: {
+        Nom: "Prise en charge par Médicus", classe: "Médicus", niveau: 10, Initiative: 0, Fatigue: 0, cible: "allieKO",
+        desc: "Réanime un allié KO adjacent avec 30 % de ses PV, et repousse d'une case tous les ennemis "
+            + "qui l'entourent. Une fois par combat."
     }
 };
 window.estTechniqueClasse = (idCarte) => !!(idCarte && window.TECHNIQUES_CLASSE[idCarte]);
@@ -948,6 +968,8 @@ window.techniquesDeClasse = function(perso) {
     return (window.atoutRace(perso || {}).techniques || []).filter(id => window.TECHNIQUES_CLASSE[id]);
 };
 // Toutes celles de sa classe, débloquées ou non (la fiche les montre toutes).
+// Ce héros est-il de cette classe ? (accents et majuscules ignorés)
+window.estDeLaClasse = (perso, nomClasse) => !!perso && cleClasse(perso.classe || perso.Classe) === cleClasse(nomClasse);
 window.toutesTechniquesDeClasse = function(perso) {
     const paliers = window.paliersDeClasse((perso || {}).classe || (perso || {}).Classe);
     return paliers.flatMap(p => (p.techniques || []).map(id => ({ id, niveau: p.niveau })))
