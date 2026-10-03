@@ -422,6 +422,34 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
         });
     });
 
+    // LUMIÈRE (Chasseur de mages) : un jet par cible, pour passer outre sa
+    // défense magique — un critique l'impose, comme il impose les états. Au
+    // niveau 10, un second jet (lumiereAveugle) aveugle la cible et les
+    // ennemis qui la touchent : leurs cases de noir se tirent ici, avec les
+    // autres dés. Rien n'est tiré pour une carte sans Lumière.
+    (plan.attaques || []).forEach(attaque => {
+        if (!(nombre(attaque.chanceLumiere) > 0)) return;
+        const aveugle = nombre(lanceur && lanceur.atouts && lanceur.atouts.lumiereAveugle);
+        (attaque.cibles || []).forEach(id => {
+            const c = pourCible(id);
+            if (c.lumiere === undefined) c.lumiere = critique || des.d100() <= Math.min(100, nombre(attaque.chanceLumiere));
+            if (aveugle > 0 && c.lumiereAveugle === undefined) {
+                c.lumiereAveugle = des.d100() <= aveugle;
+                if (c.lumiereAveugle) {
+                    const cible = combattant(etat, id);
+                    const voisins = Object.keys(etat.combattants || {}).sort().filter(v => {
+                        const x = etat.combattants[v];
+                        return v !== id && v !== idLanceur && x && !x.aTerre && !x.estIllusion
+                            && (x.camp || "Allié") !== ((lanceur && lanceur.camp) || "Allié")
+                            && cible && distanceHex(cible, x) === 1;
+                    });
+                    c.noirLumiere = {};
+                    [id, ...voisins].forEach(v => { c.noirLumiere[v] = tirerDirectionsAveugle(des); });
+                }
+            }
+        });
+    });
+
     (plan.alterations || []).forEach(alt => {
         (alt.cibles || []).forEach(id => {
             const c = pourCible(id);
@@ -537,6 +565,10 @@ export const DIRECTIONS_HEX = [
     { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 }
 ];
 export const CASES_AVEUGLEES = 3;
+// L'aveuglement de la Lumière (Chasseur de mages, niveau 10) : celui de
+// l'effet Aveuglement, 2 manches.
+export const DUREE_AVEUGLE_LUMIERE = 2;
+export const DESC_AVEUGLE = "3 cases autour de lui sont dans le noir : il ne peut y cibler personne (les zones y frappent quand même).";
 
 export function tirerDirectionsAveugle(des) {
     const reste = DIRECTIONS_HEX.map(d => ({ ...d }));
@@ -1278,6 +1310,7 @@ export function resoudreCarte(etat, action, plateau) {
 
     // --- LES ATTAQUES, DANS L'ORDRE DE LA CARTE --------------------------
     const touchees = new Set();
+    const aveuglesParLaLumiere = new Set();
     const bonusMonstre = bonusMonstreDe(lanceur);
 
     (action.attaques || []).forEach(attaque => {
@@ -1385,7 +1418,9 @@ export function resoudreCarte(etat, action, plateau) {
             // --- DÉGÂTS -------------------------------------------------
             const equip = des.equip || {};
             const percee = equip.ignoreResistances === true
-                        || (equip.ignoreArmure === true && attaque.typeRes !== "Magique");
+                        || (equip.ignoreArmure === true && attaque.typeRes !== "Magique")
+                        // Lumière : ce sort passe outre sa défense magique.
+                        || (des.lumiere === true && attaque.typeRes === "Magique");
 
             // La triche des créatures s'ajoute AU BRUT, avant la chaîne : elle
             // traverse donc le malus à bout portant et les résistances comme
@@ -1483,6 +1518,36 @@ export function resoudreCarte(etat, action, plateau) {
                 frapper(protecteur.id, protecteur, { ...attaqueAvecBonus, valeurBrute: partHoplite });
             } else {
                 frapper(idCible, cible, attaqueAvecBonus);
+            }
+
+            // LA LUMIÈRE QUI AVEUGLE (Chasseur de mages, niveau 10) : la cible
+            // touchée et les ennemis qui la touchent, chacun avec son noir.
+            if (des.lumiereAveugle && des.noirLumiere && !aveuglesParLaLumiere.has(idCible)) {
+                aveuglesParLaLumiere.add(idCible);
+                const etapesNoir = [];
+                Object.keys(des.noirLumiere).forEach(v => {
+                    const x = combattant(suivant, v);
+                    if (!x || x.aTerre) return;
+                    if (((x.atouts && x.atouts.immunites) || []).includes(ETAT_AVEUGLE)) {
+                        etapesNoir.push({ type: "etatRate", cible: v, nom: ETAT_AVEUGLE, immunise: true });
+                        return;
+                    }
+                    const cases = casesDuNoir(x, des.noirLumiere[v]);
+                    const deja = (x.etats || []).find(e => e && e.nom === ETAT_AVEUGLE);
+                    if (deja) {
+                        deja.duree = Math.max(nombre(deja.duree), DUREE_AVEUGLE_LUMIERE);
+                        deja.cases = cases;
+                    } else {
+                        x.etats = [...(x.etats || []), { nom: ETAT_AVEUGLE, duree: DUREE_AVEUGLE_LUMIERE,
+                            ...(attaque.iconeAveugle ? { icone: attaque.iconeAveugle } : {}),
+                            desc: DESC_AVEUGLE, cases }];
+                    }
+                    etapesNoir.push({ type: "etats", cible: v, pose: ETAT_AVEUGLE, liste: x.etats });
+                });
+                if (etapesNoir.length) {
+                    etapes.push({ type: "message", cible: idCible, acteur: idLanceur, texte: "☀️ Éblouis !", couleur: "#ffe082" });
+                    etapes.push(...etapesNoir);
+                }
             }
         });
     });

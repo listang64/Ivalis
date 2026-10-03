@@ -25,7 +25,7 @@
 // =========================================================================
 
 import { db } from "./firebase-config.js?v=2";
-import { collection, getDocs, doc, setDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { collection, getDocs } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 const COLLECTION_CLASSES = "Classes";
 
@@ -143,6 +143,21 @@ window.DESCRIPTIFS_CLASSES = {
                        "Repousse d'une case tous les ennemis qui l'entourent · une fois par combat",
                        "Lui seul voit, très pâles, ses alliés tombés sur le plateau"] }
         ]
+    },
+    CLASSE_CHASSEUR_DE_MAGES: {
+        presentation: "Il a appris à marcher dans les tempêtes de sorts sans y laisser sa peau. Le "
+            + "Chasseur de mages traque ceux qui plient la magie, et sa lumière perce leurs "
+            + "protections jusqu'à les aveugler.",
+        paliers: [
+            { niveau: 1, titre: "Peau de traqueur",
+              points: ["+10 % de résistance magique"] },
+            { niveau: 5, titre: "Effet de combat : Lumière",
+              points: ["Dans la Forge, sur un sort à dégâts magiques · 1 pt, Intelligence",
+                       "15 % de chance par cran d'ignorer la résistance magique de la cible (max 60 %)"] },
+            { niveau: 10, titre: "Éclat aveuglant",
+              points: ["Ses sorts de lumière ont 30 % de chance d'aveugler la cible",
+                       "… et tous les ennemis qui lui sont adjacents"] }
+        ]
     }
 };
 
@@ -200,30 +215,6 @@ window.chargerClasses = async function() {
     classes.sort((a, b) => a.ordre - b.ordre);
     window.CLASSES_CACHE = classes;
     return classes;
-};
-
-// Le bouton des Paramètres : recopie la liste du jeu dans la base. Fusion :
-// les champs qu'on aurait ajoutés à la main dans un document (ses effets, plus
-// tard) ne sont jamais écrasés.
-window.installerClasses = async function() {
-    const btn = document.getElementById("btn-installer-classes");
-    const texte = btn ? btn.innerText : "";
-    if (btn) { btn.innerText = "Installation..."; btn.style.pointerEvents = "none"; }
-    let faites = 0;
-    try {
-        for (const c of window.CLASSES_PAR_DEFAUT) {
-            await setDoc(doc(db, COLLECTION_CLASSES, c.id), window.documentDepuisClasse(c), { merge: true });
-            faites++;
-        }
-        window.CLASSES_CACHE = null;
-        if (btn) btn.innerText = `${faites} classes installées ✔️`;
-    } catch (e) {
-        console.error("Installation des classes :", e);
-        alert(`Installation interrompue (${faites} classe(s) écrite(s)).`);
-        if (btn) btn.innerText = texte;
-    } finally {
-        if (btn) setTimeout(() => { btn.innerText = texte; btn.style.pointerEvents = "auto"; }, 2500);
-    }
 };
 
 // =========================================================================

@@ -186,7 +186,10 @@ export function combattantDepuisFiche(fiche, position, regles) {
         maitrePoisons: !!race.maitrePoisons,
         // Le Médicus : des points de régénération de fatigue en plus, à chaque
         // fin de manche (regenererFinDeManche, cerveau_combat.js).
-        regenFatigue: nombre(race.regenFatigue)
+        regenFatigue: nombre(race.regenFatigue),
+        // Le Chasseur de mages, niveau 10 : la chance qu'un sort de lumière
+        // aveugle sa cible et les ennemis qui la touchent (tirerDesCarte).
+        lumiereAveugle: nombre(race.lumiereAveugle)
     };
     const mod = {
         // Ce que l'ÉQUIPEMENT change EN PERMANENCE, hors états altérés : le

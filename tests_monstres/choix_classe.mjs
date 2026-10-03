@@ -197,21 +197,16 @@ console.log("\n4. VALIDER : LA CRÉATION CONTINUE, LA CLASSE EST RETENUE");
   verifier("la création transmet la classe (complète et rapide)", (cp.match(/classe: document\.getElementById\("champ-classe"\)/g) || []).length === 2);
 }
 
-console.log("\n5. LA BASE : INSTALLER LES CLASSES");
+console.log("\n5. LA BASE : LIRE LES CLASSES (le bouton d'installation est retiré)");
 {
-  const r = await p.evaluate(async () => {
-    window.__ecrits = [];
-    await window.installerClasses();
-    return window.__ecrits;
-  });
-  verifier("14 documents écrits dans « Classes »", r.length === 14 && r.every(e => e.chemin.startsWith("Classes/")), String(r.length));
-  verifier("en fusion (rien d'ajouté à la main n'est écrasé)", r.every(e => e.options && e.options.merge === true));
-  const h = r.find(e => e.chemin === "Classes/CLASSE_HOPLITE");
-  verifier("chaque document porte nom, images et ordre", !!h && h.data.Nom === "Hoplite" && /Hoplite_fond/.test(h.data.Image_Fond)
-           && /IMG_2159/.test(h.data.Image_Tarot) && h.data.Ordre === 8, JSON.stringify(h && h.data));
+  const r = await p.evaluate(() => ({ installer: typeof window.installerClasses, bouton: !!document.getElementById("btn-installer-classes"),
+                                      doc: window.documentDepuisClasse(window.CLASSES_PAR_DEFAUT.find(c => c.id === "CLASSE_HOPLITE")) }));
+  verifier("plus de bouton ni de fonction d'installation", r.installer === "undefined" && !r.bouton);
+  verifier("le format d'un document de classe reste connu (nom, images, ordre)", r.doc.Nom === "Hoplite" && /Hoplite_fond/.test(r.doc.Image_Fond)
+           && /IMG_2159/.test(r.doc.Image_Tarot) && r.doc.Ordre === 8, JSON.stringify(r.doc));
   const lu = await p.evaluate(() => window.classeDepuisDocument("CLASSE_HOPLITE", { Nom: "Hoplite d'élite" }));
   verifier("un document incomplet est complété par la liste du jeu", lu.nom === "Hoplite d'élite" && /Hoplite_fond/.test(lu.imageFond));
-  verifier("les documents installés portent déjà les liens optimisés", r.every(e => /q_auto,f_auto/.test(e.data.Image_Tarot) && /q_auto,f_auto/.test(e.data.Image_Fond)));
+  verifier("la liste du jeu porte déjà les liens optimisés", /q_auto,f_auto/.test(r.doc.Image_Tarot) && /q_auto,f_auto/.test(r.doc.Image_Fond));
   const ancien = await p.evaluate(() => window.classeDepuisDocument("CLASSE_HOPLITE", {
     Image_Tarot: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790440202/IMG_2159_iligqv.jpg" }));
   verifier("un lien de la base SANS q_auto,f_auto le reçoit à la lecture",

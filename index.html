@@ -1412,10 +1412,6 @@
           <!-- 🔻 NOUVEAU BOUTON D'EXPORT 🔻 -->
           <button class="btn-parametres" style="background-color: #9333ea; border-color: #7e22ce;" onclick="jouerSonClic(); window.exporterEffetsBDD()">Exporter BDD (Copier)</button>
 
-          <!-- Crée dans la base l'effet Ténèbres s'il n'y est pas. Ne modifie ni ne
-               supprime JAMAIS un effet existant : les réglages faits à la main restent. -->
-          <button id="btn-migration-effets" class="btn-parametres" style="background-color: #1b6e3a; border-color: #14532d;" onclick="jouerSonClic(); window.appliquerMigrationEffets()" title="Crée l'effet Ténèbres (Nécromancien) s'il manque. Ne touche à aucun autre effet, ni à Ténèbres s'il existe déjà.">Installer Ténèbres</button>
-          <button id="btn-installer-classes" class="btn-parametres" style="background-color: #5c3a21; border-color: #3b2412;" onclick="jouerSonClic(); window.installerClasses()" title="Recopie les 14 classes (noms et images) dans la collection Classes, sans écraser ce qui y a été ajouté">Installer les classes</button>
           
           <button class="btn-parametres" onclick="jouerSonClic(); window.fermerGestionEffets()">Retour</button>
         </div>
@@ -1978,7 +1974,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=71"></script>
+<script src="trace_combat.js?v=72"></script>
 <!-- LA MISE À JOUR AUTOMATIQUE. Juste après la trace, parce qu'elle a besoin du
      numéro de version qu'elle y trouve, et avant tout le reste : si la page est
      périmée, autant s'en apercevoir avant d'avoir chargé le jeu entier.
@@ -1988,10 +1984,10 @@
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
-<script type="module" src="combat_etat.js?v=21"></script>
+<script type="module" src="combat_etat.js?v=22"></script>
 <!-- LE MOTEUR PUR : la chaîne de dégâts et le mouvement, extraits des 5 000
      lignes du moteur actuel et testables sans réseau ni navigateur. -->
-<script type="module" src="moteur_pur.js?v=31"></script>
+<script type="module" src="moteur_pur.js?v=32"></script>
 <script type="module" src="mouvement_pur.js?v=12"></script>
 <script type="module" src="ia_pure.js?v=9"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
@@ -2008,14 +2004,14 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=33"></script>
 <script type="module" src="ia_master.js?v=7"></script>
-<script type="module" src="app.js?v=75"></script>
+<script type="module" src="app.js?v=76"></script>
 <script src="jet_d20.js?v=2"></script>
 <script src="fabrique_sons.js?v=3"></script>
 <script src="experience.js?v=1"></script>
 <script type="module" src="creation_personnage.js?v=13"></script>
-<script type="module" src="classes.js?v=6"></script>
+<script type="module" src="classes.js?v=7"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
-<script type="module" src="competences.js?v=42"></script>
+<script type="module" src="competences.js?v=43"></script>
 <!-- Le plateau porte désormais son ?v= comme les autres : sans lui, un iPad
      gardait l'ancien dessin en cache après une livraison (l'œil d'or en dépend). -->
 <script src="Plateau.js?v=3"></script>
@@ -2024,7 +2020,7 @@
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=28"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
-<script type="module" src="moteur_effets.js?v=69"></script>
+<script type="module" src="moteur_effets.js?v=70"></script>
 <script type="module" src="monstres.js?v=24"></script>
 <script type="module" src="monstres_competences.js?v=24"></script>
 <script type="module" src="monstres_ia.js?v=34"></script>

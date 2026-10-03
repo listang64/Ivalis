@@ -65,7 +65,7 @@ node cap_fatigue.mjs        # le CAP de fatigue d'une compétence, table de Nico
 node gouttes_etat.mjs       # les gouttes de couleur sous un pion, un vrai token de la base, capture à l'appui
 node equipement_cerveau.mjs # percer une armure, l'élan, la bénédiction, le pas de retraite — reliés au cerveau
 node durees_etats.mjs       # la durée d'un état, de la Forge (⏳ Durée +) jusqu'à sa dernière manche
-node migration_effets.mjs   # « Installer Ténèbres » : crée Ténèbres s'il manque, ne touche à AUCUN autre effet (retouches à la main intactes)
+node migration_effets.mjs     # plus de bouton d'installation : Ténèbres et Lumière vivent en copie locale, la version de la base l'emporte toujours
 node mouvement_pur.mjs      # chemin, coût des cases, attaques d'opportunité (1 000 trajets)
 node confusion_cerveau.mjs  # les quatre bandes du dé, la dissipation, et le mot qui prévient le joueur
 node zones_cerveau.mjs      # une nappe au sol : elle naît dans l'état, elle brûle, elle vieillit, elle meurt
@@ -159,6 +159,7 @@ node tableaux_nico.mjs        # les cellules rouges des deux tableaux : brûlure
 node hoplite.mjs              # la classe Hoplite : +5 parade / +5 déf. physique, Mur de bouclier (+60 % parade, une fois), Rempart (coups partagés en deux avec l'allié adjacent, 3 manches), section « Techniques de classe » de la fiche
 node assassin.mjs             # la classe Assassin : Instinct du tueur (+15 critique 2 manches sur tout KO), Assaut mortel (zone de 2 au contact, 10 phys + poison même esquivé), Maître des poisons (18 % énergie + 10 % PV par manche, 2 manches)
 node medicus.mjs              # la classe Médicus : +5 % régénération de fatigue et +1 compétence, Soin d'urgence (12 PV à tous les alliés), Prise en charge (relève un allié KO adjacent à 30 %, repousse les ennemis), fantômes des alliés KO pour le seul Médicus
+node chasseur_de_mages.mjs    # la classe Chasseur de mages : +10 % résistance magique, effet Lumière (ignore la défense magique, 15 %/cran, max 60 %), sorts de lumière qui aveuglent la cible et les ennemis adjacents (30 %)
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4016,3 +4017,43 @@ en gris, impossibles à cliquer : c'est là qu'il doit aller pour les relever.
 (validation, 30 % arrondi, états, recul, mur, case occupée, rejeu), la
 fenêtre de choix, les fantômes, le retour hors des hors-jeu, la fiche et le
 descriptif.
+
+## La classe Chasseur de mages, et plus de boutons d'installation (version 160)
+
+**Paliers** (app.js `ATOUTS_CLASSES`, classes.js `DESCRIPTIFS_CLASSES`).
+- Niveau 1 : **Peau de traqueur**, +10 % de résistance magique (`defMagique`).
+- Niveau 5 : l'effet de combat **Lumière** dans la Forge (`effets: ["EFF_LUMIERE"]`).
+- Niveau 10 : **Éclat aveuglant** (`lumiereAveugle: 30`).
+
+**Lumière** (`EFF_LUMIERE`, copie locale dans app.js `MIGRATION_EFFETS`). Un
+sous-effet rangé dans les menus Magique et Physique de la Forge : 1 pt,
+Intelligence, 15 % par cran, 60 % au plus. Réservé au Chasseur de mages dès le
+niveau 5, jamais pioché par les monstres. Il ne se pose que sur une action à
+dégâts magiques (Attaque Magique, Mots de pouvoir, Ténèbres) ; ailleurs, il est
+grisé « non compatible » (competences.js `actionADegatsMagiques`).
+L'extraction (moteur_effets.js) donne à l'attaque magique sa
+`chanceLumiere`. Au lancement, `tirerDesCarte` (moteur_pur.js) tire un jet par
+cible (un critique l'impose) ; s'il prend, ce sort passe outre la défense
+magique de la cible (`percee`) : bouclier et absorption comptent toujours. Une
+carte sans Lumière ne tire pas un dé de plus.
+
+**Éclat aveuglant**. Pour un Chasseur de niveau 10, chaque cible d'un sort de
+lumière tire aussi un jet de 30 %. S'il prend, et si la cible est touchée
+(pas d'esquive), elle est aveuglée, ainsi que tous les ENNEMIS qui la touchent
+(pas les alliés, pas le Chasseur). C'est l'Aveuglement normal : 2 manches,
+3 cases de noir tirées autour de chacun avec les autres dés, immunités
+comprises. L'écran dit « ☀️ Éblouis ! ».
+
+**Plus de boutons d'installation.** Les boutons « Installer les effets de
+classe » et « Installer les classes » sont retirés des Paramètres, avec
+`appliquerMigrationEffets` et `installerClasses`. Le jeu n'écrit plus rien dans
+le grimoire ni dans la collection Classes. Ténèbres et Lumière vivent en copie
+locale (`completerEffetsDeSecours`) : si la base en a une version, même
+retouchée à la main, c'est elle qui compte.
+
+`chasseur_de_mages.mjs` vérifie les paliers, Lumière (défense ignorée, jet
+raté, critique, coup physique, aucun dé de plus), l'aveuglement (cible et
+ennemis voisins, pas l'allié, jet raté, esquive, immunité, niveau 9), la Forge
+(classe, niveau, menus, compatibilité, extraction, plafond) et le descriptif.
+`migration_effets.mjs` vérifie que les boutons sont partis et que la copie
+locale ne remplace jamais la base.

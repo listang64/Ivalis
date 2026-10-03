@@ -2016,6 +2016,13 @@ window.rafraichirForge = function() {
         const n = (nom || "").toLowerCase();
         return (n.includes("soin") || n.includes("guérison") || n.includes("guerison")) && !n.includes("bouclier");
     };
+    // Une action qui fait des dégâts MAGIQUES : l'Attaque Magique, les Mots de
+    // pouvoir, Ténèbres (celles qui sont des sorts, pas des soins).
+    const actionADegatsMagiques = (act) => {
+        const n = ((act && act.baseEffet && act.baseEffet.Nom) || "").toLowerCase();
+        return n.includes("attaque magique") || n.includes("pouvoir")
+            || (typeof window.estEffetTenebres === "function" && window.estEffetTenebres(n));
+    };
     const actionAccepteEtalement = (act) => {
         if (!act || !act.baseEffet) return false;
         if (estUneAttaqueDeBase(act.baseEffet.Nom) || estUnSoinDeBase(act.baseEffet.Nom)) return true;
@@ -2088,13 +2095,18 @@ window.rafraichirForge = function() {
                 // réciproquement, où qu'ils soient posés sur la carte.
                 const estIncompatiblePersistanceDot = (nomModLower.includes("persistance") && carteADejaUnEtalement)
                     || (estUnModEtalement(nomModLower) && carteADejaUnePersistance);
+                // LUMIÈRE (Chasseur de mages) : elle fait passer un sort outre la
+                // défense magique — il lui faut donc une action à dégâts magiques.
+                const estIncompatibleLumiere = nomModLower.startsWith("lumi")
+                    && !actionADegatsMagiques(actionCourante);
                 // LA DISTANCE : arme polyvalente, à distance, magie — ou un soin.
                 const estIncompatibleDistance = mod.Nom === "Distance"
                     && typeof window.distancePermiseSurAction === "function"
                     && !window.distancePermiseSurAction(actionCourante, window.forgeState.armePrincipale);
                 groupesMods[carac].push(
                     (estIncompatiblePoussee || estIncompatibleIllusion || estIncompatiblePoison || estIncompatibleEtalement
-                     || estIncompatiblePersistanceSoin || estIncompatiblePersistanceDot || estIncompatibleDistance)
+                     || estIncompatiblePersistanceSoin || estIncompatiblePersistanceDot || estIncompatibleDistance
+                     || estIncompatibleLumiere)
                         ? `<option value="${mod.id}" disabled style="color: #999;">${nettoyerNomEffet(mod.Nom)} (non compatible)</option>`
                         : `<option value="${mod.id}">${nettoyerNomEffet(mod.Nom)} (⚡ ${coutFatigue})</option>`
                 );

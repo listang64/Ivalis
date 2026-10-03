@@ -907,6 +907,15 @@ window.ATOUTS_CLASSES = {
         { niveau: 1,  regenFatigue: 5, competences: 1 },
         { niveau: 5,  techniques: ["CLASSE_SOIN_URGENCE"] },
         { niveau: 10, techniques: ["CLASSE_PRISE_EN_CHARGE"] }
+    ],
+    // LE CHASSEUR DE MAGES : +10 de défense magique ; l'effet Lumière dans la
+    // Forge au niveau 5 (EFF_LUMIERE, MIGRATION_EFFETS) ; au niveau 10, ses
+    // sorts de lumière ont 30 % de chance d'aveugler leur cible et les ennemis
+    // qui la touchent (lumiereAveugle, tirerDesCarte et resoudreCarte).
+    "Chasseur de mages": [
+        { niveau: 1,  defMagique: 10 },
+        { niveau: 5,  effets: ["EFF_LUMIERE"] },
+        { niveau: 10, lumiereAveugle: 30 }
     ]
 };
 
@@ -4344,37 +4353,40 @@ window.ajouterLigneEffetVide = function() {
 };
 
 // =========================================================================
-//  INSTALLER LES EFFETS QUI MANQUENT À LA BASE (aujourd'hui : Ténèbres)
+//  LES EFFETS DE CLASSE QUE LE JEU APPORTE LUI-MÊME (Ténèbres, Lumière)
 // =========================================================================
-//  Le bouton des Paramètres CRÉE un effet qui n'existe pas encore dans la base
-//  (Combat_Effets), et c'est TOUT ce qu'il sait faire. Il ne modifie jamais un
-//  effet existant, n'en supprime jamais un : le grimoire appartient à Nico, qui
-//  le règle à la main. Si l'effet est déjà là — même retouché depuis — il n'y
-//  touche pas.
-//
-//  Il servait autrefois aussi à réécrire les textes de plusieurs effets pour
-//  suivre le moteur. Ces réécritures sont faites depuis longtemps, et relancer
-//  le bouton aurait écrasé les réglages faits à la main depuis (la note de la
-//  Brûlure, celle de la Confusion) : elles ont été retirées, et la fonction ne
-//  sait plus écrire que des créations.
+//  Le jeu n'écrit plus rien dans le grimoire (Combat_Effets) : le bouton qui y
+//  installait ces effets a été retiré, le grimoire appartient à Nico. Ces
+//  effets de classe vivent ici, en copie locale (`secoursLocal`) : si la base
+//  en a une version, c'est la sienne qui compte — retouchée à la main, elle
+//  n'est jamais remplacée ; sinon, c'est celle-ci (completerEffetsDeSecours).
 window.MIGRATION_EFFETS = [
     // TÉNÈBRES, LE SORT DU NÉCROMANCIEN (niveau 5). Un effet de base comme
     // l'Attaque Magique (2 pts, Intelligence, 3 dégâts magiques), réservé à la
     // classe : `Classe` et `Niveau_Requis` le cachent à tous les autres dans la
-    // Forge, et le générateur de monstres ne le pioche jamais. `secoursLocal` :
-    // tant que la base ne l'a pas, le jeu en garde cette copie en mémoire —
-    // le sort marche avant même qu'on ait pressé le bouton.
+    // Forge, et le générateur de monstres ne le pioche jamais.
     { id: "EFF_TENEBRES", secoursLocal: true,
       champs: { Nom: "Ténèbres", Cout_PT: "2", Modificateur: "INTELLIGENCE",
                 Type_Mecanique: "Action/Global", Type_Mecanique_2: "Aucun",
                 Valeur: 3, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Cible_Etat: "tenebres",
                 Classe: "Nécromancien", Niveau_Requis: 5,
                 Effet_Base: "3 dégâts magiques, appliqués à la fatigue à la place des points de vie",
-                Notes: "Réservé au Nécromancien (niveau 5). Les dégâts vont à l'énergie (fatigue) de la cible au lieu de ses PV. Si elle n'a plus d'énergie, le reste frappe ses PV ×1,5 (arrondi à l'inférieur). Le bouclier ne protège pas l'énergie ; il n'absorbe que ce qui frappe les PV." } }
+                Notes: "Réservé au Nécromancien (niveau 5). Les dégâts vont à l'énergie (fatigue) de la cible au lieu de ses PV. Si elle n'a plus d'énergie, le reste frappe ses PV ×1,5 (arrondi à l'inférieur). Le bouclier ne protège pas l'énergie ; il n'absorbe que ce qui frappe les PV." } },
+    // LUMIÈRE, L'EFFET DU CHASSEUR DE MAGES (niveau 5). Un sous-effet, rangé
+    // dans les menus Magique et Physique de la Forge comme Brûlé : 1 pt,
+    // Intelligence, 15 % par cran jusqu'à 60 %. Il ne se greffe que sur une
+    // action à dégâts magiques : quand il prend, la cible encaisse ce sort
+    // sans sa défense magique.
+    { id: "EFF_LUMIERE", secoursLocal: true,
+      champs: { Nom: "Lumière", Cout_PT: "1", Modificateur: "INTELLIGENCE",
+                Type_Mecanique: "Magique", Type_Mecanique_2: "Physique",
+                Valeur: 0, Pourcent_Base: 15, Pourcent_Max: 60, Tours: 0, Cible_Etat: "lumiere",
+                Classe: "Chasseur de mages", Niveau_Requis: 5,
+                Effet_Base: "15% chance d'ignorer la résistance magique de la cible sur ce sort (Max 60%)",
+                Notes: "Réservé au Chasseur de mages (niveau 5). Seulement sur une action à dégâts magiques. Au niveau 10, un sort de lumière a 30 % de chance d'aveugler sa cible et les ennemis qui la touchent." } }
 ];
 
-// Les effets que le jeu sait jouer même quand la base ne les a pas encore
-// (bouton « Mettre la BDD à jour » pas encore pressé).
+// Les effets que le jeu sait jouer même quand la base ne les a pas.
 window.completerEffetsDeSecours = function(cache) {
     (window.MIGRATION_EFFETS || []).forEach(regle => {
         if (regle.secoursLocal && !cache[regle.id]) cache[regle.id] = { ...regle.champs };
@@ -4397,48 +4409,6 @@ window.effetReserveAUneClasse = function(id, effet) {
 window.effetAccessible = function(id, effet, perso) {
     if (!window.effetReserveAUneClasse(id, effet)) return true;
     return (window.atoutRace(perso || {}).effets || []).includes(id);
-};
-
-window.appliquerMigrationEffets = async function() {
-    const btn = document.getElementById("btn-migration-effets");
-    const texteOrigine = btn ? btn.innerText : "";
-    if (btn) { btn.innerText = "⏳ Installation..."; btn.style.pointerEvents = "none"; }
-
-    const faits = [];
-    const inchanges = [];
-    const rates = [];
-    try {
-        for (const regle of window.MIGRATION_EFFETS) {
-            const ref = doc(db, "Combat_Effets", regle.id);
-            try {
-                // DÉJÀ LÀ : on n'y touche pas, quoi qu'il contienne.
-                const snap = await getDoc(ref);
-                if (snap.exists()) { inchanges.push(regle.id + " (déjà présent)"); continue; }
-                await setDoc(ref, { ...regle.champs });
-                faits.push(regle.id + " — créé");
-            } catch (e) {
-                rates.push(`${regle.id} : ${e && e.message}`);
-            }
-        }
-
-        // Le cache du jeu repart de la base : la Forge voit l'effet installé.
-        if (typeof window.chargerCacheEffetsBDD === "function") await window.chargerCacheEffetsBDD();
-        if (document.getElementById("conteneur-table-effets")
-            && typeof window.chargerTableauEffets === "function") {
-            await window.chargerTableauEffets();
-        }
-    } finally {
-        if (btn) { btn.innerText = texteOrigine || "Installer Ténèbres"; btn.style.pointerEvents = "auto"; }
-    }
-
-    const lignes = [];
-    lignes.push(faits.length ? `Installé (${faits.length}) :\n  • ` + faits.join("\n  • ")
-                             : "Rien à installer.");
-    if (inchanges.length) lignes.push(`Déjà dans la base, laissé tel quel : ${inchanges.join(", ")}`);
-    if (rates.length) lignes.push(`⚠️ Échecs (${rates.length}) :\n  • ` + rates.join("\n  • "));
-    console.log("🧪 Installation des effets :", { faits, inchanges, rates });
-    alert(lignes.join("\n\n"));
-    return { faits, inchanges, rates };
 };
 
 window.chargerCacheEffetsBDD = async function() {
@@ -6387,7 +6357,6 @@ Object.assign(window, {
   sauvegarderEffetLigne: window.sauvegarderEffetLigne,
   ajouterLigneEffetVide: window.ajouterLigneEffetVide,
   supprimerEffetLigne: window.supprimerEffetLigne,
-  appliquerMigrationEffets: window.appliquerMigrationEffets,
   // Gestion des Races
   ouvrirGestionRaces: window.ouvrirGestionRaces,
   fermerGestionRaces: window.fermerGestionRaces,

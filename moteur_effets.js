@@ -1501,6 +1501,17 @@ window.demarrerCiblage = async function(idCarte, options) {
 
             // Ténèbres (Nécromancien) : une attaque magique qui boit l'énergie.
             const estTenebres = typeof window.estEffetTenebres === "function" && window.estEffetTenebres(effBase.Nom);
+            // LUMIÈRE (Chasseur de mages) : la chance que ce sort passe outre la
+            // défense magique de sa cible — 15 % par cran, plafond du grimoire.
+            let chanceLumiere = 0;
+            const lireLumiere = (eff, n) => {
+                if (!eff || !(eff.Nom || "").toLowerCase().startsWith("lumi")) return;
+                chanceLumiere += (parseFrFloat(eff.Pourcent_Base) || 15) * (n || 1);
+                const plafond = parseFrFloat(eff.Pourcent_Max) || 60;
+                chanceLumiere = Math.min(chanceLumiere, plafond);
+            };
+            lireLumiere(effBase, act.count);
+            listeMods.forEach(m => lireLumiere(window.EFFETS_BDD_CACHE[m.id], m.count));
             if (nomLower.includes("attaque") || nomLower.includes("pouvoir") || estTenebres || nomLower.includes("soin") || nomLower.includes("guérison") || isPurification || isShield) {
                 let isHeal = nomLower.includes("soin") || nomLower.includes("guérison") || isPurification || isShield;
                 // Les dégâts et les SOINS s'étalent ; un bouclier ou une purification, non —
@@ -1562,6 +1573,9 @@ window.demarrerCiblage = async function(idCarte, options) {
                     toursEtalement: etalementActif ? toursEtalement : 0,
                     // Ses dégâts vont à l'énergie d'abord (moteur_pur.js).
                     ...(estTenebres ? { versEnergie: true } : {}),
+                    // Un sort de lumière : il ne vaut que sur des dégâts magiques.
+                    ...(chanceLumiere > 0 && typeRes === "Magique" && !isHeal
+                        ? { chanceLumiere: Math.min(100, chanceLumiere), iconeAveugle: ICONE_AVEUGLE } : {}),
                     cibles: []
                 });
             }
