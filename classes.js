@@ -108,6 +108,23 @@ window.DESCRIPTIFS_CLASSES = {
                        "Chaque attaque qu'il reçoit est partagée : moitié pour lui, moitié pour l'Hoplite",
                        "Il faut rester côte à côte · une fois par combat"] }
         ]
+    },
+    CLASSE_ASSASSIN: {
+        presentation: "Silencieux, patient, mortel : l'Assassin frappe là où ça ne pardonne pas. "
+            + "Chaque proie qui tombe aiguise son instinct, et ses lames enduites de poison "
+            + "achèvent ce que ses coups ont commencé.",
+        paliers: [
+            { niveau: 1, titre: "Instinct du tueur",
+              points: ["Quand il met un ennemi KO : +15 % de chance de critique pendant 2 manches",
+                       "Un nouveau KO relance la durée, sans cumul"] },
+            { niveau: 5, titre: "Technique : Assaut mortel",
+              points: ["Initiative 100 · aucune fatigue",
+                       "Une zone de deux cases au contact : 10 dégâts physiques à chaque ennemi",
+                       "100 % d'empoisonnement, même s'il esquive · une fois par combat"] },
+            { niveau: 10, titre: "Maître des poisons",
+              points: ["Ses empoisonnements mordent à chaque fin de manche, 2 manches durant",
+                       "-18 % de fatigue (énergie max) et -10 % des PV max à chaque fois"] }
+        ]
     }
 };
 

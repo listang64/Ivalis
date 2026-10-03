@@ -102,6 +102,11 @@ export const REGLES_ETATS = {
 // PV maximum en dégâts magiques, réductions appliquées. Un seul tic
 // (cerveau_combat.js, ticsDeFinDeManche).
 export const POISON = { energiePct: 10, pvMaxPct: 8, typeRes: "Magique" };
+// LE POISON DU MAÎTRE (Assassin, niveau 10) : 18 % de l'énergie maximum et
+// 10 % des PV max en dégâts magiques — à CHAQUE fin de manche, pendant 2
+// manches, là où le poison ordinaire ne mord qu'une fois.
+export const POISON_MAITRE = { energiePct: 18, pvMaxPct: 10, typeRes: "Magique", manches: 2 };
+export const DESC_POISON_MAITRE = "Poison de maître : 18 % de l'énergie max et 10 % des PV max en dégâts magiques à chaque fin de manche, 2 manches.";
 
 // LA BOUSCULADE. Une poussée qui aboutit peut, en plus, faire perdre pied :
 // la cible se rattrape, et ça lui coûte de l'énergie. C'est ce qui remplace la
@@ -619,15 +624,19 @@ export function partsEtalees(montant, tours) {
 // L'état qui porte ce qu'un étalement a encore à rendre. Un second étalement
 // sur une cible déjà touchée s'ajoute PART À PART à ce qui lui reste — il ne
 // l'écrase pas, et il ne le repousse pas non plus au bout de la file.
-function empilerEtalement(cible, nomEtat, tics) {
+// `idSource` retient qui l'a posé : un KO au tic de fin de manche lui revient
+// (l'Instinct du tueur de l'Assassin, combat_etat.js).
+function empilerEtalement(cible, nomEtat, tics, idSource) {
     const dejaLa = cible.etats.find(e => e && e.nom === nomEtat);
     if (dejaLa) {
         const file = [...(dejaLa.tics || [])];
         tics.forEach((part, i) => { file[i] = nombre(file[i]) + part; });
         dejaLa.tics = file;
         dejaLa.duree = Math.max(nombre(dejaLa.duree), file.length);
+        if (idSource) dejaLa.idSource = idSource;
     } else {
-        cible.etats = [...cible.etats, { nom: nomEtat, duree: tics.length, tics: [...tics] }];
+        cible.etats = [...cible.etats, { nom: nomEtat, duree: tics.length, tics: [...tics],
+                                         ...(idSource ? { idSource } : {}) }];
     }
 }
 
@@ -1050,6 +1059,26 @@ export function protecteurRempart(etat, cible) {
     return distanceHex(p, cible) <= 1 ? p : null;
 }
 
+// L'ASSAUT MORTEL (Assassin, niveau 5) : une zone de deux cases au contact.
+// Chaque ennemi qui s'y tient prend 10 dégâts physiques — esquive, parade,
+// armure et critique comme un coup ordinaire — et l'empoisonnement à coup
+// sûr, MÊME s'il a esquivé. Le cerveau fabrique l'action lui-même à partir
+// des seules cibles : un poste ne choisit que qui il vise, jamais combien il
+// frappe. Le poison suit les règles de l'Assassin (maître au niveau 10).
+export const DEGATS_ASSAUT_MORTEL = 10;
+export const ICONE_POISON = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788096401/IMG_2083_pebnup.png";
+export function actionAssautMortel(idLanceur, cibles) {
+    const liste = [...new Set(cibles || [])];
+    return {
+        type: "carte", idLanceur, idCarte: "CLASSE_ASSAUT_MORTEL", coutFatigue: 0,
+        attaques: [{ nom: "Assaut mortel", typeRes: "Physique", valeurBrute: DEGATS_ASSAUT_MORTEL,
+                     isRanged: false, rangeMax: 1, isHeal: false, isShield: false, cibles: [...liste] }],
+        alterations: [{ nom: "Empoisonnement", icone: ICONE_POISON,
+                        desc: "10% de l'énergie max et 8% des PV max en dégâts magiques (défense magique appliquée), en fin de manche. Pas de cumul.",
+                        chance: 100, duree: 2, estPoison: true, malgreEsquive: true, cibles: [...liste] }]
+    };
+}
+
 // Ce qu'une technique de classe fait à l'état. Rend { etat, etapes } comme
 // resoudreCarte ; ne clôt pas le tour (le cerveau s'en charge).
 export function resoudreTechniqueClasse(etat, action) {
@@ -1062,7 +1091,8 @@ export function resoudreTechniqueClasse(etat, action) {
     const utilisees = [...(c.techniquesUtilisees || []), action.idCarte];
     c.techniquesUtilisees = utilisees;
     etapes.push({ type: "techniqueClasse", acteur: id, idCarte: action.idCarte,
-                  cible: action.cible || id, utilisees });
+                  cible: action.cible || id, utilisees,
+                  ...(Array.isArray(action.cibles) ? { cibles: [...action.cibles] } : {}) });
 
     if (action.idCarte === "CLASSE_MUR_BOUCLIER") {
         c.etats = [...(c.etats || []).filter(e => e && e.nom !== ETAT_MUR_BOUCLIER),
@@ -1356,7 +1386,7 @@ export function resoudreCarte(etat, action, plateau) {
                 // (compte.degats vaut zéro) ; tout est rangé dans l'état, une part
                 // par fin de manche, autant de parts que de tours.
                 if ((compte.tics || []).length > 0) {
-                    empilerEtalement(cible, attaque.versEnergie ? ETAT_TENEBRES_ETALEES : "Étalement", compte.tics);
+                    empilerEtalement(cible, attaque.versEnergie ? ETAT_TENEBRES_ETALEES : "Étalement", compte.tics, idLanceur);
                     etapes.push({ type: "etats", cible: idCible, liste: cible.etats });
                 }
 
@@ -1405,7 +1435,8 @@ export function resoudreCarte(etat, action, plateau) {
             }
 
             const des = desDe(idCible);
-            if (des.esquive) return;
+            // L'Assaut mortel empoisonne même la cible qui a esquivé le coup.
+            if (des.esquive && !alt.malgreEsquive) return;
             if (!des.etats || des.etats[alt.nom] !== true) {
                 etapes.push({ type: "etatRate", cible: idCible, nom: alt.nom });
                 return;
@@ -1491,9 +1522,18 @@ export function resoudreCarte(etat, action, plateau) {
             // Un seul vocabulaire, celui du jeu, et l'état emporte de quoi être
             // montré.
             const existant = cible.etats.find(e => e && e.nom === alt.nom);
-            const duree = nombre(alt.duree !== undefined ? alt.duree : alt.tours, 1);
+            let duree = nombre(alt.duree !== undefined ? alt.duree : alt.tours, 1);
+            // QUI A POSÉ un état qui ronge en fin de manche (poison, brûlure) :
+            // le KO qu'il fera au tic revient à son auteur (combat_etat.js).
+            const ronge = alt.nom === "Empoisonnement" || alt.nom === "Brûlé";
+            // LE MAÎTRE DES POISONS (Assassin, niveau 10) : son poison mord à
+            // chaque fin de manche, 2 manches durant (POISON_MAITRE).
+            const maitre = alt.nom === "Empoisonnement" && !!(lanceur && lanceur.atouts && lanceur.atouts.maitrePoisons);
+            if (maitre) duree = Math.max(duree, POISON_MAITRE.manches);
             if (existant) {
                 existant.duree = Math.max(nombre(existant.duree), duree);
+                if (ronge) existant.idSource = idLanceur;
+                if (maitre) { existant.maitre = true; existant.desc = DESC_POISON_MAITRE; }
                 // Une brûlure ravivée par une autre carte reprend le type de
                 // CELLE-CI : c'est la dernière flamme posée qui brûle.
                 if (typeDegatsDeLEtat) existant.typeDegats = typeDegatsDeLEtat;
@@ -1520,6 +1560,8 @@ export function resoudreCarte(etat, action, plateau) {
                     // rien n'était. L'extraction le posait, ce tri le jetait —
                     // l'effet phare du tank était décoratif sous ce régime.
                     ...(alt.idProvocateur ? { idProvocateur: alt.idProvocateur } : {}),
+                    ...(ronge ? { idSource: idLanceur } : {}),
+                    ...(maitre ? { maitre: true, desc: DESC_POISON_MAITRE } : {}),
                     // (La brûlure retenait ici le type du coup qui l'avait
                     // allumée ; elle frappe désormais toujours en physique.)
                     ...(typeDegatsDeLEtat ? { typeDegats: typeDegatsDeLEtat } : {})

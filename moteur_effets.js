@@ -1193,7 +1193,8 @@ window.demarrerCiblage = async function(idCarte, options) {
         : (window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO] || null);
     const idPourCache = (persoLanceur || {}).idPersonnage;
     const dataCarte = window.COMPETENCES_CACHE[idCarte]
-        || ((window.CACHE_COMPETENCES_GLOBAL || {})[idPourCache] || {})[idCarte];
+        || ((window.CACHE_COMPETENCES_GLOBAL || {})[idPourCache] || {})[idCarte]
+        || (typeof window.carteTechniqueClasse === "function" ? window.carteTechniqueClasse(idCarte) : null);
     if (!dataCarte) {
         console.warn(`Ciblage impossible : la technique ${idCarte} de ${idPourCache} est introuvable.`);
         return;
@@ -1301,6 +1302,21 @@ window.demarrerCiblage = async function(idCarte, options) {
         const champs = [eff.Nom, eff.Cible_Etat, eff.Type_Mecanique, eff.Type_Mecanique_2];
         return champs.some(v => (v || "").toLowerCase().includes("confus"));
     };
+
+    // L'ASSAUT MORTEL (Assassin) : une zone de deux cases au contact, qu'on
+    // fait tourner autour de soi comme toute zone de mêlée. Ce qu'elle porte
+    // n'est là que pour l'aperçu du ciblage : à la validation, seuls les
+    // ennemis de la zone partent au cerveau, qui refait l'attaque lui-même
+    // (actionAssautMortel, moteur_pur.js).
+    if (dataCarte.techniqueClasse === "CLASSE_ASSAUT_MORTEL") {
+        isZone = true;
+        zoneHexesBase = [{ q: 1, r: 0 }, { q: 1, r: -1 }];
+        attaquesExtraites.push({ nom: "Assaut mortel", typeRes: "Physique", valeurBrute: 10, pourcentPV: 0,
+                                 isRanged: false, rangeMax: 1, isHeal: false, isShield: false,
+                                 enZone: true, cibles: [] });
+        alterationsExtraites.push({ nom: "Empoisonnement", chance: 100, duree: 2, isRanged: false, rangeMax: 1,
+                                    estPoison: true, malgreEsquive: true, enZone: true, cibles: [] });
+    }
 
     if (dataCarte.Composants && dataCarte.Composants.actions) {
         // Chaque effet retient si l'action qui l'a produit porte la zone. C'est
@@ -2342,6 +2358,9 @@ window.demarrerCiblage = async function(idCarte, options) {
         repli: repliCarte,
         repliChoisi: null,
         persistanceTerrain: aPersistanceTerrain,
+        // Une technique de classe (l'Assaut mortel) part au cerveau par sa
+        // propre demande, pas comme une carte (validerZoneAoE).
+        techniqueClasse: dataCarte.techniqueClasse || null,
         zoneHexesFinaux: null,
         // Attaque ET soutien sur la même carte : deux phases de ciblage.
         phaseCiblage: "offensive",
@@ -2586,6 +2605,22 @@ window.validerZoneAoE = function() {
 
         if (cibleData.camp === lanceurData.camp && !cibleData.estIllusion) touchesSoutien.push(idToken);
         if (idToken !== idLanceur && (!cibleData.estIllusion || carteEstAttaqueSimple)) touchesFrappe.push(idToken);
+    }
+
+    // L'ASSAUT MORTEL ne frappe que les ennemis de sa zone, et part au cerveau
+    // comme technique de classe : il fabrique l'attaque à partir des cibles.
+    if (state.techniqueClasse === "CLASSE_ASSAUT_MORTEL") {
+        const ennemis = touchesFrappe.filter(id => {
+            const p = (window.PERSOS_PARTIE || []).find(x => x.idPersonnage === id);
+            return p && !p.estIllusion && p.camp !== lanceurData.camp;
+        });
+        if (ennemis.length === 0) return alert("Aucun ennemi dans la zone de l'Assaut mortel : tournez-la vers eux.");
+        const idCarte = state.idCarte;
+        window.nettoyerCiblage();
+        if (window.regimeDemande && typeof window.regimeDemande.techniqueClasse === "function") {
+            window.regimeDemande.techniqueClasse(idLanceur, idCarte, null, ennemis);
+        }
+        return;
     }
 
     const ciblesPour = (e) => e.isHeal ? [...touchesSoutien] : [...touchesFrappe];

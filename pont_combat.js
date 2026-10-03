@@ -284,7 +284,8 @@ const SCENES = {
 
     // Une technique de classe jouée : son nom sur le pion.
     techniqueClasse(e) {
-        const noms = { CLASSE_MUR_BOUCLIER: "🛡️ Mur de bouclier", CLASSE_REMPART: "🛡️ Rempart" };
+        const noms = { CLASSE_MUR_BOUCLIER: "🛡️ Mur de bouclier", CLASSE_REMPART: "🛡️ Rempart",
+                       CLASSE_ASSAUT_MORTEL: "🗡️ Assaut mortel" };
         return { geste: "message", pion: e.acteur, texte: noms[e.idCarte] || "Technique de classe",
                  couleur: "#e8c46a", duree: RYTHME.message };
     },

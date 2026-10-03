@@ -889,6 +889,14 @@ window.ATOUTS_CLASSES = {
         { niveau: 1,  parade: 5, defPhysique: 5 },
         { niveau: 5,  techniques: ["CLASSE_MUR_BOUCLIER"] },
         { niveau: 10, techniques: ["CLASSE_REMPART"] }
+    ],
+    // L'ASSASSIN : un KO lui donne +15 de critique pour 2 manches (Instinct du
+    // tueur, combat_etat.js) ; l'Assaut mortel au niveau 5 ; au niveau 10, son
+    // poison mord à chaque manche, plus fort (POISON_MAITRE, moteur_pur.js).
+    "Assassin": [
+        { niveau: 1,  critiqueSurKO: 15 },
+        { niveau: 5,  techniques: ["CLASSE_ASSAUT_MORTEL"] },
+        { niveau: 10, maitrePoisons: true }
     ]
 };
 
@@ -902,7 +910,8 @@ window.ATOUTS_CLASSES = {
 //  Leur effet est tranché par le cerveau (intention « classe »,
 //  cerveau_combat.js ; resoudreTechniqueClasse, moteur_pur.js).
 //
-//    cible    "soi" (Mur de bouclier) ou "allieAdjacent" (Rempart)
+//    cible    "soi" (Mur de bouclier), "allieAdjacent" (Rempart) ou
+//             "zoneDeux" (Assaut mortel : une zone de deux cases au contact)
 window.TECHNIQUES_CLASSE = {
     CLASSE_MUR_BOUCLIER: {
         Nom: "Mur de bouclier", classe: "Hoplite", niveau: 5, Initiative: 100, Fatigue: 0, cible: "soi",
@@ -913,6 +922,11 @@ window.TECHNIQUES_CLASSE = {
         desc: "Sur un allié adjacent, pour 3 manches : chaque attaque qu'il reçoit est partagée en deux, "
             + "moitié des dégâts pour lui, moitié pour l'Hoplite, chacun avec ses défenses. Il faut rester "
             + "côte à côte. Pas les états altérés. Une fois par combat."
+    },
+    CLASSE_ASSAUT_MORTEL: {
+        Nom: "Assaut mortel", classe: "Assassin", niveau: 5, Initiative: 100, Fatigue: 0, cible: "zoneDeux",
+        desc: "Une zone de deux cases au contact : chaque ennemi qui s'y trouve prend 10 dégâts physiques "
+            + "et 100 % d'empoisonnement, même s'il esquive le coup. Une fois par combat."
     }
 };
 window.estTechniqueClasse = (idCarte) => !!(idCarte && window.TECHNIQUES_CLASSE[idCarte]);

@@ -178,7 +178,12 @@ export function combattantDepuisFiche(fiche, position, regles) {
         sursis: nombre(race.sursis),
         // Les techniques de classe que ce héros possède à son niveau (Hoplite :
         // Mur de bouclier, Rempart). Le cerveau refuse celles qu'il n'a pas.
-        techniques: Array.isArray(race.techniques) ? [...race.techniques] : []
+        techniques: Array.isArray(race.techniques) ? [...race.techniques] : [],
+        // L'Assassin : les points de critique gagnés pour 2 manches quand il
+        // met un ennemi KO (tomber, plus bas), et son poison de maître
+        // (niveau 10, ticsDeFinDeManche dans cerveau_combat.js).
+        critiqueSurKO: nombre(race.critiqueSurKO),
+        maitrePoisons: !!race.maitrePoisons
     };
     const mod = {
         // Ce que l'ÉQUIPEMENT change EN PERMANENCE, hors états altérés : le
@@ -413,7 +418,31 @@ export const combattant = (etat, id) => (etat && etat.combattants) ? etat.combat
 //
 //  Rend les étapes à jouer ; modifie le combattant sur place, comme les
 //  fonctions du moteur qui l'appellent.
-export function tomber(etat, id, acteur) {
+// L'INSTINCT DU TUEUR (Assassin, niveau 1) : quand il met un ennemi KO — de
+// sa main, de son poison ou de son étalement — il gagne ses points de
+// critique pour 2 manches : celle du KO et la suivante. Un KO tombé pendant
+// les tics de fin de manche, juste avant que les états ne vieillissent, en
+// porte une de plus, pour valoir encore les 2 manches qui viennent. Pas de
+// cumul : un nouveau KO relance la durée, jamais le bonus.
+export const ETAT_INSTINCT_TUEUR = "Instinct du tueur";
+export const MANCHES_INSTINCT_TUEUR = 2;
+
+function recompenserLeTueur(etat, victime, idAuteur, finDeManche) {
+    const auteur = combattant(etat, idAuteur);
+    const bonus = nombre(auteur && auteur.atouts && auteur.atouts.critiqueSurKO);
+    if (!auteur || bonus <= 0 || auteur.aTerre) return [];
+    if (victime.estIllusion || (auteur.camp || "Allié") === (victime.camp || "Allié")) return [];
+    const duree = MANCHES_INSTINCT_TUEUR + (finDeManche ? 1 : 0);
+    const etats = Array.isArray(auteur.etats) ? auteur.etats : [];
+    const existant = etats.find(e => e && e.nom === ETAT_INSTINCT_TUEUR);
+    auteur.etats = existant
+        ? etats.map(e => e === existant ? { ...e, duree: Math.max(nombre(e.duree), duree) } : e)
+        : [...etats, { nom: ETAT_INSTINCT_TUEUR, duree, bonusEquip: { critique: bonus },
+                       desc: `+${bonus} % de chance de critique.` }];
+    return [{ type: "etats", cible: auteur.id, pose: ETAT_INSTINCT_TUEUR, liste: auteur.etats }];
+}
+
+export function tomber(etat, id, acteur, options) {
     const c = combattant(etat, id);
     if (!c || c.aTerre) return [];
     if (!(nombre(c.pvMax) > 0 && nombre(c.pv) <= 0)) return [];
@@ -428,7 +457,9 @@ export function tomber(etat, id, acteur) {
         return [{ type: "sursis", cible: id, acteur: acteur || id, tours, entame, pvApres: 0 }];
     }
     c.aTerre = true;
-    return [{ type: "chute", cible: id, acteur: acteur || id }];
+    const chute = [{ type: "chute", cible: id, acteur: acteur || id }];
+    if (acteur && acteur !== id) chute.push(...recompenserLeTueur(etat, c, acteur, !!(options && options.finDeManche)));
+    return chute;
 }
 
 // Un combattant en sursis : debout, la vie bloquée à zéro.

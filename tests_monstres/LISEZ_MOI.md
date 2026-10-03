@@ -157,6 +157,7 @@ node surpuissance.mjs        # la surpuissance : ×1,25 dès 70 de fatigue, ×1,
 node armes_et_zones.mjs      # persistance posée comme une zone d'une case ; Distance réservée (polyvalente, distance, magie, soin) ; arme qui bloque des techniques : alerte, grisées, retirées du deck
 node tableaux_nico.mjs        # les cellules rouges des deux tableaux : brûlure 8 % PV max physique, poison 10 % énergie + 8 % PV magique, Contre/Absorption jusqu'à 30 %, armes et effets bonus
 node hoplite.mjs              # la classe Hoplite : +5 parade / +5 déf. physique, Mur de bouclier (+60 % parade, une fois), Rempart (coups partagés en deux avec l'allié adjacent, 3 manches), section « Techniques de classe » de la fiche
+node assassin.mjs             # la classe Assassin : Instinct du tueur (+15 critique 2 manches sur tout KO), Assaut mortel (zone de 2 au contact, 10 phys + poison même esquivé), Maître des poisons (18 % énergie + 10 % PV par manche, 2 manches)
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -3925,3 +3926,49 @@ s'étale pas ; les états posés à côté se paient toujours plein pot.
 
 `initiative_hors_effets.mjs` vérifie : Soin ×2 = 4 PC, étalé 4/1,2 ;
 étalé avec Brûlé ×2 : 4/1,2 + 2.
+
+## La classe Assassin (version 158)
+
+**Paliers** (app.js `ATOUTS_CLASSES`, classes.js `DESCRIPTIFS_CLASSES`).
+- Niveau 1 : **Instinct du tueur** (`critiqueSurKO: 15`).
+- Niveau 5 : technique **Assaut mortel**.
+- Niveau 10 : **Maître des poisons** (`maitrePoisons`).
+
+**Instinct du tueur** (combat_etat.js `tomber`, `recompenserLeTueur`). Quand
+l'Assassin met un ennemi KO, il gagne l'état « Instinct du tueur » : +15 de
+critique (`bonusEquip.critique`, lu par `critiqueDe`) pour 2 manches, celle du
+KO et la suivante. Sans cumul : un nouveau KO relance la durée. Tout KO
+compte : ses cartes, l'Assaut mortel, ses attaques d'opportunité, et les tics
+de fin de manche de son poison, de sa brûlure ou de son étalement. Pour ça,
+ces états retiennent qui les a posés (`idSource`, posé par `resoudreCarte` et
+`empilerEtalement`), et `infligerTic` (cerveau_combat.js) le passe à `tomber`.
+Un KO au tic arrive juste avant que les états vieillissent : l'état y naît
+avec une manche de plus, pour valoir encore les 2 manches qui viennent. Un
+allié abattu ou une illusion ne comptent pas.
+
+**Maître des poisons** (moteur_pur.js `POISON_MAITRE`, cerveau_combat.js
+`ticsDeFinDeManche`). Le poison posé par un Assassin de niveau 10 porte
+`maitre: true` et dure 2 manches. Il remplace le poison ordinaire (10 % de
+l'énergie max + 8 % des PV max, une seule fois) : 18 % de l'énergie max et
+10 % des PV max à CHAQUE fin de manche, les 2 manches. La part des PV reste
+des dégâts magiques (défense magique, absorption, bouclier). Il vaut pour tous
+ses empoisonnements, cartes forgées et Assaut mortel.
+
+**Assaut mortel** (technique `CLASSE_ASSAUT_MORTEL` : initiative 100, fatigue
+0, une fois par combat). Il se vise comme une zone de deux cases au contact,
+qu'on fait tourner autour de l'Assassin (`demarrerCiblage`, moteur_effets.js).
+À la validation (`validerZoneAoE`), seuls les ennemis de la zone partent au
+cerveau, en intention `classe` avec `cibles` ; une zone vide le dit et reste
+ouverte. Le cerveau vérifie : un ou deux ennemis debout, au contact, côte à
+côte s'ils sont deux. Puis il fabrique lui-même l'attaque à partir des seules
+cibles (`actionAssautMortel`) : 10 dégâts physiques à chacun (esquive,
+parade, armure et critique comme un coup ordinaire) et l'empoisonnement à
+coup sûr, même sur une cible qui a esquivé (`malgreEsquive`). Des dégâts
+trafiqués envoyés par un poste sont ignorés.
+
+`assassin.mjs` vérifie les paliers, l'Instinct (coup, poison, étalement,
+opportunité, durée, sans cumul, ni allié ni autre héros), le poison du maître
+(chiffres, 2 morsures, défense magique, niveau 9 ordinaire), l'Assaut mortel
+(validation, dégâts, poison malgré l'esquive, armure, niveau 10, rejeu), la
+demande envoyée avec ses cibles, le ciblage de zone dans la vraie page, la
+fiche perso et le descriptif.

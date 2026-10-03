@@ -42,8 +42,8 @@ import { clonerEtat, combattant, creerDes, combattantIllusion,
 import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissiperConfusion,
          traverserZones, creerZonePure, poserZone, vieillirZones,
          chaineDeDegats, REGLES_ETATS, estDansLeNoir,
-         partageTenebres, ETAT_TENEBRES_ETALEES, POISON,
-         resoudreTechniqueClasse } from './moteur_pur.js';
+         partageTenebres, ETAT_TENEBRES_ETALEES, POISON, POISON_MAITRE,
+         resoudreTechniqueClasse, actionAssautMortel } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche } from './ia_pure.js';
@@ -235,6 +235,22 @@ export function validerIntention(etat, intention) {
             if (allie.aTerre || allie.estIllusion || allie.camp !== acteur.camp) return refus("Rempart : allié invalide");
             if (distance(acteur, allie) > 1) return refus("Rempart : l'allié doit être adjacent");
         }
+        // L'Assaut mortel : un ou deux ennemis debout, au contact, et côte à
+        // côte s'ils sont deux — la zone de deux cases qui tourne autour de lui.
+        if (idCarte === "CLASSE_ASSAUT_MORTEL") {
+            const cibles = Array.isArray(intention.cibles) ? [...new Set(intention.cibles)] : [];
+            if (cibles.length < 1 || cibles.length > 2) return refus("Assaut mortel : un ou deux ennemis");
+            for (const idCible of cibles) {
+                const ennemi = combattant(etat, idCible);
+                if (!ennemi || ennemi.aTerre || ennemi.estIllusion || ennemi.camp === acteur.camp) {
+                    return refus(`Assaut mortel : ${idCible} n'est pas un ennemi valable`);
+                }
+                if (distance(acteur, ennemi) !== 1) return refus("Assaut mortel : l'ennemi doit être au contact");
+            }
+            if (cibles.length === 2 && distance(combattant(etat, cibles[0]), combattant(etat, cibles[1])) !== 1) {
+                return refus("Assaut mortel : les deux cases de la zone se touchent");
+            }
+        }
     }
 
     if (intention.type === "carte") {
@@ -421,11 +437,16 @@ export function ticsDeFinDeManche(etat) {
         //  frappait 15 d'énergie fixes et 8 % des PV droit dans la vie.
         //  `tickFait` reste sur l'état : il voyage avec lui dans l'étape de
         //  vieillissement qui suit, donc le poison ne mord pas deux fois.
-        const poison = c.etats.find(e => e && e.nom === "Empoisonnement" && !e.tickFait);
+        //  LE POISON DU MAÎTRE (Assassin, niveau 10) mord, lui, à CHAQUE fin
+        //  de manche tant qu'il dure (2 manches) : 18 % de l'énergie max et
+        //  10 % des PV max (POISON_MAITRE). Le KO qu'il fait revient à
+        //  l'Assassin (`idSource`, l'Instinct du tueur).
+        const poison = c.etats.find(e => e && e.nom === "Empoisonnement" && (e.maitre ? nombre(e.duree) > 0 : !e.tickFait));
         if (poison) {
             poison.tickFait = true;
+            const regle = poison.maitre ? POISON_MAITRE : POISON;
 
-            const energie = Math.ceil(nombre(c.fatigueMax) * (POISON.energiePct / 100));
+            const energie = Math.ceil(nombre(c.fatigueMax) * (regle.energiePct / 100));
             const fatigueApres = Math.max(0, nombre(c.fatigue) - energie);
             if (fatigueApres !== nombre(c.fatigue)) {
                 c.fatigue = fatigueApres;
@@ -433,10 +454,10 @@ export function ticsDeFinDeManche(etat) {
                               tic: "Empoisonnement" });
             }
 
-            const morsure = Math.ceil(nombre(c.pvMax) * (POISON.pvMaxPct / 100));
+            const morsure = Math.ceil(nombre(c.pvMax) * (regle.pvMaxPct / 100));
             if (morsure > 0) {
-                const compte = chaineDeDegats(c, { valeurBrute: morsure, typeRes: POISON.typeRes }, {});
-                if (compte.degats > 0) etapes.push(...infligerTic(c, id, compte.degats, "Empoisonnement", etat));
+                const compte = chaineDeDegats(c, { valeurBrute: morsure, typeRes: regle.typeRes }, {});
+                if (compte.degats > 0) etapes.push(...infligerTic(c, id, compte.degats, "Empoisonnement", etat, poison.idSource));
             }
         }
 
@@ -452,7 +473,7 @@ export function ticsDeFinDeManche(etat) {
             const brut = Math.ceil(nombre(c.pvMax) * (nombre(regle.pvMaxParTour) / 100));
             const compte = chaineDeDegats(c, { valeurBrute: brut, typeRes: regle.typeParTour || "Physique" }, {});
             if (compte.degats > 0) {
-                etapes.push(...infligerTic(c, id, compte.degats, "Brûlure", etat));
+                etapes.push(...infligerTic(c, id, compte.degats, "Brûlure", etat, brulure.idSource));
             }
         }
 
@@ -473,7 +494,7 @@ export function ticsDeFinDeManche(etat) {
                 montant = nombre(etalement.degatsDifferes !== undefined
                                  ? etalement.degatsDifferes : etalement.degatsRestants);
             }
-            if (montant > 0) etapes.push(...infligerTic(c, id, montant, "Étalement", etat));
+            if (montant > 0) etapes.push(...infligerTic(c, id, montant, "Étalement", etat, etalement.idSource));
         }
 
         // --- TÉNÈBRES ÉTALÉES : la même part, selon la règle de Ténèbres -----
@@ -490,7 +511,7 @@ export function ticsDeFinDeManche(etat) {
                                   tenebres: true, montant: partage.surEnergie,
                                   tic: ETAT_TENEBRES_ETALEES });
                 }
-                if (partage.surplus > 0) etapes.push(...infligerTic(c, id, partage.surplus, ETAT_TENEBRES_ETALEES, etat));
+                if (partage.surplus > 0) etapes.push(...infligerTic(c, id, partage.surplus, ETAT_TENEBRES_ETALEES, etat, tenebres.idSource));
             }
         }
 
@@ -518,7 +539,8 @@ export function ticsDeFinDeManche(etat) {
 // ensuite, et la chute si la vie tombe à zéro. Trois états s'en servent (la
 // brûlure, l'étalement, et demain ce qu'on ajoutera) — l'écrire une fois
 // évite qu'ils divergent.
-function infligerTic(c, id, montant, nomDuTic, etat) {
+//  `idSource` : qui a posé l'état — le KO lui revient (Instinct du tueur).
+function infligerTic(c, id, montant, nomDuTic, etat, idSource) {
     const etapes = [];
     if (enSursis(c)) return etapes;             // en sursis : les coups sont ignorés
     const bouclierAvant = nombre(c.bouclier);
@@ -532,7 +554,7 @@ function infligerTic(c, id, montant, nomDuTic, etat) {
         c.pv = pvApres;
         etapes.push({ type: "degats", cible: id, montant, pvApres,
                       bouclierApres: 0, tic: nomDuTic });
-        etapes.push(...tomber(etat, id, id));
+        etapes.push(...tomber(etat, id, idSource || id, { finDeManche: true }));
     }
     return etapes;
 }
@@ -778,10 +800,21 @@ export function appliquerIntention(etat, intention, plateau) {
     // UNE TECHNIQUE DE CLASSE : son effet, puis la fin du tour — comme une
     // carte, elle occupe le tour du héros.
     if (intention.type === "classe") {
+        const cibles = Array.isArray(intention.cibles) ? [...new Set(intention.cibles)] : undefined;
         const r = resoudreTechniqueClasse(etat, { idLanceur: intention.acteur, idCarte: intention.idCarte,
-                                                  cible: intention.cible });
-        const suivant = clonerEtat(r.etat);
+                                                  cible: intention.cible, cibles });
+        let suivant = clonerEtat(r.etat);
         const etapes = [...r.etapes];
+        // L'ASSAUT MORTEL se joue comme une carte : les dés ici, chez le
+        // cerveau (critique, esquive des deux cibles), puis la résolution.
+        if (intention.idCarte === "CLASSE_ASSAUT_MORTEL") {
+            const action = actionAssautMortel(intention.acteur, cibles);
+            action.critique = tirerCritique(suivant, intention.acteur, des);
+            action.jets = tirerDesCarte(suivant, action, intention.acteur, action.critique, des);
+            const rc = resoudreCarte(suivant, action, plateau);
+            suivant = clonerEtat(rc.etat);
+            etapes.push(...rc.etapes);
+        }
         const clot = cloturerTour(suivant);
         if (clot) etapes.push(...clot.etapes);
         return fabriquerPas(etat, suivant, etapes, intention.id, intention.acteur, des);

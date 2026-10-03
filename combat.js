@@ -2869,6 +2869,7 @@ window.COULEUR_ETAT = {
     "Repli":          "#78909c",   // gris bleuté — le pas de recul défensif
     "Ténèbres étalées": "#7e57c2", // violet — l'énergie bue peu à peu
     "Mur de bouclier": "#c9a24a",  // bronze — l'Hoplite derrière son bouclier
+    "Instinct du tueur": "#c62828",
     "Rempart":        "#e8c46a"    // or — protégé par un Hoplite à ses côtés
 };
 window.COULEUR_ETAT_DEFAUT = "#9e9e9e";
@@ -4739,6 +4740,12 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
     if (!t) return;
     if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD(true);
 
+    // L'Assaut mortel se vise sur le plateau : une zone de deux cases au
+    // contact, qu'on tourne autour de soi (demarrerCiblage, moteur_effets.js).
+    if (t.cible === "zoneDeux") {
+        if (typeof window.demarrerCiblage === "function") window.demarrerCiblage(idCarte, { idLanceur });
+        return;
+    }
     if (t.cible !== "allieAdjacent") return demande.techniqueClasse(idLanceur, idCarte);
 
     const lanceur = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
