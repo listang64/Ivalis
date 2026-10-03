@@ -160,6 +160,7 @@ node hoplite.mjs              # la classe Hoplite : +5 parade / +5 déf. physiqu
 node assassin.mjs             # la classe Assassin : Instinct du tueur (+15 critique 2 manches sur tout KO), Assaut mortel (zone de 2 au contact, 10 phys + poison même esquivé), Maître des poisons (18 % énergie + 10 % PV par manche, 2 manches)
 node medicus.mjs              # la classe Médicus : +5 % régénération de fatigue et +1 compétence, Soin d'urgence (12 PV à tous les alliés), Prise en charge (relève un allié KO adjacent à 30 %, repousse les ennemis), fantômes des alliés KO pour le seul Médicus
 node chasseur_de_mages.mjs    # la classe Chasseur de mages : +10 % résistance magique, effet Lumière (ignore la défense magique, 15 %/cran, max 60 %), sorts de lumière qui aveuglent la cible et les ennemis adjacents (30 %)
+node tenues_variees.mjs        # les skins d'armure : 34 tenues antiques par type tirées au sort (+ 16 palettes), sans répétition, envoyées à MIA et au dessinateur ; le gris est simple mais propre
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4057,3 +4058,34 @@ ennemis voisins, pas l'allié, jet raté, esquive, immunité, niveau 9), la Forg
 (classe, niveau, menus, compatibilité, extraction, plafond) et le descriptif.
 `migration_effets.mjs` vérifie que les boutons sont partis et que la copie
 locale ne remplace jamais la base.
+
+## Des tenues variées pour les skins d'armure (version 161)
+
+L'IA d'images dessinait toujours la même « tunique de lin » et la même
+« cuirasse de bronze ». Avant chaque illustration, une tenue est maintenant
+tirée au sort pour chaque armure (variations_tenues.js) :
+
+- **Les listes** (`VARIATIONS_TENUES`) : 34 tenues par type d'armure (légère,
+  intermédiaire, lourde), écrites à la main. On y trouve la Grèce et Rome, la
+  Perse, l'Égypte, les steppes scythes et sarmates, les Étrusques, les
+  Phéniciens, Carthage, Babylone, les Hittites, les Gaulois… et l'Antiquité
+  fantastique (Atlantide, Tartare, champions d'Héphaïstos ou de Poséidon).
+  Chacune décrit une tenue complète : culture, coupe, pièces, ornements.
+  Aucune ne porte de casque ni de coiffe (l'équipement de départ garde le
+  visage découvert) ni de pièce médiévale.
+- **Les palettes** (`PALETTES_TENUES`) : 16 accords de couleurs, tirés en plus
+  de la tenue, pour que la même tenue ne revienne jamais sous les mêmes teintes.
+- **Le tirage** (`tirerVariationsTenues`) : jamais deux fois la même tenue dans
+  un lot ; les 12 dernières tirées sur l'appareil, par type, passent leur tour
+  (`localStorage`, sans risque s'il est indisponible). Une armure qui a déjà
+  sa tenue la garde ; les armes n'en reçoivent pas.
+- **L'envoi** (objets_ia.js) : `illustrerLesObjets` tire les tenues avant tout.
+  La tenue part à MIA_Objets (`variation_imposee`, qu'elle doit suivre
+  fidèlement) et directement au dessinateur (« DIRECTION ARTISTIQUE DE CETTE
+  TENUE »), même si MIA n'a rien pu décrire.
+- **Le gris (Commun)** : une armure commune est simple et sobre, mais propre,
+  entière et bien entretenue, jamais déchirée, rapiécée ni miteuse. C'est dit
+  à MIA (qui écrivait « simple, usé ») et au dessinateur.
+
+Ça vaut pour le butin, l'équipement de départ et toute armure illustrée.
+`tenues_variees.mjs` vérifie les listes, le tirage et ce qui part aux deux IA.

@@ -112,7 +112,10 @@ window.decrireObjetsAvecMIA = async function(objets, options) {
         type: o.type || "",
         rarete: o.rarete || "Commun",
         deux_mains: !!o.deuxMains,
-        pouvoirs: o.effetTexte || ""
+        pouvoirs: o.effetTexte || "",
+        // La tenue tirée au sort pour cette armure (variations_tenues.js).
+        ...(o.variationTenue && typeof window.texteVariationTenue === "function"
+            ? { variation_imposee: window.texteVariationTenue(o.variationTenue) } : {})
     }));
 
     const promptSysteme = `Tu es MIA_Objets, l'armurière visionnaire d'Ivalis.
@@ -122,7 +125,9 @@ Pour les armures et vêtements : linothorax, cuirasse musclée, lorica, spolas, 
 UNE ARMURE EST UNE TENUE COMPLÈTE, jamais une pièce isolée : décris le vêtement de dessous, la protection, la ceinture, les ptéruges et les protections de bras et de jambes qui l'accompagnent. Quelqu'un doit pouvoir s'habiller entièrement avec ce que tu décris.
 Pour CHACUN, tu écris une description PUREMENT VISUELLE, destinée à un illustrateur qui ne connaît rien du jeu.
 Décris : la forme et les proportions exactes, les matières (bois, bronze, fer, cuir, os, pierre, tissu), les ornements et gravures, l'usure, les couleurs dominantes.
-La rareté doit se VOIR : un objet commun est simple, usé, sans fioriture ; un objet légendaire ou épique porte des matériaux nobles, des gravures fines et une lueur magique discrète.
+La rareté doit se VOIR : un objet commun est simple et sans fioriture ; un objet légendaire ou épique porte des matériaux nobles, des gravures fines et une lueur magique discrète.
+UNE ARMURE COMMUNE N'EST PAS UNE GUENILLE : simple et sobre, mais propre, entière et bien entretenue. Jamais déchirée, rapiécée, trouée, effilochée, tachée ni miteuse.
+QUAND UNE ARMURE PORTE UNE « variation_imposee », c'est la direction artistique de sa tenue, tirée au sort pour qu'aucune ne ressemble à une autre : suis-la fidèlement (culture, coupe, pièces, ornements et couleurs), en gardant la qualité que dit la rareté. Le nom de l'objet n'est qu'une étiquette : c'est la variation qui décide de l'allure.
 Si l'objet a des pouvoirs, fais-les transparaître dans la matière (runes, veines lumineuses, givre, braise) — jamais par du texte écrit sur l'objet.
 Ne décris JAMAIS de personne, de main, de mannequin, de décor ni de fond : uniquement l'objet lui-même.
 Deux objets du même nom doivent être visiblement différents l'un de l'autre.
@@ -232,6 +237,16 @@ window.promptImageObjet = function(objet, description, style, options) {
     //  modèle d'image répond par une photo. On exige au minimum une illustration
     //  dessinée, en nommant explicitement ce qui est proscrit.
     const styleDemande = String(style || "").trim();
+    // LA TENUE TIRÉE AU SORT (variations_tenues.js) : elle décide de l'allure
+    // de l'armure, et elle part ici même si MIA n'a rien pu décrire.
+    const variation = estArmure && objet.variationTenue && typeof window.texteVariationTenue === "function"
+        ? window.texteVariationTenue(objet.variationTenue) : "";
+    // Le gris (Commun) : simple, jamais pouilleux.
+    const qualiteCommune = estArmure && (objet.rarete || "Commun") === "Commun"
+        ? "QUALITÉ COMMUNE : une tenue simple et sobre, sans ornement précieux, mais propre, entière et bien "
+        + "entretenue — jamais déchirée, rapiécée, trouée, effilochée, tachée ni miteuse.\n"
+        : "";
+
     let prompt = "DIRECTIVE DE STYLE VISUEL OBLIGATOIRE (elle prime sur tout le reste du prompt) : "
         + (styleDemande || "illustration peinte à la main, planche d'artiste, matières traitées au pinceau")
         + "\n"
@@ -243,7 +258,9 @@ window.promptImageObjet = function(objet, description, style, options) {
     prompt += `Il s'agit de : ${objet.nom}`;
     if (objet.rarete) prompt += ` (qualité ${objet.rarete})`;
     prompt += ".\n";
+    if (variation) prompt += "DIRECTION ARTISTIQUE DE CETTE TENUE (tirée au sort, à respecter) : " + variation + "\n";
     if (description) prompt += description + "\n";
+    prompt += qualiteCommune;
     prompt += "\n";
 
     prompt += "🛑 RÈGLE DE COMPOSITION (prioritaire sur la description de l'objet, jamais sur le style) : " + miseEnScene + ancrageAntique + " "
@@ -384,6 +401,8 @@ window.illustrerLesObjets = async function(objets, surImage, options) {
     if (!window.peutIllustrerLesObjets()) return 0;
 
     const style = await window.styleGraphiqueIvalis();
+    // Chaque armure reçoit sa tenue tirée au sort avant d'être décrite.
+    if (typeof window.tirerVariationsTenues === "function") window.tirerVariationsTenues(objets);
     const descriptions = await window.decrireObjetsAvecMIA(objets, options);
 
     let reussies = 0;

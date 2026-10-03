@@ -1974,7 +1974,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=72"></script>
+<script src="trace_combat.js?v=73"></script>
 <!-- LA MISE À JOUR AUTOMATIQUE. Juste après la trace, parce qu'elle a besoin du
      numéro de version qu'elle y trouve, et avant tout le reste : si la page est
      périmée, autant s'en apercevoir avant d'avoir chargé le jeu entier.
@@ -2026,7 +2026,8 @@
 <script type="module" src="monstres_ia.js?v=34"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=13"></script>
-<script type="module" src="objets_ia.js?v=11"></script>
+<script src="variations_tenues.js?v=1"></script>
+<script type="module" src="objets_ia.js?v=12"></script>
 <script type="module" src="loot.js?v=20"></script>
 
 <!-- ============================================================= -->
