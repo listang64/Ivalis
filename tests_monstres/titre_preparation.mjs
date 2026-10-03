@@ -152,7 +152,8 @@ const lireTitre = () => p.evaluate(() => {
     zPiste: parseInt(getComputedStyle(piste).zIndex),
     flou: getComputedStyle(fond).backdropFilter || getComputedStyle(fond).webkitBackdropFilter,
     rectZone: zone.getBoundingClientRect(),
-    rectPiste: piste.getBoundingClientRect()
+    rectPiste: piste.getBoundingClientRect(),
+    hauteur: window.innerHeight
   };
 });
 
@@ -228,7 +229,7 @@ await p.waitForTimeout(450);
 }
 
 // =========================================================================
-console.log("\n7. LE TITRE EST DEVANT LA PISTE, SUR UN FOND FLOUTÉ");
+console.log("\n7. LE TITRE EST EN BAS DE LA FENÊTRE, SUR UN FOND FLOUTÉ");
 // =========================================================================
 await preparation({ Combattants_Hors_Jeu: [], Ont_Joue_Ce_Round: [] });
 await p.waitForTimeout(450);
@@ -238,11 +239,12 @@ await p.waitForTimeout(450);
            `titre ${t.zZone} / piste ${t.zPiste}`);
   verifier("son fond est flouté (backdrop-filter posé)",
            !!t.flou && t.flou !== "none", String(t.flou));
-  // « masquer PARTIELLEMENT » : il recouvre le haut de la piste, sans forcément
-  // en recouvrir toute la largeur ni toute la hauteur.
-  verifier("il commence à la même hauteur que la piste (recouvre son sommet)",
-           Math.abs(t.rectZone.top - t.rectPiste.top) < 2,
-           `titre ${Math.round(t.rectZone.top)} / piste ${Math.round(t.rectPiste.top)}`);
+  // Demande de Nico : il ne recouvre plus la piste d'initiative, il descend en
+  // bas de la fenêtre.
+  verifier("il est en bas de la fenêtre, sous la piste (sans la recouvrir)",
+           t.rectZone.top > t.rectPiste.bottom && t.rectZone.bottom > t.hauteur - 60,
+           `titre ${Math.round(t.rectZone.top)}–${Math.round(t.rectZone.bottom)} / piste jusqu'à ${Math.round(t.rectPiste.bottom)} / fenêtre ${t.hauteur}`);
+  await p.screenshot({ path: "/tmp/claude-0/titre_preparation.png" });
 }
 
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

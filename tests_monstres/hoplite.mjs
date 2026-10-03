@@ -357,6 +357,14 @@ console.log("\n6. EN COMBAT : LES BANNIÈRES, LE CHOIX, LE LANCEMENT");
     const murGrise = ban("CLASSE_MUR_BOUCLIER").classList.contains("banniere-epuisee");
     const rempartLibre = !ban("CLASSE_REMPART").classList.contains("banniere-epuisee");
     const ordre = [...document.querySelectorAll("#combat-liste-competences .banniere-carte-combat")].map(x => x.dataset.cardId);
+    // Le Rempart est joué PENDANT que le volet est ouvert : la fiche le dit,
+    // le rafraîchissement doit le griser sans redessiner le volet.
+    window.PERSOS_PARTIE[0].techniquesUtilisees = ["CLASSE_MUR_BOUCLIER", "CLASSE_REMPART"];
+    window.actualiserBannieresEpuisees();
+    const rempartGriseApres = ban("CLASSE_REMPART").classList.contains("banniere-epuisee");
+    window.PERSOS_PARTIE[0].techniquesUtilisees = ["CLASSE_MUR_BOUCLIER"];
+    window.actualiserBannieresEpuisees();
+    const rempartRendu = !ban("CLASSE_REMPART").classList.contains("banniere-epuisee");
     const look = (id) => { const b = ban(id); const nom = b.querySelector(".texte-nom-banniere");
         return { cadre: document.getElementById("cadre-combat-" + id).style.backgroundImage, couleur: nom.style.color, nom: nom.textContent }; };
     const lookJoueur = look("C1"), lookRempart = look("CLASSE_REMPART");
@@ -380,12 +388,13 @@ console.log("\n6. EN COMBAT : LES BANNIÈRES, LE CHOIX, LE LANCEMENT");
     const visible = getComputedStyle(fen).display !== "none";
     fen.querySelector(".choix-rempart-allie").click();
     window.lancerTechniqueClasse("CLASSE_MUR_BOUCLIER", "H1");
-    return { lookJoueur, lookRempart, bannieres, murGrise, rempartLibre, ordre, refusMur, file, proposes, visible, demandes,
+    return { rempartGriseApres, rempartRendu, lookJoueur, lookRempart, bannieres, murGrise, rempartLibre, ordre, refusMur, file, proposes, visible, demandes,
              donnees: window.donneesCarteCombattant("H1", "CLASSE_REMPART").Nom };
   });
   verifier("le volet montre le deck, puis les deux techniques, puis le repos long",
            !r.erreur && JSON.stringify(r.ordre) === '["C1","CLASSE_MUR_BOUCLIER","CLASSE_REMPART","REPOS_LONG"]', JSON.stringify(r.ordre || r.erreur));
   verifier("Mur de bouclier déjà joué : grisé ; Rempart : libre", r.murGrise && r.rempartLibre);
+  verifier("joué pendant que le volet est ouvert : grisé au rafraîchissement", r.rempartGriseApres && r.rempartRendu);
   verifier("en combat, même bannière que les techniques du joueur (cadre, couleur, nom nu)",
            r.lookRempart && r.lookRempart.cadre === r.lookJoueur.cadre && r.lookRempart.couleur === r.lookJoueur.couleur
            && r.lookRempart.nom === "Rempart", JSON.stringify([r.lookJoueur, r.lookRempart]));

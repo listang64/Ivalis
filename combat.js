@@ -5385,7 +5385,14 @@ window.actualiserBannieresEpuisees = function() {
         if (dataCarte) {
             const coutFatigue = parseInt(dataCarte.Fatigue) || 0;
             const cadre = document.getElementById(`cadre-combat-${idCarte}`);
-            
+
+            // UNE TECHNIQUE DE CLASSE SE RELIT À CHAQUE FOIS, d'après la fiche
+            // du héros (techniquesUtilisees, posée par le cerveau) : jouée
+            // pendant que le volet était déjà dessiné, elle restait colorée.
+            if (ban.classList.contains("banniere-technique-classe") && typeof window.techniqueClasseUtilisee === "function") {
+                ban.dataset.techniqueUtilisee = String(window.techniqueClasseUtilisee(persoActuel, idCarte));
+            }
+
             // Une technique de classe déjà jouée reste grisée, quel que soit le coût.
             if (coutFatigue > fatiguePerso || ban.dataset.techniqueUtilisee === "true") {
                 ban.classList.add("banniere-epuisee");

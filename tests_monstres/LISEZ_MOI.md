@@ -161,6 +161,7 @@ node assassin.mjs             # la classe Assassin : Instinct du tueur (+15 crit
 node medicus.mjs              # la classe Médicus : +5 % régénération de fatigue et +1 compétence, Soin d'urgence (12 PV à tous les alliés), Prise en charge (relève un allié KO adjacent à 30 %, repousse les ennemis), fantômes des alliés KO pour le seul Médicus
 node chasseur_de_mages.mjs    # la classe Chasseur de mages : +10 % résistance magique, effet Lumière (ignore la défense magique, 15 %/cran, max 60 %), sorts de lumière qui aveuglent la cible et les ennemis adjacents (30 %)
 node tenues_variees.mjs        # les skins d'armure : 34 tenues antiques par type tirées au sort (+ 16 palettes), sans répétition, envoyées à MIA et au dessinateur ; le gris est simple mais propre
+node versions_modules.mjs      # la carte des imports : chaque module du moteur chargé une seule fois, à la version de sa balise (fin du moteur périmé après un déploiement)
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4089,3 +4090,37 @@ tirée au sort pour chaque armure (variations_tenues.js) :
 
 Ça vaut pour le butin, l'équipement de départ et toute armure illustrée.
 `tenues_variees.mjs` vérifie les listes, le tirage et ce qui part aux deux IA.
+
+## Le moteur périmé après un déploiement : la carte des imports (version 162)
+
+**Le symptôme.** « Assaut mortel n'a rien fait du tout », « Soin d'urgence non
+plus ». La trace montrait la technique acceptée par le cerveau et notée comme
+jouée, puis… rien : 2 étapes (la technique, la fin du tour), là où le moteur
+actuel en produit une dizaine.
+
+**La cause.** index.html charge `regime_cerveau.js?v=33`, mais celui-ci
+importe `./cerveau_combat.js`, qui importe `./moteur_pur.js`, etc. SANS numéro
+de version. Le navigateur chargeait donc chaque module du moteur DEUX fois :
+une fois par sa balise (`?v=`), une fois par l'import (sans `?v=`), et c'est
+le second exemplaire que le cerveau utilisait. Cette adresse sans version
+restait en cache après un déploiement. Comme la page se recharge toute seule
+dès qu'une version sort (mise_a_jour.js), on obtenait l'interface neuve avec
+un moteur ancien : des techniques connues de l'interface mais pas du moteur.
+C'est aussi un candidat sérieux pour « sur PC ça bloque, sur iPad non ».
+
+**La correction.** Une carte des imports (`<script type="importmap">`, dans
+index.html, avant tout module) renvoie chaque import interne vers la même
+adresse versionnée que sa balise `<script>`. Un seul exemplaire de chaque
+module, toujours à jour. **À chaque montée de `?v=` d'un module du moteur,
+monter aussi son entrée dans la carte** : `versions_modules.mjs` vérifie
+qu'elles sont identiques, que tout import interne y figure, et, dans la vraie
+page, qu'aucun module n'est demandé sans `?v=` ni chargé deux fois.
+
+**Aussi dans cette version.**
+- Une technique de classe jouée se grise dans le volet même s'il était déjà
+  ouvert : `actualiserBannieresEpuisees` (combat.js) relit
+  `techniquesUtilisees` sur la fiche à chaque rafraîchissement, au lieu de
+  ne le lire qu'au dessin du volet.
+- Le bandeau « Sélectionner une compétence / En attente des joueurs » descend
+  en bas de la fenêtre (`bottom: 24px`), il ne couvre plus la piste
+  d'initiative (titre_preparation.mjs).
