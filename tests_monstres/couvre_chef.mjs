@@ -116,10 +116,12 @@ console.log("\n2. CE QUI PART AUX IA, ET CE QUI RESTE SUR L'OBJET (objets_ia.js)
     const avec = w.promptAvatarArmure({ ...a, casquePorte: true });
     const sans = w.promptAvatarArmure({ ...a, casquePorte: false });
     const rien = w.promptAvatarArmure({ nom: "Tunique" });
+    const ancienne = w.promptAvatarArmure({ nom: "Vieille cuirasse", casquePorte: true });
     verifier("portrait, couvre-chef choisi : il le porte, visage visible", avec.startsWith(w.PROMPT_AVATAR_ARMURE)
              && /PORTE sur la tête/.test(avec) && avec.includes(a.casque.nom) && /reconnaissable/.test(avec));
     verifier("portrait, tête nue choisie : il ne le dessine pas", /TÊTE NUE/.test(sans) && /ne le dessine PAS/.test(sans));
-    verifier("armure sans couvre-chef : tête nue", /TÊTE NUE/.test(rien));
+    verifier("armure de départ (aucun choix) : tête nue", /TÊTE NUE/.test(rien));
+    verifier("couvre-chef choisi sur une armure sans couvre-chef enregistré : il le porte", /PORTE sur la tête/.test(ancienne));
 
     // L'image et le couvre-chef rejoignent le butin en base.
     const partie = { Butin: { parPersonnage: { H1: { items: [{ uid: "a1", nom: "Tenue 1" }] } }, pool: [] } };
@@ -172,11 +174,17 @@ console.log("\n3. À L'ÉQUIPEMENT : PORTER LE COUVRE-CHEF, OU RESTER TÊTE NUE"
         await equiper2;
         const sans = (window.__majs || []).slice(-1)[0];
 
+        // Une armure sans couvre-chef enregistré (une ancienne, par exemple) :
+        // la question est posée quand même, son image en montre un.
         window.__majs = [];
-        const avant = suivis.length;
-        await window.equiperObjet("H1", { uid: "a3", nom: "Tunique", emplacement: "Armure", type: "Armure légère" });
+        const equiper3 = window.equiperObjet("H1", { uid: "a3", nom: "Tunique", emplacement: "Armure", type: "Armure légère" });
+        await new Promise(r => setTimeout(r, 100));
         const fen3 = document.getElementById("fenetre-choix-casque");
-        return { vu, avec, sans, suivis, sansCasque: { fenetre: getComputedStyle(fen3).display, suivi: suivis.length - avant } };
+        const vu3 = { visible: getComputedStyle(fen3).display !== "none", texte: fen3.textContent };
+        fen3.querySelector('button[data-choix="non"]').click();
+        await equiper3;
+        await window.equiperObjet("H1", { uid: "e1", nom: "Épée", emplacement: "Main", type: "Arme lourde CAC" }, "Droite");
+        return { vu, avec, sans, suivis, vu3, troisieme: (window.__majs || [])[0], armeFenetre: getComputedStyle(fen3).display };
     });
     // La fenêtre, ouverte, pour la voir.
     await p.evaluate(() => { window.__choix = window.demanderCasque({ nom: "Cuirasse d'Arès",
@@ -200,8 +208,10 @@ console.log("\n3. À L'ÉQUIPEMENT : PORTER LE COUVRE-CHEF, OU RESTER TÊTE NUE"
     verifier("« Avec le couvre-chef » : l'armure équipée le retient",
              r.avec && r.avec.data.Equip_Armure && r.avec.data.Equip_Armure.casquePorte === true, JSON.stringify(r.avec && r.avec.data));
     verifier("« Tête nue » aussi", r.sans && r.sans.data.Equip_Armure.casquePorte === false);
-    verifier("le portrait est redessiné selon le choix", JSON.stringify(r.suivis.slice(0, 2)) === '[["H1",true],["H1",false]]', JSON.stringify(r.suivis));
-    verifier("une armure sans couvre-chef ne demande rien", r.sansCasque.fenetre === "none" && r.sansCasque.suivi === 1);
+    verifier("le portrait est redessiné selon le choix", JSON.stringify(r.suivis) === '[["H1",true],["H1",false],["H1",false]]', JSON.stringify(r.suivis));
+    verifier("une armure sans couvre-chef enregistré : la question est posée quand même",
+             r.vu3.visible && /Tunique/.test(r.vu3.texte) && r.troisieme && r.troisieme.data.Equip_Armure.casquePorte === false, r.vu3.texte.trim().slice(0, 100));
+    verifier("une arme ne demande rien", r.armeFenetre === "none");
     verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
     await b.close();
 }

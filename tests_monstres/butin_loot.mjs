@@ -157,6 +157,8 @@ function creerPoste(idJoueur, { partie, personnages, persos, monstres, difficult
   new Function('window', 'db', 'doc', 'runTransaction', SRC_MODIFIER_PARTIE)(
     w, {}, doc, partie.runTransaction);
   new Function('window', 'db', 'importerFirestore', SRC_VICTOIRE_TEST)(w, {}, importerFirestore);
+  // Personne pour répondre à la fenêtre du couvre-chef d'une armure : tête nue.
+  w.demanderCasque = async () => false;
 
   return { idJoueur, w, elements, ecouteurs };
 }

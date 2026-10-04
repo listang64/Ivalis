@@ -154,6 +154,9 @@ const res = await p.evaluate(({ srcObjets, srcIA, srcLoot }) => {
                        rarete: "Commun", image: "ARME.png", bonus: { degatsPhys: 2 }, etats: [], effets: [] };
 
         // --- Équiper une ARMURE : le héros est rhabillé -------------------
+        // (La fenêtre du couvre-chef répond « tête nue » : couvre_chef.mjs
+        // vérifie la fenêtre elle-même.)
+        window.demanderCasque = async () => false;
         await window.equiperObjet("J1", armure, "Droite");
         await new Promise(r => setTimeout(r, 300));
         const apresArmure = { openai: journal.openai.length, ecritures: [...journal.ecritures] };

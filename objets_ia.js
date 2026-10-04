@@ -603,15 +603,16 @@ window.PROMPT_AVATAR_ARMURE =
 
 // LE COUVRE-CHEF SUR LE PORTRAIT. Le portrait de référence est toujours tête
 // nue (le héros de départ) : c'est le choix fait au moment d'équiper l'armure
-// (`casquePorte`, loot.js) qui dit s'il le porte. Sans couvre-chef, ou s'il a
-// choisi de ne pas le porter, la tête reste nue — même si l'image de l'armure
-// en montre un.
+// (`casquePorte`, loot.js) qui dit s'il le porte. S'il a choisi de ne pas le
+// porter (ou pour l'armure de départ), le prompt exige un portrait SANS
+// couvre-chef — même si l'image de l'armure en montre un.
 window.promptAvatarArmure = function(armure) {
-    const avec = !!(armure && armure.casque && armure.casquePorte);
-    const nom = avec && armure.casque.nom ? ` (${armure.casque.nom})` : "";
+    const avec = !!(armure && armure.casquePorte === true);
+    const nom = avec && armure.casque && armure.casque.nom ? ` (${armure.casque.nom})` : "";
     return window.PROMPT_AVATAR_ARMURE + "\n\n" + (avec
-        ? `COUVRE-CHEF : le personnage PORTE sur la tête le couvre-chef posé avec l'armure dans la seconde image${nom}. `
-          + "S'il couvre le visage, il est relevé sur le front : le visage reste entièrement visible et reconnaissable."
+        ? `COUVRE-CHEF : le personnage PORTE sur la tête le couvre-chef posé avec l'armure dans la seconde image${nom} `
+          + "(casque, chapeau, bandeau ou coiffe). S'il couvre le visage, il est relevé sur le front : le visage reste "
+          + "entièrement visible et reconnaissable."
         : "COUVRE-CHEF : le personnage reste TÊTE NUE, avec la coiffure de la première image. Si la seconde image "
           + "montre un casque, un chapeau ou un autre couvre-chef, ne le dessine PAS sur lui.");
 };

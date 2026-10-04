@@ -289,6 +289,14 @@ const itemPool = (nom) => p.evaluate((nom) =>
 
   await p.click("#btn-valider-butin-partage");
   await p.waitForTimeout(300);
+  // L'armure gagnée demande si l'on porte son couvre-chef (loot.js).
+  const casqueDemande = await p.evaluate(() => {
+    const f = document.getElementById("fenetre-choix-casque");
+    return !!f && getComputedStyle(f).display !== "none";
+  });
+  verifier("l'armure gagnée demande si l'on porte son couvre-chef", casqueDemande);
+  if (casqueDemande) await p.click('#fenetre-choix-casque button[data-choix="non"]');
+  await p.waitForTimeout(300);
   const ecritures = await p.evaluate(() => window.__equipements.map(e => e.maj));
   const couteauEcrit = ecritures.find(m => Object.values(m).some(o => o && o.nom === "Couteau"));
   verifier("gagné, le Couteau part dans la main CHOISIE (gauche)",

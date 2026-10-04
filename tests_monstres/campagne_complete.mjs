@@ -159,6 +159,7 @@ function creerPoste(nom, monde, joueur) {
      "actualiserEncartsEquipement", "positionnerBandeauApparition", "arreterPlacementApparition",
      "verifierPointsApparition", "equiperCompetencesRencontre"].forEach(fn => { w[fn] = () => {}; });
     w.equiperCompetencesRencontre = async () => {};
+    w.demanderCasque = async () => false;   // personne pour répondre : tête nue
     // Appelée avec .catch() par la réinitialisation : elle doit rendre une promesse.
     w.sauvegarderZonesPersistantes = async () => {};
 
@@ -214,6 +215,7 @@ function creerPoste(nom, monde, joueur) {
 
     // Rechargés APRÈS monstres.js, qui redéfinit certains bouchons au passage.
     w.equiperCompetencesRencontre = async () => {};
+    w.demanderCasque = async () => false;   // personne pour répondre : tête nue
     w.dessinerTableauMonstres = () => {};
     w.afficherFenetreButin = () => {};
 

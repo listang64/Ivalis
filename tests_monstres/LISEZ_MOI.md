@@ -4155,3 +4155,14 @@ ajoute à la base les bonus de race ou de classe (atout `caracs`) et
 d'équipement (bonus de même clé : `force`, `dex`…), et le récap affiche
 « dont +N » quand il y en a. Aujourd'hui aucun atout ni objet n'en donne :
 la valeur affichée est la base.
+
+## Le couvre-chef : la question à chaque armure (version 164)
+
+Précision de Nico : chaque armure est dessinée avec son couvre-chef, et la
+question se pose au moment d'équiper, c'est tout. `equiperObjet` (loot.js)
+ouvre donc la fenêtre pour TOUTE armure, même une ancienne sans couvre-chef
+enregistré sur l'objet (le texte devient alors « équiper aussi son
+couvre-chef (casque, chapeau, bandeau…) ? »). Les armes ne demandent rien.
+`promptAvatarArmure` ne regarde plus que le choix (`casquePorte === true`) :
+« Tête nue », ou l'armure de départ qui n'a pas de choix, donne un portrait
+explicitement SANS couvre-chef.

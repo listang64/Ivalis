@@ -220,11 +220,12 @@ window.libelleMain = function(main) {
     return main === "Gauche" ? "Main gauche" : main === "Droite" ? "Main droite" : "";
 };
 
-// LE COUVRE-CHEF D'UNE ARMURE. L'armure du butin vient avec le casque, le
-// chapeau ou la coiffe tiré avec elle (variations_tenues.js) et dessiné sur son
-// image. Au moment de l'équiper, le joueur choisit : le porter sur son portrait,
-// ou rester tête nue (le portrait de référence l'est toujours). Rend une
-// promesse de vrai/faux ; fermer la fenêtre, c'est rester tête nue.
+// LE COUVRE-CHEF D'UNE ARMURE. Chaque armure est dessinée avec son couvre-chef
+// (casque, chapeau ou coiffe, tiré avec la tenue : variations_tenues.js). Au
+// moment d'équiper N'IMPORTE QUELLE armure, le joueur choisit : le porter sur
+// son portrait, ou rester tête nue (le portrait de référence l'est toujours) —
+// et dans ce cas le portrait est dessiné sans couvre-chef. Rend une promesse
+// de vrai/faux.
 window.demanderCasque = function(objet) {
     return new Promise(resoudre => {
         let fenetre = document.getElementById("fenetre-choix-casque");
@@ -237,8 +238,10 @@ window.demanderCasque = function(objet) {
         const echapper = (v) => String(v || "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
         const casque = objet.casque || {};
         fenetre.innerHTML = `
-            <div class="choix-rempart-titre">⛑️ ${echapper(casque.nom || "Couvre-chef")}</div>
-            <div class="choix-rempart-texte">${echapper(objet.nom)} vient avec ce couvre-chef${casque.description ? ` : ${echapper(casque.description)}` : ""}.<br>Le porter sur votre portrait ?</div>
+            <div class="choix-rempart-titre">⛑️ ${echapper(casque.nom || "Le couvre-chef")}</div>
+            <div class="choix-rempart-texte">${casque.nom
+                ? `${echapper(objet.nom)} vient avec ce couvre-chef${casque.description ? ` : ${echapper(casque.description)}` : ""}.`
+                : `${echapper(objet.nom)} : équiper aussi son couvre-chef (casque, chapeau, bandeau…) ?`}<br>Le porter sur votre portrait ?</div>
             <div class="choix-rempart-liste">
                 <button type="button" class="choix-rempart-allie" data-choix="oui">Avec le couvre-chef</button>
                 <button type="button" class="choix-rempart-allie" data-choix="non">Tête nue</button>
@@ -259,7 +262,9 @@ window.demanderCasque = function(objet) {
 window.equiperObjet = async function(idPersonnage, objet, main) {
     // Une armure avec son couvre-chef : le joueur dit s'il le porte, et ce
     // choix part avec l'armure (le portrait la suit, objets_ia.js).
-    if (objet && objet.emplacement === "Armure" && objet.casque && objet.casquePorte === undefined
+    // Toute armure : son image montre son couvre-chef (celle de départ, qui
+    // n'en a pas, n'arrive jamais par ici).
+    if (objet && objet.emplacement === "Armure" && objet.casquePorte === undefined
         && typeof window.demanderCasque === "function") {
         objet = { ...objet, casquePorte: await window.demanderCasque(objet) };
     }
