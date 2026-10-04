@@ -455,6 +455,21 @@ window.gererClicCarte = function(idCarte) {
 const APERCU_CARTE_X = "400px";
 const APERCU_CARTE_X_CACHE = "365px";
 
+// À QUI EST CETTE CARTE ? Son propriétaire dans le cache des compétences s'il
+// est connu ; sinon, sur une fiche ouverte, le personnage de la fiche ; sinon,
+// en combat, le héros affiché. Un propriétaire introuvable rend null : mieux
+// vaut aucune portée d'arme que celle d'un autre.
+window.porteurPourApercu = function(idCarte) {
+    const parId = (id) => id ? ((window.PERSOS_PARTIE || []).find(p => p && p.idPersonnage === id)
+        || (window.COMBAT_PERSOS_JOUEUR || []).find(p => p && p.idPersonnage === id) || null) : null;
+    const proprio = typeof window.proprietaireDeLaCarte === "function" ? window.proprietaireDeLaCarte(idCarte) : null;
+    if (proprio) return parId(proprio);
+    const fiche = document.getElementById("fenetre-fiche-perso");
+    const champ = document.getElementById("champ-id-personnage");
+    if (fiche && fiche.style.display !== "none" && champ && champ.value) return parId(champ.value);
+    return (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO] || null;
+};
+
 window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     let conteneurCarte = document.getElementById("apercu-carte-hd-competence");
     
@@ -571,7 +586,12 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     // Distance alors que la carte porte loin, en ajouter une dans le même
     // format. Une seule ligne, un seul nombre : il n'y a plus la ligne bleue
     // qui annonçait la portée vraie à côté de la ligne qui annonçait l'autre.
-    const lanceurDeLaCarte = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO] || null;
+    // LA PORTÉE QUE L'ARME DONNE EST CELLE DU PROPRIÉTAIRE DE LA CARTE. Elle se
+    // calculait toujours avec le héros de CE poste : un joueur à l'arc voyait
+    // une Distance sur les cartes d'un autre personnage qui n'en ont pas.
+    const lanceurDeLaCarte = typeof window.porteurPourApercu === "function"
+        ? window.porteurPourApercu(idCarte)
+        : ((window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO] || null);
     const porteeVraie = typeof window.distanceAAfficher === "function"
         ? window.distanceAAfficher(data, lanceurDeLaCarte) : null;
     const reecrireDistance = (texte) => (porteeVraie && typeof window.texteDistanceReelle === "function")

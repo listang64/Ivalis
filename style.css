@@ -3918,3 +3918,18 @@ textarea.input-texte-parchemin {
   font-family: 'Cinzel', serif; font-weight: bold; color: #f3dfa6; text-align: center;
   font-size: clamp(13px, 1.6vw, 20px); box-shadow: 0 6px 18px rgba(0,0,0,0.8); pointer-events: none;
 }
+
+/* Les flèches d'une liste qui défile : plus de héros au-dessus / en dessous. */
+.cadre-liste-defilante { position: relative; margin-bottom: 20px; }
+.cadre-liste-defilante > .liste-persos { margin-bottom: 0; }
+.fleche-liste-defilante {
+  position: absolute; left: 50%; transform: translateX(-50%); z-index: 2;
+  display: none; align-items: center; justify-content: center;
+  width: 34px; height: 20px; padding: 0; border: 1px solid #c2a878; border-radius: 10px;
+  background: rgba(92, 58, 33, 0.88); color: #f3dfa6; font-size: 11px; line-height: 1; cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.45);
+}
+.fleche-liste-defilante.visible { display: flex; animation: fleche-liste-pulse 1.6s ease-in-out infinite; }
+.fleche-liste-haut { top: 4px; }
+.fleche-liste-bas { bottom: 4px; }
+@keyframes fleche-liste-pulse { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }

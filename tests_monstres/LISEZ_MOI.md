@@ -171,6 +171,7 @@ node techniques_nouveau_combat.mjs # enchaîner les combats sans recharger : une
 node vampire.mjs              # la classe Vampire : +10 rés. physique, feu aggravé, première case gratuite, Vampirisme (70 % de la carte en soin), Nuée de chauve-souris (esquive ≥ 50 %, 2 manches), interdit aux Vargens
 node tenebres_brut.mjs        # Ténèbres sans armure (×1,5 sur la vie sans énergie) ; le malus de tir seulement sur la cible au contact
 node valeurs_decimales.mjs    # 1,5 par cran : le demi-point compte, arrondi au plus proche (dégâts, soins, boucliers), écrit à la française dans la Forge
+node liste_fleches.mjs         # flèches haut/bas sur une liste de héros qui défile ; la portée de l'arme lue sur le propriétaire de la carte
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4339,3 +4340,17 @@ pas dans la liste. `installerEffetsDeClasse` (app.js) crée dans Combat_Effets
 ceux qui y MANQUENT, avec les champs du jeu ; un effet déjà présent n'est
 jamais réécrit, aucun autre effet n'est touché ; puis le cache de la Forge et
 la liste sont rechargés. bouton_effets_classe.mjs.
+
+## Les flèches des listes, et la portée d'arme du bon personnage (version 176)
+
+- Une liste de héros plus longue que sa fenêtre (`.liste-persos` : liste des
+  héros, choix d'un pion) montre une petite flèche en bas s'il y en a encore en
+  dessous, en haut s'il y en a au-dessus ; un clic fait défiler
+  (`installerFlechesDefilement`, app.js — recalculées au défilement, quand la
+  liste change ou s'affiche, et au redimensionnement).
+- La carte en grand calculait la portée que l'arme donne avec le héros de CE
+  poste : un joueur à l'arc voyait une Distance sur les cartes des autres.
+  `porteurPourApercu` (competences.js) prend le propriétaire de la carte (cache
+  des compétences), sinon le personnage de la fiche ouverte, sinon le héros
+  affiché en combat ; introuvable, aucune portée d'arme.
+liste_fleches.mjs.

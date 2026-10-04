@@ -6555,3 +6555,52 @@ document.addEventListener('gesturechange', function(e) {
 document.addEventListener('gestureend', function(e) {
     e.preventDefault();
 });
+
+
+// =========================================================================
+//  LES FLÈCHES DES LISTES QUI DÉFILENT (liste des héros, choix d'un pion)
+// =========================================================================
+//  Une liste plus longue que sa fenêtre cache des personnages sans le dire. Une
+//  petite flèche en bas dit qu'il y en a encore en dessous, une en haut qu'il y
+//  en a au-dessus ; un clic dessus fait défiler. Elles se recalculent au
+//  défilement, quand la liste change ou s'affiche, et quand l'écran change.
+window.installerFlechesDefilement = function(liste) {
+    if (!liste || liste.dataset.flechesDefilement === "1") return;
+    liste.dataset.flechesDefilement = "1";
+    const cadre = document.createElement("div");
+    cadre.className = "cadre-liste-defilante";
+    liste.parentNode.insertBefore(cadre, liste);
+    cadre.appendChild(liste);
+    const fleche = (sens) => {
+        const f = document.createElement("button");
+        f.type = "button";
+        f.className = "fleche-liste-defilante fleche-liste-" + sens;
+        f.setAttribute("aria-label", sens === "haut" ? "Personnages au-dessus" : "Personnages en dessous");
+        f.innerHTML = sens === "haut" ? "&#9650;" : "&#9660;";
+        f.onclick = (e) => {
+            e.stopPropagation();
+            liste.scrollBy({ top: (sens === "haut" ? -1 : 1) * Math.max(60, liste.clientHeight * 0.7), behavior: "smooth" });
+        };
+        cadre.appendChild(f);
+        return f;
+    };
+    const haut = fleche("haut"), bas = fleche("bas");
+    const maj = () => {
+        const visible = liste.offsetParent !== null && getComputedStyle(liste).display !== "none";
+        const reste = liste.scrollHeight - liste.clientHeight - liste.scrollTop;
+        haut.classList.toggle("visible", visible && liste.scrollTop > 2);
+        bas.classList.toggle("visible", visible && reste > 2);
+    };
+    liste.addEventListener("scroll", maj, { passive: true });
+    window.addEventListener("resize", maj);
+    if (typeof MutationObserver === "function") {
+        new MutationObserver(() => requestAnimationFrame(maj))
+            .observe(liste, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "class"] });
+    }
+    // La fenêtre qui s'ouvre (la liste passe de cachée à visible) : sa taille
+    // change, et c'est ce qu'un ResizeObserver entend.
+    if (typeof ResizeObserver === "function") new ResizeObserver(() => maj()).observe(liste);
+    liste.__majFleches = maj;
+    maj();
+};
+document.querySelectorAll(".liste-persos").forEach(l => window.installerFlechesDefilement(l));
