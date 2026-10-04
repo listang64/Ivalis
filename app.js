@@ -920,7 +920,28 @@ window.ATOUTS_CLASSES = {
         { niveau: 1,  defMagique: 10 },
         { niveau: 5,  effets: ["EFF_LUMIERE"] },
         { niveau: 10, lumiereAveugle: 30 }
+    ],
+    // LE VAMPIRE : +10 de résistance physique, mais le feu le ronge plus fort
+    // (brûlé : -60 % de soins reçus au lieu de -50, 18 % des PV max par manche
+    // au lieu de 8 — brulureAggravee, moteur_pur.js) ; la première case de
+    // chaque tour ne lui coûte rien (premierPasGratuit, mouvement_pur.js).
+    // Vampirisme dans la Forge au niveau 5 (EFF_VAMPIRISME), la Nuée de
+    // chauve-souris au niveau 10. Interdit aux Vargens (CLASSES_INTERDITES).
+    "Vampire": [
+        { niveau: 1,  defPhysique: 10, brulureAggravee: true, premierPasGratuit: true },
+        { niveau: 5,  effets: ["EFF_VAMPIRISME"] },
+        { niveau: 10, techniques: ["CLASSE_NUEE_CHAUVES_SOURIS"] }
     ]
+};
+
+// LES CLASSES QU'UN PEUPLE NE PEUT PAS PRENDRE. La grille les grise (classes.js)
+// et la validation les refuse.
+window.CLASSES_INTERDITES = {
+    "Vargen": ["Vampire"]
+};
+window.classeInterditeA = function(race, nomClasse) {
+    const interdites = window.CLASSES_INTERDITES[race] || [];
+    return interdites.some(n => cleClasse(n) === cleClasse(nomClasse));
 };
 
 // =========================================================================
@@ -955,6 +976,11 @@ window.TECHNIQUES_CLASSE = {
     CLASSE_SOIN_URGENCE: {
         Nom: "Soin d'urgence", classe: "Médicus", niveau: 5, Initiative: 70, Fatigue: 0, cible: "allies",
         desc: "Soigne de 12 PV tous les alliés debout, où qu'ils soient (le Médicus compris). Une fois par combat."
+    },
+    CLASSE_NUEE_CHAUVES_SOURIS: {
+        Nom: "Nuée de chauve-souris", classe: "Vampire", niveau: 10, Initiative: 100, Fatigue: 0, cible: "soi",
+        desc: "Le Vampire se disperse en nuée : son esquive passe à 50 % (elle reste plus haute si elle "
+            + "l'était déjà) pour la manche en cours et la suivante. Une fois par combat."
     },
     CLASSE_PRISE_EN_CHARGE: {
         Nom: "Prise en charge par Médicus", classe: "Médicus", niveau: 10, Initiative: 0, Fatigue: 0, cible: "allieKO",
@@ -1078,6 +1104,8 @@ window.texteAtout = function(cle, valeur) {
         case "critiqueSurKO":  return `Instinct du tueur : ${plus(n)} % de critique pendant 2 manches après un KO`;
         case "maitrePoisons":  return "Maître des poisons : ses poisons mordent à chaque manche (18 % de fatigue, 10 % des PV max), 2 manches";
         case "lumiereAveugle": return `Sorts de lumière : ${n} % d'aveugler la cible et les ennemis adjacents`;
+        case "brulureAggravee": return "Craint le feu : brûlé, -60 % de soins reçus et 18 % des PV max par manche (au lieu de -50 % et 8 %)";
+        case "premierPasGratuit": return "La première case de chaque tour ne coûte aucune fatigue";
         case "caracs":         return Object.keys(valeur || {}).map(k => `${plus(Number(valeur[k]) || 0)} ${NOMS_CARACS_ATOUT[k] || k}`).join(" · ");
         default:               return `${cle} : ${typeof valeur === "object" ? JSON.stringify(valeur) : valeur}`;
     }
@@ -1243,10 +1271,21 @@ window.estEffetTenebres = function(nom) {
     return n.includes("tenebres");
 };
 
+// VAMPIRISME, le sort du Vampire (niveau 5) : des dégâts magiques qui soignent
+// le lanceur de 70 % de ce que la carte inflige. Même règle que Ténèbres : un
+// sort reconnu à son nom, lu ici par la Forge, l'extraction et le moteur.
+window.PART_VAMPIRISME = 70;
+window.estEffetVampirisme = function(nom) {
+    const n = String(nom || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    return n.includes("vampirisme");
+};
+// Un sort de classe à dégâts magiques (Ténèbres, Vampirisme).
+window.estSortDeClasse = (nom) => window.estEffetTenebres(nom) || window.estEffetVampirisme(nom);
+
 window.actionEstMagique = function(nomEffetBase) {
     const n = (nomEffetBase || "").toLowerCase();
     return n.includes("magique") || n.includes("pouvoir") || n.includes("soin")
-        || window.estEffetTenebres(n)
+        || window.estSortDeClasse(n)
         || n.includes("guérison") || n.includes("guerison")
         || n.includes("purification") || n.includes("bouclier");
 };
@@ -4471,7 +4510,18 @@ window.MIGRATION_EFFETS = [
                 Valeur: 0, Pourcent_Base: 15, Pourcent_Max: 60, Tours: 0, Cible_Etat: "lumiere",
                 Classe: "Chasseur de mages", Niveau_Requis: 5,
                 Effet_Base: "15% chance d'ignorer la résistance magique de la cible sur ce sort (Max 60%)",
-                Notes: "Réservé au Chasseur de mages (niveau 5). Seulement sur une action à dégâts magiques. Au niveau 10, un sort de lumière a 30 % de chance d'aveugler sa cible et les ennemis qui la touchent." } }
+                Notes: "Réservé au Chasseur de mages (niveau 5). Seulement sur une action à dégâts magiques. Au niveau 10, un sort de lumière a 30 % de chance d'aveugler sa cible et les ennemis qui la touchent." } },
+    // VAMPIRISME, LE SORT DU VAMPIRE (niveau 5). Une action de base comme
+    // Ténèbres : 1 pt, Intelligence, 1 dégât magique par cran, sans plafond.
+    // La carte qui le porte soigne son lanceur de 70 % de ce qu'elle inflige
+    // aux ennemis (resoudreCarte, moteur_pur.js).
+    { id: "EFF_VAMPIRISME", secoursLocal: true,
+      champs: { Nom: "Vampirisme", Cout_PT: "1", Modificateur: "INTELLIGENCE",
+                Type_Mecanique: "Action/Global", Type_Mecanique_2: "Aucun",
+                Valeur: 1, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Cible_Etat: "vampirisme",
+                Classe: "Vampire", Niveau_Requis: 5,
+                Effet_Base: "1 dégât magique à l'ennemi, et soigne le lanceur de 70 % des dégâts infligés",
+                Notes: "Réservé au Vampire (niveau 5). Pas de plafond : chaque cran ajoute 1 dégât magique. Le soin vaut pour tout ce que la carte inflige aux ennemis (PV et bouclier entamés), arrondi à l'inférieur ; rien sur un coup esquivé. Brûlé, le Vampire n'en tire que 40 %." } }
 ];
 
 // Les effets que le jeu sait jouer même quand la base ne les a pas.

@@ -2941,7 +2941,8 @@ window.COULEUR_ETAT = {
     "Ténèbres étalées": "#7e57c2", // violet — l'énergie bue peu à peu
     "Mur de bouclier": "#c9a24a",  // bronze — l'Hoplite derrière son bouclier
     "Instinct du tueur": "#c62828",
-    "Rempart":        "#e8c46a"    // or — protégé par un Hoplite à ses côtés
+    "Rempart":        "#e8c46a",   // or — protégé par un Hoplite à ses côtés
+    "Nuée de chauve-souris": "#6a1b9a"   // pourpre — le Vampire dispersé en nuée
 };
 window.COULEUR_ETAT_DEFAUT = "#9e9e9e";
 

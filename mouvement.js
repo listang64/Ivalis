@@ -285,6 +285,13 @@ window.ajouterEtapeMouvement = function(q, r) {
             couleur = "#ffd700";
         }
 
+        // Le Vampire : la première case de chacun de ses tours est gratuite
+        // (coutDuPas, mouvement_pur.js — la même règle chez le cerveau).
+        if (numeroCase === 1 && window.atoutRace(persoActuel).premierPasGratuit) {
+            baseCost = 0;
+            couleur = "#ffd700";
+        }
+
         if (window.MOUVEMENT_COUT_TOTAL + baseCost > fatigueDispo) {
             window.afficherMessageFlottantHex(step.q, step.r, "Énergie insuffisante");
             break; 

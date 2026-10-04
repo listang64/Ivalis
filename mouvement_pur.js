@@ -133,6 +133,10 @@ export function trouverChemin(etat, depart, arrivee, plateau, options) {
 
 export function coutDuPas(c, numeroCase, difficile, offerte) {
     if (offerte) return 0;
+    // LE VAMPIRE : la première case de chacun de ses tours ne coûte rien,
+    // quel que soit le sol. Elle compte quand même dans le barème : la
+    // deuxième et la troisième coûtent 2, la quatrième 4.
+    if (numeroCase === 1 && c && c.atouts && c.atouts.premierPasGratuit) return 0;
 
     let cout = numeroCase >= 7 ? 6 : (numeroCase >= 4 ? 4 : 2);
     if (difficile) cout *= 2;

@@ -168,6 +168,7 @@ node intention_confirmee.mjs    # le cerveau joue tout de suite les intentions d
 node jauges_selection.mjs       # le pion sélectionné montre vie et fatigue sous lui ; mon pion les replie en fondu quand il marche
 node assaut_cible_tombee.mjs    # l'Assaut mortel ignore une cible déjà à terre ; un refus du cerveau revient au poste qui a demandé (plus de partie figée)
 node techniques_nouveau_combat.mjs # enchaîner les combats sans recharger : une technique de classe jouée avant redevient disponible
+node vampire.mjs              # la classe Vampire : +10 rés. physique, feu aggravé, première case gratuite, Vampirisme (70 % de la carte en soin), Nuée de chauve-souris (esquive ≥ 50 %, 2 manches), interdit aux Vargens
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4261,3 +4262,34 @@ les fiches en mémoire (`techniquesUtilisees`, fichesDepuisEtat) et y restaient.
   appelé par `regimeFermerLeCombat` (réinitialisation) et à l'ouverture d'une
   nouvelle rencontre.
 techniques_nouveau_combat.mjs le vérifie sur la vraie page.
+
+## La classe Vampire (version 170)
+
+Paliers (ATOUTS_CLASSES["Vampire"], app.js) :
+- **Niveau 1** : `defPhysique: 10` ; `brulureAggravee` — brûlé, il perd
+  -60 % de soins reçus et 18 % de ses PV max par manche au lieu de -50 % et
+  8 % (`BRULURE_AGGRAVEE` ajoutée par `regleDesEtats`, moteur_pur.js ; le tic
+  de fin de manche lit `regleDesEtats(c, "pvMaxParTour")`) ;
+  `premierPasGratuit` — la première case de chacun de ses tours ne coûte rien,
+  même sur sol difficile ou Glacé, et compte dans le barème (`coutDuPas`,
+  mouvement_pur.js ; même règle dans l'aperçu de mouvement.js).
+- **Niveau 5** : l'effet **Vampirisme** (EFF_VAMPIRISME, MIGRATION_EFFETS) —
+  une action de base comme Ténèbres : 1 pt, Intelligence, 1 dégât magique par
+  cran, sans plafond (`estEffetVampirisme`, `estSortDeClasse`). L'attaque
+  extraite porte `vampirisme: 70` ; `resoudreCarte` soigne le lanceur de 70 %
+  (arrondi à l'inférieur) de tout ce que la carte inflige aux ennemis — PV
+  réellement perdus + bouclier entamé, cumulé sur toutes les cibles —, puis
+  applique ses soins reçus (brûlé : -60 %). Rien sur une esquive, ni sur ce
+  que Ténèbres boit en énergie ou ce qu'un étalement remet à plus tard. Étape
+  `soin` marquée `drain`/`vampirisme` (« +N 🩸 »).
+- **Niveau 10** : **Nuée de chauve-souris** (CLASSE_NUEE_CHAUVES_SOURIS, init
+  100, 0 fatigue, sur soi, une fois par combat) : état `Nuée de chauve-souris`
+  (2 manches, `esquiveMin: 50`). `esquiveDe` prend le plus haut de l'esquive
+  calculée et du plancher : plus haute, elle le reste ; malus compris, elle ne
+  descend pas sous 50. État bienfaisant (une purification ne l'enlève pas).
+
+Les Vargens ne peuvent pas être Vampire (`CLASSES_INTERDITES`,
+`classeInterditeA`, app.js) : la carte est grisée dans la grille, un clic le
+dit au lieu d'ouvrir la fiche, la validation le refuse, et un Vampire déjà
+choisi tombe si l'on revient choisir Vargen (`changerRaceSelection`).
+vampire.mjs vérifie le tout.

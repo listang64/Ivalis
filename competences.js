@@ -1038,6 +1038,7 @@ function estUneAttaqueDeBase(nom) {
     const n = nom.toLowerCase();
     return n.includes("attaque magique") || 
            n.includes("ténèbres") || n.includes("tenebres") ||   // Nécromancien
+           n.includes("vampirisme") ||                           // Vampire
            n.includes("attaque légère") || 
            n.includes("attaque legere") || 
            n.includes("attaque lourde") || 
@@ -1153,7 +1154,7 @@ function estIncompatibleAvecArme(nomEffet, arme) {
     
     // Ténèbres suit la règle de l'Attaque Magique : un sort, qui ne se lance
     // pas « sans arme ».
-    const tenebres = typeof window.estEffetTenebres === "function" && window.estEffetTenebres(nom);
+    const tenebres = typeof window.estSortDeClasse === "function" && window.estSortDeClasse(nom);
     if (arme === "Sans arme / Arme rp") {
         if (tenebres || nom.includes("attaque magique") || nom.includes("mot de pouvoir") || nom.includes("mots de pouvoir") || nom.includes("attaque légère") || nom.includes("attaque legere")) return true;
     } else if (arme === "Arme légère CAC") {
@@ -2021,7 +2022,7 @@ window.rafraichirForge = function() {
     const actionADegatsMagiques = (act) => {
         const n = ((act && act.baseEffet && act.baseEffet.Nom) || "").toLowerCase();
         return n.includes("attaque magique") || n.includes("pouvoir")
-            || (typeof window.estEffetTenebres === "function" && window.estEffetTenebres(n));
+            || (typeof window.estSortDeClasse === "function" && window.estSortDeClasse(n));
     };
     const actionAccepteEtalement = (act) => {
         if (!act || !act.baseEffet) return false;

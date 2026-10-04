@@ -144,6 +144,25 @@ window.DESCRIPTIFS_CLASSES = {
                        "Lui seul voit, très pâles, ses alliés tombés sur le plateau"] }
         ]
     },
+    CLASSE_VAMPIRE: {
+        presentation: "Ni tout à fait mort, ni tout à fait vivant, le Vampire se nourrit de ce qu'il "
+            + "arrache à ses proies. Sa peau encaisse les coups, son pas est léger comme une ombre "
+            + "— mais le feu le ronge plus que tout autre. Les Vargens ne peuvent pas l'être.",
+        paliers: [
+            { niveau: 1, titre: "Sang froid",
+              points: ["+10 % de résistance physique",
+                       "La première case de chaque tour ne coûte aucune fatigue",
+                       "Craint le feu : brûlé, -60 % de soins reçus et 18 % de ses PV max par manche"] },
+            { niveau: 5, titre: "Effet de combat : Vampirisme",
+              points: ["Dans la Forge · 1 pt, Intelligence, sans plafond",
+                       "1 dégât magique par cran",
+                       "La carte soigne le Vampire de 70 % de ce qu'elle inflige aux ennemis"] },
+            { niveau: 10, titre: "Technique : Nuée de chauve-souris",
+              points: ["Initiative 100 · aucune fatigue",
+                       "Son esquive passe à 50 % (plus si elle l'était déjà)",
+                       "Pour la manche en cours et la suivante · une fois par combat"] }
+        ]
+    },
     CLASSE_CHASSEUR_DE_MAGES: {
         presentation: "Il a appris à marcher dans les tempêtes de sorts sans y laisser sa peau. Le "
             + "Chasseur de mages traque ceux qui plient la magie, et sa lumière perce leurs "
@@ -230,6 +249,7 @@ window.ouvrirChoixClasse = async function() {
     const ecran = document.getElementById("ecran-choix-classe");
     if (!ecran) return;
     ecran.style.display = "block";
+    if (typeof window.cacherClasseInterdite === "function") window.cacherClasseInterdite();
     window.afficherGrilleClasses();
     const classes = await window.chargerClasses();
     window.rendreGrilleClasses(classes);
@@ -240,15 +260,44 @@ window.fermerChoixClasse = function() {
     if (ecran) ecran.style.display = "none";
 };
 
+// Une classe que le peuple choisi juste avant ne peut pas prendre (le Vampire
+// pour un Vargen, CLASSES_INTERDITES dans app.js).
+const raceEnCours = () => window.RACE_SELECTIONNEE_TEMP || "";
+window.classeInterditeIci = (c) => !!c && typeof window.classeInterditeA === "function"
+    && window.classeInterditeA(raceEnCours(), c.nom);
+
 window.rendreGrilleClasses = function(classes) {
     const grille = document.getElementById("grille-classes");
     if (!grille) return;
-    grille.innerHTML = (classes || []).map(c => `
-        <button type="button" class="carte-classe" data-classe="${echapper(c.id)}"
-                onclick="jouerSonClic(); window.ouvrirFicheClasse('${echapper(c.id)}')" title="${echapper(c.nom)}">
+    grille.innerHTML = (classes || []).map(c => {
+        const interdite = window.classeInterditeIci(c);
+        return `
+        <button type="button" class="carte-classe${interdite ? " carte-classe-interdite" : ""}" data-classe="${echapper(c.id)}"${interdite ? ` data-interdite="true"` : ""}
+                onclick="jouerSonClic(); window.ouvrirFicheClasse('${echapper(c.id)}')" title="${echapper(c.nom)}${interdite ? ` — interdite aux ${echapper(raceEnCours())}s` : ""}">
             <img class="carte-classe-image" src="${echapper(c.imageTarot)}" alt="${echapper(c.nom)}" loading="lazy">
             <span class="carte-classe-nom">${echapper(c.nom)}</span>
-        </button>`).join("");
+        </button>`;
+    }).join("");
+};
+
+window.cacherClasseInterdite = function() {
+    const msg = document.getElementById("message-classe-interdite");
+    if (msg) msg.style.display = "none";
+};
+
+// Le message d'une classe interdite, en bas de l'écran, quelques secondes.
+window.direClasseInterdite = function(c) {
+    const ecran = document.getElementById("ecran-choix-classe") || document.body;
+    let msg = document.getElementById("message-classe-interdite");
+    if (!msg) {
+        msg = document.createElement("div");
+        msg.id = "message-classe-interdite";
+        ecran.appendChild(msg);
+    }
+    msg.textContent = `Les ${raceEnCours()}s ne peuvent pas être ${c.nom}`;
+    msg.style.display = "block";
+    clearTimeout(window.__minuteurClasseInterdite);
+    window.__minuteurClasseInterdite = setTimeout(() => { msg.style.display = "none"; }, 3500);
 };
 
 window.afficherGrilleClasses = function() {
@@ -262,6 +311,8 @@ window.afficherGrilleClasses = function() {
 window.ouvrirFicheClasse = function(id) {
     const c = (window.CLASSES_CACHE || window.CLASSES_PAR_DEFAUT).find(x => x.id === id);
     if (!c) return;
+    if (window.classeInterditeIci(c)) { window.direClasseInterdite(c); return; }
+    window.cacherClasseInterdite();
     classeOuverte = c;
     const fond = document.getElementById("fond-fiche-classe");
     const titre = document.getElementById("titre-fiche-classe");
@@ -290,6 +341,7 @@ window.retourChoixClasse = function() {
 
 window.validerClasse = function() {
     if (!classeOuverte) return;
+    if (window.classeInterditeIci(classeOuverte)) { window.direClasseInterdite(classeOuverte); return; }
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     window.CLASSE_SELECTIONNEE_TEMP = classeOuverte.nom;
     const champ = document.getElementById("champ-classe");

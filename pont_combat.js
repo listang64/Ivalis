@@ -291,7 +291,8 @@ const SCENES = {
     techniqueClasse(e) {
         const noms = { CLASSE_MUR_BOUCLIER: "🛡️ Mur de bouclier", CLASSE_REMPART: "🛡️ Rempart",
                        CLASSE_ASSAUT_MORTEL: "🗡️ Assaut mortel",
-                       CLASSE_SOIN_URGENCE: "✚ Soin d'urgence", CLASSE_PRISE_EN_CHARGE: "✚ Prise en charge" };
+                       CLASSE_SOIN_URGENCE: "✚ Soin d'urgence", CLASSE_PRISE_EN_CHARGE: "✚ Prise en charge",
+                       CLASSE_NUEE_CHAUVES_SOURIS: "🦇 Nuée de chauve-souris" };
         return { geste: "message", pion: e.acteur, texte: noms[e.idCarte] || "Technique de classe",
                  couleur: "#e8c46a", duree: RYTHME.message };
     },

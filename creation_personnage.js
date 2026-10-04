@@ -20,6 +20,13 @@ window.fermerSelectionRace = function() {
 
 window.changerRaceSelection = function(race) {
     window.RACE_SELECTIONNEE_TEMP = race;
+    // Une classe déjà choisie que ce peuple ne peut pas prendre (le Vampire
+    // pour un Vargen) est oubliée : il faudra en choisir une autre.
+    const champClasse = document.getElementById("champ-classe");
+    if (champClasse && typeof window.classeInterditeA === "function" && window.classeInterditeA(race, champClasse.value)) {
+        champClasse.value = "";
+        window.CLASSE_SELECTIONNEE_TEMP = null;
+    }
 
     // 1. Mise à jour visuelle des onglets
     const boutons = document.querySelectorAll("#onglets-races .onglet-race");

@@ -1501,6 +1501,8 @@ window.demarrerCiblage = async function(idCarte, options) {
 
             // Ténèbres (Nécromancien) : une attaque magique qui boit l'énergie.
             const estTenebres = typeof window.estEffetTenebres === "function" && window.estEffetTenebres(effBase.Nom);
+            // Vampirisme (Vampire) : une attaque magique qui soigne son lanceur.
+            const estVampirisme = typeof window.estEffetVampirisme === "function" && window.estEffetVampirisme(effBase.Nom);
             // LUMIÈRE (Chasseur de mages) : la chance que ce sort passe outre la
             // défense magique de sa cible — 15 % par cran, plafond du grimoire.
             let chanceLumiere = 0;
@@ -1512,7 +1514,7 @@ window.demarrerCiblage = async function(idCarte, options) {
             };
             lireLumiere(effBase, act.count);
             listeMods.forEach(m => lireLumiere(window.EFFETS_BDD_CACHE[m.id], m.count));
-            if (nomLower.includes("attaque") || nomLower.includes("pouvoir") || estTenebres || nomLower.includes("soin") || nomLower.includes("guérison") || isPurification || isShield) {
+            if (nomLower.includes("attaque") || nomLower.includes("pouvoir") || estTenebres || estVampirisme || nomLower.includes("soin") || nomLower.includes("guérison") || isPurification || isShield) {
                 let isHeal = nomLower.includes("soin") || nomLower.includes("guérison") || isPurification || isShield;
                 // Les dégâts et les SOINS s'étalent ; un bouclier ou une purification, non —
                 // ce ne sont pas des montants qui tombent sur la vie. La division se fait sur le
@@ -1522,7 +1524,7 @@ window.demarrerCiblage = async function(idCarte, options) {
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 if (indexPremiereAttaque === -1) indexPremiereAttaque = idxAction;
-                const typeRes = (nomLower.includes("magique") || nomLower.includes("pouvoir") || estTenebres || isHeal)
+                const typeRes = (nomLower.includes("magique") || nomLower.includes("pouvoir") || estTenebres || estVampirisme || isHeal)
                     ? "Magique" : "Physique";
                 // Atout de l'Ondari : ses sorts magiques portent une case plus loin,
                 // dès lors qu'un cran de Distance est posé dessus.
@@ -1573,6 +1575,8 @@ window.demarrerCiblage = async function(idCarte, options) {
                     toursEtalement: etalementActif ? toursEtalement : 0,
                     // Ses dégâts vont à l'énergie d'abord (moteur_pur.js).
                     ...(estTenebres ? { versEnergie: true } : {}),
+                    // La part de ce que la carte inflige qui soigne le lanceur.
+                    ...(estVampirisme ? { vampirisme: window.PART_VAMPIRISME || 70 } : {}),
                     // Un sort de lumière : il ne vaut que sur des dégâts magiques.
                     ...(chanceLumiere > 0 && typeRes === "Magique" && !isHeal
                         ? { chanceLumiere: Math.min(100, chanceLumiere), iconeAveugle: ICONE_AVEUGLE } : {}),
@@ -3177,7 +3181,7 @@ window.porteeReelleCarte = function(dataCarte, lanceur) {
         // L'atout de portée magique, comme dans demarrerCiblage : il ne joue
         // que sur une action magique qui a déjà de la distance.
         const estMagique = nomLower.includes("magique") || nomLower.includes("pouvoir")
-            || (typeof window.estEffetTenebres === "function" && window.estEffetTenebres(nomLower));
+            || (typeof window.estSortDeClasse === "function" && window.estSortDeClasse(nomLower));
         const totale = rangeMax + (typeof window.bonusPorteeMagique === "function"
             ? window.bonusPorteeMagique(lanceur, estMagique, isRanged) : 0);
 

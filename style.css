@@ -3907,3 +3907,14 @@ textarea.input-texte-parchemin {
 .jauge-selection-remplie { height: 100%; width: 0; transition: width 0.5s ease-out; }
 .jauge-selection-vie .jauge-selection-remplie { background: #ff2b2b; }
 .jauge-selection-fatigue .jauge-selection-remplie { background: #ffd400; }
+
+/* Une classe que le peuple choisi ne peut pas prendre (le Vampire pour un
+   Vargen) : grisée, et un message dit pourquoi au clic. */
+.carte-classe.carte-classe-interdite { filter: grayscale(100%) brightness(0.55); cursor: not-allowed; }
+.carte-classe.carte-classe-interdite:hover { transform: none; }
+#message-classe-interdite {
+  display: none; position: fixed; left: 50%; bottom: 7%; transform: translateX(-50%); z-index: 50;
+  padding: 10px 22px; border-radius: 8px; border: 2px solid #a8841f; background: rgba(18, 12, 6, 0.94);
+  font-family: 'Cinzel', serif; font-weight: bold; color: #f3dfa6; text-align: center;
+  font-size: clamp(13px, 1.6vw, 20px); box-shadow: 0 6px 18px rgba(0,0,0,0.8); pointer-events: none;
+}

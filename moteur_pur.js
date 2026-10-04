@@ -122,12 +122,26 @@ export function regleDesEtats(c, cle) {
     (c && c.etats ? c.etats : []).forEach(e => {
         const regle = e && REGLES_ETATS[e.nom];
         if (regle && typeof regle[cle] === "number") total += regle[cle];
+        // Le Vampire craint le feu : sa brûlure va plus loin que celle des
+        // autres (-60 % de soins, 18 % des PV max par manche).
+        if (e && e.nom === "Brûlé" && c.atouts && c.atouts.brulureAggravee
+            && typeof BRULURE_AGGRAVEE[cle] === "number") total += BRULURE_AGGRAVEE[cle];
     });
     return total;
 }
 
-export const esquiveDe     = (c) => nombre(c && c.def && c.def.esquive)  + bonusDesEtats(c, "esquive")
-                                  + regleDesEtats(c, "esquive");
+// Ce que la brûlure ajoute sur un Vampire (atout brulureAggravee), par-dessus
+// la règle commune de REGLES_ETATS["Brûlé"].
+export const BRULURE_AGGRAVEE = { soinsRecus: -10, pvMaxParTour: 10 };
+
+export const esquiveDe     = (c) => Math.max(nombre(c && c.def && c.def.esquive)  + bonusDesEtats(c, "esquive")
+                                  + regleDesEtats(c, "esquive"), planchersEsquive(c));
+// Un plancher d'esquive posé par un état (Nuée de chauve-souris : au moins
+// 50 %). L'esquive déjà plus haute reste plus haute ; sinon elle monte au
+// plancher, malus compris.
+function planchersEsquive(c) {
+    return Math.max(0, ...((c && c.etats) || []).map(e => nombre(e && e.esquiveMin)));
+}
 export const paradeDe      = (c) => nombre(c && c.def && c.def.parade)   + bonusDesEtats(c, "parade")
                                   + regleDesEtats(c, "parade");
 export const defPhysiqueDe = (c) => nombre(c && c.def && c.def.physique) + bonusDesEtats(c, "resPhys");
@@ -605,7 +619,7 @@ export function estDansLeNoir(c, hex) {
 // aident celui qui les porte — l'Absorption et le Contre qu'un allié lui a
 // offerts, l'Élan et les bénédictions de l'équipement, un soin étalé qui n'a
 // pas fini de tomber.
-export const ETATS_BIENFAISANTS = new Set(["Absorption", "Contre", "Élan", "Soin étalé"]);
+export const ETATS_BIENFAISANTS = new Set(["Absorption", "Contre", "Élan", "Soin étalé", "Nuée de chauve-souris"]);
 export function estEtatNefaste(e) {
     return !!e && !ETATS_BIENFAISANTS.has(e.nom) && !e.bonusEquip;
 }
@@ -1077,6 +1091,11 @@ export const ETAT_MUR_BOUCLIER = "Mur de bouclier";
 export const ETAT_REMPART = "Rempart";
 export const PARADE_MUR_BOUCLIER = 60;
 export const MANCHES_REMPART = 3;
+// La Nuée de chauve-souris (Vampire, niveau 10) : l'esquive au moins à 50 %,
+// pour la manche en cours et la suivante.
+export const ETAT_NUEE = "Nuée de chauve-souris";
+export const ESQUIVE_NUEE = 50;
+export const MANCHES_NUEE = 2;
 
 // Le protecteur qui partage ce coup avec la cible, ou null : un Rempart posé
 // sur elle, un Hoplite debout (ni à terre, ni en sursis), et côte à côte À CET
@@ -1161,6 +1180,11 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
         c.etats = [...(c.etats || []).filter(e => e && e.nom !== ETAT_MUR_BOUCLIER),
                    { nom: ETAT_MUR_BOUCLIER, duree: 1, bonusEquip: { parade: PARADE_MUR_BOUCLIER } }];
         etapes.push({ type: "etats", cible: id, liste: c.etats, pose: ETAT_MUR_BOUCLIER });
+    } else if (action.idCarte === "CLASSE_NUEE_CHAUVES_SOURIS") {
+        c.etats = [...(c.etats || []).filter(e => e && e.nom !== ETAT_NUEE),
+                   { nom: ETAT_NUEE, duree: MANCHES_NUEE, esquiveMin: ESQUIVE_NUEE,
+                     desc: `Esquive d'au moins ${ESQUIVE_NUEE} % (plus si elle l'était déjà).` }];
+        etapes.push({ type: "etats", cible: id, liste: c.etats, pose: ETAT_NUEE });
     } else if (action.idCarte === "CLASSE_REMPART") {
         const allie = combattant(suivant, action.cible);
         if (allie) {
@@ -1313,6 +1337,13 @@ export function resoudreCarte(etat, action, plateau) {
     const aveuglesParLaLumiere = new Set();
     const bonusMonstre = bonusMonstreDe(lanceur);
 
+    // LE VAMPIRISME (Vampire, niveau 5) : une carte qui en porte un soigne son
+    // lanceur d'une part (70 %) de TOUT ce qu'elle inflige aux ennemis — PV et
+    // bouclier réellement entamés, cible par cible. Ce qui est esquivé, bu par
+    // Ténèbres sur l'énergie ou étalé sur les manches suivantes ne compte pas.
+    const partVampirisme = Math.max(0, ...(action.attaques || []).map(a => nombre(a && a.vampirisme)));
+    let encaisseParVampirisme = 0;
+
     (action.attaques || []).forEach(attaque => {
         (attaque.cibles || []).forEach(idCible => {
             const cible = combattant(suivant, idCible);
@@ -1459,8 +1490,12 @@ export function resoudreCarte(etat, action, plateau) {
                     // d'un bouclier qui n'existe plus.
                     if (cible.bouclier === 0) cible.bouclierMax = 0;
                 }
+                const pvAvantCoup = nombre(cible.pv);
                 if (compte.versPv > 0) {
                     cible.pv = Math.max(0, cible.pv - compte.versPv);
+                }
+                if (partVampirisme > 0 && cible.camp !== lanceur.camp && !attaqueFrappe.isHeal) {
+                    encaisseParVampirisme += nombre(compte.versBouclier) + Math.min(pvAvantCoup, nombre(compte.versPv));
                 }
 
                 // Une Ténèbres que l'énergie a bue en entier ne touche pas la vie :
@@ -1551,6 +1586,20 @@ export function resoudreCarte(etat, action, plateau) {
             }
         });
     });
+
+    // --- LE SOIN DU VAMPIRISME -------------------------------------------
+    //  70 % de ce que la carte a infligé, arrondi à l'inférieur, puis ce que
+    //  le Vampire fait des soins qu'il reçoit (brûlé : -60 %). En sursis, rien.
+    if (partVampirisme > 0 && encaisseParVampirisme > 0 && !lanceur.aTerre && !enSursis(lanceur)) {
+        const brut = Math.floor(encaisseParVampirisme * partVampirisme / 100);
+        const partSoins = 100 + nombre(lanceur.atouts && lanceur.atouts.soinsRecus) + regleDesEtats(lanceur, "soinsRecus");
+        const soin = Math.max(0, Math.round(brut * (partSoins / 100)));
+        if (soin > 0) {
+            lanceur.pv = Math.min(nombre(lanceur.pvMax), nombre(lanceur.pv) + soin);
+            etapes.push({ type: "soin", cible: idLanceur, acteur: idLanceur, drain: true, vampirisme: true,
+                          montant: soin, pvApres: lanceur.pv });
+        }
+    }
 
     // --- LES ÉTATS ALTÉRÉS -----------------------------------------------
     //  Ils se posent sur les cibles qui n'ont pas esquivé, et seulement si leur

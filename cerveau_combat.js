@@ -41,7 +41,7 @@ import { clonerEtat, combattant, creerDes, combattantIllusion,
          verifierEtatCombat, compterPasMarche, FORMAT_ETAT, tomber, enSursis } from './combat_etat.js';
 import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissiperConfusion,
          traverserZones, creerZonePure, poserZone, vieillirZones,
-         chaineDeDegats, REGLES_ETATS, estDansLeNoir,
+         chaineDeDegats, REGLES_ETATS, regleDesEtats, estDansLeNoir,
          partageTenebres, ETAT_TENEBRES_ETALEES, POISON, POISON_MAITRE,
          resoudreTechniqueClasse, actionAssautMortel } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
@@ -489,7 +489,9 @@ export function ticsDeFinDeManche(etat) {
         const brulure = c.etats.find(e => e && e.nom === "Brûlé");
         if (brulure) {
             const regle = REGLES_ETATS["Brûlé"] || {};
-            const brut = Math.ceil(nombre(c.pvMax) * (nombre(regle.pvMaxParTour) / 100));
+            // regleDesEtats plutôt que la règle seule : le Vampire brûle à
+            // 18 % de ses PV max, pas à 8 (brulureAggravee).
+            const brut = Math.ceil(nombre(c.pvMax) * (regleDesEtats(c, "pvMaxParTour") / 100));
             const compte = chaineDeDegats(c, { valeurBrute: brut, typeRes: regle.typeParTour || "Physique" }, {});
             if (compte.degats > 0) {
                 etapes.push(...infligerTic(c, id, compte.degats, "Brûlure", etat, brulure.idSource));
