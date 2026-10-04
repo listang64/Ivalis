@@ -2508,10 +2508,13 @@ window.mesuresJaugesSelection = function(perso) {
                    : (parseInt(perso.PV_Max) || 0) + (parseInt(perso.Dev_Mod_PV) || 0)) || 1;
     const fatigueMax = (window.fatigueMaxCombattant ? window.fatigueMaxCombattant(perso)
                         : parseInt(perso.Fatigue_Max) || 100) || 1;
+    // Deux noms pour la même énergie : `fatigueActuelle` en mémoire (app.js le
+    // renomme au chargement), `Fatigue_Actuelle` dans le document de base.
+    const energie = perso.fatigueActuelle !== undefined ? parseInt(perso.fatigueActuelle) || 0
+                  : perso.Fatigue_Actuelle !== undefined ? parseInt(perso.Fatigue_Actuelle) || 0 : fatigueMax;
     const pct = (v, max) => Math.max(0, Math.min(100, ((parseInt(v) || 0) / max) * 100));
-    return { vie: pct(perso.PV_Actuels, pvMax), fatigue: pct(perso.Fatigue_Actuelle, fatigueMax),
-             pv: parseInt(perso.PV_Actuels) || 0, pvMax,
-             energie: parseInt(perso.Fatigue_Actuelle) || 0, fatigueMax };
+    return { vie: pct(perso.PV_Actuels, pvMax), fatigue: pct(energie, fatigueMax),
+             pv: parseInt(perso.PV_Actuels) || 0, pvMax, energie, energieMax: fatigueMax };
 };
 
 // Pose (ou met à jour) les jauges sous le pion. `existantes` est l'élément du
@@ -2529,7 +2532,7 @@ window.poserJaugesSelection = function(divToken, perso, existantes) {
     }
     bloc.querySelector(".jauge-selection-vie .jauge-selection-remplie").style.width = m.vie + "%";
     bloc.querySelector(".jauge-selection-fatigue .jauge-selection-remplie").style.width = m.fatigue + "%";
-    bloc.title = `Vie ${m.pv}/${m.pvMax} · Fatigue ${m.energie}/${m.fatigueMax}`;
+    bloc.title = `Vie ${m.pv}/${m.pvMax} · Fatigue ${m.energie}/${m.energieMax}`;
     bloc.classList.toggle("repliee", !!window.JAUGES_REPLIEES[perso.idPersonnage]);
     divToken.appendChild(bloc);
     return bloc;
@@ -2545,7 +2548,7 @@ window.replierJaugesSelection = function(idPerso) {
 
 window.selectionnerEtCentrerPerso = function(idPersonnage) {
     window.TOKEN_SELECTIONNE = idPersonnage;
-    delete window.JAUGES_REPLIEES[idPersonnage];
+    if (window.JAUGES_REPLIEES) delete window.JAUGES_REPLIEES[idPersonnage];
     
     if (window.TOKENS_VTT_DATA && window.TOKENS_VTT_DATA[idPersonnage]) {
         const dataToken = window.TOKENS_VTT_DATA[idPersonnage];
@@ -3231,7 +3234,7 @@ window.appliquerTokensVTT = function(tokensMap) {
         }
 
         // Les jauges de vie et de fatigue, sous le pion sélectionné.
-        if (window.TOKEN_SELECTIONNE === idPerso) {
+        if (window.TOKEN_SELECTIONNE === idPerso && typeof window.poserJaugesSelection === "function") {
             window.poserJaugesSelection(divToken, pData, jaugesSelection[idPerso]);
         }
 
@@ -3246,7 +3249,7 @@ window.appliquerTokensVTT = function(tokensMap) {
             }
 
             window.TOKEN_SELECTIONNE = idPerso;
-            delete window.JAUGES_REPLIEES[idPerso];   // sélectionné de nouveau : ses jauges reviennent
+            if (window.JAUGES_REPLIEES) delete window.JAUGES_REPLIEES[idPerso];   // sélectionné de nouveau : ses jauges reviennent
             const label = document.getElementById("label-taille-token");
             if (label) label.innerText = taille;
             window.appliquerTokensVTT(window.TOKENS_VTT_DATA); 

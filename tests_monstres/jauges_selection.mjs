@@ -76,7 +76,7 @@ const preparer = () => p.evaluate(() => {
   window.VTT_SCALE = 1; window.VTT_POS_X = 0; window.VTT_POS_Y = 0;
   window.PERSOS_PARTIE = [
     { idPersonnage: "J1", camp: "Allié", prenom: "Pliors", PV_Max: 40, PV_Actuels: 30, Fatigue_Max: 100, Fatigue_Actuelle: 25, statut: "Vivant" },
-    { idPersonnage: "M1", camp: "Ennemi", estMonstre: true, nom: "Gnoll", PV_Max: 50, PV_Actuels: 10, Fatigue_Max: 100, Fatigue_Actuelle: 80, statut: "Vivant" }
+    { idPersonnage: "M1", camp: "Ennemi", estMonstre: true, nom: "Gnoll", PV_Max: 50, PV_Actuels: 10, Fatigue_Max: 100, fatigueActuelle: 80, Fatigue_Actuelle: 12, statut: "Vivant" }
   ];
   window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[0]];
   window.TOKENS_VTT_DATA = { J1: { q: 0, r: 0, url: "j.png" }, M1: { q: 3, r: 0 } };
@@ -108,7 +108,7 @@ console.log("1. UN CLIC SUR UN PION : SES JAUGES SOUS LUI");
   const m = await lire("M1");
   verifier("le pion cliqué porte ses jauges", !!m);
   verifier("vie à la bonne proportion (10/50 = 20 %)", m && m.vie === 20, JSON.stringify(m));
-  verifier("fatigue à la bonne proportion (80/100 = 80 %)", m && m.fatigue === 80);
+  verifier("fatigue à la bonne proportion (80/100 = 80 %, le nom de la mémoire d'abord)", m && m.fatigue === 80);
   verifier("sous le médaillon, centrées", m && m.sous && m.centre, JSON.stringify(m));
   verifier("rouge pour la vie, jaune pour la fatigue",
            m && m.couleurs[0] === "rgb(255, 43, 43)" && m.couleurs[1] === "rgb(255, 212, 0)", JSON.stringify(m && m.couleurs));
