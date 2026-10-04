@@ -98,6 +98,7 @@ export function creerRegime(contexte) {
         surFenetre = () => {},               // ouvrir/fermer la fenêtre sombre
         surRejeu = () => {},                 // « un tour est en train de se rejouer »
         surPublication = () => {},           // un état vient d'être publié (par nous ou par un autre)
+        surRefus = () => {},                 // une intention de CE poste a été refusée par le cerveau
         tracer = () => {},
         maintenant = () => Date.now(),
         programmer = (fn, ms) => setTimeout(fn, ms),
@@ -610,6 +611,7 @@ export function creerRegime(contexte) {
             // sans attendre que Firestore efface son marqueur « en route ».
             if (typeof depot.confirmer === "function") depot.confirmer(id);
             tracer("✉️", `${intention.type} demandé pour ${intention.acteur}`, id);
+            suivreLaReponse(id, propre);
             // Le cerveau, s'il est ici, n'attend pas la notification pour
             // travailler : c'est la latence en moins sur son propre écran.
             if (moi.cerveau) tourner();
@@ -618,6 +620,34 @@ export function creerRegime(contexte) {
             tracer("❌", `intention non envoyée : ${intention.type}`, String(e && e.message));
             return null;
         }
+    }
+
+    // UN REFUS NE DOIT PAS LAISSER LE JOUEUR DEVANT UN ÉCRAN MUET.
+    //
+    // Le cerveau marque une intention refusée (`refus`, depot_firestore.js),
+    // mais personne ne le lisait : la tête de file ne bougeant pas, le repère
+    // « demande en cours » de ce poste ne tombait jamais, et plus aucune action
+    // ne partait — la partie « plantée » de l'Assaut mortel refusé. Le poste
+    // qui envoie écoute donc SA demande jusqu'à ce qu'elle soit traitée, puis
+    // se débranche : une seule lecture de plus par action.
+    function suivreLaReponse(id, intention) {
+        if (!id || !io || typeof io.ecouterDoc !== "function") return;
+        let arret = null, fini = false, filet = null;
+        const fermer = () => {
+            fini = true;
+            if (arret) { try { arret(); } catch (e) {} arret = null; }
+            if (filet !== null) { try { arreterMinuteur(filet); } catch (e) {} filet = null; }
+        };
+        arret = io.ecouterDoc(CHEMINS.intention(idPartie, id), (doc) => {
+            if (fini || !doc || !doc.traitee) return;
+            fermer();
+            if (doc.refus) {
+                try { surRefus(intention, doc.refus); } catch (e) { tracer("❌", "surRefus", String(e && e.message)); }
+            }
+        });
+        if (fini) { fermer(); return; }   // traitée avant même que l'écoute ne rende la main
+        // Filet : on ne garde jamais une écoute plus d'une minute.
+        filet = programmer(fermer, 60000);
     }
 
     const demanderMouvement = (acteur, chemin, reserveCarte) =>
@@ -1124,6 +1154,13 @@ function contexteDuJeu() {
         // d'autre touche le document de la partie.
         surPublication: () => rendreLaMainAuxJoueurs(),
 
+        // Une demande de ce poste refusée : le repère « demande en cours »
+        // tombe, le joueur lit pourquoi, et il peut jouer autre chose.
+        surRefus: (intention, raison) => {
+            if (typeof window.regimeAnnulerDemande === "function") window.regimeAnnulerDemande();
+            if (typeof window.surRefusIntention === "function") window.surRefusIntention(intention, raison);
+        },
+
         surFenetre: (entree) => {
             window.EVENEMENT_ATTENDU = entree
                 ? { acteur: entree.acteur, tour: entree.manche, n: entree.v,
@@ -1629,6 +1666,10 @@ if (typeof window !== "undefined") {
 
     // Appelée à chaque projection : si la tête de file n'est plus celle qu'on
     // attendait, la demande a abouti (ou a été refusée) et le repère tombe.
+    // Le cerveau a refusé la demande : rien n'avancera dans la file, le repère
+    // doit tomber tout de suite (surRefus, contexteDuJeu).
+    window.regimeAnnulerDemande = function() { demandeEnVol = ""; };
+
     window.regimeOublierDemande = function(file, manche) {
         if (!demandeEnVol) return;
         const tete = (file || [])[0];

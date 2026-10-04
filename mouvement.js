@@ -635,6 +635,8 @@ window.jouerAnimationPas = async function(pas) {
     if (!pas.anticipe && await window.consommerPasAnticipe(pas)) return;
     const tokenDiv = document.getElementById("token-" + pas.idToken);
     if (!tokenDiv) return;
+    // Mon pion marche : ses jauges de sélection s'effacent en fondu (combat.js).
+    if (typeof window.replierJaugesSelection === "function") window.replierJaugesSelection(pas.idToken);
 
     window.ANIMATION_VTT_EN_COURS = true;
     window.PIONS_EN_MOUVEMENT = window.PIONS_EN_MOUVEMENT || {};

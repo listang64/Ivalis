@@ -165,6 +165,8 @@ node versions_modules.mjs      # la carte des imports : chaque module du moteur 
 node couvre_chef.mjs           # le couvre-chef des armures : 30 casques/chapeaux/coiffes par type tirés avec la tenue, dessinés sur l'armure (jamais sur celle de départ), choix « avec / tête nue » à l'équipement, le portrait suit
 node bonus_race_classe.mjs     # l'onglet Statistiques : l'encart des bonus de race et de classe, chaque atout en toutes lettres, paliers à venir grisés
 node intention_confirmee.mjs    # le cerveau joue tout de suite les intentions de son propre poste, même marquées « en route » par Firestore
+node jauges_selection.mjs       # le pion sélectionné montre vie et fatigue sous lui ; mon pion les replie en fondu quand il marche
+node assaut_cible_tombee.mjs    # l'Assaut mortel ignore une cible déjà à terre ; un refus du cerveau revient au poste qui a demandé (plus de partie figée)
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4214,3 +4216,33 @@ n'était pas prévenue quand seul ce marqueur changeait. Trois chemins, désorma
 
 intention_confirmee.mjs le rejoue avec un Firestore de banc qui garde le
 marqueur après `lot`, et ne prévient que les écoutes « métadonnées comprises ».
+
+## Les jauges du pion sélectionné (version 168)
+
+Un pion sélectionné sur le plateau montre, juste sous lui, sa vie (rouge) et
+sa fatigue (jaune), aux teintes des jauges du bandeau (`poserJaugesSelection`,
+combat.js ; style `.jauges-selection-token`). Tout est en % du pion : elles
+suivent le zoom sans calcul. Elles sont gardées d'un redessin à l'autre (même
+élément) : la barre glisse vers sa nouvelle valeur.
+
+Le pion de CE poste les replie en fondu (0,45 s) dès son premier pas
+(`replierJaugesSelection`, appelé par `jouerAnimationPas`, mouvement.js) ;
+elles restent repliées jusqu'à ce qu'on le sélectionne de nouveau. Le pion
+d'un autre (une créature surveillée) les garde et les emmène avec lui.
+jauges_selection.mjs le vérifie sur la vraie page.
+
+## L'Assaut mortel sur la case d'un mort, et les refus rendus au joueur (version 168)
+
+Le bug de la table : la zone de l'Assaut mortel couvrait un ennemi vivant ET la
+case d'une créature tombée plus tôt (pion plus dessiné, case encore dans les
+Tokens). Le cerveau refusait tout (« … n'est pas un ennemi valable ») et la
+partie restait figée : le repère « demande en cours » du poste ne tombait
+jamais, puisque la file n'avançait pas.
+- la boucle de zone (moteur_effets.js) écarte `estCombattantMort` ;
+- le cerveau retire les combattants à terre ou disparus des cibles de
+  l'Assaut (`ciblesDeLAssaut`, cerveau_combat.js) et joue le reste ;
+- le poste qui envoie une intention l'écoute jusqu'à ce qu'elle soit traitée
+  (`suivreLaReponse`, regime_cerveau.js) ; refusée, `surRefus` fait tomber le
+  repère (`regimeAnnulerDemande`) et `surRefusIntention` (combat.js) affiche
+  la raison au-dessus du pion et redessine le bouton de fin de tour.
+assaut_cible_tombee.mjs le vérifie.

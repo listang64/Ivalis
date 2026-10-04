@@ -2613,6 +2613,11 @@ window.validerZoneAoE = function() {
     for (let idToken in window.TOKENS_VTT_DATA) {
         const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idToken);
         if (!cibleData || cibleData.statut === "Mort") continue;
+        // UN COMBATTANT À TERRE N'EST PLUS SUR LE PLATEAU. Son pion n'est plus
+        // dessiné, mais sa case reste dans les Tokens : une zone posée dessus
+        // le ramassait quand même, et le cerveau refusait toute la carte
+        // (« n'est pas un ennemi valable » — l'Assaut mortel planté).
+        if (typeof window.estCombattantMort === "function" && window.estCombattantMort(idToken)) continue;
 
         const tk = window.positionCiblage(idToken);
         if (!tk || !finalHexes.some(h => h.q === tk.q && h.r === tk.r)) continue;

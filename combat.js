@@ -2485,8 +2485,67 @@ window.centrerMapSurToken = function(idPersonnage) {
     window.appliquerTransformPlateau();
 };
 
+// =========================================================================
+//  LES JAUGES DU PION SÉLECTIONNÉ
+// =========================================================================
+//  Un pion sélectionné montre, juste sous lui, sa vie (rouge) et sa fatigue
+//  (jaune) — les mêmes teintes que les jauges du bandeau. Elles vivent DANS le
+//  pion, en pourcentages : elles suivent le zoom et le pion sans calcul.
+//
+//  LE PION DE CE POSTE LES REPLIE EN FONDU QUAND IL MARCHE : on regarde où il
+//  va, pas ses chiffres. Elles restent repliées jusqu'à ce qu'on le
+//  sélectionne de nouveau. Le pion d'un autre (une créature qu'on surveille)
+//  les garde, et les emmène avec lui.
+window.JAUGES_REPLIEES = window.JAUGES_REPLIEES || {};
+
+window.estPionDuPoste = function(idPerso) {
+    return (window.COMBAT_PERSOS_JOUEUR || []).some(h => h && h.idPersonnage === idPerso);
+};
+
+window.mesuresJaugesSelection = function(perso) {
+    if (!perso) return null;
+    const pvMax = (window.pvMaxCombattant ? window.pvMaxCombattant(perso)
+                   : (parseInt(perso.PV_Max) || 0) + (parseInt(perso.Dev_Mod_PV) || 0)) || 1;
+    const fatigueMax = (window.fatigueMaxCombattant ? window.fatigueMaxCombattant(perso)
+                        : parseInt(perso.Fatigue_Max) || 100) || 1;
+    const pct = (v, max) => Math.max(0, Math.min(100, ((parseInt(v) || 0) / max) * 100));
+    return { vie: pct(perso.PV_Actuels, pvMax), fatigue: pct(perso.Fatigue_Actuelle, fatigueMax),
+             pv: parseInt(perso.PV_Actuels) || 0, pvMax,
+             energie: parseInt(perso.Fatigue_Actuelle) || 0, fatigueMax };
+};
+
+// Pose (ou met à jour) les jauges sous le pion. `existantes` est l'élément du
+// dessin précédent, s'il y en avait un : on le garde, pour que la barre glisse
+// vers sa nouvelle valeur et que le fondu ne reparte pas de zéro.
+window.poserJaugesSelection = function(divToken, perso, existantes) {
+    const m = window.mesuresJaugesSelection(perso);
+    if (!divToken || !m) return null;
+    let bloc = existantes;
+    if (!bloc) {
+        bloc = document.createElement("div");
+        bloc.className = "jauges-selection-token";
+        bloc.innerHTML = `<div class="jauge-selection jauge-selection-vie"><div class="jauge-selection-remplie"></div></div>`
+                       + `<div class="jauge-selection jauge-selection-fatigue"><div class="jauge-selection-remplie"></div></div>`;
+    }
+    bloc.querySelector(".jauge-selection-vie .jauge-selection-remplie").style.width = m.vie + "%";
+    bloc.querySelector(".jauge-selection-fatigue .jauge-selection-remplie").style.width = m.fatigue + "%";
+    bloc.title = `Vie ${m.pv}/${m.pvMax} · Fatigue ${m.energie}/${m.fatigueMax}`;
+    bloc.classList.toggle("repliee", !!window.JAUGES_REPLIEES[perso.idPersonnage]);
+    divToken.appendChild(bloc);
+    return bloc;
+};
+
+// Appelé au premier pas d'une marche (mouvement.js) : le fondu, sur place.
+window.replierJaugesSelection = function(idPerso) {
+    if (!window.estPionDuPoste(idPerso)) return;
+    window.JAUGES_REPLIEES[idPerso] = true;
+    const bloc = document.querySelector(`#token-${idPerso} .jauges-selection-token`);
+    if (bloc) bloc.classList.add("repliee");
+};
+
 window.selectionnerEtCentrerPerso = function(idPersonnage) {
     window.TOKEN_SELECTIONNE = idPersonnage;
+    delete window.JAUGES_REPLIEES[idPersonnage];
     
     if (window.TOKENS_VTT_DATA && window.TOKENS_VTT_DATA[idPersonnage]) {
         const dataToken = window.TOKENS_VTT_DATA[idPersonnage];
@@ -3012,6 +3071,14 @@ window.appliquerTokensVTT = function(tokensMap) {
         (jaugesEnCours[id] = jaugesEnCours[id] || []).push(jauge);
     });
 
+    // Même chose pour les jauges du pion sélectionné : gardées d'un dessin à
+    // l'autre, leurs barres glissent et leur fondu va jusqu'au bout.
+    const jaugesSelection = {};
+    conteneur.querySelectorAll(".jauges-selection-token").forEach(bloc => {
+        const pion = bloc.closest(".token-vtt");
+        if (pion && pion.id) jaugesSelection[pion.id.replace("token-", "")] = bloc;
+    });
+
     conteneur.innerHTML = "";
 
     for (let idPerso in tokensMap) {
@@ -3163,6 +3230,11 @@ window.appliquerTokensVTT = function(tokensMap) {
             divToken.appendChild(haloBouclier);
         }
 
+        // Les jauges de vie et de fatigue, sous le pion sélectionné.
+        if (window.TOKEN_SELECTIONNE === idPerso) {
+            window.poserJaugesSelection(divToken, pData, jaugesSelection[idPerso]);
+        }
+
         // Gestion du Clic
         divToken.onclick = function(e) {
             e.stopPropagation();
@@ -3174,6 +3246,7 @@ window.appliquerTokensVTT = function(tokensMap) {
             }
 
             window.TOKEN_SELECTIONNE = idPerso;
+            delete window.JAUGES_REPLIEES[idPerso];   // sélectionné de nouveau : ses jauges reviennent
             const label = document.getElementById("label-taille-token");
             if (label) label.innerText = taille;
             window.appliquerTokensVTT(window.TOKENS_VTT_DATA); 
@@ -4758,6 +4831,24 @@ window.donneesCarteCombattant = function(idPersonnage, idCarte) {
         || ((window.CACHE_COMPETENCES_GLOBAL || {})[idPersonnage] || {})[idCarte]
         || (typeof window.carteTechniqueClasse === "function" ? window.carteTechniqueClasse(idCarte) : null)
         || null;
+};
+
+// UNE DEMANDE DE CE POSTE REFUSÉE PAR LE CERVEAU (regime_cerveau.js, surRefus).
+// Le tour n'a pas avancé : le joueur doit le voir, savoir pourquoi, et pouvoir
+// jouer autre chose. La raison flotte au-dessus de son pion, les boutons et les
+// bannières sont redessinés.
+window.surRefusIntention = function(intention, raison) {
+    const acteur = intention && intention.acteur;
+    if (typeof window.tracerCombat === "function") {
+        window.tracerCombat("↩️", `demande refusée rendue au joueur : ${intention && intention.type}`, String(raison || ""));
+    }
+    const tk = acteur && window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[acteur] : null;
+    if (tk && typeof window.afficherMessageFlottantHex === "function") {
+        const court = String(raison || "Refusé").replace(/^[^:]*:\s*/, "");
+        window.afficherMessageFlottantHex(tk.q, tk.r, "Refusé : " + court.slice(0, 60), "#ffb74d");
+    }
+    if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
+    if (typeof window.actualiserBannieresEpuisees === "function") window.actualiserBannieresEpuisees();
 };
 
 // Cette technique de classe a-t-elle déjà servi dans ce combat, pour ce héros ?

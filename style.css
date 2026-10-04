@@ -3888,3 +3888,22 @@ textarea.input-texte-parchemin {
 .bonus-palier-verrouille { opacity: 0.55; }
 .bonus-palier-verrouille .bonus-palier-niveau { background: #bbb; }
 @media (max-width: 560px) { .bonus-race-classe-grille { grid-template-columns: 1fr; } }
+
+/* Les jauges du pion sélectionné : vie et fatigue, juste sous le médaillon.
+   Tout en % du pion, pour suivre le zoom sans calcul. */
+.jauges-selection-token {
+    position: absolute; top: 104%; left: 50%; transform: translateX(-50%);
+    width: 74%; height: 21%;
+    display: flex; flex-direction: column; justify-content: space-between;
+    pointer-events: none; z-index: 5;
+    opacity: 1; transition: opacity 0.45s ease;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9));
+}
+.jauges-selection-token.repliee { opacity: 0; }
+.jauge-selection {
+    height: 42%; background: #111; border: 1px solid #c2a878; border-radius: 3px;
+    overflow: hidden; box-sizing: border-box;
+}
+.jauge-selection-remplie { height: 100%; width: 0; transition: width 0.5s ease-out; }
+.jauge-selection-vie .jauge-selection-remplie { background: #ff2b2b; }
+.jauge-selection-fatigue .jauge-selection-remplie { background: #ffd400; }

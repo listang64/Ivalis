@@ -140,6 +140,16 @@ export function cerveauSilencieux(suivi, maintenant) {
 
 export const TYPES_INTENTION = ["mouvement", "carte", "bond", "illusion", "finTour", "classe"];
 
+
+// LES CIBLES DE L'ASSAUT MORTEL, SANS LES MORTS. Une case de la zone peut
+// encore porter le pion (invisible) d'un combattant tombé plus tôt : l'écran
+// l'envoyait avec l'autre, et toute la technique était refusée. Un combattant
+// à terre ou disparu est simplement retiré ; le reste est validé normalement.
+function ciblesDeLAssaut(etat, intention) {
+    const brutes = Array.isArray(intention.cibles) ? [...new Set(intention.cibles)] : [];
+    return brutes.filter(id => { const c = combattant(etat, id); return c && !c.aTerre; });
+}
+
 export function validerIntention(etat, intention) {
     const refus = (raison) => ({ ok: false, raison });
     if (!intention || !intention.id) return refus("intention sans identité");
@@ -246,7 +256,7 @@ export function validerIntention(etat, intention) {
         // L'Assaut mortel : un ou deux ennemis debout, au contact, et côte à
         // côte s'ils sont deux — la zone de deux cases qui tourne autour de lui.
         if (idCarte === "CLASSE_ASSAUT_MORTEL") {
-            const cibles = Array.isArray(intention.cibles) ? [...new Set(intention.cibles)] : [];
+            const cibles = ciblesDeLAssaut(etat, intention);
             if (cibles.length < 1 || cibles.length > 2) return refus("Assaut mortel : un ou deux ennemis");
             for (const idCible of cibles) {
                 const ennemi = combattant(etat, idCible);
@@ -809,7 +819,8 @@ export function appliquerIntention(etat, intention, plateau) {
     // UNE TECHNIQUE DE CLASSE : son effet, puis la fin du tour — comme une
     // carte, elle occupe le tour du héros.
     if (intention.type === "classe") {
-        const cibles = Array.isArray(intention.cibles) ? [...new Set(intention.cibles)] : undefined;
+        const cibles = intention.idCarte === "CLASSE_ASSAUT_MORTEL" ? ciblesDeLAssaut(etat, intention)
+            : Array.isArray(intention.cibles) ? [...new Set(intention.cibles)] : undefined;
         const r = resoudreTechniqueClasse(etat, { idLanceur: intention.acteur, idCarte: intention.idCarte,
                                                   cible: intention.cible, cibles }, plateau);
         let suivant = clonerEtat(r.etat);
