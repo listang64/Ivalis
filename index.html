@@ -1417,6 +1417,11 @@
           <!-- 🔻 NOUVEAU BOUTON D'EXPORT 🔻 -->
           <button class="btn-parametres" style="background-color: #9333ea; border-color: #7e22ce;" onclick="jouerSonClic(); window.exporterEffetsBDD()">Exporter BDD (Copier)</button>
 
+          <!-- PROVISOIRE : recopie dans la base les effets de classe (Ténèbres, Lumière,
+               Vampirisme) qui n'y sont pas encore. Ne modifie ni ne supprime JAMAIS
+               un effet existant : les réglages faits à la main restent. -->
+          <button id="btn-installer-effets-classe" class="btn-parametres" style="background-color: #1b6e3a; border-color: #14532d;" onclick="jouerSonClic(); window.installerEffetsDeClasse()" title="Ajoute à la liste les effets de classe qui y manquent (Ténèbres, Lumière, Vampirisme). Ne touche à aucun autre effet, ni à ceux déjà présents.">Ajouter les effets de classe</button>
+
           
           <button class="btn-parametres" onclick="jouerSonClic(); window.fermerGestionEffets()">Retour</button>
         </div>
@@ -1978,7 +1983,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=85"></script>
+<script src="trace_combat.js?v=86"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
      Les modules s'importent entre eux sans numéro (`from './moteur_pur.js'`).
      Sans cette carte, le navigateur les chargeait à part, à une adresse SANS
@@ -2031,7 +2036,7 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=36"></script>
 <script type="module" src="ia_master.js?v=7"></script>
-<script type="module" src="app.js?v=81"></script>
+<script type="module" src="app.js?v=82"></script>
 <script src="jet_d20.js?v=2"></script>
 <script src="fabrique_sons.js?v=3"></script>
 <script src="experience.js?v=1"></script>

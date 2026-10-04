@@ -171,6 +171,7 @@ node techniques_nouveau_combat.mjs # enchaîner les combats sans recharger : une
 node vampire.mjs              # la classe Vampire : +10 rés. physique, feu aggravé, première case gratuite, Vampirisme (70 % de la carte en soin), Nuée de chauve-souris (esquive ≥ 50 %, 2 manches), interdit aux Vargens
 node tenebres_brut.mjs        # Ténèbres sans armure (×1,5 sur la vie sans énergie) ; le malus de tir seulement sur la cible au contact
 node valeurs_decimales.mjs    # 1,5 par cran : le demi-point compte, arrondi au plus proche (dégâts, soins, boucliers), écrit à la française dans la Forge
+node bouton_effets_classe.mjs  # le bouton provisoire : ne crée que les effets de classe absents de Combat_Effets, ne réécrit jamais un effet existant
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4328,3 +4329,12 @@ PROCHE, là où le moteur arrondissait déjà : 1,5 → 2, 4,5 → 5 ; un critiq
 double avant (1,5 → 3). La Forge écrit la valeur à la française, sans
 décimales parasites (`formatterTexteEffet`, competences.js : « 4,5 », « 3,3 »).
 valeurs_decimales.mjs.
+
+## Bouton provisoire « Ajouter les effets de classe » (version 174)
+
+Dans Paramètres → Gestion des effets. Les effets de classe (Ténèbres, Lumière,
+Vampirisme) ne vivaient qu'en copie locale (MIGRATION_EFFETS) et n'apparaissaient
+pas dans la liste. `installerEffetsDeClasse` (app.js) crée dans Combat_Effets
+ceux qui y MANQUENT, avec les champs du jeu ; un effet déjà présent n'est
+jamais réécrit, aucun autre effet n'est touché ; puis le cache de la Forge et
+la liste sont rechargés. bouton_effets_classe.mjs.
