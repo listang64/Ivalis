@@ -153,7 +153,9 @@ const lireTitre = () => p.evaluate(() => {
     flou: getComputedStyle(fond).backdropFilter || getComputedStyle(fond).webkitBackdropFilter,
     rectZone: zone.getBoundingClientRect(),
     rectPiste: piste.getBoundingClientRect(),
-    hauteur: window.innerHeight
+    rectFond: fond.getBoundingClientRect(),
+    hauteur: window.innerHeight,
+    largeur: window.innerWidth
   };
 });
 
@@ -244,6 +246,10 @@ await p.waitForTimeout(450);
   verifier("il est en bas de la fenêtre, sous la piste (sans la recouvrir)",
            t.rectZone.top > t.rectPiste.bottom && t.rectZone.bottom > t.hauteur - 60,
            `titre ${Math.round(t.rectZone.top)}–${Math.round(t.rectZone.bottom)} / piste jusqu'à ${Math.round(t.rectPiste.bottom)} / fenêtre ${t.hauteur}`);
+  // Et un peu sur la gauche (demande de Nico) : son milieu avant celui de l'écran.
+  verifier("il est décalé vers la gauche de l'écran",
+           (t.rectFond.left + t.rectFond.right) / 2 < t.largeur * 0.45 && t.rectFond.left > 16,
+           `milieu ${Math.round((t.rectFond.left + t.rectFond.right) / 2)} / écran ${t.largeur}`);
   await p.screenshot({ path: "/tmp/claude-0/titre_preparation.png" });
 }
 

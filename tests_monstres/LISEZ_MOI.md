@@ -4182,3 +4182,11 @@ Chaque atout est écrit en clair par `texteAtout` (« +3 % d'esquive »,
 Ténèbres », « Instinct du tueur : … »). Un atout inconnu se montre tel quel
 (« clé : valeur ») plutôt que d'être caché ; `bonus_race_classe.mjs` vérifie
 qu'aucun des atouts existants n'en est réduit là.
+
+## Le bandeau de préparation, un peu à gauche (version 166)
+
+« Sélectionner une compétence / En attente des joueurs » reste en bas de la
+fenêtre, mais centré sur les 78 % de gauche de l'écran (`right: 22%` sur
+#titre-preparation-zone, index.html) : il s'éloigne de la jauge en bas à
+droite. titre_preparation.mjs vérifie que son milieu est avant celui de
+l'écran.
