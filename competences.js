@@ -1131,12 +1131,15 @@ function formatterTexteEffet(effet, stacks, action) {
             calcV += bonusPorteeDeRace(action);
         }
 
+        // Une valeur à virgule (« 1,5 » par cran) s'écrit à la française et
+        // sans décimales parasites (1,1 × 3 donne 3,3, pas 3.3000000000000003).
+        const calcTexte = String(Math.round(calcV * 100) / 100).replace(".", ",");
         if (pBase === 0) {
             // Remplace le 1er chiffre s'il n'y a pas de pourcentage dans l'effet
-            texte = texte.replace(/\b\d+(?:[.,]\d+)?\b/, calcV);
+            texte = texte.replace(/\b\d+(?:[.,]\d+)?\b/, calcTexte);
         } else {
             // S'il y a un %, on remplace le 1er chiffre qui n'est PAS collé à un %
-            texte = texte.replace(/\b\d+(?:[.,]\d+)?\b(?!\s*%)/, calcV);
+            texte = texte.replace(/\b\d+(?:[.,]\d+)?\b(?!\s*%)/, calcTexte);
         }
     }
 

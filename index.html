@@ -1978,7 +1978,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=84"></script>
+<script src="trace_combat.js?v=85"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
      Les modules s'importent entre eux sans numéro (`from './moteur_pur.js'`).
      Sans cette carte, le navigateur les chargeait à part, à une adresse SANS
@@ -1992,7 +1992,7 @@
 <script type="importmap">
 { "imports": {
     "./combat_etat.js": "./combat_etat.js?v=23",
-    "./moteur_pur.js": "./moteur_pur.js?v=35",
+    "./moteur_pur.js": "./moteur_pur.js?v=36",
     "./mouvement_pur.js": "./mouvement_pur.js?v=13",
     "./ia_pure.js": "./ia_pure.js?v=9",
     "./cerveau_combat.js": "./cerveau_combat.js?v=33",
@@ -2014,7 +2014,7 @@
 <script type="module" src="combat_etat.js?v=23"></script>
 <!-- LE MOTEUR PUR : la chaîne de dégâts et le mouvement, extraits des 5 000
      lignes du moteur actuel et testables sans réseau ni navigateur. -->
-<script type="module" src="moteur_pur.js?v=35"></script>
+<script type="module" src="moteur_pur.js?v=36"></script>
 <script type="module" src="mouvement_pur.js?v=13"></script>
 <script type="module" src="ia_pure.js?v=9"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
@@ -2038,7 +2038,7 @@
 <script type="module" src="creation_personnage.js?v=16"></script>
 <script type="module" src="classes.js?v=9"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
-<script type="module" src="competences.js?v=44"></script>
+<script type="module" src="competences.js?v=45"></script>
 <!-- Le plateau porte désormais son ?v= comme les autres : sans lui, un iPad
      gardait l'ancien dessin en cache après une livraison (l'œil d'or en dépend). -->
 <script src="Plateau.js?v=3"></script>

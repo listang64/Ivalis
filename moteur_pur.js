@@ -47,6 +47,16 @@ const nombre = (v, defaut = 0) => {
     const n = parseInt(v);
     return Number.isFinite(n) ? n : defaut;
 };
+// UNE VALEUR DE DÉGÂTS OU DE SOIN GARDE SES DÉCIMALES. Le grimoire peut dire
+// « 1,5 » par cran : lue avec `nombre`, elle perdait son demi-point avant même
+// d'entrer dans la chaîne (1,5 → 1). Elle traverse désormais le calcul telle
+// quelle, et n'est arrondie qu'une fois, AU PLUS PROCHE, là où le moteur
+// arrondissait déjà (après les résistances) : 1,5 → 2, 4,5 → 5, critique 3.
+export const decimal = (v, defaut = 0) => {
+    if (v === undefined || v === null || v === "") return defaut;
+    const n = parseFloat(String(v).replace(",", "."));
+    return Number.isFinite(n) ? n : defaut;
+};
 
 // =========================================================================
 //  1. LES DÉFENSES, ÉTAT PAR ÉTAT
@@ -727,7 +737,7 @@ export function chaineDeDegats(cible, attaque, options) {
     //    ou une valeur négative venue d'ailleurs ferait autrement des dégâts
     //    NÉGATIFS — donc un soin déguisé, ou un bouclier qui grandit sous les
     //    coups. C'est le test de propriété qui l'a trouvé, au 633e essai.
-    let degats = Math.max(0, nombre(attaque.valeurBrute)) * (critique ? 2 : 1);
+    let degats = Math.max(0, decimal(attaque.valeurBrute)) * (critique ? 2 : 1);
 
     // 2. Une attaque À DISTANCE employée au contact perd trente pour cent.
     //
@@ -896,7 +906,7 @@ export function traverserZones(etat, id, hex, des) {
             const resistance = zone.degats.typeRes === "Magique"
                 ? defMagiqueDe(cible) : defPhysiqueDe(cible);
             const part = Math.min(Math.max(resistance, 0), 100) / 100;
-            const montant = Math.max(0, Math.round(nombre(zone.degats.valeurBrute) * (1 - part)));
+            const montant = Math.max(0, Math.round(decimal(zone.degats.valeurBrute) * (1 - part)));
             if (montant > 0) {
                 let surBouclier = 0;
                 if (cible.bouclier > 0) {
@@ -922,7 +932,7 @@ export function traverserZones(etat, id, hex, des) {
         // brasier.
         if (zone.soin && !enSursis(cible)) {     // en sursis : aucun soin
             const avant = cible.pv;
-            cible.pv = Math.min(cible.pvMax, cible.pv + nombre(zone.soin.valeurBrute));
+            cible.pv = Math.min(cible.pvMax, cible.pv + Math.max(0, Math.round(decimal(zone.soin.valeurBrute))));
             if (cible.pv !== avant) {
                 etapes.push({ type: "soin", cible: id, acteur: zone.idLanceur || id,
                               montant: cible.pv - avant, pvApres: cible.pv, zone: zone.id });
@@ -978,7 +988,7 @@ export function creerZonePure(etat, action, hexes, idLanceur) {
     const soigne = attaques.find(a => a.isHeal && nombre(a.valeurBrute) > 0);
     const alt = (action.alterations || []).find(a => a && a.persistante);
 
-    const degats = frappe ? { valeurBrute: nombre(frappe.valeurBrute), typeRes: frappe.typeRes } : null;
+    const degats = frappe ? { valeurBrute: decimal(frappe.valeurBrute), typeRes: frappe.typeRes } : null;
     // PLUS DE NAPPE QUI SOIGNE (règle de Nico) : la Persistance terrain ne se
     // pose pas sur un soin. La Forge la grise ; ici, une carte qui en porterait
     // quand même (ancienne carte, soin posé à côté d'une attaque persistante)
@@ -1399,7 +1409,7 @@ export function resoudreCarte(etat, action, plateau) {
                 const pct = nombre(attaque.pourcentPV);
                 const gain = pct > 0
                     ? Math.max(0, Math.round(nombre(cible.pv) * pct / 100))
-                    : Math.max(0, nombre(attaque.valeurBrute));
+                    : Math.max(0, Math.round(decimal(attaque.valeurBrute)));
                 cible.bouclier = Math.max(0, avant + gain);
                 // LE BOUCLIER RETIENT SA TAILLE, et c'est tout le correctif.
                 //
@@ -1426,7 +1436,7 @@ export function resoudreCarte(etat, action, plateau) {
             //  dégât ni un soin.
             if (attaque.isHeal) {
                 const avant = cible.pv;
-                let soin = Math.max(0, nombre(attaque.valeurBrute) + bonusMonstre) * (critique ? 2 : 1);
+                let soin = Math.max(0, decimal(attaque.valeurBrute) + bonusMonstre) * (critique ? 2 : 1);
                 // CE QUE LA CIBLE FAIT DU SOIN QU'ELLE REÇOIT. L'Éthéré en tire
                 // trente pour cent de plus ; une plaie qui brûle en perd la
                 // moitié. Ces deux règles ne vivaient que dans l'ancien moteur :
@@ -1462,7 +1472,7 @@ export function resoudreCarte(etat, action, plateau) {
             // traverse donc le malus à bout portant et les résistances comme
             // un dégât normal, plutôt que de passer en douce derrière l'armure.
             const attaqueAvecBonus = bonusMonstre
-                ? { ...attaque, valeurBrute: nombre(attaque.valeurBrute) + bonusMonstre }
+                ? { ...attaque, valeurBrute: decimal(attaque.valeurBrute) + bonusMonstre }
                 : attaque;
 
             // UNE CIBLE FRAPPÉE : la chaîne de dégâts, puis tout ce qu'elle
@@ -1550,7 +1560,7 @@ export function resoudreCarte(etat, action, plateau) {
             // déjà porté). L'Hoplite prend la moitié arrondie au-dessus.
             const protecteur = protecteurRempart(suivant, cible);
             if (protecteur) {
-                const brut = nombre(attaqueAvecBonus.valeurBrute);
+                const brut = decimal(attaqueAvecBonus.valeurBrute);
                 const partHoplite = Math.ceil(brut / 2);
                 etapes.push({ type: "message", cible: protecteur.id, acteur: idLanceur,
                               texte: "🛡️ Rempart", couleur: "#e8c46a" });
