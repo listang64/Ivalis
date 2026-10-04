@@ -115,7 +115,10 @@ window.decrireObjetsAvecMIA = async function(objets, options) {
         pouvoirs: o.effetTexte || "",
         // La tenue tirée au sort pour cette armure (variations_tenues.js).
         ...(o.variationTenue && typeof window.texteVariationTenue === "function"
-            ? { variation_imposee: window.texteVariationTenue(o.variationTenue) } : {})
+            ? { variation_imposee: window.texteVariationTenue(o.variationTenue) } : {}),
+        // Son couvre-chef, tiré avec elle (variations_tenues.js).
+        ...(o.casque && !(options && options.sansCasque) && typeof window.texteCouvreChef === "function"
+            ? { couvre_chef_impose: window.texteCouvreChef(o.casque) } : {})
     }));
 
     const promptSysteme = `Tu es MIA_Objets, l'armurière visionnaire d'Ivalis.
@@ -128,6 +131,7 @@ Décris : la forme et les proportions exactes, les matières (bois, bronze, fer,
 La rareté doit se VOIR : un objet commun est simple et sans fioriture ; un objet légendaire ou épique porte des matériaux nobles, des gravures fines et une lueur magique discrète.
 UNE ARMURE COMMUNE N'EST PAS UNE GUENILLE : simple et sobre, mais propre, entière et bien entretenue. Jamais déchirée, rapiécée, trouée, effilochée, tachée ni miteuse.
 QUAND UNE ARMURE PORTE UNE « variation_imposee », c'est la direction artistique de sa tenue, tirée au sort pour qu'aucune ne ressemble à une autre : suis-la fidèlement (culture, coupe, pièces, ornements et couleurs), en gardant la qualité que dit la rareté. Le nom de l'objet n'est qu'une étiquette : c'est la variation qui décide de l'allure.
+QUAND UNE ARMURE PORTE UN « couvre_chef_impose », il fait partie de la tenue : décris-le aussi (matières, ornements, couleurs assorties à la tenue), posé avec elle.
 Si l'objet a des pouvoirs, fais-les transparaître dans la matière (runes, veines lumineuses, givre, braise) — jamais par du texte écrit sur l'objet.
 Ne décris JAMAIS de personne, de main, de mannequin, de décor ni de fond : uniquement l'objet lui-même.
 Deux objets du même nom doivent être visiblement différents l'un de l'autre.
@@ -241,6 +245,9 @@ window.promptImageObjet = function(objet, description, style, options) {
     // de l'armure, et elle part ici même si MIA n'a rien pu décrire.
     const variation = estArmure && objet.variationTenue && typeof window.texteVariationTenue === "function"
         ? window.texteVariationTenue(objet.variationTenue) : "";
+    // Son couvre-chef (jamais pour l'armure de départ d'un héros).
+    const couvreChef = estArmure && !sansCasque && objet.casque && typeof window.texteCouvreChef === "function"
+        ? window.texteCouvreChef(objet.casque) : "";
     // Le gris (Commun) : simple, jamais pouilleux.
     const qualiteCommune = estArmure && (objet.rarete || "Commun") === "Commun"
         ? "QUALITÉ COMMUNE : une tenue simple et sobre, sans ornement précieux, mais propre, entière et bien "
@@ -259,6 +266,8 @@ window.promptImageObjet = function(objet, description, style, options) {
     if (objet.rarete) prompt += ` (qualité ${objet.rarete})`;
     prompt += ".\n";
     if (variation) prompt += "DIRECTION ARTISTIQUE DE CETTE TENUE (tirée au sort, à respecter) : " + variation + "\n";
+    if (couvreChef) prompt += "COUVRE-CHEF DE LA TENUE (à dessiner, posé au sol au-dessus du col, assorti à la tenue) : "
+        + couvreChef + ". Il est vide lui aussi : aucune tête dessous.\n";
     if (description) prompt += description + "\n";
     prompt += qualiteCommune;
     prompt += "\n";
@@ -402,7 +411,7 @@ window.illustrerLesObjets = async function(objets, surImage, options) {
 
     const style = await window.styleGraphiqueIvalis();
     // Chaque armure reçoit sa tenue tirée au sort avant d'être décrite.
-    if (typeof window.tirerVariationsTenues === "function") window.tirerVariationsTenues(objets);
+    if (typeof window.tirerVariationsTenues === "function") window.tirerVariationsTenues(objets, undefined, options);
     const descriptions = await window.decrireObjetsAvecMIA(objets, options);
 
     let reussies = 0;
@@ -462,8 +471,14 @@ window.avancementImagesButin = function(butin, idsPersonnages) {
 // pouvoir viser une case de tableau par un chemin pointé. La transaction de
 // modifierPartie garantit qu'aucune décision prise pendant ce temps n'est
 // perdue, et l'image n'écrase jamais une image déjà posée par un autre poste.
-window.poserImageObjetEnBase = async function(uid, url) {
+// Ce qui accompagne l'image sur l'objet : son couvre-chef, tiré avec la tenue.
+// Sans lui, la question « porter le couvre-chef ? » ne pourrait plus être posée
+// au moment d'équiper l'armure (loot.js, demanderCasque).
+window.extraImageObjet = (objet) => (objet && objet.casque ? { casque: objet.casque } : {});
+
+window.poserImageObjetEnBase = async function(uid, url, objet) {
     if (!uid || !url) return false;
+    const extra = window.extraImageObjet(objet);
 
     const pose = await window.modifierPartie((data) => {
         const butin = data.Butin;
@@ -475,6 +490,7 @@ window.poserImageObjetEnBase = async function(uid, url) {
             const cible = items.find(it => it.uid === uid);
             if (!cible || cible.image) return;
             cible.image = url;
+            Object.assign(cible, extra);
             maj[`Butin.parPersonnage.${id}.items`] = items;
         });
 
@@ -482,6 +498,7 @@ window.poserImageObjetEnBase = async function(uid, url) {
         const dansPool = pool.find(it => it.uid === uid);
         if (dansPool && !dansPool.image) {
             dansPool.image = url;
+            Object.assign(dansPool, extra);
             maj["Butin.pool"] = pool;
         }
 
@@ -491,18 +508,18 @@ window.poserImageObjetEnBase = async function(uid, url) {
 
     // L'objet a pu être équipé pendant que son image se dessinait : sa copie sur
     // la fiche du héros mérite l'image qu'on vient de payer.
-    await illustrerEquipementPorte(uid, url);
+    await illustrerEquipementPorte(uid, url, extra);
     return !!pose;
 };
 
-async function illustrerEquipementPorte(uid, url) {
+async function illustrerEquipementPorte(uid, url, extra) {
     const champs = ["Equip_Armure", "Equip_Main_Droite", "Equip_Main_Gauche"];
     for (const perso of (window.PERSOS_PARTIE || [])) {
         const maj = {};
         champs.forEach(champ => {
             const porte = perso[window.champDocVersFront[champ]];
             if (porte && porte.uid === uid && !porte.image) {
-                maj[champ] = Object.assign({}, porte, { image: url });
+                maj[champ] = Object.assign({}, porte, { image: url }, extra || {});
             }
         });
         if (Object.keys(maj).length === 0) continue;
@@ -540,7 +557,7 @@ window.lancerIllustrationButin = async function(butin, idsPersonnages) {
 
     try {
         await window.illustrerLesObjets(objets, async (objet, url) => {
-            await window.poserImageObjetEnBase(objet.uid, url);
+            await window.poserImageObjetEnBase(objet.uid, url, objet);
             if (typeof window.rafraichirFouilleButin === "function") window.rafraichirFouilleButin();
         });
     } catch (e) {
@@ -584,9 +601,24 @@ window.PROMPT_AVATAR_ARMURE =
   + "Le personnage est vu de trois quarts, regardant vers la gauche, cadré en plan américain (coupé "
   + "aux genoux), exactement comme sur l'image de référence. Ne dessine aucun texte.";
 
+// LE COUVRE-CHEF SUR LE PORTRAIT. Le portrait de référence est toujours tête
+// nue (le héros de départ) : c'est le choix fait au moment d'équiper l'armure
+// (`casquePorte`, loot.js) qui dit s'il le porte. Sans couvre-chef, ou s'il a
+// choisi de ne pas le porter, la tête reste nue — même si l'image de l'armure
+// en montre un.
+window.promptAvatarArmure = function(armure) {
+    const avec = !!(armure && armure.casque && armure.casquePorte);
+    const nom = avec && armure.casque.nom ? ` (${armure.casque.nom})` : "";
+    return window.PROMPT_AVATAR_ARMURE + "\n\n" + (avec
+        ? `COUVRE-CHEF : le personnage PORTE sur la tête le couvre-chef posé avec l'armure dans la seconde image${nom}. `
+          + "S'il couvre le visage, il est relevé sur le front : le visage reste entièrement visible et reconnaissable."
+        : "COUVRE-CHEF : le personnage reste TÊTE NUE, avec la coiffure de la première image. Si la seconde image "
+          + "montre un casque, un chapeau ou un autre couvre-chef, ne le dessine PAS sur lui.");
+};
+
 // L'appel au dessinateur, avec DEUX images jointes. La même cascade de modèles
 // que les pions : gpt-image-2 d'abord, les précédents en repli.
-async function dessinerAvatarHabille(blobPersonnage, blobArmure, cles) {
+async function dessinerAvatarHabille(blobPersonnage, blobArmure, cles, prompt) {
     const modeles = [
         { model: "gpt-image-2" },
         { model: "gpt-image-1.5", input_fidelity: "high" },
@@ -600,7 +632,7 @@ async function dessinerAvatarHabille(blobPersonnage, blobArmure, cles) {
 
             const form = new FormData();
             form.append("model", candidat.model);
-            form.append("prompt", window.PROMPT_AVATAR_ARMURE);
+            form.append("prompt", prompt || window.PROMPT_AVATAR_ARMURE);
             // L'ordre compte : le personnage EN PREMIER. C'est sur lui que
             // portent les retouches, l'armure n'est qu'une référence de style.
             form.append("image[]", blobPersonnage, "personnage.png");
@@ -729,7 +761,7 @@ window.rhabillerAvatar = async function(idPersonnage, armure, urlReference) {
             return "";
         }
 
-        const dessin = await dessinerAvatarHabille(blobPerso, blobArmure, cles);
+        const dessin = await dessinerAvatarHabille(blobPerso, blobArmure, cles, window.promptAvatarArmure(armure));
         if (!dessin) return "";
 
         const url = await hebergerAvatarDetoure(dessin, cles);
@@ -791,7 +823,7 @@ window.suivreArmureEquipee = async function(idPersonnage, objet, urlReference) {
         // et sur la fiche du héros qui la porte.
         await window.illustrerLesObjets([armure], async (o, url) => {
             if (typeof window.poserImageObjetEnBase === "function") {
-                await window.poserImageObjetEnBase(o.uid, url);
+                await window.poserImageObjetEnBase(o.uid, url, o);
             }
             await poserImageArmurePortee(idPersonnage, o.uid, url);
         });

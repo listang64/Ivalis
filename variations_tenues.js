@@ -14,8 +14,10 @@
 //  Le tirage évite les répétitions : jamais deux fois la même variation dans
 //  un même lot, et les dernières tirées sur cet appareil passent leur tour.
 //
-//  Aucune variation ne décrit de casque ni de coiffe (l'équipement de départ
-//  d'un héros doit laisser son visage découvert) ni de pièce médiévale.
+//  Aucune variation ne décrit de casque ni de coiffe, ni de pièce médiévale :
+//  le couvre-chef se tire à part (COUVRE_CHEFS, plus bas), pour que l'armure
+//  de départ d'un héros n'en ait jamais et que le joueur choisisse de porter
+//  celui d'une armure du butin ou non.
 // =========================================================================
 
 window.VARIATIONS_TENUES = {
@@ -129,6 +131,113 @@ window.VARIATIONS_TENUES = {
     ]
 };
 
+// =========================================================================
+//  LES COUVRE-CHEFS
+// =========================================================================
+//  Tirés avec la tenue, dessinés posés au sol avec elle. Au moment d'équiper
+//  l'armure, le joueur choisit de le porter ou non sur son portrait (loot.js,
+//  demanderCasque). L'armure de départ d'un héros n'en a jamais.
+//  Un casque qui couvre le visage se porte relevé sur le front : sur le
+//  portrait, le visage du héros doit rester reconnaissable.
+window.COUVRE_CHEFS = {
+    "Armure légère": [
+        { nom: "Pétase de voyageur", description: "chapeau de feutre à large bord rond, tenu par un cordon sous le menton" },
+        { nom: "Bonnet phrygien", description: "bonnet de laine souple à pointe recourbée vers l'avant" },
+        { nom: "Couronne de laurier", description: "couronne de feuilles de laurier en bronze doré" },
+        { nom: "Voile de lin", description: "voile de lin fin posé sur la tête et tombant sur les épaules" },
+        { nom: "Capuche de voyage", description: "capuche de laine épaisse rabattue, bordée d'un galon tissé" },
+        { nom: "Tiare perse", description: "haute tiare de feutre souple aux rabats latéraux brodés" },
+        { nom: "Némès", description: "coiffe de lin rayé à larges pans retombant sur les épaules, à la manière égyptienne" },
+        { nom: "Couronne de lierre", description: "couronne de lierre tressé aux baies sombres" },
+        { nom: "Tholia", description: "chapeau de paille conique à large bord, comme ceux des femmes de Tanagra" },
+        { nom: "Polos", description: "haute couronne cylindrique ornée de rosettes" },
+        { nom: "Bandeau brodé", description: "large bandeau de tissu brodé de méandres, noué derrière la tête" },
+        { nom: "Capuchon scythe", description: "capuchon de feutre pointu à rabats sur les joues, appliques animalières" },
+        { nom: "Cercle d'or", description: "fin cercle d'or martelé posé sur le front" },
+        { nom: "Mitre babylonienne", description: "haute coiffe arrondie à bandeau brodé d'étoiles" },
+        { nom: "Turban de soie", description: "turban de soie enroulé, fermé par une broche de cornaline" },
+        { nom: "Couronne d'asphodèles", description: "couronne de fleurs d'asphodèle en argent terni" },
+        { nom: "Diadème lunaire", description: "diadème d'argent orné d'un croissant de lune" },
+        { nom: "Kausia", description: "béret de feutre plat à bord roulé, à la macédonienne" },
+        { nom: "Pilos de feutre", description: "bonnet conique de feutre sans bord" },
+        { nom: "Couronne de chêne", description: "couronne de feuilles de chêne en bronze patiné" },
+        { nom: "Voile étoilé", description: "voile bleu nuit semé de petites étoiles d'argent" },
+        { nom: "Coiffe de plumes", description: "bandeau de cuir orné de plumes de faucon dressées" },
+        { nom: "Calotte de prêtre", description: "calotte de lin blanc à liseré doré" },
+        { nom: "Couronne solaire", description: "couronne de rayons de bronze doré" },
+        { nom: "Capuche de mage", description: "capuche profonde de laine teinte, bord brodé de symboles astraux" },
+        { nom: "Bonnet de marin", description: "bonnet de laine conique, tel qu'en portent les navigateurs phéniciens" },
+        { nom: "Couronne de roseaux", description: "couronne de roseaux tressés et de coquillages" },
+        { nom: "Mantille de Colchide", description: "voile rouge sombre retenu par un bandeau de fils d'or" },
+        { nom: "Chapeau de berger", description: "petit chapeau de feutre à bord court relevé" },
+        { nom: "Couronne de cornes", description: "bandeau de bronze portant deux petites cornes de bélier stylisées" }
+    ],
+    "Armure intermédiaire": [
+        { nom: "Casque de cuir bouilli", description: "calotte de cuir bouilli renforcée de rivets, à couvre-nuque" },
+        { nom: "Casque à défenses de sanglier", description: "casque mycénien couvert de rangées de défenses de sanglier taillées" },
+        { nom: "Pilos de bronze", description: "casque conique de bronze sans bord, simple et poli" },
+        { nom: "Casque thrace léger", description: "casque de bronze à cimier pointu vers l'avant et larges paragnathides" },
+        { nom: "Capuche de cuir", description: "capuche de cuir épais à rabats lacés" },
+        { nom: "Bonnet de feutre renforcé", description: "bonnet de feutre épais cousu de lamelles de corne" },
+        { nom: "Kausia renforcée", description: "béret de feutre macédonien doublé d'une calotte de bronze" },
+        { nom: "Casque scythe", description: "calotte de feutre et d'écailles de bronze, à couvre-joues" },
+        { nom: "Casque à oreillettes", description: "calotte de cuir à oreillettes rabattues sur les joues" },
+        { nom: "Casque crétois à cornes", description: "calotte de bronze portant deux petites cornes" },
+        { nom: "Casque de peau de loup", description: "tête de loup tannée portée en capuche sur les épaules" },
+        { nom: "Casque de peltaste", description: "casque de bronze léger à rebord avant court et crête de crin" },
+        { nom: "Turban de guerre", description: "turban de lin serré autour d'une calotte de cuir" },
+        { nom: "Casque phrygien de bronze", description: "casque de bronze à pointe recourbée vers l'avant" },
+        { nom: "Calotte de lin collé", description: "calotte de lin lamellé collé, légère et rigide" },
+        { nom: "Casque à plumes", description: "calotte de bronze piquée de deux hautes plumes latérales" },
+        { nom: "Casque égyptien de cuir", description: "coiffe de cuir rembourré à bandes, couvrant la nuque" },
+        { nom: "Capuchon d'écailles", description: "capuchon de cuir couvert de petites écailles d'os" },
+        { nom: "Casque ibère en tendons", description: "casque tressé de tendons et de cuir, crête de crin rouge" },
+        { nom: "Casque à cimier de cerf", description: "calotte de cuir surmontée de petits bois de cerf" },
+        { nom: "Bandeau de bronze", description: "large bandeau de bronze ciselé protégeant le front" },
+        { nom: "Casque de chasse d'Artémis", description: "calotte de cuir vert ciselée d'un croissant de lune" },
+        { nom: "Casque ailé d'Hermès", description: "calotte de bronze légère ornée de deux petites ailes" },
+        { nom: "Casque de rétiaire", description: "épaulière de bronze haute (galerus) protégeant le côté du visage" },
+        { nom: "Casque dace", description: "calotte conique de fer à rebord, crête courte" },
+        { nom: "Bonnet sarmate", description: "haut bonnet de feutre pointu renforcé de plaquettes d'argent" },
+        { nom: "Casque à couvre-joues de cuir", description: "calotte de bronze avec couvre-joues de cuir lacés" },
+        { nom: "Casque de Pétra", description: "calotte de cuir teinte rose sable, voile de lin à l'arrière" },
+        { nom: "Casque des Enfers", description: "calotte de cuir noir gravée d'asphodèles, couvre-nuque fumé" },
+        { nom: "Casque de myrmidon", description: "calotte de bronze noircie à crête basse" }
+    ],
+    "Armure lourde": [
+        { nom: "Casque corinthien", description: "casque de bronze à nasal et couvre-joues, porté relevé sur le front, crête de crin" },
+        { nom: "Casque attique", description: "casque de bronze ouvert sur le visage, couvre-joues mobiles, haute crête" },
+        { nom: "Casque chalcidien", description: "casque de bronze à découpes pour les oreilles et nasal court" },
+        { nom: "Casque béotien", description: "casque de bronze en forme de chapeau à bord replié" },
+        { nom: "Casque thrace à crête", description: "casque de bronze à cimier pointu et paragnathides ciselées" },
+        { nom: "Casque illyrien", description: "casque de bronze à crête double et ouverture rectangulaire pour le visage" },
+        { nom: "Galea impériale", description: "casque de fer à couvre-nuque large, couvre-joues et arceau frontal" },
+        { nom: "Montefortino", description: "casque de bronze à bouton sommital et petit couvre-nuque" },
+        { nom: "Casque de centurion", description: "casque argenté à crête transversale de crin rouge" },
+        { nom: "Casque coolus", description: "casque de bronze arrondi à couvre-nuque plat" },
+        { nom: "Casque de cataphracte", description: "casque conique de fer à camail d'écailles couvrant la nuque" },
+        { nom: "Casque assyrien", description: "casque conique de bronze à pointe et couvre-oreilles" },
+        { nom: "Khepresh", description: "couronne de guerre égyptienne bleue, ornée de petits disques d'or" },
+        { nom: "Casque phrygien à crête", description: "casque de bronze à pointe recourbée et crête de crin" },
+        { nom: "Casque hellénistique à plumes", description: "casque de fer doré flanqué de deux plumes blanches" },
+        { nom: "Casque à cornes de taureau", description: "casque de bronze portant deux cornes de taureau polies" },
+        { nom: "Casque à visage de lion", description: "casque de bronze dont le front est sculpté en mufle de lion" },
+        { nom: "Casque d'Héphaïstos", description: "casque de bronze noirci aux veines de braise, crête de métal" },
+        { nom: "Casque de Poséidon", description: "casque nacré en forme de coquillage, crête comme une nageoire" },
+        { nom: "Casque d'Hadès", description: "casque de bronze sombre à crête de crin noir, ornements de grenades" },
+        { nom: "Casque de Talos", description: "casque de bronze rivé aux jointures apparentes, comme un automate" },
+        { nom: "Casque d'Arès", description: "casque rouge sang à crête haute, couvre-joues gravés de chiens de guerre" },
+        { nom: "Casque d'orichalque", description: "casque d'orichalque rougeoyant à motifs de cercles concentriques" },
+        { nom: "Casque à crête de griffon", description: "casque de bronze surmonté d'un griffon ciselé" },
+        { nom: "Casque de Mycènes", description: "casque de bronze à couvre-joues larges et petit cimier" },
+        { nom: "Casque samnite", description: "casque de bronze à larges bords et deux plumes latérales" },
+        { nom: "Casque celtibère", description: "casque de bronze arrondi à crête en forme de croissant" },
+        { nom: "Casque sassanide", description: "casque de fer à segments rivés et pointe, couvre-nuque d'écailles" },
+        { nom: "Casque d'Ourartou", description: "casque conique de bronze gravé de lions" },
+        { nom: "Casque de légat", description: "casque argenté ciselé d'aigles, haute crête blanche" }
+    ]
+};
+
 // Une palette de couleurs tirée en plus de la variation : la même tenue ne
 // revient jamais deux fois sous les mêmes teintes.
 window.PALETTES_TENUES = [
@@ -160,8 +269,10 @@ window.typeTenue = function(objet) {
 // description, palette } — sauf celle qui en a déjà une. Pas deux fois la
 // même dans le lot ; les plus récentes (sur cet appareil) passent leur tour
 // tant qu'il en reste d'autres.
-window.tirerVariationsTenues = function(objets, hasard) {
+window.tirerVariationsTenues = function(objets, hasard, options) {
     const tirer = typeof hasard === "function" ? hasard : Math.random;
+    // L'armure de départ d'un héros n'a jamais de couvre-chef.
+    const sansCasque = !!(options && options.sansCasque);
     const recentes = lireRecentes();
     const prises = {};
     (objets || []).forEach(o => {
@@ -178,12 +289,28 @@ window.tirerVariationsTenues = function(objets, hasard) {
         const palettes = window.PALETTES_TENUES;
         const palette = palettes[Math.min(palettes.length - 1, Math.floor(tirer() * palettes.length))];
         o.variationTenue = { titre: v.titre, description: v.description, palette };
+        // Son couvre-chef, tiré dans la liste du même type d'armure — jamais
+        // deux fois le même dans le lot.
+        const chefs = (window.COUVRE_CHEFS || {})[type] || [];
+        if (!sansCasque && !o.sansCasque && chefs.length && !o.casque) {
+            const chefsPris = prises["casque:" + type] || (prises["casque:" + type] = []);
+            const libres = chefs.filter(c => !chefsPris.includes(c.nom));
+            const pool = libres.length ? libres : chefs;
+            const c = pool[Math.min(pool.length - 1, Math.floor(tirer() * pool.length))];
+            o.casque = { nom: c.nom, description: c.description };
+            chefsPris.push(c.nom);
+        }
         dejaLot.push(v.titre);
         recentes[type] = [...(recentes[type] || []).filter(t => t !== v.titre), v.titre]
             .slice(-window.MEMOIRE_VARIATIONS_TENUES);
     });
     ecrireRecentes(recentes);
     return objets;
+};
+
+// Le couvre-chef en une phrase.
+window.texteCouvreChef = function(c) {
+    return c && c.nom ? `${c.nom} — ${c.description}` : "";
 };
 
 // La variation en une phrase, telle qu'elle part aux deux IA.

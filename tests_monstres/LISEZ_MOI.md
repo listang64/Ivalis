@@ -162,6 +162,7 @@ node medicus.mjs              # la classe Médicus : +5 % régénération de fat
 node chasseur_de_mages.mjs    # la classe Chasseur de mages : +10 % résistance magique, effet Lumière (ignore la défense magique, 15 %/cran, max 60 %), sorts de lumière qui aveuglent la cible et les ennemis adjacents (30 %)
 node tenues_variees.mjs        # les skins d'armure : 34 tenues antiques par type tirées au sort (+ 16 palettes), sans répétition, envoyées à MIA et au dessinateur ; le gris est simple mais propre
 node versions_modules.mjs      # la carte des imports : chaque module du moteur chargé une seule fois, à la version de sa balise (fin du moteur périmé après un déploiement)
+node couvre_chef.mjs           # le couvre-chef des armures : 30 casques/chapeaux/coiffes par type tirés avec la tenue, dessinés sur l'armure (jamais sur celle de départ), choix « avec / tête nue » à l'équipement, le portrait suit
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4124,3 +4125,33 @@ page, qu'aucun module n'est demandé sans `?v=` ni chargé deux fois.
 - Le bandeau « Sélectionner une compétence / En attente des joueurs » descend
   en bas de la fenêtre (`bottom: 24px`), il ne couvre plus la piste
   d'initiative (titre_preparation.mjs).
+
+## Le couvre-chef des armures, et le récapitulatif des caractéristiques (version 163)
+
+**Le couvre-chef** (variations_tenues.js `COUVRE_CHEFS`). 30 couvre-chefs par
+type d'armure : casques (corinthien, attique, béotien, galea, cataphracte…),
+chapeaux (pétase, tholia, kausia…) et coiffes (bonnet phrygien, némès, tiare
+perse, couronnes de laurier ou d'asphodèles…). Le tirage des tenues
+(`tirerVariationsTenues`) en donne un à chaque armure du butin (`casque`),
+jamais deux fois le même dans un lot, et jamais à l'armure de départ d'un
+héros (option `sansCasque`). Un casque qui couvre le visage se porte relevé.
+- **Dessiné sur l'armure** : MIA_Objets le décrit (`couvre_chef_impose`) et le
+  dessinateur le pose au sol avec la tenue, vide (`promptImageObjet`).
+- **Gardé sur l'objet** : il est écrit avec l'image dans le butin, la réserve
+  ou l'armure portée (`extraImageObjet`, `poserImageObjetEnBase`,
+  `poserImageDansLaReserve`), pour que la question puisse être posée plus tard.
+- **À l'équipement** (loot.js `equiperObjet`, `demanderCasque`), dans le butin
+  comme ailleurs : une fenêtre demande « Avec le couvre-chef » ou « Tête
+  nue ». Le choix part avec l'armure équipée (`casquePorte`).
+- **Le portrait** (objets_ia.js `promptAvatarArmure`) : il repart toujours du
+  portrait de référence, tête nue, et ajoute le couvre-chef seulement si le
+  joueur l'a choisi, visage visible ; sinon la tête reste nue, même si l'image
+  de l'armure montre un casque.
+
+**L'onglet Caractéristiques** (app.js `afficherStatsFinales`). Le bandeau des
+PV max est remplacé par le récapitulatif des six caractéristiques, avec leur
+modificateur. Les PV restent dans l'onglet Statistiques. `caracAvecBonus`
+ajoute à la base les bonus de race ou de classe (atout `caracs`) et
+d'équipement (bonus de même clé : `force`, `dex`…), et le récap affiche
+« dont +N » quand il y en a. Aujourd'hui aucun atout ni objet n'en donne :
+la valeur affichée est la base.

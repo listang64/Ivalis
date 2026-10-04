@@ -139,8 +139,8 @@ console.log("\n3. CE QUI PART AUX DEUX IA (objets_ia.js)");
     const i = src.indexOf("window.illustrerLesObjets = async function");
     const corpsIllu = src.slice(i, src.indexOf("};", i));
     verifier("le tirage se fait avant la description, dans illustrerLesObjets",
-             corpsIllu.indexOf("tirerVariationsTenues(objets)") > 0
-             && corpsIllu.indexOf("tirerVariationsTenues(objets)") < corpsIllu.indexOf("decrireObjetsAvecMIA"));
+             corpsIllu.indexOf("tirerVariationsTenues(objets") > 0
+             && corpsIllu.indexOf("tirerVariationsTenues(objets") < corpsIllu.indexOf("decrireObjetsAvecMIA"));
     const html = fs.readFileSync(`${RACINE}/index.html`, 'utf-8');
     verifier("la page charge les variations avant objets_ia.js",
              html.indexOf('src="variations_tenues.js') > 0 && html.indexOf('src="variations_tenues.js') < html.indexOf('src="objets_ia.js'));

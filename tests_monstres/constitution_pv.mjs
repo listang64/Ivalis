@@ -164,14 +164,31 @@ console.log("\n3. LA VALEUR VRAIMENT SAUVEGARDÉE SUIT LA MÊME FORMULE");
 }
 
 // =========================================================================
-console.log("\n4. LA FICHE D'UN HÉROS DÉJÀ CRÉÉ AFFICHE LA MÊME FORMULE");
+console.log("\n4. L'ONGLET CARACTÉRISTIQUES : PLUS DE PV, LE RÉCAPITULATIF DES CARACS");
 // =========================================================================
 {
-  const pv = await p.evaluate(() => {
-    window.afficherStatsFinales({ force: 8, dex: 8, con: 11, int: 8, sag: 8, cha: 8 });
-    return parseInt(document.getElementById("affichage-pv-max").innerText, 10);
+  // Demande de Nico : les PV quittent l'onglet Caractéristiques (ils sont dans
+  // l'onglet Statistiques) ; à leur place, les six caracs, bonus compris.
+  const r = await p.evaluate(() => {
+    window.PERSOS_PARTIE = [{ idPersonnage: "H1", race: "Testeur" }];
+    window.afficherStatsFinales({ force: 13, dex: 8, con: 11, int: 15, sag: 10, cha: 9 }, "H1");
+    const lire = () => [...document.querySelectorAll("#recap-caracs-perso .recap-carac")].map(x => [
+      x.dataset.carac, x.querySelector(".recap-carac-valeur").textContent, x.querySelector(".recap-carac-mod").textContent.trim()]);
+    const sans = lire();
+    // Un bonus de race fictif (+2 en Force) : le récap le compte.
+    window.ATOUTS_RACES.Testeur = { caracs: { force: 2 } };
+    window.afficherStatsFinales({ force: 13, dex: 8, con: 11, int: 15, sag: 10, cha: 9 }, "H1");
+    const avec = lire();
+    delete window.ATOUTS_RACES.Testeur;
+    return { sans, avec, pv: !!document.getElementById("affichage-pv-max"),
+             texte: document.getElementById("onglet-caracs").textContent };
   });
-  verifier("Constitution 11 (impaire) affiche bien 54 PV sur la fiche", pv === 54, String(pv));
+  verifier("plus de PV dans l'onglet Caractéristiques", !r.pv && !/Points de Vie Max/.test(r.texte));
+  verifier("les six caractéristiques en récapitulatif, avec leur modificateur",
+           JSON.stringify(r.sans) === '[["force","13","+1"],["dex","8","-1"],["con","11","+0"],["int","15","+2"],["sag","10","+0"],["cha","9","-1"]]',
+           JSON.stringify(r.sans));
+  verifier("un bonus de caractéristique est compté (Force 13 + 2 = 15, dont +2)",
+           r.avec[0][1] === "15" && /\+2 · dont \+2/.test(r.avec[0][2]), JSON.stringify(r.avec[0]));
 }
 
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

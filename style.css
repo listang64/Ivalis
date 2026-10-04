@@ -3852,3 +3852,16 @@ textarea.input-texte-parchemin {
 .choix-rempart-allie img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; }
 .choix-rempart-allie:hover { background: #4a3018; }
 .choix-rempart-annuler { background: transparent; color: #c2a878; border: 1px solid #5c3a21; border-radius: 16px; padding: 6px 18px; cursor: pointer; }
+
+/* Le récapitulatif des caractéristiques, en tête de l'onglet Caractéristiques. */
+.recap-caracs {
+    background: linear-gradient(135deg, rgba(92, 58, 33, 0.15), rgba(42, 26, 15, 0.05));
+    border: 2px solid #c2a878; border-radius: 10px; padding: 12px; margin-bottom: 25px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2), inset 0 0 10px rgba(255,255,255,0.4);
+}
+.recap-caracs-grille { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.recap-carac { display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 0; }
+.recap-carac-nom { font-size: 10px; font-weight: bold; color: #5c3a21; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.recap-carac-valeur { font-family: 'Cinzel', serif; font-size: 28px; font-weight: bold; color: #2a1a0f; line-height: 1.1; }
+.recap-carac-mod { font-size: 13px; color: #4a2e1b; }
+@media (max-width: 560px) { .recap-caracs-grille { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

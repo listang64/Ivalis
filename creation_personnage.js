@@ -488,8 +488,6 @@ window.afficherStatsCombat = function(donnees) {
     document.getElementById("stat-defphys").innerText = finalDefPhys + "%";
     document.getElementById("stat-defmag").innerText = finalDefMag + "%";
 
-    const affPv = document.getElementById("affichage-pv-max");
-    if (affPv) affPv.innerText = finalPv;
 
     const setDevMod = (id, val) => {
         const el = document.getElementById(id);

@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=45">
+  <link rel="stylesheet" href="style.css?v=46">
 
  
   <!-- ===================================================================== -->
@@ -1597,16 +1597,11 @@
 
       <div id="caracs-affiche" style="display: none; text-align: left;">
         
-        <div id="bandeau-vital-perso" style="display: flex; flex-direction: column; justify-content: center; background: linear-gradient(135deg, rgba(92, 58, 33, 0.15), rgba(42, 26, 15, 0.05)); border: 2px solid #c2a878; border-radius: 10px; padding: 15px; margin-bottom: 25px; box-shadow: 0 4px 8px rgba(0,0,0,0.2), inset 0 0 10px rgba(255,255,255,0.4);">
-          <div style="display: flex; justify-content: center; align-items: center;">
-            <div style="display: flex; align-items: center; gap: 15px;">
-              <div style="font-size: 40px; filter: drop-shadow(2px 3px 3px rgba(0,0,0,0.5));">❤️</div>
-              <div style="display: flex; flex-direction: column; align-items: center;">
-                <span style="font-size: 14px; font-weight: bold; color: #5c3a21; text-transform: uppercase; letter-spacing: 1px;">Points de Vie Max</span>
-                <span style="font-size: 34px; font-weight: bold; color: #2a1a0f; font-family: 'Cinzel', serif; line-height: 1;" id="affichage-pv-max">8</span>
-              </div>
-            </div>
-          </div>
+        <!-- Le récapitulatif des six caractéristiques, bonus compris
+             (afficherStatsFinales, app.js). Les PV ont leur place dans
+             l'onglet Statistiques. -->
+        <div id="bandeau-vital-perso" class="recap-caracs">
+          <div id="recap-caracs-perso" class="recap-caracs-grille"></div>
         </div>
         <h3 style="margin-top: 0; border-bottom: 2px solid #5c3a21; padding-bottom: 5px; color: #2a1a0f;">Attributs &amp; Compétences</h3>
         <div id="conteneur-stats-affichage" style="margin-top: 20px;"></div>
@@ -1974,7 +1969,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=74"></script>
+<script src="trace_combat.js?v=75"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
      Les modules s'importent entre eux sans numéro (`from './moteur_pur.js'`).
      Sans cette carte, le navigateur les chargeait à part, à une adresse SANS
@@ -2027,11 +2022,11 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=33"></script>
 <script type="module" src="ia_master.js?v=7"></script>
-<script type="module" src="app.js?v=76"></script>
+<script type="module" src="app.js?v=77"></script>
 <script src="jet_d20.js?v=2"></script>
 <script src="fabrique_sons.js?v=3"></script>
 <script src="experience.js?v=1"></script>
-<script type="module" src="creation_personnage.js?v=13"></script>
+<script type="module" src="creation_personnage.js?v=14"></script>
 <script type="module" src="classes.js?v=7"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=43"></script>
@@ -2049,9 +2044,9 @@
 <script type="module" src="monstres_ia.js?v=34"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=13"></script>
-<script src="variations_tenues.js?v=1"></script>
-<script type="module" src="objets_ia.js?v=12"></script>
-<script type="module" src="loot.js?v=20"></script>
+<script src="variations_tenues.js?v=2"></script>
+<script type="module" src="objets_ia.js?v=13"></script>
+<script type="module" src="loot.js?v=21"></script>
 
 <!-- ============================================================= -->
 <!--  GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)  -->

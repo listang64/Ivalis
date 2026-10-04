@@ -220,9 +220,49 @@ window.libelleMain = function(main) {
     return main === "Gauche" ? "Main gauche" : main === "Droite" ? "Main droite" : "";
 };
 
+// LE COUVRE-CHEF D'UNE ARMURE. L'armure du butin vient avec le casque, le
+// chapeau ou la coiffe tiré avec elle (variations_tenues.js) et dessiné sur son
+// image. Au moment de l'équiper, le joueur choisit : le porter sur son portrait,
+// ou rester tête nue (le portrait de référence l'est toujours). Rend une
+// promesse de vrai/faux ; fermer la fenêtre, c'est rester tête nue.
+window.demanderCasque = function(objet) {
+    return new Promise(resoudre => {
+        let fenetre = document.getElementById("fenetre-choix-casque");
+        if (!fenetre) {
+            fenetre = document.createElement("div");
+            fenetre.id = "fenetre-choix-casque";
+            fenetre.className = "fenetre-choix-rempart";
+            document.body.appendChild(fenetre);
+        }
+        const echapper = (v) => String(v || "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+        const casque = objet.casque || {};
+        fenetre.innerHTML = `
+            <div class="choix-rempart-titre">⛑️ ${echapper(casque.nom || "Couvre-chef")}</div>
+            <div class="choix-rempart-texte">${echapper(objet.nom)} vient avec ce couvre-chef${casque.description ? ` : ${echapper(casque.description)}` : ""}.<br>Le porter sur votre portrait ?</div>
+            <div class="choix-rempart-liste">
+                <button type="button" class="choix-rempart-allie" data-choix="oui">Avec le couvre-chef</button>
+                <button type="button" class="choix-rempart-allie" data-choix="non">Tête nue</button>
+            </div>`;
+        fenetre.querySelectorAll("button[data-choix]").forEach(b => {
+            b.onclick = () => {
+                fenetre.style.display = "none";
+                if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+                resoudre(b.dataset.choix === "oui");
+            };
+        });
+        fenetre.style.display = "flex";
+    });
+};
+
 // Écrit un objet dans le ou les emplacements qui lui reviennent. L'ancien
 // occupant n'est conservé nulle part : c'est voulu, il n'existe pas de sac.
 window.equiperObjet = async function(idPersonnage, objet, main) {
+    // Une armure avec son couvre-chef : le joueur dit s'il le porte, et ce
+    // choix part avec l'armure (le portrait la suit, objets_ia.js).
+    if (objet && objet.emplacement === "Armure" && objet.casque && objet.casquePorte === undefined
+        && typeof window.demanderCasque === "function") {
+        objet = { ...objet, casquePorte: await window.demanderCasque(objet) };
+    }
     const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
 
     // Le garde-fou du bouclier : une main interdite (l'autre tient déjà un
@@ -654,7 +694,7 @@ window.lancerIllustrationReserve = async function(reserve, chemin) {
 
     try {
         await window.illustrerLesObjets(objets, async (objet, url) => {
-            await window.poserImageDansLaReserve(chemin, objet.uid, url);
+            await window.poserImageDansLaReserve(chemin, objet.uid, url, objet);
         });
     } catch (e) {
         // Une réserve sans images n'est pas une panne : la fouille des cadavres
@@ -667,7 +707,9 @@ window.lancerIllustrationReserve = async function(reserve, chemin) {
 // tableau d'items est réécrit en entier faute de pouvoir viser une case de
 // tableau, et c'est justement pourquoi cette écriture n'a rien à faire sur le
 // document que le combat se dispute.
-window.poserImageDansLaReserve = async function(chemin, uid, url) {
+window.poserImageDansLaReserve = async function(chemin, uid, url, objet) {
+    // Le couvre-chef tiré avec la tenue voyage avec l'image (objets_ia.js).
+    const extra = typeof window.extraImageObjet === "function" ? window.extraImageObjet(objet) : {};
     const io = window.ioCombatFirestore;
     if (!io || typeof io.transaction !== "function" || !uid || !url) return false;
 
@@ -677,7 +719,7 @@ window.poserImageDansLaReserve = async function(chemin, uid, url) {
         const items = (actuel.items || []).slice();
         const i = items.findIndex(it => it.uid === uid);
         if (i < 0 || items[i].image) return null;
-        items[i] = Object.assign({}, items[i], { image: url });
+        items[i] = Object.assign({}, items[i], { image: url }, extra);
         apres = Object.assign({}, actuel, { items });
         return apres;
     });

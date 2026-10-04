@@ -5365,7 +5365,7 @@ window.chargerCaracteristiques = async function(idPersonnage) {
   const memoireCaracs = localStorage.getItem(cleCacheCaracs);
   
   if (memoireCaracs) {
-      afficherStatsFinales(JSON.parse(memoireCaracs));
+      afficherStatsFinales(JSON.parse(memoireCaracs), idPersonnage);
       divAffiche.style.display = "block";
   }
 
@@ -5375,7 +5375,7 @@ window.chargerCaracteristiques = async function(idPersonnage) {
     if (snap.exists()) {
       const data = snap.data();
       localStorage.setItem(cleCacheCaracs, JSON.stringify(data)); // Mise à jour du cache
-      afficherStatsFinales(data);
+      afficherStatsFinales(data, idPersonnage);
       divAffiche.style.display = "block";
     } else if (!memoireCaracs) {
       divVide.style.display = "block";
@@ -5528,19 +5528,45 @@ window.validerCreationCaracs = async function() {
 };
 
 // 3. Rendu Final (Texte exact demandé)
-window.afficherStatsFinales = function(dataStats) {
+// LA VALEUR D'UNE CARACTÉRISTIQUE, BONUS COMPRIS : la base choisie à la
+// création, plus ce que la race ou la classe y ajoutent (atout `caracs`, par
+// exemple { force: 1 }) et ce que l'équipement y ajoute (bonus de la même clé
+// que la carac : « force », « dex »…). Aujourd'hui aucun atout ni objet n'en
+// donne : la valeur est la base, mais le jour où l'un d'eux en donnera, la
+// fiche l'affichera sans rien changer ici.
+window.caracAvecBonus = function(perso, cle, base) {
+  const atout = (perso && typeof window.atoutRace === "function") ? (window.atoutRace(perso).caracs || {}) : {};
+  const equip = (perso && typeof window.bonusEquip === "function") ? (parseInt(window.bonusEquip(perso, cle)) || 0) : 0;
+  return (parseInt(base) || 8) + (parseInt(atout[cle]) || 0) + equip;
+};
+
+window.afficherStatsFinales = function(dataStats, idPersonnage) {
   const conteneur = document.getElementById("conteneur-stats-affichage");
   conteneur.innerHTML = "";
+  const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage) || null;
+  const valeurDe = (c) => window.caracAvecBonus(perso, c.id, dataStats[c.id] || 8);
 
   // =========================================================
-  // MISE À JOUR DU BANDEAU FINAL SUR LA FICHE
+  // LE RÉCAPITULATIF EN TÊTE DE L'ONGLET (à la place des PV) :
+  // les six caractéristiques d'un coup d'œil, bonus compris.
   // =========================================================
-  const affPv = document.getElementById("affichage-pv-max");
-  if (affPv) affPv.innerText = pvMaxDepuisConstitution(dataStats.con || 8);
+  const recap = document.getElementById("recap-caracs-perso");
+  if (recap) {
+    recap.innerHTML = NOMS_CARACS.map(c => {
+      const val = valeurDe(c);
+      const bonus = val - (parseInt(dataStats[c.id]) || 8);
+      const mod = getModificateur(val);
+      return `<div class="recap-carac" data-carac="${c.id}">
+          <span class="recap-carac-nom">${c.nom}</span>
+          <span class="recap-carac-valeur">${val}</span>
+          <span class="recap-carac-mod">${mod >= 0 ? "+" + mod : mod}${bonus ? ` · dont ${bonus > 0 ? "+" : ""}${bonus}` : ""}</span>
+        </div>`;
+    }).join("");
+  }
   // =========================================================
 
   NOMS_CARACS.forEach(c => {
-    const val = dataStats[c.id] || 8;
+    const val = valeurDe(c);
     const mod = getModificateur(val);
     const modAff = mod >= 0 ? "+" + mod : mod;
     
