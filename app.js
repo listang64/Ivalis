@@ -715,8 +715,12 @@ window.ioCombatFirestore = {
             (e) => { signalerSiQuota(e); console.error("Écoute de l'état du combat :", e); });
     },
 
-    ecouterCollection(chemin, requete, rappel) {
-        return onSnapshot(query(collection(db, ...chemin), ...contraintesDe(requete, { sansLimite: true })),
+    // `metadonnees` : prévenu aussi quand seul le marqueur « pas encore en
+    // base » change. Sans lui, une intention écrite par ce poste restait
+    // invisible au cerveau jusqu'à la prochaine écriture (voir creerDepot).
+    ecouterCollection(chemin, requete, rappel, options) {
+        const opts = options && options.metadonnees ? { includeMetadataChanges: true } : {};
+        return onSnapshot(query(collection(db, ...chemin), ...contraintesDe(requete, { sansLimite: true })), opts,
             (snap) => rappel(snap.docs.map(documentDuDepot)),
             (e) => { signalerSiQuota(e); console.error("Écoute du combat :", e); });
     }

@@ -152,9 +152,30 @@ export function creerDepot(io, idPartie, options) {
         return lu;
     }
 
+    // LES INTENTIONS DE CE POSTE, CONFIRMÉES PAR LA BASE.
+    //
+    // Une intention que ce poste vient d'écrire arrive marquée « pas encore en
+    // base » (hasPendingWrites), et `enAttente` l'écarte — à raison tant que
+    // l'écriture est en route. Mais Firestore garde ce marqueur APRÈS avoir
+    // accusé réception, jusqu'à ce que l'écoute du serveur repasse sur le
+    // document. Le cerveau ne voyait donc pas le déplacement qu'il venait
+    // lui-même de demander : le pion revenait à sa case (« téléporté »), et la
+    // carte suivante n'était jamais jouée. Une fois `lot` résolu, l'écriture
+    // EST en base : on le note ici, et le marqueur ne compte plus pour elle.
+    const confirmees = new Set();
+    function confirmer(id) {
+        if (!id) return;
+        confirmees.add(id);
+        if (confirmees.size > 400) confirmees.delete(confirmees.values().next().value);
+    }
+
     async function lireIntentions() {
         const toutes = await io.lister(CHEMINS.intentions(idPartie), requeteIntentions());
-        return enAttente(toutes).filter(i => !fermeesIci.has(intentionId(i)));
+        return enAttente(marquerConfirmees(toutes)).filter(i => !fermeesIci.has(intentionId(i)));
+    }
+    function marquerConfirmees(liste) {
+        return (liste || []).map(i => i && i.__pasEncoreEnBase && confirmees.has(intentionId(i))
+            ? { ...i, __pasEncoreEnBase: false } : i);
     }
 
     // L'identifiant d'une intention, qu'elle le porte en champ ou seulement
@@ -272,7 +293,7 @@ export function creerDepot(io, idPartie, options) {
         return await io.transaction(CHEMINS.etat(idPartie), decider);
     }
 
-    return { lireEtat, lireIntentions, publier, refuser, battre, reprendre };
+    return { lireEtat, lireIntentions, publier, refuser, battre, reprendre, confirmer, marquerConfirmees };
 }
 
 // =========================================================================

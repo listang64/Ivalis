@@ -1973,7 +1973,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=78"></script>
+<script src="trace_combat.js?v=79"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
      Les modules s'importent entre eux sans numéro (`from './moteur_pur.js'`).
      Sans cette carte, le navigateur les chargeait à part, à une adresse SANS
@@ -1992,7 +1992,7 @@
     "./ia_pure.js": "./ia_pure.js?v=9",
     "./cerveau_combat.js": "./cerveau_combat.js?v=31",
     "./spectateur_combat.js": "./spectateur_combat.js?v=6",
-    "./depot_firestore.js": "./depot_firestore.js?v=10",
+    "./depot_firestore.js": "./depot_firestore.js?v=11",
     "./pont_combat.js": "./pont_combat.js?v=21",
     "./playlist.js": "./playlist.js?v=1"
 } }
@@ -2019,14 +2019,14 @@
 <script type="module" src="spectateur_combat.js?v=6"></script>
 <!-- LE DÉPÔT : la seule chose qui écrive pendant un combat. Un pas = un lot,
      et le lot porte l'état, l'entrée de journal et la fermeture de l'intention. -->
-<script type="module" src="depot_firestore.js?v=10"></script>
+<script type="module" src="depot_firestore.js?v=11"></script>
 <!-- LE PONT : de l'étape à ce qu'on voit. Il traduit un résultat déjà calculé
      vers les animations existantes — il ne recalcule jamais rien. -->
 <script type="module" src="pont_combat.js?v=21"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
-<script type="module" src="regime_cerveau.js?v=33"></script>
+<script type="module" src="regime_cerveau.js?v=34"></script>
 <script type="module" src="ia_master.js?v=7"></script>
-<script type="module" src="app.js?v=78"></script>
+<script type="module" src="app.js?v=79"></script>
 <script src="jet_d20.js?v=2"></script>
 <script src="fabrique_sons.js?v=3"></script>
 <script src="experience.js?v=1"></script>

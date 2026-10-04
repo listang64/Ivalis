@@ -216,15 +216,19 @@ export function creerRegime(contexte) {
     function ecouterLesIntentions() {
         if (moi.arretIntentions || !io || typeof io.ecouterCollection !== "function") return;
         moi.arretIntentions = io.ecouterCollection(CHEMINS.intentions(idPartie), requeteIntentions(), (docs) => {
-            const enCours = enAttente(docs || []);
-            moi.intentionsEnAttente = enCours.length;
+            const lues = typeof depot.marquerConfirmees === "function" ? depot.marquerConfirmees(docs) : (docs || []);
+            const enCours = enAttente(lues);
+            // Le battement compte AUSSI celles encore « en route » : si
+            // Firestore oublie de prévenir quand leur marqueur tombe, c'est
+            // lui qui relancera le cerveau, au lieu de laisser la table figée.
+            moi.intentionsEnAttente = (docs || []).filter(i => i && !i.traitee).length;
             if (enCours.length === 0) return;
             // Le cerveau tourne déjà : sa boucle a peut-être relu les
             // intentions juste AVANT celle-ci. On le note, et il repartira
             // dès qu'il aura fini — sinon elle attendrait le battement.
             if (moi.enTrainDeTourner) { moi.intentionEnRetard = true; return; }
             tourner();
-        });
+        }, { metadonnees: true });   // prévenu aussi quand « en route » devient « en base »
     }
     function arreterLesIntentions() {
         if (moi.arretIntentions) { try { moi.arretIntentions(); } catch (e) {} }
@@ -602,6 +606,9 @@ export function creerRegime(contexte) {
                 tracer("🧹", `${intention.type} : champ(s) vide(s) retiré(s)`, retires.slice(0, 6).join(", "));
             }
             const id = await envoyerIntention(io, idPartie, propre);
+            // L'écriture est en base : le cerveau de ce poste peut la traiter
+            // sans attendre que Firestore efface son marqueur « en route ».
+            if (typeof depot.confirmer === "function") depot.confirmer(id);
             tracer("✉️", `${intention.type} demandé pour ${intention.acteur}`, id);
             // Le cerveau, s'il est ici, n'attend pas la notification pour
             // travailler : c'est la latence en moins sur son propre écran.

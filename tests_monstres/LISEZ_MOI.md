@@ -164,6 +164,7 @@ node tenues_variees.mjs        # les skins d'armure : 34 tenues antiques par typ
 node versions_modules.mjs      # la carte des imports : chaque module du moteur chargé une seule fois, à la version de sa balise (fin du moteur périmé après un déploiement)
 node couvre_chef.mjs           # le couvre-chef des armures : 30 casques/chapeaux/coiffes par type tirés avec la tenue, dessinés sur l'armure (jamais sur celle de départ), choix « avec / tête nue » à l'équipement, le portrait suit
 node bonus_race_classe.mjs     # l'onglet Statistiques : l'encart des bonus de race et de classe, chaque atout en toutes lettres, paliers à venir grisés
+node intention_confirmee.mjs    # le cerveau joue tout de suite les intentions de son propre poste, même marquées « en route » par Firestore
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4190,3 +4191,26 @@ fenêtre, mais centré sur les 78 % de gauche de l'écran (`right: 22%` sur
 #titre-preparation-zone, index.html) : il s'éloigne de la jauge en bas à
 droite. titre_preparation.mjs vérifie que son milieu est avant celui de
 l'écran.
+
+## Le cerveau voit ses propres intentions (version 167)
+
+Le bug de la table : le joueur qui tenait le cerveau déplaçait son héros, le
+pion avançait puis revenait à sa case (« téléporté ») ; le second déplacement
+débloquait le premier puis était refusé (« chemin discontinu »), et la
+technique choisie ensuite n'était jamais jouée — combat figé.
+
+Une intention écrite par un poste arrive dans SON cache marquée « pas encore
+en base » (`hasPendingWrites` → `__pasEncoreEnBase`), et `enAttente` l'écarte.
+Mais Firestore garde ce marqueur après avoir accusé réception, et l'écoute
+n'était pas prévenue quand seul ce marqueur changeait. Trois chemins, désormais :
+- `demander` (regime_cerveau.js) appelle `depot.confirmer(id)` dès que `lot`
+  est résolu : l'écriture est en base, le marqueur ne compte plus pour elle
+  (`marquerConfirmees`, depot_firestore.js) ;
+- l'écoute des intentions demande les changements de métadonnées
+  (`ecouterCollection(..., { metadonnees: true })` → `includeMetadataChanges`,
+  app.js) : quand le marqueur tombe, le cerveau repart ;
+- le battement compte aussi les intentions encore « en route » dans
+  `intentionsEnAttente`, et relance le cerveau si les deux premiers ratent.
+
+intention_confirmee.mjs le rejoue avec un Firestore de banc qui garde le
+marqueur après `lot`, et ne prévient que les écoutes « métadonnées comprises ».
