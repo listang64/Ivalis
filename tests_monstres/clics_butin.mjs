@@ -96,6 +96,9 @@ p.on('pageerror', e => erreurs.push(e.message));
 p.on('console', m => { if (m.type() === 'error') erreurs.push('console: ' + m.text().slice(0, 160)); });
 await p.goto('file:///tmp/clics_butin.html');
 await p.waitForFunction(() => window.__pret === true, null, { timeout: 5000 }).catch(() => {});
+// Le butin est tiré au hasard : si c'est une armure, la question du
+// couvre-chef s'ouvre à l'équipement. Personne pour y répondre ici : tête nue.
+await p.evaluate(() => { window.demanderCasque = async () => false; });
 
 console.log("1. LA FENÊTRE S'OUVRE ET RÉPOND AU DOIGT");
 verifier("aucune erreur JS au chargement", erreurs.length === 0, erreurs.slice(0, 2).join(" | "));
