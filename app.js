@@ -4524,42 +4524,6 @@ window.MIGRATION_EFFETS = [
                 Notes: "Réservé au Vampire (niveau 5). Pas de plafond : chaque cran ajoute 1 dégât magique. Le soin vaut pour tout ce que la carte inflige aux ennemis (PV et bouclier entamés), arrondi à l'inférieur ; rien sur un coup esquivé. Brûlé, le Vampire n'en tire que 40 %." } }
 ];
 
-// BOUTON PROVISOIRE (Gestion des effets) : recopie dans la base les effets de
-// classe qui n'y sont pas encore, pour qu'ils apparaissent dans la liste et se
-// retouchent à la main comme les autres. Un effet déjà présent n'est JAMAIS
-// touché, quoi qu'il contienne ; aucun autre effet n'est lu ni écrit.
-window.installerEffetsDeClasse = async function() {
-    const btn = document.getElementById("btn-installer-effets-classe");
-    const texteOrigine = btn ? btn.innerText : "";
-    if (btn) { btn.innerText = "⏳ Ajout..."; btn.style.pointerEvents = "none"; }
-    const faits = [], inchanges = [], rates = [];
-    try {
-        for (const regle of (window.MIGRATION_EFFETS || [])) {
-            const ref = doc(db, "Combat_Effets", regle.id);
-            try {
-                const snap = await getDoc(ref);
-                if (snap.exists()) { inchanges.push(regle.champs.Nom || regle.id); continue; }
-                await setDoc(ref, { ...regle.champs });
-                faits.push(regle.champs.Nom || regle.id);
-            } catch (e) {
-                rates.push(`${regle.champs.Nom || regle.id} : ${e && e.message}`);
-            }
-        }
-        // La Forge et la liste repartent de la base.
-        if (typeof window.chargerCacheEffetsBDD === "function") await window.chargerCacheEffetsBDD();
-        if (document.getElementById("conteneur-table-effets") && typeof window.chargerTableauEffets === "function") {
-            await window.chargerTableauEffets();
-        }
-    } finally {
-        if (btn) { btn.innerText = texteOrigine || "Ajouter les effets de classe"; btn.style.pointerEvents = "auto"; }
-    }
-    const lignes = [faits.length ? `Ajouté(s) à la liste : ${faits.join(", ")}` : "Rien à ajouter."];
-    if (inchanges.length) lignes.push(`Déjà dans la liste, laissé(s) tel(s) quel(s) : ${inchanges.join(", ")}`);
-    if (rates.length) lignes.push(`⚠️ Échecs : ${rates.join(" ; ")}`);
-    alert(lignes.join("\n\n"));
-    return { faits, inchanges, rates };
-};
-
 // Les effets que le jeu sait jouer même quand la base ne les a pas.
 window.completerEffetsDeSecours = function(cache) {
     (window.MIGRATION_EFFETS || []).forEach(regle => {
