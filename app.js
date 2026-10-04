@@ -1036,6 +1036,90 @@ window.atoutRace = function(perso) {
     return fusionnerAtouts(fusionnerAtouts({}, peuple), classe);
 };
 
+// =========================================================================
+//  LES ATOUTS, EN TOUTES LETTRES (onglet Statistiques de la fiche)
+// =========================================================================
+//  Chaque clé d'atout (ATOUTS_RACES, ATOUTS_CLASSES) devient une phrase. Une
+//  clé inconnue est montrée telle quelle plutôt que cachée : un atout ajouté
+//  demain se verra, même avant qu'on lui écrive sa phrase.
+const NOMS_CARACS_ATOUT = { force: "Force", dex: "Dextérité", con: "Constitution",
+                            int: "Intelligence", sag: "Sagesse", cha: "Charisme" };
+window.texteAtout = function(cle, valeur) {
+    const n = Number(valeur) || 0;
+    const plus = (x) => (x >= 0 ? "+" : "") + x;
+    const nomEffet = (id) => {
+        const e = (window.EFFETS_BDD_CACHE || {})[id]
+            || ((window.MIGRATION_EFFETS || []).find(r => r.id === id) || {}).champs;
+        return (e && e.Nom) || id;
+    };
+    switch (cle) {
+        case "esquive":        return `${plus(n)} % d'esquive`;
+        case "parade":         return `${plus(n)} % de parade`;
+        case "critique":       return `${plus(n)} % de chance de critique`;
+        case "defPhysique":    return `${plus(n)} % de résistance physique`;
+        case "defMagique":     return `${plus(n)} % de résistance magique`;
+        case "fatigueMax":     return `${plus(n)} de fatigue maximum`;
+        case "pvMax":          return `${plus(n)} PV maximum`;
+        case "competences":    return `${plus(n)} compétence${Math.abs(n) > 1 ? "s" : ""}`;
+        case "regenFatigue":   return `${plus(n)} % de régénération de fatigue en fin de manche`;
+        case "regenPv":        return `${plus(n)} PV repris à chaque fin de manche`;
+        case "soinsRecus":     return `${plus(n)} % de soins reçus`;
+        case "porteeMagique":  return `${plus(n)} case de portée pour les sorts magiques à distance`;
+        case "diviseurDeplacement": return n === 2 ? "Se déplace pour deux fois moins de fatigue" : `Déplacement ${n} fois moins cher`;
+        case "esquiveOpportunite":  return `${n} % de chance d'esquiver une attaque d'opportunité`;
+        case "immunites":      return `Insensible : ${(valeur || []).join(", ")}`;
+        case "sursis":         return `Tombé à 0 PV, tient encore ${n} tour${n > 1 ? "s" : ""} avant d'être KO (une fois par combat)`;
+        case "effets":         return (valeur || []).map(id => `Effet de combat : ${nomEffet(id)}`).join(" · ");
+        case "techniques":     return (valeur || []).map(id => `Technique : ${((window.TECHNIQUES_CLASSE || {})[id] || {}).Nom || id}`).join(" · ");
+        case "critiqueSurKO":  return `Instinct du tueur : ${plus(n)} % de critique pendant 2 manches après un KO`;
+        case "maitrePoisons":  return "Maître des poisons : ses poisons mordent à chaque manche (18 % de fatigue, 10 % des PV max), 2 manches";
+        case "lumiereAveugle": return `Sorts de lumière : ${n} % d'aveugler la cible et les ennemis adjacents`;
+        case "caracs":         return Object.keys(valeur || {}).map(k => `${plus(Number(valeur[k]) || 0)} ${NOMS_CARACS_ATOUT[k] || k}`).join(" · ");
+        default:               return `${cle} : ${typeof valeur === "object" ? JSON.stringify(valeur) : valeur}`;
+    }
+};
+const lignesAtout = (atout) => Object.keys(atout || {})
+    .filter(k => k !== "niveau")
+    .map(k => window.texteAtout(k, atout[k]))
+    .filter(Boolean);
+
+// Ce que la race et la classe donnent, pour l'encart de l'onglet Statistiques :
+// la race d'un bloc ; la classe palier par palier, atteint ou pas encore.
+window.detailBonusRaceClasse = function(perso) {
+    const race = (perso && (perso.race || perso.Race)) || "";
+    const classe = (perso && (perso.classe || perso.Classe)) || "";
+    const niveau = window.niveauDuPerso(perso || {});
+    return {
+        race: { nom: race, lignes: lignesAtout(window.atoutPeuple(perso || {})) },
+        classe: { nom: classe, niveau,
+                  paliers: window.paliersDeClasse(classe).map(p => ({
+                      niveau: p.niveau, atteint: niveau >= p.niveau, lignes: lignesAtout(p) })) }
+    };
+};
+
+window.htmlBonusRaceClasse = function(perso) {
+    const d = window.detailBonusRaceClasse(perso);
+    const echapper = (t) => String(t || "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+    const liste = (lignes) => lignes.length
+        ? `<ul class="bonus-liste">${lignes.map(l => `<li>${echapper(l)}</li>`).join("")}</ul>`
+        : `<p class="bonus-vide">Aucun bonus.</p>`;
+    const blocRace = `<div class="bonus-bloc" data-bloc="race">
+            <div class="bonus-titre">👤 Race${d.race.nom ? ` : ${echapper(d.race.nom)}` : ""}</div>
+            ${d.race.nom ? liste(d.race.lignes) : `<p class="bonus-vide">Aucune race.</p>`}
+        </div>`;
+    const blocClasse = `<div class="bonus-bloc" data-bloc="classe">
+            <div class="bonus-titre">📜 Classe${d.classe.nom ? ` : ${echapper(d.classe.nom)}` : ""}</div>
+            ${!d.classe.nom ? `<p class="bonus-vide">Aucune classe.</p>`
+              : d.classe.paliers.length === 0 ? `<p class="bonus-vide">Pas encore de bonus pour cette classe.</p>`
+              : d.classe.paliers.map(p => `<div class="bonus-palier${p.atteint ? "" : " bonus-palier-verrouille"}" data-niveau="${p.niveau}">
+                    <span class="bonus-palier-niveau">Niv. ${p.niveau}${p.atteint ? "" : " · à venir"}</span>
+                    ${liste(p.lignes)}
+                </div>`).join("")}
+        </div>`;
+    return `<div class="bonus-race-classe-titre">Bonus de race et de classe</div>
+        <div class="bonus-race-classe-grille">${blocRace}${blocClasse}</div>`;
+};
+
 // L'équipement (objets.js) s'ajoute aux stats exactement comme les atouts de
 // race : jamais recopié dans les valeurs enregistrées, toujours additionné à la
 // lecture. Retirer une arme rend donc immédiatement ses points, et un

@@ -163,6 +163,7 @@ node chasseur_de_mages.mjs    # la classe Chasseur de mages : +10 % résistance 
 node tenues_variees.mjs        # les skins d'armure : 34 tenues antiques par type tirées au sort (+ 16 palettes), sans répétition, envoyées à MIA et au dessinateur ; le gris est simple mais propre
 node versions_modules.mjs      # la carte des imports : chaque module du moteur chargé une seule fois, à la version de sa balise (fin du moteur périmé après un déploiement)
 node couvre_chef.mjs           # le couvre-chef des armures : 30 casques/chapeaux/coiffes par type tirés avec la tenue, dessinés sur l'armure (jamais sur celle de départ), choix « avec / tête nue » à l'équipement, le portrait suit
+node bonus_race_classe.mjs     # l'onglet Statistiques : l'encart des bonus de race et de classe, chaque atout en toutes lettres, paliers à venir grisés
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4166,3 +4167,18 @@ couvre-chef (casque, chapeau, bandeau…) ? »). Les armes ne demandent rien.
 `promptAvatarArmure` ne regarde plus que le choix (`casquePorte === true`) :
 « Tête nue », ou l'armure de départ qui n'a pas de choix, donne un portrait
 explicitement SANS couvre-chef.
+
+## Les bonus de race et de classe, dans l'onglet Statistiques (version 165)
+
+Sous la grille des statistiques, un encart à part détaille ce que la race et
+la classe du héros lui donnent (`htmlBonusRaceClasse`, app.js, rempli par
+`afficherStatsCombat`, creation_personnage.js) :
+- **la race**, d'un bloc (`atoutPeuple`) ;
+- **la classe**, palier par palier (`paliersDeClasse`), avec son niveau ; un
+  palier pas encore atteint est grisé et marqué « à venir ».
+
+Chaque atout est écrit en clair par `texteAtout` (« +3 % d'esquive »,
+« Insensible : Glacé », « Technique : Mur de bouclier », « Effet de combat :
+Ténèbres », « Instinct du tueur : … »). Un atout inconnu se montre tel quel
+(« clé : valeur ») plutôt que d'être caché ; `bonus_race_classe.mjs` vérifie
+qu'aucun des atouts existants n'en est réduit là.

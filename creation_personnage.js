@@ -450,6 +450,10 @@ window.afficherStatsCombat = function(donnees) {
     const elClasse = document.getElementById("stat-classe");
     if (elClasse) elClasse.innerText = classe || "—";
 
+    // L'encart du dessous : ce que la race et la classe lui donnent.
+    const elBonus = document.getElementById("encart-bonus-race-classe");
+    if (elBonus && typeof window.htmlBonusRaceClasse === "function") elBonus.innerHTML = window.htmlBonusRaceClasse(donnees);
+
     // Le niveau et la jauge d'expérience, en tête de fiche (experience.js),
     // et le niveau affiché entre les flèches de triche de l'onglet DEV.
     if (typeof window.afficherJaugeXP === "function") window.afficherJaugeXP(donnees);
