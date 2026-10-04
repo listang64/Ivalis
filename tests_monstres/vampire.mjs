@@ -215,6 +215,9 @@ console.log("\n5. NUÉE DE CHAUVE-SOURIS : L'ESQUIVE À 50 %, DEUX MANCHES");
     verifier("plus haute, elle le reste (70)", esquiveDe(haut.combattants.V) === 70);
     const etourdi = clonerEtat(pas.etat); etourdi.combattants.V.etats.push({ nom: "Étourdi", duree: 1 });
     verifier("étourdi (-30) : toujours 50", esquiveDe(etourdi.combattants.V) === 50, `${esquiveDe(etourdi.combattants.V)}`);
+    const sansNuee = monde(10); sansNuee.combattants.H.etats = [{ nom: "Étourdi", duree: 1 }];
+    verifier("sans Nuée, rien ne retient l'esquive : un Étourdi la met à -30", esquiveDe(sansNuee.combattants.H) === -30,
+             `${esquiveDe(sansNuee.combattants.H)}`);
     const s1 = clonerEtat(pas.etat); vieillirLesEtats(s1);
     verifier("après la fin de cette manche : toujours là", esquiveDe(s1.combattants.V) === 50 && s1.combattants.V.etats.some(x => x.nom === ETAT_NUEE));
     vieillirLesEtats(s1);

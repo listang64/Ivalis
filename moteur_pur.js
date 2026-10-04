@@ -140,7 +140,10 @@ export const esquiveDe     = (c) => Math.max(nombre(c && c.def && c.def.esquive)
 // 50 %). L'esquive déjà plus haute reste plus haute ; sinon elle monte au
 // plancher, malus compris.
 function planchersEsquive(c) {
-    return Math.max(0, ...((c && c.etats) || []).map(e => nombre(e && e.esquiveMin)));
+    const planchers = ((c && c.etats) || []).filter(e => e && e.esquiveMin !== undefined).map(e => nombre(e.esquiveMin));
+    // Sans plancher, rien ne retient l'esquive : un Étourdi la fait bien
+    // descendre sous zéro.
+    return planchers.length ? Math.max(...planchers) : -Infinity;
 }
 export const paradeDe      = (c) => nombre(c && c.def && c.def.parade)   + bonusDesEtats(c, "parade")
                                   + regleDesEtats(c, "parade");

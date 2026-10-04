@@ -38,6 +38,7 @@ const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd
 const EFFETS_REELS = JSON.parse(fs.readFileSync(`${RACINE}/tests_monstres/effets_reels.json`, 'utf-8'));
 delete EFFETS_REELS.EFF_TENEBRES;
 delete EFFETS_REELS.EFF_LUMIERE;
+delete EFFETS_REELS.EFF_VAMPIRISME;
 const RETOUCHEE = JSON.parse(JSON.stringify(EFFETS_REELS));
 RETOUCHEE.EFF_BRULE = { ...RETOUCHEE.EFF_BRULE, Notes: "-50% de soins reçus, et 8% de dégats physique des pv max de la cible" };
 RETOUCHEE.EFF_CONFUSION = { ...RETOUCHEE.EFF_CONFUSION, Notes: "" };
@@ -59,13 +60,14 @@ console.log("1. LES BOUTONS ET LEURS FONCTIONS ONT DISPARU");
 }
 
 // =========================================================================
-console.log("\n2. LA COPIE LOCALE : TÉNÈBRES ET LUMIÈRE");
+console.log("\n2. LA COPIE LOCALE : TÉNÈBRES, LUMIÈRE ET VAMPIRISME");
 // =========================================================================
 {
     const w = charger();
     const table = w.MIGRATION_EFFETS;
-    verifier("deux effets : EFF_TENEBRES, EFF_LUMIERE, en copie locale",
-             table.length === 2 && table[0].id === "EFF_TENEBRES" && table[1].id === "EFF_LUMIERE"
+    verifier("trois effets : EFF_TENEBRES, EFF_LUMIERE, EFF_VAMPIRISME, en copie locale",
+             table.length === 3 && table[0].id === "EFF_TENEBRES" && table[1].id === "EFF_LUMIERE"
+             && table[2].id === "EFF_VAMPIRISME"
              && table.every(r => r.secoursLocal), table.map(r => r.id).join(", "));
     const ten = table[0].champs;
     verifier("Ténèbres : 2 pts, Intelligence, 3, racine, Nécromancien niv. 5",
@@ -76,6 +78,11 @@ console.log("\n2. LA COPIE LOCALE : TÉNÈBRES ET LUMIÈRE");
              lum.Nom === "Lumière" && lum.Cout_PT === "1" && lum.Modificateur === "INTELLIGENCE" && lum.Pourcent_Base === 15
              && lum.Pourcent_Max === 60 && lum.Type_Mecanique === "Magique" && lum.Type_Mecanique_2 === "Physique"
              && lum.Classe === "Chasseur de mages" && lum.Niveau_Requis === 5, JSON.stringify(lum).slice(0, 140));
+    const vam = table[2].champs;
+    verifier("Vampirisme : 1 pt, Intelligence, 1, racine, sans plafond, Vampire niv. 5",
+             vam.Nom === "Vampirisme" && vam.Cout_PT === "1" && vam.Modificateur === "INTELLIGENCE" && vam.Valeur === 1
+             && vam.Pourcent_Max === 0 && vam.Type_Mecanique === "Action/Global"
+             && vam.Classe === "Vampire" && vam.Niveau_Requis === 5, JSON.stringify(vam).slice(0, 140));
 }
 
 // =========================================================================
@@ -85,8 +92,9 @@ console.log("\n3. ELLE COMPLÈTE UNE BASE QUI NE LES A PAS, SANS TOUCHER AU REST
     const w = charger();
     const cache = JSON.parse(JSON.stringify(RETOUCHEE));
     w.completerEffetsDeSecours(cache);
-    verifier("Ténèbres et Lumière sont là", cache.EFF_TENEBRES.Nom === "Ténèbres" && cache.EFF_LUMIERE.Nom === "Lumière");
-    const reste = { ...cache }; delete reste.EFF_TENEBRES; delete reste.EFF_LUMIERE;
+    verifier("Ténèbres, Lumière et Vampirisme sont là", cache.EFF_TENEBRES.Nom === "Ténèbres" && cache.EFF_LUMIERE.Nom === "Lumière"
+             && cache.EFF_VAMPIRISME.Nom === "Vampirisme");
+    const reste = { ...cache }; delete reste.EFF_TENEBRES; delete reste.EFF_LUMIERE; delete reste.EFF_VAMPIRISME;
     verifier("le reste du grimoire est intact, au caractère près", JSON.stringify(reste) === JSON.stringify(RETOUCHEE));
     verifier("la note de la Brûlure retouchée à la main est intacte",
              cache.EFF_BRULE.Notes === "-50% de soins reçus, et 8% de dégats physique des pv max de la cible");
