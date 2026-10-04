@@ -156,23 +156,42 @@ console.log("\n2. CET ENNEMI EST TOMBÉ (INCONSCIENT, 0 PV) : PLUS D'ENGAGEMENT"
 }
 
 // =========================================================================
-console.log("\n3. MÊME RÈGLE POUR UNE CIBLE UNIQUE À DISTANCE");
+console.log("\n3. UN TIR, ENGAGÉ AU CONTACT, PEUT VISER PLUS LOIN (SANS MALUS)");
 {
-  const vise = (m1) => p.evaluate(async (m1) => {
+  // Nico : « pour les attaques à distance on garde le malus au CAC, mais
+  // ajoute la possibilité de tirer sans malus sur un ennemi à portée qui
+  // n'est pas au CAC ». Le malus (30 %) se calcule sur la distance à la
+  // CIBLE (chaineDeDegats) : viser M2, à 2 cases, n'en prend aucun.
+  const vise = (m1, mods) => p.evaluate(async ({ m1, mods }) => {
     window.__poser({ J1: { q: 0, r: 0 }, J2: { q: 0, r: 3 }, M1: { q: 1, r: 0 }, M2: { q: -2, r: 0 } });
+    window.__messages.length = 0;
     const m = window.PERSOS_PARTIE.find(x => x.idPersonnage === "M1");
     Object.assign(m, { PV_Max: 30, PV_Actuels: 30 }, m1);
-    const id = window.__carte([{ baseEffetId: "ATT", mods: { DIST: 1 } }]);
+    const id = window.__carte([{ baseEffetId: "ATT", mods }]);
     await window.demarrerCiblage(id, { idLanceur: "J1" });
+    const config = window.configCiblage(window.ETAT_CIBLAGE);
     window.ajouterCibleCiblage("M2");
-    return { cible: window.ETAT_CIBLAGE.cibleUnique, messages: [...window.__messages] };
-  }, m1);
-  const debout = await vise({ statut: "Vivant" });
-  verifier("ennemi debout au contact : la cible à 2 est refusée", debout.cible === null,
-           JSON.stringify(debout.messages));
-  const tombe = await vise({ statut: "Inconscient", PV_Actuels: 0 });
+    return { cible: window.ETAT_CIBLAGE.cibleUnique, tir: !!(config && config.isRanged), messages: [...window.__messages] };
+  }, { m1, mods });
+  const debout = await vise({ statut: "Vivant" }, { DIST: 1 });
+  verifier("ennemi debout au contact : un TIR vise quand même la cible à 2", debout.tir && debout.cible === "M2",
+           JSON.stringify(debout));
+  const tombe = await vise({ statut: "Inconscient", PV_Actuels: 0 }, { DIST: 1 });
   verifier("ennemi tombé au contact : la cible à 2 est acceptée", tombe.cible === "M2",
            JSON.stringify(tombe));
+  // Au corps à corps, l'engagement tient toujours : on frappe au contact.
+  const auContact = await p.evaluate(async () => {
+    window.__poser({ J1: { q: 0, r: 0 }, J2: { q: 0, r: 3 }, M1: { q: 1, r: 0 }, M2: { q: -2, r: 0 } });
+    Object.assign(window.PERSOS_PARTIE.find(x => x.idPersonnage === "M1"), { PV_Max: 30, PV_Actuels: 30, statut: "Vivant" });
+    const id = window.__carte([{ baseEffetId: "ATT", mods: {} }]);
+    await window.demarrerCiblage(id, { idLanceur: "J1" });
+    window.ajouterCibleCiblage("M1");
+    return { cible: window.ETAT_CIBLAGE.cibleUnique, tir: window.configCiblage(window.ETAT_CIBLAGE).isRanged };
+  });
+  verifier("une attaque au contact vise toujours l'ennemi collé", !auContact.tir && auContact.cible === "M1", JSON.stringify(auContact));
+  const src = fs.readFileSync('/home/user/Ivalis/moteur_effets.js', 'utf-8');
+  verifier("l'anneau et le clic suivent la même règle (deux tests, même exception)",
+           (src.match(/estEngage && dist > 1 && !configSort\.isRanged/g) || []).length === 2);
 }
 
 // =========================================================================

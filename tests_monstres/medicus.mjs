@@ -278,15 +278,27 @@ console.log("\n5. LES FANTÔMES : LE SEUL MÉDICUS VOIT SES ALLIÉS TOMBÉS");
     const vue = () => {
       window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
       const fantomes = [...document.querySelectorAll(".token-fantome-ko")];
-      return { fantomes: fantomes.map(f => f.id).sort(), opacite: fantomes[0] ? parseFloat(fantomes[0].style.opacity) : null,
+      return { fantomes: fantomes.map(f => f.id).sort(),
+               opacite: fantomes[0] ? parseFloat(fantomes[0].querySelector(".fantome-ko-portrait").style.opacity) : null,
+               cranes: fantomes.filter(f => f.querySelector(".fantome-ko-crane svg")).map(f => f.id).sort(),
+               opaciteCrane: fantomes[0] && fantomes[0].querySelector(".fantome-ko-crane")
+                 ? parseFloat(fantomes[0].querySelector(".fantome-ko-crane").style.opacity) : null,
                clic: fantomes[0] ? getComputedStyle(fantomes[0]).pointerEvents : null,
                pions: [...document.querySelectorAll(".token-vtt:not(.token-fantome-ko)")].map(t => t.id).sort() };
     };
     window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[0]];        // le joueur du Médicus
     const medicus = vue();
+    // La Prise en charge déjà jouée : plus de tête de mort.
+    window.PERSOS_PARTIE[0].techniquesUtilisees = ["CLASSE_PRISE_EN_CHARGE"];
+    const apresUsage = vue();
+    window.PERSOS_PARTIE[0].techniquesUtilisees = [];
+    // Un Médicus de niveau 5 n'a pas encore la technique.
+    const xp = window.PERSOS_PARTIE[0].xp; window.PERSOS_PARTIE[0].xp = 2500;
+    const niveau5 = vue();
+    window.PERSOS_PARTIE[0].xp = xp;
     window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[2]];        // un autre joueur
     const autre = vue();
-    return { medicus, autre };
+    return { medicus, autre, apresUsage, niveau5 };
   });
   verifier("le joueur du Médicus voit les fantômes de ses alliés KO (pas de l'ennemi mort)",
            JSON.stringify(r.medicus.fantomes) === '["fantome-A1","fantome-A3"]', JSON.stringify(r.medicus.fantomes));
@@ -294,6 +306,12 @@ console.log("\n5. LES FANTÔMES : LE SEUL MÉDICUS VOIT SES ALLIÉS TOMBÉS");
            `${r.medicus.opacite} ${r.medicus.clic}`);
   verifier("les vivants restent des pions normaux", JSON.stringify(r.medicus.pions) === '["token-A2","token-D1"]', JSON.stringify(r.medicus.pions));
   verifier("un autre joueur ne voit aucun fantôme", r.autre.fantomes.length === 0, JSON.stringify(r.autre.fantomes));
+  verifier("une tête de mort, légère, sur chaque allié tombé tant que la Prise en charge est là",
+           JSON.stringify(r.medicus.cranes) === '["fantome-A1","fantome-A3"]' && r.medicus.opaciteCrane > 0.4 && r.medicus.opaciteCrane < 1,
+           `${JSON.stringify(r.medicus.cranes)} ${r.medicus.opaciteCrane}`);
+  verifier("Prise en charge déjà jouée : plus de tête de mort (le fantôme reste)",
+           r.apresUsage.cranes.length === 0 && r.apresUsage.fantomes.length === 2, JSON.stringify(r.apresUsage.cranes));
+  verifier("Médicus niveau 5 (pas encore la technique) : pas de tête de mort", r.niveau5.cranes.length === 0);
 }
 
 // =========================================================================

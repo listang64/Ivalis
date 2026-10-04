@@ -4498,7 +4498,7 @@ window.MIGRATION_EFFETS = [
                 Valeur: 3, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Cible_Etat: "tenebres",
                 Classe: "Nécromancien", Niveau_Requis: 5,
                 Effet_Base: "3 dégâts magiques, appliqués à la fatigue à la place des points de vie",
-                Notes: "Réservé au Nécromancien (niveau 5). Les dégâts vont à l'énergie (fatigue) de la cible au lieu de ses PV. Si elle n'a plus d'énergie, le reste frappe ses PV ×1,5 (arrondi à l'inférieur). Le bouclier ne protège pas l'énergie ; il n'absorbe que ce qui frappe les PV." } },
+                Notes: "Réservé au Nécromancien (niveau 5). Dégâts bruts : aucune armure (résistance magique) ne s'applique. Les dégâts vont à l'énergie (fatigue) de la cible au lieu de ses PV. Si elle n'a plus d'énergie, le reste frappe ses PV ×1,5 (arrondi à l'inférieur). Le bouclier ne protège pas l'énergie ; il n'absorbe que ce qui frappe les PV." } },
     // LUMIÈRE, L'EFFET DU CHASSEUR DE MAGES (niveau 5). Un sous-effet, rangé
     // dans les menus Magique et Physique de la Forge comme Brûlé : 1 pt,
     // Intelligence, 15 % par cran jusqu'à 60 %. Il ne se greffe que sur une

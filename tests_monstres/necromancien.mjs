@@ -162,7 +162,8 @@ console.log("\n3. TÉNÈBRES : L'ÉNERGIE D'ABORD, PUIS LA VIE ×1,5");
     verifier("le surplus (9) sur un bouclier de 5 : le bouclier casse, la vie ne bouge pas",
              e.m.bouclier === 0 && e.m.pv === 40 && e.m.fatigue === 0, `🛡️${e.m.bouclier} / ${e.m.pv} PV`);
     const f = cas(50, 6, { Def_Magique: 50 });
-    verifier("la défense magique réduit avant (6 → 3 sur l'énergie)", f.m.fatigue === 47, `${f.m.fatigue}`);
+    // Ténèbres frappe brut (demande de Nico) : la défense magique n'y peut rien.
+    verifier("aucune armure : 50 % de défense magique, les 6 vont à l'énergie", f.m.fatigue === 44, `${f.m.fatigue}`);
 
     const rejoue = appliquerEntree(b.avant, { etapes: b.r.etapes }).combattants.M;
     verifier("rejoué depuis le journal : même énergie, même vie", rejoue.fatigue === b.m.fatigue && rejoue.pv === b.m.pv,

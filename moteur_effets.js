@@ -456,12 +456,18 @@ window.cibleDansLeNoir = function(perso, _depuis, hexCible) {
 
 // LE BROUILLARD DE L'AVEUGLÉ. Il n'existe QUE sur l'écran de celui qui ne voit
 // pas : on ne le dessine que pour les héros de CET appareil
-// (COMBAT_PERSOS_JOUEUR). Un noir épais qui ondule, posé AU-DESSUS des pions
-// (z-index 20 contre 10) : ce qui se tient là disparaît à ses yeux. Il reste
+// (COMBAT_PERSOS_JOUEUR). Un noir épais qui ondule, posé AU-DESSUS des pions :
+// ce qui se tient là disparaît à ses yeux. Les pions vivent HORS du calque
+// zoomé (#conteneur-tokens-vtt, z-index 3) : un z-index à l'intérieur du
+// plateau ne pouvait donc jamais passer devant eux, et les ennemis restaient
+// visibles par-dessus le noir. Le brouillard a son calque à lui
+// (#calque-brouillard-vtt, z-index 4), zoomé comme le plateau. Il reste
 // sur ses cases de départ et s'efface avec l'état. Redessiné seulement quand les cases
 // changent (signature), pour ne pas relancer l'animation à chaque passage.
 window.dessinerBrouillardAveuglement = function() {
-    const conteneur = document.getElementById("transform-plateau");
+    const plateau = document.getElementById("transform-plateau");
+    const conteneur = document.getElementById("transform-brouillard") || plateau;
+    if (conteneur && plateau && conteneur !== plateau) conteneur.style.transform = plateau.style.transform;
     const fenetre = document.getElementById("fenetre-combat");
     const enCombat = !!fenetre && fenetre.style.display === "block";
     const cases = [];
@@ -2844,7 +2850,10 @@ window.dessinerAnneauxCiblage = function() {
         const porteeEffective = Math.max(configSort.rangeMax, window.ETAT_CIBLAGE.porteeMinTraction || 0);
 
         if (dist > porteeEffective) continue;
-        if (!configSort.isHeal && estEngage && dist > 1) continue;
+        // ENGAGÉ AU CONTACT, on frappe au contact — SAUF un TIR : il peut viser
+        // un ennemi plus loin, à portée, et sans malus (le malus de 30 % ne
+        // vaut que pour un tir à bout portant, chaineDeDegats).
+        if (!configSort.isHeal && estEngage && dist > 1 && !configSort.isRanged) continue;
         if (!verifierLigneDeVue(tkLanceur, tk)) continue;
 
         ciblesValides.add(idToken);
@@ -3019,7 +3028,7 @@ window.ajouterCibleCiblage = function(idCible) {
 
     const estEngage = window.estEngageAuContact(idLanceur, tkLanceur, lanceurData);
 
-    if (!configSort.isHeal && estEngage && dist > 1) {
+    if (!configSort.isHeal && estEngage && dist > 1 && !configSort.isRanged) {
         window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Engagé au CAC !", "#aaaaaa");
         return;
     }

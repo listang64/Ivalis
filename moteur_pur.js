@@ -781,7 +781,9 @@ export function chaineDeDegats(cible, attaque, options) {
     //    physique ; « ignorer les résistances » balaie les deux — le jet a été
     //    tranché au lancement, on ne fait que le lire.
     let resistance = attaque.typeRes === "Magique" ? defMagiqueDe(cible) : defPhysiqueDe(cible);
-    if (percee) resistance = 0;
+    // TÉNÈBRES FRAPPE BRUT : aucune armure ne s'applique, ni sur l'énergie
+    // qu'elle boit, ni sur la vie qu'elle frappe ensuite (×1,5).
+    if (percee || attaque.versEnergie) resistance = 0;
     const reduction = Math.min(1, resistance / 100);
     let degatsFinaux = Math.max(0, Math.round(degats * (1 - reduction)));
 

@@ -1726,9 +1726,12 @@ let frameTransformVTT = null;
 
 window.appliquerTransformPlateau = function() {
     const conteneur = document.getElementById("transform-plateau");
-    if (conteneur) {
-        conteneur.style.transform = `translate(${window.VTT_POS_X}px, ${window.VTT_POS_Y}px) scale(${window.VTT_SCALE})`;
-    }
+    const transformation = `translate(${window.VTT_POS_X}px, ${window.VTT_POS_Y}px) scale(${window.VTT_SCALE})`;
+    if (conteneur) conteneur.style.transform = transformation;
+    // Le brouillard de l'aveuglé vit dans son propre calque, au-dessus des
+    // pions : il suit le plateau à l'identique.
+    const brouillard = document.getElementById("transform-brouillard");
+    if (brouillard) brouillard.style.transform = transformation;
 
     // Les pions ne subissent pas ce scale : on les repositionne à la main, une fois par frame
     if (frameTransformVTT) return;
@@ -3022,6 +3025,30 @@ window.voitLeFantome = function(pMort) {
         && typeof window.estDeLaClasse === "function" && window.estDeLaClasse(p, "Médicus")
         && (p.camp || "Allié") === (pMort.camp || "Allié"));
 };
+// LA PRISE EN CHARGE EST-ELLE À PORTÉE DE MAIN ? Un Médicus de ce poste,
+// debout, du camp du tombé, qui a la technique (niveau 10) et ne l'a pas
+// encore jouée dans ce combat.
+window.priseEnChargeDisponible = function(pMort) {
+    if (!pMort) return false;
+    return (window.COMBAT_PERSOS_JOUEUR || []).some(p => p && p.idPersonnage !== pMort.idPersonnage
+        && typeof window.estDeLaClasse === "function" && window.estDeLaClasse(p, "Médicus")
+        && (p.camp || "Allié") === (pMort.camp || "Allié")
+        && !(typeof window.estCombattantMort === "function" && window.estCombattantMort(p.idPersonnage))
+        && typeof window.techniquesDeClasse === "function"
+        && window.techniquesDeClasse(p).includes("CLASSE_PRISE_EN_CHARGE")
+        && !(typeof window.techniqueClasseUtilisee === "function" && window.techniqueClasseUtilisee(p, "CLASSE_PRISE_EN_CHARGE")));
+};
+
+// La tête de mort posée sur la case d'un allié tombé, pour le seul Médicus et
+// tant que sa Prise en charge est disponible : il sait où aller. Dessinée en
+// SVG (pas d'emoji : sa taille suit le pion, en %, à tous les zooms).
+const SVG_TETE_DE_MORT = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M50 12 C29 12 17 27 17 45 C17 56 22 63 30 67 L30 78 C30 82 33 85 37 85 L63 85 C67 85 70 82 70 78 L70 67 C78 63 83 56 83 45 C83 27 71 12 50 12 Z" fill="#f2ede0"/>
+    <circle cx="37" cy="46" r="9" fill="#1d1712"/><circle cx="63" cy="46" r="9" fill="#1d1712"/>
+    <path d="M50 56 L44 66 L56 66 Z" fill="#1d1712"/>
+    <path d="M40 76 L40 85 M50 76 L50 85 M60 76 L60 85" stroke="#1d1712" stroke-width="3"/>
+</svg>`;
+
 window.fantomeAllieKO = function(idPerso, data, taille) {
     const div = document.createElement("div");
     div.className = "token-vtt token-fantome-ko";
@@ -3029,14 +3056,30 @@ window.fantomeAllieKO = function(idPerso, data, taille) {
     div.dataset.q = data.q;
     div.dataset.r = data.r;
     div.dataset.taille = taille;
+    // La pâleur est sur le PORTRAIT seulement : la tête de mort, elle, doit se
+    // voir.
     div.style.cssText = `position: absolute; transform: translate(-50%, -50%); pointer-events: none; z-index: 5;
-                         border-radius: 50%; opacity: ${window.OPACITE_FANTOME_KO}; filter: grayscale(70%);`;
+                         border-radius: 50%;`;
     const img = document.createElement("img");
+    img.className = "fantome-ko-portrait";
     img.src = typeof window.redimensionnerImageCloudinary === "function"
         ? window.redimensionnerImageCloudinary(data.url, 700) : data.url;
-    img.style.cssText = "position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;";
+    img.style.cssText = `position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;
+                         opacity: ${window.OPACITE_FANTOME_KO}; filter: grayscale(70%);`;
     img.onerror = () => { img.style.display = "none"; };
     div.appendChild(img);
+    const pMort = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPerso);
+    if (window.priseEnChargeDisponible(pMort)) {
+        const crane = document.createElement("div");
+        crane.className = "fantome-ko-crane";
+        crane.title = "Allié à terre : Prise en charge possible";
+        crane.style.cssText = "position: absolute; left: 22%; top: 20%; width: 56%; height: 56%; opacity: 0.6; "
+            + "filter: drop-shadow(0 0 4px rgba(0,0,0,0.9));";
+        crane.innerHTML = SVG_TETE_DE_MORT;
+        const svg = crane.querySelector("svg");
+        if (svg) svg.style.cssText = "width: 100%; height: 100%; display: block;";
+        div.appendChild(crane);
+    }
     window.positionnerTokenVTT(div, true);
     return div;
 };

@@ -169,6 +169,7 @@ node jauges_selection.mjs       # le pion sélectionné montre vie et fatigue so
 node assaut_cible_tombee.mjs    # l'Assaut mortel ignore une cible déjà à terre ; un refus du cerveau revient au poste qui a demandé (plus de partie figée)
 node techniques_nouveau_combat.mjs # enchaîner les combats sans recharger : une technique de classe jouée avant redevient disponible
 node vampire.mjs              # la classe Vampire : +10 rés. physique, feu aggravé, première case gratuite, Vampirisme (70 % de la carte en soin), Nuée de chauve-souris (esquive ≥ 50 %, 2 manches), interdit aux Vargens
+node tenebres_brut.mjs        # Ténèbres sans armure (×1,5 sur la vie sans énergie) ; le malus de tir seulement sur la cible au contact
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4293,3 +4294,24 @@ Les Vargens ne peuvent pas être Vampire (`CLASSES_INTERDITES`,
 dit au lieu d'ouvrir la fiche, la validation le refuse, et un Vampire déjà
 choisi tombe si l'on revient choisir Vargen (`changerRaceSelection`).
 vampire.mjs vérifie le tout.
+
+## Retouches de combat (version 172)
+
+- **Ténèbres frappe brut** : aucune armure (résistance) ne s'applique
+  (`attaque.versEnergie` met la résistance à zéro dans `chaineDeDegats`). Elle
+  boit l'énergie d'abord ; plus d'énergie, le reste frappe les PV ×1,5
+  (`partageTenebres`, arrondi à l'inférieur). tenebres_brut.mjs.
+- **Un tir, engagé au contact, vise plus loin** : la règle d'engagement (on ne
+  frappe qu'au contact) ne s'applique plus à une attaque à distance
+  (`configSort.isRanged`, anneaux et clic dans moteur_effets.js). Le malus de
+  30 % ne vaut que pour la cible au contact (distance à la CIBLE,
+  `chaineDeDegats`). engagement_tombe.mjs, section 3.
+- **Le Médicus sait où aller** : sur la case d'un allié tombé, une tête de mort
+  légère (SVG, opacité 0,6), pour le seul Médicus et seulement tant que sa Prise
+  en charge est disponible (`priseEnChargeDisponible`, `fantomeAllieKO`,
+  combat.js). La pâleur (0,2) n'est plus que sur le portrait. medicus.mjs §5.
+- **Le brouillard de l'aveuglé passe enfin devant les pions** : les pions
+  vivent hors du calque zoomé (z-index 3) ; le brouillard a désormais son calque
+  (#calque-brouillard-vtt, z-index 4, transform synchronisé par
+  `appliquerTransformPlateau`). aveuglement.mjs mesure ce qu'on voit au centre
+  d'un pion caché.

@@ -254,8 +254,32 @@ await pg.evaluate(async ({ src, fiche }) => {
     window.__poser(true);
     document.getElementById("fenetre-combat").style.display = "block";
     const svg = window.dessinerBrouillardAveuglement();
-    const chezLui = svg ? { cases: svg.querySelectorAll("polygon").length, z: svg.style.zIndex,
-                           anime: !!svg.querySelector("animate"), sig: svg.dataset.signature } : null;
+    // AU-DESSUS DES PIONS, POUR DE VRAI : un pion posé dans le calque des
+    // pions, sur une case du noir, doit disparaître sous le brouillard.
+    document.querySelectorAll('body > div[id^="ecran-"]').forEach(e => { e.style.display = "none"; });
+    document.getElementById("ecran-jeu").style.display = "block";
+    const calque = document.getElementById("conteneur-tokens-vtt");
+    const pion = document.createElement("div");
+    pion.id = "pion-sous-le-noir";
+    const centre = window.PLATEAU_VTT.hexToPixel(1, 0);
+    const cadre = calque.getBoundingClientRect();
+    pion.style.cssText = `position:absolute; left:${centre.x - 20}px; top:${centre.y - 20 + 60}px; width:40px; height:40px; background:red;`;
+    calque.appendChild(pion);
+    window.VTT_POS_Y = 60;
+    document.getElementById("transform-plateau").style.transform = "translate(0px, 60px) scale(1)";
+    svg && svg.remove();
+    const svgVu = window.dessinerBrouillardAveuglement();
+    // elementFromPoint ignore ce qui ne prend pas les clics : le temps de la
+    // mesure, pion et brouillard les prennent.
+    const calqueBrouillard = document.getElementById("calque-brouillard-vtt");
+    [calque, pion, calqueBrouillard, svgVu].forEach(x => { if (x) x.style.pointerEvents = "auto"; });
+    const dessus = document.elementFromPoint(cadre.left + centre.x, cadre.top + centre.y + 60);
+    [calque, calqueBrouillard, svgVu].forEach(x => { if (x) x.style.pointerEvents = "none"; });
+    const chezLui = svgVu ? { cases: svgVu.querySelectorAll("polygon").length, calque: svgVu.parentNode.id,
+                              dessusDuPion: !!(dessus && dessus.closest("#svg-brouillard-aveugle")),
+                              vu: dessus ? (dessus.id || dessus.tagName) : null,
+                              anime: !!svgVu.querySelector("animate"), sig: svgVu.dataset.signature } : null;
+    pion.remove();
     // Naomi s'éloigne : le brouillard reste sur les cases de départ.
     window.TOKENS_VTT_DATA.J1 = { q: -3, r: 2 };
     const apresDepart = window.dessinerBrouillardAveuglement();
@@ -271,7 +295,8 @@ await pg.evaluate(async ({ src, fiche }) => {
     return { chezLui, reste, ailleurs: !!ailleurs, resteAilleurs, parti: !document.getElementById("svg-brouillard-aveugle") };
   });
   verifier("chez l'aveuglé : un brouillard sur ses 3 cases, animé, au-dessus des pions",
-           brouillard.chezLui && brouillard.chezLui.cases === 3 && brouillard.chezLui.anime && Number(brouillard.chezLui.z) > 10,
+           brouillard.chezLui && brouillard.chezLui.cases === 3 && brouillard.chezLui.anime
+           && brouillard.chezLui.calque === "transform-brouillard" && brouillard.chezLui.dessusDuPion,
            JSON.stringify(brouillard.chezLui));
   verifier("il s'éloigne : le brouillard reste sur les cases de départ", brouillard.reste);
   verifier("chez un autre joueur : aucun brouillard", !brouillard.ailleurs && !brouillard.resteAilleurs);

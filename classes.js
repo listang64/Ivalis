@@ -84,7 +84,7 @@ window.DESCRIPTIFS_CLASSES = {
             { niveau: 1, titre: "Enfant de la tombe",
               points: ["Insensible au Gel (jamais Glacé)", "+1 compétence", "+5 PV"] },
             { niveau: 5, titre: "Sort : Ténèbres",
-              points: ["2 pts · Intelligence · 3 dégâts magiques",
+              points: ["2 pts · Intelligence · 3 dégâts magiques bruts (aucune armure)",
                        "Les dégâts frappent la fatigue de la cible au lieu de ses PV",
                        "Plus de fatigue ? Le reste frappe ses PV ×1,5"] },
             { niveau: 10, titre: "Sursis",
