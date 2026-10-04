@@ -1411,6 +1411,9 @@ if (typeof window !== "undefined") {
                 // réclamé cette rencontre, `ouvrir` rend null sans rien casser.
                 // On le distingue par le drapeau `dejaOuvert`.
                 ouvertureEnCours = true;
+                // Une autre rencontre : ce qui avait servi dans la précédente
+                // ne compte plus.
+                window.oublierLeCombatSurLesFiches();
                 // LES CARTES DES CRÉATURES D'ABORD. Le cerveau ne peut pas les
                 // lire au moment de jouer : il est synchrone, et l'extraction ne
                 // l'est pas. Sans cette lecture préalable, chaque créature
@@ -1621,7 +1624,27 @@ if (typeof window !== "undefined") {
     }
 
     // LE COMBAT S'ARRÊTE (victoire, fuite, réinitialisation). On range.
+    // CE QUI NE VAUT QUE POUR UNE RENCONTRE QUITTE LES FICHES QUAND ELLE FINIT.
+    // Les techniques de classe déjà jouées et le sursis du Nécromancien
+    // descendent sur les fiches en mémoire (fichesDepuisEtat) et y restaient :
+    // sans recharger la page, l'Assaut mortel joué au combat d'avant restait
+    // grisé pendant tout le combat suivant. On les efface à la réinitialisation
+    // et à l'ouverture d'une nouvelle rencontre.
+    window.oublierLeCombatSurLesFiches = function() {
+        [window.PERSOS_PARTIE, window.MONSTRES_PARTIE, window.COMBAT_PERSOS_JOUEUR].forEach(liste => {
+            (liste || []).forEach(f => {
+                if (!f) return;
+                if (f.techniquesUtilisees !== undefined) f.techniquesUtilisees = [];
+                if (f.sursis) f.sursis = null;
+            });
+        });
+        if (typeof window.actualiserBannieresEpuisees === "function") {
+            try { window.actualiserBannieresEpuisees(); } catch (e) {}
+        }
+    };
+
     window.regimeFermerLeCombat = async function() {
+        window.oublierLeCombatSurLesFiches();
         // L'état de la rencontre précédente doit partir : c'est justement
         // quand il traîne qu'il empêche la suivante de s'ouvrir. On efface
         // donc dans tous les cas.
@@ -1710,6 +1733,10 @@ if (typeof window !== "undefined") {
             return REGIME.demanderTechniqueClasse(acteur, idCarte, cible, cibles);
         },
         ok: () => REGIME ? REGIME.ok() : null,
+        // L'état du combat tel que cet écran le montre : c'est lui, pas une
+        // fiche gardée en mémoire depuis la rencontre d'avant, qui dit ce qui
+        // a déjà servi (techniqueClasseUtilisee, combat.js).
+        etat: () => REGIME ? REGIME.etatAffiche() : null,
         // « Ce combattant a-t-il déjà demandé quelque chose pour ce tour ? »
         enVol: (acteur) => {
             if (!demandeEnVol) return false;

@@ -167,6 +167,7 @@ node bonus_race_classe.mjs     # l'onglet Statistiques : l'encart des bonus de r
 node intention_confirmee.mjs    # le cerveau joue tout de suite les intentions de son propre poste, même marquées « en route » par Firestore
 node jauges_selection.mjs       # le pion sélectionné montre vie et fatigue sous lui ; mon pion les replie en fondu quand il marche
 node assaut_cible_tombee.mjs    # l'Assaut mortel ignore une cible déjà à terre ; un refus du cerveau revient au poste qui a demandé (plus de partie figée)
+node techniques_nouveau_combat.mjs # enchaîner les combats sans recharger : une technique de classe jouée avant redevient disponible
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4246,3 +4247,17 @@ jamais, puisque la file n'avançait pas.
   repère (`regimeAnnulerDemande`) et `surRefusIntention` (combat.js) affiche
   la raison au-dessus du pion et redessine le bouton de fin de tour.
 assaut_cible_tombee.mjs le vérifie.
+
+## Enchaîner les combats sans recharger : les techniques de classe reviennent (version 169)
+
+Signalé : l'Assaut mortel, joué au combat d'avant, restait grisé pendant tout
+le combat suivant (page non rechargée). Les techniques jouées descendent sur
+les fiches en mémoire (`techniquesUtilisees`, fichesDepuisEtat) et y restaient.
+- `techniqueClasseUtilisee` (combat.js) lit d'abord l'état du combat en cours
+  (`regimeDemande.etat()`, regime_cerveau.js) ; un état d'une autre rencontre
+  (`etat.combat` ≠ `PARTIE_DATA.ID_Rencontre`) n'a rien joué de celle-ci. Le
+  volet (chargerCompetencesCombat) passe par la même lecture.
+- `oublierLeCombatSurLesFiches` vide techniques jouées et sursis des fiches ;
+  appelé par `regimeFermerLeCombat` (réinitialisation) et à l'ouverture d'une
+  nouvelle rencontre.
+techniques_nouveau_combat.mjs le vérifie sur la vraie page.

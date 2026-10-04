@@ -845,11 +845,13 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
         // LES TECHNIQUES DE CLASSE, après les cartes mémorisées : même bannière,
         // même geste (aperçu, choix, lancement). Une fois jouée dans ce combat,
         // la bannière reste grisée (`techniquesUtilisees`, posé par le cerveau).
-        const utiliseesCeCombat = persoActuel.techniquesUtilisees || [];
         techniquesClasse.forEach(idCarte => {
             const data = window.carteTechniqueClasse(idCarte);
             window.COMPETENCES_CACHE[idCarte] = data;
-            const dejaJouee = utiliseesCeCombat.includes(idCarte);
+            // Même lecture que partout ailleurs : l'état de CE combat d'abord.
+            const dejaJouee = typeof window.techniqueClasseUtilisee === "function"
+                ? window.techniqueClasseUtilisee(persoActuel, idCarte)
+                : (persoActuel.techniquesUtilisees || []).includes(idCarte);
             const urlCadreClasse = dejaJouee ? IMAGE_CADRE_EPUISE : IMAGE_CADRE_NORMAL;
             const couleurTexteClasse = dejaJouee ? "#888888" : "#e0d0b0";
             const survol = dejaJouee ? ` title="Déjà utilisée dans ce combat"` : ` title="Technique de classe — une fois par combat"`;
@@ -4857,6 +4859,18 @@ window.surRefusIntention = function(intention, raison) {
 // Cette technique de classe a-t-elle déjà servi dans ce combat, pour ce héros ?
 window.techniqueClasseUtilisee = function(perso, idCarte) {
     if (!perso || !idCarte) return false;
+    // L'ÉTAT DU COMBAT FAIT FOI. La fiche en mémoire peut porter les
+    // techniques de la rencontre d'avant (on enchaîne les combats sans
+    // recharger) ; l'état, lui, est celui de CETTE rencontre. Un état qui parle
+    // d'une autre rencontre n'a rien joué de celle-ci.
+    const etat = window.regimeDemande && typeof window.regimeDemande.etat === "function"
+        ? window.regimeDemande.etat() : null;
+    if (etat && etat.combattants) {
+        const rencontre = (window.PARTIE_DATA || {}).ID_Rencontre;
+        if (rencontre && etat.combat && etat.combat !== rencontre) return false;
+        const c = etat.combattants[perso.idPersonnage];
+        if (c) return (c.techniquesUtilisees || []).includes(idCarte);
+    }
     const enRam = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === perso.idPersonnage) || perso;
     return (enRam.techniquesUtilisees || perso.techniquesUtilisees || []).includes(idCarte);
 };
