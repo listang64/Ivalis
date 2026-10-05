@@ -470,6 +470,77 @@ window.porteurPourApercu = function(idCarte) {
     return (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO] || null;
 };
 
+// =========================================================================
+//  L'ÉNERGIE DU HÉROS SOUS LA CARTE (combat)
+// =========================================================================
+//  Quand on choisit une compétence à jouer, la jauge d'énergie du héros
+//  s'affiche sous la carte : l'énergie actuelle, et en rouge clignotant ce que
+//  la carte (et le trajet déjà tracé) va coûter, avec le chiffre qui restera.
+//  Pour le repos long, l'encart du repos prend la place de la carte, et la même
+//  jauge montre en vert clignotant l'énergie regagnée.
+window.energieHerosApercu = function(perso) {
+    if (!perso) return null;
+    const max = typeof window.fatigueMaxCombattant === "function" ? window.fatigueMaxCombattant(perso) : 100;
+    const actuelle = perso.fatigueActuelle !== undefined ? (parseInt(perso.fatigueActuelle) || 0) : max;
+    return { max: Math.max(1, max), actuelle: Math.max(0, Math.min(actuelle, max)) };
+};
+
+// Ce que le repos long rend, avec la règle du cerveau (reposLongDuTour) : le
+// rendement propre au combattant (Repos_Long, en %) ou 35 % de sa jauge, sans
+// dépasser le plein.
+window.gainReposLong = function(perso) {
+    const e = window.energieHerosApercu(perso);
+    if (!e) return 0;
+    const pct = parseFloat((perso.stats && perso.stats.Repos_Long) || perso.Repos_Long) || 0;
+    const taux = pct > 0 ? pct / 100 : 0.35;
+    return Math.max(0, Math.min(e.max - e.actuelle, Math.floor(e.max * taux)));
+};
+
+// La jauge : `delta` négatif = une dépense (rouge), positif = un gain (vert).
+window.htmlJaugeEnergieApercu = function(e, delta) {
+    const pct = (v) => Math.max(0, Math.min(100, (v / e.max) * 100)).toFixed(2);
+    const apres = e.actuelle + delta;
+    const manque = apres < 0 ? -apres : 0;
+    const resteAffiche = Math.max(0, Math.min(e.max, apres));
+    const gain = delta > 0;
+    const base = gain ? e.actuelle : resteAffiche;              // la partie qui reste pleine
+    const largeurDelta = Math.abs((gain ? resteAffiche : e.actuelle) - base);
+    return `
+        <div class="jauge-energie-apercu${gain ? " gain" : " perte"}${manque ? " insuffisante" : ""}">
+            <div class="jauge-energie-libelle">
+                <span>⚡ Énergie <b>${e.actuelle}</b></span>
+                <span class="jauge-energie-fleche">→ <b class="jauge-energie-apres">${resteAffiche}</b><small>/ ${e.max}</small>${manque ? ` <em>(il manque ${manque})</em>` : ""}</span>
+            </div>
+            <div class="jauge-energie-barre">
+                <div class="jauge-energie-pleine" style="width: ${pct(base)}%"></div>
+                <div class="jauge-energie-delta" style="left: ${pct(base)}%; width: ${pct(largeurDelta)}%"></div>
+            </div>
+        </div>`;
+};
+
+// L'encart du repos long, à la place de la carte.
+window.afficherApercuReposLong = function(perso) {
+    const conteneur = document.getElementById("apercu-carte-hd-competence");
+    const fenetreCombat = document.getElementById("fenetre-combat");
+    const e = window.energieHerosApercu(perso);
+    if (!conteneur || !fenetreCombat || !e) return;
+    if (conteneur.parentNode !== fenetreCombat) fenetreCombat.appendChild(conteneur);
+    const gain = window.gainReposLong(perso);
+    const pct = parseFloat((perso.stats && perso.stats.Repos_Long) || perso.Repos_Long) || 35;
+    conteneur.dataset.cardId = "REPOS_LONG";
+    conteneur.dataset.locked = "false";
+    conteneur.innerHTML = `
+        <div class="encart-repos-long">
+            <div class="encart-repos-titre">🌙 Repos long</div>
+            <div class="encart-repos-texte">${gain > 0
+                ? `Tu reprends ton souffle : <b>+${gain}</b> d'énergie <small>(${pct} % de ta jauge)</small>.`
+                : `Ton énergie est déjà pleine : le repos n'en rendra pas.`}</div>
+        </div>
+        ${window.htmlJaugeEnergieApercu(e, gain)}`;
+    Object.assign(conteneur.style, { zIndex: "15", pointerEvents: "auto", top: "15vh", left: APERCU_CARTE_X,
+                                     transform: "none", width: "340px", height: "150px", display: "block", opacity: "1" });
+};
+
 window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     let conteneurCarte = document.getElementById("apercu-carte-hd-competence");
     
@@ -808,6 +879,21 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     // les yeux du joueur, et s'il peut la retenir pour la manche.
     window.CARTE_APERCU = { idCarte, choisissable };
 
+    // L'ÉNERGIE DU HÉROS SOUS LA CARTE, pendant qu'il choisit : ce que la carte
+    // et le trajet déjà tracé vont coûter clignote en rouge, et le chiffre dit
+    // ce qui restera.
+    let jaugeEnergieHtml = "";
+    if (isCombatMode && !isLocked && !estCarteDeMonstre && phaseTemp !== "Resolution") {
+        const heros = (porteurDeLaCarte && !porteurDeLaCarte.estMonstre) ? porteurDeLaCarte : persoActuelTemp;
+        const energie = window.energieHerosApercu(heros);
+        if (energie) {
+            const cout = (parseInt(fatigue) || 0) + (window.MOUVEMENT_COUT_TOTAL || 0);
+            jaugeEnergieHtml = window.htmlJaugeEnergieApercu(energie, -cout);
+            // Le message (« Énergie insuffisante »…) descend sous la jauge.
+            boutonChoisirHtml = boutonChoisirHtml.replace("bottom: -65px", "bottom: -98px");
+        }
+    }
+
     conteneurCarte.innerHTML = `
         <!-- COUCHE 1 : FOND DE COULEUR -->
         <div style="position: absolute; top: 12px; left: 12px; right: 12px; bottom: 12px; background-color: ${window.COULEUR_PERSO_COURANT}; border-radius: 8px; z-index: 1;"></div>
@@ -840,6 +926,8 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         <!-- COUCHE 4 : LA ZONE FLOTTANTE -->
         ${htmlZoneAbsolue}
 
+        ${jaugeEnergieHtml}
+
         ${boutonChoisirHtml}
     `;
 
@@ -852,10 +940,12 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
             conteneurCarte.style.top = "15vh";
             conteneurCarte.style.left = APERCU_CARTE_X; // Apparait à droite du volet
             conteneurCarte.style.transform = "none";
-            conteneurCarte.style.width = "340px";
-            conteneurCarte.style.height = "476px";
             void conteneurCarte.offsetWidth; 
         }
+        // Toujours la taille d'une carte : l'encart du repos long, plus petit,
+        // a pu occuper le même cadre juste avant.
+        conteneurCarte.style.width = "340px";
+        conteneurCarte.style.height = "476px";
         // Retenue ou simplement survolée, elle ne bouge plus : autrefois la
         // carte choisie glissait à 20 px pour venir couvrir les bannières, ce
         // qui n'a plus de sens maintenant que le volet se referme tout seul dès

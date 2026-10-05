@@ -175,6 +175,7 @@ node liste_fleches.mjs         # flèches haut/bas sur une liste de héros qui d
 node forge_design.mjs         # la Forge aux couleurs du jeu (aucun bleu « appli »), descriptions alignées à gauche sous leur nom
 node aide_forge_lia.mjs         # 🔨 LIA, l'aide à la création : popup récit + jauges, Gemini simulé, plan fautif corrigé par les règles de la Forge, cap, Recit_RP
 node illustration_competence.mjs  # 🎨 illustration des compétences : IA de prompt + IA d'image (portrait + armes en binaire), file sur IA saturée, image en haut de la carte, outil de réglage provisoire
+node jauge_energie_carte.mjs     # ⚡ énergie sous la carte en combat (perte rouge clignotante, reste) ; encart du repos long (gain vert)
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4524,3 +4525,16 @@ pour une zone. Le corps entier et l'arme ne sont plus obligatoires (l'arme
 n'apparaît que si le geste la montre). Le prompt décrit le plan, l'angle, la
 focale, la profondeur de champ, le mouvement figé, la lumière et la
 composition. illustration_competence.mjs, sections 2 bis, 3 et 4 bis.
+
+## L'énergie sous la carte, et l'encart du repos long (version 187)
+
+En combat, quand on choisit une compétence, la jauge d'énergie du héros
+s'affiche sous la carte (`htmlJaugeEnergieApercu`, competences.js) : l'énergie
+actuelle, la dépense (la carte + le trajet déjà tracé) en rouge clignotant, et
+le chiffre qui restera (« il manque N » si la carte est trop chère ; le message
+« Énergie insuffisante » descend sous la jauge). Pas de jauge sur une carte
+retenue, pendant la résolution, sur une carte de créature ni hors combat.
+Le repos long affiche, à la place de la carte, un encart « 🌙 Repos long » qui
+dit combien il rend (`gainReposLong` : la règle du cerveau, Repos_Long du
+combattant ou 35 % de la jauge, sans dépasser le plein), avec la même jauge et
+le gain en vert clignotant (`afficherApercuReposLong`). jauge_energie_carte.mjs.

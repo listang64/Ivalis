@@ -682,8 +682,9 @@ window.calerVoletReplie = function() {
     return true;
 };
 
-// LE REPOS LONG SE CHOISIT COMME UNE CARTE. Pas d'aperçu en grand — il n'a
-// aucun effet à détailler — mais le même geste : on le retient, le bouton fin
+// LE REPOS LONG SE CHOISIT COMME UNE CARTE. Pas de carte en grand — il n'a
+// aucun effet à détailler : un petit encart dit ce qu'il rend, avec la jauge
+// d'énergie (afficherApercuReposLong, competences.js) — et le même geste : on le retient, le bouton fin
 // de tour passe sur « choisir compétence », et c'est lui qui l'envoie.
 window.choisirReposLongDansVolet = function() {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
@@ -696,6 +697,11 @@ window.choisirReposLongDansVolet = function() {
     // Le repos ne coûte rien : la jauge d'énergie ne montre aucune réserve.
     window.COUT_COMPETENCE_SELECTIONNEE = 0;
     if (typeof window.mettreAJourJaugeFatigue === "function") window.mettreAJourJaugeFatigue(0);
+
+    // À la place de la carte : l'encart du repos, et l'énergie qu'il rendra.
+    if (typeof window.afficherApercuReposLong === "function") {
+        window.afficherApercuReposLong((window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO]);
+    }
 
     window.CARTE_APERCU = { idCarte: "REPOS_LONG", choisissable: true };
     if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
