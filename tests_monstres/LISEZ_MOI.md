@@ -173,6 +173,7 @@ node tenebres_brut.mjs        # Ténèbres sans armure (×1,5 sur la vie sans é
 node valeurs_decimales.mjs    # 1,5 par cran : le demi-point compte, arrondi au plus proche (dégâts, soins, boucliers), écrit à la française dans la Forge
 node liste_fleches.mjs         # flèches haut/bas sur une liste de héros qui défile ; la portée de l'arme lue sur le propriétaire de la carte
 node forge_design.mjs         # la Forge aux couleurs du jeu (aucun bleu « appli »), descriptions alignées à gauche sous leur nom
+node aide_forge_lia.mjs         # 🔨 LIA, l'aide à la création : popup récit + jauges, Gemini simulé, plan fautif corrigé par les règles de la Forge, cap, Recit_RP
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4377,3 +4378,33 @@ plus que des classes (mêmes identifiants, mêmes actions).
 Les « espaces bizarres » : les descriptions héritaient le centrage de
 .modale-parchemin-jeu et flottaient au milieu de la ligne ; elles s'alignent à
 gauche, sous leur nom. forge_design.mjs.
+
+## LIA, l'aide à la création de la Forge (version 179)
+
+Dans le bandeau de la Forge, les deux médaillons ont la même hauteur et leur
+chiffre est centré dedans ; à leur droite, un bouton 🔨 « Aide à la création »
+ouvre la fenêtre de LIA (lia_forge.js) : un encart pour le récit RP de la
+technique, deux jauges (⚡ Coût en Fatigue / puissance, ⏱ Rapidité : Auto,
+Faible, Modéré, Forte — Auto par défaut), Annuler et Créer.
+LIA (Gemini, outil `forgerTechnique` imposé) reçoit le récit, les jauges (en
+indications : Faible ≈ 30 % du cap, Modéré ≈ 60 %, Forte 90–100 % ; rapidité
+forte = peu de points ou Initiative +), la fiche du héros (classe, race,
+niveau, cap selon chaque caractéristique, armes en main) et la liste de TOUS
+les effets et sous-effets qu'il peut forger (rôle, carac, fatigue par cran,
+crans max, ce que fait un cran, durée réglable, armes interdites). Elle rend
+un nom, une arme et des actions avec leurs sous-effets.
+L'algorithme ne pose que ce que la Forge accepte, avec SES règles
+(`window.outilsForge`, competences.js — dont `etatSousEffet`, désormais au
+niveau du module, que les menus de sous-effets utilisent aussi) : une arme que
+le héros peut manier (en main, Magie, Sans arme / Arme rp ; sinon celle qui
+garde le plus d'actions), une seule attaque, deux caractéristiques au plus,
+aucun sous-effet incompatible, crans et durées bornés, une forme de zone
+compacte (en éventail au contact, centrée à distance), puis un rabot cran par
+cran (durées d'abord, puis le poste le plus coûteux au total) jusqu'à tenir
+sous le cap. La Forge est remplie (nom + effets), le joueur retouche et valide.
+Une Forge déjà garnie demande « Remplacer ? ». Sans clé Gemini, LIA injoignable
+ou plan sans action forgeable : un message, la Forge intacte.
+Le récit part en base avec la compétence (`Recit_RP`), pour en dessiner
+l'image plus tard ; une technique forgée à la main n'en a pas.
+etalement_sans_degats.mjs et persistance_soin.mjs lisent maintenant les règles
+dans `etatSousEffet`. aide_forge_lia.mjs.

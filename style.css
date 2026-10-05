@@ -3977,8 +3977,11 @@ textarea.input-texte-parchemin {
   padding: 5px 12px; border-radius: 20px; border: 1px solid rgba(243,223,166,0.45);
   background: rgba(0,0,0,0.25); font-size: 16px; font-weight: bold; color: #f3dfa6;
 }
-.forge-medaillons { display: flex; gap: 14px; justify-content: center; }
+.forge-medaillons { display: flex; gap: 14px; justify-content: center; align-items: stretch; }
+/* Les deux médaillons ont la même hauteur, et leur chiffre est centré dedans,
+   qu'il y ait ou non la ligne de surpuissance sous la fatigue. */
 .forge-medaillon {
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
   min-width: 112px; padding: 6px 14px 7px; border-radius: 12px; text-align: center;
   background: radial-gradient(circle at 50% 30%, #f6ead0 0%, #e2cc96 100%);
   border: 2px solid #a8841f; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.4), 0 3px 8px rgba(0,0,0,0.5);
@@ -3989,6 +3992,57 @@ textarea.input-texte-parchemin {
 .forge-medaillon-initiative .forge-medaillon-valeur { color: #5b2f86; }
 .forge-medaillon-libelle { font-size: 11px; font-weight: bold; letter-spacing: 2px; color: #5c3a21; text-transform: uppercase; }
 .forge-medaillon .forge-surpuissance { margin-top: 2px; font-size: 11px; line-height: 1.2; color: #6b5236; max-width: 150px; }
+.forge-medaillon .forge-surpuissance:empty { display: none; }
+
+/* 🔨 LIA, l'aide à la création : un sceau de cuir à droite des médaillons. */
+.forge-btn-aide {
+  display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px;
+  min-width: 96px; padding: 6px 12px; border-radius: 12px; cursor: pointer;
+  background: radial-gradient(circle at 50% 30%, #6b4428 0%, #3b2412 100%);
+  border: 2px solid #a8841f; color: #f3dfa6; font-family: inherit;
+  box-shadow: inset 0 0 0 1px rgba(255,225,140,0.25), 0 3px 8px rgba(0,0,0,0.5);
+  transition: transform 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.forge-btn-aide:hover { transform: translateY(-1px) scale(1.04); color: #00ffff; box-shadow: inset 0 0 0 1px rgba(0,255,255,0.35), 0 5px 12px rgba(0,0,0,0.55); }
+.forge-btn-aide-icone { font-size: 24px; line-height: 1; }
+.forge-btn-aide-texte { font-size: 11px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; line-height: 1.15; max-width: 92px; }
+
+/* La fenêtre de LIA */
+#modale-aide-forge.aide-forge {
+  width: 560px; max-width: 94vw; max-height: 90vh; overflow-y: auto; padding: 0; text-align: left;
+  background: #e8d5a5; border: 3px solid #1a1a1a; border-radius: 14px;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.9), inset 0 0 0 2px rgba(168,132,31,0.55);
+}
+.aide-forge-corps { padding: 14px 20px 6px; }
+#modale-aide-forge .aide-forge-intro { margin: 0 0 12px; font-size: 15px; line-height: 1.4; color: #5c3a21; text-align: left; }
+.aide-forge-recit {
+  box-sizing: border-box; width: 100%; min-height: 120px; resize: vertical; padding: 10px 12px;
+  font-family: inherit; font-size: 16px; line-height: 1.4; color: #2c1e16;
+  background: linear-gradient(180deg, #f6ead0 0%, #efdfb8 100%);
+  border: 2px solid #a8841f; border-radius: 10px; box-shadow: inset 0 1px 4px rgba(0,0,0,0.18);
+}
+.aide-forge-recit:focus { outline: none; border-color: #5c3a21; }
+.aide-forge-jauge { margin-top: 16px; }
+.aide-forge-jauge-titre { font-size: 14px; font-weight: bold; letter-spacing: 1px; color: #2c1e16; margin-bottom: 4px; }
+.aide-forge-curseur { width: 100%; margin: 4px 0 2px; accent-color: #a8841f; cursor: pointer; }
+/* Chaque libellé sous SON cran du curseur (0, 1/3, 2/3, 1), et cliquable. */
+.aide-forge-crans { position: relative; height: 18px; margin: 0 8px; font-size: 13px; color: #8a7358; }
+.aide-forge-crans span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; cursor: pointer; }
+.aide-forge-crans span:nth-child(1) { left: 0; }
+.aide-forge-crans span:nth-child(2) { left: 33.333%; }
+.aide-forge-crans span:nth-child(3) { left: 66.667%; }
+.aide-forge-crans span:nth-child(4) { left: 100%; }
+.aide-forge-crans span.actif { color: #5c3a21; font-weight: bold; }
+.aide-forge-statut { min-height: 20px; margin-top: 12px; font-size: 14px; font-style: italic; color: #5c3a21; }
+.aide-forge-statut.erreur { color: #9b2c2c; font-style: normal; font-weight: bold; }
+.aide-forge-pied { display: flex; justify-content: flex-end; gap: 10px; padding: 10px 20px 18px; }
+.aide-forge-pied .btn-parametres { margin: 0; padding: 8px 18px; font-size: 16px; }
+.aide-forge-pied .aide-forge-creer { background: linear-gradient(180deg, #24804a 0%, #145a31 100%); border-color: #0f4021; color: #fff; }
+.aide-forge-pied .btn-parametres:disabled { opacity: 0.55; cursor: wait; transform: none; }
+#modale-aide-forge-confirmer.aide-forge-confirmer { width: 420px; max-width: 90vw; padding: 20px 22px 4px; }
+.aide-forge-confirmer h3 { margin: 0 0 8px; font-size: 22px; color: #2a1a0f; }
+.aide-forge-confirmer p { font-size: 16px; margin: 0 0 6px; }
+.aide-forge-confirmer .aide-forge-pied { justify-content: center; padding: 12px 0 18px; }
 .forge-bandeau-droite { justify-self: end; }
 .forge-bandeau-droite .btn-parametres { margin: 0; padding: 6px 16px; font-size: 15px; }
 
@@ -4117,4 +4171,5 @@ textarea.input-texte-parchemin {
   .forge-bandeau { grid-template-columns: 1fr auto; }
   .forge-medaillons { grid-column: 1 / -1; order: 3; }
   .forge-medaillon { min-width: 96px; }
+  .forge-btn-aide { min-width: 84px; }
 }

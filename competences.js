@@ -1303,6 +1303,9 @@ window.ouvrirCreationCompetence = async function() {
         window.forgeState.actions = [];
         window.forgeState.isCapReached = false;
         window.forgeState.armePrincipale = null;
+        // Le récit RP d'une technique forgée avec LIA (lia_forge.js) : il part
+        // avec la compétence, pour en dessiner l'image plus tard.
+        window.forgeState.recitRP = "";
 
         document.getElementById("forge-nom").value = "";
         const selectElement = document.getElementById("forge-element");
@@ -1846,6 +1849,132 @@ window.horsInitiative = function(nom) {
     return window.MOTS_HORS_INITIATIVE.some(mot => n.includes(mot));
 };
 
+// =========================================================================
+//  LES RÈGLES DES SOUS-EFFETS, EN UN SEUL ENDROIT
+// =========================================================================
+//  Sorties de rafraichirForge pour servir à DEUX lecteurs : les menus de la
+//  Forge, et LIA (l'aide à la création), qui doit respecter exactement les
+//  mêmes règles que le joueur. `etatSousEffet` rend :
+//    "masque"       il n'apparaît pas (une 3e caractéristique, une 2e attaque) ;
+//    "incompatible" il apparaît grisé (« non compatible ») ;
+//    "ok"           il se pose.
+// Poussée est un déplacement forcé instantané : la Persistance de terrain, la Zone et la
+// Durée étalement dégâts n'ont pas de sens dessus (pas de terrain modifié, pas de zone, pas
+// d'étalement dans le temps). On grise ces mods (visibles, mais non sélectionnables) plutôt
+// que de les cacher, pour que ce soit clair que le choix n'est pas ouvert.
+const NOMS_INCOMPATIBLES_POUSSEE = ["persistance terrain", "zone", "durée étalement dégâts"];
+const actionContientPoussee = (act) => {
+    if ((act.baseEffet.Nom || "").toLowerCase().includes("pouss")) return true;
+    return Object.keys(act.mods).some(modId => {
+        const m = window.forgeState.effetsBDD.find(e => e.id === modId);
+        return m && (m.Nom || "").toLowerCase().includes("pouss");
+    });
+};
+
+// L'Illusion est un leurre statique, fixe : le mod "Zone" n'a pas de sens dessus.
+const actionContientIllusion = (act) => {
+    if ((act.baseEffet.Nom || "").toLowerCase().includes("illusion")) return true;
+    return Object.keys(act.mods).some(modId => {
+        const m = window.forgeState.effetsBDD.find(e => e.id === modId);
+        return m && (m.Nom || "").toLowerCase().includes("illusion");
+    });
+};
+
+// L'ÉTALEMENT NE S'ACCROCHE QU'À UN MONTANT. Il divise des DÉGÂTS ou des
+// SOINS par un nombre de tours : le poser sur un état altéré (un
+// étourdissement, une provocation) n'a aucun sens — il n'y a rien à
+// diviser. Il ne peut donc se greffer que sur une attaque, un soin, une
+// Zone ou une Distance : les actions par lesquelles un coup ou un soin
+// arrive. Un bouclier n'est pas un soin, et ne s'étale pas.
+const estUnModEtalement = (nomLower) => {
+    const n = (nomLower || "").trim();
+    return n === "dot" || n.includes("étalement") || n.includes("etalement");
+};
+const estUnSoinDeBase = (nom) => {
+    const n = (nom || "").toLowerCase();
+    return (n.includes("soin") || n.includes("guérison") || n.includes("guerison")) && !n.includes("bouclier");
+};
+// Une action qui fait des dégâts MAGIQUES : l'Attaque Magique, les Mots de
+// pouvoir, Ténèbres (celles qui sont des sorts, pas des soins).
+const actionADegatsMagiques = (act) => {
+    const n = ((act && act.baseEffet && act.baseEffet.Nom) || "").toLowerCase();
+    return n.includes("attaque magique") || n.includes("pouvoir")
+        || (typeof window.estSortDeClasse === "function" && window.estSortDeClasse(n));
+};
+const actionAccepteEtalement = (act) => {
+    if (!act || !act.baseEffet) return false;
+    if (estUneAttaqueDeBase(act.baseEffet.Nom) || estUnSoinDeBase(act.baseEffet.Nom)) return true;
+    const nom = (act.baseEffet.Nom || "").toLowerCase();
+    return nom.includes("zone") || nom.includes("distance");
+};
+
+
+function etatSousEffet(mod, actionCourante, activeTags) {
+    if (!mod) return "masque";
+    const tags = activeTags || getActiveTags();
+    // 🔻 Sécurité pour bloquer les attaques dans les menus déroulants
+    const aDejaUneAttaque = window.forgeState.actions.some(act => estUneAttaqueDeBase(act.baseEffet.Nom));
+    // Un soin sur la carte, c'est aussi un montant qu'on peut étaler.
+    const aDejaUnSoin = window.forgeState.actions.some(act => estUnSoinDeBase(act.baseEffet.Nom));
+    // Ce que la carte porte déjà, toutes actions confondues (socle ou sous-effet).
+    const nomsSurLaCarte = [];
+    window.forgeState.actions.forEach(act => {
+        nomsSurLaCarte.push(((act.baseEffet && act.baseEffet.Nom) || "").toLowerCase());
+        Object.keys(act.mods || {}).forEach(id => {
+            const eff = window.forgeState.effetsBDD.find(e => e.id === id);
+            if (eff) nomsSurLaCarte.push((eff.Nom || "").toLowerCase());
+        });
+    });
+    const carteADejaUnEtalement = nomsSurLaCarte.some(n => estUnModEtalement(n));
+    const carteADejaUnePersistance = nomsSurLaCarte.some(n => n.includes("persistance"));
+
+    const isLocked = tags.size >= 2 && mod.Modificateur !== "AUCUN" && !tags.has(String(mod.Modificateur).toUpperCase());
+    const isAttackLocked = aDejaUneAttaque && estUneAttaqueDeBase(mod.Nom);
+    if (isLocked || isAttackLocked) return "masque";
+
+    const estActionPoussee = !!actionCourante && actionContientPoussee(actionCourante);
+    const estActionIllusion = !!actionCourante && actionContientIllusion(actionCourante);
+    const nomModLower = (mod.Nom || "").toLowerCase();
+    // Une carte qui a déjà Poussée (socle ou mod) ne peut pas en reposer une deuxième
+    // couche par-dessus : le sous-effet Poussée redeviendrait redondant avec lui-même.
+    const estIncompatiblePoussee = estActionPoussee &&
+        (NOMS_INCOMPATIBLES_POUSSEE.includes(nomModLower) || nomModLower.includes("pouss"));
+    const estIncompatibleIllusion = estActionIllusion && mod.Nom === "Zone";
+    // Empoisonnement doit toujours être lié à une source de dégât (une attaque
+    // quelque part sur la carte), sinon aucun type de dégât n'est déterminable.
+    const estIncompatiblePoison = !aDejaUneAttaque && nomModLower.includes("poison");
+    // L'étalement divise les DÉGÂTS ou les SOINS de la carte par un nombre de
+    // tours : sur une carte qui ne frappe ni ne soigne (un pur contrôle) il n'y a
+    // rien à étaler, et sur une action qui ne porte ni coup ni soin (un état
+    // altéré) il n'y a rien à quoi l'accrocher.
+    const estIncompatibleEtalement = estUnModEtalement(nomModLower)
+        && (!(aDejaUneAttaque || aDejaUnSoin) || !actionAccepteEtalement(actionCourante));
+    // PAS DE PERSISTANCE SUR UN SOIN (règle de Nico) : un soin peut
+    // porter une Zone, jamais une Persistance terrain — il n'y a plus
+    // de nappe qui soigne au sol.
+    const estIncompatiblePersistanceSoin = nomModLower.includes("persistance")
+        && !!actionCourante && estUnSoinDeBase(actionCourante.baseEffet.Nom);
+    // PAS DE PERSISTANCE SUR UN DOT (règle de Nico) : des dégâts
+    // étalés ne se reposent pas en nappe au sol. La carte choisit
+    // l'un ou l'autre : l'Étalement grise la Persistance, et
+    // réciproquement, où qu'ils soient posés sur la carte.
+    const estIncompatiblePersistanceDot = (nomModLower.includes("persistance") && carteADejaUnEtalement)
+        || (estUnModEtalement(nomModLower) && carteADejaUnePersistance);
+    // LUMIÈRE (Chasseur de mages) : elle fait passer un sort outre la
+    // défense magique — il lui faut donc une action à dégâts magiques.
+    const estIncompatibleLumiere = nomModLower.startsWith("lumi")
+        && !actionADegatsMagiques(actionCourante);
+    // LA DISTANCE : arme polyvalente, à distance, magie — ou un soin.
+    const estIncompatibleDistance = mod.Nom === "Distance"
+        && typeof window.distancePermiseSurAction === "function"
+        && !window.distancePermiseSurAction(actionCourante, window.forgeState.armePrincipale);
+    return (estIncompatiblePoussee || estIncompatibleIllusion || estIncompatiblePoison || estIncompatibleEtalement
+            || estIncompatiblePersistanceSoin || estIncompatiblePersistanceDot || estIncompatibleDistance
+            || estIncompatibleLumiere) ? "incompatible" : "ok";
+}
+window.etatSousEffetForge = etatSousEffet;
+
+
 window.rafraichirForge = function() {
     let totalPC = 0;
     let initBonusNet = 0;
@@ -1946,6 +2075,9 @@ window.rafraichirForge = function() {
     const capDepasse = fatigueConsommee >= capFatigue;
     const capErreur = fatigueConsommee > capFatigue;
     window.forgeState.isCapReached = capDepasse;
+    // Le bilan chiffré de la carte, pour qui doit le relire sans passer par
+    // l'affichage : LIA rabote ses crans jusqu'à tenir sous le cap.
+    window.forgeState.bilan = { totalPC, fatigue: fatigueConsommee, cap: capFatigue, initiative };
 
     const armeContainer = document.getElementById("forge-weapon-tag-container");
     if (armeContainer) {
@@ -1995,56 +2127,6 @@ window.rafraichirForge = function() {
     const conteneurCarte = document.getElementById("forge-contenu-carte");
     conteneurCarte.innerHTML = "";
 
-    // Poussée est un déplacement forcé instantané : la Persistance de terrain, la Zone et la
-    // Durée étalement dégâts n'ont pas de sens dessus (pas de terrain modifié, pas de zone, pas
-    // d'étalement dans le temps). On grise ces mods (visibles, mais non sélectionnables) plutôt
-    // que de les cacher, pour que ce soit clair que le choix n'est pas ouvert.
-    const NOMS_INCOMPATIBLES_POUSSEE = ["persistance terrain", "zone", "durée étalement dégâts"];
-    const actionContientPoussee = (act) => {
-        if ((act.baseEffet.Nom || "").toLowerCase().includes("pouss")) return true;
-        return Object.keys(act.mods).some(modId => {
-            const m = window.forgeState.effetsBDD.find(e => e.id === modId);
-            return m && (m.Nom || "").toLowerCase().includes("pouss");
-        });
-    };
-
-    // L'Illusion est un leurre statique, fixe : le mod "Zone" n'a pas de sens dessus.
-    const actionContientIllusion = (act) => {
-        if ((act.baseEffet.Nom || "").toLowerCase().includes("illusion")) return true;
-        return Object.keys(act.mods).some(modId => {
-            const m = window.forgeState.effetsBDD.find(e => e.id === modId);
-            return m && (m.Nom || "").toLowerCase().includes("illusion");
-        });
-    };
-
-    // L'ÉTALEMENT NE S'ACCROCHE QU'À UN MONTANT. Il divise des DÉGÂTS ou des
-    // SOINS par un nombre de tours : le poser sur un état altéré (un
-    // étourdissement, une provocation) n'a aucun sens — il n'y a rien à
-    // diviser. Il ne peut donc se greffer que sur une attaque, un soin, une
-    // Zone ou une Distance : les actions par lesquelles un coup ou un soin
-    // arrive. Un bouclier n'est pas un soin, et ne s'étale pas.
-    const estUnModEtalement = (nomLower) => {
-        const n = (nomLower || "").trim();
-        return n === "dot" || n.includes("étalement") || n.includes("etalement");
-    };
-    const estUnSoinDeBase = (nom) => {
-        const n = (nom || "").toLowerCase();
-        return (n.includes("soin") || n.includes("guérison") || n.includes("guerison")) && !n.includes("bouclier");
-    };
-    // Une action qui fait des dégâts MAGIQUES : l'Attaque Magique, les Mots de
-    // pouvoir, Ténèbres (celles qui sont des sorts, pas des soins).
-    const actionADegatsMagiques = (act) => {
-        const n = ((act && act.baseEffet && act.baseEffet.Nom) || "").toLowerCase();
-        return n.includes("attaque magique") || n.includes("pouvoir")
-            || (typeof window.estSortDeClasse === "function" && window.estSortDeClasse(n));
-    };
-    const actionAccepteEtalement = (act) => {
-        if (!act || !act.baseEffet) return false;
-        if (estUneAttaqueDeBase(act.baseEffet.Nom) || estUnSoinDeBase(act.baseEffet.Nom)) return true;
-        const nom = (act.baseEffet.Nom || "").toLowerCase();
-        return nom.includes("zone") || nom.includes("distance");
-    };
-
     const renderSelectMenu = (type, label, color, actionId, estActionPoussee, estActionIllusion) => {
         if (type === "Physique" && window.forgeState.armePrincipale === "Magie") return "";
 
@@ -2055,77 +2137,19 @@ window.rafraichirForge = function() {
 
         let groupesMods = {};
 
-        // 🔻 Sécurité pour bloquer les attaques dans les menus déroulants
-        const aDejaUneAttaque = window.forgeState.actions.some(act => estUneAttaqueDeBase(act.baseEffet.Nom));
-        // Un soin sur la carte, c'est aussi un montant qu'on peut étaler.
-        const aDejaUnSoin = window.forgeState.actions.some(act => estUnSoinDeBase(act.baseEffet.Nom));
-        // L'action sur laquelle ce menu greffe ses sous-effets : certains ne
-        // peuvent aller que sur une action qui frappe (voir l'Étalement).
+        // L'action sur laquelle ce menu greffe ses sous-effets.
         const actionCourante = window.forgeState.actions.find(a => a.idInst === actionId);
-        // Ce que la carte porte déjà, toutes actions confondues (socle ou sous-effet).
-        const nomsSurLaCarte = [];
-        window.forgeState.actions.forEach(act => {
-            nomsSurLaCarte.push(((act.baseEffet && act.baseEffet.Nom) || "").toLowerCase());
-            Object.keys(act.mods || {}).forEach(id => {
-                const eff = window.forgeState.effetsBDD.find(e => e.id === id);
-                if (eff) nomsSurLaCarte.push((eff.Nom || "").toLowerCase());
-            });
-        });
-        const carteADejaUnEtalement = nomsSurLaCarte.some(n => estUnModEtalement(n));
-        const carteADejaUnePersistance = nomsSurLaCarte.some(n => n.includes("persistance"));
 
         modsDispos.forEach(mod => {
-            const isLocked = activeTags.size >= 2 && mod.Modificateur !== "AUCUN" && !activeTags.has(mod.Modificateur.toUpperCase());
-            const isAttackLocked = aDejaUneAttaque && estUneAttaqueDeBase(mod.Nom);
-
-            if (!isLocked && !isAttackLocked) {
-                const carac = (mod.Modificateur && mod.Modificateur !== "AUCUN") ? mod.Modificateur.toUpperCase() : "GÉNÉRAL";
-                if (!groupesMods[carac]) groupesMods[carac] = [];
-
-                // Calcul de la fatigue pour l'affichage
-                const coutFatigue = parseFrenchFloat(mod.Cout_PT) * 5;
-                const nomModLower = (mod.Nom || "").toLowerCase();
-                // Une carte qui a déjà Poussée (socle ou mod) ne peut pas en reposer une deuxième
-                // couche par-dessus : le sous-effet Poussée redeviendrait redondant avec lui-même.
-                const estIncompatiblePoussee = estActionPoussee &&
-                    (NOMS_INCOMPATIBLES_POUSSEE.includes(nomModLower) || nomModLower.includes("pouss"));
-                const estIncompatibleIllusion = estActionIllusion && mod.Nom === "Zone";
-                // Empoisonnement doit toujours être lié à une source de dégât (une attaque
-                // quelque part sur la carte), sinon aucun type de dégât n'est déterminable.
-                const estIncompatiblePoison = !aDejaUneAttaque && nomModLower.includes("poison");
-                // L'étalement divise les DÉGÂTS ou les SOINS de la carte par un nombre de
-                // tours : sur une carte qui ne frappe ni ne soigne (un pur contrôle) il n'y a
-                // rien à étaler, et sur une action qui ne porte ni coup ni soin (un état
-                // altéré) il n'y a rien à quoi l'accrocher.
-                const estIncompatibleEtalement = estUnModEtalement(nomModLower)
-                    && (!(aDejaUneAttaque || aDejaUnSoin) || !actionAccepteEtalement(actionCourante));
-                // PAS DE PERSISTANCE SUR UN SOIN (règle de Nico) : un soin peut
-                // porter une Zone, jamais une Persistance terrain — il n'y a plus
-                // de nappe qui soigne au sol.
-                const estIncompatiblePersistanceSoin = nomModLower.includes("persistance")
-                    && !!actionCourante && estUnSoinDeBase(actionCourante.baseEffet.Nom);
-                // PAS DE PERSISTANCE SUR UN DOT (règle de Nico) : des dégâts
-                // étalés ne se reposent pas en nappe au sol. La carte choisit
-                // l'un ou l'autre : l'Étalement grise la Persistance, et
-                // réciproquement, où qu'ils soient posés sur la carte.
-                const estIncompatiblePersistanceDot = (nomModLower.includes("persistance") && carteADejaUnEtalement)
-                    || (estUnModEtalement(nomModLower) && carteADejaUnePersistance);
-                // LUMIÈRE (Chasseur de mages) : elle fait passer un sort outre la
-                // défense magique — il lui faut donc une action à dégâts magiques.
-                const estIncompatibleLumiere = nomModLower.startsWith("lumi")
-                    && !actionADegatsMagiques(actionCourante);
-                // LA DISTANCE : arme polyvalente, à distance, magie — ou un soin.
-                const estIncompatibleDistance = mod.Nom === "Distance"
-                    && typeof window.distancePermiseSurAction === "function"
-                    && !window.distancePermiseSurAction(actionCourante, window.forgeState.armePrincipale);
-                groupesMods[carac].push(
-                    (estIncompatiblePoussee || estIncompatibleIllusion || estIncompatiblePoison || estIncompatibleEtalement
-                     || estIncompatiblePersistanceSoin || estIncompatiblePersistanceDot || estIncompatibleDistance
-                     || estIncompatibleLumiere)
-                        ? `<option value="${mod.id}" disabled style="color: #999;">${nettoyerNomEffet(mod.Nom)} (non compatible)</option>`
-                        : `<option value="${mod.id}">${nettoyerNomEffet(mod.Nom)} (⚡ ${coutFatigue})</option>`
-                );
-            }
+            const etat = etatSousEffet(mod, actionCourante, activeTags);
+            if (etat === "masque") return;
+            const carac = (mod.Modificateur && mod.Modificateur !== "AUCUN") ? mod.Modificateur.toUpperCase() : "GÉNÉRAL";
+            if (!groupesMods[carac]) groupesMods[carac] = [];
+            // Calcul de la fatigue pour l'affichage
+            const coutFatigue = parseFrenchFloat(mod.Cout_PT) * 5;
+            groupesMods[carac].push(etat === "incompatible"
+                ? `<option value="${mod.id}" disabled style="color: #999;">${nettoyerNomEffet(mod.Nom)} (non compatible)</option>`
+                : `<option value="${mod.id}">${nettoyerNomEffet(mod.Nom)} (⚡ ${coutFatigue})</option>`);
         });
 
         ORDRE_MODS.forEach(carac => {
@@ -2252,6 +2276,14 @@ window.rafraichirForge = function() {
     btnValider.disabled = capErreur || fatigueConsommee === 0 || nomSaisi === "" || !window.forgeState.armePrincipale;
 };
 
+// LES OUTILS DE LA FORGE, pour LIA (lia_forge.js) : elle pose ses effets avec
+// exactement les mêmes règles que le joueur, jamais avec une copie.
+window.outilsForge = {
+    getMaxStacks, etatSousEffet, estIncompatibleAvecArme, estUneAttaqueDeBase, estUnSoinDeBase,
+    typesArmesEquipeesPourForge, purgerIncompatibilitesArme, getActiveTags, actionHasDistance,
+    parseFrenchFloat, nettoyerNomEffet, formatterTexteEffet, normalizeForgeType
+};
+
 window.sauvegarderCompetence = async function() {
     const nomCompetence = document.getElementById("forge-nom").value.trim();
     const arme = window.forgeState.armePrincipale || "Non spécifié";
@@ -2290,6 +2322,8 @@ window.sauvegarderCompetence = async function() {
         Composants: composantsSerialises,
         Date_Creation: new Date().toISOString()
     };
+    // Forgée avec LIA : le récit du joueur reste avec la technique.
+    if (window.forgeState.recitRP) dataCompetence.Recit_RP = window.forgeState.recitRP;
 
     try {
         const idPerso = window.forgeState.idPersonnage;

@@ -25,17 +25,19 @@ const SRC_ATTAQUE = src.slice(src.indexOf('function estUneAttaqueDeBase'), src.i
 const finAttaque = SRC_ATTAQUE.indexOf('\n}\n') + 3;
 const SRC_ATTAQUE_FN = SRC_ATTAQUE.slice(0, finAttaque);
 
-// Les deux règles qui décident SUR QUOI l'étalement peut se greffer, prises
-// telles quelles dans la Forge — pas réécrites ici.
-const SRC_REGLES_ETALEMENT = src.slice(src.indexOf('    const estUnModEtalement = (nomLower) => {'),
-                                       src.indexOf('    const renderSelectMenu = (type, label'));
-if (!SRC_REGLES_ETALEMENT.includes('actionAccepteEtalement')) {
+// Les règles des sous-effets, prises telles quelles dans la Forge — pas
+// réécrites ici : le bloc de module de competences.js qui va de la liste des
+// noms incompatibles avec Poussée jusqu'à etatSousEffet (la Forge et LIA, l'aide
+// à la création, passent toutes deux par lui).
+const SRC_REGLES = src.slice(src.indexOf('const NOMS_INCOMPATIBLES_POUSSEE = '),
+                             src.indexOf('window.etatSousEffetForge = etatSousEffet;'));
+if (!SRC_REGLES.includes('actionAccepteEtalement') || !SRC_REGLES.includes('function etatSousEffet')) {
     throw new Error("les règles d'étalement ne sont plus là où le banc les cherche");
 }
 
 // Les trois formes d'action sur lesquelles l'étalement a un sens, et une qui
 // ne doit jamais l'accepter.
-const action = (nomEffetBase) => ({ idInst: "A1", baseEffet: { Nom: nomEffetBase }, mods: {} });
+const action = (nomEffetBase, idInst = "A1") => ({ idInst, baseEffet: { Nom: nomEffetBase }, mods: {} });
 
 // Le bloc RÉEL qui construit chaque <option> du menu déroulant de mods,
 // extrait entre ses deux repères stables (rien de plus, rien de moins).
@@ -43,32 +45,29 @@ const debutBloc = src.indexOf('modsDispos.forEach(mod => {');
 const finBloc = src.indexOf('ORDRE_MODS.forEach(carac => {');
 if (debutBloc < 0 || finBloc < 0) throw new Error("bloc modsDispos.forEach introuvable");
 const SRC_BLOC = src.slice(debutBloc, finBloc);
-// Ce que la carte porte déjà (toutes actions confondues), lu juste avant le
-// bloc : c'est là que la Forge décide si l'Étalement et la Persistance se
-// croisent déjà sur la carte.
-const debutCarte = src.indexOf('        const nomsSurLaCarte = [];');
-if (debutCarte < 0 || debutCarte > debutBloc) throw new Error("inventaire de la carte introuvable avant le bloc");
-const SRC_CARTE = src.slice(debutCarte, debutBloc);
-if (!SRC_BLOC.includes('estIncompatibleEtalement')) {
-    throw new Error("la protection étalement n'est plus dans le bloc extrait (repères à revoir)");
+if (!SRC_BLOC.includes('etatSousEffet(')) {
+    throw new Error("le menu ne passe plus par etatSousEffet (repères à revoir)");
 }
 
-// Rejoue exactement l'environnement local que ce bloc trouve dans rafraichirForge.
-function optionsPour({ aDejaUneAttaque, aDejaUnSoin = false, estActionPoussee = false, estActionIllusion = false, mods,
-                      actionCourante = action("Attaque légère"), autres = [] }) {
+// Rejoue l'environnement que ce bloc trouve dans renderSelectMenu. La carte
+// porte ce que le cas demande : une attaque, un soin, posés sur une AUTRE
+// action quand l'action courante n'en est pas une.
+function optionsPour({ aDejaUneAttaque, aDejaUnSoin = false, mods, actionCourante, autres = [] }) {
     const groupesMods = {};
-    // La Forge telle que le menu la voit : l'action courante, les autres
-    // actions de la carte, et le grimoire (pour relire le nom des sous-effets).
-    const window = { forgeState: { actions: [actionCourante, ...autres].filter(Boolean),
+    actionCourante = actionCourante || action(aDejaUneAttaque ? "Attaque légère" : aDejaUnSoin ? "Soin" : "Étourdit");
+    const surLaCarte = [actionCourante, ...autres];
+    if (aDejaUneAttaque && !surLaCarte.some(a => /attaque/i.test(a.baseEffet.Nom))) surLaCarte.push(action("Attaque légère", "A8"));
+    if (aDejaUnSoin && !surLaCarte.some(a => /soin|guérison/i.test(a.baseEffet.Nom))) surLaCarte.push(action("Soin", "A9"));
+    // La Forge telle que le menu la voit : les actions de la carte, et le
+    // grimoire (pour relire le nom des sous-effets).
+    const window = { forgeState: { actions: surLaCarte,
                                    effetsBDD: [...mods, ...autres.flatMap(a => a.effetsMods || [])] } };
     const activeTags = new Set();
-    const NOMS_INCOMPATIBLES_POUSSEE = ["persistance terrain", "zone", "durée étalement dégâts"];
     const modsDispos = mods;
     // Un seul eval : les déclarations de fonction d'un eval strict (modules ES)
     // ne fuient jamais vers l'appelant, mais restent visibles ENTRE ELLES à
     // l'intérieur d'un même bloc évalué.
-    eval(SRC_PARSE + '\n' + SRC_NETTOIE + '\n' + SRC_ATTAQUE_FN + '\n'
-         + SRC_REGLES_ETALEMENT + '\n' + SRC_CARTE + '\n' + SRC_BLOC);
+    eval(SRC_PARSE + '\n' + SRC_NETTOIE + '\n' + SRC_ATTAQUE_FN + '\n' + SRC_REGLES + '\n' + SRC_BLOC);
     return Object.values(groupesMods).flat().join("");
 }
 

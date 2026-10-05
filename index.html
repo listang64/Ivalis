@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=52">
+  <link rel="stylesheet" href="style.css?v=53">
 
  
   <!-- ===================================================================== -->
@@ -1978,7 +1978,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=90"></script>
+<script src="trace_combat.js?v=91"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
      Les modules s'importent entre eux sans numéro (`from './moteur_pur.js'`).
      Sans cette carte, le navigateur les chargeait à part, à une adresse SANS
@@ -2038,7 +2038,9 @@
 <script type="module" src="creation_personnage.js?v=16"></script>
 <script type="module" src="classes.js?v=9"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
-<script type="module" src="competences.js?v=47"></script>
+<script type="module" src="competences.js?v=48"></script>
+<!-- LIA, l'aide à la création de la Forge -->
+<script type="module" src="lia_forge.js?v=1"></script>
 <!-- Le plateau porte désormais son ?v= comme les autres : sans lui, un iPad
      gardait l'ancien dessin en cache après une livraison (l'œil d'or en dépend). -->
 <script src="Plateau.js?v=3"></script>
@@ -2453,6 +2455,11 @@
                 <div class="forge-medaillon-valeur">⏱ <span id="forge-initiative-val">100</span></div>
                 <div class="forge-medaillon-libelle">Initiative</div>
             </div>
+            <!-- LIA, l'aide à la création (lia_forge.js) -->
+            <button id="btn-aide-forge" class="forge-btn-aide" title="Raconte ta technique, LIA la forge" onclick="jouerSonClic(); window.ouvrirAideForge()">
+                <span class="forge-btn-aide-icone">🔨</span>
+                <span class="forge-btn-aide-texte">Aide à la création</span>
+            </button>
         </div>
         <div class="forge-bandeau-droite">
             <button class="btn-parametres" onclick="jouerSonClic(); window.fermerForgeCompetence()">Fermer</button>
@@ -2487,6 +2494,46 @@
     <div class="forge-pied">
         <button id="btn-valider-forge" class="btn-parametres forge-valider" onclick="jouerSonClic(); window.sauvegarderCompetence()">✔️ Valider la compétence</button>
     </div>
+  </div>
+
+  <!-- ======================================================= -->
+  <!-- 1 bis. LIA : L'AIDE À LA CRÉATION (lia_forge.js)        -->
+  <!-- ======================================================= -->
+  <div id="modale-aide-forge" class="modale-parchemin-jeu aide-forge" style="display: none; z-index: 240;">
+      <div class="forge-grimoire-entete">
+          <h3>🔨 Aide à la création</h3>
+      </div>
+      <div class="aide-forge-corps">
+          <p class="aide-forge-intro">Raconte ta technique comme en jeu. LIA choisira ses effets et remplira la Forge ; tu pourras tout retoucher avant de valider.</p>
+          <label class="forge-libelle" for="aide-forge-recit">Le récit</label>
+          <textarea id="aide-forge-recit" class="aide-forge-recit" rows="6" maxlength="1500"
+                    placeholder="Le geste, l'élément, ce que la technique fait à l'ennemi… Ex. : « Je plante ma lame dans le sol, une onde de givre jaillit et fige les ennemis autour de moi. »"></textarea>
+          <div class="aide-forge-jauge">
+              <div class="aide-forge-jauge-titre">⚡ Coût en Fatigue / puissance</div>
+              <input type="range" id="aide-forge-puissance" class="aide-forge-curseur" min="0" max="3" step="1" value="0" oninput="window.majJaugeAideForge(this)">
+              <div class="aide-forge-crans"><span class="actif">Auto</span><span>Faible</span><span>Modéré</span><span>Forte</span></div>
+          </div>
+          <div class="aide-forge-jauge">
+              <div class="aide-forge-jauge-titre">⏱ Rapidité</div>
+              <input type="range" id="aide-forge-rapidite" class="aide-forge-curseur" min="0" max="3" step="1" value="0" oninput="window.majJaugeAideForge(this)">
+              <div class="aide-forge-crans"><span class="actif">Auto</span><span>Faible</span><span>Modéré</span><span>Forte</span></div>
+          </div>
+          <div id="aide-forge-statut" class="aide-forge-statut"></div>
+      </div>
+      <div class="aide-forge-pied">
+          <button id="aide-forge-annuler" class="btn-parametres" onclick="jouerSonClic(); window.fermerAideForge()">Annuler</button>
+          <button id="aide-forge-creer" class="btn-parametres aide-forge-creer" onclick="jouerSonClic(); window.creerAvecLIA()">🔨 Créer</button>
+      </div>
+  </div>
+
+  <!-- La Forge a déjà des effets : LIA les remplacerait -->
+  <div id="modale-aide-forge-confirmer" class="modale-parchemin-jeu aide-forge-confirmer" style="display: none; z-index: 250;">
+      <h3>Remplacer la Forge ?</h3>
+      <p>La Forge contient déjà des effets. LIA va les remplacer par sa création.</p>
+      <div class="aide-forge-pied">
+          <button class="btn-parametres" onclick="jouerSonClic(); window.confirmerRemplacementLIA(false)">Garder</button>
+          <button id="aide-forge-remplacer" class="btn-parametres aide-forge-creer" onclick="jouerSonClic(); window.confirmerRemplacementLIA(true)">Remplacer</button>
+      </div>
   </div>
 
   <!-- ======================================================= -->
