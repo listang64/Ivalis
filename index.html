@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=51">
+  <link rel="stylesheet" href="style.css?v=52">
 
  
   <!-- ===================================================================== -->
@@ -1978,7 +1978,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=89"></script>
+<script src="trace_combat.js?v=90"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
      Les modules s'importent entre eux sans numéro (`from './moteur_pur.js'`).
      Sans cette carte, le navigateur les chargeait à part, à une adresse SANS
@@ -2038,7 +2038,7 @@
 <script type="module" src="creation_personnage.js?v=16"></script>
 <script type="module" src="classes.js?v=9"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
-<script type="module" src="competences.js?v=46"></script>
+<script type="module" src="competences.js?v=47"></script>
 <!-- Le plateau porte désormais son ?v= comme les autres : sans lui, un iPad
      gardait l'ancien dessin en cache après une livraison (l'œil d'or en dépend). -->
 <script src="Plateau.js?v=3"></script>
@@ -2438,83 +2438,75 @@
   <!-- ======================================================= -->
   <!-- 1. CARTE INTERACTIVE DE LA COMPÉTENCE (STYLE SWIFT APP) -->
   <!-- ======================================================= -->
-  <div id="modale-creation-competence" class="modale-parchemin-jeu" style="display: none; z-index: 210; width: 850px; max-width: 95vw; max-height: 90vh; overflow-y: auto; overflow-x: hidden; padding: 0; background-color: #f4ece1;">
-    
-    <!-- BANDEAU SUPÉRIEUR -->
-    <div style="background-color: #ede0ce; padding: 15px 20px; border-bottom: 2px solid #d1c1a3; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-        
-        <div style="font-size: 18px; font-weight: bold; color: #d97706; flex: 1;">⏳ Cap : <span id="forge-cap-fatigue">30</span></div>
-        
-        <div style="display: flex; gap: 40px; justify-content: center; flex: 1;">
-            <div style="display: flex; flex-direction: column; align-items: center;">
-                <div style="font-size: 28px; font-weight: bold; color: #d97706; line-height: 1;">⚡ <span id="forge-fatigue-val">0</span></div>
-                <div style="font-size: 13px; font-weight: bold; color: #5c3a21; margin-top: 4px; letter-spacing: 1px;">FATIGUE</div>
+  <div id="modale-creation-competence" class="modale-parchemin-jeu forge-modale" style="display: none; z-index: 210;">
+
+    <!-- BANDEAU : le cap, la fatigue et l'initiative de la technique -->
+    <div class="forge-bandeau">
+        <div class="forge-cap" title="Fatigue maximale de cette technique">⏳ Cap : <span id="forge-cap-fatigue">30</span></div>
+        <div class="forge-medaillons">
+            <div class="forge-medaillon forge-medaillon-fatigue">
+                <div class="forge-medaillon-valeur">⚡ <span id="forge-fatigue-val">0</span></div>
+                <div class="forge-medaillon-libelle">Fatigue</div>
                 <div id="forge-surpuissance" class="forge-surpuissance"></div>
             </div>
-            <div style="display: flex; flex-direction: column; align-items: center;">
-                <div style="font-size: 28px; font-weight: bold; color: #9333ea; line-height: 1;">⏱ <span id="forge-initiative-val">100</span></div>
-                <div style="font-size: 13px; font-weight: bold; color: #5c3a21; margin-top: 4px; letter-spacing: 1px;">INITIATIVE</div>
+            <div class="forge-medaillon forge-medaillon-initiative">
+                <div class="forge-medaillon-valeur">⏱ <span id="forge-initiative-val">100</span></div>
+                <div class="forge-medaillon-libelle">Initiative</div>
             </div>
         </div>
-
-        <div style="flex: 1; text-align: right;">
-            <button class="btn-parametres" style="padding: 5px 15px; font-size: 16px;" onclick="jouerSonClic(); window.fermerForgeCompetence()">Fermer</button>
+        <div class="forge-bandeau-droite">
+            <button class="btn-parametres" onclick="jouerSonClic(); window.fermerForgeCompetence()">Fermer</button>
         </div>
     </div>
 
-    <!-- CARTE PRINCIPALE -->
-    <div style="padding: 20px;">
-        <div style="background: white; border-radius: 16px; border: 2px solid rgba(0,0,0,0.1); box-shadow: 0 10px 20px rgba(0,0,0,0.1); overflow: hidden;">
-            
-            <div style="padding: 15px 20px; border-bottom: 1px solid rgba(0,0,0,0.1); text-align: center;">
-                <label style="font-size: 14px; font-weight: bold; color: gray; display: block; margin-bottom: 5px;">NOM DE LA TECHNIQUE</label>
-                <input type="text" id="forge-nom" class="input-perso" placeholder="Saisissez un nom..." style="text-align: center; font-size: 22px; font-weight: bold; border-bottom: 2px solid #3b82f6; background: transparent; width: 80%; border-radius: 0; box-shadow: none;" oninput="window.rafraichirForge()">
-                
-                <div id="forge-element-affichage" style="font-size: 16px; font-weight: bold; color: gray; margin-top: 8px;"></div>
-                
-                <div id="forge-weapon-tag-container" style="margin-top: 15px; margin-bottom: 5px;"></div>
-                <div id="forge-active-tags" style="display: flex; justify-content: center; gap: 8px; margin-top: 5px; min-height: 24px;"></div>
+    <!-- LE PARCHEMIN DE LA TECHNIQUE -->
+    <div class="forge-corps">
+        <div class="forge-parchemin">
+            <div class="forge-entete">
+                <label class="forge-libelle" for="forge-nom">Nom de la technique</label>
+                <input type="text" id="forge-nom" class="input-perso forge-nom" placeholder="Saisissez un nom..." oninput="window.rafraichirForge()">
+                <div id="forge-element-affichage" class="forge-element"></div>
+                <div id="forge-weapon-tag-container" class="forge-arme-conteneur"></div>
+                <div id="forge-active-tags" class="forge-tags"></div>
             </div>
 
-            <div style="display: flex; justify-content: space-between; padding: 12px 20px; background-color: rgba(0,0,0,0.02); border-bottom: 1px solid rgba(0,0,0,0.1); font-size: 16px;">
-                <span>Coût Total : <b id="forge-cout-pc" style="color: #2563eb;">0 PC</b></span>
+            <div class="forge-cout">
+                <span>Coût total : <b id="forge-cout-pc">0 PC</b></span>
             </div>
 
-            <div id="forge-contenu-carte" style="padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+            <div id="forge-contenu-carte" class="forge-actions">
                 <!-- Injecté par JS -->
             </div>
-            
-            <div style="text-align: center; padding: 20px;">
-                <button onclick="window.ouvrirMenuAjoutForge()" style="background: none; border: none; font-size: 48px; color: #3b82f6; cursor: pointer; text-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);">⊕</button>
+
+            <div class="forge-ajouter">
+                <button class="forge-btn-ajouter" title="Ajouter une action" onclick="window.ouvrirMenuAjoutForge()">+</button>
             </div>
         </div>
     </div>
 
-    <!-- Bouton Valider -->
-    <div style="padding: 20px; text-align: center;">
-        <button id="btn-valider-forge" class="btn-parametres" style="width: 100%; padding: 15px; font-size: 20px; background-color: #2563eb; color: white; border-radius: 12px; border: none; box-shadow: 0 5px 10px rgba(37, 99, 235, 0.4);" onclick="jouerSonClic(); window.sauvegarderCompetence()">✔️ VALIDER LA COMPÉTENCE</button>
+    <div class="forge-pied">
+        <button id="btn-valider-forge" class="btn-parametres forge-valider" onclick="jouerSonClic(); window.sauvegarderCompetence()">✔️ Valider la compétence</button>
     </div>
   </div>
 
   <!-- ======================================================= -->
   <!-- 2. MENU D'AJOUT (LE GRIMOIRE TRIÉ PAR CARAC)            -->
   <!-- ======================================================= -->
-  <div id="modale-menu-ajout" class="modale-parchemin-jeu" style="display: none; z-index: 220; width: 600px; max-width: 90vw; max-height: 85vh; overflow-y: auto; background-color: #f4ece1;">
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #d1c1a3; padding-bottom: 10px; margin-bottom: 20px;">
-          <h3 style="margin: 0; font-size: 20px;">Grimoire</h3>
-          <button class="btn-parametres" style="padding: 5px 10px; font-size: 16px;" onclick="window.fermerMenuAjoutForge()">Fermer</button>
+  <div id="modale-menu-ajout" class="modale-parchemin-jeu forge-grimoire" style="display: none; z-index: 220;">
+      <div class="forge-grimoire-entete">
+          <h3>Grimoire</h3>
+          <button class="btn-parametres" onclick="window.fermerMenuAjoutForge()">Fermer</button>
       </div>
 
-      <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: bold; color: gray; margin-bottom: 10px;">
-          <span>ACTIONS & EFFETS GLOBAUX</span>
+      <div class="forge-grimoire-sous-titre">
+          <span>ACTIONS &amp; EFFETS GLOBAUX</span>
           <span id="forge-tags-count">0/2 Tags</span>
       </div>
 
-      <!-- text-align: left OBLIGATOIRE : la classe .modale-parchemin-jeu impose text-align:center
-           à toute la modale. Hérité ici, il centrait le nom de l'effet et sa description chacun
-           par rapport à la largeur du plus large des deux — d'où les titres qui semblaient
-           décalés vers la droite quand la description était plus longue (et l'inverse). -->
-      <div id="forge-menu-caracs" style="display: flex; flex-direction: column; gap: 15px; text-align: left;">
+      <!-- text-align: left (forge-grimoire-liste) : la classe .modale-parchemin-jeu
+           impose text-align:center à toute la modale ; hérité ici, il décalait les
+           noms et les descriptions des effets. -->
+      <div id="forge-menu-caracs" class="forge-grimoire-liste">
           <!-- Injecté par JS -->
       </div>
   </div>

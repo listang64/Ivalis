@@ -172,6 +172,7 @@ node vampire.mjs              # la classe Vampire : +10 rés. physique, feu aggr
 node tenebres_brut.mjs        # Ténèbres sans armure (×1,5 sur la vie sans énergie) ; le malus de tir seulement sur la cible au contact
 node valeurs_decimales.mjs    # 1,5 par cran : le demi-point compte, arrondi au plus proche (dégâts, soins, boucliers), écrit à la française dans la Forge
 node liste_fleches.mjs         # flèches haut/bas sur une liste de héros qui défile ; la portée de l'arme lue sur le propriétaire de la carte
+node forge_design.mjs         # la Forge aux couleurs du jeu (aucun bleu « appli »), descriptions alignées à gauche sous leur nom
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4362,3 +4363,17 @@ ANNULER, puis elle disparaissait à la résolution. Elle ne s'ouvre plus (une
 carte restée ouverte se referme) ; les deux boutons ont leur barre en bas de
 l'écran (`barreCiblageResolution`, moteur_effets.js), retirée avec eux.
 bouton_fintour.mjs, section 11.
+
+## La Forge aux couleurs du jeu (version 178)
+
+La Forge et son grimoire quittent le blanc et le bleu « appli » : parchemin,
+cuir et or comme les autres fenêtres. Bandeau de cuir avec le cap et deux
+médaillons (fatigue, initiative), parchemin bordé d'or, l'arme en sceau de cuir,
+les caractéristiques en petits cachets, chaque action en bloc avec un liseré
+d'or, ses sous-effets indentés sous « ↳ », compteurs −/+ en pastilles, menus des
+sous-effets en pastilles colorées, gros bouton + de cuir, Valider en vert.
+Toute la mise en page vit dans style.css (`.forge-*`) ; competences.js ne pose
+plus que des classes (mêmes identifiants, mêmes actions).
+Les « espaces bizarres » : les descriptions héritaient le centrage de
+.modale-parchemin-jeu et flottaient au milieu de la ligne ; elles s'alignent à
+gauche, sous leur nom. forge_design.mjs.

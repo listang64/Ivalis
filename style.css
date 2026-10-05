@@ -3820,7 +3820,7 @@ textarea.input-texte-parchemin {
     border: 1px solid rgba(185, 28, 28, 0.35);
 }
 .ligne-surpuissance .titre-effet-hd { color: #ffb347 !important; }
-.forge-valeur-surpuissante { color: #b91c1c; font-weight: bold; font-style: normal; }
+.forge-valeur-surpuissante { display: block; margin-top: 2px; color: #b91c1c; font-weight: bold; font-style: normal; }
 
 /* =====================================================================
    LES TECHNIQUES DE CLASSE (fiche perso, onglet Compétences)
@@ -3950,3 +3950,171 @@ textarea.input-texte-parchemin {
 .bouton-barre-ciblage:hover { transform: scale(1.06); }
 .bouton-resoudre { color: #d7fbff; border: 1px solid #36c9d6; background: rgba(0, 120, 140, 0.35); text-shadow: 1px 1px 2px black, 0 0 8px #00ffff; }
 .bouton-annuler { color: #ffd6d6; border: 1px solid #c94a4a; background: rgba(140, 20, 20, 0.35); text-shadow: 1px 1px 2px black, 0 0 8px #ff4c4c; }
+
+/* =========================================================================
+   LA FORGE, AUX COULEURS DU JEU
+   Parchemin, cuir et or, comme les autres fenêtres : plus de blanc ni de bleu
+   « appli ». Toute la mise en page vit ici ; competences.js ne pose plus que
+   des classes. Le texte s'aligne à GAUCHE dans les blocs d'effets :
+   .modale-parchemin-jeu centre tout, et c'est ce centrage hérité qui décalait
+   les descriptions (« 3 dégâts magique » flottant au milieu de la ligne).
+   ========================================================================= */
+#modale-creation-competence.forge-modale {
+  width: 860px; max-width: 95vw; max-height: 92vh; overflow-y: auto; overflow-x: hidden; padding: 0;
+  background: #e8d5a5; border: 3px solid #1a1a1a; border-radius: 14px;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.9), inset 0 0 0 2px rgba(168,132,31,0.55);
+}
+.forge-bandeau {
+  position: sticky; top: 0; z-index: 10;
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px;
+  padding: 12px 18px;
+  background: linear-gradient(180deg, #4a2e1b 0%, #2e1c10 100%);
+  border-bottom: 3px solid #a8841f; box-shadow: 0 4px 10px rgba(0,0,0,0.45);
+  color: #f3dfa6;
+}
+.forge-cap {
+  justify-self: start; display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 20px; border: 1px solid rgba(243,223,166,0.45);
+  background: rgba(0,0,0,0.25); font-size: 16px; font-weight: bold; color: #f3dfa6;
+}
+.forge-medaillons { display: flex; gap: 14px; justify-content: center; }
+.forge-medaillon {
+  min-width: 112px; padding: 6px 14px 7px; border-radius: 12px; text-align: center;
+  background: radial-gradient(circle at 50% 30%, #f6ead0 0%, #e2cc96 100%);
+  border: 2px solid #a8841f; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.4), 0 3px 8px rgba(0,0,0,0.5);
+  color: #2c1e16;
+}
+.forge-medaillon-valeur { font-size: 26px; font-weight: bold; line-height: 1.05; }
+.forge-medaillon-fatigue .forge-medaillon-valeur { color: #a14a06; }
+.forge-medaillon-initiative .forge-medaillon-valeur { color: #5b2f86; }
+.forge-medaillon-libelle { font-size: 11px; font-weight: bold; letter-spacing: 2px; color: #5c3a21; text-transform: uppercase; }
+.forge-medaillon .forge-surpuissance { margin-top: 2px; font-size: 11px; line-height: 1.2; color: #6b5236; max-width: 150px; }
+.forge-bandeau-droite { justify-self: end; }
+.forge-bandeau-droite .btn-parametres { margin: 0; padding: 6px 16px; font-size: 15px; }
+
+.forge-corps { padding: 18px 20px 6px; }
+.forge-parchemin {
+  background: linear-gradient(180deg, #f6ead0 0%, #efdfb8 100%);
+  border: 2px solid #a8841f; border-radius: 14px; overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.45), 0 6px 16px rgba(0,0,0,0.35);
+}
+.forge-entete { padding: 16px 20px 12px; text-align: center; border-bottom: 1px solid rgba(92,58,33,0.35); }
+.forge-libelle { display: block; margin-bottom: 4px; font-size: 13px; font-weight: bold; letter-spacing: 3px; color: #6b5236; text-transform: uppercase; }
+#forge-nom.forge-nom {
+  width: 80%; padding: 6px 4px; text-align: center; font-size: 24px; font-weight: bold; color: #2c1e16;
+  background: transparent; border: none; border-bottom: 2px solid #a8841f; border-radius: 0; box-shadow: none;
+}
+#forge-nom.forge-nom::placeholder { color: rgba(92,58,33,0.5); font-weight: normal; }
+#forge-nom.forge-nom:focus { outline: none; border-bottom-color: #5c3a21; }
+.forge-element { font-size: 15px; font-weight: bold; color: #6b5236; margin-top: 6px; }
+.forge-arme-conteneur { margin-top: 12px; }
+.forge-arme {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px; border-radius: 18px; cursor: pointer;
+  background: linear-gradient(180deg, #5c3a21, #3b2412); color: #f3dfa6; border: 1px solid #a8841f;
+  font-size: 15px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.45); transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.forge-arme:hover { transform: translateY(-1px) scale(1.03); box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+.forge-tags { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; min-height: 24px; }
+.forge-tag-carac, .forge-tag-mini {
+  display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: bold; letter-spacing: 1px;
+  background: #5c3a21; color: #f3dfa6; border: 1px solid #a8841f; text-transform: uppercase;
+}
+.forge-tag-mini { padding: 1px 7px; font-size: 11px; margin-left: 6px; vertical-align: 1px; }
+.forge-aucun-tag { font-size: 14px; font-style: italic; color: #6b5236; }
+.forge-cout {
+  display: flex; justify-content: space-between; align-items: center; padding: 10px 20px;
+  background: rgba(92,58,33,0.08); border-bottom: 1px solid rgba(92,58,33,0.35); font-size: 16px; color: #2c1e16;
+}
+.forge-cout b { color: #5c3a21; font-size: 17px; }
+
+#forge-contenu-carte.forge-actions { padding: 16px 18px 4px; display: flex; flex-direction: column; gap: 14px; text-align: left; }
+.forge-action {
+  position: relative; padding: 12px 14px 10px 18px; border-radius: 10px; text-align: left;
+  background: rgba(255,250,235,0.65); border: 1px solid rgba(168,132,31,0.6);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+.forge-action::before {
+  content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 4px; border-radius: 0 3px 3px 0; background: #a8841f;
+}
+.forge-ligne { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.forge-ligne-texte { flex: 1; min-width: 0; text-align: left; }
+.forge-nom-effet { font-size: 17px; font-weight: bold; color: #2c1e16; }
+.forge-desc { margin-top: 3px; font-size: 14px; line-height: 1.35; color: #6b5236; text-align: left; }
+.forge-duree-ajoutee { display: block; margin-top: 2px; color: #5b2f86; font-weight: bold; }
+.forge-sous-effet { margin: 8px 0 0 14px; padding-top: 8px; border-top: 1px dotted rgba(92,58,33,0.35); }
+.forge-sous-effet .forge-nom-effet { font-size: 15px; }
+.forge-sous-effet .forge-nom-effet::before { content: "↳ "; color: #a8841f; }
+.forge-sous-effet .forge-desc { font-size: 13px; }
+.forge-controles { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.forge-compteur, .forge-compteur-duree {
+  display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px; border-radius: 14px;
+  background: #f6ead0; border: 1px solid #a8841f; box-shadow: inset 0 1px 2px rgba(0,0,0,0.15);
+}
+.forge-compteur-duree { background: rgba(91,47,134,0.1); border-color: rgba(91,47,134,0.5); }
+.forge-compteur b, .forge-compteur-duree span { min-width: 22px; text-align: center; font-size: 15px; font-weight: bold; color: #2c1e16; }
+.forge-compteur-duree span { color: #5b2f86; font-size: 13px; min-width: 34px; }
+.forge-btn-moins, .forge-btn-plus {
+  width: 24px; height: 24px; border-radius: 50%; border: none; cursor: pointer; padding: 0;
+  font-size: 16px; font-weight: bold; line-height: 24px; text-align: center; background: transparent; transition: background 0.12s;
+}
+.forge-btn-moins { color: #9b2c2c; }
+.forge-btn-plus { color: #1b6e3a; }
+.forge-btn-moins:hover { background: rgba(155,44,44,0.15); }
+.forge-btn-plus:hover { background: rgba(27,110,58,0.15); }
+.forge-btn-plus:disabled, .forge-btn-moins:disabled { opacity: 0.3; cursor: not-allowed; background: transparent; }
+.forge-btn-zone { margin: 0 4px 0 0; padding: 3px 10px; font-size: 12px; }
+.forge-menus {
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0 14px; padding-top: 10px;
+  border-top: 1px dashed rgba(92,58,33,0.35);
+}
+.forge-select {
+  appearance: auto; padding: 4px 8px; border-radius: 14px; font-size: 13px; font-weight: bold; cursor: pointer;
+  background: rgba(255,250,235,0.9); color: var(--couleur, #5c3a21); border: 1px solid var(--couleur, #a8841f);
+  max-width: 150px; outline: none;
+}
+.forge-select:disabled { opacity: 0.4; cursor: not-allowed; }
+.forge-ajouter { text-align: center; padding: 12px 0 18px; }
+.forge-btn-ajouter {
+  width: 54px; height: 54px; border-radius: 50%; cursor: pointer; font-size: 32px; font-weight: bold; line-height: 50px; padding: 0;
+  color: #f3dfa6; background: radial-gradient(circle at 50% 35%, #6b4428 0%, #3b2412 100%);
+  border: 2px solid #a8841f; box-shadow: 0 4px 10px rgba(0,0,0,0.45); transition: transform 0.15s ease, color 0.15s;
+}
+.forge-btn-ajouter:hover { transform: scale(1.08); color: #00ffff; }
+.forge-pied { padding: 14px 20px 20px; }
+#btn-valider-forge.forge-valider {
+  width: 100%; margin: 0; padding: 14px; font-size: 20px; letter-spacing: 2px; border-radius: 10px;
+  background: linear-gradient(180deg, #24804a 0%, #145a31 100%); border: 2px solid #0f4021; color: #fff;
+}
+#btn-valider-forge.forge-valider:disabled { filter: grayscale(0.7); opacity: 0.55; cursor: not-allowed; transform: none; }
+
+/* Le grimoire d'ajout */
+#modale-menu-ajout.forge-grimoire {
+  width: 620px; max-width: 92vw; max-height: 86vh; overflow-y: auto; padding: 0; text-align: left;
+  background: #e8d5a5; border: 3px solid #1a1a1a; border-radius: 14px; box-shadow: 0 18px 40px rgba(0,0,0,0.9), inset 0 0 0 2px rgba(168,132,31,0.55);
+}
+.forge-grimoire-entete {
+  position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 18px; background: linear-gradient(180deg, #4a2e1b 0%, #2e1c10 100%); border-bottom: 3px solid #a8841f; color: #f3dfa6;
+}
+.forge-grimoire-entete h3 { margin: 0; font-size: 22px; color: #f3dfa6; letter-spacing: 2px; }
+.forge-grimoire-entete .btn-parametres { margin: 0; padding: 5px 14px; font-size: 15px; }
+.forge-grimoire-sous-titre { display: flex; justify-content: space-between; padding: 12px 18px 4px; font-size: 13px; font-weight: bold; letter-spacing: 1px; color: #6b5236; }
+#forge-menu-caracs.forge-grimoire-liste { display: flex; flex-direction: column; gap: 12px; padding: 8px 18px 18px; text-align: left; }
+.forge-grimoire-groupe {
+  background: linear-gradient(180deg, #f6ead0 0%, #efdfb8 100%); border: 1px solid #a8841f; border-radius: 10px; overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+.forge-grimoire-ligne { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid rgba(92,58,33,0.18); }
+.forge-grimoire-ligne:last-child { border-bottom: none; }
+.forge-grimoire-ligne.desactive { opacity: 0.45; }
+.forge-grimoire-nom { font-size: 16px; font-weight: bold; color: #2c1e16; }
+.forge-grimoire-cout { margin-left: 6px; font-size: 13px; font-weight: bold; color: #a14a06; }
+.forge-grimoire-desc { display: block; margin-top: 2px; font-size: 13px; color: #6b5236; }
+.forge-grimoire-ligne .btn-rond-plus { flex-shrink: 0; width: 34px; height: 34px; font-size: 20px; border-color: #a8841f; }
+.forge-grimoire-ligne .btn-rond-plus:disabled { background: #8a7a66; cursor: not-allowed; transform: none; color: #ddd; }
+@media (max-width: 620px) {
+  .forge-bandeau { grid-template-columns: 1fr auto; }
+  .forge-medaillons { grid-column: 1 / -1; order: 3; }
+  .forge-medaillon { min-width: 96px; }
+}
