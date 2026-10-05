@@ -34,9 +34,9 @@ const resultat = await p.evaluate(async ({ fnSrc }) => {
 
   // Firestore volontairement lent : c'est la situation qu'on veut couvrir.
   const getDoc = async () => { await new Promise(r => setTimeout(r, 500)); return { exists: () => true, data: () => ({}) }; };
-  const ouvrir = new Function('window','db','doc','getDoc','normalizeForgeType',
+  const ouvrir = new Function('window','db','doc','getDoc','normalizeForgeType','LIBELLE_VALIDER_FORGE',
                               fnSrc + '; return window.ouvrirCreationCompetence;')(
-                              window, {}, () => ({}), getDoc, (t) => t);
+                              window, {}, () => ({}), getDoc, (t) => t, "✔️ Forger cette compétence");
 
   const promesse = ouvrir();
   await new Promise(r => setTimeout(r, 150));

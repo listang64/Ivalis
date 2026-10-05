@@ -4177,11 +4177,6 @@ textarea.input-texte-parchemin {
 /* =========================================================================
    L'ILLUSTRATION DES COMPÉTENCES (illustration_competence.js)
    ========================================================================= */
-/* Gabarit hachuré : la zone de l'image, visible pendant le réglage. */
-.illustration-carte-hd.illustration-gabarit {
-  background: repeating-linear-gradient(45deg, rgba(0,255,255,0.28) 0 10px, rgba(0,0,0,0.25) 10px 20px);
-  outline: 2px dashed #00ffff; outline-offset: -2px;
-}
 /* La file : un sceau discret tant qu'une illustration attend ou se dessine. */
 .badge-illustrations {
   position: fixed; left: 14px; bottom: 14px; z-index: 10050; max-width: 70vw;
@@ -4189,23 +4184,3 @@ textarea.input-texte-parchemin {
   background: linear-gradient(180deg, rgba(74,46,27,0.95), rgba(46,28,16,0.95));
   border: 1px solid #a8841f; box-shadow: 0 4px 12px rgba(0,0,0,0.5); pointer-events: none;
 }
-/* PROVISOIRE : le bouton et le panneau de réglage. */
-.btn-reglage-illustration { margin: 0; padding: 4px 12px; font-size: 13px; }
-.panneau-reglage-illustration {
-  position: fixed; top: 12vh; left: 16px; z-index: 10060; width: 300px; max-height: 80vh; overflow-y: auto;
-  padding: 0 0 12px; border-radius: 12px; text-align: left; color: #2c1e16;
-  background: #e8d5a5; border: 3px solid #1a1a1a; box-shadow: 0 12px 30px rgba(0,0,0,0.8);
-}
-.reglage-illu-entete {
-  padding: 10px 14px; font-size: 17px; font-weight: bold; color: #f3dfa6; letter-spacing: 1px;
-  background: linear-gradient(180deg, #4a2e1b 0%, #2e1c10 100%); border-bottom: 3px solid #a8841f;
-}
-.reglage-illu-entete span { font-size: 12px; font-weight: normal; opacity: 0.8; }
-.reglage-illu-aide { margin: 8px 14px; font-size: 12px; line-height: 1.3; color: #5c3a21; }
-.reglage-illu-ligne { display: grid; grid-template-columns: 96px 1fr 38px; align-items: center; gap: 6px; margin: 4px 14px; font-size: 13px; font-weight: bold; }
-.reglage-illu-ligne input[type=range] { width: 100%; accent-color: #a8841f; }
-.reglage-illu-ligne b { text-align: right; font-size: 12px; }
-.reglage-illu-case { display: flex; gap: 8px; }
-.reglage-illu-boutons { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 14px 0; }
-.reglage-illu-boutons .btn-parametres { margin: 0; padding: 5px 10px; font-size: 12px; }
-.reglage-illu-code { box-sizing: border-box; width: calc(100% - 28px); height: 90px; margin: 8px 14px 0; font-size: 11px; font-family: monospace; }

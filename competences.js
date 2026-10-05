@@ -1309,6 +1309,9 @@ window.ouvrirCreationCompetence = async function() {
         // Le récit RP d'une technique forgée avec LIA (lia_forge.js) : il part
         // avec la compétence, pour en dessiner l'image plus tard.
         window.forgeState.recitRP = "";
+        // Une Forge neuve : le bouton dit ce qu'il fera, pas ce qu'il faisait.
+        const btnValiderForge = document.getElementById("btn-valider-forge");
+        if (btnValiderForge) btnValiderForge.innerText = LIBELLE_VALIDER_FORGE;
 
         document.getElementById("forge-nom").value = "";
         const selectElement = document.getElementById("forge-element");
@@ -2295,6 +2298,11 @@ window.outilsForge = {
     parseFrenchFloat, nettoyerNomEffet, formatterTexteEffet, normalizeForgeType
 };
 
+// Le libellé du bouton de la Forge, au repos. Il restait sur « Forge en
+// cours... » après une forge réussie : à la réouverture, le bouton parlait
+// encore de la technique d'avant.
+const LIBELLE_VALIDER_FORGE = "✔️ Forger cette compétence";
+
 window.sauvegarderCompetence = async function() {
     const nomCompetence = document.getElementById("forge-nom").value.trim();
     const arme = window.forgeState.armePrincipale || "Non spécifié";
@@ -2307,7 +2315,7 @@ window.sauvegarderCompetence = async function() {
     const coutPc = parseFrenchFloat(document.getElementById("forge-cout-pc").innerText.replace(" PC", ""));
 
     const btn = document.getElementById("btn-valider-forge");
-    btn.innerText = "Forge en cours...";
+    btn.innerText = "⏳ Forge en cours…";
     btn.disabled = true;
 
     const composantsSerialises = {
@@ -2344,6 +2352,16 @@ window.sauvegarderCompetence = async function() {
         if (typeof window.illustrerCompetence === "function") window.illustrerCompetence(idPerso, idComp, nomCompetence);
 
         window.fermerForgeCompetence();
+        btn.innerText = LIBELLE_VALIDER_FORGE;
+        // La technique est forgée : son récit est parti avec elle, l'aide à la
+        // création repart d'une page blanche (jauges sur Auto).
+        window.forgeState.recitRP = "";
+        const recit = document.getElementById("aide-forge-recit");
+        if (recit) recit.value = "";
+        ["aide-forge-puissance", "aide-forge-rapidite"].forEach(id => {
+            const jauge = document.getElementById(id);
+            if (jauge) { jauge.value = 0; if (typeof window.majJaugeAideForge === "function") window.majJaugeAideForge(jauge); }
+        });
 
         if (typeof window.chargerOngletCompetences === "function") {
             window.chargerOngletCompetences(idPerso, window.competencesMaxCombattant(window.forgeState.statsPerso));
@@ -2351,7 +2369,7 @@ window.sauvegarderCompetence = async function() {
     } catch (e) {
         console.error("Erreur de sauvegarde :", e);
         alert("Échec de la forge.");
-        btn.innerText = "✔️ VALIDER LA COMPÉTENCE";
+        btn.innerText = LIBELLE_VALIDER_FORGE;
         btn.disabled = false;
     }
 };

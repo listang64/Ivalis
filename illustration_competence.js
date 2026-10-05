@@ -408,30 +408,22 @@ function rafraichirCaches(commande, url) {
 //  Elle est TOUJOURS sous l'image de la carte (le cadre, z-index 2) et
 //  au-dessus de son fond de couleur : elle ne se voit que par la fenêtre
 //  transparente du cadre, qui la borde. Aucun réglage ne la fait passer devant.
-//  Réglable à la main par l'outil provisoire ci-dessous, en attendant que les
-//  bonnes valeurs soient figées ici.
 //  La fenêtre transparente de l'image de la carte (competance_carte, 879 ×
 //  1216) va de x 129 à 748 et de y 116 à 612 : 14,7 → 85,2 % de large,
 //  9,5 → 50,4 % de haut. L'illustration la déborde d'un point de chaque côté,
-//  sous le cadre, pour ne jamais laisser de liseré vide.
-window.REGLAGE_ILLUSTRATION_DEFAUT = {
+//  sous le cadre, pour ne jamais laisser de liseré vide. Cadrage validé par
+//  Nico (l'outil de réglage provisoire est retiré).
+window.REGLAGE_ILLUSTRATION_CARTE = Object.freeze({
     haut: 8.5, gauche: 13.7, largeur: 72.5, hauteur: 42.9,   // le cadre de l'image, en % de la carte
     cadrageX: 50, cadrageY: 50,                              // le point de l'image gardé au centre (object-position)
     zoom: 100,                                               // en %
     arrondi: 0                                               // coins, en px (le cadre les cache)
-};
-const CLE_REGLAGE = "ivalis_reglage_illustration_carte";
+});
+// Un ancien réglage local (de l'outil provisoire) n'a plus cours.
+try { localStorage.removeItem("ivalis_reglage_illustration_carte"); } catch (e) {}
 
-window.reglageIllustrationCarte = function() {
-    let local = null;
-    try { local = JSON.parse(localStorage.getItem(CLE_REGLAGE) || "null"); } catch (e) {}
-    const r = { ...window.REGLAGE_ILLUSTRATION_DEFAUT, ...(local || {}) };
-    delete r.devant;   // reste d'un ancien réglage : l'image ne passe jamais devant le cadre
-    return r;
-};
-
-// Le style de l'image et de son cadre, à partir d'un réglage.
-window.styleIllustrationCarte = function(r) {
+// Le style de l'image et de son cadre.
+window.styleIllustrationCarte = function(r = window.REGLAGE_ILLUSTRATION_CARTE) {
     return {
         cadre: `position: absolute; top: ${r.haut}%; left: ${r.gauche}%; width: ${r.largeur}%; height: ${r.hauteur}%; `
              + `overflow: hidden; border-radius: ${r.arrondi}px; z-index: 1; pointer-events: none;`,
@@ -440,114 +432,11 @@ window.styleIllustrationCarte = function(r) {
     };
 };
 
-// Le HTML à glisser dans la carte HD (competences.js) : l'image si la carte en
-// a une ; pendant un réglage, un gabarit hachuré à la place, pour voir la zone.
+// Le HTML à glisser dans la carte HD (competences.js) : l'image si la carte en a une.
 window.htmlIllustrationCarte = function(data) {
-    const r = window.reglageIllustrationCarte();
-    const st = window.styleIllustrationCarte(r);
-    if (data && data.URL_Image) {
-        return `<div class="illustration-carte-hd" style="${st.cadre}"><img src="${data.URL_Image}" alt="" style="${st.image}"></div>`;
-    }
-    if (window.REGLAGE_ILLUSTRATION_OUVERT) {
-        return `<div class="illustration-carte-hd illustration-gabarit" style="${st.cadre}"></div>`;
-    }
-    return "";
-};
-
-// -------------------------------------------------------------------------
-//  L'OUTIL PROVISOIRE (fiche perso, onglet Compétences)
-// -------------------------------------------------------------------------
-const CURSEURS = [
-    ["haut", "Haut (%)", -10, 60, 0.5], ["gauche", "Gauche (%)", -10, 60, 0.5],
-    ["largeur", "Largeur (%)", 20, 120, 0.5], ["hauteur", "Hauteur (%)", 10, 80, 0.5],
-    ["cadrageX", "Cadrage X (%)", 0, 100, 1], ["cadrageY", "Cadrage Y (%)", 0, 100, 1],
-    ["zoom", "Zoom (%)", 100, 250, 1], ["arrondi", "Arrondi (px)", 0, 40, 1]
-];
-
-function appliquerReglage(r) {
-    try { localStorage.setItem(CLE_REGLAGE, JSON.stringify(r)); } catch (e) {}
-    const carte = document.getElementById("apercu-carte-hd-competence");
-    const cadre = carte && carte.querySelector(".illustration-carte-hd");
-    if (!cadre) return;
-    const st = window.styleIllustrationCarte(r);
-    cadre.style.cssText = st.cadre;
-    const img = cadre.querySelector("img");
-    if (img) img.style.cssText = st.image;
-}
-
-window.ouvrirReglageIllustration = function() {
-    window.REGLAGE_ILLUSTRATION_OUVERT = true;
-    let panneau = document.getElementById("panneau-reglage-illustration");
-    if (!panneau) {
-        panneau = document.createElement("div");
-        panneau.id = "panneau-reglage-illustration";
-        panneau.className = "panneau-reglage-illustration";
-        document.body.appendChild(panneau);
-    }
-    const r = window.reglageIllustrationCarte();
-    panneau.innerHTML = `
-        <div class="reglage-illu-entete">🖼️ Image des cartes <span>(provisoire)</span></div>
-        <p class="reglage-illu-aide">Ouvre une carte de compétence (clic sur sa bannière) pour voir le réglage en direct.</p>
-        ${CURSEURS.map(([cle, libelle, min, max, pas]) => `
-            <label class="reglage-illu-ligne">${libelle}
-                <input type="range" data-cle="${cle}" min="${min}" max="${max}" step="${pas}" value="${r[cle]}">
-                <b data-valeur="${cle}">${r[cle]}</b>
-            </label>`).join("")}
-        <div class="reglage-illu-boutons">
-            <button class="btn-parametres" data-action="illustrer">🎨 Illustrer la carte ouverte</button>
-            <button class="btn-parametres" data-action="extraire">📋 Extraire le code</button>
-            <button class="btn-parametres" data-action="defaut">↺ Défaut</button>
-            <button class="btn-parametres" data-action="fermer">Fermer</button>
-        </div>
-        <textarea class="reglage-illu-code" readonly style="display:none;"></textarea>`;
-
-    panneau.querySelectorAll("input[type=range]").forEach(input => {
-        input.oninput = () => {
-            const reglage = window.reglageIllustrationCarte();
-            reglage[input.dataset.cle] = parseFloat(input.value);
-            panneau.querySelector(`[data-valeur="${input.dataset.cle}"]`).textContent = input.value;
-            appliquerReglage(reglage);
-        };
-    });
-    panneau.querySelector('[data-action="extraire"]').onclick = () => {
-        const code = "window.REGLAGE_ILLUSTRATION_DEFAUT = " + JSON.stringify(window.reglageIllustrationCarte()) + ";";
-        const zone = panneau.querySelector(".reglage-illu-code");
-        zone.style.display = "block";
-        zone.value = code;
-        zone.select();
-        try { navigator.clipboard && navigator.clipboard.writeText(code).catch(() => {}); } catch (e) {}
-    };
-    panneau.querySelector('[data-action="defaut"]').onclick = () => {
-        try { localStorage.removeItem(CLE_REGLAGE); } catch (e) {}
-        window.ouvrirReglageIllustration();
-        appliquerReglage(window.reglageIllustrationCarte());
-    };
-    panneau.querySelector('[data-action="fermer"]').onclick = () => window.fermerReglageIllustration();
-    panneau.querySelector('[data-action="illustrer"]').onclick = () => {
-        const carte = document.getElementById("apercu-carte-hd-competence");
-        const idComp = carte && carte.style.display !== "none" ? carte.dataset.cardId : null;
-        const idPerso = (document.getElementById("champ-id-personnage") || {}).value;
-        const data = idComp && (window.COMPETENCES_CACHE || {})[idComp];
-        if (!idComp || !idPerso || !data || data.techniqueClasse) {
-            alert("Ouvre d'abord une de tes compétences (pas une technique de classe).");
-            return;
-        }
-        window.illustrerCompetence(idPerso, idComp, data.Nom);
-    };
-    panneau.style.display = "block";
-    // La carte ouverte montre tout de suite la zone (gabarit hachuré).
-    const carte = document.getElementById("apercu-carte-hd-competence");
-    if (carte && carte.dataset.cardId && carte.style.display !== "none") {
-        window.afficherApercuCarteHD(carte.dataset.cardId, carte.dataset.locked === "true");
-    }
-};
-
-window.fermerReglageIllustration = function() {
-    window.REGLAGE_ILLUSTRATION_OUVERT = false;
-    const panneau = document.getElementById("panneau-reglage-illustration");
-    if (panneau) panneau.style.display = "none";
-    const gabarit = document.querySelector("#apercu-carte-hd-competence .illustration-gabarit");
-    if (gabarit) gabarit.remove();
+    if (!data || !data.URL_Image) return "";
+    const st = window.styleIllustrationCarte();
+    return `<div class="illustration-carte-hd" style="${st.cadre}"><img src="${data.URL_Image}" alt="" style="${st.image}"></div>`;
 };
 
 // Au démarrage : ce qui attendait dans la file reprend.

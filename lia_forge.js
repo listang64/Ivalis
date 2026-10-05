@@ -195,7 +195,13 @@ RÈGLES ABSOLUES
 TON STYLE
 - Reste fidèle au récit : l'élément, le geste, l'effet sur l'ennemi. N'ajoute pas d'effet que le récit ne justifie pas.
 - Les jauges du joueur sont des INDICATIONS : garde ton jugement pour coller au récit.${regleClasse}
-- Donne un nom de technique évocateur, en français, de 2 à 5 mots.`;
+
+LE NOM DE LA TECHNIQUE
+- Court : 1 à 3 mots (4 au grand maximum). Un nom qu'un combattant dirait vraiment, pas un titre de légende.
+- Parlant et concret : il dit ce que fait la technique — le geste, l'arme, l'élément, l'effet.
+  Bons exemples : « Taille croisée », « Flèche de givre », « Coup de bouclier », « Onde de soin », « Fente basse », « Brise-garde », « Pluie de cendres », « Morsure du froid ».
+  À ÉVITER : « La Fureur Éternelle des Cendres Ancestrales », « Le Jugement Céleste du Dragon Oublié » — pas de titres pompeux, pas de « de la… du… » en cascade, pas de mots creux (éternel, ultime, suprême, divin, céleste, ancestral, légendaire), pas d'article au début.
+- En français, avec une majuscule au premier mot seulement.`;
 
     const fichePerso = {
         classe: perso.Classe || "aucune",
@@ -227,7 +233,7 @@ ${JSON.stringify(catalogueEffets(armes))}`;
             parameters: {
                 type: "OBJECT",
                 properties: {
-                    nom: { type: "STRING", description: "Nom de la technique, en français, 2 à 5 mots." },
+                    nom: { type: "STRING", description: "Nom court et parlant de la technique, en français, 1 à 3 mots (4 max), majuscule au premier mot seulement. Ex. : « Taille croisée », « Flèche de givre »." },
                     arme: { type: "STRING", enum: armes, description: "L'arme de la technique." },
                     actions: {
                         type: "ARRAY",
@@ -320,6 +326,25 @@ function formeZone(taille, aDistance) {
     cases.sort((a, b) => dist(a, centre) - dist(b, centre) || dist(a, devant) - dist(b, devant)
                          || a.q - b.q || a.r - b.r);
     return cases.slice(0, borne(taille, 1, 15));
+}
+
+// Le nom rendu par LIA, remis au propre : sans guillemets ni point final,
+// sans article en tête, en minuscules après le premier mot quand LIA a mis
+// des Majuscules Partout, et jamais plus long que la bannière ne le supporte
+// (coupé entre deux mots).
+const ARTICLES = /^(le|la|les|l'|l’|un|une)\s*/i;
+function nomDeTechnique(brut) {
+    let nom = String(brut || "").replace(/[«»"“”]/g, "").replace(/\s+/g, " ").trim().replace(/[.!…]+$/, "").trim();
+    nom = nom.replace(ARTICLES, "").trim();
+    const mots = nom.split(" ");
+    const toutEnMajuscules = mots.length > 1 && mots.filter(m => m.length > 3).every(m => /^\p{Lu}/u.test(m));
+    if (toutEnMajuscules) nom = mots.map((m, i) => i === 0 ? m : m.toLowerCase()).join(" ");
+    if (nom.length > 32) {
+        nom = nom.slice(0, 33);
+        nom = nom.slice(0, nom.lastIndexOf(" ") > 10 ? nom.lastIndexOf(" ") : 32).replace(/\s+(de|du|des|d'|d’|à|au|aux|et|en)$/i, "");
+    }
+    nom = nom.charAt(0).toUpperCase() + nom.slice(1);
+    return nom || "Technique sans nom";
 }
 
 function idInstance() {
@@ -476,7 +501,7 @@ function appliquerPlanLIA(plan, recit) {
 
     // 4) Le nom, le récit, et le cap : on rabote jusqu'à tenir dessous.
     const champ = document.getElementById("forge-nom");
-    if (champ) champ.value = String((plan && plan.nom) || "Technique de LIA").trim().slice(0, 40);
+    if (champ) champ.value = nomDeTechnique(plan && plan.nom);
     fs.recitRP = recit;
     window.rafraichirForge();
     let garde = 300, rabote = 0;
@@ -584,4 +609,4 @@ async function lancerLIA() {
 }
 
 // Pour les bancs.
-window.LIA = { armesPermises, catalogueEffets, construireDemandeLIA, appliquerPlanLIA, formeZone, NOMS_JAUGE };
+window.LIA = { armesPermises, catalogueEffets, construireDemandeLIA, appliquerPlanLIA, formeZone, nomDeTechnique, NOMS_JAUGE };

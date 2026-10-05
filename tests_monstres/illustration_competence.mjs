@@ -285,48 +285,25 @@ verifier("la carte (bords, médaillon, plaque) la recouvre partout ailleurs", gr
 const ratio = await p.evaluate(() => { const c = document.querySelector("#apercu-carte-hd-competence .illustration-carte-hd").getBoundingClientRect(); return c.width / c.height; });
 verifier("la zone de l'image a le format de la fenêtre (≈ 5:4)", Math.abs(ratio - 1.25) < 0.05, ratio.toFixed(3));
 
-console.log("\n6. LE BOUTON PROVISOIRE : RÉGLER, PUIS EXTRAIRE LE CODE");
-const reglage = await p.evaluate(async () => {
-  const bouton = document.querySelector("#onglet-competences #btn-reglage-illustration");
-  bouton.click();
-  const panneau = document.getElementById("panneau-reglage-illustration");
-  const curseur = (cle) => panneau.querySelector(`input[data-cle="${cle}"]`);
-  curseur("haut").value = 15; curseur("haut").dispatchEvent(new Event("input"));
-  curseur("hauteur").value = 30; curseur("hauteur").dispatchEvent(new Event("input"));
-  curseur("zoom").value = 130; curseur("zoom").dispatchEvent(new Event("input"));
+console.log("\n6. LE CADRAGE EST FIGÉ : PLUS D'OUTIL DE RÉGLAGE");
+// Nico : « enlève le bouton provisoire, l'image est parfaite comme ça. »
+const fige = await p.evaluate(() => {
+  // Un ancien réglage local, laissé par l'outil provisoire, ne compte plus.
+  localStorage.setItem("ivalis_reglage_illustration_carte", JSON.stringify({ haut: 40, largeur: 20, devant: true }));
+  window.afficherApercuCarteHD("SANS_IMAGE_" + Date.now());
+  window.COMPETENCES_CACHE["AVEC_IMAGE"] = { Nom: "Avec image", URL_Image: "https://res.cloudinary.com/x/image/upload/a.png", Effets_Compiles: [], Composants: { actions: [] } };
+  window.afficherApercuCarteHD("AVEC_IMAGE");
   const cadre = document.querySelector("#apercu-carte-hd-competence .illustration-carte-hd");
-  const enDirect = { top: cadre.style.top, height: cadre.style.height, zoom: cadre.querySelector("img").style.transform };
-  const devant = { caseExiste: !!panneau.querySelector('input[data-cle="devant"]'), z: cadre.style.zIndex };
-  panneau.querySelector('[data-action="extraire"]').click();
-  const code = panneau.querySelector(".reglage-illu-code").value;
-  return { bouton: !!bouton, ouvert: panneau.style.display === "block", enDirect, devant, code,
-           curseurs: [...panneau.querySelectorAll("input[type=range]")].map(i => i.dataset.cle) };
-});
-verifier("le bouton est dans l'onglet Compétences de la fiche", reglage.bouton && reglage.ouvert);
-verifier("curseurs : position, taille, cadrage, zoom, arrondi", ["haut", "gauche", "largeur", "hauteur", "cadrageX", "cadrageY", "zoom", "arrondi"].every(c => reglage.curseurs.includes(c)), reglage.curseurs.join());
-verifier("la carte ouverte suit le réglage en direct", reglage.enDirect.top === "15%" && reglage.enDirect.height === "30%" && /1\.3/.test(reglage.enDirect.zoom), JSON.stringify(reglage.enDirect));
-verifier("aucun réglage ne fait passer l'image devant la carte", !reglage.devant.caseExiste && reglage.devant.z === "1", JSON.stringify(reglage.devant));
-let lu = null;
-try { lu = JSON.parse(reglage.code.replace(/^window\.REGLAGE_ILLUSTRATION_DEFAUT = /, "").replace(/;$/, "")); } catch (e) {}
-verifier("« Extraire le code » donne le réglage complet, prêt à coller", !!lu && lu.haut === 15 && lu.hauteur === 30 && lu.zoom === 130 && !("devant" in lu), reglage.code);
-const ancien = await p.evaluate(() => {
-  localStorage.setItem("ivalis_reglage_illustration_carte", JSON.stringify({ haut: 10, devant: true }));
-  const z = window.styleIllustrationCarte(window.reglageIllustrationCarte()).cadre.match(/z-index: (\d+)/)[1];
-  localStorage.removeItem("ivalis_reglage_illustration_carte");
-  return z;
-});
-verifier("un ancien réglage « devant » est ignoré : l'image reste dessous", ancien === "1", ancien);
-const gabarit = await p.evaluate(() => {
   window.COMPETENCES_CACHE["SANS_IMAGE"] = { Nom: "Sans image", Effets_Compiles: [], Composants: { actions: [] } };
-  window.afficherApercuCarteHD("SANS_IMAGE");
-  const avec = !!document.querySelector("#apercu-carte-hd-competence .illustration-gabarit");
-  window.fermerReglageIllustration();
-  window.afficherApercuCarteHD("SANS_IMAGE");
-  return { avec, sans: !!document.querySelector("#apercu-carte-hd-competence .illustration-carte-hd") };
+  return { bouton: !!document.getElementById("btn-reglage-illustration"), outil: typeof window.ouvrirReglageIllustration,
+           style: cadre && { top: cadre.style.top, left: cadre.style.left, width: cadre.style.width, height: cadre.style.height, z: cadre.style.zIndex },
+           sansImage: (() => { window.afficherApercuCarteHD("SANS_IMAGE");
+                               return document.querySelectorAll("#apercu-carte-hd-competence .illustration-carte-hd").length; })() };
 });
-verifier("pendant le réglage, une carte sans image montre la zone (gabarit)", gabarit.avec);
-verifier("réglage fermé : rien sur une carte sans image", !gabarit.sans);
-await p.evaluate(() => localStorage.removeItem("ivalis_reglage_illustration_carte"));
+verifier("le bouton « Réglage image » a disparu de l'onglet Compétences", !fige.bouton && fige.outil === "undefined", `${fige.bouton} ${fige.outil}`);
+verifier("l'image reste au cadrage validé, quel que soit un ancien réglage local",
+         JSON.stringify(fige.style) === JSON.stringify({ top: "8.5%", left: "13.7%", width: "72.5%", height: "42.9%", z: "1" }), JSON.stringify(fige.style));
+verifier("une carte sans image n'affiche rien à sa place", fige.sansImage === 0, fige.sansImage);
 
 console.log("\n7. MAGIE ET SANS ARME : PAS D'ARME DE RÉFÉRENCE ; LA FILE SURVIT À UN RECHARGEMENT");
 // Deux commandes laissées en file (la page s'est fermée avant), qui reprennent
@@ -361,11 +338,9 @@ if (process.env.CAPTURE) {
     document.getElementById("ecran-jeu") && (document.getElementById("ecran-jeu").style.display = "block");
     window.COMPETENCES_CACHE["C_MAGIE"] = { ...window.__docs["Personnages/P1/Competences/C_MAGIE"], URL_Image: "https://res.cloudinary.com/x/image/upload/capture.svg" };
     window.afficherApercuCarteHD("C_MAGIE");
-    window.ouvrirReglageIllustration();
-    document.querySelector('#panneau-reglage-illustration [data-action="extraire"]').click();
   });
   await p.waitForTimeout(400);
-  await p.screenshot({ path: process.env.CAPTURE + "_reglage.png" });
+  await p.screenshot({ path: process.env.CAPTURE + "_carte.png" });
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

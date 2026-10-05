@@ -299,6 +299,19 @@ console.log("\n7. LE RÉCIT PART EN BASE AVEC LA COMPÉTENCE");
   const ecrit = await p.evaluate(() => (window.__ecrits || []).find(e => /Competences/.test(e.chemin)));
   verifier("la compétence est écrite", !!ecrit, ecrit && ecrit.chemin);
   verifier("avec son récit (Recit_RP)", !!ecrit && /onde de lumière apaisante/.test(ecrit.data.Recit_RP || ""), ecrit && ecrit.data.Recit_RP);
+  // Nico : « enlève ce qu'il y a dans la description RP quand la technique a
+  // été forgée ». Et le bouton ne reste plus sur « Forge en cours... ».
+  const apres = await p.evaluate(() => {
+    window.ouvrirAideForge();
+    const r = { recit: document.getElementById("aide-forge-recit").value, etat: window.forgeState.recitRP,
+                jauges: [document.getElementById("aide-forge-puissance").value, document.getElementById("aide-forge-rapidite").value],
+                bouton: document.getElementById("btn-valider-forge").innerText.trim() };
+    window.fermerAideForge();
+    return r;
+  });
+  verifier("forgée : l'encart du récit est vidé", apres.recit === "" && apres.etat === "", JSON.stringify(apres.recit));
+  verifier("…et les jauges reviennent sur Auto", apres.jauges.join() === "0,0", apres.jauges.join());
+  verifier("le bouton dit « Forger cette compétence » (plus « Forge en cours »)", /Forger cette compétence/.test(apres.bouton) && !/en cours/i.test(apres.bouton), apres.bouton);
   // Une technique forgée à la main n'a pas de récit.
   await ouvrir();
   const sansRecit = await p.evaluate(async () => {
@@ -311,6 +324,13 @@ console.log("\n7. LE RÉCIT PART EN BASE AVEC LA COMPÉTENCE");
     return e && ("Recit_RP" in e.data);
   });
   verifier("forgée à la main : pas de champ Recit_RP", sansRecit === false);
+  const libelle = await p.evaluate(async () => {
+    document.getElementById("btn-valider-forge").innerText = "⏳ Forge en cours…";   // un reste d'avant
+    window.OUVERTURE_FORGE_EN_COURS = false;
+    await window.ouvrirCreationCompetence();
+    return document.getElementById("btn-valider-forge").textContent.trim();
+  });
+  verifier("une Forge rouverte repart sur « Forger cette compétence »", libelle === "✔️ Forger cette compétence", libelle);
 }
 
 console.log("\n8. LES EFFETS DE CLASSE : DANS LA LISTE DE LIA SEULEMENT S'ILS SONT DÉBLOQUÉS");
@@ -379,6 +399,25 @@ console.log("\n9. LA MAGIE NE FAIT PLUS TOMBER LES SOUS-EFFETS DU MENU MAGIQUE")
   }, { EFFETS: EFFETS_PAR_ID });
   verifier("Lumière et Confusion (aussi Magique) restent en Magie", r.includes("EFF_LUMIERE") && r.includes("EFF_CONFUSION"), r.join(","));
   verifier("Étourdit (seulement Physique) tombe", !r.includes("EFF_ETOURDIT"), r.join(","));
+}
+
+console.log("\n10. DES NOMS COURTS, RÉALISTES ET PARLANTS");
+{
+  const n = await p.evaluate(() => {
+    const { systeme, outil } = window.LIA.construireDemandeLIA("Je fends l'air d'un revers.", { puissance: 0, rapidite: 0 });
+    const nom = window.LIA.nomDeTechnique;
+    return { systeme, descNom: outil.functionDeclarations[0].parameters.properties.nom.description,
+             cas: [nom("La Fureur Éternelle Des Cendres"), nom("« Flèche de givre. »"), nom("Taille croisée"),
+                   nom("Le coup de bouclier du vieux gardien des portes de l'ouest"), nom(""), nom("Lame de Morgoth")] };
+  });
+  verifier("consigne : 1 à 3 mots (4 max), concret, ce que fait la technique", /1 à 3 mots/.test(n.systeme) && /4 au grand maximum/.test(n.systeme) && /Parlant et concret/.test(n.systeme));
+  verifier("avec de bons exemples et les noms pompeux à éviter", /Taille croisée/.test(n.systeme) && /Fureur Éternelle/.test(n.systeme) && /pompeux/.test(n.systeme));
+  verifier("le schéma de l'outil le redit (1 à 3 mots)", /1 à 3 mots/.test(n.descNom), n.descNom);
+  verifier("Majuscules Partout et article retirés : « Fureur éternelle des cendres »", n.cas[0] === "Fureur éternelle des cendres", n.cas[0]);
+  verifier("guillemets et point final retirés", n.cas[1] === "Flèche de givre", n.cas[1]);
+  verifier("un bon nom reste tel quel", n.cas[2] === "Taille croisée", n.cas[2]);
+  verifier("un nom à rallonge est coupé entre deux mots (≤ 32 car.)", n.cas[3].length <= 32 && !/\s(de|du|des)$/.test(n.cas[3]) && /^Coup de bouclier/.test(n.cas[3]), n.cas[3]);
+  verifier("un nom vide ne laisse pas la Forge sans nom", n.cas[4].length > 0, n.cas[4]);
 }
 
 if (process.env.CAPTURE) {

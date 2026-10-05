@@ -4489,3 +4489,21 @@ Fantastique… », « Directives de style artistique obligatoires : <style> »,
 puis la scène de Gemini. Gemini le connaît toujours pour imaginer la scène ;
 le prompt de secours (sans Gemini) passe par le même assemblage.
 illustration_competence.mjs, section 3 bis.
+
+## Cadrage figé, récit vidé après la forge, noms de LIA (version 185)
+
+- L'outil provisoire de réglage de l'image est retiré (bouton, panneau, styles,
+  gabarit) : le cadrage validé par Nico est figé dans
+  `REGLAGE_ILLUSTRATION_CARTE`, et un ancien réglage local est effacé et ignoré.
+  illustration_competence.mjs, section 6.
+- Une technique forgée vide l'encart du récit de LIA et remet ses jauges sur
+  Auto : la suivante part d'une page blanche.
+- Le bouton de la Forge restait sur « Forge en cours... » après une forge
+  réussie, et la Forge rouverte l'affichait encore. Il dit maintenant
+  « ✔️ Forger cette compétence », au repos, après la forge et à chaque
+  ouverture ; « ⏳ Forge en cours… » ne dure que le temps de l'écriture.
+- LIA nomme court et parlant : 1 à 3 mots (4 max), ce que fait la technique
+  (« Taille croisée », « Flèche de givre »), sans titres pompeux ni
+  « de la… du… » en cascade. `nomDeTechnique` remet son nom au propre
+  (guillemets, point final, article en tête, Majuscules Partout) et le coupe
+  entre deux mots au-delà de 32 caractères. aide_forge_lia.mjs, sections 7 et 10.
