@@ -4478,3 +4478,14 @@ illustration_competence.mjs (4 bis, 5) le vérifie avec la vraie image de la
 carte (cadre_carte_competence.png, réduite) : la capture est comparée à la
 transparence de la carte sur une grille — illustration visible partout où la
 carte est transparente, carte intacte partout où elle est opaque.
+
+## L'illustration suit le style des paramètres (version 184)
+
+Le style du jeu (Cerveau_IA/INST_76839, celui de la création des personnages)
+n'était donné qu'à Gemini, qui le reformulait dans sa scène. Il est maintenant
+recopié MOT POUR MOT dans le prompt de l'IA d'image, dans les termes du
+portrait (`assemblerPromptImage`) : « Contexte de l'univers : Antique
+Fantastique… », « Directives de style artistique obligatoires : <style> »,
+puis la scène de Gemini. Gemini le connaît toujours pour imaginer la scène ;
+le prompt de secours (sans Gemini) passe par le même assemblage.
+illustration_competence.mjs, section 3 bis.

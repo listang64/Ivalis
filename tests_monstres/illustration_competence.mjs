@@ -118,7 +118,9 @@ await p.addInitScript(({ PERSO }) => {
   // qui est demandé, et on rend un petit PNG.
   const faux = async (url, fond) => { window.__faux.blobs.push({ url, fond }); return new Blob(["png"], { type: "image/png" }); };
   Object.defineProperty(window, "imageVersBlobPng", { get: () => faux, set: () => {}, configurable: true });
-  window.__docs = { "Personnages/P1": PERSO, "Caracteristiques/P1": { force: 14, con: 12 } };
+  window.__docs = { "Personnages/P1": PERSO, "Caracteristiques/P1": { force: 14, con: 12 },
+                    // Le style du jeu, en paramètre (le même que pour la création des persos).
+                    "Cerveau_IA/INST_76839": { Contenu_Direct: "STYLE-TEST : gravure à l'encre sépia, hachures fines, aplats de lavis." } };
 }, { PERSO });
 
 await p.route('**/firebase-app.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_APP }));
@@ -179,7 +181,16 @@ verifier("consigne : mettre CE personnage en scène, sans texte ni cadre", /exé
 console.log("\n3. L'IA D'IMAGE : MÊMES RÉGLAGES QUE LES PIONS, PORTRAIT ET ARMES EN BINAIRE");
 const ok = f.openai.filter(o => o.statut === 200);
 const o = ok[0] || {};
-verifier("le prompt envoyé est celui de l'IA de prompt", /^PROMPT-MIA/.test(o.prompt || ""), o.prompt);
+verifier("le prompt envoyé contient la scène de l'IA de prompt", /PROMPT-MIA/.test(o.prompt || ""), o.prompt);
+
+console.log("\n3 bis. LE STYLE DES PARAMÈTRES, COMME POUR LA CRÉATION DES PERSOS");
+const srcApp = fs.readFileSync('/home/user/Ivalis/app.js', 'utf-8');
+verifier("(la création de perso injecte bien « Directives de style artistique obligatoires : »)",
+         srcApp.includes('"Directives de style artistique obligatoires : " + instructionSupplementaire'));
+verifier("l'IA de prompt connaît le style", /STYLE-TEST : gravure à l'encre sépia/.test(g.systemInstruction.parts[0].text));
+verifier("…et l'IA d'image le reçoit MOT POUR MOT, dans les mêmes termes",
+         (o.prompt || "").includes("Directives de style artistique obligatoires : STYLE-TEST : gravure à l'encre sépia, hachures fines, aplats de lavis."), o.prompt);
+verifier("avec le contexte de l'univers des portraits (Antique Fantastique)", (o.prompt || "").includes("Contexte de l'univers : Antique Fantastique"));
 verifier("gpt-image-2, 1024×1024, qualité basse, PNG (comme les pions)", o.model === "gpt-image-2" && o.size === "1024x1024" && o.quality === "low" && o.format === "png",
          `${o.model} ${o.size} ${o.quality} ${o.format}`);
 verifier("en édition, avec les images de référence", /images\/edits/.test(o.url || ""));
@@ -206,7 +217,7 @@ verifier("…au centre (la bande du haut est rognée)", envoi.milieu[0] > 200 &&
 const docComp = await p.evaluate((id) => window.__docs["Personnages/P1/Competences/" + id], idComp);
 verifier("l'adresse est écrite sur la compétence (URL_Image)", /illu_1/.test(docComp.URL_Image || "") && /q_auto,f_auto/.test(docComp.URL_Image), docComp.URL_Image);
 verifier("Cloudinary livre toujours en 1000 × 800 (c_fill)", /c_fill,g_center,w_1000,h_800/.test(docComp.URL_Image || ""), docComp.URL_Image);
-verifier("avec le prompt qui l'a faite (Prompt_Image)", /^PROMPT-MIA/.test(docComp.Prompt_Image || ""));
+verifier("avec le prompt qui l'a faite (Prompt_Image), style compris", /PROMPT-MIA/.test(docComp.Prompt_Image || "") && /STYLE-TEST/.test(docComp.Prompt_Image || ""));
 verifier("la file est vide, le sceau a disparu", !(await p.evaluate(() => !!document.getElementById("badge-illustrations"))));
 
 console.log("\n5. L'IMAGE EST EN HAUT DE LA CARTE");
@@ -328,6 +339,8 @@ await p.evaluate(() => {
   localStorage.setItem("__docs_banc", JSON.stringify(window.__docs));
 });
 await p.addInitScript(() => { try { window.__docs = JSON.parse(localStorage.getItem("__docs_banc") || "null") || window.__docs; } catch (e) {} });
+// Et cette fois sans clé Gemini : le prompt de secours, assemblé à la main.
+await p.addInitScript(() => localStorage.removeItem("ivalis_GEMINI_API_KEY"));
 await p.reload();
 await p.waitForTimeout(500);
 await attendreFileVide();
@@ -337,6 +350,9 @@ verifier("après rechargement, les deux commandes en file sont traitées", apres
          `${apres.openai.length} dessins`);
 verifier("Magie : seulement le portrait (la hache n'est pas l'arme du sort)", JSON.stringify(apres.openai[0].images) === '["personnage.png"]', JSON.stringify(apres.openai[0].images));
 verifier("Sans arme : seulement le portrait", JSON.stringify(apres.openai[1].images) === '["personnage.png"]', JSON.stringify(apres.openai[1].images));
+verifier("sans Gemini, le prompt de secours porte le même style mot pour mot",
+         apres.openai.every(x => (x.prompt || "").includes("Directives de style artistique obligatoires : STYLE-TEST") && /Rayon|Coup de coude/.test(x.prompt)),
+         (apres.openai[0].prompt || "").slice(0, 160));
 
 if (process.env.CAPTURE) {
   await p.route('**/x/image/upload/**', r => r.fulfill({ contentType: 'image/svg+xml', headers: {'Access-Control-Allow-Origin':'*'},

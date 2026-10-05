@@ -144,7 +144,12 @@ async function illustrer(commande, acquis = {}) {
     const perso = window.persoDocVersFront(commande.idPerso, snapPerso.exists() ? snapPerso.data() : {});
 
     const armes = armesDeReference(perso, competence.Arme);
-    const prompt = acquis.prompt || (acquis.prompt = await ecrirePromptIllustration(competence, perso, armes, cles));
+    // LE STYLE DU JEU, celui des paramètres (Cerveau_IA/INST_76839), le même que
+    // pour la création des personnages : Gemini le connaît pour imaginer la
+    // scène, et il est recopié MOT POUR MOT dans le prompt de l'IA d'image.
+    if (acquis.style === undefined) acquis.style = await lireStyleDuJeu();
+    const prompt = acquis.prompt || (acquis.prompt = assemblerPromptImage(
+        await ecrirePromptIllustration(competence, perso, armes, cles, acquis.style), acquis.style));
     if (!acquis.references) acquis.references = await imagesDeReference(perso, armes);
     const image = acquis.image || (acquis.image = await dessinerIllustration(prompt, acquis.references, cles));
     if (!acquis.recadree) acquis.recadree = await recadrerAuFormat(image);
@@ -193,9 +198,21 @@ function effetsEnTexte(competence) {
 // -------------------------------------------------------------------------
 //  1. LE PROMPT (Gemini)
 // -------------------------------------------------------------------------
-async function ecrirePromptIllustration(competence, perso, armes, cles) {
-    const style = typeof window.instructionStyleIvalis === "function"
-        ? await window.instructionStyleIvalis().catch(() => "") : "";
+async function lireStyleDuJeu() {
+    if (typeof window.instructionStyleIvalis !== "function") return "";
+    try { return (await window.instructionStyleIvalis()) || ""; } catch (e) { return ""; }
+}
+
+// Le prompt final de l'IA d'image : le contexte de l'univers et les directives
+// de style, dans les mêmes mots que le portrait du personnage
+// (genererEtStockerPortrait, app.js), puis la scène écrite par Gemini.
+function assemblerPromptImage(scene, style) {
+    return "Contexte de l'univers : Antique Fantastique (Mythic Ancient Fantasy, Antiquité Magique).\n\n"
+        + (style ? "Directives de style artistique obligatoires : " + style + "\n\n" : "")
+        + "--- SCÈNE DE LA TECHNIQUE ---\n" + scene;
+}
+
+async function ecrirePromptIllustration(competence, perso, armes, cles, style) {
     const references = ["IMAGE 1 : le personnage (portrait de référence, en armure)"]
         .concat(armes.map((a, i) => `IMAGE ${i + 2} : son arme « ${a.nom || a.modele || a.type} » (${a.type}${a.deuxMains ? ", à deux mains" : ""})`));
     const fiche = `TECHNIQUE : ${competence.Nom}
@@ -218,10 +235,11 @@ Tu écris, en ANGLAIS, le prompt d'une illustration de carte de compétence pour
 - S'il y a des armes en référence, il les tient telles qu'elles sont dessinées. Sinon, s'appuie sur l'arme de la technique : Magie = mains nues ou focaliseur, énergie visible ; Sans arme = mains nues ou arme improvisée du récit.
 - Le récit du joueur prime sur les effets pour la mise en scène ; les effets donnent l'élément, la portée, la cible (zone = plusieurs ennemis, distance = projectile ou rayon, soin = lumière apaisante sur un allié…).
 - Composition : l'image sera recadrée au format paysage 5:4 (on perd une bande en haut et en bas) : plan large et dynamique, personnage et action entièrement dans la bande centrale, rien d'important près des bords haut et bas, fond de décor de fantasy cohérent, lumière dramatique.
-- Interdits : aucun texte, aucune lettre, aucun chiffre, aucun cadre, aucune bordure, aucune interface de jeu, aucune carte à jouer.${style ? `\n- Style artistique OBLIGATOIRE du jeu : ${style}` : "\n- Style : peinture numérique de fantasy, riche et détaillée."}
+- Interdits : aucun texte, aucune lettre, aucun chiffre, aucun cadre, aucune bordure, aucune interface de jeu, aucune carte à jouer.
+- Univers : Antique Fantastique (Mythic Ancient Fantasy, Antiquité Magique).${style ? `\n- Style artistique OBLIGATOIRE du jeu (il sera aussi joint tel quel au dessinateur ; ta scène doit s'y accorder) : ${style}` : ""}
 Appelle l'outil ecrirePromptImage avec le prompt (100 à 200 mots).`;
 
-    if (!cles.gemini) return promptDeSecours(competence, perso, armes, style);
+    if (!cles.gemini) return promptDeSecours(competence, perso, armes);
     for (let essai = 0; essai < 3; essai++) {
         let reponse, data;
         try {
@@ -247,19 +265,18 @@ Appelle l'outil ecrirePromptImage avec le prompt (100 à 200 mots).`;
         if (prompt && prompt.trim().length > 30) return prompt.trim();
     }
     // Gemini répond, mais sans prompt exploitable : on n'attend pas pour rien.
-    return promptDeSecours(competence, perso, armes, style);
+    return promptDeSecours(competence, perso, armes);
 }
 
 // Sans Gemini : un prompt assemblé à la main, moins inspiré mais fidèle.
-function promptDeSecours(competence, perso, armes, style) {
+function promptDeSecours(competence, perso, armes) {
     const effets = (competence.Effets_Compiles || []).map(e => sansBalises(typeof e === "string" ? e : e.nom)).filter(Boolean).join(", ");
     return `Fantasy card illustration. The character from reference image 1 (${perso.race || ""} ${perso.genre || ""}, same face, armor and colors) `
         + `performs the combat technique "${competence.Nom}"`
         + (armes.length ? ` wielding the weapon${armes.length > 1 ? "s" : ""} shown in the other reference images` : competence.Arme === "Magie" ? " with visible magical energy" : "")
         + `. Effects: ${effets || "a powerful strike"}. `
         + (competence.Recit_RP ? `Scene: ${competence.Recit_RP}. ` : "")
-        + "Wide dynamic shot, action centered, dramatic lighting, fantasy background. No text, no letters, no frame, no border, no UI."
-        + (style ? " Style: " + style : " Rich detailed digital fantasy painting.");
+        + "Wide dynamic shot, action centered, dramatic lighting, fantasy background. No text, no letters, no frame, no border, no UI.";
 }
 
 // -------------------------------------------------------------------------
