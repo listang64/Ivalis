@@ -4354,3 +4354,11 @@ la liste sont rechargés. bouton_effets_classe.mjs.
   des compétences), sinon le personnage de la fiche ouverte, sinon le héros
   affiché en combat ; introuvable, aucune portée d'arme.
 liste_fleches.mjs.
+
+## La carte ne s'ouvre plus au lancement (version 177)
+
+Cliquer « lancer » ouvrait la carte en grand, le temps de porter RÉSOUDRE et
+ANNULER, puis elle disparaissait à la résolution. Elle ne s'ouvre plus (une
+carte restée ouverte se referme) ; les deux boutons ont leur barre en bas de
+l'écran (`barreCiblageResolution`, moteur_effets.js), retirée avec eux.
+bouton_fintour.mjs, section 11.

@@ -3933,3 +3933,20 @@ textarea.input-texte-parchemin {
 .fleche-liste-haut { top: 4px; }
 .fleche-liste-bas { bottom: 4px; }
 @keyframes fleche-liste-pulse { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
+
+/* La barre de résolution d'un ciblage : ANNULER et RÉSOUDRE, en bas de l'écran
+   (la carte ne s'ouvre plus au lancement). */
+#barre-ciblage-resolution {
+  position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 60;
+  display: flex; gap: 14px; padding: 8px 14px; border-radius: 12px;
+  background: linear-gradient(180deg, rgba(43, 28, 16, 0.94), rgba(26, 17, 9, 0.96));
+  border: 2px solid #a8841f; box-shadow: 0 6px 18px rgba(0,0,0,0.75), inset 0 0 0 1px rgba(255,225,140,0.18);
+}
+.bouton-barre-ciblage {
+  font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase;
+  padding: 6px 16px; border-radius: 8px; cursor: pointer; user-select: none; transition: transform 0.15s, background 0.15s;
+  text-shadow: 1px 1px 2px black;
+}
+.bouton-barre-ciblage:hover { transform: scale(1.06); }
+.bouton-resoudre { color: #d7fbff; border: 1px solid #36c9d6; background: rgba(0, 120, 140, 0.35); text-shadow: 1px 1px 2px black, 0 0 8px #00ffff; }
+.bouton-annuler { color: #ffd6d6; border: 1px solid #c94a4a; background: rgba(140, 20, 20, 0.35); text-shadow: 1px 1px 2px black, 0 0 8px #ff4c4c; }

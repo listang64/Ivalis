@@ -2476,7 +2476,19 @@ window.demarrerCiblage = async function(idCarte, options) {
     window.actualiserVisuelCiblage();
 };
 
-// RÉSOUDRE et ANNULER, posés sur l'aperçu de la carte : le ciblage d'une cible
+// LA BARRE DE RÉSOLUTION : en bas de l'écran, elle porte ANNULER et RÉSOUDRE
+// pendant un ciblage. Créée à la demande, retirée quand ses boutons partent.
+window.barreCiblageResolution = function() {
+    let barre = document.getElementById("barre-ciblage-resolution");
+    if (!barre) {
+        barre = document.createElement("div");
+        barre.id = "barre-ciblage-resolution";
+        document.body.appendChild(barre);
+    }
+    return barre;
+};
+
+// RÉSOUDRE et ANNULER, posés dans la barre de résolution : le ciblage d'une cible
 // unique les ouvre, et la phase du soin (voir passerAuCiblageDuSoutien) aussi —
 // même quand l'attaque, elle, s'est visée en zone et ne les avait pas posés.
 window.poserBoutonsCibleUnique = function(idCarte) {
@@ -2488,21 +2500,16 @@ window.poserBoutonsCibleUnique = function(idCarte) {
     // exception EN PLEIN MILIEU du ciblage : l'état était posé, mais ni les
     // anneaux ni les boutons n'arrivaient — la carte ne partait jamais et
     // rien à l'écran ne disait pourquoi.
-    const hoteBoutons = document.getElementById("apercu-carte-hd-competence");
-    if (!hoteBoutons) {
-        console.error("Ciblage : l'aperçu de la carte est absent, RÉSOUDRE et ANNULER n'ont nulle part où se poser.");
-        if (typeof window.tracerCombat === "function") {
-            window.tracerCombat("🧊", `ciblage sans aperçu de carte (${idCarte})`,
-                                "RÉSOUDRE/ANNULER introuvables — la carte ne peut pas être résolue");
-        }
-    } else {
+    // LA CARTE NE S'OUVRE PLUS AU LANCEMENT (Nico : « elle apparaît puis
+    // disparaît, ne la fais pas apparaître »). Les deux boutons ont donc leur
+    // propre barre, en bas de l'écran, au lieu de se poser sur son aperçu.
+    const hoteBoutons = window.barreCiblageResolution();
+    {
         let btnResoudre = document.getElementById("btn-resoudre-carte");
         if (!btnResoudre) {
             btnResoudre = document.createElement("div");
             btnResoudre.id = "btn-resoudre-carte";
-            btnResoudre.style.cssText = "position: absolute; bottom: -30px; left: 50%; transform: translateX(10px); z-index: 5; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 2px black, 0 0 10px #00ffff; color: #00ffff; transition: transform 0.2s;";
-            btnResoudre.onmouseover = () => btnResoudre.style.transform = "translateX(10px) scale(1.1)";
-            btnResoudre.onmouseout = () => btnResoudre.style.transform = "translateX(10px) scale(1)";
+            btnResoudre.className = "bouton-barre-ciblage bouton-resoudre";
             hoteBoutons.appendChild(btnResoudre);
         }
         btnResoudre.innerText = "RÉSOUDRE";
@@ -2518,10 +2525,9 @@ window.poserBoutonsCibleUnique = function(idCarte) {
         if (!btnAnnuler) {
             btnAnnuler = document.createElement("div");
             btnAnnuler.id = "btn-annuler-ciblage";
-            btnAnnuler.style.cssText = "position: absolute; bottom: -30px; left: 50%; transform: translateX(calc(-100% - 10px)); z-index: 5; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 2px black, 0 0 10px #ff4c4c; color: #ff4c4c; transition: transform 0.2s;";
-            btnAnnuler.onmouseover = () => btnAnnuler.style.transform = "translateX(calc(-100% - 10px)) scale(1.1)";
-            btnAnnuler.onmouseout = () => btnAnnuler.style.transform = "translateX(calc(-100% - 10px)) scale(1)";
-            hoteBoutons.appendChild(btnAnnuler);
+            btnAnnuler.className = "bouton-barre-ciblage bouton-annuler";
+            // ANNULER à gauche, RÉSOUDRE à droite, comme sur l'ancienne carte.
+            hoteBoutons.insertBefore(btnAnnuler, hoteBoutons.firstChild);
         }
         btnAnnuler.innerText = "ANNULER";
         btnAnnuler.style.pointerEvents = "auto";
@@ -3077,6 +3083,8 @@ window.nettoyerCiblage = function() {
     const btnAnnuler = document.getElementById("btn-annuler-ciblage");
     if (btnResoudre) btnResoudre.remove();
     if (btnAnnuler) btnAnnuler.remove();
+    const barreResolution = document.getElementById("barre-ciblage-resolution");
+    if (barreResolution && !barreResolution.children.length) barreResolution.remove();
 
     // Et les pions avec, pour que la croix rouge du lanceur s'en aille en même
     // temps que le ciblage qu'elle annulait.

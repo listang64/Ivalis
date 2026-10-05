@@ -4451,15 +4451,12 @@ window.actionBoutonFinTour = function() {
         }
         if (!idCarte || typeof window.demarrerCiblage !== "function") return;
 
-        // LA CARTE DOIT ÊTRE À L'ÉCRAN AVANT DE VISER. RÉSOUDRE et ANNULER se
-        // posent sur son aperçu (moteur_effets.js) : l'ancien bouton
-        // « Appliquer » vivait dessus, donc l'aperçu était forcément là. Ce
-        // bouton-ci, lui, est dans le HUD et se clique même carte refermée —
-        // le ciblage partait alors sans ses deux boutons, et la carte restait
-        // en l'air sans rien pour la résoudre ni l'annuler.
-        if (typeof window.afficherApercuCarteHD === "function") {
-            window.afficherApercuCarteHD(idCarte, true);
-        }
+        // LA CARTE NE S'OUVRE PLUS ICI. Elle s'affichait en grand pour porter
+        // RÉSOUDRE et ANNULER, puis disparaissait à la résolution — Nico : « ne
+        // la fais pas apparaître ». Les deux boutons ont maintenant leur barre
+        // (barreCiblageResolution, moteur_effets.js) ; une carte restée ouverte
+        // se referme.
+        if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD(true);
         // ON NOMME LE LANCEUR. Sans ça, demarrerCiblage le déduit du panneau
         // gauche — c'est-à-dire du combattant qu'on regarde, pas de celui qui
         // joue — et allait chercher la carte dans le mauvais deck.

@@ -434,7 +434,14 @@ console.log("\n11. LE CLIC SUR « LANCER » OUVRE UN VRAI CIBLAGE, ET IL TIENT")
       anneaux: document.querySelectorAll(".anneau-ciblage").length,
       resoudreVisible: !!(rect && rect.width > 0 && rect.height > 0),
       annulerPresent: !!document.getElementById("btn-annuler-ciblage"),
-      tokenTenu: window.TOKEN_SELECTIONNE
+      tokenTenu: window.TOKEN_SELECTIONNE,
+      // La carte ne s'ouvre plus au lancement : les boutons sont dans leur barre.
+      carteOuverte: (() => { const c = document.getElementById("apercu-carte-hd-competence");
+                             return !!c && getComputedStyle(c).display !== "none" && getComputedStyle(c).opacity !== "0"
+                                    && c.getBoundingClientRect().width > 0 && c.style.visibility !== "hidden"
+                                    && !!c.querySelector(".zone-effets, .titre-auto-reduit"); })(),
+      dansLaBarre: !!(btn && btn.closest("#barre-ciblage-resolution"))
+        && !!document.querySelector("#barre-ciblage-resolution #btn-annuler-ciblage")
     };
   });
 
@@ -442,6 +449,14 @@ console.log("\n11. LE CLIC SUR « LANCER » OUVRE UN VRAI CIBLAGE, ET IL TIENT")
   verifier("ses anneaux sont dessinés ET ils TIENNENT", apres.anneaux > 0, `(${apres.anneaux} anneau(x))`);
   verifier("RÉSOUDRE est là, et visible", apres.resoudreVisible);
   verifier("ANNULER aussi", apres.annulerPresent);
+  verifier("la carte ne s'est PAS ouverte en grand au lancement", !apres.carteOuverte, JSON.stringify(apres));
+  verifier("RÉSOUDRE et ANNULER sont dans leur barre, en bas de l'écran", apres.dansLaBarre);
+  const annule = await p.evaluate(async () => {
+    document.getElementById("btn-annuler-ciblage").click();
+    await new Promise(r => setTimeout(r, 100));
+    return { barre: !!document.getElementById("barre-ciblage-resolution"), ciblage: !!(window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif) };
+  });
+  verifier("ANNULER : le ciblage se ferme et la barre s'en va", !annule.barre && !annule.ciblage, JSON.stringify(annule));
   verifier("le bouton fin de tour propose maintenant de renoncer", apres.mode === "fin_de_tour", `(${apres.mode})`);
   verifier("le pion reste sélectionné (le clic n'a pas désélectionné le héros)",
            apres.tokenTenu === "H1", `(${apres.tokenTenu})`);
