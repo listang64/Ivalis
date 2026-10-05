@@ -99,10 +99,17 @@ await p.addInitScript(({ PERSO }) => {
       entree.statut = statut;
       window.__faux.openai.push(entree);
       if (statut !== 200) return repondre({ error: { message: "Rate limit" } }, statut);
-      return repondre({ data: [{ b64_json: "iVBORw0KGgo=" }] });
+      // Un vrai PNG carré 1024 × 1024, comme l'IA le rend : trois bandes
+      // (haut bleu, milieu rouge, bas vert) pour voir le recadrage.
+      const c = document.createElement("canvas"); c.width = 1024; c.height = 1024;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#0000ff"; ctx.fillRect(0, 0, 1024, 1024);
+      ctx.fillStyle = "#ff0000"; ctx.fillRect(0, 90, 1024, 844);
+      ctx.fillStyle = "#00ff00"; ctx.fillRect(0, 934, 1024, 90);
+      return repondre({ data: [{ b64_json: c.toDataURL("image/png").split(",")[1] }] });
     }
     if (url.includes("api.cloudinary.com")) {
-      window.__faux.cloud.push({ dossier: options.body.get("folder") });
+      window.__faux.cloud.push({ dossier: options.body.get("folder"), fichier: options.body.get("file") });
       return repondre({ secure_url: "https://res.cloudinary.com/x/image/upload/Competences/illu_" + window.__faux.cloud.length + ".png", public_id: "p" });
     }
     return vraiFetch(url, options);
@@ -117,9 +124,9 @@ await p.addInitScript(({ PERSO }) => {
 await p.route('**/firebase-app.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_APP }));
 // L'IMAGE DE LA CARTE, comme la vraie : un cadre opaque (or) percé d'une
 // fenêtre transparente en haut (10 → 90 % de large, 12 → 46 % de haut).
-const CADRE_CARTE = '<svg xmlns="http://www.w3.org/2000/svg" width="340" height="476" viewBox="0 0 340 476">'
-  + '<path fill="#c8a030" fill-rule="evenodd" d="M0 0H340V476H0Z M34 57H306V219H34Z"/></svg>';
-await p.route('**competance_carte**', r => r.fulfill({ contentType: 'image/svg+xml', headers: {'Access-Control-Allow-Origin':'*'}, body: CADRE_CARTE }));
+// C'est la vraie image de la carte (réduite), donnée par Nico.
+const CADRE_CARTE = fs.readFileSync('/home/user/Ivalis/tests_monstres/cadre_carte_competence.png');
+await p.route('**competance_carte**', r => r.fulfill({ contentType: 'image/png', headers: {'Access-Control-Allow-Origin':'*'}, body: CADRE_CARTE }));
 // Les illustrations : un aplat rouge pur, pour le reconnaître au pixel.
 await p.route('**/x/image/upload/**', r => r.fulfill({ contentType: 'image/svg+xml', headers: {'Access-Control-Allow-Origin':'*'},
   body: '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024"><rect width="1024" height="1024" fill="#ff0000"/></svg>' }));
@@ -164,6 +171,8 @@ verifier("le titre de la compétence", /Fendoir des cimes/.test(texteG));
 verifier("ses effets", /Attaque lourde/.test(texteG), texteG.split("\n").find(l => /Attaque/.test(l)));
 verifier("le récit RP", /fends le sol/.test(texteG));
 verifier("la race et le genre du personnage", /RACE : Elfe/.test(texteG) && /GENRE : Femme/.test(texteG));
+verifier("consigne de cadrage : format paysage 5:4, action dans la bande centrale", /5:4/.test(g.systemInstruction.parts[0].text)
+         && /bande centrale/.test(g.systemInstruction.parts[0].text));
 verifier("consigne : mettre CE personnage en scène, sans texte ni cadre", /exécuter la technique/.test(g.systemInstruction.parts[0].text)
          && /aucun texte/.test(g.systemInstruction.parts[0].text));
 
@@ -182,9 +191,21 @@ verifier("sur fond neutre (pas le magenta des pions)", f.blobs.every(b => b.fond
 console.log("\n4. SATURÉE : LA COMMANDE ATTEND EN FILE, PUIS PASSE");
 verifier("deux refus 429, puis la réussite", f.openai.map(x => x.statut).join() === "429,429,200", f.openai.map(x => x.statut).join());
 verifier("…sans redemander le prompt ni relire les images à chaque essai", f.gemini.length === 1 && f.blobs.length === 2, `${f.gemini.length} prompt(s), ${f.blobs.length} image(s) lue(s)`);
-verifier("une seule image hébergée, dans Competences", f.cloud.length === 1 && f.cloud[0].dossier === "Competences", JSON.stringify(f.cloud));
+verifier("une seule image hébergée, dans Competences", f.cloud.length === 1 && f.cloud[0].dossier === "Competences", f.cloud.map(c => c.dossier).join());
+
+console.log("\n4 bis. UN SEUL FORMAT : 1000 × 800 (5:4), CELUI DE LA FENÊTRE DE LA CARTE");
+const envoi = await p.evaluate(async (fichier) => {
+  const img = new Image(); img.src = fichier; await img.decode();
+  const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+  const ctx = c.getContext("2d"); ctx.drawImage(img, 0, 0);
+  const couleur = (y) => Array.from(ctx.getImageData(img.width / 2, y, 1, 1).data.slice(0, 3));
+  return { l: img.width, h: img.height, type: fichier.slice(5, fichier.indexOf(";")), haut: couleur(5), milieu: couleur(img.height / 2) };
+}, f.cloud[0].fichier);
+verifier("le carré de l'IA est recadré à 1000 × 800 avant l'envoi", envoi.l === 1000 && envoi.h === 800, `${envoi.l}×${envoi.h} ${envoi.type}`);
+verifier("…au centre (la bande du haut est rognée)", envoi.milieu[0] > 200 && envoi.haut[2] < 60, JSON.stringify(envoi));
 const docComp = await p.evaluate((id) => window.__docs["Personnages/P1/Competences/" + id], idComp);
 verifier("l'adresse est écrite sur la compétence (URL_Image)", /illu_1/.test(docComp.URL_Image || "") && /q_auto,f_auto/.test(docComp.URL_Image), docComp.URL_Image);
+verifier("Cloudinary livre toujours en 1000 × 800 (c_fill)", /c_fill,g_center,w_1000,h_800/.test(docComp.URL_Image || ""), docComp.URL_Image);
 verifier("avec le prompt qui l'a faite (Prompt_Image)", /^PROMPT-MIA/.test(docComp.Prompt_Image || ""));
 verifier("la file est vide, le sceau a disparu", !(await p.evaluate(() => !!document.getElementById("badge-illustrations"))));
 
@@ -205,27 +226,53 @@ verifier("la carte montre l'illustration", carte.src === docComp.URL_Image, cart
 verifier("dans la moitié haute de la carte", carte.hautRel >= 0 && carte.basRel <= 0.55, `${carte.hautRel && carte.hautRel.toFixed(2)} → ${carte.basRel && carte.basRel.toFixed(2)}`);
 verifier("sous l'image de la carte (z-index et ordre)", Number(carte.z) < Number(carte.zCadre) && carte.avantLeCadre, `${carte.z} < ${carte.zCadre}`);
 
-// LE VRAI TEST : ce que l'œil voit. On photographie la carte et on lit les
-// pixels : l'illustration (rouge) doit se voir PAR la fenêtre du cadre, et le
-// cadre (or) doit la recouvrir partout ailleurs, y compris là où l'image
-// déborde sous lui.
-const lirePixels = async (points) => {
+// LE VRAI TEST : ce que l'œil voit, avec la VRAIE image de la carte.
+await p.waitForTimeout(400);
+// On compare la capture à la transparence de l'image de la carte elle-même,
+// sur une grille qui couvre le haut de la carte : partout où la carte est
+// TRANSPARENTE (la fenêtre), on doit voir l'illustration (rouge pur) — aucun
+// liseré vide ; partout où elle est OPAQUE (bords, médaillon d'initiative,
+// plaque vissée), on doit voir la carte, pas l'illustration.
+const grille = await (async () => {
+  // Le texte de la carte (titre, initiative, fatigue, effets) est posé
+  // par-dessus tout : on le masque le temps de la photo.
+  await p.evaluate(() => document.querySelectorAll("#apercu-carte-hd-competence > div").forEach(d => {
+    if (getComputedStyle(d).zIndex === "3" && !d.classList.contains("illustration-carte-hd")) d.style.visibility = "hidden"; }));
   const boite = await p.evaluate(() => { const r = document.getElementById("apercu-carte-hd-competence").getBoundingClientRect();
                                          return { x: r.left, y: r.top, width: r.width, height: r.height }; });
   const png = (await p.screenshot({ clip: boite })).toString("base64");
-  return p.evaluate(async ({ png, points }) => {
-    const img = new Image(); img.src = "data:image/png;base64," + png; await img.decode();
-    const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
-    const ctx = c.getContext("2d"); ctx.drawImage(img, 0, 0);
-    return points.map(([x, y]) => Array.from(ctx.getImageData(Math.round(x * img.width), Math.round(y * img.height), 1, 1).data.slice(0, 3)));
-  }, { png, points });
-};
-const estRouge = ([r, g, b]) => r > 220 && g < 40 && b < 40;
-const estOr = ([r, g, b]) => Math.abs(r - 0xc8) < 20 && Math.abs(g - 0xa0) < 20 && Math.abs(b - 0x30) < 20;
-await p.waitForTimeout(300);
-const px = await lirePixels([[0.5, 0.29], [0.2, 0.2], [0.5, 0.11], [0.09, 0.29], [0.5, 0.47], [0.91, 0.3]]);
-verifier("par la fenêtre du cadre, on voit l'illustration", estRouge(px[0]) && estRouge(px[1]), JSON.stringify(px.slice(0, 2)));
-verifier("là où l'image passe sous le cadre, le cadre la recouvre", estOr(px[2]) && estOr(px[3]) && estOr(px[4]) && estOr(px[5]), JSON.stringify(px.slice(2)));
+  return p.evaluate(async ({ png, cadre }) => {
+    const charger = async (src) => { const i = new Image(); i.src = src; await i.decode(); return i; };
+    const capture = await charger("data:image/png;base64," + png);
+    const W = capture.width, H = capture.height;
+    const lire = (img) => { const c = document.createElement("canvas"); c.width = W; c.height = H;
+      const ctx = c.getContext("2d"); ctx.drawImage(img, 0, 0, W, H); return ctx.getImageData(0, 0, W, H).data; };
+    const ecran = lire(capture), carte = lire(await charger("data:image/png;base64," + cadre));
+    const a = (x, y) => carte[(y * W + x) * 4 + 3];
+    const uniforme = (x, y, val) => { for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) if (a(x + dx, y + dy) !== val) return false; return true; };
+    let fenetre = 0, fenetreRouge = 0, opaque = 0, opaqueIntact = 0;
+    const fautes = [];
+    for (let fy = 0.04; fy <= 0.56; fy += 0.01) for (let fx = 0.08; fx <= 0.92; fx += 0.01) {
+      const x = Math.round(fx * W), y = Math.round(fy * H), i = (y * W + x) * 4;
+      const rgb = [ecran[i], ecran[i + 1], ecran[i + 2]];
+      if (uniforme(x, y, 0)) {
+        fenetre++;
+        if (rgb[0] > 220 && rgb[1] < 40 && rgb[2] < 40) fenetreRouge++; else if (fautes.length < 4) fautes.push(["fenêtre", fx.toFixed(2), fy.toFixed(2), rgb]);
+      } else if (uniforme(x, y, 255)) {
+        opaque++;
+        const ecart = Math.abs(rgb[0] - carte[i]) + Math.abs(rgb[1] - carte[i + 1]) + Math.abs(rgb[2] - carte[i + 2]);
+        if (ecart < 30) opaqueIntact++; else if (fautes.length < 8) fautes.push(["cadre", fx.toFixed(2), fy.toFixed(2), rgb]);
+      }
+    }
+    return { fenetre, fenetreRouge, opaque, opaqueIntact, fautes };
+  }, { png, cadre: CADRE_CARTE.toString("base64") });
+})();
+verifier("l'illustration remplit TOUTE la fenêtre transparente du haut", grille.fenetre > 500 && grille.fenetreRouge === grille.fenetre,
+         `${grille.fenetreRouge}/${grille.fenetre} ${JSON.stringify(grille.fautes.filter(f => f[0] === "fenêtre"))}`);
+verifier("la carte (bords, médaillon, plaque) la recouvre partout ailleurs", grille.opaque > 200 && grille.opaqueIntact === grille.opaque,
+         `${grille.opaqueIntact}/${grille.opaque} ${JSON.stringify(grille.fautes.filter(f => f[0] === "cadre"))}`);
+const ratio = await p.evaluate(() => { const c = document.querySelector("#apercu-carte-hd-competence .illustration-carte-hd").getBoundingClientRect(); return c.width / c.height; });
+verifier("la zone de l'image a le format de la fenêtre (≈ 5:4)", Math.abs(ratio - 1.25) < 0.05, ratio.toFixed(3));
 
 console.log("\n6. LE BOUTON PROVISOIRE : RÉGLER, PUIS EXTRAIRE LE CODE");
 const reglage = await p.evaluate(async () => {

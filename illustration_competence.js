@@ -32,6 +32,11 @@ const MODELES_IMAGE = [
 ];
 // Le fond posé sous les transparences des images de référence.
 const FOND_REFERENCES = "#808080";
+// LE FORMAT UNIQUE DES ILLUSTRATIONS : 1000 × 800 (5:4), celui de la fenêtre
+// du haut de la carte. L'IA dessine en carré (réglages des pions) ; l'image
+// est recadrée au centre avant l'envoi, et Cloudinary le refait à la livraison
+// (c_fill) : quoi qu'il arrive, toutes les illustrations ont ce format.
+window.FORMAT_ILLUSTRATION = { largeur: 1000, hauteur: 800 };
 
 const dormir = (ms) => new Promise(r => setTimeout(r, ms));
 const sansBalises = (t) => String(t || "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
@@ -142,7 +147,8 @@ async function illustrer(commande, acquis = {}) {
     const prompt = acquis.prompt || (acquis.prompt = await ecrirePromptIllustration(competence, perso, armes, cles));
     if (!acquis.references) acquis.references = await imagesDeReference(perso, armes);
     const image = acquis.image || (acquis.image = await dessinerIllustration(prompt, acquis.references, cles));
-    const url = acquis.url || (acquis.url = await hebergerIllustration(image, cles));
+    if (!acquis.recadree) acquis.recadree = await recadrerAuFormat(image);
+    const url = acquis.url || (acquis.url = await hebergerIllustration(acquis.recadree, cles));
 
     await updateDoc(doc(db, "Personnages", commande.idPerso, "Competences", commande.idComp),
                     { URL_Image: url, Prompt_Image: prompt })
@@ -211,7 +217,7 @@ Tu écris, en ANGLAIS, le prompt d'une illustration de carte de compétence pour
 - Montre CE personnage (celui de l'image 1 : même visage, même race, même armure, mêmes couleurs) en train d'exécuter la technique, en pleine action. Si la technique se lit mieux par son effet (un soin, un bouclier, une zone), montre l'effet en train de se produire, le personnage en lanceur.
 - S'il y a des armes en référence, il les tient telles qu'elles sont dessinées. Sinon, s'appuie sur l'arme de la technique : Magie = mains nues ou focaliseur, énergie visible ; Sans arme = mains nues ou arme improvisée du récit.
 - Le récit du joueur prime sur les effets pour la mise en scène ; les effets donnent l'élément, la portée, la cible (zone = plusieurs ennemis, distance = projectile ou rayon, soin = lumière apaisante sur un allié…).
-- Composition : plan large et dynamique, action centrée dans le tiers central de l'image (l'image sera recadrée en bandeau), fond de décor de fantasy cohérent, lumière dramatique.
+- Composition : l'image sera recadrée au format paysage 5:4 (on perd une bande en haut et en bas) : plan large et dynamique, personnage et action entièrement dans la bande centrale, rien d'important près des bords haut et bas, fond de décor de fantasy cohérent, lumière dramatique.
 - Interdits : aucun texte, aucune lettre, aucun chiffre, aucun cadre, aucune bordure, aucune interface de jeu, aucune carte à jouer.${style ? `\n- Style artistique OBLIGATOIRE du jeu : ${style}` : "\n- Style : peinture numérique de fantasy, riche et détaillée."}
 Appelle l'outil ecrirePromptImage avec le prompt (100 à 200 mots).`;
 
@@ -323,6 +329,28 @@ async function dessinerIllustration(prompt, blobs, cles) {
 // -------------------------------------------------------------------------
 //  3. L'HÉBERGEMENT (Cloudinary)
 // -------------------------------------------------------------------------
+// Recadre au centre au format unique (5:4), en JPEG. Une image qu'on ne peut
+// pas lire ici (adresse d'un autre domaine) part telle quelle : Cloudinary la
+// recadrera à la livraison.
+async function recadrerAuFormat(image) {
+    const { largeur, hauteur } = window.FORMAT_ILLUSTRATION;
+    try {
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.src = image;
+        await img.decode();
+        const ratio = largeur / hauteur;
+        let sw = img.width, sh = img.width / ratio;
+        if (sh > img.height) { sh = img.height; sw = img.height * ratio; }
+        const canvas = document.createElement("canvas");
+        canvas.width = largeur; canvas.height = hauteur;
+        canvas.getContext("2d").drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, 0, 0, largeur, hauteur);
+        return canvas.toDataURL("image/jpeg", 0.92);
+    } catch (e) {
+        return image;
+    }
+}
+
 async function hebergerIllustration(image, cles) {
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const dossier = "Competences";
@@ -340,7 +368,8 @@ async function hebergerIllustration(image, cles) {
         throw new Saturee("Cloudinary injoignable (" + (e.message || e) + ")");
     }
     if (!json || !json.secure_url) throw new Definitive("Cloudinary n'a pas rendu d'adresse");
-    return json.secure_url.replace("/upload/", "/upload/q_auto,f_auto/");
+    const { largeur, hauteur } = window.FORMAT_ILLUSTRATION;
+    return json.secure_url.replace("/upload/", `/upload/c_fill,g_center,w_${largeur},h_${hauteur}/q_auto,f_auto/`);
 }
 
 // La carte déjà chargée prend son image tout de suite, et si elle est ouverte
@@ -364,11 +393,15 @@ function rafraichirCaches(commande, url) {
 //  transparente du cadre, qui la borde. Aucun réglage ne la fait passer devant.
 //  Réglable à la main par l'outil provisoire ci-dessous, en attendant que les
 //  bonnes valeurs soient figées ici.
+//  La fenêtre transparente de l'image de la carte (competance_carte, 879 ×
+//  1216) va de x 129 à 748 et de y 116 à 612 : 14,7 → 85,2 % de large,
+//  9,5 → 50,4 % de haut. L'illustration la déborde d'un point de chaque côté,
+//  sous le cadre, pour ne jamais laisser de liseré vide.
 window.REGLAGE_ILLUSTRATION_DEFAUT = {
-    haut: 10, gauche: 8, largeur: 84, hauteur: 38,   // le cadre de l'image, en % de la carte
-    cadrageX: 50, cadrageY: 40,                      // le point de l'image gardé au centre (object-position)
-    zoom: 100,                                       // en %
-    arrondi: 6                                       // coins, en px
+    haut: 8.5, gauche: 13.7, largeur: 72.5, hauteur: 42.9,   // le cadre de l'image, en % de la carte
+    cadrageX: 50, cadrageY: 50,                              // le point de l'image gardé au centre (object-position)
+    zoom: 100,                                               // en %
+    arrondi: 0                                               // coins, en px (le cadre les cache)
 };
 const CLE_REGLAGE = "ivalis_reglage_illustration_carte";
 

@@ -4462,3 +4462,19 @@ de réglage est retirée, et un ancien réglage `devant` resté en mémoire est
 ignoré. illustration_competence.mjs, section 5, le vérifie au pixel : un cadre
 opaque percé d'une fenêtre, une illustration rouge — rouge par la fenêtre, or
 partout où l'image passe sous le cadre.
+
+## L'illustration au format de la fenêtre de la carte (version 183)
+
+L'image de la carte (competance_carte, 879 × 1216) a une fenêtre transparente
+en haut : x 129 → 748, y 116 → 612 (14,7 → 85,2 % de large, 9,5 → 50,4 % de
+haut), entre le médaillon d'initiative et la plaque vissée. Le réglage par
+défaut la couvre en la débordant d'un point de chaque côté, sous le cadre
+(haut 8,5, gauche 13,7, largeur 72,5, hauteur 42,9 %, sans arrondi).
+UN SEUL FORMAT pour toutes les illustrations : 1000 × 800 (5:4). L'IA dessine
+en carré (réglages des pions) avec la consigne de garder l'action dans la
+bande centrale ; l'image est recadrée au centre en 1000 × 800 avant l'envoi,
+et Cloudinary la livre en `c_fill,g_center,w_1000,h_800` quoi qu'il arrive.
+illustration_competence.mjs (4 bis, 5) le vérifie avec la vraie image de la
+carte (cadre_carte_competence.png, réduite) : la capture est comparée à la
+transparence de la carte sur une grille — illustration visible partout où la
+carte est transparente, carte intacte partout où elle est opaque.
