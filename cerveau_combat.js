@@ -42,7 +42,7 @@ import { clonerEtat, combattant, creerDes, combattantIllusion,
 import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissiperConfusion,
          traverserZones, creerZonePure, poserZone, vieillirZones,
          chaineDeDegats, REGLES_ETATS, regleDesEtats, estDansLeNoir,
-         partageTenebres, ETAT_TENEBRES_ETALEES, POISON, POISON_MAITRE,
+         partageTenebres, ETAT_TENEBRES_ETALEES, POISON, POISON_MAITRE, ETAT_SAIGNEMENT, SAIGNEMENT,
          resoudreTechniqueClasse, actionAssautMortel, actionBaiserVampire } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant } from './mouvement_pur.js';
@@ -501,6 +501,19 @@ export function ticsDeFinDeManche(etat) {
             const compte = chaineDeDegats(c, { valeurBrute: brut, typeRes: regle.typeParTour || "Magique" }, {});
             if (compte.degats > 0) {
                 etapes.push(...infligerTic(c, id, compte.degats, "Brûlure", etat, brulure.idSource));
+            }
+        }
+
+        // --- SAIGNEMENT : il saigne tant qu'il dure ---------------------------
+        //  Règle de Nico (tableau des effets) : 8 % des points de vie maximum
+        //  en dégâts PHYSIQUES à chaque fin de manche, l'armure réduisant le
+        //  coup (puis le bouclier). Comme la brûlure, à CHAQUE manche.
+        const saignement = c.etats.find(e => e && e.nom === ETAT_SAIGNEMENT);
+        if (saignement) {
+            const brut = Math.ceil(nombre(c.pvMax) * (SAIGNEMENT.pvMaxPct / 100));
+            const compte = chaineDeDegats(c, { valeurBrute: brut, typeRes: SAIGNEMENT.typeRes }, {});
+            if (compte.degats > 0) {
+                etapes.push(...infligerTic(c, id, compte.degats, ETAT_SAIGNEMENT, etat, saignement.idSource));
             }
         }
 

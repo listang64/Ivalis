@@ -4491,7 +4491,7 @@ window.ajouterLigneEffetVide = function() {
 };
 
 // =========================================================================
-//  LES EFFETS DE CLASSE QUE LE JEU APPORTE LUI-MÊME (Ténèbres, Lumière)
+//  LES EFFETS QUE LE JEU APPORTE LUI-MÊME (Ténèbres, Lumière, Saignement)
 // =========================================================================
 //  Le jeu n'écrit plus rien dans le grimoire (Combat_Effets) : le bouton qui y
 //  installait ces effets a été retiré, le grimoire appartient à Nico. Ces
@@ -4522,6 +4522,16 @@ window.MIGRATION_EFFETS = [
                 Classe: "Chasseur de mages", Niveau_Requis: 5,
                 Effet_Base: "15% chance d'ignorer la résistance magique de la cible sur ce sort (Max 60%)",
                 Notes: "Réservé au Chasseur de mages (niveau 5). Seulement sur une action à dégâts magiques. Au niveau 10, un sort de lumière a 30 % de chance d'aveugler sa cible et les ennemis qui la touchent." } },
+    // LE SAIGNEMENT (tableau de Nico) : un sous-effet Physique comme
+    // l'Étourdi — 1 pt, Force, 15 % de chance par cran (max 75 %), 2 tours. Il
+    // n'est réservé à personne. 8 % des PV max en dégâts physiques à chaque fin
+    // de manche, et +2 de fatigue par case de déplacement.
+    { id: "EFF_SAIGNEMENT", secoursLocal: true,
+      champs: { Nom: "Saignement", Cout_PT: "1", Modificateur: "FORCE",
+                Type_Mecanique: "Physique", Type_Mecanique_2: "Aucun",
+                Valeur: 0, Pourcent_Base: 15, Pourcent_Max: 75, Tours: 2, Cible_Etat: "saignement",
+                Effet_Base: "15% chance d'appliquer saignement (Max 75%) Dure 2 tours",
+                Notes: "Saignement : inflige 8% des PV max de la cible en dégâts physiques (armure appliquée) à chaque fin de manche, et chaque case de déplacement lui coûte 2 de fatigue de plus." } },
     // VAMPIRISME, LE SORT DU VAMPIRE (niveau 5). Une action de base comme
     // Ténèbres : 1 pt, Intelligence, 1 dégât magique par cran, sans plafond.
     // La carte qui le porte soigne son lanceur de 70 % de ce qu'elle inflige
@@ -4567,6 +4577,56 @@ window.chargerCacheEffetsBDD = async function() {
         snap.forEach(d => window.EFFETS_BDD_CACHE[d.id] = d.data());
     } catch(e) { console.error("Erreur cache effets :", e); }
     window.completerEffetsDeSecours(window.EFFETS_BDD_CACHE || (window.EFFETS_BDD_CACHE = {}));
+};
+
+// =========================================================================
+//  PROVISOIRE : METTRE LE GRIMOIRE (Combat_Effets) À JOUR DES RÈGLES
+// =========================================================================
+//  Le jeu n'écrit jamais seul dans le grimoire. Ce bouton, dans l'écran du
+//  Grimoire du moteur, propose au MJ d'y recopier les textes des règles
+//  changées (et d'y ajouter le Saignement) ; rien ne part sans sa
+//  confirmation, et seuls les champs listés sont touchés (merge).
+window.MAJ_GRIMOIRE_REGLES = [
+    { id: "EFF_EMPOISONNEMENT", champs: {
+        Notes: "Baisse l'énergie de la cible de 10 % de son énergie max et inflige 8 % de ses PV max en dégâts bruts (aucune défense ; le bouclier encaisse d'abord). Un seul tic, en fin de manche. Maître des poisons (Assassin niv. 10) : 18 % d'énergie et 9 % des PV max, à chaque fin de manche pendant 2 manches." } },
+    { id: "EFF_BRULE", champs: {
+        Notes: "-50 % de soins reçus, et 8 % des PV max de la cible en dégâts magiques (défense magique appliquée) à chaque fin de manche." } },
+    { id: "EFF_CONFUSION", champs: {
+        Notes: "Confus : à chaque technique, un jet sur 100 — 40 % : il s'attaque lui-même ou attaque un allié au hasard autour de lui ; 20 % : il s'enfuit (comme la Peur) ; 20 % : il n'est plus confus (en fin de boucle) ; 20 % : il ne se passe rien." } },
+    { id: "EFF_AVEUGLEMENT", champs: {
+        Effet_Base: "15% chance (max 75%) d'aveugler la cible, sur 2 tours",
+        Notes: "Aveuglement : 4 hexagones autour de la cible sont dans le noir, fixés là où elle a été aveuglée. Impossible d'y cibler un ennemi ou un allié (les sorts de zone les touchent quand même). Le noir n'est visible que de l'aveuglé." } },
+    { id: "EFF_REPLI", champs: {
+        Effet_Base: "Se déplace de 3 cases après avoir attaqué, et évite toutes les attaques d'opportunité.",
+        Notes: "Après l'attaque, le lanceur choisit une case à 3 pas de marche (ni mur, ni vivant traversé). Il évite toutes les attaques d'opportunité des ennemis quittés. Marche gratuite." } },
+    { id: "EFF_VAMPIRISME", champs: {
+        Notes: "RETIRÉ DE LA FORGE : remplacé par le Baiser du vampire (technique de classe du Vampire, niveau 5). Les cartes déjà forgées gardent leur effet (1 dégât magique par cran, soin de 70 % des dégâts infligés)." } }
+];
+
+window.mettreAJourGrimoireRegles = async function() {
+    const saignement = (window.MIGRATION_EFFETS || []).find(r => r.id === "EFF_SAIGNEMENT");
+    const ecritures = [...window.MAJ_GRIMOIRE_REGLES];
+    let manqueSaignement = false;
+    try {
+        const snap = await getDoc(doc(db, "Combat_Effets", "EFF_SAIGNEMENT"));
+        manqueSaignement = !snap.exists();
+    } catch (e) { manqueSaignement = true; }
+    if (manqueSaignement && saignement) ecritures.push({ id: "EFF_SAIGNEMENT", champs: { ...saignement.champs }, ajout: true });
+
+    const resume = ecritures.map(e => `• ${e.id}${e.ajout ? " (ajouté)" : ""} : ${Object.keys(e.champs).join(", ")}`).join("\n");
+    if (!confirm("Mettre le grimoire à jour des nouvelles règles ?\n\n" + resume + "\n\nSeuls ces champs sont modifiés.")) return 0;
+
+    let ok = 0;
+    for (const e of ecritures) {
+        try {
+            await setDoc(doc(db, "Combat_Effets", e.id), e.champs, { merge: true });
+            if (window.EFFETS_BDD_CACHE) window.EFFETS_BDD_CACHE[e.id] = { ...(window.EFFETS_BDD_CACHE[e.id] || {}), ...e.champs };
+            ok++;
+        } catch (err) { console.error("Grimoire : écriture impossible pour " + e.id, err); }
+    }
+    alert(`Grimoire mis à jour : ${ok}/${ecritures.length} effet(s).`);
+    if (typeof window.chargerTableauEffets === "function") await window.chargerTableauEffets();
+    return ok;
 };
 
 window.exporterEffetsBDD = async function() {

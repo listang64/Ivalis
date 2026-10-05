@@ -62,7 +62,8 @@ const plateau = { etatCase: (q, r) => ({ bloquee: MURS.has(`${q},${r}`), supprim
 console.log("\n1. LE NOYAU PUR : UNE MARCHE DE 3 CASES, GRATUITE");
 // =========================================================================
 {
-  verifier("réglages par défaut : 3 cases, 60 %", PORTEE_REPLI === 3 && CHANCE_REPLI_OPPORTUNITE === 60);
+  // (Nico, ensuite : « ça évite TOUTES les attaques d'opportunité, on enlève les 60 % ».)
+  verifier("réglages par défaut : 3 cases, toutes les opportunités évitées", PORTEE_REPLI === 3 && CHANCE_REPLI_OPPORTUNITE === 100);
   const etat = monde();
   const chemins = cheminsDeRepli(etat, "H1", 3, plateau);
   const cles = [...chemins.keys()];
@@ -88,16 +89,17 @@ console.log("\n1. LE NOYAU PUR : UNE MARCHE DE 3 CASES, GRATUITE");
            JSON.stringify(opp));
   verifier("aucun PV perdu", s.combattants.H1.pv === 60);
 
-  // Dé 61 : le repli ne se dérobe pas ; la défense (Esquive 0) ne sauve pas non plus → 8 dégâts.
+  // Plus de dé : quel qu'il soit (61, 99…), le repli se dérobe toujours.
   const s2 = clonerEtat(etat);
   const e2 = resoudreRepli(s2, "H1", { q: 0, r: -3 }, desFixe([61, 99]), plateau);
-  verifier("dé 61 : l'attaque d'opportunité porte (8 dégâts)", s2.combattants.H1.pv === 52,
+  verifier("avec n'importe quel dé : évitée, aucun dégât", s2.combattants.H1.pv === 60
+           && e2.some(e => e.type === "opportunite" && e.evitee) && !e2.some(e => e.type === "degats"),
            JSON.stringify(e2.filter(e => e.type === "opportunite" || e.type === "degats")));
 
-  // La chance se règle : 0 % = jamais évité par le repli.
+  // Même une ancienne carte qui porterait encore « 60 % » ou « 0 % » évite tout.
   const s3 = clonerEtat(etat);
-  resoudreRepli(s3, "H1", { q: 0, r: -3 }, desFixe([1, 99]), plateau, { chance: 0 });
-  verifier("avec 0 % de chance, même un dé de 1 ne sauve pas", s3.combattants.H1.pv === 52);
+  resoudreRepli(s3, "H1", { q: 0, r: -3 }, desFixe([99, 99]), plateau, { chance: 0 });
+  verifier("une ancienne chance (0 %) n'y change rien : évitée", s3.combattants.H1.pv === 60);
 
   // Hors d'atteinte / immobilisé / à terre.
   const loin = clonerEtat(etat);

@@ -114,10 +114,18 @@ export const REGLES_ETATS = {
 // (cerveau_combat.js, ticsDeFinDeManche).
 export const POISON = { energiePct: 10, pvMaxPct: 8, typeRes: "Magique", brut: true };
 // LE POISON DU MAÎTRE (Assassin, niveau 10) : 18 % de l'énergie maximum et
-// 10 % des PV max en dégâts bruts — à CHAQUE fin de manche, pendant 2
+// 9 % des PV max en dégâts bruts — à CHAQUE fin de manche, pendant 2
 // manches, là où le poison ordinaire ne mord qu'une fois.
-export const POISON_MAITRE = { energiePct: 18, pvMaxPct: 10, typeRes: "Magique", brut: true, manches: 2 };
-export const DESC_POISON_MAITRE = "Poison de maître : 18 % de l'énergie max et 10 % des PV max en dégâts bruts à chaque fin de manche, 2 manches.";
+export const POISON_MAITRE = { energiePct: 18, pvMaxPct: 9, typeRes: "Magique", brut: true, manches: 2 };
+export const DESC_POISON_MAITRE = "Poison de maître : 18 % de l'énergie max et 9 % des PV max en dégâts bruts à chaque fin de manche, 2 manches.";
+
+// LE SAIGNEMENT (tableau de Nico) : 8 % des PV max en dégâts PHYSIQUES à
+// chaque fin de manche tant qu'il dure (l'armure réduit, le bouclier encaisse
+// d'abord), et chaque case de déplacement coûte 2 de fatigue de plus
+// (coutDuPas, mouvement_pur.js). 2 manches.
+export const ETAT_SAIGNEMENT = "Saignement";
+export const SAIGNEMENT = { pvMaxPct: 8, typeRes: "Physique", coutDeplacement: 2 };
+export const DESC_SAIGNEMENT = "8% des PV max en dégâts physiques à chaque fin de manche (armure appliquée), et chaque case de déplacement coûte 2 de fatigue de plus.";
 
 // LA BOUSCULADE. Une poussée qui aboutit peut, en plus, faire perdre pied :
 // la cible se rattrape, et ça lui coûte de l'énergie. C'est ce qui remplace la
@@ -300,78 +308,70 @@ export function ligneDeVue(plateau, a, b) {
 // =========================================================================
 //  LA CONFUSION — QUAND LA CARTE PART DE TRAVERS
 // =========================================================================
-//  Règle de Nico : QUATRE EFFETS INDÉPENDANTS, chacun son propre jet de 30 %,
-//  tirés dans cet ordre quand le confus lance une carte :
+//  Règle de Nico : À CHAQUE TECHNIQUE DU CONFUS, UN SEUL JET SUR 100, et il se
+//  passe forcément UNE de ces quatre choses :
 //
-//    1. il s'attaque lui-même          (la carte le prend pour cible) ;
-//    2. il attaque au hasard autour de lui (quelqu'un d'autre à portée,
-//       ami ou ennemi) ;
-//    3. il s'enfuit, comme sous la Peur (joué par le cerveau, qui a les dés
-//       de la fuite : voir suitesDeConfusion, cerveau_combat.js) ;
-//    4. en fin de boucle, il n'est plus confus.
+//    •  1–40  la carte part de travers : il s'attaque lui-même, ou attaque un
+//              ALLIÉ au hasard autour de lui (moitié-moitié ; personne à portée
+//              → sur lui) ;
+//    • 41–60  il s'enfuit, comme sous la Peur (joué par le cerveau après la
+//              carte, qui part comme voulue : voir suitesDeConfusion,
+//              cerveau_combat.js) ;
+//    • 61–80  en fin de boucle, il n'est plus confus (la carte part comme voulue) ;
+//    • 81–100 il ne se passe rien : la carte part comme voulue, il reste confus.
 //
-//  Indépendants : rien n'empêche 1 et 2 à la fois — la carte touche alors le
-//  confus ET sa cible de hasard —, ni la fuite après un coup parti de travers.
-//  Si ni 1 ni 2 ne sortent, la carte part comme le joueur l'a voulue.
-//
-//  UNE CARTE SANS ATTAQUE NE PART PAS AU HASARD : un soin, un bouclier, une
-//  pose d'état qui « partirait au hasard » se retourne sur le confus — on ne
-//  rate pas un soin sur un inconnu, on se le donne à soi. Idem si personne
-//  n'est à portée.
+//  UNE CARTE SANS ATTAQUE NE PART PAS SUR UN AUTRE : un soin, un bouclier, une
+//  pose d'état qui partirait de travers se retourne sur le confus — on ne
+//  rate pas un soin sur un inconnu, on se le donne à soi.
 //
 //  Les dés sont tirés ICI, par le cerveau, avec ceux de la carte : le même
 //  résultat pour tous les postes. Ils ne sont tirés QUE si le lanceur est
 //  confus — une carte ordinaire consomme exactement les mêmes dés qu'avant.
-export const CHANCE_CONFUSION_SOI       = 30;
-export const CHANCE_CONFUSION_HASARD    = 30;
-export const CHANCE_CONFUSION_FUITE     = 30;
-export const CHANCE_CONFUSION_DISSIPEE  = 30;
+export const CONFUSION_TRAVERS   = 40;   // 1–40
+export const CONFUSION_FUITE     = 20;   // 41–60
+export const CONFUSION_DISSIPEE  = 20;   // 61–80 (81–100 : rien)
 
 export function appliquerConfusion(etat, action, plateau, des) {
     const lanceur = combattant(etat, action.idLanceur);
     if (!lanceur || !aLEtat(lanceur, "Confusion")) return action;
 
-    const jetSoi = des.d100() <= CHANCE_CONFUSION_SOI;
-    const jetHasard = des.d100() <= CHANCE_CONFUSION_HASARD;
-    const fuite = des.d100() <= CHANCE_CONFUSION_FUITE;
-    const dissipee = des.d100() <= CHANCE_CONFUSION_DISSIPEE;
+    const jet = des.d100();
+    const travers = jet <= CONFUSION_TRAVERS;
+    const fuite = !travers && jet <= CONFUSION_TRAVERS + CONFUSION_FUITE;
+    const dissipee = !travers && !fuite && jet <= CONFUSION_TRAVERS + CONFUSION_FUITE + CONFUSION_DISSIPEE;
+    const issue = travers ? "travers" : fuite ? "fuite" : dissipee ? "dissipee" : "rien";
 
     const attaques = action.attaques || [];
     const alterations = action.alterations || [];
-    const carteAUneAttaque = attaques.length > 0;
 
-    // Le hasard « autour de lui » : quelqu'un d'autre, à portée de la carte.
+    // De travers : sur lui, ou sur un ALLIÉ au hasard à portée de la carte.
     let idCible = null;
-    let hasardSurSoi = false;
-    if (jetHasard) {
-        if (!carteAUneAttaque) {
-            hasardSurSoi = true;
-        } else {
+    let surSoi = false;
+    if (travers) {
+        const versUnAllie = des.d100() > 50;
+        if (versUnAllie && attaques.length > 0) {
             const config = attaques[0] || alterations[0] || {};
             const portee = Math.max(nombre(config.rangeMax, 1), nombre(action.porteeMinTraction, 0));
-            // Une illusion ne se fait leurrer que par une attaque nue.
-            const attaqueSimple = !config.isHeal && !config.isShield && alterations.length === 0;
             const table = etat.combattants || {};
             const possibles = Object.keys(table).filter(id => {
                 if (id === action.idLanceur) return false;
                 const c = table[id];
-                if (!c || c.aTerre) return false;
-                if (c.estIllusion && !attaqueSimple) return false;
+                if (!c || c.aTerre || c.estIllusion) return false;
+                if ((c.camp || "Allié") !== (lanceur.camp || "Allié")) return false;
                 if (distanceHex(lanceur, c) > portee) return false;
                 return ligneDeVue(plateau, lanceur, c);
             }).sort();
-            if (possibles.length === 0) hasardSurSoi = true;   // personne : la carte revient sur lui
-            else idCible = des.parmi(possibles);
+            if (possibles.length) idCible = des.parmi(possibles);
         }
+        surSoi = !idCible;   // pas d'allié à portée, ou une carte sans attaque : sur lui
     }
 
-    const surSoi = jetSoi || hasardSurSoi;
-    const confusion = { soi: surSoi, hasard: !!idCible, idCible, fuite, dissipee };
+    const confusion = { issue, soi: surSoi, hasard: !!idCible, idCible, fuite, dissipee };
     if (!surSoi && !idCible) return { ...action, confusion };
 
-    const cibles = [...(surSoi ? [action.idLanceur] : []), ...(idCible ? [idCible] : [])];
+    const cibles = surSoi ? [action.idLanceur] : [idCible];
     // Les déplacements forcés n'ont aucun sens sur place : on ne se pousse pas
-    // soi-même. Ils ne gardent que la cible de hasard, s'il y en a une.
+    // soi-même. Ils ne gardent que l'allié visé, s'il y en a un.
     const ciblesDeplacement = idCible ? [idCible] : [];
     return {
         ...action,
@@ -385,7 +385,7 @@ export function appliquerConfusion(etat, action, plateau, des) {
     };
 }
 
-// LA FIN DE LA BOUCLE : le confus s'en remet (4e jet). Rend les étapes — le
+// LA FIN DE LA BOUCLE : le confus s'en remet (jet 61–80). Rend les étapes — le
 // cerveau l'appelle APRÈS la carte et la fuite (suitesDeConfusion).
 export function dissiperConfusion(etat, idLanceur) {
     const c = combattant(etat, idLanceur);
@@ -592,11 +592,11 @@ export const DIRECTIONS_HEX = [
     { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
     { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 }
 ];
-export const CASES_AVEUGLEES = 3;
+export const CASES_AVEUGLEES = 4;
 // L'aveuglement de la Lumière (Chasseur de mages, niveau 10) : celui de
 // l'effet Aveuglement, 2 manches.
 export const DUREE_AVEUGLE_LUMIERE = 2;
-export const DESC_AVEUGLE = "3 cases autour de lui sont dans le noir : il ne peut y cibler personne (les zones y frappent quand même).";
+export const DESC_AVEUGLE = "4 cases autour de lui sont dans le noir : il ne peut y cibler personne (les zones y frappent quand même).";
 
 export function tirerDirectionsAveugle(des) {
     const reste = DIRECTIONS_HEX.map(d => ({ ...d }));
@@ -1322,7 +1322,7 @@ export function resoudreCarte(etat, action, plateau) {
     if (action.confusion) {
         const dits = [];
         if (action.confusion.soi) dits.push("Confus : s'inflige sa propre compétence !");
-        if (action.confusion.hasard) dits.push("Confus : cible au hasard !");
+        if (action.confusion.hasard) dits.push("Confus : attaque un allié !");
         dits.forEach(texte => etapes.push({ type: "message", cible: idLanceur, acteur: idLanceur,
                                              texte, couleur: "#cc66ff" }));
     }

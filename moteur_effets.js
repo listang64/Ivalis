@@ -1637,7 +1637,7 @@ window.demarrerCiblage = async function(idCarte, options) {
 
             // L'AVEUGLEMENT : un état comme l'Étourdi — chance par cran plafonnée
             // par le Pourcentage max du grimoire (70 %), durée = Tours + ⏳. Les
-            // 3 cases de noir se tirent au moment où il prend (moteur_pur.js,
+            // 4 cases de noir se tirent au moment où il prend (moteur_pur.js,
             // tirerDesCarte), pas ici.
             let aveugleChance = 0, aveugleDuree = 0, aveuglePlafond = 0, estAveuglement = false;
             const lireAveuglement = (eff, n, crans) => {
@@ -1657,7 +1657,7 @@ window.demarrerCiblage = async function(idCarte, options) {
                 alterationsExtraites.push({
                     nom: "Aveuglé",
                     icone: ICONE_AVEUGLE,
-                    desc: "3 cases autour de lui sont dans le noir : il ne peut y cibler personne (les zones y frappent quand même).",
+                    desc: "4 cases autour de lui sont dans le noir : il ne peut y cibler personne (les zones y frappent quand même).",
                     chance: Math.min(100, aveugleChance),
                     duree: aveugleDuree || 2,
                     isRanged: isRanged,
@@ -1742,7 +1742,7 @@ window.demarrerCiblage = async function(idCarte, options) {
                 alterationsExtraites.push({
                     nom: "Confusion",
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788081823/IMG_2078_mi79mz.png",
-                    desc: "À chaque technique, 4 jets indépendants de 30% : s'infliger sa propre compétence, viser au hasard autour de soi, s'enfuir (comme la Peur), et ne plus être confus.",
+                    desc: "À chaque technique, un jet sur 100 : 40% de s'attaquer lui-même ou un allié autour de lui, 20% de s'enfuir (comme la Peur), 20% de ne plus être confus, 20% rien.",
                     chance: confusionChance,
                     duree: confusionDuree,
                     isRanged: isRanged,
@@ -1883,6 +1883,39 @@ window.demarrerCiblage = async function(idCarte, options) {
                     desc: "Coût en fatigue du mouvement doublé, et 20% de dégâts physiques subis en plus.",
                     chance: glaceChance,
                     duree: glaceDuree,
+                    isRanged: isRanged,
+                    rangeMax: rangeMax,
+                    cibles: []
+                });
+            }
+
+            // LE SAIGNEMENT (tableau de Nico) : même formule que le Glacé —
+            // chance par cran plafonnée par le Pourcentage max du grimoire (75 %),
+            // durée de base 2 tours + ⏳. 8 % des PV max en dégâts physiques à
+            // chaque fin de manche (cerveau_combat.js), et +2 de fatigue par case
+            // de déplacement (coutDuPas, mouvement_pur.js).
+            let saignChance = 0, saignDuree = 0, estSaignement = false;
+            if (nomLower.includes("saign")) {
+                estSaignement = true;
+                saignChance += parseFrFloat(effBase.Pourcent_Base) * (act.count || 1);
+                saignDuree = Math.max(saignDuree, parseFrFloat(effBase.Tours) + parseFrFloat(act.baseDuree));
+            }
+            listeMods.forEach(m => {
+                const modEff = window.EFFETS_BDD_CACHE[m.id];
+                if (!modEff || !(modEff.Nom || "").toLowerCase().includes("saign")) return;
+                estSaignement = true;
+                saignChance += (parseFrFloat(modEff.Pourcent_Base) || parseFrFloat(modEff.Pourcent_Max)) * m.count;
+                saignDuree = Math.max(saignDuree, parseFrFloat(modEff.Tours) + parseFrFloat(modsDuree[m.id]));
+            });
+            if (estSaignement) {
+                saignChance = Math.min(saignChance, plafondDuGrimoire("saign", 75));
+                if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
+                alterationsExtraites.push({
+                    nom: "Saignement",
+                    icone: ICONE_SAIGNEMENT,
+                    desc: "8% des PV max en dégâts physiques à chaque fin de manche (armure appliquée), et chaque case de déplacement coûte 2 de fatigue de plus.",
+                    chance: saignChance,
+                    duree: saignDuree > 0 ? saignDuree : 2,
                     isRanged: isRanged,
                     rangeMax: rangeMax,
                     cibles: []
@@ -3280,12 +3313,21 @@ window.texteDistanceReelle = function(texteOrigine, p) {
         : avecNombre;
 };
 
+// L'icône du Saignement : une goutte de sang, dessinée ici (aucune image
+// hébergée pour lui).
+const ICONE_SAIGNEMENT = "data:image/svg+xml," + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#2a0a0a" stroke="#c9a227" stroke-width="3"/>'
+    + '<path d="M32 12 C32 12 18 30 18 39 a14 14 0 0 0 28 0 C46 30 32 12 32 12 Z" fill="#c4141c"/>'
+    + '<path d="M26 38 a6 6 0 0 0 5 6" stroke="#ff8a8a" stroke-width="3" fill="none" stroke-linecap="round"/></svg>');
+window.ICONE_SAIGNEMENT = ICONE_SAIGNEMENT;
+
 const GABARITS_ETATS_EQUIPEMENT = {
     "Étourdi":        { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1787381297/ETOURDIT_2_j7w36h.png", desc: "-30% Esquive/Parade, 20% de chance d'échec d'attaque." },
     "Immobilisation": { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788081285/IMG_2076_vze0an.png", desc: "Ne peut plus se déplacer volontairement, gagne 20 fatigue par tour immobilisé." },
     "Empoisonnement": { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788096401/IMG_2083_pebnup.png", desc: "10% de l'énergie max et 8% des PV max en dégâts bruts (aucune défense), en fin de manche. Pas de cumul.", estPoison: true, estDot: true },
     "Brûlé":          { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181101/IMG_2087_q6chof.png", desc: "-50% de soins reçus, et 8% des PV max en dégâts magiques à chaque fin de manche (défense magique appliquée)." },
     "Glacé":          { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181888/IMG_2089_isgcrs.png", desc: "Coût en fatigue du mouvement doublé, et 20% de dégâts physiques subis en plus." },
+    "Saignement":     { duree: 2, icone: ICONE_SAIGNEMENT, desc: "8% des PV max en dégâts physiques à chaque fin de manche (armure appliquée), et chaque case de déplacement coûte 2 de fatigue de plus." },
     "Poussée":        { duree: 0, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", desc: "", estPoussee: true },
     "Traction":       { duree: 0, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", desc: "", estTraction: true },
     "Peur":           { duree: 0, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", desc: "", estPeur: true },

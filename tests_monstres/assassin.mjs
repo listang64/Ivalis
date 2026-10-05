@@ -160,7 +160,7 @@ console.log("\n2. INSTINCT DU TUEUR : +15 DE CRITIQUE, 2 MANCHES, SUR TOUT KO");
 }
 
 // =========================================================================
-console.log("\n3. MAÎTRE DES POISONS (NIVEAU 10) : 18 % D'ÉNERGIE ET 10 % DES PV, À CHAQUE MANCHE, 2 MANCHES");
+console.log("\n3. MAÎTRE DES POISONS (NIVEAU 10) : 18 % D'ÉNERGIE ET 9 % DES PV, À CHAQUE MANCHE, 2 MANCHES");
 // =========================================================================
 {
     const e = lancer(monde(10), "S", "M1", 0, { alterations: [POISON] }).etat;
@@ -170,15 +170,15 @@ console.log("\n3. MAÎTRE DES POISONS (NIVEAU 10) : 18 % D'ÉNERGIE ET 10 % DES 
     e.file = [];
     ticsDeFinDeManche(e);
     const m1 = e.combattants.M1;
-    verifier("1re fin de manche : -18 d'énergie, -10 PV", m1.fatigue === 82 && m1.pv === 90, `${m1.fatigue} / ${m1.pv}`);
+    verifier("1re fin de manche : -18 d'énergie, -9 PV", m1.fatigue === 82 && m1.pv === 91, `${m1.fatigue} / ${m1.pv}`);
     vieillirLesEtats(e);
     ticsDeFinDeManche(e);
-    verifier("2e fin de manche : encore -18 et -10", m1.fatigue === 64 && m1.pv === 80, `${m1.fatigue} / ${m1.pv}`);
+    verifier("2e fin de manche : encore -18 et -9", m1.fatigue === 64 && m1.pv === 82, `${m1.fatigue} / ${m1.pv}`);
     vieillirLesEtats(e);
     ticsDeFinDeManche(e);
-    verifier("puis il s'arrête", m1.fatigue === 64 && m1.pv === 80 && !m1.etats.some(x => x.nom === "Empoisonnement"),
+    verifier("puis il s'arrête", m1.fatigue === 64 && m1.pv === 82 && !m1.etats.some(x => x.nom === "Empoisonnement"),
              `${m1.fatigue} / ${m1.pv}`);
-    verifier("les chiffres de la règle", POISON_MAITRE.energiePct === 18 && POISON_MAITRE.pvMaxPct === 10 && POISON_MAITRE.manches === 2);
+    verifier("les chiffres de la règle", POISON_MAITRE.energiePct === 18 && POISON_MAITRE.pvMaxPct === 9 && POISON_MAITRE.manches === 2);
 
     const mag = lancer(monde(10), "S", "M1", 0, { alterations: [POISON] }).etat;
     mag.combattants.M1.def.magique = 50;
@@ -186,7 +186,7 @@ console.log("\n3. MAÎTRE DES POISONS (NIVEAU 10) : 18 % D'ÉNERGIE ET 10 % DES 
     ticsDeFinDeManche(mag);
     // Règle de Nico : le poison frappe désormais en dégâts BRUTS — la
     // défense magique ne le réduit plus.
-    verifier("la part des PV est brute : défense magique 50 %, toujours -10", mag.combattants.M1.pv === 90, String(mag.combattants.M1.pv));
+    verifier("la part des PV est brute : défense magique 50 %, toujours -9", mag.combattants.M1.pv === 91, String(mag.combattants.M1.pv));
 
     const n9 = lancer(monde(9), "S", "M1", 0, { alterations: [POISON] }).etat;
     n9.file = [];

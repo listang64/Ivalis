@@ -15,7 +15,9 @@ let echecs = 0;
 const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(64)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
 
 const src = fs.readFileSync('/home/user/Ivalis/moteur_effets.js', 'utf-8');
-const debut = src.indexOf('const GABARITS_ETATS_EQUIPEMENT = {');
+// (L'icône du Saignement est définie juste avant les gabarits, qui s'en servent.)
+const debut = src.indexOf('const ICONE_SAIGNEMENT = ') >= 0 ? src.indexOf('const ICONE_SAIGNEMENT = ')
+                                                             : src.indexOf('const GABARITS_ETATS_EQUIPEMENT = {');
 const marque = 'window.appliquerEquipementALaCarte = function';
 const debutFn = src.indexOf(marque);
 const fin = src.indexOf('\n};\n', debutFn) + 4;

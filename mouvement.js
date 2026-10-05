@@ -236,6 +236,9 @@ window.ajouterEtapeMouvement = function(q, r) {
     const estGlace = persoActuel && persoActuel.Etats_Alteres
         && persoActuel.Etats_Alteres.some(e => e.nom === "Glacé");
 
+    const estSaignant = persoActuel && persoActuel.Etats_Alteres
+        && persoActuel.Etats_Alteres.some(e => e.nom === "Saignement");
+
     // Cases gratuites accumulées en frappant (état "Repli", cf. moteur_effets.js).
     const casesOffertes = typeof window.bonusEquip === "function"
         ? window.bonusEquip(persoActuel, "hexApresAttaque") : 0;
@@ -269,6 +272,9 @@ window.ajouterEtapeMouvement = function(q, r) {
         // garde son avantage même sur un sol qui coûte double.
         const diviseur = window.atoutRace(persoActuel).diviseurDeplacement || 1;
         if (diviseur > 1) baseCost = Math.max(1, Math.round(baseCost / diviseur));
+
+        // Le Saignement : 2 de fatigue de plus par case (coutDuPas, mouvement_pur.js).
+        if (estSaignant) baseCost += 2;
 
         // L'équipement alourdit ou allège chaque case : le bouclier lourd coûte
         // une énergie de plus, le couteau une de moins. Une case ne descend

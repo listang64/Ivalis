@@ -176,6 +176,7 @@ node forge_design.mjs         # la Forge aux couleurs du jeu (aucun bleu « appl
 node aide_forge_lia.mjs         # 🔨 LIA, l'aide à la création : popup récit + jauges, Gemini simulé, plan fautif corrigé par les règles de la Forge, cap, Recit_RP
 node illustration_competence.mjs  # 🎨 illustration des compétences : IA de prompt + IA d'image (portrait + armes en binaire), file sur IA saturée, image en haut de la carte, outil de réglage provisoire
 node jauge_energie_carte.mjs     # ⚡ énergie sous la carte en combat (perte rouge clignotante, reste) ; encart du repos long (gain vert)
+node saignement.mjs             # 🩸 Saignement (8 % physique par manche, +2 par case), et le bouton qui met le grimoire à jour des nouvelles règles
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4571,3 +4572,27 @@ illustration_competence.mjs, section 8.
 Descriptifs de classe et textes des états à jour. Bancs : vampire (1, 3, 4 bis,
 5, 6, 8), necromancien, chasseur_de_mages, tableaux_nico, assassin,
 cerveau_combat, moteur_pur, bonus_race_classe, aide_forge_lia.
+
+## Saignement, Confusion, Aveuglement, Repli, poison du maître (version 190)
+
+- MAÎTRE DES POISONS (Assassin niv. 10) : 9 % des PV max (au lieu de 10).
+- CONFUSION : un seul jet sur 100 à chaque technique du confus, et une seule
+  issue — 1–40 la carte part de travers (moitié sur lui, moitié sur un ALLIÉ au
+  hasard à portée ; personne → sur lui ; une carte sans attaque revient sur
+  lui), 41–60 il s'enfuit après la carte (comme la Peur), 61–80 il n'est plus
+  confus en fin de boucle, 81–100 rien. (Avant : quatre jets de 30 %.)
+- SAIGNEMENT (nouvel effet, copie locale EFF_SAIGNEMENT, réservé à personne) :
+  sous-effet Physique, 1 pt, Force, 15 % par cran (max 75 %), 2 tours. 8 % des
+  PV max en dégâts physiques à chaque fin de manche (armure appliquée,
+  bouclier d'abord), et +2 de fatigue par case de déplacement, après les
+  doublements et la division du Vargen (coutDuPas, et l'aperçu de mouvement.js).
+- AVEUGLEMENT : 4 cases de noir (au lieu de 3).
+- REPLI : évite TOUTES les attaques d'opportunité, sans jet (plus de 60 %).
+- LE GRIMOIRE (Combat_Effets) : le jeu n'y écrit jamais seul. Un bouton
+  PROVISOIRE « 🔄 Mettre à jour les règles » dans l'écran du Grimoire du moteur
+  propose au MJ d'y recopier les textes changés (Empoisonnement, Brûlé,
+  Confusion, Aveuglement, Repli, Vampirisme retiré) et d'y ajouter le
+  Saignement s'il n'y est pas ; la liste s'affiche, rien ne part sans
+  confirmation, seuls ces champs sont touchés (merge).
+saignement.mjs ; confusion_cerveau, aveuglement, repli, assassin,
+chasseur_de_mages et migration_effets mis à jour.

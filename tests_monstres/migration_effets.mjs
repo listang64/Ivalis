@@ -60,25 +60,29 @@ console.log("1. LES BOUTONS ET LEURS FONCTIONS ONT DISPARU");
 }
 
 // =========================================================================
-console.log("\n2. LA COPIE LOCALE : TÉNÈBRES, LUMIÈRE ET VAMPIRISME");
+console.log("\n2. LA COPIE LOCALE : TÉNÈBRES, LUMIÈRE, SAIGNEMENT ET VAMPIRISME");
 // =========================================================================
 {
     const w = charger();
     const table = w.MIGRATION_EFFETS;
-    verifier("trois effets : EFF_TENEBRES, EFF_LUMIERE, EFF_VAMPIRISME, en copie locale",
-             table.length === 3 && table[0].id === "EFF_TENEBRES" && table[1].id === "EFF_LUMIERE"
-             && table[2].id === "EFF_VAMPIRISME"
+    const par = (id) => (table.find(r => r.id === id) || {}).champs || {};
+    verifier("quatre effets : Ténèbres, Lumière, Saignement, Vampirisme, en copie locale",
+             table.length === 4 && ["EFF_TENEBRES", "EFF_LUMIERE", "EFF_SAIGNEMENT", "EFF_VAMPIRISME"].every(id => table.some(r => r.id === id))
              && table.every(r => r.secoursLocal), table.map(r => r.id).join(", "));
-    const ten = table[0].champs;
+    const ten = par("EFF_TENEBRES");
     verifier("Ténèbres : 2 pts, Intelligence, 3, racine, Nécromancien niv. 5",
              ten.Nom === "Ténèbres" && ten.Cout_PT === "2" && ten.Modificateur === "INTELLIGENCE" && ten.Valeur === 3
              && ten.Type_Mecanique === "Action/Global" && ten.Classe === "Nécromancien" && ten.Niveau_Requis === 5);
-    const lum = table[1].champs;
+    const lum = par("EFF_LUMIERE");
     verifier("Lumière : 1 pt, Intelligence, 15 % (max 60), Magique/Physique, Chasseur de mages niv. 5",
              lum.Nom === "Lumière" && lum.Cout_PT === "1" && lum.Modificateur === "INTELLIGENCE" && lum.Pourcent_Base === 15
              && lum.Pourcent_Max === 60 && lum.Type_Mecanique === "Magique" && lum.Type_Mecanique_2 === "Physique"
              && lum.Classe === "Chasseur de mages" && lum.Niveau_Requis === 5, JSON.stringify(lum).slice(0, 140));
-    const vam = table[2].champs;
+    const sai = par("EFF_SAIGNEMENT");
+    verifier("Saignement : 1 pt, Force, 15 % (max 75), Physique, 2 tours, réservé à personne",
+             sai.Nom === "Saignement" && sai.Cout_PT === "1" && sai.Modificateur === "FORCE" && sai.Pourcent_Base === 15
+             && sai.Pourcent_Max === 75 && sai.Type_Mecanique === "Physique" && sai.Tours === 2 && !sai.Classe, JSON.stringify(sai).slice(0, 140));
+    const vam = par("EFF_VAMPIRISME");
     verifier("Vampirisme : 1 pt, Intelligence, 1, racine, sans plafond, Vampire niv. 5",
              vam.Nom === "Vampirisme" && vam.Cout_PT === "1" && vam.Modificateur === "INTELLIGENCE" && vam.Valeur === 1
              && vam.Pourcent_Max === 0 && vam.Type_Mecanique === "Action/Global"
@@ -92,9 +96,9 @@ console.log("\n3. ELLE COMPLÈTE UNE BASE QUI NE LES A PAS, SANS TOUCHER AU REST
     const w = charger();
     const cache = JSON.parse(JSON.stringify(RETOUCHEE));
     w.completerEffetsDeSecours(cache);
-    verifier("Ténèbres, Lumière et Vampirisme sont là", cache.EFF_TENEBRES.Nom === "Ténèbres" && cache.EFF_LUMIERE.Nom === "Lumière"
-             && cache.EFF_VAMPIRISME.Nom === "Vampirisme");
-    const reste = { ...cache }; delete reste.EFF_TENEBRES; delete reste.EFF_LUMIERE; delete reste.EFF_VAMPIRISME;
+    verifier("Ténèbres, Lumière, Saignement et Vampirisme sont là", cache.EFF_TENEBRES.Nom === "Ténèbres" && cache.EFF_LUMIERE.Nom === "Lumière"
+             && cache.EFF_SAIGNEMENT.Nom === "Saignement" && cache.EFF_VAMPIRISME.Nom === "Vampirisme");
+    const reste = { ...cache }; delete reste.EFF_TENEBRES; delete reste.EFF_LUMIERE; delete reste.EFF_SAIGNEMENT; delete reste.EFF_VAMPIRISME;
     verifier("le reste du grimoire est intact, au caractère près", JSON.stringify(reste) === JSON.stringify(RETOUCHEE));
     verifier("la note de la Brûlure retouchée à la main est intacte",
              cache.EFF_BRULE.Notes === "-50% de soins reçus, et 8% de dégats physique des pv max de la cible");

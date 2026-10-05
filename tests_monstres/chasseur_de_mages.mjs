@@ -112,8 +112,8 @@ console.log("\n3. NIVEAU 10 : LE SORT DE LUMIÈRE AVEUGLE LA CIBLE ET LES ENNEMI
     const e = monde(10);
     const r = jouer(e, sort(15), desA(1));
     const c = r.etat.combattants;
-    verifier("la cible M1 est aveuglée, 2 manches, 3 cases autour d'elle",
-             !!aveugle(c.M1) && aveugle(c.M1).duree === DUREE_AVEUGLE_LUMIERE && aveugle(c.M1).cases.length === 3
+    verifier("la cible M1 est aveuglée, 2 manches, 4 cases autour d'elle",
+             !!aveugle(c.M1) && aveugle(c.M1).duree === DUREE_AVEUGLE_LUMIERE && aveugle(c.M1).cases.length === 4
              && aveugle(c.M1).cases.every(h => Math.abs(h.q - 2) <= 1 && Math.abs(h.r) <= 1), JSON.stringify(aveugle(c.M1)));
     verifier("les ennemis qui la touchent (M2, M3) aussi", !!aveugle(c.M2) && !!aveugle(c.M3));
     verifier("pas l'allié A qui la touche, ni M4 loin, ni le Chasseur", !aveugle(c.A) && !aveugle(c.M4) && !aveugle(c.C));

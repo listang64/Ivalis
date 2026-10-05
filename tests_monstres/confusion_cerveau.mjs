@@ -1,21 +1,18 @@
-// LA CONFUSION : QUATRE EFFETS INDÉPENDANTS, CHACUN À 30 %.
+// LA CONFUSION : UN JET SUR 100, ET IL SE PASSE FORCÉMENT QUELQUE CHOSE.
 //
-// Règle de Nico : quand un confus lance une technique, quatre jets
-// indépendants, dans cet ordre :
-//    1. 30 % de s'attaquer lui-même ;
-//    2. 30 % d'attaquer au hasard autour de lui ;
-//    3. 30 % de s'enfuir (comme la Peur) ;
-//    4. 30 % de n'être plus confus (en fin de boucle).
-// Indépendants : 1 et 2 peuvent sortir ensemble (la carte touche les deux),
-// la fuite peut suivre un coup parti de travers. Avant, UN seul dé choisissait
-// une seule bande (20 % soi, 20 % hasard, 10 % dissipation).
+// Règle de Nico (la nouvelle) : quand un confus lance une technique,
+//    • 40 % : il s'attaque lui-même, ou attaque un ALLIÉ au hasard autour de lui ;
+//    • 20 % : il s'enfuit (comme la Peur) ;
+//    • 20 % : il n'est plus confus (en fin de boucle) ;
+//    • 20 % : il ne se passe rien.
+// Un seul de ces effets, jamais deux. (Avant : quatre jets indépendants de 30 %.)
 //
 // Et les règles de la maison, toujours tenues : les dés sont ceux du cerveau
 // (le même résultat pour tous les postes) et ne sont tirés QUE si le lanceur
 // est confus.
 import {
     appliquerConfusion, resoudreCarte, tirerDesCarte, dissiperConfusion,
-    CHANCE_CONFUSION_SOI, CHANCE_CONFUSION_HASARD, CHANCE_CONFUSION_FUITE, CHANCE_CONFUSION_DISSIPEE
+    CONFUSION_TRAVERS, CONFUSION_FUITE, CONFUSION_DISSIPEE
 } from '../moteur_pur.js';
 import { construireEtatCombat, creerDes } from '../combat_etat.js';
 import { appliquerIntention, jouerCreature } from '../cerveau_combat.js';
@@ -50,57 +47,60 @@ const carte = (extra = {}) => ({
     attaques: [{ valeurBrute: 10, cibles: ["ORC"], rangeMax: 3, typeRes: "Physique" }],
     alterations: [], ...extra
 });
-// Des truqués : les quatre premiers jets sont imposés, le reste est normal.
+// Des truqués : les premiers jets sont imposés, le reste est normal.
 const desTruques = (jets) => {
     const vrai = creerDes(123);
     const file = [...jets];
     return { ...vrai, d100: () => file.length ? file.shift() : vrai.d100(), parmi: vrai.parmi, fraction: vrai.fraction };
 };
-const OUI = 5, NON = 95;
+// Le premier dé choisit l'issue ; le second (de travers seulement) : ≤ 50 lui, > 50 un allié.
+const TRAVERS = 30, FUITE = 50, DISSIPEE = 70, RIEN = 90, LUI = 20, ALLIE = 80;
 
-console.log("\n1. LES QUATRE JETS, UN PAR EFFET");
+console.log("\n1. UN JET, QUATRE ISSUES");
 {
-    verifier("chacun vaut 30 %", [CHANCE_CONFUSION_SOI, CHANCE_CONFUSION_HASARD, CHANCE_CONFUSION_FUITE,
-                                  CHANCE_CONFUSION_DISSIPEE].every(c => c === 30));
-    const rien = appliquerConfusion(monde(), carte(), null, desTruques([NON, NON, NON, NON]));
-    verifier("aucun jet : la carte part comme voulue", JSON.stringify(rien.attaques[0].cibles) === '["ORC"]'
+    verifier("40 / 20 / 20 (et 20 de rien)", CONFUSION_TRAVERS === 40 && CONFUSION_FUITE === 20 && CONFUSION_DISSIPEE === 20);
+    const soi = appliquerConfusion(monde(), carte(), null, desTruques([TRAVERS, LUI]));
+    verifier("de travers (1–40), puis ≤ 50 : il se vise lui-même",
+             JSON.stringify(soi.attaques[0].cibles) === '["MOI"]' && soi.confusion.soi && soi.confusion.issue === "travers");
+    const allie = appliquerConfusion(monde(), carte(), null, desTruques([TRAVERS, ALLIE]));
+    verifier("de travers, puis > 50 : il attaque un ALLIÉ autour de lui (AMI)",
+             JSON.stringify(allie.attaques[0].cibles) === '["AMI"]' && allie.confusion.hasard && !allie.confusion.soi,
+             JSON.stringify(allie.attaques[0].cibles));
+    const fuite = appliquerConfusion(monde(), carte(), null, desTruques([FUITE]));
+    verifier("41–60 : la carte part comme voulue, puis il s'enfuit",
+             JSON.stringify(fuite.attaques[0].cibles) === '["ORC"]' && fuite.confusion.fuite && !fuite.confusion.dissipee);
+    const fin = appliquerConfusion(monde(), carte(), null, desTruques([DISSIPEE]));
+    verifier("61–80 : la carte part comme voulue, et il n'est plus confus en fin de boucle",
+             JSON.stringify(fin.attaques[0].cibles) === '["ORC"]' && fin.confusion.dissipee && !fin.confusion.fuite);
+    const rien = appliquerConfusion(monde(), carte(), null, desTruques([RIEN]));
+    verifier("81–100 : il ne se passe rien, il reste confus",
+             JSON.stringify(rien.attaques[0].cibles) === '["ORC"]' && rien.confusion.issue === "rien"
              && !rien.confusion.soi && !rien.confusion.hasard && !rien.confusion.fuite && !rien.confusion.dissipee);
-    const soi = appliquerConfusion(monde(), carte(), null, desTruques([OUI, NON, NON, NON]));
-    verifier("1er jet : il se vise lui-même", JSON.stringify(soi.attaques[0].cibles) === '["MOI"]' && soi.confusion.soi);
-    const hasard = appliquerConfusion(monde(), carte(), null, desTruques([NON, OUI, NON, NON]));
-    const c = hasard.attaques[0].cibles;
-    verifier("2e jet : quelqu'un d'autre, au hasard, à portée", c.length === 1 && c[0] !== "MOI"
-             && ["AMI", "GOB", "ORC"].includes(c[0]) && hasard.confusion.hasard, JSON.stringify(c));
-    const lesDeux = appliquerConfusion(monde(), carte(), null, desTruques([OUI, OUI, NON, NON]));
-    const c2 = lesDeux.attaques[0].cibles;
-    verifier("1er ET 2e : la carte touche le confus ET sa cible de hasard",
-             c2.length === 2 && c2.includes("MOI") && c2.some(x => x !== "MOI"), JSON.stringify(c2));
-    const fuite = appliquerConfusion(monde(), carte(), null, desTruques([NON, NON, OUI, OUI]));
-    verifier("3e et 4e jets : la carte part normalement, fuite et dissipation notées",
-             JSON.stringify(fuite.attaques[0].cibles) === '["ORC"]' && fuite.confusion.fuite && fuite.confusion.dissipee);
 }
 
-console.log("\n2. INDÉPENDANTS, SUR 6000 CARTES");
+console.log("\n2. SUR 6000 CARTES : LES BONNES PROPORTIONS, JAMAIS DEUX EFFETS");
 {
-    let n = 0, s = 0, h = 0, f = 0, d = 0, sh = 0, fd = 0;
+    let n = 0, s = 0, h = 0, f = 0, d = 0, r = 0, deux = 0, ennemi = 0;
     for (let g = 1; g <= 6000; g++) {
         const a = appliquerConfusion(monde(), carte(), null, creerDes(g));
         n++;
-        if (a.confusion.soi) s++;
-        if (a.confusion.hasard) h++;
-        if (a.confusion.fuite) f++;
-        if (a.confusion.dissipee) d++;
-        if (a.confusion.soi && a.confusion.hasard) sh++;
-        if (a.confusion.fuite && a.confusion.dissipee) fd++;
+        const c = a.confusion;
+        if (c.soi) s++;
+        if (c.hasard) { h++; if (["GOB", "ORC"].includes(c.idCible)) ennemi++; }
+        if (c.fuite) f++;
+        if (c.dissipee) d++;
+        if (c.issue === "rien") r++;
+        if ([c.soi || c.hasard, c.fuite, c.dissipee].filter(Boolean).length > 1) deux++;
     }
     const pc = (x) => x / n * 100;
     const pres = (x, cible, marge = 2.5) => Math.abs(pc(x) - cible) < marge;
-    verifier("≈ 30 % se visent eux-mêmes", pres(s, 30), pc(s).toFixed(1) + " %");
-    verifier("≈ 30 % visent au hasard", pres(h, 30), pc(h).toFixed(1) + " %");
-    verifier("≈ 30 % s'enfuient", pres(f, 30), pc(f).toFixed(1) + " %");
-    verifier("≈ 30 % s'en remettent", pres(d, 30), pc(d).toFixed(1) + " %");
-    verifier("les deux premiers ensemble ≈ 9 % (indépendants : 30 % × 30 %)", pres(sh, 9, 2), pc(sh).toFixed(1) + " %");
-    verifier("fuite ET guérison ≈ 9 %", pres(fd, 9, 2), pc(fd).toFixed(1) + " %");
+    verifier("≈ 40 % de travers (lui ou un allié)", pres(s + h, 40), pc(s + h).toFixed(1) + " %");
+    verifier("… moitié sur lui (≈ 20 %), moitié sur un allié (≈ 20 %)", pres(s, 20) && pres(h, 20), `${pc(s).toFixed(1)} / ${pc(h).toFixed(1)} %`);
+    verifier("≈ 20 % s'enfuient", pres(f, 20), pc(f).toFixed(1) + " %");
+    verifier("≈ 20 % s'en remettent", pres(d, 20), pc(d).toFixed(1) + " %");
+    verifier("≈ 20 % : rien", pres(r, 20), pc(r).toFixed(1) + " %");
+    verifier("jamais deux effets à la fois", deux === 0, String(deux));
+    verifier("jamais un ennemi visé « au hasard » : un allié seulement", ennemi === 0, String(ennemi));
 }
 
 console.log("\n3. UN COMBATTANT SAIN NE TIRE AUCUN DÉ");
@@ -114,59 +114,61 @@ console.log("\n3. UN COMBATTANT SAIN NE TIRE AUCUN DÉ");
 console.log("\n4. LES CAS PARTICULIERS");
 {
     const soin = carte({ attaques: [], alterations: [{ nom: "Étourdi", chance: 100, duree: 2, cibles: ["ORC"] }] });
-    const s = appliquerConfusion(monde(), soin, null, desTruques([NON, OUI, NON, NON]));
-    verifier("une carte sans attaque ne part pas au hasard : elle revient sur lui",
+    const s = appliquerConfusion(monde(), soin, null, desTruques([TRAVERS, ALLIE]));
+    verifier("une carte sans attaque ne part pas sur un allié : elle revient sur lui",
              JSON.stringify(s.alterations[0].cibles) === '["MOI"]');
-    const seul = monde(9, CONFUS, { MOI: { q: 0, r: 0 }, AMI: { q: 9, r: 0 }, GOB: { q: 9, r: -3 }, ORC: { q: -9, r: 0 } });
-    const perdu = appliquerConfusion(seul, carte({ attaques: [{ valeurBrute: 10, cibles: ["ORC"], rangeMax: 1 }] }),
-                                     null, desTruques([NON, OUI, NON, NON]));
-    verifier("personne à portée : la carte revient sur lui", JSON.stringify(perdu.attaques[0].cibles) === '["MOI"]');
+    const seul = monde(9, CONFUS, { MOI: { q: 0, r: 0 }, AMI: { q: 9, r: 0 }, GOB: { q: 1, r: 0 }, ORC: { q: -9, r: 0 } });
+    const perdu = appliquerConfusion(seul, carte({ attaques: [{ valeurBrute: 10, cibles: ["GOB"], rangeMax: 1 }] }),
+                                     null, desTruques([TRAVERS, ALLIE]));
+    verifier("aucun allié à portée (seulement un ennemi) : la carte revient sur lui", JSON.stringify(perdu.attaques[0].cibles) === '["MOI"]',
+             JSON.stringify(perdu.attaques[0].cibles));
     const pousse = carte({ alterations: [{ nom: "Poussée", estPoussee: true, chance: 100, cibles: ["ORC"] }] });
-    const p = appliquerConfusion(monde(), pousse, null, desTruques([OUI, NON, NON, NON]));
+    const p = appliquerConfusion(monde(), pousse, null, desTruques([TRAVERS, LUI]));
     verifier("une poussée ne se retourne jamais sur soi", p.alterations[0].cibles.length === 0);
-    const r = resoudreCarte(monde(), { ...appliquerConfusion(monde(), carte(), null, desTruques([OUI, OUI, NON, NON])),
-                                       jets: { parCible: { MOI: { esquive: false, etats: {} }, AMI: { esquive: false, etats: {} },
-                                                           GOB: { esquive: false, etats: {} }, ORC: { esquive: false, etats: {} } } } });
-    const textes = r.etapes.filter(e => e.type === "message").map(e => e.texte);
-    verifier("le joueur est prévenu des deux", textes.includes("Confus : s'inflige sa propre compétence !")
-             && textes.includes("Confus : cible au hasard !"), textes.join(" | "));
-    verifier("et les deux sont frappés", r.etat.combattants.MOI.pv === 50
-             && Object.values(r.etat.combattants).filter(c => c.pv === 50).length === 2);
+    const jets = { parCible: { MOI: { esquive: false, etats: {} }, AMI: { esquive: false, etats: {} },
+                               GOB: { esquive: false, etats: {} }, ORC: { esquive: false, etats: {} } } };
+    const rAllie = resoudreCarte(monde(), { ...appliquerConfusion(monde(), carte(), null, desTruques([TRAVERS, ALLIE])), jets });
+    const tA = rAllie.etapes.filter(e => e.type === "message").map(e => e.texte);
+    verifier("de travers sur un allié : le joueur est prévenu, l'allié est frappé, pas l'ennemi",
+             tA.includes("Confus : attaque un allié !") && rAllie.etat.combattants.AMI.pv === 50 && rAllie.etat.combattants.ORC.pv === 60,
+             tA.join(" | "));
+    const rSoi = resoudreCarte(monde(), { ...appliquerConfusion(monde(), carte(), null, desTruques([TRAVERS, LUI])), jets });
+    verifier("de travers sur lui : prévenu, et lui seul frappé",
+             rSoi.etapes.some(e => e.texte === "Confus : s'inflige sa propre compétence !") && rSoi.etat.combattants.MOI.pv === 50
+             && rSoi.etat.combattants.ORC.pv === 60);
 }
 
-console.log("\n5. DANS LE CERVEAU : LA FUITE, PUIS LA FIN DE LA BOUCLE (joueur)");
+console.log("\n5. DANS LE CERVEAU : LA FUITE APRÈS LA CARTE ; LA FIN DE LA BOUCLE (joueur)");
 {
-    // On cherche, graine par graine, un tour où les jets 3 et 4 sortent tous
-    // les deux : c'est le cerveau qui tire, on ne triche pas ici.
-    let trouve = null;
-    for (let g = 1; g <= 400 && !trouve; g++) {
-        const pas = appliquerIntention(monde(g), { id: "I1", type: "carte", acteur: "MOI", poste: "P_01", idCarte: "C1",
-            attaques: [{ valeurBrute: 10, cibles: ["ORC"], rangeMax: 3, typeRes: "Physique" }], alterations: [], coutFatigue: 5 }, null);
+    // Les dés sont ceux du cerveau : on cherche, graine par graine, les issues.
+    const jouer = (g) => appliquerIntention(monde(g), { id: "I1", type: "carte", acteur: "MOI", poste: "P_01", idCarte: "C1",
+        attaques: [{ valeurBrute: 10, cibles: ["ORC"], rangeMax: 3, typeRes: "Physique" }], alterations: [], coutFatigue: 5 }, null);
+    let fuite = null, fin = null, reste = null, lesDeux = 0;
+    for (let g = 1; g <= 400; g++) {
+        const pas = jouer(g);
         const t = pas.entree.etapes.map(e => e.texte || e.type);
-        if (t.includes("Confus : s'enfuit !") && t.includes("Confusion dissipée !")) trouve = { g, pas, t };
+        const fuit = t.includes("Confus : s'enfuit !"), guerit = t.includes("Confusion dissipée !");
+        if (fuit && guerit) lesDeux++;
+        if (fuit && !fuite) fuite = { g, pas, t };
+        if (guerit && !fin) fin = { g, pas, t };
+        if (!fuit && !guerit && !reste) reste = pas;
     }
-    verifier("le cerveau fait fuir ET guérir (une graine suffit à le montrer)", !!trouve, trouve ? `graine ${trouve.g}` : "");
-    if (trouve) {
-        const e = trouve.pas.entree.etapes;
-        const iFuite = trouve.t.indexOf("Confus : s'enfuit !"), iFin = trouve.t.indexOf("Confusion dissipée !");
-        const iCarte = e.findIndex(x => x.type === "carte");
+    verifier("jamais la fuite ET la guérison dans le même tour", lesDeux === 0, String(lesDeux));
+    verifier("le cerveau fait fuir (une graine suffit à le montrer)", !!fuite, fuite ? `graine ${fuite.g}` : "");
+    if (fuite) {
+        const e = fuite.pas.entree.etapes;
+        const iFuite = fuite.t.indexOf("Confus : s'enfuit !"), iCarte = e.findIndex(x => x.type === "carte");
         const pasFuite = e.slice(iFuite).filter(x => x.type === "pas" && x.acteur === "MOI");
-        verifier("dans l'ordre : la carte, la fuite, la dissipation", iCarte < iFuite && iFuite < iFin, trouve.t.join(","));
-        verifier("il fuit vraiment (des pas après l'annonce)", pasFuite.length > 0, String(pasFuite.length));
-        const moi = trouve.pas.etat.combattants.MOI;
-        verifier("et il n'est plus confus à la fin", !moi.etats.some(x => x.nom === "Confusion"));
-        const avant = monde(trouve.g).combattants;
+        verifier("dans l'ordre : la carte, puis la fuite", iCarte < iFuite, fuite.t.join(","));
+        verifier("il fuit vraiment (des pas après l'annonce), et reste confus", pasFuite.length > 0
+                 && fuite.pas.etat.combattants.MOI.etats.some(x => x.nom === "Confusion"), String(pasFuite.length));
+        const moi = fuite.pas.etat.combattants.MOI, avant = monde(fuite.g).combattants;
         verifier("il s'éloigne de l'ennemi le plus proche", distance(moi, avant.GOB) >= distance(avant.MOI, avant.GOB),
                  `${distance(avant.MOI, avant.GOB)} → ${distance(moi, avant.GOB)}`);
     }
-    // Et une graine où la dissipation ne sort pas : il reste confus.
-    let reste = null;
-    for (let g = 1; g <= 200 && !reste; g++) {
-        const pas = appliquerIntention(monde(g), { id: "I1", type: "carte", acteur: "MOI", poste: "P_01", idCarte: "C1",
-            attaques: [{ valeurBrute: 10, cibles: ["ORC"], rangeMax: 3, typeRes: "Physique" }], alterations: [], coutFatigue: 5 }, null);
-        if (!pas.entree.etapes.some(x => x.texte === "Confusion dissipée !")) reste = pas;
-    }
-    verifier("sans le 4e jet, la confusion demeure", !!reste && reste.etat.combattants.MOI.etats.some(x => x.nom === "Confusion"));
+    verifier("une autre graine le guérit : plus confus à la fin du tour", !!fin
+             && !fin.pas.etat.combattants.MOI.etats.some(x => x.nom === "Confusion"), fin ? `graine ${fin.g}` : "");
+    verifier("sans ces issues, la confusion demeure", !!reste && reste.etat.combattants.MOI.etats.some(x => x.nom === "Confusion"));
 }
 
 console.log("\n6. UNE CRÉATURE CONFUSE AUSSI");

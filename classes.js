@@ -123,7 +123,7 @@ window.DESCRIPTIFS_CLASSES = {
                        "100 % d'empoisonnement, même s'il esquive · une fois par combat"] },
             { niveau: 10, titre: "Maître des poisons",
               points: ["Ses empoisonnements mordent à chaque fin de manche, 2 manches durant",
-                       "-18 % de fatigue (énergie max) et -10 % des PV max en dégâts bruts à chaque fois"] }
+                       "-18 % de fatigue (énergie max) et -9 % des PV max en dégâts bruts à chaque fois"] }
         ]
     },
     CLASSE_MEDICUS: {

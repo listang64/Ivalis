@@ -41,34 +41,34 @@ const monde = (positions = {}) => construireEtatCombat({
 });
 
 // =========================================================================
-console.log("\n1. LE NOYAU : TROIS CASES TIRÉES, UN NOIR QUI RESTE");
+console.log("\n1. LE NOYAU : QUATRE CASES TIRÉES (règle de Nico), UN NOIR QUI RESTE");
 // =========================================================================
 {
-  const dirs = tirerDirectionsAveugle(desFixe([1, 1, 1]));
+  const dirs = tirerDirectionsAveugle(desFixe([1, 1, 1, 1]));
   const cles = new Set(dirs.map(d => `${d.q},${d.r}`));
-  verifier("3 directions, toutes différentes, parmi les 6 voisines",
-           dirs.length === 3 && cles.size === 3 && dirs.every(d => DIRECTIONS_HEX.some(h => h.q === d.q && h.r === d.r)),
+  verifier("4 directions, toutes différentes, parmi les 6 voisines",
+           dirs.length === 4 && cles.size === 4 && dirs.every(d => DIRECTIONS_HEX.some(h => h.q === d.q && h.r === d.r)),
            JSON.stringify(dirs));
-  const autres = tirerDirectionsAveugle(desFixe([6, 5, 4]));
+  const autres = tirerDirectionsAveugle(desFixe([6, 5, 4, 3]));
   verifier("d'autres dés, un autre noir", JSON.stringify(autres) !== JSON.stringify(dirs), JSON.stringify(autres));
 
   const etat = monde();
   const alt = { nom: ETAT_AVEUGLE, chance: 30, duree: 2, cibles: ["H1"] };
-  // dés : défense H1 (99 = touché), chance (20 ≤ 30 = pris), puis les 3 directions.
-  const jets = tirerDesCarte(etat, { attaques: [], alterations: [alt] }, "M1", false, desFixe([99, 20, 1, 1, 1]));
-  verifier("l'état prend, et le jet emporte 3 directions", jets.parCible.H1.etats[ETAT_AVEUGLE] === true
-           && (jets.parCible.H1.aveugle || []).length === 3, JSON.stringify(jets.parCible.H1));
+  // dés : défense H1 (99 = touché), chance (20 ≤ 30 = pris), puis les 4 directions.
+  const jets = tirerDesCarte(etat, { attaques: [], alterations: [alt] }, "M1", false, desFixe([99, 20, 1, 1, 1, 1]));
+  verifier("l'état prend, et le jet emporte 4 directions", jets.parCible.H1.etats[ETAT_AVEUGLE] === true
+           && (jets.parCible.H1.aveugle || []).length === 4, JSON.stringify(jets.parCible.H1));
   const rate = tirerDesCarte(etat, { attaques: [], alterations: [alt] }, "M1", false, desFixe([99, 90]));
   verifier("raté (dé 90) : aucun dé de noir n'est tiré", rate.parCible.H1.aveugle === undefined);
 
   const r = resoudreCarte(etat, { type: "carte", idLanceur: "M1", idCarte: "CM", attaques: [], alterations: [alt], jets });
   const pose = r.etat.combattants.H1.etats.find(e => e.nom === ETAT_AVEUGLE);
-  verifier("l'état « Aveuglé » est posé 2 tours, avec ses 3 cases",
-           pose && pose.duree === 2 && (pose.cases || []).length === 3, JSON.stringify(pose));
+  verifier("l'état « Aveuglé » est posé 2 tours, avec ses 4 cases",
+           pose && pose.duree === 2 && (pose.cases || []).length === 4, JSON.stringify(pose));
   const h1 = r.etat.combattants.H1;
   const noir = casesDansLeNoir(h1);
-  verifier("3 cases de noir, toutes collées à l'endroit où il a été aveuglé",
-           noir.length === 3 && noir.every(c => (Math.abs(c.q) + Math.abs(c.q + c.r) + Math.abs(c.r)) / 2 === 1), JSON.stringify(noir));
+  verifier("4 cases de noir, toutes collées à l'endroit où il a été aveuglé",
+           noir.length === 4 && noir.every(c => (Math.abs(c.q) + Math.abs(c.q + c.r) + Math.abs(c.r)) / 2 === 1), JSON.stringify(noir));
   const bouge = { ...h1, q: 5, r: 5 };
   verifier("le noir RESTE sur ses cases de départ quand l'aveuglé bouge",
            JSON.stringify(casesDansLeNoir(bouge)) === JSON.stringify(noir) && estDansLeNoir(bouge, noir[0]));

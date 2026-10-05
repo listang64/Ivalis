@@ -127,9 +127,14 @@ export function trouverChemin(etat, depart, arrivee, plateau, options) {
 //    • l'état « Glacé » double aussi, et se cumule avec le terrain ;
 //    • l'atout du Vargen divise, APRÈS les deux doublements : le prédateur garde
 //      son avantage même sur un sol qui coûte double ;
+//    • le Saignement ajoute 2 par case, après la division : une plaie ouverte
+//      coûte autant au prédateur qu'aux autres ;
 //    • l'équipement ajoute ou retire, sans jamais descendre sous 1 — se déplacer
 //      coûte toujours quelque chose ;
 //    • sauf les cases offertes par un pas de retraite, qui sont gratuites.
+
+// Ce que chaque case coûte en plus à qui saigne (SAIGNEMENT, moteur_pur.js).
+export const SURCOUT_SAIGNEMENT = 2;
 
 export function coutDuPas(c, numeroCase, difficile, offerte) {
     if (offerte) return 0;
@@ -144,6 +149,7 @@ export function coutDuPas(c, numeroCase, difficile, offerte) {
 
     const diviseur = nombre(c.atouts && c.atouts.diviseurDeplacement, 1) || 1;
     if (diviseur > 1) cout = Math.max(1, Math.round(cout / diviseur));
+    if (aLEtat(c, "Saignement")) cout += SURCOUT_SAIGNEMENT;
 
     const modEquip = nombre(c.mod && c.mod.coutDeplacement) + bonusDesEtats(c, "coutDeplacement");
     if (modEquip) cout = Math.max(1, cout + modEquip);
@@ -537,18 +543,19 @@ export function resoudrePeur(etat, idLanceur, idCible, des, plateau, options) {
 // =========================================================================
 //  7. LE REPLI
 // =========================================================================
-//  « Se déplace de 3 cases après avoir attaqué, avec 60 % de chance d'éviter
-//  les attaques d'opportunité. » C'est une MARCHE, pas un saut : on ne passe
-//  ni à travers un mur, ni à travers un vivant, et chaque ennemi quitté porte
-//  son coup — mais le repli a 60 % de chance de s'y dérober avant même le jet
-//  de défense ordinaire. La marche est offerte : la carte l'a déjà payée.
+//  « Se déplace de 3 cases après avoir attaqué, et évite TOUTES les attaques
+//  d'opportunité » (règle de Nico : il n'y a plus de jet à 60 %). C'est une
+//  MARCHE, pas un saut : on ne passe ni à travers un mur, ni à travers un
+//  vivant ; chaque ennemi quitté voit le repli lui filer sous le nez. La
+//  marche est offerte : la carte l'a déjà payée.
 //
 //  La case d'arrivée est choisie à l'écran (c'est du ciblage) ; le CHEMIN, lui,
 //  est recalculé ici depuis la position du lanceur au moment du repli — après
 //  l'attaque —, pour qu'aucun poste ne puisse envoyer un trajet de fantaisie.
 
 export const PORTEE_REPLI = 3;
-export const CHANCE_REPLI_OPPORTUNITE = 60;
+// Gardé pour qui le lit encore : le repli évite désormais TOUT (100 %).
+export const CHANCE_REPLI_OPPORTUNITE = 100;
 
 // Les cases atteignables en `portee` pas de marche, chacune avec le plus court
 // chemin qui y mène. UNE SEULE DÉFINITION, lue par l'écran qui les éclaire, par
@@ -584,7 +591,7 @@ export function cheminsDeRepli(etat, id, portee, plateau, depart) {
 
 // Mute l'état qu'on lui passe (comme resoudrePeur) et rend les étapes.
 export function resoudreRepli(etat, idLanceur, vers, des, plateau, options) {
-    const { portee = PORTEE_REPLI, chance = CHANCE_REPLI_OPPORTUNITE } = options || {};
+    const { portee = PORTEE_REPLI } = options || {};
     const etapes = [];
     const c = combattant(etat, idLanceur);
     if (!c || c.aTerre || !vers || vers.q === undefined || vers.r === undefined) return etapes;
@@ -617,19 +624,9 @@ export function resoudreRepli(etat, idLanceur, vers, des, plateau, options) {
             if (contactApres.has(ennemi)) continue;
             const a = combattant(etat, ennemi);
             if (!a || a.aTerre || a.estIllusion) continue;
-            // LE REPLI SE DÉROBE D'ABORD : un dé à lui, avant la défense.
-            if (des.d100() <= chance) {
-                etapes.push({ type: "opportunite", attaquant: ennemi, cible: idLanceur, evitee: true,
-                              mot: "Repli 💨", montant: 0, hex: pas });
-                continue;
-            }
-            const coup = resoudreOpportunite(etat, ennemi, idLanceur, des);
-            if (!coup) continue;
-            if (coup.evitee) {
-                etapes.push({ type: "opportunite", ...coup, hex: pas });
-                continue;
-            }
-            etapes.push(...infligerOpportunite(etat, idLanceur, ennemi, coup, pas));
+            // LE REPLI SE DÉROBE TOUJOURS : aucun dé, aucun coup ne part.
+            etapes.push({ type: "opportunite", attaquant: ennemi, cible: idLanceur, evitee: true,
+                          mot: "Repli 💨", montant: 0, hex: pas });
         }
         contactAvant = contactApres;
         if (c.aTerre) { etapes.push({ type: "trajetEcourte", acteur: idLanceur, raison: "à terre" }); break; }
