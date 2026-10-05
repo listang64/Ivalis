@@ -293,7 +293,9 @@ const SCENES = {
                        CLASSE_ASSAUT_MORTEL: "🗡️ Assaut mortel",
                        CLASSE_SOIN_URGENCE: "✚ Soin d'urgence", CLASSE_PRISE_EN_CHARGE: "✚ Prise en charge",
                        CLASSE_NUEE_CHAUVES_SOURIS: "🦇 Nuée de chauve-souris",
-                       CLASSE_BAISER_VAMPIRE: "🩸 Baiser du vampire" };
+                       CLASSE_BAISER_VAMPIRE: "🩸 Baiser du vampire",
+                       CLASSE_CHARME_FRATRICIDE: "🌀 Charme fratricide",
+                       CLASSE_TRANSFERT: "🔄 Transfert" };
         return { geste: "message", pion: e.acteur, texte: noms[e.idCarte] || "Technique de classe",
                  couleur: "#e8c46a", duree: RYTHME.message };
     },

@@ -121,11 +121,13 @@ console.log("\n3. L'ENCART DANS LA FICHE");
     await p.screenshot({ path: "/tmp/claude-0/bonus_race_classe.png" });
     verifier("l'encart est dans l'onglet Statistiques", r.dansStats);
     verifier("la race (Gob) : esquive et compétence", /Gob/.test(r.race) && /\+3 % d'esquive/.test(r.race) && /\+1 compétence/.test(r.race), r.race.replace(/\s+/g, " ").trim());
-    // (Le Nécromancien n'est plus insensible au gel, et a +8 PV au lieu de +5.)
-    verifier("la classe (Nécromancien) : compétence, +8 PV, Ténèbres — plus de Glacé",
-             /Nécromancien/.test(r.classe) && !/Insensible : Glacé/.test(r.classe) && /\+8 PV maximum/.test(r.classe) && /Ténèbres/.test(r.classe),
+    // (Le Nécromancien est devenu le Sorcier : la fiche qui porte l'ancien nom
+    // se lit sous le nouveau. Ténèbres, +1 portée, pas de malus au contact.)
+    verifier("la classe (Nécromancien → Sorcier) : Ténèbres, +1 portée, sans malus — plus de +8 PV",
+             /Sorcier/.test(r.classe) && !/Nécromancien/.test(r.classe) && /Ténèbres/.test(r.classe)
+             && /\+1 case de portée/.test(r.classe) && /Aucune réduction au contact/.test(r.classe) && !/\+8 PV/.test(r.classe),
              r.classe.replace(/\s+/g, " ").trim().slice(0, 160));
-    verifier("niveau 5 : le sursis du niveau 10 est grisé, « à venir »",
+    verifier("niveau 5 : le Transfert du niveau 10 est grisé, « à venir »",
              JSON.stringify(r.paliers) === '[["1",false],["5",false],["10",true]]' && /à venir/.test(r.classe), JSON.stringify(r.paliers));
     verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
     await b.close();

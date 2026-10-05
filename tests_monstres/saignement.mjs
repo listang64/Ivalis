@@ -192,7 +192,7 @@ console.log("\n5. LE GRIMOIRE (Combat_Effets) MIS À JOUR, SUR CONFIRMATION DU M
   const par = Object.fromEntries(r.ecrits.map(e => [e.chemin.split("/").pop(), e]));
   verifier("le bouton est dans l'écran du Grimoire du moteur", r.bouton);
   verifier("le MJ voit la liste avant toute écriture", /EFF_SAIGNEMENT \(ajouté\)/.test(r.demande) && /EFF_CONFUSION/.test(r.demande), r.demande.slice(0, 120));
-  verifier("7 effets écrits, toujours en « merge » (seuls les champs listés)", r.ok === 7 && r.ecrits.every(e => e.options && e.options.merge === true),
+  verifier("8 effets écrits (Ténèbres du Sorcier compris), toujours en « merge »", r.ok === 8 && r.ecrits.every(e => e.options && e.options.merge === true),
            Object.keys(par).join(","));
   const notes = (id) => ((par[id] || {}).data || {});
   verifier("Empoisonnement : bruts, et le maître à 9 %", /dégâts bruts/.test(notes("EFF_EMPOISONNEMENT").Notes) && /9 % des PV max/.test(notes("EFF_EMPOISONNEMENT").Notes));
@@ -212,7 +212,7 @@ console.log("\n5. LE GRIMOIRE (Combat_Effets) MIS À JOUR, SUR CONFIRMATION DU M
     await window.mettreAJourGrimoireRegles();
     return window.__ecrits.map(e => e.chemin);
   });
-  verifier("un Saignement déjà en base n'est pas écrasé", !deja.includes("Combat_Effets/EFF_SAIGNEMENT") && deja.length === 6, deja.join(","));
+  verifier("un Saignement déjà en base n'est pas écrasé", !deja.includes("Combat_Effets/EFF_SAIGNEMENT") && deja.length === 7, deja.join(","));
   const refuse = await p.evaluate(async () => { window.__ecrits = []; window.confirm = () => false; await window.mettreAJourGrimoireRegles(); return window.__ecrits.length; });
   verifier("le MJ refuse : rien n'est écrit", refuse === 0);
 }

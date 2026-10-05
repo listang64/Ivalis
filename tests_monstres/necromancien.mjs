@@ -72,44 +72,26 @@ console.log("=========================================================");
 console.log("\n1. SES ATOUTS, PALIER PAR PALIER (niveau tiré de l'XP)");
 // =========================================================================
 {
+    // (Nico, plus tard : le Nécromancien devient le SORCIER. Ténèbres dès le
+    // niveau 1, +1 case de portée sur ses sorts, pas de malus au contact ; plus
+    // de +1 compétence, de +8 PV ni de sursis. Ses nouvelles techniques sont
+    // dans sorcier.mjs.)
     const necro = (niveau, extra = {}) => heros("N", { classe: "Nécromancien", xp: XP[niveau], ...extra });
-    const a1 = w.atoutClasse(necro(1)), a4 = w.atoutClasse(necro(4));
-    const a5 = w.atoutClasse(necro(5)), a10 = w.atoutClasse(necro(10));
-    // (Nico, ensuite : plus d'insensibilité au gel, et +8 PV au lieu de +5.)
-    verifier("niveau 1 : +1 compétence, +8 PV, plus d'insensibilité au gel",
-             !(a1.immunites || []).length && a1.competences === 1 && a1.pvMax === 8,
-             JSON.stringify(a1));
-    verifier("niveau 4 : pas encore Ténèbres", !(a4.effets || []).length, JSON.stringify(a4.effets));
-    verifier("niveau 5 : Ténèbres débloqué", (a5.effets || []).includes("EFF_TENEBRES") && !a5.sursis,
-             JSON.stringify(a5));
-    verifier("niveau 10 : le sursis (2 tours), et les paliers d'avant restent",
-             a10.sursis === 2 && a10.competences === 1 && a10.pvMax === 8 && a10.effets.includes("EFF_TENEBRES"),
-             JSON.stringify(a10));
+    const a1 = w.atoutClasse(necro(1)), a10 = w.atoutClasse(necro(10));
+    verifier("niveau 1 (ancien nom) : Ténèbres, +1 portée de sort, sans malus",
+             (a1.effets || []).includes("EFF_TENEBRES") && a1.porteeSorts === 1 && a1.sortsSansMalusContact === true
+             && !a1.competences && !a1.pvMax && !(a1.immunites || []).length, JSON.stringify(a1));
+    verifier("niveau 10 : plus de sursis", !a10.sursis, JSON.stringify(a10));
     verifier("le nom se lit sans accents (« necromancien », « NÉCROMANCIEN »)",
-             w.atoutClasse(heros("N", { classe: "necromancien" })).pvMax === 8
-             && w.atoutClasse(heros("N", { Classe: "NÉCROMANCIEN" })).pvMax === 8);
+             w.atoutClasse(heros("N", { classe: "necromancien" })).porteeSorts === 1
+             && w.atoutClasse(heros("N", { Classe: "NÉCROMANCIEN" })).porteeSorts === 1);
     verifier("une autre classe n'a rien", Object.keys(w.atoutClasse(heros("O", { classe: "Oracle" }))).length === 0);
     verifier("une créature n'a rien, même nommée comme la classe",
              Object.keys(w.atoutClasse(monstre("M", { classe: "Nécromancien" }))).length === 0);
-
-    verifier("PV max : 40 sur la fiche → 48", w.pvMaxCombattant(necro(1)) === 48
-             && w.pvMaxCombattant(heros("H")) === 40, `${w.pvMaxCombattant(necro(1))}`);
-    verifier("+1 compétence en main (7), comme le Gob", w.competencesMaxCombattant(necro(1)) === 7
-             && w.competencesMaxCombattant(heros("H")) === 6);
-    verifier("un Gob nécromancien en a 8 (les deux s'ajoutent)",
-             w.competencesMaxCombattant(necro(1, { race: "Gob" })) === 8);
-    const ondari = w.atoutRace(necro(1, { race: "Ondari" }));
-    verifier("un Ondari nécromancien : immunisé au feu (pas au gel), et garde sa portée",
-             ondari.immunites.includes("Brûlé") && !ondari.immunites.includes("Glacé") && ondari.porteeMagique === 1,
-             JSON.stringify(ondari));
+    verifier("PV max : 40 sur la fiche → 40 (plus de +8)", w.pvMaxCombattant(necro(1)) === 40, `${w.pvMaxCombattant(necro(1))}`);
+    verifier("6 compétences en main, comme tout le monde", w.competencesMaxCombattant(necro(1)) === 6);
     verifier("la table des races n'est pas touchée par la fusion",
              JSON.stringify(w.ATOUTS_RACES.Ondari.immunites) === '["Brûlé"]');
-    verifier("estImmunise : le Nécromancien n'est plus insensible au Glacé", !w.estImmunise(necro(1), "Glacé")
-             && !w.estImmunise(heros("H"), "Glacé"));
-
-    const e = etatDe([necro(1), heros("H")]);
-    verifier("en combat, ses PV max montent à 48", e.combattants.N.pvMax === 48 && e.combattants.N.pv === 40,
-             `${e.combattants.N.pv}/${e.combattants.N.pvMax}`);
 }
 
 // =========================================================================
@@ -199,6 +181,9 @@ console.log("\n3. TÉNÈBRES : L'ÉNERGIE D'ABORD, PUIS LA VIE ×1,5");
 console.log("\n4. LE SURSIS DU NIVEAU 10");
 // =========================================================================
 {
+    // AUCUNE CLASSE NE DONNE PLUS LE SURSIS (le Sorcier l'a perdu), mais le
+    // moteur le sait toujours : on le rend au Sorcier le temps de la section.
+    w.ATOUTS_CLASSES.Sorcier.push({ niveau: 10, sursis: 2 });
     const necro10 = () => heros("N", { classe: "Nécromancien", xp: XP[10] });
     const coup = { valeurBrute: 200, typeRes: "Physique" };
 
@@ -267,6 +252,7 @@ console.log("\n4. LE SURSIS DU NIVEAU 10");
     const scene = misEnScene({ type: "sursis", cible: "N", tours: 2 }, r1.etat);
     verifier("à l'écran : « 💀 Sursis : 2 tours »", scene.geste === "message" && /Sursis : 2 tours/.test(scene.texte),
              JSON.stringify(scene));
+    w.ATOUTS_CLASSES.Sorcier.pop();
 }
 
 // =========================================================================
@@ -355,8 +341,8 @@ console.log("\n5. TÉNÈBRES DANS LE GRIMOIRE ET LA FORGE");
       window.fermerForgeCompetence();
       return ids;
     };
-    const necro5 = await forgePour({ Classe: "Nécromancien", XP: 2500, Race: "Humain" });
-    const necro4 = await forgePour({ Classe: "Nécromancien", XP: 1800, Race: "Humain" });
+    const necro5 = await forgePour({ Classe: "Sorcier", XP: 0, Race: "Humain" });
+    const necro4 = await forgePour({ Classe: "Nécromancien", XP: 0, Race: "Humain" });
     const oracle = await forgePour({ Classe: "Oracle", XP: 9000, Race: "Humain" });
     const monstres = window.paletteEffetsMonstres().map(e => e.id);
     return { avant, t, installe: !!regle.champs && window.MIGRATION_EFFETS.some(x => x.id === "EFF_TENEBRES"), secours: !!regle.secoursLocal,
@@ -370,8 +356,8 @@ console.log("\n5. TÉNÈBRES DANS LE GRIMOIRE ET LA FORGE");
            && r.t.Modificateur === "INTELLIGENCE" && r.t.Valeur === 3 && r.t.Type_Mecanique === "Action/Global",
            JSON.stringify(r.t).slice(0, 120));
   verifier("le bouton d'installation le crée", r.installe && r.secours);
-  verifier("la Forge le propose au Nécromancien de niveau 5", r.necro5);
-  verifier("pas au niveau 4", !r.necro4);
+  verifier("la Forge le propose au Sorcier dès le niveau 1", r.necro5);
+  verifier("…et à un héros resté « Nécromancien » sur sa fiche", r.necro4);
   verifier("jamais à une autre classe (même de haut niveau)", !r.oracle && r.attaqueMagique);
   verifier("le générateur de monstres ne le pioche pas", !r.monstres && r.monstresAutres > 10, String(r.monstresAutres));
   verifier("c'est un sort (magique), reconnu sans accents", r.magique && r.reconnu);
@@ -423,7 +409,7 @@ console.log("\n7. LA FICHE DE CLASSE : LE DESCRIPTIF À GAUCHE");
     document.querySelectorAll('body > div[id^="ecran-"]').forEach(e => { e.style.display = "none"; });
     window.CLASSES_CACHE = window.CLASSES_PAR_DEFAUT.map(c => ({ ...c }));
     await window.ouvrirChoixClasse();
-    window.ouvrirFicheClasse("CLASSE_NECROMANCIEN");
+    window.ouvrirFicheClasse("CLASSE_SORCIER");
     await new Promise(r => setTimeout(r, 400));
     const d = document.getElementById("descriptif-fiche-classe");
     const titre = document.getElementById("titre-fiche-classe").getBoundingClientRect();
@@ -450,17 +436,18 @@ console.log("\n7. LA FICHE DE CLASSE : LE DESCRIPTIF À GAUCHE");
     const oracle = { visible: getComputedStyle(d).display !== "none",
                      classe: document.getElementById("vue-fiche-classe").classList.contains("avec-descriptif") };
     window.retourChoixClasse();
-    window.ouvrirFicheClasse("CLASSE_NECROMANCIEN");
+    window.ouvrirFicheClasse("CLASSE_SORCIER");
     return { necro, oracle };
   });
   await p.waitForTimeout(300);
   await p.screenshot({ path: "/tmp/claude-0/necro_fiche_classe.png" });
-  verifier("le Nécromancien a son descriptif", r.necro.visible && r.necro.presentation.length > 60,
+  verifier("le Sorcier (ex-Nécromancien) a son descriptif", r.necro.visible && r.necro.presentation.length > 60,
            r.necro.presentation.slice(0, 50));
   verifier("les paliers Niv. 1, 5, 10", JSON.stringify(r.necro.niveaux) === '["Niv. 1","Niv. 5","Niv. 10"]',
            JSON.stringify(r.necro.niveaux));
-  verifier("Ténèbres et le sursis y sont dits", /Ténèbres/.test(r.necro.texte) && /Sursis/.test(r.necro.texte)
-           && !/Gel/.test(r.necro.texte) && /\+8 PV/.test(r.necro.texte));
+  verifier("Ténèbres, Charme fratricide et Transfert y sont dits — plus de sursis",
+           /Ténèbres/.test(r.necro.texte) && /Charme fratricide/.test(r.necro.texte) && /Transfert/.test(r.necro.texte)
+           && !/Sursis/.test(r.necro.texte) && !/\+8 PV/.test(r.necro.texte));
   verifier("à gauche, sous le titre, au-dessus du bouton",
            r.necro.aGauche && r.necro.sousLeTitre && r.necro.auDessusDuBouton && r.necro.titreAGauche && r.necro.sousLeRetour, JSON.stringify(r.necro).slice(-120));
   verifier("chaque palier : « Niv. N » centré au-dessus de son descriptif, boîte centrée",

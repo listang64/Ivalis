@@ -193,7 +193,10 @@ export function combattantDepuisFiche(fiche, position, regles) {
         // Le Vampire : le feu le ronge plus fort (regleDesEtats, moteur_pur.js),
         // et la première case de chacun de ses tours est gratuite (coutDuPas).
         brulureAggravee: !!race.brulureAggravee,
-        premierPasGratuit: !!race.premierPasGratuit
+        premierPasGratuit: !!race.premierPasGratuit,
+        // Le Sorcier : ses sorts à distance ne perdent rien au contact
+        // (chaineDeDegats, moteur_pur.js).
+        sortsSansMalusContact: !!race.sortsSansMalusContact
     };
     const mod = {
         // Ce que l'ÉQUIPEMENT change EN PERMANENCE, hors états altérés : le

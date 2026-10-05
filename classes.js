@@ -46,8 +46,6 @@ window.CLASSES_PAR_DEFAUT = [
                                "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438697/Chasseur_de_mage_fond_hnp2gf.png"),
     C(4,  "Sentinelle",        "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2160_vbqfus.jpg",
                                "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438697/sentinelle_fond_k7utrw.png"),
-    C(5,  "Ensorceleur",       "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2170_ivs67e.jpg",
-                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438697/Ensorceleur_fond_mwokvi.png"),
     C(6,  "Profanateur",       "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2172_m1dgfp.jpg",
                                "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438696/Profanateur_fond_c3yyaz.png"),
     C(7,  "Géomancien",        "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2168_fmgyk1.jpg",
@@ -58,7 +56,7 @@ window.CLASSES_PAR_DEFAUT = [
                                "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438698/Oracle_fond_n7togf.png"),
     C(10, "Vampire",           "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2173_yygc0q.jpg",
                                "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438696/Vampire_fond_wapbww.png"),
-    C(11, "Nécromancien",      "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2171_u2hda6.jpg",
+    C(11, "Sorcier",           "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2171_u2hda6.jpg",
                                "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438696/Necromancien_fond_duglq6.png"),
     C(12, "Mage du chaos",     "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2174_myjwel.jpg",
                                "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438697/Mage_Chaos_fond_mtfs6i.png"),
@@ -76,20 +74,24 @@ window.CLASSES_PAR_DEFAUT = [
 //  au joueur. Une classe sans descriptif garde sa fiche d'avant : le titre
 //  seul, au milieu de la moitié gauche.
 window.DESCRIPTIFS_CLASSES = {
-    CLASSE_NECROMANCIEN: {
-        presentation: "Maître des morts et des ombres, le Nécromancien puise sa force dans ce que "
-            + "les autres redoutent. La mort lui a laissé une vigueur que les vivants n'ont pas, et "
-            + "ses sorts vident l'énergie de ses ennemis avant de s'en prendre à leur chair.",
+    CLASSE_SORCIER: {
+        presentation: "Les ombres répondent à sa voix. Le Sorcier frappe de loin sans jamais "
+            + "perdre en force quand on le serre de près, vide l'énergie de ses ennemis, retourne "
+            + "leurs propres coups contre leurs alliés et change de place avec qui il veut.",
         paliers: [
-            { niveau: 1, titre: "Enfant de la tombe",
-              points: ["+1 compétence", "+8 PV"] },
-            { niveau: 5, titre: "Sort : Ténèbres",
-              points: ["2 pts · Intelligence · 3 dégâts magiques bruts (aucune armure)",
-                       "Les dégâts frappent la fatigue de la cible au lieu de ses PV",
-                       "Plus de fatigue ? Le reste frappe ses PV ×1,5"] },
-            { niveau: 10, titre: "Sursis",
-              points: ["À 0 PV, sa vie reste bloquée : il joue encore deux tours avant d'être mis KO",
-                       "Une fois par combat, aucun soin possible"] }
+            { niveau: 1, titre: "Sort : Ténèbres",
+              points: ["Dans la Forge · 2 pts · Intelligence · 3 dégâts magiques bruts (aucune armure)",
+                       "Les dégâts frappent la fatigue de la cible ; plus de fatigue ? Le reste frappe ses PV ×1,5",
+                       "+1 case de portée de base sur tous ses sorts",
+                       "Aucune réduction au contact pour ses sorts à distance"] },
+            { niveau: 5, titre: "Technique : Charme fratricide",
+              points: ["Initiative 105 · aucune fatigue · un ennemi à 3 cases",
+                       "Sa prochaine compétence frappe l'un de ses propres alliés",
+                       "Une fois par combat"] },
+            { niveau: 10, titre: "Technique : Transfert",
+              points: ["Initiative 100 · aucune fatigue · un ennemi à 5 cases, même hors de vue",
+                       "Se téléporte à sa place (il prend la sienne), et se soigne de 10 PV",
+                       "Une fois par combat"] }
         ]
     },
     CLASSE_HOPLITE: {
@@ -207,12 +209,20 @@ window.optimiserImageClasse = (url) => {
 
 // Document de la base → classe du jeu. Un champ absent retombe sur la liste
 // écrite ici : une classe à moitié remplie en base s'affiche quand même.
-window.classeDepuisDocument = function(id, d) {
+// UNE CLASSE RENOMMÉE OU RETIRÉE (demande de Nico) : la base garde ses
+// documents tels qu'ils sont ; le jeu, lui, montre le Sorcier à la place du
+// Nécromancien (mêmes images), et ne propose plus l'Ensorceleur.
+window.CLASSES_DOC_RENOMMEES = { CLASSE_NECROMANCIEN: { id: "CLASSE_SORCIER", nom: "Sorcier" } };
+window.CLASSES_RETIREES = ["CLASSE_ENSORCELEUR"];
+
+window.classeDepuisDocument = function(idBase, d) {
+    const renommee = window.CLASSES_DOC_RENOMMEES[idBase];
+    const id = renommee ? renommee.id : idBase;
     const connue = window.CLASSES_PAR_DEFAUT.find(c => c.id === id) || {};
     return {
         id,
         ordre: Number(d && d.Ordre) || connue.ordre || 99,
-        nom: (d && d.Nom) || connue.nom || id,
+        nom: renommee ? renommee.nom : ((d && d.Nom) || connue.nom || id),
         imageTarot: window.optimiserImageClasse((d && d.Image_Tarot) || connue.imageTarot || ""),
         imageFond: window.optimiserImageClasse((d && d.Image_Fond) || connue.imageFond || "")
     };
@@ -226,11 +236,18 @@ window.chargerClasses = async function() {
     let classes = [];
     try {
         const snap = await getDocs(collection(db, COLLECTION_CLASSES));
-        snap.forEach(d => classes.push(window.classeDepuisDocument(d.id, d.data())));
+        snap.forEach(d => {
+            if (window.CLASSES_RETIREES.includes(d.id)) return;
+            classes.push(window.classeDepuisDocument(d.id, d.data()));
+        });
     } catch (e) {
         console.error("Lecture des classes (on garde la liste du jeu) :", e);
     }
     if (classes.length === 0) classes = window.CLASSES_PAR_DEFAUT.map(c => ({ ...c }));
+    // Une seule carte par classe : le Nécromancien relu en Sorcier ne double
+    // pas un vrai document Sorcier qui aurait été installé depuis.
+    const vus = new Set();
+    classes = classes.filter(c => !vus.has(c.id) && vus.add(c.id));
     classes.sort((a, b) => a.ordre - b.ordre);
     window.CLASSES_CACHE = classes;
     return classes;

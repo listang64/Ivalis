@@ -99,7 +99,7 @@ console.log("\n1. APRÈS LE GENRE, LE CHOIX DE CLASSE");
            !apres.races && apres.classes && apres.grille && !apres.identite, JSON.stringify(apres));
 }
 
-console.log("\n2. LA GRILLE : 14 CARTES DE TAROT 7:12, BORDURE DORÉE, RANGÉES DE 4");
+console.log("\n2. LA GRILLE : 13 CARTES DE TAROT 7:12, BORDURE DORÉE, RANGÉES DE 4");
 {
   const g = await p.evaluate(() => {
     const cartes = [...document.querySelectorAll("#grille-classes .carte-classe")];
@@ -124,10 +124,12 @@ console.log("\n2. LA GRILLE : 14 CARTES DE TAROT 7:12, BORDURE DORÉE, RANGÉES 
     };
   });
   verifier("le titre « Choix de Classe » en haut", g.titre === "Choix de Classe", g.titre);
-  verifier("14 classes, dans l'ordre donné", g.noms.length === 14 && g.noms[0] === "Pisteur" && g.noms[13] === "Élémentariste",
+  // (L'Ensorceleur a été retiré, le Nécromancien est devenu le Sorcier.)
+  verifier("13 classes, dans l'ordre donné", g.noms.length === 13 && g.noms[0] === "Pisteur" && g.noms[12] === "Élémentariste"
+           && !g.noms.includes("Ensorceleur") && !g.noms.includes("Nécromancien"),
            g.noms.join(", "));
-  verifier("orthographe : Géomancien, Nécromancien, Médicus, Élémentariste",
-           ["Géomancien", "Nécromancien", "Médicus", "Élémentariste", "Chasseur de mages", "Mage du chaos"].every(n => g.noms.includes(n)));
+  verifier("orthographe : Géomancien, Sorcier, Médicus, Élémentariste",
+           ["Géomancien", "Sorcier", "Médicus", "Élémentariste", "Chasseur de mages", "Mage du chaos"].every(n => g.noms.includes(n)));
   verifier("cartes au format tarot 7:12", Math.abs(g.ratio - 12 / 7) < 0.02, g.ratio.toFixed(3));
   verifier("rangées de 4", g.parRangee === 4, String(g.parRangee));
   verifier("image en object-fit: cover (jamais fill)", g.fit === "cover", g.fit);

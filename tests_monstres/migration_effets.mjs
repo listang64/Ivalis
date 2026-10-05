@@ -70,9 +70,9 @@ console.log("\n2. LA COPIE LOCALE : TÉNÈBRES, LUMIÈRE, SAIGNEMENT ET VAMPIRIS
              table.length === 4 && ["EFF_TENEBRES", "EFF_LUMIERE", "EFF_SAIGNEMENT", "EFF_VAMPIRISME"].every(id => table.some(r => r.id === id))
              && table.every(r => r.secoursLocal), table.map(r => r.id).join(", "));
     const ten = par("EFF_TENEBRES");
-    verifier("Ténèbres : 2 pts, Intelligence, 3, racine, Nécromancien niv. 5",
+    verifier("Ténèbres : 2 pts, Intelligence, 3, racine, Sorcier niv. 1",
              ten.Nom === "Ténèbres" && ten.Cout_PT === "2" && ten.Modificateur === "INTELLIGENCE" && ten.Valeur === 3
-             && ten.Type_Mecanique === "Action/Global" && ten.Classe === "Nécromancien" && ten.Niveau_Requis === 5);
+             && ten.Type_Mecanique === "Action/Global" && ten.Classe === "Sorcier" && ten.Niveau_Requis === 1);
     const lum = par("EFF_LUMIERE");
     verifier("Lumière : 1 pt, Intelligence, 15 % (max 60), Magique/Physique, Chasseur de mages niv. 5",
              lum.Nom === "Lumière" && lum.Cout_PT === "1" && lum.Modificateur === "INTELLIGENCE" && lum.Pourcent_Base === 15

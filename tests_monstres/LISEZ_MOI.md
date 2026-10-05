@@ -152,7 +152,7 @@ node fiche_race_classe.mjs   # race et classe dans l'onglet Statistiques ; portr
 node jet_d20.mjs            # la scène du d20 : fondu, avatar, défilement qui ralentit, modificateur égrené, lueurs, rouge/violet ; chez tous les joueurs ; sons ; pas de monstres dans les bulles du chat
 node fabrique_sons.mjs      # Paramètres → La Fabrique : dix « ding » rendus et comparés ; le ding perle remplace le parchemin dans tout le jeu
 node experience.mjs          # l'expérience : grille des niveaux, jauge de la fiche, flèches de triche (DEV), compétences à créer par niveau (la main ne bouge pas), XP de la victoire à chaque héros
-node necromancien.mjs        # la classe Nécromancien : Glacé/+1 compétence/+5 PV (niv. 1), Ténèbres (niv. 5, énergie puis PV ×1,5), sursis (niv. 10) ; Forge, extraction, fiche de classe
+node necromancien.mjs        # Ténèbres (énergie puis PV ×1,5) et le sursis (moteur dormant, plus aucune classe ne le donne) ; Forge, extraction, fiche de classe du Sorcier
 node surpuissance.mjs        # la surpuissance : ×1,25 dès 70 de fatigue, ×1,35 dès 100 (dégâts et soins, pas les boucliers) ; extraction, Forge, carte
 node armes_et_zones.mjs      # persistance posée comme une zone d'une case ; Distance réservée (polyvalente, distance, magie, soin) ; arme qui bloque des techniques : alerte, grisées, retirées du deck
 node tableaux_nico.mjs        # les cellules rouges des deux tableaux : brûlure 8 % PV max physique, poison 10 % énergie + 8 % PV magique, Contre/Absorption jusqu'à 30 %, armes et effets bonus
@@ -177,6 +177,7 @@ node aide_forge_lia.mjs         # 🔨 LIA, l'aide à la création : popup réci
 node illustration_competence.mjs  # 🎨 illustration des compétences : IA de prompt + IA d'image (portrait + armes en binaire), file sur IA saturée, image en haut de la carte, outil de réglage provisoire
 node jauge_energie_carte.mjs     # ⚡ énergie sous la carte en combat (perte rouge clignotante, reste) ; encart du repos long (gain vert)
 node saignement.mjs             # 🩸 Saignement (8 % physique par manche, +2 par case), et le bouton qui met le grimoire à jour des nouvelles règles
+node sorcier.mjs               # 🔮 le Sorcier (ex-Nécromancien) : Ténèbres + 1 case de portée + pas de malus au contact (niv. 1), Charme fratricide (niv. 5), Transfert (niv. 10) ; plus d'Ensorceleur
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4596,3 +4597,29 @@ cerveau_combat, moteur_pur, bonus_race_classe, aide_forge_lia.
   confirmation, seuls ces champs sont touchés (merge).
 saignement.mjs ; confusion_cerveau, aveuglement, repli, assassin,
 chasseur_de_mages et migration_effets mis à jour.
+
+## Le Sorcier remplace le Nécromancien, l'Ensorceleur disparaît (version 191)
+
+- RENOMMAGE : le Nécromancien s'appelle désormais SORCIER. La base garde ses
+  documents (Classes/CLASSE_NECROMANCIEN) : le jeu les lit sous le nom Sorcier
+  (id CLASSE_SORCIER, mêmes images), et un héros dont la fiche porte encore
+  « Nécromancien » est lu comme Sorcier (CLASSES_RENOMMEES, nomActuelClasse).
+- L'ENSORCELEUR n'est plus proposé (CLASSES_RETIREES), même s'il est en base.
+- NIV. 1 : Ténèbres dans la Forge (dès le niveau 1) ; +1 case de portée de
+  BASE sur tous ses sorts, même au contact (un sort sans Distance porte à 2
+  cases et se vise comme un tir) ; aucune réduction ×0,7 au contact pour ses
+  sorts tirés (attaques magiques seulement). Plus de +8 PV, de +1 compétence
+  ni de sursis (le code du sursis reste, dormant).
+- NIV. 5 : CHARME FRATRICIDE — init 105, 0 fatigue, une fois par combat, un
+  ennemi à 3 cases. Il est « Charmé » (2 manches au plus) : sa prochaine
+  compétence part sur l'un de SES alliés, au hasard, à portée de la carte et en
+  vue ; personne à portée → la carte se perd. Le charme s'use sur cette carte.
+- NIV. 10 : TRANSFERT — init 100, 0 fatigue, une fois par combat, un ennemi à
+  5 cases, MÊME HORS DE VUE (derrière un mur) : le Sorcier se téléporte à sa
+  place, l'ennemi prend la sienne (deux bonds, aucune attaque d'opportunité),
+  puis il se soigne de 10 PV (réduits comme tout soin : Brûlé…).
+- Fenêtre de ciblage des techniques : ennemis à portée pour les deux.
+- Grimoire : le bouton provisoire du MJ recopie aussi la Classe (Sorcier) et le
+  niveau requis (1) de Ténèbres.
+sorcier.mjs ; necromancien, bonus_race_classe, choix_classe (13 classes),
+aide_forge_lia, migration_effets, saignement et hoplite mis à jour.

@@ -385,6 +385,43 @@ export function appliquerConfusion(etat, action, plateau, des) {
     };
 }
 
+// =========================================================================
+//  LE CHARME FRATRICIDE (Sorcier, niveau 5)
+// =========================================================================
+//  L'ennemi charmé joue sa prochaine compétence sur l'un de SES alliés : un au
+//  hasard, à portée de la carte et en vue. Aucun allié à portée : la carte se
+//  perd. Le charme s'use sur cette carte (resoudreCarte retire l'état) ; il
+//  dure au plus 2 manches s'il n'a pas servi. Les dés ne sont tirés que si le
+//  lanceur est charmé.
+export const ETAT_CHARME = "Charmé";
+export const MANCHES_CHARME = 2;
+export function appliquerCharme(etat, action, plateau, des) {
+    const lanceur = combattant(etat, action.idLanceur);
+    if (!lanceur || !aLEtat(lanceur, ETAT_CHARME)) return action;
+    const attaques = action.attaques || [];
+    const alterations = action.alterations || [];
+    const portee = Math.max(1, ...attaques.map(a => nombre(a.rangeMax, 1)), ...alterations.map(a => nombre(a.rangeMax, 1)),
+                            nombre(action.porteeMinTraction, 0));
+    const table = etat.combattants || {};
+    const allies = Object.keys(table).filter(id => {
+        if (id === action.idLanceur) return false;
+        const c = table[id];
+        if (!c || c.aTerre || c.estIllusion) return false;
+        if ((c.camp || "Allié") !== (lanceur.camp || "Allié")) return false;
+        if (distanceHex(lanceur, c) > portee) return false;
+        return ligneDeVue(plateau, lanceur, c);
+    }).sort();
+    const idCible = allies.length ? des.parmi(allies) : null;
+    const cibles = idCible ? [idCible] : [];
+    return {
+        ...action,
+        attaques: attaques.map(a => ({ ...a, cibles })),
+        alterations: alterations.map(alt => ({ ...alt, cibles })),
+        isZone: false,
+        charme: { idCible }
+    };
+}
+
 // LA FIN DE LA BOUCLE : le confus s'en remet (jet 61–80). Rend les étapes — le
 // cerveau l'appelle APRÈS la carte et la fuite (suitesDeConfusion).
 export function dissiperConfusion(etat, idLanceur) {
@@ -729,7 +766,7 @@ export function partRendue(pctAnnule) {
 }
 
 export function chaineDeDegats(cible, attaque, options) {
-    const { critique = false, distance = 1, percee = false } = options || {};
+    const { critique = false, distance = 1, percee = false, sansMalusContact = false } = options || {};
     const compte = { soinAbsorption: 0, degats: 0, secondTic: 0, versBouclier: 0, versPv: 0 };
 
     // 1. Le brut, doublé par un critique à la source : tout ce qui suit
@@ -749,7 +786,9 @@ export function chaineDeDegats(cible, attaque, options) {
     //    bug ; c'était la règle, et elle est juste. Ce qui manquait n'était pas
     //    ici : c'est que la CARTE ne disait pas qu'elle avait gagné cette
     //    portée (voir la ligne de portée dans competences.js).
-    if (attaque.isRanged && distance === 1) degats = Math.floor(degats * 0.7);
+    //    Sauf pour les sorts du Sorcier (sortsSansMalusContact) : sa magie ne
+    //    perd rien à bout portant.
+    if (attaque.isRanged && distance === 1 && !sansMalusContact) degats = Math.floor(degats * 0.7);
 
     // 2 bis. LES VULNÉRABILITÉS DE LA CIBLE. Un corps gelé casse plus
     //    facilement (+20 % de PHYSIQUE, règle de Nico : la glace casse sous
@@ -1180,6 +1219,8 @@ export function actionBaiserVampire(idLanceur, cible) {
 // la plus proche libre si quelqu'un s'y tient — et chaque ennemi qui l'entoure
 // recule d'une case, comme une Poussée (un mur ou un pion l'arrête).
 export const SOIN_URGENCE = 12;
+// Le Transfert du Sorcier (niveau 10) : ce qu'il se soigne en changeant de place.
+export const SOIN_TRANSFERT = 10;
 export const PART_REANIMATION = 30;
 
 function casePlusProcheLibre(etat, plateau, depart, idIgnore) {
@@ -1246,6 +1287,38 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
             if (allie.pv === avant) return;
             etapes.push({ type: "soin", cible: idAllie, acteur: id, montant: allie.pv - avant, pvApres: allie.pv });
         });
+    } else if (action.idCarte === "CLASSE_CHARME_FRATRICIDE") {
+        const ennemi = combattant(suivant, action.cible);
+        if (ennemi && !ennemi.aTerre) {
+            const immunites = (ennemi.atouts && ennemi.atouts.immunites) || [];
+            if (immunites.includes(ETAT_CHARME)) {
+                etapes.push({ type: "etatRate", cible: ennemi.id, acteur: id, etat: ETAT_CHARME, immunise: true });
+            } else {
+                ennemi.etats = [...(ennemi.etats || []).filter(e => e && e.nom !== ETAT_CHARME),
+                                { nom: ETAT_CHARME, duree: MANCHES_CHARME, idSource: id,
+                                  desc: "Sa prochaine compétence frappe l'un de ses propres alliés." }];
+                etapes.push({ type: "etats", cible: ennemi.id, liste: ennemi.etats, pose: ETAT_CHARME });
+            }
+        }
+    } else if (action.idCarte === "CLASSE_TRANSFERT") {
+        // LE TRANSFERT : les deux combattants échangent leurs cases, à vol
+        // d'oiseau (deux bonds, ni pas ni attaque d'opportunité), puis le
+        // Sorcier se soigne de 10 PV selon les règles de tout soin.
+        const autre = combattant(suivant, action.cible);
+        if (autre && !autre.aTerre && autre.id !== id) {
+            const ici = { q: nombre(c.q), r: nombre(c.r) }, la = { q: nombre(autre.q), r: nombre(autre.r) };
+            c.q = la.q; c.r = la.r;
+            autre.q = ici.q; autre.r = ici.r;
+            etapes.push({ type: "bond", acteur: id, de: ici, vers: la, transfert: true });
+            etapes.push({ type: "bond", acteur: autre.id, cible: autre.id, de: la, vers: ici, transfert: true });
+            if (!enSursis(c)) {
+                const partSoins = 100 + nombre(c.atouts && c.atouts.soinsRecus) + regleDesEtats(c, "soinsRecus");
+                const soin = Math.max(0, Math.round(SOIN_TRANSFERT * (partSoins / 100)));
+                const avant = nombre(c.pv);
+                c.pv = Math.min(nombre(c.pvMax), avant + soin);
+                if (c.pv > avant) etapes.push({ type: "soin", cible: id, acteur: id, montant: c.pv - avant, pvApres: c.pv });
+            }
+        }
     } else if (action.idCarte === "CLASSE_PRISE_EN_CHARGE") {
         const carte = plateau || PLAINE;
         const allie = combattant(suivant, action.cible);
@@ -1325,6 +1398,15 @@ export function resoudreCarte(etat, action, plateau) {
         if (action.confusion.hasard) dits.push("Confus : attaque un allié !");
         dits.forEach(texte => etapes.push({ type: "message", cible: idLanceur, acteur: idLanceur,
                                              texte, couleur: "#cc66ff" }));
+    }
+
+    // LE CHARME FRATRICIDE SE DIT AUSSI, et il s'use sur cette carte : la
+    // cible a déjà été détournée vers un allié (appliquerCharme).
+    if (action.charme) {
+        etapes.push({ type: "message", cible: idLanceur, acteur: idLanceur, couleur: "#cc66ff",
+                      texte: action.charme.idCible ? "Charmé : frappe son allié !" : "Charmé : aucun allié à portée" });
+        lanceur.etats = (lanceur.etats || []).filter(e => e && e.nom !== ETAT_CHARME);
+        etapes.push({ type: "etats", cible: idLanceur, liste: lanceur.etats });
     }
 
     // Le lanceur étourdi rate parfois complètement sa technique. Le jet a été
@@ -1507,7 +1589,9 @@ export function resoudreCarte(etat, action, plateau) {
             // chute). Une fonction, parce que le REMPART frappe deux cibles
             // avec une seule attaque (plus bas).
             const frapper = (idCible, cible, attaqueFrappe) => {
-                const compte = chaineDeDegats(cible, attaqueFrappe, { critique, distance: distanceHex(lanceur, cible), percee });
+                const sansMalusContact = !!(lanceur.atouts && lanceur.atouts.sortsSansMalusContact)
+                    && attaqueFrappe.typeRes === "Magique";
+                const compte = chaineDeDegats(cible, attaqueFrappe, { critique, distance: distanceHex(lanceur, cible), percee, sansMalusContact });
 
                 // Le drain de l'absorption soigne AVANT que le reste ne frappe.
                 if (compte.soinAbsorption > 0) {

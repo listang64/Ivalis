@@ -2951,7 +2951,8 @@ window.COULEUR_ETAT = {
     "Mur de bouclier": "#c9a24a",  // bronze — l'Hoplite derrière son bouclier
     "Instinct du tueur": "#c62828",
     "Rempart":        "#e8c46a",   // or — protégé par un Hoplite à ses côtés
-    "Nuée de chauve-souris": "#6a1b9a"   // pourpre — le Vampire dispersé en nuée
+    "Nuée de chauve-souris": "#6a1b9a",  // pourpre — le Vampire dispersé en nuée
+    "Charmé":         "#ec407a"    // rose — retourné contre les siens par le Sorcier
 };
 window.COULEUR_ETAT_DEFAUT = "#9e9e9e";
 
@@ -4942,15 +4943,20 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
         if (typeof window.demarrerCiblage === "function") window.demarrerCiblage(idCarte, { idLanceur });
         return;
     }
-    if (t.cible !== "allieAdjacent" && t.cible !== "allieKO" && t.cible !== "ennemiAdjacent") {
+    if (!["allieAdjacent", "allieKO", "ennemiAdjacent", "ennemi", "combattant"].includes(t.cible)) {
         return demande.techniqueClasse(idLanceur, idCarte);
     }
 
     // Rempart : un allié DEBOUT à côté. Prise en charge (Médicus) : un allié
     // KO à côté — son pion n'est plus dessiné, mais sa case est retenue.
     // Baiser du vampire : un ENNEMI debout au contact.
+    // Charme fratricide (Sorcier) : un ennemi debout à `portee` cases ou moins.
+    // Transfert (Sorcier) : un ennemi debout à `portee`, même hors de vue.
     const relever = t.cible === "allieKO";
     const mordre = t.cible === "ennemiAdjacent";
+    const echanger = idCarte === "CLASSE_TRANSFERT";
+    const charmer = t.cible === "ennemi" && !echanger;
+    const portee = Math.max(1, parseInt(t.portee) || 1);
     const lanceur = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
     const pos = (id) => (window.TOKENS_VTT_DATA || {})[id];
     const ici = pos(idLanceur);
@@ -4958,9 +4964,11 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
     const estKO = (id) => typeof window.estCombattantMort === "function" && window.estCombattantMort(id);
     const monCamp = (lanceur || {}).camp || "Allié";
     const allies = (window.PERSOS_PARTIE || []).filter(p => p && p.idPersonnage !== idLanceur && !p.estIllusion
-        && (mordre ? (p.camp || "Allié") !== monCamp && !estKO(p.idPersonnage)
-                   : !p.estMonstre && (p.camp || "Allié") === monCamp && estKO(p.idPersonnage) === relever)
-        && ici && pos(p.idPersonnage) && dist(ici, pos(p.idPersonnage)) === 1);
+        && ((mordre || charmer || echanger) ? (p.camp || "Allié") !== monCamp && !estKO(p.idPersonnage)
+            : !p.estMonstre && (p.camp || "Allié") === monCamp && estKO(p.idPersonnage) === relever)
+        && ici && pos(p.idPersonnage)
+        && ((charmer || echanger) ? dist(ici, pos(p.idPersonnage)) <= portee
+                                  : dist(ici, pos(p.idPersonnage)) === 1));
 
     let fenetre = document.getElementById("fenetre-choix-rempart");
     if (!fenetre) {
@@ -4979,9 +4987,14 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
     const echapper = (v) => String(v || "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
     // Personne à relever : la Prise en charge ne part pas, elle n'est pas
     // consommée — elle resservira une autre manche.
-    const titre = mordre ? "🩸 Baiser du vampire" : relever ? "✚ Prise en charge" : "🛡️ Rempart";
-    const question = mordre ? "Quel ennemi mordre ?" : relever ? "Quel allié relever ?" : "Quel allié protéger pendant 3 manches ?";
-    const personne = mordre
+    const titre = charmer ? "🌀 Charme fratricide" : echanger ? "🔄 Transfert"
+        : mordre ? "🩸 Baiser du vampire" : relever ? "✚ Prise en charge" : "🛡️ Rempart";
+    const question = charmer ? "Quel ennemi charmer ? Sa prochaine technique frappera un de ses alliés."
+        : echanger ? "Sur quel ennemi vous téléporter ? (il prend votre place)"
+        : mordre ? "Quel ennemi mordre ?" : relever ? "Quel allié relever ?" : "Quel allié protéger pendant 3 manches ?";
+    const personne = (charmer || echanger)
+        ? `Personne à ${portee} case${portee > 1 ? "s" : ""} ou moins. La technique n'est pas utilisée : finissez votre tour, elle resservira.`
+        : mordre
         ? "Aucun ennemi n'est au contact. La technique n'est pas utilisée : finissez votre tour, elle resservira."
         : relever
         ? "Aucun allié KO n'est à côté de vous. La technique n'est pas utilisée : finissez votre tour, elle resservira."
@@ -4991,7 +5004,7 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
         <div class="choix-rempart-texte">${allies.length ? question : personne}</div>
         <div class="choix-rempart-liste">${allies.map(a => `
             <button type="button" class="choix-rempart-allie" onclick="window.choisirAllieRempart('${echapper(a.idPersonnage)}')">
-                ${(a.urlToken || a.urlCloudinary) && mordre ? `<img src="${echapper(a.urlToken || a.urlCloudinary)}" alt="">` : a.urlCloudinary ? `<img src="${echapper(a.urlCloudinary)}" alt="">` : ""}<span>${echapper(a.prenom || a.nom || a.idPersonnage)}</span>
+                ${(a.urlToken || a.urlCloudinary) && (mordre || charmer || echanger) ? `<img src="${echapper(a.urlToken || a.urlCloudinary)}" alt="">` : a.urlCloudinary ? `<img src="${echapper(a.urlCloudinary)}" alt="">` : ""}<span>${echapper(a.prenom || a.nom || a.idPersonnage)}</span>
             </button>`).join("")}</div>
         <button type="button" class="choix-rempart-annuler" onclick="window.fermerChoixRempart()">Annuler</button>`;
     fenetre.style.display = "flex";

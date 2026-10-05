@@ -334,14 +334,15 @@ console.log("\n7. LE RÉCIT PART EN BASE AVEC LA COMPÉTENCE");
 }
 
 console.log("\n8. LES EFFETS DE CLASSE : DANS LA LISTE DE LIA SEULEMENT S'ILS SONT DÉBLOQUÉS");
-// Lumière (Chasseur de mages), Ténèbres (Nécromancien), Vampirisme (Vampire) :
-// niveau 5. Avant, ou dans une autre classe, LIA ne les voit pas — ni dans la
+// Lumière (Chasseur de mages) : niveau 5. Ténèbres (Sorcier, ex-Nécromancien) :
+// dès le niveau 1. Avant, ou dans une autre classe, LIA ne les voit pas — ni dans la
 // liste, ni dans ses règles — et l'algorithme refuse de les poser même si elle
 // les demande.
 {
   // (Le Vampirisme a été retiré de la Forge : remplacé par le Baiser du
   // vampire, une technique de classe. Plus personne ne l'a — voir plus bas.)
-  const CLASSE = { "Lumière": ["Chasseur de mages", "EFF_LUMIERE"], "Ténèbres": ["Nécromancien", "EFF_TENEBRES"] };
+  // [classe, effet, XP qui le débloque, XP trop tôt (aucun : dès le niveau 1)]
+  const CLASSE = { "Lumière": ["Chasseur de mages", "EFF_LUMIERE", 2500, 1800], "Ténèbres": ["Sorcier", "EFF_TENEBRES", 0, null] };
   const demande = async (fiche, plan) => {
     await p.evaluate(async ({ EFFETS, fiche }) => {
       window.EFFETS_BDD_CACHE = JSON.parse(JSON.stringify(EFFETS));
@@ -361,18 +362,20 @@ console.log("\n8. LES EFFETS DE CLASSE : DANS LA LISTE DE LIA SEULEMENT S'ILS SO
   const planAvec = (id) => ({ nom: "Essai", arme: "Magie",
     actions: id === "EFF_LUMIERE" ? [{ effet: "EFF_ATTAQUE_MAGIQUE", crans: 2, sous_effets: [{ effet: id, crans: 2 }] }]
                                   : [{ effet: id, crans: 2 }, { effet: "EFF_SOIN", crans: 1 }] });
-  for (const [nom, [classe, id]] of Object.entries(CLASSE)) {
-    const debloque = await demande({ Classe: classe, XP: 2500, Race: "Humain" }, planAvec(id));
+  for (const [nom, [classe, id, xpOk, xpTot]] of Object.entries(CLASSE)) {
+    const debloque = await demande({ Classe: classe, XP: xpOk, Race: "Humain" }, planAvec(id));
     const fiche = debloque.fiches.find(f => f.id === id);
-    verifier(`${classe} niv. 5 : ${nom} est dans la liste de LIA`, !!fiche, debloque.ids.length);
+    verifier(`${classe} niv. ${xpOk ? 5 : 1} : ${nom} est dans la liste de LIA`, !!fiche, debloque.ids.length);
     verifier(`…marqué effet de classe, avec sa note`, !!fiche && !!fiche.effet_de_classe && !!fiche.notes, fiche && fiche.effet_de_classe);
     const pose = debloque.forge.actions.some(a => a.nom === nom || a.mods[nom]);
     verifier(`…et LIA peut le poser`, pose, JSON.stringify(debloque.forge.actions.map(a => [a.nom, a.mods])));
 
-    const tropTot = await demande({ Classe: classe, XP: 1800, Race: "Humain" }, planAvec(id));
-    verifier(`${classe} niv. 4 : ${nom} absent de la liste ET des règles`, !tropTot.ids.includes(id) && !tropTot.texte.includes(nom), tropTot.ids.length);
-    const refuse = !tropTot.forge.actions.some(a => a.nom === nom || a.mods[nom]);
-    verifier(`…et refusé s'il est demandé quand même`, refuse);
+    if (xpTot !== null) {
+      const tropTot = await demande({ Classe: classe, XP: xpTot, Race: "Humain" }, planAvec(id));
+      verifier(`${classe} niv. 4 : ${nom} absent de la liste ET des règles`, !tropTot.ids.includes(id) && !tropTot.texte.includes(nom), tropTot.ids.length);
+      const refuse = !tropTot.forge.actions.some(a => a.nom === nom || a.mods[nom]);
+      verifier(`…et refusé s'il est demandé quand même`, refuse);
+    }
 
     const autre = await demande({ Classe: "Hoplite", XP: 7900, Race: "Humain" }, planAvec(id));
     verifier(`Hoplite niv. 10 : pas de ${nom}`, !autre.ids.includes(id) && !autre.texte.includes(nom)

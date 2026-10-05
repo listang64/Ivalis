@@ -43,7 +43,7 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
          traverserZones, creerZonePure, poserZone, vieillirZones,
          chaineDeDegats, REGLES_ETATS, regleDesEtats, estDansLeNoir,
          partageTenebres, ETAT_TENEBRES_ETALEES, POISON, POISON_MAITRE, ETAT_SAIGNEMENT, SAIGNEMENT,
-         resoudreTechniqueClasse, actionAssautMortel, actionBaiserVampire } from './moteur_pur.js';
+         resoudreTechniqueClasse, actionAssautMortel, actionBaiserVampire, appliquerCharme } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche } from './ia_pure.js';
@@ -251,6 +251,21 @@ export function validerIntention(etat, intention) {
             if (!ennemi) return refus("Baiser du vampire sans cible");
             if (ennemi.aTerre || ennemi.estIllusion || ennemi.camp === acteur.camp) return refus("Baiser du vampire : ennemi invalide");
             if (distance(acteur, ennemi) !== 1) return refus("Baiser du vampire : l'ennemi doit être au contact");
+        }
+        // Le Charme fratricide (Sorcier) : un ennemi debout, à 3 cases au plus.
+        if (idCarte === "CLASSE_CHARME_FRATRICIDE") {
+            const ennemi = combattant(etat, intention.cible);
+            if (!ennemi) return refus("Charme sans cible");
+            if (ennemi.aTerre || ennemi.estIllusion || ennemi.camp === acteur.camp) return refus("Charme : ennemi invalide");
+            if (distance(acteur, ennemi) > 3) return refus("Charme : l'ennemi doit être à 3 cases au plus");
+        }
+        // Le Transfert (Sorcier) : un ennemi debout, à 5 cases au plus — la
+        // ligne de vue ne compte pas (il se téléporte, même derrière un mur).
+        if (idCarte === "CLASSE_TRANSFERT") {
+            const autre = combattant(etat, intention.cible);
+            if (!autre) return refus("Transfert sans cible");
+            if (autre.id === acteur.id || autre.aTerre || autre.estIllusion || autre.camp === acteur.camp) return refus("Transfert : ennemi invalide");
+            if (distance(acteur, autre) > 5) return refus("Transfert : la cible doit être à 5 cases au plus");
         }
         // La Prise en charge (Médicus) : un allié À TERRE, à côté de lui.
         if (idCarte === "CLASSE_PRISE_EN_CHARGE") {
@@ -892,7 +907,9 @@ export function appliquerIntention(etat, intention, plateau) {
         // Le dé n'est consommé que si le lanceur est confus (voir
         // appliquerConfusion) : une carte ordinaire tire exactement les mêmes
         // dés qu'avant, et les journaux déjà écrits se rejouent à l'identique.
-        const action = appliquerConfusion(etat, brute, plateau, des);
+        // Le charme passe avant la confusion : un ennemi charmé frappe son
+        // allié, quoi qu'il ait voulu viser (appliquerCharme).
+        const action = appliquerConfusion(etat, appliquerCharme(etat, brute, plateau, des), plateau, des);
         action.jets = tirerDesCarte(etat, action, intention.acteur, critique, des);
         const r = resoudreCarte(etat, action, plateau);
 
@@ -1073,7 +1090,7 @@ export function jouerCreature(etat, id, carte, plateau) {
         // que du côté des joueurs (elle était tirée dans le navigateur du
         // lanceur) : un monstre confus visait tranquillement qui il voulait.
         // Même dé, même règle, pour tout le monde.
-        const action = appliquerConfusion(courant, brute, plateau, des);
+        const action = appliquerConfusion(courant, appliquerCharme(courant, brute, plateau, des), plateau, des);
         action.jets = tirerDesCarte(courant, action, id, critique, des);
         const r = resoudreCarte(courant, action, plateau);
         courant = clonerEtat(r.etat);

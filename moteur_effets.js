@@ -1571,7 +1571,10 @@ window.demarrerCiblage = async function(idCarte, options) {
                     valeurBrute: surpuissance > 1 ? Math.round(valeurDeLaCarte * surpuissance) : valeurDeLaCarte,
                     ...(surpuissance > 1 ? { surpuissance } : {}),
                     pourcentPV: pourcentPV,
-                    isRanged: isRanged,
+                    // Le Sorcier allonge TOUS ses sorts d'une case, même ceux
+                    // de contact : un sort qui porte à deux cases se vise
+                    // comme un tir (sans malus au contact, voir moteur_pur).
+                    isRanged: isRanged || porteeReelle > 1,
                     rangeMax: porteeReelle,
                     isHeal: isHeal,
                     isShield: isShield,
@@ -3236,7 +3239,8 @@ window.porteeReelleCarte = function(dataCarte, lanceur) {
             ? window.bonusPorteeMagique(lanceur, estMagique, isRanged) : 0);
 
         if (totale > meilleure.portee) {
-            meilleure = { portee: totale, isRanged, porteeCarte, apportArme: totale - porteeCarte };
+            meilleure = { portee: totale, isRanged: isRanged || totale > 1, porteeCarte,
+                          apportArme: totale - porteeCarte };
         }
     });
     return meilleure;

@@ -138,7 +138,8 @@ function persoDocVersFront(id, d) {
     nom: d.Nom_Personnage || "",
     race: d.Race || "",
     // La classe choisie à la création (classes.js). Vide pour un héros d'avant.
-    classe: d.Classe || "",
+    // Une classe renommée se lit sous son nom d'aujourd'hui (Nécromancien → Sorcier).
+    classe: (typeof window.nomActuelClasse === "function" ? window.nomActuelClasse(d.Classe) : d.Classe) || "",
     // DEUX AVATARS, UN SEUL POINT DE BASCULE.
     //  URL_Cloudinary est le portrait de RÉFÉRENCE : il ne bouge jamais, et
     //  c'est lui qu'on renvoie au dessinateur à chaque changement d'armure.
@@ -883,10 +884,15 @@ window.atoutPeuple = function(perso) {
 //    sursis      tombé à 0 PV, il tient encore ce nombre de tours (une fois
 //                par combat, sans soin possible) avant d'être mis KO
 window.ATOUTS_CLASSES = {
-    "Nécromancien": [
-        { niveau: 1,  competences: 1, pvMax: 8 },
-        { niveau: 5,  effets: ["EFF_TENEBRES"] },
-        { niveau: 10, sursis: 2 }
+    // LE SORCIER (ex-Nécromancien, renommé — CLASSES_RENOMMEES) : Ténèbres dans
+    // la Forge dès le niveau 1, +1 case de portée sur TOUS ses sorts (porteeSorts,
+    // bonusPorteeMagique) et aucun malus au contact pour ses sorts à distance
+    // (sortsSansMalusContact, chaineDeDegats) ; le Charme fratricide au niveau
+    // 5, le Transfert au niveau 10.
+    "Sorcier": [
+        { niveau: 1,  effets: ["EFF_TENEBRES"], porteeSorts: 1, sortsSansMalusContact: true },
+        { niveau: 5,  techniques: ["CLASSE_CHARME_FRATRICIDE"] },
+        { niveau: 10, techniques: ["CLASSE_TRANSFERT"] }
     ],
     // L'HOPLITE : le mur de la troupe. +5 de parade et +5 de défense physique
     // dès le niveau 1 ; deux techniques de classe (TECHNIQUES_CLASSE, plus bas)
@@ -987,6 +993,16 @@ window.TECHNIQUES_CLASSE = {
         desc: "Le Vampire se disperse en nuée : son esquive passe à 40 % (elle reste plus haute si elle "
             + "l'était déjà) pour la manche en cours et la suivante. Une fois par combat."
     },
+    CLASSE_CHARME_FRATRICIDE: {
+        Nom: "Charme fratricide", classe: "Sorcier", niveau: 5, Initiative: 105, Fatigue: 0, cible: "ennemi", portee: 3,
+        desc: "Sur un ennemi à 3 cases : sa prochaine compétence frappe l'un de ses propres alliés "
+            + "(au hasard, à sa portée ; aucun à portée, elle se perd). Une fois par combat."
+    },
+    CLASSE_TRANSFERT: {
+        Nom: "Transfert", classe: "Sorcier", niveau: 10, Initiative: 100, Fatigue: 0, cible: "ennemi", portee: 5,
+        desc: "Se téléporte à la place d'un ennemi à 5 cases, même hors de vue (derrière un mur), "
+            + "l'ennemi prenant la sienne, et se soigne de 10 PV. Une fois par combat."
+    },
     CLASSE_PRISE_EN_CHARGE: {
         Nom: "Prise en charge par Médicus", classe: "Médicus", niveau: 10, Initiative: 0, Fatigue: 0, cible: "allieKO",
         desc: "Réanime un allié KO adjacent avec 30 % de ses PV, et repousse d'une case tous les ennemis "
@@ -1022,8 +1038,18 @@ window.toutesTechniquesDeClasse = function(perso) {
 
 // Le nom d'une classe sans accents ni majuscules : la fiche garde le nom tel
 // qu'il a été choisi (« Nécromancien »), la base pourrait l'écrire autrement.
-const cleClasse = (nom) => String(nom || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+//
+// UNE CLASSE RENOMMÉE garde ses héros : le Nécromancien est devenu le Sorcier,
+// et une fiche qui porte encore « Nécromancien » se lit « Sorcier ».
+window.CLASSES_RENOMMEES = { "necromancien": "Sorcier" };
+const cleClasseBrute = (nom) => String(nom || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .toLowerCase().trim();
+const cleClasse = (nom) => {
+    const brute = cleClasseBrute(nom);
+    return window.CLASSES_RENOMMEES[brute] ? cleClasseBrute(window.CLASSES_RENOMMEES[brute]) : brute;
+};
+// Le nom d'aujourd'hui d'une classe (« Nécromancien » → « Sorcier »).
+window.nomActuelClasse = (nom) => window.CLASSES_RENOMMEES[cleClasseBrute(nom)] || nom || "";
 
 window.paliersDeClasse = function(nomClasse) {
     const cle = cleClasse(nomClasse);
@@ -1100,6 +1126,8 @@ window.texteAtout = function(cle, valeur) {
         case "regenPv":        return `${plus(n)} PV repris à chaque fin de manche`;
         case "soinsRecus":     return `${plus(n)} % de soins reçus`;
         case "porteeMagique":  return `${plus(n)} case de portée pour les sorts magiques à distance`;
+        case "porteeSorts":    return `${plus(n)} case de portée de base sur tous ses sorts`;
+        case "sortsSansMalusContact": return "Aucune réduction au contact pour ses sorts à distance";
         case "diviseurDeplacement": return n === 2 ? "Se déplace pour deux fois moins de fatigue" : `Déplacement ${n} fois moins cher`;
         case "esquiveOpportunite":  return `${n} % de chance d'esquiver une attaque d'opportunité`;
         case "immunites":      return `Insensible : ${(valeur || []).join(", ")}`;
@@ -1128,7 +1156,7 @@ window.detailBonusRaceClasse = function(perso) {
     const niveau = window.niveauDuPerso(perso || {});
     return {
         race: { nom: race, lignes: lignesAtout(window.atoutPeuple(perso || {})) },
-        classe: { nom: classe, niveau,
+        classe: { nom: window.nomActuelClasse(classe), niveau,
                   paliers: window.paliersDeClasse(classe).map(p => ({
                       niveau: p.niveau, atteint: niveau >= p.niveau, lignes: lignesAtout(p) })) }
     };
@@ -1298,9 +1326,12 @@ window.actionEstMagique = function(nomEffetBase) {
 // Atout de l'Ondari : une case de plus pour ses sorts magiques lancés à
 // distance. Le bonus s'ajoute UNE FOIS à la carte, pas une fois par cran de
 // Distance posé dessus — et une action au corps à corps n'y gagne rien.
+// Le Sorcier : +1 case de portée de BASE sur tous ses sorts, même sans
+// Distance (porteeSorts) — un sort au contact porte alors à 2 cases.
 window.bonusPorteeMagique = function(perso, estMagique, aDeLaDistance) {
-    if (!estMagique || !aDeLaDistance) return 0;
-    return window.atoutRace(perso).porteeMagique || 0;
+    if (!estMagique) return 0;
+    const a = window.atoutRace(perso);
+    return (aDeLaDistance ? (a.porteeMagique || 0) : 0) + (a.porteeSorts || 0);
 };
 
 // Conversion : objet front-end -> document Firestore "Personnages" (colonnes CSV)
@@ -4507,9 +4538,9 @@ window.MIGRATION_EFFETS = [
       champs: { Nom: "Ténèbres", Cout_PT: "2", Modificateur: "INTELLIGENCE",
                 Type_Mecanique: "Action/Global", Type_Mecanique_2: "Aucun",
                 Valeur: 3, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Cible_Etat: "tenebres",
-                Classe: "Nécromancien", Niveau_Requis: 5,
+                Classe: "Sorcier", Niveau_Requis: 1,
                 Effet_Base: "3 dégâts magiques, appliqués à la fatigue à la place des points de vie",
-                Notes: "Réservé au Nécromancien (niveau 5). Dégâts bruts : aucune armure (résistance magique) ne s'applique. Les dégâts vont à l'énergie (fatigue) de la cible au lieu de ses PV. Si elle n'a plus d'énergie, le reste frappe ses PV ×1,5 (arrondi à l'inférieur). Le bouclier ne protège pas l'énergie ; il n'absorbe que ce qui frappe les PV." } },
+                Notes: "Réservé au Sorcier (niveau 1). Dégâts bruts : aucune armure (résistance magique) ne s'applique. Les dégâts vont à l'énergie (fatigue) de la cible au lieu de ses PV. Si elle n'a plus d'énergie, le reste frappe ses PV ×1,5 (arrondi à l'inférieur). Le bouclier ne protège pas l'énergie ; il n'absorbe que ce qui frappe les PV." } },
     // LUMIÈRE, L'EFFET DU CHASSEUR DE MAGES (niveau 5). Un sous-effet, rangé
     // dans les menus Magique et Physique de la Forge comme Brûlé : 1 pt,
     // Intelligence, 15 % par cran jusqu'à 60 %. Il ne se greffe que sur une
@@ -4599,6 +4630,9 @@ window.MAJ_GRIMOIRE_REGLES = [
     { id: "EFF_REPLI", champs: {
         Effet_Base: "Se déplace de 3 cases après avoir attaqué, et évite toutes les attaques d'opportunité.",
         Notes: "Après l'attaque, le lanceur choisit une case à 3 pas de marche (ni mur, ni vivant traversé). Il évite toutes les attaques d'opportunité des ennemis quittés. Marche gratuite." } },
+    { id: "EFF_TENEBRES", champs: {
+        Classe: "Sorcier", Niveau_Requis: 1,
+        Notes: "Réservé au Sorcier (ex-Nécromancien), dès le niveau 1. Dégâts bruts : aucune armure (résistance magique) ne s'applique. Les dégâts vont à l'énergie (fatigue) de la cible au lieu de ses PV. Si elle n'a plus d'énergie, le reste frappe ses PV ×1,5 (arrondi à l'inférieur). Le bouclier ne protège pas l'énergie ; il n'absorbe que ce qui frappe les PV." } },
     { id: "EFF_VAMPIRISME", champs: {
         Notes: "RETIRÉ DE LA FORGE : remplacé par le Baiser du vampire (technique de classe du Vampire, niveau 5). Les cartes déjà forgées gardent leur effet (1 dégât magique par cran, soin de 70 % des dégâts infligés)." } }
 ];
