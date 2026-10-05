@@ -7,8 +7,8 @@
 //      en a un, la race, le genre et la classe du héros, ses armes — et écrit
 //      le prompt d'une scène : le héros en train d'exécuter sa technique, ou
 //      au moins ce que fait la technique, lisible d'un coup d'œil ;
-//   2. l'IA d'image (OpenAI, mêmes réglages que les pions : gpt-image-2 puis
-//      ses aînés, 1024×1024, qualité basse, PNG) reçoit ce prompt ET, en
+//   2. l'IA d'image (OpenAI : gpt-image-2 puis ses aînés, 1536×1024 paysage,
+//      qualité moyenne, PNG) reçoit ce prompt ET, en
 //      binaire, le portrait du héros et l'image de ses armes (une arme à deux
 //      mains n'est envoyée qu'une fois).
 //  L'image passe par Cloudinary, puis son adresse est écrite sur la
@@ -32,11 +32,18 @@ const MODELES_IMAGE = [
 ];
 // Le fond posé sous les transparences des images de référence.
 const FOND_REFERENCES = "#808080";
-// LE FORMAT UNIQUE DES ILLUSTRATIONS : 1000 × 800 (5:4), celui de la fenêtre
-// du haut de la carte. L'IA dessine en carré (réglages des pions) ; l'image
+// LE FORMAT UNIQUE DES ILLUSTRATIONS : 1250 × 1000 (5:4), celui de la fenêtre
+// du haut de la carte. L'IA dessine en paysage 3:2 ; l'image
 // est recadrée au centre avant l'envoi, et Cloudinary le refait à la livraison
 // (c_fill) : quoi qu'il arrive, toutes les illustrations ont ce format.
-window.FORMAT_ILLUSTRATION = { largeur: 1000, hauteur: 800 };
+window.FORMAT_ILLUSTRATION = { largeur: 1250, hauteur: 1000 };
+// LA NETTETÉ. Les premières illustrations sortaient floues : dessinées en
+// qualité « low » (le réglage des pions, fait pour un médaillon minuscule),
+// recompressées en JPEG avant l'envoi, puis encore par Cloudinary (q_auto).
+// Elles sont maintenant dessinées en paysage (le format d'un plan de cinéma,
+// moins rogné pour la fenêtre 5:4) et en qualité moyenne, envoyées en PNG
+// sans perte, et livrées en q_auto:best.
+window.DESSIN_ILLUSTRATION = { taille: "1536x1024", qualite: "medium" };
 
 const dormir = (ms) => new Promise(r => setTimeout(r, ms));
 const sansBalises = (t) => String(t || "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
@@ -232,9 +239,10 @@ ${references.join("\n")}`;
     const systeme = `Tu es MIA_ILLUSTRATION, directrice artistique d'Ivalis (jeu de rôle de fantasy).
 Tu écris, en ANGLAIS, le prompt d'une illustration de carte de compétence pour une IA d'image qui reçoit aussi les images de référence listées.
 - Montre CE personnage (celui de l'image 1 : même visage, même race, même armure, mêmes couleurs) en train d'exécuter la technique, en pleine action. Si la technique se lit mieux par son effet (un soin, un bouclier, une zone), montre l'effet en train de se produire, le personnage en lanceur.
-- S'il y a des armes en référence, il les tient telles qu'elles sont dessinées. Sinon, s'appuie sur l'arme de la technique : Magie = mains nues ou focaliseur, énergie visible ; Sans arme = mains nues ou arme improvisée du récit.
+- UN VRAI PLAN DE CINÉMA, choisi pour CETTE technique : gros plan (le visage, le regard, les mains qui libèrent la magie), plan rapproché (buste, épaule), plan américain, contre-plongée héroïque, plongée, plan par-dessus l'épaule, plan large seulement si la technique couvre une zone. Le corps entier n'est PAS obligatoire : cadre serré dès que le geste ou l'émotion suffit à raconter la technique. Décris dans le prompt le type de plan, l'angle de caméra, l'objectif (ex. 35 mm, 85 mm), la profondeur de champ (arrière-plan flou), le mouvement figé (poussière, étincelles, éclats), la lumière (contre-jour, clair-obscur, lumière de l'effet sur le visage) et la composition (règle des tiers, lignes de force).
+- Les armes : les images de référence disent à quoi elles ressemblent SI elles apparaissent. Elles ne sont pas obligatoires à l'image : ne les montre que si le geste les fait voir (une lame qui frappe, une flèche tirée) ; un gros plan sur le visage ou une main peut très bien s'en passer. Magie = mains nues ou focaliseur, énergie visible ; Sans arme = mains nues ou arme improvisée du récit.
 - Le récit du joueur prime sur les effets pour la mise en scène ; les effets donnent l'élément, la portée, la cible (zone = plusieurs ennemis, distance = projectile ou rayon, soin = lumière apaisante sur un allié…).
-- Composition : l'image sera recadrée au format paysage 5:4 (on perd une bande en haut et en bas) : plan large et dynamique, personnage et action entièrement dans la bande centrale, rien d'important près des bords haut et bas, fond de décor de fantasy cohérent, lumière dramatique.
+- Cadre : l'image est dessinée en paysage 3:2 puis recadrée en 5:4 (on perd une fine bande à gauche et à droite) : rien d'essentiel collé aux bords gauche et droit. Fond de décor de fantasy cohérent avec la scène.
 - Interdits : aucun texte, aucune lettre, aucun chiffre, aucun cadre, aucune bordure, aucune interface de jeu, aucune carte à jouer.
 - Univers : Antique Fantastique (Mythic Ancient Fantasy, Antiquité Magique).${style ? `\n- Style artistique OBLIGATOIRE du jeu (il sera aussi joint tel quel au dessinateur ; ta scène doit s'y accorder) : ${style}` : ""}
 Appelle l'outil ecrirePromptImage avec le prompt (100 à 200 mots).`;
@@ -276,7 +284,9 @@ function promptDeSecours(competence, perso, armes) {
         + (armes.length ? ` wielding the weapon${armes.length > 1 ? "s" : ""} shown in the other reference images` : competence.Arme === "Magie" ? " with visible magical energy" : "")
         + `. Effects: ${effets || "a powerful strike"}. `
         + (competence.Recit_RP ? `Scene: ${competence.Recit_RP}. ` : "")
-        + "Wide dynamic shot, action centered, dramatic lighting, fantasy background. No text, no letters, no frame, no border, no UI.";
+        + "Cinematic shot chosen for this technique (close-up or medium shot when the gesture is enough, full body not required), "
+        + "low camera angle, shallow depth of field, frozen motion (sparks, dust), dramatic chiaroscuro lighting, rule of thirds, fantasy background. "
+        + "Weapons only if the gesture shows them. No text, no letters, no frame, no border, no UI.";
 }
 
 // -------------------------------------------------------------------------
@@ -305,8 +315,8 @@ async function dessinerIllustration(prompt, blobs, cles) {
         form.append("model", candidat.model);
         form.append("prompt", prompt);
         form.append("n", "1");
-        form.append("size", "1024x1024");
-        form.append("quality", "low");
+        form.append("size", window.DESSIN_ILLUSTRATION.taille);
+        form.append("quality", window.DESSIN_ILLUSTRATION.qualite);
         form.append("output_format", "png");
         if (candidat.input_fidelity) form.append("input_fidelity", candidat.input_fidelity);
         // Le personnage EN PREMIER : c'est lui que la scène doit montrer.
@@ -315,7 +325,8 @@ async function dessinerIllustration(prompt, blobs, cles) {
         let corps = form;
         let entetes = { "Authorization": "Bearer " + cles.openai };
         if (!blobs.length) {
-            const json = { model: candidat.model, prompt, n: 1, size: "1024x1024", quality: "low", output_format: "png" };
+            const json = { model: candidat.model, prompt, n: 1, size: window.DESSIN_ILLUSTRATION.taille,
+                           quality: window.DESSIN_ILLUSTRATION.qualite, output_format: "png" };
             corps = JSON.stringify(json);
             entetes = { ...entetes, "Content-Type": "application/json" };
         }
@@ -346,7 +357,7 @@ async function dessinerIllustration(prompt, blobs, cles) {
 // -------------------------------------------------------------------------
 //  3. L'HÉBERGEMENT (Cloudinary)
 // -------------------------------------------------------------------------
-// Recadre au centre au format unique (5:4), en JPEG. Une image qu'on ne peut
+// Recadre au centre au format unique (5:4), en PNG sans perte. Une image qu'on ne peut
 // pas lire ici (adresse d'un autre domaine) part telle quelle : Cloudinary la
 // recadrera à la livraison.
 async function recadrerAuFormat(image) {
@@ -362,7 +373,7 @@ async function recadrerAuFormat(image) {
         const canvas = document.createElement("canvas");
         canvas.width = largeur; canvas.height = hauteur;
         canvas.getContext("2d").drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, 0, 0, largeur, hauteur);
-        return canvas.toDataURL("image/jpeg", 0.92);
+        return canvas.toDataURL("image/png");
     } catch (e) {
         return image;
     }
@@ -386,7 +397,7 @@ async function hebergerIllustration(image, cles) {
     }
     if (!json || !json.secure_url) throw new Definitive("Cloudinary n'a pas rendu d'adresse");
     const { largeur, hauteur } = window.FORMAT_ILLUSTRATION;
-    return json.secure_url.replace("/upload/", `/upload/c_fill,g_center,w_${largeur},h_${hauteur}/q_auto,f_auto/`);
+    return json.secure_url.replace("/upload/", `/upload/c_fill,g_center,w_${largeur},h_${hauteur}/q_auto:best,f_auto/`);
 }
 
 // La carte déjà chargée prend son image tout de suite, et si elle est ouverte

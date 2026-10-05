@@ -4507,3 +4507,20 @@ illustration_competence.mjs, section 3 bis.
   « de la… du… » en cascade. `nomDeTechnique` remet son nom au propre
   (guillemets, point final, article en tête, Majuscules Partout) et le coupe
   entre deux mots au-delà de 32 caractères. aide_forge_lia.mjs, sections 7 et 10.
+
+## Illustrations nettes et vrais plans de cinéma (version 186)
+
+Les illustrations sortaient floues : la cause principale était la génération
+en qualité « low » (le réglage des pions, pensé pour un médaillon minuscule) ;
+la compression ajoutait sa part (JPEG 0,92 avant l'envoi, puis q_auto).
+Elles sont maintenant dessinées en paysage 1536 × 1024 (le format d'un plan de
+cinéma, à peine rogné pour la fenêtre 5:4) et en qualité moyenne
+(`DESSIN_ILLUSTRATION`), recadrées en 1250 × 1000 et envoyées en PNG sans
+perte, livrées en `q_auto:best`. Les images déjà faites gardent leur netteté
+d'origine.
+MIA_ILLUSTRATION compose un vrai plan : gros plan, plan rapproché, plan
+américain, contre-plongée, plongée, par-dessus l'épaule ; plan large seulement
+pour une zone. Le corps entier et l'arme ne sont plus obligatoires (l'arme
+n'apparaît que si le geste la montre). Le prompt décrit le plan, l'angle, la
+focale, la profondeur de champ, le mouvement figé, la lumière et la
+composition. illustration_competence.mjs, sections 2 bis, 3 et 4 bis.

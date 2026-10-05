@@ -99,13 +99,13 @@ await p.addInitScript(({ PERSO }) => {
       entree.statut = statut;
       window.__faux.openai.push(entree);
       if (statut !== 200) return repondre({ error: { message: "Rate limit" } }, statut);
-      // Un vrai PNG carré 1024 × 1024, comme l'IA le rend : trois bandes
-      // (haut bleu, milieu rouge, bas vert) pour voir le recadrage.
-      const c = document.createElement("canvas"); c.width = 1024; c.height = 1024;
+      // Un vrai PNG paysage 1536 × 1024, comme l'IA le rend : trois bandes
+      // (gauche bleue, milieu rouge, droite verte) pour voir le recadrage.
+      const c = document.createElement("canvas"); c.width = 1536; c.height = 1024;
       const ctx = c.getContext("2d");
-      ctx.fillStyle = "#0000ff"; ctx.fillRect(0, 0, 1024, 1024);
-      ctx.fillStyle = "#ff0000"; ctx.fillRect(0, 90, 1024, 844);
-      ctx.fillStyle = "#00ff00"; ctx.fillRect(0, 934, 1024, 90);
+      ctx.fillStyle = "#0000ff"; ctx.fillRect(0, 0, 1536, 1024);
+      ctx.fillStyle = "#ff0000"; ctx.fillRect(110, 0, 1316, 1024);
+      ctx.fillStyle = "#00ff00"; ctx.fillRect(1426, 0, 110, 1024);
       return repondre({ data: [{ b64_json: c.toDataURL("image/png").split(",")[1] }] });
     }
     if (url.includes("api.cloudinary.com")) {
@@ -173,12 +173,24 @@ verifier("le titre de la compétence", /Fendoir des cimes/.test(texteG));
 verifier("ses effets", /Attaque lourde/.test(texteG), texteG.split("\n").find(l => /Attaque/.test(l)));
 verifier("le récit RP", /fends le sol/.test(texteG));
 verifier("la race et le genre du personnage", /RACE : Elfe/.test(texteG) && /GENRE : Femme/.test(texteG));
-verifier("consigne de cadrage : format paysage 5:4, action dans la bande centrale", /5:4/.test(g.systemInstruction.parts[0].text)
-         && /bande centrale/.test(g.systemInstruction.parts[0].text));
+const consignes = g.systemInstruction.parts[0].text;
+verifier("consigne de cadrage : dessin 3:2 recadré en 5:4, rien d'essentiel aux bords", /3:2/.test(consignes) && /5:4/.test(consignes));
+
+console.log("\n2 bis. UN VRAI PLAN DE CINÉMA");
+// Nico : « pas obligé de voir l'arme si ce n'est pas nécessaire, différents
+// plans, des vues rapprochées, pas obligé de voir le corps entier : un vrai
+// plan cinématographique. »
+verifier("des plans variés : gros plan, plan rapproché, contre-plongée, par-dessus l'épaule…",
+         /gros plan/.test(consignes) && /plan rapproché/.test(consignes) && /contre-plongée/.test(consignes) && /par-dessus l'épaule/.test(consignes));
+verifier("le corps entier n'est pas obligatoire", /corps entier n'est PAS obligatoire/.test(consignes));
+verifier("l'arme n'est pas obligatoire à l'image", /ne sont pas obligatoires à l'image/.test(consignes));
+verifier("le langage du cinéma : angle, objectif, profondeur de champ, lumière, composition",
+         /angle de caméra/.test(consignes) && /objectif/.test(consignes) && /profondeur de champ/.test(consignes)
+         && /clair-obscur|contre-jour/.test(consignes) && /règle des tiers/.test(consignes));
 verifier("consigne : mettre CE personnage en scène, sans texte ni cadre", /exécuter la technique/.test(g.systemInstruction.parts[0].text)
          && /aucun texte/.test(g.systemInstruction.parts[0].text));
 
-console.log("\n3. L'IA D'IMAGE : MÊMES RÉGLAGES QUE LES PIONS, PORTRAIT ET ARMES EN BINAIRE");
+console.log("\n3. L'IA D'IMAGE : PAYSAGE, QUALITÉ MOYENNE, PORTRAIT ET ARMES EN BINAIRE");
 const ok = f.openai.filter(o => o.statut === 200);
 const o = ok[0] || {};
 verifier("le prompt envoyé contient la scène de l'IA de prompt", /PROMPT-MIA/.test(o.prompt || ""), o.prompt);
@@ -191,7 +203,7 @@ verifier("l'IA de prompt connaît le style", /STYLE-TEST : gravure à l'encre s�
 verifier("…et l'IA d'image le reçoit MOT POUR MOT, dans les mêmes termes",
          (o.prompt || "").includes("Directives de style artistique obligatoires : STYLE-TEST : gravure à l'encre sépia, hachures fines, aplats de lavis."), o.prompt);
 verifier("avec le contexte de l'univers des portraits (Antique Fantastique)", (o.prompt || "").includes("Contexte de l'univers : Antique Fantastique"));
-verifier("gpt-image-2, 1024×1024, qualité basse, PNG (comme les pions)", o.model === "gpt-image-2" && o.size === "1024x1024" && o.quality === "low" && o.format === "png",
+verifier("gpt-image-2, paysage 1536×1024, qualité moyenne (plus la basse des pions), PNG", o.model === "gpt-image-2" && o.size === "1536x1024" && o.quality === "medium" && o.format === "png",
          `${o.model} ${o.size} ${o.quality} ${o.format}`);
 verifier("en édition, avec les images de référence", /images\/edits/.test(o.url || ""));
 verifier("le personnage d'abord, puis l'arme : la hache à deux mains UNE fois", JSON.stringify(o.images) === JSON.stringify(["personnage.png", "arme_1.png"]), JSON.stringify(o.images));
@@ -204,19 +216,22 @@ verifier("deux refus 429, puis la réussite", f.openai.map(x => x.statut).join()
 verifier("…sans redemander le prompt ni relire les images à chaque essai", f.gemini.length === 1 && f.blobs.length === 2, `${f.gemini.length} prompt(s), ${f.blobs.length} image(s) lue(s)`);
 verifier("une seule image hébergée, dans Competences", f.cloud.length === 1 && f.cloud[0].dossier === "Competences", f.cloud.map(c => c.dossier).join());
 
-console.log("\n4 bis. UN SEUL FORMAT : 1000 × 800 (5:4), CELUI DE LA FENÊTRE DE LA CARTE");
+console.log("\n4 bis. UN SEUL FORMAT : 1250 × 1000 (5:4), CELUI DE LA FENÊTRE DE LA CARTE, SANS PERTE");
 const envoi = await p.evaluate(async (fichier) => {
   const img = new Image(); img.src = fichier; await img.decode();
   const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
   const ctx = c.getContext("2d"); ctx.drawImage(img, 0, 0);
   const couleur = (y) => Array.from(ctx.getImageData(img.width / 2, y, 1, 1).data.slice(0, 3));
-  return { l: img.width, h: img.height, type: fichier.slice(5, fichier.indexOf(";")), haut: couleur(5), milieu: couleur(img.height / 2) };
+  const bord = (x) => Array.from(ctx.getImageData(x, img.height / 2, 1, 1).data.slice(0, 3));
+  return { l: img.width, h: img.height, type: fichier.slice(5, fichier.indexOf(";")), gauche: bord(3), droite: bord(img.width - 4), milieu: couleur(img.height / 2) };
 }, f.cloud[0].fichier);
-verifier("le carré de l'IA est recadré à 1000 × 800 avant l'envoi", envoi.l === 1000 && envoi.h === 800, `${envoi.l}×${envoi.h} ${envoi.type}`);
-verifier("…au centre (la bande du haut est rognée)", envoi.milieu[0] > 200 && envoi.haut[2] < 60, JSON.stringify(envoi));
+verifier("le paysage de l'IA est recadré à 1250 × 1000 avant l'envoi", envoi.l === 1250 && envoi.h === 1000, `${envoi.l}×${envoi.h}`);
+verifier("…au centre (les bandes de gauche et de droite sont rognées)", envoi.milieu[0] > 200 && envoi.gauche[0] > 200 && envoi.droite[0] > 200
+         && envoi.gauche[2] < 60 && envoi.droite[1] < 60, JSON.stringify(envoi));
+verifier("envoyé en PNG, sans perte (plus de JPEG recompressé)", envoi.type === "image/png", envoi.type);
 const docComp = await p.evaluate((id) => window.__docs["Personnages/P1/Competences/" + id], idComp);
-verifier("l'adresse est écrite sur la compétence (URL_Image)", /illu_1/.test(docComp.URL_Image || "") && /q_auto,f_auto/.test(docComp.URL_Image), docComp.URL_Image);
-verifier("Cloudinary livre toujours en 1000 × 800 (c_fill)", /c_fill,g_center,w_1000,h_800/.test(docComp.URL_Image || ""), docComp.URL_Image);
+verifier("l'adresse est écrite sur la compétence (URL_Image)", /illu_1/.test(docComp.URL_Image || "") && /q_auto:best,f_auto/.test(docComp.URL_Image), docComp.URL_Image);
+verifier("Cloudinary livre toujours en 1250 × 1000, en meilleure qualité (q_auto:best)", /c_fill,g_center,w_1250,h_1000\/q_auto:best,f_auto/.test(docComp.URL_Image || ""), docComp.URL_Image);
 verifier("avec le prompt qui l'a faite (Prompt_Image), style compris", /PROMPT-MIA/.test(docComp.Prompt_Image || "") && /STYLE-TEST/.test(docComp.Prompt_Image || ""));
 verifier("la file est vide, le sceau a disparu", !(await p.evaluate(() => !!document.getElementById("badge-illustrations"))));
 
