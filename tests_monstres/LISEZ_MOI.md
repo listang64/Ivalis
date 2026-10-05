@@ -4538,3 +4538,14 @@ Le repos long affiche, à la place de la carte, un encart « 🌙 Repos long » 
 dit combien il rend (`gainReposLong` : la règle du cerveau, Repos_Long du
 combattant ou 35 % de la jauge, sans dépasser le plein), avec la même jauge et
 le gain en vert clignotant (`afficherApercuReposLong`). jauge_energie_carte.mjs.
+
+## Une compétence effacée emporte son image (version 188)
+
+Le bouton MJ d'effacement (`supprimerCompetencePerso`) lit l'adresse de
+l'illustration (cache, sinon la base) AVANT d'effacer le document, puis la
+détruit sur Cloudinary (`supprimerImageCloudinary`, ia_master.js), sans faire
+attendre le MJ. Si l'illustration était encore en file, sa commande est retirée
+(`annulerIllustration`) ; si elle attendait une IA saturée, elle s'arrête au
+prochain essai ; si elle était en plein dessin, l'image arrivée est aussitôt
+détruite et rien n'est écrit sur la compétence effacée.
+illustration_competence.mjs, section 8.

@@ -42,7 +42,7 @@ const FAUX_FIRESTORE = `
   export const getDocs = async () => ({ forEach: () => {}, docs: [], empty: true });
   export const setDoc = async (ref, data) => { (window.__ecrits = window.__ecrits || []).push({ chemin: ref.chemin, data }); (window.__docs = window.__docs || {})[ref.chemin] = JSON.parse(JSON.stringify(data)); };
   export const updateDoc = async (ref, data) => { (window.__majs = window.__majs || []).push({ chemin: ref.chemin, data }); const d = (window.__docs = window.__docs || {}); d[ref.chemin] = { ...(d[ref.chemin] || {}), ...data }; };
-  export const deleteDoc = async () => {};
+  export const deleteDoc = async (ref) => { (window.__effaces = window.__effaces || []).push(ref.chemin); delete (window.__docs || {})[ref.chemin]; };
   export const addDoc = async () => ({ id: "n" });
   export const deleteField = () => "x"; export class FieldPath { constructor(...s){this.s=s;} }
   export const arrayUnion = (...v) => v; export const arrayRemove = (...v) => v;
@@ -98,6 +98,7 @@ await p.addInitScript(({ PERSO }) => {
       const statut = window.__faux.statutsOpenAI.length ? window.__faux.statutsOpenAI.shift() : 200;
       entree.statut = statut;
       window.__faux.openai.push(entree);
+      if (window.__faux.delaiOpenAI) await new Promise(r => setTimeout(r, window.__faux.delaiOpenAI));
       if (statut !== 200) return repondre({ error: { message: "Rate limit" } }, statut);
       // Un vrai PNG paysage 1536 × 1024, comme l'IA le rend : trois bandes
       // (gauche bleue, milieu rouge, droite verte) pour voir le recadrage.
@@ -107,6 +108,10 @@ await p.addInitScript(({ PERSO }) => {
       ctx.fillStyle = "#ff0000"; ctx.fillRect(110, 0, 1316, 1024);
       ctx.fillStyle = "#00ff00"; ctx.fillRect(1426, 0, 110, 1024);
       return repondre({ data: [{ b64_json: c.toDataURL("image/png").split(",")[1] }] });
+    }
+    if (url.includes("api.cloudinary.com") && url.includes("/image/destroy")) {
+      (window.__faux.detruits = window.__faux.detruits || []).push(options.body.get("public_id"));
+      return repondre({ result: "ok" });
     }
     if (url.includes("api.cloudinary.com")) {
       window.__faux.cloud.push({ dossier: options.body.get("folder"), fichier: options.body.get("file") });
@@ -357,6 +362,73 @@ if (process.env.CAPTURE) {
   await p.waitForTimeout(400);
   await p.screenshot({ path: process.env.CAPTURE + "_carte.png" });
 }
+
+console.log("\n8. UNE COMPÉTENCE EFFACÉE PAR LE MJ : SON IMAGE QUITTE CLOUDINARY");
+// Nico : « quand on supprime une compétence avec le bouton de MJ, ça efface
+// l'image dans Cloudinary. »
+const effacer = (idComp) => p.evaluate(async (idComp) => {
+  window.confirm = () => true;
+  window.ID_PERSONNAGE_DECK = "P1";
+  window.chargerOngletCompetences = async () => {};
+  await window.supprimerCompetencePerso(idComp, "Banc");
+  await new Promise(r => setTimeout(r, 200));
+}, idComp);
+// a) L'adresse est dans le cache (carte déjà chargée).
+await p.evaluate(() => {
+  const url = "https://res.cloudinary.com/x/image/upload/c_fill,g_center,w_1250,h_1000/q_auto:best,f_auto/v17/Competences/abc123.png";
+  window.__docs["Personnages/P1/Competences/C_DEL"] = { Nom: "À effacer", URL_Image: url };
+  window.COMPETENCES_CACHE["C_DEL"] = { Nom: "À effacer", URL_Image: url };
+  window.__faux.detruits = [];
+});
+await effacer("C_DEL");
+let d = await p.evaluate(() => ({ detruits: window.__faux.detruits, doc: !!window.__docs["Personnages/P1/Competences/C_DEL"] }));
+verifier("la compétence est effacée, et son image détruite (« Competences/abc123 »)", !d.doc && JSON.stringify(d.detruits) === '["Competences/abc123"]', JSON.stringify(d));
+// b) L'adresse n'est que dans la base (carte jamais chargée ici).
+await p.evaluate(() => {
+  window.__docs["Personnages/P1/Competences/C_DEL2"] = { Nom: "Autre", URL_Image: "https://res.cloudinary.com/x/image/upload/q_auto,f_auto/Competences/xyz.png" };
+  delete window.COMPETENCES_CACHE["C_DEL2"]; window.__faux.detruits = [];
+});
+await effacer("C_DEL2");
+d = await p.evaluate(() => window.__faux.detruits);
+verifier("adresse lue dans la base avant l'effacement : image détruite aussi", JSON.stringify(d) === '["Competences/xyz"]', JSON.stringify(d));
+// c) Sans illustration : aucune destruction demandée.
+await p.evaluate(() => { window.__docs["Personnages/P1/Competences/C_NUE"] = { Nom: "Nue" }; window.__faux.detruits = []; });
+await effacer("C_NUE");
+verifier("une compétence sans image : rien à détruire", (await p.evaluate(() => window.__faux.detruits.length)) === 0);
+const fileVide = () => p.waitForFunction(() => JSON.parse(localStorage.getItem("ivalis_illustrations_en_attente") || "[]").length === 0
+                                             && !window.ILLUSTRATION.occupee(), null, { timeout: 15000 });
+// d) Effacée pendant qu'elle attend une IA saturée : plus aucun dessin.
+await p.evaluate(() => {
+  window.__docs["Personnages/P1/Competences/C_ATTENTE"] = { Nom: "En attente", Arme: "Magie", Effets_Compiles: [] };
+  window.__faux.openai = []; window.__faux.cloud = []; window.__faux.detruits = [];
+  window.__faux.statutsOpenAI = [429, 429, 429, 429];
+  window.illustrerCompetence("P1", "C_ATTENTE", "En attente");
+});
+await p.waitForFunction(() => window.__faux.openai.length >= 1, null, { timeout: 5000 });
+await effacer("C_ATTENTE");
+await fileVide();
+d = await p.evaluate(() => ({ openai: window.__faux.openai.length, cloud: window.__faux.cloud.length }));
+verifier("effacée pendant l'attente (IA saturée) : plus aucun dessin, rien hébergé", d.openai === 1 && d.cloud === 0, JSON.stringify(d));
+// e) Effacée PENDANT son dessin (la requête est partie), une autre encore en file.
+await p.evaluate(() => {
+  window.__docs["Personnages/P1/Competences/C_DESSIN"] = { Nom: "En dessin", Arme: "Magie", Effets_Compiles: [] };
+  window.__docs["Personnages/P1/Competences/C_FILE"] = { Nom: "En file", Arme: "Magie", Effets_Compiles: [] };
+  window.__faux.openai = []; window.__faux.cloud = []; window.__faux.detruits = []; window.__majs = [];
+  window.__faux.statutsOpenAI = []; window.__faux.delaiOpenAI = 1200;   // le dessin prend du temps
+  window.illustrerCompetence("P1", "C_DESSIN", "En dessin");
+  window.illustrerCompetence("P1", "C_FILE", "En file");
+});
+await p.waitForFunction(() => window.__faux.openai.length >= 1, null, { timeout: 5000 });
+await effacer("C_DESSIN");
+await effacer("C_FILE");
+await fileVide();
+await p.waitForTimeout(300);
+d = await p.evaluate(() => ({ openai: window.__faux.openai.length, cloud: window.__faux.cloud.length, detruits: window.__faux.detruits,
+                             majs: (window.__majs || []).filter(m => /C_DESSIN|C_FILE/.test(m.chemin)).length }));
+await p.evaluate(() => { window.__faux.delaiOpenAI = 0; });
+verifier("celle qui était en file n'est jamais dessinée", d.openai === 1, `${d.openai} dessin(s)`);
+verifier("celle en plein dessin : son image arrivée est aussitôt détruite", d.cloud === 1 && d.detruits.length === 1 && /^Competences\//.test(d.detruits[0]), JSON.stringify(d));
+verifier("…et aucune adresse n'est écrite sur une compétence effacée", d.majs === 0, d.majs);
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
 await b.close(); serveur.close();

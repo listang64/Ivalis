@@ -64,6 +64,17 @@ function ecrireFile(file) {
 const cleCommande = (c) => `${c.idPerso}/${c.idComp}`;
 
 let enCours = false;
+// Les commandes annulées pendant qu'elles se dessinent (compétence effacée).
+const annulees = new Set();
+
+// Une compétence effacée (supprimerCompetencePerso, competences.js) : sa
+// commande quitte la file, et si elle se dessine en ce moment, son image sera
+// retirée de Cloudinary dès qu'elle arrive.
+window.annulerIllustration = function(idPerso, idComp) {
+    const cle = `${idPerso}/${idComp}`;
+    annulees.add(cle);
+    ecrireFile(lireFile().filter(c => cleCommande(c) !== cle));
+};
 let etatBadge = "";
 
 // Met une compétence en file. Elle sera illustrée dès que possible.
@@ -85,6 +96,10 @@ async function traiterFile() {
             const file = lireFile();
             if (file.length === 0) break;
             const commande = file[0];
+            if (annulees.has(cleCommande(commande))) {
+                ecrireFile(lireFile().filter(c => cleCommande(c) !== cleCommande(commande)));
+                continue;
+            }
             // Ce qui est déjà fait survit aux nouveaux essais : on ne redemande
             // pas un prompt, ni une image, qu'on a déjà.
             const acquis = {};
@@ -162,6 +177,14 @@ async function illustrer(commande, acquis = {}) {
     if (!acquis.recadree) acquis.recadree = await recadrerAuFormat(image);
     const url = acquis.url || (acquis.url = await hebergerIllustration(acquis.recadree, cles));
 
+    // La compétence a pu être effacée par le MJ pendant le dessin : l'image
+    // n'a plus de carte, elle quitte Cloudinary et la commande s'arrête là.
+    const encore = await getDoc(doc(db, "Personnages", commande.idPerso, "Competences", commande.idComp))
+        .catch(e => { throw new Saturee("lecture Firestore impossible (" + e.message + ")"); });
+    if (!encore.exists() || annulees.has(cleCommande(commande))) {
+        if (typeof window.supprimerImageCloudinary === "function") await window.supprimerImageCloudinary(url);
+        throw new Definitive("compétence effacée pendant le dessin : image retirée de Cloudinary");
+    }
     await updateDoc(doc(db, "Personnages", commande.idPerso, "Competences", commande.idComp),
                     { URL_Image: url, Prompt_Image: prompt })
         .catch(e => { throw new Saturee("écriture Firestore impossible (" + e.message + ")"); });
@@ -454,4 +477,5 @@ window.htmlIllustrationCarte = function(data) {
 setTimeout(() => { if (lireFile().length) { afficherBadge(); traiterFile(); } }, 4000);
 
 // Pour les bancs.
-window.ILLUSTRATION = { lireFile, armesDeReference, promptDeSecours, traiterFile, Saturee, Definitive };
+window.ILLUSTRATION = { lireFile, armesDeReference, promptDeSecours, traiterFile, Saturee, Definitive,
+                        occupee: () => enCours };

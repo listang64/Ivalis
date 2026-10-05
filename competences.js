@@ -362,9 +362,28 @@ window.supprimerCompetencePerso = async function(idCarte, titre) {
         banniere.style.transform = "translateX(-40px)";
     }
 
+    // Son illustration (illustration_competence.js), lue AVANT d'effacer le
+    // document : c'est lui qui en garde l'adresse.
+    let urlImage = ((window.COMPETENCES_CACHE || {})[idCarte] || {}).URL_Image
+        || (((window.CACHE_COMPETENCES_GLOBAL || {})[idPersonnage] || {})[idCarte] || {}).URL_Image || "";
+    if (!urlImage) {
+        try {
+            const snap = await getDoc(doc(db, "Personnages", idPersonnage, "Competences", idCarte));
+            if (snap.exists()) urlImage = snap.data().URL_Image || "";
+        } catch (e) { /* sans réseau, l'effacement ci-dessous échouera de toute façon */ }
+    }
+
     try {
         // 1. Le document de la technique.
         await deleteDoc(doc(db, "Personnages", idPersonnage, "Competences", idCarte));
+
+        // 1 bis. Son illustration quitte Cloudinary (sans faire attendre le MJ),
+        //        et si elle était encore en file ou en train de se dessiner,
+        //        la commande est annulée.
+        if (typeof window.annulerIllustration === "function") window.annulerIllustration(idPersonnage, idCarte);
+        if (urlImage && typeof window.supprimerImageCloudinary === "function") {
+            window.supprimerImageCloudinary(urlImage);
+        }
 
         // 2. Le deck équipé, s'il la portait.
         if (Array.isArray(window.CARTES_SELECTIONNEES) && window.CARTES_SELECTIONNEES.includes(idCarte)) {
