@@ -78,11 +78,11 @@ window.CLASSES_PAR_DEFAUT = [
 window.DESCRIPTIFS_CLASSES = {
     CLASSE_NECROMANCIEN: {
         presentation: "Maître des morts et des ombres, le Nécromancien puise sa force dans ce que "
-            + "les autres redoutent. Le froid de la tombe ne l'atteint plus, et ses sorts vident "
-            + "l'énergie de ses ennemis avant de s'en prendre à leur chair.",
+            + "les autres redoutent. La mort lui a laissé une vigueur que les vivants n'ont pas, et "
+            + "ses sorts vident l'énergie de ses ennemis avant de s'en prendre à leur chair.",
         paliers: [
             { niveau: 1, titre: "Enfant de la tombe",
-              points: ["Insensible au Gel (jamais Glacé)", "+1 compétence", "+5 PV"] },
+              points: ["+1 compétence", "+8 PV"] },
             { niveau: 5, titre: "Sort : Ténèbres",
               points: ["2 pts · Intelligence · 3 dégâts magiques bruts (aucune armure)",
                        "Les dégâts frappent la fatigue de la cible au lieu de ses PV",
@@ -123,7 +123,7 @@ window.DESCRIPTIFS_CLASSES = {
                        "100 % d'empoisonnement, même s'il esquive · une fois par combat"] },
             { niveau: 10, titre: "Maître des poisons",
               points: ["Ses empoisonnements mordent à chaque fin de manche, 2 manches durant",
-                       "-18 % de fatigue (énergie max) et -10 % des PV max à chaque fois"] }
+                       "-18 % de fatigue (énergie max) et -10 % des PV max en dégâts bruts à chaque fois"] }
         ]
     },
     CLASSE_MEDICUS: {
@@ -146,20 +146,20 @@ window.DESCRIPTIFS_CLASSES = {
     },
     CLASSE_VAMPIRE: {
         presentation: "Ni tout à fait mort, ni tout à fait vivant, le Vampire se nourrit de ce qu'il "
-            + "arrache à ses proies. Sa peau encaisse les coups, son pas est léger comme une ombre "
+            + "arrache à ses proies. Sa peau encaisse les coups, le froid ne le saisit plus "
             + "— mais le feu le ronge plus que tout autre. Les Vargens ne peuvent pas l'être.",
         paliers: [
             { niveau: 1, titre: "Sang froid",
               points: ["+10 % de résistance physique",
-                       "La première case de chaque tour ne coûte aucune fatigue",
+                       "Insensible au Gel (jamais Glacé)",
                        "Craint le feu : brûlé, -60 % de soins reçus et 18 % de ses PV max par manche"] },
-            { niveau: 5, titre: "Effet de combat : Vampirisme",
-              points: ["Dans la Forge · 1 pt, Intelligence, sans plafond",
-                       "1 dégât magique par cran",
-                       "La carte soigne le Vampire de 70 % de ce qu'elle inflige aux ennemis"] },
+            { niveau: 5, titre: "Technique : Baiser du vampire",
+              points: ["Initiative 100 · aucune fatigue · sur un ennemi au contact",
+                       "25 % de ses PV max en dégâts bruts, à coup sûr",
+                       "Se soigne de 60 % des dégâts infligés · une fois par combat"] },
             { niveau: 10, titre: "Technique : Nuée de chauve-souris",
               points: ["Initiative 100 · aucune fatigue",
-                       "Son esquive passe à 50 % (plus si elle l'était déjà)",
+                       "Son esquive passe à 40 % (plus si elle l'était déjà)",
                        "Pour la manche en cours et la suivante · une fois par combat"] }
         ]
     },
@@ -169,7 +169,7 @@ window.DESCRIPTIFS_CLASSES = {
             + "protections jusqu'à les aveugler.",
         paliers: [
             { niveau: 1, titre: "Peau de traqueur",
-              points: ["+10 % de résistance magique"] },
+              points: ["+13 % de résistance magique"] },
             { niveau: 5, titre: "Effet de combat : Lumière",
               points: ["Dans la Forge, sur un sort à dégâts magiques · 1 pt, Intelligence",
                        "15 % de chance par cran d'ignorer la résistance magique de la cible (max 60 %)"] },

@@ -773,8 +773,8 @@ console.log("\n19. LA BRÛLURE RONGE EN PHYSIQUE, QUOI QUI L'AIT ALLUMÉE");
     verifier("posée par une torche : pareil", physique && physique.typeDegats === undefined,
              physique && physique.typeDegats);
 
-    verifier("et le tableau dit combien elle ronge (8 % des PV max, physique)",
-             REGLES_ETATS["Brûlé"].pvMaxParTour === 8 && REGLES_ETATS["Brûlé"].typeParTour === "Physique");
+    verifier("et le tableau dit combien elle ronge (8 % des PV max, magique)",
+             REGLES_ETATS["Brûlé"].pvMaxParTour === 8 && REGLES_ETATS["Brûlé"].typeParTour === "Magique");
     verifier("et de combien elle ampute les soins", REGLES_ETATS["Brûlé"].soinsRecus === -50);
 }
 

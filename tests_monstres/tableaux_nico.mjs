@@ -47,11 +47,12 @@ console.log("  LES TABLEAUX DE NICO");
 console.log("=========================================================");
 
 // =========================================================================
-console.log("\n1. LA BRÛLURE : 8 % DES PV MAX EN PHYSIQUE, À CHAQUE MANCHE");
+console.log("\n1. LA BRÛLURE : 8 % DES PV MAX EN MAGIQUE, À CHAQUE MANCHE");
 // =========================================================================
 {
-    verifier("la règle : 8 % des PV max, physique, -50 % de soins",
-             REGLES_ETATS["Brûlé"].pvMaxParTour === 8 && REGLES_ETATS["Brûlé"].typeParTour === "Physique"
+    // Règle de Nico : la brûlure est un dégât MAGIQUE, réduit par la défense magique.
+    verifier("la règle : 8 % des PV max, magique, -50 % de soins",
+             REGLES_ETATS["Brûlé"].pvMaxParTour === 8 && REGLES_ETATS["Brûlé"].typeParTour === "Magique"
              && REGLES_ETATS["Brûlé"].soinsRecus === -50, JSON.stringify(REGLES_ETATS["Brûlé"]));
     const bruler = (extra) => {
         const e = etatDe([fiche("M1", { ...extra, Etats_Alteres: [{ nom: "Brûlé", duree: 2 }] })]);
@@ -63,8 +64,8 @@ console.log("\n1. LA BRÛLURE : 8 % DES PV MAX EN PHYSIQUE, À CHAQUE MANCHE");
     };
     const nu = bruler({}), arme = bruler({ Def_Physique: 50 }), mag = bruler({ Def_Magique: 50 });
     verifier("100 PV max : 8 dégâts à la 1re manche, encore 8 à la 2e", nu[0] === 92 && nu[1] === 84, JSON.stringify(nu));
-    verifier("l'armure réduit (50 % de défense physique → 4)", arme[0] === 96, JSON.stringify(arme));
-    verifier("la défense magique, elle, ne protège pas", mag[0] === 92, JSON.stringify(mag));
+    verifier("la défense magique réduit (50 % → 4)", mag[0] === 96, JSON.stringify(mag));
+    verifier("l'armure physique, elle, ne protège pas", arme[0] === 92, JSON.stringify(arme));
     const gros = etatDe([fiche("M1", { PV_Max: 250, PV_Actuels: 250 })]);
     gros.combattants.M1.etats = [{ nom: "Brûlé", duree: 2 }];
     ticsDeFinDeManche(gros);
@@ -80,10 +81,10 @@ console.log("\n1. LA BRÛLURE : 8 % DES PV MAX EN PHYSIQUE, À CHAQUE MANCHE");
 }
 
 // =========================================================================
-console.log("\n2. LE POISON : 10 % DE L'ÉNERGIE MAX, 8 % DES PV MAX EN MAGIQUE");
+console.log("\n2. LE POISON : 10 % DE L'ÉNERGIE MAX, 8 % DES PV MAX EN BRUT");
 // =========================================================================
 {
-    verifier("la règle", POISON.energiePct === 10 && POISON.pvMaxPct === 8 && POISON.typeRes === "Magique",
+    verifier("la règle (dégâts bruts)", POISON.energiePct === 10 && POISON.pvMaxPct === 8 && POISON.brut === true,
              JSON.stringify(POISON));
     const empoisonner = (extra) => {
         const e = etatDe([fiche("M1", extra)]);
@@ -98,8 +99,9 @@ console.log("\n2. LE POISON : 10 % DE L'ÉNERGIE MAX, 8 % DES PV MAX EN MAGIQUE"
     verifier("PV : -8 (8 % de 100)", nu.pv === 92, String(nu.pv));
     verifier("un seul tic (rien à la manche suivante)", nu.pvApres2 === 92, String(nu.pvApres2));
     const defMag = empoisonner({ Def_Magique: 50 }), defPhys = empoisonner({ Def_Physique: 50 });
-    verifier("la défense magique réduit (50 % → 4)", defMag.pv === 96, String(defMag.pv));
-    verifier("l'armure physique, non", defPhys.pv === 92, String(defPhys.pv));
+    // Règle de Nico : le poison frappe en dégâts BRUTS — aucune défense.
+    verifier("dégâts bruts : la défense magique ne réduit rien", defMag.pv === 92, String(defMag.pv));
+    verifier("l'armure physique non plus", defPhys.pv === 92, String(defPhys.pv));
     const bouclier = empoisonner({ Bouclier_Actuel: 20, Bouclier_Max: 20 });
     verifier("le bouclier encaisse d'abord", bouclier.pv === 100, String(bouclier.pv));
     const peu = empoisonner({ Fatigue_Actuelle: 5 });

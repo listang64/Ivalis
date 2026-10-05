@@ -884,7 +884,7 @@ window.atoutPeuple = function(perso) {
 //                par combat, sans soin possible) avant d'être mis KO
 window.ATOUTS_CLASSES = {
     "Nécromancien": [
-        { niveau: 1,  immunites: ["Glacé"], competences: 1, pvMax: 5 },
+        { niveau: 1,  competences: 1, pvMax: 8 },
         { niveau: 5,  effets: ["EFF_TENEBRES"] },
         { niveau: 10, sursis: 2 }
     ],
@@ -912,24 +912,24 @@ window.ATOUTS_CLASSES = {
         { niveau: 5,  techniques: ["CLASSE_SOIN_URGENCE"] },
         { niveau: 10, techniques: ["CLASSE_PRISE_EN_CHARGE"] }
     ],
-    // LE CHASSEUR DE MAGES : +10 de défense magique ; l'effet Lumière dans la
+    // LE CHASSEUR DE MAGES : +13 de défense magique ; l'effet Lumière dans la
     // Forge au niveau 5 (EFF_LUMIERE, MIGRATION_EFFETS) ; au niveau 10, ses
     // sorts de lumière ont 30 % de chance d'aveugler leur cible et les ennemis
     // qui la touchent (lumiereAveugle, tirerDesCarte et resoudreCarte).
     "Chasseur de mages": [
-        { niveau: 1,  defMagique: 10 },
+        { niveau: 1,  defMagique: 13 },
         { niveau: 5,  effets: ["EFF_LUMIERE"] },
         { niveau: 10, lumiereAveugle: 30 }
     ],
-    // LE VAMPIRE : +10 de résistance physique, mais le feu le ronge plus fort
-    // (brûlé : -60 % de soins reçus au lieu de -50, 18 % des PV max par manche
-    // au lieu de 8 — brulureAggravee, moteur_pur.js) ; la première case de
-    // chaque tour ne lui coûte rien (premierPasGratuit, mouvement_pur.js).
-    // Vampirisme dans la Forge au niveau 5 (EFF_VAMPIRISME), la Nuée de
-    // chauve-souris au niveau 10. Interdit aux Vargens (CLASSES_INTERDITES).
+    // LE VAMPIRE : +10 de résistance physique, insensible au gel (jamais
+    // Glacé), mais le feu le ronge plus fort (brûlé : -60 % de soins reçus au
+    // lieu de -50, 18 % des PV max par manche au lieu de 8 — brulureAggravee,
+    // moteur_pur.js). Le Baiser du vampire au niveau 5 (technique de classe :
+    // il remplace l'effet Vampirisme de la Forge), la Nuée de chauve-souris au
+    // niveau 10. Interdit aux Vargens (CLASSES_INTERDITES).
     "Vampire": [
-        { niveau: 1,  defPhysique: 10, brulureAggravee: true, premierPasGratuit: true },
-        { niveau: 5,  effets: ["EFF_VAMPIRISME"] },
+        { niveau: 1,  defPhysique: 10, brulureAggravee: true, immunites: ["Glacé"] },
+        { niveau: 5,  techniques: ["CLASSE_BAISER_VAMPIRE"] },
         { niveau: 10, techniques: ["CLASSE_NUEE_CHAUVES_SOURIS"] }
     ]
 };
@@ -977,9 +977,14 @@ window.TECHNIQUES_CLASSE = {
         Nom: "Soin d'urgence", classe: "Médicus", niveau: 5, Initiative: 70, Fatigue: 0, cible: "allies",
         desc: "Soigne de 12 PV tous les alliés debout, où qu'ils soient (le Médicus compris). Une fois par combat."
     },
+    CLASSE_BAISER_VAMPIRE: {
+        Nom: "Baiser du vampire", classe: "Vampire", niveau: 5, Initiative: 100, Fatigue: 0, cible: "ennemiAdjacent",
+        desc: "Sur un ennemi au contact : 25 % de ses PV max en dégâts bruts (aucune défense, à coup sûr), "
+            + "et le Vampire se soigne de 60 % des dégâts infligés. Une fois par combat."
+    },
     CLASSE_NUEE_CHAUVES_SOURIS: {
         Nom: "Nuée de chauve-souris", classe: "Vampire", niveau: 10, Initiative: 100, Fatigue: 0, cible: "soi",
-        desc: "Le Vampire se disperse en nuée : son esquive passe à 50 % (elle reste plus haute si elle "
+        desc: "Le Vampire se disperse en nuée : son esquive passe à 40 % (elle reste plus haute si elle "
             + "l'était déjà) pour la manche en cours et la suivante. Une fois par combat."
     },
     CLASSE_PRISE_EN_CHARGE: {

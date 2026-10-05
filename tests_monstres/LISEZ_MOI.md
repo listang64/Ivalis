@@ -4549,3 +4549,25 @@ attendre le MJ. Si l'illustration était encore en file, sa commande est retiré
 prochain essai ; si elle était en plein dessin, l'image arrivée est aussitôt
 détruite et rien n'est écrit sur la compétence effacée.
 illustration_competence.mjs, section 8.
+
+## Rééquilibrage des effets et des classes (version 189)
+
+- EMPOISONNEMENT : la part des PV (8 % des PV max ; 10 % pour le poison du
+  maître) frappe en dégâts BRUTS (`POISON.brut`) — ni défense, ni absorption,
+  ni vulnérabilité ; seul le bouclier encaisse d'abord. L'énergie (10 % / 18 %)
+  ne change pas. `chaineDeDegats` connaît désormais `attaque.brut`.
+- BRÛLURE : 8 % des PV max (18 % pour un Vampire) en dégâts MAGIQUES, réduits
+  par la défense magique (et l'absorption) — ils étaient physiques.
+- VAMPIRE : la première case gratuite est retirée ; il devient insensible au
+  gel (jamais Glacé). Le Vampirisme quitte la Forge (plus personne ne l'a ; les
+  cartes déjà forgées gardent leur soin) : au niveau 5, le BAISER DU VAMPIRE,
+  technique de classe (aucune fatigue, une fois par combat, initiative 100,
+  sur un ennemi au contact choisi dans une petite fenêtre) : 25 % de ses PV max
+  (arrondi au-dessus) en dégâts bruts, à coup sûr (ni esquive, ni critique),
+  et le Vampire se soigne de 60 % de ce qu'il a infligé (bouclier compris ;
+  brûlé, -60 %). La Nuée de chauve-souris descend à 40 % d'esquive.
+- NÉCROMANCIEN : plus d'insensibilité au gel ; +8 PV au lieu de +5.
+- CHASSEUR DE MAGES : +13 % de résistance magique au lieu de +10.
+Descriptifs de classe et textes des états à jour. Bancs : vampire (1, 3, 4 bis,
+5, 6, 8), necromancien, chasseur_de_mages, tableaux_nico, assassin,
+cerveau_combat, moteur_pur, bonus_race_classe, aide_forge_lia.

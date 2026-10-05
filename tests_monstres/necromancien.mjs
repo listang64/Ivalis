@@ -75,52 +75,53 @@ console.log("\n1. SES ATOUTS, PALIER PAR PALIER (niveau tiré de l'XP)");
     const necro = (niveau, extra = {}) => heros("N", { classe: "Nécromancien", xp: XP[niveau], ...extra });
     const a1 = w.atoutClasse(necro(1)), a4 = w.atoutClasse(necro(4));
     const a5 = w.atoutClasse(necro(5)), a10 = w.atoutClasse(necro(10));
-    verifier("niveau 1 : insensible au Gel (Glacé), +1 compétence, +5 PV",
-             JSON.stringify(a1.immunites) === '["Glacé"]' && a1.competences === 1 && a1.pvMax === 5,
+    // (Nico, ensuite : plus d'insensibilité au gel, et +8 PV au lieu de +5.)
+    verifier("niveau 1 : +1 compétence, +8 PV, plus d'insensibilité au gel",
+             !(a1.immunites || []).length && a1.competences === 1 && a1.pvMax === 8,
              JSON.stringify(a1));
     verifier("niveau 4 : pas encore Ténèbres", !(a4.effets || []).length, JSON.stringify(a4.effets));
     verifier("niveau 5 : Ténèbres débloqué", (a5.effets || []).includes("EFF_TENEBRES") && !a5.sursis,
              JSON.stringify(a5));
     verifier("niveau 10 : le sursis (2 tours), et les paliers d'avant restent",
-             a10.sursis === 2 && a10.competences === 1 && a10.pvMax === 5 && a10.effets.includes("EFF_TENEBRES"),
+             a10.sursis === 2 && a10.competences === 1 && a10.pvMax === 8 && a10.effets.includes("EFF_TENEBRES"),
              JSON.stringify(a10));
     verifier("le nom se lit sans accents (« necromancien », « NÉCROMANCIEN »)",
-             w.atoutClasse(heros("N", { classe: "necromancien" })).pvMax === 5
-             && w.atoutClasse(heros("N", { Classe: "NÉCROMANCIEN" })).pvMax === 5);
+             w.atoutClasse(heros("N", { classe: "necromancien" })).pvMax === 8
+             && w.atoutClasse(heros("N", { Classe: "NÉCROMANCIEN" })).pvMax === 8);
     verifier("une autre classe n'a rien", Object.keys(w.atoutClasse(heros("O", { classe: "Oracle" }))).length === 0);
     verifier("une créature n'a rien, même nommée comme la classe",
              Object.keys(w.atoutClasse(monstre("M", { classe: "Nécromancien" }))).length === 0);
 
-    verifier("PV max : 40 sur la fiche → 45", w.pvMaxCombattant(necro(1)) === 45
+    verifier("PV max : 40 sur la fiche → 48", w.pvMaxCombattant(necro(1)) === 48
              && w.pvMaxCombattant(heros("H")) === 40, `${w.pvMaxCombattant(necro(1))}`);
     verifier("+1 compétence en main (7), comme le Gob", w.competencesMaxCombattant(necro(1)) === 7
              && w.competencesMaxCombattant(heros("H")) === 6);
     verifier("un Gob nécromancien en a 8 (les deux s'ajoutent)",
              w.competencesMaxCombattant(necro(1, { race: "Gob" })) === 8);
     const ondari = w.atoutRace(necro(1, { race: "Ondari" }));
-    verifier("un Ondari nécromancien : immunisé au feu ET au gel, et garde sa portée",
-             ondari.immunites.includes("Brûlé") && ondari.immunites.includes("Glacé") && ondari.porteeMagique === 1,
+    verifier("un Ondari nécromancien : immunisé au feu (pas au gel), et garde sa portée",
+             ondari.immunites.includes("Brûlé") && !ondari.immunites.includes("Glacé") && ondari.porteeMagique === 1,
              JSON.stringify(ondari));
     verifier("la table des races n'est pas touchée par la fusion",
              JSON.stringify(w.ATOUTS_RACES.Ondari.immunites) === '["Brûlé"]');
-    verifier("estImmunise : le Nécromancien au Glacé", w.estImmunise(necro(1), "Glacé")
+    verifier("estImmunise : le Nécromancien n'est plus insensible au Glacé", !w.estImmunise(necro(1), "Glacé")
              && !w.estImmunise(heros("H"), "Glacé"));
 
     const e = etatDe([necro(1), heros("H")]);
-    verifier("en combat, ses PV max montent à 45", e.combattants.N.pvMax === 45 && e.combattants.N.pv === 40,
+    verifier("en combat, ses PV max montent à 48", e.combattants.N.pvMax === 48 && e.combattants.N.pv === 40,
              `${e.combattants.N.pv}/${e.combattants.N.pvMax}`);
 }
 
 // =========================================================================
-console.log("\n2. L'IMMUNITÉ AU GLACÉ, MÊME SUR UN CRITIQUE");
+console.log("\n2. PLUS D'IMMUNITÉ AU GLACÉ (elle est passée au Vampire)");
 // =========================================================================
 {
     const glacer = (cible) => frapper(etatDe([monstre("M"), cible]), "M", cible.idPersonnage,
         { valeurBrute: 2, typeRes: "Magique" }, [{ nom: "Glacé", chance: 100, duree: 2 }], true);
     const n = glacer(heros("N", { classe: "Nécromancien" }));
     const h = glacer(heros("H"));
-    verifier("le Nécromancien n'est jamais Glacé", !n.etat.combattants.N.etats.some(x => x.nom === "Glacé")
-             && n.etapes.some(x => x.type === "etatRate" && x.immunise), JSON.stringify(n.etat.combattants.N.etats));
+    verifier("le Nécromancien est Glacé comme les autres", n.etat.combattants.N.etats.some(x => x.nom === "Glacé"),
+             JSON.stringify(n.etat.combattants.N.etats));
     verifier("un autre héros l'est", h.etat.combattants.H.etats.some(x => x.nom === "Glacé"));
 }
 
@@ -459,7 +460,7 @@ console.log("\n7. LA FICHE DE CLASSE : LE DESCRIPTIF À GAUCHE");
   verifier("les paliers Niv. 1, 5, 10", JSON.stringify(r.necro.niveaux) === '["Niv. 1","Niv. 5","Niv. 10"]',
            JSON.stringify(r.necro.niveaux));
   verifier("Ténèbres et le sursis y sont dits", /Ténèbres/.test(r.necro.texte) && /Sursis/.test(r.necro.texte)
-           && /Gel/.test(r.necro.texte) && /\+5 PV/.test(r.necro.texte));
+           && !/Gel/.test(r.necro.texte) && /\+8 PV/.test(r.necro.texte));
   verifier("à gauche, sous le titre, au-dessus du bouton",
            r.necro.aGauche && r.necro.sousLeTitre && r.necro.auDessusDuBouton && r.necro.titreAGauche && r.necro.sousLeRetour, JSON.stringify(r.necro).slice(-120));
   verifier("chaque palier : « Niv. N » centré au-dessus de son descriptif, boîte centrée",

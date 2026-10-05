@@ -339,8 +339,9 @@ console.log("\n8. LES EFFETS DE CLASSE : DANS LA LISTE DE LIA SEULEMENT S'ILS SO
 // liste, ni dans ses règles — et l'algorithme refuse de les poser même si elle
 // les demande.
 {
-  const CLASSE = { "Lumière": ["Chasseur de mages", "EFF_LUMIERE"], "Ténèbres": ["Nécromancien", "EFF_TENEBRES"],
-                   "Vampirisme": ["Vampire", "EFF_VAMPIRISME"] };
+  // (Le Vampirisme a été retiré de la Forge : remplacé par le Baiser du
+  // vampire, une technique de classe. Plus personne ne l'a — voir plus bas.)
+  const CLASSE = { "Lumière": ["Chasseur de mages", "EFF_LUMIERE"], "Ténèbres": ["Nécromancien", "EFF_TENEBRES"] };
   const demande = async (fiche, plan) => {
     await p.evaluate(async ({ EFFETS, fiche }) => {
       window.EFFETS_BDD_CACHE = JSON.parse(JSON.stringify(EFFETS));
@@ -377,6 +378,19 @@ console.log("\n8. LES EFFETS DE CLASSE : DANS LA LISTE DE LIA SEULEMENT S'ILS SO
     verifier(`Hoplite niv. 10 : pas de ${nom}`, !autre.ids.includes(id) && !autre.texte.includes(nom)
              && !autre.forge.actions.some(a => a.nom === nom || a.mods[nom]));
   }
+}
+
+{
+  // Le Vampirisme : plus dans la liste de LIA, même pour un Vampire niveau 10.
+  const ids = await p.evaluate(async ({ EFFETS }) => {
+    window.EFFETS_BDD_CACHE = JSON.parse(JSON.stringify(EFFETS));
+    window.completerEffetsDeSecours(window.EFFETS_BDD_CACHE);
+    window.__docs = { "Personnages/P1": { Classe: "Vampire", XP: 7900, Race: "Humain" }, "Caracteristiques/P1": { int: 15 } };
+    window.OUVERTURE_FORGE_EN_COURS = false;
+    await window.ouvrirCreationCompetence();
+    return window.LIA.catalogueEffets(window.LIA.armesPermises()).map(e => e.id);
+  }, { EFFETS: EFFETS_PAR_ID });
+  verifier("Vampire niv. 10 : plus de Vampirisme dans la liste de LIA (remplacé par le Baiser)", !ids.includes("EFF_VAMPIRISME"), ids.length);
 }
 
 console.log("\n9. LA MAGIE NE FAIT PLUS TOMBER LES SOUS-EFFETS DU MENU MAGIQUE");

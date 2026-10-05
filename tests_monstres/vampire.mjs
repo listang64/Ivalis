@@ -15,6 +15,12 @@
 // sur plusieurs cibles, rien sur une esquive, réduit par la brûlure ; la Nuée
 // met l'esquive À AU MOINS 50 % (plus haute, elle le reste), pour la manche en
 // cours et la suivante ; pour un Vargen, la carte Vampire est grisée.
+//
+// PUIS (rééquilibrage) : plus de première case gratuite, mais insensible au
+// gel ; le Vampirisme de la Forge est remplacé par le BAISER DU VAMPIRE,
+// technique de classe du niveau 5 (aucune fatigue, une fois par combat) :
+// 25 % des PV max de la cible en dégâts bruts, et 60 % des dégâts infligés en
+// soin ; la Nuée descend à 40 % d'esquive.
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
@@ -82,30 +88,33 @@ console.log("=========================================================");
 console.log("\n1. LES PALIERS, ET LES VARGENS");
 {
     const a1 = w.atoutRace(vampire(1)), a5 = w.atoutRace(vampire(5)), a10 = w.atoutRace(vampire(10));
-    verifier("niveau 1 : +10 résistance physique, feu aggravé, première case gratuite",
-             a1.defPhysique === 10 && a1.brulureAggravee === true && a1.premierPasGratuit === true, JSON.stringify(a1));
-    verifier("niveau 5 : Vampirisme dans la Forge", JSON.stringify(a5.effets) === '["EFF_VAMPIRISME"]');
-    verifier("niveau 10 : Nuée de chauve-souris", JSON.stringify(a10.techniques) === '["CLASSE_NUEE_CHAUVES_SOURIS"]');
-    verifier("niveau 4 : pas encore de Vampirisme", !(w.atoutRace(vampire(4)).effets || []).length);
+    verifier("niveau 1 : +10 résistance physique, feu aggravé, insensible au gel — plus de case gratuite",
+             a1.defPhysique === 10 && a1.brulureAggravee === true && JSON.stringify(a1.immunites) === '["Glacé"]' && !a1.premierPasGratuit,
+             JSON.stringify(a1));
+    verifier("niveau 5 : le Baiser du vampire (technique), plus de Vampirisme dans la Forge",
+             JSON.stringify(a5.techniques) === '["CLASSE_BAISER_VAMPIRE"]' && !(a5.effets || []).length, JSON.stringify(a5));
+    verifier("niveau 10 : + la Nuée de chauve-souris",
+             JSON.stringify(a10.techniques) === '["CLASSE_BAISER_VAMPIRE","CLASSE_NUEE_CHAUVES_SOURIS"]', JSON.stringify(a10.techniques));
+    verifier("niveau 4 : pas encore de Baiser", !(w.atoutRace(vampire(4)).techniques || []).length);
     const t = w.TECHNIQUES_CLASSE.CLASSE_NUEE_CHAUVES_SOURIS;
     verifier("la Nuée : init 100, aucune fatigue, sur soi", t.Initiative === 100 && t.Fatigue === 0 && t.cible === "soi");
-    const vamp = w.MIGRATION_EFFETS.find(x => x.id === "EFF_VAMPIRISME").champs;
-    verifier("Vampirisme : 1 pt, Intelligence, 1 dégât, sans plafond, réservé niv. 5",
-             vamp.Cout_PT === "1" && vamp.Modificateur === "INTELLIGENCE" && vamp.Valeur === 1 && vamp.Pourcent_Max === 0
-             && vamp.Classe === "Vampire" && vamp.Niveau_Requis === 5);
+    const baiser = w.TECHNIQUES_CLASSE.CLASSE_BAISER_VAMPIRE;
+    verifier("le Baiser : niveau 5, init 100, aucune fatigue, sur un ennemi au contact",
+             baiser && baiser.niveau === 5 && baiser.Initiative === 100 && baiser.Fatigue === 0 && baiser.cible === "ennemiAdjacent",
+             JSON.stringify(baiser));
     verifier("un Vargen ne peut pas être Vampire", w.classeInterditeA("Vargen", "Vampire") && w.classeInterditeA("Vargen", "vampire"));
     verifier("…mais peut être autre chose, et les autres peuples peuvent être Vampire",
              !w.classeInterditeA("Vargen", "Assassin") && !w.classeInterditeA("Humain", "Vampire") && !w.classeInterditeA("Ondari", "Vampire"));
     verifier("chaque atout du Vampire s'écrit en clair",
-             ["brulureAggravee", "premierPasGratuit"].every(k => !w.texteAtout(k, true).startsWith(k)),
-             w.texteAtout("brulureAggravee", true) + " | " + w.texteAtout("premierPasGratuit", true));
+             !w.texteAtout("brulureAggravee", true).startsWith("brulureAggravee") && /Glacé/.test(w.texteAtout("immunites", ["Glacé"])),
+             w.texteAtout("brulureAggravee", true) + " | " + w.texteAtout("immunites", ["Glacé"]));
     const e = monde(1);
     verifier("en combat : 10 de résistance physique de plus qu'un héros sans classe",
              e.combattants.V.def.physique - e.combattants.H.def.physique === 10,
              `${e.combattants.V.def.physique} / ${e.combattants.H.def.physique}`);
-    verifier("…et ses deux atouts dans le combattant",
-             e.combattants.V.atouts.brulureAggravee === true && e.combattants.V.atouts.premierPasGratuit === true
-             && !e.combattants.H.atouts.brulureAggravee && !e.combattants.H.atouts.premierPasGratuit);
+    verifier("…et ses atouts dans le combattant (feu aggravé, insensible au gel)",
+             e.combattants.V.atouts.brulureAggravee === true && e.combattants.V.atouts.immunites.includes("Glacé")
+             && !e.combattants.V.atouts.premierPasGratuit && !e.combattants.H.atouts.brulureAggravee);
 }
 
 console.log("\n2. LE FEU LE RONGE PLUS FORT");
@@ -133,31 +142,23 @@ console.log("\n2. LE FEU LE RONGE PLUS FORT");
     verifier("sans brûlure : rien de tout ça", regleDesEtats(sain.combattants.V, "soinsRecus") === 0);
 }
 
-console.log("\n3. LA PREMIÈRE CASE DE CHAQUE TOUR EST GRATUITE");
+console.log("\n3. INSENSIBLE AU GEL (LA PREMIÈRE CASE GRATUITE EST RETIRÉE)");
 {
     const e = monde(1);
     const V = e.combattants.V, H = e.combattants.H;
-    verifier("case 1 : 0 pour lui, 2 pour un autre", coutDuPas(V, 1, false, false) === 0 && coutDuPas(H, 1, false, false) === 2);
-    verifier("même sur un sol difficile", coutDuPas(V, 1, true, false) === 0);
-    V.etats = [{ nom: "Glacé", duree: 2 }];
-    verifier("même Glacé", coutDuPas(V, 1, false, false) === 0);
-    V.etats = [];
-    verifier("comptée dans le barème : case 2 et 3 à 2, case 4 à 4",
-             coutDuPas(V, 2, false, false) === 2 && coutDuPas(V, 3, false, false) === 2 && coutDuPas(V, 4, false, false) === 4);
-    const t = planifierTrajet(e, "V", [{ q: -1, r: 0 }, { q: -2, r: 0 }, { q: -2, r: 1 }], null, {});
-    verifier("un trajet de 3 cases lui coûte 0 + 2 + 2 = 4", t.cout === 4 && t.pas[0].cout === 0, JSON.stringify(t.pas.map(x => x.cout)));
-    const repris = planifierTrajet(e, "V", [{ q: -1, r: 0 }], null, { pasDejaFaits: 1 });
-    verifier("dans le même tour, une case de plus n'est plus gratuite", repris.cout === 2, `${repris.cout}`);
-    const m = enTete(monde(1), "V", "X");
-    const pas = appliquerIntention(m, { id: "I1", type: "mouvement", acteur: "V", chemin: [{ q: -1, r: 0 }, { q: -2, r: 0 }] });
-    verifier("chez le cerveau : deux cases, 2 de fatigue seulement", pas.etat.combattants.V.fatigue === 98,
-             `${pas.etat.combattants.V.fatigue}`);
-    const src = fs.readFileSync(new URL('../mouvement.js', import.meta.url), 'utf8');
-    verifier("l'aperçu du chemin (mouvement.js) dit la même chose",
-             /numeroCase === 1 && window\.atoutRace\(persoActuel\)\.premierPasGratuit/.test(src));
+    verifier("la première case lui coûte comme à tout le monde (2)", coutDuPas(V, 1, false, false) === 2 && coutDuPas(H, 1, false, false) === 2);
+    const glacer = resoudreCarte(monde(1), { type: "carte", idLanceur: "M1", idCarte: "G", critique: false,
+        attaques: [{ valeurBrute: 1, typeRes: "Magique", cibles: ["V", "A"] }],
+        alterations: [{ nom: "Glacé", chance: 100, duree: 2, cibles: ["V", "A"] }],
+        jets: { attaqueRatee: false, parCible: { V: { esquive: false, etats: { "Glacé": true } }, A: { esquive: false, etats: { "Glacé": true } } } } });
+    verifier("le Vampire n'est jamais Glacé", !glacer.etat.combattants.V.etats.some(x => x.nom === "Glacé")
+             && glacer.etapes.some(x => x.type === "etatRate" && x.cible === "V" && x.immunise), JSON.stringify(glacer.etat.combattants.V.etats));
+    verifier("un allié, lui, l'est", glacer.etat.combattants.A.etats.some(x => x.nom === "Glacé"));
 }
 
-console.log("\n4. VAMPIRISME : 70 % DE CE QUE LA CARTE INFLIGE, SUR LUI");
+// Le Vampirisme n'est plus donné par la classe ; le moteur garde son soin
+// pour les cartes déjà forgées — et le Baiser du vampire s'en sert.
+console.log("\n4. LE SOIN DU VAMPIRISME (moteur) : 70 % DE CE QUE LA CARTE INFLIGE, SUR LUI");
 {
     const e = monde(5); e.combattants.V.pv = 40;
     const r = resoudreCarte(e, carte([sort(10, ["M1"])]));
@@ -199,7 +200,43 @@ console.log("\n4. VAMPIRISME : 70 % DE CE QUE LA CARTE INFLIGE, SUR LUI");
     verifier("à l'écran : « +N 🩸 » sur le Vampire", scene && /🩸/.test(scene.texte || ""), JSON.stringify(scene));
 }
 
-console.log("\n5. NUÉE DE CHAUVE-SOURIS : L'ESQUIVE À 50 %, DEUX MANCHES");
+console.log("\n4 bis. LE BAISER DU VAMPIRE : 25 % DES PV MAX EN BRUT, 60 % EN SOIN");
+{
+    const baiser = (cible = "M1") => ({ id: "B1", type: "classe", acteur: "V", idCarte: "CLASSE_BAISER_VAMPIRE", cible });
+    const e = enTete(monde(5, { PV_Actuels: 40 }), "V", "CLASSE_BAISER_VAMPIRE");
+    e.combattants.M1.def = { ...e.combattants.M1.def, magique: 50, physique: 50, esquive: 100, parade: 100 };
+    verifier("niveau 5 : acceptée sur un ennemi au contact", validerIntention(e, baiser()).ok, validerIntention(e, baiser()).raison || "");
+    verifier("niveau 4 : il ne l'a pas", !validerIntention(enTete(monde(4), "V", "CLASSE_BAISER_VAMPIRE"), baiser()).ok);
+    verifier("pas sur un allié", !validerIntention(e, baiser("A")).ok);
+    const loin = enTete(monde(5), "V", "CLASSE_BAISER_VAMPIRE"); loin.combattants.M2.q = 4; loin.combattants.M2.r = 0;
+    verifier("pas sur un ennemi hors de portée", !validerIntention(loin, baiser("M2")).ok, validerIntention(loin, baiser("M2")).raison || "");
+    const pas = appliquerIntention(e, baiser());
+    const M1 = pas.etat.combattants.M1, V = pas.etat.combattants.V;
+    verifier("25 % de 100 PV max = 25 dégâts bruts, malgré 50 % de défenses et 100 % d'esquive", M1.pv === 75, `${M1.pv}`);
+    verifier("le Vampire se soigne de 60 % : 15 PV (40 → 55)", V.pv === 55, `${V.pv}`);
+    verifier("aucune fatigue, technique utilisée, tour clos",
+             V.fatigue === 100 && V.techniquesUtilisees.includes("CLASSE_BAISER_VAMPIRE") && pas.etat.file[0].id === "M1");
+    verifier("une seconde fois dans le combat : refusée",
+             !validerIntention(enTete(clonerEtat(pas.etat), "V", "CLASSE_BAISER_VAMPIRE"), baiser()).ok);
+    verifier("rejoué depuis le journal : mêmes PV des deux côtés",
+             appliquerEntree(e, pas.entree).combattants.M1.pv === 75 && appliquerEntree(e, pas.entree).combattants.V.pv === 55);
+    const gros = enTete(monde(5, { PV_Actuels: 40 }), "V", "CLASSE_BAISER_VAMPIRE");
+    gros.combattants.M1.pvMax = 250; gros.combattants.M1.pv = 250;
+    verifier("sur 250 PV max : 63 (arrondi au-dessus), soin 37", (() => { const r = appliquerIntention(gros, baiser());
+             return r.etat.combattants.M1.pv === 187 && r.etat.combattants.V.pv === 77; })());
+    const bou = enTete(monde(5, { PV_Actuels: 40 }), "V", "CLASSE_BAISER_VAMPIRE"); bou.combattants.M1.bouclier = 10;
+    const rb = appliquerIntention(bou, baiser());
+    // Règle du jeu : un bouclier qui casse arrête aussi le surplus.
+    verifier("le bouclier encaisse (10, le surplus est perdu) : soin sur les 10 → 6",
+             rb.etat.combattants.M1.bouclier === 0 && rb.etat.combattants.M1.pv === 100 && rb.etat.combattants.V.pv === 46,
+             `🛡️${rb.etat.combattants.M1.bouclier} / ${rb.etat.combattants.V.pv}`);
+    const br = enTete(monde(5, { PV_Actuels: 40 }), "V", "CLASSE_BAISER_VAMPIRE"); br.combattants.V.etats = [{ ...BRULE }];
+    verifier("brûlé : 15 × 40 % → 6", appliquerIntention(br, baiser()).etat.combattants.V.pv === 46);
+    const scene = misEnScene({ type: "techniqueClasse", acteur: "V", idCarte: "CLASSE_BAISER_VAMPIRE" }, pas.etat);
+    verifier("à l'écran : « 🩸 Baiser du vampire »", /Baiser du vampire/.test(scene.texte || ""), scene.texte);
+}
+
+console.log("\n5. NUÉE DE CHAUVE-SOURIS : L'ESQUIVE À 40 %, DEUX MANCHES");
 {
     const e = enTete(monde(10), "V", "CLASSE_NUEE_CHAUVES_SOURIS");
     e.combattants.V.def.esquive = 10;
@@ -208,18 +245,18 @@ console.log("\n5. NUÉE DE CHAUVE-SOURIS : L'ESQUIVE À 50 %, DEUX MANCHES");
     verifier("niveau 9 : il ne l'a pas", !validerIntention(enTete(monde(9), "V", "CLASSE_NUEE_CHAUVES_SOURIS"), nuee).ok);
     const pas = appliquerIntention(e, nuee);
     const V = pas.etat.combattants.V;
-    verifier("son esquive passe de 10 à 50", esquiveDe(V) === 50, `${esquiveDe(V)}`);
+    verifier("son esquive passe de 10 à 40", esquiveDe(V) === 40, `${esquiveDe(V)}`);
     verifier("technique utilisée, tour clos, aucune fatigue",
              V.techniquesUtilisees.includes("CLASSE_NUEE_CHAUVES_SOURIS") && pas.etat.file[0].id === "M1" && V.fatigue === 100);
     const haut = clonerEtat(pas.etat); haut.combattants.V.def.esquive = 70;
     verifier("plus haute, elle le reste (70)", esquiveDe(haut.combattants.V) === 70);
     const etourdi = clonerEtat(pas.etat); etourdi.combattants.V.etats.push({ nom: "Étourdi", duree: 1 });
-    verifier("étourdi (-30) : toujours 50", esquiveDe(etourdi.combattants.V) === 50, `${esquiveDe(etourdi.combattants.V)}`);
+    verifier("étourdi (-30) : toujours 40", esquiveDe(etourdi.combattants.V) === 40, `${esquiveDe(etourdi.combattants.V)}`);
     const sansNuee = monde(10); sansNuee.combattants.H.etats = [{ nom: "Étourdi", duree: 1 }];
     verifier("sans Nuée, rien ne retient l'esquive : un Étourdi la met à -30", esquiveDe(sansNuee.combattants.H) === -30,
              `${esquiveDe(sansNuee.combattants.H)}`);
     const s1 = clonerEtat(pas.etat); vieillirLesEtats(s1);
-    verifier("après la fin de cette manche : toujours là", esquiveDe(s1.combattants.V) === 50 && s1.combattants.V.etats.some(x => x.nom === ETAT_NUEE));
+    verifier("après la fin de cette manche : toujours là", esquiveDe(s1.combattants.V) === 40 && s1.combattants.V.etats.some(x => x.nom === ETAT_NUEE));
     vieillirLesEtats(s1);
     verifier("après la manche suivante : partie (10)", esquiveDe(s1.combattants.V) === 10 && !s1.combattants.V.etats.some(x => x.nom === ETAT_NUEE));
     verifier("rejouée depuis le journal : même état", appliquerEntree(e, pas.entree).combattants.V.etats.some(x => x.nom === ETAT_NUEE));
@@ -281,7 +318,7 @@ p.on('pageerror', e => erreurs.push(e.message));
 await p.goto(base + '/index.html');
 await p.waitForTimeout(2000);
 
-console.log("\n6. LA FORGE : VAMPIRISME POUR LE SEUL VAMPIRE, ET SON SOIN EMPORTÉ PAR LA CARTE");
+console.log("\n6. LA FORGE : PLUS DE VAMPIRISME (remplacé par le Baiser) ; UNE CARTE D'AVANT GARDE SON SOIN");
 {
   const r = await p.evaluate(async (EFFETS) => {
     window.EFFETS_BDD_CACHE = JSON.parse(JSON.stringify(EFFETS));
@@ -302,8 +339,7 @@ console.log("\n6. LA FORGE : VAMPIRISME POUR LE SEUL VAMPIRE, ET SON SOIN EMPORT
              monstres: window.paletteEffetsMonstres().some(e => e.id === "EFF_VAMPIRISME"),
              magique: window.actionEstMagique("Vampirisme") };
   }, EFFETS_PAR_ID);
-  verifier("le Vampire niveau 5 l'a dans la Forge", r.v5);
-  verifier("pas au niveau 4, ni une autre classe, ni les monstres", !r.v4 && !r.autre && !r.monstres, JSON.stringify(r));
+  verifier("plus personne ne l'a dans la Forge, même le Vampire niveau 5", !r.v5 && !r.v4 && !r.autre && !r.monstres, JSON.stringify(r));
   verifier("c'est un sort (action magique)", r.magique);
 
   const ex = await p.evaluate(async () => {
@@ -354,11 +390,37 @@ console.log("\n7. LA GRILLE DES CLASSES : LE VAMPIRE GRISÉ POUR UN VARGEN");
   verifier("un clic dessus n'ouvre pas sa fiche, et le dit",
            !r.apresClic.ficheOuverte && /Vargens ne peuvent pas être Vampire/.test(r.apresClic.message || ""), JSON.stringify(r.apresClic));
   verifier("Humain : rien de grisé, la fiche s'ouvre", !r.humain.grisee && JSON.stringify(r.fiche.niveaux) === '["Niv. 1","Niv. 5","Niv. 10"]');
-  verifier("la fiche dit le feu, la case gratuite, le Vampirisme et la Nuée",
-           /18 %/.test(r.fiche.texte) && /première case/.test(r.fiche.texte) && /Vampirisme/.test(r.fiche.texte) && /Nuée/.test(r.fiche.texte));
+  verifier("la fiche dit le feu, le gel, le Baiser (25 %, 60 %) et la Nuée à 40 % — plus la case gratuite ni le Vampirisme",
+           /18 %/.test(r.fiche.texte) && /Gel/.test(r.fiche.texte) && /Baiser du vampire/.test(r.fiche.texte) && /25 %/.test(r.fiche.texte)
+           && /60 %/.test(r.fiche.texte) && /Nuée/.test(r.fiche.texte) && /40 %/.test(r.fiche.texte)
+           && !/première case/.test(r.fiche.texte) && !/Vampirisme/.test(r.fiche.texte));
   verifier("le message ne traîne pas sur la fiche suivante", r.fiche.messageCache);
   verifier("un Humain peut la valider", r.champHumain === "Vampire");
   verifier("redevenu Vargen, la classe Vampire est oubliée", r.champApresVargen === "", r.champApresVargen);
+}
+
+console.log("\n8. LE BAISER À L'ÉCRAN : ON CHOISIT L'ENNEMI AU CONTACT");
+{
+  const r = await p.evaluate(() => {
+    window.PERSOS_PARTIE = [
+      { idPersonnage: "V1", camp: "Allié", prenom: "Vlad", classe: "Vampire", xp: 2500, PV_Max: 40, PV_Actuels: 40, statut: "Vivant" },
+      { idPersonnage: "A1", camp: "Allié", prenom: "Ama", PV_Max: 40, PV_Actuels: 40, statut: "Vivant" },
+      { idPersonnage: "M1", camp: "Ennemi", estMonstre: true, nom: "Gnoll", PV_Max: 40, PV_Actuels: 40, statut: "Vivant" },
+      { idPersonnage: "M2", camp: "Ennemi", estMonstre: true, nom: "Loup", PV_Max: 40, PV_Actuels: 40, statut: "Vivant" }];
+    window.TOKENS_VTT_DATA = { V1: { q: 0, r: 0 }, A1: { q: 0, r: 1 }, M1: { q: 1, r: 0 }, M2: { q: 4, r: 0 } };
+    const appels = [];
+    window.regimeDemande = { techniqueClasse: (...a) => { appels.push(a); return null; }, etat: () => null, enVol: () => false };
+    window.lancerTechniqueClasse("CLASSE_BAISER_VAMPIRE", "V1");
+    const f = document.getElementById("fenetre-choix-rempart");
+    const choix = [...f.querySelectorAll(".choix-rempart-allie")].map(x => x.textContent.trim());
+    const titre = f.querySelector(".choix-rempart-titre").textContent;
+    f.querySelector(".choix-rempart-allie").click();
+    return { titre, choix, appels, ferme: f.style.display === "none" };
+  });
+  verifier("la fenêtre « Baiser du vampire » propose le seul ennemi au contact (pas l'allié, pas l'ennemi lointain)",
+           /Baiser du vampire/.test(r.titre) && JSON.stringify(r.choix) === '["Gnoll"]', JSON.stringify(r));
+  verifier("le choix part au cerveau : (V1, Baiser, M1)",
+           JSON.stringify(r.appels) === '[["V1","CLASSE_BAISER_VAMPIRE","M1"]]' && r.ferme, JSON.stringify(r.appels));
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

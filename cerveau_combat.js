@@ -43,7 +43,7 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
          traverserZones, creerZonePure, poserZone, vieillirZones,
          chaineDeDegats, REGLES_ETATS, regleDesEtats, estDansLeNoir,
          partageTenebres, ETAT_TENEBRES_ETALEES, POISON, POISON_MAITRE,
-         resoudreTechniqueClasse, actionAssautMortel } from './moteur_pur.js';
+         resoudreTechniqueClasse, actionAssautMortel, actionBaiserVampire } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche } from './ia_pure.js';
@@ -244,6 +244,13 @@ export function validerIntention(etat, intention) {
             if (allie.id === acteur.id) return refus("le Rempart protège un autre que soi");
             if (allie.aTerre || allie.estIllusion || allie.camp !== acteur.camp) return refus("Rempart : allié invalide");
             if (distance(acteur, allie) > 1) return refus("Rempart : l'allié doit être adjacent");
+        }
+        // Le Baiser du vampire : un ennemi debout, au contact.
+        if (idCarte === "CLASSE_BAISER_VAMPIRE") {
+            const ennemi = combattant(etat, intention.cible);
+            if (!ennemi) return refus("Baiser du vampire sans cible");
+            if (ennemi.aTerre || ennemi.estIllusion || ennemi.camp === acteur.camp) return refus("Baiser du vampire : ennemi invalide");
+            if (distance(acteur, ennemi) !== 1) return refus("Baiser du vampire : l'ennemi doit être au contact");
         }
         // La Prise en charge (Médicus) : un allié À TERRE, à côté de lui.
         if (idCarte === "CLASSE_PRISE_EN_CHARGE") {
@@ -451,9 +458,8 @@ export function ticsDeFinDeManche(etat) {
 
         // --- EMPOISONNEMENT : un seul tic, jamais retenté --------------------
         //  Règle de Nico (tableau des effets) : 10 % de l'énergie MAXIMUM, et
-        //  8 % des points de vie maximum en dégâts MAGIQUES — défense magique,
-        //  absorption et bouclier compris (« réductions appliquées »). Il
-        //  frappait 15 d'énergie fixes et 8 % des PV droit dans la vie.
+        //  8 % des points de vie maximum en dégâts BRUTS — aucune défense ni
+        //  absorption ; seul le bouclier encaisse d'abord (POISON.brut).
         //  `tickFait` reste sur l'état : il voyage avec lui dans l'étape de
         //  vieillissement qui suit, donc le poison ne mord pas deux fois.
         //  LE POISON DU MAÎTRE (Assassin, niveau 10) mord, lui, à CHAQUE fin
@@ -475,15 +481,15 @@ export function ticsDeFinDeManche(etat) {
 
             const morsure = Math.ceil(nombre(c.pvMax) * (regle.pvMaxPct / 100));
             if (morsure > 0) {
-                const compte = chaineDeDegats(c, { valeurBrute: morsure, typeRes: regle.typeRes }, {});
+                const compte = chaineDeDegats(c, { valeurBrute: morsure, typeRes: regle.typeRes, brut: !!regle.brut }, {});
                 if (compte.degats > 0) etapes.push(...infligerTic(c, id, compte.degats, "Empoisonnement", etat, poison.idSource));
             }
         }
 
         // --- BRÛLURE : elle ronge tant qu'elle dure --------------------------
         //  Règle de Nico (tableau des effets) : 8 % des points de vie maximum
-        //  en dégâts PHYSIQUES à chaque fin de manche, l'armure réduisant le
-        //  coup (défense physique, puis bouclier). Elle faisait 3 dégâts du
+        //  en dégâts MAGIQUES à chaque fin de manche, la défense magique
+        //  réduisant le coup (puis le bouclier). Elle faisait 3 dégâts du
         //  type de l'attaque qui l'avait allumée. Contrairement au poison, elle
         //  mord à CHAQUE manche tant qu'elle dure.
         const brulure = c.etats.find(e => e && e.nom === "Brûlé");
@@ -492,7 +498,7 @@ export function ticsDeFinDeManche(etat) {
             // regleDesEtats plutôt que la règle seule : le Vampire brûle à
             // 18 % de ses PV max, pas à 8 (brulureAggravee).
             const brut = Math.ceil(nombre(c.pvMax) * (regleDesEtats(c, "pvMaxParTour") / 100));
-            const compte = chaineDeDegats(c, { valeurBrute: brut, typeRes: regle.typeParTour || "Physique" }, {});
+            const compte = chaineDeDegats(c, { valeurBrute: brut, typeRes: regle.typeParTour || "Magique" }, {});
             if (compte.degats > 0) {
                 etapes.push(...infligerTic(c, id, compte.degats, "Brûlure", etat, brulure.idSource));
             }
@@ -837,6 +843,14 @@ export function appliquerIntention(etat, intention, plateau) {
             const action = actionAssautMortel(intention.acteur, cibles);
             action.critique = tirerCritique(suivant, intention.acteur, des);
             action.jets = tirerDesCarte(suivant, action, intention.acteur, action.critique, des);
+            const rc = resoudreCarte(suivant, action, plateau);
+            suivant = clonerEtat(rc.etat);
+            etapes.push(...rc.etapes);
+        }
+        // LE BAISER DU VAMPIRE frappe comme une carte, mais à coup sûr : pas de
+        // dés (ni esquive, ni critique), des dégâts bruts, le soin du vampirisme.
+        if (intention.idCarte === "CLASSE_BAISER_VAMPIRE") {
+            const action = actionBaiserVampire(intention.acteur, combattant(suivant, intention.cible));
             const rc = resoudreCarte(suivant, action, plateau);
             suivant = clonerEtat(rc.etat);
             etapes.push(...rc.etapes);

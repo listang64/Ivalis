@@ -845,24 +845,24 @@ console.log("\nCE QUE LES ÉTATS FONT À CHAQUE FIN DE MANCHE");
     verifier("elle mord encore à la manche suivante", etat.combattants.H1.pv === avant - 10,
              String(etat.combattants.H1.pv));
 
-    // Elle frappe en PHYSIQUE, quel que soit le coup qui l'a allumée (même
-    // un ancien état qui retenait « Magique ») : la résistance magique ne la
-    // stoppe plus, l'armure si.
+    // Elle frappe en MAGIQUE (règle de Nico), quel que soit le coup qui l'a
+    // allumée (même un ancien état qui retenait « Physique ») : la défense
+    // magique la réduit, l'armure physique non.
     let resistant = monde();
     resistant.combattants.H1.def = { ...resistant.combattants.H1.def, magique: 100 };
-    resistant.combattants.H1.etats = [{ nom: "Brûlé", duree: 2, typeDegats: "Magique" }];
+    resistant.combattants.H1.etats = [{ nom: "Brûlé", duree: 2, typeDegats: "Physique" }];
     const pvAvant = resistant.combattants.H1.pv;
     ticsDeFinDeManche(resistant);
-    verifier("une résistance magique totale ne l'éteint pas (physique)",
-             resistant.combattants.H1.pv === pvAvant - 5, String(resistant.combattants.H1.pv));
+    verifier("une résistance magique totale l'éteint (magique)",
+             resistant.combattants.H1.pv === pvAvant, String(resistant.combattants.H1.pv));
 
     let blinde = monde();
     blinde.combattants.H1.def = { ...blinde.combattants.H1.def, physique: 100 };
-    blinde.combattants.H1.etats = [{ nom: "Brûlé", duree: 2, typeDegats: "Physique" }];
+    blinde.combattants.H1.etats = [{ nom: "Brûlé", duree: 2, typeDegats: "Magique" }];
     const pvBlinde = blinde.combattants.H1.pv;
     ticsDeFinDeManche(blinde);
-    verifier("et une armure totale arrête une brûlure physique",
-             blinde.combattants.H1.pv === pvBlinde);
+    verifier("et une armure physique totale ne l'arrête pas",
+             blinde.combattants.H1.pv === pvBlinde - 5, String(blinde.combattants.H1.pv));
 
     // Le bouclier encaisse en premier, comme pour n'importe quel coup.
     let protege = monde();

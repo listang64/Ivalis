@@ -1762,7 +1762,7 @@ window.demarrerCiblage = async function(idCarte, options) {
             // poison, résolu plus tard dans jouerAnimationMoteur (via state.attaques[0]). Chance
             // cumulable comme les autres états (10%/action, cap 70%), durée fixe de 2 tours,
             // jamais prolongeable. Un seul tic, en fin de manche (cerveau_combat.js) : 10% de
-            // l'énergie max et 8% des PV max en dégâts magiques, défense magique appliquée.
+            // l'énergie max et 8% des PV max en dégâts bruts, aucune défense.
             let isPoison = nomLower.includes("poison");
             let poisonChance = 0;
             if (isPoison) {
@@ -1782,7 +1782,7 @@ window.demarrerCiblage = async function(idCarte, options) {
                 alterationsExtraites.push({
                     nom: "Empoisonnement",
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788096401/IMG_2083_pebnup.png",
-                    desc: "10% de l'énergie max et 8% des PV max en dégâts magiques (défense magique appliquée), en fin de manche. Pas de cumul.",
+                    desc: "10% de l'énergie max et 8% des PV max en dégâts bruts (aucune défense), en fin de manche. Pas de cumul.",
                     chance: poisonChance,
                     duree: 2,
                     isRanged: isRanged,
@@ -1833,7 +1833,7 @@ window.demarrerCiblage = async function(idCarte, options) {
                 alterationsExtraites.push({
                     nom: "Brûlé",
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181101/IMG_2087_q6chof.png",
-                    desc: "-50% de soins reçus, et 8% des PV max en dégâts physiques à chaque fin de manche (armure appliquée).",
+                    desc: "-50% de soins reçus, et 8% des PV max en dégâts magiques à chaque fin de manche (défense magique appliquée).",
                     chance: bruleChance,
                     duree: bruleDuree,
                     isRanged: isRanged,
@@ -3283,8 +3283,8 @@ window.texteDistanceReelle = function(texteOrigine, p) {
 const GABARITS_ETATS_EQUIPEMENT = {
     "Étourdi":        { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1787381297/ETOURDIT_2_j7w36h.png", desc: "-30% Esquive/Parade, 20% de chance d'échec d'attaque." },
     "Immobilisation": { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788081285/IMG_2076_vze0an.png", desc: "Ne peut plus se déplacer volontairement, gagne 20 fatigue par tour immobilisé." },
-    "Empoisonnement": { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788096401/IMG_2083_pebnup.png", desc: "10% de l'énergie max et 8% des PV max en dégâts magiques (défense magique appliquée), en fin de manche. Pas de cumul.", estPoison: true, estDot: true },
-    "Brûlé":          { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181101/IMG_2087_q6chof.png", desc: "-50% de soins reçus, et 8% des PV max en dégâts physiques à chaque fin de manche (armure appliquée)." },
+    "Empoisonnement": { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788096401/IMG_2083_pebnup.png", desc: "10% de l'énergie max et 8% des PV max en dégâts bruts (aucune défense), en fin de manche. Pas de cumul.", estPoison: true, estDot: true },
+    "Brûlé":          { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181101/IMG_2087_q6chof.png", desc: "-50% de soins reçus, et 8% des PV max en dégâts magiques à chaque fin de manche (défense magique appliquée)." },
     "Glacé":          { duree: 2, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181888/IMG_2089_isgcrs.png", desc: "Coût en fatigue du mouvement doublé, et 20% de dégâts physiques subis en plus." },
     "Poussée":        { duree: 0, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", desc: "", estPoussee: true },
     "Traction":       { duree: 0, icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", desc: "", estTraction: true },

@@ -103,20 +103,21 @@ export const REGLES_ETATS = {
     "Étourdi":    { esquive: -30, parade: -30, echecTechnique: 20 },
     "Glacé":      { degatsPhysiquesSubis: 20 },
     "Électrifié": { degatsMagiquesSubis: 20 },
-    // Tableau de Nico : « -50 % de soins reçus + 8 % des PV max en dégâts
-    // physiques », l'armure réduisant le coup.
-    "Brûlé":      { pvMaxParTour: 8, typeParTour: "Physique", soinsRecus: -50 }
+    // Tableau de Nico : « -50 % de soins reçus + 8 % des PV max » — des dégâts
+    // MAGIQUES, que la défense magique réduit (ils étaient physiques).
+    "Brûlé":      { pvMaxParTour: 8, typeParTour: "Magique", soinsRecus: -50 }
 };
 
 // L'EMPOISONNEMENT (tableau de Nico) : 10 % de l'énergie maximum et 8 % des
-// PV maximum en dégâts magiques, réductions appliquées. Un seul tic
+// PV maximum en dégâts BRUTS — aucune défense ne les réduit (ils étaient
+// magiques). Le bouclier, lui, encaisse toujours en premier. Un seul tic
 // (cerveau_combat.js, ticsDeFinDeManche).
-export const POISON = { energiePct: 10, pvMaxPct: 8, typeRes: "Magique" };
+export const POISON = { energiePct: 10, pvMaxPct: 8, typeRes: "Magique", brut: true };
 // LE POISON DU MAÎTRE (Assassin, niveau 10) : 18 % de l'énergie maximum et
-// 10 % des PV max en dégâts magiques — à CHAQUE fin de manche, pendant 2
+// 10 % des PV max en dégâts bruts — à CHAQUE fin de manche, pendant 2
 // manches, là où le poison ordinaire ne mord qu'une fois.
-export const POISON_MAITRE = { energiePct: 18, pvMaxPct: 10, typeRes: "Magique", manches: 2 };
-export const DESC_POISON_MAITRE = "Poison de maître : 18 % de l'énergie max et 10 % des PV max en dégâts magiques à chaque fin de manche, 2 manches.";
+export const POISON_MAITRE = { energiePct: 18, pvMaxPct: 10, typeRes: "Magique", brut: true, manches: 2 };
+export const DESC_POISON_MAITRE = "Poison de maître : 18 % de l'énergie max et 10 % des PV max en dégâts bruts à chaque fin de manche, 2 manches.";
 
 // LA BOUSCULADE. Une poussée qui aboutit peut, en plus, faire perdre pied :
 // la cible se rattrape, et ça lui coûte de l'énergie. C'est ce qui remplace la
@@ -147,7 +148,7 @@ export const BRULURE_AGGRAVEE = { soinsRecus: -10, pvMaxParTour: 10 };
 export const esquiveDe     = (c) => Math.max(nombre(c && c.def && c.def.esquive)  + bonusDesEtats(c, "esquive")
                                   + regleDesEtats(c, "esquive"), planchersEsquive(c));
 // Un plancher d'esquive posé par un état (Nuée de chauve-souris : au moins
-// 50 %). L'esquive déjà plus haute reste plus haute ; sinon elle monte au
+// 40 %). L'esquive déjà plus haute reste plus haute ; sinon elle monte au
 // plancher, malus compris.
 function planchersEsquive(c) {
     const planchers = ((c && c.etats) || []).filter(e => e && e.esquiveMin !== undefined).map(e => nombre(e.esquiveMin));
@@ -756,8 +757,14 @@ export function chaineDeDegats(cible, attaque, options) {
     //    (+20 % de magique en plus). Elles s'ajoutent l'une à l'autre, et se
     //    posent AVANT l'absorption et les résistances : c'est le coup qui
     //    arrive plus fort, pas l'armure qui protège moins.
-    let vulnerabilite = regleDesEtats(cible, "degatsSubis");
-    if (attaque.typeRes === "Magique") vulnerabilite += regleDesEtats(cible, "degatsMagiquesSubis");
+    //
+    //    DES DÉGÂTS BRUTS (`attaque.brut` : le poison, le Baiser du vampire)
+    //    ne connaissent ni vulnérabilité, ni absorption, ni contre, ni
+    //    résistance : ils arrivent tels quels. Seul le bouclier les encaisse.
+    const brut = attaque.brut === true;
+    let vulnerabilite = brut ? 0 : regleDesEtats(cible, "degatsSubis");
+    if (brut) { /* rien ne s'ajoute */ }
+    else if (attaque.typeRes === "Magique") vulnerabilite += regleDesEtats(cible, "degatsMagiquesSubis");
     else vulnerabilite += regleDesEtats(cible, "degatsPhysiquesSubis");
     if (vulnerabilite !== 0) degats = Math.max(0, Math.round(degats * (1 + vulnerabilite / 100)));
 
@@ -772,14 +779,14 @@ export function chaineDeDegats(cible, attaque, options) {
     //    en rendent 20, 60 (le maximum) en rendent 30. Toujours calculée sur
     //    le coup AVANT l'armure.
     const estMagique = attaque.typeRes === "Magique";
-    const abs = estMagique && (cible.etats || []).find(e => e && e.nom === "Absorption");
+    const abs = !brut && estMagique && (cible.etats || []).find(e => e && e.nom === "Absorption");
     if (abs) {
         const pctAnnule = nombre(abs.valeurAbs, 20);
         const aAnnuler = Math.floor(degats * (pctAnnule / 100));
         compte.soinAbsorption = Math.floor(degats * (partRendue(pctAnnule) / 100));
         degats = Math.max(0, degats - aAnnuler);
     }
-    const contre = !estMagique && (cible.etats || []).find(e => e && e.nom === "Contre");
+    const contre = !brut && !estMagique && (cible.etats || []).find(e => e && e.nom === "Contre");
     if (contre) {
         const pctAnnule = nombre(contre.valeurContre, 20);
         const aAnnuler = Math.floor(degats * (pctAnnule / 100));
@@ -793,7 +800,7 @@ export function chaineDeDegats(cible, attaque, options) {
     let resistance = attaque.typeRes === "Magique" ? defMagiqueDe(cible) : defPhysiqueDe(cible);
     // TÉNÈBRES FRAPPE BRUT : aucune armure ne s'applique, ni sur l'énergie
     // qu'elle boit, ni sur la vie qu'elle frappe ensuite (×1,5).
-    if (percee || attaque.versEnergie) resistance = 0;
+    if (percee || attaque.versEnergie || brut) resistance = 0;
     const reduction = Math.min(1, resistance / 100);
     let degatsFinaux = Math.max(0, Math.round(degats * (1 - reduction)));
 
@@ -1106,10 +1113,10 @@ export const ETAT_MUR_BOUCLIER = "Mur de bouclier";
 export const ETAT_REMPART = "Rempart";
 export const PARADE_MUR_BOUCLIER = 60;
 export const MANCHES_REMPART = 3;
-// La Nuée de chauve-souris (Vampire, niveau 10) : l'esquive au moins à 50 %,
+// La Nuée de chauve-souris (Vampire, niveau 10) : l'esquive au moins à 40 %,
 // pour la manche en cours et la suivante.
 export const ETAT_NUEE = "Nuée de chauve-souris";
-export const ESQUIVE_NUEE = 50;
+export const ESQUIVE_NUEE = 40;
 export const MANCHES_NUEE = 2;
 
 // Le protecteur qui partage ce coup avec la cible, ou null : un Rempart posé
@@ -1140,8 +1147,28 @@ export function actionAssautMortel(idLanceur, cibles) {
         attaques: [{ nom: "Assaut mortel", typeRes: "Physique", valeurBrute: DEGATS_ASSAUT_MORTEL,
                      isRanged: false, rangeMax: 1, isHeal: false, isShield: false, cibles: [...liste] }],
         alterations: [{ nom: "Empoisonnement", icone: ICONE_POISON,
-                        desc: "10% de l'énergie max et 8% des PV max en dégâts magiques (défense magique appliquée), en fin de manche. Pas de cumul.",
+                        desc: "10% de l'énergie max et 8% des PV max en dégâts bruts (aucune défense), en fin de manche. Pas de cumul.",
                         chance: 100, duree: 2, estPoison: true, malgreEsquive: true, cibles: [...liste] }]
+    };
+}
+
+// LE BAISER DU VAMPIRE (Vampire, niveau 5) : sur un ennemi au contact, 25 %
+// de ses PV max en dégâts BRUTS (aucune défense ; le bouclier encaisse
+// d'abord) — un coup sûr, ni esquive, ni parade, ni critique. Le Vampire se
+// soigne de 60 % de ce qu'il a infligé (PV et bouclier entamés), avec ce que
+// le feu fait de ses soins (brûlé : -60 %) — la mécanique du vampirisme.
+export const PART_PV_BAISER = 25;
+export const SOIN_BAISER = 60;
+export function actionBaiserVampire(idLanceur, cible) {
+    const pvMax = nombre(cible && cible.pvMax);
+    return {
+        type: "carte", idLanceur, idCarte: "CLASSE_BAISER_VAMPIRE", coutFatigue: 0, critique: false,
+        jets: { parCible: {} },
+        attaques: [{ nom: "Baiser du vampire", typeRes: "Magique", brut: true,
+                     valeurBrute: Math.ceil(pvMax * PART_PV_BAISER / 100), vampirisme: SOIN_BAISER,
+                     isRanged: false, rangeMax: 1, isHeal: false, isShield: false,
+                     cibles: cible ? [cible.id] : [] }],
+        alterations: []
     };
 }
 
@@ -1620,7 +1647,7 @@ export function resoudreCarte(etat, action, plateau) {
     //  Ils se posent sur les cibles qui n'ont pas esquivé, et seulement si leur
     //  jet est passé — jet tiré au lancement, comme tout le reste.
     //  (La brûlure retenait le type du coup qui l'avait allumée ; elle frappe
-    //  désormais toujours en physique, voir REGLES_ETATS.)
+    //  désormais toujours en magique, voir REGLES_ETATS.)
     (action.alterations || []).forEach(alt => {
         if (tractionEnTete(alt)) return;      // déjà jouée, avant l'attaque
         const typeDegatsDeLEtat = null;
@@ -1767,7 +1794,7 @@ export function resoudreCarte(etat, action, plateau) {
                     ...(ronge ? { idSource: idLanceur } : {}),
                     ...(maitre ? { maitre: true, desc: DESC_POISON_MAITRE } : {}),
                     // (La brûlure retenait ici le type du coup qui l'avait
-                    // allumée ; elle frappe désormais toujours en physique.)
+                    // allumée ; elle frappe désormais toujours en magique.)
                     ...(typeDegatsDeLEtat ? { typeDegats: typeDegatsDeLEtat } : {})
                 }];
             }

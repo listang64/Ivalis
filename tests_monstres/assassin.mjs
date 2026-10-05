@@ -184,7 +184,9 @@ console.log("\n3. MAÎTRE DES POISONS (NIVEAU 10) : 18 % D'ÉNERGIE ET 10 % DES 
     mag.combattants.M1.def.magique = 50;
     mag.file = [];
     ticsDeFinDeManche(mag);
-    verifier("la part des PV est magique : défense magique 50 % → -5", mag.combattants.M1.pv === 95, String(mag.combattants.M1.pv));
+    // Règle de Nico : le poison frappe désormais en dégâts BRUTS — la
+    // défense magique ne le réduit plus.
+    verifier("la part des PV est brute : défense magique 50 %, toujours -10", mag.combattants.M1.pv === 90, String(mag.combattants.M1.pv));
 
     const n9 = lancer(monde(9), "S", "M1", 0, { alterations: [POISON] }).etat;
     n9.file = [];

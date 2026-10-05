@@ -1,6 +1,6 @@
 // LA CLASSE CHASSEUR DE MAGES.
 //
-// Nico : « lvl1 : +10 % Résistance magique. lvl5 : SKILL Lumière. lvl10 : tous
+// Nico : « lvl1 : +10 % Résistance magique (passé à 13 % ensuite). lvl5 : SKILL Lumière. lvl10 : tous
 // les sorts de lumière ont 30 % de chance d'aveugler la cible et tous les
 // personnages adjacents. Nouvel effet de combat : Lumières (CHASSEUR DE MAGE),
 // 1 pt, INTELLIGENCE, 15 % de chance d'ignorer la résistance magique de la
@@ -65,18 +65,18 @@ console.log("  LE CHASSEUR DE MAGES");
 console.log("=========================================================");
 
 // =========================================================================
-console.log("\n1. LES PALIERS : +10 RÉSISTANCE MAGIQUE, LUMIÈRE, ÉCLAT AVEUGLANT");
+console.log("\n1. LES PALIERS : +13 RÉSISTANCE MAGIQUE, LUMIÈRE, ÉCLAT AVEUGLANT");
 // =========================================================================
 {
     const a1 = w.atoutClasse(chasseur(1)), a5 = w.atoutClasse(chasseur(5)), a10 = w.atoutClasse(chasseur(10));
-    verifier("niveau 1 : +10 de défense magique", a1.defMagique === 10 && !(a1.effets || []).length && !a1.lumiereAveugle, JSON.stringify(a1));
+    verifier("niveau 1 : +13 de défense magique", a1.defMagique === 13 && !(a1.effets || []).length && !a1.lumiereAveugle, JSON.stringify(a1));
     verifier("niveau 5 : l'effet Lumière", JSON.stringify(a5.effets) === '["EFF_LUMIERE"]' && !a5.lumiereAveugle);
-    verifier("niveau 10 : 30 % d'aveugler", a10.lumiereAveugle === 30 && a10.defMagique === 10);
-    verifier("la fiche annonce +10 de résistance magique",
-             w.defMagiqueCombattant(chasseur(1)) === w.defMagiqueCombattant(fiche("X")) + 10);
+    verifier("niveau 10 : 30 % d'aveugler", a10.lumiereAveugle === 30 && a10.defMagique === 13);
+    verifier("la fiche annonce +13 de résistance magique",
+             w.defMagiqueCombattant(chasseur(1)) === w.defMagiqueCombattant(fiche("X")) + 13);
     const e = monde(10);
-    verifier("en combat : défense magique 10, atout d'aveuglement 30",
-             defMagiqueDe(e.combattants.C) === 10 && e.combattants.C.atouts.lumiereAveugle === 30);
+    verifier("en combat : défense magique 13, atout d'aveuglement 30",
+             defMagiqueDe(e.combattants.C) === 13 && e.combattants.C.atouts.lumiereAveugle === 30);
 }
 
 // =========================================================================
@@ -284,7 +284,7 @@ console.log("\n5. LA FICHE DE CLASSE");
   await p.screenshot({ path: "/tmp/claude-0/chasseur_classe.png" });
   verifier("présentation et paliers Niv. 1 / 5 / 10", r.visible && JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 5","Niv. 10"]');
   verifier("résistance magique, Lumière et aveuglement y sont dits",
-           /\+10 % de résistance magique/.test(r.texte) && /Lumière/.test(r.texte) && /aveugler/.test(r.texte));
+           /\+13 % de résistance magique/.test(r.texte) && /Lumière/.test(r.texte) && /aveugler/.test(r.texte));
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

@@ -4942,19 +4942,24 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
         if (typeof window.demarrerCiblage === "function") window.demarrerCiblage(idCarte, { idLanceur });
         return;
     }
-    if (t.cible !== "allieAdjacent" && t.cible !== "allieKO") return demande.techniqueClasse(idLanceur, idCarte);
+    if (t.cible !== "allieAdjacent" && t.cible !== "allieKO" && t.cible !== "ennemiAdjacent") {
+        return demande.techniqueClasse(idLanceur, idCarte);
+    }
 
     // Rempart : un allié DEBOUT à côté. Prise en charge (Médicus) : un allié
     // KO à côté — son pion n'est plus dessiné, mais sa case est retenue.
+    // Baiser du vampire : un ENNEMI debout au contact.
     const relever = t.cible === "allieKO";
+    const mordre = t.cible === "ennemiAdjacent";
     const lanceur = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
     const pos = (id) => (window.TOKENS_VTT_DATA || {})[id];
     const ici = pos(idLanceur);
     const dist = (a, b) => (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
     const estKO = (id) => typeof window.estCombattantMort === "function" && window.estCombattantMort(id);
-    const allies = (window.PERSOS_PARTIE || []).filter(p => p && p.idPersonnage !== idLanceur
-        && !p.estMonstre && !p.estIllusion && (p.camp || "Allié") === ((lanceur || {}).camp || "Allié")
-        && estKO(p.idPersonnage) === relever
+    const monCamp = (lanceur || {}).camp || "Allié";
+    const allies = (window.PERSOS_PARTIE || []).filter(p => p && p.idPersonnage !== idLanceur && !p.estIllusion
+        && (mordre ? (p.camp || "Allié") !== monCamp && !estKO(p.idPersonnage)
+                   : !p.estMonstre && (p.camp || "Allié") === monCamp && estKO(p.idPersonnage) === relever)
         && ici && pos(p.idPersonnage) && dist(ici, pos(p.idPersonnage)) === 1);
 
     let fenetre = document.getElementById("fenetre-choix-rempart");
@@ -4974,9 +4979,11 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
     const echapper = (v) => String(v || "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
     // Personne à relever : la Prise en charge ne part pas, elle n'est pas
     // consommée — elle resservira une autre manche.
-    const titre = relever ? "✚ Prise en charge" : "🛡️ Rempart";
-    const question = relever ? "Quel allié relever ?" : "Quel allié protéger pendant 3 manches ?";
-    const personne = relever
+    const titre = mordre ? "🩸 Baiser du vampire" : relever ? "✚ Prise en charge" : "🛡️ Rempart";
+    const question = mordre ? "Quel ennemi mordre ?" : relever ? "Quel allié relever ?" : "Quel allié protéger pendant 3 manches ?";
+    const personne = mordre
+        ? "Aucun ennemi n'est au contact. La technique n'est pas utilisée : finissez votre tour, elle resservira."
+        : relever
         ? "Aucun allié KO n'est à côté de vous. La technique n'est pas utilisée : finissez votre tour, elle resservira."
         : "Aucun allié n'est à côté de vous. Rapprochez-vous, ou finissez votre tour.";
     fenetre.innerHTML = `
@@ -4984,7 +4991,7 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
         <div class="choix-rempart-texte">${allies.length ? question : personne}</div>
         <div class="choix-rempart-liste">${allies.map(a => `
             <button type="button" class="choix-rempart-allie" onclick="window.choisirAllieRempart('${echapper(a.idPersonnage)}')">
-                ${a.urlCloudinary ? `<img src="${echapper(a.urlCloudinary)}" alt="">` : ""}<span>${echapper(a.prenom || a.idPersonnage)}</span>
+                ${(a.urlToken || a.urlCloudinary) && mordre ? `<img src="${echapper(a.urlToken || a.urlCloudinary)}" alt="">` : a.urlCloudinary ? `<img src="${echapper(a.urlCloudinary)}" alt="">` : ""}<span>${echapper(a.prenom || a.nom || a.idPersonnage)}</span>
             </button>`).join("")}</div>
         <button type="button" class="choix-rempart-annuler" onclick="window.fermerChoixRempart()">Annuler</button>`;
     fenetre.style.display = "flex";
