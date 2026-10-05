@@ -86,7 +86,7 @@ console.log("\n1. LES PALIERS, ET L'ANCIEN NOM");
              w.nomActuelClasse("Nécromancien") === "Sorcier" && w.nomActuelClasse("NECROMANCIEN") === "Sorcier"
              && w.atoutRace(fiche("N", { classe: "Nécromancien", xp: XP[10] })).techniques.length === 2
              && w.estDeLaClasse({ classe: "Nécromancien" }, "Sorcier"));
-    verifier("une autre classe garde son nom", w.nomActuelClasse("Hoplite") === "Hoplite");
+    verifier("une autre classe garde son nom", w.nomActuelClasse("Oracle") === "Oracle");
     verifier("l'Ensorceleur n'a rien", Object.keys(w.atoutClasse(fiche("E", { classe: "Ensorceleur", xp: XP[10] }))).length === 0);
 }
 

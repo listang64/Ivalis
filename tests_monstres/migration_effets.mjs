@@ -74,10 +74,10 @@ console.log("\n2. LA COPIE LOCALE : TÉNÈBRES, LUMIÈRE, SAIGNEMENT ET VAMPIRIS
              ten.Nom === "Ténèbres" && ten.Cout_PT === "2" && ten.Modificateur === "INTELLIGENCE" && ten.Valeur === 3
              && ten.Type_Mecanique === "Action/Global" && ten.Classe === "Sorcier" && ten.Niveau_Requis === 1);
     const lum = par("EFF_LUMIERE");
-    verifier("Lumière : 1 pt, Intelligence, 15 % (max 60), Magique/Physique, Chasseur de mages niv. 5",
+    verifier("Lumière : 1 pt, Intelligence, 15 % (max 60), Magique/Physique, Chasseur de mages niv. 1, 8 % d'aveugler",
              lum.Nom === "Lumière" && lum.Cout_PT === "1" && lum.Modificateur === "INTELLIGENCE" && lum.Pourcent_Base === 15
              && lum.Pourcent_Max === 60 && lum.Type_Mecanique === "Magique" && lum.Type_Mecanique_2 === "Physique"
-             && lum.Classe === "Chasseur de mages" && lum.Niveau_Requis === 5, JSON.stringify(lum).slice(0, 140));
+             && lum.Classe === "Chasseur de mages" && lum.Niveau_Requis === 1 && /8% chance d'aveugler/.test(lum.Effet_Base), JSON.stringify(lum).slice(0, 140));
     const sai = par("EFF_SAIGNEMENT");
     verifier("Saignement : 1 pt, Force, 15 % (max 75), Physique, 2 tours, réservé à personne",
              sai.Nom === "Saignement" && sai.Cout_PT === "1" && sai.Modificateur === "FORCE" && sai.Pourcent_Base === 15

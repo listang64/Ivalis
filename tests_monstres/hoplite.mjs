@@ -14,12 +14,20 @@
 // défense pour l'Hoplite ; partagés : les cartes (zones comprises) et les
 // attaques d'opportunité, pas les tics ni les nappes ; il s'arrête si
 // l'Hoplite tombe.
+//
+// Puis, Nico : « Hoplite : au lvl5 mettre la compétence Rempart et enlever mur
+// de bouclier. lvl1 : +7 % Parade / 15 % chance de provoquer sur toutes ses
+// attaques. lvl10 : COMP Résonance du bouclier, 0 fatigue (une fois par
+// combat) : étourdit tous les ennemis adjacents et inflige 5 % de dégâts
+// physiques des PV max de la cible. Hoplite : changer son nom par
+// Protecteur. » Le Mur de bouclier n'est plus donné ; le moteur le sait
+// toujours jouer (section 2, palier rendu le temps de la section).
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
 import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 import { construireEtatCombat, clonerEtat, appliquerEntree, verifierEtatCombat } from '../combat_etat.js';
-import { resoudreCarte, paradeDe, protecteurRempart } from '../moteur_pur.js';
+import { resoudreCarte, paradeDe, protecteurRempart, PART_PV_RESONANCE } from '../moteur_pur.js';
 import { validerIntention, appliquerIntention, vieillirLesEtats, ticsDeFinDeManche } from '../cerveau_combat.js';
 import { infligerOpportunite } from '../mouvement_pur.js';
 import { misEnScene } from '../pont_combat.js';
@@ -68,28 +76,29 @@ const frapper = (e, cible, valeur, extra = {}) => resoudreCarte(e, {
 
 console.log("\n=========================================================");
 console.log("  L'HOPLITE");
-console.log("=========================================================");
-
 // =========================================================================
-console.log("\n1. NIVEAU 1 : +5 PARADE, +5 RÉSISTANCE PHYSIQUE ; TECHNIQUES AUX NIVEAUX 5 ET 10");
+console.log("\n1. LE PROTECTEUR (EX-HOPLITE) : +7 PARADE, 15 % DE PROVOCATION ; RANG 5 REMPART, RANG 10 RÉSONANCE");
 // =========================================================================
 {
     const a1 = w.atoutClasse(hoplite(1)), a5 = w.atoutClasse(hoplite(5)), a10 = w.atoutClasse(hoplite(10));
-    verifier("niveau 1 : +5 parade, +5 défense physique, pas de technique",
-             a1.parade === 5 && a1.defPhysique === 5 && !(a1.techniques || []).length, JSON.stringify(a1));
-    verifier("niveau 5 : Mur de bouclier", JSON.stringify(a5.techniques) === '["CLASSE_MUR_BOUCLIER"]', JSON.stringify(a5.techniques));
-    verifier("niveau 10 : Mur de bouclier et Rempart",
-             JSON.stringify(a10.techniques) === '["CLASSE_MUR_BOUCLIER","CLASSE_REMPART"]', JSON.stringify(a10.techniques));
-    verifier("la parade et la défense physique de la fiche montent de 5",
-             w.paradeCombattant(hoplite(1)) === w.paradeCombattant(fiche("X")) + 5
-             && w.defPhysiqueCombattant(hoplite(1)) === w.defPhysiqueCombattant(fiche("X")) + 5);
+    verifier("niveau 1 : +7 parade, 15 % de provocation, pas de technique",
+             a1.parade === 7 && a1.provocationAttaques === 15 && !a1.defPhysique && !(a1.techniques || []).length, JSON.stringify(a1));
+    verifier("niveau 5 : le Rempart (plus de Mur de bouclier)", JSON.stringify(a5.techniques) === '["CLASSE_REMPART"]', JSON.stringify(a5.techniques));
+    verifier("niveau 10 : + la Résonance du bouclier",
+             JSON.stringify(a10.techniques) === '["CLASSE_REMPART","CLASSE_RESONANCE_BOUCLIER"]', JSON.stringify(a10.techniques));
+    verifier("une fiche « Hoplite » est un Protecteur", w.nomActuelClasse("Hoplite") === "Protecteur"
+             && w.estDeLaClasse({ classe: "Hoplite" }, "Protecteur"));
+    verifier("la parade de la fiche monte de 7, la défense physique ne bouge plus",
+             w.paradeCombattant(hoplite(1)) === w.paradeCombattant(fiche("X")) + 7
+             && w.defPhysiqueCombattant(hoplite(1)) === w.defPhysiqueCombattant(fiche("X")));
     const e = monde(10);
-    verifier("en combat : +5 de parade et de défense physique, techniques dans l'atout",
-             e.combattants.H.def.parade === 5 && e.combattants.H.def.physique === 5
+    verifier("en combat : +7 de parade, techniques dans l'atout",
+             e.combattants.H.def.parade === 7 && e.combattants.H.def.physique === 0
              && e.combattants.H.atouts.techniques.length === 2, JSON.stringify(e.combattants.H.def));
-    verifier("une carte de technique : initiative 100 / 105, fatigue 0",
-             w.carteTechniqueClasse("CLASSE_MUR_BOUCLIER").Initiative === 100 && w.carteTechniqueClasse("CLASSE_REMPART").Initiative === 105
-             && w.carteTechniqueClasse("CLASSE_MUR_BOUCLIER").Fatigue === 0);
+    const res = w.TECHNIQUES_CLASSE.CLASSE_RESONANCE_BOUCLIER;
+    verifier("les cartes : Rempart init 105 niveau 5, Résonance niveau 10, fatigue 0",
+             w.carteTechniqueClasse("CLASSE_REMPART").Initiative === 105 && w.TECHNIQUES_CLASSE.CLASSE_REMPART.niveau === 5
+             && res.niveau === 10 && res.Fatigue === 0 && res.classe === "Protecteur");
     verifier("la limite en main ne bouge pas (6)", w.competencesMaxCombattant(hoplite(10)) === 6);
 }
 
@@ -97,12 +106,13 @@ console.log("\n1. NIVEAU 1 : +5 PARADE, +5 RÉSISTANCE PHYSIQUE ; TECHNIQUES AUX
 console.log("\n2. MUR DE BOUCLIER : +60 DE PARADE JUSQU'À LA FIN DE LA MANCHE, UNE FOIS");
 // =========================================================================
 {
+    w.ATOUTS_CLASSES.Protecteur.push({ niveau: 5, techniques: ["CLASSE_MUR_BOUCLIER"] });
     const e = enTete(monde(5), "H", "CLASSE_MUR_BOUCLIER");
     const i = intention("CLASSE_MUR_BOUCLIER");
     verifier("l'intention est acceptée", validerIntention(e, i).ok, validerIntention(e, i).raison);
     const pas = appliquerIntention(e, i);
     const h = pas.etat.combattants.H;
-    verifier("+60 de parade sur soi (5 + 60)", paradeDe(h) === 65, String(paradeDe(h)));
+    verifier("+60 de parade sur soi (7 + 60)", paradeDe(h) === 67, String(paradeDe(h)));
     verifier("la technique est marquée « utilisée »", JSON.stringify(h.techniquesUtilisees) === '["CLASSE_MUR_BOUCLIER"]');
     verifier("elle occupe le tour : la file avance", pas.etat.file[0] && pas.etat.file[0].id === "M",
              JSON.stringify(pas.etat.file.map(f => f.id)));
@@ -110,10 +120,10 @@ console.log("\n2. MUR DE BOUCLIER : +60 DE PARADE JUSQU'À LA FIN DE LA MANCHE, 
     verifier("l'état reste cohérent", verifierEtatCombat(pas.etat).length === 0, verifierEtatCombat(pas.etat).join(" | "));
     const rejoue = appliquerEntree(e, pas.entree).combattants.H;
     verifier("rejoué depuis le journal : même parade, même usage",
-             paradeDe(rejoue) === 65 && JSON.stringify(rejoue.techniquesUtilisees) === '["CLASSE_MUR_BOUCLIER"]');
+             paradeDe(rejoue) === 67 && JSON.stringify(rejoue.techniquesUtilisees) === '["CLASSE_MUR_BOUCLIER"]');
     const fin = clonerEtat(pas.etat);
     vieillirLesEtats(fin);
-    verifier("à la fin de la manche, il tombe", paradeDe(fin.combattants.H) === 5, String(paradeDe(fin.combattants.H)));
+    verifier("à la fin de la manche, il tombe", paradeDe(fin.combattants.H) === 7, String(paradeDe(fin.combattants.H)));
     const encore = enTete(clonerEtat(pas.etat), "H", "CLASSE_MUR_BOUCLIER");
     verifier("une seconde fois dans le combat : refusée", !validerIntention(encore, intention("CLASSE_MUR_BOUCLIER")).ok,
              validerIntention(encore, intention("CLASSE_MUR_BOUCLIER")).raison);
@@ -121,6 +131,44 @@ console.log("\n2. MUR DE BOUCLIER : +60 DE PARADE JUSQU'À LA FIN DE LA MANCHE, 
     verifier("niveau 4 : il ne l'a pas", !validerIntention(niv4, intention("CLASSE_MUR_BOUCLIER")).ok);
     const autreCarte = enTete(monde(5), "H", "COMP_x");
     verifier("pas si une autre carte a été choisie pour la manche", !validerIntention(autreCarte, intention("CLASSE_MUR_BOUCLIER")).ok);
+    w.ATOUTS_CLASSES.Protecteur.pop();
+    verifier("sans le palier rendu, plus personne ne l'a", !validerIntention(enTete(monde(10), "H", "CLASSE_MUR_BOUCLIER"), intention("CLASSE_MUR_BOUCLIER")).ok);
+}
+
+// =========================================================================
+console.log("\n2 bis. RÉSONANCE DU BOUCLIER : LES ENNEMIS AU CONTACT ÉTOURDIS, 5 % DE LEURS PV MAX");
+// =========================================================================
+{
+    // H en (0,0) ; M au contact en (1,-1) ; N au contact en (-1,0) avec 50 % d'armure ;
+    // A l'allié au contact (1,0) ; B loin.
+    const fiches = [hoplite(10), fiche("A"), fiche("M", { PV_Max: 200, PV_Actuels: 200 }), fiche("MN", { PV_Max: 100, PV_Actuels: 100 }), fiche("B")];
+    const pos = { H: { q: 0, r: 0 }, A: { q: 1, r: 0 }, M: { q: 1, r: -1 }, MN: { q: -1, r: 0 }, B: { q: 5, r: 0 } };
+    const e = construireEtatCombat({ idPartie: "P", cerveau: "P", graine: 1, combattants: fiches, positions: pos,
+                                     partie: { Tour_Combat: 1 }, regles: REGLES });
+    e.ordre = ["H", "A", "M", "MN", "B"]; e.phase = "Resolution";
+    e.combattants.MN.def.physique = 50;
+    enTete(e, "H", "CLASSE_RESONANCE_BOUCLIER");
+    const i = intention("CLASSE_RESONANCE_BOUCLIER");
+    verifier("niveau 10, des ennemis au contact : acceptée", validerIntention(e, i).ok, validerIntention(e, i).raison || "");
+    verifier("niveau 9 : il ne l'a pas", !validerIntention(enTete(monde(9), "H", "CLASSE_RESONANCE_BOUCLIER"), i).ok);
+    const seul = enTete(monde(10, { M: { q: 4, r: 0 } }), "H", "CLASSE_RESONANCE_BOUCLIER");
+    verifier("personne au contact : refusée (pas gâchée)", !validerIntention(seul, i).ok, validerIntention(seul, i).raison);
+    const pas = appliquerIntention(e, i);
+    const c = pas.etat.combattants;
+    const etourdi = (x) => (x.etats || []).find(t => t.nom === "Étourdi");
+    verifier(`M (200 PV) : ${PART_PV_RESONANCE} % → 10 physiques, Étourdi 2 manches`, c.M.pv === 190 && etourdi(c.M) && etourdi(c.M).duree === 2,
+             `${c.M.pv} ${JSON.stringify(c.M.etats)}`);
+    verifier("MN (100 PV, 50 % d'armure) : 5 → 3 (l'armure compte), Étourdi", c.MN.pv === 97 && !!etourdi(c.MN), String(c.MN.pv));
+    verifier("ni l'allié au contact, ni un ennemi loin, ni lui", c.A.pv === 100 && !etourdi(c.A) && !etourdi(c.B) && c.H.pv === 100);
+    verifier("à coup sûr, sans fatigue, une fois par combat", c.H.fatigue === 100
+             && !validerIntention(enTete(clonerEtat(pas.etat), "H", "CLASSE_RESONANCE_BOUCLIER"), i).ok);
+    const rejoue = appliquerEntree(e, pas.entree).combattants;
+    verifier("rejoué depuis le journal : mêmes PV, mêmes états", rejoue.M.pv === 190 && rejoue.MN.pv === 97 && !!etourdi(rejoue.M));
+    const titre = misEnScene(pas.entree.etapes.find(x => x.type === "techniqueClasse"), pas.etat);
+    verifier("à l'écran : « 🛡️ Résonance du bouclier »", titre && /Résonance du bouclier/.test(titre.texte));
+    const imm = clonerEtat(e); imm.combattants.M.atouts.immunites = ["Étourdi"];
+    const ri = appliquerIntention(enTete(imm, "H", "CLASSE_RESONANCE_BOUCLIER"), i).etat.combattants.M;
+    verifier("un immunisé prend les dégâts, pas l'Étourdi", ri.pv === 190 && !etourdi(ri));
 }
 
 // =========================================================================
@@ -172,8 +220,8 @@ console.log("\n4. LE PARTAGE DES COUPS");
     const critique = clonerEtat(protege);
     critique.combattants.M.estMonstre = false;
     const crit = frapper(critique, "A", 20, { critique: true });
-    // L'Hoplite garde ses +5 % d'armure de classe : 20 × 0,95 = 19.
-    verifier("un critique double chaque moitié (20 et 19 avec son armure)", crit.etat.combattants.A.pv === 80 && crit.etat.combattants.H.pv === 81,
+    // (Le Protecteur n'a plus d'armure de classe : 20 et 20.)
+    verifier("un critique double chaque moitié (20 et 20)", crit.etat.combattants.A.pv === 80 && crit.etat.combattants.H.pv === 80,
              `${crit.etat.combattants.A.pv} / ${crit.etat.combattants.H.pv}`);
 
     const glace = frapper(protege, "A", 10, { alterations: [{ nom: "Glacé", chance: 100, duree: 2 }] });
@@ -302,7 +350,7 @@ console.log("\n5. LA FICHE PERSO : LES TECHNIQUES DE CLASSE À PART");
     const niv5 = lire();
     // Le premier clic d'une technique forgée met en avant et ouvre la carte ;
     // sur une technique de classe, deux clics ne la mémorisent jamais.
-    const calque = document.querySelector('#ui-carte-CLASSE_MUR_BOUCLIER [onclick]');
+    const calque = document.querySelector('#ui-carte-CLASSE_REMPART [onclick]');
     calque.click(); calque.click();
     niv5.apercu = document.getElementById("apercu-carte-hd-competence")?.dataset.cardId || null;
     niv5.deckApres = [...window.CARTES_SELECTIONNEES];
@@ -312,15 +360,15 @@ console.log("\n5. LA FICHE PERSO : LES TECHNIQUES DE CLASSE À PART");
   });
   await p.screenshot({ path: "/tmp/claude-0/hoplite_fiche.png" });
   verifier("une section « Techniques de classe », après le grimoire", r.section && r.apresLeGrimoire, JSON.stringify(r));
-  verifier("niveau 5 : Mur de bouclier acquis, Rempart verrouillé (niveau 10)",
-           JSON.stringify(r.techniques.map(t => [t.id, t.verrouillee])) === '[["CLASSE_MUR_BOUCLIER",false],["CLASSE_REMPART",true]]'
+  verifier("niveau 5 : Rempart acquis, Résonance du bouclier verrouillée (niveau 10)",
+           JSON.stringify(r.techniques.map(t => [t.id, t.verrouillee])) === '[["CLASSE_REMPART",false],["CLASSE_RESONANCE_BOUCLIER",true]]'
            && /Niveau 10 requis/.test(r.techniques[1].badge), JSON.stringify(r.techniques));
   verifier("elles ne comptent pas dans les mémorisées (1 / 6)", r.memorisees === "1", r.memorisees);
   verifier("mêmes bannières que les techniques forgées (même cadre)",
            r.techniques.every(t => t.banniere) && /ban_cible/.test(r.cadreJoueur) && /bandeau_carte_normal/.test(r.techniques[0].cadre), r.techniques[0].cadre);
   verifier("la verrouillée prend le cadre épuisé", /ban_epuis/.test(r.techniques[1].cadre), r.techniques[1].cadre);
   verifier("un clic ouvre la carte en grand, sans la mémoriser",
-           r.apercu === "CLASSE_MUR_BOUCLIER" && JSON.stringify(r.deckApres) === '["C1"]', JSON.stringify([r.apercu, r.deckApres]));
+           r.apercu === "CLASSE_REMPART" && JSON.stringify(r.deckApres) === '["C1"]', JSON.stringify([r.apercu, r.deckApres]));
   const necro = await p.evaluate(async () => {
     window.PERSOS_PARTIE[0].classe = "Oracle";
     await window.chargerOngletCompetences("H1", 7);
@@ -338,7 +386,7 @@ console.log("\n6. EN COMBAT : LES BANNIÈRES, LE CHOIX, LE LANCEMENT");
     document.getElementById("fenetre-combat").style.display = "block";
     window.PERSOS_PARTIE = [
       { idPersonnage: "H1", prenom: "Léonidas", classe: "Hoplite", xp: 7900, couleur: "#335", camp: "Allié",
-        deckEquipe: ["C1"], PV_Max: 50, PV_Actuels: 50, Fatigue_Max: 100, fatigueActuelle: 100, techniquesUtilisees: ["CLASSE_MUR_BOUCLIER"] },
+        deckEquipe: ["C1"], PV_Max: 50, PV_Actuels: 50, Fatigue_Max: 100, fatigueActuelle: 100, techniquesUtilisees: ["CLASSE_RESONANCE_BOUCLIER"] },
       { idPersonnage: "A1", prenom: "Cybile", camp: "Allié", PV_Max: 40, PV_Actuels: 40 },
       { idPersonnage: "A2", prenom: "Jade", camp: "Allié", PV_Max: 40, PV_Actuels: 40 },
       { idPersonnage: "M1", prenom: "Gnoll", camp: "Ennemi", estMonstre: true, PV_Max: 40, PV_Actuels: 40 }
@@ -353,16 +401,16 @@ console.log("\n6. EN COMBAT : LES BANNIÈRES, LE CHOIX, LE LANCEMENT");
     try { window.chargerCompetencesCombat("H1", "#335"); } catch (e) { return { erreur: e.message }; }
     await new Promise(r => setTimeout(r, 100));
     const ban = (id) => document.getElementById("combat-carte-" + id);
-    const bannieres = ["C1", "CLASSE_MUR_BOUCLIER", "CLASSE_REMPART", "REPOS_LONG"].map(id => !!ban(id));
-    const murGrise = ban("CLASSE_MUR_BOUCLIER").classList.contains("banniere-epuisee");
+    const bannieres = ["C1", "CLASSE_REMPART", "CLASSE_RESONANCE_BOUCLIER", "REPOS_LONG"].map(id => !!ban(id));
+    const murGrise = ban("CLASSE_RESONANCE_BOUCLIER").classList.contains("banniere-epuisee");
     const rempartLibre = !ban("CLASSE_REMPART").classList.contains("banniere-epuisee");
     const ordre = [...document.querySelectorAll("#combat-liste-competences .banniere-carte-combat")].map(x => x.dataset.cardId);
     // Le Rempart est joué PENDANT que le volet est ouvert : la fiche le dit,
     // le rafraîchissement doit le griser sans redessiner le volet.
-    window.PERSOS_PARTIE[0].techniquesUtilisees = ["CLASSE_MUR_BOUCLIER", "CLASSE_REMPART"];
+    window.PERSOS_PARTIE[0].techniquesUtilisees = ["CLASSE_RESONANCE_BOUCLIER", "CLASSE_REMPART"];
     window.actualiserBannieresEpuisees();
     const rempartGriseApres = ban("CLASSE_REMPART").classList.contains("banniere-epuisee");
-    window.PERSOS_PARTIE[0].techniquesUtilisees = ["CLASSE_MUR_BOUCLIER"];
+    window.PERSOS_PARTIE[0].techniquesUtilisees = ["CLASSE_RESONANCE_BOUCLIER"];
     window.actualiserBannieresEpuisees();
     const rempartRendu = !ban("CLASSE_REMPART").classList.contains("banniere-epuisee");
     const look = (id) => { const b = ban(id); const nom = b.querySelector(".texte-nom-banniere");
@@ -373,7 +421,7 @@ console.log("\n6. EN COMBAT : LES BANNIÈRES, LE CHOIX, LE LANCEMENT");
     let ecrit = null;
     window.modifierPartieOuEchec = async (f) => { const r = f({ Phase_Combat: "Preparation", File_Attente_Combat: [] }); ecrit = r && r.maj; return { ok: true }; };
     window.avecCarteJouee = (d, id) => [id]; window.toutLeMondeAJoue = () => false;
-    await window.jouerCarteCombat("CLASSE_MUR_BOUCLIER");
+    await window.jouerCarteCombat("CLASSE_RESONANCE_BOUCLIER");
     const refusMur = alertes.slice();
     await window.jouerCarteCombat("CLASSE_REMPART");
     const file = ecrit && ecrit.File_Attente_Combat;
@@ -387,30 +435,30 @@ console.log("\n6. EN COMBAT : LES BANNIÈRES, LE CHOIX, LE LANCEMENT");
     const proposes = [...fen.querySelectorAll(".choix-rempart-allie span")].map(x => x.textContent);
     const visible = getComputedStyle(fen).display !== "none";
     fen.querySelector(".choix-rempart-allie").click();
-    window.lancerTechniqueClasse("CLASSE_MUR_BOUCLIER", "H1");
+    window.lancerTechniqueClasse("CLASSE_RESONANCE_BOUCLIER", "H1");
     return { rempartGriseApres, rempartRendu, lookJoueur, lookRempart, bannieres, murGrise, rempartLibre, ordre, refusMur, file, proposes, visible, demandes,
              donnees: window.donneesCarteCombattant("H1", "CLASSE_REMPART").Nom };
   });
   verifier("le volet montre le deck, puis les deux techniques, puis le repos long",
-           !r.erreur && JSON.stringify(r.ordre) === '["C1","CLASSE_MUR_BOUCLIER","CLASSE_REMPART","REPOS_LONG"]', JSON.stringify(r.ordre || r.erreur));
-  verifier("Mur de bouclier déjà joué : grisé ; Rempart : libre", r.murGrise && r.rempartLibre);
+           !r.erreur && JSON.stringify(r.ordre) === '["C1","CLASSE_REMPART","CLASSE_RESONANCE_BOUCLIER","REPOS_LONG"]', JSON.stringify(r.ordre || r.erreur));
+  verifier("Résonance déjà jouée : grisée ; Rempart : libre", r.murGrise && r.rempartLibre);
   verifier("joué pendant que le volet est ouvert : grisé au rafraîchissement", r.rempartGriseApres && r.rempartRendu);
   verifier("en combat, même bannière que les techniques du joueur (cadre, couleur, nom nu)",
            r.lookRempart && r.lookRempart.cadre === r.lookJoueur.cadre && r.lookRempart.couleur === r.lookJoueur.couleur
            && r.lookRempart.nom === "Rempart", JSON.stringify([r.lookJoueur, r.lookRempart]));
-  verifier("choisir le Mur déjà joué : refusé, avec un message", r.refusMur.length === 1 && /déjà servi/.test(r.refusMur[0]), JSON.stringify(r.refusMur));
+  verifier("choisir la Résonance déjà jouée : refusée, avec un message", r.refusMur.length === 1 && /déjà servi/.test(r.refusMur[0]), JSON.stringify(r.refusMur));
   verifier("choisir le Rempart : inscrit dans la file à l'initiative 105",
            Array.isArray(r.file) && r.file.length === 1 && r.file[0].idCarte === "CLASSE_REMPART" && r.file[0].initiative === 105,
            JSON.stringify(r.file));
   verifier("son tour venu : seuls les alliés adjacents sont proposés", r.visible && JSON.stringify(r.proposes) === '["Cybile"]',
            JSON.stringify(r.proposes));
-  verifier("le clic envoie le Rempart sur cet allié ; le Mur part sur soi",
-           JSON.stringify(r.demandes) === '[["H1","CLASSE_REMPART","A1"],["H1","CLASSE_MUR_BOUCLIER",null]]', JSON.stringify(r.demandes));
+  verifier("le clic envoie le Rempart sur cet allié ; la Résonance part sans cible",
+           JSON.stringify(r.demandes) === '[["H1","CLASSE_REMPART","A1"],["H1","CLASSE_RESONANCE_BOUCLIER",null]]', JSON.stringify(r.demandes));
   verifier("les autres postes savent nommer la technique", r.donnees === "Rempart");
 }
 
 // =========================================================================
-console.log("\n7. LA FICHE DE CLASSE : LE DESCRIPTIF DE L'HOPLITE");
+console.log("\n7. LA FICHE DE CLASSE : LE DESCRIPTIF DU PROTECTEUR");
 // =========================================================================
 {
   const r = await p.evaluate(async () => {
@@ -418,14 +466,45 @@ console.log("\n7. LA FICHE DE CLASSE : LE DESCRIPTIF DE L'HOPLITE");
     document.querySelectorAll('body > div[id^="ecran-"]').forEach(e => { e.style.display = "none"; });
     window.CLASSES_CACHE = window.CLASSES_PAR_DEFAUT.map(c => ({ ...c }));
     await window.ouvrirChoixClasse();
-    window.ouvrirFicheClasse("CLASSE_HOPLITE");
+    window.ouvrirFicheClasse("CLASSE_PROTECTEUR");
     const d = document.getElementById("descriptif-fiche-classe");
     return { visible: getComputedStyle(d).display !== "none",
              niveaux: [...d.querySelectorAll(".palier-classe-niveau")].map(x => x.textContent.trim()), texte: d.textContent };
   });
   await p.screenshot({ path: "/tmp/claude-0/hoplite_classe.png" });
   verifier("présentation et paliers Niv. 1 / 5 / 10", r.visible && JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 5","Niv. 10"]');
-  verifier("Mur de bouclier et Rempart y sont dits", /Mur de bouclier/.test(r.texte) && /Rempart/.test(r.texte) && /\+5 % de parade/.test(r.texte));
+  verifier("Rempart, Résonance, +7 % de parade et provocation y sont dits — plus de Mur",
+           /Rempart/.test(r.texte) && /Résonance du bouclier/.test(r.texte) && /\+7 % de parade/.test(r.texte)
+           && /provoquer/.test(r.texte) && !/Mur de bouclier/.test(r.texte));
+}
+
+// =========================================================================
+console.log("\n8. 15 % DE PROVOCATION SUR CHACUNE DE SES ATTAQUES");
+// =========================================================================
+{
+  const r = await p.evaluate(() => {
+    window.PERSOS_PARTIE = [{ idPersonnage: "H1", camp: "Allié", classe: "Protecteur", xp: 0 },
+                            { idPersonnage: "A1", camp: "Allié" }, { idPersonnage: "M1", camp: "Ennemi", estMonstre: true }];
+    const lanceur = window.PERSOS_PARTIE[0];
+    const enrichir = (state, qui = lanceur) => { window.appliquerEquipementALaCarte(state, qui, ""); return state.alterations || []; };
+    const coup = () => ({ attaques: [{ nom: "Coup", valeurBrute: 5, typeRes: "Physique", cibles: ["M1", "A1"] }], alterations: [] });
+    const simple = enrichir(coup());
+    const dejaFaible = enrichir({ ...coup(), alterations: [{ nom: "Provocation", chance: 10, cibles: ["M1"] }] });
+    const dejaForte = enrichir({ ...coup(), alterations: [{ nom: "Provocation", chance: 40, cibles: ["M1"] }] });
+    const soin = enrichir({ attaques: [{ nom: "Soin", valeurBrute: 5, isHeal: true, cibles: ["A1"] }], alterations: [] });
+    const autre = enrichir(coup(), { idPersonnage: "X", camp: "Allié", classe: "Oracle", xp: 0 });
+    const ancien = enrichir(coup(), { idPersonnage: "H2", camp: "Allié", classe: "Hoplite", xp: 0 });
+    return { simple, dejaFaible, dejaForte, soin, autre, ancien };
+  });
+  const prov = (l) => l.find(a => a.nom === "Provocation");
+  verifier("une attaque : Provocation 15 %, sur l'ennemi frappé seulement, au nom du Protecteur",
+           prov(r.simple) && prov(r.simple).chance === 15 && JSON.stringify(prov(r.simple).cibles) === '["M1"]'
+           && prov(r.simple).idProvocateur === "H1" && prov(r.simple).duree === 2, JSON.stringify(r.simple));
+  verifier("une carte qui provoquait à 10 % : montée à 15", prov(r.dejaFaible).chance === 15 && r.dejaFaible.length === 1);
+  verifier("une carte qui provoquait à 40 % : garde 40", prov(r.dejaForte).chance === 40);
+  verifier("un soin : aucune provocation", !prov(r.soin));
+  verifier("une autre classe : rien", !prov(r.autre));
+  verifier("un héros resté « Hoplite » sur sa fiche provoque aussi", prov(r.ancien) && prov(r.ancien).chance === 15);
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

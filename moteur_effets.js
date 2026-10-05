@@ -3360,10 +3360,14 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
         ? window.bonusEquipPourCarte(lanceur, cle, armeDeLaCarte)
         : window.bonusEquip(lanceur, cle);
 
+    // Ce que la CLASSE ajoute aux cartes (app.js, ATOUTS_CLASSES) : +1 à
+    // chaque soin du Médicus, la provocation du Protecteur.
+    const atouts = (typeof window.atoutRace === "function") ? (window.atoutRace(lanceur) || {}) : {};
+
     const degatsTous = bonus("degats");
     const degatsPhys = bonus("degatsPhys");
     const degatsMag  = bonus("degatsMag");
-    const soin       = bonus("soin");
+    const soin       = bonus("soin") + (Number(atouts.bonusSoin) || 0);
     const bonusDegatsPct = bonus("degatsPct");
 
     (state.attaques || []).forEach(attaque => {
@@ -3378,6 +3382,29 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
         // appliqué APRÈS les dégâts plats, comme un dernier multiplicateur.
         if (bonusDegatsPct > 0) attaque.valeurBrute = Math.round(attaque.valeurBrute * (1 + bonusDegatsPct / 100));
     });
+
+    // LE PROTECTEUR PROVOQUE : chacune de ses attaques a 15 % de chance de
+    // provoquer les ennemis qu'elle frappe. Une carte qui provoquait déjà
+    // garde la meilleure des deux chances.
+    const provoc = Number(atouts.provocationAttaques) || 0;
+    if (provoc > 0) {
+        const camp = (id) => ((window.PERSOS_PARTIE || []).find(p => p.idPersonnage === id) || {}).camp || "Allié";
+        const visees = [...new Set(attaquesFrappantes(state).flatMap(a => a.cibles || []))]
+            .filter(id => id !== lanceur.idPersonnage && camp(id) !== (lanceur.camp || "Allié"));
+        if (visees.length > 0) {
+            state.alterations = state.alterations || [];
+            const deja = state.alterations.find(a => a.nom === "Provocation");
+            if (deja) {
+                deja.chance = Math.max(deja.chance || 0, provoc);
+                deja.idProvocateur = lanceur.idPersonnage;
+                deja.cibles = [...new Set([...(deja.cibles || []), ...visees])];
+            } else {
+                state.alterations.push({ nom: "Provocation", ...GABARITS_ETATS_EQUIPEMENT["Provocation"], chance: provoc,
+                    venuDeLaClasse: true, isRanged: false, rangeMax: 1, cibles: visees,
+                    idProvocateur: lanceur.idPersonnage });
+            }
+        }
+    }
 
     // Les états de l'arme visent exactement ce que la carte a frappé — et seule
     // une carte qui se sert de l'arme y a droit.

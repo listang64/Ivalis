@@ -72,13 +72,14 @@ console.log("\n1. CHAQUE ATOUT A SA PHRASE");
 
 console.log("\n2. LE DÉTAIL D'UN HÉROS");
 {
-    const d = w.detailBonusRaceClasse({ race: "Humain", classe: "Hoplite", xp: XP[5] });
+    const d = w.detailBonusRaceClasse({ race: "Humain", classe: "Hoplite", xp: XP[5] });   // (ex-Hoplite : le Protecteur)
     verifier("Humain : +10 de fatigue maximum", d.race.nom === "Humain" && JSON.stringify(d.race.lignes) === '["+10 de fatigue maximum"]',
              JSON.stringify(d.race.lignes));
     verifier("Hoplite niveau 5 : paliers 1 et 5 atteints, 10 à venir",
              JSON.stringify(d.classe.paliers.map(p => [p.niveau, p.atteint])) === '[[1,true],[5,true],[10,false]]');
-    verifier("le palier 1 dit +5 % de parade et de résistance physique",
-             JSON.stringify(d.classe.paliers[0].lignes) === '["+5 % de parade","+5 % de résistance physique"]', JSON.stringify(d.classe.paliers[0].lignes));
+    verifier("le palier 1 dit +7 % de parade et 15 % de provocation (classe lue « Protecteur »)",
+             d.classe.nom === "Protecteur"
+             && JSON.stringify(d.classe.paliers[0].lignes) === '["+7 % de parade","15 % de chance de provoquer la cible de chacune de ses attaques"]', JSON.stringify(d.classe.paliers[0].lignes));
     const sans = w.detailBonusRaceClasse({ race: "", classe: "Oracle" });
     verifier("une classe sans bonus définis : aucun palier", sans.classe.paliers.length === 0 && sans.race.lignes.length === 0);
 }

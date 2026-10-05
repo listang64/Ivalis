@@ -10,12 +10,22 @@
 // critique ; réservé à la classe dès le niveau 5, jamais aux monstres ; au
 // niveau 10, un jet par cible touchée, qui aveugle la cible et les ENNEMIS
 // qui la touchent, pas d'esquive pour les voisins, l'Aveuglement normal.
+//
+// Puis, Nico : « chasseur de mage : lvl1 : +10% Résistance magique / SKILL :
+// Lumière : 15% chance d'ignorer la résistance magique de la cible sur ce sort
+// (Max 60%) et 8% chance d'aveugler /// lvl5 : Compétence : Bouclier
+// anti-magie : 0 fatigue, sur deux tours renvoie tous les dégâts magiques à la
+// cible, INIT 200 /// lvl10 : Appel de la lumière, 0 fatigue, aveugle tous les
+// combattants sur la map. » L'aveuglement de la Lumière ne prend plus que sa
+// cible.
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
 import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 import { construireEtatCombat, clonerEtat, appliquerEntree } from '../combat_etat.js';
-import { resoudreCarte, tirerDesCarte, defMagiqueDe, DUREE_AVEUGLE_LUMIERE } from '../moteur_pur.js';
+import { resoudreCarte, tirerDesCarte, defMagiqueDe, DUREE_AVEUGLE_LUMIERE, ETAT_ANTIMAGIE } from '../moteur_pur.js';
+import { validerIntention, appliquerIntention, vieillirLesEtats } from '../cerveau_combat.js';
+import { misEnScene } from '../pont_combat.js';
 
 let echecs = 0;
 const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(66)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
@@ -62,21 +72,26 @@ const aveugle = (c) => (c.etats || []).find(x => x.nom === "Aveuglé");
 
 console.log("\n=========================================================");
 console.log("  LE CHASSEUR DE MAGES");
-console.log("=========================================================");
-
 // =========================================================================
-console.log("\n1. LES PALIERS : +13 RÉSISTANCE MAGIQUE, LUMIÈRE, ÉCLAT AVEUGLANT");
+console.log("\n1. LES PALIERS : +10 RÉSISTANCE MAGIQUE ET LUMIÈRE, BOUCLIER ANTI-MAGIE, APPEL DE LA LUMIÈRE");
 // =========================================================================
 {
     const a1 = w.atoutClasse(chasseur(1)), a5 = w.atoutClasse(chasseur(5)), a10 = w.atoutClasse(chasseur(10));
-    verifier("niveau 1 : +13 de défense magique", a1.defMagique === 13 && !(a1.effets || []).length && !a1.lumiereAveugle, JSON.stringify(a1));
-    verifier("niveau 5 : l'effet Lumière", JSON.stringify(a5.effets) === '["EFF_LUMIERE"]' && !a5.lumiereAveugle);
-    verifier("niveau 10 : 30 % d'aveugler", a10.lumiereAveugle === 30 && a10.defMagique === 13);
-    verifier("la fiche annonce +13 de résistance magique",
-             w.defMagiqueCombattant(chasseur(1)) === w.defMagiqueCombattant(fiche("X")) + 13);
-    const e = monde(10);
-    verifier("en combat : défense magique 13, atout d'aveuglement 30",
-             defMagiqueDe(e.combattants.C) === 13 && e.combattants.C.atouts.lumiereAveugle === 30);
+    verifier("niveau 1 : +10 de défense magique, Lumière, 8 % d'aveugler",
+             a1.defMagique === 10 && JSON.stringify(a1.effets) === '["EFF_LUMIERE"]' && a1.lumiereAveugle === 8
+             && !(a1.techniques || []).length, JSON.stringify(a1));
+    verifier("niveau 5 : le Bouclier anti-magie", JSON.stringify(a5.techniques) === '["CLASSE_BOUCLIER_ANTIMAGIE"]');
+    verifier("niveau 10 : + l'Appel de la lumière (plus de 30 %)",
+             JSON.stringify(a10.techniques) === '["CLASSE_BOUCLIER_ANTIMAGIE","CLASSE_APPEL_LUMIERE"]' && a10.lumiereAveugle === 8);
+    const ba = w.TECHNIQUES_CLASSE.CLASSE_BOUCLIER_ANTIMAGIE, al = w.TECHNIQUES_CLASSE.CLASSE_APPEL_LUMIERE;
+    verifier("Bouclier anti-magie : init 200, aucune fatigue, sur soi",
+             ba.Initiative === 200 && ba.Fatigue === 0 && ba.cible === "soi" && ba.niveau === 5);
+    verifier("Appel de la lumière : aucune fatigue, niveau 10", al.Fatigue === 0 && al.niveau === 10 && al.cible === "soi");
+    verifier("la fiche annonce +10 de résistance magique",
+             w.defMagiqueCombattant(chasseur(1)) === w.defMagiqueCombattant(fiche("X")) + 10);
+    const e = monde(1);
+    verifier("en combat : défense magique 10, atout d'aveuglement 8",
+             defMagiqueDe(e.combattants.C) === 10 && e.combattants.C.atouts.lumiereAveugle === 8);
 }
 
 // =========================================================================
@@ -106,44 +121,108 @@ console.log("\n2. LUMIÈRE : LE SORT PASSE OUTRE LA DÉFENSE MAGIQUE");
 }
 
 // =========================================================================
-console.log("\n3. NIVEAU 10 : LE SORT DE LUMIÈRE AVEUGLE LA CIBLE ET LES ENNEMIS QUI LA TOUCHENT");
+console.log("\n3. LE SORT DE LUMIÈRE AVEUGLE SA CIBLE (8 %), DÈS LE NIVEAU 1");
 // =========================================================================
 {
-    const e = monde(10);
+    const e = monde(1);
     const r = jouer(e, sort(15), desA(1));
     const c = r.etat.combattants;
     verifier("la cible M1 est aveuglée, 2 manches, 4 cases autour d'elle",
              !!aveugle(c.M1) && aveugle(c.M1).duree === DUREE_AVEUGLE_LUMIERE && aveugle(c.M1).cases.length === 4
              && aveugle(c.M1).cases.every(h => Math.abs(h.q - 2) <= 1 && Math.abs(h.r) <= 1), JSON.stringify(aveugle(c.M1)));
-    verifier("les ennemis qui la touchent (M2, M3) aussi", !!aveugle(c.M2) && !!aveugle(c.M3));
-    verifier("pas l'allié A qui la touche, ni M4 loin, ni le Chasseur", !aveugle(c.A) && !aveugle(c.M4) && !aveugle(c.C));
-    verifier("le noir de M3 est autour de M3", aveugle(c.M3).cases.every(h => Math.abs(h.q - 3) <= 1 && Math.abs(h.r) <= 1));
+    verifier("ses voisins (M2, M3), l'allié, le Chasseur : non",
+             !aveugle(c.M2) && !aveugle(c.M3) && !aveugle(c.A) && !aveugle(c.M4) && !aveugle(c.C));
     verifier("l'écran le dit : « Éblouis »", r.etapes.some(x => x.type === "message" && /blouis/.test(x.texte)));
     const rejoue = appliquerEntree(e, { etapes: r.etapes }).combattants;
-    verifier("rejoué depuis le journal : les trois aveuglés", !!aveugle(rejoue.M1) && !!aveugle(rejoue.M2) && !!aveugle(rejoue.M3));
+    verifier("rejoué depuis le journal : aveuglé", !!aveugle(rejoue.M1));
 
-    // Le jet de 30 % raté : personne. (Dés dans l'ordre : esquive, Lumière,
-    // puis l'aveuglement — le 3e tombe sur 31.)
+    // Le jet de 8 % raté : personne. (Dés dans l'ordre : esquive, Lumière,
+    // puis l'aveuglement — le 3e tombe sur 9.)
     let n = 0;
-    const jets = tirerDesCarte(monde(10), sort(15), "C", false, { ...desA(1), d100: () => { n++; return n === 3 ? 31 : 1; } });
-    verifier("le jet d'aveuglement raté (31 > 30) : rien", jets.parCible.M1.lumiereAveugle === false && !jets.parCible.M1.noirLumiere,
+    const jets = tirerDesCarte(monde(1), sort(15), "C", false, { ...desA(1), d100: () => { n++; return n === 3 ? 9 : 1; } });
+    verifier("le jet d'aveuglement raté (9 > 8) : rien", jets.parCible.M1.lumiereAveugle === false && !jets.parCible.M1.noirLumiere,
              JSON.stringify(jets.parCible.M1));
+    n = 0;
+    const jets8 = tirerDesCarte(monde(1), sort(15), "C", false, { ...desA(1), d100: () => { n++; return n === 3 ? 8 : 1; } });
+    verifier("8 : réussi", jets8.parCible.M1.lumiereAveugle === true);
 
-    const esq = monde(10);
+    const esq = monde(1);
     esq.combattants.M1.def.esquive = 100;
-    const re = jouer(esq, sort(15), desA(1)).etat.combattants;
-    verifier("la cible esquive : personne n'est aveuglé", !aveugle(re.M1) && !aveugle(re.M2));
-
-    const imm = monde(10);
-    imm.combattants.M2.atouts.immunites = ["Aveuglé"];
+    verifier("la cible esquive : pas d'aveuglement", !aveugle(jouer(esq, sort(15), desA(1)).etat.combattants.M1));
+    const imm = monde(1);
+    imm.combattants.M1.atouts.immunites = ["Aveuglé"];
     const ri = jouer(imm, sort(15), desA(1));
-    verifier("un voisin immunisé ne l'est pas", !aveugle(ri.etat.combattants.M2) && !!aveugle(ri.etat.combattants.M3)
-             && ri.etapes.some(x => x.type === "etatRate" && x.cible === "M2" && x.immunise));
-
-    const n9 = jouer(monde(9), sort(15), desA(1)).etat.combattants;
-    verifier("niveau 9 : Lumière, mais pas d'aveuglement", !aveugle(n9.M1) && n9.M1.pv === 90);
+    verifier("une cible immunisée ne l'est pas", !aveugle(ri.etat.combattants.M1)
+             && ri.etapes.some(x => x.type === "etatRate" && x.cible === "M1" && x.immunise));
     const sansLum = jouer(monde(10), sort(0), desA(1)).etat.combattants;
-    verifier("niveau 10, sort sans Lumière : pas d'aveuglement", !aveugle(sansLum.M1));
+    verifier("un sort sans Lumière : pas d'aveuglement", !aveugle(sansLum.M1));
+}
+
+// =========================================================================
+console.log("\n3 bis. LE BOUCLIER ANTI-MAGIE : LES SORTS REPARTENT SUR LEUR LANCEUR");
+// =========================================================================
+{
+    const enTete = (e, id, carte) => { e.file = [{ id, carte, initiative: 200, pas: 0 }, { id: "M1", carte: "X", initiative: 10, pas: 0 }]; return e; };
+    const bouclier = { id: "B1", type: "classe", acteur: "C", idCarte: "CLASSE_BOUCLIER_ANTIMAGIE" };
+    const e = enTete(monde(5), "C", "CLASSE_BOUCLIER_ANTIMAGIE");
+    verifier("niveau 5 : accepté", validerIntention(e, bouclier).ok, validerIntention(e, bouclier).raison || "");
+    verifier("niveau 4 : il ne l'a pas", !validerIntention(enTete(monde(4), "C", "CLASSE_BOUCLIER_ANTIMAGIE"), bouclier).ok);
+    const pas = appliquerIntention(e, bouclier);
+    const etat = (pas.etat.combattants.C.etats || []).find(x => x.nom === ETAT_ANTIMAGIE);
+    verifier("l'état sur lui, 2 manches, aucune fatigue", etat && etat.duree === 2 && pas.etat.combattants.C.fatigue === 100);
+    verifier("une fois par combat", !validerIntention(enTete(clonerEtat(pas.etat), "C", "CLASSE_BOUCLIER_ANTIMAGIE"), bouclier).ok);
+    const titre = misEnScene(pas.entree.etapes.find(x => x.type === "techniqueClasse"), pas.etat);
+    verifier("à l'écran : « 🔮 Bouclier anti-magie »", titre && /Bouclier anti-magie/.test(titre.texte));
+
+    // M1 lui lance 20 magiques : M1 les prend (50 % de défense → 10), lui rien.
+    const frappe = (typeRes, valeur = 20) => resoudreCarte(clonerEtat(pas.etat), { type: "carte", idLanceur: "M1", idCarte: "X", critique: false,
+        attaques: [{ nom: "Boule", valeurBrute: valeur, typeRes, isRanged: true, rangeMax: 3, cibles: ["C"] }], alterations: [],
+        jets: { attaqueRatee: false, parCible: { C: { esquive: false, etats: {} } } } });
+    const r = frappe("Magique");
+    verifier("un sort sur lui : il ne prend rien", r.etat.combattants.C.pv === 100, String(r.etat.combattants.C.pv));
+    verifier("le lanceur prend son propre sort, avec ses défenses (20 → 10)", r.etat.combattants.M1.pv === 90, String(r.etat.combattants.M1.pv));
+    verifier("ça se dit : « 🔮 Renvoyé ! »", r.etapes.some(x => x.type === "message" && /Renvoyé/.test(x.texte)));
+    verifier("rejoué depuis le journal : mêmes PV", appliquerEntree(pas.etat, { etapes: r.etapes }).combattants.M1.pv === 90);
+    const phys = frappe("Physique");
+    verifier("un coup physique, lui, le touche", phys.etat.combattants.C.pv === 80 && phys.etat.combattants.M1.pv === 100,
+             `${phys.etat.combattants.C.pv} / ${phys.etat.combattants.M1.pv}`);
+    // Deux boucliers face à face : le coup renvoyé ne repart pas.
+    const deux = clonerEtat(pas.etat);
+    deux.combattants.M1.etats = [{ nom: ETAT_ANTIMAGIE, duree: 2 }];
+    const ping = resoudreCarte(deux, { type: "carte", idLanceur: "M1", idCarte: "X", critique: false,
+        attaques: [{ nom: "Boule", valeurBrute: 20, typeRes: "Magique", cibles: ["C"] }], alterations: [],
+        jets: { attaqueRatee: false, parCible: { C: { esquive: false, etats: {} } } } });
+    verifier("deux boucliers face à face : renvoyé une fois, pas de ping-pong", ping.etat.combattants.M1.pv === 90 && ping.etat.combattants.C.pv === 100);
+    const vieux = clonerEtat(pas.etat);
+    vieillirLesEtats(vieux);
+    const encore = (vieux.combattants.C.etats || []).some(x => x.nom === ETAT_ANTIMAGIE);
+    vieillirLesEtats(vieux);
+    verifier("il tient la manche en cours et la suivante", encore && !(vieux.combattants.C.etats || []).some(x => x.nom === ETAT_ANTIMAGIE));
+}
+
+// =========================================================================
+console.log("\n3 ter. L'APPEL DE LA LUMIÈRE : TOUT LE PLATEAU AVEUGLÉ");
+// =========================================================================
+{
+    const enTete = (e) => { e.file = [{ id: "C", carte: "CLASSE_APPEL_LUMIERE", initiative: 100, pas: 0 }, { id: "M1", carte: "X", initiative: 10, pas: 0 }]; return e; };
+    const appel = { id: "L1", type: "classe", acteur: "C", idCarte: "CLASSE_APPEL_LUMIERE" };
+    const e = enTete(monde(10));
+    e.combattants.M4.aTerre = true;
+    e.combattants.M3.atouts.immunites = ["Aveuglé"];
+    verifier("niveau 10 : accepté", validerIntention(e, appel).ok, validerIntention(e, appel).raison || "");
+    verifier("niveau 9 : il ne l'a pas", !validerIntention(enTete(monde(9)), appel).ok);
+    const pas = appliquerIntention(e, appel);
+    const c = pas.etat.combattants;
+    verifier("ennemis ET alliés debout aveuglés, 2 manches, chacun son noir",
+             [c.M1, c.M2, c.A].every(x => aveugle(x) && aveugle(x).duree === DUREE_AVEUGLE_LUMIERE && aveugle(x).cases.length === 4));
+    verifier("le noir de M2 est autour de M2", aveugle(c.M2).cases.every(h => Math.abs(h.q - 2) <= 1 && Math.abs(h.r + 1) <= 1));
+    verifier("pas lui, pas un KO, pas un immunisé", !aveugle(c.C) && !aveugle(c.M4) && !aveugle(c.M3)
+             && pas.entree.etapes.some(x => x.type === "etatRate" && x.cible === "M3"));
+    verifier("aucune fatigue, une fois par combat", c.C.fatigue === 100 && !validerIntention(enTete(clonerEtat(pas.etat)), appel).ok);
+    const rejoue = appliquerEntree(e, pas.entree).combattants;
+    verifier("rejoué depuis le journal : mêmes noirs", JSON.stringify(aveugle(rejoue.M2)) === JSON.stringify(aveugle(c.M2)));
+    const titre = misEnScene(pas.entree.etapes.find(x => x.type === "techniqueClasse"), pas.etat);
+    verifier("à l'écran : « ☀️ Appel de la lumière »", titre && /Appel de la lumière/.test(titre.texte));
 }
 
 // =========================================================================
@@ -215,9 +294,9 @@ console.log("\n4. LA FORGE : LUMIÈRE POUR LE SEUL CHASSEUR DE MAGES, SUR UN SOR
       await window.ouvrirCreationCompetence();
       return (window.forgeState.effetsBDD || []).map(e => e.id);
     };
-    const c4 = await forgePour({ Classe: "Chasseur de mages", XP: 1800, Race: "Humain" });
+    const c4 = await forgePour({ Classe: "Chasseur de mages", XP: 0, Race: "Humain" });
     window.fermerForgeCompetence();
-    const autre = await forgePour({ Classe: "Hoplite", XP: 9000, Race: "Humain" });
+    const autre = await forgePour({ Classe: "Protecteur", XP: 9000, Race: "Humain" });
     window.fermerForgeCompetence();
     const c5 = await forgePour({ Classe: "Chasseur de mages", XP: 2500, Race: "Humain" });
     window.forgeState.armePrincipale = "Magie";
@@ -237,8 +316,8 @@ console.log("\n4. LA FORGE : LUMIÈRE POUR LE SEUL CHASSEUR DE MAGES, SUR UN SOR
     return { c4: c4.includes("EFF_LUMIERE"), autre: autre.includes("EFF_LUMIERE"), c5: c5.includes("EFF_LUMIERE"),
              surMagique, surPhysique, surSoin, monstres: window.paletteEffetsMonstres().some(e => e.id === "EFF_LUMIERE") };
   }, EFFETS_PAR_ID);
-  verifier("le Chasseur de mages niveau 5 l'a dans la Forge", r.c5);
-  verifier("pas au niveau 4, ni une autre classe", !r.c4 && !r.autre);
+  verifier("le Chasseur de mages l'a dans la Forge dès le niveau 1", r.c5 && r.c4);
+  verifier("pas une autre classe", !r.autre);
   verifier("jamais les monstres", !r.monstres);
   // (Avec l'arme Magie, la Forge n'ouvre pas de menu Physique.)
   verifier("sur une Attaque Magique : proposée (⚡ 5)",
@@ -283,8 +362,9 @@ console.log("\n5. LA FICHE DE CLASSE");
   });
   await p.screenshot({ path: "/tmp/claude-0/chasseur_classe.png" });
   verifier("présentation et paliers Niv. 1 / 5 / 10", r.visible && JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 5","Niv. 10"]');
-  verifier("résistance magique, Lumière et aveuglement y sont dits",
-           /\+13 % de résistance magique/.test(r.texte) && /Lumière/.test(r.texte) && /aveugler/.test(r.texte));
+  verifier("résistance magique, Lumière, Bouclier anti-magie, Appel de la lumière y sont dits",
+           /\+10 % de résistance magique/.test(r.texte) && /Lumière/.test(r.texte) && /8 % de chance d'aveugler/.test(r.texte)
+           && /Bouclier anti-magie/.test(r.texte) && /Appel de la lumière/.test(r.texte));
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

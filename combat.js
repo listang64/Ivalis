@@ -2952,7 +2952,8 @@ window.COULEUR_ETAT = {
     "Instinct du tueur": "#c62828",
     "Rempart":        "#e8c46a",   // or — protégé par un Hoplite à ses côtés
     "Nuée de chauve-souris": "#6a1b9a",  // pourpre — le Vampire dispersé en nuée
-    "Charmé":         "#ec407a"    // rose — retourné contre les siens par le Sorcier
+    "Charmé":         "#ec407a",   // rose — retourné contre les siens par le Sorcier
+    "Bouclier anti-magie": "#90caf9"  // bleu pâle — les sorts rebondissent sur le Chasseur de mages
 };
 window.COULEUR_ETAT_DEFAUT = "#9e9e9e";
 

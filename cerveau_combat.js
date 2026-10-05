@@ -43,7 +43,8 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
          traverserZones, creerZonePure, poserZone, vieillirZones,
          chaineDeDegats, REGLES_ETATS, regleDesEtats, estDansLeNoir,
          partageTenebres, ETAT_TENEBRES_ETALEES, POISON, POISON_MAITRE, ETAT_SAIGNEMENT, SAIGNEMENT,
-         resoudreTechniqueClasse, actionAssautMortel, actionBaiserVampire, appliquerCharme } from './moteur_pur.js';
+         resoudreTechniqueClasse, actionAssautMortel, actionBaiserVampire, appliquerCharme,
+         actionResonanceBouclier, ennemisAuContact, tirerDirectionsAveugle } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche } from './ia_pure.js';
@@ -266,6 +267,11 @@ export function validerIntention(etat, intention) {
             if (!autre) return refus("Transfert sans cible");
             if (autre.id === acteur.id || autre.aTerre || autre.estIllusion || autre.camp === acteur.camp) return refus("Transfert : ennemi invalide");
             if (distance(acteur, autre) > 5) return refus("Transfert : la cible doit être à 5 cases au plus");
+        }
+        // La Résonance du bouclier (Protecteur) : il lui faut au moins un
+        // ennemi au contact — sinon elle n'est pas gâchée, elle est refusée.
+        if (idCarte === "CLASSE_RESONANCE_BOUCLIER" && ennemisAuContact(etat, acteur.id).length === 0) {
+            return refus("Résonance du bouclier : aucun ennemi au contact");
         }
         // La Prise en charge (Médicus) : un allié À TERRE, à côté de lui.
         if (idCarte === "CLASSE_PRISE_EN_CHARGE") {
@@ -857,8 +863,16 @@ export function appliquerIntention(etat, intention, plateau) {
     if (intention.type === "classe") {
         const cibles = intention.idCarte === "CLASSE_ASSAUT_MORTEL" ? ciblesDeLAssaut(etat, intention)
             : Array.isArray(intention.cibles) ? [...new Set(intention.cibles)] : undefined;
+        // L'APPEL DE LA LUMIÈRE : le noir de chaque combattant aveuglé se tire
+        // ici, chez le cerveau, dans l'ordre des ids.
+        const noirs = intention.idCarte === "CLASSE_APPEL_LUMIERE"
+            ? Object.fromEntries(Object.keys(etat.combattants || {}).sort()
+                .filter(id => id !== intention.acteur && etat.combattants[id] && !etat.combattants[id].aTerre)
+                .map(id => [id, tirerDirectionsAveugle(des)]))
+            : undefined;
         const r = resoudreTechniqueClasse(etat, { idLanceur: intention.acteur, idCarte: intention.idCarte,
-                                                  cible: intention.cible, cibles }, plateau);
+                                                  cible: intention.cible, cibles,
+                                                  ...(noirs ? { noirs } : {}) }, plateau);
         let suivant = clonerEtat(r.etat);
         const etapes = [...r.etapes];
         // Repoussé dans le feu par la Prise en charge : ça brûle aussi.
@@ -879,6 +893,14 @@ export function appliquerIntention(etat, intention, plateau) {
         // dés (ni esquive, ni critique), des dégâts bruts, le soin du vampirisme.
         if (intention.idCarte === "CLASSE_BAISER_VAMPIRE") {
             const action = actionBaiserVampire(intention.acteur, combattant(suivant, intention.cible));
+            const rc = resoudreCarte(suivant, action, plateau);
+            suivant = clonerEtat(rc.etat);
+            etapes.push(...rc.etapes);
+        }
+        // LA RÉSONANCE DU BOUCLIER frappe comme une carte, à coup sûr : chaque
+        // ennemi au contact, 5 % de ses PV max en physique, et Étourdi.
+        if (intention.idCarte === "CLASSE_RESONANCE_BOUCLIER") {
+            const action = actionResonanceBouclier(intention.acteur, ennemisAuContact(suivant, intention.acteur));
             const rc = resoudreCarte(suivant, action, plateau);
             suivant = clonerEtat(rc.etat);
             etapes.push(...rc.etapes);

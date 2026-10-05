@@ -488,10 +488,10 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
     });
 
     // LUMIÈRE (Chasseur de mages) : un jet par cible, pour passer outre sa
-    // défense magique — un critique l'impose, comme il impose les états. Au
-    // niveau 10, un second jet (lumiereAveugle) aveugle la cible et les
-    // ennemis qui la touchent : leurs cases de noir se tirent ici, avec les
-    // autres dés. Rien n'est tiré pour une carte sans Lumière.
+    // défense magique — un critique l'impose, comme il impose les états. Un
+    // second jet (lumiereAveugle, 8 % dès le niveau 1) aveugle la cible : ses
+    // cases de noir se tirent ici, avec les autres dés. Rien n'est tiré pour
+    // une carte sans Lumière.
     (plan.attaques || []).forEach(attaque => {
         if (!(nombre(attaque.chanceLumiere) > 0)) return;
         const aveugle = nombre(lanceur && lanceur.atouts && lanceur.atouts.lumiereAveugle);
@@ -500,17 +500,7 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
             if (c.lumiere === undefined) c.lumiere = critique || des.d100() <= Math.min(100, nombre(attaque.chanceLumiere));
             if (aveugle > 0 && c.lumiereAveugle === undefined) {
                 c.lumiereAveugle = des.d100() <= aveugle;
-                if (c.lumiereAveugle) {
-                    const cible = combattant(etat, id);
-                    const voisins = Object.keys(etat.combattants || {}).sort().filter(v => {
-                        const x = etat.combattants[v];
-                        return v !== id && v !== idLanceur && x && !x.aTerre && !x.estIllusion
-                            && (x.camp || "Allié") !== ((lanceur && lanceur.camp) || "Allié")
-                            && cible && distanceHex(cible, x) === 1;
-                    });
-                    c.noirLumiere = {};
-                    [id, ...voisins].forEach(v => { c.noirLumiere[v] = tirerDirectionsAveugle(des); });
-                }
+                if (c.lumiereAveugle) c.noirLumiere = { [id]: tirerDirectionsAveugle(des) };
             }
         });
     });
@@ -630,8 +620,8 @@ export const DIRECTIONS_HEX = [
     { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 }
 ];
 export const CASES_AVEUGLEES = 4;
-// L'aveuglement de la Lumière (Chasseur de mages, niveau 10) : celui de
-// l'effet Aveuglement, 2 manches.
+// L'aveuglement de la Lumière et de l'Appel de la lumière (Chasseur de
+// mages) : celui de l'effet Aveuglement, 2 manches.
 export const DUREE_AVEUGLE_LUMIERE = 2;
 export const DESC_AVEUGLE = "4 cases autour de lui sont dans le noir : il ne peut y cibler personne (les zones y frappent quand même).";
 
@@ -670,7 +660,8 @@ export function estDansLeNoir(c, hex) {
 // aident celui qui les porte — l'Absorption et le Contre qu'un allié lui a
 // offerts, l'Élan et les bénédictions de l'équipement, un soin étalé qui n'a
 // pas fini de tomber.
-export const ETATS_BIENFAISANTS = new Set(["Absorption", "Contre", "Élan", "Soin étalé", "Nuée de chauve-souris"]);
+export const ETATS_BIENFAISANTS = new Set(["Absorption", "Contre", "Élan", "Soin étalé", "Nuée de chauve-souris",
+                                           "Bouclier anti-magie"]);
 export function estEtatNefaste(e) {
     return !!e && !ETATS_BIENFAISANTS.has(e.nom) && !e.bonusEquip;
 }
@@ -1219,6 +1210,42 @@ export function actionBaiserVampire(idLanceur, cible) {
 // la plus proche libre si quelqu'un s'y tient — et chaque ennemi qui l'entoure
 // recule d'une case, comme une Poussée (un mur ou un pion l'arrête).
 export const SOIN_URGENCE = 12;
+
+// LE CHASSEUR DE MAGES. Bouclier anti-magie (niveau 5) : pour la manche en
+// cours et la suivante, tout coup MAGIQUE qui le frappe repart en entier sur
+// celui qui l'a lancé (avec les défenses de ce dernier) — lui n'en prend rien.
+// Appel de la lumière (niveau 10) : tous les autres combattants debout du
+// plateau, alliés compris, sont Aveuglés (2 manches, un noir chacun).
+export const ETAT_ANTIMAGIE = "Bouclier anti-magie";
+export const MANCHES_ANTIMAGIE = 2;
+export const DESC_ANTIMAGIE = "Tout coup magique qui le frappe repart en entier sur son lanceur.";
+
+// LE PROTECTEUR (ex-Hoplite). Résonance du bouclier (niveau 10) : chaque
+// ennemi au contact est Étourdi (2 manches) et prend 5 % de ses PV max en
+// dégâts physiques (son armure réduit, son bouclier encaisse d'abord) — à
+// coup sûr, sans esquive ni critique.
+export const PART_PV_RESONANCE = 5;
+export const MANCHES_ETOURDI_RESONANCE = 2;
+export const DESC_ETOURDI = "-30% Esquive/Parade, 20% de chance d'échec d'attaque.";
+export function ennemisAuContact(etat, idLanceur) {
+    const c = combattant(etat, idLanceur);
+    if (!c) return [];
+    return Object.keys(etat.combattants || {}).sort().map(id => etat.combattants[id]).filter(x =>
+        x && x.id !== idLanceur && !x.aTerre && !x.estIllusion
+        && (x.camp || "Allié") !== (c.camp || "Allié") && distanceHex(c, x) === 1);
+}
+export function actionResonanceBouclier(idLanceur, ennemis) {
+    const ids = ennemis.map(e => e.id);
+    return {
+        type: "carte", idLanceur, idCarte: "CLASSE_RESONANCE_BOUCLIER", coutFatigue: 0, critique: false,
+        jets: { parCible: Object.fromEntries(ids.map(id => [id, { esquive: false, etats: { "Étourdi": true } }])) },
+        attaques: ennemis.map(e => ({ nom: "Résonance du bouclier", typeRes: "Physique",
+                                      valeurBrute: Math.ceil(nombre(e.pvMax) * PART_PV_RESONANCE / 100),
+                                      isRanged: false, rangeMax: 1, isHeal: false, isShield: false, cibles: [e.id] })),
+        alterations: ids.length ? [{ nom: "Étourdi", chance: 100, duree: MANCHES_ETOURDI_RESONANCE,
+                                     desc: DESC_ETOURDI, isRanged: false, rangeMax: 1, cibles: ids }] : []
+    };
+}
 // Le Transfert du Sorcier (niveau 10) : ce qu'il se soigne en changeant de place.
 export const SOIN_TRANSFERT = 10;
 export const PART_REANIMATION = 30;
@@ -1286,6 +1313,31 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
             allie.pv = Math.min(nombre(allie.pvMax), avant + soin);
             if (allie.pv === avant) return;
             etapes.push({ type: "soin", cible: idAllie, acteur: id, montant: allie.pv - avant, pvApres: allie.pv });
+        });
+    } else if (action.idCarte === "CLASSE_BOUCLIER_ANTIMAGIE") {
+        c.etats = [...(c.etats || []).filter(e => e && e.nom !== ETAT_ANTIMAGIE),
+                   { nom: ETAT_ANTIMAGIE, duree: MANCHES_ANTIMAGIE, desc: DESC_ANTIMAGIE }];
+        etapes.push({ type: "etats", cible: id, liste: c.etats, pose: ETAT_ANTIMAGIE });
+    } else if (action.idCarte === "CLASSE_APPEL_LUMIERE") {
+        // Les noirs ont été tirés par le cerveau (action.noirs), un par
+        // combattant : on ne fait que les poser.
+        const noirs = action.noirs || {};
+        Object.keys(noirs).sort().forEach(v => {
+            const x = combattant(suivant, v);
+            if (!x || x.aTerre || x.id === id) return;
+            if (((x.atouts && x.atouts.immunites) || []).includes(ETAT_AVEUGLE)) {
+                etapes.push({ type: "etatRate", cible: v, nom: ETAT_AVEUGLE, immunise: true });
+                return;
+            }
+            const cases = casesDuNoir(x, noirs[v]);
+            const deja = (x.etats || []).find(e => e && e.nom === ETAT_AVEUGLE);
+            if (deja) {
+                deja.duree = Math.max(nombre(deja.duree), DUREE_AVEUGLE_LUMIERE);
+                deja.cases = cases;
+            } else {
+                x.etats = [...(x.etats || []), { nom: ETAT_AVEUGLE, duree: DUREE_AVEUGLE_LUMIERE, desc: DESC_AVEUGLE, cases }];
+            }
+            etapes.push({ type: "etats", cible: v, pose: ETAT_AVEUGLE, liste: x.etats });
         });
     } else if (action.idCarte === "CLASSE_CHARME_FRATRICIDE") {
         const ennemi = combattant(suivant, action.cible);
@@ -1589,6 +1641,16 @@ export function resoudreCarte(etat, action, plateau) {
             // chute). Une fonction, parce que le REMPART frappe deux cibles
             // avec une seule attaque (plus bas).
             const frapper = (idCible, cible, attaqueFrappe) => {
+                // LE BOUCLIER ANTI-MAGIE (Chasseur de mages) : le coup magique
+                // repart en entier sur son lanceur, qui l'encaisse avec ses
+                // propres défenses. Un coup renvoyé ne se renvoie plus.
+                if (!attaqueFrappe.renvoyeAntimagie && attaqueFrappe.typeRes === "Magique" && !attaqueFrappe.isHeal
+                    && idCible !== idLanceur && aLEtat(cible, ETAT_ANTIMAGIE) && !lanceur.aTerre) {
+                    etapes.push({ type: "message", cible: idCible, acteur: idLanceur,
+                                  texte: "🔮 Renvoyé !", couleur: "#90caf9" });
+                    frapper(idLanceur, lanceur, { ...attaqueFrappe, renvoyeAntimagie: true });
+                    return;
+                }
                 const sansMalusContact = !!(lanceur.atouts && lanceur.atouts.sortsSansMalusContact)
                     && attaqueFrappe.typeRes === "Magique";
                 const compte = chaineDeDegats(cible, attaqueFrappe, { critique, distance: distanceHex(lanceur, cible), percee, sansMalusContact });
@@ -1681,8 +1743,8 @@ export function resoudreCarte(etat, action, plateau) {
                 frapper(idCible, cible, attaqueAvecBonus);
             }
 
-            // LA LUMIÈRE QUI AVEUGLE (Chasseur de mages, niveau 10) : la cible
-            // touchée et les ennemis qui la touchent, chacun avec son noir.
+            // LA LUMIÈRE QUI AVEUGLE (Chasseur de mages) : la cible touchée,
+            // avec son noir.
             if (des.lumiereAveugle && des.noirLumiere && !aveuglesParLaLumiere.has(idCible)) {
                 aveuglesParLaLumiere.add(idCible);
                 const etapesNoir = [];

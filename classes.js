@@ -50,7 +50,7 @@ window.CLASSES_PAR_DEFAUT = [
                                "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438696/Profanateur_fond_c3yyaz.png"),
     C(7,  "Géomancien",        "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2168_fmgyk1.jpg",
                                "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438698/G%C3%A9omancien_fond_b72j1c.png"),
-    C(8,  "Hoplite",           "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2159_iligqv.jpg",
+    C(8,  "Protecteur",           "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2159_iligqv.jpg",
                                "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438697/Hoplite_fond_jzi0f3.png"),
     C(9,  "Oracle",            "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2169_hbb5xu.jpg",
                                "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438698/Oracle_fond_n7togf.png"),
@@ -94,21 +94,22 @@ window.DESCRIPTIFS_CLASSES = {
                        "Une fois par combat"] }
         ]
     },
-    CLASSE_HOPLITE: {
-        presentation: "Lance au poing et bouclier levé, l'Hoplite est le mur sur lequel la troupe "
-            + "s'appuie. Il ne recule pas : il encaisse, il tient la ligne, et il couvre de son "
+    CLASSE_PROTECTEUR: {
+        presentation: "Lance au poing et bouclier levé, le Protecteur est le mur sur lequel la troupe "
+            + "s'appuie. Il ne recule pas : il défie l'ennemi, il encaisse, et il couvre de son "
             + "bouclier le camarade qui combat à ses côtés.",
         paliers: [
             { niveau: 1, titre: "Discipline de la phalange",
-              points: ["+5 % de parade", "+5 % de résistance physique"] },
-            { niveau: 5, titre: "Technique : Mur de bouclier",
-              points: ["Initiative 100 · aucune fatigue",
-                       "+60 % de parade sur soi jusqu'à la fin de la manche",
-                       "Une fois par combat"] },
-            { niveau: 10, titre: "Technique : Rempart",
+              points: ["+7 % de parade",
+                       "15 % de chance de provoquer la cible de chacune de ses attaques"] },
+            { niveau: 5, titre: "Technique : Rempart",
               points: ["Initiative 105 · aucune fatigue · sur un allié adjacent, 3 manches",
-                       "Chaque attaque qu'il reçoit est partagée : moitié pour lui, moitié pour l'Hoplite",
-                       "Il faut rester côte à côte · une fois par combat"] }
+                       "Chaque attaque qu'il reçoit est partagée : moitié pour lui, moitié pour le Protecteur",
+                       "Il faut rester côte à côte · une fois par combat"] },
+            { niveau: 10, titre: "Technique : Résonance du bouclier",
+              points: ["Initiative 100 · aucune fatigue",
+                       "Étourdit tous les ennemis au contact (2 manches)",
+                       "… et leur inflige 5 % de leurs PV max en dégâts physiques · une fois par combat"] }
         ]
     },
     CLASSE_ASSASSIN: {
@@ -134,7 +135,8 @@ window.DESCRIPTIFS_CLASSES = {
             + "il voit un compagnon à relever.",
         paliers: [
             { niveau: 1, titre: "Régénération naturelle",
-              points: ["+5 % de régénération de fatigue en fin de manche", "+1 compétence à créer"] },
+              points: ["+5 % de régénération de fatigue en fin de manche", "+1 compétence à créer",
+                       "+1 à chacun de ses soins"] },
             { niveau: 5, titre: "Technique : Soin d'urgence",
               points: ["Initiative 70 · aucune fatigue",
                        "Soigne de 12 PV tous les alliés debout, où qu'ils soient",
@@ -167,17 +169,22 @@ window.DESCRIPTIFS_CLASSES = {
     },
     CLASSE_CHASSEUR_DE_MAGES: {
         presentation: "Il a appris à marcher dans les tempêtes de sorts sans y laisser sa peau. Le "
-            + "Chasseur de mages traque ceux qui plient la magie, et sa lumière perce leurs "
-            + "protections jusqu'à les aveugler.",
+            + "Chasseur de mages traque ceux qui plient la magie : sa lumière perce leurs "
+            + "protections, et leurs propres sorts se retournent contre eux.",
         paliers: [
-            { niveau: 1, titre: "Peau de traqueur",
-              points: ["+13 % de résistance magique"] },
-            { niveau: 5, titre: "Effet de combat : Lumière",
-              points: ["Dans la Forge, sur un sort à dégâts magiques · 1 pt, Intelligence",
-                       "15 % de chance par cran d'ignorer la résistance magique de la cible (max 60 %)"] },
-            { niveau: 10, titre: "Éclat aveuglant",
-              points: ["Ses sorts de lumière ont 30 % de chance d'aveugler la cible",
-                       "… et tous les ennemis qui lui sont adjacents"] }
+            { niveau: 1, titre: "Effet de combat : Lumière",
+              points: ["+10 % de résistance magique",
+                       "Dans la Forge, sur un sort à dégâts magiques · 1 pt, Intelligence",
+                       "15 % de chance par cran d'ignorer la résistance magique de la cible (max 60 %)",
+                       "8 % de chance d'aveugler la cible"] },
+            { niveau: 5, titre: "Technique : Bouclier anti-magie",
+              points: ["Initiative 200 · aucune fatigue · la manche en cours et la suivante",
+                       "Tout coup magique qui le frappe repart en entier sur son lanceur",
+                       "Une fois par combat"] },
+            { niveau: 10, titre: "Technique : Appel de la lumière",
+              points: ["Initiative 100 · aucune fatigue",
+                       "Aveugle tous les combattants du plateau (alliés compris, sauf lui), 2 manches",
+                       "Une fois par combat"] }
         ]
     }
 };
@@ -212,7 +219,8 @@ window.optimiserImageClasse = (url) => {
 // UNE CLASSE RENOMMÉE OU RETIRÉE (demande de Nico) : la base garde ses
 // documents tels qu'ils sont ; le jeu, lui, montre le Sorcier à la place du
 // Nécromancien (mêmes images), et ne propose plus l'Ensorceleur.
-window.CLASSES_DOC_RENOMMEES = { CLASSE_NECROMANCIEN: { id: "CLASSE_SORCIER", nom: "Sorcier" } };
+window.CLASSES_DOC_RENOMMEES = { CLASSE_NECROMANCIEN: { id: "CLASSE_SORCIER", nom: "Sorcier" },
+                                 CLASSE_HOPLITE: { id: "CLASSE_PROTECTEUR", nom: "Protecteur" } };
 window.CLASSES_RETIREES = ["CLASSE_ENSORCELEUR"];
 
 window.classeDepuisDocument = function(idBase, d) {

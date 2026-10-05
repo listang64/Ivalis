@@ -334,15 +334,15 @@ console.log("\n7. LE RÉCIT PART EN BASE AVEC LA COMPÉTENCE");
 }
 
 console.log("\n8. LES EFFETS DE CLASSE : DANS LA LISTE DE LIA SEULEMENT S'ILS SONT DÉBLOQUÉS");
-// Lumière (Chasseur de mages) : niveau 5. Ténèbres (Sorcier, ex-Nécromancien) :
-// dès le niveau 1. Avant, ou dans une autre classe, LIA ne les voit pas — ni dans la
+// Lumière (Chasseur de mages) et Ténèbres (Sorcier, ex-Nécromancien) : dès
+// le niveau 1. Avant, ou dans une autre classe, LIA ne les voit pas — ni dans la
 // liste, ni dans ses règles — et l'algorithme refuse de les poser même si elle
 // les demande.
 {
   // (Le Vampirisme a été retiré de la Forge : remplacé par le Baiser du
   // vampire, une technique de classe. Plus personne ne l'a — voir plus bas.)
   // [classe, effet, XP qui le débloque, XP trop tôt (aucun : dès le niveau 1)]
-  const CLASSE = { "Lumière": ["Chasseur de mages", "EFF_LUMIERE", 2500, 1800], "Ténèbres": ["Sorcier", "EFF_TENEBRES", 0, null] };
+  const CLASSE = { "Lumière": ["Chasseur de mages", "EFF_LUMIERE", 0, null], "Ténèbres": ["Sorcier", "EFF_TENEBRES", 0, null] };
   const demande = async (fiche, plan) => {
     await p.evaluate(async ({ EFFETS, fiche }) => {
       window.EFFETS_BDD_CACHE = JSON.parse(JSON.stringify(EFFETS));

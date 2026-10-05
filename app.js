@@ -894,13 +894,15 @@ window.ATOUTS_CLASSES = {
         { niveau: 5,  techniques: ["CLASSE_CHARME_FRATRICIDE"] },
         { niveau: 10, techniques: ["CLASSE_TRANSFERT"] }
     ],
-    // L'HOPLITE : le mur de la troupe. +5 de parade et +5 de défense physique
-    // dès le niveau 1 ; deux techniques de classe (TECHNIQUES_CLASSE, plus bas)
-    // aux niveaux 5 et 10.
-    "Hoplite": [
-        { niveau: 1,  parade: 5, defPhysique: 5 },
-        { niveau: 5,  techniques: ["CLASSE_MUR_BOUCLIER"] },
-        { niveau: 10, techniques: ["CLASSE_REMPART"] }
+    // LE PROTECTEUR (ex-Hoplite, renommé — CLASSES_RENOMMEES) : +7 % de
+    // parade, et 15 % de chance de provoquer la cible de chacune de ses
+    // attaques (provocationAttaques, appliquerEquipementALaCarte) ; le Rempart
+    // au niveau 5, la Résonance du bouclier au niveau 10. (Le Mur de bouclier
+    // n'est plus donné.)
+    "Protecteur": [
+        { niveau: 1,  parade: 7, provocationAttaques: 15 },
+        { niveau: 5,  techniques: ["CLASSE_REMPART"] },
+        { niveau: 10, techniques: ["CLASSE_RESONANCE_BOUCLIER"] }
     ],
     // L'ASSASSIN : un KO lui donne +15 de critique pour 2 manches (Instinct du
     // tueur, combat_etat.js) ; l'Assaut mortel au niveau 5 ; au niveau 10, son
@@ -911,21 +913,24 @@ window.ATOUTS_CLASSES = {
         { niveau: 10, maitrePoisons: true }
     ],
     // LE MÉDICUS : +5 de régénération de fatigue en fin de manche (lue par
-    // regenerationCombattant ici, et par le cerveau) et une création de plus
-    // dans la Forge ; Soin d'urgence au niveau 5, Prise en charge au niveau 10.
+    // regenerationCombattant ici, et par le cerveau), une création de plus
+    // dans la Forge, et +1 à chacun de ses soins (bonusSoin,
+    // appliquerEquipementALaCarte) ; Soin d'urgence au niveau 5, Prise en
+    // charge au niveau 10.
     "Médicus": [
-        { niveau: 1,  regenFatigue: 5, competences: 1 },
+        { niveau: 1,  regenFatigue: 5, competences: 1, bonusSoin: 1 },
         { niveau: 5,  techniques: ["CLASSE_SOIN_URGENCE"] },
         { niveau: 10, techniques: ["CLASSE_PRISE_EN_CHARGE"] }
     ],
-    // LE CHASSEUR DE MAGES : +13 de défense magique ; l'effet Lumière dans la
-    // Forge au niveau 5 (EFF_LUMIERE, MIGRATION_EFFETS) ; au niveau 10, ses
-    // sorts de lumière ont 30 % de chance d'aveugler leur cible et les ennemis
-    // qui la touchent (lumiereAveugle, tirerDesCarte et resoudreCarte).
+    // LE CHASSEUR DE MAGES : +10 de défense magique et l'effet Lumière dans
+    // la Forge dès le niveau 1 (EFF_LUMIERE, MIGRATION_EFFETS) — ses sorts de
+    // lumière ont en plus 8 % de chance d'aveugler leur cible (lumiereAveugle,
+    // tirerDesCarte et resoudreCarte) ; le Bouclier anti-magie au niveau 5,
+    // l'Appel de la lumière au niveau 10.
     "Chasseur de mages": [
-        { niveau: 1,  defMagique: 13 },
-        { niveau: 5,  effets: ["EFF_LUMIERE"] },
-        { niveau: 10, lumiereAveugle: 30 }
+        { niveau: 1,  defMagique: 10, effets: ["EFF_LUMIERE"], lumiereAveugle: 8 },
+        { niveau: 5,  techniques: ["CLASSE_BOUCLIER_ANTIMAGIE"] },
+        { niveau: 10, techniques: ["CLASSE_APPEL_LUMIERE"] }
     ],
     // LE VAMPIRE : +10 de résistance physique, insensible au gel (jamais
     // Glacé), mais le feu le ronge plus fort (brûlé : -60 % de soins reçus au
@@ -964,15 +969,31 @@ window.classeInterditeA = function(race, nomClasse) {
 //             "zoneDeux" (Assaut mortel : une zone de deux cases au contact),
 //             "allies" (Soin d'urgence) ou "allieKO" (Prise en charge)
 window.TECHNIQUES_CLASSE = {
+    // (Le Mur de bouclier n'est plus donné par aucune classe : le moteur le
+    // sait toujours jouer.)
     CLASSE_MUR_BOUCLIER: {
-        Nom: "Mur de bouclier", classe: "Hoplite", niveau: 5, Initiative: 100, Fatigue: 0, cible: "soi",
+        Nom: "Mur de bouclier", classe: "Protecteur", niveau: 5, Initiative: 100, Fatigue: 0, cible: "soi",
         desc: "+60 % de parade sur soi jusqu'à la fin de la manche. Une fois par combat."
     },
     CLASSE_REMPART: {
-        Nom: "Rempart", classe: "Hoplite", niveau: 10, Initiative: 105, Fatigue: 0, cible: "allieAdjacent",
+        Nom: "Rempart", classe: "Protecteur", niveau: 5, Initiative: 105, Fatigue: 0, cible: "allieAdjacent",
         desc: "Sur un allié adjacent, pour 3 manches : chaque attaque qu'il reçoit est partagée en deux, "
-            + "moitié des dégâts pour lui, moitié pour l'Hoplite, chacun avec ses défenses. Il faut rester "
+            + "moitié des dégâts pour lui, moitié pour le Protecteur, chacun avec ses défenses. Il faut rester "
             + "côte à côte. Pas les états altérés. Une fois par combat."
+    },
+    CLASSE_RESONANCE_BOUCLIER: {
+        Nom: "Résonance du bouclier", classe: "Protecteur", niveau: 10, Initiative: 100, Fatigue: 0, cible: "soi",
+        desc: "Étourdit tous les ennemis au contact (2 manches) et leur inflige 5 % de leurs PV max en dégâts "
+            + "physiques, à coup sûr. Une fois par combat."
+    },
+    CLASSE_BOUCLIER_ANTIMAGIE: {
+        Nom: "Bouclier anti-magie", classe: "Chasseur de mages", niveau: 5, Initiative: 200, Fatigue: 0, cible: "soi",
+        desc: "Pour la manche en cours et la suivante, tout coup magique qui le frappe repart en entier "
+            + "sur son lanceur ; lui n'en prend rien. Une fois par combat."
+    },
+    CLASSE_APPEL_LUMIERE: {
+        Nom: "Appel de la lumière", classe: "Chasseur de mages", niveau: 10, Initiative: 100, Fatigue: 0, cible: "soi",
+        desc: "Aveugle tous les combattants du plateau (alliés compris, sauf lui) pour 2 manches. Une fois par combat."
     },
     CLASSE_ASSAUT_MORTEL: {
         Nom: "Assaut mortel", classe: "Assassin", niveau: 5, Initiative: 100, Fatigue: 0, cible: "zoneDeux",
@@ -1041,7 +1062,7 @@ window.toutesTechniquesDeClasse = function(perso) {
 //
 // UNE CLASSE RENOMMÉE garde ses héros : le Nécromancien est devenu le Sorcier,
 // et une fiche qui porte encore « Nécromancien » se lit « Sorcier ».
-window.CLASSES_RENOMMEES = { "necromancien": "Sorcier" };
+window.CLASSES_RENOMMEES = { "necromancien": "Sorcier", "hoplite": "Protecteur" };
 const cleClasseBrute = (nom) => String(nom || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .toLowerCase().trim();
 const cleClasse = (nom) => {
@@ -1135,8 +1156,10 @@ window.texteAtout = function(cle, valeur) {
         case "effets":         return (valeur || []).map(id => `Effet de combat : ${nomEffet(id)}`).join(" · ");
         case "techniques":     return (valeur || []).map(id => `Technique : ${((window.TECHNIQUES_CLASSE || {})[id] || {}).Nom || id}`).join(" · ");
         case "critiqueSurKO":  return `Instinct du tueur : ${plus(n)} % de critique pendant 2 manches après un KO`;
-        case "maitrePoisons":  return "Maître des poisons : ses poisons mordent à chaque manche (18 % de fatigue, 10 % des PV max), 2 manches";
-        case "lumiereAveugle": return `Sorts de lumière : ${n} % d'aveugler la cible et les ennemis adjacents`;
+        case "maitrePoisons":  return "Maître des poisons : ses poisons mordent à chaque manche (18 % de fatigue, 9 % des PV max), 2 manches";
+        case "lumiereAveugle": return `Sorts de lumière : ${n} % de chance d'aveugler la cible`;
+        case "provocationAttaques": return `${n} % de chance de provoquer la cible de chacune de ses attaques`;
+        case "bonusSoin":      return `${plus(n)} à chacun de ses soins`;
         case "brulureAggravee": return "Craint le feu : brûlé, -60 % de soins reçus et 18 % des PV max par manche (au lieu de -50 % et 8 %)";
         case "premierPasGratuit": return "La première case de chaque tour ne coûte aucune fatigue";
         case "caracs":         return Object.keys(valeur || {}).map(k => `${plus(Number(valeur[k]) || 0)} ${NOMS_CARACS_ATOUT[k] || k}`).join(" · ");
@@ -4550,9 +4573,9 @@ window.MIGRATION_EFFETS = [
       champs: { Nom: "Lumière", Cout_PT: "1", Modificateur: "INTELLIGENCE",
                 Type_Mecanique: "Magique", Type_Mecanique_2: "Physique",
                 Valeur: 0, Pourcent_Base: 15, Pourcent_Max: 60, Tours: 0, Cible_Etat: "lumiere",
-                Classe: "Chasseur de mages", Niveau_Requis: 5,
-                Effet_Base: "15% chance d'ignorer la résistance magique de la cible sur ce sort (Max 60%)",
-                Notes: "Réservé au Chasseur de mages (niveau 5). Seulement sur une action à dégâts magiques. Au niveau 10, un sort de lumière a 30 % de chance d'aveugler sa cible et les ennemis qui la touchent." } },
+                Classe: "Chasseur de mages", Niveau_Requis: 1,
+                Effet_Base: "15% chance d'ignorer la résistance magique de la cible sur ce sort (Max 60%) et 8% chance d'aveugler",
+                Notes: "Réservé au Chasseur de mages, dès le niveau 1. Seulement sur une action à dégâts magiques. Le sort a en plus 8 % de chance d'aveugler sa cible (2 manches)." } },
     // LE SAIGNEMENT (tableau de Nico) : un sous-effet Physique comme
     // l'Étourdi — 1 pt, Force, 15 % de chance par cran (max 75 %), 2 tours. Il
     // n'est réservé à personne. 8 % des PV max en dégâts physiques à chaque fin
@@ -4630,6 +4653,10 @@ window.MAJ_GRIMOIRE_REGLES = [
     { id: "EFF_REPLI", champs: {
         Effet_Base: "Se déplace de 3 cases après avoir attaqué, et évite toutes les attaques d'opportunité.",
         Notes: "Après l'attaque, le lanceur choisit une case à 3 pas de marche (ni mur, ni vivant traversé). Il évite toutes les attaques d'opportunité des ennemis quittés. Marche gratuite." } },
+    { id: "EFF_LUMIERE", champs: {
+        Classe: "Chasseur de mages", Niveau_Requis: 1,
+        Effet_Base: "15% chance d'ignorer la résistance magique de la cible sur ce sort (Max 60%) et 8% chance d'aveugler",
+        Notes: "Réservé au Chasseur de mages, dès le niveau 1. Seulement sur une action à dégâts magiques. Le sort a en plus 8 % de chance d'aveugler sa cible (2 manches)." } },
     { id: "EFF_TENEBRES", champs: {
         Classe: "Sorcier", Niveau_Requis: 1,
         Notes: "Réservé au Sorcier (ex-Nécromancien), dès le niveau 1. Dégâts bruts : aucune armure (résistance magique) ne s'applique. Les dégâts vont à l'énergie (fatigue) de la cible au lieu de ses PV. Si elle n'a plus d'énergie, le reste frappe ses PV ×1,5 (arrondi à l'inférieur). Le bouclier ne protège pas l'énergie ; il n'absorbe que ce qui frappe les PV." } },

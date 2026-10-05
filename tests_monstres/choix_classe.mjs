@@ -183,16 +183,19 @@ console.log("\n4. VALIDER : LA CRÉATION CONTINUE, LA CLASSE EST RETENUE");
 {
   await p.evaluate(() => window.validerRaceEtGenre("Male"));
   await p.waitForTimeout(300);
-  await p.click('.carte-classe[data-classe="CLASSE_HOPLITE"]');
+  await p.click('.carte-classe[data-classe="CLASSE_PROTECTEUR"]');
   await p.click('#btn-valider-classe');
   await p.waitForTimeout(200);
   const e = await etat();
   const champs = await p.evaluate(() => ({ classe: document.getElementById("champ-classe").value,
                                            genre: document.getElementById("champ-genre").value }));
   verifier("la validation ouvre l'étape d'identité", e.identite && !e.classes, JSON.stringify(e));
-  verifier("avec la classe et le genre retenus", champs.classe === "Hoplite" && champs.genre === "Male", JSON.stringify(champs));
-  const fiche = await p.evaluate(() => window.persoDocVersFront("PERSO_T", { Race: "Humain", Classe: "Hoplite" }).classe);
-  verifier("la fiche du héros relit sa classe (champ « Classe »)", fiche === "Hoplite", String(fiche));
+  verifier("avec la classe et le genre retenus", champs.classe === "Protecteur" && champs.genre === "Male", JSON.stringify(champs));
+  const fiche = await p.evaluate(() => window.persoDocVersFront("PERSO_T", { Race: "Humain", Classe: "Protecteur" }).classe);
+  verifier("la fiche du héros relit sa classe (champ « Classe »)", fiche === "Protecteur", String(fiche));
+  // (L'Hoplite est devenu le Protecteur : une fiche qui porte l'ancien nom se lit sous le nouveau.)
+  const ancienne = await p.evaluate(() => window.persoDocVersFront("PERSO_T", { Race: "Humain", Classe: "Hoplite" }).classe);
+  verifier("une fiche « Hoplite » se lit « Protecteur »", ancienne === "Protecteur", String(ancienne));
   const src = fs.readFileSync(`${RACINE}/app.js`, "utf-8");
   verifier("et l'écrit à la création", /Classe: donnees\.classe \|\| ""/.test(src));
   const cp = fs.readFileSync(`${RACINE}/creation_personnage.js`, "utf-8");
@@ -202,12 +205,15 @@ console.log("\n4. VALIDER : LA CRÉATION CONTINUE, LA CLASSE EST RETENUE");
 console.log("\n5. LA BASE : LIRE LES CLASSES (le bouton d'installation est retiré)");
 {
   const r = await p.evaluate(() => ({ installer: typeof window.installerClasses, bouton: !!document.getElementById("btn-installer-classes"),
-                                      doc: window.documentDepuisClasse(window.CLASSES_PAR_DEFAUT.find(c => c.id === "CLASSE_HOPLITE")) }));
+                                      doc: window.documentDepuisClasse(window.CLASSES_PAR_DEFAUT.find(c => c.id === "CLASSE_PROTECTEUR")) }));
   verifier("plus de bouton ni de fonction d'installation", r.installer === "undefined" && !r.bouton);
-  verifier("le format d'un document de classe reste connu (nom, images, ordre)", r.doc.Nom === "Hoplite" && /Hoplite_fond/.test(r.doc.Image_Fond)
+  verifier("le format d'un document de classe reste connu (nom, images, ordre)", r.doc.Nom === "Protecteur" && /Hoplite_fond/.test(r.doc.Image_Fond)
            && /IMG_2159/.test(r.doc.Image_Tarot) && r.doc.Ordre === 8, JSON.stringify(r.doc));
-  const lu = await p.evaluate(() => window.classeDepuisDocument("CLASSE_HOPLITE", { Nom: "Hoplite d'élite" }));
-  verifier("un document incomplet est complété par la liste du jeu", lu.nom === "Hoplite d'élite" && /Hoplite_fond/.test(lu.imageFond));
+  const lu = await p.evaluate(() => window.classeDepuisDocument("CLASSE_PROTECTEUR", { Nom: "Protecteur d'élite" }));
+  verifier("un document incomplet est complété par la liste du jeu", lu.nom === "Protecteur d'élite" && /Hoplite_fond/.test(lu.imageFond));
+  const vieux = await p.evaluate(() => window.classeDepuisDocument("CLASSE_HOPLITE", { Nom: "Hoplite" }));
+  verifier("le document Hoplite de la base se lit « Protecteur » (CLASSE_PROTECTEUR)",
+           vieux.id === "CLASSE_PROTECTEUR" && vieux.nom === "Protecteur" && /Hoplite_fond/.test(vieux.imageFond), JSON.stringify(vieux).slice(0, 80));
   verifier("la liste du jeu porte déjà les liens optimisés", /q_auto,f_auto/.test(r.doc.Image_Tarot) && /q_auto,f_auto/.test(r.doc.Image_Fond));
   const ancien = await p.evaluate(() => window.classeDepuisDocument("CLASSE_HOPLITE", {
     Image_Tarot: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790440202/IMG_2159_iligqv.jpg" }));

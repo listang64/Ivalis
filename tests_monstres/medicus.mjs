@@ -13,6 +13,7 @@
 // Poussée ; la case la plus proche si quelqu'un se tient sur le corps ; sans
 // allié KO à côté, la technique n'est pas consommée. Et : « seul le Médicus
 // peut voir le fantôme des tokens alliés morts, en très faible opacité ».
+// Puis : « Médicus : +1 en soin au lvl1. »
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
@@ -70,8 +71,8 @@ console.log("\n1. NIVEAU 1 : +5 DE RÉGÉNÉRATION DE FATIGUE, +1 COMPÉTENCE");
 // =========================================================================
 {
     const a1 = w.atoutClasse(medicus(1)), a5 = w.atoutClasse(medicus(5)), a10 = w.atoutClasse(medicus(10));
-    verifier("niveau 1 : regen +5, +1 compétence, pas de technique",
-             a1.regenFatigue === 5 && a1.competences === 1 && !(a1.techniques || []).length, JSON.stringify(a1));
+    verifier("niveau 1 : regen +5, +1 compétence, +1 aux soins, pas de technique",
+             a1.regenFatigue === 5 && a1.competences === 1 && a1.bonusSoin === 1 && !(a1.techniques || []).length, JSON.stringify(a1));
     verifier("niveau 5 : Soin d'urgence", JSON.stringify(a5.techniques) === '["CLASSE_SOIN_URGENCE"]');
     verifier("niveau 10 : et la Prise en charge",
              JSON.stringify(a10.techniques) === '["CLASSE_SOIN_URGENCE","CLASSE_PRISE_EN_CHARGE"]' && a10.regenFatigue === 5);
@@ -366,6 +367,26 @@ console.log("\n7. LA FICHE PERSO ET LA FICHE DE CLASSE");
            JSON.stringify(r.techniques));
   verifier("fiche de classe : paliers Niv. 1 / 5 / 10", r.visible && JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 5","Niv. 10"]');
   verifier("Soin d'urgence et Prise en charge y sont dits", /Soin d'urgence/.test(r.texte) && /Prise en charge/.test(r.texte) && /12 PV/.test(r.texte));
+}
+
+// =========================================================================
+console.log("\n8. +1 À CHACUN DE SES SOINS");
+// =========================================================================
+{
+  const r = await p.evaluate(() => {
+    const carte = () => ({ attaques: [{ nom: "Soin", valeurBrute: 5, isHeal: true, cibles: ["A1"] },
+                                      { nom: "Soin 2", valeurBrute: 3, isHeal: true, cibles: ["A2"] },
+                                      { nom: "Coup", valeurBrute: 4, typeRes: "Physique", cibles: ["M1"] },
+                                      { nom: "Bouclier", valeurBrute: 10, isShield: true, cibles: ["A1"] }], alterations: [] });
+    const enrichir = (perso) => { const st = carte(); window.appliquerEquipementALaCarte(st, perso, ""); return st.attaques.map(a => a.valeurBrute); };
+    return { medicus: enrichir({ idPersonnage: "D1", camp: "Allié", classe: "Médicus", xp: 0 }),
+             sansAccent: enrichir({ idPersonnage: "D2", camp: "Allié", classe: "medicus", xp: 0 }),
+             autre: enrichir({ idPersonnage: "X", camp: "Allié", classe: "Oracle", xp: 0 }) };
+  });
+  verifier("Médicus : chaque soin +1 (5 → 6, 3 → 4), ni le coup ni le bouclier",
+           JSON.stringify(r.medicus) === "[6,4,4,10]", JSON.stringify(r.medicus));
+  verifier("le nom se lit sans accent", JSON.stringify(r.sansAccent) === "[6,4,4,10]");
+  verifier("une autre classe : rien", JSON.stringify(r.autre) === "[5,3,4,10]", JSON.stringify(r.autre));
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

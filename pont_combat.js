@@ -295,7 +295,10 @@ const SCENES = {
                        CLASSE_NUEE_CHAUVES_SOURIS: "🦇 Nuée de chauve-souris",
                        CLASSE_BAISER_VAMPIRE: "🩸 Baiser du vampire",
                        CLASSE_CHARME_FRATRICIDE: "🌀 Charme fratricide",
-                       CLASSE_TRANSFERT: "🔄 Transfert" };
+                       CLASSE_TRANSFERT: "🔄 Transfert",
+                       CLASSE_RESONANCE_BOUCLIER: "🛡️ Résonance du bouclier",
+                       CLASSE_BOUCLIER_ANTIMAGIE: "🔮 Bouclier anti-magie",
+                       CLASSE_APPEL_LUMIERE: "☀️ Appel de la lumière" };
         return { geste: "message", pion: e.acteur, texte: noms[e.idCarte] || "Technique de classe",
                  couleur: "#e8c46a", duree: RYTHME.message };
     },

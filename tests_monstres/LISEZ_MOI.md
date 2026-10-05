@@ -156,10 +156,10 @@ node necromancien.mjs        # Ténèbres (énergie puis PV ×1,5) et le sursis 
 node surpuissance.mjs        # la surpuissance : ×1,25 dès 70 de fatigue, ×1,35 dès 100 (dégâts et soins, pas les boucliers) ; extraction, Forge, carte
 node armes_et_zones.mjs      # persistance posée comme une zone d'une case ; Distance réservée (polyvalente, distance, magie, soin) ; arme qui bloque des techniques : alerte, grisées, retirées du deck
 node tableaux_nico.mjs        # les cellules rouges des deux tableaux : brûlure 8 % PV max physique, poison 10 % énergie + 8 % PV magique, Contre/Absorption jusqu'à 30 %, armes et effets bonus
-node hoplite.mjs              # la classe Hoplite : +5 parade / +5 déf. physique, Mur de bouclier (+60 % parade, une fois), Rempart (coups partagés en deux avec l'allié adjacent, 3 manches), section « Techniques de classe » de la fiche
+node hoplite.mjs              # 🛡️ le Protecteur (ex-Hoplite) : +7 parade et 15 % de provocation (niv. 1), Rempart (niv. 5), Résonance du bouclier (niv. 10) ; le Mur de bouclier, dormant ; fiche, volet de combat
 node assassin.mjs             # la classe Assassin : Instinct du tueur (+15 critique 2 manches sur tout KO), Assaut mortel (zone de 2 au contact, 10 phys + poison même esquivé), Maître des poisons (18 % énergie + 10 % PV par manche, 2 manches)
-node medicus.mjs              # la classe Médicus : +5 % régénération de fatigue et +1 compétence, Soin d'urgence (12 PV à tous les alliés), Prise en charge (relève un allié KO adjacent à 30 %, repousse les ennemis), fantômes des alliés KO pour le seul Médicus
-node chasseur_de_mages.mjs    # la classe Chasseur de mages : +10 % résistance magique, effet Lumière (ignore la défense magique, 15 %/cran, max 60 %), sorts de lumière qui aveuglent la cible et les ennemis adjacents (30 %)
+node medicus.mjs              # la classe Médicus : +5 % régénération de fatigue et +1 compétence, Soin d'urgence (12 PV à tous les alliés), Prise en charge (relève un allié KO adjacent à 30 %, repousse les ennemis), fantômes des alliés KO pour le seul Médicus ; +1 à chacun de ses soins
+node chasseur_de_mages.mjs    # ☀️ le Chasseur de mages : +10 rés. magique et Lumière (8 % d'aveugler sa cible) au niv. 1, Bouclier anti-magie (niv. 5, renvoi des sorts), Appel de la lumière (niv. 10)
 node tenues_variees.mjs        # les skins d'armure : 34 tenues antiques par type tirées au sort (+ 16 palettes), sans répétition, envoyées à MIA et au dessinateur ; le gris est simple mais propre
 node versions_modules.mjs      # la carte des imports : chaque module du moteur chargé une seule fois, à la version de sa balise (fin du moteur périmé après un déploiement)
 node couvre_chef.mjs           # le couvre-chef des armures : 30 casques/chapeaux/coiffes par type tirés avec la tenue, dessinés sur l'armure (jamais sur celle de départ), choix « avec / tête nue » à l'équipement, le portrait suit
@@ -4623,3 +4623,36 @@ chasseur_de_mages et migration_effets mis à jour.
   niveau requis (1) de Ténèbres.
 sorcier.mjs ; necromancien, bonus_race_classe, choix_classe (13 classes),
 aide_forge_lia, migration_effets, saignement et hoplite mis à jour.
+
+## Médicus, Chasseur de mages, le Protecteur (ex-Hoplite) (version 192)
+
+- MÉDICUS niv. 1 : +1 à chacun de ses soins (bonusSoin), ajouté à la carte
+  avec les bonus d'équipement (appliquerEquipementALaCarte) — ni aux coups,
+  ni aux boucliers.
+- CHASSEUR DE MAGES niv. 1 : +10 % de résistance magique (au lieu de 13) et
+  Lumière dans la Forge dès le niveau 1 ; un sort de lumière a 8 % de chance
+  d'aveugler SA CIBLE (plus ses voisins ; l'ancien 30 % du niveau 10 n'existe
+  plus).
+  Niv. 5 : BOUCLIER ANTI-MAGIE — init 200, 0 fatigue, une fois par combat,
+  la manche en cours et la suivante : tout coup magique qui le frappe repart
+  en entier sur son lanceur (encaissé avec les défenses de ce dernier) ; lui
+  n'en prend rien. Un coup renvoyé ne se renvoie plus. Les états du sort le
+  touchent quand même (seuls les dégâts repartent).
+  Niv. 10 : APPEL DE LA LUMIÈRE — 0 fatigue, une fois par combat : tous les
+  autres combattants debout du plateau, ALLIÉS COMPRIS, sont Aveuglés 2
+  manches (noir tiré par le cerveau pour chacun ; immunisés épargnés).
+- L'HOPLITE s'appelle désormais PROTECTEUR (document CLASSE_HOPLITE lu en
+  CLASSE_PROTECTEUR, mêmes images ; fiches « Hoplite » lues « Protecteur »).
+  Niv. 1 : +7 % de parade (plus de +5 de résistance physique) et 15 % de
+  chance de provoquer les ennemis que frappe chacune de ses attaques
+  (provocationAttaques ; une carte qui provoquait garde la meilleure chance).
+  Niv. 5 : le Rempart (au lieu du niveau 10). Le Mur de bouclier n'est plus
+  donné (le moteur le sait toujours jouer).
+  Niv. 10 : RÉSONANCE DU BOUCLIER — init 100, 0 fatigue, une fois par combat :
+  chaque ennemi au contact est Étourdi (2 manches) et prend 5 % de ses PV max
+  en dégâts physiques (armure appliquée), à coup sûr. Refusée (non gâchée)
+  sans ennemi au contact.
+- Grimoire : le bouton provisoire du MJ recopie aussi la Lumière (Classe,
+  niveau 1, texte avec les 8 %).
+hoplite, chasseur_de_mages, medicus ; bonus_race_classe, choix_classe,
+aide_forge_lia, migration_effets, saignement, sorcier mis à jour.
