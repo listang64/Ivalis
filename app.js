@@ -2191,8 +2191,14 @@ window.urlCloudinaryEnPng = (...a) => urlCloudinaryEnPng(...a);
 window.imageVersBlobPng = (...a) => portraitVersBlobPng(...a);
 window.signatureCloudinaryIvalis = (...a) => sha1Hex(...a);
 window.clesApiIvalis = () => lireClesApi();
+// Le style artistique du jeu (Cerveau_IA), que l'illustration des compétences
+// reprend pour ressembler aux portraits.
+window.instructionStyleIvalis = () => recupererInstructionStyle();
 
-async function portraitVersBlobPng(urlPortrait) {
+// `fond` : la couleur posée sous les transparences. Magenta pour les pions
+// (détourés ensuite) ; l'illustration des compétences prend un gris neutre, qui
+// ne déteint pas sur la scène.
+async function portraitVersBlobPng(urlPortrait, fond = "#FF00FF") {
     const urlSource = urlCloudinaryEnPng(urlPortrait);
 
     const blobCanvas = await new Promise((resolve) => {
@@ -2206,7 +2212,7 @@ async function portraitVersBlobPng(urlPortrait) {
                 canvas.height = cote;
                 const ctx = canvas.getContext("2d");
 
-                ctx.fillStyle = "#FF00FF";
+                ctx.fillStyle = fond;
                 ctx.fillRect(0, 0, cote, cote);
 
                 const echelle = Math.min(cote / img.width, cote / img.height);

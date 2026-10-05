@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=53">
+  <link rel="stylesheet" href="style.css?v=54">
 
  
   <!-- ===================================================================== -->
@@ -1745,6 +1745,8 @@
       <!-- En-tête avec le compteur Max -->
       <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #5c3a21; padding-bottom: 5px; margin-bottom: 20px;">
         <h3 style="margin: 0; color: #2a1a0f; font-family: 'Cinzel', serif; font-size: 24px;">Compétences</h3>
+        <!-- PROVISOIRE : régler la place de l'illustration sur les cartes -->
+        <button id="btn-reglage-illustration" class="btn-parametres btn-reglage-illustration" onclick="jouerSonClic(); window.ouvrirReglageIllustration()">🖼️ Réglage image</button>
         <span style="font-family: 'Almendra', serif; font-size: 18px; color: #5c3a21; font-weight: bold;">
           En combat : <span id="affichage-competences-max" style="font-size: 22px;">6</span>
         </span>
@@ -1978,7 +1980,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=92"></script>
+<script src="trace_combat.js?v=93"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
      Les modules s'importent entre eux sans numéro (`from './moteur_pur.js'`).
      Sans cette carte, le navigateur les chargeait à part, à une adresse SANS
@@ -2031,16 +2033,18 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=36"></script>
 <script type="module" src="ia_master.js?v=7"></script>
-<script type="module" src="app.js?v=84"></script>
+<script type="module" src="app.js?v=85"></script>
 <script src="jet_d20.js?v=2"></script>
 <script src="fabrique_sons.js?v=3"></script>
 <script src="experience.js?v=1"></script>
 <script type="module" src="creation_personnage.js?v=16"></script>
 <script type="module" src="classes.js?v=9"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
-<script type="module" src="competences.js?v=49"></script>
+<script type="module" src="competences.js?v=50"></script>
 <!-- LIA, l'aide à la création de la Forge -->
 <script type="module" src="lia_forge.js?v=2"></script>
+<!-- L'illustration des compétences (prompt IA + image IA, en file) -->
+<script type="module" src="illustration_competence.js?v=1"></script>
 <!-- Le plateau porte désormais son ?v= comme les autres : sans lui, un iPad
      gardait l'ancien dessin en cache après une livraison (l'œil d'or en dépend). -->
 <script src="Plateau.js?v=3"></script>
@@ -2056,7 +2060,7 @@
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=13"></script>
 <script src="variations_tenues.js?v=2"></script>
-<script type="module" src="objets_ia.js?v=14"></script>
+<script type="module" src="objets_ia.js?v=15"></script>
 <script type="module" src="loot.js?v=22"></script>
 
 <!-- ============================================================= -->

@@ -174,6 +174,7 @@ node valeurs_decimales.mjs    # 1,5 par cran : le demi-point compte, arrondi au 
 node liste_fleches.mjs         # flèches haut/bas sur une liste de héros qui défile ; la portée de l'arme lue sur le propriétaire de la carte
 node forge_design.mjs         # la Forge aux couleurs du jeu (aucun bleu « appli »), descriptions alignées à gauche sous leur nom
 node aide_forge_lia.mjs         # 🔨 LIA, l'aide à la création : popup récit + jauges, Gemini simulé, plan fautif corrigé par les règles de la Forge, cap, Recit_RP
+node illustration_competence.mjs  # 🎨 illustration des compétences : IA de prompt + IA d'image (portrait + armes en binaire), file sur IA saturée, image en haut de la carte, outil de réglage provisoire
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4422,3 +4423,32 @@ Au passage : en Magie, `purgerIncompatibilitesArme` retirait tout sous-effet
 rangé AUSSI en Physique (Lumière, Confusion, Peur, Empoisonnement…), alors que
 le menu Magique les propose ; seuls les sous-effets purement physiques
 tombent maintenant (`estSeulementPhysique`). aide_forge_lia.mjs, sections 8 et 9.
+
+## L'illustration des compétences (version 181)
+
+Une compétence forgée part en file d'illustration (illustration_competence.js) :
+1. MIA_ILLUSTRATION (Gemini) lit le titre, les effets, le récit RP s'il y en a
+   un, la race, le genre et la classe du héros, et la liste des images de
+   référence ; elle écrit en anglais le prompt d'une scène — le héros en train
+   d'exécuter sa technique, ou ce que fait la technique — dans le style des
+   portraits du jeu (Cerveau_IA). Sans Gemini : un prompt assemblé à la main.
+2. L'IA d'image prend les réglages des pions (gpt-image-2 puis 1.5 et 1,
+   1024×1024, qualité basse, PNG) et reçoit en binaire l'avatar du héros (en
+   armure) puis ses armes : celles du type de la technique (une arme à deux
+   mains une seule fois), son focaliseur pour la Magie, aucune pour Sans arme.
+   Les références sont posées sur un gris neutre, pas le magenta des pions.
+3. Cloudinary (dossier Competences), puis `URL_Image` et `Prompt_Image` sur la
+   compétence ; les caches et la carte ouverte suivent tout de suite.
+La file (localStorage) tient une IA saturée (429, 5xx, « overloaded ») :
+nouvel essai après 5 s, 15 s, 30 s, 1 min, puis toutes les 2 min, jusqu'à
+réussite, sans redemander le prompt ni relire les images déjà acquises. Elle
+survit à un rechargement et reprend au démarrage. Un sceau en bas à gauche dit
+ce qui attend. Une erreur définitive (clés absentes, refus d'OpenAI, compétence
+supprimée) retire la commande.
+Sur la carte HD, l'image se pose sous le cadre de la carte (`htmlIllustrationCarte`),
+à la place réglée par `REGLAGE_ILLUSTRATION_DEFAUT`. PROVISOIRE : le bouton
+« 🖼️ Réglage image » de l'onglet Compétences ouvre des curseurs (haut, gauche,
+largeur, hauteur, cadrage X/Y, zoom, arrondi, devant/sous le cadre) appliqués en
+direct à la carte ouverte (gabarit hachuré si elle n'a pas d'image),
+« Extraire le code » donne la ligne à recopier, « Illustrer la carte ouverte »
+met une compétence existante en file. illustration_competence.mjs.

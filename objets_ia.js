@@ -310,6 +310,8 @@ async function reserverCreneauImage() {
         await dormir(attente);
     }
 }
+// Le même compteur pour tous les dessins du jeu (illustrations des compétences).
+window.reserverCreneauImage = reserverCreneauImage;
 
 // Le dessin lui-même. Mêmes réglages que les pions — gpt-image-2, qualité
 // basse, PNG — mais en carré et sans image de référence : l'objet n'existe

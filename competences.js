@@ -812,6 +812,9 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         <!-- COUCHE 1 : FOND DE COULEUR -->
         <div style="position: absolute; top: 12px; left: 12px; right: 12px; bottom: 12px; background-color: ${window.COULEUR_PERSO_COURANT}; border-radius: 8px; z-index: 1;"></div>
         
+        <!-- COUCHE 1 bis : L'ILLUSTRATION DE LA TECHNIQUE (illustration_competence.js) -->
+        ${typeof window.htmlIllustrationCarte === "function" ? window.htmlIllustrationCarte(data) : ""}
+
         <!-- COUCHE 2 : L'IMAGE DE LA CARTE (CONSERVÉE PROPREMENT) -->
         <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1785866318/competance_carte_vy8omh.png" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none;">
         
@@ -2337,6 +2340,8 @@ window.sauvegarderCompetence = async function() {
         const idPerso = window.forgeState.idPersonnage;
         const idComp = "COMP_" + Math.random().toString(36).substring(2, 9);
         await setDoc(doc(db, "Personnages", idPerso, "Competences", idComp), dataCompetence);
+        // Son illustration se dessine en tâche de fond (illustration_competence.js).
+        if (typeof window.illustrerCompetence === "function") window.illustrerCompetence(idPerso, idComp, nomCompetence);
 
         window.fermerForgeCompetence();
 
