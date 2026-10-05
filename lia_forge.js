@@ -41,6 +41,14 @@ function armesPermises() {
     return [...ARMES_PHYSIQUES.filter(a => !enMain || enMain.has(a)), ...ARMES_TOUJOURS];
 }
 
+const estEffetDeClasse = (e) => typeof window.effetReserveAUneClasse === "function"
+    ? window.effetReserveAUneClasse(e.id, e) : !!e.Classe;
+
+// Les règles qui ne parlent que d'un effet de classe ne sont dites à LIA que
+// si le héros a cet effet : on ne lui souffle jamais un nom qu'elle ne peut
+// pas poser.
+const aEffet = (nom) => window.forgeState.effetsBDD.some(e => sansAccents(e.Nom) === sansAccents(nom));
+
 const estRacine = (e) => e.Type_Mecanique === "Action/Global" || e.Type_Mecanique_2 === "Action/Global";
 
 // Les menus de sous-effets où l'effet apparaît, pour cette arme (la Magie n'a
@@ -106,6 +114,13 @@ function catalogueEffets(armes) {
                 fiche.cout_special = "ne coûte rien lui-même : divise le coût des dégâts/soins/Zone/Distance de l'action";
             }
             if (dureeReglable(e, !estRacine(e))) fiche.duree_reglable = true;
+            // Un effet de classe (Ténèbres, Lumière, Vampirisme…) : il n'est dans
+            // cette liste que parce que le héros l'a débloqué (effetAccessible,
+            // à l'ouverture de la Forge). Sa note dit ce qu'il fait vraiment.
+            if (estEffetDeClasse(e)) {
+                fiche.effet_de_classe = e.Classe || (window.forgeState.statsPerso || {}).Classe || true;
+                if (e.Notes) fiche.notes = sansBalises(e.Notes);
+            }
             const interdites = armes.filter(a => O.estIncompatibleAvecArme(e.Nom, a));
             if (interdites.length) fiche.armes_interdites = interdites;
             if (menus.length && armes.includes("Magie") && !menusSousEffet(e, "Magie").length) fiche.sous_effet_interdit_avec = "Magie";
@@ -147,6 +162,14 @@ function construireDemandeLIA(recit, jauges) {
         ? (() => { try { return window.niveauDuPerso(window.persoDocVersFront(window.forgeState.idPersonnage, perso)); } catch (e) { return null; } })()
         : null;
 
+    const attaques = ["Attaque légère", "Attaque lourde", "Attaque Magique", "Mots de pouvoirs", "Ténèbres", "Vampirisme"]
+        .filter(n => !["Ténèbres", "Vampirisme"].includes(n) || aEffet(n));
+    const effetsDeClasse = window.forgeState.effetsBDD.filter(estEffetDeClasse).map(e => O.nettoyerNomEffet(e.Nom));
+    const regleLumiere = aEffet("Lumière") ? "\n9. Lumière : seulement sur une action à dégâts magiques." : "";
+    const regleClasse = effetsDeClasse.length
+        ? `\n- Le héros a débloqué des effets de classe (${effetsDeClasse.join(", ")}) : ce sont ses signatures, utilise-les quand le récit s'y prête (lis leurs notes).`
+        : "";
+
     const systeme = `Tu es LIA, la forgeronne de techniques de combat d'Ivalis (jeu de rôle tactique, plateau hexagonal).
 Le joueur te raconte une technique. Tu la traduis en effets de jeu en répartissant des points (des « crans ») dans les effets et sous-effets disponibles, puis tu appelles l'outil forgerTechnique.
 
@@ -159,20 +182,19 @@ COMMENT EST FAITE UNE TECHNIQUE
 - Initiative = 100 − fatigue totale (+8 par cran d'Initiative +). Les états (aveuglement, brûlure, peur…) ne retardent pas la technique.
 
 RÈGLES ABSOLUES
-1. Une SEULE attaque de base par technique (Attaque légère, Attaque lourde, Attaque Magique, Mots de pouvoirs, Ténèbres, Vampirisme).
+1. Une SEULE attaque de base par technique (${attaques.join(", ")}).
 2. Deux caractéristiques différentes au plus sur toute la technique (les effets de carac AUCUN ne comptent pas).
 3. L'arme est choisie parmi : ${armes.join(", ")}. Un effet dont armes_interdites contient l'arme choisie est impossible. Avec Magie, pas de sous-effet Physique.
 4. Empoisonnement exige une attaque sur la technique.
 5. Durée étalement dégâts : seulement sur une attaque, un soin, une Zone ou une Distance, et jamais avec Persistance terrain sur la même technique.
 6. Persistance terrain : jamais sur un soin.
 7. Sur une action Poussée : pas de Zone, de Persistance terrain ni d'étalement. Sur une Illusion : pas de Zone.
-8. Distance : seulement avec Arme polyvalente, Arme légère Distance ou Magie — ou sur un soin.
-9. Lumière : seulement sur une action à dégâts magiques.
-10. N'utilise QUE des identifiants (id) de la liste fournie.
+8. Distance : seulement avec Arme polyvalente, Arme légère Distance ou Magie — ou sur un soin.${regleLumiere}
+10. N'utilise QUE des identifiants (id) de la liste fournie : aucun autre effet n'existe pour ce héros.
 
 TON STYLE
 - Reste fidèle au récit : l'élément, le geste, l'effet sur l'ennemi. N'ajoute pas d'effet que le récit ne justifie pas.
-- Les jauges du joueur sont des INDICATIONS : garde ton jugement pour coller au récit.
+- Les jauges du joueur sont des INDICATIONS : garde ton jugement pour coller au récit.${regleClasse}
 - Donne un nom de technique évocateur, en français, de 2 à 5 mots.`;
 
     const fichePerso = {

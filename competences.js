@@ -1485,6 +1485,14 @@ window.fermerMenuAjoutForge = function() {
 function isEffetPhysique(effet) {
     return effet && (effet.Type_Mecanique === "Physique" || effet.Type_Mecanique_2 === "Physique");
 }
+// Un sous-effet SEULEMENT physique : la Magie n'a pas de menu Physique, mais
+// un effet rangé aussi au menu Magique (Lumière, Confusion, Peur,
+// Empoisonnement…) s'y pose très bien — il ne doit pas tomber au changement
+// d'arme.
+function estSeulementPhysique(effet) {
+    if (!isEffetPhysique(effet)) return false;
+    return ![effet.Type_Mecanique, effet.Type_Mecanique_2].some(t => ["Magique", "Spatial", "Duree"].includes(t));
+}
 
 // LE SOUS-EFFET DISTANCE N'EST PAS POUR TOUTES LES ARMES (règle de Nico) :
 // seulement une arme polyvalente, une arme à distance, la magie — ou, quelle
@@ -1511,7 +1519,7 @@ function purgerIncompatibilitesArme() {
         window.forgeState.actions.forEach(act => {
             Object.keys(act.mods).forEach(modId => {
                 const modEff = window.forgeState.effetsBDD.find(e => e.id === modId);
-                if (isEffetPhysique(modEff)) delete act.mods[modId];
+                if (estSeulementPhysique(modEff)) delete act.mods[modId];
             });
         });
     }

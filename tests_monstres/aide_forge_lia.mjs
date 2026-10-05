@@ -313,6 +313,74 @@ console.log("\n7. LE RÉCIT PART EN BASE AVEC LA COMPÉTENCE");
   verifier("forgée à la main : pas de champ Recit_RP", sansRecit === false);
 }
 
+console.log("\n8. LES EFFETS DE CLASSE : DANS LA LISTE DE LIA SEULEMENT S'ILS SONT DÉBLOQUÉS");
+// Lumière (Chasseur de mages), Ténèbres (Nécromancien), Vampirisme (Vampire) :
+// niveau 5. Avant, ou dans une autre classe, LIA ne les voit pas — ni dans la
+// liste, ni dans ses règles — et l'algorithme refuse de les poser même si elle
+// les demande.
+{
+  const CLASSE = { "Lumière": ["Chasseur de mages", "EFF_LUMIERE"], "Ténèbres": ["Nécromancien", "EFF_TENEBRES"],
+                   "Vampirisme": ["Vampire", "EFF_VAMPIRISME"] };
+  const demande = async (fiche, plan) => {
+    await p.evaluate(async ({ EFFETS, fiche }) => {
+      window.EFFETS_BDD_CACHE = JSON.parse(JSON.stringify(EFFETS));
+      window.completerEffetsDeSecours(window.EFFETS_BDD_CACHE);
+      window.__docs = { "Personnages/P1": fiche, "Caracteristiques/P1": { int: 15, sag: 14, dex: 12 } };
+      document.getElementById("champ-id-personnage").value = "P1";
+      window.OUVERTURE_FORGE_EN_COURS = false;
+      await window.ouvrirCreationCompetence();
+    }, { EFFETS: EFFETS_PAR_ID, fiche });
+    await simulerGemini(plan);
+    await creer("Un sort sombre jaillit de mes mains et ronge l'ennemi, une lumière aveuglante le transperce.");
+    const req = await p.evaluate(() => window.__requetes[0] && window.__requetes[0].corps);
+    const texte = req ? req.systemInstruction.parts[0].text + "\n" + req.contents[0].parts[0].text : "";
+    const liste = JSON.parse(texte.slice(texte.indexOf("LES EFFETS DISPONIBLES")).replace(/^[^\n]*\n/, ""));
+    return { texte, ids: liste.map(e => e.id), fiches: liste, forge: await etatForge() };
+  };
+  const planAvec = (id) => ({ nom: "Essai", arme: "Magie",
+    actions: id === "EFF_LUMIERE" ? [{ effet: "EFF_ATTAQUE_MAGIQUE", crans: 2, sous_effets: [{ effet: id, crans: 2 }] }]
+                                  : [{ effet: id, crans: 2 }, { effet: "EFF_SOIN", crans: 1 }] });
+  for (const [nom, [classe, id]] of Object.entries(CLASSE)) {
+    const debloque = await demande({ Classe: classe, XP: 2500, Race: "Humain" }, planAvec(id));
+    const fiche = debloque.fiches.find(f => f.id === id);
+    verifier(`${classe} niv. 5 : ${nom} est dans la liste de LIA`, !!fiche, debloque.ids.length);
+    verifier(`…marqué effet de classe, avec sa note`, !!fiche && !!fiche.effet_de_classe && !!fiche.notes, fiche && fiche.effet_de_classe);
+    const pose = debloque.forge.actions.some(a => a.nom === nom || a.mods[nom]);
+    verifier(`…et LIA peut le poser`, pose, JSON.stringify(debloque.forge.actions.map(a => [a.nom, a.mods])));
+
+    const tropTot = await demande({ Classe: classe, XP: 1800, Race: "Humain" }, planAvec(id));
+    verifier(`${classe} niv. 4 : ${nom} absent de la liste ET des règles`, !tropTot.ids.includes(id) && !tropTot.texte.includes(nom), tropTot.ids.length);
+    const refuse = !tropTot.forge.actions.some(a => a.nom === nom || a.mods[nom]);
+    verifier(`…et refusé s'il est demandé quand même`, refuse);
+
+    const autre = await demande({ Classe: "Hoplite", XP: 7900, Race: "Humain" }, planAvec(id));
+    verifier(`Hoplite niv. 10 : pas de ${nom}`, !autre.ids.includes(id) && !autre.texte.includes(nom)
+             && !autre.forge.actions.some(a => a.nom === nom || a.mods[nom]));
+  }
+}
+
+console.log("\n9. LA MAGIE NE FAIT PLUS TOMBER LES SOUS-EFFETS DU MENU MAGIQUE");
+// purgerIncompatibilitesArme retirait, en Magie, tout sous-effet rangé AUSSI en
+// Physique : Lumière, Confusion, Peur, Empoisonnement… alors que le menu
+// Magique les propose. Seuls les sous-effets purement physiques tombent.
+{
+  const r = await p.evaluate(async ({ EFFETS }) => {
+    window.EFFETS_BDD_CACHE = JSON.parse(JSON.stringify(EFFETS));
+    window.completerEffetsDeSecours(window.EFFETS_BDD_CACHE);
+    window.__docs = { "Personnages/P1": { Classe: "Chasseur de mages", XP: 2500, Race: "Humain" }, "Caracteristiques/P1": { int: 15 } };
+    window.OUVERTURE_FORGE_EN_COURS = false;
+    await window.ouvrirCreationCompetence();
+    window.forgeState.armePrincipale = "Arme polyvalente";
+    window.ajouterComposantPrincipal("EFF_ATTAQUE_MAGIQUE");
+    window.forgeState.actions[0].mods = { EFF_LUMIERE: 1, EFF_CONFUSION: 1, EFF_ETOURDIT: 1 };
+    window.selectionnerArme("Magie");
+    window.fermerMenuAjoutForge();
+    return Object.keys(window.forgeState.actions[0].mods);
+  }, { EFFETS: EFFETS_PAR_ID });
+  verifier("Lumière et Confusion (aussi Magique) restent en Magie", r.includes("EFF_LUMIERE") && r.includes("EFF_CONFUSION"), r.join(","));
+  verifier("Étourdit (seulement Physique) tombe", !r.includes("EFF_ETOURDIT"), r.join(","));
+}
+
 if (process.env.CAPTURE) {
   await ouvrir();
   await p.evaluate(() => { window.ouvrirAideForge(); document.getElementById("aide-forge-recit").value = "Je lève mon bâton, une tempête de cendres brûlantes s'abat autour de ma cible."; });

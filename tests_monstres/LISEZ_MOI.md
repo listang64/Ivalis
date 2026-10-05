@@ -4408,3 +4408,17 @@ Le récit part en base avec la compétence (`Recit_RP`), pour en dessiner
 l'image plus tard ; une technique forgée à la main n'en a pas.
 etalement_sans_degats.mjs et persistance_soin.mjs lisent maintenant les règles
 dans `etatSousEffet`. aide_forge_lia.mjs.
+
+## LIA et les effets de classe (version 180)
+
+La liste que LIA reçoit est celle de la Forge du héros : un effet de classe
+(Lumière, Ténèbres, Vampirisme…) n'y figure que si sa classe l'a débloqué à son
+niveau (`effetAccessible`, à l'ouverture de la Forge). Il y est marqué
+`effet_de_classe`, avec sa note, et LIA est invitée à l'utiliser quand le récit
+s'y prête. Les règles qui nomment un effet de classe (la liste des attaques,
+la règle de Lumière) ne sont dites que si le héros l'a ; un effet verrouillé
+demandé quand même est refusé par l'algorithme.
+Au passage : en Magie, `purgerIncompatibilitesArme` retirait tout sous-effet
+rangé AUSSI en Physique (Lumière, Confusion, Peur, Empoisonnement…), alors que
+le menu Magique les propose ; seuls les sous-effets purement physiques
+tombent maintenant (`estSeulementPhysique`). aide_forge_lia.mjs, sections 8 et 9.
