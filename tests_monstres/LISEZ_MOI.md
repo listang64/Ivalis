@@ -4452,3 +4452,13 @@ largeur, hauteur, cadrage X/Y, zoom, arrondi, devant/sous le cadre) appliqués e
 direct à la carte ouverte (gabarit hachuré si elle n'a pas d'image),
 « Extraire le code » donne la ligne à recopier, « Illustrer la carte ouverte »
 met une compétence existante en file. illustration_competence.mjs.
+
+## L'illustration toujours SOUS l'image de la carte (version 182)
+
+L'illustration se pose entre le fond de couleur de la carte et l'image de la
+carte (z-index 1, sous le cadre à 2) : elle ne se voit que par la fenêtre
+transparente du cadre, qui la borde. L'option « par-dessus le cadre » de l'outil
+de réglage est retirée, et un ancien réglage `devant` resté en mémoire est
+ignoré. illustration_competence.mjs, section 5, le vérifie au pixel : un cadre
+opaque percé d'une fenêtre, une illustration rouge — rouge par la fenêtre, or
+partout où l'image passe sous le cadre.

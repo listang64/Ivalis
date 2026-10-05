@@ -115,6 +115,14 @@ await p.addInitScript(({ PERSO }) => {
 }, { PERSO });
 
 await p.route('**/firebase-app.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_APP }));
+// L'IMAGE DE LA CARTE, comme la vraie : un cadre opaque (or) percé d'une
+// fenêtre transparente en haut (10 → 90 % de large, 12 → 46 % de haut).
+const CADRE_CARTE = '<svg xmlns="http://www.w3.org/2000/svg" width="340" height="476" viewBox="0 0 340 476">'
+  + '<path fill="#c8a030" fill-rule="evenodd" d="M0 0H340V476H0Z M34 57H306V219H34Z"/></svg>';
+await p.route('**competance_carte**', r => r.fulfill({ contentType: 'image/svg+xml', headers: {'Access-Control-Allow-Origin':'*'}, body: CADRE_CARTE }));
+// Les illustrations : un aplat rouge pur, pour le reconnaître au pixel.
+await p.route('**/x/image/upload/**', r => r.fulfill({ contentType: 'image/svg+xml', headers: {'Access-Control-Allow-Origin':'*'},
+  body: '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024"><rect width="1024" height="1024" fill="#ff0000"/></svg>' }));
 const erreurs = [];
 p.on('pageerror', e => erreurs.push(e.message));
 await p.goto(base + '/index.html');
@@ -195,7 +203,29 @@ const carte = await p.evaluate(async ({ id, data }) => {
 }, { id: idComp, data: docComp });
 verifier("la carte montre l'illustration", carte.src === docComp.URL_Image, carte.src);
 verifier("dans la moitié haute de la carte", carte.hautRel >= 0 && carte.basRel <= 0.55, `${carte.hautRel && carte.hautRel.toFixed(2)} → ${carte.basRel && carte.basRel.toFixed(2)}`);
-verifier("sous le cadre de la carte par défaut", Number(carte.z) < Number(carte.zCadre) && carte.avantLeCadre, `${carte.z} < ${carte.zCadre}`);
+verifier("sous l'image de la carte (z-index et ordre)", Number(carte.z) < Number(carte.zCadre) && carte.avantLeCadre, `${carte.z} < ${carte.zCadre}`);
+
+// LE VRAI TEST : ce que l'œil voit. On photographie la carte et on lit les
+// pixels : l'illustration (rouge) doit se voir PAR la fenêtre du cadre, et le
+// cadre (or) doit la recouvrir partout ailleurs, y compris là où l'image
+// déborde sous lui.
+const lirePixels = async (points) => {
+  const boite = await p.evaluate(() => { const r = document.getElementById("apercu-carte-hd-competence").getBoundingClientRect();
+                                         return { x: r.left, y: r.top, width: r.width, height: r.height }; });
+  const png = (await p.screenshot({ clip: boite })).toString("base64");
+  return p.evaluate(async ({ png, points }) => {
+    const img = new Image(); img.src = "data:image/png;base64," + png; await img.decode();
+    const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+    const ctx = c.getContext("2d"); ctx.drawImage(img, 0, 0);
+    return points.map(([x, y]) => Array.from(ctx.getImageData(Math.round(x * img.width), Math.round(y * img.height), 1, 1).data.slice(0, 3)));
+  }, { png, points });
+};
+const estRouge = ([r, g, b]) => r > 220 && g < 40 && b < 40;
+const estOr = ([r, g, b]) => Math.abs(r - 0xc8) < 20 && Math.abs(g - 0xa0) < 20 && Math.abs(b - 0x30) < 20;
+await p.waitForTimeout(300);
+const px = await lirePixels([[0.5, 0.29], [0.2, 0.2], [0.5, 0.11], [0.09, 0.29], [0.5, 0.47], [0.91, 0.3]]);
+verifier("par la fenêtre du cadre, on voit l'illustration", estRouge(px[0]) && estRouge(px[1]), JSON.stringify(px.slice(0, 2)));
+verifier("là où l'image passe sous le cadre, le cadre la recouvre", estOr(px[2]) && estOr(px[3]) && estOr(px[4]) && estOr(px[5]), JSON.stringify(px.slice(2)));
 
 console.log("\n6. LE BOUTON PROVISOIRE : RÉGLER, PUIS EXTRAIRE LE CODE");
 const reglage = await p.evaluate(async () => {
@@ -208,8 +238,7 @@ const reglage = await p.evaluate(async () => {
   curseur("zoom").value = 130; curseur("zoom").dispatchEvent(new Event("input"));
   const cadre = document.querySelector("#apercu-carte-hd-competence .illustration-carte-hd");
   const enDirect = { top: cadre.style.top, height: cadre.style.height, zoom: cadre.querySelector("img").style.transform };
-  panneau.querySelector('input[data-cle="devant"]').click();
-  const devant = cadre.style.zIndex;
+  const devant = { caseExiste: !!panneau.querySelector('input[data-cle="devant"]'), z: cadre.style.zIndex };
   panneau.querySelector('[data-action="extraire"]').click();
   const code = panneau.querySelector(".reglage-illu-code").value;
   return { bouton: !!bouton, ouvert: panneau.style.display === "block", enDirect, devant, code,
@@ -218,10 +247,17 @@ const reglage = await p.evaluate(async () => {
 verifier("le bouton est dans l'onglet Compétences de la fiche", reglage.bouton && reglage.ouvert);
 verifier("curseurs : position, taille, cadrage, zoom, arrondi", ["haut", "gauche", "largeur", "hauteur", "cadrageX", "cadrageY", "zoom", "arrondi"].every(c => reglage.curseurs.includes(c)), reglage.curseurs.join());
 verifier("la carte ouverte suit le réglage en direct", reglage.enDirect.top === "15%" && reglage.enDirect.height === "30%" && /1\.3/.test(reglage.enDirect.zoom), JSON.stringify(reglage.enDirect));
-verifier("« par-dessus le cadre » passe l'image devant", Number(reglage.devant) >= 3, reglage.devant);
+verifier("aucun réglage ne fait passer l'image devant la carte", !reglage.devant.caseExiste && reglage.devant.z === "1", JSON.stringify(reglage.devant));
 let lu = null;
 try { lu = JSON.parse(reglage.code.replace(/^window\.REGLAGE_ILLUSTRATION_DEFAUT = /, "").replace(/;$/, "")); } catch (e) {}
-verifier("« Extraire le code » donne le réglage complet, prêt à coller", !!lu && lu.haut === 15 && lu.hauteur === 30 && lu.zoom === 130 && lu.devant === true, reglage.code);
+verifier("« Extraire le code » donne le réglage complet, prêt à coller", !!lu && lu.haut === 15 && lu.hauteur === 30 && lu.zoom === 130 && !("devant" in lu), reglage.code);
+const ancien = await p.evaluate(() => {
+  localStorage.setItem("ivalis_reglage_illustration_carte", JSON.stringify({ haut: 10, devant: true }));
+  const z = window.styleIllustrationCarte(window.reglageIllustrationCarte()).cadre.match(/z-index: (\d+)/)[1];
+  localStorage.removeItem("ivalis_reglage_illustration_carte");
+  return z;
+});
+verifier("un ancien réglage « devant » est ignoré : l'image reste dessous", ancien === "1", ancien);
 const gabarit = await p.evaluate(() => {
   window.COMPETENCES_CACHE["SANS_IMAGE"] = { Nom: "Sans image", Effets_Compiles: [], Composants: { actions: [] } };
   window.afficherApercuCarteHD("SANS_IMAGE");
@@ -263,9 +299,6 @@ if (process.env.CAPTURE) {
     window.COMPETENCES_CACHE["C_MAGIE"] = { ...window.__docs["Personnages/P1/Competences/C_MAGIE"], URL_Image: "https://res.cloudinary.com/x/image/upload/capture.svg" };
     window.afficherApercuCarteHD("C_MAGIE");
     window.ouvrirReglageIllustration();
-    // Ici le cadre de carte (Cloudinary) est remplacé par un aplat opaque : on
-    // passe l'image devant pour la voir.
-    document.querySelector('#panneau-reglage-illustration input[data-cle="devant"]').click();
     document.querySelector('#panneau-reglage-illustration [data-action="extraire"]').click();
   });
   await p.waitForTimeout(400);

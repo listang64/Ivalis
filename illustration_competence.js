@@ -359,28 +359,32 @@ function rafraichirCaches(commande, url) {
 //  L'IMAGE SUR LA CARTE : SON CADRAGE
 // =========================================================================
 //  Où l'illustration se pose sur la carte HD (340 × 476) : en % de la carte.
+//  Elle est TOUJOURS sous l'image de la carte (le cadre, z-index 2) et
+//  au-dessus de son fond de couleur : elle ne se voit que par la fenêtre
+//  transparente du cadre, qui la borde. Aucun réglage ne la fait passer devant.
 //  Réglable à la main par l'outil provisoire ci-dessous, en attendant que les
 //  bonnes valeurs soient figées ici.
 window.REGLAGE_ILLUSTRATION_DEFAUT = {
     haut: 10, gauche: 8, largeur: 84, hauteur: 38,   // le cadre de l'image, en % de la carte
     cadrageX: 50, cadrageY: 40,                      // le point de l'image gardé au centre (object-position)
     zoom: 100,                                       // en %
-    arrondi: 6,                                      // coins, en px
-    devant: false                                    // false : sous le cadre de la carte ; true : par-dessus
+    arrondi: 6                                       // coins, en px
 };
 const CLE_REGLAGE = "ivalis_reglage_illustration_carte";
 
 window.reglageIllustrationCarte = function() {
     let local = null;
     try { local = JSON.parse(localStorage.getItem(CLE_REGLAGE) || "null"); } catch (e) {}
-    return { ...window.REGLAGE_ILLUSTRATION_DEFAUT, ...(local || {}) };
+    const r = { ...window.REGLAGE_ILLUSTRATION_DEFAUT, ...(local || {}) };
+    delete r.devant;   // reste d'un ancien réglage : l'image ne passe jamais devant le cadre
+    return r;
 };
 
 // Le style de l'image et de son cadre, à partir d'un réglage.
 window.styleIllustrationCarte = function(r) {
     return {
         cadre: `position: absolute; top: ${r.haut}%; left: ${r.gauche}%; width: ${r.largeur}%; height: ${r.hauteur}%; `
-             + `overflow: hidden; border-radius: ${r.arrondi}px; z-index: ${r.devant ? 3 : 1}; pointer-events: none;`,
+             + `overflow: hidden; border-radius: ${r.arrondi}px; z-index: 1; pointer-events: none;`,
         image: `width: 100%; height: 100%; object-fit: cover; object-position: ${r.cadrageX}% ${r.cadrageY}%; `
              + `transform: scale(${r.zoom / 100}); transform-origin: ${r.cadrageX}% ${r.cadrageY}%; display: block;`
     };
@@ -439,7 +443,6 @@ window.ouvrirReglageIllustration = function() {
                 <input type="range" data-cle="${cle}" min="${min}" max="${max}" step="${pas}" value="${r[cle]}">
                 <b data-valeur="${cle}">${r[cle]}</b>
             </label>`).join("")}
-        <label class="reglage-illu-ligne reglage-illu-case"><input type="checkbox" data-cle="devant" ${r.devant ? "checked" : ""}> Par-dessus le cadre de la carte</label>
         <div class="reglage-illu-boutons">
             <button class="btn-parametres" data-action="illustrer">🎨 Illustrer la carte ouverte</button>
             <button class="btn-parametres" data-action="extraire">📋 Extraire le code</button>
@@ -456,11 +459,6 @@ window.ouvrirReglageIllustration = function() {
             appliquerReglage(reglage);
         };
     });
-    panneau.querySelector("input[type=checkbox]").onchange = (ev) => {
-        const reglage = window.reglageIllustrationCarte();
-        reglage.devant = ev.target.checked;
-        appliquerReglage(reglage);
-    };
     panneau.querySelector('[data-action="extraire"]').onclick = () => {
         const code = "window.REGLAGE_ILLUSTRATION_DEFAUT = " + JSON.stringify(window.reglageIllustrationCarte()) + ";";
         const zone = panneau.querySelector(".reglage-illu-code");
