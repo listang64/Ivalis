@@ -193,6 +193,9 @@ const lirePiste = () => p.evaluate(() => {
         couleurBordure: t.querySelector('div[style*="border-radius: 50%"][style*="z-index: 3"]')
           ? getComputedStyle(t.querySelector('div[style*="border-radius: 50%"][style*="z-index: 3"]')).borderTopColor
           : null,
+        couleurFond: t.querySelector('div[style*="border-radius: 50%"][style*="z-index: 3"]')
+          ? getComputedStyle(t.querySelector('div[style*="border-radius: 50%"][style*="z-index: 3"]')).backgroundColor
+          : null,
         jauges: t.querySelectorAll('div[style*="rotate(30deg)"], div[style*="rotate(-30deg)"]').length,
         etats: t.querySelectorAll('img[src*="upload"]').length - (t.querySelector("img[src*='IMG_2137']") ? 1 : 0),
         rond: !!t.querySelector('div[style*="border-radius: 50%"][style*="overflow: hidden"]'),
@@ -749,14 +752,46 @@ console.log("\n14. LE CERCLE D'INITIATIVE PREND LA COULEUR DU PALIER");
   const v = await lirePiste();
   const parId = Object.fromEntries(v.ordre.map(x => [x.id, x]));
 
-  verifier("Petit : cercle gris", parId.M_PETIT.couleurBordure === rgb("#a8a8a8"), parId.M_PETIT.couleurBordure);
-  verifier("Normal : cercle blanc", parId.M_NORMAL.couleurBordure === rgb("#ffffff"), parId.M_NORMAL.couleurBordure);
-  verifier("Élite : cercle jaune", parId.M_ELITE.couleurBordure === rgb("#f4c430"), parId.M_ELITE.couleurBordure);
-  verifier("Boss : cercle rouge", parId.M_BOSS.couleurBordure === rgb("#e63946"), parId.M_BOSS.couleurBordure);
-  verifier("le texte du chiffre suit la même couleur que la bordure (Boss)",
-           parId.M_BOSS.couleurTexte === parId.M_BOSS.couleurBordure, parId.M_BOSS.couleurTexte);
-  verifier("UN HÉROS N'A PAS DE PALIER : IL GARDE L'OR D'ORIGINE",
-           parId.H1.couleurBordure === rgb("#e8d5a5"), parId.H1.couleurBordure);
+  // LA COULEUR REMPLIT TOUT LE ROND (Nico : « plutôt que mettre la couleur
+  // sur le bord du rond, mettre la couleur partout dans le rond, et idem pour
+  // les joueurs »). Le chiffre se lit dessus : on prend, du noir ou du blanc,
+  // celui qui contraste le plus avec le fond (WCAG). Sur le rouge du Boss
+  // c'est encore le sombre : 4,5 contre 4,2 pour le blanc.
+  const SOMBRE = rgb("#1a0f08");
+  verifier("Petit : rond rempli de gris", parId.M_PETIT.couleurFond === rgb("#a8a8a8"), parId.M_PETIT.couleurFond);
+  verifier("Normal : rond rempli de blanc", parId.M_NORMAL.couleurFond === rgb("#ffffff"), parId.M_NORMAL.couleurFond);
+  verifier("Élite : rond rempli de jaune", parId.M_ELITE.couleurFond === rgb("#f4c430"), parId.M_ELITE.couleurFond);
+  verifier("Boss : rond rempli de rouge", parId.M_BOSS.couleurFond === rgb("#e63946"), parId.M_BOSS.couleurFond);
+  verifier("UN HÉROS N'A PAS DE PALIER : SON ROND EST REMPLI DE L'OR D'ORIGINE",
+           parId.H1.couleurFond === rgb("#e8d5a5"), parId.H1.couleurFond);
+  verifier("le bord n'est plus la couleur du palier (Boss)",
+           parId.M_BOSS.couleurBordure !== rgb("#e63946"), parId.M_BOSS.couleurBordure);
+  verifier("chiffre sombre sur gris, blanc, jaune, rouge et or (le plus contrasté)",
+           Object.values(parId).every(x => x.couleurTexte === SOMBRE),
+           Object.values(parId).map(x => x.couleurTexte).join(" / "));
+  verifier("le chiffre n'est plus de la couleur du rond (il s'y fondrait)",
+           Object.values(parId).every(x => x.couleurTexte !== x.couleurFond));
+  verifier("le chiffre est toujours affiché", parId.M_BOSS.initiative === "50" && parId.M_PETIT.initiative === "80",
+           `${parId.M_BOSS.initiative} ${parId.M_PETIT.initiative}`);
+  // Le choix sombre / blanc est bien le plus contrasté, sur toutes les teintes.
+  const choix = await p.evaluate(() => ["#a8a8a8", "#ffffff", "#f4c430", "#e63946", "#e8d5a5", "#1a0f08", "#3050a0"]
+    .map(h => window.texteSurCouleur(h)));
+  verifier("sur une teinte foncée (bleu nuit, brun), le chiffre passe en blanc",
+           choix[5] === "#ffffff" && choix[6] === "#ffffff", choix.join(" "));
+  // Le contraste réel entre le chiffre et son fond (WCAG) : jamais sous 4.
+  const lum = (c) => { const [r, g, bl] = c.match(/\d+/g).map(Number).map(v => { v /= 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl; };
+  const contraste = (a, z) => { const [x, y] = [lum(a), lum(z)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+  const pires = Object.values(parId).map(x => contraste(x.couleurTexte, x.couleurFond));
+  verifier("contraste chiffre / fond d'au moins 4 partout", Math.min(...pires) >= 4,
+           pires.map(c => c.toFixed(1)).join(" / "));
+  // La capture : la section 13 avait masqué les tuiles pour mesurer le voile.
+  await p.evaluate(() => document.querySelectorAll(".piste-tuile").forEach(t => { t.style.visibility = ""; }));
+  await p.waitForTimeout(300);
+  const boite = await p.evaluate(() => { const r = document.getElementById("piste-initiative").getBoundingClientRect();
+    return { x: Math.max(0, r.left - 20), y: Math.max(0, r.top - 10), width: r.width + 40, height: r.height + 20 }; });
+  await p.screenshot({ path: "/tmp/claude-0/piste_ronds_pleins.png", clip: boite });
 }
 
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

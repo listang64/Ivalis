@@ -4952,3 +4952,19 @@ réaliste que ces traits bizarres ».
   continuent la même pierre. Le pilier seul a la même pierre sur son dessus.
   geomancien.mjs (« pas un aplat » : la teinte la plus fréquente du dessus en
   couvre moins de 5 % — 83 % avec l'ancien dessus).
+
+## La piste d'initiative : des ronds pleins (version 205)
+
+Nico : « pour les ronds avec l'initiative dans la barre d'initiative, plutôt
+que mettre la couleur sur le bord du rond en fonction du niveau du monstre,
+mettre la couleur partout dans le rond, et idem pour les joueurs ».
+- LE ROND EST REMPLI de la couleur du palier (contenuTuilePiste, combat.js) :
+  gris pour un Petit, blanc pour un Normal, jaune pour un Élite, rouge pour un
+  Boss, et l'or d'origine pour un héros. Le liseré devient un fin trait sombre,
+  avec un léger relief (reflet en haut, ombre en bas).
+- LE CHIFFRE RESTE LISIBLE : texteSurCouleur choisit, du sombre ou du blanc,
+  celui qui contraste le plus avec le fond (luminance du WCAG). Sur les cinq
+  teintes actuelles c'est le sombre — même sur le rouge du Boss (4,5 contre
+  4,2 pour le blanc) ; une teinte foncée ajoutée un jour passerait en blanc.
+piste_initiative.mjs (section 14 : fond de chaque palier, bord neutre, chiffre
+sombre, contraste d'au moins 4 partout).

@@ -4921,6 +4921,16 @@ window.COULEURS_PALIER_INITIATIVE = {
     "Boss": "#e63946"
 };
 
+// Le chiffre posé sur un fond plein : sombre sur une teinte claire, blanc sur
+// une teinte foncée (luminance relative, au sens du WCAG).
+window.texteSurCouleur = function(hex) {
+    const n = parseInt(String(hex).replace("#", ""), 16);
+    const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    const L = 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+    // Le seuil où le noir et le blanc offrent le même contraste.
+    return L > 0.179 ? "#1a0f08" : "#ffffff";
+};
+
 // Le contenu d'une tuile : le portrait (hexagone pour un héros, médaillon rond
 // pour une créature), l'encart d'initiative, les deux jauges penchées, et les
 // pastilles d'état sous le tout.
@@ -4967,8 +4977,15 @@ function contenuTuilePiste(entree, cestSonTour) {
     // sans lire son nom ni ouvrir sa fiche, on sait si c'est un Petit, un
     // Normal, un Élite ou un Boss qui va jouer. Un héros n'a pas de palier
     // (voir combat_etat.js) : il garde l'or d'origine.
+    //
+    // LA COULEUR REMPLIT TOUT LE ROND, plus seulement son liseré : un fin
+    // cercle coloré se lisait mal à la taille de la piste, un disque plein se
+    // repère tout de suite. Le chiffre passe alors en sombre sur les teintes
+    // claires (gris, blanc, jaune, or), en blanc sur le rouge du Boss — sinon
+    // il disparaîtrait dans son propre fond.
     const couleurInitiative = (perso.estMonstre && window.COULEURS_PALIER_INITIATIVE[perso.Palier])
         || "#e8d5a5";
+    const texteInitiative = window.texteSurCouleur(couleurInitiative);
 
     let etatsHtml = "";
     if (perso.Etats_Alteres && perso.Etats_Alteres.length > 0) {
@@ -4980,8 +4997,8 @@ function contenuTuilePiste(entree, cestSonTour) {
     return `
         ${cestSonTour ? '<div class="piste-scintillement"></div>' : ''}
         ${portrait}
-        <div style="position: absolute; top: -3px; left: -5px; width: 23px; height: 23px; border-radius: 50%; border: 1px solid ${couleurInitiative}; background: #1a0f08; box-shadow: 0 2px 5px rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 3;">
-            <span style="color: ${couleurInitiative}; font-family: 'Cinzel', serif; font-size: 12px; font-weight: bold; text-shadow: 1px 1px 3px black, 0 0 5px ${couleurInitiative}80;">${affichageInit}</span>
+        <div style="position: absolute; top: -3px; left: -5px; width: 23px; height: 23px; border-radius: 50%; border: 1px solid rgba(26, 15, 8, 0.85); background: ${couleurInitiative}; box-shadow: 0 2px 5px rgba(0,0,0,0.9), inset 0 -2px 3px rgba(0,0,0,0.25), inset 0 1px 2px rgba(255,255,255,0.45); display: flex; align-items: center; justify-content: center; z-index: 3;">
+            <span style="color: ${texteInitiative}; font-family: 'Cinzel', serif; font-size: 12px; font-weight: bold; text-shadow: ${texteInitiative === "#ffffff" ? "1px 1px 2px rgba(0,0,0,0.8)" : "0 1px 0 rgba(255,255,255,0.35)"};">${affichageInit}</span>
         </div>
 
         <div style="position: absolute; bottom: 5px; left: -6px; width: 31px; height: 5px; background: #000; border: 1px solid #1a0f08; border-radius: 2px; transform: rotate(30deg); transform-origin: center; box-shadow: 0 2px 4px rgba(0,0,0,0.8); overflow: hidden; z-index: 3;">
