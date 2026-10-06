@@ -5065,3 +5065,22 @@ compagnon. »
   reçoit un à son prochain déploiement (poserCompagnonSurTerrain) ; l'IA
   muette, rien n'est écrit et on retentera.
 fenetre_tour.mjs (le compagnon, le zombie), compagnon_attaque.mjs.
+
+## Tir précis sur le plateau, le butin sans compagnon ni zombies (version 209)
+
+Nico : « pour le Tir précis du Pisteur, plutôt qu'une fenêtre avec les noms de
+la cible, faire cibler comme normalement sur la map » ; « le compagnon est pris
+en compte dans l'attente des joueurs pour le loot ; le compagnon et les zombies
+n'ont pas de loot ».
+- LE TIR PRÉCIS (combat.js, moteur_effets.js) : il ouvre le ciblage du plateau,
+  comme l'Assaut mortel. demarrerCiblage lui prête une Immobilisation à
+  distance (5 cases) pour l'aperçu ; les refus sont ceux de tout tir (hors de
+  portée, allié, vue obstruée). À la validation
+  (declencherResolutionAvecBondEventuel), la cible part au cerveau comme
+  technique de classe, qui pose l'état lui-même — rien d'autre ne change.
+  pisteur.mjs (13).
+- LE BUTIN (loot.js, estHerosDuButin) : le compagnon du Pisteur et les zombies
+  du Profanateur sont du camp « Allié » mais ce sont des créatures : ils ne
+  sont plus participants (ni lot, ni part de la réserve, ni XP), le butin ne
+  les attend plus, et seuls debout ils ne valent pas une victoire de héros.
+  butin_loot.mjs (16).

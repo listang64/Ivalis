@@ -541,9 +541,16 @@ window.cheminReserve = function(idPartie, difficulte) {
 // Qui touche une part ? Exactement les mêmes que dans demarrerButin — un héros
 // tombé au combat a participé, un héros mis de côté ou une illusion non.
 // Une seule définition, donc la réserve ne peut pas viser à côté.
+//
+// LES CRÉATURES DU CAMP DES HÉROS N'EN SONT PAS (Nico) : le compagnon du
+// Pisteur et les zombies du Profanateur sont « Allié », mais ce sont des
+// documents Monstres — ni lot, ni part de la réserve, ni XP, et personne ne
+// les attend pour clore le butin.
+window.estHerosDuButin = (p) => !!p && p.camp === "Allié" && !p.estIllusion && p.actif !== false
+    && !p.estMonstre && !p.compagnonDe && !p.zombie;
 window.participantsAuButin = function() {
     return (window.PERSOS_PARTIE || [])
-        .filter(p => p.camp === "Allié" && !p.estIllusion && p.actif !== false)
+        .filter(window.estHerosDuButin)
         .map(p => p.idPersonnage);
 };
 
@@ -834,7 +841,8 @@ window.verifierVictoireCombat = function() {
 
     if (!window.combatGagne()) return;
 
-    const heroVivant = (window.PERSOS_PARTIE || []).some(p => p.camp === "Allié" && !p.estIllusion && p.actif !== false
+    // Un héros, pas son compagnon ni un zombie : seuls, ils ne gagnent rien.
+    const heroVivant = (window.PERSOS_PARTIE || []).some(p => window.estHerosDuButin(p)
         && !(typeof window.estCombattantMort === "function" && window.estCombattantMort(p.idPersonnage)));
     if (!heroVivant) return;
 

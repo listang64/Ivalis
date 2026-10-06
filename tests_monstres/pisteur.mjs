@@ -468,6 +468,67 @@ console.log("\n12. AU COMBAT : IL APPARAÎT AVEC LES HÉROS, AVEC SON PION");
   verifier("debout, il n'empêche pas la victoire ; il ne rapporte pas d'XP", r.gagne === true && r.xp === 10, `${r.gagne} ${r.xp}`);
 }
 
+console.log("\n13. LE TIR PRÉCIS SE VISE SUR LE PLATEAU, COMME UN TIR ORDINAIRE");
+// Nico : « pour le Tir précis du Pisteur, plutôt qu'une fenêtre avec les noms
+// de la cible, faire ciblé comme normalement sur la map. »
+{
+  const r = await p.evaluate(async () => {
+    document.getElementById("fenetre-combat").style.display = "block";
+    window.jouerSonClic = () => {};
+    window.PLATEAU_VTT = { getCaseState: () => ({}), hexToPixel: (q, r) => ({ x: 300 + q * 60, y: 300 + r * 60 }),
+                           pixelToHex: () => ({ q: 0, r: 0 }), renderMap: () => {} };
+    window.VTT_SCALE = 1; window.VTT_POS_X = 0; window.VTT_POS_Y = 0;
+    window.PERSOS_PARTIE = [
+      { idPersonnage: "P", camp: "Allié", prenom: "Lyra", classe: "Pisteur", xp: 2500,
+        PV_Max: 40, PV_Actuels: 40, Fatigue_Max: 100, fatigueActuelle: 100, Etats_Alteres: [], statut: "Vivant" },
+      { idPersonnage: "M1", camp: "Ennemi", estMonstre: true, prenom: "Gnoll", PV_Max: 40, PV_Actuels: 40, Etats_Alteres: [], statut: "Vivant" },
+      { idPersonnage: "M2", camp: "Ennemi", estMonstre: true, prenom: "Chacal", PV_Max: 40, PV_Actuels: 40, Etats_Alteres: [], statut: "Vivant" },
+      { idPersonnage: "A1", camp: "Allié", prenom: "Cybile", PV_Max: 40, PV_Actuels: 40, Etats_Alteres: [], statut: "Vivant" }
+    ];
+    window.TOKENS_VTT_DATA = { P: { q: 0, r: 0 }, M1: { q: 4, r: 0 }, M2: { q: 7, r: 0 }, A1: { q: 0, r: 2 } };
+    window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[0]]; window.COMBAT_INDEX_PERSO = 0;
+    window.COMPETENCES_CACHE = {}; window.CACHE_COMPETENCES_GLOBAL = { P: {} };
+    window.CHEMIN_MOUVEMENT = []; window.ZONES_PERSISTANTES = {};
+    const demandes = [];
+    window.regimeDemande = { actif: () => true, enVol: () => false,
+                             techniqueClasse: (a, id, cible, cibles) => { demandes.push([a, id, cible || null, cibles || null]); } };
+    const fenetre = () => { const f = document.getElementById("fenetre-choix-rempart"); return !!f && f.style.display !== "none"; };
+    const avant = fenetre();
+    window.lancerTechniqueClasse("CLASSE_TIR_PRECIS", "P");
+    await new Promise(r => setTimeout(r, 150));
+    const st = window.ETAT_CIBLAGE || {};
+    const ciblage = { actif: !!st.actif, technique: st.techniqueClasse, fenetre: fenetre() && !avant,
+                      portee: ((st.alterations || [])[0] || {}).rangeMax, distance: ((st.alterations || [])[0] || {}).isRanged };
+    // Les refus du plateau, comme pour tout tir.
+    window.ajouterCibleCiblage("M2");   // 7 cases : hors de portée
+    window.ajouterCibleCiblage("A1");   // un allié
+    const refusees = { cible: st.cibleUnique || null };
+    // L'ennemi à 4 cases, puis la validation.
+    window.ajouterCibleCiblage("M1");
+    const choisie = st.cibleUnique;
+    await window.declencherResolutionAvecBondEventuel();
+    const ferme = !(window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif);
+    // Validé sans cible : on le dit, rien ne part.
+    const alertes = []; window.alert = (m) => alertes.push(m);
+    window.lancerTechniqueClasse("CLASSE_TIR_PRECIS", "P");
+    await new Promise(r => setTimeout(r, 150));
+    await window.declencherResolutionAvecBondEventuel();
+    const resteOuvert = !!(window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif);
+    if (typeof window.nettoyerCiblage === "function") window.nettoyerCiblage();
+    return { ciblage, refusees, choisie, ferme, demandes, alertes, resteOuvert };
+  });
+  verifier("le lancement ouvre le ciblage du plateau (plus de fenêtre de noms)",
+           r.ciblage.actif && r.ciblage.technique === "CLASSE_TIR_PRECIS" && !r.ciblage.fenetre, JSON.stringify(r.ciblage));
+  verifier("un tir à 5 cases", r.ciblage.portee === 5 && r.ciblage.distance === true, `${r.ciblage.portee} ${r.ciblage.distance}`);
+  verifier("hors de portée ou allié : refusé sur le plateau", r.refusees.cible === null, JSON.stringify(r.refusees));
+  verifier("l'ennemi à 4 cases : choisi", r.choisie === "M1", String(r.choisie));
+  verifier("validé : la cible part au cerveau comme technique de classe, le ciblage se ferme",
+           r.ferme && r.demandes.length === 1 && JSON.stringify(r.demandes[0]) === '["P","CLASSE_TIR_PRECIS","M1",null]',
+           JSON.stringify(r.demandes));
+  verifier("validé sans cible : on le dit, rien ne part", r.demandes.length === 1 && /Tir précis/.test(r.alertes[0] || "") && r.resteOuvert,
+           JSON.stringify(r.alertes));
+}
+
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
 await b.close(); serveur.close();
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

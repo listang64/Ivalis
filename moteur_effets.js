@@ -1330,6 +1330,18 @@ window.demarrerCiblage = async function(idCarte, options) {
                                     estPoison: true, malgreEsquive: true, enZone: true, cibles: [] });
     }
 
+    // LE TIR PRÉCIS (Pisteur) se vise comme une compétence ordinaire, sur le
+    // plateau (Nico : « plutôt qu'une fenêtre avec les noms de la cible »).
+    // Un ennemi à `portee` cases, en vue : l'Immobilisation n'est là que pour
+    // l'aperçu ; à la validation, la cible part au cerveau, qui pose l'état
+    // lui-même (declencherResolutionAvecBondEventuel, plus bas).
+    if (dataCarte.techniqueClasse === "CLASSE_TIR_PRECIS") {
+        const tir = (window.TECHNIQUES_CLASSE || {}).CLASSE_TIR_PRECIS || {};
+        alterationsExtraites.push({ nom: "Immobilisation", chance: 100, duree: 2, isRanged: true,
+                                    rangeMax: Math.max(1, parseInt(tir.portee) || 5),
+                                    malgreEsquive: true, cibles: [] });
+    }
+
     if (dataCarte.Composants && dataCarte.Composants.actions) {
         // Chaque effet retient si l'action qui l'a produit porte la zone. C'est
         // ce qui départage, sur une carte qui frappe ET soigne, un soin posé
@@ -3681,6 +3693,20 @@ window.declencherResolution = async function() {
 // avoir lancé la résolution de celle-ci (le jet est déjà figé côté serveur) : l'ordre de la
 // carte est respecté, et le saut interactif ne bloque jamais le lancement de l'attaque.
 window.declencherResolutionAvecBondEventuel = async function() {
+    // LE TIR PRÉCIS VISÉ : sa cible part au cerveau comme technique de classe.
+    const ciblage = window.ETAT_CIBLAGE;
+    if (ciblage && ciblage.techniqueClasse === "CLASSE_TIR_PRECIS") {
+        const idCible = ciblage.cibleUnique
+            || ((ciblage.alterations || []).find(a => (a.cibles || []).length) || { cibles: [] }).cibles[0];
+        if (!idCible) return alert("Tir précis : touchez l'ennemi à immobiliser.");
+        const idLanceur = window.lanceurDuCiblage();
+        const idCarte = ciblage.idCarte;
+        window.nettoyerCiblage();
+        if (window.regimeDemande && typeof window.regimeDemande.techniqueClasse === "function") {
+            window.regimeDemande.techniqueClasse(idLanceur, idCarte, idCible);
+        }
+        return;
+    }
     // L'attaque est visée, mais la carte porte aussi un soin à viser à part :
     // on ouvre la seconde phase au lieu de résoudre.
     if (window.passerAuCiblageDuSoutien()) return;

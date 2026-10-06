@@ -5147,7 +5147,8 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
 
     // L'Assaut mortel se vise sur le plateau : une zone de deux cases au
     // contact, qu'on tourne autour de soi (demarrerCiblage, moteur_effets.js).
-    if (t.cible === "zoneDeux") {
+    // Le Tir précis aussi, comme un tir ordinaire : un ennemi à 5 cases, en vue.
+    if (t.cible === "zoneDeux" || idCarte === "CLASSE_TIR_PRECIS") {
         if (typeof window.demarrerCiblage === "function") window.demarrerCiblage(idCarte, { idLanceur });
         return;
     }

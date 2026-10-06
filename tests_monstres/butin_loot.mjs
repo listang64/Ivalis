@@ -907,5 +907,37 @@ console.log("\n15. UNE VICTOIRE D'ÉQUIPE PROFITE À TOUTE L'ÉQUIPE, MÊME AUX 
            `(${JSON.stringify(personnages.table.J2)})`);
 }
 
+// ==========================================================================
+console.log("\n16. LE COMPAGNON ET LES ZOMBIES N'ONT PAS DE BUTIN, ET ON NE LES ATTEND PAS");
+{
+  // Nico : « pour le Pisteur, le compagnon est pris en compte dans l'attente
+  // des joueurs pour le loot ; le compagnon et les zombies n'ont pas de loot. »
+  // Tous deux sont du camp « Allié » — mais ce sont des créatures.
+  const partie = creerPartieButin({});
+  const personnages = creerPersonnagesFirestore(["J1", "J2"]);
+  const persos = [...trosHeros().slice(0, 2),
+    { idPersonnage: "COMPAGNON_J1", prenom: "Croc-Gris", camp: "Allié", estMonstre: true, compagnonDe: "J1",
+      statut: "Vivant", actif: true, PV_Actuels: 25 },
+    { idPersonnage: "M_Z", prenom: "Goule", camp: "Allié", estMonstre: true, zombie: true,
+      statut: "Vivant", actif: true, PV_Actuels: 15 }];
+  const monstres = [{ idPersonnage: "M1", camp: "Ennemi", statut: "Mort", PV_Actuels: 0, estIllusion: false }];
+  const p1 = creerPoste("P1", { partie, personnages, persos, monstres, difficulte: "Normale" });
+  const w = p1.w;
+  verifier("participants : les deux héros, ni le compagnon ni le zombie",
+           JSON.stringify(w.participantsAuButin()) === '["J1","J2"]', JSON.stringify(w.participantsAuButin()));
+  await w.demarrerButin();
+  const butin = partie.partagee.doc.Butin || {};
+  verifier("le butin ouvert n'attend qu'eux (2 participants)",
+           JSON.stringify(butin.participants) === '["J1","J2"]', JSON.stringify(butin.participants));
+  verifier("aucun lot pour le compagnon ni le zombie",
+           !(butin.parPersonnage || {}).COMPAGNON_J1 && !(butin.parPersonnage || {}).M_Z,
+           JSON.stringify(Object.keys(butin.parPersonnage || {})));
+  // Le compagnon et un zombie seuls debout : pas de butin pour autant.
+  const seuls = trosHeros().slice(0, 1).map(h => ({ ...h, statut: "Mort", PV_Actuels: 0 }));
+  w.PERSOS_PARTIE = [...seuls, ...persos.slice(2), ...monstres];
+  verifier("seule une créature alliée est debout : ce n'est pas un héros vivant",
+           !w.PERSOS_PARTIE.some(p => w.estHerosDuButin(p) && p.statut !== "Mort"));
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);
