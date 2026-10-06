@@ -92,7 +92,8 @@ console.log("\n1. L'ONGLET STATISTIQUES : RACE ET CLASSE EN TÊTE");
   await p.evaluate(() => window.afficherStatsCombat({ prenom: "Cybile", nom: "Ardente", race: "Gob", classe: "Hoplite",
                                                      PV_Max: 30, Def_Physique: 0, Def_Magique: 0 }));
   const r1 = await lire();
-  verifier("une fiche convertie : race et classe", r1.race === "Gob" && r1.classe === "Hoplite", JSON.stringify(r1));
+  // (L'Hoplite est devenu le Protecteur : la fiche affiche le nom d'aujourd'hui.)
+  verifier("une fiche convertie : race et classe", r1.race === "Gob" && r1.classe === "Protecteur", JSON.stringify(r1));
   await p.evaluate(() => window.afficherStatsCombat({ Prenom_Personnage: "Jade", Race: "Ophior", Classe: "Oracle", PV_Max: 30 }));
   const r2 = await lire();
   verifier("le document brut de la base : Race et Classe", r2.race === "Ophior" && r2.classe === "Oracle", JSON.stringify(r2));

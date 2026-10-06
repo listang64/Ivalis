@@ -254,7 +254,7 @@ RÉCIT DU JOUEUR : ${competence.Recit_RP ? `"""${competence.Recit_RP}"""` : "(au
 LE PERSONNAGE : ${[perso.prenom, perso.nom].filter(Boolean).join(" ") || "héros"}
 RACE : ${perso.race || "inconnue"}
 GENRE : ${perso.genre || "non précisé"}
-CLASSE : ${perso.classe || "aucune"}
+CLASSE : ${(typeof window.nomClasseGenre === "function" ? window.nomClasseGenre(perso.classe, perso.genre) : perso.classe) || "aucune"}
 
 IMAGES DE RÉFÉRENCE JOINTES AU DESSINATEUR :
 ${references.join("\n")}`;

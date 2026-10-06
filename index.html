@@ -1980,7 +1980,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=107"></script>
+<script src="trace_combat.js?v=108"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
      Les modules s'importent entre eux sans numéro (`from './moteur_pur.js'`).
      Sans cette carte, le navigateur les chargeait à part, à une adresse SANS
@@ -2033,18 +2033,18 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=37"></script>
 <script type="module" src="ia_master.js?v=7"></script>
-<script type="module" src="app.js?v=92"></script>
+<script type="module" src="app.js?v=93"></script>
 <script src="jet_d20.js?v=2"></script>
 <script src="fabrique_sons.js?v=3"></script>
 <script src="experience.js?v=1"></script>
-<script type="module" src="creation_personnage.js?v=16"></script>
-<script type="module" src="classes.js?v=16"></script>
+<script type="module" src="creation_personnage.js?v=17"></script>
+<script type="module" src="classes.js?v=17"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=54"></script>
 <!-- LIA, l'aide à la création de la Forge -->
 <script type="module" src="lia_forge.js?v=3"></script>
 <!-- L'illustration des compétences (prompt IA + image IA, en file) -->
-<script type="module" src="illustration_competence.js?v=7"></script>
+<script type="module" src="illustration_competence.js?v=8"></script>
 <!-- Le plateau porte désormais son ?v= comme les autres : sans lui, un iPad
      gardait l'ancien dessin en cache après une livraison (l'œil d'or en dépend). -->
 <script src="Plateau.js?v=3"></script>

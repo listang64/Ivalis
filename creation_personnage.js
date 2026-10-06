@@ -455,7 +455,10 @@ window.afficherStatsCombat = function(donnees) {
     const elRace = document.getElementById("stat-race");
     if (elRace) elRace.innerText = race || "—";
     const elClasse = document.getElementById("stat-classe");
-    if (elClasse) elClasse.innerText = classe || "—";
+    // Au féminin pour une héroïne (Sorcière, Pisteuse…) ; la fiche garde le nom de la classe.
+    const classeAffichee = typeof window.nomClasseGenre === "function"
+        ? window.nomClasseGenre(classe, donnees.genre || donnees.Genre) : classe;
+    if (elClasse) elClasse.innerText = classeAffichee || "—";
 
     // L'encart du dessous : ce que la race et la classe lui donnent.
     const elBonus = document.getElementById("encart-bonus-race-classe");

@@ -180,6 +180,7 @@ node saignement.mjs             # 🩸 Saignement (8 % physique par manche, +2 p
 node sorcier.mjs               # 🔮 le Sorcier (ex-Nécromancien) : Ténèbres + 1 case de portée + pas de malus au contact (niv. 1), Charme fratricide (niv. 5), Transfert (niv. 10) ; plus d'Ensorceleur
 node oracle.mjs                # ⏳ l'Oracle : +10 d'initiative (niv. 1), Arrêt du temps (niv. 5 : voir la file, rejouer une compétence à l'initiative choisie), Retour arrière (niv. 10 : repos long puis compétence)
 node sentinelle.mjs            # 🛡️ la Sentinelle : +6 aux attaques d'opportunité et +20 % de soins (niv. 1), Défenseur 30 % et zone de 2 cases avec allonge (niv. 5), Fureur de la sentinelle (niv. 10)
+node classes_feminin.mjs        # ♀ les noms de classe au féminin pour une héroïne (Pisteuse, Sorcière, Protectrice…) : grille, fiche de classe, statistiques ; la fiche garde le nom de la classe
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4714,3 +4715,17 @@ oracle.mjs ; bonus_race_classe, hoplite, necromancien mis à jour.
   d'une case (un mur ou un pion l'arrête ; le feu où l'on atterrit brûle).
   Refusée, non consommée, sans ennemi au contact.
 sentinelle.mjs.
+
+## Les noms de classe au féminin (version 196)
+
+Pour une héroïne (genre « Femelle »), le nom de la classe s'affiche au féminin
+quand il en a un : Pisteuse, Assassine, Chasseuse de mages, Profanatrice,
+Géomancienne, Protectrice, Sorcière. Sans féminin d'usage, inchangées :
+Sentinelle, Oracle, Vampire, Mage du chaos, Médicus, Élémentariste.
+AFFICHAGE SEULEMENT (window.nomClasseGenre, app.js) : la grille et la fiche du
+choix de classe (selon le genre choisi juste avant), l'en-tête et l'encart des
+statistiques, et la classe donnée à l'IA qui illustre les compétences. La
+fiche du personnage garde le nom de la classe (« Sorcier ») : toutes les
+règles le lisent ainsi. Les anciens noms suivent (Nécromancien → Sorcière,
+Hoplite → Protectrice).
+classes_feminin.mjs.

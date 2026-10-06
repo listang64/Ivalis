@@ -325,6 +325,12 @@ const raceEnCours = () => window.RACE_SELECTIONNEE_TEMP || "";
 window.classeInterditeIci = (c) => !!c && typeof window.classeInterditeA === "function"
     && window.classeInterditeA(raceEnCours(), c.nom);
 
+// Le nom à afficher : au féminin si l'héroïne en création est une femme
+// (validerRaceEtGenre, creation_personnage.js). Le nom retenu pour la fiche,
+// lui, reste celui de la classe (validerClasse).
+const nomAffiche = (c) => (typeof window.nomClasseGenre === "function")
+    ? window.nomClasseGenre(c.nom, window.GENRE_SELECTIONNE_TEMP) : c.nom;
+
 window.rendreGrilleClasses = function(classes) {
     const grille = document.getElementById("grille-classes");
     if (!grille) return;
@@ -332,9 +338,9 @@ window.rendreGrilleClasses = function(classes) {
         const interdite = window.classeInterditeIci(c);
         return `
         <button type="button" class="carte-classe${interdite ? " carte-classe-interdite" : ""}" data-classe="${echapper(c.id)}"${interdite ? ` data-interdite="true"` : ""}
-                onclick="jouerSonClic(); window.ouvrirFicheClasse('${echapper(c.id)}')" title="${echapper(c.nom)}${interdite ? ` — interdite aux ${echapper(raceEnCours())}s` : ""}">
-            <img class="carte-classe-image" src="${echapper(c.imageTarot)}" alt="${echapper(c.nom)}" loading="lazy">
-            <span class="carte-classe-nom">${echapper(c.nom)}</span>
+                onclick="jouerSonClic(); window.ouvrirFicheClasse('${echapper(c.id)}')" title="${echapper(nomAffiche(c))}${interdite ? ` — interdite aux ${echapper(raceEnCours())}s` : ""}">
+            <img class="carte-classe-image" src="${echapper(c.imageTarot)}" alt="${echapper(nomAffiche(c))}" loading="lazy">
+            <span class="carte-classe-nom">${echapper(nomAffiche(c))}</span>
         </button>`;
     }).join("");
 };
@@ -353,7 +359,7 @@ window.direClasseInterdite = function(c) {
         msg.id = "message-classe-interdite";
         ecran.appendChild(msg);
     }
-    msg.textContent = `Les ${raceEnCours()}s ne peuvent pas être ${c.nom}`;
+    msg.textContent = `Les ${raceEnCours()}s ne peuvent pas être ${nomAffiche(c)}`;
     msg.style.display = "block";
     clearTimeout(window.__minuteurClasseInterdite);
     window.__minuteurClasseInterdite = setTimeout(() => { msg.style.display = "none"; }, 3500);
@@ -375,8 +381,8 @@ window.ouvrirFicheClasse = function(id) {
     classeOuverte = c;
     const fond = document.getElementById("fond-fiche-classe");
     const titre = document.getElementById("titre-fiche-classe");
-    if (fond) { fond.src = c.imageFond || c.imageTarot || ""; fond.alt = c.nom; }
-    if (titre) titre.innerText = c.nom;
+    if (fond) { fond.src = c.imageFond || c.imageTarot || ""; fond.alt = nomAffiche(c); }
+    if (titre) titre.innerText = nomAffiche(c);
     const descriptif = document.getElementById("descriptif-fiche-classe");
     const html = window.rendreDescriptifClasse(c.id);
     if (descriptif) {

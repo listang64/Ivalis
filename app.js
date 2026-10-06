@@ -1112,6 +1112,29 @@ const cleClasse = (nom) => {
 // Le nom d'aujourd'hui d'une classe (« Nécromancien » → « Sorcier »).
 window.nomActuelClasse = (nom) => window.CLASSES_RENOMMEES[cleClasseBrute(nom)] || nom || "";
 
+// LE NOM DE LA CLASSE AU FÉMININ, pour une héroïne (genre « Femelle »). C'est
+// de l'AFFICHAGE seulement : la fiche garde le nom de la classe tel quel
+// (« Sorcier »), et toutes les règles le lisent ainsi. Les classes sans
+// féminin d'usage (Sentinelle, Oracle, Vampire, Mage du chaos, Médicus,
+// Élémentariste) ne changent pas.
+window.CLASSES_AU_FEMININ = {
+    "Pisteur": "Pisteuse",
+    "Assassin": "Assassine",
+    "Chasseur de mages": "Chasseuse de mages",
+    "Profanateur": "Profanatrice",
+    "Géomancien": "Géomancienne",
+    "Protecteur": "Protectrice",
+    "Sorcier": "Sorcière"
+};
+window.estGenreFeminin = (genre) => /^(f|femelle|femme|féminin|feminin)$/i.test(String(genre || "").trim());
+window.nomClasseGenre = function(nom, genre) {
+    const actuel = window.nomActuelClasse(nom);
+    if (!actuel || !window.estGenreFeminin(genre)) return actuel;
+    const cle = cleClasse(actuel);
+    const masculin = Object.keys(window.CLASSES_AU_FEMININ).find(n => cleClasse(n) === cle);
+    return masculin ? window.CLASSES_AU_FEMININ[masculin] : actuel;
+};
+
 window.paliersDeClasse = function(nomClasse) {
     const cle = cleClasse(nomClasse);
     const nom = Object.keys(window.ATOUTS_CLASSES).find(n => cleClasse(n) === cle);
@@ -1223,7 +1246,7 @@ window.detailBonusRaceClasse = function(perso) {
     const niveau = window.niveauDuPerso(perso || {});
     return {
         race: { nom: race, lignes: lignesAtout(window.atoutPeuple(perso || {})) },
-        classe: { nom: window.nomActuelClasse(classe), niveau,
+        classe: { nom: window.nomClasseGenre(classe, perso && (perso.genre || perso.Genre)), niveau,
                   paliers: window.paliersDeClasse(classe).map(p => ({
                       niveau: p.niveau, atteint: niveau >= p.niveau, lignes: lignesAtout(p) })) }
     };
