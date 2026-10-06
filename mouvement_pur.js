@@ -28,7 +28,7 @@
 
 import { clonerEtat, combattant, tomber } from './combat_etat.js';
 import { esquiveDe, paradeDe, defPhysiqueDe, bonusDesEtats, aLEtat, traverserZones, protecteurRempart,
-         ligneDeVue, caseLibre } from './moteur_pur.js';
+         ligneDeVue, caseLibre, destinationPoussee } from './moteur_pur.js';
 
 const nombre = (v, defaut = 0) => {
     const n = parseInt(v);
@@ -203,6 +203,16 @@ export function planifierTrajet(etat, id, chemin, plateau, options) {
 //  Une illusion ne frappe pas : elle n'a pas d'arme. Un combattant à terre non
 //  plus, et un allié encore moins.
 
+// LA ZONE DE MENACE d'un combattant : une case, deux pour une Sentinelle
+// (niveau 5, `allongeOpportunite`) qui tient une arme à allonge (la lance
+// lourde). C'est la zone qu'on quitte (attaque d'opportunité) ou dans laquelle
+// on entre (Défenseur).
+export function porteeDeMenace(c) {
+    return (c && c.atouts && c.atouts.allongeOpportunite && nombre(c.mod && c.mod.allonge) > 0) ? 2 : 1;
+}
+
+// Les ennemis dont la zone de menace couvre `hex` (le contact, ou deux cases
+// pour la Sentinelle à la lance).
 export function ennemisAuContact(etat, id, hex) {
     const moi = combattant(etat, id);
     if (!moi || !hex || hex.q === null) return [];
@@ -213,7 +223,8 @@ export function ennemisAuContact(etat, id, hex) {
         if (c.aTerre || c.estIllusion) continue;
         if (c.camp === moi.camp) continue;
         if (c.q === null || c.q === undefined) continue;
-        if (distance(hex, c) === 1) liste.push(autre);
+        const d = distance(hex, c);
+        if (d >= 1 && d <= porteeDeMenace(c)) liste.push(autre);
     }
     return liste;
 }
@@ -229,7 +240,10 @@ const reduireParArmure = (cible, brut) => {
     const reduction = Math.min(1, Math.max(0, defPhysiqueDe(cible)) / 100);
     return Math.max(0, Math.round(brut * (1 - reduction)));
 };
-export const degatsOpportuniteContre = (cible) => reduireParArmure(cible, DEGATS_OPPORTUNITE);
+// La Sentinelle frappe plus fort (+6, `degatsOpportunite`), avant l'armure.
+export const degatsOpportuniteBruts = (attaquant) =>
+    DEGATS_OPPORTUNITE + nombre(attaquant && attaquant.atouts && attaquant.atouts.degatsOpportunite);
+export const degatsOpportuniteContre = (cible, attaquant) => reduireParArmure(cible, degatsOpportuniteBruts(attaquant));
 
 // LE COUP D'OPPORTUNITÉ QUI PORTE : le bouclier d'abord (le surplus part dans
 // le vide), la vie ensuite, la chute éventuelle. Une seule écriture pour les
@@ -249,10 +263,11 @@ export function infligerOpportunite(etat, idCible, ennemi, coup, hex) {
     };
     const protecteur = protecteurRempart(etat, cible);
     if (protecteur) {
-        const partHoplite = Math.ceil(DEGATS_OPPORTUNITE / 2);
+        const brut = nombre(coup.brut, DEGATS_OPPORTUNITE);
+        const partHoplite = Math.ceil(brut / 2);
         etapes.push({ type: "opportunite", ...coup, hex });
         etapes.push({ type: "message", cible: protecteur.id, acteur: ennemi, texte: "🛡️ Rempart", couleur: "#e8c46a" });
-        appliquer(idCible, cible, reduireParArmure(cible, DEGATS_OPPORTUNITE - partHoplite));
+        appliquer(idCible, cible, reduireParArmure(cible, brut - partHoplite));
         appliquer(protecteur.id, protecteur, reduireParArmure(protecteur, partHoplite));
         return etapes;
     }
@@ -283,7 +298,72 @@ export function resoudreOpportunite(etat, idAttaquant, idCible, des) {
     if (evitee) return { attaquant: idAttaquant, cible: idCible, evitee: true, mot, montant: 0 };
 
     return { attaquant: idAttaquant, cible: idCible, evitee: false, mot: "",
-             montant: degatsOpportuniteContre(cible) };
+             brut: degatsOpportuniteBruts(a), montant: degatsOpportuniteContre(cible, a) };
+}
+
+// LE DÉFENSEUR (Sentinelle, niveau 5) : l'ennemi qui ENTRE de lui-même dans sa
+// zone de menace (marche, Bond, fuite de la Peur) lui donne 30 % de chance de
+// frapper — puis l'attaque d'opportunité se joue comme toute autre (esquive
+// ou parade). Un seul jet par Sentinelle et par déplacement (`tentes`), même
+// s'il sort et rentre. `exempte` ne frappe pas (le lanceur d'une Peur).
+// Mute l'état et rend les étapes.
+export function declencherDefenseurs(etat, idMobile, contactAvant, contactApres, tentes, des, hex, exempte) {
+    const etapes = [];
+    for (const ennemi of contactApres) {
+        if (contactAvant.has(ennemi) || tentes.has(ennemi) || ennemi === exempte) continue;
+        const a = combattant(etat, ennemi);
+        const chance = nombre(a && a.atouts && a.atouts.defenseur);
+        if (!a || chance <= 0 || a.aTerre || a.estIllusion) continue;
+        const mobile = combattant(etat, idMobile);
+        if (!mobile || mobile.aTerre) break;
+        tentes.add(ennemi);
+        if (des.d100() > chance) continue;
+        const coup = resoudreOpportunite(etat, ennemi, idMobile, des);
+        if (!coup) continue;
+        etapes.push({ type: "message", cible: ennemi, acteur: ennemi, texte: "🛡️ Défenseur", couleur: "#e8c46a" });
+        if (coup.evitee) etapes.push({ type: "opportunite", ...coup, hex, defenseur: true });
+        else etapes.push(...infligerOpportunite(etat, idMobile, ennemi, { ...coup, defenseur: true }, hex));
+    }
+    return etapes;
+}
+
+// LA FUREUR DE LA SENTINELLE (niveau 10) : chaque ENNEMI qui lui est adjacent
+// reçoit une attaque d'opportunité (esquive ou parade possible, +6 compris),
+// puis ceux qui tiennent encore debout sont repoussés d'une case — un mur ou
+// un pion arrête la poussée, le coup a déjà porté. Mute l'état, rend les
+// étapes (poussées comprises, et le feu où l'on atterrit).
+export function fureurDeLaSentinelle(etat, idLanceur, des, plateau) {
+    const etapes = [];
+    const moi = combattant(etat, idLanceur);
+    if (!moi || moi.aTerre) return etapes;
+    const cibles = Object.keys(etat.combattants || {}).sort().filter(id => {
+        const x = etat.combattants[id];
+        return id !== idLanceur && x && !x.aTerre && !x.estIllusion
+            && (x.camp || "Allié") !== (moi.camp || "Allié") && distance(moi, x) === 1;
+    });
+    cibles.forEach(id => {
+        const x = combattant(etat, id);
+        const coup = resoudreOpportunite(etat, idLanceur, id, des);
+        if (!coup) return;
+        const hex = { q: x.q, r: x.r };
+        if (coup.evitee) etapes.push({ type: "opportunite", ...coup, hex });
+        else etapes.push(...infligerOpportunite(etat, id, idLanceur, coup, hex));
+    });
+    cibles.forEach(id => {
+        const x = combattant(etat, id);
+        if (!x || x.aTerre) return;
+        const de = { q: nombre(x.q), r: nombre(x.r) };
+        const vers = destinationPoussee(moi, x, 1, (q, r) => caseLibre(etat, plateau, q, r, id));
+        if (!vers) {
+            etapes.push({ type: "message", cible: id, acteur: idLanceur, texte: "Poussée bloquée" });
+            return;
+        }
+        x.q = vers.q;
+        x.r = vers.r;
+        etapes.push({ type: "poussee", cible: id, acteur: idLanceur, de, vers });
+        etapes.push(...traverserZones(etat, id, vers, des));
+    });
+    return etapes;
 }
 
 // =========================================================================
@@ -312,6 +392,7 @@ export function resoudreMouvement(etat, action, des, plateau) {
     });
 
     let contactAvant = new Set(ennemisAuContact(suivant, id, { q: c.q, r: c.r }));
+    const defenseursTentes = new Set();
 
     // UN COMBATTANT QUI TOMBE EN CHEMIN S'ARRÊTE LÀ. La marche se déroulait
     // jusqu'au bout quoi qu'il arrive : un pion mis à terre par une attaque
@@ -337,6 +418,8 @@ export function resoudreMouvement(etat, action, des, plateau) {
                 etapes.push(...infligerOpportunite(suivant, id, ennemi, coup, pas.vers));
             }
         }
+        // Une Sentinelle dans la zone de laquelle on vient d'entrer.
+        etapes.push(...declencherDefenseurs(suivant, id, contactAvant, contactApres, defenseursTentes, des, pas.vers));
         contactAvant = contactApres;
 
         // LA CASE OÙ L'ON POSE LE PIED PEUT BRÛLER. Chaque case franchie
@@ -425,9 +508,13 @@ export function resoudreBond(etat, action, des, plateau) {
     }
 
     const de = { q: c.q, r: c.r };
+    const contactAvant = new Set(ennemisAuContact(suivant, id, de));
     c.q = vers.q;
     c.r = vers.r;
     etapes.push({ type: "bond", cible: id, acteur: id, de, vers: { q: vers.q, r: vers.r } });
+    // Atterrir dans la zone d'une Sentinelle : son Défenseur peut frapper.
+    etapes.push(...declencherDefenseurs(suivant, id, contactAvant, new Set(ennemisAuContact(suivant, id, vers)),
+                                        new Set(), des, { q: vers.q, r: vers.r }));
 
     // Atterrir dans le feu brûle autant que d'y entrer à pied.
     etapes.push(...traverserZones(suivant, id, vers, des));
@@ -508,6 +595,7 @@ export function resoudrePeur(etat, idLanceur, idCible, des, plateau, options) {
     // Attaques d'opportunité déclenchées en fuyant, case par case (même
     // principe qu'un déplacement volontaire), sauf de la part du lanceur.
     let contactAvant = new Set(ennemisAuContact(etat, idCible, depart).filter(id => id !== exempte));
+    const defenseursTentes = new Set();
     for (const pas of chemin) {
         const de = { q: cible.q, r: cible.r };
         cible.q = pas.q;
@@ -527,6 +615,7 @@ export function resoudrePeur(etat, idLanceur, idCible, des, plateau, options) {
                 etapes.push(...infligerOpportunite(etat, idCible, ennemi, coup, pas));
             }
         }
+        etapes.push(...declencherDefenseurs(etat, idCible, contactAvant, contactApres, defenseursTentes, des, pas, exempte));
         contactAvant = contactApres;
 
         if (cible.aTerre) break;  // Tombée en chemin : la fuite s'arrête là.
@@ -627,6 +716,15 @@ export function resoudreRepli(etat, idLanceur, vers, des, plateau, options) {
             // LE REPLI SE DÉROBE TOUJOURS : aucun dé, aucun coup ne part.
             etapes.push({ type: "opportunite", attaquant: ennemi, cible: idLanceur, evitee: true,
                           mot: "Repli 💨", montant: 0, hex: pas });
+        }
+        // Le Défenseur d'une Sentinelle dans la zone de laquelle il entre : le
+        // Repli s'en dérobe aussi, sans dé.
+        for (const ennemi of contactApres) {
+            if (contactAvant.has(ennemi)) continue;
+            const a = combattant(etat, ennemi);
+            if (!a || a.aTerre || a.estIllusion || !(nombre(a.atouts && a.atouts.defenseur) > 0)) continue;
+            etapes.push({ type: "opportunite", attaquant: ennemi, cible: idLanceur, evitee: true,
+                          mot: "Repli 💨", montant: 0, hex: pas, defenseur: true });
         }
         contactAvant = contactApres;
         if (c.aTerre) { etapes.push({ type: "trajetEcourte", acteur: idLanceur, raison: "à terre" }); break; }

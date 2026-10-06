@@ -300,7 +300,8 @@ const SCENES = {
                        CLASSE_BOUCLIER_ANTIMAGIE: "🔮 Bouclier anti-magie",
                        CLASSE_APPEL_LUMIERE: "☀️ Appel de la lumière",
                        CLASSE_ARRET_TEMPS: "⏳ Arrêt du temps",
-                       CLASSE_RETOUR_ARRIERE: "⏪ Retour arrière" };
+                       CLASSE_RETOUR_ARRIERE: "⏪ Retour arrière",
+                       CLASSE_FUREUR_SENTINELLE: "⚔️ Fureur de la sentinelle" };
         return { geste: "message", pion: e.acteur, texte: noms[e.idCarte] || "Technique de classe",
                  couleur: "#e8c46a", duree: RYTHME.message };
     },

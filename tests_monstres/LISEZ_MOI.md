@@ -179,6 +179,7 @@ node jauge_energie_carte.mjs     # ⚡ énergie sous la carte en combat (perte r
 node saignement.mjs             # 🩸 Saignement (8 % physique par manche, +2 par case), et le bouton qui met le grimoire à jour des nouvelles règles
 node sorcier.mjs               # 🔮 le Sorcier (ex-Nécromancien) : Ténèbres + 1 case de portée + pas de malus au contact (niv. 1), Charme fratricide (niv. 5), Transfert (niv. 10) ; plus d'Ensorceleur
 node oracle.mjs                # ⏳ l'Oracle : +10 d'initiative (niv. 1), Arrêt du temps (niv. 5 : voir la file, rejouer une compétence à l'initiative choisie), Retour arrière (niv. 10 : repos long puis compétence)
+node sentinelle.mjs            # 🛡️ la Sentinelle : +6 aux attaques d'opportunité et +20 % de soins (niv. 1), Défenseur 30 % et zone de 2 cases avec allonge (niv. 5), Fureur de la sentinelle (niv. 10)
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4693,3 +4694,23 @@ sorcier et chasseur_de_mages mis à jour.
 - Les bancs qui prenaient l'Oracle pour « une classe sans rien » prennent
   maintenant le Pisteur.
 oracle.mjs ; bonus_race_classe, hoplite, necromancien mis à jour.
+
+## La Sentinelle (version 195)
+
+- NIV. 1 : +6 aux dégâts de TOUTES ses attaques d'opportunité (8 → 14 avant
+  l'armure ; le Rempart partage les 14) et +20 % de soins reçus (soinsRecus,
+  comme l'Éthéré).
+- NIV. 5 : DÉFENSEUR — un ennemi qui ENTRE de lui-même dans sa zone (marche,
+  Bond, fuite de la Peur) : un jet de 30 %, puis l'attaque d'opportunité se
+  joue normalement (esquive ou parade). Un seul jet par ennemi et par
+  déplacement. Un Repli s'en dérobe sans dé ; une Poussée, une Traction ou un
+  Transfert n'en déclenchent pas. Sa ZONE DE MENACE (porteeDeMenace,
+  mouvement_pur.js) passe à 2 cases avec une arme à allonge (lance lourde) :
+  pour le Défenseur ET pour l'attaque d'opportunité classique (qui quitte ses
+  2 cases). L'allonge de l'équipement est retenue dans l'état (mod.allonge).
+- NIV. 10 : FUREUR DE LA SENTINELLE — init 20, 0 fatigue, une fois par combat :
+  chaque ENNEMI adjacent reçoit une attaque d'opportunité (dés du cerveau,
+  esquive ou parade possible), puis ceux qui tiennent debout sont repoussés
+  d'une case (un mur ou un pion l'arrête ; le feu où l'on atterrit brûle).
+  Refusée, non consommée, sans ennemi au contact.
+sentinelle.mjs.

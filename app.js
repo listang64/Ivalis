@@ -932,6 +932,16 @@ window.ATOUTS_CLASSES = {
         { niveau: 5,  techniques: ["CLASSE_BOUCLIER_ANTIMAGIE"] },
         { niveau: 10, techniques: ["CLASSE_APPEL_LUMIERE"] }
     ],
+    // LA SENTINELLE : +6 à ses attaques d'opportunité et +20 % de soins reçus
+    // (mouvement_pur.js, moteur_pur.js) ; au niveau 5, le Défenseur — 30 % de
+    // chance de frapper l'ennemi qui ENTRE dans sa zone — et cette zone portée
+    // à 2 cases avec une arme à allonge ; la Fureur de la sentinelle au
+    // niveau 10.
+    "Sentinelle": [
+        { niveau: 1,  degatsOpportunite: 6, soinsRecus: 20 },
+        { niveau: 5,  defenseur: 30, allongeOpportunite: true },
+        { niveau: 10, techniques: ["CLASSE_FUREUR_SENTINELLE"] }
+    ],
     // L'ORACLE : +10 d'initiative sur ses compétences forgées (jouerCarteCombat,
     // combat.js) ; l'Arrêt du temps au niveau 5 (voir la file, rejouer une
     // compétence à l'initiative de son choix), le Retour arrière au niveau 10
@@ -1048,6 +1058,11 @@ window.TECHNIQUES_CLASSE = {
         Nom: "Retour arrière", classe: "Oracle", niveau: 10, Initiative: 0, Fatigue: 0, cible: "avecCompetence",
         desc: "Se choisit avec une autre compétence : au début de son tour, l'Oracle prend un repos long, "
             + "puis joue cette compétence avec sa fatigue remise à jour. Une fois par combat."
+    },
+    CLASSE_FUREUR_SENTINELLE: {
+        Nom: "Fureur de la sentinelle", classe: "Sentinelle", niveau: 10, Initiative: 20, Fatigue: 0, cible: "soi",
+        desc: "Chaque ennemi adjacent reçoit une attaque d'opportunité, puis est repoussé d'une case. "
+            + "Une fois par combat."
     },
     CLASSE_PRISE_EN_CHARGE: {
         Nom: "Prise en charge par Médicus", classe: "Médicus", niveau: 10, Initiative: 0, Fatigue: 0, cible: "allieKO",
@@ -1186,6 +1201,9 @@ window.texteAtout = function(cle, valeur) {
         case "provocationAttaques": return `${n} % de chance de provoquer la cible de chacune de ses attaques`;
         case "bonusSoin":      return `${plus(n)} à chacun de ses soins`;
         case "initiative":     return `${plus(n)} d'initiative sur ses compétences`;
+        case "degatsOpportunite": return `${plus(n)} aux dégâts de ses attaques d'opportunité`;
+        case "defenseur":      return `Défenseur : ${n} % de chance de frapper l'ennemi qui entre dans sa zone`;
+        case "allongeOpportunite": return "Sa zone passe à 2 cases avec une arme à allonge (lance lourde)";
         case "brulureAggravee": return "Craint le feu : brûlé, -60 % de soins reçus et 18 % des PV max par manche (au lieu de -50 % et 8 %)";
         case "premierPasGratuit": return "La première case de chaque tour ne coûte aucune fatigue";
         case "caracs":         return Object.keys(valeur || {}).map(k => `${plus(Number(valeur[k]) || 0)} ${NOMS_CARACS_ATOUT[k] || k}`).join(" · ");

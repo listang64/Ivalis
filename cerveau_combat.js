@@ -47,7 +47,7 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
          resoudreTechniqueClasse, actionAssautMortel, actionBaiserVampire, appliquerCharme,
          actionResonanceBouclier, ennemisAuContact, tirerDirectionsAveugle } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
-         occupantVivant } from './mouvement_pur.js';
+         occupantVivant, fureurDeLaSentinelle } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche } from './ia_pure.js';
 
 // LES SUITES D'UNE CARTE LANCÉE EN ÉTAT DE CONFUSION (règle de Nico, voir
@@ -282,6 +282,11 @@ export function validerIntention(etat, intention) {
             if (!Number.isInteger(init) || init < 0 || init > 199) {
                 return refus("Arrêt du temps : l'initiative va de 0 à 199");
             }
+        }
+        // La Fureur de la sentinelle : au moins un ennemi au contact, sinon
+        // refusée (pas gâchée).
+        if (idCarte === "CLASSE_FUREUR_SENTINELLE" && ennemisAuContact(etat, acteur.id).length === 0) {
+            return refus("Fureur de la sentinelle : aucun ennemi au contact");
         }
         // La Résonance du bouclier (Protecteur) : il lui faut au moins un
         // ennemi au contact — sinon elle n'est pas gâchée, elle est refusée.
@@ -916,6 +921,11 @@ export function appliquerIntention(etat, intention, plateau) {
             const rc = resoudreCarte(suivant, action, plateau);
             suivant = clonerEtat(rc.etat);
             etapes.push(...rc.etapes);
+        }
+        // LA FUREUR DE LA SENTINELLE : une attaque d'opportunité sur chaque
+        // ennemi au contact (dés du cerveau), puis la poussée.
+        if (intention.idCarte === "CLASSE_FUREUR_SENTINELLE") {
+            etapes.push(...fureurDeLaSentinelle(suivant, intention.acteur, des, plateau));
         }
         // LA RÉSONANCE DU BOUCLIER frappe comme une carte, à coup sûr : chaque
         // ennemi au contact, 5 % de ses PV max en physique, et Étourdi.

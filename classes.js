@@ -112,6 +112,22 @@ window.DESCRIPTIFS_CLASSES = {
                        "… et leur inflige 5 % de leurs PV max en dégâts physiques · une fois par combat"] }
         ]
     },
+    CLASSE_SENTINELLE: {
+        presentation: "Rien ne passe la Sentinelle sans payer le prix. Elle garde sa place, punit "
+            + "quiconque ose s'en approcher ou s'en éloigner, et quand la mêlée l'enserre, elle la "
+            + "repousse d'un seul élan.",
+        paliers: [
+            { niveau: 1, titre: "Vigilance",
+              points: ["+6 aux dégâts de ses attaques d'opportunité", "+20 % de soins reçus"] },
+            { niveau: 5, titre: "Passif : Défenseur",
+              points: ["Un ennemi qui entre dans sa zone (case adjacente) : 30 % de chance d'une attaque d'opportunité",
+                       "Avec une arme à allonge (lance lourde), sa zone passe à 2 cases"] },
+            { niveau: 10, titre: "Technique : Fureur de la sentinelle",
+              points: ["Initiative 20 · aucune fatigue",
+                       "Une attaque d'opportunité sur chaque ennemi adjacent, puis repoussé d'une case",
+                       "Une fois par combat"] }
+        ]
+    },
     CLASSE_ORACLE: {
         presentation: "Le temps n'a pas de secret pour l'Oracle. Il voit venir chaque geste avant qu'il "
             + "ne parte, il sait arrêter l'instant pour frapper au moment juste, et revenir sur ses pas "

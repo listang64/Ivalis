@@ -196,7 +196,13 @@ export function combattantDepuisFiche(fiche, position, regles) {
         premierPasGratuit: !!race.premierPasGratuit,
         // Le Sorcier : ses sorts à distance ne perdent rien au contact
         // (chaineDeDegats, moteur_pur.js).
-        sortsSansMalusContact: !!race.sortsSansMalusContact
+        sortsSansMalusContact: !!race.sortsSansMalusContact,
+        // La Sentinelle : +6 à ses attaques d'opportunité ; au niveau 5, le
+        // Défenseur (chance de frapper qui ENTRE dans sa zone) et sa zone de
+        // menace portée à 2 cases avec une arme à allonge (mouvement_pur.js).
+        degatsOpportunite: nombre(race.degatsOpportunite),
+        defenseur: nombre(race.defenseur),
+        allongeOpportunite: !!race.allongeOpportunite
     };
     const mod = {
         // Ce que l'ÉQUIPEMENT change EN PERMANENCE, hors états altérés : le
@@ -206,7 +212,10 @@ export function combattantDepuisFiche(fiche, position, regles) {
         // porté, posée comme un état d'un tour (Repli) au moment de résoudre
         // la carte — jamais une ligne de mouvement gratuite du premier au
         // dernier tour.
-        coutDeplacement: nombre(calcul.bonusEquip(sansEtats, "coutDeplacement"))
+        coutDeplacement: nombre(calcul.bonusEquip(sansEtats, "coutDeplacement")),
+        // L'allonge de l'arme (lance lourde) : la zone de menace de la
+        // Sentinelle (porteeDeMenace, mouvement_pur.js).
+        allonge: nombre(calcul.bonusEquip(sansEtats, "allonge"))
     };
     // CE QUE L'ÉQUIPEMENT DÉCLENCHE QUAND ON JOUE UNE CARTE, plutôt que ce
     // qu'il change en continu : percer une armure, gagner de l'élan en
