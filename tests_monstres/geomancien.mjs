@@ -334,6 +334,89 @@ console.log("\n9. LE DESSIN DES MURS ET DES GRAVATS (SANS IA)");
   verifier("même mur, même dessin ; un autre, un autre", r.meme && r.autre);
 }
 
+console.log("\n9 bis. LES MURS QUI SE SUIVENT, ET LEURS BOUTS CASSÉS");
+{
+  const r = await p.evaluate(() => {
+    // Un plateau à bords plats, comme le vrai (Plateau.js).
+    const R = 60, ech = 128 / (R * 1.9);
+    const plat = (q, r) => ({ x: R * 1.5 * q, y: R * (Math.sqrt(3) / 2 * q + Math.sqrt(3) * r) });
+    const DIR = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+    const voisins = (etats) => DIR.map(([dq, dr], i) => { const a = plat(dq, dr); return { dx: a.x * ech, dy: a.y * ech, etat: etats[i] || null }; });
+    const opaques = (cv, test) => { const d = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data; let n = 0;
+      for (let y = 0; y < cv.height; y++) for (let x = 0; x < cv.width; x++) if (d[(y * cv.width + x) * 4 + 3] > 200 && test(x, y)) n++; return n; };
+    const inR = Math.hypot(plat(0, 1).x, plat(0, 1).y) / 2 * ech;          // demi-distance entre centres, en pixels du dessin
+    // Un bout de muraille qui part vers le haut (voisine (0,-1)), rien en bas.
+    const haut = window.dessinerMurTerre("A", voisins([null, null, "mur", null, null, null]), "G");
+    const sousLaCase = opaques(haut, (x, y) => y > 130 + inR + 3);
+    // La même case, avec en plus une voisine cassée en bas à droite (1,0).
+    const casse = window.dessinerMurTerre("A", voisins([null, null, "mur", null, null, null].map((e, i) => i === 0 ? "casse" : e)), "G");
+    const versLaCasse = (cv) => opaques(cv, (x, y) => { const dx = x - 64, dy = y - 130, u = plat(1, 0); const n = Math.hypot(u.x, u.y);
+      const t = (dx * u.x + dy * u.y) / n / (n * ech / 2); return t > 0.8 && t < 1 && Math.abs(dx * u.y - dy * u.x) / n < 14; });
+    // Deux cases l'une au-dessus de l'autre, composées comme sur le plateau :
+    // la roche ne s'interrompt pas sur la frontière.
+    window.PLATEAU_VTT = { hexSize: R, hexToPixel: (q, r) => ({ x: 300 + plat(q, r).x, y: 300 + plat(q, r).y }), getCaseState: () => ({}) };
+    if (!document.getElementById("transform-plateau")) { const t = document.createElement("div"); t.id = "transform-plateau"; document.body.appendChild(t); }
+    window.MURS_TERRE = { X1: { id: "X1", q: 0, r: 0, pv: 10, pvMax: 10, idLanceur: "G" }, X2: { id: "X2", q: 0, r: 1, pv: 10, pvMax: 10, idLanceur: "G" } };
+    window.GRAVATS_TERRE = {};
+    window.appliquerMursTerre();
+    const ens = document.querySelector("#calque-murs-terre canvas.murs-terre-ensemble");
+    const ox = parseFloat(ens.style.left), oy = parseFloat(ens.style.top), k = ens.width / parseFloat(ens.style.width);
+    const ctx = ens.getContext("2d");
+    // Le long de la colonne du milieu, du dessus de la case haute au dessus de la case basse.
+    const H = 62 / ech;                                                  // la hauteur de la roche, en pixels du plateau
+    let trous = 0, ecart = 0;
+    const ref = ctx.getImageData(Math.round((300 - ox) * k), Math.round((300 - H - oy) * k), 1, 1).data;
+    for (let y = 300 - H + 5; y < 300 + plat(0, 1).y - H - 5; y++) {
+      const d = ctx.getImageData(Math.round((300 - ox) * k), Math.round((y - oy) * k), 1, 1).data;
+      if (d[3] < 250) trous++;
+      ecart = Math.max(ecart, Math.abs(d[0] - ref[0]));
+    }
+    const v = window.voisinsDuMur(0, 0, ech).map(x => x.etat);
+    // Le mur du bas casse : la case haute se redessine avec un bout cassé.
+    delete window.MURS_TERRE.X2; window.GRAVATS_TERRE = { "0_1": true };
+    const vApres = window.voisinsDuMur(0, 0, ech).map(x => x.etat);
+    window.appliquerMursTerre();
+    window.MURS_TERRE = {}; window.GRAVATS_TERRE = {};
+    window.appliquerMursTerre();
+    return { sousLaCase, versHaut: opaques(haut, (x, y) => y < 130 - inR - 62 + 10), avecCasse: versLaCasse(casse), sansCasse: versLaCasse(haut),
+             trous, ecart, v: v.join(","), vApres: vApres.join(","), meme: haut.toDataURL() === window.dessinerMurTerre("A", voisins([null, null, "mur", null, null, null]), "G").toDataURL() };
+  });
+  verifier("rien ne déborde sous sa case (au sol)", r.sousLaCase === 0, String(r.sousLaCase));
+  verifier("un bras de roche monte vers la case du dessus", r.versHaut > 200, String(r.versHaut));
+  verifier("deux murs voisins : une seule roche, sans trou ni couture sur la frontière", r.trous === 0 && r.ecart <= 6, `${r.trous} / ${r.ecart}`);
+  verifier("une voisine cassée : un moignon et des éclats de son côté", r.avecCasse > 20 && r.sansCasse === 0, `${r.avecCasse} / ${r.sansCasse}`);
+  verifier("les voisines vues : « mur » puis, cassée, « casse »", /mur/.test(r.v) && !/casse/.test(r.v) && /casse/.test(r.vApres) && !/mur/.test(r.vApres),
+           `${r.v} → ${r.vApres}`);
+  verifier("même voisinage, même dessin", r.meme);
+}
+await p.evaluate(() => {
+  // La vitrine : une muraille en ligne, une en T, une coupée par un mur cassé.
+  const R = 46;
+  window.PLATEAU_VTT = { hexSize: R, hexToPixel: (q, r) => ({ x: 560 + R * 1.5 * q, y: 400 + R * (Math.sqrt(3) / 2 * q + Math.sqrt(3) * r) }), getCaseState: () => ({}) };
+  const fond = document.createElement("canvas"); fond.id = "vitrine-murailles"; fond.width = 1194; fond.height = 834;
+  fond.style.cssText = "position:fixed;left:0;top:0;z-index:99990;background:#6f8a4f";
+  const g = fond.getContext("2d"); g.strokeStyle = "rgba(255,255,255,0.22)";
+  for (let q = -14; q <= 14; q++) for (let r = -14; r <= 14; r++) { const c = PLATEAU_VTT.hexToPixel(q, r); g.beginPath();
+    for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i; i ? g.lineTo(c.x + R * Math.cos(a), c.y + R * Math.sin(a)) : g.moveTo(c.x + R * Math.cos(a), c.y + R * Math.sin(a)); }
+    g.closePath(); g.stroke(); }
+  document.body.appendChild(fond);
+  const cadre = document.createElement("div"); cadre.id = "cadre-murailles";
+  cadre.style.cssText = "position:fixed;left:0;top:0;z-index:99991";
+  document.body.appendChild(cadre);
+  const murs = {}; let n = 0; const mettre = (q, r, l = "G") => { const id = "V" + (n++); murs[id] = { id, q, r, pv: 10, pvMax: 10, idLanceur: l }; };
+  [[-8, 3], [-7, 3], [-6, 2], [-5, 2], [-4, 1], [-3, 1]].forEach(([q, r]) => mettre(q, r));
+  [[0, -4], [0, -3], [0, -2], [0, -1], [0, 0], [-1, -1], [-2, -1]].forEach(([q, r]) => mettre(q, r));
+  [[3, 1], [4, 0], [6, -1], [7, -2], [8, -2]].forEach(([q, r]) => mettre(q, r, "H"));
+  mettre(-5, -3);
+  window.MURS_TERRE = murs; window.GRAVATS_TERRE = { "5_0": true };
+  window.appliquerMursTerre();
+  cadre.appendChild(document.getElementById("calque-murs-terre"));
+});
+await p.waitForTimeout(200);
+await p.screenshot({ path: "/tmp/claude-0/geomancien_murailles.png" });
+await p.evaluate(() => { document.getElementById("vitrine-murailles").remove(); document.getElementById("cadre-murailles").remove();
+  window.MURS_TERRE = {}; window.GRAVATS_TERRE = {}; window.appliquerMursTerre(); });
+
 console.log("\n10. À L'ÉCRAN : TERRAIN, CALQUE, POSE, CIBLAGE");
 {
   const r = await p.evaluate(async () => {
@@ -359,7 +442,8 @@ console.log("\n10. À L'ÉCRAN : TERRAIN, CALQUE, POSE, CIBLAGE");
     const los = window.verifierLigneDeVueVTT({ q: 0, r: 0 }, { q: 4, r: 0 });
     window.appliquerMursTerre();
     const calque = document.getElementById("calque-murs-terre");
-    const imgs = [...calque.querySelectorAll("img.mur-terre")].length, grav = calque.querySelectorAll("img.gravats-terre").length;
+    const imgs = calque.querySelectorAll(".mur-terre[data-mur]").length, grav = calque.querySelectorAll("img.gravats-terre").length;
+    const ensemble = calque.querySelectorAll("canvas.murs-terre-ensemble").length;
     const jauges = calque.querySelectorAll(".mur-terre-jauge").length;
     // La pose.
     let envoye = null;
@@ -374,18 +458,19 @@ console.log("\n10. À L'ÉCRAN : TERRAIN, CALQUE, POSE, CIBLAGE");
     window.toucherCaseMurTerre({ q: 3, r: -3 });
     window.toucherCaseMurTerre({ q: 1, r: -2 });        // 4e : 80 > 70 d'énergie
     const compte = document.querySelector(".pose-murs-compte").textContent;
-    const projets = calque.querySelectorAll("img.mur-terre-projet").length;
+    const projets = calque.querySelectorAll(".mur-terre-projet").length;
     window.toucherCaseMurTerre({ q: 3, r: -3 });         // retiré
     window.validerPoseMursTerre();
     return { pourG: !!pourG.isBlocked, pourH: !!pourH.isBlocked, vue: !!vue.isBlocked, mur: !!vue.murTerre,
-             gravH: !!gravH.isDifficult, gravG: !!gravG.isDifficult, los, imgs, grav, jauges, bandeau, compte, projets, envoye,
+             gravH: !!gravH.isDifficult, gravG: !!gravG.isDifficult, los, imgs, grav, jauges, bandeau, compte, projets, envoye, ensemble,
              ferme: !document.getElementById("bandeau-pose-murs") };
   });
   verifier("terrain : le mur bloque les autres, pas le Géomancien (qui ne s'y arrête pas)",
            r.pourH && !r.pourG && r.vue && r.mur);
   verifier("des gravats : difficiles pour un autre, pas pour lui", r.gravH && !r.gravG);
   verifier("la ligne de vue de l'écran est coupée", r.los === false);
-  verifier("le calque : 2 murs, 1 tas de gravats, une jauge sur le mur entamé", r.imgs === 2 && r.grav === 1 && r.jauges === 1, JSON.stringify(r));
+  verifier("le calque : 2 murs (peints dans un seul canvas), 1 tas de gravats, une jauge sur le mur entamé",
+           r.imgs === 2 && r.ensemble === 1 && r.grav === 1 && r.jauges === 1, JSON.stringify(r));
   verifier("la pose : un bandeau ; trop loin et déjà muré refusés ; plus d'énergie au 4e",
            r.bandeau && /3 murs · 60 ⚡ \/ 70 ⚡/.test(r.compte) && r.projets === 3, r.compte);
   verifier("validée : la technique part avec ses cases, le bandeau se ferme",
@@ -402,7 +487,7 @@ console.log("\n10. À L'ÉCRAN : TERRAIN, CALQUE, POSE, CIBLAGE");
     window.dessinerAnneauxCiblage = () => {};
     window.ajouterCibleCiblage("MUR_B");
     const vise = phase.attaques[0].cibles.slice();
-    const classe = document.querySelector('#calque-murs-terre img[data-mur="MUR_B"]').classList.contains("mur-terre-vise");
+    const classe = document.querySelector('#calque-murs-terre [data-mur="MUR_B"]').classList.contains("mur-terre-vise");
     window.ETAT_CIBLAGE.actif = false;
     return { vise, classe };
   });

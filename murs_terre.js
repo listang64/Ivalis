@@ -260,16 +260,269 @@
         return canvas;
     };
 
+    // ---------------------------------------------------------------------
+    //  LES MURS QUI SE SUIVENT
+    // ---------------------------------------------------------------------
+    //  Un mur posé à côté d'un autre forme avec lui UNE muraille : chaque case
+    //  dessine un cœur de roche, puis un BRAS vers chaque case voisine murée,
+    //  jusqu'au milieu de leur bord commun — même largeur, même hauteur, même
+    //  teinte (celle du Géomancien) des deux côtés : les deux moitiés se
+    //  rejoignent pile sur la frontière, dans n'importe quelle direction, et
+    //  la perspective suit (la roche monte toujours vers le haut de l'écran).
+    //  Vers une voisine CASSÉE (des gravats), un moignon déchiqueté et des
+    //  éclats tombés. Rien ne sort de la case au sol.
+    //
+    //  `voisins` : les 6 directions, { dx, dy, etat } — dx, dy : le centre de
+    //  la case voisine, en pixels du dessin ; etat : "mur", "casse" ou rien.
+    const MUR_L = 128, MUR_H = 200, MUR_CX = 64, MUR_CY = 130;
+    const HAUTEUR_MUR = 62;
+    const dansPolygone = (pt, poly) => {
+        let dedans = false;
+        for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+            const a = poly[i], b = poly[j];
+            if ((a.y > pt.y) !== (b.y > pt.y) && pt.x < (b.x - a.x) * (pt.y - a.y) / (b.y - a.y) + a.x) dedans = !dedans;
+        }
+        return dedans;
+    };
+    window.dessinerMurTerre = function (graine, voisins, graineTeinte) {
+        const liens = (voisins || []).filter(v => v && (v.etat === "mur" || v.etat === "casse"));
+        const canvas = document.createElement("canvas");
+        canvas.width = MUR_L; canvas.height = MUR_H;
+        const ctx = canvas.getContext("2d");
+        // Seul, sans voisin : le pilier d'avant, posé au même pied.
+        if (liens.length === 0) {
+            ctx.drawImage(window.dessinerPilierTerre(graine), 0, MUR_CY - PIED_Y);
+            return canvas;
+        }
+        const alea = hasard(graine);
+        const aleaTeinte = hasard(graineTeinte || graine);
+        const roche = [26 + Math.floor(aleaTeinte() * 16), 44 + Math.floor(aleaTeinte() * 8), 8 + Math.floor(aleaTeinte() * 9)];
+        const rayonInt = Math.min(...(voisins || []).filter(Boolean).map(v => Math.hypot(v.dx, v.dy) / 2)) || 56;
+        const largeur = rayonInt * 0.42;
+        const pieces = [];
+        // Le cœur.
+        const nbMurs = liens.filter(v => v.etat === "mur").length;
+        const nCoeur = 7;
+        const depart = alea() * Math.PI * 2;
+        const coeur = [];
+        for (let i = 0; i < nCoeur; i++) {
+            const a = depart + (i / nCoeur) * Math.PI * 2;
+            // Un carrefour (2 bras ou plus) a un cœur plus large : pas de creux
+            // entre ses bras.
+            const rr = rayonInt * (nbMurs >= 2 ? 0.74 + alea() * 0.08 : 0.62 + alea() * 0.1);
+            coeur.push({ x: Math.cos(a) * rr, y: Math.sin(a) * rr, h: HAUTEUR_MUR + (alea() - 0.3) * 7 });
+        }
+        pieces.push({ pts: coeur, joints: new Set() });
+        const debris = [];
+        liens.forEach(v => {
+            const mx = v.dx / 2, my = v.dy / 2, d = Math.hypot(mx, my);
+            const ux = mx / d, uy = my / d, px = -uy, py = ux;
+            const P = (t, s, h) => ({ x: ux * t + px * s, y: uy * t + py * s, h });
+            if (v.etat === "mur") {
+                // Un bras jusqu'au bord : ses deux coins sur le bord sont
+                // exacts (la voisine a les mêmes), le reste un peu brut.
+                // (Quatre pixels de recouvrement sur le joint, sous la voisine : deux images
+                // bord à bord laisseraient passer un fil d'herbe.)
+                const bout = d + 4;
+                const pts = [P(0, largeur, HAUTEUR_MUR), P(d * 0.55, largeur * (0.94 + alea() * 0.1), HAUTEUR_MUR + (alea() - 0.5) * 3),
+                             P(bout, largeur, HAUTEUR_MUR), P(bout, -largeur, HAUTEUR_MUR),
+                             P(d * 0.55, -largeur * (0.94 + alea() * 0.1), HAUTEUR_MUR + (alea() - 0.5) * 3), P(0, -largeur, HAUTEUR_MUR)];
+                pieces.push({ pts, joints: new Set([2]) });       // l'arête 2→3 est le joint
+            } else {
+                // Un moignon cassé : la roche s'arrête net, en dents, plus bas.
+                const L = d * (0.5 + alea() * 0.1);
+                const pts = [P(0, largeur, HAUTEUR_MUR), P(L * (0.8 + alea() * 0.2), largeur * 0.95, HAUTEUR_MUR * (0.55 + alea() * 0.3))];
+                for (let k = 1; k <= 3; k++) {
+                    const s2 = largeur * (1 - k / 2);
+                    pts.push(P(L * (0.75 + alea() * 0.35), s2 * 0.9, HAUTEUR_MUR * (0.35 + alea() * 0.4)));
+                }
+                pts.push(P(L * (0.8 + alea() * 0.2), -largeur * 0.95, HAUTEUR_MUR * (0.55 + alea() * 0.3)), P(0, -largeur, HAUTEUR_MUR));
+                pieces.push({ pts, joints: new Set(), casse: true });
+                const n = 3 + Math.floor(alea() * 3);
+                for (let k = 0; k < n; k++) {
+                    const t = d * (0.76 + alea() * 0.14), s2 = (alea() - 0.5) * largeur * 1.4;
+                    debris.push({ x: ux * t + px * s2, y: uy * t + py * s2, r: 2.5 + alea() * 3 });
+                }
+            }
+        });
+        // LES COINS PARTAGÉS : deux voisines murées côte à côte (qui se
+        // touchent aussi entre elles) forment un triangle de murs ; chacun
+        // remplit son coin jusqu'au sommet commun des trois cases, sinon un
+        // creux reste au milieu.
+        const parAngle = (voisins || []).filter(Boolean).map(v => ({ ...v, a: Math.atan2(v.dy, v.dx) }))
+            .sort((x, y) => x.a - y.a);
+        parAngle.forEach((v, i) => {
+            const w = parAngle[(i + 1) % parAngle.length];
+            if (!w || v === w || v.etat !== "mur" || w.etat !== "mur") return;
+            let ecart = w.a - v.a; if (ecart < 0) ecart += Math.PI * 2;
+            if (ecart > Math.PI / 2) return;                      // pas deux voisines contiguës
+            const m1 = { x: v.dx / 2, y: v.dy / 2 }, m2 = { x: w.dx / 2, y: w.dy / 2 };
+            const sx = m1.x + m2.x, sy = m1.y + m2.y, ns = Math.hypot(sx, sy) || 1;
+            const rs = Math.hypot(m1.x, m1.y) / Math.cos(Math.PI / 6) + 4;
+            const sommet = { x: sx / ns * rs, y: sy / ns * rs, h: HAUTEUR_MUR };
+            pieces.push({ pts: [{ x: 0, y: 0, h: HAUTEUR_MUR }, { ...m1, h: HAUTEUR_MUR }, sommet, { ...m2, h: HAUTEUR_MUR }],
+                          joints: new Set([1, 2]) });
+        });
+        const vers = (p) => ({ x: MUR_CX + p.x, y: MUR_CY + p.y });
+        const haut = (p) => ({ x: MUR_CX + p.x, y: MUR_CY + p.y - p.h });
+        // L'ombre, sous la roche seulement.
+        ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
+        pieces.forEach(pc => {
+            ctx.beginPath();
+            pc.pts.forEach((p, k) => { const b = vers(p); k ? ctx.lineTo(b.x + 2, b.y + 2) : ctx.moveTo(b.x + 2, b.y + 2); });
+            ctx.closePath();
+            ctx.fill();
+        });
+        // LE VOLUME D'ABORD, en roche sombre : chaque arête monte de son pied à
+        // son sommet. Les angles rentrants entre le cœur et ses bras ne
+        // laissent plus voir l'herbe — juste une ombre de roche.
+        ctx.fillStyle = teinte([roche[0], roche[1] - 22], roche[2] + 4);
+        pieces.forEach(pc => {
+            const n = pc.pts.length;
+            for (let i = 0; i < n; i++) {
+                if (pc.joints.has(i)) continue;
+                const a = pc.pts[i], b = pc.pts[(i + 1) % n];
+                const ba = vers(a), bb = vers(b), hb = haut(b), ha = haut(a);
+                ctx.beginPath();
+                ctx.moveTo(ba.x, ba.y); ctx.lineTo(bb.x, bb.y); ctx.lineTo(hb.x, hb.y); ctx.lineTo(ha.x, ha.y);
+                ctx.closePath();
+                ctx.fill();
+            }
+        });
+        // Les faces de devant (tournées vers le bas de l'écran), d'arrière
+        // en avant ; ni les joints, ni les arêtes cachées dans une autre pièce.
+        const faces = [];
+        pieces.forEach((pc, ip) => {
+            const n = pc.pts.length;
+            const gx = pc.pts.reduce((t, p) => t + p.x, 0) / n, gy = pc.pts.reduce((t, p) => t + p.y, 0) / n;
+            for (let i = 0; i < n; i++) {
+                if (pc.joints.has(i)) continue;
+                const a = pc.pts[i], b = pc.pts[(i + 1) % n];
+                const ex = b.x - a.x, ey = b.y - a.y, longueur = Math.hypot(ex, ey) || 1;
+                let nx = ey / longueur, ny = -ex / longueur;
+                const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+                if (nx * (mx - gx) + ny * (my - gy) < 0) { nx = -nx; ny = -ny; }
+                const cachee = pieces.some((autre, j) => j !== ip && dansPolygone({ x: mx + nx * 0.8, y: my + ny * 0.8 }, autre.pts));
+                pc.cachees = pc.cachees || new Set();
+                if (cachee) pc.cachees.add(i);
+                if (ny <= 0.05 || cachee) continue;
+                faces.push({ a, b, y: Math.max(a.y, b.y), lumiere: -0.7 * nx - 0.7 * ny + 0.55 });
+            }
+        });
+        faces.sort((f, g) => f.y - g.y).forEach(f => {
+            const ba = vers(f.a), bb = vers(f.b), hb = haut(f.b), ha = haut(f.a);
+            const clarte = roche[1] - 6 + Math.max(-0.5, Math.min(1, f.lumiere)) * 12;
+            ctx.beginPath();
+            ctx.moveTo(ba.x, ba.y); ctx.lineTo(bb.x, bb.y); ctx.lineTo(hb.x, hb.y); ctx.lineTo(ha.x, ha.y);
+            ctx.closePath();
+            const g = ctx.createLinearGradient(0, MUR_CY - HAUTEUR_MUR, 0, MUR_CY + rayonInt);
+            g.addColorStop(0, teinte([roche[0], clarte + 8], roche[2]));
+            g.addColorStop(1, teinte([roche[0], clarte - 9], roche[2] + 4));
+            ctx.fillStyle = g;
+            ctx.fill();
+            // Une arête de pied marquée, les arêtes montantes à peine.
+            ctx.strokeStyle = "rgba(30, 24, 18, 0.5)";
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(ba.x, ba.y); ctx.lineTo(bb.x, bb.y); ctx.stroke();
+            ctx.strokeStyle = "rgba(30, 24, 18, 0.16)";
+            ctx.beginPath(); ctx.moveTo(ba.x, ba.y); ctx.lineTo(ha.x, ha.y); ctx.stroke();
+            // Strates et éclats sur la face.
+            ctx.save();
+            ctx.clip();
+            for (let k = 1; k <= 3; k++) {
+                const t = k / 4 + (alea() - 0.5) * 0.06;
+                const y0 = ba.y + (ha.y - ba.y) * t, y1 = bb.y + (hb.y - bb.y) * t;
+                ctx.strokeStyle = "rgba(35, 28, 22, 0.3)";
+                ctx.beginPath();
+                ctx.moveTo(ba.x, y0 + (alea() - 0.5) * 2);
+                ctx.lineTo((ba.x + bb.x) / 2, (y0 + y1) / 2 + (alea() - 0.5) * 3);
+                ctx.lineTo(bb.x, y1 + (alea() - 0.5) * 2);
+                ctx.stroke();
+            }
+            for (let k = 0; k < 8; k++) {
+                const u = alea(), v = alea();
+                ctx.fillStyle = alea() < 0.5 ? "rgba(255, 248, 235, 0.18)" : "rgba(20, 14, 10, 0.25)";
+                ctx.fillRect(ba.x + (bb.x - ba.x) * u, ba.y + (bb.y - ba.y) * u + (ha.y - ba.y) * v, 1.6, 1.6);
+            }
+            ctx.restore();
+        });
+        // Les dessus, d'une seule teinte (celle de la voisine aussi).
+        const dessus = teinte([roche[0], roche[1] + 9], roche[2]);
+        pieces.forEach(pc => {
+            ctx.beginPath();
+            pc.pts.forEach((p, k) => { const t = haut(p); k ? ctx.lineTo(t.x, t.y) : ctx.moveTo(t.x, t.y); });
+            ctx.closePath();
+            ctx.fillStyle = pc.casse ? teinte([roche[0], roche[1] + 3], roche[2]) : dessus;
+            ctx.fill();
+        });
+        // Le contour du dessus, sauf les joints et les arêtes fondues.
+        ctx.strokeStyle = "rgba(30, 22, 16, 0.55)";
+        ctx.lineWidth = 1.1;
+        pieces.forEach(pc => {
+            const n = pc.pts.length;
+            for (let i = 0; i < n; i++) {
+                if (pc.joints.has(i) || (pc.cachees && pc.cachees.has(i))) continue;
+                const a = haut(pc.pts[i]), b = haut(pc.pts[(i + 1) % n]);
+                ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+            }
+        });
+        // Grain et fissures du dessus.
+        ctx.save();
+        ctx.beginPath();
+        pieces.forEach(pc => pc.pts.forEach((p, k) => { const t = haut(p); k ? ctx.lineTo(t.x, t.y) : ctx.moveTo(t.x, t.y); }));
+        ctx.clip();
+        for (let k = 0; k < 50; k++) {
+            ctx.fillStyle = alea() < 0.5 ? "rgba(255, 250, 240, 0.16)" : "rgba(30, 20, 12, 0.18)";
+            ctx.fillRect(MUR_CX + (alea() - 0.5) * 2 * rayonInt, MUR_CY - HAUTEUR_MUR + (alea() - 0.5) * 2 * rayonInt, 1.5, 1.5);
+        }
+        ctx.strokeStyle = "rgba(40, 28, 18, 0.45)";
+        for (let k = 0; k < 2; k++) {
+            const a = alea() * Math.PI * 2;
+            ctx.beginPath();
+            ctx.moveTo(MUR_CX + Math.cos(a) * rayonInt * 0.4, MUR_CY - HAUTEUR_MUR + Math.sin(a) * rayonInt * 0.4);
+            ctx.lineTo(MUR_CX + (alea() - 0.5) * 8, MUR_CY - HAUTEUR_MUR + (alea() - 0.5) * 8);
+            ctx.lineTo(MUR_CX - Math.cos(a + 0.4) * rayonInt * 0.35, MUR_CY - HAUTEUR_MUR - Math.sin(a + 0.4) * rayonInt * 0.35);
+            ctx.stroke();
+        }
+        ctx.restore();
+        // Les éclats tombés au pied d'un bout cassé.
+        debris.sort((a, b) => a.y - b.y).forEach(e => {
+            const b = vers(e);
+            ombre(ctx, b.x + 1.5, b.y + 1.5, e.r * 1.5, e.r * 0.8, 0.35);
+            masse(ctx, alea, b.x, b.y, e.r, e.r * (0.6 + alea() * 0.6), [roche[0], roche[1] + 2, roche[2]]);
+        });
+        return canvas;
+    };
+
+    // Les 6 voisines d'une case de mur, vues du dessin (pixels du canvas).
+    const DIRECTIONS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+    window.voisinsDuMur = function (q, r, echelle) {
+        const ici = window.PLATEAU_VTT.hexToPixel(q, r);
+        return DIRECTIONS.map(([dq, dr]) => {
+            const la = window.PLATEAU_VTT.hexToPixel(q + dq, r + dr);
+            const etat = window.murEnCase(q + dq, r + dr) ? "mur"
+                : ((window.GRAVATS_TERRE || {})[cleCase(q + dq, r + dr)] ? "casse" : null);
+            return { dx: (la.x - ici.x) * echelle, dy: (la.y - ici.y) * echelle, etat };
+        });
+    };
+
+    // Les dessins, gardés : un canvas par mur et par voisinage (un mur qui
+    // gagne ou perd une voisine se redessine), une image par tas de gravats.
     const CACHE = new Map();
+    const tuile = (graine, voisins, graineTeinte) => {
+        const signature = (voisins || []).map(v => (v.etat || "-")[0] + Math.round(v.dx) + "," + Math.round(v.dy)).join("|");
+        const cle = "mur|" + graine + "|" + signature + "|" + (graineTeinte || "");
+        if (!CACHE.has(cle)) {
+            try { CACHE.set(cle, window.dessinerMurTerre(graine, voisins, graineTeinte)); }
+            catch (e) { CACHE.set(cle, null); }
+        }
+        return CACHE.get(cle);
+    };
     const image = (genre, graine) => {
         const cle = genre + "|" + graine;
         if (!CACHE.has(cle)) {
-            try {
-                const c = genre === "mur" ? window.dessinerPilierTerre(graine) : window.dessinerGravatsTerre(graine);
-                CACHE.set(cle, c.toDataURL("image/png"));
-            } catch (e) {
-                CACHE.set(cle, "");
-            }
+            try { CACHE.set(cle, window.dessinerGravatsTerre(graine).toDataURL("image/png")); }
+            catch (e) { CACHE.set(cle, ""); }
         }
         return CACHE.get(cle);
     };
@@ -298,24 +551,59 @@
             const src = image("gravats", cle);
             if (src) morceaux.push(`<img class="gravats-terre" alt="" src="${src}" style="left:${px.x - t / 2}px;top:${px.y - t / 2}px;width:${t}px;height:${t}px">`);
         });
-        Object.values(window.MURS_TERRE || {}).sort((a, b) => (a.r - b.r) || (a.q - b.q)).forEach(m => {
+        // TOUS LES MURS DANS UN SEUL CANVAS, du haut de l'écran vers le bas (la
+        // roche du devant passe devant). Une image par mur laissait un fil
+        // sombre à chaque raccord : le bord transparent d'une image agrandie
+        // fonce un peu. Composés ensemble, les morceaux se soudent sans couture.
+        const l = R * 1.9, h = l * MUR_H / MUR_L, echelle = MUR_L / l;
+        const yEcran = (m) => window.PLATEAU_VTT.hexToPixel(m.q, m.r).y;
+        const murs = Object.values(window.MURS_TERRE || {}).sort((a, b) => (yEcran(a) - yEcran(b)) || (a.q - b.q));
+        const projets = (window.POSE_MURS ? window.POSE_MURS.cases : []).map((c, i) => ({ ...c, projet: true, id: "projet_" + i + "_" + c.q + "_" + c.r }));
+        const tous = [...murs, ...projets].map(m => {
             const px = window.PLATEAU_VTT.hexToPixel(m.q, m.r);
-            const l = R * 1.9, h = l * HAUTEUR / LARGEUR;
-            const src = image("mur", m.id);
+            const dessin = m.projet ? tuile(m.id, null, null) : tuile(m.id, window.voisinsDuMur(m.q, m.r, echelle), m.idLanceur);
+            return { m, px, x0: px.x - l / 2, y0: px.y - h * MUR_CY / MUR_H, dessin };
+        }).filter(t => t.dessin);
+        if (tous.length > 0) {
+            const minX = Math.min(...tous.map(t => t.x0)), minY = Math.min(...tous.map(t => t.y0));
+            const maxX = Math.max(...tous.map(t => t.x0 + l)), maxY = Math.max(...tous.map(t => t.y0 + h));
+            const ensemble = document.createElement("canvas");
+            ensemble.width = Math.ceil((maxX - minX) * echelle);
+            ensemble.height = Math.ceil((maxY - minY) * echelle);
+            const ctx = ensemble.getContext("2d");
+            tous.forEach(t => {
+                ctx.save();
+                if (t.m.projet) ctx.globalAlpha = 0.55;
+                ctx.drawImage(t.dessin, (t.x0 - minX) * echelle, (t.y0 - minY) * echelle);
+                ctx.restore();
+            });
+            // Le mur visé, entouré de rouge par-dessus.
+            tous.filter(t => vise && t.m.id === vise).forEach(t => {
+                ctx.save();
+                ctx.shadowColor = "#ff4c4c";
+                ctx.shadowBlur = 14;
+                ctx.drawImage(t.dessin, (t.x0 - minX) * echelle, (t.y0 - minY) * echelle);
+                ctx.restore();
+            });
+            ensemble.className = "murs-terre-ensemble";
+            ensemble.style.cssText = `position:absolute;left:${minX}px;top:${minY}px;width:${maxX - minX}px;height:${maxY - minY}px;pointer-events:none`;
+            morceaux.push(ensemble);
+        }
+        // Une balise par mur (son nom, ses PV ; le visé), et sa jauge s'il est entamé.
+        murs.forEach(m => {
+            const px = window.PLATEAU_VTT.hexToPixel(m.q, m.r);
             const blesse = Number(m.pv) < Number(m.pvMax);
-            const jauge = blesse
-                ? `<span class="mur-terre-jauge" style="left:${px.x - R * 0.6}px;top:${px.y + R * 0.55}px;width:${R * 1.2}px">
-                     <span style="width:${Math.max(0, Math.min(100, 100 * Number(m.pv) / Number(m.pvMax)))}%"></span></span>` : "";
-            morceaux.push(`<img class="mur-terre${vise === m.id ? " mur-terre-vise" : ""}" data-mur="${m.id}" alt="Mur de terre (${m.pv} PV)" title="Mur de terre : ${m.pv} / ${m.pvMax} PV"
-                src="${src}" style="left:${px.x - l / 2}px;top:${px.y - h * PIED_Y / HAUTEUR}px;width:${l}px;height:${h}px">${jauge}`);
+            if (blesse) {
+                morceaux.push(`<span class="mur-terre-jauge" style="left:${px.x - R * 0.6}px;top:${px.y + R * 0.55}px;width:${R * 1.2}px">
+                     <span style="width:${Math.max(0, Math.min(100, 100 * Number(m.pv) / Number(m.pvMax)))}%"></span></span>`);
+            }
+            morceaux.push(`<span class="mur-terre${vise === m.id ? " mur-terre-vise" : ""}" data-mur="${m.id}" title="Mur de terre : ${m.pv} / ${m.pvMax} PV"
+                style="left:${px.x - R * 0.7}px;top:${px.y - R * 0.7}px;width:${R * 1.4}px;height:${R * 1.4}px"></span>`);
         });
-        (window.POSE_MURS ? window.POSE_MURS.cases : []).forEach((c, i) => {
-            const px = window.PLATEAU_VTT.hexToPixel(c.q, c.r);
-            const l = R * 1.9, h = l * HAUTEUR / LARGEUR;
-            const src = image("mur", "projet_" + i + "_" + c.q + "_" + c.r);
-            morceaux.push(`<img class="mur-terre mur-terre-projet" alt="" src="${src}" style="left:${px.x - l / 2}px;top:${px.y - h * PIED_Y / HAUTEUR}px;width:${l}px;height:${h}px">`);
-        });
-        calque.innerHTML = morceaux.join("");
+        projets.forEach(() => morceaux.push(`<span class="mur-terre-projet"></span>`));
+        calque.innerHTML = morceaux.filter(x => typeof x === "string").join("");
+        const ensemble = morceaux.find(x => typeof x !== "string");
+        if (ensemble) calque.insertBefore(ensemble, calque.firstChild ? calque.querySelector(".mur-terre, .mur-terre-jauge, .mur-terre-projet") : null);
     };
 
     // ---------------------------------------------------------------------

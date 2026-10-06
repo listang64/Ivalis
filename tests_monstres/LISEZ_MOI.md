@@ -4873,3 +4873,28 @@ gravats à côté ; cassés, des gravats sur la case, qui devient difficile. »
   gravats en éclats sur une tache de terre. Tiré d'une graine (l'id du mur) :
   le même sur tous les écrans.
 geomancien.mjs.
+
+## Les murs de terre qui se suivent (version 202)
+
+Nico : « quand le Géomancien crée des murs sur des hexagones adjacents, que ça
+crée visuellement un mur de pierre qui se suit ; quand un morceau est pété en
+bout ou entre, que ça redessine un bout pété ; que ça suive la direction et la
+perspective du mur — toujours sans déborder sur les autres hexagones. »
+- Chaque case de mur se dessine selon ses 6 voisines (voisinsDuMur,
+  murs_terre.js) : un cœur de roche, et un BRAS vers chaque voisine murée,
+  jusqu'au milieu de leur bord commun — même largeur, même hauteur, même
+  teinte (celle du Géomancien qui les a levés) des deux côtés : les deux
+  moitiés se rejoignent sur la frontière, dans les 6 directions, et la
+  perspective suit (la roche monte vers le haut de l'écran). Trois murs qui
+  se touchent deux à deux remplissent leur coin commun ; un carrefour a un
+  cœur plus large.
+- Vers une voisine CASSÉE (des gravats) : un moignon déchiqueté, plus bas, et
+  des éclats tombés de son côté. Le mur se redessine dès que sa voisine casse.
+- Rien ne sort de la case au sol ; seule la hauteur de la roche monte vers la
+  case du dessus (comme avant). Un mur seul garde son pilier.
+- Tous les murs sont peints ENSEMBLE dans un seul canvas
+  (.murs-terre-ensemble) : une image par mur laissait un fil sombre à chaque
+  raccord (le bord transparent d'une image agrandie fonce un peu). Chaque mur
+  garde une balise sur sa case (nom, PV, visé) ; le mur visé est entouré de
+  rouge dans le canvas.
+geomancien.mjs (section 9 bis).
