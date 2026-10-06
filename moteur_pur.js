@@ -1214,8 +1214,8 @@ export const SOIN_URGENCE = 12;
 // LE CHASSEUR DE MAGES. Bouclier anti-magie (niveau 5) : pour la manche en
 // cours et la suivante, tout coup MAGIQUE qui le frappe repart en entier sur
 // celui qui l'a lancé (avec les défenses de ce dernier) — lui n'en prend rien.
-// Appel de la lumière (niveau 10) : tous les autres combattants debout du
-// plateau, alliés compris, sont Aveuglés (2 manches, un noir chacun).
+// Appel de la lumière (niveau 10) : tout le monde sur le champ de bataille,
+// alliés et Chasseur compris, est Aveuglé (2 manches, un noir chacun).
 export const ETAT_ANTIMAGIE = "Bouclier anti-magie";
 export const MANCHES_ANTIMAGIE = 2;
 export const DESC_ANTIMAGIE = "Tout coup magique qui le frappe repart en entier sur son lanceur.";
@@ -1324,7 +1324,7 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
         const noirs = action.noirs || {};
         Object.keys(noirs).sort().forEach(v => {
             const x = combattant(suivant, v);
-            if (!x || x.aTerre || x.id === id) return;
+            if (!x || x.aTerre) return;
             if (((x.atouts && x.atouts.immunites) || []).includes(ETAT_AVEUGLE)) {
                 etapes.push({ type: "etatRate", cible: v, nom: ETAT_AVEUGLE, immunise: true });
                 return;

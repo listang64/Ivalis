@@ -260,12 +260,13 @@ export function validerIntention(etat, intention) {
             if (ennemi.aTerre || ennemi.estIllusion || ennemi.camp === acteur.camp) return refus("Charme : ennemi invalide");
             if (distance(acteur, ennemi) > 3) return refus("Charme : l'ennemi doit être à 3 cases au plus");
         }
-        // Le Transfert (Sorcier) : un ennemi debout, à 5 cases au plus — la
-        // ligne de vue ne compte pas (il se téléporte, même derrière un mur).
+        // Le Transfert (Sorcier) : un autre combattant debout, allié ou ennemi,
+        // à 5 cases au plus — la ligne de vue ne compte pas (il se téléporte,
+        // même derrière un mur).
         if (idCarte === "CLASSE_TRANSFERT") {
             const autre = combattant(etat, intention.cible);
             if (!autre) return refus("Transfert sans cible");
-            if (autre.id === acteur.id || autre.aTerre || autre.estIllusion || autre.camp === acteur.camp) return refus("Transfert : ennemi invalide");
+            if (autre.id === acteur.id || autre.aTerre || autre.estIllusion) return refus("Transfert : cible invalide");
             if (distance(acteur, autre) > 5) return refus("Transfert : la cible doit être à 5 cases au plus");
         }
         // La Résonance du bouclier (Protecteur) : il lui faut au moins un
@@ -863,11 +864,11 @@ export function appliquerIntention(etat, intention, plateau) {
     if (intention.type === "classe") {
         const cibles = intention.idCarte === "CLASSE_ASSAUT_MORTEL" ? ciblesDeLAssaut(etat, intention)
             : Array.isArray(intention.cibles) ? [...new Set(intention.cibles)] : undefined;
-        // L'APPEL DE LA LUMIÈRE : le noir de chaque combattant aveuglé se tire
-        // ici, chez le cerveau, dans l'ordre des ids.
+        // L'APPEL DE LA LUMIÈRE : tout le monde, le Chasseur compris. Le noir
+        // de chacun se tire ici, chez le cerveau, dans l'ordre des ids.
         const noirs = intention.idCarte === "CLASSE_APPEL_LUMIERE"
             ? Object.fromEntries(Object.keys(etat.combattants || {}).sort()
-                .filter(id => id !== intention.acteur && etat.combattants[id] && !etat.combattants[id].aTerre)
+                .filter(id => etat.combattants[id] && !etat.combattants[id].aTerre)
                 .map(id => [id, tirerDirectionsAveugle(des)]))
             : undefined;
         const r = resoudreTechniqueClasse(etat, { idLanceur: intention.acteur, idCarte: intention.idCarte,

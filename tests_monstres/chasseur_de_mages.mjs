@@ -16,7 +16,8 @@
 // (Max 60%) et 8% chance d'aveugler /// lvl5 : Compétence : Bouclier
 // anti-magie : 0 fatigue, sur deux tours renvoie tous les dégâts magiques à la
 // cible, INIT 200 /// lvl10 : Appel de la lumière, 0 fatigue, aveugle tous les
-// combattants sur la map. » L'aveuglement de la Lumière ne prend plus que sa
+// combattants sur la map. » (Et : « Appel de la lumière aveugle tout le monde
+// sur le champ de bataille », lui compris.) L'aveuglement de la Lumière ne prend plus que sa
 // cible.
 import fs from 'fs';
 import http from 'http';
@@ -213,10 +214,11 @@ console.log("\n3 ter. L'APPEL DE LA LUMIÈRE : TOUT LE PLATEAU AVEUGLÉ");
     verifier("niveau 9 : il ne l'a pas", !validerIntention(enTete(monde(9)), appel).ok);
     const pas = appliquerIntention(e, appel);
     const c = pas.etat.combattants;
-    verifier("ennemis ET alliés debout aveuglés, 2 manches, chacun son noir",
-             [c.M1, c.M2, c.A].every(x => aveugle(x) && aveugle(x).duree === DUREE_AVEUGLE_LUMIERE && aveugle(x).cases.length === 4));
+    verifier("ennemis, alliés ET le Chasseur aveuglés, 2 manches, chacun son noir",
+             [c.M1, c.M2, c.A, c.C].every(x => aveugle(x) && aveugle(x).duree === DUREE_AVEUGLE_LUMIERE && aveugle(x).cases.length === 4));
     verifier("le noir de M2 est autour de M2", aveugle(c.M2).cases.every(h => Math.abs(h.q - 2) <= 1 && Math.abs(h.r + 1) <= 1));
-    verifier("pas lui, pas un KO, pas un immunisé", !aveugle(c.C) && !aveugle(c.M4) && !aveugle(c.M3)
+    verifier("le noir du Chasseur est autour de lui", aveugle(c.C).cases.every(h => Math.abs(h.q) <= 1 && Math.abs(h.r) <= 1));
+    verifier("pas un KO, pas un immunisé", !aveugle(c.M4) && !aveugle(c.M3)
              && pas.entree.etapes.some(x => x.type === "etatRate" && x.cible === "M3"));
     verifier("aucune fatigue, une fois par combat", c.C.fatigue === 100 && !validerIntention(enTete(clonerEtat(pas.etat)), appel).ok);
     const rejoue = appliquerEntree(e, pas.entree).combattants;

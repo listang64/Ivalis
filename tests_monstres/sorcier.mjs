@@ -8,7 +8,8 @@
 // portée 3. Transfert (sorcier) 0 fatigue (une fois par combat) : change sa
 // place avec sa cible et se soigne de 10 PV. INIT 100, portée 5. Virer la
 // classe Ensorceleur. » Puis : « Transfert : se tp sur un ennemi même hors
-// vue, genre derrière un mur. »
+// vue, genre derrière un mur. » Et enfin : « Transfert marche idem sur tout
+// le monde » (alliés compris).
 //
 // Partie 1 : le VRAI code des règles (app.js, experience.js) et le VRAI noyau
 // (moteur_pur, combat_etat, cerveau_combat), sans navigateur.
@@ -80,8 +81,8 @@ console.log("\n1. LES PALIERS, ET L'ANCIEN NOM");
     const ch = w.TECHNIQUES_CLASSE.CLASSE_CHARME_FRATRICIDE, tr = w.TECHNIQUES_CLASSE.CLASSE_TRANSFERT;
     verifier("Charme : init 105, aucune fatigue, un ennemi à 3 cases",
              ch.Initiative === 105 && ch.Fatigue === 0 && ch.cible === "ennemi" && ch.portee === 3 && ch.niveau === 5, JSON.stringify(ch).slice(0, 120));
-    verifier("Transfert : init 100, aucune fatigue, un ennemi à 5 cases",
-             tr.Initiative === 100 && tr.Fatigue === 0 && tr.cible === "ennemi" && tr.portee === 5 && tr.niveau === 10);
+    verifier("Transfert : init 100, aucune fatigue, un combattant à 5 cases",
+             tr.Initiative === 100 && tr.Fatigue === 0 && tr.cible === "combattant" && tr.portee === 5 && tr.niveau === 10);
     verifier("un héros resté « Nécromancien » est un Sorcier",
              w.nomActuelClasse("Nécromancien") === "Sorcier" && w.nomActuelClasse("NECROMANCIEN") === "Sorcier"
              && w.atoutRace(fiche("N", { classe: "Nécromancien", xp: XP[10] })).techniques.length === 2
@@ -178,7 +179,10 @@ console.log("\n5. LE TRANSFERT");
     const transfert = (cible = "M1") => ({ id: "T1", type: "classe", acteur: "S", idCarte: "CLASSE_TRANSFERT", cible });
     const e = enTete(monde(10, { PV_Actuels: 40 }), "S", "CLASSE_TRANSFERT");
     verifier("niveau 10 : accepté sur un ennemi à 2 cases", validerIntention(e, transfert()).ok, validerIntention(e, transfert()).raison || "");
-    verifier("pas sur un allié", !validerIntention(e, transfert("H")).ok);
+    // (Nico, ensuite : « Transfert marche idem sur tout le monde. »)
+    verifier("et sur un allié à 3 cases", validerIntention(e, transfert("H")).ok, validerIntention(e, transfert("H")).raison || "");
+    const avecAllie = appliquerIntention(enTete(monde(10), "S", "CLASSE_TRANSFERT"), transfert("H")).etat.combattants;
+    verifier("…places échangées avec l'allié", pos(avecAllie.S) === "-3,0" && pos(avecAllie.H) === "0,0");
     verifier("niveau 9 : il ne l'a pas", !validerIntention(enTete(monde(9), "S", "CLASSE_TRANSFERT"), transfert()).ok);
     verifier("pas au-delà de 5 cases", !validerIntention(e, transfert("M3")).ok);
     verifier("pas sur soi", !validerIntention(e, transfert("S")).ok);
@@ -351,8 +355,8 @@ console.log("\n7. LA FENÊTRE DE CIBLAGE DES TECHNIQUES");
   verifier("un clic : la technique part sur lui", JSON.stringify(choisi) === '["S","CLASSE_CHARME_FRATRICIDE","M1"]', JSON.stringify(choisi));
   const tr = await ouvrir("CLASSE_TRANSFERT");
   await p.screenshot({ path: "/tmp/claude-0/sorcier_transfert.png" });
-  verifier("Transfert : « 🔄 Transfert », les ennemis debout à 5 cases, même hors de vue",
-           /Transfert/.test(tr.titre) && JSON.stringify([...tr.noms].sort()) === '["Gnoll","Ogre"]' , JSON.stringify(tr));
+  verifier("Transfert : « 🔄 Transfert », alliés ET ennemis debout à 5 cases",
+           /Transfert/.test(tr.titre) && JSON.stringify([...tr.noms].sort()) === '["Bran","Gnoll","Ogre"]' , JSON.stringify(tr));
 }
 
 console.log("\n8. LES CLASSES LUES EN BASE : LE NÉCROMANCIEN DEVENU SORCIER, PLUS D'ENSORCELEUR");

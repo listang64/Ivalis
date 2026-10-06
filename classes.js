@@ -89,7 +89,7 @@ window.DESCRIPTIFS_CLASSES = {
                        "Sa prochaine compétence frappe l'un de ses propres alliés",
                        "Une fois par combat"] },
             { niveau: 10, titre: "Technique : Transfert",
-              points: ["Initiative 100 · aucune fatigue · un ennemi à 5 cases, même hors de vue",
+              points: ["Initiative 100 · aucune fatigue · un combattant à 5 cases (allié ou ennemi), même hors de vue",
                        "Se téléporte à sa place (il prend la sienne), et se soigne de 10 PV",
                        "Une fois par combat"] }
         ]
@@ -183,7 +183,7 @@ window.DESCRIPTIFS_CLASSES = {
                        "Une fois par combat"] },
             { niveau: 10, titre: "Technique : Appel de la lumière",
               points: ["Initiative 100 · aucune fatigue",
-                       "Aveugle tous les combattants du plateau (alliés compris, sauf lui), 2 manches",
+                       "Aveugle tout le monde sur le champ de bataille (alliés et lui-même compris), 2 manches",
                        "Une fois par combat"] }
         ]
     }

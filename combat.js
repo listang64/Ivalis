@@ -4952,11 +4952,12 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
     // KO à côté — son pion n'est plus dessiné, mais sa case est retenue.
     // Baiser du vampire : un ENNEMI debout au contact.
     // Charme fratricide (Sorcier) : un ennemi debout à `portee` cases ou moins.
-    // Transfert (Sorcier) : un ennemi debout à `portee`, même hors de vue.
+    // Transfert (Sorcier) : n'importe quel autre combattant debout à `portee`,
+    // allié ou ennemi, même hors de vue.
     const relever = t.cible === "allieKO";
     const mordre = t.cible === "ennemiAdjacent";
     const echanger = idCarte === "CLASSE_TRANSFERT";
-    const charmer = t.cible === "ennemi" && !echanger;
+    const charmer = t.cible === "ennemi";
     const portee = Math.max(1, parseInt(t.portee) || 1);
     const lanceur = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
     const pos = (id) => (window.TOKENS_VTT_DATA || {})[id];
@@ -4965,7 +4966,8 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
     const estKO = (id) => typeof window.estCombattantMort === "function" && window.estCombattantMort(id);
     const monCamp = (lanceur || {}).camp || "Allié";
     const allies = (window.PERSOS_PARTIE || []).filter(p => p && p.idPersonnage !== idLanceur && !p.estIllusion
-        && ((mordre || charmer || echanger) ? (p.camp || "Allié") !== monCamp && !estKO(p.idPersonnage)
+        && (echanger ? !estKO(p.idPersonnage)
+            : (mordre || charmer) ? (p.camp || "Allié") !== monCamp && !estKO(p.idPersonnage)
             : !p.estMonstre && (p.camp || "Allié") === monCamp && estKO(p.idPersonnage) === relever)
         && ici && pos(p.idPersonnage)
         && ((charmer || echanger) ? dist(ici, pos(p.idPersonnage)) <= portee
@@ -4991,7 +4993,7 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
     const titre = charmer ? "🌀 Charme fratricide" : echanger ? "🔄 Transfert"
         : mordre ? "🩸 Baiser du vampire" : relever ? "✚ Prise en charge" : "🛡️ Rempart";
     const question = charmer ? "Quel ennemi charmer ? Sa prochaine technique frappera un de ses alliés."
-        : echanger ? "Sur quel ennemi vous téléporter ? (il prend votre place)"
+        : echanger ? "Avec qui échanger votre place ? (allié ou ennemi)"
         : mordre ? "Quel ennemi mordre ?" : relever ? "Quel allié relever ?" : "Quel allié protéger pendant 3 manches ?";
     const personne = (charmer || echanger)
         ? `Personne à ${portee} case${portee > 1 ? "s" : ""} ou moins. La technique n'est pas utilisée : finissez votre tour, elle resservira.`

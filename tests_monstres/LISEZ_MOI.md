@@ -4656,3 +4656,13 @@ aide_forge_lia, migration_effets, saignement et hoplite mis à jour.
   niveau 1, texte avec les 8 %).
 hoplite, chasseur_de_mages, medicus ; bonus_race_classe, choix_classe,
 aide_forge_lia, migration_effets, saignement, sorcier mis à jour.
+
+## Appel de la lumière et Transfert : sur tout le monde (version 193)
+
+Nico : « Appel de la lumière aveugle tout le monde sur le champ de bataille.
+Transfert marche idem sur tout le monde. »
+- APPEL DE LA LUMIÈRE : tous les combattants debout sont Aveuglés 2 manches,
+  alliés ET Chasseur de mages compris (chacun son noir ; immunisés épargnés).
+- TRANSFERT : n'importe quel autre combattant debout à 5 cases, allié ou
+  ennemi, toujours sans ligne de vue ; la fenêtre de ciblage les propose tous.
+sorcier et chasseur_de_mages mis à jour.

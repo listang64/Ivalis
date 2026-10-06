@@ -993,7 +993,7 @@ window.TECHNIQUES_CLASSE = {
     },
     CLASSE_APPEL_LUMIERE: {
         Nom: "Appel de la lumière", classe: "Chasseur de mages", niveau: 10, Initiative: 100, Fatigue: 0, cible: "soi",
-        desc: "Aveugle tous les combattants du plateau (alliés compris, sauf lui) pour 2 manches. Une fois par combat."
+        desc: "Aveugle tout le monde sur le champ de bataille (alliés et lui-même compris) pour 2 manches. Une fois par combat."
     },
     CLASSE_ASSAUT_MORTEL: {
         Nom: "Assaut mortel", classe: "Assassin", niveau: 5, Initiative: 100, Fatigue: 0, cible: "zoneDeux",
@@ -1020,9 +1020,9 @@ window.TECHNIQUES_CLASSE = {
             + "(au hasard, à sa portée ; aucun à portée, elle se perd). Une fois par combat."
     },
     CLASSE_TRANSFERT: {
-        Nom: "Transfert", classe: "Sorcier", niveau: 10, Initiative: 100, Fatigue: 0, cible: "ennemi", portee: 5,
-        desc: "Se téléporte à la place d'un ennemi à 5 cases, même hors de vue (derrière un mur), "
-            + "l'ennemi prenant la sienne, et se soigne de 10 PV. Une fois par combat."
+        Nom: "Transfert", classe: "Sorcier", niveau: 10, Initiative: 100, Fatigue: 0, cible: "combattant", portee: 5,
+        desc: "Se téléporte à la place d'un combattant à 5 cases (allié ou ennemi), même hors de vue "
+            + "(derrière un mur), qui prend la sienne, et se soigne de 10 PV. Une fois par combat."
     },
     CLASSE_PRISE_EN_CHARGE: {
         Nom: "Prise en charge par Médicus", classe: "Médicus", niveau: 10, Initiative: 0, Fatigue: 0, cible: "allieKO",
