@@ -275,6 +275,17 @@ console.log("\n4. EN PRÉPARATION : +10 D'INITIATIVE, LE RETOUR ARRIÈRE QUI ATT
     await window.afficherApercuCarteHD("C2", false, true);
     const choisissable = window.CARTE_APERCU && window.CARTE_APERCU.choisissable;
     const jauge = (document.querySelector("#apercu-carte-hd-competence .jauge-energie-libelle") || {}).textContent || "";
+    // LE RAFRAÎCHISSEMENT SUIVANT (Nico : « on peut sélectionner une autre
+    // compétence, mais après tout se grise, on n'a pas le temps »). Chaque
+    // nouvelle de la partie repasse par actualiserEtatCarteCombat : il
+    // regrisait C2 et la désélectionnait avec l'énergie d'AVANT le repos.
+    window.CARTE_EN_APERCU = null;   // l'aperçu ci-dessus fermé : un vrai clic de sélection
+    window.gererClicCarteCombat("C2");
+    const c2Choisie = ban("C2").dataset.actif;
+    window.actualiserEtatCarteCombat();
+    window.actualiserEtatCarteCombat();
+    const apresRafraichi = { grisee: ban("C2").classList.contains("banniere-epuisee"), actif: ban("C2").dataset.actif,
+                             c1: ban("C1").classList.contains("banniere-epuisee") };
 
     await window.jouerReposLong();
     const reposRefuse = ecrits.length === nbAvant && alertes.some(a => /Retour arrière/.test(a));
@@ -291,7 +302,7 @@ console.log("\n4. EN PRÉPARATION : +10 D'INITIATIVE, LE RETOUR ARRIÈRE QUI ATT
     const annule = window.RETOUR_ARRIERE_EN_ATTENTE;
     await window.jouerCarteCombat("C1");
     const sansRA = derniere();
-    return { ordre, c2Avant, c1, arret, rienEcrit, enAttente, c2Apres, cadreRA, fatigueChoix, choisissable, jauge,
+    return { ordre, c2Avant, c1, arret, rienEcrit, enAttente, c2Apres, cadreRA, fatigueChoix, choisissable, jauge, c2Choisie, apresRafraichi,
              reposRefuse, arretRefuse, c2, vide, annule, sansRA };
   });
   verifier("le volet : ses compétences, puis Arrêt du temps et Retour arrière, puis le repos",
@@ -303,6 +314,10 @@ console.log("\n4. EN PRÉPARATION : +10 D'INITIATIVE, LE RETOUR ARRIÈRE QUI ATT
   verifier("le repos compte déjà : C2 (70) n'est plus grisée (50 + 38 = 88)",
            r.c2Avant && !r.c2Apres && r.fatigueChoix === 88, `${r.c2Avant} ${r.c2Apres} ${r.fatigueChoix}`);
   verifier("l'aperçu de C2 : « Choisir » possible, la jauge part de 88", r.choisissable && /88/.test(r.jauge), r.jauge.replace(/\s+/g, " "));
+  verifier("C2 sélectionnée après le Retour arrière", r.c2Choisie === "true", r.c2Choisie);
+  verifier("le rafraîchissement suivant ne regrise pas C2 et ne la désélectionne pas",
+           r.apresRafraichi.grisee === false && r.apresRafraichi.actif === "true" && r.apresRafraichi.c1 === false,
+           JSON.stringify(r.apresRafraichi));
   verifier("pas de repos long en plus", r.reposRefuse);
   verifier("pas d'autre technique de classe avec lui", r.arretRefuse);
   verifier("C2 inscrite à 40 (30 + 10), marquée Retour arrière", r.c2 && r.c2.idCarte === "C2" && r.c2.initiative === 40 && r.c2.retourArriere === true,

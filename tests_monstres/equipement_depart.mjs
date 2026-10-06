@@ -55,18 +55,22 @@ console.log("1. LE FORMULAIRE PROPOSE LES BONNES FAMILLES");
              /value="Armure intermédiaire">Armure moyenne</.test(bloc));
 
     // Le formulaire ne doit proposer que des familles qui existent réellement,
-    // à l'exception d'« Arme + Bouclier » : un choix combiné du formulaire, pas
-    // une vraie famille du catalogue (voir objets.js, equipementDeDepart).
+    // à l'exception des choix « arme + bouclier » : combinés dans le formulaire,
+    // pas de vraies familles du catalogue (voir objets.js, equipementDeDepart).
     const w = {};
     new Function('window', SRC_OBJETS)(w);
     const typesReels = new Set((w.MODELES_OBJETS || []).map(m => m.type));
-    const inconnus = valeurs.filter(v => v !== "Arme + Bouclier" && !typesReels.has(v));
+    const inconnus = valeurs.filter(v => !/\+ Bouclier$/.test(v) && !typesReels.has(v));
     verifier("chaque famille proposée existe dans le catalogue",
              inconnus.length === 0, `(${inconnus.join(", ") || "aucune inconnue"})`);
     verifier("le bouclier n'est pas proposé seul : ce n'est pas une arme",
              !valeurs.includes("Bouclier"));
-    verifier("« Arme + Bouclier » est proposé",
-             valeurs.includes("Arme + Bouclier"));
+    // Nico : « pour l'arme et bouclier, faire le choix entre arme légère et
+    // bouclier ou arme lourde et bouclier ».
+    verifier("« Arme légère + Bouclier » et « Arme lourde + Bouclier » sont proposés",
+             valeurs.includes("Arme légère + Bouclier") && valeurs.includes("Arme lourde + Bouclier"));
+    verifier("l'ancien « Arme + Bouclier » sans famille n'est plus proposé",
+             !valeurs.includes("Arme + Bouclier"));
 
     // Et inversement : aucune famille d'arme du jeu ne doit manquer.
     const armesDuJeu = w.TYPES_ARMES_FORGE;
@@ -124,6 +128,11 @@ const res = await p.evaluate(({ srcObjets, srcEquiper, srcDoc, srcChamps }) => {
     // vérifier qu'aucune arme à deux mains ne s'y glisse jamais.
     const armeBouclier = [];
     for (let i = 0; i < 200; i++) armeBouclier.push(window.equipementDeDepart("Arme + Bouclier", ""));
+    const legereBouclier = [], lourdeBouclier = [];
+    for (let i = 0; i < 200; i++) {
+        legereBouclier.push(window.equipementDeDepart("Arme légère + Bouclier", ""));
+        lourdeBouclier.push(window.equipementDeDepart("Arme lourde + Bouclier", ""));
+    }
 
     // La fiche complète, telle qu'elle part en base.
     const fiches = [];
@@ -137,7 +146,7 @@ const res = await p.evaluate(({ srcObjets, srcEquiper, srcDoc, srcChamps }) => {
     }
 
     // La fiche « Arme + Bouclier » elle-même, jusqu'en base.
-    const donneesBouclier = { prenom: "Test", typeArme: "Arme + Bouclier", typeArmure: "Armure légère" };
+    const donneesBouclier = { prenom: "Test", typeArme: "Arme lourde + Bouclier", typeArmure: "Armure légère" };
     equiperLeHerosDeDepart(donneesBouclier);
     const ficheBouclier = frontVersPersoDoc(donneesBouclier, "PERSO_1");
 
@@ -153,7 +162,7 @@ const res = await p.evaluate(({ srcObjets, srcEquiper, srcDoc, srcChamps }) => {
     const bonus = window.bonusEquipement(front);
     const portes = window.objetsEquipes(front);
 
-    return { parFamille, inexistant, partiel, fiches, bonus, portes, armeBouclier, ficheBouclier,
+    return { parFamille, inexistant, partiel, fiches, bonus, portes, armeBouclier, ficheBouclier, legereBouclier, lourdeBouclier,
              cles: window.CLES_BONUS };
 }, { srcObjets: SRC_OBJETS, srcEquiper: SRC_EQUIPER, srcDoc: SRC_DOC, srcChamps: SRC_CHAMPS });
 
@@ -207,11 +216,32 @@ console.log("\n2bis. « ARME + BOUCLIER »");
              typesArmeTires.length > 1
              && new Set(res.armeBouclier.map(d => d.bouclier.modele)).size > 1);
 
+
+    // LE CHOIX DE LA FAMILLE (version 206).
+    const resume = (lot) => ({ types: [...new Set(lot.map(d => d.arme && d.arme.type))],
+                               modeles: [...new Set(lot.map(d => d.arme && d.arme.modele))].sort(),
+                               complets: lot.every(d => d.arme && d.bouclier && d.bouclier.type === "Bouclier" && !d.arme.deuxMains) });
+    const leg = resume(res.legereBouclier), lou = resume(res.lourdeBouclier);
+    verifier("« Arme légère + Bouclier » : toujours une arme légère à une main, et un bouclier",
+             leg.complets && leg.types.length === 1 && leg.types[0] === "Arme légère CAC", `${leg.types} — ${leg.modeles.join(", ")}`);
+    verifier("…dague, couteau ou épée courbée (jamais l'épée à deux mains)",
+             JSON.stringify(leg.modeles) === JSON.stringify(["Couteau", "Dague", "Épée courbée"]), leg.modeles.join(", "));
+    verifier("« Arme lourde + Bouclier » : toujours une arme lourde à une main, et un bouclier",
+             lou.complets && lou.types.length === 1 && lou.types[0] === "Arme lourde CAC", `${lou.types} — ${lou.modeles.join(", ")}`);
+    verifier("…épée courte, hache, gourdin, masse ou lance courte",
+             JSON.stringify(lou.modeles) === JSON.stringify(["Gourdin", "Hache", "Lance courte", "Masse", "Épée courte"].sort()),
+             lou.modeles.join(", "));
+    verifier("une fiche d'avant (« Arme + Bouclier ») reçoit encore son arme et son bouclier",
+             res.armeBouclier.every(d => !!d.arme && !!d.bouclier));
+
     verifier("à l'équipement, l'arme part en main droite",
              !!res.ficheBouclier.Equip_Main_Droite && !res.ficheBouclier.Equip_Main_Droite.deuxMains);
     verifier("et le bouclier en main gauche, sans écraser l'arme",
              !!res.ficheBouclier.Equip_Main_Gauche
              && res.ficheBouclier.Equip_Main_Gauche.type === "Bouclier");
+    verifier("la fiche « Arme lourde + Bouclier » porte une arme lourde",
+             res.ficheBouclier.Equip_Main_Droite && res.ficheBouclier.Equip_Main_Droite.type === "Arme lourde CAC",
+             res.ficheBouclier.Equip_Main_Droite && res.ficheBouclier.Equip_Main_Droite.type);
 }
 
 // =========================================================================

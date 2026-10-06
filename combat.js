@@ -3096,6 +3096,32 @@ window.construireIndicateursEtatsToken = function(etats, taille) {
 // une donnée de la créature, c'est une décision d'affichage.
 window.IMAGE_TOKEN_ENNEMI = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789309136/IMG_2137_mxyexl.png";
 
+// L'IMAGE DU PION D'UNE CRÉATURE, TELLE QUE LE PLATEAU LA MONTRE. La piste
+// d'initiative et la fenêtre de tour la reprennent : un zombie du Profanateur
+// doit y être un zombie (pion grignoté, zombie_token.js), un compagnon du
+// Pisteur son propre animal — pas l'image commune des ennemis.
+//
+// Rend { url, provisoire } : `provisoire` dit que le pion zombie n'est pas
+// encore dessiné (on montre l'original sous un filtre cadavérique) ; `rappel`
+// est appelé une fois, quand il l'est.
+window.imagePionCreature = function(perso, rappel) {
+    perso = perso || {};
+    const brute = (perso.compagnonDe && (perso.urlToken || perso.urlCloudinary)) || window.IMAGE_TOKEN_ENNEMI;
+    // La même URL que le plateau (taille 700) : c'est la clé du cache zombie.
+    const source = typeof window.redimensionnerImageCloudinary === "function"
+        ? window.redimensionnerImageCloudinary(brute, 700) : brute;
+    if (!perso.zombie) return { url: source, provisoire: false };
+    const id = perso.idPersonnage;
+    const pret = typeof window.imageZombieEnCache === "function" ? window.imageZombieEnCache(source, id) : null;
+    if (pret) return { url: pret, provisoire: false };
+    if (typeof window.imageZombie === "function") {
+        window.imageZombie(source, id).then(url => { if (url && typeof rappel === "function") rappel(); });
+    }
+    return { url: source, provisoire: true };
+};
+// Le filtre du pion zombie en attendant son dessin (le même que le plateau).
+window.FILTRE_ZOMBIE_PROVISOIRE = "grayscale(0.6) sepia(0.4) hue-rotate(50deg) brightness(0.85)";
+
 // LES FANTÔMES DES ALLIÉS KO, pour le seul Médicus. Le poste qui commande un
 // Médicus voit, à très faible opacité, les alliés tombés de son camp ; les
 // autres postes ne voient rien (leur pion disparaît, comme toujours).
@@ -4955,16 +4981,25 @@ function contenuTuilePiste(entree, cestSonTour) {
     // sa fiche : c'est ce token-là qu'on reconnaît en un coup d'œil sur la
     // carte, et la piste doit montrer la même chose. L'hexagone doré n'a plus
     // de raison de traiter les deux camps différemment.
+    //
+    // UN ZOMBIE Y EST UN ZOMBIE, un compagnon son animal : la créature reprend
+    // l'image de son pion (imagePionCreature). Tant que le pion zombie se
+    // dessine, l'original passe sous le filtre cadavérique, puis la piste se
+    // redessine d'elle-même.
     const estEnnemi = !!perso.estMonstre && !perso.estIllusion;
+    const pion = estEnnemi && typeof window.imagePionCreature === "function"
+        ? window.imagePionCreature(perso, () => window.afficherPisteInitiative())
+        : null;
     const imgUrl = estEnnemi
-        ? window.IMAGE_TOKEN_ENNEMI
+        ? (pion ? pion.url : window.IMAGE_TOKEN_ENNEMI)
         : (((window.TOKENS_VTT_DATA || {})[perso.idPersonnage] || {}).url
            || perso.urlCloudinary
            || "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1786114507/Les_humains_h0ubwh.png");
+    const filtrePion = pion && pion.provisoire ? ` filter: ${window.FILTRE_ZOMBIE_PROVISOIRE};` : "";
 
     const portrait = `<div style="position: absolute; top: ${Math.round((H - L) / 2)}px; left: 0; width: ${L}px; height: ${L}px;
                        border-radius: 50%; overflow: hidden; z-index: 1;">
-               <img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: contain;">
+               <img src="${imgUrl}"${perso.zombie ? ' class="piste-zombie"' : ""} style="width: 100%; height: 100%; object-fit: contain;${filtrePion}">
            </div>`;
 
     // Le chiffre d'initiative, dans le même petit encart pour tout le monde.
@@ -5596,13 +5631,19 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
         // n'en charge qu'un morceau. Sans repli, `url` valait `undefined`, la
         // garde « a-t-elle changé ? » comparait undefined à undefined, l'image
         // n'était jamais posée, et le pion restait vide sans un mot.
+        // Une créature : l'image de SON pion — un zombie y est un zombie.
+        const pionCreature = estCreature && typeof window.imagePionCreature === "function"
+            ? window.imagePionCreature(perso, () => window.rafraichirVoileTour(queueParam, phaseParam))
+            : null;
         const url = (estCreature
-            ? window.IMAGE_TOKEN_ENNEMI
+            ? (pionCreature ? pionCreature.url : window.IMAGE_TOKEN_ENNEMI)
             : perso.urlCloudinary)
             || "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1786114507/Les_humains_h0ubwh.png";
         // Réécrire `src` à chaque battement relancerait le chargement de
         // l'image, et le pion clignoterait pendant tout le tour.
         if (elPion.dataset.url !== url) { elPion.dataset.url = url; elPion.src = url; }
+        const filtre = pionCreature && pionCreature.provisoire ? window.FILTRE_ZOMBIE_PROVISOIRE : "";
+        if (elPion.style.filter !== filtre) elPion.style.filter = filtre;
     }
 
     const elNom = document.getElementById("voile-tour-nom");
@@ -5728,9 +5769,13 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
     if (window.CARTE_EN_APERCU && !(persoInQueue && persoInQueue.idCarte)) {
         const dataSel = window.COMPETENCES_CACHE[window.CARTE_EN_APERCU];
         const coutSel = parseInt(dataSel?.Fatigue) || 0;
-        const fatigueRestante = persoActuel.fatigueActuelle !== undefined
+        // Le repos d'un Retour arrière en attente compte déjà (Oracle) : sans
+        // lui, la compétence choisie après le Retour arrière était
+        // désélectionnée au rafraîchissement suivant, quelques secondes après.
+        const fatigueRestante = (persoActuel.fatigueActuelle !== undefined
             ? parseInt(persoActuel.fatigueActuelle)
-            : (window.COMBAT_FATIGUE_ACTUELLE || 0);
+            : (window.COMBAT_FATIGUE_ACTUELLE || 0))
+            + (typeof window.bonusRetourArriere === "function" ? window.bonusRetourArriere(persoActuel) : 0);
         if (coutSel > fatigueRestante) {
             window.COUT_COMPETENCE_SELECTIONNEE = 0;
             document.querySelectorAll('.banniere-carte-combat').forEach(el => {
@@ -5802,7 +5847,13 @@ window.actualiserBannieresEpuisees = function() {
     if (!persoActuel) return;
     
     const fatigueMax = window.fatigueMaxCombattant(persoActuel);
-    const fatiguePerso = persoActuel.fatigueActuelle !== undefined ? parseInt(persoActuel.fatigueActuelle) : fatigueMax;
+    // LE RETOUR ARRIÈRE EN ATTENTE COMPTE ICI AUSSI. Le volet était dessiné avec
+    // l'énergie d'après le repos (fatiguePourChoisir), puis ce rafraîchissement
+    // — à chaque nouvelle de la partie — regrisait tout avec l'énergie d'avant :
+    // l'Oracle voyait ses compétences s'éteindre quelques secondes après avoir
+    // choisi son Retour arrière, sans avoir le temps d'en prendre une.
+    const fatiguePerso = (persoActuel.fatigueActuelle !== undefined ? parseInt(persoActuel.fatigueActuelle) : fatigueMax)
+        + (typeof window.bonusRetourArriere === "function" ? window.bonusRetourArriere(persoActuel) : 0);
 
     const liste = document.getElementById("combat-liste-competences");
     if (!liste) return;
@@ -5826,7 +5877,11 @@ window.actualiserBannieresEpuisees = function() {
             }
 
             // Une technique de classe déjà jouée reste grisée, quel que soit le coût.
-            if (coutFatigue > fatiguePerso || ban.dataset.techniqueUtilisee === "true") {
+            // Une carte que l'arme en main interdit aussi : le volet la grise à
+            // l'ouverture, ce rafraîchissement la rallumait.
+            const blocageArme = typeof window.raisonBlocageCarte === "function"
+                ? window.raisonBlocageCarte(persoActuel, dataCarte.Arme) : null;
+            if (coutFatigue > fatiguePerso || ban.dataset.techniqueUtilisee === "true" || blocageArme) {
                 ban.classList.add("banniere-epuisee");
                 if (cadre) cadre.style.backgroundImage = `url('${IMAGE_CADRE_EPUISE}')`;
             } else {

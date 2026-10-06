@@ -51,7 +51,7 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant, fureurDeLaSentinelle, voisinsDe } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche, casesAccessibles,
-         ennemiAtteignable } from './ia_pure.js';
+         ennemiAtteignable, pasJusquAuContact } from './ia_pure.js';
 
 // LES SUITES D'UNE CARTE LANCÉE EN ÉTAT DE CONFUSION (règle de Nico, voir
 // appliquerConfusion) : après la carte, le 3e jet le fait FUIR comme sous la
@@ -1400,9 +1400,18 @@ function murAFrapper(etat, id, carte, plateau) {
 
 // LE TOUR D'UN SERVITEUR : le zombie du Profanateur (niveau 5) ou le
 // compagnon du Pisteur (niveau 1). Pas de carte : il marche jusqu'à `pas`
-// cases vers l'ennemi le plus proche (sans payer de fatigue), puis le frappe
-// s'il est au contact — que la cible peut esquiver ou parer ; l'armure réduit
-// la morsure du zombie, pas le coup (brut) du compagnon. Puis son tour se clôt.
+// cases (sans payer de fatigue), puis frappe un ennemi au contact — que la
+// cible peut esquiver ou parer ; l'armure réduit la morsure du zombie, pas le
+// coup (brut) du compagnon. Puis son tour se clôt.
+//
+// IL VA OÙ IL PEUT FRAPPER, PAS VERS LE PLUS PROCHE À VOL D'OISEAU. Il
+// visait l'ennemi le plus proche en ligne droite et cherchait à s'en
+// rapprocher ; si celui-là était cerné, aucune case n'était « plus près » et
+// le zombie renonçait sur place — alors qu'un autre ennemi, à deux cases
+// aussi, l'attendait à un pas (partie réelle, manche 4). Il compte désormais
+// les pas À PIED jusqu'au contact de n'importe quel ennemi (pasJusquAuContact,
+// ia_pure.js) : une case d'où il peut frapper d'abord, la plus proche du
+// contact sinon.
 const MORSURE_ZOMBIE = { pas: ZOMBIE.pas, degats: ZOMBIE.degats, brut: false, idCarte: "ZOMBIE_MORSURE",
                          nom: "Morsure", quoi: "zombie" };
 const ATTAQUE_COMPAGNON = { pas: COMPAGNON.pas, degats: COMPAGNON.degats, brut: true, idCarte: "COMPAGNON_ATTAQUE",
@@ -1413,21 +1422,34 @@ function jouerServiteur(etat, id, plateau, regle) {
     const etapes = [];
     const moi = combattant(etat, id);
     if (!moi || moi.aTerre) return null;
-    const cible = ennemiLePlusProche(etat, id);
-    if (cible && distance(moi, cible) > 1) {
+    const ennemis = (e) => Object.values(e.combattants || {}).filter(c => c && c.camp !== moi.camp && !c.aTerre
+                                    && !c.estIllusion && c.q !== null && c.q !== undefined);
+    const auContact = (h, e) => ennemis(e).filter(c => distance(h, c) === 1);
+    if (ennemis(etat).length > 0 && auContact(moi, etat).length === 0) {
+        const aPied = pasJusquAuContact(etat, id, plateau);
+        const versContact = (h) => { const d = aPied.get(`${h.q},${h.r}`); return d === undefined ? Infinity : d; };
+        // À défaut de chemin connu (borne atteinte, ennemi muré) : la ligne droite.
+        const volOiseau = (h) => Math.min(...ennemis(etat).map(c => distance(h, c)));
         const cases = casesAccessibles(etat, id, plateau, regle.pas)
             .filter(h => h.chemin.length > 0 && h.chemin.length <= regle.pas);
-        cases.sort((a, b) => (distance(a, cible) - distance(b, cible)) || (a.ao - b.ao)
+        cases.sort((a, b) => (versContact(a) - versContact(b)) || (volOiseau(a) - volOiseau(b)) || (a.ao - b.ao)
                              || (a.chemin.length - b.chemin.length) || (a.q - b.q) || (a.r - b.r));
         const meilleure = cases[0];
-        if (meilleure && distance(meilleure, cible) < distance(moi, cible)) {
+        const gagne = meilleure && (versContact(meilleure) < versContact(moi)
+            || (versContact(meilleure) === versContact(moi) && volOiseau(meilleure) < volOiseau(moi)));
+        if (gagne) {
             const m = resoudreMouvement(courant, { idLanceur: id, chemin: meilleure.chemin }, des, plateau);
             courant = m.etat;
             etapes.push(...m.etapes);
         }
     }
     const apres = combattant(courant, id);
-    const proie = apres && !apres.aTerre ? ennemiLePlusProche(courant, id) : null;
+    // Qui mordre : le plus proche s'il est au contact, sinon le plus entamé de
+    // ceux qui le sont.
+    const proche = apres && !apres.aTerre ? ennemiLePlusProche(courant, id) : null;
+    const colles = apres && !apres.aTerre ? auContact(apres, courant)
+        .sort((a, b) => (a.pv - b.pv) || String(a.id).localeCompare(String(b.id))) : [];
+    const proie = proche && distance(apres, proche) === 1 ? proche : (colles[0] || proche);
     if (proie && distance(apres, proie) === 1) {
         const action = { type: "carte", idLanceur: id, idCarte: regle.idCarte, critique: false, coutFatigue: 0,
                          attaques: [{ nom: regle.nom, valeurBrute: regle.degats, typeRes: "Physique",

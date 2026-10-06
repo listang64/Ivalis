@@ -192,6 +192,36 @@ console.log("\n4. LE TOUR D'UN ZOMBIE : 2 CASES, PUIS SA MORSURE DE 7");
     verifier("il n'a ni esquive ni parade", esquiveDe(frappe.combattants.M1) === 0 && paradeDe(frappe.combattants.M1) === 0);
 }
 
+console.log("\n4 bis. IL VA OÙ IL PEUT MORDRE, PAS VERS LE PLUS PROCHE À VOL D'OISEAU");
+// Nico : « lors de son tour, le zombie ne s'est pas déplacé pour attaquer ».
+// Le journal de la partie (manche 4) : « zombie : hors de portée », sans un
+// seul pas. Trois ennemis à deux cases ; il visait le premier, cerné par les
+// héros — aucune case « plus près » de lui, donc il restait planté — alors
+// qu'un pas en (2,-2) le collait à un autre. Même scène, en petit.
+{
+    const autres = ["M1", "M2", "M3", "H", "H2", "H3"];
+    const e = monde(5, { P: { q: 0, r: 0 }, M1: { q: 3, r: -2 }, M2: { q: 2, r: 0 }, M3: { q: 1, r: -1 },
+                         H: { q: 3, r: -1 }, H2: { q: 2, r: -1 }, H3: { q: 3, r: 0 } }, autres);
+    e.combattants.M1.pv = 5;
+    const s = clonerEtat(coup(e, "P", "M1", 10).etat);
+    s.file = [{ id: "M1", carte: "ZOMBIE_MORSURE", initiative: 0, pas: 0 }, { id: "M2", carte: "X", initiative: 0, pas: 0 }];
+    verifier("la scène : le zombie debout, M2 et M3 tous deux à deux cases", s.combattants.M1.zombie && !s.combattants.M1.aTerre);
+    const pas = jouerZombie(s, "M1");
+    const z = pas.etat.combattants.M1;
+    const types = pas.entree.etapes.map(x => x.type);
+    verifier("il ne renonce plus : il avance d'un pas en (2,-2)", z.q === 2 && z.r === -2 && !types.includes("renonce"),
+             `(${z.q},${z.r}) ${types.join(" ")}`);
+    verifier("et mord celui qui est à côté (M3 : 100 → 93)", pas.etat.combattants.M3.pv === 93, String(pas.etat.combattants.M3.pv));
+    // Plus aucun ennemi joignable dans la manche : il s'approche quand même,
+    // à pied, du contact le plus proche (pas à travers les héros).
+    const loin = monde(5, { P: { q: -6, r: 6 }, M1: { q: 0, r: 0 }, M2: { q: 6, r: 0 }, H: { q: -6, r: 5 } });
+    loin.combattants.M1.pv = 5;
+    const l = clonerEtat(coup(loin, "P", "M1", 10).etat);
+    const pl = jouerZombie(l, "M1");
+    verifier("ennemi à 6 cases : il fait ses deux pas vers lui", pl.etat.combattants.M1.q === 2 && pl.etat.combattants.M1.r === 0,
+             `(${pl.etat.combattants.M1.q},${pl.etat.combattants.M1.r})`);
+}
+
 console.log("\n5. NIVEAU 10 : LE SURSIS");
 {
     const e = monde(10); e.file = [{ id: "M2", carte: "X", initiative: 50, pas: 0 }, { id: "P", carte: "C", initiative: 10, pas: 0 }];

@@ -3,7 +3,7 @@
 // =========================================================================
 
 import { db } from "./firebase-config.js?v=2";
-import { doc, getDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { doc, getDoc, getDocs, collection, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 window.RACE_SELECTIONNEE_TEMP = "Humain"; // Par défaut
 
@@ -483,6 +483,8 @@ window.afficherStatsCombat = function(donnees) {
     // Le champ « Nom du héros » de l'onglet DEV, prêt à être changé.
     const elNomDev = document.getElementById("dev-nom-perso");
     if (elNomDev) elNomDev.value = donnees.prenom || donnees.Prenom_Personnage || "";
+    // Et le joueur à qui il appartient.
+    if (typeof window.remplirProprioDev === "function") window.remplirProprioDev(donnees.idJoueur || donnees.ID_Joueur || "");
 
     const modPv = donnees.Dev_Mod_PV || 0;
     const modFatigue = donnees.Dev_Mod_Fatigue || 0;
@@ -660,6 +662,81 @@ window.renommerPersoDev = async function() {
     } catch (e) {
         console.error("Renommer le héros :", e);
         alert("Échec du changement de nom.");
+    } finally {
+        if (bouton) bouton.style.pointerEvents = "auto";
+    }
+};
+
+// À QUI APPARTIENT LE HÉROS (onglet DEV, demande de Nico : « un encart de
+// sélection pour changer l'appartenance d'un personnage à un autre joueur »).
+//
+// L'appartenance, c'est le seul ID_Joueur de la fiche : la liste « mes
+// héros », le droit de jouer son tour en combat, tout part de là. La liste des
+// joueurs est lue une fois (collection Joueurs, comme l'écran
+// d'identification) puis gardée.
+let JOUEURS_DEV = null;
+async function joueursDev() {
+    if (JOUEURS_DEV) return JOUEURS_DEV;
+    const snap = await getDocs(collection(db, "Joueurs"));
+    const liste = [];
+    snap.forEach(d => {
+        const x = d.data() || {};
+        if (x.Nom) liste.push({ id: x.ID_Joueur || d.id, nom: x.Nom });
+    });
+    liste.sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
+    JOUEURS_DEV = liste;
+    return liste;
+}
+window.remplirProprioDev = async function(idProprio) {
+    const select = document.getElementById("dev-proprio-perso");
+    if (!select) return;
+    select.dataset.proprio = idProprio || "";
+    let joueurs = [];
+    try { joueurs = await joueursDev(); }
+    catch (e) { console.error("Liste des joueurs :", e); }
+    // La fiche a pu changer pendant la lecture : on prend le dernier proprio connu.
+    const actuel = select.dataset.proprio;
+    const options = joueurs.map(j => ({ valeur: j.id, libelle: j.nom }));
+    // Un propriétaire absent de la liste (le MJ, un joueur supprimé) reste visible.
+    if (actuel && !options.some(o => o.valeur === actuel)) options.unshift({ valeur: actuel, libelle: actuel === "MJ" ? "MJ" : `Inconnu (${actuel})` });
+    if (!actuel) options.unshift({ valeur: "", libelle: "— Aucun joueur —" });
+    select.innerHTML = "";
+    options.forEach(o => {
+        const opt = document.createElement("option");
+        opt.value = o.valeur; opt.textContent = o.libelle;
+        select.appendChild(opt);
+    });
+    select.value = actuel;
+};
+window.reattribuerPersoDev = async function() {
+    const idPersonnage = document.getElementById("champ-id-personnage").value;
+    if (!idPersonnage) {
+        alert("Ouvrez d'abord la fiche d'un héros existant.");
+        return;
+    }
+    const select = document.getElementById("dev-proprio-perso");
+    const nouveau = select ? select.value : "";
+    if (!nouveau) { alert("Choisissez un joueur."); return; }
+    if (nouveau === (select.dataset.proprio || "")) { alert("Ce héros appartient déjà à ce joueur."); return; }
+    const nomJoueur = (select.options[select.selectedIndex] || {}).textContent || nouveau;
+    const nomHeros = (document.getElementById("titre-nom-personnage") || {}).innerText || "ce héros";
+    if (!confirm(`Confier ${nomHeros} à ${nomJoueur} ?`)) return;
+    const bouton = document.getElementById("btn-dev-proprio");
+    if (bouton) bouton.style.pointerEvents = "none";
+    try {
+        await updateDoc(doc(db, "Personnages", idPersonnage), { ID_Joueur: nouveau });
+        [window.PERSOS_PARTIE, window.PERSOS_JOUEURS_PARTIE, window.COMBAT_PERSOS_JOUEUR].forEach(liste => {
+            const p = (liste || []).find(x => x && x.idPersonnage === idPersonnage);
+            if (p) { p.idJoueur = nouveau; p.ID_Joueur = nouveau; }
+        });
+        select.dataset.proprio = nouveau;
+        const champProprio = document.getElementById("champ-id-joueur-perso");
+        if (champProprio) champProprio.value = nouveau;
+        if (typeof window.afficherMessageFlottant === "function") window.afficherMessageFlottant(`${nomHeros} est confié à ${nomJoueur}`);
+    } catch (e) {
+        console.error("Changer le joueur du héros :", e);
+        alert("Échec du changement de joueur.");
+        select.value = select.dataset.proprio || "";
     } finally {
         if (bouton) bouton.style.pointerEvents = "auto";
     }

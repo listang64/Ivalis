@@ -607,12 +607,22 @@ window.objetDeDepart = function(typeObjet, rarete, options) {
 };
 
 // « Arme + Bouclier » n'est pas une famille du catalogue : c'est un CHOIX
-// combiné du formulaire de création. On y tire une arme à UNE MAIN parmi les
-// familles de corps à corps (jamais une arme à deux mains, sinon plus de main
-// libre pour le bouclier), plus un bouclier tiré à part — les deux se
-// retrouvent chacun dans une main à l'équipement (voir equiperLeHerosDeDepart).
-const FAMILLE_ARME_BOUCLIER = "Arme + Bouclier";
+// combiné du formulaire de création. On y tire une arme à UNE MAIN de corps à
+// corps (jamais une arme à deux mains, sinon plus de main libre pour le
+// bouclier), plus un bouclier tiré à part — les deux se retrouvent chacun dans
+// une main à l'équipement (voir equiperLeHerosDeDepart).
+//
+// LE JOUEUR CHOISIT LA FAMILLE DE L'ARME (Nico) : « arme légère + bouclier »
+// (dague, couteau, épée courbée) ou « arme lourde + bouclier » (épée courte,
+// hache, gourdin, masse, lance courte) — c'est l'arme qui décide des
+// techniques qu'il pourra lancer. L'ancien choix sans famille reste compris,
+// pour une fiche ou un formulaire d'avant.
 const FAMILLES_UNE_MAIN_CAC = ["Arme légère CAC", "Arme lourde CAC", "Arme polyvalente"];
+const CHOIX_ARME_BOUCLIER = {
+    "Arme légère + Bouclier": ["Arme légère CAC"],
+    "Arme lourde + Bouclier": ["Arme lourde CAC"],
+    "Arme + Bouclier": FAMILLES_UNE_MAIN_CAC
+};
 
 window.objetDeDepartUneMain = function(familles, rarete) {
     const modeles = (window.MODELES_OBJETS || [])
@@ -625,9 +635,11 @@ window.objetDeDepartUneMain = function(familles, rarete) {
 // Renvoie toujours un objet, même partiel : un type inconnu ne doit pas
 // empêcher la création du personnage.
 window.equipementDeDepart = function(typeArme, typeArmure) {
-    const estArmeBouclier = typeArme === FAMILLE_ARME_BOUCLIER;
+    const famillesAvecBouclier = Object.prototype.hasOwnProperty.call(CHOIX_ARME_BOUCLIER, typeArme)
+        ? CHOIX_ARME_BOUCLIER[typeArme] : null;
+    const estArmeBouclier = !!famillesAvecBouclier;
     return {
-        arme: estArmeBouclier ? window.objetDeDepartUneMain(FAMILLES_UNE_MAIN_CAC)
+        arme: estArmeBouclier ? window.objetDeDepartUneMain(famillesAvecBouclier)
               : typeArme ? window.objetDeDepart(typeArme) : null,
         bouclier: estArmeBouclier ? window.objetDeDepart("Bouclier") : null,
         // L'armure de départ : aucun prérequis, et ses résistances au plus bas

@@ -185,6 +185,7 @@ node profanateur.mjs           # 🧟 le Profanateur : DOT ×1,3, +1 compétence
 node pisteur.mjs               # 🐾 le Pisteur : son compagnon (25 PV, 15 % d'esquive, 6 bruts, 3 cases, juste après lui), +1 aux tirs, Tir précis (niv. 5), Lien de sang (niv. 10), la fenêtre du compagnon et son image
 node geomancien.mjs            # 🪨 le Géomancien : 5e case de zone offerte et +10 init (niv. 1), Mur de terre (murs de 10 PV, poussée, gravats), ses passifs (niv. 5), le dessin des murs sans IA
 node renommer_dev.mjs            # ✏️ renommer un héros depuis l'onglet DEV de sa fiche (Prenom_Personnage)
+node proprio_dev.mjs             # 🤝 confier un héros à un autre joueur depuis l'onglet DEV (ID_Joueur)
 node interrupteur_illustration.mjs # 🖼️ l'interrupteur des Paramètres : couper / rallumer la génération des images des cartes
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
@@ -4968,3 +4969,46 @@ mettre la couleur partout dans le rond, et idem pour les joueurs ».
   4,2 pour le blanc) ; une teinte foncée ajoutée un jour passerait en blanc.
 piste_initiative.mjs (section 14 : fond de chaque palier, bord neutre, chiffre
 sombre, contraste d'au moins 4 partout).
+
+## Zombies, Retour arrière, arme et bouclier, héros confié (version 206)
+
+Nico : « quand un token est transformé en zombie, il doit aussi apparaître
+zombie dans la piste d'initiative » ; « lors de son tour, le zombie ne s'est
+pas déplacé pour attaquer » ; « pour l'Oracle, la technique Retour arrière bug
+un peu : on peut sélectionner une autre compétence mais après tout se grise,
+on n'a pas le temps » ; « à la création, pour l'arme et bouclier, faire le
+choix entre arme légère et bouclier ou arme lourde et bouclier » ; « dans le
+panneau dev de la fiche perso, un encart de sélection pour changer
+l'appartenance d'un personnage à un autre joueur ».
+- LE ZOMBIE DANS LA PISTE (combat.js, imagePionCreature) : la piste et la
+  fenêtre de tour reprennent l'image du PION — le pion grignoté de
+  zombie_token.js, sous le filtre cadavérique tant qu'il se dessine, puis la
+  piste se redessine seule. Le compagnon du Pisteur y montre aussi son pion.
+  piste_initiative.mjs, section 15.
+- LE ZOMBIE QUI NE BOUGEAIT PAS : relu dans le journal de la partie
+  (Combat_Journal, lecture seule) — manche 4, « zombie : hors de portée » sans
+  un pas. Il visait l'ennemi le plus proche à vol d'oiseau ; celui-là était
+  cerné, aucune case n'en rapprochait, et il restait planté alors qu'un autre
+  ennemi à la même distance l'attendait à un pas. Le serviteur (zombie et
+  compagnon) compte maintenant les pas À PIED jusqu'au contact de n'importe
+  quel ennemi (pasJusquAuContact, ia_pure.js ; jouerServiteur,
+  cerveau_combat.js) : une case d'où mordre d'abord, la plus proche du contact
+  sinon ; au contact de plusieurs, le plus proche puis le plus entamé. Rejoué
+  sur la position réelle : un pas en (2,-2), puis la morsure.
+  profanateur.mjs, section 4 bis.
+- LE RETOUR ARRIÈRE QUI SE REGRISAIT : le volet était dessiné avec l'énergie
+  d'après le repos, mais le rafraîchissement suivant (à chaque nouvelle de la
+  partie) regrisait les bannières et désélectionnait la carte en aperçu avec
+  l'énergie d'avant. actualiserBannieresEpuisees et actualiserEtatCarteCombat
+  comptent maintenant le repos en attente (bonusRetourArriere). Au passage,
+  ce même rafraîchissement rallumait une carte que l'arme interdit : elle reste
+  grisée. oracle.mjs, section 4.
+- ARME ET BOUCLIER (index.html, objets.js) : « Arme légère + Bouclier »
+  (dague, couteau, épée courbée) ou « Arme lourde + Bouclier » (épée courte,
+  hache, gourdin, masse, lance courte), toujours à une main ; l'ancien choix
+  sans famille reste compris. equipement_depart.mjs.
+- CONFIER UN HÉROS (onglet DEV, creation_personnage.js) : une liste des
+  joueurs (collection Joueurs, lue une fois), le joueur actuel présélectionné,
+  « Confier » après confirmation — seul ID_Joueur est écrit sur la fiche, les
+  listes en mémoire suivent. Un propriétaire hors liste (le MJ) reste affiché.
+  proprio_dev.mjs.

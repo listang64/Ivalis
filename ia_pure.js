@@ -159,6 +159,57 @@ export function ennemiAtteignable(etat, id, plateau, borne = 600) {
     return front.length > 0;
 }
 
+// À COMBIEN DE PAS, À PIED, DU CONTACT D'UN ENNEMI ? Pour chaque case, le
+// nombre de pas qui la sépare de la plus proche case libre collée à un
+// adversaire debout — en contournant murs, cases supprimées et vivants. Un
+// parcours en largeur parti de TOUTES ces cases à la fois, borné.
+//
+// C'est ce qui manquait au zombie : il visait l'ennemi le plus proche À VOL
+// D'OISEAU, et si celui-là était entouré, il ne trouvait aucune case « plus
+// près » et restait planté — alors qu'un autre ennemi, à la même distance,
+// l'attendait à un pas (journal réel, manche 4 : « zombie : hors de portée »
+// sans un seul pas).
+export function pasJusquAuContact(etat, id, plateau, borne = 2500) {
+    const moi = combattant(etat, id);
+    const carte = plateau || PLAINE;
+    const cle = (h) => `${h.q},${h.r}`;
+    const dist = new Map();
+    if (!moi || moi.q === null || moi.q === undefined) return dist;
+    const libre = (h) => {
+        const dessus = carte.etatCase(h.q, h.r) || {};
+        if (dessus.bloquee || dessus.supprimee) return false;
+        return !occupantVivant(etat, h.q, h.r, id);
+    };
+    let front = [];
+    for (const autre in etat.combattants) {
+        const e = etat.combattants[autre];
+        if (!e || e.camp === moi.camp || e.aTerre || e.estIllusion) continue;
+        if (e.q === null || e.q === undefined) continue;
+        for (const v of voisinsDe(e)) {
+            const k = cle(v);
+            if (dist.has(k) || !libre(v)) continue;
+            dist.set(k, 0);
+            front.push(v);
+        }
+    }
+    let n = 0;
+    while (front.length > 0 && n < borne) {
+        const suivant = [];
+        for (const h of front) {
+            n++;
+            const d = dist.get(cle(h)) + 1;
+            for (const v of voisinsDe(h)) {
+                const k = cle(v);
+                if (dist.has(k) || !libre(v)) continue;
+                dist.set(k, d);
+                suivant.push(v);
+            }
+        }
+        front = suivant;
+    }
+    return dist;
+}
+
 // =========================================================================
 //  3. OÙ PEUT-ELLE ALLER ?
 // =========================================================================

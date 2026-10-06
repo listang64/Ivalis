@@ -794,6 +794,59 @@ console.log("\n14. LE CERCLE D'INITIATIVE PREND LA COULEUR DU PALIER");
   await p.screenshot({ path: "/tmp/claude-0/piste_ronds_pleins.png", clip: boite });
 }
 
+// =========================================================================
+console.log("\n15. UN ZOMBIE EST UN ZOMBIE DANS LA PISTE AUSSI");
+// =========================================================================
+// Nico : « quand un token est transformé en zombie, il doit aussi apparaître
+// zombie dans la piste d'initiative ». La piste prend l'image du PION
+// (imagePionCreature) : le pion grignoté de zombie_token.js, le filtre
+// cadavérique en attendant qu'il soit dessiné, puis elle se redessine seule.
+// Le dessin (canvas sur l'image du pion) est remplacé ici par un faux, les
+// images du banc ne chargeant pas.
+{
+  const z = await p.evaluate(async () => {
+    const res = {};
+    const DESSIN = "data:image/png;base64,ZOMBIE";
+    const cache = new Map();
+    let demandes = 0, lacher;
+    const pret = new Promise(r => { lacher = r; });
+    window.imageZombieEnCache = (url, graine) => cache.get(url + "|" + graine) || null;
+    window.imageZombie = (url, graine) => { demandes++;
+      return pret.then(() => { cache.set(url + "|" + graine, DESSIN); return DESSIN; }); };
+    const fiche = (id, extra) => ({ idPersonnage: id, prenom: id, camp: "Ennemi", estMonstre: true, Palier: "Normal",
+      PV_Max: 40, PV_Actuels: 40, Fatigue_Max: 100, fatigueActuelle: 100, Bouclier_Actuel: 0,
+      Etats_Alteres: [], statut: "Vivant", ...extra });
+    window.PERSOS_PARTIE = [fiche("M_VIVANT"), fiche("M_ZOMBIE", { zombie: true, camp: "Allié" }),
+      fiche("C_LOUP", { compagnonDe: "H1", camp: "Allié", urlToken: "https://res.cloudinary.com/x/loup_token.png" })];
+    window.TOKENS_VTT_DATA = { M_VIVANT: { q: 1, r: 0 }, M_ZOMBIE: { q: 2, r: 0 }, C_LOUP: { q: 3, r: 0 } };
+    window.PISTE_MANCHE = { manche: 0, ordre: [] };
+    const file = ["M_VIVANT", "M_ZOMBIE", "C_LOUP"].map((id, i) => ({ idPersonnage: id, idCarte: "X", initiative: 30 - i * 10 }));
+    window.PARTIE_DATA.Tour_Combat = 41;
+    window.PARTIE_DATA.File_Attente_Combat = file;
+    window.afficherPisteInitiative(file, "Resolution");
+    const lire = (id) => { const img = document.querySelector(`.piste-tuile[data-id="${id}"] img`);
+      return img ? { src: img.getAttribute("src"), filtre: img.style.filter } : null; };
+    res.avant = { vivant: lire("M_VIVANT"), zombie: lire("M_ZOMBIE"), loup: lire("C_LOUP") };
+    lacher();
+    await new Promise(r => setTimeout(r, 50));
+    res.apres = { vivant: lire("M_VIVANT"), zombie: lire("M_ZOMBIE") };
+    res.demandes = demandes;
+    window.afficherPisteInitiative(file, "Resolution");
+    res.demandesApres = demandes;
+    return res;
+  });
+  verifier("pendant le dessin : le pion d'origine sous le filtre cadavérique",
+           /IMG_2137/.test(z.avant.zombie.src) && /grayscale/.test(z.avant.zombie.filtre), JSON.stringify(z.avant.zombie));
+  verifier("une créature vivante : l'image commune, sans filtre",
+           /IMG_2137/.test(z.avant.vivant.src) && !z.avant.vivant.filtre, JSON.stringify(z.avant.vivant));
+  verifier("le pion zombie dessiné : la piste se redessine d'elle-même avec lui",
+           z.apres.zombie.src === "data:image/png;base64,ZOMBIE" && !z.apres.zombie.filtre, JSON.stringify(z.apres.zombie));
+  verifier("la créature vivante n'a pas changé", /IMG_2137/.test(z.apres.vivant.src));
+  verifier("dessiné une fois, repris du cache ensuite", z.demandes === 1 && z.demandesApres === 1, `${z.demandes} ${z.demandesApres}`);
+  verifier("le compagnon du Pisteur : son propre pion, pas l'image commune",
+           /loup_token/.test(z.avant.loup.src), z.avant.loup.src);
+}
+
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
 
 await b.close();
