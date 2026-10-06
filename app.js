@@ -201,9 +201,12 @@ function persoDocVersFront(id, d) {
     // LE COMPAGNON DU PISTEUR, décrit à la création (classes.js) : son nom,
     // son allure, son image (paysage) et son pion — générés juste après le
     // héros (genererCompagnonEnArrierePlan).
+    // Son attaque porte un nom RP, trouvé par l'IA à sa création
+    // (nommerAttaqueCompagnon).
     compagnon: (d.Compagnon_Nom || d.Compagnon_Description || d.Compagnon_Image || d.Compagnon_Token) ? {
       nom: d.Compagnon_Nom || "", description: d.Compagnon_Description || "",
-      image: d.Compagnon_Image || "", token: d.Compagnon_Token || ""
+      image: d.Compagnon_Image || "", token: d.Compagnon_Token || "",
+      attaque: d.Compagnon_Attaque || ""
     } : null,
     // Décoché depuis la liste des héros (mode développeur) : le personnage
     // existe toujours, mais il est mis de côté — ni combat, ni tour de parole.
@@ -1561,7 +1564,8 @@ function frontVersPersoDoc(donnees, idPersonnage) {
       Compagnon_Nom: donnees.compagnon.nom || "",
       Compagnon_Description: donnees.compagnon.description || "",
       Compagnon_Image: donnees.compagnon.image || "",
-      Compagnon_Token: donnees.compagnon.token || ""
+      Compagnon_Token: donnees.compagnon.token || "",
+      Compagnon_Attaque: donnees.compagnon.attaque || ""
     } : {})
   };
 }
@@ -1887,6 +1891,10 @@ async function sauvegarderFichePersonnage(donnees, skipImage = false) {
   // LE COMPAGNON DU PISTEUR : son image, puis son pion, en arrière-plan aussi.
   if (estNouveau && !skipImage && donnees.compagnon && donnees.compagnon.description) {
       genererCompagnonEnArrierePlan(donnees, idPersonnage).catch(e => console.error(e));
+  }
+  // Et le nom RP de son attaque (du texte seulement : pas lié aux images).
+  if (estNouveau && donnees.compagnon && donnees.compagnon.description) {
+      window.assurerNomAttaqueCompagnon({ ...donnees, idPersonnage }).catch(e => console.error(e));
   }
   if (!skipImage && donnees.urlCloudinary !== "") {
       genererEtStockerTokenBackground(donnees, idPersonnage, donnees.urlCloudinary).catch(e => console.error(e));
@@ -2736,6 +2744,69 @@ async function genererCompagnonEnArrierePlan(donnees, idPersonnage) {
     return genererEtStockerTokenBackground(donnees, idPersonnage, urlImage,
                                            { sujet: "animal companion", champ: "Compagnon_Token" });
 }
+
+// LE NOM RP DE L'ATTAQUE DU COMPAGNON (Nico : « dans le descriptif de
+// l'attaque, c'est marqué TECHNIQUE et technique inconnue de ce poste. Fais en
+// sorte qu'une IA crée un nom RP à cette attaque quand on crée le compagnon »).
+// Gemini le tire de la description de la bête : deux à quatre mots, en
+// français, sans chiffre. Rendu "" si l'IA ne répond pas — la fenêtre de tour
+// retombe alors sur « Attaque de <nom> ».
+window.nommerAttaqueCompagnon = async function(compagnon) {
+    const cle = lireClesApi().gemini;
+    const c = compagnon || {};
+    if (!cle || !String(c.description || "").trim()) return "";
+    const consigne = "Univers : Antiquité fantastique (mythes grecs et romains, magie ancienne). "
+        + "Tu nommes l'attaque d'un compagnon animal qui combat aux côtés d'un héros : un coup au contact, "
+        + "griffes, crocs, cornes, bec, sabots… selon la bête. Donne UN nom d'attaque évocateur, en français, "
+        + "de deux à quatre mots, sans chiffre, sans guillemets, sans le nom de la bête. "
+        + "Exemples du ton : « Croc du chasseur », « Ruée des cornes », « Serres de tempête ».";
+    try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cle}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                systemInstruction: { parts: [{ text: consigne }] },
+                contents: [{ role: "user", parts: [{ text: `Le compagnon${c.nom ? ` s'appelle ${c.nom}` : ""}. `
+                    + `Le joueur le décrit ainsi : « ${String(c.description).trim()} ».` }] }],
+                tools: [{ functionDeclarations: [{
+                    name: "nommerAttaque",
+                    description: "Le nom RP de l'attaque du compagnon.",
+                    parameters: { type: "OBJECT", properties: { nom: { type: "STRING", description: "2 à 4 mots" } }, required: ["nom"] }
+                }] }],
+                toolConfig: { functionCallingConfig: { mode: "ANY" } }
+            })
+        });
+        const data = await res.json();
+        const appel = data.candidates?.[0]?.content?.parts?.find(p => p.functionCall)?.functionCall;
+        return window.nettoyerNomAttaque(appel?.args?.nom);
+    } catch (e) {
+        console.error("🐾 [Compagnon] Nom d'attaque impossible :", e);
+        return "";
+    }
+};
+// Ce que l'IA rend, rendu présentable : une ligne, sans guillemets, 40 signes
+// au plus, une majuscule.
+window.nettoyerNomAttaque = function(brut) {
+    let nom = String(brut || "").replace(/[«»"“”]/g, "").replace(/\s+/g, " ").trim().replace(/[.!]+$/, "");
+    if (!nom) return "";
+    if (nom.length > 40) nom = nom.slice(0, 40).replace(/\s+\S*$/, "");
+    return nom.charAt(0).toUpperCase() + nom.slice(1);
+};
+// Un compagnon sans nom d'attaque (créé avant, ou l'IA muette) en reçoit un :
+// écrit sur la fiche de son maître (Compagnon_Attaque) et rendu. Sans IA,
+// rien n'est écrit — on réessaiera au prochain combat.
+window.assurerNomAttaqueCompagnon = async function(heros) {
+    const c = heros && heros.compagnon;
+    if (!c || !heros.idPersonnage) return "";
+    if (c.attaque) return c.attaque;
+    const nom = await window.nommerAttaqueCompagnon(c);
+    if (!nom) return "";
+    c.attaque = nom;
+    const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+    await updateDoc(doc(db, "Personnages", heros.idPersonnage), { Compagnon_Attaque: nom });
+    console.log(`🐾 [Compagnon] Son attaque : « ${nom} »`);
+    return nom;
+};
 
 // Exposée pour les outils (et les bancs) : redessiner le compagnon d'un héros.
 window.genererCompagnonEnArrierePlan = (donnees, idPersonnage) => genererCompagnonEnArrierePlan(donnees, idPersonnage);

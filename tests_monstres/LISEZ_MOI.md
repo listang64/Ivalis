@@ -187,6 +187,7 @@ node geomancien.mjs            # 🪨 le Géomancien : 5e case de zone offerte e
 node renommer_dev.mjs            # ✏️ renommer un héros depuis l'onglet DEV de sa fiche (Prenom_Personnage)
 node proprio_dev.mjs             # 🤝 confier un héros à un autre joueur depuis l'onglet DEV (ID_Joueur)
 node bagues_dps.mjs              # 💍 les bagues de dégâts : Intelligence ou Charisme (la meilleure), bonus sur le magique ou le brut
+node compagnon_attaque.mjs        # 🐾 le compagnon du Pisteur : le nom RP de son attaque, trouvé par Gemini et gardé sur la fiche
 node interrupteur_illustration.mjs # 🖼️ l'interrupteur des Paramètres : couper / rallumer la génération des images des cartes
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
@@ -5040,3 +5041,27 @@ grande des deux pour l'équiper, et les dégâts rajoutés au brut ou au magique
   (degatsMag) s'ajoute aux attaques magiques et aux attaques brutes ; une
   brute physique garde aussi les dégâts physiques de l'arme. La bague de soin
   reste à la Sagesse. bagues_dps.mjs.
+
+## Le compagnon du Pisteur dans la fenêtre de tour (version 208)
+
+Nico : « pour le compagnon du Pisteur, dans le descriptif de combat, on voit
+l'image de son token et non de son image de personnage. De plus, dans le
+descriptif de l'attaque, c'est marqué TECHNIQUE et technique inconnue de ce
+poste. Fais en sorte qu'une IA crée un nom RP à cette attaque quand on crée le
+compagnon. »
+- SON IMAGE (combat.js, rafraichirVoileTour) : le compagnon montre son image
+  de personnage en entier, comme un héros, et plus son pion rond. Elle est en
+  paysage : hud_disposition.js la cale à gauche du nom de l'attaque, sans
+  passer dessous.
+- SON ATTAQUE A UNE CARTE (carteServiteur, combat.js) : le compagnon et le
+  zombie jouent un geste fixe, sans carte — d'où « Technique inconnue de ce
+  poste ». La fenêtre lit désormais une carte de lecture : le nom RP de
+  l'attaque (à défaut « Attaque de <nom> »), « 6 dégâts bruts » et sa course
+  de 3 cases ; le zombie, « Morsure », 7 dégâts physiques, 2 cases.
+- LE NOM RP (app.js, nommerAttaqueCompagnon) : Gemini le tire de la
+  description de la bête à la création du compagnon (2 à 4 mots, nettoyés),
+  écrit sur la fiche du maître (Compagnon_Attaque) puis recopié sur le
+  document du compagnon (Nom_Attaque → nomAttaque). Un compagnon d'avant en
+  reçoit un à son prochain déploiement (poserCompagnonSurTerrain) ; l'IA
+  muette, rien n'est écrit et on retentera.
+fenetre_tour.mjs (le compagnon, le zombie), compagnon_attaque.mjs.

@@ -40,6 +40,7 @@ await p.route('**', r => {
   const u = r.request().url();
   if (u.startsWith('file:')) return r.continue();
   if (/pliors|naomi/.test(u)) return r.fulfill(svg(300, 800, '#48c'));   // un portrait debout
+  if (/compagnon_loup/.test(u)) return r.fulfill(svg(1536, 1024, '#8a6'));  // une bête, en paysage
   if (/Les_humains|token/i.test(u)) return r.fulfill(svg(200, 200, '#c44')); // un pion carré
   if (/IMG_2122/.test(u)) return r.fulfill(svg(1520, 520, '#111'));      // la plaque
   return r.abort();
@@ -563,6 +564,31 @@ console.log("\n  LE PORTRAIT : MÉDAILLON OU AVATAR EN PIED");
     await new Promise(r => setTimeout(r, 200));
     const avecPortrait = lire();
 
+    // LE COMPAGNON DU PISTEUR (Nico : « on voit l'image de son token et non de
+    // son image de personnage ; et l'attaque est marquée TECHNIQUE, technique
+    // inconnue de ce poste »). Son image est en paysage, son pion à part.
+    window.PERSOS_PARTIE.push(
+      { idPersonnage: "M_LOUP", prenom: "Fauve", nom: "", estMonstre: true, compagnonDe: "H1", camp: "Allié",
+        urlCloudinary: "https://res.cloudinary.com/x/compagnon_loup.png",
+        urlToken: "https://res.cloudinary.com/x/token_loup.png", nomAttaque: "Croc du chasseur", Etats_Alteres: [] },
+      { idPersonnage: "M_SANSNOM", prenom: "Brume", nom: "", estMonstre: true, compagnonDe: "H1", camp: "Allié",
+        urlCloudinary: "https://res.cloudinary.com/x/compagnon_loup.png", Etats_Alteres: [] },
+      { idPersonnage: "M_ZOMBIE", prenom: "Goule", nom: "", estMonstre: true, zombie: true, camp: "Allié", Etats_Alteres: [] });
+    const texte = () => ({ carte: document.getElementById("voile-tour-carte").textContent,
+                           effets: document.getElementById("voile-tour-effets").textContent.replace(/\s+/g, " ").trim() });
+    poser([{ idPersonnage: "M_LOUP", idCarte: "COMPAGNON_ATTAQUE", initiative: 0, timestamp: 50 }]);
+    await new Promise(r => setTimeout(r, 300));
+    const compagnon = { ...lire(), ...texte(),
+      droiteImg: Math.round(document.getElementById("voile-tour-pion").getBoundingClientRect().right),
+      gaucheTitre: Math.round(document.getElementById("voile-tour-carte").getBoundingClientRect().left) };
+    poser([{ idPersonnage: "M_SANSNOM", idCarte: "COMPAGNON_ATTAQUE", initiative: 0, timestamp: 51 }]);
+    await new Promise(r => setTimeout(r, 200));
+    const compagnonSansNom = texte();
+    poser([{ idPersonnage: "M_ZOMBIE", idCarte: "ZOMBIE_MORSURE", initiative: 0, timestamp: 52 }]);
+    await new Promise(r => setTimeout(r, 200));
+    const zombie = { ...lire(), ...texte() };
+    window.PERSOS_PARTIE = window.PERSOS_PARTIE.filter(x => !["M_LOUP", "M_SANSNOM", "M_ZOMBIE"].includes(x.idPersonnage));
+
     // LE HÉROS D'UN AUTRE POSTE, qui a lui aussi un portrait.
     poser([{ idPersonnage: "H3", idCarte: "CARTE_H", initiative: 65, timestamp: 40 }]);
     await new Promise(r => setTimeout(r, 200));
@@ -596,7 +622,7 @@ console.log("\n  LE PORTRAIT : MÉDAILLON OU AVATAR EN PIED");
     await new Promise(r => setTimeout(r, 300));
     const creatureAFroid = lire();       // avatar → médaillon, plaque non mesurable
 
-    return { creature, sansPortrait, avecPortrait, autreJoueur,
+    return { creature, sansPortrait, avecPortrait, autreJoueur, compagnon, compagnonSansNom, zombie,
              retraitConfirme, herosAFroid, creatureAFroid };
   }, [srcVoile, srcSequence]);
 
@@ -621,6 +647,35 @@ console.log("\n  LE PORTRAIT : MÉDAILLON OU AVATAR EN PIED");
            `${formes.creature.hauteurImg}px → ${formes.avecPortrait.hauteurImg}px`);
   verifier("c'est bien SON portrait qui est chargé",
            /pliors/.test(formes.avecPortrait.source), formes.avecPortrait.source.slice(-30));
+
+  // LE COMPAGNON DU PISTEUR.
+  verifier("LE COMPAGNON : SON IMAGE DE PERSONNAGE, PAS SON PION",
+           /compagnon_loup/.test(formes.compagnon.source) && !/token/.test(formes.compagnon.source), formes.compagnon.source.slice(-30));
+  verifier("en entier (en pied, non taillée, non arrondie)", formes.compagnon.enPied === true && formes.compagnon.taille === "contain"
+           && parseFloat(formes.compagnon.arrondi) === 0, `${formes.compagnon.taille} ${formes.compagnon.arrondi}`);
+  verifier("sa bête en paysage tient sur la plaque (posée plus bas qu'un héros)",
+           formes.compagnon.hauteurImg < formes.avecPortrait.hauteurImg && formes.compagnon.droiteImg <= formes.compagnon.gaucheTitre,
+           `${formes.compagnon.largeurImg}×${formes.compagnon.hauteurImg}px, bord droit ${formes.compagnon.droiteImg} / titre ${formes.compagnon.gaucheTitre}`);
+  verifier("SON ATTAQUE PORTE SON NOM RP, plus « Technique »", formes.compagnon.carte === "Croc du chasseur", formes.compagnon.carte);
+  verifier("et ses effets sont décrits (plus « inconnue de ce poste »)",
+           !/inconnue/.test(formes.compagnon.effets) && /6 dégâts bruts/.test(formes.compagnon.effets) && /3 cases/.test(formes.compagnon.effets),
+           formes.compagnon.effets);
+  verifier("sans nom RP encore : « Attaque de <son nom> »", formes.compagnonSansNom.carte === "Attaque de Brume", formes.compagnonSansNom.carte);
+  verifier("le zombie : « Morsure », 7 dégâts physiques, en médaillon",
+           formes.zombie.carte === "Morsure" && /7 dégâts physiques/.test(formes.zombie.effets) && !/inconnue/.test(formes.zombie.effets)
+           && formes.zombie.enPied === false, `${formes.zombie.carte} — ${formes.zombie.effets}`);
+
+  // La capture, pour l'œil.
+  await p.evaluate(async () => {
+    window.EVENEMENT_ATTENDU = null; window.EVENEMENT_EN_COURS = null;
+    window.PERSOS_PARTIE.push({ idPersonnage: "M_LOUP", prenom: "Fauve", nom: "", estMonstre: true, compagnonDe: "H1", camp: "Allié",
+      urlCloudinary: "https://res.cloudinary.com/x/compagnon_loup.png", nomAttaque: "Croc du chasseur", Etats_Alteres: [] });
+    window.PARTIE_DATA = { Tour_Combat: 1, File_Attente_Combat: [{ idPersonnage: "M_LOUP", idCarte: "COMPAGNON_ATTAQUE", initiative: 0, timestamp: 60 }], Phase_Combat: "Resolution" };
+    window.rafraichirVoileTour();
+    await new Promise(r => setTimeout(r, 400));
+  });
+  await p.screenshot({ path: "/tmp/claude-0/compagnon_tour.png" });
+  await p.evaluate(() => { window.PERSOS_PARTIE = window.PERSOS_PARTIE.filter(x => x.idPersonnage !== "M_LOUP"); });
 
   // LE HÉROS D'UN AUTRE POSTE A DROIT AU MÊME TRAITEMENT. « Mon frère, je ne
   // vois pas son avatar à son tour » : l'encart annonce QUI JOUE, et ce n'est

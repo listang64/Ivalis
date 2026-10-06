@@ -302,6 +302,7 @@ window.ecouterMonstresPartie = function(idPartie) {
             objet.XP_Groupe     = brut.XP_Groupe || 0;
             // Le compagnon du Pisteur : l'identifiant de son maître.
             objet.compagnonDe   = brut.Compagnon_De || "";
+            objet.nomAttaque    = brut.Nom_Attaque || "";
             monstres.push(objet);
 
             // Les techniques du monstre vivent dans une sous-collection : il
@@ -812,7 +813,9 @@ window.donneesCompagnon = function(heros) {
         Personnalite: "brutal",
         Initiative: 0, Competences_Max: 0,
         URL_Cloudinary: c.image || "",
-        URL_Token: c.token || c.image || ""
+        URL_Token: c.token || c.image || "",
+        // Le nom RP de son attaque (nommerAttaqueCompagnon, app.js).
+        Nom_Attaque: c.attaque || ""
     };
 };
 window.poserCompagnonSurTerrain = async function(heros, tokensData) {
@@ -830,6 +833,14 @@ window.poserCompagnonSurTerrain = async function(heros, tokensData) {
         ? window.trouverHexLibreAutour(tokensData, maitre, 1)
         : window.trouverHexLibreVTT(tokensData);
     tokensData[idCompagnon] = { q: hexLibre.q, r: hexLibre.r, url: data.URL_Token, taille: 55 };
+
+    // Un compagnon d'avant le nom RP de son attaque en reçoit un, sans
+    // retarder le déploiement : la fiche de la bête est complétée ensuite.
+    if (!data.Nom_Attaque && typeof window.assurerNomAttaqueCompagnon === "function") {
+        window.assurerNomAttaqueCompagnon(heros)
+            .then(nom => nom ? updateDoc(doc(db, COLLECTION_MONSTRES, idCompagnon), { Nom_Attaque: nom }) : null)
+            .catch(e => console.error("🐾 [Compagnon] Nom d'attaque :", e));
+    }
 
     const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
     const partieSnap = await getDoc(partieRef);

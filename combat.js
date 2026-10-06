@@ -5062,10 +5062,36 @@ function contenuTuilePiste(entree, cestSonTour) {
 // La fiche d'une carte, qu'elle appartienne à un héros (cache du panneau) ou à
 // une créature (cache global alimenté à la génération du monstre).
 window.donneesCarteCombattant = function(idPersonnage, idCarte) {
+    // LES SERVITEURS N'ONT PAS DE CARTE : le compagnon du Pisteur et le zombie
+    // du Profanateur jouent un geste fixe (cerveau_combat.js, jouerServiteur).
+    // La fenêtre de tour affichait donc « Technique » et « Technique inconnue
+    // de ce poste » (Nico) : on leur donne une carte de lecture, au nom RP de
+    // l'attaque du compagnon (nommerAttaqueCompagnon, app.js).
+    const serviteur = window.carteServiteur ? window.carteServiteur(idPersonnage, idCarte) : null;
+    if (serviteur) return serviteur;
     return (window.COMPETENCES_CACHE || {})[idCarte]
         || ((window.CACHE_COMPETENCES_GLOBAL || {})[idPersonnage] || {})[idCarte]
         || (typeof window.carteTechniqueClasse === "function" ? window.carteTechniqueClasse(idCarte) : null)
         || null;
+};
+
+window.carteServiteur = function(idPersonnage, idCarte) {
+    if (idCarte !== "COMPAGNON_ATTAQUE" && idCarte !== "ZOMBIE_MORSURE") return null;
+    const fiche = (window.PERSOS_PARTIE || []).find(p => p && p.idPersonnage === idPersonnage)
+        || (window.MONSTRES_PARTIE || []).find(p => p && p.idPersonnage === idPersonnage) || {};
+    if (idCarte === "COMPAGNON_ATTAQUE") {
+        const nomBete = (fiche.prenom || fiche.Prenom_Personnage || "").trim();
+        return {
+            Nom: fiche.nomAttaque || (nomBete ? `Attaque de ${nomBete}` : "Attaque du compagnon"),
+            Effets_Compiles: [{ nom: "Attaque au contact", desc: "6 dégâts bruts (ni armure ni résistance)" },
+                              { nom: "Course", desc: "jusqu'à 3 cases vers l'ennemi, sans fatigue", isMod: true }]
+        };
+    }
+    return {
+        Nom: "Morsure",
+        Effets_Compiles: [{ nom: "Morsure au contact", desc: "7 dégâts physiques" },
+                          { nom: "Traîne", desc: "jusqu'à 2 cases vers l'ennemi, sans fatigue", isMod: true }]
+    };
 };
 
 // UNE DEMANDE DE CE POSTE REFUSÉE PAR LE CERVEAU (regime_cerveau.js, surRefus).
@@ -5618,8 +5644,17 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
         // bas de l'écran ; une créature, ou un héros qui n'en a pas, garde son
         // médaillon. La bascule tient dans cette seule classe, et hud_disposition.js
         // la lit pour savoir laquelle des deux géométries poser.
-        const enPied = !estCreature && !!perso.urlCloudinary;
+        //
+        // LE COMPAGNON DU PISTEUR montre son image de personnage, en entier,
+        // comme un héros — pas son pion rond (Nico). Elle est en paysage : la
+        // disposition la pose un peu plus bas (hud_disposition.js).
+        const estCompagnon = !!perso.compagnonDe && !!perso.urlCloudinary;
+        const enPied = (!estCreature || estCompagnon) && !!perso.urlCloudinary;
         const boitePion = document.getElementById("voile-tour-pion-boite");
+        if (boitePion && (boitePion.dataset.compagnon === "1") !== estCompagnon) {
+            boitePion.dataset.compagnon = estCompagnon ? "1" : "";
+            if (typeof window.appliquerReglagesEncart === "function") window.appliquerReglagesEncart();
+        }
         if (boitePion && boitePion.classList.contains("pion-avatar-entier") !== enPied) {
             boitePion.classList.toggle("pion-avatar-entier", enPied);
             // La forme vient de changer : ses mesures ne sont plus les bonnes.
@@ -5632,10 +5667,10 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
         // garde « a-t-elle changé ? » comparait undefined à undefined, l'image
         // n'était jamais posée, et le pion restait vide sans un mot.
         // Une créature : l'image de SON pion — un zombie y est un zombie.
-        const pionCreature = estCreature && typeof window.imagePionCreature === "function"
+        const pionCreature = estCreature && !estCompagnon && typeof window.imagePionCreature === "function"
             ? window.imagePionCreature(perso, () => window.rafraichirVoileTour(queueParam, phaseParam))
             : null;
-        const url = (estCreature
+        const url = (estCreature && !estCompagnon
             ? (pionCreature ? pionCreature.url : window.IMAGE_TOKEN_ENNEMI)
             : perso.urlCloudinary)
             || "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1786114507/Les_humains_h0ubwh.png";

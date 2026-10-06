@@ -308,7 +308,13 @@
                 pion.style.bottom = r.encartAvatar.bas + "%";
                 pion.style.width = "auto";
                 pion.style.height = "auto";
-                if (image) image.style.height = pc(r.encartAvatar.hauteur) + "px";
+                // Le compagnon du Pisteur : une bête en paysage (3:2). À la
+                // hauteur d'un héros en pied, elle passerait sous le nom de
+                // son attaque : sa largeur s'arrête là où le texte commence.
+                const hauteur = pc(r.encartAvatar.hauteur);
+                const largeurLibre = pc(r.encartCarte.x - r.encartAvatar.x - 2);
+                const h = pion.dataset.compagnon === "1" ? Math.min(hauteur, largeurLibre / 1.5) : hauteur;
+                if (image) image.style.height = h + "px";
             } else {
                 pion.style.left = r.encartPion.x + "%";
                 pion.style.top = r.encartPion.y + "%";
