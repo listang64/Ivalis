@@ -77,9 +77,31 @@ window.annulerIllustration = function(idPerso, idComp) {
 };
 let etatBadge = "";
 
+// L'INTERRUPTEUR DES PARAMÈTRES (demande de Nico) : la génération des images
+// des cartes peut être coupée. Gardé dans ce navigateur ; allumé par défaut.
+// Coupé, une compétence forgée ne part pas en illustration, et la file en
+// attente se met en pause (elle repart quand on le rallume) ; les images déjà
+// faites restent affichées.
+const CLE_ILLUSTRATION_ACTIVE = "ivalis_illustration_cartes";
+window.illustrationCartesActive = function() {
+    try { return localStorage.getItem(CLE_ILLUSTRATION_ACTIVE) !== "0"; } catch (e) { return true; }
+};
+window.basculerIllustrationCartes = function(actif) {
+    try { localStorage.setItem(CLE_ILLUSTRATION_ACTIVE, actif ? "1" : "0"); } catch (e) {}
+    window.afficherInterrupteurIllustration();
+    if (actif) traiterFile();
+};
+window.afficherInterrupteurIllustration = function() {
+    const caseACocher = document.getElementById("interrupteur-illustration-cartes");
+    if (caseACocher) caseACocher.checked = window.illustrationCartesActive();
+    const etat = document.getElementById("etat-illustration-cartes");
+    if (etat) etat.textContent = window.illustrationCartesActive() ? "Activée" : "Désactivée";
+};
+
 // Met une compétence en file. Elle sera illustrée dès que possible.
 window.illustrerCompetence = function(idPerso, idComp, nom) {
     if (!idPerso || !idComp) return;
+    if (!window.illustrationCartesActive()) return;
     const file = lireFile();
     if (!file.some(c => cleCommande(c) === `${idPerso}/${idComp}`)) {
         file.push({ idPerso, idComp, nom: nom || "", depuis: Date.now() });
@@ -90,9 +112,11 @@ window.illustrerCompetence = function(idPerso, idComp, nom) {
 
 async function traiterFile() {
     if (enCours) return;
+    if (!window.illustrationCartesActive()) return;
     enCours = true;
     try {
         for (;;) {
+            if (!window.illustrationCartesActive()) break;      // coupé en route : la file attend
             const file = lireFile();
             if (file.length === 0) break;
             const commande = file[0];

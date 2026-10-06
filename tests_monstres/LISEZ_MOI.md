@@ -184,6 +184,8 @@ node classes_feminin.mjs        # ♀ les noms de classe au féminin pour une h�
 node profanateur.mjs           # 🧟 le Profanateur : DOT ×1,3, +1 compétence, +5 PV (niv. 1), ses zombies (niv. 5 : 15 PV, morsure de 7, 2 cases, en dernier) et leur pion grignoté sans IA, le sursis (niv. 10)
 node pisteur.mjs               # 🐾 le Pisteur : son compagnon (25 PV, 15 % d'esquive, 6 bruts, 3 cases, juste après lui), +1 aux tirs, Tir précis (niv. 5), Lien de sang (niv. 10), la fenêtre du compagnon et son image
 node geomancien.mjs            # 🪨 le Géomancien : 5e case de zone offerte et +10 init (niv. 1), Mur de terre (murs de 10 PV, poussée, gravats), ses passifs (niv. 5), le dessin des murs sans IA
+node renommer_dev.mjs            # ✏️ renommer un héros depuis l'onglet DEV de sa fiche (Prenom_Personnage)
+node interrupteur_illustration.mjs # 🖼️ l'interrupteur des Paramètres : couper / rallumer la génération des images des cartes
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4923,3 +4925,30 @@ lisses et plus rocheux, et plus de gravats à leur base. »
 - PLUS DE GRAVATS AU PIED, devant (gravatsAuPied), toujours dans la case, et
   jamais du côté d'une voisine murée (ils ressortiraient sur sa roche).
 geomancien.mjs (sections 9 bis et 10).
+
+## Renommer un héros, couper les images des cartes, la pierre des murs (version 204)
+
+Nico : « dans l'onglet dev des fiches perso, fais-moi un champ pour changer
+les noms des personnages » ; « mets dans Paramètres un bouton poussoir pour
+activer ou désactiver la génération de photo dans les cartes de compétence » ;
+« le dessus des murs est trop lisse, fais comme si c'était de la roche — plus
+réaliste que ces traits bizarres ».
+- RENOMMER (onglet DEV de la fiche, index.html) : un champ « Nom du héros »,
+  rempli à l'ouverture de la fiche (afficherStatsCombat), et « Renommer » (ou
+  Entrée) — renommerPersoDev (creation_personnage.js) écrit Prenom_Personnage
+  sur sa fiche, puis met à jour le titre de la fiche et les listes en mémoire.
+  Un nom vide est refusé ; une écriture qui échoue ne change rien à l'écran.
+  renommer_dev.mjs.
+- L'INTERRUPTEUR DES IMAGES DES CARTES (menu Paramètres) : allumé par défaut,
+  gardé dans ce navigateur (ivalis_illustration_cartes). Coupé, une compétence
+  forgée ne part pas en illustration et la file en attente se met en pause
+  (illustration_competence.js) ; rallumé, elle repart. Les images déjà faites
+  restent affichées. interrupteur_illustration.mjs.
+- LE DESSUS DES MURS EN PIERRE (texturePierre, murs_terre.js) : plus de
+  facettes ni de traits — une texture calculée pixel par pixel : un bruit
+  fractal (des bosses de toutes tailles) éclairé du haut à gauche pour le
+  relief, un grain fin et un réseau de fissures qui suit les creux d'un second
+  bruit. Le motif est lu dans les coordonnées du plateau : deux murs voisins
+  continuent la même pierre. Le pilier seul a la même pierre sur son dessus.
+  geomancien.mjs (« pas un aplat » : la teinte la plus fréquente du dessus en
+  couvre moins de 5 % — 83 % avec l'ancien dessus).

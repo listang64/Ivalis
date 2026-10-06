@@ -173,6 +173,17 @@
         dessus.addColorStop(1, teinte([couleur[0], couleur[1] + 2], couleur[2]));
         ctx.fillStyle = dessus;
         ctx.fill();
+        if (rayon >= 14) {
+            ctx.save();
+            ctx.clip();
+            const T = Math.ceil(rayon * 2.4);
+            texturePierre(ctx, cx - T / 2, cy - hauteur - T / 2, T, T, [couleur[0], couleur[1] + 9, couleur[2]],
+                          Math.floor(alea() * 5000), Math.floor(alea() * 5000), Math.floor(alea() * 1e6));
+            ctx.restore();
+            ctx.beginPath();
+            haut.forEach((p, k) => k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+            ctx.closePath();
+        }
         ctx.strokeStyle = "rgba(30, 20, 12, 0.55)";
         ctx.stroke();
         if (alea() < 0.8) {
@@ -294,6 +305,66 @@
         }
         return dedans;
     };
+    // UN DESSUS DE PIERRE, CALCULÉ PIXEL PAR PIXEL : un bruit fractal (des
+    // bosses de toutes tailles) éclairé du haut à gauche — le relief —, un
+    // grain fin, et un réseau de fissures qui suit les creux du bruit. Le
+    // motif se lit dans les coordonnées DU PLATEAU (ox, oy) : deux murs voisins
+    // continuent la même pierre, sans raccord.
+    function bruitValeur(graine) {
+        const h = (x, y) => {
+            let n = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(graine, 1274126177)) | 0;
+            n = Math.imul(n ^ (n >>> 13), 1274126177);
+            n ^= n >>> 16;
+            return (n >>> 0) / 4294967296;
+        };
+        const lisse = (t) => t * t * (3 - 2 * t);
+        return (x, y) => {
+            const xi = Math.floor(x), yi = Math.floor(y), u = lisse(x - xi), v = lisse(y - yi);
+            const a = h(xi, yi), b = h(xi + 1, yi), c = h(xi, yi + 1), d = h(xi + 1, yi + 1);
+            return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+        };
+    }
+    function hslVersRgb(h, s, l) {
+        s /= 100; l /= 100;
+        const k = (n) => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
+        const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+        return [f(0) * 255, f(8) * 255, f(4) * 255];
+    }
+    function texturePierre(ctx, x0, y0, w, h, couleur, ox, oy, graine) {
+        const L = Math.max(1, Math.ceil(w)), H = Math.max(1, Math.ceil(h));
+        const tampon = document.createElement("canvas");
+        tampon.width = L; tampon.height = H;
+        const tctx = tampon.getContext("2d");
+        const img = tctx.createImageData(L, H);
+        const n1 = bruitValeur(graine >>> 0), n2 = bruitValeur((graine * 7 + 13) >>> 0), n3 = bruitValeur((graine * 31 + 5) >>> 0);
+        const fbm = (x, y) => n1(x / 22, y / 22) * 0.5 + n1(x / 11 + 17, y / 11 + 3) * 0.25
+                            + n1(x / 5.5 + 41, y / 5.5 + 29) * 0.15 + n1(x / 2.7 + 7, y / 2.7 + 61) * 0.1;
+        const [r0, g0, b0] = hslVersRgb(couleur[0], couleur[2], couleur[1]);
+        for (let j = 0; j < H; j++) {
+            for (let i = 0; i < L; i++) {
+                const X = ox + i, Y = oy + j;
+                const f = fbm(X, Y);
+                // Le relief : la pente vers la lumière (haut-gauche) éclaire.
+                const pente = (fbm(X - 1, Y - 1) - fbm(X + 1, Y + 1)) * 3.2;
+                // Les fissures : là où le second bruit passe par sa crête.
+                const crete = 1 - Math.abs(2 * n2(X / 13, Y / 13) - 1);
+                const fissure = crete > 0.95 ? (crete - 0.95) / 0.05 : 0;
+                const fine = 1 - Math.abs(2 * n3(X / 6, Y / 6) - 1);
+                const fissureFine = fine > 0.975 ? (fine - 0.975) / 0.025 * 0.5 : 0;
+                const grain = (n3(X * 0.9, Y * 0.9) - 0.5) * 0.08;
+                const k = 1 + (f - 0.5) * 0.3 + pente + grain - fissure * 0.38 - fissureFine * 0.25;
+                const o = (j * L + i) * 4;
+                img.data[o] = Math.max(0, Math.min(255, r0 * k));
+                img.data[o + 1] = Math.max(0, Math.min(255, g0 * k));
+                img.data[o + 2] = Math.max(0, Math.min(255, b0 * k));
+                img.data[o + 3] = 255;
+            }
+        }
+        tctx.putImageData(img, 0, 0);
+        ctx.drawImage(tampon, x0, y0);
+    }
+    const graineDe = (texte) => { let h = 2166136261 >>> 0; for (const ch of String(texte || "")) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0; return h; };
+
     // LA ROCHE MOINS LISSE : sur une face (le quadrilatère pied a→b, sommet
     // b→a), des taches claires et sombres, des fissures qui se ramifient, des
     // contours de blocs, des ébréchures au bord du haut et du grain.
@@ -425,7 +496,7 @@
         });
     }
 
-    window.dessinerMurTerre = function (graine, voisins, graineTeinte) {
+    window.dessinerMurTerre = function (graine, voisins, graineTeinte, origine) {
         const liens = (voisins || []).filter(v => v && (v.etat === "mur" || v.etat === "casse"));
         const canvas = document.createElement("canvas");
         canvas.width = MUR_L; canvas.height = MUR_H;
@@ -627,37 +698,36 @@
                 ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
             }
         });
-        // Grain et fissures du dessus.
+        // Grain et fissures du dessus — dans l'union des dessus. Tous les
+        // contours tournent dans le même sens : sinon, là où le cœur et un bras
+        // se recouvrent, leurs sens opposés s'annulent et la zone sort du découpage.
         ctx.save();
         ctx.beginPath();
-        pieces.forEach(pc => pc.pts.forEach((p, k) => { const t = haut(p); k ? ctx.lineTo(t.x, t.y) : ctx.moveTo(t.x, t.y); }));
+        pieces.forEach(pc => {
+            const t = pc.pts.map(haut);
+            const aire = t.reduce((acc, p, i) => { const q = t[(i + 1) % t.length]; return acc + p.x * q.y - q.x * p.y; }, 0);
+            (aire < 0 ? t.slice().reverse() : t).forEach((p, k) => k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+            ctx.closePath();
+        });
         ctx.clip();
-        const surLeDessus = () => ({ x: MUR_CX + (alea() - 0.5) * 2 * rayonInt, y: MUR_CY - HAUTEUR_MUR + (alea() - 0.5) * 2 * rayonInt });
-        for (let k = 0; k < 10; k++) {                          // les taches
-            const c = surLeDessus();
-            ctx.fillStyle = alea() < 0.5 ? `rgba(255, 248, 230, ${0.05 + alea() * 0.08})` : `rgba(30, 20, 12, ${0.06 + alea() * 0.09})`;
-            ctx.beginPath(); ctx.ellipse(c.x, c.y, 3 + alea() * 10, 2 + alea() * 6, alea() * Math.PI, 0, Math.PI * 2); ctx.fill();
-        }
-        for (let k = 0; k < 7; k++) {                           // les trous (un creux sombre, un rebord clair)
-            const c = surLeDessus(), r = 1 + alea() * 2.2;
-            ctx.fillStyle = "rgba(25, 17, 10, 0.4)"; ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = "rgba(255, 248, 235, 0.25)"; ctx.beginPath(); ctx.arc(c.x + r * 0.5, c.y + r * 0.6, r * 0.6, 0, Math.PI * 2); ctx.fill();
-        }
-        for (let k = 0; k < 90; k++) {                          // le grain
-            const c = surLeDessus();
-            ctx.fillStyle = alea() < 0.5 ? "rgba(255, 250, 240, 0.18)" : "rgba(30, 20, 12, 0.22)";
-            ctx.fillRect(c.x, c.y, 1.2 + alea(), 1.2 + alea());
-        }
-        ctx.strokeStyle = "rgba(40, 28, 18, 0.45)";
-        for (let k = 0; k < 4; k++) {
-            const a = alea() * Math.PI * 2;
-            ctx.beginPath();
-            ctx.moveTo(MUR_CX + Math.cos(a) * rayonInt * 0.4, MUR_CY - HAUTEUR_MUR + Math.sin(a) * rayonInt * 0.4);
-            ctx.lineTo(MUR_CX + (alea() - 0.5) * 8, MUR_CY - HAUTEUR_MUR + (alea() - 0.5) * 8);
-            ctx.lineTo(MUR_CX - Math.cos(a + 0.4) * rayonInt * 0.35, MUR_CY - HAUTEUR_MUR - Math.sin(a + 0.4) * rayonInt * 0.35);
-            ctx.stroke();
-        }
+        // La pierre du dessus, dans les coordonnées du plateau : la même
+        // d'une case à sa voisine.
+        const T = Math.ceil(rayonInt * 2.6);
+        const gx = MUR_CX - T / 2, gy = MUR_CY - HAUTEUR_MUR - T / 2;
+        texturePierre(ctx, gx, gy, T, T, [roche[0], roche[1] + 9, roche[2]],
+                      Math.round((origine ? origine.x : 0) + gx - MUR_CX), Math.round((origine ? origine.y : 0) + gy - MUR_CY + HAUTEUR_MUR),
+                      graineDe(graineTeinte || graine));
         ctx.restore();
+        ctx.strokeStyle = "rgba(30, 22, 16, 0.5)";
+        ctx.lineWidth = 1;
+        pieces.forEach(pc => {
+            const n = pc.pts.length;
+            for (let i = 0; i < n; i++) {
+                if (pc.joints.has(i) || (pc.cachees && pc.cachees.has(i))) continue;
+                const a = haut(pc.pts[i]), b = haut(pc.pts[(i + 1) % n]);
+                ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+            }
+        });
         // Des gravats au pied (devant : ceux de derrière seraient cachés).
         gravatsAuPied(ctx, alea, contours.filter(c => c[3] > 0.05), MUR_CX, MUR_CY, roche, libre);
         // Les éclats tombés au pied d'un bout cassé.
@@ -683,11 +753,11 @@
     // Les dessins, gardés : un canvas par mur et par voisinage (un mur qui
     // gagne ou perd une voisine se redessine), une image par tas de gravats.
     const CACHE = new Map();
-    const tuile = (graine, voisins, graineTeinte) => {
+    const tuile = (graine, voisins, graineTeinte, origine) => {
         const signature = (voisins || []).map(v => (v.etat || "-")[0] + Math.round(v.dx) + "," + Math.round(v.dy)).join("|");
-        const cle = "mur|" + graine + "|" + signature + "|" + (graineTeinte || "");
+        const cle = "mur|" + graine + "|" + signature + "|" + (graineTeinte || "") + "|" + (origine ? Math.round(origine.x) + "," + Math.round(origine.y) : "");
         if (!CACHE.has(cle)) {
-            try { CACHE.set(cle, window.dessinerMurTerre(graine, voisins, graineTeinte)); }
+            try { CACHE.set(cle, window.dessinerMurTerre(graine, voisins, graineTeinte, origine)); }
             catch (e) { CACHE.set(cle, null); }
         }
         return CACHE.get(cle);
@@ -746,7 +816,8 @@
         const projets = (window.POSE_MURS ? window.POSE_MURS.cases : []).map((c, i) => ({ ...c, projet: true, id: "projet_" + i + "_" + c.q + "_" + c.r }));
         const tous = [...murs, ...projets].map(m => {
             const px = window.PLATEAU_VTT.hexToPixel(m.q, m.r);
-            const dessin = m.projet ? tuile(m.id, null, null) : tuile(m.id, window.voisinsDuMur(m.q, m.r, echelle), m.idLanceur);
+            const dessin = m.projet ? tuile(m.id, null, null)
+                : tuile(m.id, window.voisinsDuMur(m.q, m.r, echelle), m.idLanceur, { x: px.x * echelle, y: px.y * echelle });
             return { m, px, x0: px.x - l / 2, y0: px.y - h * MUR_CY / MUR_H, dessin };
         }).filter(t => t.dessin);
         if (tous.length > 0) {

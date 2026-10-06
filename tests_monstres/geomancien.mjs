@@ -364,12 +364,16 @@ console.log("\n9 bis. LES MURS QUI SE SUIVENT, ET LEURS BOUTS CASSÉS");
     const ctx = ens.getContext("2d");
     // Le long de la colonne du milieu, du dessus de la case haute au dessus de la case basse.
     const H = 62 / ech;                                                  // la hauteur de la roche, en pixels du plateau
-    let trous = 0, ecart = 0;
+    let trous = 0, ecart = 0, sombre = 255;
+    const valeurs = [];
     const ref = ctx.getImageData(Math.round((300 - ox) * k), Math.round((300 - H - oy) * k), 1, 1).data;
     for (let y = 300 - H + 5; y < 300 + plat(0, 1).y - H - 5; y++) {
       const d = ctx.getImageData(Math.round((300 - ox) * k), Math.round((y - oy) * k), 1, 1).data;
       if (d[3] < 250) trous++;
       ecart = Math.max(ecart, Math.abs(d[0] - ref[0]));
+      valeurs.push(d[0]);
+      // La frontière (à ±4 px) : une couture s'y verrait.
+      if (Math.abs(y - (300 + plat(0, 1).y / 2 - H)) <= 4) sombre = Math.min(sombre, d[0]);
     }
     const v = window.voisinsDuMur(0, 0, ech).map(x => x.etat);
     // Le mur du bas casse : la case haute se redessine avec un bout cassé.
@@ -386,16 +390,26 @@ console.log("\n9 bis. LES MURS QUI SE SUIVENT, ET LEURS BOUTS CASSÉS");
       for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 250) v.add((d[i] >> 2) + "," + (d[i + 1] >> 2) + "," + (d[i + 2] >> 2)); return v.size; })();
     // Des gravats et de la terre au pied, devant (sous le cœur, dans la case).
     const auPied = opaques(haut, (x, y) => y > 130 + inR * 0.7 && y <= 130 + inR + 3);
-    return { ombres, teintes, auPied, sousLaCase, versHaut: opaques(haut, (x, y) => y < 130 - inR - 62 + 10), avecCasse: versLaCasse(casse), sansCasse: versLaCasse(haut),
-             trous, ecart, v: v.join(","), vApres: vApres.join(","), meme: haut.toDataURL() === window.dessinerMurTerre("A", voisins([null, null, "mur", null, null, null]), "G").toDataURL() };
+    // Un dessus de roche, pas lisse : beaucoup de teintes au centre du dessus.
+    const dessusTeintes = (() => { const d = haut.getContext("2d").getImageData(44, 130 - 62 - 20, 40, 40).data; const v = new Set();
+      for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 250) v.add(d[i] + "," + d[i + 1] + "," + d[i + 2]); return v.size; })();
+    // Pas d'aplat : la teinte la plus fréquente du dessus n'en couvre qu'une infime part.
+    const aplat = (() => { const d = haut.getContext("2d").getImageData(44, 130 - 62 - 20, 40, 40).data; const n = {}; let t = 0;
+      for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 250) { const k = d[i] + "," + d[i + 1] + "," + d[i + 2]; n[k] = (n[k] || 0) + 1; t++; }
+      return Math.max(...Object.values(n)) / Math.max(1, t); })();
+    return { ombres, teintes, auPied, dessusTeintes, aplat, sousLaCase, versHaut: opaques(haut, (x, y) => y < 130 - inR - 62 + 10), avecCasse: versLaCasse(casse), sansCasse: versLaCasse(haut),
+             trous, ecart, sombre, mediane: valeurs.slice().sort((a, b) => a - b)[Math.floor(valeurs.length / 2)], v: v.join(","), vApres: vApres.join(","), meme: haut.toDataURL() === window.dessinerMurTerre("A", voisins([null, null, "mur", null, null, null]), "G").toDataURL() };
   });
   verifier("rien ne déborde sous sa case (au sol)", r.sousLaCase === 0, String(r.sousLaCase));
   verifier("un bras de roche monte vers la case du dessus", r.versHaut > 200, String(r.versHaut));
-  verifier("deux murs voisins : une seule roche, sans trou ni couture sur la frontière", r.trous === 0 && r.ecart <= 30, `${r.trous} / ${r.ecart}`);
+  verifier("deux murs voisins : une seule roche, sans trou ni couture sur la frontière", r.trous === 0 && r.sombre >= r.mediane - 40,
+           `${r.trous} trou(s), sur la frontière ${r.sombre} (pierre ${r.mediane})`);
   verifier("une voisine cassée : un moignon et des éclats de son côté", r.avecCasse > r.sansCasse + 15, `${r.avecCasse} / ${r.sansCasse}`);
   verifier("plus d'ombre portée sous la roche (elle sort du sol)", r.ombres <= 5, String(r.ombres));
   verifier("une roche moins lisse : beaucoup de teintes (taches, fissures, grain)", r.teintes > 180, String(r.teintes));
   verifier("de la terre et des gravats à son pied, dans la case", r.auPied > 30, String(r.auPied));
+  verifier("le dessus : de la pierre, pas un aplat (aucune teinte ne domine)", r.dessusTeintes > 60 && r.aplat < 0.05,
+           `${r.dessusTeintes} teintes, la plus fréquente ${(r.aplat * 100).toFixed(1)} %`);
   verifier("les voisines vues : « mur » puis, cassée, « casse »", /mur/.test(r.v) && !/casse/.test(r.v) && /casse/.test(r.vApres) && !/mur/.test(r.vApres),
            `${r.v} → ${r.vApres}`);
   verifier("même voisinage, même dessin", r.meme);

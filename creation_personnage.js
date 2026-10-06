@@ -480,6 +480,9 @@ window.afficherStatsCombat = function(donnees) {
     if (elNiveauDev && typeof window.niveauDepuisXP === "function") {
         elNiveauDev.innerText = "Niveau " + window.niveauDepuisXP(window.xpDuPerso(donnees));
     }
+    // Le champ « Nom du héros » de l'onglet DEV, prêt à être changé.
+    const elNomDev = document.getElementById("dev-nom-perso");
+    if (elNomDev) elNomDev.value = donnees.prenom || donnees.Prenom_Personnage || "";
 
     const modPv = donnees.Dev_Mod_PV || 0;
     const modFatigue = donnees.Dev_Mod_Fatigue || 0;
@@ -626,6 +629,39 @@ window.changerNiveauDev = async function(delta) {
         alert("Échec du changement de niveau.");
     } finally {
         boutons.forEach(b => { b.style.pointerEvents = "auto"; });
+    }
+};
+
+// RENOMMER LE HÉROS (onglet DEV, demande de Nico). Le nom affiché partout est
+// le prénom (Prenom_Personnage) : on le change sur la fiche, puis tout de
+// suite à l'écran (titre de la fiche, listes en mémoire, pions) sans attendre
+// l'écouteur.
+window.renommerPersoDev = async function() {
+    const idPersonnage = document.getElementById("champ-id-personnage").value;
+    if (!idPersonnage) {
+        alert("Ouvrez d'abord la fiche d'un héros existant.");
+        return;
+    }
+    const champ = document.getElementById("dev-nom-perso");
+    const nom = ((champ && champ.value) || "").replace(/\s+/g, " ").trim();
+    if (!nom) { alert("Le héros doit posséder un nom."); return; }
+    const bouton = document.getElementById("btn-dev-renommer");
+    if (bouton) bouton.style.pointerEvents = "none";
+    try {
+        await updateDoc(doc(db, "Personnages", idPersonnage), { Prenom_Personnage: nom });
+        [window.PERSOS_PARTIE, window.PERSOS_JOUEURS_PARTIE, window.COMBAT_PERSOS_JOUEUR].forEach(liste => {
+            const p = (liste || []).find(x => x && x.idPersonnage === idPersonnage);
+            if (p) { p.prenom = nom; p.Prenom_Personnage = nom; }
+        });
+        const titre = document.getElementById("titre-nom-personnage");
+        if (titre) titre.innerText = nom;
+        if (champ) champ.value = nom;
+        if (typeof window.afficherMessageFlottant === "function") window.afficherMessageFlottant("Héros renommé : " + nom);
+    } catch (e) {
+        console.error("Renommer le héros :", e);
+        alert("Échec du changement de nom.");
+    } finally {
+        if (bouton) bouton.style.pointerEvents = "auto";
     }
 };
 

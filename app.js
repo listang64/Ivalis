@@ -5713,6 +5713,7 @@ window.ouvrirMenuPersonnages = function() {
 
 // 4. Bouton Paramètres
 window.ouvrirParametres = function() {
+  if (typeof window.afficherInterrupteurIllustration === "function") window.afficherInterrupteurIllustration();
   const menuParam = document.getElementById('conteneur-parametres');
   const estDejaOuvert = (menuParam.style.display === 'block' || menuParam.classList.contains('ouvert'));
   
