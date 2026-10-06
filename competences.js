@@ -1184,12 +1184,18 @@ function estUneAttaqueDeBase(nom) {
 }
 
 // LA RISTOURNE DE L'ÉTALEMENT se lit dans son coût au grimoire : « Cout / 1.2 »
-// divise le coût de l'action par 1,2. Elle était écrite en dur (1,3) et ne
-// suivait plus la base. 1,3 reste le secours si la base ne dit rien de lisible.
-function diviseurEtalement(effet) {
+// divise le coût de l'action par 1,2. 1,2 reste le secours si la base ne dit
+// rien de lisible (c'était 1,3 : le diviseur du seul Profanateur).
+//
+// LE PROFANATEUR divise par 1,3 (atout diviseurEtalement, app.js) : le plus
+// avantageux des deux l'emporte, pour lui seul.
+function diviseurEtalement(effet, perso) {
     const m = /\/\s*([\d.,]+)/.exec(String((effet && effet.Cout_PT) || ""));
     const d = m ? parseFloat(m[1].replace(",", ".")) : NaN;
-    return d > 1 ? d : 1.3;
+    const base = d > 1 ? d : 1.2;
+    const atout = (perso && typeof window.atoutRace === "function") ? (window.atoutRace(perso) || {}) : {};
+    const classe = Number(atout.diviseurEtalement) || 0;
+    return Math.max(base, classe);
 }
 window.diviseurEtalement = diviseurEtalement;
 
@@ -2127,7 +2133,7 @@ window.rafraichirForge = function() {
         
         let coutMods = 0;
         let aDOT = false;
-        let diviseurDOT = 1.3;
+        let diviseurDOT = 1.2;
         // LA RISTOURNE DE L'ÉTALEMENT NE VAUT QUE POUR LA ZONE, LES DÉGÂTS, LES
         // SOINS ET LA DISTANCE (règle de Nico) — pas pour les effets associés
         // (états, Durée +, etc.). On met donc de côté la part « étalable » du
@@ -2175,7 +2181,7 @@ window.rafraichirForge = function() {
                         : Math.max(0, zoneLen - 1));
                 } else if (modEff.Nom === "DOT" || modEff.Nom === "Durée étalement dégâts") {
                     aDOT = true;
-                    diviseurDOT = diviseurEtalement(modEff);
+                    diviseurDOT = diviseurEtalement(modEff, window.forgeState && window.forgeState.statsPerso);
                 } else {
                     coutCeMod = parseFrenchFloat(modEff.Cout_PT) * modCount;
                 }

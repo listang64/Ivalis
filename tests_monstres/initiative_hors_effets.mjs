@@ -158,6 +158,41 @@ console.log("\n1 bis. L'ÉTALEMENT NE REMISE QUE LA ZONE, LES DÉGÂTS, LES SOIN
            `${pc.soinEtaleBrule} PC`);
 }
 
+console.log("\n1 ter. LE PROFANATEUR : SA PART ÉTALÉE DIVISÉE PAR 1,3 (LES AUTRES : 1,2)");
+{
+  // Nico : « ce n'est pas du tout ×1,3 dégâts. C'est étalé : la fatigue est
+  // de base divisée par 1,2, sauf pour le Profanateur, le coût en fatigue est
+  // divisé par 1,3. » Attaque légère ×2 étalée + Brûlé ×2 : seule la part
+  // étalable (les 4 PC d'attaque) change de diviseur.
+  const pc = await p.evaluate(({ effets, attaque, dot, brule }) => {
+    const base = effets.find(e => e.id === attaque);
+    const cout = (statsPerso, mods) => {
+      window.forgeState.effetsBDD = effets;
+      window.forgeState.statsPerso = statsPerso;
+      window.forgeState.actions = [{ idInst: "A1", baseEffet: base, count: 2, baseDuree: 0,
+                                     mods, modsDuree: {}, zoneHexes: [] }];
+      window.rafraichirForge();
+      return { pc: parseFloat(document.getElementById("forge-cout-pc").innerText),
+               fatigue: parseInt(document.getElementById("forge-fatigue-val").innerText) };
+    };
+    const prof = { classe: "Profanateur", race: "Humain", xp: 0 };
+    const autre = { classe: "Assassin", race: "Humain", xp: 0 };
+    const r = {
+      autre: cout(autre, { [dot]: 1, [brule]: 2 }),
+      prof: cout(prof, { [dot]: 1, [brule]: 2 }),
+      profSansEtal: cout(prof, { [brule]: 2 }),
+      autreSansEtal: cout(autre, { [brule]: 2 })
+    };
+    window.forgeState.statsPerso = {};
+    return r;
+  }, { effets, attaque: id("Attaque légère"), dot: id("Durée étalement dégâts"), brule: id("Brûlé") });
+  verifier("un autre héros : 4/1,2 + 2", Math.abs(pc.autre.pc - (4 / 1.2 + 2)) < 0.06, `${pc.autre.pc} PC, ${pc.autre.fatigue} de fatigue`);
+  verifier("le Profanateur : 4/1,3 + 2 (moins de fatigue)", Math.abs(pc.prof.pc - (4 / 1.3 + 2)) < 0.06 && pc.prof.fatigue < pc.autre.fatigue,
+           `${pc.prof.pc} PC, ${pc.prof.fatigue} de fatigue`);
+  verifier("sans étalement : le Profanateur paie comme tout le monde", pc.profSansEtal.pc === pc.autreSansEtal.pc,
+           `${pc.profSansEtal.pc} / ${pc.autreSansEtal.pc}`);
+}
+
 console.log("\n2. LE GÉNÉRATEUR DE MONSTRES SUIT LA MÊME LISTE");
 {
   const forge = await p.evaluate(() => window.MOTS_HORS_INITIATIVE);

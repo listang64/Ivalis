@@ -939,13 +939,15 @@ window.ATOUTS_CLASSES = {
         { niveau: 5,  techniques: ["CLASSE_BOUCLIER_ANTIMAGIE"] },
         { niveau: 10, techniques: ["CLASSE_APPEL_LUMIERE"] }
     ],
-    // LE PROFANATEUR : ses dégâts sur la durée font 30 % de plus (poison,
-    // brûlure, saignement, dégâts étalés — dotBonus, cerveau_combat.js et
-    // moteur_pur.js), +1 compétence, +5 PV ; au niveau 5, ses zombies
+    // LE PROFANATEUR : à la Forge, la part étalée d'une compétence lui coûte
+    // moins cher — sa fatigue est divisée par 1,3 au lieu du 1,2 de base
+    // (diviseurEtalement, competences.js). Ce n'était PAS un bonus de dégâts :
+    // le ×1,3 sur ses poisons et ses étalements était une erreur (Nico).
+    // +1 compétence, +5 PV ; au niveau 5, ses zombies
     // (combat_etat.js, zombifier) ; au niveau 10, le sursis de l'ancien
     // Nécromancien (2 tours debout à zéro PV, une fois par combat).
     "Profanateur": [
-        { niveau: 1,  dotBonus: 30, competences: 1, pvMax: 5 },
+        { niveau: 1,  diviseurEtalement: 1.3, competences: 1, pvMax: 5 },
         { niveau: 5,  zombies: true },
         { niveau: 10, sursis: 2 }
     ],
@@ -970,7 +972,9 @@ window.ATOUTS_CLASSES = {
     "Géomancien": [
         { niveau: 1,  zoneGratuite: true, initiativeZone: 10 },
         { niveau: 5,  techniques: ["CLASSE_MUR_DE_TERRE"], zonesInoffensives: true, terrainFacile: true,
-                      traverseSesMurs: true }
+                      traverseSesMurs: true },
+        // Niveau 10 : ses zones persistantes durent un tour de plus (4 au lieu de 3).
+        { niveau: 10, zonesProlongees: 1 }
     ],
     // LA SENTINELLE : +6 à ses attaques d'opportunité et +20 % de soins reçus
     // (mouvement_pur.js, moteur_pur.js) ; au niveau 5, le Défenseur — 30 % de
@@ -1301,7 +1305,7 @@ window.texteAtout = function(cle, valeur) {
         case "provocationAttaques": return `${n} % de chance de provoquer la cible de chacune de ses attaques`;
         case "bonusSoin":      return `${plus(n)} à chacun de ses soins`;
         case "initiative":     return `${plus(n)} d'initiative sur ses compétences`;
-        case "dotBonus":       return `Dégâts sur la durée (poison, brûlure, saignement, étalés) ×${(1 + n / 100).toFixed(1).replace(".", ",")}`;
+        case "diviseurEtalement": return `Forge : la fatigue des dégâts étalés est divisée par ${String(n).replace(".", ",")} (au lieu de 1,2)`;
         case "compagnon":      return "Un compagnon animal combat à ses côtés : 25 PV, 15 % d'esquive, 6 dégâts bruts, 3 cases, joue juste après lui";
         case "bonusDistance":  return `${plus(n)} dégât à chaque attaque de ses compétences à arme à distance`;
         case "zoneGratuite":   return "Forge : la 5e case de zone payante d'une compétence ne coûte rien";
@@ -1309,6 +1313,7 @@ window.texteAtout = function(cle, valeur) {
         case "zonesInoffensives": return "Ses zones ne lui infligent aucun dégât";
         case "terrainFacile":  return "Se déplace sur le terrain difficile comme sur un terrain normal";
         case "traverseSesMurs": return "Traverse ses murs de terre";
+        case "zonesProlongees": return `Ses zones persistantes durent ${n === 1 ? "un" : n} tour${n > 1 ? "s" : ""} de plus`;
         case "zombies":        return "Les ennemis qu'il tue, ou qui tombent à côté de lui, se relèvent en zombies à son service";
         case "degatsOpportunite": return `${plus(n)} aux dégâts de ses attaques d'opportunité`;
         case "defenseur":      return `Défenseur : ${n} % de chance de frapper l'ennemi qui entre dans sa zone`;

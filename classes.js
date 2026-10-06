@@ -149,7 +149,9 @@ window.DESCRIPTIFS_CLASSES = {
             { niveau: 5, titre: "Passifs",
               points: ["Ses zones ne lui infligent aucun dégât",
                        "Le terrain difficile ne le ralentit pas",
-                       "Il traverse ses propres murs"] }
+                       "Il traverse ses propres murs"] },
+            { niveau: 10, titre: "Terre tenace",
+              points: ["Ses zones persistantes durent un tour de plus (4 au lieu de 3)"] }
         ]
     },
     CLASSE_PROFANATEUR: {
@@ -158,7 +160,7 @@ window.DESCRIPTIFS_CLASSES = {
             + "et la mort elle-même doit attendre son tour avant de le prendre.",
         paliers: [
             { niveau: 1, titre: "Souillure",
-              points: ["Dégâts sur la durée ×1,3 (poison, brûlure, saignement, dégâts étalés)",
+              points: ["Forge : la fatigue des dégâts étalés est divisée par 1,3 (au lieu de 1,2)",
                        "+1 compétence à créer", "+5 PV"] },
             { niveau: 5, titre: "Passif : Relève des morts",
               points: ["Un ennemi qu'il tue, ou qui tombe à côté de lui, se relève en zombie à son service",

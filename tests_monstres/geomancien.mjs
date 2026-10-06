@@ -25,7 +25,7 @@ import path from 'path';
 import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 import { construireEtatCombat, clonerEtat, appliquerEntree, verifierEtatCombat, creerDes, MUR_TERRE,
          plateauDeCombat, murEn, cleGravats } from '../combat_etat.js';
-import { ligneDeVue, traverserZones } from '../moteur_pur.js';
+import { ligneDeVue, traverserZones, creerZonePure, vieillirZones } from '../moteur_pur.js';
 import { coutDuPas, planifierTrajet, trouverChemin } from '../mouvement_pur.js';
 import { casesAccessibles } from '../ia_pure.js';
 import { prochainPas, validerIntention, jouerCreature } from '../cerveau_combat.js';
@@ -89,6 +89,27 @@ console.log("\n1. LES PALIERS");
     verifier("en combat : les passifs voyagent", e.combattants.G.atouts.traverseSesMurs && e.combattants.G.atouts.terrainFacile
              && e.combattants.G.atouts.zonesInoffensives && !e.combattants.H.atouts.traverseSesMurs);
     verifier("un nouveau combat : ni mur ni gravats", JSON.stringify(e.murs) === "{}" && JSON.stringify(e.gravats) === "{}");
+}
+
+console.log("\n1 bis. NIVEAU 10 : SES ZONES PERSISTANTES DURENT UN TOUR DE PLUS");
+{
+    // Nico : « Géomancien, lvl 10 : les zones persistantes durent un tour de plus. »
+    const a5 = w.atoutRace(geomancien(5)), a10 = w.atoutRace(geomancien(10));
+    verifier("niveau 10 : +1 tour aux zones (pas avant)", a10.zonesProlongees === 1 && !a5.zonesProlongees,
+             `${a5.zonesProlongees} / ${a10.zonesProlongees}`);
+    verifier("écrit en clair", /un tour de plus/.test(w.texteAtout("zonesProlongees", 1)), w.texteAtout("zonesProlongees", 1));
+    const nappe = (niveau, lanceur = "G") => {
+        const e = monde(niveau);
+        const action = { attaques: [{ valeurBrute: 5, typeRes: "Magique" }], alterations: [] };
+        return creerZonePure(e, action, [{ q: 3, r: 3 }, { q: 4, r: 3 }], lanceur);
+    };
+    verifier("sa nappe au niveau 10 : 4 tours", nappe(10).dureeRestante === 4, String(nappe(10).dureeRestante));
+    verifier("au niveau 5 : 3 tours, comme tout le monde", nappe(5).dureeRestante === 3, String(nappe(5).dureeRestante));
+    verifier("la nappe d'un autre, même à côté d'un Géomancien 10 : 3 tours", nappe(10, "H").dureeRestante === 3);
+    // Elle vit bien quatre fins de manche.
+    const e = monde(10); const z = nappe(10); e.zones = { [z.id]: z };
+    let fins = 0; while (Object.keys(e.zones).length && fins < 10) { vieillirZones(e); fins++; }
+    verifier("elle s'efface à la 4e fin de manche", fins === 4, String(fins));
 }
 
 console.log("\n2. NIVEAU 1 : LA FORGE ET L'INITIATIVE");

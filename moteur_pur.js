@@ -1047,9 +1047,13 @@ export function creerZonePure(etat, action, hexes, idLanceur) {
     const id = `zp_${nombre(etat.version)}_${idLanceur || "x"}`;
     const type = etatDeZone ? (alt.typeZone || "neutre") : (soin ? "soin" : "neutre");
 
+    // 3 tours, fixes (la Forge masque le bouton ⏳ sur ce mod) — un de plus
+    // pour le Géomancien de niveau 10 (atout zonesProlongees).
+    const lanceur = idLanceur ? combattant(etat, idLanceur) : null;
+    const enPlus = nombre(lanceur && lanceur.atouts && lanceur.atouts.zonesProlongees);
     return {
         id, hexes: emprise, type, degats, soin, etat: etatDeZone,
-        dureeRestante: 3,          // Fixe : la Forge masque le bouton ⏳ sur ce mod
+        dureeRestante: 3 + Math.max(0, enPlus),
         idLanceur: idLanceur || null
     };
 }
@@ -1777,10 +1781,7 @@ export function resoudreCarte(etat, action, plateau) {
                 // (compte.degats vaut zéro) ; tout est rangé dans l'état, une part
                 // par fin de manche, autant de parts que de tours.
                 if ((compte.tics || []).length > 0) {
-                    // Le Profanateur étale plus fort (×1,3, arrondi à l'inférieur).
-                    const bonusDot = nombre(lanceur.atouts && lanceur.atouts.dotBonus);
-                    const tics = bonusDot > 0 ? compte.tics.map(t => Math.floor(nombre(t) * (1 + bonusDot / 100))) : compte.tics;
-                    empilerEtalement(cible, attaque.versEnergie ? ETAT_TENEBRES_ETALEES : "Étalement", tics, idLanceur);
+                    empilerEtalement(cible, attaque.versEnergie ? ETAT_TENEBRES_ETALEES : "Étalement", compte.tics, idLanceur);
                     etapes.push({ type: "etats", cible: idCible, liste: cible.etats });
                 }
 

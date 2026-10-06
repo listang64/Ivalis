@@ -3426,7 +3426,12 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
             return;
         }
         if ((attaque.valeurBrute || 0) <= 0) return;
-        attaque.valeurBrute += degatsTous + bonusDistance + (attaque.typeRes === "Magique" ? degatsMag : degatsPhys);
+        // La bague de dégâts sert les attaques magiques ET les attaques
+        // brutes (Nico) ; une attaque brute physique garde aussi les dégâts
+        // physiques de l'arme.
+        const estMagique = attaque.typeRes === "Magique";
+        attaque.valeurBrute += degatsTous + bonusDistance + (estMagique ? degatsMag : degatsPhys)
+            + (attaque.brut && !estMagique ? degatsMag : 0);
         // Bénédiction offensive d'une bague de soin : un pourcentage en plus,
         // appliqué APRÈS les dégâts plats, comme un dernier multiplicateur.
         if (bonusDegatsPct > 0) attaque.valeurBrute = Math.round(attaque.valeurBrute * (1 + bonusDegatsPct / 100));

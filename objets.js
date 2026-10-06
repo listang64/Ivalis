@@ -97,9 +97,16 @@ window.CARACS_ARMURE = {
     "Armure intermédiaire": ["DEXTÉRITÉ", "SAGESSE"],
     "Armure lourde":        ["FORCE"]
 };
+// LES BAGUES DE DÉGÂTS AUSSI (Nico) : l'intelligence OU le charisme — le
+// mage et le diseur de mots de pouvoir y ont droit tous les deux. Lue par
+// MODÈLE, pour que les bagues déjà trouvées suivent la règle.
+window.CARACS_MODELE = {
+    "Bagues DPS": ["INTELLIGENCE", "CHARISME"]
+};
 window.caracsRequisesObjet = function(objet) {
     if (!objet) return [];
-    return window.CARACS_ARMURE[objet.type] || (objet.carac ? [objet.carac] : []);
+    return window.CARACS_ARMURE[objet.type] || window.CARACS_MODELE[objet.modele]
+        || (objet.carac ? [objet.carac] : []);
 };
 // « Intelligence ou Charisme », prêt à écrire dans une phrase.
 window.texteCaracsObjet = function(objet) {
@@ -114,7 +121,7 @@ window.texteCaracsObjet = function(objet) {
 window.CLES_BONUS = [
     "critique",          // points de % de coup critique
     "degatsPhys",        // dégâts plats sur les attaques physiques
-    "degatsMag",         // dégâts plats sur les attaques magiques
+    "degatsMag",         // dégâts plats sur les attaques magiques ou brutes
     "degats",            // dégâts plats, quel que soit le type (effets A/B)
     "soin",              // points de soin en plus
     "initiative",        // initiative des cartes lancées
@@ -694,7 +701,7 @@ window.tirerObjetPourDifficulte = function(difficulte) {
 const LIBELLES_BONUS = {
     critique:          v => `+${v}% de coup critique`,
     degatsPhys:        v => `+${v} dégât${v > 1 ? "s" : ""} physique${v > 1 ? "s" : ""}`,
-    degatsMag:         v => `+${v} dégât${v > 1 ? "s" : ""} magique${v > 1 ? "s" : ""}`,
+    degatsMag:         v => `+${v} dégât${v > 1 ? "s" : ""} magique${v > 1 ? "s" : ""} ou brut${v > 1 ? "s" : ""}`,
     degats:            v => `+${v} dégât${v > 1 ? "s" : ""}`,
     soin:              v => `+${v} soin${v > 1 ? "s" : ""}`,
     initiative:        v => `+${v} d'initiative`,

@@ -10,8 +10,11 @@
 // d'être mis KO (l'ancienne mécanique du Nécromancien). Pour les tokens
 // ennemis qui reviennent en zombie, un algo qui grignote un peu l'image du
 // token, et dessine un peu de sang dessus, sans IA. »
-// Ses réponses : ×1,3 sur tous ses dégâts sur la durée, arrondis à
-// l'inférieur ; le zombie passe dans son camp, joué par l'IA ; il n'a lui-même
+// Corrigé ensuite (Nico) : « ce n'est pas du tout ×1,3 dégâts. C'est étalé :
+// la fatigue est de base divisée par 1,2, sauf pour le Profanateur, le coût en
+// fatigue est divisé par 1,3. » Ses dégâts sur la durée sont donc ceux de tout
+// le monde ; son atout joue à la Forge (initiative_hors_effets.mjs, 1 ter).
+// Ses réponses : le zombie passe dans son camp, joué par l'IA ; il n'a lui-même
 // ni parade ni esquive ; il joue en dernier (initiative 0), sans fatigue ;
 // jusqu'à ce qu'on le retue, ne revient pas, ne rapporte rien une 2e fois ;
 // les boss aussi.
@@ -66,18 +69,20 @@ console.log("=========================================================");
 console.log("\n1. LES PALIERS");
 {
     const a1 = w.atoutRace(profanateur(1)), a5 = w.atoutRace(profanateur(5)), a10 = w.atoutRace(profanateur(10));
-    verifier("niveau 1 : DOT +30 %, +1 compétence, +5 PV", a1.dotBonus === 30 && a1.competences === 1 && a1.pvMax === 5 && !a1.zombies,
+    verifier("niveau 1 : étalement ÷1,3 à la Forge, +1 compétence, +5 PV", a1.diviseurEtalement === 1.3 && !a1.dotBonus
+             && a1.competences === 1 && a1.pvMax === 5 && !a1.zombies,
              JSON.stringify(a1));
     verifier("niveau 5 : les zombies", a5.zombies === true && !a5.sursis);
     verifier("niveau 10 : le sursis (2 tours)", a10.sursis === 2 && a10.zombies === true);
     verifier("PV max +5, 7 compétences en main", w.pvMaxCombattant(profanateur(1)) === 105 && w.competencesMaxCombattant(profanateur(1)) === 7);
-    verifier("écrit en clair : « ×1,3 »", /×1,3/.test(w.texteAtout("dotBonus", 30)) && /zombies/.test(w.texteAtout("zombies", true)));
+    verifier("écrit en clair : « divisée par 1,3 »", /divisée par 1,3/.test(w.texteAtout("diviseurEtalement", 1.3))
+             && /zombies/.test(w.texteAtout("zombies", true)), w.texteAtout("diviseurEtalement", 1.3));
     const e = monde(10);
-    verifier("en combat : les atouts voyagent", e.combattants.P.atouts.dotBonus === 30 && e.combattants.P.atouts.zombies === true
+    verifier("en combat : les atouts voyagent", e.combattants.P.atouts.zombies === true
              && e.combattants.P.atouts.sursis === 2);
 }
 
-console.log("\n2. NIVEAU 1 : SES DÉGÂTS SUR LA DURÉE ×1,3");
+console.log("\n2. NIVEAU 1 : SES DÉGÂTS SUR LA DURÉE SONT CEUX DE TOUT LE MONDE");
 {
     const tic = (etatNom, source, extra = {}) => {
         const e = monde(1, { M1: { q: 9, r: 9 } });
@@ -86,16 +91,16 @@ console.log("\n2. NIVEAU 1 : SES DÉGÂTS SUR LA DURÉE ×1,3");
         return { pv: 100 - e.combattants.M2.pv, fatigue: 100 - e.combattants.M2.fatigue };
     };
     const poisonP = tic("Empoisonnement", "P"), poisonH = tic("Empoisonnement", "H");
-    verifier("poison : 8 → 10 PV, 10 → 13 d'énergie (un autre : 8 et 10)",
-             poisonP.pv === 10 && poisonP.fatigue === 13 && poisonH.pv === 8 && poisonH.fatigue === 10, JSON.stringify([poisonP, poisonH]));
-    verifier("brûlure : 8 → 10", tic("Brûlé", "P").pv === 10 && tic("Brûlé", "H").pv === 8);
-    verifier("saignement : 8 → 10", tic("Saignement", "P").pv === 10 && tic("Saignement", "H").pv === 8);
-    // Étalée : 10 sur 2 tours → 5 + 5 → ×1,3 → 6 + 6.
+    verifier("poison : 8 PV, 10 d'énergie, comme un autre (plus de ×1,3)",
+             poisonP.pv === 8 && poisonP.fatigue === 10 && poisonH.pv === 8 && poisonH.fatigue === 10, JSON.stringify([poisonP, poisonH]));
+    verifier("brûlure : 8, comme un autre", tic("Brûlé", "P").pv === 8 && tic("Brûlé", "H").pv === 8);
+    verifier("saignement : 8, comme un autre", tic("Saignement", "P").pv === 8 && tic("Saignement", "H").pv === 8);
+    // Étalée : 10 sur 2 tours → 5 + 5, pour lui comme pour un autre.
     const e = monde(1, { M1: { q: 9, r: 9 } });
     const r = coup(e, "P", "M2", 10, { estEtalement: true, toursEtalement: 2 });
     const etal = r.etat.combattants.M2.etats.find(x => x.nom === "Étalement");
     const rh = coup(monde(1, { M1: { q: 9, r: 9 } }), "H", "M2", 10, { estEtalement: true, toursEtalement: 2 });
-    verifier("dégâts étalés : 5 + 5 → 6 + 6 (un autre : 5 + 5)", etal && JSON.stringify(etal.tics) === "[6,6]"
+    verifier("dégâts étalés : 5 + 5 (un autre : 5 + 5)", etal && JSON.stringify(etal.tics) === "[5,5]"
              && JSON.stringify(rh.etat.combattants.M2.etats.find(x => x.nom === "Étalement").tics) === "[5,5]", JSON.stringify(etal));
     // Le saignement retient son auteur.
     const s = resoudreCarte(monde(1), { type: "carte", idLanceur: "P", idCarte: "C", critique: false, attaques: [],
@@ -412,8 +417,8 @@ console.log("\n8. LA FICHE DE CLASSE");
              niveaux: [...d.querySelectorAll(".palier-classe-niveau")].map(x => x.textContent.trim()) };
   });
   await p.screenshot({ path: "/tmp/claude-0/profanateur_classe.png" });
-  verifier("Niv. 1 / 5 / 10 : ×1,3, zombie 15 PV / 7 dégâts / 2 cases, sursis 2 tours",
-           JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 5","Niv. 10"]' && /×1,3/.test(r.texte) && /15 PV/.test(r.texte)
+  verifier("Niv. 1 / 5 / 10 : étalement ÷1,3, zombie 15 PV / 7 dégâts / 2 cases, sursis 2 tours",
+           JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 5","Niv. 10"]' && /divisée par 1,3/.test(r.texte) && !/×1,3/.test(r.texte) && /15 PV/.test(r.texte)
            && /7 dégâts/.test(r.texte) && /2 cases/.test(r.texte) && /2 tours/.test(r.texte));
   verifier("pour une héroïne : « Profanatrice »", r.titre === "Profanatrice", r.titre);
 }

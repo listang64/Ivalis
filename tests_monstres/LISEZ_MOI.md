@@ -186,6 +186,7 @@ node pisteur.mjs               # 🐾 le Pisteur : son compagnon (25 PV, 15 % d'
 node geomancien.mjs            # 🪨 le Géomancien : 5e case de zone offerte et +10 init (niv. 1), Mur de terre (murs de 10 PV, poussée, gravats), ses passifs (niv. 5), le dessin des murs sans IA
 node renommer_dev.mjs            # ✏️ renommer un héros depuis l'onglet DEV de sa fiche (Prenom_Personnage)
 node proprio_dev.mjs             # 🤝 confier un héros à un autre joueur depuis l'onglet DEV (ID_Joueur)
+node bagues_dps.mjs              # 💍 les bagues de dégâts : Intelligence ou Charisme (la meilleure), bonus sur le magique ou le brut
 node interrupteur_illustration.mjs # 🖼️ l'interrupteur des Paramètres : couper / rallumer la génération des images des cartes
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
@@ -5012,3 +5013,30 @@ l'appartenance d'un personnage à un autre joueur ».
   « Confier » après confirmation — seul ID_Joueur est écrit sur la fiche, les
   listes en mémoire suivent. Un propriétaire hors liste (le MJ) reste affiché.
   proprio_dev.mjs.
+
+## Profanateur corrigé, Géomancien niveau 10, bagues de dégâts (version 207)
+
+Nico : « pour le Profanateur, il y a une erreur, tu as mis ×1,3 dégâts, ce
+n'est pas du tout ça. C'est étalé : la fatigue est de base divisée par 1,2,
+sauf pour le Profanateur, le coût en fatigue est divisé par 1,3 » ; « Géomancien
+lvl 10 : les zones persistantes durent un tour de plus » ; « les bagues qui font
+des dégâts en plus : à la fois pour l'intelligence et le charisme, la plus
+grande des deux pour l'équiper, et les dégâts rajoutés au brut ou au magique ».
+- LE PROFANATEUR (app.js, competences.js) : plus aucun ×1,3 sur ses poisons,
+  brûlures, saignements ni étalements (cerveau_combat.js, moteur_pur.js : ils
+  sont ceux de tout le monde). Son atout du niveau 1 devient
+  `diviseurEtalement: 1.3` : à la Forge, la part étalable de la compétence
+  est divisée par 1,3 au lieu du 1,2 du grimoire (diviseurEtalement prend le
+  plus avantageux des deux). Le secours, si le grimoire ne dit rien de
+  lisible, passe de 1,3 à 1,2. initiative_hors_effets.mjs (1 ter),
+  profanateur.mjs.
+- LE GÉOMANCIEN, NIVEAU 10 (« Terre tenace ») : atout `zonesProlongees: 1`,
+  porté en combat ; ses zones persistantes naissent avec 4 tours au lieu de 3
+  (creerZonePure, moteur_pur.js). Celles des autres ne changent pas.
+  geomancien.mjs (1 bis).
+- LES BAGUES DE DÉGÂTS (objets.js, moteur_effets.js) : CARACS_MODELE ouvre
+  « Bagues DPS » à l'Intelligence OU au Charisme — la meilleure des deux,
+  comme une armure légère, bagues déjà trouvées comprises. Leur bonus
+  (degatsMag) s'ajoute aux attaques magiques et aux attaques brutes ; une
+  brute physique garde aussi les dégâts physiques de l'arme. La bague de soin
+  reste à la Sagesse. bagues_dps.mjs.

@@ -536,13 +536,8 @@ function regenerationDe(c) {
 // L'ORDRE COMPTE, et c'est celui de l'ancien monde : l'immobilisation puise
 // l'énergie tant que l'état dure, le poison mord une fois, l'étalement porte
 // son reste — PUIS tout vieillit d'un cran (vieillirLesEtats, juste après).
-// LE PROFANATEUR : ses dégâts sur la durée font 30 % de plus (dotBonus),
-// arrondis à l'inférieur. L'auteur est celui que l'état a retenu (`idSource`).
-const parDot = (etat, idSource, montant) => {
-    const auteur = idSource ? combattant(etat, idSource) : null;
-    const bonus = nombre(auteur && auteur.atouts && auteur.atouts.dotBonus);
-    return bonus > 0 ? Math.floor(nombre(montant) * (1 + bonus / 100)) : nombre(montant);
-};
+// (Le ×1,3 du Profanateur sur ces dégâts était une erreur : son atout est un
+// rabais de fatigue à la Forge, pas un bonus de dégâts — voir app.js.)
 
 export function ticsDeFinDeManche(etat) {
     const etapes = [];
@@ -576,7 +571,7 @@ export function ticsDeFinDeManche(etat) {
             poison.tickFait = true;
             const regle = poison.maitre ? POISON_MAITRE : POISON;
 
-            const energie = parDot(etat, poison.idSource, Math.ceil(nombre(c.fatigueMax) * (regle.energiePct / 100)));
+            const energie = Math.ceil(nombre(c.fatigueMax) * (regle.energiePct / 100));
             const fatigueApres = Math.max(0, nombre(c.fatigue) - energie);
             if (fatigueApres !== nombre(c.fatigue)) {
                 c.fatigue = fatigueApres;
@@ -584,7 +579,7 @@ export function ticsDeFinDeManche(etat) {
                               tic: "Empoisonnement" });
             }
 
-            const morsure = parDot(etat, poison.idSource, Math.ceil(nombre(c.pvMax) * (regle.pvMaxPct / 100)));
+            const morsure = Math.ceil(nombre(c.pvMax) * (regle.pvMaxPct / 100));
             if (morsure > 0) {
                 const compte = chaineDeDegats(c, { valeurBrute: morsure, typeRes: regle.typeRes, brut: !!regle.brut }, {});
                 if (compte.degats > 0) etapes.push(...infligerTic(c, id, compte.degats, "Empoisonnement", etat, poison.idSource));
@@ -602,7 +597,7 @@ export function ticsDeFinDeManche(etat) {
             const regle = REGLES_ETATS["Brûlé"] || {};
             // regleDesEtats plutôt que la règle seule : le Vampire brûle à
             // 18 % de ses PV max, pas à 8 (brulureAggravee).
-            const brut = parDot(etat, brulure.idSource, Math.ceil(nombre(c.pvMax) * (regleDesEtats(c, "pvMaxParTour") / 100)));
+            const brut = Math.ceil(nombre(c.pvMax) * (regleDesEtats(c, "pvMaxParTour") / 100));
             const compte = chaineDeDegats(c, { valeurBrute: brut, typeRes: regle.typeParTour || "Magique" }, {});
             if (compte.degats > 0) {
                 etapes.push(...infligerTic(c, id, compte.degats, "Brûlure", etat, brulure.idSource));
@@ -615,7 +610,7 @@ export function ticsDeFinDeManche(etat) {
         //  coup (puis le bouclier). Comme la brûlure, à CHAQUE manche.
         const saignement = c.etats.find(e => e && e.nom === ETAT_SAIGNEMENT);
         if (saignement) {
-            const brut = parDot(etat, saignement.idSource, Math.ceil(nombre(c.pvMax) * (SAIGNEMENT.pvMaxPct / 100)));
+            const brut = Math.ceil(nombre(c.pvMax) * (SAIGNEMENT.pvMaxPct / 100));
             const compte = chaineDeDegats(c, { valeurBrute: brut, typeRes: SAIGNEMENT.typeRes }, {});
             if (compte.degats > 0) {
                 etapes.push(...infligerTic(c, id, compte.degats, ETAT_SAIGNEMENT, etat, saignement.idSource));

@@ -200,10 +200,9 @@ export function combattantDepuisFiche(fiche, position, regles) {
         // La Sentinelle : +6 à ses attaques d'opportunité ; au niveau 5, le
         // Défenseur (chance de frapper qui ENTRE dans sa zone) et sa zone de
         // menace portée à 2 cases avec une arme à allonge (mouvement_pur.js).
-        // Le Profanateur : ses dégâts sur la durée sont plus forts (en %), et
-        // au niveau 5 les ennemis qui tombent de sa main ou à côté de lui se
-        // relèvent en zombies (tomber, plus bas).
-        dotBonus: nombre(race.dotBonus),
+        // Le Profanateur : au niveau 5, les ennemis qui tombent de sa main ou
+        // à côté de lui se relèvent en zombies (tomber, plus bas). Son atout
+        // du niveau 1 ne joue qu'à la Forge (diviseurEtalement).
         zombies: !!race.zombies,
         degatsOpportunite: nombre(race.degatsOpportunite),
         defenseur: nombre(race.defenseur),
@@ -213,7 +212,10 @@ export function combattantDepuisFiche(fiche, position, regles) {
         // blessent pas (mouvement_pur.js, traverserZones).
         traverseSesMurs: !!race.traverseSesMurs,
         terrainFacile: !!race.terrainFacile,
-        zonesInoffensives: !!race.zonesInoffensives
+        zonesInoffensives: !!race.zonesInoffensives,
+        // Niveau 10 : ses zones persistantes durent un tour de plus
+        // (creerZonePure, moteur_pur.js).
+        zonesProlongees: nombre(race.zonesProlongees)
     };
     const mod = {
         // Ce que l'ÉQUIPEMENT change EN PERMANENCE, hors états altérés : le
