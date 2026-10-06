@@ -519,6 +519,14 @@ window.preparerCartesMonstres = async function() {
     window.IA_MONSTRES_EN_ATTENTE = 0;
     for (const monstre of aJouer) {
         if (fileConnue.some(f => f.idPersonnage === monstre.idPersonnage)) continue;
+        // UN ZOMBIE DU PROFANATEUR n'a pas de carte : il joue en dernier
+        // (initiative 0), son tour est décidé par le cerveau (jouerZombie).
+        if (monstre.zombie) {
+            aInscrire.push({ idPersonnage: monstre.idPersonnage, idCarte: "ZOMBIE_MORSURE",
+                             initiative: 0, timestamp: new Date().getTime() });
+            auMoinsUn = true;
+            continue;
+        }
         const carte = window.choisirCarteMonstre(monstre);
         // Pas de carte : ses techniques ne sont pas encore forgées. On ne pose
         // rien pour lui et on repassera — surtout pas un repos long par défaut.

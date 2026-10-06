@@ -795,7 +795,8 @@ window.reglerLaReserveApresPartage = async function(chemin, reserve, restants) {
 // combat est gagné, et à savoir si le butin a encore le droit d'occuper
 // l'écran. Une seule définition, donc aucun risque que les deux divergent.
 window.ennemisEncoreDebout = function() {
-    const estMort = (m) => m.estIllusion || m.statut === "Mort"
+    // Un zombie du Profanateur n'est plus un ennemi : il se bat pour les héros.
+    const estMort = (m) => m.estIllusion || m.zombie || m.statut === "Mort"
         || (typeof window.estCombattantMort === "function" && window.estCombattantMort(m.idPersonnage));
     return (window.MONSTRES_PARTIE || []).some(m => !estMort(m));
 };
@@ -987,7 +988,8 @@ window.demarrerButin = async function() {
 // groupe » des créatures tombées (experience.js, xpDeLaCreature). Un leurre
 // n'en rapporte pas ; une créature encore debout non plus.
 window.xpDeLaVictoire = function() {
-    const tombee = (m) => m.statut === "Mort"
+    // Un zombie est tombé une première fois : son XP est due (une seule fois).
+    const tombee = (m) => m.statut === "Mort" || m.zombie
         || (typeof window.estCombattantMort === "function" && window.estCombattantMort(m.idPersonnage));
     return (window.MONSTRES_PARTIE || [])
         .filter(m => m && !m.estIllusion && tombee(m))

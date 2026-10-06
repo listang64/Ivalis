@@ -181,6 +181,7 @@ node sorcier.mjs               # 🔮 le Sorcier (ex-Nécromancien) : Ténèbres
 node oracle.mjs                # ⏳ l'Oracle : +10 d'initiative (niv. 1), Arrêt du temps (niv. 5 : voir la file, rejouer une compétence à l'initiative choisie), Retour arrière (niv. 10 : repos long puis compétence)
 node sentinelle.mjs            # 🛡️ la Sentinelle : +6 aux attaques d'opportunité et +20 % de soins (niv. 1), Défenseur 30 % et zone de 2 cases avec allonge (niv. 5), Fureur de la sentinelle (niv. 10)
 node classes_feminin.mjs        # ♀ les noms de classe au féminin pour une héroïne (Pisteuse, Sorcière, Protectrice…) : grille, fiche de classe, statistiques ; la fiche garde le nom de la classe
+node profanateur.mjs           # 🧟 le Profanateur : DOT ×1,3, +1 compétence, +5 PV (niv. 1), ses zombies (niv. 5 : 15 PV, morsure de 7, 2 cases, en dernier) et leur pion grignoté sans IA, le sursis (niv. 10)
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4737,3 +4738,30 @@ classes_feminin.mjs.
   dans la grille, l'image voilée (opacité 35 %) et « Arrive bientôt » écrit
   par-dessus ; un clic ne les ouvre pas, un message le dit.
 classes_feminin.mjs mis à jour.
+
+## Le Profanateur (version 198)
+
+- NIV. 1 : ses dégâts sur la durée font 30 % de plus, arrondis à l'inférieur
+  (dotBonus) : poison (PV et énergie), brûlure et saignement au tic de fin de
+  manche (l'auteur est l'`idSource` de l'état — le Saignement le retient
+  désormais aussi), dégâts étalés et Ténèbres étalées dès la pose. +1
+  compétence, +5 PV.
+- NIV. 5 : LES ZOMBIES (combat_etat.js, zombifier, appelé par `tomber`) : une
+  CRÉATURE ennemie tuée par lui (même par son poison, de loin), ou qui tombe
+  sur une case adjacente à lui (quel que soit le tueur), se relève aussitôt
+  dans son camp : 15 / 15 PV, plus d'esquive ni de parade, ses résistances
+  gardées, ses états effacés. Étape « zombie » dans le journal (rejouée à
+  l'identique), son tour de la manche en cours retiré de la file. Les boss
+  aussi ; pas les héros, ni les illusions ; un zombie retué ne revient pas.
+  SON TOUR (jouerZombie, cerveau_combat.js) : pas de carte ; jusqu'à 2 cases
+  vers l'ennemi le plus proche, sans fatigue (coutDuPas), puis une morsure de
+  7 physiques (armure de la cible, esquive/parade de la cible possibles).
+  En préparation, l'IA l'inscrit à l'initiative 0 (monstres_ia.js). La
+  victoire ne l'attend pas et son XP compte une fois (loot.js).
+  SON PION (zombie_token.js, sans IA) : l'image du pion passée dans un canvas
+  — chair vert-gris, taches de pourriture, morsures en dents de scie au bord,
+  ourlées de sang, éclaboussures et coulures — tirée de l'id de la créature
+  (le même zombie sur tous les écrans), gardée en cache.
+- NIV. 10 : le SURSIS de l'ancien Nécromancien (2 tours debout à 0 PV, coups
+  ignorés, aucun soin, une fois par combat).
+profanateur.mjs.

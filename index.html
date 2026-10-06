@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=58">
+  <link rel="stylesheet" href="style.css?v=59">
 
  
   <!-- ===================================================================== -->
@@ -1980,7 +1980,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=109"></script>
+<script src="trace_combat.js?v=110"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
      Les modules s'importent entre eux sans numéro (`from './moteur_pur.js'`).
      Sans cette carte, le navigateur les chargeait à part, à une adresse SANS
@@ -1993,14 +1993,14 @@
      vérifie qu'ils sont identiques. Elle doit précéder tout module. -->
 <script type="importmap">
 { "imports": {
-    "./combat_etat.js": "./combat_etat.js?v=26",
-    "./moteur_pur.js": "./moteur_pur.js?v=42",
-    "./mouvement_pur.js": "./mouvement_pur.js?v=15",
+    "./combat_etat.js": "./combat_etat.js?v=27",
+    "./moteur_pur.js": "./moteur_pur.js?v=43",
+    "./mouvement_pur.js": "./mouvement_pur.js?v=16",
     "./ia_pure.js": "./ia_pure.js?v=9",
-    "./cerveau_combat.js": "./cerveau_combat.js?v=40",
+    "./cerveau_combat.js": "./cerveau_combat.js?v=41",
     "./spectateur_combat.js": "./spectateur_combat.js?v=6",
     "./depot_firestore.js": "./depot_firestore.js?v=11",
-    "./pont_combat.js": "./pont_combat.js?v=27",
+    "./pont_combat.js": "./pont_combat.js?v=28",
     "./playlist.js": "./playlist.js?v=1"
 } }
 </script>
@@ -2013,14 +2013,14 @@
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
-<script type="module" src="combat_etat.js?v=26"></script>
+<script type="module" src="combat_etat.js?v=27"></script>
 <!-- LE MOTEUR PUR : la chaîne de dégâts et le mouvement, extraits des 5 000
      lignes du moteur actuel et testables sans réseau ni navigateur. -->
-<script type="module" src="moteur_pur.js?v=42"></script>
-<script type="module" src="mouvement_pur.js?v=15"></script>
+<script type="module" src="moteur_pur.js?v=43"></script>
+<script type="module" src="mouvement_pur.js?v=16"></script>
 <script type="module" src="ia_pure.js?v=9"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
-<script type="module" src="cerveau_combat.js?v=40"></script>
+<script type="module" src="cerveau_combat.js?v=41"></script>
 <!-- LE SPECTATEUR : la boucle de rejeu. Elle lit le journal du cerveau, ouvre
      la fenêtre de tour, anime PUIS applique, et ne saute jamais un numéro. -->
 <script type="module" src="spectateur_combat.js?v=6"></script>
@@ -2029,16 +2029,16 @@
 <script type="module" src="depot_firestore.js?v=11"></script>
 <!-- LE PONT : de l'étape à ce qu'on voit. Il traduit un résultat déjà calculé
      vers les animations existantes — il ne recalcule jamais rien. -->
-<script type="module" src="pont_combat.js?v=27"></script>
+<script type="module" src="pont_combat.js?v=28"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=37"></script>
 <script type="module" src="ia_master.js?v=7"></script>
-<script type="module" src="app.js?v=94"></script>
+<script type="module" src="app.js?v=95"></script>
 <script src="jet_d20.js?v=2"></script>
 <script src="fabrique_sons.js?v=3"></script>
 <script src="experience.js?v=1"></script>
 <script type="module" src="creation_personnage.js?v=17"></script>
-<script type="module" src="classes.js?v=18"></script>
+<script type="module" src="classes.js?v=19"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=54"></script>
 <!-- LIA, l'aide à la création de la Forge -->
@@ -2049,19 +2049,20 @@
      gardait l'ancien dessin en cache après une livraison (l'œil d'or en dépend). -->
 <script src="Plateau.js?v=3"></script>
 <script type="module" src="sequence_tour.js?v=23"></script>
-<script type="module" src="combat.js?v=119"></script>
+<script src="zombie_token.js?v=1"></script>
+<script type="module" src="combat.js?v=120"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=31"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
 <script type="module" src="moteur_effets.js?v=78"></script>
 <script type="module" src="monstres.js?v=24"></script>
 <script type="module" src="monstres_competences.js?v=24"></script>
-<script type="module" src="monstres_ia.js?v=34"></script>
+<script type="module" src="monstres_ia.js?v=35"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=13"></script>
 <script src="variations_tenues.js?v=2"></script>
 <script type="module" src="objets_ia.js?v=15"></script>
-<script type="module" src="loot.js?v=22"></script>
+<script type="module" src="loot.js?v=23"></script>
 
 <!-- ============================================================= -->
 <!--  GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)  -->

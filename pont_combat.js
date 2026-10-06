@@ -282,6 +282,12 @@ const SCENES = {
         return { geste: "chute", pion: e.cible, duree: RYTHME.chute };
     },
 
+    // Une créature se relève en zombie (Profanateur, niveau 5).
+    zombie(e) {
+        return { geste: "message", pion: e.cible, texte: "🧟 Se relève en zombie !",
+                 couleur: "#7cb342", duree: RYTHME.message };
+    },
+
     // Un allié relevé par le Médicus : il le dit, sur son pion.
     reanimation(e) {
         return { geste: "message", pion: e.cible, texte: "✚ Relevé !", couleur: "#43a047", duree: RYTHME.message };
@@ -538,7 +544,11 @@ export function fichesDepuisEtat(etat, fichesActuelles) {
             sursis: c.sursis ? { tours: nombre(c.sursis.tours) } : null,
             // Les techniques de classe déjà jouées dans ce combat (Hoplite) :
             // le volet les grise d'après la fiche.
-            techniquesUtilisees: [...(c.techniquesUtilisees || [])]
+            techniquesUtilisees: [...(c.techniquesUtilisees || [])],
+            // UN ZOMBIE DU PROFANATEUR change de camp, et sa jauge est la
+            // sienne (15) : la victoire ne l'attend plus, son XP reste due
+            // (loot.js), son pion se grignote (zombie_token.js).
+            ...(c.zombie ? { zombie: true, camp: c.camp, PV_Max: nombre(c.pvMax), statut: "Vivant" } : {})
         };
     });
 }

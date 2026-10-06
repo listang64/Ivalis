@@ -932,6 +932,16 @@ window.ATOUTS_CLASSES = {
         { niveau: 5,  techniques: ["CLASSE_BOUCLIER_ANTIMAGIE"] },
         { niveau: 10, techniques: ["CLASSE_APPEL_LUMIERE"] }
     ],
+    // LE PROFANATEUR : ses dégâts sur la durée font 30 % de plus (poison,
+    // brûlure, saignement, dégâts étalés — dotBonus, cerveau_combat.js et
+    // moteur_pur.js), +1 compétence, +5 PV ; au niveau 5, ses zombies
+    // (combat_etat.js, zombifier) ; au niveau 10, le sursis de l'ancien
+    // Nécromancien (2 tours debout à zéro PV, une fois par combat).
+    "Profanateur": [
+        { niveau: 1,  dotBonus: 30, competences: 1, pvMax: 5 },
+        { niveau: 5,  zombies: true },
+        { niveau: 10, sursis: 2 }
+    ],
     // LA SENTINELLE : +6 à ses attaques d'opportunité et +20 % de soins reçus
     // (mouvement_pur.js, moteur_pur.js) ; au niveau 5, le Défenseur — 30 % de
     // chance de frapper l'ennemi qui ENTRE dans sa zone — et cette zone portée
@@ -1223,6 +1233,8 @@ window.texteAtout = function(cle, valeur) {
         case "provocationAttaques": return `${n} % de chance de provoquer la cible de chacune de ses attaques`;
         case "bonusSoin":      return `${plus(n)} à chacun de ses soins`;
         case "initiative":     return `${plus(n)} d'initiative sur ses compétences`;
+        case "dotBonus":       return `Dégâts sur la durée (poison, brûlure, saignement, étalés) ×${(1 + n / 100).toFixed(1).replace(".", ",")}`;
+        case "zombies":        return "Les ennemis qu'il tue, ou qui tombent à côté de lui, se relèvent en zombies à son service";
         case "degatsOpportunite": return `${plus(n)} aux dégâts de ses attaques d'opportunité`;
         case "defenseur":      return `Défenseur : ${n} % de chance de frapper l'ennemi qui entre dans sa zone`;
         case "allongeOpportunite": return "Sa zone passe à 2 cases avec une arme à allonge (lance lourde)";

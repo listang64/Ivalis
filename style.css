@@ -4258,3 +4258,6 @@ textarea.input-texte-parchemin {
 .encart-repos-texte { font-family: 'Almendra', serif; font-size: 16px; line-height: 1.35; }
 .encart-repos-texte b { color: #5dff8a; font-size: 19px; }
 .encart-repos-texte small { opacity: 0.75; }
+
+/* Le pion d'un zombie, le temps que son image grignotée soit dessinée. */
+.token-img-main.token-zombie-provisoire { filter: grayscale(0.6) sepia(0.4) hue-rotate(50deg) brightness(0.85); }

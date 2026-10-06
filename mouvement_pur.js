@@ -138,6 +138,8 @@ export const SURCOUT_SAIGNEMENT = 2;
 
 export function coutDuPas(c, numeroCase, difficile, offerte) {
     if (offerte) return 0;
+    // Un zombie du Profanateur marche sans se fatiguer.
+    if (c && c.zombie) return 0;
     // LE VAMPIRE : la première case de chacun de ses tours ne coûte rien,
     // quel que soit le sol. Elle compte quand même dans le barème : la
     // deuxième et la troisième coûtent 2, la quatrième 4.

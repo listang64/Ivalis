@@ -112,6 +112,23 @@ window.DESCRIPTIFS_CLASSES = {
                        "… et leur inflige 5 % de leurs PV max en dégâts physiques · une fois par combat"] }
         ]
     },
+    CLASSE_PROFANATEUR: {
+        presentation: "Il souille ce qu'il touche et ne laisse rien reposer en paix. Ses poisons et "
+            + "ses brûlures rongent plus profond, ses ennemis tombés se relèvent pour le servir, "
+            + "et la mort elle-même doit attendre son tour avant de le prendre.",
+        paliers: [
+            { niveau: 1, titre: "Souillure",
+              points: ["Dégâts sur la durée ×1,3 (poison, brûlure, saignement, dégâts étalés)",
+                       "+1 compétence à créer", "+5 PV"] },
+            { niveau: 5, titre: "Passif : Relève des morts",
+              points: ["Un ennemi qu'il tue, ou qui tombe à côté de lui, se relève en zombie à son service",
+                       "15 PV · morsure de 7 dégâts physiques · 2 cases par tour · joue en dernier",
+                       "Garde ses résistances, mais plus d'esquive ni de parade"] },
+            { niveau: 10, titre: "Sursis",
+              points: ["Tombé à 0 PV, il tient encore 2 tours debout avant d'être mis KO",
+                       "Les coups sont ignorés, aucun soin possible · une fois par combat"] }
+        ]
+    },
     CLASSE_SENTINELLE: {
         presentation: "Rien ne passe la Sentinelle sans payer le prix. Elle garde sa place, punit "
             + "quiconque ose s'en approcher ou s'en éloigner, et quand la mêlée l'enserre, elle la "

@@ -1731,7 +1731,10 @@ export function resoudreCarte(etat, action, plateau) {
                 // (compte.degats vaut zéro) ; tout est rangé dans l'état, une part
                 // par fin de manche, autant de parts que de tours.
                 if ((compte.tics || []).length > 0) {
-                    empilerEtalement(cible, attaque.versEnergie ? ETAT_TENEBRES_ETALEES : "Étalement", compte.tics, idLanceur);
+                    // Le Profanateur étale plus fort (×1,3, arrondi à l'inférieur).
+                    const bonusDot = nombre(lanceur.atouts && lanceur.atouts.dotBonus);
+                    const tics = bonusDot > 0 ? compte.tics.map(t => Math.floor(nombre(t) * (1 + bonusDot / 100))) : compte.tics;
+                    empilerEtalement(cible, attaque.versEnergie ? ETAT_TENEBRES_ETALEES : "Étalement", tics, idLanceur);
                     etapes.push({ type: "etats", cible: idCible, liste: cible.etats });
                 }
 
@@ -1914,7 +1917,9 @@ export function resoudreCarte(etat, action, plateau) {
             let duree = nombre(alt.duree !== undefined ? alt.duree : alt.tours, 1);
             // QUI A POSÉ un état qui ronge en fin de manche (poison, brûlure) :
             // le KO qu'il fera au tic revient à son auteur (combat_etat.js).
-            const ronge = alt.nom === "Empoisonnement" || alt.nom === "Brûlé";
+            // (Le Saignement aussi : son auteur compte pour le Profanateur, dont
+            // les dégâts sur la durée sont plus forts, et pour ses zombies.)
+            const ronge = alt.nom === "Empoisonnement" || alt.nom === "Brûlé" || alt.nom === ETAT_SAIGNEMENT;
             // LE MAÎTRE DES POISONS (Assassin, niveau 10) : son poison mord à
             // chaque fin de manche, 2 manches durant (POISON_MAITRE).
             const maitre = alt.nom === "Empoisonnement" && !!(lanceur && lanceur.atouts && lanceur.atouts.maitrePoisons);

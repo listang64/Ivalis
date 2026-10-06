@@ -200,6 +200,11 @@ export function combattantDepuisFiche(fiche, position, regles) {
         // La Sentinelle : +6 à ses attaques d'opportunité ; au niveau 5, le
         // Défenseur (chance de frapper qui ENTRE dans sa zone) et sa zone de
         // menace portée à 2 cases avec une arme à allonge (mouvement_pur.js).
+        // Le Profanateur : ses dégâts sur la durée sont plus forts (en %), et
+        // au niveau 5 les ennemis qui tombent de sa main ou à côté de lui se
+        // relèvent en zombies (tomber, plus bas).
+        dotBonus: nombre(race.dotBonus),
+        zombies: !!race.zombies,
         degatsOpportunite: nombre(race.degatsOpportunite),
         defenseur: nombre(race.defenseur),
         allongeOpportunite: !!race.allongeOpportunite
@@ -508,6 +513,33 @@ function recompenserLeTueur(etat, victime, idAuteur, finDeManche) {
     return [{ type: "etats", cible: auteur.id, pose: ETAT_INSTINCT_TUEUR, liste: auteur.etats }];
 }
 
+// LES ZOMBIES DU PROFANATEUR (niveau 5). Une CRÉATURE ennemie qui tombe de
+// la main d'un Profanateur — ou qui tombe à côté de lui, quel que soit son
+// tueur — se relève aussitôt dans SON camp : 15 PV, plus ni esquive ni parade,
+// ses résistances gardées, ses états effacés. Elle est jouée par l'IA (une
+// morsure de 7 physiques, 2 cases de déplacement, en dernier : initiative 0)
+// et ne se relève plus si on la tue de nouveau. Son tour éventuel dans la
+// manche en cours tombe : elle jouera à partir de la suivante.
+export const ZOMBIE = { pv: 15, degats: 7, pas: 2, initiative: 0 };
+const distanceHexEtat = (a, b) => (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
+export function profanateurPourZombie(etat, victime, idTueur) {
+    if (!victime || !victime.estMonstre || victime.estIllusion || victime.zombie) return null;
+    const table = etat.combattants || {};
+    const peut = (p) => p && !p.aTerre && p.atouts && p.atouts.zombies && (p.camp || "Allié") !== (victime.camp || "Allié");
+    if (idTueur && peut(table[idTueur])) return table[idTueur];
+    return Object.keys(table).sort().map(k => table[k])
+        .find(p => peut(p) && p.q !== null && p.q !== undefined && victime.q !== null && victime.q !== undefined
+                   && distanceHexEtat(p, victime) === 1) || null;
+}
+function zombifier(etat, victime, idTueur) {
+    const maitre = profanateurPourZombie(etat, victime, idTueur);
+    if (!maitre) return [];
+    const etape = { type: "zombie", cible: victime.id, acteur: maitre.id, camp: maitre.camp || "Allié",
+                    pv: ZOMBIE.pv, pvMax: ZOMBIE.pv };
+    APPLICATEURS.zombie(etat, etape);
+    return [etape];
+}
+
 export function tomber(etat, id, acteur, options) {
     const c = combattant(etat, id);
     if (!c || c.aTerre) return [];
@@ -525,6 +557,7 @@ export function tomber(etat, id, acteur, options) {
     c.aTerre = true;
     const chute = [{ type: "chute", cible: id, acteur: acteur || id }];
     if (acteur && acteur !== id) chute.push(...recompenserLeTueur(etat, c, acteur, !!(options && options.finDeManche)));
+    chute.push(...zombifier(etat, c, acteur && acteur !== id ? acteur : null));
     return chute;
 }
 
@@ -696,6 +729,25 @@ const APPLICATEURS = {
         c.aTerre = true;
         c.pv = 0;
         c.sursis = null;
+    },
+
+    // Une créature se relève en zombie, dans le camp du Profanateur (voir
+    // zombifier). Le RÉSULTAT : son camp, ses PV ; son tour de la manche en
+    // cours, s'il n'est pas déjà en tête, s'en va de la file.
+    zombie(etat, e) {
+        const c = combattant(etat, e.cible);
+        if (!c) return;
+        c.aTerre = false;
+        c.zombie = { idMaitre: e.acteur };
+        c.camp = e.camp || c.camp;
+        c.pv = nombre(e.pv, 15);
+        c.pvMax = nombre(e.pvMax, c.pv);
+        c.bouclier = 0;
+        c.bouclierMax = 0;
+        c.etats = [];
+        c.sursis = null;
+        c.def = { ...(c.def || {}), esquive: 0, parade: 0 };
+        etat.file = (etat.file || []).filter((f, i) => i === 0 || f.id !== e.cible);
     },
 
     // Un allié relevé par le Médicus (Prise en charge) : debout, ses PV, ses

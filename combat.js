@@ -3370,6 +3370,22 @@ window.appliquerTokensVTT = function(tokensMap) {
             imgEnnemi.style.zIndex = "2";
             imgEnnemi.style.pointerEvents = "none";
             imgEnnemi.onerror = () => { imgEnnemi.style.display = "none"; };
+            // UN ZOMBIE DU PROFANATEUR : son pion grignoté et ensanglanté,
+            // dessiné ici (zombie_token.js) — teinte cadavérique en attendant.
+            if (pData.zombie) {
+                const source = imgEnnemi.src;
+                divToken.classList.add("token-zombie");
+                const pret = typeof window.imageZombieEnCache === "function" ? window.imageZombieEnCache(source, idPerso) : null;
+                if (pret) imgEnnemi.src = pret;
+                else if (typeof window.imageZombie === "function") {
+                    imgEnnemi.classList.add("token-zombie-provisoire");
+                    window.imageZombie(source, idPerso).then(url => {
+                        if (!url) return;
+                        imgEnnemi.src = url;
+                        imgEnnemi.classList.remove("token-zombie-provisoire");
+                    });
+                }
+            }
             divToken.appendChild(imgEnnemi);
 
             // 5️⃣ LES GOUTTES D'ÉTAT : un point par altération active, discret,

@@ -39,7 +39,7 @@
 
 import { clonerEtat, combattant, creerDes, combattantIllusion,
          verifierEtatCombat, compterPasMarche, FORMAT_ETAT, tomber, enSursis,
-         reposDuRetourArriere, entreeDeFile } from './combat_etat.js';
+         reposDuRetourArriere, entreeDeFile, ZOMBIE } from './combat_etat.js';
 import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissiperConfusion,
          traverserZones, creerZonePure, poserZone, vieillirZones,
          chaineDeDegats, REGLES_ETATS, regleDesEtats, estDansLeNoir,
@@ -48,7 +48,7 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
          actionResonanceBouclier, ennemisAuContact, tirerDirectionsAveugle } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant, fureurDeLaSentinelle } from './mouvement_pur.js';
-import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche } from './ia_pure.js';
+import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche, casesAccessibles } from './ia_pure.js';
 
 // LES SUITES D'UNE CARTE LANCÉE EN ÉTAT DE CONFUSION (règle de Nico, voir
 // appliquerConfusion) : après la carte, le 3e jet le fait FUIR comme sous la
@@ -485,6 +485,14 @@ function regenerationDe(c) {
 // L'ORDRE COMPTE, et c'est celui de l'ancien monde : l'immobilisation puise
 // l'énergie tant que l'état dure, le poison mord une fois, l'étalement porte
 // son reste — PUIS tout vieillit d'un cran (vieillirLesEtats, juste après).
+// LE PROFANATEUR : ses dégâts sur la durée font 30 % de plus (dotBonus),
+// arrondis à l'inférieur. L'auteur est celui que l'état a retenu (`idSource`).
+const parDot = (etat, idSource, montant) => {
+    const auteur = idSource ? combattant(etat, idSource) : null;
+    const bonus = nombre(auteur && auteur.atouts && auteur.atouts.dotBonus);
+    return bonus > 0 ? Math.floor(nombre(montant) * (1 + bonus / 100)) : nombre(montant);
+};
+
 export function ticsDeFinDeManche(etat) {
     const etapes = [];
 
@@ -517,7 +525,7 @@ export function ticsDeFinDeManche(etat) {
             poison.tickFait = true;
             const regle = poison.maitre ? POISON_MAITRE : POISON;
 
-            const energie = Math.ceil(nombre(c.fatigueMax) * (regle.energiePct / 100));
+            const energie = parDot(etat, poison.idSource, Math.ceil(nombre(c.fatigueMax) * (regle.energiePct / 100)));
             const fatigueApres = Math.max(0, nombre(c.fatigue) - energie);
             if (fatigueApres !== nombre(c.fatigue)) {
                 c.fatigue = fatigueApres;
@@ -525,7 +533,7 @@ export function ticsDeFinDeManche(etat) {
                               tic: "Empoisonnement" });
             }
 
-            const morsure = Math.ceil(nombre(c.pvMax) * (regle.pvMaxPct / 100));
+            const morsure = parDot(etat, poison.idSource, Math.ceil(nombre(c.pvMax) * (regle.pvMaxPct / 100)));
             if (morsure > 0) {
                 const compte = chaineDeDegats(c, { valeurBrute: morsure, typeRes: regle.typeRes, brut: !!regle.brut }, {});
                 if (compte.degats > 0) etapes.push(...infligerTic(c, id, compte.degats, "Empoisonnement", etat, poison.idSource));
@@ -543,7 +551,7 @@ export function ticsDeFinDeManche(etat) {
             const regle = REGLES_ETATS["Brûlé"] || {};
             // regleDesEtats plutôt que la règle seule : le Vampire brûle à
             // 18 % de ses PV max, pas à 8 (brulureAggravee).
-            const brut = Math.ceil(nombre(c.pvMax) * (regleDesEtats(c, "pvMaxParTour") / 100));
+            const brut = parDot(etat, brulure.idSource, Math.ceil(nombre(c.pvMax) * (regleDesEtats(c, "pvMaxParTour") / 100)));
             const compte = chaineDeDegats(c, { valeurBrute: brut, typeRes: regle.typeParTour || "Magique" }, {});
             if (compte.degats > 0) {
                 etapes.push(...infligerTic(c, id, compte.degats, "Brûlure", etat, brulure.idSource));
@@ -556,7 +564,7 @@ export function ticsDeFinDeManche(etat) {
         //  coup (puis le bouclier). Comme la brûlure, à CHAQUE manche.
         const saignement = c.etats.find(e => e && e.nom === ETAT_SAIGNEMENT);
         if (saignement) {
-            const brut = Math.ceil(nombre(c.pvMax) * (SAIGNEMENT.pvMaxPct / 100));
+            const brut = parDot(etat, saignement.idSource, Math.ceil(nombre(c.pvMax) * (SAIGNEMENT.pvMaxPct / 100)));
             const compte = chaineDeDegats(c, { valeurBrute: brut, typeRes: SAIGNEMENT.typeRes }, {});
             if (compte.degats > 0) {
                 etapes.push(...infligerTic(c, id, compte.degats, ETAT_SAIGNEMENT, etat, saignement.idSource));
@@ -1210,6 +1218,49 @@ export function jouerCreature(etat, id, carte, plateau) {
     return fabriquerPas(etat, courant, etapes, `ia|${id}|${etat.manche}`, id, des);
 }
 
+// LE TOUR D'UN ZOMBIE (Profanateur, niveau 5). Pas de carte : il marche
+// jusqu'à 2 cases vers l'ennemi le plus proche (sans payer de fatigue), puis
+// le mord s'il est au contact — 7 dégâts physiques, que l'armure réduit et
+// que la cible peut esquiver ou parer. Puis son tour se clôt.
+export function jouerZombie(etat, id, plateau) {
+    const des = creerDes(etat.graine);
+    let courant = etat;
+    const etapes = [];
+    const moi = combattant(etat, id);
+    if (!moi || moi.aTerre) return null;
+    const cible = ennemiLePlusProche(etat, id);
+    if (cible && distance(moi, cible) > 1) {
+        const cases = casesAccessibles(etat, id, plateau, ZOMBIE.pas)
+            .filter(h => h.chemin.length > 0 && h.chemin.length <= ZOMBIE.pas);
+        cases.sort((a, b) => (distance(a, cible) - distance(b, cible)) || (a.ao - b.ao)
+                             || (a.chemin.length - b.chemin.length) || (a.q - b.q) || (a.r - b.r));
+        const meilleure = cases[0];
+        if (meilleure && distance(meilleure, cible) < distance(moi, cible)) {
+            const m = resoudreMouvement(courant, { idLanceur: id, chemin: meilleure.chemin }, des, plateau);
+            courant = m.etat;
+            etapes.push(...m.etapes);
+        }
+    }
+    const apres = combattant(courant, id);
+    const proie = apres && !apres.aTerre ? ennemiLePlusProche(courant, id) : null;
+    if (proie && distance(apres, proie) === 1) {
+        const action = { type: "carte", idLanceur: id, idCarte: "ZOMBIE_MORSURE", critique: false, coutFatigue: 0,
+                         attaques: [{ nom: "Morsure", valeurBrute: ZOMBIE.degats, typeRes: "Physique",
+                                      isRanged: false, rangeMax: 1, isHeal: false, isShield: false, cibles: [proie.id] }],
+                         alterations: [] };
+        action.jets = tirerDesCarte(courant, action, id, false, des);
+        const r = resoudreCarte(courant, action, plateau);
+        courant = clonerEtat(r.etat);
+        etapes.push(...r.etapes);
+    } else if (apres && !apres.aTerre) {
+        etapes.push({ type: "renonce", acteur: id, raison: proie ? "zombie : hors de portée" : "zombie : plus d'ennemi" });
+    }
+    courant = clonerEtat(courant);
+    const clot = cloturerTour(courant);
+    if (clot) etapes.push(...clot.etapes);
+    return fabriquerPas(etat, courant, etapes, `zombie|${id}|${etat.manche}`, id, des);
+}
+
 // =========================================================================
 //  7. QUE FAIRE MAINTENANT ?
 // =========================================================================
@@ -1252,6 +1303,11 @@ export function prochainPas(etat, intentions, contexte) {
 
     // Personne n'a rien demandé. Si c'est le tour d'une créature, elle joue.
     const acteur = combattant(etat, tete.id);
+    // Un zombie du Profanateur : son propre tour, sans carte.
+    if (acteur && acteur.zombie && !acteur.aTerre) {
+        const pas = jouerZombie(etat, tete.id, plateau);
+        if (pas) return { ...pas, creature: tete.id };
+    }
     if (acteur && acteur.estMonstre && !acteur.aTerre) {
         const carte = carteDe ? carteDe(tete.id, tete.carte) : null;
         const pas = jouerCreature(etat, tete.id, carte, plateau);
