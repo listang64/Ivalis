@@ -4898,3 +4898,28 @@ perspective du mur — toujours sans déborder sur les autres hexagones. »
   garde une balise sur sa case (nom, PV, visé) ; le mur visé est entouré de
   rouge dans le canvas.
 geomancien.mjs (section 9 bis).
+
+## Les murs de terre : au-dessus des pions, sans ombre, plus rocheux (version 203)
+
+Nico : « les murs > l'image des tokens en dessous de l'image des murs. Enlever
+l'ombre sous la roche, pour donner plus l'impression qu'ils sortent du sol. Et
+dessiner plus de détails aléatoires sur les murs, qu'ils paraissent moins
+lisses et plus rocheux, et plus de gravats à leur base. »
+- LES MURS PASSENT DEVANT LES PIONS : un calque à eux (#calque-murs-vtt /
+  #transform-murs, index.html), placé après les pions au même z-index, sous le
+  brouillard de l'aveuglé, zoomé comme le plateau (appliquerTransformPlateau,
+  combat.js). Un pion qui se tient derrière un mur est caché par sa roche. Les
+  gravats d'un mur cassé restent au sol, sous les pions (#calque-murs-terre).
+- PLUS D'OMBRE PORTÉE (ni sous les murs, ni sous le pilier seul, ni sous les
+  éclats) : à la place, de la terre soulevée au pied — la roche vient de
+  percer le sol (terreSoulevee).
+- LA ROCHE MOINS LISSE (detaillerFace) : sur chaque face, des taches, des
+  blocs fendus, des bosses en relief (éclairées en haut, ombrées en bas), des
+  fissures ramifiées, des ébréchures au bord du haut et du grain ; une crête
+  plus inégale, des flancs bosselés, un éclairage qui varie d'une facette à
+  l'autre ; sur le dessus, des taches, des trous et plus de fissures. (Un
+  défaut corrigé au passage : les strates des faces ne se dessinaient plus —
+  le découpage se faisait sur le dernier trait, pas sur la face.)
+- PLUS DE GRAVATS AU PIED, devant (gravatsAuPied), toujours dans la case, et
+  jamais du côté d'une voisine murée (ils ressortiraient sur sa roche).
+geomancien.mjs (sections 9 bis et 10).

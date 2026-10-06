@@ -1772,6 +1772,9 @@ window.appliquerTransformPlateau = function() {
     // pions : il suit le plateau à l'identique.
     const brouillard = document.getElementById("transform-brouillard");
     if (brouillard) brouillard.style.transform = transformation;
+    // Les murs de terre aussi (au-dessus des pions, murs_terre.js).
+    const murs = document.getElementById("transform-murs");
+    if (murs) murs.style.transform = transformation;
 
     // Les pions ne subissent pas ce scale : on les repositionne à la main, une fois par frame
     if (frameTransformVTT) return;
@@ -2523,6 +2526,11 @@ window.centrerMapSurToken = function(idPersonnage) {
     if (conteneurTransform) {
         conteneurTransform.style.transition = "transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)";
         setTimeout(() => { if (conteneurTransform) conteneurTransform.style.transition = "none"; }, 400);
+        const murs = document.getElementById("transform-murs");
+        if (murs) {
+            murs.style.transition = "transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)";
+            setTimeout(() => { murs.style.transition = "none"; }, 400);
+        }
     }
 
     // Les pions vivent hors du calque zoomé : ils doivent glisser au même rythme que la caméra

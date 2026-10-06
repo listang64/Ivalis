@@ -138,6 +138,18 @@
                 ctx.restore();
             }
         });
+        // Les grosses masses (pas les cailloux) : la roche moins lisse.
+        if (rayon >= 14) {
+            faces.filter(f => f.y > cy - rayon * 0.2).forEach(f => {
+                ctx.save();
+                ctx.beginPath();
+                f.pts.forEach((p, k) => k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+                ctx.closePath();
+                ctx.clip();
+                detaillerFace(ctx, alea, f.pts[0], f.pts[1], f.pts[2], f.pts[3]);
+                ctx.restore();
+            });
+        }
         // Quelques fissures verticales sur les faces de devant.
         ctx.strokeStyle = "rgba(25, 16, 10, 0.5)";
         ctx.lineWidth = 1.2;
@@ -200,7 +212,14 @@
         const alea = hasard(graine);
         // Une roche grise, à peine teintée de terre.
         const roche = [26 + Math.floor(alea() * 16), 44 + Math.floor(alea() * 8), 8 + Math.floor(alea() * 9)];
-        ombre(ctx, 70, PIED_Y + 4, 54, 24, 0.45);
+        // Pas d'ombre portée : de la terre soulevée tout autour du pied.
+        const tour = [];
+        for (let i = 0; i < 12; i++) {
+            const a0 = (i / 12) * Math.PI * 2, a1 = ((i + 1) / 12) * Math.PI * 2;
+            tour.push([{ x: 64 + Math.cos(a0) * 36, y: PIED_Y + Math.sin(a0) * 20 }, { x: 64 + Math.cos(a1) * 36, y: PIED_Y + Math.sin(a1) * 20 },
+                       Math.cos((a0 + a1) / 2), Math.sin((a0 + a1) / 2)]);
+        }
+        terreSoulevee(ctx, alea, tour, 64, PIED_Y);
         const masses = [];
         const nb = 2 + Math.floor(alea() * 2);
         for (let i = 0; i < nb; i++) {
@@ -211,17 +230,8 @@
         // Le cœur du pilier, le plus large, au centre.
         masses.push({ x: 64, y: PIED_Y, rayon: 34 + alea() * 4, hauteur: 50 + alea() * 16 });
         masses.sort((a, b) => a.y - b.y).forEach(m => masse(ctx, alea, m.x, m.y, m.rayon, m.hauteur, roche));
-        // Parfois des cailloux au pied.
-        if (alea() < 0.7) {
-            const n = 2 + Math.floor(alea() * 3);
-            for (let i = 0; i < n; i++) {
-                const a = 0.15 * Math.PI + alea() * 0.7 * Math.PI;
-                const x = 64 + Math.cos(a) * (40 + alea() * 12), y = PIED_Y + Math.sin(a) * (18 + alea() * 8);
-                const r = 4 + alea() * 4;
-                ombre(ctx, x + 2, y + 2, r * 1.6, r * 0.8, 0.35);
-                masse(ctx, alea, x, y, r, r * 0.9, [roche[0], roche[1] + 2, roche[2]]);
-            }
-        }
+        // Des gravats au pied, devant.
+        gravatsAuPied(ctx, alea, tour.filter(t => t[3] > 0.05), 64, PIED_Y, roche);
         return canvas;
     };
 
@@ -284,6 +294,137 @@
         }
         return dedans;
     };
+    // LA ROCHE MOINS LISSE : sur une face (le quadrilatère pied a→b, sommet
+    // b→a), des taches claires et sombres, des fissures qui se ramifient, des
+    // contours de blocs, des ébréchures au bord du haut et du grain.
+    function detaillerFace(ctx, alea, ba, bb, hb, ha) {
+        const point = (u, v) => ({ x: ba.x + (bb.x - ba.x) * u + (ha.x - ba.x) * v,
+                                   y: ba.y + (bb.y - ba.y) * u + (ha.y - ba.y) * v });
+        const largeurFace = Math.hypot(bb.x - ba.x, bb.y - ba.y), hauteurFace = Math.abs(ha.y - ba.y);
+        if (largeurFace < 3 || hauteurFace < 4) return;
+        // Les taches (la roche n'a pas une teinte égale).
+        for (let k = 0; k < 4 + Math.floor(largeurFace / 6); k++) {
+            const c = point(alea(), alea());
+            ctx.fillStyle = alea() < 0.5 ? `rgba(255, 246, 228, ${0.06 + alea() * 0.08})` : `rgba(25, 18, 12, ${0.08 + alea() * 0.1})`;
+            ctx.beginPath();
+            ctx.ellipse(c.x, c.y, 2 + alea() * Math.min(9, largeurFace / 2), 1.5 + alea() * 5, (alea() - 0.5) * 0.8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        // Les blocs : quelques joints en escalier, comme une roche fendue.
+        ctx.strokeStyle = "rgba(30, 22, 16, 0.32)";
+        ctx.lineWidth = 0.9;
+        for (let k = 0; k < 2; k++) {
+            let u = alea() * 0.8 + 0.1, v = 0.15 + alea() * 0.25;
+            let p0 = point(u, v);
+            ctx.beginPath(); ctx.moveTo(p0.x, p0.y);
+            for (let e = 0; e < 3; e++) {
+                v = Math.min(0.95, v + 0.15 + alea() * 0.2);
+                u = Math.max(0, Math.min(1, u + (alea() - 0.5) * 0.35));
+                const p1 = point(u, v); ctx.lineTo(p1.x, p1.y);
+            }
+            ctx.stroke();
+        }
+        // Des bosses en relief : un éclat de pierre qui dépasse, éclairé en
+        // haut à gauche, ombré en bas à droite.
+        for (let k = 0; k < 2 + Math.floor(largeurFace / 9); k++) {
+            const c = point(0.1 + alea() * 0.8, 0.1 + alea() * 0.8), r = 2 + alea() * Math.min(5, largeurFace / 3);
+            const n = 5 + Math.floor(alea() * 3), pts = [];
+            for (let i = 0; i < n; i++) {
+                const a = (i / n) * Math.PI * 2, rr = r * (0.7 + alea() * 0.5);
+                pts.push({ x: c.x + Math.cos(a) * rr, y: c.y + Math.sin(a) * rr * 0.8 });
+            }
+            ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.closePath();
+            ctx.fillStyle = `rgba(255, 246, 228, ${0.08 + alea() * 0.08})`;
+            ctx.fill();
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = "rgba(25, 18, 12, 0.4)";
+            ctx.beginPath(); pts.slice(0, Math.ceil(n / 2) + 1).forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.stroke();
+            ctx.strokeStyle = "rgba(255, 248, 235, 0.3)";
+            ctx.beginPath(); pts.slice(Math.ceil(n / 2)).concat([pts[0]]).forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.stroke();
+        }
+        // Les fissures : du haut vers le bas, en zigzag, avec une branche.
+        ctx.strokeStyle = "rgba(22, 15, 10, 0.55)";
+        ctx.lineWidth = 1.1;
+        for (let k = 0; k < 1 + Math.floor(alea() * 2); k++) {
+            let u = 0.15 + alea() * 0.7, v = 1;
+            let pf = point(u, v);
+            ctx.beginPath(); ctx.moveTo(pf.x, pf.y);
+            const pas = 3 + Math.floor(alea() * 3);
+            let branche = null;
+            for (let e = 0; e < pas; e++) {
+                v -= (0.5 + alea() * 0.4) / pas;
+                u = Math.max(0.02, Math.min(0.98, u + (alea() - 0.5) * 0.18));
+                pf = point(u, v); ctx.lineTo(pf.x, pf.y);
+                if (!branche && alea() < 0.4) branche = { u, v };
+            }
+            ctx.stroke();
+            if (branche) {
+                const b0 = point(branche.u, branche.v), b1 = point(branche.u + (alea() - 0.5) * 0.3, branche.v - 0.15 - alea() * 0.15);
+                ctx.lineWidth = 0.8;
+                ctx.beginPath(); ctx.moveTo(b0.x, b0.y); ctx.lineTo(b1.x, b1.y); ctx.stroke();
+                ctx.lineWidth = 1.1;
+            }
+        }
+        // Les ébréchures du bord du haut : de petits éclats clairs.
+        for (let k = 0; k < 2 + Math.floor(alea() * 3); k++) {
+            const u = alea(), c = point(u, 0.97), t = 2 + alea() * 3;
+            ctx.fillStyle = "rgba(255, 248, 235, 0.22)";
+            ctx.beginPath(); ctx.moveTo(c.x - t, c.y); ctx.lineTo(c.x + t, c.y); ctx.lineTo(c.x + (alea() - 0.5) * t, c.y + t * 1.2); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = "rgba(20, 14, 10, 0.3)";
+            ctx.fillRect(c.x - 0.5, c.y + t * 1.2, 1.2, 1.2);
+        }
+        // Le grain.
+        for (let k = 0; k < 10 + Math.floor(largeurFace / 2); k++) {
+            const c = point(alea(), alea());
+            ctx.fillStyle = alea() < 0.5 ? "rgba(255, 248, 235, 0.2)" : "rgba(20, 14, 10, 0.28)";
+            ctx.fillRect(c.x, c.y, 1.3 + alea(), 1.3 + alea());
+        }
+    }
+
+    // La case au sol, dans le dessin (bords plats, comme le plateau) : rien de
+    // ce qu'on pose au pied ne doit en sortir.
+    const RAYON_CASE = MUR_L / 1.9;
+    function dansLaCase(x, y, cx, cy, marge = 3) {
+        const R = RAYON_CASE - marge, dx = Math.abs(x - cx), dy = Math.abs(y - cy);
+        return dx <= R && dy <= R * Math.sqrt(3) / 2 && Math.sqrt(3) * dx + dy <= Math.sqrt(3) * R;
+    }
+
+    // La terre soulevée au pied de la roche : de petites mottes brunes le
+    // long d'un contour (la roche vient de percer le sol).
+    function terreSoulevee(ctx, alea, pieds, cx, cy, libre = () => true) {
+        pieds.forEach(([a, b]) => {
+            const n = 2 + Math.floor(Math.hypot(b.x - a.x, b.y - a.y) / 7);
+            for (let k = 0; k < n; k++) {
+                const t = alea();
+                const x = a.x + (b.x - a.x) * t + (alea() - 0.5) * 4, y = a.y + (b.y - a.y) * t + (alea() - 0.2) * 4;
+                if (!dansLaCase(x, y, cx, cy) || !libre(x, y)) continue;
+                const r = 2.5 + alea() * 4;
+                ctx.fillStyle = `hsla(${26 + Math.floor(alea() * 10)}, ${28 + Math.floor(alea() * 12)}%, ${20 + Math.floor(alea() * 12)}%, ${0.55 + alea() * 0.3})`;
+                ctx.beginPath(); ctx.ellipse(x, y, r * 1.4, r * 0.8, (alea() - 0.5) * 0.6, 0, Math.PI * 2); ctx.fill();
+            }
+        });
+    }
+
+    // Les gravats au pied : des cailloux le long d'un contour, un peu devant,
+    // sans sortir de la case.
+    function gravatsAuPied(ctx, alea, pieds, cx, cy, roche, libre = () => true) {
+        const cailloux = [];
+        pieds.forEach(([a, b, nx, ny]) => {
+            const n = 2 + Math.floor(alea() * 3) + Math.floor(Math.hypot(b.x - a.x, b.y - a.y) / 14);
+            for (let k = 0; k < n; k++) {
+                const t = alea(), ecart = 1.5 + alea() * 6;
+                const x = a.x + (b.x - a.x) * t + nx * ecart, y = a.y + (b.y - a.y) * t + ny * ecart;
+                const r = 1.6 + alea() * 3.4;
+                if (!dansLaCase(x, y, cx, cy, r + 1) || !libre(x, y)) continue;
+                cailloux.push({ x, y, r });
+            }
+        });
+        cailloux.sort((u, v) => u.y - v.y).forEach(c => {
+            masse(ctx, alea, c.x, c.y, c.r, c.r * (0.5 + alea() * 0.7),
+                  [roche[0] + Math.floor((alea() - 0.5) * 8), roche[1] + Math.floor((alea() - 0.5) * 10), roche[2]]);
+        });
+    }
+
     window.dessinerMurTerre = function (graine, voisins, graineTeinte) {
         const liens = (voisins || []).filter(v => v && (v.etat === "mur" || v.etat === "casse"));
         const canvas = document.createElement("canvas");
@@ -302,15 +443,15 @@
         const pieces = [];
         // Le cœur.
         const nbMurs = liens.filter(v => v.etat === "mur").length;
-        const nCoeur = 7;
+        const nCoeur = 10;
         const depart = alea() * Math.PI * 2;
         const coeur = [];
         for (let i = 0; i < nCoeur; i++) {
             const a = depart + (i / nCoeur) * Math.PI * 2;
             // Un carrefour (2 bras ou plus) a un cœur plus large : pas de creux
             // entre ses bras.
-            const rr = rayonInt * (nbMurs >= 2 ? 0.74 + alea() * 0.08 : 0.62 + alea() * 0.1);
-            coeur.push({ x: Math.cos(a) * rr, y: Math.sin(a) * rr, h: HAUTEUR_MUR + (alea() - 0.3) * 7 });
+            const rr = rayonInt * (nbMurs >= 2 ? 0.72 + alea() * 0.1 : 0.58 + alea() * 0.16);
+            coeur.push({ x: Math.cos(a) * rr, y: Math.sin(a) * rr, h: HAUTEUR_MUR + (alea() - 0.4) * 18 });
         }
         pieces.push({ pts: coeur, joints: new Set() });
         const debris = [];
@@ -324,10 +465,13 @@
                 // (Quatre pixels de recouvrement sur le joint, sous la voisine : deux images
                 // bord à bord laisseraient passer un fil d'herbe.)
                 const bout = d + 4;
-                const pts = [P(0, largeur, HAUTEUR_MUR), P(d * 0.55, largeur * (0.94 + alea() * 0.1), HAUTEUR_MUR + (alea() - 0.5) * 3),
-                             P(bout, largeur, HAUTEUR_MUR), P(bout, -largeur, HAUTEUR_MUR),
-                             P(d * 0.55, -largeur * (0.94 + alea() * 0.1), HAUTEUR_MUR + (alea() - 0.5) * 3), P(0, -largeur, HAUTEUR_MUR)];
-                pieces.push({ pts, joints: new Set([2]) });       // l'arête 2→3 est le joint
+                // Des flancs bosselés (vers l'intérieur seulement) et une crête
+                // inégale — le joint, lui, reste exact.
+                const flanc = (signe) => [0.2, 0.38, 0.56, 0.74].map(t =>
+                    P(d * (t + (alea() - 0.5) * 0.06), signe * largeur * (0.84 + alea() * 0.16), HAUTEUR_MUR + (alea() - 0.55) * 16));
+                const pts = [P(0, largeur, HAUTEUR_MUR), ...flanc(1), P(bout, largeur, HAUTEUR_MUR), P(bout, -largeur, HAUTEUR_MUR),
+                             ...flanc(-1).reverse(), P(0, -largeur, HAUTEUR_MUR)];
+                pieces.push({ pts, joints: new Set([5]) });       // l'arête 5→6 est le joint
             } else {
                 // Un moignon cassé : la roche s'arrête net, en dents, plus bas.
                 const L = d * (0.5 + alea() * 0.1);
@@ -365,14 +509,30 @@
         });
         const vers = (p) => ({ x: MUR_CX + p.x, y: MUR_CY + p.y });
         const haut = (p) => ({ x: MUR_CX + p.x, y: MUR_CY + p.y - p.h });
-        // L'ombre, sous la roche seulement.
-        ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
+        // PAS D'OMBRE PORTÉE : la roche sort du sol. À son pied, de la terre
+        // soulevée (le contour de chaque pièce, hors joints).
+        const contours = [];
         pieces.forEach(pc => {
-            ctx.beginPath();
-            pc.pts.forEach((p, k) => { const b = vers(p); k ? ctx.lineTo(b.x + 2, b.y + 2) : ctx.moveTo(b.x + 2, b.y + 2); });
-            ctx.closePath();
-            ctx.fill();
+            const n = pc.pts.length;
+            const gx = pc.pts.reduce((t, p) => t + p.x, 0) / n, gy = pc.pts.reduce((t, p) => t + p.y, 0) / n;
+            for (let i = 0; i < n; i++) {
+                if (pc.joints.has(i)) continue;
+                const a = pc.pts[i], b = pc.pts[(i + 1) % n];
+                const ex = b.x - a.x, ey = b.y - a.y, l2 = Math.hypot(ex, ey) || 1;
+                let nx = ey / l2, ny = -ex / l2;
+                if (nx * ((a.x + b.x) / 2 - gx) + ny * ((a.y + b.y) / 2 - gy) < 0) { nx = -nx; ny = -ny; }
+                const mx = (a.x + b.x) / 2 + nx, my = (a.y + b.y) / 2 + ny;
+                if (pieces.some(autre => autre !== pc && dansPolygone({ x: mx, y: my }, autre.pts))) continue;
+                contours.push([vers(a), vers(b), nx, ny]);
+            }
         });
+        // Ni terre ni gravats du côté d'une voisine murée : sa roche passe
+        // devant, des cailloux y ressortiraient par-dessus.
+        const versMurs = liens.filter(v => v.etat === "mur").map(v => {
+            const d = Math.hypot(v.dx, v.dy) / 2; return { ux: v.dx / 2 / d, uy: v.dy / 2 / d, d };
+        });
+        const libre = (x, y) => versMurs.every(m => ((x - MUR_CX) * m.ux + (y - MUR_CY) * m.uy) < m.d * 0.3);
+        terreSoulevee(ctx, alea, contours, MUR_CX, MUR_CY, libre);
         // LE VOLUME D'ABORD, en roche sombre : chaque arête monte de son pied à
         // son sommet. Les angles rentrants entre le cœur et ses bras ne
         // laissent plus voir l'herbe — juste une ombre de roche.
@@ -406,7 +566,7 @@
                 pc.cachees = pc.cachees || new Set();
                 if (cachee) pc.cachees.add(i);
                 if (ny <= 0.05 || cachee) continue;
-                faces.push({ a, b, y: Math.max(a.y, b.y), lumiere: -0.7 * nx - 0.7 * ny + 0.55 });
+                faces.push({ a, b, y: Math.max(a.y, b.y), lumiere: -0.7 * nx - 0.7 * ny + 0.55 + (alea() - 0.5) * 0.6 });
             }
         });
         faces.sort((f, g) => f.y - g.y).forEach(f => {
@@ -426,24 +586,25 @@
             ctx.beginPath(); ctx.moveTo(ba.x, ba.y); ctx.lineTo(bb.x, bb.y); ctx.stroke();
             ctx.strokeStyle = "rgba(30, 24, 18, 0.16)";
             ctx.beginPath(); ctx.moveTo(ba.x, ba.y); ctx.lineTo(ha.x, ha.y); ctx.stroke();
-            // Strates et éclats sur la face.
+            // Strates, taches, blocs, fissures, ébréchures, grain — dans la
+            // face seulement (on retrace son contour : le chemin courant est
+            // celui du dernier trait).
             ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(ba.x, ba.y); ctx.lineTo(bb.x, bb.y); ctx.lineTo(hb.x, hb.y); ctx.lineTo(ha.x, ha.y);
+            ctx.closePath();
             ctx.clip();
             for (let k = 1; k <= 3; k++) {
                 const t = k / 4 + (alea() - 0.5) * 0.06;
                 const y0 = ba.y + (ha.y - ba.y) * t, y1 = bb.y + (hb.y - bb.y) * t;
-                ctx.strokeStyle = "rgba(35, 28, 22, 0.3)";
+                ctx.strokeStyle = "rgba(35, 28, 22, 0.26)";
                 ctx.beginPath();
                 ctx.moveTo(ba.x, y0 + (alea() - 0.5) * 2);
                 ctx.lineTo((ba.x + bb.x) / 2, (y0 + y1) / 2 + (alea() - 0.5) * 3);
                 ctx.lineTo(bb.x, y1 + (alea() - 0.5) * 2);
                 ctx.stroke();
             }
-            for (let k = 0; k < 8; k++) {
-                const u = alea(), v = alea();
-                ctx.fillStyle = alea() < 0.5 ? "rgba(255, 248, 235, 0.18)" : "rgba(20, 14, 10, 0.25)";
-                ctx.fillRect(ba.x + (bb.x - ba.x) * u, ba.y + (bb.y - ba.y) * u + (ha.y - ba.y) * v, 1.6, 1.6);
-            }
+            detaillerFace(ctx, alea, ba, bb, hb, ha);
             ctx.restore();
         });
         // Les dessus, d'une seule teinte (celle de la voisine aussi).
@@ -471,12 +632,24 @@
         ctx.beginPath();
         pieces.forEach(pc => pc.pts.forEach((p, k) => { const t = haut(p); k ? ctx.lineTo(t.x, t.y) : ctx.moveTo(t.x, t.y); }));
         ctx.clip();
-        for (let k = 0; k < 50; k++) {
-            ctx.fillStyle = alea() < 0.5 ? "rgba(255, 250, 240, 0.16)" : "rgba(30, 20, 12, 0.18)";
-            ctx.fillRect(MUR_CX + (alea() - 0.5) * 2 * rayonInt, MUR_CY - HAUTEUR_MUR + (alea() - 0.5) * 2 * rayonInt, 1.5, 1.5);
+        const surLeDessus = () => ({ x: MUR_CX + (alea() - 0.5) * 2 * rayonInt, y: MUR_CY - HAUTEUR_MUR + (alea() - 0.5) * 2 * rayonInt });
+        for (let k = 0; k < 10; k++) {                          // les taches
+            const c = surLeDessus();
+            ctx.fillStyle = alea() < 0.5 ? `rgba(255, 248, 230, ${0.05 + alea() * 0.08})` : `rgba(30, 20, 12, ${0.06 + alea() * 0.09})`;
+            ctx.beginPath(); ctx.ellipse(c.x, c.y, 3 + alea() * 10, 2 + alea() * 6, alea() * Math.PI, 0, Math.PI * 2); ctx.fill();
+        }
+        for (let k = 0; k < 7; k++) {                           // les trous (un creux sombre, un rebord clair)
+            const c = surLeDessus(), r = 1 + alea() * 2.2;
+            ctx.fillStyle = "rgba(25, 17, 10, 0.4)"; ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "rgba(255, 248, 235, 0.25)"; ctx.beginPath(); ctx.arc(c.x + r * 0.5, c.y + r * 0.6, r * 0.6, 0, Math.PI * 2); ctx.fill();
+        }
+        for (let k = 0; k < 90; k++) {                          // le grain
+            const c = surLeDessus();
+            ctx.fillStyle = alea() < 0.5 ? "rgba(255, 250, 240, 0.18)" : "rgba(30, 20, 12, 0.22)";
+            ctx.fillRect(c.x, c.y, 1.2 + alea(), 1.2 + alea());
         }
         ctx.strokeStyle = "rgba(40, 28, 18, 0.45)";
-        for (let k = 0; k < 2; k++) {
+        for (let k = 0; k < 4; k++) {
             const a = alea() * Math.PI * 2;
             ctx.beginPath();
             ctx.moveTo(MUR_CX + Math.cos(a) * rayonInt * 0.4, MUR_CY - HAUTEUR_MUR + Math.sin(a) * rayonInt * 0.4);
@@ -485,10 +658,11 @@
             ctx.stroke();
         }
         ctx.restore();
+        // Des gravats au pied (devant : ceux de derrière seraient cachés).
+        gravatsAuPied(ctx, alea, contours.filter(c => c[3] > 0.05), MUR_CX, MUR_CY, roche, libre);
         // Les éclats tombés au pied d'un bout cassé.
         debris.sort((a, b) => a.y - b.y).forEach(e => {
             const b = vers(e);
-            ombre(ctx, b.x + 1.5, b.y + 1.5, e.r * 1.5, e.r * 0.8, 0.35);
             masse(ctx, alea, b.x, b.y, e.r, e.r * (0.6 + alea() * 0.6), [roche[0], roche[1] + 2, roche[2]]);
         });
         return canvas;
@@ -540,8 +714,19 @@
             calque.id = "calque-murs-terre";
             plateau.appendChild(calque);
         }
+        // LES MURS AU-DESSUS DES PIONS : leur propre calque (#transform-murs,
+        // zoomé comme le plateau, sous le brouillard) — la roche cache qui se
+        // tient derrière elle. Les gravats, eux, restent au sol, sous les pions.
+        const zoneHaute = document.getElementById("transform-murs") || plateau;
+        let haut = document.getElementById("calque-murs-terre-haut");
+        if (!haut) {
+            haut = document.createElement("div");
+            haut.id = "calque-murs-terre-haut";
+            zoneHaute.appendChild(haut);
+        }
         const R = window.PLATEAU_VTT.hexSize || 40;
         const morceaux = [];
+        const sol = [];
         const vise = window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif ? window.ETAT_CIBLAGE.cibleUnique : null;
         Object.keys(window.GRAVATS_TERRE || {}).sort().forEach(cle => {
             const [q, r] = cle.split("_").map(Number);
@@ -549,7 +734,7 @@
             const px = window.PLATEAU_VTT.hexToPixel(q, r);
             const t = R * 1.8;
             const src = image("gravats", cle);
-            if (src) morceaux.push(`<img class="gravats-terre" alt="" src="${src}" style="left:${px.x - t / 2}px;top:${px.y - t / 2}px;width:${t}px;height:${t}px">`);
+            if (src) sol.push(`<img class="gravats-terre" alt="" src="${src}" style="left:${px.x - t / 2}px;top:${px.y - t / 2}px;width:${t}px;height:${t}px">`);
         });
         // TOUS LES MURS DANS UN SEUL CANVAS, du haut de l'écran vers le bas (la
         // roche du devant passe devant). Une image par mur laissait un fil
@@ -601,9 +786,10 @@
                 style="left:${px.x - R * 0.7}px;top:${px.y - R * 0.7}px;width:${R * 1.4}px;height:${R * 1.4}px"></span>`);
         });
         projets.forEach(() => morceaux.push(`<span class="mur-terre-projet"></span>`));
-        calque.innerHTML = morceaux.filter(x => typeof x === "string").join("");
+        calque.innerHTML = sol.join("");
+        haut.innerHTML = morceaux.filter(x => typeof x === "string").join("");
         const ensemble = morceaux.find(x => typeof x !== "string");
-        if (ensemble) calque.insertBefore(ensemble, calque.firstChild ? calque.querySelector(".mur-terre, .mur-terre-jauge, .mur-terre-projet") : null);
+        if (ensemble) haut.insertBefore(ensemble, haut.firstChild);
     };
 
     // ---------------------------------------------------------------------

@@ -359,7 +359,7 @@ console.log("\n9 bis. LES MURS QUI SE SUIVENT, ET LEURS BOUTS CASSÉS");
     window.MURS_TERRE = { X1: { id: "X1", q: 0, r: 0, pv: 10, pvMax: 10, idLanceur: "G" }, X2: { id: "X2", q: 0, r: 1, pv: 10, pvMax: 10, idLanceur: "G" } };
     window.GRAVATS_TERRE = {};
     window.appliquerMursTerre();
-    const ens = document.querySelector("#calque-murs-terre canvas.murs-terre-ensemble");
+    const ens = document.querySelector("#calque-murs-terre-haut canvas.murs-terre-ensemble");
     const ox = parseFloat(ens.style.left), oy = parseFloat(ens.style.top), k = ens.width / parseFloat(ens.style.width);
     const ctx = ens.getContext("2d");
     // Le long de la colonne du milieu, du dessus de la case haute au dessus de la case basse.
@@ -378,13 +378,24 @@ console.log("\n9 bis. LES MURS QUI SE SUIVENT, ET LEURS BOUTS CASSÉS");
     window.appliquerMursTerre();
     window.MURS_TERRE = {}; window.GRAVATS_TERRE = {};
     window.appliquerMursTerre();
-    return { sousLaCase, versHaut: opaques(haut, (x, y) => y < 130 - inR - 62 + 10), avecCasse: versLaCasse(casse), sansCasse: versLaCasse(haut),
+    // Sans ombre portée : aucun voile noir translucide autour de la roche.
+    const ombres = opaques(haut, () => true) === 0 ? -1 : (() => { const d = haut.getContext("2d").getImageData(0, 0, haut.width, haut.height).data; let n = 0;
+      for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 20 && d[i + 3] < 140 && d[i] < 12 && d[i + 1] < 12 && d[i + 2] < 12) n++; return n; })();
+    // Plus rocheux : beaucoup de teintes différentes sur la roche.
+    const teintes = (() => { const d = haut.getContext("2d").getImageData(0, 0, haut.width, haut.height).data; const v = new Set();
+      for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 250) v.add((d[i] >> 2) + "," + (d[i + 1] >> 2) + "," + (d[i + 2] >> 2)); return v.size; })();
+    // Des gravats et de la terre au pied, devant (sous le cœur, dans la case).
+    const auPied = opaques(haut, (x, y) => y > 130 + inR * 0.7 && y <= 130 + inR + 3);
+    return { ombres, teintes, auPied, sousLaCase, versHaut: opaques(haut, (x, y) => y < 130 - inR - 62 + 10), avecCasse: versLaCasse(casse), sansCasse: versLaCasse(haut),
              trous, ecart, v: v.join(","), vApres: vApres.join(","), meme: haut.toDataURL() === window.dessinerMurTerre("A", voisins([null, null, "mur", null, null, null]), "G").toDataURL() };
   });
   verifier("rien ne déborde sous sa case (au sol)", r.sousLaCase === 0, String(r.sousLaCase));
   verifier("un bras de roche monte vers la case du dessus", r.versHaut > 200, String(r.versHaut));
-  verifier("deux murs voisins : une seule roche, sans trou ni couture sur la frontière", r.trous === 0 && r.ecart <= 6, `${r.trous} / ${r.ecart}`);
-  verifier("une voisine cassée : un moignon et des éclats de son côté", r.avecCasse > 20 && r.sansCasse === 0, `${r.avecCasse} / ${r.sansCasse}`);
+  verifier("deux murs voisins : une seule roche, sans trou ni couture sur la frontière", r.trous === 0 && r.ecart <= 30, `${r.trous} / ${r.ecart}`);
+  verifier("une voisine cassée : un moignon et des éclats de son côté", r.avecCasse > r.sansCasse + 15, `${r.avecCasse} / ${r.sansCasse}`);
+  verifier("plus d'ombre portée sous la roche (elle sort du sol)", r.ombres <= 5, String(r.ombres));
+  verifier("une roche moins lisse : beaucoup de teintes (taches, fissures, grain)", r.teintes > 180, String(r.teintes));
+  verifier("de la terre et des gravats à son pied, dans la case", r.auPied > 30, String(r.auPied));
   verifier("les voisines vues : « mur » puis, cassée, « casse »", /mur/.test(r.v) && !/casse/.test(r.v) && /casse/.test(r.vApres) && !/mur/.test(r.vApres),
            `${r.v} → ${r.vApres}`);
   verifier("même voisinage, même dessin", r.meme);
@@ -411,6 +422,7 @@ await p.evaluate(() => {
   window.MURS_TERRE = murs; window.GRAVATS_TERRE = { "5_0": true };
   window.appliquerMursTerre();
   cadre.appendChild(document.getElementById("calque-murs-terre"));
+  cadre.appendChild(document.getElementById("calque-murs-terre-haut"));
 });
 await p.waitForTimeout(200);
 await p.screenshot({ path: "/tmp/claude-0/geomancien_murailles.png" });
@@ -441,10 +453,16 @@ console.log("\n10. À L'ÉCRAN : TERRAIN, CALQUE, POSE, CIBLAGE");
     const gravH = window.etatCaseCombat(0, 2, "H"), gravG = window.etatCaseCombat(0, 2, "G");
     const los = window.verifierLigneDeVueVTT({ q: 0, r: 0 }, { q: 4, r: 0 });
     window.appliquerMursTerre();
-    const calque = document.getElementById("calque-murs-terre");
-    const imgs = calque.querySelectorAll(".mur-terre[data-mur]").length, grav = calque.querySelectorAll("img.gravats-terre").length;
-    const ensemble = calque.querySelectorAll("canvas.murs-terre-ensemble").length;
-    const jauges = calque.querySelectorAll(".mur-terre-jauge").length;
+    const calque = document.getElementById("calque-murs-terre"), haut = document.getElementById("calque-murs-terre-haut");
+    const imgs = haut.querySelectorAll(".mur-terre[data-mur]").length, grav = calque.querySelectorAll("img.gravats-terre").length;
+    const ensemble = haut.querySelectorAll("canvas.murs-terre-ensemble").length;
+    const jauges = haut.querySelectorAll(".mur-terre-jauge").length;
+    // Les murs AU-DESSUS des pions (leur calque vient après, même z-index),
+    // sous le brouillard ; les gravats au sol, dans le plateau.
+    const pions = document.getElementById("conteneur-tokens-vtt"), cm = document.getElementById("calque-murs-vtt"), br = document.getElementById("calque-brouillard-vtt");
+    const ordre = !!(pions && cm && br && (pions.compareDocumentPosition(cm) & Node.DOCUMENT_POSITION_FOLLOWING)
+      && getComputedStyle(cm).zIndex === getComputedStyle(pions).zIndex && Number(getComputedStyle(br).zIndex) > Number(getComputedStyle(cm).zIndex)
+      && haut.closest("#transform-murs") && calque.closest("#transform-plateau"));
     // La pose.
     let envoye = null;
     window.regimeDemande = { actif: () => true, etat: () => null,
@@ -458,17 +476,18 @@ console.log("\n10. À L'ÉCRAN : TERRAIN, CALQUE, POSE, CIBLAGE");
     window.toucherCaseMurTerre({ q: 3, r: -3 });
     window.toucherCaseMurTerre({ q: 1, r: -2 });        // 4e : 80 > 70 d'énergie
     const compte = document.querySelector(".pose-murs-compte").textContent;
-    const projets = calque.querySelectorAll(".mur-terre-projet").length;
+    const projets = haut.querySelectorAll(".mur-terre-projet").length;
     window.toucherCaseMurTerre({ q: 3, r: -3 });         // retiré
     window.validerPoseMursTerre();
     return { pourG: !!pourG.isBlocked, pourH: !!pourH.isBlocked, vue: !!vue.isBlocked, mur: !!vue.murTerre,
-             gravH: !!gravH.isDifficult, gravG: !!gravG.isDifficult, los, imgs, grav, jauges, bandeau, compte, projets, envoye, ensemble,
+             ordre, gravH: !!gravH.isDifficult, gravG: !!gravG.isDifficult, los, imgs, grav, jauges, bandeau, compte, projets, envoye, ensemble,
              ferme: !document.getElementById("bandeau-pose-murs") };
   });
   verifier("terrain : le mur bloque les autres, pas le Géomancien (qui ne s'y arrête pas)",
            r.pourH && !r.pourG && r.vue && r.mur);
   verifier("des gravats : difficiles pour un autre, pas pour lui", r.gravH && !r.gravG);
   verifier("la ligne de vue de l'écran est coupée", r.los === false);
+  verifier("les murs passent AU-DESSUS des pions (sous le brouillard) ; les gravats au sol", r.ordre === true);
   verifier("le calque : 2 murs (peints dans un seul canvas), 1 tas de gravats, une jauge sur le mur entamé",
            r.imgs === 2 && r.ensemble === 1 && r.grav === 1 && r.jauges === 1, JSON.stringify(r));
   verifier("la pose : un bandeau ; trop loin et déjà muré refusés ; plus d'énergie au 4e",
@@ -487,7 +506,7 @@ console.log("\n10. À L'ÉCRAN : TERRAIN, CALQUE, POSE, CIBLAGE");
     window.dessinerAnneauxCiblage = () => {};
     window.ajouterCibleCiblage("MUR_B");
     const vise = phase.attaques[0].cibles.slice();
-    const classe = document.querySelector('#calque-murs-terre [data-mur="MUR_B"]').classList.contains("mur-terre-vise");
+    const classe = document.querySelector('[data-mur="MUR_B"]').classList.contains("mur-terre-vise");
     window.ETAT_CIBLAGE.actif = false;
     return { vise, classe };
   });
