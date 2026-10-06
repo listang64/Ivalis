@@ -298,7 +298,9 @@ const SCENES = {
                        CLASSE_TRANSFERT: "🔄 Transfert",
                        CLASSE_RESONANCE_BOUCLIER: "🛡️ Résonance du bouclier",
                        CLASSE_BOUCLIER_ANTIMAGIE: "🔮 Bouclier anti-magie",
-                       CLASSE_APPEL_LUMIERE: "☀️ Appel de la lumière" };
+                       CLASSE_APPEL_LUMIERE: "☀️ Appel de la lumière",
+                       CLASSE_ARRET_TEMPS: "⏳ Arrêt du temps",
+                       CLASSE_RETOUR_ARRIERE: "⏪ Retour arrière" };
         return { geste: "message", pion: e.acteur, texte: noms[e.idCarte] || "Technique de classe",
                  couleur: "#e8c46a", duree: RYTHME.message };
     },
@@ -548,7 +550,11 @@ export function fileDepuisEtat(etat) {
         // le MÊME compteur que celui sur lequel le cerveau facturera. Deux
         // comptes séparés finiraient par ne plus être d'accord, et le joueur
         // verrait un prix qu'on ne lui prend pas.
-        pasParcourus: nombre(f.pas)
+        pasParcourus: nombre(f.pas),
+        // Les marques de l'Oracle (Retour arrière, Arrêt du temps).
+        ...(f.retourArriere ? { retourArriere: true } : {}),
+        ...(f.reposPris ? { reposPris: true } : {}),
+        ...(f.arretDuTemps ? { arretDuTemps: true } : {})
     }));
 }
 

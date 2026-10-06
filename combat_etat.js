@@ -363,7 +363,7 @@ export function construireEtatCombat(source) {
         table[fiche.idPersonnage] = combattantDepuisFiche(fiche, positions[fiche.idPersonnage], regles);
     });
 
-    return {
+    const etat = {
         format: FORMAT_ETAT,
         // La version s'incrémente de UN à chaque pas, jamais de deux. C'est ce
         // qui permet à un poste en retard de savoir exactement ce qu'il a raté.
@@ -393,17 +393,61 @@ export function construireEtatCombat(source) {
         // IL VIT DANS LA FILE, ET C'EST TOUT L'INTÉRÊT : l'entrée disparaît
         // quand le tour se termine, donc le compteur se remet à zéro tout seul.
         // Aucune remise à zéro à écrire, aucune à oublier.
-        file: (partie.File_Attente_Combat || []).map(f => ({
-            id: f.idPersonnage,
-            carte: f.idCarte || null,
-            initiative: nombre(f.initiative, 0),
-            pas: nombre(f.pasParcourus)
-        })),
+        file: (partie.File_Attente_Combat || []).map(entreeDeFile),
         ontJoue: [...(partie.Ont_Joue_Ce_Round || [])],
 
         combattants: table,
         zones: JSON.parse(JSON.stringify(zones || {}))
     };
+    // Un Oracle en tête dès l'ouverture, avec un Retour arrière : son repos se
+    // prend tout de suite (l'état de départ n'a pas d'étapes à raconter).
+    if (etat.phase === "Resolution") reposDuRetourArriere(etat);
+    return etat;
+}
+
+// UNE ENTRÉE DE LA FILE, telle que le cerveau la tient — depuis la file de la
+// partie (idPersonnage, idCarte) ou depuis la sienne (id, carte). Les marques
+// des techniques de l'Oracle voyagent avec elle.
+export function entreeDeFile(f) {
+    return {
+        id: f.id || f.idPersonnage,
+        carte: f.carte || f.idCarte || null,
+        initiative: nombre(f.initiative, 0),
+        pas: nombre(f.pas !== undefined ? f.pas : f.pasParcourus),
+        ...(f.retourArriere ? { retourArriere: true } : {}),
+        ...(f.reposPris ? { reposPris: true } : {}),
+        ...(f.arretDuTemps ? { arretDuTemps: true } : {})
+    };
+}
+
+// LE RETOUR ARRIÈRE (Oracle, niveau 10). Choisi en préparation avec une
+// compétence, il marque l'entrée de la file (`retourArriere`). Quand cette
+// entrée arrive en tête, l'Oracle prend son repos long — même rendement que le
+// repos ordinaire (Repos_Long en %, ou 35 % de la jauge) — AVANT de bouger ou
+// de lancer : la compétence part avec la fatigue remise à jour. La technique
+// est alors consommée. Une seule fois (`reposPris`), et seulement si l'Oracle
+// l'a bien et ne l'a pas déjà jouée. Rend les étapes ; l'état est modifié.
+export const TECHNIQUE_RETOUR_ARRIERE = "CLASSE_RETOUR_ARRIERE";
+export function reposDuRetourArriere(etat) {
+    const tete = (etat && etat.file || [])[0];
+    if (!tete || !tete.retourArriere || tete.reposPris) return [];
+    tete.reposPris = true;
+    const c = (etat.combattants || {})[tete.id];
+    if (!c || c.aTerre) return [];
+    const techniques = (c.atouts && c.atouts.techniques) || [];
+    const deja = c.techniquesUtilisees || [];
+    if (!techniques.includes(TECHNIQUE_RETOUR_ARRIERE) || deja.includes(TECHNIQUE_RETOUR_ARRIERE)) return [];
+    c.techniquesUtilisees = [...deja, TECHNIQUE_RETOUR_ARRIERE];
+    const pct = nombre(c.stats && c.stats.Repos_Long);
+    const taux = pct > 0 ? pct / 100 : 0.35;
+    const apres = Math.min(nombre(c.fatigueMax), nombre(c.fatigue) + Math.floor(nombre(c.fatigueMax) * taux));
+    const etapes = [{ type: "techniqueClasse", acteur: tete.id, idCarte: TECHNIQUE_RETOUR_ARRIERE,
+                      cible: tete.id, utilisees: [...c.techniquesUtilisees] }];
+    if (apres !== nombre(c.fatigue)) {
+        c.fatigue = apres;
+        etapes.push({ type: "fatigue", cible: tete.id, fatigueApres: apres, repos: true });
+    }
+    return etapes;
 }
 
 // Une copie franche, sans lien avec l'original. Le cerveau travaille sur une

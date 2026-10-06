@@ -755,6 +755,31 @@ window.fermerVoletCompetences = function() {
     window.toggleVoletCompetences(false);
 };
 
+// =========================================================================
+//  LE RETOUR ARRIÈRE DE L'ORACLE, EN PRÉPARATION
+// =========================================================================
+//  Choisir « Retour arrière » ne remplit pas la file : l'Oracle doit ensuite
+//  choisir la compétence qui suivra son repos. Entre les deux, le repos à venir
+//  compte déjà dans ce qu'il peut se payer (une compétence trop chère avant le
+//  repos redevient abordable). La file reçoit la compétence, marquée
+//  `retourArriere` ; le cerveau fera le repos au début de son tour.
+window.RETOUR_ARRIERE_EN_ATTENTE = null;   // l'id du héros qui l'a choisi
+window.retourArriereEnAttente = function(perso) {
+    if (!perso || !perso.idPersonnage || window.RETOUR_ARRIERE_EN_ATTENTE !== perso.idPersonnage) return false;
+    return ((window.PARTIE_DATA || {}).Phase_Combat || "Preparation") === "Preparation";
+};
+window.bonusRetourArriere = function(perso) {
+    if (!window.retourArriereEnAttente(perso) || typeof window.gainReposLong !== "function") return 0;
+    return window.gainReposLong(perso);
+};
+// L'énergie avec laquelle ce héros choisit sa compétence.
+window.fatiguePourChoisir = function(perso) {
+    if (!perso) return window.COMBAT_FATIGUE_ACTUELLE || 0;
+    const max = typeof window.fatigueMaxCombattant === "function" ? window.fatigueMaxCombattant(perso) : 100;
+    const actuelle = perso.fatigueActuelle !== undefined ? (parseInt(perso.fatigueActuelle) || 0) : max;
+    return actuelle + window.bonusRetourArriere(perso);
+};
+
 window.chargerCompetencesCombat = function(idPersonnage, couleur) {
     // LE DÉMÉNAGEMENT SE FAIT AVANT LE REMPLISSAGE, jamais après. Sans cette
     // ligne, les bannières restaient dans le panneau latéral jusqu'au premier
@@ -814,7 +839,8 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
             const titre = data.Nom || "Technique";
             const initiative = data.Initiative || 0;
             const coutFatigue = parseInt(data.Fatigue) || 0;
-            const estEpuise = coutFatigue > window.COMBAT_FATIGUE_ACTUELLE;
+            const estEpuise = coutFatigue > (typeof window.fatiguePourChoisir === "function"
+                ? window.fatiguePourChoisir(persoActuel) : window.COMBAT_FATIGUE_ACTUELLE);
 
             // L'arme en main peut interdire la technique. Une carte inadaptée
             // reste visible — le joueur doit comprendre POURQUOI elle ne part
@@ -858,7 +884,12 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
             const dejaJouee = typeof window.techniqueClasseUtilisee === "function"
                 ? window.techniqueClasseUtilisee(persoActuel, idCarte)
                 : (persoActuel.techniquesUtilisees || []).includes(idCarte);
-            const urlCadreClasse = dejaJouee ? IMAGE_CADRE_EPUISE : IMAGE_CADRE_NORMAL;
+            // Le Retour arrière choisi, en attente de sa compétence : surligné.
+            const enAttente = idCarte === "CLASSE_RETOUR_ARRIERE" && typeof window.retourArriereEnAttente === "function"
+                && window.retourArriereEnAttente(persoActuel);
+            const urlCadreClasse = dejaJouee ? IMAGE_CADRE_EPUISE
+                : enAttente ? "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1783286721/ban_cible_pdpnad.png"
+                : IMAGE_CADRE_NORMAL;
             const couleurTexteClasse = dejaJouee ? "#888888" : "#e0d0b0";
             const survol = dejaJouee ? ` title="Déjà utilisée dans ce combat"` : ` title="Technique de classe — une fois par combat"`;
             htmlDeck += `
@@ -1558,7 +1589,8 @@ window.gererClicCarteCombat = function(idCarte) {
 
     const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
     const fatigueMax = window.fatigueMaxCombattant(persoActuel);
-    const fatiguePerso = (persoActuel && persoActuel.fatigueActuelle !== undefined) ? parseInt(persoActuel.fatigueActuelle) : fatigueMax;
+    const fatiguePerso = ((persoActuel && persoActuel.fatigueActuelle !== undefined) ? parseInt(persoActuel.fatigueActuelle) : fatigueMax)
+        + (typeof window.bonusRetourArriere === "function" ? window.bonusRetourArriere(persoActuel) : 0);
 
     const dataCarte = window.COMPETENCES_CACHE[idCarte];
     const cout = parseInt(dataCarte?.Fatigue) || 0;
@@ -1569,7 +1601,9 @@ window.gererClicCarteCombat = function(idCarte) {
     // l'affichage (competences.js, boutonChoisirHtml) que le bouton "Choisir"
     // cède la place à "Énergie Insuffisante". On ne réserve simplement pas son
     // coût auprès du déplacement, puisqu'elle ne pourra de toute façon pas partir.
-    const abordable = cout + (window.MOUVEMENT_COUT_TOTAL || 0) <= (window.COMBAT_FATIGUE_ACTUELLE || 0);
+    const abordable = cout + (window.MOUVEMENT_COUT_TOTAL || 0)
+        <= (window.COMBAT_FATIGUE_ACTUELLE || 0)
+           + (typeof window.bonusRetourArriere === "function" ? window.bonusRetourArriere(persoActuel) : 0);
 
     if (window.CARTE_EN_APERCU !== idCarte) {
         window.COUT_COMPETENCE_SELECTIONNEE = abordable ? cout : 0;
@@ -4098,6 +4132,29 @@ window.jouerCarteCombat = async function(idCarte) {
         return;
     }
 
+    // LE RETOUR ARRIÈRE (Oracle) ne s'inscrit pas seul : il attend la
+    // compétence qui suivra le repos. Le rechoisir l'annule.
+    const avecRetourArriere = typeof window.retourArriereEnAttente === "function"
+        && window.retourArriereEnAttente(persoActuel);
+    if (idCarte === "CLASSE_RETOUR_ARRIERE") {
+        window.RETOUR_ARRIERE_EN_ATTENTE = avecRetourArriere ? null : persoActuel.idPersonnage;
+        refuser(avecRetourArriere ? "Retour arrière annulé" : "Retour arrière : en attente de sa compétence");
+        if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD(true);
+        const tk = (window.TOKENS_VTT_DATA || {})[persoActuel.idPersonnage];
+        if (tk && typeof window.afficherMessageFlottantHex === "function") {
+            window.afficherMessageFlottantHex(tk.q, tk.r, avecRetourArriere ? "Retour arrière annulé"
+                : "⏪ Retour arrière : choisis la compétence qui suivra le repos", "#b39ddb");
+        }
+        window.chargerCompetencesCombat(persoActuel.idPersonnage, window.COULEUR_PERSO_COURANT);
+        return;
+    }
+    // Avec un Retour arrière : une compétence forgée, rien d'autre.
+    if (avecRetourArriere && dataCarte.techniqueClasse) {
+        refuser("Retour arrière : une technique de classe ne peut pas suivre");
+        alert("Retour arrière : choisis une de tes compétences (pas une autre technique de classe).");
+        return;
+    }
+
     // Ce qu'on tient en main peut interdire la technique : pas d'attaque légère
     // avec une hache, pas de sort les deux mains prises. Contrôlé ici, au
     // moment de jouer, plutôt qu'à la Forge : une carte reste forgeable, elle
@@ -4148,8 +4205,12 @@ window.jouerCarteCombat = async function(idCarte) {
             // L'équipement (épée courte, effet A/B "+3 initiative") avance le
             // héros dans la piste ; l'élan temporaire gagné en frappant s'y
             // ajoute tant qu'il dure.
+            // L'Oracle (+10) avance ses compétences forgées — pas ses techniques
+            // de classe, qui gardent leur initiative.
             let initiativeCarte = (dataCarte.Initiative || 0)
-                + (typeof window.bonusEquip === "function" ? window.bonusEquip(persoActuel, "initiative") : 0);
+                + (typeof window.bonusEquip === "function" ? window.bonusEquip(persoActuel, "initiative") : 0)
+                + (!dataCarte.techniqueClasse && typeof window.atoutRace === "function"
+                    ? (Number(window.atoutRace(persoActuel).initiative) || 0) : 0);
             const etatElectrifie = persoActuel.Etats_Alteres && persoActuel.Etats_Alteres.find(e => e.nom === "Électrifié");
             if (etatElectrifie) {
                 initiativeCarte = Math.max(0, initiativeCarte - 35);
@@ -4160,7 +4221,8 @@ window.jouerCarteCombat = async function(idCarte) {
                 idPersonnage: persoActuel.idPersonnage,
                 idCarte: idCarte, // NOUVEAU : Sauvegarde la carte choisie !
                 initiative: initiativeCarte,
-                timestamp: new Date().getTime()
+                timestamp: new Date().getTime(),
+                ...(avecRetourArriere ? { retourArriere: true } : {})
             });
 
             file.sort((a, b) => {
@@ -4189,6 +4251,7 @@ window.jouerCarteCombat = async function(idCarte) {
         // par la version qui DIT si l'écriture a eu lieu, et un échec rejoint
         // le chemin d'erreur : le deck se rouvre, et le joueur le sait.
         if (!ecriture.ok) throw (ecriture.erreur || new Error("la carte n'a pas pu être inscrite"));
+        if (avecRetourArriere) window.RETOUR_ARRIERE_EN_ATTENTE = null;
 
         // L'état Électrifié se dissipe une fois la carte réellement inscrite.
         if (etatsApresElectrifie) {
@@ -4228,6 +4291,12 @@ window.jouerReposLong = async function() {
 
     const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
     if (!persoActuel) return;
+
+    // Le Retour arrière EST un repos : il ne se double pas d'un repos long.
+    if (typeof window.retourArriereEnAttente === "function" && window.retourArriereEnAttente(persoActuel)) {
+        alert("Retour arrière : choisis une de tes compétences — le repos est déjà compris.");
+        return;
+    }
 
     if (typeof window.rangerDeckApresChoix === "function") window.rangerDeckApresChoix();
     window.mettreAJourJaugeFatigue(0);
@@ -4944,6 +5013,8 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
         if (typeof window.demarrerCiblage === "function") window.demarrerCiblage(idCarte, { idLanceur });
         return;
     }
+    // L'Arrêt du temps (Oracle) : sa propre fenêtre.
+    if (t.cible === "arretTemps") return window.ouvrirArretDuTemps(idLanceur);
     if (!["allieAdjacent", "allieKO", "ennemiAdjacent", "ennemi", "combattant"].includes(t.cible)) {
         return demande.techniqueClasse(idLanceur, idCarte);
     }
@@ -5010,6 +5081,103 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
                 ${(a.urlToken || a.urlCloudinary) && (mordre || charmer || echanger) ? `<img src="${echapper(a.urlToken || a.urlCloudinary)}" alt="">` : a.urlCloudinary ? `<img src="${echapper(a.urlCloudinary)}" alt="">` : ""}<span>${echapper(a.prenom || a.nom || a.idPersonnage)}</span>
             </button>`).join("")}</div>
         <button type="button" class="choix-rempart-annuler" onclick="window.fermerChoixRempart()">Annuler</button>`;
+    fenetre.style.display = "flex";
+};
+
+// =========================================================================
+//  L'ARRÊT DU TEMPS (Oracle, niveau 5)
+// =========================================================================
+//  Son tour venu, l'Oracle voit la file de la manche — qui joue, à quelle
+//  initiative, avec quelle compétence, créatures comprises — puis choisit une
+//  autre de ses compétences mémorisées et l'initiative (0 à 199) à laquelle il
+//  la jouera, plus tard dans cette même manche. Une compétence trop chère pour
+//  son énergie, ou que son arme interdit, est grisée. Le cerveau valide et
+//  insère sa seconde entrée dans la file (resoudreTechniqueClasse).
+window.ouvrirArretDuTemps = function(idLanceur) {
+    const demande = window.regimeDemande;
+    if (!demande || typeof demande.techniqueClasse !== "function") return;
+    const echapper = (v) => String(v === undefined || v === null ? "" : v)
+        .replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+    const persos = window.PERSOS_PARTIE || [];
+    const lanceur = persos.find(p => p.idPersonnage === idLanceur) || {};
+    const nomDe = (id) => { const p = persos.find(x => x.idPersonnage === id) || {}; return p.prenom || p.nom || id; };
+    const nomCarte = (id, idCarte) => {
+        if (!idCarte) return "—";
+        if (idCarte === "REPOS_LONG") return "Repos long";
+        const d = typeof window.donneesCarteCombattant === "function" ? window.donneesCarteCombattant(id, idCarte) : null;
+        return (d && d.Nom) || "Compétence inconnue";
+    };
+
+    // L'énergie de CE combat (l'état du cerveau), sinon la fiche.
+    const etat = typeof demande.etat === "function" ? demande.etat() : null;
+    const dansEtat = etat && etat.combattants && etat.combattants[idLanceur];
+    const energie = dansEtat ? Number(dansEtat.fatigue) || 0
+        : (lanceur.fatigueActuelle !== undefined ? parseInt(lanceur.fatigueActuelle) || 0 : 100);
+    const bonusInit = typeof window.atoutRace === "function" ? (Number(window.atoutRace(lanceur).initiative) || 0) : 0;
+
+    const file = ((window.PARTIE_DATA || {}).File_Attente_Combat || []).slice()
+        .sort((a, b) => (Number(b.initiative) || 0) - (Number(a.initiative) || 0));
+    const lignesFile = file.map(f => `
+        <div class="arret-temps-ligne${f.idPersonnage === idLanceur ? " arret-temps-moi" : ""}">
+            <span class="arret-temps-init">${f.idCarte === "REPOS_LONG" ? "⏳" : echapper(f.initiative)}</span>
+            <span class="arret-temps-nom">${echapper(nomDe(f.idPersonnage))}</span>
+            <span class="arret-temps-carte">${echapper(nomCarte(f.idPersonnage, f.idCarte))}</span>
+        </div>`).join("");
+
+    const deck = (lanceur.deckEquipe || []).filter(id => id && !String(id).startsWith("CLASSE_") && id !== "REPOS_LONG");
+    const competences = deck.map(id => {
+        const d = (typeof window.donneesCarteCombattant === "function" ? window.donneesCarteCombattant(idLanceur, id) : null) || {};
+        const cout = parseInt(d.Fatigue) || 0;
+        const blocage = typeof window.raisonBlocageCarte === "function" ? window.raisonBlocageCarte(lanceur, d.Arme) : null;
+        const raison = cout > energie ? `Il faut ${cout} d'énergie (il en reste ${energie})` : (blocage || "");
+        return { id, nom: d.Nom || id, cout, initiative: Math.min(199, (Number(d.Initiative) || 0) + bonusInit), raison };
+    });
+
+    let fenetre = document.getElementById("fenetre-arret-temps");
+    if (!fenetre) {
+        fenetre = document.createElement("div");
+        fenetre.id = "fenetre-arret-temps";
+        fenetre.className = "fenetre-choix-rempart fenetre-arret-temps";
+        document.body.appendChild(fenetre);
+    }
+    let choisie = null;
+    window.fermerArretDuTemps = () => { fenetre.style.display = "none"; };
+    window.choisirCompetenceArretTemps = (id) => {
+        const c = competences.find(x => x.id === id);
+        if (!c || c.raison) return;
+        choisie = id;
+        fenetre.querySelectorAll(".arret-temps-competence").forEach(b => b.classList.toggle("choisie", b.dataset.id === id));
+        const champ = document.getElementById("arret-temps-initiative");
+        if (champ) champ.value = c.initiative;
+        const ok = document.getElementById("arret-temps-valider");
+        if (ok) ok.disabled = false;
+    };
+    window.validerArretDuTemps = () => {
+        if (!choisie) return;
+        const champ = document.getElementById("arret-temps-initiative");
+        const initiative = Math.max(0, Math.min(199, Math.round(Number(champ && champ.value) || 0)));
+        fenetre.style.display = "none";
+        if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+        demande.techniqueClasse(idLanceur, "CLASSE_ARRET_TEMPS", choisie, undefined, { initiative });
+    };
+    fenetre.innerHTML = `
+        <div class="choix-rempart-titre">⏳ Arrêt du temps</div>
+        <div class="choix-rempart-texte">Le temps se fige. Voici la manche, telle qu'elle va se jouer :</div>
+        <div class="arret-temps-file">${lignesFile || "<i>Personne d'autre ne doit encore jouer.</i>"}</div>
+        <div class="choix-rempart-texte">Quelle compétence rejouer, et à quelle initiative ? <small>(⚡ ${energie})</small></div>
+        <div class="arret-temps-competences">${competences.length ? competences.map(c => `
+            <button type="button" class="arret-temps-competence" data-id="${echapper(c.id)}" ${c.raison ? `disabled title="${echapper(c.raison)}"` : ""}
+                    onclick="window.choisirCompetenceArretTemps('${echapper(c.id)}')">
+                <span class="arret-temps-competence-nom">${echapper(c.nom)}</span>
+                <small>⚡ ${c.cout} · init. ${c.initiative}</small>
+            </button>`).join("") : "<i>Aucune compétence mémorisée à rejouer.</i>"}</div>
+        <label class="arret-temps-champ">Initiative (0 à 199)
+            <input type="number" id="arret-temps-initiative" min="0" max="199" step="1" value="100">
+        </label>
+        <div class="arret-temps-boutons">
+            <button type="button" id="arret-temps-valider" class="arret-temps-valider" disabled onclick="window.validerArretDuTemps()">Arrêter le temps</button>
+            <button type="button" class="choix-rempart-annuler" onclick="window.fermerArretDuTemps()">Annuler</button>
+        </div>`;
     fenetre.style.display = "flex";
 };
 

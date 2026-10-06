@@ -1314,6 +1314,18 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
             if (allie.pv === avant) return;
             etapes.push({ type: "soin", cible: idAllie, acteur: id, montant: allie.pv - avant, pvApres: allie.pv });
         });
+    } else if (action.idCarte === "CLASSE_ARRET_TEMPS") {
+        // L'ARRÊT DU TEMPS (Oracle) : une seconde entrée pour lui dans la file,
+        // avec la compétence choisie, à l'initiative qu'il a fixée — derrière
+        // ceux qui ont autant ou plus. La tête (lui, maintenant) s'en va à la
+        // clôture du tour ; la nouvelle entrée attend son tour.
+        const initiative = Math.max(0, Math.min(199, Math.round(nombre(action.initiative))));
+        const file = suivant.file || [];
+        let place = 1;
+        while (place < file.length && nombre(file[place].initiative) >= initiative) place++;
+        file.splice(place, 0, { id, carte: action.cible, initiative, pas: 0, arretDuTemps: true });
+        suivant.file = file;
+        etapes.push({ type: "message", cible: id, acteur: id, texte: `⏳ Rejouera à ${initiative}`, couleur: "#b39ddb" });
     } else if (action.idCarte === "CLASSE_BOUCLIER_ANTIMAGIE") {
         c.etats = [...(c.etats || []).filter(e => e && e.nom !== ETAT_ANTIMAGIE),
                    { nom: ETAT_ANTIMAGIE, duree: MANCHES_ANTIMAGIE, desc: DESC_ANTIMAGIE }];

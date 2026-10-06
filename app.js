@@ -932,6 +932,15 @@ window.ATOUTS_CLASSES = {
         { niveau: 5,  techniques: ["CLASSE_BOUCLIER_ANTIMAGIE"] },
         { niveau: 10, techniques: ["CLASSE_APPEL_LUMIERE"] }
     ],
+    // L'ORACLE : +10 d'initiative sur ses compétences forgées (jouerCarteCombat,
+    // combat.js) ; l'Arrêt du temps au niveau 5 (voir la file, rejouer une
+    // compétence à l'initiative de son choix), le Retour arrière au niveau 10
+    // (un repos long, puis une compétence).
+    "Oracle": [
+        { niveau: 1,  initiative: 10 },
+        { niveau: 5,  techniques: ["CLASSE_ARRET_TEMPS"] },
+        { niveau: 10, techniques: ["CLASSE_RETOUR_ARRIERE"] }
+    ],
     // LE VAMPIRE : +10 de résistance physique, insensible au gel (jamais
     // Glacé), mais le feu le ronge plus fort (brûlé : -60 % de soins reçus au
     // lieu de -50, 18 % des PV max par manche au lieu de 8 — brulureAggravee,
@@ -1023,6 +1032,22 @@ window.TECHNIQUES_CLASSE = {
         Nom: "Transfert", classe: "Sorcier", niveau: 10, Initiative: 100, Fatigue: 0, cible: "combattant", portee: 5,
         desc: "Se téléporte à la place d'un combattant à 5 cases (allié ou ennemi), même hors de vue "
             + "(derrière un mur), qui prend la sienne, et se soigne de 10 PV. Une fois par combat."
+    },
+    // L'ARRÊT DU TEMPS : son tour venu (initiative 200), l'Oracle voit la file
+    // de tout le monde, et choisit une autre de ses compétences qu'il jouera
+    // plus tard dans la manche, à l'initiative qu'il fixe (0 à 199).
+    CLASSE_ARRET_TEMPS: {
+        Nom: "Arrêt du temps", classe: "Oracle", niveau: 5, Initiative: 200, Fatigue: 0, cible: "arretTemps",
+        desc: "Voit l'initiative et la compétence de tout le monde, puis rejoue une autre de ses compétences "
+            + "plus tard dans la manche, à l'initiative de son choix (0 à 199). Une fois par combat."
+    },
+    // LE RETOUR ARRIÈRE : choisi en préparation AVEC une compétence. Au début
+    // de son tour, l'Oracle prend un repos long, puis joue cette compétence
+    // avec sa fatigue remise à jour (reposDuRetourArriere, combat_etat.js).
+    CLASSE_RETOUR_ARRIERE: {
+        Nom: "Retour arrière", classe: "Oracle", niveau: 10, Initiative: 0, Fatigue: 0, cible: "avecCompetence",
+        desc: "Se choisit avec une autre compétence : au début de son tour, l'Oracle prend un repos long, "
+            + "puis joue cette compétence avec sa fatigue remise à jour. Une fois par combat."
     },
     CLASSE_PRISE_EN_CHARGE: {
         Nom: "Prise en charge par Médicus", classe: "Médicus", niveau: 10, Initiative: 0, Fatigue: 0, cible: "allieKO",
@@ -1160,6 +1185,7 @@ window.texteAtout = function(cle, valeur) {
         case "lumiereAveugle": return `Sorts de lumière : ${n} % de chance d'aveugler la cible`;
         case "provocationAttaques": return `${n} % de chance de provoquer la cible de chacune de ses attaques`;
         case "bonusSoin":      return `${plus(n)} à chacun de ses soins`;
+        case "initiative":     return `${plus(n)} d'initiative sur ses compétences`;
         case "brulureAggravee": return "Craint le feu : brûlé, -60 % de soins reçus et 18 % des PV max par manche (au lieu de -50 % et 8 %)";
         case "premierPasGratuit": return "La première case de chaque tour ne coûte aucune fatigue";
         case "caracs":         return Object.keys(valeur || {}).map(k => `${plus(Number(valeur[k]) || 0)} ${NOMS_CARACS_ATOUT[k] || k}`).join(" · ");

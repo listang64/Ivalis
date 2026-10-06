@@ -689,9 +689,12 @@ export function creerRegime(contexte) {
 
     // Une technique de classe (Hoplite) : laquelle, et pour le Rempart, l'allié.
     // `cibles` : les ennemis de la zone de l'Assaut mortel (Assassin).
-    const demanderTechniqueClasse = (acteur, idCarte, cible, cibles) =>
+    // `extra` : ce qu'une technique demande en plus (l'Arrêt du temps :
+    // l'initiative choisie).
+    const demanderTechniqueClasse = (acteur, idCarte, cible, cibles, extra) =>
         demander({ type: "classe", acteur, idCarte, ...(cible ? { cible } : {}),
-                   ...(Array.isArray(cibles) ? { cibles: [...cibles] } : {}) });
+                   ...(Array.isArray(cibles) ? { cibles: [...cibles] } : {}),
+                   ...(extra && Number.isFinite(extra.initiative) ? { initiative: extra.initiative } : {}) });
 
     // Le OK de la fenêtre sombre. Purement local, comme avant : chacun lit à
     // son rythme et rattrape ensuite. Aucun poste n'attend un autre.
@@ -1727,10 +1730,10 @@ if (typeof window !== "undefined") {
             return REGIME.demanderFinDeTour(acteur);
         },
         // La technique de classe clôt le tour comme une carte : on marque.
-        techniqueClasse: (acteur, idCarte, cible, cibles) => {
+        techniqueClasse: (acteur, idCarte, cible, cibles, extra) => {
             if (!REGIME) return null;
             marquerDemande(acteur);
-            return REGIME.demanderTechniqueClasse(acteur, idCarte, cible, cibles);
+            return REGIME.demanderTechniqueClasse(acteur, idCarte, cible, cibles, extra);
         },
         ok: () => REGIME ? REGIME.ok() : null,
         // L'état du combat tel que cet écran le montre : c'est lui, pas une

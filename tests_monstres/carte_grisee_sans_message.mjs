@@ -98,7 +98,8 @@ console.log("\n6. « CHOISIR » DISPARAÎT AUSSI QUAND SEUL LE TRAJET RACLE LE B
     // tracé, exactement comme gererClicCarteCombat : sinon "Choisir" resterait
     // affiché sur une carte que gererClicCarteCombat refuse pourtant de réserver.
     const debut = competences.indexOf('let estEpuise = false;');
-    const bloc = competences.slice(debut, debut + 900);
+    // (1300 : le bonus du Retour arrière de l'Oracle s'y est ajouté.)
+    const bloc = competences.slice(debut, debut + 1300);
     verifier("le calcul d'épuisement inclut MOUVEMENT_COUT_TOTAL",
              /parseInt\(fatigue\) \+ \(window\.MOUVEMENT_COUT_TOTAL \|\| 0\) > fatiguePerso/.test(bloc));
 }

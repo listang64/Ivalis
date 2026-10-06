@@ -38,7 +38,8 @@
 // =========================================================================
 
 import { clonerEtat, combattant, creerDes, combattantIllusion,
-         verifierEtatCombat, compterPasMarche, FORMAT_ETAT, tomber, enSursis } from './combat_etat.js';
+         verifierEtatCombat, compterPasMarche, FORMAT_ETAT, tomber, enSursis,
+         reposDuRetourArriere, entreeDeFile } from './combat_etat.js';
 import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissiperConfusion,
          traverserZones, creerZonePure, poserZone, vieillirZones,
          chaineDeDegats, REGLES_ETATS, regleDesEtats, estDansLeNoir,
@@ -269,6 +270,19 @@ export function validerIntention(etat, intention) {
             if (autre.id === acteur.id || autre.aTerre || autre.estIllusion) return refus("Transfert : cible invalide");
             if (distance(acteur, autre) > 5) return refus("Transfert : la cible doit être à 5 cases au plus");
         }
+        // L'Arrêt du temps (Oracle) : une compétence FORGÉE à rejouer (ni une
+        // technique de classe, ni le repos long), et une initiative de 0 à 199.
+        if (idCarte === "CLASSE_ARRET_TEMPS") {
+            const choisie = intention.cible;
+            if (!choisie || typeof choisie !== "string") return refus("Arrêt du temps : aucune compétence choisie");
+            if (choisie.startsWith("CLASSE_") || choisie === "REPOS_LONG") {
+                return refus("Arrêt du temps : une compétence forgée seulement");
+            }
+            const init = Number(intention.initiative);
+            if (!Number.isInteger(init) || init < 0 || init > 199) {
+                return refus("Arrêt du temps : l'initiative va de 0 à 199");
+            }
+        }
         // La Résonance du bouclier (Protecteur) : il lui faut au moins un
         // ennemi au contact — sinon elle n'est pas gâchée, elle est refusée.
         if (idCarte === "CLASSE_RESONANCE_BOUCLIER" && ennemisAuContact(etat, acteur.id).length === 0) {
@@ -415,10 +429,15 @@ export function cloturerTour(etat) {
         etat.ontJoue = [...new Set([...(etat.ontJoue || []), partie.id])];
     }
     etat.file = file;
+    // LE RETOUR ARRIÈRE DE L'ORACLE : son tour commence, il se repose d'abord
+    // (combat_etat.js). Posé AVANT l'étape « tour », pour qu'elle emporte
+    // l'entrée marquée « repos pris ».
+    const etapesRepos = finDeManche ? [] : reposDuRetourArriere(etat);
 
     const etapes = [...etapesSursis,
                     { type: "tour", fini: partie.id, file, phase: etat.phase,
-                      manche: etat.manche, ontJoue: etat.ontJoue }];
+                      manche: etat.manche, ontJoue: etat.ontJoue },
+                    ...etapesRepos];
     if (finDeManche) {
         // LA RÉGÉNÉRATION DE FIN DE MANCHE. Sans elle, l'énergie ne remonte
         // jamais et le combat s'éteint tout seul au bout de trois manches :
@@ -707,11 +726,9 @@ export function ouvrirManche(etat, file, des) {
     // c'est très exactement « nos héros rayés de la file », par le bon bout :
     // ici on les écarte pour une raison lisible, au lieu de les perdre.
     const propre = file
-        .map(f => ({ id: f.id || f.idPersonnage, carte: f.carte || f.idCarte || null,
-                     initiative: nombre(f.initiative, 0),
-                     // Une manche qui s'ouvre, c'est un compteur de cases à zéro
-                     // pour tout le monde.
-                     pas: 0 }))
+        // Une manche qui s'ouvre, c'est un compteur de cases à zéro pour tout
+        // le monde. (Les marques de l'Oracle, elles, suivent l'entrée.)
+        .map(f => ({ ...entreeDeFile(f), pas: 0 }))
         .filter(f => {
             const c = combattant(suivant, f.id);
             return c && !c.aTerre;
@@ -721,9 +738,10 @@ export function ouvrirManche(etat, file, des) {
     suivant.file = propre;
     suivant.phase = "Resolution";
     suivant.ontJoue = [];
+    const etapesRepos = reposDuRetourArriere(suivant);
 
     const etapes = [{ type: "tour", file: propre, phase: "Resolution",
-                      manche: suivant.manche, ontJoue: [] }];
+                      manche: suivant.manche, ontJoue: [] }, ...etapesRepos];
     return fabriquerPas(etat, suivant, etapes, `manche|${suivant.manche}`, null, des);
 }
 
@@ -873,7 +891,8 @@ export function appliquerIntention(etat, intention, plateau) {
             : undefined;
         const r = resoudreTechniqueClasse(etat, { idLanceur: intention.acteur, idCarte: intention.idCarte,
                                                   cible: intention.cible, cibles,
-                                                  ...(noirs ? { noirs } : {}) }, plateau);
+                                                  ...(noirs ? { noirs } : {}),
+                                                  ...(intention.initiative !== undefined ? { initiative: intention.initiative } : {}) }, plateau);
         let suivant = clonerEtat(r.etat);
         const etapes = [...r.etapes];
         // Repoussé dans le feu par la Prise en charge : ça brûle aussi.

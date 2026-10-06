@@ -828,7 +828,9 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
         if (persoActuel) {
             const fatigueMax = window.fatigueMaxCombattant(persoActuel);
-            const fatiguePerso = persoActuel.fatigueActuelle !== undefined ? parseInt(persoActuel.fatigueActuelle) : fatigueMax;
+            // (Retour arrière de l'Oracle : le repos à venir compte déjà.)
+            const fatiguePerso = (persoActuel.fatigueActuelle !== undefined ? parseInt(persoActuel.fatigueActuelle) : fatigueMax)
+                + (typeof window.bonusRetourArriere === "function" ? window.bonusRetourArriere(persoActuel) : 0);
             // Le trajet déjà tracé mord aussi sur le budget : une carte abordable
             // seule mais pas une fois le déplacement compté doit perdre "Choisir"
             // exactement comme gererClicCarteCombat (combat.js) le décide déjà.
@@ -905,6 +907,9 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     if (isCombatMode && !isLocked && !estCarteDeMonstre && phaseTemp !== "Resolution") {
         const heros = (porteurDeLaCarte && !porteurDeLaCarte.estMonstre) ? porteurDeLaCarte : persoActuelTemp;
         const energie = window.energieHerosApercu(heros);
+        // Retour arrière : la jauge part de l'énergie APRÈS le repos.
+        const bonusRA = (energie && typeof window.bonusRetourArriere === "function") ? window.bonusRetourArriere(heros) : 0;
+        if (energie && bonusRA > 0) energie.actuelle = Math.min(energie.max, energie.actuelle + bonusRA);
         if (energie) {
             const cout = (parseInt(fatigue) || 0) + (window.MOUVEMENT_COUT_TOTAL || 0);
             jaugeEnergieHtml = window.htmlJaugeEnergieApercu(energie, -cout);

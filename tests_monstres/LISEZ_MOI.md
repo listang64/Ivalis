@@ -178,6 +178,7 @@ node illustration_competence.mjs  # 🎨 illustration des compétences : IA de p
 node jauge_energie_carte.mjs     # ⚡ énergie sous la carte en combat (perte rouge clignotante, reste) ; encart du repos long (gain vert)
 node saignement.mjs             # 🩸 Saignement (8 % physique par manche, +2 par case), et le bouton qui met le grimoire à jour des nouvelles règles
 node sorcier.mjs               # 🔮 le Sorcier (ex-Nécromancien) : Ténèbres + 1 case de portée + pas de malus au contact (niv. 1), Charme fratricide (niv. 5), Transfert (niv. 10) ; plus d'Ensorceleur
+node oracle.mjs                # ⏳ l'Oracle : +10 d'initiative (niv. 1), Arrêt du temps (niv. 5 : voir la file, rejouer une compétence à l'initiative choisie), Retour arrière (niv. 10 : repos long puis compétence)
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4666,3 +4667,29 @@ Transfert marche idem sur tout le monde. »
 - TRANSFERT : n'importe quel autre combattant debout à 5 cases, allié ou
   ennemi, toujours sans ligne de vue ; la fenêtre de ciblage les propose tous.
 sorcier et chasseur_de_mages mis à jour.
+
+## L'Oracle (version 194)
+
+- NIV. 1 : +10 d'initiative sur ses compétences FORGÉES (jouerCarteCombat ;
+  pas sur ses techniques de classe, ni le repos long).
+- NIV. 5 : ARRÊT DU TEMPS — init 200, 0 fatigue, une fois par combat. Son tour
+  venu, une fenêtre montre la file de la manche (initiative, nom, compétence
+  de chacun, créatures comprises) et ses compétences mémorisées (grisées si
+  trop chères pour son énergie ou interdites par son arme). Il en choisit une
+  et fixe son initiative (0 à 199 ; proposée : celle de la carte, +10). Le
+  cerveau valide (une compétence forgée, ni technique de classe ni repos long,
+  initiative entière de 0 à 199) et insère une seconde entrée dans la file,
+  derrière ceux qui ont autant ou plus (resoudreTechniqueClasse) : il joue
+  donc deux fois dans la manche ; la compétence coûte sa fatigue normale.
+- NIV. 10 : RETOUR ARRIÈRE — 0 fatigue, une fois par combat. En préparation,
+  il le choisit (rien n'est inscrit, sa bannière se surligne ; le rechoisir
+  l'annule), puis une compétence forgée : le repos à venir compte déjà pour ce
+  qu'il peut se payer (bannières, aperçu, jauge). Ni repos long, ni autre
+  technique de classe avec lui. La file reçoit la compétence, à son initiative
+  (+10), marquée `retourArriere`. Au DÉBUT de son tour (ouverture de manche ou
+  clôture du tour d'avant), le cerveau prend le repos long (même rendement que
+  le repos ordinaire) et consomme la technique (reposDuRetourArriere,
+  combat_etat.js) : il bouge et lance avec la fatigue remise à jour.
+- Les bancs qui prenaient l'Oracle pour « une classe sans rien » prennent
+  maintenant le Pisteur.
+oracle.mjs ; bonus_race_classe, hoplite, necromancien mis à jour.

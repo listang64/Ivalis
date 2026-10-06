@@ -80,7 +80,7 @@ console.log("\n2. LE DÉTAIL D'UN HÉROS");
     verifier("le palier 1 dit +7 % de parade et 15 % de provocation (classe lue « Protecteur »)",
              d.classe.nom === "Protecteur"
              && JSON.stringify(d.classe.paliers[0].lignes) === '["+7 % de parade","15 % de chance de provoquer la cible de chacune de ses attaques"]', JSON.stringify(d.classe.paliers[0].lignes));
-    const sans = w.detailBonusRaceClasse({ race: "", classe: "Oracle" });
+    const sans = w.detailBonusRaceClasse({ race: "", classe: "Pisteur" });
     verifier("une classe sans bonus définis : aucun palier", sans.classe.paliers.length === 0 && sans.race.lignes.length === 0);
 }
 
