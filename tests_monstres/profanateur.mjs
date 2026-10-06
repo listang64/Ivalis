@@ -22,7 +22,7 @@ import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 import { construireEtatCombat, clonerEtat, appliquerEntree, verifierEtatCombat, ZOMBIE } from '../combat_etat.js';
 import { resoudreCarte, esquiveDe, paradeDe } from '../moteur_pur.js';
 import { ticsDeFinDeManche, jouerZombie, prochainPas } from '../cerveau_combat.js';
-import { misEnScene, fichesDepuisEtat } from '../pont_combat.js';
+import { misEnScene, fichesDepuisEtat, renfortsDuTour } from '../pont_combat.js';
 
 let echecs = 0;
 const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(66)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
@@ -200,6 +200,33 @@ console.log("\n5. NIVEAU 10 : LE SURSIS");
     verifier("à 0 PV : debout, 2 tours de sursis", p.pv === 0 && !p.aTerre && p.sursis && p.sursis.tours === 2, JSON.stringify(p.sursis));
     const n9 = monde(9);
     verifier("niveau 9 : il tombe", coup(n9, "M2", "P", 500).etat.combattants.P.aTerre);
+}
+
+console.log("\n5 bis. LES RENFORTS : UNE PLACE PAR CRÉATURE PERDUE, À LA FIN DU TOUR");
+{
+    // Nico : « un adversaire mort et qui se transforme en zombie : s'il y a des
+    // ennemis en attente ils spawn. Les renforts n'apparaissent pas direct à
+    // la mort d'un ennemi mais à la fin du tour. »
+    const memoire = { annonces: new Set(), attente: [], clePrecedente: null };
+    const etatDe = (tete, combattants) => ({ manche: 1, phase: "Resolution", file: [{ id: tete }],
+        combattants: Object.fromEntries(combattants.map(c => [c.id, { estMonstre: c.id.startsWith("M"), ...c }])) });
+    const vivants = () => [{ id: "P" }, { id: "M1" }, { id: "M2" }, { id: "M3" }];
+    const r1 = renfortsDuTour(etatDe("P", vivants()), memoire);
+    verifier("personne ne tombe : aucun renfort", r1.renforts === 0 && !r1.morts.length);
+    // En plein tour de P (une attaque d'opportunité pendant sa marche), M1 tombe.
+    const r2 = renfortsDuTour(etatDe("P", [{ id: "P" }, { id: "M1", aTerre: true }, { id: "M2" }, { id: "M3" }]), memoire);
+    verifier("M1 tombe en plein tour : marqué mort, le renfort attend", JSON.stringify(r2.morts) === '["M1"]' && r2.renforts === 0);
+    const r3 = renfortsDuTour(etatDe("M2", [{ id: "P" }, { id: "M1", aTerre: true }, { id: "M2" }, { id: "M3" }]), memoire);
+    verifier("le tour de P s'achève : le renfort entre", r3.renforts === 1 && !r3.morts.length);
+    // M2 se relève en zombie, dans l'entrée qui clôt le tour de M3.
+    renfortsDuTour(etatDe("M3", [{ id: "P" }, { id: "M1", aTerre: true }, { id: "M2" }, { id: "M3" }]), memoire);
+    const r4 = renfortsDuTour(etatDe("P", [{ id: "P" }, { id: "M1", aTerre: true }, { id: "M2", zombie: true, camp: "Allié" }, { id: "M3" }]), memoire);
+    verifier("une créature passée zombie libère aussi sa place (fin de tour : tout de suite)",
+             JSON.stringify(r4.zombies) === '["M2"]' && r4.renforts === 1 && !r4.morts.length);
+    const r5 = renfortsDuTour(etatDe("M3", [{ id: "P" }, { id: "M1", aTerre: true }, { id: "M2", zombie: true, aTerre: true }, { id: "M3" }]), memoire);
+    verifier("le zombie retué ne rappelle personne", r5.renforts === 0 && !r5.morts.length && !r5.zombies.length);
+    const r6 = renfortsDuTour(etatDe("M3", [{ id: "P", aTerre: true }, { id: "M1", aTerre: true }, { id: "M2", aTerre: true }, { id: "M3" }]), memoire);
+    verifier("un héros qui tombe n'appelle pas de renfort", r6.renforts === 0 && !r6.morts.length);
 }
 
 // =========================================================================

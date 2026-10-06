@@ -891,7 +891,8 @@ window.entrerRenfortMonstre = async function() {
     const aTerre = typeof window.estCombattantMort === "function"
         ? (m) => window.estCombattantMort(m.idPersonnage)
         : (m) => m.statut === "Mort" || (parseInt(m.PV_Actuels) || 0) <= 0;
-    const vivants = (window.MONSTRES_PARTIE || []).filter(m => !aTerre(m)).length;
+    // Un zombie du Profanateur ne compte plus : il se bat pour les héros.
+    const vivants = (window.MONSTRES_PARTIE || []).filter(m => !aTerre(m) && !m.zombie).length;
     if (vivants >= limiteMonstresTerrain()) return null;
 
     const renfort = reserve.shift();
@@ -928,11 +929,13 @@ window.entrerRenfortMonstre = async function() {
 //  Le monstre est d'abord marqué Mort (le cadavre reste visible, les effets en
 //  cours qui le ciblent ne pointent pas dans le vide), puis réellement effacé
 //  de la base à la fin du combat.
-window.marquerMonstreMort = async function(idMonstre) {
+// `options.sansRenfort` : le renfort est géré à part — il attend la fin du
+// tour (regime_cerveau.js, renfortsDuTour).
+window.marquerMonstreMort = async function(idMonstre, options) {
     if (!window.estMonstre(idMonstre)) return;
     await updateDoc(doc(db, COLLECTION_MONSTRES, idMonstre), { Statut: "Mort" })
         .catch(e => console.error("Marquage de la mort :", e));
-    await window.entrerRenfortMonstre();
+    if (!(options && options.sansRenfort)) await window.entrerRenfortMonstre();
 };
 
 // Efface tous les monstres de la partie : documents, pions, initiative, réserve.

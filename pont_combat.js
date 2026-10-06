@@ -553,6 +553,37 @@ export function fichesDepuisEtat(etat, fichesActuelles) {
     });
 }
 
+// LES RENFORTS DE LA RÉSERVE, ET QUAND ILS ENTRENT. Une créature qui tombe —
+// ou qui se relève en zombie du Profanateur, ce qui revient à la perdre —
+// libère une place pour un renfort. Le renfort n'entre pas à l'instant de la
+// chute, mais à la FIN DU TOUR où elle a eu lieu : quand la tête de file (ou
+// la manche, ou la phase) a changé depuis.
+//
+// Fonction pure : `memoire` ({ annonces: Set, attente: [], clePrecedente })
+// est tenue par l'appelant (regime_cerveau.js). Rend les créatures à marquer
+// mortes, celles passées zombies, et le nombre de renforts à faire entrer
+// maintenant. Une créature ne libère qu'UNE place : un zombie qu'on retue ne
+// rappelle personne.
+export function renfortsDuTour(etat, memoire) {
+    const tete = ((etat && etat.file) || [])[0];
+    const cle = `${nombre(etat && etat.manche)}|${(etat && etat.phase) || ""}|${(tete && tete.id) || ""}`;
+    const tour = memoire.clePrecedente || cle;
+    const morts = [], zombies = [];
+    Object.keys((etat && etat.combattants) || {}).sort().forEach(id => {
+        const c = etat.combattants[id];
+        if (!c || !c.estMonstre || c.estIllusion || memoire.annonces.has(id)) return;
+        if (c.aTerre) morts.push(id);
+        else if (c.zombie) zombies.push(id);
+        else return;
+        memoire.annonces.add(id);
+        memoire.attente.push({ id, tour });
+    });
+    memoire.clePrecedente = cle;
+    const renforts = memoire.attente.filter(r => r.tour !== cle).length;
+    memoire.attente = memoire.attente.filter(r => r.tour === cle);
+    return { morts, zombies, renforts };
+}
+
 export function fileDepuisEtat(etat) {
     return ((etat && etat.file) || []).map(f => ({
         idPersonnage: f.id, idCarte: f.carte || null, initiative: nombre(f.initiative),

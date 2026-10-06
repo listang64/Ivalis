@@ -29,7 +29,7 @@ import { construireEtatCombat, verifierEtatCombat, creerDes, combattantDepuisFic
 import { creerCerveau, estLeCerveau, cerveauPerdu, suivreBattement, cerveauSilencieux,
          ouvrirManche, accueillirCombattant, BATTEMENT_MS } from './cerveau_combat.js';
 import { creerSpectateur } from './spectateur_combat.js';
-import { creerPont, creerProjection, versAnimationDeSaut } from './pont_combat.js';
+import { creerPont, creerProjection, versAnimationDeSaut, renfortsDuTour } from './pont_combat.js';
 // DES NOMS QUI EXISTAIENT DÉJÀ, ET AUCUN AUTRE. Ces imports ne portent pas de
 // numéro de version : un appareil peut donc, quelques minutes après une mise à
 // jour, recevoir ce fichier-ci neuf et depot_firestore.js encore en cache. Un
@@ -838,6 +838,9 @@ const LEURRES_EFFACES = new Set();
 // mémoire, chaque projection redemanderait le marquage et un renfort de plus.
 // Elle s'oublie au changement de partie : les deux combats n'ont rien en commun.
 const TOMBES_ANNONCEES = new Set();
+// Les renforts qui attendent la fin du tour (renfortsDuTour, pont_combat.js).
+const MEMOIRE_RENFORTS = { annonces: TOMBES_ANNONCEES, attente: [], clePrecedente: null };
+let RENFORTS_EN_COURS = Promise.resolve();
 
 function contexteDuJeu() {
     return {
@@ -1121,23 +1124,35 @@ function contexteDuJeu() {
 
                     // Une créature tombée est marquée morte dans son document
                     // (son cadavre reste sur la carte jusqu'à la fin du combat)
-                    // et laisse sa place au renfort suivant, s'il en reste un.
-                    tombes.forEach(c => {
-                        if (!c.estMonstre || c.estIllusion) return;
-                        if (TOMBES_ANNONCEES.has(c.id)) return;
-                        // Le repère se pose APRÈS s'être assuré qu'on peut
-                        // vraiment agir : le poser avant condamnerait la
-                        // créature à ne jamais être marquée si monstres.js
-                        // n'était pas encore chargé au moment de sa chute.
-                        if (typeof window.marquerMonstreMort !== "function") return;
-                        TOMBES_ANNONCEES.add(c.id);
-                        if (typeof window.tracerCombat === "function") {
-                            window.tracerCombat("☠️", `${c.nom || c.id} est terrassé`,
-                                                "la réserve peut envoyer un renfort");
+                    // et laisse sa place au renfort suivant, s'il en reste un —
+                    // une créature passée zombie aussi. Le renfort entre à la
+                    // FIN DU TOUR de la chute (renfortsDuTour, pont_combat.js).
+                    // Rien ne se note tant que monstres.js n'est pas chargé :
+                    // sinon la créature ne serait jamais marquée.
+                    if (typeof window.marquerMonstreMort === "function") {
+                        const bilan = renfortsDuTour(etat, MEMOIRE_RENFORTS);
+                        bilan.morts.forEach(id => {
+                            const c = etat.combattants[id] || {};
+                            if (typeof window.tracerCombat === "function") {
+                                window.tracerCombat("☠️", `${c.nom || id} est terrassé`,
+                                                    "un renfort entrera à la fin du tour");
+                            }
+                            Promise.resolve(window.marquerMonstreMort(id, { sansRenfort: true }))
+                                .catch(e => signalerPanne("marquerMonstreMort", e));
+                        });
+                        bilan.zombies.forEach(id => {
+                            if (typeof window.tracerCombat === "function") {
+                                window.tracerCombat("🧟", `${(etat.combattants[id] || {}).nom || id} se relève en zombie`,
+                                                    "un renfort entrera à la fin du tour");
+                            }
+                        });
+                        for (let i = 0; i < bilan.renforts; i++) {
+                            // Un renfort après l'autre : chacun relit la réserve.
+                            RENFORTS_EN_COURS = RENFORTS_EN_COURS
+                                .then(() => typeof window.entrerRenfortMonstre === "function" ? window.entrerRenfortMonstre() : null)
+                                .catch(e => signalerPanne("entrerRenfortMonstre", e));
                         }
-                        Promise.resolve(window.marquerMonstreMort(c.id))
-                            .catch(e => signalerPanne("marquerMonstreMort", e));
-                    });
+                    }
                 }
                 [["rafraichirAffichageCombat", () => window.rafraichirAffichageCombat()],
                  ["redessinerPions", () => window.redessinerPions()]]
@@ -1354,6 +1369,8 @@ if (typeof window !== "undefined") {
             if (REGIME) REGIME.debrancher();
             fermerLeGuet();
             TOMBES_ANNONCEES.clear();
+            MEMOIRE_RENFORTS.attente = [];
+            MEMOIRE_RENFORTS.clePrecedente = null;
             LEURRES_EFFACES.clear();
             REGIME = null;
             partieSuivie = null;

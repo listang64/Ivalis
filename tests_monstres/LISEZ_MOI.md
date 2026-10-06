@@ -4765,3 +4765,20 @@ classes_feminin.mjs mis à jour.
 - NIV. 10 : le SURSIS de l'ancien Nécromancien (2 tours debout à 0 PV, coups
   ignorés, aucun soin, une fois par combat).
 profanateur.mjs.
+
+## Les renforts : à la fin du tour, et pour un zombie aussi (version 199)
+
+Nico : « un adversaire mort et qui se transforme en zombie : s'il y a des
+ennemis en attente, ils spawn. Les renforts n'apparaissent pas direct à la
+mort d'un ennemi mais à la fin du tour. »
+- Une créature passée zombie libère sa place dans la réserve comme une
+  créature tuée, et ne compte plus parmi les créatures debout
+  (entrerRenfortMonstre, monstres.js). Une seule place par créature : le
+  zombie retué ne rappelle personne.
+- Le renfort entre à la FIN DU TOUR où la créature est tombée (renfortsDuTour,
+  pont_combat.js, fonction pure ; appelée par le cerveau dans regime_cerveau.js) :
+  une chute en plein tour (attaque d'opportunité pendant une marche) attend
+  que la tête de file change ; une chute dans l'entrée qui clôt le tour entre
+  aussitôt. marquerMonstreMort marque toujours la mort tout de suite, sans
+  plus appeler le renfort lui-même ({ sansRenfort: true }).
+profanateur.mjs (section 5 bis).
