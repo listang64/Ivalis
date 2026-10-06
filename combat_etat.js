@@ -297,7 +297,10 @@ function combattantBrut(fiche, position, bornes) {
         aTerre: fiche.statut === "Mort" || (pvMax > 0 && nombre(fiche.PV_Actuels, pvMax) <= 0),
 
         bouclierMax: nombre(fiche.Bouclier_Max),
-        stats
+        stats,
+        // LE COMPAGNON DU PISTEUR : une créature de son camp, jouée par le
+        // cerveau juste après son maître (jouerCompagnon, cerveau_combat.js).
+        ...(fiche.compagnonDe ? { compagnon: { idMaitre: String(fiche.compagnonDe) } } : {})
     };
 }
 
@@ -419,6 +422,41 @@ export function construireEtatCombat(source) {
     return etat;
 }
 
+// LE COMPAGNON DU PISTEUR (niveau 1) : une bête indépendante, 25 PV, 15 %
+// d'esquive, ni parade ni résistances, qui marche 3 cases sans fatigue vers
+// l'ennemi le plus proche et le frappe au contact de 6 dégâts bruts (aucune
+// armure ; l'esquive et la parade comptent). Mêmes chiffres à tous les
+// niveaux. KO, il reste à terre jusqu'à la fin du combat (sauf Lien de sang)
+// et revient plein au combat suivant (un nouveau document, monstres.js).
+export const COMPAGNON = { pv: 25, esquive: 15, degats: 6, pas: 3 };
+
+// Le compagnon de ce maître, s'il en a un dans ce combat.
+export function compagnonDe(etat, idMaitre) {
+    const table = (etat && etat.combattants) || {};
+    const id = Object.keys(table).sort().find(k => table[k] && table[k].compagnon
+                                                 && table[k].compagnon.idMaitre === idMaitre);
+    return id ? table[id] : null;
+}
+
+// IL JOUE JUSTE APRÈS SON MAÎTRE : chaque entrée d'un compagnon est ôtée de
+// la file et reposée derrière la première entrée de son maître, avec la même
+// initiative (la piste l'affiche donc à côté de lui). Un maître absent de la
+// file (KO) : le compagnon garde sa place. Rend une nouvelle file.
+export function placerCompagnons(etat, file) {
+    const table = (etat && etat.combattants) || {};
+    const estCompagnon = (f) => { const c = table[f.id]; return !!(c && c.compagnon); };
+    const compagnons = (file || []).filter(estCompagnon);
+    if (compagnons.length === 0) return [...(file || [])];
+    let resultat = (file || []).filter(f => !estCompagnon(f));
+    compagnons.forEach(f => {
+        const idMaitre = table[f.id].compagnon.idMaitre;
+        const i = resultat.findIndex(x => x.id === idMaitre);
+        if (i < 0) { resultat.push(f); return; }
+        resultat.splice(i + 1, 0, { ...f, initiative: nombre(resultat[i].initiative) });
+    });
+    return resultat;
+}
+
 // UNE ENTRÉE DE LA FILE, telle que le cerveau la tient — depuis la file de la
 // partie (idPersonnage, idCarte) ou depuis la sienne (id, carte). Les marques
 // des techniques de l'Oracle voyagent avec elle.
@@ -523,7 +561,7 @@ function recompenserLeTueur(etat, victime, idAuteur, finDeManche) {
 export const ZOMBIE = { pv: 15, degats: 7, pas: 2, initiative: 0 };
 const distanceHexEtat = (a, b) => (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
 export function profanateurPourZombie(etat, victime, idTueur) {
-    if (!victime || !victime.estMonstre || victime.estIllusion || victime.zombie) return null;
+    if (!victime || !victime.estMonstre || victime.estIllusion || victime.zombie || victime.compagnon) return null;
     const table = etat.combattants || {};
     const peut = (p) => p && !p.aTerre && p.atouts && p.atouts.zombies && (p.camp || "Allié") !== (victime.camp || "Allié");
     if (idTueur && peut(table[idTueur])) return table[idTueur];

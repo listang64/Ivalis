@@ -796,7 +796,8 @@ window.reglerLaReserveApresPartage = async function(chemin, reserve, restants) {
 // l'écran. Une seule définition, donc aucun risque que les deux divergent.
 window.ennemisEncoreDebout = function() {
     // Un zombie du Profanateur n'est plus un ennemi : il se bat pour les héros.
-    const estMort = (m) => m.estIllusion || m.zombie || m.statut === "Mort"
+    // Le compagnon du Pisteur non plus (un document Monstres de leur camp).
+    const estMort = (m) => m.estIllusion || m.zombie || m.compagnonDe || m.statut === "Mort"
         || (typeof window.estCombattantMort === "function" && window.estCombattantMort(m.idPersonnage));
     return (window.MONSTRES_PARTIE || []).some(m => !estMort(m));
 };
@@ -807,7 +808,9 @@ window.ennemisEncoreDebout = function() {
 // nuance, un butin oublié en base rouvrait sa fenêtre juste après une
 // réinitialisation, par-dessus la demande de points d'apparition.
 window.combatGagne = function() {
-    const monstres = window.MONSTRES_PARTIE || [];
+    // Le compagnon du Pisteur ne compte pas : seul sur le plateau (la
+    // rencontre pas encore générée), il ne fait pas une victoire.
+    const monstres = (window.MONSTRES_PARTIE || []).filter(m => m && !m.compagnonDe);
     if (monstres.length === 0) return false;
     return !window.ennemisEncoreDebout();
 };
@@ -992,7 +995,7 @@ window.xpDeLaVictoire = function() {
     const tombee = (m) => m.statut === "Mort" || m.zombie
         || (typeof window.estCombattantMort === "function" && window.estCombattantMort(m.idPersonnage));
     return (window.MONSTRES_PARTIE || [])
-        .filter(m => m && !m.estIllusion && tombee(m))
+        .filter(m => m && !m.estIllusion && !m.compagnonDe && tombee(m))
         .reduce((total, m) => total + (typeof window.xpDeLaCreature === "function" ? window.xpDeLaCreature(m) : 0), 0);
 };
 

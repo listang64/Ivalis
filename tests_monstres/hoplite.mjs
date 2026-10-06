@@ -370,7 +370,7 @@ console.log("\n5. LA FICHE PERSO : LES TECHNIQUES DE CLASSE À PART");
   verifier("un clic ouvre la carte en grand, sans la mémoriser",
            r.apercu === "CLASSE_REMPART" && JSON.stringify(r.deckApres) === '["C1"]', JSON.stringify([r.apercu, r.deckApres]));
   const necro = await p.evaluate(async () => {
-    window.PERSOS_PARTIE[0].classe = "Pisteur";
+    window.PERSOS_PARTIE[0].classe = "Géomancien";
     await window.chargerOngletCompetences("H1", 7);
     return !!document.getElementById("section-techniques-classe");
   });

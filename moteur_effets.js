@@ -3361,7 +3361,8 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
         : window.bonusEquip(lanceur, cle);
 
     // Ce que la CLASSE ajoute aux cartes (app.js, ATOUTS_CLASSES) : +1 à
-    // chaque soin du Médicus, la provocation du Protecteur.
+    // chaque soin du Médicus, la provocation du Protecteur, +1 aux tirs du
+    // Pisteur.
     const atouts = (typeof window.atoutRace === "function") ? (window.atoutRace(lanceur) || {}) : {};
 
     const degatsTous = bonus("degats");
@@ -3369,6 +3370,8 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
     const degatsMag  = bonus("degatsMag");
     const soin       = bonus("soin") + (Number(atouts.bonusSoin) || 0);
     const bonusDegatsPct = bonus("degatsPct");
+    // LE PISTEUR : +1 à chaque attaque d'une compétence à arme à distance.
+    const bonusDistance = String(armeDeLaCarte || "").includes("Distance") ? (Number(atouts.bonusDistance) || 0) : 0;
 
     (state.attaques || []).forEach(attaque => {
         if (attaque.isShield) return;
@@ -3377,7 +3380,7 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
             return;
         }
         if ((attaque.valeurBrute || 0) <= 0) return;
-        attaque.valeurBrute += degatsTous + (attaque.typeRes === "Magique" ? degatsMag : degatsPhys);
+        attaque.valeurBrute += degatsTous + bonusDistance + (attaque.typeRes === "Magique" ? degatsMag : degatsPhys);
         // Bénédiction offensive d'une bague de soin : un pourcentage en plus,
         // appliqué APRÈS les dégâts plats, comme un dernier multiplicateur.
         if (bonusDegatsPct > 0) attaque.valeurBrute = Math.round(attaque.valeurBrute * (1 + bonusDegatsPct / 100));

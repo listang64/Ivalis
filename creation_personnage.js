@@ -9,6 +9,7 @@ window.RACE_SELECTIONNEE_TEMP = "Humain"; // Par défaut
 
 // --- ÉTAPE 0 : LE NOUVEL ÉCRAN DE SÉLECTION DE LA RACE ---
 window.ouvrirCreationHero = function() {
+    window.COMPAGNON_TEMP = null;   // un compagnon décrit pour un héros d'avant ne suit pas
     // On ouvre le grand écran en forçant l'affichage sur les Humains au démarrage
     window.changerRaceSelection('Humain');
     document.getElementById("ecran-selection-race").style.display = "block";
@@ -351,6 +352,10 @@ window.validerEtapeDescriptif = async function() {
         race: document.getElementById("champ-race").value,
         genre: document.getElementById("champ-genre").value,
         classe: document.getElementById("champ-classe") ? document.getElementById("champ-classe").value : "",
+        // Le compagnon du Pisteur, décrit juste après le choix de la classe.
+        compagnon: typeof window.compagnonPourCreation === "function"
+            ? window.compagnonPourCreation(document.getElementById("champ-classe") ? document.getElementById("champ-classe").value : "")
+            : null,
         cheveux: document.getElementById("champ-cheveux") ? document.getElementById("champ-cheveux").value.trim() : "",
         yeux: document.getElementById("champ-yeux") ? document.getElementById("champ-yeux").value.trim() : "",
         pilosite: document.getElementById("champ-pilosite") ? document.getElementById("champ-pilosite").value.trim() : "",
@@ -414,6 +419,10 @@ window.validerEtapeDescriptifRapide = async function() {
         race: document.getElementById("champ-race").value,
         genre: document.getElementById("champ-genre").value,
         classe: document.getElementById("champ-classe") ? document.getElementById("champ-classe").value : "",
+        // Le compagnon du Pisteur, décrit juste après le choix de la classe.
+        compagnon: typeof window.compagnonPourCreation === "function"
+            ? window.compagnonPourCreation(document.getElementById("champ-classe") ? document.getElementById("champ-classe").value : "")
+            : null,
         couleur: document.getElementById("champ-couleur-token").value || "#ff4c4c",
         
         // Même équipement de départ que la création complète : les deux listes

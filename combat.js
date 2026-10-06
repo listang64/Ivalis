@@ -2710,6 +2710,24 @@ window.genererTokensCombat = async function() {
         }
     });
 
+    // LE COMPAGNON DU PISTEUR apparaît avec les héros, au contact de son
+    // maître (poserCompagnonSurTerrain, monstres.js). Un seul par Pisteur.
+    if (typeof window.poserCompagnonSurTerrain === "function") {
+        const pisteurs = window.PERSOS_PARTIE.filter(p => p && !p.estMonstre && !p.estIllusion
+            && p.statut !== "Mort" && p.actif !== false
+            && typeof window.atoutRace === "function" && (window.atoutRace(p) || {}).compagnon);
+        for (const heros of pisteurs) {
+            const idCompagnon = window.ID_COMPAGNON(heros.idPersonnage);
+            if (tokensData[idCompagnon]) continue;
+            try {
+                const pose = await window.poserCompagnonSurTerrain(heros, tokensData);
+                if (pose) nouveaux.push(pose);
+            } catch (e) {
+                console.error("Compagnon du Pisteur :", e);
+            }
+        }
+    }
+
     // Seuls les pions qu'on vient de créer sont écrits : renvoyer toute la carte
     // remettrait au passage les positions périmées des autres.
     if (nouveaux.length > 0) {
@@ -3358,9 +3376,13 @@ window.appliquerTokensVTT = function(tokensMap) {
         if (pData && pData.estMonstre) {
             const imgEnnemi = document.createElement("img");
             imgEnnemi.className = "token-img-main";
+            // LE COMPAGNON DU PISTEUR porte son propre pion (généré à la
+            // création du héros) ; à défaut, l'image commune.
+            const imageDuPion = (pData.compagnonDe && (pData.urlToken || pData.urlCloudinary)) || window.IMAGE_TOKEN_ENNEMI;
+            if (pData.compagnonDe) divToken.classList.add("token-compagnon");
             imgEnnemi.src = typeof window.redimensionnerImageCloudinary === "function"
-                ? window.redimensionnerImageCloudinary(window.IMAGE_TOKEN_ENNEMI, 700)
-                : window.IMAGE_TOKEN_ENNEMI;
+                ? window.redimensionnerImageCloudinary(imageDuPion, 700)
+                : imageDuPion;
             imgEnnemi.style.position = "absolute";
             imgEnnemi.style.top = "0";
             imgEnnemi.style.left = "0";
@@ -5045,6 +5067,10 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
     const mordre = t.cible === "ennemiAdjacent";
     const echanger = idCarte === "CLASSE_TRANSFERT";
     const charmer = t.cible === "ennemi";
+    // Tir précis (Pisteur) : un ennemi à `portee` cases, EN VUE.
+    const tirer = idCarte === "CLASSE_TIR_PRECIS";
+    const enVue = (id) => !t.ligneDeVue || typeof window.verifierLigneDeVueVTT !== "function"
+        || window.verifierLigneDeVueVTT(ici, pos(id));
     const portee = Math.max(1, parseInt(t.portee) || 1);
     const lanceur = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
     const pos = (id) => (window.TOKENS_VTT_DATA || {})[id];
@@ -5058,7 +5084,8 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
             : !p.estMonstre && (p.camp || "Allié") === monCamp && estKO(p.idPersonnage) === relever)
         && ici && pos(p.idPersonnage)
         && ((charmer || echanger) ? dist(ici, pos(p.idPersonnage)) <= portee
-                                  : dist(ici, pos(p.idPersonnage)) === 1));
+                                  : dist(ici, pos(p.idPersonnage)) === 1)
+        && enVue(p.idPersonnage));
 
     let fenetre = document.getElementById("fenetre-choix-rempart");
     if (!fenetre) {
@@ -5077,13 +5104,14 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
     const echapper = (v) => String(v || "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
     // Personne à relever : la Prise en charge ne part pas, elle n'est pas
     // consommée — elle resservira une autre manche.
-    const titre = charmer ? "🌀 Charme fratricide" : echanger ? "🔄 Transfert"
+    const titre = tirer ? "🎯 Tir précis" : charmer ? "🌀 Charme fratricide" : echanger ? "🔄 Transfert"
         : mordre ? "🩸 Baiser du vampire" : relever ? "✚ Prise en charge" : "🛡️ Rempart";
-    const question = charmer ? "Quel ennemi charmer ? Sa prochaine technique frappera un de ses alliés."
+    const question = tirer ? "Quel ennemi immobiliser pendant 2 manches ?"
+        : charmer ? "Quel ennemi charmer ? Sa prochaine technique frappera un de ses alliés."
         : echanger ? "Avec qui échanger votre place ? (allié ou ennemi)"
         : mordre ? "Quel ennemi mordre ?" : relever ? "Quel allié relever ?" : "Quel allié protéger pendant 3 manches ?";
     const personne = (charmer || echanger)
-        ? `Personne à ${portee} case${portee > 1 ? "s" : ""} ou moins. La technique n'est pas utilisée : finissez votre tour, elle resservira.`
+        ? `Personne à ${portee} case${portee > 1 ? "s" : ""} ou moins${t.ligneDeVue ? ", en vue" : ""}. La technique n'est pas utilisée : finissez votre tour, elle resservira.`
         : mordre
         ? "Aucun ennemi n'est au contact. La technique n'est pas utilisée : finissez votre tour, elle resservira."
         : relever

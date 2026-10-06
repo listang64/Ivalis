@@ -307,7 +307,9 @@ const SCENES = {
                        CLASSE_APPEL_LUMIERE: "☀️ Appel de la lumière",
                        CLASSE_ARRET_TEMPS: "⏳ Arrêt du temps",
                        CLASSE_RETOUR_ARRIERE: "⏪ Retour arrière",
-                       CLASSE_FUREUR_SENTINELLE: "⚔️ Fureur de la sentinelle" };
+                       CLASSE_FUREUR_SENTINELLE: "⚔️ Fureur de la sentinelle",
+                       CLASSE_TIR_PRECIS: "🎯 Tir précis",
+                       CLASSE_LIEN_DE_SANG: "🩸 Lien de sang" };
         return { geste: "message", pion: e.acteur, texte: noms[e.idCarte] || "Technique de classe",
                  couleur: "#e8c46a", duree: RYTHME.message };
     },
@@ -571,7 +573,9 @@ export function renfortsDuTour(etat, memoire) {
     const morts = [], zombies = [];
     Object.keys((etat && etat.combattants) || {}).sort().forEach(id => {
         const c = etat.combattants[id];
-        if (!c || !c.estMonstre || c.estIllusion || memoire.annonces.has(id)) return;
+        // Le compagnon du Pisteur n'est pas une créature de la réserve : il ne
+        // libère aucune place, et son KO n'est pas une mort.
+        if (!c || !c.estMonstre || c.estIllusion || c.compagnon || memoire.annonces.has(id)) return;
         if (c.aTerre) morts.push(id);
         else if (c.zombie) zombies.push(id);
         else return;

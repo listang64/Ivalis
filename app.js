@@ -198,6 +198,13 @@ function persoDocVersFront(id, d) {
     equipMainDroite: d.Equip_Main_Droite || null,
     equipMainGauche: d.Equip_Main_Gauche || null,
     estIllusion: d.Est_Illusion === true,
+    // LE COMPAGNON DU PISTEUR, décrit à la création (classes.js) : son nom,
+    // son allure, son image (paysage) et son pion — générés juste après le
+    // héros (genererCompagnonEnArrierePlan).
+    compagnon: (d.Compagnon_Nom || d.Compagnon_Description || d.Compagnon_Image || d.Compagnon_Token) ? {
+      nom: d.Compagnon_Nom || "", description: d.Compagnon_Description || "",
+      image: d.Compagnon_Image || "", token: d.Compagnon_Token || ""
+    } : null,
     // Décoché depuis la liste des héros (mode développeur) : le personnage
     // existe toujours, mais il est mis de côté — ni combat, ni tour de parole.
     // L'absence du champ vaut "actif" : toutes les fiches d'avant le restent.
@@ -942,6 +949,18 @@ window.ATOUTS_CLASSES = {
         { niveau: 5,  zombies: true },
         { niveau: 10, sursis: 2 }
     ],
+    // LE PISTEUR : un compagnon animal qui combat à ses côtés (25 PV, 15 %
+    // d'esquive, 6 dégâts bruts, 3 cases — un document Monstres de son camp
+    // posé avec les héros, joué par le cerveau juste après lui :
+    // poserCompagnonSurTerrain, monstres.js ; jouerCompagnon,
+    // cerveau_combat.js), et +1 dégât à chaque attaque de ses compétences à
+    // arme à distance (bonusDistance, appliquerEquipementALaCarte) ; le Tir
+    // précis au niveau 5, le Lien de sang au niveau 10.
+    "Pisteur": [
+        { niveau: 1,  compagnon: true, bonusDistance: 1 },
+        { niveau: 5,  techniques: ["CLASSE_TIR_PRECIS"] },
+        { niveau: 10, techniques: ["CLASSE_LIEN_DE_SANG"] }
+    ],
     // LA SENTINELLE : +6 à ses attaques d'opportunité et +20 % de soins reçus
     // (mouvement_pur.js, moteur_pur.js) ; au niveau 5, le Défenseur — 30 % de
     // chance de frapper l'ennemi qui ENTRE dans sa zone — et cette zone portée
@@ -1072,6 +1091,17 @@ window.TECHNIQUES_CLASSE = {
     CLASSE_FUREUR_SENTINELLE: {
         Nom: "Fureur de la sentinelle", classe: "Sentinelle", niveau: 10, Initiative: 20, Fatigue: 0, cible: "soi",
         desc: "Chaque ennemi adjacent reçoit une attaque d'opportunité, puis est repoussé d'une case. "
+            + "Une fois par combat."
+    },
+    CLASSE_TIR_PRECIS: {
+        Nom: "Tir précis", classe: "Pisteur", niveau: 5, Initiative: 100, Fatigue: 0, cible: "ennemi", portee: 5,
+        ligneDeVue: true,
+        desc: "Un ennemi à 5 cases, en vue, est immobilisé à coup sûr (aucune esquive) pour 2 manches. "
+            + "Une fois par combat."
+    },
+    CLASSE_LIEN_DE_SANG: {
+        Nom: "Lien de sang", classe: "Pisteur", niveau: 10, Initiative: 100, Fatigue: 0, cible: "compagnon",
+        desc: "Soigne entièrement son compagnon au contact — et le relève avec tous ses PV s'il est KO. "
             + "Une fois par combat."
     },
     CLASSE_PRISE_EN_CHARGE: {
@@ -1234,6 +1264,8 @@ window.texteAtout = function(cle, valeur) {
         case "bonusSoin":      return `${plus(n)} à chacun de ses soins`;
         case "initiative":     return `${plus(n)} d'initiative sur ses compétences`;
         case "dotBonus":       return `Dégâts sur la durée (poison, brûlure, saignement, étalés) ×${(1 + n / 100).toFixed(1).replace(".", ",")}`;
+        case "compagnon":      return "Un compagnon animal combat à ses côtés : 25 PV, 15 % d'esquive, 6 dégâts bruts, 3 cases, joue juste après lui";
+        case "bonusDistance":  return `${plus(n)} dégât à chaque attaque de ses compétences à arme à distance`;
         case "zombies":        return "Les ennemis qu'il tue, ou qui tombent à côté de lui, se relèvent en zombies à son service";
         case "degatsOpportunite": return `${plus(n)} aux dégâts de ses attaques d'opportunité`;
         case "defenseur":      return `Défenseur : ${n} % de chance de frapper l'ennemi qui entre dans sa zone`;
@@ -1474,7 +1506,15 @@ function frontVersPersoDoc(donnees, idPersonnage) {
     // 🔻 NOUVEAU : On sauvegarde les états altérés ! 🔻
     Etats_Alteres: donnees.Etats_Alteres || [],
     Bouclier_Max: donnees.Bouclier_Max || 0,
-    Bouclier_Actuel: donnees.Bouclier_Actuel || 0
+    Bouclier_Actuel: donnees.Bouclier_Actuel || 0,
+    // Le compagnon du Pisteur voyage avec la fiche (la fiche est réécrite en
+    // entier : sans ces champs, il disparaîtrait à la sauvegarde suivante).
+    ...(donnees.compagnon ? {
+      Compagnon_Nom: donnees.compagnon.nom || "",
+      Compagnon_Description: donnees.compagnon.description || "",
+      Compagnon_Image: donnees.compagnon.image || "",
+      Compagnon_Token: donnees.compagnon.token || ""
+    } : {})
   };
 }
 
@@ -1796,6 +1836,10 @@ async function sauvegarderFichePersonnage(donnees, skipImage = false) {
 
   // 🔻 NOUVEAU : On lance la génération du token top-down en arrière-plan ! 🔻
   // Note : On ne met pas de "await" devant, pour libérer l'écran du joueur tout de suite.
+  // LE COMPAGNON DU PISTEUR : son image, puis son pion, en arrière-plan aussi.
+  if (estNouveau && !skipImage && donnees.compagnon && donnees.compagnon.description) {
+      genererCompagnonEnArrierePlan(donnees, idPersonnage).catch(e => console.error(e));
+  }
   if (!skipImage && donnees.urlCloudinary !== "") {
       genererEtStockerTokenBackground(donnees, idPersonnage, donnees.urlCloudinary).catch(e => console.error(e));
   }
@@ -2378,7 +2422,12 @@ async function portraitVersBlobPng(urlPortrait, fond = "#FF00FF") {
 }
 
 // Fonction silencieuse qui tourne en arrière-plan
-async function genererEtStockerTokenBackground(donnees, idPersonnage, urlPortrait) {
+// `options` : { sujet, champ } — le pion du compagnon du Pisteur passe par
+// ici aussi, à partir de SON image (sujet « animal companion », écrit dans
+// Compagnon_Token au lieu d'URL_Token).
+async function genererEtStockerTokenBackground(donnees, idPersonnage, urlPortrait, options = {}) {
+    const sujet = options.sujet || "character";
+    const champ = options.champ || "URL_Token";
     console.log("🚁 [Token] Lancement de la génération du pion tactique...");
     const cles = lireClesApi();
     if (!cles.openai || !cles.cloudName || !cles.cloudKey || !cles.cloudSecret) return false;
@@ -2390,10 +2439,10 @@ async function genererEtStockerTokenBackground(donnees, idPersonnage, urlPortrai
         return false;
     }
 
-    const promptText = "A detailed photograph of a circular hand-carved high-relief wooden plaque medallion, featuring only the head of the character from the provided " +
+    const promptText = "A detailed photograph of a circular hand-carved high-relief wooden plaque medallion, featuring only the head of the " + sujet + " from the provided " +
                        "reference image — a close-up head shot, not the bust or full body — rendered in meticulously sculpted detail. The head emerges from the " +
                        "central field with deep undercuts for a powerful three-dimensional effect, matching the exact facial features, head shape and any " +
-                       "head-attached details (horns, ears, hair, headwear) of the reference character. The head is fully contained within the medallion's central " +
+                       "head-attached details (horns, ears, hair, headwear) of the reference " + sujet + ". The head is fully contained within the medallion's central " +
                        "circular field, filling it closely, never overflowing past its inner border. The outer rim of the medallion carries a fine, delicate thin line of gold gilding traced along its circular edge. " +
                        "The entire piece is crafted from a rich, medium-toned hardwood, like aged walnut, " +
                        "with a tactile, oiled finish. Visible wood grain patterns and fine, authentic chisel marks are present across all surfaces. " +
@@ -2532,7 +2581,7 @@ async function genererEtStockerTokenBackground(donnees, idPersonnage, urlPortrai
             
             const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
             await updateDoc(doc(db, "Personnages", idPersonnage), {
-                URL_Token: finalTokenUrl
+                [champ]: finalTokenUrl
             });
             return true;
         }
@@ -2540,6 +2589,108 @@ async function genererEtStockerTokenBackground(donnees, idPersonnage, urlPortrai
     
     return false;
 }
+
+// =========================================================================
+//  LE COMPAGNON DU PISTEUR : SON IMAGE, PUIS SON PION
+// =========================================================================
+//  Décrit par le joueur à la création (classes.js), il est dessiné juste après
+//  le héros, en arrière-plan : une image en PAYSAGE (1536×1024 — une bête se
+//  tient en longueur), au style des portraits, détourée comme eux ; puis son
+//  pion rond, tiré de cette image par le même chemin que celui d'un héros. Le
+//  pion n'occupe qu'une case, même pour un cheval.
+window.TAILLE_IMAGE_COMPAGNON = "1536x1024";
+window.promptCompagnon = function(compagnon, style) {
+    const c = compagnon || {};
+    return "Contexte de l'univers : Antique Fantastique (Mythic Ancient Fantasy, Antiquité Magique).\n\n"
+        + "--- LE SUJET ---\n"
+        + `Le compagnon animal d'un héros${c.nom ? `, nommé ${c.nom}` : ""}. Le joueur le décrit ainsi : `
+        + `« ${String(c.description || "").trim()} ». `
+        + "C'est une bête (animal réel ou créature fantastique), JAMAIS un humanoïde. "
+        + "TAILLE MAXIMALE : celle d'un cheval — s'il est décrit plus grand, ramène-le à la taille d'un cheval. "
+        + "Montre-le en entier, de la tête à la queue, vu de trois quart, dans une posture vivante et alerte, "
+        + "sans cavalier, sans selle ni harnais sauf si la description le demande.\n\n"
+        + "Directives de style artistique obligatoires : " + (style || "") + "\n\n"
+        + "🛑 RÈGLE TECHNIQUE DÉFINITIVE (PRIORITAIRE SUR TOUT LE RESTE) : "
+        + "le compagnon DOIT ÊTRE PLACÉ SUR UN FOND TOTALEMENT MAGENTA FLUO UNI (#FF00FF). "
+        + "Il est STRICTEMENT INTERDIT de dessiner un décor, un sol, une ombre portée ou un dégradé. "
+        + "💡 LUMIÈRE : lumière naturelle d'un soleil, chaude et franche. Le fond magenta n'éclaire RIEN : "
+        + "aucun reflet, liseré ou halo violet, rose ou magenta sur le compagnon. "
+        + "Format paysage : la bête entière tient dans le cadre, rien n'est coupé. Ne dessine aucun texte.";
+};
+
+// Une image venue de l'IA : déposée sur Cloudinary (pour pouvoir en lire les
+// pixels), détourée de son fond magenta, puis redéposée à la même adresse.
+async function televerserImageDetouree(imageSource, dossier, cles) {
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const form1 = new FormData();
+    form1.append("file", imageSource); form1.append("api_key", cles.cloudKey);
+    form1.append("timestamp", timestamp);
+    form1.append("signature", await sha1Hex(`folder=${dossier}&timestamp=${timestamp}${cles.cloudSecret}`));
+    form1.append("folder", dossier);
+    let urlSecurisee = imageSource, publicId = null;
+    try {
+        const json1 = await (await fetch(`https://api.cloudinary.com/v1_1/${cles.cloudName}/image/upload`, { method: "POST", body: form1 })).json();
+        if (json1.secure_url) { urlSecurisee = json1.secure_url; publicId = json1.public_id; }
+    } catch (e) { console.error("Compagnon : pont Cloudinary impossible :", e); }
+    const detouree = await detourerFondMagenta(urlSecurisee);
+    const form2 = new FormData();
+    form2.append("file", detouree); form2.append("api_key", cles.cloudKey);
+    form2.append("timestamp", timestamp);
+    form2.append("signature", await sha1Hex(publicId
+        ? `public_id=${publicId}&timestamp=${timestamp}${cles.cloudSecret}`
+        : `folder=${dossier}&timestamp=${timestamp}${cles.cloudSecret}`));
+    if (publicId) form2.append("public_id", publicId); else form2.append("folder", dossier);
+    try {
+        const json2 = await (await fetch(`https://api.cloudinary.com/v1_1/${cles.cloudName}/image/upload`, { method: "POST", body: form2 })).json();
+        if (json2.secure_url) return json2.secure_url.replace("/upload/", "/upload/q_auto,f_auto/");
+    } catch (e) { console.error("Compagnon : dépôt final impossible :", e); }
+    return urlSecurisee && !String(urlSecurisee).startsWith("data:") ? urlSecurisee : "";
+}
+
+async function genererCompagnonEnArrierePlan(donnees, idPersonnage) {
+    const cles = lireClesApi();
+    if (!cles.openai || !cles.cloudName || !cles.cloudKey || !cles.cloudSecret) return false;
+    console.log("🐾 [Compagnon] Dessin du compagnon...");
+    const prompt = window.promptCompagnon(donnees.compagnon, await recupererInstructionStyle());
+    const modeles = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1"];
+    const delais = [5000, 15000, 30000];
+    let json = null;
+    for (const model of modeles) {
+        for (let tentative = 0; tentative < 3 && !json; tentative++) {
+            let statut = 0, texte = "";
+            try {
+                const rep = await fetch("https://api.openai.com/v1/images/generations", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + cles.openai },
+                    body: JSON.stringify({ model, prompt, n: 1, size: window.TAILLE_IMAGE_COMPAGNON,
+                                           quality: "medium", output_format: "png", moderation: "low" })
+                });
+                statut = rep.status;
+                texte = await rep.text();
+            } catch (e) { texte = "error code: 1015"; }
+            if (statut === 429 || texte.includes("error code: 1015") || texte.includes("Rate Limited")) {
+                await new Promise(r => setTimeout(r, delais[tentative]));
+                continue;
+            }
+            if (statut === 404 || texte.includes("model_not_found")) break;
+            try { const j = JSON.parse(texte); if (j && j.data && j.data.length) json = j; } catch (e) {}
+            break;
+        }
+        if (json) break;
+    }
+    if (!json) { console.error("🐾 [Compagnon] Aucune image renvoyée."); return false; }
+    const source = json.data[0].url || ("data:image/png;base64," + json.data[0].b64_json);
+    const urlImage = await televerserImageDetouree(source, "Accueil/Compagnons", cles);
+    if (!urlImage) return false;
+    const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+    await updateDoc(doc(db, "Personnages", idPersonnage), { Compagnon_Image: urlImage });
+    console.log("✅ [Compagnon] Image prête, place au pion.");
+    return genererEtStockerTokenBackground(donnees, idPersonnage, urlImage,
+                                           { sujet: "animal companion", champ: "Compagnon_Token" });
+}
+
+// Exposée pour les outils (et les bancs) : redessiner le compagnon d'un héros.
+window.genererCompagnonEnArrierePlan = (donnees, idPersonnage) => genererCompagnonEnArrierePlan(donnees, idPersonnage);
 
 async function genererEtStockerPortrait(donnees) {
   // 1. Lecture des cles dans le localStorage

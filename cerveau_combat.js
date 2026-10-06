@@ -39,13 +39,14 @@
 
 import { clonerEtat, combattant, creerDes, combattantIllusion,
          verifierEtatCombat, compterPasMarche, FORMAT_ETAT, tomber, enSursis,
-         reposDuRetourArriere, entreeDeFile, ZOMBIE } from './combat_etat.js';
+         reposDuRetourArriere, entreeDeFile, ZOMBIE, COMPAGNON, compagnonDe,
+         placerCompagnons } from './combat_etat.js';
 import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissiperConfusion,
          traverserZones, creerZonePure, poserZone, vieillirZones,
          chaineDeDegats, REGLES_ETATS, regleDesEtats, estDansLeNoir,
          partageTenebres, ETAT_TENEBRES_ETALEES, POISON, POISON_MAITRE, ETAT_SAIGNEMENT, SAIGNEMENT,
          resoudreTechniqueClasse, actionAssautMortel, actionBaiserVampire, appliquerCharme,
-         actionResonanceBouclier, ennemisAuContact, tirerDirectionsAveugle } from './moteur_pur.js';
+         actionResonanceBouclier, ennemisAuContact, tirerDirectionsAveugle, ligneDeVue } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant, fureurDeLaSentinelle } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche, casesAccessibles } from './ia_pure.js';
@@ -152,7 +153,7 @@ function ciblesDeLAssaut(etat, intention) {
     return brutes.filter(id => { const c = combattant(etat, id); return c && !c.aTerre; });
 }
 
-export function validerIntention(etat, intention) {
+export function validerIntention(etat, intention, plateau) {
     const refus = (raison) => ({ ok: false, raison });
     if (!intention || !intention.id) return refus("intention sans identité");
     if (!TYPES_INTENTION.includes(intention.type)) return refus(`type inconnu : ${intention.type}`);
@@ -282,6 +283,23 @@ export function validerIntention(etat, intention) {
             if (!Number.isInteger(init) || init < 0 || init > 199) {
                 return refus("Arrêt du temps : l'initiative va de 0 à 199");
             }
+        }
+        // Le Tir précis (Pisteur) : un ennemi debout, à 5 cases au plus, en
+        // vue (le plateau tranche quand on l'a).
+        if (idCarte === "CLASSE_TIR_PRECIS") {
+            const ennemi = combattant(etat, intention.cible);
+            if (!ennemi) return refus("Tir précis sans cible");
+            if (ennemi.aTerre || ennemi.estIllusion || ennemi.camp === acteur.camp) return refus("Tir précis : ennemi invalide");
+            if (distance(acteur, ennemi) > 5) return refus("Tir précis : l'ennemi doit être à 5 cases au plus");
+            if (plateau && !ligneDeVue(plateau, acteur, ennemi)) return refus("Tir précis : pas de ligne de vue");
+        }
+        // Le Lien de sang (Pisteur) : son compagnon, au contact, blessé ou KO —
+        // indemne, la technique est refusée (pas gâchée).
+        if (idCarte === "CLASSE_LIEN_DE_SANG") {
+            const bete = compagnonDe(etat, acteur.id);
+            if (!bete) return refus("Lien de sang : aucun compagnon");
+            if (distance(acteur, bete) !== 1) return refus("Lien de sang : le compagnon doit être au contact");
+            if (!bete.aTerre && nombre(bete.pv) >= nombre(bete.pvMax)) return refus("Lien de sang : le compagnon est indemne");
         }
         // La Fureur de la sentinelle : au moins un ennemi au contact, sinon
         // refusée (pas gâchée).
@@ -747,6 +765,9 @@ export function ouvrirManche(etat, file, des) {
             return c && !c.aTerre;
         });
     if (propre.length === 0) return null;
+    // Le compagnon du Pisteur joue juste après son maître (combat_etat.js).
+    const rangee = placerCompagnons(suivant, propre);
+    propre.splice(0, propre.length, ...rangee);
 
     suivant.file = propre;
     suivant.phase = "Resolution";
@@ -902,8 +923,10 @@ export function appliquerIntention(etat, intention, plateau) {
                 .filter(id => etat.combattants[id] && !etat.combattants[id].aTerre)
                 .map(id => [id, tirerDirectionsAveugle(des)]))
             : undefined;
+        const cibleTechnique = intention.idCarte === "CLASSE_LIEN_DE_SANG"
+            ? (compagnonDe(etat, intention.acteur) || {}).id : intention.cible;
         const r = resoudreTechniqueClasse(etat, { idLanceur: intention.acteur, idCarte: intention.idCarte,
-                                                  cible: intention.cible, cibles,
+                                                  cible: cibleTechnique, cibles,
                                                   ...(noirs ? { noirs } : {}),
                                                   ...(intention.initiative !== undefined ? { initiative: intention.initiative } : {}) }, plateau);
         let suivant = clonerEtat(r.etat);
@@ -1218,11 +1241,16 @@ export function jouerCreature(etat, id, carte, plateau) {
     return fabriquerPas(etat, courant, etapes, `ia|${id}|${etat.manche}`, id, des);
 }
 
-// LE TOUR D'UN ZOMBIE (Profanateur, niveau 5). Pas de carte : il marche
-// jusqu'à 2 cases vers l'ennemi le plus proche (sans payer de fatigue), puis
-// le mord s'il est au contact — 7 dégâts physiques, que l'armure réduit et
-// que la cible peut esquiver ou parer. Puis son tour se clôt.
-export function jouerZombie(etat, id, plateau) {
+// LE TOUR D'UN SERVITEUR : le zombie du Profanateur (niveau 5) ou le
+// compagnon du Pisteur (niveau 1). Pas de carte : il marche jusqu'à `pas`
+// cases vers l'ennemi le plus proche (sans payer de fatigue), puis le frappe
+// s'il est au contact — que la cible peut esquiver ou parer ; l'armure réduit
+// la morsure du zombie, pas le coup (brut) du compagnon. Puis son tour se clôt.
+const MORSURE_ZOMBIE = { pas: ZOMBIE.pas, degats: ZOMBIE.degats, brut: false, idCarte: "ZOMBIE_MORSURE",
+                         nom: "Morsure", quoi: "zombie" };
+const ATTAQUE_COMPAGNON = { pas: COMPAGNON.pas, degats: COMPAGNON.degats, brut: true, idCarte: "COMPAGNON_ATTAQUE",
+                            nom: "Attaque du compagnon", quoi: "compagnon" };
+function jouerServiteur(etat, id, plateau, regle) {
     const des = creerDes(etat.graine);
     let courant = etat;
     const etapes = [];
@@ -1230,8 +1258,8 @@ export function jouerZombie(etat, id, plateau) {
     if (!moi || moi.aTerre) return null;
     const cible = ennemiLePlusProche(etat, id);
     if (cible && distance(moi, cible) > 1) {
-        const cases = casesAccessibles(etat, id, plateau, ZOMBIE.pas)
-            .filter(h => h.chemin.length > 0 && h.chemin.length <= ZOMBIE.pas);
+        const cases = casesAccessibles(etat, id, plateau, regle.pas)
+            .filter(h => h.chemin.length > 0 && h.chemin.length <= regle.pas);
         cases.sort((a, b) => (distance(a, cible) - distance(b, cible)) || (a.ao - b.ao)
                              || (a.chemin.length - b.chemin.length) || (a.q - b.q) || (a.r - b.r));
         const meilleure = cases[0];
@@ -1244,8 +1272,9 @@ export function jouerZombie(etat, id, plateau) {
     const apres = combattant(courant, id);
     const proie = apres && !apres.aTerre ? ennemiLePlusProche(courant, id) : null;
     if (proie && distance(apres, proie) === 1) {
-        const action = { type: "carte", idLanceur: id, idCarte: "ZOMBIE_MORSURE", critique: false, coutFatigue: 0,
-                         attaques: [{ nom: "Morsure", valeurBrute: ZOMBIE.degats, typeRes: "Physique",
+        const action = { type: "carte", idLanceur: id, idCarte: regle.idCarte, critique: false, coutFatigue: 0,
+                         attaques: [{ nom: regle.nom, valeurBrute: regle.degats, typeRes: "Physique",
+                                      ...(regle.brut ? { brut: true } : {}),
                                       isRanged: false, rangeMax: 1, isHeal: false, isShield: false, cibles: [proie.id] }],
                          alterations: [] };
         action.jets = tirerDesCarte(courant, action, id, false, des);
@@ -1253,13 +1282,17 @@ export function jouerZombie(etat, id, plateau) {
         courant = clonerEtat(r.etat);
         etapes.push(...r.etapes);
     } else if (apres && !apres.aTerre) {
-        etapes.push({ type: "renonce", acteur: id, raison: proie ? "zombie : hors de portée" : "zombie : plus d'ennemi" });
+        etapes.push({ type: "renonce", acteur: id,
+                      raison: proie ? `${regle.quoi} : hors de portée` : `${regle.quoi} : plus d'ennemi` });
     }
     courant = clonerEtat(courant);
     const clot = cloturerTour(courant);
     if (clot) etapes.push(...clot.etapes);
-    return fabriquerPas(etat, courant, etapes, `zombie|${id}|${etat.manche}`, id, des);
+    return fabriquerPas(etat, courant, etapes, `${regle.quoi}|${id}|${etat.manche}`, id, des);
 }
+export function jouerZombie(etat, id, plateau) { return jouerServiteur(etat, id, plateau, MORSURE_ZOMBIE); }
+// LE COMPAGNON DU PISTEUR : 3 cases, 6 dégâts bruts au contact.
+export function jouerCompagnon(etat, id, plateau) { return jouerServiteur(etat, id, plateau, ATTAQUE_COMPAGNON); }
 
 // =========================================================================
 //  7. QUE FAIRE MAINTENANT ?
@@ -1283,7 +1316,7 @@ export function prochainPas(etat, intentions, contexte) {
     // Une intention qui concerne le combattant en tête, dans l'ordre d'arrivée.
     const enAttente = (intentions || []).filter(i => i && !i.traitee);
     for (const intention of enAttente) {
-        const verdict = validerIntention(etat, intention);
+        const verdict = validerIntention(etat, intention, plateau);
         if (!verdict.ok) {
             // On la referme quand même : sans ça, une intention illégitime
             // reviendrait à chaque tour de boucle et bloquerait la file.
@@ -1306,6 +1339,11 @@ export function prochainPas(etat, intentions, contexte) {
     // Un zombie du Profanateur : son propre tour, sans carte.
     if (acteur && acteur.zombie && !acteur.aTerre) {
         const pas = jouerZombie(etat, tete.id, plateau);
+        if (pas) return { ...pas, creature: tete.id };
+    }
+    // Le compagnon du Pisteur : son propre tour, sans carte, lui aussi.
+    if (acteur && acteur.compagnon && !acteur.zombie && !acteur.aTerre) {
+        const pas = jouerCompagnon(etat, tete.id, plateau);
         if (pas) return { ...pas, creature: tete.id };
     }
     if (acteur && acteur.estMonstre && !acteur.aTerre) {

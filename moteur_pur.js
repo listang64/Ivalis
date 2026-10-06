@@ -1415,9 +1415,53 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
                 }
             });
         }
+    } else if (action.idCarte === "CLASSE_TIR_PRECIS") {
+        // LE TIR PRÉCIS (Pisteur) : l'ennemi visé est immobilisé à coup sûr
+        // (aucun jet d'esquive) pour 2 manches — sauf s'il y est insensible.
+        const ennemi = combattant(suivant, action.cible);
+        if (ennemi && !ennemi.aTerre) {
+            const immunites = (ennemi.atouts && ennemi.atouts.immunites) || [];
+            etapes.push({ type: "message", cible: ennemi.id, acteur: id, texte: "🎯 Tir précis !", couleur: "#e8c46a" });
+            if (immunites.includes(ETAT_IMMOBILISATION)) {
+                etapes.push({ type: "etatRate", cible: ennemi.id, acteur: id, etat: ETAT_IMMOBILISATION, immunise: true });
+            } else {
+                ennemi.etats = [...(ennemi.etats || []).filter(e => e && e.nom !== ETAT_IMMOBILISATION),
+                                { nom: ETAT_IMMOBILISATION, duree: MANCHES_TIR_PRECIS, desc: DESC_IMMOBILISATION }];
+                etapes.push({ type: "etats", cible: ennemi.id, liste: ennemi.etats, pose: ETAT_IMMOBILISATION });
+            }
+        }
+    } else if (action.idCarte === "CLASSE_LIEN_DE_SANG") {
+        // LE LIEN DE SANG (Pisteur) : son compagnon, au contact, retrouve tous
+        // ses PV — KO, il se relève (sur sa case, ou la plus proche libre).
+        const bete = combattant(suivant, action.cible);
+        if (bete && bete.compagnon && bete.compagnon.idMaitre === id) {
+            if (bete.aTerre) {
+                const carte = plateau || PLAINE;
+                let place = { q: bete.q, r: bete.r };
+                if (!caseLibre(suivant, carte, place.q, place.r, bete.id)) {
+                    place = casePlusProcheLibre(suivant, carte, place, bete.id) || place;
+                }
+                bete.aTerre = false;
+                bete.sursis = null;
+                bete.etats = [];
+                bete.pv = nombre(bete.pvMax);
+                bete.q = place.q;
+                bete.r = place.r;
+                etapes.push({ type: "reanimation", cible: bete.id, acteur: id, pvApres: bete.pv, q: place.q, r: place.r });
+            } else if (nombre(bete.pv) < nombre(bete.pvMax)) {
+                const avant = nombre(bete.pv);
+                bete.pv = nombre(bete.pvMax);
+                etapes.push({ type: "soin", cible: bete.id, acteur: id, montant: bete.pv - avant, pvApres: bete.pv });
+            }
+        }
     }
     return { etat: suivant, etapes };
 }
+
+// LE PISTEUR. Tir précis (niveau 5) : Immobilisation sûre, 2 manches.
+export const ETAT_IMMOBILISATION = "Immobilisation";
+export const MANCHES_TIR_PRECIS = 2;
+export const DESC_IMMOBILISATION = "Ne peut plus se déplacer volontairement, gagne 20 fatigue par tour immobilisé.";
 
 export function resoudreCarte(etat, action, plateau) {
     const suivant = clonerEtat(etat);

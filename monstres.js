@@ -300,6 +300,8 @@ window.ecouterMonstresPartie = function(idPartie) {
             objet.Personnalite  = brut.Personnalite || "brutal";
             objet.Nombre_Actions = brut.Nombre_Actions || 1;
             objet.XP_Groupe     = brut.XP_Groupe || 0;
+            // Le compagnon du Pisteur : l'identifiant de son maître.
+            objet.compagnonDe   = brut.Compagnon_De || "";
             monstres.push(objet);
 
             // Les techniques du monstre vivent dans une sous-collection : il
@@ -780,6 +782,68 @@ window.poserMonstreSurTerrain = async function(monstre, tokensData) {
 };
 
 // -------------------------------------------------------------------------
+//  Le compagnon du Pisteur
+// -------------------------------------------------------------------------
+//  Un document Monstres DE SON CAMP (COMPAGNON_<héros>), posé à côté de son
+//  maître quand les héros se déploient. Tout le reste suit le chemin des
+//  créatures : le cerveau le joue (jouerCompagnon, juste après son maître), la
+//  réinitialisation du combat l'efface (nettoyerMonstresCombat) — il revient
+//  donc avec ses 25 PV au combat suivant. Rend son identifiant, ou null.
+window.ID_COMPAGNON = (idMaitre) => "COMPAGNON_" + idMaitre;
+window.donneesCompagnon = function(heros) {
+    const c = (heros && heros.compagnon) || {};
+    return {
+        ID_Partie: window.ID_PARTIE_COURANTE || heros.idPartie || "",
+        ID_Joueur: "MJ",
+        Camp: heros.camp || "Allié",
+        Statut: "Vivant",
+        Compagnon_De: heros.idPersonnage,
+        Prenom_Personnage: c.nom || "Compagnon",
+        Nom_Personnage: "",
+        Archetype: "Compagnon",
+        Palier: "",
+        PV_Max: 25, PV_Actuels: 25,
+        Fatigue_Max: 100, Fatigue_Actuelle: 100,
+        Esquive: 15, Parade: 0, Critique: 0,
+        Def_Physique: 0, Def_Magique: 0,
+        Regeneration: 0, Repos_Long: 0,
+        Nombre_Actions: 1, XP_Groupe: 0,
+        Couleur: heros.couleur || "#7cb342",
+        Personnalite: "brutal",
+        Initiative: 0, Competences_Max: 0,
+        URL_Cloudinary: c.image || "",
+        URL_Token: c.token || c.image || ""
+    };
+};
+window.poserCompagnonSurTerrain = async function(heros, tokensData) {
+    if (!heros || !window.ID_PARTIE_COURANTE) return null;
+    const idCompagnon = window.ID_COMPAGNON(heros.idPersonnage);
+    if (tokensData[idCompagnon]) return null;
+    const data = window.donneesCompagnon(heros);
+    window.SOURCE_COMBATTANTS[idCompagnon] = COLLECTION_MONSTRES;
+    await setDoc(doc(db, COLLECTION_MONSTRES, idCompagnon), data);
+
+    // Une case libre au contact de son maître (ou au plus près).
+    const maitre = tokensData[heros.idPersonnage] || (typeof window.pointApparition === "function"
+        ? window.pointApparition(heros.camp || "Allié") : null);
+    const hexLibre = typeof window.trouverHexLibreAutour === "function"
+        ? window.trouverHexLibreAutour(tokensData, maitre, 1)
+        : window.trouverHexLibreVTT(tokensData);
+    tokensData[idCompagnon] = { q: hexLibre.q, r: hexLibre.r, url: data.URL_Token, taille: 55 };
+
+    const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
+    const partieSnap = await getDoc(partieRef);
+    if (partieSnap.exists()) {
+        const ordre = partieSnap.data().Ordre_Initiative || [];
+        if (!ordre.includes(idCompagnon)) {
+            ordre.push(idCompagnon);
+            await updateDoc(partieRef, { Ordre_Initiative: ordre });
+        }
+    }
+    return idCompagnon;
+};
+
+// -------------------------------------------------------------------------
 //  Génération complète, déclenchée par le bouton "Valider" de la fenêtre
 // -------------------------------------------------------------------------
 window.genererRencontreMonstres = async function(difficulte) {
@@ -892,7 +956,8 @@ window.entrerRenfortMonstre = async function() {
         ? (m) => window.estCombattantMort(m.idPersonnage)
         : (m) => m.statut === "Mort" || (parseInt(m.PV_Actuels) || 0) <= 0;
     // Un zombie du Profanateur ne compte plus : il se bat pour les héros.
-    const vivants = (window.MONSTRES_PARTIE || []).filter(m => !aTerre(m) && !m.zombie).length;
+    // Le compagnon du Pisteur non plus.
+    const vivants = (window.MONSTRES_PARTIE || []).filter(m => !aTerre(m) && !m.zombie && !m.compagnonDe).length;
     if (vivants >= limiteMonstresTerrain()) return null;
 
     const renfort = reserve.shift();

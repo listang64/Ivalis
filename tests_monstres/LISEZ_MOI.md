@@ -182,6 +182,7 @@ node oracle.mjs                # ⏳ l'Oracle : +10 d'initiative (niv. 1), Arrê
 node sentinelle.mjs            # 🛡️ la Sentinelle : +6 aux attaques d'opportunité et +20 % de soins (niv. 1), Défenseur 30 % et zone de 2 cases avec allonge (niv. 5), Fureur de la sentinelle (niv. 10)
 node classes_feminin.mjs        # ♀ les noms de classe au féminin pour une héroïne (Pisteuse, Sorcière, Protectrice…) : grille, fiche de classe, statistiques ; la fiche garde le nom de la classe
 node profanateur.mjs           # 🧟 le Profanateur : DOT ×1,3, +1 compétence, +5 PV (niv. 1), ses zombies (niv. 5 : 15 PV, morsure de 7, 2 cases, en dernier) et leur pion grignoté sans IA, le sursis (niv. 10)
+node pisteur.mjs               # 🐾 le Pisteur : son compagnon (25 PV, 15 % d'esquive, 6 bruts, 3 cases, juste après lui), +1 aux tirs, Tir précis (niv. 5), Lien de sang (niv. 10), la fenêtre du compagnon et son image
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4782,3 +4783,48 @@ mort d'un ennemi mais à la fin du tour. »
   aussitôt. marquerMonstreMort marque toujours la mort tout de suite, sans
   plus appeler le renfort lui-même ({ sansRenfort: true }).
 profanateur.mjs (section 5 bis).
+
+## Le Pisteur (version 200)
+
+Nico : « un compagnon animal indépendant en combat (25 PV, 15 % d'esquive, 6
+dégâts bruts), arme à distance +1 dégât ; niveau 5 Tir précis ; niveau 10
+Lien de sang. Après le choix de la classe, une fenêtre demande à quoi
+ressemble le compagnon (pas plus grand qu'un cheval) ; à la création du perso,
+son image est créée aussi, et il a son propre pion en combat. Il apparaît avec
+les joueurs. »
+- NIV. 1 — LE COMPAGNON (ATOUTS_CLASSES « Pisteur » : compagnon, app.js).
+  C'est un document Monstres DE SON CAMP, COMPAGNON_<héros>
+  (poserCompagnonSurTerrain, monstres.js), posé au contact de son maître quand
+  les héros se déploient (genererTokensCombat, combat.js) : 25 PV, 15 %
+  d'esquive, parade 0, aucune résistance, mêmes chiffres à tous les niveaux.
+  En combat il porte `compagnon: { idMaitre }` (combattantDepuisFiche).
+  SON TOUR (jouerCompagnon, cerveau_combat.js — le même tour que le zombie,
+  jouerServiteur) : 3 cases vers l'ennemi le plus proche sans fatigue
+  (coutDuPas), puis 6 dégâts BRUTS au contact (aucune armure ; l'esquive et la
+  parade de la cible comptent). Il joue JUSTE APRÈS SON MAÎTRE : ouvrirManche
+  repose son entrée derrière celle du maître, avec la même initiative
+  (placerCompagnons, combat_etat.js) ; maître KO, il garde sa place et se bat
+  toujours. Les créatures le visent comme n'importe quel héros. KO, il reste
+  à terre jusqu'à la fin du combat (sans renfort ni mort de la réserve :
+  renfortsDuTour), et la réinitialisation efface son document — il revient
+  avec 25 PV au combat suivant. Il n'empêche pas la victoire, ne la fait pas
+  seul sur le plateau, et ne rapporte pas d'XP (loot.js).
+- NIV. 1 — +1 dégât à chaque attaque d'une compétence à arme à distance
+  (bonusDistance, appliquerEquipementALaCarte, moteur_effets.js).
+- NIV. 5 — TIR PRÉCIS (CLASSE_TIR_PRECIS, init 100, 0 fatigue, une fois par
+  combat) : un ennemi à 5 cases, EN VUE (le cerveau vérifie la ligne de vue
+  avec le plateau), immobilisé à coup sûr pendant 2 manches.
+- NIV. 10 — LIEN DE SANG (CLASSE_LIEN_DE_SANG, init 100, 0 fatigue, une fois
+  par combat) : son compagnon au contact retrouve tous ses PV ; KO, il se
+  relève plein (étape « reanimation ») et rejoue à la manche suivante. Un
+  compagnon indemne, ou loin : la technique est refusée, pas gâchée.
+- LA CRÉATION : choisir le Pisteur ouvre la fenêtre du compagnon (son nom, à
+  quoi il ressemble ; classes.js), gardée dans COMPAGNON_TEMP puis jointe au
+  héros (Compagnon_Nom, Compagnon_Description). Juste après le héros, en
+  arrière-plan (genererCompagnonEnArrierePlan, app.js) : une image en paysage
+  1536×1024, au style des portraits, fond magenta détouré, la taille d'un
+  cheval au plus (promptCompagnon) → Compagnon_Image ; puis son pion rond,
+  par le même chemin que celui d'un héros (sujet « animal companion ») →
+  Compagnon_Token. Sur le plateau, le pion du compagnon est son image à lui,
+  d'une seule case.
+pisteur.mjs.

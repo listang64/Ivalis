@@ -521,6 +521,14 @@ window.preparerCartesMonstres = async function() {
         if (fileConnue.some(f => f.idPersonnage === monstre.idPersonnage)) continue;
         // UN ZOMBIE DU PROFANATEUR n'a pas de carte : il joue en dernier
         // (initiative 0), son tour est décidé par le cerveau (jouerZombie).
+        // LE COMPAGNON DU PISTEUR non plus : le cerveau le fait jouer juste
+        // après son maître (placerCompagnons, jouerCompagnon).
+        if (monstre.compagnonDe) {
+            aInscrire.push({ idPersonnage: monstre.idPersonnage, idCarte: "COMPAGNON_ATTAQUE",
+                             initiative: 0, timestamp: new Date().getTime() });
+            auMoinsUn = true;
+            continue;
+        }
         if (monstre.zombie) {
             aInscrire.push({ idPersonnage: monstre.idPersonnage, idCarte: "ZOMBIE_MORSURE",
                              initiative: 0, timestamp: new Date().getTime() });

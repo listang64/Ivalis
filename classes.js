@@ -112,6 +112,26 @@ window.DESCRIPTIFS_CLASSES = {
                        "… et leur inflige 5 % de leurs PV max en dégâts physiques · une fois par combat"] }
         ]
     },
+    CLASSE_PISTEUR: {
+        presentation: "Il lit les traces, tire juste et ne chasse jamais seul. Le Pisteur cloue sa proie "
+            + "sur place d'une flèche bien placée, pendant que son compagnon — une bête liée à lui par "
+            + "le sang — se jette dans la mêlée.",
+        paliers: [
+            { niveau: 1, titre: "Compagnon animal",
+              points: ["Une bête de votre choix (décrite à la création, pas plus grande qu'un cheval) combat à ses côtés",
+                       "25 PV · 15 % d'esquive · 6 dégâts bruts au contact · 3 cases par tour, sans fatigue",
+                       "Jouée par l'IA, juste après le Pisteur ; KO, elle revient au combat suivant",
+                       "+1 dégât à chaque attaque de ses compétences à arme à distance"] },
+            { niveau: 5, titre: "Technique : Tir précis",
+              points: ["Initiative 100 · aucune fatigue · un ennemi à 5 cases, en vue",
+                       "Immobilisé à coup sûr (aucune esquive) pendant 2 manches",
+                       "Une fois par combat"] },
+            { niveau: 10, titre: "Technique : Lien de sang",
+              points: ["Initiative 100 · aucune fatigue · son compagnon, au contact",
+                       "Le soigne entièrement — et le relève avec tous ses PV s'il est KO",
+                       "Une fois par combat"] }
+        ]
+    },
     CLASSE_PROFANATEUR: {
         presentation: "Il souille ce qu'il touche et ne laisse rien reposer en paix. Ses poisons et "
             + "ses brûlures rongent plus profond, ses ennemis tombés se relèvent pour le servir, "
@@ -436,7 +456,82 @@ window.validerClasse = function() {
     window.CLASSE_SELECTIONNEE_TEMP = classeOuverte.nom;
     const champ = document.getElementById("champ-classe");
     if (champ) champ.value = classeOuverte.nom;
+    const avecCompagnon = window.classeAvecCompagnon(classeOuverte.nom);
+    if (!avecCompagnon) window.COMPAGNON_TEMP = null;
     window.fermerChoixClasse();
     classeOuverte = null;
+    // LE PISTEUR décrit d'abord son compagnon, dans une fenêtre à part.
+    if (avecCompagnon) { window.ouvrirFenetreCompagnon(); return; }
     if (typeof window.ouvrirEtapeIdentite === "function") window.ouvrirEtapeIdentite();
+};
+
+// =========================================================================
+//  LE COMPAGNON DU PISTEUR
+// =========================================================================
+//  Juste après le choix de la classe, une fenêtre demande son nom et à quoi il
+//  ressemble (pas plus grand qu'un cheval). C'est gardé en mémoire
+//  (COMPAGNON_TEMP) jusqu'à la création du héros, qui dessine aussi le
+//  compagnon : son image, puis son pion (app.js).
+window.COMPAGNON_TEMP = null;
+window.classeAvecCompagnon = (nomClasse) => {
+    const paliers = typeof window.paliersDeClasse === "function" ? window.paliersDeClasse(nomClasse) : [];
+    return paliers.some(p => p.compagnon);
+};
+window.ouvrirFenetreCompagnon = function() {
+    let fenetre = document.getElementById("fenetre-compagnon");
+    if (!fenetre) {
+        fenetre = document.createElement("div");
+        fenetre.id = "fenetre-compagnon";
+        fenetre.className = "fenetre-compagnon";
+        document.body.appendChild(fenetre);
+    }
+    const deja = window.COMPAGNON_TEMP || {};
+    fenetre.innerHTML = `
+        <div class="fenetre-compagnon-boite">
+            <div class="fenetre-compagnon-titre">🐾 Votre compagnon</div>
+            <p class="fenetre-compagnon-texte">Le Pisteur ne chasse jamais seul. Une bête combat à ses côtés :
+                donnez-lui un nom, et dites à quoi elle ressemble. <em>Taille maximale : celle d'un cheval.</em></p>
+            <label class="fenetre-compagnon-champ">Son nom
+                <input type="text" id="champ-compagnon-nom" maxlength="40" placeholder="Croc-Gris" value="${echapper(deja.nom)}">
+            </label>
+            <label class="fenetre-compagnon-champ">À quoi ressemble-t-il ?
+                <textarea id="champ-compagnon-description" maxlength="600" rows="5"
+                    placeholder="Un grand loup au pelage gris cendré, une oreille déchirée, des yeux ambrés...">${echapper(deja.description)}</textarea>
+            </label>
+            <div class="fenetre-compagnon-erreur" id="erreur-compagnon"></div>
+            <div class="fenetre-compagnon-boutons">
+                <button type="button" class="fenetre-compagnon-retour" onclick="window.retourFenetreCompagnon()">Retour</button>
+                <button type="button" class="fenetre-compagnon-valider" onclick="window.validerCompagnon()">Valider</button>
+            </div>
+        </div>`;
+    fenetre.style.display = "flex";
+};
+window.fermerFenetreCompagnon = function() {
+    const fenetre = document.getElementById("fenetre-compagnon");
+    if (fenetre) fenetre.style.display = "none";
+};
+window.retourFenetreCompagnon = function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    window.fermerFenetreCompagnon();
+    window.ouvrirChoixClasse();
+};
+window.validerCompagnon = function() {
+    const nom = ((document.getElementById("champ-compagnon-nom") || {}).value || "").trim();
+    const description = ((document.getElementById("champ-compagnon-description") || {}).value || "").trim();
+    const erreur = document.getElementById("erreur-compagnon");
+    if (!nom || !description) {
+        if (erreur) erreur.textContent = !nom ? "Donnez-lui un nom." : "Décrivez-le en quelques mots.";
+        return;
+    }
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    window.COMPAGNON_TEMP = { nom, description };
+    window.fermerFenetreCompagnon();
+    if (typeof window.ouvrirEtapeIdentite === "function") window.ouvrirEtapeIdentite();
+};
+// Le compagnon à joindre au héros qu'on crée : seulement pour une classe qui
+// en a un (une classe changée en route l'oublie).
+window.compagnonPourCreation = function(nomClasse) {
+    const c = window.COMPAGNON_TEMP;
+    if (!c || !window.classeAvecCompagnon(nomClasse)) return null;
+    return { nom: c.nom, description: c.description, image: "", token: "" };
 };
