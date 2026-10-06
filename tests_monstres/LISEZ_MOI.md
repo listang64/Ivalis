@@ -4729,3 +4729,11 @@ fiche du personnage garde le nom de la classe (« Sorcier ») : toutes les
 règles le lisent ainsi. Les anciens noms suivent (Nécromancien → Sorcière,
 Hoplite → Protectrice).
 classes_feminin.mjs.
+
+## Assassin pour les deux sexes ; Mage du chaos et Élémentariste « Arrive bientôt » (version 197)
+
+- L'Assassin garde son nom pour une héroïne (plus d'« Assassine »).
+- Le MAGE DU CHAOS et l'ÉLÉMENTARISTE (CLASSES_BIENTOT, classes.js) restent
+  dans la grille, l'image voilée (opacité 35 %) et « Arrive bientôt » écrit
+  par-dessus ; un clic ne les ouvre pas, un message le dit.
+classes_feminin.mjs mis à jour.

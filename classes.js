@@ -331,15 +331,22 @@ window.classeInterditeIci = (c) => !!c && typeof window.classeInterditeA === "fu
 const nomAffiche = (c) => (typeof window.nomClasseGenre === "function")
     ? window.nomClasseGenre(c.nom, window.GENRE_SELECTIONNE_TEMP) : c.nom;
 
+// LES CLASSES QUI ARRIVENT BIENTÔT : visibles dans la grille, l'image voilée et
+// « Arrive bientôt » par-dessus ; elles ne s'ouvrent pas encore.
+window.CLASSES_BIENTOT = ["CLASSE_MAGE_DU_CHAOS", "CLASSE_ELEMENTARISTE"];
+window.classeBientot = (c) => !!c && window.CLASSES_BIENTOT.includes(c.id);
+
 window.rendreGrilleClasses = function(classes) {
     const grille = document.getElementById("grille-classes");
     if (!grille) return;
     grille.innerHTML = (classes || []).map(c => {
         const interdite = window.classeInterditeIci(c);
+        const bientot = window.classeBientot(c);
         return `
-        <button type="button" class="carte-classe${interdite ? " carte-classe-interdite" : ""}" data-classe="${echapper(c.id)}"${interdite ? ` data-interdite="true"` : ""}
+        <button type="button" class="carte-classe${interdite ? " carte-classe-interdite" : ""}${bientot ? " carte-classe-bientot" : ""}" data-classe="${echapper(c.id)}"${interdite ? ` data-interdite="true"` : ""}${bientot ? ` data-bientot="true"` : ""}
                 onclick="jouerSonClic(); window.ouvrirFicheClasse('${echapper(c.id)}')" title="${echapper(nomAffiche(c))}${interdite ? ` — interdite aux ${echapper(raceEnCours())}s` : ""}">
             <img class="carte-classe-image" src="${echapper(c.imageTarot)}" alt="${echapper(nomAffiche(c))}" loading="lazy">
+            ${bientot ? `<span class="carte-classe-bientot-texte">Arrive bientôt</span>` : ""}
             <span class="carte-classe-nom">${echapper(nomAffiche(c))}</span>
         </button>`;
     }).join("");
@@ -359,7 +366,8 @@ window.direClasseInterdite = function(c) {
         msg.id = "message-classe-interdite";
         ecran.appendChild(msg);
     }
-    msg.textContent = `Les ${raceEnCours()}s ne peuvent pas être ${nomAffiche(c)}`;
+    msg.textContent = window.classeBientot(c) ? `${nomAffiche(c)} : arrive bientôt`
+        : `Les ${raceEnCours()}s ne peuvent pas être ${nomAffiche(c)}`;
     msg.style.display = "block";
     clearTimeout(window.__minuteurClasseInterdite);
     window.__minuteurClasseInterdite = setTimeout(() => { msg.style.display = "none"; }, 3500);
@@ -376,7 +384,7 @@ window.afficherGrilleClasses = function() {
 window.ouvrirFicheClasse = function(id) {
     const c = (window.CLASSES_CACHE || window.CLASSES_PAR_DEFAUT).find(x => x.id === id);
     if (!c) return;
-    if (window.classeInterditeIci(c)) { window.direClasseInterdite(c); return; }
+    if (window.classeInterditeIci(c) || window.classeBientot(c)) { window.direClasseInterdite(c); return; }
     window.cacherClasseInterdite();
     classeOuverte = c;
     const fond = document.getElementById("fond-fiche-classe");

@@ -1116,10 +1116,9 @@ window.nomActuelClasse = (nom) => window.CLASSES_RENOMMEES[cleClasseBrute(nom)] 
 // de l'AFFICHAGE seulement : la fiche garde le nom de la classe tel quel
 // (« Sorcier »), et toutes les règles le lisent ainsi. Les classes sans
 // féminin d'usage (Sentinelle, Oracle, Vampire, Mage du chaos, Médicus,
-// Élémentariste) ne changent pas.
+// Élémentariste) ne changent pas — ni l'Assassin (Nico : le même pour les deux).
 window.CLASSES_AU_FEMININ = {
     "Pisteur": "Pisteuse",
-    "Assassin": "Assassine",
     "Chasseur de mages": "Chasseuse de mages",
     "Profanateur": "Profanatrice",
     "Géomancien": "Géomancienne",

@@ -3940,6 +3940,16 @@ textarea.input-texte-parchemin {
    Vargen) : grisée, et un message dit pourquoi au clic. */
 .carte-classe.carte-classe-interdite { filter: grayscale(100%) brightness(0.55); cursor: not-allowed; }
 .carte-classe.carte-classe-interdite:hover { transform: none; }
+/* Une classe qui arrive bientôt : l'image voilée, le mot par-dessus. */
+.carte-classe.carte-classe-bientot { cursor: not-allowed; }
+.carte-classe.carte-classe-bientot:hover { transform: none; }
+.carte-classe.carte-classe-bientot .carte-classe-image { opacity: 0.35; }
+.carte-classe-bientot-texte {
+  position: absolute; left: 6%; right: 6%; top: 42%; transform: translateY(-50%) rotate(-8deg); z-index: 2;
+  padding: 6px 4px; border: 2px solid #d4af37; border-radius: 6px; background: rgba(18, 12, 6, 0.82);
+  font-family: 'Cinzel', serif; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
+  font-size: clamp(10px, 1.7vw, 20px); color: #f3dfa6; text-align: center; text-shadow: 1px 1px 3px black;
+}
 #message-classe-interdite {
   display: none; position: fixed; left: 50%; bottom: 7%; transform: translateX(-50%); z-index: 50;
   padding: 10px 22px; border-radius: 8px; border: 2px solid #a8841f; background: rgba(18, 12, 6, 0.94);
