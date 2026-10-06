@@ -207,7 +207,13 @@ export function combattantDepuisFiche(fiche, position, regles) {
         zombies: !!race.zombies,
         degatsOpportunite: nombre(race.degatsOpportunite),
         defenseur: nombre(race.defenseur),
-        allongeOpportunite: !!race.allongeOpportunite
+        allongeOpportunite: !!race.allongeOpportunite,
+        // Le Géomancien, niveau 5 : il traverse ses murs de terre, marche sur
+        // le terrain difficile comme sur un sol nu, et ses nappes ne le
+        // blessent pas (mouvement_pur.js, traverserZones).
+        traverseSesMurs: !!race.traverseSesMurs,
+        terrainFacile: !!race.terrainFacile,
+        zonesInoffensives: !!race.zonesInoffensives
     };
     const mod = {
         // Ce que l'ÉQUIPEMENT change EN PERMANENCE, hors états altérés : le
@@ -414,12 +420,90 @@ export function construireEtatCombat(source) {
         ontJoue: [...(partie.Ont_Joue_Ce_Round || [])],
 
         combattants: table,
-        zones: JSON.parse(JSON.stringify(zones || {}))
+        zones: JSON.parse(JSON.stringify(zones || {})),
+        // LES MURS DE TERRE du Géomancien (par identifiant) et les GRAVATS
+        // des murs cassés (par case, « q_r ») : un nouveau combat n'en a pas.
+        murs: JSON.parse(JSON.stringify((source && source.murs) || {})),
+        gravats: { ...((source && source.gravats) || {}) }
     };
     // Un Oracle en tête dès l'ouverture, avec un Retour arrière : son repos se
     // prend tout de suite (l'état de départ n'a pas d'étapes à raconter).
     if (etat.phase === "Resolution") reposDuRetourArriere(etat);
     return etat;
+}
+
+// =========================================================================
+//  LES MURS DE TERRE DU GÉOMANCIEN (niveau 5)
+// =========================================================================
+//  Un mur occupe une case : 10 PV, aucune défense, infranchissable et opaque
+//  (il coupe la ligne de vue) tant qu'il tient — sauf pour le Géomancien qui
+//  l'a levé, qui le traverse (sans pouvoir s'y arrêter). Cassé, il laisse des
+//  GRAVATS : un terrain difficile jusqu'à la fin du combat. Les murs vivent
+//  dans l'état (etat.murs, etat.gravats), pas dans la carte du plateau : le
+//  noyau les ajoute au plateau qu'on lui donne (plateauDeCombat).
+export const MUR_TERRE = { pv: 10, coutFatigue: 20, portee: 5, degatsPoussee: 3 };
+export const cleGravats = (q, r) => `${nombre(q)}_${nombre(r)}`;
+export function murEn(etat, q, r) {
+    const murs = (etat && etat.murs) || {};
+    const id = Object.keys(murs).sort().find(k => murs[k] && murs[k].q === q && murs[k].r === r);
+    return id ? murs[id] : null;
+}
+// Le plateau, murs et gravats compris. Une case de mur est `bloquee` (et
+// porte `murTerre` : qui l'a levé) ; une case de gravats est `difficile`.
+export function plateauDeCombat(plateau, etat) {
+    const parCase = {};
+    Object.values((etat && etat.murs) || {}).forEach(m => { if (m) parCase[cleGravats(m.q, m.r)] = m; });
+    const gravats = (etat && etat.gravats) || {};
+    if (Object.keys(parCase).length === 0 && Object.keys(gravats).length === 0) return plateau;
+    const base = plateau || { etatCase: () => ({}) };
+    return {
+        ...base,
+        etatCase(q, r) {
+            const e = { ...((base.etatCase && base.etatCase(q, r)) || {}) };
+            const m = parCase[cleGravats(q, r)];
+            if (m) {
+                e.bloqueeCarte = !!e.bloquee;
+                e.bloquee = true;
+                e.murTerre = { id: m.id, idLanceur: m.idLanceur };
+            }
+            if (gravats[cleGravats(q, r)]) { e.difficile = true; e.gravats = true; }
+            return e;
+        }
+    };
+}
+// Ce combattant peut-il passer par cette case ? Un mur de terre ne s'ouvre
+// qu'à celui qui l'a levé (atout traverseSesMurs) — un vrai mur de la carte,
+// jamais.
+export function franchissablePour(dessus, c) {
+    if (!dessus) return true;
+    if (dessus.supprimee) return false;
+    if (!dessus.bloquee) return true;
+    return !!(dessus.murTerre && !dessus.bloqueeCarte && c && c.atouts && c.atouts.traverseSesMurs
+              && dessus.murTerre.idLanceur === c.id);
+}
+
+// Des coups portés à des murs (idMur → dégâts bruts, doublés par un
+// critique) : aucune défense. À zéro, le mur casse et laisse ses gravats.
+// Modifie l'état ; rend les étapes.
+export function frapperMurs(etat, coups, idActeur, critique) {
+    const etapes = [];
+    Object.keys(coups || {}).sort().forEach(id => {
+        const m = (etat.murs || {})[id];
+        const degats = Math.max(0, Math.round(nombre(coups[id]) * (critique ? 2 : 1)));
+        if (!m || degats <= 0) return;
+        const pv = Math.max(0, nombre(m.pv) - degats);
+        if (pv > 0) {
+            etat.murs[id] = { ...m, pv };
+            etapes.push({ type: "mur", id, mur: etat.murs[id], degats, acteur: idActeur || null });
+        } else {
+            delete etat.murs[id];
+            const g = cleGravats(m.q, m.r);
+            etat.gravats = { ...(etat.gravats || {}), [g]: true };
+            etapes.push({ type: "mur", id, retire: true, casse: true, gravats: g, degats,
+                          q: m.q, r: m.r, acteur: idActeur || null });
+        }
+    });
+    return etapes;
 }
 
 // LE COMPAGNON DU PISTEUR (niveau 1) : une bête indépendante, 25 PV, 15 %
@@ -657,7 +741,7 @@ export function compterPasMarche(etat, etape) {
     if (tete && tete.id === etape.acteur) tete.pas = nombre(tete.pas) + 1;
 }
 
-const APPLICATEURS = {
+export const APPLICATEURS = {
     // Un hexagone franchi. Un pas, un événement : c'est ce qui permet à
     // l'animation de sauter de case en case au lieu de téléporter le pion.
     pas(etat, e) {
@@ -786,6 +870,17 @@ const APPLICATEURS = {
         c.sursis = null;
         c.def = { ...(c.def || {}), esquive: 0, parade: 0 };
         etat.file = (etat.file || []).filter((f, i) => i === 0 || f.id !== e.cible);
+    },
+
+    // Un mur de terre levé, entamé ou cassé (Géomancien) ; les gravats qu'il
+    // laisse (ou qu'un mur impossible à lever laisse sous quelqu'un).
+    mur(etat, e) {
+        if (!etat.murs) etat.murs = {};
+        if (e.id) {
+            if (e.retire) delete etat.murs[e.id];
+            else if (e.mur) etat.murs[e.id] = JSON.parse(JSON.stringify(e.mur));
+        }
+        if (e.gravats) etat.gravats = { ...(etat.gravats || {}), [e.gravats]: true };
     },
 
     // Un allié relevé par le Médicus (Prise en charge) : debout, ses PV, ses

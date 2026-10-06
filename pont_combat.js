@@ -288,6 +288,15 @@ const SCENES = {
                  couleur: "#7cb342", duree: RYTHME.message };
     },
 
+    // Un mur de terre levé, entamé ou cassé (Géomancien). Le mur n'a pas de
+    // pion : c'est le dessin des murs (murs_terre.js) qui le montre ; on dit
+    // seulement sa chute, et les gravats sous qui n'a pas pu être poussé.
+    mur(e) {
+        if (e.casse && e.acteur) return { geste: "message", pion: e.acteur, texte: "💥 Mur brisé", couleur: "#a1887f", duree: RYTHME.message };
+        if (!e.id && e.bloque) return { geste: "message", pion: e.bloque, texte: "🪨 Écrasé sous la roche", couleur: "#a1887f", duree: RYTHME.message };
+        return { geste: "rien" };
+    },
+
     // Un allié relevé par le Médicus : il le dit, sur son pion.
     reanimation(e) {
         return { geste: "message", pion: e.cible, texte: "✚ Relevé !", couleur: "#43a047", duree: RYTHME.message };
@@ -309,6 +318,7 @@ const SCENES = {
                        CLASSE_RETOUR_ARRIERE: "⏪ Retour arrière",
                        CLASSE_FUREUR_SENTINELLE: "⚔️ Fureur de la sentinelle",
                        CLASSE_TIR_PRECIS: "🎯 Tir précis",
+                       CLASSE_MUR_DE_TERRE: "🪨 Mur de terre",
                        CLASSE_LIEN_DE_SANG: "🩸 Lien de sang" };
         return { geste: "message", pion: e.acteur, texte: noms[e.idCarte] || "Technique de classe",
                  couleur: "#e8c46a", duree: RYTHME.message };
@@ -610,6 +620,7 @@ export function creerProjection(ecran) {
         poserFiches = () => {},
         poserFile = () => {},
         poserZones = () => {},
+        poserMurs = () => {},
         rafraichir = () => {},
         lireFiches = () => []
     } = ecran || {};
@@ -627,6 +638,8 @@ export function creerProjection(ecran) {
         // zone posée pendant le combat n'existait que pour le cerveau et
         // restait invisible.
         poserZones(JSON.parse(JSON.stringify(etat.zones || {})));
+        // Les murs de terre et leurs gravats, de même.
+        poserMurs(JSON.parse(JSON.stringify(etat.murs || {})), { ...(etat.gravats || {}) });
         if (!options || options.file !== false) {
             poserFile(fileDepuisEtat(etat), {
                 phase: etat.phase, manche: nombre(etat.manche, 1), ontJoue: etat.ontJoue || []

@@ -85,7 +85,7 @@ console.log("\n1. SES ATOUTS, PALIER PAR PALIER (niveau tiré de l'XP)");
     verifier("le nom se lit sans accents (« necromancien », « NÉCROMANCIEN »)",
              w.atoutClasse(heros("N", { classe: "necromancien" })).porteeSorts === 1
              && w.atoutClasse(heros("N", { Classe: "NÉCROMANCIEN" })).porteeSorts === 1);
-    verifier("une autre classe n'a rien", Object.keys(w.atoutClasse(heros("O", { classe: "Géomancien" }))).length === 0);
+    verifier("une autre classe n'a rien", Object.keys(w.atoutClasse(heros("O", { classe: "Élémentariste" }))).length === 0);
     verifier("une créature n'a rien, même nommée comme la classe",
              Object.keys(w.atoutClasse(monstre("M", { classe: "Nécromancien" }))).length === 0);
     verifier("PV max : 40 sur la fiche → 40 (plus de +8)", w.pvMaxCombattant(necro(1)) === 40, `${w.pvMaxCombattant(necro(1))}`);
@@ -432,7 +432,12 @@ console.log("\n7. LA FICHE DE CLASSE : LE DESCRIPTIF À GAUCHE");
                  auDessus: niv.bottom <= corps.top + 1, centre: getComputedStyle(li).textAlign === "center" };
       }) };
     window.retourChoixClasse();
+    // (Une classe sans descriptif : toutes en ont un désormais, on retire
+    // celui du Géomancien le temps de ce contrôle.)
+    const descGeo = window.DESCRIPTIFS_CLASSES.CLASSE_GEOMANCIEN;
+    delete window.DESCRIPTIFS_CLASSES.CLASSE_GEOMANCIEN;
     window.ouvrirFicheClasse("CLASSE_GEOMANCIEN");
+    window.DESCRIPTIFS_CLASSES.CLASSE_GEOMANCIEN = descGeo;
     const oracle = { visible: getComputedStyle(d).display !== "none",
                      classe: document.getElementById("vue-fiche-classe").classList.contains("avec-descriptif") };
     window.retourChoixClasse();

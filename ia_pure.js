@@ -123,6 +123,42 @@ export function ennemiLePlusProche(etat, id) {
     return proche;
 }
 
+// UN ENNEMI EST-IL ENCORE JOIGNABLE À PIED ? Un parcours en largeur sur les
+// cases praticables (murs de terre compris comme obstacles), borné : sert à
+// savoir si un mur du Géomancien l'enferme — auquel cas elle le frappe.
+export function ennemiAtteignable(etat, id, plateau, borne = 600) {
+    const moi = combattant(etat, id);
+    if (!moi || moi.q === null || moi.q === undefined) return false;
+    const carte = plateau || PLAINE;
+    const ennemis = Object.values(etat.combattants || {})
+        .filter(c => c && c.camp !== moi.camp && !c.aTerre && !c.estIllusion && c.q !== null && c.q !== undefined);
+    if (ennemis.length === 0) return true;
+    const touche = (h) => ennemis.some(e => distance(h, e) <= 1);
+    const cle = (h) => `${h.q},${h.r}`;
+    const vus = new Set([cle(moi)]);
+    let front = [{ q: moi.q, r: moi.r }];
+    let n = 0;
+    while (front.length > 0 && n < borne) {
+        const suivant = [];
+        for (const h of front) {
+            if (touche(h)) return true;
+            n++;
+            for (const v of voisinsDe(h)) {
+                if (vus.has(cle(v))) continue;
+                vus.add(cle(v));
+                const dessus = carte.etatCase(v.q, v.r) || {};
+                if (dessus.bloquee || dessus.supprimee) continue;
+                if (occupantVivant(etat, v.q, v.r, id)) continue;
+                suivant.push(v);
+            }
+        }
+        front = suivant;
+    }
+    // Borne atteinte sans conclure : on la croit libre (elle ne frappera pas
+    // un mur pour rien).
+    return front.length > 0;
+}
+
 // =========================================================================
 //  3. OÙ PEUT-ELLE ALLER ?
 // =========================================================================
@@ -564,7 +600,7 @@ export function deciderTourCreature(etat, id, infosCarte, plateau, des) {
 if (typeof window !== "undefined") {
     window.iaPure = {
         PERSONNALITES, traitsDe, dangerDeLaCase, ennemisAuContactDepuis, alliesAdjacents,
-        ennemiLePlusProche, casesAccessibles, choisirCible, choisirPosition, choisirZone,
+        ennemiLePlusProche, ennemiAtteignable, casesAccessibles, choisirCible, choisirPosition, choisirZone,
         deciderTourCreature
     };
 }

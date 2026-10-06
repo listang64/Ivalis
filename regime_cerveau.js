@@ -694,7 +694,10 @@ export function creerRegime(contexte) {
     const demanderTechniqueClasse = (acteur, idCarte, cible, cibles, extra) =>
         demander({ type: "classe", acteur, idCarte, ...(cible ? { cible } : {}),
                    ...(Array.isArray(cibles) ? { cibles: [...cibles] } : {}),
-                   ...(extra && Number.isFinite(extra.initiative) ? { initiative: extra.initiative } : {}) });
+                   ...(extra && Number.isFinite(extra.initiative) ? { initiative: extra.initiative } : {}),
+                   // Le Mur de terre : les cases choisies sur le plateau.
+                   ...(extra && Array.isArray(extra.murs)
+                       ? { murs: extra.murs.map(h => ({ q: nombre(h.q), r: nombre(h.r) })) } : {}) });
 
     // Le OK de la fenêtre sombre. Purement local, comme avant : chacun lit à
     // son rythme et rattrape ensuite. Aucun poste n'attend un autre.
@@ -1049,6 +1052,17 @@ function contexteDuJeu() {
             // nourrissait ; le cerveau les porte maintenant, et cette ligne les
             // rend visibles. On ne réécrit rien en base : le dessin suit l'état,
             // il ne le devance pas.
+            // LES MURS DE TERRE (Géomancien) descendent de l'état comme les
+            // nappes : murs_terre.js les dessine, et le déplacement, la ligne
+            // de vue et le ciblage de l'écran les lisent.
+            poserMurs: (murs, gravats) => {
+                window.MURS_TERRE = murs || {};
+                window.GRAVATS_TERRE = gravats || {};
+                if (typeof window.appliquerMursTerre === "function") {
+                    try { window.appliquerMursTerre(); }
+                    catch (e) { signalerPanne("appliquerMursTerre", e); }
+                }
+            },
             poserZones: (zones) => {
                 window.ZONES_PERSISTANTES = zones || {};
                 if (typeof window.appliquerZonesPersistantes === "function") {

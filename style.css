@@ -4298,3 +4298,34 @@ textarea.input-texte-parchemin {
 .fenetre-compagnon-valider { background: #c9a24a; color: #1a0f08; }
 .fenetre-compagnon-retour { background: #3a2614; color: #f3d27a; }
 .token-compagnon .token-img-main { filter: drop-shadow(0 0 4px rgba(124, 179, 66, 0.85)); }
+
+/* =========================================================================
+   LES MURS DE TERRE DU GÉOMANCIEN : le calque (dans le plateau transformé,
+   sous les pions, au-dessus des nappes) et le bandeau de pose
+   ========================================================================= */
+#calque-murs-terre { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 4; pointer-events: none; overflow: visible; }
+#calque-murs-terre img { position: absolute; pointer-events: none; user-select: none; }
+.gravats-terre { opacity: 0.95; }
+.mur-terre { filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35)); }
+.mur-terre-vise { filter: drop-shadow(0 0 6px #ff4c4c) drop-shadow(0 0 2px #ff4c4c); }
+.mur-terre-projet { opacity: 0.55; filter: drop-shadow(0 0 5px #f3d27a); }
+.mur-terre-jauge { position: absolute; height: 5px; background: rgba(0, 0, 0, 0.65); border-radius: 3px; overflow: hidden; }
+.mur-terre-jauge span { display: block; height: 100%; background: linear-gradient(90deg, #8d6e63, #d7b98e); }
+.bandeau-pose-murs {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 20040;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    width: min(460px, calc(100vw - 32px)); padding: 14px 18px; box-sizing: border-box;
+    background: linear-gradient(180deg, #2a1a0f, #1a0f08); border: 2px solid #c9a24a; border-radius: 14px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.85); color: #e8d5a5; text-align: center;
+}
+.pose-murs-titre { font-family: 'Cinzel', serif; font-size: 20px; font-weight: bold; color: #f3d27a; }
+.pose-murs-texte { font-size: 13px; line-height: 1.4; }
+.pose-murs-compte { font-family: 'Cinzel', serif; font-weight: bold; color: #f3d27a; }
+.pose-murs-boutons { display: flex; gap: 10px; }
+.pose-murs-boutons button {
+    font-family: 'Cinzel', serif; font-weight: bold; font-size: 14px; cursor: pointer;
+    padding: 8px 16px; border-radius: 10px; border: 1px solid #c9a24a;
+}
+.pose-murs-valider { background: #c9a24a; color: #1a0f08; }
+.pose-murs-valider:disabled { opacity: 0.45; cursor: default; }
+.pose-murs-annuler { background: #3a2614; color: #f3d27a; }

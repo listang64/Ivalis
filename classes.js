@@ -132,6 +132,26 @@ window.DESCRIPTIFS_CLASSES = {
                        "Une fois par combat"] }
         ]
     },
+    CLASSE_GEOMANCIEN: {
+        presentation: "La terre lui obéit. Le Géomancien façonne le champ de bataille : ses sorts "
+            + "couvrent de larges étendues, la roche surgit du sol à son ordre pour barrer la route et "
+            + "couper les tirs, et rien de ce qu'il sème ne se retourne contre lui.",
+        paliers: [
+            { niveau: 1, titre: "Maître des étendues",
+              points: ["Dans la Forge, la 5e case de zone payante d'une compétence ne coûte rien",
+                       "+10 d'initiative sur ses compétences à zone"] },
+            { niveau: 5, titre: "Technique : Mur de terre",
+              points: ["Initiative 80 · 20 de fatigue par mur · autant de murs que sa fatigue le permet",
+                       "Sur les cases choisies, à 5 cases et en vue : un pilier de roche de 10 PV, "
+                           + "infranchissable, qui coupe la ligne de vue",
+                       "Qui s'y tient est repoussé à côté (3 dégâts bruts) ; sans place, il reste sur des gravats et en prend 6",
+                       "Cassé, il laisse des gravats : un terrain difficile"] },
+            { niveau: 5, titre: "Passifs",
+              points: ["Ses zones ne lui infligent aucun dégât",
+                       "Le terrain difficile ne le ralentit pas",
+                       "Il traverse ses propres murs"] }
+        ]
+    },
     CLASSE_PROFANATEUR: {
         presentation: "Il souille ce qu'il touche et ne laisse rien reposer en paix. Ses poisons et "
             + "ses brûlures rongent plus profond, ses ennemis tombés se relèvent pour le servir, "

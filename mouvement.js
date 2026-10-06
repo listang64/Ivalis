@@ -5,6 +5,14 @@ import { doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebase
 //  MOTEUR DE DÉPLACEMENT TACTIQUE (PATHFINDING & ANIMATION)
 // =========================================================================
 
+// Le terrain vu par le combattant qui marche : murs de terre et gravats
+// compris (murs_terre.js).
+function etatCaseDuMarcheur(q, r) {
+    return typeof window.etatCaseCombat === "function"
+        ? window.etatCaseCombat(q, r, window.TOKEN_SELECTIONNE)
+        : window.PLATEAU_VTT.getCaseState(q, r);
+}
+
 window.CHEMIN_MOUVEMENT = [];
 window.CHEMIN_START_NODE = null;
 
@@ -136,8 +144,11 @@ function calculerCheminAStar(startHex, endHex) {
         for (let d of directions) {
             let neighbor = { q: current.q + d.q, r: current.r + d.r };
             
-            const state = window.PLATEAU_VTT.getCaseState(neighbor.q, neighbor.r);
+            // Les murs de terre comptent (le Géomancien traverse les siens, sans
+            // s'y arrêter) ; les gravats ralentissent.
+            const state = etatCaseDuMarcheur(neighbor.q, neighbor.r);
             if (state.isBlocked || state.isDeleted) continue;
+            if (state.murTerre && neighbor.q === endHex.q && neighbor.r === endHex.r) continue;
             
             // Un cadavre ne barre plus la route : on lui passe dessus (cf. window.estCombattantMort).
             if (window.caseOccupeeParVivant(neighbor.q, neighbor.r)) continue;
@@ -202,8 +213,8 @@ window.ajouterEtapeMouvement = function(q, r) {
     }
 
     // Le reste du script de tracé
-    const state = window.PLATEAU_VTT.getCaseState(q, r);
-    if (state.isBlocked || state.isDeleted) {
+    const state = etatCaseDuMarcheur(q, r);
+    if (state.isBlocked || state.isDeleted || state.murTerre) {
         window.afficherMessageFlottantHex(q, r, "Passage bloqué");
         return;
     }
@@ -259,7 +270,7 @@ window.ajouterEtapeMouvement = function(q, r) {
             couleur = "#ff4c4c";
         }
 
-        const stepState = window.PLATEAU_VTT.getCaseState(step.q, step.r);
+        const stepState = etatCaseDuMarcheur(step.q, step.r);
         if (stepState.isDifficult) {
             baseCost *= 2;
             couleur = "#b366ff";

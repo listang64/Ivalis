@@ -1853,6 +1853,13 @@ window.clicHexagoneZone = function(q, r) {
     window.dessinerGrilleZone();
 };
 
+// Les cases de zone qui se paient, pour le héros qui forge.
+function casesZoneAPayer(nbCases) {
+    return typeof window.casesZonePayantes === "function"
+        ? window.casesZonePayantes(nbCases, window.forgeState && window.forgeState.statsPerso)
+        : Math.max(0, nbCases - 1);
+}
+
 window.dessinerGrilleZone = function() {
     const svg = document.getElementById("zone-hex-grid");
     svg.innerHTML = "";
@@ -1868,8 +1875,9 @@ window.dessinerGrilleZone = function() {
     const costPC = modZone ? parseFrenchFloat(modZone.Cout_PT) : 1.5;
 
     const currentZoneCount = window.forgeState.selectedZoneHexes.length;
-    // On remet la gratuité pour le 1er hexagone
-    const finalCost = Math.max(0, (currentZoneCount - 1) * costPC);
+    // On remet la gratuité pour le 1er hexagone — et pour le Géomancien, la
+    // 5e case payante est offerte aussi (casesZonePayantes, app.js).
+    const finalCost = Math.max(0, casesZoneAPayer(currentZoneCount) * costPC);
     
     const affichage = document.getElementById("zone-cout-affichage");
     affichage.innerText = finalCost === 0 ? "Gratuit" : `${finalCost} PC`;
@@ -2160,8 +2168,11 @@ window.rafraichirForge = function() {
                 let coutCeMod = 0;
                 if (modEff.Nom === "Zone") {
                     let zoneLen = (act.zoneHexes && act.zoneHexes.length > 0) ? act.zoneHexes.length : modCount;
-                    // On remet le premier hexagone gratuit ici aussi !
-                    coutCeMod = parseFrenchFloat(modEff.Cout_PT) * Math.max(0, zoneLen - 1);
+                    // On remet le premier hexagone gratuit ici aussi ! (Et la
+                    // 5e case payante du Géomancien.)
+                    coutCeMod = parseFrenchFloat(modEff.Cout_PT) * (typeof window.casesZonePayantes === "function"
+                        ? window.casesZonePayantes(zoneLen, window.forgeState && window.forgeState.statsPerso)
+                        : Math.max(0, zoneLen - 1));
                 } else if (modEff.Nom === "DOT" || modEff.Nom === "Durée étalement dégâts") {
                     aDOT = true;
                     diviseurDOT = diviseurEtalement(modEff);

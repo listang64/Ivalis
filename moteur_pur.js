@@ -926,7 +926,9 @@ export function traverserZones(etat, id, hex, des) {
         // L'ordre des clés d'un objet n'est pas une garantie : on le fixe, sans
         // quoi deux postes pourraient résoudre deux zones superposées dans un
         // ordre différent — et consommer les dés dans un ordre différent.
-        .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+        .sort((a, b) => String(a.id).localeCompare(String(b.id)))
+        // Le Géomancien (niveau 5) : ses propres nappes ne le touchent pas.
+        .filter(z => !(cible.atouts && cible.atouts.zonesInoffensives && z.idLanceur === id));
 
     zones.forEach(zone => {
         // Le jet de défense d'abord, comme pour une attaque d'opportunité :

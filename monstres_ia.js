@@ -101,7 +101,8 @@ const distanceHex = (a, b) => (typeof window.hexDistanceVTT === "function")
 
 function caseLibre(q, r, idIgnore) {
     if (!window.PLATEAU_VTT) return false;
-    const etat = window.PLATEAU_VTT.getCaseState(q, r);
+    const etat = typeof window.etatCaseCombat === "function"
+        ? window.etatCaseCombat(q, r) : window.PLATEAU_VTT.getCaseState(q, r);
     if (etat.isDeleted || etat.isBlocked) return false;
     const tokens = window.TOKENS_VTT_DATA || {};
     for (const id in tokens) {

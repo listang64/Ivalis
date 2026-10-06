@@ -40,16 +40,18 @@
 import { clonerEtat, combattant, creerDes, combattantIllusion,
          verifierEtatCombat, compterPasMarche, FORMAT_ETAT, tomber, enSursis,
          reposDuRetourArriere, entreeDeFile, ZOMBIE, COMPAGNON, compagnonDe,
-         placerCompagnons } from './combat_etat.js';
+         placerCompagnons, MUR_TERRE, murEn, plateauDeCombat, franchissablePour, frapperMurs,
+         cleGravats, APPLICATEURS } from './combat_etat.js';
 import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissiperConfusion,
          traverserZones, creerZonePure, poserZone, vieillirZones,
          chaineDeDegats, REGLES_ETATS, regleDesEtats, estDansLeNoir,
          partageTenebres, ETAT_TENEBRES_ETALEES, POISON, POISON_MAITRE, ETAT_SAIGNEMENT, SAIGNEMENT,
          resoudreTechniqueClasse, actionAssautMortel, actionBaiserVampire, appliquerCharme,
-         actionResonanceBouclier, ennemisAuContact, tirerDirectionsAveugle, ligneDeVue } from './moteur_pur.js';
+         actionResonanceBouclier, ennemisAuContact, tirerDirectionsAveugle, ligneDeVue, caseLibre } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
-         occupantVivant, fureurDeLaSentinelle } from './mouvement_pur.js';
-import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche, casesAccessibles } from './ia_pure.js';
+         occupantVivant, fureurDeLaSentinelle, voisinsDe } from './mouvement_pur.js';
+import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche, casesAccessibles,
+         ennemiAtteignable } from './ia_pure.js';
 
 // LES SUITES D'UNE CARTE LANCÉE EN ÉTAT DE CONFUSION (règle de Nico, voir
 // appliquerConfusion) : après la carte, le 3e jet le fait FUIR comme sous la
@@ -187,8 +189,14 @@ export function validerIntention(etat, intention, plateau) {
             if (distance(de, vers) !== 1) return refus("chemin discontinu");
             const occupant = occupantVivant(etat, vers.q, vers.r, intention.acteur);
             if (occupant) return refus(`${occupant} occupe (${vers.q},${vers.r})`);
+            // Un mur de terre : seul le Géomancien qui l'a levé le traverse.
+            const dessus = (plateau && plateau.etatCase) ? (plateau.etatCase(vers.q, vers.r) || {}) : {};
+            if (dessus.murTerre && !franchissablePour(dessus, acteur)) return refus("un mur de terre barre le chemin");
             de = vers;
         }
+        const finChemin = chemin[chemin.length - 1];
+        const dessusFin = (plateau && plateau.etatCase) ? (plateau.etatCase(finChemin.q, finChemin.r) || {}) : {};
+        if (dessusFin.murTerre) return refus("on ne s'arrête pas sur un mur de terre");
         // Et il doit être payable, au moins en partie — au barème de CE tour,
         // cases déjà marchées comprises (voir le `pas` de la file).
         const plan = planifierTrajet(etat, intention.acteur, chemin, intention.plateau, {
@@ -239,7 +247,32 @@ export function validerIntention(etat, intention, plateau) {
         if (!((acteur.atouts && acteur.atouts.techniques) || []).includes(idCarte)) {
             return refus(`${intention.acteur} n'a pas la technique ${idCarte}`);
         }
-        if ((acteur.techniquesUtilisees || []).includes(idCarte)) return refus(`${idCarte} déjà utilisée dans ce combat`);
+        if (idCarte !== TECHNIQUE_MUR_TERRE && (acteur.techniquesUtilisees || []).includes(idCarte)) {
+            return refus(`${idCarte} déjà utilisée dans ce combat`);
+        }
+        // Le Mur de terre (Géomancien) : des cases choisies, chacune à 5 cases
+        // au plus et en vue, libres de tout mur ; 20 de fatigue par mur.
+        if (idCarte === TECHNIQUE_MUR_TERRE) {
+            const cases = Array.isArray(intention.murs) ? intention.murs : [];
+            if (cases.length === 0) return refus("Mur de terre : aucune case choisie");
+            const vues = new Set();
+            for (const h of cases) {
+                if (!h || !Number.isInteger(h.q) || !Number.isInteger(h.r)) return refus("Mur de terre : case invalide");
+                const cle = cleGravats(h.q, h.r);
+                if (vues.has(cle)) return refus("Mur de terre : deux murs sur la même case");
+                vues.add(cle);
+                const d = distance(acteur, h);
+                if (d < 1 || d > MUR_TERRE.portee) return refus("Mur de terre : à 5 cases au plus (pas sur soi)");
+                if (murEn(etat, h.q, h.r)) return refus("Mur de terre : il y a déjà un mur");
+                if (plateau && plateau.etatCase) {
+                    const dessus = plateau.etatCase(h.q, h.r) || {};
+                    if (dessus.bloquee || dessus.supprimee) return refus("Mur de terre : case impraticable");
+                    if (!ligneDeVue(plateau, acteur, h)) return refus("Mur de terre : pas de ligne de vue");
+                }
+            }
+            const cout = MUR_TERRE.coutFatigue * cases.length;
+            if (cout > nombre(acteur.fatigue)) return refus(`Mur de terre : il faut ${cout} d'énergie, il en reste ${nombre(acteur.fatigue)}`);
+        }
         if (tete.carte && tete.carte !== idCarte) return refus(`la carte de ce tour est ${tete.carte}`);
         if (idCarte === "CLASSE_REMPART") {
             const allie = combattant(etat, intention.cible);
@@ -913,6 +946,14 @@ export function appliquerIntention(etat, intention, plateau) {
 
     // UNE TECHNIQUE DE CLASSE : son effet, puis la fin du tour — comme une
     // carte, elle occupe le tour du héros.
+    if (intention.type === "classe" && intention.idCarte === TECHNIQUE_MUR_TERRE) {
+        const suivant = clonerEtat(etat);
+        const etapes = leverMursDeTerre(suivant, intention.acteur, intention.murs || [], des, plateau);
+        const clot = cloturerTour(suivant);
+        if (clot) etapes.push(...clot.etapes);
+        return fabriquerPas(etat, suivant, etapes, intention.id, intention.acteur, des);
+    }
+
     if (intention.type === "classe") {
         const cibles = intention.idCarte === "CLASSE_ASSAUT_MORTEL" ? ciblesDeLAssaut(etat, intention)
             : Array.isArray(intention.cibles) ? [...new Set(intention.cibles)] : undefined;
@@ -992,7 +1033,10 @@ export function appliquerIntention(etat, intention, plateau) {
         // dés qu'avant, et les journaux déjà écrits se rejouent à l'identique.
         // Le charme passe avant la confusion : un ennemi charmé frappe son
         // allié, quoi qu'il ait voulu viser (appliquerCharme).
-        const action = appliquerConfusion(etat, appliquerCharme(etat, brute, plateau, des), plateau, des);
+        // LES MURS DE TERRE VISÉS (Géomancien) ne sont pas des combattants :
+        // ils sortent de la carte avant les dés, et prennent leurs coups après.
+        const { action: sansMurs, coups: coupsSurMurs } = separerMurs(etat, brute);
+        const action = appliquerConfusion(etat, appliquerCharme(etat, sansMurs, plateau, des), plateau, des);
         action.jets = tirerDesCarte(etat, action, intention.acteur, critique, des);
         const r = resoudreCarte(etat, action, plateau);
 
@@ -1007,6 +1051,9 @@ export function appliquerIntention(etat, intention, plateau) {
         // de X »). Il n'y a pas de compteur à tenir, juste une règle à dire.
         const suivant = clonerEtat(r.etat);
         const etapes = [...r.etapes];
+        if (Object.keys(coupsSurMurs).length > 0 && !(action.jets && action.jets.attaqueRatee)) {
+            etapes.push(...frapperMurs(suivant, coupsSurMurs, intention.acteur, critique));
+        }
 
         // ÊTRE POUSSÉ OU TIRÉ DANS LE FEU BRÛLE AUTANT QU'Y MARCHER. La
         // traversée de zone se fait ici et non dans resoudreCarte, pour une
@@ -1220,6 +1267,21 @@ export function jouerCreature(etat, id, carte, plateau) {
                 }));
             }
         }
+    } else if (!aPortee && murAFrapper(courant, id, carte, plateau)) {
+        // ENFERMÉE PAR UN MUR DE TERRE : plus aucun ennemi joignable à pied,
+        // elle frappe le mur à son contact avec sa carte (ses dégâts, bruts).
+        const mur = murAFrapper(courant, id, carte, plateau);
+        courant = clonerEtat(courant);
+        const elle = combattant(courant, id);
+        const cout = Math.min(nombre(elle.fatigue), nombre(infos.fatigue));
+        if (cout > 0) {
+            elle.fatigue = nombre(elle.fatigue) - cout;
+            etapes.push({ type: "fatigue", cible: id, fatigueApres: elle.fatigue });
+        }
+        const degats = (carte.attaques || []).filter(a => a && !a.isHeal && !a.isShield)
+            .reduce((t, a) => t + nombre(a.valeurBrute), 0);
+        etapes.push({ type: "message", cible: id, acteur: id, texte: "⛏️ Frappe le mur", couleur: "#a1887f" });
+        etapes.push(...frapperMurs(courant, { [mur.id]: degats }, id, false));
     } else if (!aPortee) {
         // Pourquoi elle n'a rien lancé. Dans la trace, cette ligne vaut de l'or :
         // « tour de 20 millisecondes sans rien faire » restait inexplicable.
@@ -1239,6 +1301,101 @@ export function jouerCreature(etat, id, carte, plateau) {
     if (clot) etapes.push(...clot.etapes);
 
     return fabriquerPas(etat, courant, etapes, `ia|${id}|${etat.manche}`, id, des);
+}
+
+// LE MUR DE TERRE (Géomancien, niveau 5). Plusieurs fois par combat, 20 de
+// fatigue par mur. Sur chaque case choisie : celui qui s'y tient est repoussé
+// sur une case libre au hasard tout autour (3 dégâts bruts) ; s'il n'y en a
+// aucune, il reste là, sur des gravats (pas de mur), et en prend le double.
+export const TECHNIQUE_MUR_TERRE = "CLASSE_MUR_DE_TERRE";
+function leverMursDeTerre(etat, id, cases, des, plateau) {
+    const c = combattant(etat, id);
+    const etapes = [];
+    if (!c) return etapes;
+    const vues = new Set();
+    const liste = (cases || []).filter(h => {
+        const k = h && cleGravats(h.q, h.r);
+        if (!k || vues.has(k)) return false;
+        vues.add(k);
+        return true;
+    }).map(h => ({ q: nombre(h.q), r: nombre(h.r) }));
+    etapes.push({ type: "techniqueClasse", acteur: id, idCarte: TECHNIQUE_MUR_TERRE, cible: id,
+                  utilisees: [...(c.techniquesUtilisees || [])] });
+    c.fatigue = Math.max(0, nombre(c.fatigue) - MUR_TERRE.coutFatigue * liste.length);
+    etapes.push({ type: "fatigue", cible: id, fatigueApres: c.fatigue });
+
+    const frapper = (cible, degats) => {
+        const r = resoudreCarte(etat, { type: "carte", idLanceur: id, idCarte: TECHNIQUE_MUR_TERRE, critique: false, coutFatigue: 0,
+            // Ni à distance (pas de réduction au contact), ni bornée : la roche
+            // frappe là où elle surgit.
+            attaques: [{ nom: "Mur de terre", valeurBrute: degats, typeRes: "Physique", brut: true,
+                         isRanged: false, rangeMax: 99, isHeal: false, isShield: false, cibles: [cible] }],
+            alterations: [], jets: { parCible: { [cible]: { esquive: false, etats: {} } } } }, plateau);
+        Object.keys(etat).forEach(k => delete etat[k]);
+        Object.assign(etat, r.etat);
+        etapes.push(...r.etapes.filter(e => e.type !== "carte"));
+    };
+    liste.forEach((h, i) => {
+        const occupant = occupantVivant(etat, h.q, h.r, null);
+        let poser = true;
+        if (occupant) {
+            const libres = voisinsDe(h).filter(v => !vues.has(cleGravats(v.q, v.r)) && !murEn(etat, v.q, v.r)
+                                                    && caseLibre(etat, plateau, v.q, v.r, occupant));
+            if (libres.length > 0) {
+                const vers = libres[Math.min(libres.length - 1, Math.floor(des.fraction() * libres.length))];
+                const qui = combattant(etat, occupant);
+                const de = { q: qui.q, r: qui.r };
+                qui.q = vers.q; qui.r = vers.r;
+                etapes.push({ type: "poussee", cible: occupant, acteur: id, de, vers: { q: vers.q, r: vers.r } });
+                etapes.push(...traverserZones(etat, occupant, vers, des));
+                frapper(occupant, MUR_TERRE.degatsPoussee);
+            } else {
+                poser = false;
+                const g = cleGravats(h.q, h.r);
+                etat.gravats = { ...(etat.gravats || {}), [g]: true };
+                etapes.push({ type: "mur", gravats: g, acteur: id, q: h.q, r: h.r, bloque: occupant });
+                frapper(occupant, MUR_TERRE.degatsPoussee * 2);
+            }
+        }
+        if (poser) {
+            const idMur = `MUR_${nombre(etat.version)}_${i}`;
+            const etape = { type: "mur", id: idMur, acteur: id,
+                            mur: { id: idMur, q: h.q, r: h.r, pv: MUR_TERRE.pv, pvMax: MUR_TERRE.pv, idLanceur: id } };
+            APPLICATEURS.mur(etat, etape);
+            etapes.push(etape);
+        }
+    });
+    return etapes;
+}
+
+// Les murs qu'une carte vise sortent de ses cibles ; leurs coups (les
+// attaques qui frappent) sont additionnés, mur par mur.
+function separerMurs(etat, brute) {
+    const murs = (etat && etat.murs) || {};
+    const coups = {};
+    if (Object.keys(murs).length === 0) return { action: brute, coups };
+    const filtrer = (liste, compter) => (liste || []).map(a => {
+        const cibles = (a && a.cibles) || [];
+        const surMurs = cibles.filter(x => murs[x]);
+        if (surMurs.length === 0) return a;
+        if (compter && !a.isHeal && !a.isShield) {
+            surMurs.forEach(x => { coups[x] = nombre(coups[x]) + nombre(a.valeurBrute); });
+        }
+        return { ...a, cibles: cibles.filter(x => !murs[x]) };
+    });
+    return { action: { ...brute, attaques: filtrer(brute.attaques, true), alterations: filtrer(brute.alterations, false) }, coups };
+}
+
+// Une créature qu'un mur de terre enferme (plus aucun ennemi joignable à
+// pied) frappe le mur qu'elle touche — le premier, dans l'ordre des ids.
+function murAFrapper(etat, id, carte, plateau) {
+    const murs = Object.values((etat && etat.murs) || {});
+    const moi = combattant(etat, id);
+    if (murs.length === 0 || !moi || moi.aTerre || !carte || !carte.idCarte) return null;
+    const touches = murs.filter(m => distance(moi, m) === 1).sort((a, b) => String(a.id).localeCompare(String(b.id)));
+    if (touches.length === 0) return null;
+    if (ennemiAtteignable(etat, id, plateau)) return null;
+    return touches[0];
 }
 
 // LE TOUR D'UN SERVITEUR : le zombie du Profanateur (niveau 5) ou le
@@ -1306,8 +1463,10 @@ export function jouerCompagnon(etat, id, plateau) { return jouerServiteur(etat, 
 //  elle est rendue avec sa raison, pour que le poste concerné l'affiche.
 
 export function prochainPas(etat, intentions, contexte) {
-    const { plateau = null, carteDe = null } = contexte || {};
+    const { carteDe = null } = contexte || {};
     if (!etat || etat.format !== FORMAT_ETAT) return null;
+    // LES MURS DE TERRE ET LEURS GRAVATS s'ajoutent au terrain du plateau.
+    const plateau = plateauDeCombat((contexte && contexte.plateau) || null, etat);
     if (etat.phase !== "Resolution") return null;
 
     const tete = (etat.file || [])[0];

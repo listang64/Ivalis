@@ -183,6 +183,7 @@ node sentinelle.mjs            # 🛡️ la Sentinelle : +6 aux attaques d'oppor
 node classes_feminin.mjs        # ♀ les noms de classe au féminin pour une héroïne (Pisteuse, Sorcière, Protectrice…) : grille, fiche de classe, statistiques ; la fiche garde le nom de la classe
 node profanateur.mjs           # 🧟 le Profanateur : DOT ×1,3, +1 compétence, +5 PV (niv. 1), ses zombies (niv. 5 : 15 PV, morsure de 7, 2 cases, en dernier) et leur pion grignoté sans IA, le sursis (niv. 10)
 node pisteur.mjs               # 🐾 le Pisteur : son compagnon (25 PV, 15 % d'esquive, 6 bruts, 3 cases, juste après lui), +1 aux tirs, Tir précis (niv. 5), Lien de sang (niv. 10), la fenêtre du compagnon et son image
+node geomancien.mjs            # 🪨 le Géomancien : 5e case de zone offerte et +10 init (niv. 1), Mur de terre (murs de 10 PV, poussée, gravats), ses passifs (niv. 5), le dessin des murs sans IA
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
 node zone_persistante_soin.mjs # une carte de soin laisse une zone verte qui soigne sans dépasser les PV max
@@ -4828,3 +4829,47 @@ les joueurs. »
   Compagnon_Token. Sur le plateau, le pion du compagnon est son image à lui,
   d'une seule case.
 pisteur.mjs.
+
+## Le Géomancien (version 201)
+
+Nico : « Géomancien. Niv. 1 : à partir de quatre zones payantes placées, la 5e
+ne coûte rien (dans la Forge) ; +10 init pour les sorts avec une zone. Niv. 5 :
+Mur de terre (20 fatigue par mur, init 80, portée 5) — mur à 10 PV,
+infranchissable s'il n'est pas cassé, qui casse la ligne de vue ; qui est
+dessus est repoussé d'un côté et prend 3 dégâts bruts. Ses zones ne le
+blessent pas, le terrain difficile ne le ralentit pas, il traverse ses murs.
+Murs dessinés vus de dessus, un peu iso, en piliers de roche, parfois des
+gravats à côté ; cassés, des gravats sur la case, qui devient difficile. »
+- NIV. 1 : dans la Forge, la première case de zone reste offerte et, pour lui,
+  la 5e case PAYANTE aussi (casesZonePayantes, app.js ; competences.js) ; ses
+  compétences à Zone ont +10 d'initiative quand il les joue
+  (bonusInitiativeClasse — qui porte aussi le +10 de l'Oracle).
+- NIV. 5 — MUR DE TERRE (CLASSE_MUR_DE_TERRE, init 80, pas une fois par
+  combat) : le joueur touche les cases sur le plateau (murs_terre.js,
+  ouvrirPoseMursTerre), 20 ⚡ par mur, à 5 cases, en vue ; la seule limite est
+  sa fatigue. Le cerveau lève les murs (leverMursDeTerre, cerveau_combat.js) :
+  qui se tient sur une case est repoussé sur une case libre au hasard tout
+  autour (3 dégâts bruts) — sans place, il reste là, sur des gravats, pas de
+  mur, et prend 6.
+- LES MURS vivent dans l'état (etat.murs, etat.gravats ; étape « mur ») ; le
+  noyau les ajoute au terrain du plateau (plateauDeCombat, combat_etat.js) :
+  un mur est une case bloquée (infranchissable, opaque), des gravats une case
+  difficile. 10 PV, aucune défense : on les vise comme un ennemi (un clic sur
+  la case pendant le ciblage), les zones les touchent ; leurs coups sont
+  retirés de la carte avant les dés et portés après (separerMurs,
+  frapperMurs). Cassé : des gravats jusqu'à la fin du combat. Une créature
+  que des murs enferment (plus aucun ennemi joignable à pied,
+  ennemiAtteignable, ia_pure.js) frappe le mur qu'elle touche. La
+  réinitialisation du combat les efface (un nouvel état n'en a pas).
+- PASSIFS (niv. 5) : ses nappes ne le touchent pas (traverserZones), le
+  terrain difficile — gravats compris — lui coûte le prix normal (coutDuPas),
+  il traverse SES murs sans s'y arrêter (franchissablePour, trouverChemin,
+  planifierTrajet recule hors du mur, la validation refuse d'y finir). Le mur
+  lui coupe la vue comme à tout le monde.
+- L'ÉCRAN : window.MURS_TERRE / GRAVATS_TERRE (projetés de l'état),
+  etatCaseCombat (déplacement, ligne de vue, cases d'arrivée), et le DESSIN
+  sans IA : piliers de roche grise à facettes (strates, éclats, fissures),
+  vus de dessus un peu en perspective, parfois des cailloux au pied ; les
+  gravats en éclats sur une tache de terre. Tiré d'une graine (l'id du mur) :
+  le même sur tous les écrans.
+geomancien.mjs.

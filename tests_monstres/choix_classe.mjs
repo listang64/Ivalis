@@ -150,6 +150,9 @@ console.log("\n2. LA GRILLE : 13 CARTES DE TAROT 7:12, BORDURE DORÉE, RANGÉES 
 
 console.log("\n3. LA FICHE DE CLASSE ET LA FLÈCHE COUDÉE");
 {
+  // (Une classe SANS descriptif : toutes en ont un désormais, on retire
+  // celui du Géomancien le temps de ce contrôle.)
+  await p.evaluate(() => { window.__descGeo = window.DESCRIPTIFS_CLASSES.CLASSE_GEOMANCIEN; delete window.DESCRIPTIFS_CLASSES.CLASSE_GEOMANCIEN; });
   await p.click('.carte-classe[data-classe="CLASSE_GEOMANCIEN"]');
   await p.waitForTimeout(200);
   const f = await p.evaluate(() => {

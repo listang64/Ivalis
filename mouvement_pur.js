@@ -26,7 +26,7 @@
 //  lui passe en argument.
 // =========================================================================
 
-import { clonerEtat, combattant, tomber } from './combat_etat.js';
+import { clonerEtat, combattant, tomber, franchissablePour } from './combat_etat.js';
 import { esquiveDe, paradeDe, defPhysiqueDe, bonusDesEtats, aLEtat, traverserZones, protecteurRempart,
          ligneDeVue, caseLibre, destinationPoussee } from './moteur_pur.js';
 
@@ -88,6 +88,7 @@ export function trouverChemin(etat, depart, arrivee, plateau, options) {
     let ouverts = [depart];
     let explorees = 0;
 
+    const qui = idQuiBouge ? combattant(etat, idQuiBouge) : null;
     while (ouverts.length > 0 && explorees++ < maxCases) {
         ouverts.sort((a, b) => (f.get(cle(a)) ?? Infinity) - (f.get(cle(b)) ?? Infinity));
         const courant = ouverts.shift();
@@ -101,10 +102,14 @@ export function trouverChemin(etat, depart, arrivee, plateau, options) {
 
         for (const voisin of voisinsDe(courant)) {
             const etatCase = carte.etatCase(voisin.q, voisin.r) || {};
-            if (etatCase.bloquee || etatCase.supprimee) continue;
+            // Un mur de terre : seul le Géomancien qui l'a levé le traverse —
+            // et il ne s'y arrête pas.
+            if (!franchissablePour(etatCase, qui)) continue;
+            if (etatCase.murTerre && voisin.q === arrivee.q && voisin.r === arrivee.r) continue;
             if (occupantVivant(etat, voisin.q, voisin.r, idQuiBouge)) continue;
 
-            const pas = (g.get(cle(courant)) ?? Infinity) + (etatCase.difficile ? 2 : 1);
+            const difficile = etatCase.difficile && !(qui && qui.atouts && qui.atouts.terrainFacile);
+            const pas = (g.get(cle(courant)) ?? Infinity) + (difficile ? 2 : 1);
             if (pas < (g.get(cle(voisin)) ?? Infinity)) {
                 venantDe.set(cle(voisin), courant);
                 g.set(cle(voisin), pas);
@@ -147,7 +152,9 @@ export function coutDuPas(c, numeroCase, difficile, offerte) {
     if (numeroCase === 1 && c && c.atouts && c.atouts.premierPasGratuit) return 0;
 
     let cout = numeroCase >= 7 ? 6 : (numeroCase >= 4 ? 4 : 2);
-    if (difficile) cout *= 2;
+    // Le Géomancien (niveau 5) marche sur le terrain difficile comme sur un
+    // sol nu.
+    if (difficile && !(c && c.atouts && c.atouts.terrainFacile)) cout *= 2;
     if (aLEtat(c, "Glacé")) cout *= 2;
 
     const diviseur = nombre(c.atouts && c.atouts.diviseurDeplacement, 1) || 1;
@@ -185,14 +192,27 @@ export function planifierTrajet(etat, id, chemin, plateau, options) {
         const etatCase = carte.etatCase(vers.q, vers.r) || {};
         const prix = coutDuPas(c, pasDejaFaits + i + 1, !!etatCase.difficile, i < offertes);
 
-        if (cout + prix > budget) return { pas, cout, tronque: true };
+        if (cout + prix > budget) return sansFinirSurUnMur({ pas, cout, tronque: true }, carte);
 
         pas.push({ de, vers: { q: vers.q, r: vers.r }, cout: prix,
                    difficile: !!etatCase.difficile, offerte: i < offertes });
         cout += prix;
         de = { q: vers.q, r: vers.r };
     }
-    return { pas, cout, tronque: false };
+    return sansFinirSurUnMur({ pas, cout, tronque: false }, carte);
+}
+
+// Le Géomancien traverse ses murs, il ne s'arrête jamais dessus : une marche
+// tronquée au milieu d'un mur recule jusqu'à la dernière case libre.
+function sansFinirSurUnMur(plan, carte) {
+    while (plan.pas.length > 0) {
+        const fin = plan.pas[plan.pas.length - 1].vers;
+        const dessus = (carte.etatCase ? carte.etatCase(fin.q, fin.r) : null) || {};
+        if (!dessus.murTerre) break;
+        plan.cout -= plan.pas.pop().cout;
+        plan.tronque = true;
+    }
+    return plan;
 }
 
 // =========================================================================

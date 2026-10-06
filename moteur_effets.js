@@ -62,7 +62,8 @@ window.positionCiblage = function(idCombattant) {
     if (state && state.origineLanceur && idCombattant && idCombattant === state.idLanceur) {
         return state.origineLanceur;
     }
-    return (window.TOKENS_VTT_DATA || {})[idCombattant];
+    // Un mur de terre se vise aussi (10 PV) : sa case.
+    return (window.TOKENS_VTT_DATA || {})[idCombattant] || (window.MURS_TERRE || {})[idCombattant];
 };
 
 // UNE CARTE QUI FRAPPE ET SOUTIENT SE VISE EN DEUX TEMPS. Un soin, un bouclier
@@ -396,7 +397,9 @@ function verifierLigneDeVue(hexA, hexB) {
         let s = lerp(aCube.s, bCube.s, t);
         let pt = cubeRound(q, r, s);
         
-        const state = window.PLATEAU_VTT.getCaseState(pt.q, pt.r);
+        // Un mur de terre (Géomancien) coupe la vue comme un mur de la carte.
+        const state = typeof window.etatCaseCombat === "function"
+            ? window.etatCaseCombat(pt.q, pt.r) : window.PLATEAU_VTT.getCaseState(pt.q, pt.r);
         if (state && state.isBlocked) return false;
     }
     return true;
@@ -609,7 +612,8 @@ window.resoudreBondInteractif = function(idPerso, portee, options) {
         const hexesValides = candidats.filter(h => {
             if (h.q === hexDepart.q && h.r === hexDepart.r) return false;
 
-            const state = window.PLATEAU_VTT.getCaseState(h.q, h.r);
+            const state = typeof window.etatCaseCombat === "function"
+                ? window.etatCaseCombat(h.q, h.r) : window.PLATEAU_VTT.getCaseState(h.q, h.r);
             if (state.isBlocked || state.isDeleted) return false;
 
             for (let idAutre in window.TOKENS_VTT_DATA) {
@@ -727,7 +731,8 @@ window.casesDeRepliEcran = function(idPerso, portee, depart) {
     });
     combattants[idPerso] = { ...(combattants[idPerso] || { id: idPerso }), q: Number(tk.q), r: Number(tk.r), aTerre: false };
     const plateau = { etatCase: (q, r) => {
-        const e = (window.PLATEAU_VTT && window.PLATEAU_VTT.getCaseState) ? (window.PLATEAU_VTT.getCaseState(q, r) || {}) : {};
+        const e = typeof window.etatCaseCombat === "function" ? window.etatCaseCombat(q, r)
+            : ((window.PLATEAU_VTT && window.PLATEAU_VTT.getCaseState) ? (window.PLATEAU_VTT.getCaseState(q, r) || {}) : {});
         return { bloquee: !!e.isBlocked, supprimee: !!e.isDeleted, difficile: !!e.isDifficult };
     } };
     const chemins = mp.cheminsDeRepli({ combattants }, idPerso, portee, plateau);
@@ -835,7 +840,8 @@ window.resoudreIllusionInteractif = function(idLanceur, portee, exclues = []) {
             if (h.q === tkLanceur.q && h.r === tkLanceur.r) return false;
             if ((exclues || []).some(x => x && x.q === h.q && x.r === h.r)) return false;
 
-            const state = window.PLATEAU_VTT.getCaseState(h.q, h.r);
+            const state = typeof window.etatCaseCombat === "function"
+                ? window.etatCaseCombat(h.q, h.r) : window.PLATEAU_VTT.getCaseState(h.q, h.r);
             if (state.isBlocked || state.isDeleted) return false;
 
             for (let idAutre in window.TOKENS_VTT_DATA) {
@@ -2678,6 +2684,11 @@ window.validerZoneAoE = function() {
         if (idToken !== idLanceur && (!cibleData.estIllusion || carteEstAttaqueSimple)) touchesFrappe.push(idToken);
     }
 
+    // LES MURS DE TERRE de la zone prennent ses coups (pas ses soins).
+    Object.values(window.MURS_TERRE || {}).forEach(m => {
+        if (finalHexes.some(h => h.q === m.q && h.r === m.r)) touchesFrappe.push(m.id);
+    });
+
     // L'ASSAUT MORTEL ne frappe que les ennemis de sa zone, et part au cerveau
     // comme technique de classe : il fabrique l'attaque à partir des cibles.
     if (state.techniqueClasse === "CLASSE_ASSAUT_MORTEL") {
@@ -3000,6 +3011,7 @@ window.dessinerAnneauxCiblage = function() {
 };
 
 window.ajouterCibleCiblage = function(idCible) {
+    if (typeof window.estIdMur === "function" && window.estIdMur(idCible)) return window.ajouterMurCiblage(idCible);
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     const state = window.ETAT_CIBLAGE;
     const configSort = window.configCiblage(state);
@@ -3092,6 +3104,40 @@ window.ajouterCibleCiblage = function(idCible) {
         phase.alterations.forEach(alt => alt.cibles = [idCible]);
     }
     window.dessinerAnneauxCiblage();
+};
+
+// UN MUR DE TERRE VISÉ (Géomancien) : 10 PV, aucune défense. Seule une
+// attaque le frappe (ni soin, ni bouclier) ; portée, engagement et ligne de
+// vue comme pour un ennemi. Le cerveau lui porte ses coups (frapperMurs).
+window.ajouterMurCiblage = function(idMur) {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    const state = window.ETAT_CIBLAGE;
+    const configSort = window.configCiblage(state);
+    const phase = window.effetsDeLaPhase(state);
+    const mur = (window.MURS_TERRE || {})[idMur];
+    if (!configSort || !mur) return;
+    const idLanceur = window.lanceurDuCiblage();
+    const tkLanceur = window.positionCiblage(idLanceur);
+    const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
+    if (!tkLanceur || !lanceurData) return;
+    const dire = (texte) => window.afficherMessageFlottantHex(mur.q, mur.r, texte, "#aaaaaa");
+    if (configSort.isHeal || configSort.isShield || !phase.attaques.some(a => !a.isHeal && !a.isShield)) return dire("Cible invalide");
+    const dist = getHexDistance(tkLanceur, mur);
+    const porteeEffective = Math.max(configSort.rangeMax, state.porteeMinTraction || 0);
+    if (dist > porteeEffective) return dire("Hors de portée");
+    if (dist > 1 && !configSort.isRanged && window.estEngageAuContact(idLanceur, tkLanceur, lanceurData)) return dire("Engagé au CAC !");
+    if (!verifierLigneDeVue(tkLanceur, mur)) return dire("Vue obstruée");
+    if (state.cibleUnique === idMur) {
+        state.cibleUnique = null;
+        phase.attaques.forEach(a => a.cibles = []);
+        phase.alterations.forEach(alt => alt.cibles = []);
+    } else {
+        state.cibleUnique = idMur;
+        phase.attaques.forEach(a => a.cibles = [idMur]);
+        phase.alterations.forEach(alt => alt.cibles = [idMur]);
+    }
+    window.dessinerAnneauxCiblage();
+    if (typeof window.appliquerMursTerre === "function") window.appliquerMursTerre();
 };
 
 window.nettoyerCiblage = function() {

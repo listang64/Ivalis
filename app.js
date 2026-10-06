@@ -961,6 +961,17 @@ window.ATOUTS_CLASSES = {
         { niveau: 5,  techniques: ["CLASSE_TIR_PRECIS"] },
         { niveau: 10, techniques: ["CLASSE_LIEN_DE_SANG"] }
     ],
+    // LE GÉOMANCIEN : dans la Forge, la 5e case de zone payante d'une
+    // compétence ne coûte rien (zoneGratuite, casesZonePayantes), et ses
+    // compétences à zone ont +10 d'initiative (initiativeZone,
+    // jouerCarteCombat) ; au niveau 5, le Mur de terre — et ses nappes ne le
+    // blessent plus, il marche sur le terrain difficile comme sur un sol nu et
+    // traverse ses murs (combat_etat.js, mouvement_pur.js).
+    "Géomancien": [
+        { niveau: 1,  zoneGratuite: true, initiativeZone: 10 },
+        { niveau: 5,  techniques: ["CLASSE_MUR_DE_TERRE"], zonesInoffensives: true, terrainFacile: true,
+                      traverseSesMurs: true }
+    ],
     // LA SENTINELLE : +6 à ses attaques d'opportunité et +20 % de soins reçus
     // (mouvement_pur.js, moteur_pur.js) ; au niveau 5, le Défenseur — 30 % de
     // chance de frapper l'ennemi qui ENTRE dans sa zone — et cette zone portée
@@ -1093,6 +1104,16 @@ window.TECHNIQUES_CLASSE = {
         desc: "Chaque ennemi adjacent reçoit une attaque d'opportunité, puis est repoussé d'une case. "
             + "Une fois par combat."
     },
+    // LE MUR DE TERRE : pas une fois par combat — autant de murs que sa
+    // fatigue en paie (20 chacun), sur les cases qu'il désigne (cerveau :
+    // leverMursDeTerre).
+    CLASSE_MUR_DE_TERRE: {
+        Nom: "Mur de terre", classe: "Géomancien", niveau: 5, Initiative: 80, Fatigue: 0, cible: "murs", portee: 5,
+        coutParMur: 20, sansLimite: true,
+        desc: "Lève un mur de roche sur chaque case choisie à 5 cases (en vue) : 20 de fatigue par mur. "
+            + "10 PV, infranchissable, coupe la ligne de vue. Qui s'y tient est repoussé à côté et prend "
+            + "3 dégâts bruts (6, et pas de mur, s'il n'a nulle part où aller). Cassé, il laisse des gravats."
+    },
     CLASSE_TIR_PRECIS: {
         Nom: "Tir précis", classe: "Pisteur", niveau: 5, Initiative: 100, Fatigue: 0, cible: "ennemi", portee: 5,
         ligneDeVue: true,
@@ -1109,6 +1130,23 @@ window.TECHNIQUES_CLASSE = {
         desc: "Réanime un allié KO adjacent avec 30 % de ses PV, et repousse d'une case tous les ennemis "
             + "qui l'entourent. Une fois par combat."
     }
+};
+// LE GÉOMANCIEN (niveau 1) : combien de cases de zone se PAIENT dans la Forge.
+// La première est toujours offerte ; pour lui, la 5e payante l'est aussi.
+window.casesZonePayantes = function(nbCases, perso) {
+    const payantes = Math.max(0, (Number(nbCases) || 0) - 1);
+    const atout = (typeof window.atoutRace === "function" && perso) ? (window.atoutRace(perso) || {}) : {};
+    return (atout.zoneGratuite && payantes >= 5) ? payantes - 1 : payantes;
+};
+// Une carte qui porte une Zone (ses effets compilés le disent).
+window.carteAZone = (dataCarte) => !!dataCarte && (dataCarte.Effets_Compiles || [])
+    .some(e => e && (e.isZone || e.nom === "Zone"));
+// L'initiative que la classe ajoute à une compétence FORGÉE : l'Oracle sur
+// toutes, le Géomancien sur celles à zone.
+window.bonusInitiativeClasse = function(perso, dataCarte) {
+    if (!dataCarte || dataCarte.techniqueClasse || typeof window.atoutRace !== "function") return 0;
+    const atout = window.atoutRace(perso) || {};
+    return (Number(atout.initiative) || 0) + (window.carteAZone(dataCarte) ? (Number(atout.initiativeZone) || 0) : 0);
 };
 window.estTechniqueClasse = (idCarte) => !!(idCarte && window.TECHNIQUES_CLASSE[idCarte]);
 
@@ -1266,6 +1304,11 @@ window.texteAtout = function(cle, valeur) {
         case "dotBonus":       return `Dégâts sur la durée (poison, brûlure, saignement, étalés) ×${(1 + n / 100).toFixed(1).replace(".", ",")}`;
         case "compagnon":      return "Un compagnon animal combat à ses côtés : 25 PV, 15 % d'esquive, 6 dégâts bruts, 3 cases, joue juste après lui";
         case "bonusDistance":  return `${plus(n)} dégât à chaque attaque de ses compétences à arme à distance`;
+        case "zoneGratuite":   return "Forge : la 5e case de zone payante d'une compétence ne coûte rien";
+        case "initiativeZone": return `${plus(n)} d'initiative sur ses compétences à zone`;
+        case "zonesInoffensives": return "Ses zones ne lui infligent aucun dégât";
+        case "terrainFacile":  return "Se déplace sur le terrain difficile comme sur un terrain normal";
+        case "traverseSesMurs": return "Traverse ses murs de terre";
         case "zombies":        return "Les ennemis qu'il tue, ou qui tombent à côté de lui, se relèvent en zombies à son service";
         case "degatsOpportunite": return `${plus(n)} aux dégâts de ses attaques d'opportunité`;
         case "defenseur":      return `Défenseur : ${n} % de chance de frapper l'ennemi qui entre dans sa zone`;

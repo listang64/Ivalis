@@ -2307,6 +2307,19 @@ document.addEventListener("click", async function(event) {
         || event.target.closest("#volet-competences")
         || event.target.closest("#apercu-carte-hd-competence")) return;
 
+    // UN MUR DE TERRE VISÉ : pendant un ciblage (hors zone), toucher la case
+    // d'un mur le désigne comme cible (moteur_effets.js, ajouterMurCiblage).
+    if (window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif && !window.ETAT_CIBLAGE.isZone
+        && typeof window.murEnCase === "function" && window.PLATEAU_VTT) {
+        const conteneurMur = document.getElementById("conteneur-plateau-vtt");
+        if (conteneurMur && conteneurMur.contains(event.target)) {
+            const hexMur = window.PLATEAU_VTT.pixelToHex((event.clientX - window.VTT_POS_X) / window.VTT_SCALE,
+                                                         (event.clientY - window.VTT_POS_Y) / window.VTT_SCALE);
+            const mur = hexMur && window.murEnCase(hexMur.q, hexMur.r);
+            if (mur) { window.ajouterCibleCiblage(mur.id); return; }
+        }
+    }
+
     // UN CLIC SUR LA CARTE REFERME LE VOLET. C'est la seconde façon de le
     // ranger, avec son bouton — et la plus naturelle : on a vu ses techniques,
     // on revient au plateau. Les exclusions ci-dessus comptent autant que la
@@ -4245,10 +4258,11 @@ window.jouerCarteCombat = async function(idCarte) {
             // ajoute tant qu'il dure.
             // L'Oracle (+10) avance ses compétences forgées — pas ses techniques
             // de classe, qui gardent leur initiative.
+            // Le Géomancien (+10) avance ses compétences à zone.
             let initiativeCarte = (dataCarte.Initiative || 0)
                 + (typeof window.bonusEquip === "function" ? window.bonusEquip(persoActuel, "initiative") : 0)
-                + (!dataCarte.techniqueClasse && typeof window.atoutRace === "function"
-                    ? (Number(window.atoutRace(persoActuel).initiative) || 0) : 0);
+                + (typeof window.bonusInitiativeClasse === "function"
+                    ? window.bonusInitiativeClasse(persoActuel, dataCarte) : 0);
             const etatElectrifie = persoActuel.Etats_Alteres && persoActuel.Etats_Alteres.find(e => e.nom === "Électrifié");
             if (etatElectrifie) {
                 initiativeCarte = Math.max(0, initiativeCarte - 35);
@@ -5053,6 +5067,8 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
     }
     // L'Arrêt du temps (Oracle) : sa propre fenêtre.
     if (t.cible === "arretTemps") return window.ouvrirArretDuTemps(idLanceur);
+    // Le Mur de terre (Géomancien) : les cases se touchent sur le plateau.
+    if (t.cible === "murs") return window.ouvrirPoseMursTerre(idLanceur);
     if (!["allieAdjacent", "allieKO", "ennemiAdjacent", "ennemi", "combattant"].includes(t.cible)) {
         return demande.techniqueClasse(idLanceur, idCarte);
     }
@@ -5157,7 +5173,7 @@ window.ouvrirArretDuTemps = function(idLanceur) {
     const dansEtat = etat && etat.combattants && etat.combattants[idLanceur];
     const energie = dansEtat ? Number(dansEtat.fatigue) || 0
         : (lanceur.fatigueActuelle !== undefined ? parseInt(lanceur.fatigueActuelle) || 0 : 100);
-    const bonusInit = typeof window.atoutRace === "function" ? (Number(window.atoutRace(lanceur).initiative) || 0) : 0;
+
 
     const file = ((window.PARTIE_DATA || {}).File_Attente_Combat || []).slice()
         .sort((a, b) => (Number(b.initiative) || 0) - (Number(a.initiative) || 0));
@@ -5174,6 +5190,7 @@ window.ouvrirArretDuTemps = function(idLanceur) {
         const cout = parseInt(d.Fatigue) || 0;
         const blocage = typeof window.raisonBlocageCarte === "function" ? window.raisonBlocageCarte(lanceur, d.Arme) : null;
         const raison = cout > energie ? `Il faut ${cout} d'énergie (il en reste ${energie})` : (blocage || "");
+        const bonusInit = typeof window.bonusInitiativeClasse === "function" ? window.bonusInitiativeClasse(lanceur, d) : 0;
         return { id, nom: d.Nom || id, cout, initiative: Math.min(199, (Number(d.Initiative) || 0) + bonusInit), raison };
     });
 
@@ -6205,6 +6222,7 @@ window.pointApparition = function(camp) {
 // Un clic franc : ni un glissement de carte, ni un appui prolongé, ni un
 // pincement à deux doigts. Sur iPad, poser le doigt pour faire glisser le
 // plateau ne doit surtout pas planter un point d'apparition au passage.
+window.armerClicFrancPlateau = (surCase) => armerClicFrancPlateau(surCase);
 function armerClicFrancPlateau(surCase) {
     const conteneur = document.getElementById("conteneur-plateau-vtt");
     if (!conteneur) return () => {};
