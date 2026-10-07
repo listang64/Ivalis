@@ -375,6 +375,21 @@ console.log("\n5. LA FICHE PERSO : LES TECHNIQUES DE CLASSE À PART");
     return !!document.getElementById("section-techniques-classe");
   });
   verifier("une classe sans technique : pas de section", necro === false);
+  // Nico : « les compétences de classe, fais-les apparaître dans la fiche
+  // perso que quand une première compétence a été créée par le joueur ».
+  const avantLaPremiere = await p.evaluate(async () => {
+    window.PERSOS_PARTIE[0].classe = "Hoplite";
+    window.CACHE_COMPETENCES_GLOBAL = { H1: {} };
+    await window.chargerOngletCompetences("H1", 6);
+    const sans = { section: !!document.getElementById("section-techniques-classe"),
+                   invitation: /pas encore forgé/.test(document.getElementById("liste-competences-perso").textContent) };
+    window.CACHE_COMPETENCES_GLOBAL = { H1: { C1: { Nom: "Coup de lance", Arme: "Arme lourde CAC", Initiative: 40 } } };
+    await window.chargerOngletCompetences("H1", 6);
+    return { sans, avec: !!document.getElementById("section-techniques-classe") };
+  });
+  verifier("aucune compétence forgée : pas encore de techniques de classe, seulement l'invitation",
+           avantLaPremiere.sans.section === false && avantLaPremiere.sans.invitation, JSON.stringify(avantLaPremiere.sans));
+  verifier("la première forgée : la section apparaît", avantLaPremiere.avec === true);
 }
 
 // =========================================================================

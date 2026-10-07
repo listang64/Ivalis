@@ -61,6 +61,9 @@ function optionsPour({ aDejaUneAttaque, aDejaUnSoin = false, mods, actionCourant
     const window = { forgeState: { actions: surLaCarte,
                                    effetsBDD: [...mods, ...autres.flatMap(a => a.effetsMods || [])] } };
     const activeTags = new Set();
+    // Le menu des sous-effets est un menu maison (plus un <select>) : chaque
+    // ligne nomme l'action qu'elle greffe.
+    const actionId = "A1";
     const modsDispos = mods;
     // Un seul eval : les déclarations de fonction d'un eval strict (modules ES)
     // ne fuient jamais vers l'appelant, mais restent visibles ENTRE ELLES à
@@ -74,27 +77,27 @@ const modEtalement = (nom) => ({ id: "M1", Nom: nom, Modificateur: "AUCUN", Cout
 console.log("1. SANS ATTAQUE NI SOIN SUR LA CARTE : L'ÉTALEMENT EST GRISÉ");
 {
     const html = optionsPour({ aDejaUneAttaque: false, mods: [modEtalement("Durée étalement dégâts")] });
-    verifier("le mod apparaît, mais désactivé", /disabled/.test(html) && /non compatible/.test(html), html);
+    verifier("le mod apparaît, mais désactivé", /incompatible/.test(html) && /non compatible/.test(html), html);
 }
 
 console.log("\n2. AVEC UNE ATTAQUE DÉJÀ SUR LA CARTE : IL REDEVIENT DISPONIBLE");
 {
     const html = optionsPour({ aDejaUneAttaque: true, mods: [modEtalement("Durée étalement dégâts")] });
-    verifier("le mod est sélectionnable", !/disabled/.test(html) && !/non compatible/.test(html), html);
+    verifier("le mod est sélectionnable", !/incompatible/.test(html) && !/non compatible/.test(html), html);
 }
 
 console.log("\n3. L'ALIAS « DOT » SUIT LA MÊME RÈGLE");
 {
     const sansAttaque = optionsPour({ aDejaUneAttaque: false, mods: [modEtalement("DOT")] });
     const avecAttaque = optionsPour({ aDejaUneAttaque: true, mods: [modEtalement("DOT")] });
-    verifier("grisé sans attaque", /disabled/.test(sansAttaque));
-    verifier("disponible avec une attaque", !/disabled/.test(avecAttaque));
+    verifier("grisé sans attaque", /incompatible/.test(sansAttaque));
+    verifier("disponible avec une attaque", !/incompatible/.test(avecAttaque));
 }
 
 console.log("\n4. LES AUTRES MODS NE SONT PAS TOUCHÉS PAR CETTE RÈGLE");
 {
     const html = optionsPour({ aDejaUneAttaque: false, mods: [modEtalement("Distance")] });
-    verifier("un mod sans rapport reste disponible même sans attaque", !/disabled/.test(html), html);
+    verifier("un mod sans rapport reste disponible même sans attaque", !/incompatible/.test(html), html);
 }
 
 console.log("\n5. ET SEULEMENT SUR UNE ACTION QUI FRAPPE, SOIGNE, UNE ZONE OU UNE DISTANCE");
@@ -103,46 +106,46 @@ console.log("\n5. ET SEULEMENT SUR UNE ACTION QUI FRAPPE, SOIGNE, UNE ZONE OU UN
 {
     const surAttaque = optionsPour({ aDejaUneAttaque: true, mods: [modEtalement("DOT")],
                                      actionCourante: action("Attaque lourde") });
-    verifier("sur une attaque : disponible", !/disabled/.test(surAttaque));
+    verifier("sur une attaque : disponible", !/incompatible/.test(surAttaque));
 
     const surZone = optionsPour({ aDejaUneAttaque: true, mods: [modEtalement("DOT")],
                                   actionCourante: action("Zone") });
-    verifier("sur une Zone : disponible", !/disabled/.test(surZone));
+    verifier("sur une Zone : disponible", !/incompatible/.test(surZone));
 
     const surDistance = optionsPour({ aDejaUneAttaque: true, mods: [modEtalement("DOT")],
                                       actionCourante: action("Distance") });
-    verifier("sur une Distance : disponible", !/disabled/.test(surDistance));
+    verifier("sur une Distance : disponible", !/incompatible/.test(surDistance));
 
     const surEtat = optionsPour({ aDejaUneAttaque: true, mods: [modEtalement("DOT")],
                                   actionCourante: action("Étourdit") });
     verifier("sur un état altéré : GRISÉ, même si la carte frappe ailleurs",
-             /disabled/.test(surEtat) && /non compatible/.test(surEtat), surEtat);
+             /incompatible/.test(surEtat) && /non compatible/.test(surEtat), surEtat);
 
     const surSoin = optionsPour({ aDejaUneAttaque: true, mods: [modEtalement("DOT")],
                                   actionCourante: action("Soin") });
-    verifier("sur un soin : disponible (un soin s'étale aussi)", !/disabled/.test(surSoin), surSoin);
+    verifier("sur un soin : disponible (un soin s'étale aussi)", !/incompatible/.test(surSoin), surSoin);
 
     const surBouclier = optionsPour({ aDejaUneAttaque: true, mods: [modEtalement("DOT")],
                                       actionCourante: action("Bouclier magique") });
-    verifier("sur un bouclier : grisé", /disabled/.test(surBouclier), surBouclier);
+    verifier("sur un bouclier : grisé", /incompatible/.test(surBouclier), surBouclier);
 
     // Et les autres mods, eux, restent offerts sur une action d'état.
     const autre = optionsPour({ aDejaUneAttaque: true, mods: [modEtalement("Distance")],
                                 actionCourante: action("Étourdit") });
-    verifier("un mod sans rapport reste disponible sur un état", !/disabled/.test(autre), autre);
+    verifier("un mod sans rapport reste disponible sur un état", !/incompatible/.test(autre), autre);
 }
 
 console.log("\n6. UNE CARTE QUI NE FAIT QUE SOIGNER PEUT ÉTALER SON SOIN");
 {
     const soinSeul = optionsPour({ aDejaUneAttaque: false, aDejaUnSoin: true, mods: [modEtalement("Durée étalement dégâts")],
                                    actionCourante: action("Soin") });
-    verifier("sur le soin d'une carte sans attaque : disponible", !/disabled/.test(soinSeul), soinSeul);
+    verifier("sur le soin d'une carte sans attaque : disponible", !/incompatible/.test(soinSeul), soinSeul);
     const zoneDeSoin = optionsPour({ aDejaUneAttaque: false, aDejaUnSoin: true, mods: [modEtalement("DOT")],
                                      actionCourante: action("Zone") });
-    verifier("sur la Zone d'une carte de soin : disponible", !/disabled/.test(zoneDeSoin), zoneDeSoin);
+    verifier("sur la Zone d'une carte de soin : disponible", !/incompatible/.test(zoneDeSoin), zoneDeSoin);
     const etatDeSoin = optionsPour({ aDejaUneAttaque: false, aDejaUnSoin: true, mods: [modEtalement("DOT")],
                                      actionCourante: action("Étourdit") });
-    verifier("sur l'état d'une carte de soin : grisé", /disabled/.test(etatDeSoin), etatDeSoin);
+    verifier("sur l'état d'une carte de soin : grisé", /incompatible/.test(etatDeSoin), etatDeSoin);
 }
 
 console.log("\n7. LE BOUTON ⏳ ET LE TEXTE DE LA FORGE");

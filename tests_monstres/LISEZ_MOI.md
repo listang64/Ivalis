@@ -189,6 +189,7 @@ node proprio_dev.mjs             # 🤝 confier un héros à un autre joueur dep
 node bagues_dps.mjs              # 💍 les bagues de dégâts : Intelligence ou Charisme (la meilleure), bonus sur le magique ou le brut
 node compagnon_attaque.mjs        # 🐾 le compagnon du Pisteur : le nom RP de son attaque, trouvé par Gemini et gardé sur la fiche
 node aide_caracs.mjs              # 📜 la répartition des caractéristiques : effets de combat (Codex) et usages RP sous chacune
+node forge_bulles.mjs             # 💬 la Forge : bulle d'explication des effets (survol, appui 2 s), menus de sous-effets maison, barres de défilement
 node interrupteur_illustration.mjs # 🖼️ l'interrupteur des Paramètres : couper / rallumer la génération des images des cartes
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
@@ -5100,3 +5101,37 @@ dessous, ce pour quoi cette carac pourra être jouée en RP. »
   Les effets de classe (Ténèbres, Lumière, Vampirisme) n'y sont pas.
 - La fenêtre s'élargit un peu (520 px au plus) et défile si l'écran est trop
   bas. aide_caracs.mjs.
+
+## Le bouton « Lever les murs », les bulles de la Forge, les barres de défilement (version 211)
+
+Nico : « je joue mon Géomancien, j'ai posé des murs au sol mais rien ne se
+passe quand je veux valider avec le bouton Lever les murs » ; « dans la Forge,
+pour tous les sous-effets listés : au survol (PC) une petite bulle explique le
+détail de l'effet ; sur iPad, doigt posé 2 secondes, et elle disparaît si on
+appuie ailleurs » ; « les barres de défilement sont toutes grises et moches » ;
+« les compétences de classe n'apparaissent dans la fiche qu'une fois une
+première compétence créée ».
+- LEVER LES MURS (combat.js, armerClicFrancPlateau) : pendant la pose, le
+  clic franc du plateau arrête tous les clics de la page (pour qu'un toucher
+  sur une case ne sélectionne pas aussi un pion) — il n'épargnait que le
+  bandeau de placement des héros. Les boutons du bandeau des murs ne
+  recevaient donc jamais leur clic. Exemptés. Aucune intention n'arrivait au
+  cerveau (Combat_Intentions vide, relu en lecture seule). geomancien.mjs
+  valide désormais d'un vrai clic.
+- LES BULLES (competences.js, installerBullesEffets) : tout élément qui porte
+  data-bulle-effet en a une — les sous-effets des menus, les effets posés sur
+  la carte, le grimoire d'ajout. Elle dit le texte de l'effet, ses Notes du
+  grimoire (le détail de l'état) et son coût. Souris : au survol. Doigt :
+  2 s sans bouger (DELAI_APPUI_LONG_BULLE), sans choisir l'effet ; un appui
+  ailleurs la ferme ; un toucher court choisit l'effet comme avant.
+  Les menus de sous-effets ne sont plus des <select> (une option native n'a
+  pas de survol et ouvre la roue d'iOS) : un menu maison dont la liste s'ouvre
+  sur la page elle-même (la carte la coupait, et la Forge, centrée par un
+  transform, retient le position: fixed).
+- LES BARRES DE DÉFILEMENT (style.css) : une règle pour toute la page, fine,
+  curseur de bronze sur rail de parchemin (scrollbar-color pour Chrome, Edge,
+  Firefox ; ::-webkit-scrollbar pour Safari). Les zones qui cachaient leur
+  barre la gardent cachée.
+- LES TECHNIQUES DE CLASSE (competences.js) : sans compétence forgée,
+  l'onglet n'affiche que l'invitation à forger. hoplite.mjs.
+forge_bulles.mjs.

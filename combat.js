@@ -6387,8 +6387,12 @@ function armerClicFrancPlateau(surCase) {
     // barrage, le même geste sélectionnerait un pion ou tracerait un chemin.
     // Le bandeau de la demande fait exception, sinon son lien « Plus tard »
     // serait lui aussi bloqué et la demande deviendrait impossible à écarter.
+    // LE BANDEAU DU MUR DE TERRE AUSSI (Nico : « j'ai posé des murs au sol mais
+    // rien ne se passe quand je veux valider avec le bouton Lever les murs ») :
+    // ses deux boutons ne recevaient jamais leur clic, le barrage l'arrêtait
+    // en chemin.
     const barrage = e => {
-        if (e.target && e.target.closest && e.target.closest("#placement-apparition")) return;
+        if (e.target && e.target.closest && e.target.closest("#placement-apparition, #bandeau-pose-murs")) return;
         e.stopPropagation();
     };
 

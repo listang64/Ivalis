@@ -398,7 +398,9 @@ console.log("\n6. LA FICHE PERSO ET LA FICHE DE CLASSE");
     document.getElementById("champ-id-personnage").value = "S1";
     window.PERSOS_PARTIE = [{ idPersonnage: "S1", prenom: "Ombre", classe: "Assassin", xp: 2500, couleur: "#335", deckEquipe: [], PV_Max: 40 }];
     window.PERSOS_JOUEURS_PARTIE = window.PERSOS_PARTIE;
-    window.CACHE_COMPETENCES_GLOBAL = { S1: {} };
+    // Une compétence forgée : les techniques de classe n'apparaissent qu'après
+    // la première (règle de Nico, hoplite.mjs).
+    window.CACHE_COMPETENCES_GLOBAL = { S1: { C1: { Nom: "Lame", Arme: "", Initiative: 40 } } };
     await window.chargerOngletCompetences("S1", 6);
     const techniques = [...document.querySelectorAll(".technique-classe")].map(x => [x.dataset.technique, x.dataset.statut]);
 

@@ -199,9 +199,11 @@ window.chargerOngletCompetences = async function(idPersonnage, competencesMax = 
         // Celles d'un palier pas encore atteint restent grisées, avec leur niveau.
         const sectionClasse = typeof htmlTechniquesDeClasse === "function" ? htmlTechniquesDeClasse(fichePerso) : "";
 
+        // LES TECHNIQUES DE CLASSE ATTENDENT LA PREMIÈRE COMPÉTENCE (Nico) :
+        // tant que le joueur n'a rien forgé, l'onglet ne montre que l'invitation
+        // à forger — la classe se découvre ensuite, sous ses compétences.
         if (nbCreees === 0) {
-            listeDiv.innerHTML = `<p style="text-align: center; font-style: italic; color: #5c3a21; margin-top: 20px;">Le héros n'a pas encore forgé ses techniques de combat.</p>` + sectionClasse;
-            if (sectionClasse && typeof window.ajusterTitresBannieres === "function") window.ajusterTitresBannieres(listeDiv);
+            listeDiv.innerHTML = `<p style="text-align: center; font-style: italic; color: #5c3a21; margin-top: 20px;">Le héros n'a pas encore forgé ses techniques de combat.</p>`;
             return;
         }
 
@@ -1585,7 +1587,7 @@ window.ouvrirMenuAjoutForge = function() {
                 const coutFatigue = parseFrenchFloat(eff.Cout_PT) * 5;
 
                 htmlLignes += `
-                    <div class="forge-grimoire-ligne${isDisabled ? " desactive" : ""}">
+                    <div class="forge-grimoire-ligne${isDisabled ? " desactive" : ""}" data-bulle-effet="${eff.id}">
                         <div>
                             <span class="forge-grimoire-nom">${nettoyerNomEffet(eff.Nom)}</span>${eff.Modificateur !== "AUCUN" ? `<span class="forge-tag-mini">${eff.Modificateur}</span>` : ""}<span class="forge-grimoire-cout">⚡ ${coutFatigue}</span>
                             <span class="forge-grimoire-desc">${formatterTexteEffet(eff, 1)}</span>
@@ -1758,6 +1760,156 @@ window.attacherModificateur = function(selectElement, idInst) {
     window.modifierModCount(idInst, modId, 1);
     selectElement.value = "";
 };
+
+// =========================================================================
+//  LES BULLES D'EXPLICATION DES EFFETS (Forge)
+// =========================================================================
+//  Nico : « pour tous les sous-effets listés : sur PC, au survol de la souris,
+//  une petite bulle s'affiche à côté pour expliquer le détail de cet effet ;
+//  sur iPad, si on reste le doigt dessus 2 secondes la bulle apparaît, et
+//  disparaît si on appuie ailleurs. » Tout élément qui porte
+//  data-bulle-effet="<id>" en a une : les sous-effets des menus, les effets
+//  posés sur la carte, ceux du grimoire d'ajout. Le détail vient du grimoire
+//  lui-même — son texte, et ses Notes (ce que fait l'état).
+window.DELAI_APPUI_LONG_BULLE = 2000;
+window.texteBulleEffet = function(idEffet, idAction) {
+    const eff = ((window.forgeState || {}).effetsBDD || []).find(e => e.id === idEffet)
+        || (window.EFFETS_BDD_CACHE || {})[idEffet];
+    if (!eff) return "";
+    const echapper = (t) => String(t || "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+    const act = idAction ? ((window.forgeState || {}).actions || []).find(a => a.idInst === idAction) : null;
+    let base = "";
+    try { base = formatterTexteEffet(eff, (act && act.mods && act.mods[idEffet]) || 1, act || undefined); } catch (e) { base = eff.Effet_Base || ""; }
+    const carac = eff.Modificateur && eff.Modificateur !== "AUCUN" ? eff.Modificateur : "";
+    const cout = parseFrenchFloat(eff.Cout_PT) * 5;
+    const notes = String(eff.Notes || "").replace(/^\s*EFFET\s+[ÉE]TAT\s+[^=]*=\s*/i, "").trim();
+    return `<div class="bulle-effet-titre">${echapper(nettoyerNomEffet(eff.Nom))}${carac ? `<span class="bulle-effet-carac">${echapper(carac)}</span>` : ""}</div>`
+        + (base ? `<div class="bulle-effet-base">${base}</div>` : "")
+        + (notes ? `<div class="bulle-effet-notes">${echapper(notes)}</div>` : "")
+        + `<div class="bulle-effet-cout">⚡ ${cout} de fatigue par cran</div>`;
+};
+function bulleEffet() {
+    let b = document.getElementById("bulle-effet-forge");
+    if (!b) {
+        b = document.createElement("div");
+        b.id = "bulle-effet-forge";
+        b.className = "bulle-effet-forge";
+        document.body.appendChild(b);
+    }
+    return b;
+}
+window.montrerBulleEffet = function(cible) {
+    const html = cible && window.texteBulleEffet(cible.dataset.bulleEffet, cible.dataset.action);
+    if (!html) return;
+    const b = bulleEffet();
+    b.innerHTML = html;
+    b.style.display = "block";
+    b.dataset.pour = cible.dataset.bulleEffet;
+    // À côté de l'effet : à droite s'il y a la place, sinon à gauche ; jamais
+    // hors de l'écran.
+    const r = cible.getBoundingClientRect();
+    const l = b.offsetWidth, h = b.offsetHeight, marge = 8;
+    let x = r.right + marge;
+    if (x + l > window.innerWidth - marge) x = Math.max(marge, r.left - l - marge);
+    const y = Math.min(Math.max(marge, r.top + r.height / 2 - h / 2), window.innerHeight - h - marge);
+    b.style.left = Math.round(x) + "px";
+    b.style.top = Math.round(y) + "px";
+};
+window.cacherBulleEffet = function() {
+    const b = document.getElementById("bulle-effet-forge");
+    if (b) { b.style.display = "none"; b.dataset.pour = ""; }
+};
+window.fermerMenusSousEffets = function() {
+    document.querySelectorAll(".forge-menu.ouvert").forEach(m => m.classList.remove("ouvert"));
+    const ouverte = document.getElementById("forge-menu-liste-ouverte");
+    if (ouverte) ouverte.remove();
+};
+window.basculerMenuSousEffets = function(bouton) {
+    const menu = bouton && bouton.closest(".forge-menu");
+    if (!menu) return;
+    const ouvrir = !menu.classList.contains("ouvert");
+    window.fermerMenusSousEffets();
+    window.cacherBulleEffet();
+    if (!ouvrir) return;
+    menu.classList.add("ouvert");
+    // LA LISTE SORT DU PARCHEMIN. Dans la carte, elle était coupée par son
+    // bas (la carte défile) ; et la fenêtre de la Forge, centrée par un
+    // `transform`, retient aussi ce qui s'y pose en fixe. Une copie de la liste
+    // s'ouvre donc sur la page elle-même, sous le bouton s'il y a la place,
+    // au-dessus sinon, jamais plus haute que l'écran.
+    const modele = menu.querySelector(".forge-menu-liste");
+    if (!modele) return;
+    const liste = modele.cloneNode(true);
+    liste.id = "forge-menu-liste-ouverte";
+    liste.style.setProperty("--couleur", menu.style.getPropertyValue("--couleur"));
+    document.body.appendChild(liste);
+    const r = bouton.getBoundingClientRect(), marge = 10;
+    const dessous = window.innerHeight - r.bottom - marge, dessus = r.top - marge;
+    const enHaut = dessous < 220 && dessus > dessous;
+    liste.style.left = Math.round(Math.min(r.left, window.innerWidth - 230)) + "px";
+    liste.style.maxHeight = Math.round(Math.max(120, (enHaut ? dessus : dessous) - 4)) + "px";
+    liste.style.top = enHaut ? "auto" : Math.round(r.bottom + 4) + "px";
+    liste.style.bottom = enHaut ? Math.round(window.innerHeight - r.top + 4) + "px" : "auto";
+};
+(function installerBullesEffets() {
+    if (typeof document === "undefined" || window.__bullesEffetsInstallees) return;
+    window.__bullesEffetsInstallees = true;
+    let minuteur = null, depart = null, appuiLong = false;
+    const annuler = () => { clearTimeout(minuteur); minuteur = null; depart = null; };
+    // LA SOURIS : la bulle suit le survol.
+    document.addEventListener("pointerover", (e) => {
+        if (e.pointerType !== "mouse") return;
+        const cible = e.target.closest && e.target.closest("[data-bulle-effet]");
+        if (cible) window.montrerBulleEffet(cible);
+    });
+    document.addEventListener("pointerout", (e) => {
+        if (e.pointerType !== "mouse") return;
+        const cible = e.target.closest && e.target.closest("[data-bulle-effet]");
+        if (cible && !cible.contains(e.relatedTarget)) window.cacherBulleEffet();
+    });
+    // LE DOIGT : deux secondes sans bouger, et la bulle s'ouvre ; elle reste
+    // jusqu'au prochain appui ailleurs.
+    document.addEventListener("pointerdown", (e) => {
+        const b = document.getElementById("bulle-effet-forge");
+        if (b && b.style.display === "block" && !b.contains(e.target)) window.cacherBulleEffet();
+        if (!e.target.closest || (!e.target.closest(".forge-menu") && !e.target.closest("#forge-menu-liste-ouverte"))) {
+            window.fermerMenusSousEffets();
+        }
+        if (e.pointerType === "mouse") return;
+        const cible = e.target.closest && e.target.closest("[data-bulle-effet]");
+        if (!cible) return;
+        annuler();
+        appuiLong = false;
+        depart = { x: e.clientX, y: e.clientY };
+        minuteur = setTimeout(() => { appuiLong = true; window.montrerBulleEffet(cible); }, window.DELAI_APPUI_LONG_BULLE);
+    }, true);
+    document.addEventListener("pointermove", (e) => {
+        if (depart && Math.hypot(e.clientX - depart.x, e.clientY - depart.y) > 10) annuler();
+    }, true);
+    document.addEventListener("pointerup", annuler, true);
+    document.addEventListener("pointercancel", annuler, true);
+    // La carte défile : la liste, posée en fixe, ne la suivrait pas — on la
+    // referme (sauf quand c'est la liste elle-même qui défile).
+    document.addEventListener("scroll", (e) => {
+        if (e.target && e.target.closest && e.target.closest("#forge-menu-liste-ouverte")) return;
+        window.fermerMenusSousEffets();
+    }, true);
+    // Pas de menu de copie d'iOS sur un appui long.
+    document.addEventListener("contextmenu", (e) => {
+        if (e.target.closest && e.target.closest("[data-bulle-effet]")) e.preventDefault();
+    });
+    // LE CHOIX D'UN SOUS-EFFET. Un appui long a ouvert la bulle : il ne
+    // choisit pas l'effet en plus.
+    document.addEventListener("click", (e) => {
+        const option = e.target.closest && e.target.closest(".forge-menu-option");
+        if (!option) return;
+        if (appuiLong) { appuiLong = false; e.preventDefault(); e.stopPropagation(); return; }
+        if (option.classList.contains("incompatible") || !option.dataset.mod) return;
+        window.cacherBulleEffet();
+        window.fermerMenusSousEffets();
+        window.attacherModificateur({ value: option.dataset.mod }, option.dataset.action);
+    });
+})();
 
 function getActiveTags() {
     let tags = new Set();
@@ -2118,6 +2270,8 @@ window.etatSousEffetForge = etatSousEffet;
 
 
 window.rafraichirForge = function() {
+    // La carte se redessine : la liste ouverte d'un menu d'avant n'a plus de sens.
+    if (typeof window.fermerMenusSousEffets === "function") window.fermerMenusSousEffets();
     let totalPC = 0;
     let initBonusNet = 0;
     const activeTags = getActiveTags();
@@ -2278,7 +2432,7 @@ window.rafraichirForge = function() {
         let modsDispos = window.forgeState.effetsBDD.filter(e =>
             (e.Type_Mecanique === type || e.Type_Mecanique_2 === type) && e.Nom !== "Durée +"
         );
-        let options = `<option value="">+ ${label}</option>`;
+        let options = "";
 
         let groupesMods = {};
 
@@ -2293,27 +2447,27 @@ window.rafraichirForge = function() {
             // Calcul de la fatigue pour l'affichage
             const coutFatigue = parseFrenchFloat(mod.Cout_PT) * 5;
             groupesMods[carac].push(etat === "incompatible"
-                ? `<option value="${mod.id}" disabled style="color: #999;">${nettoyerNomEffet(mod.Nom)} (non compatible)</option>`
-                : `<option value="${mod.id}">${nettoyerNomEffet(mod.Nom)} (⚡ ${coutFatigue})</option>`);
+                ? `<div class="forge-menu-option incompatible" data-bulle-effet="${mod.id}" data-action="${actionId}">${nettoyerNomEffet(mod.Nom)} <span class="forge-menu-cout">non compatible</span></div>`
+                : `<div class="forge-menu-option" data-bulle-effet="${mod.id}" data-mod="${mod.id}" data-action="${actionId}">${nettoyerNomEffet(mod.Nom)} <span class="forge-menu-cout">⚡ ${coutFatigue}</span></div>`);
         });
 
+        const groupe = (carac) => `<div class="forge-menu-groupe">${carac}</div>` + groupesMods[carac].join("");
         ORDRE_MODS.forEach(carac => {
-            if (groupesMods[carac] && groupesMods[carac].length > 0) {
-                options += `<optgroup label="-- ${carac} --">`;
-                options += groupesMods[carac].join("");
-                options += `</optgroup>`;
-            }
+            if (groupesMods[carac] && groupesMods[carac].length > 0) options += groupe(carac);
         });
-
         Object.keys(groupesMods).forEach(carac => {
-            if (!ORDRE_MODS.includes(carac)) {
-                options += `<optgroup label="-- ${carac} --">`;
-                options += groupesMods[carac].join("");
-                options += `</optgroup>`;
-            }
+            if (!ORDRE_MODS.includes(carac)) options += groupe(carac);
         });
 
-        return `<select class="forge-select" ${capDepasse ? "disabled" : ""} style="--couleur: ${color};" onchange="window.attacherModificateur(this, '${actionId}')">${options}</select>`;
+        // UN MENU À NOUS, PLUS UN <select> : une option native ne sait pas
+        // montrer de bulle au survol, et sur iPad elle ouvre la roue d'iOS.
+        // Chaque sous-effet y porte sa bulle d'explication (data-bulle-effet,
+        // voir installerBullesEffets) ; un toucher simple le choisit.
+        return `<div class="forge-menu" style="--couleur: ${color};">
+                    <button type="button" class="forge-menu-bouton" ${capDepasse || !options ? "disabled" : ""}
+                            onclick="window.basculerMenuSousEffets(this)">+ ${label}</button>
+                    <div class="forge-menu-liste">${options}</div>
+                </div>`;
     };
 
     if (window.forgeState.actions.length > 0) {
@@ -2358,7 +2512,7 @@ window.rafraichirForge = function() {
                 htmlMods += `
                     <div class="forge-ligne forge-sous-effet">
                         <div class="forge-ligne-texte">
-                            <span class="forge-nom-effet">${nettoyerNomEffet(modEff.Nom)}</span>${modEff.Modificateur !== "AUCUN" ? `<span class="forge-tag-mini">${modEff.Modificateur}</span>` : ""}
+                            <span class="forge-nom-effet" data-bulle-effet="${modEff.id}" data-action="${act.idInst}">${nettoyerNomEffet(modEff.Nom)}</span>${modEff.Modificateur !== "AUCUN" ? `<span class="forge-tag-mini">${modEff.Modificateur}</span>` : ""}
                             <div class="forge-desc">${formatterTexteEffet(modEff, modCount, act)}${currentModDuree > 0 ? `<span class="forge-duree-ajoutee">⏳ +${currentModDuree} tour(s) (+${(currentModDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}</div>
                         </div>
                         <div class="forge-controles">
@@ -2384,7 +2538,7 @@ window.rafraichirForge = function() {
                 <div class="forge-action">
                     <div class="forge-ligne">
                         <div class="forge-ligne-texte">
-                            <span class="forge-nom-effet">${nettoyerNomEffet(act.baseEffet.Nom)}</span>${act.baseEffet.Modificateur !== "AUCUN" ? `<span class="forge-tag-mini">${act.baseEffet.Modificateur}</span>` : ""}
+                            <span class="forge-nom-effet" data-bulle-effet="${act.baseEffet.id}" data-action="${act.idInst}">${nettoyerNomEffet(act.baseEffet.Nom)}</span>${act.baseEffet.Modificateur !== "AUCUN" ? `<span class="forge-tag-mini">${act.baseEffet.Modificateur}</span>` : ""}
                             <div class="forge-desc">${formatterTexteEffet(act.baseEffet, act.count, act)}${texteValeurSurpuissante(act, fatigueConsommee)}${currentBaseDuree > 0 ? `<span class="forge-duree-ajoutee">⏳ +${currentBaseDuree} tour(s) (+${(currentBaseDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}</div>
                         </div>
                         <div class="forge-controles">

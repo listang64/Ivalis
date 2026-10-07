@@ -155,8 +155,8 @@ console.log("\n2. LE SOUS-EFFET DISTANCE : POLYVALENTE, DISTANCE, MAGIE — OU U
       window.forgeState.armePrincipale = arme;
       window.forgeState.actions = [action(idEffet)];
       window.rafraichirForge();
-      const opt = [...document.querySelectorAll("#forge-contenu-carte option")].find(o => o.value === "EFF_DISTANCE");
-      return !!opt && !opt.disabled;
+      const opt = document.querySelector('#forge-contenu-carte .forge-menu-option[data-bulle-effet="EFF_DISTANCE"]');
+      return !!opt && !opt.classList.contains("incompatible");
     };
     const res = {};
     for (const arme of ["Arme légère CAC", "Arme lourde CAC", "Sans arme / Arme rp", "Arme polyvalente", "Arme légère Distance", "Magie"]) {

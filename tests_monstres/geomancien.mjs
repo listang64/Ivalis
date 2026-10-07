@@ -513,10 +513,14 @@ console.log("\n10. À L'ÉCRAN : TERRAIN, CALQUE, POSE, CIBLAGE");
     const compte = document.querySelector(".pose-murs-compte").textContent;
     const projets = haut.querySelectorAll(".mur-terre-projet").length;
     window.toucherCaseMurTerre({ q: 3, r: -3 });         // retiré
-    window.validerPoseMursTerre();
+    // UN VRAI CLIC SUR « LEVER LES MURS », pas l'appel direct : en partie, le
+    // barrage du clic franc du plateau l'avalait (Nico : « rien ne se passe
+    // quand je veux valider avec le bouton Lever les murs »).
+    const barrageArme = !!(window.POSE_MURS && window.POSE_MURS.nettoyer);
+    document.querySelector("#bandeau-pose-murs .pose-murs-valider").click();
     return { pourG: !!pourG.isBlocked, pourH: !!pourH.isBlocked, vue: !!vue.isBlocked, mur: !!vue.murTerre,
              ordre, gravH: !!gravH.isDifficult, gravG: !!gravG.isDifficult, los, imgs, grav, jauges, bandeau, compte, projets, envoye, ensemble,
-             ferme: !document.getElementById("bandeau-pose-murs") };
+             ferme: !document.getElementById("bandeau-pose-murs"), barrageArme };
   });
   verifier("terrain : le mur bloque les autres, pas le Géomancien (qui ne s'y arrête pas)",
            r.pourH && !r.pourG && r.vue && r.mur);
@@ -527,7 +531,8 @@ console.log("\n10. À L'ÉCRAN : TERRAIN, CALQUE, POSE, CIBLAGE");
            r.imgs === 2 && r.ensemble === 1 && r.grav === 1 && r.jauges === 1, JSON.stringify(r));
   verifier("la pose : un bandeau ; trop loin et déjà muré refusés ; plus d'énergie au 4e",
            r.bandeau && /3 murs · 60 ⚡ \/ 70 ⚡/.test(r.compte) && r.projets === 3, r.compte);
-  verifier("validée : la technique part avec ses cases, le bandeau se ferme",
+  verifier("le clic franc du plateau est bien armé pendant la pose", r.barrageArme === true);
+  verifier("validée D'UN VRAI CLIC : la technique part avec ses cases, le bandeau se ferme",
            r.envoye && r.envoye[1] === "CLASSE_MUR_DE_TERRE" && JSON.stringify(r.envoye[4].murs) === '[{"q":0,"r":-2},{"q":-2,"r":1}]' && r.ferme,
            JSON.stringify(r.envoye));
 

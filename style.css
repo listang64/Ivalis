@@ -8,6 +8,29 @@
   font-family: 'Almendra', serif !important;
 }
 
+/* --- LES BARRES DE DEFILEMENT, AU DESIGN DU JEU ---
+   Nico : « dans la liste des personnages et dans la Forge, quand une barre de
+   defilement apparait, elle est toute grise et moche ». Une regle pour toute
+   la page : une barre fine, un curseur de bronze sur un rail de parchemin.
+   scrollbar-color sert Chrome, Edge et Firefox (et prend le pas, chez Chrome,
+   sur les ::-webkit-scrollbar ci-dessous) ; les ::-webkit-scrollbar servent
+   Safari. Une zone qui cache sa barre (scrollbar-width: none, sur une classe)
+   la garde cachee : une classe l'emporte sur l'etoile. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #8c6a45 rgba(92, 58, 33, 0.14);
+}
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: rgba(92, 58, 33, 0.12); border-radius: 6px; }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #a07a4a, #6b4524);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #c2a878, #8c6a45); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+
 /* --- REGLAGES GLOBAUX --- */
 /* Sur iPad installe sur l'ecran d'accueil, iOS donne au document une zone visible
    plus courte que la dalle (mesure : 992 px pour un ecran de 1024 px). Les 32 px
@@ -4210,6 +4233,51 @@ textarea.input-texte-parchemin {
   max-width: 150px; outline: none;
 }
 .forge-select:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* LE MENU DES SOUS-EFFETS (le <select> d'avant, au même habit) et sa liste. */
+.forge-menu { position: relative; display: inline-block; }
+.forge-menu-bouton {
+  padding: 4px 10px; border-radius: 14px; font-size: 13px; font-weight: bold; cursor: pointer;
+  background: rgba(255,250,235,0.9); color: var(--couleur, #5c3a21); border: 1px solid var(--couleur, #a8841f);
+  max-width: 150px; white-space: nowrap;
+}
+.forge-menu-bouton:disabled { opacity: 0.4; cursor: not-allowed; }
+.forge-menu-liste {
+  display: none; position: fixed; z-index: 4000;
+  min-width: 210px; max-height: 46vh; overflow-y: auto; padding: 4px 0;
+  background: #f4e7c4; border: 1px solid var(--couleur, #a8841f); border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.45);
+}
+#forge-menu-liste-ouverte { display: block; }
+.forge-menu-groupe {
+  font-family: 'Cinzel', serif; font-size: 10.5px; letter-spacing: 1px; color: #8c6a45;
+  padding: 6px 12px 2px; border-top: 1px dashed rgba(140,106,69,0.35);
+}
+.forge-menu-groupe:first-child { border-top: none; }
+.forge-menu-option {
+  display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
+  padding: 5px 12px; font-size: 14px; color: #2c1e16; cursor: pointer;
+  -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+}
+.forge-menu-option:hover { background: rgba(140,106,69,0.15); }
+.forge-menu-option.incompatible { color: #999; cursor: not-allowed; }
+.forge-menu-cout { font-size: 12px; color: #7a5a3a; white-space: nowrap; }
+.forge-nom-effet[data-bulle-effet], .forge-grimoire-ligne[data-bulle-effet] { -webkit-touch-callout: none; }
+
+/* LA BULLE D'EXPLICATION D'UN EFFET : un petit parchemin à côté de l'effet. */
+.bulle-effet-forge {
+  display: none; position: fixed; z-index: 5000; max-width: 280px; pointer-events: none;
+  padding: 10px 12px; text-align: left;
+  background: linear-gradient(180deg, #fbf3dc, #ecdcae); color: #2c1e16;
+  border: 1px solid #a8841f; border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.5);
+  font-size: 13px; line-height: 1.35;
+}
+.bulle-effet-titre { font-family: 'Cinzel', serif; font-weight: bold; font-size: 14px; color: #3b2412; margin-bottom: 4px; }
+.bulle-effet-carac { font-size: 10px; letter-spacing: 0.5px; color: #8c6a45; margin-left: 6px; font-weight: normal; }
+.bulle-effet-base { color: #3b2412; }
+.bulle-effet-notes { margin-top: 5px; padding-top: 5px; border-top: 1px dashed rgba(140,106,69,0.45); font-style: italic; color: #5c3a21; }
+.bulle-effet-cout { margin-top: 6px; font-size: 11.5px; color: #7a5a3a; }
 .forge-ajouter { text-align: center; padding: 12px 0 18px; }
 .forge-btn-ajouter {
   width: 54px; height: 54px; border-radius: 50%; cursor: pointer; font-size: 32px; font-weight: bold; line-height: 50px; padding: 0;

@@ -305,8 +305,10 @@ console.log("\n4. LA FORGE : LUMIÈRE POUR LE SEUL CHASSEUR DE MAGES, SUR UN SOR
     const menus = (idEffet) => {
       window.forgeState.actions = [];
       window.ajouterComposantPrincipal(idEffet);
-      return [...document.querySelectorAll("#forge-contenu-carte select")].map(s => [...s.options]
-        .filter(o => /Lumi/.test(o.textContent)).map(o => (s.options[0].textContent + " : " + o.textContent + (o.disabled ? " [X]" : ""))))
+      // Les menus de sous-effets sont des menus maison (plus des <select>).
+      return [...document.querySelectorAll("#forge-contenu-carte .forge-menu")].map(m => [...m.querySelectorAll(".forge-menu-option")]
+        .filter(o => /Lumi/.test(o.textContent)).map(o => (m.querySelector(".forge-menu-bouton").textContent.trim() + " : "
+          + o.textContent.replace(/\s+/g, " ").trim() + (o.classList.contains("incompatible") ? " [X]" : ""))))
         .flat();
     };
     const surMagique = menus("EFF_ATTAQUE_MAGIQUE");
@@ -323,7 +325,7 @@ console.log("\n4. LA FORGE : LUMIÈRE POUR LE SEUL CHASSEUR DE MAGES, SUR UN SOR
   verifier("jamais les monstres", !r.monstres);
   // (Avec l'arme Magie, la Forge n'ouvre pas de menu Physique.)
   verifier("sur une Attaque Magique : proposée (⚡ 5)",
-           r.surMagique.length === 1 && /Magique : Lumière \(⚡ 5\)/.test(r.surMagique[0]), JSON.stringify(r.surMagique));
+           r.surMagique.length === 1 && /Magique : Lumière ⚡ 5/.test(r.surMagique[0]), JSON.stringify(r.surMagique));
   verifier("sur une attaque physique : dans les menus Magique et Physique, « non compatible »",
            r.surPhysique.length === 2 && r.surPhysique.every(x => /non compatible/.test(x))
            && r.surPhysique.some(x => /Physique/.test(x)),

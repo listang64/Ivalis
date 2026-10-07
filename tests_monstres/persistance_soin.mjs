@@ -63,6 +63,9 @@ function optionsPour({ aDejaUneAttaque, aDejaUnSoin = false, mods, actionCourant
     const window = { forgeState: { actions: surLaCarte,
                                    effetsBDD: [...mods, ...autres.flatMap(a => a.effetsMods || [])] } };
     const activeTags = new Set();
+    // Le menu des sous-effets est un menu maison (plus un <select>) : chaque
+    // ligne nomme l'action qu'elle greffe.
+    const actionId = "A1";
     const modsDispos = mods;
     // Un seul eval : les déclarations de fonction d'un eval strict (modules ES)
     // ne fuient jamais vers l'appelant, mais restent visibles ENTRE ELLES à
@@ -73,28 +76,28 @@ function optionsPour({ aDejaUneAttaque, aDejaUnSoin = false, mods, actionCourant
 
 const mod = (nom) => ({ id: "M_" + nom, Nom: nom, Modificateur: "AUCUN", Cout_PT: "1" });
 const MODS = [mod("Persistance terrain"), mod("Zone")];
-const ligne = (html, nom) => (html.match(new RegExp(`<option[^>]*>${nom}[^<]*</option>`)) || [""])[0];
+const ligne = (html, nom) => (html.match(new RegExp(`<div class="forge-menu-option[^"]*"[^>]*>${nom} <span[^>]*>[^<]*</span></div>`)) || [""])[0];
 
 console.log("1. SUR UN SOIN : LA ZONE OUI, LA PERSISTANCE NON");
 {
     const html = optionsPour({ aDejaUneAttaque: false, aDejaUnSoin: true, mods: MODS, actionCourante: action("Soin") });
     const persistance = ligne(html, "Persistance terrain"), zone = ligne(html, "Zone");
     verifier("« Persistance terrain » est grisée (non compatible)",
-             /disabled/.test(persistance) && /non compatible/.test(persistance), persistance);
-    verifier("« Zone » reste disponible", !!zone && !/disabled/.test(zone), zone);
+             /incompatible/.test(persistance) && /non compatible/.test(persistance), persistance);
+    verifier("« Zone » reste disponible", !!zone && !/incompatible/.test(zone), zone);
 }
 
 console.log("\n2. SUR UNE ATTAQUE : RIEN NE CHANGE");
 {
     const html = optionsPour({ aDejaUneAttaque: true, mods: MODS, actionCourante: action("Attaque Magique") });
     verifier("la Persistance terrain reste disponible sur une attaque",
-             !/disabled/.test(ligne(html, "Persistance terrain")), ligne(html, "Persistance terrain"));
+             !/incompatible/.test(ligne(html, "Persistance terrain")), ligne(html, "Persistance terrain"));
 }
 
 console.log("\n3. UN SOIN AUX AUTRES NOMS (Guérison) EST TRAITÉ PAREIL");
 {
     const html = optionsPour({ aDejaUneAttaque: false, aDejaUnSoin: true, mods: MODS, actionCourante: action("Guérison") });
-    verifier("grisée aussi sur une Guérison", /disabled/.test(ligne(html, "Persistance terrain")));
+    verifier("grisée aussi sur une Guérison", /incompatible/.test(ligne(html, "Persistance terrain")));
 }
 
 console.log("\n4. LES MONSTRES SUIVENT LA MÊME RÈGLE (générateur)");
@@ -131,28 +134,28 @@ console.log("\n5. UN DOT SUR LA CARTE : LA PERSISTANCE EST GRISÉE");
     const surLaMeme = optionsPour({ aDejaUneAttaque: true, mods: MODS_DOT,
         actionCourante: { ...action("Attaque Magique"), mods: { [DOT.id]: 1 } } });
     verifier("DOT sur l'attaque : sa Persistance est grisée",
-             /disabled/.test(ligne(surLaMeme, "Persistance terrain")), ligne(surLaMeme, "Persistance terrain"));
-    verifier("la Zone, elle, reste disponible", !/disabled/.test(ligne(surLaMeme, "Zone")));
+             /incompatible/.test(ligne(surLaMeme, "Persistance terrain")), ligne(surLaMeme, "Persistance terrain"));
+    verifier("la Zone, elle, reste disponible", !/incompatible/.test(ligne(surLaMeme, "Zone")));
     const ailleurs = optionsPour({ aDejaUneAttaque: true, mods: MODS_DOT, actionCourante: action("Zone"),
         autres: [{ idInst: "A0", baseEffet: { Nom: "Attaque Magique" }, mods: { [DOT.id]: 1 }, effetsMods: [DOT] }] });
     verifier("DOT posé sur une AUTRE action : la Persistance reste grisée",
-             /disabled/.test(ligne(ailleurs, "Persistance terrain")), ligne(ailleurs, "Persistance terrain"));
+             /incompatible/.test(ligne(ailleurs, "Persistance terrain")), ligne(ailleurs, "Persistance terrain"));
     const sansDot = optionsPour({ aDejaUneAttaque: true, mods: MODS_DOT, actionCourante: action("Attaque Magique") });
     verifier("sans DOT, la Persistance redevient disponible",
-             !/disabled/.test(ligne(sansDot, "Persistance terrain")), ligne(sansDot, "Persistance terrain"));
+             !/incompatible/.test(ligne(sansDot, "Persistance terrain")), ligne(sansDot, "Persistance terrain"));
 }
 
 console.log("\n6. UNE PERSISTANCE SUR LA CARTE : LE DOT EST GRISÉ");
 {
     const html = optionsPour({ aDejaUneAttaque: true, mods: MODS_DOT,
         actionCourante: { ...action("Attaque Magique"), mods: { [PERSIST.id]: 1 } } });
-    verifier("« Durée étalement dégâts » grisée", /disabled/.test(ligne(html, "Durée étalement dégâts")),
+    verifier("« Durée étalement dégâts » grisée", /incompatible/.test(ligne(html, "Durée étalement dégâts")),
              ligne(html, "Durée étalement dégâts"));
-    verifier("« DOT » grisé aussi", /disabled/.test(ligne(html, "DOT")), ligne(html, "DOT"));
+    verifier("« DOT » grisé aussi", /incompatible/.test(ligne(html, "DOT")), ligne(html, "DOT"));
     const ailleurs = optionsPour({ aDejaUneAttaque: true, mods: MODS_DOT, actionCourante: action("Attaque Magique"),
         autres: [{ idInst: "A0", baseEffet: { Nom: "Zone" }, mods: { [PERSIST.id]: 1 }, effetsMods: [PERSIST] }] });
     verifier("Persistance posée sur une AUTRE action : le DOT reste grisé",
-             /disabled/.test(ligne(ailleurs, "Durée étalement dégâts")));
+             /incompatible/.test(ligne(ailleurs, "Durée étalement dégâts")));
 }
 
 console.log("\n7. LES MONSTRES NON PLUS NE MÉLANGENT PAS DOT ET PERSISTANCE");
