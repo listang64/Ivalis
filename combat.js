@@ -3936,9 +3936,14 @@ function dessinerHexZonePersistante(type, hex, R, leger) {
         deco += `<polygon points="${pointsHexZone(0, 0, R)}" fill="rgba(255,76,76,0.22)" class="zp-anim" style="animation: zpSocle 2.6s ease-in-out infinite"/>`;
     }
 
+    // LE FEU N'A PLUS DE CADRE (Nico : « enlève juste le cadre orange autour
+    // du bord de l'hexagone, pour voir ») : ses flammes suffisent à dire où
+    // brûle le sol. Les autres nappes gardent leur liseré.
+    const lisere = contour && type !== "feu"
+        ? `<polygon points="${pointsHexZone(0, 0, R * 0.985)}" fill="none" stroke="${contour}" stroke-width="2.2" opacity="0.8"/>` : "";
     return `<g transform="translate(${px.x.toFixed(1)},${px.y.toFixed(1)})">
         <g clip-path="url(#zp-clip-hex)">${deco}</g>
-        <polygon points="${pointsHexZone(0, 0, R * 0.985)}" fill="none" stroke="${contour}" stroke-width="2.2" opacity="0.8"/>
+        ${lisere}
     </g>`;
 }
 

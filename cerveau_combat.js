@@ -47,11 +47,11 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
          chaineDeDegats, REGLES_ETATS, regleDesEtats, estDansLeNoir,
          partageTenebres, ETAT_TENEBRES_ETALEES, POISON, POISON_MAITRE, ETAT_SAIGNEMENT, SAIGNEMENT,
          resoudreTechniqueClasse, actionAssautMortel, actionBaiserVampire, appliquerCharme,
-         actionResonanceBouclier, ennemisAuContact, tirerDirectionsAveugle, ligneDeVue, caseLibre } from './moteur_pur.js';
+         actionResonanceBouclier, ennemisAuContact, tirerDirectionsAveugle, ligneDeVue, caseLibre, aLEtat } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant, fureurDeLaSentinelle, voisinsDe } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche, casesAccessibles,
-         ennemiAtteignable, pasJusquAuContact } from './ia_pure.js';
+         ennemiAtteignable, pasJusquAuContact, detourDesMurs, DETOUR_MAX_MURS, PAS_MAX_CREATURE } from './ia_pure.js';
 
 // LES SUITES D'UNE CARTE LANCÉE EN ÉTAT DE CONFUSION (règle de Nico, voir
 // appliquerConfusion) : après la carte, le 3e jet le fait FUIR comme sous la
@@ -1159,6 +1159,22 @@ export function jouerCreature(etat, id, carte, plateau) {
     const plan = deciderTourCreature(etat, id, infos, plateau, des);
     if (!plan) return null;
 
+    // UN MUR DE TERRE QUI FAIT FAIRE UN TROP LONG DÉTOUR : elle ne le
+    // contourne pas, elle marche droit dessus (pour le frapper ensuite, voir
+    // murAFrapper). Seulement si sa carte ne part pas déjà ce tour-ci.
+    const detour = detourDesMurs(etat, id, plateau);
+    if (detour && detour.detour > DETOUR_MAX_MURS && !plan.lancera) {
+        const moiAvant = combattant(etat, id);
+        const versLeMur = (h) => { const d = detour.carteSansMurs.get(`${h.q},${h.r}`); return d === undefined ? Infinity : d; };
+        const cases = aLEtat(moiAvant, "Immobilisation") ? []
+            : casesAccessibles(etat, id, plateau, PAS_MAX_CREATURE).filter(h => h.chemin.length > 0);
+        cases.sort((a, b) => (versLeMur(a) - versLeMur(b)) || (a.ao - b.ao) || (a.chemin.length - b.chemin.length)
+                             || (a.q - b.q) || (a.r - b.r));
+        const meilleure = cases[0];
+        plan.chemin = meilleure && versLeMur(meilleure) < versLeMur(moiAvant) ? meilleure.chemin : [];
+        plan.raison = "le mur fait un trop long détour : elle va le casser";
+    }
+
     let courant = etat;
     const etapes = [];
 
@@ -1381,15 +1397,22 @@ function separerMurs(etat, brute) {
     return { action: { ...brute, attaques: filtrer(brute.attaques, true), alterations: filtrer(brute.alterations, false) }, coups };
 }
 
-// Une créature qu'un mur de terre enferme (plus aucun ennemi joignable à
-// pied) frappe le mur qu'elle touche — le premier, dans l'ordre des ids.
+// Une créature frappe le mur de terre qu'elle touche quand il l'enferme (plus
+// aucun ennemi joignable à pied) OU quand le contourner coûterait plus de
+// DETOUR_MAX_MURS cases (Nico : « au-delà de 6, ils pètent les murs »). Celui
+// qui lui barre le plus la route d'abord — le plus près du contact d'un ennemi
+// si les murs n'étaient pas là —, puis dans l'ordre des ids.
 function murAFrapper(etat, id, carte, plateau) {
     const murs = Object.values((etat && etat.murs) || {});
     const moi = combattant(etat, id);
     if (murs.length === 0 || !moi || moi.aTerre || !carte || !carte.idCarte) return null;
-    const touches = murs.filter(m => distance(moi, m) === 1).sort((a, b) => String(a.id).localeCompare(String(b.id)));
+    const touches = murs.filter(m => distance(moi, m) === 1);
     if (touches.length === 0) return null;
-    if (ennemiAtteignable(etat, id, plateau)) return null;
+    const detour = detourDesMurs(etat, id, plateau);
+    const tropLong = !!detour && detour.detour > DETOUR_MAX_MURS;
+    if (!tropLong && ennemiAtteignable(etat, id, plateau)) return null;
+    const route = (m) => { const d = detour && detour.carteSansMurs.get(`${m.q},${m.r}`); return d === undefined ? Infinity : d; };
+    touches.sort((a, b) => (route(a) - route(b)) || String(a.id).localeCompare(String(b.id)));
     return touches[0];
 }
 

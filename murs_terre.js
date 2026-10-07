@@ -476,16 +476,28 @@
         });
     }
 
-    // Les gravats au pied : des cailloux le long d'un contour, un peu devant,
-    // sans sortir de la case.
+    // Les gravats au pied : des cailloux le long d'un contour, sans sortir de
+    // la case. PLEIN DE CAILLOUX, DE TOUTES TAILLES, À CHEVAL SUR LE PIED
+    // (Nico : « à la base des murs, plein de cailloux de différentes tailles
+    // pour masquer la ligne des murs au sol ») : quelques gros blocs, des
+    // moyens, une poussière de petits ; une partie mord sur la roche, le reste
+    // roule un peu devant — la jonction mur-sol ne se lit plus comme un trait.
     function gravatsAuPied(ctx, alea, pieds, cx, cy, roche, libre = () => true) {
         const cailloux = [];
+        const taille = () => {
+            const u = alea();
+            return u < 0.12 ? 4.5 + alea() * 3        // un gros bloc de temps en temps
+                 : u < 0.45 ? 2.6 + alea() * 1.9     // des moyens
+                 : 1.1 + alea() * 1.5;               // et beaucoup de petits
+        };
         pieds.forEach(([a, b, nx, ny]) => {
-            const n = 2 + Math.floor(alea() * 3) + Math.floor(Math.hypot(b.x - a.x, b.y - a.y) / 14);
+            const longueur = Math.hypot(b.x - a.x, b.y - a.y);
+            const n = 5 + Math.floor(alea() * 3) + Math.floor(longueur / 5);
             for (let k = 0; k < n; k++) {
-                const t = alea(), ecart = 1.5 + alea() * 6;
+                const t = alea(), r = taille();
+                // À cheval sur la ligne du pied : de -r (sur la roche) à +7.
+                const ecart = -r * 0.6 + alea() * (7 + r * 0.6);
                 const x = a.x + (b.x - a.x) * t + nx * ecart, y = a.y + (b.y - a.y) * t + ny * ecart;
-                const r = 1.6 + alea() * 3.4;
                 if (!dansLaCase(x, y, cx, cy, r + 1) || !libre(x, y)) continue;
                 cailloux.push({ x, y, r });
             }
@@ -494,8 +506,10 @@
             masse(ctx, alea, c.x, c.y, c.r, c.r * (0.5 + alea() * 0.7),
                   [roche[0] + Math.floor((alea() - 0.5) * 8), roche[1] + Math.floor((alea() - 0.5) * 10), roche[2]]);
         });
+        return cailloux.length;
     }
 
+    window.ASSOMBRIR_MUR_TERRE = 11;
     window.dessinerMurTerre = function (graine, voisins, graineTeinte, origine) {
         const liens = (voisins || []).filter(v => v && (v.etat === "mur" || v.etat === "casse"));
         const canvas = document.createElement("canvas");
@@ -509,6 +523,12 @@
         const alea = hasard(graine);
         const aleaTeinte = hasard(graineTeinte || graine);
         const roche = [26 + Math.floor(aleaTeinte() * 16), 44 + Math.floor(aleaTeinte() * 8), 8 + Math.floor(aleaTeinte() * 9)];
+        // AUSSI FONCÉ QU'UN PILIER SEUL (Nico : « les murs sont moins foncés
+        // que les piliers ») : la même roche donnait un mur nettement plus
+        // clair (115 de clarté moyenne contre 91, mesuré sur douze tirages) —
+        // son dessus de pierre, large et plat, l'emporte. La roche du mur est
+        // donc descendue d'autant (geomancien.mjs mesure l'écart).
+        roche[1] -= window.ASSOMBRIR_MUR_TERRE;
         const rayonInt = Math.min(...(voisins || []).filter(Boolean).map(v => Math.hypot(v.dx, v.dy) / 2)) || 56;
         const largeur = rayonInt * 0.42;
         const pieces = [];
@@ -729,7 +749,13 @@
             }
         });
         // Des gravats au pied (devant : ceux de derrière seraient cachés).
-        gravatsAuPied(ctx, alea, contours.filter(c => c[3] > 0.05), MUR_CX, MUR_CY, roche, libre);
+        // TOUT LE LONG DU PIED, jonctions comprises : le filtre de la terre
+        // (libre, 30 % du bras) laissait nu le pied du mur entre deux cases —
+        // la ligne mur-sol s'y lisait comme un trait. Les cailloux vont
+        // jusqu'à 90 % du bras ; au-delà, c'est la case voisine qui en pose.
+        const libreCailloux = (x, y) => versMurs.every(m => ((x - MUR_CX) * m.ux + (y - MUR_CY) * m.uy) < m.d * 0.9);
+        // (Le compte reste sur le canvas : le banc le lit.)
+        canvas.nbCailloux = gravatsAuPied(ctx, alea, contours.filter(c => c[3] > 0.05), MUR_CX, MUR_CY, roche, libreCailloux);
         // Les éclats tombés au pied d'un bout cassé.
         debris.sort((a, b) => a.y - b.y).forEach(e => {
             const b = vers(e);

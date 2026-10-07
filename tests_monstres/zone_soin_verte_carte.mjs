@@ -46,7 +46,12 @@ console.log("\n2. LES AUTRES TYPES NE SONT PAS TOUCHÉS PAR L'AJOUT");
 {
     const svgFeu = w.dessinerHexZonePersistante("feu", { q: 0, r: 0 }, 30, false);
     const svgNeutre = w.dessinerHexZonePersistante("neutre", { q: 0, r: 0 }, 30, false);
-    verifier("le feu reste orange (#ff8a2e)", svgFeu.includes("#ff8a2e"));
+    // Nico : « pour l'effet de feu en persistance terrain, enlève juste le
+    // cadre orange autour du bord de l'hexagone, pour voir ».
+    verifier("le feu garde ses flammes (dégradé de feu)", svgFeu.includes("zp-grad-feu"));
+    verifier("mais plus de cadre orange autour de l'hexagone", !svgFeu.includes("#ff8a2e") && !/stroke=/.test(svgFeu), svgFeu.match(/stroke="[^"]*"/g) || "");
+    verifier("les autres nappes gardent leur liseré", /stroke="#ff4c4c"/.test(svgNeutre)
+             && /stroke=/.test(w.dessinerHexZonePersistante("soin", { q: 0, r: 0 }, 30, false)));
     verifier("une zone neutre (dégâts sans état) reste rouge, comme avant",
              svgNeutre.includes("rgba(255,76,76"));
 }

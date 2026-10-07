@@ -210,6 +210,31 @@ export function pasJusquAuContact(etat, id, plateau, borne = 2500) {
     return dist;
 }
 
+// LE DÉTOUR QUE LES MURS DE TERRE IMPOSENT (Géomancien). Nico : « si
+// contourner les murs est trop long, les ennemis préfèrent péter les murs —
+// un contournement de 6 cases, c'est ok ; plus, ils pètent les murs. » Le
+// détour, c'est le chemin à pied jusqu'au contact d'un ennemi MOINS ce même
+// chemin si les murs n'étaient pas là. Rendu null sans mur, ou sans ennemi
+// joignable même murs ôtés ; `sansMurs` est la carte des distances murs ôtés
+// (elle dit vers quel mur marcher, et lequel frapper).
+export const DETOUR_MAX_MURS = 6;
+export function detourDesMurs(etat, id, plateau) {
+    const moi = combattant(etat, id);
+    if (!moi || moi.q === null || moi.q === undefined) return null;
+    if (Object.keys((etat && etat.murs) || {}).length === 0) return null;
+    const carte = plateau || PLAINE;
+    const sansLesMurs = { etatCase: (q, r) => {
+        const e = carte.etatCase(q, r) || {};
+        return e.murTerre ? { ...e, bloquee: false } : e;
+    } };
+    const ici = `${moi.q},${moi.r}`;
+    const sansMurs = pasJusquAuContact(etat, id, sansLesMurs);
+    if (!sansMurs.has(ici)) return null;
+    const avec = pasJusquAuContact(etat, id, carte).get(ici);
+    const avecMurs = avec === undefined ? Infinity : avec;
+    return { avecMurs, sansMurs: sansMurs.get(ici), detour: avecMurs - sansMurs.get(ici), carteSansMurs: sansMurs };
+}
+
 // =========================================================================
 //  3. OÙ PEUT-ELLE ALLER ?
 // =========================================================================

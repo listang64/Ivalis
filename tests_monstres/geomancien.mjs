@@ -27,7 +27,7 @@ import { construireEtatCombat, clonerEtat, appliquerEntree, verifierEtatCombat, 
          plateauDeCombat, murEn, cleGravats } from '../combat_etat.js';
 import { ligneDeVue, traverserZones, creerZonePure, vieillirZones } from '../moteur_pur.js';
 import { coutDuPas, planifierTrajet, trouverChemin } from '../mouvement_pur.js';
-import { casesAccessibles } from '../ia_pure.js';
+import { casesAccessibles, detourDesMurs, DETOUR_MAX_MURS } from '../ia_pure.js';
 import { prochainPas, validerIntention, jouerCreature } from '../cerveau_combat.js';
 import { misEnScene, TYPES_MIS_EN_SCENE } from '../pont_combat.js';
 import { TYPES_ETAPES } from '../combat_etat.js';
@@ -271,6 +271,49 @@ console.log("\n8. ON LE CASSE");
     verifier("une créature qui peut contourner ne le frappe pas", pl.etat.murs["MUR_T_5_0"].pv === 10);
 }
 
+console.log("\n8 bis. UN DÉTOUR DE PLUS DE 6 CASES : ELLE CASSE LE MUR");
+// Nico : « si contourner les murs est trop long, les ennemis préfèrent péter
+// les murs. Un contournement de 6 cases de distance, c'est ok ; plus, ils
+// pètent les murs. » Le détour = le chemin à pied jusqu'au contact d'un ennemi,
+// moins ce chemin si les murs n'étaient pas là (detourDesMurs, ia_pure.js).
+{
+    const carte = { idCarte: "GRIFFE", infos: { portee: 1, fatigue: 0 },
+                    attaques: [{ nom: "Griffe", valeurBrute: 4, typeRes: "Physique", isRanged: false, rangeMax: 1 }], alterations: [] };
+    const avecMuraille = (de, a) => {
+        const e = monde(5, { M1: { q: 6, r: 0 } });
+        for (let r = de; r <= a; r++) unMurEn(e, 3, r);
+        e.file = [{ id: "M1", carte: "GRIFFE", initiative: 10, pas: 0 }];
+        return e;
+    };
+    // Une muraille courte : 3 cases. Le détour est petit, elle contourne.
+    const courte = avecMuraille(-1, 1);
+    const dc = detourDesMurs(courte, "M1", plateauDeCombat(null, courte));
+    const pc = jouerCreature(courte, "M1", carte, plateauDeCombat(null, courte));
+    verifier("muraille de 3 : détour de 6 cases au plus", dc && dc.detour <= DETOUR_MAX_MURS, JSON.stringify(dc && { avec: dc.avecMurs, sans: dc.sansMurs }));
+    verifier("…elle la contourne : aucun mur frappé", Object.values(pc.etat.murs).every(m => m.pv === 10)
+             && pc.entree.etapes.some(x => x.type === "pas"));
+    // Une longue muraille : 21 cases. Le détour dépasse 6 : elle marche droit
+    // dessus et la frappe.
+    const longue = avecMuraille(-10, 10);
+    const dl = detourDesMurs(longue, "M1", plateauDeCombat(null, longue));
+    const pl = jouerCreature(longue, "M1", carte, plateauDeCombat(null, longue));
+    const arrivee = pl.etat.combattants.M1;
+    const entames = Object.values(pl.etat.murs).filter(m => m.pv < 10);
+    verifier("muraille de 21 : détour de plus de 6 cases", dl && dl.detour > DETOUR_MAX_MURS, JSON.stringify(dl && { avec: dl.avecMurs, sans: dl.sansMurs }));
+    verifier("…elle marche droit vers le mur (au contact)", Math.abs(arrivee.q - 3) + Math.abs(arrivee.q + arrivee.r - 3 - arrivee.r) <= 2
+             && Object.values(longue.murs).some(m => (Math.abs(arrivee.q - m.q) + Math.abs(arrivee.r - m.r) + Math.abs(arrivee.q + arrivee.r - m.q - m.r)) / 2 === 1),
+             `(${arrivee.q},${arrivee.r})`);
+    verifier("…et le frappe : celui qui lui barre la route (4 dégâts)",
+             entames.length === 1 && entames[0].pv === 6 && Math.abs(entames[0].r) <= 1, JSON.stringify(entames.map(m => [m.q, m.r, m.pv])));
+    verifier("le journal le dit : « ⛏️ Frappe le mur »", pl.entree.etapes.some(x => x.type === "message" && /Frappe le mur/.test(x.texte)));
+    // Une créature qui peut déjà frapper un héros ne s'occupe pas du mur.
+    const proche = avecMuraille(-10, 10);
+    proche.combattants.H.q = 7; proche.combattants.H.r = 0;
+    const pp = jouerCreature(proche, "M1", carte, plateauDeCombat(null, proche));
+    verifier("un héros à portée : elle le frappe lui, pas le mur",
+             Object.values(pp.etat.murs).every(m => m.pv === 10) && pp.etat.combattants.H.pv < 100, String(pp.etat.combattants.H.pv));
+}
+
 // =========================================================================
 //  PARTIE 2 : LA VRAIE PAGE
 // =========================================================================
@@ -463,6 +506,36 @@ await p.waitForTimeout(200);
 await p.screenshot({ path: "/tmp/claude-0/geomancien_murailles.png" });
 await p.evaluate(() => { document.getElementById("vitrine-murailles").remove(); document.getElementById("cadre-murailles").remove();
   window.MURS_TERRE = {}; window.GRAVATS_TERRE = {}; window.appliquerMursTerre(); });
+
+console.log("\n9 ter. AUSSI FONCÉS QUE LES PILIERS, ET UN PIED PLEIN DE CAILLOUX");
+// Nico : « les murs sont moins foncés que les piliers créés, j'aimerais qu'ils
+// le soient » ; « à la base des murs, plein de cailloux de différentes tailles
+// pour masquer la ligne des murs au sol ».
+{
+  const m = await p.evaluate(() => {
+    const R = 60, ech = 128 / (R * 1.9);
+    const plat = (q, r) => ({ x: R * 1.5 * q, y: R * (Math.sqrt(3) / 2 * q + Math.sqrt(3) * r) });
+    const DIR = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+    const voisins = (liens) => DIR.map(([dq, dr]) => { const a = plat(dq, dr);
+      return { dx: a.x * ech, dy: a.y * ech, etat: liens.some(([x, y]) => x === dq && y === dr) ? "mur" : null }; });
+    const clarte = (cv) => { const d = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data; let s = 0, n = 0;
+      for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200) { s += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; n++; } return s / n; };
+    const piliers = [], murs = [], cailloux = [];
+    for (let g = 1; g <= 10; g++) {
+      piliers.push(clarte(window.dessinerPilierTerre("P" + g)));
+      const milieu = window.dessinerMurTerre("P" + g, voisins([[1, 0], [-1, 0]]), "G", { x: 0, y: 0 });
+      murs.push(clarte(milieu));
+      cailloux.push(milieu.nbCailloux);
+    }
+    const moy = (t) => t.reduce((a, b) => a + b, 0) / t.length;
+    return { pilier: moy(piliers), mur: moy(murs), cailloux: Math.min(...cailloux), moyCailloux: moy(cailloux),
+             reglage: window.ASSOMBRIR_MUR_TERRE };
+  });
+  verifier("un mur relié est aussi foncé qu'un pilier seul (à 5 % près)", Math.abs(m.mur - m.pilier) / m.pilier < 0.05,
+           `mur ${m.mur.toFixed(1)} / pilier ${m.pilier.toFixed(1)} (roche du mur −${m.reglage})`);
+  verifier("une case au milieu d'un mur : son pied est garni de cailloux (12 au moins)", m.cailloux >= 12,
+           `au moins ${m.cailloux}, ${m.moyCailloux.toFixed(1)} en moyenne`);
+}
 
 console.log("\n10. À L'ÉCRAN : TERRAIN, CALQUE, POSE, CIBLAGE");
 {

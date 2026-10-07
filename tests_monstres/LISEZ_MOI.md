@@ -5135,3 +5135,30 @@ première compétence créée ».
 - LES TECHNIQUES DE CLASSE (competences.js) : sans compétence forgée,
   l'onglet n'affiche que l'invitation à forger. hoplite.mjs.
 forge_bulles.mjs.
+
+## Feu sans cadre ; les créatures cassent les murs trop longs à contourner ; murs plus foncés, pied caillouteux (version 212)
+
+Nico : « pour l'effet de feu en persistance terrain, enlève juste le cadre
+orange autour du bord de l'hexagone » ; « pour les murs du Géomancien, si les
+contourner est trop long, les ennemis préfèrent péter les murs — 6 cases de
+détour c'est ok, plus ils les pètent » ; « les murs sont moins foncés que les
+piliers » ; « à la base des murs, plein de cailloux de différentes tailles pour
+masquer la ligne au sol ».
+- LE FEU (combat.js, dessinerHexZonePersistante) : plus de liseré autour de
+  ses cases ; les autres nappes gardent le leur. zone_soin_verte_carte.mjs.
+- LE DÉTOUR (ia_pure.js, detourDesMurs ; cerveau_combat.js) : le chemin à pied
+  jusqu'au contact d'un ennemi, moins ce même chemin murs ôtés. Au-delà de
+  DETOUR_MAX_MURS (6), une créature dont la carte ne part pas ce tour-ci
+  marche droit vers le mur qui lui barre la route, et le frappe (murAFrapper :
+  celui qui la rapproche le plus de l'ennemi, murs ôtés). 6 cases ou moins :
+  elle contourne, comme avant. Enfermée, elle frappe toujours.
+  geomancien.mjs (8 bis : muraille de 3 contournée, de 21 frappée).
+- LA TEINTE (murs_terre.js, ASSOMBRIR_MUR_TERRE = 11) : à roche égale, un mur
+  relié sortait nettement plus clair qu'un pilier seul (115 contre 91 de
+  clarté moyenne sur douze tirages) ; sa roche est descendue d'autant.
+- LE PIED (gravatsAuPied) : bien plus de cailloux, de trois tailles (quelques
+  gros blocs, des moyens, beaucoup de petits), à cheval sur la ligne du pied ;
+  ils vont maintenant jusqu'à 90 % du bras vers une case voisine (la terre,
+  elle, garde ses 30 %) : le pied d'un mur n'est plus nu entre deux cases.
+  geomancien.mjs (9 ter : clarté à 5 % près, 12 cailloux au moins au pied
+  d'une case de milieu — 48 au moins mesurés).
