@@ -805,12 +805,21 @@ export function chaineDeDegats(cible, attaque, options) {
     // 2 ter. UN SORT D'UN ÉLÉMENT CONTRE QUI Y EST INSENSIBLE (règle de Nico) :
     //    l'Ondari au Feu, le Vampire à la Glace, une créature qui résiste à la
     //    Foudre… encaissent 20 % de moins d'une Attaque Magique de cet élément.
-    //    L'élément voyage sur l'attaque avec le nom de son état (etatElement,
-    //    moteur_effets.js) : c'est la même liste d'immunités qui décide.
-    if (!brut && attaque.etatElement
-        && ((cible.atouts && cible.atouts.immunites) || []).includes(attaque.etatElement)) {
-        compte.resiste = attaque.etatElement;
-        degats = Math.max(0, Math.round(degats * (1 - REDUCTION_SORT_RESISTE / 100)));
+    //    Les éléments voyagent sur l'attaque avec le nom de leur état
+    //    (etatsElements, moteur_effets.js) : c'est la même liste d'immunités qui
+    //    décide. PLUSIEURS ÉLÉMENTS : la réduction se partage, −20 % ×
+    //    insensibles ÷ éléments — insensible à 1 des 3, c'est −6,67 %.
+    const etatsDuSort = brut ? [] : (Array.isArray(attaque.etatsElements) && attaque.etatsElements.length > 0
+        ? attaque.etatsElements : (attaque.etatElement ? [attaque.etatElement] : []));
+    if (etatsDuSort.length > 0) {
+        const immunites = (cible.atouts && cible.atouts.immunites) || [];
+        const resistes = etatsDuSort.filter(e => immunites.includes(e));
+        if (resistes.length > 0) {
+            compte.resiste = resistes[0];
+            compte.resistes = resistes;
+            compte.reductionElementaire = REDUCTION_SORT_RESISTE * resistes.length / etatsDuSort.length;
+            degats = Math.max(0, Math.round(degats * (1 - compte.reductionElementaire / 100)));
+        }
     }
 
     // 3. Absorption et Contre : la cible annule une part du coup — un
@@ -1732,8 +1741,12 @@ export function resoudreCarte(etat, action, plateau) {
                     && attaqueFrappe.typeRes === "Magique";
                 const compte = chaineDeDegats(cible, attaqueFrappe, { critique, distance: distanceHex(lanceur, cible), percee, sansMalusContact });
                 if (compte.resiste) {
-                    etapes.push({ type: "message", cible: idCible, acteur: idLanceur,
-                                  texte: MESSAGES_RESISTANCE[compte.resiste] || "🛡️ Résiste", couleur: "#b0bec5" });
+                    // Un seul élément : « Résiste au feu ». Plusieurs : les icônes
+                    // de ceux qui butent, et la part retirée.
+                    const texte = compte.resistes.length === 1 && compte.reductionElementaire === REDUCTION_SORT_RESISTE
+                        ? (MESSAGES_RESISTANCE[compte.resiste] || "🛡️ Résiste")
+                        : `${compte.resistes.map(e => (MESSAGES_RESISTANCE[e] || "").split(" ")[0]).join("")} Résiste −${String(Math.round(compte.reductionElementaire * 10) / 10).replace(".", ",")} %`;
+                    etapes.push({ type: "message", cible: idCible, acteur: idLanceur, texte, couleur: "#b0bec5" });
                 }
 
                 // Le drain de l'absorption soigne AVANT que le reste ne frappe.

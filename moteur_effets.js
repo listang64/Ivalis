@@ -2286,6 +2286,20 @@ window.demarrerCiblage = async function(idCarte, options) {
         });
     }
 
+    // UN SORT À PLUSIEURS ÉLÉMENTS (Nico) : l'élément choisi pour l'Attaque
+    // Magique, plus chaque état élémentaire que la carte pose aussi (une
+    // Attaque de Feu qui glace et électrifie est Feu, Glace et Foudre). La
+    // réduction d'un insensible se partage : −20 % × insensibles ÷ éléments
+    // (chaineDeDegats, moteur_pur.js). L'état offert de l'élément est toujours
+    // parmi les altérations : l'élément choisi compte donc toujours.
+    const etatsElementairesCarte = [...new Set(alterationsExtraites.map(a => a.nom)
+        .filter(nom => (window.ELEMENTS_MAGIQUES || []).some(e => e.etat === nom)))];
+    attaquesExtraites.forEach(a => {
+        if (!a.etatElement) return;
+        a.etatsElements = [...new Set([a.etatElement, ...etatsElementairesCarte])];
+        a.elements = a.etatsElements.map(etat => ((window.ELEMENTS_MAGIQUES || []).find(e => e.etat === etat) || {}).id).filter(Boolean);
+    });
+
     // LA PERSISTANCE DE TERRAIN SE POSE COMME UNE ZONE (demande de Nico). Une
     // carte « 8 dégâts + Persistance » sans mod Zone visait une CRÉATURE, et la
     // nappe naissait sous elle : impossible de la poser sur une case vide. Elle

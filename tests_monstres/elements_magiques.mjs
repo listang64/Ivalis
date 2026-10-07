@@ -99,6 +99,34 @@ console.log("\n2. LE NOYAU : −20 % CONTRE QUI EST INSENSIBLE À L'ÉLÉMENT");
     verifier("un humain : le Feu en entier", 100 - pv(r4, "X") === 50);
 }
 
+console.log("\n2 bis. PLUSIEURS ÉLÉMENTS : −20 % × INSENSIBLES ÷ ÉLÉMENTS");
+// Nico : « si plusieurs éléments sur une attaque : −20 % × (insensibilités ÷
+// éléments) — 1 sur 3 éléments de la technique, −6,66 % ».
+{
+    const cible = (immunites) => ({ pv: 100, pvMax: 100, bouclier: 0, etats: [], atouts: { immunites }, defense: {} });
+    const trois = { valeurBrute: 300, typeRes: "Magique", etatElement: "Brûlé", etatsElements: ["Brûlé", "Glacé", "Électrifié"] };
+    const d = (imm, att = trois) => chaineDeDegats(cible(imm), att, {});
+    const un = d(["Glacé"]), deux = d(["Glacé", "Brûlé"]), tous = d(["Glacé", "Brûlé", "Électrifié"]), aucun = d(["Étourdi"]);
+    verifier("3 éléments, insensible à 1 : −6,67 % (300 → 280)", un.degats === 280 && Math.abs(un.reductionElementaire - 20 / 3) < 1e-9,
+             `${un.degats} (−${un.reductionElementaire.toFixed(2)} %)`);
+    verifier("3 éléments, insensible à 2 : −13,33 % (300 → 260)", deux.degats === 260, String(deux.degats));
+    verifier("3 éléments, insensible aux 3 : −20 % (300 → 240)", tous.degats === 240, String(tous.degats));
+    verifier("insensible à aucun : en entier", aucun.degats === 300 && !aucun.resiste);
+    const deuxEl = d(["Brûlé"], { valeurBrute: 100, typeRes: "Magique", etatElement: "Brûlé", etatsElements: ["Brûlé", "Glacé"] });
+    verifier("2 éléments, insensible à 1 : −10 % (100 → 90)", deuxEl.degats === 90, String(deuxEl.degats));
+    const ancien = d(["Brûlé"], { valeurBrute: 100, typeRes: "Magique", etatElement: "Brûlé" });
+    verifier("un seul élément (etatElement seul) : −20 % comme avant", ancien.degats === 80, String(ancien.degats));
+
+    const e = monde([fiche("H", { classe: "Sorcier" }), fiche("O", { race: "Ondari", camp: "Ennemi" })]);
+    const r = resoudreCarte(e, { type: "carte", idLanceur: "H", idCarte: "C", critique: false,
+        attaques: [{ nom: "Attaque Magique", valeurBrute: 30, typeRes: "Magique", cibles: ["O"],
+                     element: "Feu", etatElement: "Brûlé", etatsElements: ["Brûlé", "Glacé", "Électrifié"] }],
+        alterations: [], jets: { attaqueRatee: false, parCible: { O: { esquive: false, etats: {} } } } });
+    const msg = r.etapes.filter(x => x.type === "message").map(x => x.texte);
+    verifier("l'Ondari, un sort Feu-Glace-Foudre : 28 au lieu de 30, « 🔥 Résiste −6,7 % »",
+             100 - r.etat.combattants.O.pv === 28 && msg.some(t => t === "🔥 Résiste −6,7 %"), `${100 - r.etat.combattants.O.pv} ${JSON.stringify(msg)}`);
+}
+
 console.log("\n3. LES RÉSISTANCES DES CRÉATURES : NORMAL 1, ÉLITE 2, BOSS 3");
 {
     const etats = ["Brûlé", "Électrifié", "Glacé"];
@@ -243,6 +271,14 @@ console.log("\n4. LA FORGE : LA POPUP DES ÉLÉMENTS");
   verifier("le sous-effet offert : ❄️ Glacé, 5 %, OFFERT, à 0 cran",
            !!g.offert && /❄️ Glacé/.test(g.offert) && /OFFERT/.test(g.offert) && /\b5%/.test(g.offert) && /- 0 \+/.test(g.offert), g.offert);
   verifier("la pastille et l'en-tête disent l'élément", /❄️ Glace/.test(g.pastille) && /GLACE/.test(g.entete), `${g.pastille} | ${g.entete}`);
+  const multi = await p.evaluate(() => {
+    const act = window.forgeState.actions[0];
+    act.mods.EFF_ELECTRIFIE = 1; window.rafraichirForge();
+    const t = document.getElementById("forge-element-affichage").textContent;
+    delete act.mods.EFF_ELECTRIFIE; window.rafraichirForge();
+    return t;
+  });
+  verifier("un état élémentaire en plus (Électrifié) : l'en-tête dit les deux éléments", /❄️ GLACE/.test(multi) && /⚡ FOUDRE/.test(multi), multi);
   await p.screenshot({ path: "/tmp/claude-0/elements_forge_offert.png" });
 
   // Monter la chance : le « + » de la ligne offerte, comme un sous-effet.
@@ -326,13 +362,16 @@ console.log("\n5. LE COMBAT : CE QUE LA CARTE EMPORTE");
       FEU1: carte([a({ element: "Feu", mods: { EFF_BRULE: 1 } })]),
       GLACE: carte([a({ element: "Glace" })]),
       FOUDRE_GLACE: carte([a({ element: "Foudre", mods: { EFF_GLACE: 1 } })]),
+      TRIPLE: carte([a({ element: "Feu", mods: { EFF_GLACE: 1, EFF_ELECTRIFIE: 1 } })]),
       ANCIENNE: carte([a({})]),
       MOT: carte([{ baseEffetId: "EFF_MOTS_DE_POUVOIRS", count: 2, mods: {}, zoneHexes: [], baseDuree: 0, modsDuree: {}, element: "Feu" }])
     };
     window.CACHE_COMPETENCES_GLOBAL = { H1: window.COMPETENCES_CACHE };
     const lire = async (id) => {
       const r = (await window.demarrerCiblage(id, { extraire: true, idLanceur: "H1" })) || {};
-      return { att: (r.attaques || [])[0] || {}, alt: (r.alterations || []).map(x => `${x.nom}:${x.chance}:${x.duree}`) };
+      const att = (r.attaques || [])[0] || {};
+      return { att, alt: (r.alterations || []).map(x => `${x.nom}:${x.chance}:${x.duree}`),
+               etats: att.etatsElements || null, elements: att.elements || null };
     };
     const out = {};
     for (const id of Object.keys(window.COMPETENCES_CACHE)) out[id] = await lire(id);
@@ -346,6 +385,12 @@ console.log("\n5. LE COMBAT : CE QUE LA CARTE EMPORTE");
   verifier("Glace : Glacé à 5 %", JSON.stringify(r("GLACE").alt) === '["Glacé:5:2"]', JSON.stringify(r("GLACE").alt));
   verifier("Foudre + 1 cran de Glacé : Glacé 15 %, Électrifié 5 %",
            r("FOUDRE_GLACE").alt.includes("Glacé:15:2") && r("FOUDRE_GLACE").alt.includes("Électrifié:5:2"), JSON.stringify(r("FOUDRE_GLACE").alt));
+  verifier("ses éléments : Feu seul → [Brûlé] ; Foudre qui glace → [Électrifié, Glacé]",
+           JSON.stringify(r("FEU").etats) === '["Brûlé"]' && JSON.stringify(r("FOUDRE_GLACE").etats) === '["Électrifié","Glacé"]',
+           JSON.stringify([r("FEU").etats, r("FOUDRE_GLACE").etats]));
+  verifier("Feu qui glace et électrifie : trois éléments (Feu, Glace, Foudre)",
+           JSON.stringify(r("TRIPLE").etats) === '["Brûlé","Glacé","Électrifié"]' && JSON.stringify(r("TRIPLE").elements) === '["Feu","Glace","Foudre"]',
+           JSON.stringify(r("TRIPLE").elements));
   verifier("une technique d'avant (sans élément) : rien d'offert", r("ANCIENNE").alt.length === 0 && !r("ANCIENNE").att.etatElement);
   verifier("un Mot de pouvoir n'a jamais d'élément", r("MOT").alt.length === 0 && !r("MOT").att.etatElement, JSON.stringify(r("MOT")));
 }

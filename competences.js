@@ -1758,6 +1758,23 @@ function effetDeLElement(el) {
     const bdd = (window.forgeState && window.forgeState.effetsBDD) || [];
     return bdd.find(e => e.id === el.effetId) || bdd.find(e => e.Nom === el.etat) || null;
 }
+// Les éléments du sort que forge la carte : celui de ses Attaques Magiques,
+// puis ceux des états élémentaires qu'elle pose aussi (même règle que
+// moteur_effets.js). Aucun sans Attaque Magique à élément.
+function elementsDeLaCarte() {
+    const actions = (window.forgeState && window.forgeState.actions) || [];
+    const choisis = actions.map(elementDeLAction).filter(Boolean);
+    if (choisis.length === 0) return [];
+    const bdd = window.forgeState.effetsBDD || [];
+    const etats = new Set();
+    actions.forEach(a => {
+        etats.add((a.baseEffet && a.baseEffet.Nom) || "");
+        Object.keys(a.mods || {}).forEach(id => etats.add((bdd.find(e => e.id === id) || {}).Nom || ""));
+    });
+    const poses = (window.ELEMENTS_MAGIQUES || []).filter(el => etats.has(el.etat));
+    return [...new Set([...choisis, ...poses])];
+}
+
 // La chance offerte qu'un effet reçoit sur cette action : 5 % sur l'état de
 // son élément, rien ailleurs.
 function chanceOfferteSur(effet, action) {
@@ -2477,10 +2494,11 @@ window.rafraichirForge = function() {
     }
 
     // L'élément de la technique, sous son nom : celui de ses Attaques Magiques.
+    // Un sort à plusieurs éléments (un état élémentaire posé en plus) les
+    // montre tous : c'est sur eux que se partage la résistance d'une cible.
     const affichageElement = document.getElementById("forge-element-affichage");
     if (affichageElement) {
-        const els = [...new Set(window.forgeState.actions.map(elementDeLAction).filter(Boolean))];
-        affichageElement.innerText = els.map(el => `${el.icone} ${el.nom.toUpperCase()}`).join("  ");
+        affichageElement.innerText = elementsDeLaCarte().map(el => `${el.icone} ${el.nom.toUpperCase()}`).join("  ");
     }
 
     document.getElementById("forge-cout-pc").innerText = totalPC.toFixed(1) + " PC";

@@ -5235,3 +5235,22 @@ laisser, le reste change ».
 - LA TRACTION ×3 : vérifiée, une carte vise UNE cible (hors zone) ; trois
   crans de Traction magique font 45 % de chance (15 % par cran, plafond 60 %
   du grimoire), pas trois cibles. En attente d'une décision de Nico.
+
+## La résistance se partage entre les éléments d'un sort (version 216)
+
+Nico : « pour les faiblesses élémentaires, si plusieurs éléments sur une
+attaque : −20 % × (insensibilités ÷ éléments) — 1 sur 3 éléments de la
+technique, −6,66 % ». (La formule écrite donnait (total − insensibilités) ÷
+total ; c'est l'exemple, 1/3 → 6,66 %, qui a été suivi.)
+- LES ÉLÉMENTS D'UN SORT (moteur_effets.js) : l'élément choisi pour
+  l'Attaque Magique, plus chaque état élémentaire que la carte pose aussi
+  (Brûlé → Feu, Électrifié → Foudre, Glacé → Glace). Une Attaque de Feu
+  avec Glacé et Électrifié en sous-effets est Feu, Glace et Foudre. Ils
+  voyagent sur l'attaque : etatsElements / elements.
+- LE NOYAU (moteur_pur.js, chaineDeDegats 2 ter) : −20 % × insensibles ÷
+  éléments. Un élément : −20 % (« 🔥 Résiste au feu ») ; trois éléments dont
+  un résisté : −6,67 % (« 🔥 Résiste −6,7 % »). Une attaque qui ne porte que
+  etatElement (carte d'avant) se lit comme un seul élément.
+- LA FORGE (competences.js, elementsDeLaCarte) : l'en-tête montre tous les
+  éléments du sort (❄️ GLACE ⚡ FOUDRE).
+  elements_magiques.mjs (2 bis, 4, 5).
