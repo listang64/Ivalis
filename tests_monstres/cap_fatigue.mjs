@@ -21,7 +21,7 @@ const srcApp = fs.readFileSync('/home/user/Ivalis/app.js', 'utf-8');
 const blocAtouts = srcApp.slice(srcApp.indexOf('window.ATOUTS_RACES = {'),
                                 srcApp.indexOf('window.atoutRace = function') );
 const blocAtoutRace = srcApp.slice(srcApp.indexOf('window.atoutRace = function'),
-                                   srcApp.indexOf('window.atoutRace = function') + 400);
+                                   srcApp.indexOf('window.atoutRace = function') + 800);
 const finAtoutRace = blocAtoutRace.indexOf('\n};') + 3;
 // bonusRaceFatigue : le pont que competences.js emprunte plutôt que de lire
 // ATOUTS_RACES lui-même.

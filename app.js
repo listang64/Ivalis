@@ -1263,7 +1263,7 @@ function fusionnerAtouts(a, b) {
 window.atoutRace = function(perso) {
     const peuple = window.atoutPeuple(perso);
     const classe = window.atoutClasse(perso);
-    const creature = window.atoutCreature(perso);
+    const creature = typeof window.atoutCreature === "function" ? window.atoutCreature(perso) : {};
     if (Object.keys(classe).length === 0 && Object.keys(creature).length === 0) return peuple;
     return fusionnerAtouts(fusionnerAtouts(fusionnerAtouts({}, peuple), classe), creature);
 };

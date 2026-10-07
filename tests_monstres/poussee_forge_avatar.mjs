@@ -35,7 +35,7 @@ console.log("\n1. LE TEXTE DE LA FORGE (vrai competences.js)");
   const SRC_TEXTE = src.slice(d, src.indexOf('\nfunction ', d + 10));
   const d2 = src.indexOf('function getMaxStacks');
   const SRC_STACKS = src.slice(d2, src.indexOf('\n}\n', d2) + 3);
-  const outils = new Function(SRC_PARSE + '\nconst bonusPorteeDeRace = () => 0;\n' + SRC_TEXTE + '\n' + SRC_STACKS
+  const outils = new Function('const window = {};\n' + SRC_PARSE + '\nconst bonusPorteeDeRace = () => 0;\n' + SRC_TEXTE + '\n' + SRC_STACKS
     + '\nreturn { formatterTexteEffet, getMaxStacks };')();
   const t = (eff, n) => outils.formatterTexteEffet(eff, n, { modsDuree: {} });
 

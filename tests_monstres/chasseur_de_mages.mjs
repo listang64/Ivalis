@@ -305,6 +305,8 @@ console.log("\n4. LA FORGE : LUMIÈRE POUR LE SEUL CHASSEUR DE MAGES, SUR UN SOR
     const menus = (idEffet) => {
       window.forgeState.actions = [];
       window.ajouterComposantPrincipal(idEffet);
+      // Une Attaque Magique demande son élément (elements_magiques.mjs).
+      if (getComputedStyle(document.getElementById("modale-choix-element")).display === "block") window.choisirElementForge("Feu");
       // Les menus de sous-effets sont des menus maison (plus des <select>).
       return [...document.querySelectorAll("#forge-contenu-carte .forge-menu")].map(m => [...m.querySelectorAll(".forge-menu-option")]
         .filter(o => /Lumi/.test(o.textContent)).map(o => (m.querySelector(".forge-menu-bouton").textContent.trim() + " : "

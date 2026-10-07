@@ -1248,7 +1248,9 @@ function formatterTexteEffet(effet, stacks, action) {
     // 1. Remplacement du % de base et du Max
     if (pBase > 0) {
         // Les 5 % qu'offre l'élément d'une Attaque Magique s'y ajoutent.
-        const offert = chanceOfferteSur(effet, action);
+        // (une fonction du même fichier, lue par window : les bancs qui
+        // n'extraient que formatterTexteEffet s'en passent.)
+        const offert = typeof window.chanceOfferteForge === "function" ? window.chanceOfferteForge(effet, action) : 0;
         const calcP = offert > 0 && pMax > 0 ? Math.min(pMax, pBase * stacks + offert) : pBase * stacks + offert;
         if (/\d+(?:[.,]\d+)?\s*%/.test(texte)) {
             texte = texte.replace(/\d+(?:[.,]\d+)?\s*%/, calcP + "%");
@@ -1762,6 +1764,7 @@ function chanceOfferteSur(effet, action) {
     const el = elementDeLAction(action);
     return (el && effet && (effet.id === el.effetId || effet.Nom === el.etat)) ? (window.CHANCE_ELEMENT_OFFERTE || 5) : 0;
 }
+window.chanceOfferteForge = chanceOfferteSur;
 
 window.modifierActionCount = function(idInst, delta) {
     const act = window.forgeState.actions.find(a => a.idInst === idInst);
