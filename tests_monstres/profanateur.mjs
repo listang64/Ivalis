@@ -227,6 +227,22 @@ console.log("\n4 bis. IL VA OÙ IL PEUT MORDRE, PAS VERS LE PLUS PROCHE À VOL D
              `(${pl.etat.combattants.M1.q},${pl.etat.combattants.M1.r})`);
 }
 
+console.log("\n4 ter. NIVEAU 10 : LES ZOMBIES SE RELÈVENT À 2 CASES");
+// Nico : « pour le Profanateur, au niveau 10, augmente d'une case le rayon où
+// il crée les zombies (donc 2 cases tout autour de lui si un ennemi meurt). »
+{
+    const tombeA = (niveau, pos) => {
+        const e = monde(niveau, { M1: pos });
+        e.combattants.M1.pv = 5;
+        return coup(e, "H", "M1", 10).etat.combattants.M1;     // tué par un autre héros
+    };
+    verifier("niveau 10 : un rayon de 2", w.atoutRace(profanateur(10)).rayonZombies === 2 && w.atoutRace(profanateur(5)).rayonZombies === undefined);
+    verifier("niveau 5 : à 2 cases, il reste à terre", tombeA(5, { q: 2, r: 0 }).aTerre === true);
+    verifier("niveau 10 : à 2 cases, il se relève en zombie", !tombeA(10, { q: 2, r: 0 }).aTerre && !!tombeA(10, { q: 2, r: 0 }).zombie);
+    verifier("niveau 10 : à 3 cases, il reste à terre", tombeA(10, { q: 3, r: 0 }).aTerre === true);
+    verifier("niveau 10 : à côté, toujours", !!tombeA(10, { q: 1, r: 0 }).zombie);
+}
+
 console.log("\n5. NIVEAU 10 : LE SURSIS");
 {
     const e = monde(10); e.file = [{ id: "M2", carte: "X", initiative: 50, pas: 0 }, { id: "P", carte: "C", initiative: 10, pas: 0 }];

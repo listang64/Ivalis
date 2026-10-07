@@ -671,6 +671,12 @@ function poserAction(chantier, effetBase, count) {
         zoneHexes: [],
         baseDuree: 0
     };
+    // ⚖️ règle Forge : une Attaque Magique est toujours liée à un élément —
+    // celui d'une créature est tiré au sort.
+    if (typeof window.estAttaqueElementaire === "function" && window.estAttaqueElementaire(effetBase.Nom)) {
+        const els = window.ELEMENTS_MAGIQUES || [];
+        if (els.length > 0) act.element = els[Math.floor(Math.random() * els.length)].id;
+    }
     chantier.actions.push(act);
     const tag = tagDe(effetBase);
     if (tag) chantier.tags.add(tag);
@@ -1112,7 +1118,8 @@ function chantierVersDocument(carte, nom, arme, palette) {
                 mods,
                 zoneHexes: act.zoneHexes || [],
                 baseDuree: act.baseDuree || 0,
-                modsDuree
+                modsDuree,
+                ...(act.element ? { element: act.element } : {})
             };
         })
     };
@@ -1127,11 +1134,15 @@ function chantierVersDocument(carte, nom, arme, palette) {
 
     const effetsCompiles = [];
     carte.chantier.actions.forEach(act => {
+        const el = act.element && typeof window.elementMagique === "function" ? window.elementMagique(act.element) : null;
         effetsCompiles.push({
             nom: act.baseEffet.Nom,
-            desc: texteEffet(act.baseEffet, act.count) + marqueurDuree(act.baseDuree || 0),
+            desc: texteEffet(act.baseEffet, act.count) + marqueurDuree(act.baseDuree || 0)
+                + (el ? ` · ${el.icone} ${el.nom}` : ""),
             isMod: false
         });
+        // ⚖️ règle Forge : l'état de l'élément, 5 % offerts.
+        if (el) effetsCompiles.push({ nom: el.etat, desc: `${window.CHANCE_ELEMENT_OFFERTE || 5}% de chance (offert)`, isMod: true });
         act.modsEffets.forEach(m => {
             if (m.effet.Nom === "Zone") {
                 const taille = act.zoneHexes.length > 0 ? act.zoneHexes.length : m.count;
@@ -1149,7 +1160,11 @@ function chantierVersDocument(carte, nom, arme, palette) {
     return {
         Nom: nom,
         Arme: arme,
-        Element: "Aucun",
+        Element: (() => {
+            const a = carte.chantier.actions.find(x => x.element);
+            const el = a && typeof window.elementMagique === "function" ? window.elementMagique(a.element) : null;
+            return el ? el.nom : "Aucun";
+        })(),
         Fatigue: carte.fatigue,
         Initiative: carte.initiative,
         Cout_PC: Math.round(carte.coutPC * 100) / 100,

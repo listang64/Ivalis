@@ -5162,3 +5162,52 @@ masquer la ligne au sol ».
   elle, garde ses 30 %) : le pied d'un mur n'est plus nu entre deux cases.
   geomancien.mjs (9 ter : clarté à 5 % près, 12 cailloux au moins au pied
   d'une case de milieu — 48 au moins mesurés).
+
+## Les éléments des sorts, les résistances des créatures ; Profanateur 10 : zombies à 2 cases ; cailloux sur les murs (version 213)
+
+Nico : « Une attaque magique (hors Mot de pouvoir) sera toujours liée à un
+élément ; au moment où l'on sélectionne Attaque magique, une popup s'ouvre
+avec un élément au choix — de beaux boutons ronds. L'attaque se met dans la
+Forge avec en sous-effet gratuit 5 % de chance de brûler, électrifier, glacer
+selon l'élément, qu'on peut monter comme un sous-effet classique. Si un
+personnage ou un ennemi est insensible au gel, à la brûlure ou à l'électrique,
+un sort de la même nature lui fait −20 % de dégâts. Une résistance aléatoire
+pour chaque ennemi à partir de Normal : 1, les Élites 2, les Boss 3. » Et :
+« Profanateur niveau 10 : il crée ses zombies une case plus loin (2 cases
+autour de lui) » ; « pour les murs de pierre, quelques cailloux sur le
+dessus, tu peux en mettre plus ».
+- LA TABLE (app.js, ELEMENTS_MAGIQUES) : Feu → Brûlé, Foudre → Électrifié,
+  Glace → Glacé. estAttaqueElementaire : l'Attaque Magique seule (un Mot de
+  pouvoir n'a pas d'élément).
+- LA FORGE (competences.js) : poser une Attaque Magique ouvre
+  #modale-choix-element (trois disques) ; Annuler ne pose rien. L'action garde
+  `element` ; sa pastille (un toucher pour en changer) et l'en-tête le disent.
+  L'état de l'élément s'affiche en ligne « OFFERT » à 0 cran, sans coût ; son
+  « + » le monte comme un sous-effet (15 % par cran + 5 % offerts, plafond du
+  grimoire). Sans élément (technique d'avant), le bouton Forger s'éteint et
+  la pastille demande « Choisir un élément ». Enregistré : `element` sur
+  l'action, Element sur la technique, l'état offert dans Effets_Compiles.
+- LIA (lia_forge.js) : champ element dans son plan ; sinon déduit du récit
+  (éclair, givre…), sinon Feu. Les créatures (monstres_competences.js) : un
+  élément tiré au sort sur leurs Attaques Magiques.
+- LE COMBAT (moteur_effets.js) : +5 % sur l'état de l'élément (durée du
+  grimoire), et l'attaque emporte element / etatElement. Le noyau
+  (moteur_pur.js, chaineDeDegats 2 ter) retire REDUCTION_SORT_RESISTE (20 %)
+  si la cible a cet état dans ses immunités, avant l'armure ; message
+  « 🔥 Résiste au feu ». Pas sur des dégâts bruts.
+- LES CRÉATURES (monstres.js) : Resistances_Elementaires tirées à la création
+  selon le palier (Petit 0, Normal 1, Élite 2, Boss 3) ; une créature plus
+  ancienne reçoit les siennes de son identifiant (resistancesParDefaut, même
+  tirage sur tous les écrans, rien n'est écrit). atoutCreature les verse
+  dans les immunités (atoutRace) : résister = être insensible à l'état, et
+  −20 % de ses sorts. Ni le compagnon du Pisteur ni les héros. L'encart du
+  tour (combat.js) les montre en petits ronds pointillés.
+- texteAtout : « Insensible : Brûlé (−20 % des sorts de Feu) ».
+  elements_magiques.mjs, bonus_race_classe.mjs.
+- LE PROFANATEUR, NIVEAU 10 (app.js, rayonZombies: 2 ; combat_etat.js,
+  profanateurPourZombie) : un ennemi qui meurt à 2 cases de lui (et plus
+  seulement au contact) se relève en zombie. profanateur.mjs (4 ter).
+- LES CAILLOUX SUR LE DESSUS (murs_terre.js) : 3 à 6 par case de mur, et un
+  semis sur chaque bloc assez grand d'un pilier (canvas.nbCaillouxDessus).
+  geomancien.mjs (9 ter : 8 au moins sur un mur relié, 6 sur un pilier ; la
+  clarté reste à 5 % près).

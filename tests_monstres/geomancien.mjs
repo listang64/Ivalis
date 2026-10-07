@@ -520,21 +520,25 @@ console.log("\n9 ter. AUSSI FONCÉS QUE LES PILIERS, ET UN PIED PLEIN DE CAILLOU
       return { dx: a.x * ech, dy: a.y * ech, etat: liens.some(([x, y]) => x === dq && y === dr) ? "mur" : null }; });
     const clarte = (cv) => { const d = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data; let s = 0, n = 0;
       for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200) { s += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; n++; } return s / n; };
-    const piliers = [], murs = [], cailloux = [];
+    const piliers = [], murs = [], cailloux = [], dessusMur = [], dessusPilier = [];
     for (let g = 1; g <= 10; g++) {
-      piliers.push(clarte(window.dessinerPilierTerre("P" + g)));
+      const pil = window.dessinerPilierTerre("P" + g);
+      piliers.push(clarte(pil)); dessusPilier.push(pil.nbCaillouxDessus || 0);
       const milieu = window.dessinerMurTerre("P" + g, voisins([[1, 0], [-1, 0]]), "G", { x: 0, y: 0 });
       murs.push(clarte(milieu));
-      cailloux.push(milieu.nbCailloux);
+      cailloux.push(milieu.nbCailloux); dessusMur.push(milieu.nbCaillouxDessus || 0);
     }
     const moy = (t) => t.reduce((a, b) => a + b, 0) / t.length;
     return { pilier: moy(piliers), mur: moy(murs), cailloux: Math.min(...cailloux), moyCailloux: moy(cailloux),
-             reglage: window.ASSOMBRIR_MUR_TERRE };
+             reglage: window.ASSOMBRIR_MUR_TERRE, dessusMur: Math.min(...dessusMur), dessusPilier: Math.min(...dessusPilier) };
   });
   verifier("un mur relié est aussi foncé qu'un pilier seul (à 5 % près)", Math.abs(m.mur - m.pilier) / m.pilier < 0.05,
            `mur ${m.mur.toFixed(1)} / pilier ${m.pilier.toFixed(1)} (roche du mur −${m.reglage})`);
   verifier("une case au milieu d'un mur : son pied est garni de cailloux (12 au moins)", m.cailloux >= 12,
            `au moins ${m.cailloux}, ${m.moyCailloux.toFixed(1)} en moyenne`);
+  // Nico : « quelques cailloux sur le dessus, tu peux en mettre plus ».
+  verifier("des cailloux SUR LE DESSUS : 8 au moins sur un mur relié, 6 au moins sur un pilier", m.dessusMur >= 8 && m.dessusPilier >= 6,
+           `mur ≥ ${m.dessusMur}, pilier ≥ ${m.dessusPilier}`);
 }
 
 console.log("\n10. À L'ÉCRAN : TERRAIN, CALQUE, POSE, CIBLAGE");

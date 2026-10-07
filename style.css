@@ -4468,3 +4468,68 @@ textarea.input-texte-parchemin {
 .interrupteur-parametre input:checked + .interrupteur-glissiere { background: #5a8a3a; }
 .interrupteur-parametre input:checked + .interrupteur-glissiere::after { transform: translateX(24px); }
 .interrupteur-parametre input:focus-visible + .interrupteur-glissiere { outline: 2px solid #c9a24a; outline-offset: 2px; }
+
+/* =========================================================================
+   LES ÉLÉMENTS D'UNE ATTAQUE MAGIQUE (competences.js, ELEMENTS_MAGIQUES)
+   ========================================================================= */
+#modale-choix-element.forge-choix-element {
+  width: 520px; max-width: 92vw; padding: 0; text-align: center; overflow: hidden;
+  background: #e8d5a5; border: 3px solid #1a1a1a; border-radius: 14px;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.9), inset 0 0 0 2px rgba(168,132,31,0.55);
+}
+.forge-choix-element-texte { margin: 16px 22px 4px; font-size: 15px; line-height: 1.4; color: #4a3423; }
+.forge-elements-ronds { display: flex; justify-content: center; gap: clamp(14px, 4vw, 30px); flex-wrap: wrap; padding: 18px 16px 26px; }
+.forge-element-rond {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: none; border: none; padding: 4px; cursor: pointer; font-family: inherit; color: #2c1e16;
+  -webkit-tap-highlight-color: transparent;
+}
+.forge-element-disque {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  width: 92px; height: 92px; border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 32%),
+    radial-gradient(circle at 50% 55%, var(--el-couleur) 0%, var(--el-fond) 78%, #120a05 100%);
+  border: 4px solid #a8841f;
+  box-shadow: 0 0 0 2px #2a1a0f, 0 6px 14px rgba(0,0,0,0.55), 0 0 18px -2px var(--el-couleur),
+              inset 0 -8px 16px rgba(0,0,0,0.45), inset 0 4px 10px rgba(255,255,255,0.25);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.forge-element-disque::after {
+  content: ""; position: absolute; inset: 6px; border-radius: 50%;
+  border: 1px solid rgba(255,236,190,0.45); pointer-events: none;
+}
+.forge-element-icone { font-size: 44px; line-height: 1; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
+.forge-element-nom { font-size: 17px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; }
+.forge-element-etat { font-size: 12px; color: #6b5236; font-weight: bold; }
+.forge-element-rond:hover .forge-element-disque,
+.forge-element-rond:focus-visible .forge-element-disque {
+  transform: translateY(-3px) scale(1.07);
+  box-shadow: 0 0 0 2px #2a1a0f, 0 10px 18px rgba(0,0,0,0.55), 0 0 30px 4px var(--el-couleur),
+              inset 0 -8px 16px rgba(0,0,0,0.45), inset 0 4px 10px rgba(255,255,255,0.25);
+}
+.forge-element-rond:active .forge-element-disque { transform: scale(0.96); }
+.forge-element-rond.choisi .forge-element-disque { border-color: #f3dfa6; }
+.forge-element-rond.choisi .forge-element-nom { text-decoration: underline; text-decoration-color: var(--el-couleur); text-underline-offset: 4px; }
+
+/* Sur la carte : la pastille de l'élément (un toucher pour en changer) et la
+   ligne de l'état offert. */
+.forge-element-pastille {
+  margin-left: 8px; padding: 2px 10px 2px 8px; border-radius: 999px; cursor: pointer; vertical-align: middle;
+  font-family: inherit; font-size: 12px; font-weight: bold; letter-spacing: 0.5px; color: #fff8e6;
+  background: radial-gradient(circle at 30% 30%, var(--el-couleur, #8a7a66) 0%, var(--el-fond, #4a3a2a) 100%);
+  border: 2px solid #a8841f; box-shadow: 0 0 8px -2px var(--el-couleur, transparent); text-shadow: 0 1px 2px rgba(0,0,0,0.7);
+}
+.forge-element-pastille.manquant { background: #9b2c2c; animation: forge-element-manquant 1.2s ease-in-out infinite alternate; }
+@keyframes forge-element-manquant { from { box-shadow: 0 0 0 0 rgba(155,44,44,0.0); } to { box-shadow: 0 0 10px 2px rgba(155,44,44,0.7); } }
+.forge-tag-offert {
+  margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px;
+  color: #2c1e16; background: linear-gradient(180deg, #f6e3a1 0%, #d9b65a 100%); border: 1px solid #a8841f; vertical-align: middle;
+}
+.forge-sous-effet-offert { border-left: 3px solid var(--el-couleur, #a8841f); }
+/* Une résistance de créature, dans l'encart de son tour (actualiserEtatsEncart). */
+.pastille-resistance {
+  display: flex; align-items: center; justify-content: center; border-radius: 50%; line-height: 1; box-sizing: border-box;
+  background: radial-gradient(circle at 35% 30%, var(--el-couleur) 0%, var(--el-fond) 85%);
+  border: 2px dashed #e8d5a5; box-shadow: 0 0 6px -1px var(--el-couleur);
+}

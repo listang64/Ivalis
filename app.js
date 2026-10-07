@@ -952,7 +952,9 @@ window.ATOUTS_CLASSES = {
     "Profanateur": [
         { niveau: 1,  diviseurEtalement: 1.3, competences: 1, pvMax: 5 },
         { niveau: 5,  zombies: true },
-        { niveau: 10, sursis: 2 }
+        // Niveau 10 : le sursis, et ses zombies se relèvent dans un rayon de
+        // 2 cases autour de lui (au lieu de 1).
+        { niveau: 10, sursis: 2, rayonZombies: 2 }
     ],
     // LE PISTEUR : un compagnon animal qui combat à ses côtés (25 PV, 15 %
     // d'esquive, 6 dégâts bruts, 3 cases — un document Monstres de son camp
@@ -1261,8 +1263,78 @@ function fusionnerAtouts(a, b) {
 window.atoutRace = function(perso) {
     const peuple = window.atoutPeuple(perso);
     const classe = window.atoutClasse(perso);
-    if (Object.keys(classe).length === 0) return peuple;
-    return fusionnerAtouts(fusionnerAtouts({}, peuple), classe);
+    const creature = window.atoutCreature(perso);
+    if (Object.keys(classe).length === 0 && Object.keys(creature).length === 0) return peuple;
+    return fusionnerAtouts(fusionnerAtouts(fusionnerAtouts({}, peuple), classe), creature);
+};
+
+// =========================================================================
+//  LES ÉLÉMENTS DES SORTS
+// =========================================================================
+//  Nico : « Une attaque magique (hors Mot de pouvoir) sera toujours liée à un
+//  élément » — choisi dans la Forge, à la pose de l'Attaque Magique. Chaque
+//  élément offre 5 % de chance de poser SON état (le Feu brûle, la Foudre
+//  électrifie, la Glace gèle), qu'on monte ensuite comme un sous-effet
+//  classique. Et qui est insensible à cet état (l'Ondari et le feu, le Vampire
+//  et le gel, une créature qui y résiste) encaisse 20 % de dégâts en moins
+//  d'un sort de cet élément (chaineDeDegats, moteur_pur.js).
+window.ELEMENTS_MAGIQUES = [
+    { id: "Feu",    nom: "Feu",    icone: "🔥", etat: "Brûlé",      effetId: "EFF_BRULE",      motCle: "brûl",
+      couleur: "#e8622c", fond: "#7a1f0c" },
+    { id: "Foudre", nom: "Foudre", icone: "⚡", etat: "Électrifié", effetId: "EFF_ELECTRIFIE", motCle: "électrif",
+      couleur: "#f2cf3a", fond: "#5e4a08" },
+    { id: "Glace",  nom: "Glace",  icone: "❄️", etat: "Glacé",      effetId: "EFF_GLACE",      motCle: "glac",
+      couleur: "#6cc6f0", fond: "#0f4560" }
+];
+window.CHANCE_ELEMENT_OFFERTE = 5;
+window.REDUCTION_SORT_RESISTE = 20;
+window.elementMagique = function(id) {
+    return window.ELEMENTS_MAGIQUES.find(e => e.id === id) || null;
+};
+// L'Attaque Magique, et elle seule : un Mot de pouvoir frappe brut, sans élément.
+window.estAttaqueElementaire = function(nomEffet) {
+    const n = String(nomEffet || "").toLowerCase();
+    return n.includes("attaque magique") && !n.includes("pouvoir");
+};
+
+// LES RÉSISTANCES DES CRÉATURES (Nico) : « une résistance aléatoire pour
+// chaque ennemi à partir de Normal : 1 résistance, les Élites 2, les Boss 3 ».
+// Résister à un élément, c'est être insensible à son état — et donc encaisser
+// 20 % de moins de ses sorts. Tirées une fois à la création de la créature
+// (Resistances_Elementaires, monstres.js) ; une créature posée avant ce
+// changement reçoit les siennes de son identifiant : le même tirage sur tous
+// les écrans, sans rien écrire en base.
+window.NB_RESISTANCES_PALIER = { "Petit": 0, "Normal": 1, "Élite": 2, "Elite": 2, "Boss": 3 };
+window.nbResistancesPalier = function(palier) {
+    return window.NB_RESISTANCES_PALIER[String(palier || "").trim()] || 0;
+};
+window.tirerResistancesElementaires = function(palier, alea) {
+    const tirer = typeof alea === "function" ? alea : Math.random;
+    const etats = window.ELEMENTS_MAGIQUES.map(e => e.etat);
+    for (let i = etats.length - 1; i > 0; i--) {
+        const j = Math.floor(tirer() * (i + 1));
+        [etats[i], etats[j]] = [etats[j], etats[i]];
+    }
+    return etats.slice(0, Math.min(etats.length, window.nbResistancesPalier(palier)));
+};
+window.resistancesParDefaut = function(id, palier) {
+    let graine = 2166136261;
+    for (const c of String(id || "")) graine = Math.imul(graine ^ c.charCodeAt(0), 16777619) >>> 0;
+    const alea = () => {
+        graine = (graine + 0x6D2B79F5) >>> 0;
+        let t = graine;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    return window.tirerResistancesElementaires(palier, alea);
+};
+// Ce qu'une créature apporte en propre : ses résistances, comme une immunité.
+// Ni le compagnon du Pisteur ni un héros n'en ont.
+window.atoutCreature = function(perso) {
+    if (!perso || !perso.estMonstre || perso.compagnonDe) return {};
+    const resist = Array.isArray(perso.resistancesElementaires) ? perso.resistancesElementaires : [];
+    return resist.length > 0 ? { immunites: [...resist] } : {};
 };
 
 // =========================================================================
@@ -1298,7 +1370,13 @@ window.texteAtout = function(cle, valeur) {
         case "sortsSansMalusContact": return "Aucune réduction au contact pour ses sorts à distance";
         case "diviseurDeplacement": return n === 2 ? "Se déplace pour deux fois moins de fatigue" : `Déplacement ${n} fois moins cher`;
         case "esquiveOpportunite":  return `${n} % de chance d'esquiver une attaque d'opportunité`;
-        case "immunites":      return `Insensible : ${(valeur || []).join(", ")}`;
+        case "immunites": {
+            // Insensible à l'état d'un élément : ses sorts lui font 20 % de moins.
+            const liste = valeur || [];
+            const elementaires = liste.map(nom => (window.ELEMENTS_MAGIQUES || []).find(e => e.etat === nom)).filter(Boolean);
+            return `Insensible : ${liste.join(", ")}`
+                + (elementaires.length ? ` (−20 % des sorts de ${elementaires.map(e => e.nom).join(", ")})` : "");
+        }
         case "sursis":         return `Tombé à 0 PV, tient encore ${n} tour${n > 1 ? "s" : ""} avant d'être KO (une fois par combat)`;
         case "effets":         return (valeur || []).map(id => `Effet de combat : ${nomEffet(id)}`).join(" · ");
         case "techniques":     return (valeur || []).map(id => `Technique : ${((window.TECHNIQUES_CLASSE || {})[id] || {}).Nom || id}`).join(" · ");
@@ -1318,6 +1396,7 @@ window.texteAtout = function(cle, valeur) {
         case "traverseSesMurs": return "Traverse ses murs de terre";
         case "zonesProlongees": return `Ses zones persistantes durent ${n === 1 ? "un" : n} tour${n > 1 ? "s" : ""} de plus`;
         case "zombies":        return "Les ennemis qu'il tue, ou qui tombent à côté de lui, se relèvent en zombies à son service";
+        case "rayonZombies":   return n > 1 ? `Ses zombies se relèvent jusqu'à ${n} cases autour de lui` : "";
         case "degatsOpportunite": return `${plus(n)} aux dégâts de ses attaques d'opportunité`;
         case "defenseur":      return `Défenseur : ${n} % de chance de frapper l'ennemi qui entre dans sa zone`;
         case "allongeOpportunite": return "Sa zone passe à 2 cases avec une arme à allonge (lance lourde)";

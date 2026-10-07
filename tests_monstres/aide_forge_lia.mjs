@@ -409,6 +409,7 @@ console.log("\n9. LA MAGIE NE FAIT PLUS TOMBER LES SOUS-EFFETS DU MENU MAGIQUE")
     await window.ouvrirCreationCompetence();
     window.forgeState.armePrincipale = "Arme polyvalente";
     window.ajouterComposantPrincipal("EFF_ATTAQUE_MAGIQUE");
+    window.choisirElementForge("Feu"); // une Attaque Magique a toujours un élément (elements_magiques.mjs)
     window.forgeState.actions[0].mods = { EFF_LUMIERE: 1, EFF_CONFUSION: 1, EFF_ETOURDIT: 1 };
     window.selectionnerArme("Magie");
     window.fermerMenuAjoutForge();

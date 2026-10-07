@@ -204,6 +204,8 @@ export function combattantDepuisFiche(fiche, position, regles) {
         // à côté de lui se relèvent en zombies (tomber, plus bas). Son atout
         // du niveau 1 ne joue qu'à la Forge (diviseurEtalement).
         zombies: !!race.zombies,
+        // Le rayon où un ennemi qui tombe se relève (1 case ; 2 au niveau 10).
+        rayonZombies: nombre(race.rayonZombies, race.zombies ? 1 : 0),
         degatsOpportunite: nombre(race.degatsOpportunite),
         defenseur: nombre(race.defenseur),
         allongeOpportunite: !!race.allongeOpportunite,
@@ -653,7 +655,9 @@ export function profanateurPourZombie(etat, victime, idTueur) {
     if (idTueur && peut(table[idTueur])) return table[idTueur];
     return Object.keys(table).sort().map(k => table[k])
         .find(p => peut(p) && p.q !== null && p.q !== undefined && victime.q !== null && victime.q !== undefined
-                   && distanceHexEtat(p, victime) === 1) || null;
+                   && distanceHexEtat(p, victime) >= 1
+                   // Au niveau 10, deux cases tout autour de lui (rayonZombies).
+                   && distanceHexEtat(p, victime) <= Math.max(1, nombre(p.atouts.rayonZombies, 1))) || null;
 }
 function zombifier(etat, victime, idTueur) {
     const maitre = profanateurPourZombie(etat, victime, idTueur);

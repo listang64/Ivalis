@@ -195,6 +195,23 @@
             ctx.lineTo(cx - Math.cos(a) * rayon * 0.4, cy - hauteur - Math.sin(a) * rayon * 0.18);
             ctx.stroke();
         }
+        // QUELQUES CAILLOUX SUR LE DESSUS d'une grosse masse (Nico : « j'aime
+        // bien l'idée d'avoir quelques cailloux sur le dessus, mets-en plus »).
+        if (rayon < 14) return 0;
+        const sur = [];
+        const nb = 3 + Math.floor(alea() * 4) + Math.floor(rayon / 12);
+        for (let k = 0; k < nb; k++) {
+            const a = alea() * Math.PI * 2, d = Math.sqrt(alea()) * rayon * 0.6;
+            sur.push({ x: cx + Math.cos(a) * d, y: cy - hauteur + Math.sin(a) * d * 0.55, r: tailleCaillouDessus(alea) });
+        }
+        sur.sort((u, v) => u.y - v.y).forEach(c => masse(ctx, alea, c.x, c.y, c.r, c.r * (0.4 + alea() * 0.5),
+            [couleur[0] + Math.floor((alea() - 0.5) * 8), couleur[1] + Math.floor((alea() - 0.5) * 12), couleur[2]]));
+        return sur.length;
+    }
+    // Des petits surtout, quelques moyens.
+    function tailleCaillouDessus(alea) {
+        const u = alea();
+        return u < 0.2 ? 2.6 + alea() * 1.4 : 1.0 + alea() * 1.6;
     }
 
     // Une ombre douce au pied, vers le bas à droite.
@@ -240,7 +257,8 @@
         }
         // Le cœur du pilier, le plus large, au centre.
         masses.push({ x: 64, y: PIED_Y, rayon: 34 + alea() * 4, hauteur: 50 + alea() * 16 });
-        masses.sort((a, b) => a.y - b.y).forEach(m => masse(ctx, alea, m.x, m.y, m.rayon, m.hauteur, roche));
+        canvas.nbCaillouxDessus = 0;
+        masses.sort((a, b) => a.y - b.y).forEach(m => { canvas.nbCaillouxDessus += masse(ctx, alea, m.x, m.y, m.rayon, m.hauteur, roche) || 0; });
         // Des gravats au pied, devant.
         gravatsAuPied(ctx, alea, tour.filter(t => t[3] > 0.05), 64, PIED_Y, roche);
         return canvas;
@@ -748,6 +766,24 @@
                 ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
             }
         });
+        // DES CAILLOUX SUR LE DESSUS, semés dans chaque pièce (le cœur et ses
+        // bras), à l'écart de ses bords.
+        const surLeDessus = [];
+        pieces.forEach(pc => {
+            const n = pc.pts.length;
+            const g = { x: pc.pts.reduce((t, p) => t + p.x, 0) / n, y: pc.pts.reduce((t, p) => t + p.y, 0) / n };
+            const h = pc.pts.reduce((t, p) => t + (p.h || 0), 0) / n;
+            const nb = 3 + Math.floor(alea() * 4);
+            for (let k = 0; k < nb; k++) {
+                const v = pc.pts[Math.floor(alea() * n)], w = pc.pts[Math.floor(alea() * n)];
+                const t = 0.1 + alea() * 0.55, u = alea();
+                const x = g.x + ((v.x * u + w.x * (1 - u)) - g.x) * t, y = g.y + ((v.y * u + w.y * (1 - u)) - g.y) * t;
+                surLeDessus.push({ x: MUR_CX + x, y: MUR_CY + y - h, r: tailleCaillouDessus(alea) });
+            }
+        });
+        surLeDessus.sort((u, v) => u.y - v.y).forEach(c => masse(ctx, alea, c.x, c.y, c.r, c.r * (0.4 + alea() * 0.5),
+            [roche[0] + Math.floor((alea() - 0.5) * 8), roche[1] + 6 + Math.floor((alea() - 0.5) * 12), roche[2]]));
+        canvas.nbCaillouxDessus = surLeDessus.length;
         // Des gravats au pied (devant : ceux de derrière seraient cachés).
         // TOUT LE LONG DU PIED, jonctions comprises : le filtre de la terre
         // (libre, 30 % du bras) laissait nu le pied du mur entre deux cases —

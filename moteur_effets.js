@@ -1360,6 +1360,19 @@ window.demarrerCiblage = async function(idCarte, options) {
             const listeMods = extraireMods(act.mods);
             const modsDuree = act.modsDuree || {};
 
+            // L'ÉLÉMENT D'UNE ATTAQUE MAGIQUE (Nico) : choisi dans la Forge, il
+            // offre 5 % de chance de poser son état — Brûlé, Électrifié ou
+            // Glacé — en plus des crans qu'on y a mis comme sous-effet.
+            const elementAct = (act.element && typeof window.elementMagique === "function"
+                                && window.estAttaqueElementaire(effBase.Nom))
+                ? window.elementMagique(act.element) : null;
+            const chanceOfferte = (etat) => (elementAct && elementAct.etat === etat)
+                ? (window.CHANCE_ELEMENT_OFFERTE || 5) : 0;
+            const dureeOfferte = () => {
+                const e = elementAct && window.EFFETS_BDD_CACHE[elementAct.effetId];
+                return (e && parseFrFloat(e.Tours)) || 2;
+            };
+
             // Persistance de terrain : simple drapeau de carte (mod ou effet de base). La zone
             // qu'elle laisse derrière elle est construite après la résolution, à partir des
             // dégâts/états de la carte (voir declencherResolution).
@@ -1607,6 +1620,10 @@ window.demarrerCiblage = async function(idCarte, options) {
                     // Un sort de lumière : il ne vaut que sur des dégâts magiques.
                     ...(chanceLumiere > 0 && typeRes === "Magique" && !isHeal
                         ? { chanceLumiere: Math.min(100, chanceLumiere), iconeAveugle: ICONE_AVEUGLE } : {}),
+                    // L'élément d'une Attaque Magique (Feu, Foudre, Glace) et
+                    // l'état qui va avec : qui y est insensible en prend 20 %
+                    // de moins (chaineDeDegats, moteur_pur.js).
+                    ...(elementAct && !isHeal ? { element: elementAct.id, etatElement: elementAct.etat } : {}),
                     cibles: []
                 });
             }
@@ -1846,6 +1863,12 @@ window.demarrerCiblage = async function(idCarte, options) {
                 if (d > bruleDuree) bruleDuree = d;
             });
 
+            if (chanceOfferte("Brûlé") > 0) {
+                isBrule = true;
+                bruleChance += chanceOfferte("Brûlé");
+                bruleDuree = Math.max(bruleDuree, dureeOfferte());
+            }
+
             if (isBrule) {
                 bruleChance = Math.min(bruleChance, plafondDuGrimoire("brûl", 60)); // plafond du grimoire
                 if (bruleDuree <= 0) bruleDuree = 2; // Sécurité si la BDD n'a pas de durée
@@ -1892,6 +1915,12 @@ window.demarrerCiblage = async function(idCarte, options) {
                 const d = parseFrFloat(modEff.Tours) + bonus;
                 if (d > glaceDuree) glaceDuree = d;
             });
+
+            if (chanceOfferte("Glacé") > 0) {
+                isGlace = true;
+                glaceChance += chanceOfferte("Glacé");
+                glaceDuree = Math.max(glaceDuree, dureeOfferte());
+            }
 
             if (isGlace) {
                 glaceChance = Math.min(glaceChance, plafondDuGrimoire("glac", 60)); // plafond du grimoire
@@ -1973,6 +2002,12 @@ window.demarrerCiblage = async function(idCarte, options) {
                 const d = parseFrFloat(modEff.Tours) + bonus;
                 if (d > electrifieDuree) electrifieDuree = d;
             });
+
+            if (chanceOfferte("Électrifié") > 0) {
+                isElectrifie = true;
+                electrifieChance += chanceOfferte("Électrifié");
+                electrifieDuree = Math.max(electrifieDuree, dureeOfferte());
+            }
 
             if (isElectrifie) {
                 electrifieChance = Math.min(electrifieChance, plafondDuGrimoire("électri", 60)); // plafond du grimoire

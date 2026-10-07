@@ -303,6 +303,12 @@ window.ecouterMonstresPartie = function(idPartie) {
             // Le compagnon du Pisteur : l'identifiant de son maître.
             objet.compagnonDe   = brut.Compagnon_De || "";
             objet.nomAttaque    = brut.Nom_Attaque || "";
+            // Ses résistances élémentaires (app.js) : tirées à sa création ; une
+            // créature plus ancienne les reçoit de son identifiant.
+            objet.resistancesElementaires = Array.isArray(brut.Resistances_Elementaires)
+                ? brut.Resistances_Elementaires
+                : (brut.Compagnon_De || typeof window.resistancesParDefaut !== "function"
+                    ? [] : window.resistancesParDefaut(document.id, brut.Palier));
             monstres.push(objet);
 
             // Les techniques du monstre vivent dans une sous-collection : il
@@ -350,6 +356,9 @@ window.creerMonstreDepuisGabarit = async function(idMonstre, gabarit, donneesSup
         Personnalite: (typeof window.tirerPersonnaliteMonstre === "function")
             ? window.tirerPersonnaliteMonstre(gabarit.Archetype)
             : "brutal",
+        // Une résistance à partir de Normal, deux en Élite, trois en Boss.
+        Resistances_Elementaires: typeof window.tirerResistancesElementaires === "function"
+            ? window.tirerResistancesElementaires(gabarit.Palier) : [],
         ...donneesSupplementaires
     };
 

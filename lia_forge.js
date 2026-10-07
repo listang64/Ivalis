@@ -191,6 +191,7 @@ RÈGLES ABSOLUES
 7. Sur une action Poussée : pas de Zone, de Persistance terrain ni d'étalement. Sur une Illusion : pas de Zone.
 8. Distance : seulement avec Arme polyvalente, Arme légère Distance ou Magie — ou sur un soin.${regleLumiere}
 10. N'utilise QUE des identifiants (id) de la liste fournie : aucun autre effet n'existe pour ce héros.
+11. Une Attaque Magique est TOUJOURS liée à un élément (champ element de l'action) : Feu, Foudre ou Glace, selon le récit. Il lui offre déjà 5 % de chance de Brûlé, Électrifié ou Glacé : n'ajoute ce sous-effet que pour monter cette chance. Un Mot de pouvoir n'a pas d'élément.
 
 TON STYLE
 - Reste fidèle au récit : l'élément, le geste, l'effet sur l'ennemi. N'ajoute pas d'effet que le récit ne justifie pas.
@@ -244,6 +245,7 @@ ${JSON.stringify(catalogueEffets(armes))}`;
                                 effet: { type: "STRING", description: "id d'un effet de rôle « action »." },
                                 crans: { type: "INTEGER" },
                                 duree: { type: "INTEGER", description: "crans ⏳ ajoutés, 0 sinon" },
+                                element: { type: "STRING", enum: ["Feu", "Foudre", "Glace"], description: "L'élément d'une Attaque Magique (et d'elle seule)." },
                                 sous_effets: {
                                     type: "ARRAY",
                                     items: {
@@ -420,6 +422,18 @@ function raboterUnCran() {
     return false;
 }
 
+// L'élément d'une Attaque Magique posée par LIA : le sien s'il est valide,
+// sinon celui que le récit évoque (flamme, éclair, givre…), sinon le Feu.
+function elementPourLIA(propose, recit) {
+    const ids = (window.ELEMENTS_MAGIQUES || []).map(e => e.id);
+    const p = (ids.find(id => sansAccents(id) === sansAccents(propose)));
+    if (p) return p;
+    const r = sansAccents(recit);
+    if (/(foudre|eclair|electri|orage|tonnerre)/.test(r)) return "Foudre";
+    if (/(glace|givre|gel|froid|neige|glacial)/.test(r)) return "Glace";
+    return "Feu";
+}
+
 // Pose le plan de LIA dans la Forge. Rend { ok, notes, message }. Sur un
 // échec, la Forge est remise exactement comme avant.
 function appliquerPlanLIA(plan, recit) {
@@ -456,6 +470,11 @@ function appliquerPlanLIA(plan, recit) {
         if ((eff.Nom || "").toLowerCase().includes("poison") && !aUneAttaque()) { notes.push(`${nom} exige une attaque`); return; }
         const act = { idInst: idInstance(), baseEffet: eff, count: borne(pa.crans, 1, O.getMaxStacks(eff)),
                       mods: {}, zoneHexes: [], baseDuree: 0, modsDuree: {} };
+        // Une Attaque Magique reçoit son élément : celui que LIA a dit, sinon
+        // celui que le récit évoque, sinon le Feu.
+        if (typeof window.estAttaqueElementaire === "function" && window.estAttaqueElementaire(eff.Nom)) {
+            act.element = elementPourLIA(pa && pa.element, recit);
+        }
         fs.actions.push(act);
         if (O.getActiveTags().size > 2) { fs.actions.pop(); notes.push(`${nom} : une 3e caractéristique, écarté`); return; }
         if (dureeReglable(eff, false)) act.baseDuree = borne(pa.duree, 0, max);

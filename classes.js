@@ -168,7 +168,8 @@ window.DESCRIPTIFS_CLASSES = {
                        "Garde ses résistances, mais plus d'esquive ni de parade"] },
             { niveau: 10, titre: "Sursis",
               points: ["Tombé à 0 PV, il tient encore 2 tours debout avant d'être mis KO",
-                       "Les coups sont ignorés, aucun soin possible · une fois par combat"] }
+                       "Les coups sont ignorés, aucun soin possible · une fois par combat",
+                       "Ses zombies se relèvent jusqu'à 2 cases autour de lui"] }
         ]
     },
     CLASSE_SENTINELLE: {

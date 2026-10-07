@@ -1247,7 +1247,9 @@ function formatterTexteEffet(effet, stacks, action) {
 
     // 1. Remplacement du % de base et du Max
     if (pBase > 0) {
-        const calcP = pBase * stacks;
+        // Les 5 % qu'offre l'élément d'une Attaque Magique s'y ajoutent.
+        const offert = chanceOfferteSur(effet, action);
+        const calcP = offert > 0 && pMax > 0 ? Math.min(pMax, pBase * stacks + offert) : pBase * stacks + offert;
         if (/\d+(?:[.,]\d+)?\s*%/.test(texte)) {
             texte = texte.replace(/\d+(?:[.,]\d+)?\s*%/, calcP + "%");
         }
@@ -1679,19 +1681,87 @@ window.selectionnerArme = function(arme) {
 
 window.ajouterComposantPrincipal = function(effetId) {
     const eff = window.forgeState.effetsBDD.find(e => e.id === effetId);
-    window.forgeState.actions.push({
-        idInst: "ACT_" + Math.random().toString(36).substring(2, 9),
-        baseEffet: eff, 
-        count: 1, 
-        mods: {},
-        zoneHexes: [],
-        baseDuree: 0,
-        modsDuree: {}
-    });
+    const poser = (element) => {
+        window.forgeState.actions.push({
+            idInst: "ACT_" + Math.random().toString(36).substring(2, 9),
+            baseEffet: eff,
+            count: 1,
+            mods: {},
+            zoneHexes: [],
+            baseDuree: 0,
+            modsDuree: {},
+            ...(element ? { element } : {})
+        });
+        window.rafraichirForge();
+    };
 
     window.fermerMenuAjoutForge();
-    window.rafraichirForge();
+    // UNE ATTAQUE MAGIQUE EST TOUJOURS LIÉE À UN ÉLÉMENT (Nico) : on le
+    // choisit avant qu'elle ne se pose. Annuler, c'est ne rien poser.
+    if (typeof window.estAttaqueElementaire === "function" && window.estAttaqueElementaire(eff && eff.Nom)) {
+        window.ouvrirChoixElement(poser);
+        return;
+    }
+    poser(null);
 };
+
+// =========================================================================
+//  LE CHOIX DE L'ÉLÉMENT (Attaque Magique)
+// =========================================================================
+//  Une fenêtre, trois boutons ronds : Feu, Foudre, Glace (ELEMENTS_MAGIQUES,
+//  app.js). L'élément choisi offre 5 % de chance de poser son état, que la
+//  carte montre comme un sous-effet « offert » qu'on peut monter.
+window.ouvrirChoixElement = function(surChoix, actuel) {
+    const modale = document.getElementById("modale-choix-element");
+    const boutons = document.getElementById("forge-choix-element-boutons");
+    if (!modale || !boutons) { surChoix((window.ELEMENTS_MAGIQUES || [])[0].id); return; }
+    window.forgeState.surChoixElement = surChoix;
+    const offert = window.CHANCE_ELEMENT_OFFERTE || 5;
+    boutons.innerHTML = (window.ELEMENTS_MAGIQUES || []).map(el => `
+        <button type="button" class="forge-element-rond${el.id === actuel ? " choisi" : ""}" data-element="${el.id}"
+                style="--el-couleur: ${el.couleur}; --el-fond: ${el.fond};"
+                onclick="if (typeof jouerSonClic === 'function') jouerSonClic(); window.choisirElementForge('${el.id}')">
+            <span class="forge-element-disque"><span class="forge-element-icone">${el.icone}</span></span>
+            <span class="forge-element-nom">${el.nom}</span>
+            <span class="forge-element-etat">${el.etat} · ${offert} %</span>
+        </button>`).join("");
+    modale.style.display = "block";
+};
+window.choisirElementForge = function(id) {
+    const suite = window.forgeState.surChoixElement;
+    window.forgeState.surChoixElement = null;
+    document.getElementById("modale-choix-element").style.display = "none";
+    if (typeof suite === "function" && window.elementMagique(id)) suite(id);
+};
+window.fermerChoixElement = function() {
+    window.forgeState.surChoixElement = null;
+    const modale = document.getElementById("modale-choix-element");
+    if (modale) modale.style.display = "none";
+};
+// Le rond de l'élément, sur la carte : un toucher pour en changer.
+window.changerElementForge = function(idInst) {
+    const act = window.forgeState.actions.find(a => a.idInst === idInst);
+    if (!act) return;
+    window.ouvrirChoixElement((id) => { act.element = id; window.rafraichirForge(); }, act.element);
+};
+
+// L'élément d'une action de la Forge, et l'effet du grimoire qui porte son état.
+function elementDeLAction(act) {
+    if (!act || !act.element || typeof window.estAttaqueElementaire !== "function") return null;
+    if (!window.estAttaqueElementaire(act.baseEffet && act.baseEffet.Nom)) return null;
+    return window.elementMagique(act.element);
+}
+function effetDeLElement(el) {
+    if (!el) return null;
+    const bdd = (window.forgeState && window.forgeState.effetsBDD) || [];
+    return bdd.find(e => e.id === el.effetId) || bdd.find(e => e.Nom === el.etat) || null;
+}
+// La chance offerte qu'un effet reçoit sur cette action : 5 % sur l'état de
+// son élément, rien ailleurs.
+function chanceOfferteSur(effet, action) {
+    const el = elementDeLAction(action);
+    return (el && effet && (effet.id === el.effetId || effet.Nom === el.etat)) ? (window.CHANCE_ELEMENT_OFFERTE || 5) : 0;
+}
 
 window.modifierActionCount = function(idInst, delta) {
     const act = window.forgeState.actions.find(a => a.idInst === idInst);
@@ -1930,11 +2000,18 @@ function compilerEffetsTexte() {
         if (act.baseDuree > 0) descBase += ` <span style="color:#9333ea;">(+ ⏳ ${act.baseDuree} Trs)</span>`;
         
         // On sauvegarde un objet propre au lieu d'une simple phrase
+        const elementAct = elementDeLAction(act);
+        if (elementAct) descBase += ` · ${elementAct.icone} ${elementAct.nom}`;
         descriptions.push({
             nom: act.baseEffet.Nom,
             desc: descBase,
             isMod: false
         });
+        // Son état offert, quand on n'y a mis aucun cran.
+        const effElement = effetDeLElement(elementAct);
+        if (effElement && !act.mods[effElement.id]) {
+            descriptions.push({ nom: effElement.Nom, desc: formatterTexteEffet(effElement, 0, act) + " (offert)", isMod: true });
+        }
 
         Object.keys(act.mods).forEach(modId => {
             const modEff = window.forgeState.effetsBDD.find(e => e.id === modId);
@@ -2396,10 +2473,11 @@ window.rafraichirForge = function() {
         }
     }
 
-    const selectElement = document.getElementById("forge-element");
-    if (selectElement) {
-        const element = selectElement.value;
-        document.getElementById("forge-element-affichage").innerText = element === "Aucun" ? "" : "• " + element.toUpperCase();
+    // L'élément de la technique, sous son nom : celui de ses Attaques Magiques.
+    const affichageElement = document.getElementById("forge-element-affichage");
+    if (affichageElement) {
+        const els = [...new Set(window.forgeState.actions.map(elementDeLAction).filter(Boolean))];
+        affichageElement.innerText = els.map(el => `${el.icone} ${el.nom.toUpperCase()}`).join("  ");
     }
 
     document.getElementById("forge-cout-pc").innerText = totalPC.toFixed(1) + " PC";
@@ -2485,9 +2563,33 @@ window.rafraichirForge = function() {
             const btnPlusBaseDureeDisabled = (currentBaseDuree >= maxDureeStacks || capDepasse) ? `class="forge-btn-plus" disabled` : `class="forge-btn-plus"`;
 
             let htmlMods = "";
+            // L'ÉTAT DE L'ÉLÉMENT, OFFERT : tant qu'on n'y a mis aucun cran, il
+            // se montre quand même — 5 % gratuits, et le « + » le monte comme
+            // n'importe quel sous-effet (la ligne normale prend alors le relais).
+            const elementAct = elementDeLAction(act);
+            const effElement = effetDeLElement(elementAct);
+            if (effElement && !act.mods[effElement.id]) {
+                const montable = !capDepasse && etatSousEffet(effElement, act, activeTags) === "ok";
+                htmlMods += `
+                    <div class="forge-ligne forge-sous-effet forge-sous-effet-offert" style="--el-couleur: ${elementAct.couleur};">
+                        <div class="forge-ligne-texte">
+                            <span class="forge-nom-effet" data-bulle-effet="${effElement.id}" data-action="${act.idInst}">${elementAct.icone} ${nettoyerNomEffet(effElement.Nom)}</span><span class="forge-tag-offert">OFFERT</span>
+                            <div class="forge-desc">${formatterTexteEffet(effElement, 0, act)}</div>
+                        </div>
+                        <div class="forge-controles">
+                            <div class="forge-compteur">
+                                <button class="forge-btn-moins" disabled>-</button>
+                                <b>0</b>
+                                <button class="forge-btn-plus" onclick="window.modifierModCount('${act.idInst}', '${effElement.id}', 1)" ${montable ? "" : "disabled"}>+</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
             Object.keys(act.mods).forEach(modId => {
                 const modCount = act.mods[modId];
                 const modEff = window.forgeState.effetsBDD.find(e => e.id === modId);
+                const offertIci = chanceOfferteSur(modEff, act);
 
                 const isModMaxed = modCount >= getMaxStacks(modEff);
                 const btnPlusModDisabled = (isModMaxed || capDepasse) ? `class="forge-btn-plus" disabled` : `class="forge-btn-plus"`;
@@ -2512,7 +2614,7 @@ window.rafraichirForge = function() {
                 htmlMods += `
                     <div class="forge-ligne forge-sous-effet">
                         <div class="forge-ligne-texte">
-                            <span class="forge-nom-effet" data-bulle-effet="${modEff.id}" data-action="${act.idInst}">${nettoyerNomEffet(modEff.Nom)}</span>${modEff.Modificateur !== "AUCUN" ? `<span class="forge-tag-mini">${modEff.Modificateur}</span>` : ""}
+                            <span class="forge-nom-effet" data-bulle-effet="${modEff.id}" data-action="${act.idInst}">${offertIci > 0 ? elementAct.icone + " " : ""}${nettoyerNomEffet(modEff.Nom)}</span>${modEff.Modificateur !== "AUCUN" ? `<span class="forge-tag-mini">${modEff.Modificateur}</span>` : ""}${offertIci > 0 ? `<span class="forge-tag-offert">+${offertIci} % OFFERTS</span>` : ""}
                             <div class="forge-desc">${formatterTexteEffet(modEff, modCount, act)}${currentModDuree > 0 ? `<span class="forge-duree-ajoutee">⏳ +${currentModDuree} tour(s) (+${(currentModDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}</div>
                         </div>
                         <div class="forge-controles">
@@ -2538,7 +2640,7 @@ window.rafraichirForge = function() {
                 <div class="forge-action">
                     <div class="forge-ligne">
                         <div class="forge-ligne-texte">
-                            <span class="forge-nom-effet" data-bulle-effet="${act.baseEffet.id}" data-action="${act.idInst}">${nettoyerNomEffet(act.baseEffet.Nom)}</span>${act.baseEffet.Modificateur !== "AUCUN" ? `<span class="forge-tag-mini">${act.baseEffet.Modificateur}</span>` : ""}
+                            <span class="forge-nom-effet" data-bulle-effet="${act.baseEffet.id}" data-action="${act.idInst}">${nettoyerNomEffet(act.baseEffet.Nom)}</span>${act.baseEffet.Modificateur !== "AUCUN" ? `<span class="forge-tag-mini">${act.baseEffet.Modificateur}</span>` : ""}${window.estAttaqueElementaire && window.estAttaqueElementaire(act.baseEffet.Nom) ? `<button type="button" class="forge-element-pastille${elementAct ? "" : " manquant"}" title="Changer d'élément" ${elementAct ? `style="--el-couleur: ${elementAct.couleur}; --el-fond: ${elementAct.fond};"` : ""} onclick="window.changerElementForge('${act.idInst}')">${elementAct ? `${elementAct.icone} ${elementAct.nom}` : "Choisir un élément"}</button>` : ""}
                             <div class="forge-desc">${formatterTexteEffet(act.baseEffet, act.count, act)}${texteValeurSurpuissante(act, fatigueConsommee)}${currentBaseDuree > 0 ? `<span class="forge-duree-ajoutee">⏳ +${currentBaseDuree} tour(s) (+${(currentBaseDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}</div>
                         </div>
                         <div class="forge-controles">
@@ -2572,7 +2674,11 @@ window.rafraichirForge = function() {
     const btnValider = document.getElementById("btn-valider-forge");
     const nomSaisi = document.getElementById("forge-nom").value.trim();
 
-    btnValider.disabled = capErreur || fatigueConsommee === 0 || nomSaisi === "" || !window.forgeState.armePrincipale;
+    // Une Attaque Magique sans élément ne se forge pas (une technique d'avant,
+    // ou LIA qui n'en a pas trouvé) : son rond le demande.
+    const sansElement = window.forgeState.actions.some(a => typeof window.estAttaqueElementaire === "function"
+        && window.estAttaqueElementaire(a.baseEffet.Nom) && !elementDeLAction(a));
+    btnValider.disabled = capErreur || fatigueConsommee === 0 || nomSaisi === "" || !window.forgeState.armePrincipale || sansElement;
 };
 
 // LES OUTILS DE LA FORGE, pour LIA (lia_forge.js) : elle pose ses effets avec
@@ -2592,8 +2698,8 @@ window.sauvegarderCompetence = async function() {
     const nomCompetence = document.getElementById("forge-nom").value.trim();
     const arme = window.forgeState.armePrincipale || "Non spécifié";
 
-    const selectElement = document.getElementById("forge-element");
-    const element = selectElement ? selectElement.value : "Aucun";
+    const elementsCarte = window.forgeState.actions.map(elementDeLAction).filter(Boolean);
+    const element = elementsCarte.length > 0 ? elementsCarte[0].nom : "Aucun";
 
     const fatigue = parseInt(document.getElementById("forge-fatigue-val").innerText);
     const initiative = parseInt(document.getElementById("forge-initiative-val").innerText);
@@ -2611,7 +2717,8 @@ window.sauvegarderCompetence = async function() {
             mods: { ...a.mods },
             zoneHexes: a.zoneHexes || [],
             baseDuree: a.baseDuree || 0,
-            modsDuree: { ...(a.modsDuree || {}) }
+            modsDuree: { ...(a.modsDuree || {}) },
+            ...(elementDeLAction(a) ? { element: a.element } : {})
         }))
     };
 

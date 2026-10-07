@@ -5537,7 +5537,12 @@ window.actualiserEtatsEncart = function() {
         vus.add(e.nom);
         return true;
     });
-    const signature = elEtats.dataset.acteur + "#" + etats.map(e => e.nom + ":" + e.duree).join("|");
+    // LES RÉSISTANCES D'UNE CRÉATURE (app.js) : un petit rond par élément,
+    // à la suite de ses états — on voit à quoi elle résiste quand elle joue.
+    const resistances = typeof window.atoutCreature === "function"
+        ? (window.atoutCreature(perso).immunites || []) : [];
+    const signature = elEtats.dataset.acteur + "#" + etats.map(e => e.nom + ":" + e.duree).join("|")
+        + "#" + resistances.join(",");
     if (elEtats.dataset.signature === signature) return;
     elEtats.dataset.signature = signature;
     // Les icônes seules, sous le pion : leur nom tiendrait mal dans une
@@ -5548,7 +5553,11 @@ window.actualiserEtatsEncart = function() {
     const tailleEtat = parseInt(elEtats.dataset.taille) || 32;
     elEtats.innerHTML = etats.map(etat =>
         `<div title="${etat.nom} (${etat.duree})" style="line-height: 0;">${window.imageEtat(etat, tailleEtat)}</div>`
-    ).join("");
+    ).join("") + resistances.map(nomEtat => {
+        const el = (window.ELEMENTS_MAGIQUES || []).find(e => e.etat === nomEtat);
+        return el ? `<div class="pastille-resistance" title="Résiste : ${el.nom} (insensible à ${el.etat}, −20 % de ses sorts)"
+                         style="--el-couleur: ${el.couleur}; --el-fond: ${el.fond}; width: ${tailleEtat}px; height: ${tailleEtat}px; font-size: ${Math.round(tailleEtat * 0.55)}px;">${el.icone}</div>` : "";
+    }).join("");
 };
 
 window.rafraichirVoileTour = function(queueParam, phaseParam) {

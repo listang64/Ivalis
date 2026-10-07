@@ -756,6 +756,10 @@ export function partRendue(pctAnnule) {
     return Math.min(PART_RENDUE_MAX, Math.max(0, nombre(pctAnnule)) / 2);
 }
 
+// Ce qu'un sort perd contre qui est insensible à son élément (chaineDeDegats).
+export const REDUCTION_SORT_RESISTE = 20;
+const MESSAGES_RESISTANCE = { "Brûlé": "🔥 Résiste au feu", "Électrifié": "⚡ Résiste à la foudre", "Glacé": "❄️ Résiste à la glace" };
+
 export function chaineDeDegats(cible, attaque, options) {
     const { critique = false, distance = 1, percee = false, sansMalusContact = false } = options || {};
     const compte = { soinAbsorption: 0, degats: 0, secondTic: 0, versBouclier: 0, versPv: 0 };
@@ -797,6 +801,17 @@ export function chaineDeDegats(cible, attaque, options) {
     else if (attaque.typeRes === "Magique") vulnerabilite += regleDesEtats(cible, "degatsMagiquesSubis");
     else vulnerabilite += regleDesEtats(cible, "degatsPhysiquesSubis");
     if (vulnerabilite !== 0) degats = Math.max(0, Math.round(degats * (1 + vulnerabilite / 100)));
+
+    // 2 ter. UN SORT D'UN ÉLÉMENT CONTRE QUI Y EST INSENSIBLE (règle de Nico) :
+    //    l'Ondari au Feu, le Vampire à la Glace, une créature qui résiste à la
+    //    Foudre… encaissent 20 % de moins d'une Attaque Magique de cet élément.
+    //    L'élément voyage sur l'attaque avec le nom de son état (etatElement,
+    //    moteur_effets.js) : c'est la même liste d'immunités qui décide.
+    if (!brut && attaque.etatElement
+        && ((cible.atouts && cible.atouts.immunites) || []).includes(attaque.etatElement)) {
+        compte.resiste = attaque.etatElement;
+        degats = Math.max(0, Math.round(degats * (1 - REDUCTION_SORT_RESISTE / 100)));
+    }
 
     // 3. Absorption et Contre : la cible annule une part du coup — un
     //    POURCENTAGE de ce qui arrive, jamais un nombre fixe. Le grimoire les
@@ -1716,6 +1731,10 @@ export function resoudreCarte(etat, action, plateau) {
                 const sansMalusContact = !!(lanceur.atouts && lanceur.atouts.sortsSansMalusContact)
                     && attaqueFrappe.typeRes === "Magique";
                 const compte = chaineDeDegats(cible, attaqueFrappe, { critique, distance: distanceHex(lanceur, cible), percee, sansMalusContact });
+                if (compte.resiste) {
+                    etapes.push({ type: "message", cible: idCible, acteur: idLanceur,
+                                  texte: MESSAGES_RESISTANCE[compte.resiste] || "🛡️ Résiste", couleur: "#b0bec5" });
+                }
 
                 // Le drain de l'absorption soigne AVANT que le reste ne frappe.
                 if (compte.soinAbsorption > 0) {

@@ -76,6 +76,7 @@ const r = await p.evaluate(async (EFFETS) => {
   await window.ouvrirCreationCompetence();
   window.forgeState.armePrincipale = "Magie";
   window.ajouterComposantPrincipal("EFF_ATTAQUE_MAGIQUE");
+    window.choisirElementForge("Feu"); // une Attaque Magique a toujours un élément (elements_magiques.mjs)
   window.forgeState.actions[0].mods = { EFF_DISTANCE: 1 };
   document.getElementById("forge-nom").value = "Rayon";
   window.rafraichirForge();
