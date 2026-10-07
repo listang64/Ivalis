@@ -5921,6 +5921,27 @@ const NOMS_CARACS = [
 
 window.statsCreation = { force: 8, dex: 8, con: 8, int: 8, sag: 8, cha: 8 };
 
+// CE QUE CHAQUE CARACTÉRISTIQUE SERT, sous son compteur dans la fenêtre de
+// répartition (Nico : « que l'on sache dans quoi placer les points »). Les
+// effets de combat sont ceux du Codex (feuille CRÉA COMP) : à la Forge, une
+// compétence est plafonnée par la caractéristique de ses effets. La
+// Constitution n'y porte aucun effet : elle donne les points de vie. La
+// seconde ligne dit ce qu'elle sert à jouer en RP.
+window.AIDE_CARACS = {
+  force: { combat: ["Attaque lourde", "Étourdit", "Poussée", "Provocations", "Saignement"],
+           rp: "soulever, enfoncer, escalader, nager, porter, bras de fer" },
+  dex:   { combat: ["Attaque légère", "Contre", "Bond", "Repli", "Aveuglement", "Empoisonnement"],
+           rp: "saut, adresse, acrobaties, discrétion, crochetage, escamotage" },
+  con:   { combat: ["Points de vie max"],
+           rp: "endurance, tenir la marche, résister au poison, au froid, à la faim, à l'ivresse" },
+  int:   { combat: ["Attaque magique", "Glacé", "Brûlé", "Électrifié", "Traction magique"],
+           rp: "arcanes, histoire, enquête, nature, religion, déchiffrer" },
+  sag:   { combat: ["Soin", "Purification", "Bouclier magique", "Absorption"],
+           rp: "perception, intuition, médecine, survie, pister, dressage" },
+  cha:   { combat: ["Mots de pouvoirs", "Confusion", "Peur", "Immobilisation", "Illusion"],
+           rp: "persuasion, intimidation, duperie, marchandage, représentation" }
+};
+
 function getCoutStat(valeur) {
   const couts = { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9, 16: 12 };
   return couts[valeur] || 0;
@@ -6049,15 +6070,21 @@ window.actualiserModaleCaracs = function() {
     const limiteAtteinte = (val >= 16) || (aUneStatA16 && val >= 15);
     const btnPlusDisabled = (limiteAtteinte || pointsRestants < coutSuivant) ? "disabled" : "";
 
+    const aide = (window.AIDE_CARACS || {})[c.id];
+    const aideHtml = aide ? `
+        <div class="aide-carac-creation">
+          <div class="aide-carac-combat">${aide.combat.map(e => `<span class="aide-carac-effet">${e}</span>`).join("")}</div>
+          <div class="aide-carac-rp">${aide.rp}</div>
+        </div>` : "";
     const html = `
-      <div class="ligne-creation-carac">
+      <div class="ligne-creation-carac" data-carac="${c.id}">
         <div class="nom-carac-creation">${c.nom}</div>
         <div class="controle-carac">
           <button class="btn-plus-moins" ${btnMoinsDisabled} onclick="modifierStat('${c.id}', -1)">-</button>
           <div class="valeur-carac-creation">${val}</div>
           <button class="btn-plus-moins" ${btnPlusDisabled} onclick="modifierStat('${c.id}', 1)">+</button>
           <div class="modif-carac-creation">(${modAff})</div>
-        </div>
+        </div>${aideHtml}
       </div>
     `;
     conteneur.insertAdjacentHTML('beforeend', html);

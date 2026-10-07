@@ -188,6 +188,7 @@ node renommer_dev.mjs            # ✏️ renommer un héros depuis l'onglet DEV
 node proprio_dev.mjs             # 🤝 confier un héros à un autre joueur depuis l'onglet DEV (ID_Joueur)
 node bagues_dps.mjs              # 💍 les bagues de dégâts : Intelligence ou Charisme (la meilleure), bonus sur le magique ou le brut
 node compagnon_attaque.mjs        # 🐾 le compagnon du Pisteur : le nom RP de son attaque, trouvé par Gemini et gardé sur la fiche
+node aide_caracs.mjs              # 📜 la répartition des caractéristiques : effets de combat (Codex) et usages RP sous chacune
 node interrupteur_illustration.mjs # 🖼️ l'interrupteur des Paramètres : couper / rallumer la génération des images des cartes
 node ecritures_combat.mjs   # un seul poste écrit le résultat d'une carte, créature comprise
 node cent_combats.mjs       # 100 combats à 3 joueurs, ratio de victoires
@@ -5084,3 +5085,18 @@ n'ont pas de loot ».
   sont plus participants (ni lot, ni part de la réserve, ni XP), le butin ne
   les attend plus, et seuls debout ils ne valent pas une victoire de héros.
   butin_loot.mjs (16).
+
+## À quoi sert chaque caractéristique (version 210)
+
+Nico : « dans le panneau pour créer les caractéristiques d'un nouveau perso,
+rajoute sous chaque carac chaque effet de combat lié, que l'on sache dans quoi
+placer les points. Quelque chose de discret et joli. Et sur une ligne en
+dessous, ce pour quoi cette carac pourra être jouée en RP. »
+- AIDE_CARACS (app.js) : sous chaque compteur de la fenêtre « Répartition »,
+  les effets de combat en petites étiquettes — ceux du Codex (feuille
+  CRÉA COMP), vérifiés contre le grimoire en ligne en lecture seule ; la
+  Constitution, qui n'en module aucun, affiche ses points de vie — puis une
+  ligne « RP : » en italique (pour la Dextérité : saut, adresse, acrobaties…).
+  Les effets de classe (Ténèbres, Lumière, Vampirisme) n'y sont pas.
+- La fenêtre s'élargit un peu (520 px au plus) et défile si l'écran est trop
+  bas. aide_caracs.mjs.

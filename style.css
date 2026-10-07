@@ -1457,6 +1457,7 @@ textarea.input-texte-parchemin {
    ========================================= */
 .ligne-creation-carac {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   background-color: rgba(92, 58, 33, 0.1);
@@ -1519,6 +1520,49 @@ textarea.input-texte-parchemin {
   text-align: right;
   color: #5c3a21;
 }
+
+/* CE QUE LA CARACTÉRISTIQUE SERT (sous son compteur) : les effets de combat
+   en petites étiquettes, puis ses usages RP en italique. Discret : couleurs
+   du parchemin, petite taille, séparé du compteur par un filet. */
+.aide-carac-creation {
+  flex-basis: 100%;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(122, 90, 28, 0.35);
+  text-align: left;
+}
+.aide-carac-combat {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.aide-carac-effet {
+  font-family: 'Cinzel', serif;
+  font-size: 10.5px;
+  letter-spacing: 0.3px;
+  color: #5c3a21;
+  background: rgba(255, 248, 225, 0.55);
+  border: 1px solid rgba(194, 168, 120, 0.8);
+  border-radius: 10px;
+  padding: 1px 7px;
+  white-space: nowrap;
+}
+.aide-carac-rp {
+  margin-top: 4px;
+  font-size: 12px;
+  font-style: italic;
+  color: #7a5a3a;
+}
+.aide-carac-rp::before { content: "RP : "; font-style: normal; font-weight: bold; color: #8c6a45; }
+
+/* Plus haute avec ses aides : elle défile plutôt que de sortir de l'écran. */
+#modale-creation-caracs {
+  width: min(520px, 94vw) !important;
+  max-height: 92vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+#grille-creation-caracs { gap: 10px !important; }
 
 /* Affichage Final */
 .bloc-stat-final {
