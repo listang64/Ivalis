@@ -106,7 +106,7 @@ console.log("\n3. L'ENCART DANS LA FICHE");
         const fiche = document.getElementById("fenetre-fiche-perso");
         fiche.style.display = "flex"; fiche.style.left = "2vw"; fiche.style.top = "10px";
         document.getElementById("titre-nom-personnage").textContent = "Morvak";
-        const bouton = [...document.querySelectorAll(".onglet-btn")].find(x => x.textContent.trim() === "Statistiques");
+        const bouton = [...document.querySelectorAll(".onglet-btn")].find(x => x.textContent.trim() === "Aperçu");
         if (bouton) bouton.click();
         window.afficherStatsCombat({ prenom: "Morvak", race: "Gob", classe: "Nécromancien", XP: 2500, PV_Max: 50, Fatigue_Max: 100, Regeneration: 35 });
         const encart = document.getElementById("encart-bonus-race-classe");

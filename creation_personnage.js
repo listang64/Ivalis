@@ -516,6 +516,22 @@ window.afficherStatsCombat = function(donnees) {
     document.getElementById("stat-defphys").innerText = finalDefPhys + "%";
     document.getElementById("stat-defmag").innerText = finalDefMag + "%";
 
+    // L'APERÇU (ex-Statistiques) : le blason porte l'initiale du héros, la
+    // puce Niveau son niveau, et chaque pourcentage une jauge sur 100.
+    const elBlason = document.getElementById("stats-blason");
+    if (elBlason) elBlason.innerText = ((prenom || nom || "?").trim()[0] || "?").toUpperCase();
+    const elNiveau = document.getElementById("stat-niveau");
+    if (elNiveau && typeof window.niveauDepuisXP === "function" && typeof window.xpDuPerso === "function") {
+        elNiveau.innerText = window.niveauDepuisXP(window.xpDuPerso(donnees));
+    }
+    [["stat-esquive", finalEsquive], ["stat-parade", finalParade], ["stat-critique", finalCritique],
+     ["stat-defphys", finalDefPhys], ["stat-defmag", finalDefMag]].forEach(([id, valeur]) => {
+        const ligne = document.querySelector(`.apercu-ligne[data-stat="${id}"]`);
+        const jauge = ligne && ligne.querySelector(".apercu-jauge-remplie");
+        if (jauge) jauge.style.width = Math.max(0, Math.min(100, Number(valeur) || 0)) + "%";
+        if (ligne) ligne.classList.toggle("apercu-ligne-nulle", !(Number(valeur) > 0));
+    });
+
 
     const setDevMod = (id, val) => {
         const el = document.getElementById(id);

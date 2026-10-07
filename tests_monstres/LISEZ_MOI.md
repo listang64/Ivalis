@@ -5211,3 +5211,27 @@ dessus, tu peux en mettre plus ».
   semis sur chaque bloc assez grand d'un pilier (canvas.nbCaillouxDessus).
   geomancien.mjs (9 ter : 8 au moins sur un mur relié, 6 sur un pilier ; la
   clarté reste à 5 % près).
+
+## L'onglet « Aperçu » (ex-Statistiques) ; l'empoisonnement sur l'énergie max (version 215)
+
+Nico : « vérifie que pour l'empoisonnement, la baisse de fatigue se fait bien
+sur la fatigue max de la cible et non actuelle » ; « une refonte graphique
+propre de l'onglet Statistiques de la fiche perso, renommé Aperçu, plus jolie
+et plus lisible ; l'encart des effets de race et de classe, tu peux le
+laisser, le reste change ».
+- L'EMPOISONNEMENT (cerveau_combat.js, ticsDeFinDeManche) : c'était déjà
+  juste — 10 % de fatigueMax (18 % pour le poison du maître). Un banc le
+  fixe avec une énergie max différente de 100 et une cible presque à vide
+  (150 max, 30 restants : −15, pas −3). poison_fatigue_max.mjs.
+- L'APERÇU (index.html, style.css, afficherStatsCombat) : un en-tête sombre
+  (blason à l'initiale, nom, puces Race / Classe / Niveau) ; « Vitalité » en
+  trois tuiles (PV, fatigue max, régénération) ; « Réflexes » (esquive,
+  parade, critique) et « Résistances » (défenses) en lignes avec une phrase
+  d'aide et une jauge sur 100 ; une valeur nulle se grise. Plus de style en
+  ligne : tout vit dans la feuille. Les tailles suivent la largeur de
+  l'onglet (container queries), pas celle de l'écran : la fiche peut être
+  étroite. Les identifiants stat-* sont gardés. L'encart race/classe ne
+  bouge pas. apercu.mjs, fiche_race_classe.mjs, bonus_race_classe.mjs.
+- LA TRACTION ×3 : vérifiée, une carte vise UNE cible (hors zone) ; trois
+  crans de Traction magique font 45 % de chance (15 % par cran, plafond 60 %
+  du grimoire), pas trois cibles. En attente d'une décision de Nico.

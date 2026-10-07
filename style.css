@@ -4533,3 +4533,98 @@ textarea.input-texte-parchemin {
   background: radial-gradient(circle at 35% 30%, var(--el-couleur) 0%, var(--el-fond) 85%);
   border: 2px dashed #e8d5a5; box-shadow: 0 0 6px -1px var(--el-couleur);
 }
+
+/* =========================================================================
+   L'ONGLET APERÇU DE LA FICHE (ex-Statistiques ; afficherStatsCombat)
+   ========================================================================= */
+.apercu { --apercu-encre: #2a1a0f; --apercu-brun: #5c3a21; --apercu-or: #a8841f; --apercu-doux: #7a5a3a;
+           container-type: inline-size; container-name: apercu; }
+.apercu-entete {
+  display: flex; align-items: center; gap: 16px; padding: 14px 18px; margin-bottom: 18px;
+  background: linear-gradient(180deg, #4a2e1b 0%, #2e1c10 100%); border: 2px solid var(--apercu-or);
+  border-radius: 12px; box-shadow: 0 6px 14px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(243,223,166,0.15);
+}
+.apercu-blason {
+  flex-shrink: 0; width: 62px; height: 62px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-family: 'Cinzel', serif; font-size: 30px; font-weight: bold; color: #2a1a0f;
+  background: radial-gradient(circle at 35% 30%, #fff3c9 0%, #e2b84f 55%, #9c7420 100%);
+  border: 3px solid #f3dfa6; box-shadow: 0 0 0 2px #1a1208, 0 4px 10px rgba(0,0,0,0.5);
+}
+.apercu-entete-texte { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.apercu .apercu-nom {
+  margin: 0; padding: 0; border: none; text-align: left; font-family: 'Cinzel', serif; font-size: 28px; line-height: 1.1;
+  color: #f3dfa6; text-shadow: 0 2px 4px rgba(0,0,0,0.6); overflow-wrap: anywhere;
+}
+.apercu-identite { display: flex; flex-wrap: wrap; gap: 8px; }
+.apercu-puce {
+  display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 12px; border-radius: 999px;
+  background: rgba(243,223,166,0.12); border: 1px solid rgba(243,223,166,0.45); color: #f3dfa6;
+}
+.apercu-puce-mot { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; opacity: 0.75; }
+.apercu-puce b { font-family: 'Cinzel', serif; font-size: 16px; }
+
+.apercu-section-titre {
+  display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-family: 'Cinzel', serif; font-size: 14px;
+  font-weight: bold; letter-spacing: 2px; text-transform: uppercase; color: var(--apercu-brun);
+}
+.apercu-section-titre::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--apercu-or), transparent); }
+
+.apercu-vitalite { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
+.apercu-tuile {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px 8px 12px;
+  border-radius: 12px; overflow: hidden; text-align: center;
+  background: linear-gradient(180deg, #fbf3df 0%, #efe0bd 100%); border: 1px solid #c2a878;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+}
+.apercu-tuile::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: var(--accent); }
+.apercu-tuile-vie { --accent: linear-gradient(90deg, #b3261e, #e8584f); }
+.apercu-tuile-fatigue { --accent: linear-gradient(90deg, #b8860b, #f2cf3a); }
+.apercu-tuile-regen { --accent: linear-gradient(90deg, #2e7d32, #7cc47f); }
+.apercu-tuile-icone { font-size: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)); }
+.apercu-tuile-valeur { font-family: 'Cinzel', serif; font-size: 32px; font-weight: bold; color: var(--apercu-encre); line-height: 1.1; }
+.apercu-tuile-nom { font-size: 12px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; color: var(--apercu-doux); }
+
+.apercu-colonnes { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+.apercu-bloc {
+  padding: 12px 14px 6px; border-radius: 12px; background: rgba(255,255,255,0.45); border: 1px solid #c2a878;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+}
+.apercu-ligne {
+  display: grid; grid-template-columns: 28px 1fr auto; grid-template-rows: auto 6px; column-gap: 10px; row-gap: 6px;
+  align-items: center; padding: 8px 0 10px; border-bottom: 1px solid rgba(92,58,33,0.15);
+}
+.apercu-ligne:last-child { border-bottom: none; }
+.apercu-ligne-icone { grid-row: 1 / 3; font-size: 20px; text-align: center; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3)); }
+.apercu-ligne-texte { display: flex; flex-direction: column; min-width: 0; }
+.apercu-ligne-nom { font-size: 15px; font-weight: bold; color: var(--apercu-encre); }
+.apercu-ligne-aide { font-size: 12px; font-style: italic; color: var(--apercu-doux); }
+.apercu-ligne-valeur { font-family: 'Cinzel', serif; font-size: 22px; font-weight: bold; color: var(--apercu-encre); }
+.apercu-jauge {
+  grid-column: 2 / 4; height: 6px; border-radius: 999px; overflow: hidden;
+  background: rgba(92,58,33,0.15); box-shadow: inset 0 1px 2px rgba(0,0,0,0.15);
+}
+.apercu-jauge-remplie {
+  display: block; height: 100%; width: 0; border-radius: 999px;
+  background: linear-gradient(90deg, #9c7420, #e2b84f); transition: width 0.5s ease-out;
+}
+.apercu-ligne-nulle .apercu-ligne-valeur { color: #a89a86; }
+/* La fiche peut être bien plus étroite que l'écran : on lit la largeur de
+   l'onglet lui-même, pas celle de la fenêtre. */
+@container apercu (max-width: 520px) {
+  .apercu-colonnes { grid-template-columns: 1fr; }
+  .apercu-vitalite { gap: 8px; }
+  .apercu-tuile-valeur { font-size: 26px; }
+  .apercu .apercu-nom { font-size: 22px; }
+}
+@container apercu (max-width: 340px) {
+  .apercu-entete { flex-direction: column; text-align: center; padding: 14px 12px; }
+  .apercu .apercu-nom { text-align: center; font-size: 20px; }
+  .apercu-identite { justify-content: center; }
+  .apercu-vitalite { grid-template-columns: 1fr; }
+  .apercu-tuile { flex-direction: row; justify-content: space-between; padding: 10px 14px; text-align: left; }
+  .apercu-tuile-icone { order: 0; }
+  .apercu-tuile-nom { order: 1; flex: 1; min-width: 0; margin: 0 8px; font-size: 10px; letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; }
+  .apercu-tuile-valeur { order: 2; font-size: 22px; white-space: nowrap; }
+  .apercu-bloc { padding: 10px 10px 4px; }
+  .apercu-ligne-valeur { font-size: 18px; }
+}

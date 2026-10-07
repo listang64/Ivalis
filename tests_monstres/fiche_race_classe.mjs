@@ -82,12 +82,14 @@ console.log("\n1. L'ONGLET STATISTIQUES : RACE ET CLASSE EN TÊTE");
 {
   const lire = () => p.evaluate(() => ({ race: (document.getElementById("stat-race") || {}).innerText,
                                          classe: (document.getElementById("stat-classe") || {}).innerText }));
+  // (L'onglet est devenu « Aperçu » : race et classe sont des puces dans son
+  // en-tête, avant les tuiles de vitalité — apercu.mjs.)
   const tuiles = await p.evaluate(() => {
-    const grille = document.getElementById("stat-pv").closest("div[style*='grid']");
-    const ordre = [...grille.querySelectorAll("span[id^='stat-']")].map(s => s.id);
+    const onglet = document.getElementById("onglet-stats");
+    const ordre = [...onglet.querySelectorAll("[id^='stat-']")].map(s => s.id);
     return ordre.slice(0, 3);
   });
-  verifier("les tuiles Race et Classe ouvrent la grille", JSON.stringify(tuiles) === '["stat-race","stat-classe","stat-pv"]',
+  verifier("Race et Classe ouvrent l'onglet, avant les points de vie", JSON.stringify(tuiles) === '["stat-race","stat-classe","stat-niveau"]',
            JSON.stringify(tuiles));
   await p.evaluate(() => window.afficherStatsCombat({ prenom: "Cybile", nom: "Ardente", race: "Gob", classe: "Hoplite",
                                                      PV_Max: 30, Def_Physique: 0, Def_Magique: 0 }));
