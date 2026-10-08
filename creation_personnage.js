@@ -448,6 +448,29 @@ window.validerEtapeDescriptifRapide = async function() {
     }
 };
 
+// LE BLASON DE L'APERÇU (Nico : « à la place du rond jaune avec l'initiale,
+// pour exactement la même taille, l'image du token du joueur »). Le même rond,
+// le même cadre doré : le pion du plateau dedans. Un héros sans pion — ou un
+// pion qui ne se charge pas — garde son initiale.
+window.remplirBlasonApercu = function(el, urlToken, initiale) {
+    const remettreInitiale = () => {
+        el.classList.remove("avec-token");
+        el.textContent = initiale;
+    };
+    if (!urlToken) { remettreInitiale(); return; }
+    const deja = el.querySelector("img.apercu-blason-token");
+    if (deja && deja.getAttribute("src") === urlToken) { deja.alt = initiale; return; }
+    const img = document.createElement("img");
+    img.className = "apercu-blason-token";
+    img.alt = initiale;
+    img.draggable = false;
+    img.onerror = () => { if (img.parentNode === el) remettreInitiale(); };
+    img.src = urlToken;
+    el.textContent = "";
+    el.appendChild(img);
+    el.classList.add("avec-token");
+};
+
 window.afficherStatsCombat = function(donnees) {
     const prenom = donnees.prenom || donnees.Prenom_Personnage || "";
     const nom = donnees.nom || donnees.Nom_Personnage || "";
@@ -526,10 +549,12 @@ window.afficherStatsCombat = function(donnees) {
     document.getElementById("stat-defphys").innerText = finalDefPhys + "%";
     document.getElementById("stat-defmag").innerText = finalDefMag + "%";
 
-    // L'APERÇU (ex-Statistiques) : le blason porte l'initiale du héros, la
-    // puce Niveau son niveau, et chaque pourcentage une jauge sur 100.
+    // L'APERÇU (ex-Statistiques) : le blason porte le pion du héros (à défaut,
+    // son initiale), la puce Niveau son niveau, et chaque pourcentage une
+    // jauge sur 100.
     const elBlason = document.getElementById("stats-blason");
-    if (elBlason) elBlason.innerText = ((prenom || nom || "?").trim()[0] || "?").toUpperCase();
+    if (elBlason) window.remplirBlasonApercu(elBlason, donnees.urlToken || donnees.URL_Token || "",
+                                             ((prenom || nom || "?").trim()[0] || "?").toUpperCase());
     const elNiveau = document.getElementById("stat-niveau");
     if (elNiveau && typeof window.niveauDepuisXP === "function" && typeof window.xpDuPerso === "function") {
         elNiveau.innerText = window.niveauDepuisXP(window.xpDuPerso(donnees));

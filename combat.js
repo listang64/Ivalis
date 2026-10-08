@@ -4839,6 +4839,14 @@ window.afficherPisteInitiative = function(queue, phase) {
     const resteAJouer = new Set(enResolution ? queue.map(f => f.idPersonnage) : ordre.map(e => e.id));
     const idQuiJoue = enResolution ? queue[0].idPersonnage : null;
 
+    // QUI A CHOISI SA COMPÉTENCE (Nico) : pendant la préparation, un sablier
+    // sur le portrait d'un héros qui n'a pas encore choisi, une coche verte
+    // sur celui qui l'a fait. Même règle que le titre « En attente des
+    // joueurs » : on a choisi dès qu'on est dans la file (ou qu'on a déjà joué).
+    const enPreparation = phase === "Preparation";
+    const ontChoisi = new Set([...(partie.Ont_Joue_Ce_Round || []), ...queue.map(f => f.idPersonnage)]);
+    const horsJeuPiste = new Set(partie.Combattants_Hors_Jeu || []);
+
     // On ne garde que ceux dont on a vraiment la fiche : sans elle il n'y a ni
     // portrait, ni jauges, ni rien à montrer.
     const visibles = ordre
@@ -4928,7 +4936,14 @@ window.afficherPisteInitiative = function(queue, phase) {
         // devant ses voisins, comme dans un éventail.
         tuile.style.zIndex = String(visibles.length - index);
         tuile.classList.toggle("a-joue", enResolution && pisteAJoue(e.id, resteAJouer));
-        tuile.innerHTML = contenuTuilePiste(e, e.id === idQuiJoue);
+        // La coche ne « pop » qu'au moment où elle apparaît : la piste se
+        // redessine à chaque notification, et une coche qui rebondit à chaque
+        // choix d'un autre joueur attirerait l'œil pour rien.
+        const choix = enPreparation && window.estJoueurDeLaPiste(e.perso) && !horsJeuPiste.has(e.id)
+            ? (ontChoisi.has(e.id) ? "pret" : "attente") : null;
+        const cocheNeuve = choix === "pret" && tuile.dataset.choix !== "pret";
+        tuile.dataset.choix = choix || "";
+        tuile.innerHTML = contenuTuilePiste(e, e.id === idQuiJoue, choix, cocheNeuve);
     });
 
     // Un combattant qui n'est plus sur la piste (tombé, retiré du combat)
@@ -4964,10 +4979,23 @@ window.texteSurCouleur = function(hex) {
     return L > 0.179 ? "#1a0f08" : "#ffffff";
 };
 
+// Un JOUEUR sur la piste : un héros, ni créature (le compagnon et les zombies
+// sont des créatures de son camp), ni illusion. Lui seul choisit sa compétence.
+window.estJoueurDeLaPiste = (perso) => !!perso && !perso.estMonstre && !perso.estIllusion
+    && !perso.compagnonDe && !perso.zombie;
+
+// Le badge du choix, en haut à droite du portrait : un sablier qui attend, ou
+// une coche verte.
+function badgeChoixPiste(choix, neuf) {
+    if (choix === "pret") return `<div class="piste-choix pret${neuf ? " neuf" : ""}" title="Compétence choisie">✓</div>`;
+    if (choix === "attente") return `<div class="piste-choix attente" title="Choisit sa compétence…"><span>⏳</span></div>`;
+    return "";
+}
+
 // Le contenu d'une tuile : le portrait (hexagone pour un héros, médaillon rond
 // pour une créature), l'encart d'initiative, les deux jauges penchées, et les
-// pastilles d'état sous le tout.
-function contenuTuilePiste(entree, cestSonTour) {
+// pastilles d'état sous le tout. `choix` (préparation) : "attente", "pret" ou rien.
+function contenuTuilePiste(entree, cestSonTour, choix, choixNeuf) {
     const perso = entree.perso;
     const L = PISTE_LARGEUR_TUILE, H = PISTE_HAUTEUR_TUILE;
 
@@ -5050,7 +5078,8 @@ function contenuTuilePiste(entree, cestSonTour) {
         <div style="position: absolute; bottom: 5px; right: -6px; width: 31px; height: 5px; background: #000; border: 1px solid #1a0f08; border-radius: 2px; transform: rotate(-30deg); transform-origin: center; box-shadow: 0 2px 4px rgba(0,0,0,0.8); overflow: hidden; z-index: 3;">
             <div style="position: absolute; top: 0; left: 0; width: ${pctFatigue}%; height: 100%; background: linear-gradient(to right, #c2a878, #fbf5bd); transition: width 0.3s ease;"></div>
         </div>
-        ${etatsHtml}`;
+        ${etatsHtml}
+        ${badgeChoixPiste(choix, choixNeuf)}`;
 }
 
 // =========================================================================

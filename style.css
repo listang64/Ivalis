@@ -4262,7 +4262,12 @@ textarea.input-texte-parchemin {
 .forge-menu-option:hover { background: rgba(140,106,69,0.15); }
 .forge-menu-option.incompatible { color: #999; cursor: not-allowed; }
 .forge-menu-cout { font-size: 12px; color: #7a5a3a; white-space: nowrap; }
-.forge-nom-effet[data-bulle-effet], .forge-grimoire-ligne[data-bulle-effet] { -webkit-touch-callout: none; }
+/* Un doigt posé sur un effet ne doit rien sélectionner : sur iPad, la
+   sélection de texte qui démarre au bout d'une demi-seconde coupait l'appui
+   long de la bulle. */
+[data-bulle-effet], #forge-menu-liste-ouverte {
+  -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+}
 
 /* LA BULLE D'EXPLICATION D'UN EFFET : un petit parchemin à côté de l'effet. */
 .bulle-effet-forge {
@@ -4511,6 +4516,10 @@ textarea.input-texte-parchemin {
 .forge-element-rond:active .forge-element-disque { transform: scale(0.96); }
 .forge-element-rond.choisi .forge-element-disque { border-color: #f3dfa6; }
 .forge-element-rond.choisi .forge-element-nom { text-decoration: underline; text-decoration-color: var(--el-couleur); text-underline-offset: 4px; }
+/* Déjà pris par l'autre Attaque Magique de la carte : grisé, intouchable. */
+.forge-element-rond.pris { cursor: not-allowed; opacity: 0.45; filter: grayscale(0.85); }
+.forge-element-rond.pris:hover .forge-element-disque { transform: none; }
+.forge-element-rond.pris .forge-element-etat { font-style: italic; }
 
 /* Sur la carte : la pastille de l'élément (un toucher pour en changer) et la
    ligne de l'état offert. */
@@ -4550,6 +4559,9 @@ textarea.input-texte-parchemin {
   background: radial-gradient(circle at 35% 30%, #fff3c9 0%, #e2b84f 55%, #9c7420 100%);
   border: 3px solid #f3dfa6; box-shadow: 0 0 0 2px #1a1208, 0 4px 10px rgba(0,0,0,0.5);
 }
+/* Le pion du héros dans le blason : même rond, même cadre, même taille. */
+.apercu-blason.avec-token { overflow: hidden; background: #1a1208; }
+.apercu-blason-token { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .apercu-entete-texte { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .apercu .apercu-nom {
   margin: 0; padding: 0; border: none; text-align: left; font-family: 'Cinzel', serif; font-size: 28px; line-height: 1.1;
@@ -4971,3 +4983,17 @@ textarea.input-texte-parchemin {
 .studio-pion.studio-pion-saisi { cursor: grabbing; z-index: 20; animation: none; box-shadow: 0 0 0 3px #fff3b0, 0 0 20px #e2b84f; }
 @keyframes studio-pion-mobile { from { box-shadow: 0 0 0 2px rgba(226,184,79,0.6), 0 0 6px rgba(226,184,79,0.4); }
                                 to   { box-shadow: 0 0 0 3px rgba(226,184,79,1), 0 0 16px rgba(226,184,79,0.8); } }
+
+/* La piste d'initiative pendant la préparation : qui a choisi sa compétence. */
+.piste-choix {
+  position: absolute; top: -4px; right: -5px; width: 22px; height: 22px; border-radius: 50%; z-index: 4;
+  display: flex; align-items: center; justify-content: center; font-size: 13px; line-height: 1;
+  border: 1px solid rgba(26, 15, 8, 0.85); box-shadow: 0 2px 5px rgba(0,0,0,0.9);
+}
+.piste-choix.attente { background: #2a1d12; color: #f3dfa6; }
+.piste-choix.attente span { display: inline-block; animation: piste-sablier 2.4s ease-in-out infinite; }
+.piste-choix.pret { background: #1b8a3a; color: #ffffff; font-weight: bold; font-size: 14px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.9), 0 0 8px rgba(60, 200, 100, 0.7); }
+.piste-choix.pret.neuf { animation: piste-coche 0.35s ease-out; }
+@keyframes piste-sablier { 0%, 40% { transform: rotate(0deg); } 55%, 100% { transform: rotate(180deg); } }
+@keyframes piste-coche { from { transform: scale(0.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }

@@ -1228,6 +1228,9 @@ window.demarrerCiblage = async function(idCarte, options) {
 
     const attaquesExtraites = [];
     const alterationsExtraites = [];
+    // De quelle action de la carte vient chaque attaque / altération (les
+    // éléments de deux Attaques Magiques ne se mélangent pas).
+    const actionSource = new Map();
     let isZone = false;
     let zoneHexesBase = [];
     // La portée de placement de la zone, lue sur l'action qui la dessine.
@@ -2298,8 +2301,8 @@ window.demarrerCiblage = async function(idCarte, options) {
             const avantA = attaquesExtraites.length, avantAlt = alterationsExtraites.length;
             lireAction(act, idxAction);
             const enZone = !!(act.zoneHexes && act.zoneHexes.length > 0);
-            attaquesExtraites.slice(avantA).forEach(a => { a.enZone = enZone; });
-            alterationsExtraites.slice(avantAlt).forEach(a => { a.enZone = enZone; });
+            attaquesExtraites.slice(avantA).forEach(a => { a.enZone = enZone; actionSource.set(a, idxAction); });
+            alterationsExtraites.slice(avantAlt).forEach(a => { a.enZone = enZone; actionSource.set(a, idxAction); });
         });
     }
 
@@ -2309,10 +2312,26 @@ window.demarrerCiblage = async function(idCarte, options) {
     // réduction d'un insensible se partage : −20 % × insensibles ÷ éléments
     // (chaineDeDegats, moteur_pur.js). L'état offert de l'élément est toujours
     // parmi les altérations : l'élément choisi compte donc toujours.
-    const etatsElementairesCarte = [...new Set(alterationsExtraites.map(a => a.nom)
-        .filter(nom => (window.ELEMENTS_MAGIQUES || []).some(e => e.etat === nom)))];
+    //
+    // DEUX ATTAQUES MAGIQUES SUR LA CARTE (Feu puis Glace) : chacune garde son
+    // élément. Un état qu'une AUTRE Attaque Magique de la carte pose (son état
+    // offert, ou un cran monté sur elle) est à elle, pas à celle-ci ; un état
+    // élémentaire posé par une action à part reste à toute la carte.
+    const actionsCarte = ((dataCarte && dataCarte.Composants && dataCarte.Composants.actions) || []);
+    const estAttaqueMagiqueDe = (idx) => {
+        const act = actionsCarte[idx];
+        const eff = act && window.EFFETS_BDD_CACHE && window.EFFETS_BDD_CACHE[act.baseEffetId];
+        return !!(eff && typeof window.estAttaqueElementaire === "function" && window.estAttaqueElementaire(eff.Nom));
+    };
+    const estEtatElementaire = (nom) => (window.ELEMENTS_MAGIQUES || []).some(e => e.etat === nom);
     attaquesExtraites.forEach(a => {
         if (!a.etatElement) return;
+        const source = actionSource.get(a);
+        const etatsElementairesCarte = [...new Set(alterationsExtraites.filter(alt => {
+            if (!estEtatElementaire(alt.nom)) return false;
+            const autre = actionSource.get(alt);
+            return autre === undefined || autre === source || !estAttaqueMagiqueDe(autre);
+        }).map(alt => alt.nom))];
         a.etatsElements = [...new Set([a.etatElement, ...etatsElementairesCarte])];
         a.elements = a.etatsElements.map(etat => ((window.ELEMENTS_MAGIQUES || []).find(e => e.etat === etat) || {}).id).filter(Boolean);
     });

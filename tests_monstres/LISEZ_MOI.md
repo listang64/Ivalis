@@ -5478,3 +5478,47 @@ au-dessus des tokens. »
   mise à terre « -30 » puis « À terre ! ». Ils montent et s'effacent seuls
   (2,2 s) ; une lecture interrompue les efface (classe anim-message).
   studio_animation.mjs, section 11.
+
+## Piste d'initiative : qui a choisi ; deux sorts sur une carte ; la bulle au doigt ; le pion dans l'Aperçu (version 224)
+
+Nico : « Dans les bulles d'initiative, quand on attend que les joueurs
+choisissent une compétence : un sablier pour ceux qui n'ont pas choisi, une
+coche verte pour ceux qui ont choisi. — Je ne peux pas mettre deux attaques
+magiques différentes sur une même compétence. — Sur iPad, quand je laisse le
+doigt sur un sous-effet dans la Forge, ça ne me met pas de bulle. — Dans
+l'Aperçu, à la place du rond jaune à l'initiale, pour exactement la même
+taille, l'image du token du joueur. »
+- LA PISTE (combat.js, afficherPisteInitiative / badgeChoixPiste) : pendant
+  la préparation, chaque héros porte en haut à droite de son portrait un
+  sablier (qui se retourne) ou une coche verte. La règle est celle du titre
+  « En attente des joueurs » : on a choisi dès qu'on est dans la file de la
+  manche ou dans Ont_Joue_Ce_Round. Rien sur une créature (monstre, compagnon,
+  zombie, illusion — estJoueurDeLaPiste), rien sur un héros hors jeu, rien en
+  résolution. La coche ne rebondit qu'à son apparition (tuile.dataset.choix),
+  pas à chaque notification. piste_choix.mjs.
+- DEUX ATTAQUES MAGIQUES (competences.js, attaqueEncorePermise) : une carte
+  ne porte toujours qu'une attaque de base, sauf l'Attaque Magique, qui peut
+  s'y poser une deuxième fois (MAX_ATTAQUES_MAGIQUES = 2) dans un AUTRE
+  élément. La popup des éléments grise celui que la carte a déjà (« déjà sur
+  la carte »), à la pose comme au changement par la pastille. Seulement entre
+  Attaques Magiques : un Mot de pouvoir ou une Attaque légère restent seuls.
+  Au combat (moteur_effets.js), chaque attaque garde SON élément : l'état
+  qu'une autre Attaque Magique de la carte pose (son offert, ses crans) est à
+  elle ; un état élémentaire posé par une action à part reste à toute la
+  carte, comme avant. Une créature insensible au gel n'encaisse donc moins
+  que l'éclat de glace, pas la boule de feu. deux_attaques_magiques.mjs.
+- LA BULLE AU DOIGT (competences.js, installerBullesEffets) : Safari
+  abandonne le pointeur au bout d'une demi-seconde de doigt immobile
+  (sélection de texte, glisser-déposer) et envoie `pointercancel`, qui tuait
+  le minuteur des 2 s. Sur un écran tactile, ce sont maintenant les
+  événements « touch » qui décident : touchmove au-delà de 10 px (défilement)
+  ou touchend/touchcancel annulent, un deuxième doigt aussi ; pointercancel
+  seul n'annule plus. Et plus rien ne se sélectionne sous le doigt
+  ([data-bulle-effet] : user-select et touch-callout à none).
+  forge_bulle_ipad.mjs (navigateur tactile : la séquence d'iOS rejouée, et un
+  vrai appui long par le protocole du navigateur) ; forge_bulles.mjs inchangé.
+- LE PION DANS L'APERÇU (creation_personnage.js, remplirBlasonApercu) : le
+  blason porte l'image du pion (urlToken / URL_Token), rognée en cercle dans
+  le même rond de 62 px et le même cadre doré (68 px en tout, avant comme
+  après). Pas de pion, ou un pion qui ne se charge pas : l'initiale revient.
+  apercu_pion.mjs ; apercu.mjs inchangé.

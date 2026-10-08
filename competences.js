@@ -1197,6 +1197,36 @@ function estUneAttaqueDeBase(nom) {
            n.includes("mot de pouvoir");
 }
 
+// DEUX ATTAQUES MAGIQUES, DEUX ÉLÉMENTS (Nico : « qu'on puisse mettre deux
+// attaques magiques différentes sur une même compétence »). Une carte ne
+// porte qu'une attaque de base — sauf l'Attaque Magique, qui peut s'y poser
+// une deuxième fois, dans un AUTRE élément : une boule de feu suivie d'un
+// éclat de glace. Seulement entre Attaques Magiques : une Attaque légère ne
+// s'ajoute pas à un sort, ni l'inverse.
+const MAX_ATTAQUES_MAGIQUES = 2;
+function estAttaqueMagiqueForge(nom) {
+    return typeof window.estAttaqueElementaire === "function" && window.estAttaqueElementaire(nom);
+}
+// Les éléments déjà pris par les Attaques Magiques de la carte (sauf `sauf`,
+// celle dont on change justement l'élément).
+function elementsPrisSurLaCarte(sauf) {
+    return ((window.forgeState && window.forgeState.actions) || [])
+        .filter(a => a !== sauf && a.element && estAttaqueMagiqueForge(a.baseEffet && a.baseEffet.Nom))
+        .map(a => a.element);
+}
+// Cette attaque de base peut-elle encore se poser sur la carte ?
+function attaqueEncorePermise(nom) {
+    const attaques = ((window.forgeState && window.forgeState.actions) || [])
+        .filter(a => estUneAttaqueDeBase(a.baseEffet && a.baseEffet.Nom));
+    if (attaques.length === 0) return true;
+    if (!estAttaqueMagiqueForge(nom)) return false;
+    if (!attaques.every(a => estAttaqueMagiqueForge(a.baseEffet && a.baseEffet.Nom))) return false;
+    if (attaques.length >= MAX_ATTAQUES_MAGIQUES) return false;
+    const pris = new Set(elementsPrisSurLaCarte());
+    return (window.ELEMENTS_MAGIQUES || []).some(el => !pris.has(el.id));
+}
+window.attaqueEncorePermiseForge = attaqueEncorePermise;
+
 // LA RISTOURNE DE L'ÉTALEMENT se lit dans son coût au grimoire : « Cout / 1.2 »
 // divise le coût de l'action par 1,2. 1,2 reste le secours si la base ne dit
 // rien de lisible (c'était 1,3 : le diviseur du seul Profanateur).
@@ -1590,7 +1620,8 @@ window.ouvrirMenuAjoutForge = function() {
                 const isArmeIncompatible = estIncompatibleAvecArme(eff.Nom, window.forgeState.armePrincipale);
                 
                 // 🔻 On verrouille si c'est une attaque et qu'il y en a déjà une sur la carte
-                const isAttackLocked = aDejaUneAttaque && estUneAttaqueDeBase(eff.Nom);
+                // (une deuxième Attaque Magique, d'un autre élément, reste permise).
+                const isAttackLocked = aDejaUneAttaque && estUneAttaqueDeBase(eff.Nom) && !attaqueEncorePermise(eff.Nom);
 
                 // Empoisonnement doit toujours être lié à une source de dégât (une attaque
                 // quelque part sur la carte détermine son type de dégât) : verrouillé tant
@@ -1713,7 +1744,7 @@ window.ajouterComposantPrincipal = function(effetId) {
     // UNE ATTAQUE MAGIQUE EST TOUJOURS LIÉE À UN ÉLÉMENT (Nico) : on le
     // choisit avant qu'elle ne se pose. Annuler, c'est ne rien poser.
     if (typeof window.estAttaqueElementaire === "function" && window.estAttaqueElementaire(eff && eff.Nom)) {
-        window.ouvrirChoixElement(poser);
+        window.ouvrirChoixElement(poser, null, elementsPrisSurLaCarte());
         return;
     }
     poser(null);
@@ -1725,30 +1756,44 @@ window.ajouterComposantPrincipal = function(effetId) {
 //  Une fenêtre, trois boutons ronds : Feu, Foudre, Glace (ELEMENTS_MAGIQUES,
 //  app.js). L'élément choisi offre 5 % de chance de poser son état, que la
 //  carte montre comme un sous-effet « offert » qu'on peut monter.
-window.ouvrirChoixElement = function(surChoix, actuel) {
+//  `pris` : les éléments d'une autre Attaque Magique de la même carte, grisés
+//  (deux attaques sur une carte, deux éléments différents).
+window.ouvrirChoixElement = function(surChoix, actuel, pris) {
     const modale = document.getElementById("modale-choix-element");
     const boutons = document.getElementById("forge-choix-element-boutons");
-    if (!modale || !boutons) { surChoix((window.ELEMENTS_MAGIQUES || [])[0].id); return; }
+    const interdits = new Set(pris || []);
+    if (!modale || !boutons) {
+        const libre = (window.ELEMENTS_MAGIQUES || []).find(el => !interdits.has(el.id));
+        if (libre) surChoix(libre.id);
+        return;
+    }
     window.forgeState.surChoixElement = surChoix;
+    window.forgeState.elementsInterdits = [...interdits];
     const offert = window.CHANCE_ELEMENT_OFFERTE || 5;
-    boutons.innerHTML = (window.ELEMENTS_MAGIQUES || []).map(el => `
-        <button type="button" class="forge-element-rond${el.id === actuel ? " choisi" : ""}" data-element="${el.id}"
-                style="--el-couleur: ${el.couleur}; --el-fond: ${el.fond};"
+    boutons.innerHTML = (window.ELEMENTS_MAGIQUES || []).map(el => {
+        const prisAilleurs = interdits.has(el.id);
+        return `
+        <button type="button" class="forge-element-rond${el.id === actuel ? " choisi" : ""}${prisAilleurs ? " pris" : ""}" data-element="${el.id}"
+                style="--el-couleur: ${el.couleur}; --el-fond: ${el.fond};" ${prisAilleurs ? "disabled" : ""}
                 onclick="if (typeof jouerSonClic === 'function') jouerSonClic(); window.choisirElementForge('${el.id}')">
             <span class="forge-element-disque"><span class="forge-element-icone">${el.icone}</span></span>
             <span class="forge-element-nom">${el.nom}</span>
-            <span class="forge-element-etat">${el.etat} · ${offert} %</span>
-        </button>`).join("");
+            <span class="forge-element-etat">${prisAilleurs ? "déjà sur la carte" : `${el.etat} · ${offert} %`}</span>
+        </button>`;
+    }).join("");
     modale.style.display = "block";
 };
 window.choisirElementForge = function(id) {
+    if ((window.forgeState.elementsInterdits || []).includes(id)) return;
     const suite = window.forgeState.surChoixElement;
     window.forgeState.surChoixElement = null;
+    window.forgeState.elementsInterdits = [];
     document.getElementById("modale-choix-element").style.display = "none";
     if (typeof suite === "function" && window.elementMagique(id)) suite(id);
 };
 window.fermerChoixElement = function() {
     window.forgeState.surChoixElement = null;
+    window.forgeState.elementsInterdits = [];
     const modale = document.getElementById("modale-choix-element");
     if (modale) modale.style.display = "none";
 };
@@ -1756,7 +1801,7 @@ window.fermerChoixElement = function() {
 window.changerElementForge = function(idInst) {
     const act = window.forgeState.actions.find(a => a.idInst === idInst);
     if (!act) return;
-    window.ouvrirChoixElement((id) => { act.element = id; window.rafraichirForge(); }, act.element);
+    window.ouvrirChoixElement((id) => { act.element = id; window.rafraichirForge(); }, act.element, elementsPrisSurLaCarte(act));
 };
 
 // L'élément d'une action de la Forge, et l'effet du grimoire qui porte son état.
@@ -1958,6 +2003,28 @@ window.basculerMenuSousEffets = function(bouton) {
     window.__bullesEffetsInstallees = true;
     let minuteur = null, depart = null, appuiLong = false;
     const annuler = () => { clearTimeout(minuteur); minuteur = null; depart = null; };
+    // L'APPUI LONG, COMPTÉ À PART DES ÉVÉNEMENTS « POINTER » (Nico, sur iPad :
+    // « quand je laisse le doigt sur un sous-effet, ça ne me met pas de
+    // bulle »). Safari, lui, abandonne le pointeur au bout d'une demi-seconde
+    // de doigt immobile — il y voit le début d'une sélection de texte, d'un
+    // glisser-déposer ou d'un défilement — et envoie `pointercancel`, qui
+    // arrêtait notre minuteur bien avant les 2 secondes. Le doigt, lui, est
+    // toujours là, et les événements « touch » continuent : ce sont eux qui
+    // disent s'il a bougé (touchmove) ou s'il s'est levé (touchend).
+    const demarrer = (cible, x, y) => {
+        annuler();
+        appuiLong = false;
+        depart = { x, y };
+        minuteur = setTimeout(() => {
+            minuteur = null;
+            // La liste a pu se refermer entre-temps : pas de bulle orpheline.
+            if (!cible.isConnected) return;
+            appuiLong = true;
+            window.montrerBulleEffet(cible);
+        }, window.DELAI_APPUI_LONG_BULLE);
+    };
+    const aBouge = (x, y) => !!depart && Math.hypot(x - depart.x, y - depart.y) > 10;
+    const tactile = typeof window !== "undefined" && "ontouchstart" in window;
     // LA SOURIS : la bulle suit le survol.
     document.addEventListener("pointerover", (e) => {
         if (e.pointerType !== "mouse") return;
@@ -1980,16 +2047,30 @@ window.basculerMenuSousEffets = function(bouton) {
         if (e.pointerType === "mouse") return;
         const cible = e.target.closest && e.target.closest("[data-bulle-effet]");
         if (!cible) return;
-        annuler();
-        appuiLong = false;
-        depart = { x: e.clientX, y: e.clientY };
-        minuteur = setTimeout(() => { appuiLong = true; window.montrerBulleEffet(cible); }, window.DELAI_APPUI_LONG_BULLE);
+        demarrer(cible, e.clientX, e.clientY);
     }, true);
     document.addEventListener("pointermove", (e) => {
-        if (depart && Math.hypot(e.clientX - depart.x, e.clientY - depart.y) > 10) annuler();
+        if (aBouge(e.clientX, e.clientY)) annuler();
     }, true);
     document.addEventListener("pointerup", annuler, true);
-    document.addEventListener("pointercancel", annuler, true);
+    // Sur un écran tactile, `pointercancel` ne veut pas dire que le doigt est
+    // parti (voir plus haut) : on laisse les événements « touch » trancher.
+    document.addEventListener("pointercancel", () => { if (!tactile) annuler(); }, true);
+    // Le même appui, vu par les événements « touch » : il démarre le compte
+    // si le pointeur ne l'a pas fait, et il est seul juge de la suite.
+    document.addEventListener("touchstart", (e) => {
+        const t = e.touches && e.touches[0];
+        if (!t || e.touches.length > 1) { annuler(); return; }
+        if (minuteur) return;
+        const cible = e.target.closest && e.target.closest("[data-bulle-effet]");
+        if (cible) demarrer(cible, t.clientX, t.clientY);
+    }, { capture: true, passive: true });
+    document.addEventListener("touchmove", (e) => {
+        const t = e.touches && e.touches[0];
+        if (t && aBouge(t.clientX, t.clientY)) annuler();
+    }, { capture: true, passive: true });
+    document.addEventListener("touchend", annuler, true);
+    document.addEventListener("touchcancel", annuler, true);
     // La carte défile : la liste, posée en fixe, ne la suivrait pas — on la
     // referme (sauf quand c'est la liste elle-même qui défile).
     document.addEventListener("scroll", (e) => {
