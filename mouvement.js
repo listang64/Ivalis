@@ -53,6 +53,10 @@ window.ANIMATION_VTT_EN_COURS = false;
 // pile les uns sur les autres et deviennent illisibles. window._MESSAGES_FLOTTANTS
 // compte, par case, combien de messages y sont déjà affichés pour empiler les
 // nouveaux un cran plus haut au lieu de les superposer.
+//
+// `options.ecran` ({ conteneur, x, y, cle }) pose le même message ailleurs que
+// sur le plateau du combat — le Studio d'animation s'en sert sur sa réplique,
+// pour que ses textes soient EXACTEMENT ceux du combat. Rend le message.
 window.afficherMessageFlottantHex = function(q, r, texte, couleur = "#ff4c4c", options = {}) {
     // Une créature qui CALCULE son tour ne fait pas parler le plateau : les
     // dégâts, les états, les esquives s'afficheront quand le tour se jouera,
@@ -60,16 +64,22 @@ window.afficherMessageFlottantHex = function(q, r, texte, couleur = "#ff4c4c", o
     // tous les chiffres monter une première fois pendant le calcul, puis une
     // seconde pendant l'animation.
     if (window.CALCUL_IA_SILENCIEUX) return;
-    const conteneur = document.getElementById("conteneur-plateau-vtt");
-    if (!conteneur || !window.PLATEAU_VTT) return;
+    const ecran = options.ecran || null;
+    const conteneur = ecran ? ecran.conteneur : document.getElementById("conteneur-plateau-vtt");
+    if (!conteneur || (!ecran && !window.PLATEAU_VTT)) return;
 
-    const px = window.PLATEAU_VTT.hexToPixel(q, r);
+    let ecranX, ecranY;
+    if (ecran) {
+        ecranX = ecran.x;
+        ecranY = ecran.y;
+    } else {
+        const px = window.PLATEAU_VTT.hexToPixel(q, r);
+        // Le conteneur n'est pas zoomé : on convertit la case en position écran
+        ecranX = window.VTT_POS_X + px.x * window.VTT_SCALE;
+        ecranY = window.VTT_POS_Y + px.y * window.VTT_SCALE;
+    }
 
-    // Le conteneur n'est pas zoomé : on convertit la case en position écran
-    const ecranX = window.VTT_POS_X + px.x * window.VTT_SCALE;
-    const ecranY = window.VTT_POS_Y + px.y * window.VTT_SCALE;
-
-    const cleCase = q + "," + r;
+    const cleCase = ecran ? (ecran.cle || "ecran") : q + "," + r;
     const actifs = window._MESSAGES_FLOTTANTS = window._MESSAGES_FLOTTANTS || {};
     const rangEmpilement = actifs[cleCase] || 0;
     actifs[cleCase] = rangEmpilement + 1;
@@ -107,6 +117,7 @@ window.afficherMessageFlottantHex = function(q, r, texte, couleur = "#ff4c4c", o
         msg.remove();
         actifs[cleCase] = Math.max(0, (actifs[cleCase] || 1) - 1);
     }, 2200);
+    return msg;
 };
 
 function hexDistance(a, b) {

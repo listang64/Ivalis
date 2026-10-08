@@ -36,6 +36,10 @@
     const fini = (a) => a.finished.catch(() => {});
     const hasard = (a, b) => a + Math.random() * (b - a);
     const ROUGE = "sepia(1) saturate(7) hue-rotate(-45deg) brightness(1.05)";
+    // Les couleurs des textes du combat (COULEURS, pont_combat.js) ; l'état
+    // posé, en violet, comme les zones persistantes (moteur_effets.js).
+    const COULEURS = { degats: "#ff4c4c", bouclier: "#00ffff", soin: "#1b6e3a", neutre: "#cccccc",
+                       attention: "#ffaa00", critique: "#ff2d2d", etat: "#9333ea" };
 
     // Le centre d'un pion dans le repère du calque, et sa taille à l'écran.
     function centre(el, calque) {
@@ -122,16 +126,31 @@
                                  { transform: pas(-0.2) }, { transform: "translate(0,0)" }], { duration: duree || 320 });
         };
         o.eclat = (el, filtre, duree) => o.teinter(el, [{ filter: "none" }, { filter: filtre, offset: 0.3 }, { filter: "none" }], { duration: duree || 420 });
-        // Un nombre qui s'envole au-dessus du pion (les dégâts, le soin).
-        o.nombreVolant = (calque, pos, texte, couleur) => {
-            const n = o.poser(calque, pos.x, pos.y - pos.t * 0.45, `font-family:'Cinzel', serif; font-weight:bold; font-size:${Math.max(16, pos.t * 0.42)}px;
-                color:${couleur}; text-shadow:0 2px 3px #000, 0 0 10px ${couleur}; white-space:nowrap; z-index:5;`, texte);
-            return o.jouerPuisRetirer(n, [
-                { transform: "translate(-50%,-50%) scale(0.6)", opacity: 0 },
-                { transform: "translate(-50%,-90%) scale(1.15)", opacity: 1, offset: 0.2 },
-                { transform: "translate(-50%,-220%) scale(1)", opacity: 0 }
-            ], { duration: 1100, easing: "ease-out" });
+        // LES TEXTES FLOTTANTS DU COMBAT, au-dessus des pions : le même dessin
+        // que sur le plateau (afficherMessageFlottantHex, mouvement.js), posé
+        // dans ce calque au-dessus du pion. Les couleurs sont celles du combat
+        // (COULEURS, pont_combat.js).
+        o.texte = (calque, pion, texte, couleur, options) => {
+            if (jeton.annule || !pion) return null;
+            const c = centre(pion, calque);
+            if (typeof window.afficherMessageFlottantHex !== "function") return null;
+            const msg = window.afficherMessageFlottantHex(null, null, texte, couleur || COULEURS.degats,
+                { ...(options || {}), ecran: { conteneur: calque, x: c.x, y: c.y, cle: "anim-" + (pion.id || "pion") } });
+            if (msg && msg.classList) msg.classList.add("anim-message");
+            return msg;
         };
+        // Le chiffre, l'éclat et la petite barre qui se vide sous le pion :
+        // afficherFlashDegatToken (moteur_effets.js), comme pour un vrai coup.
+        o.jauge = (calque, pion, de, vers, max, texte, couleurTexte, couleurBarre) => {
+            if (jeton.annule || !pion) return;
+            o.texte(calque, pion, texte, couleurTexte);
+            if (typeof window.afficherFlashDegatToken === "function") {
+                // Sans `ecran` : l'éclat et la barre seulement, le texte vient d'être posé.
+                window.afficherFlashDegatToken(null, de, vers, max, texte, couleurTexte, couleurBarre, { pion });
+                pion.querySelectorAll(".jauge-flash-token").forEach(j => j.classList.add("anim-message"));
+            }
+        };
+
         // Une onde qui s'élargit (le sol qui s'illumine, l'explosion).
         o.onde = (calque, pos, w) => {
             const d = o.poser(calque, pos.x, pos.y + (w.decalage || 0), `width:${pos.t * (w.taille || 1)}px; height:${pos.t * (w.taille || 1) * (w.aplati || 1)}px;
@@ -203,6 +222,7 @@
                       stroke-linecap="round" stroke-dasharray="120" stroke-dashoffset="120" style="filter:drop-shadow(0 0 6px #fff) drop-shadow(0 0 12px #9cf)"/></svg>`);
                 const coupe = o.teinter(entaille.querySelector("path"), [{ strokeDashoffset: 120, opacity: 1 }, { strokeDashoffset: 0, opacity: 1, offset: 0.5 },
                                                                          { strokeDashoffset: -120, opacity: 0 }], { duration: 380, easing: "ease-out" });
+                o.jauge(calque, cible, 40, 28, 40, "-12", COULEURS.degats, COULEURS.degats);
                 await Promise.all([elan, coupe.then(() => entaille.remove()), o.secouer(cible, b.t * 0.1, 320, v), o.eclat(cible, ROUGE),
                                    o.gerbe(calque, b.x, b.y, { nombre: 8, dist: b.t * 0.7, angle: v.angle, eventail: Math.PI, couleurs: ["#fff", "#ffd6d6"], taille: 5 })]);
             }
@@ -216,7 +236,7 @@
                 const flanc = { x: a.x - recul.ux * a.t * 0.4, y: a.y - recul.uy * a.t * 0.4, t: a.t };
                 o.son("coup-sourd");
                 await Promise.all([o.secouer(lanceur, a.t * 0.14, 380, recul), o.eclat(lanceur, ROUGE, 480),
-                                   o.nombreVolant(calque, a, "−12", "#ff4c4c"),
+                                   Promise.resolve(o.jauge(calque, lanceur, 40, 28, 40, "-12", COULEURS.degats, COULEURS.degats)),
                                    o.gerbe(calque, flanc.x, flanc.y, { nombre: 8, dist: a.t * 0.6, angle: recul.angle + Math.PI, eventail: Math.PI * 0.9,
                                                                        couleurs: ["#c4141c", "#ff6b6b"], taille: 6 })]);
             }
@@ -233,7 +253,7 @@
                     o.eclat(lanceur, "brightness(1.45) drop-shadow(0 0 10px #7dff9a)", 1200),
                     o.gerbe(calque, a.x, a.y + a.t * 0.2, { nombre: 9, dist: a.t * 0.35, monte: a.t * 0.9, couleurs: ["#7dff9a", "#d9ffe1"],
                                                             texte: "+", taille: 18, tailleMin: 12, duree: 1300, etale: 500 }),
-                    o.nombreVolant(calque, a, "+15", "#7dff9a")
+                    Promise.resolve(o.jauge(calque, lanceur, 20, 35, 40, "+15", COULEURS.soin, COULEURS.soin))
                 ]);
             }
         },
@@ -251,6 +271,7 @@
                 const paroi = o.poser(calque, a.x + v.ux * a.t * 0.62, a.y + v.uy * a.t * 0.62, `width:${a.t * 0.32}px; height:${a.t * 1.1}px; z-index:4;
                     border-radius:50%; border-right:5px solid #e8ffff; filter:drop-shadow(0 0 8px #5be8ff);`);
                 const rot = v.angle * 180 / Math.PI;
+                o.jauge(calque, lanceur, 0, 12, 12, "+12 🛡️", COULEURS.bouclier, COULEURS.bouclier);
                 await Promise.all([
                     o.jouerPuisRetirer(dome, [
                         { transform: "translate(-50%,-50%) scale(0.2)", opacity: 0 },
@@ -278,6 +299,8 @@
                 await o.projectile(calque, a, b, { taille: 0.5, duree: Math.min(900, 380 + axe(a, b).d * 0.9), traine: ["#ffb02e", "#ff5a0a"],
                     style: "background:radial-gradient(circle at 40% 40%, #fff6c4, #ffb02e 40%, #e8420c 75%, rgba(200,30,0,0) 100%); box-shadow:0 0 18px #ff7a1a, 0 0 36px #ff4500;" });
                 o.son("feu-explosion");
+                o.jauge(calque, cible, 40, 26, 40, "-14", COULEURS.degats, COULEURS.degats);
+                o.attendre(500).then(() => o.texte(calque, cible, "Brûlé !", COULEURS.etat));
                 await Promise.all([
                     o.onde(calque, b, { couleur: "#ff7a1a", taille: 1, fond: "radial-gradient(circle, rgba(255,240,180,0.9), rgba(255,120,20,0.5) 60%, transparent)", duree: 600, echelle: 2 }),
                     o.onde(calque, b, { couleur: "#ffcf5a", taille: 0.8, duree: 700, echelle: 2.4, retard: 80 }),
@@ -298,6 +321,7 @@
                 fantome.style.pointerEvents = "none";
                 if (!o.annulee()) lanceur.parentNode.insertBefore(fantome, lanceur);
                 o.son("esquive");
+                o.texte(calque, lanceur, "Esquivé 💨", COULEURS.neutre);
                 const trace = o.teinter(fantome, [{ opacity: 0.55, filter: "grayscale(0.6) brightness(1.4)" }, { opacity: 0, filter: "grayscale(1) brightness(1.6)" }], { duration: 650 });
                 // Le coup venu de l'ennemi traverse la case vide.
                 const trait = o.poser(calque, a.x, a.y, `width:${a.t * 1.3}px; height:4px; z-index:4; border-radius:2px;
@@ -327,6 +351,8 @@
                     traine: ["#e8fbff", "#9fe6ff"],
                     style: "height:auto; aspect-ratio:3/1; background:linear-gradient(90deg, rgba(160,230,255,0), #bdf3ff 60%, #ffffff); clip-path:polygon(0 35%, 75% 0, 100% 50%, 75% 100%, 0 65%); filter:drop-shadow(0 0 6px #9fe6ff);" });
                 o.son("glace-impact");
+                o.jauge(calque, cible, 40, 31, 40, "-9", COULEURS.degats, COULEURS.degats);
+                o.attendre(500).then(() => o.texte(calque, cible, "Glacé !", COULEURS.etat));
                 const eclats = [];
                 for (let i = 0; i < 7; i++) {
                     const ang = (i / 7) * Math.PI * 2, r = b.t * 0.55;
@@ -357,6 +383,8 @@
                 await o.projectile(calque, a, b, { taille: 0.3, arc: 0.7, duree: Math.min(800, 360 + axe(a, b).d * 0.8), easing: "ease-in-out",
                     style: "background:radial-gradient(circle at 35% 35%, #e8ffc0, #7dd321 50%, #2e5a0a); box-shadow:0 0 10px #7dd321;" });
                 o.son("poison-bulles");
+                o.jauge(calque, cible, 40, 35, 40, "-5", COULEURS.degats, COULEURS.degats);
+                o.attendre(500).then(() => o.texte(calque, cible, "Empoisonnement !", COULEURS.etat));
                 await Promise.all([
                     o.onde(calque, b, { couleur: "#7dd321", taille: 0.9, fond: "radial-gradient(circle, rgba(125,211,33,0.5), transparent 70%)", duree: 600, echelle: 1.6 }),
                     o.teinter(cible, [{ filter: "none" }, { filter: VERT, offset: 0.25 }, { filter: "none", offset: 0.5 }, { filter: VERT, offset: 0.75 }, { filter: "none" }], { duration: 1500 }),
@@ -373,6 +401,8 @@
                 const a = centre(lanceur, calque), b = centre(cible, calque);
                 const v = axe(a, b);
                 o.son("critique-charge");
+                // Le critique s'annonce AVANT le coup, sur le lanceur (pont_combat.js).
+                o.texte(calque, lanceur, "Critique !", COULEURS.critique, { taille: 30, eclat: true });
                 await o.eclat(lanceur, "brightness(1.4) drop-shadow(0 0 12px #ffd700)", 380);
                 const elan = o.elan(lanceur, a, b, { portee: 0.75, echelle: 1.12, prise: 0.15, frappe: 0.4, duree: 420, easing: "cubic-bezier(.5,0,.3,1)" });
                 await o.attendre(170);
@@ -382,14 +412,11 @@
                     `<svg viewBox="-50 -50 100 100" width="100%" height="100%">${Array.from({ length: 12 }, (_, i) =>
                         `<polygon points="0,-48 4,-6 -4,-6" fill="${i % 2 ? "#fff3b0" : "#ffd700"}" transform="rotate(${i * 30})"/>`).join("")}
                         <circle r="10" fill="#fffbe6"/></svg>`);
-                const texte = o.poser(calque, b.x, b.y - b.t * 0.9, `font-family:'Cinzel', serif; font-weight:bold; font-size:${Math.max(16, b.t * 0.36)}px;
-                    color:#ffd700; text-shadow:0 2px 3px #000, 0 0 12px #ffb000; white-space:nowrap; z-index:5;`, "CRITIQUE !");
+                o.jauge(calque, cible, 40, 16, 40, "-24 !", COULEURS.degats, COULEURS.degats);
                 await Promise.all([elan,
                     o.jouerPuisRetirer(etoile, [{ transform: "translate(-50%,-50%) scale(0.2) rotate(0deg)", opacity: 1 },
                                                 { transform: "translate(-50%,-50%) scale(1) rotate(25deg)", opacity: 1, offset: 0.4 },
                                                 { transform: "translate(-50%,-50%) scale(1.3) rotate(45deg)", opacity: 0 }], { duration: 650, easing: "ease-out" }),
-                    o.jouerPuisRetirer(texte, [{ transform: "translate(-50%,-50%) scale(1.8)", opacity: 0 }, { transform: "translate(-50%,-50%) scale(1)", opacity: 1, offset: 0.25 },
-                                               { transform: "translate(-50%,-80%) scale(1)", opacity: 1, offset: 0.75 }, { transform: "translate(-50%,-120%) scale(0.9)", opacity: 0 }], { duration: 1300 }),
                     o.secouer(cible, b.t * 0.2, 450, v), o.eclat(cible, ROUGE, 500),
                     o.gerbe(calque, b.x, b.y, { nombre: 12, dist: b.t * 1.2, angle: v.angle, eventail: Math.PI * 1.4, couleurs: ["#ffd700", "#fff3b0"], taille: 6, duree: 800 })]);
             }
@@ -403,6 +430,8 @@
                 const tourne = loin.ux >= 0 ? 80 : -80;
                 o.son("coup-sourd");
                 o.son("chute", 900);
+                o.jauge(calque, lanceur, 30, 0, 40, "-30", COULEURS.degats, COULEURS.degats);
+                o.attendre(900).then(() => o.texte(calque, lanceur, "À terre !", COULEURS.degats, { taille: 26 }));
                 await o.bouger(lanceur, [
                     { transform: "translate(0,0) rotate(0deg)", filter: "none", opacity: 1 },
                     { transform: `translate(${loin.ux * a.t * 0.06}px, ${loin.uy * a.t * 0.06}px) rotate(${tourne * 0.1}deg)`, offset: 0.15 },

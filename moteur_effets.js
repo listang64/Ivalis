@@ -140,16 +140,22 @@ window.estEngageAuContact = function(idLanceur, tkLanceur, lanceurData) {
 // remplit) sur le pion, exactement comme pour une attaque classique (voir jouerAnimationMoteur).
 // Réutilisée par les attaques d'opportunité et les tics d'Empoisonnement, qui n'avaient jusqu'ici
 // que le message flottant générique, sans le retour visuel de la barre.
-window.afficherFlashDegatToken = function(idCible, ancienneValeur, nouvelleValeur, valeurMax, texte, couleurTexte, couleurBarre) {
+//
+// `options` ({ pion, ecran }) : le Studio d'animation passe son propre pion et la
+// place de son texte (voir afficherMessageFlottantHex) — le même chiffre, le
+// même éclat, la même barre qu'en combat.
+window.afficherFlashDegatToken = function(idCible, ancienneValeur, nouvelleValeur, valeurMax, texte, couleurTexte, couleurBarre, options) {
     // Même règle que pour les messages flottants : pendant qu'une créature
     // calcule son tour, le plateau ne clignote pas. Le coup se verra à son tour.
     if (window.CALCUL_IA_SILENCIEUX) return;
-    const tkCible = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idCible] : null;
-    if (tkCible && typeof window.afficherMessageFlottantHex === "function") {
-        window.afficherMessageFlottantHex(tkCible.q, tkCible.r, texte, couleurTexte || "#ff4c4c");
+    const ailleurs = options && options.pion;
+    const tkCible = !ailleurs && window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idCible] : null;
+    if (typeof window.afficherMessageFlottantHex === "function") {
+        if (ailleurs && options.ecran) window.afficherMessageFlottantHex(null, null, texte, couleurTexte || "#ff4c4c", { ecran: options.ecran });
+        else if (tkCible) window.afficherMessageFlottantHex(tkCible.q, tkCible.r, texte, couleurTexte || "#ff4c4c");
     }
 
-    const tokenDiv = document.getElementById("token-" + idCible);
+    const tokenDiv = ailleurs ? options.pion : document.getElementById("token-" + idCible);
     if (!tokenDiv || !valeurMax) return;
 
     const couleur = couleurBarre || "#ff4c4c";

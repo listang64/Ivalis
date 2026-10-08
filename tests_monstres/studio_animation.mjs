@@ -189,7 +189,9 @@ const ids = await p.evaluate(() => (window.ANIMATIONS_COMBAT || []).map(a => a.i
 console.log("\n4. UN CLIC JOUE L'ANIMATION EN DIRECT SUR LE PION");
 {
   await p.evaluate(() => { window.__fin = null; document.querySelector('#studio-liste .studio-anim[data-anim="boule-de-feu"] .studio-anim-jouer').click(); });
-  await p.waitForTimeout(450);
+  // On attend que la boule soit en vol (des effets sur la scène), quelle que
+  // soit la cadence de la machine.
+  await p.waitForFunction(() => document.querySelectorAll("#studio-pions .anim-effet").length > 0, null, { timeout: 5000 }).catch(() => {});
   const pendant = await p.evaluate(() => ({
     effets: document.querySelectorAll("#studio-pions .anim-effet").length,
     joue: document.querySelector('#studio-liste .studio-anim[data-anim="boule-de-feu"]').classList.contains("joue"),
@@ -471,6 +473,83 @@ console.log("\n10. LE SON DES ANIMATIONS");
   });
   verifier("une animation coupée par une autre se tait (pas d'explosion après le soin)", !coupe.joues.includes("feu-explosion")
            && coupe.joues.includes("soin") && coupe.restes === 0, JSON.stringify(coupe));
+}
+
+console.log("\n11. LES TEXTES FLOTTANTS, COMME EN COMBAT");
+// Nico : « et faut aussi pour l'animation les textes flottants comme en combat
+// au-dessus des tokens. »
+{
+  const r = await p.evaluate(async () => {
+    const calque = document.getElementById("studio-pions");
+    const h = document.getElementById("studio-pion-heros"), e = document.getElementById("studio-pion-ennemi");
+    const centre = (el) => { const a = el.getBoundingClientRect(), c = calque.getBoundingClientRect(); return { x: a.left - c.left + a.width / 2, y: a.top - c.top + a.height / 2 }; };
+    const res = {};
+    for (const a of window.ANIMATIONS_COMBAT) {
+      const vus = [];
+      let barres = 0;
+      const obs = new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => {
+        if (!n.classList) return;
+        if (n.classList.contains("jauge-flash-token")) barres++;
+        if (n.style && n.style.transition && /top 1.8s/.test(n.style.transition)) {
+          const H = centre(h), E = centre(e), x = parseFloat(n.style.left), y = parseFloat(n.style.top);
+          vus.push({ texte: n.innerText, couleur: n.style.color, taille: n.style.fontSize, police: n.style.fontFamily,
+                     ombre: n.style.textShadow, marque: n.classList.contains("anim-message"),
+                     sur: Math.abs(x - H.x) < Math.abs(x - E.x) ? "heros" : "ennemi",
+                     auDessus: y < (Math.abs(x - H.x) < Math.abs(x - E.x) ? H.y : E.y) });
+        }
+      })));
+      obs.observe(calque, { childList: true, subtree: true });
+      await window.jouerAnimationStudio(a.id);
+      await new Promise(r => setTimeout(r, 50));
+      obs.disconnect();
+      res[a.id] = { vus, barres };
+    }
+    await new Promise(r => setTimeout(r, 2400));
+    return { res, restes: document.querySelectorAll("#studio-pions .anim-message").length };
+  });
+  Object.entries(r.res).forEach(([id, x]) => console.log(`     ${id.padEnd(16)} ${x.vus.map(v => `« ${v.texte} » (${v.sur})`).join("  ")}${x.barres ? "  + barre" : ""}`));
+  const textes = (id) => r.res[id].vus.map(v => v.texte + "@" + v.sur);
+  verifier("chaque animation a ses textes flottants", Object.values(r.res).every(x => x.vus.length > 0));
+  verifier("le dessin du combat : Cinzel gras, ombre noire, au-dessus du pion", Object.values(r.res).every(x => x.vus.every(v =>
+           /Cinzel/.test(v.police) && /black/.test(v.ombre) && v.auDessus && v.marque)));
+  verifier("épée : « -12 » sur l'ennemi, avec sa barre qui se vide", textes("coup-epee").join() === "-12@ennemi" && r.res["coup-epee"].barres === 1);
+  verifier("coup reçu : « -12 » sur le héros", textes("coup-recu").join() === "-12@heros" && r.res["coup-recu"].barres === 1);
+  const soin = r.res["soin"].vus[0] || {};
+  verifier("soin : « +15 » en vert sur le héros (la couleur du combat)", soin.texte === "+15" && soin.sur === "heros" && soin.couleur === "rgb(27, 110, 58)", soin.couleur);
+  const bouclier = r.res["bouclier"].vus[0] || {};
+  verifier("bouclier : « +12 🛡️ » en cyan sur le héros", bouclier.texte === "+12 🛡️" && bouclier.couleur === "rgb(0, 255, 255)");
+  verifier("boule de feu : « -14 » puis « Brûlé ! » sur l'ennemi", textes("boule-de-feu").join() === "-14@ennemi,Brûlé !@ennemi");
+  verifier("gel : « -9 » puis « Glacé ! » ; poison : « -5 » puis « Empoisonnement ! »", textes("gel").join() === "-9@ennemi,Glacé !@ennemi"
+           && textes("poison").join() === "-5@ennemi,Empoisonnement !@ennemi");
+  verifier("esquive : « Esquivé 💨 » sur le héros", textes("esquive").join() === "Esquivé 💨@heros");
+  const crit = r.res["coup-critique"].vus;
+  verifier("critique : « Critique ! » en grand sur le héros AVANT le coup, puis « -24 ! » sur l'ennemi",
+           crit.map(v => v.texte + "@" + v.sur).join() === "Critique !@heros,-24 !@ennemi" && crit[0].taille === "30px", JSON.stringify(crit.map(v => v.taille)));
+  const terre = r.res["mise-a-terre"].vus;
+  verifier("mise à terre : « -30 » puis « À terre ! » sur le héros", terre.map(v => v.texte + "@" + v.sur).join() === "-30@heros,À terre !@heros" && terre[1].taille === "26px");
+  verifier("les textes s'en vont d'eux-mêmes", r.restes === 0, String(r.restes));
+  // Pour les yeux : la boule de feu, au moment où « Brûlé ! » monte.
+  await p.evaluate(() => { window.recentrerStudio(); window.jouerAnimationStudio("boule-de-feu"); });
+  await p.waitForFunction(() => [...document.querySelectorAll("#studio-pions .anim-message")].some(m => /Brûlé/.test(m.innerText)), null, { timeout: 8000 });
+  await p.waitForTimeout(250);
+  await p.screenshot({ path: "/tmp/claude-0/studio_textes_feu.png" });
+  await p.evaluate(() => { window.jouerAnimationStudio("coup-critique"); });
+  await p.waitForFunction(() => [...document.querySelectorAll("#studio-pions .anim-message")].some(m => /-24/.test(m.innerText)), null, { timeout: 8000 });
+  await p.waitForTimeout(200);
+  await p.screenshot({ path: "/tmp/claude-0/studio_textes_critique.png" });
+  await p.waitForTimeout(2600);
+  // Interrompue, une animation ne laisse aucun texte en plan.
+  const coupe = await p.evaluate(async () => {
+    const premiere = window.jouerAnimationStudio("boule-de-feu");
+    // On attend que le premier texte (« -14 ») soit à l'écran.
+    for (let i = 0; i < 100 && !document.querySelector("#studio-pions .anim-message"); i++) await new Promise(r => setTimeout(r, 30));
+    const pendant = document.querySelectorAll("#studio-pions .anim-message").length;
+    window.fermerStudioAnimation();
+    await premiere;
+    await new Promise(r => setTimeout(r, 700));
+    return { pendant, apres: document.querySelectorAll("#studio-pions .anim-message, #studio-pions .anim-effet").length };
+  });
+  verifier("fermer le studio en pleine animation efface ses textes", coupe.pendant > 0 && coupe.apres === 0, JSON.stringify(coupe));
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

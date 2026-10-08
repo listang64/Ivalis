@@ -440,7 +440,8 @@ function arreterTout() {
     if (typeof window.annulerAnimationsCombat === "function") window.annulerAnimationsCombat();
     const calque = document.getElementById("studio-pions");
     if (!calque) return;
-    calque.querySelectorAll(".anim-effet").forEach(e => e.remove());
+    calque.querySelectorAll(".anim-effet, .anim-message").forEach(e => e.remove());
+    calque.querySelectorAll(".studio-pion").forEach(p => { p.style.filter = ""; });
     calque.querySelectorAll("*").forEach(el => (el.getAnimations ? el.getAnimations() : []).forEach(a => a.cancel()));
     document.querySelectorAll("#studio-liste .studio-anim.joue").forEach(r => r.classList.remove("joue"));
     studio.enCours = null;

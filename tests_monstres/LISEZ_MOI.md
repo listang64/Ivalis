@@ -5456,3 +5456,25 @@ sur le token joueur et en direction de l'ennemi. »
   studio_animation.mjs (sections 8 à 10 : glisser, cases refusées, axe à
   l'ouest puis à l'est, sons de chaque animation, rendu des quinze sons,
   volume, coupure).
+
+## Le Studio : les textes flottants du combat (version 223)
+
+Nico : « Et faut aussi pour l'animation les textes flottants comme en combat
+au-dessus des tokens. »
+- LE MÊME DESSIN QUE LE COMBAT, PAS UNE COPIE : afficherMessageFlottantHex
+  (mouvement.js) accepte `options.ecran` ({ conteneur, x, y, cle }) pour poser
+  son message ailleurs que sur le plateau, et rend le message ;
+  afficherFlashDegatToken (moteur_effets.js) accepte `options.pion` (l'éclat
+  et la petite barre sous CE pion). Sans ces options, rien ne change en combat
+  (message_flottant_taille.mjs, jauge_token.mjs inchangés).
+- LES OUTILS DES ANIMATIONS (animations_combat.js) : `texte` (un mot au-dessus
+  d'un pion) et `jauge` (le chiffre + l'éclat + la barre qui se vide), aux
+  couleurs du combat (COULEURS de pont_combat.js ; l'état posé en violet,
+  comme les zones persistantes). Épée « -12 » sur l'ennemi ; coup reçu
+  « -12 » ; soin « +15 » vert ; bouclier « +12 🛡️ » cyan ; boule de feu
+  « -14 » puis « Brûlé ! » ; gel « -9 » puis « Glacé ! » ; poison « -5 » puis
+  « Empoisonnement ! » ; esquive « Esquivé 💨 » ; critique « Critique ! » en
+  grand sur le héros AVANT le coup (comme pont_combat.js), puis « -24 ! » ;
+  mise à terre « -30 » puis « À terre ! ». Ils montent et s'effacent seuls
+  (2,2 s) ; une lecture interrompue les efface (classe anim-message).
+  studio_animation.mjs, section 11.
