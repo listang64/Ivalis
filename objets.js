@@ -757,15 +757,39 @@ window.decrireObjet = function(objet) {
 //  même uid : elle est donc dédoublonnée ici, sinon ses bonus compteraient
 //  double.
 
+//  UN OBJET QU'UNE BLESSURE INTERDIT (blessures.js) reste sur la fiche, mais ne
+//  sert à rien tant qu'elle dure : ni bonus, ni état, ni arme en main — il est
+//  simplement absent d'ici. L'inventaire dit pourquoi (raisonObjetInterditParBlessure).
 window.objetsEquipes = function(perso) {
     if (!perso) return [];
-    const bruts = [perso.equipArmure, perso.equipMainDroite, perso.equipMainGauche].filter(o => o && o.nom);
+    const bruts = [["armure", perso.equipArmure], ["droite", perso.equipMainDroite], ["gauche", perso.equipMainGauche]]
+        .filter(([, o]) => o && o.nom);
     const vus = new Set();
-    return bruts.filter(o => {
+    return bruts.filter(([emplacement, o]) => {
         if (o.uid && vus.has(o.uid)) return false;
         if (o.uid) vus.add(o.uid);
-        return true;
-    });
+        return !window.raisonObjetInterditParBlessure(perso, o, emplacement);
+    }).map(([, o]) => o);
+};
+
+// null, ou la phrase qui dit quelle blessure empêche de s'en servir.
+// `emplacement` : "armure", "droite" ou "gauche".
+window.raisonObjetInterditParBlessure = function(perso, objet, emplacement) {
+    if (!perso || !objet || typeof window.blessureQuiInterdit !== "function") return null;
+    const deuxMains = objet.deuxMains === true;
+    const type = String(objet.type || "");
+    const regles = [
+        ["interditDeuxMains", deuxMains, "pas d'arme à deux mains"],
+        ["interditBouclier", type === "Bouclier", "pas de bouclier"],
+        ["interditArmureLourde", type === "Armure lourde" || type === "Armure intermédiaire", "ni armure lourde ni armure moyenne"],
+        ["interditMainGauche", emplacement === "gauche", "la deuxième main ne sert pas"]
+    ];
+    for (const [cle, concerne, texte] of regles) {
+        if (!concerne) continue;
+        const nom = window.blessureQuiInterdit(perso, cle);
+        if (nom) return `${nom} : ${texte}`;
+    }
+    return null;
 };
 
 window.bonusEquipement = function(perso) {
@@ -922,7 +946,13 @@ window.etatsEquipementPourCarte = function(perso, armeDeLaCarte) {
 };
 
 // null = la carte peut partir ; sinon, la phrase à montrer au joueur.
-window.raisonBlocageCarte = function(perso, arme) {
+window.raisonBlocageCarte = function(perso, arme, idCarte) {
+    // LE CHOC CRÂNIEN (blessures.js) : deux compétences oubliées pour deux
+    // combats — quelle que soit l'arme en main.
+    if (perso && idCarte && typeof window.atoutBlessures === "function"
+        && ((window.atoutBlessures(perso) || {}).cartesOubliees || []).includes(idCarte)) {
+        return "Choc crânien : le héros a oublié comment utiliser cette compétence.";
+    }
     if (!perso || !arme || arme === window.CARTE_SANS_ARME || arme === "Non spécifié") return null;
 
     // Aucune contrainte de main pour la magie : le sort part toujours.
@@ -942,6 +972,6 @@ window.competencesBloqueesParArme = function(perso) {
     const cartes = (window.CACHE_COMPETENCES_GLOBAL || {})[perso.idPersonnage] || {};
     return Object.keys(cartes)
         .map(id => ({ id, nom: (cartes[id] && cartes[id].Nom) || "Technique", arme: (cartes[id] || {}).Arme || "",
-                      raison: window.raisonBlocageCarte(perso, (cartes[id] || {}).Arme) }))
+                      raison: window.raisonBlocageCarte(perso, (cartes[id] || {}).Arme, id) }))
         .filter(c => c.raison);
 };

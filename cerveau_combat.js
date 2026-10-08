@@ -41,7 +41,7 @@ import { clonerEtat, combattant, creerDes, combattantIllusion,
          verifierEtatCombat, compterPasMarche, reductionInertie, FORMAT_ETAT, tomber, enSursis,
          reposDuRetourArriere, entreeDeFile, ZOMBIE, COMPAGNON, compagnonDe,
          placerCompagnons, MUR_TERRE, murEn, plateauDeCombat, franchissablePour, frapperMurs,
-         cleGravats, APPLICATEURS } from './combat_etat.js';
+         cleGravats, APPLICATEURS, ETAT_PLAIE_ROUVERTE, gainReposLong } from './combat_etat.js';
 import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissiperConfusion,
          traverserZones, creerZonePure, poserZone, vieillirZones,
          chaineDeDegats, REGLES_ETATS, regleDesEtats, estDansLeNoir,
@@ -203,7 +203,8 @@ export function validerIntention(etat, intention, plateau) {
             pasDejaFaits: nombre(tete.pas),
             reserveCarte: nombre(intention.reserveCarte)
         });
-        if (plan.pas.length === 0) return refus("pas assez d'énergie pour un seul pas");
+        if (plan.pas.length === 0) return refus(plan.plafond ? "blessé : plus aucune case permise ce tour-ci"
+                                                             : "pas assez d'énergie pour un seul pas");
     }
 
     // Un saut sans destination n'est pas un saut. La validité de la case,
@@ -619,6 +620,11 @@ export function ticsDeFinDeManche(etat) {
             }
         }
 
+        // --- PLAIE ROUVERTE (Saignement persistant, blessures.js) ----------
+        //  Des PV fixes, bruts, à chaque fin de manche tant qu'elle dure.
+        const plaie = c.etats.find(e => e && e.nom === ETAT_PLAIE_ROUVERTE && nombre(e.perteFixe) > 0);
+        if (plaie) etapes.push(...infligerTic(c, id, nombre(plaie.perteFixe), ETAT_PLAIE_ROUVERTE, etat, id));
+
         // --- ÉTALEMENT : une part par manche, jamais au lancement ------------
         //  La technique étalée n'a rien fait quand elle est partie : ses parts
         //  (le montant divisé par le nombre de tours) attendent dans cette
@@ -729,9 +735,12 @@ export function regenererFinDeManche(etat) {
     (etat.ordre || Object.keys(etat.combattants || {})).forEach(id => {
         const c = combattant(etat, id);
         if (!c || c.aTerre) return;
+        // LE CHOC CARDIAQUE (blessures.js) : la régénération est FIXÉE (30
+        // de fatigue), quel que soit le pourcentage de la fiche.
+        const fixe = nombre(c.atouts && c.atouts.regenFixe);
         const pct = regenerationDe(c);
-        if (pct <= 0) return;
-        const gagne = Math.floor((pct / 100) * nombre(c.fatigueMax));
+        if (fixe <= 0 && pct <= 0) return;
+        const gagne = fixe > 0 ? fixe : Math.floor((pct / 100) * nombre(c.fatigueMax));
         if (gagne <= 0) return;
         const apres = Math.min(nombre(c.fatigueMax), nombre(c.fatigue) + gagne);
         if (apres === nombre(c.fatigue)) return;
@@ -873,10 +882,7 @@ export function reposLongDuTour(etat) {
     if (!tete || tete.carte !== "REPOS_LONG") return [];
     const c = combattant(etat, tete.id);
     if (!c) return [];
-    const pct = nombre(c.stats && c.stats.Repos_Long);
-    const taux = pct > 0 ? pct / 100 : 0.35;
-    const apres = Math.min(nombre(c.fatigueMax),
-                           nombre(c.fatigue) + Math.floor(nombre(c.fatigueMax) * taux));
+    const apres = Math.min(nombre(c.fatigueMax), nombre(c.fatigue) + gainReposLong(c));
     const etapes = [];
     if (apres !== nombre(c.fatigue)) {
         c.fatigue = apres;

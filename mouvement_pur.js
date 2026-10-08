@@ -156,6 +156,9 @@ export function coutDuPas(c, numeroCase, difficile, offerte) {
     // sol nu.
     if (difficile && !(c && c.atouts && c.atouts.terrainFacile)) cout *= 2;
     if (aLEtat(c, "Glacé")) cout *= 2;
+    // Une Cheville tordue (blessures.js) double encore, comme le Glacé.
+    const mult = nombre(c && c.atouts && c.atouts.coutDeplacementMult, 1);
+    if (mult > 1) cout *= mult;
 
     const diviseur = nombre(c.atouts && c.atouts.diviseurDeplacement, 1) || 1;
     if (diviseur > 1) cout = Math.max(1, Math.round(cout / diviseur));
@@ -187,7 +190,14 @@ export function planifierTrajet(etat, id, chemin, plateau, options) {
     let cout = 0;
     let de = { q: c.q, r: c.r };
 
+    // UN PLAFOND DE CASES PAR TOUR (blessures.js : Courbatures, Genou affaibli,
+    // Jambe fracturée, Amputation du pied, Lésion de la colonne). Les cases
+    // déjà marchées ce tour-ci comptent.
+    const plafond = nombre(c.atouts && c.atouts.maxCasesParTour);
+    const permises = plafond > 0 ? Math.max(0, plafond - Math.max(0, pasDejaFaits)) : Infinity;
+
     for (let i = 0; i < chemin.length; i++) {
+        if (i >= permises) return sansFinirSurUnMur({ pas, cout, tronque: true, plafond: true }, carte);
         const vers = chemin[i];
         const etatCase = carte.etatCase(vers.q, vers.r) || {};
         const prix = coutDuPas(c, pasDejaFaits + i + 1, !!etatCase.difficile, i < offertes);
@@ -445,6 +455,16 @@ export function resoudreMouvement(etat, action, des, plateau) {
         etapes.push(...declencherDefenseurs(suivant, id, contactAvant, contactApres, defenseursTentes, des, pas.vers));
         contactAvant = contactApres;
 
+        // L'HÉMORRAGIE INTERNE (blessures.js) : chaque case traversée coûte
+        // des PV, directement sur la vie.
+        const perte = nombre(c.atouts && c.atouts.perteParCase);
+        if (perte > 0 && !c.aTerre && !(c.sursis && nombre(c.sursis.tours) > 0)) {
+            c.pv = Math.max(0, nombre(c.pv) - perte);
+            etapes.push({ type: "degats", cible: id, montant: perte, pvApres: c.pv,
+                          bouclierApres: nombre(c.bouclier), tic: "Hémorragie interne" });
+            etapes.push(...tomber(suivant, id, id, {}));
+        }
+
         // LA CASE OÙ L'ON POSE LE PIED PEUT BRÛLER. Chaque case franchie
         // déclenche sa propre résolution — « s'il continue dans la zone, ça
         // continue » —, après les opportunités de ce pas, comme dans l'ancien
@@ -460,7 +480,7 @@ export function resoudreMouvement(etat, action, des, plateau) {
     }
 
     // Tombé en chemin : la marche s'arrête là où elle s'est arrêtée.
-    if (plan.tronque) etapes.push({ type: "trajetEcourte", acteur: id, raison: "énergie" });
+    if (plan.tronque) etapes.push({ type: "trajetEcourte", acteur: id, raison: plan.plafond ? "blessure" : "énergie" });
 
     return { etat: suivant, etapes, cout: plan.cout };
 }

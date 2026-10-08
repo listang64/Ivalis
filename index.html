@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=70">
+  <link rel="stylesheet" href="style.css?v=71">
 
  
   <!-- ===================================================================== -->
@@ -1713,6 +1713,8 @@
       <div id="encart-bonus-race-classe" class="encart-bonus-race-classe"></div>
       <!-- Le rappel des talents pris (talents_ui.js). -->
       <div id="encart-talents-pris" class="encart-talents-pris"></div>
+      <!-- Les blessures du héros, et ce qu'il leur reste (blessures_ui.js). -->
+      <div id="encart-blessures" class="encart-blessures"></div>
     </div>
     
     <div id="modale-creation-caracs" class="modale-parchemin" style="display: none; z-index: 160; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 450px;">
@@ -1891,6 +1893,12 @@
           <button id="btn-dev-talents" class="btn-parametres" style="background-color: #5c1e16; border-color: #ff4c4c;" onclick="jouerSonClic(); window.reinitialiserTalentsDev()">Remettre les talents à zéro</button>
       </div>
 
+      <!-- Les blessures qui attendent des soins en ville (blessures_ui.js). -->
+      <div style="background-color: rgba(92, 30, 22, 0.1); border: 2px dashed #ff4c4c; padding: 15px; border-radius: 8px; margin-bottom: 30px; text-align: center;">
+          <h4 style="margin-top: 0; color: #5c1e16;">Blessures : soins en ville</h4>
+          <div id="dev-blessures-liste" class="dev-blessures-liste"></div>
+      </div>
+
       <!-- Le niveau, en triche : l'XP est posée au seuil du niveau visé. -->
       <div style="background-color: rgba(92, 30, 22, 0.1); border: 2px dashed #ff4c4c; padding: 15px; border-radius: 8px; margin-bottom: 30px; text-align: center;">
           <h4 style="margin-top: 0; color: #5c1e16;">Niveau (triche)</h4>
@@ -2008,7 +2016,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=130"></script>
+<script src="trace_combat.js?v=131"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
      Les modules s'importent entre eux sans numéro (`from './moteur_pur.js'`).
      Sans cette carte, le navigateur les chargeait à part, à une adresse SANS
@@ -2021,11 +2029,11 @@
      vérifie qu'ils sont identiques. Elle doit précéder tout module. -->
 <script type="importmap">
 { "imports": {
-    "./combat_etat.js": "./combat_etat.js?v=32",
+    "./combat_etat.js": "./combat_etat.js?v=33",
     "./moteur_pur.js": "./moteur_pur.js?v=50",
-    "./mouvement_pur.js": "./mouvement_pur.js?v=18",
+    "./mouvement_pur.js": "./mouvement_pur.js?v=19",
     "./ia_pure.js": "./ia_pure.js?v=12",
-    "./cerveau_combat.js": "./cerveau_combat.js?v=47",
+    "./cerveau_combat.js": "./cerveau_combat.js?v=48",
     "./spectateur_combat.js": "./spectateur_combat.js?v=6",
     "./depot_firestore.js": "./depot_firestore.js?v=11",
     "./pont_combat.js": "./pont_combat.js?v=31",
@@ -2041,14 +2049,14 @@
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
-<script type="module" src="combat_etat.js?v=32"></script>
+<script type="module" src="combat_etat.js?v=33"></script>
 <!-- LE MOTEUR PUR : la chaîne de dégâts et le mouvement, extraits des 5 000
      lignes du moteur actuel et testables sans réseau ni navigateur. -->
 <script type="module" src="moteur_pur.js?v=50"></script>
-<script type="module" src="mouvement_pur.js?v=18"></script>
+<script type="module" src="mouvement_pur.js?v=19"></script>
 <script type="module" src="ia_pure.js?v=12"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
-<script type="module" src="cerveau_combat.js?v=47"></script>
+<script type="module" src="cerveau_combat.js?v=48"></script>
 <!-- LE SPECTATEUR : la boucle de rejeu. Elle lit le journal du cerveau, ouvre
      la fenêtre de tour, anime PUIS applique, et ne saute jamais un numéro. -->
 <script type="module" src="spectateur_combat.js?v=6"></script>
@@ -2059,19 +2067,22 @@
      vers les animations existantes — il ne recalcule jamais rien. -->
 <script type="module" src="pont_combat.js?v=31"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
-<script type="module" src="regime_cerveau.js?v=39"></script>
+<script type="module" src="regime_cerveau.js?v=40"></script>
 <script type="module" src="ia_master.js?v=7"></script>
-<script type="module" src="app.js?v=104"></script>
+<script type="module" src="app.js?v=105"></script>
 <script src="jet_d20.js?v=2"></script>
-<script src="fabrique_sons.js?v=3"></script>
+<script src="fabrique_sons.js?v=4"></script>
 <script src="experience.js?v=1"></script>
 <!-- Les talents : les règles (script simple), puis leur fenêtre. -->
-<script src="talents.js?v=1"></script>
-<script type="module" src="creation_personnage.js?v=22"></script>
+<script src="talents.js?v=2"></script>
+<!-- Les blessures : la table et ses règles (script simple), puis l'écran. -->
+<script src="blessures.js?v=1"></script>
+<script type="module" src="creation_personnage.js?v=23"></script>
 <script type="module" src="classes.js?v=23"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
-<script type="module" src="competences.js?v=60"></script>
+<script type="module" src="competences.js?v=61"></script>
 <script type="module" src="talents_ui.js?v=1"></script>
+<script type="module" src="blessures_ui.js?v=1"></script>
 <!-- LIA, l'aide à la création de la Forge -->
 <script type="module" src="lia_forge.js?v=4"></script>
 <!-- L'illustration des compétences (prompt IA + image IA, en file) -->
@@ -2082,19 +2093,19 @@
 <script type="module" src="sequence_tour.js?v=23"></script>
 <script src="zombie_token.js?v=1"></script>
 <script src="murs_terre.js?v=6"></script>
-<script type="module" src="combat.js?v=131"></script>
+<script type="module" src="combat.js?v=132"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
-<script type="module" src="mouvement.js?v=32"></script>
+<script type="module" src="mouvement.js?v=33"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
-<script type="module" src="moteur_effets.js?v=87"></script>
-<script type="module" src="monstres.js?v=28"></script>
+<script type="module" src="moteur_effets.js?v=88"></script>
+<script type="module" src="monstres.js?v=29"></script>
 <script type="module" src="monstres_competences.js?v=25"></script>
 <script type="module" src="monstres_ia.js?v=37"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
-<script type="module" src="objets.js?v=15"></script>
+<script type="module" src="objets.js?v=16"></script>
 <script src="variations_tenues.js?v=2"></script>
 <script type="module" src="objets_ia.js?v=15"></script>
-<script type="module" src="loot.js?v=25"></script>
+<script type="module" src="loot.js?v=26"></script>
 
 <!-- ============================================================= -->
 <!--  GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)  -->

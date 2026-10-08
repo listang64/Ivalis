@@ -476,6 +476,8 @@ window.afficherStatsCombat = function(donnees) {
         if (champ && champ.value) donnees.idPersonnage = champ.value;
     }
     if (typeof window.actualiserTalentsApercu === "function") window.actualiserTalentsApercu(donnees);
+    // Les blessures, tout en bas (blessures_ui.js).
+    if (typeof window.actualiserBlessuresApercu === "function") window.actualiserBlessuresApercu(donnees);
 
     // L'encart du dessous : ce que la race et la classe lui donnent.
     const elBonus = document.getElementById("encart-bonus-race-classe");

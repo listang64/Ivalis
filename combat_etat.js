@@ -145,7 +145,11 @@ const DEFENSES_SIMPLES = {
                     + nombre(f.Dev_Mod_Fatigue)
 };
 
-export function combattantDepuisFiche(fiche, position, regles) {
+// `options.debutCombat` : le combattant ENTRE dans la rencontre (ouverture du
+// combat, renfort qui arrive) — c'est là que se paient les blessures « au
+// début du prochain combat » (fatigue en moins, plaie qui se rouvre). Une
+// reconstruction en cours de rencontre ne les paie pas deux fois.
+export function combattantDepuisFiche(fiche, position, regles, options) {
     const calcul = { ...DEFENSES_SIMPLES, ...(regles || {}) };
     const sansEtats = { ...fiche, Etats_Alteres: [] };
     const def = {
@@ -231,7 +235,18 @@ export function combattantDepuisFiche(fiche, position, regles) {
         elanPartage: nombre(race.elanPartage),
         bouclierDesSages: nombre(race.bouclierDesSages),
         degatsIllusoires: nombre(race.degatsIllusoires),
-        etatsRaccourcis: nombre(race.etatsRaccourcis)
+        etatsRaccourcis: nombre(race.etatsRaccourcis),
+        // LES BLESSURES (blessures.js) qui se jouent dans le noyau : un plafond
+        // de cases par tour (0 : aucun), un déplacement plus cher, des PV
+        // perdus à chaque case (Hémorragie interne), une régénération fixée
+        // (Choc cardiaque), un repos long rabotés (Lésion d'un organe, Côtes
+        // fêlées).
+        maxCasesParTour: nombre(race.maxCasesParTour),
+        coutDeplacementMult: nombre(race.coutDeplacementMult, 1) || 1,
+        perteParCase: nombre(race.perteParCase),
+        regenFixe: nombre(race.regenFixe),
+        reposLongTaux: nombre(race.reposLongTaux),
+        reposLongMoins: nombre(race.reposLongMoins)
     };
     const mod = {
         // Ce que l'ÉQUIPEMENT change EN PERMANENCE, hors états altérés : le
@@ -268,7 +283,31 @@ export function combattantDepuisFiche(fiche, position, regles) {
     // rabote l'énergie est l'affaire du moteur, pas celle de la borne.
     const bornes = { pvMax: nombre(calcul.pvMax(sansEtats)),
                      fatigueMax: nombre(calcul.fatigueMax(sansEtats)) };
-    return { ...combattantBrut(fiche, position, bornes), def, atouts, mod, equip };
+    const c = { ...combattantBrut(fiche, position, bornes), def, atouts, mod, equip };
+    if (options && options.debutCombat && !c.estMonstre && !c.aTerre) entrerAvecSesBlessures(c, race);
+    return c;
+}
+
+// LES BLESSURES QUI SE PAIENT À L'ENTRÉE. L'Essoufflement profond : moins de
+// fatigue au départ. Le Saignement persistant : la plaie se rouvre, des PV
+// perdus à chaque fin de manche pendant quelques rounds (un état, « Plaie
+// rouverte », que ticsDeFinDeManche fait mordre).
+export const ETAT_PLAIE_ROUVERTE = "Plaie rouverte";
+// Son icône : une goutte sous un pansement défait, dessinée ici (le noyau ne
+// lit aucune image hébergée).
+const ICONE_PLAIE_ROUVERTE = "data:image/svg+xml," + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#2a0a0a" stroke="#c9a227" stroke-width="3"/>'
+    + '<rect x="12" y="24" width="40" height="12" rx="4" fill="#e8d5a5" transform="rotate(-30 32 30)"/>'
+    + '<path d="M38 26 C38 26 28 38 28 44 a10 10 0 0 0 20 0 C48 38 38 26 38 26 Z" fill="#8b0000"/></svg>');
+function entrerAvecSesBlessures(c, race) {
+    const moins = nombre(race.fatigueDebutCombat);
+    if (moins !== 0) c.fatigue = Math.max(0, Math.min(nombre(c.fatigueMax), nombre(c.fatigue) + moins));
+    const plaie = race.saignementDebut;
+    if (plaie && nombre(plaie.pv) > 0 && nombre(plaie.tours) > 0) {
+        c.etats = [...(c.etats || []).filter(e => e && e.nom !== ETAT_PLAIE_ROUVERTE),
+                   { nom: ETAT_PLAIE_ROUVERTE, duree: nombre(plaie.tours), perteFixe: nombre(plaie.pv), icone: ICONE_PLAIE_ROUVERTE,
+                     desc: `La plaie se rouvre : −${nombre(plaie.pv)} PV à chaque fin de manche.` }];
+    }
 }
 
 function combattantBrut(fiche, position, bornes) {
@@ -404,7 +443,10 @@ export function construireEtatCombat(source) {
     const table = {};
     combattants.forEach(fiche => {
         if (!fiche || !fiche.idPersonnage) return;
-        table[fiche.idPersonnage] = combattantDepuisFiche(fiche, positions[fiche.idPersonnage], regles);
+        // Un combat qui s'ouvre au premier tour : les blessures d'entrée se
+        // paient ici (et pas sur un combat repris en cours de route).
+        table[fiche.idPersonnage] = combattantDepuisFiche(fiche, positions[fiche.idPersonnage], regles,
+                                                          { debutCombat: nombre(partie.Tour_Combat, 1) <= 1 });
     });
 
     const etat = {
@@ -587,6 +629,19 @@ export function entreeDeFile(f) {
 // est alors consommée. Une seule fois (`reposPris`), et seulement si l'Oracle
 // l'a bien et ne l'a pas déjà jouée. Rend les étapes ; l'état est modifié.
 export const TECHNIQUE_RETOUR_ARRIERE = "CLASSE_RETOUR_ARRIERE";
+
+// Ce qu'un repos long rend : le taux de la créature (Repos_Long) ou 35 % pour
+// un héros — plafonné par une Lésion d'un organe vital (reposLongTaux : 15 %),
+// diminué par des Côtes fêlées (reposLongMoins : 10 de moins), jamais négatif.
+// Le cerveau (reposLongDuTour) et le Retour arrière de l'Oracle s'en servent.
+export function gainReposLong(c) {
+    const pct = nombre(c && c.stats && c.stats.Repos_Long);
+    let taux = pct > 0 ? pct / 100 : 0.35;
+    const plafond = nombre(c && c.atouts && c.atouts.reposLongTaux);
+    if (plafond > 0) taux = Math.min(taux, plafond / 100);
+    const moins = nombre(c && c.atouts && c.atouts.reposLongMoins);
+    return Math.max(0, Math.floor(nombre(c && c.fatigueMax) * taux) - moins);
+}
 export function reposDuRetourArriere(etat) {
     const tete = (etat && etat.file || [])[0];
     if (!tete || !tete.retourArriere || tete.reposPris) return [];
@@ -597,9 +652,7 @@ export function reposDuRetourArriere(etat) {
     const deja = c.techniquesUtilisees || [];
     if (!techniques.includes(TECHNIQUE_RETOUR_ARRIERE) || deja.includes(TECHNIQUE_RETOUR_ARRIERE)) return [];
     c.techniquesUtilisees = [...deja, TECHNIQUE_RETOUR_ARRIERE];
-    const pct = nombre(c.stats && c.stats.Repos_Long);
-    const taux = pct > 0 ? pct / 100 : 0.35;
-    const apres = Math.min(nombre(c.fatigueMax), nombre(c.fatigue) + Math.floor(nombre(c.fatigueMax) * taux));
+    const apres = Math.min(nombre(c.fatigueMax), nombre(c.fatigue) + gainReposLong(c));
     const etapes = [{ type: "techniqueClasse", acteur: tete.id, idCarte: TECHNIQUE_RETOUR_ARRIERE,
                       cible: tete.id, utilisees: [...c.techniquesUtilisees] }];
     if (apres !== nombre(c.fatigue)) {

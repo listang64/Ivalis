@@ -2467,7 +2467,7 @@ window.demarrerCiblage = async function(idCarte, options) {
         //
         // La fiche de la carte est là, à portée de main, depuis le début de
         // cette fonction. On la lit.
-        coutFatigue: parseInt(dataCarte.Fatigue) || 0,
+        coutFatigue: window.coutFatigueCarte(dataCarte, persoLanceur),
         // QUI LANCE, retenu au moment où le ciblage s'ouvre. Tout le moteur le
         // relit ensuite par lanceurDuCiblage : les anneaux, les portées, les
         // cibles, la résolution. Sans ce champ, chacun retombait sur le panneau
@@ -3475,8 +3475,28 @@ window.porteeAvecArme = function(lanceur, isRanged, rangeMax, armeDeLaCarte) {
         : window.bonusEquip(lanceur, cle);
     const portee = bonus("portee");
     const allonge = bonus("allonge");
-    if (portee > 0) return { isRanged: true, rangeMax: rangeMax + portee + allonge };
-    return { isRanged, rangeMax: rangeMax + allonge };
+    const r = portee > 0 ? { isRanged: true, rangeMax: rangeMax + portee + allonge }
+                         : { isRanged, rangeMax: rangeMax + allonge };
+    // L'AMPUTATION DE DOIGTS (blessures.js) : −1 de portée aux attaques à
+    // distance — jamais sous 2, une attaque à distance reste à distance.
+    const moins = (typeof window.atoutRace === "function") ? (Number((window.atoutRace(lanceur) || {}).porteeDistance) || 0) : 0;
+    if (moins < 0 && r.isRanged && r.rangeMax > 2) r.rangeMax = Math.max(2, r.rangeMax + moins);
+    return r;
+};
+
+// LE COÛT EN FATIGUE D'UNE CARTE, POUR CE LANCEUR-LÀ. Celui de la Forge, plus
+// la Main endolorie (blessures.js) : +5 sur une compétence magique ou à
+// distance. Une seule règle, lue par le volet, la carte en grand, le choix et
+// le cerveau (carteConstruite.coutFatigue).
+window.coutFatigueCarte = function(dataCarte, lanceur) {
+    const base = parseInt(dataCarte && dataCarte.Fatigue) || 0;
+    if (!dataCarte || !lanceur || typeof window.atoutRace !== "function") return base;
+    const surcout = Number((window.atoutRace(lanceur) || {}).coutCarteMagieDistance) || 0;
+    if (surcout <= 0) return base;
+    const arme = String(dataCarte.Arme || "");
+    const loin = /magie|distance/i.test(arme)
+        || (typeof window.porteeReelleCarte === "function" && !!(window.porteeReelleCarte(dataCarte, lanceur) || {}).isRanged);
+    return loin ? base + surcout : base;
 };
 
 // =========================================================================
@@ -3601,8 +3621,11 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
         const estMotDePouvoir = /pouvoir/i.test(attaque.nom || "");
         const talentDegats = estMotDePouvoir ? (Number(atouts.degatsMotsPouvoir) || 0)
             : estMagique ? (Number(atouts.degatsMagiques) || 0) : (Number(atouts.degatsPhysiques) || 0);
-        attaque.valeurBrute += degatsTous + bonusDistance + (estMagique ? degatsMag : degatsPhys)
-            + (attaque.brut && !estMagique ? degatsMag : 0) + talentDegats;
+        // LES BLESSURES (blessures.js) : Entaille musculaire, Bras fracturé —
+        // des dégâts en moins au corps à corps, jamais sous zéro.
+        const blessureMelee = attaque.isRanged ? 0 : (Number(atouts.degatsMelee) || 0);
+        attaque.valeurBrute = Math.max(0, attaque.valeurBrute + degatsTous + bonusDistance + (estMagique ? degatsMag : degatsPhys)
+            + (attaque.brut && !estMagique ? degatsMag : 0) + talentDegats + blessureMelee);
         // Bénédiction offensive d'une bague de soin : un pourcentage en plus,
         // appliqué APRÈS les dégâts plats, comme un dernier multiplicateur.
         if (bonusDegatsPct > 0) attaque.valeurBrute = Math.round(attaque.valeurBrute * (1 + bonusDegatsPct / 100));

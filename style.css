@@ -4811,3 +4811,80 @@ textarea.input-texte-parchemin {
   .talent-case { flex-basis: 160px; }
   .talents-popup-choix { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* =========================================================================
+   LES BLESSURES (blessures.js, blessures_ui.js)
+   ========================================================================= */
+/* L'encart de l'Aperçu, tout en bas. */
+.encart-blessures {
+  margin-top: 18px; padding: 14px 16px; border: 2px solid #7a2a1e; border-radius: 10px;
+  background: linear-gradient(180deg, rgba(255,240,235,0.55), rgba(255,255,255,0.35)); box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+.encart-blessures:empty { display: none; }
+.blessures-titre { font-family: 'Cinzel', serif; font-size: 18px; font-weight: bold; color: #5a0d0d; text-align: center;
+  border-bottom: 2px solid #7a2a1e; padding-bottom: 6px; margin-bottom: 10px; }
+.blessures-liste { display: flex; flex-direction: column; gap: 8px; }
+.blessure-ligne { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,0.5); border: 1px solid rgba(122,42,30,0.25); }
+.blessure-ligne.permanente { background: rgba(60,10,10,0.07); }
+.blessure-ligne.indisponible { border-color: #7a2a1e; box-shadow: inset 3px 0 0 #8b0000; }
+.blessure-icone { width: 32px; height: 32px; }
+.blessure-texte { display: flex; flex-direction: column; min-width: 0; }
+.blessure-nom { font-family: 'Cinzel', serif; font-size: 15px; color: #6b0b0b; }
+.blessure-effet { font-size: 12.5px; font-style: italic; color: #4a3423; }
+.blessure-reste { font-family: Georgia, serif; font-size: 12px; font-weight: bold; color: #2a1a0f; white-space: nowrap;
+  padding: 3px 9px; border-radius: 999px; background: #f3dfa6; border: 1px solid #b08a3a; }
+.blessure-reste.a-vie { background: #3a0e0e; color: #f3c9b8; border-color: #6b0b0b; }
+.blessure-mort { text-align: center; font-family: 'Cinzel', serif; font-size: 15px; color: #f3dfa6; background: #2a0606;
+  border: 1px solid #8b0000; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+@container apercu (max-width: 420px) {
+  .blessure-ligne { grid-template-columns: 30px minmax(0, 1fr); }
+  .blessure-reste { grid-column: 2; justify-self: start; }
+}
+.dev-blessures-liste { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.dev-blessure-ligne { display: flex; gap: 12px; align-items: center; justify-content: center; color: #4a2e1b; }
+.dev-blessures-vide { font-size: 14px; color: #4a2e1b; margin: 0; }
+
+/* La fin du combat : le grand bandeau, puis la blessure. Par-dessus le butin. */
+.fin-combat-voile {
+  position: fixed; inset: 0; z-index: 21000; display: none; align-items: center; justify-content: center; padding: 16px;
+  box-sizing: border-box; background: radial-gradient(ellipse at center, rgba(40,26,10,0.78), rgba(5,3,1,0.94));
+  animation: fin-combat-voile .5s ease both; cursor: default;
+}
+.fin-combat-voile.defaite { background: radial-gradient(ellipse at center, rgba(50,6,6,0.82), rgba(5,1,1,0.96)); }
+.fin-combat-voile.se-ferme { animation: fin-combat-voile-sort .45s ease both; }
+@keyframes fin-combat-voile { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fin-combat-voile-sort { from { opacity: 1; } to { opacity: 0; } }
+
+.fin-combat-bandeau { text-align: center; animation: fin-combat-entree 1.1s cubic-bezier(.2,.8,.2,1) both; }
+.fin-combat-ornement { font-size: 18px; letter-spacing: 18px; color: #c9a24a; opacity: .8; }
+.fin-combat-mot { font-family: 'Cinzel', serif; font-weight: bold; text-transform: uppercase; line-height: 1;
+  font-size: clamp(54px, 13vw, 132px); letter-spacing: .08em; margin: 6px 0; }
+.fin-combat-bandeau.victoire .fin-combat-mot { color: #f3d27a; background: linear-gradient(180deg, #fff1c4, #e2b84f 55%, #a8741e);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 22px rgba(226,184,79,0.55)) drop-shadow(0 4px 2px rgba(0,0,0,0.7)); }
+.fin-combat-bandeau.defaite .fin-combat-mot { color: #8b0000; text-shadow: 0 0 28px rgba(139,0,0,0.75), 0 4px 3px #000; }
+.fin-combat-bandeau.defaite .fin-combat-ornement { color: #7a1a12; }
+.fin-combat-sous { font-family: 'Cinzel', serif; font-size: clamp(15px, 2.6vw, 22px); color: #e8d5a5; letter-spacing: .12em; }
+@keyframes fin-combat-entree { 0% { opacity: 0; transform: scale(1.35); letter-spacing: .4em; } 100% { opacity: 1; transform: scale(1); } }
+
+.blessure-revelation {
+  width: min(560px, 100%); text-align: center; padding: 26px 26px 22px; border-radius: 12px; color: #e8d5a5;
+  background: linear-gradient(180deg, #1d120b, #120a06); border: 2px solid #5a1a12;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.85), inset 0 0 0 1px #8a6a2a, inset 0 0 60px rgba(90,10,10,0.35);
+  opacity: 0; transform: translateY(14px); transition: opacity .6s ease, transform .6s ease;
+}
+.blessure-revelation.visible { opacity: 1; transform: none; }
+.blessure-revelation-titre { font-family: 'Cinzel', serif; font-size: clamp(22px, 4.4vw, 30px); color: #c9a24a; letter-spacing: .06em; }
+.blessure-revelation-heros { margin-top: 6px; font-size: 15px; font-style: italic; color: #b8a27a; }
+.blessure-revelation-nom { margin: 22px 0 10px; font-family: 'Cinzel', serif; font-weight: bold; font-size: clamp(26px, 6vw, 40px);
+  color: #8b0000; text-shadow: 0 0 18px rgba(170,0,0,0.55), 0 2px 2px #000; opacity: 0; transform: scale(1.12);
+  transition: opacity 1.6s ease, transform 1.6s ease; }
+.blessure-revelation.mort .blessure-revelation-nom { color: #a30000; letter-spacing: .04em; }
+.blessure-revelation-texte { font-size: 16px; line-height: 1.45; color: #e8d5a5; opacity: 0; transition: opacity 1.4s ease; }
+.blessure-revelation-jet { margin-top: 12px; font-size: 12px; color: #8a7a5a; opacity: 0; transition: opacity 1.4s ease; }
+.blessure-revelation-nom.visible, .blessure-revelation-texte.visible, .blessure-revelation-jet.visible { opacity: 1; transform: none; }
+.blessure-revelation-continuer { margin-top: 20px; padding: 9px 26px; border-radius: 8px; cursor: pointer; font-family: 'Cinzel', serif;
+  font-size: 15px; font-weight: bold; color: #f3dfa6; background: linear-gradient(180deg, #5a1a12, #3a0e0a); border: 1px solid #c9a24a;
+  opacity: 0; pointer-events: none; transition: opacity .6s ease; }
+.blessure-revelation-continuer.visible { opacity: 1; pointer-events: auto; }

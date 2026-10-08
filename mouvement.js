@@ -254,11 +254,21 @@ window.ajouterEtapeMouvement = function(q, r) {
     const casesOffertes = typeof window.bonusEquip === "function"
         ? window.bonusEquip(persoActuel, "hexApresAttaque") : 0;
 
+    // Les blessures (blessures.js) : un plafond de cases par tour, un coût
+    // multiplié (planifierTrajet et coutDuPas, mouvement_pur.js).
+    const atoutMarcheur = (persoActuel && typeof window.atoutRace === "function") ? (window.atoutRace(persoActuel) || {}) : {};
+    const plafondCases = parseInt(atoutMarcheur.maxCasesParTour) || 0;
+    const multCout = parseInt(atoutMarcheur.coutDeplacementMult) || 1;
+
     for (let i = 0; i < segment.length; i++) {
         let step = segment[i];
 
         let numeroCase = window.pasDejaParcourus(window.TOKEN_SELECTIONNE)
                        + window.CHEMIN_MOUVEMENT.length + 1;
+        if (plafondCases > 0 && numeroCase > plafondCases) {
+            window.afficherMessageFlottantHex(step.q, step.r, `Blessé : ${plafondCases} case${plafondCases > 1 ? "s" : ""} par tour`);
+            break;
+        }
         let baseCost = 2;
         let couleur = "#ffffff";
 
@@ -277,6 +287,7 @@ window.ajouterEtapeMouvement = function(q, r) {
         }
 
         if (estGlace) baseCost *= 2;
+        if (multCout > 1) baseCost *= multCout;
 
         // Atout du Vargen : il se déplace pour deux fois moins cher. Appliqué en
         // dernier, donc APRÈS le terrain difficile et le Glacé : le prédateur

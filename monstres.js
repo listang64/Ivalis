@@ -268,6 +268,11 @@ window.recomposerCombattants = function() {
         try { window.verifierVictoireCombat(); }
         catch (e) { console.error("Détection de victoire (le combat continue) :", e); }
     }
+    // Et la défaite : tous les héros à terre (blessures_ui.js).
+    if (typeof window.verifierDefaiteCombat === "function") {
+        try { window.verifierDefaiteCombat(); }
+        catch (e) { console.error("Détection de défaite (le combat continue) :", e); }
+    }
 };
 
 let unsubscribeMonstres = null;

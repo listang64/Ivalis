@@ -215,7 +215,14 @@ function persoDocVersFront(id, d) {
     // Décoché depuis la liste des héros (mode développeur) : le personnage
     // existe toujours, mais il est mis de côté — ni combat, ni tour de parole.
     // L'absence du champ vaut "actif" : toutes les fiches d'avant le restent.
-    actif: d.Actif !== false
+    // LES BLESSURES (blessures.js) : [{ uid, id, combats?, jours?, soins?,
+    // definitif?, cartes? }]. Un héros mort pour de bon, ou inconscient le
+    // temps de sa convalescence, ne combat plus : il quitte le combat et le
+    // tour de parole comme un héros mis de côté.
+    blessures: Array.isArray(d.Blessures) ? d.Blessures.map(b => ({ ...b })) : [],
+    mortDefinitive: d.Mort_Definitive === true,
+    actif: d.Actif !== false && d.Mort_Definitive !== true
+        && !(typeof window.estIndisponible === "function" && window.estIndisponible({ blessures: d.Blessures }))
   };
 
   // LA DERNIÈRE PAROLE DE LA BASE, mise de côté. Le rejeu d'un tour écrit dans
@@ -299,6 +306,14 @@ window.afficherEmplacementEquipement = function(suffixe, objet) {
         if (rempli && objet.prerequis > 0 && typeof window.peutEquiper === "function") {
             const test = window.peutEquiper(idPersonnage, objet);
             if (!test.possible) texte = `⚠ ${window.texteCaracsObjet(objet)} ${objet.prerequis} requis (tu as ${test.valeur})`;
+        }
+        // Une blessure peut rendre l'objet inutilisable (blessures.js) : il
+        // reste porté, mais ne sert à rien tant qu'elle dure.
+        if (rempli && !texte && typeof window.raisonObjetInterditParBlessure === "function") {
+            const perso = (window.PERSOS_JOUEURS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+            const cote = { armure: "armure", "main-droite": "droite", "main-gauche": "gauche", droite: "droite", gauche: "gauche" }[suffixe] || suffixe;
+            const raison = perso ? window.raisonObjetInterditParBlessure(perso, objet, cote) : null;
+            if (raison) texte = `⚠ Inutilisable — ${raison}`;
         }
         prerequis.innerText = texte;
         prerequis.style.display = texte ? "block" : "none";
@@ -820,8 +835,13 @@ window.pvMaxCombattant = function(perso) {
     if (!perso) return 0;
     // Les PV que la classe ajoute (Nécromancien : +5) s'ajoutent à la lecture,
     // comme l'énergie de l'Humain : la fiche garde sa valeur de création.
-    const bonus = window.atoutRace ? (Number(window.atoutRace(perso).pvMax) || 0) : 0;
-    return (parseInt(perso.PV_Max) || 0) + (parseInt(perso.Dev_Mod_PV) || 0) + bonus;
+    const atout = window.atoutRace ? (window.atoutRace(perso) || {}) : {};
+    const bonus = Number(atout.pvMax) || 0;
+    const total = (parseInt(perso.PV_Max) || 0) + (parseInt(perso.Dev_Mod_PV) || 0) + bonus;
+    // Une blessure qui rabote le maximum (Déchirure musculaire −20 %,
+    // Mutilation multiple −40 %) : jamais sous 1.
+    const pct = Number(atout.pvMaxPct) || 0;
+    return pct ? Math.max(1, Math.floor(total * (100 + pct) / 100)) : total;
 };
 
 // Un monstre porte "fatigueMax", un personnage "Fatigue_Max" : les deux noms
@@ -836,7 +856,10 @@ window.bonusRaceFatigue = function(perso) {
 window.fatigueMaxCombattant = function(perso, defaut = 100) {
     if (!perso) return defaut;
     const socle = (parseInt(perso.Fatigue_Max) || parseInt(perso.fatigueMax) || defaut);
-    return socle + (parseInt(perso.Dev_Mod_Fatigue) || 0) + window.bonusRaceFatigue(perso);
+    const total = socle + (parseInt(perso.Dev_Mod_Fatigue) || 0) + window.bonusRaceFatigue(perso);
+    // Le Choc cardiaque (blessures.js) : la jauge réduite de moitié.
+    const pct = window.atoutRace ? (Number(window.atoutRace(perso).fatigueMaxPct) || 0) : 0;
+    return pct ? Math.max(1, Math.floor(total * (100 + pct) / 100)) : total;
 };
 
 window.regenerationCombattant = function(perso) {
@@ -1246,7 +1269,8 @@ window.atoutClasse = function(perso) {
 };
 
 // Deux jeux d'atouts en un : les nombres s'additionnent, les listes se
-// rejoignent, le reste se garde.
+// rejoignent, les tables de nombres ({ cha: -2 }, { force: 1 }) s'additionnent
+// clé par clé, le reste se garde.
 function fusionnerAtouts(a, b) {
     const r = { ...a };
     Object.keys(b || {}).forEach(k => {
@@ -1254,6 +1278,13 @@ function fusionnerAtouts(a, b) {
         const v = b[k];
         if (typeof v === "number") r[k] = (Number(r[k]) || 0) + v;
         else if (Array.isArray(v)) r[k] = [...new Set([...(r[k] || []), ...v])];
+        else if (v && typeof v === "object" && r[k] && typeof r[k] === "object" && !Array.isArray(r[k])) {
+            const t = { ...r[k] };
+            Object.keys(v).forEach(s => {
+                t[s] = (typeof v[s] === "number" && typeof t[s] === "number") ? t[s] + v[s] : v[s];
+            });
+            r[k] = t;
+        }
         else r[k] = v;
     });
     return r;
@@ -1270,8 +1301,10 @@ window.atoutRace = function(perso) {
     const creature = typeof window.atoutCreature === "function" ? window.atoutCreature(perso) : {};
     // LES TALENTS (talents.js) : une source de plus, par le même chemin.
     const talents = typeof window.atoutTalents === "function" ? window.atoutTalents(perso) : {};
-    if (Object.keys(classe).length === 0 && Object.keys(creature).length === 0 && Object.keys(talents).length === 0) return peuple;
-    return fusionnerAtouts(fusionnerAtouts(fusionnerAtouts(fusionnerAtouts({}, peuple), classe), creature), talents);
+    // LES BLESSURES (blessures.js) : des malus, par le même chemin encore.
+    const blessures = typeof window.atoutBlessures === "function" ? window.atoutBlessures(perso) : {};
+    if ([classe, creature, talents, blessures].every(a => Object.keys(a).length === 0)) return peuple;
+    return [classe, creature, talents, blessures].reduce(fusionnerAtouts, fusionnerAtouts({}, peuple));
 };
 
 // =========================================================================
@@ -1398,7 +1431,7 @@ window.texteAtout = function(cle, valeur) {
         case "chanceElementaire": return `${plus(n)} % de chance sur Brûlé, Électrifié et Glacé`;
         case "chanceEtatsCharisme": return `${plus(n)} % de chance sur Confusion, Peur et Immobilisation`;
         case "chancePoisonPhysique": return `${plus(n)} % de chance d'empoisonner`;
-        case "testsCarac":      return Object.keys(valeur || {}).map(c => `+${valeur[c]} aux tests de ${NOMS_CARACS_ATOUT[c] || c}`).join(" · ");
+        case "testsCarac":      return Object.keys(valeur || {}).map(c => `${plus(Number(valeur[c]) || 0)} aux tests de ${NOMS_CARACS_ATOUT[c] || c}`).join(" · ");
         case "fatigueSurKO":    return `${plus(n)} de fatigue à chaque ennemi abattu`;
         case "inertieMartiale": return `−${n} de fatigue sur la mêlée après 4 cases en ligne droite`;
         case "impactCinetique": return "Une cible poussée contre un obstacle encaisse le choc";
@@ -3569,6 +3602,13 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
          // exception ici les emportait tous, à chaque notification, et le
          // combat entier semblait cassé. Le butin est la dernière chose dont
          // la panne doit coûter la partie : elle s'arrête donc à lui.
+         // LA FIN DU COMBAT (blessures_ui.js) : le grand « Victoire » ou
+         // « Défaite », puis la blessure de ses héros — une fois par poste.
+         if (dataPartie.Fin_Combat && typeof window.afficherFinCombat === "function") {
+             try { window.afficherFinCombat(dataPartie.Fin_Combat); }
+             catch (e) { console.error("Fin du combat (le jeu continue) :", e); }
+         }
+
          if (typeof window.afficherFenetreButin === "function") {
              try {
                  window.afficherFenetreButin(dataPartie.Butin || null);
@@ -6441,6 +6481,11 @@ window.validerChangementDate = async function() {
             Jour: jourActuel.toString(),
             Annee: anneeActuelle.toString()
         });
+
+        // Les blessures « jours » des héros se décomptent (blessures_ui.js).
+        if (typeof window.decompterJoursBlessures === "function") {
+            await window.decompterJoursBlessures(joursEcoules).catch(e => console.error("Blessures (jours) :", e));
+        }
 
         // =========================================================
         // NOUVEAU : Message automatique du Maître du Temps

@@ -5320,3 +5320,68 @@ partagé aux alliés au contact du soigneur ; Diversion s'ajoute au Vargen.
   l'en-tête de l'Aperçu, rappel des talents (chiffres de CE héros) sous
   l'encart race/classe, « Remettre les talents à zéro » dans l'onglet DEV.
   talents.mjs.
+
+## La table des blessures, la victoire et la défaite (version 220)
+
+Nico : « Un personnage joueur tombé KO pendant un combat (sauf le Profanateur
+debout grâce à son sursis) reçoit une blessure avant les loot. Une popup
+s'ouvre avec marqué défaite ou victoire douloureuse, puis apparaît en fondu,
+avec un bruit résonnant et en rouge foncé, le nom de la blessure, et 2 secondes
+après le descriptif. Un jet de dé sur le tableau ; le talent qui baisse la
+gravité retranche au jet. Dans l'Aperçu, tout en bas, un encart pour les
+blessures, avec les jours / combats restants. »
+Ses réponses : 1d50, les deux bouts (Égratignure 1-5, Mort 46-50) couvrent
+cinq faces ; on retranche le modificateur de CON (jamais négatif) et Chanceux
+(5) ; le 16 à pile ou face ; Veinard : −7 au prochain jet seulement ; les
+relances (Commotion sévère +4, Estropié) AJOUTENT une blessure ; un héros
+relevé n'a rien, une blessure par combat ; un gros popup Victoire / Défaite
+pour tous, pas de butin à la défaite ; chacun ne voit que la blessure de ses
+héros ; « jours » quand le MJ avance le temps, « combats » à chaque fin (une
+réinitialisation compte) ; Soigner en DEV pour les soins en ville ; Tympan
+crevé définitif −5 SAG ; Mort : il ne combat plus ; inconscient : indisponible,
+décompte dans la fiche ; Amputation de la main = celle du bras ; Amnésie : 2
+compétences grisées 2 combats ; « 3 déplacements » = 3 cases par tour ; Choc
+cardiaque : régénération fixe à 30 ; Agonie : −3 aux six caracs.
+- LES RÈGLES (blessures.js, script simple) : TABLE_BLESSURES (43 lignes, la
+  table de Table_des_blessures.xlsx), retraitsJetBlessure, tirerBlessures
+  (le jet et ses relances), entreeBlessure (ce que la fiche retient : combats,
+  jours, soins, definitif, prochainJet, cartes oubliées), blessuresApresCombat
+  / ApresJours / ApresSoins, majBlessuresFinCombat (décompte, Veinard
+  consommé, nouvelles blessures, Mort_Definitive), estIndisponible,
+  resteBlessure. La fiche porte Blessures [{ uid, id, … }] et Mort_Definitive.
+- CE QU'ELLES FONT : window.atoutBlessures, fusionné dans atoutRace (app.js)
+  après les talents — fusionnerAtouts additionne désormais les tables de
+  nombres clé par clé (testsCarac, caracs). Clés : testsCarac, caracs (aussi
+  dans caracPourTalents), esquive, initiative, fatigueMax, pvMaxPct /
+  fatigueMaxPct (pvMaxCombattant, fatigueMaxCombattant), soinsRecus ;
+  maxCasesParTour (planifierTrajet + aperçu de mouvement.js),
+  coutDeplacementMult (coutDuPas), perteParCase (resoudreMouvement :
+  Hémorragie), regenFixe (regenererFinDeManche), reposLongTaux /
+  reposLongMoins (gainReposLong, combat_etat.js, partagé avec l'Oracle et
+  l'encart du repos), fatigueDebutCombat et saignementDebut (payés à l'entrée
+  dans combattantDepuisFiche, option debutCombat — un combat repris au tour
+  3 ne les repaie pas ; état « Plaie rouverte », tics de fin de manche),
+  degatsMelee (appliquerEquipementALaCarte), porteeDistance (porteeAvecArme,
+  jamais sous 2), coutCarteMagieDistance (coutFatigueCarte, lu par le volet,
+  la carte, le choix et le cerveau), interditDeuxMains / Bouclier /
+  ArmureLourde / MainGauche (objetsEquipes : l'objet reste porté mais ne sert
+  plus ; l'inventaire dit pourquoi ; les mains des talents aussi),
+  cartesOubliees (raisonBlocageCarte, avec l'identifiant de la carte). Les PV
+  et l'énergie d'une fiche au-dessus du nouveau maximum y sont ramenés.
+- LA FIN DU COMBAT (blessures_ui.js) : cloturerCombat("victoire" | "defaite")
+  tire les jets AVANT la transaction, pose Fin_Combat { id, idRencontre,
+  issue, participants, blessures } une fois par rencontre (modifierPartie),
+  et le poste gagnant écrit les fiches. La victoire (loot.js) l'appelle avant
+  le butin ; verifierDefaiteCombat (rejouée avec la victoire, monstres.js)
+  quand tous les héros sont à terre — pas de butin. Une réinitialisation d'un
+  combat non clos décompte les combats (majBlessuresReinitialisation) ; le MJ
+  qui avance le temps décompte les jours (decompterJoursBlessures). Un héros
+  mort ou inconscient n'est plus « actif » (persoDocVersFront).
+- L'ÉCRAN : le grand « VICTOIRE » / « DÉFAITE » pour tous (au-dessus du
+  butin), puis, pour le seul joueur du héros blessé, « Victoire douloureuse »
+  ou « Défaite », le nom en rouge foncé en fondu avec un gong (fabrique_sons.js,
+  SONS_EVENEMENTS, à part des dix clics), le descriptif 2 s après, le jet,
+  « Continuer ». Une fois par poste. L'encart « Blessures » au bas de
+  l'Aperçu (reste : jours, combats, soins, définitif) ; « Blessures : soins en
+  ville » dans l'onglet DEV. Chanceux devient prenable (−5 au jet).
+  blessures.mjs ; talents.mjs mis à jour (Chanceux).

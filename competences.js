@@ -513,8 +513,12 @@ window.gainReposLong = function(perso) {
     const e = window.energieHerosApercu(perso);
     if (!e) return 0;
     const pct = parseFloat((perso.stats && perso.stats.Repos_Long) || perso.Repos_Long) || 0;
-    const taux = pct > 0 ? pct / 100 : 0.35;
-    return Math.max(0, Math.min(e.max - e.actuelle, Math.floor(e.max * taux)));
+    let taux = pct > 0 ? pct / 100 : 0.35;
+    // Les blessures (blessures.js) : Lésion d'un organe (15 %), Côtes fêlées (−10).
+    const atout = typeof window.atoutRace === "function" ? (window.atoutRace(perso) || {}) : {};
+    if ((Number(atout.reposLongTaux) || 0) > 0) taux = Math.min(taux, atout.reposLongTaux / 100);
+    const brut = Math.max(0, Math.floor(e.max * taux) - (Number(atout.reposLongMoins) || 0));
+    return Math.max(0, Math.min(e.max - e.actuelle, brut));
 };
 
 // La jauge : `delta` négatif = une dépense (rouge), positif = un gain (vert).
@@ -547,7 +551,9 @@ window.afficherApercuReposLong = function(perso) {
     if (!conteneur || !fenetreCombat || !e) return;
     if (conteneur.parentNode !== fenetreCombat) fenetreCombat.appendChild(conteneur);
     const gain = window.gainReposLong(perso);
-    const pct = parseFloat((perso.stats && perso.stats.Repos_Long) || perso.Repos_Long) || 35;
+    const atoutRepos = typeof window.atoutRace === "function" ? (window.atoutRace(perso) || {}) : {};
+    const pct = Math.min(parseFloat((perso.stats && perso.stats.Repos_Long) || perso.Repos_Long) || 35,
+                         (Number(atoutRepos.reposLongTaux) || 0) > 0 ? Number(atoutRepos.reposLongTaux) : Infinity);
     conteneur.dataset.cardId = "REPOS_LONG";
     conteneur.dataset.locked = "false";
     conteneur.innerHTML = `
@@ -653,7 +659,12 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
 
     const titre = data.Nom || "Inconnue";
     const initiative = data.Initiative || 0;
-    const fatigue = data.Fatigue || 0;
+    // Le coût affiché est celui que CE porteur paiera (une blessure peut
+    // l'alourdir : coutFatigueCarte, moteur_effets.js).
+    const porteurCout = typeof window.porteurPourApercu === "function"
+        ? window.porteurPourApercu(idCarte) : ((window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO] || null);
+    const fatigue = (typeof window.coutFatigueCarte === "function" && porteurCout)
+        ? window.coutFatigueCarte(data, porteurCout) : (data.Fatigue || 0);
     const effets = data.Effets_Compiles || [];
 
     let allZoneHexes = [];
@@ -836,6 +847,7 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
             // Le trajet déjà tracé mord aussi sur le budget : une carte abordable
             // seule mais pas une fois le déplacement compté doit perdre "Choisir"
             // exactement comme gererClicCarteCombat (combat.js) le décide déjà.
+            // (`fatigue` est déjà le coût de CE porteur, blessures comprises.)
             if (parseInt(fatigue) + (window.MOUVEMENT_COUT_TOTAL || 0) > fatiguePerso) {
                 estEpuise = true;
             }

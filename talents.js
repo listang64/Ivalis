@@ -52,7 +52,11 @@
     // Une main est « vide » pour le Pugiliste si elle ne tient rien, ou une bague.
     const estBague = (o) => !!o && (o.bague === true || /bague/i.test(String(o.modele || o.nom || "")));
     const estBouclier = (o) => !!o && (o.type === "Bouclier" || /bouclier/i.test(String(o.modele || o.type || "")));
-    const mains = (perso) => [perso && perso.equipMainDroite, perso && perso.equipMainGauche].filter(o => o && o.nom);
+    // Une main qu'une blessure rend inutilisable (blessures.js) ne tient rien.
+    const utilisable = (perso, o, cote) => !(typeof window.raisonObjetInterditParBlessure === "function"
+        && window.raisonObjetInterditParBlessure(perso, o, cote));
+    const mains = (perso) => [[perso && perso.equipMainDroite, "droite"], [perso && perso.equipMainGauche, "gauche"]]
+        .filter(([o, cote]) => o && o.nom && utilisable(perso, o, cote)).map(([o]) => o);
     const sansArme = (perso) => mains(perso).every(estBague);
     const porteBouclier = (perso) => mains(perso).some(estBouclier);
     const estVampire = (perso) => sansAccent(perso && (perso.classe || perso.Classe)) === "vampire";
@@ -131,10 +135,12 @@
           texte: "Bouclier équipé : parade +2 × le modificateur de Constitution.",
           effet: (m, p) => (porteBouclier(p) ? { parade: 2 * m("con") } : {}),
           resume: (m, p) => porteBouclier(p) ? `${plus(2 * m("con"))} % de parade` : `Inactif sans bouclier (${plus(2 * m("con"))} % de parade)` },
-        { id: "TAL_CHANCEUX", nom: "Chanceux", carac: "con", min: 10, max: 1, aVenir: true,
-          texte: "Réduit un peu (5) la gravité des blessures en combat (à implanter avec les blessures).",
+        // Lu par le jet de blessure (retraitsJetBlessure, blessures.js) :
+        // 5 de moins sur le d50, donc une blessure moins grave.
+        { id: "TAL_CHANCEUX", nom: "Chanceux", carac: "con", min: 10, max: 1,
+          texte: "Réduit la gravité des blessures en combat : −5 au jet sur la table des blessures.",
           effet: () => ({}),
-          resume: () => "À venir" },
+          resume: () => "−5 au jet de blessure" },
         { id: "TAL_MASTODONTE", nom: "Mastodonte", carac: "con", min: 12, max: 1,
           texte: "+10 PV.",
           effet: () => ({ pvMax: 10 }),
@@ -245,7 +251,9 @@
         const base = parseInt(window.caracsBaseDuPerso(perso)[cle]);
         const valeur = Number.isFinite(base) ? base : 8;
         const caracsAtout = (src) => ((typeof src === "function" ? src(perso) : {}) || {}).caracs || {};
-        const atouts = (parseInt(caracsAtout(window.atoutPeuple)[cle]) || 0) + (parseInt(caracsAtout(window.atoutClasse)[cle]) || 0);
+        // Les blessures aussi (l'Agonie surmontée : −3 partout).
+        const atouts = (parseInt(caracsAtout(window.atoutPeuple)[cle]) || 0) + (parseInt(caracsAtout(window.atoutClasse)[cle]) || 0)
+            + (parseInt(caracsAtout(window.atoutBlessures)[cle]) || 0);
         const equip = typeof window.bonusEquip === "function" ? (parseInt(window.bonusEquip(perso, cle)) || 0) : 0;
         return valeur + atouts + equip;
     };

@@ -898,7 +898,7 @@ function contexteDuJeu() {
                 const fiche = fiches.find(f => f && f.idPersonnage === id);
                 const pion = pions[id];
                 if (!fiche || !pion || pion.q === undefined || pion.r === undefined) return;
-                try { venus.push(combattantDepuisFiche(fiche, pion, regles)); }
+                try { venus.push(combattantDepuisFiche(fiche, pion, regles, { debutCombat: true })); }
                 catch (e) { console.error("Accueil d'un combattant :", e); }
             });
             return venus;

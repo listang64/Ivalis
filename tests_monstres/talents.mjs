@@ -69,8 +69,9 @@ console.log("\n1. LA LISTE, LES POINTS, LES PRÉREQUIS");
     verifier("27 talents : Général 5, Force 4, Dex 2, Con 4, Int 3, Sag 5, Cha 4", w.TALENTS.length === 27
              && JSON.stringify(par) === '{"Général":5,"Force":4,"Dextérité":2,"Constitution":4,"Intelligence":3,"Sagesse":5,"Charisme":4}',
              JSON.stringify(par));
-    verifier("Chanceux : « à venir », jamais prenable", w.talentParId("TAL_CHANCEUX").aVenir
-             && w.etatTalent(heros(), "TAL_CHANCEUX").aVenir && !w.etatTalent(heros(), "TAL_CHANCEUX").ok);
+    // Chanceux est branché depuis les blessures (blessures.js) : prenable.
+    verifier("Chanceux : prenable désormais (CON 10), « −5 au jet de blessure »", !w.talentParId("TAL_CHANCEUX").aVenir
+             && w.etatTalent(heros(), "TAL_CHANCEUX").ok && /−5/.test(w.talentParId("TAL_CHANCEUX").texte));
     const pts = [1, 3, 5, 7, 9, 12].map(n => w.pointsTalentsGagnes(w.niveauDepuisXP(XP[n])));
     verifier("un point aux niveaux 3, 5, 7, 9 ; plus rien ensuite", JSON.stringify(pts) === "[0,1,2,3,4,4]", JSON.stringify(pts));
     const h = heros({ talents: { TAL_PREPARER: 2, TAL_PRECIS: 1 } });
@@ -330,8 +331,8 @@ await p.waitForTimeout(300);
   verifier("la carac requise sur la case : « FOR 14 »", r.etiquette === "FOR 14", r.etiquette);
   verifier("FOR 13 < 14 : case grisée, et elle dit pourquoi", /verrou/.test(r.verrou) && /grayscale/.test(r.gris)
            && /Force 14 requise \(13\)/.test(r.raison), r.raison);
-  verifier("Chanceux en rouge, « à venir », pas prenable", /a-venir/.test(r.chanceux) && !/prenable/.test(r.chanceux)
-           && r.chanceuxCouleur === "rgb(179, 38, 30)", r.chanceuxCouleur);
+  verifier("Chanceux n'est plus « à venir » ni en rouge : il se prend", !/a-venir/.test(r.chanceux) && /prenable/.test(r.chanceux)
+           && r.chanceuxCouleur !== "rgb(179, 38, 30)", r.chanceux + " " + r.chanceuxCouleur);
   verifier("les talents pris sont cochés ; Préparer dit 1/2", /pris/.test(r.pris) && r.rangsPreparer === "1/2");
 }
 

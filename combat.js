@@ -838,7 +838,7 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
             const idCarte = comp.id;
             const titre = data.Nom || "Technique";
             const initiative = data.Initiative || 0;
-            const coutFatigue = parseInt(data.Fatigue) || 0;
+            const coutFatigue = (typeof window.coutFatigueCarte === "function" ? window.coutFatigueCarte(data, persoActuel) : (parseInt(data && data.Fatigue) || 0));
             const estEpuise = coutFatigue > (typeof window.fatiguePourChoisir === "function"
                 ? window.fatiguePourChoisir(persoActuel) : window.COMBAT_FATIGUE_ACTUELLE);
 
@@ -847,7 +847,7 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
             // pas — mais elle s'assombrit et annonce sa raison au survol.
             const persoCarte = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
             const blocageArme = typeof window.raisonBlocageCarte === "function"
-                ? window.raisonBlocageCarte(persoCarte, data.Arme) : null;
+                ? window.raisonBlocageCarte(persoCarte, data.Arme, idCarte) : null;
 
             const urlCadre = (estEpuise || blocageArme) ? IMAGE_CADRE_EPUISE : IMAGE_CADRE_NORMAL;
             const classeEpuise = (estEpuise || blocageArme) ? "banniere-epuisee" : "";
@@ -1593,7 +1593,7 @@ window.gererClicCarteCombat = function(idCarte) {
         + (typeof window.bonusRetourArriere === "function" ? window.bonusRetourArriere(persoActuel) : 0);
 
     const dataCarte = window.COMPETENCES_CACHE[idCarte];
-    const cout = parseInt(dataCarte?.Fatigue) || 0;
+    const cout = (typeof window.coutFatigueCarte === "function" ? window.coutFatigueCarte(dataCarte, persoActuel) : (parseInt(dataCarte && dataCarte.Fatigue) || 0));
 
     // Une carte trop chère (seule, ou combinée au trajet déjà tracé) reste
     // consultable comme n'importe quelle autre : plus de message d'erreur ni de
@@ -1616,7 +1616,7 @@ window.gererClicCarteCombat = function(idCarte) {
         el.dataset.actif = "false";
         const cId = el.id.replace("combat-carte-", "");
         const cData = window.COMPETENCES_CACHE[cId];
-        const estEp = (cData && (parseInt(cData.Fatigue) || 0) > fatiguePerso) || el.dataset.techniqueUtilisee === "true";
+        const estEp = (cData && (typeof window.coutFatigueCarte === "function" ? window.coutFatigueCarte(cData, persoActuel) : (parseInt(cData && cData.Fatigue) || 0)) > fatiguePerso) || el.dataset.techniqueUtilisee === "true";
         const cadre = document.getElementById(`cadre-combat-${cId}`);
         if (cadre) cadre.style.backgroundImage = `url('${estEp ? IMAGE_CADRE_EPUISE : IMAGE_CADRE_NORMAL}')`;
     });
@@ -4250,11 +4250,11 @@ window.jouerCarteCombat = async function(idCarte) {
     // moment de jouer, plutôt qu'à la Forge : une carte reste forgeable, elle
     // attend seulement la bonne arme.
     if (typeof window.raisonBlocageCarte === "function") {
-        const blocage = window.raisonBlocageCarte(persoActuel, dataCarte.Arme);
+        const blocage = window.raisonBlocageCarte(persoActuel, dataCarte.Arme, idCarte);
         if (blocage) {
             if (typeof window.afficherMessageFlottantHex === "function") {
                 const tk = (window.TOKENS_VTT_DATA || {})[persoActuel.idPersonnage];
-                if (tk) window.afficherMessageFlottantHex(tk.q, tk.r, "Arme inadaptée", "#ff4c4c");
+                if (tk) window.afficherMessageFlottantHex(tk.q, tk.r, /^Choc/.test(blocage) ? "Compétence oubliée" : "Arme inadaptée", "#ff4c4c");
             }
             alert(blocage);
             return;
@@ -5281,8 +5281,8 @@ window.ouvrirArretDuTemps = function(idLanceur) {
     const deck = (lanceur.deckEquipe || []).filter(id => id && !String(id).startsWith("CLASSE_") && id !== "REPOS_LONG");
     const competences = deck.map(id => {
         const d = (typeof window.donneesCarteCombattant === "function" ? window.donneesCarteCombattant(idLanceur, id) : null) || {};
-        const cout = parseInt(d.Fatigue) || 0;
-        const blocage = typeof window.raisonBlocageCarte === "function" ? window.raisonBlocageCarte(lanceur, d.Arme) : null;
+        const cout = (typeof window.coutFatigueCarte === "function" ? window.coutFatigueCarte(d, lanceur) : (parseInt(d && d.Fatigue) || 0));
+        const blocage = typeof window.raisonBlocageCarte === "function" ? window.raisonBlocageCarte(lanceur, d.Arme, id) : null;
         const raison = cout > energie ? `Il faut ${cout} d'énergie (il en reste ${energie})` : (blocage || "");
         const bonusInit = typeof window.bonusInitiativeClasse === "function" ? window.bonusInitiativeClasse(lanceur, d) : 0;
         return { id, nom: d.Nom || id, cout, initiative: Math.min(199, (Number(d.Initiative) || 0) + bonusInit), raison };
@@ -5820,7 +5820,7 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
     // Dé-sélection visuelle si la carte en aperçu n'est plus finançable
     if (window.CARTE_EN_APERCU && !(persoInQueue && persoInQueue.idCarte)) {
         const dataSel = window.COMPETENCES_CACHE[window.CARTE_EN_APERCU];
-        const coutSel = parseInt(dataSel?.Fatigue) || 0;
+        const coutSel = (typeof window.coutFatigueCarte === "function" ? window.coutFatigueCarte(dataSel, persoActuel) : (parseInt(dataSel && dataSel.Fatigue) || 0));
         // Le repos d'un Retour arrière en attente compte déjà (Oracle) : sans
         // lui, la compétence choisie après le Retour arrière était
         // désélectionnée au rafraîchissement suivant, quelques secondes après.
@@ -5918,7 +5918,7 @@ window.actualiserBannieresEpuisees = function() {
         const dataCarte = window.COMPETENCES_CACHE[idCarte];
         
         if (dataCarte) {
-            const coutFatigue = parseInt(dataCarte.Fatigue) || 0;
+            const coutFatigue = (typeof window.coutFatigueCarte === "function" ? window.coutFatigueCarte(dataCarte, persoActuel) : (parseInt(dataCarte && dataCarte.Fatigue) || 0));
             const cadre = document.getElementById(`cadre-combat-${idCarte}`);
 
             // UNE TECHNIQUE DE CLASSE SE RELIT À CHAQUE FOIS, d'après la fiche
@@ -5932,7 +5932,7 @@ window.actualiserBannieresEpuisees = function() {
             // Une carte que l'arme en main interdit aussi : le volet la grise à
             // l'ouverture, ce rafraîchissement la rallumait.
             const blocageArme = typeof window.raisonBlocageCarte === "function"
-                ? window.raisonBlocageCarte(persoActuel, dataCarte.Arme) : null;
+                ? window.raisonBlocageCarte(persoActuel, dataCarte.Arme, idCarte) : null;
             if (coutFatigue > fatiguePerso || ban.dataset.techniqueUtilisee === "true" || blocageArme) {
                 ban.classList.add("banniere-epuisee");
                 if (cadre) cadre.style.backgroundImage = `url('${IMAGE_CADRE_EPUISE}')`;
@@ -5962,13 +5962,13 @@ window.validerCarteCombat = async function(idCarte, idLanceur, options) {
         const qui = idLanceur || persoActuel.idPersonnage;
         if (typeof window.tracerCombat === "function") {
             window.tracerCombat("🎴", `carte sans cible pour ${qui}`,
-                                `${idCarte} — ${parseInt(dataCarte.Fatigue) || 0} d'énergie`);
+                                `${idCarte} — ${(typeof window.coutFatigueCarte === "function" ? window.coutFatigueCarte(dataCarte, persoActuel) : (parseInt(dataCarte && dataCarte.Fatigue) || 0))} d'énergie`);
         }
         return await window.regimeDemande.carte(qui, {
             idCarte,
             attaques: [],
             alterations: [],
-            coutFatigue: parseInt(dataCarte.Fatigue) || 0,
+            coutFatigue: (typeof window.coutFatigueCarte === "function" ? window.coutFatigueCarte(dataCarte, persoActuel) : (parseInt(dataCarte && dataCarte.Fatigue) || 0)),
             // Une carte qui ne fait que se replier emporte sa case.
             repli: (options && options.repli) || null
         });
@@ -6016,6 +6016,17 @@ window.reinitialiserCombat = async function() {
     // Combattants_Hors_Jeu, n'en sortent plus, et la rencontre suivante se joue
     // sans eux (voir synchroniserCombattantsHorsJeu).
     window.REINITIALISATION_COMBAT_EN_COURS = true;
+
+    // UN COMBAT QUE RIEN N'A CLOS COMPTE COMME FINI (Nico) : les blessures
+    // « combats » des héros qui y étaient se décomptent, plus bas. Un combat
+    // déjà clos (Fin_Combat de cette rencontre) les a déjà décomptées.
+    const partieAvant = window.PARTIE_DATA || {};
+    const rencontreReinit = partieAvant.ID_Rencontre || "";
+    const combatNonClos = !!rencontreReinit
+        && !(partieAvant.Fin_Combat && partieAvant.Fin_Combat.idRencontre === rencontreReinit);
+    const herosDuCombat = new Set((window.PERSOS_PARTIE || [])
+        .filter(p => typeof window.estHerosDuButin === "function" && window.estHerosDuButin(p))
+        .map(p => p.idPersonnage));
 
     // La piste oublie l'ordre de la manche : celui de la rencontre d'avant n'a
     // plus rien à montrer, et il ferait apparaître des combattants effacés le
@@ -6210,12 +6221,17 @@ window.reinitialiserCombat = async function() {
                 // Un échec sur un combattant (document supprimé entre-temps, coupure réseau)
                 // ne doit jamais empêcher les suivants d'être soignés.
                 const persoRef = window.refCombattant(perso.idPersonnage);
+                const blessuresReinit = (herosDuCombat.has(perso.idPersonnage)
+                    && typeof window.majBlessuresReinitialisation === "function")
+                    ? window.majBlessuresReinitialisation(perso, combatNonClos) : null;
+                if (blessuresReinit) perso.blessures = blessuresReinit.Blessures;
                 await updateDoc(persoRef, {
                     PV_Actuels: pvMax,
                     Fatigue_Actuelle: fatigueMax,
                     Bouclier_Max: 0,
                     Bouclier_Actuel: 0,
-                    Etats_Alteres: []
+                    Etats_Alteres: [],
+                    ...(blessuresReinit || {})
                 }).catch(e => console.error(`Reset de ${perso.idPersonnage} :`, e));
             }
         }

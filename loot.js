@@ -846,6 +846,13 @@ window.verifierVictoireCombat = function() {
         && !(typeof window.estCombattantMort === "function" && window.estCombattantMort(p.idPersonnage)));
     if (!heroVivant) return;
 
+    // LA FIN DU COMBAT S'ÉCRIT D'ABORD (blessures_ui.js) : les héros encore à
+    // terre reçoivent leur blessure, et le grand « Victoire » s'affiche
+    // par-dessus le butin.
+    if (typeof window.cloturerCombat === "function") {
+        Promise.resolve(window.cloturerCombat("victoire")).catch(e => console.error("Fin du combat :", e));
+    }
+
     if (typeof window.demarrerButin === "function") window.demarrerButin();
 
     // LE COMBAT EST GAGNÉ : son journal est clos. On l'efface (et on remet son

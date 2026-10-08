@@ -233,6 +233,53 @@
         }
     };
 
+    // --- LES SONS D'ÉVÉNEMENT ----------------------------------------------
+    //  À part des dix clics (ils ne s'affichent pas dans la Fabrique) : la fin
+    //  d'un combat et la blessure qui tombe (blessures_ui.js).
+    const SONS_EVENEMENTS = {
+        // Un gong grave qui résonne longtemps : des partiels inharmoniques,
+        // un battement lent, une queue de quatre secondes.
+        "gong-blessure"(ctx, s) {
+            bruit(ctx, s, { duree: 0.06, freq: 300, q: 1.2, gain: 0.5 });
+            [[1, 1, 1], [1.48, 0.55, 0.8], [2.09, 0.4, 0.6], [2.76, 0.22, 0.45], [3.9, 0.1, 0.3]].forEach(([k, part, tenue]) => {
+                note(ctx, s, { freq: 82 * k, duree: 4.2 * tenue, gain: 0.32 * part, attaque: 0.01, type: "sine" });
+                note(ctx, s, { freq: 82 * k, duree: 4.2 * tenue, gain: 0.16 * part, attaque: 0.02, type: "sine", desaccord: 7 });
+            });
+            note(ctx, s, { freq: 41, duree: 2.5, gain: 0.25, attaque: 0.02, type: "triangle", passeBas: 200 });
+        },
+        // La victoire : trois notes qui montent, claires.
+        "victoire"(ctx, s) {
+            [[523.3, 0], [659.3, 0.16], [784, 0.32], [1046.5, 0.5]].forEach(([f, d], i) =>
+                ding(ctx, s, { freq: f, debut: d, duree: i === 3 ? 1.4 : 0.5, force: 1.1, type: "triangle",
+                               partiels: [[1, 1, 1], [2, 0.25, 0.6], [3, 0.1, 0.4]] }));
+        },
+        // La défaite : deux notes graves qui descendent, étouffées.
+        "defaite"(ctx, s) {
+            ding(ctx, s, { freq: 220, duree: 1.2, force: 1.3, clic: false, passeBas: 900, type: "triangle" });
+            ding(ctx, s, { freq: 164.8, debut: 0.45, duree: 2.6, force: 1.4, clic: false, passeBas: 700, type: "triangle",
+                           partiels: [[1, 1, 1], [1.5, 0.3, 0.7], [2, 0.15, 0.5]] });
+        }
+    };
+    window.SONS_EVENEMENTS = SONS_EVENEMENTS;
+    window.jouerSonEvenement = function (id, facteur) {
+        const fabriquer = SONS_EVENEMENTS[id];
+        if (!fabriquer) return false;
+        const v = volume() * (facteur === undefined ? 1 : Math.max(0, Number(facteur) || 0));
+        if (v <= 0) return false;
+        const ctx = audio();
+        if (!ctx) return false;
+        try {
+            const sortie = ctx.createGain();
+            sortie.gain.value = v;
+            sortie.connect(ctx.destination);
+            fabriquer(ctx, sortie);
+            return true;
+        } catch (e) {
+            console.error("La Fabrique (événement) :", e);
+            return false;
+        }
+    };
+
     // --- L'ÉCRAN ---------------------------------------------------------
     //  Les dix boutons sont construits ici, à partir de la liste : ajouter un
     //  son, c'est ajouter une entrée à SONS, rien d'autre.
