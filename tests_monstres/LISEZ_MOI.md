@@ -5522,3 +5522,25 @@ taille, l'image du token du joueur. »
   le même rond de 62 px et le même cadre doré (68 px en tout, avant comme
   après). Pas de pion, ou un pion qui ne se charge pas : l'initiale revient.
   apercu_pion.mjs ; apercu.mjs inchangé.
+
+## La Fabrique, en sobre : dix sons à la manière d'Apple (version 225)
+
+Nico : « Les sons que tu as faits dans la Fabrique, ça ne va pas. J'aimerais
+quelque chose de plus sobre, un peu comme les bruits Apple. Refais-moi des
+propositions de sons. »
+- DIX NOUVEAUX SONS (fabrique_sons.js, SONS) : Tic (une touche de clavier),
+  Tac (un petit coup de bois), Bascule (un interrupteur : deux clics serrés),
+  Pop (une bulle qui éclate), Goutte (un « plic » qui remonte), Tinte (un
+  tintement de métal), Verre (un verre effleuré), Validation (deux notes qui
+  montent), Retour (deux notes qui redescendent), Envoi (un souffle qui file
+  vers l'aigu). Très courts, très propres, une seule idée par son.
+- TROIS MATIÈRES : le clic (un souffle de quelques millisecondes sur une note
+  très brève), la note qui glisse (pop, goutte), la cloche FM (une note dont
+  l'éclat s'éteint avant elle : le timbre « verre poli »). Les anciennes
+  briques douces (doux, paliers) sont parties avec la série d'avant.
+- Le ding perle des boutons du jeu (SONS_JEU), les sons d'événement et ceux
+  du combat ne changent pas.
+  fabrique_sons.mjs, section 3 : dix sons nouveaux, crête sous 0,3, aucun
+  au-delà de 0,8 s, au moins cinq sous 0,2 s, la moitié de la crête en moins
+  de 15 ms (sauf le souffle de l'Envoi), deux attaques au plus, dix sons
+  vraiment différents.

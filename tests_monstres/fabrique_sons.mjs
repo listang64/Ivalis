@@ -143,9 +143,10 @@ console.log("\n2. CHAQUE BOUTON JOUE SON SON");
   verifier("le son part pour de vrai (contexte audio du navigateur)", r.joue === true);
 }
 
-console.log("\n3. LES DIX SONS, RENDUS HORS LIGNE : DOUX, LÉGERS, CERTAINS PAR PALIERS");
-// Nico : « remplace les sons existants par dix autres, plus doux et légers ;
-// certains qui s'effacent en graduation. »
+console.log("\n3. LES DIX SONS, RENDUS HORS LIGNE : SOBRES, À LA MANIÈRE D'APPLE");
+// Nico : « les sons de la Fabrique, ça ne va pas ; j'aimerais quelque chose de
+// plus sobre, un peu comme les bruits Apple. » Très courts, très propres, une
+// attaque nette, une seule idée par son, rien qui traîne.
 {
   const sons = await p.evaluate(async () => {
     const taux = 44100;
@@ -196,28 +197,32 @@ console.log("\n3. LES DIX SONS, RENDUS HORS LIGNE : DOUX, LÉGERS, CERTAINS PAR 
       let e1 = 0, e2 = 0;
       for (let i = 0; i < moitie; i++) e1 += d[i] * d[i];
       for (let i = moitie; i < dernier; i++) e2 += d[i] * d[i];
-      mesures.push({ id: son.id, crete, rms: Math.sqrt(somme / Math.max(1, dernier)), duree, tCrete: iCrete / taux,
+      // Le temps pour atteindre la moitié de la crête : la netteté de l'attaque.
+      let iMoitie = 0;
+      while (iMoitie < d.length && Math.abs(d[iMoitie]) < crete * 0.5) iMoitie++;
+      mesures.push({ id: son.id, crete, tMoitie: iMoitie / taux, rms: Math.sqrt(somme / Math.max(1, dernier)), duree, tCrete: iCrete / taux,
                      attaque: debutFort / Math.max(crete, 1e-9), hauteur: actif ? n / (actif / taux) / 2 : 0,
                      paliers: attaques.map(a => +a.pic.toFixed(4)), finSurDebut: e2 / Math.max(e1, 1e-12) });
     }
     return mesures;
   });
   sons.forEach(m => console.log(`     ${m.id.padEnd(18)} crête ${m.crete.toFixed(2)}  durée ${m.duree.toFixed(2)} s  hauteur ~${Math.round(m.hauteur)} Hz  paliers ${m.paliers.length}`));
-  verifier("dix nouveaux sons (plus aucun « ding » de l'ancienne série)", sons.length === 10 && sons.every(m => !/^ding-/.test(m.id)),
+  const ANCIENS = ["goutte-rosee", "plume", "bulle", "souffle-verre", "echo-efface", "carillon-lointain",
+                   "harpe-feutree", "petale", "brume", "pluie-notes"];
+  verifier("dix nouveaux sons (plus aucun de la série « douce »)", sons.length === 10 && sons.every(m => !ANCIENS.includes(m.id)),
            sons.map(m => m.id).join(", "));
   verifier("aucun n'est muet", sons.every(m => m.crete > 0.02), sons.filter(m => m.crete <= 0.02).map(m => m.id).join());
-  verifier("légers : crête sous 0,3 (les dings montaient jusqu'à 0,5)", sons.every(m => m.crete < 0.3), sons.map(m => m.crete.toFixed(2)).join(" "));
-  verifier("doux : aucun « tac » d'attaque (3 premières ms sous 30 % de la crête)", sons.every(m => m.attaque < 0.3),
-           sons.map(m => m.attaque.toFixed(2)).join(" "));
-  verifier("des notes tendres, ni graves ni perçantes (300 à 2 000 Hz)", sons.every(m => m.hauteur > 300 && m.hauteur < 2000),
-           sons.map(m => Math.round(m.hauteur)).join(" "));
-  verifier("aucun ne traîne (moins d'1,3 s)", sons.every(m => m.duree < 1.3), sons.map(m => m.duree.toFixed(2)).join(" "));
-  const parPaliers = sons.filter(m => m.paliers.length >= 3 && m.paliers.every((v, i) => i === 0 || v < m.paliers[i - 1] * 1.05)
-                                   && m.paliers[m.paliers.length - 1] < m.paliers[0] * 0.6);
-  verifier("certains s'effacent PAR PALIERS : au moins trois, chaque reprise plus faible", parPaliers.length >= 3,
-           parPaliers.map(m => m.id + " " + m.paliers.length).join(", "));
-  const lents = sons.filter(m => m.duree > 0.6 && m.finSurDebut < 0.5 && m.finSurDebut > 0.001);
-  verifier("et d'autres s'éteignent lentement, en un long fondu", lents.length >= 2, lents.map(m => m.id).join(", "));
+  verifier("sobres : crête sous 0,3", sons.every(m => m.crete < 0.3), sons.map(m => m.crete.toFixed(2)).join(" "));
+  verifier("brefs : aucun ne dépasse 0,8 s", sons.every(m => m.duree < 0.8), sons.map(m => m.duree.toFixed(2)).join(" "));
+  const eclairs = sons.filter(m => m.duree < 0.2);
+  verifier("la plupart sont des éclairs (au moins cinq sous 0,2 s)", eclairs.length >= 5, eclairs.map(m => m.id).join(", "));
+  // Le souffle de l'Envoi enfle exprès ; tous les autres touchent d'emblée.
+  const nets = sons.filter(m => m.id !== "envoi");
+  verifier("nets : la moitié de la crête atteinte en moins de 15 ms", nets.every(m => m.tMoitie < 0.015),
+           nets.map(m => `${m.id} ${(m.tMoitie * 1000).toFixed(1)}`).join(", "));
+  // (Les remous d'un souffle ne sont pas des reprises : l'Envoi n'est pas compté.)
+  verifier("rien qui traîne : ni écho ni cascade (deux attaques au plus)", nets.every(m => m.paliers.length <= 2),
+           nets.map(m => `${m.id} ${m.paliers.length}`).join(", "));
   const proche = (a, b) => Math.abs(a - b) / Math.max(a, b, 1e-9) < 0.12;
   const jumeaux = [];
   for (let i = 0; i < sons.length; i++) for (let j = i + 1; j < sons.length; j++) {

@@ -2,10 +2,11 @@
 //  IVALIS — LA FABRIQUE (Paramètres → La Fabrique)
 // =========================================================================
 //  Dix sons d'interface, fabriqués sur place avec Web Audio : aucun fichier
-//  à héberger, aucun réseau. Doux et légers — goutte, plume, bulle, verre,
-//  écho, carillon, harpe, pétale, brume, pluie de notes —, certains
-//  s'effacent par paliers. On les écoute ici avant d'en choisir un pour les
-//  boutons du jeu (aujourd'hui le ding perle, gardé à part dans SONS_JEU).
+//  à héberger, aucun réseau. Sobres, à la manière des bruits d'Apple — tic,
+//  tac, bascule, pop, goutte, tinte, verre, validation, retour, envoi : très
+//  courts, très propres, rien qui traîne. On les écoute ici avant d'en
+//  choisir un pour les boutons du jeu (aujourd'hui le ding perle, gardé à
+//  part dans SONS_JEU).
 //
 //  Chaque son est une fonction (ctx, sortie) : elle ne fait que brancher des
 //  oscillateurs et des souffles filtrés sur `sortie`. C'est ce qui permet de
@@ -99,100 +100,120 @@
         });
     }
 
-    // --- LES DIX SONS DE LA FABRIQUE ---------------------------------------
-    //  Nico : « remplace les sons existants par dix autres, plus doux et
-    //  légers ; certains qui s'effacent en graduation. » Pas de souffle
-    //  d'attaque (le petit « tac » des dings) : chaque son monte en douceur,
-    //  reste discret, et quatre d'entre eux s'éteignent par paliers — un écho,
-    //  un carillon, une pluie de notes, une cascade.
-    //  `doux` : une note tendre, sinusoïdale, à l'attaque lente et filtrée.
-    function doux(ctx, s, o) {
-        const debut = o.debut || 0;
-        (o.partiels || [[1, 1, 1], [2, 0.12, 0.5]]).forEach(([k, part, tenue]) => {
-            note(ctx, s, { freq: o.freq * k, debut, duree: (o.duree || 0.3) * tenue, gain: (o.gain || 0.1) * part,
-                           type: o.type || "sine", attaque: o.attaque || 0.014, glisse: o.glisse ? o.glisse * k : undefined,
-                           desaccord: o.desaccord || 0, passeBas: o.passeBas || 2600 });
-        });
+    // --- DIX SONS SOBRES, À LA MANIÈRE DES BRUITS D'APPLE ------------------
+    //  Nico : « les sons de la Fabrique, ça ne va pas ; j'aimerais quelque
+    //  chose de plus sobre, un peu comme les bruits Apple ». Ce qui fait ces
+    //  sons-là : très courts, très propres, une attaque nette sans jamais être
+    //  agressive, une seule idée par son (un tic, un pop, un verre), et rien
+    //  qui traîne — ni écho, ni nappe, ni cascade. Trois matières :
+    //    • le clic : un souffle de quelques millisecondes posé sur une note
+    //      très brève — c'est lui qui donne le « toucher » ;
+    //    • la note qui glisse : un pop qui retombe, une goutte qui remonte ;
+    //    • la cloche FM : une note dont l'éclat (la modulation) s'éteint bien
+    //      avant elle — le timbre « verre poli » des interfaces.
+
+    // Un clic : un souffle de quelques millisecondes, et un corps très bref.
+    function clic(ctx, s, o) {
+        bruit(ctx, s, { debut: o.debut, duree: o.dureeSouffle || 0.012, filtre: "bandpass",
+                        freq: o.souffle || 3500, q: o.q || 1.2, gain: o.gainSouffle || 0.15 });
+        if (o.corps) note(ctx, s, { debut: o.debut, freq: o.corps, glisse: o.glisse, duree: o.duree || 0.03,
+                                    gain: o.gain || 0.08, attaque: 0.001 });
     }
-    // Une même note reprise plusieurs fois, chaque fois plus bas : l'effacement
-    // par paliers. `pas` : l'écart entre deux reprises ; `chute` : ce qu'il
-    // reste du volume à chaque palier.
-    function paliers(ctx, s, o) {
-        (o.notes || Array(o.fois || 4).fill(o.freq)).forEach((f, i) => {
-            doux(ctx, s, { ...o, freq: f, debut: (o.debut || 0) + i * o.pas, gain: (o.gain || 0.1) * Math.pow(o.chute || 0.55, i) });
-        });
+    // Une cloche FM : une porteuse, et une modulante dont l'indice (l'éclat,
+    // les harmoniques) retombe en `eclat` secondes, bien avant la note.
+    function clocheFM(ctx, s, o) {
+        const t = ctx.currentTime + (o.debut || 0);
+        const duree = o.duree || 0.4;
+        const porteuse = ctx.createOscillator();
+        const modulante = ctx.createOscillator();
+        const indice = ctx.createGain();
+        const g = ctx.createGain();
+        const fm = o.freq * (o.rapport || 2);
+        porteuse.frequency.setValueAtTime(o.freq, t);
+        modulante.frequency.setValueAtTime(fm, t);
+        indice.gain.setValueAtTime(fm * (o.indice || 1), t);
+        indice.gain.exponentialRampToValueAtTime(Math.max(0.5, fm * (o.indice || 1) * 0.01), t + (o.eclat || duree * 0.3));
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(o.gain || 0.1, t + (o.attaque || 0.002));
+        g.gain.exponentialRampToValueAtTime(0.0001, t + duree);
+        modulante.connect(indice).connect(porteuse.frequency);
+        porteuse.connect(g).connect(s);
+        porteuse.start(t); modulante.start(t);
+        porteuse.stop(t + duree + 0.03); modulante.stop(t + duree + 0.03);
     }
 
     const SONS = [
         {
-            id: "goutte-rosee", nom: "Goutte de rosée",
-            usage: "Une goutte qui tombe, toute ronde, et glisse un peu vers le bas",
-            fabriquer(ctx, s) { doux(ctx, s, { freq: 1175, glisse: 1046, duree: 0.26, gain: 0.12, attaque: 0.008 }); }
-        },
-        {
-            id: "plume", nom: "Plume",
-            usage: "Presque rien : une note feutrée qui se pose",
+            id: "tic", nom: "Tic",
+            usage: "Le tic d'une touche de clavier : à peine là, pour taper ou cocher",
             fabriquer(ctx, s) {
-                doux(ctx, s, { freq: 784, duree: 0.24, gain: 0.1, attaque: 0.02, type: "triangle", passeBas: 1500,
-                               partiels: [[1, 1, 1]] });
+                clic(ctx, s, { souffle: 5000, q: 1.4, dureeSouffle: 0.014, gainSouffle: 0.16,
+                               corps: 2200, duree: 0.022, gain: 0.05 });
             }
         },
         {
-            id: "bulle", nom: "Bulle",
-            usage: "Une petite bulle qui remonte, légère",
-            fabriquer(ctx, s) { doux(ctx, s, { freq: 520, glisse: 820, duree: 0.17, gain: 0.12, attaque: 0.012 }); }
-        },
-        {
-            id: "souffle-verre", nom: "Souffle de verre",
-            usage: "Un verre effleuré qui s'éteint lentement",
+            id: "tac", nom: "Tac",
+            usage: "Un petit coup de bois, mat et rond, pour un bouton",
             fabriquer(ctx, s) {
-                doux(ctx, s, { freq: 1568, duree: 1.4, gain: 0.08, attaque: 0.02,
-                               partiels: [[1, 1, 1], [2.76, 0.12, 0.35]] });
+                note(ctx, s, { freq: 560, glisse: 440, duree: 0.09, gain: 0.2, attaque: 0.0015 });
+                note(ctx, s, { freq: 1680, duree: 0.035, gain: 0.035, attaque: 0.001 });
+                bruit(ctx, s, { duree: 0.008, filtre: "lowpass", freq: 2500, q: 0.7, gain: 0.12 });
             }
         },
         {
-            id: "echo-efface", nom: "Écho qui s'efface",
-            usage: "Une note, puis son écho, de plus en plus loin",
-            fabriquer(ctx, s) { paliers(ctx, s, { freq: 988, fois: 5, pas: 0.12, chute: 0.5, duree: 0.2, gain: 0.11 }); }
-        },
-        {
-            id: "carillon-lointain", nom: "Carillon lointain",
-            usage: "Trois clochettes qui descendent et s'éloignent",
+            id: "bascule", nom: "Bascule",
+            usage: "Un interrupteur qui s'enclenche : deux clics serrés, pour un oui / non",
             fabriquer(ctx, s) {
-                paliers(ctx, s, { notes: [1319, 1175, 988, 880], pas: 0.11, chute: 0.6, duree: 0.32, gain: 0.09,
-                                  partiels: [[1, 1, 1], [2.0, 0.15, 0.5]] });
+                clic(ctx, s, { souffle: 2600, q: 1.6, dureeSouffle: 0.01, gainSouffle: 0.13, corps: 950, duree: 0.02, gain: 0.05 });
+                clic(ctx, s, { debut: 0.05, souffle: 3800, q: 1.6, dureeSouffle: 0.009, gainSouffle: 0.09,
+                               corps: 1400, duree: 0.018, gain: 0.035 });
             }
         },
         {
-            id: "harpe-feutree", nom: "Harpe feutrée",
-            usage: "Une corde pincée du bout du doigt",
+            id: "pop", nom: "Pop",
+            usage: "Une bulle qui éclate, ronde et brève, pour ouvrir une fenêtre",
+            fabriquer(ctx, s) { note(ctx, s, { freq: 1100, glisse: 300, duree: 0.07, gain: 0.22, attaque: 0.0015, passeBas: 3000 }); }
+        },
+        {
+            id: "goutte", nom: "Goutte",
+            usage: "Un « plic » qui remonte, comme une goutte d'eau, pour une petite réussite",
+            fabriquer(ctx, s) { note(ctx, s, { freq: 1250, glisse: 2300, duree: 0.06, gain: 0.16, attaque: 0.002 }); }
+        },
+        {
+            id: "tinte", nom: "Tinte",
+            usage: "Un tintement de métal, net et court, pour une alerte discrète",
             fabriquer(ctx, s) {
-                doux(ctx, s, { freq: 659, duree: 0.5, gain: 0.12, attaque: 0.006, type: "triangle", passeBas: 1200,
-                               partiels: [[1, 1, 1], [2, 0.2, 0.4], [3, 0.06, 0.25]] });
+                note(ctx, s, { freq: 2349, duree: 0.16, gain: 0.09, attaque: 0.001 });
+                note(ctx, s, { freq: 2349 * 2.76, duree: 0.05, gain: 0.022, attaque: 0.001 });
+                note(ctx, s, { freq: 2349 * 0.5, duree: 0.06, gain: 0.03, attaque: 0.001 });
             }
         },
         {
-            id: "petale", nom: "Pétale",
-            usage: "Deux notes tendres ensemble, comme un accord murmuré",
+            id: "verre", nom: "Verre",
+            usage: "Un verre effleuré d'un ongle : clair, poli, il sonne un instant",
+            fabriquer(ctx, s) { clocheFM(ctx, s, { freq: 1760, rapport: 2, indice: 1.1, eclat: 0.1, duree: 0.7, gain: 0.1 }); }
+        },
+        {
+            id: "validation", nom: "Validation",
+            usage: "Deux notes qui montent : c'est fait, c'est bon",
             fabriquer(ctx, s) {
-                doux(ctx, s, { freq: 880, duree: 0.4, gain: 0.07, attaque: 0.025, partiels: [[1, 1, 1]] });
-                doux(ctx, s, { freq: 1109, duree: 0.4, gain: 0.06, attaque: 0.03, partiels: [[1, 1, 1]] });
+                clocheFM(ctx, s, { freq: 1046.5, rapport: 2, indice: 0.8, eclat: 0.06, duree: 0.24, gain: 0.085 });
+                clocheFM(ctx, s, { debut: 0.085, freq: 1568, rapport: 2, indice: 0.8, eclat: 0.08, duree: 0.48, gain: 0.095 });
             }
         },
         {
-            id: "brume", nom: "Brume",
-            usage: "Une nappe très douce qui monte puis se dissout",
+            id: "retour", nom: "Retour",
+            usage: "Deux notes qui redescendent, à mi-voix : on referme, on revient",
             fabriquer(ctx, s) {
-                doux(ctx, s, { freq: 698.5, duree: 1.5, gain: 0.07, attaque: 0.05, desaccord: -6, partiels: [[1, 1, 1]] });
-                doux(ctx, s, { freq: 698.5, duree: 1.5, gain: 0.07, attaque: 0.05, desaccord: 6, partiels: [[1, 1, 1]] });
+                clocheFM(ctx, s, { freq: 1318.5, rapport: 2, indice: 0.5, eclat: 0.05, duree: 0.16, gain: 0.07 });
+                clocheFM(ctx, s, { debut: 0.075, freq: 987.8, rapport: 2, indice: 0.5, eclat: 0.06, duree: 0.28, gain: 0.07 });
             }
         },
         {
-            id: "pluie-notes", nom: "Pluie de notes",
-            usage: "Une cascade qui monte et s'efface note après note",
+            id: "envoi", nom: "Envoi",
+            usage: "Un souffle qui file vers l'aigu : un message qui part",
             fabriquer(ctx, s) {
-                paliers(ctx, s, { notes: [784, 988, 1175, 1319, 1568], pas: 0.07, chute: 0.62, duree: 0.24, gain: 0.1,
-                                  partiels: [[1, 1, 1]] });
+                bruit(ctx, s, { duree: 0.3, filtre: "bandpass", q: 1.8, balayage: [900, 5500], gain: 0.25, forme: "cloche" });
             }
         }
     ];
