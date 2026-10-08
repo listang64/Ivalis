@@ -2083,11 +2083,17 @@ window.demarrerCiblage = async function(idCarte, options) {
             // Le nombre de cases tirées : la Valeur du grimoire (3), jamais
             // multipliée par les crans — les crans n'achètent que la chance.
             let tractionCases = 0;
+            // LES CRANS RESTENT COMPTÉS (Nico) : le joueur les répartit sur une
+            // ou plusieurs cibles au ciblage — 3 crans, c'est 1 cible à 45 %,
+            // 2 cibles à 30 et 15 %, ou 3 cibles à 15 %.
+            let tractionCrans = 0, tractionParCran = 0;
 
             if (nomLower.includes("traction")) {
                 isTraction = true;
                 tractionChance += (parseFrFloat(effBase.Pourcent_Base) || 0) * (act.count || 1);
                 tractionCases = Math.max(tractionCases, Math.round(parseFrFloat(effBase.Valeur)) || 3);
+                tractionCrans += (act.count || 1);
+                tractionParCran = tractionParCran || parseFrFloat(effBase.Pourcent_Base) || 0;
             }
 
             listeMods.forEach(m => {
@@ -2096,6 +2102,8 @@ window.demarrerCiblage = async function(idCarte, options) {
                     isTraction = true;
                     tractionChance += (parseFrFloat(modEff.Pourcent_Base) || 0) * m.count;
                     tractionCases = Math.max(tractionCases, Math.round(parseFrFloat(modEff.Valeur)) || 3);
+                    tractionCrans += m.count;
+                    tractionParCran = tractionParCran || parseFrFloat(modEff.Pourcent_Base) || 0;
                 }
             });
 
@@ -2113,6 +2121,9 @@ window.demarrerCiblage = async function(idCarte, options) {
                     isRanged: isRanged,
                     rangeMax: rangeMax,
                     cases: tractionCases || 3,
+                    crans: tractionCrans,
+                    chanceParCran: tractionParCran,
+                    plafond: plafondDuGrimoire("traction", 60),
                     cibles: [],
                     estTraction: true
                 });
@@ -2479,6 +2490,8 @@ window.demarrerCiblage = async function(idCarte, options) {
         bondChoisi: null,
         porteeMinTraction: porteeMinTraction,
         tractionAvantAttaque: tractionAvantAttaque,
+        repartitionTraction: {},
+        ordreTraction: [],
         illusionEnAttente: isIllusion ? { idLanceur: idLanceurBond, portee: porteeIllusion, nombre: nbIllusions } : null,
         // { portee, chance } si la carte porte un Repli ; la case, elle, est
         // choisie au moment de résoudre (repliChoisi).
@@ -2972,7 +2985,9 @@ window.dessinerAnneauxCiblage = function() {
 
         ciblesValides.add(idToken);
         
-        const estSelectionne = window.ETAT_CIBLAGE.cibleUnique === idToken;
+        const repTraction = window.ETAT_CIBLAGE.phaseCiblage === "soutien" ? 0
+            : ((window.ETAT_CIBLAGE.repartitionTraction || {})[idToken] || 0);
+        const estSelectionne = window.ETAT_CIBLAGE.cibleUnique === idToken || repTraction > 0;
         const divToken = document.getElementById("token-" + idToken);
         
         if (divToken) {
@@ -3015,6 +3030,22 @@ window.dessinerAnneauxCiblage = function() {
                 }
             } else if (malusLabel) {
                 malusLabel.remove();
+            }
+
+            // La part de Traction posée sur cette cible (répartition) ; la
+            // première porte aussi l'attaque de la carte.
+            let badgeTraction = anneau.querySelector(".badge-traction");
+            if (repTraction > 0) {
+                if (!badgeTraction) {
+                    badgeTraction = document.createElement("div");
+                    badgeTraction.className = "badge-traction";
+                    anneau.appendChild(badgeTraction);
+                }
+                const modeleTraction = phase.alterations.find(a => a.estTraction);
+                const porteAttaque = phase.attaques.length > 0 && window.ETAT_CIBLAGE.cibleUnique === idToken;
+                badgeTraction.textContent = `${porteAttaque ? "⚔️ " : ""}🧲 ${window.chanceTractionRepartie(modeleTraction, repTraction)} %`;
+            } else if (badgeTraction) {
+                badgeTraction.remove();
             }
 
             if (estSelectionne) {
@@ -3153,6 +3184,13 @@ window.ajouterCibleCiblage = function(idCible) {
         return;
     }
 
+    // LA TRACTION RÉPARTIE : plusieurs crans se posent cible par cible.
+    if (window.cransTractionCiblage(state, phase) > 1) {
+        window.repartirTractionCiblage(state, phase, idCible, tkCible);
+        window.dessinerAnneauxCiblage();
+        return;
+    }
+
     // Seuls les effets de la phase en cours prennent cette cible : en phase
     // d'attaque, le soin de la carte n'est pas concerné (il se vise ensuite).
     if (state.cibleUnique === idCible) {
@@ -3165,6 +3203,72 @@ window.ajouterCibleCiblage = function(idCible) {
         phase.alterations.forEach(alt => alt.cibles = [idCible]);
     }
     window.dessinerAnneauxCiblage();
+};
+
+// =========================================================================
+//  LA TRACTION RÉPARTIE (Nico)
+// =========================================================================
+//  Plusieurs crans de Traction magique se répartissent au choix du joueur :
+//  3 crans, c'est 1 cible à 45 %, 2 cibles à 30 et 15 %, ou 3 cibles à 15 %
+//  (chance par cran du grimoire, plafond du grimoire par cible). Chaque
+//  toucher pose un cran ; toucher une cible déjà tirée lui en ajoute un tant
+//  qu'il en reste, puis la retire. L'attaque de la carte frappe la PREMIÈRE
+//  cible choisie ; les autres ne sont que tirées. Une zone ne répartit rien.
+window.cransTractionCiblage = function(state, phase) {
+    if (!state || state.isZone) return 0;
+    const tractions = ((phase && phase.alterations) || []).filter(a => a.estTraction);
+    return tractions.reduce((n, a) => n + Math.max(1, parseInt(a.crans) || 1), 0);
+};
+window.chanceTractionRepartie = function(alt, crans) {
+    const parCran = Number(alt && alt.chanceParCran) || 0;
+    if (!(parCran > 0)) return Number(alt && alt.chance) || 0;
+    const plafond = Number(alt.plafond) || 60;
+    return Math.min(plafond, parCran * crans);
+};
+window.repartirTractionCiblage = function(state, phase, idCible, tkCible) {
+    const total = window.cransTractionCiblage(state, phase);
+    const rep = state.repartitionTraction || (state.repartitionTraction = {});
+    const ordre = state.ordreTraction || (state.ordreTraction = []);
+    const poses = Object.values(rep).reduce((a, b) => a + b, 0);
+    if (rep[idCible]) {
+        if (poses < total) rep[idCible]++;
+        else { delete rep[idCible]; ordre.splice(ordre.indexOf(idCible), 1); }
+    } else {
+        if (poses >= total) {
+            window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Plus de traction à poser", "#aaaaaa");
+            return;
+        }
+        rep[idCible] = 1;
+        ordre.push(idCible);
+    }
+    const premier = ordre[0] || null;
+    state.cibleUnique = premier;
+    phase.attaques.forEach(a => a.cibles = premier ? [premier] : []);
+    phase.alterations.forEach(alt => alt.cibles = alt.estTraction ? [...ordre] : (premier ? [premier] : []));
+    if (rep[idCible]) {
+        const modele = phase.alterations.find(a => a.estTraction);
+        const restants = total - Object.values(rep).reduce((a, b) => a + b, 0);
+        window.afficherMessageFlottantHex(tkCible.q, tkCible.r,
+            `🧲 ${window.chanceTractionRepartie(modele, rep[idCible])} %${restants > 0 ? ` · ${restants} à poser` : ""}`, "#b39ddb");
+    }
+};
+// À l'envoi : une Traction par cible, avec la chance de ses crans.
+window.eclaterTractionRepartie = function(state) {
+    const rep = state && state.repartitionTraction;
+    const ordre = (state && state.ordreTraction) || [];
+    if (!rep || ordre.length === 0) return;
+    const alterations = state.alterations || [];
+    const modele = alterations.find(a => a.estTraction);
+    if (!modele) return;
+    const eclatees = ordre.map((id, i) => ({
+        ...modele, crans: rep[id], chance: window.chanceTractionRepartie(modele, rep[id]), cibles: [id],
+        // Seule la première cible porte l'attaque : le coup « à portée » ne vaut que pour elle.
+        ...(i > 0 ? { coupAPortee: false } : {}),
+        desc: `${window.chanceTractionRepartie(modele, rep[id])}% de chance de tirer la cible de ${modele.cases || 3} cases vers soi.`
+    }));
+    const premiere = alterations.findIndex(a => a.estTraction);
+    state.alterations = [...alterations.slice(0, premiere).filter(a => !a.estTraction), ...eclatees,
+                         ...alterations.slice(premiere).filter(a => !a.estTraction)];
 };
 
 // UN MUR DE TERRE VISÉ (Géomancien) : 10 PV, aucune défense. Seule une
@@ -3632,6 +3736,8 @@ window.appliquerSuitesEquipement = async function(action, jeSuisLAuteur) {
 window.declencherResolution = async function() {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     const state = window.ETAT_CIBLAGE;
+    // Une Traction répartie part en autant de Tractions que de cibles.
+    window.eclaterTractionRepartie(state);
 
     document.querySelectorAll(".bulle-validation-cible").forEach(el => el.style.display = "none");
     const bulleZone = document.getElementById("bulle-validation-zone");

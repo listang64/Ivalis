@@ -1573,6 +1573,15 @@ export function resoudreCarte(etat, action, plateau) {
                           texte: "Traction bloquée" });
         }
     };
+    // UNE CIBLE SEULEMENT TIRÉE (Traction répartie) : l'attaque ne la vise
+    // pas, son esquive ne se dirait donc nulle part — on la dit ici, une fois.
+    const ciblesDesAttaques = new Set((action.attaques || []).flatMap(a => a.cibles || []));
+    const esquivesDites = new Set();
+    const direEsquiveHorsAttaque = (idCible, des) => {
+        if (ciblesDesAttaques.has(idCible) || esquivesDites.has(idCible)) return;
+        esquivesDites.add(idCible);
+        etapes.push({ type: "esquive", cible: idCible, acteur: idLanceur, parade: !!des.parade });
+    };
     const tractionEnTete = (alt) => !!alt && alt.nom === "Traction" && !!alt.avantAttaque;
     const tractionsEnTete = (action.alterations || []).filter(tractionEnTete);
     tractionsEnTete.forEach(alt => {
@@ -1585,7 +1594,7 @@ export function resoudreCarte(etat, action, plateau) {
                 return;
             }
             const des = desDe(idCible);
-            if (des.esquive) return;      // l'esquive de la carte se dira avec l'attaque
+            if (des.esquive) { direEsquiveHorsAttaque(idCible, des); return; }   // sinon dite avec l'attaque
             if (!des.etats || des.etats[alt.nom] !== true) {
                 etapes.push({ type: "etatRate", cible: idCible, nom: alt.nom });
                 return;
@@ -1907,7 +1916,10 @@ export function resoudreCarte(etat, action, plateau) {
 
             const des = desDe(idCible);
             // L'Assaut mortel empoisonne même la cible qui a esquivé le coup.
-            if (des.esquive && !alt.malgreEsquive) return;
+            if (des.esquive && !alt.malgreEsquive) {
+                if (alt.estTraction) direEsquiveHorsAttaque(idCible, des);
+                return;
+            }
             if (!des.etats || des.etats[alt.nom] !== true) {
                 etapes.push({ type: "etatRate", cible: idCible, nom: alt.nom });
                 return;

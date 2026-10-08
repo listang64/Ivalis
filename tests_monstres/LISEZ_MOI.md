@@ -5254,3 +5254,25 @@ total ; c'est l'exemple, 1/3 → 6,66 %, qui a été suivi.)
 - LA FORGE (competences.js, elementsDeLaCarte) : l'en-tête montre tous les
   éléments du sort (❄️ GLACE ⚡ FOUDRE).
   elements_magiques.mjs (2 bis, 4, 5).
+
+## La Traction répartie : plusieurs crans, plusieurs cibles (version 217)
+
+Nico : « si je mets 3 tractions magiques sur une compétence, vérifie que je
+peux cibler trois cibles différentes » ; « au choix du joueur » ; « s'il y a
+une attaque après les tractions, ça tape la première cible ».
+- L'EXTRACTION (moteur_effets.js) : la Traction garde ses crans (crans),
+  la chance d'un cran (chanceParCran, 15 % au grimoire) et le plafond
+  (plafond, 60 %). Sa chance d'ensemble reste celle d'avant (45 % pour 3).
+- LE CIBLAGE (cransTractionCiblage, repartirTractionCiblage) : avec plus
+  d'un cran et sans zone, chaque toucher pose un cran sur la cible ;
+  retoucher une cible tirée lui en ajoute un tant qu'il en reste, puis la
+  retire ; une cible de trop est refusée (« Plus de traction à poser »).
+  La PREMIÈRE cible porte l'attaque de la carte (cibleUnique) ; un badge
+  « 🧲 30 % » (« ⚔️ » sur celle qui prend l'attaque) dit la part de chacune.
+  Un seul cran : rien ne change (cible unique).
+- L'ENVOI (eclaterTractionRepartie, au début de declencherResolution) : une
+  Traction par cible, chance = crans × 15 % (plafond 60 %).
+- LE NOYAU (moteur_pur.js) : chaque Traction tire sa cible ; une cible
+  seulement tirée qui esquive voit son esquive dite (direEsquiveHorsAttaque).
+- Les créatures gardent une cible unique (leur carte ne passe pas par ce
+  ciblage). traction_repartie.mjs.

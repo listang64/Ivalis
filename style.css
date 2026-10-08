@@ -4628,3 +4628,11 @@ textarea.input-texte-parchemin {
   .apercu-bloc { padding: 10px 10px 4px; }
   .apercu-ligne-valeur { font-size: 18px; }
 }
+
+/* La part de Traction posée sur une cible (Traction répartie, moteur_effets.js). */
+.badge-traction {
+  position: absolute; top: -26px; left: 50%; transform: translateX(-50%); white-space: nowrap;
+  padding: 1px 8px; border-radius: 999px; font-size: 13px; font-weight: bold; color: #f3e8ff;
+  background: rgba(60, 30, 100, 0.9); border: 1px solid #b39ddb; text-shadow: 0 1px 2px #000;
+  box-shadow: 0 0 8px rgba(179, 157, 219, 0.7);
+}

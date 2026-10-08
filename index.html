@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=68">
+  <link rel="stylesheet" href="style.css?v=69">
 
  
   <!-- ===================================================================== -->
@@ -1998,7 +1998,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=127"></script>
+<script src="trace_combat.js?v=128"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
      Les modules s'importent entre eux sans numéro (`from './moteur_pur.js'`).
      Sans cette carte, le navigateur les chargeait à part, à une adresse SANS
@@ -2012,7 +2012,7 @@
 <script type="importmap">
 { "imports": {
     "./combat_etat.js": "./combat_etat.js?v=31",
-    "./moteur_pur.js": "./moteur_pur.js?v=48",
+    "./moteur_pur.js": "./moteur_pur.js?v=49",
     "./mouvement_pur.js": "./mouvement_pur.js?v=18",
     "./ia_pure.js": "./ia_pure.js?v=12",
     "./cerveau_combat.js": "./cerveau_combat.js?v=46",
@@ -2034,7 +2034,7 @@
 <script type="module" src="combat_etat.js?v=31"></script>
 <!-- LE MOTEUR PUR : la chaîne de dégâts et le mouvement, extraits des 5 000
      lignes du moteur actuel et testables sans réseau ni navigateur. -->
-<script type="module" src="moteur_pur.js?v=48"></script>
+<script type="module" src="moteur_pur.js?v=49"></script>
 <script type="module" src="mouvement_pur.js?v=18"></script>
 <script type="module" src="ia_pure.js?v=12"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
@@ -2073,7 +2073,7 @@
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=32"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
-<script type="module" src="moteur_effets.js?v=84"></script>
+<script type="module" src="moteur_effets.js?v=85"></script>
 <script type="module" src="monstres.js?v=28"></script>
 <script type="module" src="monstres_competences.js?v=25"></script>
 <script type="module" src="monstres_ia.js?v=37"></script>
