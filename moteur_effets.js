@@ -3645,8 +3645,8 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
     // LE PUGILISTE VARGEN : +15 % d'empoisonner sur ses coups physiques — en
     // plus du poison de la carte, ou un poison à lui s'il n'y en a pas.
     const poisonTalent = Number(atouts.chancePoisonPhysique) || 0;
-    const frappesPhysiques = attaquesFrappantes(state).filter(a => a.typeRes !== "Magique");
-    if (poisonTalent > 0 && frappesPhysiques.length > 0) {
+    const frappesPhysiques = poisonTalent > 0 ? attaquesFrappantes(state).filter(a => a.typeRes !== "Magique") : [];
+    if (frappesPhysiques.length > 0) {
         state.alterations = state.alterations || [];
         const poison = state.alterations.find(a => a.nom === "Empoisonnement");
         const visees = [...new Set(frappesPhysiques.flatMap(a => a.cibles || []))];
