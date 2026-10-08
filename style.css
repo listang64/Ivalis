@@ -4636,3 +4636,178 @@ textarea.input-texte-parchemin {
   background: rgba(60, 30, 100, 0.9); border: 1px solid #b39ddb; text-shadow: 0 1px 2px #000;
   box-shadow: 0 0 8px rgba(179, 157, 219, 0.7);
 }
+
+/* =========================================================================
+   LES TALENTS (talents.js, talents_ui.js)
+   ========================================================================= */
+/* Le bouton de l'en-tête de l'Aperçu, et le rappel sous l'encart race/classe. */
+.apercu-btn-talents {
+  margin-left: auto; flex-shrink: 0; align-self: center; display: inline-flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 8px 14px; border-radius: 10px; cursor: pointer; font-family: 'Cinzel', serif; color: #f3dfa6;
+  background: linear-gradient(180deg, rgba(243,223,166,0.14), rgba(243,223,166,0.04)); border: 1px solid rgba(201,162,74,0.8);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.3); transition: transform .15s ease, box-shadow .15s ease;
+}
+.apercu-btn-talents:hover { transform: translateY(-1px); box-shadow: 0 0 12px rgba(226,184,79,0.45), inset 0 0 0 1px rgba(0,0,0,0.3); }
+.apercu-btn-talents-icone { font-size: 18px; line-height: 1; color: #e2b84f; }
+.apercu-btn-talents-mot { font-size: 14px; font-weight: bold; letter-spacing: 1px; }
+.apercu-btn-talents-compte { font-family: Georgia, serif; font-size: 11px; font-weight: bold; color: #2a1a0f; background: #e2b84f;
+  border-radius: 999px; padding: 1px 8px; }
+.apercu-btn-talents.a-attribuer { border-color: #f3dfa6; animation: talents-appel 1.6s ease-in-out infinite alternate; }
+@keyframes talents-appel { from { box-shadow: 0 0 0 rgba(226,184,79,0); } to { box-shadow: 0 0 16px rgba(226,184,79,0.7); } }
+@container apercu (max-width: 340px) { .apercu-btn-talents { margin-left: 0; } }
+
+.encart-talents-pris {
+  margin-top: 18px; padding: 14px 16px; border: 2px solid #c2a878; border-radius: 10px;
+  background: rgba(255,255,255,0.45); box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+.encart-talents-pris:empty { display: none; }
+.talents-rappel-titre { font-family: 'Cinzel', serif; font-size: 18px; font-weight: bold; color: #2a1a0f; text-align: center;
+  border-bottom: 2px solid #5c3a21; padding-bottom: 6px; margin-bottom: 10px; }
+.talents-rappel-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px 14px; }
+.talents-rappel-ligne { display: flex; align-items: center; gap: 10px; }
+.talents-rappel-ligne .talents-medaillon { flex-shrink: 0; }
+.talents-rappel-texte { display: flex; flex-direction: column; min-width: 0; font-size: 14px; color: #2a1a0f; }
+.talents-rappel-effet { font-size: 12px; font-style: italic; color: #6b5236; }
+.talents-rappel-rang { font-size: 11px; color: #8a6a2a; }
+
+/* La fenêtre : un parchemin sur un voile sombre. */
+.talents-voile {
+  position: fixed; inset: 0; z-index: 3000; display: none; align-items: center; justify-content: center;
+  background: rgba(10, 6, 3, 0.72); backdrop-filter: blur(3px); padding: 12px; box-sizing: border-box;
+}
+.talents-parchemin {
+  position: relative; display: flex; flex-direction: column; width: min(1060px, 100%); max-height: min(92vh, 100%);
+  color: #2c1e16; border-radius: 10px; overflow: hidden;
+  background:
+    radial-gradient(ellipse at 20% 10%, rgba(255,255,255,0.35), transparent 55%),
+    radial-gradient(ellipse at 85% 90%, rgba(120,80,30,0.18), transparent 60%),
+    linear-gradient(180deg, #efe1bd 0%, #e6d3a6 100%);
+  border: 3px solid #2a1a10; box-shadow: 0 24px 60px rgba(0,0,0,0.85), inset 0 0 0 2px #c9a24a, inset 0 0 40px rgba(110,70,20,0.25);
+}
+.talents-entete { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 18px 24px 4px; }
+.talents-titre { margin: 0; font-family: 'Cinzel', serif; font-size: 38px; color: #2a1a0f; letter-spacing: 1px; line-height: 1; }
+.talents-titre::first-letter { font-size: 48px; color: #6e2a18; }
+.talents-sous-titre { margin: 6px 0 0; font-size: 14px; color: #4a3423; }
+.talents-dispo {
+  flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-radius: 8px;
+  background: linear-gradient(180deg, #f6ead0, #e2cf9f); border: 1px solid #8a6a2a; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5), 0 2px 6px rgba(0,0,0,0.2);
+}
+.talents-dispo-mot { display: block; font-size: 13px; color: #4a3423; }
+.talents-dispo b { font-family: 'Cinzel', serif; font-size: 24px; color: #2a1a0f; }
+.talents-filet { position: relative; height: 18px; margin: 4px 24px 6px; }
+.talents-filet::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px;
+  background: linear-gradient(90deg, transparent, #8a6a2a 12%, #8a6a2a 88%, transparent); }
+.talents-filet span { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 0 10px;
+  background: #ead9af; color: #8a6a2a; font-size: 13px; }
+
+.talents-corps { flex: 1; overflow-y: auto; padding: 0 18px 10px; }
+.talents-ligne {
+  display: grid; grid-template-columns: 200px minmax(0, 1fr); align-items: stretch;
+  border-bottom: 1px solid rgba(92,58,33,0.28); padding: 10px 0;
+}
+.talents-ligne:last-child { border-bottom: none; }
+.talents-ligne-tete { display: flex; align-items: center; gap: 12px; padding-right: 10px; border-right: 1px solid rgba(92,58,33,0.25); }
+.talents-ligne-tete .talents-medaillon { flex-shrink: 0; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.35)); }
+.talents-ligne-nom { display: flex; flex-direction: column; gap: 2px; }
+.talents-ligne-nom b { font-family: 'Cinzel', serif; font-size: 18px; color: #2a1a0f; }
+.talents-ligne-compte { font-size: 15px; color: #4a3423; font-weight: bold; }
+.talents-ligne-valeur { font-size: 11px; letter-spacing: 1px; color: #8a6a2a; }
+
+/* La piste qui défile, et ses flèches. */
+.talents-piste-cadre { position: relative; min-width: 0; }
+.talents-piste {
+  display: flex; gap: 10px; overflow-x: auto; overflow-y: hidden; padding: 4px 12px 6px; scroll-behavior: smooth;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
+}
+.talents-piste::-webkit-scrollbar { display: none; }
+.talents-fleche {
+  position: absolute; top: 50%; z-index: 2; width: 30px; height: 30px; margin-top: -15px; border-radius: 50%;
+  display: none; align-items: center; justify-content: center; cursor: pointer; padding: 0 0 3px;
+  font-size: 22px; font-weight: bold; line-height: 1; color: #f3dfa6; background: radial-gradient(circle at 40% 35%, #6e4a2a, #2a1a10);
+  border: 2px solid #c9a24a; box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+}
+.talents-fleche.visible { display: flex; }
+.talents-fleche.gauche { left: -4px; }
+.talents-fleche.droite { right: -4px; }
+.talents-fleche:hover { filter: brightness(1.2); }
+
+/* Une case de talent. */
+.talent-case {
+  position: relative; flex: 0 0 176px; display: flex; flex-direction: column; gap: 6px; padding: 30px 10px 10px;
+  border-radius: 6px; border: 1px solid rgba(92,58,33,0.25); background: rgba(255,250,235,0.35);
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease; user-select: none;
+}
+.talent-exigence {
+  position: absolute; top: 6px; left: 6px; right: 14px; padding: 2px 10px; font-size: 12px; font-weight: bold; color: #3a2a1a;
+  background: linear-gradient(180deg, #e3cf9e, #d4bd85); clip-path: polygon(0 0, 100% 0, 94% 50%, 100% 100%, 0 100%);
+}
+.talent-tete { display: flex; align-items: center; gap: 8px; }
+.talent-coche {
+  flex-shrink: 0; width: 18px; height: 18px; border-radius: 3px; border: 2px solid #4a3423; background: rgba(255,255,255,0.6);
+  display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; color: #2a1a0f;
+}
+.talent-nom { font-size: 15px; font-weight: bold; color: #2a1a0f; line-height: 1.15; }
+.talent-rangs { margin-left: auto; font-size: 12px; font-weight: bold; color: #6e4a1e; background: rgba(226,184,79,0.35);
+  border-radius: 999px; padding: 0 7px; }
+.talent-effet { font-size: 12px; line-height: 1.35; color: #4a3423;
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.talent-raison { font-size: 11px; font-weight: bold; color: #7a5a3a; }
+.talent-case.prenable { cursor: pointer; }
+.talent-case.prenable:hover, .talent-case.prenable:focus-visible {
+  transform: translateY(-2px); background: rgba(255,248,225,0.8); box-shadow: 0 0 0 2px #c9a24a, 0 6px 12px rgba(0,0,0,0.15); outline: none;
+}
+.talent-case.pris { background: linear-gradient(180deg, #f8e7b6, #f0d58e); border-color: #c9a24a; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.6); }
+.talent-case.pris .talent-coche { background: #fff3cf; border-color: #6e4a1e; }
+.talent-case.verrou { filter: grayscale(0.9); opacity: 0.5; }
+.talent-case.sans-point:not(.pris) { opacity: 0.85; }
+/* Chanceux : à implanter avec les blessures — en rouge pour ne pas l'oublier. */
+.talent-case.a-venir { border: 2px solid #b3261e; background: rgba(179,38,30,0.08); }
+.talent-case.a-venir .talent-nom, .talent-case.a-venir .talent-raison { color: #b3261e; }
+.talent-case.a-venir .talent-exigence { background: linear-gradient(180deg, #e8a59a, #d9877a); color: #4a0e08; }
+
+.talents-pied {
+  position: relative; display: flex; align-items: center; justify-content: center; padding: 10px 18px; min-height: 54px; box-sizing: border-box;
+  background: linear-gradient(180deg, #3a2414, #1f130a); border-top: 2px solid #8a6a2a;
+}
+.talents-retour {
+  position: absolute; left: 16px; top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; gap: 10px;
+  padding: 6px 22px 6px 14px; cursor: pointer; font-family: Georgia, serif; font-size: 16px; color: #f3dfa6;
+  background: linear-gradient(180deg, #4a2e1b, #2e1c10); border: 1px solid #c9a24a; border-radius: 6px 18px 18px 6px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.4);
+}
+.talents-retour:hover { filter: brightness(1.15); }
+.talents-retour span { font-size: 22px; line-height: 1; }
+.talents-pied-orne { color: #c9a24a; font-size: 16px; }
+
+/* La confirmation. */
+.talents-popup-voile { position: fixed; inset: 0; z-index: 3100; display: flex; align-items: center; justify-content: center;
+  background: rgba(10, 6, 3, 0.55); padding: 12px; box-sizing: border-box; }
+.talents-popup {
+  width: min(460px, 100%); padding: 18px 20px; border-radius: 10px; color: #2c1e16;
+  background: linear-gradient(180deg, #f3e6c4, #e6d3a6); border: 3px solid #2a1a10;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.85), inset 0 0 0 2px #c9a24a;
+}
+.talents-popup-tete { display: flex; align-items: center; gap: 12px; }
+.talents-popup-nom { font-family: 'Cinzel', serif; font-size: 22px; font-weight: bold; color: #2a1a0f; }
+.talents-popup-exigence { font-size: 12px; letter-spacing: 1px; color: #8a6a2a; text-transform: uppercase; }
+.talents-popup-texte { font-size: 15px; line-height: 1.45; margin: 14px 0 8px; }
+.talents-popup-choix-titre { font-size: 12px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; color: #6b5236; margin: 10px 0 6px; }
+.talents-popup-choix { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.talents-popup-carac { display: flex; align-items: center; gap: 6px; padding: 4px 6px; cursor: pointer; border-radius: 8px;
+  font-family: inherit; font-size: 13px; color: #2a1a0f; background: rgba(255,255,255,0.4); border: 1px solid rgba(92,58,33,0.3); }
+.talents-popup-carac.choisi { background: #f0d58e; border-color: #8a6a2a; box-shadow: 0 0 0 2px #c9a24a; }
+.talents-popup-avertissement { font-size: 13px; font-style: italic; color: #8a2a1a; margin: 12px 0 0; }
+.talents-popup-boutons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+.talents-popup-boutons button { font-family: 'Cinzel', serif; font-size: 14px; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+.talents-popup-annuler { background: transparent; border: 1px solid #5c3a21; color: #4a3423; }
+.talents-popup-prendre { background: linear-gradient(180deg, #4a2e1b, #2e1c10); border: 1px solid #c9a24a; color: #f3dfa6; }
+.talents-popup-prendre:disabled { opacity: 0.5; cursor: not-allowed; }
+
+@media (max-width: 700px) {
+  .talents-entete { flex-direction: column; padding: 14px 14px 4px; }
+  .talents-titre { font-size: 30px; }
+  .talents-ligne { grid-template-columns: 1fr; gap: 8px; }
+  .talents-ligne-tete { border-right: none; }
+  .talent-case { flex-basis: 160px; }
+  .talents-popup-choix { grid-template-columns: repeat(2, 1fr); }
+}

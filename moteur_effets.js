@@ -3595,8 +3595,14 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
         // brutes (Nico) ; une attaque brute physique garde aussi les dégâts
         // physiques de l'arme.
         const estMagique = attaque.typeRes === "Magique";
+        // LES TALENTS (talents.js) : Taillé pour la guerre et le Pugiliste en
+        // physique, Archimage sur la magie, Langage arcanique sur les Mots de
+        // pouvoir (qui ne prennent pas l'Archimage).
+        const estMotDePouvoir = /pouvoir/i.test(attaque.nom || "");
+        const talentDegats = estMotDePouvoir ? (Number(atouts.degatsMotsPouvoir) || 0)
+            : estMagique ? (Number(atouts.degatsMagiques) || 0) : (Number(atouts.degatsPhysiques) || 0);
         attaque.valeurBrute += degatsTous + bonusDistance + (estMagique ? degatsMag : degatsPhys)
-            + (attaque.brut && !estMagique ? degatsMag : 0);
+            + (attaque.brut && !estMagique ? degatsMag : 0) + talentDegats;
         // Bénédiction offensive d'une bague de soin : un pourcentage en plus,
         // appliqué APRÈS les dégâts plats, comme un dernier multiplicateur.
         if (bonusDegatsPct > 0) attaque.valeurBrute = Math.round(attaque.valeurBrute * (1 + bonusDegatsPct / 100));
@@ -3622,6 +3628,32 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
                     venuDeLaClasse: true, isRanged: false, rangeMax: 1, cibles: visees,
                     idProvocateur: lanceur.idPersonnage });
             }
+        }
+    }
+
+    // LES TALENTS QUI POUSSENT LES ÉTATS (talents.js) : le Maître des éléments
+    // sur Brûlé / Électrifié / Glacé, le Maître illusionniste sur Confusion /
+    // Peur / Immobilisation — au-delà du plafond du grimoire (100 au plus).
+    const pousserEtats = (noms, bonusPct) => {
+        if (!(bonusPct > 0)) return;
+        (state.alterations || []).forEach(alt => {
+            if (noms.includes(alt.nom) && (alt.chance || 0) > 0) alt.chance = Math.min(100, (alt.chance || 0) + bonusPct);
+        });
+    };
+    pousserEtats((window.ELEMENTS_MAGIQUES || []).map(e => e.etat), Number(atouts.chanceElementaire) || 0);
+    pousserEtats(window.ETATS_CHARISME_TALENT || ["Confusion", "Peur", "Immobilisation"], Number(atouts.chanceEtatsCharisme) || 0);
+    // LE PUGILISTE VARGEN : +15 % d'empoisonner sur ses coups physiques — en
+    // plus du poison de la carte, ou un poison à lui s'il n'y en a pas.
+    const poisonTalent = Number(atouts.chancePoisonPhysique) || 0;
+    const frappesPhysiques = attaquesFrappantes(state).filter(a => a.typeRes !== "Magique");
+    if (poisonTalent > 0 && frappesPhysiques.length > 0) {
+        state.alterations = state.alterations || [];
+        const poison = state.alterations.find(a => a.nom === "Empoisonnement");
+        const visees = [...new Set(frappesPhysiques.flatMap(a => a.cibles || []))];
+        if (poison) poison.chance = Math.min(100, (poison.chance || 0) + poisonTalent);
+        else if (visees.length > 0 && GABARITS_ETATS_EQUIPEMENT["Empoisonnement"]) {
+            state.alterations.push({ nom: "Empoisonnement", ...GABARITS_ETATS_EQUIPEMENT["Empoisonnement"], chance: poisonTalent,
+                venuDuTalent: true, isRanged: false, rangeMax: 1, cibles: visees });
         }
     }
 

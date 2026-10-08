@@ -469,6 +469,14 @@ window.afficherStatsCombat = function(donnees) {
         ? window.nomClasseGenre(classe, donnees.genre || donnees.Genre) : classe;
     if (elClasse) elClasse.innerText = classeAffichee || "—";
 
+    // Les talents (talents_ui.js) : le bouton du haut, le rappel du bas. Le
+    // héros affiché garde son identifiant : ses caracs en dépendent.
+    if (!donnees.idPersonnage) {
+        const champ = document.getElementById("champ-id-personnage");
+        if (champ && champ.value) donnees.idPersonnage = champ.value;
+    }
+    if (typeof window.actualiserTalentsApercu === "function") window.actualiserTalentsApercu(donnees);
+
     // L'encart du dessous : ce que la race et la classe lui donnent.
     const elBonus = document.getElementById("encart-bonus-race-classe");
     if (elBonus && typeof window.htmlBonusRaceClasse === "function") elBonus.innerHTML = window.htmlBonusRaceClasse(donnees);

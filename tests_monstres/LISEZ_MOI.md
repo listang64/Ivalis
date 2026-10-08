@@ -5276,3 +5276,47 @@ une attaque après les tractions, ça tape la première cible ».
   seulement tirée qui esquive voit son esquive dite (direEsquiveHorsAttaque).
 - Les créatures gardent une cible unique (leur carte ne passe pas par ce
   ciblage). traction_repartie.mjs.
+
+## Les talents (version 218)
+
+Nico : « Dans l'onglet Aperçu, en haut, un bouton pour accéder aux talents du
+joueur, avec le nombre de talents à attribuer ; en bas, sous les effets de
+race, le rappel des talents pris. Le bouton ouvre une fenêtre inspirée de
+l'image : séparée par carac, avec la carac requise ; case grisée quand on n'a
+pas la carac ; sous le nom des caracs, le compteur des talents pris ; chaque
+ligne défile à gauche et à droite (molette, doigt), avec une flèche tant qu'on
+n'est pas au bout. Le talent qui réduit les blessures, plus tard, en rouge. »
+Ses réponses : un point aux niveaux 3, 5, 7, 9, rien après ; seule la carac
+requise compte (bonus compris) ; une ligne « Général » ; pas de retrait (une
+confirmation, et une remise à zéro en DEV) ; modificateur = ⌊(carac − 10) ÷ 2⌋,
+jamais négatif ; Pugiliste sans arme ou bagues seulement, Vampire/Vargen en
+plus ; Impact sur les dégâts de la compétence ; Bouclier des Sages sur les
+deux résistances ; Immunisé : un état d'un tour ne prend plus ; Maître des
+éléments au-delà du plafond ; Dégâts illusoires sur le modificateur ; Élan
+partagé aux alliés au contact du soigneur ; Diversion s'ajoute au Vargen.
+- LES RÈGLES (talents.js, script simple) : les 27 talents de Talents.xlsx,
+  rangés par ligne (Général, FOR, DEX, CON, INT, SAG, CHA) et par exigence ;
+  pointsTalentsGagnes / Disponibles, etatTalent (prenable, verrou + raison,
+  à venir, complet, plus de point), caracPourTalents (base + race/classe +
+  objets, sans repasser par atoutRace), modPourTalents, resumeTalent.
+- CE QU'ILS DONNENT : window.atoutTalents, fusionné dans atoutRace (app.js)
+  comme la race, la classe et la créature. Clés connues (initiative,
+  competences, esquive, critique, parade, defPhysique, defMagique, pvMax,
+  fatigueMax, soinsRecus, bonusSoin, esquiveOpportunite) et nouvelles :
+  degatsPhysiques / degatsMagiques / degatsMotsPouvoir, chanceElementaire,
+  chanceEtatsCharisme, chancePoisonPhysique (appliquerEquipementALaCarte,
+  moteur_effets.js) ; testsCarac (jets au d20) ; fatigueSurKO, inertieMartiale,
+  impactCinetique, elanPartage, bouclierDesSages, degatsIllusoires,
+  etatsRaccourcis (combat_etat.js : atouts, tomber, compterPasMarche,
+  reductionInertie ; moteur_pur.js : poussée, états, fatigue ; cerveau :
+  reposLongDuTour). La fiche porte Talents { id: rangs } et Talents_Choix.
+- LA FENÊTRE (talents_ui.js, style.css) : parchemin, sept médaillons dessinés
+  en SVG (écu, poing, aile, cœur, livre, œil, étoile à huit branches), le
+  compteur pris/possible sous chaque nom, des cases à étiquette de carac
+  requise ; pistes à défilement horizontal (molette tant que la ligne n'est
+  pas au bout, doigt natif, flèches ‹ › seulement s'il reste à voir) ;
+  confirmation « définitif » (choix de carac pour Perfectionnement) ;
+  Chanceux en rouge, « à venir ». Bouton « ✦ Talents · n à attribuer » dans
+  l'en-tête de l'Aperçu, rappel des talents (chiffres de CE héros) sous
+  l'encart race/classe, « Remettre les talents à zéro » dans l'onglet DEV.
+  talents.mjs.

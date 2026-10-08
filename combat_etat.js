@@ -217,7 +217,21 @@ export function combattantDepuisFiche(fiche, position, regles) {
         zonesInoffensives: !!race.zonesInoffensives,
         // Niveau 10 : ses zones persistantes durent un tour de plus
         // (creerZonePure, moteur_pur.js).
-        zonesProlongees: nombre(race.zonesProlongees)
+        zonesProlongees: nombre(race.zonesProlongees),
+        // LES TALENTS (talents.js) qui se jouent dans le noyau : l'Adrénaline
+        // du Bourreau (fatigue rendue à chaque ennemi abattu), l'Inertie
+        // martiale (mêlée moins chère après une charge en ligne droite),
+        // l'Impact cinétique (collision d'une poussée), l'Élan partagé (fatigue
+        // aux alliés au contact quand il soigne), le Bouclier des Sages (repos
+        // long), les Dégâts illusoires (qui brise son illusion le paie) et
+        // Immunisé (états néfastes plus courts).
+        fatigueSurKO: nombre(race.fatigueSurKO),
+        inertieMartiale: nombre(race.inertieMartiale),
+        impactCinetique: !!race.impactCinetique,
+        elanPartage: nombre(race.elanPartage),
+        bouclierDesSages: nombre(race.bouclierDesSages),
+        degatsIllusoires: nombre(race.degatsIllusoires),
+        etatsRaccourcis: nombre(race.etatsRaccourcis)
     };
     const mod = {
         // Ce que l'ÉQUIPEMENT change EN PERMANENCE, hors états altérés : le
@@ -346,7 +360,10 @@ export function combattantIllusion(lanceur, id, q, r) {
         etats: [],
         aTerre: false,
         def: { esquive: 0, parade: 0, physique: 0, magique: 0, critique: 0 },
-        atouts: {}, equip: {}, mod: {}, stats: {}
+        atouts: {}, equip: {}, mod: {}, stats: {},
+        // Qui l'a créée, et ce qu'il en coûte de la briser (Dégâts illusoires).
+        idCreateur: (lanceur && lanceur.id) || null,
+        degatsIllusoires: nombre(lanceur && lanceur.atouts && lanceur.atouts.degatsIllusoires)
     };
 }
 
@@ -554,6 +571,8 @@ export function entreeDeFile(f) {
         carte: f.carte || f.idCarte || null,
         initiative: nombre(f.initiative, 0),
         pas: nombre(f.pas !== undefined ? f.pas : f.pasParcourus),
+        // La ligne droite du tour (Inertie martiale), si elle a commencé.
+        ...(f.ligneMax ? { ligne: nombre(f.ligne), dirLigne: f.dirLigne || null, ligneMax: nombre(f.ligneMax) } : {}),
         ...(f.retourArriere ? { retourArriere: true } : {}),
         ...(f.reposPris ? { reposPris: true } : {}),
         ...(f.arretDuTemps ? { arretDuTemps: true } : {})
@@ -668,6 +687,38 @@ function zombifier(etat, victime, idTueur) {
     return [etape];
 }
 
+// L'ADRÉNALINE DU BOURREAU (talent) : une attaque qui met un ennemi à 0 PV
+// rend aussitôt 20 points de fatigue à son auteur. Un KO de fin de manche
+// (poison, brûlure) n'est pas une attaque : il n'en donne pas.
+function adrenalineDuBourreau(etat, victime, idAuteur) {
+    const auteur = combattant(etat, idAuteur);
+    const gain = nombre(auteur && auteur.atouts && auteur.atouts.fatigueSurKO);
+    if (!auteur || gain <= 0 || auteur.aTerre || victime.estIllusion) return [];
+    if ((auteur.camp || "Allié") === (victime.camp || "Allié")) return [];
+    const apres = Math.min(nombre(auteur.fatigueMax), nombre(auteur.fatigue) + gain);
+    if (apres === nombre(auteur.fatigue)) return [];
+    auteur.fatigue = apres;
+    return [{ type: "fatigue", cible: auteur.id, fatigueApres: apres, tic: "Adrénaline" }];
+}
+
+// LES DÉGÂTS ILLUSOIRES (talent) : l'ennemi qui brise une illusion encaisse
+// des dégâts bruts — le bouclier d'abord, la vie ensuite. Il peut en tomber.
+function briserIllusion(etat, illusion, idAuteur) {
+    const montant = nombre(illusion && illusion.degatsIllusoires);
+    const auteur = combattant(etat, idAuteur);
+    if (!illusion || !illusion.estIllusion || montant <= 0 || !auteur || auteur.aTerre) return [];
+    if ((auteur.camp || "Allié") === (illusion.camp || "Allié")) return [];
+    const bouclierAvant = nombre(auteur.bouclier);
+    const surBouclier = Math.min(bouclierAvant, montant);
+    auteur.bouclier = bouclierAvant - surBouclier;
+    if (auteur.bouclier === 0) auteur.bouclierMax = 0;
+    auteur.pv = Math.max(0, nombre(auteur.pv) - (montant - surBouclier));
+    return [{ type: "message", cible: auteur.id, acteur: illusion.idCreateur || illusion.id, texte: "✨ Dégâts illusoires", couleur: "#c39bd3" },
+            { type: "degats", cible: auteur.id, acteur: illusion.idCreateur || illusion.id, montant, surBouclier,
+              bouclierApres: auteur.bouclier, pvApres: auteur.pv, brut: true },
+            ...tomber(etat, auteur.id, illusion.idCreateur || null)];
+}
+
 export function tomber(etat, id, acteur, options) {
     const c = combattant(etat, id);
     if (!c || c.aTerre) return [];
@@ -685,6 +736,8 @@ export function tomber(etat, id, acteur, options) {
     c.aTerre = true;
     const chute = [{ type: "chute", cible: id, acteur: acteur || id }];
     if (acteur && acteur !== id) chute.push(...recompenserLeTueur(etat, c, acteur, !!(options && options.finDeManche)));
+    if (acteur && acteur !== id && !(options && options.finDeManche)) chute.push(...adrenalineDuBourreau(etat, c, acteur));
+    if (acteur && acteur !== id) chute.push(...briserIllusion(etat, c, acteur));
     chute.push(...zombifier(etat, c, acteur && acteur !== id ? acteur : null));
     return chute;
 }
@@ -744,7 +797,31 @@ export const occupantDe = (etat, q, r) => {
 export function compterPasMarche(etat, etape) {
     if (!etape || etape.type !== "pas") return;
     const tete = (etat && etat.file || [])[0];
-    if (tete && tete.id === etape.acteur) tete.pas = nombre(tete.pas) + 1;
+    if (!tete || tete.id !== etape.acteur) return;
+    tete.pas = nombre(tete.pas) + 1;
+    // LA LIGNE DROITE DU TOUR (Inertie martiale) : combien de cases de suite
+    // dans la même direction, et la plus longue de ces lignes.
+    if (etape.de && etape.vers) {
+        const dir = `${nombre(etape.vers.q) - nombre(etape.de.q)},${nombre(etape.vers.r) - nombre(etape.de.r)}`;
+        tete.ligne = tete.dirLigne === dir ? nombre(tete.ligne) + 1 : 1;
+        tete.dirLigne = dir;
+        tete.ligneMax = Math.max(nombre(tete.ligneMax), tete.ligne);
+    }
+}
+
+// L'INERTIE MARTIALE (talent) : 4 cases ou plus en ligne droite dans le tour,
+// et la compétence de MÊLÉE qui suit coûte 20 de fatigue de moins. Lue par le
+// cerveau (assez d'énergie ?) et par le noyau (le prix payé) : une règle, ici.
+export const CASES_INERTIE = 4;
+export function reductionInertie(etat, idLanceur, action) {
+    const c = combattant(etat, idLanceur);
+    const reduction = nombre(c && c.atouts && c.atouts.inertieMartiale);
+    if (reduction <= 0) return 0;
+    const tete = (etat.file || [])[0];
+    if (!tete || tete.id !== idLanceur || nombre(tete.ligneMax) < CASES_INERTIE) return 0;
+    const attaques = ((action && action.attaques) || []).filter(a => !a.isHeal && !a.isShield);
+    if (attaques.length === 0 || attaques.some(a => a.isRanged)) return 0;
+    return reduction;
 }
 
 export const APPLICATEURS = {

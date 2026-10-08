@@ -4405,7 +4405,9 @@ window.jouerReposLong = async function() {
             file.push({
                 idPersonnage: persoActuel.idPersonnage,
                 idCarte: "REPOS_LONG", 
-                initiative: 0,
+                // Le Bouclier des Sages (talent) : son repos long passe en tête.
+                initiative: (typeof window.atoutRace === "function"
+                             && Number((window.atoutRace(persoActuel) || {}).bouclierDesSages) > 0) ? 100 : 0,
                 timestamp: new Date().getTime()
             });
 

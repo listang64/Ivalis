@@ -188,6 +188,10 @@ function persoDocVersFront(id, d) {
     Competences_Max: d.Competences_Max !== undefined ? d.Competences_Max : 6,
     // L'expérience TOTALE du héros (experience.js en déduit son niveau).
     xp: Math.max(0, parseInt(d.XP) || 0),
+    // Ses talents (talents.js) : { TAL_X: rangs }, et la carac choisie pour
+    // ceux qui en demandent une (Perfectionnement).
+    talents: (d.Talents && typeof d.Talents === "object") ? { ...d.Talents } : {},
+    talentsChoix: (d.Talents_Choix && typeof d.Talents_Choix === "object") ? { ...d.Talents_Choix } : {},
     Etats_Alteres: etatsAlteres,
     Bouclier_Max: d.Bouclier_Max || 0,
     Bouclier_Actuel: d.Bouclier_Actuel || 0,
@@ -1264,8 +1268,10 @@ window.atoutRace = function(perso) {
     const peuple = window.atoutPeuple(perso);
     const classe = window.atoutClasse(perso);
     const creature = typeof window.atoutCreature === "function" ? window.atoutCreature(perso) : {};
-    if (Object.keys(classe).length === 0 && Object.keys(creature).length === 0) return peuple;
-    return fusionnerAtouts(fusionnerAtouts(fusionnerAtouts({}, peuple), classe), creature);
+    // LES TALENTS (talents.js) : une source de plus, par le même chemin.
+    const talents = typeof window.atoutTalents === "function" ? window.atoutTalents(perso) : {};
+    if (Object.keys(classe).length === 0 && Object.keys(creature).length === 0 && Object.keys(talents).length === 0) return peuple;
+    return fusionnerAtouts(fusionnerAtouts(fusionnerAtouts(fusionnerAtouts({}, peuple), classe), creature), talents);
 };
 
 // =========================================================================
@@ -1385,6 +1391,21 @@ window.texteAtout = function(cle, valeur) {
         case "lumiereAveugle": return `Sorts de lumière : ${n} % de chance d'aveugler la cible`;
         case "provocationAttaques": return `${n} % de chance de provoquer la cible de chacune de ses attaques`;
         case "bonusSoin":      return `${plus(n)} à chacun de ses soins`;
+        // Les clés des talents (talents.js).
+        case "degatsPhysiques": return `${plus(n)} dégât${Math.abs(n) > 1 ? "s" : ""} physique${Math.abs(n) > 1 ? "s" : ""}`;
+        case "degatsMagiques":  return `${plus(n)} dégât${Math.abs(n) > 1 ? "s" : ""} magique${Math.abs(n) > 1 ? "s" : ""}`;
+        case "degatsMotsPouvoir": return `${plus(n)} dégât aux Mots de pouvoir`;
+        case "chanceElementaire": return `${plus(n)} % de chance sur Brûlé, Électrifié et Glacé`;
+        case "chanceEtatsCharisme": return `${plus(n)} % de chance sur Confusion, Peur et Immobilisation`;
+        case "chancePoisonPhysique": return `${plus(n)} % de chance d'empoisonner`;
+        case "testsCarac":      return Object.keys(valeur || {}).map(c => `+${valeur[c]} aux tests de ${NOMS_CARACS_ATOUT[c] || c}`).join(" · ");
+        case "fatigueSurKO":    return `${plus(n)} de fatigue à chaque ennemi abattu`;
+        case "inertieMartiale": return `−${n} de fatigue sur la mêlée après 4 cases en ligne droite`;
+        case "impactCinetique": return "Une cible poussée contre un obstacle encaisse le choc";
+        case "elanPartage":     return `+${n} de fatigue aux alliés à son contact quand il soigne`;
+        case "bouclierDesSages": return `Repos long à l'initiative 100, +${n} % de résistances pour le tour`;
+        case "degatsIllusoires": return `${n} dégâts bruts à qui brise une de ses illusions`;
+        case "etatsRaccourcis": return `États néfastes subis : −${n} tour`;
         case "initiative":     return `${plus(n)} d'initiative sur ses compétences`;
         case "diviseurEtalement": return `Forge : la fatigue des dégâts étalés est divisée par ${String(n).replace(".", ",")} (au lieu de 1,2)`;
         case "compagnon":      return "Un compagnon animal combat à ses côtés : 25 PV, 15 % d'esquive, 6 dégâts bruts, 3 cases, joue juste après lui";
@@ -6514,6 +6535,10 @@ window.lancerJetDeCaracteristique = async function(idCarac, nomCarac, valeurCara
     const nomPersonnage = document.getElementById("titre-nom-personnage").innerText;
     
     const resultatD20 = Math.floor(Math.random() * 20) + 1;
+    // PERFECTIONNEMENT (talents.js) : +2 aux tests de la carac choisie.
+    const persoJet = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnageFiche) || null;
+    const bonusTalent = persoJet ? (parseInt(((window.atoutRace(persoJet) || {}).testsCarac || {})[idCarac]) || 0) : 0;
+    modCarac = (Number(modCarac) || 0) + bonusTalent;
     const total = resultatD20 + modCarac;
     
     window.ID_MON_LANCER = Math.random().toString(36).substring(2, 10);

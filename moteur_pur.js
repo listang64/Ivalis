@@ -41,7 +41,7 @@
 //  venaient les dégâts comptés deux fois.
 // =========================================================================
 
-import { clonerEtat, combattant, creerDes, tomber, enSursis } from './combat_etat.js';
+import { clonerEtat, combattant, creerDes, tomber, enSursis, reductionInertie } from './combat_etat.js';
 
 const nombre = (v, defaut = 0) => {
     const n = parseInt(v);
@@ -203,7 +203,7 @@ export function caseLibre(etat, plateau, q, r, idIgnore) {
 //  `estLibre` est fourni par l'appelant — le noyau ne connaît ni le plateau ni
 //  qui se tient où, on les lui passe. Rendre `null`, c'est « bloquée » : la
 //  cible ne bouge pas d'un pouce.
-export function destinationPoussee(lanceur, cible, cases, estLibre) {
+export function destinationPoussee(lanceur, cible, cases, estLibre, info) {
     const distance = distanceHex(lanceur, cible);
     if (!Number.isFinite(distance) || distance === 0) return null;
 
@@ -224,11 +224,18 @@ export function destinationPoussee(lanceur, cible, cases, estLibre) {
     for (let i = 1; i <= nombre(cases, 2); i++) {
         const t = (distance + i) / distance;
         const pt = arrondiCube(lerp(a.q, b.q, t), lerp(a.r, b.r, t), lerp(a.s, b.s, t));
-        if (!estLibre(pt.q, pt.r)) break;
+        // La case qui l'arrête : un obstacle, un mur ou une unité (l'Impact
+        // cinétique s'en sert pour la collision).
+        if (!estLibre(pt.q, pt.r)) { if (info) info.bloque = pt; break; }
         arrivee = pt;
     }
     return arrivee;
 }
+
+// L'IMPACT CINÉTIQUE (talent) : la part des dégâts de la compétence — sa
+// valeur, avant défenses — que la collision inflige en dégâts bruts.
+export const IMPACT_CIBLE_PCT = 30;
+export const IMPACT_PERCUTE_PCT = 15;
 
 // Le sens inverse de la Poussée : on tire la cible vers le lanceur au lieu de
 // la repousser. Même géométrie (interpolation cubique, arrondi au caractère
@@ -1932,8 +1939,9 @@ export function resoudreCarte(etat, action, plateau) {
             //  suivante. Ici, la cible part vraiment.
             if (alt.nom === "Poussée") {
                 const depart = { q: nombre(cible.q), r: nombre(cible.r) };
+                const choc = {};
                 const arrivee = destinationPoussee(lanceur, cible, nombre(alt.cases, 2),
-                                                   (q, r) => caseLibre(suivant, carte, q, r, idCible));
+                                                   (q, r) => caseLibre(suivant, carte, q, r, idCible), choc);
                 if (arrivee) {
                     cible.q = arrivee.q;
                     cible.r = arrivee.r;
@@ -1942,6 +1950,33 @@ export function resoudreCarte(etat, action, plateau) {
                 } else {
                     etapes.push({ type: "message", cible: idCible, acteur: idLanceur,
                                   texte: "Poussée bloquée" });
+                }
+
+                // L'IMPACT CINÉTIQUE (talent) : arrêtée par un obstacle ou une
+                // unité, la cible encaisse 30 % des dégâts de la compétence en
+                // brut ; l'unité percutée, 15 % (arrondis à l'inférieur).
+                if (choc.bloque && lanceur.atouts && lanceur.atouts.impactCinetique) {
+                    const initiaux = (action.attaques || []).filter(a => !a.isHeal && !a.isShield)
+                        .reduce((t, a) => t + Math.max(0, decimal(a.valeurBrute)), 0);
+                    const frapperBrut = (id, c, montant) => {
+                        if (!c || c.aTerre || montant <= 0) return;
+                        const surBouclier = Math.min(nombre(c.bouclier), montant);
+                        c.bouclier = nombre(c.bouclier) - surBouclier;
+                        if (c.bouclier === 0) c.bouclierMax = 0;
+                        c.pv = Math.max(0, nombre(c.pv) - (montant - surBouclier));
+                        etapes.push({ type: "degats", cible: id, acteur: idLanceur, montant, surBouclier,
+                                      bouclierApres: c.bouclier, pvApres: c.pv, brut: true });
+                        etapes.push(...tomber(suivant, id, idLanceur));
+                    };
+                    const pourCible = Math.floor(initiaux * IMPACT_CIBLE_PCT / 100);
+                    const idPercute = Object.keys(suivant.combattants || {}).find(id => {
+                        const x = suivant.combattants[id];
+                        return id !== idCible && x && !x.aTerre && x.q === choc.bloque.q && x.r === choc.bloque.r;
+                    });
+                    if (pourCible > 0 || idPercute) etapes.push({ type: "message", cible: idCible, acteur: idLanceur,
+                                                                 texte: "💥 Impact !", couleur: "#ffb74d" });
+                    frapperBrut(idCible, cible, pourCible);
+                    if (idPercute) frapperBrut(idPercute, suivant.combattants[idPercute], Math.floor(initiaux * IMPACT_PERCUTE_PCT / 100));
                 }
 
                 // La bousculade : elle se joue même quand un mur a arrêté la
@@ -2015,6 +2050,16 @@ export function resoudreCarte(etat, action, plateau) {
             // chaque fin de manche, 2 manches durant (POISON_MAITRE).
             const maitre = alt.nom === "Empoisonnement" && !!(lanceur && lanceur.atouts && lanceur.atouts.maitrePoisons);
             if (maitre) duree = Math.max(duree, POISON_MAITRE.manches);
+            // IMMUNISÉ (talent) : un état néfaste subi dure un tour de moins ;
+            // un état d'un seul tour ne prend plus.
+            const raccourci = nombre(cible.atouts && cible.atouts.etatsRaccourcis);
+            if (raccourci > 0 && estEtatNefaste({ nom: alt.nom, bonusEquip: alt.bonusEquip })) {
+                duree -= raccourci;
+                if (duree <= 0) {
+                    etapes.push({ type: "etatRate", cible: idCible, nom: alt.nom, immunise: true, raison: "Immunisé" });
+                    return;
+                }
+            }
             if (existant) {
                 existant.duree = Math.max(nombre(existant.duree), duree);
                 if (ronge) existant.idSource = idLanceur;
@@ -2138,10 +2183,31 @@ export function resoudreCarte(etat, action, plateau) {
             `${nombre(jets.equipPasOfferts)} case(s) de déplacement gratuite(s) après avoir frappé.`);
     }
 
+    // --- L'ÉLAN PARTAGÉ (talent) --------------------------------------------
+    //  Il a soigné un allié : les alliés à SON contact reprennent 8 de fatigue,
+    //  une fois pour la carte.
+    const elan = nombre(lanceur.atouts && lanceur.atouts.elanPartage);
+    if (elan > 0 && etapes.some(e => e.type === "soin" && e.acteur === idLanceur && !e.drain && e.cible !== idLanceur
+                                     && (combattant(suivant, e.cible) || {}).camp === lanceur.camp)) {
+        Object.keys(suivant.combattants || {}).sort().forEach(id => {
+            const a = suivant.combattants[id];
+            if (id === idLanceur || !a || a.aTerre || a.estIllusion || a.camp !== lanceur.camp) return;
+            if (a.q === null || a.q === undefined || distanceHex(lanceur, a) !== 1) return;
+            const apres = Math.min(nombre(a.fatigueMax), nombre(a.fatigue) + elan);
+            if (apres === nombre(a.fatigue)) return;
+            a.fatigue = apres;
+            etapes.push({ type: "fatigue", cible: id, fatigueApres: apres, tic: "Élan partagé" });
+        });
+    }
+
     // --- LA FATIGUE DU LANCEUR -------------------------------------------
     if (action.coutFatigue !== undefined) {
+        // L'Inertie martiale : une charge en ligne droite allège la mêlée.
+        const inertie = Math.min(nombre(action.coutFatigue), reductionInertie(etat, idLanceur, action));
+        if (inertie > 0) etapes.push({ type: "message", cible: idLanceur, acteur: idLanceur,
+                                       texte: `⚡ Inertie martiale −${inertie}`, couleur: "#e8c46a" });
         lanceur.fatigue = Math.max(0, Math.min(lanceur.fatigueMax,
-                                               lanceur.fatigue - nombre(action.coutFatigue)));
+                                               lanceur.fatigue - (nombre(action.coutFatigue) - inertie)));
         etapes.push({ type: "fatigue", cible: idLanceur, fatigueApres: lanceur.fatigue });
     }
 

@@ -38,7 +38,7 @@
 // =========================================================================
 
 import { clonerEtat, combattant, creerDes, combattantIllusion,
-         verifierEtatCombat, compterPasMarche, FORMAT_ETAT, tomber, enSursis,
+         verifierEtatCombat, compterPasMarche, reductionInertie, FORMAT_ETAT, tomber, enSursis,
          reposDuRetourArriere, entreeDeFile, ZOMBIE, COMPAGNON, compagnonDe,
          placerCompagnons, MUR_TERRE, murEn, plateauDeCombat, franchissablePour, frapperMurs,
          cleGravats, APPLICATEURS } from './combat_etat.js';
@@ -372,7 +372,9 @@ export function validerIntention(etat, intention, plateau) {
 
     if (intention.type === "carte") {
         if (!intention.idCarte) return refus("carte sans identité");
-        const cout = nombre(intention.coutFatigue);
+        // (L'Inertie martiale allège la mêlée après une charge : on juge sur
+        // le prix réellement payé.)
+        const cout = Math.max(0, nombre(intention.coutFatigue) - reductionInertie(etat, acteur.id, intention));
         if (cout > acteur.fatigue) {
             return refus(`il faut ${cout} d'énergie, il en reste ${acteur.fatigue}`);
         }
@@ -875,10 +877,24 @@ export function reposLongDuTour(etat) {
     const taux = pct > 0 ? pct / 100 : 0.35;
     const apres = Math.min(nombre(c.fatigueMax),
                            nombre(c.fatigue) + Math.floor(nombre(c.fatigueMax) * taux));
-    if (apres === nombre(c.fatigue)) return [];
-    c.fatigue = apres;
-    return [{ type: "fatigue", cible: tete.id, fatigueApres: apres, repos: true }];
+    const etapes = [];
+    if (apres !== nombre(c.fatigue)) {
+        c.fatigue = apres;
+        etapes.push({ type: "fatigue", cible: tete.id, fatigueApres: apres, repos: true });
+    }
+    // LE BOUCLIER DES SAGES (talent) : son repos long part à l'initiative 100
+    // (combat.js) et lui donne +10 % de résistances physique et magique
+    // jusqu'à la fin de la manche.
+    const sages = nombre(c.atouts && c.atouts.bouclierDesSages);
+    if (sages > 0) {
+        c.etats = [...(c.etats || []).filter(e => e && e.nom !== ETAT_BOUCLIER_SAGES),
+                   { nom: ETAT_BOUCLIER_SAGES, duree: 1, bonusEquip: { resPhys: sages, resMag: sages },
+                     desc: `+${sages} % de résistances physique et magique jusqu'à la fin de la manche.` }];
+        etapes.push({ type: "etats", cible: tete.id, pose: ETAT_BOUCLIER_SAGES, liste: c.etats });
+    }
+    return etapes;
 }
+export const ETAT_BOUCLIER_SAGES = "Bouclier des Sages";
 
 // =========================================================================
 //  5. EXÉCUTER UNE INTENTION
