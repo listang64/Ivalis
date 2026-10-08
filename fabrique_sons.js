@@ -1,10 +1,11 @@
 // =========================================================================
 //  IVALIS — LA FABRIQUE (Paramètres → La Fabrique)
 // =========================================================================
-//  Dix sons de clic de menu, fabriqués sur place avec Web Audio : aucun
-//  fichier à héberger, aucun réseau. Tous sont un léger « ding » — clair,
-//  doux, cristal, boisé, double, feutré, perle, clochette, écho, scintillant —
-//  pour qu'on les écoute ici avant de choisir celui des boutons du jeu.
+//  Dix sons d'interface, fabriqués sur place avec Web Audio : aucun fichier
+//  à héberger, aucun réseau. Doux et légers — goutte, plume, bulle, verre,
+//  écho, carillon, harpe, pétale, brume, pluie de notes —, certains
+//  s'effacent par paliers. On les écoute ici avant d'en choisir un pour les
+//  boutons du jeu (aujourd'hui le ding perle, gardé à part dans SONS_JEU).
 //
 //  Chaque son est une fonction (ctx, sortie) : elle ne fait que brancher des
 //  oscillateurs et des souffles filtrés sur `sortie`. C'est ce qui permet de
@@ -98,84 +99,114 @@
         });
     }
 
+    // --- LES DIX SONS DE LA FABRIQUE ---------------------------------------
+    //  Nico : « remplace les sons existants par dix autres, plus doux et
+    //  légers ; certains qui s'effacent en graduation. » Pas de souffle
+    //  d'attaque (le petit « tac » des dings) : chaque son monte en douceur,
+    //  reste discret, et quatre d'entre eux s'éteignent par paliers — un écho,
+    //  un carillon, une pluie de notes, une cascade.
+    //  `doux` : une note tendre, sinusoïdale, à l'attaque lente et filtrée.
+    function doux(ctx, s, o) {
+        const debut = o.debut || 0;
+        (o.partiels || [[1, 1, 1], [2, 0.12, 0.5]]).forEach(([k, part, tenue]) => {
+            note(ctx, s, { freq: o.freq * k, debut, duree: (o.duree || 0.3) * tenue, gain: (o.gain || 0.1) * part,
+                           type: o.type || "sine", attaque: o.attaque || 0.014, glisse: o.glisse ? o.glisse * k : undefined,
+                           desaccord: o.desaccord || 0, passeBas: o.passeBas || 2600 });
+        });
+    }
+    // Une même note reprise plusieurs fois, chaque fois plus bas : l'effacement
+    // par paliers. `pas` : l'écart entre deux reprises ; `chute` : ce qu'il
+    // reste du volume à chaque palier.
+    function paliers(ctx, s, o) {
+        (o.notes || Array(o.fois || 4).fill(o.freq)).forEach((f, i) => {
+            doux(ctx, s, { ...o, freq: f, debut: (o.debut || 0) + i * o.pas, gain: (o.gain || 0.1) * Math.pow(o.chute || 0.55, i) });
+        });
+    }
+
     const SONS = [
         {
-            id: "ding-clair", nom: "Ding clair",
-            usage: "Net et lumineux — le clic de menu de base",
-            fabriquer(ctx, s) { ding(ctx, s, { freq: 1318.5, duree: 0.22 }); }
+            id: "goutte-rosee", nom: "Goutte de rosée",
+            usage: "Une goutte qui tombe, toute ronde, et glisse un peu vers le bas",
+            fabriquer(ctx, s) { doux(ctx, s, { freq: 1175, glisse: 1046, duree: 0.26, gain: 0.12, attaque: 0.008 }); }
         },
         {
-            id: "ding-doux", nom: "Ding doux",
-            usage: "Plus bas et plus rond, sans aucune pointe",
+            id: "plume", nom: "Plume",
+            usage: "Presque rien : une note feutrée qui se pose",
             fabriquer(ctx, s) {
-                ding(ctx, s, { freq: 880, duree: 0.3, clic: 0.4, attaque: 0.012,
-                               partiels: [[1, 1, 1], [2, 0.08, 0.4]] });
+                doux(ctx, s, { freq: 784, duree: 0.24, gain: 0.1, attaque: 0.02, type: "triangle", passeBas: 1500,
+                               partiels: [[1, 1, 1]] });
             }
         },
         {
-            id: "ding-cristal", nom: "Ding cristal",
-            usage: "Un verre qu'on effleure, très pur",
+            id: "bulle", nom: "Bulle",
+            usage: "Une petite bulle qui remonte, légère",
+            fabriquer(ctx, s) { doux(ctx, s, { freq: 520, glisse: 820, duree: 0.17, gain: 0.12, attaque: 0.012 }); }
+        },
+        {
+            id: "souffle-verre", nom: "Souffle de verre",
+            usage: "Un verre effleuré qui s'éteint lentement",
             fabriquer(ctx, s) {
-                ding(ctx, s, { freq: 1760, duree: 0.28, force: 0.8,
-                               partiels: [[1, 1, 1], [2.76, 0.22, 0.45], [5.4, 0.06, 0.2]] });
+                doux(ctx, s, { freq: 1568, duree: 1.4, gain: 0.08, attaque: 0.02,
+                               partiels: [[1, 1, 1], [2.76, 0.12, 0.35]] });
             }
         },
         {
-            id: "ding-bois", nom: "Ding boisé",
-            usage: "Court et mat, un petit coup sur du bois",
+            id: "echo-efface", nom: "Écho qui s'efface",
+            usage: "Une note, puis son écho, de plus en plus loin",
+            fabriquer(ctx, s) { paliers(ctx, s, { freq: 988, fois: 5, pas: 0.12, chute: 0.5, duree: 0.2, gain: 0.11 }); }
+        },
+        {
+            id: "carillon-lointain", nom: "Carillon lointain",
+            usage: "Trois clochettes qui descendent et s'éloignent",
             fabriquer(ctx, s) {
-                bruit(ctx, s, { duree: 0.025, freq: 1400, q: 3, gain: 0.35 });
-                ding(ctx, s, { freq: 1046.5, duree: 0.11, clic: false, type: "triangle",
-                               partiels: [[1, 1, 1], [3, 0.1, 0.4]] });
+                paliers(ctx, s, { notes: [1319, 1175, 988, 880], pas: 0.11, chute: 0.6, duree: 0.32, gain: 0.09,
+                                  partiels: [[1, 1, 1], [2.0, 0.15, 0.5]] });
             }
         },
         {
-            id: "ding-double", nom: "Ding double",
-            usage: "Deux petites notes qui montent, vives",
+            id: "harpe-feutree", nom: "Harpe feutrée",
+            usage: "Une corde pincée du bout du doigt",
             fabriquer(ctx, s) {
-                // Do puis sol : une quinte, pour que la montée s'entende.
-                ding(ctx, s, { freq: 1046.5, duree: 0.13, force: 0.8 });
-                ding(ctx, s, { freq: 1568, debut: 0.065, duree: 0.2, force: 0.8, clic: 0.5 });
+                doux(ctx, s, { freq: 659, duree: 0.5, gain: 0.12, attaque: 0.006, type: "triangle", passeBas: 1200,
+                               partiels: [[1, 1, 1], [2, 0.2, 0.4], [3, 0.06, 0.25]] });
             }
         },
         {
-            id: "ding-feutre", nom: "Ding feutré",
-            usage: "Très discret, comme étouffé sous un tissu",
+            id: "petale", nom: "Pétale",
+            usage: "Deux notes tendres ensemble, comme un accord murmuré",
             fabriquer(ctx, s) {
-                ding(ctx, s, { freq: 698.5, duree: 0.2, force: 0.75, clic: 0.15, passeBas: 1100,
-                               attaque: 0.012, partiels: [[1, 1, 1], [2, 0.06, 0.4]] });
+                doux(ctx, s, { freq: 880, duree: 0.4, gain: 0.07, attaque: 0.025, partiels: [[1, 1, 1]] });
+                doux(ctx, s, { freq: 1109, duree: 0.4, gain: 0.06, attaque: 0.03, partiels: [[1, 1, 1]] });
             }
         },
+        {
+            id: "brume", nom: "Brume",
+            usage: "Une nappe très douce qui monte puis se dissout",
+            fabriquer(ctx, s) {
+                doux(ctx, s, { freq: 698.5, duree: 1.5, gain: 0.07, attaque: 0.05, desaccord: -6, partiels: [[1, 1, 1]] });
+                doux(ctx, s, { freq: 698.5, duree: 1.5, gain: 0.07, attaque: 0.05, desaccord: 6, partiels: [[1, 1, 1]] });
+            }
+        },
+        {
+            id: "pluie-notes", nom: "Pluie de notes",
+            usage: "Une cascade qui monte et s'efface note après note",
+            fabriquer(ctx, s) {
+                paliers(ctx, s, { notes: [784, 988, 1175, 1319, 1568], pas: 0.07, chute: 0.62, duree: 0.24, gain: 0.1,
+                                  partiels: [[1, 1, 1]] });
+            }
+        }
+    ];
+
+    // LE SON DES BOUTONS DU JEU vit à part (SONS_JEU) : la Fabrique peut
+    // changer ses dix sons sans couper la voix des boutons. Le ding perle,
+    // choisi par Nico, reste celui du jeu tant qu'il n'en choisit pas un autre.
+    const SONS_JEU = [
         {
             id: "ding-perle", nom: "Ding perle",
             usage: "Minuscule et aigu, pour un petit bouton",
             fabriquer(ctx, s) {
                 ding(ctx, s, { freq: 2093, duree: 0.1, force: 0.7, clic: 0.6,
                                partiels: [[1, 1, 1], [2, 0.1, 0.5]] });
-            }
-        },
-        {
-            id: "ding-cloche", nom: "Ding clochette",
-            usage: "Une petite clochette, qui tinte un peu plus",
-            fabriquer(ctx, s) {
-                ding(ctx, s, { freq: 987.8, duree: 0.45, force: 0.85,
-                               partiels: [[1, 1, 1], [2.0, 0.3, 0.7], [2.76, 0.18, 0.5], [5.4, 0.06, 0.25]] });
-            }
-        },
-        {
-            id: "ding-echo", nom: "Ding écho",
-            usage: "Le ding, puis son écho plus faible",
-            fabriquer(ctx, s) {
-                ding(ctx, s, { freq: 1174.7, duree: 0.18 });
-                ding(ctx, s, { freq: 1174.7, debut: 0.12, duree: 0.2, force: 0.35, clic: false });
-            }
-        },
-        {
-            id: "ding-scintillant", nom: "Ding scintillant",
-            usage: "Deux voix à peine décalées qui miroitent",
-            fabriquer(ctx, s) {
-                ding(ctx, s, { freq: 1396.9, duree: 0.32, force: 0.65, desaccord: -9 });
-                ding(ctx, s, { freq: 1396.9, duree: 0.32, force: 0.65, desaccord: 9, clic: false });
             }
         }
     ];
@@ -215,7 +246,8 @@
     // `facteur` règle le volume par-dessus les réglages du jeu (le survol des
     // menus joue à moitié, comme l'ancien bruit de parchemin).
     window.jouerSonFabrique = function (quel, facteur) {
-        const son = typeof quel === "number" ? SONS[quel - 1] : SONS.find(x => x.id === quel);
+        const son = typeof quel === "number" ? SONS[quel - 1]
+            : (SONS.find(x => x.id === quel) || SONS_JEU.find(x => x.id === quel));
         if (!son) return false;
         const v = volume() * (facteur === undefined ? 1 : Math.max(0, Number(facteur) || 0));
         if (v <= 0) return false;

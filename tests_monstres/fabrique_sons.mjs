@@ -143,13 +143,15 @@ console.log("\n2. CHAQUE BOUTON JOUE SON SON");
   verifier("le son part pour de vrai (contexte audio du navigateur)", r.joue === true);
 }
 
-console.log("\n3. LES DIX SONS, RENDUS HORS LIGNE");
+console.log("\n3. LES DIX SONS, RENDUS HORS LIGNE : DOUX, LÉGERS, CERTAINS PAR PALIERS");
+// Nico : « remplace les sons existants par dix autres, plus doux et légers ;
+// certains qui s'effacent en graduation. »
 {
   const sons = await p.evaluate(async () => {
     const taux = 44100;
     const mesures = [];
     for (const son of window.SONS_FABRIQUE) {
-      const ctx = new OfflineAudioContext(1, Math.floor(taux * 1.3), taux);
+      const ctx = new OfflineAudioContext(1, Math.floor(taux * 1.6), taux);
       const sortie = ctx.createGain();
       sortie.gain.value = 1;
       sortie.connect(ctx.destination);
@@ -161,65 +163,70 @@ console.log("\n3. LES DIX SONS, RENDUS HORS LIGNE");
         const a = Math.abs(d[i]);
         if (a > crete) { crete = a; iCrete = i; }
         somme += d[i] * d[i];
-        if (a > 0.003) dernier = i;
+        if (a > 0.002) dernier = i;
       }
       const duree = dernier / taux;
-      // La hauteur, grossièrement : passages par zéro par seconde, comptés
-      // SEULEMENT dans les tranches de 10 ms où le son est vraiment audible —
-      // sans quoi les silences entre deux notes et les queues presque muettes
-      // faussent tout.
-      const zcr = (de, a) => {
-        const tranche = Math.floor(taux / 100);
-        let n = 0, actif = 0;
-        for (let t0 = de; t0 + tranche <= a; t0 += tranche) {
-          let e = 0; for (let i = t0; i < t0 + tranche; i++) e += d[i] * d[i];
-          if (Math.sqrt(e / tranche) < 0.01) continue;
-          actif += tranche;
-          for (let i = t0 + 1; i < t0 + tranche; i++) if ((d[i - 1] < 0) !== (d[i] < 0)) n++;
+      // L'attaque : la plus forte valeur des 3 premières millisecondes.
+      let debutFort = 0;
+      for (let i = 0; i < Math.floor(0.003 * taux); i++) debutFort = Math.max(debutFort, Math.abs(d[i]));
+      // L'enveloppe, par tranches de 10 ms, et ses attaques (une tranche qui
+      // remonte nettement au-dessus de la précédente).
+      const tranche = Math.floor(taux / 100);
+      const env = [];
+      for (let t0 = 0; t0 + tranche <= d.length; t0 += tranche) {
+        let e = 0; for (let i = t0; i < t0 + tranche; i++) e += d[i] * d[i];
+        env.push(Math.sqrt(e / tranche));
+      }
+      const attaques = [];
+      for (let k = 1; k < env.length; k++) {
+        if (env[k] > 0.004 && env[k] > env[k - 1] * 1.25 && (k + 1 >= env.length || env[k + 1] <= env[k] * 1.6)) {
+          let pic = env[k]; for (let j = k; j < Math.min(env.length, k + 4); j++) pic = Math.max(pic, env[j]);
+          if (attaques.length === 0 || k - attaques[attaques.length - 1].k > 4) attaques.push({ k, pic });
         }
-        return actif ? n / (actif / taux) : 0;
-      };
-      const milieu = Math.floor(dernier / 2);
+      }
+      // La hauteur : passages par zéro, dans les tranches audibles.
+      let n = 0, actif = 0;
+      for (let t0 = 0; t0 + tranche <= dernier; t0 += tranche) {
+        let e = 0; for (let i = t0; i < t0 + tranche; i++) e += d[i] * d[i];
+        if (Math.sqrt(e / tranche) < 0.005) continue;
+        actif += tranche;
+        for (let i = t0 + 1; i < t0 + tranche; i++) if ((d[i - 1] < 0) !== (d[i] < 0)) n++;
+      }
+      const moitie = Math.floor(dernier / 2);
+      let e1 = 0, e2 = 0;
+      for (let i = 0; i < moitie; i++) e1 += d[i] * d[i];
+      for (let i = moitie; i < dernier; i++) e2 += d[i] * d[i];
       mesures.push({ id: son.id, crete, rms: Math.sqrt(somme / Math.max(1, dernier)), duree, tCrete: iCrete / taux,
-                     // Pour le ding double : la première note (de 15 à 55 ms, après
-                     // le petit souffle d'attaque), la seconde (après 75 ms).
-                     zcrNote1: zcr(Math.floor(0.015 * taux), Math.floor(0.055 * taux)),
-                     zcrNote2: zcr(Math.floor(0.075 * taux), dernier),
-                     zcr1: zcr(0, milieu), zcr2: zcr(milieu, dernier), zcr: zcr(0, dernier) });
+                     attaque: debutFort / Math.max(crete, 1e-9), hauteur: actif ? n / (actif / taux) / 2 : 0,
+                     paliers: attaques.map(a => +a.pic.toFixed(4)), finSurDebut: e2 / Math.max(e1, 1e-12) });
     }
     return mesures;
   });
-  sons.forEach(m => console.log(`     ${m.id.padEnd(18)} crête ${m.crete.toFixed(2)}  durée ${m.duree.toFixed(2)} s  hauteur ~${Math.round(m.zcr / 2)} Hz`));
+  sons.forEach(m => console.log(`     ${m.id.padEnd(18)} crête ${m.crete.toFixed(2)}  durée ${m.duree.toFixed(2)} s  hauteur ~${Math.round(m.hauteur)} Hz  paliers ${m.paliers.length}`));
+  verifier("dix nouveaux sons (plus aucun « ding » de l'ancienne série)", sons.length === 10 && sons.every(m => !/^ding-/.test(m.id)),
+           sons.map(m => m.id).join(", "));
   verifier("aucun n'est muet", sons.every(m => m.crete > 0.02), sons.filter(m => m.crete <= 0.02).map(m => m.id).join());
-  verifier("aucun ne sature", sons.every(m => m.crete < 1), sons.filter(m => m.crete >= 1).map(m => m.id).join());
-  verifier("tous brefs, comme un clic de menu (moins d'une demi-seconde)", sons.every(m => m.duree < 0.5),
-           sons.map(m => m.duree.toFixed(2)).join(" "));
-  verifier("tous légers (crête sous 0,5)", sons.every(m => m.crete < 0.5), sons.map(m => m.crete.toFixed(2)).join(" "));
-  verifier("des « ding » : l'attaque frappe tout de suite (crête dans les 80 premières ms)",
-           sons.every(m => m.tCrete < 0.08), sons.map(m => Math.round(m.tCrete * 1000) + "ms").join(" "));
-  verifier("une note claire, dans la hauteur d'un ding (entre 600 et 3 000 Hz)",
-           sons.every(m => m.zcr / 2 > 600 && m.zcr / 2 < 3000), sons.map(m => Math.round(m.zcr / 2)).join(" "));
-  // Deux sons « se ressemblent » si leur durée, leur hauteur, leur force ET
-  // leur direction (qui monte, qui descend) sont toutes proches à 12 % près.
-  // Les souffles sont tirés au hasard : la direction est ce qui distingue le
-  // plus sûrement deux sons de même longueur.
+  verifier("légers : crête sous 0,3 (les dings montaient jusqu'à 0,5)", sons.every(m => m.crete < 0.3), sons.map(m => m.crete.toFixed(2)).join(" "));
+  verifier("doux : aucun « tac » d'attaque (3 premières ms sous 30 % de la crête)", sons.every(m => m.attaque < 0.3),
+           sons.map(m => m.attaque.toFixed(2)).join(" "));
+  verifier("des notes tendres, ni graves ni perçantes (300 à 2 000 Hz)", sons.every(m => m.hauteur > 300 && m.hauteur < 2000),
+           sons.map(m => Math.round(m.hauteur)).join(" "));
+  verifier("aucun ne traîne (moins d'1,3 s)", sons.every(m => m.duree < 1.3), sons.map(m => m.duree.toFixed(2)).join(" "));
+  const parPaliers = sons.filter(m => m.paliers.length >= 3 && m.paliers.every((v, i) => i === 0 || v < m.paliers[i - 1] * 1.05)
+                                   && m.paliers[m.paliers.length - 1] < m.paliers[0] * 0.6);
+  verifier("certains s'effacent PAR PALIERS : au moins trois, chaque reprise plus faible", parPaliers.length >= 3,
+           parPaliers.map(m => m.id + " " + m.paliers.length).join(", "));
+  const lents = sons.filter(m => m.duree > 0.6 && m.finSurDebut < 0.5 && m.finSurDebut > 0.001);
+  verifier("et d'autres s'éteignent lentement, en un long fondu", lents.length >= 2, lents.map(m => m.id).join(", "));
   const proche = (a, b) => Math.abs(a - b) / Math.max(a, b, 1e-9) < 0.12;
-  const pente = (m) => m.zcr2 / Math.max(1, m.zcr1);
   const jumeaux = [];
   for (let i = 0; i < sons.length; i++) for (let j = i + 1; j < sons.length; j++) {
     const a = sons[i], b = sons[j];
-    if (proche(a.duree, b.duree) && proche(a.zcr, b.zcr) && proche(a.rms, b.rms) && proche(pente(a), pente(b))) {
-      jumeaux.push(a.id + "/" + b.id);
-    }
+    if (proche(a.duree, b.duree) && proche(a.hauteur, b.hauteur) && proche(a.rms, b.rms) && a.paliers.length === b.paliers.length) jumeaux.push(a.id + "/" + b.id);
   }
   verifier("dix sons vraiment différents", jumeaux.length === 0, jumeaux.join(", "));
-  const s = Object.fromEntries(sons.map(m => [m.id, m]));
-  verifier("le ding double monte", s["ding-double"].zcrNote2 > s["ding-double"].zcrNote1 * 1.15,
-           `${Math.round(s["ding-double"].zcrNote1 / 2)} → ${Math.round(s["ding-double"].zcrNote2 / 2)} Hz`);
-  verifier("la perle est le plus aigu, le feutré le plus grave",
-           sons.every(m => m.zcr <= s["ding-perle"].zcr) && sons.every(m => m.zcr >= s["ding-feutre"].zcr));
-  verifier("la clochette tinte plus longtemps que la perle", s["ding-cloche"].duree > 2 * s["ding-perle"].duree,
-           `${s["ding-cloche"].duree.toFixed(2)} s / ${s["ding-perle"].duree.toFixed(2)} s`);
+  const r = await p.evaluate(() => ({ perle: window.jouerSonFabrique("ding-perle"), liste: window.SONS_FABRIQUE.some(s => s.id === "ding-perle") }));
+  verifier("le ding perle des boutons du jeu joue toujours, hors de la liste", r.perle === true && !r.liste);
 }
 
 console.log("\n4. LE VOLUME DU JEU FAIT LOI, ET LE RETOUR RAMÈNE AU MENU");

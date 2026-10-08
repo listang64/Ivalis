@@ -5385,3 +5385,43 @@ cardiaque : régénération fixe à 30 ; Agonie : −3 aux six caracs.
   l'Aperçu (reste : jours, combats, soins, définitif) ; « Blessures : soins en
   ville » dans l'onglet DEV. Chanceux devient prenable (−5 au jet).
   blessures.mjs ; talents.mjs mis à jour (Chanceux).
+
+## La Fabrique adoucie ; le Studio d'animation (version 221)
+
+Nico : « Dans les paramètres, la Fabrique de sons : remplace les sons
+existants par dix autres plus doux et légers, certains qui s'effacent en
+graduation. Ensuite, toujours dans les paramètres, un bouton Studio
+d'animation : une fenêtre avec, à gauche, la réplique de la map actuelle du
+mode combat, le token du joueur posé sur un hexagone central et à côté un
+token ennemi inerte ; à droite la liste des futures animations de combat
+que nous allons créer. Un clic sur une animation la joue en direct sur mon
+token, et pour chaque animation une petite case à cocher pour me rappeler si
+elle est intégrée ou non. »
+- LA FABRIQUE (fabrique_sons.js) : dix nouveaux sons sans souffle d'attaque,
+  à l'attaque lente et filtrée (`doux`) — Goutte de rosée, Plume, Bulle,
+  Souffle de verre, Écho qui s'efface, Carillon lointain, Harpe feutrée,
+  Pétale, Brume, Pluie de notes. Quatre s'effacent par paliers (`paliers` :
+  la même note, ou une suite de notes, chaque reprise plus faible), deux en
+  un long fondu. Le ding perle des boutons du jeu (SON_CLIC_JEU) est gardé à
+  part (SONS_JEU) : il sonne toujours tant que Nico n'en choisit pas un autre.
+  fabrique_sons.mjs (section 3 réécrite : légèreté, absence de « tac »,
+  hauteur, paliers, fondus, dix sons distincts).
+- LE CATALOGUE (animations_combat.js, script simple) : ANIMATIONS_COMBAT, une
+  entrée par animation — `jouer({ lanceur, cible, calque })` rend une
+  promesse, sur des pions posés par leur centre (`translate(-50%, -50%)`,
+  comme les `.token-vtt` du plateau) : le jour où une animation est intégrée,
+  le combat l'appelle sur ses vrais pions avec le même code
+  (jouerAnimationCombat). Dix pour commencer : Coup d'épée, Coup reçu, Soin,
+  Bouclier magique, Boule de feu, Esquive, Gel, Poison, Coup critique, Mise à
+  terre. Chacune nettoie ce qu'elle pose.
+- LE STUDIO (studio_animation.js, style.css) : bouton « Studio d'animation »
+  sous la Fabrique. À gauche, la réplique de la carte du combat — la même
+  image, la même taille d'hexagone, la même opacité, les mêmes cases gommées
+  (une instance Plateau à lui, le plateau du combat n'est jamais touché) ;
+  le pion du héros de ce poste (au choix s'il en a plusieurs) sur la case
+  libre la plus proche du centre, l'ennemi au pion commun juste à côté ;
+  glisser, molette, pincer, −/+, Recentrer. À droite, la liste numérotée :
+  un clic joue l'animation (la ligne s'allume), la case « Intégrée » s'écrit
+  dans Studio_Animations/etat (Firestore, fusion — l'iPad et le PC voient la
+  même chose) et dans ce navigateur ; un compteur « n / 10 intégrées ».
+  studio_animation.mjs.
