@@ -5425,3 +5425,34 @@ elle est intégrée ou non. »
   dans Studio_Animations/etat (Firestore, fusion — l'iPad et le PC voient la
   même chose) et dans ce navigateur ; un compteur « n / 10 intégrées ».
   studio_animation.mjs.
+
+## Le Studio : pions mobiles, sons, tout part du héros vers l'ennemi (version 222)
+
+Nico : « Tu me feras un bouton pour bouger le token joueur et l'ennemi. Quand
+on jouera une animation il y aura du son aussi. Et l'animation sera toujours
+sur le token joueur et en direction de l'ennemi. »
+- DÉPLACER LES PIONS (studio_animation.js) : le bouton « ✥ Déplacer les
+  pions » arme le glisser (les pions s'illuminent, « Glisse un pion sur une
+  case libre ») ; un pion suit le doigt ou la souris et se pose au centre de
+  la case la plus proche — une case de la carte (ni gommée, ni mur) qui n'est
+  pas celle de l'autre pion ; sinon il revient. Bouton éteint, glisser fait
+  glisser la carte. Jouer une animation désarme le déplacement.
+- TOUJOURS LE HÉROS, VERS L'ENNEMI (animations_combat.js) : chaque animation
+  porte son `sens` (« vers l'ennemi » / « sur soi ») et calcule tout sur
+  l'axe héros → ennemi au moment de jouer (axe). L'élan au corps à corps est
+  borné (un ennemi loin ne fait pas traverser la carte) ; le Gel et le Poison
+  partent désormais du héros (trait de glace, fiole) ; le coup reçu le fait
+  reculer à l'opposé de l'ennemi, la chute aussi ; le bouclier brille côté
+  ennemi ; l'esquive s'écarte perpendiculairement, le coup traverse la case.
+- LES SONS (fabrique_sons.js, SONS_COMBAT, jouerSonCombat) : quinze sons
+  fabriqués sur place, au volume du jeu — lame (souffle, impact), coup sourd,
+  soin, bouclier, feu (départ, explosion), esquive, gel (départ, impact),
+  poison (départ, bulles), critique (charge, impact), chute. Les attaques ont
+  deux temps : l'élan, puis l'impact.
+- UNE LECTURE À LA FOIS : les outils d'une animation (poser, son, attendre…)
+  sont liés à sa lecture ; une autre animation lancée, ou le studio fermé
+  (annulerAnimationsCombat), et la première se tait — plus de son en
+  attente, plus d'effet posé.
+  studio_animation.mjs (sections 8 à 10 : glisser, cases refusées, axe à
+  l'ouest puis à l'est, sons de chaque animation, rendu des quinze sons,
+  volume, coupure).

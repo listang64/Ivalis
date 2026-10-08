@@ -4961,3 +4961,13 @@ textarea.input-texte-parchemin {
 @media (max-width: 820px) {
   .studio-corps { grid-template-columns: 1fr; grid-template-rows: minmax(260px, 1.2fr) minmax(200px, 1fr); }
 }
+/* Le déplacement des pions du studio : armé par son bouton. */
+.studio-bouton.actif { background: linear-gradient(180deg, #c9a24a, #8a6a2a); color: #2a1a0f; box-shadow: 0 0 10px rgba(226,184,79,0.7); }
+.studio-aide-deplacer { display: none; font-size: 12px; font-style: italic; color: #6e2a18; }
+.studio-scene.studio-deplacement + .studio-commandes .studio-aide-deplacer { display: inline; }
+.studio-scene.studio-deplacement .studio-pions { pointer-events: none; }
+.studio-scene.studio-deplacement .studio-pion { pointer-events: auto; cursor: grab; touch-action: none;
+  box-shadow: 0 0 0 3px rgba(226,184,79,0.9), 0 0 14px rgba(226,184,79,0.7); animation: studio-pion-mobile 1.2s ease-in-out infinite alternate; }
+.studio-pion.studio-pion-saisi { cursor: grabbing; z-index: 20; animation: none; box-shadow: 0 0 0 3px #fff3b0, 0 0 20px #e2b84f; }
+@keyframes studio-pion-mobile { from { box-shadow: 0 0 0 2px rgba(226,184,79,0.6), 0 0 6px rgba(226,184,79,0.4); }
+                                to   { box-shadow: 0 0 0 3px rgba(226,184,79,1), 0 0 16px rgba(226,184,79,0.8); } }

@@ -293,9 +293,8 @@
         }
     };
     window.SONS_EVENEMENTS = SONS_EVENEMENTS;
-    window.jouerSonEvenement = function (id, facteur) {
-        const fabriquer = SONS_EVENEMENTS[id];
-        if (!fabriquer) return false;
+    // Jouer une fabrication au volume du jeu (« Interface » × « Général »).
+    function jouerFabrication(fabriquer, facteur, quoi) {
         const v = volume() * (facteur === undefined ? 1 : Math.max(0, Number(facteur) || 0));
         if (v <= 0) return false;
         const ctx = audio();
@@ -307,9 +306,100 @@
             fabriquer(ctx, sortie);
             return true;
         } catch (e) {
-            console.error("La Fabrique (événement) :", e);
+            console.error("La Fabrique (" + quoi + ") :", e);
             return false;
         }
+    }
+    window.jouerSonEvenement = function (id, facteur) {
+        const fabriquer = SONS_EVENEMENTS[id];
+        return fabriquer ? jouerFabrication(fabriquer, facteur, "événement") : false;
+    };
+
+    // --- LES SONS DES ANIMATIONS DE COMBAT ----------------------------------
+    //  Joués par animations_combat.js, au moment exact où l'animation les
+    //  demande : le souffle de la lame à l'élan, l'impact au contact, le feu
+    //  qui part puis qui explose. Brefs, et sous le volume des clics.
+    const SONS_COMBAT = {
+        // Une lame qui fend l'air : un souffle filtré qui balaie vers l'aigu.
+        "lame-souffle"(ctx, s) { bruit(ctx, s, { duree: 0.24, filtre: "bandpass", q: 1.4, balayage: [500, 3200], gain: 0.45, forme: "cloche" }); },
+        // L'acier qui mord : un claquement, deux harmoniques métalliques, un coup sourd.
+        "lame-impact"(ctx, s) {
+            bruit(ctx, s, { duree: 0.04, freq: 3200, q: 1.5, gain: 0.5 });
+            note(ctx, s, { freq: 1870, duree: 0.28, gain: 0.07, type: "triangle", attaque: 0.002 });
+            note(ctx, s, { freq: 2790, duree: 0.18, gain: 0.04, type: "triangle", attaque: 0.002 });
+            note(ctx, s, { freq: 140, glisse: 70, duree: 0.16, gain: 0.3, attaque: 0.003 });
+        },
+        // Un coup encaissé : un choc grave et mat.
+        "coup-sourd"(ctx, s) {
+            note(ctx, s, { freq: 110, glisse: 48, duree: 0.28, gain: 0.5, attaque: 0.003 });
+            bruit(ctx, s, { duree: 0.09, filtre: "lowpass", freq: 700, q: 0.7, gain: 0.5 });
+        },
+        // Un soin : un arpège clair qui monte, puis un scintillement.
+        "soin"(ctx, s) {
+            [659, 880, 1109, 1319].forEach((f, i) => note(ctx, s, { freq: f, debut: i * 0.09, duree: 0.6, gain: 0.07, attaque: 0.02 }));
+            note(ctx, s, { freq: 2637, debut: 0.36, duree: 0.7, gain: 0.025, attaque: 0.04 });
+        },
+        // Un bouclier : un bourdon cristallin qui ondule, puis s'éteint.
+        "bouclier"(ctx, s) {
+            note(ctx, s, { freq: 523, duree: 1.4, gain: 0.08, attaque: 0.08 });
+            note(ctx, s, { freq: 523, duree: 1.4, gain: 0.08, attaque: 0.08, desaccord: 14 });
+            note(ctx, s, { freq: 1568, duree: 0.9, gain: 0.025, attaque: 0.06 });
+            bruit(ctx, s, { duree: 0.5, filtre: "highpass", freq: 6000, q: 0.5, gain: 0.05, forme: "cloche" });
+        },
+        // Le feu qui part : un souffle grave qui enfle, et des crépitements.
+        "feu-lancer"(ctx, s) {
+            bruit(ctx, s, { duree: 0.55, filtre: "bandpass", q: 0.9, balayage: [250, 1300], gain: 0.4, forme: "cloche" });
+            for (let i = 0; i < 6; i++) bruit(ctx, s, { debut: 0.08 + i * 0.07, duree: 0.015, freq: 2600, q: 3, gain: 0.25 });
+        },
+        // L'explosion : un grondement qui retombe, un souffle qui se ferme.
+        "feu-explosion"(ctx, s) {
+            bruit(ctx, s, { duree: 0.7, filtre: "lowpass", q: 0.7, balayage: [2400, 160], gain: 0.7 });
+            note(ctx, s, { freq: 80, glisse: 38, duree: 0.6, gain: 0.45, attaque: 0.004 });
+        },
+        // Une esquive : un sifflement bref qui retombe.
+        "esquive"(ctx, s) { bruit(ctx, s, { duree: 0.2, filtre: "bandpass", q: 2, balayage: [2800, 700], gain: 0.4, forme: "cloche" }); },
+        // Le givre qui se forme : un tintement de verre et un froissement aigu.
+        "gel-lancer"(ctx, s) {
+            [2093, 2637, 3136].forEach((f, i) => note(ctx, s, { freq: f, debut: i * 0.05, duree: 0.3, gain: 0.035, attaque: 0.005 }));
+            bruit(ctx, s, { duree: 0.35, filtre: "highpass", freq: 5000, q: 0.6, gain: 0.12, forme: "cloche" });
+        },
+        // La glace qui saisit : des éclats de cristal et un craquement.
+        "glace-impact"(ctx, s) {
+            bruit(ctx, s, { duree: 0.08, filtre: "highpass", freq: 3500, q: 0.8, gain: 0.35 });
+            [3520, 2960, 3950, 2490, 4430].forEach((f, i) => note(ctx, s, { freq: f, debut: i * 0.035, duree: 0.22, gain: 0.03, attaque: 0.002, type: "triangle" }));
+        },
+        // La fiole qui part : un « fouit » qui monte.
+        "poison-lancer"(ctx, s) {
+            bruit(ctx, s, { duree: 0.18, filtre: "bandpass", q: 2.5, balayage: [600, 1800], gain: 0.3, forme: "cloche" });
+            note(ctx, s, { freq: 300, glisse: 620, duree: 0.2, gain: 0.08, attaque: 0.01 });
+        },
+        // Les bulles toxiques : de petits éclatements qui montent.
+        "poison-bulles"(ctx, s) {
+            [0, 0.12, 0.2, 0.34, 0.45, 0.6, 0.72].forEach((t, i) =>
+                note(ctx, s, { freq: 380 + (i % 3) * 140, glisse: 700 + (i % 3) * 200, debut: t, duree: 0.07, gain: 0.1, attaque: 0.004 }));
+        },
+        // Le critique qui se prépare : un son qui monte, plein d'or.
+        "critique-charge"(ctx, s) {
+            note(ctx, s, { freq: 392, glisse: 1175, duree: 0.38, gain: 0.08, attaque: 0.02, type: "triangle" });
+            note(ctx, s, { freq: 784, glisse: 2349, duree: 0.38, gain: 0.03, attaque: 0.02 });
+        },
+        // Le critique qui frappe : un choc lourd et une cloche éclatante.
+        "critique-impact"(ctx, s) {
+            note(ctx, s, { freq: 90, glisse: 40, duree: 0.45, gain: 0.55, attaque: 0.003 });
+            bruit(ctx, s, { duree: 0.06, freq: 2500, q: 1, gain: 0.5 });
+            [1568, 2093, 3136].forEach((f, i) => note(ctx, s, { freq: f, debut: 0.01, duree: 0.7 - i * 0.15, gain: 0.06 - i * 0.015, attaque: 0.003 }));
+        },
+        // La chute : un choc mat, puis une note qui s'effondre.
+        "chute"(ctx, s) {
+            note(ctx, s, { freq: 70, duree: 0.3, gain: 0.45, attaque: 0.004 });
+            bruit(ctx, s, { duree: 0.12, filtre: "lowpass", freq: 500, q: 0.7, gain: 0.45 });
+            note(ctx, s, { freq: 330, glisse: 82, debut: 0.05, duree: 0.7, gain: 0.06, attaque: 0.02, type: "triangle" });
+        }
+    };
+    window.SONS_COMBAT = SONS_COMBAT;
+    window.jouerSonCombat = function (id, facteur) {
+        const fabriquer = SONS_COMBAT[id];
+        return fabriquer ? jouerFabrication(fabriquer, facteur, "combat") : false;
     };
 
     // --- L'ÉCRAN ---------------------------------------------------------

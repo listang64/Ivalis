@@ -288,6 +288,191 @@ console.log("\n7. LA CAMÉRA, ET LA FERMETURE");
   verifier("fermer rend la main aux Paramètres", r.ferme && r.menu);
 }
 
+console.log("\n8. LE BOUTON POUR DÉPLACER LES PIONS");
+// Nico : « un bouton pour bouger le pion joueur et l'ennemi. »
+await p.evaluate(async () => { await window.ouvrirStudioAnimation(); });
+await p.waitForTimeout(300);
+const centrePion = (id) => p.evaluate((id) => { const r = document.getElementById(id).getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2, q: +document.getElementById(id).dataset.q, r: +document.getElementById(id).dataset.r }; }, id);
+// Le centre écran d'une case de la carte du studio.
+const centreCase = (q, r) => p.evaluate(([q, r]) => {
+  const scene = document.getElementById("studio-scene").getBoundingClientRect();
+  const t = document.getElementById("studio-plateau").style.transform.match(/translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([-\d.]+)\)/);
+  const x = +t[1], y = +t[2], e = +t[3];
+  const pl = { hexSize: window.PLATEAU_VTT.hexSize, w: 1600, h: 1200 };
+  const px = pl.hexSize * 1.5 * q + pl.w / 2, py = pl.hexSize * (Math.sqrt(3) / 2 * q + Math.sqrt(3) * r) + pl.h / 2;
+  return { x: scene.left + x + px * e, y: scene.top + y + py * e };
+}, [q, r]);
+const glisser = async (id, vers) => {
+  const de = await centrePion(id);
+  await p.mouse.move(de.x, de.y); await p.mouse.down();
+  await p.mouse.move((de.x + vers.x) / 2, (de.y + vers.y) / 2, { steps: 4 });
+  await p.mouse.move(vers.x, vers.y, { steps: 4 }); await p.mouse.up();
+  await p.waitForTimeout(120);
+};
+{
+  const heros0 = await centrePion("studio-pion-heros");
+  // Sans le bouton : glisser un pion fait glisser la carte, pas le pion.
+  await glisser("studio-pion-ennemi", await centreCase(heros0.q - 2, heros0.r + 1));
+  const sansBouton = await centrePion("studio-pion-ennemi");
+  await p.evaluate(() => window.recentrerStudio());
+  await p.click("#studio-btn-deplacer");
+  const arme = await p.evaluate(() => ({ scene: document.getElementById("studio-scene").classList.contains("studio-deplacement"),
+    bouton: document.getElementById("studio-btn-deplacer").classList.contains("actif"),
+    aide: getComputedStyle(document.getElementById("studio-aide-deplacer")).display !== "none" }));
+  verifier("un bouton « Déplacer les pions » : il s'allume et dit quoi faire", arme.scene && arme.bouton && arme.aide);
+  verifier("sans lui, glisser sur un pion ne le déplace pas", sansBouton.q === 0 && sansBouton.r === -1, JSON.stringify(sansBouton));
+  // L'ennemi à l'ouest du héros, à deux cases.
+  const heros = await centrePion("studio-pion-heros");
+  await glisser("studio-pion-ennemi", await centreCase(heros.q - 2, heros.r + 1));
+  const ennemi = await centrePion("studio-pion-ennemi");
+  const attendu = await centreCase(heros.q - 2, heros.r + 1);
+  verifier("l'ennemi se pose sur la case visée, à son centre", ennemi.q === heros.q - 2 && ennemi.r === heros.r + 1
+           && Math.hypot(ennemi.x - attendu.x, ennemi.y - attendu.y) < 3, JSON.stringify(ennemi) + " / " + JSON.stringify(attendu));
+  // Le héros aussi se déplace (d'une case vers le nord-ouest : la case
+  // centrale, gommée, est à l'est).
+  await glisser("studio-pion-heros", await centreCase(heros.q, heros.r - 1));
+  const herosApres = await centrePion("studio-pion-heros");
+  verifier("le héros aussi", herosApres.q === heros.q && herosApres.r === heros.r - 1, JSON.stringify(herosApres));
+  // Une case gommée (0,0) ou celle de l'autre pion : il revient.
+  await glisser("studio-pion-heros", await centreCase(0, 0));
+  const refuse1 = await centrePion("studio-pion-heros");
+  await glisser("studio-pion-heros", await centreCase(ennemi.q, ennemi.r));
+  const refuse2 = await centrePion("studio-pion-heros");
+  verifier("sur une case gommée, ou sur l'autre pion : il revient à sa place", refuse1.q === herosApres.q && refuse1.r === herosApres.r
+           && refuse2.q === herosApres.q && refuse2.r === herosApres.r);
+  await p.screenshot({ path: "/tmp/claude-0/studio_deplacement.png" });
+}
+
+console.log("\n9. TOUJOURS SUR LE PION DU JOUEUR, EN DIRECTION DE L'ENNEMI");
+// Nico : « l'animation sera toujours sur le token joueur et en direction de l'ennemi. »
+{
+  // Ce que fait chaque animation, suivi image par image : où va le héros, et
+  // où se posent les effets, par rapport à l'axe héros → ennemi.
+  const suivre = (id) => p.evaluate(async (id) => {
+    const h = document.getElementById("studio-pion-heros"), e = document.getElementById("studio-pion-ennemi");
+    const c = (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+    const A = c(h), B = c(e);
+    const ux = (B.x - A.x) / Math.hypot(B.x - A.x, B.y - A.y), uy = (B.y - A.y) / Math.hypot(B.x - A.x, B.y - A.y);
+    let avanceMax = 0, avanceMin = 0, effetsVersEnnemi = 0, effets = 0, ennemiTouche = false;
+    let fin = false;
+    // Le mouvement du héros se lit dans les images clés de ses animations
+    // (« translate(-50%, -50%) translate(x px, y px) … ») : exact, quelle que
+    // soit la cadence de la machine.
+    const vues = new Set();
+    const lireMouvements = () => h.getAnimations().forEach(an => {
+      if (vues.has(an)) return; vues.add(an);
+      (an.effect.getKeyframes() || []).forEach(k => {
+        const m = String(k.transform || "").match(/translate\(-50%, -50%\) translate\(([-\d.e]+)px, ([-\d.e]+)px\)/);
+        if (!m) return;
+        const av = (+m[1]) * ux + (+m[2]) * uy;
+        avanceMax = Math.max(avanceMax, av); avanceMin = Math.min(avanceMin, av);
+      });
+    });
+    const sonde = () => {
+      lireMouvements();
+      document.querySelectorAll("#studio-pions .anim-effet").forEach(f => {
+        const F = c(f); effets++;
+        if ((F.x - A.x) * ux + (F.y - A.y) * uy > 0.5 * Math.hypot(B.x - A.x, B.y - A.y)) effetsVersEnnemi++;
+      });
+      if (e.getAnimations().length) ennemiTouche = true;
+      if (!fin) requestAnimationFrame(sonde);
+    };
+    requestAnimationFrame(sonde);
+    await window.jouerAnimationStudio(id);
+    fin = true;
+    return { avanceMax: Math.round(avanceMax), avanceMin: Math.round(avanceMin), effets, effetsVersEnnemi, ennemiTouche };
+  }, id);
+  await p.click("#studio-btn-deplacer");   // désarmé (une animation le désarme aussi)
+  const ouest = { epee: await suivre("coup-epee"), feu: await suivre("boule-de-feu"), gel: await suivre("gel"), recu: await suivre("coup-recu"), chute: await suivre("mise-a-terre") };
+  verifier("ennemi à l'ouest : l'épée part vers lui (le héros avance vers l'ouest)", ouest.epee.avanceMax > 10 && ouest.epee.ennemiTouche, JSON.stringify(ouest.epee));
+  verifier("la boule de feu file jusqu'à lui et l'embrase", ouest.feu.effetsVersEnnemi > 5 && ouest.feu.ennemiTouche, JSON.stringify(ouest.feu));
+  verifier("le gel aussi part du héros vers l'ennemi", ouest.gel.effetsVersEnnemi > 5 && ouest.gel.ennemiTouche, JSON.stringify(ouest.gel));
+  verifier("un coup reçu le fait reculer, À L'OPPOSÉ de l'ennemi", ouest.recu.avanceMin < -5 && ouest.recu.avanceMin < -ouest.recu.avanceMax
+           && !ouest.recu.ennemiTouche, JSON.stringify(ouest.recu));
+  verifier("mis à terre, il tombe à l'opposé de l'ennemi", ouest.chute.avanceMin < -10 && ouest.chute.avanceMax < -ouest.chute.avanceMin / 3, JSON.stringify(ouest.chute));
+  // L'ennemi passe à l'est : tout se retourne.
+  await p.click("#studio-btn-deplacer");
+  const heros = await centrePion("studio-pion-heros");
+  await glisser("studio-pion-ennemi", await centreCase(heros.q + 2, heros.r - 1));
+  await p.click("#studio-btn-deplacer");
+  const est = await p.evaluate(async () => {
+    const h = document.getElementById("studio-pion-heros"), e = document.getElementById("studio-pion-ennemi");
+    const x0 = h.getBoundingClientRect().left, ex = e.getBoundingClientRect().left;
+    let dxMax = 0, fin = false;
+    const sonde = () => {
+      h.getAnimations().forEach(an => (an.effect.getKeyframes() || []).forEach(k => {
+        const m = String(k.transform || "").match(/translate\(-50%, -50%\) translate\(([-\d.e]+)px, ([-\d.e]+)px\)/);
+        if (m) dxMax = Math.max(dxMax, +m[1]);
+      }));
+      if (!fin) requestAnimationFrame(sonde);
+    };
+    requestAnimationFrame(sonde);
+    await window.jouerAnimationStudio("coup-epee");
+    fin = true;
+    return { ennemiAEst: ex > x0, dxMax: Math.round(dxMax) };
+  });
+  verifier("ennemi déplacé à l'est : l'épée part vers l'est", est.ennemiAEst && est.dxMax > 8, JSON.stringify(est));
+}
+
+console.log("\n10. LE SON DES ANIMATIONS");
+// Nico : « quand on jouera une animation il y aura du son aussi. »
+{
+  const r = await p.evaluate(async () => {
+    const vrai = window.jouerSonCombat;
+    const res = [];
+    for (const a of window.ANIMATIONS_COMBAT) {
+      const joues = [];
+      window.jouerSonCombat = (id, f) => { joues.push(id); return vrai(id, f); };
+      await window.jouerAnimationStudio(a.id);
+      res.push({ id: a.id, joues });
+    }
+    window.jouerSonCombat = vrai;
+    return { res, catalogue: Object.keys(window.SONS_COMBAT) };
+  });
+  r.res.forEach(x => console.log(`     ${x.id.padEnd(16)} ${x.joues.join(", ")}`));
+  verifier("chaque animation joue son son (au moins un, et du catalogue)", r.res.every(x => x.joues.length > 0 && x.joues.every(j => r.catalogue.includes(j))),
+           r.res.filter(x => !x.joues.length).map(x => x.id).join());
+  verifier("les attaques ont deux temps : l'élan, puis l'impact", ["coup-epee", "boule-de-feu", "gel", "poison", "coup-critique"]
+           .every(id => r.res.find(x => x.id === id).joues.length >= 2));
+  const rendus = await p.evaluate(async () => {
+    const out = [];
+    for (const [id, fabriquer] of Object.entries(window.SONS_COMBAT)) {
+      const ctx = new OfflineAudioContext(1, 44100 * 2, 44100);
+      const g = ctx.createGain(); g.connect(ctx.destination);
+      fabriquer(ctx, g);
+      const d = (await ctx.startRendering()).getChannelData(0);
+      let crete = 0, dernier = 0;
+      for (let i = 0; i < d.length; i++) { const v = Math.abs(d[i]); if (v > crete) crete = v; if (v > 0.003) dernier = i; }
+      out.push({ id, crete: +crete.toFixed(3), duree: +(dernier / 44100).toFixed(2) });
+    }
+    const avant = window.PARAMETRES_AUDIO.interface;
+    window.PARAMETRES_AUDIO.interface = 0;
+    const muet = window.jouerSonCombat("lame-impact");
+    window.PARAMETRES_AUDIO.interface = avant;
+    return { out, muet, joue: window.jouerSonCombat("lame-impact") };
+  });
+  verifier("quinze sons de combat fabriqués, aucun muet, aucun ne sature", rendus.out.length === 15 && rendus.out.every(x => x.crete > 0.02 && x.crete < 0.95),
+           rendus.out.map(x => `${x.id} ${x.crete}`).join(" · "));
+  verifier("tous brefs (moins de 1,6 s)", rendus.out.every(x => x.duree < 1.6), rendus.out.map(x => x.duree).join(" "));
+  verifier("ils suivent le volume du jeu (à zéro : rien)", rendus.muet === false && rendus.joue === true);
+  // Une animation interrompue se tait : la boule de feu coupée par un soin
+  // n'explose jamais.
+  const coupe = await p.evaluate(async () => {
+    const vrai = window.jouerSonCombat, joues = [];
+    window.jouerSonCombat = (id, f) => { joues.push(id); return vrai(id, f); };
+    const premiere = window.jouerAnimationStudio("boule-de-feu");
+    await new Promise(r => setTimeout(r, 150));
+    await window.jouerAnimationStudio("soin");
+    await premiere;
+    await new Promise(r => setTimeout(r, 900));
+    window.jouerSonCombat = vrai;
+    return { joues, restes: document.querySelectorAll("#studio-pions .anim-effet").length };
+  });
+  verifier("une animation coupée par une autre se tait (pas d'explosion après le soin)", !coupe.joues.includes("feu-explosion")
+           && coupe.joues.includes("soin") && coupe.restes === 0, JSON.stringify(coupe));
+}
+
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
 await b.close(); serveur.close();
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

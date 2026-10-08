@@ -126,7 +126,7 @@ function fenetre() {
         <div class="studio-entete">
           <div>
             <h2 class="studio-titre">Studio d'animation</h2>
-            <p class="studio-sous-titre">La carte du combat, ton pion au centre, un ennemi inerte à côté. Touche une animation pour la jouer.</p>
+            <p class="studio-sous-titre">La carte du combat, ton pion au centre, un ennemi inerte à côté. Touche une animation : elle part de ton pion, vers l'ennemi, avec son son.</p>
           </div>
           <button type="button" class="studio-fermer" title="Fermer" onclick="window.fermerStudioAnimation()">✕</button>
         </div>
@@ -143,6 +143,8 @@ function fenetre() {
               <label class="studio-choix-heros">Héros
                 <select id="studio-heros" onchange="window.changerHerosStudio(this.value)"></select>
               </label>
+              <button type="button" id="studio-btn-deplacer" class="studio-bouton studio-bouton-texte" onclick="window.basculerDeplacementStudio()">✥ Déplacer les pions</button>
+              <span id="studio-aide-deplacer" class="studio-aide-deplacer">Glisse un pion sur une case libre</span>
               <span class="studio-commandes-espace"></span>
               <button type="button" class="studio-bouton" title="Dézoomer" onclick="window.zoomStudio(1 / 1.25)">−</button>
               <button type="button" class="studio-bouton" title="Zoomer" onclick="window.zoomStudio(1.25)">+</button>
@@ -178,6 +180,10 @@ window.ouvrirStudioAnimation = async function () {
 window.fermerStudioAnimation = function () {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     arreterTout();
+    const sceneEl = document.getElementById("studio-scene");
+    if (sceneEl) sceneEl.classList.remove("studio-deplacement");
+    const bouton = document.getElementById("studio-btn-deplacer");
+    if (bouton) bouton.classList.remove("actif");
     const f = document.getElementById("studio-animation");
     if (!f) return;
     f.classList.remove("ouvert");
@@ -254,7 +260,68 @@ function poserPions() {
     e.title = "Ennemi inerte";
     calque.appendChild(e);
     calque.appendChild(h);
+    brancherGlisser(h, "heros");
+    brancherGlisser(e, "ennemi");
     placerPions();
+}
+
+// --- DÉPLACER LES PIONS : un bouton, puis on les glisse ---
+//  Nico : « un bouton pour bouger le pion joueur et l'ennemi. » Le bouton
+//  arme le déplacement : un pion se prend du doigt (ou de la souris), suit le
+//  geste, et se pose sur la case la plus proche — une case de la carte (ni
+//  gommée, ni mur) qui n'est pas celle de l'autre pion ; sinon il revient.
+//  Les animations lisent la position au moment de jouer : l'axe héros →
+//  ennemi suit le déplacement.
+window.basculerDeplacementStudio = function (actif) {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    const scene = document.getElementById("studio-scene");
+    if (!scene) return;
+    const armer = actif === undefined ? !scene.classList.contains("studio-deplacement") : !!actif;
+    if (armer) arreterTout();
+    scene.classList.toggle("studio-deplacement", armer);
+    const bouton = document.getElementById("studio-btn-deplacer");
+    if (bouton) bouton.classList.toggle("actif", armer);
+};
+function caseSousLePoint(clientX, clientY) {
+    const scene = document.getElementById("studio-scene").getBoundingClientRect();
+    const mx = (clientX - scene.left - studio.x) / studio.echelle;
+    const my = (clientY - scene.top - studio.y) / studio.echelle;
+    return studio.plateau.pixelToHex(mx, my);
+}
+window.deplacerPionStudio = function (quel, q, r) {
+    const autre = quel === "heros" ? studio.caseEnnemi : studio.caseHeros;
+    if (!studio.plateau || !caseLibre(q, r) || (autre.q === q && autre.r === r)) return false;
+    if (quel === "heros") studio.caseHeros = { q, r }; else studio.caseEnnemi = { q, r };
+    const el = document.getElementById(quel === "heros" ? "studio-pion-heros" : "studio-pion-ennemi");
+    if (el) { el.dataset.q = q; el.dataset.r = r; }
+    placerPions();
+    return true;
+};
+function brancherGlisser(pionEl, quel) {
+    pionEl.addEventListener("pointerdown", (e) => {
+        const scene = document.getElementById("studio-scene");
+        if (!scene || !scene.classList.contains("studio-deplacement")) return;
+        e.stopPropagation();
+        e.preventDefault();
+        try { pionEl.setPointerCapture(e.pointerId); } catch (err) {}
+        pionEl.classList.add("studio-pion-saisi");
+        const cadre = scene.getBoundingClientRect();
+        const suivre = (ev) => {
+            pionEl.style.left = (ev.clientX - cadre.left) + "px";
+            pionEl.style.top = (ev.clientY - cadre.top) + "px";
+        };
+        const lacher = (ev) => {
+            pionEl.removeEventListener("pointermove", suivre);
+            pionEl.removeEventListener("pointerup", lacher);
+            pionEl.removeEventListener("pointercancel", lacher);
+            pionEl.classList.remove("studio-pion-saisi");
+            const c = caseSousLePoint(ev.clientX, ev.clientY);
+            if (!window.deplacerPionStudio(quel, c.q, c.r)) placerPions();   // case interdite : il revient
+        };
+        pionEl.addEventListener("pointermove", suivre);
+        pionEl.addEventListener("pointerup", lacher);
+        pionEl.addEventListener("pointercancel", lacher);
+    });
 }
 
 // --- LA CAMÉRA : comme au combat, on glisse et on zoome ---
@@ -352,7 +419,7 @@ function rendreListe() {
             <button type="button" class="studio-anim-jouer" onclick="window.jouerAnimationStudio('${echapper(a.id)}')">
               <span class="studio-anim-numero">${i + 1}</span>
               <span class="studio-anim-texte">
-                <span class="studio-anim-nom">${echapper(a.nom)} <span class="studio-anim-categorie">${echapper(a.categorie || "")}</span></span>
+                <span class="studio-anim-nom">${echapper(a.nom)} <span class="studio-anim-categorie">${echapper(a.categorie || "")}${a.sens ? " · " + echapper(a.sens) : ""}</span></span>
                 <span class="studio-anim-description">${echapper(a.description || "")}</span>
               </span>
               <span class="studio-anim-lecture">▶</span>
@@ -369,6 +436,8 @@ function rendreListe() {
 // Tout ce qu'une animation a laissé derrière elle disparaît : effets posés,
 // transformations en cours. Le pion revient tel qu'il était.
 function arreterTout() {
+    // La lecture en cours se tait : plus de son, plus d'effet posé.
+    if (typeof window.annulerAnimationsCombat === "function") window.annulerAnimationsCombat();
     const calque = document.getElementById("studio-pions");
     if (!calque) return;
     calque.querySelectorAll(".anim-effet").forEach(e => e.remove());
@@ -379,6 +448,9 @@ function arreterTout() {
 
 window.jouerAnimationStudio = async function (id) {
     arreterTout();
+    // Jouer, c'est reposer les pions : le déplacement se désarme.
+    const sceneEl = document.getElementById("studio-scene");
+    if (sceneEl && sceneEl.classList.contains("studio-deplacement")) window.basculerDeplacementStudio(false);
     const scene = {
         lanceur: document.getElementById("studio-pion-heros"),
         cible: document.getElementById("studio-pion-ennemi"),
