@@ -110,14 +110,9 @@ console.log("\n4. VU DE DESSUS, SUR LA GRILLE");
     const h1 = h.getBoundingClientRect();
     const decale = Math.hypot(h1.left - h0.left, h1.top - h0.top);
     window.replacerPionsStudio();
-    // Pendant une zone de feu : combien d'hexagones (des cases entières) ?
-    let hexagones = 0;
-    const obs = new MutationObserver(() => {
-      hexagones = Math.max(hexagones, [...document.querySelectorAll("#studio-pions .anim-effet")].filter(d => /polygon\(25% 0/.test(d.style.clipPath || "")).length);
-    });
-    obs.observe(document.getElementById("studio-pions"), { childList: true, subtree: true });
+    // Une zone de feu : combien de cases entières (les nappes du jeu, qui restent sur la carte) ?
     await window.jouerAnimationStudio("zone-feu");
-    obs.disconnect();
+    const hexagones = document.querySelectorAll("#studio-zones .studio-nappe").length;
     window.VITESSE_ANIMATIONS = 1;
     // Les cases qui existent autour de l'ennemi (la carte a une case gommée).
     const en = document.getElementById("studio-pion-ennemi");
@@ -133,7 +128,7 @@ console.log("\n4. VU DE DESSUS, SUR LA GRILLE");
            r.pas.length === 3 && sauts.every(d => Math.abs(d - r.voisin) < 2), `pas de ${sauts.map(Math.round).join(", ")} px pour ${Math.round(r.voisin)} px`);
   verifier("la marche finie, le héros RESTE sur sa nouvelle case (trois cases plus loin)", r.ecartCases === 3 && r.decale > r.voisin * 1.5,
            `${r.ecartCases} cases, ${Math.round(r.decale)} px`);
-  verifier("une zone persistante couvre des hexagones entiers : l'ennemi et ses voisins (sauf une case gommée)",
+  verifier("une zone persistante couvre des hexagones entiers (les nappes du jeu) : l'ennemi et ses voisins (sauf une case gommée)",
            r.hexagones === r.attendues && r.attendues >= 6, `${r.hexagones} pour ${r.attendues}`);
 }
 

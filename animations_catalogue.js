@@ -188,6 +188,77 @@
         return pts;
     };
 
+    // =====================================================================
+    //  LE TERRAIN ET LE CIBLAGE (Nico : « pour les sorts style persistance de
+    //  terrain, murs de pierre, qu'on puisse cliquer sur les hexagones à cibler ;
+    //  et mets-y les mêmes que dans le jeu »)
+    // =====================================================================
+    //  Une animation qui porte `ciblage` se vise sur la carte du Studio : ses
+    //  cases arrivent dans `sc.cases`. Le dessin vient du jeu quand la scène le
+    //  fournit (sc.terrain : les nappes de combat.js, la roche et les gravats de
+    //  murs_terre.js), et ce qui est posé RESTE sur la carte, comme en combat.
+    const ciblees = (sc, o, auto) => {
+        if (!Array.isArray(sc.cases) || !sc.cases.length || !o.grille) return auto();
+        const t = centre(sc.lanceur, sc.calque).t;
+        return sc.cases.map(c => { const px = o.grille.pixel(c.q, c.r); return { x: px.x, y: px.y, q: c.q, r: c.r, t }; });
+    };
+    const memeCase = (a, b) => !!(a && b && a.q !== undefined && a.q === b.q && a.r === b.r);
+    // Le pion (héros ou ennemi) qui se tient sur cette case.
+    const pionSur = (sc, o, pt) => [sc.lanceur, sc.cible].find(el => el && memeCase(o.caseDe(el), pt)) || null;
+    // La case du milieu d'une zone (la plus proche du centre de ses cases).
+    const milieu = (pts) => {
+        const mx = pts.reduce((s, p) => s + p.x, 0) / pts.length, my = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+        return pts.slice().sort((a, b) => Math.hypot(a.x - mx, a.y - my) - Math.hypot(b.x - mx, b.y - my))[0];
+    };
+    // Les nappes du jeu (TYPES_ZONES_PERSISTANTES, moteur_effets.js) : la foudre y est « électrique ».
+    const NAPPE_JEU = { feu: "feu", glace: "glace", foudre: "electrique", poison: "poison", soin: "soin" };
+    // Les rangs des cases, du haut de l'écran vers le bas.
+    const duHautVersLeBas = (pts) => pts.map((pt, i) => i).sort((i, j) => (pts[i].y - pts[j].y) || (i - j));
+    const VOISINS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+    // UN COMBATTANT SOUS UN MUR QUI SE LÈVE est repoussé sur une case voisine
+    // libre, loin de `loinDe` (comme en combat) — jamais sur une case murée.
+    const repousser = async (sc, o, pion, interdites, loinDe) => {
+        const c = o.caseDe(pion);
+        if (!c || !o.grille) { await o.secouer(pion, 4, 300); return false; }
+        const P = centre(pion, sc.calque);
+        const dest = VOISINS.map(([dq, dr]) => ({ q: c.q + dq, r: c.r + dr }))
+            .filter(x => o.grille.libre(x.q, x.r) && !interdites.some(i => memeCase(i, x)))
+            .map(x => { const px = o.grille.pixel(x.q, x.r); return { ...x, x: px.x, y: px.y, t: P.t, s: loinDe ? Math.hypot(px.x - loinDe.x, px.y - loinDe.y) : 0 }; })
+            .sort((m, k) => k.s - m.s)[0];
+        if (!dest) { await o.secouer(pion, 4, 300); return false; }
+        await o.parcourir(pion, P, [dest], { duree: 300, easing: "ease-out" });
+        poussiere(o, sc.calque, dest, { n: 6 });
+        await o.attendre(150);
+        return o.arriver(pion, dest);
+    };
+    // Les murs levés RESTENT sur la carte (sc.terrain) : leurs dessins
+    // d'animation cèdent la place aux murs de la carte, reliés entre eux.
+    // Sans terrain, ils s'effacent.
+    const garderMurs = async (o, sc, pts, murs) => {
+        if (sc.terrain && typeof sc.terrain.poserMurs === "function" && sc.terrain.poserMurs(pts)) {
+            murs.forEach(m => m && m.remove());
+            return true;
+        }
+        await o.attendre(600);
+        await effacerTout(o, murs.filter(Boolean), { duree: 350 });
+        return false;
+    };
+    // DES GRAVATS QUI RESTENT (sc.terrain) : les tas du jeu, posés en cascade.
+    const tasDeGravats = (o, sc, pts, p = {}) => {
+        if (sc.terrain && typeof sc.terrain.poserGravats === "function") {
+            const tas = sc.terrain.poserGravats(pts);
+            tas.forEach((el, i) => {
+                el.dataset.ancre = "libre";
+                o.teinter(el, [{ opacity: 0, transform: "scale(0.6)" }, { opacity: 0.95, transform: "scale(1)" }],
+                          { duration: 420, delay: i * (p.cascade || 0), easing: "ease-out", fill: "both" });
+            });
+            return { tas, restent: true };
+        }
+        return { tas: pts.map((pt, i) => o.gravats(sc.calque, pt, { retard: i * (p.cascade || 0), nombre: p.nombre })), restent: false };
+    };
+    const CIBLAGE_ZONE = { genre: "zone", min: 1, max: 19,
+        consigne: "Touche les cases de la zone sur la carte (19 au plus) — touche-en une de nouveau pour l'enlever — puis « Lancer »." };
+
     const A = [];
     const ajouter = (section, sousSection, liste) => liste.forEach(x => A.push({ section, ...(sousSection ? { sousSection } : {}), ...x }));
 
@@ -326,7 +397,7 @@
                 const { a, v } = lieux(sc);
                 const pts = o.chemin(sc.lanceur, a, o.tourner(v, Math.PI / 2), 3);
                 const types = ["feu", "glace", "foudre"];
-                pts.forEach((pt, i) => o.hexagone(sc.calque, pt, { fond: FONDS_ZONE[types[i]], opacite: 0.7, retard: i * 80 }));
+                pts.forEach((pt, i) => o.nappe(sc.calque, pt, NAPPE_JEU[types[i]], { fond: FONDS_ZONE[types[i]], opacite: 0.7, retard: i * 80 }));
                 await o.attendre(500);
                 await o.parcourir(sc.lanceur, a, pts, { duree: 420, apresPas: (pt, i) => {
                     o.son("pas");
@@ -592,21 +663,25 @@
         },
         {
             id: "attaque-zone", nom: "Attaque de zone", sens: "vers l'ennemi",
-            description: "Les sept cases autour de l'ennemi rougeoient, puis explosent ensemble : chaque hexagone flamboie, l'onde balaie la zone.",
+            description: "Les cases de la zone (par défaut, les sept autour de l'ennemi) rougeoient, puis explosent ensemble : chaque hexagone flamboie, l'onde balaie la zone.",
+            ciblage: CIBLAGE_ZONE,
             async jouer(sc, o) {
-                const { a, b } = lieux(sc);
-                const pts = o.autour(sc.cible, b, 1, { avecCentre: true });
+                const { a } = lieux(sc);
+                const pts = ciblees(sc, o, () => o.autour(sc.cible, centre(sc.cible, sc.calque), 1, { avecCentre: true }));
+                const b = milieu(pts);
+                // L'ennemi encaisse s'il est dans la zone (le lanceur, jamais : comme au combat).
+                const touches = (!o.grille || pts.some(pt => memeCase(o.caseDe(sc.cible), pt))) ? [sc.cible] : [];
                 o.eclat(sc.lanceur, "brightness(1.3) drop-shadow(0 0 10px #ff5030)", 600);
                 const cases = pts.map((pt, i) => o.hexagone(sc.calque, pt, { fond: "radial-gradient(circle, rgba(255,120,80,0.45), rgba(200,30,20,0.35) 80%)", retard: i * 40 }));
                 await o.pulser(cases, { duree: 300, fois: 2, eclat: 1.6, decale: 20 });
                 o.son("zone-explosion");
-                o.jauge(sc.calque, sc.cible, 40, 28, 40, "-12", COULEURS.degats, COULEURS.degats);
+                touches.forEach(el => o.jauge(sc.calque, el, 40, 28, 40, "-12", COULEURS.degats, COULEURS.degats));
                 await Promise.all([
                     ...cases.map(c => o.teinter(c, [{ filter: "brightness(1)", opacity: 1 }, { filter: "brightness(2.4) saturate(1.5)", opacity: 1, offset: 0.2 },
                                                     { filter: "brightness(1)", opacity: 0 }], { duration: 800, fill: "forwards" })),
                     ...pts.map((pt, i) => o.onde(sc.calque, pt, { couleur: "#ff9a40", taille: 0.7, duree: 600, echelle: 1.7, retard: i * 25 })),
-                    o.gerbe(sc.calque, b.x, b.y, { nombre: 18, dist: b.t * 1.8, couleurs: ["#ffcf5a", "#ff7a1a", "#e8420c"], taille: 7, duree: 850 }),
-                    o.secouer(sc.cible, b.t * 0.14, 420, axe(a, b))]);
+                    o.gerbe(sc.calque, b.x, b.y, { nombre: 18, dist: b.t * Math.min(3.5, 1.8 * Math.sqrt(pts.length / 7)), couleurs: ["#ffcf5a", "#ff7a1a", "#e8420c"], taille: 7, duree: 850 }),
+                    ...touches.map(el => o.secouer(el, b.t * 0.14, 420, axe(a, centre(el, sc.calque))))]);
             }
         },
         {
@@ -1465,31 +1540,47 @@
     // =====================================================================
     //  7. ZONES ET TERRAIN
     // =====================================================================
+    // LA NAPPE DU JEU (combat.js), case après case, sur les cases visées (par
+    // défaut, l'ennemi et ses voisines) : elle reste sur la carte, comme en
+    // combat, jusqu'à « ⟲ Replacer ».
     const zonePersistante = (type, nom, son, texte, description) => ({
-        id: "zone-" + type, nom, sens: "vers l'ennemi", description,
+        id: "zone-" + type, nom, sens: "vers l'ennemi", description, ciblage: CIBLAGE_ZONE,
         async jouer(sc, o) {
             const { b } = lieux(sc);
-            const pts = o.autour(sc.cible, b, 1, { avecCentre: true });
+            const pts = ciblees(sc, o, () => o.autour(sc.cible, b, 1, { avecCentre: true }));
+            const dedans = pionSur(sc, o, pts.find(pt => pionSur(sc, o, pt)));
             o.son(son);
-            o.texte(sc.calque, sc.cible, texte, COULEURS.etat);
-            const cases = await zone(o, sc.calque, pts, type, { duree: 1200 });
+            o.texte(sc.calque, dedans || sc.cible, texte, COULEURS.etat);
+            const nappes = pts.map((pt, i) => o.nappe(sc.calque, pt, NAPPE_JEU[type], { persistante: true, fond: FONDS_ZONE[type], opacite: 0.85, retard: i * 70, duree: 420 }));
+            await o.attendre(420 + pts.length * 70);
+            await Promise.all([o.pulser(nappes, { duree: 520, fois: 2, eclat: 1.35 }), animerZone(o, sc.calque, pts, type, 1200)]);
             o.son(son);
             await animerZone(o, sc.calque, pts, type, 700);
-            await effacerTout(o, cases, { duree: 450 });
+            // Sans la carte du Studio (pas de terrain), la zone n'est qu'un dessin : elle s'efface.
+            if (!sc.terrain) await effacerTout(o, nappes, { duree: 450 });
         }
     });
     ajouter(7, null, [
         {
             id: "zone-apercu", nom: "Aperçu d'une zone ciblée", sens: "vers l'ennemi",
-            description: "Avant de lancer : les cases que la zone couvrira s'éclairent d'un orange pâle et pulsent ; un viseur marque son centre.",
+            description: "Avant de lancer : les cases que la zone couvrira se teintent de rouge, cernées d'un trait, comme au combat, et pulsent ; un viseur marque son centre.",
+            ciblage: CIBLAGE_ZONE,
             async jouer(sc, o) {
                 const { b } = lieux(sc);
                 o.son("chiffre");
-                const pts = o.autour(sc.cible, b, 1, { avecCentre: true });
-                const cases = pts.map((pt, i) => o.hexagone(sc.calque, pt, { fond: "radial-gradient(circle, rgba(255,200,90,0.18), rgba(255,160,40,0.45) 85%)", retard: i * 30 }));
-                o.icone(sc.calque, b, "⌖", { dy: 0, taille: 0.9, duree: 1600, lueur: "#ffb040" });
-                o.texte(sc.calque, sc.cible, "Zone ciblée", COULEURS.attention);
-                await o.pulser(cases, { duree: 600, fois: 3, eclat: 1.6, decale: 0 });
+                const pts = ciblees(sc, o, () => o.autour(sc.cible, b, 1, { avecCentre: true }));
+                const coeur = milieu(pts);
+                // Le dessin du combat (dessinerHexesZoneCiblage), sinon des hexagones orangés.
+                const apercu = sc.terrain && typeof sc.terrain.apercuZone === "function" ? o.suivre(sc.terrain.apercuZone(pts)) : null;
+                const cases = apercu ? [apercu]
+                    : pts.map((pt, i) => o.hexagone(sc.calque, pt, { fond: "radial-gradient(circle, rgba(255,200,90,0.18), rgba(255,160,40,0.45) 85%)", retard: i * 30 }));
+                o.icone(sc.calque, coeur, "⌖", { dy: 0, taille: 0.9, duree: 1600, lueur: "#ffb040" });
+                o.texte(sc.calque, pionSur(sc, o, coeur) || sc.cible, "Zone ciblée", COULEURS.attention);
+                if (apercu) {
+                    apercu.dataset.ancre = "libre";
+                    await o.teinter(apercu, [{ opacity: 0 }, { opacity: 1 }], { duration: 260, fill: "both" });
+                    await o.teinter(apercu, [{ opacity: 1 }, { opacity: 0.4, offset: 0.5 }, { opacity: 1 }], { duration: 600, iterations: 3 });
+                } else await o.pulser(cases, { duree: 600, fois: 3, eclat: 1.6, decale: 0 });
                 await effacerTout(o, cases, { cascade: 0 });
             }
         },
@@ -1503,16 +1594,18 @@
                         "Une nappe verte s'étale autour de l'ennemi et bouillonne de bulles toxiques, puis se dissipe."),
         {
             id: "gravats", nom: "Gravats / terrain difficile", sens: "vers l'ennemi",
-            description: "Des pierres éparses jonchent quelques cases près de l'ennemi : ce terrain coûte double.",
+            description: "Les tas de gravats du jeu jonchent les cases visées (par défaut, quelques-unes près de l'ennemi) : ce terrain coûte double. Ils restent sur la carte.",
+            ciblage: { genre: "gravats", min: 1, max: 8,
+                       consigne: "Touche les cases à joncher de gravats (8 au plus) — touche-en une de nouveau pour l'enlever — puis « Lancer »." },
             async jouer(sc, o) {
                 const { b } = lieux(sc);
                 o.son("gravats");
-                const pts = o.autour(sc.cible, b, 1, { libres: true }).slice(0, 4);
-                const cases = pts.map((pt, i) => o.gravats(sc.calque, pt, { retard: i * 110 }));
+                const pts = ciblees(sc, o, () => o.autour(sc.cible, b, 1, { libres: true }).slice(0, 4));
+                const { tas, restent } = tasDeGravats(o, sc, pts, { cascade: 110 });
                 pts.forEach((pt, i) => o.attendre(i * 110).then(() => poussiere(o, sc.calque, pt, { n: 5 })));
-                o.texte(sc.calque, sc.cible, "Gravats : terrain difficile", COULEURS.attention);
+                o.texte(sc.calque, pionSur(sc, o, pts[0]) || tas[0] || sc.cible, "Gravats : terrain difficile", COULEURS.attention);
                 await o.attendre(1800);
-                await effacerTout(o, cases);
+                if (!restent) await effacerTout(o, tas);
             }
         }
     ]);
@@ -2152,50 +2245,77 @@
     ajouter(8, "Géomancien", [
         {
             id: "mur-terre", nom: "Niv.5 Mur de terre", sens: "sur soi",
-            description: "Sur chaque case choisie, le sol se soulève : un bloc de roche surgit en tremblant dans un nuage de poussière.",
+            description: "Sur chaque case touchée, la roche du jeu sort de terre en tremblant, dans un nuage de poussière ; les murs voisins se soudent en muraille et restent sur la carte. Un combattant sur une case murée est repoussé.",
+            ciblage: { genre: "mur", min: 1, max: 8,
+                       consigne: "Touche les cases où lever un mur, comme en combat (8 au plus ; pas sur ton pion) — touche-en une de nouveau pour l'enlever — puis « Lancer »." },
             async jouer(sc, o) {
                 const { a } = lieux(sc);
-                const pts = o.autour(sc.lanceur, a, 1, { libres: true }).slice(0, 3);
+                const pts = ciblees(sc, o, () => o.autour(sc.lanceur, a, 1, { libres: true }).slice(0, 3));
                 o.son("mur-terre");
-                const murs = pts.map((pt, i) => o.mur(sc.calque, pt, { retard: i * 180 }));
+                // Posés du haut de l'écran vers le bas : la roche du devant passe
+                // devant (comme au combat) ; ils sortent de terre dans l'ordre touché.
+                const murs = duHautVersLeBas(pts).map(i => o.mur(sc.calque, pts[i], { retard: i * 180, avec: pts }));
                 o.texte(sc.calque, sc.lanceur, "Mur de terre", "#c8b08a");
-                await o.attendre(1700);
-                await effacerTout(o, murs, { duree: 350 });
+                // Quelqu'un sur une case murée : il est repoussé (comme en combat).
+                const pousses = pts.map((pt, i) => {
+                    const pion = pionSur(sc, o, pt);
+                    if (!pion || pion === sc.lanceur) return null;
+                    return o.attendre(i * 180 + 220).then(() => {
+                        o.son("poussee");
+                        o.texte(sc.calque, pion, "Repoussé !", COULEURS.etat);
+                        return repousser(sc, o, pion, pts, a);
+                    });
+                }).filter(Boolean);
+                await Promise.all([o.attendre(1100 + pts.length * 180), ...pousses]);
+                await garderMurs(o, sc, pts, murs);
             }
         },
         {
             id: "mur-terre-repousse", nom: "Niv.5 Mur de terre sous un combattant", sens: "vers l'ennemi",
-            description: "Le mur jaillit sous l'ennemi qui se tenait sur la case : il est éjecté sur la case voisine et le mur se dresse à sa place.",
+            description: "Le mur jaillit sous le combattant qui se tenait sur la case visée (par défaut, l'ennemi) : il est éjecté sur une case voisine et la roche se dresse à sa place, pour de bon.",
+            ciblage: { genre: "mur", min: 1, max: 1,
+                       consigne: "Touche la case d'un combattant (l'ennemi) : le mur jaillira sous lui. Puis « Lancer »." },
             async jouer(sc, o) {
-                const { b, v } = lieux(sc);
-                o.gerbe(sc.calque, b.x, b.y, { nombre: 8, dist: b.t * 0.6, couleurs: ["#a08868", "#6e5a40"], taille: 5, carre: true, duree: 500 });
-                o.secouer(sc.cible, 3, 400);
+                const { a, b } = lieux(sc);
+                const pt = ciblees(sc, o, () => [{ ...b, ...(o.caseDe(sc.cible) || {}) }])[0];
+                // Sans grille, la case de l'ennemi.
+                const dessus = o.grille ? pionSur(sc, o, pt) : sc.cible;
+                o.gerbe(sc.calque, pt.x, pt.y, { nombre: 8, dist: pt.t * 0.6, couleurs: ["#a08868", "#6e5a40"], taille: 5, carre: true, duree: 500 });
+                if (dessus) o.secouer(dessus, 3, 400);
                 await o.attendre(400);
                 o.son("mur-terre");
-                const mur = o.mur(sc.calque, b, {});
-                o.son("poussee", 100);
-                o.texte(sc.calque, sc.cible, "Repoussé !", COULEURS.etat);
-                await marcher(sc, o, { qui: sc.cible, cases: 1, duree: 300, easing: "ease-out", dir: () => v, pause: 900,
-                    pas: (pt) => poussiere(o, sc.calque, pt, { n: 6 }) });
-                await o.effacer(mur);
+                const mur = o.mur(sc.calque, pt, { avec: [pt] });
+                if (dessus) {
+                    o.son("poussee", 100);
+                    o.texte(sc.calque, dessus, "Repoussé !", COULEURS.etat);
+                    await o.attendre(150);
+                    await repousser(sc, o, dessus, [pt], a);
+                }
+                await o.attendre(dessus ? 750 : 1100);
+                await garderMurs(o, sc, [pt], [mur]);
             }
         },
         {
             id: "mur-effondre", nom: "Niv.5 Mur de terre effondré → gravats", sens: "vers l'ennemi",
-            description: "Le mur se fissure, tremble, puis s'écroule en un tas de gravats qui reste sur la case.",
+            description: "Le mur visé (un mur levé sur la carte, ou une case libre où il se dresse d'abord) se fissure, tremble, puis s'écroule en un tas de gravats qui reste sur la case ; ses voisins gardent un moignon cassé.",
+            ciblage: { genre: "effondre", min: 1, max: 4,
+                       consigne: "Touche un mur de terre levé sur la carte (ou une case libre : un mur s'y dressera d'abord) — 4 au plus — puis « Lancer »." },
             async jouer(sc, o) {
                 const { b, v } = lieux(sc);
-                const pos = o.voisine(sc.cible, b, o.tourner(v, Math.PI / 2));
-                const mur = o.mur(sc.calque, pos, { sansApparition: true });
+                const pts = ciblees(sc, o, () => [o.voisine(sc.cible, b, o.tourner(v, Math.PI / 2))]);
+                // La roche telle qu'elle se dresse (reliée à ses voisines) prend la place du mur de la carte le temps de tomber.
+                const murs = duHautVersLeBas(pts).map(i => o.mur(sc.calque, pts[i], { sansApparition: true }));
+                if (sc.terrain && typeof sc.terrain.retirerMur === "function") pts.forEach(pt => pt.q !== undefined && sc.terrain.retirerMur(pt.q, pt.r));
                 await o.attendre(300);
-                await o.secouer(mur, 4, 500);
+                await Promise.all(murs.map(m => o.secouer(m, 4, 500)));
                 o.son("effondrement");
-                await Promise.all([o.teinter(mur, [{ transform: `${BASE} scale(1)`, opacity: 1 }, { transform: `${BASE} scale(0.5) rotate(12deg)`, opacity: 0 }], { duration: 500, fill: "forwards" }),
-                    o.gerbe(sc.calque, pos.x, pos.y, { nombre: 16, dist: pos.t * 0.9, couleurs: ["#a08868", "#6e5a40", "#cbb898"], taille: 7, tailleMin: 3, carre: true, duree: 800 })]);
-                const g = o.gravats(sc.calque, pos, { nombre: 9 });
-                o.texte(sc.calque, g, "Gravats", COULEURS.attention);
+                await Promise.all([...murs.map(m => o.effondrer(m)),
+                    ...pts.map(pos => o.gerbe(sc.calque, pos.x, pos.y, { nombre: 16, dist: pos.t * 0.9, couleurs: ["#a08868", "#6e5a40", "#cbb898"], taille: 7, tailleMin: 3, carre: true, duree: 800 }))]);
+                murs.forEach(m => m && m.remove());
+                const { tas, restent } = tasDeGravats(o, sc, pts, { nombre: 9 });
+                o.texte(sc.calque, tas[0] || sc.cible, "Gravats", COULEURS.attention);
                 await o.attendre(1200);
-                await o.effacer(g);
+                if (!restent) await effacerTout(o, tas);
             }
         },
         {
@@ -2226,7 +2346,7 @@
                 const { a, v } = lieux(sc);
                 const pts = o.chemin(sc.lanceur, a, o.tourner(v, -Math.PI / 2), 3);
                 o.son("zone-feu");
-                const cases = pts.map((pt, i) => o.hexagone(sc.calque, pt, { fond: FONDS_ZONE.feu, opacite: 0.75, retard: i * 70 }));
+                const cases = pts.map((pt, i) => o.nappe(sc.calque, pt, "feu", { fond: FONDS_ZONE.feu, opacite: 0.75, retard: i * 70 }));
                 animerZone(o, sc.calque, pts, "feu", 1500);
                 await o.attendre(450);
                 await o.parcourir(sc.lanceur, a, pts, { duree: 420, apresPas: (pt) => {

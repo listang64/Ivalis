@@ -5622,3 +5622,46 @@ ne change, et seul le Studio appelle ces animations).
   DEPLACENT_ENNEMI) : chaque animation qui déplace laisse le pion sur une
   autre case, posé net ; les autres ne bougent personne ; « Replacer » ramène
   toujours la scène ; Traction et Inertie à trois cases.
+
+## Le Studio : le ciblage à la main, et le terrain du jeu (version 229)
+
+Nico : « Assure-toi que pour des sorts style persistance de terrain et
+autres, genre murs de pierre, on puisse cliquer sur les hexagones à cibler.
+Et pour ceux-là, mets dans le Studio les mêmes que ceux qu'on a implantés
+dans le jeu actuellement. On pourra les retravailler en partant de ça. »
+- LE CIBLAGE (studio_animation.js) : dix animations portent `ciblage` et un
+  🎯 dans la liste — Attaque de zone, Aperçu d'une zone ciblée, les quatre
+  zones persistantes, Gravats, Mur de terre, Mur sous un combattant, Mur
+  effondré. Les toucher ouvre un bandeau (comme la pose des murs au combat) ;
+  chaque touche sur la carte prend une case ou la rend (un glissé déplace
+  toujours la carte) ; une case gommée, un mur sur son propre pion… sont
+  refusés, avec la raison ; « Lancer » joue l'animation sur ces cases-là,
+  « Annuler » ne pose rien. Les cases visées se voient comme au combat : la
+  zone teintée de rouge et cernée (dessinerHexesZoneCiblage, sorti de
+  dessinerZoneAoE dans moteur_effets.js, dessin inchangé), les piliers à demi
+  transparents des murs à venir, le mur à abattre cerné de rouge. Jouée sans
+  cases (« jouer » direct, les bancs), chaque animation garde les siennes.
+- LES DESSINS DU JEU, À L'IDENTIQUE. Les nappes : dessinerHexZonePersistante
+  et ses <defs> (combat.js), exposés tels quels (RENDU_ZONES_PERSISTANTES) ;
+  le Studio passe seulement le centre de la case et un suffixe d'identifiants
+  (« -studio ») — le combat, lui, dessine au caractère près ce qu'il dessinait.
+  Les murs : la roche de dessinerMurTerre (murs_terre.js), reliée à ses
+  voisines et composée en un seul canvas au-dessus des pions, comme
+  appliquerMursTerre (mêmes mesures : GEOMETRIE_MURS_TERRE). Les gravats : le
+  tas de dessinerGravatsTerre. Le moteur (animations_combat.js) prend ces
+  dessins quand la scène les donne (scene.terrain) : o.mur fait sortir la
+  roche de terre, o.gravats pose le tas, o.nappe la nappe ; o.effondrer
+  enfonce la roche ; sans terrain, les dessins d'avant.
+- LE TERRAIN RESTE sur la carte du Studio, comme en combat : les zones, les
+  murs (qui bloquent leur case : ni pion posé, ni marche au travers), les
+  gravats. Un mur levé sur la case de l'ennemi l'éjecte sur une case voisine
+  libre ; un mur qui s'effondre laisse ses gravats, et ses voisins se
+  redessinent avec leur moignon cassé. « ⟲ Replacer » efface tout le terrain.
+  studio_terrain.mjs : le dessin des nappes identique au jeu (6 types), le
+  plateau du combat qui dessine toujours les siennes ; le ciblage à la souris
+  (prendre, rendre, refuser, Lancer, Annuler) ; la zone de feu posée sur les
+  cases touchées avec la nappe du jeu ; trois murs reliés qui restent,
+  bloquent, et partent avec Replacer ; un héros encerclé qui ne peut plus
+  marcher ; l'ennemi repoussé ; l'effondrement en gravats ; les dix
+  animations ciblées jouées sans cases. studio_catalogue_1/_2 comptent
+  maintenant les nappes et la roche du jeu.

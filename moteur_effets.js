@@ -2843,16 +2843,24 @@ window.dessinerZoneAoE = function() {
 
     const configSort = window.configCiblage(state);
     const estSoin = configSort && configSort.isHeal;
-    const couleurRemplissage = estSoin ? "rgba(27, 110, 58, 0.35)" : "rgba(255, 76, 76, 0.35)";
-    const couleurBordure = estSoin ? "#1b6e3a" : "#ff4c4c";
 
     const finalHexes = state.zoneHexesBase.map(h => {
         const rot = rotateHex(h, state.zoneRotationStep);
         return { q: state.zoneCenterHex.q + rot.q, r: state.zoneCenterHex.r + rot.r };
     });
 
+    window.dessinerHexesZoneCiblage(svg, finalHexes, hexRadius, (q, r) => window.PLATEAU_VTT.hexToPixel(q, r), estSoin);
+};
+
+// LE DESSIN DE LA ZONE VISÉE : les cases teintées, et un trait sur le seul bord
+// extérieur de la zone. `pixel(q, r)` : le centre d'une case. Le Studio
+// d'animation (studio_animation.js) dessine son aperçu de zone avec.
+window.dessinerHexesZoneCiblage = function(svg, finalHexes, hexRadius, pixel, estSoin) {
+    const couleurRemplissage = estSoin ? "rgba(27, 110, 58, 0.35)" : "rgba(255, 76, 76, 0.35)";
+    const couleurBordure = estSoin ? "#1b6e3a" : "#ff4c4c";
+
     finalHexes.forEach(h => {
-        const px = window.PLATEAU_VTT.hexToPixel(h.q, h.r);
+        const px = pixel(h.q, h.r);
         const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
         let points = "";
         for(let i=0; i<6; i++) {
@@ -2869,7 +2877,7 @@ window.dessinerZoneAoE = function() {
     const dirs = [ {q: 1, r: 0}, {q: 0, r: 1}, {q: -1, r: 1}, {q: -1, r: 0}, {q: 0, r: -1}, {q: 1, r: -1} ];
 
     finalHexes.forEach(h => {
-        const px = window.PLATEAU_VTT.hexToPixel(h.q, h.r);
+        const px = pixel(h.q, h.r);
         const corners = [];
         for(let i=0; i<6; i++) {
             let angle_rad = Math.PI / 180 * (60 * i);

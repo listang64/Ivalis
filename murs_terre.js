@@ -833,6 +833,12 @@
         return CACHE.get(cle);
     };
 
+    // LA PLACE D'UN DESSIN SUR LE PLATEAU : un mur couvre 1,9 rayon de case en
+    // largeur (sa case au pied, en MUR_CY), des gravats 1,8 rayon. Le Studio
+    // d'animation (studio_animation.js) compose ses murs avec les mêmes mesures.
+    const EMPRISE_MUR = 1.9, EMPRISE_GRAVATS = 1.8;
+    window.GEOMETRIE_MURS_TERRE = { largeur: MUR_L, hauteur: MUR_H, pied: MUR_CY, emprise: EMPRISE_MUR, empriseGravats: EMPRISE_GRAVATS };
+
     // ---------------------------------------------------------------------
     //  LE CALQUE : sous les pions, au-dessus des nappes, dans le plateau
     //  transformé (il suit le zoom et le défilement tout seul).
@@ -864,7 +870,7 @@
             const [q, r] = cle.split("_").map(Number);
             if (window.murEnCase(q, r)) return;
             const px = window.PLATEAU_VTT.hexToPixel(q, r);
-            const t = R * 1.8;
+            const t = R * EMPRISE_GRAVATS;
             const src = image("gravats", cle);
             if (src) sol.push(`<img class="gravats-terre" alt="" src="${src}" style="left:${px.x - t / 2}px;top:${px.y - t / 2}px;width:${t}px;height:${t}px">`);
         });
@@ -872,7 +878,7 @@
         // roche du devant passe devant). Une image par mur laissait un fil
         // sombre à chaque raccord : le bord transparent d'une image agrandie
         // fonce un peu. Composés ensemble, les morceaux se soudent sans couture.
-        const l = R * 1.9, h = l * MUR_H / MUR_L, echelle = MUR_L / l;
+        const l = R * EMPRISE_MUR, h = l * MUR_H / MUR_L, echelle = MUR_L / l;
         const yEcran = (m) => window.PLATEAU_VTT.hexToPixel(m.q, m.r).y;
         const murs = Object.values(window.MURS_TERRE || {}).sort((a, b) => (yEcran(a) - yEcran(b)) || (a.q - b.q));
         const projets = (window.POSE_MURS ? window.POSE_MURS.cases : []).map((c, i) => ({ ...c, projet: true, id: "projet_" + i + "_" + c.q + "_" + c.r }));

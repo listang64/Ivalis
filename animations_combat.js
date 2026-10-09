@@ -421,9 +421,20 @@
         ], { duration: p.duree || 420, easing: "ease-out", fill: "forwards" });
         o.effacer = async (el, p = {}) => {
             if (!el) return;
-            await o.teinter(el, [{ opacity: 1, transform: `${BASE} scale(1)` }, { opacity: 0, transform: `${BASE} scale(${p.echelle || 1})` }],
+            // Un élément du terrain (une nappe, un tas de gravats) n'est pas centré
+            // par translate(-50%,-50%) : il rétrécit sur place.
+            const base = el.dataset && el.dataset.ancre === "libre" ? "" : BASE;
+            await o.teinter(el, [{ opacity: 1, transform: `${base} scale(1)` }, { opacity: 0, transform: `${base} scale(${p.echelle || 1})` }],
                             { duration: p.duree || 400, fill: "forwards" });
             if (p.garder !== true) el.remove();
+        };
+        // SUIVRE un élément posé ailleurs que dans le calque (une nappe sur la
+        // carte du Studio) : il disparaît avec le reste à la fin de la lecture.
+        o.suivre = (el) => {
+            if (!el) return el;
+            if (jeton.annule) { el.remove(); return el; }
+            jeton.poses.add(el);
+            return el;
         };
         // La silhouette laissée derrière soi (une foulée rapide, un repli).
         o.fantome = (calque, modele, pos, p = {}) => {
@@ -582,7 +593,31 @@
         };
         // UN MUR DE TERRE qui surgit du sol (vu de dessus : un bloc de roche qui
         // grossit en tremblant, la poussière autour).
+        //  LE DESSIN DU JEU (Nico : « mets dans le Studio les mêmes que dans le
+        //  jeu ») : si la scène sait dessiner un mur de terre sur cette case
+        //  (scene.terrain.tuileMur, murs_terre.js), c'est sa roche qui sort de
+        //  terre — elle monte depuis le pied de la case, en tremblant. Sinon, le
+        //  bloc dessiné d'avant.
+        const terrain = (scene && scene.terrain) || null;
+        o.terrain = terrain;
         o.mur = (calque, pt, p = {}) => {
+            const tuile = terrain && pt && pt.q !== undefined && typeof terrain.tuileMur === "function" ? terrain.tuileMur(pt.q, pt.r, p) : null;
+            if (tuile && tuile.dessin) {
+                // La case est au pied du dessin (`pied`, en fraction de sa hauteur).
+                const d = o.poser(calque, pt.x, pt.y + tuile.h * (0.5 - tuile.pied),
+                    `width:${tuile.l}px; height:${tuile.h}px; z-index:${p.z || 12}; overflow:hidden;`);
+                d.classList.add("anim-mur");
+                tuile.dessin.style.cssText = "position:absolute; left:0; top:0; width:100%; height:100%;";
+                d.appendChild(tuile.dessin);
+                if (!p.sansApparition) {
+                    o.teinter(tuile.dessin, [{ transform: "translateY(100%)" }, { transform: "translateY(-5%)", offset: 0.72 }, { transform: "translateY(0)" }],
+                              { duration: p.duree || 680, delay: p.retard || 0, easing: "cubic-bezier(.25,.8,.3,1)", fill: "both" });
+                    o.attendre((p.retard || 0) + 60).then(() => o.secouer(d, 2.5, 560));
+                    o.attendre((p.retard || 0) + 120).then(() => o.gerbe(calque, pt.x, pt.y, { nombre: 12, dist: tuile.l * 0.6,
+                        couleurs: ["#a08868", "#6e5a40", "#cbb898"], taille: 7, tailleMin: 3, carre: true, duree: 700 }));
+                }
+                return d;
+            }
             const h = o.tailleHex(pt);
             const d = o.poser(calque, pt.x, pt.y, `width:${h.l * 0.86}px; height:${h.h * 0.86}px; z-index:${p.z || 12};
                 clip-path:polygon(20% 4%, 52% 0, 82% 8%, 100% 46%, 86% 88%, 52% 100%, 16% 92%, 0 52%);
@@ -602,8 +637,29 @@
             }
             return d;
         };
-        // DES GRAVATS : quelques pierres éparses sur une case.
+        // UN MUR QUI S'ÉCROULE : la roche du jeu s'enfonce dans sa case ; le bloc
+        // d'avant rapetisse en tournant.
+        o.effondrer = (mur, p = {}) => {
+            if (!mur) return Promise.resolve();
+            const roche = mur.classList && mur.classList.contains("anim-mur") ? mur.querySelector("canvas") : null;
+            if (roche) return Promise.all([
+                o.teinter(roche, [{ transform: "translateY(0) rotate(0deg)" }, { transform: "translateY(18%) rotate(-3deg)", offset: 0.3 },
+                                  { transform: "translateY(70%) rotate(5deg)" }], { duration: p.duree || 560, easing: "ease-in", fill: "forwards" }),
+                o.teinter(mur, [{ opacity: 1 }, { opacity: 1, offset: 0.55 }, { opacity: 0 }], { duration: p.duree || 560, fill: "forwards" })]);
+            return o.teinter(mur, [{ transform: `${BASE} scale(1)`, opacity: 1 }, { transform: `${BASE} scale(0.5) rotate(12deg)`, opacity: 0 }],
+                             { duration: p.duree || 500, fill: "forwards" });
+        };
+        // DES GRAVATS : le tas du jeu (scene.terrain.tuileGravats) à plat sur la
+        // case ; sinon quelques pierres éparses.
         o.gravats = (calque, pt, p = {}) => {
+            const tas = terrain && pt && pt.q !== undefined && typeof terrain.tuileGravats === "function" ? terrain.tuileGravats(pt.q, pt.r) : null;
+            if (tas && tas.src) {
+                const d = o.poser(calque, pt.x, pt.y, `width:${tas.t}px; height:${tas.t}px; z-index:${p.z || Z.bas};`,
+                    `<img class="gravats-terre" alt="" src="${tas.src}" style="display:block; width:100%; height:100%;">`);
+                if (!p.sansApparition) o.teinter(d, [{ opacity: 0, transform: `${BASE} scale(0.6)` }, { opacity: 1, transform: `${BASE} scale(1)` }],
+                                                 { duration: p.duree || 420, delay: p.retard || 0, easing: "ease-out", fill: "both" });
+                return d;
+            }
             const h = o.tailleHex(pt);
             const pierres = Array.from({ length: p.nombre || 7 }, () => {
                 const t = hasard(h.h * 0.1, h.h * 0.22);
@@ -612,6 +668,22 @@
                     background:radial-gradient(circle at 35% 30%, #b8a284, #6a563e); box-shadow:0 2px 3px rgba(0,0,0,.5);"></span>`;
             }).join("");
             return o.hexagone(calque, pt, { fond: "rgba(90,70,48,0.35)", contenu: pierres, z: Z.bas, duree: p.duree || 420, retard: p.retard });
+        };
+        // UNE NAPPE (une case de zone persistante) : le dessin du jeu
+        // (scene.terrain.nappe, combat.js) sur la carte même ; sinon un hexagone
+        // peint (`fond`). `persistante` : elle reste après la lecture (le Studio
+        // la garde sur sa carte, comme le combat) ; sinon elle part avec le reste.
+        o.nappe = (calque, pt, type, p = {}) => {
+            const el = terrain && pt && pt.q !== undefined && typeof terrain.nappe === "function"
+                ? terrain.nappe(type, pt.q, pt.r, { persistante: !!p.persistante }) : null;
+            if (el) {
+                if (!p.persistante) o.suivre(el);
+                el.dataset.ancre = "libre";
+                if (!p.sansApparition) o.teinter(el, [{ opacity: 0, transform: "scale(0.55)" }, { opacity: 1, transform: "scale(1)" }],
+                                                 { duration: p.duree || 420, delay: p.retard || 0, easing: "ease-out", fill: "both" });
+                return el;
+            }
+            return o.hexagone(calque, pt, { fond: p.fond, opacite: p.opacite, retard: p.retard, duree: p.duree, sansApparition: p.sansApparition });
         };
         // L'OMBRE au sol d'un pion qui s'élève (un bond, une nuée).
         o.ombre = (calque, pos, p = {}) => {

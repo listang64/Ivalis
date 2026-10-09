@@ -3775,21 +3775,24 @@ function pointsHexZone(cx, cy, rayon) {
 // que les joueurs voient exactement où le terrain est piégé.
 // `leger` : mode allégé automatique sur les très grandes emprises (moins d'éléments, pas de
 // flou) — un iPad ne doit pas ramer parce qu'un joueur a posé une AoE de 19 cases en feu.
-function dessinerHexZonePersistante(type, hex, R, leger) {
-    const px = window.PLATEAU_VTT.hexToPixel(hex.q, hex.r);
+// `px` : le centre de la case (par défaut, celui du plateau de combat) ; `sfx` :
+// le suffixe des identifiants de <defs> (le Studio d'animation dessine les
+// mêmes cases dans son propre SVG, avec ses propres défs).
+function dessinerHexZonePersistante(type, hex, R, leger, px, sfx = "") {
+    px = px || window.PLATEAU_VTT.hexToPixel(hex.q, hex.r);
     const rnd = (k) => graineZone(hex.q, hex.r, k);
-    const flouDoux = leger ? "" : ` filter="url(#zp-flou-doux)"`;
-    const flouFort = leger ? "" : ` filter="url(#zp-flou-fort)"`;
-    const halo = leger ? "" : ` filter="url(#zp-glow)"`;
+    const flouDoux = leger ? "" : ` filter="url(#zp-flou-doux${sfx})"`;
+    const flouFort = leger ? "" : ` filter="url(#zp-flou-fort${sfx})"`;
+    const halo = leger ? "" : ` filter="url(#zp-glow${sfx})"`;
 
     let deco = "";
     let contour = "#ff4c4c";
 
     if (type === "feu") {
         contour = "#ff8a2e";
-        deco += `<polygon points="${pointsHexZone(0, 0, R)}" fill="url(#zp-grad-feu)" class="zp-anim" style="animation: zpSocle 2.4s ease-in-out infinite; animation-delay:-${(rnd(1) * 2).toFixed(2)}s"/>`;
+        deco += `<polygon points="${pointsHexZone(0, 0, R)}" fill="url(#zp-grad-feu${sfx})" class="zp-anim" style="animation: zpSocle 2.4s ease-in-out infinite; animation-delay:-${(rnd(1) * 2).toFixed(2)}s"/>`;
         // Cœur incandescent : c'est lui qui donne la chaleur, les langues ne font que danser autour.
-        deco += `<ellipse rx="${(R * 0.42).toFixed(1)}" ry="${(R * 0.34).toFixed(1)}" fill="url(#zp-grad-coeur)"${flouDoux} class="zp-anim"
+        deco += `<ellipse rx="${(R * 0.42).toFixed(1)}" ry="${(R * 0.34).toFixed(1)}" fill="url(#zp-grad-coeur${sfx})"${flouDoux} class="zp-anim"
             style="animation: zpBraise 2.1s ease-in-out infinite"/>`;
 
         // Lit de braises : de larges taches chaudes qui respirent, vues du dessus.
@@ -3799,7 +3802,7 @@ function dessinerHexZonePersistante(type, hex, R, leger) {
             const d = R * (0.08 + rnd(k + 8) * 0.30);
             const rx = R * (0.30 + rnd(k + 14) * 0.14);
             deco += `<g transform="translate(${(Math.cos(ang) * d).toFixed(1)},${(Math.sin(ang) * d).toFixed(1)})">
-                <ellipse rx="${rx.toFixed(1)}" ry="${(rx * 0.80).toFixed(1)}" fill="url(#zp-grad-braise)"${flouDoux} class="zp-anim"
+                <ellipse rx="${rx.toFixed(1)}" ry="${(rx * 0.80).toFixed(1)}" fill="url(#zp-grad-braise${sfx})"${flouDoux} class="zp-anim"
                     style="animation: zpBraise ${(1.3 + rnd(k + 20) * 1.1).toFixed(2)}s ease-in-out infinite; animation-delay:-${(rnd(k + 26) * 2).toFixed(2)}s"/></g>`;
         }
 
@@ -3814,7 +3817,7 @@ function dessinerHexZonePersistante(type, hex, R, leger) {
             const rad = ang * Math.PI / 180;
             deco += `<g transform="translate(${(Math.cos(rad) * d).toFixed(1)},${(Math.sin(rad) * d).toFixed(1)}) rotate(${(ang + 90).toFixed(0)})">
                 <path d="M 0,${t.toFixed(1)} C ${(-t * 0.80).toFixed(1)},${(t * 0.15).toFixed(1)} ${(-t * 0.40).toFixed(1)},${(-t * 1.50).toFixed(1)} 0,${(-t * 2.60).toFixed(1)} C ${(t * 0.40).toFixed(1)},${(-t * 1.50).toFixed(1)} ${(t * 0.80).toFixed(1)},${(t * 0.15).toFixed(1)} 0,${t.toFixed(1)} Z"
-                    fill="url(#zp-grad-langue)"${halo} class="zp-anim"
+                    fill="url(#zp-grad-langue${sfx})"${halo} class="zp-anim"
                     style="animation: zpLangue ${(0.7 + rnd(k + 50) * 0.5).toFixed(2)}s ease-in-out infinite; animation-delay:-${(rnd(k + 56) * 1.4).toFixed(2)}s"/></g>`;
         }
 
@@ -3830,7 +3833,7 @@ function dessinerHexZonePersistante(type, hex, R, leger) {
 
     } else if (type === "glace") {
         contour = "#d6f4ff";
-        deco += `<polygon points="${pointsHexZone(0, 0, R)}" fill="url(#zp-grad-glace)"/>`;
+        deco += `<polygon points="${pointsHexZone(0, 0, R)}" fill="url(#zp-grad-glace${sfx})"/>`;
         deco += `<polygon points="${pointsHexZone(0, 0, R * 0.68)}" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.6" stroke-dasharray="5 9" class="zp-anim"
             style="animation: zpGivreTour 26s linear infinite"/>`;
 
@@ -3842,13 +3845,13 @@ function dessinerHexZonePersistante(type, hex, R, leger) {
             const rad = ang * Math.PI / 180;
             deco += `<g transform="translate(${(Math.cos(rad) * d).toFixed(1)},${(Math.sin(rad) * d).toFixed(1)}) rotate(${(rnd(k + 21) * 360).toFixed(0)})">
                 <polygon points="0,${(-L).toFixed(1)} ${(L * 0.30).toFixed(1)},0 0,${L.toFixed(1)} ${(-L * 0.30).toFixed(1)},0"
-                    fill="url(#zp-grad-cristal)" stroke="rgba(255,255,255,0.9)" stroke-width="0.8" class="zp-anim"
+                    fill="url(#zp-grad-cristal${sfx})" stroke="rgba(255,255,255,0.9)" stroke-width="0.8" class="zp-anim"
                     style="animation: zpGivre ${(2.6 + rnd(k + 27) * 2).toFixed(2)}s ease-in-out infinite; animation-delay:-${(rnd(k + 33) * 3).toFixed(2)}s"/></g>`;
         }
 
     } else if (type === "electrique") {
         contour = "#9fdcff";
-        deco += `<polygon points="${pointsHexZone(0, 0, R)}" fill="url(#zp-grad-elec)" class="zp-anim" style="animation: zpSocle 3s ease-in-out infinite"/>`;
+        deco += `<polygon points="${pointsHexZone(0, 0, R)}" fill="url(#zp-grad-elec${sfx})" class="zp-anim" style="animation: zpSocle 3s ease-in-out infinite"/>`;
 
         // Un arc se construit d'un bord à l'autre, en zigzag.
         const arc = (k, largeur) => {
@@ -3896,7 +3899,7 @@ function dessinerHexZonePersistante(type, hex, R, leger) {
 
     } else if (type === "poison") {
         contour = "#8fdc4c";
-        deco += `<polygon points="${pointsHexZone(0, 0, R)}" fill="url(#zp-grad-poison)" class="zp-anim" style="animation: zpSocle 4s ease-in-out infinite"/>`;
+        deco += `<polygon points="${pointsHexZone(0, 0, R)}" fill="url(#zp-grad-poison${sfx})" class="zp-anim" style="animation: zpSocle 4s ease-in-out infinite"/>`;
 
         const nbBouillons = leger ? 2 : 4;
         for (let k = 0; k < nbBouillons; k++) {
@@ -3904,7 +3907,7 @@ function dessinerHexZonePersistante(type, hex, R, leger) {
             const d = R * (0.06 + rnd(k + 11) * 0.34);
             const rr = R * (0.28 + rnd(k + 17) * 0.16);
             deco += `<g transform="translate(${(Math.cos(ang) * d).toFixed(1)},${(Math.sin(ang) * d).toFixed(1)})">
-                <circle r="${rr.toFixed(1)}" fill="url(#zp-grad-vapeur)"${flouFort} class="zp-anim"
+                <circle r="${rr.toFixed(1)}" fill="url(#zp-grad-vapeur${sfx})"${flouFort} class="zp-anim"
                     style="animation: zpNappe ${(4.5 + rnd(k + 23) * 3).toFixed(2)}s ease-in-out infinite; animation-delay:-${(rnd(k + 29) * 5).toFixed(2)}s"/></g>`;
         }
         const nbBulles = leger ? 1 : 3;
@@ -3920,8 +3923,8 @@ function dessinerHexZonePersistante(type, hex, R, leger) {
         // Une zone bienfaisante : verte, jamais rouge — un remous de vie qui pulse doucement,
         // avec quelques étincelles qui montent et s'effacent, comme une bénédiction posée au sol.
         contour = "#4caf50";
-        deco += `<polygon points="${pointsHexZone(0, 0, R)}" fill="url(#zp-grad-soin)" class="zp-anim" style="animation: zpSocle 3.4s ease-in-out infinite"/>`;
-        deco += `<ellipse rx="${(R * 0.40).toFixed(1)}" ry="${(R * 0.32).toFixed(1)}" fill="url(#zp-grad-soin-coeur)"${flouDoux} class="zp-anim"
+        deco += `<polygon points="${pointsHexZone(0, 0, R)}" fill="url(#zp-grad-soin${sfx})" class="zp-anim" style="animation: zpSocle 3.4s ease-in-out infinite"/>`;
+        deco += `<ellipse rx="${(R * 0.40).toFixed(1)}" ry="${(R * 0.32).toFixed(1)}" fill="url(#zp-grad-soin-coeur${sfx})"${flouDoux} class="zp-anim"
             style="animation: zpBraise 2.6s ease-in-out infinite"/>`;
 
         const nbEtincelles = leger ? 2 : 4;
@@ -3929,7 +3932,7 @@ function dessinerHexZonePersistante(type, hex, R, leger) {
             const ang = (k * (360 / nbEtincelles) + rnd(k + 5) * 45) * Math.PI / 180;
             const d = R * (0.10 + rnd(k + 11) * 0.42);
             deco += `<g transform="translate(${(Math.cos(ang) * d).toFixed(1)},${(Math.sin(ang) * d).toFixed(1)})">
-                <circle r="${(R * 0.09).toFixed(1)}" fill="url(#zp-grad-etincelle-soin)"${halo} class="zp-anim"
+                <circle r="${(R * 0.09).toFixed(1)}" fill="url(#zp-grad-etincelle-soin${sfx})"${halo} class="zp-anim"
                     style="animation: zpBulle ${(2.2 + rnd(k + 17) * 1.8).toFixed(2)}s ease-out infinite; animation-delay:-${(rnd(k + 23) * 3).toFixed(2)}s"/></g>`;
         }
     } else {
@@ -3942,9 +3945,83 @@ function dessinerHexZonePersistante(type, hex, R, leger) {
     const lisere = contour && type !== "feu"
         ? `<polygon points="${pointsHexZone(0, 0, R * 0.985)}" fill="none" stroke="${contour}" stroke-width="2.2" opacity="0.8"/>` : "";
     return `<g transform="translate(${px.x.toFixed(1)},${px.y.toFixed(1)})">
-        <g clip-path="url(#zp-clip-hex)">${deco}</g>
+        <g clip-path="url(#zp-clip-hex${sfx})">${deco}</g>
         ${lisere}
     </g>`;
+}
+
+// Les <defs> des nappes (découpe hexagonale, flous, dégradés), pour des cases
+// de rayon R ; `sfx` suffixe les identifiants (voir dessinerHexZonePersistante).
+function defsZonesPersistantes(R, sfx = "") {
+    return `<defs>
+        <clipPath id="zp-clip-hex${sfx}"><polygon points="${pointsHexZone(0, 0, R)}"/></clipPath>
+        <filter id="zp-glow${sfx}" x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur stdDeviation="${(R * 0.11).toFixed(2)}" result="flou"/>
+            <feMerge><feMergeNode in="flou"/><feMergeNode in="flou"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="zp-flou-doux${sfx}" x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur stdDeviation="${(R * 0.10).toFixed(2)}"/>
+        </filter>
+        <filter id="zp-flou-fort${sfx}" x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur stdDeviation="${(R * 0.20).toFixed(2)}"/>
+        </filter>
+        <radialGradient id="zp-grad-feu${sfx}">
+            <stop offset="0%"   stop-color="#ffa53c" stop-opacity="0.62"/>
+            <stop offset="55%"  stop-color="#d63a08" stop-opacity="0.50"/>
+            <stop offset="100%" stop-color="#4d1000" stop-opacity="0.40"/>
+        </radialGradient>
+        <radialGradient id="zp-grad-coeur${sfx}">
+            <stop offset="0%"   stop-color="#fff6d2" stop-opacity="0.90"/>
+            <stop offset="45%"  stop-color="#ffab3a" stop-opacity="0.55"/>
+            <stop offset="100%" stop-color="#ff6a12" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="zp-grad-braise${sfx}">
+            <stop offset="0%"   stop-color="#fff2b0" stop-opacity="0.95"/>
+            <stop offset="45%"  stop-color="#ff9d2e" stop-opacity="0.75"/>
+            <stop offset="100%" stop-color="#e03a05" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="zp-grad-langue${sfx}" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0%"   stop-color="#ff7a1e" stop-opacity="0.90"/>
+            <stop offset="50%"  stop-color="#ffcf5c" stop-opacity="0.98"/>
+            <stop offset="100%" stop-color="#fffbe6" stop-opacity="1"/>
+        </linearGradient>
+        <radialGradient id="zp-grad-glace${sfx}">
+            <stop offset="0%"   stop-color="#eafaff" stop-opacity="0.45"/>
+            <stop offset="70%"  stop-color="#8fd8f7" stop-opacity="0.38"/>
+            <stop offset="100%" stop-color="#4aa6cf" stop-opacity="0.32"/>
+        </radialGradient>
+        <linearGradient id="zp-grad-cristal${sfx}" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.95"/>
+            <stop offset="100%" stop-color="#8fd8f7" stop-opacity="0.55"/>
+        </linearGradient>
+        <radialGradient id="zp-grad-elec${sfx}">
+            <stop offset="0%"   stop-color="#9fd8ff" stop-opacity="0.30"/>
+            <stop offset="100%" stop-color="#1b4c7a" stop-opacity="0.22"/>
+        </radialGradient>
+        <radialGradient id="zp-grad-poison${sfx}">
+            <stop offset="0%"   stop-color="#a8ef6c" stop-opacity="0.38"/>
+            <stop offset="100%" stop-color="#2f6b1f" stop-opacity="0.34"/>
+        </radialGradient>
+        <radialGradient id="zp-grad-vapeur${sfx}">
+            <stop offset="0%"   stop-color="#e2ffb8" stop-opacity="0.92"/>
+            <stop offset="55%"  stop-color="#9ae04f" stop-opacity="0.50"/>
+            <stop offset="100%" stop-color="#4d9b32" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="zp-grad-soin${sfx}">
+            <stop offset="0%"   stop-color="#c8f7a8" stop-opacity="0.55"/>
+            <stop offset="55%"  stop-color="#6fce4c" stop-opacity="0.42"/>
+            <stop offset="100%" stop-color="#2e7d32" stop-opacity="0.32"/>
+        </radialGradient>
+        <radialGradient id="zp-grad-soin-coeur${sfx}">
+            <stop offset="0%"   stop-color="#ffffe6" stop-opacity="0.92"/>
+            <stop offset="45%"  stop-color="#baf78c" stop-opacity="0.55"/>
+            <stop offset="100%" stop-color="#6fce4c" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="zp-grad-etincelle-soin${sfx}">
+            <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.95"/>
+            <stop offset="100%" stop-color="#9df57a" stop-opacity="0"/>
+        </radialGradient>
+    </defs>`;
 }
 
 window.appliquerZonesPersistantes = function() {
@@ -3984,75 +4061,7 @@ window.appliquerZonesPersistantes = function() {
 
     const R = window.PLATEAU_VTT.hexSize;
 
-    const defs = `<defs>
-        <clipPath id="zp-clip-hex"><polygon points="${pointsHexZone(0, 0, R)}"/></clipPath>
-        <filter id="zp-glow" x="-80%" y="-80%" width="260%" height="260%">
-            <feGaussianBlur stdDeviation="${(R * 0.11).toFixed(2)}" result="flou"/>
-            <feMerge><feMergeNode in="flou"/><feMergeNode in="flou"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-        <filter id="zp-flou-doux" x="-80%" y="-80%" width="260%" height="260%">
-            <feGaussianBlur stdDeviation="${(R * 0.10).toFixed(2)}"/>
-        </filter>
-        <filter id="zp-flou-fort" x="-80%" y="-80%" width="260%" height="260%">
-            <feGaussianBlur stdDeviation="${(R * 0.20).toFixed(2)}"/>
-        </filter>
-        <radialGradient id="zp-grad-feu">
-            <stop offset="0%"   stop-color="#ffa53c" stop-opacity="0.62"/>
-            <stop offset="55%"  stop-color="#d63a08" stop-opacity="0.50"/>
-            <stop offset="100%" stop-color="#4d1000" stop-opacity="0.40"/>
-        </radialGradient>
-        <radialGradient id="zp-grad-coeur">
-            <stop offset="0%"   stop-color="#fff6d2" stop-opacity="0.90"/>
-            <stop offset="45%"  stop-color="#ffab3a" stop-opacity="0.55"/>
-            <stop offset="100%" stop-color="#ff6a12" stop-opacity="0"/>
-        </radialGradient>
-        <radialGradient id="zp-grad-braise">
-            <stop offset="0%"   stop-color="#fff2b0" stop-opacity="0.95"/>
-            <stop offset="45%"  stop-color="#ff9d2e" stop-opacity="0.75"/>
-            <stop offset="100%" stop-color="#e03a05" stop-opacity="0"/>
-        </radialGradient>
-        <linearGradient id="zp-grad-langue" x1="0" y1="1" x2="0" y2="0">
-            <stop offset="0%"   stop-color="#ff7a1e" stop-opacity="0.90"/>
-            <stop offset="50%"  stop-color="#ffcf5c" stop-opacity="0.98"/>
-            <stop offset="100%" stop-color="#fffbe6" stop-opacity="1"/>
-        </linearGradient>
-        <radialGradient id="zp-grad-glace">
-            <stop offset="0%"   stop-color="#eafaff" stop-opacity="0.45"/>
-            <stop offset="70%"  stop-color="#8fd8f7" stop-opacity="0.38"/>
-            <stop offset="100%" stop-color="#4aa6cf" stop-opacity="0.32"/>
-        </radialGradient>
-        <linearGradient id="zp-grad-cristal" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.95"/>
-            <stop offset="100%" stop-color="#8fd8f7" stop-opacity="0.55"/>
-        </linearGradient>
-        <radialGradient id="zp-grad-elec">
-            <stop offset="0%"   stop-color="#9fd8ff" stop-opacity="0.30"/>
-            <stop offset="100%" stop-color="#1b4c7a" stop-opacity="0.22"/>
-        </radialGradient>
-        <radialGradient id="zp-grad-poison">
-            <stop offset="0%"   stop-color="#a8ef6c" stop-opacity="0.38"/>
-            <stop offset="100%" stop-color="#2f6b1f" stop-opacity="0.34"/>
-        </radialGradient>
-        <radialGradient id="zp-grad-vapeur">
-            <stop offset="0%"   stop-color="#e2ffb8" stop-opacity="0.92"/>
-            <stop offset="55%"  stop-color="#9ae04f" stop-opacity="0.50"/>
-            <stop offset="100%" stop-color="#4d9b32" stop-opacity="0"/>
-        </radialGradient>
-        <radialGradient id="zp-grad-soin">
-            <stop offset="0%"   stop-color="#c8f7a8" stop-opacity="0.55"/>
-            <stop offset="55%"  stop-color="#6fce4c" stop-opacity="0.42"/>
-            <stop offset="100%" stop-color="#2e7d32" stop-opacity="0.32"/>
-        </radialGradient>
-        <radialGradient id="zp-grad-soin-coeur">
-            <stop offset="0%"   stop-color="#ffffe6" stop-opacity="0.92"/>
-            <stop offset="45%"  stop-color="#baf78c" stop-opacity="0.55"/>
-            <stop offset="100%" stop-color="#6fce4c" stop-opacity="0"/>
-        </radialGradient>
-        <radialGradient id="zp-grad-etincelle-soin">
-            <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.95"/>
-            <stop offset="100%" stop-color="#9df57a" stop-opacity="0"/>
-        </radialGradient>
-    </defs>`;
+    const defs = defsZonesPersistantes(R);
 
     let totalHexes = 0;
     zones.forEach(z => { totalHexes += (z.hexes || []).length; });
@@ -4077,6 +4086,14 @@ window.appliquerZonesPersistantes = function() {
     } catch (e) {
         console.error("Erreur rendu zones persistantes :", e);
     }
+};
+
+// LE MÊME DESSIN, POUR LE STUDIO D'ANIMATION (studio_animation.js) : il pose
+// les nappes du jeu sur sa propre carte, sans toucher au plateau de combat.
+window.RENDU_ZONES_PERSISTANTES = {
+    defs: defsZonesPersistantes,
+    hexagone: dessinerHexZonePersistante,
+    style: injecterStyleZonesPersistantes
 };
 
 // =========================================================================

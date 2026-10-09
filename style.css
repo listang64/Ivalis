@@ -4994,6 +4994,41 @@ textarea.input-texte-parchemin {
 @keyframes studio-pion-mobile { from { box-shadow: 0 0 0 2px rgba(226,184,79,0.6), 0 0 6px rgba(226,184,79,0.4); }
                                 to   { box-shadow: 0 0 0 3px rgba(226,184,79,1), 0 0 16px rgba(226,184,79,0.8); } }
 
+/* LE TERRAIN DU STUDIO (studio_animation.js) : les nappes, les gravats et les
+   murs de terre du jeu, sur la carte du Studio — sous les pions pour les
+   nappes et les gravats, au-dessus pour les murs (comme au combat). */
+.studio-terrain-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.studio-zones { z-index: 3; }
+.studio-gravats { position: absolute; top: 0; left: 0; width: 0; height: 0; overflow: visible; z-index: 4; pointer-events: none; }
+.studio-gravats img { position: absolute; pointer-events: none; user-select: none; }
+.studio-cibles { z-index: 5; }
+.studio-zones .zp-anim, .studio-nappe, .studio-apercu { transform-box: fill-box; transform-origin: center; }
+.studio-murs { position: absolute; top: 0; left: 0; width: 0; height: 0; overflow: visible; transform-origin: 0 0; z-index: 12; pointer-events: none; }
+/* LE CIBLAGE : un bandeau comme celui de la pose des murs au combat, en bas
+   de la carte ; la carte vise (curseur en croix). */
+.studio-gauche { position: relative; }
+.studio-scene.studio-en-ciblage { cursor: crosshair; box-shadow: inset 0 0 0 2px rgba(255,76,76,0.55), inset 0 0 30px rgba(0,0,0,0.8); }
+.studio-ciblage {
+  position: absolute; bottom: 54px; left: 50%; transform: translateX(-50%); z-index: 40;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  width: min(440px, calc(100% - 24px)); padding: 10px 14px; box-sizing: border-box;
+  background: linear-gradient(180deg, #2a1a0f, #1a0f08); border: 2px solid #c9a24a; border-radius: 14px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.85); color: #e8d5a5; text-align: center;
+}
+.studio-ciblage-titre { font-family: 'Cinzel', serif; font-size: 17px; font-weight: bold; color: #f3d27a; }
+.studio-ciblage-consigne { font-size: 12.5px; line-height: 1.35; }
+.studio-ciblage-compte { font-family: 'Cinzel', serif; font-weight: bold; font-size: 13px; color: #f3d27a; min-height: 17px; }
+.studio-ciblage-compte.refus { color: #ff8a65; animation: studio-refus 0.35s ease-in-out 2; }
+@keyframes studio-refus { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+.studio-ciblage-boutons { display: flex; gap: 10px; }
+.studio-ciblage-boutons button { font-family: 'Cinzel', serif; font-weight: bold; font-size: 14px; cursor: pointer;
+  padding: 7px 16px; border-radius: 8px; border: 1px solid #c9a24a; }
+.studio-ciblage-lancer { background: #c9a24a; color: #1a0f08; }
+.studio-ciblage-lancer:disabled { opacity: 0.45; cursor: default; }
+.studio-ciblage-annuler { background: #3a2614; color: #f3d27a; }
+.studio-anim-cible { font-size: 13px; }
+.studio-anim.cible { border-color: #ff4c4c; box-shadow: 0 0 0 2px rgba(255,76,76,0.6), 0 0 12px rgba(255,76,76,0.4); }
+
 /* La piste d'initiative pendant la préparation : qui a choisi sa compétence. */
 .piste-choix {
   position: absolute; top: -4px; right: -5px; width: 22px; height: 22px; border-radius: 50%; z-index: 4;

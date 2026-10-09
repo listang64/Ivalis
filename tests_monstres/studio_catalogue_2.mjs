@@ -68,19 +68,21 @@ console.log("\n2. LES FIGURANTS : DE VRAIES CASES, ET ILS S'EN VONT");
     requestAnimationFrame(sonde);
     await window.jouerAnimationStudio("transfert");
     fin = true;
-    // Le Mur de terre : plusieurs blocs de roche.
+    // Le Mur de terre : plusieurs blocs de la roche du jeu, qui restent sur la carte.
     let murs = 0;
-    const obs2 = new MutationObserver(() => { murs = Math.max(murs, [...document.querySelectorAll("#studio-pions .anim-effet")].filter(d => /polygon\(20% 4%/.test(d.style.clipPath || "")).length); });
+    const obs2 = new MutationObserver(() => { murs = Math.max(murs, document.querySelectorAll("#studio-pions .anim-mur canvas").length); });
     obs2.observe(document.getElementById("studio-pions"), { childList: true, subtree: true });
     await window.jouerAnimationStudio("mur-terre");
     obs2.disconnect();
+    const restes = window.terrainStudio().murs.length;
+    window.replacerPionsStudio();
     window.VITESSE_ANIMATIONS = 1;
-    return { cases: [...cases], occupees, restants, atteint, murs };
+    return { cases: [...cases], occupees, restants, atteint, murs, restes };
   });
   verifier("Soin de zone : deux alliés, chacun sur sa propre case libre", r.cases.length === 2 && r.cases.every(c => !r.occupees.includes(c)), JSON.stringify(r.cases));
   verifier("…et plus aucun figurant une fois l'animation finie", r.restants === 0);
   verifier("Transfert : le héros va bien prendre la place de l'ennemi", r.atteint);
-  verifier("Mur de terre : un bloc de roche sur chacune des trois cases", r.murs === 3, String(r.murs));
+  verifier("Mur de terre : un bloc de la roche du jeu sur chacune des trois cases, qui y reste", r.murs === 3 && r.restes === 3, `${r.murs} / ${r.restes}`);
 }
 
 console.log("\n3. EN VRAIES CONDITIONS : LA TRACTION ATTIRE, L'INERTIE CHARGE");
@@ -140,7 +142,7 @@ console.log("\n4. SECTIONS 5 À 9, JOUÉES JUSQU'AU BOUT");
 if (process.env.CAPTURE_DIR) {
   for (const [id, ms] of [["bond", 480], ["attaque-foudre", 520], ["zone-feu", 1100], ["mur-terre", 900], ["transfert", 1100], ["nuee", 1000],
                           ["appel-lumiere", 1150], ["rempart", 800], ["traction", 1300], ["resonance-bouclier", 650], ["aveugle", 900], ["tir-precis", 450]]) {
-    await p.evaluate((id) => { window.recentrerStudio(); window.jouerAnimationStudio(id); }, id);
+    await p.evaluate((id) => { window.replacerPionsStudio(); window.recentrerStudio(); window.jouerAnimationStudio(id); }, id);
     await p.waitForTimeout(ms);
     await p.locator(".studio-scene").screenshot({ path: `${process.env.CAPTURE_DIR}/studio_${id}.png` });
     await p.evaluate(() => window.annulerAnimationsCombat());
