@@ -404,6 +404,440 @@
             note(ctx, s, { freq: 330, glisse: 82, debut: 0.05, duree: 0.7, gain: 0.06, attaque: 0.02, type: "triangle" });
         }
     };
+    // --- LES SONS DU CATALOGUE COMPLET (animations_catalogue.js) ------------
+    //  Trois petites matières de plus : la crépitation (de minuscules
+    //  claquements au hasard : feu, électricité, gravats), les bulles (de
+    //  petites notes qui remontent), et les tintements (des éclats de verre ou
+    //  de cristal, aigus et brefs).
+    const au = (a, b) => a + Math.random() * (b - a);
+    function crepiter(ctx, s, o) {
+        for (let i = 0; i < (o.n || 10); i++) {
+            bruit(ctx, s, { debut: (o.debut || 0) + au(0, o.duree || 0.6), duree: au(0.006, 0.02), filtre: o.filtre || "highpass",
+                            freq: au(o.fmin || 1800, o.fmax || 4000), q: 1, gain: au(0.4, 1) * (o.gain || 0.25) });
+        }
+    }
+    function bulles(ctx, s, o) {
+        for (let i = 0; i < (o.n || 8); i++) {
+            const f = au(o.fmin || 300, o.fmax || 700);
+            note(ctx, s, { debut: (o.debut || 0) + au(0, o.duree || 0.7), freq: f, glisse: f * au(1.5, 2.2), duree: au(0.05, 0.09),
+                           gain: o.gain || 0.08, attaque: 0.004 });
+        }
+    }
+    function tintements(ctx, s, o) {
+        for (let i = 0; i < (o.n || 6); i++) {
+            note(ctx, s, { debut: (o.debut || 0) + i * (o.pas || 0.035) + au(0, 0.015), freq: au(o.fmin || 2500, o.fmax || 5000),
+                           duree: au(0.12, o.tenue || 0.3), gain: o.gain || 0.03, attaque: 0.002, type: "triangle" });
+        }
+    }
+    function pas(ctx, s, o) {
+        const d = o.debut || 0;
+        bruit(ctx, s, { debut: d, duree: o.duree || 0.07, filtre: "lowpass", freq: o.grain || 650, q: 0.7, gain: o.gain || 0.3 });
+        note(ctx, s, { debut: d, freq: o.corps || 95, glisse: (o.corps || 95) * 0.7, duree: (o.duree || 0.07) * 1.2, gain: (o.gain || 0.3) * 0.6, attaque: 0.003 });
+    }
+    function souffle(ctx, s, o) {
+        bruit(ctx, s, { debut: o.debut || 0, duree: o.duree || 0.3, filtre: "bandpass", q: o.q || 1.4, balayage: o.balayage,
+                        gain: o.gain || 0.3, forme: "cloche" });
+    }
+    Object.assign(SONS_COMBAT, {
+        // — DÉPLACEMENTS —
+        "pas"(ctx, s) { pas(ctx, s, {}); },
+        "pas-lourd"(ctx, s) {
+            pas(ctx, s, { duree: 0.13, grain: 380, corps: 62, gain: 0.42 });
+            bruit(ctx, s, { debut: 0.02, duree: 0.09, freq: 2500, q: 0.8, gain: 0.07 });
+        },
+        "pas-givre"(ctx, s) {
+            pas(ctx, s, { duree: 0.06, gain: 0.22 });
+            for (let i = 0; i < 5; i++) bruit(ctx, s, { debut: i * 0.013, duree: 0.012, filtre: "highpass", freq: 3200, q: 0.8, gain: 0.18 });
+            note(ctx, s, { debut: 0.02, freq: 2637, duree: 0.09, gain: 0.02, attaque: 0.002, type: "triangle" });
+        },
+        "pas-leger"(ctx, s) { pas(ctx, s, { duree: 0.045, grain: 1500, corps: 160, gain: 0.18 }); },
+        "course"(ctx, s) { for (let i = 0; i < 4; i++) pas(ctx, s, { debut: i * 0.09, duree: 0.045, grain: 1300, corps: 150, gain: 0.2 }); },
+        "bond-envol"(ctx, s) {
+            souffle(ctx, s, { duree: 0.3, balayage: [400, 1800], gain: 0.3 });
+            note(ctx, s, { freq: 180, glisse: 260, duree: 0.22, gain: 0.06, attaque: 0.02 });
+        },
+        "reception"(ctx, s) {
+            note(ctx, s, { freq: 75, glisse: 45, duree: 0.26, gain: 0.42, attaque: 0.003 });
+            bruit(ctx, s, { duree: 0.12, filtre: "lowpass", freq: 500, q: 0.7, gain: 0.42 });
+        },
+        "repli"(ctx, s) {
+            souffle(ctx, s, { duree: 0.3, balayage: [2400, 500], gain: 0.32 });
+            note(ctx, s, { freq: 520, glisse: 300, duree: 0.25, gain: 0.04, attaque: 0.02 });
+        },
+        "apparition"(ctx, s) {
+            bruit(ctx, s, { duree: 0.4, filtre: "highpass", freq: 4000, q: 0.6, gain: 0.12, forme: "cloche" });
+            clocheFM(ctx, s, { freq: 880, rapport: 1.5, indice: 1.5, eclat: 0.2, duree: 0.6, gain: 0.07 });
+            note(ctx, s, { freq: 220, glisse: 440, duree: 0.3, gain: 0.06, attaque: 0.02 });
+        },
+        "illusion"(ctx, s) {
+            [1318, 1661, 1976].forEach((f, i) => clocheFM(ctx, s, { debut: i * 0.06, freq: f, rapport: 3.5, indice: 0.7, eclat: 0.3, duree: 0.9, gain: 0.045 }));
+            bruit(ctx, s, { duree: 0.7, filtre: "highpass", freq: 6000, q: 0.5, gain: 0.05, forme: "cloche" });
+        },
+        "deploiement"(ctx, s) {
+            pas(ctx, s, { duree: 0.12, grain: 500, corps: 70, gain: 0.35 });
+            pas(ctx, s, { debut: 0.18, duree: 0.12, grain: 500, corps: 80, gain: 0.3 });
+            ding(ctx, s, { freq: 784, debut: 0.36, duree: 0.5, force: 0.6, clic: false });
+        },
+        "saignement"(ctx, s) {
+            note(ctx, s, { freq: 900, glisse: 1500, duree: 0.05, gain: 0.1, attaque: 0.003 });
+            note(ctx, s, { debut: 0.18, freq: 700, glisse: 1100, duree: 0.05, gain: 0.07, attaque: 0.003 });
+            bruit(ctx, s, { duree: 0.06, filtre: "lowpass", freq: 800, q: 0.7, gain: 0.15 });
+        },
+        // — ATTAQUES —
+        "dague"(ctx, s) {
+            souffle(ctx, s, { duree: 0.12, balayage: [1200, 5000], gain: 0.32 });
+            note(ctx, s, { debut: 0.1, freq: 4000, duree: 0.03, gain: 0.04, attaque: 0.001 });
+        },
+        "lourd-elan"(ctx, s) {
+            souffle(ctx, s, { duree: 0.45, balayage: [200, 900], q: 1, gain: 0.42 });
+            note(ctx, s, { freq: 70, glisse: 110, duree: 0.4, gain: 0.12, attaque: 0.05 });
+        },
+        "lourd-impact"(ctx, s) {
+            note(ctx, s, { freq: 60, glisse: 35, duree: 0.5, gain: 0.45, attaque: 0.003 });
+            bruit(ctx, s, { duree: 0.4, filtre: "lowpass", q: 0.7, balayage: [1800, 150], gain: 0.42 });
+            note(ctx, s, { freq: 1240, duree: 0.4, gain: 0.05, type: "triangle", attaque: 0.002 });
+            note(ctx, s, { freq: 1860, duree: 0.3, gain: 0.03, type: "triangle", attaque: 0.002 });
+        },
+        "tir"(ctx, s) {
+            note(ctx, s, { freq: 220, glisse: 180, duree: 0.25, gain: 0.18, type: "triangle", attaque: 0.002 });
+            note(ctx, s, { freq: 440, duree: 0.12, gain: 0.05, attaque: 0.002 });
+            souffle(ctx, s, { debut: 0.03, duree: 0.25, balayage: [3000, 1200], q: 2, gain: 0.18 });
+        },
+        "fleche-impact"(ctx, s) {
+            note(ctx, s, { freq: 180, glisse: 110, duree: 0.12, gain: 0.32, attaque: 0.002 });
+            bruit(ctx, s, { duree: 0.05, freq: 1200, q: 2, gain: 0.32 });
+            note(ctx, s, { debut: 0.02, freq: 330, duree: 0.22, gain: 0.04, type: "triangle", desaccord: 30 });
+        },
+        "foudre"(ctx, s) {
+            bruit(ctx, s, { duree: 0.05, filtre: "highpass", freq: 2000, q: 0.7, gain: 0.36 });
+            bruit(ctx, s, { duree: 0.35, filtre: "bandpass", q: 0.9, balayage: [6000, 400], gain: 0.28 });
+            note(ctx, s, { freq: 110, duree: 0.4, gain: 0.05, type: "sawtooth", passeBas: 1500 });
+            note(ctx, s, { freq: 50, duree: 0.6, gain: 0.22, attaque: 0.01 });
+            crepiter(ctx, s, { n: 8, duree: 0.35, gain: 0.2 });
+        },
+        "givre-rayon"(ctx, s) {
+            bruit(ctx, s, { duree: 0.7, filtre: "highpass", freq: 3500, q: 0.6, gain: 0.16, forme: "cloche" });
+            tintements(ctx, s, { n: 5, fmin: 2000, fmax: 3300, pas: 0.09, gain: 0.025 });
+            note(ctx, s, { freq: 1046, duree: 0.6, gain: 0.035, attaque: 0.05 });
+        },
+        "mots"(ctx, s) {
+            note(ctx, s, { freq: 110, duree: 0.6, gain: 0.1, type: "sawtooth", passeBas: 900, attaque: 0.04 });
+            note(ctx, s, { freq: 165, duree: 0.55, gain: 0.06, type: "sawtooth", passeBas: 1100, attaque: 0.05 });
+            note(ctx, s, { debut: 0.15, freq: 55, glisse: 38, duree: 0.5, gain: 0.35, attaque: 0.004 });
+            bruit(ctx, s, { debut: 0.15, duree: 0.3, filtre: "lowpass", freq: 300, q: 0.7, gain: 0.3 });
+        },
+        "lumiere"(ctx, s) {
+            [1046.5, 1318.5, 1568, 2093].forEach((f, i) => note(ctx, s, { debut: i * 0.03, freq: f, duree: 0.9, gain: 0.04, attaque: 0.05 }));
+            bruit(ctx, s, { duree: 0.6, filtre: "highpass", freq: 7000, q: 0.5, gain: 0.06, forme: "cloche" });
+        },
+        "zone-explosion"(ctx, s) {
+            bruit(ctx, s, { duree: 1.0, filtre: "lowpass", q: 0.7, balayage: [3000, 120], gain: 0.55 });
+            note(ctx, s, { freq: 55, glisse: 30, duree: 0.9, gain: 0.4, attaque: 0.004 });
+            crepiter(ctx, s, { debut: 0.05, n: 8, duree: 0.6, gain: 0.18 });
+        },
+        "marque"(ctx, s) {
+            note(ctx, s, { freq: 196, duree: 0.6, gain: 0.1, type: "triangle", attaque: 0.01 });
+            note(ctx, s, { freq: 196, duree: 0.6, gain: 0.08, type: "triangle", attaque: 0.01, desaccord: 25 });
+            clocheFM(ctx, s, { freq: 392, rapport: 1.41, indice: 1, eclat: 0.2, duree: 0.5, gain: 0.05 });
+            bruit(ctx, s, { duree: 0.08, filtre: "lowpass", freq: 600, q: 0.7, gain: 0.2 });
+        },
+        "griffe"(ctx, s) { [0, 0.07, 0.14].forEach(d => souffle(ctx, s, { debut: d, duree: 0.08, balayage: [3000, 1200], q: 1.6, gain: 0.3 })); },
+        "zombie"(ctx, s) {
+            note(ctx, s, { freq: 98, glisse: 82, duree: 0.9, gain: 0.08, type: "sawtooth", passeBas: 600, attaque: 0.08 });
+            note(ctx, s, { freq: 147, glisse: 130, duree: 0.8, gain: 0.05, type: "sawtooth", passeBas: 700, attaque: 0.1, desaccord: 15 });
+            bruit(ctx, s, { duree: 0.9, filtre: "lowpass", freq: 400, q: 0.7, gain: 0.12, forme: "cloche" });
+        },
+        "pioche"(ctx, s) {
+            bruit(ctx, s, { duree: 0.05, freq: 2200, q: 3, gain: 0.45 });
+            note(ctx, s, { freq: 1900, duree: 0.12, gain: 0.07, type: "triangle", attaque: 0.001 });
+            note(ctx, s, { freq: 240, duree: 0.08, gain: 0.2, attaque: 0.002 });
+            bruit(ctx, s, { debut: 0.02, duree: 0.1, filtre: "highpass", freq: 4000, q: 0.7, gain: 0.12 });
+        },
+        "echec"(ctx, s) {
+            souffle(ctx, s, { duree: 0.5, balayage: [3000, 300], q: 1, gain: 0.22 });
+            note(ctx, s, { freq: 600, glisse: 150, duree: 0.45, gain: 0.08, attaque: 0.01 });
+        },
+        "refus"(ctx, s) {
+            note(ctx, s, { freq: 196, duree: 0.11, gain: 0.06, type: "square", passeBas: 800, attaque: 0.004 });
+            note(ctx, s, { debut: 0.15, freq: 185, duree: 0.13, gain: 0.06, type: "square", passeBas: 800, attaque: 0.004 });
+        },
+        "confusion"(ctx, s) {
+            [[600, 900], [900, 550], [550, 820]].forEach(([a, b], i) =>
+                note(ctx, s, { debut: i * 0.17, freq: a, glisse: b, duree: 0.18, gain: 0.07, type: "triangle", attaque: 0.01 }));
+            note(ctx, s, { freq: 450, glisse: 700, duree: 0.5, gain: 0.03, desaccord: 20, attaque: 0.05 });
+        },
+        // — IMPACTS ET DÉFENSES —
+        "coup-physique"(ctx, s) {
+            bruit(ctx, s, { duree: 0.06, freq: 1600, q: 1, gain: 0.45 });
+            note(ctx, s, { freq: 140, glisse: 70, duree: 0.18, gain: 0.35, attaque: 0.002 });
+        },
+        "impact-magique"(ctx, s) {
+            note(ctx, s, { freq: 880, glisse: 220, duree: 0.35, gain: 0.1, attaque: 0.003 });
+            clocheFM(ctx, s, { freq: 659, rapport: 2.5, indice: 2, eclat: 0.15, duree: 0.5, gain: 0.06 });
+            bruit(ctx, s, { duree: 0.3, filtre: "highpass", freq: 5000, q: 0.6, gain: 0.08, forme: "cloche" });
+        },
+        "impact-brut"(ctx, s) {
+            note(ctx, s, { freq: 80, glisse: 50, duree: 0.35, gain: 0.45, attaque: 0.003 });
+            bruit(ctx, s, { duree: 0.12, filtre: "lowpass", freq: 300, q: 0.7, gain: 0.45 });
+        },
+        "chiffre"(ctx, s) {
+            note(ctx, s, { freq: 500, glisse: 1200, duree: 0.09, gain: 0.14, attaque: 0.002 });
+            note(ctx, s, { debut: 0.08, freq: 1568, duree: 0.2, gain: 0.04, attaque: 0.003 });
+        },
+        "parade"(ctx, s) {
+            bruit(ctx, s, { duree: 0.03, filtre: "highpass", freq: 2500, q: 0.7, gain: 0.42 });
+            [[1180, 0.5, 0.08], [1770, 0.35, 0.05], [2650, 0.25, 0.035]].forEach(([f, d, g]) =>
+                note(ctx, s, { freq: f, duree: d, gain: g, type: "triangle", attaque: 0.001 }));
+            note(ctx, s, { freq: 300, duree: 0.1, gain: 0.15, attaque: 0.002 });
+        },
+        "absorption"(ctx, s) {
+            note(ctx, s, { freq: 300, glisse: 900, duree: 0.4, gain: 0.07, attaque: 0.03 });
+            souffle(ctx, s, { duree: 0.4, balayage: [600, 3000], q: 1, gain: 0.12 });
+            clocheFM(ctx, s, { debut: 0.35, freq: 1318.5, rapport: 2, indice: 0.8, eclat: 0.1, duree: 0.45, gain: 0.05 });
+        },
+        "resiste"(ctx, s) {
+            note(ctx, s, { freq: 220, duree: 0.3, gain: 0.12, type: "triangle", attaque: 0.003 });
+            clocheFM(ctx, s, { freq: 440, rapport: 1, indice: 0.5, eclat: 0.1, duree: 0.5, gain: 0.06 });
+            bruit(ctx, s, { duree: 0.05, filtre: "lowpass", freq: 900, q: 0.7, gain: 0.2 });
+        },
+        "bouclier-impact"(ctx, s) {
+            note(ctx, s, { freq: 523, duree: 0.5, gain: 0.08, attaque: 0.003 });
+            note(ctx, s, { freq: 523, duree: 0.5, gain: 0.08, attaque: 0.003, desaccord: 18 });
+            bruit(ctx, s, { duree: 0.06, filtre: "highpass", freq: 3000, q: 0.7, gain: 0.22 });
+            note(ctx, s, { freq: 180, duree: 0.12, gain: 0.18, attaque: 0.002 });
+        },
+        "bris-verre"(ctx, s) {
+            bruit(ctx, s, { duree: 0.4, filtre: "highpass", freq: 3500, q: 0.7, gain: 0.3 });
+            tintements(ctx, s, { n: 9, fmin: 2500, fmax: 5500, pas: 0.03, gain: 0.03 });
+            note(ctx, s, { freq: 160, duree: 0.1, gain: 0.15, attaque: 0.002 });
+        },
+        // — SOINS, PROTECTIONS, ÉNERGIE —
+        "soin-tic"(ctx, s) {
+            ding(ctx, s, { freq: 1318.5, duree: 0.3, force: 0.55, clic: false });
+            note(ctx, s, { debut: 0.05, freq: 2637, duree: 0.25, gain: 0.02, attaque: 0.01 });
+        },
+        "soin-zone"(ctx, s) {
+            [523.3, 659.3, 784, 1046.5, 1318.5].forEach((f, i) => note(ctx, s, { debut: i * 0.07, freq: f, duree: 0.8, gain: 0.055, attaque: 0.02 }));
+            bruit(ctx, s, { debut: 0.3, duree: 0.6, filtre: "highpass", freq: 6000, q: 0.5, gain: 0.05, forme: "cloche" });
+        },
+        "purification"(ctx, s) {
+            souffle(ctx, s, { duree: 0.6, balayage: [2000, 9000], q: 1, gain: 0.12 });
+            [1568, 2093, 2637].forEach((f, i) => note(ctx, s, { debut: 0.1 + i * 0.08, freq: f, duree: 0.4, gain: 0.045, attaque: 0.01 }));
+        },
+        "benediction"(ctx, s) {
+            [[523.3, 0.05], [659.3, 0.05], [784, 0.05], [1046.5, 0.03]].forEach(([f, g]) =>
+                note(ctx, s, { freq: f, duree: 1.0, gain: g, attaque: 0.12 }));
+        },
+        "repos"(ctx, s) {
+            note(ctx, s, { freq: 220, glisse: 330, duree: 1.2, gain: 0.08, attaque: 0.2 });
+            note(ctx, s, { freq: 330, glisse: 495, duree: 1.1, gain: 0.05, attaque: 0.25 });
+            bruit(ctx, s, { duree: 1.0, filtre: "lowpass", freq: 900, q: 0.6, gain: 0.05, forme: "cloche" });
+        },
+        "energie"(ctx, s) {
+            note(ctx, s, { freq: 660, glisse: 990, duree: 0.12, gain: 0.08, attaque: 0.004 });
+            note(ctx, s, { debut: 0.08, freq: 990, glisse: 1320, duree: 0.14, gain: 0.06, attaque: 0.004 });
+        },
+        "depense"(ctx, s) {
+            note(ctx, s, { freq: 990, glisse: 495, duree: 0.18, gain: 0.08, attaque: 0.004 });
+            souffle(ctx, s, { duree: 0.2, balayage: [3000, 800], q: 1.2, gain: 0.06 });
+        },
+        // — CONTRÔLE —
+        "poussee"(ctx, s) {
+            souffle(ctx, s, { duree: 0.25, balayage: [500, 2500], gain: 0.3 });
+            note(ctx, s, { debut: 0.05, freq: 110, glisse: 60, duree: 0.25, gain: 0.32, attaque: 0.003 });
+            bruit(ctx, s, { debut: 0.1, duree: 0.35, filtre: "lowpass", freq: 1200, q: 0.7, gain: 0.12, forme: "cloche" });
+        },
+        "traction"(ctx, s) {
+            note(ctx, s, { freq: 200, glisse: 500, duree: 0.5, gain: 0.08, attaque: 0.03 });
+            souffle(ctx, s, { duree: 0.5, balayage: [3000, 400], q: 1, gain: 0.2 });
+            pas(ctx, s, { debut: 0.5, duree: 0.08, gain: 0.25 });
+        },
+        "peur"(ctx, s) {
+            note(ctx, s, { freq: 110, duree: 1.0, gain: 0.06, type: "sawtooth", passeBas: 700, attaque: 0.08 });
+            note(ctx, s, { freq: 116.5, duree: 1.0, gain: 0.06, type: "sawtooth", passeBas: 700, attaque: 0.08 });
+            note(ctx, s, { freq: 155, glisse: 140, duree: 0.9, gain: 0.05, type: "triangle", attaque: 0.1 });
+            bruit(ctx, s, { duree: 1.0, filtre: "lowpass", freq: 300, q: 0.7, gain: 0.12, forme: "cloche" });
+        },
+        "provocation"(ctx, s) {
+            note(ctx, s, { freq: 196, duree: 0.5, gain: 0.1, type: "sawtooth", passeBas: 1200, attaque: 0.04 });
+            note(ctx, s, { freq: 294, duree: 0.5, gain: 0.06, type: "sawtooth", passeBas: 1400, attaque: 0.05 });
+            bruit(ctx, s, { duree: 0.4, freq: 800, q: 0.8, gain: 0.1, forme: "cloche" });
+        },
+        "dissipe"(ctx, s) {
+            note(ctx, s, { freq: 523, glisse: 1046, duree: 0.3, gain: 0.07, attaque: 0.01 });
+            clocheFM(ctx, s, { debut: 0.2, freq: 1568, rapport: 2, indice: 0.6, eclat: 0.08, duree: 0.4, gain: 0.05 });
+            bruit(ctx, s, { debut: 0.15, duree: 0.4, filtre: "highpass", freq: 6000, q: 0.5, gain: 0.05, forme: "cloche" });
+        },
+        "chaines"(ctx, s) {
+            [0, 0.08, 0.17, 0.23].forEach((d, i) => {
+                bruit(ctx, s, { debut: d, duree: 0.02, filtre: "highpass", freq: 4000, q: 0.7, gain: 0.25 });
+                note(ctx, s, { debut: d, freq: 1600 + i * 170, duree: 0.15, gain: 0.05, type: "triangle", attaque: 0.001 });
+            });
+            note(ctx, s, { debut: 0.3, freq: 140, duree: 0.2, gain: 0.2, attaque: 0.003 });
+        },
+        "etourdi"(ctx, s) {
+            note(ctx, s, { freq: 300, glisse: 150, duree: 0.15, gain: 0.2, attaque: 0.002 });
+            [2093, 2349, 2637, 2349, 2093, 2637].forEach((f, i) =>
+                note(ctx, s, { debut: 0.12 + i * 0.1, freq: f, glisse: f * 1.04, duree: 0.12, gain: 0.04, attaque: 0.005 }));
+        },
+        // — ÉTATS —
+        "brule"(ctx, s) {
+            crepiter(ctx, s, { n: 12, duree: 0.6, gain: 0.25 });
+            bruit(ctx, s, { duree: 0.6, filtre: "lowpass", freq: 800, q: 0.7, gain: 0.15, forme: "cloche" });
+        },
+        "electrique"(ctx, s) {
+            note(ctx, s, { freq: 120, duree: 0.5, gain: 0.06, type: "sawtooth", passeBas: 2500 });
+            note(ctx, s, { freq: 180, duree: 0.5, gain: 0.03, type: "square", passeBas: 2000 });
+            crepiter(ctx, s, { n: 7, duree: 0.45, fmin: 3000, fmax: 6000, gain: 0.25 });
+        },
+        "aveugle"(ctx, s) {
+            bruit(ctx, s, { duree: 0.8, filtre: "lowpass", q: 0.7, balayage: [2500, 200], gain: 0.25, forme: "cloche" });
+            note(ctx, s, { freq: 300, glisse: 120, duree: 0.8, gain: 0.07, attaque: 0.05 });
+        },
+        // — ZONES —
+        "zone-feu"(ctx, s) {
+            bruit(ctx, s, { duree: 1.0, filtre: "lowpass", freq: 900, q: 0.7, gain: 0.32, forme: "cloche" });
+            crepiter(ctx, s, { n: 10, duree: 0.9, gain: 0.2 });
+        },
+        "zone-glace"(ctx, s) {
+            [1760, 2349, 2794, 3520].forEach((f, i) => note(ctx, s, { debut: i * 0.06, freq: f, duree: 0.4, gain: 0.04, type: "triangle", attaque: 0.003 }));
+            bruit(ctx, s, { duree: 0.6, filtre: "highpass", freq: 4500, q: 0.6, gain: 0.1, forme: "cloche" });
+        },
+        "zone-foudre"(ctx, s) {
+            bruit(ctx, s, { duree: 0.04, filtre: "highpass", freq: 2000, q: 0.7, gain: 0.4 });
+            note(ctx, s, { freq: 120, duree: 0.7, gain: 0.06, type: "sawtooth", passeBas: 2200 });
+            crepiter(ctx, s, { n: 10, duree: 0.7, fmin: 3000, fmax: 6500, gain: 0.22 });
+        },
+        "zone-poison"(ctx, s) {
+            bulles(ctx, s, { n: 9, duree: 0.8, gain: 0.08 });
+            bruit(ctx, s, { duree: 0.9, filtre: "lowpass", freq: 500, q: 0.7, gain: 0.08, forme: "cloche" });
+        },
+        "gravats"(ctx, s) {
+            for (let i = 0; i < 10; i++) bruit(ctx, s, { debut: au(0, 0.5), duree: au(0.02, 0.05), freq: au(700, 1500), q: 1.2, gain: au(0.15, 0.3) });
+            note(ctx, s, { freq: 80, duree: 0.3, gain: 0.22, attaque: 0.003 });
+        },
+        // — CLASSES —
+        "tenebres"(ctx, s) {
+            note(ctx, s, { freq: 73, duree: 0.9, gain: 0.12, type: "sawtooth", passeBas: 400, attaque: 0.06 });
+            note(ctx, s, { freq: 77.8, duree: 0.9, gain: 0.1, type: "sawtooth", passeBas: 400, attaque: 0.06 });
+            souffle(ctx, s, { duree: 0.7, balayage: [200, 1200], q: 1, gain: 0.2 });
+        },
+        "charme"(ctx, s) {
+            [1046.5, 1318.5, 1568, 2093].forEach((f, i) => note(ctx, s, { debut: i * 0.1, freq: f, duree: 0.35, gain: 0.05, attaque: 0.01, desaccord: 8 }));
+            bruit(ctx, s, { debut: 0.2, duree: 0.5, filtre: "highpass", freq: 6000, q: 0.5, gain: 0.04, forme: "cloche" });
+        },
+        "teleport"(ctx, s) {
+            note(ctx, s, { freq: 400, glisse: 1600, duree: 0.35, gain: 0.07, attaque: 0.02 });
+            souffle(ctx, s, { duree: 0.35, balayage: [500, 6000], q: 1, gain: 0.18 });
+            note(ctx, s, { debut: 0.4, freq: 1600, glisse: 400, duree: 0.35, gain: 0.06, attaque: 0.02 });
+            souffle(ctx, s, { debut: 0.4, duree: 0.35, balayage: [6000, 500], q: 1, gain: 0.15 });
+        },
+        "rempart"(ctx, s) {
+            note(ctx, s, { freq: 262, duree: 0.8, gain: 0.09, type: "triangle", attaque: 0.05 });
+            note(ctx, s, { freq: 393, duree: 0.8, gain: 0.05, type: "triangle", attaque: 0.06 });
+            bruit(ctx, s, { duree: 0.03, filtre: "highpass", freq: 2500, q: 0.7, gain: 0.25 });
+            note(ctx, s, { freq: 1180, duree: 0.4, gain: 0.04, type: "triangle", attaque: 0.002 });
+        },
+        "rupture"(ctx, s) {
+            bruit(ctx, s, { duree: 0.04, filtre: "highpass", freq: 3000, q: 0.7, gain: 0.42 });
+            note(ctx, s, { freq: 1500, glisse: 600, duree: 0.2, gain: 0.07, type: "triangle", attaque: 0.002 });
+            [0.15, 0.24, 0.3].forEach((d, i) => note(ctx, s, { debut: d, freq: 1900 - i * 250, duree: 0.1, gain: 0.04, type: "triangle", attaque: 0.001 }));
+        },
+        "onde-choc"(ctx, s) {
+            note(ctx, s, { freq: 50, glisse: 30, duree: 0.8, gain: 0.45, attaque: 0.004 });
+            bruit(ctx, s, { duree: 0.6, filtre: "lowpass", q: 0.7, balayage: [2000, 100], gain: 0.4 });
+            note(ctx, s, { freq: 523, duree: 1.0, gain: 0.05, type: "triangle", attaque: 0.003 });
+        },
+        "instinct"(ctx, s) {
+            note(ctx, s, { freq: 60, duree: 0.12, gain: 0.42, attaque: 0.004 });
+            note(ctx, s, { debut: 0.18, freq: 60, duree: 0.12, gain: 0.36, attaque: 0.004 });
+            souffle(ctx, s, { debut: 0.35, duree: 0.25, balayage: [3000, 8000], q: 1.5, gain: 0.18 });
+        },
+        "releve"(ctx, s) {
+            note(ctx, s, { freq: 110, glisse: 220, duree: 0.8, gain: 0.1, attaque: 0.1 });
+            note(ctx, s, { freq: 165, glisse: 330, duree: 0.8, gain: 0.06, attaque: 0.12 });
+            bruit(ctx, s, { debut: 0.4, duree: 0.5, filtre: "highpass", freq: 6000, q: 0.5, gain: 0.05, forme: "cloche" });
+        },
+        "sursis"(ctx, s) {
+            note(ctx, s, { freq: 55, duree: 0.12, gain: 0.45, attaque: 0.004 });
+            note(ctx, s, { debut: 0.22, freq: 55, duree: 0.12, gain: 0.38, attaque: 0.004 });
+            [0.6, 1.0].forEach(d => bruit(ctx, s, { debut: d, duree: 0.01, freq: 3000, q: 2, gain: 0.2 }));
+        },
+        "appel"(ctx, s) {
+            note(ctx, s, { freq: 1400, glisse: 1900, duree: 0.25, gain: 0.08, attaque: 0.02 });
+            note(ctx, s, { debut: 0.27, freq: 1900, glisse: 1500, duree: 0.2, gain: 0.07, attaque: 0.02 });
+        },
+        "morsure"(ctx, s) {
+            bruit(ctx, s, { duree: 0.05, freq: 1000, q: 1.2, gain: 0.42 });
+            note(ctx, s, { freq: 200, glisse: 90, duree: 0.15, gain: 0.3, attaque: 0.002 });
+            bruit(ctx, s, { debut: 0.08, duree: 0.15, filtre: "lowpass", freq: 900, q: 0.7, gain: 0.15, forme: "cloche" });
+        },
+        "lien"(ctx, s) {
+            note(ctx, s, { freq: 82, duree: 0.12, gain: 0.35, attaque: 0.004 });
+            clocheFM(ctx, s, { debut: 0.1, freq: 523.3, rapport: 2, indice: 0.7, eclat: 0.1, duree: 0.6, gain: 0.05 });
+            clocheFM(ctx, s, { debut: 0.14, freq: 659.3, rapport: 2, indice: 0.7, eclat: 0.1, duree: 0.6, gain: 0.04 });
+        },
+        "mur-terre"(ctx, s) {
+            note(ctx, s, { freq: 45, duree: 0.9, gain: 0.4, attaque: 0.05 });
+            bruit(ctx, s, { duree: 0.8, filtre: "lowpass", freq: 250, q: 0.7, gain: 0.42, forme: "cloche" });
+            bruit(ctx, s, { debut: 0.4, duree: 0.08, freq: 1500, q: 1, gain: 0.32 });
+        },
+        "effondrement"(ctx, s) {
+            bruit(ctx, s, { duree: 0.9, filtre: "lowpass", freq: 300, q: 0.7, gain: 0.35 });
+            for (let i = 0; i < 12; i++) bruit(ctx, s, { debut: au(0.05, 0.7), duree: au(0.02, 0.06), freq: au(500, 1400), q: 1.2, gain: au(0.15, 0.32) });
+            note(ctx, s, { freq: 60, glisse: 40, duree: 0.6, gain: 0.3, attaque: 0.004 });
+        },
+        "tourbillon"(ctx, s) {
+            souffle(ctx, s, { duree: 0.28, balayage: [400, 2600], gain: 0.28 });
+            souffle(ctx, s, { debut: 0.22, duree: 0.28, balayage: [2600, 500], gain: 0.25 });
+        },
+        "rembobiner"(ctx, s) {
+            note(ctx, s, { freq: 1200, glisse: 300, duree: 0.5, gain: 0.05, type: "sawtooth", passeBas: 2000, attaque: 0.02 });
+            souffle(ctx, s, { duree: 0.5, balayage: [4000, 500], q: 1, gain: 0.15 });
+            [0.05, 0.13, 0.2, 0.26, 0.31, 0.35].forEach(d => bruit(ctx, s, { debut: d, duree: 0.01, freq: 3200, q: 2, gain: 0.18 }));
+        },
+        "aspiration"(ctx, s) {
+            note(ctx, s, { freq: 600, glisse: 200, duree: 0.5, gain: 0.07, attaque: 0.03 });
+            bruit(ctx, s, { duree: 0.5, filtre: "lowpass", q: 0.7, balayage: [3000, 300], gain: 0.22, forme: "cloche" });
+        },
+        "nuee"(ctx, s) {
+            for (let i = 0; i < 22; i++) {
+                const t = i * 0.035;
+                bruit(ctx, s, { debut: t, duree: 0.025, freq: au(600, 1200), q: 1.4, gain: 0.25 * Math.sin(Math.PI * (i + 1) / 23) });
+            }
+            [0.1, 0.35, 0.6].forEach(d => note(ctx, s, { debut: d, freq: au(3500, 4500), duree: 0.03, gain: 0.03, attaque: 0.002 }));
+        },
+        "anti-magie"(ctx, s) {
+            note(ctx, s, { freq: 330, duree: 1.0, gain: 0.07, attaque: 0.08 });
+            note(ctx, s, { freq: 333, duree: 1.0, gain: 0.07, attaque: 0.08 });
+            clocheFM(ctx, s, { freq: 1318.5, rapport: 3, indice: 1, eclat: 0.15, duree: 0.7, gain: 0.05 });
+        },
+        "renvoi"(ctx, s) {
+            clocheFM(ctx, s, { freq: 880, rapport: 2, indice: 1, eclat: 0.06, duree: 0.2, gain: 0.07 });
+            souffle(ctx, s, { debut: 0.05, duree: 0.25, balayage: [800, 4000], q: 1.2, gain: 0.15 });
+            clocheFM(ctx, s, { debut: 0.25, freq: 1318.5, rapport: 2, indice: 1, eclat: 0.08, duree: 0.4, gain: 0.07 });
+        },
+        "appel-lumiere"(ctx, s) {
+            [1046.5, 1318.5, 1568, 2093].forEach((f, i) => note(ctx, s, { debut: i * 0.05, freq: f, duree: 1.4, gain: 0.04, attaque: 0.15 }));
+            bruit(ctx, s, { duree: 1.4, filtre: "highpass", freq: 5000, q: 0.5, gain: 0.12, forme: "cloche" });
+            note(ctx, s, { freq: 130.8, duree: 1.4, gain: 0.1, attaque: 0.3 });
+        },
+        // — TALENTS —
+        "charge"(ctx, s) {
+            for (let i = 0; i < 4; i++) pas(ctx, s, { debut: i * 0.08, duree: 0.05, grain: 900, corps: 120, gain: 0.22 });
+            souffle(ctx, s, { duree: 0.5, balayage: [300, 2000], gain: 0.28 });
+        },
+        "impact-mur"(ctx, s) {
+            note(ctx, s, { freq: 70, duree: 0.3, gain: 0.42, attaque: 0.003 });
+            bruit(ctx, s, { duree: 0.05, freq: 1800, q: 2, gain: 0.42 });
+            for (let i = 0; i < 5; i++) bruit(ctx, s, { debut: 0.05 + au(0, 0.3), duree: au(0.02, 0.04), freq: au(700, 1400), q: 1.2, gain: 0.2 });
+        },
+        "coup-poing"(ctx, s) {
+            note(ctx, s, { freq: 150, glisse: 70, duree: 0.12, gain: 0.42, attaque: 0.002 });
+            bruit(ctx, s, { duree: 0.04, filtre: "lowpass", freq: 1200, q: 0.7, gain: 0.42 });
+        }
+    });
+
     window.SONS_COMBAT = SONS_COMBAT;
     window.jouerSonCombat = function (id, facteur) {
         const fabriquer = SONS_COMBAT[id];

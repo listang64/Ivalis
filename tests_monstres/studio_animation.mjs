@@ -171,7 +171,12 @@ console.log("\n2. LA RÉPLIQUE DE LA CARTE ET LES DEUX PIONS");
 }
 
 console.log("\n3. LA LISTE DES ANIMATIONS");
-const ids = await p.evaluate(() => (window.ANIMATIONS_COMBAT || []).map(a => a.id));
+// Les dix premières animations du Studio : ce banc les suit de près (sons,
+// textes, directions) ; le catalogue complet (142) a ses propres bancs,
+// studio_catalogue_1.mjs et studio_catalogue_2.mjs.
+const PREMIERES = ["coup-epee", "coup-recu", "soin", "bouclier", "boule-de-feu", "esquive", "gel", "poison", "coup-critique", "mise-a-terre"];
+const tous = await p.evaluate(() => (window.ANIMATIONS_COMBAT || []).map(a => a.id));
+const ids = PREMIERES.filter(id => tous.includes(id));
 {
   const r = await p.evaluate(() => ({
     lignes: [...document.querySelectorAll("#studio-liste .studio-anim")].map(l => ({
@@ -179,11 +184,12 @@ const ids = await p.evaluate(() => (window.ANIMATIONS_COMBAT || []).map(a => a.i
       case: !!l.querySelector("input[type=checkbox]"), coche: l.querySelector("input[type=checkbox]").checked })),
     compteur: document.getElementById("studio-compteur").textContent
   }));
-  verifier("dix animations pour commencer, chacune son nom et sa description", r.lignes.length === 10 && ids.length === 10
-           && new Set(r.lignes.map(l => l.nom)).size === 10 && r.lignes.every(l => l.description.length > 20));
+  verifier("tout le catalogue (142), chacune son nom et sa description", r.lignes.length === 142 && tous.length === 142
+           && new Set(r.lignes.map(l => l.nom)).size === 142 && r.lignes.every(l => l.description.length > 20), String(r.lignes.length));
+  verifier("les dix premières y sont toutes", ids.length === 10, ids.join());
   verifier("chacune sa case « Intégrée »", r.lignes.every(l => l.case));
   verifier("la case cochée en base (Soin) l'est à l'ouverture, et le compteur le dit", r.lignes.filter(l => l.coche).length === 1
-           && r.lignes.find(l => l.coche).nom.startsWith("Soin") && r.compteur === "1 / 10 intégrées", r.compteur);
+           && r.lignes.find(l => l.coche).nom.startsWith("Soin") && r.compteur === "1 / 142 intégrées", r.compteur);
 }
 
 console.log("\n4. UN CLIC JOUE L'ANIMATION EN DIRECT SUR LE PION");
@@ -239,7 +245,7 @@ console.log("\n5. CHAQUE ANIMATION DU CATALOGUE, JUSQU'AU BOUT");
   r.forEach(x => console.log(`     ${x.id.padEnd(16)} ${x.ok ? "jouée" : "ÉCHEC"} en ${x.ms} ms${x.reste ? `, ${x.reste} effet(s) restés` : ""}`));
   verifier("les dix se jouent sans erreur", r.every(x => x.ok), r.filter(x => !x.ok).map(x => x.id).join());
   verifier("chacune fait vraiment quelque chose (pion animé ou effets posés)", r.every(x => x.bouge), r.filter(x => !x.bouge).map(x => x.id).join());
-  verifier("aucune ne dure plus de 4 secondes", r.every(x => x.ms < 4000), r.map(x => x.ms).join(" "));
+  verifier("aucune ne dure plus de 5 secondes", r.every(x => x.ms < 5000), r.map(x => x.ms).join(" "));
   verifier("aucune ne laisse d'effet derrière elle, les pions reviennent à leur place", r.every(x => x.reste === 0 && x.retour && x.filtre === "none|none"),
            r.filter(x => !(x.reste === 0 && x.retour && x.filtre === "none|none")).map(x => x.id + " " + x.filtre).join(", "));
 }
@@ -258,7 +264,7 @@ console.log("\n6. LA CASE « INTÉGRÉE » SE SOUVIENT");
   }));
   verifier("cocher écrit la case en base (fusion, pour l'iPad et le PC)", r.ecrit && r.ecrit.data.Integrees["coup-epee"] === true
            && r.ecrit.options && r.ecrit.options.merge === true, JSON.stringify(r.ecrit));
-  verifier("…et dans ce navigateur ; le compteur passe à 2, la ligne verdit", r.local["coup-epee"] === true && r.compteur === "2 / 10 intégrées" && r.vert);
+  verifier("…et dans ce navigateur ; le compteur passe à 2, la ligne verdit", r.local["coup-epee"] === true && r.compteur === "2 / 142 intégrées" && r.vert, r.compteur);
   verifier("cocher ne joue pas l'animation", r.rienJoue);
   await p.evaluate(async () => {
     window.__docs = {};
@@ -420,10 +426,10 @@ console.log("\n9. TOUJOURS SUR LE PION DU JOUEUR, EN DIRECTION DE L'ENNEMI");
 console.log("\n10. LE SON DES ANIMATIONS");
 // Nico : « quand on jouera une animation il y aura du son aussi. »
 {
-  const r = await p.evaluate(async () => {
+  const r = await p.evaluate(async (PREMIERES) => {
     const vrai = window.jouerSonCombat;
     const res = [];
-    for (const a of window.ANIMATIONS_COMBAT) {
+    for (const a of window.ANIMATIONS_COMBAT.filter(x => PREMIERES.includes(x.id))) {
       const joues = [];
       window.jouerSonCombat = (id, f) => { joues.push(id); return vrai(id, f); };
       await window.jouerAnimationStudio(a.id);
@@ -431,7 +437,7 @@ console.log("\n10. LE SON DES ANIMATIONS");
     }
     window.jouerSonCombat = vrai;
     return { res, catalogue: Object.keys(window.SONS_COMBAT) };
-  });
+  }, PREMIERES);
   r.res.forEach(x => console.log(`     ${x.id.padEnd(16)} ${x.joues.join(", ")}`));
   verifier("chaque animation joue son son (au moins un, et du catalogue)", r.res.every(x => x.joues.length > 0 && x.joues.every(j => r.catalogue.includes(j))),
            r.res.filter(x => !x.joues.length).map(x => x.id).join());
@@ -454,7 +460,7 @@ console.log("\n10. LE SON DES ANIMATIONS");
     window.PARAMETRES_AUDIO.interface = avant;
     return { out, muet, joue: window.jouerSonCombat("lame-impact") };
   });
-  verifier("quinze sons de combat fabriqués, aucun muet, aucun ne sature", rendus.out.length === 15 && rendus.out.every(x => x.crete > 0.02 && x.crete < 0.95),
+  verifier("les sons de combat fabriqués (99 avec le catalogue complet), aucun muet, aucun ne sature", rendus.out.length === 99 && rendus.out.every(x => x.crete > 0.02 && x.crete < 0.95),
            rendus.out.map(x => `${x.id} ${x.crete}`).join(" · "));
   verifier("tous brefs (moins de 1,6 s)", rendus.out.every(x => x.duree < 1.6), rendus.out.map(x => x.duree).join(" "));
   verifier("ils suivent le volume du jeu (à zéro : rien)", rendus.muet === false && rendus.joue === true);
@@ -479,12 +485,12 @@ console.log("\n11. LES TEXTES FLOTTANTS, COMME EN COMBAT");
 // Nico : « et faut aussi pour l'animation les textes flottants comme en combat
 // au-dessus des tokens. »
 {
-  const r = await p.evaluate(async () => {
+  const r = await p.evaluate(async (PREMIERES) => {
     const calque = document.getElementById("studio-pions");
     const h = document.getElementById("studio-pion-heros"), e = document.getElementById("studio-pion-ennemi");
     const centre = (el) => { const a = el.getBoundingClientRect(), c = calque.getBoundingClientRect(); return { x: a.left - c.left + a.width / 2, y: a.top - c.top + a.height / 2 }; };
     const res = {};
-    for (const a of window.ANIMATIONS_COMBAT) {
+    for (const a of window.ANIMATIONS_COMBAT.filter(x => PREMIERES.includes(x.id))) {
       const vus = [];
       let barres = 0;
       const obs = new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => {
@@ -506,7 +512,7 @@ console.log("\n11. LES TEXTES FLOTTANTS, COMME EN COMBAT");
     }
     await new Promise(r => setTimeout(r, 2400));
     return { res, restes: document.querySelectorAll("#studio-pions .anim-message").length };
-  });
+  }, PREMIERES);
   Object.entries(r.res).forEach(([id, x]) => console.log(`     ${id.padEnd(16)} ${x.vus.map(v => `« ${v.texte} » (${v.sur})`).join("  ")}${x.barres ? "  + barre" : ""}`));
   const textes = (id) => r.res[id].vus.map(v => v.texte + "@" + v.sur);
   verifier("chaque animation a ses textes flottants", Object.values(r.res).every(x => x.vus.length > 0));
@@ -519,8 +525,9 @@ console.log("\n11. LES TEXTES FLOTTANTS, COMME EN COMBAT");
   const bouclier = r.res["bouclier"].vus[0] || {};
   verifier("bouclier : « +12 🛡️ » en cyan sur le héros", bouclier.texte === "+12 🛡️" && bouclier.couleur === "rgb(0, 255, 255)");
   verifier("boule de feu : « -14 » puis « Brûlé ! » sur l'ennemi", textes("boule-de-feu").join() === "-14@ennemi,Brûlé !@ennemi");
-  verifier("gel : « -9 » puis « Glacé ! » ; poison : « -5 » puis « Empoisonnement ! »", textes("gel").join() === "-9@ennemi,Glacé !@ennemi"
-           && textes("poison").join() === "-5@ennemi,Empoisonnement !@ennemi");
+  verifier("Glacé : « -9 », « Glacé ! », puis sa présence ; Empoisonnement : « -5 », « Empoisonnement ! », puis le tic « -3 ⚡ », « -2 »",
+           textes("gel").join() === "-9@ennemi,Glacé !@ennemi,Marche ×2 · +20 % dégâts phys.@ennemi"
+           && textes("poison").join() === "-5@ennemi,Empoisonnement !@ennemi,-3 ⚡@ennemi,-2@ennemi", JSON.stringify([textes("gel"), textes("poison")]));
   verifier("esquive : « Esquivé 💨 » sur le héros", textes("esquive").join() === "Esquivé 💨@heros");
   const crit = r.res["coup-critique"].vus;
   verifier("critique : « Critique ! » en grand sur le héros AVANT le coup, puis « -24 ! » sur l'ennemi",

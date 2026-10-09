@@ -5559,3 +5559,41 @@ Nico : « Ok, remplace tous les sons menu par : la goutte. »
   ceux du combat ne changent pas.
   fabrique_sons.mjs, section 5 : clic, survol, vrai bouton de la page, vrai
   bouton du menu latéral — tous la Goutte ; plus aucune trace du ding perle.
+
+## Le Studio d'animation : tout le catalogue, avec ses sons (version 227)
+
+Nico : « Tu vas m'intégrer et me créer une animation dans le Studio
+d'animation de tous ces effets que je vais te donner (certains sont déjà dans
+le Studio). Pour rappel, la vue du token est une vue de haut sur la map. Tu
+vas me créer l'animation et le son qui vont bien. » Suivait sa liste en neuf
+sections : 142 entrées, dont les dix premières.
+- LE CATALOGUE (animations_catalogue.js) : 132 nouvelles animations, dans
+  l'ordre exact de la liste (ORDRE_ANIMATIONS_COMBAT), rangées en sections
+  (1. Déplacements … 9. Talents) et, pour les classes, en sous-sections
+  (Sorcier, Protecteur, Assassin, Médicus, Chasseur de mages, Profanateur,
+  Pisteur, Géomancien, Sentinelle, Oracle, Vampire). Les dix premières y
+  prennent leur place ; Empoisonnement gagne son tic (énergie puis PV), Glacé
+  sa présence (le sol reste gelé), comme la liste les décrit.
+- VUE DE DESSUS : ce qui s'élève grossit (le bond, à 1,42), son ombre reste
+  au sol ; ce qui tombe du ciel rapetisse jusqu'à sa case (un renfort, le
+  déploiement) ; un mur de terre surgit en grossissant.
+- LA GRILLE (scene.grille, fournie par le Studio ; le combat fournira la
+  sienne) : la marche va de centre d'hexagone en centre d'hexagone, une zone
+  couvre des hexagones entiers (sauf une case gommée), un allié, un renfort,
+  un zombie, un compagnon se posent sur une vraie case voisine libre.
+- LE MOTEUR (animations_combat.js) : la vitesse de lecture
+  (VITESSE_ANIMATIONS) passe par toutes les durées ; tout ce qu'une lecture
+  pose ou anime est suivi et nettoyé à la fin (les pions reviennent tels
+  quels) ; de nouveaux outils communs : chemin, parcourir/rentrer, figurant,
+  icône, aura, rayon, éclair, hexagone, lien, filer, étoiles, voile,
+  brouillard, mur, gravats, ombre, énergie.
+- LES SONS (fabrique_sons.js, SONS_COMBAT) : 84 sons de plus (99 en tout),
+  fabriqués sur place — pas, bond, réception, tir, foudre, mots de pouvoir,
+  lumière, parade, bris de verre, chaînes, étourdi, zones, mur de terre,
+  zombie, téléport, nuée… ; chaque animation joue les siens.
+- LE STUDIO (studio_animation.js) : la liste en sections, des puces 1 à 9
+  pour sauter d'une section à l'autre, un bouton 🐢 Ralenti (×0,4).
+  studio_catalogue_1.mjs (la liste, la grille, le ralenti, sections 1 à 4)
+  et studio_catalogue_2.mjs (vue de dessus, figurants, Transfert, Mur de
+  terre, sections 5 à 9), avec _studio_commun.mjs ; studio_animation.mjs
+  suit toujours de près les dix premières.

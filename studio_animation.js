@@ -13,7 +13,8 @@
 //  classe Plateau, dans son propre canvas : il ne touche jamais au plateau de
 //  combat ni à ses pions, et peut s'ouvrir pendant une partie.
 //
-//  Les animations vivent dans animations_combat.js (le catalogue) ; les cases
+//  Les animations vivent dans animations_combat.js (le moteur et les dix
+//  premières) et animations_catalogue.js (tout le reste) ; les cases
 //  « intégrée » dans Studio_Animations/etat (Firestore, partagées entre l'iPad
 //  et le PC), avec une copie dans ce navigateur.
 // =========================================================================
@@ -145,6 +146,7 @@ function fenetre() {
               </label>
               <button type="button" id="studio-btn-deplacer" class="studio-bouton studio-bouton-texte" onclick="window.basculerDeplacementStudio()">✥ Déplacer les pions</button>
               <span id="studio-aide-deplacer" class="studio-aide-deplacer">Glisse un pion sur une case libre</span>
+              <button type="button" id="studio-btn-ralenti" class="studio-bouton studio-bouton-texte" title="Rejouer au ralenti pour bien voir" onclick="window.basculerRalentiStudio()">🐢 Ralenti</button>
               <span class="studio-commandes-espace"></span>
               <button type="button" class="studio-bouton" title="Dézoomer" onclick="window.zoomStudio(1 / 1.25)">−</button>
               <button type="button" class="studio-bouton" title="Zoomer" onclick="window.zoomStudio(1.25)">+</button>
@@ -156,6 +158,7 @@ function fenetre() {
               <span class="studio-liste-titre">Animations de combat</span>
               <span id="studio-compteur" class="studio-compteur"></span>
             </div>
+            <div id="studio-sections" class="studio-sections"></div>
             <div id="studio-liste" class="studio-liste"></div>
           </div>
         </div>
@@ -180,6 +183,7 @@ window.ouvrirStudioAnimation = async function () {
 window.fermerStudioAnimation = function () {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     arreterTout();
+    window.basculerRalentiStudio(false, true);
     const sceneEl = document.getElementById("studio-scene");
     if (sceneEl) sceneEl.classList.remove("studio-deplacement");
     const bouton = document.getElementById("studio-btn-deplacer");
@@ -324,6 +328,31 @@ function brancherGlisser(pionEl, quel) {
     });
 }
 
+// --- LE RALENTI : la même animation, deux fois et demie plus lente ---
+window.basculerRalentiStudio = function (actif, sansSon) {
+    if (!sansSon && typeof window.jouerSonClic === "function") window.jouerSonClic();
+    const bouton = document.getElementById("studio-btn-ralenti");
+    const armer = actif === undefined ? !(bouton && bouton.classList.contains("actif")) : !!actif;
+    window.VITESSE_ANIMATIONS = armer ? 0.4 : 1;
+    if (bouton) bouton.classList.toggle("actif", armer);
+};
+
+// --- LA GRILLE, pour les animations : cases, voisins, cases libres ---
+//  Les animations marchent de case en case, posent des zones sur des
+//  hexagones entiers, cherchent une case libre pour un allié : elles lisent
+//  la carte du studio par ces quelques questions (le combat fournira les
+//  siennes, avec la même forme).
+function grilleDuStudio() {
+    if (!studio.plateau) return null;
+    const occupee = (q, r) => (studio.caseHeros.q === q && studio.caseHeros.r === r) || (studio.caseEnnemi.q === q && studio.caseEnnemi.r === r);
+    return {
+        pixel: (q, r) => { const p = studio.plateau.hexToPixel(q, r); return { x: studio.x + p.x * studio.echelle, y: studio.y + p.y * studio.echelle }; },
+        caseDe: (el) => (el && el.dataset && el.dataset.q !== undefined && el.dataset.q !== "") ? { q: parseFloat(el.dataset.q), r: parseFloat(el.dataset.r) } : null,
+        existe: (q, r) => { const e = studio.plateau.getCaseState(q, r) || {}; return !e.isDeleted; },
+        libre: (q, r) => caseLibre(q, r) && !occupee(q, r)
+    };
+}
+
 // --- LA CAMÉRA : comme au combat, on glisse et on zoome ---
 function appliquerCamera() {
     const conteneur = document.getElementById("studio-plateau");
@@ -408,13 +437,46 @@ function rendreCompteur() {
     const anims = window.ANIMATIONS_COMBAT || [];
     if (el) el.textContent = `${anims.filter(a => studio.integrees[a.id]).length} / ${anims.length} intégrée${anims.length > 1 ? "s" : ""}`;
 }
+// LA LISTE EN SECTIONS (la liste de Nico) : un titre par section, un
+// sous-titre par classe ; des puces en haut pour sauter d'une section à
+// l'autre.
+function titreSection(n) {
+    const s = (window.SECTIONS_ANIMATIONS || []).find(x => x.n === n);
+    return s ? `${s.n}. ${s.titre}` : "";
+}
+function rendreSections() {
+    const zone = document.getElementById("studio-sections");
+    if (!zone) return;
+    const presentes = new Set((window.ANIMATIONS_COMBAT || []).map(a => a.section));
+    zone.innerHTML = (window.SECTIONS_ANIMATIONS || []).filter(s => presentes.has(s.n)).map(s =>
+        `<button type="button" class="studio-puce-section" title="${echapper(s.titre)}" onclick="window.allerSectionStudio(${s.n})">${s.n}</button>`).join("");
+}
+window.allerSectionStudio = function (n) {
+    const titre = document.querySelector(`#studio-liste .studio-section-titre[data-section="${n}"]`);
+    const liste = document.getElementById("studio-liste");
+    if (titre && liste) liste.scrollTo({ top: titre.offsetTop - liste.offsetTop - 4, behavior: "smooth" });
+};
 function rendreListe() {
     const liste = document.getElementById("studio-liste");
     if (!liste) return;
+    rendreSections();
     const anims = window.ANIMATIONS_COMBAT || [];
+    let section = null, sousSection = null;
+    const entetes = (a) => {
+        let h = "";
+        if (a.section !== section) {
+            section = a.section; sousSection = null;
+            h += `<h3 class="studio-section-titre" data-section="${section}">${echapper(titreSection(section))}</h3>`;
+        }
+        if (a.sousSection && a.sousSection !== sousSection) {
+            sousSection = a.sousSection;
+            h += `<h4 class="studio-sous-section">${echapper(sousSection)}</h4>`;
+        }
+        return h;
+    };
     liste.innerHTML = anims.length === 0
         ? `<p class="studio-vide">Aucune animation pour l'instant.</p>`
-        : anims.map((a, i) => `
+        : anims.map((a, i) => `${entetes(a)}
           <div class="studio-anim${studio.integrees[a.id] ? " integree" : ""}" data-anim="${echapper(a.id)}">
             <button type="button" class="studio-anim-jouer" onclick="window.jouerAnimationStudio('${echapper(a.id)}')">
               <span class="studio-anim-numero">${i + 1}</span>
@@ -455,7 +517,8 @@ window.jouerAnimationStudio = async function (id) {
     const scene = {
         lanceur: document.getElementById("studio-pion-heros"),
         cible: document.getElementById("studio-pion-ennemi"),
-        calque: document.getElementById("studio-pions")
+        calque: document.getElementById("studio-pions"),
+        grille: grilleDuStudio()
     };
     if (!scene.lanceur || typeof window.jouerAnimationCombat !== "function") return false;
     const jeton = {};

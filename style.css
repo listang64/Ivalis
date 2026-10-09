@@ -4975,6 +4975,16 @@ textarea.input-texte-parchemin {
 }
 /* Le déplacement des pions du studio : armé par son bouton. */
 .studio-bouton.actif { background: linear-gradient(180deg, #c9a24a, #8a6a2a); color: #2a1a0f; box-shadow: 0 0 10px rgba(226,184,79,0.7); }
+/* La liste en sections (le catalogue complet) : titres, sous-titres de
+   classe, et les puces pour sauter d'une section à l'autre. */
+.studio-sections { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px 0; }
+.studio-puce-section { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-family: 'Cinzel', serif; font-weight: bold;
+  font-size: 14px; color: #f3dfa6; background: radial-gradient(circle at 40% 35%, #6e4a2a, #3a2414); border: 2px solid #c9a24a; }
+.studio-puce-section:hover { box-shadow: 0 0 8px rgba(226,184,79,0.8); }
+.studio-section-titre { margin: 10px 2px 2px; padding: 4px 8px; font-family: 'Cinzel', serif; font-size: 16px; color: #f3dfa6;
+  background: linear-gradient(90deg, #4a2e1b, rgba(74,46,27,0.15)); border-left: 4px solid #c9a24a; border-radius: 4px; }
+.studio-section-titre:first-child { margin-top: 0; }
+.studio-sous-section { margin: 6px 4px 0; font-family: 'Cinzel', serif; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: #8a6a2a; }
 .studio-aide-deplacer { display: none; font-size: 12px; font-style: italic; color: #6e2a18; }
 .studio-scene.studio-deplacement + .studio-commandes .studio-aide-deplacer { display: inline; }
 .studio-scene.studio-deplacement .studio-pions { pointer-events: none; }
