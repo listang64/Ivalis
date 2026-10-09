@@ -3235,7 +3235,12 @@ window.appliquerTokensVTT = function(tokensMap) {
         if (pion && pion.id) jaugesSelection[pion.id.replace("token-", "")] = bloc;
     });
 
-    conteneur.innerHTML = "";
+    // LES EFFETS D'UNE ANIMATION EN COURS restent (animations_jeu.js : la
+    // poussière, les silhouettes, la copie d'un pion qui entre en scène) : un
+    // redessin ne coupe pas une entrée.
+    conteneur.querySelectorAll(":scope > :not(.anim-effet):not(.anim-message)").forEach(e => e.remove());
+    // Les pions dessinés, pour qui sait animer ceux qui viennent de paraître.
+    const dessines = [];
 
     for (let idPerso in tokensMap) {
         const data = tokensMap[idPerso];
@@ -3277,6 +3282,8 @@ window.appliquerTokensVTT = function(tokensMap) {
         divToken.style.zIndex = "10";
         divToken.style.borderRadius = "50%";
         divToken.id = "token-" + idPerso;
+        // Un pion en pleine entrée en scène reste caché : c'est sa copie qu'on voit.
+        if (window.PIONS_EN_ENTREE && window.PIONS_EN_ENTREE[idPerso]) divToken.classList.add("pion-en-entree");
         (jaugesEnCours[idPerso] || []).forEach(jauge => divToken.appendChild(jauge));
 
         // LA CROIX ROUGE SOUS LE PION : ON RENONCE À CE QU'ON ÉTAIT EN TRAIN DE
@@ -3466,6 +3473,7 @@ window.appliquerTokensVTT = function(tokensMap) {
 
             window.positionnerTokenVTT(divToken, true);
             conteneur.appendChild(divToken);
+            dessines.push(idPerso);
             continue;
         }
 
@@ -3498,9 +3506,14 @@ window.appliquerTokensVTT = function(tokensMap) {
 
         window.positionnerTokenVTT(divToken, true);
         conteneur.appendChild(divToken);
+        dessines.push(idPerso);
     }
 
     echelleTokensAppliquee = window.VTT_SCALE;
+    // Un renfort, une illusion, un déploiement : leur entrée en scène.
+    if (typeof window.animerNouveauxPions === "function") {
+        try { window.animerNouveauxPions(dessines); } catch (e) { console.error("Entrée en scène des pions :", e); }
+    }
 };
 
 // =========================================================================

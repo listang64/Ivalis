@@ -40,7 +40,6 @@ const studio = {
     caseHeros: { q: 0, r: 0 }, caseEnnemi: { q: 1, r: 0 },
     // Les cases de départ (« Replacer les pions » y ramène).
     departHeros: { q: 0, r: 0 }, departEnnemi: { q: 1, r: 0 },
-    taillePion: 55,
     idHeros: null,
     integrees: {},
     enCours: null,
@@ -285,18 +284,36 @@ function pion(id, image, classe) {
     img.src = image;
     return d;
 }
+// LA TAILLE DES PIONS, CELLE DU COMBAT (Nico : « les pions ne sont pas de la
+// même taille, par rapport aux cases, que dans mon menu combat »). Un pion de
+// combat a sa taille à lui, en pixels de la carte, réglable pion par pion
+// (55 par défaut, appliquerTokensVTT) — elle ne suit pas celle des cases. Le
+// Studio reprend la même : celle du pion du héros, celle d'un pion de
+// créature posé sur la carte pour l'ennemi, et 55 sinon. Il prenait jusqu'ici
+// 92 % du rayon de case quand le héros n'avait pas de pion : sur une carte à
+// petites cases, ses pions paraissaient deux fois trop petits.
+const TAILLE_PION_JEU = 55;
+function tailleDuPion(id) {
+    const t = id ? (window.TOKENS_VTT_DATA || {})[id] : null;
+    return (t && Number(t.taille)) || TAILLE_PION_JEU;
+}
+function tailleEnnemi() {
+    const pions = window.TOKENS_VTT_DATA || {};
+    const creature = (window.PERSOS_PARTIE || []).find(p => p && p.estMonstre && !p.estIllusion && pions[p.idPersonnage] && Number(pions[p.idPersonnage].taille));
+    return creature ? Number(pions[creature.idPersonnage].taille) : TAILLE_PION_JEU;
+}
 function poserPions() {
     const calque = document.getElementById("studio-pions");
     // Tout, sauf le calque des murs de terre (le terrain reste).
     calque.querySelectorAll(":scope > :not(#studio-murs)").forEach(e => e.remove());
     const heros = herosDisponibles().find(p => p.idPersonnage === studio.idHeros) || null;
-    const pionJeu = heros ? (window.TOKENS_VTT_DATA || {})[heros.idPersonnage] : null;
-    studio.taillePion = (pionJeu && pionJeu.taille) || Math.round((studio.plateau ? studio.plateau.hexSize : 60) * 0.92);
     const h = pion("studio-pion-heros", imageDuHeros(heros), "studio-pion-heros");
     h.dataset.q = studio.caseHeros.q; h.dataset.r = studio.caseHeros.r;
+    h.dataset.taille = tailleDuPion(heros ? heros.idPersonnage : null);
     h.title = heros ? (heros.prenom || heros.nom || "") : "Héros";
     const e = pion("studio-pion-ennemi", imageEnnemi(), "studio-pion-ennemi");
     e.dataset.q = studio.caseEnnemi.q; e.dataset.r = studio.caseEnnemi.r;
+    e.dataset.taille = tailleEnnemi();
     e.title = "Ennemi inerte";
     calque.appendChild(e);
     calque.appendChild(h);
@@ -432,7 +449,7 @@ function placerPions() {
         const px = studio.plateau.hexToPixel(parseFloat(d.dataset.q), parseFloat(d.dataset.r));
         d.style.left = (studio.x + px.x * studio.echelle) + "px";
         d.style.top = (studio.y + px.y * studio.echelle) + "px";
-        d.style.width = d.style.height = (studio.taillePion * studio.echelle) + "px";
+        d.style.width = d.style.height = ((Number(d.dataset.taille) || TAILLE_PION_JEU) * studio.echelle) + "px";
     });
 }
 window.recentrerStudio = function () {

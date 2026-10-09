@@ -13,7 +13,7 @@
 //   3. les créatures : l'IA (ia_pure.js, choisirRepli) décroche vers la case
 //      la plus éloignée de l'adversaire ;
 //   4. la carte (moteur_effets.js) : la vraie fiche du grimoire, extraite ;
-//   5. l'écran (pont_combat.js) : « ↩️ Repli ! », des pas marqués repli, et
+//   5. l'écran (pont_combat.js) : « Repli : sans opportunité », des pas marqués repli, et
 //      « Repli 💨 » quand une opportunité est évitée ;
 //   6. le générateur de techniques des monstres (monstres_competences.js).
 import fs from 'fs';
@@ -176,7 +176,10 @@ console.log("\n4. L'ÉCRAN");
 // =========================================================================
 {
   const annonce = misEnScene({ type: "repli", acteur: "H1", de: { q: 0, r: 0 }, vers: { q: 0, r: -3 } }, monde());
-  verifier("« ↩️ Repli ! » s'affiche sur le lanceur", annonce.geste === "message" && /Repli/.test(annonce.texte));
+  // Nico, dans le Studio : « tu peux virer le logo bleu qui pop avec le texte » —
+  // l'annonce est le geste du Studio (animations_jeu.js), sans icône.
+  verifier("« Repli : sans opportunité » s'annonce sur le lanceur, sans le logo bleu ↩️",
+           annonce.geste === "repli" && annonce.pion === "H1" && annonce.texte === "Repli : sans opportunité" && !/↩/.test(annonce.texte), annonce.texte);
   const p = misEnScene({ type: "pas", acteur: "H1", de: { q: 0, r: 0 }, vers: { q: -1, r: 0 }, cout: 0, repli: true }, monde());
   verifier("ses pas sont joués en mode repli (rapides, avec traînée)", p.geste === "pas" && p.repli === true);
   const o = misEnScene({ type: "opportunite", attaquant: "M1", cible: "H1", evitee: true, mot: "Repli 💨" }, monde());

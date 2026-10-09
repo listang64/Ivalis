@@ -1,0 +1,202 @@
+// =========================================================================
+//  IVALIS — LES ANIMATIONS DU STUDIO, EN JEU
+// =========================================================================
+//  Nico, dans le Studio d'animation : « Marche du Vargen, Bond, Repli, Pas de
+//  retraite offert par l'arme, Fuite sous la Peur, Fuite sous la Confusion,
+//  Hémorragie interne, Arrivée d'un combattant ou d'un renfort, Apparition
+//  d'une Illusion, Déploiement des pions en début de combat : tu peux les
+//  implanter en jeu. »
+//
+//  Les gestes sont ceux du Studio (animations_catalogue.js, la section « En
+//  jeu »), joués par le même moteur (animations_combat.js) ; ce fichier leur
+//  donne la SCÈNE DU COMBAT — les vrais pions, la vraie grille, le calque des
+//  pions — et les branche là où le combat se joue :
+//
+//    • un pas (jouerAnimationPas, mouvement.js) : selon sa manière — repli,
+//      fuite, case offerte, foulée de Vargen — sinon la marche d'avant ;
+//    • un bond (jouerAnimationBond) — pas le Transfert, qui garde la sienne ;
+//    • l'annonce du repli, une case qui saigne, un combattant qui arrive
+//      (le pont du combat, pont_combat.js / regime_cerveau.js) ;
+//    • un pion qui apparaît sur le plateau en début de combat
+//      (appliquerTokensVTT, combat.js) : le déploiement.
+//
+//  Rien ici ne décide : le cerveau a tranché, le journal raconte, on montre.
+// =========================================================================
+(function () {
+    const memeCase = (a, b) => !!a && !!b && Number(a.q) === Number(b.q) && Number(a.r) === Number(b.r);
+    const pionDe = (id) => (id ? document.getElementById("token-" + id) : null);
+
+    // --- LA SCÈNE DU COMBAT -----------------------------------------------
+    //  Les pions vivent en pixels d'écran dans #conteneur-tokens-vtt, posés à
+    //  VTT_POS + case × VTT_SCALE (positionnerTokenVTT, combat.js) : les
+    //  effets s'y posent aussi, entre le sol et les pions comme au Studio.
+    function grilleDuCombat() {
+        const P = window.PLATEAU_VTT;
+        if (!P || typeof P.hexToPixel !== "function") return null;
+        const occupee = (q, r) => Object.keys(window.TOKENS_VTT_DATA || {}).some(id => {
+            const t = window.TOKENS_VTT_DATA[id];
+            return t && Number(t.q) === q && Number(t.r) === r
+                && !(typeof window.estCombattantMort === "function" && window.estCombattantMort(id));
+        });
+        return {
+            pixel: (q, r) => {
+                const px = P.hexToPixel(q, r), e = window.VTT_SCALE || 1;
+                return { x: (window.VTT_POS_X || 0) + px.x * e, y: (window.VTT_POS_Y || 0) + px.y * e };
+            },
+            caseDe: (el) => (el && el.dataset && el.dataset.q !== undefined && el.dataset.q !== "")
+                ? { q: parseFloat(el.dataset.q), r: parseFloat(el.dataset.r) } : null,
+            existe: (q, r) => !((P.getCaseState && P.getCaseState(q, r)) || {}).isDeleted,
+            libre: (q, r) => {
+                const e = typeof window.etatCaseCombat === "function" ? window.etatCaseCombat(q, r) : ((P.getCaseState && P.getCaseState(q, r)) || {});
+                return !e.isDeleted && !e.isBlocked && !occupee(q, r);
+            }
+        };
+    }
+    // Un pion qui arrive pour de bon : sa case, sans glisser (positionnerTokenVTT).
+    function poserPion(el, q, r) {
+        if (!el || typeof window.positionnerTokenVTT !== "function") return false;
+        el.style.transition = "none";
+        el.dataset.q = q;
+        el.dataset.r = r;
+        window.positionnerTokenVTT(el, true);
+        return true;
+    }
+    window.sceneDeCombat = function (idLanceur, idCible, plus) {
+        const lanceur = pionDe(idLanceur), calque = document.getElementById("conteneur-tokens-vtt");
+        if (!lanceur || !calque || typeof window.jouerAnimationJeu !== "function") return null;
+        // `grace` : le ménage d'une lecture attend que ses effets (gouttes,
+        // poussière, silhouettes) aient fini de s'effacer d'eux-mêmes.
+        return { lanceur, cible: pionDe(idCible), calque, grille: grilleDuCombat(), poserPion, grace: 2000, ...(plus || {}) };
+    };
+
+    // --- LES PAS --------------------------------------------------------------
+    //  La manière de marcher, d'après le pas (le cerveau la porte : repli,
+    //  fuite, case offerte) ou d'après le marcheur (le Vargen et son atout de
+    //  race). Rien de tout ça : la marche d'avant (null).
+    window.sortePasDeCombat = function (pas) {
+        if (!pas || typeof window.jouerAnimationJeu !== "function") return null;
+        if (pas.repli) return "repli";
+        if (pas.fuite === "peur" || pas.fuite === "confusion") return pas.fuite;
+        if (pas.offert) return "offert";
+        const p = (window.PERSOS_PARTIE || []).find(x => x && x.idPersonnage === pas.idToken);
+        const atout = (p && typeof window.atoutRace === "function") ? (window.atoutRace(p) || {}) : {};
+        if (Number(atout.diviseurDeplacement) >= 2) return "vargen";
+        return null;
+    };
+    const ANIMATION_DU_PAS = { repli: "jeu-pas-repli", peur: "jeu-pas-peur", confusion: "jeu-pas-confusion",
+                               offert: "jeu-pas-offert", vargen: "jeu-pas-vargen" };
+    // Le premier pas d'un trajet (ce qui ne se dit qu'une fois) : le pas d'avant
+    // de ce pion, de la même manière, finissait-il là où celui-ci commence ?
+    const derniers = {};
+    function ouvreLeTrajet(id, sorte, de) {
+        const d = derniers[id];
+        return !(d && d.sorte === sorte && memeCase(d.vers, de) && Date.now() - d.quand < 5000);
+    }
+    window.animerPasDeCombat = async function (pas, sorte) {
+        const scene = window.sceneDeCombat(pas.idToken, null, { de: pas.de, vers: pas.vers });
+        if (!scene || !scene.grille || !ANIMATION_DU_PAS[sorte]) return false;
+        scene.premier = ouvreLeTrajet(pas.idToken, sorte, pas.de || scene.grille.caseDe(scene.lanceur));
+        await window.jouerAnimationJeu(ANIMATION_DU_PAS[sorte], scene);
+        derniers[pas.idToken] = { sorte, vers: pas.vers, quand: Date.now() };
+        // Quoi qu'il arrive, le pion finit sur sa case.
+        const el = pionDe(pas.idToken);
+        if (el && !memeCase({ q: el.dataset.q, r: el.dataset.r }, pas.vers)) poserPion(el, pas.vers.q, pas.vers.r);
+        return true;
+    };
+
+    // --- LE BOND (pas le Transfert : il garde son geste) ------------------------
+    window.animerBondDeCombat = async function (data) {
+        if (!data || data.transfert || !data.arrivee) return false;
+        const scene = window.sceneDeCombat(data.idToken, null, { de: data.depart, vers: data.arrivee });
+        if (!scene || !scene.grille) return false;
+        await window.jouerAnimationJeu("jeu-bond", scene);
+        const el = pionDe(data.idToken);
+        if (el && !memeCase({ q: el.dataset.q, r: el.dataset.r }, data.arrivee)) poserPion(el, data.arrivee.q, data.arrivee.r);
+        return true;
+    };
+
+    // --- L'ANNONCE DU REPLI, UNE CASE QUI SAIGNE ---------------------------------
+    window.annoncerRepliCombat = async function ({ pion, texte, couleur }) {
+        const scene = window.sceneDeCombat(pion, null, { texte, couleur, grace: 1500 });
+        if (scene) return window.jouerAnimationJeu("jeu-annonce-repli", scene);
+        const tk = (window.TOKENS_VTT_DATA || {})[pion];
+        if (tk && typeof window.afficherMessageFlottantHex === "function") window.afficherMessageFlottantHex(tk.q, tk.r, texte, couleur);
+        await new Promise(r => setTimeout(r, 450));
+    };
+    const saignements = {};
+    window.animerHemorragieCombat = async function ({ pion }) {
+        const scene = window.sceneDeCombat(pion);
+        if (!scene) return;
+        scene.premier = !(saignements[pion] && Date.now() - saignements[pion] < 5000);
+        saignements[pion] = Date.now();
+        await window.jouerAnimationJeu("jeu-hemorragie", scene);
+    };
+
+    // --- UN PION QUI ENTRE EN SCÈNE ------------------------------------------------
+    //  Le vrai pion reste caché (.pion-en-entree, reposée par appliquerTokensVTT
+    //  à chaque redessin) pendant que sa copie fait l'entrée ; il réapparaît
+    //  dessous à la fin. Un redessin du plateau en pleine entrée ne coupe donc
+    //  rien.
+    window.PIONS_EN_ENTREE = window.PIONS_EN_ENTREE || {};
+    const ANIMATION_D_ENTREE = { renfort: "jeu-arrivee-renfort", illusion: "jeu-apparition-illusion", deploiement: "jeu-deploiement" };
+    function montrer(id) {
+        delete window.PIONS_EN_ENTREE[id];
+        const el = pionDe(id);
+        if (el) el.classList.remove("pion-en-entree");
+    }
+    function entrer(id, sorte, plus) {
+        const el = pionDe(id);
+        // Pas de grâce ici : la copie doit partir dès que le vrai pion est revenu.
+        const scene = el ? window.sceneDeCombat(id, null, { montrer: () => montrer(id), grace: 250, ...(plus || {}) }) : null;
+        if (!scene) { montrer(id); return Promise.resolve(false); }
+        window.PIONS_EN_ENTREE[id] = true;
+        el.classList.add("pion-en-entree");
+        // Un filet : une entrée qui ne finirait jamais rendrait le pion invisible pour de bon.
+        const filet = setTimeout(() => montrer(id), 6000 + ((plus && plus.retard) || 0));
+        return window.jouerAnimationJeu(ANIMATION_D_ENTREE[sorte], scene)
+            .finally(() => { clearTimeout(filet); montrer(id); });
+    }
+    // L'ARRIVÉE, annoncée par le journal (un renfort, une illusion). Son pion est
+    // souvent dessiné juste APRÈS l'étape (l'état descend ensuite) : on la note,
+    // et appliquerTokensVTT la lance quand il paraît.
+    const arrivees = {};
+    window.annoncerArriveeCombat = async function ({ pion, illusion }) {
+        if (!pion) return;
+        const sorte = illusion ? "illusion" : "renfort";
+        if (pionDe(pion)) { entrer(pion, sorte); return; }
+        arrivees[pion] = { sorte, quand: Date.now() };
+        window.PIONS_EN_ENTREE[pion] = true;
+        setTimeout(() => { if (arrivees[pion]) { delete arrivees[pion]; montrer(pion); } }, 10000);
+    };
+
+    // LE DÉPLOIEMENT EN DÉBUT DE COMBAT : un pion qui paraît sur le plateau avant
+    // que la première manche ne se joue (les héros autour de leur repère, les
+    // créatures de la rencontre, le compagnon du Pisteur) y descend. Pas au
+    // chargement de la page (tout y paraît d'un coup), pas en plein combat (un
+    // renfort a son entrée à lui).
+    const DEBUT_PAGE = Date.now();
+    let connus = null;
+    const auDebutDuCombat = () => {
+        const partie = window.PARTIE_DATA || {};
+        return (Number(partie.Tour_Combat) || 1) <= 1 && (partie.Phase_Combat || "Preparation") === "Preparation";
+    };
+    const estAllie = (id) => {
+        const p = (window.PERSOS_PARTIE || []).find(x => x && x.idPersonnage === id);
+        return !!p && !p.estMonstre && (p.camp || "Allié") !== "Ennemi";
+    };
+    window.animerNouveauxPions = function (ids) {
+        const avant = connus;
+        connus = new Set(ids || []);
+        // Les arrivées annoncées par le journal, enfin dessinées.
+        (ids || []).forEach(id => {
+            const a = arrivees[id];
+            if (!a) return;
+            delete arrivees[id];
+            entrer(id, a.sorte);
+        });
+        if (!avant || Date.now() - DEBUT_PAGE < (window.DELAI_DEPLOIEMENT_MS === undefined ? 6000 : window.DELAI_DEPLOIEMENT_MS)) return;
+        if (!auDebutDuCombat()) return;
+        const nouveaux = (ids || []).filter(id => !avant.has(id) && !window.PIONS_EN_ENTREE[id]);
+        nouveaux.forEach((id, i) => entrer(id, "deploiement", { retard: i * 140, allie: estAllie(id), sonne: i === 0, texte: i === 0 }));
+    };
+})();

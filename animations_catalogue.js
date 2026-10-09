@@ -177,7 +177,7 @@
         const dir = p.dir ? p.dir(v) : v;
         const pts = o.chemin(el, depart, dir, p.cases || 3, { zigzag: p.zigzag });
         if (p.avant) await p.avant(depart, pts);
-        await o.parcourir(el, depart, pts, { duree: p.duree || 380, hauteur: p.hauteur, tangue: p.tangue, rythme: p.rythme, easing: p.easing,
+        await o.parcourir(el, depart, pts, { duree: p.duree || 380, hauteur: p.hauteur, tangue: p.tangue, rythme: p.rythme, easing: p.easing, saut: p.saut,
             apresPas: (pt, i) => { if (p.son) o.son(p.son); if (p.pas) p.pas(pt, i, pts); } });
         if (p.apres) await p.apres(pts);
         await o.attendre(p.pause === undefined ? 250 : p.pause);
@@ -186,6 +186,25 @@
         if (p.revenir) await o.rentrer(el);
         else await o.arriver(el, pts[pts.length - 1]);
         return pts;
+    };
+
+    // QUELQUES CRISTAUX DE GIVRE au sol, sous le pion (la marche gelée) : ils
+    // poussent d'un coup puis fondent.
+    const cristaux = (o, calque, pt, p = {}) => {
+        const t = pt.t * (p.taille || 1.2);
+        const n = p.n || 6;
+        const formes = Array.from({ length: n }, (_, i) => {
+            const ang = (i / n) * Math.PI * 2 + hasard(-0.4, 0.4), d = hasard(14, 36);
+            const x = 50 + Math.cos(ang) * d, y = 50 + Math.sin(ang) * d * 0.8, L = hasard(8, 14), rot = hasard(0, 180);
+            return `<polygon points="0,${-L} ${L * 0.34},0 0,${L} ${-L * 0.34},0" transform="translate(${x.toFixed(1)},${y.toFixed(1)}) rotate(${rot.toFixed(0)})"
+                       fill="rgba(235,250,255,0.95)" stroke="#7fcfff" stroke-width="1.2"/>`;
+        }).join("");
+        const d = o.poser(calque, pt.x, pt.y + pt.t * 0.08, `width:${t}px; height:${t}px; z-index:${Z.sol};`,
+            `<svg viewBox="0 0 100 100" width="100%" height="100%" style="overflow:visible; filter:drop-shadow(0 0 3px #bdf3ff)">${formes}</svg>`);
+        d.classList.add("anim-cristaux");
+        return o.jouerPuisRetirer(d, [{ opacity: 0, transform: `${BASE} scale(0.5)` }, { opacity: 1, transform: `${BASE} scale(1)`, offset: 0.2 },
+                                      { opacity: 1, transform: `${BASE} scale(1)`, offset: 0.65 }, { opacity: 0, transform: `${BASE} scale(1.05)` }],
+                                  { duration: p.duree || 1100, easing: "ease-out" });
     };
 
     // =====================================================================
@@ -268,30 +287,28 @@
     ajouter(1, null, [
         {
             id: "marche", nom: "Marche case par case", sens: "sur soi",
-            description: "Le pion avance d'hexagone en hexagone ; à chaque case, un peu de poussière et un point d'énergie dépensé.",
+            description: "Le pion avance d'hexagone en hexagone par petits sauts ; à chaque case, un pas sur l'herbe et la terre, un peu de poussière et l'énergie dépensée.",
             async jouer(sc, o) {
-                await marcher(sc, o, { cases: 3, son: "pas", pas: (pt) => { poussiere(o, sc.calque, pt, { n: 4 }); o.texte(sc.calque, sc.lanceur, "-1 ⚡", COULEURS.attention, { taille: 15 }); } });
+                await marcher(sc, o, { cases: 3, duree: 420, saut: true, son: "pas-herbe",
+                    pas: (pt) => { poussiere(o, sc.calque, pt, { n: 4 }); o.texte(sc.calque, sc.lanceur, "-1 ⚡", COULEURS.attention, { taille: 15 }); } });
             }
         },
         {
             id: "marche-difficile", nom: "Marche en terrain difficile", sens: "sur soi",
-            description: "Des gravats sur le chemin : le pion s'enfonce à chaque pas, lourd, dans un nuage de poussière ; chaque case coûte double.",
+            description: "La marche, par petits sauts, mais plus lente et plus lourde : chaque pas pèse, un peu de poussière ; chaque case coûte double.",
             async jouer(sc, o) {
-                await marcher(sc, o, { cases: 2, duree: 680, hauteur: 0.95, tangue: 5, son: "pas-lourd",
-                    avant: async (a, pts) => { pts.forEach((pt, i) => o.gravats(sc.calque, pt, { retard: i * 90 })); await o.attendre(450); },
-                    pas: (pt) => { poussiere(o, sc.calque, pt, { n: 10, dist: 0.55, taille: 8 }); o.texte(sc.calque, sc.lanceur, "-2 ⚡", COULEURS.attention, { taille: 15 }); } });
+                await marcher(sc, o, { cases: 2, duree: 700, saut: true, hauteur: 1.1, son: "pas-lourd",
+                    pas: (pt) => { poussiere(o, sc.calque, pt, { n: 5 }); o.texte(sc.calque, sc.lanceur, "-2 ⚡", COULEURS.attention, { taille: 15 }); } });
             }
         },
         {
             id: "marche-gelee", nom: "Marche gelée (Glacé)", sens: "sur soi",
-            description: "Le héros bleuit de givre ; ses pas sont raides, le sol gèle sous chacun d'eux, chaque case coûte double.",
+            description: "La marche, par petits sauts, sans rien sur le pion ; dessous, à chaque pas, quelques cristaux de givre poussent puis fondent, et la glace craque ; chaque case coûte double.",
             async jouer(sc, o) {
                 etat(o, sc.calque, sc.lanceur, "Glacé : marche ×2");
-                await teinte(o, sc.lanceur, GIVRE);
-                await marcher(sc, o, { cases: 2, duree: 560, hauteur: 1, tangue: 7, easing: "cubic-bezier(.8,0,.2,1)", son: "pas-givre",
+                await marcher(sc, o, { cases: 2, duree: 420, saut: true, son: "pas-glace",
                     pas: (pt) => {
-                        o.hexagone(sc.calque, pt, { fond: FONDS_ZONE.glace, opacite: 0.55, duree: 300 });
-                        o.gerbe(sc.calque, pt.x, pt.y, { nombre: 6, dist: pt.t * 0.45, couleurs: ["#ffffff", "#bdf3ff"], taille: 5, carre: true, duree: 600 });
+                        cristaux(o, sc.calque, pt);
                         o.texte(sc.calque, sc.lanceur, "-2 ⚡", COULEURS.attention, { taille: 15 });
                     } });
             }
@@ -343,7 +360,6 @@
             description: "Le héros frappe, puis recule de trois cases d'un trait, sans que l'ennemi puisse le frapper au passage.",
             async jouer(sc, o) {
                 await frapper(o, sc.calque, sc.lanceur, sc.cible, { valeur: "-8" });
-                o.icone(sc.calque, centre(sc.lanceur, sc.calque), "↩️", { taille: 0.45, duree: 1100 });
                 o.son("repli");
                 o.texte(sc.calque, sc.lanceur, "Repli : sans opportunité", COULEURS.neutre);
                 let prec = centre(sc.lanceur, sc.calque);
@@ -368,7 +384,6 @@
             description: "Le héros tremble, s'assombrit, puis détale à l'opposé de l'ennemi en titubant.",
             async jouer(sc, o) {
                 o.son("peur");
-                o.icone(sc.calque, centre(sc.lanceur, sc.calque), "😱", { duree: 1300 });
                 etat(o, sc.calque, sc.lanceur, "Peur : il s'enfuit !");
                 teinte(o, sc.lanceur, SOMBRE);
                 await o.secouer(sc.lanceur, 4, 500);
@@ -410,7 +425,7 @@
                         o.onde(sc.calque, pt, { couleur: "#bdf3ff", taille: 0.8, duree: 500, echelle: 1.6 });
                         o.texte(sc.calque, sc.lanceur, "Glacé !", COULEURS.etat);
                     } else {
-                        o.son("electrique"); o.eclat(sc.lanceur, ELEC, 500);
+                        o.son("decharge"); o.eclat(sc.lanceur, ELEC, 500);
                         for (let k = 0; k < 3; k++) o.eclair(sc.calque, { x: pt.x - pt.t * 0.5, y: pt.y + hasard(-20, 20), t: pt.t }, { x: pt.x + pt.t * 0.5, y: pt.y + hasard(-20, 20), t: pt.t }, { largeur: 0.4, duree: 360, retard: k * 90, segments: 6 });
                         o.texte(sc.calque, sc.lanceur, "Électrifié !", COULEURS.etat);
                     }
@@ -2692,4 +2707,197 @@
     ];
     window.ORDRE_ANIMATIONS_COMBAT = ORDRE;
     window.enregistrerAnimationsCombat(A, ORDRE);
+
+    // =====================================================================
+    //  EN JEU : LES ANIMATIONS VALIDÉES, JOUÉES PAR LE COMBAT
+    // =====================================================================
+    //  Nico, dans le Studio : « Marche du Vargen, Bond, Repli, Pas de retraite
+    //  offert par l'arme, Fuite sous la Peur, Fuite sous la Confusion,
+    //  Hémorragie interne, Arrivée d'un renfort, Apparition d'une Illusion,
+    //  Déploiement des pions : tu peux les implanter en jeu. »
+    //
+    //  Le combat ne joue pas une scène entière : il rejoue son journal ÉTAPE
+    //  PAR ÉTAPE — un pas, un bond, une arrivée (animations_jeu.js). Ce sont
+    //  donc les gestes du Studio, découpés au pas : `sc.de` et `sc.vers` sont
+    //  les cases du pas, `sc.premier` dit s'il ouvre le trajet (ce qui ne se
+    //  dit qu'une fois : « Foulée du Vargen », « Peur : il s'enfuit ! »), et
+    //  le pion finit sur sa case (sc.poserPion). Pour un pion qui entre en
+    //  scène, le vrai pion reste caché (sc.montrer le rend visible) : c'est
+    //  sa copie qui tombe du ciel, qu'un redessin du plateau ne coupe pas.
+    const pointDe = (o, sc, c) => {
+        const px = o.grille.pixel(c.q, c.r);
+        return { x: px.x, y: px.y, q: c.q, r: c.r, t: centre(sc.lanceur, sc.calque).t };
+    };
+    // UN PAS DU COMBAT : de la case où le pion se tient jusqu'à `sc.vers`, où il reste.
+    const unPas = async (sc, o, p = {}) => {
+        const a = centre(sc.lanceur, sc.calque), arrivee = pointDe(o, sc, sc.vers);
+        await o.parcourir(sc.lanceur, a, [arrivee], { duree: p.duree || 380, hauteur: p.hauteur, tangue: p.tangue, saut: p.saut,
+            apresPas: (pt) => { if (p.son) o.son(p.son); if (p.pas) p.pas(pt, a); } });
+        await o.arriver(sc.lanceur, arrivee, { sinonRentrer: false });
+        return arrivee;
+    };
+    // UNE TEINTE QUI TIENT LE TEMPS D'UNE FUITE : reposée sur l'image du pion à
+    // chaque pas, elle s'en va d'elle-même quand plus aucun pas ne la ravive.
+    const teintesTenues = new WeakMap();
+    const teinteTenue = (el, filtre, ms) => {
+        const img = (el && el.querySelector(".token-img-main")) || el;
+        if (!img) return;
+        if (!teintesTenues.has(img)) img.dataset.filtreAvant = img.style.filter || "";
+        img.style.transition = "filter 0.3s ease";
+        img.style.filter = filtre;
+        clearTimeout(teintesTenues.get(img));
+        teintesTenues.set(img, setTimeout(() => { img.style.filter = img.dataset.filtreAvant || ""; teintesTenues.delete(img); }, ms || 2000));
+    };
+    // La copie d'un pion qui entre en scène (le vrai, caché, la remplace à la fin).
+    const doublure = (o, sc, pos) => {
+        const f = o.figurant(sc.calque, sc.lanceur, pos, { opacite: 0 });
+        if (f) f.classList.remove("pion-en-entree");
+        return f;
+    };
+    const positionDe = (o, sc) => ({ ...centre(sc.lanceur, sc.calque), ...(o.caseDe(sc.lanceur) || {}) });
+
+    window.enregistrerAnimationsJeu([
+        // LA MARCHE DU VARGEN : foulée légère et rapide, une silhouette laissée
+        // sur chaque case quittée ; « ½ ⚡ » au premier pas.
+        { id: "jeu-pas-vargen", async jouer(sc, o) {
+            if (sc.premier) o.texte(sc.calque, sc.lanceur, "Foulée du Vargen : ½ ⚡", COULEURS.neutre);
+            await unPas(sc, o, { duree: 210, hauteur: 1.08, son: "pas-leger",
+                pas: (pt, a) => o.fantome(sc.calque, sc.lanceur, a, { opacite: 0.4 }) });
+        } },
+        // LE REPLI : son annonce (le souffle, sans icône), puis des pas qui filent
+        // en laissant leur ombre derrière eux.
+        { id: "jeu-annonce-repli", async jouer(sc, o) {
+            o.son("repli");
+            o.texte(sc.calque, sc.lanceur, sc.texte || "Repli : sans opportunité", sc.couleur || COULEURS.neutre);
+            await o.attendre(450);
+        } },
+        { id: "jeu-pas-repli", async jouer(sc, o) {
+            await unPas(sc, o, { duree: 190, hauteur: 1.03,
+                pas: (pt, a) => o.fantome(sc.calque, sc.lanceur, a, { opacite: 0.35 }) });
+        } },
+        // LE PAS DE RETRAITE OFFERT PAR L'ARME : chaque case gratuite marquée
+        // d'une empreinte dorée, « Pas gratuit ».
+        { id: "jeu-pas-offert", async jouer(sc, o) {
+            let empreinte = null;
+            await unPas(sc, o, { duree: 320, son: "pas-leger",
+                pas: (pt) => {
+                    empreinte = o.hexagone(sc.calque, pt, { fond: "radial-gradient(circle, rgba(255,230,140,0.7), rgba(226,184,79,0.25) 70%)", duree: 300 });
+                    o.texte(sc.calque, sc.lanceur, "Pas gratuit", "#ffd700");
+                } });
+            await o.attendre(250);
+            if (empreinte) o.effacer(empreinte, { duree: 500 });
+        } },
+        // LA FUITE SOUS LA PEUR : au premier pas il tremble et s'assombrit
+        // (plus de smiley), puis détale en titubant, des gouttes de sueur.
+        { id: "jeu-pas-peur", async jouer(sc, o) {
+            teinteTenue(sc.lanceur, SOMBRE, 2000);
+            if (sc.premier) {
+                o.son("peur");
+                etat(o, sc.calque, sc.lanceur, "Peur : il s'enfuit !");
+                await o.secouer(sc.lanceur, 4, 500);
+            }
+            o.son("course");
+            await unPas(sc, o, { duree: 230, tangue: 12, hauteur: 1.06,
+                pas: (pt) => o.gerbe(sc.calque, pt.x, pt.y, { nombre: 3, dist: pt.t * 0.4, couleurs: ["#bfe6ff", "#8ac8ff"], taille: 4, duree: 400 }) });
+        } },
+        // LA FUITE SOUS LA CONFUSION : des « ? » qui tournent, une teinte
+        // violette, puis une course folle qui tangue (le combat a déjà dit
+        // « Confus : s'enfuit ! »).
+        { id: "jeu-pas-confusion", async jouer(sc, o) {
+            teinteTenue(sc.lanceur, VIOLET, 2000);
+            if (sc.premier) {
+                o.son("confusion");
+                o.etoiles(sc.calque, centre(sc.lanceur, sc.calque), { signe: "?", couleur: "#d6a8ff", duree: 1900 });
+                await o.attendre(300);
+            }
+            o.son("course");
+            await unPas(sc, o, { duree: 280, tangue: 35 });
+        } },
+        // L'HÉMORRAGIE INTERNE : à chaque case, un éclat rouge, des gouttes, le
+        // son qui saigne (le chiffre suit, avec sa jauge).
+        { id: "jeu-hemorragie", async jouer(sc, o) {
+            if (sc.premier) etat(o, sc.calque, sc.lanceur, "Hémorragie interne");
+            const p = centre(sc.lanceur, sc.calque);
+            o.son("saignement");
+            o.eclat(sc.lanceur, ROUGE, 380);
+            o.gerbe(sc.calque, p.x, p.y + p.t * 0.15, { nombre: 6, dist: p.t * 0.35, couleurs: ["#b0101c", "#e03040"], taille: 6, duree: 600 });
+            await o.attendre(220);
+        } },
+        // LE BOND : le pion s'élève (il grossit), survole les cases en arc
+        // pendant que son ombre glisse au sol, et se reçoit dans la poussière.
+        { id: "jeu-bond", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque), fin = pointDe(o, sc, sc.vers);
+            const dx = fin.x - a.x, dy = fin.y - a.y;
+            const ombre = o.ombre(sc.calque, a);
+            o.son("bond-envol");
+            const vol = o.bouger(sc.lanceur, [
+                { transform: "translate(0,0) scale(1)" },
+                { transform: `translate(${dx * 0.08}px, ${dy * 0.08}px) scale(0.9)`, offset: 0.14 },
+                { transform: `translate(${dx * 0.5}px, ${dy * 0.5}px) scale(1.42)`, offset: 0.55 },
+                { transform: `translate(${dx}px, ${dy}px) scale(0.93)`, offset: 0.9 },
+                { transform: `translate(${dx}px, ${dy}px) scale(1)` }
+            ], { duration: 900, easing: "ease-in-out", fill: "forwards" });
+            o.teinter(ombre, [{ transform: `${BASE} translate(0px, 0px) scale(1)`, opacity: 1 },
+                              { transform: `${BASE} translate(${dx * 0.5}px, ${dy * 0.5}px) scale(0.5)`, opacity: 0.45, offset: 0.55 },
+                              { transform: `${BASE} translate(${dx}px, ${dy}px) scale(1)`, opacity: 1 }],
+                      { duration: 900, easing: "ease-in-out", fill: "forwards" });
+            await o.attendre(810);
+            o.son("reception");
+            o.onde(sc.calque, fin, { couleur: "#c8b08a", taille: 0.9, duree: 500, echelle: 1.8 });
+            poussiere(o, sc.calque, fin, { n: 12, dist: 0.65 });
+            await vol;
+            o.texte(sc.calque, sc.lanceur, "Bond !", COULEURS.neutre);
+            await o.arriver(sc.lanceur, fin, { sinonRentrer: false });
+            o.effacer(ombre, { duree: 200 });
+            await o.attendre(150);
+        } },
+        // UN RENFORT : un cercle doré s'ouvre sur sa case, il tombe du ciel et
+        // se pose dans la poussière. « Renfort ! »
+        { id: "jeu-arrivee-renfort", async jouer(sc, o) {
+            const pos = positionDe(o, sc);
+            o.son("apparition");
+            const cercle = o.hexagone(sc.calque, pos, { fond: "radial-gradient(circle, rgba(255,240,200,0.2) 30%, rgba(226,184,79,0.75) 60%, rgba(120,60,20,0) 80%)" });
+            o.onde(sc.calque, pos, { couleur: "#e2b84f", taille: 1, duree: 700, echelle: 1.5 });
+            await o.attendre(400);
+            const f = doublure(o, sc, pos);
+            await atterrir(o, f, {});
+            o.son("reception");
+            poussiere(o, sc.calque, pos, { n: 10, dist: 0.6 });
+            if (sc.montrer) sc.montrer();
+            o.texte(sc.calque, f || sc.lanceur, "Renfort !", COULEURS.attention);
+            await o.attendre(900);
+            await o.effacer(cercle);
+        } },
+        // UNE ILLUSION : des éclats irisés convergent sur sa case et forment le
+        // leurre, qui sort du flou et chatoie.
+        { id: "jeu-apparition-illusion", async jouer(sc, o) {
+            const pos = positionDe(o, sc);
+            o.son("illusion");
+            await rassembler(o, sc.calque, pos, { couleur: "#c9a8ff", n: 12, duree: 600, etale: 250 });
+            const f = doublure(o, sc, pos);
+            await o.teinter(f, [{ opacity: 0, filter: "hue-rotate(200deg) saturate(1.4) brightness(1.2) blur(4px)" }, { opacity: 1, filter: "none" }],
+                            { duration: 450, fill: "forwards" });
+            if (sc.montrer) sc.montrer();
+            o.texte(sc.calque, f || sc.lanceur, "Illusion", "#c9a8ff");
+            await o.teinter(f, [{ filter: "none" }, { filter: "hue-rotate(260deg) saturate(1.4) brightness(1.3)" }, { filter: "none" }], { duration: 900 });
+        } },
+        // LE DÉPLOIEMENT : la case s'illumine (d'or pour un allié, de rouge pour
+        // un ennemi) et le pion y descend ; `sc.retard` les égrène.
+        { id: "jeu-deploiement", async jouer(sc, o) {
+            const pos = positionDe(o, sc);
+            await o.attendre(sc.retard || 0);
+            if (sc.sonne) o.son("deploiement");
+            const h = o.hexagone(sc.calque, pos, { fond: sc.allie ? "radial-gradient(circle, rgba(255,235,150,0.75), rgba(226,184,79,0.35) 70%)"
+                                                               : "radial-gradient(circle, rgba(255,140,140,0.7), rgba(180,30,30,0.35) 70%)" });
+            await o.attendre(150);
+            const f = doublure(o, sc, pos);
+            await o.teinter(f, [{ transform: `${BASE} scale(1.6)`, opacity: 0 }, { transform: `${BASE} scale(0.95)`, opacity: 1, offset: 0.8 },
+                                { transform: `${BASE} scale(1)`, opacity: 1 }], { duration: 480, easing: "ease-in", fill: "forwards" });
+            poussiere(o, sc.calque, pos, { n: 8 });
+            if (sc.montrer) sc.montrer();
+            if (sc.texte) o.texte(sc.calque, f || sc.lanceur, "Déploiement", COULEURS.neutre);
+            await o.attendre(600);
+            await o.effacer(h);
+        } }
+    ]);
 })();

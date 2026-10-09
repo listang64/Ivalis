@@ -329,11 +329,20 @@
                 const mx = (prec.x + vers.x) / 2, my = (prec.y + vers.y) / 2;
                 const tangue = p.tangue ? hasard(-p.tangue, p.tangue) : 0;
                 const rot = p.rotation || 0;
-                await o.bouger(el, [
+                // `saut` : un PETIT SAUT par case (vu de dessus, le pion grossit
+                // en quittant le sol, retombe un peu tassé sur la case, puis se
+                // redresse) ; sinon une foulée qui glisse.
+                const images = p.saut ? [
+                    { transform: `translate(${prec.x}px, ${prec.y}px) scale(1) rotate(${rot}deg)`, easing: "ease-out" },
+                    { transform: `translate(${mx}px, ${my}px) scale(${p.hauteur || 1.14}) rotate(${rot + tangue}deg)`, offset: 0.45, easing: "ease-in" },
+                    { transform: `translate(${vers.x}px, ${vers.y}px) scale(0.95) rotate(${rot}deg)`, offset: 0.82 },
+                    { transform: `translate(${vers.x}px, ${vers.y}px) scale(1) rotate(${rot}deg)` }
+                ] : [
                     { transform: `translate(${prec.x}px, ${prec.y}px) rotate(${rot}deg)` },
                     { transform: `translate(${mx}px, ${my}px) scale(${p.hauteur || 1.05}) rotate(${rot + tangue}deg)`, offset: 0.5 },
                     { transform: `translate(${vers.x}px, ${vers.y}px) rotate(${rot}deg)` }
-                ], { duration: (p.duree || 360) * (p.rythme ? p.rythme(i) : 1), easing: p.easing || "ease-in-out", fill: "forwards" });
+                ];
+                await o.bouger(el, images, { duration: (p.duree || 360) * (p.rythme ? p.rythme(i) : 1), easing: p.saut ? "linear" : (p.easing || "ease-in-out"), fill: "forwards" });
                 prec = vers;
                 if (p.apresPas) p.apresPas(pts[i], i);
             }
@@ -994,30 +1003,71 @@
         jeton.poses.forEach(el => el.remove());
         jeton.poses.clear();
     }
+    const nouveauJeton = () => ({ annule: false, minuteurs: new Set(), reveils: new Set(), anims: new Set(), poses: new Set() });
+    function annulerJeton(jeton) {
+        jeton.annule = true;
+        jeton.minuteurs.forEach(clearTimeout);
+        jeton.minuteurs.clear();
+        jeton.reveils.forEach(r => r());
+        jeton.reveils.clear();
+        nettoyer(jeton);
+    }
     window.annulerAnimationsCombat = function () {
         if (!enCours) return;
-        enCours.annule = true;
-        enCours.minuteurs.forEach(clearTimeout);
-        enCours.minuteurs.clear();
-        enCours.reveils.forEach(r => r());
-        enCours.reveils.clear();
-        nettoyer(enCours);
+        annulerJeton(enCours);
         enCours = null;
     };
-    // Le point d'entrée, pour le Studio comme pour le combat de demain.
-    window.jouerAnimationCombat = function (id, scene) {
-        const anim = window.animationCombatParId(id);
-        if (!anim || !scene || !scene.lanceur || !scene.calque) return Promise.resolve(false);
-        window.annulerAnimationsCombat();
-        const jeton = { annule: false, minuteurs: new Set(), reveils: new Set(), anims: new Set(), poses: new Set() };
-        enCours = jeton;
+    // UNE LECTURE : les outils autour de son jeton, et le ménage à la fin.
+    // `scene.grace` (ms) : le ménage attend un peu — une lecture du combat ne
+    // dure qu'un pas, et les gouttes, la poussière, la silhouette laissée
+    // derrière ont le temps de finir de s'effacer d'elles-mêmes.
+    function lire(anim, scene, jeton) {
         // Sans cible (un héros seul), l'axe pointe vers la droite.
         const cible = scene.cible || scene.lanceur;
-        const fin = (ok) => { nettoyer(jeton); if (enCours === jeton) enCours = null; return ok; };
+        const fin = (ok) => {
+            if (scene.grace > 0) setTimeout(() => nettoyer(jeton), scene.grace);
+            else nettoyer(jeton);
+            return ok;
+        };
         let promesse;
         try { promesse = Promise.resolve(anim.jouer({ ...scene, cible }, outils(jeton, scene))); }
         catch (e) { promesse = Promise.reject(e); }
         return promesse.then(() => fin(!jeton.annule),
-                             (e) => { console.error("Animation " + id + " :", e); return fin(false); });
+                             (e) => { console.error("Animation " + anim.id + " :", e); return fin(false); });
+    }
+    // Le point d'entrée du Studio : une seule lecture à la fois.
+    window.jouerAnimationCombat = function (id, scene) {
+        const anim = window.animationCombatParId(id);
+        if (!anim || !scene || !scene.lanceur || !scene.calque) return Promise.resolve(false);
+        window.annulerAnimationsCombat();
+        const jeton = nouveauJeton();
+        enCours = jeton;
+        return lire(anim, scene, jeton).then(ok => { if (enCours === jeton) enCours = null; return ok; });
+    };
+
+    // =====================================================================
+    //  LES ANIMATIONS DU COMBAT
+    // =====================================================================
+    //  Celles que Nico a validées dans le Studio et fait « implanter en jeu »
+    //  (animations_catalogue.js, ANIMATIONS_JEU), jouées par le combat
+    //  (animations_jeu.js) sur les vrais pions. Chacune a SA lecture :
+    //  plusieurs tournent ensemble (un renfort qui se pose pendant qu'un pion
+    //  marche), et aucune ne coupe celle du Studio.
+    const ANIMATIONS_JEU = {};
+    const lecturesJeu = new Set();
+    window.enregistrerAnimationsJeu = function (liste) {
+        (liste || []).forEach(a => { if (a && a.id) ANIMATIONS_JEU[a.id] = a; });
+    };
+    window.animationJeuExiste = (id) => !!ANIMATIONS_JEU[id];
+    window.jouerAnimationJeu = function (id, scene) {
+        const anim = ANIMATIONS_JEU[id];
+        if (!anim || !scene || !scene.lanceur || !scene.calque) return Promise.resolve(false);
+        const jeton = nouveauJeton();
+        lecturesJeu.add(jeton);
+        return lire(anim, scene, jeton).then(ok => { lecturesJeu.delete(jeton); return ok; });
+    };
+    window.annulerAnimationsJeu = function () {
+        lecturesJeu.forEach(annulerJeton);
+        lecturesJeu.clear();
     };
 })();

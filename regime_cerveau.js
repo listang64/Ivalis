@@ -957,7 +957,18 @@ function contexteDuJeu() {
             opportunite: (d) => window.jouerAnimationOpportunite
                 ? window.jouerAnimationOpportunite(d) : null,
             zone: () => window.appliquerZonesPersistantes
-                ? window.appliquerZonesPersistantes() : null
+                ? window.appliquerZonesPersistantes() : null,
+            // Les animations du Studio intégrées au combat (animations_jeu.js) :
+            // l'annonce du repli, une case qui saigne (Hémorragie interne), un
+            // renfort ou une illusion qui entre en scène.
+            repli: (d) => {
+                if (window.annoncerRepliCombat) return window.annoncerRepliCombat(d);
+                const tk = (window.TOKENS_VTT_DATA || {})[d.pion];
+                if (tk && typeof window.afficherMessageFlottantHex === "function") window.afficherMessageFlottantHex(tk.q, tk.r, d.texte, d.couleur);
+                return null;
+            },
+            hemorragie: (d) => window.animerHemorragieCombat ? window.animerHemorragieCombat(d) : null,
+            arrivee: (d) => window.annoncerArriveeCombat ? window.annoncerArriveeCombat(d) : null
         },
 
         // OÙ POSER L'ÉTAT. Un seul sens : l'état descend, rien ne remonte.

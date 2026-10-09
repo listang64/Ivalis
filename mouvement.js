@@ -725,20 +725,30 @@ window.jouerAnimationPas = async function(pas) {
         //    LE REPLI file plus vite, sans bond, et laisse sur chaque case
         //    quittée une ombre du pion qui s'efface : on voit le combattant
         //    décrocher, pas se promener.
-        const repli = !!pas.repli;
-        if (repli) laisserTraceRepli(tokenDiv);
-        const duree = repli ? 0.2 : 0.4;
-        tokenDiv.style.transition = `left ${duree}s ${repli ? "ease-out" : "linear"}, top ${duree}s ${repli ? "ease-out" : "linear"}`;
-        if (imgMain) imgMain.style.transition = "transform 0.15s ease-out";
-        void tokenDiv.offsetWidth;
+        //
+        //    LES MARCHES DU STUDIO D'ANIMATION (animations_jeu.js) passent
+        //    avant : le repli, la fuite sous la Peur ou la Confusion, la case
+        //    offerte par un pas de retraite, la foulée du Vargen. Les autres
+        //    pas gardent la marche d'avant.
+        const sorte = typeof window.sortePasDeCombat === "function" ? window.sortePasDeCombat(pas) : null;
+        const animeParLeStudio = !!sorte && typeof window.animerPasDeCombat === "function"
+            && await window.animerPasDeCombat(pas, sorte);
+        if (!animeParLeStudio) {
+            const repli = !!pas.repli;
+            if (repli) laisserTraceRepli(tokenDiv);
+            const duree = repli ? 0.2 : 0.4;
+            tokenDiv.style.transition = `left ${duree}s ${repli ? "ease-out" : "linear"}, top ${duree}s ${repli ? "ease-out" : "linear"}`;
+            if (imgMain) imgMain.style.transition = "transform 0.15s ease-out";
+            void tokenDiv.offsetWidth;
 
-        if (imgMain) imgMain.style.transform = repli ? "scale(0.94)" : "scale(1.12)";
-        tokenDiv.dataset.q = pas.vers.q;
-        tokenDiv.dataset.r = pas.vers.r;
-        window.positionnerTokenVTT(tokenDiv, true);
-        await new Promise(r => setTimeout(r, repli ? 130 : 250));
-        if (imgMain) imgMain.style.transform = "scale(1)";
-        await new Promise(r => setTimeout(r, repli ? 80 : 150));
+            if (imgMain) imgMain.style.transform = repli ? "scale(0.94)" : "scale(1.12)";
+            tokenDiv.dataset.q = pas.vers.q;
+            tokenDiv.dataset.r = pas.vers.r;
+            window.positionnerTokenVTT(tokenDiv, true);
+            await new Promise(r => setTimeout(r, repli ? 130 : 250));
+            if (imgMain) imgMain.style.transform = "scale(1)";
+            await new Promise(r => setTimeout(r, repli ? 80 : 150));
+        }
 
         // 4. La zone persistante se déclenche une fois ARRIVÉ sur la case.
         for (const entree of (pas.zones || [])) {
@@ -848,11 +858,18 @@ window.anticiperMarche = function(idPerso, chemin) {
     window.PIONS_EN_MOUVEMENT = window.PIONS_EN_MOUVEMENT || {};
     window.PIONS_EN_MOUVEMENT[idPerso] = Date.now();
 
+    // Les premières cases offertes par un pas de retraite (l'état « Repli »
+    // posé par l'arme, hexApresAttaque) : le cerveau les marquera « offert »,
+    // l'écran qui anticipe les marque de même (animations_jeu.js).
+    const moi = (window.PERSOS_PARTIE || []).find(p => p && p.idPersonnage === idPerso) || {};
+    const offertes = (moi.Etats_Alteres || []).reduce((n, e) => n + (Number(e && e.bonusEquip && e.bonusEquip.hexApresAttaque) || 0), 0);
+
     (async () => {
         for (let i = 0; i < pas.length; i++) {
             if (a.annulee) { for (let j = i; j < pas.length; j++) fins[j].tenir(false); return; }
             try {
-                await window.jouerAnimationPas({ idToken: idPerso, de: pas[i].de, vers: pas[i].vers, anticipe: true });
+                await window.jouerAnimationPas({ idToken: idPerso, de: pas[i].de, vers: pas[i].vers, anticipe: true,
+                                                 ...(i < offertes ? { offert: true } : {}) });
                 a.joues = i + 1;
                 fins[i].tenir(true);
                 // Refermée pendant ce pas, et ce pas n'a pas été confirmé : le
@@ -1115,23 +1132,34 @@ window.jouerAnimationBond = async function(data) {
         void tokenDiv.offsetWidth;
     }
 
-    tokenDiv.style.transition = "left 0.25s ease-in-out, top 0.25s ease-in-out";
-    if (imgMain) imgMain.style.transition = "transform 0.12s ease-in-out";
+    // LE BOND DU STUDIO D'ANIMATION (animations_jeu.js) : le pion s'élève,
+    // survole les cases pendant que son ombre glisse au sol, se reçoit dans la
+    // poussière. Le Transfert garde son saut à lui.
+    let animeParLeStudio = false;
+    try {
+        animeParLeStudio = !data.transfert && typeof window.animerBondDeCombat === "function"
+            && await window.animerBondDeCombat(data);
+    } catch (e) { console.error("Bond :", e); }
 
-    if (imgMain) imgMain.style.transform = "scale(0.85)";
-    await new Promise(r => setTimeout(r, 120));
+    if (!animeParLeStudio) {
+        tokenDiv.style.transition = "left 0.25s ease-in-out, top 0.25s ease-in-out";
+        if (imgMain) imgMain.style.transition = "transform 0.12s ease-in-out";
 
-    tokenDiv.dataset.q = data.arrivee.q;
-    tokenDiv.dataset.r = data.arrivee.r;
-    window.positionnerTokenVTT(tokenDiv, false);
-    if (imgMain) imgMain.style.transform = "scale(1.15)";
-    await new Promise(r => setTimeout(r, 250));
+        if (imgMain) imgMain.style.transform = "scale(0.85)";
+        await new Promise(r => setTimeout(r, 120));
 
-    if (imgMain) imgMain.style.transform = "scale(0.85)";
-    await new Promise(r => setTimeout(r, 120));
+        tokenDiv.dataset.q = data.arrivee.q;
+        tokenDiv.dataset.r = data.arrivee.r;
+        window.positionnerTokenVTT(tokenDiv, false);
+        if (imgMain) imgMain.style.transform = "scale(1.15)";
+        await new Promise(r => setTimeout(r, 250));
 
-    if (imgMain) imgMain.style.transform = "scale(1)";
-    await new Promise(r => setTimeout(r, 150));
+        if (imgMain) imgMain.style.transform = "scale(0.85)";
+        await new Promise(r => setTimeout(r, 120));
+
+        if (imgMain) imgMain.style.transform = "scale(1)";
+        await new Promise(r => setTimeout(r, 150));
+    }
 
     tokenDiv.style.transition = "none";
     if (imgMain) {

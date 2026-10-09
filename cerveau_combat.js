@@ -67,7 +67,7 @@ function suitesDeConfusion(etat, action, des, plateau) {
     if (conf.fuite && moi && !moi.aTerre) {
         etapes.push({ type: "message", cible: id, acteur: id, texte: "Confus : s'enfuit !", couleur: "#cc66ff" });
         const menace = ennemiLePlusProche(etat, id);
-        etapes.push(...resoudrePeur(etat, menace ? menace.id : id, id, des, plateau, { exempte: null }));
+        etapes.push(...resoudrePeur(etat, menace ? menace.id : id, id, des, plateau, { exempte: null, fuite: "confusion" }));
     }
     const apres = combattant(etat, id);
     if (conf.dissipee && apres && !apres.aTerre) etapes.push(...dissiperConfusion(etat, id));

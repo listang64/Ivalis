@@ -5669,3 +5669,69 @@ dans le jeu actuellement. On pourra les retravailler en partant de ça. »
   « ✥ Déplacer » suit la carte par `~` (le bandeau de ciblage s'est glissé
   entre la carte et la barre) ; zone_soin_verte_carte.mjs lit la nouvelle
   signature de dessinerHexZonePersistante.
+
+## Le Studio retouché, et dix animations implantées en jeu (version 230)
+
+Nico, à propos de la taille des pions : « on est d'accord que les animations
+sont liées aux tokens, donc si on réduit la taille des hexagones ça ne
+changera rien aux animations ? » — Les effets (éclats, gouttes, icônes) se
+règlent sur la taille du PION à l'écran ; les déplacements, eux, vont de
+centre de case à centre de case. Réduire les hexagones raccourcit donc les pas
+(toujours une case pile), sans changer la taille des effets autour du pion.
+La différence vue dans le Studio venait de lui : sans pion de combat pour le
+héros, il prenait 92 % du rayon de case. Chaque pion du Studio prend
+maintenant la taille de son pion de combat (celle du héros, celle d'une
+créature posée sur la carte pour l'ennemi, 55 par défaut comme
+appliquerTokensVTT), dans la même proportion qu'au combat.
+
+Les retouches du Studio (animations_catalogue.js, animations_combat.js) :
+- MARCHE : de petits sauts case par case (o.parcourir, `saut` : il grossit en
+  quittant le sol, retombe un peu tassé, se redresse), un pas sur l'herbe et la
+  terre (son « pas-herbe »), la fatigue garde son « -1 ⚡ ».
+- TERRAIN DIFFICILE : plus de cailloux qui pop ; la même marche, plus lente,
+  « -2 ⚡ », les pas lourds.
+- MARCHE GELÉE : plus de teinte sur le pion ; la même marche, quelques
+  cristaux de givre qui poussent sous le pion à chaque pas, la glace qui
+  craque (« pas-glace »).
+- REPLI : plus de logo bleu ↩️ ; FUITE SOUS LA PEUR : plus de smiley ;
+  ENTRÉE DANS UNE ZONE : un vrai bruitage électrique (« decharge ») dans la
+  zone électrique. Trois sons neufs (fabrique_sons.js) : 102 sons de combat.
+
+Implantées en jeu (animations_jeu.js, nouveau ; le catalogue en garde les
+gestes, « En jeu », découpés au pas) : Marche du Vargen, Bond, Repli, Pas de
+retraite offert par l'arme, Fuite sous la Peur, Fuite sous la Confusion,
+Hémorragie interne, Arrivée d'un renfort, Apparition d'une Illusion,
+Déploiement des pions.
+- LE MOTEUR joue désormais aussi des lectures « jeu »
+  (jouerAnimationJeu) : plusieurs à la fois, sans couper le Studio, et leur
+  ménage attend que poussière et silhouettes aient fini de s'effacer.
+- LA SCÈNE DU COMBAT (sceneDeCombat) : les vrais pions, la grille du plateau
+  (VTT_POS + case × VTT_SCALE), le calque des pions ; un pion arrivé est posé
+  par positionnerTokenVTT.
+- LE NOYAU dit la manière d'un pas : `fuite: "peur" | "confusion"`
+  (resoudrePeur, et le confus de suitesDeConfusion), `offert` (la case d'un pas
+  de retraite, resoudreMouvement). Le pont la transmet (pont_combat.js), avec
+  le `transfert` d'un bond, la case qui saigne (`tic` Hémorragie interne →
+  `hemorragie`), l'illusion qui arrive ; l'annonce du repli devient un geste
+  (« Repli : sans opportunité », sans icône) ; regime_cerveau.js donne les
+  effets (repli, hemorragie, arrivee).
+- LES PAS (jouerAnimationPas, mouvement.js) : repli, fuite, case offerte,
+  foulée du Vargen (son atout de race) passent par le Studio ; ce qui ne se
+  dit qu'une fois (« Foulée du Vargen : ½ ⚡ », « Peur : il s'enfuit ! ») au
+  premier pas du trajet ; la fuite garde sa teinte le temps de la fuite. Les
+  autres pas gardent la marche d'avant ; l'écran qui anticipe sa marche
+  marque lui aussi les cases offertes.
+- LE BOND (jouerAnimationBond) : l'envol, l'ombre, la réception — le
+  Transfert garde son saut.
+- LES ENTRÉES EN SCÈNE : renfort et illusion annoncés par le journal, et le
+  déploiement (un pion qui paraît avant que la première manche ne se joue,
+  pas au chargement de la page, pas en plein combat). Le vrai pion reste caché
+  (.pion-en-entree, reposée par appliquerTokensVTT) pendant que sa copie
+  descend ; appliquerTokensVTT garde les effets en cours au redessin.
+  animations_en_jeu.mjs : le noyau et le pont (fuite, offert, transfert,
+  hémorragie, illusion), puis le vrai plateau — chaque pas son geste, ses
+  sons, ses mots une seule fois, posé net sur sa case ; un humain et le
+  Transfert inchangés ; renfort, illusion, déploiement, un redessin en pleine
+  entrée, pas de déploiement en plein combat. studio_deplacements.mjs : les
+  retouches du Studio, les sons neufs, la taille des pions. repli.mjs lit la
+  nouvelle annonce ; studio_animation.mjs compte 102 sons.

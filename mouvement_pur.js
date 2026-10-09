@@ -435,8 +435,10 @@ export function resoudreMouvement(etat, action, des, plateau) {
         c.q = pas.vers.q;
         c.r = pas.vers.r;
         c.fatigue = Math.max(0, c.fatigue - pas.cout);
+        // Une case offerte par un pas de retraite le dit : l'écran la marque
+        // d'une empreinte dorée (pont_combat.js, animations_jeu.js).
         etapes.push({ type: "pas", acteur: id, de: pas.de, vers: pas.vers,
-                      cout: pas.cout, fatigueApres: c.fatigue });
+                      cout: pas.cout, fatigueApres: c.fatigue, ...(pas.offerte ? { offert: true } : {}) });
 
         // Chaque ennemi QUITTÉ frappe, ici, à cet hexagone précis.
         const contactApres = new Set(ennemisAuContact(suivant, id, pas.vers));
@@ -601,8 +603,11 @@ export function resoudreBond(etat, action, des, plateau) {
 // `options.exempte` : qui ne frappe PAS le fuyard en opportunité (par défaut
 // le lanceur de la Peur, qui n'en profite pas d'un coup en plus). La fuite
 // d'un confus (règle de Nico) n'exempte personne : `exempte: null`.
+// `options.fuite` : ce qui fait fuir (« peur » par défaut, « confusion ») —
+// chaque pas le porte, l'écran ne court pas pareil (animations_jeu.js).
 export function resoudrePeur(etat, idLanceur, idCible, des, plateau, options) {
     const exempte = (options && "exempte" in options) ? options.exempte : idLanceur;
+    const fuite = (options && options.fuite) || "peur";
     const etapes = [];
     const cible = combattant(etat, idCible);
     if (!cible || cible.aTerre) return etapes;
@@ -644,7 +649,7 @@ export function resoudrePeur(etat, idLanceur, idCible, des, plateau, options) {
         cible.q = pas.q;
         cible.r = pas.r;
         cible.fatigue = Math.max(0, nombre(cible.fatigue) - 2);
-        etapes.push({ type: "pas", acteur: idCible, de, vers: pas, cout: 2, fatigueApres: cible.fatigue });
+        etapes.push({ type: "pas", acteur: idCible, de, vers: pas, cout: 2, fatigueApres: cible.fatigue, fuite });
 
         const contactApres = new Set(ennemisAuContact(etat, idCible, pas).filter(id => id !== exempte));
         for (const ennemi of contactAvant) {

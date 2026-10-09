@@ -451,6 +451,28 @@
             note(ctx, s, { debut: 0.02, freq: 2637, duree: 0.09, gain: 0.02, attaque: 0.002, type: "triangle" });
         },
         "pas-leger"(ctx, s) { pas(ctx, s, { duree: 0.045, grain: 1500, corps: 160, gain: 0.18 }); },
+        // UN PAS SUR UN SOL D'HERBE ET DE TERRE (Nico : « un bruit de pas sur un
+        // sol herbeux, terre plutôt ») : la terre qui reçoit le pied, mate et
+        // feutrée, l'herbe froissée par-dessus, et quelques brins qui craquent.
+        "pas-herbe"(ctx, s) {
+            bruit(ctx, s, { duree: 0.09, filtre: "lowpass", freq: 320, q: 0.6, gain: 0.34 });
+            note(ctx, s, { freq: 88, glisse: 60, duree: 0.08, gain: 0.12, attaque: 0.004 });
+            bruit(ctx, s, { debut: 0.005, duree: 0.14, filtre: "bandpass", freq: 2600, q: 0.9, gain: 0.1, forme: "cloche" });
+            for (let i = 0; i < 4; i++) bruit(ctx, s, { debut: au(0.01, 0.1), duree: au(0.004, 0.01), filtre: "highpass", freq: au(3500, 5500), q: 1, gain: au(0.04, 0.08) });
+        },
+        // UN PAS SUR LA GLACE (Nico : « un craquement de glace ») : le pied qui
+        // pèse, la croûte qui cède d'un coup sec, puis les fêlures qui
+        // courent, et le grincement du gel.
+        "pas-glace"(ctx, s) {
+            bruit(ctx, s, { duree: 0.07, filtre: "lowpass", freq: 420, q: 0.6, gain: 0.22 });
+            bruit(ctx, s, { debut: 0.01, duree: 0.025, filtre: "highpass", freq: 2200, q: 0.8, gain: 0.3 });
+            let t = 0.02;
+            for (let i = 0; i < 6; i++) {
+                bruit(ctx, s, { debut: t, duree: au(0.006, 0.014), filtre: "bandpass", freq: au(1400, 4200), q: 2, gain: au(0.12, 0.22) });
+                t += au(0.012, 0.026);
+            }
+            note(ctx, s, { debut: 0.015, freq: 1300, glisse: 760, duree: 0.12, gain: 0.025, attaque: 0.002, type: "triangle" });
+        },
         "course"(ctx, s) { for (let i = 0; i < 4; i++) pas(ctx, s, { debut: i * 0.09, duree: 0.045, grain: 1300, corps: 150, gain: 0.2 }); },
         "bond-envol"(ctx, s) {
             souffle(ctx, s, { duree: 0.3, balayage: [400, 1800], gain: 0.3 });
@@ -707,6 +729,15 @@
             bruit(ctx, s, { duree: 0.04, filtre: "highpass", freq: 2000, q: 0.7, gain: 0.4 });
             note(ctx, s, { freq: 120, duree: 0.7, gain: 0.06, type: "sawtooth", passeBas: 2200 });
             crepiter(ctx, s, { n: 10, duree: 0.7, fmin: 3000, fmax: 6500, gain: 0.22 });
+        },
+        // ENTRER DANS UNE NAPPE ÉLECTRIQUE (Nico : « fais un bruitage
+        // électrique ») : l'arc qui claque, le bourdonnement haché du courant,
+        // une note qui grésille en retombant, et les étincelles qui crépitent.
+        "decharge"(ctx, s) {
+            bruit(ctx, s, { duree: 0.03, filtre: "highpass", freq: 3000, q: 0.7, gain: 0.42 });
+            for (let i = 0; i < 9; i++) note(ctx, s, { debut: i * 0.045, freq: 98, duree: 0.03, gain: 0.07, type: "sawtooth", attaque: 0.002, passeBas: 3000 });
+            note(ctx, s, { freq: 1800, glisse: 300, duree: 0.25, gain: 0.03, type: "square", attaque: 0.002, passeBas: 4000 });
+            crepiter(ctx, s, { n: 14, duree: 0.45, fmin: 2500, fmax: 7000, gain: 0.28 });
         },
         "zone-poison"(ctx, s) {
             bulles(ctx, s, { n: 9, duree: 0.8, gain: 0.08 });

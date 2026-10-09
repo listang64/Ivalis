@@ -80,21 +80,26 @@ export const RYTHME = {
 const SCENES = {
 
     // --- LE MOUVEMENT ----------------------------------------------------
+    // Un pas porte sa manière de marcher, que l'écran montre (animations du
+    // Studio intégrées au combat, animations_jeu.js) : un repli, une FUITE
+    // (sous la Peur ou la Confusion), une case OFFERTE par un pas de retraite.
     pas(e) {
         return { geste: "pas", pion: e.acteur, de: e.de, vers: e.vers,
-                 cout: nombre(e.cout), ...(e.repli ? { repli: true } : {}) };
+                 cout: nombre(e.cout), ...(e.repli ? { repli: true } : {}),
+                 ...(e.fuite ? { fuite: e.fuite } : {}), ...(e.offert ? { offert: true } : {}) };
     },
-    // Le repli s'annonce, puis ses pas (marqués `repli`) filent plus vite, en
-    // laissant une traînée derrière le pion.
+    // Le repli s'annonce (son souffle, et « Repli : sans opportunité » — plus
+    // d'icône bleue, Nico : « tu peux virer le logo bleu »), puis ses pas
+    // (marqués `repli`) filent plus vite, en laissant une traînée derrière le pion.
     repli(e) {
-        return { geste: "message", pion: e.acteur, texte: "↩️ Repli !",
-                 couleur: COULEURS.attention, duree: RYTHME.repli };
+        return { geste: "repli", pion: e.acteur, texte: "Repli : sans opportunité",
+                 couleur: COULEURS.neutre, duree: RYTHME.repli };
     },
     // Un déplacement imposé. Même géométrie, autre gestuelle : un pion poussé
     // ne marche pas, il glisse ; un bond est un saut à vol d'oiseau.
     poussee(e)  { return { geste: "poussee", pion: e.cible || e.acteur, de: e.de, vers: e.vers }; },
     traction(e) { return { geste: "poussee", pion: e.cible || e.acteur, de: e.de, vers: e.vers }; },
-    bond(e)     { return { geste: "bond", pion: e.cible || e.acteur, de: e.de, vers: e.vers }; },
+    bond(e)     { return { geste: "bond", pion: e.cible || e.acteur, de: e.de, vers: e.vers, ...(e.transfert ? { transfert: true } : {}) }; },
 
     // --- LA TECHNIQUE ----------------------------------------------------
     //  On ne rejoue PAS la résolution : on montre le lanceur s'élancer vers sa
@@ -213,6 +218,9 @@ const SCENES = {
                  couleurBarre: champ === "bouclier" ? COULEURS.bouclier : COULEURS.degats,
                  bouclierBrise: !!e.bouclierBrise,
                  critique: !!e.critique,
+                 // L'Hémorragie interne saigne à chaque case : son geste à elle
+                 // (des gouttes, un éclat rouge) précède le chiffre.
+                 ...(e.tic === "Hémorragie interne" ? { hemorragie: true } : {}),
                  duree: RYTHME.jauge };
     },
 
@@ -275,7 +283,12 @@ const SCENES = {
     },
     tour()     { return { geste: "rien" }; },
     manche(e)  { return { geste: "manche", numero: nombre(e.numero) }; },
-    arrivee(e) { return { geste: "arrivee", pion: e.combattant && e.combattant.id }; },
+    // Un combattant entre en scène : un renfort tombe du ciel, une illusion se
+    // forme (animations_jeu.js).
+    arrivee(e) {
+        return { geste: "arrivee", pion: e.combattant && e.combattant.id,
+                 ...(e.combattant && e.combattant.estIllusion ? { illusion: true } : {}) };
+    },
     zone(e)    { return { geste: "zone", id: e.id, zone: e.zone || null, retiree: !!e.retiree }; },
 
     chute(e) {
@@ -371,7 +384,7 @@ export const TYPES_MIS_EN_SCENE = Object.keys(SCENES);
 // imposé rejoue cette même animation, il appelle celle-ci et ne peut plus
 // s'en écarter.
 export function versAnimationDeSaut(d) {
-    return { idToken: d.idToken, depart: d.de, arrivee: d.vers };
+    return { idToken: d.idToken, depart: d.de, arrivee: d.vers, ...(d.transfert ? { transfert: true } : {}) };
 }
 
 export function creerPont(effets) {
@@ -386,6 +399,10 @@ export function creerPont(effets) {
         esquive = () => {},                // animerEsquive : le mot ET le recul
         opportunite = async () => {},      // jouerAnimationOpportunite
         zone = async () => {},             // appliquerZonesPersistantes
+        // Les animations du Studio intégrées au combat (animations_jeu.js) :
+        repli = null,                      // l'annonce du repli
+        hemorragie = async () => {},       // une case qui saigne
+        arrivee = async () => {},          // un renfort, une illusion entrent en scène
         pause = (ms) => new Promise(r => setTimeout(r, ms)),
         tracer = () => {}
     } = effets || {};
@@ -418,7 +435,14 @@ export function creerPont(effets) {
         switch (scene.geste) {
             case "pas":
                 await pas({ idToken: scene.pion, de: scene.de, vers: scene.vers,
-                            ...(scene.repli ? { repli: true } : {}) });
+                            ...(scene.repli ? { repli: true } : {}),
+                            ...(scene.fuite ? { fuite: scene.fuite } : {}),
+                            ...(scene.offert ? { offert: true } : {}) });
+                break;
+
+            case "repli":
+                if (repli) await repli({ pion: scene.pion, texte: scene.texte, couleur: scene.couleur });
+                else { message(scene.pion, scene.texte, scene.couleur); await pause(scene.duree); }
                 break;
 
             case "poussee":
@@ -426,7 +450,8 @@ export function creerPont(effets) {
                 break;
 
             case "bond":
-                await bond({ idToken: scene.pion, de: scene.de, vers: scene.vers });
+                await bond({ idToken: scene.pion, de: scene.de, vers: scene.vers,
+                             ...(scene.transfert ? { transfert: true } : {}) });
                 break;
 
             case "carte":
@@ -451,6 +476,7 @@ export function creerPont(effets) {
                 break;
 
             case "jauge":
+                if (scene.hemorragie) await hemorragie({ pion: scene.pion });
                 // Le chiffre flottant et la barre partent ensemble, puis on laisse
                 // le temps de les lire. C'est le seul endroit du jeu où un joueur
                 // apprend ce qu'il vient d'encaisser.
@@ -485,7 +511,11 @@ export function creerPont(effets) {
                 await zone(scene);
                 break;
 
-            // « etats », « manche », « arrivee » n'ont pas d'animation propre :
+            case "arrivee":
+                await arrivee({ pion: scene.pion, ...(scene.illusion ? { illusion: true } : {}) });
+                break;
+
+            // « etats » et « manche » n'ont pas d'animation propre :
             // le rafraîchissement que le spectateur fait après chaque étape les
             // montre déjà. On les laisse passer plutôt que d'inventer un geste.
             default:

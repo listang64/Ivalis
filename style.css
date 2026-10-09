@@ -5029,6 +5029,10 @@ textarea.input-texte-parchemin {
 .studio-anim-cible { font-size: 13px; }
 .studio-anim.cible { border-color: #ff4c4c; box-shadow: 0 0 0 2px rgba(255,76,76,0.6), 0 0 12px rgba(255,76,76,0.4); }
 
+/* UN PION QUI ENTRE EN SCÈNE (animations_jeu.js : déploiement, renfort,
+   illusion) reste caché le temps que sa copie tombe sur sa case. */
+.token-vtt.pion-en-entree { visibility: hidden; }
+
 /* La piste d'initiative pendant la préparation : qui a choisi sa compétence. */
 .piste-choix {
   position: absolute; top: -4px; right: -5px; width: 22px; height: 22px; border-radius: 50%; z-index: 4;
