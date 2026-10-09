@@ -4185,11 +4185,11 @@ function validerIdentification(idJoueur) {
   setTimeout(() => { ecranIdentification.style.display = "none"; }, 1500);
 }
 
-// LE CLIC DES BOUTONS : le ding perle de la Fabrique (fabrique_sons.js), à la
-// place de l'ancien bruit de parchemin. Le volume suit Interface × Général.
+// LE CLIC DES BOUTONS : la Goutte de la Fabrique (fabrique_sons.js,
+// SON_CLIC_JEU). Le volume suit Interface × Général.
 function jouerSonClic() {
   if (typeof window.jouerSonFabrique === "function") {
-    window.jouerSonFabrique(window.SON_CLIC_JEU || "ding-perle");
+    window.jouerSonFabrique(window.SON_CLIC_JEU || "goutte");
   }
 }
 
@@ -4576,11 +4576,11 @@ function lancerPartieChargee(idChoisi) {
 // =========================================================================
 //  ECRAN DE JEU : son, volume, pop-ups
 // =========================================================================
-// Le survol des menus (et l'ouverture/fermeture du chat et du combat) : le
-// même ding perle, à mi-volume comme l'était l'ancien bruit de parchemin.
+// Le survol des menus (et l'ouverture/fermeture du chat et du combat) : la
+// même Goutte, à mi-volume comme l'était l'ancien bruit de parchemin.
 function jouerSonSurvolParchemin() {
   if (typeof window.jouerSonFabrique === "function") {
-    window.jouerSonFabrique(window.SON_CLIC_JEU || "ding-perle", 0.5);
+    window.jouerSonFabrique(window.SON_CLIC_JEU || "goutte", 0.5);
   }
 }
 

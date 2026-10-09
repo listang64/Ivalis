@@ -5544,3 +5544,18 @@ propositions de sons. »
   au-delà de 0,8 s, au moins cinq sous 0,2 s, la moitié de la crête en moins
   de 15 ms (sauf le souffle de l'Envoi), deux attaques au plus, dix sons
   vraiment différents.
+
+## La Goutte, son de tous les menus (version 226)
+
+Nico : « Ok, remplace tous les sons menu par : la goutte. »
+- UNE SEULE LIGNE (fabrique_sons.js) : SON_CLIC_JEU = "goutte", la n° 5 de la
+  Fabrique. Elle joue à chaque clic de bouton (jouerSonClic) et, à mi-volume,
+  au survol des menus et à l'ouverture du chat ou du combat
+  (jouerSonSurvolParchemin, app.js) — les deux seules portes du son des
+  menus.
+- LE DING PERLE S'EN VA : il n'était plus que le son des menus ; SONS_JEU
+  disparaît avec lui, et jouerSonFabrique ne cherche plus que dans les dix
+  sons de la Fabrique. Les sons d'événement (victoire, défaite, blessure) et
+  ceux du combat ne changent pas.
+  fabrique_sons.mjs, section 5 : clic, survol, vrai bouton de la page, vrai
+  bouton du menu latéral — tous la Goutte ; plus aucune trace du ding perle.

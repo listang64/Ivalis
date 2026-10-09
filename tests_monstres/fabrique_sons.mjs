@@ -230,8 +230,8 @@ console.log("\n3. LES DIX SONS, RENDUS HORS LIGNE : SOBRES, À LA MANIÈRE D'APP
     if (proche(a.duree, b.duree) && proche(a.hauteur, b.hauteur) && proche(a.rms, b.rms) && a.paliers.length === b.paliers.length) jumeaux.push(a.id + "/" + b.id);
   }
   verifier("dix sons vraiment différents", jumeaux.length === 0, jumeaux.join(", "));
-  const r = await p.evaluate(() => ({ perle: window.jouerSonFabrique("ding-perle"), liste: window.SONS_FABRIQUE.some(s => s.id === "ding-perle") }));
-  verifier("le ding perle des boutons du jeu joue toujours, hors de la liste", r.perle === true && !r.liste);
+  const r = await p.evaluate(() => ({ goutte: window.jouerSonFabrique("goutte"), perle: window.jouerSonFabrique("ding-perle") }));
+  verifier("la Goutte joue par son nom ; le ding perle n'existe plus", r.goutte === true && r.perle === false, JSON.stringify(r));
 }
 
 console.log("\n4. LE VOLUME DU JEU FAIT LOI, ET LE RETOUR RAMÈNE AU MENU");
@@ -257,16 +257,19 @@ console.log("\n4. LE VOLUME DU JEU FAIT LOI, ET LE RETOUR RAMÈNE AU MENU");
   verifier("« Retour » ramène au menu des Paramètres", r.menu && !r.fabrique);
 }
 
-console.log("\n5. LE DING PERLE REMPLACE LE BRUIT DE PARCHEMIN DANS TOUT LE JEU");
+console.log("\n5. LA GOUTTE EST LE SON DE TOUS LES MENUS");
 {
-  // Nico : « je choisis le ding perle ; remplace tous les bruits de parchemin
-  // actuels dans le jeu par ce ding perle ». Le parchemin était un seul
-  // fichier (clik_bouton_aniy88.mp3), joué par jouerSonClic (tous les
-  // boutons) et jouerSonSurvolParchemin (survol des menus, chat, combat).
+  // Nico : « ok, remplace tous les sons menu par la goutte ». Avant elle, le
+  // ding perle ; avant encore, un fichier de parchemin (clik_bouton_aniy88.mp3).
+  // Deux portes jouent le son des menus : jouerSonClic (tous les boutons) et
+  // jouerSonSurvolParchemin (survol des menus, chat, combat).
   const html = fs.readFileSync(`${RACINE}/index.html`, "utf-8");
   const app = fs.readFileSync(`${RACINE}/app.js`, "utf-8");
+  const fabrique = fs.readFileSync(`${RACINE}/fabrique_sons.js`, "utf-8");
   verifier("le fichier du parchemin n'est plus chargé nulle part",
            !/clik_bouton/.test(html) && !/clik_bouton/.test(app) && !/id="son-clic"|audio-survol-parchemin/.test(html));
+  verifier("plus aucune trace du ding perle dans le code du jeu",
+           !/ding-perle/.test(app) && !/ding-perle/.test(fabrique) && !/SONS_JEU/.test(fabrique));
   const r = await p.evaluate(async () => {
     const appels = [];
     const vrai = window.jouerSonFabrique;
@@ -280,17 +283,30 @@ console.log("\n5. LE DING PERLE REMPLACE LE BRUIT DE PARCHEMIN DANS TOUT LE JEU"
     const lateral = document.querySelector(".conteneur-bouton-lateral");
     const menu = await suivre(() => lateral.dispatchEvent(new MouseEvent("mouseenter")));
     window.jouerSonFabrique = vrai;
+    // La Goutte de la Fabrique et celle des menus : le même son, rendu.
+    const rendre = async (fabriquer) => {
+      const ctx = new OfflineAudioContext(1, 44100 * 0.2, 44100);
+      const g = ctx.createGain(); g.connect(ctx.destination);
+      fabriquer(ctx, g);
+      const d = (await ctx.startRendering()).getChannelData(0);
+      let e = 0; for (const x of d) e += x * x; return Math.sqrt(e / d.length);
+    };
+    const goutte = window.SONS_FABRIQUE.find(s => s.id === window.SON_CLIC_JEU);
     return { clic, survol, bouton, menu, choisi: window.SON_CLIC_JEU,
-             aMoitie: vrai("ding-perle", 0.5), aZero: vrai("ding-perle", 0) };
+             rangGoutte: window.SONS_FABRIQUE.findIndex(s => s.id === "goutte") + 1,
+             energie: goutte ? await rendre(goutte.fabriquer) : 0,
+             aMoitie: vrai(window.SON_CLIC_JEU, 0.5), aZero: vrai(window.SON_CLIC_JEU, 0) };
   });
-  verifier("le son choisi pour le jeu est le ding perle", r.choisi === "ding-perle", r.choisi);
-  verifier("un clic de bouton joue le ding perle", JSON.stringify(r.clic) === '[["ding-perle",1]]', JSON.stringify(r.clic));
-  verifier("le survol des menus aussi, à mi-volume comme avant", JSON.stringify(r.survol) === '[["ding-perle",0.5]]',
+  verifier("le son des menus est la Goutte, la n° 5 de la Fabrique", r.choisi === "goutte" && r.rangGoutte === 5,
+           `${r.choisi} (n° ${r.rangGoutte})`);
+  verifier("la Goutte sonne bien (rendue hors ligne)", r.energie > 0.005, r.energie.toFixed(4));
+  verifier("un clic de bouton joue la Goutte", JSON.stringify(r.clic) === '[["goutte",1]]', JSON.stringify(r.clic));
+  verifier("le survol des menus aussi, à mi-volume comme avant", JSON.stringify(r.survol) === '[["goutte",0.5]]',
            JSON.stringify(r.survol));
-  verifier("un vrai bouton de la page le joue", r.bouton.some(a => a[0] === "ding-perle"), JSON.stringify(r.bouton));
-  verifier("un vrai bouton du menu latéral, au survol, aussi", JSON.stringify(r.menu) === '[["ding-perle",0.5]]',
+  verifier("un vrai bouton de la page la joue", r.bouton.some(a => a[0] === "goutte"), JSON.stringify(r.bouton));
+  verifier("un vrai bouton du menu latéral, au survol, aussi", JSON.stringify(r.menu) === '[["goutte",0.5]]',
            JSON.stringify(r.menu));
-  verifier("à mi-volume il joue, à volume nul il se tait", r.aMoitie === true && r.aZero === false);
+  verifier("à mi-volume elle joue, à volume nul elle se tait", r.aMoitie === true && r.aZero === false);
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

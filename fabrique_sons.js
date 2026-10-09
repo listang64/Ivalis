@@ -4,9 +4,8 @@
 //  Dix sons d'interface, fabriqués sur place avec Web Audio : aucun fichier
 //  à héberger, aucun réseau. Sobres, à la manière des bruits d'Apple — tic,
 //  tac, bascule, pop, goutte, tinte, verre, validation, retour, envoi : très
-//  courts, très propres, rien qui traîne. On les écoute ici avant d'en
-//  choisir un pour les boutons du jeu (aujourd'hui le ding perle, gardé à
-//  part dans SONS_JEU).
+//  courts, très propres, rien qui traîne. On les écoute ici ; celui des
+//  menus du jeu est la Goutte (SON_CLIC_JEU).
 //
 //  Chaque son est une fonction (ctx, sortie) : elle ne fait que brancher des
 //  oscillateurs et des souffles filtrés sur `sortie`. C'est ce qui permet de
@@ -218,20 +217,6 @@
         }
     ];
 
-    // LE SON DES BOUTONS DU JEU vit à part (SONS_JEU) : la Fabrique peut
-    // changer ses dix sons sans couper la voix des boutons. Le ding perle,
-    // choisi par Nico, reste celui du jeu tant qu'il n'en choisit pas un autre.
-    const SONS_JEU = [
-        {
-            id: "ding-perle", nom: "Ding perle",
-            usage: "Minuscule et aigu, pour un petit bouton",
-            fabriquer(ctx, s) {
-                ding(ctx, s, { freq: 2093, duree: 0.1, force: 0.7, clic: 0.6,
-                               partiels: [[1, 1, 1], [2, 0.1, 0.5]] });
-            }
-        }
-    ];
-
     // --- LE JOUEUR ---------------------------------------------------------
     //  Safari n'ouvre le son qu'après un geste : le contexte naît (ou se
     //  réveille) au premier toucher — ici, le bouton lui-même en est un.
@@ -251,12 +236,14 @@
 
     window.SONS_FABRIQUE = SONS;
 
-    // LE SON DES BOUTONS DU JEU, choisi par Nico dans la Fabrique : le ding
-    // perle. Il remplace le bruit de parchemin (clik_bouton_aniy88.mp3) qui
-    // jouait à chaque clic (jouerSonClic) et au survol des menus
-    // (jouerSonSurvolParchemin, app.js). Changer de son pour tout le jeu,
-    // c'est changer cette seule ligne.
-    window.SON_CLIC_JEU = "ding-perle";
+    // LE SON DES MENUS, choisi par Nico dans la Fabrique : la Goutte (« ok,
+    // remplace tous les sons menu par la goutte »). Elle joue à chaque clic de
+    // bouton (jouerSonClic) et, à mi-volume, au survol des menus et à
+    // l'ouverture du chat ou du combat (jouerSonSurvolParchemin, app.js).
+    // Avant elle : le ding perle, et avant encore le bruit de parchemin
+    // (clik_bouton_aniy88.mp3). Changer de son pour tout le jeu, c'est changer
+    // cette seule ligne.
+    window.SON_CLIC_JEU = "goutte";
 
     // Safari et Chrome n'ouvrent le son qu'après un geste : le contexte se
     // réveille au premier toucher, pour que même un survol sonne ensuite.
@@ -268,7 +255,7 @@
     // menus joue à moitié, comme l'ancien bruit de parchemin).
     window.jouerSonFabrique = function (quel, facteur) {
         const son = typeof quel === "number" ? SONS[quel - 1]
-            : (SONS.find(x => x.id === quel) || SONS_JEU.find(x => x.id === quel));
+            : SONS.find(x => x.id === quel);
         if (!son) return false;
         const v = volume() * (facteur === undefined ? 1 : Math.max(0, Number(facteur) || 0));
         if (v <= 0) return false;
