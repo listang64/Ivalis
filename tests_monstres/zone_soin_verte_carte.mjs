@@ -20,7 +20,7 @@ function fonction(src, marqueur, finLigne = '}') {
 const SRC = [
     fonction(combat, 'function graineZone(q, r, k) {'),
     fonction(combat, 'function pointsHexZone(cx, cy, rayon) {'),
-    fonction(combat, 'function dessinerHexZonePersistante(type, hex, R, leger) {')
+    fonction(combat, 'function dessinerHexZonePersistante(type, hex, R, leger, px, sfx = "") {')
 ].join('\n\n');
 
 let echecs = 0;

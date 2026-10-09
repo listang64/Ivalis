@@ -5665,3 +5665,7 @@ dans le jeu actuellement. On pourra les retravailler en partant de ça. »
   marcher ; l'ennemi repoussé ; l'effondrement en gravats ; les dix
   animations ciblées jouées sans cases. studio_catalogue_1/_2 comptent
   maintenant les nappes et la roche du jeu.
+  Au passage : l'aide « Glisse un pion sur une case libre » du bouton
+  « ✥ Déplacer » suit la carte par `~` (le bandeau de ciblage s'est glissé
+  entre la carte et la barre) ; zone_soin_verte_carte.mjs lit la nouvelle
+  signature de dessinerHexZonePersistante.

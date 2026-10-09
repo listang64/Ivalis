@@ -4986,7 +4986,7 @@ textarea.input-texte-parchemin {
 .studio-section-titre:first-child { margin-top: 0; }
 .studio-sous-section { margin: 6px 4px 0; font-family: 'Cinzel', serif; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: #8a6a2a; }
 .studio-aide-deplacer { display: none; font-size: 12px; font-style: italic; color: #6e2a18; }
-.studio-scene.studio-deplacement + .studio-commandes .studio-aide-deplacer { display: inline; }
+.studio-scene.studio-deplacement ~ .studio-commandes .studio-aide-deplacer { display: inline; }
 .studio-scene.studio-deplacement .studio-pions { pointer-events: none; }
 .studio-scene.studio-deplacement .studio-pion { pointer-events: auto; cursor: grab; touch-action: none;
   box-shadow: 0 0 0 3px rgba(226,184,79,0.9), 0 0 14px rgba(226,184,79,0.7); animation: studio-pion-mobile 1.2s ease-in-out infinite alternate; }
