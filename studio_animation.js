@@ -32,6 +32,8 @@ const studio = {
     largeur: 1800, hauteur: 1800,
     echelle: 1, x: 0, y: 0,
     caseHeros: { q: 0, r: 0 }, caseEnnemi: { q: 1, r: 0 },
+    // Les cases de départ (« Replacer les pions » y ramène).
+    departHeros: { q: 0, r: 0 }, departEnnemi: { q: 1, r: 0 },
     taillePion: 55,
     idHeros: null,
     integrees: {},
@@ -107,10 +109,15 @@ function choisirCases() {
         for (const c of cases) {
             if (!caseLibre(c.q, c.r)) continue;
             const v = VOISINS.map(([dq, dr]) => ({ q: c.q + dq, r: c.r + dr })).find(n => caseLibre(n.q, n.r));
-            if (v) { studio.caseHeros = c; studio.caseEnnemi = v; return; }
+            if (v) { studio.caseHeros = c; studio.caseEnnemi = v; memoriserDepart(); return; }
         }
     }
     studio.caseHeros = { q: 0, r: 0 }; studio.caseEnnemi = { q: 1, r: 0 };
+    memoriserDepart();
+}
+function memoriserDepart() {
+    studio.departHeros = { ...studio.caseHeros };
+    studio.departEnnemi = { ...studio.caseEnnemi };
 }
 
 // =========================================================================
@@ -144,9 +151,10 @@ function fenetre() {
               <label class="studio-choix-heros">Héros
                 <select id="studio-heros" onchange="window.changerHerosStudio(this.value)"></select>
               </label>
-              <button type="button" id="studio-btn-deplacer" class="studio-bouton studio-bouton-texte" onclick="window.basculerDeplacementStudio()">✥ Déplacer les pions</button>
+              <button type="button" id="studio-btn-deplacer" class="studio-bouton studio-bouton-texte" title="Déplacer les pions à la main" onclick="window.basculerDeplacementStudio()">✥ Déplacer</button>
               <span id="studio-aide-deplacer" class="studio-aide-deplacer">Glisse un pion sur une case libre</span>
               <button type="button" id="studio-btn-ralenti" class="studio-bouton studio-bouton-texte" title="Rejouer au ralenti pour bien voir" onclick="window.basculerRalentiStudio()">🐢 Ralenti</button>
+              <button type="button" id="studio-btn-replacer" class="studio-bouton studio-bouton-texte" title="Ramener les deux pions sur leurs cases de départ" onclick="window.replacerPionsStudio()">⟲ Replacer</button>
               <span class="studio-commandes-espace"></span>
               <button type="button" class="studio-bouton" title="Dézoomer" onclick="window.zoomStudio(1 / 1.25)">−</button>
               <button type="button" class="studio-bouton" title="Zoomer" onclick="window.zoomStudio(1.25)">+</button>
@@ -292,6 +300,30 @@ function caseSousLePoint(clientX, clientY) {
     const my = (clientY - scene.top - studio.y) / studio.echelle;
     return studio.plateau.pixelToHex(mx, my);
 }
+// REPLACER LES PIONS : les déplacements des animations sont réels (le pion
+// reste sur sa nouvelle case, comme en combat) ; ce bouton les ramène sur
+// leurs cases de départ.
+window.replacerPionsStudio = function () {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    arreterTout();
+    studio.caseHeros = { ...studio.departHeros };
+    studio.caseEnnemi = { ...studio.departEnnemi };
+    const h = document.getElementById("studio-pion-heros"), e = document.getElementById("studio-pion-ennemi");
+    if (h) { h.dataset.q = studio.caseHeros.q; h.dataset.r = studio.caseHeros.r; }
+    if (e) { e.dataset.q = studio.caseEnnemi.q; e.dataset.r = studio.caseEnnemi.r; }
+    window.recentrerStudio();
+};
+// L'échange de places (le Transfert).
+function echangerPions() {
+    const h = studio.caseHeros;
+    studio.caseHeros = studio.caseEnnemi;
+    studio.caseEnnemi = h;
+    const ph = document.getElementById("studio-pion-heros"), pe = document.getElementById("studio-pion-ennemi");
+    if (ph) { ph.dataset.q = studio.caseHeros.q; ph.dataset.r = studio.caseHeros.r; }
+    if (pe) { pe.dataset.q = studio.caseEnnemi.q; pe.dataset.r = studio.caseEnnemi.r; }
+    placerPions();
+    return true;
+}
 window.deplacerPionStudio = function (quel, q, r) {
     const autre = quel === "heros" ? studio.caseEnnemi : studio.caseHeros;
     if (!studio.plateau || !caseLibre(q, r) || (autre.q === q && autre.r === r)) return false;
@@ -321,6 +353,7 @@ function brancherGlisser(pionEl, quel) {
             pionEl.classList.remove("studio-pion-saisi");
             const c = caseSousLePoint(ev.clientX, ev.clientY);
             if (!window.deplacerPionStudio(quel, c.q, c.r)) placerPions();   // case interdite : il revient
+            else memoriserDepart();   // la scène voulue : « Replacer les pions » y ramènera
         };
         pionEl.addEventListener("pointermove", suivre);
         pionEl.addEventListener("pointerup", lacher);
@@ -518,7 +551,13 @@ window.jouerAnimationStudio = async function (id) {
         lanceur: document.getElementById("studio-pion-heros"),
         cible: document.getElementById("studio-pion-ennemi"),
         calque: document.getElementById("studio-pions"),
-        grille: grilleDuStudio()
+        grille: grilleDuStudio(),
+        // Un déplacement réel : le pion reste sur sa nouvelle case.
+        poserPion: (el, q, r) => {
+            const quel = el && el.id === "studio-pion-heros" ? "heros" : el && el.id === "studio-pion-ennemi" ? "ennemi" : null;
+            return quel ? window.deplacerPionStudio(quel, q, r) : false;
+        },
+        echangerPions
     };
     if (!scene.lanceur || typeof window.jouerAnimationCombat !== "function") return false;
     const jeton = {};
@@ -529,6 +568,13 @@ window.jouerAnimationStudio = async function (id) {
     if (studio.enCours === jeton) {
         studio.enCours = null;
         if (ligne) ligne.classList.remove("joue");
+        // Un pion parti hors du cadre : la caméra le retrouve.
+        const cadre = sceneEl && sceneEl.getBoundingClientRect();
+        const dehors = cadre && [scene.lanceur, scene.cible].some(p => {
+            const r = p.getBoundingClientRect();
+            return r.left < cadre.left || r.right > cadre.right || r.top < cadre.top || r.bottom > cadre.bottom;
+        });
+        if (dehors) window.recentrerStudio();
     }
     return ok;
 };

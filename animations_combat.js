@@ -345,8 +345,35 @@
                 if (an.effect && an.effect.target === el) { an.cancel(); jeton.anims.delete(an); }
             });
         };
+        // ARRIVER POUR DE BON (Nico : « que ça fasse bouger le pion, qu'on
+        // puisse voir l'animation en vraies conditions »). Un déplacement qui,
+        // en combat, change la case du combattant le laisse sur sa nouvelle
+        // case : la scène la lui donne (scene.poserPion), et l'animation qui
+        // l'y a mené s'efface dans le même instant — pas de saut. Sans scène
+        // capable de le poser (ni grille, ni case libre), il rentre chez lui.
+        o.arriver = async (el, pt, p = {}) => {
+            if (!el || jeton.annule) return false;
+            const pose = !!(pt && pt.q !== undefined && scene && typeof scene.poserPion === "function" && scene.poserPion(el, pt.q, pt.r));
+            if (pose) { o.lacher(el); return true; }
+            if (p.sinonRentrer !== false) await o.rentrer(el);
+            return false;
+        };
+        // L'ÉCHANGE DE PLACES (le Transfert) : chacun reste sur la case de l'autre.
+        o.echanger = async (a, b) => {
+            if (jeton.annule) return false;
+            if (scene && typeof scene.echangerPions === "function" && scene.echangerPions()) { o.lacher(a); o.lacher(b); return true; }
+            await Promise.all([o.rentrer(a), o.rentrer(b)]);
+            return false;
+        };
+        // La distance en cases entre deux pions (ou null sans grille).
+        o.distanceCases = (el1, el2) => {
+            const c1 = o.caseDe(el1), c2 = o.caseDe(el2);
+            if (!c1 || !c2) return null;
+            const dq = c1.q - c2.q, dr = c1.r - c2.r;
+            return Math.max(Math.abs(dq), Math.abs(dr), Math.abs(dq + dr));
+        };
         // Le retour du pion à sa case : il s'efface là où il est, et réapparaît
-        // chez lui (le studio rejoue toujours depuis la même scène).
+        // chez lui (une démonstration qui ne change pas de case).
         o.rentrer = async (el, p = {}) => {
             if (!el) return;
             await o.teinter(el, [{ opacity: 1 }, { opacity: 0 }], { duration: p.duree || 260, fill: "forwards" });

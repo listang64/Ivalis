@@ -181,7 +181,10 @@
             apresPas: (pt, i) => { if (p.son) o.son(p.son); if (p.pas) p.pas(pt, i, pts); } });
         if (p.apres) await p.apres(pts);
         await o.attendre(p.pause === undefined ? 250 : p.pause);
-        if (p.rentrer !== false) await o.rentrer(el);
+        // En vraies conditions, le pion RESTE sur sa nouvelle case (o.arriver) ;
+        // `revenir` : une démonstration qui le ramène chez lui.
+        if (p.revenir) await o.rentrer(el);
+        else await o.arriver(el, pts[pts.length - 1]);
         return pts;
     };
 
@@ -260,8 +263,8 @@
                 poussiere(o, sc.calque, fin, { n: 12, dist: 0.65 });
                 await vol;
                 o.texte(sc.calque, sc.lanceur, "Bond !", COULEURS.neutre);
-                await o.attendre(500);
-                await o.rentrer(sc.lanceur);
+                await o.attendre(300);
+                await o.arriver(sc.lanceur, fin);
             }
         },
         {
@@ -342,7 +345,7 @@
                     }
                 } });
                 await o.attendre(600);
-                await o.rentrer(sc.lanceur);
+                await o.arriver(sc.lanceur, pts[pts.length - 1]);
             }
         },
         {
@@ -635,7 +638,7 @@
                 await frapper(o, sc.calque, sc.cible, sc.lanceur, { valeur: "-6" });
                 await o.parcourir(sc.lanceur, a, [loin], { duree: 320, depuis: { x: a.x + (loin.x - a.x) * 0.45, y: a.y + (loin.y - a.y) * 0.45 } });
                 await o.attendre(250);
-                await o.rentrer(sc.lanceur);
+                await o.arriver(sc.lanceur, loin);
             }
         },
         {
@@ -1103,9 +1106,27 @@
         },
         {
             id: "traction", nom: "Traction magique", sens: "vers l'ennemi",
-            description: "Deux ennemis, loin ; un fil violet part du héros et les attire, case après case, jusqu'à lui.",
+            description: "Un fil violet part du héros et attire l'ennemi, case après case, jusqu'à lui (jusqu'à 3 cases). Déjà au contact : la démonstration le pose loin, avec un second ennemi, puis les attire.",
             async jouer(sc, o) {
                 const { a, b, v } = lieux(sc);
+                const fondFil = "linear-gradient(90deg, #e0c8ff, #9050e0)";
+                const ecart = o.distanceCases(sc.lanceur, sc.cible);
+                if (ecart !== null && ecart > 1) {
+                    // EN VRAIES CONDITIONS : l'ennemi est loin, il est attiré jusqu'au contact (3 cases au plus).
+                    const chemin = o.chemin(sc.cible, b, axe(b, a), Math.min(3, ecart - 1));
+                    o.son("traction");
+                    o.texte(sc.calque, sc.lanceur, "Traction !", COULEURS.etat);
+                    const fil = o.lien(sc.calque, a, b, { couleur: "#b070ff", epaisseur: 4, fond: fondFil });
+                    const arrivee = chemin[chemin.length - 1] || b;
+                    const v1 = axe(a, b);
+                    await Promise.all([o.parcourir(sc.cible, b, chemin, { duree: 300, apresPas: (pt) => poussiere(o, sc.calque, pt, { n: 4 }) }),
+                        o.teinter(fil, [{ transform: `translate(0,-50%) rotate(${deg(v1.angle)}deg) scaleX(1)` },
+                                        { transform: `translate(0,-50%) rotate(${deg(v1.angle)}deg) scaleX(${Math.max(0.05, axe(a, arrivee).d / v1.d)})` }],
+                                  { duration: 300 * chemin.length, easing: "ease-in", fill: "forwards" })]);
+                    await o.effacer(fil);
+                    await o.arriver(sc.cible, arrivee);
+                    return;
+                }
                 const pts = o.chemin(sc.cible, b, v, 3);
                 const loin = pts[pts.length - 1] || b;
                 // L'ennemi est d'abord posé au loin (sans transition).
@@ -1620,8 +1641,8 @@
                 await Promise.all([reparaitre(sc.lanceur, a, b), reparaitre(sc.cible, b, a)]);
                 o.texte(sc.calque, sc.lanceur, "+10", COULEURS.soin);
                 o.eclat(sc.lanceur, "brightness(1.4) drop-shadow(0 0 10px #b070ff)", 600);
-                await o.attendre(900);
-                await Promise.all([o.rentrer(sc.lanceur), o.rentrer(sc.cible)]);
+                await o.attendre(600);
+                await o.echanger(sc.lanceur, sc.cible);
             }
         }
     ]);
@@ -2195,7 +2216,7 @@
                     }
                 } });
                 await o.attendre(400);
-                await o.rentrer(sc.lanceur);
+                await o.arriver(sc.lanceur, pts[pts.length - 1]);
             }
         },
         {
@@ -2214,7 +2235,7 @@
                 } });
                 o.texte(sc.calque, sc.lanceur, "Indemne", COULEURS.soin);
                 await o.attendre(500);
-                await Promise.all([o.rentrer(sc.lanceur), effacerTout(o, cases)]);
+                await Promise.all([o.arriver(sc.lanceur, pts[pts.length - 1]), effacerTout(o, cases)]);
             }
         }
     ]);
@@ -2357,9 +2378,24 @@
         },
         {
             id: "inertie-martiale", nom: "Inertie martiale", sens: "vers l'ennemi",
-            description: "Le héros prend deux cases d'élan et charge en ligne droite, des silhouettes dans son sillage ; l'impact est d'autant plus lourd. « ⚡ Inertie martiale »",
+            description: "Le héros charge en ligne droite jusqu'à l'ennemi, des silhouettes dans son sillage ; plus la course est longue, plus l'impact est lourd. « ⚡ Inertie martiale » (au contact : il prend d'abord deux cases d'élan).",
             async jouer(sc, o) {
                 const { a, b, v } = lieux(sc);
+                const ecart = o.distanceCases(sc.lanceur, sc.cible);
+                if (ecart !== null && ecart > 1) {
+                    // EN VRAIES CONDITIONS : l'ennemi est à distance, le héros charge en ligne droite jusqu'à lui.
+                    const chemin = o.chemin(sc.lanceur, a, v, Math.min(4, ecart - 1));
+                    o.son("charge");
+                    let prec = a;
+                    await o.parcourir(sc.lanceur, a, chemin, { duree: 150, hauteur: 1.04, easing: "linear",
+                        apresPas: (pt) => { o.fantome(sc.calque, sc.lanceur, prec, { opacite: 0.4 }); prec = pt; } });
+                    await o.arriver(sc.lanceur, chemin[chemin.length - 1]);
+                    o.son("lourd-impact");
+                    o.texte(sc.calque, sc.lanceur, `⚡ Inertie martiale -${2 * chemin.length}`, COULEURS.attention);
+                    await frapper(o, sc.calque, sc.lanceur, sc.cible, { valeur: "-14", sonElan: false, sonImpact: false, elan: { portee: 0.7, duree: 360, prise: 0.05, frappe: 0.35 },
+                                                                       contact: 120, force: 0.2, entaille: { taille: 1.9, epaisseur: 9 } });
+                    return;
+                }
                 const recul = o.chemin(sc.lanceur, a, o.tourner(v, Math.PI), 2);
                 const depart = recul[recul.length - 1] || a;
                 await o.bouger(sc.lanceur, [{ transform: `translate(${depart.x - a.x}px, ${depart.y - a.y}px)`, opacity: 0 },
@@ -2492,8 +2528,8 @@
                 o.texte(sc.calque, sc.lanceur, "Diversion : esquivée", COULEURS.neutre);
                 await Promise.all([part, elan, entaille(o, sc.calque, a, axe(b, a).angle, { couleur: "#dddddd" }),
                     leurre ? o.gerbe(sc.calque, a.x, a.y, { nombre: 8, dist: a.t * 0.5, couleurs: ["#e0e0e0", "#a0a0a0"], taille: 6, duree: 600 }) : null]);
-                await o.attendre(400);
-                await o.rentrer(sc.lanceur);
+                await o.attendre(300);
+                await o.arriver(sc.lanceur, loin);
             }
         }
     ]);

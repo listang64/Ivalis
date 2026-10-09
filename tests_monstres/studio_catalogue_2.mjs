@@ -7,9 +7,13 @@
 //     de vraies cases voisines, chacun sa case, et ils s'en vont à la fin ;
 //   • le Transfert échange vraiment les places ; le Mur de terre surgit sur
 //     plusieurs cases ;
+//   • EN VRAIES CONDITIONS (Nico : « que ça fasse bouger le pion ») : un
+//     déplacement laisse le pion sur sa nouvelle case ; la Traction attire un
+//     ennemi lointain jusqu'au contact, l'Inertie martiale y fait charger le
+//     héros ; « Replacer les pions » ramène la scène de départ ;
 //   • contrôle, états, zones, classes, talents : chacune se joue jusqu'au
 //     bout, fait quelque chose, joue son son, ne laisse rien.
-import { ouvrirStudio, jouerTout } from './_studio_commun.mjs';
+import { ouvrirStudio, jouerTout, verifierDeplacements } from './_studio_commun.mjs';
 
 const { p, verifier, fin } = await ouvrirStudio();
 
@@ -79,7 +83,41 @@ console.log("\n2. LES FIGURANTS : DE VRAIES CASES, ET ILS S'EN VONT");
   verifier("Mur de terre : un bloc de roche sur chacune des trois cases", r.murs === 3, String(r.murs));
 }
 
-console.log("\n3. SECTIONS 5 À 9, JOUÉES JUSQU'AU BOUT");
+console.log("\n3. EN VRAIES CONDITIONS : LA TRACTION ATTIRE, L'INERTIE CHARGE");
+{
+  const r = await p.evaluate(async () => {
+    window.VITESSE_ANIMATIONS = 2;
+    const h = document.getElementById("studio-pion-heros"), e = document.getElementById("studio-pion-ennemi");
+    const c = (x) => ({ q: +x.dataset.q, r: +x.dataset.r });
+    const dist = () => { const a = c(h), b = c(e); return Math.max(Math.abs(a.q - b.q), Math.abs(a.r - b.r), Math.abs(a.q - b.q + a.r - b.r)); };
+    // L'ennemi posé à trois cases du héros, sur une case libre.
+    const aTroisCases = () => {
+      window.replacerPionsStudio();
+      const a = c(h);
+      for (let dq = -3; dq <= 3; dq++) for (let dr = -3; dr <= 3; dr++) {
+        if (Math.max(Math.abs(dq), Math.abs(dr), Math.abs(dq + dr)) !== 3) continue;
+        if (window.deplacerPionStudio("ennemi", a.q + dq, a.r + dr)) return true;
+      }
+      return false;
+    };
+    const res = {};
+    res.pose1 = aTroisCases(); res.avant1 = dist();
+    const ennemiAvant = JSON.stringify(c(e));
+    await window.jouerAnimationStudio("traction");
+    res.apresTraction = dist(); res.ennemiBouge = JSON.stringify(c(e)) !== ennemiAvant;
+    res.pose2 = aTroisCases();
+    const herosAvant = JSON.stringify(c(h));
+    await window.jouerAnimationStudio("inertie-martiale");
+    res.apresInertie = dist(); res.herosBouge = JSON.stringify(c(h)) !== herosAvant;
+    window.replacerPionsStudio();
+    window.VITESSE_ANIMATIONS = 1;
+    return res;
+  });
+  verifier("Traction : l'ennemi à 3 cases est attiré jusqu'au contact, et y reste", r.pose1 && r.avant1 === 3 && r.apresTraction === 1 && r.ennemiBouge, JSON.stringify(r));
+  verifier("Inertie martiale : le héros charge l'ennemi à 3 cases jusqu'au contact, et y reste", r.pose2 && r.apresInertie === 1 && r.herosBouge, JSON.stringify(r));
+}
+
+console.log("\n4. SECTIONS 5 À 9, JOUÉES JUSQU'AU BOUT");
 {
   const ids = await p.evaluate(() => window.ANIMATIONS_COMBAT.filter(a => a.section >= 5).map(a => a.id));
   const r = await jouerTout(p, ids, 4);
@@ -89,8 +127,9 @@ console.log("\n3. SECTIONS 5 À 9, JOUÉES JUSQU'AU BOUT");
   verifier("chacune fait vraiment quelque chose (pions animés ou effets posés)", r.every(x => x.fait), mauvais(x => !x.fait));
   verifier("chacune joue son son (au moins un, et du catalogue)", r.every(x => x.sons.length && !x.inconnus.length), mauvais(x => !x.sons.length || x.inconnus.length));
   verifier("aucune ne laisse d'effet derrière elle", r.every(x => x.reste === 0), mauvais(x => x.reste));
-  verifier("les pions reviennent à leur place, nets, opaques", r.every(x => x.retour && x.filtre === "none|none" && x.opacite === "1|1"),
-           mauvais(x => !(x.retour && x.filtre === "none|none" && x.opacite === "1|1")));
+  verifier("les pions restent nets et opaques", r.every(x => x.filtre === "none|none" && x.opacite === "1|1"),
+           mauvais(x => !(x.filtre === "none|none" && x.opacite === "1|1")));
+  verifierDeplacements(verifier, r);
   const t = (id) => (r.find(x => x.id === id) || {}).textes || [];
   verifier("les textes du combat : « Charmé : frappe son allié ! », « 🔮 Renvoyé ! », « Sursis 💀 », « ⚡ Inertie martiale -4 »",
            t("charme-frappe").includes("Charmé : frappe son allié !") && t("renvoi").includes("🔮 Renvoyé !") && t("sursis").includes("Sursis 💀")

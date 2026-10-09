@@ -111,7 +111,9 @@ export async function jouerTout(p, ids, vitesse) {
     const res = [];
     const h = document.getElementById("studio-pion-heros"), e = document.getElementById("studio-pion-ennemi");
     const pose = () => [h, e].map(x => { const r = x.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width)].join(","); }).join("|");
-    const repos = pose();
+    const caseDe = (x) => x.dataset.q + "," + x.dataset.r;
+    window.replacerPionsStudio();
+    const repos = pose(), casesDepart = [caseDe(h), caseDe(e)];
     const catalogue = Object.keys(window.SONS_COMBAT || {});
     for (const id of ids) {
       let vu = 0, anime = false;
@@ -135,12 +137,41 @@ export async function jouerTout(p, ids, vitesse) {
       for (let k = 0; k < 40 && (getComputedStyle(h).filter !== "none" || getComputedStyle(e).filter !== "none"); k++) await new Promise(r => setTimeout(r, 25));
       window.jouerSonCombat = vrai;
       window.afficherMessageFlottantHex = vraiTexte;
+      // Un déplacement réel laisse le pion sur sa nouvelle case : posé net
+      // (plus aucune animation sur lui, pas de décalage), puis on le replace.
+      const cases = [caseDe(h), caseDe(e)];
+      const net = (x) => x.getAnimations().length === 0 && /matrix\(1, 0, 0, 1, -[\d.]+, -[\d.]+\)/.test(getComputedStyle(x).transform);
       res.push({ id, ok, ms, fait: anime || vu > 0, sons, inconnus: sons.filter(s => !catalogue.includes(s)), textes,
                  reste: document.querySelectorAll("#studio-pions .anim-effet").length,
+                 deplaces: { heros: cases[0] !== casesDepart[0], ennemi: cases[1] !== casesDepart[1] },
+                 echange: cases[0] === casesDepart[1] && cases[1] === casesDepart[0],
+                 nets: net(h) && net(e),
                  retour: pose() === repos, filtre: getComputedStyle(h).filter + "|" + getComputedStyle(e).filter,
                  opacite: getComputedStyle(h).opacity + "|" + getComputedStyle(e).opacity });
+      window.replacerPionsStudio();
+      res[res.length - 1].replaces = pose() === repos;
     }
     window.VITESSE_ANIMATIONS = 1;
     return res;
   }, { ids, vitesse });
+}
+
+// LES ANIMATIONS QUI CHANGENT LA CASE D'UN COMBATTANT (en vraies conditions,
+// le pion reste sur sa nouvelle case). Le Transfert échange les deux.
+export const DEPLACENT_HEROS = ["marche", "marche-difficile", "marche-gelee", "marche-vargen", "bond", "repli", "pas-retraite", "fuite-peur",
+  "fuite-confusion", "entree-zone", "hemorragie-interne", "attaque-opportunite", "confusion-fuite", "traverse-murs", "zones-sans-danger",
+  "fureur-sentinelle", "diversion", "transfert"];
+export const DEPLACENT_ENNEMI = ["poussee", "peur", "saignement", "prise-en-charge", "mur-terre-repousse", "transfert"];
+export function verifierDeplacements(verifier, r) {
+  const mauvais = (f) => r.filter(f).map(x => x.id).join(", ");
+  const attendu = (x) => ({ heros: DEPLACENT_HEROS.includes(x.id), ennemi: DEPLACENT_ENNEMI.includes(x.id) });
+  verifier("un déplacement laisse le pion SUR SA NOUVELLE CASE (vraies conditions), les autres ne bougent personne",
+           r.every(x => x.deplaces.heros === attendu(x).heros && x.deplaces.ennemi === attendu(x).ennemi),
+           mauvais(x => x.deplaces.heros !== attendu(x).heros || x.deplaces.ennemi !== attendu(x).ennemi));
+  verifier("le pion arrivé est posé net sur sa case (plus d'animation, pas de décalage)", r.every(x => x.nets), mauvais(x => !x.nets));
+  const sans = r.filter(x => !attendu(x).heros && !attendu(x).ennemi);
+  verifier("les autres : les pions reviennent exactement à leur place", sans.every(x => x.retour), mauvais(x => !attendu(x).heros && !attendu(x).ennemi && !x.retour));
+  verifier("« Replacer les pions » les ramène toujours sur leurs cases de départ", r.every(x => x.replaces), mauvais(x => !x.replaces));
+  const transfert = r.find(x => x.id === "transfert");
+  if (transfert) verifier("le Transfert échange vraiment les deux cases", transfert.echange);
 }

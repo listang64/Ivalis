@@ -5597,3 +5597,28 @@ sections : 142 entrées, dont les dix premières.
   et studio_catalogue_2.mjs (vue de dessus, figurants, Transfert, Mur de
   terre, sections 5 à 9), avec _studio_commun.mjs ; studio_animation.mjs
   suit toujours de près les dix premières.
+
+## Le Studio en vraies conditions : les déplacements restent (version 228)
+
+Nico : « Assure-toi que, pour tester les animations qui font bouger le pion,
+ça fasse bouger le pion, qu'on puisse voir l'animation dans de vraies
+conditions. » Et : le Studio est à part, pour tester, puis décider de
+l'intégrer ou non — rien du jeu réel n'est touché (murs de terre,
+persistance des effets de terrain, mouvement, combat : aucun de ces fichiers
+ne change, et seul le Studio appelle ces animations).
+- UN DÉPLACEMENT RESTE (animations_combat.js, o.arriver) : un pion qui marche,
+  bondit, se replie, fuit, est poussé, attiré, éjecté par un mur… finit sur sa
+  nouvelle case, comme en combat. La scène la lui donne (scene.poserPion) et
+  l'animation qui l'y a mené s'efface au même instant : pas de saut, pas de
+  retour au départ. L'animation suivante part de là. Le Transfert échange
+  vraiment les deux cases (scene.echangerPions).
+- EN VRAIES CONDITIONS, la Traction attire un ennemi lointain jusqu'au
+  contact (3 cases au plus) et l'Inertie martiale fait charger le héros
+  jusqu'à lui ; au contact, elles gardent leur démonstration.
+- LE STUDIO (studio_animation.js) : un bouton « ⟲ Replacer » ramène les pions
+  sur leurs cases de départ (celles qu'on a choisies avec « ✥ Déplacer ») ;
+  un pion sorti du cadre fait recentrer la caméra.
+  studio_catalogue_1.mjs / _2.mjs (_studio_commun.mjs : DEPLACENT_HEROS,
+  DEPLACENT_ENNEMI) : chaque animation qui déplace laisse le pion sur une
+  autre case, posé net ; les autres ne bougent personne ; « Replacer » ramène
+  toujours la scène ; Traction et Inertie à trois cases.

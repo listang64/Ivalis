@@ -4943,7 +4943,7 @@ textarea.input-texte-parchemin {
 .studio-choix-heros select { font-size: 14px; padding: 4px 8px; border-radius: 6px; border: 1px solid #8a6a2a; background: #f6ead0; color: #2a1a0f; }
 .studio-bouton { min-width: 38px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 18px; font-weight: bold;
   color: #f3dfa6; background: linear-gradient(180deg, #6b4a2a, #4a3018); border: 1px solid #c9a24a; }
-.studio-bouton-texte { font-size: 13px; padding: 0 12px; font-family: 'Cinzel', serif; }
+.studio-bouton-texte { font-size: 13px; padding: 0 12px; font-family: 'Cinzel', serif; white-space: nowrap; }
 
 .studio-droite { display: flex; flex-direction: column; min-height: 0; border-radius: 10px; border: 2px solid #c2a878;
   background: rgba(255,255,255,0.4); }

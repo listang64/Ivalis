@@ -12,7 +12,7 @@
 //     centre d'hexagone, une zone couvre sept hexagones entiers ;
 //   • chacune se joue jusqu'au bout, fait quelque chose, joue au moins un son
 //     (du catalogue), et ne laisse rien derrière elle.
-import { ouvrirStudio, jouerTout } from './_studio_commun.mjs';
+import { ouvrirStudio, jouerTout, verifierDeplacements } from './_studio_commun.mjs';
 
 const { p, verifier, fin } = await ouvrirStudio();
 
@@ -96,14 +96,20 @@ console.log("\n4. VU DE DESSUS, SUR LA GRILLE");
       });
       if (!fin) requestAnimationFrame(sonde);
     };
+    // La distance d'une case à sa voisine (le héros et l'ennemi, côte à côte au départ).
+    window.replacerPionsStudio();
+    const e0 = document.getElementById("studio-pion-ennemi").getBoundingClientRect(), h0 = h.getBoundingClientRect();
+    const voisin = Math.hypot(e0.left - h0.left, e0.top - h0.top);
+    const depart = h.dataset.q + "," + h.dataset.r;
     requestAnimationFrame(sonde);
     await window.jouerAnimationStudio("marche");
     fin = true;
-    // La distance d'une case à sa voisine, sur la carte du studio.
-    const pions = document.getElementById("studio-pions").getBoundingClientRect();
-    const e = document.getElementById("studio-pion-ennemi").getBoundingClientRect();
-    const hr = h.getBoundingClientRect();
-    const voisin = Math.hypot(e.left - hr.left, e.top - hr.top);
+    // EN VRAIES CONDITIONS : il est resté là où il est arrivé, trois cases plus loin.
+    const arrivee = { q: +h.dataset.q, r: +h.dataset.r }, [dq0, dr0] = depart.split(",").map(Number);
+    const ecartCases = Math.max(Math.abs(arrivee.q - dq0), Math.abs(arrivee.r - dr0), Math.abs(arrivee.q - dq0 + arrivee.r - dr0));
+    const h1 = h.getBoundingClientRect();
+    const decale = Math.hypot(h1.left - h0.left, h1.top - h0.top);
+    window.replacerPionsStudio();
     // Pendant une zone de feu : combien d'hexagones (des cases entières) ?
     let hexagones = 0;
     const obs = new MutationObserver(() => {
@@ -120,11 +126,13 @@ console.log("\n4. VU DE DESSUS, SUR LA GRILLE");
     for (const [dq, dr] of [[0, 0], [1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]]) {
       if (!(window.PLATEAU_VTT.getCaseState(q0 + dq, r0 + dr) || {}).isDeleted) attendues++;
     }
-    return { pas, voisin, hexagones, attendues };
+    return { pas, voisin, hexagones, attendues, ecartCases, decale };
   });
   const sauts = r.pas.map((q, i) => Math.hypot(q[0] - (i ? r.pas[i - 1][0] : 0), q[1] - (i ? r.pas[i - 1][1] : 0)));
   verifier("la marche : trois pas, chacun d'une case exactement (centre à centre)",
            r.pas.length === 3 && sauts.every(d => Math.abs(d - r.voisin) < 2), `pas de ${sauts.map(Math.round).join(", ")} px pour ${Math.round(r.voisin)} px`);
+  verifier("la marche finie, le héros RESTE sur sa nouvelle case (trois cases plus loin)", r.ecartCases === 3 && r.decale > r.voisin * 1.5,
+           `${r.ecartCases} cases, ${Math.round(r.decale)} px`);
   verifier("une zone persistante couvre des hexagones entiers : l'ennemi et ses voisins (sauf une case gommée)",
            r.hexagones === r.attendues && r.attendues >= 6, `${r.hexagones} pour ${r.attendues}`);
 }
@@ -139,8 +147,9 @@ console.log("\n5. SECTIONS 1 À 4, JOUÉES JUSQU'AU BOUT");
   verifier("chacune fait vraiment quelque chose (pions animés ou effets posés)", r.every(x => x.fait), mauvais(x => !x.fait));
   verifier("chacune joue son son (au moins un, et du catalogue)", r.every(x => x.sons.length && !x.inconnus.length), mauvais(x => !x.sons.length || x.inconnus.length));
   verifier("aucune ne laisse d'effet derrière elle", r.every(x => x.reste === 0), mauvais(x => x.reste));
-  verifier("les pions reviennent à leur place, nets, opaques", r.every(x => x.retour && x.filtre === "none|none" && x.opacite === "1|1"),
-           mauvais(x => !(x.retour && x.filtre === "none|none" && x.opacite === "1|1")));
+  verifier("les pions restent nets et opaques", r.every(x => x.filtre === "none|none" && x.opacite === "1|1"),
+           mauvais(x => !(x.filtre === "none|none" && x.opacite === "1|1")));
+  verifierDeplacements(verifier, r);
 }
 
 await fin();
