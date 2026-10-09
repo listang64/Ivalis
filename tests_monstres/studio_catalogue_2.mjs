@@ -55,8 +55,9 @@ console.log("\n2. LES FIGURANTS : DE VRAIES CASES, ET ILS S'EN VONT");
     const occupees = [h, e].map(x => x.dataset.q + "," + x.dataset.r);
     const restants = document.querySelectorAll("#studio-pions .anim-figurant").length;
     // Le Transfert : le héros part bien sur la case de l'ennemi.
+    // De centre à centre : les deux pions n'ont pas la même taille (celle de leur pion de combat).
     const H = h.getBoundingClientRect(), E = e.getBoundingClientRect();
-    const voulu = [E.left - H.left, E.top - H.top];
+    const voulu = [E.left + E.width / 2 - H.left - H.width / 2, E.top + E.height / 2 - H.top - H.height / 2];
     let atteint = false, fin = false;
     const sonde = () => {
       h.getAnimations().forEach(an => (an.effect.getKeyframes() || []).forEach(k => {
