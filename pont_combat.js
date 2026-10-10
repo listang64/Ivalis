@@ -85,6 +85,21 @@ function zoneDe(e, etat) {
     return { zone: { id: e.zone, type: (z && z.type) || "neutre" } };
 }
 
+// LE COUP REÇU, SELON CE QUI L'A ENCAISSÉ (Nico : « coup reçu physique /
+// magique / brut, contre, le bouclier magique encaisse le coup, le bouclier
+// magique se brise : tu peux intégrer »). Le Contre se montre sur celui qui le
+// rend ; le bouclier, sur son dôme ; sinon la nature du coup.
+function reactionAuCoup(e, champ) {
+    const depuis = e.acteur && e.acteur !== e.cible ? e.acteur : null;
+    if (e.renvoi) return { reaction: { sorte: "contre", pion: e.cible, depuis } };
+    if (e.bouclierBrise) return { reaction: { sorte: "bouclier-brise", pion: e.cible, depuis } };
+    if (champ === "bouclier") return { reaction: { sorte: "bouclier-encaisse", pion: e.cible, depuis } };
+    if (e.nature === "physique" || e.nature === "magique" || e.nature === "brut") {
+        return { reaction: { sorte: "coup-" + e.nature, pion: e.cible, depuis } };
+    }
+    return {};
+}
+
 const SCENES = {
 
     // --- LE MOUVEMENT ----------------------------------------------------
@@ -141,7 +156,12 @@ const SCENES = {
             // sort) et qui est vraiment touché.
             ...(e.frappe ? { frappe: e.frappe } : {}),
             ...(e.element ? { element: e.element } : {}),
+            ...(e.sort ? { sort: e.sort } : {}),
             ...(Array.isArray(e.touches) ? { touches: e.touches } : {}),
+            // Une carte de soin : ses cases fleurissent (zone), ou un sceau se
+            // pose sous chaque soigné (étalé).
+            ...(Array.isArray(e.soinZone) && e.soinZone.length ? { soinZone: e.soinZone } : {}),
+            ...(e.soinEtale ? { soinEtale: true } : {}),
             depuis: lanceur ? { q: nombre(lanceur.q), r: nombre(lanceur.r) } : null,
             vers: cibles.map(id => {
                 const c = combattantDe(etat, id);
@@ -158,10 +178,14 @@ const SCENES = {
     // l'état d'avant, que le spectateur nous donne exprès.
     esquive(e, etat) {
         const attaquant = combattantDe(etat, e.acteur);
-        return { geste: "esquive", pion: e.cible,
-                 depuis: attaquant ? { q: nombre(attaquant.q), r: nombre(attaquant.r) } : null,
-                 texte: e.parade ? "Paré 🛡️" : "Esquivé 💨",
-                 couleur: COULEURS.neutre, duree: RYTHME.esquive };
+        const depuis = attaquant ? { q: nombre(attaquant.q), r: nombre(attaquant.r) } : null;
+        const texte = e.parade ? "Paré 🛡️" : "Esquivé 💨";
+        return { geste: "esquive", pion: e.cible, depuis, texte,
+                 couleur: COULEURS.neutre, duree: RYTHME.esquive,
+                 // Le geste du Studio (Nico : « esquive, parade : tu peux
+                 // intégrer ») remplace le recul d'avant quand il est là.
+                 reaction: { sorte: e.parade ? "parade" : "esquive", pion: e.cible, depuis: e.acteur || null,
+                             caseDepuis: depuis, texte, remplace: true } };
     },
     // L'échec d'un Étourdi a son geste (l'énergie qui fuse et retombe en
     // fumée) ; l'Immobilisation garde son mot.
@@ -183,7 +207,10 @@ const SCENES = {
     // dans le gris de tout le reste. Sans couleur portée, on garde le neutre.
     message(e) {
         return { geste: "message", pion: e.cible || e.acteur, texte: e.texte || "",
-                 couleur: e.couleur || COULEURS.neutre, duree: RYTHME.message };
+                 couleur: e.couleur || COULEURS.neutre, duree: RYTHME.message,
+                 // Une créature enfermée frappe un mur de terre : le geste du
+                 // Studio, vers la case du mur (le mot suit).
+                 ...(e.frappeMur ? { reaction: { sorte: "frappe-mur", pion: e.acteur || e.cible, mur: e.frappeMur } } : {}) };
     },
     etatRate(e) {
         // Une immunité de peuple n'est pas un jet manqué : c'est écrit sur la
@@ -223,7 +250,8 @@ const SCENES = {
                      max: nombre(c.bouclierMax) || nombre(e.bouclierApres),
                      texte: `+${nombre(e.gainBouclier)} 🛡️`,
                      couleurTexte: COULEURS.bouclier, couleurBarre: COULEURS.bouclier,
-                     duree: RYTHME.jauge };
+                     duree: RYTHME.jauge,
+                     reaction: { sorte: "bouclier-cree", pion: e.cible, depuis: e.acteur !== e.cible ? (e.acteur || null) : null } };
         }
 
         // Un coup encaissé PAR LE BOUCLIER se montre sur le bouclier — sinon on
@@ -254,18 +282,24 @@ const SCENES = {
                  // Une zone persistante où l'on vient de poser le pied : la case
                  // réagit (le feu, la glace, la décharge) avant le chiffre.
                  ...zoneDe(e, etat),
-                 duree: RYTHME.jauge };
+                 duree: RYTHME.jauge,
+                 ...reactionAuCoup(e, champ) };
     },
 
     soin(e, etat) {
         const c = combattantDe(etat, e.cible);
         if (!c) return { geste: "rien" };
         const montant = nombre(e.montant, nombre(e.pvApres) - nombre(c.pv));
+        // Le geste qui va avec : l'aura qui avale le sort (Absorption), le sceau
+        // qui pulse (une part de soin étalé), la lueur verte d'un soin. Le drain
+        // du vampire garde son chiffre seul.
+        const sorte = e.absorption ? "absorption" : e.tic === "Soin étalé" ? "soin-tic" : e.drain ? null : "soin";
         return { geste: "jauge", pion: e.cible, champ: "pv",
                  de: nombre(c.pv), vers: nombre(e.pvApres, c.pv), max: nombre(c.pvMax),
                  texte: `+${Math.max(0, montant)}${e.drain ? " 🩸" : ""}`,
                  couleurTexte: COULEURS.soin, couleurBarre: COULEURS.soin,
-                 duree: RYTHME.jauge };
+                 duree: RYTHME.jauge,
+                 ...(sorte ? { reaction: { sorte, pion: e.cible, depuis: e.acteur && e.acteur !== e.cible ? e.acteur : null } } : {}) };
     },
 
     // L'attaque d'opportunité : le coup part du pion qui reste, vers celui qui
@@ -283,7 +317,10 @@ const SCENES = {
         // `montant`, d'où le « -undefined » vu à la table. L'attaquant s'appelle
         // `attaquant` dans l'étape (resoudreOpportunite), pas `acteur`.
         return { geste: "opportunite", pion: e.acteur || e.attaquant, cible: e.cible, hex: e.hex,
-                 montant: nombre(e.montant), annonceSeule: true };
+                 montant: nombre(e.montant), annonceSeule: true,
+                 // Le coup au passage du Studio (Nico : « attaque d'opportunité :
+                 // tu peux intégrer ») remplace l'annonce d'avant quand il est là.
+                 reaction: { sorte: "opportunite", pion: e.acteur || e.attaquant, depuis: e.cible, remplace: true } };
     },
 
     // --- CE QUI CHANGE SANS BOUGER --------------------------------------
@@ -295,7 +332,13 @@ const SCENES = {
         // personne ne saurait lequel est parti.
         if (e.purifie && (e.retires || []).length) {
             return { geste: "message", pion: e.cible, texte: `✨ Purifié : ${e.retires.join(", ")}`,
-                     couleur: COULEURS.soin, duree: RYTHME.message };
+                     couleur: COULEURS.soin, duree: RYTHME.message,
+                     reaction: { sorte: "purification", pion: e.cible } };
+        }
+        // Une bénédiction de l'équipement de soin : son sceau, son aura, son emblème.
+        if (e.benediction) {
+            return { geste: "etats", pion: e.cible, liste: e.liste || [], pose: e.pose || null,
+                     reaction: { sorte: "benediction-" + e.benediction, pion: e.cible } };
         }
         // L'aveuglement se dit à tout le monde ; le noir, lui, n'est vu que par
         // l'aveuglé (moteur_effets.js, dessinerBrouillardAveuglement).
@@ -307,12 +350,21 @@ const SCENES = {
     },
     // L'énergie qui monte ou descend ne s'anime pas — sauf quand TÉNÈBRES la
     // boit : c'est le coup lui-même, il doit se voir sur le pion.
-    fatigue(e) {
+    fatigue(e, etat) {
         if (e.tenebres && nombre(e.montant) > 0) {
             return { geste: "message", pion: e.cible, texte: `-${nombre(e.montant)} ⚡🌑`,
                      couleur: COULEURS.tenebres, duree: RYTHME.message };
         }
-        return { geste: "rien" };
+        // LE REPOS LONG, LA RÉGÉNÉRATION DE FIN DE MANCHE, LA DÉPENSE D'UNE
+        // COMPÉTENCE (Nico : « tu peux intégrer ») : l'énergie se voit monter
+        // ou descendre sur le pion. Sans geste du Studio : rien, comme avant.
+        const sorte = e.repos ? "repos" : nombre(e.regeneration) > 0 ? "regen" : nombre(e.depense) > 0 ? "depense" : null;
+        const c = combattantDe(etat, e.cible);
+        if (!sorte || !c) return { geste: "rien" };
+        const de = nombre(c.fatigue), vers = nombre(e.fatigueApres, de);
+        return { geste: "energie", pion: e.cible,
+                 reaction: { sorte, pion: e.cible, de, vers, max: nombre(c.fatigueMax) || Math.max(de, vers),
+                             texte: `${vers >= de ? "+" : "-"}${Math.abs(vers - de)} ⚡` } };
     },
     tour()     { return { geste: "rien" }; },
     manche(e)  { return { geste: "manche", numero: nombre(e.numero) }; },
@@ -324,8 +376,13 @@ const SCENES = {
     },
     zone(e)    { return { geste: "zone", id: e.id, zone: e.zone || null, retiree: !!e.retiree }; },
 
-    chute(e) {
-        return { geste: "chute", pion: e.cible, duree: RYTHME.chute };
+    chute(e, etat) {
+        const c = combattantDe(etat, e.cible);
+        return { geste: "chute", pion: e.cible, duree: RYTHME.chute,
+                 // Le Studio : il s'effondre (la mise à terre), ou le leurre
+                 // vole en éclats (l'Illusion brisée).
+                 reaction: { sorte: c && c.estIllusion ? "illusion-brisee" : "ko", pion: e.cible,
+                             depuis: e.acteur && e.acteur !== e.cible ? e.acteur : null, remplace: true } };
     },
 
     // Une créature se relève en zombie (Profanateur, niveau 5).
@@ -442,6 +499,7 @@ export function creerPont(effets) {
         echec = null,                      // l'Étourdi rate sa technique
         surSoi = null,                     // la Confusion retourne la carte contre son lanceur
         attaque = null,                    // le geste du Studio d'une attaque (épée, légère, lourde, tir, feu)
+        reaction = null,                   // le geste du Studio d'une réaction (coup reçu, esquive, soin, énergie…)
         pause = (ms) => new Promise(r => setTimeout(r, ms)),
         tracer = () => {}
     } = effets || {};
@@ -471,6 +529,24 @@ export function creerPont(effets) {
     }
 
     async function jouerLeGeste(scene) {
+        // LA RÉACTION DU STUDIO (animations_jeu.js) : elle REMPLACE le geste
+        // d'avant (une esquive, une chute, une opportunité) quand elle a su se
+        // jouer ; sinon elle l'ACCOMPAGNE (le coup reçu sous le chiffre, la
+        // lueur d'un soin, l'énergie qui monte). Sans elle, rien ne change.
+        let enParallele = null;
+        if (scene.reaction && reaction) {
+            const geste = Promise.resolve().then(() => reaction(scene.reaction)).catch(() => false);
+            if (scene.reaction.remplace) {
+                if (await geste) return;
+            } else {
+                enParallele = geste;
+            }
+        }
+        await jouerLeGesteDAvant(scene);
+        if (enParallele) await enParallele;
+    }
+
+    async function jouerLeGesteDAvant(scene) {
         switch (scene.geste) {
             case "pas":
                 await pas({ idToken: scene.pion, de: scene.de, vers: scene.vers, cout: scene.cout,
@@ -498,7 +574,7 @@ export function creerPont(effets) {
             case "carte":
                 // Le critique s'annonce AVANT le coup : après, on ne saurait plus
                 // à quoi rattacher le mot.
-                if (scene.critique) {
+                if (scene.critique && !(reaction && await Promise.resolve().then(() => reaction({ sorte: "critique", pion: scene.pion })).catch(() => false))) {
                     message(scene.pion, "Critique !", COULEURS.critique, { taille: 30, eclat: true });
                     await pause(RYTHME.critique);
                 }
@@ -513,6 +589,7 @@ export function creerPont(effets) {
                 // touché ; elles disent si elles ont su le jouer.
                 else if (!(attaque && await attaque({ pion: scene.pion, cibles: scene.cibles, touches: scene.touches,
                                                        frappe: scene.frappe || null, element: scene.element || null,
+                                                       sort: scene.sort || null,
                                                        projectile: scene.projectile, carte: scene.carte }))) {
                     await ruee({ pion: scene.pion, cibles: scene.cibles });
                     // PUIS CE QUI TRAVERSE, s'il y a quelque chose à voir voler.
@@ -528,6 +605,10 @@ export function creerPont(effets) {
                 }
                 // UNE ATTAQUE DE ZONE : ses cases rougeoient, puis explosent.
                 if (scene.zone && zoneCarte) await zoneCarte({ pion: scene.pion, cases: scene.zone, cibles: scene.cibles });
+                // UN SOIN DE ZONE : ses cases fleurissent ; UN SOIN ÉTALÉ : son
+                // sceau se pose sous chaque soigné.
+                if (scene.soinZone && reaction) await Promise.resolve().then(() => reaction({ sorte: "soin-zone", pion: scene.pion, cases: scene.soinZone })).catch(() => false);
+                if (scene.soinEtale && reaction) await Promise.resolve().then(() => reaction({ sorte: "soin-etale", pion: scene.pion, cibles: scene.cibles })).catch(() => false);
                 await pause(RYTHME.carte);
                 break;
 

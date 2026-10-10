@@ -214,21 +214,74 @@
     //  l'esquive à la sienne. Un geste qui ne convient pas (un soin, un autre
     //  sort, une technique de classe, le compagnon, un journal d'avant) rend
     //  false : la ruée d'avant prend le relais.
+    //  Puis (Nico : « attaque magique foudre, glace, multi-élémentaire, mots
+    //  de pouvoir, lumière : tu peux intégrer ») : le sort a son geste selon
+    //  son élément (Feu, Foudre, Glace) ou sa nature (`sort` : les Mots de
+    //  pouvoir, plusieurs éléments, la Lumière) — au contact comme à distance.
     const GESTE_DE_FRAPPE = { legere: "jeu-attaque-legere", lourde: "jeu-attaque-lourde", epee: "jeu-coup-epee" };
-    window.gesteAttaqueCombat = function ({ projectile, frappe, element, carte, touches }) {
+    const GESTE_D_ELEMENT = { Feu: "jeu-boule-de-feu", Foudre: "jeu-attaque-foudre", Glace: "jeu-attaque-glace" };
+    const GESTE_DE_SORT = { mots: "jeu-mots-de-pouvoir", multi: "jeu-attaque-multi", lumiere: "jeu-lumiere" };
+    window.gesteAttaqueCombat = function ({ projectile, frappe, element, sort, carte, touches }) {
         if (!Array.isArray(touches) || /^(CLASSE_|COMPAGNON_|ZOMBIE_)/.test(String(carte || ""))) return null;
+        if (sort && GESTE_DE_SORT[sort]) return GESTE_DE_SORT[sort];
+        if (element && GESTE_D_ELEMENT[element]) return GESTE_D_ELEMENT[element];
         if (!projectile) return GESTE_DE_FRAPPE[frappe] || null;
         if (projectile === "fleche" && frappe) return "jeu-attaque-distance";
-        if (projectile === "magie" && element === "Feu") return "jeu-boule-de-feu";
         return null;
     };
+    // Qui vient de recevoir le coup d'un geste du Studio : son coup reçu est
+    // déjà montré, l'étape des dégâts qui suit n'en remet pas un second.
+    const frappesRecentes = {};
+    const noterFrappe = (ids) => (ids || []).forEach(id => { if (id) frappesRecentes[id] = Date.now(); });
+    const dejaFrappe = (id) => !!frappesRecentes[id] && Date.now() - frappesRecentes[id] < 4000;
     window.animerAttaqueCombat = async function (d) {
         const geste = window.gesteAttaqueCombat(d || {});
         const cibles = ((d && d.cibles) || []).filter(id => id && id !== d.pion && pionDe(id));
         if (!geste || !cibles.length) return false;
+        const touchees = cibles.filter(id => d.touches.includes(id));
         const scene = window.sceneDeCombat(d.pion, cibles[0], { cibles: cibles.map(pionDe),
-                                                               touchees: cibles.filter(id => d.touches.includes(id)).map(pionDe), grace: 1500 });
+                                                               touchees: touchees.map(pionDe), grace: 1500 });
         if (!scene) return false;
+        noterFrappe(touchees);
+        await window.jouerAnimationJeu(geste, scene);
+        return true;
+    };
+
+    // --- LES RÉACTIONS : CE QUI ARRIVE AU PION -------------------------------------
+    //  Le pont (pont_combat.js) dit, étape par étape, ce qui arrive : un coup
+    //  reçu (physique, magique, brut), une esquive ou une parade, un Contre, une
+    //  Absorption, le bouclier qui encaisse, se brise ou se pose, une mise à
+    //  terre, une illusion brisée, un soin (simple, de zone, étalé), une
+    //  purification, une bénédiction, le repos long, la régénération et la
+    //  dépense d'énergie, le coup d'opportunité, la frappe d'un mur, le coup
+    //  critique annoncé. Le chiffre, lui, reste à l'étape (sa jauge).
+    const GESTE_DE_REACTION = {
+        "coup-physique": "jeu-coup-recu-physique", "coup-magique": "jeu-coup-recu-magique", "coup-brut": "jeu-coup-recu-brut",
+        esquive: "jeu-esquive", parade: "jeu-parade", contre: "jeu-contre", absorption: "jeu-absorption",
+        "bouclier-encaisse": "jeu-bouclier-encaisse", "bouclier-brise": "jeu-bouclier-brise", "bouclier-cree": "jeu-bouclier-cree",
+        ko: "jeu-mise-a-terre", "illusion-brisee": "jeu-illusion-brisee",
+        soin: "jeu-soin", "soin-tic": "jeu-soin-tic", "soin-zone": "jeu-soin-zone", "soin-etale": "jeu-soin-etale",
+        purification: "jeu-purification", "benediction-magique": "jeu-benediction-magique",
+        "benediction-physique": "jeu-benediction-physique", "benediction-offensive": "jeu-benediction-offensive",
+        repos: "jeu-repos-long", regen: "jeu-regen-energie", depense: "jeu-depense-energie",
+        opportunite: "jeu-attaque-opportunite", "frappe-mur": "jeu-frappe-mur", critique: "jeu-critique"
+    };
+    window.animerReactionCombat = async function (d) {
+        const geste = d && GESTE_DE_REACTION[d.sorte];
+        if (!geste || typeof window.jouerAnimationJeu !== "function" || !pionDe(d.pion)) return false;
+        // Le coup reçu d'un geste d'attaque du Studio est déjà montré : fait.
+        if (/^coup-/.test(d.sorte) && dejaFrappe(d.pion)) return true;
+        const plus = { grace: 1500, sorte: d.sorte };
+        if (d.caseDepuis) plus.caseDepuis = d.caseDepuis;
+        if (d.texte) plus.texte = d.texte;
+        if (d.mur) plus.mur = d.mur;
+        if (Array.isArray(d.cases)) plus.cases = d.cases;
+        if (Array.isArray(d.cibles)) plus.cibles = d.cibles.map(pionDe).filter(Boolean);
+        if (d.max !== undefined) Object.assign(plus, { de: d.de, vers: d.vers, max: d.max });
+        const scene = window.sceneDeCombat(d.pion, d.depuis && pionDe(d.depuis) ? d.depuis : null, plus);
+        if (!scene) return false;
+        // Le coup d'opportunité porte : la cible a reçu son coup.
+        if (d.sorte === "opportunite" && d.depuis) noterFrappe([d.depuis]);
         await window.jouerAnimationJeu(geste, scene);
         return true;
     };

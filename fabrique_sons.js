@@ -925,6 +925,19 @@
         "coup-poing"(ctx, s) {
             note(ctx, s, { freq: 150, glisse: 70, duree: 0.12, gain: 0.42, attaque: 0.002 });
             bruit(ctx, s, { duree: 0.04, filtre: "lowpass", freq: 1200, q: 0.7, gain: 0.42 });
+        },
+        // LE CRITIQUE, SOURD ET ÉPIQUE (Nico : « coup critique : mets un son plus
+        // sourd et épique ») : une frappe de timbale qui s'enfonce très bas, un
+        // grondement qui monte derrière, des cuivres sombres lentement ouverts,
+        // et un gong grave qui s'éteint — rien d'aigu, rien de doré.
+        "critique-epique"(ctx, s) {
+            note(ctx, s, { freq: 62, glisse: 38, duree: 1.1, gain: 0.6, attaque: 0.004 });
+            bruit(ctx, s, { duree: 0.18, filtre: "lowpass", freq: 260, q: 0.8, gain: 0.55 });
+            bruit(ctx, s, { duree: 0.9, filtre: "lowpass", balayage: [120, 420], q: 0.7, gain: 0.25, forme: "cloche" });
+            [98, 147, 196].forEach((f, i) => note(ctx, s, { debut: 0.06, freq: f, duree: 1.3, gain: 0.07 - i * 0.012,
+                                                            attaque: 0.09, type: "sawtooth", passeBas: 700 }));
+            note(ctx, s, { debut: 0.02, freq: 73.4, duree: 2.2, gain: 0.12, attaque: 0.01, type: "triangle" });
+            note(ctx, s, { debut: 0.02, freq: 74.2, duree: 2.2, gain: 0.08, attaque: 0.01, type: "triangle" });
         }
     });
 

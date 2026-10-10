@@ -132,7 +132,9 @@ console.log("\n3. LE FEU, LA FOUDRE");
 }
 {
   const r = await observer("attaque-foudre");
-  verifier("la foudre : des éclairs, puis la décharge électrique à la réception", ids(r).includes("foudre") && ids(r).includes("decharge"), JSON.stringify(ids(r)));
+  // v234 (Nico : « garde juste le son de l'électricité, pas de son quand la
+  // cible reçoit les dégâts ») : plus de décharge à la réception.
+  verifier("la foudre : le seul son des éclairs, rien à la réception", ids(r).includes("foudre") && !ids(r).includes("decharge"), JSON.stringify(ids(r)));
 }
 
 console.log("\n4. LA GLACE : DES POINTES DE CRISTAL, UNE À UNE");
@@ -170,10 +172,11 @@ console.log("\n5. LA LUMIÈRE, LE COUP CRITIQUE");
            && /rgb\(255, 42, 42\)/.test(pose.couleur), pose ? `${Math.round(pose.y - r.H.y)} px sous le centre, ${pose.couleur}` : "jamais vu");
   verifier("…il arrive de haut (énorme, flou) et se pose : le joli effet", vus.length > 5 && vus[0].opacite < 0.6);
   verifier("puis l'attaque normale : la lame, la chair, « -24 ! » (plus d'étoile dorée ni de cloche)",
-           ids(r).includes("critique-charge") && ids(r).includes("lame-souffle") && ids(r).includes("entaille-chair") && !ids(r).includes("critique-impact")
+           // v234 : le son sourd et épique (critique-epique) remplace la charge dorée.
+           ids(r).includes("critique-epique") && !ids(r).includes("critique-charge") && ids(r).includes("lame-souffle") && ids(r).includes("entaille-chair") && !ids(r).includes("critique-impact")
            && r.textes.some(x => x.t === "-24 !" && x.envol) && !r.poses.some(x => /polygon points="0,-48 4,-6 -4,-6"/.test(x.html)), JSON.stringify(ids(r)));
   const ordre = r.sons.map(s => s[0]);
-  verifier("…le message d'abord, l'attaque ensuite", ordre.indexOf("critique-charge") < ordre.indexOf("lame-souffle"));
+  verifier("…le message d'abord, l'attaque ensuite", ordre.indexOf("critique-epique") >= 0 && ordre.indexOf("critique-epique") < ordre.indexOf("lame-souffle"));
 }
 
 console.log("\n6. LES SONS NEUFS");

@@ -198,8 +198,9 @@ console.log("\n3. LE CHOIX DU GESTE");
   verifier("coup d'épée, légère, lourde, tir, boule de feu : chacune son geste",
            r.epee === "jeu-coup-epee" && r.legere === "jeu-attaque-legere" && r.lourde === "jeu-attaque-lourde"
            && r.tir === "jeu-attaque-distance" && r.feu === "jeu-boule-de-feu", JSON.stringify(r));
-  verifier("…les autres gardent la ruée : la foudre, un sort au contact, un soin, une technique, le compagnon, un journal d'avant",
-           [r.foudre, r.magieContact, r.soin, r.technique, r.compagnon, r.journalDAvant].every(x => x === null), JSON.stringify(r));
+  // v234 : la foudre a son geste (animations_en_jeu_4.mjs).
+  verifier("…les autres gardent la ruée : un sort sans élément au contact, un soin, une technique, le compagnon, un journal d'avant",
+           r.foudre === "jeu-attaque-foudre" && [r.magieContact, r.soin, r.technique, r.compagnon, r.journalDAvant].every(x => x === null), JSON.stringify(r));
 }
 
 console.log("\n4. LES ATTAQUES SUR LE VRAI PLATEAU");
@@ -250,7 +251,10 @@ console.log("\n4. LES ATTAQUES SUR LE VRAI PLATEAU");
   verifier("…ratée : elle s'écrase sur la case, plus petite", r.feuRate.langues > 0 && r.feuRate.langues < 6, String(r.feuRate.langues));
   verifier("aucun chiffre dans le geste (l'étape des dégâts le dira, une fois)",
            ![r.epee, r.legere, r.lourde, r.tir, r.feu].some(chiffre), JSON.stringify([r.epee, r.legere, r.lourde, r.tir, r.feu].map(x => x.textes)));
-  verifier("un sort de foudre garde la ruée d'avant (le geste rend la main)", r.foudre.fait === false && r.foudre.sons.length === 0, JSON.stringify(r.foudre));
+  // v234 (Nico : « attaque magique : garde juste le son de l'électricité, pas
+  // de son quand la cible reçoit les dégâts ») : la foudre a son geste.
+  verifier("un sort de foudre joue son geste, avec le seul son de l'électricité",
+           r.foudre.fait === true && JSON.stringify(r.foudre.sons) === '["foudre"]', JSON.stringify(r.foudre));
 }
 
 // Pour les yeux : la flèche plantée, la boule de feu, en jeu.

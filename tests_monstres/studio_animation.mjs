@@ -463,7 +463,7 @@ console.log("\n10. LE SON DES ANIMATIONS");
     window.PARAMETRES_AUDIO.interface = avant;
     return { out, muet, joue: window.jouerSonCombat("lame-impact") };
   });
-  verifier("les sons de combat fabriqués (108 avec le catalogue complet), aucun muet, aucun ne sature", rendus.out.length === 108 && rendus.out.every(x => x.crete > 0.02 && x.crete < 0.95),
+  verifier("les sons de combat fabriqués (109 avec le catalogue complet : + critique-epique, v234), aucun muet, aucun ne sature", rendus.out.length === 109 && rendus.out.every(x => x.crete > 0.02 && x.crete < 0.95),
            rendus.out.map(x => `${x.id} ${x.crete}`).join(" · "));
   verifier("tous brefs (moins de 1,6 s)", rendus.out.every(x => x.duree < 1.6), rendus.out.map(x => x.duree).join(" "));
   verifier("ils suivent le volume du jeu (à zéro : rien)", rendus.muet === false && rendus.joue === true);

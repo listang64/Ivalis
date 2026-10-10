@@ -5929,3 +5929,56 @@ après la réinitialisation, « -30% » du Sorcier, casque demandé au résolveu
 La suite : 210/210 — regime_cerveau.mjs a rappelé qu'un poste sans écran
 (Node) passe aussi par l'effacement des murs : il ne touche à `window` que
 s'il existe.
+
+## v234 — La deuxième liste du Studio, en jeu
+
+Nico : « attaque magique : garde juste le son de l'électricité, pas de son
+quand la cible reçoit les dégâts, et ensuite intègre-la ; glace,
+multi-élémentaire, mots de pouvoir, lumière : tu peux intégrer ; coup
+critique : mets un son plus sourd et épique ; attaque d'opportunité ; créature
+qui frappe un mur de pierre : enlève juste l'émoticône pioche ; dégâts qui
+s'envolent ; coup reçu physique / magique / brut ; esquive ; parade ; contre ;
+absorption ; le bouclier magique encaisse le coup, se brise ; mise à terre /
+KO ; illusion brisée ; soin, soin de zone, soin étalé ; bouclier magique
+création ; purification ; bénédictions magique, physique, offensive ; repos
+long ; régénération de fin de manche ; dépense d'énergie d'une compétence :
+tu peux intégrer. »
+
+- LE STUDIO : la foudre n'a plus que le son des éclairs (plus de décharge à la
+  réception) ; le coup critique sonne « critique-epique » (fabrique_sons.js :
+  une timbale qui s'enfonce, un grondement, des cuivres sombres, un gong
+  grave) ; le mur frappé n'a plus de pioche ⛏️ (ni l'icône, ni dans le mot).
+- LE NOYAU (moteur_pur.js) dit ce que l'écran doit savoir : `sort` sur l'étape
+  carte (« mots », « multi », « lumiere » — l'élément seul reste `element`),
+  `soinZone` (les cases d'un soin de zone) et `soinEtale` ; `nature` sur les
+  dégâts (physique, magique, brut) ; `absorption` sur le soin de l'Absorption ;
+  `depense` sur la fatigue que coûte la carte ; `benediction` (magique,
+  physique, offensive) sur l'état « Béni ». Le cerveau dit la case du mur
+  qu'une créature frappe (`frappeMur`) ; le mot devient « Frappe le mur ».
+- LE PONT (pont_combat.js) en tire une `reaction` par étape : le coup reçu
+  selon sa nature, le Contre, le bouclier qui encaisse / se brise / se pose,
+  l'esquive et la parade, l'Absorption, le soin et sa part étalée, la
+  purification, la bénédiction, l'énergie (repos long, régénération,
+  dépense), la chute (mise à terre ou illusion brisée), l'opportunité, la
+  frappe d'un mur, le critique. Elle REMPLACE le geste d'avant quand elle a
+  su se jouer (esquive, chute, opportunité, critique), sinon elle
+  l'ACCOMPAGNE (sous le chiffre de la jauge) ; sans geste du Studio, rien ne
+  change. Après une carte : le soin de zone fleurit, le soin étalé pose ses
+  sceaux.
+- EN JEU (animations_jeu.js : animerReactionCombat ; animations_catalogue.js :
+  les gestes « jeu-… ») : les sorts ont leur geste selon l'élément (Feu,
+  Foudre, Glace) ou le sort (Mots de pouvoir, multi-élémentaire, Lumière), au
+  contact comme à distance, vers chaque cible, le coup ne portant que sur qui
+  est touché. Le coup reçu d'un geste d'attaque du Studio n'est pas rejoué à
+  l'étape des dégâts. Le pion mis à terre (ou le leurre brisé) ne se relève
+  pas : il reste invisible jusqu'au redessin qui le retire. Les dégâts qui
+  s'envolent étaient déjà en jeu (v230).
+
+animations_en_jeu_4.mjs : le noyau (sort, soins, nature, Absorption, dépense,
+bénédiction, mur frappé), le pont (chaque réaction, remplacer ou accompagner,
+le geste d'avant sans Studio), puis le vrai plateau — chaque sort et chaque
+réaction, leurs sons, sans chiffre de trop, la mise à terre qui ne se relève
+pas — et le Studio (foudre, critique, mur ; le son du critique, grave et
+long). Il mord sur l'ancien code (15 échecs, puis le pont s'arrête net).
+animations_en_jeu_3.mjs suit : la foudre a désormais son geste, avec le seul
+son de l'électricité.

@@ -987,7 +987,14 @@ function contexteDuJeu() {
             // Puis : « coup d'épée, attaque légère, attaque lourde, attaque à
             // distance, attaque magique feu : tu peux implanter ». Rend false
             // quand le geste ne convient pas (la ruée d'avant prend le relais).
-            attaque: (d) => window.animerAttaqueCombat ? window.animerAttaqueCombat(d) : false
+            attaque: (d) => window.animerAttaqueCombat ? window.animerAttaqueCombat(d) : false,
+            // Puis : « foudre, glace, multi-élémentaire, mots de pouvoir,
+            // lumière, coup critique, opportunité, frappe d'un mur, coups reçus,
+            // esquive, parade, contre, absorption, bouclier, mise à terre,
+            // illusion brisée, soins, purification, bénédictions, repos long,
+            // régénération, dépense d'énergie : tu peux intégrer ». Rend false
+            // quand le geste ne peut pas se jouer (le geste d'avant reste).
+            reaction: (d) => window.animerReactionCombat ? window.animerReactionCombat(d) : false
         },
 
         // OÙ POSER L'ÉTAT. Un seul sens : l'état descend, rien ne remonte.

@@ -1549,6 +1549,22 @@ export function resoudreCarte(etat, action, plateau) {
         : nomOffensive.includes("attaque lourde") ? "lourde" : "epee";
     const elementSort = offensive && offensive.typeRes === "Magique" && offensive.element
                         && !((offensive.elements || []).length > 1) ? offensive.element : null;
+    // LES AUTRES SORTS DU STUDIO (Nico : « attaque magique de glace,
+    // multi-élémentaire, mots de pouvoir, lumière : tu peux intégrer ») : les
+    // Mots de pouvoir, un sort de plusieurs éléments, un sort de Lumière sans
+    // élément. L'élément seul (Feu, Foudre, Glace) voyage dans `element`.
+    const sortCarte = !offensive ? null
+        : nomOffensive.includes("pouvoir") ? "mots"
+        : offensive.typeRes !== "Magique" ? null
+        : (offensive.elements || []).length > 1 ? "multi"
+        : (!offensive.element && nombre(offensive.chanceLumiere) > 0) ? "lumiere" : null;
+    // UNE CARTE DE SOIN : de zone, ses cases fleurissent (« soin de zone ») ;
+    // étalée, un sceau se pose sous chaque soigné (« soin étalé »).
+    const soinCarte = (action.attaques || []).find(a => a && a.isHeal && !a.isShield && (a.cibles || []).length > 0);
+    const soinZone = (soinCarte && !frappe && !rate && Array.isArray(action.zoneVisee))
+        ? action.zoneVisee.filter(h => h && h.q !== undefined && h.r !== undefined).map(h => ({ q: nombre(h.q), r: nombre(h.r) }))
+        : [];
+    const soinEtale = !!(soinCarte && !rate && soinCarte.estEtalement);
     const etapeCarte = {
         type: "carte", acteur: idLanceur, carte: action.idCarte,
         critique,
@@ -1562,6 +1578,9 @@ export function resoudreCarte(etat, action, plateau) {
         ...(zone.length ? { zone } : {}),
         ...(styleFrappe ? { frappe: styleFrappe } : {}),
         ...(elementSort ? { element: elementSort } : {}),
+        ...(sortCarte ? { sort: sortCarte } : {}),
+        ...(soinZone.length ? { soinZone } : {}),
+        ...(soinEtale ? { soinEtale: true } : {}),
         cibles: [...new Set([].concat(
             ...(action.attaques || []).map(a => a.cibles || []),
             ...(action.alterations || []).map(a => a.cibles || [])
@@ -1803,7 +1822,7 @@ export function resoudreCarte(etat, action, plateau) {
                 // Le drain de l'absorption soigne AVANT que le reste ne frappe.
                 if (compte.soinAbsorption > 0) {
                     cible.pv = Math.min(cible.pvMax, cible.pv + compte.soinAbsorption);
-                    etapes.push({ type: "soin", cible: idCible, acteur: idLanceur, drain: true,
+                    etapes.push({ type: "soin", cible: idCible, acteur: idLanceur, drain: true, absorption: true,
                                   montant: compte.soinAbsorption, pvApres: cible.pv });
                 }
 
@@ -1841,6 +1860,9 @@ export function resoudreCarte(etat, action, plateau) {
                     bouclierApres: cible.bouclier,
                     pvApres: cible.pv,
                     critique,
+                    // LA NATURE DU COUP : l'écran montre le coup reçu qui va avec
+                    // (physique, magique, brut — animations_jeu.js).
+                    nature: attaqueFrappe.brut === true ? "brut" : attaqueFrappe.typeRes === "Magique" ? "magique" : "physique",
                     ...(compte.tenebres ? { tenebres: true } : {})
                 });
 
@@ -2175,7 +2197,7 @@ export function resoudreCarte(etat, action, plateau) {
     //  deux durées, jamais de cumul).
     const ICONE_SUITE_EQUIPEMENT =
         "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png";
-    const poserSuiteEquipement = (idCible, nom, duree, bonusEquip, desc) => {
+    const poserSuiteEquipement = (idCible, nom, duree, bonusEquip, desc, plus) => {
         const cible = combattant(suivant, idCible);
         if (!cible || cible.aTerre) return;
         const existant = cible.etats.find(e => e && e.nom === nom);
@@ -2186,7 +2208,7 @@ export function resoudreCarte(etat, action, plateau) {
             cible.etats = [...cible.etats,
                            { nom, duree, bonusEquip, icone: ICONE_SUITE_EQUIPEMENT, desc }];
         }
-        etapes.push({ type: "etats", cible: idCible, pose: nom, liste: cible.etats });
+        etapes.push({ type: "etats", cible: idCible, pose: nom, liste: cible.etats, ...(plus || {}) });
     };
 
     (jets.equipLanceur || []).forEach(buff => {
@@ -2209,7 +2231,9 @@ export function resoudreCarte(etat, action, plateau) {
                             beni.resMag ? `+${beni.resMag}% résistance magique` : null,
                             beni.degatsPct ? `+${beni.degatsPct}% de dégâts` : null]
                 .filter(Boolean).join(", ");
-            soignes.forEach(id => poserSuiteEquipement(id, "Béni", beni.tours || 1, bonus, detail));
+            // Laquelle (l'écran a un geste pour chacune) : offensive, physique, magique.
+            const benediction = beni.degatsPct ? "offensive" : beni.resPhys ? "physique" : "magique";
+            soignes.forEach(id => poserSuiteEquipement(id, "Béni", beni.tours || 1, bonus, detail, { benediction }));
         });
     }
 
@@ -2241,9 +2265,13 @@ export function resoudreCarte(etat, action, plateau) {
         const inertie = Math.min(nombre(action.coutFatigue), reductionInertie(etat, idLanceur, action));
         if (inertie > 0) etapes.push({ type: "message", cible: idLanceur, acteur: idLanceur,
                                        texte: `⚡ Inertie martiale −${inertie}`, couleur: "#e8c46a" });
+        const avantCout = nombre(lanceur.fatigue);
         lanceur.fatigue = Math.max(0, Math.min(lanceur.fatigueMax,
                                                lanceur.fatigue - (nombre(action.coutFatigue) - inertie)));
-        etapes.push({ type: "fatigue", cible: idLanceur, fatigueApres: lanceur.fatigue });
+        // `depense` : ce que la carte a coûté (l'écran le montre, Nico :
+        // « dépense d'énergie d'une compétence : tu peux intégrer »).
+        etapes.push({ type: "fatigue", cible: idLanceur, fatigueApres: lanceur.fatigue,
+                      ...(avantCout > lanceur.fatigue ? { depense: avantCout - lanceur.fatigue } : {}) });
     }
 
     // Qui la carte a vraiment frappé (ni esquivé, ni épargné) : l'écran y met

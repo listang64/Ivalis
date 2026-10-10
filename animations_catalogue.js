@@ -709,9 +709,9 @@
                 o.eclat(sc.lanceur, "brightness(1.4) drop-shadow(0 0 8px #9fd8ff)", 500);
                 for (let k = 0; k < 3; k++) o.eclair(sc.calque, a, { x: a.x + hasard(-1, 1) * a.t * 0.6, y: a.y + hasard(-1, 1) * a.t * 0.6, t: a.t }, { largeur: 0.3, duree: 260, retard: k * 90, segments: 4 });
                 await o.attendre(320);
+                // Le seul son de l'électricité (Nico : « garde juste le son de
+                // l'électricité, pas de son quand la cible reçoit les dégâts »).
                 o.son("foudre");
-                // À la réception, la décharge électrique.
-                o.son("decharge", 260);
                 o.eclair(sc.calque, a, b, { duree: 480 });
                 o.eclair(sc.calque, a, b, { duree: 420, retard: 200 });
                 o.jauge(sc.calque, sc.cible, 40, 29, 40, "-11", COULEURS.degats, COULEURS.degats);
@@ -942,7 +942,7 @@
         },
         {
             id: "frappe-mur", nom: "Créature qui frappe un mur de terre", sens: "vers l'ennemi",
-            description: "Un mur de terre barre la route : l'ennemi le frappe à coups de pioche ⛏️, des éclats de roche volent, le mur tremble.",
+            description: "Un mur de terre barre la route : l'ennemi le frappe à grands coups, des éclats de roche volent, le mur tremble.",
             async jouer(sc, o) {
                 const { b, v } = lieux(sc);
                 const pos = o.voisine(sc.cible, b, o.tourner(v, Math.PI / 2));
@@ -951,12 +951,11 @@
                     const elan = o.elan(sc.cible, b, pos, { portee: 0.5, duree: 420 });
                     await o.attendre(240);
                     o.son("pioche");
-                    o.icone(sc.calque, pos, "⛏️", { taille: 0.5, duree: 700 });
                     o.gerbe(sc.calque, pos.x, pos.y, { nombre: 9, dist: pos.t * 0.8, couleurs: ["#a08868", "#6e5a40"], taille: 6, carre: true, duree: 600 });
                     o.secouer(mur, 4, 260);
                     await elan;
                 }
-                o.texte(sc.calque, mur, "⛏️ -1", COULEURS.attention);
+                o.texte(sc.calque, mur, "-1", COULEURS.attention);
                 await o.attendre(700);
             }
         },
@@ -1234,7 +1233,8 @@
     };
     // Une bénédiction : un sceau, une aura, un emblème qui s'élève.
     const benir = async (o, sc, couleur, embleme, texte) => {
-        const { a } = lieux(sc);
+        // Sur le pion seul : en jeu, une bénédiction n'a pas d'ennemi en face.
+        const a = centre(sc.lanceur, sc.calque);
         o.son("benediction");
         const s = sceau(o, sc.calque, a, couleur, { duree: 1800 });
         o.icone(sc.calque, a, embleme, { duree: 1600, lueur: couleur, taille: 0.6 });
@@ -2894,9 +2894,9 @@
         },
         {
             id: "coup-critique", nom: "Coup critique", categorie: "Attaque", sens: "vers l'ennemi",
-            description: "« COUP CRITIQUE ! » tombe en rouge sous le pion du héros, claque, souligné d'un trait, dans une pluie d'étincelles ; puis vient l'attaque, normale.",
+            description: "« COUP CRITIQUE ! » tombe en rouge sous le pion du héros, claque, souligné d'un trait, dans une pluie d'étincelles, sur un son sourd et épique ; puis vient l'attaque, normale.",
             async jouer(sc, o) {
-                o.son("critique-charge");
+                o.son("critique-epique");
                 messageCritique(o, sc.calque, sc.lanceur);
                 await o.attendre(650);
                 await frapper(o, sc.calque, sc.lanceur, sc.cible, { valeur: "-24 !" });
@@ -3012,6 +3012,19 @@
     };
     // Ce que coûte la case, au-dessus du pion (une case gratuite ne dit rien).
     const coutAffiche = (sc, o) => { if (Number(sc.cout) > 0) o.texte(sc.calque, sc.lanceur, `-${Number(sc.cout)} ⚡`, COULEURS.attention, { taille: 15 }); };
+    // D'OÙ VIENT LE COUP d'une réaction : le pion qui l'a porté (sc.cible),
+    // sinon sa case (sc.caseDepuis), sinon d'au-dessus (une zone, un tic).
+    const sourceDuCoup = (sc, o) => {
+        const a = centre(sc.lanceur, sc.calque);
+        if (sc.cible) return centre(sc.cible, sc.calque);
+        if (sc.caseDepuis && o.grille) return pointDe(o, sc, sc.caseDepuis);
+        return { x: a.x, y: a.y - a.t, t: a.t };
+    };
+    // L'énergie qui monte ou descend sur le pion : sa barre et son chiffre (« +5 ⚡ »).
+    const energieEnJeu = (o, sc) => {
+        if (sc.max === undefined) return;
+        o.energie(sc.calque, sc.lanceur, sc.de, sc.vers, sc.max, sc.texte || "");
+    };
 
     window.enregistrerAnimationsJeu([
         // LES ATTAQUES (Nico : « coup d'épée au corps à corps, attaque légère,
@@ -3345,6 +3358,465 @@
             if (sc.texte) o.texte(sc.calque, f || sc.lanceur, "Déploiement", COULEURS.neutre);
             await o.attendre(600);
             await o.effacer(h);
+        } },
+
+        // =================================================================
+        //  LA LISTE SUIVANTE (Nico : « attaque magique, garde juste le son de
+        //  l'électricité… glace, multi-élémentaire, mots de pouvoir, lumière,
+        //  coup critique, attaque d'opportunité, créature qui frappe un mur,
+        //  coups reçus, esquive, parade, contre, absorption, bouclier,
+        //  mise à terre, illusion brisée, soins, bouclier créé, purification,
+        //  bénédictions, repos long, régénération, dépense d'énergie : tu peux
+        //  intégrer »). Les sorts partent vers chaque cible (sc.cibles) ; le coup
+        //  ne porte que sur qui est vraiment touché (sc.touchees). Aucun chiffre
+        //  ici : il vient, une fois, à l'étape des dégâts.
+        // =================================================================
+        // LA FOUDRE : le lanceur crépite de bleu ; deux éclairs déchirent l'air
+        // jusqu'à la cible, qui blanchit et jette des étincelles. Manquée,
+        // l'éclair claque au sol à côté d'elle. Un seul son, celui de
+        // l'électricité — rien quand la cible reçoit le coup.
+        { id: "jeu-attaque-foudre", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            o.eclat(sc.lanceur, "brightness(1.4) drop-shadow(0 0 8px #9fd8ff)", 500);
+            for (let k = 0; k < 3; k++) o.eclair(sc.calque, a, { x: a.x + hasard(-1, 1) * a.t * 0.6, y: a.y + hasard(-1, 1) * a.t * 0.6, t: a.t },
+                                                 { largeur: 0.3, duree: 260, retard: k * 90, segments: 4 });
+            await o.attendre(320);
+            o.son("foudre");
+            await Promise.all(sc.cibles.map(async el => {
+                const b = centre(el, sc.calque), v = axe(a, b), touchee = toucheEnJeu(sc, el);
+                const vise = touchee ? b : { x: b.x - v.uy * b.t * 0.75, y: b.y + v.ux * b.t * 0.75, t: b.t };
+                o.eclair(sc.calque, a, vise, { duree: 480 });
+                o.eclair(sc.calque, a, vise, { duree: 420, retard: 200 });
+                if (!touchee) return o.gerbe(sc.calque, vise.x, vise.y, { nombre: 6, dist: b.t * 0.5, couleurs: ["#ffffff", "#9fd8ff"], taille: 3, duree: 420 });
+                await Promise.all([o.onde(sc.calque, b, { couleur: "#9fd8ff", taille: 0.9, duree: 500, echelle: 1.8 }),
+                    o.teinter(el, [{ filter: "none" }, { filter: ELEC, offset: 0.15 }, { filter: "none", offset: 0.3 }, { filter: ELEC, offset: 0.45 }, { filter: "none" }], { duration: 700 }),
+                    o.gerbe(sc.calque, b.x, b.y, { nombre: 12, dist: b.t * 0.9, couleurs: ["#ffffff", "#9fd8ff", "#5aa0ff"], taille: 4, duree: 500 }),
+                    o.secouer(el, b.t * 0.06, 500)]);
+            }));
+        } },
+        // LA GLACE : des pointes de cristal naissent devant le lanceur, se
+        // tournent vers la cible et filent une à une s'y planter ; elle blanchit
+        // de froid. Manquées, elles filent au-delà et se brisent au sol.
+        { id: "jeu-attaque-glace", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            const n = sc.cibles.length > 1 ? 3 : 5, R = a.t * 0.82, L = a.t * 0.52, H = L * 0.3;
+            const pose = (angle, s, dx = 0, dy = 0) => `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) rotate(${angle}deg) scale(${s})`;
+            o.son("glace-formation");
+            const pics = [];
+            sc.cibles.forEach((el, j) => {
+                const b = centre(el, sc.calque), v = axe(a, b), touchee = toucheEnJeu(sc, el);
+                for (let i = 0; i < n; i++) {
+                    const k = i - (n - 1) / 2, base = v.angle + k * 0.42, ang = deg(base);
+                    const pos = { x: a.x + Math.cos(base) * R, y: a.y + Math.sin(base) * R };
+                    const vise = touchee ? { x: b.x - v.uy * k * b.t * 0.1, y: b.y + v.ux * k * b.t * 0.1 }
+                                         : { x: b.x + v.ux * b.t * 1.3 - v.uy * k * b.t * 0.25, y: b.y + v.uy * b.t * 1.3 + v.ux * k * b.t * 0.25 };
+                    const u = axe(pos, vise);
+                    const fin = { x: vise.x - u.ux * L * 0.3, y: vise.y - u.uy * L * 0.3 };
+                    const vers = ang + ((deg(u.angle) - ang + 540) % 360) - 180;
+                    const pic = o.poser(sc.calque, pos.x, pos.y, `width:${L}px; height:${H}px; z-index:${Z.ciel}; opacity:0;
+                        transform:${BASE} rotate(${ang}deg) scale(0);`, DESSIN_PIC_DE_GLACE);
+                    pic.classList.add("anim-pic-glace");
+                    pics.push({ el: pic, pos, fin, ang, vers, u, cible: el, b, touchee, rang: j * n + i });
+                }
+            });
+            pics.forEach(pc => o.teinter(pc.el, [{ transform: pose(pc.ang, 0), opacity: 0 }, { transform: pose(pc.ang, 1.15), opacity: 1, offset: 0.5 },
+                                                 { transform: pose(pc.ang, 1), opacity: 1 }], { duration: 300, delay: pc.rang * 60, easing: "ease-out", fill: "forwards" }));
+            await o.attendre(300 + (pics.length - 1) * 60);
+            await Promise.all(pics.map(pc => o.teinter(pc.el, [{ transform: pose(pc.ang, 1), opacity: 1 }, { transform: pose(pc.vers, 1), opacity: 1 }],
+                                                       { duration: 240, easing: "ease-in-out", fill: "forwards" })));
+            await o.attendre(120);
+            await Promise.all(pics.map((pc, i) => o.attendre(i * 100).then(async () => {
+                o.son("glace-tir");
+                await o.teinter(pc.el, [{ transform: pose(pc.vers, 1), opacity: 1 },
+                                        { transform: pose(pc.vers, 0.9, pc.fin.x - pc.pos.x, pc.fin.y - pc.pos.y), opacity: 1 }],
+                                { duration: 140, easing: "cubic-bezier(.5,0,1,1)", fill: "forwards" });
+                o.gerbe(sc.calque, pc.fin.x + pc.u.ux * L * 0.4, pc.fin.y + pc.u.uy * L * 0.4, { nombre: 5, dist: pc.b.t * 0.35, angle: pc.u.angle + Math.PI,
+                    eventail: Math.PI * 0.8, couleurs: ["#ffffff", "#bdf3ff", "#7fcfff"], taille: 4, tailleMin: 2, carre: true, duree: 420 });
+                if (!pc.touchee) return;
+                o.son("glace-plante");
+                o.secouer(pc.cible, pc.b.t * 0.05, 160, pc.u);
+            })));
+            await Promise.all([...sc.cibles.filter(el => toucheEnJeu(sc, el)).map(el => Promise.all([
+                o.teinter(el, [{ filter: "none" }, { filter: GIVRE, offset: 0.3 }, { filter: GIVRE, offset: 0.8 }, { filter: "none" }], { duration: 1000 }),
+                o.onde(sc.calque, centre(el, sc.calque), { couleur: "#bdf3ff", taille: 1, duree: 650, echelle: 1.6 })])),
+                ...pics.map(pc => fondre(o, pc.el, 350))]);
+        } },
+        // LE SORT DE PLUSIEURS ÉLÉMENTS : trois orbes (feu, glace, foudre)
+        // tournent autour du lanceur, puis filent ensemble et éclatent en trois
+        // couleurs mêlées. Manquée, la cible les voit passer et s'éteindre.
+        { id: "jeu-attaque-multi", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            const couleurs = [["#ff7a1a", "#fff1c0"], ["#9fe6ff", "#ffffff"], ["#8fb0ff", "#ffffff"]];
+            o.son("feu-lancer"); o.son("gel-lancer", 120);
+            const r = a.t * 0.62;
+            await Promise.all(couleurs.map(([c, coeur], i) => {
+                const d = o.poser(sc.calque, a.x, a.y, `width:${a.t * 0.26}px; height:${a.t * 0.26}px; border-radius:50%; z-index:${Z.ciel};
+                    background:radial-gradient(circle at 40% 40%, ${coeur}, ${c} 60%, rgba(0,0,0,0)); box-shadow:0 0 12px ${c};`);
+                const images = [];
+                for (let k = 0; k <= 8; k++) {
+                    const ang = (i / 3) * Math.PI * 2 + (k / 8) * Math.PI * 2;
+                    images.push({ transform: `translate(calc(-50% + ${Math.cos(ang) * r}px), calc(-50% + ${Math.sin(ang) * r}px))` });
+                }
+                return o.jouerPuisRetirer(d, images, { duration: 700, easing: "linear" });
+            }));
+            o.son("foudre");
+            let sonne = false;
+            await Promise.all(sc.cibles.map(async el => {
+                const b = centre(el, sc.calque), v = axe(a, b), touchee = toucheEnJeu(sc, el);
+                const fin = touchee ? b : { x: b.x + v.ux * b.t * 1.2, y: b.y + v.uy * b.t * 1.2, t: b.t };
+                await Promise.all(couleurs.map(([c, coeur], i) => orbe(o, sc.calque, a, fin, { couleur: c, coeur, taille: 0.26, arc: [0.5, 0, -0.5][i], duree: 520,
+                                                                                              traine: [c, coeur] })));
+                if (!touchee) return o.gerbe(sc.calque, fin.x, fin.y, { nombre: 6, dist: b.t * 0.5, couleurs: ["#ff7a1a", "#bdf3ff", "#8fb0ff"], taille: 4, duree: 450 });
+                if (!sonne) { sonne = true; o.son("feu-explosion"); }
+                await Promise.all([...couleurs.map(([c], i) => o.onde(sc.calque, b, { couleur: c, taille: 0.8 + i * 0.15, duree: 700, echelle: 2, retard: i * 90 })),
+                    o.gerbe(sc.calque, b.x, b.y, { nombre: 15, dist: b.t * 1.1, couleurs: ["#ff7a1a", "#bdf3ff", "#8fb0ff"], taille: 6, duree: 800 }),
+                    o.secouer(el, b.t * 0.12, 380, v)]);
+            }));
+        } },
+        // LES MOTS DE POUVOIR : le lanceur prononce les mots, trois ondes de voix
+        // roulent en arcs jusqu'à la cible et la frappent, sans couleur.
+        { id: "jeu-mots-de-pouvoir", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            o.son("mots");
+            o.eclat(sc.lanceur, "brightness(1.3) grayscale(0.5) drop-shadow(0 0 8px #fff)", 600);
+            await Promise.all(sc.cibles.map(async el => {
+                const b = centre(el, sc.calque), v = axe(a, b), rot = deg(v.angle), touchee = toucheEnJeu(sc, el);
+                const arcs = [0, 1, 2].map(i => {
+                    const d = o.poser(sc.calque, a.x, a.y, `width:${a.t * 0.5}px; height:${a.t * 1.1}px; z-index:${Z.haut}; border-radius:50%;
+                        border-right:4px solid rgba(240,240,240,0.9); filter:drop-shadow(0 0 6px #fff);`);
+                    d.classList.add("anim-arc-mots");
+                    return o.jouerPuisRetirer(d, [
+                        { transform: `translate(-50%,-50%) rotate(${rot}deg) scale(0.5)`, opacity: 0 },
+                        { transform: `translate(calc(-50% + ${(b.x - a.x) * 0.3}px), calc(-50% + ${(b.y - a.y) * 0.3}px)) rotate(${rot}deg) scale(0.9)`, opacity: 1, offset: 0.3 },
+                        { transform: `translate(calc(-50% + ${b.x - a.x}px), calc(-50% + ${b.y - a.y}px)) rotate(${rot}deg) scale(1.5)`, opacity: 0 }
+                    ], { duration: 620, delay: i * 140, easing: "ease-out" });
+                });
+                await o.attendre(480);
+                if (!touchee) return Promise.all(arcs);
+                await Promise.all([...arcs, o.onde(sc.calque, b, { couleur: "#e6e6e6", taille: 0.9, duree: 600, echelle: 1.8 }),
+                    o.secouer(el, b.t * 0.14, 500, v), o.eclat(el, "grayscale(1) brightness(1.5)", 500)]);
+            }));
+        } },
+        // LA LUMIÈRE : un arc de lumière s'ouvre devant le lanceur ; le rayon en
+        // part, large, et s'amincit jusqu'à la cible qu'il perce : elle
+        // clignote une fois d'un jaune léger.
+        { id: "jeu-lumiere", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque), R = a.t * 0.62;
+            o.son("lumiere");
+            o.eclat(sc.lanceur, "brightness(1.25) drop-shadow(0 0 8px #ffe680)", 700);
+            await Promise.all(sc.cibles.map(async el => {
+                const b = centre(el, sc.calque), v = axe(a, b), rot = deg(v.angle), touchee = toucheEnJeu(sc, el);
+                const arc = o.poser(sc.calque, a.x, a.y, `width:${R * 2.4}px; height:${R * 2.4}px; z-index:${Z.haut}; opacity:0; transform:${BASE} rotate(${rot}deg);`,
+                    `<svg viewBox="-60 -60 120 120" width="100%" height="100%" style="overflow:visible; filter:drop-shadow(0 0 4px #ffd700) drop-shadow(0 0 10px #ffb800)">
+                       <path d="M26.5 -42.4 A 50 50 0 0 1 26.5 42.4" fill="none" stroke="#fff6c8" stroke-width="5" stroke-linecap="round"/></svg>`);
+                arc.classList.add("anim-arc-lumiere");
+                await o.teinter(arc, [{ transform: `${BASE} rotate(${rot}deg) scale(0.6, 0)`, opacity: 0 }, { transform: `${BASE} rotate(${rot}deg) scale(1, 1)`, opacity: 1 }],
+                                { duration: 260, easing: "ease-out", fill: "forwards" });
+                const corde = R * 0.848 * 2;
+                const S = { x: a.x + v.ux * R * 0.53, y: a.y + v.uy * R * 0.53 };
+                const fin = touchee ? b : { x: b.x + v.ux * b.t * 0.9, y: b.y + v.uy * b.t * 0.9 };
+                const L = Math.max(10, Math.hypot(fin.x - S.x, fin.y - S.y));
+                const rayon = o.poser(sc.calque, S.x, S.y, `width:${L}px; height:${corde}px; z-index:${Z.haut}; transform-origin:0 50%;
+                    transform:translate(0,-50%) rotate(${rot}deg) scaleX(0); filter:drop-shadow(0 0 5px #ffd700) drop-shadow(0 0 12px #ffb800);`,
+                    `<div style="position:absolute; inset:0; clip-path:polygon(0 0, 100% 48%, 100% 52%, 0 100%);
+                          background:linear-gradient(90deg, rgba(255,226,120,0.5), rgba(255,240,170,0.9));"></div>
+                     <div style="position:absolute; inset:0; clip-path:polygon(0 34%, 100% 49.4%, 100% 50.6%, 0 66%);
+                          background:linear-gradient(90deg, rgba(255,255,240,0.8), #ffffff);"></div>`);
+                rayon.classList.add("anim-rayon-lumiere");
+                const trace = (sx) => `translate(0,-50%) rotate(${rot}deg) scaleX(${sx})`;
+                const trait = o.teinter(rayon, [{ transform: trace(0), opacity: 1 }, { transform: trace(1), opacity: 1, offset: 0.28 },
+                                                 { transform: trace(1), opacity: 0.9, offset: 0.7 }, { transform: trace(1), opacity: 0 }],
+                                        { duration: 900, easing: "ease-out", fill: "forwards" });
+                await o.attendre(250);
+                await Promise.all([trait, touchee ? o.teinter(el, [{ filter: "none" }, { filter: JAUNE_LEGER, offset: 0.45 }, { filter: "none" }], { duration: 520 }) : null,
+                    o.teinter(arc, [{ opacity: 1 }, { opacity: 1, offset: 0.6 }, { opacity: 0 }], { duration: 650, fill: "forwards" })]);
+                arc.remove();
+                rayon.remove();
+            }));
+        } },
+        // LE COUP CRITIQUE S'ANNONCE AVANT LE COUP (Nico : « mets un son plus
+        // sourd et épique ») : « COUP CRITIQUE ! » tombe sous le pion, sur un
+        // son de timbale et de cuivres graves ; puis vient l'attaque, normale.
+        { id: "jeu-critique", async jouer(sc, o) {
+            o.son("critique-epique");
+            messageCritique(o, sc.calque, sc.lanceur);
+            await o.attendre(650);
+        } },
+        // L'ATTAQUE D'OPPORTUNITÉ : celui qui reste frappe au passage celui qui
+        // s'en va (⚔️, « Opportunité ! ») — l'élan, l'entaille, le coup reçu ;
+        // le chiffre vient à l'étape des dégâts.
+        { id: "jeu-attaque-opportunite", async jouer(sc, o) {
+            if (!sc.cible) return;
+            const a = centre(sc.lanceur, sc.calque), b = centre(sc.cible, sc.calque), v = axe(a, b);
+            o.icone(sc.calque, a, "⚔️", { taille: 0.45, duree: 1100 });
+            o.texte(sc.calque, sc.lanceur, "Opportunité !", COULEURS.attention);
+            o.son("lame-souffle", 150);
+            const elan = o.elan(sc.lanceur, a, b, {});
+            await o.attendre(330);
+            await Promise.all([elan, entaille(o, sc.calque, b, v.angle, {}), coupRecu(o, sc.calque, sc.cible, a, {})]);
+        } },
+        // UNE CRÉATURE QUI FRAPPE UN MUR DE TERRE (sans la pioche, Nico) : deux
+        // grands coups vers la case du mur, des éclats de roche qui volent, de
+        // la poussière.
+        { id: "jeu-frappe-mur", async jouer(sc, o) {
+            if (!sc.mur || !o.grille) return;
+            const a = centre(sc.lanceur, sc.calque), pos = pointDe(o, sc, sc.mur);
+            for (let k = 0; k < 2; k++) {
+                const elan = o.elan(sc.lanceur, a, pos, { portee: 0.5, duree: 420 });
+                await o.attendre(240);
+                o.son("pioche");
+                o.gerbe(sc.calque, pos.x, pos.y, { nombre: 9, dist: pos.t * 0.8, couleurs: ["#a08868", "#6e5a40"], taille: 6, carre: true, duree: 600 });
+                poussiere(o, sc.calque, pos, { n: 5, dist: 0.5 });
+                await elan;
+            }
+        } },
+
+        // --- LES RÉACTIONS (le pion qui encaisse, qui se dérobe, qu'on soigne) ---
+        // LE COUP REÇU PHYSIQUE : deux entailles se croisent, le pion recule,
+        // s'empourpre et saigne de son flanc.
+        { id: "jeu-coup-recu-physique", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque), D = sourceDuCoup(sc, o), v = axe(D, a);
+            o.son("lame-souffle");
+            await Promise.all([entaille(o, sc.calque, a, v.angle, { taille: 1.3 }), entaille(o, sc.calque, a, v.angle, { taille: 1.3, tourne: 90, retard: 80 }),
+                coupRecu(o, sc.calque, sc.lanceur, D, {})]);
+        } },
+        // LE COUP REÇU MAGIQUE : un anneau violet se resserre, des éclats
+        // d'arcane crépitent, le pion se teinte de violet.
+        { id: "jeu-coup-recu-magique", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque), D = sourceDuCoup(sc, o);
+            o.son("impact-magique");
+            await Promise.all([o.onde(sc.calque, a, { couleur: "#b070ff", taille: 1.6, duree: 500, echelle: 0.5 }),
+                o.gerbe(sc.calque, a.x, a.y, { nombre: 10, dist: a.t * 0.8, couleurs: ["#d6b0ff", "#9050e0", "#ffffff"], texte: "✦", taille: 16, tailleMin: 10, duree: 700 }),
+                o.secouer(sc.lanceur, a.t * 0.12, 360, axe(D, a)), o.eclat(sc.lanceur, VIOLET, 460)]);
+        } },
+        // LE COUP REÇU BRUT : un choc sans couleur, que rien n'arrête.
+        { id: "jeu-coup-recu-brut", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque), D = sourceDuCoup(sc, o);
+            o.son("impact-brut");
+            await Promise.all([o.onde(sc.calque, a, { couleur: "#c8c8c8", taille: 0.9, duree: 550, echelle: 1.9 }),
+                o.bouger(sc.lanceur, [{ transform: "scale(1)" }, { transform: "scale(0.86)", offset: 0.25 }, { transform: "scale(1.03)", offset: 0.6 }, { transform: "scale(1)" }], { duration: 500 }),
+                o.eclat(sc.lanceur, "grayscale(1) brightness(1.4)", 500), o.secouer(sc.lanceur, a.t * 0.06, 400, axe(D, a))]);
+        } },
+        // L'ESQUIVE : un pas de côté fulgurant, perpendiculaire au coup ; le
+        // coup ne trouve qu'une image fantôme.
+        { id: "jeu-esquive", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque), D = sourceDuCoup(sc, o), v = axe(a, D);
+            const px = -v.uy * a.t * 0.7, py = v.ux * a.t * 0.7;
+            o.son("esquive");
+            o.texte(sc.calque, sc.lanceur, sc.texte || "Esquivé 💨", COULEURS.neutre);
+            o.fantome(sc.calque, sc.lanceur, a, { opacite: 0.55, duree: 650 });
+            const trait = o.poser(sc.calque, a.x, a.y, `width:${a.t * 1.3}px; height:4px; z-index:${Z.haut}; border-radius:2px;
+                background:linear-gradient(90deg, transparent, #fff, transparent); transform:translate(-50%,-50%) rotate(${deg(v.angle)}deg);`);
+            await Promise.all([o.bouger(sc.lanceur, [{ transform: "translate(0,0)" }, { transform: `translate(${px}px, ${py}px) skewX(-10deg)`, offset: 0.25 },
+                                                      { transform: `translate(${px}px, ${py}px)`, offset: 0.7 }, { transform: "translate(0,0)" }],
+                                       { duration: 820, easing: "cubic-bezier(.2,.9,.3,1)" }),
+                o.jouerPuisRetirer(trait, [{ opacity: 0 }, { opacity: 1, offset: 0.3 }, { opacity: 0 }], { duration: 400, delay: 120 })]);
+        } },
+        // LA PARADE : un arc d'acier doré se lève côté attaquant, le coup y
+        // claque dans une gerbe d'étincelles, le pion tient bon.
+        { id: "jeu-parade", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque), D = sourceDuCoup(sc, o), v = axe(a, D);
+            o.son("parade");
+            const contact = { x: a.x + v.ux * a.t * 0.55, y: a.y + v.uy * a.t * 0.55, t: a.t };
+            const arc = o.poser(sc.calque, contact.x, contact.y, `width:${a.t * 0.35}px; height:${a.t * 1.1}px; z-index:${Z.haut};
+                border-radius:50%; border-right:6px solid #ffe9a0; filter:drop-shadow(0 0 8px #ffd700);`);
+            arc.classList.add("anim-parade");
+            o.texte(sc.calque, sc.lanceur, sc.texte || "Paré !", COULEURS.neutre);
+            await Promise.all([o.jouerPuisRetirer(arc, [{ transform: `translate(-50%,-50%) rotate(${deg(v.angle)}deg) scale(0.4)`, opacity: 0 },
+                                                        { transform: `translate(-50%,-50%) rotate(${deg(v.angle)}deg) scale(1.1)`, opacity: 1, offset: 0.25 },
+                                                        { transform: `translate(-50%,-50%) rotate(${deg(v.angle)}deg) scale(1)`, opacity: 0 }], { duration: 650 }),
+                o.gerbe(sc.calque, contact.x, contact.y, { nombre: 12, dist: a.t * 0.7, angle: v.angle, eventail: Math.PI * 1.2, couleurs: ["#fff6c0", "#ffd700"], taille: 4, duree: 500 }),
+                o.secouer(sc.lanceur, a.t * 0.04, 250, axe(D, a))]);
+        } },
+        // LE CONTRE : celui qui contre (sc.cible) rend une part du coup d'un
+        // revers doré ; c'est l'attaquant (le pion) qui l'encaisse.
+        { id: "jeu-contre", async jouer(sc, o) {
+            if (!sc.cible) return;
+            const a = centre(sc.lanceur, sc.calque), b = centre(sc.cible, sc.calque), v = axe(b, a);
+            o.son("parade");
+            o.texte(sc.calque, sc.cible, "Contre !", COULEURS.bouclier);
+            o.gerbe(sc.calque, b.x + v.ux * b.t * 0.5, b.y + v.uy * b.t * 0.5, { nombre: 8, dist: b.t * 0.5, angle: v.angle, eventail: Math.PI,
+                                                                             couleurs: ["#fff6c0", "#ffd700"], taille: 4, duree: 450 });
+            const elan = o.elan(sc.cible, b, a, { portee: 0.35, duree: 320, frappe: 0.5 });
+            await o.attendre(160);
+            await Promise.all([elan, entaille(o, sc.calque, a, v.angle, { taille: 1.1, couleur: "#ffe9a0", lueur: "#ffd700", lueur2: "#ffb000" }),
+                coupRecu(o, sc.calque, sc.lanceur, b, {})]);
+        } },
+        // L'ABSORPTION : l'aura du pion avale le sort dans un tourbillon
+        // vert-violet ; une part s'éteint, une part le soigne (le chiffre suit).
+        { id: "jeu-absorption", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            o.son("absorption");
+            o.texte(sc.calque, sc.lanceur, "Absorbé", COULEURS.bouclier);
+            await Promise.all([o.aura(sc.calque, a, { couleur: "#7dffb0", taille: 1.3, tourne: 360, pulsations: 2, duree: 1000, trait: "dashed" }),
+                rassembler(o, sc.calque, a, { couleur: "#b8ffd0", n: 10, duree: 500, rayon: 0.9 }),
+                o.eclat(sc.lanceur, "brightness(1.4) drop-shadow(0 0 10px #7dff9a)", 800)]);
+        } },
+        // LE BOUCLIER MAGIQUE ENCAISSE : le dôme cyan reçoit le coup, une onde
+        // court sur sa paroi au point d'impact, il vacille.
+        { id: "jeu-bouclier-encaisse", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque), D = sourceDuCoup(sc, o), v = axe(a, D);
+            const d = dome(o, sc.calque, a);
+            d.classList.add("anim-dome");
+            await o.attendre(260);
+            o.son("bouclier-impact");
+            const contact = { x: a.x + v.ux * a.t * 0.7, y: a.y + v.uy * a.t * 0.7, t: a.t * 0.6 };
+            await Promise.all([o.onde(sc.calque, contact, { couleur: "#e8ffff", taille: 0.8, duree: 500, echelle: 1.8 }),
+                o.teinter(d, [{ opacity: 1 }, { opacity: 0.35, offset: 0.2 }, { opacity: 1, offset: 0.45 }, { opacity: 0.6, offset: 0.7 }, { opacity: 1 }], { duration: 600 })]);
+            await o.effacer(d, { echelle: 1.2 });
+        } },
+        // LE BOUCLIER MAGIQUE SE BRISE : le dôme se fissure, puis vole en éclats
+        // de verre cyan.
+        { id: "jeu-bouclier-brise", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque), D = sourceDuCoup(sc, o);
+            const d = dome(o, sc.calque, a, { contenu: `<svg viewBox="0 0 100 100" width="100%" height="100%" class="fissures" style="opacity:0">
+                <path d="M50 50 L22 18 M50 50 L84 30 M50 50 L70 88 M50 50 L18 66 M36 34 L28 40 M70 40 L78 50" stroke="#ffffff" stroke-width="2.5" fill="none"/></svg>` });
+            d.classList.add("anim-dome");
+            await o.attendre(260);
+            o.son("bouclier-impact");
+            await o.teinter(d.querySelector(".fissures"), [{ opacity: 0 }, { opacity: 1 }], { duration: 250, fill: "forwards" });
+            await o.attendre(120);
+            o.son("bris-verre");
+            o.texte(sc.calque, sc.lanceur, "Bouclier brisé !", COULEURS.bouclier);
+            d.remove();
+            await Promise.all([o.gerbe(sc.calque, a.x, a.y, { nombre: 22, dist: a.t * 1.3, couleurs: ["#e8ffff", "#5be8ff", "#a0f5ff"], taille: 9, tailleMin: 4, carre: true, duree: 800 }),
+                o.secouer(sc.lanceur, a.t * 0.06, 300, axe(D, a))]);
+        } },
+        // LE BOUCLIER MAGIQUE SE POSE : un dôme cyan se referme sur le pion,
+        // pulse, puis se dissipe (le « +N 🛡️ » est celui de l'étape).
+        { id: "jeu-bouclier-cree", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            o.son("bouclier");
+            const d = dome(o, sc.calque, a);
+            d.classList.add("anim-dome");
+            await o.teinter(d, [{ opacity: 1, filter: "brightness(1)" }, { opacity: 0.85, filter: "brightness(1.5)", offset: 0.4 }, { opacity: 1, filter: "brightness(1)" }],
+                            { duration: 900 });
+            await o.effacer(d, { echelle: 1.25 });
+        } },
+        // LA MISE À TERRE : frappé, il vacille, s'effondre à l'opposé du coup et
+        // pâlit — et il y reste : le plateau le retire juste après.
+        { id: "jeu-mise-a-terre", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque), D = sourceDuCoup(sc, o);
+            const loin = axe(D, a), tourne = loin.ux >= 0 ? 80 : -80;
+            o.son("coup-sourd");
+            o.son("chute", 650);
+            o.attendre(650).then(() => o.texte(sc.calque, sc.lanceur, "À terre !", COULEURS.degats, { taille: 26 }));
+            await o.bouger(sc.lanceur, [
+                { transform: "translate(0,0) rotate(0deg)", filter: "none", opacity: 1 },
+                { transform: `translate(${loin.ux * a.t * 0.06}px, ${loin.uy * a.t * 0.06}px) rotate(${tourne * 0.1}deg)`, offset: 0.25 },
+                { transform: `translate(${-loin.ux * a.t * 0.04}px, ${-loin.uy * a.t * 0.04}px) rotate(${-tourne * 0.08}deg)`, offset: 0.45 },
+                { transform: `translate(${loin.ux * a.t * 0.22}px, ${loin.uy * a.t * 0.22 + a.t * 0.08}px) rotate(${tourne}deg) scale(0.92)`, filter: "grayscale(1) brightness(0.6)", opacity: 0.55, offset: 0.8 },
+                { transform: `translate(${loin.ux * a.t * 0.22}px, ${loin.uy * a.t * 0.22 + a.t * 0.08}px) rotate(${tourne}deg) scale(0.92)`, filter: "grayscale(1) brightness(0.6)", opacity: 0 }
+            ], { duration: 1500, easing: "ease-in-out", fill: "forwards" });
+            // Il ne se relève pas : invisible jusqu'au redessin qui le retire.
+            if (!o.annulee()) sc.lanceur.style.opacity = "0";
+            await o.attendre(200);
+        } },
+        // L'ILLUSION BRISÉE : le leurre éclate comme du verre, en éclats irisés.
+        { id: "jeu-illusion-brisee", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            o.son("bris-verre");
+            o.son("illusion", 120);
+            o.texte(sc.calque, sc.lanceur, "Illusion brisée", "#c9a8ff");
+            await Promise.all([o.bouger(sc.lanceur, [{ transform: "scale(1)", opacity: 1, filter: "none" }, { transform: "scale(1.3)", opacity: 0, filter: ILLUSION }],
+                                        { duration: 260, fill: "forwards" }),
+                o.gerbe(sc.calque, a.x, a.y, { nombre: 20, dist: a.t * 1.2, couleurs: ["#e8d8ff", "#9fd8ff", "#ffffff"], taille: 8, tailleMin: 3, carre: true, duree: 800 })]);
+            if (!o.annulee()) sc.lanceur.style.opacity = "0";
+            await o.attendre(200);
+        } },
+        // LE SOIN : une lueur verte monte du sol, des « + » s'élèvent.
+        { id: "jeu-soin", async jouer(sc, o) {
+            o.son("soin");
+            await lueurSoin(o, sc.calque, sc.lanceur, {});
+        } },
+        // UNE PART DE SOIN ÉTALÉ (fin de manche) : le sceau vert pulse sous le pion.
+        { id: "jeu-soin-tic", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            o.son("soin-tic");
+            const s = sceau(o, sc.calque, a, "#7dff9a", { duree: 900, tours: 120 });
+            s.classList.add("anim-sceau-soin");
+            await Promise.all([o.teinter(s, [{ filter: "brightness(1)" }, { filter: "brightness(2)" }, { filter: "brightness(1)" }], { duration: 500 }),
+                o.eclat(sc.lanceur, "brightness(1.35) drop-shadow(0 0 8px #7dff9a)", 500)]);
+            await o.effacer(s);
+        } },
+        // LE SOIN DE ZONE : les cases de la zone fleurissent de vert et pulsent
+        // (chaque soigné a ensuite sa lueur, à son étape).
+        { id: "jeu-soin-zone", async jouer(sc, o) {
+            const pts = (sc.cases || []).map(c => pointDe(o, sc, c));
+            if (!pts.length) return;
+            o.son("soin-zone");
+            const cases = pts.map((pt, i) => o.hexagone(sc.calque, pt, { fond: FONDS_ZONE.soin, opacite: 0.7, retard: i * 50 }));
+            cases.forEach(c => c.classList.add("anim-case-soin"));
+            await o.attendre(300);
+            await o.pulser(cases, { duree: 500, fois: 2, eclat: 1.3, decale: 30 });
+            await effacerTout(o, cases);
+        } },
+        // LE SOIN ÉTALÉ, POSÉ : un sceau vert se pose sous chaque soigné ; il
+        // rendra une part du soin à chaque fin de manche.
+        { id: "jeu-soin-etale", async jouer(sc, o) {
+            const cibles = (sc.cibles || []).length ? sc.cibles : [sc.lanceur];
+            o.son("soin");
+            const sceaux = cibles.map(el => {
+                const s = sceau(o, sc.calque, centre(el, sc.calque), "#7dff9a", { duree: 1600, tours: 220 });
+                s.classList.add("anim-sceau-soin");
+                o.texte(sc.calque, el, "Soin étalé", COULEURS.soin);
+                return s;
+            });
+            await o.attendre(1300);
+            await Promise.all(sceaux.map(s => o.effacer(s)));
+        } },
+        // LA PURIFICATION : une tache d'ombre colle au pion ; un éclat blanc
+        // l'arrache vers le ciel, où elle se dissout en étincelles.
+        { id: "jeu-purification", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            const tache = o.poser(sc.calque, a.x, a.y, `width:${a.t * 0.9}px; height:${a.t * 0.9}px; border-radius:50%; z-index:${Z.haut};
+                background:radial-gradient(circle, rgba(60,10,80,0.85), rgba(120,40,160,0.4) 60%, rgba(0,0,0,0) 75%);
+                display:flex; align-items:center; justify-content:center; font-size:${a.t * 0.4}px;`, "☠️");
+            tache.classList.add("anim-tache-purifiee");
+            await o.surgir(tache, { duree: 350 });
+            o.son("purification");
+            await o.eclat(sc.lanceur, "brightness(1.8) drop-shadow(0 0 14px #ffffff)", 450);
+            await Promise.all([
+                o.teinter(tache, [{ transform: `${BASE} scale(1)`, opacity: 1 }, { transform: `${BASE} translate(0, ${-a.t * 0.8}px) scale(1.6)`, opacity: 0 }],
+                          { duration: 700, easing: "ease-in", fill: "forwards" }),
+                o.gerbe(sc.calque, a.x, a.y - a.t * 0.5, { nombre: 14, dist: a.t * 0.9, couleurs: ["#ffffff", "#fffbe0", "#e0d0ff"], taille: 5, duree: 800 })]);
+            tache.remove();
+        } },
+        // LES BÉNÉDICTIONS DE L'ÉQUIPEMENT DE SOIN : un sceau, une aura, un
+        // emblème qui s'élève — bleu-violet (résistance magique), acier doré
+        // (résistance physique), rouge-orangé (dégâts).
+        { id: "jeu-benediction-magique", async jouer(sc, o) { await benir(o, sc, "#8fa8ff", "✦", "+ Résistance magique"); } },
+        { id: "jeu-benediction-physique", async jouer(sc, o) { await benir(o, sc, "#e0c070", "🛡️", "+ Résistance physique"); } },
+        { id: "jeu-benediction-offensive", async jouer(sc, o) { await benir(o, sc, "#ff8050", "⚔️", "+ Dégâts"); } },
+        // LE REPOS LONG : le pion s'apaise et respire lentement, quelques « z »
+        // s'envolent, puis l'énergie remonte en paillettes dorées.
+        { id: "jeu-repos-long", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            o.son("repos");
+            teinte(o, sc.lanceur, "brightness(0.82) saturate(0.8)", 400);
+            [0, 300, 600].forEach((d, i) => o.icone(sc.calque, a, "💤", { dx: a.t * (0.25 + i * 0.12), dy: -a.t * (0.5 + i * 0.12), taille: 0.3 + i * 0.06, duree: 1000, retard: d }));
+            await o.bouger(sc.lanceur, [{ transform: "scale(1)" }, { transform: "scale(0.95)" }, { transform: "scale(1)" }], { duration: 700, iterations: 2, easing: "ease-in-out" });
+            deteindre(o, sc.lanceur, "brightness(0.82) saturate(0.8)");
+            o.son("energie");
+            energieEnJeu(o, sc);
+            await o.gerbe(sc.calque, a.x, a.y + a.t * 0.2, { nombre: 14, dist: a.t * 0.4, monte: a.t * 0.9, couleurs: ["#fbf5bd", "#e2c46a", "#ffd700"], taille: 6, duree: 1000, etale: 400 });
+        } },
+        // LA RÉGÉNÉRATION DE FIN DE MANCHE : quelques paillettes dorées
+        // remontent, la jauge d'énergie se remplit d'un cran.
+        { id: "jeu-regen-energie", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            o.son("energie");
+            energieEnJeu(o, sc);
+            await o.gerbe(sc.calque, a.x, a.y + a.t * 0.2, { nombre: 8, dist: a.t * 0.35, monte: a.t * 0.7, couleurs: ["#fbf5bd", "#e2c46a"], taille: 5, duree: 900, etale: 300 });
+        } },
+        // LA DÉPENSE D'ÉNERGIE D'UNE COMPÉTENCE : l'énergie s'échappe du pion en
+        // éclats jaunes et la jauge baisse.
+        { id: "jeu-depense-energie", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            o.son("depense");
+            energieEnJeu(o, sc);
+            await Promise.all([o.gerbe(sc.calque, a.x, a.y, { nombre: 12, dist: a.t * 0.9, couleurs: ["#fbf5bd", "#e2c46a", "#c2a878"], taille: 5, duree: 700 }),
+                o.eclat(sc.lanceur, "brightness(0.8) saturate(0.7)", 600)]);
         } }
     ]);
 })();

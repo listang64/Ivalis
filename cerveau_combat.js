@@ -1320,7 +1320,11 @@ export function jouerCreature(etat, id, carte, plateau) {
         }
         const degats = (carte.attaques || []).filter(a => a && !a.isHeal && !a.isShield)
             .reduce((t, a) => t + nombre(a.valeurBrute), 0);
-        etapes.push({ type: "message", cible: id, acteur: id, texte: "⛏️ Frappe le mur", couleur: "#a1887f" });
+        // `frappeMur` : la case du mur — l'écran y montre le coup (Nico :
+        // « créature qui frappe un mur : enlève juste l'émoticône pioche, tu
+        // peux intégrer »).
+        etapes.push({ type: "message", cible: id, acteur: id, texte: "Frappe le mur", couleur: "#a1887f",
+                      frappeMur: { q: nombre(mur.q), r: nombre(mur.r) } });
         etapes.push(...frapperMurs(courant, { [mur.id]: degats }, id, false));
     } else if (!aPortee) {
         // Pourquoi elle n'a rien lancé. Dans la trace, cette ligne vaut de l'or :
