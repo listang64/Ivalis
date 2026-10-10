@@ -1534,7 +1534,20 @@ export function resoudreCarte(etat, action, plateau) {
     const zone = (!rate && !detournee && frappe && Array.isArray(action.zoneVisee))
         ? action.zoneVisee.filter(h => h && h.q !== undefined && h.r !== undefined).map(h => ({ q: nombre(h.q), r: nombre(h.r) }))
         : [];
-    etapes.push({
+    // LE GESTE DE L'ATTAQUE (Nico : « coup d'épée, attaque légère, attaque
+    // lourde, attaque à distance, attaque magique feu : tu peux implanter ») :
+    // la manière de frapper d'une attaque PHYSIQUE (légère, lourde, sinon le
+    // coup d'épée), l'élément d'un sort (un seul : le Feu a sa boule). Qui est
+    // vraiment touché s'ajoute plus bas, une fois les coups résolus : le sang
+    // ne coule que sur un coup qui porte.
+    const offensive = (action.attaques || []).find(a => a && !a.isHeal && !a.isShield && (a.cibles || []).length > 0);
+    const nomOffensive = String((offensive && offensive.nom) || "").toLowerCase();
+    const styleFrappe = !offensive || offensive.typeRes !== "Physique" ? null
+        : (nomOffensive.includes("attaque légère") || nomOffensive.includes("attaque legere")) ? "legere"
+        : nomOffensive.includes("attaque lourde") ? "lourde" : "epee";
+    const elementSort = offensive && offensive.typeRes === "Magique" && offensive.element
+                        && !((offensive.elements || []).length > 1) ? offensive.element : null;
+    const etapeCarte = {
         type: "carte", acteur: idLanceur, carte: action.idCarte,
         critique,
         // Ce que la carte envoie, s'il y a quelque chose à voir traverser. Le
@@ -1545,11 +1558,14 @@ export function resoudreCarte(etat, action, plateau) {
         ...(rate ? { rate: true } : {}),
         ...(surSoi ? { surSoi: true } : {}),
         ...(zone.length ? { zone } : {}),
+        ...(styleFrappe ? { frappe: styleFrappe } : {}),
+        ...(elementSort ? { element: elementSort } : {}),
         cibles: [...new Set([].concat(
             ...(action.attaques || []).map(a => a.cibles || []),
             ...(action.alterations || []).map(a => a.cibles || [])
         ))]
-    });
+    };
+    etapes.push(etapeCarte);
 
     // LA CONFUSION SE DIT AVANT DE SE VOIR. Sans ce mot, le joueur regarde sa
     // carte partir sur son propre camp sans comprendre, et croit à un bug. Les
@@ -2227,6 +2243,13 @@ export function resoudreCarte(etat, action, plateau) {
         lanceur.fatigue = Math.max(0, Math.min(lanceur.fatigueMax,
                                                lanceur.fatigue - (nombre(action.coutFatigue) - inertie)));
         etapes.push({ type: "fatigue", cible: idLanceur, fatigueApres: lanceur.fatigue });
+    }
+
+    // Qui la carte a vraiment frappé (ni esquivé, ni épargné) : l'écran y met
+    // le coup reçu — le recul, le sang, la chair (animations_jeu.js).
+    if (offensive) {
+        etapeCarte.touches = [...touchees].filter(id => (action.attaques || []).some(a =>
+            a && !a.isHeal && !a.isShield && (a.cibles || []).includes(id)));
     }
 
     return { etat: suivant, etapes, touchees: [...touchees] };

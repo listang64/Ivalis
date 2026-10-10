@@ -8,7 +8,9 @@
 //  implanter en jeu. » Puis : « Marche case par case, marche en terrain
 //  difficile, marche gelée, entrée dans les zones persistantes, attaque de
 //  zone, attaque d'un zombie, échec de technique (Étourdi), compétence lancée
-//  sur soi : c'est bon, tu peux intégrer. »
+//  sur soi : c'est bon, tu peux intégrer. » Et : « Coup d'épée au corps à
+//  corps, attaque légère, attaque lourde, attaque à distance, attaque magique
+//  feu : tu peux implanter. »
 //
 //  Les gestes sont ceux du Studio (animations_catalogue.js, la section « En
 //  jeu »), joués par le même moteur (animations_combat.js) ; ce fichier leur
@@ -202,6 +204,33 @@
         });
         const scene = window.sceneDeCombat(pion, proche, { grace: 1200 });
         if (scene) return window.jouerAnimationJeu("jeu-carte-sur-soi", scene);
+    };
+
+    // --- LES ATTAQUES : COUP D'ÉPÉE, LÉGÈRE, LOURDE, TIR, BOULE DE FEU ----------------
+    //  Le noyau dit la manière de frapper d'une attaque physique (`frappe` :
+    //  légère, lourde, sinon le coup d'épée), l'élément d'un sort, et qui est
+    //  vraiment touché (`touches`) : le coup reçu (le recul, le sang, la chair)
+    //  ne tombe que sur eux ; le chiffre suit, une fois, à l'étape des dégâts,
+    //  l'esquive à la sienne. Un geste qui ne convient pas (un soin, un autre
+    //  sort, une technique de classe, le compagnon, un journal d'avant) rend
+    //  false : la ruée d'avant prend le relais.
+    const GESTE_DE_FRAPPE = { legere: "jeu-attaque-legere", lourde: "jeu-attaque-lourde", epee: "jeu-coup-epee" };
+    window.gesteAttaqueCombat = function ({ projectile, frappe, element, carte, touches }) {
+        if (!Array.isArray(touches) || /^(CLASSE_|COMPAGNON_|ZOMBIE_)/.test(String(carte || ""))) return null;
+        if (!projectile) return GESTE_DE_FRAPPE[frappe] || null;
+        if (projectile === "fleche" && frappe) return "jeu-attaque-distance";
+        if (projectile === "magie" && element === "Feu") return "jeu-boule-de-feu";
+        return null;
+    };
+    window.animerAttaqueCombat = async function (d) {
+        const geste = window.gesteAttaqueCombat(d || {});
+        const cibles = ((d && d.cibles) || []).filter(id => id && id !== d.pion && pionDe(id));
+        if (!geste || !cibles.length) return false;
+        const scene = window.sceneDeCombat(d.pion, cibles[0], { cibles: cibles.map(pionDe),
+                                                               touchees: cibles.filter(id => d.touches.includes(id)).map(pionDe), grace: 1500 });
+        if (!scene) return false;
+        await window.jouerAnimationJeu(geste, scene);
+        return true;
     };
 
     // --- UN PION QUI ENTRE EN SCÈNE ------------------------------------------------

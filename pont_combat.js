@@ -137,6 +137,11 @@ const SCENES = {
             ...(e.rate ? { rate: true } : {}),
             ...(e.surSoi ? { surSoi: true } : {}),
             ...(Array.isArray(e.zone) && e.zone.length ? { zone: e.zone } : {}),
+            // Le geste de l'attaque (légère, lourde, coup d'épée ; l'élément du
+            // sort) et qui est vraiment touché.
+            ...(e.frappe ? { frappe: e.frappe } : {}),
+            ...(e.element ? { element: e.element } : {}),
+            ...(Array.isArray(e.touches) ? { touches: e.touches } : {}),
             depuis: lanceur ? { q: nombre(lanceur.q), r: nombre(lanceur.r) } : null,
             vers: cibles.map(id => {
                 const c = combattantDe(etat, id);
@@ -436,6 +441,7 @@ export function creerPont(effets) {
         zombie = null,                     // un zombie griffe sa proie
         echec = null,                      // l'Étourdi rate sa technique
         surSoi = null,                     // la Confusion retourne la carte contre son lanceur
+        attaque = null,                    // le geste du Studio d'une attaque (épée, légère, lourde, tir, feu)
         pause = (ms) => new Promise(r => setTimeout(r, ms)),
         tracer = () => {}
     } = effets || {};
@@ -502,16 +508,23 @@ export function creerPont(effets) {
                 if (scene.surSoi && surSoi) { await surSoi({ pion: scene.pion }); await pause(RYTHME.carte); break; }
                 // Un zombie ne s'élance pas comme un combattant : il titube et griffe.
                 if (scene.zombie && zombie && (scene.cibles || []).length) await zombie({ pion: scene.pion, cible: scene.cibles[0] });
-                else await ruee({ pion: scene.pion, cibles: scene.cibles });
-                // PUIS CE QUI TRAVERSE, s'il y a quelque chose à voir voler.
-                // Dans cet ordre, et pas l'inverse : le lanceur s'élance, PUIS
-                // le tir part — un projectile qui partirait avant le geste
-                // aurait l'air de s'échapper tout seul. L'attente est celle de
-                // l'animation elle-même : les dégâts ne doivent pas tomber
-                // avant que la flèche n'arrive.
-                if (scene.projectile && scene.depuis && (scene.vers || []).length) {
-                    await projectile({ de: scene.depuis, vers: scene.vers,
-                                       sorte: scene.projectile });
+                // LES ATTAQUES DU STUDIO (coup d'épée, légère, lourde, tir, boule
+                // de feu) jouent leur geste entier, le coup reçu sur qui est
+                // touché ; elles disent si elles ont su le jouer.
+                else if (!(attaque && await attaque({ pion: scene.pion, cibles: scene.cibles, touches: scene.touches,
+                                                       frappe: scene.frappe || null, element: scene.element || null,
+                                                       projectile: scene.projectile, carte: scene.carte }))) {
+                    await ruee({ pion: scene.pion, cibles: scene.cibles });
+                    // PUIS CE QUI TRAVERSE, s'il y a quelque chose à voir voler.
+                    // Dans cet ordre, et pas l'inverse : le lanceur s'élance, PUIS
+                    // le tir part — un projectile qui partirait avant le geste
+                    // aurait l'air de s'échapper tout seul. L'attente est celle de
+                    // l'animation elle-même : les dégâts ne doivent pas tomber
+                    // avant que la flèche n'arrive.
+                    if (scene.projectile && scene.depuis && (scene.vers || []).length) {
+                        await projectile({ de: scene.depuis, vers: scene.vers,
+                                           sorte: scene.projectile });
+                    }
                 }
                 // UNE ATTAQUE DE ZONE : ses cases rougeoient, puis explosent.
                 if (scene.zone && zoneCarte) await zoneCarte({ pion: scene.pion, cases: scene.zone, cibles: scene.cibles });

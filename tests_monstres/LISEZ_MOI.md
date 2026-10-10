@@ -5831,3 +5831,36 @@ message_flottant_taille.mjs : un message ordinaire reste à 18 px, un chiffre
 de dégâts s'envole à la taille du pion. Les cristaux de la marche gelée
 s'écartent en couronne pour dépasser du pion. Les deux nouveaux bancs mordent
 sur l'ancien code (26 et 28 échecs) ; la suite : 207/207.
+
+## v232 — Les attaques du Studio, en jeu
+
+Nico : « Coup d'épée au corps à corps, attaque légère, attaque lourde,
+attaque à distance, attaque magique feu : tu peux implanter. »
+
+- LE NOYAU (moteur_pur.js, resoudreCarte) dit sur l'étape carte ce que l'écran
+  doit savoir pour montrer le bon geste : la manière de frapper d'une attaque
+  PHYSIQUE (`frappe` : « Attaque légère » → legere, « Attaque lourde » →
+  lourde, toute autre → epee — jamais pour un sort au contact), l'élément
+  d'un sort quand il n'en a qu'un (`element`), et, une fois les coups résolus,
+  qui a vraiment été frappé (`touches` : ni esquivé, ni épargné ; vide si tout
+  a été esquivé ; absent pour une carte sans attaque). Rien de neuf sur une
+  carte de soin ; les journaux d'avant se rejouent tels quels.
+- LE PONT (pont_combat.js) les transmet et appelle `attaque` (regime_cerveau.js
+  → animerAttaqueCombat, animations_jeu.js) À LA PLACE de la ruée et du
+  projectile ; le geste rend false quand il ne convient pas, et la ruée
+  d'avant prend le relais (un autre sort, un soin, une technique de classe, le
+  compagnon, un journal d'avant). La zone d'une attaque de zone suit toujours.
+- LES CINQ GESTES (animations_catalogue.js, « En jeu ») : le coup d'épée,
+  l'attaque légère (deux coups de dague), l'attaque lourde (l'élan, le choc
+  sourd, l'onde), le tir (la corde qui se tend, la flèche qui se plante et
+  garde son angle — ratée, elle file au-delà), la boule de feu (la flamme tout
+  le chemin, l'explosion et la gerbe de feu — ratée, elle s'écrase sur la
+  case, plus petite). Le coup reçu (le recul, le sang, la chair) ne tombe que
+  sur la cible touchée ; aucun chiffre dans le geste : il vient ensuite, une
+  seule fois, à l'étape des dégâts ; l'esquive à la sienne.
+
+animations_en_jeu_3.mjs : le noyau (frappe, élément, touchés), le pont (le
+geste à la place de la ruée, la ruée quand il ne convient pas, la zone après),
+le choix du geste, puis le vrai plateau — chaque geste et ses sons, touché ou
+esquivé, sans chiffre ; la foudre garde la ruée. Il mord sur l'ancien code
+(12 échecs).

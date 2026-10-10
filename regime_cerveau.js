@@ -980,7 +980,11 @@ function contexteDuJeu() {
             zoneCarte: (d) => window.animerAttaqueZoneCombat ? window.animerAttaqueZoneCombat(d) : null,
             zombie: (d) => window.animerAttaqueZombieCombat ? window.animerAttaqueZombieCombat(d) : null,
             echec: (d) => window.animerEchecCombat ? window.animerEchecCombat(d) : null,
-            surSoi: (d) => window.animerCarteSurSoiCombat ? window.animerCarteSurSoiCombat(d) : null
+            surSoi: (d) => window.animerCarteSurSoiCombat ? window.animerCarteSurSoiCombat(d) : null,
+            // Puis : « coup d'épée, attaque légère, attaque lourde, attaque à
+            // distance, attaque magique feu : tu peux implanter ». Rend false
+            // quand le geste ne convient pas (la ruée d'avant prend le relais).
+            attaque: (d) => window.animerAttaqueCombat ? window.animerAttaqueCombat(d) : false
         },
 
         // OÙ POSER L'ÉTAT. Un seul sens : l'état descend, rien ne remonte.

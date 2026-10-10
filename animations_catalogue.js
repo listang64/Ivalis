@@ -2953,6 +2953,8 @@
     //  case par case, terrain difficile, marche gelée, entrée dans les zones
     //  persistantes, attaque de zone, attaque d'un zombie, échec de technique
     //  (Étourdi), compétence lancée sur soi : c'est bon, tu peux intégrer. »
+    //  Et : « coup d'épée au corps à corps, attaque légère, attaque lourde,
+    //  attaque à distance, attaque magique feu : tu peux implanter. »
     //
     //  Le combat ne joue pas une scène entière : il rejoue son journal ÉTAPE
     //  PAR ÉTAPE — un pas, un bond, une arrivée (animations_jeu.js). Ce sont
@@ -2993,10 +2995,104 @@
         return f;
     };
     const positionDe = (o, sc) => ({ ...centre(sc.lanceur, sc.calque), ...(o.caseDe(sc.lanceur) || {}) });
+    // UN COUP AU CORPS À CORPS, EN JEU : l'élan vers la première cible, une
+    // entaille sur chacune, le coup reçu sur qui est vraiment touché (sans
+    // chiffre : l'étape des dégâts le dira).
+    const toucheEnJeu = (sc, el) => (sc.touchees || []).includes(el);
+    const frapperEnJeu = async (o, sc, p = {}) => {
+        const A = centre(sc.lanceur, sc.calque), B = centre(sc.cibles[0], sc.calque);
+        if (p.sonElan !== false) o.son(p.sonElan || "lame-souffle", p.retardSon === undefined ? 150 : p.retardSon);
+        const elan = o.elan(sc.lanceur, A, B, p.elan || {});
+        await o.attendre(p.contact || 330);
+        await Promise.all([elan, ...sc.cibles.map(el => {
+            const C = centre(el, sc.calque);
+            return Promise.all([entaille(o, sc.calque, C, axe(A, C).angle, p.entaille || {}),
+                toucheEnJeu(sc, el) ? coupRecu(o, sc.calque, el, A, {}) : null]);
+        })]);
+    };
     // Ce que coûte la case, au-dessus du pion (une case gratuite ne dit rien).
     const coutAffiche = (sc, o) => { if (Number(sc.cout) > 0) o.texte(sc.calque, sc.lanceur, `-${Number(sc.cout)} ⚡`, COULEURS.attention, { taille: 15 }); };
 
     window.enregistrerAnimationsJeu([
+        // LES ATTAQUES (Nico : « coup d'épée au corps à corps, attaque légère,
+        // attaque lourde, attaque à distance, attaque magique feu : tu peux
+        // implanter ») : le geste du Studio, vers chaque cible (sc.cibles) ; le
+        // coup reçu — le recul, le sang, la chair — sur qui est vraiment touché
+        // (sc.touchees). Le chiffre vient ensuite, une fois, à l'étape des
+        // dégâts ; l'esquive à la sienne.
+        { id: "jeu-coup-epee", async jouer(sc, o) {
+            await frapperEnJeu(o, sc, {});
+        } },
+        // Deux coups vifs, deux entailles fines qui se croisent ; les dégâts une
+        // seule fois (l'étape des dégâts suit).
+        { id: "jeu-attaque-legere", async jouer(sc, o) {
+            const elan = { portee: 0.45, duree: 300, prise: 0.25, frappe: 0.55 };
+            await frapperEnJeu(o, sc, { elan, contact: 165, sonElan: "dague", retardSon: 40, entaille: { taille: 1.1, epaisseur: 5, duree: 260 } });
+            await frapperEnJeu(o, sc, { elan, contact: 165, sonElan: "dague", retardSon: 40, entaille: { taille: 1.1, epaisseur: 5, duree: 260, tourne: 180 } });
+        } },
+        // Il arme longuement, recule et pivote, puis abat un coup ample : grande
+        // entaille, onde de choc au sol, le choc sourd.
+        { id: "jeu-attaque-lourde", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque), b = centre(sc.cibles[0], sc.calque), v = axe(a, b);
+            o.son("lourd-elan");
+            await o.bouger(sc.lanceur, [{ transform: "translate(0,0) rotate(0deg)" },
+                { transform: `translate(${-v.ux * a.t * 0.22}px, ${-v.uy * a.t * 0.22}px) rotate(-14deg) scale(1.08)` }],
+                { duration: 520, easing: "ease-out", fill: "forwards" });
+            o.lacher(sc.lanceur);
+            const elan = o.bouger(sc.lanceur, [
+                { transform: `translate(${-v.ux * a.t * 0.22}px, ${-v.uy * a.t * 0.22}px) rotate(-14deg) scale(1.08)` },
+                { transform: `translate(${v.ux * Math.min(v.d * 0.45, a.t * 0.75)}px, ${v.uy * Math.min(v.d * 0.45, a.t * 0.75)}px) rotate(10deg) scale(1.1)`, offset: 0.45 },
+                { transform: "translate(0,0) rotate(0deg)" }], { duration: 520, easing: "cubic-bezier(.6,0,.3,1)" });
+            await o.attendre(230);
+            o.son("lourd-impact");
+            await Promise.all([elan, ...sc.cibles.map(el => {
+                const c = centre(el, sc.calque);
+                return Promise.all([entaille(o, sc.calque, c, axe(a, c).angle, { taille: 2.1, epaisseur: 11, duree: 460 }),
+                    o.onde(sc.calque, c, { couleur: "#c8a878", taille: 1.1, duree: 650, echelle: 2.1, bord: 5 }),
+                    toucheEnJeu(sc, el) ? coupRecu(o, sc.calque, el, a, { force: 0.22, n: 12 }) : null]);
+            })]);
+        } },
+        // La corde qui se tend, la flèche qui file ; touchée, la cible la prend
+        // dans la chair (elle y vibre, garde son angle, puis s'efface) ; ratée,
+        // la flèche file au-delà.
+        { id: "jeu-attaque-distance", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque), v0 = axe(a, centre(sc.cibles[0], sc.calque));
+            o.son("arc-tendu");
+            await o.bouger(sc.lanceur, [{ transform: "translate(0,0)" }, { transform: `translate(${-v0.ux * 4}px, ${-v0.uy * 4}px) scale(0.97)` }],
+                           { duration: 380, fill: "forwards" });
+            o.son("tir");
+            o.lacher(sc.lanceur);
+            const L = a.t * 0.9;
+            await Promise.all(sc.cibles.map(async el => {
+                const b = centre(el, sc.calque), v = axe(a, b), touchee = toucheEnJeu(sc, el);
+                const fin = touchee ? { x: b.x + v.ux * (b.t * 0.05 - L / 2), y: b.y + v.uy * (b.t * 0.05 - L / 2), t: b.t }
+                                    : { x: b.x + v.ux * b.t * 1.4, y: b.y + v.uy * b.t * 1.4, t: b.t };
+                await o.projectile(sc.calque, a, fin, { taille: 0.9, arc: 0.06, oriente: true, easing: "linear", duree: Math.min(560, 200 + axe(a, fin).d * 0.5),
+                    forme: "0", contenu: DESSIN_FLECHE, style: "height:auto; aspect-ratio:7/1; background:none;" });
+                if (!touchee) return;
+                const fleche = flechePlantee(o, sc.calque, b, v, { longueur: L });
+                o.attendre(900).then(() => fondre(o, fleche.el, 380));
+                await Promise.all([coupRecu(o, sc.calque, el, a, { son: "fleche-impact", force: 0.08, n: 6 }),
+                    o.teinter(fleche.fut, [0, 7, -5, 3, -1.5, 0].map(k => ({ transform: `rotate(${deg(v.angle) + k}deg)` })), { duration: 560, easing: "ease-out" })]);
+            }));
+        } },
+        // La boule de feu : le lanceur s'embrase, la flamme gronde tout le
+        // chemin, en ligne droite ; sur la cible touchée, l'explosion et la gerbe
+        // de feu ; ratée, elle s'écrase sur sa case, plus petite.
+        { id: "jeu-boule-de-feu", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            await o.eclat(sc.lanceur, "brightness(1.3) drop-shadow(0 0 10px #ff8c1a)", 260);
+            o.son("feu-vol");
+            let sonne = false;
+            await Promise.all(sc.cibles.map(async el => {
+                const b = centre(el, sc.calque), v = axe(a, b), touchee = toucheEnJeu(sc, el);
+                await o.projectile(sc.calque, a, b, { taille: 0.55, arc: 0, oriente: true, duree: Math.min(900, 380 + v.d * 0.9), easing: "cubic-bezier(.4,0,.8,1)",
+                    traine: ["#ffcf5a", "#ff7a1a", "#e8420c"], contenu: DESSIN_BOULE_DE_FEU, style: "background:none; overflow:visible;" });
+                if (!sonne) { sonne = true; o.son("feu-explosion"); }
+                if (!touchee) return gerbeDeFeu(o, sc.calque, b, { taille: 0.6, n: 5 });
+                await Promise.all([gerbeDeFeu(o, sc.calque, b), o.secouer(el, b.t * 0.12, 320, v), o.eclat(el, ORANGE, 600)]);
+            }));
+        } },
         // LA MARCHE CASE PAR CASE (Nico : « c'est bon, tu peux intégrer ») : un
         // petit saut par case, un pas sur l'herbe et la terre, un peu de
         // poussière, et ce que coûte la case au-dessus du pion.
