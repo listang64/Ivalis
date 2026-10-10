@@ -198,7 +198,7 @@ export function combattantDepuisFiche(fiche, position, regles, options) {
         // et la première case de chacun de ses tours est gratuite (coutDuPas).
         brulureAggravee: !!race.brulureAggravee,
         premierPasGratuit: !!race.premierPasGratuit,
-        // Le Sorcier : ses sorts à distance ne perdent rien au contact
+        // Le Sorcier : ses attaques à distance ne perdent rien au contact
         // (chaineDeDegats, moteur_pur.js).
         sortsSansMalusContact: !!race.sortsSansMalusContact,
         // La Sentinelle : +6 à ses attaques d'opportunité ; au niveau 5, le

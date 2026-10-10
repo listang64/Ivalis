@@ -345,6 +345,9 @@ export function creerRegime(contexte) {
                         arreterLesIntentions();
                         spectateur.oublier();
                     }
+                    // Les murs de terre ne vivent que dans l'état : partis avec lui
+                    // (un poste sans écran — un banc sous Node — n'a rien à effacer).
+                    if (typeof window !== "undefined" && typeof window.effacerMursTerre === "function") window.effacerMursTerre();
                     return;
                 }
                 // UN POSTE QUI NE COMPREND PAS LE FORMAT NE JOUE PAS. Il ne fait

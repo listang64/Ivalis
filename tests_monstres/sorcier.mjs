@@ -103,7 +103,7 @@ console.log("\n2. +1 CASE DE PORTÉE SUR TOUS SES SORTS");
              w.bonusPorteeMagique(autre, true, false) === 0 && w.bonusPorteeMagique(autre, true, true) === 1);
 }
 
-console.log("\n3. AUCUNE RÉDUCTION AU CONTACT POUR SES SORTS À DISTANCE");
+console.log("\n3. AUCUNE RÉDUCTION AU CONTACT POUR SES ATTAQUES À DISTANCE");
 {
     const sortTire = (lanceur, typeRes = "Magique") => {
         const e = monde(1); e.combattants.M1.q = 1; e.combattants.M1.r = 0;   // au contact
@@ -115,7 +115,9 @@ console.log("\n3. AUCUNE RÉDUCTION AU CONTACT POUR SES SORTS À DISTANCE");
     };
     verifier("le Sorcier, sort à distance tiré au contact : 10 pleins", sortTire("S") === 10, `${sortTire("S")}`);
     verifier("un autre héros : 7 (×0,7)", sortTire("H") === 7, `${sortTire("H")}`);
-    verifier("le Sorcier, tir PHYSIQUE au contact : 7 (seuls les sorts)", sortTire("S", "Physique") === 7, `${sortTire("S", "Physique")}`);
+    // v233 (Nico : « le Sorcier a eu le malus de -30 % au contact alors qu'il
+    // n'est pas censé l'avoir ») : plus rien de ce qu'il tire ne perd au contact.
+    verifier("le Sorcier, tir PHYSIQUE au contact : 10 pleins aussi", sortTire("S", "Physique") === 10, `${sortTire("S", "Physique")}`);
     verifier("l'atout voyage dans le combattant", monde(1).combattants.S.atouts.sortsSansMalusContact === true
              && !monde(1).combattants.H.atouts.sortsSansMalusContact);
 }
@@ -321,42 +323,63 @@ console.log("\n6. LA PORTÉE : CE QUE LA CARTE ANNONCE ET CE QUE LE COMBAT VISE"
   verifier("un coup physique du Sorcier : 1 case", r.coup.rangeMax === 1 && !r.coup.isRanged, JSON.stringify(r.coup));
 }
 
-console.log("\n7. LA FENÊTRE DE CIBLAGE DES TECHNIQUES");
+console.log("\n7. LE CHARME ET LE TRANSFERT SE VISENT SUR LE PLATEAU, COMME UN SORT");
+// v233 (Nico : « Charme fratricide, pour cibler, enlève les noms et fais un
+// ciblage visuel comme n'importe quel autre sort ; pareil pour le Transfert »).
 {
-  const ouvrir = (idCarte) => p.evaluate((idCarte) => {
+  const viser = (idCarte, essais) => p.evaluate(async ({ idCarte, essais }) => {
+    document.getElementById("fenetre-combat").style.display = "block";
     window.jouerSonClic = () => {};
     window.estCombattantMort = (id) => id === "K";
-    window.PERSOS_PARTIE = [
-      { idPersonnage: "S", camp: "Allié", prenom: "Ysolde", classe: "Sorcier", xp: 7900 },
-      { idPersonnage: "A", camp: "Allié", prenom: "Bran" },
-      { idPersonnage: "K", camp: "Allié", prenom: "Tombé" },
-      { idPersonnage: "M1", camp: "Ennemi", estMonstre: true, prenom: "Gnoll" },
-      { idPersonnage: "M4", camp: "Ennemi", estMonstre: true, prenom: "Ogre" },
-      { idPersonnage: "M6", camp: "Ennemi", estMonstre: true, prenom: "Loin" },
-      { idPersonnage: "I", camp: "Ennemi", estMonstre: true, prenom: "Leurre", estIllusion: true }];
-    window.TOKENS_VTT_DATA = { S: { q: 0, r: 0 }, A: { q: 0, r: 1 }, K: { q: 1, r: -1 }, M1: { q: 2, r: 0 },
-                               M4: { q: 4, r: 0 }, M6: { q: 6, r: 0 }, I: { q: 1, r: 0 } };
-    window.__demandes = [];
-    window.regimeDemande = { techniqueClasse: (...a) => window.__demandes.push(a), etat: () => null };
+    // Deux murs de la carte : (3,0) devant l'Ogre, (0,-2) devant le Chacal.
+    const murs = new Set(["3,0", "0,-2"]);
+    window.PLATEAU_VTT = { getCaseState: (q, r) => ({ isBlocked: murs.has(`${q},${r}`) }), hexToPixel: (q, r) => ({ x: 300 + q * 60, y: 300 + r * 60 }),
+                           pixelToHex: () => ({ q: 0, r: 0 }), renderMap: () => {} };
+    window.VTT_SCALE = 1; window.VTT_POS_X = 0; window.VTT_POS_Y = 0;
+    const f = (id, extra) => ({ idPersonnage: id, camp: "Allié", PV_Max: 40, PV_Actuels: 40, Fatigue_Max: 100, fatigueActuelle: 100,
+                                Etats_Alteres: [], statut: "Vivant", ...extra });
+    window.PERSOS_PARTIE = [f("S", { prenom: "Ysolde", classe: "Sorcier", xp: 7900 }), f("A", { prenom: "Bran" }), f("K", { prenom: "Tombé" }),
+      f("M1", { camp: "Ennemi", estMonstre: true, prenom: "Gnoll" }), f("M3", { camp: "Ennemi", estMonstre: true, prenom: "Chacal" }),
+      f("M4", { camp: "Ennemi", estMonstre: true, prenom: "Ogre" }), f("M6", { camp: "Ennemi", estMonstre: true, prenom: "Loin" }),
+      f("I", { camp: "Ennemi", estMonstre: true, prenom: "Leurre", estIllusion: true })];
+    window.TOKENS_VTT_DATA = { S: { q: 0, r: 0 }, A: { q: 0, r: 1 }, K: { q: 1, r: -1 }, M1: { q: 2, r: 0 }, M3: { q: 0, r: -3 },
+                               M4: { q: 4, r: 0 }, M6: { q: 6, r: 0 }, I: { q: -1, r: 0 } };
+    window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[0]]; window.COMBAT_INDEX_PERSO = 0;
+    window.COMPETENCES_CACHE = {}; window.CACHE_COMPETENCES_GLOBAL = { S: {} };
+    window.CHEMIN_MOUVEMENT = []; window.ZONES_PERSISTANTES = {};
+    const demandes = [];
+    window.regimeDemande = { actif: () => true, enVol: () => false, etat: () => null,
+                             techniqueClasse: (a, id, cible) => { demandes.push([a, id, cible || null]); } };
+    const fenetre = () => { const x = document.getElementById("fenetre-choix-rempart"); return !!x && x.style.display !== "none"; };
+    const avant = fenetre();
     window.lancerTechniqueClasse(idCarte, "S");
-    const f = document.getElementById("fenetre-choix-rempart");
-    return { titre: f.querySelector(".choix-rempart-titre").textContent,
-             noms: [...f.querySelectorAll(".choix-rempart-allie span")].map(x => x.textContent),
-             visible: getComputedStyle(f).display !== "none" };
-  }, idCarte);
-  const ch = await ouvrir("CLASSE_CHARME_FRATRICIDE");
-  await p.screenshot({ path: "/tmp/claude-0/sorcier_charme.png" });
-  verifier("Charme : « 🌀 Charme fratricide », les ennemis debout à 3 cases",
-           ch.visible && /Charme fratricide/.test(ch.titre) && JSON.stringify(ch.noms) === '["Gnoll"]', JSON.stringify(ch));
-  const choisi = await p.evaluate(() => {
-    document.querySelector(".choix-rempart-allie").click();
-    return window.__demandes[0];
-  });
-  verifier("un clic : la technique part sur lui", JSON.stringify(choisi) === '["S","CLASSE_CHARME_FRATRICIDE","M1"]', JSON.stringify(choisi));
-  const tr = await ouvrir("CLASSE_TRANSFERT");
-  await p.screenshot({ path: "/tmp/claude-0/sorcier_transfert.png" });
-  verifier("Transfert : « 🔄 Transfert », alliés ET ennemis debout à 5 cases",
-           /Transfert/.test(tr.titre) && JSON.stringify([...tr.noms].sort()) === '["Bran","Gnoll","Ogre"]' , JSON.stringify(tr));
+    await new Promise(r => setTimeout(r, 150));
+    const st = window.ETAT_CIBLAGE || {};
+    const ouvert = { actif: !!st.actif, technique: st.techniqueClasse, fenetre: fenetre() && !avant };
+    // Chaque combattant touché sur le plateau : accepté, ou refusé.
+    const acceptes = [];
+    essais.forEach(id => {
+      window.ajouterCibleCiblage(id);
+      if (st.cibleUnique === id) { acceptes.push(id); window.ajouterCibleCiblage(id); }
+    });
+    window.ajouterCibleCiblage(acceptes[0]);
+    await window.declencherResolutionAvecBondEventuel();
+    const ferme = !(window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif);
+    if (typeof window.nettoyerCiblage === "function") window.nettoyerCiblage();
+    return { ouvert, acceptes, demandes, ferme };
+  }, { idCarte, essais });
+  const essais = ["S", "A", "K", "M1", "M3", "M4", "M6", "I"];
+  const ch = await viser("CLASSE_CHARME_FRATRICIDE", essais);
+  verifier("Charme : le lancement ouvre le ciblage du plateau (plus de fenêtre de noms)",
+           ch.ouvert.actif && ch.ouvert.technique === "CLASSE_CHARME_FRATRICIDE" && !ch.ouvert.fenetre, JSON.stringify(ch.ouvert));
+  verifier("…seul l'ennemi debout, à 3 cases et en vue, se vise (ni allié, ni leurre, ni trop loin, ni derrière un mur)",
+           JSON.stringify(ch.acceptes) === '["M1"]', JSON.stringify(ch.acceptes));
+  verifier("validé : la technique part sur lui, le ciblage se ferme",
+           ch.ferme && JSON.stringify(ch.demandes) === '[["S","CLASSE_CHARME_FRATRICIDE","M1"]]', JSON.stringify(ch.demandes));
+  const tr = await viser("CLASSE_TRANSFERT", essais);
+  verifier("Transfert : alliés ET ennemis debout à 5 cases, même derrière un mur (ni lui-même, ni un tombé, ni un leurre, ni trop loin)",
+           tr.ouvert.actif && !tr.ouvert.fenetre && JSON.stringify(tr.acceptes) === '["A","M1","M3","M4"]', JSON.stringify(tr));
+  verifier("…validé : la technique part sur le premier", tr.ferme && JSON.stringify(tr.demandes) === '[["S","CLASSE_TRANSFERT","A"]]', JSON.stringify(tr.demandes));
 }
 
 console.log("\n8. LES CLASSES LUES EN BASE : LE NÉCROMANCIEN DEVENU SORCIER, PLUS D'ENSORCELEUR");

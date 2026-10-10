@@ -84,7 +84,7 @@ const preparer = () => p.evaluate(() => {
 });
 
 const lire = (id) => p.evaluate((id) => {
-  const bloc = document.querySelector(`#token-${id} .jauges-selection-token`);
+  const bloc = document.querySelector(`#porteur-${id} .jauges-selection-token`);
   if (!bloc) return null;
   const pion = document.getElementById("token-" + id).getBoundingClientRect();
   const r = bloc.getBoundingClientRect();
@@ -119,11 +119,11 @@ console.log("1. UN CLIC SUR UN PION : SES JAUGES SOUS LUI");
 console.log("\n2. UN REDESSIN NE LES RECRÉE PAS : LA BARRE GLISSE");
 {
   const r = await p.evaluate(async () => {
-    const avant = document.querySelector("#token-M1 .jauges-selection-token");
+    const avant = document.querySelector("#porteur-M1 .jauges-selection-token");
     avant.dataset.marque = "le-meme";
     window.PERSOS_PARTIE[1].PV_Actuels = 25;
     window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
-    const apres = document.querySelector("#token-M1 .jauges-selection-token");
+    const apres = document.querySelector("#porteur-M1 .jauges-selection-token");
     return { meme: apres && apres.dataset.marque === "le-meme",
              vie: parseFloat(apres.querySelector(".jauge-selection-vie .jauge-selection-remplie").style.width) };
   });
@@ -138,6 +138,8 @@ console.log("\n3. UNE CRÉATURE SÉLECTIONNÉE QUI MARCHE GARDE SES JAUGES");
   });
   const m = await lire("M1");
   verifier("pas repliées, et emmenées avec elle", m && !m.repliee && m.opacite === 1, JSON.stringify(m));
+  // Elles vivent au-dessus des murs, dans le porteur du pion : il l'a suivi.
+  verifier("toujours sous elle, centrées, à sa nouvelle case", m && m.sous && m.centre, JSON.stringify(m));
 }
 
 console.log("\n4. MON PION QUI MARCHE LES REPLIE EN FONDU");
@@ -152,7 +154,7 @@ console.log("\n4. MON PION QUI MARCHE LES REPLIE EN FONDU");
   const pendant = await p.evaluate(async () => {
     const marche = window.jouerAnimationPas({ idToken: "J1", de: { q: 0, r: 0 }, vers: { q: 1, r: 0 }, anticipe: true });
     await new Promise(r => setTimeout(r, 200));   // le fondu dure 0,45 s : à 0,2 s, il est en route
-    const bloc = document.querySelector("#token-J1 .jauges-selection-token");
+    const bloc = document.querySelector("#porteur-J1 .jauges-selection-token");
     const o = parseFloat(getComputedStyle(bloc).opacity);
     await marche;
     return { repliee: bloc.classList.contains("repliee"), enCours: o > 0 && o < 1, o };

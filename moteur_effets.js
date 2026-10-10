@@ -1358,6 +1358,23 @@ window.demarrerCiblage = async function(idCarte, options) {
                                     rangeMax: Math.max(1, parseInt(tir.portee) || 5),
                                     malgreEsquive: true, cibles: [] });
     }
+    // LES AUTRES TECHNIQUES QUI VISENT UN COMBATTANT se visent de même (Nico :
+    // « Charme fratricide, pour cibler, enlève les noms et fais un ciblage
+    // visuel comme n'importe quel autre sort ; pareil pour le Transfert et
+    // toutes les compétences qui utilisent les noms des ennemis ») : le Charme
+    // fratricide (un ennemi à 3 cases), le Baiser du vampire (un ennemi au
+    // contact), le Transfert (n'importe quel autre combattant à 5 cases, allié
+    // ou ennemi, même hors de vue : `toutCamp`, `sansVue`). L'altération n'est
+    // là que pour le ciblage ; à la validation, la cible part au cerveau.
+    const VISEE = window.TECHNIQUES_VISEES && window.TECHNIQUES_VISEES[dataCarte.techniqueClasse];
+    if (VISEE) {
+        const t = (window.TECHNIQUES_CLASSE || {})[dataCarte.techniqueClasse] || {};
+        const portee = Math.max(1, parseInt(t.portee) || 1);
+        alterationsExtraites.push({ nom: VISEE.nom, chance: 100, duree: 0, isRanged: portee > 1, rangeMax: portee,
+                                    malgreEsquive: true, techniqueVisee: true,
+                                    ...(VISEE.toutCamp ? { toutCamp: true } : {}), ...(VISEE.sansVue ? { sansVue: true } : {}),
+                                    cibles: [] });
+    }
 
     if (dataCarte.Composants && dataCarte.Composants.actions) {
         // Chaque effet retient si l'action qui l'a produit porte la zone. C'est
@@ -2933,7 +2950,10 @@ function dessinerJaugeCible(divToken, cibleData) {
     const pv = cibleData.PV_Actuels !== undefined ? parseInt(cibleData.PV_Actuels) : pvMax;
     const pct = Math.max(0, Math.min(100, (pv / pvMax) * 100));
 
-    let jauge = divToken.querySelector(".jauge-cible-ciblage");
+    // Au-dessus des murs, à la place du pion (combat.js, porteurAuDessus) : une
+    // cible à demi cachée par la roche garde sa jauge lisible.
+    const porteur = window.porteurAuDessus ? window.porteurAuDessus(divToken) : divToken;
+    let jauge = porteur.querySelector(".jauge-cible-ciblage");
     if (!jauge) {
         // Enveloppe SANS "overflow:hidden" : le chiffre des points de vie est posé
         // au-dessus de la barre, donc en dehors de ses limites. S'il était placé dans
@@ -2952,7 +2972,7 @@ function dessinerJaugeCible(divToken, cibleData) {
             + ` transform:translateX(-50%); font-family:'Cinzel', serif; font-size:11px; font-weight:bold;`
             + ` color:#ffffff; text-shadow:0 0 3px black, 0 0 5px black, 1px 1px 2px black; white-space:nowrap;`
             + ` line-height:1;"></div>`;
-        divToken.appendChild(jauge);
+        porteur.appendChild(jauge);
     }
     jauge.querySelector(".remplissage-jauge-cible").style.width = pct + "%";
     jauge.querySelector(".texte-jauge-cible").innerText = pv + " / " + pvMax;
@@ -2991,12 +3011,17 @@ window.dessinerAnneauxCiblage = function() {
     // ramener vers soi) : seule une carte SANS attaque qui les porte l'autorise —
     // une carte qui frappe ET pousse reste une agression, donc réservée aux ennemis.
     const cartePousseeOuTraction = phase.attaques.length === 0
-        && phase.alterations.some(a => a.estPoussee || a.estTraction);
+        && phase.alterations.some(a => a.estPoussee || a.estTraction || a.toutCamp);
+    const sansVue = phase.alterations.some(a => a.sansVue);
+    // Le Sorcier ne perd rien au contact (sortsSansMalusContact) : pas d'étiquette « -30% ».
+    const sansMalusContact = !!(typeof window.atoutRace === "function" && (window.atoutRace(lanceurData) || {}).sortsSansMalusContact);
 
     const ciblesValides = new Set();
     for (let idToken in window.TOKENS_VTT_DATA) {
         const cibleData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idToken);
         if (!cibleData || cibleData.statut === "Mort") continue;
+        if (phase.alterations.some(a => a.techniqueVisee) && typeof window.estCombattantMort === "function"
+            && window.estCombattantMort(idToken)) continue;
         if (cibleData.estIllusion && !carteEstAttaqueSimple) continue;
         // Pas d'anneau dans le noir d'un aveuglé : il ne peut pas y viser.
         if (window.cibleDansLeNoir(lanceurData, tkLanceur, window.positionCiblage(idToken))) continue;
@@ -3022,7 +3047,7 @@ window.dessinerAnneauxCiblage = function() {
         // un ennemi plus loin, à portée, et sans malus (le malus de 30 % ne
         // vaut que pour un tir à bout portant, chaineDeDegats).
         if (!configSort.isHeal && estEngage && dist > 1 && !configSort.isRanged) continue;
-        if (!verifierLigneDeVue(tkLanceur, tk)) continue;
+        if (!sansVue && !verifierLigneDeVue(tkLanceur, tk)) continue;
 
         ciblesValides.add(idToken);
         
@@ -3053,7 +3078,7 @@ window.dessinerAnneauxCiblage = function() {
             }
 
             let malusLabel = anneau.querySelector(".malus-cac");
-            if (configSort.isRanged && dist === 1 && phase.attaques.length > 0 && !configSort.isHeal) {
+            if (configSort.isRanged && dist === 1 && phase.attaques.length > 0 && !configSort.isHeal && !sansMalusContact) {
                 if (!malusLabel) {
                     malusLabel = document.createElement("div");
                     malusLabel.className = "malus-cac";
@@ -3095,7 +3120,10 @@ window.dessinerAnneauxCiblage = function() {
                 anneau.style.border = `4px solid ${couleurAnneau}`;
                 anneau.style.animation = "none"; 
                 
-                let bulle = divToken.querySelector(".bulle-validation-cible");
+                // La bulle ✔ passe au-dessus des murs, à la place du pion
+                // (combat.js, porteurAuDessus) : elle seule s'y clique.
+                const porteur = window.porteurAuDessus ? window.porteurAuDessus(divToken) : divToken;
+                let bulle = porteur.querySelector(".bulle-validation-cible");
                 if (!bulle) {
                     bulle = document.createElement("div");
                     bulle.className = "bulle-validation-cible";
@@ -3113,6 +3141,7 @@ window.dessinerAnneauxCiblage = function() {
                     bulle.style.justifyContent = "center";
                     bulle.style.alignItems = "center";
                     bulle.style.cursor = "pointer";
+                    bulle.style.pointerEvents = "auto";
                     bulle.style.zIndex = "100";
                     bulle.style.color = "white";
                     bulle.style.fontWeight = "bold";
@@ -3124,21 +3153,25 @@ window.dessinerAnneauxCiblage = function() {
                         e.stopPropagation();
                         window.declencherResolutionAvecBondEventuel();
                     };
-                    divToken.appendChild(bulle);
+                    porteur.appendChild(bulle);
                 }
             } else {
                 anneau.style.width = "110%";
                 anneau.style.height = "110%";
                 anneau.style.border = `3px dashed ${couleurAnneau}`;
                 anneau.style.animation = "pulsationCible 1.2s infinite alternate ease-in-out";
-                const bulle = divToken.querySelector(".bulle-validation-cible");
-                if (bulle) bulle.remove();
+                [divToken, document.getElementById("porteur-" + idToken)].forEach(parent => {
+                    const bulle = parent && parent.querySelector(".bulle-validation-cible");
+                    if (bulle) bulle.remove();
+                });
             }
         }
     }
     
     document.querySelectorAll(".anneau-ciblage, .bulle-validation-cible, .jauge-cible-ciblage").forEach(el => {
-        const tokenId = el.parentElement.id.replace("token-", "");
+        // Dans le pion ou dans son porteur au-dessus des murs.
+        const parent = el.parentElement;
+        const tokenId = parent ? (parent.dataset.pion || parent.id.replace("token-", "")) : "";
         if (!ciblesValides.has(tokenId)) el.remove();
     });
 };
@@ -3160,7 +3193,11 @@ window.ajouterCibleCiblage = function(idCible) {
 
     if (!tkLanceur || !tkCible || !lanceurData || !cibleData) return;
 
-    if (cibleData.statut === "Mort") {
+    // Une technique visée (Charme, Baiser, Transfert) ne prend jamais un
+    // combattant à terre, même s'il n'est pas « Mort » (un KO du cerveau).
+    const aTerre = phase.alterations.some(a => a.techniqueVisee)
+        && typeof window.estCombattantMort === "function" && window.estCombattantMort(idCible);
+    if (cibleData.statut === "Mort" || aTerre) {
         window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Cible invalide", "#aaaaaa");
         return;
     }
@@ -3182,9 +3219,11 @@ window.ajouterCibleCiblage = function(idCible) {
     }
 
     // Poussée et Traction peuvent aussi viser un allié (voir dessinerAnneauxCiblage) :
-    // seule une carte SANS attaque qui les porte l'autorise.
+    // seule une carte SANS attaque qui les porte l'autorise. Le Transfert vise
+    // n'importe quel autre combattant (`toutCamp`), même hors de vue (`sansVue`).
     const cartePousseeOuTraction = phase.attaques.length === 0
-        && phase.alterations.some(a => a.estPoussee || a.estTraction);
+        && phase.alterations.some(a => a.estPoussee || a.estTraction || a.toutCamp);
+    const sansVue = phase.alterations.some(a => a.sansVue);
 
     if (configSort.isHeal) {
         if (cibleData.camp !== lanceurData.camp) {
@@ -3220,7 +3259,7 @@ window.ajouterCibleCiblage = function(idCible) {
         return;
     }
 
-    if (!verifierLigneDeVue(tkLanceur, tkCible)) {
+    if (!sansVue && !verifierLigneDeVue(tkLanceur, tkCible)) {
         window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Vue obstruée", "#aaaaaa");
         return;
     }
@@ -3948,12 +3987,18 @@ window.declencherResolution = async function() {
 // avoir lancé la résolution de celle-ci (le jet est déjà figé côté serveur) : l'ordre de la
 // carte est respecté, et le saut interactif ne bloque jamais le lancement de l'attaque.
 window.declencherResolutionAvecBondEventuel = async function() {
-    // LE TIR PRÉCIS VISÉ : sa cible part au cerveau comme technique de classe.
+    // LE TIR PRÉCIS VISÉ (et le Charme fratricide, le Baiser du vampire, le
+    // Transfert) : sa cible part au cerveau comme technique de classe.
     const ciblage = window.ETAT_CIBLAGE;
-    if (ciblage && ciblage.techniqueClasse === "CLASSE_TIR_PRECIS") {
+    const visee = ciblage && (ciblage.techniqueClasse === "CLASSE_TIR_PRECIS"
+                              || (window.TECHNIQUES_VISEES || {})[ciblage.techniqueClasse]);
+    if (visee) {
         const idCible = ciblage.cibleUnique
             || ((ciblage.alterations || []).find(a => (a.cibles || []).length) || { cibles: [] }).cibles[0];
-        if (!idCible) return alert("Tir précis : touchez l'ennemi à immobiliser.");
+        if (!idCible) {
+            const t = (window.TECHNIQUES_CLASSE || {})[ciblage.techniqueClasse] || {};
+            return alert(`${t.Nom || "Technique"} : touchez ${ciblage.techniqueClasse === "CLASSE_TIR_PRECIS" ? "l'ennemi à immobiliser" : "votre cible"}.`);
+        }
         const idLanceur = window.lanceurDuCiblage();
         const idCarte = ciblage.idCarte;
         window.nettoyerCiblage();

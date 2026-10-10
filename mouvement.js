@@ -512,10 +512,14 @@ window.dessinerCheminMouvement = function() {
 // retirer ne justifie pas de reconstruire le plateau entier : on le retire
 // directement, sur le seul pion concerné.
 window.retirerCroixDeplacement = function(idPersonnage) {
-    const token = document.getElementById("token-" + idPersonnage);
-    if (!token) return;
-    token.querySelectorAll(".croix-annuler-deplacement, .croix-annuler-ciblage")
-         .forEach(croix => croix.remove());
+    // La croix vit au-dessus des murs, dans le porteur du pion (combat.js,
+    // porteurAuDessus) — ou dans le pion, sur une page sans ce calque.
+    [document.getElementById("token-" + idPersonnage), document.getElementById("porteur-" + idPersonnage)]
+        .forEach(parent => {
+            if (!parent) return;
+            parent.querySelectorAll(".croix-annuler-deplacement, .croix-annuler-ciblage")
+                  .forEach(croix => croix.remove());
+        });
 };
 
 window.annulerMouvement = function() {

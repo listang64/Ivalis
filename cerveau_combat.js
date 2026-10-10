@@ -1222,8 +1222,11 @@ export function jouerCreature(etat, id, carte, plateau) {
     // Aveuglée, une créature ne vise pas ce qui se tient dans son noir (une
     // zone, si : elle frappe ce qu'elle couvre sans avoir à le voir).
     const dansLeNoir = !!(moi && cible && !infos.estZone && estDansLeNoir(moi, cible));
+    // EN VUE, comme un joueur : un mur (de la carte ou de terre) entre elle et
+    // sa cible, et elle ne tire pas (une zone a sa propre règle, choisirZone).
     const aPortee = moi && !moi.aTerre && cible && !cible.aTerre && !dansLeNoir
-                    && distance(moi, cible) <= nombre(infos.portee, 1);
+                    && distance(moi, cible) <= nombre(infos.portee, 1)
+                    && (!!infos.estZone || ligneDeVue(plateau, moi, cible));
 
     // UNE CARTE DE ZONE ne ramasse pas la cible unique choisie plus haut — elle
     // ne sert ici qu'à décider si ça valait le coup de marcher. On recalcule
@@ -1364,8 +1367,10 @@ function leverMursDeTerre(etat, id, cases, des, plateau) {
     const frapper = (cible, degats) => {
         const r = resoudreCarte(etat, { type: "carte", idLanceur: id, idCarte: TECHNIQUE_MUR_TERRE, critique: false, coutFatigue: 0,
             // Ni à distance (pas de réduction au contact), ni bornée : la roche
-            // frappe là où elle surgit.
-            attaques: [{ nom: "Mur de terre", valeurBrute: degats, typeRes: "Physique", brut: true,
+            // frappe là où elle surgit. Des dégâts PHYSIQUES (Nico : « écrasé
+            // sous la roche, c'est des dégâts physiques, pas bruts ») : l'armure
+            // les réduit.
+            attaques: [{ nom: "Mur de terre", valeurBrute: degats, typeRes: "Physique",
                          isRanged: false, rangeMax: 99, isHeal: false, isShield: false, cibles: [cible] }],
             alterations: [], jets: { parCible: { [cible]: { esquive: false, etats: {} } } } }, plateau);
         Object.keys(etat).forEach(k => delete etat[k]);

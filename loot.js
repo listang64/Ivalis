@@ -259,14 +259,22 @@ window.demanderCasque = function(objet) {
 
 // Écrit un objet dans le ou les emplacements qui lui reviennent. L'ancien
 // occupant n'est conservé nulle part : c'est voulu, il n'existe pas de sac.
-window.equiperObjet = async function(idPersonnage, objet, main) {
+window.equiperObjet = async function(idPersonnage, objet, main, options) {
     // Une armure avec son couvre-chef : le joueur dit s'il le porte, et ce
     // choix part avec l'armure (le portrait la suit, objets_ia.js).
     // Toute armure : son image montre son couvre-chef (celle de départ, qui
     // n'en a pas, n'arrive jamais par ici).
-    if (objet && objet.emplacement === "Armure" && objet.casquePorte === undefined
-        && typeof window.demanderCasque === "function") {
-        objet = { ...objet, casquePorte: await window.demanderCasque(objet) };
+    //
+    // L'ARMURE D'UN AUTRE JOUEUR (`pourUnAutre` : le partage commun, résolu
+    // par l'écran du dernier qui valide) : ce n'est pas à cet écran de poser
+    // la question (Nico : « c'est lui qui a eu le message demandant si je
+    // voulais afficher le casque, ça devrait être moi »). L'armure part marquée
+    // `casqueAChoisir` ; l'écran de son joueur pose la question et redessine
+    // le portrait (demanderCasquesEnAttente).
+    const pourUnAutre = !!(options && options.pourUnAutre);
+    if (objet && objet.emplacement === "Armure" && objet.casquePorte === undefined) {
+        if (pourUnAutre) objet = { ...objet, casqueAChoisir: true };
+        else if (typeof window.demanderCasque === "function") objet = { ...objet, casquePorte: await window.demanderCasque(objet) };
     }
     const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
 
@@ -341,9 +349,42 @@ window.equiperObjet = async function(idPersonnage, objet, main) {
     // l'armure. Volontairement pas attendu — le joueur continue de jouer, et
     // l'image arrive quand elle arrive. Les armes, elles, ne se voient pas sur
     // l'avatar : rien à refaire pour elles.
-    if (objet && objet.emplacement === "Armure" && typeof window.suivreArmureEquipee === "function") {
+    // (Pas pour l'armure d'un autre joueur dont le couvre-chef reste à choisir :
+    // son écran redessinera le portrait une fois la question posée.)
+    if (objet && objet.emplacement === "Armure" && !objet.casqueAChoisir && typeof window.suivreArmureEquipee === "function") {
         Promise.resolve(window.suivreArmureEquipee(idPersonnage, objet))
             .catch(e => console.error("Rhabillage de l'avatar :", e));
+    }
+};
+
+// LE COUVRE-CHEF D'UNE ARMURE GAGNÉE AU PARTAGE, DEMANDÉ À SON JOUEUR. L'écran
+// qui a résolu le partage a équipé l'armure sans poser la question (elle porte
+// `casqueAChoisir`) : l'écran du joueur à qui appartient le héros la pose dès
+// que la fiche lui arrive (le suivi des Personnages, app.js), écrit le choix,
+// et redessine le portrait. Une seule question à la fois, une fois par armure.
+const casquesEnQuestion = new Set();
+window.demanderCasquesEnAttente = async function(persos) {
+    const moi = localStorage.getItem("ID_JOUEUR_COURANT");
+    if (!moi || typeof window.demanderCasque !== "function") return;
+    for (const p of (persos || window.PERSOS_PARTIE || [])) {
+        const armure = p && p.equipArmure;
+        if (!armure || !armure.casqueAChoisir || p.idJoueur !== moi) continue;
+        const cle = p.idPersonnage + "|" + (armure.uid || armure.nom || "");
+        if (casquesEnQuestion.has(cle)) continue;
+        casquesEnQuestion.add(cle);
+        try {
+            const { casqueAChoisir, ...reste } = armure;
+            const valeur = { ...reste, casquePorte: await window.demanderCasque(armure) };
+            await updateDoc(doc(db, "Personnages", p.idPersonnage), { Equip_Armure: valeur });
+            window.appliquerEquipementEnRam(p.idPersonnage, { Equip_Armure: valeur });
+            if (typeof window.suivreArmureEquipee === "function") {
+                Promise.resolve(window.suivreArmureEquipee(p.idPersonnage, valeur))
+                    .catch(e => console.error("Rhabillage de l'avatar :", e));
+            }
+        } catch (e) {
+            console.error("Couvre-chef :", e);
+            casquesEnQuestion.delete(cle);
+        }
     }
 };
 
@@ -463,7 +504,7 @@ window.appliquerEquipementEnRam = function(idPersonnage, maj) {
 // est respectée ; sans choix (un placement d'avant cette règle), on prend la
 // main libre s'il y en a une, sinon la droite — toujours parmi les mains
 // permises, pour qu'un bouclier gagné ne rejoigne jamais un autre bouclier.
-window.equiperObjetButin = async function(idPersonnage, item, main) {
+window.equiperObjetButin = async function(idPersonnage, item, main, options) {
     const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
     const permises = window.mainsPossibles(perso, item);
     let mainChoisie = main;
@@ -471,7 +512,7 @@ window.equiperObjetButin = async function(idPersonnage, item, main) {
         const libre = (m) => !(perso && perso["equipMain" + m] && perso["equipMain" + m].nom);
         mainChoisie = permises.find(libre) || permises[0];
     }
-    await window.equiperObjet(idPersonnage, item, mainChoisie);
+    await window.equiperObjet(idPersonnage, item, mainChoisie, options);
 };
 
 // Deux objets par héros, tirés dans le tableau d'équipement (objets.js) selon
@@ -1923,7 +1964,10 @@ window.validerButinPool = async function() {
             // plaçant. Ce qui ne concernait que le partage (candidats, mains,
             // gagnant) reste au partage : la fiche ne reçoit que l'objet.
             const { candidats, mains, gagnant, ...objet } = item;
-            if (test.possible) await window.equiperObjetButin(gagnant, objet, (mains || {})[gagnant]);
+            // Le héros d'un autre joueur : sa question du couvre-chef lui revient.
+            const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === gagnant);
+            const pourUnAutre = !!(perso && perso.idJoueur && perso.idJoueur !== joueurId);
+            if (test.possible) await window.equiperObjetButin(gagnant, objet, (mains || {})[gagnant], { pourUnAutre });
         }
     }
 };

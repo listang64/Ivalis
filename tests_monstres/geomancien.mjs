@@ -5,7 +5,8 @@
 // Lvl5 : Mur de terre (20 fatigue par mur, créé directement en combat, INIT 80,
 // portée 5) : mur à 10 PV, infranchissable s'il n'est pas cassé, casse la
 // ligne de vue ; si un ennemi ou un joueur est dessus, il est repoussé
-// aléatoirement d'un côté du mur et prend 3 dégâts bruts. Les zones que le
+// aléatoirement d'un côté du mur et prend 3 dégâts physiques (l'armure les
+// réduit — Nico : « c'est des dégâts physiques, pas bruts »). Les zones que le
 // Géomancien place ne lui infligent pas de dégâts, il se déplace dans le
 // terrain difficile comme sur un terrain normal, et peut traverser ses murs.
 // Murs dessinés vus de dessus, un peu iso : des masses de roche comme de gros
@@ -166,9 +167,9 @@ console.log("\n4. QUELQU'UN SUR LA CASE");
     const m1 = p.etat.combattants.M1;
     verifier("repoussé sur une case voisine libre", (m1.q !== 3 || m1.r !== 0) && Math.max(Math.abs(m1.q - 3), Math.abs(m1.r), Math.abs(m1.q + m1.r - 3)) === 1,
              `(${m1.q},${m1.r})`);
-    verifier("3 dégâts bruts (l'armure n'y fait rien)", m1.pv === 97, String(m1.pv));
+    verifier("3 dégâts PHYSIQUES : son armure (50 %) les réduit à 2", m1.pv === 98, String(m1.pv));
     verifier("et le mur est levé", !!murEn(p.etat, 3, 0));
-    verifier("rejoué depuis le journal", (() => { const r = appliquerEntree(e, p.entree); return r.combattants.M1.q === m1.q && r.combattants.M1.pv === 97 && !!murEn(r, 3, 0); })());
+    verifier("rejoué depuis le journal", (() => { const r = appliquerEntree(e, p.entree); return r.combattants.M1.q === m1.q && r.combattants.M1.pv === 98 && !!murEn(r, 3, 0); })());
     // Un allié aussi.
     const allie = murs(monde(5), [{ q: -1, r: 0 }]);
     verifier("un allié aussi (3 dégâts)", allie.etat.combattants.H.pv === 97 && !!murEn(allie.etat, -1, 0));

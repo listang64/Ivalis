@@ -923,7 +923,7 @@ window.atoutPeuple = function(perso) {
 window.ATOUTS_CLASSES = {
     // LE SORCIER (ex-Nécromancien, renommé — CLASSES_RENOMMEES) : Ténèbres dans
     // la Forge dès le niveau 1, +1 case de portée sur TOUS ses sorts (porteeSorts,
-    // bonusPorteeMagique) et aucun malus au contact pour ses sorts à distance
+    // bonusPorteeMagique) et aucun malus au contact pour ses attaques à distance
     // (sortsSansMalusContact, chaineDeDegats) ; le Charme fratricide au niveau
     // 5, le Transfert au niveau 10.
     "Sorcier": [
@@ -1148,7 +1148,7 @@ window.TECHNIQUES_CLASSE = {
         coutParMur: 20, sansLimite: true,
         desc: "Lève un mur de roche sur chaque case choisie à 5 cases (en vue) : 20 de fatigue par mur. "
             + "10 PV, infranchissable, coupe la ligne de vue. Qui s'y tient est repoussé à côté et prend "
-            + "3 dégâts bruts (6, et pas de mur, s'il n'a nulle part où aller). Cassé, il laisse des gravats."
+            + "3 dégâts physiques (6, et pas de mur, s'il n'a nulle part où aller). Cassé, il laisse des gravats."
     },
     CLASSE_TIR_PRECIS: {
         Nom: "Tir précis", classe: "Pisteur", niveau: 5, Initiative: 100, Fatigue: 0, cible: "ennemi", portee: 5,
@@ -1189,6 +1189,15 @@ window.estTechniqueClasse = (idCarte) => !!(idCarte && window.TECHNIQUES_CLASSE[
 // La « carte » d'une technique de classe, au format des cartes forgées : c'est
 // ce qui lui permet de passer par les mêmes chemins (aperçu en grand, choix en
 // préparation, file d'initiative). Elle n'a ni arme ni composants.
+// LES TECHNIQUES QUI SE VISENT SUR LE PLATEAU, comme un sort (demarrerCiblage,
+// moteur_effets.js) : `nom` est l'effet montré pendant le ciblage ;
+// `toutCamp` : allié ou ennemi ; `sansVue` : même derrière un mur.
+window.TECHNIQUES_VISEES = {
+    CLASSE_CHARME_FRATRICIDE: { nom: "Charmé" },
+    CLASSE_BAISER_VAMPIRE: { nom: "Baiser du vampire" },
+    CLASSE_TRANSFERT: { nom: "Transfert", toutCamp: true, sansVue: true }
+};
+
 window.carteTechniqueClasse = function(idCarte) {
     const t = window.TECHNIQUES_CLASSE[idCarte];
     if (!t) return null;
@@ -1406,7 +1415,7 @@ window.texteAtout = function(cle, valeur) {
         case "soinsRecus":     return `${plus(n)} % de soins reçus`;
         case "porteeMagique":  return `${plus(n)} case de portée pour les sorts magiques à distance`;
         case "porteeSorts":    return `${plus(n)} case de portée de base sur tous ses sorts`;
-        case "sortsSansMalusContact": return "Aucune réduction au contact pour ses sorts à distance";
+        case "sortsSansMalusContact": return "Aucune réduction au contact pour ses attaques à distance";
         case "diviseurDeplacement": return n === 2 ? "Se déplace pour deux fois moins de fatigue" : `Déplacement ${n} fois moins cher`;
         case "esquiveOpportunite":  return `${n} % de chance d'esquiver une attaque d'opportunité`;
         case "immunites": {
@@ -3781,6 +3790,11 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
       window.recomposerCombattants();
     } else {
       window.PERSOS_PARTIE = persos.filter(p => p.actif !== false);
+    }
+    // Une armure gagnée au partage, équipée par l'écran d'un autre joueur :
+    // la question du couvre-chef se pose ici, à son joueur (loot.js).
+    if (typeof window.demanderCasquesEnAttente === "function") {
+      setTimeout(() => window.demanderCasquesEnAttente(persos), 0);
     }
 
     // Les illusions sont de vrais combattants (le moteur doit les voir dans PERSOS_PARTIE),

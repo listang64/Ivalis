@@ -5864,3 +5864,68 @@ geste à la place de la ruée, la ruée quand il ne convient pas, la zone après
 le choix du geste, puis le vrai plateau — chaque geste et ses sons, touché ou
 esquivé, sans chiffre ; la foudre garde la ruée. Il mord sur l'ancien code
 (12 échecs).
+
+## v233 — Murs, lignes de tir, ciblage sur le plateau, butin partagé
+
+Nico : « Réinitialiser un combat n'enlève pas de suite les murs mis par le
+Géomancien. Charme fratricide : pour cibler, enlève les noms et fais un
+ciblage visuel comme n'importe quel autre sort ; pareil pour le Transfert et
+toutes les compétences qui utilisent le nom des ennemis. Écrasé sous la roche :
+dégâts physiques, pas bruts. Un ennemi élite vient de tirer sans prendre en
+compte les murs : ils doivent être sujets aux lignes de tir comme les joueurs.
+Au moment de cibler un ennemi partiellement derrière un mur, les boutons
+d'annulation et de validation et les points de vie/fatigue doivent apparaître
+au-dessus des murs. Le Sorcier a eu le malus de -30 % au contact. Loot
+partagé : j'ai gagné un habit sur lequel je m'étais placé, c'est mon ami qui a
+eu la question du casque, ça devrait être moi. »
+
+- LES MURS À LA RÉINITIALISATION (murs_terre.js : effacerMursTerre) : sur
+  l'écran qui réinitialise, avant la moindre écriture en base (combat.js,
+  reinitialiserCombat) ; sur les autres, dès que l'état du combat disparaît
+  (regime_cerveau.js).
+- LES TECHNIQUES VISÉES SUR LE PLATEAU (app.js : TECHNIQUES_VISEES) : le
+  Charme fratricide, le Baiser du vampire et le Transfert ouvrent le ciblage
+  du plateau comme un sort (moteur_effets.js : demarrerCiblage, comme le Tir
+  précis) — anneaux, portée, ligne de vue, bulle ✔. Le Transfert vise aussi
+  les alliés et passe les murs ; personne ne vise un combattant à terre ni un
+  leurre. Restent en fenêtre de noms : Rempart et Prise en charge (des alliés).
+- ÉCRASÉ SOUS LA ROCHE (cerveau_combat.js) : dégâts physiques, l'armure les
+  réduit (« 3 dégâts physiques » dans la description).
+- LES CRÉATURES ET LA LIGNE DE TIR (ia_pure.js, cerveau_combat.js) : une case
+  n'est « à portée » que si la cible s'y voit (ligneDeVue : murs de la carte
+  et de terre) ; sans vue, la créature se décale, ou renonce — elle ne tire
+  plus à travers la roche. Une zone garde sa règle de pose.
+- AU-DESSUS DES MURS (combat.js : porteurAuDessus, #calque-ciblage-haut dans
+  index.html) : la bulle ✔, la croix ✖, la jauge de vie de la cible et les
+  jauges vie/fatigue du pion sélectionné vivent dans un PORTEUR, cadre vide à
+  la place du pion, sur un calque posé au-dessus des murs ; ils gardent leurs
+  positions en % du pion, le porteur suit le pion (zoom, carte, marche), part
+  avec lui. Le pion, lui, reste derrière la roche. Un redessin des pions
+  pendant un ciblage remet aussi les anneaux (ils disparaissaient).
+- LE SORCIER AU CONTACT (moteur_pur.js, moteur_effets.js) : aucune réduction
+  pour ses attaques à distance au contact, sorts comme tirs, et plus
+  d'étiquette « -30% Dégâts » au ciblage.
+- LE COUVRE-CHEF D'UN BUTIN PARTAGÉ (loot.js) : l'écran qui résout le partage
+  équipe l'armure d'un héros d'un autre joueur marquée `casqueAChoisir`, sans
+  poser la question ; l'écran du joueur du héros la pose à l'arrivée de la
+  fiche (app.js → demanderCasquesEnAttente), une fois, écrit le choix et
+  redessine le portrait.
+
+Les bancs : lignes_de_tir_creatures.mjs (le vrai noyau : sans mur il tire ;
+derrière une muraille de terre il se décale pour voir ; immobile, il renonce ;
+un mur de la carte pareil ; au contact, rien ne s'interpose) ;
+corrections_v233.mjs (la vraie page : bulle, jauges et croix peintes
+par-dessus la roche, le pion caché derrière, vrais clics sur la bulle et la
+croix, porteurs qui suivent la carte et partent avec leur pion ; la
+réinitialisation qui efface les murs sans attendre la base ; l'étiquette du
+Sorcier ; le casque demandé au bon joueur, une seule fois). Suivent les
+changements voulus : geomancien.mjs (l'écrasement réduit par l'armure),
+sorcier.mjs et vampire.mjs (Charme, Transfert et Baiser visés sur le plateau),
+jauges_selection.mjs et bouton_fintour.mjs (jauges et croix dans le porteur),
+menage_images.mjs (equiperObjet prend ses options). Les deux nouveaux bancs
+mordent sur l'ancien code (5 échecs pour les lignes de tir ; la page : bulle et
+jauge balayées par le redessin, croix et jauges sous la roche, murs restés
+après la réinitialisation, « -30% » du Sorcier, casque demandé au résolveur).
+La suite : 210/210 — regime_cerveau.mjs a rappelé qu'un poste sans écran
+(Node) passe aussi par l'effacement des murs : il ne touche à `window` que
+s'il existe.

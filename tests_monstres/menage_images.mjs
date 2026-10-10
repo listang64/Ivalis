@@ -34,7 +34,7 @@ const SRC = [
   // equiperObjet refuse un second bouclier : il s'appuie sur ces deux-là.
   extraire('loot.js', 'window.estBouclier = function(objet) {'),
   extraire('loot.js', 'window.mainsPossibles = function(perso, objet) {'),
-  extraire('loot.js', 'window.equiperObjet = async function(idPersonnage, objet, main) {'),
+  extraire('loot.js', 'window.equiperObjet = async function(idPersonnage, objet, main, options) {'),
   extraire('loot.js', 'window.lacherObjet = async function(idPersonnage, champ) {'),
   extraire('loot.js', 'window.appliquerEquipementEnRam = function(idPersonnage, maj) {'),
   extraire('loot.js', 'window.fermerFenetreButin = async function() {'),

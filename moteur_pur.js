@@ -788,8 +788,10 @@ export function chaineDeDegats(cible, attaque, options) {
     //    bug ; c'était la règle, et elle est juste. Ce qui manquait n'était pas
     //    ici : c'est que la CARTE ne disait pas qu'elle avait gagné cette
     //    portée (voir la ligne de portée dans competences.js).
-    //    Sauf pour les sorts du Sorcier (sortsSansMalusContact) : sa magie ne
-    //    perd rien à bout portant.
+    //    Sauf pour le Sorcier (sortsSansMalusContact) : rien de ce qu'il lance
+    //    ne perd à bout portant — ses sorts, et aussi ce qu'une arme a fait
+    //    tirer (Nico : « le Sorcier a eu le malus de -30 % au contact alors
+    //    qu'il n'est pas censé l'avoir »).
     if (attaque.isRanged && distance === 1 && !sansMalusContact) degats = Math.floor(degats * 0.7);
 
     // 2 bis. LES VULNÉRABILITÉS DE LA CIBLE. Un corps gelé casse plus
@@ -1787,8 +1789,7 @@ export function resoudreCarte(etat, action, plateau) {
                     frapper(idLanceur, lanceur, { ...attaqueFrappe, renvoyeAntimagie: true });
                     return;
                 }
-                const sansMalusContact = !!(lanceur.atouts && lanceur.atouts.sortsSansMalusContact)
-                    && attaqueFrappe.typeRes === "Magique";
+                const sansMalusContact = !!(lanceur.atouts && lanceur.atouts.sortsSansMalusContact);
                 const compte = chaineDeDegats(cible, attaqueFrappe, { critique, distance: distanceHex(lanceur, cible), percee, sansMalusContact });
                 if (compte.resiste) {
                     // Un seul élément : « Résiste au feu ». Plusieurs : les icônes

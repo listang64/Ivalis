@@ -276,7 +276,7 @@ console.log("\n5. UN DÉPLACEMENT SE TRACE : « VALIDER », ET LA CROIX SOUS LE 
   verifier("le mode est « valider déplacement »", e.mode === "valider_deplacement", `(${e.mode})`);
   verifier("l'image est IMG_2130", e.src.includes("IMG_2130"), e.src);
 
-  const croix = await p.evaluate(() => !!document.querySelector("#token-H1 .croix-annuler-deplacement"));
+  const croix = await p.evaluate(() => !!document.querySelector("#porteur-H1 .croix-annuler-deplacement"));
   verifier("la croix d'annulation apparaît sous le pion", croix);
 
   await p.evaluate(() => { window.validerMouvement = async () => { window.APPELS.push(["validerDirect"]); }; });
@@ -293,12 +293,12 @@ console.log("\n6. ANNULER LE DÉPLACEMENT PAR LA CROIX : RETOUR À « LANCER »"
     window.CHEMIN_MOUVEMENT = [{ q: 1, r: 0, cost: 2 }];
     window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
   });
-  await p.evaluate(() => document.querySelector("#token-H1 .croix-annuler-deplacement").click());
+  await p.evaluate(() => document.querySelector("#porteur-H1 .croix-annuler-deplacement").click());
   await p.waitForTimeout(50);
 
   const cheminVide = await p.evaluate(() => window.CHEMIN_MOUVEMENT.length === 0);
   verifier("la croix vide le chemin (annulerMouvement)", cheminVide);
-  const croixPartie = await p.evaluate(() => !document.querySelector("#token-H1 .croix-annuler-deplacement"));
+  const croixPartie = await p.evaluate(() => !document.querySelector("#porteur-H1 .croix-annuler-deplacement"));
   verifier("la croix elle-même disparaît", croixPartie);
 
   const e = await etatBouton();

@@ -399,26 +399,39 @@ console.log("\n7. LA GRILLE DES CLASSES : LE VAMPIRE GRISÉ POUR UN VARGEN");
   verifier("redevenu Vargen, la classe Vampire est oubliée", r.champApresVargen === "", r.champApresVargen);
 }
 
-console.log("\n8. LE BAISER À L'ÉCRAN : ON CHOISIT L'ENNEMI AU CONTACT");
+console.log("\n8. LE BAISER SE VISE SUR LE PLATEAU : L'ENNEMI AU CONTACT");
+// v233 (Nico : « fais un ciblage visuel comme n'importe quel autre sort, pour
+// toutes les compétences qui utilisent les noms des ennemis »).
 {
-  const r = await p.evaluate(() => {
-    window.PERSOS_PARTIE = [
-      { idPersonnage: "V1", camp: "Allié", prenom: "Vlad", classe: "Vampire", xp: 2500, PV_Max: 40, PV_Actuels: 40, statut: "Vivant" },
-      { idPersonnage: "A1", camp: "Allié", prenom: "Ama", PV_Max: 40, PV_Actuels: 40, statut: "Vivant" },
-      { idPersonnage: "M1", camp: "Ennemi", estMonstre: true, nom: "Gnoll", PV_Max: 40, PV_Actuels: 40, statut: "Vivant" },
-      { idPersonnage: "M2", camp: "Ennemi", estMonstre: true, nom: "Loup", PV_Max: 40, PV_Actuels: 40, statut: "Vivant" }];
+  const r = await p.evaluate(async () => {
+    document.getElementById("fenetre-combat").style.display = "block";
+    window.jouerSonClic = () => {};
+    window.PLATEAU_VTT = { getCaseState: () => ({}), hexToPixel: (q, r) => ({ x: 300 + q * 60, y: 300 + r * 60 }),
+                           pixelToHex: () => ({ q: 0, r: 0 }), renderMap: () => {} };
+    window.VTT_SCALE = 1; window.VTT_POS_X = 0; window.VTT_POS_Y = 0;
+    const f = (id, extra) => ({ idPersonnage: id, camp: "Allié", PV_Max: 40, PV_Actuels: 40, Fatigue_Max: 100, fatigueActuelle: 100,
+                                Etats_Alteres: [], statut: "Vivant", ...extra });
+    window.PERSOS_PARTIE = [f("V1", { prenom: "Vlad", classe: "Vampire", xp: 2500 }), f("A1", { prenom: "Ama" }),
+      f("M1", { camp: "Ennemi", estMonstre: true, nom: "Gnoll" }), f("M2", { camp: "Ennemi", estMonstre: true, nom: "Loup" })];
     window.TOKENS_VTT_DATA = { V1: { q: 0, r: 0 }, A1: { q: 0, r: 1 }, M1: { q: 1, r: 0 }, M2: { q: 4, r: 0 } };
+    window.COMBAT_PERSOS_JOUEUR = [window.PERSOS_PARTIE[0]]; window.COMBAT_INDEX_PERSO = 0;
+    window.COMPETENCES_CACHE = {}; window.CACHE_COMPETENCES_GLOBAL = { V1: {} };
+    window.CHEMIN_MOUVEMENT = []; window.ZONES_PERSISTANTES = {};
     const appels = [];
-    window.regimeDemande = { techniqueClasse: (...a) => { appels.push(a); return null; }, etat: () => null, enVol: () => false };
+    window.regimeDemande = { actif: () => true, techniqueClasse: (...a) => { appels.push(a); return null; }, etat: () => null, enVol: () => false };
+    const fenetre = () => { const x = document.getElementById("fenetre-choix-rempart"); return !!x && x.style.display !== "none"; };
     window.lancerTechniqueClasse("CLASSE_BAISER_VAMPIRE", "V1");
-    const f = document.getElementById("fenetre-choix-rempart");
-    const choix = [...f.querySelectorAll(".choix-rempart-allie")].map(x => x.textContent.trim());
-    const titre = f.querySelector(".choix-rempart-titre").textContent;
-    f.querySelector(".choix-rempart-allie").click();
-    return { titre, choix, appels, ferme: f.style.display === "none" };
+    await new Promise(r => setTimeout(r, 150));
+    const st = window.ETAT_CIBLAGE || {};
+    const ouvert = { actif: !!st.actif, technique: st.techniqueClasse, fenetre: fenetre() };
+    const acceptes = [];
+    ["A1", "M2", "M1"].forEach(id => { window.ajouterCibleCiblage(id); if (st.cibleUnique === id) acceptes.push(id); });
+    await window.declencherResolutionAvecBondEventuel();
+    return { ouvert, acceptes, appels, ferme: !(window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif) };
   });
-  verifier("la fenêtre « Baiser du vampire » propose le seul ennemi au contact (pas l'allié, pas l'ennemi lointain)",
-           /Baiser du vampire/.test(r.titre) && JSON.stringify(r.choix) === '["Gnoll"]', JSON.stringify(r));
+  verifier("le Baiser ouvre le ciblage du plateau (plus de fenêtre de noms)",
+           r.ouvert.actif && r.ouvert.technique === "CLASSE_BAISER_VAMPIRE" && !r.ouvert.fenetre, JSON.stringify(r.ouvert));
+  verifier("…seul l'ennemi au contact se vise (pas l'allié, pas l'ennemi lointain)", JSON.stringify(r.acceptes) === '["M1"]', JSON.stringify(r.acceptes));
   verifier("le choix part au cerveau : (V1, Baiser, M1)",
            JSON.stringify(r.appels) === '[["V1","CLASSE_BAISER_VAMPIRE","M1"]]' && r.ferme, JSON.stringify(r.appels));
 }

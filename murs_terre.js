@@ -26,6 +26,16 @@
         return id ? murs[id] : null;
     };
     window.estIdMur = (id) => !!(id && (window.MURS_TERRE || {})[id]);
+    // PLUS DE MURS NI DE GRAVATS, tout de suite (Nico : « réinitialiser un
+    // combat n'enlève pas de suite les murs du Géomancien ») : le combat est
+    // effacé, ou réinitialisé ; on n'attend pas qu'un nouvel état descende.
+    window.effacerMursTerre = function () {
+        window.MURS_TERRE = {};
+        window.GRAVATS_TERRE = {};
+        if (typeof window.appliquerMursTerre === "function") {
+            try { window.appliquerMursTerre(); } catch (e) { console.error("Murs de terre :", e); }
+        }
+    };
 
     const persoDe = (id) => (window.PERSOS_PARTIE || []).find(p => p && p.idPersonnage === id) || null;
     const atoutDe = (id) => {

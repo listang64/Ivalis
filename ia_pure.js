@@ -437,9 +437,13 @@ export function choisirPosition(etat, id, cible, infosCarte, plateau, des) {
             // cases fixes) : une cible qui s'y tient n'est jamais « à portée ».
             // Une zone, elle, frapperait quand même.
             const cachee = !infos.estZone && estDansLeNoir(moi, cible);
+            // LA LIGNE DE TIR (Nico : « un élite vient de tirer sans prendre en
+            // compte les murs ; ils doivent être sujets aux lignes de tir comme
+            // les joueurs ») : un mur — de la carte ou de terre — entre la case
+            // et la cible, et elle n'est pas « à portée » d'ici.
             if (cachee) {
                 score -= 18;
-            } else if (d <= portee) {
+            } else if (d <= portee && ligneDeVue(carte, c, cible)) {
                 score += 25;           // à portée : c'est l'objectif premier
                 // Un tireur ne veut pas coller sa cible : il garde ses distances.
                 if (t.tientDistance > 0 && portee > 1) {
@@ -632,8 +636,10 @@ export function deciderTourCreature(etat, id, infosCarte, plateau, des) {
     // son tour. Et comme elle ne lancera rien, inutile de garder l'énergie de
     // la carte en réserve : elle peut aller aussi loin que ses jambes le
     // permettent.
+    // À portée ET en vue (une zone a sa propre règle de pose, choisirZone).
+    const enVue = (de) => !!infos.estZone || ligneDeVue(plateau, de, cible);
     const atteindra = place && cible
-        && distance({ q: place.q, r: place.r }, cible) <= nombre(infos.portee, 1);
+        && distance({ q: place.q, r: place.r }, cible) <= nombre(infos.portee, 1) && enVue({ q: place.q, r: place.r });
 
     if (!atteindra) {
         const proche = ennemiLePlusProche(etat, id);
@@ -650,7 +656,7 @@ export function deciderTourCreature(etat, id, infosCarte, plateau, des) {
     }
 
     const arrivee = place ? { q: place.q, r: place.r } : { q: moi.q, r: moi.r };
-    const aPortee = cible && distance(arrivee, cible) <= nombre(infos.portee, 1);
+    const aPortee = cible && distance(arrivee, cible) <= nombre(infos.portee, 1) && enVue(arrivee);
 
     // UNE CARTE DE ZONE ne vise pas la cible choisie plus haut : elle sert
     // juste à décider si ça vaut le coup de marcher (le contournement, la fuite

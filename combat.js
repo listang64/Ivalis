@@ -2600,7 +2600,8 @@ window.poserJaugesSelection = function(divToken, perso, existantes) {
     bloc.querySelector(".jauge-selection-fatigue .jauge-selection-remplie").style.width = m.fatigue + "%";
     bloc.title = `Vie ${m.pv}/${m.pvMax} · Fatigue ${m.energie}/${m.energieMax}`;
     bloc.classList.toggle("repliee", !!window.JAUGES_REPLIEES[perso.idPersonnage]);
-    divToken.appendChild(bloc);
+    // Au-dessus des murs, à la place du pion (voir porteurAuDessus).
+    (window.porteurAuDessus ? window.porteurAuDessus(divToken) : divToken).appendChild(bloc);
     return bloc;
 };
 
@@ -2608,7 +2609,7 @@ window.poserJaugesSelection = function(divToken, perso, existantes) {
 window.replierJaugesSelection = function(idPerso) {
     if (!window.estPionDuPoste(idPerso)) return;
     window.JAUGES_REPLIEES[idPerso] = true;
-    const bloc = document.querySelector(`#token-${idPerso} .jauges-selection-token`);
+    const bloc = document.querySelector(`#porteur-${idPerso} .jauges-selection-token, #token-${idPerso} .jauges-selection-token`);
     if (bloc) bloc.classList.add("repliee");
 };
 
@@ -2777,15 +2778,18 @@ window.positionnerTokenVTT = function(divToken, majEchelle) {
     divToken.style.left = (window.VTT_POS_X + px.x * echelle) + "px";
     divToken.style.top = (window.VTT_POS_Y + px.y * echelle) + "px";
 
-    if (!majEchelle) return;
+    if (majEchelle) {
+        const taille = parseFloat(divToken.dataset.taille) || 55;
 
-    const taille = parseFloat(divToken.dataset.taille) || 55;
-
-    divToken.style.width = (taille * echelle) + "px";
-    divToken.style.height = (taille * echelle) + "px";
+        divToken.style.width = (taille * echelle) + "px";
+        divToken.style.height = (taille * echelle) + "px";
+    }
 
     // L'ombre au sol et le halo de sélection sont en %/scale : ils se redimensionnent seuls
-    // avec le pion, sans aucun recalcul JS ici.
+    // avec le pion, sans aucun recalcul JS ici. Son porteur au-dessus des murs, s'il en a un,
+    // le suit (voir porteurAuDessus).
+    const porteur = divToken.id ? document.getElementById("porteur-" + divToken.id.replace("token-", "")) : null;
+    if (porteur) calerPorteur(porteur, divToken);
 };
 
 let echelleTokensAppliquee = null;
@@ -2798,6 +2802,63 @@ window.repositionnerTokensVTT = function() {
     const echelleModifiee = echelleTokensAppliquee !== window.VTT_SCALE;
     conteneur.querySelectorAll(".token-vtt").forEach(div => window.positionnerTokenVTT(div, echelleModifiee));
     echelleTokensAppliquee = window.VTT_SCALE;
+};
+
+// =========================================================================
+//  CE QUI SE CLIQUE OU SE LIT SOUS UN PION PASSE AU-DESSUS DES MURS
+// =========================================================================
+//  Signalé en partie : « au moment de cibler un ennemi qui est partiellement
+//  derrière un mur, les boutons d'annulation et de validation de cible et les
+//  points de vie/fatigue doivent apparaître au-dessus des murs ». Les murs du
+//  Géomancien ont leur calque AU-DESSUS des pions (#calque-murs-vtt) : la
+//  roche cache bien qui se tient derrière… mais aussi tout ce qui vivait DANS
+//  le pion — la bulle ✔, la croix ✖, la jauge de vie de la cible, les jauges
+//  du pion sélectionné. Aucun z-index n'y pouvait rien : un enfant ne sort
+//  jamais du calque de son pion.
+//
+//  Ces éléments-là vivent donc dans un PORTEUR : un cadre vide, de la taille
+//  et à la place du pion, dans un calque posé au-dessus des murs
+//  (#calque-ciblage-haut, index.html). Ils gardent leurs positions en
+//  pourcentages du pion : seul leur parent change. Le pion, lui, reste
+//  derrière la roche.
+function calerPorteur(porteur, divToken) {
+    porteur.style.left = divToken.style.left;
+    porteur.style.top = divToken.style.top;
+    porteur.style.width = divToken.style.width;
+    porteur.style.height = divToken.style.height;
+    // Une marche glisse en left/top (mouvement.js) : le porteur glisse avec son pion.
+    porteur.style.transition = divToken.style.transition;
+}
+
+// Le porteur d'un pion (créé au besoin). Sans calque — une page sans plateau
+// —, le pion lui-même : rien ne change pour qui l'appelle.
+window.porteurAuDessus = function(divToken) {
+    const calque = document.getElementById("calque-ciblage-haut");
+    if (!divToken || !divToken.id || !calque) return divToken;
+    const id = divToken.id.replace("token-", "");
+    let porteur = document.getElementById("porteur-" + id);
+    if (!porteur) {
+        porteur = document.createElement("div");
+        porteur.id = "porteur-" + id;
+        porteur.className = "porteur-pion";
+        porteur.dataset.pion = id;
+        porteur.style.cssText = "position: absolute; transform: translate(-50%, -50%); pointer-events: none;";
+        calque.appendChild(porteur);
+    }
+    calerPorteur(porteur, divToken);
+    return porteur;
+};
+
+// Les porteurs se recalent sur leurs pions ; celui d'un pion disparu, ou qui
+// ne porte plus rien, s'en va.
+window.synchroniserPorteurs = function() {
+    const calque = document.getElementById("calque-ciblage-haut");
+    if (!calque) return;
+    calque.querySelectorAll(".porteur-pion").forEach(porteur => {
+        const pion = document.getElementById("token-" + porteur.dataset.pion);
+        if (!pion || !porteur.firstElementChild) { porteur.remove(); return; }
+        calerPorteur(porteur, pion);
+    });
 };
 
 // =========================================================================
@@ -3229,11 +3290,18 @@ window.appliquerTokensVTT = function(tokensMap) {
 
     // Même chose pour les jauges du pion sélectionné : gardées d'un dessin à
     // l'autre, leurs barres glissent et leur fondu va jusqu'au bout.
+    // Elles vivent au-dessus des murs, dans le porteur du pion (voir
+    // porteurAuDessus) : on les en détache, comme le redessin les détachait du
+    // pion. Celles qu'on ne repose pas disparaissent ; les croix sont refaites.
     const jaugesSelection = {};
-    conteneur.querySelectorAll(".jauges-selection-token").forEach(bloc => {
-        const pion = bloc.closest(".token-vtt");
-        if (pion && pion.id) jaugesSelection[pion.id.replace("token-", "")] = bloc;
+    document.querySelectorAll("#conteneur-tokens-vtt .jauges-selection-token, #calque-ciblage-haut .jauges-selection-token").forEach(bloc => {
+        const parent = bloc.parentElement;
+        const id = parent ? (parent.dataset.pion || parent.id.replace("token-", "")) : "";
+        if (id) jaugesSelection[id] = bloc;
+        bloc.remove();
     });
+    document.querySelectorAll("#calque-ciblage-haut .croix-annuler-ciblage, #calque-ciblage-haut .croix-annuler-deplacement")
+            .forEach(croix => croix.remove());
 
     // LES EFFETS D'UNE ANIMATION EN COURS restent (animations_jeu.js : la
     // poussière, les silhouettes, la copie d'un pion qui entre en scène) : un
@@ -3302,10 +3370,12 @@ window.appliquerTokensVTT = function(tokensMap) {
             const croix = document.createElement("div");
             croix.className = classe;
             croix.title = titre;
-            croix.style.cssText = "position: absolute; bottom: -14px; right: -6px; width: 26px; height: 26px; background: #d32f2f; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; border: 2px solid white; box-shadow: 0 0 8px #d32f2f; cursor: pointer; z-index: 6;";
+            croix.style.cssText = "position: absolute; bottom: -14px; right: -6px; width: 26px; height: 26px; background: #d32f2f; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; border: 2px solid white; box-shadow: 0 0 8px #d32f2f; cursor: pointer; pointer-events: auto; z-index: 6;";
             croix.innerText = "✖";
             croix.onclick = (e) => { e.stopPropagation(); action(); };
-            divToken.appendChild(croix);
+            // Au-dessus des murs, à la place du pion (voir porteurAuDessus) ; le
+            // porteur laisse passer les clics, la croix les prend.
+            (window.porteurAuDessus ? window.porteurAuDessus(divToken) : divToken).appendChild(croix);
         };
 
         // LE CIBLAGE PASSE DEVANT LE DÉPLACEMENT. Signalé en partie : « quand on
@@ -3510,6 +3580,13 @@ window.appliquerTokensVTT = function(tokensMap) {
     }
 
     echelleTokensAppliquee = window.VTT_SCALE;
+    // Le redessin a balayé les anneaux d'un ciblage en cours : on les remet,
+    // avec la bulle et la jauge de la cible (au-dessus des murs). Puis les
+    // porteurs se recalent, et ceux qui ne portent plus rien s'en vont.
+    if (window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif && typeof window.actualiserVisuelCiblage === "function") {
+        try { window.actualiserVisuelCiblage(); } catch (e) { console.error("Ciblage redessiné :", e); }
+    }
+    if (typeof window.synchroniserPorteurs === "function") window.synchroniserPorteurs();
     // Un renfort, une illusion, un déploiement : leur entrée en scène.
     if (typeof window.animerNouveauxPions === "function") {
         try { window.animerNouveauxPions(dessines); } catch (e) { console.error("Entrée en scène des pions :", e); }
@@ -5214,7 +5291,10 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
     // L'Assaut mortel se vise sur le plateau : une zone de deux cases au
     // contact, qu'on tourne autour de soi (demarrerCiblage, moteur_effets.js).
     // Le Tir précis aussi, comme un tir ordinaire : un ennemi à 5 cases, en vue.
-    if (t.cible === "zoneDeux" || idCarte === "CLASSE_TIR_PRECIS") {
+    // Le Charme fratricide, le Baiser du vampire et le Transfert aussi (Nico :
+    // « enlève les noms et fais un ciblage visuel comme n'importe quel autre
+    // sort »).
+    if (t.cible === "zoneDeux" || idCarte === "CLASSE_TIR_PRECIS" || (window.TECHNIQUES_VISEES || {})[idCarte]) {
         if (typeof window.demarrerCiblage === "function") window.demarrerCiblage(idCarte, { idLanceur });
         return;
     }
@@ -6095,6 +6175,13 @@ window.reinitialiserCombat = async function() {
     // Et la piste des états oublie son tapis, pour la même raison : elle garde
     // l'ordre d'arrivée en mémoire, et cet ordre-là n'a plus d'objet.
     if (typeof window.oublierPisteEtats === "function") window.oublierPisteEtats();
+
+    // LES MURS DE TERRE DU GÉOMANCIEN (et leurs gravats) partent TOUT DE SUITE
+    // (Nico : « réinitialiser un combat n'enlève pas de suite les murs mis par
+    // le Géomancien ») : avant la moindre écriture en base, qui peut prendre
+    // son temps. Les autres écrans les effacent en voyant l'état du combat
+    // disparaître (regime_cerveau.js).
+    if (typeof window.effacerMursTerre === "function") window.effacerMursTerre();
 
     // LE COMBAT DU NOUVEAU RÉGIME SE FERME AUSSI, ET AVANT LE RESTE. Un état
     // publié qui survivrait à une réinitialisation serait pire qu'inutile : les
