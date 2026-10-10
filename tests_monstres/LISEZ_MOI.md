@@ -5735,3 +5735,99 @@ Déploiement des pions.
   entrée, pas de déploiement en plein combat. studio_deplacements.mjs : les
   retouches du Studio, les sons neufs, la taille des pions. repli.mjs lit la
   nouvelle annonce ; studio_animation.mjs compte 102 sons.
+
+## v231 — Les attaques du Studio retouchées, et huit animations de plus en jeu
+
+Nico, au Studio d'animation : « Attaque légère : le trait qui simule le coup,
+ses deux extrémités en pointes ; les dégâts une seule fois au deuxième coup ;
+on garde le bruit de lame, mais pour le coup reçu un son d'entaille de chair,
+et la gerbe de sang de l'animation coup reçu (mets-la pour toutes les
+réceptions d'attaque physique) » ; « le nombre de dégâts qui s'envole, sur
+tous les popups de dégâts » ; puis la flèche, le feu, la foudre, la glace, le
+mot de pouvoir, la lumière, le coup critique ; et « marche case par case,
+terrain difficile, marche gelée, entrée dans les zones persistantes, attaque
+de zone, attaque d'un zombie, échec de technique (Étourdi), compétence lancée
+sur soi : c'est bon, tu peux intégrer ».
+
+Le Studio (animations_catalogue.js, animations_combat.js, fabrique_sons.js,
+style.css) :
+- LE TRAIT D'UNE LAME est effilé aux deux bouts : un croissant plein, que la
+  lame dévoile puis emporte (un masque qui court le long de la courbe).
+- LE COUP REÇU (coupRecu) : le pion recule à l'opposé du coup, s'empourpre,
+  une gerbe de sang jaillit de son flanc, et l'on entend la chair entaillée
+  (« entaille-chair », plus de « ding » de lame-impact). frapper et
+  encaisser (un coup physique) passent par lui : attaque légère (les dégâts
+  au second coup seulement), lourde, coup d'épée, attaque d'opportunité,
+  coup reçu physique, Fureur, Assaut mortel, Rempart actif, compagnon, Tir
+  précis… Une illusion qui se brise ne saigne pas (des éclats clairs).
+- LE CHIFFRE QUI S'ENVOLE, partout : afficherMessageFlottantHex reconnaît un
+  texte de dégâts (« -12 », « -24 ! ») et le fait jaillir, grossir, tourner
+  et s'envoler en arc, à la taille du pion — au Studio comme en jeu.
+- LA FLÈCHE : un dessin neuf (deux plumes barbées crème et rouge, un fût plus
+  fin, une pointe d'acier), la corde qui se tend (« arc-tendu »), le tir sans
+  note, le plantage dans la chair (« fleche-impact ») ; plantée, la pointe
+  cachée dans la chair, elle vibre puis s'efface en fondu SANS TOURNER (sa
+  pose est sur un élément intérieur : l'effacement ne touche que l'opacité).
+- LA BOULE DE FEU : un cœur qui palpite, un halo, des langues qui tournent,
+  une queue de flammes (.anim-boule-feu) ; elle part en ligne droite ; la
+  flamme gronde tout le chemin (« feu-vol »), l'explosion n'est que du feu ;
+  une gerbe de feu sur la cible (des langues de flamme tout autour).
+- LA FOUDRE : des éclairs (deux claquements, le courant haché), et la
+  décharge électrique à la réception.
+- LA GLACE : cinq pointes de cristal naissent en suspension devant le héros,
+  se tournent vers l'ennemi et filent une à une se planter en lui
+  (« glace-formation », « glace-tir », « glace-plante »).
+- LE MOT DE POUVOIR : un murmure sifflé (des sifflantes) ; LA LUMIÈRE : un arc
+  de cercle s'ouvre devant le héros, le rayon en part large et s'amincit
+  jusqu'à la cible, qui clignote UNE fois d'un léger jaune (plus de cercle
+  jaune, ni de flash rouge : la jauge accepte `sansEclat`) ; un autre son.
+- LE COUP CRITIQUE : « COUP CRITIQUE ! » tombe en rouge sous le pion (énorme et
+  flou, il claque à sa taille, souligné d'un trait, des étincelles), puis
+  l'attaque normale. (messageCritique, réutilisable.)
+- Six sons neufs : 108 sons de combat.
+
+Implantées en jeu (animations_jeu.js, pont_combat.js, regime_cerveau.js) :
+- LA MARCHE CASE PAR CASE devient la marche du jeu : un petit saut par case,
+  le pas sur l'herbe, et ce que coûte la case au-dessus du pion (« -2 ⚡ » ;
+  une case gratuite ne dit rien). LE TERRAIN DIFFICILE : la même, plus lente
+  et plus lourde. LA MARCHE GELÉE (Glacé) : des cristaux sous le pion, la
+  glace qui craque, « Glacé : marche ×2 » au premier pas. Le noyau le dit sur
+  le pas (mouvement_pur.js : `difficile` — sauf pour qui y marche comme
+  ailleurs —, `glace`) ; le pion joué en avance (anticiperMarche) reçoit le
+  coût de chaque case du tracé, le terrain et le Glacé. La marche d'avant ne
+  sert plus que sans le Studio.
+- L'ENTRÉE DANS UNE ZONE PERSISTANTE : les dégâts et l'état qu'une zone pose
+  (traverserZones) disent leur zone ; le pont lit sa nature dans l'état et la
+  case réagit avant le chiffre — le feu monte, la glace saisit, la décharge
+  crépite, le poison bouillonne — une seule fois par entrée ; l'état posé se
+  dit (« Électrifié ! »).
+- L'ATTAQUE DE ZONE : le joueur envoie l'emprise de sa zone avec la carte
+  (zoneVisee), la créature aussi (choisirZone) ; l'étape carte la porte
+  (sauf une carte détournée ou ratée, et pas pour un soin) ; après la ruée et
+  le tir, les cases rougeoient, pulsent et explosent, ceux qui y sont
+  secoués.
+- LE ZOMBIE titube et griffe sa proie (à la place de la ruée).
+- L'ÉCHEC D'UN ÉTOURDI : l'étape carte dit `rate`, la carte ne s'élance plus ;
+  l'échec a son geste (l'énergie qui fuse et retombe en fumée, 💫,
+  « Échec ! (Étourdi) »). L'Immobilisation garde son mot.
+- LA COMPÉTENCE LANCÉE SUR SOI (Confusion) : l'étape carte dit `surSoi` ; le
+  sort part vers l'ennemi le plus proche, fait demi-tour et revient frapper
+  son lanceur (« Confus : s'inflige sa propre compétence ! » suit).
+
+Les bancs : studio_attaques.mjs (les traits en pointe, la chair et le sang,
+les dégâts une fois, la flèche qui garde son angle, la boule en ligne droite
+et sa gerbe, la foudre, les pics de glace un à un, la lumière qui clignote une
+fois, le message du critique sous le pion, les sons neufs) ;
+animations_en_jeu_2.mjs (le noyau, le cerveau et le pont, puis le vrai
+plateau : les trois marches, les quatre zones, l'attaque de zone, le zombie,
+l'échec, le retour sur soi, la marche jouée en avance). animations_en_jeu.mjs :
+un humain marche case par case ; studio_animation.mjs compte 108 sons, lit
+les chiffres qui s'envolent, le message propre du critique, et attend la fin
+de la boule de feu (plus longue). Quatre bancs suivent les changements voulus :
+saut_deplacement.mjs mesure l'échelle VUE (le pion fois son image : la marche
+du Studio fait bondir le pion entier) ; marche_anticipee.mjs accepte un pion
+déjà en marche (la marche du Studio ne pose sa case qu'en y arrivant) ;
+message_flottant_taille.mjs : un message ordinaire reste à 18 px, un chiffre
+de dégâts s'envole à la taille du pion. Les cristaux de la marche gelée
+s'écartent en couronne pour dépasser du pion. Les deux nouveaux bancs mordent
+sur l'ancien code (26 et 28 échecs) ; la suite : 207/207.

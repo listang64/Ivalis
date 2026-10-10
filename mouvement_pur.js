@@ -436,9 +436,13 @@ export function resoudreMouvement(etat, action, des, plateau) {
         c.r = pas.vers.r;
         c.fatigue = Math.max(0, c.fatigue - pas.cout);
         // Une case offerte par un pas de retraite le dit : l'écran la marque
-        // d'une empreinte dorée (pont_combat.js, animations_jeu.js).
+        // d'une empreinte dorée (pont_combat.js, animations_jeu.js). Le terrain
+        // difficile (sauf pour qui y marche comme ailleurs) et le Glacé le
+        // disent aussi : l'écran ralentit la marche, ou fait craquer la glace.
+        const lourd = !!pas.difficile && !(c.atouts && c.atouts.terrainFacile);
         etapes.push({ type: "pas", acteur: id, de: pas.de, vers: pas.vers,
-                      cout: pas.cout, fatigueApres: c.fatigue, ...(pas.offerte ? { offert: true } : {}) });
+                      cout: pas.cout, fatigueApres: c.fatigue, ...(pas.offerte ? { offert: true } : {}),
+                      ...(lourd ? { difficile: true } : {}), ...(aLEtat(c, "Glacé") ? { glace: true } : {}) });
 
         // Chaque ennemi QUITTÉ frappe, ici, à cet hexagone précis.
         const contactApres = new Set(ennemisAuContact(suivant, id, pas.vers));

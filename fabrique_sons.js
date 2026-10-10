@@ -360,9 +360,20 @@
             for (let i = 0; i < 6; i++) bruit(ctx, s, { debut: 0.08 + i * 0.07, duree: 0.015, freq: 2600, q: 3, gain: 0.25 });
         },
         // L'explosion : un grondement qui retombe, un souffle qui se ferme.
+        // L'EXPLOSION DE FLAMME (Nico : « sans bruit de métal ») : le souffle qui
+        // éclate, sourd, puis le feu qui ronfle et crépite en retombant.
         "feu-explosion"(ctx, s) {
-            bruit(ctx, s, { duree: 0.7, filtre: "lowpass", q: 0.7, balayage: [2400, 160], gain: 0.7 });
-            note(ctx, s, { freq: 80, glisse: 38, duree: 0.6, gain: 0.45, attaque: 0.004 });
+            bruit(ctx, s, { duree: 0.18, filtre: "lowpass", freq: 260, q: 0.8, gain: 0.8 });
+            bruit(ctx, s, { duree: 0.7, filtre: "lowpass", q: 0.7, balayage: [2400, 160], gain: 0.55 });
+            bruit(ctx, s, { debut: 0.05, duree: 0.8, filtre: "bandpass", q: 0.8, balayage: [900, 300], gain: 0.25, forme: "cloche" });
+            for (let i = 0; i < 9; i++) bruit(ctx, s, { debut: 0.08 + au(0, 0.6), duree: au(0.008, 0.02), filtre: "highpass", freq: au(1800, 3800), q: 1, gain: au(0.08, 0.2) });
+        },
+        // LA FLAMME QUI VOLE (« le bruit d'une flamme tout le long du chemin ») :
+        // un ronflement qui souffle et crépite, un peu moins d'une seconde.
+        "feu-vol"(ctx, s) {
+            bruit(ctx, s, { duree: 0.95, filtre: "lowpass", freq: 600, q: 0.8, gain: 0.32, forme: "cloche" });
+            bruit(ctx, s, { duree: 0.95, filtre: "bandpass", q: 0.7, balayage: [500, 1500], gain: 0.16, forme: "cloche" });
+            for (let i = 0; i < 12; i++) bruit(ctx, s, { debut: au(0, 0.85), duree: au(0.006, 0.018), filtre: "highpass", freq: au(1800, 4200), q: 1, gain: au(0.06, 0.16) });
         },
         // Une esquive : un sifflement bref qui retombe.
         "esquive"(ctx, s) { bruit(ctx, s, { duree: 0.2, filtre: "bandpass", q: 2, balayage: [2800, 700], gain: 0.4, forme: "cloche" }); },
@@ -514,43 +525,82 @@
             souffle(ctx, s, { duree: 0.45, balayage: [200, 900], q: 1, gain: 0.42 });
             note(ctx, s, { freq: 70, glisse: 110, duree: 0.4, gain: 0.12, attaque: 0.05 });
         },
+        // Le coup lourd qui s'abat : un choc sourd, sans résonance de métal.
         "lourd-impact"(ctx, s) {
             note(ctx, s, { freq: 60, glisse: 35, duree: 0.5, gain: 0.45, attaque: 0.003 });
             bruit(ctx, s, { duree: 0.4, filtre: "lowpass", q: 0.7, balayage: [1800, 150], gain: 0.42 });
-            note(ctx, s, { freq: 1240, duree: 0.4, gain: 0.05, type: "triangle", attaque: 0.002 });
-            note(ctx, s, { freq: 1860, duree: 0.3, gain: 0.03, type: "triangle", attaque: 0.002 });
         },
+        // LA FLÈCHE PART (Nico : « au lancement et à l'arrivée il y a un vieux
+        // dong pas joli ») : plus de note, la corde qui se détend d'un coup sec,
+        // puis le sifflement de la flèche.
         "tir"(ctx, s) {
-            note(ctx, s, { freq: 220, glisse: 180, duree: 0.25, gain: 0.18, type: "triangle", attaque: 0.002 });
-            note(ctx, s, { freq: 440, duree: 0.12, gain: 0.05, attaque: 0.002 });
+            bruit(ctx, s, { duree: 0.04, filtre: "lowpass", freq: 900, q: 0.8, gain: 0.32 });
+            bruit(ctx, s, { duree: 0.02, filtre: "bandpass", freq: 2400, q: 2, gain: 0.18 });
             souffle(ctx, s, { debut: 0.03, duree: 0.25, balayage: [3000, 1200], q: 2, gain: 0.18 });
         },
-        "fleche-impact"(ctx, s) {
-            note(ctx, s, { freq: 180, glisse: 110, duree: 0.12, gain: 0.32, attaque: 0.002 });
-            bruit(ctx, s, { duree: 0.05, freq: 1200, q: 2, gain: 0.32 });
-            note(ctx, s, { debut: 0.02, freq: 330, duree: 0.22, gain: 0.04, type: "triangle", desaccord: 30 });
+        // L'ARC QUI SE TEND : le bois et la corde qui grincent en montant.
+        "arc-tendu"(ctx, s) {
+            bruit(ctx, s, { duree: 0.34, filtre: "bandpass", q: 9, balayage: [260, 720], gain: 0.5, forme: "cloche" });
+            for (let i = 0; i < 5; i++) bruit(ctx, s, { debut: 0.04 + i * 0.06 + au(0, 0.02), duree: 0.008, filtre: "bandpass", freq: au(500, 900), q: 4, gain: au(0.08, 0.14) });
         },
+        // LA FLÈCHE SE PLANTE DANS LA CHAIR : un choc mat et mouillé, sans tinter.
+        "fleche-impact"(ctx, s) {
+            note(ctx, s, { freq: 150, glisse: 85, duree: 0.1, gain: 0.3, attaque: 0.002 });
+            bruit(ctx, s, { duree: 0.09, filtre: "lowpass", freq: 520, q: 0.8, gain: 0.4 });
+            bruit(ctx, s, { debut: 0.01, duree: 0.06, filtre: "bandpass", freq: 1300, q: 1.4, gain: 0.14, forme: "cloche" });
+        },
+        // DES ÉCLAIRS (Nico : « change le son par des éclairs, vire le dong ») :
+        // deux claquements secs qui déchirent l'air, le grésillement haché du
+        // courant, les étincelles, et un grondement de bruit — aucune note tenue.
         "foudre"(ctx, s) {
-            bruit(ctx, s, { duree: 0.05, filtre: "highpass", freq: 2000, q: 0.7, gain: 0.36 });
-            bruit(ctx, s, { duree: 0.35, filtre: "bandpass", q: 0.9, balayage: [6000, 400], gain: 0.28 });
-            note(ctx, s, { freq: 110, duree: 0.4, gain: 0.05, type: "sawtooth", passeBas: 1500 });
-            note(ctx, s, { freq: 50, duree: 0.6, gain: 0.22, attaque: 0.01 });
-            crepiter(ctx, s, { n: 8, duree: 0.35, gain: 0.2 });
+            [0, 0.2].forEach(d => {
+                bruit(ctx, s, { debut: d, duree: 0.04, filtre: "highpass", freq: 2500, q: 0.7, gain: 0.4 });
+                bruit(ctx, s, { debut: d, duree: 0.25, filtre: "bandpass", q: 0.9, balayage: [7000, 900], gain: 0.24 });
+            });
+            for (let i = 0; i < 8; i++) note(ctx, s, { debut: 0.02 + i * 0.04, freq: 120, duree: 0.025, gain: 0.05, type: "sawtooth", attaque: 0.002, passeBas: 3500 });
+            crepiter(ctx, s, { n: 14, duree: 0.5, fmin: 2500, fmax: 7000, gain: 0.24 });
+            bruit(ctx, s, { debut: 0.05, duree: 0.7, filtre: "lowpass", freq: 180, q: 0.7, gain: 0.3, forme: "cloche" });
+        },
+        // LES POINTES DE GLACE (Nico : « des sons de glace ») : elles se forment
+        // en craquant et en tintant, filent en sifflant, se plantent et éclatent.
+        "glace-formation"(ctx, s) {
+            for (let i = 0; i < 7; i++) bruit(ctx, s, { debut: i * 0.07 + au(0, 0.02), duree: au(0.01, 0.025), filtre: "bandpass", freq: au(1800, 4200), q: 2.5, gain: au(0.12, 0.22) });
+            tintements(ctx, s, { n: 6, fmin: 2600, fmax: 4800, pas: 0.07, gain: 0.03 });
+            bruit(ctx, s, { duree: 0.55, filtre: "highpass", freq: 5000, q: 0.6, gain: 0.08, forme: "cloche" });
+        },
+        "glace-tir"(ctx, s) {
+            souffle(ctx, s, { duree: 0.12, balayage: [5000, 2000], q: 2.2, gain: 0.2 });
+            note(ctx, s, { freq: 3300, duree: 0.06, gain: 0.02, attaque: 0.002, type: "triangle" });
+        },
+        "glace-plante"(ctx, s) {
+            bruit(ctx, s, { duree: 0.03, filtre: "highpass", freq: 2600, q: 0.8, gain: 0.32 });
+            bruit(ctx, s, { duree: 0.06, filtre: "lowpass", freq: 600, q: 0.7, gain: 0.18 });
+            tintements(ctx, s, { debut: 0.01, n: 4, fmin: 3000, fmax: 5500, pas: 0.025, gain: 0.025, tenue: 0.18 });
         },
         "givre-rayon"(ctx, s) {
             bruit(ctx, s, { duree: 0.7, filtre: "highpass", freq: 3500, q: 0.6, gain: 0.16, forme: "cloche" });
             tintements(ctx, s, { n: 5, fmin: 2000, fmax: 3300, pas: 0.09, gain: 0.025 });
             note(ctx, s, { freq: 1046, duree: 0.6, gain: 0.035, attaque: 0.05 });
         },
+        // LES MOTS DE POUVOIR (Nico : « un murmure sifflé, style Fourchelang ») :
+        // des syllables sifflantes, « sss… hhh… ssa… », soufflées à mi-voix.
         "mots"(ctx, s) {
-            note(ctx, s, { freq: 110, duree: 0.6, gain: 0.1, type: "sawtooth", passeBas: 900, attaque: 0.04 });
-            note(ctx, s, { freq: 165, duree: 0.55, gain: 0.06, type: "sawtooth", passeBas: 1100, attaque: 0.05 });
-            note(ctx, s, { debut: 0.15, freq: 55, glisse: 38, duree: 0.5, gain: 0.35, attaque: 0.004 });
-            bruit(ctx, s, { debut: 0.15, duree: 0.3, filtre: "lowpass", freq: 300, q: 0.7, gain: 0.3 });
+            let t = 0;
+            for (let i = 0; i < 9; i++) {
+                const d = au(0.06, 0.15);
+                bruit(ctx, s, { debut: t, duree: d, filtre: "bandpass", freq: au(4800, 7600), q: au(2.5, 4), gain: au(0.28, 0.42), forme: "cloche" });
+                if (i % 3 === 1) bruit(ctx, s, { debut: t + d * 0.6, duree: d * 0.8, filtre: "bandpass", freq: au(900, 1500), q: 1.2, gain: 0.08, forme: "cloche" });
+                t += d + au(0.015, 0.05);
+            }
         },
+        // LA LUMIÈRE (Nico : « change complètement le son ») : un rayon qui
+        // s'allume en montant — un souffle clair qui s'ouvre vers l'aigu, un
+        // bourdon lumineux qui ondule, et des scintillements à l'arrivée.
         "lumiere"(ctx, s) {
-            [1046.5, 1318.5, 1568, 2093].forEach((f, i) => note(ctx, s, { debut: i * 0.03, freq: f, duree: 0.9, gain: 0.04, attaque: 0.05 }));
-            bruit(ctx, s, { duree: 0.6, filtre: "highpass", freq: 7000, q: 0.5, gain: 0.06, forme: "cloche" });
+            bruit(ctx, s, { duree: 0.6, filtre: "bandpass", q: 1.6, balayage: [700, 7000], gain: 0.22, forme: "cloche" });
+            note(ctx, s, { freq: 660, glisse: 990, duree: 0.85, gain: 0.05, type: "triangle", attaque: 0.15 });
+            note(ctx, s, { freq: 663, glisse: 995, duree: 0.85, gain: 0.04, type: "triangle", attaque: 0.15, desaccord: 12 });
+            tintements(ctx, s, { debut: 0.45, n: 6, fmin: 3500, fmax: 6500, pas: 0.05, gain: 0.025 });
         },
         "zone-explosion"(ctx, s) {
             bruit(ctx, s, { duree: 1.0, filtre: "lowpass", q: 0.7, balayage: [3000, 120], gain: 0.55 });
@@ -589,6 +639,15 @@
             note(ctx, s, { freq: 450, glisse: 700, duree: 0.5, gain: 0.03, desaccord: 20, attaque: 0.05 });
         },
         // — IMPACTS ET DÉFENSES —
+        // L'ENTAILLE DE CHAIR (Nico : « pour le coup reçu, un son d'entaille de
+        // chair, pas un ding ») : la lame qui tranche, mouillée, et le choc sourd
+        // du corps — aucune résonance de métal.
+        "entaille-chair"(ctx, s) {
+            bruit(ctx, s, { duree: 0.09, filtre: "bandpass", q: 1.3, balayage: [2600, 800], gain: 0.42 });
+            bruit(ctx, s, { debut: 0.015, duree: 0.13, filtre: "lowpass", freq: 420, q: 0.9, gain: 0.32 });
+            note(ctx, s, { freq: 115, glisse: 70, duree: 0.12, gain: 0.18, attaque: 0.003 });
+            bruit(ctx, s, { debut: 0.04, duree: 0.08, filtre: "bandpass", freq: 900, q: 3, gain: 0.08, forme: "cloche" });
+        },
         "coup-physique"(ctx, s) {
             bruit(ctx, s, { duree: 0.06, freq: 1600, q: 1, gain: 0.45 });
             note(ctx, s, { freq: 140, glisse: 70, duree: 0.18, gain: 0.35, attaque: 0.002 });

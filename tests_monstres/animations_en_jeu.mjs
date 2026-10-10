@@ -12,7 +12,8 @@
 //   2. LE VRAI PLATEAU (index.html, les vrais pions d'appliquerTokensVTT) :
 //      chaque pas joue SON geste du Studio, ses sons, ses mots — au premier
 //      pas seulement ce qui ne se dit qu'une fois — et finit sur sa case ; un
-//      humain garde la marche d'avant, le Transfert son saut ;
+//      humain marche case par case (animations_en_jeu_2.mjs), le Transfert
+//      garde son saut ;
 //   3. LES ENTRÉES EN SCÈNE : renfort, illusion, déploiement — le vrai pion
 //      reste caché pendant que sa copie descend, un redessin ne coupe rien,
 //      et il n'y a pas de déploiement en plein combat.
@@ -194,13 +195,16 @@ console.log("\n2. LES PAS SUR LE VRAI PLATEAU");
     await new Promise(r => setTimeout(r, 120));   // le dernier son, la dernière silhouette
     res.vargen = { silhouettes: fin(), sons: window.__sons, textes1, textes2: window.__textes.slice(textes1.length),
                    surCase: window.__surCase("V1", { q: 0, r: 2 }), sorte: window.sortePasDeCombat({ idToken: "V1" }) };
-    // Un humain : la marche d'avant (aucune silhouette, la transition d'avant).
+    // Un humain : la marche case par case (plus de silhouette ; la marche
+    // d'avant n'a plus cours quand le Studio est chargé).
     await new Promise(r => setTimeout(r, 600));   // les silhouettes du Vargen se sont effacées
     window.__noter();
     const fin2 = window.__sonder("#conteneur-tokens-vtt .anim-figurant");
     await window.jouerAnimationPas({ idToken: "H1", de: { q: 0, r: 0 }, vers: { q: 1, r: 0 } });
+    await new Promise(r => setTimeout(r, 120));   // son dernier son
     res.humain = { silhouettes: fin2(), sorte: window.sortePasDeCombat({ idToken: "H1" }),
-                   transition: document.getElementById("token-H1").style.transition, sons: window.__sons };
+                   transition: document.getElementById("token-H1").style.transition, sons: window.__sons,
+                   surCase: window.__surCase("H1", { q: 1, r: 0 }) };
     // Le repli : l'annonce, puis un pas qui file.
     window.__noter();
     await window.annoncerRepliCombat({ pion: "H1", texte: "Repli : sans opportunité", couleur: "#ccc" });
@@ -220,8 +224,8 @@ console.log("\n2. LES PAS SUR LE VRAI PLATEAU");
   verifier("« Foulée du Vargen : ½ ⚡ » au premier pas du trajet, pas au second",
            r.vargen.textes1.includes("Foulée du Vargen : ½ ⚡") && !r.vargen.textes2.includes("Foulée du Vargen : ½ ⚡"), JSON.stringify([r.vargen.textes1, r.vargen.textes2]));
   verifier("…et il finit posé net sur sa case", r.vargen.surCase);
-  verifier("un humain garde la marche d'avant (pas de silhouette, sa transition)",
-           r.humain.sorte === null && r.humain.silhouettes === 0 && /left 0\.4s/.test(r.humain.transition), r.humain.transition);
+  verifier("un humain marche case par case : sans silhouette, le pas sur l'herbe, posé sur sa case",
+           r.humain.sorte === "marche" && r.humain.silhouettes === 0 && r.humain.sons.includes("pas-herbe") && r.humain.surCase, JSON.stringify(r.humain));
   verifier("le repli s'annonce : son souffle, « Repli : sans opportunité », sans logo",
            r.repli.sons[0] === "repli" && r.repli.textes.includes("Repli : sans opportunité") && !r.repli.textes.some(t => /↩/.test(t)), JSON.stringify(r.repli));
   verifier("…puis son pas file en laissant son ombre, et finit sur sa case", r.repli.silhouettes >= 1 && r.repli.surCase);

@@ -1036,7 +1036,9 @@ export function appliquerIntention(etat, intention, plateau) {
         const brute = {
             type: "carte", idLanceur: intention.acteur, idCarte: intention.idCarte,
             attaques: intention.attaques || [], alterations: intention.alterations || [],
-            coutFatigue: nombre(intention.coutFatigue), critique
+            coutFatigue: nombre(intention.coutFatigue), critique,
+            // Les cases d'une attaque de zone : l'écran les fait flamboyer.
+            ...(Array.isArray(intention.zoneVisee) && intention.zoneVisee.length ? { zoneVisee: intention.zoneVisee } : {})
         };
 
         // LA CONFUSION DÉTOURNE LA CARTE AVANT QUE LES DÉS NE TOMBENT. L'ordre
@@ -1247,7 +1249,9 @@ export function jouerCreature(etat, id, carte, plateau) {
             type: "carte", idLanceur: id, idCarte: carte.idCarte,
             attaques: (carte.attaques || []).map(a => ({ ...a, cibles: ciblesDe(a) })),
             alterations: (carte.alterations || []).map(a => ({ ...a, cibles: ciblesDe(a) })),
-            coutFatigue: nombre(infos.fatigue), critique
+            coutFatigue: nombre(infos.fatigue), critique,
+            // Les cases de son attaque de zone : l'écran les fait flamboyer.
+            ...(zone && (zone.hexes || []).length ? { zoneVisee: zone.hexes } : {})
         };
         // UNE CRÉATURE CONFUSE SE TROMPE AUSSI DE CIBLE. La confusion ne vivait
         // que du côté des joueurs (elle était tirée dans le navigateur du

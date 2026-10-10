@@ -89,7 +89,10 @@ const valider = (chemin) => p.evaluate((chemin) => {
   window.validerMouvement();
   // Aucune attente : on regarde où est le pion À L'INSTANT même.
   const d = document.getElementById("token-J1");
-  return { case: d.dataset.q + "," + d.dataset.r, demandes: window.__demandes.length,
+  // Le pion part : la marche d'avant posait sa case d'arrivée tout de suite ;
+  // celle du Studio (animations_jeu.js) le fait glisser, et ne pose la case
+  // qu'en y arrivant — son mouvement, lui, a déjà commencé.
+  return { case: d.dataset.q + "," + d.dataset.r, anime: d.getAnimations().length > 0, demandes: window.__demandes.length,
            anticipes: window.ANTICIPATION_MARCHE ? window.ANTICIPATION_MARCHE.pas.length : 0,
            dt: performance.now() - t0 };
 }, chemin);
@@ -124,7 +127,7 @@ console.log("1. EN TERRAIN LIBRE, LE PION PART À LA VALIDATION");
   const v = await valider(C3);
   verifier("la demande part bien au cerveau", v.demandes === 1);
   verifier("les trois pas sont sûrs, donc anticipés", v.anticipes === 3, String(v.anticipes));
-  verifier("le pion a DÉJÀ quitté sa case, sans attendre la réponse", v.case === "1,0", v.case);
+  verifier("le pion a DÉJÀ quitté sa case, sans attendre la réponse", v.case === "1,0" || v.anime, `${v.case}${v.anime ? ", en marche" : ""}`);
   await p.waitForTimeout(1500);
   const r = await journal(PAS3);
   verifier("le journal arrive : ses pas ne sont PAS rejoués (retour immédiat)",

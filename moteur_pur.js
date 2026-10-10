@@ -1519,6 +1519,21 @@ export function resoudreCarte(etat, action, plateau) {
     const desDe = (id) => (jets.parCible && jets.parCible[id]) || {};
 
     const projectile = projectileDe(action);
+    // Le lanceur étourdi rate parfois complètement sa technique : le jet a été
+    // tiré au lancement, on ne fait que le lire (l'échec se joue plus bas).
+    const rate = regleDesEtats(lanceur, "echecTechnique") > 0 && !!jets.attaqueRatee;
+    // CE QUE L'ÉCRAN DOIT SAVOIR AVANT DE MONTRER LA CARTE PARTIR (les
+    // animations du Studio en jeu, animations_jeu.js) : une technique ratée
+    // (l'Étourdi) ne s'élance pas ; une carte que la Confusion retourne contre
+    // son lanceur ne part pas vers l'ennemi ; une attaque de zone fait
+    // flamboyer ses cases — sauf détournée (Confusion, Charme) ou ratée.
+    const surSoi = !!(action.confusion && action.confusion.soi);
+    const detournee = !!(action.confusion && (action.confusion.soi || action.confusion.hasard))
+                   || !!(action.charme && action.charme.idCible);
+    const frappe = (action.attaques || []).some(a => a && !a.isHeal && !a.isShield);
+    const zone = (!rate && !detournee && frappe && Array.isArray(action.zoneVisee))
+        ? action.zoneVisee.filter(h => h && h.q !== undefined && h.r !== undefined).map(h => ({ q: nombre(h.q), r: nombre(h.r) }))
+        : [];
     etapes.push({
         type: "carte", acteur: idLanceur, carte: action.idCarte,
         critique,
@@ -1527,6 +1542,9 @@ export function resoudreCarte(etat, action, plateau) {
         // corps à corps reste exactement ce qu'elle était, et les journaux déjà
         // écrits se rejouent sans rien de neuf.
         ...(projectile ? { projectile } : {}),
+        ...(rate ? { rate: true } : {}),
+        ...(surSoi ? { surSoi: true } : {}),
+        ...(zone.length ? { zone } : {}),
         cibles: [...new Set([].concat(
             ...(action.attaques || []).map(a => a.cibles || []),
             ...(action.alterations || []).map(a => a.cibles || [])
@@ -1556,7 +1574,7 @@ export function resoudreCarte(etat, action, plateau) {
 
     // Le lanceur étourdi rate parfois complètement sa technique. Le jet a été
     // tiré au lancement ; on ne fait que le lire.
-    if (regleDesEtats(lanceur, "echecTechnique") > 0 && jets.attaqueRatee) {
+    if (rate) {
         etapes.push({ type: "echec", acteur: idLanceur, raison: "Étourdi" });
         return { etat: suivant, etapes };
     }

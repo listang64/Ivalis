@@ -3,6 +3,9 @@
 // Question de Nico : « les ennemis, quand ils se déplacent, ont-ils aussi
 // l'animation de saut comme les joueurs ? »
 //
+// (v231 : la marche case par case du Studio fait bondir le pion tout entier ;
+// on mesure donc l'échelle vue — le pion fois son image.)
+//
 // La réponse ne se lit pas dans le code : `jouerAnimationPas` grossit le pion
 // de 12 % à chaque case, mais elle le fait sur `.token-img-main`, et les pions
 // de créature sont construits par une AUTRE branche d'appliquerTokensVTT que
@@ -157,12 +160,15 @@ const bondir = (idToken, de, vers) => p.evaluate(async ({ idToken, de, vers }) =
   const img = div.querySelector(".token-img-main");
   if (!img) return { existe: true, image: false };
 
-  const echelle = () => {
-    const t = getComputedStyle(img).transform;
+  // L'échelle VUE : celle du pion (la marche du Studio, animations_jeu.js, le
+  // fait bondir tout entier) fois celle de son image (la marche d'avant).
+  const lire = (el) => {
+    const t = getComputedStyle(el).transform;
     if (!t || t === "none") return 1;
     const m = t.match(/matrix\(([^,]+),/);
     return m ? parseFloat(m[1]) : 1;
   };
+  const echelle = () => lire(div) * lire(img);
 
   const mesures = [];
   const animation = window.jouerAnimationPas({ idToken, de, vers });
@@ -188,7 +194,7 @@ const creature = await bondir("M1", { q: 4, r: 0 }, { q: 3, r: 0 });
 console.log("\n1. LE HÉROS BONDIT EN MARCHANT");
 verifier("son pion existe sur le plateau", heros.existe === true);
 verifier("et il porte bien une image", heros.image === true);
-verifier("SON IMAGE GROSSIT PENDANT LE PAS", heros.max > 1.05, `${heros.max}×`);
+verifier("IL GROSSIT PENDANT LE PAS (LE PETIT SAUT)", heros.max > 1.05, `${heros.max}×`);
 verifier("puis retombe à sa taille", Math.abs(heros.fin - 1) < 0.02, `${heros.fin}×`);
 verifier("et il finit sur la case visée",
          heros.caseFinale && heros.caseFinale.q === 1 && heros.caseFinale.r === 0,

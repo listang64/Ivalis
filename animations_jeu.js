@@ -5,7 +5,10 @@
 //  retraite offert par l'arme, Fuite sous la Peur, Fuite sous la Confusion,
 //  Hémorragie interne, Arrivée d'un combattant ou d'un renfort, Apparition
 //  d'une Illusion, Déploiement des pions en début de combat : tu peux les
-//  implanter en jeu. »
+//  implanter en jeu. » Puis : « Marche case par case, marche en terrain
+//  difficile, marche gelée, entrée dans les zones persistantes, attaque de
+//  zone, attaque d'un zombie, échec de technique (Étourdi), compétence lancée
+//  sur soi : c'est bon, tu peux intégrer. »
 //
 //  Les gestes sont ceux du Studio (animations_catalogue.js, la section « En
 //  jeu »), joués par le même moteur (animations_combat.js) ; ce fichier leur
@@ -13,7 +16,11 @@
 //  pions — et les branche là où le combat se joue :
 //
 //    • un pas (jouerAnimationPas, mouvement.js) : selon sa manière — repli,
-//      fuite, case offerte, foulée de Vargen — sinon la marche d'avant ;
+//      fuite, case offerte, foulée de Vargen, marche gelée, terrain difficile,
+//      sinon la marche case par case (son petit saut, ce que coûte la case) ;
+//    • une zone persistante où l'on pose le pied, une attaque de zone, la
+//      griffe d'un zombie, l'échec d'un Étourdi, une carte que la Confusion
+//      retourne contre son lanceur (pont_combat.js / regime_cerveau.js) ;
 //    • un bond (jouerAnimationBond) — pas le Transfert, qui garde la sienne ;
 //    • l'annonce du repli, une case qui saigne, un combattant qui arrive
 //      (le pont du combat, pont_combat.js / regime_cerveau.js) ;
@@ -71,8 +78,9 @@
 
     // --- LES PAS --------------------------------------------------------------
     //  La manière de marcher, d'après le pas (le cerveau la porte : repli,
-    //  fuite, case offerte) ou d'après le marcheur (le Vargen et son atout de
-    //  race). Rien de tout ça : la marche d'avant (null).
+    //  fuite, case offerte, Glacé, terrain difficile) ou d'après le marcheur
+    //  (le Vargen et son atout de race). Rien de tout ça : la marche case par
+    //  case. Sans le Studio chargé : la marche d'avant (null).
     window.sortePasDeCombat = function (pas) {
         if (!pas || typeof window.jouerAnimationJeu !== "function") return null;
         if (pas.repli) return "repli";
@@ -81,10 +89,13 @@
         const p = (window.PERSOS_PARTIE || []).find(x => x && x.idPersonnage === pas.idToken);
         const atout = (p && typeof window.atoutRace === "function") ? (window.atoutRace(p) || {}) : {};
         if (Number(atout.diviseurDeplacement) >= 2) return "vargen";
-        return null;
+        if (pas.glace) return "gelee";
+        if (pas.difficile) return "difficile";
+        return "marche";
     };
     const ANIMATION_DU_PAS = { repli: "jeu-pas-repli", peur: "jeu-pas-peur", confusion: "jeu-pas-confusion",
-                               offert: "jeu-pas-offert", vargen: "jeu-pas-vargen" };
+                               offert: "jeu-pas-offert", vargen: "jeu-pas-vargen",
+                               gelee: "jeu-pas-gelee", difficile: "jeu-pas-difficile", marche: "jeu-pas-marche" };
     // Le premier pas d'un trajet (ce qui ne se dit qu'une fois) : le pas d'avant
     // de ce pion, de la même manière, finissait-il là où celui-ci commence ?
     const derniers = {};
@@ -93,7 +104,8 @@
         return !(d && d.sorte === sorte && memeCase(d.vers, de) && Date.now() - d.quand < 5000);
     }
     window.animerPasDeCombat = async function (pas, sorte) {
-        const scene = window.sceneDeCombat(pas.idToken, null, { de: pas.de, vers: pas.vers });
+        const scene = window.sceneDeCombat(pas.idToken, null, { de: pas.de, vers: pas.vers,
+                                                               cout: Number(pas.cout) || 0, difficile: !!pas.difficile });
         if (!scene || !scene.grille || !ANIMATION_DU_PAS[sorte]) return false;
         scene.premier = ouvreLeTrajet(pas.idToken, sorte, pas.de || scene.grille.caseDe(scene.lanceur));
         await window.jouerAnimationJeu(ANIMATION_DU_PAS[sorte], scene);
@@ -130,6 +142,66 @@
         scene.premier = !(saignements[pion] && Date.now() - saignements[pion] < 5000);
         saignements[pion] = Date.now();
         await window.jouerAnimationJeu("jeu-hemorragie", scene);
+    };
+
+    // --- UNE ZONE PERSISTANTE OÙ L'ON POSE LE PIED ----------------------------------
+    //  Le cerveau dit ce qu'elle a fait (des dégâts, un état), étape par étape ;
+    //  la case réagit UNE fois par entrée — au premier de ces mots —, l'état
+    //  posé se dit ensuite.
+    const entrees = {};
+    window.animerEntreeZoneCombat = async function ({ pion, zone, etat }) {
+        const el = pionDe(pion);
+        if (!el || !zone) return;
+        const cle = `${pion}|${zone.id}|${el.dataset.q},${el.dataset.r}`;
+        const deja = entrees[cle] && Date.now() - entrees[cle] < 4000;
+        entrees[cle] = Date.now();
+        const scene = window.sceneDeCombat(pion, null, { type: zone.type || "neutre", etat: etat || null, deja, grace: 1500 });
+        if (scene) await window.jouerAnimationJeu("jeu-entree-zone", scene);
+    };
+
+    // --- UNE ATTAQUE DE ZONE : SES CASES ROUGEOIENT, PUIS EXPLOSENT -----------------
+    window.animerAttaqueZoneCombat = async function ({ pion, cases, cibles }) {
+        const scene = window.sceneDeCombat(pion, null, { cases: cases || [], cibles: cibles || [], grace: 900 });
+        if (scene && scene.grille && (cases || []).length) await window.jouerAnimationJeu("jeu-attaque-zone", scene);
+    };
+
+    // --- LA GRIFFE D'UN ZOMBIE --------------------------------------------------------
+    //  Il titube, s'élance et griffe de trois traits pâles. Le coup lui-même
+    //  (le chiffre, ou l'esquive) vient à l'étape suivante.
+    window.animerAttaqueZombieCombat = async function ({ pion, cible }) {
+        const scene = window.sceneDeCombat(pion, cible);
+        if (scene && scene.cible) return window.jouerAnimationJeu("jeu-attaque-zombie", scene);
+        if (typeof window.jouerRueeCarte === "function") return window.jouerRueeCarte({ pion, cibles: cible ? [cible] : [] });
+    };
+
+    // --- L'ÉCHEC D'UN ÉTOURDI ----------------------------------------------------------
+    window.animerEchecCombat = async function ({ pion, texte, couleur }) {
+        const scene = window.sceneDeCombat(pion, null, { texte, couleur, grace: 1200 });
+        if (scene) return window.jouerAnimationJeu("jeu-echec-etourdi", scene);
+        const tk = (window.TOKENS_VTT_DATA || {})[pion];
+        if (tk && typeof window.afficherMessageFlottantHex === "function") window.afficherMessageFlottantHex(tk.q, tk.r, texte, couleur);
+        await new Promise(r => setTimeout(r, 900));
+    };
+
+    // --- LA CARTE QUE LA CONFUSION RETOURNE CONTRE SON LANCEUR -------------------------
+    //  Elle part vers l'ennemi le plus proche, fait demi-tour en l'air et revient
+    //  le frapper (« Confus : s'inflige sa propre compétence ! » suit).
+    window.animerCarteSurSoiCombat = async function ({ pion }) {
+        const moi = (window.TOKENS_VTT_DATA || {})[pion];
+        const fiche = (window.PERSOS_PARTIE || []).find(p => p && p.idPersonnage === pion) || {};
+        const campDe = (p) => (p && (p.estMonstre ? "Ennemi" : (p.camp || "Allié")));
+        let proche = null, mieux = Infinity;
+        Object.keys(window.TOKENS_VTT_DATA || {}).forEach(id => {
+            if (id === pion || !moi) return;
+            const p = (window.PERSOS_PARTIE || []).find(x => x && x.idPersonnage === id);
+            if (!p || campDe(p) === campDe(fiche)) return;
+            if (typeof window.estCombattantMort === "function" && window.estCombattantMort(id)) return;
+            const t = window.TOKENS_VTT_DATA[id];
+            const d = (Math.abs(t.q - moi.q) + Math.abs(t.q + t.r - moi.q - moi.r) + Math.abs(t.r - moi.r)) / 2;
+            if (d < mieux) { mieux = d; proche = id; }
+        });
+        const scene = window.sceneDeCombat(pion, proche, { grace: 1200 });
+        if (scene) return window.jouerAnimationJeu("jeu-carte-sur-soi", scene);
     };
 
     // --- UN PION QUI ENTRE EN SCÈNE ------------------------------------------------

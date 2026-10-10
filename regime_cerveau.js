@@ -662,6 +662,10 @@ export function creerRegime(contexte) {
                    // désignées, le cerveau en fait une zone.
                    persistanceTerrain: !!carte.persistanceTerrain,
                    zoneHexes: carte.zoneHexes || [],
+                   // Les cases d'une attaque de zone, pour l'écran (elles
+                   // flamboient) : rien n'en dépend dans les règles.
+                   ...(Array.isArray(carte.zoneVisee) && carte.zoneVisee.length
+                       ? { zoneVisee: carte.zoneVisee.map(h => ({ q: nombre(h.q), r: nombre(h.r) })) } : {}),
                    // La case de repli, choisie à l'écran avant l'envoi : la
                    // carte clôt le tour, une demande envoyée après serait
                    // refusée. Absente, la carte ne se replie pas.
@@ -968,7 +972,15 @@ function contexteDuJeu() {
                 return null;
             },
             hemorragie: (d) => window.animerHemorragieCombat ? window.animerHemorragieCombat(d) : null,
-            arrivee: (d) => window.annoncerArriveeCombat ? window.annoncerArriveeCombat(d) : null
+            arrivee: (d) => window.annoncerArriveeCombat ? window.annoncerArriveeCombat(d) : null,
+            // Puis (Nico : « c'est bon, tu peux intégrer ») : l'entrée dans une
+            // zone persistante, l'attaque de zone, la griffe du zombie, l'échec
+            // d'un Étourdi, la carte que la Confusion retourne contre son lanceur.
+            marche: (d) => window.animerEntreeZoneCombat ? window.animerEntreeZoneCombat(d) : null,
+            zoneCarte: (d) => window.animerAttaqueZoneCombat ? window.animerAttaqueZoneCombat(d) : null,
+            zombie: (d) => window.animerAttaqueZombieCombat ? window.animerAttaqueZombieCombat(d) : null,
+            echec: (d) => window.animerEchecCombat ? window.animerEchecCombat(d) : null,
+            surSoi: (d) => window.animerCarteSurSoiCombat ? window.animerCarteSurSoiCombat(d) : null
         },
 
         // OÙ POSER L'ÉTAT. Un seul sens : l'état descend, rien ne remonte.

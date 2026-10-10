@@ -89,6 +89,50 @@ window.afficherMessageFlottantHex = function(q, r, texte, couleur = "#ff4c4c", o
     msg.innerText = texte;
     msg.style.position = "absolute";
     msg.style.left = ecranX + "px";
+
+    // LE CHIFFRE DE DÉGÂTS S'ENVOLE (Nico, dans le Studio : « Nombre de dégâts
+    // qui s'envole, j'aime beaucoup : mets-le sur tous les popups de dégâts »).
+    // Un texte qui commence par « -N » est un coup encaissé (pas l'énergie,
+    // « -2 ⚡ », qui garde son petit pop) : il jaillit du pion, grossit, tourne
+    // en s'envolant en arc et s'efface. `options.envol` force l'un ou l'autre ;
+    // `options.taillePion` (px à l'écran) règle sa taille, `options.sens` (±1)
+    // le côté où il part.
+    const envol = options.envol !== undefined ? !!options.envol
+        : (/^[-−]\s*\d/.test(String(texte)) && !/⚡/.test(String(texte)));
+    if (envol) {
+        const t = options.taillePion || (55 * (ecran ? 1 : (window.VTT_SCALE || 1)));
+        const sx = options.sens || (Math.random() < 0.5 ? -1 : 1);
+        msg.className = "chiffre-envol";
+        msg.style.top = (ecranY - t * 0.3 - decalageEmpilement) + "px";
+        msg.style.transform = "translate(-50%, -50%)";
+        msg.style.color = couleur;
+        msg.style.fontWeight = "bold";
+        msg.style.fontFamily = "'Cinzel', serif";
+        msg.style.fontSize = Math.max(18, Math.round(t * 0.6)) + "px";
+        msg.style.textShadow = "0 0 6px #000, 0 0 12px #000, 2px 2px 2px #000, 0 0 18px " + couleur;
+        msg.style.pointerEvents = "none";
+        msg.style.zIndex = "1000";
+        msg.style.whiteSpace = "nowrap";
+        msg.style.opacity = "0";
+        conteneur.appendChild(msg);
+        const finir = () => {
+            if (!msg.isConnected) return;
+            msg.remove();
+            actifs[cleCase] = Math.max(0, (actifs[cleCase] || 1) - 1);
+        };
+        if (typeof msg.animate === "function") {
+            const vol = msg.animate([
+                { transform: "translate(-50%,-50%) scale(0.4) rotate(0deg)", opacity: 0 },
+                { transform: "translate(-50%,-50%) scale(1.5) rotate(-6deg)", opacity: 1, offset: 0.18 },
+                { transform: `translate(calc(-50% + ${sx * t * 0.5}px), calc(-50% - ${t * 0.9}px)) scale(1.2) rotate(${sx * 8}deg)`, opacity: 1, offset: 0.6 },
+                { transform: `translate(calc(-50% + ${sx * t * 0.9}px), calc(-50% - ${t * 1.2}px)) scale(0.8) rotate(${sx * 14}deg)`, opacity: 0 }
+            ], { duration: 1400, easing: "cubic-bezier(.2,.8,.3,1)", fill: "forwards" });
+            vol.finished.then(finir, finir);
+        }
+        setTimeout(finir, 1700);
+        return msg;
+    }
+
     msg.style.top = (ecranY - 30 - decalageEmpilement) + "px";
     msg.style.transform = "translate(-50%, -50%)";
     msg.style.color = couleur;
@@ -505,6 +549,9 @@ window.validerMouvement = async function() {
     // au rythme du journal, un hexagone à la fois, comme chez les autres.
     if (window.regimeDemande && window.regimeDemande.actif()) {
         const chemin = window.CHEMIN_MOUVEMENT.map(step => ({ q: step.q, r: step.r }));
+        // Ce que coûte chaque case (le tracé l'a chiffré) : le pion joué en
+        // avance l'affiche au-dessus de lui, comme le journal le fera ailleurs.
+        const couts = window.CHEMIN_MOUVEMENT.map(step => Number(step.cost) || 0);
 
         // LA COPIE LOCALE EST POSÉE AVANT D'ENVOYER, pas après.
         //
@@ -535,7 +582,7 @@ window.validerMouvement = async function() {
         if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour();
         // Le pion part TOUT DE SUITE sur cet écran, sans attendre l'aller-retour
         // du cerveau (voir anticiperMarche, plus bas).
-        window.anticiperMarche(idPerso, chemin);
+        window.anticiperMarche(idPerso, chemin, { couts });
         return await window.regimeDemande.mouvement(
             idPerso, chemin, window.COUT_COMPETENCE_SELECTIONNEE || 0);
     }
@@ -728,8 +775,10 @@ window.jouerAnimationPas = async function(pas) {
         //
         //    LES MARCHES DU STUDIO D'ANIMATION (animations_jeu.js) passent
         //    avant : le repli, la fuite sous la Peur ou la Confusion, la case
-        //    offerte par un pas de retraite, la foulée du Vargen. Les autres
-        //    pas gardent la marche d'avant.
+        //    offerte par un pas de retraite, la foulée du Vargen, la marche
+        //    gelée, le terrain difficile, et la marche case par case elle-même
+        //    (le petit saut, le pas sur l'herbe, ce que coûte la case). La
+        //    marche d'avant ne sert plus que si le Studio n'est pas chargé.
         const sorte = typeof window.sortePasDeCombat === "function" ? window.sortePasDeCombat(pas) : null;
         const animeParLeStudio = !!sorte && typeof window.animerPasDeCombat === "function"
             && await window.animerPasDeCombat(pas, sorte);
@@ -840,7 +889,7 @@ window.pasAnticipables = function(idPerso, depart, chemin) {
     return surs;
 };
 
-window.anticiperMarche = function(idPerso, chemin) {
+window.anticiperMarche = function(idPerso, chemin, infos) {
     window.fermerAnticipationMarche();
     const token = document.getElementById("token-" + idPerso);
     const tk = (window.TOKENS_VTT_DATA || {})[idPerso];
@@ -863,13 +912,26 @@ window.anticiperMarche = function(idPerso, chemin) {
     // l'écran qui anticipe les marque de même (animations_jeu.js).
     const moi = (window.PERSOS_PARTIE || []).find(p => p && p.idPersonnage === idPerso) || {};
     const offertes = (moi.Etats_Alteres || []).reduce((n, e) => n + (Number(e && e.bonusEquip && e.bonusEquip.hexApresAttaque) || 0), 0);
+    // La marche se montre comme le cerveau la racontera : ce que coûte la case,
+    // le terrain difficile (sauf pour qui y marche comme ailleurs — etatCaseCombat
+    // le sait), le Glacé qui fait craquer la glace (animations_jeu.js).
+    const couts = (infos && Array.isArray(infos.couts)) ? infos.couts : [];
+    const glace = (moi.Etats_Alteres || []).some(e => e && e.nom === "Glacé");
+    const difficile = (c) => {
+        const e = typeof window.etatCaseCombat === "function" ? window.etatCaseCombat(c.q, c.r, idPerso)
+            : ((window.PLATEAU_VTT && window.PLATEAU_VTT.getCaseState && window.PLATEAU_VTT.getCaseState(c.q, c.r)) || {});
+        return !!(e && e.isDifficult);
+    };
 
     (async () => {
         for (let i = 0; i < pas.length; i++) {
             if (a.annulee) { for (let j = i; j < pas.length; j++) fins[j].tenir(false); return; }
             try {
                 await window.jouerAnimationPas({ idToken: idPerso, de: pas[i].de, vers: pas[i].vers, anticipe: true,
-                                                 ...(i < offertes ? { offert: true } : {}) });
+                                                 ...(couts[i] !== undefined ? { cout: couts[i] } : {}),
+                                                 ...(i < offertes ? { offert: true } : {}),
+                                                 ...(difficile(pas[i].vers) ? { difficile: true } : {}),
+                                                 ...(glace ? { glace: true } : {}) });
                 a.joues = i + 1;
                 fins[i].tenir(true);
                 // Refermée pendant ce pas, et ce pas n'a pas été confirmé : le

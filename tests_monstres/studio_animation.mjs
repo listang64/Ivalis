@@ -205,7 +205,10 @@ console.log("\n4. UN CLIC JOUE L'ANIMATION EN DIRECT SUR LE PION");
   }));
   await p.screenshot({ path: "/tmp/claude-0/studio_boule_de_feu.png" });
   verifier("pendant : la boule de feu vole (des effets sur la scène), la ligne s'allume", pendant.effets > 0 && pendant.joue, JSON.stringify(pendant));
-  await p.waitForTimeout(1800);
+  // La boule de feu dure plus longtemps (la flamme tout le chemin, la gerbe de
+  // feu) : on attend que la ligne s'éteigne, puis on regarde la scène.
+  await p.waitForFunction(() => !document.querySelector('#studio-liste .studio-anim[data-anim="boule-de-feu"]').classList.contains("joue"), null, { timeout: 8000 }).catch(() => {});
+  await p.waitForTimeout(150);
   const apres = await p.evaluate(() => ({
     effets: document.querySelectorAll("#studio-pions .anim-effet").length,
     joue: document.querySelector('#studio-liste .studio-anim[data-anim="boule-de-feu"]').classList.contains("joue"),
@@ -460,7 +463,7 @@ console.log("\n10. LE SON DES ANIMATIONS");
     window.PARAMETRES_AUDIO.interface = avant;
     return { out, muet, joue: window.jouerSonCombat("lame-impact") };
   });
-  verifier("les sons de combat fabriqués (102 avec le catalogue complet), aucun muet, aucun ne sature", rendus.out.length === 102 && rendus.out.every(x => x.crete > 0.02 && x.crete < 0.95),
+  verifier("les sons de combat fabriqués (108 avec le catalogue complet), aucun muet, aucun ne sature", rendus.out.length === 108 && rendus.out.every(x => x.crete > 0.02 && x.crete < 0.95),
            rendus.out.map(x => `${x.id} ${x.crete}`).join(" · "));
   verifier("tous brefs (moins de 1,6 s)", rendus.out.every(x => x.duree < 1.6), rendus.out.map(x => x.duree).join(" "));
   verifier("ils suivent le volume du jeu (à zéro : rien)", rendus.muet === false && rendus.joue === true);
@@ -496,7 +499,8 @@ console.log("\n11. LES TEXTES FLOTTANTS, COMME EN COMBAT");
       const obs = new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => {
         if (!n.classList) return;
         if (n.classList.contains("jauge-flash-token")) barres++;
-        if (n.style && n.style.transition && /top 1.8s/.test(n.style.transition)) {
+        // Un texte flottant : celui qui monte (top 1.8s), ou le chiffre de dégâts qui s'envole.
+        if (n.style && ((n.style.transition && /top 1.8s/.test(n.style.transition)) || n.classList.contains("chiffre-envol"))) {
           const H = centre(h), E = centre(e), x = parseFloat(n.style.left), y = parseFloat(n.style.top);
           vus.push({ texte: n.innerText, couleur: n.style.color, taille: n.style.fontSize, police: n.style.fontFamily,
                      ombre: n.style.textShadow, marque: n.classList.contains("anim-message"),
@@ -517,7 +521,7 @@ console.log("\n11. LES TEXTES FLOTTANTS, COMME EN COMBAT");
   const textes = (id) => r.res[id].vus.map(v => v.texte + "@" + v.sur);
   verifier("chaque animation a ses textes flottants", Object.values(r.res).every(x => x.vus.length > 0));
   verifier("le dessin du combat : Cinzel gras, ombre noire, au-dessus du pion", Object.values(r.res).every(x => x.vus.every(v =>
-           /Cinzel/.test(v.police) && /black/.test(v.ombre) && v.auDessus && v.marque)));
+           /Cinzel/.test(v.police) && /black|rgb\(0, 0, 0\)/.test(v.ombre) && v.auDessus && v.marque)));
   verifier("épée : « -12 » sur l'ennemi, avec sa barre qui se vide", textes("coup-epee").join() === "-12@ennemi" && r.res["coup-epee"].barres === 1);
   verifier("coup reçu : « -12 » sur le héros", textes("coup-recu").join() === "-12@heros" && r.res["coup-recu"].barres === 1);
   const soin = r.res["soin"].vus[0] || {};
@@ -529,9 +533,10 @@ console.log("\n11. LES TEXTES FLOTTANTS, COMME EN COMBAT");
            textes("gel").join() === "-9@ennemi,Glacé !@ennemi,Marche ×2 · +20 % dégâts phys.@ennemi"
            && textes("poison").join() === "-5@ennemi,Empoisonnement !@ennemi,-3 ⚡@ennemi,-2@ennemi", JSON.stringify([textes("gel"), textes("poison")]));
   verifier("esquive : « Esquivé 💨 » sur le héros", textes("esquive").join() === "Esquivé 💨@heros");
+  // Le critique a désormais SON message (« COUP CRITIQUE ! », rouge, sous le
+  // pion — studio_attaques.mjs), puis l'attaque normale et son chiffre.
   const crit = r.res["coup-critique"].vus;
-  verifier("critique : « Critique ! » en grand sur le héros AVANT le coup, puis « -24 ! » sur l'ennemi",
-           crit.map(v => v.texte + "@" + v.sur).join() === "Critique !@heros,-24 !@ennemi" && crit[0].taille === "30px", JSON.stringify(crit.map(v => v.taille)));
+  verifier("critique : son message à lui, puis « -24 ! » sur l'ennemi", crit.map(v => v.texte + "@" + v.sur).join() === "-24 !@ennemi", JSON.stringify(crit.map(v => v.texte)));
   const terre = r.res["mise-a-terre"].vus;
   verifier("mise à terre : « -30 » puis « À terre ! » sur le héros", terre.map(v => v.texte + "@" + v.sur).join() === "-30@heros,À terre !@heros" && terre[1].taille === "26px");
   verifier("les textes s'en vont d'eux-mêmes", r.restes === 0, String(r.restes));

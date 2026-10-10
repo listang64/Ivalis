@@ -77,16 +77,27 @@ export const RYTHME = {
 //  Le départ, on le lit dans l'état que le spectateur n'a pas encore fait
 //  avancer — c'est pour ça qu'il anime AVANT d'appliquer.
 
+// La zone persistante qui a produit cette étape (traverserZones, moteur_pur.js) :
+// sa nature, lue dans l'état d'avant (elle y est encore).
+function zoneDe(e, etat) {
+    if (!e || !e.zone) return {};
+    const z = (etat && etat.zones && etat.zones[e.zone]) || null;
+    return { zone: { id: e.zone, type: (z && z.type) || "neutre" } };
+}
+
 const SCENES = {
 
     // --- LE MOUVEMENT ----------------------------------------------------
     // Un pas porte sa manière de marcher, que l'écran montre (animations du
     // Studio intégrées au combat, animations_jeu.js) : un repli, une FUITE
     // (sous la Peur ou la Confusion), une case OFFERTE par un pas de retraite.
+    //  Le terrain difficile et le Glacé aussi : la marche ralentit, ou la
+    //  glace craque sous le pion ; et ce que coûte la case s'affiche.
     pas(e) {
         return { geste: "pas", pion: e.acteur, de: e.de, vers: e.vers,
                  cout: nombre(e.cout), ...(e.repli ? { repli: true } : {}),
-                 ...(e.fuite ? { fuite: e.fuite } : {}), ...(e.offert ? { offert: true } : {}) };
+                 ...(e.fuite ? { fuite: e.fuite } : {}), ...(e.offert ? { offert: true } : {}),
+                 ...(e.difficile ? { difficile: true } : {}), ...(e.glace ? { glace: true } : {}) };
     },
     // Le repli s'annonce (son souffle, et « Repli : sans opportunité » — plus
     // d'icône bleue, Nico : « tu peux virer le logo bleu »), puis ses pas
@@ -111,6 +122,10 @@ const SCENES = {
     //  l'état que le spectateur n'a pas encore fait avancer. C'est la même
     //  raison que pour l'esquive : après coup, un pion poussé aurait déjà
     //  bougé, et la flèche partirait d'où il n'était plus.
+    //  CE QUE L'ÉCRAN DOIT SAVOIR AVANT DE LA MONTRER (animations_jeu.js) :
+    //  un zombie griffe, une technique ratée (l'Étourdi) ne s'élance pas, une
+    //  carte retournée contre son lanceur (la Confusion) lui revient dessus,
+    //  une attaque de zone fait flamboyer ses cases.
     carte(e, etat) {
         const lanceur = combattantDe(etat, e.acteur);
         const cibles = e.cibles || [];
@@ -118,6 +133,10 @@ const SCENES = {
             geste: "carte", pion: e.acteur, cibles,
             critique: !!e.critique, carte: e.carte || null,
             projectile: e.projectile || null,
+            ...((lanceur && lanceur.zombie) || e.carte === "ZOMBIE_MORSURE" ? { zombie: true } : {}),
+            ...(e.rate ? { rate: true } : {}),
+            ...(e.surSoi ? { surSoi: true } : {}),
+            ...(Array.isArray(e.zone) && e.zone.length ? { zone: e.zone } : {}),
             depuis: lanceur ? { q: nombre(lanceur.q), r: nombre(lanceur.r) } : null,
             vers: cibles.map(id => {
                 const c = combattantDe(etat, id);
@@ -139,7 +158,13 @@ const SCENES = {
                  texte: e.parade ? "Paré 🛡️" : "Esquivé 💨",
                  couleur: COULEURS.neutre, duree: RYTHME.esquive };
     },
+    // L'échec d'un Étourdi a son geste (l'énergie qui fuse et retombe en
+    // fumée) ; l'Immobilisation garde son mot.
     echec(e) {
+        if (e.raison === "Étourdi") {
+            return { geste: "echec", pion: e.acteur, texte: "Échec ! (Étourdi)",
+                     couleur: COULEURS.attention, duree: RYTHME.message };
+        }
         return { geste: "message", pion: e.acteur, texte: "Échec technique !",
                  couleur: COULEURS.attention, duree: RYTHME.message };
     },
@@ -221,6 +246,9 @@ const SCENES = {
                  // L'Hémorragie interne saigne à chaque case : son geste à elle
                  // (des gouttes, un éclat rouge) précède le chiffre.
                  ...(e.tic === "Hémorragie interne" ? { hemorragie: true } : {}),
+                 // Une zone persistante où l'on vient de poser le pied : la case
+                 // réagit (le feu, la glace, la décharge) avant le chiffre.
+                 ...zoneDe(e, etat),
                  duree: RYTHME.jauge };
     },
 
@@ -257,7 +285,7 @@ const SCENES = {
     //  Un état posé, une énergie dépensée : rien à animer, mais l'écran doit
     //  se rafraîchir. C'est le spectateur qui s'en charge après chaque étape ;
     //  ici on dit simplement « il n'y a pas de geste ».
-    etats(e)   {
+    etats(e, etat) {
         // Une purification se dit : l'état disparaît du pion, et sans un mot
         // personne ne saurait lequel est parti.
         if (e.purifie && (e.retires || []).length) {
@@ -270,7 +298,7 @@ const SCENES = {
             return { geste: "message", pion: e.cible, texte: "Aveuglé 🌫️",
                      couleur: COULEURS.neutre, duree: RYTHME.message };
         }
-        return { geste: "etats", pion: e.cible, liste: e.liste || [], pose: e.pose || null };
+        return { geste: "etats", pion: e.cible, liste: e.liste || [], pose: e.pose || null, ...zoneDe(e, etat) };
     },
     // L'énergie qui monte ou descend ne s'anime pas — sauf quand TÉNÈBRES la
     // boit : c'est le coup lui-même, il doit se voir sur le pion.
@@ -403,6 +431,11 @@ export function creerPont(effets) {
         repli = null,                      // l'annonce du repli
         hemorragie = async () => {},       // une case qui saigne
         arrivee = async () => {},          // un renfort, une illusion entrent en scène
+        marche = null,                     // une zone persistante où l'on pose le pied
+        zoneCarte = null,                  // une attaque de zone : ses cases flamboient
+        zombie = null,                     // un zombie griffe sa proie
+        echec = null,                      // l'Étourdi rate sa technique
+        surSoi = null,                     // la Confusion retourne la carte contre son lanceur
         pause = (ms) => new Promise(r => setTimeout(r, ms)),
         tracer = () => {}
     } = effets || {};
@@ -434,10 +467,12 @@ export function creerPont(effets) {
     async function jouerLeGeste(scene) {
         switch (scene.geste) {
             case "pas":
-                await pas({ idToken: scene.pion, de: scene.de, vers: scene.vers,
+                await pas({ idToken: scene.pion, de: scene.de, vers: scene.vers, cout: scene.cout,
                             ...(scene.repli ? { repli: true } : {}),
                             ...(scene.fuite ? { fuite: scene.fuite } : {}),
-                            ...(scene.offert ? { offert: true } : {}) });
+                            ...(scene.offert ? { offert: true } : {}),
+                            ...(scene.difficile ? { difficile: true } : {}),
+                            ...(scene.glace ? { glace: true } : {}) });
                 break;
 
             case "repli":
@@ -461,7 +496,13 @@ export function creerPont(effets) {
                     message(scene.pion, "Critique !", COULEURS.critique, { taille: 30, eclat: true });
                     await pause(RYTHME.critique);
                 }
-                await ruee({ pion: scene.pion, cibles: scene.cibles });
+                // Ratée (l'Étourdi), elle ne part pas : l'échec a son geste, juste après.
+                if (scene.rate && echec) { await pause(RYTHME.carte); break; }
+                // Retournée contre son lanceur (la Confusion) : elle lui revient dessus.
+                if (scene.surSoi && surSoi) { await surSoi({ pion: scene.pion }); await pause(RYTHME.carte); break; }
+                // Un zombie ne s'élance pas comme un combattant : il titube et griffe.
+                if (scene.zombie && zombie && (scene.cibles || []).length) await zombie({ pion: scene.pion, cible: scene.cibles[0] });
+                else await ruee({ pion: scene.pion, cibles: scene.cibles });
                 // PUIS CE QUI TRAVERSE, s'il y a quelque chose à voir voler.
                 // Dans cet ordre, et pas l'inverse : le lanceur s'élance, PUIS
                 // le tir part — un projectile qui partirait avant le geste
@@ -472,11 +513,14 @@ export function creerPont(effets) {
                     await projectile({ de: scene.depuis, vers: scene.vers,
                                        sorte: scene.projectile });
                 }
+                // UNE ATTAQUE DE ZONE : ses cases rougeoient, puis explosent.
+                if (scene.zone && zoneCarte) await zoneCarte({ pion: scene.pion, cases: scene.zone, cibles: scene.cibles });
                 await pause(RYTHME.carte);
                 break;
 
             case "jauge":
                 if (scene.hemorragie) await hemorragie({ pion: scene.pion });
+                if (scene.zone && marche) await marche({ pion: scene.pion, zone: scene.zone });
                 // Le chiffre flottant et la barre partent ensemble, puis on laisse
                 // le temps de les lire. C'est le seul endroit du jeu où un joueur
                 // apprend ce qu'il vient d'encaisser.
@@ -494,6 +538,17 @@ export function creerPont(effets) {
             case "message":
                 message(scene.pion, scene.texte, scene.couleur);
                 await pause(scene.duree);
+                break;
+
+            case "echec":
+                if (echec) await echec({ pion: scene.pion, texte: scene.texte, couleur: scene.couleur });
+                else { message(scene.pion, scene.texte, scene.couleur); await pause(scene.duree); }
+                break;
+
+            // Un état posé par une zone où l'on vient d'entrer : la case réagit
+            // (si ce n'est déjà fait pour un chiffre) et l'état se dit.
+            case "etats":
+                if (scene.zone && marche) await marche({ pion: scene.pion, zone: scene.zone, etat: scene.pose });
                 break;
 
             case "opportunite":

@@ -150,20 +150,28 @@ window.afficherFlashDegatToken = function(idCible, ancienneValeur, nouvelleValeu
     if (window.CALCUL_IA_SILENCIEUX) return;
     const ailleurs = options && options.pion;
     const tkCible = !ailleurs && window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idCible] : null;
+    const tokenDiv = ailleurs ? options.pion : document.getElementById("token-" + idCible);
+    // Le chiffre (qui s'envole s'il dit des dégâts, afficherMessageFlottantHex)
+    // prend la taille du pion touché.
+    const taillePion = tokenDiv ? (tokenDiv.getBoundingClientRect().width || undefined) : undefined;
     if (typeof window.afficherMessageFlottantHex === "function") {
-        if (ailleurs && options.ecran) window.afficherMessageFlottantHex(null, null, texte, couleurTexte || "#ff4c4c", { ecran: options.ecran });
-        else if (tkCible) window.afficherMessageFlottantHex(tkCible.q, tkCible.r, texte, couleurTexte || "#ff4c4c");
+        if (ailleurs && options.ecran) window.afficherMessageFlottantHex(null, null, texte, couleurTexte || "#ff4c4c", { ecran: options.ecran, taillePion });
+        else if (tkCible) window.afficherMessageFlottantHex(tkCible.q, tkCible.r, texte, couleurTexte || "#ff4c4c", { taillePion });
     }
 
-    const tokenDiv = ailleurs ? options.pion : document.getElementById("token-" + idCible);
     if (!tokenDiv || !valeurMax) return;
 
     const couleur = couleurBarre || "#ff4c4c";
     const bordure = couleur === "#00ffff" ? "#00ffff" : "#c2a878";
     const hueRotate = couleur === "#00ffff" ? "180deg" : (couleur === "#1b6e3a" ? "90deg" : "-50deg");
 
-    tokenDiv.style.transition = "filter 0.1s";
-    tokenDiv.style.filter = `sepia(1) hue-rotate(${hueRotate}) saturate(5) brightness(1.2)`;
+    // `sansEclat` : le coup a son propre éclat (la Lumière clignote une seule
+    // fois, d'un léger jaune) — la barre, sans le flash.
+    const eclat = !(options && options.sansEclat);
+    if (eclat) {
+        tokenDiv.style.transition = "filter 0.1s";
+        tokenDiv.style.filter = `sepia(1) hue-rotate(${hueRotate}) saturate(5) brightness(1.2)`;
+    }
 
     const oldPct = Math.max(0, Math.min(100, (ancienneValeur / valeurMax) * 100));
     const newPct = Math.max(0, Math.min(100, (nouvelleValeur / valeurMax) * 100));
@@ -197,7 +205,7 @@ jaugeContainer.className = "jauge-flash-token";
     void jaugeContainer.offsetWidth;
     jaugeContainer.style.opacity = "1";
 
-    setTimeout(() => { tokenDiv.style.filter = ""; }, 300);
+    if (eclat) setTimeout(() => { tokenDiv.style.filter = ""; }, 300);
     setTimeout(() => { jaugeFill.style.width = newPct + "%"; }, 400);
     setTimeout(() => {
         jaugeContainer.style.opacity = "0";
@@ -3920,6 +3928,10 @@ window.declencherResolution = async function() {
                                       : (state.fatigue || window.COUT_COMPETENCE_SELECTIONNEE)) || 0,
                 persistanceTerrain: !!state.persistanceTerrain,
                 zoneHexes,
+                // L'emprise d'une attaque de zone : ses cases flamboient à
+                // l'écran (animations_jeu.js), qu'elle laisse une nappe ou non.
+                zoneVisee: (state.isZone && Array.isArray(state.zoneHexesFinaux))
+                    ? state.zoneHexesFinaux.map(h => ({ q: h.q, r: h.r })) : [],
                 repli: (state.repli && state.repliChoisi)
                     ? { ...state.repli, vers: state.repliChoisi } : null,
                 bond: (state.bondApresAttaque && state.bondChoisi)

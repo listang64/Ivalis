@@ -35,6 +35,7 @@
     const ALLIE = "hue-rotate(110deg) saturate(1.2)";
     const ZOMBIE = "grayscale(0.5) sepia(0.7) hue-rotate(45deg) saturate(1.6) brightness(0.8)";
     const ILLUSION = "hue-rotate(200deg) saturate(1.4) brightness(1.2)";
+    const JAUNE_LEGER = "brightness(1.2) sepia(0.5) saturate(1.6) hue-rotate(-8deg)";
 
     // --- LES MORCEAUX COMMUNS ----------------------------------------------
     // Où sont les deux pions, et l'axe héros → ennemi.
@@ -46,40 +47,67 @@
     // Tenir une teinte sur un pion le temps de l'animation (elle s'en va au nettoyage).
     const teinte = (o, el, filtre, duree) => o.teinter(el, [{ filter: "none" }, { filter: filtre }], { duration: duree || 300, fill: "forwards" });
     const deteindre = (o, el, filtre, duree) => o.teinter(el, [{ filter: filtre }, { filter: "none" }], { duration: duree || 400, fill: "forwards" });
-    // L'entaille d'une lame, en travers de l'axe du coup.
+    // L'ENTAILLE D'UNE LAME, en travers de l'axe du coup — EFFILÉE AUX DEUX
+    // BOUTS (Nico : « le trait qui apparaît pour simuler le coup, ses deux
+    // extrémités, fais-les en pointes ») : un croissant plein, épais au milieu,
+    // en pointe aux extrémités, que la lame dévoile puis emporte (un masque qui
+    // court le long de la courbe).
+    let numeroEntaille = 0;
     const entaille = (o, calque, pos, angle, p = {}) => {
         const t = pos.t * (p.taille || 1.5);
+        const e = p.epaisseur || 7, id = "anim-entaille-" + (++numeroEntaille);
         const d = o.poser(calque, pos.x + (p.dx || 0), pos.y + (p.dy || 0), `width:${t}px; height:${t}px; z-index:${Z.haut};
             transform:translate(-50%,-50%) rotate(${deg(angle) + (p.tourne || 0)}deg);`,
-            `<svg viewBox="0 0 100 100" width="100%" height="100%"><path d="M30 12 Q 62 50 30 88" fill="none" stroke="${p.couleur || "#fff"}"
-               stroke-width="${p.epaisseur || 7}" stroke-linecap="round" stroke-dasharray="120" stroke-dashoffset="120"
-               style="filter:drop-shadow(0 0 6px ${p.lueur || "#fff"}) drop-shadow(0 0 12px ${p.lueur2 || "#9cf"})"/></svg>`);
-        return o.teinter(d.querySelector("path"), [{ strokeDashoffset: 120, opacity: 1 }, { strokeDashoffset: 0, opacity: 1, offset: 0.5 },
-                                                  { strokeDashoffset: -120, opacity: 0 }], { duration: p.duree || 380, delay: p.retard || 0, easing: "ease-out" })
+            `<svg viewBox="0 0 100 100" width="100%" height="100%" style="overflow:visible">
+               <defs><mask id="${id}" maskUnits="userSpaceOnUse" x="-20" y="-20" width="140" height="140">
+                 <path d="M30 12 Q 62 50 30 88" fill="none" stroke="#fff" stroke-width="${e * 3 + 6}" stroke-linecap="round" stroke-dasharray="120" stroke-dashoffset="120"/>
+               </mask></defs>
+               <path class="entaille-lame" d="M30 10 Q ${59 + e} 50 30 90 Q ${59 - e} 50 30 10 Z" fill="${p.couleur || "#fff"}" mask="url(#${id})"
+                 style="filter:drop-shadow(0 0 6px ${p.lueur || "#fff"}) drop-shadow(0 0 12px ${p.lueur2 || "#9cf"})"/></svg>`);
+        return o.teinter(d.querySelector("mask path"), [{ strokeDashoffset: 120 }, { strokeDashoffset: 0, offset: 0.5 }, { strokeDashoffset: -120 }],
+                         { duration: p.duree || 380, delay: p.retard || 0, easing: "ease-out" })
             .then(() => d.remove());
     };
     // Trois griffures parallèles (un fauve, un zombie).
     const griffes = (o, calque, pos, angle, couleur) => Promise.all([-1, 0, 1].map(k => entaille(o, calque, pos, angle,
         { taille: 1.1, epaisseur: 4, couleur, lueur: couleur, lueur2: couleur, dx: -Math.sin(angle) * k * pos.t * 0.16, dy: Math.cos(angle) * k * pos.t * 0.16, retard: (k + 1) * 50 })));
-    // UN COUP au corps à corps, de `de` vers `vers` (n'importe quels pions).
+    // LE COUP REÇU (Nico : « cette animation de coup reçu, mets-la pour toutes
+    // les réceptions d'attaque physique du Studio ») : le pion recule à
+    // l'opposé du coup et s'empourpre, une gerbe de sang jaillit de son flanc,
+    // et l'on entend la chair entaillée (plus de « ding »). `depuis` : le pion
+    // ou le point d'où vient le coup.
+    const coupRecu = (o, calque, pion, depuis, p = {}) => {
+        const A = centre(pion, calque), D = depuis && depuis.x !== undefined ? depuis : centre(depuis, calque);
+        const recul = axe(D, A);
+        const flanc = { x: A.x - recul.ux * A.t * 0.4, y: A.y - recul.uy * A.t * 0.4 };
+        if (p.son !== false) o.son(p.son || "entaille-chair");
+        if (p.valeur) o.jauge(calque, pion, 40, Math.max(2, 40 - Math.abs(parseInt(p.valeur, 10) || 8)), 40, p.valeur, p.couleur || COULEURS.degats, p.couleur || COULEURS.degats);
+        return Promise.all([o.secouer(pion, A.t * (p.force || 0.14), 380, recul), o.eclat(pion, ROUGE, 480),
+            // Une illusion qui se brise ne saigne pas (`sang: false`) : des éclats clairs.
+            o.gerbe(calque, flanc.x, flanc.y, { nombre: p.n || 8, dist: A.t * 0.6, angle: recul.angle + Math.PI, eventail: Math.PI * 0.9,
+                                                couleurs: p.sang === false ? ["#ffffff", "#d6c8ff"] : ["#c4141c", "#ff6b6b"], taille: 6 })]);
+    };
+    // UN COUP au corps à corps, de `de` vers `vers` (n'importe quels pions) :
+    // l'élan (le bruit de la lame), l'entaille, puis le coup reçu.
     const frapper = async (o, calque, de, vers, p = {}) => {
         const A = centre(de, calque), B = centre(vers, calque), v = axe(A, B);
         if (p.sonElan !== false) o.son(p.sonElan || "lame-souffle", p.retardSon === undefined ? 150 : p.retardSon);
         const elan = o.elan(de, A, B, p.elan || {});
         await o.attendre(p.contact || 330);
-        if (p.sonImpact !== false) o.son(p.sonImpact || "lame-impact");
-        if (p.valeur) o.jauge(calque, vers, 40, Math.max(2, 40 - Math.abs(parseInt(p.valeur, 10) || 8)), 40, p.valeur, p.couleur || COULEURS.degats, p.couleur || COULEURS.degats);
         await Promise.all([elan,
             p.griffes ? griffes(o, calque, B, v.angle, p.griffes) : entaille(o, calque, B, v.angle, p.entaille || {}),
-            o.secouer(vers, B.t * (p.force || 0.1), 320, v), o.eclat(vers, p.filtre || ROUGE),
-            o.gerbe(calque, B.x, B.y, { nombre: 8, dist: B.t * 0.7, angle: v.angle, eventail: Math.PI, couleurs: p.gerbe || ["#fff", "#ffd6d6"], taille: 5 })]);
+            coupRecu(o, calque, vers, A, { son: p.sonImpact === false ? false : (p.sonImpact || "entaille-chair"), valeur: p.valeur, couleur: p.couleur,
+                                           force: p.force ? p.force * 1.3 : undefined, sang: p.sang })]);
         return { A, B, v };
     };
-    // Encaisser un coup venu de `depuis` : secousse, éclat, chiffre.
+    // Encaisser un coup venu de `depuis` : un coup physique est un coup reçu
+    // (le sang, la chair) ; un coup teinté (`filtre` : magie, confusion…) garde
+    // sa secousse et sa couleur.
     const encaisser = (o, calque, pion, depuis, p = {}) => {
+        if (!p.filtre) return coupRecu(o, calque, pion, depuis, { valeur: p.valeur, couleur: p.couleur, force: p.force, son: p.son });
         const P = centre(pion, calque), D = centre(depuis, calque), recul = axe(D, P);
         if (p.valeur) o.jauge(calque, pion, 40, Math.max(2, 40 - Math.abs(parseInt(p.valeur, 10) || 8)), 40, p.valeur, p.couleur || COULEURS.degats, p.couleur || COULEURS.degats);
-        return Promise.all([o.secouer(pion, P.t * (p.force || 0.12), 360, recul), o.eclat(pion, p.filtre || ROUGE, 460)]);
+        return Promise.all([o.secouer(pion, P.t * (p.force || 0.12), 360, recul), o.eclat(pion, p.filtre, 460)]);
     };
     // Un projectile magique (une orbe) de A vers B.
     const orbe = (o, calque, A, B, p = {}) => o.projectile(calque, A, B, { taille: p.taille || 0.36, arc: p.arc === undefined ? 0.3 : p.arc,
@@ -188,13 +216,117 @@
         return pts;
     };
 
+    // S'EFFACER EN FONDU, sans toucher à la pose : une flèche plantée, un pic de
+    // glace gardent leur angle jusqu'au bout.
+    const fondre = async (o, el, duree) => {
+        if (!el) return;
+        await o.teinter(el, [{ opacity: 1 }, { opacity: 0 }], { duration: duree || 400, fill: "forwards" });
+        el.remove();
+    };
+    // LA FLÈCHE, vue de dessus, la pointe vers la droite (Nico : « revois le
+    // dessin de l'empennage, plume de la flèche, et baisse un peu l'épaisseur du
+    // bois ») : l'encoche, deux plumes barbées (crème, liseré rouge), un fût
+    // fin, la ligature, une pointe d'acier. 140 × 20 : la boîte fait 7 pour 1.
+    const DESSIN_FLECHE = `<svg viewBox="0 0 140 20" width="100%" height="100%" preserveAspectRatio="none" style="display:block; overflow:visible; filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))">
+        <path d="M0 6.6 L 5 8 L 5 12 L 0 13.4 L 1.8 10 Z" fill="#2f2318"/>
+        <path d="M5 8 L 9.5 1 Q 22 -0.4 35 5.4 L 39 8 Z" fill="#efe6d2" stroke="#a8977a" stroke-width="0.5" stroke-linejoin="round"/>
+        <path d="M5 12 L 9.5 19 Q 22 20.4 35 14.6 L 39 12 Z" fill="#efe6d2" stroke="#a8977a" stroke-width="0.5" stroke-linejoin="round"/>
+        <path d="M9 8 L 12 1.4 L 16.5 0.9 L 15 8 Z M9 12 L 12 18.6 L 16.5 19.1 L 15 12 Z" fill="#b3261e"/>
+        <path d="M14 8 L 11.5 2.2 M19 8 L 17 1.4 M24 8 L 22.5 1.6 M29 8 L 28 3 M34 8 L 33.4 5.4
+                 M14 12 L 11.5 17.8 M19 12 L 17 18.6 M24 12 L 22.5 18.4 M29 12 L 28 17 M34 12 L 33.4 14.6" stroke="#9c8b6e" stroke-width="0.45" fill="none"/>
+        <rect class="fleche-fut" x="4" y="7.5" width="114" height="5" rx="2.5" fill="#86602f"/>
+        <rect x="4" y="8" width="114" height="1.1" fill="#b98d55" opacity="0.8"/>
+        <rect x="111" y="7.2" width="6" height="5.6" rx="1" fill="#3d2b1c"/>
+        <path d="M116 4 L 140 10 L 116 16 L 120 10 Z" fill="#c9d1d8" stroke="#59636c" stroke-width="0.7" stroke-linejoin="round"/>
+        <path d="M120 10 L 139 10" stroke="#ffffff" stroke-width="0.8" opacity="0.85"/></svg>`;
+    // UNE FLÈCHE PLANTÉE dans un pion : la pointe enfoncée (cachée dans la chair),
+    // le fût et l'empennage dehors, dans l'axe du tir. Elle vibre autour de son
+    // point d'entrée et GARDE SON ANGLE jusqu'au bout (Nico : « une fois plantée,
+    // à la toute fin la flèche bouge et se met à 90° : fais-lui garder son
+    // angle »). `longueur` : celle de la flèche en vol, pour qu'elle ne change
+    // pas de taille en se plantant.
+    const flechePlantee = (o, calque, pos, v, p = {}) => {
+        const L = p.longueur || pos.t * 0.9, h = L / 7, dehors = 0.84;
+        // Le point d'entrée : là où était la ligature quand la pointe a touché.
+        const x = pos.x + v.ux * (pos.t * 0.05 - L * 0.16), y = pos.y + v.uy * (pos.t * 0.05 - L * 0.16);
+        const el = o.poser(calque, x, y, `width:0; height:0; z-index:${Z.haut};`,
+            `<div class="anim-fleche-plantee" style="position:absolute; right:0; top:${-h / 2}px; width:${L * dehors}px; height:${h}px; overflow:hidden;
+                  transform-origin:100% 50%; transform:rotate(${deg(v.angle)}deg);"><div style="width:${100 / dehors}%; height:100%">${DESSIN_FLECHE}</div></div>`);
+        return { el, fut: el.querySelector(".anim-fleche-plantee") };
+    };
+    // LA BOULE DE FEU (Nico : « une boule de feu plus réaliste ») : un cœur
+    // blanc-jaune qui palpite, un halo orangé, des langues qui tournent, une
+    // queue de flammes qui traîne derrière (style.css, .anim-boule-feu).
+    const DESSIN_BOULE_DE_FEU = `<span class="anim-boule-feu"><span class="bf-queue"></span><span class="bf-halo"></span><span class="bf-langues"></span><span class="bf-coeur"></span></span>`;
+    // UNE GERBE DE FEU sur un pion (« à l'impact, une gerbe de feu sur la
+    // cible ») : des langues de flamme jaillissent tout autour et s'élancent,
+    // des braises volent, un éclair de chaleur au cœur.
+    const LANGUE_DE_FEU = `<svg viewBox="0 0 100 40" width="100%" height="100%" preserveAspectRatio="none" style="display:block; overflow:visible">
+        <path d="M0 20 C 18 3, 52 6, 100 20 C 62 26, 70 34, 44 36 C 26 37, 12 31, 0 20 Z" fill="#e8420c" opacity="0.85"/>
+        <path d="M0 20 C 14 9, 40 10, 78 20 C 44 28, 22 29, 0 20 Z" fill="#ff9a1f"/>
+        <path d="M0 20 C 10 14, 26 15, 48 20 C 26 25, 10 25, 0 20 Z" fill="#fff1b8"/></svg>`;
+    const gerbeDeFeu = (o, calque, pos, p = {}) => {
+        const n = p.n || 7, L = pos.t * (p.taille || 0.95), H = L * 0.42;
+        const langues = Array.from({ length: n }, (_, i) => {
+            const ang = (i / n) * 360 + hasard(-18, 18), s = hasard(0.85, 1.15);
+            const d = o.poser(calque, pos.x, pos.y, `width:${L * s}px; height:${H * s}px; z-index:${Z.haut}; transform-origin:0 50%;
+                transform:translate(0,-50%) rotate(${ang}deg) scale(0.15, 0.4); opacity:0; filter:drop-shadow(0 0 6px #ff7a1a);`, LANGUE_DE_FEU);
+            d.classList.add("anim-langue-feu");
+            return o.jouerPuisRetirer(d, [
+                { transform: `translate(0,-50%) rotate(${ang}deg) translateX(${-pos.t * 0.1}px) scale(0.15, 0.4)`, opacity: 0 },
+                { transform: `translate(0,-50%) rotate(${ang}deg) translateX(${pos.t * 0.02}px) scale(1, 1)`, opacity: 1, offset: 0.3 },
+                { transform: `translate(0,-50%) rotate(${ang + hasard(-12, 12)}deg) translateX(${pos.t * 0.25}px) scale(1.15, 0.55)`, opacity: 0 }
+            ], { duration: p.duree || 680, delay: i * 22, easing: "cubic-bezier(.2,.8,.3,1)" });
+        });
+        return Promise.all([...langues,
+            o.onde(calque, pos, { couleur: "#ff7a1a", taille: 0.9, bord: 2, duree: 520, echelle: 2.1,
+                                  fond: "radial-gradient(circle, rgba(255,246,200,0.95), rgba(255,140,30,0.6) 55%, rgba(255,60,0,0) 75%)" }),
+            o.gerbe(calque, pos.x, pos.y, { nombre: 16, dist: pos.t * 1.15, couleurs: ["#ffcf5a", "#ff7a1a", "#e8420c"], taille: 6, tailleMin: 2, duree: 850 }),
+            o.gerbe(calque, pos.x, pos.y, { nombre: 8, dist: pos.t * 0.4, monte: pos.t * 0.7, couleurs: ["#fff1b8", "#ffb02e"], taille: 4, tailleMin: 2, duree: 1000, etale: 250 })]);
+    };
+    // UN PIC DE CRISTAL GELÉ, la pointe vers la droite : deux faces (l'une
+    // éclairée, l'autre dans l'ombre), une arête blanche, une lueur de givre.
+    const DESSIN_PIC_DE_GLACE = `<svg viewBox="0 0 100 30" width="100%" height="100%" preserveAspectRatio="none" style="display:block; overflow:visible; filter:drop-shadow(0 0 4px #bdf3ff) drop-shadow(0 0 1px #3aa8e8)">
+        <polygon points="0,15 14,6 62,9 100,15" fill="#f2fdff"/>
+        <polygon points="0,15 14,24 62,21 100,15" fill="#8fd3f2"/>
+        <polygon points="0,15 14,6 62,9 100,15 62,21 14,24" fill="none" stroke="#5fb4e0" stroke-width="1"/>
+        <path d="M14 6 L 30 15 L 14 24 M62 9 L 48 15 L 62 21" stroke="#ffffff" stroke-width="0.8" fill="none" opacity="0.8"/>
+        <path d="M4 15 L 96 15" stroke="#ffffff" stroke-width="1.1" opacity="0.9"/></svg>`;
+    // LE MESSAGE DU COUP CRITIQUE (Nico : « un message en rouge qui spawn, pour
+    // changer, sous le token, avec un joli effet ») : « COUP CRITIQUE ! » tombe
+    // sous le pion de très haut (énorme et flou), claque à sa taille, un trait
+    // rouge le souligne d'un coup de lame, des étincelles giclent ; puis il
+    // glisse vers le bas et s'efface. Ensuite vient l'attaque, normale.
+    const messageCritique = (o, calque, pion, p = {}) => {
+        const c = centre(pion, calque);
+        const taille = Math.max(16, Math.round(c.t * 0.4));
+        const y = c.y + c.t * 0.78;
+        const m = o.poser(calque, c.x, y, `z-index:${Z.ciel}; white-space:nowrap; font-family:'Cinzel', Georgia, serif; font-weight:900; font-size:${taille}px;
+            letter-spacing:0.06em; color:#ff2a2a; opacity:0; text-shadow:0 0 2px #000, 0 0 3px #000, 2px 2px 0 #4a0000, 0 0 10px #ff1a1a, 0 0 20px #c00000;`, p.texte || "COUP CRITIQUE !");
+        m.classList.add("anim-message-critique");
+        const trait = o.poser(calque, c.x, y + taille * 0.72, `width:${c.t * 2.3}px; height:3px; z-index:${Z.ciel}; border-radius:2px; opacity:0;
+            background:linear-gradient(90deg, rgba(255,40,40,0), #ff3030 20%, #ffd0d0 50%, #ff3030 80%, rgba(255,40,40,0)); box-shadow:0 0 8px #ff2020;`);
+        o.jouerPuisRetirer(trait, [{ transform: `${BASE} scaleX(0)`, opacity: 1 }, { transform: `${BASE} scaleX(1)`, opacity: 1, offset: 0.35 },
+                                   { transform: `${BASE} scaleX(1.05)`, opacity: 0 }], { duration: 560, delay: 170, easing: "ease-out" });
+        o.attendre(170).then(() => o.gerbe(calque, c.x, y, { nombre: 12, dist: c.t, couleurs: ["#ff3030", "#ffb0a0", "#ffd700"], taille: 4, tailleMin: 2, duree: 650 }));
+        o.onde(calque, { x: c.x, y, t: c.t }, { couleur: "#ff3030", taille: 1.6, aplati: 0.32, duree: 600, echelle: 1.6, retard: 150, bord: 2 });
+        return o.jouerPuisRetirer(m, [
+            { transform: `${BASE} scale(2.6)`, opacity: 0, filter: "blur(6px)" },
+            { transform: `${BASE} scale(0.9)`, opacity: 1, filter: "blur(0px)", offset: 0.12 },
+            { transform: `${BASE} scale(1.08)`, opacity: 1, filter: "blur(0px)", offset: 0.19 },
+            { transform: `${BASE} scale(1)`, opacity: 1, filter: "blur(0px)", offset: 0.26 },
+            { transform: `${BASE} scale(1)`, opacity: 1, filter: "blur(0px)", offset: 0.8 },
+            { transform: `translate(-50%, calc(-50% + ${c.t * 0.22}px)) scale(0.96)`, opacity: 0, filter: "blur(2px)" }
+        ], { duration: p.duree || 1700, easing: "ease-out" });
+    };
     // QUELQUES CRISTAUX DE GIVRE au sol, sous le pion (la marche gelée) : ils
-    // poussent d'un coup puis fondent.
+    // poussent d'un coup puis fondent, en couronne — assez loin du centre pour
+    // dépasser du pion qui les recouvre.
     const cristaux = (o, calque, pt, p = {}) => {
-        const t = pt.t * (p.taille || 1.2);
-        const n = p.n || 6;
+        const t = pt.t * (p.taille || 1.6);
+        const n = p.n || 7;
         const formes = Array.from({ length: n }, (_, i) => {
-            const ang = (i / n) * Math.PI * 2 + hasard(-0.4, 0.4), d = hasard(14, 36);
+            const ang = (i / n) * Math.PI * 2 + hasard(-0.4, 0.4), d = hasard(30, 46);
             const x = 50 + Math.cos(ang) * d, y = 50 + Math.sin(ang) * d * 0.8, L = hasard(8, 14), rot = hasard(0, 180);
             return `<polygon points="0,${-L} ${L * 0.34},0 0,${L} ${-L * 0.34},0" transform="translate(${x.toFixed(1)},${y.toFixed(1)}) rotate(${rot.toFixed(0)})"
                        fill="rgba(235,250,255,0.95)" stroke="#7fcfff" stroke-width="1.2"/>`;
@@ -513,12 +645,13 @@
     ajouter(2, null, [
         {
             id: "attaque-legere", nom: "Attaque légère (Dextérité)", sens: "vers l'ennemi",
-            description: "Deux coups vifs, à peine le temps de les voir : deux entailles fines qui se croisent.",
+            description: "Deux coups vifs, à peine le temps de les voir : deux entailles fines, effilées, qui se croisent ; la chair entaillée, le sang, et les dégâts au second coup.",
             async jouer(sc, o) {
                 const elan = { portee: 0.45, duree: 300, prise: 0.25, frappe: 0.55 };
-                await frapper(o, sc.calque, sc.lanceur, sc.cible, { valeur: "-4", elan, contact: 165, sonElan: "dague", retardSon: 40,
+                // Les dégâts une seule fois, au second coup (Nico).
+                await frapper(o, sc.calque, sc.lanceur, sc.cible, { elan, contact: 165, sonElan: "dague", retardSon: 40,
                                                                    entaille: { taille: 1.1, epaisseur: 5, duree: 260 } });
-                await frapper(o, sc.calque, sc.lanceur, sc.cible, { valeur: "-4", elan, contact: 165, sonElan: "dague", retardSon: 40,
+                await frapper(o, sc.calque, sc.lanceur, sc.cible, { valeur: "-8", elan, contact: 165, sonElan: "dague", retardSon: 40,
                                                                    entaille: { taille: 1.1, epaisseur: 5, duree: 260, tourne: 180 } });
             }
         },
@@ -537,34 +670,35 @@
                     { transform: `translate(${v.ux * Math.min(v.d * 0.45, a.t * 0.75)}px, ${v.uy * Math.min(v.d * 0.45, a.t * 0.75)}px) rotate(10deg) scale(1.1)`, offset: 0.45 },
                     { transform: "translate(0,0) rotate(0deg)" }], { duration: 520, easing: "cubic-bezier(.6,0,.3,1)" });
                 await o.attendre(230);
+                // Le choc sourd du coup, puis la chair entaillée (plus de « ding »).
                 o.son("lourd-impact");
-                o.jauge(sc.calque, sc.cible, 40, 22, 40, "-18", COULEURS.degats, COULEURS.degats);
                 await Promise.all([elan, entaille(o, sc.calque, b, v.angle, { taille: 2.1, epaisseur: 11, duree: 460 }),
                     o.onde(sc.calque, b, { couleur: "#c8a878", taille: 1.1, duree: 650, echelle: 2.1, bord: 5 }),
-                    o.gerbe(sc.calque, b.x, b.y, { nombre: 12, dist: b.t * 1.1, couleurs: ["#a08868", "#6e5a40", "#fff"], taille: 7, carre: true, duree: 750 }),
-                    o.secouer(sc.cible, b.t * 0.22, 460, v), o.eclat(sc.cible, ROUGE, 520)]);
+                    coupRecu(o, sc.calque, sc.cible, a, { valeur: "-18", force: 0.22, n: 12 })]);
             }
         },
         {
             id: "attaque-distance", nom: "Attaque à distance (tir)", sens: "vers l'ennemi",
-            description: "Le héros bande son arc, la flèche file droit sur l'ennemi et s'y plante en vibrant.",
+            description: "Le héros bande son arc (la corde se tend), la flèche file en sifflant et se plante dans la chair de l'ennemi ; elle y vibre, garde son angle, puis s'efface.",
             async jouer(sc, o) {
                 const { a, b, v } = lieux(sc);
+                // La corde qui se tend, pendant que le héros recule d'un rien.
+                o.son("arc-tendu");
                 await o.bouger(sc.lanceur, [{ transform: "translate(0,0)" }, { transform: `translate(${-v.ux * 4}px, ${-v.uy * 4}px) scale(0.97)` }],
-                               { duration: 320, fill: "forwards" });
+                               { duration: 380, fill: "forwards" });
                 o.son("tir");
                 o.lacher(sc.lanceur);
-                await o.projectile(sc.calque, a, b, { taille: 0.7, arc: 0.12, oriente: true, easing: "linear", duree: Math.min(520, 200 + v.d * 0.5),
-                    style: "height:auto; aspect-ratio:7/1; background:linear-gradient(90deg, #e8e0d0 0 12%, #6b4a2a 12% 82%, #cfd6dc 82%); clip-path:polygon(0 20%, 82% 30%, 82% 0, 100% 50%, 82% 100%, 82% 70%, 0 80%); filter:drop-shadow(0 0 3px #fff);" });
-                o.son("fleche-impact");
-                const fleche = o.poser(sc.calque, b.x - v.ux * b.t * 0.3, b.y - v.uy * b.t * 0.3, `width:${b.t * 0.55}px; height:${b.t * 0.08}px; z-index:${Z.haut};
-                    background:linear-gradient(90deg, #e8e0d0 0 12%, #6b4a2a 12%); transform:translate(-50%,-50%) rotate(${deg(v.angle)}deg);`);
-                o.jauge(sc.calque, sc.cible, 40, 31, 40, "-9", COULEURS.degats, COULEURS.degats);
-                await Promise.all([o.secouer(sc.cible, b.t * 0.08, 300, v), o.eclat(sc.cible, ROUGE),
-                    o.teinter(fleche, [{ transform: `translate(-50%,-50%) rotate(${deg(v.angle)}deg)` }, { transform: `translate(-50%,-50%) rotate(${deg(v.angle) + 6}deg)` },
-                                       { transform: `translate(-50%,-50%) rotate(${deg(v.angle) - 4}deg)` }, { transform: `translate(-50%,-50%) rotate(${deg(v.angle)}deg)` }],
-                              { duration: 300, iterations: 2 })]);
-                await o.effacer(fleche);
+                // Elle vole droit, la pointe devant, jusqu'à toucher l'ennemi.
+                const L = a.t * 0.9;
+                const fin = { x: b.x + v.ux * (b.t * 0.05 - L / 2), y: b.y + v.uy * (b.t * 0.05 - L / 2), t: b.t };
+                await o.projectile(sc.calque, a, fin, { taille: 0.9, arc: 0.06, oriente: true, easing: "linear", duree: Math.min(520, 200 + v.d * 0.5), forme: "0",
+                    contenu: DESSIN_FLECHE, style: "height:auto; aspect-ratio:7/1; background:none;" });
+                // Plantée : le bruit de la chair, le coup reçu ; elle vibre et garde son angle.
+                const fleche = flechePlantee(o, sc.calque, b, v, { longueur: L });
+                await Promise.all([coupRecu(o, sc.calque, sc.cible, a, { son: "fleche-impact", valeur: "-9", force: 0.08, n: 6 }),
+                    o.teinter(fleche.fut, [0, 7, -5, 3, -1.5, 0].map(k => ({ transform: `rotate(${deg(v.angle) + k}deg)` })), { duration: 560, easing: "ease-out" })]);
+                await o.attendre(350);
+                await fondre(o, fleche.el, 380);
             }
         },
         {
@@ -576,6 +710,8 @@
                 for (let k = 0; k < 3; k++) o.eclair(sc.calque, a, { x: a.x + hasard(-1, 1) * a.t * 0.6, y: a.y + hasard(-1, 1) * a.t * 0.6, t: a.t }, { largeur: 0.3, duree: 260, retard: k * 90, segments: 4 });
                 await o.attendre(320);
                 o.son("foudre");
+                // À la réception, la décharge électrique.
+                o.son("decharge", 260);
                 o.eclair(sc.calque, a, b, { duree: 480 });
                 o.eclair(sc.calque, a, b, { duree: 420, retard: 200 });
                 o.jauge(sc.calque, sc.cible, 40, 29, 40, "-11", COULEURS.degats, COULEURS.degats);
@@ -589,20 +725,52 @@
         },
         {
             id: "attaque-glace", nom: "Attaque magique Glace", sens: "vers l'ennemi",
-            description: "Un trait de givre continu relie le héros à l'ennemi ; des cristaux naissent le long du rayon, l'ennemi blanchit de froid.",
+            description: "Des pointes de cristal gelé naissent en suspension devant le héros, se tournent vers l'ennemi, puis filent une à une, très vite, se planter en lui ; il blanchit de froid.",
             async jouer(sc, o) {
                 const { a, b, v } = lieux(sc);
-                o.son("givre-rayon");
-                const rayon = o.rayon(sc.calque, a, b, { fond: "linear-gradient(90deg, rgba(225,250,255,0.95), rgba(140,215,255,0.85))", couleur: "#9fe6ff", epaisseur: 0.13, duree: 950 });
-                for (let k = 1; k <= 4; k++) {
-                    const f = k / 5;
-                    o.gerbe(sc.calque, a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, { nombre: 3, dist: a.t * 0.3, couleurs: ["#ffffff", "#bdf3ff"], taille: 5, carre: true, duree: 600, etale: 300 });
-                }
-                await o.attendre(380);
-                o.son("glace-impact");
+                const n = 5, R = a.t * 0.82, L = a.t * 0.52, H = L * 0.3;
+                o.son("glace-formation");
+                const pics = Array.from({ length: n }, (_, i) => {
+                    const k = i - (n - 1) / 2, ang = deg(v.angle + k * 0.42);
+                    const pos = { x: a.x + Math.cos(v.angle + k * 0.42) * R, y: a.y + Math.sin(v.angle + k * 0.42) * R };
+                    // Où il se plantera : en éventail serré sur l'ennemi.
+                    const vise = { x: b.x - v.uy * k * b.t * 0.1, y: b.y + v.ux * k * b.t * 0.1 };
+                    const u = axe(pos, vise);
+                    const fin = { x: vise.x - u.ux * L * 0.3, y: vise.y - u.uy * L * 0.3 };
+                    // L'angle visé, pris du côté le plus court (pas de tour complet).
+                    const vers = ang + ((deg(u.angle) - ang + 540) % 360) - 180;
+                    const el = o.poser(sc.calque, pos.x, pos.y, `width:${L}px; height:${H}px; z-index:${Z.ciel}; opacity:0;
+                        transform:${BASE} rotate(${ang}deg) scale(0);`, DESSIN_PIC_DE_GLACE);
+                    el.classList.add("anim-pic-glace");
+                    return { el, pos, fin, ang, vers, u };
+                });
+                const pose = (pc, angle, s, dx = 0, dy = 0) => `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) rotate(${angle}deg) scale(${s})`;
+                // Ils naissent l'un après l'autre et flottent, pointés vers l'extérieur…
+                pics.forEach((pc, i) => o.teinter(pc.el, [{ transform: pose(pc, pc.ang, 0), opacity: 0 }, { transform: pose(pc, pc.ang, 1.15), opacity: 1, offset: 0.5 },
+                                                          { transform: pose(pc, pc.ang, 1), opacity: 1 }], { duration: 300, delay: i * 70, easing: "ease-out", fill: "forwards" }));
+                await o.attendre(300 + (n - 1) * 70);
+                // …en suspension (vus d'en haut, ils respirent)…
+                await Promise.all(pics.map((pc, i) => o.teinter(pc.el, [{ transform: pose(pc, pc.ang, 1) }, { transform: pose(pc, pc.ang, 1.07), offset: 0.5 },
+                                                                        { transform: pose(pc, pc.ang, 1) }], { duration: 380, delay: i * 30 })));
+                // …puis se tournent vers l'ennemi.
+                await Promise.all(pics.map(pc => o.teinter(pc.el, [{ transform: pose(pc, pc.ang, 1), opacity: 1 }, { transform: pose(pc, pc.vers, 1), opacity: 1 }],
+                                                           { duration: 240, easing: "ease-in-out", fill: "forwards" })));
+                await o.attendre(120);
+                // L'un après l'autre, très vite, ils filent se planter.
+                await Promise.all(pics.map((pc, i) => o.attendre(i * 110).then(async () => {
+                    o.son("glace-tir");
+                    await o.teinter(pc.el, [{ transform: pose(pc, pc.vers, 1), opacity: 1 },
+                                            { transform: pose(pc, pc.vers, 0.9, pc.fin.x - pc.pos.x, pc.fin.y - pc.pos.y), opacity: 1 }],
+                                    { duration: 140, easing: "cubic-bezier(.5,0,1,1)", fill: "forwards" });
+                    o.son("glace-plante");
+                    o.gerbe(sc.calque, pc.fin.x + pc.u.ux * L * 0.4, pc.fin.y + pc.u.uy * L * 0.4, { nombre: 5, dist: b.t * 0.35, angle: pc.u.angle + Math.PI, eventail: Math.PI * 0.8,
+                                                                                         couleurs: ["#ffffff", "#bdf3ff", "#7fcfff"], taille: 4, tailleMin: 2, carre: true, duree: 420 });
+                    o.secouer(sc.cible, b.t * 0.05, 160, pc.u);
+                })));
                 o.jauge(sc.calque, sc.cible, 40, 31, 40, "-9", COULEURS.degats, COULEURS.degats);
-                await Promise.all([rayon, o.teinter(sc.cible, [{ filter: "none" }, { filter: GIVRE, offset: 0.3 }, { filter: GIVRE, offset: 0.8 }, { filter: "none" }], { duration: 1100 }),
-                    o.onde(sc.calque, b, { couleur: "#bdf3ff", taille: 1, duree: 700, echelle: 1.6 }), o.secouer(sc.cible, b.t * 0.05, 400, v)]);
+                await Promise.all([o.teinter(sc.cible, [{ filter: "none" }, { filter: GIVRE, offset: 0.3 }, { filter: GIVRE, offset: 0.8 }, { filter: "none" }], { duration: 1000 }),
+                    o.onde(sc.calque, b, { couleur: "#bdf3ff", taille: 1, duree: 650, echelle: 1.6 })]);
+                await Promise.all(pics.map(pc => fondre(o, pc.el, 350)));
             }
         },
         {
@@ -662,18 +830,44 @@
         },
         {
             id: "lumiere-forge", nom: "Lumière (effet de la Forge)", sens: "vers l'ennemi",
-            description: "Un rayon doré et blanc jaillit du héros et traverse l'ennemi : un halo l'entoure, sa résistance magique est percée.",
+            description: "Un arc de lumière s'ouvre devant le héros ; le rayon en part, large, et s'amincit jusqu'à l'ennemi qu'il perce : l'ennemi clignote une fois d'un jaune léger, sa résistance magique est percée.",
             async jouer(sc, o) {
-                const { a, b } = lieux(sc);
+                const { a, b, v } = lieux(sc);
+                const rot = deg(v.angle), R = a.t * 0.62;
                 o.son("lumiere");
-                o.eclat(sc.lanceur, OR, 700);
-                await o.attendre(200);
-                const rayon = o.rayon(sc.calque, a, b, { fond: "linear-gradient(90deg, rgba(255,250,220,0.95), rgba(255,215,90,0.9))", couleur: "#ffd700", epaisseur: 0.2, duree: 900, longueur: 1.35 });
+                o.eclat(sc.lanceur, "brightness(1.25) drop-shadow(0 0 8px #ffe680)", 700);
+                // L'arc de cercle devant le héros (± 58°), qui s'ouvre depuis son milieu.
+                const arc = o.poser(sc.calque, a.x, a.y, `width:${R * 2.4}px; height:${R * 2.4}px; z-index:${Z.haut}; opacity:0; transform:${BASE} rotate(${rot}deg);`,
+                    `<svg viewBox="-60 -60 120 120" width="100%" height="100%" style="overflow:visible; filter:drop-shadow(0 0 4px #ffd700) drop-shadow(0 0 10px #ffb800)">
+                       <path d="M26.5 -42.4 A 50 50 0 0 1 26.5 42.4" fill="none" stroke="#fff6c8" stroke-width="5" stroke-linecap="round"/></svg>`);
+                arc.classList.add("anim-arc-lumiere");
+                await o.teinter(arc, [{ transform: `${BASE} rotate(${rot}deg) scale(0.6, 0)`, opacity: 0 }, { transform: `${BASE} rotate(${rot}deg) scale(1, 1)`, opacity: 1 }],
+                                { duration: 260, easing: "ease-out", fill: "forwards" });
+                // Le rayon part de l'arc : large à sa corde, il s'amincit jusqu'à sa
+                // pointe, sur l'ennemi (un cœur blanc dans un trait doré).
+                const corde = R * 0.848 * 2;
+                const S = { x: a.x + v.ux * R * 0.53, y: a.y + v.uy * R * 0.53 };
+                const L = Math.max(10, Math.hypot(b.x - S.x, b.y - S.y));
+                const rayon = o.poser(sc.calque, S.x, S.y, `width:${L}px; height:${corde}px; z-index:${Z.haut}; transform-origin:0 50%;
+                    transform:translate(0,-50%) rotate(${rot}deg) scaleX(0); filter:drop-shadow(0 0 5px #ffd700) drop-shadow(0 0 12px #ffb800);`,
+                    `<div style="position:absolute; inset:0; clip-path:polygon(0 0, 100% 48%, 100% 52%, 0 100%);
+                          background:linear-gradient(90deg, rgba(255,226,120,0.5), rgba(255,240,170,0.9));"></div>
+                     <div style="position:absolute; inset:0; clip-path:polygon(0 34%, 100% 49.4%, 100% 50.6%, 0 66%);
+                          background:linear-gradient(90deg, rgba(255,255,240,0.8), #ffffff);"></div>`);
+                rayon.classList.add("anim-rayon-lumiere");
+                const trace = (sx) => `translate(0,-50%) rotate(${rot}deg) scaleX(${sx})`;
+                const trait = o.teinter(rayon, [{ transform: trace(0), opacity: 1 }, { transform: trace(1), opacity: 1, offset: 0.28 },
+                                                 { transform: trace(1), opacity: 0.9, offset: 0.7 }, { transform: trace(1), opacity: 0 }],
+                                        { duration: 900, easing: "ease-out", fill: "forwards" });
                 await o.attendre(250);
-                o.jauge(sc.calque, sc.cible, 40, 30, 40, "-10", COULEURS.degats, COULEURS.degats);
-                o.attendre(450).then(() => o.texte(sc.calque, sc.cible, "Résistance percée", "#ffd700"));
-                await Promise.all([rayon, o.aura(sc.calque, b, { couleur: "#ffe680", taille: 1.3, pulsations: 2, duree: 1100 }),
-                    o.eclat(sc.cible, "brightness(1.8) sepia(0.4)", 700)]);
+                // Touchée, la cible clignote UNE fois d'un jaune léger (plus de cercle
+                // jaune autour d'elle, ni de flash rouge : la barre seulement).
+                o.jauge(sc.calque, sc.cible, 40, 30, 40, "-10", COULEURS.degats, COULEURS.degats, { sansEclat: true });
+                o.attendre(420).then(() => o.texte(sc.calque, sc.cible, "Résistance percée", "#ffd700"));
+                await Promise.all([trait, o.teinter(sc.cible, [{ filter: "none" }, { filter: JAUNE_LEGER, offset: 0.45 }, { filter: "none" }], { duration: 520 }),
+                    o.teinter(arc, [{ opacity: 1 }, { opacity: 1, offset: 0.6 }, { opacity: 0 }], { duration: 650, fill: "forwards" })]);
+                arc.remove();
+                rayon.remove();
             }
         },
         {
@@ -828,14 +1022,13 @@
     ajouter(3, null, [
         {
             id: "coup-recu-physique", nom: "Coup reçu — physique", sens: "sur soi",
-            description: "Une lame venue de l'ennemi : deux traits d'acier blanc se croisent sur le héros, qui recule dans une gerbe d'étincelles rouges.",
+            description: "Une lame venue de l'ennemi : deux entailles effilées se croisent sur le héros, qui recule, s'empourpre et saigne de son flanc ; la chair entaillée.",
             async jouer(sc, o) {
                 const { a, b } = lieux(sc);
                 const v = axe(b, a);
-                o.son("coup-physique");
+                o.son("lame-souffle");
                 await Promise.all([entaille(o, sc.calque, a, v.angle, { taille: 1.3 }), entaille(o, sc.calque, a, v.angle, { taille: 1.3, tourne: 90, retard: 80 }),
-                    encaisser(o, sc.calque, sc.lanceur, sc.cible, { valeur: "-8" }),
-                    o.gerbe(sc.calque, a.x, a.y, { nombre: 9, dist: a.t * 0.7, angle: v.angle, eventail: Math.PI, couleurs: ["#c4141c", "#ff6b6b", "#fff"], taille: 5 })]);
+                    coupRecu(o, sc.calque, sc.lanceur, sc.cible, { valeur: "-8" })]);
             }
         },
         {
@@ -1017,7 +1210,7 @@
                 const pos = o.voisine(sc.cible, b, o.tourner(v, Math.PI * 0.6));
                 const f = o.figurant(sc.calque, sc.lanceur, pos, { filtre: ILLUSION, opacite: 0.78 });
                 await o.attendre(400);
-                await frapper(o, sc.calque, sc.cible, f, { sonImpact: "bris-verre" });
+                await frapper(o, sc.calque, sc.cible, f, { sonImpact: "bris-verre", sang: false });
                 o.son("illusion");
                 o.texte(sc.calque, f, "Illusion brisée", "#c9a8ff");
                 await Promise.all([o.effacer(f, { duree: 200, echelle: 1.3 }),
@@ -1288,7 +1481,6 @@
                 o.son("confusion");
                 o.icone(sc.calque, a, "❓", { duree: 1300, lueur: "#c9a8ff" });
                 await o.attendre(400);
-                o.son("coup-sourd");
                 o.texte(sc.calque, sc.lanceur, "Confusion : se frappe !", COULEURS.etat);
                 await Promise.all([entaille(o, sc.calque, a, v.angle + Math.PI), encaisser(o, sc.calque, sc.lanceur, sc.cible, { valeur: "-5" })]);
             }
@@ -1414,7 +1606,7 @@
             description: "Une entaille rouge sur l'ennemi, des gouttes ; en fin de manche il saigne encore, et chaque case qu'il parcourt lui coûte plus cher.",
             async jouer(sc, o) {
                 const { b, v } = lieux(sc);
-                o.son("lame-impact");
+                o.son("entaille-chair");
                 o.son("saignement", 120);
                 await Promise.all([entaille(o, sc.calque, b, v.angle, { couleur: "#e02030", lueur: "#ff4050", lueur2: "#a00010" }),
                     o.gerbe(sc.calque, b.x, b.y, { nombre: 8, dist: b.t * 0.5, couleurs: ["#b0101c", "#e03040"], taille: 6, duree: 600 })]);
@@ -1796,9 +1988,7 @@
                 o.son("lame-souffle", 80);
                 const elan = o.elan(sc.cible, b, al.pos, { portee: 0.4 });
                 await o.attendre(300);
-                o.son("coup-sourd");
-                o.jauge(sc.calque, al.el, 40, 34, 40, "-6", COULEURS.degats, COULEURS.degats);
-                await Promise.all([elan, o.secouer(al.el, 5, 300), o.eclat(al.el, ROUGE, 400)]);
+                await Promise.all([elan, coupRecu(o, sc.calque, al.el, b, { valeur: "-6" })]);
                 o.son("rempart");
                 await o.filer(sc.calque, al.pos, a, { couleur: "#ffd700", taille: 0.3, duree: 450 });
                 o.texte(sc.calque, sc.lanceur, "🛡️ Rempart", "#ffd700");
@@ -1878,14 +2068,13 @@
                 o.son("lame-souffle");
                 await o.bouger(sc.lanceur, [{ transform: "rotate(0deg) scale(1)" }, { transform: "rotate(-200deg) scale(1.12)", offset: 0.6 }, { transform: "rotate(-360deg) scale(1)" }],
                                { duration: 520, easing: "ease-in-out" });
-                o.son("lame-impact");
                 o.son("poison-bulles", 200);
                 const toucher = (el, pos, valeur, esquive) => {
                     if (esquive) o.texte(sc.calque, el, "Esquivé 💨", COULEURS.neutre);
-                    else o.jauge(sc.calque, el, 40, 30, 40, valeur, COULEURS.degats, COULEURS.degats);
                     o.attendre(450).then(() => etat(o, sc.calque, el, "Empoisonné !"));
-                    return Promise.all([entaille(o, sc.calque, pos, axe(a, pos).angle), o.secouer(el, 5, 300),
-                        o.teinter(el, [{ filter: "none" }, { filter: VERT, offset: 0.3 }, { filter: "none" }], { duration: 1000 }),
+                    // Touché : le coup reçu (la chair, le sang) ; esquivé, le seul poison.
+                    return Promise.all([entaille(o, sc.calque, pos, axe(a, pos).angle), esquive ? o.secouer(el, 5, 300) : coupRecu(o, sc.calque, el, a, { valeur }),
+                        o.teinter(el, [{ filter: "none" }, { filter: VERT, offset: 0.3 }, { filter: "none" }], { duration: 1000, delay: esquive ? 0 : 420 }),
                         o.gerbe(sc.calque, pos.x, pos.y, { nombre: 8, dist: pos.t * 0.4, monte: pos.t * 0.5, couleurs: ["#7dd321", "#b5ff4c"], taille: 7, duree: 900 })]);
                 };
                 await Promise.all([toucher(sc.cible, b, "-10", false), toucher(autre.el, autre.pos, "-10", true)]);
@@ -2168,8 +2357,8 @@
                 o.son("morsure", 200);
                 const elan = o.elan(c.el, c.pos, b, { portee: 0.6, duree: 480 });
                 await o.attendre(260);
-                o.jauge(sc.calque, sc.cible, 40, 32, 40, "-8", COULEURS.degats, COULEURS.degats);
-                await Promise.all([elan, griffes(o, sc.calque, b, axe(c.pos, b).angle, "#ffffff"), o.secouer(sc.cible, 5, 300), o.eclat(sc.cible, ROUGE)]);
+                // La morsure (son déjà parti) : le coup reçu, sans autre bruit.
+                await Promise.all([elan, griffes(o, sc.calque, b, axe(c.pos, b).angle, "#ffffff"), coupRecu(o, sc.calque, sc.cible, c.pos, { son: false, valeur: "-8" })]);
                 await o.attendre(300);
                 await o.effacer(c.el);
             }
@@ -2198,21 +2387,23 @@
                     border:3px solid #ff4040; box-shadow:0 0 8px #ff4040, inset 0 0 8px #ff4040;`,
                     `<div style="position:absolute; left:50%; top:0; bottom:0; width:2px; background:#ff4040; transform:translateX(-50%)"></div>
                      <div style="position:absolute; top:50%; left:0; right:0; height:2px; background:#ff4040; transform:translateY(-50%)"></div>`);
+                o.son("arc-tendu");
                 await o.teinter(mire, [{ transform: `${BASE} scale(1.6)`, opacity: 0 }, { transform: `${BASE} scale(0.75)`, opacity: 1 }], { duration: 600, easing: "ease-in", fill: "forwards" });
                 o.son("tir");
-                await o.projectile(sc.calque, a, b, { taille: 0.7, arc: 0, oriente: true, easing: "linear", duree: Math.min(380, 140 + v.d * 0.4),
-                    style: "height:auto; aspect-ratio:7/1; background:linear-gradient(90deg, #e8e0d0 0 12%, #6b4a2a 12% 82%, #cfd6dc 82%); clip-path:polygon(0 20%, 82% 30%, 82% 0, 100% 50%, 82% 100%, 82% 70%, 0 80%);" });
-                o.son("fleche-impact");
+                const L = a.t * 0.9;
+                await o.projectile(sc.calque, a, { x: b.x + v.ux * (b.t * 0.05 - L / 2), y: b.y + v.uy * (b.t * 0.05 - L / 2), t: b.t },
+                    { taille: 0.9, arc: 0, oriente: true, easing: "linear", duree: Math.min(380, 140 + v.d * 0.4), forme: "0",
+                      contenu: DESSIN_FLECHE, style: "height:auto; aspect-ratio:7/1; background:none;" });
                 mire.remove();
+                const fleche = flechePlantee(o, sc.calque, b, v, { longueur: L });
                 o.texte(sc.calque, sc.cible, "🎯 Tir précis !", "#ff6060");
-                o.jauge(sc.calque, sc.cible, 40, 32, 40, "-8", COULEURS.degats, COULEURS.degats);
+                coupRecu(o, sc.calque, sc.cible, a, { son: "fleche-impact", valeur: "-8", force: 0.08, n: 6 });
                 o.son("chaines", 300);
                 const anneau = o.poser(sc.calque, b.x, b.y, `width:${b.t * 1.2}px; height:${b.t * 1.2}px; border-radius:50%; z-index:${Z.sol}; border:5px dotted #8a8a8a;`);
                 o.surgir(anneau);
                 o.attendre(500).then(() => etat(o, sc.calque, sc.cible, "Immobilisé"));
-                await Promise.all([o.secouer(sc.cible, 5, 300, v), o.eclat(sc.cible, ROUGE)]);
-                await o.attendre(1000);
-                await o.effacer(anneau);
+                await o.attendre(1300);
+                await Promise.all([o.effacer(anneau), fondre(o, fleche.el, 400)]);
             }
         },
         {
@@ -2389,11 +2580,8 @@
                 const tour = o.bouger(sc.lanceur, [{ transform: "rotate(0deg) scale(1)" }, { transform: "rotate(360deg) scale(1.12)", offset: 0.7 }, { transform: "rotate(360deg) scale(1)" }],
                                       { duration: 700, easing: "ease-in-out" });
                 await o.attendre(250);
-                o.son("lame-impact"); o.son("lame-impact", 150);
-                const toucher = (el, pos, k) => {
-                    o.attendre(k * 150).then(() => o.jauge(sc.calque, el, 40, 33, 40, "-7", COULEURS.degats, COULEURS.degats));
-                    return Promise.all([entaille(o, sc.calque, pos, axe(a, pos).angle, { retard: k * 150 }), o.secouer(el, 5, 300), o.eclat(el, ROUGE)]);
-                };
+                const toucher = (el, pos, k) => Promise.all([entaille(o, sc.calque, pos, axe(a, pos).angle, { retard: k * 150 }),
+                    o.attendre(k * 150).then(() => coupRecu(o, sc.calque, el, a, { valeur: "-7" }))]);
                 await Promise.all([tour, toucher(sc.cible, b, 0), toucher(autre.el, autre.pos, 1)]);
                 await marcher(sc, o, { cases: 1, duree: 320, son: "pas", dir: (v) => o.tourner(v, Math.PI) });
             }
@@ -2610,7 +2798,7 @@
                 const pos = o.voisine(sc.cible, b, o.tourner(v, Math.PI * 0.6));
                 const f = o.figurant(sc.calque, sc.lanceur, pos, { filtre: ILLUSION, opacite: 0.78 });
                 await o.attendre(350);
-                await frapper(o, sc.calque, sc.cible, f, { sonImpact: "bris-verre" });
+                await frapper(o, sc.calque, sc.cible, f, { sonImpact: "bris-verre", sang: false });
                 f.remove();
                 o.son("impact-magique");
                 await Promise.all(Array.from({ length: 6 }, (_, k) => o.filer(sc.calque, pos, b, { couleur: "#c9a8ff", taille: 0.12, duree: 420, retard: k * 50 })));
@@ -2670,6 +2858,53 @@
     ]);
 
     // L'ORDRE DE LA LISTE DE NICO (les dix premières y prennent leur place).
+    // LES PREMIÈRES ANIMATIONS, RETOUCHÉES (animations_combat.js garde leur
+    // version d'origine ; celles-ci les remplacent, à la même place).
+    //   • Coup d'épée : l'entaille effilée, la chair, le sang (le coup reçu).
+    //   • Boule de feu (Nico : « le bruit d'une flamme tout le long du chemin,
+    //     à l'arrivée une explosion de flamme sans bruit de métal ; une boule
+    //     de feu plus réaliste, qui part en ligne droite ; à l'impact une
+    //     gerbe de feu sur la cible »).
+    //   • Coup critique (« juste l'animation du message coup critique, ensuite
+    //     c'est l'animation normale de l'attaque »).
+    ajouter(2, null, [
+        {
+            id: "coup-epee", nom: "Coup d'épée (corps à corps)", categorie: "Attaque", sens: "vers l'ennemi",
+            description: "Le héros prend son élan et fond sur l'ennemi : une entaille effilée le traverse, il recule et saigne. (Le coup de base, sans style : Attaque légère et Attaque lourde en sont les deux formes du jeu.)",
+            async jouer(sc, o) {
+                await frapper(o, sc.calque, sc.lanceur, sc.cible, { valeur: "-12" });
+            }
+        },
+        {
+            id: "boule-de-feu", nom: "Attaque magique Feu (Boule de feu)", categorie: "Sort", sens: "vers l'ennemi",
+            description: "Le héros s'embrase ; une boule de feu rugissante file droit sur l'ennemi en semant des braises et explose sur lui en une gerbe de flammes.",
+            async jouer(sc, o) {
+                const { a, b, v } = lieux(sc);
+                await o.eclat(sc.lanceur, "brightness(1.3) drop-shadow(0 0 10px #ff8c1a)", 260);
+                // La flamme qui gronde, tout le long du chemin.
+                o.son("feu-vol");
+                await o.projectile(sc.calque, a, b, { taille: 0.55, arc: 0, oriente: true, duree: Math.min(900, 380 + v.d * 0.9), easing: "cubic-bezier(.4,0,.8,1)",
+                    traine: ["#ffcf5a", "#ff7a1a", "#e8420c"], contenu: DESSIN_BOULE_DE_FEU, style: "background:none; overflow:visible;" });
+                // L'explosion de flammes (sans métal), la gerbe de feu sur la cible.
+                o.son("feu-explosion");
+                o.jauge(sc.calque, sc.cible, 40, 26, 40, "-14", COULEURS.degats, COULEURS.degats);
+                o.attendre(500).then(() => etat(o, sc.calque, sc.cible, "Brûlé !"));
+                await Promise.all([gerbeDeFeu(o, sc.calque, b), o.secouer(sc.cible, b.t * 0.12, 320, v), o.eclat(sc.cible, ORANGE, 600)]);
+            }
+        },
+        {
+            id: "coup-critique", nom: "Coup critique", categorie: "Attaque", sens: "vers l'ennemi",
+            description: "« COUP CRITIQUE ! » tombe en rouge sous le pion du héros, claque, souligné d'un trait, dans une pluie d'étincelles ; puis vient l'attaque, normale.",
+            async jouer(sc, o) {
+                o.son("critique-charge");
+                messageCritique(o, sc.calque, sc.lanceur);
+                await o.attendre(650);
+                await frapper(o, sc.calque, sc.lanceur, sc.cible, { valeur: "-24 !" });
+                await o.attendre(300);
+            }
+        }
+    ]);
+
     const ORDRE = [
         // 1. Déplacements
         "marche", "marche-difficile", "marche-gelee", "marche-vargen", "bond", "repli", "pas-retraite", "fuite-peur", "fuite-confusion",
@@ -2714,7 +2949,10 @@
     //  Nico, dans le Studio : « Marche du Vargen, Bond, Repli, Pas de retraite
     //  offert par l'arme, Fuite sous la Peur, Fuite sous la Confusion,
     //  Hémorragie interne, Arrivée d'un renfort, Apparition d'une Illusion,
-    //  Déploiement des pions : tu peux les implanter en jeu. »
+    //  Déploiement des pions : tu peux les implanter en jeu. » Puis : « Marche
+    //  case par case, terrain difficile, marche gelée, entrée dans les zones
+    //  persistantes, attaque de zone, attaque d'un zombie, échec de technique
+    //  (Étourdi), compétence lancée sur soi : c'est bon, tu peux intégrer. »
     //
     //  Le combat ne joue pas une scène entière : il rejoue son journal ÉTAPE
     //  PAR ÉTAPE — un pas, un bond, une arrivée (animations_jeu.js). Ce sont
@@ -2755,8 +2993,121 @@
         return f;
     };
     const positionDe = (o, sc) => ({ ...centre(sc.lanceur, sc.calque), ...(o.caseDe(sc.lanceur) || {}) });
+    // Ce que coûte la case, au-dessus du pion (une case gratuite ne dit rien).
+    const coutAffiche = (sc, o) => { if (Number(sc.cout) > 0) o.texte(sc.calque, sc.lanceur, `-${Number(sc.cout)} ⚡`, COULEURS.attention, { taille: 15 }); };
 
     window.enregistrerAnimationsJeu([
+        // LA MARCHE CASE PAR CASE (Nico : « c'est bon, tu peux intégrer ») : un
+        // petit saut par case, un pas sur l'herbe et la terre, un peu de
+        // poussière, et ce que coûte la case au-dessus du pion.
+        { id: "jeu-pas-marche", async jouer(sc, o) {
+            await unPas(sc, o, { duree: 400, saut: true, son: "pas-herbe",
+                pas: (pt) => { poussiere(o, sc.calque, pt, { n: 4 }); coutAffiche(sc, o); } });
+        } },
+        // LE TERRAIN DIFFICILE : la même marche, plus lente et plus lourde.
+        { id: "jeu-pas-difficile", async jouer(sc, o) {
+            await unPas(sc, o, { duree: 680, saut: true, hauteur: 1.1, son: "pas-lourd",
+                pas: (pt) => { poussiere(o, sc.calque, pt, { n: 5 }); coutAffiche(sc, o); } });
+        } },
+        // LA MARCHE GELÉE (Glacé) : rien sur le pion ; dessous, quelques cristaux
+        // de givre à chaque pas, et la glace qui craque. « Glacé : marche ×2 »
+        // au premier pas.
+        { id: "jeu-pas-gelee", async jouer(sc, o) {
+            if (sc.premier) etat(o, sc.calque, sc.lanceur, "Glacé : marche ×2");
+            await unPas(sc, o, { duree: sc.difficile ? 680 : 420, saut: true, hauteur: sc.difficile ? 1.1 : undefined, son: "pas-glace",
+                pas: (pt) => { cristaux(o, sc.calque, pt); coutAffiche(sc, o); } });
+        } },
+        // L'ENTRÉE DANS UNE ZONE PERSISTANTE : la case réagit sous le pion, selon
+        // sa nature — le feu monte, la glace saisit, la décharge crépite (son
+        // électrique), le poison bouillonne. Le chiffre suit, avec sa jauge ;
+        // l'état posé se dit. `sc.deja` : la case a déjà réagi pour cette
+        // entrée (un chiffre, puis un état) : l'état seul.
+        { id: "jeu-entree-zone", async jouer(sc, o) {
+            const pt = centre(sc.lanceur, sc.calque);
+            if (!sc.deja) {
+                if (sc.type === "feu") {
+                    o.son("brule"); o.eclat(sc.lanceur, ORANGE, 500);
+                    o.gerbe(sc.calque, pt.x, pt.y, { nombre: 10, dist: pt.t * 0.5, monte: pt.t * 0.6, couleurs: ["#ffd25a", "#ff7a1a", "#ff4500"], taille: 8, duree: 700 });
+                } else if (sc.type === "glace") {
+                    o.son("glace-impact"); o.eclat(sc.lanceur, GIVRE, 500);
+                    o.onde(sc.calque, pt, { couleur: "#bdf3ff", taille: 0.8, duree: 500, echelle: 1.6 });
+                    cristaux(o, sc.calque, pt, { n: 5 });
+                } else if (sc.type === "electrique") {
+                    o.son("decharge"); o.eclat(sc.lanceur, ELEC, 500);
+                    for (let k = 0; k < 3; k++) o.eclair(sc.calque, { x: pt.x - pt.t * 0.5, y: pt.y + hasard(-0.3, 0.3) * pt.t, t: pt.t },
+                                                         { x: pt.x + pt.t * 0.5, y: pt.y + hasard(-0.3, 0.3) * pt.t, t: pt.t }, { largeur: 0.4, duree: 360, retard: k * 90, segments: 6 });
+                } else if (sc.type === "poison") {
+                    o.son("poison-bulles"); o.eclat(sc.lanceur, VERT, 500);
+                    o.gerbe(sc.calque, pt.x, pt.y + pt.t * 0.1, { nombre: 10, dist: pt.t * 0.4, monte: pt.t * 0.7, couleurs: ["#7dd321", "#b5ff4c", "#4e8a12"],
+                                                                 taille: 8, tailleMin: 4, duree: 900, etale: 300 });
+                } else {
+                    o.son("impact-magique"); o.eclat(sc.lanceur, ROUGE, 450);
+                    o.onde(sc.calque, pt, { couleur: "#ff6a4a", taille: 0.8, duree: 500, echelle: 1.6 });
+                }
+            }
+            if (sc.etat) etat(o, sc.calque, sc.lanceur, `${sc.etat} !`);
+            await o.attendre(sc.deja ? 300 : 450);
+        } },
+        // L'ATTAQUE DE ZONE (Nico : « on garde, tu peux l'implanter ») : les cases
+        // visées rougeoient, pulsent, puis explosent ensemble — chaque hexagone
+        // flamboie, une onde par case, une gerbe au milieu ; ceux qui y sont
+        // secoués. Les chiffres suivent, un par cible.
+        { id: "jeu-attaque-zone", async jouer(sc, o) {
+            const pts = (sc.cases || []).map(c => pointDe(o, sc, c));
+            if (!pts.length) return;
+            const a = centre(sc.lanceur, sc.calque), b = milieu(pts);
+            const touches = (sc.cibles || []).map(id => document.getElementById("token-" + id)).filter(el => el && el !== sc.lanceur);
+            o.eclat(sc.lanceur, "brightness(1.3) drop-shadow(0 0 10px #ff5030)", 600);
+            const cases = pts.map((pt, i) => o.hexagone(sc.calque, pt, { fond: "radial-gradient(circle, rgba(255,120,80,0.45), rgba(200,30,20,0.35) 80%)", retard: i * 40 }));
+            cases.forEach(c => c.classList.add("anim-case-zone"));
+            await o.pulser(cases, { duree: 300, fois: 2, eclat: 1.6, decale: 20 });
+            o.son("zone-explosion");
+            await Promise.all([
+                ...cases.map(c => o.teinter(c, [{ filter: "brightness(1)", opacity: 1 }, { filter: "brightness(2.4) saturate(1.5)", opacity: 1, offset: 0.2 },
+                                                { filter: "brightness(1)", opacity: 0 }], { duration: 800, fill: "forwards" })),
+                ...pts.map((pt, i) => o.onde(sc.calque, pt, { couleur: "#ff9a40", taille: 0.7, duree: 600, echelle: 1.7, retard: i * 25 })),
+                o.gerbe(sc.calque, b.x, b.y, { nombre: 18, dist: b.t * Math.min(3.5, 1.8 * Math.sqrt(pts.length / 7)), couleurs: ["#ffcf5a", "#ff7a1a", "#e8420c"], taille: 7, duree: 850 }),
+                ...touches.map(el => o.secouer(el, b.t * 0.14, 420, axe(a, centre(el, sc.calque))))]);
+            cases.forEach(c => c.remove());
+        } },
+        // L'ATTAQUE D'UN ZOMBIE (« c'est bon, tu peux implanter ») : il titube,
+        // s'élance et griffe sa proie de trois traits pâles.
+        { id: "jeu-attaque-zombie", async jouer(sc, o) {
+            const A = centre(sc.lanceur, sc.calque), B = centre(sc.cible, sc.calque), v = axe(A, B);
+            o.son("zombie");
+            await o.bouger(sc.lanceur, [{ transform: "rotate(0deg)" }, { transform: "rotate(-8deg)" }, { transform: "rotate(6deg)" }, { transform: "rotate(0deg)" }], { duration: 500 });
+            const elan = o.elan(sc.lanceur, A, B, {});
+            await o.attendre(330);
+            o.son("griffe");
+            await Promise.all([elan, griffes(o, sc.calque, B, v.angle, "#c8ffb0")]);
+        } },
+        // L'ÉCHEC D'UNE TECHNIQUE (Étourdi) : le combattant rassemble son
+        // énergie… qui fuse et retombe en fumée grise.
+        { id: "jeu-echec-etourdi", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            o.son("energie");
+            await Promise.all([rassembler(o, sc.calque, a, { couleur: "#ffe680", n: 8, duree: 450 }), o.eclat(sc.lanceur, OR, 500)]);
+            o.son("echec");
+            o.icone(sc.calque, a, "💫", { duree: 1200 });
+            o.texte(sc.calque, sc.lanceur, sc.texte || "Échec ! (Étourdi)", sc.couleur || COULEURS.attention);
+            await Promise.all([o.gerbe(sc.calque, a.x, a.y, { nombre: 12, dist: a.t * 0.8, monte: a.t * 0.4, couleurs: ["#9a9a9a", "#cfcfcf", "#6a6a6a"], taille: 12, tailleMin: 6, duree: 1100, etale: 200 }),
+                o.teinter(sc.lanceur, [{ filter: "none" }, { filter: "grayscale(0.8) brightness(0.8)", offset: 0.3 }, { filter: "none" }], { duration: 900 })]);
+        } },
+        // UNE COMPÉTENCE LANCÉE SUR SOI (la Confusion) : le sort part, fait
+        // demi-tour en l'air et revient frapper son lanceur, qui se teinte de
+        // violet. (« Confus : s'inflige sa propre compétence ! » suit.)
+        { id: "jeu-carte-sur-soi", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            const loin = sc.cible ? centre(sc.cible, sc.calque) : { x: a.x + a.t * 2, y: a.y, t: a.t };
+            o.son("confusion");
+            o.icone(sc.calque, a, "❓", { duree: 1300, lueur: "#c9a8ff" });
+            const v = axe(a, loin), d = Math.min(v.d * 0.7, a.t * 2.2);
+            const mi = { x: a.x + v.ux * d, y: a.y + v.uy * d, t: a.t };
+            await orbe(o, sc.calque, a, mi, { couleur: "#b070ff", taille: 0.3, arc: 0.6, duree: 420, easing: "ease-out" });
+            await orbe(o, sc.calque, mi, a, { couleur: "#b070ff", taille: 0.3, arc: -0.6, duree: 420, easing: "ease-in" });
+            o.son("impact-magique");
+            await Promise.all([o.secouer(sc.lanceur, a.t * 0.12, 360, axe(mi, a)), o.eclat(sc.lanceur, VIOLET, 460)]);
+        } },
         // LA MARCHE DU VARGEN : foulée légère et rapide, une silhouette laissée
         // sur chaque case quittée ; « ½ ⚡ » au premier pas.
         { id: "jeu-pas-vargen", async jouer(sc, o) {

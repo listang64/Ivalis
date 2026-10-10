@@ -153,19 +153,21 @@
             if (jeton.annule || !pion) return null;
             const c = centre(pion, calque);
             if (typeof window.afficherMessageFlottantHex !== "function") return null;
+            // Un chiffre de dégâts s'envole (afficherMessageFlottantHex), à la taille du pion.
             const msg = window.afficherMessageFlottantHex(null, null, texte, couleur || COULEURS.degats,
-                { ...(options || {}), ecran: { conteneur: calque, x: c.x, y: c.y, cle: "anim-" + (pion.id || "pion") } });
+                { taillePion: c.t, ...(options || {}), ecran: { conteneur: calque, x: c.x, y: c.y, cle: "anim-" + (pion.id || "pion") } });
             if (msg && msg.classList) msg.classList.add("anim-message");
             return msg;
         };
         // Le chiffre, l'éclat et la petite barre qui se vide sous le pion :
         // afficherFlashDegatToken (moteur_effets.js), comme pour un vrai coup.
-        o.jauge = (calque, pion, de, vers, max, texte, couleurTexte, couleurBarre) => {
+        o.jauge = (calque, pion, de, vers, max, texte, couleurTexte, couleurBarre, options) => {
             if (jeton.annule || !pion) return;
             o.texte(calque, pion, texte, couleurTexte);
             if (typeof window.afficherFlashDegatToken === "function") {
                 // Sans `ecran` : l'éclat et la barre seulement, le texte vient d'être posé.
-                window.afficherFlashDegatToken(null, de, vers, max, texte, couleurTexte, couleurBarre, { pion });
+                // `options.sansEclat` : la barre, sans le flash (le coup a son propre éclat).
+                window.afficherFlashDegatToken(null, de, vers, max, texte, couleurTexte, couleurBarre, { pion, ...(options || {}) });
                 pion.querySelectorAll(".jauge-flash-token").forEach(j => j.classList.add("anim-message"));
             }
         };
@@ -184,7 +186,8 @@
         // traînée. `style` : son allure ; rend une promesse à l'arrivée.
         o.projectile = async (calque, a, b, p) => {
             const t = a.t * (p.taille || 0.45);
-            const bille = o.poser(calque, a.x, a.y, `width:${t}px; height:${t}px; border-radius:${p.forme || "50%"}; z-index:4; ${p.style}`);
+            // `contenu` : un dessin à l'intérieur (la flèche, la boule de feu).
+            const bille = o.poser(calque, a.x, a.y, `width:${t}px; height:${t}px; border-radius:${p.forme || "50%"}; z-index:4; ${p.style}`, p.contenu || "");
             const duree = p.duree || 520, arc = a.t * (p.arc === undefined ? 0.35 : p.arc);
             const rot = (p.oriente ? axe(a, b).angle * 180 / Math.PI : 0);
             const vol = o.teinter(bille, [
