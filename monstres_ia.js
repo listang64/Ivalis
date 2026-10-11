@@ -10,7 +10,7 @@
 //     vivants ont choisi, monstres compris.
 //
 //   • Phase de résolution : quand la file présente un monstre en tête, il
-//     se déplace (3 cases au maximum) pour se mettre à portée, lance sa
+//     se déplace (4 à 6 cases selon son palier) pour se mettre à portée, lance sa
 //     carte, puis passe la main.
 //
 //  Rien n'est réécrit du moteur : le déplacement passe par
@@ -116,9 +116,14 @@ function caseLibre(q, r, idIgnore) {
     return true;
 }
 
-// Les cases atteignables en 3 pas AU PLUS, avec la longueur réelle du trajet
-// (murs, cases supprimées et combattants contournés par l'A* du jeu).
-const PAS_MAX_MONSTRE = 3;
+// LE DÉPLACEMENT D'UNE CRÉATURE SELON SON PALIER (Nico : « petits 6, normal 5,
+// élite 4, boss 4 ») — le même barème que le cerveau (ia_pure.js, pasMaxDe).
+const PAS_PAR_PALIER_MONSTRE = { "Petit": 6, "Normal": 5, "Élite": 4, "Elite": 4, "Boss": 4 };
+const PAS_MAX_MONSTRE = 5;
+window.pasMaxMonstre = (m) => PAS_PAR_PALIER_MONSTRE[(m && (m.Palier || m.palier)) || ""] || PAS_MAX_MONSTRE;
+
+// Les cases atteignables en quelques pas (selon le palier), avec la longueur
+// réelle du trajet (murs, cases supprimées et combattants contournés par l'A*).
 
 window.casesAccessiblesMonstre = function(idMonstre, pasMax = PAS_MAX_MONSTRE) {
     const depart = (window.TOKENS_VTT_DATA || {})[idMonstre];
@@ -336,8 +341,10 @@ const DELAI_FORGE_MS = 30000;
 const DELAI_ATTENTE_JOUEURS_MS = 180000;
 window.ATTENTE_TECHNIQUES_MONSTRES = window.ATTENTE_TECHNIQUES_MONSTRES || {};
 
-window.choisirCarteMonstre = function(monstre) {
-    const cartes = cartesDuMonstre(monstre);
+window.choisirCarteMonstre = function(monstre, exclure) {
+    // `exclure` : l'identifiant d'une carte déjà retenue ce tour-ci (la
+    // première compétence d'un boss), qu'on ne choisit pas une seconde fois.
+    const cartes = cartesDuMonstre(monstre).filter(c => !exclure || c.id !== exclure);
     const fatigue = parseInt(monstre.fatigueActuelle);
     const fatigueDispo = isNaN(fatigue) ? 0 : fatigue;
     const fatigueMax = window.fatigueMaxCombattant(monstre);
@@ -381,7 +388,8 @@ window.choisirCarteMonstre = function(monstre) {
     const tkMonstre = tokens[monstre.idPersonnage];
 
     // Distance à l'adversaire le plus proche : sert à juger si la carte pourra
-    // vraiment servir, sachant que le monstre pourra encore avancer de 3 cases.
+    // vraiment servir, sachant que le monstre pourra encore avancer (4 à 6 cases
+    // selon son palier, pasMaxMonstre).
     let distanceProche = Infinity;
     (window.PERSOS_PARTIE || []).forEach(p => {
         if (p.camp === monstre.camp) return;
@@ -417,7 +425,7 @@ window.choisirCarteMonstre = function(monstre) {
         let score = 0;
 
         // Une carte utilisable dès ce tour vaut mieux qu'une carte hors d'atteinte.
-        const portable = distanceProche <= infos.portee + PAS_MAX_MONSTRE;
+        const portable = distanceProche <= infos.portee + window.pasMaxMonstre(monstre);
         score += portable ? 12 : -20;
 
         if (infos.estSoin) {
@@ -455,6 +463,22 @@ window.choisirCarteMonstre = function(monstre) {
     });
 
     return meilleure;
+};
+
+// LA SECONDE COMPÉTENCE D'UN BOSS : null pour tout autre palier, pour une
+// première carte qui est un repos, ou quand il ne lui reste pas de quoi payer
+// une autre carte que la première.
+window.secondeCarteBoss = function(monstre, premiere) {
+    if (!monstre || (monstre.Palier || monstre.palier) !== "Boss") return null;
+    if (!premiere || premiere.repos || !premiere.data) return null;
+    const fatigue = parseInt(monstre.fatigueActuelle);
+    const reste = (isNaN(fatigue) ? 0 : fatigue) - (parseInt(premiere.data.Fatigue) || 0);
+    if (reste <= 0) return null;
+    // Aucune autre technique dans son jeu : pas la peine de demander (une
+    // demande sans carte passerait pour une forge en cours, voir plus haut).
+    if (!cartesDuMonstre(monstre).some(c => c.id !== premiere.id)) return null;
+    const seconde = window.choisirCarteMonstre({ ...monstre, fatigueActuelle: reste }, premiere.id);
+    return (seconde && !seconde.repos && seconde.id !== premiere.id) ? seconde : null;
 };
 
 // Pose la carte choisie dans la file d'initiative, exactement comme le fait
@@ -561,15 +585,25 @@ window.preparerCartesMonstres = async function() {
                 .catch(e => console.error(e));
         }
 
+        // UN BOSS EFFECTUE DEUX COMPÉTENCES DANS SON TOUR. La seconde se choisit
+        // comme la première, sur ce qu'il lui reste d'énergie une fois la
+        // première payée, et jamais la même. Elle part dans la même entrée de
+        // file (même initiative : celle de la première) ; le cerveau la joue
+        // juste après la première (cerveau_combat.js, jouerCreature). S'il n'a
+        // plus de quoi, ou si son choix serait de souffler, il n'en a qu'une.
+        const carte2 = window.secondeCarteBoss(monstre, carte);
+
         aInscrire.push({
             idPersonnage: monstre.idPersonnage,
             idCarte: carte.id,
+            ...(carte2 ? { idCarte2: carte2.id } : {}),
             initiative,
             timestamp: new Date().getTime()
         });
         auMoinsUn = true;
         window.DERNIERES_CARTES_MONSTRES[monstre.idPersonnage] = carte.id;
-        console.log(`🧠 ${monstre.prenom || monstre.idPersonnage} prépare « ${carte.data.Nom} » (init ${initiative})`);
+        console.log(`🧠 ${monstre.prenom || monstre.idPersonnage} prépare « ${carte.data.Nom} » (init ${initiative})`
+                    + (carte2 ? ` puis « ${carte2.data.Nom} »` : ""));
     }
 
     if (!auMoinsUn) return;   // personne n'a rien à poser : la file reste telle quelle

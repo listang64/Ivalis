@@ -5982,3 +5982,70 @@ pas — et le Studio (foudre, critique, mur ; le son du critique, grave et
 long). Il mord sur l'ancien code (15 échecs, puis le pont s'arrête net).
 animations_en_jeu_3.mjs suit : la foudre a désormais son geste, avec le seul
 son de l'électricité.
+
+## v235 — Renforts, marche des créatures, confusion, mise à terre, boss
+
+Nico : « les renforts qui arrivent en combat, j'ai l'impression qu'ils
+spawnent direct et pas au début du tour d'après. Change les déplacements pour
+les monstres : petits 6, normal 5, élite 4, boss 4. Il y a un bug avec la
+confusion : il a fait son attaque et après il a fait "confus s'enfuit".
+L'attaque ne se fait que quand il est confus et le fait sur un allié à lui ou
+sur soi-même ; s'il fuit il ne la fait pas. Et s'il n'est plus confus alors il
+fait son attaque normale. L'animation de à terre, tu ne l'as pas implantée du
+Studio, en tout cas en jeu c'est pas la même. La validation de la cible ou la
+croix pour annuler se met en dessous de l'effet aveugle de l'hexagone d'à
+côté : mets-les au-dessus. Les boss, mets-leur qu'ils puissent effectuer deux
+compétences durant leurs tours. »
+
+- LES RENFORTS (pont_combat.js, renfortsDuTour) : une créature abattue (ou
+  relevée en zombie) libère sa place, et le renfort entre quand la MANCHE
+  suivante s'ouvre — plus à la fin du tour d'un combattant. Son pion est posé
+  pendant la préparation : l'IA lui choisit une carte comme aux autres. Tant
+  que la réserve n'est pas vide, abattre le dernier ennemi du plateau n'est
+  pas une victoire (loot.js, combatGagne).
+- LA MARCHE DES CRÉATURES selon leur palier : petit 6 cases, normal 5, élite
+  4, boss 4 (ia_pure.js : PAS_PAR_PALIER, pasMaxDe ; monstres_ia.js :
+  pasMaxMonstre, pour juger en préparation si une carte portera). Sans
+  palier, celle d'un normal. Hors de portée, la créature marche tout son
+  palier : le rapprochement pèse 3,5 la case (au lieu de 2,5) et le bruit
+  ±1 (au lieu de ±2) — à l'ancien barème, le prix des cases 4 à 6 et le
+  bruit l'arrêtaient une case avant une fois sur trois. L'arbitrage des
+  attaques d'opportunité ne bouge pas (deux cases gagnées n'en valent pas
+  une encaissée, trois si).
+- LA CONFUSION (moteur_pur.js, appliquerConfusion et resoudreCarte ; cerveau)
+  : de travers (40 %), la carte part, sur lui ou sur un allié ; en fuite
+  (20 %), il s'enfuit SANS lancer sa carte (ni dégâts, ni coût, ni zone, ni
+  peur, ni repli, ni bond) ; dissipée (20 %), il n'est plus confus AVANT sa
+  carte et la lance normalement ; rien (20 %), « Confus : ne fait rien », la
+  carte ne part pas. Même règle pour les héros et les créatures.
+- LA MISE À TERRE EN JEU : le coup qui abat (vie à zéro) le dit (`chute`) et
+  l'écran RETIENT le pion (animations_jeu.js : PIONS_RETENUS, pionRetenu ;
+  combat.js, appliquerTokensVTT) — avant, la vie à zéro descendue, le redessin
+  le retirait aussitôt et la mise à terre du Studio n'avait plus de pion à
+  faire tomber. La mise à terre (ou l'illusion brisée) le rend ; un filet le
+  rend de toute façon au bout de six secondes. Un coup sans nature (poison,
+  zone) qui abat retient aussi (`retenir`).
+- LA BULLE ✔ ET LA CROIX ✖ (et les jauges) : leur calque (#calque-ciblage-haut)
+  passe AU-DESSUS du brouillard de l'aveuglé (z-index 5, après
+  #calque-brouillard-vtt).
+- LE BOSS JOUE DEUX COMPÉTENCES : en préparation, il choisit une seconde carte
+  (monstres_ia.js, secondeCarteBoss) sur l'énergie qui lui reste une fois la
+  première payée, jamais la même, et pas s'il souffle ou n'en a plus de quoi ;
+  elle part dans la même entrée de file (`idCarte2`, entreeDeFile /
+  fileDepuisEtat), lue d'avance pour le cerveau (regime_cerveau.js,
+  preparerLesCartes, `seconde`). Le cerveau (cerveau_combat.js, jouerCreature
+  → actionDeCreature) la joue juste après la première, avec ce qu'il lui
+  reste de marche (4 cases pour TOUT le tour) ; sa première marche garde de
+  quoi payer les deux cartes. Abattu entre les deux, il s'en tient là.
+
+corrections_v235.mjs : les renforts par manche, la marche de chaque palier
+(cases atteignables et pas réellement faits), les quatre issues de la
+confusion (créature et héros), la chute dite par le pont, le boss et ses deux
+cartes (énergie, marche partagée, file), puis la vraie page — la bulle et la
+croix au-dessus du noir, le pion abattu gardé puis tombé avec le geste du
+Studio, la victoire qui attend la réserve, la seconde carte choisie en
+préparation. Il mord sur l'ancien code (22 échecs, puis la page s'arrête net).
+Mis à jour : ia_pure.mjs (les champs de 3 pas deviennent explicites, et la
+marche par palier), profanateur.mjs (5 bis : le renfort à la manche
+suivante), confusion_cerveau.mjs (la fuite et le « rien » ne lancent plus la
+carte).

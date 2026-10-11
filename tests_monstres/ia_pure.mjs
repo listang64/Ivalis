@@ -181,27 +181,37 @@ console.log("\n6. OÙ PEUT-ELLE ALLER ?");
     const desert = monde("brutal");
     ["H1", "H2", "H3", "M2"].forEach(id => { delete desert.combattants[id]; });
     verifier("trois pas sur une plaine vide : trente-sept cases",
-             casesAccessibles(desert, "M1", null).length === 37,
-             `(${casesAccessibles(desert, "M1", null).length})`);
+             casesAccessibles(desert, "M1", null, 3).length === 37,
+             `(${casesAccessibles(desert, "M1", null, 3).length})`);
+    // LA MARCHE SUIT LE PALIER (Nico, v235 : « petits 6, normal 5, élite 4,
+    // boss 4 ») ; sans palier, celle d'un normal.
+    const champ = (palier) => { desert.combattants.M1.palier = palier; return casesAccessibles(desert, "M1", null).length; };
+    verifier("sans palier, cinq pas (comme un normal) : quatre-vingt-onze cases", champ("") === 91, `(${champ("")})`);
+    verifier("un petit, six pas : cent vingt-sept cases", champ("Petit") === 127, `(${champ("Petit")})`);
+    verifier("une élite ou un boss, quatre pas : soixante et une cases",
+             champ("Élite") === 61 && champ("Boss") === 61, `(${champ("Élite")}, ${champ("Boss")})`);
 
     // Avec du monde, moins : un vivant occupe sa case ET barre le passage. Ici
     // le congénère en (6,0) coûte sa propre case, et celle qu'il masque
     // derrière lui.
     const etat = monde("brutal");
-    const cases = casesAccessibles(etat, "M1", null);
+    const cases = casesAccessibles(etat, "M1", null, 3);
     verifier("un congénère coûte sa case et celle qu'il masque",
              cases.length === 35, `(${cases.length})`);
     verifier("sa propre case en fait partie, avec un chemin vide",
              cases.some(c => c.q === 4 && c.r === 0 && c.chemin.length === 0));
     verifier("aucune n'est à plus de trois pas",
              cases.every(c => c.chemin.length <= 3));
+    verifier("et sans limite demandée, aucune à plus de cinq (pas de palier)",
+             casesAccessibles(etat, "M1", null).every(c => c.chemin.length <= 5)
+             && casesAccessibles(etat, "M1", null).some(c => c.chemin.length === 5));
     verifier("et chaque chemin mène bien où il dit",
              cases.every(c => c.chemin.length === 0
                  || (c.chemin[c.chemin.length - 1].q === c.q && c.chemin[c.chemin.length - 1].r === c.r)));
 
     // Un mur réduit le champ des possibles.
     const mur = { etatCase: (q) => ({ bloquee: q === 3, supprimee: false, difficile: false }) };
-    const bloquee = casesAccessibles(etat, "M1", mur);
+    const bloquee = casesAccessibles(etat, "M1", mur, 3);
     verifier("un mur réduit les cases atteignables", bloquee.length < cases.length,
              `(${bloquee.length} contre ${cases.length})`);
     verifier("et aucune n'est dans le mur", !bloquee.some(c => c.q === 3));

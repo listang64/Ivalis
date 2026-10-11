@@ -51,13 +51,15 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant, fureurDeLaSentinelle, voisinsDe } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche, casesAccessibles,
-         ennemiAtteignable, pasJusquAuContact, detourDesMurs, DETOUR_MAX_MURS, PAS_MAX_CREATURE } from './ia_pure.js';
+         ennemiAtteignable, pasJusquAuContact, detourDesMurs, DETOUR_MAX_MURS, pasMaxDe } from './ia_pure.js';
 
 // LES SUITES D'UNE CARTE LANCÉE EN ÉTAT DE CONFUSION (règle de Nico, voir
-// appliquerConfusion) : après la carte, le 3e jet le fait FUIR comme sous la
-// Peur — loin de l'adversaire le plus proche, et chaque ennemi quitté frappe —
-// puis, en fin de boucle, le 4e jet dissipe la confusion. Ici et pas dans
-// resoudreCarte : la fuite tire un dé à chaque case, et seul le cerveau en a.
+// appliquerConfusion) : le 2e quart du jet le fait FUIR comme sous la Peur —
+// loin de l'adversaire le plus proche, et chaque ennemi quitté frappe — sans
+// que sa carte soit partie (resoudreCarte l'a laissée). La dissipation, elle,
+// se dit avant la carte (resoudreCarte) : celle d'ici ne trouve plus rien à
+// dissiper. Ici et pas dans resoudreCarte : la fuite tire un dé à chaque case,
+// et seul le cerveau en a.
 function suitesDeConfusion(etat, action, des, plateau) {
     const conf = action && action.confusion;
     if (!conf) return [];
@@ -1058,6 +1060,9 @@ export function appliquerIntention(etat, intention, plateau) {
         const action = appliquerConfusion(etat, appliquerCharme(etat, sansMurs, plateau, des), plateau, des);
         action.jets = tirerDesCarte(etat, action, intention.acteur, critique, des);
         const r = resoudreCarte(etat, action, plateau);
+        // CONFUS, IL NE LANCE RIEN (il fuit, ou il reste planté) : ni murs
+        // frappés, ni peur, ni zone, ni bond, ni repli — la carte n'est pas partie.
+        const annulee = !!(action.confusion && action.confusion.annulee);
 
         // UNE CARTE TERMINE LE TOUR, et c'est la règle du jeu depuis toujours :
         // validerCarteCombat enchaîne sur finDeTourCombat. Le cerveau ne le
@@ -1070,7 +1075,7 @@ export function appliquerIntention(etat, intention, plateau) {
         // de X »). Il n'y a pas de compteur à tenir, juste une règle à dire.
         const suivant = clonerEtat(r.etat);
         const etapes = [...r.etapes];
-        if (Object.keys(coupsSurMurs).length > 0 && !(action.jets && action.jets.attaqueRatee)) {
+        if (!annulee && Object.keys(coupsSurMurs).length > 0 && !(action.jets && action.jets.attaqueRatee)) {
             etapes.push(...frapperMurs(suivant, coupsSurMurs, intention.acteur, critique));
         }
 
@@ -1094,7 +1099,7 @@ export function appliquerIntention(etat, intention, plateau) {
         // et on la fait fuir avec les dés du cerveau — exactement comme une
         // marche normale (resoudreMouvement) tranche déjà ses propres
         // attaques d'opportunité en vivant.
-        (action.alterations || []).forEach(alt => {
+        (annulee ? [] : (action.alterations || [])).forEach(alt => {
             if (alt.nom !== "Peur") return;
             (alt.cibles || []).forEach(idCible => {
                 const jetCible = (action.jets && action.jets.parCible && action.jets.parCible[idCible]) || {};
@@ -1115,7 +1120,7 @@ export function appliquerIntention(etat, intention, plateau) {
         // Les cases viennent du client : c'est du CIBLAGE, décidé par le joueur
         // au moment où il pose sa carte, exactement comme la liste des cibles.
         // Aucun dé là-dedans — rien qu'un poste puisse fausser à son avantage.
-        if (intention.persistanceTerrain) {
+        if (intention.persistanceTerrain && !annulee) {
             const zone = creerZonePure(suivant, action, intention.zoneHexes || [],
                                        intention.acteur);
             if (zone) etapes.push(...poserZone(suivant, zone));
@@ -1126,7 +1131,7 @@ export function appliquerIntention(etat, intention, plateau) {
         // était refusé. Il part donc avec elle et se joue ici, après
         // l'attaque ; la géométrie (portée, murs, cases libres) reste celle
         // de resoudreBond.
-        if (intention.bond && intention.bond.vers) {
+        if (intention.bond && intention.bond.vers && !annulee) {
             const lanceurBond = combattant(suivant, intention.acteur);
             if (lanceurBond && !lanceurBond.aTerre) {
                 const rb = resoudreBond(suivant, {
@@ -1143,7 +1148,7 @@ export function appliquerIntention(etat, intention, plateau) {
         // carte clôt le tour juste en dessous. Le chemin est recalculé depuis
         // la position du lanceur une fois l'attaque jouée, et les dés
         // d'esquive sont ceux du cerveau.
-        if (intention.repli && intention.repli.vers) {
+        if (intention.repli && intention.repli.vers && !annulee) {
             etapes.push(...resoudreRepli(suivant, intention.acteur, intention.repli.vers, des, plateau, {
                 portee: Math.min(6, Math.max(0, nombre(intention.repli.portee, 3))),
                 chance: Math.min(100, Math.max(0, nombre(intention.repli.chance, 60)))
@@ -1176,9 +1181,64 @@ export function appliquerIntention(etat, intention, plateau) {
 //  pourraient s'entrelacer avec autre chose. Là où l'ancienne architecture
 //  faisait huit à douze écritures indépendantes, il n'y en a plus qu'une.
 
-export function jouerCreature(etat, id, carte, plateau) {
+//  LE BOSS JOUE DEUX COMPÉTENCES (Nico : « les boss, mets-leur qu'ils puissent
+//  effectuer deux compétences durant leurs tours ») : `carte2`, sa seconde
+//  carte choisie en préparation (monstres_ia.js), part après la première, dans
+//  la même entrée, avec ce qu'il lui reste de marche (son palier : 4 cases pour
+//  tout le tour) et d'énergie. Mort ou à court, il s'en tient là.
+export function jouerCreature(etat, id, carte, plateau, carte2) {
     const des = creerDes(etat.graine);
-    const infos = carte && carte.infos ? carte.infos : { portee: 1, fatigue: 0 };
+    const estBoss = (c) => !!(c && c.palier === "Boss");
+    const avecSeconde = !!(carte2 && carte2.idCarte && estBoss(combattant(etat, id)));
+    // Sa première marche garde de quoi payer les DEUX cartes, pas seulement la
+    // première : sinon elle vidait son énergie en chemin et la seconde partait
+    // à crédit.
+    const reserveEnPlus = avecSeconde ? nombre((carte2.infos || {}).fatigue) : 0;
+    const premiere = actionDeCreature(etat, id, carte, plateau, des, { reserveEnPlus });
+    if (!premiere) return null;
+    let courant = premiere.courant;
+    const etapes = [...premiere.etapes];
+
+    const boss = combattant(courant, id);
+    if (avecSeconde && boss && !boss.aTerre) {
+        // Les cases de sa première marche : le compteur de la file ne les
+        // prendra qu'au bout du tour (fabriquerPas), on les compte donc ici —
+        // même règle que compterPasMarche.
+        const tete = (courant.file || [])[0];
+        const marchees = premiere.etapes.filter(e => e.type === "pas" && e.acteur === id).length;
+        const pasFaits = nombre(tete && tete.id === id ? tete.pas : 0) + marchees;
+        const seconde = actionDeCreature(courant, id, carte2, plateau, des,
+                                         { pasMax: Math.max(0, pasMaxDe(boss) - pasFaits), pasDejaFaits: pasFaits, seconde: true });
+        if (seconde) {
+            courant = seconde.courant;
+            etapes.push(...seconde.etapes);
+        }
+    }
+
+    // ET SON TOUR SE CLÔT DANS LA MÊME ENTRÉE. Une créature ne clique pas « fin
+    // de tour » : personne ne le fera à sa place. Sans cette clôture, elle
+    // restait en tête de file et le cerveau la rejouait indéfiniment — la
+    // version filait, le journal se remplissait, et le combat n'avançait pas
+    // d'un pouce. C'est le même symptôme que « le tour d'un ennemi complètement
+    // passé », par l'autre bout.
+    courant = clonerEtat(courant);
+    const clot = cloturerTour(courant);
+    if (clot) etapes.push(...clot.etapes);
+
+    return fabriquerPas(etat, courant, etapes, `ia|${id}|${etat.manche}`, id, des);
+}
+
+// UNE ACTION DE CRÉATURE : marcher, puis lancer sa carte (ou frapper le mur qui
+// l'enferme, ou dire pourquoi elle renonce). Rend l'état d'après et ses étapes ;
+// le tour, lui, se clôt dans jouerCreature. `options.pasMax` : ce qu'il reste de
+// marche ; `options.seconde` : la seconde compétence d'un boss (silencieuse si
+// elle ne peut pas partir) ; `options.reserveEnPlus` : l'énergie à garder pour
+// elle pendant la première marche ; `options.pasDejaFaits` : les cases déjà
+// marchées ce tour-ci (le barème reprend où il en était).
+function actionDeCreature(etat, id, carte, plateau, des, options) {
+    const opts = options || {};
+    const infos = { ...(carte && carte.infos ? carte.infos : { portee: 1, fatigue: 0 }),
+                    ...(opts.pasMax !== undefined ? { pasMax: opts.pasMax } : {}) };
 
     const plan = deciderTourCreature(etat, id, infos, plateau, des);
     if (!plan) return null;
@@ -1191,7 +1251,7 @@ export function jouerCreature(etat, id, carte, plateau) {
         const moiAvant = combattant(etat, id);
         const versLeMur = (h) => { const d = detour.carteSansMurs.get(`${h.q},${h.r}`); return d === undefined ? Infinity : d; };
         const cases = aLEtat(moiAvant, "Immobilisation") ? []
-            : casesAccessibles(etat, id, plateau, PAS_MAX_CREATURE).filter(h => h.chemin.length > 0);
+            : casesAccessibles(etat, id, plateau, infos.pasMax !== undefined ? infos.pasMax : pasMaxDe(moiAvant)).filter(h => h.chemin.length > 0);
         cases.sort((a, b) => (versLeMur(a) - versLeMur(b)) || (a.ao - b.ao) || (a.chemin.length - b.chemin.length)
                              || (a.q - b.q) || (a.r - b.r));
         const meilleure = cases[0];
@@ -1207,8 +1267,9 @@ export function jouerCreature(etat, id, carte, plateau) {
         const teteIA = (courant.file || [])[0];
         const m = resoudreMouvement(courant, {
             idLanceur: id, chemin: plan.chemin,
-            pasDejaFaits: nombre(teteIA && teteIA.id === id ? teteIA.pas : 0),
-            reserveCarte: nombre(infos.fatigue)
+            pasDejaFaits: opts.pasDejaFaits !== undefined ? opts.pasDejaFaits
+                                                          : nombre(teteIA && teteIA.id === id ? teteIA.pas : 0),
+            reserveCarte: nombre(infos.fatigue) + nombre(opts.reserveEnPlus)
         }, des, plateau);
         courant = m.etat;
         etapes.push(...m.etapes);
@@ -1265,12 +1326,15 @@ export function jouerCreature(etat, id, carte, plateau) {
         const r = resoudreCarte(courant, action, plateau);
         courant = clonerEtat(r.etat);
         etapes.push(...r.etapes);
+        // Confuse, elle ne lance rien (elle fuit, ou reste plantée) : ni zone,
+        // ni peur, ni repli — la carte n'est pas partie.
+        const annulee = !!(action.confusion && action.confusion.annulee);
 
         // LA ZONE QU'UNE CARTE DE PERSISTANCE LAISSE DERRIÈRE ELLE — même
         // raisonnement que pour un joueur (voir prochainPas plus haut) : une
         // créature qui lance une carte à persistance de terrain laisse le
         // même feu au sol, avec la même emprise que celle qui a frappé.
-        if (infos.persistanceTerrain && zone && zone.hexes.length) {
+        if (!annulee && infos.persistanceTerrain && zone && zone.hexes.length) {
             const zonePosee = creerZonePure(courant, action, zone.hexes, id);
             if (zonePosee) etapes.push(...poserZone(courant, zonePosee));
         }
@@ -1283,7 +1347,7 @@ export function jouerCreature(etat, id, carte, plateau) {
         // Et une créature qui fait fuir sa cible la fait fuir pour de vrai —
         // même raisonnement que côté joueur (voir plus haut) : la Peur a
         // besoin de dés qu'on n'a plus dans resoudreCarte.
-        (action.alterations || []).forEach(alt => {
+        (annulee ? [] : (action.alterations || [])).forEach(alt => {
             if (alt.nom !== "Peur") return;
             (alt.cibles || []).forEach(idCible => {
                 const jetCible = (action.jets && action.jets.parCible && action.jets.parCible[idCible]) || {};
@@ -1298,7 +1362,7 @@ export function jouerCreature(etat, id, carte, plateau) {
         // SA CARTE PORTE UN REPLI : elle décroche après avoir frappé, vers la
         // case qui l'éloigne le plus de l'adversaire (ia_pure.js, choisirRepli),
         // et marche comme un joueur qui se replie — mêmes dés, même règle.
-        if (carte.repli) {
+        if (carte.repli && !annulee) {
             const portee = Math.min(6, Math.max(0, nombre(carte.repli.portee, 3)));
             const vers = choisirRepli(courant, id, portee, plateau);
             if (vers) {
@@ -1326,7 +1390,7 @@ export function jouerCreature(etat, id, carte, plateau) {
         etapes.push({ type: "message", cible: id, acteur: id, texte: "Frappe le mur", couleur: "#a1887f",
                       frappeMur: { q: nombre(mur.q), r: nombre(mur.r) } });
         etapes.push(...frapperMurs(courant, { [mur.id]: degats }, id, false));
-    } else if (!aPortee) {
+    } else if (!aPortee && !opts.seconde) {
         // Pourquoi elle n'a rien lancé. Dans la trace, cette ligne vaut de l'or :
         // « tour de 20 millisecondes sans rien faire » restait inexplicable.
         etapes.push({ type: "renonce", acteur: id,
@@ -1334,17 +1398,7 @@ export function jouerCreature(etat, id, carte, plateau) {
                               : (plan.raison || (moi && moi.aTerre ? "tombée en chemin" : "hors de portée")) });
     }
 
-    // ET SON TOUR SE CLÔT DANS LA MÊME ENTRÉE. Une créature ne clique pas « fin
-    // de tour » : personne ne le fera à sa place. Sans cette clôture, elle
-    // restait en tête de file et le cerveau la rejouait indéfiniment — la
-    // version filait, le journal se remplissait, et le combat n'avançait pas
-    // d'un pouce. C'est le même symptôme que « le tour d'un ennemi complètement
-    // passé », par l'autre bout.
-    courant = clonerEtat(courant);
-    const clot = cloturerTour(courant);
-    if (clot) etapes.push(...clot.etapes);
-
-    return fabriquerPas(etat, courant, etapes, `ia|${id}|${etat.manche}`, id, des);
+    return { courant, etapes };
 }
 
 // LE MUR DE TERRE (Géomancien, niveau 5). Plusieurs fois par combat, 20 de
@@ -1582,7 +1636,9 @@ export function prochainPas(etat, intentions, contexte) {
     }
     if (acteur && acteur.estMonstre && !acteur.aTerre) {
         const carte = carteDe ? carteDe(tete.id, tete.carte) : null;
-        const pas = jouerCreature(etat, tete.id, carte, plateau);
+        // La seconde compétence d'un boss (jouerCreature).
+        const carte2 = carteDe && tete.carte2 ? carteDe(tete.id, tete.carte2) : null;
+        const pas = jouerCreature(etat, tete.id, carte, plateau, carte2);
         if (pas) return { ...pas, creature: tete.id };
     }
 

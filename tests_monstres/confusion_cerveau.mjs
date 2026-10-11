@@ -2,9 +2,12 @@
 //
 // Règle de Nico (la nouvelle) : quand un confus lance une technique,
 //    • 40 % : il s'attaque lui-même, ou attaque un ALLIÉ au hasard autour de lui ;
-//    • 20 % : il s'enfuit (comme la Peur) ;
-//    • 20 % : il n'est plus confus (en fin de boucle) ;
-//    • 20 % : il ne se passe rien.
+//    • 20 % : il s'enfuit (comme la Peur), SANS lancer sa carte ;
+//    • 20 % : il n'est plus confus, et lance sa carte normalement ;
+//    • 20 % : il ne fait rien (sa carte ne part pas).
+// (v235, Nico : « l'attaque ne se fait que quand il est confus et le fait sur
+// un allié à lui ou sur soi-même ; s'il fuit il ne la fait pas. Et s'il n'est
+// plus confus alors il fait son attaque normale. »)
 // Un seul de ces effets, jamais deux. (Avant : quatre jets indépendants de 30 %.)
 //
 // Et les règles de la maison, toujours tenues : les dés sont ceux du cerveau
@@ -67,14 +70,14 @@ console.log("\n1. UN JET, QUATRE ISSUES");
              JSON.stringify(allie.attaques[0].cibles) === '["AMI"]' && allie.confusion.hasard && !allie.confusion.soi,
              JSON.stringify(allie.attaques[0].cibles));
     const fuite = appliquerConfusion(monde(), carte(), null, desTruques([FUITE]));
-    verifier("41–60 : la carte part comme voulue, puis il s'enfuit",
-             JSON.stringify(fuite.attaques[0].cibles) === '["ORC"]' && fuite.confusion.fuite && !fuite.confusion.dissipee);
+    verifier("41–60 : il s'enfuit, et sa carte ne part pas (annulée)",
+             fuite.confusion.fuite && fuite.confusion.annulee && !fuite.confusion.dissipee);
     const fin = appliquerConfusion(monde(), carte(), null, desTruques([DISSIPEE]));
-    verifier("61–80 : la carte part comme voulue, et il n'est plus confus en fin de boucle",
-             JSON.stringify(fin.attaques[0].cibles) === '["ORC"]' && fin.confusion.dissipee && !fin.confusion.fuite);
+    verifier("61–80 : il n'est plus confus, et sa carte part comme voulue",
+             JSON.stringify(fin.attaques[0].cibles) === '["ORC"]' && fin.confusion.dissipee && !fin.confusion.fuite && !fin.confusion.annulee);
     const rien = appliquerConfusion(monde(), carte(), null, desTruques([RIEN]));
-    verifier("81–100 : il ne se passe rien, il reste confus",
-             JSON.stringify(rien.attaques[0].cibles) === '["ORC"]' && rien.confusion.issue === "rien"
+    verifier("81–100 : il ne fait rien (carte annulée), il reste confus",
+             rien.confusion.annulee && rien.confusion.issue === "rien"
              && !rien.confusion.soi && !rien.confusion.hasard && !rien.confusion.fuite && !rien.confusion.dissipee);
 }
 
@@ -138,7 +141,7 @@ console.log("\n4. LES CAS PARTICULIERS");
              && rSoi.etat.combattants.ORC.pv === 60);
 }
 
-console.log("\n5. DANS LE CERVEAU : LA FUITE APRÈS LA CARTE ; LA FIN DE LA BOUCLE (joueur)");
+console.log("\n5. DANS LE CERVEAU : LA FUITE SANS LA CARTE ; LA GUÉRISON AVANT ELLE (joueur)");
 {
     // Les dés sont ceux du cerveau : on cherche, graine par graine, les issues.
     const jouer = (g) => appliquerIntention(monde(g), { id: "I1", type: "carte", acteur: "MOI", poste: "P_01", idCarte: "C1",
@@ -159,7 +162,7 @@ console.log("\n5. DANS LE CERVEAU : LA FUITE APRÈS LA CARTE ; LA FIN DE LA BOUC
         const e = fuite.pas.entree.etapes;
         const iFuite = fuite.t.indexOf("Confus : s'enfuit !"), iCarte = e.findIndex(x => x.type === "carte");
         const pasFuite = e.slice(iFuite).filter(x => x.type === "pas" && x.acteur === "MOI");
-        verifier("dans l'ordre : la carte, puis la fuite", iCarte < iFuite, fuite.t.join(","));
+        verifier("il fuit SANS lancer sa carte", iFuite >= 0 && iCarte === -1, fuite.t.join(","));
         verifier("il fuit vraiment (des pas après l'annonce), et reste confus", pasFuite.length > 0
                  && fuite.pas.etat.combattants.MOI.etats.some(x => x.nom === "Confusion"), String(pasFuite.length));
         const moi = fuite.pas.etat.combattants.MOI, avant = monde(fuite.g).combattants;

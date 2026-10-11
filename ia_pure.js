@@ -238,7 +238,7 @@ export function detourDesMurs(etat, id, plateau) {
 // =========================================================================
 //  3. OÙ PEUT-ELLE ALLER ?
 // =========================================================================
-//  Un parcours en largeur borné : trois pas au maximum, murs et vivants
+//  Un parcours en largeur borné : quatre à six pas selon le palier, murs et vivants
 //  exclus. Chaque case atteignable arrive avec le chemin pour y aller, parce
 //  que c'est le chemin qui coûte, pas la destination.
 //
@@ -246,7 +246,14 @@ export function detourDesMurs(etat, id, plateau) {
 //  est une décision comme une autre, et souvent la bonne.
 
 const PLAINE = { etatCase: () => ({ bloquee: false, supprimee: false, difficile: false }) };
-export const PAS_MAX_CREATURE = 3;
+// LE DÉPLACEMENT D'UNE CRÉATURE SELON SON PALIER (Nico : « change les
+// déplacements pour les monstres : petits 6, normal 5, élite 4, boss 4 »).
+// Elles marchaient toutes trois cases au plus. Un palier inconnu (une créature
+// d'avant les paliers) marche comme une normale. Le même barème guide le choix
+// de carte en préparation (monstres_ia.js, pasMaxMonstre).
+export const PAS_PAR_PALIER = { "Petit": 6, "Normal": 5, "Élite": 4, "Elite": 4, "Boss": 4 };
+export const PAS_MAX_CREATURE = 5;
+export const pasMaxDe = (c) => (c && PAS_PAR_PALIER[c.palier]) || PAS_MAX_CREATURE;
 
 // LES ATTAQUES D'OPPORTUNITÉ QU'UN CHEMIN DÉCLENCHE, comptées EXACTEMENT comme
 // le moteur les déclenche (resoudreMouvement, mouvement_pur.js) : à chaque pas,
@@ -271,11 +278,12 @@ export function opportunitesSurLeChemin(etat, id, chemin) {
 // Toutes les cases atteignables en `pasMax` pas, et pour chacune LE MEILLEUR
 // CHEMIN : celui qui déclenche le moins d'attaques d'opportunité, puis le plus
 // court. Le premier chemin trouvé (un parcours en largeur) frôlait volontiers
-// un héros alors qu'un détour de même longueur l'évitait. Trois pas au plus :
-// quelques centaines de chemins, rien du tout à énumérer.
-export function casesAccessibles(etat, id, plateau, pasMax = PAS_MAX_CREATURE) {
+// un héros alors qu'un détour de même longueur l'évitait. Six pas au plus (un
+// petit, en plaine) : quelques dizaines de millisecondes, une fois par tour.
+export function casesAccessibles(etat, id, plateau, pasMaxDemande) {
     const moi = combattant(etat, id);
     if (!moi || moi.q === null) return [];
+    const pasMax = pasMaxDemande !== undefined && pasMaxDemande !== null ? pasMaxDemande : pasMaxDe(moi);
     const carte = plateau || PLAINE;
 
     const cle = (h) => `${h.q},${h.r}`;
@@ -392,7 +400,8 @@ export function choisirPosition(etat, id, cible, infosCarte, plateau, des) {
     const infos = infosCarte || {};
     const carte = plateau || PLAINE;
 
-    const cases = casesAccessibles(etat, id, carte);
+    // `infos.pasMax` : ce qu'il reste de marche (la seconde compétence d'un boss).
+    const cases = casesAccessibles(etat, id, carte, infos.pasMax);
     if (cases.length === 0) return null;
 
     // L'énergie réellement disponible pour marcher : la carte est payée d'abord.
@@ -451,8 +460,14 @@ export function choisirPosition(etat, id, cible, infosCarte, plateau, des) {
                     score -= t.tientDistance * Math.abs(d - ideale) * 3;
                 }
             } else {
-                // Hors de portée : on récompense au moins le rapprochement.
-                score -= d * 2.5;
+                // Hors de portée : on récompense au moins le rapprochement —
+                // assez pour qu'elle marche TOUT son palier (Nico : « petits 6,
+                // normal 5, élite 4, boss 4 ») : à 2,5 la case, le bruit et le
+                // prix des cases 4 à 6 (4 d'énergie) l'arrêtaient une case
+                // avant une fois sur trois. 3,5 garde l'arbitrage des attaques
+                // d'opportunité (deux cases de gagnées n'en valent toujours pas
+                // une encaissée, trois si).
+                score -= d * 3.5;
             }
         }
 
@@ -479,8 +494,9 @@ export function choisirPosition(etat, id, cible, infosCarte, plateau, des) {
         score -= t.contourne * alliesAdjacents(etat, c.q, c.r, moi.camp, id) * 5;
 
         // Marcher coûte : à avantage égal, on préfère rester où l'on est.
+        // Le bruit départage, sans jamais valoir une case de rapprochement.
         score -= cout * 0.35;
-        score += bruit(des, 2);
+        score += bruit(des, 1);
 
         if (score > meilleurScore) { meilleurScore = score; meilleure = { ...c, cout, score }; }
     });

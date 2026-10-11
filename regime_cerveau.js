@@ -848,7 +848,7 @@ const LEURRES_EFFACES = new Set();
 // mémoire, chaque projection redemanderait le marquage et un renfort de plus.
 // Elle s'oublie au changement de partie : les deux combats n'ont rien en commun.
 const TOMBES_ANNONCEES = new Set();
-// Les renforts qui attendent la fin du tour (renfortsDuTour, pont_combat.js).
+// Les renforts qui attendent la manche suivante (renfortsDuTour, pont_combat.js).
 const MEMOIRE_RENFORTS = { annonces: TOMBES_ANNONCEES, attente: [], clePrecedente: null };
 let RENFORTS_EN_COURS = Promise.resolve();
 
@@ -878,8 +878,11 @@ function contexteDuJeu() {
         // a constaté.
         carteDe: (idMonstre, idCarte) => {
             const prete = (window.CARTES_DU_CERVEAU || {})[idMonstre];
-            if (!prete || prete.idCarte !== idCarte) return null;
-            return prete;
+            if (!prete) return null;
+            if (prete.idCarte === idCarte) return prete;
+            // La seconde compétence d'un boss, rangée à côté de la première.
+            if (prete.seconde && prete.seconde.idCarte === idCarte) return prete.seconde;
+            return null;
         },
 
         // CEUX QUI NE SONT PAS ENTRÉS AVEC LES AUTRES.
@@ -1176,8 +1179,8 @@ function contexteDuJeu() {
                     // Une créature tombée est marquée morte dans son document
                     // (son cadavre reste sur la carte jusqu'à la fin du combat)
                     // et laisse sa place au renfort suivant, s'il en reste un —
-                    // une créature passée zombie aussi. Le renfort entre à la
-                    // FIN DU TOUR de la chute (renfortsDuTour, pont_combat.js).
+                    // une créature passée zombie aussi. Le renfort entre AU DÉBUT
+                    // DE LA MANCHE SUIVANTE (renfortsDuTour, pont_combat.js).
                     // Rien ne se note tant que monstres.js n'est pas chargé :
                     // sinon la créature ne serait jamais marquée.
                     if (typeof window.marquerMonstreMort === "function") {
@@ -1186,7 +1189,7 @@ function contexteDuJeu() {
                             const c = etat.combattants[id] || {};
                             if (typeof window.tracerCombat === "function") {
                                 window.tracerCombat("☠️", `${c.nom || id} est terrassé`,
-                                                    "un renfort entrera à la fin du tour");
+                                                    "un renfort entrera à la manche suivante");
                             }
                             Promise.resolve(window.marquerMonstreMort(id, { sansRenfort: true }))
                                 .catch(e => signalerPanne("marquerMonstreMort", e));
@@ -1194,7 +1197,7 @@ function contexteDuJeu() {
                         bilan.zombies.forEach(id => {
                             if (typeof window.tracerCombat === "function") {
                                 window.tracerCombat("🧟", `${(etat.combattants[id] || {}).nom || id} se relève en zombie`,
-                                                    "un renfort entrera à la fin du tour");
+                                                    "un renfort entrera à la manche suivante");
                             }
                         });
                         for (let i = 0; i < bilan.renforts; i++) {
@@ -1299,11 +1302,9 @@ async function preparerLesCartes(file) {
         return perso && perso.estMonstre;
     });
 
-    const table = {};
-    for (const f of aLire) {
-        const id = f.id || f.idPersonnage;
-        const idCarte = f.carte || f.idCarte;
-        if (!idCarte) continue;
+    // Lit une technique et la range sous la forme qu'attend le cerveau
+    // (null si elle n'est pas jouable ou illisible — on le dit dans la trace).
+    const lire = async (id, idCarte) => {
         try {
             const carte = await window.demarrerCiblage(idCarte, { extraire: true, idLanceur: id });
             const data = ((window.CACHE_COMPETENCES_GLOBAL || {})[id] || {})[idCarte];
@@ -1314,9 +1315,9 @@ async function preparerLesCartes(file) {
                 // dit, plutôt que de laisser la créature « renoncer » sans
                 // qu'on sache pourquoi.
                 tracer("🃏", `${id} n'a pas de carte jouable`, idCarte);
-                continue;
+                return null;
             }
-            table[id] = {
+            return {
                 idCarte,
                 infos,
                 attaques: carte.attaques || [],
@@ -1329,6 +1330,24 @@ async function preparerLesCartes(file) {
             };
         } catch (e) {
             tracer("❌", `carte de ${id} illisible`, String(e && e.message));
+            return null;
+        }
+    };
+
+    const table = {};
+    for (const f of aLire) {
+        const id = f.id || f.idPersonnage;
+        const idCarte = f.carte || f.idCarte;
+        if (!idCarte) continue;
+        const premiere = await lire(id, idCarte);
+        if (!premiere) continue;
+        table[id] = premiere;
+        // LA SECONDE COMPÉTENCE D'UN BOSS (monstres_ia.js, preparerCartesMonstres) :
+        // lue elle aussi d'avance, rangée à côté de la première (voir carteDe).
+        const idCarte2 = f.carte2 || f.idCarte2;
+        if (idCarte2) {
+            const seconde = await lire(id, idCarte2);
+            if (seconde) premiere.seconde = seconde;
         }
     }
     window.CARTES_DU_CERVEAU = table;

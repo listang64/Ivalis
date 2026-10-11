@@ -611,6 +611,9 @@ export function entreeDeFile(f) {
     return {
         id: f.id || f.idPersonnage,
         carte: f.carte || f.idCarte || null,
+        // La seconde compétence d'un boss : choisie en préparation
+        // (monstres_ia.js), jouée par le cerveau (cerveau_combat.js, jouerCreature).
+        ...(f.carte2 || f.idCarte2 ? { carte2: f.carte2 || f.idCarte2 } : {}),
         initiative: nombre(f.initiative, 0),
         pas: nombre(f.pas !== undefined ? f.pas : f.pasParcourus),
         // La ligne droite du tour (Inertie martiale), si elle a commencé.

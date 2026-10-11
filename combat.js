@@ -2817,8 +2817,10 @@ window.repositionnerTokensVTT = function() {
 //  jamais du calque de son pion.
 //
 //  Ces éléments-là vivent donc dans un PORTEUR : un cadre vide, de la taille
-//  et à la place du pion, dans un calque posé au-dessus des murs
-//  (#calque-ciblage-haut, index.html). Ils gardent leurs positions en
+//  et à la place du pion, dans un calque posé au-dessus des murs — et du
+//  brouillard de l'aveuglé (Nico : « la validation de la cible ou la croix pour
+//  annuler se met en dessous de l'effet aveugle de l'hexagone d'à côté »)
+//  (#calque-ciblage-haut, index.html, z-index 5). Ils gardent leurs positions en
 //  pourcentages du pion : seul leur parent change. Le pion, lui, reste
 //  derrière la roche.
 function calerPorteur(porteur, divToken) {
@@ -3321,7 +3323,9 @@ window.appliquerTokensVTT = function(tokensMap) {
         // cherchent un pion par son id gèrent déjà son absence.
         // SEUL LE MÉDICUS VOIT SES ALLIÉS TOMBÉS : leur fantôme, très pâle, sur
         // la case où ils gisent — c'est là qu'il doit aller pour les relever.
-        if (window.estCombattantMort(idPerso)) {
+        // SAUF LE PION QU'UN COUP VIENT D'ABATTRE : il reste le temps de sa mise à
+        // terre (animations_jeu.js, pionRetenu), puis s'en va.
+        if (window.estCombattantMort(idPerso) && !(typeof window.pionRetenu === "function" && window.pionRetenu(idPerso))) {
             if (pData && window.voitLeFantome(pData)) conteneur.appendChild(window.fantomeAllieKO(idPerso, data, taille));
             continue;
         }

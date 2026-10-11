@@ -266,7 +266,22 @@
         repos: "jeu-repos-long", regen: "jeu-regen-energie", depense: "jeu-depense-energie",
         opportunite: "jeu-attaque-opportunite", "frappe-mur": "jeu-frappe-mur", critique: "jeu-critique"
     };
+    // LE PION ABATTU RESTE SUR LE PLATEAU JUSQU'À SA CHUTE. Le coup qui abat
+    // le dit (`chute`) : sans ça, la vie à zéro, le redessin le retirait aussitôt
+    // (estCombattantMort) et la mise à terre n'avait plus de pion à faire tomber.
+    // La mise à terre (ou l'illusion brisée) le rend ; un filet le rend de toute
+    // façon au bout de quelques secondes.
+    window.PIONS_RETENUS = window.PIONS_RETENUS || {};
+    window.pionRetenu = (id) => !!window.PIONS_RETENUS[id] && Date.now() - window.PIONS_RETENUS[id] < 6000;
+    const rendrePion = (id) => {
+        delete window.PIONS_RETENUS[id];
+        // Tombé : il ne se relève pas, jusqu'au redessin qui le retire.
+        const el = pionDe(id);
+        if (el) el.style.opacity = "0";
+    };
     window.animerReactionCombat = async function (d) {
+        if (d && d.chute && d.pion && pionDe(d.pion)) window.PIONS_RETENUS[d.pion] = Date.now();
+        if (d && d.sorte === "retenir") return !!(d.pion && window.PIONS_RETENUS[d.pion]);
         const geste = d && GESTE_DE_REACTION[d.sorte];
         if (!geste || typeof window.jouerAnimationJeu !== "function" || !pionDe(d.pion)) return false;
         // Le coup reçu d'un geste d'attaque du Studio est déjà montré : fait.
@@ -282,7 +297,11 @@
         if (!scene) return false;
         // Le coup d'opportunité porte : la cible a reçu son coup.
         if (d.sorte === "opportunite" && d.depuis) noterFrappe([d.depuis]);
-        await window.jouerAnimationJeu(geste, scene);
+        try {
+            await window.jouerAnimationJeu(geste, scene);
+        } finally {
+            if (d.sorte === "ko" || d.sorte === "illusion-brisee") rendrePion(d.pion);
+        }
         return true;
     };
 

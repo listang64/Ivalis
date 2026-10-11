@@ -860,6 +860,10 @@ window.combatGagne = function() {
     // rencontre pas encore générée), il ne fait pas une victoire.
     const monstres = (window.MONSTRES_PARTIE || []).filter(m => m && !m.compagnonDe);
     if (monstres.length === 0) return false;
+    // DES RENFORTS ATTENDENT ENCORE DANS LA RÉSERVE : ils entrent au début de
+    // la manche suivante (renfortsDuTour, pont_combat.js). Le dernier ennemi
+    // du plateau abattu n'est donc pas encore une victoire.
+    if (((window.PARTIE_DATA || {}).Reserve_Monstres || []).length > 0) return false;
     return !window.ennemisEncoreDebout();
 };
 

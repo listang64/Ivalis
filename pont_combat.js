@@ -89,15 +89,23 @@ function zoneDe(e, etat) {
 // magique / brut, contre, le bouclier magique encaisse le coup, le bouclier
 // magique se brise : tu peux intégrer »). Le Contre se montre sur celui qui le
 // rend ; le bouclier, sur son dôme ; sinon la nature du coup.
+//
+// UN COUP QUI ABAT (Nico : « l'animation de à terre, tu ne l'as pas implantée
+// du Studio, en tout cas en jeu c'est pas la même ») : la vie à zéro, le pion
+// disparaissait dès cette étape — l'état descendu, il passait pour mort — et la
+// mise à terre, à l'étape suivante, n'avait plus de pion à faire tomber. Le
+// coup qui abat le dit (`chute`) : l'écran garde le pion jusqu'à sa chute.
 function reactionAuCoup(e, champ) {
     const depuis = e.acteur && e.acteur !== e.cible ? e.acteur : null;
-    if (e.renvoi) return { reaction: { sorte: "contre", pion: e.cible, depuis } };
-    if (e.bouclierBrise) return { reaction: { sorte: "bouclier-brise", pion: e.cible, depuis } };
+    const chute = champ === "pv" && e.pvApres !== undefined && nombre(e.pvApres) <= 0 ? { chute: true } : {};
+    if (e.renvoi) return { reaction: { sorte: "contre", pion: e.cible, depuis, ...chute } };
+    if (e.bouclierBrise) return { reaction: { sorte: "bouclier-brise", pion: e.cible, depuis, ...chute } };
     if (champ === "bouclier") return { reaction: { sorte: "bouclier-encaisse", pion: e.cible, depuis } };
     if (e.nature === "physique" || e.nature === "magique" || e.nature === "brut") {
-        return { reaction: { sorte: "coup-" + e.nature, pion: e.cible, depuis } };
+        return { reaction: { sorte: "coup-" + e.nature, pion: e.cible, depuis, ...chute } };
     }
-    return {};
+    // Un coup sans nature connue (une zone, un poison) qui abat : garder le pion.
+    return chute.chute ? { reaction: { sorte: "retenir", pion: e.cible, chute: true } } : {};
 }
 
 const SCENES = {
@@ -747,8 +755,11 @@ export function fichesDepuisEtat(etat, fichesActuelles) {
 // LES RENFORTS DE LA RÉSERVE, ET QUAND ILS ENTRENT. Une créature qui tombe —
 // ou qui se relève en zombie du Profanateur, ce qui revient à la perdre —
 // libère une place pour un renfort. Le renfort n'entre pas à l'instant de la
-// chute, mais à la FIN DU TOUR où elle a eu lieu : quand la tête de file (ou
-// la manche, ou la phase) a changé depuis.
+// chute, mais AU DÉBUT DE LA MANCHE SUIVANTE (Nico : « les renforts qui
+// arrivent en combat, j'ai l'impression qu'ils spawn direct et pas au début du
+// tour d'après ») : il entrait à la fin du tour du combattant, c'est-à-dire
+// presque aussitôt. Il paraît maintenant quand la manche change, à l'heure où
+// chacun choisit sa carte — et il choisit la sienne (monstres_ia.js).
 //
 // Fonction pure : `memoire` ({ annonces: Set, attente: [], clePrecedente })
 // est tenue par l'appelant (regime_cerveau.js). Rend les créatures à marquer
@@ -756,8 +767,7 @@ export function fichesDepuisEtat(etat, fichesActuelles) {
 // maintenant. Une créature ne libère qu'UNE place : un zombie qu'on retue ne
 // rappelle personne.
 export function renfortsDuTour(etat, memoire) {
-    const tete = ((etat && etat.file) || [])[0];
-    const cle = `${nombre(etat && etat.manche)}|${(etat && etat.phase) || ""}|${(tete && tete.id) || ""}`;
+    const cle = String(nombre(etat && etat.manche));
     const tour = memoire.clePrecedente || cle;
     const morts = [], zombies = [];
     Object.keys((etat && etat.combattants) || {}).sort().forEach(id => {
@@ -780,6 +790,7 @@ export function renfortsDuTour(etat, memoire) {
 export function fileDepuisEtat(etat) {
     return ((etat && etat.file) || []).map(f => ({
         idPersonnage: f.id, idCarte: f.carte || null, initiative: nombre(f.initiative),
+        ...(f.carte2 ? { idCarte2: f.carte2 } : {}),
         // Les cases déjà marchées ce tour-ci descendent avec la file : c'est ce
         // que lit l'écran pour chiffrer la case suivante au bon prix, et c'est
         // le MÊME compteur que celui sur lequel le cerveau facturera. Deux

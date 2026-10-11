@@ -321,11 +321,18 @@ export function ligneDeVue(plateau, a, b) {
 //    •  1–40  la carte part de travers : il s'attaque lui-même, ou attaque un
 //              ALLIÉ au hasard autour de lui (moitié-moitié ; personne à portée
 //              → sur lui) ;
-//    • 41–60  il s'enfuit, comme sous la Peur (joué par le cerveau après la
-//              carte, qui part comme voulue : voir suitesDeConfusion,
-//              cerveau_combat.js) ;
-//    • 61–80  en fin de boucle, il n'est plus confus (la carte part comme voulue) ;
-//    • 81–100 il ne se passe rien : la carte part comme voulue, il reste confus.
+//    • 41–60  il s'enfuit, comme sous la Peur (joué par le cerveau : voir
+//              suitesDeConfusion, cerveau_combat.js) — SANS lancer sa carte ;
+//    • 61–80  il n'est plus confus : la confusion se dissipe D'ABORD, et la
+//              carte part comme voulue ;
+//    • 81–100 il ne se passe rien : il reste confus, et sa carte ne part pas.
+//
+//  Nico : « l'attaque ne se fait que quand il est confus et le fait sur un
+//  allié à lui ou sur soi-même ; s'il fuit, il ne la fait pas. Et s'il n'est
+//  plus confus, alors il fait son attaque normale. » La carte partait jusqu'ici
+//  comme voulue dans trois cas sur quatre — on la voyait frapper, PUIS le
+//  confus s'enfuir. `annulee` : la carte ne part pas (fuite, rien) ; rien
+//  n'est payé (resoudreCarte).
 //
 //  UNE CARTE SANS ATTAQUE NE PART PAS SUR UN AUTRE : un soin, un bouclier, une
 //  pose d'état qui partirait de travers se retourne sur le confus — on ne
@@ -373,7 +380,8 @@ export function appliquerConfusion(etat, action, plateau, des) {
         surSoi = !idCible;   // pas d'allié à portée, ou une carte sans attaque : sur lui
     }
 
-    const confusion = { issue, soi: surSoi, hasard: !!idCible, idCible, fuite, dissipee };
+    const confusion = { issue, soi: surSoi, hasard: !!idCible, idCible, fuite, dissipee,
+                        ...(fuite || issue === "rien" ? { annulee: true } : {}) };
     if (!surSoi && !idCible) return { ...action, confusion };
 
     const cibles = surSoi ? [action.idLanceur] : [idCible];
@@ -1509,6 +1517,18 @@ export function resoudreCarte(etat, action, plateau) {
     const lanceur = combattant(suivant, idLanceur);
     if (!lanceur) return { etat: suivant, etapes };
 
+    // LA CONFUSION DÉCIDE D'ABORD SI LA CARTE PART (voir appliquerConfusion).
+    // Dissipée : il n'est plus confus, et c'est dit AVANT que la carte ne parte
+    // comme voulue. Fuite, ou rien : la carte ne part pas — ni coup, ni coût ;
+    // la fuite elle-même se joue ensuite, dans le cerveau (suitesDeConfusion).
+    const confusionCarte = action.confusion;
+    if (confusionCarte && confusionCarte.dissipee) etapes.push(...dissiperConfusion(suivant, idLanceur));
+    if (confusionCarte && confusionCarte.annulee) {
+        if (!confusionCarte.fuite) etapes.push({ type: "message", cible: idLanceur, acteur: idLanceur,
+                                                 texte: "Confus : ne fait rien", couleur: "#cc66ff" });
+        return { etat: suivant, etapes, touchees: [] };
+    }
+
     // Le terrain, pour les effets qui déplacent (la Poussée). Sans lui, on
     // travaille sur une plaine infinie : c'est ce dont un banc a besoin, et
     // jamais ce que le jeu fournit.
@@ -1590,8 +1610,8 @@ export function resoudreCarte(etat, action, plateau) {
 
     // LA CONFUSION SE DIT AVANT DE SE VOIR. Sans ce mot, le joueur regarde sa
     // carte partir sur son propre camp sans comprendre, et croit à un bug. Les
-    // cibles ont déjà été détournées en amont (appliquerConfusion) ; la fuite
-    // et la dissipation se jouent après la carte, dans le cerveau.
+    // cibles ont déjà été détournées en amont (appliquerConfusion) ; la
+    // dissipation s'est dite plus haut, la fuite se joue dans le cerveau.
     if (action.confusion) {
         const dits = [];
         if (action.confusion.soi) dits.push("Confus : s'inflige sa propre compétence !");
