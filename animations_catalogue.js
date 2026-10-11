@@ -2451,7 +2451,7 @@
     ajouter(8, "Géomancien", [
         {
             id: "mur-terre", nom: "Niv.5 Mur de terre", sens: "sur soi",
-            description: "Sur chaque case touchée, la roche du jeu sort de terre en tremblant, dans un nuage de poussière ; les murs voisins se soudent en muraille et restent sur la carte. Un combattant sur une case murée est repoussé.",
+            description: "Sur toutes les cases touchées à la fois, la roche du jeu sort de terre en tremblant ; un nuage de poussière roule à son pied et des cailloux volent de partout avant de s'effacer en fondu. Les murs voisins se soudent en muraille et restent sur la carte. Un combattant sur une case murée est repoussé.",
             ciblage: { genre: "mur", min: 1, max: 8,
                        consigne: "Touche les cases où lever un mur, comme en combat (8 au plus ; pas sur ton pion) — touche-en une de nouveau pour l'enlever — puis « Lancer »." },
             async jouer(sc, o) {
@@ -2459,20 +2459,23 @@
                 const pts = ciblees(sc, o, () => o.autour(sc.lanceur, a, 1, { libres: true }).slice(0, 3));
                 o.son("mur-terre");
                 // Posés du haut de l'écran vers le bas : la roche du devant passe
-                // devant (comme au combat) ; ils sortent de terre dans l'ordre touché.
-                const murs = duHautVersLeBas(pts).map(i => o.mur(sc.calque, pts[i], { retard: i * 180, avec: pts }));
+                // devant (comme au combat). TOUS sortent de terre EN MÊME TEMPS
+                // (Nico : « il faut que tous les murs de pierre sortent de terre en
+                // même temps ») — chacun dans sa poussière et ses cailloux (o.mur).
+                const murs = duHautVersLeBas(pts).map(i => o.mur(sc.calque, pts[i], { avec: pts }));
                 o.texte(sc.calque, sc.lanceur, "Mur de terre", "#c8b08a");
                 // Quelqu'un sur une case murée : il est repoussé (comme en combat).
-                const pousses = pts.map((pt, i) => {
+                const pousses = pts.map((pt) => {
                     const pion = pionSur(sc, o, pt);
                     if (!pion || pion === sc.lanceur) return null;
-                    return o.attendre(i * 180 + 220).then(() => {
+                    return o.attendre(220).then(() => {
                         o.son("poussee");
                         o.texte(sc.calque, pion, "Repoussé !", COULEURS.etat);
                         return repousser(sc, o, pion, pts, a);
                     });
                 }).filter(Boolean);
-                await Promise.all([o.attendre(1100 + pts.length * 180), ...pousses]);
+                // Le temps que la poussière retombe et que les cailloux s'effacent.
+                await Promise.all([o.attendre(2400), ...pousses]);
                 await garderMurs(o, sc, pts, murs);
             }
         },
@@ -2497,13 +2500,14 @@
                     await o.attendre(150);
                     await repousser(sc, o, dessus, [pt], a);
                 }
-                await o.attendre(dessus ? 750 : 1100);
+                // Le temps que la poussière retombe et que les cailloux s'effacent.
+                await o.attendre(dessus ? 1900 : 2400);
                 await garderMurs(o, sc, [pt], [mur]);
             }
         },
         {
             id: "mur-effondre", nom: "Niv.5 Mur de terre effondré → gravats", sens: "vers l'ennemi",
-            description: "Le mur visé (un mur levé sur la carte, ou une case libre où il se dresse d'abord) se fissure, tremble, puis s'écroule en un tas de gravats qui reste sur la case ; ses voisins gardent un moignon cassé.",
+            description: "Le mur visé (un mur levé sur la carte, ou une case libre où il se dresse d'abord) se fissure, tremble, puis s'écroule dans un gros nuage de poussière, des cailloux volant de partout avant de s'effacer en fondu ; il reste un tas de gravats sur la case, et ses voisins gardent un moignon cassé.",
             ciblage: { genre: "effondre", min: 1, max: 4,
                        consigne: "Touche un mur de terre levé sur la carte (ou une case libre : un mur s'y dressera d'abord) — 4 au plus — puis « Lancer »." },
             async jouer(sc, o) {
@@ -2515,12 +2519,18 @@
                 await o.attendre(300);
                 await Promise.all(murs.map(m => o.secouer(m, 4, 500)));
                 o.son("effondrement");
-                await Promise.all([...murs.map(m => o.effondrer(m)),
-                    ...pts.map(pos => o.gerbe(sc.calque, pos.x, pos.y, { nombre: 16, dist: pos.t * 0.9, couleurs: ["#a08868", "#6e5a40", "#cbb898"], taille: 7, tailleMin: 3, carre: true, duree: 800 }))]);
+                // L'écroulement soulève un GROS nuage de poussière (Nico : « pareil
+                // pour l'animation du mur détruit : nuage de poussière »), plus
+                // large et plus long que celui d'un mur qui sort, et projette ses
+                // cailloux de partout ; tout s'efface en fondu.
+                const poussieres = pts.map(pos => Promise.all([
+                    o.nuagePoussiere(sc.calque, pos, { nombre: 18, etendue: 1.4, taille: 1.25, pied: 0.1, duree: 2200 }),
+                    o.attendre(60).then(() => o.cailloux(sc.calque, pos, { nombre: 16, portee: 1.3, pied: 0 }))]));
+                await Promise.all(murs.map(m => o.effondrer(m)));
                 murs.forEach(m => m && m.remove());
                 const { tas, restent } = tasDeGravats(o, sc, pts, { nombre: 9 });
                 o.texte(sc.calque, tas[0] || sc.cible, "Gravats", COULEURS.attention);
-                await o.attendre(1200);
+                await Promise.all([o.attendre(1200), ...poussieres]);
                 if (!restent) await effacerTout(o, tas);
             }
         },

@@ -6049,3 +6049,37 @@ Mis à jour : ia_pure.mjs (les champs de 3 pas deviennent explicites, et la
 marche par palier), profanateur.mjs (5 bis : le renfort à la manche
 suivante), confusion_cerveau.mjs (la fuite et le « rien » ne lancent plus la
 carte).
+
+## v236 — Studio : les murs de pierre sortent ensemble, dans la poussière
+
+Nico : « Dans le Studio, on va revoir l'animation du mur de pierre. On garde
+le fait qu'il sorte de terre comme ça, juste il faut que tous les murs de
+pierre sortent de terre en même temps. De plus, fais un effet de nuage de
+poussière et des cailloux qui volent de partout avant de disparaître en
+fondu. Pareil pour l'animation du mur détruit : nuage de poussière. »
+
+- DEUX OUTILS D'ANIMATION (animations_combat.js) : `o.nuagePoussiere` — des
+  bouffées de terre claire qui naissent au pied de la case, gonflent,
+  roulent vers l'extérieur en montant, puis se dissipent en fondu ;
+  `o.cailloux` — des éclats de roche projetés en cloche dans toutes les
+  directions, qui tournent, retombent, rebondissent une fois et s'effacent
+  en fondu.
+- LE MUR QUI SORT DE TERRE (o.mur) garde sa montée (la roche du jeu qui
+  monte du pied de la case en tremblant) ; la poussière et les cailloux
+  remplacent l'ancienne gerbe de carrés.
+- « MUR DE TERRE » : toutes les cases touchées lèvent leur roche AU MÊME
+  INSTANT (avant, 180 ms d'écart de l'une à l'autre) ; les combattants sur
+  une case murée sont repoussés ensemble. L'animation dure le temps que tout
+  retombe (2,4 s) : rien n'est coupé net. Même attente pour « Mur de terre
+  sous un combattant ».
+- « MUR DE TERRE EFFONDRÉ » : l'écroulement soulève un gros nuage (plus de
+  bouffées, plus large, plus long) et projette ses cailloux ; les gravats
+  restent, comme avant.
+
+studio_murs_poussiere.mjs : dans le vrai Studio, trois murs levés d'un coup
+(départs à moins de 40 ms l'un de l'autre), au moins dix bouffées et douze
+cailloux par mur, la poussière qui roule et monte, les cailloux en cloche
+dans les quatre quarts, tout en fondu, l'animation qui attend la fin, rien
+qui reste ; puis l'effondrement — gros nuage plus large que celui d'un mur
+qui sort, cailloux, fondu, gravats. Il mord sur l'ancien code (11 échecs :
+murs en cascade, ni poussière ni cailloux).

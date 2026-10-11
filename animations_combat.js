@@ -603,6 +603,71 @@
                 { opacity: 0, transform: "translate(-50%,-50%) scale(1.1)" }
             ], { duration: p.duree || 2000, easing: "ease-in-out" });
         };
+        // UN NUAGE DE POUSSIÈRE au pied d'une case (Nico : « fais un effet de
+        // nuage de poussière ») : des bouffées de terre claire qui gonflent,
+        // roulent vers l'extérieur en montant un peu, puis se dissipent en fondu.
+        // `etendue` : jusqu'où elles roulent (en tailles de case) ; `pied` : où
+        // elles naissent sous le centre ; `nombre`, `duree`, `retard`, `etale`.
+        o.nuagePoussiere = (calque, pt, p = {}) => {
+            const t = pt.t || 60, n = p.nombre || 14, fins = [];
+            const teintes = p.teintes || ["196,173,134", "160,136,104", "214,198,170", "138,116,88"];
+            for (let i = 0; i < n; i++) {
+                const ang = (i / n) * Math.PI * 2 + hasard(-0.35, 0.35);
+                const r0 = t * hasard(0.1, 0.3), r1 = t * (p.etendue || 0.9) * hasard(0.7, 1.15);
+                const taille = t * hasard(0.6, 1.0) * (p.taille || 1);
+                const c = teintes[i % teintes.length];
+                const x0 = pt.x + Math.cos(ang) * r0, y0 = pt.y + t * (p.pied === undefined ? 0.28 : p.pied) + Math.sin(ang) * r0 * 0.5;
+                // Vu de trois quarts : le nuage s'étale plus en largeur qu'en profondeur, et monte.
+                const dx = Math.cos(ang) * (r1 - r0), dy = Math.sin(ang) * (r1 - r0) * 0.5 - t * hasard(0.15, 0.45);
+                const d = o.poser(calque, x0, y0, `width:${taille}px; height:${taille * 0.8}px; border-radius:50%; z-index:${p.z || Z.haut};
+                    background:radial-gradient(ellipse at 50% 55%, rgba(${c},0.95) 0%, rgba(${c},0.65) 40%, rgba(${c},0) 70%);`);
+                d.classList.add("anim-poussiere");
+                fins.push(o.jouerPuisRetirer(d, [
+                    { transform: "translate(-50%,-50%) scale(0.3)", opacity: 0 },
+                    { transform: `translate(calc(-50% + ${dx * 0.4}px), calc(-50% + ${dy * 0.4}px)) scale(1)`, opacity: p.opacite || 0.95, offset: 0.2 },
+                    { transform: `translate(calc(-50% + ${dx * 0.8}px), calc(-50% + ${dy * 0.8}px)) scale(1.45)`, opacity: (p.opacite || 0.95) * 0.6, offset: 0.6 },
+                    { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(1.8)`, opacity: 0 }
+                ], { duration: (p.duree || 1700) * hasard(0.85, 1.15), delay: (p.retard || 0) + hasard(0, p.etale || 160),
+                     easing: "cubic-bezier(.15,.6,.35,1)" }));
+            }
+            return Promise.all(fins);
+        };
+        // DES CAILLOUX QUI VOLENT DE PARTOUT (Nico : « et des cailloux qui volent
+        // de partout avant de disparaître en fondu ») : des éclats de roche
+        // projetés en cloche tout autour de la case, qui tournent, retombent,
+        // rebondissent une fois, puis s'effacent. `portee` : jusqu'où (en tailles
+        // de case) ; `nombre`, `taille`, `duree`, `retard`, `etale`.
+        o.cailloux = (calque, pt, p = {}) => {
+            const t = pt.t || 60, n = p.nombre || 14, fins = [];
+            const teintes = [["#c4ae8e", "#6a563e"], ["#a8957a", "#4e4030"], ["#d2c1a2", "#7a6248"], ["#8f8170", "#3e352a"]];
+            const y0 = pt.y + t * (p.pied === undefined ? 0.15 : p.pied);
+            for (let i = 0; i < n; i++) {
+                const ang = (i / n) * Math.PI * 2 + hasard(-0.3, 0.3);
+                const portee = t * (p.portee || 1.1) * hasard(0.45, 1.1);
+                const haut = t * hasard(0.4, 1.0);
+                const taille = t * hasard(0.07, 0.17) * (p.taille || 1);
+                const [clair, sombre] = teintes[i % teintes.length];
+                const forme = `${hasard(30, 60)}% ${hasard(40, 70)}% ${hasard(30, 60)}% ${hasard(40, 70)}% / ${hasard(40, 70)}% ${hasard(30, 60)}% ${hasard(40, 70)}% ${hasard(30, 60)}%`;
+                const d = o.poser(calque, pt.x, y0, `width:${taille}px; height:${taille * hasard(0.65, 0.95)}px; z-index:${(p.z || Z.haut) + 1};
+                    border-radius:${forme}; background:radial-gradient(circle at 35% 30%, ${clair}, ${sombre}); box-shadow:0 2px 3px rgba(0,0,0,.55);`);
+                d.classList.add("anim-caillou");
+                const dx = Math.cos(ang) * portee, dy = Math.sin(ang) * portee * 0.6, tours = hasard(-600, 600);
+                const en = (f, z, rot) => `translate(calc(-50% + ${(dx * f).toFixed(1)}px), calc(-50% + ${(dy * f - z).toFixed(1)}px)) rotate(${(tours * rot).toFixed(0)}deg)`;
+                // Le vol : une vraie cloche (z = 4·h·f·(1−f)) sur 55 % de la durée…
+                const images = [];
+                for (let k = 0; k <= 8; k++) {
+                    const f = k / 8;
+                    images.push({ transform: en(f, 4 * haut * f * (1 - f), f), opacity: k === 0 ? 0 : 1, offset: 0.55 * f });
+                }
+                // …un petit rebond, il roule encore un peu, puis le fondu.
+                images.push({ transform: en(1.05, haut * 0.12, 1.08), opacity: 1, offset: 0.63 });
+                images.push({ transform: en(1.1, 0, 1.15), opacity: 1, offset: 0.7 });
+                images.push({ transform: en(1.1, 0, 1.15), opacity: 0, offset: 1 });
+                fins.push(o.jouerPuisRetirer(d, images, { duration: (p.duree || 1900) * hasard(0.85, 1.15),
+                                                          delay: (p.retard || 0) + hasard(0, p.etale || 120), easing: "linear" }));
+            }
+            return Promise.all(fins);
+        };
         // UN MUR DE TERRE qui surgit du sol (vu de dessus : un bloc de roche qui
         // grossit en tremblant, la poussière autour).
         //  LE DESSIN DU JEU (Nico : « mets dans le Studio les mêmes que dans le
@@ -625,8 +690,11 @@
                     o.teinter(tuile.dessin, [{ transform: "translateY(100%)" }, { transform: "translateY(-5%)", offset: 0.72 }, { transform: "translateY(0)" }],
                               { duration: p.duree || 680, delay: p.retard || 0, easing: "cubic-bezier(.25,.8,.3,1)", fill: "both" });
                     o.attendre((p.retard || 0) + 60).then(() => o.secouer(d, 2.5, 560));
-                    o.attendre((p.retard || 0) + 120).then(() => o.gerbe(calque, pt.x, pt.y, { nombre: 12, dist: tuile.l * 0.6,
-                        couleurs: ["#a08868", "#6e5a40", "#cbb898"], taille: 7, tailleMin: 3, carre: true, duree: 700 }));
+                    // La roche crève le sol : un nuage de poussière roule autour
+                    // de son pied, des cailloux volent de partout, puis tout
+                    // s'efface en fondu.
+                    o.attendre((p.retard || 0) + 40).then(() => o.nuagePoussiere(calque, pt, { nombre: 12, etendue: 1.05 }));
+                    o.attendre((p.retard || 0) + 90).then(() => o.cailloux(calque, pt, { nombre: 12, portee: 1.05 }));
                 }
                 return d;
             }
@@ -644,8 +712,8 @@
                     { transform: `${BASE} scale(0.97) rotate(-1deg)`, offset: 0.75 },
                     { transform: `${BASE} scale(1) rotate(0deg)`, opacity: 1 }
                 ], { duration: p.duree || 620, delay: p.retard || 0, easing: "cubic-bezier(.2,.8,.3,1.2)", fill: "forwards" });
-                o.attendre((p.retard || 0) + 120).then(() => o.gerbe(calque, pt.x, pt.y, { nombre: 12, dist: h.l * 0.75,
-                    couleurs: ["#a08868", "#6e5a40", "#cbb898"], taille: 7, tailleMin: 3, carre: true, duree: 700 }));
+                o.attendre((p.retard || 0) + 40).then(() => o.nuagePoussiere(calque, { ...pt, t: pt.t || h.l }, { nombre: 12, etendue: 1.05 }));
+                o.attendre((p.retard || 0) + 90).then(() => o.cailloux(calque, { ...pt, t: pt.t || h.l }, { nombre: 12, portee: 1.05 }));
             }
             return d;
         };
