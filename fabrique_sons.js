@@ -728,10 +728,18 @@
             note(ctx, s, { debut: 0.05, freq: 110, glisse: 60, duree: 0.25, gain: 0.32, attaque: 0.003 });
             bruit(ctx, s, { debut: 0.1, duree: 0.35, filtre: "lowpass", freq: 1200, q: 0.7, gain: 0.12, forme: "cloche" });
         },
+        // LE COUP D'AIR QUI ATTIRE (Nico : « fais comme un coup d'air qui attire
+        // la cible vers soi ; revois le son en fonction ») : une bourrasque
+        // aspirée — un souffle qui s'enfle en montant, son sifflement léger par
+        // dessus, un second souffle plus court qui le suit — puis le « pouf »
+        // feutré de la cible qui arrive.
         "traction"(ctx, s) {
-            note(ctx, s, { freq: 200, glisse: 500, duree: 0.5, gain: 0.08, attaque: 0.03 });
-            souffle(ctx, s, { duree: 0.5, balayage: [3000, 400], q: 1, gain: 0.2 });
-            pas(ctx, s, { debut: 0.5, duree: 0.08, gain: 0.25 });
+            bruit(ctx, s, { duree: 0.62, filtre: "bandpass", q: 0.8, balayage: [280, 2300], gain: 0.36, forme: "cloche" });
+            bruit(ctx, s, { debut: 0.06, duree: 0.5, filtre: "bandpass", q: 4, balayage: [900, 2800], gain: 0.07, forme: "cloche" });
+            note(ctx, s, { debut: 0.08, freq: 520, glisse: 1180, duree: 0.48, gain: 0.018, attaque: 0.18 });
+            souffle(ctx, s, { debut: 0.22, duree: 0.34, balayage: [600, 1900], q: 1.1, gain: 0.16 });
+            bruit(ctx, s, { debut: 0.6, duree: 0.14, filtre: "lowpass", freq: 520, q: 0.7, gain: 0.24 });
+            note(ctx, s, { debut: 0.6, freq: 92, glisse: 62, duree: 0.14, gain: 0.12, attaque: 0.004 });
         },
         "peur"(ctx, s) {
             note(ctx, s, { freq: 110, duree: 1.0, gain: 0.06, type: "sawtooth", passeBas: 700, attaque: 0.08 });

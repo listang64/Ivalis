@@ -352,10 +352,12 @@ console.log("\n4. LES ZONES, L'ATTAQUE DE ZONE, LE ZOMBIE, L'ÉCHEC, LE RETOUR S
     await window.__attendre(1500);
     window.__noter();
     let question = false; const guet2 = setInterval(() => { if ([...document.querySelectorAll("#conteneur-tokens-vtt .anim-effet")].some(e => e.textContent.includes("❓"))) question = true; }, 30);
-    const orbes = window.__sonder('#conteneur-tokens-vtt .anim-effet[style*="radial-gradient"]');
-    await window.animerCarteSurSoiCombat({ pion: "H1" });
+    // (v238 — Nico : « Confusion se frappe soi-même : on garde, tu peux
+    // intégrer » : le geste du Studio, l'entaille sur son propre pion.)
+    const lames = window.__sonder('#conteneur-tokens-vtt .entaille-lame');
+    await window.animerCarteSurSoiCombat({ pion: "H1", touches: ["H1"] });
     clearInterval(guet2);
-    res.surSoi = { sons: window.__sons, question, orbes: orbes() };
+    res.surSoi = { sons: window.__sons, question, lames: lames(), textes: window.__textes };
     return res;
   });
   verifier("une zone de feu : le brasier monte (son « brûle »)", r.feu.sons.includes("brule"), JSON.stringify(r.feu));
@@ -371,8 +373,9 @@ console.log("\n4. LES ZONES, L'ATTAQUE DE ZONE, LE ZOMBIE, L'ÉCHEC, LE RETOUR S
            r.zombie.sons.includes("zombie") && r.zombie.sons.includes("griffe") && r.zombie.traits === 3 && r.zombie.surCase, JSON.stringify(r.zombie));
   verifier("l'échec de l'Étourdi : l'énergie qui fuse, 💫, « Échec ! (Étourdi) »",
            r.echec.sons.includes("energie") && r.echec.sons.includes("echec") && r.echec.etourdi && r.echec.textes.includes("Échec ! (Étourdi)"), JSON.stringify(r.echec));
-  verifier("la carte retournée contre son lanceur : ❓, l'orbe qui part et revient, l'impact",
-           r.surSoi.sons.includes("confusion") && r.surSoi.sons.includes("impact-magique") && r.surSoi.question && r.surSoi.orbes >= 1, JSON.stringify(r.surSoi));
+  verifier("la carte retournée contre son lanceur : ❓, son mot, l'entaille sur son propre pion, la chair",
+           r.surSoi.sons.includes("confusion") && r.surSoi.sons.includes("entaille-chair") && r.surSoi.question && r.surSoi.lames >= 1
+           && r.surSoi.textes.includes("Confus : s'inflige sa propre compétence !"), JSON.stringify(r.surSoi));
 }
 
 console.log("\n5. LE PION JOUÉ EN AVANCE : LA MÊME MARCHE QUE LE JOURNAL");

@@ -159,6 +159,8 @@ const SCENES = {
             ...((lanceur && lanceur.zombie) || e.carte === "ZOMBIE_MORSURE" ? { zombie: true } : {}),
             ...(e.rate ? { rate: true } : {}),
             ...(e.surSoi ? { surSoi: true } : {}),
+            // Détournée sur un allié par la Confusion : son « ❓ » d'abord.
+            ...(e.surAllie ? { surAllie: true } : {}),
             ...(Array.isArray(e.zone) && e.zone.length ? { zone: e.zone } : {}),
             // Le geste de l'attaque (légère, lourde, coup d'épée ; l'élément du
             // sort) et qui est vraiment touché.
@@ -214,11 +216,19 @@ const SCENES = {
     // confusion qui se dissipe est une bonne nouvelle et se dit en vert, pas
     // dans le gris de tout le reste. Sans couleur portée, on garde le neutre.
     message(e) {
-        return { geste: "message", pion: e.cible || e.acteur, texte: e.texte || "",
+        const pion = e.cible || e.acteur;
+        return { geste: "message", pion, texte: e.texte || "",
                  couleur: e.couleur || COULEURS.neutre, duree: RYTHME.message,
                  // Une créature enfermée frappe un mur de terre : le geste du
                  // Studio, vers la case du mur (le mot suit).
-                 ...(e.frappeMur ? { reaction: { sorte: "frappe-mur", pion: e.acteur || e.cible, mur: e.frappeMur } } : {}) };
+                 ...(e.frappeMur ? { reaction: { sorte: "frappe-mur", pion: e.acteur || e.cible, mur: e.frappeMur } } : {}),
+                 // LA CONFUSION (Nico : « on garde, tu peux intégrer ») : la
+                 // confusion dissipée a son geste, qui dit le mot ; celui de la
+                 // carte détournée (sur soi, sur un allié) a déjà été dit par le
+                 // geste de la carte — on ne le redit pas.
+                 ...(e.confusion === "dissipee" ? { reaction: { sorte: "confusion-dissipee", pion, texte: e.texte || "", couleur: e.couleur || null, remplace: true } }
+                   : (e.confusion === "soi" || e.confusion === "allie") ? { reaction: { sorte: "confusion-dit", pion, texte: e.texte || "", remplace: true } }
+                   : {}) };
     },
     etatRate(e) {
         // Une immunité de peuple n'est pas un jet manqué : c'est écrit sur la
@@ -354,7 +364,10 @@ const SCENES = {
             return { geste: "message", pion: e.cible, texte: "Aveuglé 🌫️",
                      couleur: COULEURS.neutre, duree: RYTHME.message };
         }
-        return { geste: "etats", pion: e.cible, liste: e.liste || [], pose: e.pose || null, ...zoneDe(e, etat) };
+        // Étourdi (Nico : « on garde, tu peux intégrer ») : des étoiles autour
+        // de sa tête, il vacille.
+        return { geste: "etats", pion: e.cible, liste: e.liste || [], pose: e.pose || null, ...zoneDe(e, etat),
+                 ...(e.pose === "Étourdi" ? { reaction: { sorte: "etourdi", pion: e.cible } } : {}) };
     },
     // L'énergie qui monte ou descend ne s'anime pas — sauf quand TÉNÈBRES la
     // boit : c'est le coup lui-même, il doit se voir sur le pion.
@@ -588,8 +601,17 @@ export function creerPont(effets) {
                 }
                 // Ratée (l'Étourdi), elle ne part pas : l'échec a son geste, juste après.
                 if (scene.rate && echec) { await pause(RYTHME.carte); break; }
-                // Retournée contre son lanceur (la Confusion) : elle lui revient dessus.
-                if (scene.surSoi && surSoi) { await surSoi({ pion: scene.pion }); await pause(RYTHME.carte); break; }
+                // Retournée contre son lanceur (la Confusion) : il se frappe lui-même.
+                if (scene.surSoi && surSoi) {
+                    await surSoi({ pion: scene.pion, ...(Array.isArray(scene.touches) ? { touches: scene.touches } : {}) });
+                    await pause(RYTHME.carte);
+                    break;
+                }
+                // Détournée sur un allié (la Confusion) : son « ❓ » et son mot, puis l'attaque.
+                if (scene.surAllie && reaction) {
+                    await Promise.resolve().then(() => reaction({ sorte: "confusion-allie", pion: scene.pion,
+                                                                  texte: "Confus : attaque un allié !", couleur: "#cc66ff" })).catch(() => false);
+                }
                 // Un zombie ne s'élance pas comme un combattant : il titube et griffe.
                 if (scene.zombie && zombie && (scene.cibles || []).length) await zombie({ pion: scene.pion, cible: scene.cibles[0] });
                 // LES ATTAQUES DU STUDIO (coup d'épée, légère, lourde, tir, boule

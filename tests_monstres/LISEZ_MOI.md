@@ -6151,3 +6151,66 @@ la carte, les gravats et les gros cailloux. Il mord sur l'ancien code (34
 échecs). Mis à jour : initiative_hors_effets, aide_forge_lia, chasseur_de_mages,
 atouts_races, atouts_races_cerveau, apercu, bonus_race_classe, blessures,
 experience, hoplite (et ceux que la suite a signalés ensuite).
+
+## v238 — Studio : poussée, traction, peur, provocation ; la Confusion et l'Étourdi en jeu
+
+Nico : « Poussée : enlève l'animation de coup d'épée, une glisse fluide sans
+saccade qui laisse un nuage de poussière qui disparaît en fondu. Traction
+magique : un coup d'air qui attire la cible vers soi, revois le son. Peur :
+pas de smiley ; le lanceur grossit et devient légèrement mauve foncé, la
+cible devient un peu plus petite, légèrement verte, trois traits rouges
+verticaux rapprochés sur le coin droit de son image, avant de partir en
+courant. Provocation : garde tout sauf la ligne rouge. Confusion se frappe
+soi-même, attaque un allié au hasard, dissipée, Étourdi : on garde, tu peux
+intégrer. Confusion s'enfuit : un point d'exclamation au lieu du dé. »
+
+- LA POUSSÉE DU STUDIO (animations_catalogue.js) : plus d'entaille, de sang
+  ni de « -5 » — un élan d'épaule et une onde de choc ; l'ennemi file d'UN
+  SEUL TRAIT sur ses deux cases (glisser : une animation de 33 images qui
+  ralentit, sans le petit rebond de chaque case) et sème derrière lui des
+  bouffées de poussière, sous les pions, qui gonflent et s'effacent en fondu
+  (l'animation attend qu'elles aient fini).
+- LA TRACTION : plus de fil violet. Des filets d'air pâles et ondulés
+  naissent derrière l'ennemi et filent vers le héros, qui avale l'air (trois
+  anneaux qui se resserrent sur lui) ; l'ennemi est aspiré d'un trait (il
+  accélère), sa traînée de poussière derrière lui, un petit choc à
+  l'arrivée. Toujours jusqu'au contact (3 cases au plus) ; la démonstration
+  au contact garde ses deux ennemis. LE SON (fabrique_sons.js, « traction ») :
+  une bourrasque aspirée qui s'enfle, son sifflement, un second souffle, puis
+  le « pouf » feutré de l'arrivée.
+- LA PEUR : plus de 😱. Le héros grossit (×1,22) et se teinte de mauve foncé
+  (une volute sombre autour de lui) ; l'ennemi rapetisse (×0,82) en
+  tremblant, verdit, trois traits rouges serrés lui sautent au coin haut
+  droit, puis il reprend sa taille et détale sur deux cases ; le héros
+  reprend la sienne. Les teintes passent par un sépia presque entier (sans
+  lui, un pion bleu virait au vert au lieu du mauve).
+- LA PROVOCATION : l'anneau rouge, le « ❗ », l'ennemi qui vacille — plus de
+  fil rouge.
+- LA FUITE CONFUSE : un « ❗ » violet au lieu du dé qui roule.
+- EN JEU (animations_jeu.js, pont_combat.js, moteur_pur.js) :
+  • SE FRAPPER SOI-MÊME : le geste du Studio remplace l'orbe qui revenait — le
+    « ❓ », « Confus : s'inflige sa propre compétence ! », l'entaille sur son
+    propre pion et le coup reçu s'il se touche vraiment (`touches` de la
+    carte) ; une carte sans attaque qu'il se donne : le « ❓ », le mot, la
+    lueur violette. Son coup reçu ne se rejoue pas à l'étape des dégâts.
+  • FRAPPER UN ALLIÉ : la carte le dit (« surAllie ») ; le pont joue d'abord
+    le « ❓ », « Confus : attaque un allié ! » et la lueur violette, PUIS le
+    geste de l'attaque sur l'allié.
+  • LE MOT NE SE DIT QU'UNE FOIS : les mots de la Confusion portent ce qu'ils
+    sont (`confusion` : soi, allie, dissipee) ; celui qui suit la carte
+    n'est pas redit quand son geste l'a déjà dit (« confusion-dit »), et
+    reste affiché sinon (sans le Studio, un vieux journal).
+  • LA CONFUSION DISSIPÉE : les « ? » qui tournent puis éclatent, la teinte
+    violette qui s'efface, « Confusion dissipée ! » en vert.
+  • L'ÉTOURDI POSÉ : des étoiles autour de la tête, « Étourdi ! », il
+    vacille (le choc a eu son étape ; sans coup avant, un éclat).
+  Le Studio garde ses quatre animations telles quelles.
+
+studio_controle_v238.mjs : la poussée (ni lame ni sang, une glissade d'un
+trait, la traînée), la traction (filets d'air, sans fil, au contact, la
+démonstration, le son rendu hors ligne), la Peur (tailles, teintes, les trois
+traits au bon coin, la fuite), la Provocation sans fil, la fuite confuse au
+« ❗ » ; puis les cinq jouées jusqu'au bout. corrections_v238.mjs : le noyau,
+le pont (l'ordre, le mot pas redit), puis le vrai plateau. Ils mordent sur
+l'ancien code (21 et 24 échecs). Mis à jour : animations_en_jeu_2 (le retour
+sur soi : l'entaille au lieu de l'orbe).

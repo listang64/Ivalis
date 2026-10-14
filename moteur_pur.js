@@ -448,7 +448,7 @@ export function dissiperConfusion(etat, idLanceur) {
     if (!c || !aLEtat(c, "Confusion")) return [];
     c.etats = (c.etats || []).filter(e => e && e.nom !== "Confusion");
     return [
-        { type: "message", cible: idLanceur, acteur: idLanceur, texte: "Confusion dissipée !", couleur: "#33cc66" },
+        { type: "message", cible: idLanceur, acteur: idLanceur, texte: "Confusion dissipée !", couleur: "#33cc66", confusion: "dissipee" },
         { type: "etats", cible: idLanceur, liste: c.etats }
     ];
 }
@@ -1646,6 +1646,7 @@ export function resoudreCarte(etat, action, plateau) {
         ...(projectile ? { projectile } : {}),
         ...(rate ? { rate: true } : {}),
         ...(surSoi ? { surSoi: true } : {}),
+        ...(action.confusion && action.confusion.hasard ? { surAllie: true } : {}),
         ...(zone.length ? { zone } : {}),
         ...(styleFrappe ? { frappe: styleFrappe } : {}),
         ...(elementSort ? { element: elementSort } : {}),
@@ -1664,11 +1665,12 @@ export function resoudreCarte(etat, action, plateau) {
     // cibles ont déjà été détournées en amont (appliquerConfusion) ; la
     // dissipation s'est dite plus haut, la fuite se joue dans le cerveau.
     if (action.confusion) {
+        // (`confusion` : l'écran le reconnaît — le geste de la carte l'a déjà dit.)
         const dits = [];
-        if (action.confusion.soi) dits.push("Confus : s'inflige sa propre compétence !");
-        if (action.confusion.hasard) dits.push("Confus : attaque un allié !");
-        dits.forEach(texte => etapes.push({ type: "message", cible: idLanceur, acteur: idLanceur,
-                                             texte, couleur: "#cc66ff" }));
+        if (action.confusion.soi) dits.push(["Confus : s'inflige sa propre compétence !", "soi"]);
+        if (action.confusion.hasard) dits.push(["Confus : attaque un allié !", "allie"]);
+        dits.forEach(([texte, sorte]) => etapes.push({ type: "message", cible: idLanceur, acteur: idLanceur,
+                                                        texte, couleur: "#cc66ff", confusion: sorte }));
     }
 
     // LE CHARME FRATRICIDE SE DIT AUSSI, et il s'use sur cette carte : la

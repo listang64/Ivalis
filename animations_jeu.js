@@ -185,10 +185,22 @@
         await new Promise(r => setTimeout(r, 900));
     };
 
-    // --- LA CARTE QUE LA CONFUSION RETOURNE CONTRE SON LANCEUR -------------------------
-    //  Elle part vers l'ennemi le plus proche, fait demi-tour en l'air et revient
-    //  le frapper (« Confus : s'inflige sa propre compétence ! » suit).
-    window.animerCarteSurSoiCombat = async function ({ pion }) {
+    // --- LA CONFUSION : SE FRAPPER SOI-MÊME, FRAPPER UN ALLIÉ ---------------------------
+    //  Le geste du Studio dit son mot (« Confus : s'inflige sa propre
+    //  compétence ! », « Confus : attaque un allié ! ») AVANT le coup ; l'étape
+    //  du mot, qui suit la carte dans le journal, ne le redit pas.
+    const confusionsDites = {};
+    const direConfusion = (id, texte) => { if (id) confusionsDites[id] = { texte, quand: Date.now() }; };
+    const dejaDit = (id, texte) => {
+        const x = confusionsDites[id];
+        if (!x || x.texte !== texte || Date.now() - x.quand > 8000) return false;
+        delete confusionsDites[id];
+        return true;
+    };
+    //  SE FRAPPER SOI-MÊME (Nico : « on garde, tu peux intégrer ») : le « ❓ », le
+    //  mot, puis l'entaille sur son propre pion — le coup reçu s'il se touche
+    //  vraiment (`touches`, posé par le noyau sur une carte qui attaque).
+    window.animerCarteSurSoiCombat = async function ({ pion, touches }) {
         const moi = (window.TOKENS_VTT_DATA || {})[pion];
         const fiche = (window.PERSOS_PARTIE || []).find(p => p && p.idPersonnage === pion) || {};
         const campDe = (p) => (p && (p.estMonstre ? "Ennemi" : (p.camp || "Allié")));
@@ -202,8 +214,14 @@
             const d = (Math.abs(t.q - moi.q) + Math.abs(t.q + t.r - moi.q - moi.r) + Math.abs(t.r - moi.r)) / 2;
             if (d < mieux) { mieux = d; proche = id; }
         });
-        const scene = window.sceneDeCombat(pion, proche, { grace: 1200 });
-        if (scene) return window.jouerAnimationJeu("jeu-carte-sur-soi", scene);
+        const offensive = Array.isArray(touches), touche = offensive && touches.includes(pion);
+        const texte = "Confus : s'inflige sa propre compétence !";
+        const scene = window.sceneDeCombat(pion, proche, { grace: 1200, offensive, touche, texte, couleur: "#cc66ff" });
+        if (!scene) return;
+        // Son coup reçu est montré ici : l'étape des dégâts ne le redouble pas.
+        if (touche) noterFrappe([pion]);
+        direConfusion(pion, texte);
+        return window.jouerAnimationJeu("jeu-carte-sur-soi", scene);
     };
 
     // --- LES ATTAQUES : COUP D'ÉPÉE, LÉGÈRE, LOURDE, TIR, BOULE DE FEU ----------------
@@ -264,7 +282,10 @@
         purification: "jeu-purification", "benediction-magique": "jeu-benediction-magique",
         "benediction-physique": "jeu-benediction-physique", "benediction-offensive": "jeu-benediction-offensive",
         repos: "jeu-repos-long", regen: "jeu-regen-energie", depense: "jeu-depense-energie",
-        opportunite: "jeu-attaque-opportunite", "frappe-mur": "jeu-frappe-mur", critique: "jeu-critique"
+        opportunite: "jeu-attaque-opportunite", "frappe-mur": "jeu-frappe-mur", critique: "jeu-critique",
+        // Puis (Nico : « Confusion attaque un allié au hasard, Confusion
+        // dissipée, Étourdi : on garde, tu peux intégrer »).
+        "confusion-allie": "jeu-confusion-allie", "confusion-dissipee": "jeu-confusion-dissipee", etourdi: "jeu-etourdi"
     };
     // LE PION ABATTU RESTE SUR LE PLATEAU JUSQU'À SA CHUTE. Le coup qui abat
     // le dit (`chute`) : sans ça, la vie à zéro, le redessin le retirait aussitôt
@@ -282,6 +303,8 @@
     window.animerReactionCombat = async function (d) {
         if (d && d.chute && d.pion && pionDe(d.pion)) window.PIONS_RETENUS[d.pion] = Date.now();
         if (d && d.sorte === "retenir") return !!(d.pion && window.PIONS_RETENUS[d.pion]);
+        // Le mot de la Confusion, déjà dit par son geste : rien à redire.
+        if (d && d.sorte === "confusion-dit") return dejaDit(d.pion, d.texte);
         const geste = d && GESTE_DE_REACTION[d.sorte];
         if (!geste || typeof window.jouerAnimationJeu !== "function" || !pionDe(d.pion)) return false;
         // Le coup reçu d'un geste d'attaque du Studio est déjà montré : fait.
@@ -293,10 +316,14 @@
         if (Array.isArray(d.cases)) plus.cases = d.cases;
         if (Array.isArray(d.cibles)) plus.cibles = d.cibles.map(pionDe).filter(Boolean);
         if (d.max !== undefined) Object.assign(plus, { de: d.de, vers: d.vers, max: d.max });
+        if (d.couleur) plus.couleur = d.couleur;
+        if (d.sorte === "etourdi") plus.dejaFrappe = dejaFrappe(d.pion);
         const scene = window.sceneDeCombat(d.pion, d.depuis && pionDe(d.depuis) ? d.depuis : null, plus);
         if (!scene) return false;
         // Le coup d'opportunité porte : la cible a reçu son coup.
         if (d.sorte === "opportunite" && d.depuis) noterFrappe([d.depuis]);
+        // Le confus qui va frapper un allié : son mot est dit ici.
+        if (d.sorte === "confusion-allie") direConfusion(d.pion, scene.texte || "Confus : attaque un allié !");
         try {
             await window.jouerAnimationJeu(geste, scene);
         } finally {

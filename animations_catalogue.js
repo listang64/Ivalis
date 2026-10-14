@@ -1374,40 +1374,145 @@
     // =====================================================================
     // Une fuite désordonnée (Confusion).
     const fuiteConfuse = (sc, o) => marcher(sc, o, { cases: 3, duree: 280, tangue: 35, zigzag: 1.3, dir: (v) => o.tourner(v, hasard(-2.5, 2.5)), son: "pas-leger" });
+    // UNE GLISSADE FLUIDE (Nico : « fais qu'elle soit fluide, sans saccade ») :
+    // le pion file d'un seul trait le long de ses cases — une seule animation,
+    // sans rebond ni arrêt à chaque case — en ralentissant (`courbe`) ; il
+    // reste là où il arrive (fill), jusqu'à o.arriver. `trainee(point, k)` :
+    // ce qu'il sème derrière lui, à mesure qu'il passe. `depuis` : d'où il
+    // part, s'il n'est pas chez lui.
+    const ralentir = (t) => 1 - Math.pow(1 - t, 3);
+    const accelerer = (t) => t * t * (1.6 - 0.6 * t);
+    const glisser = async (o, el, origine, pts, p = {}) => {
+        const depart = p.depuis ? { x: p.depuis.x - origine.x, y: p.depuis.y - origine.y } : { x: 0, y: 0 };
+        const sommets = [depart, ...pts.map(pt => ({ x: pt.x - origine.x, y: pt.y - origine.y }))];
+        const cumul = [0];
+        for (let i = 1; i < sommets.length; i++) cumul.push(cumul[i - 1] + Math.hypot(sommets[i].x - sommets[i - 1].x, sommets[i].y - sommets[i - 1].y));
+        const L = cumul[cumul.length - 1] || 1;
+        // Le point à la fraction `f` du trajet (en longueur parcourue).
+        const ou = (f) => {
+            const d = Math.max(0, Math.min(1, f)) * L;
+            let i = 1;
+            while (i < cumul.length - 1 && cumul[i] < d) i++;
+            const k = (d - cumul[i - 1]) / ((cumul[i] - cumul[i - 1]) || 1);
+            return { x: sommets[i - 1].x + (sommets[i].x - sommets[i - 1].x) * k, y: sommets[i - 1].y + (sommets[i].y - sommets[i - 1].y) * k };
+        };
+        const courbe = p.courbe || ralentir, duree = p.duree || 700, N = 32;
+        const images = [];
+        for (let k = 0; k <= N; k++) {
+            const q = ou(courbe(k / N));
+            images.push({ transform: `translate(${q.x.toFixed(2)}px, ${q.y.toFixed(2)}px)`, offset: k / N });
+        }
+        const semis = [];
+        if (p.trainee && sommets.length > 1) {
+            const n = p.bouffees || Math.max(4, Math.round(L / ((origine.t || 60) * 0.32)));
+            for (let k = 0; k < n; k++) {
+                const t = (k + 0.4) / n, q = ou(courbe(t));
+                semis.push(o.attendre(duree * t).then(() => p.trainee({ x: origine.x + q.x, y: origine.y + q.y, t: origine.t }, k)));
+            }
+        }
+        await o.bouger(el, images, { duration: duree, easing: "linear", fill: "forwards" });
+        return semis;
+    };
+    // LA TRAÎNÉE DE POUSSIÈRE d'une glissade (Nico : « que ça laisse sur le
+    // passage comme un nuage de poussière qui disparaît en fondu ») : de
+    // petites bouffées sous le pion, qui gonflent sur place et s'effacent.
+    const traineePoussiere = (o, calque, pt) => o.nuagePoussiere(calque, pt, { nombre: 4, etendue: 0.38, taille: 0.62, pied: 0.22,
+                                                                           duree: 1350, etale: 80, opacite: 0.8, z: Z.bas });
+    // UN COUP D'AIR (la Traction magique) : des filets de vent pâles qui
+    // naissent derrière la cible et filent vers le héros, en ondulant.
+    const filetsDAir = (o, calque, de, vers, p = {}) => {
+        const v = axe(de, vers), t = de.t || 60, n = p.n || 9, fins = [];
+        for (let i = 0; i < n; i++) {
+            const lat = hasard(-0.55, 0.55) * t, recul = hasard(0.1, 0.7) * t;
+            const x0 = de.x - v.ux * recul - v.uy * lat, y0 = de.y - v.uy * recul + v.ux * lat;
+            const L = t * hasard(0.55, 1.0), course = v.d + recul - t * 0.35;
+            const d = o.poser(calque, x0, y0, `width:${L}px; height:${t * 0.2}px; z-index:${Z.haut}; transform-origin:0 50%; opacity:0;`,
+                `<svg viewBox="0 0 100 20" width="100%" height="100%" preserveAspectRatio="none" style="overflow:visible; display:block">
+                   <path d="M0 10 C 25 ${hasard(2, 6).toFixed(1)}, 55 ${hasard(14, 18).toFixed(1)}, 100 10" fill="none" stroke="rgba(235,248,255,0.9)"
+                     stroke-width="2.2" stroke-linecap="round" vector-effect="non-scaling-stroke" style="filter:drop-shadow(0 0 3px rgba(190,225,255,0.9))"/></svg>`);
+            d.classList.add("anim-filet-air");
+            const pose = (k, sx) => `translate(${(v.ux * course * k).toFixed(1)}px, calc(-50% + ${(v.uy * course * k).toFixed(1)}px)) rotate(${deg(v.angle) + 180}deg) scaleX(${sx})`;
+            fins.push(o.jouerPuisRetirer(d, [
+                { transform: pose(0, 0.3), opacity: 0 },
+                { transform: pose(0.25, 1), opacity: 0.95, offset: 0.25 },
+                { transform: pose(0.8, 1.15), opacity: 0.7, offset: 0.8 },
+                { transform: pose(1, 0.4), opacity: 0 }
+            ], { duration: (p.duree || 620) * hasard(0.85, 1.15), delay: (p.retard || 0) + hasard(0, p.etale || 420), easing: "ease-in" }));
+        }
+        return Promise.all(fins);
+    };
+    // L'AIR AVALÉ par le héros : des anneaux pâles qui se resserrent sur lui.
+    const aspiration = (o, calque, pos, p = {}) => Promise.all([0, 1, 2].map(k => {
+        const t = (pos.t || 60) * 1.9;
+        const d = o.poser(calque, pos.x, pos.y, `width:${t}px; height:${t}px; border-radius:50%; z-index:${Z.haut};
+            border:2px solid rgba(230,245,255,0.75); box-shadow:0 0 10px rgba(190,225,255,0.8), inset 0 0 8px rgba(190,225,255,0.6);`);
+        return o.jouerPuisRetirer(d, [{ transform: `${BASE} scale(1) rotate(0deg)`, opacity: 0 },
+                                      { transform: `${BASE} scale(0.75) rotate(-60deg)`, opacity: 0.8, offset: 0.35 },
+                                      { transform: `${BASE} scale(0.3) rotate(-160deg)`, opacity: 0 }],
+                                  { duration: p.duree || 560, delay: (p.retard || 0) + k * 170, easing: "ease-in" });
+    }));
+    // TROIS TRAITS ROUGES DE FRAYEUR, serrés, sur le coin haut droit du pion.
+    const traitsDeFrayeur = (o, calque, pos, p = {}) => {
+        const t = pos.t || 60, h = t * 0.26, e = Math.max(2.5, t * 0.045);
+        const d = o.poser(calque, pos.x + t * 0.38, pos.y - t * 0.36, `width:${e * 5.4}px; height:${h}px; z-index:${Z.ciel};`,
+            [0, 1, 2].map(i => `<span class="trait-frayeur" style="position:absolute; left:${i * e * 2.2}px; top:${i === 1 ? -h * 0.12 : 0}px; width:${e}px; height:${h}px;
+                border-radius:${e}px; background:linear-gradient(180deg, #ff5a4a, #c80f0f); box-shadow:0 0 4px rgba(255,40,30,0.8), 0 1px 1px #000;
+                transform-origin:50% 100%;"></span>`).join(""));
+        d.classList.add("anim-frayeur");
+        d.querySelectorAll(".trait-frayeur").forEach((s, i) => o.teinter(s, [{ transform: "scaleY(0)" }, { transform: "scaleY(1.15)", offset: 0.6 }, { transform: "scaleY(1)" }],
+                                                                          { duration: 220, delay: i * 70, easing: "ease-out", fill: "both" }));
+        return o.jouerPuisRetirer(d, [{ opacity: 1, transform: `${BASE} translate(0,0)` }, { opacity: 1, transform: `${BASE} translate(1px,-1px)`, offset: 0.3 },
+                                      { opacity: 1, transform: `${BASE} translate(-1px,1px)`, offset: 0.55 }, { opacity: 1, transform: `${BASE} translate(0,0)`, offset: 0.8 },
+                                      { opacity: 0, transform: `${BASE} translate(0,-3px)` }], { duration: p.duree || 1000 });
+    };
+    // La Peur : la teinte du héros qui l'inspire (mauve foncé) et celle de qui la subit (un peu vert).
+    // Le sépia d'abord, presque entier : sans lui, la couleur propre du pion tourne
+    // avec la teinte (un pion bleu virait au vert au lieu du mauve).
+    const MAUVE_SOMBRE = "sepia(0.9) saturate(1.8) hue-rotate(228deg) brightness(0.7)";
+    const VERT_PEUR = "sepia(0.85) saturate(1.5) hue-rotate(58deg) brightness(0.98)";
     ajouter(5, null, [
         {
             id: "poussee", nom: "Poussée", sens: "vers l'ennemi",
-            description: "Le héros frappe et l'ennemi glisse de deux cases en ligne droite, en laissant une traînée de poussière.",
+            description: "Le héros donne une poussée d'épaule : l'ennemi file d'un trait, sans à-coups, sur deux cases en ligne droite, et laisse derrière lui un nuage de poussière qui s'efface en fondu.",
             async jouer(sc, o) {
-                const { b, v } = lieux(sc);
-                await frapper(o, sc.calque, sc.lanceur, sc.cible, { valeur: "-5", sonImpact: "coup-physique" });
+                const { a, b, v } = lieux(sc);
+                // Plus de coup d'épée (Nico : « enlève l'animation de coup
+                // d'épée ») : un élan bref, l'onde de la poussée sur l'ennemi.
+                const elan = o.elan(sc.lanceur, a, b, { portee: 0.45, duree: 460 });
+                await o.attendre(250);
                 o.son("poussee");
+                o.onde(sc.calque, b, { couleur: "rgba(236,226,200,0.9)", taille: 0.9, echelle: 1.9, bord: 3, duree: 520 });
                 o.texte(sc.calque, sc.cible, "Poussé !", COULEURS.etat);
-                await marcher(sc, o, { qui: sc.cible, cases: 2, duree: 240, hauteur: 1, easing: "ease-out", dir: () => v,
-                                       pas: (pt) => poussiere(o, sc.calque, pt, { n: 7, dist: 0.5 }) });
+                const pts = o.chemin(sc.cible, b, v, 2);
+                const semis = await glisser(o, sc.cible, b, pts, { duree: 640, courbe: ralentir, trainee: (pt) => traineePoussiere(o, sc.calque, pt) });
+                await elan;
+                await o.arriver(sc.cible, pts[pts.length - 1]);
+                // La poussière finit de retomber, en fondu.
+                await Promise.all(semis);
             }
         },
         {
             id: "traction", nom: "Traction magique", sens: "vers l'ennemi",
-            description: "Un fil violet part du héros et attire l'ennemi, case après case, jusqu'à lui (jusqu'à 3 cases). Déjà au contact : la démonstration le pose loin, avec un second ennemi, puis les attire.",
+            description: "Un coup d'air : des filets de vent pâles naissent derrière l'ennemi et filent vers le héros, qui avale l'air ; l'ennemi est aspiré d'un trait jusqu'à lui (jusqu'à 3 cases). Déjà au contact : la démonstration le pose loin, avec un second ennemi, puis les attire.",
             async jouer(sc, o) {
                 const { a, b, v } = lieux(sc);
-                const fondFil = "linear-gradient(90deg, #e0c8ff, #9050e0)";
                 const ecart = o.distanceCases(sc.lanceur, sc.cible);
-                if (ecart !== null && ecart > 1) {
-                    // EN VRAIES CONDITIONS : l'ennemi est loin, il est attiré jusqu'au contact (3 cases au plus).
-                    const chemin = o.chemin(sc.cible, b, axe(b, a), Math.min(3, ecart - 1));
+                const appel = (loin) => {
                     o.son("traction");
                     o.texte(sc.calque, sc.lanceur, "Traction !", COULEURS.etat);
-                    const fil = o.lien(sc.calque, a, b, { couleur: "#b070ff", epaisseur: 4, fond: fondFil });
+                    o.bouger(sc.lanceur, [{ transform: "scale(1)" }, { transform: "scale(1.06)", offset: 0.4 }, { transform: "scale(1)" }], { duration: 700 });
+                    return Promise.all([aspiration(o, sc.calque, a, { duree: 600 }), filetsDAir(o, sc.calque, loin, a, { n: 10, duree: 640, etale: 520 })]);
+                };
+                if (ecart !== null && ecart > 1) {
+                    // EN VRAIES CONDITIONS : l'ennemi est loin, il est aspiré jusqu'au contact (3 cases au plus).
+                    const chemin = o.chemin(sc.cible, b, axe(b, a), Math.min(3, ecart - 1));
                     const arrivee = chemin[chemin.length - 1] || b;
-                    const v1 = axe(a, b);
-                    await Promise.all([o.parcourir(sc.cible, b, chemin, { duree: 300, apresPas: (pt) => poussiere(o, sc.calque, pt, { n: 4 }) }),
-                        o.teinter(fil, [{ transform: `translate(0,-50%) rotate(${deg(v1.angle)}deg) scaleX(1)` },
-                                        { transform: `translate(0,-50%) rotate(${deg(v1.angle)}deg) scaleX(${Math.max(0.05, axe(a, arrivee).d / v1.d)})` }],
-                                  { duration: 300 * chemin.length, easing: "ease-in", fill: "forwards" })]);
-                    await o.effacer(fil);
+                    const air = appel(b);
+                    await o.attendre(260);
+                    const semis = await glisser(o, sc.cible, b, chemin, { duree: 260 + 170 * chemin.length, courbe: accelerer,
+                                                                          trainee: (pt) => traineePoussiere(o, sc.calque, pt) });
                     await o.arriver(sc.cible, arrivee);
+                    await Promise.all([air, o.secouer(sc.cible, 3, 220, axe(arrivee, a)), ...semis]);
                     return;
                 }
                 const pts = o.chemin(sc.cible, b, v, 3);
@@ -1420,46 +1525,51 @@
                 const loin2 = p2[p2.length - 1], pres2 = p2[0];
                 const f = loin2 ? o.figurant(sc.calque, sc.cible, loin2, {}) : null;
                 await o.attendre(300);
-                o.son("traction");
-                const fil1 = o.lien(sc.calque, a, loin, { couleur: "#b070ff", epaisseur: 4, fond: "linear-gradient(90deg, #e0c8ff, #9050e0)" });
-                const fil2 = f ? o.lien(sc.calque, a, loin2, { couleur: "#b070ff", epaisseur: 4, fond: "linear-gradient(90deg, #e0c8ff, #9050e0)" }) : null;
-                o.texte(sc.calque, sc.lanceur, "Traction !", COULEURS.etat);
-                const retour = [...pts.slice(0, -1).reverse(), { x: b.x, y: b.y }];
-                // Les fils raccourcissent à mesure que les cibles arrivent.
-                const raccourcir = (fil, loinP, presP, duree) => {
-                    const v1 = axe(a, loinP), k = Math.max(0.05, axe(a, presP).d / v1.d);
-                    return o.teinter(fil, [{ transform: `translate(0,-50%) rotate(${deg(v1.angle)}deg) scaleX(1)` },
-                                           { transform: `translate(0,-50%) rotate(${deg(v1.angle)}deg) scaleX(${k})` }], { duration: duree, easing: "ease-in", fill: "forwards" });
-                };
-                await Promise.all([
-                    o.parcourir(sc.cible, b, retour, { duree: 300, depuis: loin, apresPas: (pt) => poussiere(o, sc.calque, pt, { n: 4 }) }),
-                    raccourcir(fil1, loin, b, 300 * retour.length),
-                    f ? raccourcir(fil2, loin2, pres2, 900) : null,
-                    f ? o.teinter(f, [{ transform: `${BASE} translate(0px, 0px)` }, { transform: `${BASE} translate(${pres2.x - loin2.x}px, ${pres2.y - loin2.y}px)` }],
-                                  { duration: 900, easing: "ease-in", fill: "forwards" }) : null]);
-                await Promise.all([o.effacer(fil1), fil2 ? o.effacer(fil2) : null]);
-                await o.attendre(400);
+                const air = Promise.all([appel(loin), loin2 ? filetsDAir(o, sc.calque, loin2, a, { n: 7, duree: 640, etale: 520 }) : null]);
+                await o.attendre(260);
+                const retour = [...pts.slice(0, -1).reverse(), { x: b.x, y: b.y, t: b.t }];
+                const [semis] = await Promise.all([
+                    glisser(o, sc.cible, b, retour, { depuis: loin, duree: 260 + 170 * retour.length, courbe: accelerer,
+                                                      trainee: (pt) => traineePoussiere(o, sc.calque, pt) }),
+                    f ? glisser(o, f, loin2, [pres2], { duree: 260 + 170 * 2, courbe: accelerer,
+                                                        trainee: (pt) => traineePoussiere(o, sc.calque, pt) }).then(x => Promise.all(x)) : null]);
+                await Promise.all([air, ...semis]);
+                await o.attendre(300);
                 if (f) await o.effacer(f);
             }
         },
         {
             id: "peur", nom: "Peur", sens: "vers l'ennemi",
-            description: "Une volute d'ombre touche l'ennemi : il tremble, s'assombrit, et s'enfuit loin du héros.",
+            description: "Le héros grandit et se teinte de mauve foncé ; l'ennemi, lui, rapetisse un instant, verdit, trois traits rouges de frayeur lui sautent au coin de la tête… et il détale loin du héros.",
             async jouer(sc, o) {
                 const { a, b, v } = lieux(sc);
+                // Plus de smiley (Nico : « pas de smiley déjà ») : le héros
+                // grandit et s'assombrit de mauve…
                 o.son("peur");
-                await orbe(o, sc.calque, a, b, { couleur: "#40206a", coeur: "#b090d0", taille: 0.3, traine: ["#40206a", "#7050a0"] });
-                o.icone(sc.calque, b, "😱", { duree: 1300 });
+                o.bouger(sc.lanceur, [{ transform: "scale(1)" }, { transform: "scale(1.22)" }], { duration: 520, easing: "cubic-bezier(.3,.8,.3,1.2)", fill: "forwards" });
+                teinte(o, sc.lanceur, MAUVE_SOMBRE, 520);
+                o.gerbe(sc.calque, a.x, a.y, { nombre: 10, dist: a.t * 0.75, couleurs: ["#3a1850", "#6a3a8a"], taille: 10, tailleMin: 5, duree: 900, etale: 250 });
+                await o.attendre(380);
+                // …l'ennemi rapetisse un instant en tremblant, verdit, et trois
+                // traits rouges lui sautent au coin de la tête.
                 etat(o, sc.calque, sc.cible, "Peur !");
-                teinte(o, sc.cible, SOMBRE);
-                await o.secouer(sc.cible, 4, 450);
+                teinte(o, sc.cible, VERT_PEUR, 260);
+                const frayeur = traitsDeFrayeur(o, sc.calque, b, { duree: 1050 });
+                await o.bouger(sc.cible, [{ transform: "scale(1) translate(0,0)" }, { transform: "scale(0.82) translate(0,0)", offset: 0.22 },
+                                          { transform: "scale(0.82) translate(2px,-1px)", offset: 0.4 }, { transform: "scale(0.82) translate(-2px,1px)", offset: 0.55 },
+                                          { transform: "scale(0.82) translate(1px,0)", offset: 0.7 }, { transform: "scale(0.84) translate(0,0)", offset: 0.85 },
+                                          { transform: "scale(1) translate(0,0)" }], { duration: 950, easing: "ease-out" });
+                // Puis il détale ; le héros reprend sa taille et sa couleur.
                 o.son("course");
-                await marcher(sc, o, { qui: sc.cible, cases: 2, duree: 240, tangue: 12, dir: () => v });
+                o.bouger(sc.lanceur, [{ transform: "scale(1.22)" }, { transform: "scale(1)" }], { duration: 600, easing: "ease-in-out", fill: "forwards" });
+                deteindre(o, sc.lanceur, MAUVE_SOMBRE, 700);
+                await Promise.all([frayeur, marcher(sc, o, { qui: sc.cible, cases: 2, duree: 240, tangue: 12, dir: () => v, pause: 150,
+                                                             apres: () => deteindre(o, sc.cible, VERT_PEUR, 350) })]);
             }
         },
         {
             id: "provocation", nom: "Provocation", sens: "vers l'ennemi",
-            description: "Le héros lance son défi : un anneau rouge part de lui, un « ! » éclate sur l'ennemi et un fil rouge le rive au héros.",
+            description: "Le héros lance son défi : un anneau rouge part de lui, un « ! » éclate sur l'ennemi, qui vacille.",
             async jouer(sc, o) {
                 const { a, b } = lieux(sc);
                 o.son("provocation");
@@ -1467,10 +1577,10 @@
                 await o.attendre(300);
                 o.icone(sc.calque, b, "❗", { duree: 1400, lueur: "#ff4040" });
                 etat(o, sc.calque, sc.cible, "Provoqué !");
-                const fil = o.lien(sc.calque, b, a, { couleur: "#ff4040", epaisseur: 4, fond: "linear-gradient(90deg, #ff8080, #c01010)" });
+                // (Plus de fil rouge qui rive l'ennemi au héros — Nico : « garde
+                // tout sauf la ligne rouge qui pop, c'est pas beau ».)
                 await o.bouger(sc.cible, [{ transform: "rotate(0deg)" }, { transform: "rotate(-14deg)" }, { transform: "rotate(10deg)" }, { transform: "rotate(0deg)" }], { duration: 600 });
                 await o.attendre(600);
-                await o.effacer(fil);
             }
         },
         {
@@ -1501,11 +1611,14 @@
         },
         {
             id: "confusion-fuite", nom: "Confusion : s'enfuit", sens: "sur soi",
-            description: "Le dé de la Confusion roule au-dessus du héros… « S'enfuit ! » : il part en zigzag.",
+            description: "Un « ! » violet éclate au-dessus du héros confus… « S'enfuit ! » : il part en zigzag.",
             async jouer(sc, o) {
                 const { a } = lieux(sc);
                 o.son("confusion");
-                await o.icone(sc.calque, a, "🎲", { duree: 800, tourne: 720 });
+                // (Plus de dé qui roule — Nico : « enlève l'animation de dé et
+                // mets un point d'exclamation comme les autres ».)
+                o.icone(sc.calque, a, "❗", { duree: 1200, lueur: "#c9a8ff" });
+                await o.attendre(450);
                 o.texte(sc.calque, sc.lanceur, "S'enfuit !", COULEURS.etat);
                 teinte(o, sc.lanceur, VIOLET);
                 o.son("course");
@@ -3212,20 +3325,60 @@
             await Promise.all([o.gerbe(sc.calque, a.x, a.y, { nombre: 12, dist: a.t * 0.8, monte: a.t * 0.4, couleurs: ["#9a9a9a", "#cfcfcf", "#6a6a6a"], taille: 12, tailleMin: 6, duree: 1100, etale: 200 }),
                 o.teinter(sc.lanceur, [{ filter: "none" }, { filter: "grayscale(0.8) brightness(0.8)", offset: 0.3 }, { filter: "none" }], { duration: 900 })]);
         } },
-        // UNE COMPÉTENCE LANCÉE SUR SOI (la Confusion) : le sort part, fait
-        // demi-tour en l'air et revient frapper son lanceur, qui se teinte de
-        // violet. (« Confus : s'inflige sa propre compétence ! » suit.)
+        // SE FRAPPER SOI-MÊME (la Confusion — Nico : « Confusion se frappe
+        // soi-même : on garde, tu peux intégrer ») : le geste du Studio. Un
+        // « ❓ » au-dessus du confus, « Confus : s'inflige sa propre
+        // compétence ! », puis il retourne son arme contre lui : une entaille sur
+        // son propre pion, et le coup reçu s'il se touche vraiment (sc.touche) —
+        // le chiffre suit, à l'étape des dégâts. Une carte sans attaque qu'il se
+        // donne (un soin, un bouclier) : le « ❓ », le mot et la lueur violette.
         { id: "jeu-carte-sur-soi", async jouer(sc, o) {
             const a = centre(sc.lanceur, sc.calque);
             const loin = sc.cible ? centre(sc.cible, sc.calque) : { x: a.x + a.t * 2, y: a.y, t: a.t };
+            const v = axe(a, loin);
             o.son("confusion");
             o.icone(sc.calque, a, "❓", { duree: 1300, lueur: "#c9a8ff" });
-            const v = axe(a, loin), d = Math.min(v.d * 0.7, a.t * 2.2);
-            const mi = { x: a.x + v.ux * d, y: a.y + v.uy * d, t: a.t };
-            await orbe(o, sc.calque, a, mi, { couleur: "#b070ff", taille: 0.3, arc: 0.6, duree: 420, easing: "ease-out" });
-            await orbe(o, sc.calque, mi, a, { couleur: "#b070ff", taille: 0.3, arc: -0.6, duree: 420, easing: "ease-in" });
-            o.son("impact-magique");
-            await Promise.all([o.secouer(sc.lanceur, a.t * 0.12, 360, axe(mi, a)), o.eclat(sc.lanceur, VIOLET, 460)]);
+            await o.attendre(400);
+            o.texte(sc.calque, sc.lanceur, sc.texte || "Confus : s'inflige sa propre compétence !", sc.couleur || "#cc66ff");
+            if (!sc.offensive) { await o.eclat(sc.lanceur, VIOLET, 600); return; }
+            o.son("lame-souffle");
+            await Promise.all([entaille(o, sc.calque, a, v.angle + Math.PI),
+                sc.touche ? coupRecu(o, sc.calque, sc.lanceur, loin, {}) : o.eclat(sc.lanceur, VIOLET, 460)]);
+        } },
+        // ATTAQUER UN ALLIÉ AU HASARD (la Confusion — « on garde, tu peux
+        // intégrer ») : le « ❓ » et le mot sur le confus, sa lueur violette ;
+        // puis (le geste de l'attaque, juste après) il frappe l'allié.
+        { id: "jeu-confusion-allie", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            o.son("confusion");
+            o.icone(sc.calque, a, "❓", { duree: 1300, lueur: "#c9a8ff" });
+            o.texte(sc.calque, sc.lanceur, sc.texte || "Confus : attaque un allié !", sc.couleur || "#cc66ff");
+            await Promise.all([o.eclat(sc.lanceur, VIOLET, 450), o.attendre(450)]);
+        } },
+        // LA CONFUSION DISSIPÉE (« on garde, tu peux intégrer ») : les « ? » qui
+        // tournaient autour du pion éclatent en étincelles, sa teinte violette
+        // s'efface ; le mot, en vert.
+        { id: "jeu-confusion-dissipee", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            teinte(o, sc.lanceur, VIOLET, 200);
+            o.etoiles(sc.calque, a, { signe: "?", couleur: "#d6a8ff", duree: 900, tours: 400 });
+            await o.attendre(800);
+            o.son("dissipe");
+            o.texte(sc.calque, sc.lanceur, sc.texte || "Confusion dissipée !", sc.couleur || "#33cc66");
+            await Promise.all([o.gerbe(sc.calque, a.x, a.y - a.t * 0.2, { nombre: 12, dist: a.t * 0.8, couleurs: ["#ffffff", "#e0c8ff"], taille: 5, duree: 700 }),
+                deteindre(o, sc.lanceur, VIOLET, 700)]);
+        } },
+        // ÉTOURDI (« on garde, tu peux intégrer ») : l'état posé, des étoiles
+        // tournent autour de sa tête et il vacille. Le choc lui-même (le coup
+        // reçu, le chiffre) a eu son étape ; sans coup avant, un éclat le marque.
+        { id: "jeu-etourdi", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            o.son("etourdi");
+            etat(o, sc.calque, sc.lanceur, "Étourdi !");
+            await Promise.all([o.etoiles(sc.calque, a, { duree: 1600 }),
+                sc.dejaFrappe ? null : o.eclat(sc.lanceur, "brightness(1.5)", 300),
+                o.bouger(sc.lanceur, [{ transform: "rotate(0deg)" }, { transform: "rotate(-9deg)" }, { transform: "rotate(8deg)" }, { transform: "rotate(-6deg)" },
+                                      { transform: "rotate(5deg)" }, { transform: "rotate(0deg)" }], { duration: 1500, easing: "ease-in-out" })]);
         } },
         // LA MARCHE DU VARGEN : foulée légère et rapide, une silhouette laissée
         // sur chaque case quittée ; « ½ ⚡ » au premier pas.
