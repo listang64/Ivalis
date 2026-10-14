@@ -81,7 +81,7 @@
     // irrégulier aplati (la perspective), son sommet le même, plus haut et un
     // peu resserré. Les faces se dessinent du fond vers l'avant, éclairées du
     // haut à gauche, puis le dessus, plus clair, avec ses fissures.
-    function masse(ctx, alea, cx, cy, rayon, hauteur, couleur) {
+    function masse(ctx, alea, cx, cy, rayon, hauteur, couleur, gros = 0) {
         const n = 5 + Math.floor(alea() * 3);
         const depart = alea() * Math.PI * 2;
         const bas = [], haut = [];
@@ -214,9 +214,20 @@
             const a = alea() * Math.PI * 2, d = Math.sqrt(alea()) * rayon * 0.6;
             sur.push({ x: cx + Math.cos(a) * d, y: cy - hauteur + Math.sin(a) * d * 0.55, r: tailleCaillouDessus(alea) });
         }
-        sur.sort((u, v) => u.y - v.y).forEach(c => masse(ctx, alea, c.x, c.y, c.r, c.r * (0.4 + alea() * 0.5),
+        // QUELQUES GROS CAILLOUX (Nico, v237 : « sur les murs, j'aimerais
+        // quelques gros cailloux aléatoires ») : posés plus près du centre,
+        // pour ne pas déborder du dessus.
+        for (let k = 0; k < gros; k++) {
+            const a = alea() * Math.PI * 2, d = Math.sqrt(alea()) * rayon * 0.35;
+            sur.push({ x: cx + Math.cos(a) * d, y: cy - hauteur + Math.sin(a) * d * 0.55, r: tailleGrosCaillou(alea), gros: true });
+        }
+        sur.sort((u, v) => u.y - v.y).forEach(c => masse(ctx, alea, c.x, c.y, c.r, c.r * (c.gros ? 0.6 + alea() * 0.4 : 0.4 + alea() * 0.5),
             [couleur[0] + Math.floor((alea() - 0.5) * 8), couleur[1] + Math.floor((alea() - 0.5) * 12), couleur[2]]));
         return sur.length;
+    }
+    // Un gros caillou : deux à trois fois un caillou ordinaire du dessus.
+    function tailleGrosCaillou(alea) {
+        return 5.5 + alea() * 3.5;
     }
     // Des petits surtout, quelques moyens.
     function tailleCaillouDessus(alea) {
@@ -266,16 +277,21 @@
                           rayon: 18 + alea() * 9, hauteur: 56 + alea() * 34 });
         }
         // Le cœur du pilier, le plus large, au centre.
-        masses.push({ x: 64, y: PIED_Y, rayon: 34 + alea() * 4, hauteur: 50 + alea() * 16 });
+        masses.push({ x: 64, y: PIED_Y, rayon: 34 + alea() * 4, hauteur: 50 + alea() * 16, gros: 1 + Math.floor(alea() * 2) });
         canvas.nbCaillouxDessus = 0;
-        masses.sort((a, b) => a.y - b.y).forEach(m => { canvas.nbCaillouxDessus += masse(ctx, alea, m.x, m.y, m.rayon, m.hauteur, roche) || 0; });
+        canvas.nbGrosCailloux = masses.reduce((t, m) => t + (m.gros || 0), 0);
+        masses.sort((a, b) => a.y - b.y).forEach(m => { canvas.nbCaillouxDessus += masse(ctx, alea, m.x, m.y, m.rayon, m.hauteur, roche, m.gros || 0) || 0; });
         // Des gravats au pied, devant.
         gravatsAuPied(ctx, alea, tour.filter(t => t[3] > 0.05), 64, PIED_Y, roche);
         return canvas;
     };
 
-    // LES GRAVATS : 128 × 128, à plat sur la case. Une tache de terre
-    // retournée, des éclats de roche et de la poussière.
+    // LES GRAVATS : 128 × 128, sur la case. UN PETIT MONTICULE (Nico, v237 :
+    // « pour les gravats au sol quand un mur de pierre est pété, j'aimerais
+    // qu'il y en ait plus, comme un petit monticule ») : une tache de terre
+    // retournée, une butte de terre et de poussière, puis des éclats de roche
+    // empilés en couches — beaucoup en bas, larges et étalés, de moins en
+    // moins vers le haut, chaque couche un peu plus haute que la précédente.
     window.dessinerGravatsTerre = function (graine) {
         const canvas = document.createElement("canvas");
         canvas.width = 128; canvas.height = 128;
@@ -283,7 +299,7 @@
         const alea = hasard(graine);
         const terre = [26 + Math.floor(alea() * 8), 26 + Math.floor(alea() * 6), 30];
         for (let i = 0; i < 4; i++) {
-            const x = 64 + (alea() - 0.5) * 34, y = 64 + (alea() - 0.5) * 26, r = 26 + alea() * 16;
+            const x = 64 + (alea() - 0.5) * 34, y = 66 + (alea() - 0.5) * 26, r = 28 + alea() * 16;
             const g = ctx.createRadialGradient(x, y, 2, x, y, r);
             g.addColorStop(0, teinte([terre[0], terre[1]], terre[2], 0.55));
             g.addColorStop(1, teinte([terre[0], terre[1]], terre[2], 0));
@@ -292,19 +308,50 @@
             ctx.ellipse(x, y, r, r * 0.7, 0, 0, Math.PI * 2);
             ctx.fill();
         }
-        const n = 12 + Math.floor(alea() * 8);
-        const eclats = [];
-        for (let i = 0; i < n; i++) {
-            const a = alea() * Math.PI * 2, d = Math.sqrt(alea()) * 40;
-            eclats.push({ x: 64 + Math.cos(a) * d, y: 64 + Math.sin(a) * d * 0.75, r: 2.5 + alea() * 5.5 });
-        }
-        eclats.sort((a, b) => a.y - b.y).forEach(e => {
-            ombre(ctx, e.x + 1.5, e.y + 1.5, e.r * 1.5, e.r * 0.8, 0.35);
-            masse(ctx, alea, e.x, e.y, e.r, e.r * (0.4 + alea() * 0.5), [26 + Math.floor(alea() * 12), 44 + Math.floor(alea() * 8), 12]);
+        // La butte : de la terre et de la poussière tassées, éclairées du haut
+        // à gauche, plus sombres au pied.
+        const cx = 64, cy = 76;
+        ombre(ctx, cx + 5, cy + 6, 46, 18, 0.4);
+        // Un dôme : le profil d'une butte (base large, sommet arrondi), clair
+        // en haut à gauche, sombre au pied.
+        ctx.beginPath();
+        ctx.moveTo(cx - 44, cy + 4);
+        ctx.bezierCurveTo(cx - 40, cy - 22, cx - 16, cy - 36, cx, cy - 36);
+        ctx.bezierCurveTo(cx + 18, cy - 36, cx + 40, cy - 22, cx + 44, cy + 4);
+        ctx.ellipse(cx, cy + 4, 44, 14, 0, 0, Math.PI);
+        ctx.closePath();
+        const butte = ctx.createLinearGradient(cx - 30, cy - 36, cx + 20, cy + 16);
+        butte.addColorStop(0, teinte([terre[0], terre[1] + 18], terre[2] - 2, 0.95));
+        butte.addColorStop(0.55, teinte([terre[0], terre[1] + 4], terre[2], 0.95));
+        butte.addColorStop(1, teinte([terre[0], terre[1] - 8], terre[2] + 4, 0.95));
+        ctx.fillStyle = butte;
+        ctx.fill();
+        // Les couches d'éclats, de la base au sommet.
+        const COUCHES = [
+            { n: 16 + Math.floor(alea() * 6), rx: 44, ry: 14, monte: 0,  rMin: 3.5, rMax: 8.5 },
+            { n: 11 + Math.floor(alea() * 4), rx: 32, ry: 10, monte: 11, rMin: 3.0, rMax: 7.5 },
+            { n: 7 + Math.floor(alea() * 3),  rx: 20, ry: 7,  monte: 21, rMin: 2.8, rMax: 6.5 },
+            { n: 3 + Math.floor(alea() * 2),  rx: 9,  ry: 4,  monte: 30, rMin: 2.5, rMax: 5.5 }
+        ];
+        let total = 0;
+        COUCHES.forEach(c => {
+            const eclats = [];
+            for (let i = 0; i < c.n; i++) {
+                const a = alea() * Math.PI * 2, d = Math.sqrt(alea());
+                eclats.push({ x: cx + Math.cos(a) * d * c.rx, y: cy + Math.sin(a) * d * c.ry - c.monte,
+                              r: c.rMin + alea() * (c.rMax - c.rMin) });
+            }
+            eclats.sort((u, v) => u.y - v.y).forEach(e => {
+                ombre(ctx, e.x + 1.5, e.y + 1.5, e.r * 1.5, e.r * 0.8, 0.35);
+                masse(ctx, alea, e.x, e.y, e.r, e.r * (0.45 + alea() * 0.55), [26 + Math.floor(alea() * 12), 44 + Math.floor(alea() * 8), 12]);
+            });
+            total += eclats.length;
         });
+        canvas.nbEclats = total;
+        canvas.couchesMonticule = COUCHES.length;
         ctx.fillStyle = "rgba(60, 44, 30, 0.55)";
-        for (let i = 0; i < 40; i++) {
-            ctx.fillRect(64 + (alea() - 0.5) * 84, 64 + (alea() - 0.5) * 64, 1.2, 1.2);
+        for (let i = 0; i < 60; i++) {
+            ctx.fillRect(64 + (alea() - 0.5) * 96, 72 + (alea() - 0.5) * 50, 1.2, 1.2);
         }
         return canvas;
     };
@@ -791,9 +838,22 @@
                 surLeDessus.push({ x: MUR_CX + x, y: MUR_CY + y - h, r: tailleCaillouDessus(alea) });
             }
         });
-        surLeDessus.sort((u, v) => u.y - v.y).forEach(c => masse(ctx, alea, c.x, c.y, c.r, c.r * (0.4 + alea() * 0.5),
+        // QUELQUES GROS CAILLOUX, au hasard (Nico, v237) : un à trois par case,
+        // sur le cœur ou un bras pas cassé, bien à l'intérieur du dessus.
+        const entieres = pieces.filter(pc => !pc.casse);
+        const nbGros = 1 + Math.floor(alea() * 3);
+        for (let k = 0; k < nbGros && entieres.length; k++) {
+            const pc = entieres[Math.floor(alea() * entieres.length)];
+            const n = pc.pts.length;
+            const g = { x: pc.pts.reduce((t, p) => t + p.x, 0) / n, y: pc.pts.reduce((t, p) => t + p.y, 0) / n };
+            const h = pc.pts.reduce((t, p) => t + (p.h || 0), 0) / n;
+            const v = pc.pts[Math.floor(alea() * n)], t = alea() * 0.35;
+            surLeDessus.push({ x: MUR_CX + g.x + (v.x - g.x) * t, y: MUR_CY + g.y + (v.y - g.y) * t - h, r: tailleGrosCaillou(alea), gros: true });
+        }
+        surLeDessus.sort((u, v) => u.y - v.y).forEach(c => masse(ctx, alea, c.x, c.y, c.r, c.r * (c.gros ? 0.6 + alea() * 0.4 : 0.4 + alea() * 0.5),
             [roche[0] + Math.floor((alea() - 0.5) * 8), roche[1] + 6 + Math.floor((alea() - 0.5) * 12), roche[2]]));
         canvas.nbCaillouxDessus = surLeDessus.length;
+        canvas.nbGrosCailloux = surLeDessus.filter(c => c.gros).length;
         // Des gravats au pied (devant : ceux de derrière seraient cachés).
         // TOUT LE LONG DU PIED, jonctions comprises : le filtre de la terre
         // (libre, 30 % du bras) laissait nu le pied du mur entre deux cases —

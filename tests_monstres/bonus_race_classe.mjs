@@ -74,7 +74,7 @@ console.log("\n1. CHAQUE ATOUT A SA PHRASE");
 console.log("\n2. LE DÉTAIL D'UN HÉROS");
 {
     const d = w.detailBonusRaceClasse({ race: "Humain", classe: "Hoplite", xp: XP[5] });   // (ex-Hoplite : le Protecteur)
-    verifier("Humain : +10 de fatigue maximum", d.race.nom === "Humain" && JSON.stringify(d.race.lignes) === '["+10 de fatigue maximum"]',
+    verifier("Humain : +10 de fatigue maximum, +1 compétence (v237)", d.race.nom === "Humain" && JSON.stringify(d.race.lignes) === '["+10 de fatigue maximum","+1 compétence"]',
              JSON.stringify(d.race.lignes));
     verifier("Hoplite niveau 5 : paliers 1 et 5 atteints, 10 à venir",
              JSON.stringify(d.classe.paliers.map(p => [p.niveau, p.atteint])) === '[[1,true],[5,true],[10,false]]');
@@ -122,7 +122,7 @@ console.log("\n3. L'ENCART DANS LA FICHE");
     });
     await p.screenshot({ path: "/tmp/claude-0/bonus_race_classe.png" });
     verifier("l'encart est dans l'onglet Statistiques", r.dansStats);
-    verifier("la race (Gob) : esquive et compétence", /Gob/.test(r.race) && /\+3 % d'esquive/.test(r.race) && /\+1 compétence/.test(r.race), r.race.replace(/\s+/g, " ").trim());
+    verifier("la race (Gob) : esquive et compétence", /Gob/.test(r.race) && /\+5 % d'esquive/.test(r.race) && /\+1 compétence/.test(r.race), r.race.replace(/\s+/g, " ").trim());
     // (Le Nécromancien est devenu le Sorcier : la fiche qui porte l'ancien nom
     // se lit sous le nouveau. Ténèbres, +1 portée, pas de malus au contact.)
     verifier("la classe (Nécromancien → Sorcier) : Ténèbres, +1 portée, sans malus — plus de +8 PV",

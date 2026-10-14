@@ -54,7 +54,7 @@ window.changerRaceSelection = function(race) {
     if (race === "Humain") {
         bgImage.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786114507/Les_humains_h0ubwh.png";
         texteDesc = "Peuple le plus répandu d'Elyria, les Humains vivent sur presque tout le continent. Héritiers de l'ancienne humanité, ils sont aujourd'hui présents dans toutes les cultures et tous les milieux.";
-        texteGameplay = "Adaptables et endurants, les Humains disposent d'une réserve de fatigue supérieure à celle des autres peuples.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> Fatigue de base : 110</div>";
+        texteGameplay = "Adaptables et endurants, les Humains disposent d'une réserve de fatigue supérieure à celle des autres peuples, et d'une compétence supplémentaire dès la création.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> Fatigue de base : 110 • +1 compétence</div>";
     
     } else if (race === "Ondari") {
         bgImage.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786218901/Ondaris_i6uxhm.png";
@@ -64,27 +64,27 @@ window.changerRaceSelection = function(race) {
     } else if (race === "Vargen") {
         bgImage.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786220009/Vargens_npjuoa.png";
         texteDesc = "Peuple bestial puissant vivant en clans, les Vargens sont réputés pour leur force, leur endurance et leur instinct de survie. Méfiants envers les autres peuples, ils privilégient les solutions simples et la force brute plutôt que les raisonnements complexes.";
-        texteGameplay = "Prédateurs rapides et instinctifs, les Vargens se déplacent avec une grande efficacité et savent éviter les attaques lorsqu'ils quittent le combat.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> Coût de déplacement réduit de 50 % • 30 % de chances d'éviter les attaques d'opportunité</div>";
+        texteGameplay = "Prédateurs rapides et instinctifs, les Vargens se déplacent avec une grande efficacité et savent éviter les attaques lorsqu'ils quittent le combat.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> Coût de déplacement réduit de 50 % • 50 % de chances d'éviter les attaques d'opportunité</div>";
     
     } else if (race === "Ankylar") {
         bgImage.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786220393/Ankylars_tbaq8b.png";
         texteDesc = "Robustes humanoïdes reptiliens, les Ankylars sont des guerriers endurants et des maîtres de la forge. Peuple dominant de Volcanisse, ils valorisent l'honneur, la discipline et le combat martial, tout en rejetant profondément la magie.";
-        texteGameplay = "Robustes et résistants, les Ankylars encaissent particulièrement bien les dégâts physiques grâce à leur constitution naturelle, et leur carapace ne laisse aucune prise à ce qui cherche à leur faire perdre leur tour.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> +8 % de résistance physique • Immunisé à l'Étourdissement</div>";
+        texteGameplay = "Robustes et résistants, les Ankylars encaissent particulièrement bien les dégâts physiques grâce à leur constitution naturelle, et leur carapace ne laisse aucune prise à ce qui cherche à leur faire perdre leur tour.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> +12 % de résistance physique • Immunisé à l'Étourdissement</div>";
     
     } else if (race === "Ophior") {
         bgImage.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786221325/ophiors_zdmtjn.png";
         texteDesc = "Êtres humanoïdes vivant en symbiose avec les champignons et la nature, les Ophiors ont une apparence aussi fascinante qu'inquiétante. Pacifiques par nature et profondément liés aux forêts, ils évitent les conflits mais savent se défendre lorsque cela devient nécessaire.";
-        texteGameplay = "Profondément liés à la nature, les Ophiors possèdent une résistance naturelle aux énergies magiques, et leur symbiose avec les champignons referme lentement leurs blessures au fil du combat.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> +8 % de résistance magique • +3 PV soignés à chaque fin de manche</div>";
+        texteGameplay = "Profondément liés à la nature, les Ophiors possèdent une résistance naturelle aux énergies magiques, et leur symbiose avec les champignons referme lentement leurs blessures au fil du combat.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> +12 % de résistance magique • +3 PV soignés à chaque fin de manche</div>";
     
     } else if (race === "Gob") {
         bgImage.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786221325/Gobs_wayc5p.png";
         texteDesc = "Petits, agiles et particulièrement ingénieux, les Gobs sont des êtres curieux qui excelent dans le bricolage, l'invention et les tâches demandant de la précision. Souvent méprisés et réduits en esclavage par les autres peuples, ils survivent grâce à leur intelligence et leur débrouillardise.";
-        texteGameplay = "Agiles et débrouillards, les Gobs sont difficiles à toucher et disposent d'une compétence supplémentaire dès la création.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> +3 % d'esquive • +1 compétence</div>";
+        texteGameplay = "Agiles et débrouillards, les Gobs sont difficiles à toucher et disposent d'une compétence supplémentaire dès la création.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> +5 % d'esquive • +1 compétence</div>";
     
     } else if (race === "Ethéré") {
         bgImage.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786221325/%C3%89th%C3%A9r%C3%A9s_jflyo0.png";
         texteDesc = "Peuple nomade du désert d'Etheria, les Éthérés sont des êtres mystérieux privés de la vue, mais dotés de sens extrêmement développés. Silencieux, précis et remarquablement habiles, ils se déplacent à travers le désert en clans, loin des autres civilisations.";
-        texteGameplay = "Résistants et mystérieux, les Éthérés récupèrent davantage de santé grâce aux soins et leur organisme les protège naturellement du poison.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> +30 % aux soins reçus • Immunisé au poison</div>";
+        texteGameplay = "Résistants et mystérieux, les Éthérés récupèrent davantage de santé grâce aux soins et leur organisme les protège naturellement du poison.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> +25 % aux soins reçus • Immunisé au poison</div>";
     
     } else {
         bgImage.src = "";

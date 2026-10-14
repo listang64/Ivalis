@@ -334,15 +334,16 @@ console.log("\n7. LE RÉCIT PART EN BASE AVEC LA COMPÉTENCE");
 }
 
 console.log("\n8. LES EFFETS DE CLASSE : DANS LA LISTE DE LIA SEULEMENT S'ILS SONT DÉBLOQUÉS");
-// Lumière (Chasseur de mages) et Ténèbres (Sorcier, ex-Nécromancien) : dès
-// le niveau 1. Avant, ou dans une autre classe, LIA ne les voit pas — ni dans la
+// Ténèbres (Sorcier, ex-Nécromancien) : dès le niveau 1. Avant, ou dans une autre classe, LIA ne les voit pas — ni dans la
 // liste, ni dans ses règles — et l'algorithme refuse de les poser même si elle
 // les demande.
 {
   // (Le Vampirisme a été retiré de la Forge : remplacé par le Baiser du
   // vampire, une technique de classe. Plus personne ne l'a — voir plus bas.)
   // [classe, effet, XP qui le débloque, XP trop tôt (aucun : dès le niveau 1)]
-  const CLASSE = { "Lumière": ["Chasseur de mages", "EFF_LUMIERE", 0, null], "Ténèbres": ["Sorcier", "EFF_TENEBRES", 0, null] };
+  // (La Lumière a quitté la Forge en v237 : le Chasseur de mages a la Maîtrise
+  // de la lumière à la place — voir plus bas.)
+  const CLASSE = { "Ténèbres": ["Sorcier", "EFF_TENEBRES", 0, null] };
   const demande = async (fiche, plan) => {
     await p.evaluate(async ({ EFFETS, fiche }) => {
       window.EFFETS_BDD_CACHE = JSON.parse(JSON.stringify(EFFETS));
@@ -396,9 +397,23 @@ console.log("\n8. LES EFFETS DE CLASSE : DANS LA LISTE DE LIA SEULEMENT S'ILS SO
   verifier("Vampire niv. 10 : plus de Vampirisme dans la liste de LIA (remplacé par le Baiser)", !ids.includes("EFF_VAMPIRISME"), ids.length);
 }
 
+{
+  // La Lumière (v237) : plus dans la liste de LIA, même pour un Chasseur de
+  // mages niveau 10 (remplacée par la Maîtrise de la lumière, un passif).
+  const ids = await p.evaluate(async ({ EFFETS }) => {
+    window.EFFETS_BDD_CACHE = JSON.parse(JSON.stringify(EFFETS));
+    window.completerEffetsDeSecours(window.EFFETS_BDD_CACHE);
+    window.__docs = { "Personnages/P1": { Classe: "Chasseur de mages", XP: 7900, Race: "Humain" }, "Caracteristiques/P1": { int: 15 } };
+    window.OUVERTURE_FORGE_EN_COURS = false;
+    await window.ouvrirCreationCompetence();
+    return window.LIA.catalogueEffets(window.LIA.armesPermises()).map(e => e.id);
+  }, { EFFETS: EFFETS_PAR_ID });
+  verifier("Chasseur de mages niv. 10 : plus de Lumière dans la liste de LIA (Maîtrise de la lumière)", !ids.includes("EFF_LUMIERE"), ids.length);
+}
+
 console.log("\n9. LA MAGIE NE FAIT PLUS TOMBER LES SOUS-EFFETS DU MENU MAGIQUE");
 // purgerIncompatibilitesArme retirait, en Magie, tout sous-effet rangé AUSSI en
-// Physique : Lumière, Confusion, Peur, Empoisonnement… alors que le menu
+// Physique : Confusion, Peur, Empoisonnement… alors que le menu
 // Magique les propose. Seuls les sous-effets purement physiques tombent.
 {
   const r = await p.evaluate(async ({ EFFETS }) => {
@@ -410,12 +425,14 @@ console.log("\n9. LA MAGIE NE FAIT PLUS TOMBER LES SOUS-EFFETS DU MENU MAGIQUE")
     window.forgeState.armePrincipale = "Arme polyvalente";
     window.ajouterComposantPrincipal("EFF_ATTAQUE_MAGIQUE");
     window.choisirElementForge("Feu"); // une Attaque Magique a toujours un élément (elements_magiques.mjs)
-    window.forgeState.actions[0].mods = { EFF_LUMIERE: 1, EFF_CONFUSION: 1, EFF_ETOURDIT: 1 };
+    window.forgeState.actions[0].mods = { EFF_PEUR: 1, EFF_CONFUSION: 1, EFF_ETOURDIT: 1 };
     window.selectionnerArme("Magie");
     window.fermerMenuAjoutForge();
     return Object.keys(window.forgeState.actions[0].mods);
   }, { EFFETS: EFFETS_PAR_ID });
-  verifier("Lumière et Confusion (aussi Magique) restent en Magie", r.includes("EFF_LUMIERE") && r.includes("EFF_CONFUSION"), r.join(","));
+  // (La Lumière, qui servait d'exemple, a quitté la Forge en v237 : la Peur
+  // la remplace.)
+  verifier("Peur et Confusion (aussi Magique) restent en Magie", r.includes("EFF_PEUR") && r.includes("EFF_CONFUSION"), r.join(","));
   verifier("Étourdit (seulement Physique) tombe", !r.includes("EFF_ETOURDIT"), r.join(","));
 }
 

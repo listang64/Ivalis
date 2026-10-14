@@ -98,8 +98,11 @@ console.log("\n2. UN NUAGE DE POUSSIÈRE AU PIED DE CHAQUE MUR");
   // Toutes roulent vers l'extérieur ; le nuage, dans son ensemble, monte
   // (celles qui roulent vers nous peuvent finir un peu plus bas).
   const montee = P.reduce((t, b) => t + b.fin.y, 0) / Math.max(1, P.length);
-  verifier("elles gonflent et roulent vers l'extérieur, le nuage monte", P.length > 0 && P.every(t => Math.hypot(t.fin.x, t.fin.y) > 4) && montee < -5,
-           `montée moyenne ${montee.toFixed(1)} px`);
+  // (Une bouffée qui roule vers nous peut voir sa montée annuler sa course :
+  // presque toutes, pas toutes, bougent nettement.)
+  const bougent = P.filter(t => Math.hypot(t.fin.x, t.fin.y) > 4).length / Math.max(1, P.length);
+  verifier("elles gonflent et roulent vers l'extérieur, le nuage monte", P.length > 0 && bougent >= 0.9 && montee < -5,
+           `${Math.round(bougent * 100)} % bougent, montée moyenne ${montee.toFixed(1)} px`);
   verifier("puis se dissipent en fondu (dernière image : opacité 0)", P.length > 0 && P.every(t => t.opaciteFin === 0 && t.opaciteMax > 0.5));
 }
 

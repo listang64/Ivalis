@@ -78,8 +78,9 @@ console.log("\n1. NIVEAU 1 : +5 DE RÉGÉNÉRATION DE FATIGUE, +1 COMPÉTENCE");
              JSON.stringify(a10.techniques) === '["CLASSE_SOIN_URGENCE","CLASSE_PRISE_EN_CHARGE"]' && a10.regenFatigue === 5);
     verifier("la fiche annonce 40 % de régénération (35 + 5)", w.regenerationCombattant(medicus(1)) === 40
              && w.regenerationCombattant(fiche("X")) === 35, String(w.regenerationCombattant(medicus(1))));
-    verifier("+1 compétence, comme le Nécromancien (7)", w.competencesMaxCombattant(medicus(1)) === 7
-             && w.competencesMaxCombattant(fiche("X")) === 6);
+    // (Des Ondaris : l'Humain a sa propre compétence en plus depuis la v237.)
+    verifier("+1 compétence, comme le Nécromancien (7)", w.competencesMaxCombattant(medicus(1, { race: "Ondari" })) === 7
+             && w.competencesMaxCombattant(fiche("X", { race: "Ondari" })) === 6);
     const e = monde(1);
     e.combattants.D.fatigue = 50; e.combattants.B.fatigue = 50;
     regenererFinDeManche(e);
@@ -102,7 +103,7 @@ console.log("\n2. SOIN D'URGENCE : 12 PV À TOUS LES ALLIÉS DEBOUT, OÙ QU'ILS 
     const pas = appliquerIntention(e, intention("CLASSE_SOIN_URGENCE"));
     const c = pas.etat.combattants;
     verifier("le Médicus brûlé : 6 (la moitié)", c.D.pv === 56, String(c.D.pv));
-    verifier("l'allié loin (Éthéré, +30 %) : 16", c.B.pv === 66, String(c.B.pv));
+    verifier("l'allié loin (Éthéré, +25 % depuis la v237) : 15", c.B.pv === 65, String(c.B.pv));
     verifier("l'allié KO : rien, il reste KO", c.A.pv === 0 && c.A.aTerre);
     verifier("les ennemis : rien", c.M1.pv === 50 && c.M3.pv === 50);
     verifier("technique utilisée, tour clos, aucune énergie",
@@ -113,7 +114,7 @@ console.log("\n2. SOIN D'URGENCE : 12 PV À TOUS LES ALLIÉS DEBOUT, OÙ QU'ILS 
     Object.assign(sursis.combattants.B, { pv: 0, sursis: { tours: 2 } });
     verifier("un Nécromancien en sursis n'est pas soigné", appliquerIntention(sursis, intention("CLASSE_SOIN_URGENCE")).etat.combattants.B.pv === 0);
     const rejoue = appliquerEntree(e, pas.entree).combattants;
-    verifier("rejoué depuis le journal : mêmes PV", rejoue.D.pv === 56 && rejoue.B.pv === 66);
+    verifier("rejoué depuis le journal : mêmes PV", rejoue.D.pv === 56 && rejoue.B.pv === 65);
     verifier("une seconde fois : refusée", !validerIntention(enTete(clonerEtat(pas.etat), "CLASSE_SOIN_URGENCE"), intention("CLASSE_SOIN_URGENCE")).ok);
     verifier("niveau 4 : il ne l'a pas", !validerIntention(enTete(monde(4), "CLASSE_SOIN_URGENCE"), intention("CLASSE_SOIN_URGENCE")).ok);
     verifier("le chiffre de la règle", SOIN_URGENCE === 12);

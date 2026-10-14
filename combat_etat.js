@@ -172,7 +172,7 @@ export function combattantDepuisFiche(fiche, position, regles, options) {
         // L'Ophior reprend des points de vie à chaque fin de manche — la seule
         // race à en avoir, donc le seul atout de ce genre à porter un nombre.
         regenPv: nombre(race.regenPv),
-        // L'Éthéré tire trente pour cent de plus de chaque soin reçu. Le noyau
+        // L'Éthéré tire vingt-cinq pour cent de plus de chaque soin reçu. Le noyau
         // applique ce pourcentage au moment de soigner (moteur_pur.js) : sans
         // ce champ, l'atout restait dans l'ancien moteur et ne servait à rien.
         soinsRecus: nombre(race.soinsRecus),
@@ -194,9 +194,16 @@ export function combattantDepuisFiche(fiche, position, regles, options) {
         // Le Chasseur de mages, niveau 10 : la chance qu'un sort de lumière
         // aveugle sa cible et les ennemis qui la touchent (tirerDesCarte).
         lumiereAveugle: nombre(race.lumiereAveugle),
-        // Le Vampire : le feu le ronge plus fort (regleDesEtats, moteur_pur.js),
+        // …et depuis la v237, sa Maîtrise de la lumière (niveau 1) : 33 % de
+        // chance qu'un sort de FOUDRE aveugle sa cible (tirerDesCarte).
+        maitriseLumiere: nombre(race.maitriseLumiere),
+        // Le Vampire : le feu le rongeait plus fort (regleDesEtats, moteur_pur.js —
+        // plus aucune classe ne l'a depuis la v237),
         // et la première case de chacun de ses tours est gratuite (coutDuPas).
         brulureAggravee: !!race.brulureAggravee,
+        // …et désormais, à la place, le feu le PREND plus facilement : +20 %
+        // de chance d'être Brûlé par un sort qui brûle (tirerDesCarte).
+        brulureFacile: nombre(race.brulureFacile),
         premierPasGratuit: !!race.premierPasGratuit,
         // Le Sorcier : ses attaques à distance ne perdent rien au contact
         // (chaineDeDegats, moteur_pur.js).
@@ -204,10 +211,12 @@ export function combattantDepuisFiche(fiche, position, regles, options) {
         // La Sentinelle : +6 à ses attaques d'opportunité ; au niveau 5, le
         // Défenseur (chance de frapper qui ENTRE dans sa zone) et sa zone de
         // menace portée à 2 cases avec une arme à allonge (mouvement_pur.js).
-        // Le Profanateur : au niveau 5, les ennemis qui tombent de sa main ou
-        // à côté de lui se relèvent en zombies (tomber, plus bas). Son atout
-        // du niveau 1 ne joue qu'à la Forge (diviseurEtalement).
+        // Le Profanateur, dès le niveau 1 : les ennemis qui tombent de sa main
+        // ou à côté de lui se relèvent en zombies (tomber, plus bas), et ses
+        // attaques magiques de glace frappent en physique (glaceEnPhysique,
+        // moteur_pur.js).
         zombies: !!race.zombies,
+        glacePhysique: !!race.glacePhysique,
         // Le rayon où un ennemi qui tombe se relève (1 case ; 2 au niveau 10).
         rayonZombies: nombre(race.rayonZombies, race.zombies ? 1 : 0),
         degatsOpportunite: nombre(race.degatsOpportunite),

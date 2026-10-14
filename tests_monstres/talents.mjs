@@ -95,8 +95,9 @@ console.log("\n2. CE QU'ILS DONNENT (atoutRace, les stats du jeu)");
         TAL_MAITRE_ELEMENTS: 1, TAL_MAITRE_ILLUSIONNISTE: 1, TAL_FORMATION_MEDICUS: 1, TAL_ARCHIMAGE: 1, TAL_TAILLE_GUERRE: 1,
         TAL_LANGAGE_ARCANIQUE: 1, TAL_DEGATS_ILLUSOIRES: 1, TAL_IMMUNISE: 1 } });
     const a = w.atoutRace(tous);
-    verifier("Préparer ×2 : +10 d'initiative ; Formé ×2 : +2 compétences", a.initiative === 10 && a.competences === 2
-             && w.competencesMaxCombattant(tous) === 8 && w.bonusInitiativeClasse(tous, { Effets_Compiles: [] }) === 10);
+    // (L'Humain a sa propre compétence en plus depuis la v237 : 2 + 1.)
+    verifier("Préparer ×2 : +10 d'initiative ; Formé ×2 : +2 compétences", a.initiative === 10 && a.competences === 3
+             && w.competencesMaxCombattant(tous) === 9 && w.bonusInitiativeClasse(tous, { Effets_Compiles: [] }) === 10);
     verifier("Guerrier implacable : ⌈2,5 × 2⌉ = +5 % de résistance physique", w.defPhysiqueCombattant(tous) === 5, String(w.defPhysiqueCombattant(tous)));
     verifier("Précis +4 % de critique, Art de l'esquive +4 % d'esquive", w.critiqueCombattant(tous) === 4 && w.esquiveCombattant(tous) === 4);
     verifier("Mastodonte +10 PV, Réserve arcanique +8 de fatigue max (Humain : 110 → 118)",
@@ -108,7 +109,7 @@ console.log("\n2. CE QU'ILS DONNENT (atoutRace, les stats du jeu)");
     verifier("Archimage, Taillé, Langage : +1 chacun ; Dégâts illusoires ⌈2,5 × 2⌉ = 5 ; Immunisé 1",
              a.degatsMagiques === 1 && a.degatsPhysiques === 1 && a.degatsMotsPouvoir === 1 && a.degatsIllusoires === 5 && a.etatsRaccourcis === 1);
     const vargen = heros({ race: "Vargen", talents: { TAL_DIVERSION: 1 } });
-    verifier("Diversion s'ajoute à l'esquive d'opportunité du Vargen (30 + 30)", w.atoutRace(vargen).esquiveOpportunite === 60);
+    verifier("Diversion s'ajoute à l'esquive d'opportunité du Vargen (50 + 30, v237)", w.atoutRace(vargen).esquiveOpportunite === 80);
     const nul = heros({ caracs: { ...CARACS, dex: 8 }, talents: { TAL_PRECIS: 1 } });
     verifier("un modificateur négatif ne retire rien (DEX 8 → 0)", w.critiqueCombattant(nul) === 0);
     verifier("Perfectionnement : +2 aux tests de la carac choisie",
@@ -169,16 +170,17 @@ console.log("\n3. DANS LE COMBAT");
         compterPasMarche(e3b, { type: "pas", acteur: "H", de: { q: a, r: b }, vers: { q: c, r: d } }));
     verifier("…4 cases mais avec un virage : rien", reductionInertie(e3b, "H", { attaques: [{ valeurBrute: 5 }] }) === 0, String(e3b.file[0].ligneMax));
 
-    // Impact cinétique : M1 poussé vers M2 qui le bloque.
+    // Impact cinétique : M1 poussé vers M2 qui le bloque (v237 : une part du
+    // COÛT de la compétence, en physique — 10 % à la cible, 6 % à l'unité).
     const e4 = monde([heros({ talents: { TAL_IMPACT_CINETIQUE: 1 } }), monstre("M1"), monstre("M2")],
                      { H: { q: 0, r: 0 }, M1: { q: 1, r: 0 }, M2: { q: 2, r: 0 } });
-    const r4 = resoudreCarte(e4, { type: "carte", idLanceur: "H", idCarte: "C", critique: false,
+    const r4 = resoudreCarte(e4, { type: "carte", idLanceur: "H", idCarte: "C", critique: false, coutFatigue: 50,
         attaques: [{ nom: "Coup", valeurBrute: 20, typeRes: "Physique", cibles: ["M1"] }],
         alterations: [{ nom: "Poussée", chance: 100, cases: 2, duree: 0, estPoussee: true, cibles: ["M1"] }],
         jets: jetsOk(["M1"], { "Poussée": true }) });
     const c4 = r4.etat.combattants;
-    verifier("Impact : la cible poussée sur une unité prend 30 % de 20 = 6 bruts, l'unité 15 % = 3",
-             c4.M1.pv === 100 - 20 - 6 && c4.M2.pv === 97 && r4.etapes.some(x => x.texte === "💥 Impact !"), `M1 ${c4.M1.pv}, M2 ${c4.M2.pv}`);
+    verifier("Impact : coût 50, la cible poussée sur une unité prend 10 % = 5, l'unité 6 % = 3",
+             c4.M1.pv === 100 - 20 - 5 && c4.M2.pv === 97 && r4.etapes.some(x => x.texte === "💥 Impact !"), `M1 ${c4.M1.pv}, M2 ${c4.M2.pv}`);
     const e4b = monde([heros(), monstre("M1"), monstre("M2")], { H: { q: 0, r: 0 }, M1: { q: 1, r: 0 }, M2: { q: 2, r: 0 } });
     const r4b = resoudreCarte(e4b, { type: "carte", idLanceur: "H", idCarte: "C", critique: false,
         attaques: [{ nom: "Coup", valeurBrute: 20, typeRes: "Physique", cibles: ["M1"] }],
@@ -299,7 +301,7 @@ await p.waitForTimeout(300);
   verifier("en bas, sous les effets de race : le rappel des talents pris, chiffres compris", r.apresRace && r.rappel.length === 2
            && r.rappel.some(t => /Préparer 1\/2 \+5 d'initiative/.test(t)) && r.rappel.some(t => /Art de l'esquive \+4 % d'esquive/.test(t)),
            JSON.stringify(r.rappel));
-  verifier("les chiffres de l'Aperçu comptent les talents (esquive : Gob 3 + 4)", r.esquive === "7%", r.esquive);
+  verifier("les chiffres de l'Aperçu comptent les talents (esquive : Gob 5 + 4)", r.esquive === "9%", r.esquive);
 }
 
 console.log("\n5. LA FENÊTRE DES TALENTS");

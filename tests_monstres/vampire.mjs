@@ -26,7 +26,7 @@ import http from 'http';
 import path from 'path';
 import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 import { construireEtatCombat, clonerEtat, appliquerEntree } from '../combat_etat.js';
-import { resoudreCarte, regleDesEtats, esquiveDe, ETAT_NUEE } from '../moteur_pur.js';
+import { resoudreCarte, regleDesEtats, esquiveDe, ETAT_NUEE, chanceEtatDe } from '../moteur_pur.js';
 import { validerIntention, appliquerIntention, vieillirLesEtats, ticsDeFinDeManche } from '../cerveau_combat.js';
 import { coutDuPas, planifierTrajet } from '../mouvement_pur.js';
 import { misEnScene } from '../pont_combat.js';
@@ -88,8 +88,10 @@ console.log("=========================================================");
 console.log("\n1. LES PALIERS, ET LES VARGENS");
 {
     const a1 = w.atoutRace(vampire(1)), a5 = w.atoutRace(vampire(5)), a10 = w.atoutRace(vampire(10));
-    verifier("niveau 1 : +10 résistance physique, feu aggravé, insensible au gel — plus de case gratuite",
-             a1.defPhysique === 10 && a1.brulureAggravee === true && JSON.stringify(a1.immunites) === '["Glacé"]' && !a1.premierPasGratuit,
+    // v237 (Nico) : « son malus au feu niv.1 remplacé par +20 % de chance de
+    // brûler sur les sorts qu'il reçoit et qui brûlent ».
+    verifier("niveau 1 : +10 résistance physique, +20 % d'être Brûlé, insensible au gel — plus de case gratuite",
+             a1.defPhysique === 10 && a1.brulureFacile === 20 && !a1.brulureAggravee && JSON.stringify(a1.immunites) === '["Glacé"]' && !a1.premierPasGratuit,
              JSON.stringify(a1));
     verifier("niveau 5 : le Baiser du vampire (technique), plus de Vampirisme dans la Forge",
              JSON.stringify(a5.techniques) === '["CLASSE_BAISER_VAMPIRE"]' && !(a5.effets || []).length, JSON.stringify(a5));
@@ -106,37 +108,40 @@ console.log("\n1. LES PALIERS, ET LES VARGENS");
     verifier("…mais peut être autre chose, et les autres peuples peuvent être Vampire",
              !w.classeInterditeA("Vargen", "Assassin") && !w.classeInterditeA("Humain", "Vampire") && !w.classeInterditeA("Ondari", "Vampire"));
     verifier("chaque atout du Vampire s'écrit en clair",
-             !w.texteAtout("brulureAggravee", true).startsWith("brulureAggravee") && /Glacé/.test(w.texteAtout("immunites", ["Glacé"])),
-             w.texteAtout("brulureAggravee", true) + " | " + w.texteAtout("immunites", ["Glacé"]));
+             /\+20 % de chance d'être Brûlé/.test(w.texteAtout("brulureFacile", 20)) && /Glacé/.test(w.texteAtout("immunites", ["Glacé"])),
+             w.texteAtout("brulureFacile", 20) + " | " + w.texteAtout("immunites", ["Glacé"]));
     const e = monde(1);
     verifier("en combat : 10 de résistance physique de plus qu'un héros sans classe",
              e.combattants.V.def.physique - e.combattants.H.def.physique === 10,
              `${e.combattants.V.def.physique} / ${e.combattants.H.def.physique}`);
-    verifier("…et ses atouts dans le combattant (feu aggravé, insensible au gel)",
-             e.combattants.V.atouts.brulureAggravee === true && e.combattants.V.atouts.immunites.includes("Glacé")
-             && !e.combattants.V.atouts.premierPasGratuit && !e.combattants.H.atouts.brulureAggravee);
+    verifier("…et ses atouts dans le combattant (feu facile, insensible au gel)",
+             e.combattants.V.atouts.brulureFacile === 20 && !e.combattants.V.atouts.brulureAggravee && e.combattants.V.atouts.immunites.includes("Glacé")
+             && !e.combattants.V.atouts.premierPasGratuit && !e.combattants.H.atouts.brulureFacile);
 }
 
-console.log("\n2. LE FEU LE RONGE PLUS FORT");
+console.log("\n2. LE FEU LE PREND PLUS FACILEMENT (v237) — ET NE LE RONGE PLUS PLUS FORT");
 {
     const e = monde(1);
     e.combattants.V.etats = [{ ...BRULE }]; e.combattants.H.etats = [{ ...BRULE }];
     e.combattants.V.def.physique = 0; e.combattants.H.def.physique = 0;   // le seul feu, sans armure
-    verifier("soins reçus : -60 % pour lui, -50 % pour les autres",
-             regleDesEtats(e.combattants.V, "soinsRecus") === -60 && regleDesEtats(e.combattants.H, "soinsRecus") === -50);
-    verifier("brûlure : 18 % des PV max par manche pour lui, 8 % pour les autres",
-             regleDesEtats(e.combattants.V, "pvMaxParTour") === 18 && regleDesEtats(e.combattants.H, "pvMaxParTour") === 8);
+    verifier("brûlé, soins reçus : -50 %, comme les autres",
+             regleDesEtats(e.combattants.V, "soinsRecus") === -50 && regleDesEtats(e.combattants.H, "soinsRecus") === -50);
+    verifier("brûlure : 8 % des PV max par manche, comme les autres",
+             regleDesEtats(e.combattants.V, "pvMaxParTour") === 8 && regleDesEtats(e.combattants.H, "pvMaxParTour") === 8);
     ticsDeFinDeManche(e);
-    verifier("fin de manche : il perd 18 PV (sur 100), l'autre 8",
-             e.combattants.V.pv === 82 && e.combattants.H.pv === 92, `${e.combattants.V.pv} / ${e.combattants.H.pv}`);
+    verifier("fin de manche : il perd 8 PV, comme l'autre",
+             e.combattants.V.pv === 92 && e.combattants.H.pv === 92, `${e.combattants.V.pv} / ${e.combattants.H.pv}`);
+    const brule = { nom: "Brûlé", chance: 30 };
+    verifier("un sort qui brûle à 30 % : 50 % sur lui, 30 % sur un autre",
+             chanceEtatDe(e.combattants.M1, brule, e.combattants.V) === 50 && chanceEtatDe(e.combattants.M1, brule, e.combattants.H) === 30);
     const s = monde(1);
     s.combattants.V.etats = [{ ...BRULE }]; s.combattants.V.pv = 50;
     s.combattants.A.etats = [{ ...BRULE }]; s.combattants.A.pv = 50;
     const soin = resoudreCarte(s, { type: "carte", idLanceur: "H", idCarte: "S", critique: false, alterations: [],
         attaques: [{ valeurBrute: 10, typeRes: "Magique", isHeal: true, cibles: ["V", "A"] }],
         jets: { attaqueRatee: false, parCible: { V: { esquive: false, etats: {} }, A: { esquive: false, etats: {} } } } });
-    verifier("un soin de 10 lui rend 4 PV (−60 %), 5 à un allié brûlé (−50 %)",
-             soin.etat.combattants.V.pv === 54 && soin.etat.combattants.A.pv === 55,
+    verifier("un soin de 10 lui rend 5 PV (−50 %), comme à un allié brûlé",
+             soin.etat.combattants.V.pv === 55 && soin.etat.combattants.A.pv === 55,
              `${soin.etat.combattants.V.pv} / ${soin.etat.combattants.A.pv}`);
     const sain = monde(1);
     verifier("sans brûlure : rien de tout ça", regleDesEtats(sain.combattants.V, "soinsRecus") === 0);
@@ -184,7 +189,7 @@ console.log("\n4. LE SOIN DU VAMPIRISME (moteur) : 70 % DE CE QUE LA CARTE INFLI
     const plein = resoudreCarte(monde(5, { PV_Actuels: 98 }), carte([sort(10, ["M1"])]));
     verifier("jamais au-dessus de ses PV max", plein.etat.combattants.V.pv === 100);
     const br = monde(5, { PV_Actuels: 40 }); br.combattants.V.etats = [{ ...BRULE }];
-    verifier("brûlé : 7 × 40 % → 3", soinDuVampire(resoudreCarte(br, carte([sort(10, ["M1"])]))) === 3);
+    verifier("brûlé : 7 × 50 % → 4 (arrondi)", soinDuVampire(resoudreCarte(br, carte([sort(10, ["M1"])]))) === 4);
     const sans = resoudreCarte(monde(5, { PV_Actuels: 40 }), carte([{ nom: "Attaque Magique", valeurBrute: 10, typeRes: "Magique", cibles: ["M1"] }]));
     verifier("une carte sans Vampirisme ne soigne rien", soinDuVampire(sans) === 0 && sans.etat.combattants.V.pv === 40);
     // Par le cerveau, dés compris : le champ voyage avec la carte.
@@ -231,7 +236,7 @@ console.log("\n4 bis. LE BAISER DU VAMPIRE : 25 % DES PV MAX EN BRUT, 60 % EN SO
              rb.etat.combattants.M1.bouclier === 0 && rb.etat.combattants.M1.pv === 100 && rb.etat.combattants.V.pv === 46,
              `🛡️${rb.etat.combattants.M1.bouclier} / ${rb.etat.combattants.V.pv}`);
     const br = enTete(monde(5, { PV_Actuels: 40 }), "V", "CLASSE_BAISER_VAMPIRE"); br.combattants.V.etats = [{ ...BRULE }];
-    verifier("brûlé : 15 × 40 % → 6", appliquerIntention(br, baiser()).etat.combattants.V.pv === 46);
+    verifier("brûlé : 15 × 50 % → 8 (arrondi)", appliquerIntention(br, baiser()).etat.combattants.V.pv === 48);
     const scene = misEnScene({ type: "techniqueClasse", acteur: "V", idCarte: "CLASSE_BAISER_VAMPIRE" }, pas.etat);
     verifier("à l'écran : « 🩸 Baiser du vampire »", /Baiser du vampire/.test(scene.texte || ""), scene.texte);
 }
@@ -391,7 +396,7 @@ console.log("\n7. LA GRILLE DES CLASSES : LE VAMPIRE GRISÉ POUR UN VARGEN");
            !r.apresClic.ficheOuverte && /Vargens ne peuvent pas être Vampire/.test(r.apresClic.message || ""), JSON.stringify(r.apresClic));
   verifier("Humain : rien de grisé, la fiche s'ouvre", !r.humain.grisee && JSON.stringify(r.fiche.niveaux) === '["Niv. 1","Niv. 5","Niv. 10"]');
   verifier("la fiche dit le feu, le gel, le Baiser (25 %, 60 %) et la Nuée à 40 % — plus la case gratuite ni le Vampirisme",
-           /18 %/.test(r.fiche.texte) && /Gel/.test(r.fiche.texte) && /Baiser du vampire/.test(r.fiche.texte) && /25 %/.test(r.fiche.texte)
+           /\+20 % de chance d'être Brûlé/.test(r.fiche.texte) && /Gel/.test(r.fiche.texte) && /Baiser du vampire/.test(r.fiche.texte) && /25 %/.test(r.fiche.texte)
            && /60 %/.test(r.fiche.texte) && /Nuée/.test(r.fiche.texte) && /40 %/.test(r.fiche.texte)
            && !/première case/.test(r.fiche.texte) && !/Vampirisme/.test(r.fiche.texte));
   verifier("le message ne traîne pas sur la fiche suivante", r.fiche.messageCache);

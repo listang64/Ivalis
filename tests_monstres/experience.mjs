@@ -115,7 +115,9 @@ console.log("\n2. LA JAUGE DE LA FICHE, LE NIVEAU AU-DESSUS");
     document.querySelectorAll('body > div[id^="ecran-"]').forEach(e => { e.style.display = e.id === "ecran-jeu" ? "block" : "none"; });
     const fiche = document.getElementById("fenetre-fiche-perso");
     fiche.style.display = "flex"; fiche.style.left = "2vw"; fiche.style.top = "40px";
-    window.PERSOS_PARTIE = [{ idPersonnage: "P1", prenom: "Cybile", nom: "Ardente", camp: "Allié", race: "Humain",
+    // (Une Ondari : depuis la v237, l'Humain a une compétence de plus, comme le
+    // Gob — ce banc compte celles que donnent les niveaux.)
+    window.PERSOS_PARTIE = [{ idPersonnage: "P1", prenom: "Cybile", nom: "Ardente", camp: "Allié", race: "Ondari",
                               classe: "Oracle", PV_Max: 50, xp: 1450, Competences_Max: 6 }];
     window.PERSOS_JOUEURS_PARTIE = window.PERSOS_PARTIE;
     document.getElementById("champ-id-personnage").value = "P1";

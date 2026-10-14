@@ -568,6 +568,21 @@ window.afficherApercuReposLong = function(perso) {
                                      transform: "none", width: "340px", height: "150px", display: "block", opacity: "1" });
 };
 
+// CE QUE LA CARTE DEMANDE EN MAIN, en clair : le type choisi à la Forge
+// (« Arme légère CAC », « Magie »…), dit comme un joueur le dirait. Rien pour
+// une carte sans type (« Non spécifié », vide).
+const LIBELLES_ARMES_CARTE = {
+    "Arme légère CAC": "🗡️ Arme légère", "Arme lourde CAC": "🪓 Arme lourde",
+    "Arme polyvalente": "⚔️ Arme polyvalente", "Arme légère Distance": "🏹 Arme à distance",
+    "Magie": "✨ Magie", "Sans arme / Arme rp": "✊ Sans arme"
+};
+window.libelleArmeCarte = function(arme) {
+    const a = String(arme || "").trim();
+    if (!a || a === "Non spécifié") return "";
+    return LIBELLES_ARMES_CARTE[a]
+        || a.replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+};
+
 window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     let conteneurCarte = document.getElementById("apercu-carte-hd-competence");
     
@@ -659,6 +674,9 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
 
     const titre = data.Nom || "Inconnue";
     const initiative = data.Initiative || 0;
+    // LE TYPE D'ARME, en petit sous le titre (Nico, v237 : « arme légère,
+    // magie, etc. »).
+    const armeDeLaCarte = window.libelleArmeCarte(data.Arme);
     // Le coût affiché est celui que CE porteur paiera (une blessure peut
     // l'alourdir : coutFatigueCarte, moteur_effets.js).
     const porteurCout = typeof window.porteurPourApercu === "function"
@@ -946,6 +964,7 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         <div class="titre-auto-reduit" data-taille-max="16" style="position: absolute; top: 18px; left: 50px; right: 80px; text-align: center; font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; color: #e0d0b0; text-transform: uppercase; text-shadow: 2px 2px 4px black; z-index: 3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;">
             ${titre}
         </div>
+        ${armeDeLaCarte ? `<div class="sous-titre-arme-carte" style="position: absolute; top: 39px; left: 50px; right: 80px; text-align: center; font-family: 'Almendra', serif; font-size: 11.5px; letter-spacing: 0.4px; color: #cdb98f; text-shadow: 1px 1px 2px black; z-index: 3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;">${armeDeLaCarte}</div>` : ""}
 
         <div style="position: absolute; top: 7px; right: 9px; width: 75px; height: 72px; display: flex; justify-content: center; align-items: center; padding-left: 8px; box-sizing: border-box; font-family: 'Cinzel', serif; font-size: 34px; font-weight: bold; color: white; text-shadow: 2px 2px 6px black; z-index: 3; pointer-events: none;">
             ${initiative}
@@ -1227,16 +1246,18 @@ function attaqueEncorePermise(nom) {
 }
 window.attaqueEncorePermiseForge = attaqueEncorePermise;
 
-// LA RISTOURNE DE L'ÉTALEMENT se lit dans son coût au grimoire : « Cout / 1.2 »
-// divise le coût de l'action par 1,2. 1,2 reste le secours si la base ne dit
-// rien de lisible (c'était 1,3 : le diviseur du seul Profanateur).
+// LA RISTOURNE DE L'ÉTALEMENT : la part étalée du coût est divisée par 1,3
+// pour tout le monde (Nico, v237 : « monte à 1,4 pour le Profanateur et 1,3
+// pour tout le monde »). Le grimoire peut dire plus (« Cout / 1.5 ») : le plus
+// avantageux l'emporte ; il disait 1,2, qui ne vaut plus.
 //
-// LE PROFANATEUR divise par 1,3 (atout diviseurEtalement, app.js) : le plus
-// avantageux des deux l'emporte, pour lui seul.
+// LE PROFANATEUR divise par 1,4 (atout diviseurEtalement, app.js) : le plus
+// avantageux des trois l'emporte, pour lui seul.
+const DIVISEUR_ETALEMENT = 1.3;
 function diviseurEtalement(effet, perso) {
     const m = /\/\s*([\d.,]+)/.exec(String((effet && effet.Cout_PT) || ""));
     const d = m ? parseFloat(m[1].replace(",", ".")) : NaN;
-    const base = d > 1 ? d : 1.2;
+    const base = Math.max(DIVISEUR_ETALEMENT, d > 1 ? d : 0);
     const atout = (perso && typeof window.atoutRace === "function") ? (window.atoutRace(perso) || {}) : {};
     const classe = Number(atout.diviseurEtalement) || 0;
     return Math.max(base, classe);
@@ -2477,18 +2498,18 @@ window.rafraichirForge = function() {
         
         let coutMods = 0;
         let aDOT = false;
-        let diviseurDOT = 1.2;
-        // LA RISTOURNE DE L'ÉTALEMENT NE VAUT QUE POUR LA ZONE, LES DÉGÂTS, LES
-        // SOINS ET LA DISTANCE (règle de Nico) — pas pour les effets associés
-        // (états, Durée +, etc.). On met donc de côté la part « étalable » du
-        // coût : le socle s'il frappe ou soigne (ou s'il est lui-même une Zone
-        // ou une Distance), et les sous-effets Zone et Distance. Un bouclier
-        // n'est pas un soin : il ne s'étale pas.
+        let diviseurDOT = DIVISEUR_ETALEMENT;
+        // LA RISTOURNE DE L'ÉTALEMENT NE VAUT QUE POUR LES DÉGÂTS ET LES SOINS
+        // (Nico, v237 : « être sûr qu'il se fasse uniquement sur les dégâts et
+        // les soins ») — ni la Zone, ni la Distance (qui y avaient droit
+        // jusqu'ici), ni les effets associés (états, Durée +, etc.). On met donc
+        // de côté la part « étalable » du coût : le socle s'il frappe ou soigne.
+        // Un bouclier n'est pas un soin : il ne s'étale pas.
         const soigne = (nom) => {
             const n = (nom || "").toLowerCase();
             return (n.includes("soin") || n.includes("guérison") || n.includes("guerison")) && !n.includes("bouclier");
         };
-        const estPartEtalable = (nom) => estUneAttaqueDeBase(nom) || soigne(nom) || nom === "Zone" || nom === "Distance";
+        const estPartEtalable = (nom) => estUneAttaqueDeBase(nom) || soigne(nom);
         let coutEtalable = estPartEtalable(act.baseEffet.Nom) ? baseActionCost + coutDureeBase : 0;
 
         if (act.baseEffet.Nom === "Initiative +") {

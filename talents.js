@@ -111,10 +111,10 @@
           effet: () => ({ inertieMartiale: 20 }),
           resume: () => "−20 de fatigue sur la mêlée après 4 cases en ligne droite" },
         { id: "TAL_IMPACT_CINETIQUE", nom: "Impact cinétique", carac: "force", min: 14, max: 1,
-          texte: "Une cible poussée qui percute un obstacle ou une unité subit 30 % des dégâts de la compétence en dégâts bruts ; "
-               + "l'unité percutée en subit 15 % (arrondi inférieur).",
+          texte: "Une cible poussée qui percute une unité subit 10 % du coût en fatigue de la compétence en dégâts physiques, "
+               + "et l'unité percutée 6 % ; envoyée dans un obstacle, elle en subit 16 %. Si rien n'est percuté, elle recule sans dégâts.",
           effet: () => ({ impactCinetique: true }),
-          resume: () => "Collision : 30 % des dégâts à la cible poussée, 15 % à l'unité percutée" },
+          resume: () => "Collision : 10 % du coût (6 % à l'unité percutée), 16 % contre un obstacle — en physique" },
         { id: "TAL_TAILLE_GUERRE", nom: "Taillé pour la guerre", carac: "force", min: 14, max: 1,
           texte: "+1 dégât physique.",
           effet: () => ({ degatsPhysiques: 1 }),

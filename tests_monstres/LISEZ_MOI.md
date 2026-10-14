@@ -6083,3 +6083,71 @@ dans les quatre quarts, tout en fondu, l'animation qui attend la fin, rien
 qui reste ; puis l'effondrement — gros nuage plus large que celui d'un mur
 qui sort, cailloux, fondu, gravats. Il mord sur l'ancien code (11 échecs :
 murs en cascade, ni poussière ni cailloux).
+
+## v237 — Équilibrage des peuples et des classes, gravats, type d'arme
+
+Nico : gravats en petit monticule et gros cailloux sur les murs ; Lumière
+retirée des effets de combat, Maîtrise de la lumière pour le Chasseur de mages ;
+Impact cinétique revu ; étalement sur les seuls dégâts et soins, à 1,3 ;
+Gobs 5 % d'esquive, Ankylars 12 % de résistance physique, Ophiors 12 % de
+résistance magique, Éthérés +25 % aux soins reçus, Vargens 50 % d'éviter les
+attaques d'opportunité, Humains +1 compétence ; type d'arme sous le titre des
+cartes ; Vampire : +20 % d'être Brûlé à la place de l'ancien malus au feu ;
+Profanateur : Relève des morts au niveau 1, sa glace frappe en physique, le
+reste de son niveau 1 retiré.
+
+- LES PEUPLES (app.js, ATOUTS_RACES ; textes de creation_personnage.js) :
+  Gob esquive 5 ; Ankylar défense physique 12 ; Ophior défense magique 12 ;
+  Éthéré soins reçus +25 ; Vargen esquiveOpportunite 50 (sa dérobade, un jet
+  à part avant l'esquive : « en plus du reste ») ; Humain competences 1 (7
+  cartes, comme le Gob) en plus de sa réserve de 110.
+- LA LUMIÈRE QUITTE LA FORGE (app.js, EFFETS_RETIRES_FORGE) : réservée à
+  une classe qui ne la débloque jamais, quoi que dise le grimoire — ni la
+  Forge, ni LIA, ni les monstres ne la proposent. Les cartes déjà forgées
+  avec Lumière la gardent (passer outre la défense magique). La mise à jour
+  du grimoire proposée au MJ le dit.
+- LA MAÎTRISE DE LA LUMIÈRE (Chasseur de mages, niveau 1 : maitriseLumiere
+  33 ; moteur_pur.js, tirerDesCarte) : un sort de FOUDRE (élément seul ou
+  parmi plusieurs) a 33 % de chance d'aveugler chaque cible touchée (2
+  manches, le noir de l'Aveuglement). Fixe, sans s'additionner : sur une
+  cible qu'un Aveuglement de la carte vise, la plus forte des deux chances
+  joue en un seul jet (chanceEtatDe) ; sinon un jet à elle. « ⚡ Ébloui par
+  l'éclair ! ». Ses anciens 8 % sur les sorts de Lumière disparaissent.
+- L'IMPACT CINÉTIQUE (moteur_pur.js, Poussée) : sur le COÛT EN FATIGUE de la
+  compétence, en dégâts PHYSIQUES (l'armure réduit) — la cible qui percute
+  une unité 10 %, l'unité percutée 6 % ; envoyée dans un obstacle, 16 % ;
+  rien de percuté, elle recule sans dégâts. (Avant : 30 / 15 % des dégâts de
+  la carte, en brut.)
+- L'ÉTALEMENT (competences.js et monstres_competences.js) : sa ristourne ne
+  porte plus que sur les dégâts et les soins (la Zone et la Distance y
+  avaient droit), divisée par 1,3 pour tout le monde (le grimoire disait
+  1,2 ; s'il dit plus, le plus avantageux joue). En combat, il n'étalait
+  déjà que les dégâts et les soins (jamais un bouclier, une purification ou
+  un état) : vérifié.
+- LE PROFANATEUR (dernière demande) : au niveau 1, la Relève des morts
+  (zombies) et la glace funèbre — ses attaques magiques de glace frappent en
+  physique (glaceEnPhysique : l'armure les réduit, le Contre les pare ; le
+  sort reste de glace à l'écran et pour la résistance au gel). Tout le reste
+  de son niveau 1 est retiré : plus de ristourne d'étalement à 1,4 (demandée
+  juste avant, puis retirée avec « tout le reste »), ni compétence, ni PV en
+  plus. Rien au niveau 5 ; le sursis au niveau 10.
+- LE VAMPIRE (niveau 1, brulureFacile 20) : +20 % de chance d'être Brûlé par
+  un sort qui brûle (chanceEtatDe, sur la cible) ; plus de brûlure aggravée.
+- LES CARTES (competences.js, afficherApercuCarteHD, libelleArmeCarte) : en
+  petit sous le titre, l'arme qu'elles demandent — 🗡️ Arme légère, 🪓 Arme
+  lourde, ⚔️ Arme polyvalente, 🏹 Arme à distance, ✨ Magie, ✊ Sans arme ;
+  rien pour une carte sans type.
+- LES GRAVATS EN MONTICULE (murs_terre.js, dessinerGravatsTerre) : une butte
+  de terre en dôme et quatre couches d'éclats de plus en plus hautes (une
+  quarantaine d'éclats, contre 12 à 19). DE GROS CAILLOUX sur les murs (1 à
+  3 par case) et sur les piliers (1 ou 2).
+
+corrections_v237.mjs : les peuples (et la dérobade du Vargen aux dés), la
+Maîtrise de la lumière aux dés (33 %, sans cumul avec un Aveuglement à 20 %,
+60 % avec un à 60 %), le Vampire, le Profanateur (glace physique, rien
+d'autre au niveau 1), l'Impact (unité, obstacle, armure, rien), puis la vraie
+page — la Forge et l'étalement, la Lumière introuvable, le type d'arme sur
+la carte, les gravats et les gros cailloux. Il mord sur l'ancien code (34
+échecs). Mis à jour : initiative_hors_effets, aide_forge_lia, chasseur_de_mages,
+atouts_races, atouts_races_cerveau, apercu, bonus_race_classe, blessures,
+experience, hoplite (et ceux que la suite a signalés ensuite).

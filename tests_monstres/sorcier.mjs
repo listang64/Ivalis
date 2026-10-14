@@ -74,8 +74,10 @@ console.log("\n1. LES PALIERS, ET L'ANCIEN NOM");
     verifier("niveau 1 : Ténèbres, +1 portée de sort, sans malus au contact",
              JSON.stringify(a1.effets) === '["EFF_TENEBRES"]' && a1.porteeSorts === 1 && a1.sortsSansMalusContact === true
              && !(a1.techniques || []).length, JSON.stringify(a1));
+    // (La classe seule : l'Humain a sa propre compétence en plus depuis la v237.)
+    const c10 = w.atoutClasse(sorcier(10));
     verifier("…et plus rien de l'ancien Nécromancien (+8 PV, +1 compétence, sursis)",
-             !a10.pvMax && !a10.competences && !a10.sursis, JSON.stringify(a10));
+             !c10.pvMax && !c10.competences && !c10.sursis, JSON.stringify(c10));
     verifier("niveau 5 : Charme fratricide", JSON.stringify(a5.techniques) === '["CLASSE_CHARME_FRATRICIDE"]');
     verifier("niveau 10 : + Transfert", JSON.stringify(a10.techniques) === '["CLASSE_CHARME_FRATRICIDE","CLASSE_TRANSFERT"]');
     const ch = w.TECHNIQUES_CLASSE.CLASSE_CHARME_FRATRICIDE, tr = w.TECHNIQUES_CLASSE.CLASSE_TRANSFERT;

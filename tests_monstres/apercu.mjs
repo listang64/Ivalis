@@ -117,8 +117,8 @@ verifier("l'en-tête : blason à l'initiale, nom, Race / Classe / Niveau",
          JSON.stringify({ blason: r.blason, nom: r.nom, race: r.race, classe: r.classe, niveau: r.niveau }));
 verifier("trois sections : Vitalité, Réflexes, Résistances", JSON.stringify(r.sections) === '["Vitalité","Réflexes","Résistances"]',
          JSON.stringify(r.sections));
-verifier("Vitalité : PV, fatigue max, régénération — les chiffres du combat (Gob : +3 esquive)",
-         JSON.stringify(r.vitalite) === '["50","100","35%"]' && r.pourcents[0] === "15%", JSON.stringify(r.vitalite) + " " + r.pourcents[0]);
+verifier("Vitalité : PV, fatigue max, régénération — les chiffres du combat (Gob : +5 esquive)",
+         JSON.stringify(r.vitalite) === '["50","100","35%"]' && r.pourcents[0] === "17%", JSON.stringify(r.vitalite) + " " + r.pourcents[0]);
 verifier("chaque pourcentage a sa jauge à sa mesure (sur 100)",
          r.jauges.every((j, i) => Math.abs(j - parseInt(r.pourcents[i])) <= 1), JSON.stringify(r.jauges) + " / " + JSON.stringify(r.pourcents));
 verifier("une valeur nulle (parade 0 %) se grise", r.paradeNulle && r.pourcents[1] === "0%");

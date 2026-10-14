@@ -114,11 +114,11 @@ console.log("1. LES CHIFFRES DE LA FICHE");
   console.log(`     Ophior : rés. magique ${gob.defMag} → ${ophior.defMag} %`);
   console.log(`     Humain : énergie ${gob.energie} → ${humain.energie}`);
 
-  verifier("Gob : +3 % d'esquive", gob.esquive === 18, `(${gob.esquive} %)`);
+  verifier("Gob : +5 % d'esquive (v237)", gob.esquive === 20, `(${gob.esquive} %)`);
   verifier("Gob : une compétence de plus", gob.cartes === 7, `(${gob.cartes})`);
-  verifier("Ankylar : +8 % de résistance physique", anky.defPhys === 8, `(${anky.defPhys} %)`);
+  verifier("Ankylar : +12 % de résistance physique (v237)", anky.defPhys === 12, `(${anky.defPhys} %)`);
   verifier("Ankylar : sa résistance magique ne bouge pas", anky.defMag === 0, `(${anky.defMag} %)`);
-  verifier("Ophior : +8 % de résistance magique", ophior.defMag === 8, `(${ophior.defMag} %)`);
+  verifier("Ophior : +12 % de résistance magique (v237)", ophior.defMag === 12, `(${ophior.defMag} %)`);
   verifier("Ophior : sa résistance physique ne bouge pas", ophior.defPhys === 0, `(${ophior.defPhys} %)`);
   verifier("Humain : 110 d'énergie de base", humain.energie === 110, `(${humain.energie})`);
   verifier("les autres peuples gardent 6 cartes", anky.cartes === 6, `(${anky.cartes})`);
@@ -126,7 +126,7 @@ console.log("1. LES CHIFFRES DE LA FICHE");
   // Les atouts s'ajoutent aux retouches de la fiche, ils ne les remplacent pas.
   const gobRetouche = combattant("Gob", { Dev_Mod_Esquive: 25, Dev_Mod_Fatigue: 10 });
   verifier("l'atout s'ajoute à la retouche de la fiche",
-           p.w.esquiveCombattant(gobRetouche) === 43, `(15 + 25 + 3 = ${p.w.esquiveCombattant(gobRetouche)})`);
+           p.w.esquiveCombattant(gobRetouche) === 45, `(15 + 25 + 5 = ${p.w.esquiveCombattant(gobRetouche)})`);
   const humainRetouche = combattant("Humain", { Dev_Mod_Fatigue: 10 });
   verifier("énergie : base + retouche + atout",
            p.w.fatigueMaxCombattant(humainRetouche) === 120, `(${p.w.fatigueMaxCombattant(humainRetouche)})`);
@@ -215,8 +215,9 @@ console.log("\n7. LE REPOS LONG DE L'HUMAIN : PLUS DE BONUS");
   const w = p.w;
   const { construireEtatCombat, creerDes } = await import('../combat_etat.js');
   const { avancerFile } = await import('../cerveau_combat.js');
-  verifier("l'atout Humain : la jauge plus grande, rien d'autre",
-           JSON.stringify(w.ATOUTS_RACES.Humain) === '{"fatigueMax":10}', JSON.stringify(w.ATOUTS_RACES.Humain));
+  // (v237 : et une compétence de plus, comme le Gob.)
+  verifier("l'atout Humain : la jauge plus grande et une compétence de plus, rien d'autre",
+           JSON.stringify(w.ATOUTS_RACES.Humain) === '{"fatigueMax":10,"competences":1}', JSON.stringify(w.ATOUTS_RACES.Humain));
 
   const reposDe = (race) => {
     const etat = construireEtatCombat({

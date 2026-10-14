@@ -157,7 +157,7 @@ console.log("\n4. CE QU'ELLES FONT : LES ATOUTS");
     const a = w.atoutBlessures(h);
     verifier("3 cases et 2 cases : la plus stricte (2) ; Charisme −2 −5 = −7", a.maxCasesParTour === 2 && a.testsCarac.cha === -7);
     const r = w.atoutRace(h);
-    verifier("atoutRace les rejoint : esquive Gob 3 − 20 = −17", r.esquive === -17 && r.maxCasesParTour === 2, JSON.stringify(r));
+    verifier("atoutRace les rejoint : esquive Gob 5 − 20 = −15 (v237 : Gob à 5)", r.esquive === -15 && r.maxCasesParTour === 2, JSON.stringify(r));
     const perf = w.atoutRace(heros({ caracs: { cha: 12 }, xp: 1200, talents: { TAL_PERFECTIONNEMENT: 1 }, talentsChoix: { TAL_PERFECTIONNEMENT: "cha" },
         blessures: [ble("BLE_LEVRE_FENDUE", { jours: 3 })] }));
     verifier("les tests de carac s'additionnent clé par clé (Perfectionnement +2, Lèvre −2)", (perf.testsCarac || {}).cha === 0, JSON.stringify(perf.testsCarac));

@@ -155,17 +155,15 @@ window.DESCRIPTIFS_CLASSES = {
         ]
     },
     CLASSE_PROFANATEUR: {
-        presentation: "Il souille ce qu'il touche et ne laisse rien reposer en paix. Ses poisons et "
-            + "ses brûlures rongent plus profond, ses ennemis tombés se relèvent pour le servir, "
+        presentation: "Il souille ce qu'il touche et ne laisse rien reposer en paix. Sa glace "
+            + "funèbre frappe comme une lame, ses ennemis tombés se relèvent pour le servir, "
             + "et la mort elle-même doit attendre son tour avant de le prendre.",
         paliers: [
-            { niveau: 1, titre: "Souillure",
-              points: ["Forge : la fatigue des dégâts étalés est divisée par 1,3 (au lieu de 1,2)",
-                       "+1 compétence à créer", "+5 PV"] },
-            { niveau: 5, titre: "Passif : Relève des morts",
+            { niveau: 1, titre: "Passif : Relève des morts · Glace funèbre",
               points: ["Un ennemi qu'il tue, ou qui tombe à côté de lui, se relève en zombie à son service",
                        "15 PV · morsure de 7 dégâts physiques · 2 cases par tour · joue en dernier",
-                       "Garde ses résistances, mais plus d'esquive ni de parade"] },
+                       "Garde ses résistances, mais plus d'esquive ni de parade",
+                       "Ses attaques magiques de glace font des dégâts physiques au lieu de magiques"] },
             { niveau: 10, titre: "Sursis",
               points: ["Tombé à 0 PV, il tient encore 2 tours debout avant d'être mis KO",
                        "Les coups sont ignorés, aucun soin possible · une fois par combat",
@@ -250,7 +248,7 @@ window.DESCRIPTIFS_CLASSES = {
             { niveau: 1, titre: "Sang froid",
               points: ["+10 % de résistance physique",
                        "Insensible au Gel (jamais Glacé)",
-                       "Craint le feu : brûlé, -60 % de soins reçus et 18 % de ses PV max par manche"] },
+                       "Craint le feu : +20 % de chance d'être Brûlé par les sorts qui brûlent"] },
             { niveau: 5, titre: "Technique : Baiser du vampire",
               points: ["Initiative 100 · aucune fatigue · sur un ennemi au contact",
                        "25 % de ses PV max en dégâts bruts, à coup sûr",
@@ -263,14 +261,13 @@ window.DESCRIPTIFS_CLASSES = {
     },
     CLASSE_CHASSEUR_DE_MAGES: {
         presentation: "Il a appris à marcher dans les tempêtes de sorts sans y laisser sa peau. Le "
-            + "Chasseur de mages traque ceux qui plient la magie : sa lumière perce leurs "
-            + "protections, et leurs propres sorts se retournent contre eux.",
+            + "Chasseur de mages traque ceux qui plient la magie : ses éclairs les aveuglent "
+            + "de lumière, et leurs propres sorts se retournent contre eux.",
         paliers: [
-            { niveau: 1, titre: "Effet de combat : Lumière",
+            { niveau: 1, titre: "Passif : Maîtrise de la lumière",
               points: ["+10 % de résistance magique",
-                       "Dans la Forge, sur un sort à dégâts magiques · 1 pt, Intelligence",
-                       "15 % de chance par cran d'ignorer la résistance magique de la cible (max 60 %)",
-                       "8 % de chance d'aveugler la cible"] },
+                       "Ses sorts de foudre ont 33 % de chance d'aveugler leur cible (2 manches)",
+                       "Une chance fixe : elle ne s'additionne pas à l'effet Aveuglement de la carte"] },
             { niveau: 5, titre: "Technique : Bouclier anti-magie",
               points: ["Initiative 200 · aucune fatigue · la manche en cours et la suivante",
                        "Tout coup magique qui le frappe repart en entier sur son lanceur",

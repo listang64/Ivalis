@@ -701,7 +701,8 @@ function poserMod(chantier, act, effetMod, count) {
 function diviseurEtalementMonstre(effet) {
     const m = /\/\s*([\d.,]+)/.exec(String((effet && effet.Cout_PT) || ""));
     const d = m ? parseFloat(m[1].replace(",", ".")) : NaN;
-    return d > 1 ? d : 1.3;
+    // ⚖️ règle Forge : 1,3 pour tout le monde, plus si le grimoire le dit.
+    return Math.max(1.3, d > 1 ? d : 0);
 }
 
 function coutPCChantier(chantier, palette) {
@@ -715,11 +716,11 @@ function coutPCChantier(chantier, palette) {
         let coutMods = 0;
         let aEtalement = false;
         let diviseur = 1.3;
-        // ⚖️ règle Forge : la ristourne de l'Étalement ne vaut que pour la
-        // Zone, les dégâts, les soins et la Distance, pas pour les effets associés.
+        // ⚖️ règle Forge : la ristourne de l'Étalement ne vaut que pour les
+        // dégâts et les soins — ni la Zone, ni la Distance, ni les effets associés.
         const soigne = (nom) => { const n = (nom || "").toLowerCase();
             return (n.includes("soin") || n.includes("guérison") || n.includes("guerison")) && !n.includes("bouclier"); };
-        const etalable = (nom) => estAttaqueDeBase(nom) || soigne(nom) || nom === "Zone" || nom === "Distance";
+        const etalable = (nom) => estAttaqueDeBase(nom) || soigne(nom);
         let coutEtalable = etalable(act.baseEffet.Nom) ? coutBase + coutDuree : 0;
 
         act.modsEffets.forEach(m => {
@@ -731,8 +732,8 @@ function coutPCChantier(chantier, palette) {
                 coutCeMod = coutPC(m.effet) * Math.max(0, taille - 1);
             } else if (nom === "DOT" || nom === "Durée étalement dégâts") {
                 aEtalement = true;
-                // ⚖️ règle Forge : la ristourne se lit dans le coût au grimoire
-                // (« Cout / 1.2 »), comme dans la Forge (diviseurEtalement).
+                // ⚖️ règle Forge : 1,3, ou plus si le grimoire le dit
+                // (« Cout / 1.x »), comme dans la Forge (diviseurEtalement).
                 diviseur = diviseurEtalementMonstre(m.effet);
             } else {
                 coutCeMod = coutPC(m.effet) * m.count;

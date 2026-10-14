@@ -232,10 +232,14 @@ export function destinationPoussee(lanceur, cible, cases, estLibre, info) {
     return arrivee;
 }
 
-// L'IMPACT CINÉTIQUE (talent) : la part des dégâts de la compétence — sa
-// valeur, avant défenses — que la collision inflige en dégâts bruts.
-export const IMPACT_CIBLE_PCT = 30;
-export const IMPACT_PERCUTE_PCT = 15;
+// L'IMPACT CINÉTIQUE (talent, v237 — Nico) : la collision se paie en part du
+// COÛT EN FATIGUE de la compétence, en dégâts PHYSIQUES (l'armure les réduit).
+// La cible poussée qui percute une unité en prend 10 %, l'unité percutée 6 % ;
+// envoyée dans un obstacle (mur, case bloquée), elle en prend 16 %. Rien de
+// percuté : elle recule, sans dégâts.
+export const IMPACT_CIBLE_PCT = 10;
+export const IMPACT_PERCUTE_PCT = 6;
+export const IMPACT_OBSTACLE_PCT = 16;
 
 // Le sens inverse de la Poussée : on tire la cible vers le lanceur au lieu de
 // la repousser. Même géométrie (interpolation cubique, arrondi au caractère
@@ -520,6 +524,19 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
         });
     });
 
+    // MAÎTRISE DE LA LUMIÈRE (Chasseur de mages, niveau 1 — v237, à la place
+    // de l'effet Lumière) : un sort de FOUDRE a 33 % de chance FIXE
+    // d'aveugler chaque cible qu'il vise. Elle ne s'additionne pas à
+    // l'Aveuglement que porterait la carte : sur une cible que la carte veut
+    // aveugler, c'est la plus forte des deux chances, en un seul jet (plus
+    // bas, chanceEtatDe) ; sur les autres, un jet à elle, après les états.
+    const maitrise = nombre(lanceur && lanceur.atouts && lanceur.atouts.maitriseLumiere);
+    const estFoudre = (a) => !!a && !a.isHeal && !a.isShield && a.typeRes === "Magique"
+                             && (a.element === "Foudre" || (a.elements || []).includes("Foudre"));
+    if (maitrise > 0) (plan.attaques || []).filter(estFoudre).forEach(a => (a.cibles || []).forEach(id => {
+        pourCible(id).maitriseLumiere = maitrise;
+    }));
+
     (plan.alterations || []).forEach(alt => {
         (alt.cibles || []).forEach(id => {
             const c = pourCible(id);
@@ -530,7 +547,7 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
             if (c.esquive === undefined) c.esquive = alt.isHeal ? false : jetDeDefense(id);
             // Un coup critique impose les effets de la carte, sans jet.
             if (c.etats[alt.nom] === undefined) {
-                c.etats[alt.nom] = critique || des.d100() <= chanceEtatDe(lanceur, alt);
+                c.etats[alt.nom] = critique || des.d100() <= chanceEtatDe(lanceur, alt, combattant(etat, id), c);
             }
             // L'AVEUGLEMENT tire ICI les 3 cases de noir autour de sa cible —
             // avec les autres dés, pour que tous les postes voient le même noir.
@@ -548,6 +565,16 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
                 c.bouscule = des.d100() <= CHANCE_BOUSCULADE_POUSSEE;
             }
         });
+    });
+
+    // Le jet de la Maîtrise de la lumière sur les cibles que la carte ne
+    // cherchait pas à aveugler : le noir se tire avec (lumiereAveugle, comme
+    // l'ancienne Lumière — resoudreCarte le pose sur la cible touchée).
+    if (maitrise > 0) Object.keys(jets.parCible).forEach(id => {
+        const c = jets.parCible[id];
+        if (!(c.maitriseLumiere > 0) || c.etats[ETAT_AVEUGLE] !== undefined || c.lumiereAveugle !== undefined) return;
+        c.lumiereAveugle = des.d100() <= c.maitriseLumiere;
+        if (c.lumiereAveugle) c.noirLumiere = { [id]: tirerDirectionsAveugle(des) };
     });
 
     // --- LES JETS DE L'ÉQUIPEMENT -----------------------------------------
@@ -686,10 +713,18 @@ export function estEtatNefaste(e) {
 // soit sa stature. Ils s'ajoutent à la chance de la carte, plafonnés à 100.
 export const BONUS_CHANCE_ETAT_MONSTRE = { "Peur": 8, "Étourdi": 8 };
 
-export function chanceEtatDe(lanceur, alt) {
+// `cible` (facultative) : ce que la cible ajoute elle-même à la chance — le
+// Vampire, +20 % d'être Brûlé par un sort (brulureFacile, v237). `jetsCible`
+// (facultatif) : ses jets de la carte — un sort de foudre d'un Chasseur de
+// mages y a noté sa Maîtrise de la lumière (l'Aveuglement prend alors la plus
+// forte des deux chances, sans les additionner).
+export function chanceEtatDe(lanceur, alt, cible, jetsCible) {
     const base = nombre(alt && alt.chance);
     const bonus = (lanceur && lanceur.estMonstre) ? (BONUS_CHANCE_ETAT_MONSTRE[alt && alt.nom] || 0) : 0;
-    return Math.min(100, base + bonus);
+    const subie = (alt && alt.nom === "Brûlé" && cible && cible.atouts) ? nombre(cible.atouts.brulureFacile) : 0;
+    let chance = base + bonus + (base > 0 ? subie : 0);
+    if (alt && alt.nom === ETAT_AVEUGLE && jetsCible && jetsCible.maitriseLumiere > 0) chance = Math.max(chance, jetsCible.maitriseLumiere);
+    return Math.min(100, chance);
 }
 
 // =========================================================================
@@ -1154,7 +1189,7 @@ export function projectileDe(action) {
 
     const attaques = (action && action.attaques) || [];
     const offensive = attaques.find(a => aCibles(a) && !a.isHeal);
-    if (offensive) return offensive.typeRes === "Magique" ? "magie" : "fleche";
+    if (offensive) return offensive.typeRes === "Magique" || offensive.glacePhysique ? "magie" : "fleche";
 
     const soin = attaques.find(a => aCibles(a) && a.isHeal && !a.isShield);
     if (soin) return "soin";
@@ -1510,6 +1545,19 @@ export const ETAT_IMMOBILISATION = "Immobilisation";
 export const MANCHES_TIR_PRECIS = 2;
 export const DESC_IMMOBILISATION = "Ne peut plus se déplacer volontairement, gagne 20 fatigue par tour immobilisé.";
 
+// LA GLACE FUNÈBRE DU PROFANATEUR (niveau 1, Nico : « ses attaques magiques
+// de glace font des dégâts physiques au lieu de magiques ») : une attaque
+// magique d'un seul élément, la Glace, frappe en PHYSIQUE — l'armure la
+// réduit (plus la résistance magique), le Contre la pare (plus l'Absorption).
+// Le sort reste un sort de glace : son geste, sa chance de geler, la
+// résistance au gel (`glacePhysique` le dit à l'écran).
+export function glaceEnPhysique(action) {
+    const estGlace = (a) => !!a && !a.isHeal && !a.isShield && a.typeRes === "Magique" && a.element === "Glace"
+                            && !((a.elements || []).length > 1);
+    if (!(action && (action.attaques || []).some(estGlace))) return action;
+    return { ...action, attaques: action.attaques.map(a => estGlace(a) ? { ...a, typeRes: "Physique", glacePhysique: true } : a) };
+}
+
 export function resoudreCarte(etat, action, plateau) {
     const suivant = clonerEtat(etat);
     const etapes = [];
@@ -1528,6 +1576,7 @@ export function resoudreCarte(etat, action, plateau) {
                                                  texte: "Confus : ne fait rien", couleur: "#cc66ff" });
         return { etat: suivant, etapes, touchees: [] };
     }
+    if (lanceur.atouts && lanceur.atouts.glacePhysique) action = glaceEnPhysique(action);
 
     // Le terrain, pour les effets qui déplacent (la Poussée). Sans lui, on
     // travaille sur une plaine infinie : c'est ce dont un banc a besoin, et
@@ -1564,10 +1613,12 @@ export function resoudreCarte(etat, action, plateau) {
     // ne coule que sur un coup qui porte.
     const offensive = (action.attaques || []).find(a => a && !a.isHeal && !a.isShield && (a.cibles || []).length > 0);
     const nomOffensive = String((offensive && offensive.nom) || "").toLowerCase();
-    const styleFrappe = !offensive || offensive.typeRes !== "Physique" ? null
+    // (La glace funèbre du Profanateur frappe en physique, mais reste un sort.)
+    const estSort = !!offensive && (offensive.typeRes === "Magique" || !!offensive.glacePhysique);
+    const styleFrappe = !offensive || offensive.typeRes !== "Physique" || offensive.glacePhysique ? null
         : (nomOffensive.includes("attaque légère") || nomOffensive.includes("attaque legere")) ? "legere"
         : nomOffensive.includes("attaque lourde") ? "lourde" : "epee";
-    const elementSort = offensive && offensive.typeRes === "Magique" && offensive.element
+    const elementSort = offensive && estSort && offensive.element
                         && !((offensive.elements || []).length > 1) ? offensive.element : null;
     // LES AUTRES SORTS DU STUDIO (Nico : « attaque magique de glace,
     // multi-élémentaire, mots de pouvoir, lumière : tu peux intégrer ») : les
@@ -1575,7 +1626,7 @@ export function resoudreCarte(etat, action, plateau) {
     // élément. L'élément seul (Feu, Foudre, Glace) voyage dans `element`.
     const sortCarte = !offensive ? null
         : nomOffensive.includes("pouvoir") ? "mots"
-        : offensive.typeRes !== "Magique" ? null
+        : !estSort ? null
         : (offensive.elements || []).length > 1 ? "multi"
         : (!offensive.element && nombre(offensive.chanceLumiere) > 0) ? "lumiere" : null;
     // UNE CARTE DE SOIN : de zone, ses cases fleurissent (« soin de zone ») ;
@@ -1955,7 +2006,8 @@ export function resoudreCarte(etat, action, plateau) {
                     etapesNoir.push({ type: "etats", cible: v, pose: ETAT_AVEUGLE, liste: x.etats });
                 });
                 if (etapesNoir.length) {
-                    etapes.push({ type: "message", cible: idCible, acteur: idLanceur, texte: "☀️ Éblouis !", couleur: "#ffe082" });
+                    etapes.push({ type: "message", cible: idCible, acteur: idLanceur,
+                                  texte: des.maitriseLumiere > 0 ? "⚡ Ébloui par l'éclair !" : "☀️ Éblouis !", couleur: "#ffe082" });
                     etapes.push(...etapesNoir);
                 }
             }
@@ -2029,31 +2081,36 @@ export function resoudreCarte(etat, action, plateau) {
                                   texte: "Poussée bloquée" });
                 }
 
-                // L'IMPACT CINÉTIQUE (talent) : arrêtée par un obstacle ou une
-                // unité, la cible encaisse 30 % des dégâts de la compétence en
-                // brut ; l'unité percutée, 15 % (arrondis à l'inférieur).
+                // L'IMPACT CINÉTIQUE (talent) : arrêtée par une unité, la cible
+                // encaisse 10 % du coût en fatigue de la compétence, l'unité
+                // percutée 6 % ; arrêtée par un obstacle, la cible 16 %. Des
+                // dégâts PHYSIQUES : l'armure de chacun les réduit (arrondis à
+                // l'inférieur avant l'armure, comme avant).
                 if (choc.bloque && lanceur.atouts && lanceur.atouts.impactCinetique) {
-                    const initiaux = (action.attaques || []).filter(a => !a.isHeal && !a.isShield)
-                        .reduce((t, a) => t + Math.max(0, decimal(a.valeurBrute)), 0);
-                    const frapperBrut = (id, c, montant) => {
-                        if (!c || c.aTerre || montant <= 0) return;
+                    const cout = Math.max(0, decimal(action.coutFatigue));
+                    const frapperPhysique = (id, c, brut) => {
+                        if (!c || c.aTerre || brut <= 0) return;
+                        const reduction = Math.min(1, Math.max(0, defPhysiqueDe(c)) / 100);
+                        const montant = Math.max(0, Math.round(brut * (1 - reduction)));
+                        if (montant <= 0) return;
                         const surBouclier = Math.min(nombre(c.bouclier), montant);
                         c.bouclier = nombre(c.bouclier) - surBouclier;
                         if (c.bouclier === 0) c.bouclierMax = 0;
                         c.pv = Math.max(0, nombre(c.pv) - (montant - surBouclier));
                         etapes.push({ type: "degats", cible: id, acteur: idLanceur, montant, surBouclier,
-                                      bouclierApres: c.bouclier, pvApres: c.pv, brut: true });
+                                      bouclierApres: c.bouclier, pvApres: c.pv, nature: "physique" });
                         etapes.push(...tomber(suivant, id, idLanceur));
                     };
-                    const pourCible = Math.floor(initiaux * IMPACT_CIBLE_PCT / 100);
                     const idPercute = Object.keys(suivant.combattants || {}).find(id => {
                         const x = suivant.combattants[id];
                         return id !== idCible && x && !x.aTerre && x.q === choc.bloque.q && x.r === choc.bloque.r;
                     });
-                    if (pourCible > 0 || idPercute) etapes.push({ type: "message", cible: idCible, acteur: idLanceur,
-                                                                 texte: "💥 Impact !", couleur: "#ffb74d" });
-                    frapperBrut(idCible, cible, pourCible);
-                    if (idPercute) frapperBrut(idPercute, suivant.combattants[idPercute], Math.floor(initiaux * IMPACT_PERCUTE_PCT / 100));
+                    const pourCible = Math.floor(cout * (idPercute ? IMPACT_CIBLE_PCT : IMPACT_OBSTACLE_PCT) / 100);
+                    const pourPercute = idPercute ? Math.floor(cout * IMPACT_PERCUTE_PCT / 100) : 0;
+                    if (pourCible > 0 || pourPercute > 0) etapes.push({ type: "message", cible: idCible, acteur: idLanceur,
+                                                                        texte: "💥 Impact !", couleur: "#ffb74d" });
+                    frapperPhysique(idCible, cible, pourCible);
+                    if (idPercute) frapperPhysique(idPercute, suivant.combattants[idPercute], pourPercute);
                 }
 
                 // La bousculade : elle se joue même quand un mur a arrêté la

@@ -118,11 +118,12 @@ console.log("\n1. LA VRAIE FORGE");
   }
 }
 
-console.log("\n1 bis. L'ÉTALEMENT NE REMISE QUE LA ZONE, LES DÉGÂTS, LES SOINS ET LA DISTANCE");
+console.log("\n1 bis. L'ÉTALEMENT NE REMISE QUE LES DÉGÂTS ET LES SOINS (÷1,3)");
 {
-  // Règle de Nico : la ristourne de fatigue de l'Étalement (« Cout / 1.2 »)
-  // ne s'applique qu'à la zone, aux dégâts et à la distance — pas aux effets
-  // associés. Attaque légère ×2 (2 PC chacune), Étalement, Brûlé ×2 (1 PC).
+  // Règle de Nico (v237) : la ristourne de fatigue de l'Étalement (÷1,3 pour
+  // tout le monde) ne s'applique qu'aux dégâts et aux soins — ni à la Zone, ni
+  // à la Distance, ni aux effets associés. Attaque légère ×2 (2 PC chacune),
+  // Étalement, Brûlé ×2 (1 PC).
   const pc = await p.evaluate(({ effets, attaque, dot, brule, dist, soinId }) => {
     const base = effets.find(e => e.id === attaque);
     window.forgeState.effetsBDD = effets;
@@ -148,17 +149,17 @@ console.log("\n1 bis. L'ÉTALEMENT NE REMISE QUE LA ZONE, LES DÉGÂTS, LES SOIN
     return { avecEtat, avecDistance, soinNu, soinEtale, soinEtaleBrule };
   }, { effets, attaque: id("Attaque légère"), dot: id("Durée étalement dégâts"), brule: id("Brûlé"), dist: id("Distance"), soinId: id("Soin") });
   const coutDist = parseFloat(String(effets.find(e => e.Nom === "Distance").Cout_PT).replace(",", "."));
-  verifier("attaque + étalement + Brûlé : 4/1,2 + 2 (l'état se paie plein pot)", Math.abs(pc.avecEtat - (4 / 1.2 + 2)) < 0.06,
-           `${pc.avecEtat} PC (avant : ${(6 / 1.2).toFixed(1)})`);
-  verifier("attaque + étalement + Distance : tout est remisé", Math.abs(pc.avecDistance - (4 + 2 * coutDist) / 1.2) < 0.06,
+  verifier("attaque + étalement + Brûlé : 4/1,3 + 2 (l'état se paie plein pot)", Math.abs(pc.avecEtat - (4 / 1.3 + 2)) < 0.06,
+           `${pc.avecEtat} PC (avant : ${(6 / 1.3).toFixed(1)})`);
+  verifier("attaque + étalement + Distance : seule l'attaque est remisée", Math.abs(pc.avecDistance - (4 / 1.3 + 2 * coutDist)) < 0.06,
            `${pc.avecDistance} PC`);
-  verifier("soin + étalement : le soin est remisé (4 → 4/1,2)", pc.soinNu === 4 && Math.abs(pc.soinEtale - 4 / 1.2) < 0.06,
+  verifier("soin + étalement : le soin est remisé (4 → 4/1,3)", pc.soinNu === 4 && Math.abs(pc.soinEtale - 4 / 1.3) < 0.06,
            `${pc.soinNu} → ${pc.soinEtale} PC`);
-  verifier("soin + étalement + Brûlé : l'état se paie plein pot", Math.abs(pc.soinEtaleBrule - (4 / 1.2 + 2)) < 0.06,
+  verifier("soin + étalement + Brûlé : l'état se paie plein pot", Math.abs(pc.soinEtaleBrule - (4 / 1.3 + 2)) < 0.06,
            `${pc.soinEtaleBrule} PC`);
 }
 
-console.log("\n1 ter. LE PROFANATEUR : SA PART ÉTALÉE DIVISÉE PAR 1,3 (LES AUTRES : 1,2)");
+console.log("\n1 ter. LE PROFANATEUR PAIE COMME TOUT LE MONDE (÷1,3) DEPUIS LA v237");
 {
   // Nico : « ce n'est pas du tout ×1,3 dégâts. C'est étalé : la fatigue est
   // de base divisée par 1,2, sauf pour le Profanateur, le coût en fatigue est
@@ -186,8 +187,10 @@ console.log("\n1 ter. LE PROFANATEUR : SA PART ÉTALÉE DIVISÉE PAR 1,3 (LES AU
     window.forgeState.statsPerso = {};
     return r;
   }, { effets, attaque: id("Attaque légère"), dot: id("Durée étalement dégâts"), brule: id("Brûlé") });
-  verifier("un autre héros : 4/1,2 + 2", Math.abs(pc.autre.pc - (4 / 1.2 + 2)) < 0.06, `${pc.autre.pc} PC, ${pc.autre.fatigue} de fatigue`);
-  verifier("le Profanateur : 4/1,3 + 2 (moins de fatigue)", Math.abs(pc.prof.pc - (4 / 1.3 + 2)) < 0.06 && pc.prof.fatigue < pc.autre.fatigue,
+  // (Nico, v237 : « Profanateur : on vire tout le reste du niveau 1 » — sa
+  // ristourne d'étalement à 1,3 comprise ; tout le monde est passé à 1,3.)
+  verifier("un autre héros : 4/1,3 + 2", Math.abs(pc.autre.pc - (4 / 1.3 + 2)) < 0.06, `${pc.autre.pc} PC, ${pc.autre.fatigue} de fatigue`);
+  verifier("le Profanateur : pareil", pc.prof.pc === pc.autre.pc && pc.prof.fatigue === pc.autre.fatigue,
            `${pc.prof.pc} PC, ${pc.prof.fatigue} de fatigue`);
   verifier("sans étalement : le Profanateur paie comme tout le monde", pc.profSansEtal.pc === pc.autreSansEtal.pc,
            `${pc.profSansEtal.pc} / ${pc.autreSansEtal.pc}`);

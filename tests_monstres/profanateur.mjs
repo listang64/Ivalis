@@ -69,14 +69,19 @@ console.log("=========================================================");
 console.log("\n1. LES PALIERS");
 {
     const a1 = w.atoutRace(profanateur(1)), a5 = w.atoutRace(profanateur(5)), a10 = w.atoutRace(profanateur(10));
-    verifier("niveau 1 : étalement ÷1,3 à la Forge, +1 compétence, +5 PV", a1.diviseurEtalement === 1.3 && !a1.dotBonus
-             && a1.competences === 1 && a1.pvMax === 5 && !a1.zombies,
-             JSON.stringify(a1));
-    verifier("niveau 5 : les zombies", a5.zombies === true && !a5.sursis);
+    // v237 (Nico) : « passif Relève des morts passe au lvl1 et on vire tout le
+    // reste du lvl1 ; au lvl1, ses attaques magiques de glace font des dégâts
+    // physiques ». (L'Humain a désormais sa compétence en plus : on lit la
+    // classe seule.)
+    const c1 = w.atoutClasse(profanateur(1));
+    verifier("niveau 1 : les zombies et la glace physique, plus rien d'autre", c1.zombies === true && c1.glacePhysique === true
+             && !c1.diviseurEtalement && !c1.competences && !c1.pvMax && !c1.dotBonus, JSON.stringify(c1));
+    verifier("niveau 5 : rien de plus", a5.zombies === true && !a5.sursis);
     verifier("niveau 10 : le sursis (2 tours)", a10.sursis === 2 && a10.zombies === true);
-    verifier("PV max +5, 7 compétences en main", w.pvMaxCombattant(profanateur(1)) === 105 && w.competencesMaxCombattant(profanateur(1)) === 7);
-    verifier("écrit en clair : « divisée par 1,3 »", /divisée par 1,3/.test(w.texteAtout("diviseurEtalement", 1.3))
-             && /zombies/.test(w.texteAtout("zombies", true)), w.texteAtout("diviseurEtalement", 1.3));
+    verifier("plus de PV ni de compétence en plus", w.pvMaxCombattant(profanateur(1)) === 100
+             && w.competencesMaxCombattant(profanateur(1, { race: "Ondari" })) === 6);
+    verifier("écrit en clair : les zombies, la glace physique", /zombies/.test(w.texteAtout("zombies", true))
+             && /glace font des dégâts physiques/.test(w.texteAtout("glacePhysique", true)), w.texteAtout("glacePhysique", true));
     const e = monde(10);
     verifier("en combat : les atouts voyagent", e.combattants.P.atouts.zombies === true
              && e.combattants.P.atouts.sursis === 2);
@@ -139,8 +144,9 @@ console.log("\n3. NIVEAU 5 : LES ENNEMIS SE RELÈVENT EN ZOMBIES");
     verifier("tué par un autre, loin de lui : rien", coup(loin, "H", "M2", 10).etat.combattants.M2.aTerre);
     const parP = monde(5); parP.combattants.M2.pv = 5;
     verifier("tué par lui, même loin : zombie", !coup(parP, "P", "M2", 10).etat.combattants.M2.aTerre);
-    const n4 = monde(4); n4.combattants.M1.pv = 5;
-    verifier("niveau 4 : rien", coup(n4, "P", "M1", 10).etat.combattants.M1.aTerre);
+    // (Depuis la v237, la Relève des morts vient dès le niveau 1.)
+    const n1 = monde(1); n1.combattants.M1.pv = 5;
+    verifier("niveau 1 : zombie aussi", !coup(n1, "P", "M1", 10).etat.combattants.M1.aTerre);
     const allie = monde(5, { H: { q: 1, r: -1 } }); allie.combattants.H.pv = 5;
     verifier("un héros qui tombe à côté de lui : rien", coup(allie, "M2", "H", 10).etat.combattants.H.aTerre);
     const illu = monde(5); illu.combattants.M1.pv = 5; illu.combattants.M1.estIllusion = true;
@@ -438,9 +444,10 @@ console.log("\n8. LA FICHE DE CLASSE");
              niveaux: [...d.querySelectorAll(".palier-classe-niveau")].map(x => x.textContent.trim()) };
   });
   await p.screenshot({ path: "/tmp/claude-0/profanateur_classe.png" });
-  verifier("Niv. 1 / 5 / 10 : étalement ÷1,3, zombie 15 PV / 7 dégâts / 2 cases, sursis 2 tours",
-           JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 5","Niv. 10"]' && /divisée par 1,3/.test(r.texte) && !/×1,3/.test(r.texte) && /15 PV/.test(r.texte)
-           && /7 dégâts/.test(r.texte) && /2 cases/.test(r.texte) && /2 tours/.test(r.texte));
+  verifier("Niv. 1 / 10 : Relève des morts (zombie 15 PV / 7 dégâts / 2 cases) et glace physique, sursis 2 tours",
+           JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 10"]' && /Relève des morts/.test(r.texte) && !/divisée par/.test(r.texte)
+           && /glace font des dégâts physiques/.test(r.texte) && /15 PV/.test(r.texte)
+           && /7 dégâts/.test(r.texte) && /2 cases/.test(r.texte) && /2 tours/.test(r.texte), JSON.stringify(r.niveaux));
   verifier("pour une héroïne : « Profanatrice »", r.titre === "Profanatrice", r.titre);
 }
 

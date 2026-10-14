@@ -99,7 +99,8 @@ console.log("\n1. LE PROTECTEUR (EX-HOPLITE) : +7 PARADE, 15 % DE PROVOCATION ; 
     verifier("les cartes : Rempart init 105 niveau 5, Résonance niveau 10, fatigue 0",
              w.carteTechniqueClasse("CLASSE_REMPART").Initiative === 105 && w.TECHNIQUES_CLASSE.CLASSE_REMPART.niveau === 5
              && res.niveau === 10 && res.Fatigue === 0 && res.classe === "Protecteur");
-    verifier("la limite en main ne bouge pas (6)", w.competencesMaxCombattant(hoplite(10)) === 6);
+    // (Un Ondari : l'Humain a une compétence de plus depuis la v237.)
+    verifier("la limite en main ne bouge pas (6)", w.competencesMaxCombattant(hoplite(10, { race: "Ondari" })) === 6);
 }
 
 // =========================================================================

@@ -104,7 +104,7 @@ console.log("\n3. LES SOINS REÇUS");
     const humain = soigner("Humain"), ethere = soigner("Ethéré");
     console.log(`     soin de 20 : +${humain} pour un Humain, +${ethere} pour un Éthéré`);
     verifier("un soin ordinaire rend sa valeur", humain === 20, `(+${humain})`);
-    verifier("l'Éthéré reçoit 30 % de plus", ethere === 26, `(+${ethere})`);
+    verifier("l'Éthéré reçoit 25 % de plus (v237)", ethere === 25, `(+${ethere})`);
 }
 
 // =========================================================================

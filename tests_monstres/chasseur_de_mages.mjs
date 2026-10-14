@@ -19,6 +19,12 @@
 // combattants sur la map. » (Et : « Appel de la lumière aveugle tout le monde
 // sur le champ de bataille », lui compris.) L'aveuglement de la Lumière ne prend plus que sa
 // cible.
+//
+// Puis (v237), Nico : « Lumière ne doit plus être un effet de combat. À la
+// place, le Chasseur de mages niv.1 gagne le passif Maîtrise de la lumière :
+// 33 % de chances d'aveugler avec un sort de foudre (fixe, ne s'additionne pas
+// avec l'effet aveugler). » Les cartes déjà forgées avec Lumière gardent leur
+// effet (passer outre la défense magique) : la section 2 le vérifie encore.
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
@@ -74,16 +80,16 @@ const aveugle = (c) => (c.etats || []).find(x => x.nom === "Aveuglé");
 console.log("\n=========================================================");
 console.log("  LE CHASSEUR DE MAGES");
 // =========================================================================
-console.log("\n1. LES PALIERS : +10 RÉSISTANCE MAGIQUE ET LUMIÈRE, BOUCLIER ANTI-MAGIE, APPEL DE LA LUMIÈRE");
+console.log("\n1. LES PALIERS : +10 RÉSISTANCE MAGIQUE ET MAÎTRISE DE LA LUMIÈRE, BOUCLIER ANTI-MAGIE, APPEL DE LA LUMIÈRE");
 // =========================================================================
 {
     const a1 = w.atoutClasse(chasseur(1)), a5 = w.atoutClasse(chasseur(5)), a10 = w.atoutClasse(chasseur(10));
-    verifier("niveau 1 : +10 de défense magique, Lumière, 8 % d'aveugler",
-             a1.defMagique === 10 && JSON.stringify(a1.effets) === '["EFF_LUMIERE"]' && a1.lumiereAveugle === 8
+    verifier("niveau 1 : +10 de défense magique, Maîtrise de la lumière (33 %), plus d'effet Lumière",
+             a1.defMagique === 10 && a1.maitriseLumiere === 33 && !(a1.effets || []).length && !a1.lumiereAveugle
              && !(a1.techniques || []).length, JSON.stringify(a1));
     verifier("niveau 5 : le Bouclier anti-magie", JSON.stringify(a5.techniques) === '["CLASSE_BOUCLIER_ANTIMAGIE"]');
     verifier("niveau 10 : + l'Appel de la lumière (plus de 30 %)",
-             JSON.stringify(a10.techniques) === '["CLASSE_BOUCLIER_ANTIMAGIE","CLASSE_APPEL_LUMIERE"]' && a10.lumiereAveugle === 8);
+             JSON.stringify(a10.techniques) === '["CLASSE_BOUCLIER_ANTIMAGIE","CLASSE_APPEL_LUMIERE"]' && a10.maitriseLumiere === 33);
     const ba = w.TECHNIQUES_CLASSE.CLASSE_BOUCLIER_ANTIMAGIE, al = w.TECHNIQUES_CLASSE.CLASSE_APPEL_LUMIERE;
     verifier("Bouclier anti-magie : init 200, aucune fatigue, sur soi",
              ba.Initiative === 200 && ba.Fatigue === 0 && ba.cible === "soi" && ba.niveau === 5);
@@ -91,12 +97,12 @@ console.log("\n1. LES PALIERS : +10 RÉSISTANCE MAGIQUE ET LUMIÈRE, BOUCLIER AN
     verifier("la fiche annonce +10 de résistance magique",
              w.defMagiqueCombattant(chasseur(1)) === w.defMagiqueCombattant(fiche("X")) + 10);
     const e = monde(1);
-    verifier("en combat : défense magique 10, atout d'aveuglement 8",
-             defMagiqueDe(e.combattants.C) === 10 && e.combattants.C.atouts.lumiereAveugle === 8);
+    verifier("en combat : défense magique 10, Maîtrise de la lumière 33",
+             defMagiqueDe(e.combattants.C) === 10 && e.combattants.C.atouts.maitriseLumiere === 33);
 }
 
 // =========================================================================
-console.log("\n2. LUMIÈRE : LE SORT PASSE OUTRE LA DÉFENSE MAGIQUE");
+console.log("\n2. UNE CARTE DÉJÀ FORGÉE AVEC LUMIÈRE : LE SORT PASSE OUTRE LA DÉFENSE MAGIQUE");
 // =========================================================================
 {
     const sansLumiere = jouer(monde(5), sort(0), desA(100)).etat.combattants.M1.pv;
@@ -122,41 +128,47 @@ console.log("\n2. LUMIÈRE : LE SORT PASSE OUTRE LA DÉFENSE MAGIQUE");
 }
 
 // =========================================================================
-console.log("\n3. LE SORT DE LUMIÈRE AVEUGLE SA CIBLE (8 %), DÈS LE NIVEAU 1");
+console.log("\n3. LA MAÎTRISE DE LA LUMIÈRE : UN SORT DE FOUDRE AVEUGLE SA CIBLE (33 %), DÈS LE NIVEAU 1");
 // =========================================================================
 {
+    const foudre = (extra = {}) => ({ type: "carte", idLanceur: "C", idCarte: "S", critique: false,
+        attaques: [{ nom: "Attaque Magique", valeurBrute: 10, typeRes: "Magique", rangeMax: 3, element: extra.element || "Foudre",
+                     cibles: ["M1"] }], alterations: [] });
     const e = monde(1);
-    const r = jouer(e, sort(15), desA(1));
+    const r = jouer(e, foudre(), desA(1));
     const c = r.etat.combattants;
     verifier("la cible M1 est aveuglée, 2 manches, 4 cases autour d'elle",
              !!aveugle(c.M1) && aveugle(c.M1).duree === DUREE_AVEUGLE_LUMIERE && aveugle(c.M1).cases.length === 4
              && aveugle(c.M1).cases.every(h => Math.abs(h.q - 2) <= 1 && Math.abs(h.r) <= 1), JSON.stringify(aveugle(c.M1)));
     verifier("ses voisins (M2, M3), l'allié, le Chasseur : non",
              !aveugle(c.M2) && !aveugle(c.M3) && !aveugle(c.A) && !aveugle(c.M4) && !aveugle(c.C));
-    verifier("l'écran le dit : « Éblouis »", r.etapes.some(x => x.type === "message" && /blouis/.test(x.texte)));
+    verifier("l'écran le dit : « ⚡ Ébloui par l'éclair ! »", r.etapes.some(x => x.type === "message" && /bloui par l'éclair/.test(x.texte)));
     const rejoue = appliquerEntree(e, { etapes: r.etapes }).combattants;
     verifier("rejoué depuis le journal : aveuglé", !!aveugle(rejoue.M1));
 
-    // Le jet de 8 % raté : personne. (Dés dans l'ordre : esquive, Lumière,
-    // puis l'aveuglement — le 3e tombe sur 9.)
+    // Le jet de 33 % raté : personne. (Dés dans l'ordre : esquive, puis la
+    // Maîtrise — le 2e tombe sur 34.)
     let n = 0;
-    const jets = tirerDesCarte(monde(1), sort(15), "C", false, { ...desA(1), d100: () => { n++; return n === 3 ? 9 : 1; } });
-    verifier("le jet d'aveuglement raté (9 > 8) : rien", jets.parCible.M1.lumiereAveugle === false && !jets.parCible.M1.noirLumiere,
+    const jets = tirerDesCarte(monde(1), foudre(), "C", false, { ...desA(1), d100: () => { n++; return n === 2 ? 34 : 1; } });
+    verifier("le jet raté (34 > 33) : rien", jets.parCible.M1.lumiereAveugle === false && !jets.parCible.M1.noirLumiere,
              JSON.stringify(jets.parCible.M1));
     n = 0;
-    const jets8 = tirerDesCarte(monde(1), sort(15), "C", false, { ...desA(1), d100: () => { n++; return n === 3 ? 8 : 1; } });
-    verifier("8 : réussi", jets8.parCible.M1.lumiereAveugle === true);
+    const jets33 = tirerDesCarte(monde(1), foudre(), "C", false, { ...desA(1), d100: () => { n++; return n === 2 ? 33 : 1; } });
+    verifier("33 : réussi", jets33.parCible.M1.lumiereAveugle === true);
 
     const esq = monde(1);
     esq.combattants.M1.def.esquive = 100;
-    verifier("la cible esquive : pas d'aveuglement", !aveugle(jouer(esq, sort(15), desA(1)).etat.combattants.M1));
+    verifier("la cible esquive : pas d'aveuglement", !aveugle(jouer(esq, foudre(), desA(1)).etat.combattants.M1));
     const imm = monde(1);
     imm.combattants.M1.atouts.immunites = ["Aveuglé"];
-    const ri = jouer(imm, sort(15), desA(1));
+    const ri = jouer(imm, foudre(), desA(1));
     verifier("une cible immunisée ne l'est pas", !aveugle(ri.etat.combattants.M1)
              && ri.etapes.some(x => x.type === "etatRate" && x.cible === "M1" && x.immunise));
-    const sansLum = jouer(monde(10), sort(0), desA(1)).etat.combattants;
-    verifier("un sort sans Lumière : pas d'aveuglement", !aveugle(sansLum.M1));
+    verifier("un sort de feu : pas d'aveuglement", !aveugle(jouer(monde(10), foudre({ element: "Feu" }), desA(1)).etat.combattants.M1));
+    // Une carte de feu ne tire pas un dé de plus.
+    let tires = 0;
+    tirerDesCarte(monde(10), foudre({ element: "Feu" }), "C", false, { ...desA(100), d100: () => { tires++; return 100; } });
+    verifier("…et ne consomme aucun dé de plus", tires === 1, `${tires} dé(s)`);
 }
 
 // =========================================================================
@@ -282,7 +294,7 @@ await p.goto(base + '/index.html');
 await p.waitForTimeout(2000);
 
 // =========================================================================
-console.log("\n4. LA FORGE : LUMIÈRE POUR LE SEUL CHASSEUR DE MAGES, SUR UN SORT À DÉGÂTS MAGIQUES");
+console.log("\n4. LA FORGE : PLUS DE LUMIÈRE, POUR PERSONNE (v237) ; LES CARTES DÉJÀ FORGÉES LA GARDENT");
 // =========================================================================
 {
   const r = await p.evaluate(async (EFFETS) => {
@@ -322,17 +334,12 @@ console.log("\n4. LA FORGE : LUMIÈRE POUR LE SEUL CHASSEUR DE MAGES, SUR UN SOR
     return { c4: c4.includes("EFF_LUMIERE"), autre: autre.includes("EFF_LUMIERE"), c5: c5.includes("EFF_LUMIERE"),
              surMagique, surPhysique, surSoin, monstres: window.paletteEffetsMonstres().some(e => e.id === "EFF_LUMIERE") };
   }, EFFETS_PAR_ID);
-  verifier("le Chasseur de mages l'a dans la Forge dès le niveau 1", r.c5 && r.c4);
-  verifier("pas une autre classe", !r.autre);
-  verifier("jamais les monstres", !r.monstres);
-  // (Avec l'arme Magie, la Forge n'ouvre pas de menu Physique.)
-  verifier("sur une Attaque Magique : proposée (⚡ 5)",
-           r.surMagique.length === 1 && /Magique : Lumière ⚡ 5/.test(r.surMagique[0]), JSON.stringify(r.surMagique));
-  verifier("sur une attaque physique : dans les menus Magique et Physique, « non compatible »",
-           r.surPhysique.length === 2 && r.surPhysique.every(x => /non compatible/.test(x))
-           && r.surPhysique.some(x => /Physique/.test(x)),
-           JSON.stringify(r.surPhysique));
-  verifier("sur un soin : « non compatible »", r.surSoin.length > 0 && r.surSoin.every(x => /non compatible/.test(x)), JSON.stringify(r.surSoin));
+  verifier("le Chasseur de mages ne l'a plus dans la Forge (niveau 1 ni 5)", !r.c5 && !r.c4);
+  verifier("ni une autre classe", !r.autre);
+  verifier("ni les monstres", !r.monstres);
+  verifier("aucun menu ne la propose plus (Attaque Magique, attaque physique, soin)",
+           r.surMagique.length === 0 && r.surPhysique.length === 0 && r.surSoin.length === 0,
+           JSON.stringify([r.surMagique, r.surPhysique, r.surSoin]));
 
   const ex = await p.evaluate(async () => {
     window.PERSOS_PARTIE = [{ idPersonnage: "C1", camp: "Allié", prenom: "Varn", classe: "Chasseur de mages", xp: 2500,
@@ -368,9 +375,9 @@ console.log("\n5. LA FICHE DE CLASSE");
   });
   await p.screenshot({ path: "/tmp/claude-0/chasseur_classe.png" });
   verifier("présentation et paliers Niv. 1 / 5 / 10", r.visible && JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 5","Niv. 10"]');
-  verifier("résistance magique, Lumière, Bouclier anti-magie, Appel de la lumière y sont dits",
-           /\+10 % de résistance magique/.test(r.texte) && /Lumière/.test(r.texte) && /8 % de chance d'aveugler/.test(r.texte)
-           && /Bouclier anti-magie/.test(r.texte) && /Appel de la lumière/.test(r.texte));
+  verifier("résistance magique, Maîtrise de la lumière, Bouclier anti-magie, Appel de la lumière y sont dits",
+           /\+10 % de résistance magique/.test(r.texte) && /Maîtrise de la lumière/.test(r.texte) && /33 % de chance d'aveugler/.test(r.texte)
+           && /foudre/.test(r.texte) && /Bouclier anti-magie/.test(r.texte) && /Appel de la lumière/.test(r.texte));
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

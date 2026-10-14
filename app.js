@@ -880,23 +880,27 @@ window.regenerationCombattant = function(perso) {
 //
 //  Le bestiaire n'enregistre aucune race : les créatures n'en tirent rien.
 
+// v237 (Nico) : esquive des Gobs à 5 %, résistance physique des Ankylars et
+// magique des Ophiors à 12 %, soins reçus des Éthérés à +25 %, 50 % de chance
+// pour le Vargen d'éviter une attaque d'opportunité, et une compétence de plus
+// pour l'Humain (comme le Gob).
 window.ATOUTS_RACES = {
-    "Gob":     { esquive: 3, competences: 1 },
+    "Gob":     { esquive: 5, competences: 1 },
     // L'immunité à l'Étourdi rejoint la résistance : les Ankylars ne
     // craignent plus qu'on leur fasse perdre leur tour, en plus d'encaisser
     // mieux les coups.
-    "Ankylar": { defPhysique: 8, immunites: ["Étourdi"] },
+    "Ankylar": { defPhysique: 12, immunites: ["Étourdi"] },
     "Ondari":  { porteeMagique: 1, immunites: ["Brûlé"] },
-    "Vargen":  { diviseurDeplacement: 2, esquiveOpportunite: 30 },
+    "Vargen":  { diviseurDeplacement: 2, esquiveOpportunite: 50 },
     // regenPv : des points de vie repris à chaque fin de manche, comme la
     // fatigue de tout le monde (regenerationDe, cerveau_combat.js) mais sur
     // la jauge de vie — un mécanisme qui n'existait pour personne d'autre.
-    "Ophior":  { defMagique: 8, regenPv: 3 },
-    "Ethéré":  { soinsRecus: 30, immunites: ["Empoisonnement"] },
+    "Ophior":  { defMagique: 12, regenPv: 3 },
+    "Ethéré":  { soinsRecus: 25, immunites: ["Empoisonnement"] },
     // L'Humain garde sa réserve plus grande (110 au lieu de 100). Son bonus de
     // repos long (+10) a été retiré à la demande de Nico : il récupère comme
-    // tout le monde, 35 % de sa jauge.
-    "Humain":  { fatigueMax: 10 }
+    // tout le monde, 35 % de sa jauge. Il a une compétence de plus, comme le Gob.
+    "Humain":  { fatigueMax: 10, competences: 1 }
 };
 
 // La fiche front-end porte "race", le document Firestore porte "Race" : la
@@ -959,26 +963,28 @@ window.ATOUTS_CLASSES = {
         { niveau: 5,  techniques: ["CLASSE_SOIN_URGENCE"] },
         { niveau: 10, techniques: ["CLASSE_PRISE_EN_CHARGE"] }
     ],
-    // LE CHASSEUR DE MAGES : +10 de défense magique et l'effet Lumière dans
-    // la Forge dès le niveau 1 (EFF_LUMIERE, MIGRATION_EFFETS) — ses sorts de
-    // lumière ont en plus 8 % de chance d'aveugler leur cible (lumiereAveugle,
-    // tirerDesCarte et resoudreCarte) ; le Bouclier anti-magie au niveau 5,
-    // l'Appel de la lumière au niveau 10.
+    // LE CHASSEUR DE MAGES : +10 de défense magique et, dès le niveau 1, la
+    // Maîtrise de la lumière (v237, à la place de l'effet Lumière, retiré de
+    // la Forge) : ses sorts de foudre ont 33 % de chance d'aveugler leur cible
+    // — une chance fixe, qui ne s'additionne pas à l'Aveuglement d'une carte
+    // (maitriseLumiere, tirerDesCarte et resoudreCarte) ; le Bouclier
+    // anti-magie au niveau 5, l'Appel de la lumière au niveau 10.
     "Chasseur de mages": [
-        { niveau: 1,  defMagique: 10, effets: ["EFF_LUMIERE"], lumiereAveugle: 8 },
+        { niveau: 1,  defMagique: 10, maitriseLumiere: 33 },
         { niveau: 5,  techniques: ["CLASSE_BOUCLIER_ANTIMAGIE"] },
         { niveau: 10, techniques: ["CLASSE_APPEL_LUMIERE"] }
     ],
-    // LE PROFANATEUR : à la Forge, la part étalée d'une compétence lui coûte
-    // moins cher — sa fatigue est divisée par 1,3 au lieu du 1,2 de base
-    // (diviseurEtalement, competences.js). Ce n'était PAS un bonus de dégâts :
-    // le ×1,3 sur ses poisons et ses étalements était une erreur (Nico).
-    // +1 compétence, +5 PV ; au niveau 5, ses zombies
-    // (combat_etat.js, zombifier) ; au niveau 10, le sursis de l'ancien
-    // Nécromancien (2 tours debout à zéro PV, une fois par combat).
+    // LE PROFANATEUR (v237, Nico : « passif Relève des morts passe au lvl1 et
+    // on vire tout le reste du lvl1 ; au lvl1, ses attaques magiques de glace
+    // font des dégâts physiques au lieu de magiques ») : dès le niveau 1, les
+    // ennemis qui tombent de sa main ou à côté de lui se relèvent en zombies
+    // (combat_etat.js, zombifier), et ses sorts de Glace frappent en physique
+    // (l'armure les réduit, plus la résistance magique — glacePhysique,
+    // resoudreCarte). Plus de ristourne d'étalement à lui (1,3 comme tout le
+    // monde), ni de compétence ou de PV en plus. Au niveau 10, le sursis de
+    // l'ancien Nécromancien (2 tours debout à zéro PV, une fois par combat).
     "Profanateur": [
-        { niveau: 1,  diviseurEtalement: 1.3, competences: 1, pvMax: 5 },
-        { niveau: 5,  zombies: true },
+        { niveau: 1,  zombies: true, glacePhysique: true },
         // Niveau 10 : le sursis, et ses zombies se relèvent dans un rayon de
         // 2 cases autour de lui (au lieu de 1).
         { niveau: 10, sursis: 2, rayonZombies: 2 }
@@ -1028,13 +1034,13 @@ window.ATOUTS_CLASSES = {
         { niveau: 10, techniques: ["CLASSE_RETOUR_ARRIERE"] }
     ],
     // LE VAMPIRE : +10 de résistance physique, insensible au gel (jamais
-    // Glacé), mais le feu le ronge plus fort (brûlé : -60 % de soins reçus au
-    // lieu de -50, 18 % des PV max par manche au lieu de 8 — brulureAggravee,
-    // moteur_pur.js). Le Baiser du vampire au niveau 5 (technique de classe :
+    // Glacé), mais le feu le prend plus facilement : +20 % de chance d'être
+    // Brûlé par un sort qui brûle (brulureFacile, tirerDesCarte — v237, à la
+    // place de l'ancienne brûlure aggravée). Le Baiser du vampire au niveau 5 (technique de classe :
     // il remplace l'effet Vampirisme de la Forge), la Nuée de chauve-souris au
     // niveau 10. Interdit aux Vargens (CLASSES_INTERDITES).
     "Vampire": [
-        { niveau: 1,  defPhysique: 10, brulureAggravee: true, immunites: ["Glacé"] },
+        { niveau: 1,  defPhysique: 10, brulureFacile: 20, immunites: ["Glacé"] },
         { niveau: 5,  techniques: ["CLASSE_BAISER_VAMPIRE"] },
         { niveau: 10, techniques: ["CLASSE_NUEE_CHAUVES_SOURIS"] }
     ]
@@ -1431,6 +1437,7 @@ window.texteAtout = function(cle, valeur) {
         case "critiqueSurKO":  return `Instinct du tueur : ${plus(n)} % de critique pendant 2 manches après un KO`;
         case "maitrePoisons":  return "Maître des poisons : ses poisons mordent à chaque manche (18 % de fatigue, 9 % des PV max), 2 manches";
         case "lumiereAveugle": return `Sorts de lumière : ${n} % de chance d'aveugler la cible`;
+        case "maitriseLumiere": return `Maîtrise de la lumière : ${n} % de chance d'aveugler avec un sort de foudre (sans s'ajouter à l'Aveuglement)`;
         case "provocationAttaques": return `${n} % de chance de provoquer la cible de chacune de ses attaques`;
         case "bonusSoin":      return `${plus(n)} à chacun de ses soins`;
         // Les clés des talents (talents.js).
@@ -1443,13 +1450,13 @@ window.texteAtout = function(cle, valeur) {
         case "testsCarac":      return Object.keys(valeur || {}).map(c => `${plus(Number(valeur[c]) || 0)} aux tests de ${NOMS_CARACS_ATOUT[c] || c}`).join(" · ");
         case "fatigueSurKO":    return `${plus(n)} de fatigue à chaque ennemi abattu`;
         case "inertieMartiale": return `−${n} de fatigue sur la mêlée après 4 cases en ligne droite`;
-        case "impactCinetique": return "Une cible poussée contre un obstacle encaisse le choc";
+        case "impactCinetique": return "Collision d'une poussée : 10 % du coût de la compétence à la cible (6 % à l'unité percutée), 16 % contre un obstacle";
         case "elanPartage":     return `+${n} de fatigue aux alliés à son contact quand il soigne`;
         case "bouclierDesSages": return `Repos long à l'initiative 100, +${n} % de résistances pour le tour`;
         case "degatsIllusoires": return `${n} dégâts bruts à qui brise une de ses illusions`;
         case "etatsRaccourcis": return `États néfastes subis : −${n} tour`;
         case "initiative":     return `${plus(n)} d'initiative sur ses compétences`;
-        case "diviseurEtalement": return `Forge : la fatigue des dégâts étalés est divisée par ${String(n).replace(".", ",")} (au lieu de 1,2)`;
+        case "diviseurEtalement": return `Forge : la fatigue des dégâts et soins étalés est divisée par ${String(n).replace(".", ",")} (au lieu de 1,3)`;
         case "compagnon":      return "Un compagnon animal combat à ses côtés : 25 PV, 15 % d'esquive, 6 dégâts bruts, 3 cases, joue juste après lui";
         case "bonusDistance":  return `${plus(n)} dégât à chaque attaque de ses compétences à arme à distance`;
         case "zoneGratuite":   return "Forge : la 5e case de zone payante d'une compétence ne coûte rien";
@@ -1460,10 +1467,12 @@ window.texteAtout = function(cle, valeur) {
         case "zonesProlongees": return `Ses zones persistantes durent ${n === 1 ? "un" : n} tour${n > 1 ? "s" : ""} de plus`;
         case "zombies":        return "Les ennemis qu'il tue, ou qui tombent à côté de lui, se relèvent en zombies à son service";
         case "rayonZombies":   return n > 1 ? `Ses zombies se relèvent jusqu'à ${n} cases autour de lui` : "";
+        case "glacePhysique":  return "Ses attaques magiques de glace font des dégâts physiques au lieu de magiques";
         case "degatsOpportunite": return `${plus(n)} aux dégâts de ses attaques d'opportunité`;
         case "defenseur":      return `Défenseur : ${n} % de chance de frapper l'ennemi qui entre dans sa zone`;
         case "allongeOpportunite": return "Sa zone passe à 2 cases avec une arme à allonge (lance lourde)";
         case "brulureAggravee": return "Craint le feu : brûlé, -60 % de soins reçus et 18 % des PV max par manche (au lieu de -50 % et 8 %)";
+        case "brulureFacile":  return `Craint le feu : +${n} % de chance d'être Brûlé par les sorts qui brûlent`;
         case "premierPasGratuit": return "La première case de chaque tour ne coûte aucune fatigue";
         case "caracs":         return Object.keys(valeur || {}).map(k => `${plus(Number(valeur[k]) || 0)} ${NOMS_CARACS_ATOUT[k] || k}`).join(" · ");
         default:               return `${cle} : ${typeof valeur === "object" ? JSON.stringify(valeur) : valeur}`;
@@ -1573,7 +1582,8 @@ window.critiqueCombattant = function(perso) {
 };
 
 // Le nombre de cartes qu'un héros peut mémoriser : six pour tout le monde, sept
-// pour un Gob — dès la création, donc aussi une carte de plus à forger.
+// pour un Gob ou un Humain — dès la création, donc aussi une carte de plus à
+// forger.
 window.competencesMaxCombattant = function(perso) {
     if (!perso) return 6;
     const base = perso.Competences_Max !== undefined ? (parseInt(perso.Competences_Max) || 0) : 6;
@@ -1587,7 +1597,7 @@ window.estImmunise = function(perso, nomEtat) {
     return immunites.includes(nomEtat);
 };
 
-// Les soins reçus, multipliés par l'atout du peuple (Éthéré : +30 %).
+// Les soins reçus, multipliés par l'atout du peuple (Éthéré : +25 %).
 window.multiplicateurSoinsRecus = function(perso) {
     return 1 + ((window.atoutRace(perso).soinsRecus || 0) / 100);
 };
@@ -5112,7 +5122,14 @@ window.completerEffetsDeSecours = function(cache) {
 // LES EFFETS RÉSERVÉS À UNE CLASSE. Un effet l'est quand sa fiche le dit
 // (`Classe`), ou quand une classe le range dans ses atouts (ATOUTS_CLASSES) —
 // les deux, pour qu'un grimoire retouché à la main ne le rende pas public.
+// LES EFFETS RETIRÉS DE LA FORGE : plus personne ne les choisit, quoi que dise
+// le grimoire (Lumière, v237 — Nico : « Lumière ne doit plus être un effet de
+// combat » ; le Chasseur de mages a la Maîtrise de la lumière à la place). Ils
+// passent pour réservés à une classe qui ne les débloque jamais : ni la Forge,
+// ni le générateur de monstres, ni l'IA de la Forge ne les proposent.
+window.EFFETS_RETIRES_FORGE = ["EFF_LUMIERE"];
 window.effetReserveAUneClasse = function(id, effet) {
+    if ((window.EFFETS_RETIRES_FORGE || []).includes(id)) return true;
     if (effet && effet.Classe) return true;
     return Object.values(window.ATOUTS_CLASSES || {}).some(paliers =>
         paliers.some(p => (p.effets || []).includes(id)));
@@ -5122,6 +5139,7 @@ window.effetReserveAUneClasse = function(id, effet) {
 // public ; pour un effet de classe, seulement si sa classe l'a débloqué à son
 // niveau (Ténèbres : Nécromancien de niveau 5).
 window.effetAccessible = function(id, effet, perso) {
+    if ((window.EFFETS_RETIRES_FORGE || []).includes(id)) return false;
     if (!window.effetReserveAUneClasse(id, effet)) return true;
     return (window.atoutRace(perso || {}).effets || []).includes(id);
 };
@@ -5157,8 +5175,7 @@ window.MAJ_GRIMOIRE_REGLES = [
         Notes: "Après l'attaque, le lanceur choisit une case à 3 pas de marche (ni mur, ni vivant traversé). Il évite toutes les attaques d'opportunité des ennemis quittés. Marche gratuite." } },
     { id: "EFF_LUMIERE", champs: {
         Classe: "Chasseur de mages", Niveau_Requis: 1,
-        Effet_Base: "15% chance d'ignorer la résistance magique de la cible sur ce sort (Max 60%) et 8% chance d'aveugler",
-        Notes: "Réservé au Chasseur de mages, dès le niveau 1. Seulement sur une action à dégâts magiques. Le sort a en plus 8 % de chance d'aveugler sa cible (2 manches)." } },
+        Notes: "RETIRÉ DE LA FORGE (v237) : remplacé par la Maîtrise de la lumière du Chasseur de mages (niveau 1 : 33 % de chance d'aveugler avec un sort de foudre, sans s'ajouter à l'Aveuglement). Les cartes déjà forgées gardent leur effet (15 % par cran d'ignorer la résistance magique)." } },
     { id: "EFF_TENEBRES", champs: {
         Classe: "Sorcier", Niveau_Requis: 1,
         Notes: "Réservé au Sorcier (ex-Nécromancien), dès le niveau 1. Dégâts bruts : aucune armure (résistance magique) ne s'applique. Les dégâts vont à l'énergie (fatigue) de la cible au lieu de ses PV. Si elle n'a plus d'énergie, le reste frappe ses PV ×1,5 (arrondi à l'inférieur). Le bouclier ne protège pas l'énergie ; il n'absorbe que ce qui frappe les PV." } },
