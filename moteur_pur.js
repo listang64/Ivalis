@@ -962,7 +962,7 @@ export function chaineDeDegats(cible, attaque, options) {
 //      • une FLÈCHE  — un tir qui n'est pas magique (arc, dague lancée, arme
 //                      devenue tir par l'équipement : typeRes « Physique ») ;
 //      • une BOULE BLEUE — un sort offensif lancé de loin (typeRes
-//                      « Magique » : les effets « pouvoir », « magique ») ;
+//                      « Magique » : la Distorsion mentale, les effets « magique ») ;
 //      • une BOULE VERTE — un soin lancé de loin.
 //
 //  L'ordre compte : une carte qui frappe ET soigne montre son attaque, parce
@@ -1710,10 +1710,11 @@ export function resoudreCarte(etat, action, plateau) {
                         && !((offensive.elements || []).length > 1) ? offensive.element : null;
     // LES AUTRES SORTS DU STUDIO (Nico : « attaque magique de glace,
     // multi-élémentaire, mots de pouvoir, lumière : tu peux intégrer ») : les
-    // Mots de pouvoir, un sort de plusieurs éléments, un sort de Lumière sans
-    // élément. L'élément seul (Feu, Foudre, Glace) voyage dans `element`.
+    // Mots de pouvoir — devenus la Distorsion mentale (v240), les deux noms
+    // jouent son geste —, un sort de plusieurs éléments, un sort de Lumière
+    // sans élément. L'élément seul (Feu, Foudre, Glace) voyage dans `element`.
     const sortCarte = !offensive ? null
-        : nomOffensive.includes("pouvoir") ? "mots"
+        : (nomOffensive.includes("distorsion") || nomOffensive.includes("pouvoir")) ? "mots"
         : !estSort ? null
         : (offensive.elements || []).length > 1 ? "multi"
         : (!offensive.element && nombre(offensive.chanceLumiere) > 0) ? "lumiere" : null;

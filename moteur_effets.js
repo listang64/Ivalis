@@ -1,6 +1,12 @@
 import { db } from "./firebase-config.js?v=2";
 import { doc, updateDoc, setDoc, deleteDoc, deleteField } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
+// LA DISTORSION MENTALE (ex-Mots de pouvoir) : les deux noms la désignent
+// (app.js, estDistorsionMentale), un grimoire pas encore mis à jour comme une
+// carte forgée avant le renommage.
+const estDistorsionNom = (nom) => typeof window.estDistorsionMentale === "function"
+    ? window.estDistorsionMentale(nom) : /distorsion|pouvoir/i.test(String(nom || ""));
+
 // =========================================================================
 //  IVALIS - MOTEUR DE RÉSOLUTION DES COMBATS (CIBLAGE ET DÉGÂTS)
 // =========================================================================
@@ -1415,10 +1421,17 @@ window.demarrerCiblage = async function(idCarte, options) {
             const elementAct = (act.element && typeof window.elementMagique === "function"
                                 && window.estAttaqueElementaire(effBase.Nom))
                 ? window.elementMagique(act.element) : null;
-            const chanceOfferte = (etat) => (elementAct && elementAct.etat === etat)
+            // L'ÉTAT DU CHARISME D'UNE DISTORSION MENTALE (Nico : « tout comme
+            // les attaques magiques qui sont liées à un élément ») : Confusion,
+            // Immobilisation ou Peur, choisi dans la Forge, avec les mêmes 5 %.
+            const etatMentalAct = (act.etatMental && typeof window.etatDistorsion === "function"
+                                   && estDistorsionNom(effBase.Nom))
+                ? window.etatDistorsion(act.etatMental) : null;
+            const lienAct = elementAct || etatMentalAct;
+            const chanceOfferte = (etat) => (lienAct && lienAct.etat === etat)
                 ? (window.CHANCE_ELEMENT_OFFERTE || 5) : 0;
             const dureeOfferte = () => {
-                const e = elementAct && window.EFFETS_BDD_CACHE[elementAct.effetId];
+                const e = lienAct && window.EFFETS_BDD_CACHE[lienAct.effetId];
                 return (e && parseFrFloat(e.Tours)) || 2;
             };
 
@@ -1600,7 +1613,7 @@ window.demarrerCiblage = async function(idCarte, options) {
             };
             lireLumiere(effBase, act.count);
             listeMods.forEach(m => lireLumiere(window.EFFETS_BDD_CACHE[m.id], m.count));
-            if (nomLower.includes("attaque") || nomLower.includes("pouvoir") || estTenebres || estVampirisme || nomLower.includes("soin") || nomLower.includes("guérison") || isPurification || isShield) {
+            if (nomLower.includes("attaque") || estDistorsionNom(nomLower) || estTenebres || estVampirisme || nomLower.includes("soin") || nomLower.includes("guérison") || isPurification || isShield) {
                 let isHeal = nomLower.includes("soin") || nomLower.includes("guérison") || isPurification || isShield;
                 // Les dégâts et les SOINS s'étalent ; un bouclier ou une purification, non —
                 // ce ne sont pas des montants qui tombent sur la vie. La division se fait sur le
@@ -1610,7 +1623,7 @@ window.demarrerCiblage = async function(idCarte, options) {
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 if (indexPremiereAttaque === -1) indexPremiereAttaque = idxAction;
-                const typeRes = (nomLower.includes("magique") || nomLower.includes("pouvoir") || estTenebres || estVampirisme || isHeal)
+                const typeRes = (nomLower.includes("magique") || estDistorsionNom(nomLower) || estTenebres || estVampirisme || isHeal)
                     ? "Magique" : "Physique";
                 // Atout de l'Ondari : ses sorts magiques portent une case plus loin,
                 // dès lors qu'un cran de Distance est posé dessus.
@@ -1775,6 +1788,11 @@ window.demarrerCiblage = async function(idCarte, options) {
                 }
             });
 
+            if (chanceOfferte("Immobilisation") > 0) {
+                isImmobilisation = true;
+                immobilisationChance += chanceOfferte("Immobilisation");
+            }
+
             if (isImmobilisation) {
                 immobilisationChance = Math.min(immobilisationChance, plafondDuGrimoire("immobil", 40)); // plafond du grimoire
 
@@ -1820,6 +1838,12 @@ window.demarrerCiblage = async function(idCarte, options) {
                 const d = parseFrFloat(modEff.Tours) + bonus;
                 if (d > confusionDuree) confusionDuree = d;
             });
+
+            if (chanceOfferte("Confusion") > 0) {
+                isConfusion = true;
+                confusionChance += chanceOfferte("Confusion");
+                confusionDuree = Math.max(confusionDuree, dureeOfferte());
+            }
 
             if (isConfusion) {
                 confusionChance = Math.min(confusionChance, plafondDuGrimoire("confus", 40)); // plafond du grimoire
@@ -2200,6 +2224,11 @@ window.demarrerCiblage = async function(idCarte, options) {
                     peurChance += (parseFrFloat(modEff.Pourcent_Base) || 0) * m.count;
                 }
             });
+
+            if (chanceOfferte("Peur") > 0) {
+                isPeur = true;
+                peurChance += chanceOfferte("Peur");
+            }
 
             if (isPeur) {
                 peurChance = Math.min(peurChance, plafondDuGrimoire("peur", 60)); // plafond du grimoire
@@ -3550,7 +3579,7 @@ window.porteeReelleCarte = function(dataCarte, lanceur) {
 
         // L'atout de portée magique, comme dans demarrerCiblage : il ne joue
         // que sur une action magique qui a déjà de la distance.
-        const estMagique = nomLower.includes("magique") || nomLower.includes("pouvoir")
+        const estMagique = nomLower.includes("magique") || estDistorsionNom(nomLower)
             || (typeof window.estSortDeClasse === "function" && window.estSortDeClasse(nomLower));
         const totale = rangeMax + (typeof window.bonusPorteeMagique === "function"
             ? window.bonusPorteeMagique(lanceur, estMagique, isRanged) : 0);
@@ -3722,9 +3751,9 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
         // physiques de l'arme.
         const estMagique = attaque.typeRes === "Magique";
         // LES TALENTS (talents.js) : Taillé pour la guerre et le Pugiliste en
-        // physique, Archimage sur la magie, Langage arcanique sur les Mots de
-        // pouvoir (qui ne prennent pas l'Archimage).
-        const estMotDePouvoir = /pouvoir/i.test(attaque.nom || "");
+        // physique, Archimage sur la magie, Langage arcanique sur la Distorsion
+        // mentale, ex-Mots de pouvoir (qui ne prend pas l'Archimage).
+        const estMotDePouvoir = (typeof window.estDistorsionMentale === "function" ? window.estDistorsionMentale(attaque.nom || "") : /distorsion|pouvoir/i.test(attaque.nom || ""));
         const talentDegats = estMotDePouvoir ? (Number(atouts.degatsMotsPouvoir) || 0)
             : estMagique ? (Number(atouts.degatsMagiques) || 0) : (Number(atouts.degatsPhysiques) || 0);
         // LES BLESSURES (blessures.js) : Entaille musculaire, Bras fracturé —

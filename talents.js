@@ -18,7 +18,8 @@
 //  savoir d'où ils viennent. Les clés déjà connues (esquive, critique,
 //  pvMax…) marchent telles quelles ; les nouvelles sont lues là où leur
 //  mécanique se joue :
-//    degatsPhysiques / degatsMagiques / degatsMotsPouvoir   dégâts plats sur
+//    degatsPhysiques / degatsMagiques / degatsMotsPouvoir (la Distorsion
+//    mentale, ex-Mots de pouvoir — la clé garde l'ancien nom)   dégâts plats sur
 //        la carte (appliquerEquipementALaCarte, moteur_effets.js)
 //    chanceElementaire / chanceEtatsCharisme / chancePoisonPhysique   chance
 //        en plus sur les états de la carte (idem), au-delà du plafond
@@ -200,9 +201,9 @@
           effet: (m) => ({ degatsIllusoires: Math.ceil(2.5 * m("cha")) }),
           resume: (m) => `${Math.ceil(2.5 * m("cha"))} dégâts bruts à qui brise une illusion` },
         { id: "TAL_LANGAGE_ARCANIQUE", nom: "Langage arcanique", carac: "cha", min: 14, max: 1,
-          texte: "+1 dégât pour les Mots de pouvoir.",
+          texte: "+1 dégât pour la Distorsion mentale.",
           effet: () => ({ degatsMotsPouvoir: 1 }),
-          resume: () => "+1 dégât aux Mots de pouvoir" }
+          resume: () => "+1 dégât à la Distorsion mentale" }
     ];
 
     // Les états « de Charisme » que le Maître illusionniste renforce.

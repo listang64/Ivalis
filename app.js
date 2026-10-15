@@ -1337,7 +1337,7 @@ window.atoutRace = function(perso) {
 // =========================================================================
 //  LES ÉLÉMENTS DES SORTS
 // =========================================================================
-//  Nico : « Une attaque magique (hors Mot de pouvoir) sera toujours liée à un
+//  Nico : « Une attaque magique (hors Distorsion mentale) sera toujours liée à un
 //  élément » — choisi dans la Forge, à la pose de l'Attaque Magique. Chaque
 //  élément offre 5 % de chance de poser SON état (le Feu brûle, la Foudre
 //  électrifie, la Glace gèle), qu'on monte ensuite comme un sous-effet
@@ -1357,10 +1357,83 @@ window.REDUCTION_SORT_RESISTE = 20;
 window.elementMagique = function(id) {
     return window.ELEMENTS_MAGIQUES.find(e => e.id === id) || null;
 };
-// L'Attaque Magique, et elle seule : un Mot de pouvoir frappe brut, sans élément.
+// L'Attaque Magique, et elle seule : la Distorsion mentale (ex-Mots de pouvoir)
+// frappe brut, sans élément — elle a son état du charisme (plus bas).
 window.estAttaqueElementaire = function(nomEffet) {
     const n = String(nomEffet || "").toLowerCase();
-    return n.includes("attaque magique") && !n.includes("pouvoir");
+    return n.includes("attaque magique") && !window.estDistorsionMentale(n);
+};
+
+// =========================================================================
+//  LA DISTORSION MENTALE (ex-Mots de pouvoir)
+// =========================================================================
+//  Nico : « renommer l'effet de combat Mot de pouvoir par : Distorsion
+//  mentale. Et tout comme les attaques magiques qui sont liées à un élément,
+//  la distorsion mentale sera liée à un des trois effets d'état du charisme,
+//  à savoir : Confusion, Immobilisation et Peur, avec les mêmes pourcentages.
+//  Je te laisse créer aussi des icônes sympas. »
+//
+//  LE NOM : le grimoire (Combat_Effets) dit encore « Mots de pouvoirs » tant
+//  que le MJ ne l'a pas mis à jour (MAJ_GRIMOIRE_REGLES) ; le jeu, lui, le
+//  renomme dès le chargement (EFFETS_RENOMMES), et les cartes déjà forgées,
+//  qui gardent l'ancien nom écrit dans leurs effets, l'affichent sous le
+//  nouveau (nomEffetActuel). Tout ce qui RECONNAÎT l'effet passe par
+//  estDistorsionMentale, qui lit les deux noms : rien ne casse, ni les cartes
+//  d'avant, ni les créatures, ni un grimoire pas encore mis à jour.
+//
+//  L'ÉTAT : choisi dans la Forge à la pose de la Distorsion (comme l'élément
+//  d'une Attaque Magique), il lui offre 5 % de chance de poser son état
+//  (CHANCE_ELEMENT_OFFERTE), qu'on monte ensuite comme un sous-effet
+//  classique. L'action le garde dans `etatMental`.
+window.NOM_DISTORSION = "Distorsion mentale";
+window.estDistorsionMentale = function(nom) {
+    const n = String(nom || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    return n.includes("distorsion") || n.includes("pouvoir");
+};
+// Les noms d'avant, lus sous le nouveau (cartes déjà forgées, journaux) : dans
+// un nom comme dans une phrase (« • Mots de pouvoirs : 3 dégâts »).
+window.nomEffetActuel = function(nom) {
+    if (typeof nom !== "string") return nom;
+    return nom.replace(/mots?\s+de\s+pouvoirs?/gi, window.NOM_DISTORSION);
+};
+// Le grimoire, renommé au chargement (completerEffetsDeSecours).
+window.EFFETS_RENOMMES = { EFF_MOTS_DE_POUVOIRS: "Distorsion mentale" };
+// LES TROIS ÉTATS DU CHARISME, et leurs icônes : une spirale violette qui
+// égare (Confusion), deux maillons d'acier qui entravent (Immobilisation), un
+// œil exorbité et ses trois traits rouges de frayeur (Peur — ceux de son
+// animation).
+const ICONE_DISTORSION_CONFUSION = `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs><radialGradient id="dm-confusion" cx="50%" cy="45%" r="62%"><stop offset="0" stop-color="#f6ecff"/><stop offset="1" stop-color="#b98cff"/></radialGradient></defs>
+  <path d="M32 33c0-2.2 1.8-3.4 3.6-2.6 2.6 1.1 2.6 5 0 6.8-3.8 2.6-9.2-.2-9.6-4.8-.6-6.2 5.8-10.6 11.6-8.6 7.8 2.6 9.6 12.6 3.6 18.2-7.4 7-20.2 3.4-22.6-6.6-2.8-11.6 7.4-21.8 19-19.4"
+        fill="none" stroke="url(#dm-confusion)" stroke-width="4.4" stroke-linecap="round"/>
+  <path d="M50 8l1.7 4 4 1.7-4 1.7-1.7 4-1.7-4-4-1.7 4-1.7z" fill="#fff4c2"/>
+  <path d="M13 45l1.1 2.7 2.7 1.1-2.7 1.1L13 52.6l-1.1-2.7-2.7-1.1 2.7-1.1z" fill="#ead8ff"/>
+</svg>`;
+const ICONE_DISTORSION_IMMOBILISATION = `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs><linearGradient id="dm-immobilisation" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6f9fd"/><stop offset="1" stop-color="#8aa3bd"/></linearGradient></defs>
+  <g fill="none" stroke="url(#dm-immobilisation)" stroke-width="5.4" stroke-linecap="round">
+    <rect x="6" y="26" width="27" height="15" rx="7.5" transform="rotate(-35 19.5 33.5)"/>
+    <rect x="31" y="22" width="27" height="15" rx="7.5" transform="rotate(-35 44.5 29.5)"/>
+  </g>
+  <path d="M8 54l6-6M50 10l6-6" stroke="#cfe0f0" stroke-width="2.4" stroke-linecap="round" opacity="0.8"/>
+</svg>`;
+const ICONE_DISTORSION_PEUR = `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs><radialGradient id="dm-peur" cx="50%" cy="50%" r="58%"><stop offset="0" stop-color="#f3fff1"/><stop offset="1" stop-color="#93df8e"/></radialGradient></defs>
+  <path d="M5 35c7-11 16.5-16.5 27-16.5S52 24 59 35c-7 11-16.5 16.5-27 16.5S12 46 5 35z" fill="url(#dm-peur)" stroke="#2c6a30" stroke-width="2.4"/>
+  <circle cx="32" cy="35" r="9.5" fill="#ffffff" stroke="#2c6a30" stroke-width="2"/>
+  <circle cx="32" cy="35" r="3" fill="#10241a"/>
+  <g stroke="#ff4a3d" stroke-width="3.2" stroke-linecap="round"><path d="M44 5v10"/><path d="M50.5 3v11"/><path d="M57 5v10"/></g>
+</svg>`;
+window.ETATS_DISTORSION = [
+    { id: "Confusion", nom: "Confusion", icone: "🌀", dessin: ICONE_DISTORSION_CONFUSION, etat: "Confusion",
+      effetId: "EFF_CONFUSION", motCle: "confus", couleur: "#b98cff", fond: "#3a1766" },
+    { id: "Immobilisation", nom: "Immobilisation", icone: "⛓️", dessin: ICONE_DISTORSION_IMMOBILISATION, etat: "Immobilisation",
+      effetId: "EFF_IMMOBILISATION", motCle: "immobil", couleur: "#a3bad0", fond: "#22303d" },
+    { id: "Peur", nom: "Peur", icone: "👁️", dessin: ICONE_DISTORSION_PEUR, etat: "Peur",
+      effetId: "EFF_PEUR", motCle: "peur", couleur: "#7fd47a", fond: "#15381d" }
+];
+window.etatDistorsion = function(id) {
+    return window.ETATS_DISTORSION.find(e => e.id === id) || null;
 };
 
 // LES RÉSISTANCES DES CRÉATURES (Nico) : « une résistance aléatoire pour
@@ -1455,7 +1528,7 @@ window.texteAtout = function(cle, valeur) {
         // Les clés des talents (talents.js).
         case "degatsPhysiques": return `${plus(n)} dégât${Math.abs(n) > 1 ? "s" : ""} physique${Math.abs(n) > 1 ? "s" : ""}`;
         case "degatsMagiques":  return `${plus(n)} dégât${Math.abs(n) > 1 ? "s" : ""} magique${Math.abs(n) > 1 ? "s" : ""}`;
-        case "degatsMotsPouvoir": return `${plus(n)} dégât aux Mots de pouvoir`;
+        case "degatsMotsPouvoir": return `${plus(n)} dégât à la Distorsion mentale`;
         case "chanceElementaire": return `${plus(n)} % de chance sur Brûlé, Électrifié et Glacé`;
         case "chanceEtatsCharisme": return `${plus(n)} % de chance sur Confusion, Peur et Immobilisation`;
         case "chancePoisonPhysique": return `${plus(n)} % de chance d'empoisonner`;
@@ -1665,7 +1738,7 @@ window.estSortDeClasse = (nom) => window.estEffetTenebres(nom) || window.estEffe
 
 window.actionEstMagique = function(nomEffetBase) {
     const n = (nomEffetBase || "").toLowerCase();
-    return n.includes("magique") || n.includes("pouvoir") || n.includes("soin")
+    return n.includes("magique") || window.estDistorsionMentale(n) || n.includes("soin")
         || window.estSortDeClasse(n)
         || n.includes("guérison") || n.includes("guerison")
         || n.includes("purification") || n.includes("bouclier");
@@ -5123,10 +5196,16 @@ window.MIGRATION_EFFETS = [
                 Notes: "Réservé au Vampire (niveau 5). Pas de plafond : chaque cran ajoute 1 dégât magique. Le soin vaut pour tout ce que la carte inflige aux ennemis (PV et bouclier entamés), arrondi à l'inférieur ; rien sur un coup esquivé. Brûlé, le Vampire n'en tire que 40 %." } }
 ];
 
-// Les effets que le jeu sait jouer même quand la base ne les a pas.
+// Les effets que le jeu sait jouer même quand la base ne les a pas. Et ceux
+// que le jeu a RENOMMÉS (EFFETS_RENOMMES : les Mots de pouvoir, devenus la
+// Distorsion mentale) prennent leur nouveau nom, que le grimoire soit à jour
+// ou pas.
 window.completerEffetsDeSecours = function(cache) {
     (window.MIGRATION_EFFETS || []).forEach(regle => {
         if (regle.secoursLocal && !cache[regle.id]) cache[regle.id] = { ...regle.champs };
+    });
+    Object.keys(window.EFFETS_RENOMMES || {}).forEach(id => {
+        if (cache[id]) cache[id] = { ...cache[id], Nom: window.EFFETS_RENOMMES[id] };
     });
     return cache;
 };
@@ -5173,6 +5252,10 @@ window.chargerCacheEffetsBDD = async function() {
 //  changées (et d'y ajouter le Saignement) ; rien ne part sans sa
 //  confirmation, et seuls les champs listés sont touchés (merge).
 window.MAJ_GRIMOIRE_REGLES = [
+    { id: "EFF_MOTS_DE_POUVOIRS", champs: {
+        Nom: "Distorsion mentale",
+        Effet_Base: "1 dégât brut, lié à un état du charisme (Confusion, Immobilisation ou Peur) : 5 % de chance de le poser",
+        Notes: "Ex-Mots de pouvoirs (v240). Toujours liée, dans la Forge, à un état du charisme — Confusion, Immobilisation ou Peur — qui lui offre 5 % de chance de le poser (comme l'élément d'une Attaque Magique) ; on monte cette chance avec le sous-effet de l'état. Dégâts bruts : aucune armure." } },
     { id: "EFF_EMPOISONNEMENT", champs: {
         Notes: "Baisse l'énergie de la cible de 10 % de son énergie max et inflige 8 % de ses PV max en dégâts bruts (aucune défense ; le bouclier encaisse d'abord). Un seul tic, en fin de manche. Maître des poisons (Assassin niv. 10) : 18 % d'énergie et 9 % des PV max, à chaque fin de manche pendant 2 manches." } },
     { id: "EFF_BRULE", champs: {
@@ -6121,7 +6204,7 @@ window.AIDE_CARACS = {
            rp: "arcanes, histoire, enquête, nature, religion, déchiffrer" },
   sag:   { combat: ["Soin", "Purification", "Bouclier magique", "Absorption"],
            rp: "perception, intuition, médecine, survie, pister, dressage" },
-  cha:   { combat: ["Mots de pouvoirs", "Confusion", "Peur", "Immobilisation", "Illusion"],
+  cha:   { combat: ["Distorsion mentale", "Confusion", "Peur", "Immobilisation", "Illusion"],
            rp: "persuasion, intimidation, duperie, marchandage, représentation" }
 };
 

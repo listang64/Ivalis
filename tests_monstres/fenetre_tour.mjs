@@ -332,7 +332,7 @@ verifier("ses états sont sous son nom", res.avecOk.nbEtats === 2, `(${res.avecO
 verifier("la technique est annoncée en grand", res.avecOk.carte === "Hurlement putride" && res.avecOk.tailleCarte >= 24,
          `(${res.avecOk.carte}, ${res.avecOk.tailleCarte}px)`);
 verifier("elle est plus grosse que le détail des effets", res.avecOk.tailleCarte > 20);
-verifier("ses effets sont listés dessous", /Mot de pouvoir/.test(res.avecOk.effets) && /Peur/.test(res.avecOk.effets),
+verifier("ses effets sont listés dessous", /Distorsion mentale/.test(res.avecOk.effets) && /Peur/.test(res.avecOk.effets),
          `(${res.avecOk.effets.replace(/\s+/g, ' ').trim()})`);
 verifier("l'initiative n'y figure pas", !/Initiative/.test(res.avecOk.effets));
 verifier("tant qu'aucun événement n'est arrivé, la fenêtre est là mais sans OK",

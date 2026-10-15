@@ -5526,12 +5526,14 @@ window.ligneEffetsCarte = function(dataCarte, lanceur) {
             </div>`;
     };
     let aDejaSaDistance = false;
+    // Une carte d'avant le renommage dit encore « Mots de pouvoirs ».
+    const nomActuel = (t) => typeof window.nomEffetActuel === "function" ? window.nomEffetActuel(t) : t;
 
     effets.forEach(eff => {
         // Les vieilles cartes gardent des effets en simple texte : on les
         // affiche tels quels, sans description.
         if (typeof eff === "string") {
-            const brut = eff.replace(/\s+/g, " ").trim();
+            const brut = nomActuel(eff.replace(/\s+/g, " ").trim());
             if (!brut || brut.indexOf("Initiative +") >= 0) return;
             const estDistance = brut.indexOf("Distance") >= 0;
             if (estDistance) aDejaSaDistance = true;
@@ -5546,7 +5548,7 @@ window.ligneEffetsCarte = function(dataCarte, lanceur) {
         const estDistance = eff.nom.indexOf("Distance") >= 0;
         if (estDistance) aDejaSaDistance = true;
         const chiffre = eff.desc && !/%/.test(eff.desc);
-        lignes.push(ligneEffet(eff.nom,
+        lignes.push(ligneEffet(nomActuel(eff.nom),
                                chiffre ? (estDistance ? reecrireDistance(eff.desc) : eff.desc) : "",
                                !!eff.isMod));
     });

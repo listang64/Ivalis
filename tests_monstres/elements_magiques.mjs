@@ -307,15 +307,18 @@ console.log("\n4. LA FORGE : LA POPUP DES ÉLÉMENTS");
   verifier("la pastille rouvre la popup : passé au Feu, 🔥 Brûlé offert (le Glacé reste un sous-effet)",
            feu.element === "Feu" && /🔥 Brûlé/.test(feu.offert), feu.offert.replace(/\s+/g, " ").trim());
 
-  // Un Mot de pouvoir : pas de popup.
+  // Une Distorsion mentale (ex-Mot de pouvoir, v240) : jamais d'élément — la
+  // popup lui propose les trois états du charisme, pas Feu/Foudre/Glace.
   await p.evaluate(() => window.ajouterComposantPrincipal("EFF_MOTS_DE_POUVOIRS"));
   const mot = await p.evaluate(() => ({ popup: getComputedStyle(document.getElementById("modale-choix-element")).display,
-    n: window.forgeState.actions.length, element: window.forgeState.actions[1] && window.forgeState.actions[1].element }));
-  verifier("un Mot de pouvoir se pose sans popup, sans élément", mot.popup === "none" && mot.n === 2 && !mot.element, JSON.stringify(mot));
+    ronds: [...document.querySelectorAll("#modale-choix-element .forge-element-rond")].map(x => x.dataset.element).join(","),
+    n: window.forgeState.actions.length }));
+  verifier("une Distorsion mentale : la popup des états du charisme, pas des éléments",
+           mot.popup === "block" && mot.ronds === "Confusion,Immobilisation,Peur" && mot.n === 1, JSON.stringify(mot));
+  await p.evaluate(() => window.fermerChoixElement());
 
   // Enregistrer : l'élément part avec la technique.
   const enr = await p.evaluate(async () => {
-    window.forgeState.actions.pop();
     document.getElementById("forge-nom").value = "Souffle ardent";
     window.rafraichirForge();
     window.__ecrits = [];

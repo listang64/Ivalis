@@ -728,8 +728,15 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
                     </div>
                 `;
 
+    // Les cartes forgées avant le renommage disent encore « Mots de pouvoirs » :
+    // elles s'affichent sous le nom d'aujourd'hui (la surbrillance dorée cherche
+    // la ligne par le nom de l'attaque, qui est le nouveau).
+    const nomActuel = (t) => typeof window.nomEffetActuel === "function" ? window.nomEffetActuel(t) : t;
+
     // 🔻 CORRECTION : On encapsule chaque effet dans une div avec un ID précis pour pouvoir le cibler (Surbrillance Dorée)
     effets.forEach((eff, indexEffet) => {
+        if (typeof eff === "string") eff = nomActuel(eff);
+        else if (eff && typeof eff.nom === "string") eff = { ...eff, nom: nomActuel(eff.nom) };
         let textToCheck = typeof eff === 'string' ? eff : eff.nom;
         const estLigneDistance = (textToCheck || "").includes("Distance");
         if (estLigneDistance) hasDist = true;
@@ -1202,6 +1209,14 @@ function normalizeForgeType(type, fallback = "Aucun") {
     return LEGACY_TYPE_MAP[type] || type;
 }
 
+// La Distorsion mentale (ex-Mots de pouvoir) : les deux noms la désignent
+// (app.js, estDistorsionMentale), un grimoire pas encore mis à jour comme une
+// carte forgée avant le renommage.
+function estDistorsion(nom) {
+    if (typeof window.estDistorsionMentale === "function") return window.estDistorsionMentale(nom);
+    return /distorsion|pouvoir/i.test(String(nom || ""));
+}
+
 // 🔻 FONCTION : Identifie les attaques de base 🔻
 function estUneAttaqueDeBase(nom) {
     if (!nom) return false;
@@ -1212,8 +1227,7 @@ function estUneAttaqueDeBase(nom) {
            n.includes("attaque légère") || 
            n.includes("attaque legere") || 
            n.includes("attaque lourde") || 
-           n.includes("mots de pouvoir") || 
-           n.includes("mot de pouvoir");
+           (typeof window.estDistorsionMentale === "function" ? window.estDistorsionMentale(n) : /distorsion|pouvoir/i.test(n));   // la Distorsion mentale, ex-Mots de pouvoir
 }
 
 // DEUX ATTAQUES MAGIQUES, DEUX ÉLÉMENTS (Nico : « qu'on puisse mettre deux
@@ -1371,7 +1385,7 @@ function estIncompatibleAvecArme(nomEffet, arme) {
     // pas « sans arme ».
     const tenebres = typeof window.estSortDeClasse === "function" && window.estSortDeClasse(nom);
     if (arme === "Sans arme / Arme rp") {
-        if (tenebres || nom.includes("attaque magique") || nom.includes("mot de pouvoir") || nom.includes("mots de pouvoir") || nom.includes("attaque légère") || nom.includes("attaque legere")) return true;
+        if (tenebres || nom.includes("attaque magique") || (typeof window.estDistorsionMentale === "function" ? window.estDistorsionMentale(nom) : /distorsion|pouvoir/i.test(nom)) || nom.includes("attaque légère") || nom.includes("attaque legere")) return true;
     } else if (arme === "Arme légère CAC") {
         if (nom.includes("attaque lourde")) return true;
     } else if (arme === "Arme lourde CAC") {
@@ -1747,7 +1761,9 @@ window.selectionnerArme = function(arme) {
 
 window.ajouterComposantPrincipal = function(effetId) {
     const eff = window.forgeState.effetsBDD.find(e => e.id === effetId);
-    const poser = (element) => {
+    // `lien` : l'élément d'une Attaque Magique ({ element }) ou l'état du
+    // charisme d'une Distorsion mentale ({ etatMental }).
+    const poser = (lien) => {
         window.forgeState.actions.push({
             idInst: "ACT_" + Math.random().toString(36).substring(2, 9),
             baseEffet: eff,
@@ -1756,7 +1772,7 @@ window.ajouterComposantPrincipal = function(effetId) {
             zoneHexes: [],
             baseDuree: 0,
             modsDuree: {},
-            ...(element ? { element } : {})
+            ...(lien || {})
         });
         window.rafraichirForge();
     };
@@ -1765,7 +1781,13 @@ window.ajouterComposantPrincipal = function(effetId) {
     // UNE ATTAQUE MAGIQUE EST TOUJOURS LIÉE À UN ÉLÉMENT (Nico) : on le
     // choisit avant qu'elle ne se pose. Annuler, c'est ne rien poser.
     if (typeof window.estAttaqueElementaire === "function" && window.estAttaqueElementaire(eff && eff.Nom)) {
-        window.ouvrirChoixElement(poser, null, elementsPrisSurLaCarte());
+        window.ouvrirChoixElement((element) => poser({ element }), null, elementsPrisSurLaCarte());
+        return;
+    }
+    // LA DISTORSION MENTALE, DE MÊME, À UN ÉTAT DU CHARISME (Nico) :
+    // Confusion, Immobilisation ou Peur.
+    if (estDistorsion(eff && eff.Nom) && (window.ETATS_DISTORSION || []).length > 0) {
+        window.ouvrirChoixEtatMental((etatMental) => poser({ etatMental }), null);
         return;
     }
     poser(null);
@@ -1779,49 +1801,91 @@ window.ajouterComposantPrincipal = function(effetId) {
 //  carte montre comme un sous-effet « offert » qu'on peut monter.
 //  `pris` : les éléments d'une autre Attaque Magique de la même carte, grisés
 //  (deux attaques sur une carte, deux éléments différents).
-window.ouvrirChoixElement = function(surChoix, actuel, pris) {
+//  La MÊME fenêtre sert à la Distorsion mentale (ouvrirChoixEtatMental) :
+//  `options` lui donne sa liste (les trois états du charisme), son titre et
+//  son texte.
+const TEXTES_CHOIX_LIEN = {
+    element: { titre: "Élément du sort",
+               texte: `Une Attaque Magique est toujours liée à un élément.
+         Il lui offre <b>5 %</b> de chance de poser son état, que tu peux monter comme un sous-effet.` },
+    etatMental: { titre: "État de la Distorsion",
+                  texte: `Une Distorsion mentale est toujours liée à un état du charisme.
+         Il lui offre <b>5 %</b> de chance de le poser, que tu peux monter comme un sous-effet.` }
+};
+// L'icône d'un lien : le dessin d'un état du charisme (des dégradés aux
+// identifiants rendus uniques, la même icône pouvant se montrer deux fois à
+// l'écran), sinon son emoji.
+let compteurIconesLien = 0;
+function iconeDuLien(lien) {
+    if (!lien) return "";
+    if (!lien.dessin) return lien.icone || "";
+    const n = ++compteurIconesLien;
+    return lien.dessin.replace(/\bdm-([a-z]+)\b/g, `dm-$1-${n}`);
+}
+window.iconeDuLienForge = iconeDuLien;
+window.ouvrirChoixElement = function(surChoix, actuel, pris, options) {
+    const opts = options || {};
+    const liste = opts.liste || window.ELEMENTS_MAGIQUES || [];
+    const textes = TEXTES_CHOIX_LIEN[opts.genre === "etatMental" ? "etatMental" : "element"];
     const modale = document.getElementById("modale-choix-element");
     const boutons = document.getElementById("forge-choix-element-boutons");
     const interdits = new Set(pris || []);
     if (!modale || !boutons) {
-        const libre = (window.ELEMENTS_MAGIQUES || []).find(el => !interdits.has(el.id));
+        const libre = liste.find(el => !interdits.has(el.id));
         if (libre) surChoix(libre.id);
         return;
     }
     window.forgeState.surChoixElement = surChoix;
     window.forgeState.elementsInterdits = [...interdits];
+    window.forgeState.listeChoixLien = liste;
+    modale.dataset.genre = opts.genre === "etatMental" ? "etatMental" : "element";
+    const titre = modale.querySelector(".forge-grimoire-entete h3");
+    if (titre) titre.textContent = textes.titre;
+    const texte = modale.querySelector(".forge-choix-element-texte");
+    if (texte) texte.innerHTML = textes.texte;
     const offert = window.CHANCE_ELEMENT_OFFERTE || 5;
-    boutons.innerHTML = (window.ELEMENTS_MAGIQUES || []).map(el => {
+    boutons.innerHTML = liste.map(el => {
         const prisAilleurs = interdits.has(el.id);
         return `
         <button type="button" class="forge-element-rond${el.id === actuel ? " choisi" : ""}${prisAilleurs ? " pris" : ""}" data-element="${el.id}"
                 style="--el-couleur: ${el.couleur}; --el-fond: ${el.fond};" ${prisAilleurs ? "disabled" : ""}
                 onclick="if (typeof jouerSonClic === 'function') jouerSonClic(); window.choisirElementForge('${el.id}')">
-            <span class="forge-element-disque"><span class="forge-element-icone">${el.icone}</span></span>
+            <span class="forge-element-disque"><span class="forge-element-icone${el.dessin ? " dessin" : ""}">${iconeDuLien(el)}</span></span>
             <span class="forge-element-nom">${el.nom}</span>
             <span class="forge-element-etat">${prisAilleurs ? "déjà sur la carte" : `${el.etat} · ${offert} %`}</span>
         </button>`;
     }).join("");
     modale.style.display = "block";
 };
+// Le choix de l'état du charisme d'une Distorsion mentale.
+window.ouvrirChoixEtatMental = function(surChoix, actuel) {
+    window.ouvrirChoixElement(surChoix, actuel, [], { liste: window.ETATS_DISTORSION || [], genre: "etatMental" });
+};
 window.choisirElementForge = function(id) {
     if ((window.forgeState.elementsInterdits || []).includes(id)) return;
     const suite = window.forgeState.surChoixElement;
+    const liste = window.forgeState.listeChoixLien || window.ELEMENTS_MAGIQUES || [];
     window.forgeState.surChoixElement = null;
     window.forgeState.elementsInterdits = [];
+    window.forgeState.listeChoixLien = null;
     document.getElementById("modale-choix-element").style.display = "none";
-    if (typeof suite === "function" && window.elementMagique(id)) suite(id);
+    if (typeof suite === "function" && liste.some(el => el.id === id)) suite(id);
 };
 window.fermerChoixElement = function() {
     window.forgeState.surChoixElement = null;
     window.forgeState.elementsInterdits = [];
+    window.forgeState.listeChoixLien = null;
     const modale = document.getElementById("modale-choix-element");
     if (modale) modale.style.display = "none";
 };
-// Le rond de l'élément, sur la carte : un toucher pour en changer.
+// Le rond de l'élément (ou de l'état), sur la carte : un toucher pour en changer.
 window.changerElementForge = function(idInst) {
     const act = window.forgeState.actions.find(a => a.idInst === idInst);
     if (!act) return;
+    if (estDistorsion(act.baseEffet && act.baseEffet.Nom)) {
+        window.ouvrirChoixEtatMental((id) => { act.etatMental = id; window.rafraichirForge(); }, act.etatMental);
+        return;
+    }
     window.ouvrirChoixElement((id) => { act.element = id; window.rafraichirForge(); }, act.element, elementsPrisSurLaCarte(act));
 };
 
@@ -1830,6 +1894,25 @@ function elementDeLAction(act) {
     if (!act || !act.element || typeof window.estAttaqueElementaire !== "function") return null;
     if (!window.estAttaqueElementaire(act.baseEffet && act.baseEffet.Nom)) return null;
     return window.elementMagique(act.element);
+}
+// L'état du charisme d'une Distorsion mentale de la Forge.
+function etatMentalDeLAction(act) {
+    if (!act || !act.etatMental || typeof window.etatDistorsion !== "function") return null;
+    if (!estDistorsion(act.baseEffet && act.baseEffet.Nom)) return null;
+    return window.etatDistorsion(act.etatMental);
+}
+// Ce qui lie une action à son état offert : l'élément d'une Attaque Magique,
+// ou l'état du charisme d'une Distorsion mentale. Les deux ont la même forme
+// (id, nom, icone, etat, effetId, couleur, fond).
+function lienDeLAction(act) {
+    return elementDeLAction(act) || etatMentalDeLAction(act);
+}
+// Une action qui DOIT avoir un lien, et laquelle : « element », « etatMental ».
+function genreDuLien(act) {
+    const nom = act && act.baseEffet && act.baseEffet.Nom;
+    if (typeof window.estAttaqueElementaire === "function" && window.estAttaqueElementaire(nom)) return "element";
+    if (estDistorsion(nom) && (window.ETATS_DISTORSION || []).length > 0) return "etatMental";
+    return null;
 }
 function effetDeLElement(el) {
     if (!el) return null;
@@ -1854,9 +1937,9 @@ function elementsDeLaCarte() {
 }
 
 // La chance offerte qu'un effet reçoit sur cette action : 5 % sur l'état de
-// son élément, rien ailleurs.
+// son élément (ou de sa Distorsion), rien ailleurs.
 function chanceOfferteSur(effet, action) {
-    const el = elementDeLAction(action);
+    const el = lienDeLAction(action);
     return (el && effet && (effet.id === el.effetId || effet.Nom === el.etat)) ? (window.CHANCE_ELEMENT_OFFERTE || 5) : 0;
 }
 window.chanceOfferteForge = chanceOfferteSur;
@@ -2134,7 +2217,7 @@ function compilerEffetsTexte() {
         if (act.baseDuree > 0) descBase += ` <span style="color:#9333ea;">(+ ⏳ ${act.baseDuree} Trs)</span>`;
         
         // On sauvegarde un objet propre au lieu d'une simple phrase
-        const elementAct = elementDeLAction(act);
+        const elementAct = lienDeLAction(act);
         if (elementAct) descBase += ` · ${elementAct.icone} ${elementAct.nom}`;
         descriptions.push({
             nom: act.baseEffet.Nom,
@@ -2399,11 +2482,11 @@ const estUnSoinDeBase = (nom) => {
     const n = (nom || "").toLowerCase();
     return (n.includes("soin") || n.includes("guérison") || n.includes("guerison")) && !n.includes("bouclier");
 };
-// Une action qui fait des dégâts MAGIQUES : l'Attaque Magique, les Mots de
-// pouvoir, Ténèbres (celles qui sont des sorts, pas des soins).
+// Une action qui fait des dégâts MAGIQUES : l'Attaque Magique, la Distorsion
+// mentale, Ténèbres (celles qui sont des sorts, pas des soins).
 const actionADegatsMagiques = (act) => {
     const n = ((act && act.baseEffet && act.baseEffet.Nom) || "").toLowerCase();
-    return n.includes("attaque magique") || n.includes("pouvoir")
+    return n.includes("attaque magique") || (typeof window.estDistorsionMentale === "function" ? window.estDistorsionMentale(n) : /distorsion|pouvoir/i.test(n))
         || (typeof window.estSortDeClasse === "function" && window.estSortDeClasse(n));
 };
 const actionAccepteEtalement = (act) => {
@@ -2612,7 +2695,9 @@ window.rafraichirForge = function() {
     // montre tous : c'est sur eux que se partage la résistance d'une cible.
     const affichageElement = document.getElementById("forge-element-affichage");
     if (affichageElement) {
-        affichageElement.innerText = elementsDeLaCarte().map(el => `${el.icone} ${el.nom.toUpperCase()}`).join("  ");
+        // L'élément du sort, et l'état du charisme d'une Distorsion mentale.
+        const etatsMentaux = ((window.forgeState && window.forgeState.actions) || []).map(etatMentalDeLAction).filter(Boolean);
+        affichageElement.innerText = [...elementsDeLaCarte(), ...etatsMentaux].map(el => `${el.icone} ${el.nom.toUpperCase()}`).join("  ");
     }
 
     document.getElementById("forge-cout-pc").innerText = totalPC.toFixed(1) + " PC";
@@ -2701,7 +2786,7 @@ window.rafraichirForge = function() {
             // L'ÉTAT DE L'ÉLÉMENT, OFFERT : tant qu'on n'y a mis aucun cran, il
             // se montre quand même — 5 % gratuits, et le « + » le monte comme
             // n'importe quel sous-effet (la ligne normale prend alors le relais).
-            const elementAct = elementDeLAction(act);
+            const elementAct = lienDeLAction(act);
             const effElement = effetDeLElement(elementAct);
             if (effElement && !act.mods[effElement.id]) {
                 const montable = !capDepasse && etatSousEffet(effElement, act, activeTags) === "ok";
@@ -2775,7 +2860,7 @@ window.rafraichirForge = function() {
                 <div class="forge-action">
                     <div class="forge-ligne">
                         <div class="forge-ligne-texte">
-                            <span class="forge-nom-effet" data-bulle-effet="${act.baseEffet.id}" data-action="${act.idInst}">${nettoyerNomEffet(act.baseEffet.Nom)}</span>${act.baseEffet.Modificateur !== "AUCUN" ? `<span class="forge-tag-mini">${act.baseEffet.Modificateur}</span>` : ""}${window.estAttaqueElementaire && window.estAttaqueElementaire(act.baseEffet.Nom) ? `<button type="button" class="forge-element-pastille${elementAct ? "" : " manquant"}" title="Changer d'élément" ${elementAct ? `style="--el-couleur: ${elementAct.couleur}; --el-fond: ${elementAct.fond};"` : ""} onclick="window.changerElementForge('${act.idInst}')">${elementAct ? `${elementAct.icone} ${elementAct.nom}` : "Choisir un élément"}</button>` : ""}
+                            <span class="forge-nom-effet" data-bulle-effet="${act.baseEffet.id}" data-action="${act.idInst}">${nettoyerNomEffet(act.baseEffet.Nom)}</span>${act.baseEffet.Modificateur !== "AUCUN" ? `<span class="forge-tag-mini">${act.baseEffet.Modificateur}</span>` : ""}${genreDuLien(act) ? `<button type="button" class="forge-element-pastille${elementAct ? "" : " manquant"}" data-genre="${genreDuLien(act)}" title="${genreDuLien(act) === "etatMental" ? "Changer d'état" : "Changer d'élément"}" ${elementAct ? `style="--el-couleur: ${elementAct.couleur}; --el-fond: ${elementAct.fond};"` : ""} onclick="window.changerElementForge('${act.idInst}')">${elementAct ? `${elementAct.dessin ? `<span class="forge-pastille-dessin">${iconeDuLien(elementAct)}</span>` : elementAct.icone} ${elementAct.nom}` : (genreDuLien(act) === "etatMental" ? "Choisir un état" : "Choisir un élément")}</button>` : ""}
                             <div class="forge-desc">${formatterTexteEffet(act.baseEffet, act.count, act)}${texteValeurSurpuissante(act, fatigueConsommee)}${currentBaseDuree > 0 ? `<span class="forge-duree-ajoutee">⏳ +${currentBaseDuree} tour(s) (+${(currentBaseDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}</div>
                         </div>
                         <div class="forge-controles">
@@ -2811,8 +2896,9 @@ window.rafraichirForge = function() {
 
     // Une Attaque Magique sans élément ne se forge pas (une technique d'avant,
     // ou LIA qui n'en a pas trouvé) : son rond le demande.
-    const sansElement = window.forgeState.actions.some(a => typeof window.estAttaqueElementaire === "function"
-        && window.estAttaqueElementaire(a.baseEffet.Nom) && !elementDeLAction(a));
+    // Une Attaque Magique sans élément, une Distorsion mentale sans état : la
+    // carte n'est pas finie.
+    const sansElement = window.forgeState.actions.some(a => genreDuLien(a) && !lienDeLAction(a));
     btnValider.disabled = capErreur || fatigueConsommee === 0 || nomSaisi === "" || !window.forgeState.armePrincipale || sansElement;
 };
 
@@ -2821,7 +2907,7 @@ window.rafraichirForge = function() {
 window.outilsForge = {
     getMaxStacks, etatSousEffet, estIncompatibleAvecArme, estUneAttaqueDeBase, estUnSoinDeBase,
     typesArmesEquipeesPourForge, purgerIncompatibilitesArme, getActiveTags, actionHasDistance,
-    parseFrenchFloat, nettoyerNomEffet, formatterTexteEffet, normalizeForgeType
+    parseFrenchFloat, nettoyerNomEffet, formatterTexteEffet, normalizeForgeType, estDistorsion
 };
 
 // Le libellé du bouton de la Forge, au repos. Il restait sur « Forge en
@@ -2853,7 +2939,8 @@ window.sauvegarderCompetence = async function() {
             zoneHexes: a.zoneHexes || [],
             baseDuree: a.baseDuree || 0,
             modsDuree: { ...(a.modsDuree || {}) },
-            ...(elementDeLAction(a) ? { element: a.element } : {})
+            ...(elementDeLAction(a) ? { element: a.element } : {}),
+            ...(etatMentalDeLAction(a) ? { etatMental: a.etatMental } : {})
         }))
     };
 

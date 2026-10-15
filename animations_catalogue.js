@@ -804,7 +804,9 @@
             }
         },
         {
-            id: "mots-de-pouvoir", nom: "Mots de pouvoir", sens: "vers l'ennemi",
+            // Renommée Distorsion mentale (v240) ; l'identifiant reste, pour
+            // garder la case « intégrée » que le MJ a cochée.
+            id: "mots-de-pouvoir", nom: "Distorsion mentale", sens: "vers l'ennemi",
             description: "Le héros prononce les mots : trois ondes de voix, en arcs, roulent vers l'ennemi et le frappent de dégâts bruts, sans couleur.",
             async jouer(sc, o) {
                 const { a, b, v } = lieux(sc);
@@ -3811,8 +3813,9 @@
                     o.secouer(el, b.t * 0.12, 380, v)]);
             }));
         } },
-        // LES MOTS DE POUVOIR : le lanceur prononce les mots, trois ondes de voix
-        // roulent en arcs jusqu'à la cible et la frappent, sans couleur.
+        // LA DISTORSION MENTALE (ex-Mots de pouvoir) : le lanceur prononce les
+        // mots, trois ondes de voix roulent en arcs jusqu'à la cible et la
+        // frappent, sans couleur.
         { id: "jeu-mots-de-pouvoir", async jouer(sc, o) {
             const a = centre(sc.lanceur, sc.calque);
             o.son("mots");

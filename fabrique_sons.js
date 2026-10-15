@@ -582,7 +582,8 @@
             tintements(ctx, s, { n: 5, fmin: 2000, fmax: 3300, pas: 0.09, gain: 0.025 });
             note(ctx, s, { freq: 1046, duree: 0.6, gain: 0.035, attaque: 0.05 });
         },
-        // LES MOTS DE POUVOIR (Nico : « un murmure sifflé, style Fourchelang ») :
+        // LA DISTORSION MENTALE, ex-Mots de pouvoir (Nico : « un murmure sifflé,
+        // style Fourchelang ») :
         // des syllables sifflantes, « sss… hhh… ssa… », soufflées à mi-voix.
         "mots"(ctx, s) {
             let t = 0;

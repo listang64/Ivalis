@@ -242,11 +242,14 @@ function armesDeReference(perso, armeDeLaCarte) {
     });
 }
 
+// Une carte d'avant le renommage dit encore « Mots de pouvoirs » (app.js).
+const nomActuel = (t) => typeof window.nomEffetActuel === "function" ? window.nomEffetActuel(t) : t;
+
 // Ce que la carte fait, en phrases.
 function effetsEnTexte(competence) {
     return (competence.Effets_Compiles || []).map(e => typeof e === "string"
-        ? sansBalises(e)
-        : `${e.isMod ? "  ↳ " : "• "}${sansBalises(e.nom)} : ${sansBalises(e.desc)}`).join("\n");
+        ? sansBalises(nomActuel(e))
+        : `${e.isMod ? "  ↳ " : "• "}${sansBalises(nomActuel(e.nom))} : ${sansBalises(e.desc)}`).join("\n");
 }
 
 // -------------------------------------------------------------------------
@@ -325,7 +328,7 @@ Appelle l'outil ecrirePromptImage avec le prompt (100 à 200 mots).`;
 
 // Sans Gemini : un prompt assemblé à la main, moins inspiré mais fidèle.
 function promptDeSecours(competence, perso, armes) {
-    const effets = (competence.Effets_Compiles || []).map(e => sansBalises(typeof e === "string" ? e : e.nom)).filter(Boolean).join(", ");
+    const effets = (competence.Effets_Compiles || []).map(e => sansBalises(nomActuel(typeof e === "string" ? e : e.nom))).filter(Boolean).join(", ");
     return `Fantasy card illustration. The character from reference image 1 (${perso.race || ""} ${perso.genre || ""}, same face, armor and colors) `
         + `performs the combat technique "${competence.Nom}"`
         + (armes.length ? ` wielding the weapon${armes.length > 1 ? "s" : ""} shown in the other reference images` : competence.Arme === "Magie" ? " with visible magical energy" : "")

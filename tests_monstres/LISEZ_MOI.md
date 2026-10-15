@@ -6270,3 +6270,62 @@ pont, puis le vrai plateau (le zombie qui titube, la relève au contact et à 2
 cases pion absent, le sursis) et le ciblage du cône. studio_pointes_glace.mjs :
 l'animation du Studio. Ils mordent sur l'ancien code (34 et 9 échecs). Mis à
 jour : profanateur (niveau 5, fiche de classe).
+
+## v240 — Les Mots de pouvoir deviennent la Distorsion mentale
+
+Nico : « renommer l'effet de combat Mot de pouvoir par : Distorsion mentale.
+Je veux que tu sois méticuleux et que tu fouilles partout pour changer ce nom
+sans faire bugger tout le jeu. Et tout comme les attaques magiques qui sont
+liées à un élément, la distorsion mentale sera liée à un des trois effets
+d'état du charisme, à savoir : Confusion, Immobilisation et Peur, avec les
+mêmes pourcentages. Je te laisse créer aussi des icônes sympas. »
+
+- LE NOM (app.js) : NOM_DISTORSION, et estDistorsionMentale, qui reconnaît
+  les DEUX noms. Le grimoire en ligne dit encore « Mots de pouvoirs » : le jeu
+  le renomme au chargement (EFFETS_RENOMMES, appliqué par
+  completerEffetsDeSecours — seul le Nom change, l'id EFF_MOTS_DE_POUVOIRS et
+  les valeurs restent), et le bouton du MJ (MAJ_GRIMOIRE_REGLES) a une
+  entrée pour l'écrire en base (Nom, Effet_Base, Notes) — le jeu n'y écrit
+  toujours rien seul. Les cartes forgées avant gardent l'ancien nom dans
+  leurs Effets_Compiles : nomEffetActuel les lit sous le nouveau (carte en
+  grand, encart du tour, prompt d'illustration), et la surbrillance dorée,
+  qui cherche la ligne par le nom de l'attaque, la retrouve.
+- TOUT CE QUI RECONNAISSAIT « pouvoir » lit les deux noms : la Forge
+  (attaque de base, interdite sans arme, dégâts magiques), le moteur
+  (l'attaque et son type Magique, la portée magique, le talent Langage
+  arcanique — clé degatsMotsPouvoir gardée), le noyau (son geste « mots »),
+  les créatures (mots-clés, attaque de base, sans arme, note des patrons,
+  l'IA qui compte ses dégâts), LIA (sa liste d'attaques). Textes : aide des
+  caracs (Charisme), talent, Studio (« Distorsion mentale », id
+  mots-de-pouvoir gardé pour sa case « intégrée »).
+- L'ÉTAT DU CHARISME (comme l'élément d'une Attaque Magique) : la même
+  fenêtre de la Forge, titrée « État de la Distorsion », propose Confusion,
+  Immobilisation, Peur (ETATS_DISTORSION), chacun avec son icône dessinée —
+  une spirale violette étoilée, deux maillons d'acier, un œil vert exorbité et
+  ses trois traits rouges de frayeur (ceux de l'animation de la Peur). Les
+  dégradés des icônes prennent un identifiant unique à chaque dessin. L'état
+  choisi (action.etatMental) offre 5 % (CHANCE_ELEMENT_OFFERTE) : la ligne
+  « OFFERT » à 0 cran, que le « + » monte comme un sous-effet (6 + 5 = 11 %
+  de Confusion au premier cran) ; la pastille (icône + nom) rouvre la
+  fenêtre ; l'en-tête de la carte dit l'état ; sans état, « Choisir un état »
+  clignote et Forger reste éteint. Enregistré sur l'action (etatMental), et
+  dans la description (« · 🌀 Confusion »). Au combat (moteur_effets.js) :
+  5 % de Confusion (2 tours), d'Immobilisation (2 tours) ou de Peur ajoutés
+  aux crans de la carte, sous les mêmes plafonds. Un état posé sur une
+  Attaque Magique n'y compte pas, ni un élément sur une Distorsion.
+- LES CRÉATURES tirent leur état au sort (poserAction), comme leur élément ;
+  LIA le choisit (champ etat_mental du schéma), sinon le récit le dit
+  (terreur → Peur ; chaînes, paralysie → Immobilisation), sinon Confusion.
+
+corrections_v240.mjs : le geste du noyau, les deux noms, le grimoire renommé,
+les trois états et leurs icônes, la fenêtre (titre, ronds, taille, à l'écran),
+l'état offert, la pastille, le changement d'état, l'Attaque Magique qui garde
+sa fenêtre, l'enregistrement, la validation, une carte d'avant affichée sous
+le nouveau nom, puis le combat (5 % par état, 11 % avec un cran, une
+Distorsion d'avant) et les créatures/LIA. Il mord sur l'ancien code (14 échecs
+avant de tomber). Mis à jour : elements_magiques (la Distorsion ouvre la
+fenêtre des états), aide_caracs (Charisme), fenetre_tour (une carte d'avant
+s'y lit « Distorsion mentale »), saignement (10 effets au bouton du MJ). Les
+fonctions que des bancs découpent dans le source (estUneAttaqueDeBase,
+estIncompatibleAvecArme, actionADegatsMagiques, appliquerEquipementALaCarte)
+reconnaissent la Distorsion sans assistant de module.

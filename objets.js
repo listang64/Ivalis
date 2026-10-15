@@ -98,7 +98,7 @@ window.CARACS_ARMURE = {
     "Armure lourde":        ["FORCE"]
 };
 // LES BAGUES DE DÉGÂTS AUSSI (Nico) : l'intelligence OU le charisme — le
-// mage et le diseur de mots de pouvoir y ont droit tous les deux. Lue par
+// mage et le maître de la Distorsion mentale y ont droit tous les deux. Lue par
 // MODÈLE, pour que les bagues déjà trouvées suivent la règle.
 window.CARACS_MODELE = {
     "Bagues DPS": ["INTELLIGENCE", "CHARISME"]

@@ -242,6 +242,7 @@
     //  pouvoir, plusieurs éléments, la Lumière) — au contact comme à distance.
     const GESTE_DE_FRAPPE = { legere: "jeu-attaque-legere", lourde: "jeu-attaque-lourde", epee: "jeu-coup-epee" };
     const GESTE_D_ELEMENT = { Feu: "jeu-boule-de-feu", Foudre: "jeu-attaque-foudre", Glace: "jeu-attaque-glace" };
+    // « mots » : la Distorsion mentale (ex-Mots de pouvoir).
     const GESTE_DE_SORT = { mots: "jeu-mots-de-pouvoir", multi: "jeu-attaque-multi", lumiere: "jeu-lumiere" };
     window.gesteAttaqueCombat = function ({ projectile, frappe, element, sort, carte, touches }) {
         if (!Array.isArray(touches) || /^(CLASSE_|COMPAGNON_|ZOMBIE_)/.test(String(carte || ""))) return null;

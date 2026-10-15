@@ -240,14 +240,16 @@ window.analyserCarteMonstre = function(dataCarte) {
             indexTraction = idx;
             casesTraction = Math.round(parseFloat(String(tractionIci.Valeur).replace(",", "."))) || 3;
         }
-        if (indexAttaque === -1 && (nomBase.includes("attaque") || nomBase.includes("mot de pouvoir")
-            || nomBase.includes("mots de pouvoir"))) indexAttaque = idx;
+        // La Distorsion mentale (ex-Mots de pouvoir), sous ses deux noms.
+        const distorsion = nomBase.includes("distorsion") || nomBase.includes("mot de pouvoir")
+            || nomBase.includes("mots de pouvoir");
+        if (indexAttaque === -1 && (nomBase.includes("attaque") || distorsion)) indexAttaque = idx;
 
         if (nomBase.includes("soin") || nomBase.includes("guérison") || nomBase.includes("bouclier")
             || nomBase.includes("purification") || nomBase.includes("absorption")) {
             infos.estSoin = true;
         }
-        if (nomBase.includes("attaque") || nomBase.includes("mot de pouvoir") || nomBase.includes("mots de pouvoir")) {
+        if (nomBase.includes("attaque") || distorsion) {
             infos.degats += (parseFloat(String(base.Valeur).replace(",", ".")) || 0) * (act.count || 1);
         }
         if (nomBase.includes("persistance")) infos.persistanceTerrain = true;

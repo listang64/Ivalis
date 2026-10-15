@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=80">
+  <link rel="stylesheet" href="style.css?v=81">
 
  
   <!-- ===================================================================== -->
@@ -2026,7 +2026,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=150"></script>
+<script src="trace_combat.js?v=151"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
      Les modules s'importent entre eux sans numéro (`from './moteur_pur.js'`).
      Sans cette carte, le navigateur les chargeait à part, à une adresse SANS
@@ -2040,7 +2040,7 @@
 <script type="importmap">
 { "imports": {
     "./combat_etat.js": "./combat_etat.js?v=37",
-    "./moteur_pur.js": "./moteur_pur.js?v=58",
+    "./moteur_pur.js": "./moteur_pur.js?v=59",
     "./mouvement_pur.js": "./mouvement_pur.js?v=21",
     "./ia_pure.js": "./ia_pure.js?v=14",
     "./cerveau_combat.js": "./cerveau_combat.js?v=54",
@@ -2062,7 +2062,7 @@
 <script type="module" src="combat_etat.js?v=37"></script>
 <!-- LE MOTEUR PUR : la chaîne de dégâts et le mouvement, extraits des 5 000
      lignes du moteur actuel et testables sans réseau ni navigateur. -->
-<script type="module" src="moteur_pur.js?v=58"></script>
+<script type="module" src="moteur_pur.js?v=59"></script>
 <script type="module" src="mouvement_pur.js?v=21"></script>
 <script type="module" src="ia_pure.js?v=14"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
@@ -2079,46 +2079,46 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=47"></script>
 <script type="module" src="ia_master.js?v=7"></script>
-<script type="module" src="app.js?v=109"></script>
+<script type="module" src="app.js?v=110"></script>
 <script src="jet_d20.js?v=2"></script>
-<script src="fabrique_sons.js?v=13"></script>
+<script src="fabrique_sons.js?v=14"></script>
 <!-- Les animations de combat (le catalogue, script simple), puis leur studio. -->
 <script src="animations_combat.js?v=9"></script>
-<script src="animations_catalogue.js?v=10"></script>
+<script src="animations_catalogue.js?v=11"></script>
 <!-- …et leur branchement sur le vrai combat (les animations validées dans le Studio). -->
-<script src="animations_jeu.js?v=7"></script>
+<script src="animations_jeu.js?v=8"></script>
 <script src="experience.js?v=1"></script>
 <!-- Les talents : les règles (script simple), puis leur fenêtre. -->
-<script src="talents.js?v=3"></script>
+<script src="talents.js?v=4"></script>
 <!-- Les blessures : la table et ses règles (script simple), puis l'écran. -->
 <script src="blessures.js?v=1"></script>
 <script type="module" src="creation_personnage.js?v=25"></script>
 <script type="module" src="classes.js?v=25"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
-<script type="module" src="competences.js?v=63"></script>
+<script type="module" src="competences.js?v=64"></script>
 <script type="module" src="talents_ui.js?v=1"></script>
 <script type="module" src="blessures_ui.js?v=1"></script>
 <script type="module" src="studio_animation.js?v=7"></script>
 <!-- LIA, l'aide à la création de la Forge -->
-<script type="module" src="lia_forge.js?v=4"></script>
+<script type="module" src="lia_forge.js?v=5"></script>
 <!-- L'illustration des compétences (prompt IA + image IA, en file) -->
-<script type="module" src="illustration_competence.js?v=9"></script>
+<script type="module" src="illustration_competence.js?v=10"></script>
 <!-- Le plateau porte désormais son ?v= comme les autres : sans lui, un iPad
      gardait l'ancien dessin en cache après une livraison (l'œil d'or en dépend). -->
 <script src="Plateau.js?v=3"></script>
 <script type="module" src="sequence_tour.js?v=23"></script>
 <script src="zombie_token.js?v=1"></script>
 <script src="murs_terre.js?v=9"></script>
-<script type="module" src="combat.js?v=138"></script>
+<script type="module" src="combat.js?v=139"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=37"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
-<script type="module" src="moteur_effets.js?v=94"></script>
+<script type="module" src="moteur_effets.js?v=95"></script>
 <script type="module" src="monstres.js?v=29"></script>
-<script type="module" src="monstres_competences.js?v=26"></script>
-<script type="module" src="monstres_ia.js?v=38"></script>
+<script type="module" src="monstres_competences.js?v=27"></script>
+<script type="module" src="monstres_ia.js?v=39"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
-<script type="module" src="objets.js?v=16"></script>
+<script type="module" src="objets.js?v=17"></script>
 <script src="variations_tenues.js?v=2"></script>
 <script type="module" src="objets_ia.js?v=15"></script>
 <script type="module" src="loot.js?v=28"></script>
@@ -2605,7 +2605,9 @@
   <!-- 2. MENU D'AJOUT (LE GRIMOIRE TRIÉ PAR CARAC)            -->
   <!-- ======================================================= -->
   <!-- LE CHOIX DE L'ÉLÉMENT D'UNE ATTAQUE MAGIQUE (competences.js) : trois
-       boutons ronds, dessinés par window.ouvrirChoixElement. -->
+       boutons ronds, dessinés par window.ouvrirChoixElement. La même fenêtre
+       choisit l'état du charisme d'une Distorsion mentale (Confusion,
+       Immobilisation, Peur) : son titre et son texte changent alors. -->
   <div id="modale-choix-element" class="modale-parchemin-jeu forge-choix-element" style="display: none; z-index: 230;">
       <div class="forge-grimoire-entete">
           <h3>Élément du sort</h3>

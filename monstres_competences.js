@@ -131,7 +131,8 @@ const PART_SOCLE = window.PART_SOCLE;
 // Nico à tout moment, donc tout est reconnu par le NOM de l'effet, comme
 // le fait déjà le moteur de combat.
 const MOTS_CLES = {
-    attaque:     ["attaque", "mot de pouvoir", "mots de pouvoir"],
+    // La Distorsion mentale (ex-Mots de pouvoir) : les deux noms la désignent.
+    attaque:     ["attaque", "distorsion", "mot de pouvoir", "mots de pouvoir"],
     soin:        ["soin", "guérison", "guerison", "bouclier", "purification", "absorption"],
     zone:        ["zone"],
     persistance: ["persistance"],
@@ -174,7 +175,13 @@ function nombreFr(val) {
 function estAttaqueDeBase(nom) {
     const n = (nom || "").toLowerCase();
     return n.includes("attaque magique") || n.includes("attaque légère") || n.includes("attaque legere")
-        || n.includes("attaque lourde") || n.includes("mots de pouvoir") || n.includes("mot de pouvoir");
+        || n.includes("attaque lourde") || estDistorsionMonstre(n);
+}
+
+// La Distorsion mentale (ex-Mots de pouvoir), sous ses deux noms (app.js).
+function estDistorsionMonstre(nom) {
+    if (typeof window.estDistorsionMentale === "function") return window.estDistorsionMentale(nom);
+    return /distorsion|pouvoir/i.test(String(nom || ""));
 }
 
 // ⚖️ règle Forge : getMaxStacks — combien de fois un effet peut être empilé.
@@ -199,7 +206,7 @@ function incompatibleAvecArme(nomEffet, arme) {
     const nom = nomEffet.toLowerCase();
     const legere = nom.includes("attaque légère") || nom.includes("attaque legere");
 
-    if (arme === "Sans arme / Arme rp")  return nom.includes("attaque magique") || nom.includes("mot de pouvoir") || nom.includes("mots de pouvoir") || legere;
+    if (arme === "Sans arme / Arme rp")  return nom.includes("attaque magique") || estDistorsionMonstre(nom) || legere;
     if (arme === "Arme légère CAC")      return nom.includes("attaque lourde");
     if (arme === "Arme lourde CAC")      return legere;
     if (arme === "Arme polyvalente")     return legere;
@@ -281,8 +288,8 @@ function affinitesParDefaut(monstre) {
 
         if (contient(nom, MOTS_CLES.distance))    note = distance ? 9 : (cac ? 0 : 4);
         // Une bête ou un guerrier ne lance pas d'incantation : sans cette mise à
-        // zéro, un ours finissait par sortir des "Mots de pouvoir".
-        if (nom.toLowerCase().includes("attaque magique") || contient(nom, ["mot de pouvoir", "mots de pouvoir"]))
+        // zéro, un ours finissait par sortir une "Distorsion mentale".
+        if (nom.toLowerCase().includes("attaque magique") || estDistorsionMonstre(nom))
                                                   note = magique ? 9 : 0;
         if (nom.toLowerCase().includes("attaque lourde")) note = tank ? 9 : (cac ? 7 : 0);
         if (contient(nom, ["attaque légère", "attaque legere"])) note = distance ? 8 : (cac ? 6 : 2);
@@ -676,6 +683,12 @@ function poserAction(chantier, effetBase, count) {
     if (typeof window.estAttaqueElementaire === "function" && window.estAttaqueElementaire(effetBase.Nom)) {
         const els = window.ELEMENTS_MAGIQUES || [];
         if (els.length > 0) act.element = els[Math.floor(Math.random() * els.length)].id;
+    }
+    // ⚖️ règle Forge : une Distorsion mentale est toujours liée à un état du
+    // charisme (Confusion, Immobilisation, Peur) — tiré au sort lui aussi.
+    if (estDistorsionMonstre(effetBase.Nom)) {
+        const etats = window.ETATS_DISTORSION || [];
+        if (etats.length > 0) act.etatMental = etats[Math.floor(Math.random() * etats.length)].id;
     }
     chantier.actions.push(act);
     const tag = tagDe(effetBase);
@@ -1120,7 +1133,8 @@ function chantierVersDocument(carte, nom, arme, palette) {
                 zoneHexes: act.zoneHexes || [],
                 baseDuree: act.baseDuree || 0,
                 modsDuree,
-                ...(act.element ? { element: act.element } : {})
+                ...(act.element ? { element: act.element } : {}),
+                ...(act.etatMental ? { etatMental: act.etatMental } : {})
             };
         })
     };
@@ -1135,14 +1149,15 @@ function chantierVersDocument(carte, nom, arme, palette) {
 
     const effetsCompiles = [];
     carte.chantier.actions.forEach(act => {
-        const el = act.element && typeof window.elementMagique === "function" ? window.elementMagique(act.element) : null;
+        const el = act.element && typeof window.elementMagique === "function" ? window.elementMagique(act.element)
+            : act.etatMental && typeof window.etatDistorsion === "function" ? window.etatDistorsion(act.etatMental) : null;
         effetsCompiles.push({
             nom: act.baseEffet.Nom,
             desc: texteEffet(act.baseEffet, act.count) + marqueurDuree(act.baseDuree || 0)
                 + (el ? ` · ${el.icone} ${el.nom}` : ""),
             isMod: false
         });
-        // ⚖️ règle Forge : l'état de l'élément, 5 % offerts.
+        // ⚖️ règle Forge : l'état de l'élément (ou de la Distorsion), 5 % offerts.
         if (el) effetsCompiles.push({ nom: el.etat, desc: `${window.CHANCE_ELEMENT_OFFERTE || 5}% de chance (offert)`, isMod: true });
         act.modsEffets.forEach(m => {
             if (m.effet.Nom === "Zone") {

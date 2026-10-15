@@ -109,7 +109,7 @@ const CODEX = {
   dex:   ["Attaque légère", "Contre", "Bond", "Repli", "Aveuglement", "Empoisonnement"],
   int:   ["Attaque magique", "Glacé", "Brûlé", "Électrifié", "Traction magique"],
   sag:   ["Soin", "Purification", "Bouclier magique", "Absorption"],
-  cha:   ["Mots de pouvoirs", "Confusion", "Peur", "Immobilisation", "Illusion"]
+  cha:   ["Distorsion mentale", "Confusion", "Peur", "Immobilisation", "Illusion"]
 };
 const ecarts = Object.keys(CODEX).filter(id => JSON.stringify(parId[id].effets) !== JSON.stringify(CODEX[id]))
   .map(id => `${id} : ${parId[id].effets.join(", ")}`);
