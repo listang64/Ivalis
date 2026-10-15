@@ -985,6 +985,8 @@ window.ATOUTS_CLASSES = {
     // l'ancien Nécromancien (2 tours debout à zéro PV, une fois par combat).
     "Profanateur": [
         { niveau: 1,  zombies: true, glacePhysique: true },
+        // Niveau 5 : les Pointes de glace (un cône de pics, une fois par combat).
+        { niveau: 5,  techniques: ["CLASSE_POINTES_GLACE"] },
         // Niveau 10 : le sursis, et ses zombies se relèvent dans un rayon de
         // 2 cases autour de lui (au lieu de 1).
         { niveau: 10, sursis: 2, rayonZombies: 2 }
@@ -1068,6 +1070,7 @@ window.classeInterditeA = function(race, nomClasse) {
 //
 //    cible    "soi" (Mur de bouclier), "allieAdjacent" (Rempart) ou
 //             "zoneDeux" (Assaut mortel : une zone de deux cases au contact),
+//             "cone" (Pointes de glace : un cône de trois rangs devant soi),
 //             "allies" (Soin d'urgence) ou "allieKO" (Prise en charge)
 window.TECHNIQUES_CLASSE = {
     // (Le Mur de bouclier n'est plus donné par aucune classe : le moteur le
@@ -1100,6 +1103,15 @@ window.TECHNIQUES_CLASSE = {
         Nom: "Assaut mortel", classe: "Assassin", niveau: 5, Initiative: 100, Fatigue: 0, cible: "zoneDeux",
         desc: "Une zone de deux cases au contact : chaque ennemi qui s'y trouve prend 10 dégâts physiques "
             + "et 100 % d'empoisonnement, même s'il esquive le coup. Une fois par combat."
+    },
+    // LES POINTES DE GLACE : un cône de trois rangs devant lui (2, 3 puis 4
+    // cases), qu'il tourne autour de lui comme une zone de mêlée
+    // (pointesDeGlace, moteur_pur.js).
+    CLASSE_POINTES_GLACE: {
+        Nom: "Pointes de glace", classe: "Profanateur", niveau: 5, Initiative: 100, Fatigue: 0, cible: "cone",
+        desc: "Des pics de glace jaillissent en cône devant le Profanateur (trois rangs : 2, 3 puis 4 cases) "
+            + "et y restent 3 manches. Qui s'y tient ou y entre : 75 % de chance d'être Glacé (2 manches) "
+            + "et 5 % de ses PV max en moins, sans défense. Une fois par combat."
     },
     CLASSE_SOIN_URGENCE: {
         Nom: "Soin d'urgence", classe: "Médicus", niveau: 5, Initiative: 70, Fatigue: 0, cible: "allies",

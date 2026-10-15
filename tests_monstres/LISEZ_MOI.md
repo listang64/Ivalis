@@ -6214,3 +6214,59 @@ traits au bon coin, la fuite), la Provocation sans fil, la fuite confuse au
 le pont (l'ordre, le mot pas redit), puis le vrai plateau. Ils mordent sur
 l'ancien code (21 et 24 échecs). Mis à jour : animations_en_jeu_2 (le retour
 sur soi : l'entaille au lieu de l'orbe).
+
+## v239 — Profanateur : Pointes de glace ; ses zombies et son sursis en jeu
+
+Nico : « Profanateur lvl5 : Compétence : Pointes de glace : 1 fois par
+combat, 0 fatigue, créer en cône devant le lanceur une zone de terrain de pics
+de glace (effet gelée standard, 75 % de chance de gelée, et enlève 5 % des PV
+max de la cible). Pour le Studio d'animation : relève des zombies, zombie qui
+marche et qui attaque, sursis, soin refusé en sursis, fin de sursis, relève
+des zombies à 2 cases : on garde, tu peux intégrer. »
+
+- LES POINTES DE GLACE (app.js : CLASSE_POINTES_GLACE au niveau 5 du
+  Profanateur, cible « cone » ; moteur_pur.js : POINTES_GLACE,
+  conePointesGlace, orientationCone, pointesDeGlace) :
+  • LE CÔNE : trois rangs devant lui — 2, 3 puis 4 cases (9 en tout) —, entre
+    deux de ses six directions ; le premier rang est celui de l'Assaut mortel.
+    Il se vise comme lui (combat.js, lancerTechniqueClasse ; moteur_effets.js :
+    la zone tourne autour du lanceur), et part au cerveau en CASES
+    (validerZoneAoE → regimeDemande.techniqueClasse(…, { cases }) →
+    demanderTechniqueClasse). Le cerveau n'accepte que le cône exact, partant
+    de lui (orientationCone), à son niveau, une fois par combat.
+  • LA ZONE : de glace, 3 manches (+1 pour qui prolonge ses zones), sur les
+    cases du cône qui existent (pas les gommées). Qui s'y tient quand elle
+    jaillit, puis qui y entre : 5 % de ses PV MAX en moins, sans défense
+    (traverserZones sait maintenant les dégâts « Brut » et en part des PV
+    max), et 75 % d'être Glacé (2 manches, la gelée standard). Comme toute
+    zone : une esquive l'en sauve, elle ne fait pas le tri des camps, les
+    insensibles au gel (le Vampire) n'y sont pas Glacés.
+  • L'écran : « ❄️ Pointes de glace » sur le pion, puis la nappe de glace du
+    jeu. Son animation est au Studio (« Niv.5 Pointes de glace » : le froid
+    rassemblé, puis le cône qui jaillit rang après rang, gelé et hérissé de
+    pics, l'ennemi pris dedans givré) — à intégrer quand elle te va.
+  • La fiche de classe : « Niv. 5 · Technique : Pointes de glace ».
+- EN JEU (animations_jeu.js, pont_combat.js, combat_etat.js, moteur_pur.js) :
+  • LA RELÈVE : le pion tombé a quitté le plateau ; quand l'état le redessine,
+    c'est sa copie, couchée et grise, qui se relève vert-de-gris sur un sceau
+    vert (le vrai pion caché dessous, rendu à la fin) — « 🧟 Se relève en
+    zombie ! ». À 2 cases ou plus du Profanateur (son rayon de niveau 10, ou
+    tué de sa main au loin), le grand sceau part de lui et une lueur file
+    jusqu'au mort (annoncerZombieCombat, comme l'arrivée d'un renfort).
+  • LE ZOMBIE QUI MARCHE titube d'un pas lourd (gémissement au premier pas) ;
+    sa griffe était déjà en jeu.
+  • LE SURSIS QUI COMMENCE (l'étape porte `debut`) : grisé, un sablier, une
+    aura sombre — « 💀 Sursis : 2 tours » ; le décompte garde son mot.
+  • LE COUP IGNORÉ et LE SOIN REFUSÉ (les mots portent `sursis` : coup, soin) :
+    une entaille grise et un bruit sourd — « Sursis 💀 » ; les éclats de soin
+    qui retombent en cendres — « Sursis : aucun soin 💀 ».
+  • LA FIN DU SURSIS : le sablier renversé, il s'effondre — « Fin du sursis ».
+  Le Studio garde les siens ; la Relève et le zombie y sont rangés au niveau 1.
+
+corrections_v239.mjs : le cône (géométrie, six directions, reconnaissance),
+le cerveau (accepté/refusé, la zone, ceux qui s'y tiennent, 75 % sur 400
+graines, qui y entre, l'esquive, 3 manches, les cases gommées, le rejeu), le
+pont, puis le vrai plateau (le zombie qui titube, la relève au contact et à 2
+cases pion absent, le sursis) et le ciblage du cône. studio_pointes_glace.mjs :
+l'animation du Studio. Ils mordent sur l'ancien code (34 et 9 échecs). Mis à
+jour : profanateur (niveau 5, fiche de classe).

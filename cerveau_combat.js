@@ -47,6 +47,7 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
          chaineDeDegats, REGLES_ETATS, regleDesEtats, estDansLeNoir,
          partageTenebres, ETAT_TENEBRES_ETALEES, POISON, POISON_MAITRE, ETAT_SAIGNEMENT, SAIGNEMENT,
          resoudreTechniqueClasse, actionAssautMortel, actionBaiserVampire, appliquerCharme,
+         pointesDeGlace, orientationCone,
          actionResonanceBouclier, ennemisAuContact, tirerDirectionsAveugle, ligneDeVue, caseLibre, aLEtat } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant, fureurDeLaSentinelle, voisinsDe } from './mouvement_pur.js';
@@ -354,6 +355,11 @@ export function validerIntention(etat, intention, plateau) {
             if (allie.id === acteur.id || allie.estIllusion || allie.camp !== acteur.camp) return refus("Prise en charge : allié invalide");
             if (!allie.aTerre) return refus("Prise en charge : l'allié n'est pas KO");
             if (distance(acteur, allie) > 1) return refus("Prise en charge : l'allié doit être adjacent");
+        }
+        // Les Pointes de glace (Profanateur) : le cône part de lui, dans l'une
+        // de ses six directions — exactement ses cases.
+        if (idCarte === "CLASSE_POINTES_GLACE" && orientationCone(acteur, intention.cases) < 0) {
+            return refus("Pointes de glace : le cône part du Profanateur, devant lui");
         }
         // L'Assaut mortel : un ou deux ennemis debout, au contact, et côte à
         // côte s'ils sont deux — la zone de deux cases qui tourne autour de lui.
@@ -987,6 +993,7 @@ export function appliquerIntention(etat, intention, plateau) {
             ? (compagnonDe(etat, intention.acteur) || {}).id : intention.cible;
         const r = resoudreTechniqueClasse(etat, { idLanceur: intention.acteur, idCarte: intention.idCarte,
                                                   cible: cibleTechnique, cibles,
+                                                  ...(Array.isArray(intention.cases) ? { cases: intention.cases } : {}),
                                                   ...(noirs ? { noirs } : {}),
                                                   ...(intention.initiative !== undefined ? { initiative: intention.initiative } : {}) }, plateau);
         let suivant = clonerEtat(r.etat);
@@ -1012,6 +1019,11 @@ export function appliquerIntention(etat, intention, plateau) {
             const rc = resoudreCarte(suivant, action, plateau);
             suivant = clonerEtat(rc.etat);
             etapes.push(...rc.etapes);
+        }
+        // LES POINTES DE GLACE : la zone de pics, et ceux qui s'y tiennent la
+        // subissent aussitôt (dés du cerveau).
+        if (intention.idCarte === "CLASSE_POINTES_GLACE") {
+            etapes.push(...pointesDeGlace(suivant, intention.acteur, intention.cases || [], des, plateau));
         }
         // LA FUREUR DE LA SENTINELLE : une attaque d'opportunité sur chaque
         // ennemi au contact (dés du cerveau), puis la poussée.

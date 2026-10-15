@@ -1953,6 +1953,49 @@
         return { el: o.pionDessine(sc.calque, pos, { contenu: "🐺" }), pos };
     };
     // Un pion qui se relève en zombie (vert-de-gris).
+    // LE CÔNE DES POINTES DE GLACE : trois rangs devant le Profanateur (2, 3 puis
+    // 4 cases), entre deux de ses six directions — celle qui prend l'ennemi,
+    // sinon la plus proche de lui (conePointesGlace, moteur_pur.js). Sans grille :
+    // un éventail à vue.
+    const coneDevant = (o, sc, a, b, v) => {
+        const c0 = o.caseDe(sc.lanceur), ce = o.caseDe(sc.cible);
+        if (o.grille && c0) {
+            const tourner = (h, pas) => { let q = h.q, r = h.r; for (let i = 0; i < pas; i++) { const nq = -r, nr = q + r; q = nq; r = nr; } return { q, r }; };
+            let mieux = null;
+            for (let pas = 0; pas < 6; pas++) {
+                const cases = [];
+                for (let k = 1; k <= 3; k++) for (let j = 0; j <= k; j++) {
+                    const h = tourner({ q: k, r: -j }, pas), q = c0.q + h.q, r = c0.r + h.r, px = o.grille.pixel(q, r);
+                    cases.push({ x: px.x, y: px.y, q, r, t: a.t, rang: k, ennemi: !!ce && ce.q === q && ce.r === r });
+                }
+                const cx = cases.reduce((m, c) => m + c.x, 0) / cases.length - a.x, cy = cases.reduce((m, c) => m + c.y, 0) / cases.length - a.y;
+                const score = (cases.some(c => c.ennemi) ? 10 : 0) + (cx * v.ux + cy * v.uy) / (Math.hypot(cx, cy) || 1);
+                if (!mieux || score > mieux.score) mieux = { score, cases };
+            }
+            return mieux.cases;
+        }
+        const pas = o.pasHex(a), cases = [];
+        for (let k = 1; k <= 3; k++) for (let j = 0; j <= k; j++) {
+            const ang = v.angle + (j - k / 2) * (Math.PI / 3) / Math.max(1, k);
+            cases.push({ x: a.x + Math.cos(ang) * pas * k, y: a.y + Math.sin(ang) * pas * k, t: a.t, rang: k, ennemi: k === 1 && j === 0 });
+        }
+        return cases;
+    };
+    // DES PICS DE GLACE qui jaillissent du sol d'une case, en étoile (vus de dessus).
+    const picsDeGlace = (o, calque, pt, p = {}) => {
+        const n = p.n || 4, t = pt.t || 60, els = [];
+        for (let i = 0; i < n; i++) {
+            const ang = (i / n) * 360 + hasard(-25, 25), L = t * hasard(0.3, 0.46), H = L * 0.32;
+            const el = o.poser(calque, pt.x, pt.y, `width:${L}px; height:${H}px; z-index:${Z.bas + 1}; transform-origin:0 50%; opacity:0;
+                transform:translate(0,-50%) rotate(${ang.toFixed(0)}deg) scaleX(0);`, DESSIN_PIC_DE_GLACE);
+            el.classList.add("anim-pic-pointe");
+            const pose = (sx) => `translate(0,-50%) rotate(${ang.toFixed(0)}deg) scaleX(${sx})`;
+            o.teinter(el, [{ transform: pose(0), opacity: 0 }, { transform: pose(1.18), opacity: 1, offset: 0.6 }, { transform: pose(1), opacity: 1 }],
+                      { duration: 280, delay: (p.retard || 0) + i * 35, easing: "cubic-bezier(.2,.9,.3,1.3)", fill: "forwards" });
+            els.push(el);
+        }
+        return els;
+    };
     const releverEnZombie = (o, el, tourne) => o.bouger(el, [
         { transform: `rotate(${tourne}deg) scale(0.9)`, filter: GRIS, opacity: 0.6 },
         { transform: "rotate(0deg) scale(1.05)", filter: ZOMBIE, opacity: 1, offset: 0.75 },
@@ -2328,7 +2371,7 @@
 
     ajouter(8, "Profanateur", [
         {
-            id: "releve-zombies", nom: "Niv.5 Relève des zombies", sens: "vers l'ennemi",
+            id: "releve-zombies", nom: "Niv.1 Relève des zombies", sens: "vers l'ennemi",
             description: "L'ennemi tombé à côté du Profanateur : un sceau vert s'ouvre sous lui, et il se relève, vert-de-gris, à son service.",
             async jouer(sc, o) {
                 const { b } = lieux(sc);
@@ -2346,7 +2389,7 @@
             }
         },
         {
-            id: "zombie-marche-attaque", nom: "Niv.5 Zombie qui marche / qui attaque", sens: "vers l'ennemi",
+            id: "zombie-marche-attaque", nom: "Niv.1 Zombie qui marche / qui attaque", sens: "vers l'ennemi",
             description: "Un zombie du Profanateur avance en titubant, d'un pas lourd, puis griffe l'ennemi.",
             async jouer(sc, o) {
                 const { a, b, v } = lieux(sc);
@@ -2416,6 +2459,40 @@
                     { duration: 700, easing: "ease-in", fill: "forwards" });
                 await o.attendre(900);
                 await o.rentrer(sc.lanceur);
+            }
+        },
+        {
+            id: "pointes-glace", nom: "Niv.5 Pointes de glace", sens: "vers l'ennemi",
+            description: "Le Profanateur frappe le sol de son froid : en cône devant lui, rang après rang, des pics de glace jaillissent et la terre gèle ; l'ennemi pris dedans se fige, Glacé, et perd 5 % de ses PV max.",
+            async jouer(sc, o) {
+                const { a, b, v } = lieux(sc);
+                const cases = coneDevant(o, sc, a, b, v);
+                o.son("gel-lancer");
+                o.bouger(sc.lanceur, [{ transform: "scale(1)" }, { transform: "scale(1.08)", offset: 0.4 }, { transform: "scale(0.96)", offset: 0.7 }, { transform: "scale(1)" }], { duration: 560 });
+                o.eclat(sc.lanceur, "brightness(1.3) drop-shadow(0 0 10px #bdf3ff)", 600);
+                await rassembler(o, sc.calque, a, { couleur: "#e8fbff", n: 10, duree: 420, rayon: 1.2 });
+                const sols = [], pics = [];
+                let prise = false;
+                for (let rang = 1; rang <= 3; rang++) {
+                    o.son("glace-impact");
+                    const duRang = cases.filter(c => c.rang === rang);
+                    duRang.forEach((pt, i) => {
+                        sols.push(o.hexagone(sc.calque, pt, { fond: FONDS_ZONE.glace, opacite: 0.7, duree: 260, retard: i * 40 }));
+                        pics.push(...picsDeGlace(o, sc.calque, pt, { retard: i * 40 }));
+                        cristaux(o, sc.calque, pt, { n: 5, duree: 900 });
+                    });
+                    if (!prise && duRang.some(c => c.ennemi)) {
+                        prise = true;
+                        teinte(o, sc.cible, GIVRE, 300);
+                        etat(o, sc.calque, sc.cible, "Glacé !");
+                        o.jauge(sc.calque, sc.cible, 40, 38, 40, "-2", COULEURS.degats, COULEURS.degats);
+                        o.secouer(sc.cible, b.t * 0.06, 300);
+                    }
+                    await o.attendre(230);
+                }
+                await o.attendre(1100);
+                if (prise) deteindre(o, sc.cible, GIVRE, 500);
+                await Promise.all([effacerTout(o, sols, { duree: 500 }), ...pics.map(el => fondre(o, el, 500))]);
             }
         },
         {
@@ -3055,7 +3132,7 @@
         "instinct-tueur", "assaut-mortel",
         "soin-urgence", "prise-en-charge",
         "lumiere-classe", "lumiere-aveuglante", "bouclier-anti-magie", "renvoi", "appel-lumiere",
-        "releve-zombies", "zombie-marche-attaque", "sursis", "sursis-soin-refuse", "sursis-fin", "releve-zombies-2",
+        "releve-zombies", "zombie-marche-attaque", "pointes-glace", "sursis", "sursis-soin-refuse", "sursis-fin", "releve-zombies-2",
         "compagnon-apparition", "compagnon-attaque", "compagnon-terre", "tir-precis", "lien-sang-soin", "lien-sang-releve",
         "mur-terre", "mur-terre-repousse", "mur-effondre", "traverse-murs", "zones-sans-danger",
         "fureur-sentinelle", "retour-arriere",
@@ -3379,6 +3456,104 @@
                 sc.dejaFrappe ? null : o.eclat(sc.lanceur, "brightness(1.5)", 300),
                 o.bouger(sc.lanceur, [{ transform: "rotate(0deg)" }, { transform: "rotate(-9deg)" }, { transform: "rotate(8deg)" }, { transform: "rotate(-6deg)" },
                                       { transform: "rotate(5deg)" }, { transform: "rotate(0deg)" }], { duration: 1500, easing: "ease-in-out" })]);
+        } },
+        // =================================================================
+        //  LE PROFANATEUR (Nico : « relève des zombies, zombie qui marche et
+        //  qui attaque, sursis, soin refusé en sursis, fin de sursis, relève
+        //  des zombies à 2 cases : on garde, tu peux intégrer »).
+        // =================================================================
+        // LA RELÈVE : tombé, le pion a quitté le plateau ; sa copie, couchée et
+        // grise, se relève sur un sceau vert, vert-de-gris, à son service (le
+        // vrai pion reparaît dessous à la fin).
+        { id: "jeu-releve-zombie", async jouer(sc, o) {
+            const pos = positionDe(o, sc);
+            const f = doublure(o, sc, pos);
+            await o.bouger(f, [{ transform: "rotate(80deg) scale(0.9)", filter: GRIS, opacity: 0.6 },
+                               { transform: "rotate(80deg) scale(0.9)", filter: GRIS, opacity: 0.6 }], { duration: 30, fill: "forwards" });
+            o.son("zombie");
+            const s = sceau(o, sc.calque, pos, "#7dd321", { duree: 1800 });
+            await o.attendre(500);
+            o.son("releve");
+            await releverEnZombie(o, f, 80);
+            if (sc.montrer) sc.montrer();
+            o.texte(sc.calque, f || sc.lanceur, sc.texte || "🧟 Se relève en zombie !", "#9fe070");
+            await o.attendre(600);
+            await o.effacer(s);
+        } },
+        // À 2 CASES DU PROFANATEUR (niveau 10) : le grand sceau s'étend autour
+        // de lui (sc.cible), une lueur file jusqu'au mort, qui se relève.
+        { id: "jeu-releve-zombie-2", async jouer(sc, o) {
+            const pos = positionDe(o, sc);
+            const m = sc.cible ? centre(sc.cible, sc.calque) : pos;
+            const f = doublure(o, sc, pos);
+            await o.bouger(f, [{ transform: "rotate(80deg) scale(0.9)", filter: GRIS, opacity: 0.6 },
+                               { transform: "rotate(80deg) scale(0.9)", filter: GRIS, opacity: 0.6 }], { duration: 30, fill: "forwards" });
+            o.son("zombie");
+            const s = sceau(o, sc.calque, m, "#7dd321", { taille: 4.6, duree: 2200, tours: 90 });
+            await o.attendre(500);
+            await o.filer(sc.calque, m, pos, { couleur: "#9fe070", taille: 0.2, duree: 500 });
+            o.son("releve");
+            await releverEnZombie(o, f, 80);
+            if (sc.montrer) sc.montrer();
+            o.texte(sc.calque, f || sc.lanceur, sc.texte || "🧟 Se relève en zombie !", "#9fe070");
+            await o.attendre(600);
+            await o.effacer(s);
+        } },
+        // LE ZOMBIE QUI MARCHE : il titube, d'un pas lourd (sa griffe :
+        // jeu-attaque-zombie).
+        { id: "jeu-pas-zombie", async jouer(sc, o) {
+            if (sc.premier) o.son("zombie");
+            await unPas(sc, o, { duree: 340, tangue: 10, hauteur: 1.02, son: "pas-lourd" });
+        } },
+        // LE SURSIS QUI COMMENCE : à zéro PV, il reste debout, grisé, un sablier
+        // au-dessus de lui, une aura sombre qui pulse ; « 💀 Sursis : 2 tours ».
+        { id: "jeu-sursis", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            o.son("sursis");
+            teinte(o, sc.lanceur, GRIS, 400);
+            o.icone(sc.calque, a, "⏳", { duree: 2000, tourne: 180 });
+            o.aura(sc.calque, a, { couleur: "#7a1020", fond: "radial-gradient(circle, rgba(0,0,0,0) 50%, rgba(40,0,0,0.5) 85%)", pulsations: 3, duree: 1900 });
+            o.texte(sc.calque, sc.lanceur, sc.texte || "💀 Sursis", sc.couleur || "#b388ff");
+            await o.attendre(1800);
+            await deteindre(o, sc.lanceur, GRIS, 300);
+        } },
+        // UN COUP SUR LUI EN SURSIS : une entaille grise, un bruit sourd, rien
+        // ne se passe — « Sursis 💀 ».
+        { id: "jeu-sursis-coup", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            const D = sc.cible ? centre(sc.cible, sc.calque) : { x: a.x - a.t, y: a.y, t: a.t };
+            o.son("coup-sourd");
+            o.texte(sc.calque, sc.lanceur, sc.texte || "Sursis 💀", sc.couleur || "#b388ff");
+            await Promise.all([entaille(o, sc.calque, a, axe(D, a).angle, { couleur: "#9a9a9a", lueur: "#666", lueur2: "#333" }),
+                               o.eclat(sc.lanceur, GRIS, 500)]);
+        } },
+        // UN SOIN REFUSÉ EN SURSIS : les éclats de soin viennent à lui… et
+        // retombent en cendres grises.
+        { id: "jeu-sursis-soin-refuse", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            o.son("soin");
+            await rassembler(o, sc.calque, a, { couleur: "#7dff9a", n: 9, duree: 600, rayon: 1.3 });
+            o.son("refus");
+            o.texte(sc.calque, sc.lanceur, sc.texte || "Sursis : aucun soin 💀", sc.couleur || "#b388ff");
+            await Promise.all([o.gerbe(sc.calque, a.x, a.y, { nombre: 10, dist: a.t * 0.5, couleurs: ["#8a8a8a", "#5a5a5a"], taille: 5, duree: 900 }),
+                               o.eclat(sc.lanceur, GRIS, 700)]);
+        } },
+        // LA FIN DU SURSIS : le sablier se vide et se renverse ; à bout, il
+        // s'effondre (et ne se relève pas : invisible jusqu'au redessin).
+        { id: "jeu-sursis-fin", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque), D = sourceDuCoup(sc, o);
+            const loin = axe(D, a), tourne = loin.ux >= 0 ? 85 : -85;
+            teinte(o, sc.lanceur, GRIS, 300);
+            o.son("sursis");
+            await o.icone(sc.calque, a, "⌛", { duree: 1000, tourne: 180 });
+            o.son("chute");
+            o.texte(sc.calque, sc.lanceur, "Fin du sursis", COULEURS.degats, { taille: 24 });
+            await o.bouger(sc.lanceur, [{ transform: "translate(0,0) rotate(0deg)", filter: GRIS, opacity: 1 },
+                { transform: `translate(${loin.ux * a.t * 0.2}px, ${loin.uy * a.t * 0.2}px) rotate(${tourne}deg) scale(0.9)`, filter: "grayscale(1) brightness(0.4)", opacity: 0.5, offset: 0.7 },
+                { transform: `translate(${loin.ux * a.t * 0.2}px, ${loin.uy * a.t * 0.2}px) rotate(${tourne}deg) scale(0.9)`, filter: "grayscale(1) brightness(0.4)", opacity: 0 }],
+                { duration: 1100, easing: "ease-in", fill: "forwards" });
+            if (!o.annulee()) sc.lanceur.style.opacity = "0";
+            await o.attendre(200);
         } },
         // LA MARCHE DU VARGEN : foulée légère et rapide, une silhouette laissée
         // sur chaque case quittée ; « ½ ⚡ » au premier pas.

@@ -1347,6 +1347,21 @@ window.demarrerCiblage = async function(idCarte, options) {
                                     estPoison: true, malgreEsquive: true, enZone: true, cibles: [] });
     }
 
+    // LES POINTES DE GLACE (Profanateur) : un cône de trois rangs devant lui
+    // (2, 3 puis 4 cases), qu'il tourne autour de lui comme une zone de mêlée.
+    // L'attaque n'est là que pour l'aperçu ; à la validation, les cases du cône
+    // partent au cerveau, qui pose la zone de pics (pointesDeGlace, moteur_pur.js).
+    if (dataCarte.techniqueClasse === "CLASSE_POINTES_GLACE") {
+        isZone = true;
+        zoneHexesBase = [];
+        for (let k = 1; k <= 3; k++) for (let b = 0; b <= k; b++) zoneHexesBase.push({ q: k, r: -b });
+        attaquesExtraites.push({ nom: "Pointes de glace", typeRes: "Brut", valeurBrute: 0, pourcentPV: 5,
+                                 isRanged: false, rangeMax: 1, isHeal: false, isShield: false,
+                                 enZone: true, cibles: [] });
+        alterationsExtraites.push({ nom: "Glacé", chance: 75, duree: 2, isRanged: false, rangeMax: 1,
+                                    enZone: true, cibles: [] });
+    }
+
     // LE TIR PRÉCIS (Pisteur) se vise comme une compétence ordinaire, sur le
     // plateau (Nico : « plutôt qu'une fenêtre avec les noms de la cible »).
     // Un ennemi à `portee` cases, en vue : l'Immobilisation n'est là que pour
@@ -2825,6 +2840,17 @@ window.validerZoneAoE = function() {
         window.nettoyerCiblage();
         if (window.regimeDemande && typeof window.regimeDemande.techniqueClasse === "function") {
             window.regimeDemande.techniqueClasse(idLanceur, idCarte, null, ennemis);
+        }
+        return;
+    }
+
+    // LES POINTES DE GLACE : leur cône part au cerveau tel quel (des cases,
+    // pas des cibles) — la zone se pose même vide.
+    if (state.techniqueClasse === "CLASSE_POINTES_GLACE") {
+        const idCarte = state.idCarte;
+        window.nettoyerCiblage();
+        if (window.regimeDemande && typeof window.regimeDemande.techniqueClasse === "function") {
+            window.regimeDemande.techniqueClasse(idLanceur, idCarte, null, null, { cases: finalHexes.map(h => ({ q: h.q, r: h.r })) });
         }
         return;
     }

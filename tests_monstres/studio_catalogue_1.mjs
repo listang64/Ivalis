@@ -5,7 +5,7 @@
 // d'animation de tous ces effets (certains sont déjà dans le Studio). Pour
 // rappel, la vue du token est une vue de haut sur la map. Tu vas me créer
 // l'animation et le son qui vont bien. » Suivait sa liste, en neuf sections.
-//   • les 142 animations, dans l'ordre de sa liste, rangées en sections (et
+//   • les 143 animations, dans l'ordre de sa liste, rangées en sections (et
 //     les classes en sous-sections), chacune avec son nom et sa description ;
 //   • des puces pour sauter d'une section à l'autre, un bouton Ralenti ;
 //   • vu de dessus, sur la grille : la marche va de centre d'hexagone en
@@ -28,16 +28,17 @@ const cat = await p.evaluate(() => ({
 }));
 const parSection = {};
 cat.sections.forEach(n => { parSection[n] = (parSection[n] || 0) + 1; });
-verifier("142 animations (les dix premières et les 132 nouvelles)", cat.ids.length === 142 && new Set(cat.ids).size === 142, String(cat.ids.length));
+// (v239 : les Pointes de glace du Profanateur, en section 8 — 143.)
+verifier("143 animations (les dix premières, les 132 nouvelles, les Pointes de glace)", cat.ids.length === 143 && new Set(cat.ids).size === 143, String(cat.ids.length));
 verifier("dans l'ordre exact de la liste", JSON.stringify(cat.ids) === JSON.stringify(cat.ordre));
-verifier("par section : 14, 19, 15, 12, 10, 14, 6, 43, 9 (comme la liste)",
-         JSON.stringify(parSection) === '{"1":14,"2":19,"3":15,"4":12,"5":10,"6":14,"7":6,"8":43,"9":9}', JSON.stringify(parSection));
+verifier("par section : 14, 19, 15, 12, 10, 14, 6, 44, 9 (comme la liste)",
+         JSON.stringify(parSection) === '{"1":14,"2":19,"3":15,"4":12,"5":10,"6":14,"7":6,"8":44,"9":9}', JSON.stringify(parSection));
 verifier("les sections se suivent, sans retour en arrière", cat.sections.every((n, i) => i === 0 || n >= cat.sections[i - 1]));
 const classes = [...new Set(cat.sous)];
 verifier("les classes en sous-sections, dans l'ordre de la liste",
          JSON.stringify(classes) === '["Sorcier","Protecteur","Assassin","Médicus","Chasseur de mages","Profanateur","Pisteur","Géomancien","Sentinelle","Oracle","Vampire"]',
          JSON.stringify(classes));
-verifier("chacune son nom (tous différents), sa description, sa lecture", new Set(cat.noms).size === 142 && cat.descriptions.every(n => n > 30) && cat.fonctions);
+verifier("chacune son nom (tous différents), sa description, sa lecture", new Set(cat.noms).size === 143 && cat.descriptions.every(n => n > 30) && cat.fonctions);
 
 console.log("\n2. LA LISTE DU STUDIO : SECTIONS, SOUS-SECTIONS, PUCES");
 {
@@ -58,7 +59,7 @@ console.log("\n2. LA LISTE DU STUDIO : SECTIONS, SOUS-SECTIONS, PUCES");
   verifier("neuf titres de section, dans l'ordre", JSON.stringify(r.titres) === JSON.stringify(["1. Déplacements", "2. Attaques", "3. Impacts et défenses",
            "4. Soins, protections, énergie", "5. Contrôle et déplacements forcés", "6. États altérés", "7. Zones et terrain", "8. Classes", "9. Talents"]), JSON.stringify(r.titres));
   verifier("onze sous-titres de classe", r.sous.length === 11, JSON.stringify(r.sous));
-  verifier("142 lignes jouables", r.lignes === 142, String(r.lignes));
+  verifier("143 lignes jouables", r.lignes === 143, String(r.lignes));
   verifier("neuf puces ; la puce 8 amène la liste aux Classes", JSON.stringify(r.puces) === '["1","2","3","4","5","6","7","8","9"]'
            && r.apres > r.avant + 200 && r.ecart < 20, JSON.stringify({ avant: r.avant, apres: r.apres, ecart: r.ecart }));
 }

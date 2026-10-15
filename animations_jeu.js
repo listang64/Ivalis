@@ -93,11 +93,15 @@
         if (Number(atout.diviseurDeplacement) >= 2) return "vargen";
         if (pas.glace) return "gelee";
         if (pas.difficile) return "difficile";
+        // Un zombie du Profanateur titube, d'un pas lourd (Nico : « zombie qui
+        // marche et qui attaque : on garde, tu peux intégrer »).
+        if (p && p.zombie) return "zombie";
         return "marche";
     };
     const ANIMATION_DU_PAS = { repli: "jeu-pas-repli", peur: "jeu-pas-peur", confusion: "jeu-pas-confusion",
                                offert: "jeu-pas-offert", vargen: "jeu-pas-vargen",
-                               gelee: "jeu-pas-gelee", difficile: "jeu-pas-difficile", marche: "jeu-pas-marche" };
+                               gelee: "jeu-pas-gelee", difficile: "jeu-pas-difficile", marche: "jeu-pas-marche",
+                               zombie: "jeu-pas-zombie" };
     // Le premier pas d'un trajet (ce qui ne se dit qu'une fois) : le pas d'avant
     // de ce pion, de la même manière, finissait-il là où celui-ci commence ?
     const derniers = {};
@@ -285,7 +289,11 @@
         opportunite: "jeu-attaque-opportunite", "frappe-mur": "jeu-frappe-mur", critique: "jeu-critique",
         // Puis (Nico : « Confusion attaque un allié au hasard, Confusion
         // dissipée, Étourdi : on garde, tu peux intégrer »).
-        "confusion-allie": "jeu-confusion-allie", "confusion-dissipee": "jeu-confusion-dissipee", etourdi: "jeu-etourdi"
+        "confusion-allie": "jeu-confusion-allie", "confusion-dissipee": "jeu-confusion-dissipee", etourdi: "jeu-etourdi",
+        // Puis (« sursis, soin refusé en sursis, fin de sursis : on garde, tu
+        // peux intégrer »).
+        sursis: "jeu-sursis", "sursis-coup": "jeu-sursis-coup", "sursis-soin-refuse": "jeu-sursis-soin-refuse",
+        "sursis-fin": "jeu-sursis-fin"
     };
     // LE PION ABATTU RESTE SUR LE PLATEAU JUSQU'À SA CHUTE. Le coup qui abat
     // le dit (`chute`) : sans ça, la vie à zéro, le redessin le retirait aussitôt
@@ -305,6 +313,9 @@
         if (d && d.sorte === "retenir") return !!(d.pion && window.PIONS_RETENUS[d.pion]);
         // Le mot de la Confusion, déjà dit par son geste : rien à redire.
         if (d && d.sorte === "confusion-dit") return dejaDit(d.pion, d.texte);
+        // Une créature qui se relève en zombie : son pion revient au plateau
+        // juste après (l'état le redessine) — c'est là qu'il se relève.
+        if (d && d.sorte === "releve-zombie") return window.annoncerZombieCombat(d);
         const geste = d && GESTE_DE_REACTION[d.sorte];
         if (!geste || typeof window.jouerAnimationJeu !== "function" || !pionDe(d.pion)) return false;
         // Le coup reçu d'un geste d'attaque du Studio est déjà montré : fait.
@@ -327,7 +338,7 @@
         try {
             await window.jouerAnimationJeu(geste, scene);
         } finally {
-            if (d.sorte === "ko" || d.sorte === "illusion-brisee") rendrePion(d.pion);
+            if (d.sorte === "ko" || d.sorte === "illusion-brisee" || d.sorte === "sursis-fin") rendrePion(d.pion);
         }
         return true;
     };
@@ -338,7 +349,8 @@
     //  dessous à la fin. Un redessin du plateau en pleine entrée ne coupe donc
     //  rien.
     window.PIONS_EN_ENTREE = window.PIONS_EN_ENTREE || {};
-    const ANIMATION_D_ENTREE = { renfort: "jeu-arrivee-renfort", illusion: "jeu-apparition-illusion", deploiement: "jeu-deploiement" };
+    const ANIMATION_D_ENTREE = { renfort: "jeu-arrivee-renfort", illusion: "jeu-apparition-illusion", deploiement: "jeu-deploiement",
+                                 zombie: "jeu-releve-zombie", "zombie-loin": "jeu-releve-zombie-2" };
     function montrer(id) {
         delete window.PIONS_EN_ENTREE[id];
         const el = pionDe(id);
@@ -347,7 +359,9 @@
     function entrer(id, sorte, plus) {
         const el = pionDe(id);
         // Pas de grâce ici : la copie doit partir dès que le vrai pion est revenu.
-        const scene = el ? window.sceneDeCombat(id, null, { montrer: () => montrer(id), grace: 250, ...(plus || {}) }) : null;
+        // (`maitre` : le pion d'où part le geste — le Profanateur d'un zombie.)
+        const scene = el ? window.sceneDeCombat(id, (plus && plus.maitre && pionDe(plus.maitre)) ? plus.maitre : null,
+                                                { montrer: () => montrer(id), grace: 250, ...(plus || {}) }) : null;
         if (!scene) { montrer(id); return Promise.resolve(false); }
         window.PIONS_EN_ENTREE[id] = true;
         el.classList.add("pion-en-entree");
@@ -360,6 +374,22 @@
     // souvent dessiné juste APRÈS l'étape (l'état descend ensuite) : on la note,
     // et appliquerTokensVTT la lance quand il paraît.
     const arrivees = {};
+    // LE ZOMBIE QUI SE RELÈVE (Nico : « relève des zombies, à 1 et à 2 cases :
+    // on garde, tu peux intégrer ») : tombé, son pion a quitté le plateau ;
+    // l'état le redessine aussitôt — c'est sa copie qui se relève, sur un sceau
+    // vert (le grand sceau du Profanateur, à 2 cases de lui).
+    window.annoncerZombieCombat = function ({ pion, depuis, loin, texte }) {
+        if (!pion) return false;
+        const sorte = loin && depuis ? "zombie-loin" : "zombie";
+        const plus = { maitre: depuis || null, texte: texte || "🧟 Se relève en zombie !" };
+        delete window.PIONS_RETENUS[pion];
+        const el = pionDe(pion);
+        if (el) { el.style.opacity = ""; entrer(pion, sorte, plus); return true; }
+        arrivees[pion] = { sorte, plus, quand: Date.now() };
+        window.PIONS_EN_ENTREE[pion] = true;
+        setTimeout(() => { if (arrivees[pion]) { delete arrivees[pion]; montrer(pion); } }, 10000);
+        return true;
+    };
     window.annoncerArriveeCombat = async function ({ pion, illusion }) {
         if (!pion) return;
         const sorte = illusion ? "illusion" : "renfort";
@@ -392,7 +422,7 @@
             const a = arrivees[id];
             if (!a) return;
             delete arrivees[id];
-            entrer(id, a.sorte);
+            entrer(id, a.sorte, a.plus);
         });
         if (!avant || Date.now() - DEBUT_PAGE < (window.DELAI_DEPLOIEMENT_MS === undefined ? 6000 : window.DELAI_DEPLOIEMENT_MS)) return;
         if (!auDebutDuCombat()) return;

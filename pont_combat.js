@@ -222,6 +222,13 @@ const SCENES = {
                  // Une créature enfermée frappe un mur de terre : le geste du
                  // Studio, vers la case du mur (le mot suit).
                  ...(e.frappeMur ? { reaction: { sorte: "frappe-mur", pion: e.acteur || e.cible, mur: e.frappeMur } } : {}),
+                 // LE SURSIS (« sursis, soin refusé en sursis : on garde, tu peux
+                 // intégrer ») : le coup qui ne fait rien, le soin qui se ternit —
+                 // leur geste dit le mot.
+                 ...(e.sursis === "coup" || e.sursis === "soin"
+                     ? { reaction: { sorte: e.sursis === "soin" ? "sursis-soin-refuse" : "sursis-coup", pion,
+                                     depuis: e.acteur && e.acteur !== pion ? e.acteur : null, texte: e.texte || "", couleur: e.couleur || null, remplace: true } }
+                     : {}),
                  // LA CONFUSION (Nico : « on garde, tu peux intégrer ») : la
                  // confusion dissipée a son geste, qui dit le mot ; celui de la
                  // carte détournée (sur soi, sur un allié) a déjà été dit par le
@@ -402,14 +409,23 @@ const SCENES = {
         return { geste: "chute", pion: e.cible, duree: RYTHME.chute,
                  // Le Studio : il s'effondre (la mise à terre), ou le leurre
                  // vole en éclats (l'Illusion brisée).
-                 reaction: { sorte: c && c.estIllusion ? "illusion-brisee" : "ko", pion: e.cible,
+                 // La fin du sursis (« on garde, tu peux intégrer ») : le sablier
+                 // se renverse et il s'effondre.
+                 reaction: { sorte: e.finSursis ? "sursis-fin" : c && c.estIllusion ? "illusion-brisee" : "ko", pion: e.cible,
                              depuis: e.acteur && e.acteur !== e.cible ? e.acteur : null, remplace: true } };
     },
 
-    // Une créature se relève en zombie (Profanateur, niveau 5).
-    zombie(e) {
-        return { geste: "message", pion: e.cible, texte: "🧟 Se relève en zombie !",
-                 couleur: "#7cb342", duree: RYTHME.message };
+    // Une créature se relève en zombie (Profanateur). Le geste du Studio
+    // (Nico : « relève des zombies, à 1 et à 2 cases : on garde, tu peux
+    // intégrer ») : un sceau vert sous elle, et elle se relève — à 2 cases du
+    // Profanateur (niveau 10), le grand sceau part de lui. Il dit le mot.
+    zombie(e, etat) {
+        const texte = "🧟 Se relève en zombie !";
+        const maitre = combattantDe(etat, e.acteur), victime = combattantDe(etat, e.cible);
+        const loin = !!(maitre && victime && maitre.q !== null && maitre.q !== undefined && victime.q !== null && victime.q !== undefined
+                        && (Math.abs(maitre.q - victime.q) + Math.abs(maitre.r - victime.r) + Math.abs(maitre.q + maitre.r - victime.q - victime.r)) / 2 >= 2);
+        return { geste: "message", pion: e.cible, texte, couleur: "#7cb342", duree: RYTHME.message,
+                 reaction: { sorte: "releve-zombie", pion: e.cible, depuis: e.acteur || null, loin, texte, couleur: "#9fe070", remplace: true } };
     },
 
     // Un mur de terre levé, entamé ou cassé (Géomancien). Le mur n'a pas de
@@ -429,7 +445,7 @@ const SCENES = {
     // Une technique de classe jouée : son nom sur le pion.
     techniqueClasse(e) {
         const noms = { CLASSE_MUR_BOUCLIER: "🛡️ Mur de bouclier", CLASSE_REMPART: "🛡️ Rempart",
-                       CLASSE_ASSAUT_MORTEL: "🗡️ Assaut mortel",
+                       CLASSE_ASSAUT_MORTEL: "🗡️ Assaut mortel", CLASSE_POINTES_GLACE: "❄️ Pointes de glace",
                        CLASSE_SOIN_URGENCE: "✚ Soin d'urgence", CLASSE_PRISE_EN_CHARGE: "✚ Prise en charge",
                        CLASSE_NUEE_CHAUVES_SOURIS: "🦇 Nuée de chauve-souris",
                        CLASSE_BAISER_VAMPIRE: "🩸 Baiser du vampire",
@@ -450,12 +466,16 @@ const SCENES = {
 
     // Le sursis du Nécromancien : il ne tombe pas, il le dit — et il dit
     // combien de tours il lui reste.
+    //  Le sursis qui commence (Nico : « sursis : on garde, tu peux intégrer ») :
+    //  son geste du Studio — il se grise, un sablier, une aura sombre — dit le
+    //  mot. Le décompte, lui, garde son mot.
     sursis(e) {
         const tours = nombre(e.tours);
         if (tours <= 0) return { geste: "rien" };
-        return { geste: "message", pion: e.cible,
-                 texte: `💀 Sursis : ${tours} tour${tours > 1 ? "s" : ""}`,
-                 couleur: COULEURS.tenebres, duree: RYTHME.message };
+        const texte = `💀 Sursis : ${tours} tour${tours > 1 ? "s" : ""}`;
+        return { geste: "message", pion: e.cible, texte,
+                 couleur: COULEURS.tenebres, duree: RYTHME.message,
+                 ...((e.debut || e.acteur) ? { reaction: { sorte: "sursis", pion: e.cible, texte, couleur: COULEURS.tenebres, remplace: true } } : {}) };
     }
 };
 

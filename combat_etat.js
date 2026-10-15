@@ -796,7 +796,7 @@ export function tomber(etat, id, acteur, options) {
         c.sursis = { tours, entame };
         c.sursisUtilise = true;
         c.aTerre = false;
-        return [{ type: "sursis", cible: id, acteur: acteur || id, tours, entame, pvApres: 0 }];
+        return [{ type: "sursis", cible: id, acteur: acteur || id, tours, entame, pvApres: 0, debut: true }];
     }
     c.aTerre = true;
     const chute = [{ type: "chute", cible: id, acteur: acteur || id }];

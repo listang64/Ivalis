@@ -1018,10 +1018,16 @@ export function traverserZones(etat, id, hex, des) {
         }
 
         if (zone.degats && !enSursis(cible)) {   // en sursis : les coups sont ignorés
-            const resistance = zone.degats.typeRes === "Magique"
+            // Des dégâts BRUTS ne connaissent aucune défense (les Pointes de
+            // glace) ; une part des PV MAX se compte sur ceux de la victime.
+            const brut = zone.degats.typeRes === "Brut";
+            const resistance = brut ? 0 : zone.degats.typeRes === "Magique"
                 ? defMagiqueDe(cible) : defPhysiqueDe(cible);
             const part = Math.min(Math.max(resistance, 0), 100) / 100;
-            const montant = Math.max(0, Math.round(decimal(zone.degats.valeurBrute) * (1 - part)));
+            const base = nombre(zone.degats.pourcentPvMax) > 0
+                ? Math.max(1, Math.round(nombre(cible.pvMax) * nombre(zone.degats.pourcentPvMax) / 100))
+                : decimal(zone.degats.valeurBrute);
+            const montant = Math.max(0, Math.round(base * (1 - part)));
             if (montant > 0) {
                 let surBouclier = 0;
                 if (cible.bouclier > 0) {
@@ -1033,7 +1039,7 @@ export function traverserZones(etat, id, hex, des) {
                 }
                 etapes.push({ type: "degats", cible: id, acteur: zone.idLanceur || id,
                               montant, surBouclier, zone: zone.id,
-                              bouclierApres: cible.bouclier, pvApres: cible.pv });
+                              bouclierApres: cible.bouclier, pvApres: cible.pv, ...(brut ? { brut: true } : {}) });
 
                 const chute = tomber(etat, id, zone.idLanceur || id);
                 etapes.push(...chute);
@@ -1180,6 +1186,87 @@ export function vieillirZones(etat) {
             delete etat.zones[z.id];
             etapes.push({ type: "zone", id: z.id, retiree: true });
         }
+    });
+    return etapes;
+}
+
+// =========================================================================
+//  LES POINTES DE GLACE (Profanateur, niveau 5)
+// =========================================================================
+//  Nico : « Profanateur lvl5 : Pointes de glace : 1 fois par combat, 0
+//  fatigue, crée en cône devant le lanceur une zone de terrain de pics de
+//  glace (effet gelée standard : 75 % de chance de gelée, et enlève 5 % des
+//  PV max de la cible). »
+//
+//  LE CÔNE : trois rangs devant le Profanateur — 2, 3 puis 4 cases —, entre
+//  deux de ses six directions ; il le tourne autour de lui comme une zone de
+//  mêlée (le premier rang est celui de l'Assaut mortel). Les cases gommées de
+//  la carte n'en sont pas.
+//  LA ZONE : de glace, 3 manches (une de plus pour qui prolonge ses zones).
+//  Qui s'y tient quand les pics jaillissent, ou y entre ensuite : 75 % d'être
+//  Glacé (2 manches, la gelée standard) et 5 % de ses PV max en moins, sans
+//  défense. Comme toute zone, une esquive (ou une parade) l'en sauve, et elle
+//  ne fait pas le tri entre les camps.
+export const POINTES_GLACE = { profondeur: 3, chance: 75, duree: 2, pourcentPvMax: 5, manches: 3 };
+const ICONE_GLACE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181888/IMG_2089_isgcrs.png";
+const DESC_GLACE = "Coût en fatigue du mouvement doublé, et 20% de dégâts physiques subis en plus.";
+// Un sixième de tour autour du centre (la même rotation que le ciblage, rotateHex).
+const tournerHex = (h, pas) => {
+    let q = h.q, r = h.r;
+    for (let i = 0; i < ((nombre(pas) % 6) + 6) % 6; i++) { const nq = -r, nr = q + r; q = nq; r = nr; }
+    return { q, r };
+};
+export function conePointesGlace(origine, pas) {
+    const cases = [];
+    for (let k = 1; k <= POINTES_GLACE.profondeur; k++) {
+        for (let b = 0; b <= k; b++) {
+            const h = tournerHex({ q: k, r: -b }, pas);
+            cases.push({ q: nombre(origine && origine.q) + h.q, r: nombre(origine && origine.r) + h.r });
+        }
+    }
+    return cases;
+}
+// Ces cases sont-elles le cône de ce lanceur, dans l'une des six directions ?
+// Rend la direction (0 à 5), ou -1.
+export function orientationCone(origine, cases) {
+    if (!origine || !Array.isArray(cases)) return -1;
+    const cle = (h) => nombre(h && h.q) + "," + nombre(h && h.r);
+    const voulues = new Set(cases.map(cle));
+    for (let pas = 0; pas < 6; pas++) {
+        const cone = conePointesGlace(origine, pas);
+        if (cone.length === voulues.size && cases.length === cone.length && cone.every(h => voulues.has(cle(h)))) return pas;
+    }
+    return -1;
+}
+// Les pics jaillissent : la zone se pose, puis chacun de ceux qui s'y tiennent
+// (dans l'ordre des ids : les dés tombent pareil sur tous les postes) la subit.
+export function pointesDeGlace(etat, idLanceur, cases, des, plateau) {
+    const lanceur = combattant(etat, idLanceur);
+    if (!lanceur) return [];
+    const carte = plateau || PLAINE;
+    const vues = new Set();
+    const emprise = (cases || []).map(h => ({ q: nombre(h && h.q), r: nombre(h && h.r) })).filter(h => {
+        const cle = h.q + "," + h.r;
+        if (vues.has(cle)) return false;
+        vues.add(cle);
+        return !((carte.etatCase && carte.etatCase(h.q, h.r)) || {}).supprimee;
+    });
+    if (emprise.length === 0) return [];
+    const enPlus = nombre(lanceur.atouts && lanceur.atouts.zonesProlongees);
+    const zone = {
+        id: `zp_${nombre(etat.version)}_${idLanceur}_pics`, hexes: emprise, type: "glace", pics: true,
+        degats: { pourcentPvMax: POINTES_GLACE.pourcentPvMax, typeRes: "Brut" }, soin: null,
+        etat: { nom: "Glacé", icone: ICONE_GLACE, desc: DESC_GLACE, chance: POINTES_GLACE.chance,
+                duree: POINTES_GLACE.duree, estPoison: false, tickFait: false },
+        dureeRestante: POINTES_GLACE.manches + Math.max(0, enPlus),
+        idLanceur
+    };
+    const etapes = poserZone(etat, zone);
+    Object.keys(etat.combattants || {}).sort().forEach(id => {
+        const c = etat.combattants[id];
+        if (!c || c.aTerre || c.q === null || c.q === undefined) return;
+        const hex = emprise.find(h => h.q === nombre(c.q) && h.r === nombre(c.r));
+        if (hex) etapes.push(...traverserZones(etat, id, hex, des));
     });
     return etapes;
 }
@@ -1366,7 +1453,8 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
     c.techniquesUtilisees = utilisees;
     etapes.push({ type: "techniqueClasse", acteur: id, idCarte: action.idCarte,
                   cible: action.cible || id, utilisees,
-                  ...(Array.isArray(action.cibles) ? { cibles: [...action.cibles] } : {}) });
+                  ...(Array.isArray(action.cibles) ? { cibles: [...action.cibles] } : {}),
+                  ...(Array.isArray(action.cases) ? { cases: action.cases.map(h => ({ q: nombre(h.q), r: nombre(h.r) })) } : {}) });
 
     if (action.idCarte === "CLASSE_MUR_BOUCLIER") {
         c.etats = [...(c.etats || []).filter(e => e && e.nom !== ETAT_MUR_BOUCLIER),
@@ -1761,7 +1849,7 @@ export function resoudreCarte(etat, action, plateau) {
             if (enSursis(cible)) {
                 etapes.push({ type: "message", cible: idCible, acteur: idLanceur,
                               texte: attaque.isHeal ? "Sursis : aucun soin 💀" : "Sursis 💀",
-                              couleur: "#b388ff" });
+                              couleur: "#b388ff", sursis: attaque.isHeal ? "soin" : "coup" });
                 return;
             }
 

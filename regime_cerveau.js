@@ -704,7 +704,10 @@ export function creerRegime(contexte) {
                    ...(extra && Number.isFinite(extra.initiative) ? { initiative: extra.initiative } : {}),
                    // Le Mur de terre : les cases choisies sur le plateau.
                    ...(extra && Array.isArray(extra.murs)
-                       ? { murs: extra.murs.map(h => ({ q: nombre(h.q), r: nombre(h.r) })) } : {}) });
+                       ? { murs: extra.murs.map(h => ({ q: nombre(h.q), r: nombre(h.r) })) } : {}),
+                   // Les Pointes de glace : les cases du cône.
+                   ...(extra && Array.isArray(extra.cases)
+                       ? { cases: extra.cases.map(h => ({ q: nombre(h.q), r: nombre(h.r) })) } : {}) });
 
     // Le OK de la fenêtre sombre. Purement local, comme avant : chacun lit à
     // son rythme et rattrape ensuite. Aucun poste n'attend un autre.

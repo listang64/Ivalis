@@ -156,14 +156,18 @@ window.DESCRIPTIFS_CLASSES = {
     },
     CLASSE_PROFANATEUR: {
         presentation: "Il souille ce qu'il touche et ne laisse rien reposer en paix. Sa glace "
-            + "funèbre frappe comme une lame, ses ennemis tombés se relèvent pour le servir, "
-            + "et la mort elle-même doit attendre son tour avant de le prendre.",
+            + "funèbre frappe comme une lame et hérisse la terre de pics, ses ennemis tombés se "
+            + "relèvent pour le servir, et la mort elle-même doit attendre son tour avant de le prendre.",
         paliers: [
             { niveau: 1, titre: "Passif : Relève des morts · Glace funèbre",
               points: ["Un ennemi qu'il tue, ou qui tombe à côté de lui, se relève en zombie à son service",
                        "15 PV · morsure de 7 dégâts physiques · 2 cases par tour · joue en dernier",
                        "Garde ses résistances, mais plus d'esquive ni de parade",
                        "Ses attaques magiques de glace font des dégâts physiques au lieu de magiques"] },
+            { niveau: 5, titre: "Technique : Pointes de glace",
+              points: ["Initiative 100 · aucune fatigue · une fois par combat",
+                       "Des pics de glace jaillissent en cône devant lui (2, 3 puis 4 cases) et y restent 3 manches",
+                       "Qui s'y tient ou y entre : 75 % de chance d'être Glacé (2 manches), et 5 % de ses PV max en moins"] },
             { niveau: 10, titre: "Sursis",
               points: ["Tombé à 0 PV, il tient encore 2 tours debout avant d'être mis KO",
                        "Les coups sont ignorés, aucun soin possible · une fois par combat",
