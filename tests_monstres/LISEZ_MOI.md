@@ -6329,3 +6329,69 @@ s'y lit « Distorsion mentale »), saignement (10 effets au bouton du MJ). Les
 fonctions que des bancs découpent dans le source (estUneAttaqueDeBase,
 estIncompatibleAvecArme, actionADegatsMagiques, appliquerEquipementALaCarte)
 reconnaissent la Distorsion sans assistant de module.
+
+## v241 — La carte du monde fixe ; cases, bannières, surpuissance en DOT, états de la piste, triche des sorts
+
+Nico : « La map monde en arrière-plan, quand on arrive après le charger
+partie : fixe en plein écran, qu'on ne puisse plus zoomer ou dézoomer, la
+hauteur de l'image toujours fixée à l'écran ; en largeur, qu'on puisse la
+faire glisser à droite ou à gauche si elle n'est pas affichée en entier (clic
+souris maintenu, ou le doigt sur iPad) ; et par défaut, le plus à gauche
+possible. » Puis cinq points du combat.
+
+- LA CARTE DU MONDE (app.js : bornesCarteMonde, glisserCarteMonde,
+  recadrerCarte, cadrageCarteMonde ; style.css) : zoom = hauteur de l'écran
+  ÷ 2160, toujours ; le décalage horizontal reste entre « bord gauche au bord
+  de l'écran » (0, la place par défaut) et « bord droit au bord de l'écran » ;
+  jamais de vide sur un côté, jamais de décalage en hauteur. Glissé à la
+  souris (clic maintenu), au doigt, et à la molette (ou deux doigts sur un
+  pavé tactile) ; ni molette-zoom, ni pincement, ni ctrl + molette, ni zoom
+  de la page sur iPad (touch-action: none, gesturestart). Le clic qui finit
+  un glissé ne déclenche pas le fanion ni une icône. Un écran plus large que
+  la carte (rare) : centrée, immobile. Au redimensionnement (plein écran,
+  iPad tourné) : recadrée, à sa place bornée. La main n'apparaît que si la
+  carte glisse.
+- LE VAMPIRE ANKYLAR À 6 PAR CASE (mouvement.js, regime_cerveau.js) : la
+  copie locale du compte des cases marchées était rangée sous « ce héros,
+  cette manche » ; la manche 1 d'un nouveau combat (ou d'un combat
+  réinitialisé) retrouvait celle du combat d'avant — 7 cases, donc 6 de
+  fatigue partout à l'aperçu, alors que le cerveau, lui, facturait le vrai
+  prix. Elle est maintenant datée et ne vit que 15 s (le temps d'un
+  aller-retour), et s'efface quand un combat se ferme ou repart
+  (oublierLeCombatSurLesFiches).
+- LES BANNIÈRES GRISÉES (combat.js) : le volet, dessiné pendant que
+  l'énergie n'était pas encore remontée (le gain de fin de manche est animé
+  après coup), écrivait le gris du texte EN DUR (#888) ; le rafraîchissement
+  retirait la classe et rendait le cadre, jamais ce gris — une bannière
+  « grisée » qu'on pouvait choisir. Le texte n'est plus gris que par la classe
+  (.banniere-epuisee), et le rafraîchissement lit la fiche fraîche
+  (combattantCourant) avec l'énergie du volet (fatiguePourChoisir).
+- LA SURPUISSANCE EN DOT (competences.js : coutDUneAction, sorti de
+  rafraichirForge, et fatigueDeSurpuissance ; moteur_effets.js) : la
+  surpuissance se lit sur la PUISSANCE de la carte — sa fatigue avant la
+  ristourne de l'étalement. 8 crans d'Attaque Magique étalés coûtent 61 mais
+  pèsent 80 : ×1,25 (24 → 30). La Forge l'annonce (« — 80 avant
+  l'étalement ») et l'enregistre (Fatigue_Surpuissance) ; une carte d'avant
+  est relue en refaisant le compte de la Forge sur ses composants. La carte
+  en grand le dit aussi.
+- LES ÉTATS SOUS LES PORTRAITS (combat.js : imageEtat, medaillonEtat,
+  SYMBOLES_ETATS) : un état sans image (Charmé, Rempart, Mur de bouclier,
+  Nuée, Bouclier anti-magie, Ténèbres étalées, Instinct du tueur, Bouclier
+  des Sages, Étalement, Soin étalé, Plaie rouverte, Béni…) ou avec l'image
+  de bandeau de carte (Provocation, Peur, Élan, Repli) prend un médaillon de
+  la couleur de sa bulle sur le pion, avec un symbole, et son nom au survol —
+  sous le portrait de la piste comme dans l'encart du tour.
+- LA TRICHE DES SORTS DES CRÉATURES (app.js : MULTIPLICATEUR_SORTS_MONSTRE,
+  multiplicateurSortsMonstre ; moteur_effets.js, à la lecture de la carte) :
+  +20 % sur les dégâts, les soins, les boucliers et les chances d'état d'une
+  carte de créature (au-delà du plafond du grimoire, jamais de 100) ; sa
+  fatigue reste celle de sa création. Le bonus fixe par stature s'y ajoute
+  ensuite comme avant. Ni zombie ni compagnon.
+
+corrections_v241.mjs : la carte (calage, molette, glissés souris et doigt,
+bornes, clic après glissé, pincement, écran large, redimensionnement, PC),
+le prix des cases après un combat, les bannières, la surpuissance en DOT
+(carte d'avant, carte neuve, Forge, enregistrement), la triche des créatures,
+les médaillons de la piste. Il mord sur l'ancien code (18 échecs avant de
+tomber). Mis à jour : deplacement_repris (copie locale datée), surpuissance
+(une créature : 12 × 1,2 = 14, sans surpuissance).

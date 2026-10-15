@@ -1654,7 +1654,10 @@ window.demarrerCiblage = async function(idCarte, options) {
                     ? 0 : (parseFrFloat(effBase.Valeur) || 0) * (act.count || 1);
                 const surpuissance = (!isShield && !isPurification && !(lanceurCarte && lanceurCarte.estMonstre)
                                       && typeof window.multiplicateurSurpuissance === "function")
-                    ? window.multiplicateurSurpuissance(dataCarte.Fatigue) : 1;
+                    // Sa puissance d'avant l'étalement (v241) : un sort mis en
+                    // DOT garde la surpuissance de ce qu'il pèse.
+                    ? window.multiplicateurSurpuissance(typeof window.fatigueDeSurpuissance === "function"
+                        ? window.fatigueDeSurpuissance(dataCarte, lanceurCarte) : dataCarte.Fatigue) : 1;
 
                 attaquesExtraites.push({
                     nom: effBase.Nom,
@@ -2433,6 +2436,23 @@ window.demarrerCiblage = async function(idCarte, options) {
             if (a.isShield || a.purifChance > 0) return;
             a.estEtalement = true;
             a.toursEtalement = Math.max(a.toursEtalement || 0, toursEtalementDeLaCarte);
+        });
+    }
+
+    // LA TRICHE DES SORTS DES CRÉATURES (app.js, v241) : une fois la carte
+    // lue, ses effets valent 20 % de plus — dégâts, soins, boucliers, chances
+    // d'état (au-delà du plafond du grimoire, jamais au-delà de 100). Sa
+    // fatigue, elle, reste celle de sa création.
+    const tricheSorts = typeof window.multiplicateurSortsMonstre === "function"
+        ? window.multiplicateurSortsMonstre(persoLanceur) : 1;
+    if (tricheSorts !== 1) {
+        attaquesExtraites.forEach(a => {
+            if ((Number(a.valeurBrute) || 0) > 0) a.valeurBrute = Math.round(a.valeurBrute * tricheSorts);
+            if ((Number(a.pourcentPV) || 0) > 0) a.pourcentPV = Math.round(a.pourcentPV * tricheSorts * 10) / 10;
+            a.tricheSorts = tricheSorts;
+        });
+        alterationsExtraites.forEach(alt => {
+            if ((Number(alt.chance) || 0) > 0) alt.chance = Math.min(100, Math.round(alt.chance * tricheSorts));
         });
     }
 

@@ -1724,6 +1724,9 @@ if (typeof window !== "undefined") {
     // grisé pendant tout le combat suivant. On les efface à la réinitialisation
     // et à l'ouverture d'une nouvelle rencontre.
     window.oublierLeCombatSurLesFiches = function() {
+        // Le compte des cases marchées de la manche, gardé le temps d'un
+        // aller-retour (mouvement.js) : il ne passe jamais d'un combat à l'autre.
+        window.PAS_PARCOURUS_TOUR = { id: null, tour: null, pas: 0, quand: 0 };
         [window.PERSOS_PARTIE, window.MONSTRES_PARTIE, window.COMBAT_PERSOS_JOUEUR].forEach(liste => {
             (liste || []).forEach(f => {
                 if (!f) return;

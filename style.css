@@ -460,6 +460,9 @@ body {
   overflow: hidden; 
   z-index: 0;
   background-color: #F5F5DC;
+  /* La carte du monde est fixe (v241) : ni pincement ni défilement du
+     navigateur par-dessus — le doigt la fait seulement glisser. */
+  touch-action: none;
 }
 
 #carte-fond-jeu {
@@ -477,14 +480,15 @@ body {
   background-position: top left;
   background-repeat: no-repeat;
   
-  cursor: grab;
+  cursor: default;
   transform-origin: 0 0; /* 🔻 MODIFIÉ ICI : Origine en haut à gauche */
   will-change: transform;
 }
 
-#carte-fond-jeu:active {
-  cursor: grabbing;
-}
+/* La main n'apparaît que si la carte a de quoi glisser (plus large que
+   l'écran). */
+.carte-glissable #carte-fond-jeu { cursor: grab; }
+.carte-glissable #carte-fond-jeu:active { cursor: grabbing; }
 
 /* --- LE MENU LATERAL FIXE (PC par défaut : x2 par rapport à l'original) --- */
 #menu-lateral {

@@ -1710,6 +1710,23 @@ window.multiplicateurSurpuissance = function(fatigue) {
     const palier = window.PALIERS_SURPUISSANCE.find(p => f >= p.fatigue);
     return palier ? palier.multiplicateur : 1;
 };
+// =========================================================================
+//  LA TRICHE DES SORTS DES CRÉATURES (v241)
+// =========================================================================
+//  Nico : « rajoute un cheat qui fait que tu rajoutes +20 % de bonus à tous
+//  les effets des sorts des monstres après leur création (donc ne rentre pas
+//  en compte dans la fatigue). » La carte d'une créature est créée et chiffrée
+//  comme avant (sa fatigue ne bouge pas) ; c'est en la LISANT pour le combat
+//  (demarrerCiblage, moteur_effets.js) que ses effets valent 20 % de plus :
+//  dégâts, soins, boucliers et chances d'état. La triche fixe par stature
+//  (bonusMonstreDe, moteur_pur.js) s'y ajoute ensuite, comme avant. Ni le
+//  zombie du Profanateur ni le compagnon du Pisteur : ils n'ont pas de sorts.
+window.MULTIPLICATEUR_SORTS_MONSTRE = 1.2;
+window.multiplicateurSortsMonstre = function(c) {
+    if (!c || !c.estMonstre || c.zombie || c.compagnonDe || c.compagnon) return 1;
+    return Number(window.MULTIPLICATEUR_SORTS_MONSTRE) || 1;
+};
+
 // « ×1,25 » — le texte que la Forge et la carte affichent.
 window.texteSurpuissance = function(fatigue) {
     const m = window.multiplicateurSurpuissance(fatigue);
@@ -5648,168 +5665,169 @@ document.addEventListener("click", function (event) {
 });
 
 // =========================================================================
-//  MOTEUR DE LA CARTE INTERACTIVE (ZOOM & DÉPLACEMENT)
+//  LA CARTE DU MONDE : FIXE, EN PLEIN ÉCRAN (v241)
 // =========================================================================
+//  Nico : « la map monde en arrière-plan, quand on arrive après le charger
+//  partie, j'aimerais qu'elle soit fixe en plein écran, qu'on ne puisse plus
+//  zoomer ou dézoomer ; que la hauteur de l'image soit toujours calée à
+//  l'écran ; en largeur, selon les écrans, qu'on puisse faire glisser la map
+//  à droite ou à gauche si elle n'est pas affichée en entier, avec un clic
+//  souris maintenu ou avec le doigt sur iPad ; et si la map ne rentre pas en
+//  entier, la positionner toujours par défaut le plus à gauche possible. »
+//
+//  - LA HAUTEUR FAIT LOI : zoom = hauteur de l'écran ÷ 2160, toujours. Ni la
+//    molette, ni le pincement, ni rien d'autre ne le change.
+//  - LA LARGEUR GLISSE : le décalage horizontal reste entre « bord gauche de
+//    la carte au bord gauche de l'écran » (0, la place par défaut) et « bord
+//    droit au bord droit » ; jamais de vide sur un côté. La molette (et le
+//    glissé à deux doigts d'un pavé tactile) la fait glisser aussi.
+//  - UN ÉCRAN PLUS LARGE QUE LA CARTE (très rare) : elle est centrée, et ne
+//    bouge pas.
+//  - Un glissé n'est pas un clic : la carte qu'on vient de traîner ne
+//    déclenche pas l'icône sur laquelle le doigt s'est levé.
+const LARGEUR_CARTE_MONDE = 3840;
+const HAUTEUR_CARTE_MONDE = 2160;
+// Au-delà de ce déplacement (en pixels), le geste est un glissé, plus un clic.
+const SEUIL_GLISSE_CARTE = 6;
 let carteZoom = 1;
 let cartePanX = 0;
 let cartePanY = 0;
 let isDraggingCarte = false;
 let startDragX = 0;
-let startDragY = 0;
-let lastMapPinchDist = 0;
-let lastMapPinchCenter = { x: 0, y: 0 };
+let departPanX = 0;
+let carteVientDeGlisser = false;
 
-window.recadrerCarte = function() {
-  const carte = document.getElementById("carte-fond-jeu");
-  if (!carte) return;
-
-  const hauteurEcran = typeof window.hauteurDalle === "function" ? window.hauteurDalle() : window.innerHeight;
-  const ratioX = window.innerWidth / 3840;
-  const ratioY = hauteurEcran / 2160;
-
-  carteZoom = Math.max(ratioX, ratioY);
-
-  // Bord gauche de la carte collé au bord gauche de l'écran (même logique que la carte de combat)
-  cartePanX = 0;
-  cartePanY = (hauteurEcran - (2160 * carteZoom)) / 2;
-
-  carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
+// Le cadrage pour un écran donné : le zoom (calé sur la hauteur) et les deux
+// bornes du décalage horizontal.
+window.bornesCarteMonde = function(largeurEcran, hauteurEcran) {
+  const zoom = hauteurEcran / HAUTEUR_CARTE_MONDE;
+  const largeur = LARGEUR_CARTE_MONDE * zoom;
+  if (largeur <= largeurEcran) {
+    const centre = (largeurEcran - largeur) / 2;
+    return { zoom, min: centre, max: centre, glisse: false };
+  }
+  return { zoom, min: largeurEcran - largeur, max: 0, glisse: true };
 };
+
+function tailleEcranCarte() {
+  const hauteur = typeof window.hauteurDalle === "function" ? window.hauteurDalle() : window.innerHeight;
+  return { largeur: window.innerWidth, hauteur };
+}
+
+function poserCarteMonde() {
+  const carte = document.getElementById("carte-fond-jeu");
+  if (carte) carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
+  const conteneur = document.getElementById("conteneur-carte-fond");
+  if (conteneur) {
+    const { largeur, hauteur } = tailleEcranCarte();
+    conteneur.classList.toggle("carte-glissable", window.bornesCarteMonde(largeur, hauteur).glisse);
+  }
+}
+
+// Fait glisser la carte à ce décalage, gardé entre ses bornes. Rend le
+// décalage retenu.
+window.glisserCarteMonde = function(panX) {
+  const { largeur, hauteur } = tailleEcranCarte();
+  const b = window.bornesCarteMonde(largeur, hauteur);
+  carteZoom = b.zoom;
+  cartePanY = 0;
+  cartePanX = Math.min(b.max, Math.max(b.min, Number(panX) || 0));
+  poserCarteMonde();
+  return cartePanX;
+};
+
+// Recadre la carte sur l'écran : calée à gauche (par défaut), ou à sa place
+// actuelle (`garderPosition`, au redimensionnement), toujours entre ses bornes.
+window.recadrerCarte = function(garderPosition) {
+  const { largeur, hauteur } = tailleEcranCarte();
+  const b = window.bornesCarteMonde(largeur, hauteur);
+  return window.glisserCarteMonde(garderPosition === true ? cartePanX : b.max);
+};
+
+// Le cadrage actuel (lu par les bancs).
+window.cadrageCarteMonde = () => ({ zoom: carteZoom, panX: cartePanX, panY: cartePanY });
 
 function initialiserCarteInteractive() {
   const conteneur = document.getElementById("conteneur-carte-fond");
   if (!conteneur) return;
 
-  // Auto-cadrage au lancement
+  // Calée à gauche dès l'arrivée.
   window.recadrerCarte();
 
-  // 1. Gérer le Zoom avec la molette PC (Centré sur le curseur)
+  // 1. LA MOLETTE NE ZOOME PLUS : elle fait glisser la carte (et le glissé à
+  //    deux doigts d'un pavé tactile aussi). Le zoom du navigateur au
+  //    ctrl + molette est bloqué au passage.
   conteneur.addEventListener("wheel", function(e) {
     e.preventDefault();
-    const delta = Math.sign(e.deltaY) * -0.1;
-    const zoomFactor = Math.exp(delta);
-    
-    // Sécurité de blocage pour éviter les décalages infinis
-    let nextZoom = carteZoom * zoomFactor;
-    if (nextZoom < 0.1) nextZoom = 0.1;
-    if (nextZoom > 5) nextZoom = 5;
-    const actualZoomFactor = nextZoom / carteZoom;
-    
-    cartePanX = e.clientX - (e.clientX - cartePanX) * actualZoomFactor;
-    cartePanY = e.clientY - (e.clientY - cartePanY) * actualZoomFactor;
-    carteZoom = nextZoom;
-
-    const carte = document.getElementById("carte-fond-jeu");
-    if (carte) carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
+    if (e.ctrlKey) return;
+    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    window.glisserCarteMonde(cartePanX - delta);
   }, { passive: false });
 
-  // 2. Attraper la carte (Souris PC)
+  const commencer = (x) => {
+    isDraggingCarte = true;
+    carteVientDeGlisser = false;
+    startDragX = x;
+    departPanX = cartePanX;
+  };
+  const suivre = (x) => {
+    if (!isDraggingCarte) return;
+    if (Math.abs(x - startDragX) > SEUIL_GLISSE_CARTE) carteVientDeGlisser = true;
+    window.glisserCarteMonde(departPanX + (x - startDragX));
+  };
+  const finir = () => { isDraggingCarte = false; };
+
+  // 2. LA SOURIS : clic maintenu, et on glisse.
   conteneur.addEventListener("mousedown", function(e) {
     if (e.button !== 0) return;
-    isDraggingCarte = true;
-    startDragX = e.clientX - cartePanX;
-    startDragY = e.clientY - cartePanY;
+    commencer(e.clientX);
   });
-
-  // 3. Déplacer la carte (Souris PC)
   window.addEventListener("mousemove", function(e) {
     if (!isDraggingCarte) return;
     e.preventDefault();
-    cartePanX = e.clientX - startDragX;
-    cartePanY = e.clientY - startDragY;
-
-    const carte = document.getElementById("carte-fond-jeu");
-    if (carte) carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
+    suivre(e.clientX);
   });
+  window.addEventListener("mouseup", finir);
+  window.addEventListener("mouseleave", finir);
 
-  // 4. Lâcher la carte (Souris PC)
-  window.addEventListener("mouseup", function() { isDraggingCarte = false; });
-  window.addEventListener("mouseleave", function() { isDraggingCarte = false; });
+  // Le clic qui termine un glissé ne vaut pas clic (le fanion, une icône).
+  conteneur.addEventListener("click", function(e) {
+    if (!carteVientDeGlisser) return;
+    carteVientDeGlisser = false;
+    e.stopPropagation();
+    e.preventDefault();
+  }, true);
 
-  // =========================================================
-  // 5. GESTION TACTILE IPAD (PAN & PINCH TO ZOOM)
-  // =========================================================
+  // 3. LE DOIGT (iPad) : un doigt fait glisser ; deux doigts ne zooment plus.
   conteneur.addEventListener("touchstart", function(e) {
-      if (e.touches.length === 1) {
-          isDraggingCarte = true;
-          startDragX = e.touches[0].clientX - cartePanX;
-          startDragY = e.touches[0].clientY - cartePanY;
-      } else if (e.touches.length === 2) {
-          isDraggingCarte = false;
-          lastMapPinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-          lastMapPinchCenter = {
-              x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-              y: (e.touches[0].clientY + e.touches[1].clientY) / 2
-          };
-      }
+    if (e.touches.length === 1) commencer(e.touches[0].clientX);
+    else isDraggingCarte = false;
   }, { passive: false });
-
   conteneur.addEventListener("touchmove", function(e) {
-      if (isDraggingCarte || e.touches.length === 2) {
-          if (e.cancelable) e.preventDefault();
-      }
-
-      const carte = document.getElementById("carte-fond-jeu");
-      if (!carte) return;
-
-      if (e.touches.length === 1 && isDraggingCarte) {
-          cartePanX = e.touches[0].clientX - startDragX;
-          cartePanY = e.touches[0].clientY - startDragY;
-          carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
-          
-      } else if (e.touches.length === 2) {
-          const currentDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-          const currentCenter = {
-              x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-              y: (e.touches[0].clientY + e.touches[1].clientY) / 2
-          };
-
-          if (lastMapPinchDist > 0) {
-              const zoomFactor = currentDist / lastMapPinchDist;
-              
-              // 🔻 CORRECTION : Sécurité anti-dérive quand on atteint le zoom limite
-              let nextZoom = carteZoom * zoomFactor;
-              if (nextZoom < 0.1) nextZoom = 0.1;
-              if (nextZoom > 5) nextZoom = 5;
-              const actualZoomFactor = nextZoom / carteZoom;
-              
-              cartePanX += currentCenter.x - lastMapPinchCenter.x;
-              cartePanY += currentCenter.y - lastMapPinchCenter.y;
-              
-              // Centrage mathématique parfait sous les doigts de l'iPad
-              cartePanX = currentCenter.x - (currentCenter.x - cartePanX) * actualZoomFactor;
-              cartePanY = currentCenter.y - (currentCenter.y - cartePanY) * actualZoomFactor;
-              
-              carteZoom = nextZoom;
-              carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
-          }
-
-          lastMapPinchDist = currentDist;
-          lastMapPinchCenter = currentCenter;
-      }
+    if (e.cancelable) e.preventDefault();
+    if (e.touches.length === 1) suivre(e.touches[0].clientX);
   }, { passive: false });
-
   conteneur.addEventListener("touchend", function(e) {
-      if (e.touches.length === 1) {
-          lastMapPinchDist = 0;
-          isDraggingCarte = true;
-          startDragX = e.touches[0].clientX - cartePanX;
-          startDragY = e.touches[0].clientY - cartePanY;
-      } else if (e.touches.length === 0) {
-          isDraggingCarte = false;
-          lastMapPinchDist = 0;
-      }
-  });
+    if (e.touches.length === 1) commencer(e.touches[0].clientX);
+    else if (e.touches.length === 0) {
+      finir();
+      // Un toucher qui a glissé ne se change pas en clic sur l'icône.
+      if (carteVientDeGlisser && e.cancelable) e.preventDefault();
+    }
+  }, { passive: false });
+  // Safari (iPad) : le pincement de la page elle-même.
+  conteneur.addEventListener("gesturestart", function(e) { e.preventDefault(); });
 
   window.dessinerIconesCarte();
 }
 
 // --- CORRECTION DU BUG PLEIN ÉCRAN ---
-// Si l'écran change de taille (ex: passage en plein écran), on attend 200ms
-// pour laisser l'animation du navigateur se terminer, puis on recadre la carte !
+// Si l'écran change de taille (ex: passage en plein écran, iPad tourné), on
+// attend 200 ms que le navigateur ait fini, puis on recadre la carte — la
+// hauteur toujours calée, à sa place (bornée) en largeur.
 window.addEventListener("resize", () => {
   if (document.getElementById("ecran-jeu").style.display !== "none") {
-    setTimeout(window.recadrerCarte, 200);
+    setTimeout(() => window.recadrerCarte(true), 200);
   }
 });
 

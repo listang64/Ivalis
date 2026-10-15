@@ -75,8 +75,10 @@ const res = await p.evaluate(({ src, srcGarde }) => {
                            couts: window.CHEMIN_MOUVEMENT.map(e => e.cost) };
 
   // Ce que validerMouvement retient : le nombre de pas, mémorisé sur-le-champ.
+  // (v241 : la copie locale est datée — elle ne vit que le temps de
+  // l'aller-retour, voir corrections_v241.)
   window.PAS_PARCOURUS_TOUR = { id: "J1", tour: 1,
-    pas: window.pasDejaParcourus("J1") + window.CHEMIN_MOUVEMENT.length };
+    pas: window.pasDejaParcourus("J1") + window.CHEMIN_MOUVEMENT.length, quand: Date.now() };
   const memoireLocale = window.pasDejaParcourus("J1");
 
   // Le personnage repart de sa nouvelle case, la base n'a pas encore répondu.
@@ -98,7 +100,7 @@ const res = await p.evaluate(({ src, srcGarde }) => {
   const apresRechargement = window.pasDejaParcourus("J1");
 
   // Tour suivant : le compteur repart de zéro.
-  window.PAS_PARCOURUS_TOUR = { id: "J1", tour: 1, pas: 8 };
+  window.PAS_PARCOURUS_TOUR = { id: "J1", tour: 1, pas: 8, quand: Date.now() };
   window.PARTIE_DATA = { Tour_Combat: 2, Phase_Combat: "Resolution",
     File_Attente_Combat: [{ idPersonnage: "J1", idCarte: "C1" }] };
   const tourSuivant = window.pasDejaParcourus("J1");

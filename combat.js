@@ -851,7 +851,14 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
 
             const urlCadre = (estEpuise || blocageArme) ? IMAGE_CADRE_EPUISE : IMAGE_CADRE_NORMAL;
             const classeEpuise = (estEpuise || blocageArme) ? "banniere-epuisee" : "";
-            const couleurTexte = (estEpuise || blocageArme) ? "#888888" : "#e0d0b0";
+            // LE GRIS DU TEXTE EST CELUI DE LA CLASSE, jamais écrit en dur
+            // (v241). Une bannière dessinée pendant que l'énergie n'était pas
+            // encore remontée (le gain de fin de manche, animé après coup)
+            // gardait son texte gris #888 pour de bon : le rafraîchissement
+            // retirait la classe et remettait le cadre, mais pas cette couleur
+            // — une bannière « grisée » qu'on pouvait pourtant choisir.
+            // `.banniere-epuisee *` grise le texte tant que la classe est là.
+            const couleurTexte = "#e0d0b0";
             const titreSurvol = blocageArme ? ` title="${blocageArme.replace(/"/g, "&quot;")}"` : "";
 
             htmlDeck += `
@@ -890,7 +897,7 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
             const urlCadreClasse = dejaJouee ? IMAGE_CADRE_EPUISE
                 : enAttente ? "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1783286721/ban_cible_pdpnad.png"
                 : IMAGE_CADRE_NORMAL;
-            const couleurTexteClasse = dejaJouee ? "#888888" : "#e0d0b0";
+            const couleurTexteClasse = "#e0d0b0"; // grisé par la classe (voir plus haut)
             const survol = dejaJouee ? ` title="Déjà utilisée dans ce combat"` : ` title="Technique de classe — une fois par combat"`;
             htmlDeck += `
             <div style="position: relative; height: 100px; margin-bottom: ${ESPACEMENT_BANNIERES}px; transition: margin 0.2s ease;">
@@ -2972,8 +2979,42 @@ function construireHaloVTT(options) {
 // donc `src="undefined"`, une requête 404 en boucle dans la console et un
 // rectangle d'image cassée sous le portrait du héros, dans la piste
 // d'initiative. Un état sans visage ne se dessine pas : il ne casse rien.
+// UN ÉTAT SANS IMAGE A QUAND MÊME SON ICÔNE (v241). Nico : « il y a des états
+// qui sont affichés en bulle sur le token mais pas en image sous l'image du
+// token de la piste d'initiative pour nous expliquer à quoi ça correspond. »
+// Tout état a sa bulle sur le pion (construireIndicateursEtatsToken) ; sous le
+// portrait de la piste, seuls ceux qui portaient une image se montraient —
+// le Charme, le Rempart, le Mur de bouclier, la Nuée, l'Étalement… n'y
+// étaient pas, et la Peur, l'Élan, le Repli ou la Provocation n'avaient que
+// l'image d'un bandeau de carte. Ceux-là prennent un médaillon de LA COULEUR
+// DE LEUR BULLE (COULEUR_ETAT), avec un symbole, et leur nom au survol.
+window.SYMBOLES_ETATS = {
+    "Charmé": "💘", "Ténèbres étalées": "🌑", "Mur de bouclier": "🛡️", "Rempart": "🏰",
+    "Nuée de chauve-souris": "🦇", "Bouclier anti-magie": "💠", "Plaie rouverte": "🩸",
+    "Instinct du tueur": "🗡️", "Bouclier des Sages": "📜", "Étalement": "💢", "Soin étalé": "💚",
+    "Élan": "💨", "Repli": "↩️", "Provocation": "😤", "Peur": "😱", "Béni": "✨",
+    "Absorption": "🌀", "Contre": "⚔️", "Saignement": "🩸", "Aveuglé": "🌫️",
+    "Étourdi": "💫", "Immobilisation": "⛓️", "Confusion": "❓", "Empoisonnement": "☠️",
+    "Brûlé": "🔥", "Glacé": "❄️", "Électrifié": "⚡"
+};
+window.medaillonEtat = function(etat, taille) {
+    const nom = (etat && etat.nom) || "";
+    const couleur = (window.COULEUR_ETAT || {})[nom] || window.COULEUR_ETAT_DEFAUT || "#9e9e9e";
+    const symbole = (window.SYMBOLES_ETATS || {})[nom] || (nom.trim()[0] || "?").toUpperCase();
+    const t = Math.max(12, Math.round(taille || 18));
+    return `<span class="medaillon-etat" data-etat="${nom.replace(/"/g, "&quot;")}" title="${nom.replace(/"/g, "&quot;")}"`
+         + ` style="display: inline-flex; align-items: center; justify-content: center; width: ${t}px; height: ${t}px;`
+         + ` border-radius: 50%; font-size: ${Math.round(t * 0.62)}px; line-height: 1;`
+         + ` background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.55) 0%, ${couleur} 45%, ${couleur} 72%, rgba(0,0,0,0.45) 100%);`
+         + ` border: 1px solid rgba(0,0,0,0.55); box-shadow: 0 ${t > 30 ? 3 : 1}px ${t > 30 ? 5 : 3}px rgba(0,0,0,0.85);">${symbole}</span>`;
+};
 window.imageEtat = function(etat, taille) {
-    if (!etat || !etat.icone) return "";
+    if (!etat || !etat.nom && !etat.icone) return "";
+    // L'image d'un bandeau de carte, posée faute de mieux sur quelques états,
+    // n'est pas une icône.
+    if (!etat.icone || /bandeau_carte_normal/.test(String(etat.icone))) {
+        return typeof window.medaillonEtat === "function" ? window.medaillonEtat(etat, taille) : "";
+    }
     return `<img src="${etat.icone}" style="width: ${taille}px; height: auto; border: none;`
          + ` background: transparent; box-shadow: none;`
          + ` filter: drop-shadow(0 ${taille > 30 ? 4 : 2}px ${taille > 30 ? 6 : 4}px rgba(0,0,0,0.85));">`;
@@ -6041,7 +6082,10 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
 };
 
 window.actualiserBannieresEpuisees = function() {
-    const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
+    // LA FICHE FRAÎCHE (v241), comme les jauges (combattantCourant) : la
+    // liste du volet peut garder l'objet d'avant la dernière nouvelle — celui
+    // d'avant le gain d'énergie de fin de manche.
+    const persoActuel = combattantCourant();
     if (!persoActuel) return;
     
     const fatigueMax = window.fatigueMaxCombattant(persoActuel);
@@ -6050,8 +6094,11 @@ window.actualiserBannieresEpuisees = function() {
     // — à chaque nouvelle de la partie — regrisait tout avec l'énergie d'avant :
     // l'Oracle voyait ses compétences s'éteindre quelques secondes après avoir
     // choisi son Retour arrière, sans avoir le temps d'en prendre une.
-    const fatiguePerso = (persoActuel.fatigueActuelle !== undefined ? parseInt(persoActuel.fatigueActuelle) : fatigueMax)
-        + (typeof window.bonusRetourArriere === "function" ? window.bonusRetourArriere(persoActuel) : 0);
+    // La même énergie que celle qui a dessiné le volet (fatiguePourChoisir).
+    const fatiguePerso = typeof window.fatiguePourChoisir === "function"
+        ? Number(window.fatiguePourChoisir(persoActuel)) || 0
+        : (persoActuel.fatigueActuelle !== undefined ? parseInt(persoActuel.fatigueActuelle) : fatigueMax)
+          + (typeof window.bonusRetourArriere === "function" ? window.bonusRetourArriere(persoActuel) : 0);
 
     const liste = document.getElementById("combat-liste-competences");
     if (!liste) return;

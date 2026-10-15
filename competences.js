@@ -789,10 +789,16 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     // LA SURPUISSANCE (app.js) : une technique de 70 de fatigue ou plus frappe
     // et soigne plus fort. Dite sur la carte, dans le format des autres lignes,
     // et calculée à l'affichage : une carte forgée avant la règle la montre aussi.
-    const surpuissance = typeof window.texteSurpuissance === "function" ? window.texteSurpuissance(fatigue) : "";
+    // Une carte étalée pèse sa fatigue d'avant l'étalement (fatigueDeSurpuissance, v241).
+    // (La puissance se lit sur la carte, comme au combat : jamais sur ce
+    // qu'une blessure ajoute au prix.)
+    const fatigueCarte = Number(data.Fatigue) || fatigue;
+    const puissance = typeof window.fatigueDeSurpuissance === "function"
+        ? window.fatigueDeSurpuissance(data, porteurCout) : fatigueCarte;
+    const surpuissance = typeof window.texteSurpuissance === "function" ? window.texteSurpuissance(puissance) : "";
     if (surpuissance) {
         htmlEffets += `<div class="ligne-surpuissance">${ligneEffetHD("Surpuissance " + surpuissance,
-            `Dégâts et soins ${surpuissance} (technique à ${fatigue} de fatigue)`, false)}</div>`;
+            `Dégâts et soins ${surpuissance} (technique à ${fatigueCarte} de fatigue${puissance > fatigueCarte ? `, ${puissance} avant l'étalement` : ""})`, false)}</div>`;
     }
 
     // NOUVEAU : Dessin avec Bounding Box Dynamique (Rognage auto)
@@ -2563,6 +2569,121 @@ function etatSousEffet(mod, actionCourante, activeTags) {
 window.etatSousEffetForge = etatSousEffet;
 
 
+// LE COÛT D'UNE ACTION DE LA FORGE (en PC) et ce qu'elle rend à l'initiative.
+// `plein` : le même coût SANS la ristourne de l'étalement — la PUISSANCE de
+// l'action, celle qui décide de la surpuissance (v241 : « une compétence avec
+// surpuissance, il ne l'a pas prise en compte car c'est mis en DOT »). Sortie
+// de rafraichirForge pour servir aussi au combat (fatigueDeSurpuissance).
+function coutDUneAction(act, bdd, statsPerso, coutDureePlus) {
+    let initBonus = 0;
+    let baseActionCost = parseFrenchFloat(act.baseEffet.Cout_PT) * act.count;
+    let coutDureeBase = (act.baseDuree || 0) * coutDureePlus;
+    
+    let coutMods = 0;
+    let aDOT = false;
+    let diviseurDOT = DIVISEUR_ETALEMENT;
+    // LA RISTOURNE DE L'ÉTALEMENT NE VAUT QUE POUR LES DÉGÂTS ET LES SOINS
+    // (Nico, v237 : « être sûr qu'il se fasse uniquement sur les dégâts et
+    // les soins ») — ni la Zone, ni la Distance (qui y avaient droit
+    // jusqu'ici), ni les effets associés (états, Durée +, etc.). On met donc
+    // de côté la part « étalable » du coût : le socle s'il frappe ou soigne.
+    // Un bouclier n'est pas un soin : il ne s'étale pas.
+    const soigne = (nom) => {
+        const n = (nom || "").toLowerCase();
+        return (n.includes("soin") || n.includes("guérison") || n.includes("guerison")) && !n.includes("bouclier");
+    };
+    const estPartEtalable = (nom) => estUneAttaqueDeBase(nom) || soigne(nom);
+    let coutEtalable = estPartEtalable(act.baseEffet.Nom) ? baseActionCost + coutDureeBase : 0;
+
+    if (act.baseEffet.Nom === "Initiative +") {
+        const baseVal = parseFrenchFloat(act.baseEffet.Valeur) || 8;
+        initBonus += act.count * (baseVal + parseFrenchFloat(act.baseEffet.Cout_PT) * 5);
+    }
+    // Le coût d'un effet hors initiative (Absorption, Contre, états…) est
+    // rendu à l'initiative : il ne retarde pas la carte.
+    if (window.horsInitiative(act.baseEffet.Nom)) {
+        initBonus += baseActionCost * 5;
+    }
+
+    Object.keys(act.mods).forEach(modId => {
+        const modCount = act.mods[modId];
+        const modEff = (bdd || []).find(e => e.id === modId);
+
+        if (modEff) {
+            if (modEff.Nom === "Initiative +") {
+                const baseVal = parseFrenchFloat(modEff.Valeur) || 8;
+                initBonus += modCount * (baseVal + parseFrenchFloat(modEff.Cout_PT) * 5);
+            }
+            // Même remboursement pour un sous-effet hors initiative.
+            if (window.horsInitiative(modEff.Nom)) {
+                initBonus += (parseFrenchFloat(modEff.Cout_PT) * modCount) * 5;
+            }
+
+            let coutCeMod = 0;
+            if (modEff.Nom === "Zone") {
+                let zoneLen = (act.zoneHexes && act.zoneHexes.length > 0) ? act.zoneHexes.length : modCount;
+                // On remet le premier hexagone gratuit ici aussi ! (Et la
+                // 5e case payante du Géomancien.)
+                coutCeMod = parseFrenchFloat(modEff.Cout_PT) * (typeof window.casesZonePayantes === "function"
+                    ? window.casesZonePayantes(zoneLen, statsPerso)
+                    : Math.max(0, zoneLen - 1));
+            } else if (modEff.Nom === "DOT" || modEff.Nom === "Durée étalement dégâts") {
+                aDOT = true;
+                diviseurDOT = diviseurEtalement(modEff, statsPerso);
+            } else {
+                coutCeMod = parseFrenchFloat(modEff.Cout_PT) * modCount;
+            }
+
+            // Surcoût lié au bouton ⏳ de CE sous-effet
+            let currentModDuree = (act.modsDuree && act.modsDuree[modId]) || 0;
+            coutCeMod += currentModDuree * coutDureePlus;
+            coutMods += coutCeMod;
+            if (estPartEtalable(modEff.Nom)) coutEtalable += coutCeMod;
+        }
+    });
+
+    let coutActionTotale = baseActionCost + coutDureeBase + coutMods;
+    // Seule la part étalable est divisée ; le reste se paie plein pot.
+    if (aDOT) coutActionTotale = (coutActionTotale - coutEtalable) + coutEtalable / diviseurDOT;
+    return { cout: coutActionTotale, plein: baseActionCost + coutDureeBase + coutMods, initBonus };
+}
+window.coutDUneActionForge = coutDUneAction;
+
+// LA PUISSANCE D'UNE CARTE FORGÉE (v241) : la fatigue qui décide de sa
+// surpuissance, celle d'AVANT la ristourne de l'étalement — un sort de 80 mis
+// en DOT ne coûte plus que 62 de fatigue, mais il frappe toujours comme un
+// sort de 80. Les cartes forgées depuis la portent (Fatigue_Surpuissance) ;
+// pour celles d'avant, on refait le compte de la Forge sur leurs composants
+// (coutDUneAction) : sans étalement, c'est leur fatigue, telle quelle.
+window.fatigueDeSurpuissance = function(carte, perso) {
+    if (!carte) return 0;
+    const fatigue = Number(carte.Fatigue) || 0;
+    const ecrite = Number(carte.Fatigue_Surpuissance) || 0;
+    if (ecrite > 0) return Math.max(fatigue, ecrite);
+    const actions = (carte.Composants && Array.isArray(carte.Composants.actions)) ? carte.Composants.actions : [];
+    if (actions.length === 0) return fatigue;
+    const cache = window.EFFETS_BDD_CACHE || {};
+    const bdd = Object.keys(cache).map(id => ({ ...cache[id], id }));
+    const dureePlus = bdd.find(e => e.Nom === "Durée +");
+    const coutDureePlus = dureePlus ? parseFrenchFloat(dureePlus.Cout_PT) : 5;
+    let cout = 0, plein = 0;
+    try {
+        actions.forEach(a => {
+            const baseEffet = bdd.find(e => e.id === a.baseEffetId);
+            if (!baseEffet) return;
+            const c = coutDUneAction({ baseEffet, count: a.count || 1, mods: a.mods || {}, zoneHexes: a.zoneHexes || [],
+                                       baseDuree: a.baseDuree || 0, modsDuree: a.modsDuree || {} }, bdd, perso || null, coutDureePlus);
+            cout += c.cout;
+            plein += c.plein;
+        });
+    } catch (e) { return fatigue; }
+    if (!(cout > 0) || plein <= cout + 1e-9) return fatigue;
+    // Le grimoire n'a pas bougé depuis la forge : le compte exact. Sinon, la
+    // même part de ristourne, appliquée à la fatigue enregistrée.
+    if (Math.floor(cout * 5) === fatigue) return Math.max(fatigue, Math.floor(plein * 5));
+    return Math.max(fatigue, Math.floor(fatigue * plein / cout));
+};
+
 window.rafraichirForge = function() {
     // La carte se redessine : la liste ouverte d'un menu d'avant n'a plus de sens.
     if (typeof window.fermerMenusSousEffets === "function") window.fermerMenusSousEffets();
@@ -2575,77 +2696,13 @@ window.rafraichirForge = function() {
     const coutDureePlus = effetDureePlus ? parseFrenchFloat(effetDureePlus.Cout_PT) : 5;
     const maxDureeStacks = effetDureePlus ? getMaxStacks(effetDureePlus) : 1;
 
+    // La puissance de la carte : son coût sans la ristourne de l'étalement.
+    let totalPCPlein = 0;
     window.forgeState.actions.forEach(act => {
-        let baseActionCost = parseFrenchFloat(act.baseEffet.Cout_PT) * act.count;
-        let coutDureeBase = (act.baseDuree || 0) * coutDureePlus;
-        
-        let coutMods = 0;
-        let aDOT = false;
-        let diviseurDOT = DIVISEUR_ETALEMENT;
-        // LA RISTOURNE DE L'ÉTALEMENT NE VAUT QUE POUR LES DÉGÂTS ET LES SOINS
-        // (Nico, v237 : « être sûr qu'il se fasse uniquement sur les dégâts et
-        // les soins ») — ni la Zone, ni la Distance (qui y avaient droit
-        // jusqu'ici), ni les effets associés (états, Durée +, etc.). On met donc
-        // de côté la part « étalable » du coût : le socle s'il frappe ou soigne.
-        // Un bouclier n'est pas un soin : il ne s'étale pas.
-        const soigne = (nom) => {
-            const n = (nom || "").toLowerCase();
-            return (n.includes("soin") || n.includes("guérison") || n.includes("guerison")) && !n.includes("bouclier");
-        };
-        const estPartEtalable = (nom) => estUneAttaqueDeBase(nom) || soigne(nom);
-        let coutEtalable = estPartEtalable(act.baseEffet.Nom) ? baseActionCost + coutDureeBase : 0;
-
-        if (act.baseEffet.Nom === "Initiative +") {
-            const baseVal = parseFrenchFloat(act.baseEffet.Valeur) || 8;
-            initBonusNet += act.count * (baseVal + parseFrenchFloat(act.baseEffet.Cout_PT) * 5);
-        }
-        // Le coût d'un effet hors initiative (Absorption, Contre, états…) est
-        // rendu à l'initiative : il ne retarde pas la carte.
-        if (window.horsInitiative(act.baseEffet.Nom)) {
-            initBonusNet += baseActionCost * 5;
-        }
-
-        Object.keys(act.mods).forEach(modId => {
-            const modCount = act.mods[modId];
-            const modEff = window.forgeState.effetsBDD.find(e => e.id === modId);
-
-            if (modEff) {
-                if (modEff.Nom === "Initiative +") {
-                    const baseVal = parseFrenchFloat(modEff.Valeur) || 8;
-                    initBonusNet += modCount * (baseVal + parseFrenchFloat(modEff.Cout_PT) * 5);
-                }
-                // Même remboursement pour un sous-effet hors initiative.
-                if (window.horsInitiative(modEff.Nom)) {
-                    initBonusNet += (parseFrenchFloat(modEff.Cout_PT) * modCount) * 5;
-                }
-
-                let coutCeMod = 0;
-                if (modEff.Nom === "Zone") {
-                    let zoneLen = (act.zoneHexes && act.zoneHexes.length > 0) ? act.zoneHexes.length : modCount;
-                    // On remet le premier hexagone gratuit ici aussi ! (Et la
-                    // 5e case payante du Géomancien.)
-                    coutCeMod = parseFrenchFloat(modEff.Cout_PT) * (typeof window.casesZonePayantes === "function"
-                        ? window.casesZonePayantes(zoneLen, window.forgeState && window.forgeState.statsPerso)
-                        : Math.max(0, zoneLen - 1));
-                } else if (modEff.Nom === "DOT" || modEff.Nom === "Durée étalement dégâts") {
-                    aDOT = true;
-                    diviseurDOT = diviseurEtalement(modEff, window.forgeState && window.forgeState.statsPerso);
-                } else {
-                    coutCeMod = parseFrenchFloat(modEff.Cout_PT) * modCount;
-                }
-
-                // Surcoût lié au bouton ⏳ de CE sous-effet
-                let currentModDuree = (act.modsDuree && act.modsDuree[modId]) || 0;
-                coutCeMod += currentModDuree * coutDureePlus;
-                coutMods += coutCeMod;
-                if (estPartEtalable(modEff.Nom)) coutEtalable += coutCeMod;
-            }
-        });
-
-        let coutActionTotale = baseActionCost + coutDureeBase + coutMods;
-        // Seule la part étalable est divisée ; le reste se paie plein pot.
-        if (aDOT) coutActionTotale = (coutActionTotale - coutEtalable) + coutEtalable / diviseurDOT;
-        totalPC += coutActionTotale;
+        const c = coutDUneAction(act, window.forgeState.effetsBDD, window.forgeState && window.forgeState.statsPerso, coutDureePlus);
+        totalPC += c.cout;
+        totalPCPlein += c.plein;
+        initBonusNet += c.initBonus;
     });
 
     const caracs = window.forgeState.caracs || {};
@@ -2670,7 +2727,10 @@ window.rafraichirForge = function() {
     window.forgeState.isCapReached = capDepasse;
     // Le bilan chiffré de la carte, pour qui doit le relire sans passer par
     // l'affichage : LIA rabote ses crans jusqu'à tenir sous le cap.
-    window.forgeState.bilan = { totalPC, fatigue: fatigueConsommee, cap: capFatigue, initiative };
+    // LA PUISSANCE DE LA CARTE (v241) : sa fatigue sans la ristourne de
+    // l'étalement. C'est elle qui donne la surpuissance (fatigueDeSurpuissance).
+    const fatigueSurpuissance = Math.max(fatigueConsommee, Math.floor(totalPCPlein * 5));
+    window.forgeState.bilan = { totalPC, fatigue: fatigueConsommee, cap: capFatigue, initiative, fatigueSurpuissance };
 
     const armeContainer = document.getElementById("forge-weapon-tag-container");
     if (armeContainer) {
@@ -2710,13 +2770,15 @@ window.rafraichirForge = function() {
     // prochain palier tant qu'il en reste un.
     const surpuissance = document.getElementById("forge-surpuissance");
     if (surpuissance && typeof window.multiplicateurSurpuissance === "function") {
-        const texte = window.texteSurpuissance(fatigueConsommee);
-        const prochain = [...window.PALIERS_SURPUISSANCE].reverse().find(p => fatigueConsommee < p.fatigue);
+        const texte = window.texteSurpuissance(fatigueSurpuissance);
+        const prochain = [...window.PALIERS_SURPUISSANCE].reverse().find(p => fatigueSurpuissance < p.fatigue);
+        // Étalée, la carte coûte moins qu'elle ne pèse : on le dit.
+        const avantEtalement = fatigueSurpuissance > fatigueConsommee ? ` — ${fatigueSurpuissance} avant l'étalement` : "";
         surpuissance.classList.toggle("active", !!texte);
         surpuissance.textContent = texte
             ? `💥 Surpuissance ${texte} : dégâts et soins`
-              + (prochain ? ` (×${String(prochain.multiplicateur).replace(".", ",")} dès ${prochain.fatigue})` : "")
-            : `Surpuissance ×${String(prochain.multiplicateur).replace(".", ",")} dès ${prochain.fatigue} de fatigue`;
+              + (prochain ? ` (×${String(prochain.multiplicateur).replace(".", ",")} dès ${prochain.fatigue})` : "") + avantEtalement
+            : `Surpuissance ×${String(prochain.multiplicateur).replace(".", ",")} dès ${prochain.fatigue} de fatigue` + avantEtalement;
     }
     document.getElementById("forge-cap-fatigue").innerText = capFatigue;
     document.getElementById("forge-initiative-val").innerText = initiative;
@@ -2861,7 +2923,7 @@ window.rafraichirForge = function() {
                     <div class="forge-ligne">
                         <div class="forge-ligne-texte">
                             <span class="forge-nom-effet" data-bulle-effet="${act.baseEffet.id}" data-action="${act.idInst}">${nettoyerNomEffet(act.baseEffet.Nom)}</span>${act.baseEffet.Modificateur !== "AUCUN" ? `<span class="forge-tag-mini">${act.baseEffet.Modificateur}</span>` : ""}${genreDuLien(act) ? `<button type="button" class="forge-element-pastille${elementAct ? "" : " manquant"}" data-genre="${genreDuLien(act)}" title="${genreDuLien(act) === "etatMental" ? "Changer d'état" : "Changer d'élément"}" ${elementAct ? `style="--el-couleur: ${elementAct.couleur}; --el-fond: ${elementAct.fond};"` : ""} onclick="window.changerElementForge('${act.idInst}')">${elementAct ? `${elementAct.dessin ? `<span class="forge-pastille-dessin">${iconeDuLien(elementAct)}</span>` : elementAct.icone} ${elementAct.nom}` : (genreDuLien(act) === "etatMental" ? "Choisir un état" : "Choisir un élément")}</button>` : ""}
-                            <div class="forge-desc">${formatterTexteEffet(act.baseEffet, act.count, act)}${texteValeurSurpuissante(act, fatigueConsommee)}${currentBaseDuree > 0 ? `<span class="forge-duree-ajoutee">⏳ +${currentBaseDuree} tour(s) (+${(currentBaseDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}</div>
+                            <div class="forge-desc">${formatterTexteEffet(act.baseEffet, act.count, act)}${texteValeurSurpuissante(act, fatigueSurpuissance)}${currentBaseDuree > 0 ? `<span class="forge-duree-ajoutee">⏳ +${currentBaseDuree} tour(s) (+${(currentBaseDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}</div>
                         </div>
                         <div class="forge-controles">
                             ${baseHasDuree ? `
@@ -2949,6 +3011,10 @@ window.sauvegarderCompetence = async function() {
         Arme: arme,
         Element: element,
         Fatigue: fatigue,
+        // La puissance de la carte, quand l'étalement l'a rendue moins chère
+        // (v241) : c'est elle qui décide de la surpuissance.
+        ...(window.forgeState.bilan && window.forgeState.bilan.fatigueSurpuissance > fatigue
+            ? { Fatigue_Surpuissance: window.forgeState.bilan.fatigueSurpuissance } : {}),
         Initiative: initiative,
         Cout_PC: coutPc,
         Effets_Compiles: compilerEffetsTexte(),

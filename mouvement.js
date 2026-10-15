@@ -23,7 +23,17 @@ window.CHEMIN_START_NODE = null;
 // La valeur de référence vit dans la file d'attente en base — elle survit à un
 // rechargement et vaut pour tous les postes ; la copie locale prend le relais
 // pendant le temps d'aller-retour du réseau.
-window.PAS_PARCOURUS_TOUR = { id: null, tour: null, pas: 0 };
+//
+// LA COPIE LOCALE NE VIT QUE LE TEMPS DE L'ALLER-RETOUR (v241). Elle était
+// rangée sous « ce héros, cette manche » — et la manche 1 d'un nouveau
+// combat (ou d'un combat réinitialisé) retrouvait celle de la manche 1 du
+// combat d'avant : un Vampire qui avait marché 6 cases voyait toutes ses
+// cases à 6 de fatigue, alors que le cerveau, lui, repartait de zéro et ne
+// facturait que le vrai prix. Passé quelques secondes, c'est le compteur de
+// la file — le même que celui du cerveau — qui fait seul foi ; et elle
+// s'efface à chaque combat qui finit ou repart (oublierLeCombatSurLesFiches).
+window.PAS_PARCOURUS_TOUR = { id: null, tour: null, pas: 0, quand: 0 };
+window.DUREE_COPIE_PAS_MS = 15000;
 
 window.pasDejaParcourus = function(idPerso) {
     const partie = window.PARTIE_DATA || {};
@@ -32,8 +42,9 @@ window.pasDejaParcourus = function(idPerso) {
 
     const enBase = (queue.length > 0 && queue[0].idPersonnage === idPerso)
         ? (parseInt(queue[0].pasParcourus) || 0) : 0;
-    const memoire = window.PAS_PARCOURUS_TOUR;
-    const enLocal = (memoire.id === idPerso && memoire.tour === tour) ? memoire.pas : 0;
+    const memoire = window.PAS_PARCOURUS_TOUR || {};
+    const fraiche = (Date.now() - (Number(memoire.quand) || 0)) < (window.DUREE_COPIE_PAS_MS || 15000);
+    const enLocal = (memoire.id === idPerso && memoire.tour === tour && fraiche) ? (Number(memoire.pas) || 0) : 0;
 
     // Le plus élevé des deux : la base peut être en retard juste après une
     // validation, la copie locale peut l'être juste après un rechargement.
@@ -569,7 +580,8 @@ window.validerMouvement = async function() {
         window.PAS_PARCOURUS_TOUR = {
             id: idPerso,
             tour: tourCourant,
-            pas: window.pasDejaParcourus(idPerso) + chemin.length
+            pas: window.pasDejaParcourus(idPerso) + chemin.length,
+            quand: Date.now()
         };
 
         const svgR = document.getElementById("svg-chemin-mouvement");
