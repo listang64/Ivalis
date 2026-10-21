@@ -1,5 +1,5 @@
 // =========================================================================
-//  IVALIS — LES ZONES PROCÉDURALES : LE GIVRE ET LE BRASIER
+//  IVALIS — LES ZONES PROCÉDURALES : GIVRE, BRASIER, POISON, FOUDRE, GRAVATS
 // =========================================================================
 //  Nico, dans le Studio d'animation : « J'aimerais qu'on revoie l'animation
 //  des zones de glace. Je ne veux pas de contour, mais quelque chose de plus
@@ -8,7 +8,9 @@
 //  glacée soufflée par le vent. Si plusieurs zones sont collées, ça fait comme
 //  une grosse zone. Quelque chose de procédural. » Puis : « Comme les zones
 //  de glace, fais aussi de façon procédurale les zones de feu du Studio. » Et :
-//  « Refais dans le même état d'esprit les zones poison et électrique. »
+//  « Refais dans le même état d'esprit les zones poison et électrique. » Et
+//  (v247) : « Dans le même esprit, refais-moi les zones de gravats, de terrain
+//  difficile, quand les murs se brisent. »
 //
 //  UNE COUCHE couvre TOUTES les cases d'un même élément : leur union, pas une
 //  nappe par case. Le dessin part de la distance de chaque point au BORD DE
@@ -33,17 +35,22 @@
 //    • LA FOUDRE (electrique) : le sol ionisé, à peine bleui, marqué de
 //      figures de Lichtenberg (les brûlures ramifiées de la foudre) qui
 //      grésillent ; des arcs qui claquent au hasard d'un point à l'autre ; un
-//      voile de plasma ; des étincelles qui crépitent.
+//      voile de plasma ; des étincelles qui crépitent ;
+//    • LES GRAVATS (gravats) : la terre retournée, un petit monticule par
+//      case éclairé en haut à gauche ; des pierres cassées (gros blocs au
+//      cœur, moellons autour, cailloux qui roulent jusqu'au bord et au-delà),
+//      chacune avec son ombre ; la poussière du mur ; une poussière légère
+//      qui traîne sous le vent, une bouffée qui se lève de loin en loin.
 //
 //  `creerCoucheProcedurale(conteneur, { type, R, pixel, graine, vent })` rend
 //  la couche (`creerCoucheGivre`, `creerCoucheFeu`, `creerCouchePoison`,
-//  `creerCoucheElectrique` : la même, d'un élément) ;
+//  `creerCoucheElectrique`, `creerCoucheGravats` : la même, d'un élément) ;
 //  elle vit dans le repère de la carte (le conteneur est posé sur elle).
 //  `ajouter(cases, { depuis, duree })` : l'élément gagne les nouvelles cases
 //  depuis `depuis` (la plaque grandit) ; `poser(cases)` : sans animation ;
 //  `retirer(cases)`, `vider()`, `detruire()`. Le Studio s'en sert
-//  (studio_animation.js) ; le combat garde ses nappes tant que Nico ne les a
-//  pas validées.
+//  (studio_animation.js) ; le combat aussi pour les quatre zones (v246,
+//  combat.js) ; il garde ses tas de gravats tant que Nico n'a pas validé.
 // =========================================================================
 (function () {
     // --- LE BRUIT ---------------------------------------------------------
@@ -112,6 +119,7 @@
                               box-shadow: 0 0 3px 1px rgba(170, 225, 255, 1), 0 0 9px 3px rgba(90, 170, 255, 0.6); }
             .poison-bulle { border-radius: 50%; border: 1.5px solid rgba(215, 255, 150, 0.7);
                             background: radial-gradient(circle at 34% 32%, rgba(255, 255, 255, 0.55), rgba(170, 225, 90, 0.18) 38%, rgba(90, 140, 30, 0.08) 70%); }
+            .gravats-bouffee { border-radius: 50%; background: radial-gradient(circle, rgba(214, 198, 168, 0.75), rgba(200, 182, 150, 0.3) 45%, rgba(190, 172, 140, 0) 70%); }
             .zone-proc-arcs { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
             .zone-proc-arcs canvas { opacity: 0; }
         `;
@@ -130,7 +138,9 @@
         // Le miasme du poison : un vert sale, lourd.
         miasme: (f) => [120, 175, 62, entre(0.44, 0.86, f) * 205],
         // Le plasma de la foudre : un bleu pâle, à peine là.
-        plasma: (f) => [150, 205, 255, entre(0.55, 0.92, f) * 190]
+        plasma: (f) => [150, 205, 255, entre(0.55, 0.92, f) * 190],
+        // La poussière des gravats : un beige sec, en volutes légères.
+        poussiere: (f) => [206, 190, 160, entre(0.5, 0.9, f) * 200]
     };
     const tuilesFaites = {};
     function tuile(nom) {
@@ -138,7 +148,7 @@
         const N = 128, c = document.createElement("canvas");
         c.width = c.height = N;
         const ctx = c.getContext("2d"), img = ctx.createImageData(N, N);
-        const graine = { brume: 911, flamme: 313, fumee: 521, miasme: 641, plasma: 733 }[nom] || 1;
+        const graine = { brume: 911, flamme: 313, fumee: 521, miasme: 641, plasma: 733, poussiere: 857 }[nom] || 1;
         for (let y = 0; y < N; y++) {
             for (let x = 0; x < N; x++) {
                 // 4 cellules de base par tuile, période 4 (puis 8, 16…) : raccordable.
@@ -196,6 +206,54 @@
         arc(ctx, mx, my, x2, y2, ecart * 0.55, profondeur - 1, h * 3 + 2);
     }
 
+    // UN CAILLOU vu d'en haut : un polygone irrégulier (de la roche cassée),
+    // son ombre portée en bas à droite, la lumière en haut à gauche, une face
+    // plate plus claire, une arête vive, une arête sombre.
+    function caillou(cf, { x, y, r, h, haut }) {
+        const n = 5 + Math.floor(hacher(h, 4, 61) * 4);
+        const rot = hacher(h, 5, 61) * Math.PI * 2, allonge = 0.62 + 0.38 * hacher(h, 6, 61);
+        const pts = [];
+        for (let i = 0; i < n; i++) {
+            const a = (i + (hacher(h, 10 + i, 61) - 0.5) * 0.7) / n * Math.PI * 2;
+            const rr = r * (0.76 + 0.32 * hacher(h, 20 + i, 61));
+            const lx = Math.cos(a) * rr, ly = Math.sin(a) * rr * allonge;
+            pts.push([x + lx * Math.cos(rot) - ly * Math.sin(rot), y + lx * Math.sin(rot) + ly * Math.cos(rot)]);
+        }
+        const chemin = (dx, dy, e) => {
+            cf.beginPath();
+            pts.forEach(([px, py], i) => { const X = x + (px - x) * e + dx, Y = y + (py - y) * e + dy; if (i) cf.lineTo(X, Y); else cf.moveTo(X, Y); });
+            cf.closePath();
+        };
+        // L'ombre, douce : deux passes, plus haut il est, plus elle s'écarte.
+        const porte = 0.2 + 0.18 * haut;
+        cf.fillStyle = "rgba(24, 16, 10, 0.26)"; chemin(r * (porte + 0.12), r * (porte + 0.18), 1.16); cf.fill();
+        cf.fillStyle = "rgba(24, 16, 10, 0.42)"; chemin(r * porte, r * (porte + 0.06), 1.0); cf.fill();
+        // La roche : un gris brun, chaque pierre la sienne.
+        const L = 31 + 16 * hacher(h, 7, 61) + 8 * haut, S = 5 + 9 * hacher(h, 8, 61), T = 28 + 14 * hacher(h, 9, 61);
+        const g = cf.createLinearGradient(x - r * 0.7, y - r * 0.8, x + r * 0.7, y + r * 0.8);
+        g.addColorStop(0, `hsl(${T}, ${S}%, ${L + 15}%)`); g.addColorStop(0.5, `hsl(${T}, ${S}%, ${L}%)`); g.addColorStop(1, `hsl(${T}, ${S}%, ${L - 17}%)`);
+        cf.fillStyle = g; chemin(0, 0, 1); cf.fill();
+        // La face plate, tournée vers la lumière.
+        cf.fillStyle = `hsla(${T}, ${S}%, ${L + 16}%, 0.45)`; chemin(-r * 0.13, -r * 0.15, 0.58); cf.fill();
+        // Les arêtes : vive en haut à gauche, sombre en bas à droite.
+        cf.lineJoin = "round";
+        for (let i = 0; i < n; i++) {
+            const [ax, ay] = pts[i], [bx, by] = pts[(i + 1) % n];
+            const nx = by - ay, ny = -(bx - ax), lum = -(nx * 0.6 + ny * 0.8) / (Math.hypot(nx, ny) || 1);
+            if (Math.abs(lum) < 0.25) continue;
+            cf.strokeStyle = lum > 0 ? `hsla(${T}, ${S}%, ${L + 28}%, ${(0.55 * lum).toFixed(2)})` : `rgba(26, 18, 12, ${(-0.5 * lum).toFixed(2)})`;
+            cf.lineWidth = Math.max(0.5, r * 0.09);
+            cf.beginPath(); cf.moveTo(ax, ay); cf.lineTo(bx, by); cf.stroke();
+        }
+        // Parfois, une fêlure.
+        if (hacher(h, 30, 61) < 0.35 && r > 3) {
+            const a = hacher(h, 31, 61) * Math.PI;
+            cf.strokeStyle = "rgba(30, 22, 16, 0.45)"; cf.lineWidth = Math.max(0.4, r * 0.05);
+            cf.beginPath(); cf.moveTo(x - Math.cos(a) * r * 0.55, y - Math.sin(a) * r * 0.45); cf.lineTo(x + Math.cos(a + 0.4) * r * 0.1, y + Math.sin(a + 0.4) * r * 0.1);
+            cf.lineTo(x + Math.cos(a) * r * 0.6, y + Math.sin(a) * r * 0.5); cf.stroke();
+        }
+    }
+
     // =====================================================================
     //  LES RECETTES
     // =====================================================================
@@ -203,8 +261,10 @@
     //  null — en un point de la carte à la profondeur `p` (sa distance au bord,
     //  positive dedans) ; `lueur` (le feu) : le pixel des braises, sur un
     //  calque à part qui respire ; `decor` : ce qui se trace par-dessus (les
-    //  fougères de givre) ; `voiles` : brume, flammes, fumée ; `eclats` ;
-    //  `frange` : la couleur du front qui avance.
+    //  fougères de givre, les pierres des gravats), découpé par la plaque sauf
+    //  `decorDebord` (des cailloux roulent au-delà) ; `voiles` : brume,
+    //  flammes, fumée, poussière ; `eclats` ; `frange` : la couleur du front
+    //  qui avance. Les outils : R, graine, pixel, k, profondeur, versCase.
     const RECETTES = {
         glace: {
             classe: "givre", marge: 1.6,
@@ -426,6 +486,88 @@
             ],
             eclats: { parCase: 4, classe: "elec-etincelle", geste: "crepite" },
             frange: [150, 210, 255]
+        },
+
+        gravats: {
+            classe: "gravats", marge: 1.5,
+            // LA TERRE RETOURNÉE : un sol brun, en mottes, un petit monticule par
+            // case (éclairé en haut à gauche, dans l'ombre en bas à droite) ; la
+            // poussière du mur, plus claire vers les bords ; au-delà, une poudre
+            // beige retombée, sans trait, et des grains épars.
+            sol(x, y, p, { R, graine, pixel, versCase }) {
+                if (p < -R * 0.62) return null;
+                const n1 = fbm(x / (R * 0.45), y / (R * 0.45), 3, graine + 13);
+                const bord = p + (n1 - 0.5) * R * 0.7;
+                const m = entre(-R * 0.12, R * 0.26, bord);
+                const poudre = bord > -R * 0.62 ? entre(-R * 0.62, -R * 0.04, bord) : 0;
+                // Des grains, des petits cailloux : nombreux sur la terre, rares dans la poudre.
+                const gx = x / (R * 0.075), gy = y / (R * 0.075), ix = Math.floor(gx), iy = Math.floor(gy);
+                let grain = null;
+                const amas = entre(0.35, 0.75, fbm(x / (R * 0.35), y / (R * 0.35), 2, graine + 79));
+                if (hacher(ix, iy, graine + 71) > 0.97 - (0.22 + 0.4 * amas) * Math.max(m, poudre * 0.3)) {
+                    const cx = ix + 0.3 + 0.4 * hacher(ix, iy, graine + 72), cy = iy + 0.3 + 0.4 * hacher(ix, iy, graine + 73);
+                    const rr = 0.09 + 0.24 * Math.pow(hacher(ix, iy, graine + 74), 2);
+                    const dx = gx - cx, dy = gy - cy, d = Math.sqrt(dx * dx + dy * dy);
+                    if (d < rr) grain = { lum: -(dx * 0.6 + dy * 0.8) / rr, t: hacher(ix, iy, graine + 75) };
+                    else if (d < rr * 1.45 && dx + dy > 0) grain = { ombre: 1 };
+                }
+                if (m <= 0.003 && poudre <= 0.003 && !grain) return null;
+                if (grain && grain.lum !== undefined) {
+                    const l = 96 + 34 * grain.lum + 28 * grain.t;
+                    return [l, l * 0.9, l * 0.78, Math.max(0.85, m), m];
+                }
+                if (m <= 0.003) return grain ? [40, 28, 18, 0.25 * poudre + 0.1, 0] : [190, 172, 140, poudre * 0.18, 0];
+                // Le monticule de la case : une butte douce, dont la pente se tourne vers la lumière.
+                const c = versCase(x, y), o = pixel(c.q, c.r);
+                const dx = (x - o.x) / R, dy = (y - o.y) / R, d = Math.sqrt(dx * dx + dy * dy);
+                const butte = Math.max(0, 1 - d * d / 0.85);
+                const pente = d > 0.02 ? -(dx * 0.6 + dy * 0.8) / d * Math.min(1, d * 1.8) * butte : 0;
+                const n2 = fbm(x / (R * 0.17), y / (R * 0.17), 3, graine + 29);
+                const n3 = bruit(x / (R * 0.022), y / (R * 0.022), graine + 41);
+                const motte = entre(0.42, 0.72, n2);
+                let r = 100 + 52 * pente - 30 * motte + 14 * n3, g = 76 + 42 * pente - 24 * motte + 11 * n3, b = 52 + 30 * pente - 16 * motte + 8 * n3;
+                // La poussière du mur : par plaques, et plus vers le bord.
+                const poussiere = Math.min(0.7, (1 - entre(0, R * 0.5, bord)) * 0.45 + 0.35 * entre(0.6, 0.82, fbm(x / (R * 0.3), y / (R * 0.3), 2, graine + 47)));
+                r += (186 - r) * poussiere * 0.55; g += (168 - g) * poussiere * 0.55; b += (136 - b) * poussiere * 0.55;
+                if (grain && grain.ombre) { r *= 0.72; g *= 0.72; b *= 0.72; }
+                const a = m * (0.74 + 0.16 * butte + 0.05 * n3) + poudre * 0.18 * (1 - m);
+                return [r, g, b, Math.min(0.92, a), m];
+            },
+            // LES PIERRES : de gros blocs au cœur de chaque case, des moellons autour,
+            // des cailloux qui roulent jusqu'au bord et au-delà ; les plus hauts
+            // (près du cœur) posés par-dessus les autres.
+            decor(cf, liste, { R, graine, pixel, profondeur }) {
+                const pierres = [];
+                const FAMILLES = [
+                    { n: 5, rMin: 0.14, rMax: 0.25, loin: 0.42, dedans: 0.7 },
+                    { n: 18, rMin: 0.075, rMax: 0.14, loin: 0.72, dedans: 0.45 },
+                    { n: 34, rMin: 0.03, rMax: 0.065, loin: 1.05, dedans: -6 }
+                ];
+                liste.forEach(c => {
+                    const p = pixel(c.q, c.r), h0 = (c.q * 73856 + c.r * 19349 + graine) | 0;
+                    FAMILLES.forEach((f, fi) => {
+                        for (let s = 0; s < f.n; s++) {
+                            const h = (h0 * 31 + fi * 1009 + s * 7) | 0;
+                            const ang = hacher(h, 1, 61) * Math.PI * 2, d = R * f.loin * Math.sqrt(hacher(h, 2, 61));
+                            const x = p.x + Math.cos(ang) * d, y = p.y + Math.sin(ang) * d;
+                            const r = R * (f.rMin + (f.rMax - f.rMin) * hacher(h, 3, 61));
+                            // Les blocs restent sur la terre ; les cailloux roulent jusqu'à la poudre.
+                            if (profondeur(x, y) < r * f.dedans) continue;
+                            pierres.push({ x, y, r, h, haut: Math.max(0, 1 - d / (R * 1.1)) * (fi === 2 ? 0.5 : 1) });
+                        }
+                    });
+                });
+                pierres.sort((a, b) => a.haut - b.haut).forEach(pt => caillou(cf, pt));
+            },
+            decorDebord: true,
+            voiles: [
+                // Une poussière légère, qui traîne et s'en va doucement sous le vent.
+                { nom: "poussiere", classe: "gravats-poussiere", ecran: false, sousLeVent: 0.5,
+                  masque: (p, n, R) => entre(-R * 0.6, R * 0.4, p + (n - 0.5) * R * 0.6),
+                  couches: [{ tuile: "poussiere", l: 6, h: 3, op: 0.24, v: 0.45 }, { tuile: "poussiere", l: 4.2, h: 2.2, op: 0.16, v: 0.3 }] }
+            ],
+            eclats: { parCase: 2, classe: "gravats-bouffee", geste: "bouffee" },
+            frange: [215, 196, 160]
         }
     };
 
@@ -534,7 +676,7 @@
                 if (liste2) for (const s of liste2) { const v = distanceSegment(x, y, s); if (v < d) d = v; }
                 return dedans.has(cle(c.q, c.r)) ? d : -d;
             };
-            const outils = { R, graine, pixel, k };
+            const outils = { R, graine, pixel, k, profondeur, versCase };
 
             const toile = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
             const plein = toile(W, H), masque = toile(W, H), braises = recette.lueur || recette.decorLueur ? toile(W, H) : null;
@@ -587,16 +729,18 @@
 
             // LE DÉCOR TRACÉ (les fougères de givre, les brûlures de la foudre — et
             // leur lueur), découpé par le masque.
-            const tracer = (fonction, cible) => {
+            const tracer = (fonction, cible, libre) => {
                 const deco = toile(W, H), cf = deco.getContext("2d");
                 cf.setTransform(k, 0, 0, k, -E.x0 * k, -E.y0 * k);
                 fonction(cf, liste, outils);
                 cf.setTransform(1, 0, 0, 1, 0, 0);
-                cf.globalCompositeOperation = "destination-in";
-                cf.drawImage(masque, 0, 0);
+                if (!libre) {
+                    cf.globalCompositeOperation = "destination-in";
+                    cf.drawImage(masque, 0, 0);
+                }
                 cible.getContext("2d").drawImage(deco, 0, 0);
             };
-            if (recette.decor) tracer(recette.decor, plein);
+            if (recette.decor) tracer(recette.decor, plein, recette.decorDebord);
             if (recette.decorLueur) tracer(recette.decorLueur, braises);
 
             // LES ARCS (la foudre) : chacun sur son image, en demi-définition (ils sont flous de lumière).
@@ -684,6 +828,15 @@
                     e.animate([{ opacity: 0, transform: "scale(0.2)" }, { opacity: 0.9, transform: "scale(0.55)", offset: 0.2 },
                                { opacity: 0.9, transform: "scale(0.95)", offset: 0.72 }, { opacity: 0.9, transform: "scale(1)", offset: 0.8 },
                                { opacity: 0, transform: "scale(1.35)", offset: 0.86 }, { opacity: 0, transform: "scale(0.2)" }],
+                              { duration: periode, delay: (retard || 0) + pt.h * periode, iterations: Infinity, easing: "ease-out" });
+                } else if (recette.eclats.geste === "bouffee") {
+                    // Une bouffée de poussière se lève, s'étale et retombe, de loin en loin.
+                    const t = R * (0.35 + 0.25 * pt.h), periode = 4200 + pt.h * 4800;
+                    e.style.width = e.style.height = t + "px";
+                    e.style.margin = `${-t / 2}px 0 0 ${-t / 2}px`;
+                    e.animate([{ opacity: 0, transform: "translate(0px, 0px) scale(0.3)" }, { opacity: 0, transform: "translate(0px, 0px) scale(0.3)", offset: 0.55 },
+                               { opacity: 0.55, transform: `translate(${(ux * R * 0.08).toFixed(1)}px, ${(uy * R * 0.08).toFixed(1)}px) scale(0.9)`, offset: 0.66 },
+                               { opacity: 0, transform: `translate(${(ux * R * 0.35).toFixed(1)}px, ${(uy * R * 0.35).toFixed(1)}px) scale(1.6)` }],
                               { duration: periode, delay: (retard || 0) + pt.h * periode, iterations: Infinity, easing: "ease-out" });
                 } else if (recette.eclats.geste === "crepite") {
                     // Une étincelle claque deux fois, vite, et disparaît.
@@ -923,5 +1076,7 @@
     window.creerCoucheFeu = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "feu" });
     window.creerCouchePoison = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "poison" });
     window.creerCoucheElectrique = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "electrique" });
-    window.TYPES_ZONES_PROCEDURALES = Object.keys(RECETTES);
+    window.creerCoucheGravats = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "gravats" });
+    // Les zones persistantes (les gravats sont un terrain, pas une zone).
+    window.TYPES_ZONES_PROCEDURALES = Object.keys(RECETTES).filter(t => t !== "gravats");
 })();

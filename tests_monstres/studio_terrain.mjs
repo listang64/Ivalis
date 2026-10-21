@@ -244,12 +244,14 @@ console.log("\n5. LE MUR QUI S'EFFONDRE LAISSE LES GRAVATS DU JEU");
     await new Promise(r => setTimeout(r, 50));
     await window.__fini();
     window.VITESSE_ANIMATIONS = 1;
-    return { t: window.terrainStudio(), tas: [...document.querySelectorAll("#studio-gravats img")].map(i => i.dataset.case),
+    // (v247 : les gravats sont un éboulis procédural — une plaque — et non plus un tas d'images.)
+    const plaque = typeof window.gravatsStudio === "function" && window.gravatsStudio();
+    return { t: window.terrainStudio(), tas: plaque ? plaque.cases().map(c => `${c.q}_${c.r}`) : [...document.querySelectorAll("#studio-gravats img")].map(i => i.dataset.case),
              casse: window.__espions.murs.some(d => /c/.test(d.etats)), gravats: window.__espions.gravats };
   });
   const milieu = `${ligne[1].q}_${ligne[1].r}`;
   verifier("le mur du milieu tombe ; ses deux voisins restent", r.t.murs.length === 2 && !r.t.murs.some(m => `${m.q}_${m.r}` === milieu), JSON.stringify(r.t.murs));
-  verifier("à sa place, le tas de gravats du jeu (dessinerGravatsTerre), qui reste", r.t.gravats.includes(milieu) && r.tas.includes(milieu) && r.gravats > 0,
+  verifier("à sa place, l'éboulis (procédural depuis v247), qui reste", r.t.gravats.includes(milieu) && r.tas.includes(milieu),
            JSON.stringify(r.tas));
   verifier("…et les murs voisins se redessinent avec leur moignon cassé (voisin « casse »)", r.casse);
   // Sur une case libre : un mur s'y dresse d'abord, puis tombe.

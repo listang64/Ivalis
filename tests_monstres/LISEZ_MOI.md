@@ -6644,3 +6644,56 @@ retenue ; la réinitialisation ; le secours SVG. Il mord sur l'ancien code
 (18 échecs). Mis à jour : corrections_v243, v244 et v245 (le combat pose
 désormais les mêmes plaques que le Studio), studio_terrain (le combat
 dessine toujours ses nappes de soin).
+
+## v247 — Studio : les gravats, procéduraux
+
+Nico : « Ensuite, dans le même esprit que ceux-là [les zones procédurales],
+refais-moi les zones de gravats, de terrain difficile, quand les murs se
+brisent. »
+
+- UNE RECETTE DE PLUS (zones_procedurales.js, « gravats ») — le même moteur :
+  tous les tas forment UNE plaque, deux tas voisins sans couture, aucun
+  contour, du bruit en coordonnées de la carte, l'éboulis qui gagne depuis
+  le cœur (sa frange : une poussière beige).
+  - LA TERRE RETOURNÉE : brune, en mottes, presque opaque ; un petit
+    monticule par case, sa pente éclairée en haut à gauche et dans l'ombre
+    en bas à droite ; la poussière du mur, par plaques et plus vers le bord ;
+    au-delà, une poudre beige retombée, sans trait ; des grains épars, par
+    amas.
+  - LES PIERRES (le décor, tracé) : de gros blocs au cœur de chaque case,
+    des moellons autour, des cailloux qui roulent jusqu'au bord et au-delà
+    (decorDebord : ce décor n'est pas découpé par la plaque) ; chacune un
+    polygone de roche cassée, gris brun, avec son ombre portée (plus haute
+    elle est, plus l'ombre s'écarte), une face plate tournée vers la
+    lumière, une arête vive et une arête sombre, parfois une fêlure ; les
+    plus hautes (près du cœur) posées par-dessus.
+  - UNE POUSSIÈRE LÉGÈRE qui traîne sous le vent (un voile beige, lent) ; de
+    loin en loin, une bouffée qui se lève, s'étale et retombe.
+  - Le moteur gagne : la profondeur et la case de chaque point dans les
+    outils des recettes, le décor qui déborde, le geste « bouffée » ;
+    creerCoucheGravats. Les gravats sont un terrain, pas une zone :
+    TYPES_ZONES_PROCEDURALES reste aux quatre éléments.
+- LE STUDIO (studio_animation.js) : un seul éboulis pour tous les gravats de
+  la carte (#studio-gravats) ; terrain.etendreGravats(cases, { depuis,
+  duree }) le fait gagner du terrain ; un mur levé sur des gravats les
+  couvre (l'éboulis s'y retire) ; « ⟲ Replacer » l'efface.
+  window.gravatsStudio() pour les bancs.
+- LE CATALOGUE (animations_catalogue.js) : « Gravats » — l'éboulis part de
+  la case la plus centrale des cases visées ; « Mur de terre effondré » —
+  pendant que le mur s'écroule dans son nuage, l'éboulis gagne sa case
+  depuis le pied du mur ; deux murs tombés côte à côte n'en font qu'un, et
+  leurs voisins gardent leur moignon cassé. Sans le moteur, les tas d'avant.
+- Le combat garde ses tas (dessinerGravatsTerre) tant que Nico n'a pas
+  validé.
+- Le calcul : environ 0,1 s pour 7 cases.
+
+corrections_v247.mjs : l'éboulis (une plaque, plus d'images, sans contour,
+qui couvre ses cases et rien d'autre ; la terre brune presque opaque ; les
+pierres claires et leurs ombres ; le monticule éclairé en haut à gauche ;
+les cailloux au-delà ; la poussière au vent et les bouffées), sans couture,
+le même dessin pour les mêmes cases, depuis le cœur, le calcul ; les murs
+qui se brisent (l'éboulis gagne la case du mur tombé, deux murs côte à côte
+en un seul éboulis, un mur levé sur des gravats, « Replacer ») ; le
+catalogue ; les tas du combat inchangés. Il mord sur l'ancien code
+(17 échecs). Mis à jour : studio_terrain (le mur effondré laisse l'éboulis,
+une plaque, et non plus une image de tas).

@@ -48,6 +48,10 @@ const studio = {
     // Les plaques procédurales, une par élément (zones_procedurales.js) : le
     // givre de toutes les cases de glace (v243), le brasier de toutes celles de feu (v244).
     couches: {},
+    // Les gravats, procéduraux (v247) : une plaque pour tous les tas ; les cases
+    // déjà confiées à la plaque (posées ou en train d'avancer).
+    coucheGravats: null,
+    gravatsPoses: new Set(),
     // Le ciblage en cours : { id, nom, regle, cases }.
     ciblage: null
 };
@@ -542,8 +546,9 @@ function brancherCamera(scene) {
 //  dans un SVG de la carte du Studio, sous les pions. Les murs : la roche de
 //  murs_terre.js (dessinerMurTerre), reliée à ses voisines et composée en un
 //  seul canvas, au-dessus des pions, comme au combat. Les gravats : le tas de
-//  dessinerGravatsTerre, à plat sur la case. Un mur bloque la case (on ne
-//  peut ni y glisser un pion ni y marcher) ; tout part avec « ⟲ Replacer ».
+//  dessinerGravatsTerre, à plat sur la case — puis (v247) une plaque
+//  procédurale, comme les zones. Un mur bloque la case (on ne peut ni y
+//  glisser un pion ni y marcher) ; tout part avec « ⟲ Replacer ».
 const NS_SVG = "http://www.w3.org/2000/svg";
 const SUFFIXE_DEFS = "-studio";
 const rayonCase = () => (studio.plateau ? studio.plateau.hexSize : 50);
@@ -730,6 +735,20 @@ function rendreMurs() {
 }
 
 // --- LES GRAVATS ---
+//  Nico (v247) : « Dans le même esprit que les zones, refais-moi les zones de
+//  gravats, de terrain difficile, quand les murs se brisent. » Tous les tas
+//  forment UNE plaque procédurale (zones_procedurales.js, recette « gravats ») :
+//  la terre retournée, un petit monticule par case, des pierres cassées et
+//  leurs ombres, une poussière légère au vent ; deux tas voisins ne font
+//  qu'un éboulis. Sans le moteur, les tas d'avant (dessinerGravatsTerre).
+const gravatsProceduraux = () => typeof window.creerCoucheGravats === "function";
+function coucheGravats() {
+    if (studio.coucheGravats) return studio.coucheGravats;
+    const conteneur = document.getElementById("studio-gravats");
+    if (!conteneur || !studio.plateau || !gravatsProceduraux()) return null;
+    studio.coucheGravats = window.creerCoucheGravats(conteneur, { R: rayonCase(), pixel: pixelPlateau, graine: 7 });
+    return studio.coucheGravats;
+}
 const IMAGES_GRAVATS = new Map();
 function imageGravats(cle) {
     if (typeof window.dessinerGravatsTerre !== "function") return "";
@@ -742,6 +761,21 @@ function imageGravats(cle) {
 function rendreGravats() {
     const calque = document.getElementById("studio-gravats");
     if (!calque) return;
+    if (gravatsProceduraux()) {
+        // La plaque suit le terrain, sans animation : un mur levé sur des
+        // gravats les couvre, « Replacer » les efface.
+        const voulues = new Set([...studio.terrain.gravats].filter(k => !studio.terrain.murs.has(k)));
+        const parties = [...studio.gravatsPoses].filter(k => !voulues.has(k));
+        const neuves = [...voulues].filter(k => !studio.gravatsPoses.has(k));
+        const enCase = (k) => { const [q, r] = k.split("_").map(Number); return { q, r }; };
+        const couche = neuves.length ? coucheGravats() : studio.coucheGravats;
+        if (!couche) return;
+        parties.forEach(k => studio.gravatsPoses.delete(k));
+        neuves.forEach(k => studio.gravatsPoses.add(k));
+        if (parties.length) couche.retirer(parties.map(enCase));
+        if (neuves.length) couche.ajouter(neuves.map(enCase), { duree: 1 });
+        return;
+    }
     calque.innerHTML = "";
     if (!studio.plateau) return;
     const t = rayonCase() * geometrieMur().G.empriseGravats;
@@ -769,6 +803,11 @@ function viderTerrain() {
     Object.values(CONTENEUR_PROCEDURAL).forEach(id => { const c = document.getElementById(id); if (c) c.innerHTML = ""; });
     studio.terrain.murs.clear();
     studio.terrain.gravats.clear();
+    if (studio.coucheGravats) studio.coucheGravats.detruire();
+    studio.coucheGravats = null;
+    studio.gravatsPoses.clear();
+    const gr = document.getElementById("studio-gravats");
+    if (gr) gr.innerHTML = "";
     const svg = document.getElementById("studio-zones");
     if (svg) svg.innerHTML = "";
     rendreZones();
@@ -778,6 +817,7 @@ function viderTerrain() {
 // Les plaques procédurales, pour les bancs d'essai.
 window.givreStudio = () => studio.couches.glace || null;
 window.coucheStudio = (type) => studio.couches[type] || null;
+window.gravatsStudio = () => studio.coucheGravats;
 // L'état du terrain, pour les bancs d'essai.
 window.terrainStudio = () => ({
     zones: [...studio.terrain.zones.values()].map(z => ({ type: z.type, q: z.q, r: z.r })),
@@ -844,6 +884,21 @@ function terrainDeScene() {
         tuileGravats: (q, r) => {
             const src = imageGravats(cleCase(q, r));
             return src ? { src, t: rayonCase() * geometrieMur().G.empriseGravats * ecran() } : null;
+        },
+        // Des gravats qui restent, procéduraux (v247) : ils gagnent les cases
+        // depuis `depuis` (la case du mur tombé), en `duree` ms ; rend la
+        // promesse de leur arrivée — ou null sans le moteur (les tas d'avant).
+        etendreGravats: (liste, p = {}) => {
+            if (!gravatsProceduraux() || !studio.plateau) return null;
+            const ok = cases(liste).filter(c => !studio.terrain.murs.has(cleCase(c.q, c.r)));
+            ok.forEach(c => studio.terrain.gravats.add(cleCase(c.q, c.r)));
+            const neuves = ok.filter(c => !studio.gravatsPoses.has(cleCase(c.q, c.r)));
+            const couche = neuves.length ? coucheGravats() : null;
+            rendreMurs();
+            if (!couche) return Promise.resolve(false);
+            neuves.forEach(c => studio.gravatsPoses.add(cleCase(c.q, c.r)));
+            const depuis = p.depuis && p.depuis.q !== undefined ? { q: p.depuis.q, r: p.depuis.r } : { q: neuves[0].q, r: neuves[0].r };
+            return couche.ajouter(neuves.map(c => ({ q: c.q, r: c.r })), { depuis, duree: p.duree || 1100 });
         },
         // Des gravats qui restent : les tas posés (une image par case).
         poserGravats: (liste) => {

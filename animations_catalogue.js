@@ -396,8 +396,16 @@
         await effacerTout(o, murs.filter(Boolean), { duree: 350 });
         return false;
     };
-    // DES GRAVATS QUI RESTENT (sc.terrain) : les tas du jeu, posés en cascade.
+    // DES GRAVATS QUI RESTENT (sc.terrain) : l'éboulis procédural (v247), qui
+    // gagne les cases depuis `depuis` ; sinon les tas du jeu, posés en cascade.
+    // `tas[0]` : où dire « Gravats ».
     const tasDeGravats = (o, sc, pts, p = {}) => {
+        const arrivee = sc.terrain && typeof sc.terrain.etendreGravats === "function" && pts.length && pts.every(pt => pt.q !== undefined)
+            ? sc.terrain.etendreGravats(pts.map(pt => ({ q: pt.q, r: pt.r })), { depuis: p.depuis, duree: p.duree }) : null;
+        if (arrivee) {
+            const pt = p.depuis || pts[0];
+            return { tas: [o.poser(sc.calque, pt.x, pt.y, "width:1px; height:1px; opacity:0;", "")], restent: true, arrivee };
+        }
         if (sc.terrain && typeof sc.terrain.poserGravats === "function") {
             const tas = sc.terrain.poserGravats(pts);
             tas.forEach((el, i) => {
@@ -1980,14 +1988,17 @@
                         "La boue acide gagne les cases visées depuis le cœur de la zone : translucide, vert vif sur les bords, vert noir dans les flaques, luisante, sans contour ; le terrain se fane autour ; des bulles gonflent et crèvent ; un miasme lourd rampe sous le vent. Deux zones qui se touchent ne font qu'un marais."),
         {
             id: "gravats", nom: "Gravats / terrain difficile", sens: "vers l'ennemi",
-            description: "Les tas de gravats du jeu jonchent les cases visées (par défaut, quelques-unes près de l'ennemi) : ce terrain coûte double. Ils restent sur la carte.",
+            description: "Un éboulis jonche les cases visées (par défaut, quelques-unes près de l'ennemi) : il gagne le terrain depuis le cœur — la terre retournée, un petit monticule par case, des pierres cassées et leurs ombres, des cailloux qui roulent au-delà, une poussière légère au vent ; deux tas voisins ne font qu'un, sans contour. Ce terrain coûte double. Il reste sur la carte.",
             ciblage: { genre: "gravats", min: 1, max: 8,
                        consigne: "Touche les cases à joncher de gravats (8 au plus) — touche-en une de nouveau pour l'enlever — puis « Lancer »." },
             async jouer(sc, o) {
                 const { b } = lieux(sc);
                 o.son("gravats");
                 const pts = ciblees(sc, o, () => o.autour(sc.cible, b, 1, { libres: true }).slice(0, 4));
-                const { tas, restent } = tasDeGravats(o, sc, pts, { cascade: 110 });
+                // L'éboulis part de la case la plus centrale des cases visées.
+                const mx = pts.reduce((a, pt) => a + pt.x, 0) / pts.length, my = pts.reduce((a, pt) => a + pt.y, 0) / pts.length;
+                const coeur = pts.reduce((m, pt) => Math.hypot(pt.x - mx, pt.y - my) < Math.hypot(m.x - mx, m.y - my) ? pt : m, pts[0]);
+                const { tas, restent } = tasDeGravats(o, sc, pts, { cascade: 110, depuis: coeur, duree: 1000 });
                 pts.forEach((pt, i) => o.attendre(i * 110).then(() => poussiere(o, sc.calque, pt, { n: 5 })));
                 o.texte(sc.calque, pionSur(sc, o, pts[0]) || tas[0] || sc.cible, "Gravats : terrain difficile", COULEURS.attention);
                 await o.attendre(1800);
@@ -2763,7 +2774,7 @@
         },
         {
             id: "mur-effondre", nom: "Niv.5 Mur de terre effondré → gravats", sens: "vers l'ennemi",
-            description: "Le mur visé (un mur levé sur la carte, ou une case libre où il se dresse d'abord) se fissure, tremble, puis s'écroule dans un gros nuage de poussière, des cailloux volant de partout avant de s'effacer en fondu ; il reste un tas de gravats sur la case, et ses voisins gardent un moignon cassé.",
+            description: "Le mur visé (un mur levé sur la carte, ou une case libre où il se dresse d'abord) se fissure, tremble, puis s'écroule dans un gros nuage de poussière, des cailloux volant de partout avant de s'effacer en fondu ; à son pied, l'éboulis gagne la case — terre retournée, pierres cassées, poussière — et reste (deux murs tombés côte à côte ne font qu'un éboulis) ; ses voisins gardent un moignon cassé.",
             ciblage: { genre: "effondre", min: 1, max: 4,
                        consigne: "Touche un mur de terre levé sur la carte (ou une case libre : un mur s'y dressera d'abord) — 4 au plus — puis « Lancer »." },
             async jouer(sc, o) {
@@ -2782,9 +2793,12 @@
                 const poussieres = pts.map(pos => Promise.all([
                     o.nuagePoussiere(sc.calque, pos, { nombre: 18, etendue: 1.4, taille: 1.25, pied: 0.1, duree: 2200 }),
                     o.attendre(60).then(() => o.cailloux(sc.calque, pos, { nombre: 16, portee: 1.3, pied: 0 }))]));
-                await Promise.all(murs.map(m => o.effondrer(m)));
+                // L'éboulis gagne le sol depuis le pied du mur pendant qu'il s'écroule.
+                const chute = Promise.all(murs.map(m => o.effondrer(m)));
+                await o.attendre(260);
+                const { tas, restent } = tasDeGravats(o, sc, pts, { nombre: 9, depuis: pts[0], duree: 900 });
+                await chute;
                 murs.forEach(m => m && m.remove());
-                const { tas, restent } = tasDeGravats(o, sc, pts, { nombre: 9 });
                 o.texte(sc.calque, tas[0] || sc.cible, "Gravats", COULEURS.attention);
                 await Promise.all([o.attendre(1200), ...poussieres]);
                 if (!restent) await effacerTout(o, tas);
