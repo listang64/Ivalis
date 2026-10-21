@@ -214,9 +214,9 @@ console.log("\n7. LE CATALOGUE");
     const a = (window.ANIMATIONS_COMBAT || []).find(x => x.id === "zone-glace");
     return { nb: (window.ANIMATIONS_COMBAT || []).length, cible: !!(a && a.ciblage), desc: a ? a.description : "" };
   });
-  // (v248 : la zone de pièges en plus — 144.)
-  verifier("toujours 144 animations ; la zone de glace se cible et dit ce qu'elle fait",
-           r.nb === 144 && r.cible && /brume/.test(r.desc) && /contour/.test(r.desc), JSON.stringify(r));
+  // (v248 : la zone de pièges en plus — 144 ; v250 : la zone de soin — 145.)
+  verifier("toujours 145 animations ; la zone de glace se cible et dit ce qu'elle fait",
+           r.nb === 145 && r.cible && /brume/.test(r.desc) && /contour/.test(r.desc), JSON.stringify(r));
 }
 
 await fin();

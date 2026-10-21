@@ -198,7 +198,8 @@ console.log("\n4. LE CATALOGUE ; LE COMBAT (SA NAPPE, PUIS LES PIÈGES EN v249)"
     return { nb: liste.length, cible: !!a.ciblage, desc: a.description || "", section: a.section, apres: i === j + 1,
              son: !!(window.SONS_COMBAT || {})["zone-pieges"], types: window.TYPES_ZONES_PROCEDURALES || [], recettes: window.RECETTES_PROCEDURALES || [], jeu };
   });
-  verifier("144 animations ; « Zone de pièges » se cible, juste après le poison, en section 7", r.nb === 144 && r.cible && r.apres && r.section === 7, JSON.stringify({ nb: r.nb, section: r.section }));
+  // (v250 : la zone de soin en plus — 145.)
+  verifier("145 animations ; « Zone de pièges » se cible, juste après le poison, en section 7", r.nb === 145 && r.cible && r.apres && r.section === 7, JSON.stringify({ nb: r.nb, section: r.section }));
   verifier("…et dit ce qu'elle fait : des chausse-trappes, sans contour", /chausse-trappes/.test(r.desc) && /contour/.test(r.desc) && /ombre/.test(r.desc));
   verifier("son bruit à elle : du fer qui tinte (« zone-pieges »)", r.son);
   verifier("le moteur connaît les pièges ; le combat aussi (v249)", r.recettes.includes("neutre") && r.types.includes("neutre"), JSON.stringify({ recettes: r.recettes, types: r.types }));

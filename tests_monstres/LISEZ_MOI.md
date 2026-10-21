@@ -6790,3 +6790,54 @@ réinitialisation en fondu, le secours. Il mord sur l'ancien code
 (11 échecs). Mis à jour : corrections_v247 et v248 (le combat pose
 désormais l'éboulis et les pièges ; cinq types de zones), geomancien (il
 compte les cases de l'éboulis).
+
+## v250 — Studio : la zone de soin (lumière sacrée), procédurale
+
+Nico : « Dans le même esprit que les autres, fais la zone de soin et mets-la
+dans le Studio. Je verrais bien comme de la lumière blanche qui jaillit par
+endroits du sol, comme un soin de paladin, tu sais. »
+
+- LA RECETTE « soin » (zones_procedurales.js, classe « sacre ») — le même
+  moteur : une plaque pour toutes ses cases, deux zones collées sans
+  couture, aucun contour, la lumière qui gagne depuis le cœur (sa frange :
+  un blanc chaud).
+  - LA CLARTÉ : un voile blanc doré posé sur le sol, translucide, par
+    nappes douces, un peu plus dense au cœur ; quelques grains qui brillent.
+  - LES SOURCES : un semis régulier de la carte (chaque point déplacé au
+    hasard, un sur quatre laissé dans l'ombre, seules celles franchement
+    dans la zone) ; chacune une flaque de lumière — un cœur blanc, un halo
+    doré un peu ovale — sur le calque « écran » qui respire lentement, avec
+    son halo flou. Une case garde ses sources quand la plaque grandit.
+  - LES COLONNES : de chaque source, une colonne de lumière blanche (deux
+    lueurs ovales qui partent du pied et s'effilent vers le haut de
+    l'écran, comme les murs montent) jaillit, s'élargit, puis s'éteint ;
+    chacune à son rythme, déjà décalée dans son cycle : elles jaillissent
+    tour à tour dès le début.
+  - DES ÉTINCELLES qui montent doucement ; un voile de clarté (« aura »,
+    écran) qui dérive à peine.
+  - Le moteur gagne : plusieurs familles d'éclats par recette (le soin : ses
+    colonnes et ses étincelles), les gestes « jaillit » et « monte »,
+    creerCoucheSoin.
+- LE STUDIO : le soin est une plaque comme les autres zones (#studio-soin) ;
+  une case n'a qu'une zone — le feu chasse la lumière, la lumière chasse le
+  feu.
+- LE CATALOGUE : « Zone persistante de soin (lumière sacrée) » (zone-soin),
+  en section 7 après les pièges — 145 animations —, avec le son
+  « soin-zone ».
+- Le combat garde sa nappe de soin tant que Nico n'a pas validé
+  (TYPES_ZONES_PROCEDURALES n'a pas le soin). NB : depuis la règle « plus de
+  nappe qui soigne » (moteur_pur.js), le combat ne pose de toute façon plus
+  de zone de soin.
+- Le calcul : environ 0,12 s pour 10 cases.
+
+corrections_v250.mjs : la plaque (une, sans nappe ni contour, ses cases et
+rien d'autre), la clarté blanc doré translucide, les sources (des taches,
+pas une nappe) qui respirent, les colonnes (une par source, posées sur
+elle, dressées depuis leur pied, qui jaillissent en boucle, tour à tour),
+les étincelles qui montent, le voile ; sans couture, la case du cœur qui
+garde ses sources, le même dessin, depuis le cœur, le calcul ; le feu et la
+lumière qui se chassent, « Replacer » ; le catalogue (145, après les
+pièges), le combat inchangé. Il mord sur l'ancien code (18 échecs). Mis à
+jour : corrections_v243, v244, v245, v247, v248, studio_animation et
+studio_catalogue_1 (145 animations ; huit en section 7), studio_terrain
+(douze animations qui se ciblent).

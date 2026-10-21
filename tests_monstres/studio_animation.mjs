@@ -172,7 +172,7 @@ console.log("\n2. LA RÉPLIQUE DE LA CARTE ET LES DEUX PIONS");
 
 console.log("\n3. LA LISTE DES ANIMATIONS");
 // Les dix premières animations du Studio : ce banc les suit de près (sons,
-// textes, directions) ; le catalogue complet (144 depuis v248) a ses propres bancs,
+// textes, directions) ; le catalogue complet (145 depuis v250) a ses propres bancs,
 // studio_catalogue_1.mjs et studio_catalogue_2.mjs.
 const PREMIERES = ["coup-epee", "coup-recu", "soin", "bouclier", "boule-de-feu", "esquive", "gel", "poison", "coup-critique", "mise-a-terre"];
 const tous = await p.evaluate(() => (window.ANIMATIONS_COMBAT || []).map(a => a.id));
@@ -184,12 +184,12 @@ const ids = PREMIERES.filter(id => tous.includes(id));
       case: !!l.querySelector("input[type=checkbox]"), coche: l.querySelector("input[type=checkbox]").checked })),
     compteur: document.getElementById("studio-compteur").textContent
   }));
-  verifier("tout le catalogue (144), chacune son nom et sa description", r.lignes.length === 144 && tous.length === 144
-           && new Set(r.lignes.map(l => l.nom)).size === 144 && r.lignes.every(l => l.description.length > 20), String(r.lignes.length));
+  verifier("tout le catalogue (145), chacune son nom et sa description", r.lignes.length === 145 && tous.length === 145
+           && new Set(r.lignes.map(l => l.nom)).size === 145 && r.lignes.every(l => l.description.length > 20), String(r.lignes.length));
   verifier("les dix premières y sont toutes", ids.length === 10, ids.join());
   verifier("chacune sa case « Intégrée »", r.lignes.every(l => l.case));
   verifier("la case cochée en base (Soin) l'est à l'ouverture, et le compteur le dit", r.lignes.filter(l => l.coche).length === 1
-           && r.lignes.find(l => l.coche).nom.startsWith("Soin") && r.compteur === "1 / 144 intégrées", r.compteur);
+           && r.lignes.find(l => l.coche).nom.startsWith("Soin") && r.compteur === "1 / 145 intégrées", r.compteur);
 }
 
 console.log("\n4. UN CLIC JOUE L'ANIMATION EN DIRECT SUR LE PION");
@@ -267,7 +267,7 @@ console.log("\n6. LA CASE « INTÉGRÉE » SE SOUVIENT");
   }));
   verifier("cocher écrit la case en base (fusion, pour l'iPad et le PC)", r.ecrit && r.ecrit.data.Integrees["coup-epee"] === true
            && r.ecrit.options && r.ecrit.options.merge === true, JSON.stringify(r.ecrit));
-  verifier("…et dans ce navigateur ; le compteur passe à 2, la ligne verdit", r.local["coup-epee"] === true && r.compteur === "2 / 144 intégrées" && r.vert, r.compteur);
+  verifier("…et dans ce navigateur ; le compteur passe à 2, la ligne verdit", r.local["coup-epee"] === true && r.compteur === "2 / 145 intégrées" && r.vert, r.compteur);
   verifier("cocher ne joue pas l'animation", r.rienJoue);
   await p.evaluate(async () => {
     window.__docs = {};

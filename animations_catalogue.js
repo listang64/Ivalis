@@ -1986,6 +1986,12 @@
         zoneProcedurale("neutre", "zone", "Zone persistante de dégâts (chausse-trappes)", "zone-pieges", "Terrain piégé", "rgba(215,220,230,0.8)",
                         "Des chausse-trappes se répandent depuis le cœur de la zone sur les cases visées : le sol piétiné, à peine assombri, sans contour, semé de pointes de fer — trois à plat, la quatrième dressée — tournées au hasard, chacune avec son ombre, plus ou moins rouillées ; un reflet accroche la lumière de loin en loin. Deux zones qui se touchent ne font qu'un champ de pièges.",
                         "zone-pieges"),
+        // LA ZONE DE SOIN (Nico, v250 : « dans le même esprit, fais la zone de
+        // soin : de la lumière blanche qui jaillit par endroits du sol, comme un
+        // soin de paladin »).
+        zoneProcedurale("soin", "zone", "Zone persistante de soin (lumière sacrée)", "soin-zone", "Zone de soin", "rgba(255,250,225,0.9)",
+                        "La lumière gagne les cases visées depuis le cœur de la zone : une clarté blanc doré posée sur le sol, sans contour ; par endroits, des sources de lumière qui respirent, et de leurs cœurs des colonnes de lumière blanche qui jaillissent vers le ciel, tour à tour, comme un soin de paladin ; des étincelles montent, un voile de clarté flotte. Deux zones qui se touchent ne font qu'un sanctuaire.",
+                        "zone-soin"),
         // LA ZONE DE FOUDRE ET LA ZONE DE POISON (Nico, v245 : « refais dans le même
         // état d'esprit les zones poison et électrique ») : procédurales elles aussi.
         zoneProcedurale("electrique", "zone", "Zone persistante de foudre", "zone-foudre", "Zone de foudre", "rgba(170,220,255,0.85)",
@@ -3216,7 +3222,7 @@
         "poison", "brule", "gel", "electrifie", "saignement", "aveugle", "etourdi-presence", "immobilisation-presence", "confusion-presence",
         "peur-presence", "provocation-presence", "etalement-tic", "plaie-rouverte", "repli-etat",
         // 7. Zones et terrain
-        "zone-apercu", "zone-feu", "zone-glace", "zone-foudre", "zone-poison", "zone-pieges", "gravats",
+        "zone-apercu", "zone-feu", "zone-glace", "zone-foudre", "zone-poison", "zone-pieges", "zone-soin", "gravats",
         // 8. Classes
         "tenebres", "tenebres-etalees", "charme-fratricide", "charme-frappe", "charme-perdu", "transfert",
         "provocation-protecteur", "rempart", "rempart-actif", "rempart-rompu", "resonance-bouclier",

@@ -1,5 +1,5 @@
 // =========================================================================
-//  IVALIS — LES ZONES PROCÉDURALES : GIVRE, BRASIER, POISON, FOUDRE, PIÈGES, GRAVATS
+//  IVALIS — LES ZONES PROCÉDURALES : GIVRE, BRASIER, POISON, FOUDRE, PIÈGES, SOIN, GRAVATS
 // =========================================================================
 //  Nico, dans le Studio d'animation : « J'aimerais qu'on revoie l'animation
 //  des zones de glace. Je ne veux pas de contour, mais quelque chose de plus
@@ -12,7 +12,9 @@
 //  (v247) : « Dans le même esprit, refais-moi les zones de gravats, de terrain
 //  difficile, quand les murs se brisent. » Puis (v248) : « Et pour les zones
 //  avec juste des dégâts normaux, fais des chausse-trappes sur le sol, en
-//  mode procédural pareil. »
+//  mode procédural pareil. » Et (v250) : « Dans le même esprit, fais la zone
+//  de soin : de la lumière blanche qui jaillit par endroits du sol, comme un
+//  soin de paladin. »
 //
 //  UNE COUCHE couvre TOUTES les cases d'un même élément : leur union, pas une
 //  nappe par case. Le dessin part de la distance de chaque point au BORD DE
@@ -43,6 +45,11 @@
 //      chausse-trappes semées partout (trois pointes au sol, la quatrième
 //      dressée), chacune tournée au hasard, avec son ombre, du fer plus ou
 //      moins rouillé ; des reflets qui accrochent la lumière sur les pointes ;
+//    • LE SOIN (soin) : une clarté blanc doré posée sur le sol ; par endroits,
+//      des sources de lumière (un cœur blanc, son halo, une étoile de rayons
+//      au sol) qui respirent ; de leurs cœurs, des colonnes de lumière
+//      blanche jaillissent vers le ciel, se dressent et s'éteignent tour à
+//      tour ; des étincelles qui montent ; un voile de clarté ;
 //    • LES GRAVATS (gravats) : la terre retournée, un petit monticule par
 //      case éclairé en haut à gauche ; des pierres cassées (gros blocs au
 //      cœur, moellons autour, cailloux qui roulent jusqu'au bord et au-delà),
@@ -51,8 +58,8 @@
 //
 //  `creerCoucheProcedurale(conteneur, { type, R, pixel, graine, vent })` rend
 //  la couche (`creerCoucheGivre`, `creerCoucheFeu`, `creerCouchePoison`,
-//  `creerCoucheElectrique`, `creerCouchePieges`, `creerCoucheGravats` : la
-//  même, d'un élément) ;
+//  `creerCoucheElectrique`, `creerCouchePieges`, `creerCoucheSoin`,
+//  `creerCoucheGravats` : la même, d'un élément) ;
 //  elle vit dans le repère de la carte (le conteneur est posé sur elle).
 //  `ajouter(cases, { depuis, duree })` : l'élément gagne les nouvelles cases
 //  depuis `depuis` (la plaque grandit) ; `poser(cases)` : sans animation ;
@@ -130,6 +137,11 @@
                             background: radial-gradient(circle at 34% 32%, rgba(255, 255, 255, 0.55), rgba(170, 225, 90, 0.18) 38%, rgba(90, 140, 30, 0.08) 70%); }
             .piege-reflet { width: 2px; height: 2px; margin: -1px 0 0 -1px; background: #ffffff;
                             box-shadow: 0 0 2px 1px rgba(235, 240, 250, 0.95), 0 0 6px 2px rgba(200, 210, 230, 0.5); }
+            .sacre-rayon { mix-blend-mode: screen; filter: blur(1.5px);
+                           background: radial-gradient(ellipse 22% 100% at 50% 100%, rgba(255, 255, 255, 1), rgba(255, 255, 250, 0.7) 40%, rgba(255, 255, 245, 0) 100%),
+                                       radial-gradient(ellipse 50% 100% at 50% 100%, rgba(255, 252, 238, 0.9), rgba(255, 248, 225, 0.55) 35%, rgba(255, 242, 210, 0.2) 70%, rgba(255, 240, 205, 0) 100%); }
+            .sacre-etincelle { width: 3px; height: 3px; margin: -1.5px 0 0 -1.5px; background: #fffdf2;
+                               box-shadow: 0 0 3px 1px rgba(255, 250, 225, 0.95), 0 0 8px 2px rgba(255, 235, 170, 0.5); }
             .gravats-bouffee { border-radius: 50%; background: radial-gradient(circle, rgba(214, 198, 168, 0.75), rgba(200, 182, 150, 0.3) 45%, rgba(190, 172, 140, 0) 70%); }
             .zone-proc-arcs { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
             .zone-proc-arcs canvas { opacity: 0; }
@@ -150,6 +162,8 @@
         miasme: (f) => [120, 175, 62, entre(0.44, 0.86, f) * 205],
         // Le plasma de la foudre : un bleu pâle, à peine là.
         plasma: (f) => [150, 205, 255, entre(0.55, 0.92, f) * 190],
+        // La clarté du soin : un blanc doré, à peine là.
+        aura: (f) => [255, 248, 222, entre(0.55, 0.92, f) * 200],
         // La poussière des gravats : un beige sec, en volutes légères.
         poussiere: (f) => [206, 190, 160, entre(0.5, 0.9, f) * 200]
     };
@@ -159,7 +173,7 @@
         const N = 128, c = document.createElement("canvas");
         c.width = c.height = N;
         const ctx = c.getContext("2d"), img = ctx.createImageData(N, N);
-        const graine = { brume: 911, flamme: 313, fumee: 521, miasme: 641, plasma: 733, poussiere: 857 }[nom] || 1;
+        const graine = { brume: 911, flamme: 313, fumee: 521, miasme: 641, plasma: 733, poussiere: 857, aura: 967 }[nom] || 1;
         for (let y = 0; y < N; y++) {
             for (let x = 0; x < N; x++) {
                 // 4 cellules de base par tuile, période 4 (puis 8, 16…) : raccordable.
@@ -330,6 +344,27 @@
         cf.beginPath(); cf.arc(x - w * 0.3, y - w * 0.35, w * 0.35, 0, Math.PI * 2); cf.fill();
         cf.fillStyle = "rgba(240, 244, 250, 0.75)";
         cf.beginPath(); cf.arc(x + Math.cos(dressee.a) * dressee.l * 0.92, y + Math.sin(dressee.a) * dressee.l * 0.92, w * 0.28, 0, Math.PI * 2); cf.fill();
+    }
+
+    // LES SOURCES DE LUMIÈRE du soin : un semis régulier de la carte, chaque
+    // point déplacé au hasard, un sur trois laissé dans l'ombre ; seules
+    // restent celles qui tombent franchement dans la zone. Leur force (h)
+    // dit leur taille et leur rythme.
+    function semerSources(liste, { R, graine, pixel, profondeur }) {
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        liste.forEach(c => { const p = pixel(c.q, c.r); x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); });
+        const d = R * 0.95, dy = d * 0.866, sources = [];
+        for (let j = Math.floor((y0 - R) / dy); j <= Math.ceil((y1 + R) / dy); j++) {
+            for (let i = Math.floor((x0 - R) / d) - 1; i <= Math.ceil((x1 + R) / d) + 1; i++) {
+                const h = (Math.imul(i, 6151) ^ Math.imul(j, 92821) ^ Math.imul(graine, 17)) | 0;
+                if (hacher(h, 1, 91) < 0.25) continue;
+                const x = (i + (j & 1) * 0.5 + (hacher(h, 2, 91) - 0.5) * 0.6) * d;
+                const y = (j + (hacher(h, 3, 91) - 0.5) * 0.6) * dy;
+                if (profondeur(x, y) < R * 0.18) continue;
+                sources.push({ x, y, h, force: hacher(h, 4, 91) });
+            }
+        }
+        return sources;
     }
 
     // =====================================================================
@@ -599,6 +634,58 @@
             frange: null
         },
 
+        soin: {
+            classe: "sacre", marge: 1.4,
+            // LA CLARTÉ : un voile blanc doré, translucide, par nappes douces,
+            // un peu plus dense au cœur ; quelques grains qui brillent.
+            sol(x, y, p, { R, graine }) {
+                if (p < -R * 0.45) return null;
+                const n1 = fbm(x / (R * 0.5), y / (R * 0.5), 3, graine + 21);
+                const bord = p + (n1 - 0.5) * R * 0.7;
+                const m = entre(-R * 0.08, R * 0.32, bord);
+                if (m <= 0.003) return null;
+                const n2 = fbm(x / (R * 0.28), y / (R * 0.28), 3, graine + 39);
+                const n3 = bruit(x / (R * 0.03), y / (R * 0.03), graine + 49);
+                const coeur = entre(0, R * 1.0, p);
+                const grain = hacher(Math.floor(x * 1.3), Math.floor(y * 1.3), graine + 71) > 0.994 ? 0.35 : 0;
+                const a = m * (0.1 + 0.1 * entre(0.4, 0.75, n2) + 0.06 * coeur + 0.04 * n3 + grain);
+                return [255, 246 + 8 * n3, 212 + 34 * n2, Math.min(0.45, a), m];
+            },
+            // LES SOURCES : une flaque de lumière posée sur le sol — un cœur
+            // blanc, un halo doré qui s'étale, un peu ovale (le sol fuit vers le
+            // haut de l'écran) — sur le calque qui respire (et son halo flou).
+            decorLueur(cf, liste, outils) {
+                const { R } = outils;
+                semerSources(liste, outils).forEach(({ x, y, force }) => {
+                    const r = R * (0.3 + 0.18 * force);
+                    cf.save();
+                    cf.translate(x, y); cf.scale(1, 0.78);
+                    const g = cf.createRadialGradient(0, 0, 0, 0, 0, r);
+                    g.addColorStop(0, "rgba(255, 255, 255, 1)"); g.addColorStop(0.18, "rgba(255, 254, 242, 0.95)");
+                    g.addColorStop(0.45, "rgba(255, 246, 210, 0.45)"); g.addColorStop(1, "rgba(255, 236, 180, 0)");
+                    cf.fillStyle = g;
+                    cf.beginPath(); cf.arc(0, 0, r, 0, Math.PI * 2); cf.fill();
+                    cf.restore();
+                });
+            },
+            // Une respiration lente, apaisée.
+            respiration: { lueur: [1, 0.72, 0.95, 0.8, 1], duree: 3400, halo: [0.85, 0.5, 0.9, 0.6, 0.85], dureeHalo: 4300 },
+            voiles: [
+                // Un voile de clarté, qui dérive à peine.
+                { nom: "aura", classe: "sacre-aura", ecran: true,
+                  masque: (p, n, R) => entre(-R * 0.3, R * 0.45, p + (n - 0.5) * R * 0.6),
+                  couches: [{ tuile: "aura", l: 5, h: 2.4, op: 0.3, v: 0.25 }, { tuile: "aura", l: 3.4, h: 1.8, op: 0.2, v: 0.18 }] }
+            ],
+            eclats: [
+                // Les colonnes de lumière : de chaque source, à son heure.
+                { parCase: 0, classe: "sacre-rayon", geste: "jaillit",
+                  points: (liste, outils) => semerSources(liste, outils).map(s => ({ x: s.x, y: s.y, h: s.force })) },
+                // Les étincelles qui montent.
+                { parCase: 5, classe: "sacre-etincelle", geste: "monte" }
+            ],
+            frange: [255, 246, 215]
+        },
+
         gravats: {
             classe: "gravats", marge: 1.5,
             // LA TERRE RETOURNÉE : un sol brun, en mottes, un petit monticule par
@@ -711,6 +798,7 @@
             return { q, r };
         };
         const pre = recette.classe;
+        const famillesEclats = [].concat(recette.eclats);
 
         const racine = document.createElement("div");
         racine.className = `zone-proc zone-proc-${opts.type || "glace"} ${pre}-couche`;
@@ -866,19 +954,23 @@
                 return c;
             }) : [];
 
-            // LES ÉCLATS : quelques-uns par case, là où la plaque est franche.
+            // LES ÉCLATS : quelques-uns par case, là où la plaque est franche, ou
+            // aux points que la recette donne ; une recette peut en avoir
+            // plusieurs familles (le soin : ses colonnes et ses étincelles).
             const points = [];
-            if (recette.eclats.points) recette.eclats.points(liste, outils).forEach(pt => {
-                if (pt.x >= E.x0 && pt.y >= E.y0 && pt.x < E.x0 + E.l && pt.y < E.y0 + E.h) points.push({ x: pt.x - E.x0, y: pt.y - E.y0, h: pt.h });
-            });
-            liste.forEach(c => {
-                const p = pixel(c.q, c.r), h0 = (c.q * 7349 + c.r * 2903 + graine) | 0;
-                for (let s = 0; s < recette.eclats.parCase; s++) {
-                    const ang = hacher(h0, s, 51) * Math.PI * 2, d = R * 0.8 * Math.sqrt(hacher(h0, s, 52));
-                    const x = p.x + Math.cos(ang) * d, y = p.y + Math.sin(ang) * d;
-                    const i = Math.floor((x - E.x0) * k), j = Math.floor((y - E.y0) * k);
-                    if (i >= 0 && j >= 0 && i < W && j < H && im.data[(j * W + i) * 4 + 3] > 160) points.push({ x: x - E.x0, y: y - E.y0, h: hacher(h0, s, 53) });
-                }
+            famillesEclats.forEach((fam, n) => {
+                if (fam.points) fam.points(liste, outils).forEach(pt => {
+                    if (pt.x >= E.x0 && pt.y >= E.y0 && pt.x < E.x0 + E.l && pt.y < E.y0 + E.h) points.push({ x: pt.x - E.x0, y: pt.y - E.y0, h: pt.h, n });
+                });
+                liste.forEach(c => {
+                    const p = pixel(c.q, c.r), h0 = (c.q * 7349 + c.r * 2903 + graine + n * 7919) | 0;
+                    for (let s = 0; s < fam.parCase; s++) {
+                        const ang = hacher(h0, s, 51) * Math.PI * 2, d = R * 0.8 * Math.sqrt(hacher(h0, s, 52));
+                        const x = p.x + Math.cos(ang) * d, y = p.y + Math.sin(ang) * d;
+                        const i = Math.floor((x - E.x0) * k), j = Math.floor((y - E.y0) * k);
+                        if (i >= 0 && j >= 0 && i < W && j < H && im.data[(j * W + i) * 4 + 3] > 160) points.push({ x: x - E.x0, y: y - E.y0, h: hacher(h0, s, 53), n });
+                    }
+                });
             });
             return { ...E, k, plein, masque, braises, masquesVoiles, imagesArcs, points, cases: liste };
         }
@@ -929,12 +1021,13 @@
         function eclater(d, retard) {
             eclats.forEach(e => e.remove());
             eclats = d.points.map(pt => {
+                const fam = famillesEclats[pt.n || 0];
                 const e = document.createElement("div");
-                e.className = `zone-proc-eclat ${recette.eclats.classe}`;
+                e.className = `zone-proc-eclat ${fam.classe}`;
                 e.style.left = pt.x + "px"; e.style.top = pt.y + "px";
                 racine.appendChild(e);
                 if (typeof e.animate !== "function") return e;
-                if (recette.eclats.geste === "bulle") {
+                if (fam.geste === "bulle") {
                     // Une bulle gonfle sur la boue, tremble, et crève.
                     const t = R * (0.1 + 0.12 * pt.h), periode = 1800 + pt.h * 2400;
                     e.style.width = e.style.height = t + "px";
@@ -943,7 +1036,7 @@
                                { opacity: 0.9, transform: "scale(0.95)", offset: 0.72 }, { opacity: 0.9, transform: "scale(1)", offset: 0.8 },
                                { opacity: 0, transform: "scale(1.35)", offset: 0.86 }, { opacity: 0, transform: "scale(0.2)" }],
                               { duration: periode, delay: (retard || 0) + pt.h * periode, iterations: Infinity, easing: "ease-out" });
-                } else if (recette.eclats.geste === "bouffee") {
+                } else if (fam.geste === "bouffee") {
                     // Une bouffée de poussière se lève, s'étale et retombe, de loin en loin.
                     const t = R * (0.35 + 0.25 * pt.h), periode = 4200 + pt.h * 4800;
                     e.style.width = e.style.height = t + "px";
@@ -952,14 +1045,33 @@
                                { opacity: 0.55, transform: `translate(${(ux * R * 0.08).toFixed(1)}px, ${(uy * R * 0.08).toFixed(1)}px) scale(0.9)`, offset: 0.66 },
                                { opacity: 0, transform: `translate(${(ux * R * 0.35).toFixed(1)}px, ${(uy * R * 0.35).toFixed(1)}px) scale(1.6)` }],
                               { duration: periode, delay: (retard || 0) + pt.h * periode, iterations: Infinity, easing: "ease-out" });
-                } else if (recette.eclats.geste === "crepite") {
+                } else if (fam.geste === "jaillit") {
+                    // Une colonne de lumière jaillit du sol, monte vers le haut de l'écran
+                    // (comme les murs), s'élargit un instant, puis s'éteint.
+                    const w = R * (0.5 + 0.2 * pt.h), haut = R * (1.4 + 0.7 * pt.h), periode = 2400 + pt.h * 2400;
+                    e.style.width = w + "px"; e.style.height = haut + "px";
+                    e.style.margin = `${-haut}px 0 0 ${-w / 2}px`;
+                    e.style.transformOrigin = "50% 100%";
+                    e.animate([{ opacity: 0, transform: "scale(0.6, 0.1)" }, { opacity: 0, transform: "scale(0.6, 0.1)", offset: 0.25 },
+                               { opacity: 1, transform: "scale(1, 1)", offset: 0.42 }, { opacity: 0.8, transform: "scale(0.9, 1.05)", offset: 0.7 },
+                               { opacity: 0, transform: "scale(0.5, 1.12)" }],
+                              // Déjà décalées dans leur cycle : elles jaillissent tour à tour dès le début.
+                              { duration: periode, delay: (retard || 0) - ((pt.h * 7.3) % 1) * periode, iterations: Infinity, easing: "ease-out" });
+                } else if (fam.geste === "monte") {
+                    // Une étincelle monte doucement, et s'éteint.
+                    const periode = 2000 + pt.h * 2200, haut = R * (0.5 + 0.6 * pt.h), derive = (pt.h - 0.5) * R * 0.2;
+                    e.animate([{ opacity: 0, transform: "translate(0px, 0px) scale(0.6)" }, { opacity: 1, transform: `translate(${(derive * 0.2).toFixed(1)}px, ${(-haut * 0.2).toFixed(1)}px) scale(1)`, offset: 0.2 },
+                               { opacity: 0.8, transform: `translate(${(derive * 0.7).toFixed(1)}px, ${(-haut * 0.7).toFixed(1)}px) scale(0.9)`, offset: 0.7 },
+                               { opacity: 0, transform: `translate(${derive.toFixed(1)}px, ${(-haut).toFixed(1)}px) scale(0.5)` }],
+                              { duration: periode, delay: (retard || 0) + pt.h * periode, iterations: Infinity, easing: "ease-out" });
+                } else if (fam.geste === "crepite") {
                     // Une étincelle claque deux fois, vite, et disparaît.
                     const periode = 900 + pt.h * 1300, o = 0.2 + pt.h * 0.6;
                     e.animate([{ opacity: 0, transform: "scale(0.5)" }, { opacity: 0, offset: o }, { opacity: 1, transform: "scale(1.6)", offset: o + 0.03 },
                                { opacity: 0.1, transform: "scale(0.7)", offset: o + 0.06 }, { opacity: 1, transform: "scale(1.3)", offset: o + 0.09 },
                                { opacity: 0, transform: "scale(0.5)", offset: o + 0.14 }, { opacity: 0, transform: "scale(0.5)" }],
                               { duration: periode, delay: (retard || 0) + pt.h * 400, iterations: Infinity });
-                } else if (recette.eclats.geste === "envol") {
+                } else if (fam.geste === "envol") {
                     // Une étincelle s'élève (elle grandit, vue d'en haut) et file avec le vent.
                     const periode = 1300 + pt.h * 1500, loin = R * (0.9 + pt.h * 0.9);
                     e.animate([{ opacity: 0, transform: "translate(0px, 0px) scale(0.5)" },
@@ -1191,6 +1303,7 @@
     window.creerCouchePoison = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "poison" });
     window.creerCoucheElectrique = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "electrique" });
     window.creerCouchePieges = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "neutre" });
+    window.creerCoucheSoin = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "soin" });
     window.creerCoucheGravats = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "gravats" });
     // Toutes les recettes (le Studio les essaie toutes).
     window.RECETTES_PROCEDURALES = Object.keys(RECETTES);
