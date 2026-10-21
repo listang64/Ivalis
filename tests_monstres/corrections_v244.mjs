@@ -221,8 +221,9 @@ console.log("\n8. LE CATALOGUE");
     const a = (window.ANIMATIONS_COMBAT || []).find(x => x.id === "zone-feu");
     return { nb: (window.ANIMATIONS_COMBAT || []).length, cible: !!(a && a.ciblage), desc: a ? a.description : "" };
   });
-  verifier("toujours 143 animations ; la zone de feu se cible et dit ce qu'elle fait",
-           r.nb === 143 && r.cible && /braises/.test(r.desc) && /fumée/.test(r.desc) && /contour/.test(r.desc), JSON.stringify(r));
+  // (v248 : la zone de pièges en plus — 144.)
+  verifier("toujours 144 animations ; la zone de feu se cible et dit ce qu'elle fait",
+           r.nb === 144 && r.cible && /braises/.test(r.desc) && /fumée/.test(r.desc) && /contour/.test(r.desc), JSON.stringify(r));
 }
 
 await fin();

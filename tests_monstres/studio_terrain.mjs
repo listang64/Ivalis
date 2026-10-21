@@ -283,8 +283,9 @@ console.log("\n6. ANNULER, ET LES ANIMATIONS SANS CIBLAGE");
              marques: [...document.querySelectorAll("#studio-liste .studio-anim")].filter(l => l.querySelector(".studio-anim-cible")).map(l => l.dataset.anim) };
   });
   verifier("« Annuler » referme le bandeau sans rien jouer ni rien poser", r.pris === 1 && !r.visible && r.cibles === 0 && r.rien === 0 && !r.joue, JSON.stringify(r));
-  const CIBLEES = ["attaque-zone", "zone-apercu", "zone-feu", "zone-glace", "zone-foudre", "zone-poison", "gravats", "mur-terre", "mur-terre-repousse", "mur-effondre"];
-  verifier("les dix animations qui se ciblent portent 🎯 dans la liste", r.marques.length === 10 && CIBLEES.every(id => r.marques.includes(id)), JSON.stringify(r.marques));
+  // (v248 : la zone de pièges se cible aussi — onze.)
+  const CIBLEES = ["attaque-zone", "zone-apercu", "zone-feu", "zone-glace", "zone-foudre", "zone-poison", "zone-pieges", "gravats", "mur-terre", "mur-terre-repousse", "mur-effondre"];
+  verifier("les onze animations qui se ciblent portent 🎯 dans la liste", r.marques.length === 11 && CIBLEES.every(id => r.marques.includes(id)), JSON.stringify(r.marques));
   const tout = await jouerTout(p, CIBLEES, 3);
   verifier("sans cases touchées (« jouer » direct), chacune garde ses cases à elle et se joue jusqu'au bout",
            tout.every(x => x.ok && x.fait && x.reste === 0 && x.inconnus.length === 0), JSON.stringify(tout.filter(x => !(x.ok && x.fait && x.reste === 0)).map(x => x.id)));

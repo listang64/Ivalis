@@ -1,5 +1,5 @@
 // =========================================================================
-//  IVALIS — LES ZONES PROCÉDURALES : GIVRE, BRASIER, POISON, FOUDRE, GRAVATS
+//  IVALIS — LES ZONES PROCÉDURALES : GIVRE, BRASIER, POISON, FOUDRE, PIÈGES, GRAVATS
 // =========================================================================
 //  Nico, dans le Studio d'animation : « J'aimerais qu'on revoie l'animation
 //  des zones de glace. Je ne veux pas de contour, mais quelque chose de plus
@@ -10,7 +10,9 @@
 //  de glace, fais aussi de façon procédurale les zones de feu du Studio. » Et :
 //  « Refais dans le même état d'esprit les zones poison et électrique. » Et
 //  (v247) : « Dans le même esprit, refais-moi les zones de gravats, de terrain
-//  difficile, quand les murs se brisent. »
+//  difficile, quand les murs se brisent. » Puis (v248) : « Et pour les zones
+//  avec juste des dégâts normaux, fais des chausse-trappes sur le sol, en
+//  mode procédural pareil. »
 //
 //  UNE COUCHE couvre TOUTES les cases d'un même élément : leur union, pas une
 //  nappe par case. Le dessin part de la distance de chaque point au BORD DE
@@ -36,6 +38,11 @@
 //      figures de Lichtenberg (les brûlures ramifiées de la foudre) qui
 //      grésillent ; des arcs qui claquent au hasard d'un point à l'autre ; un
 //      voile de plasma ; des étincelles qui crépitent ;
+//    • LES PIÈGES (neutre, la zone qui ne fait que des dégâts) : le sol
+//      piétiné, à peine assombri, griffé, quelques traces de rouille ; des
+//      chausse-trappes semées partout (trois pointes au sol, la quatrième
+//      dressée), chacune tournée au hasard, avec son ombre, du fer plus ou
+//      moins rouillé ; des reflets qui accrochent la lumière sur les pointes ;
 //    • LES GRAVATS (gravats) : la terre retournée, un petit monticule par
 //      case éclairé en haut à gauche ; des pierres cassées (gros blocs au
 //      cœur, moellons autour, cailloux qui roulent jusqu'au bord et au-delà),
@@ -44,13 +51,15 @@
 //
 //  `creerCoucheProcedurale(conteneur, { type, R, pixel, graine, vent })` rend
 //  la couche (`creerCoucheGivre`, `creerCoucheFeu`, `creerCouchePoison`,
-//  `creerCoucheElectrique`, `creerCoucheGravats` : la même, d'un élément) ;
+//  `creerCoucheElectrique`, `creerCouchePieges`, `creerCoucheGravats` : la
+//  même, d'un élément) ;
 //  elle vit dans le repère de la carte (le conteneur est posé sur elle).
 //  `ajouter(cases, { depuis, duree })` : l'élément gagne les nouvelles cases
 //  depuis `depuis` (la plaque grandit) ; `poser(cases)` : sans animation ;
 //  `retirer(cases)`, `vider()`, `detruire()`. Le Studio s'en sert
 //  (studio_animation.js) ; le combat aussi pour les quatre zones (v246,
-//  combat.js) ; il garde ses tas de gravats tant que Nico n'a pas validé.
+//  combat.js) ; il garde ses tas de gravats et sa nappe de pièges tant que
+//  Nico n'a pas validé.
 // =========================================================================
 (function () {
     // --- LE BRUIT ---------------------------------------------------------
@@ -119,6 +128,8 @@
                               box-shadow: 0 0 3px 1px rgba(170, 225, 255, 1), 0 0 9px 3px rgba(90, 170, 255, 0.6); }
             .poison-bulle { border-radius: 50%; border: 1.5px solid rgba(215, 255, 150, 0.7);
                             background: radial-gradient(circle at 34% 32%, rgba(255, 255, 255, 0.55), rgba(170, 225, 90, 0.18) 38%, rgba(90, 140, 30, 0.08) 70%); }
+            .piege-reflet { width: 2px; height: 2px; margin: -1px 0 0 -1px; background: #ffffff;
+                            box-shadow: 0 0 2px 1px rgba(235, 240, 250, 0.95), 0 0 6px 2px rgba(200, 210, 230, 0.5); }
             .gravats-bouffee { border-radius: 50%; background: radial-gradient(circle, rgba(214, 198, 168, 0.75), rgba(200, 182, 150, 0.3) 45%, rgba(190, 172, 140, 0) 70%); }
             .zone-proc-arcs { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
             .zone-proc-arcs canvas { opacity: 0; }
@@ -252,6 +263,73 @@
             cf.beginPath(); cf.moveTo(x - Math.cos(a) * r * 0.55, y - Math.sin(a) * r * 0.45); cf.lineTo(x + Math.cos(a + 0.4) * r * 0.1, y + Math.sin(a + 0.4) * r * 0.1);
             cf.lineTo(x + Math.cos(a) * r * 0.6, y + Math.sin(a) * r * 0.5); cf.stroke();
         }
+    }
+
+    // LES CHAUSSE-TRAPPES : semées sur un réseau régulier de la carte, chaque
+    // point déplacé au hasard (un semis sans amas ni trou, sans couture entre
+    // deux cases, le même quelle que soit la plaque), parfois deux tombées
+    // ensemble ; seules restent celles qui tombent franchement dans la zone.
+    function semerPieges(liste, { R, graine, pixel, profondeur }) {
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        liste.forEach(c => { const p = pixel(c.q, c.r); x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); });
+        const d = R * 0.6, dy = d * 0.866, pieges = [];
+        const garder = (x, y, s, rot, h) => { if (profondeur(x, y) >= s * 0.9) pieges.push({ x, y, s, rot, h }); };
+        for (let j = Math.floor((y0 - R) / dy); j <= Math.ceil((y1 + R) / dy); j++) {
+            for (let i = Math.floor((x0 - R) / d) - 1; i <= Math.ceil((x1 + R) / d) + 1; i++) {
+                const h = (Math.imul(i, 7919) ^ Math.imul(j, 104729) ^ Math.imul(graine, 31)) | 0;
+                if (hacher(h, 1, 81) < 0.12) continue;
+                const x = (i + (j & 1) * 0.5 + (hacher(h, 2, 81) - 0.5) * 0.7) * d;
+                const y = (j + (hacher(h, 3, 81) - 0.5) * 0.7) * dy;
+                const s = R * (0.16 + 0.06 * hacher(h, 4, 81));
+                garder(x, y, s, hacher(h, 5, 81) * Math.PI * 2, h);
+                if (hacher(h, 6, 81) < 0.2) {
+                    const a = hacher(h, 7, 81) * Math.PI * 2;
+                    garder(x + Math.cos(a) * s * 1.8, y + Math.sin(a) * s * 1.8, s * 0.92, hacher(h, 8, 81) * Math.PI * 2, (h * 3 + 1) | 0);
+                }
+            }
+        }
+        return pieges;
+    }
+    // UNE CHAUSSE-TRAPPE vue d'en haut : trois pointes à plat (une arête, une
+    // face au clair, une face à l'ombre), la quatrième dressée, que l'on voit
+    // courte vers le haut de l'écran (comme les murs, qui montent vers le
+    // haut) ; leurs ombres en bas à droite, la dressée la plus longue ; un nœud
+    // au centre ; le fer plus ou moins rouillé.
+    function chausseTrappe(cf, { x, y, s, rot, h }) {
+        const rouille = hacher(h, 9, 81) < 0.45 ? hacher(h, 19, 81) * 0.45 : 0;
+        const fer = (l) => {
+            const a = [l * 0.92, l * 0.95, l * 1.03], b = [l * 1.2 + 18, l * 0.72 + 4, l * 0.45];
+            return `rgb(${a.map((v, i) => Math.round(Math.min(255, v + (b[i] - v) * rouille))).join(",")})`;
+        };
+        const w = s * 0.19;
+        const bras = [0, 1, 2].map(i => ({ a: rot + i * 2 * Math.PI / 3 + (hacher(h, 10 + i, 81) - 0.5) * 0.3, l: s * (0.85 + 0.3 * hacher(h, 13 + i, 81)) }));
+        const dressee = { a: -Math.PI / 2 + (hacher(h, 16, 81) - 0.5) * 0.5, l: s * 0.55 };
+        const pointe = (ox, oy, a, l, e) => {
+            const px = -Math.sin(a) * e, py = Math.cos(a) * e;
+            cf.beginPath(); cf.moveTo(ox + px, oy + py); cf.lineTo(ox + Math.cos(a) * l, oy + Math.sin(a) * l); cf.lineTo(ox - px, oy - py); cf.closePath();
+        };
+        // Les ombres.
+        cf.fillStyle = "rgba(14, 10, 8, 0.4)";
+        bras.forEach(b => { pointe(x + s * 0.12, y + s * 0.16, b.a, b.l, w * 1.1); cf.fill(); });
+        pointe(x + s * 0.05, y + s * 0.07, Math.atan2(0.8, 0.6), s * 0.95, w * 0.9); cf.fill();
+        // Les pointes : chacune deux faces, l'une tournée vers la lumière (en haut à gauche).
+        const facettes = (b) => {
+            const ex = x + Math.cos(b.a) * b.l, ey = y + Math.sin(b.a) * b.l, px = -Math.sin(b.a) * w, py = Math.cos(b.a) * w;
+            const lum = -(px * 0.6 + py * 0.8) / w;
+            [[1, lum], [-1, -lum]].forEach(([sg, l]) => {
+                cf.fillStyle = fer(l > 0 ? 78 + 80 * l : 40 + 18 * (1 + l));
+                cf.beginPath(); cf.moveTo(x + px * sg, y + py * sg); cf.lineTo(ex, ey); cf.lineTo(x, y); cf.closePath(); cf.fill();
+            });
+        };
+        bras.forEach(facettes);
+        facettes(dressee);
+        // Le nœud, et l'éclat de la pointe dressée.
+        cf.fillStyle = fer(58);
+        cf.beginPath(); cf.arc(x, y, w * 0.9, 0, Math.PI * 2); cf.fill();
+        cf.fillStyle = fer(165);
+        cf.beginPath(); cf.arc(x - w * 0.3, y - w * 0.35, w * 0.35, 0, Math.PI * 2); cf.fill();
+        cf.fillStyle = "rgba(240, 244, 250, 0.75)";
+        cf.beginPath(); cf.arc(x + Math.cos(dressee.a) * dressee.l * 0.92, y + Math.sin(dressee.a) * dressee.l * 0.92, w * 0.28, 0, Math.PI * 2); cf.fill();
     }
 
     // =====================================================================
@@ -486,6 +564,39 @@
             ],
             eclats: { parCase: 4, classe: "elec-etincelle", geste: "crepite" },
             frange: [150, 210, 255]
+        },
+
+        neutre: {
+            classe: "piege", marge: 1.2,
+            // LE SOL PIÉTINÉ : une terre à peine assombrie, sans bord net, griffée
+            // (du fer traîné), quelques traces de rouille.
+            sol(x, y, p, { R, graine }) {
+                if (p < -R * 0.4) return null;
+                const n1 = fbm(x / (R * 0.5), y / (R * 0.5), 3, graine + 15);
+                const bord = p + (n1 - 0.5) * R * 0.6;
+                const m = entre(-R * 0.1, R * 0.3, bord);
+                if (m <= 0.003) return null;
+                const n2 = fbm(x / (R * 0.22), y / (R * 0.22), 3, graine + 33);
+                const n3 = bruit(x / (R * 0.03), y / (R * 0.03), graine + 45);
+                // Quelques éraflures, par endroits : un bruit étiré dont on ne garde que les crêtes.
+                const e = fbm((x * 0.8 + y * 0.6) / (R * 0.05), (y * 0.8 - x * 0.6) / (R * 0.5), 2, graine + 57);
+                const griffe = entre(0.9, 0.97, 1 - Math.abs(2 * e - 1)) * entre(0.6, 0.78, fbm(x / (R * 0.4), y / (R * 0.4), 2, graine + 59));
+                const rouille = entre(0.74, 0.86, fbm(x / (R * 0.12), y / (R * 0.12), 2, graine + 63)) * 0.5;
+                const r = 58 + 16 * n3 + rouille * 50, g = 50 + 13 * n3 + rouille * 16, b = 44 + 10 * n3;
+                const a = m * (0.15 + 0.12 * entre(0.35, 0.7, n2) + 0.05 * n3 + 0.1 * griffe + 0.08 * rouille);
+                return [r, g, b, Math.min(0.5, a), m];
+            },
+            // Les chausse-trappes, semées partout dans la zone.
+            decor(cf, liste, outils) {
+                semerPieges(liste, outils).sort((a, b) => a.y - b.y).forEach(pt => chausseTrappe(cf, pt));
+            },
+            decorDebord: true,
+            voiles: [],
+            // Un reflet, de loin en loin, sur la pointe dressée d'une chausse-trappe sur trois.
+            eclats: { parCase: 0, classe: "piege-reflet", geste: "scintille",
+                      points: (liste, outils) => semerPieges(liste, outils).filter(pt => hacher(pt.h, 17, 81) < 0.34)
+                          .map(pt => ({ x: pt.x, y: pt.y - pt.s * 0.5, h: hacher(pt.h, 18, 81) })) },
+            frange: null
         },
 
         gravats: {
@@ -757,6 +868,9 @@
 
             // LES ÉCLATS : quelques-uns par case, là où la plaque est franche.
             const points = [];
+            if (recette.eclats.points) recette.eclats.points(liste, outils).forEach(pt => {
+                if (pt.x >= E.x0 && pt.y >= E.y0 && pt.x < E.x0 + E.l && pt.y < E.y0 + E.h) points.push({ x: pt.x - E.x0, y: pt.y - E.y0, h: pt.h });
+            });
             liste.forEach(c => {
                 const p = pixel(c.q, c.r), h0 = (c.q * 7349 + c.r * 2903 + graine) | 0;
                 for (let s = 0; s < recette.eclats.parCase; s++) {
@@ -1076,7 +1190,11 @@
     window.creerCoucheFeu = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "feu" });
     window.creerCouchePoison = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "poison" });
     window.creerCoucheElectrique = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "electrique" });
+    window.creerCouchePieges = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "neutre" });
     window.creerCoucheGravats = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "gravats" });
-    // Les zones persistantes (les gravats sont un terrain, pas une zone).
-    window.TYPES_ZONES_PROCEDURALES = Object.keys(RECETTES).filter(t => t !== "gravats");
+    // Toutes les recettes (le Studio les essaie toutes).
+    window.RECETTES_PROCEDURALES = Object.keys(RECETTES);
+    // Les zones persistantes que le combat dessine ainsi (v246) : les quatre
+    // éléments validés. Les pièges et les gravats attendent leur validation.
+    window.TYPES_ZONES_PROCEDURALES = ["glace", "feu", "poison", "electrique"];
 })();

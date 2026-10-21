@@ -215,8 +215,9 @@ console.log("\n4. LE CATALOGUE ; LE COMBAT GARDE SES TAS");
     return { nb: (window.ANIMATIONS_COMBAT || []).length, gravats: a("gravats").description || "", effondre: a("mur-effondre").description || "",
              types: window.TYPES_ZONES_PROCEDURALES || [], jeu, moteur: typeof window.creerCoucheGravats === "function" };
   });
-  verifier("toujours 143 animations ; « Gravats » et « Mur effondré » parlent d'éboulis, sans contour",
-           r.nb === 143 && /éboulis/.test(r.gravats) && /contour/.test(r.gravats) && /éboulis/.test(r.effondre), JSON.stringify({ nb: r.nb }));
+  // (v248 : la zone de pièges en plus — 144.)
+  verifier("toujours 144 animations ; « Gravats » et « Mur effondré » parlent d'éboulis, sans contour",
+           r.nb === 144 && /éboulis/.test(r.gravats) && /contour/.test(r.gravats) && /éboulis/.test(r.effondre), JSON.stringify({ nb: r.nb }));
   verifier("le moteur sait faire des gravats (creerCoucheGravats), qui ne sont pas une zone", r.moteur && !r.types.includes("gravats") && r.types.length === 4, r.types.join());
   verifier("le combat garde ses tas de gravats tant que le Studio n'est pas validé", r.jeu === 1, String(r.jeu));
 }

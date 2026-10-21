@@ -143,7 +143,8 @@
         glace: "radial-gradient(circle, rgba(255,255,255,0.92), rgba(175,232,255,0.72) 50%, rgba(60,150,220,0.55) 88%)",
         foudre: "radial-gradient(circle, rgba(225,242,255,0.88), rgba(95,145,255,0.62) 50%, rgba(30,40,140,0.58) 88%)",
         poison: "radial-gradient(circle, rgba(205,255,125,0.82), rgba(110,190,40,0.66) 50%, rgba(40,90,10,0.58) 88%)",
-        soin: "radial-gradient(circle, rgba(220,255,225,0.85), rgba(110,230,140,0.6) 50%, rgba(30,120,60,0.45) 88%)"
+        soin: "radial-gradient(circle, rgba(220,255,225,0.85), rgba(110,230,140,0.6) 50%, rgba(30,120,60,0.45) 88%)",
+        neutre: "radial-gradient(circle, rgba(150,150,158,0.5), rgba(95,92,96,0.45) 55%, rgba(50,46,48,0.4) 88%)"
     };
     const animerZone = (o, calque, pts, type, duree) => {
         const fins = [];
@@ -1979,6 +1980,12 @@
         // visées, et rejoint la plaque déjà posée (zones_procedurales.js) ; il reste.
         zoneProcedurale("glace", "givre", "Zone persistante de glace", "zone-glace", "Zone de glace", "rgba(220,244,255,0.8)",
                         "Le givre gagne les cases visées depuis le cœur de la zone : une pellicule blanc-bleu translucide sur le terrain, sans contour, des fougères de givre, des éclats qui scintillent, et une brume glacée que le vent pousse. Deux zones qui se touchent ne font qu'une plaque."),
+        // LA ZONE DE PIÈGES (Nico, v248 : « pour les zones avec juste des dégâts
+        // normaux, fais des chausse-trappes sur le sol, en mode procédural
+        // pareil ») : le type « neutre » du combat, « Terrain piégé ».
+        zoneProcedurale("neutre", "zone", "Zone persistante de dégâts (chausse-trappes)", "zone-pieges", "Terrain piégé", "rgba(215,220,230,0.8)",
+                        "Des chausse-trappes se répandent depuis le cœur de la zone sur les cases visées : le sol piétiné, à peine assombri, sans contour, semé de pointes de fer — trois à plat, la quatrième dressée — tournées au hasard, chacune avec son ombre, plus ou moins rouillées ; un reflet accroche la lumière de loin en loin. Deux zones qui se touchent ne font qu'un champ de pièges.",
+                        "zone-pieges"),
         // LA ZONE DE FOUDRE ET LA ZONE DE POISON (Nico, v245 : « refais dans le même
         // état d'esprit les zones poison et électrique ») : procédurales elles aussi.
         zoneProcedurale("electrique", "zone", "Zone persistante de foudre", "zone-foudre", "Zone de foudre", "rgba(170,220,255,0.85)",
@@ -3209,7 +3216,7 @@
         "poison", "brule", "gel", "electrifie", "saignement", "aveugle", "etourdi-presence", "immobilisation-presence", "confusion-presence",
         "peur-presence", "provocation-presence", "etalement-tic", "plaie-rouverte", "repli-etat",
         // 7. Zones et terrain
-        "zone-apercu", "zone-feu", "zone-glace", "zone-foudre", "zone-poison", "gravats",
+        "zone-apercu", "zone-feu", "zone-glace", "zone-foudre", "zone-poison", "zone-pieges", "gravats",
         // 8. Classes
         "tenebres", "tenebres-etalees", "charme-fratricide", "charme-frappe", "charme-perdu", "transfert",
         "provocation-protecteur", "rempart", "rempart-actif", "rempart-rompu", "resonance-bouclier",

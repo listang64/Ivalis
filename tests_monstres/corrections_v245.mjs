@@ -191,8 +191,9 @@ console.log("\n5. LE CATALOGUE");
     return { nb: (window.ANIMATIONS_COMBAT || []).length, poison: a("zone-poison"), foudre: a("zone-foudre"),
              types: window.TYPES_ZONES_PROCEDURALES || [] };
   });
-  verifier("toujours 143 animations ; poison et foudre se ciblent et disent ce qu'ils font (sans contour)",
-           r.nb === 143 && !!r.poison.ciblage && !!r.foudre.ciblage && /bulles/.test(r.poison.description || "") && /miasme/.test(r.poison.description || "")
+  // (v248 : la zone de pièges en plus — 144.)
+  verifier("toujours 144 animations ; poison et foudre se ciblent et disent ce qu'ils font (sans contour)",
+           r.nb === 144 && !!r.poison.ciblage && !!r.foudre.ciblage && /bulles/.test(r.poison.description || "") && /miasme/.test(r.poison.description || "")
            && /arcs/.test(r.foudre.description || "") && /contour/.test(r.poison.description || "") && /contour/.test(r.foudre.description || ""), JSON.stringify({ nb: r.nb }));
   verifier("le moteur connaît les quatre éléments", ["glace", "feu", "poison", "electrique"].every(t => r.types.includes(t)), r.types.join());
 }

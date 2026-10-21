@@ -811,6 +811,16 @@
             bulles(ctx, s, { n: 9, duree: 0.8, gain: 0.08 });
             bruit(ctx, s, { duree: 0.9, filtre: "lowpass", freq: 500, q: 0.7, gain: 0.08, forme: "cloche" });
         },
+        // DES CHAUSSE-TRAPPES SEMÉES (v248) : une poignée de fer qui tinte en
+        // tombant, chaque pointe sa petite note sèche, et un froissement au sol.
+        "zone-pieges"(ctx, s) {
+            for (let i = 0; i < 9; i++) {
+                const t = au(0, 0.55), f = au(2400, 4200);
+                note(ctx, s, { debut: t, freq: f, duree: au(0.05, 0.12), gain: au(0.025, 0.05), type: "triangle", attaque: 0.001 });
+                bruit(ctx, s, { debut: t, duree: 0.015, filtre: "highpass", freq: 5000, q: 0.7, gain: au(0.08, 0.16) });
+            }
+            bruit(ctx, s, { duree: 0.5, filtre: "bandpass", freq: 1800, q: 0.8, gain: 0.06, forme: "cloche" });
+        },
         "gravats"(ctx, s) {
             for (let i = 0; i < 10; i++) bruit(ctx, s, { debut: au(0, 0.5), duree: au(0.02, 0.05), freq: au(700, 1500), q: 1.2, gain: au(0.15, 0.3) });
             note(ctx, s, { freq: 80, duree: 0.3, gain: 0.22, attaque: 0.003 });

@@ -161,6 +161,7 @@ function fenetre() {
               <div id="studio-plateau" class="studio-plateau">
                 <img id="studio-image-carte" class="studio-image-carte" alt="">
                 <canvas id="studio-canvas" class="studio-canvas"></canvas>
+                <div id="studio-pieges" class="studio-givre studio-pieges"></div>
                 <div id="studio-givre" class="studio-givre"></div>
                 <div id="studio-feu" class="studio-givre studio-feu"></div>
                 <div id="studio-poison" class="studio-givre studio-poison"></div>
@@ -614,9 +615,13 @@ function rendreZones() {
 //  une case n'a qu'un élément : le feu fait fondre la glace, la glace éteint
 //  le feu.
 // Puis (v245) : « refais dans le même état d'esprit les zones poison et électrique. »
-const PROCEDURALES = ["glace", "feu", "poison", "electrique"];
-const CONTENEUR_PROCEDURAL = { glace: "studio-givre", feu: "studio-feu", poison: "studio-poison", electrique: "studio-electrique" };
-const estProcedurale = (type) => PROCEDURALES.includes(type) && typeof window.creerCoucheProcedurale === "function";
+// Et (v248) : « pour les zones avec juste des dégâts normaux, fais des
+// chausse-trappes sur le sol, en mode procédural pareil » — le type « neutre »
+// du combat (« Terrain piégé »), sous les autres plaques.
+const PROCEDURALES = ["glace", "feu", "poison", "electrique", "neutre"];
+const CONTENEUR_PROCEDURAL = { glace: "studio-givre", feu: "studio-feu", poison: "studio-poison", electrique: "studio-electrique", neutre: "studio-pieges" };
+const estProcedurale = (type) => PROCEDURALES.includes(type) && typeof window.creerCoucheProcedurale === "function"
+    && (window.RECETTES_PROCEDURALES || window.TYPES_ZONES_PROCEDURALES || []).includes(type);
 function nouvelleCouche(type) {
     const conteneur = document.getElementById(CONTENEUR_PROCEDURAL[type]);
     if (!conteneur || !studio.plateau || !estProcedurale(type)) return null;

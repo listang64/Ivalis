@@ -6697,3 +6697,53 @@ en un seul éboulis, un mur levé sur des gravats, « Replacer ») ; le
 catalogue ; les tas du combat inchangés. Il mord sur l'ancien code
 (17 échecs). Mis à jour : studio_terrain (le mur effondré laisse l'éboulis,
 une plaque, et non plus une image de tas).
+
+## v248 — Studio : la zone de pièges (chausse-trappes), procédurale
+
+Nico : « Et aussi pour les zones avec juste des dégâts normaux, fais des
+chausse-trappes sur le sol, en mode procédural pareil. (Rajoute cet effet
+dans les zones du Studio.) »
+
+- LA ZONE « NEUTRE » du combat (celle qui ne fait que des dégâts : « 💥
+  Terrain piégé ! ») a sa recette dans zones_procedurales.js — le même
+  moteur : une plaque pour toutes ses cases, deux zones collées sans
+  couture, aucun contour, les pièges qui gagnent depuis le cœur.
+  - LE SOL PIÉTINÉ : une terre à peine assombrie, translucide, quelques
+    éraflures par endroits (du fer traîné), des traces de rouille.
+  - LES CHAUSSE-TRAPPES (le décor, tracé) : semées sur un réseau régulier
+    de la carte, chaque point déplacé au hasard — ni amas ni trou, pas de
+    couture entre deux cases, et une case garde ses pièges quand la plaque
+    grandit —, parfois deux tombées ensemble ; seules restent celles qui
+    tombent franchement dans la zone. Chacune : trois pointes à plat (une
+    face au clair, une à l'ombre), la quatrième dressée, vue courte vers le
+    haut de l'écran (comme les murs), leurs ombres en bas à droite (la
+    dressée la plus longue), un nœud au centre, l'éclat de la pointe ; une
+    sur deux à peu près un peu rouillée ; chacune tournée au hasard.
+  - DES REFLETS : de loin en loin, sur la pointe dressée d'une chausse-trappe
+    sur trois (le moteur prend désormais les points des éclats d'une
+    recette quand elle les donne).
+  - Pas de voile : rien ne flotte au-dessus des pièges.
+- LE STUDIO : le type « neutre » est une plaque comme les quatre éléments
+  (#studio-pieges, sous les autres) ; une case n'a qu'une zone — le feu
+  chasse les pièges, les pièges chassent le feu.
+- LE CATALOGUE : « Zone persistante de dégâts (chausse-trappes) »
+  (zone-pieges), en section 7 après le poison — 144 animations — avec son
+  bruit, « zone-pieges » (fabrique_sons.js) : une poignée de fer qui tinte
+  en tombant.
+- Le combat garde sa nappe de pièges tant que Nico n'a pas validé :
+  RECETTES_PROCEDURALES (tout ce que sait faire le moteur) et
+  TYPES_ZONES_PROCEDURALES (ce que le combat dessine ainsi : les quatre
+  éléments) sont désormais deux listes.
+- Le calcul : environ 0,1 s pour 10 cases.
+
+corrections_v248.mjs : la plaque (une, sans nappe ni contour, qui couvre
+ses cases et rien d'autre), le sol translucide, le fer gris et opaque en
+nombre, les ombres, des pièges dans chaque case et aucun au-delà, les
+reflets ; deux zones collées sans couture, la case du cœur qui garde ses
+pièges, le même semis pour les mêmes cases, depuis le cœur, le calcul ; le
+feu et les pièges qui se chassent, « Replacer » ; le catalogue (144, après
+le poison, en section 7), le son, les deux listes du moteur, la nappe du
+combat inchangée. Il mord sur l'ancien code (19 échecs). Mis à jour :
+corrections_v243, v244, v245, v247, studio_animation et studio_catalogue_1
+(144 animations ; sept en section 7 ; 110 sons fabriqués), studio_terrain
+(onze animations qui se ciblent).
