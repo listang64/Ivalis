@@ -111,9 +111,10 @@ console.log("\n4. VU DE DESSUS, SUR LA GRILLE");
     const h1 = h.getBoundingClientRect();
     const decale = Math.hypot(h1.left - h0.left, h1.top - h0.top);
     window.replacerPionsStudio();
-    // Une zone de feu : combien de cases entières (les nappes du jeu, qui restent sur la carte) ?
+    // Une zone de feu : combien de cases entières (qui restent sur la carte) ? (v244 : un brasier
+    // procédural pour toutes — on compte les cases de feu du terrain.)
     await window.jouerAnimationStudio("zone-feu");
-    const hexagones = document.querySelectorAll("#studio-zones .studio-nappe").length;
+    const hexagones = window.terrainStudio().zones.filter(z => z.type === "feu").length;
     window.VITESSE_ANIMATIONS = 1;
     // Les cases qui existent autour de l'ennemi (la carte a une case gommée).
     const en = document.getElementById("studio-pion-ennemi");

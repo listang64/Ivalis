@@ -6509,3 +6509,51 @@ au vent et les éclats, le procédural (même dessin pour les mêmes cases, une
 autre graine change tout, une case garde son givre), le feu qui fait fondre,
 « Replacer », la glace qui passe, la nappe du combat inchangée. Il mord sur
 l'ancien code (19 échecs).
+
+## v244 — Studio : la zone de feu, procédurale
+
+Nico : « Ensuite, comme les zones de glace, fais aussi de façon procédurale
+les zones de feu du Studio. »
+
+- UN SEUL MOTEUR (zones_procedurales.js, qui remplace givre.js :
+  creerCoucheProcedurale, et creerCoucheGivre / creerCoucheFeu pour un
+  élément) : l'union des cases, la distance au bord, le bruit en
+  coordonnées de la carte, l'emprise calée, le front qui avance, les voiles
+  au vent, les éclats — et une RECETTE par élément. Celle du givre est celle
+  de la v243, telle quelle.
+- LE BRASIER (la recette du feu) : une plaque pour toutes les cases de feu,
+  deux zones collées font un seul brasier, aucun contour.
+  - le sol calciné : roussi sur la frange, noir de suie vers le cœur, des
+    cendres claires par endroits, translucide (le terrain se devine) ;
+  - les braises : des fissures fines (un bruit en crêtes) qui rougeoient,
+    orange, jaunes seulement au plus chaud, plus ou moins vives, jamais sur
+    la frange — sur un calque qui s'éclaire (« écran ») et respire, avec un
+    halo flou qui respire à son rythme ;
+  - les flammes : deux voiles de bruit chaud, couchés et emportés par le
+    vent, qui vacillent vite et sans régularité (« écran ») ;
+  - la fumée : deux voiles sombres qui s'en vont SOUS LE VENT, au-delà de la
+    zone (son masque est lu un peu en amont : il s'étire en aval) ;
+  - les étincelles : trois par case, qui s'élèvent (elles grandissent, vues
+    d'en haut) et filent avec le vent ;
+  - le feu gagne depuis le cœur de la zone, son front rougeoyant (une
+    frange orange qui s'éteint derrière lui).
+- LE STUDIO (studio_animation.js : une couche par élément, coucheDe,
+  poserProcedurale, plaquePassagere, quitterSonElement ;
+  animations_catalogue.js : zoneProcedurale, pour la glace et le feu) : une
+  case n'a qu'un élément — le feu fait fondre la glace, la glace éteint le
+  feu (d'un seul redessin, après ce qui avance encore) ; le Géomancien qui
+  marche dans ses flammes a un seul petit brasier, qui ne reste pas ; le feu
+  et la glace d'une entrée de zone non plus ; « ⟲ Replacer » efface tout. Le
+  combat garde ses nappes tant que Nico n'a pas validé.
+- Le calcul : environ 0,1 s pour 7 cases de feu (sur la machine des bancs).
+
+corrections_v244.mjs : le brasier (une plaque, sans contour, sol calciné
+sombre et translucide), les braises (fissures orange, écran, respiration,
+halo), le feu qui gagne, deux zones sans couture, les flammes et la fumée au
+vent (la fumée sous le vent, pas au vent), les étincelles, le procédural et
+le moteur commun, la glace qui éteint le feu, « Replacer », les
+démonstrations, la nappe du combat inchangée. Il mord sur l'ancien code (20
+échecs). Mis à jour : studio_terrain (la zone de feu du ciblage est un
+brasier, plus une nappe par case), studio_catalogue_1 (les cases de feu se
+comptent sur le terrain), corrections_v243 (le moteur s'appelle
+zones_procedurales.js).

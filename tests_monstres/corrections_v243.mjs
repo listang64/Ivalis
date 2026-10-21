@@ -7,7 +7,7 @@
 // par le vent. Si plusieurs zones sont collées, ça fait comme une grosse zone.
 // Quelque chose de procédural. »
 //
-//   1. LA PLAQUE : les cases visées gèlent, une seule plaque (givre.js) ; pas
+//   1. LA PLAQUE : les cases visées gèlent, une seule plaque (zones_procedurales.js) ; pas
 //      de nappe hexagonale ni de liseré ; translucide ; rien loin d'elle ;
 //   2. LE GIVRE RAMPE depuis le cœur de la zone ;
 //   3. DEUX ZONES COLLÉES : une seule plaque, sans couture entre elles ;
@@ -52,7 +52,7 @@ console.log("\n1. LA PLAQUE : UNE SEULE, SANS CONTOUR, TRANSLUCIDE");
     return { ok, joue, ms, zones: t.zones.filter(z => z.type === "glace").length, couches, nappesGlace, traits,
              centres: centres.map(x => +x.toFixed(2)), loin, max: max / 255, moyenne, n };
   }, A);
-  verifier("le Studio a son givre (givre.js) et la zone de glace se joue", r.ok && r.joue, JSON.stringify({ ok: r.ok, joue: r.joue }));
+  verifier("le Studio a son givre (zones_procedurales.js) et la zone de glace se joue", r.ok && r.joue, JSON.stringify({ ok: r.ok, joue: r.joue }));
   verifier("les 7 cases visées sont des cases de glace du terrain", r.zones === 7, String(r.zones));
   verifier("UNE plaque de givre, pas une nappe hexagonale par case", r.couches === 1 && r.nappesGlace === 0, JSON.stringify({ couches: r.couches, nappes: r.nappesGlace }));
   verifier("pas de contour : aucun trait vectoriel (polygone, liseré) dans le givre", r.traits === 0, String(r.traits));
@@ -170,8 +170,8 @@ console.log("\n5. PROCÉDURAL : LE MÊME DESSIN POUR LES MÊMES CASES");
   verifier("les mêmes cases donnent le même givre (le bruit est déterministe)", r.memes);
   verifier("une autre graine, un autre givre", r.autre);
   verifier("une case garde son givre quand la plaque s'agrandit", r.garde);
-  const src = fs.readFileSync('/home/user/Ivalis/givre.js', 'utf-8');
-  verifier("rien d'une image : pas de fichier ni d'URL d'image dans givre.js", !/\.(png|jpe?g|webp|gif|svg)["'`]|https?:\/\//.test(src));
+  const src = fs.readFileSync('/home/user/Ivalis/zones_procedurales.js', 'utf-8');
+  verifier("rien d'une image : pas de fichier ni d'URL d'image dans zones_procedurales.js", !/\.(png|jpe?g|webp|gif|svg)["'`]|https?:\/\//.test(src));
 }
 
 console.log("\n6. LE TERRAIN : LE FEU FOND LA GLACE, « REPLACER » EFFACE, LA GLACE QUI PASSE NE RESTE PAS");

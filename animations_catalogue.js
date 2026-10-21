@@ -1904,6 +1904,32 @@
     // LA NAPPE DU JEU (combat.js), case après case, sur les cases visées (par
     // défaut, l'ennemi et ses voisines) : elle reste sur la carte, comme en
     // combat, jusqu'à « ⟲ Replacer ».
+    // UNE ZONE PROCÉDURALE (v243 la glace, v244 le feu) : l'élément gagne les
+    // cases visées depuis leur cœur et rejoint la plaque déjà posée sur la
+    // carte du Studio (zones_procedurales.js). Sans cette carte : la nappe
+    // d'avant, qui s'efface.
+    const zoneProcedurale = (type, methode, nom, son, texte, souffle, description) => ({
+        id: "zone-" + type, nom, sens: "vers l'ennemi", description, ciblage: CIBLAGE_ZONE,
+        async jouer(sc, o) {
+            const { b } = lieux(sc);
+            const pts = ciblees(sc, o, () => o.autour(sc.cible, b, 1, { avecCentre: true }));
+            const dedans = pionSur(sc, o, pts.find(pt => pionSur(sc, o, pt)));
+            const coeur = milieu(pts);
+            o.son(son);
+            o.texte(sc.calque, dedans || sc.cible, texte, COULEURS.etat);
+            if (sc.terrain && typeof sc.terrain[methode] === "function" && pts.every(pt => pt.q !== undefined)) {
+                // Un souffle au cœur (froid ou brûlant), puis l'élément gagne les cases.
+                o.onde(sc.calque, coeur, { couleur: souffle, taille: 0.8, echelle: 2.2, bord: 2, duree: 900 });
+                await sc.terrain[methode](pts.map(pt => ({ q: pt.q, r: pt.r })), { depuis: { q: coeur.q, r: coeur.r }, duree: 1700 });
+                await o.attendre(400);
+                return;
+            }
+            const nappes = pts.map((pt, i) => o.nappe(sc.calque, pt, type, { fond: FONDS_ZONE[type], opacite: 0.85, retard: i * 70, duree: 420 }));
+            await o.attendre(420 + pts.length * 70);
+            await animerZone(o, sc.calque, pts, type, 1000);
+            await effacerTout(o, nappes, { duree: 450 });
+        }
+    });
     const zonePersistante = (type, nom, son, texte, description) => ({
         id: "zone-" + type, nom, sens: "vers l'ennemi", description, ciblage: CIBLAGE_ZONE,
         async jouer(sc, o) {
@@ -1945,38 +1971,20 @@
                 await effacerTout(o, cases, { cascade: 0 });
             }
         },
-        zonePersistante("feu", "Zone persistante de feu", "zone-feu", "Zone de feu",
-                        "Les cases autour de l'ennemi s'embrasent en cascade ; les braises montent, les flammes vivent, puis tout retombe en cendres."),
+        // LA ZONE DE FEU (Nico, v244 : « comme les zones de glace, fais aussi de
+        // façon procédurale les zones de feu ») : le feu prend au cœur de la zone
+        // et gagne les cases visées, son front rougeoyant ; il rejoint le brasier
+        // déjà posé ; il reste.
+        zoneProcedurale("feu", "feu", "Zone persistante de feu", "zone-feu", "Zone de feu", "rgba(255,170,70,0.85)",
+                        "Le feu prend au cœur de la zone et gagne les cases visées, son front rougeoyant : le sol se calcine sans contour, des veines de braises respirent, des flammes dansent couchées par le vent, une fumée s'en va sous le vent au-delà de la zone, des étincelles s'envolent. Deux zones qui se touchent ne font qu'un brasier."),
         // LA ZONE DE GLACE (Nico, v243 : « pas de contour, quelque chose de plus
         // réaliste vu du dessus : une zone de givre qui vient un peu en
         // transparence au-dessus du terrain, une petite brume glacée soufflée
         // par le vent ; plusieurs zones collées font une grosse zone ;
         // procédural ») : le givre rampe depuis le cœur de la zone sur les cases
-        // visées, et rejoint la plaque déjà posée (givre.js) ; il reste.
-        {
-            id: "zone-glace", nom: "Zone persistante de glace", sens: "vers l'ennemi", ciblage: CIBLAGE_ZONE,
-            description: "Le givre gagne les cases visées depuis le cœur de la zone : une pellicule blanc-bleu translucide sur le terrain, sans contour, des fougères de givre, des éclats qui scintillent, et une brume glacée que le vent pousse. Deux zones qui se touchent ne font qu'une plaque.",
-            async jouer(sc, o) {
-                const { b } = lieux(sc);
-                const pts = ciblees(sc, o, () => o.autour(sc.cible, b, 1, { avecCentre: true }));
-                const dedans = pionSur(sc, o, pts.find(pt => pionSur(sc, o, pt)));
-                const coeur = milieu(pts);
-                o.son("zone-glace");
-                o.texte(sc.calque, dedans || sc.cible, "Zone de glace", COULEURS.etat);
-                if (sc.terrain && typeof sc.terrain.givre === "function" && pts.every(pt => pt.q !== undefined)) {
-                    // Un souffle froid au cœur, puis le givre rampe.
-                    o.onde(sc.calque, coeur, { couleur: "rgba(220,244,255,0.8)", taille: 0.8, echelle: 2.2, bord: 2, duree: 900 });
-                    await sc.terrain.givre(pts.map(pt => ({ q: pt.q, r: pt.r })), { depuis: { q: coeur.q, r: coeur.r }, duree: 1700 });
-                    await o.attendre(400);
-                    return;
-                }
-                // Sans la carte du Studio : la nappe d'avant, qui s'efface.
-                const nappes = pts.map((pt, i) => o.nappe(sc.calque, pt, "glace", { fond: FONDS_ZONE.glace, opacite: 0.85, retard: i * 70, duree: 420 }));
-                await o.attendre(420 + pts.length * 70);
-                await animerZone(o, sc.calque, pts, "glace", 1000);
-                await effacerTout(o, nappes, { duree: 450 });
-            }
-        },
+        // visées, et rejoint la plaque déjà posée (zones_procedurales.js) ; il reste.
+        zoneProcedurale("glace", "givre", "Zone persistante de glace", "zone-glace", "Zone de glace", "rgba(220,244,255,0.8)",
+                        "Le givre gagne les cases visées depuis le cœur de la zone : une pellicule blanc-bleu translucide sur le terrain, sans contour, des fougères de givre, des éclats qui scintillent, et une brume glacée que le vent pousse. Deux zones qui se touchent ne font qu'une plaque."),
         zonePersistante("foudre", "Zone persistante de foudre", "zone-foudre", "Zone de foudre",
                         "Un champ électrique couvre les cases autour de l'ennemi : de petits éclairs y crépitent, puis la charge s'éteint."),
         zonePersistante("poison", "Zone persistante de poison", "zone-poison", "Zone de poison",
@@ -2821,7 +2829,11 @@
                 const { a, v } = lieux(sc);
                 const pts = o.chemin(sc.lanceur, a, o.tourner(v, -Math.PI / 2), 3);
                 o.son("zone-feu");
-                const cases = pts.map((pt, i) => o.nappe(sc.calque, pt, "feu", { fond: FONDS_ZONE.feu, opacite: 0.75, retard: i * 70 }));
+                // Une seule petite plaque de feu sur les trois cases (la carte du Studio), sinon une nappe par case.
+                const plaque = sc.terrain && typeof sc.terrain.plaquePassagere === "function" && pts.every(pt => pt.q !== undefined)
+                    ? sc.terrain.plaquePassagere("feu", pts.map(pt => ({ q: pt.q, r: pt.r }))) : null;
+                if (plaque) { o.suivre(plaque); o.teinter(plaque, [{ opacity: 0 }, { opacity: 1 }], { duration: 420, fill: "both" }); }
+                const cases = plaque ? [plaque] : pts.map((pt, i) => o.nappe(sc.calque, pt, "feu", { fond: FONDS_ZONE.feu, opacite: 0.75, retard: i * 70 }));
                 animerZone(o, sc.calque, pts, "feu", 1500);
                 await o.attendre(450);
                 await o.parcourir(sc.lanceur, a, pts, { duree: 420, apresPas: (pt) => {

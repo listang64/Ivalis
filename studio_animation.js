@@ -45,8 +45,9 @@ const studio = {
     enCours: null,
     // Le terrain posé par les animations : nappes, murs, gravats (clé « q_r »).
     terrain: { zones: new Map(), murs: new Map(), gravats: new Set() },
-    // La plaque de givre de toutes les cases de glace (givre.js, v243).
-    givre: null,
+    // Les plaques procédurales, une par élément (zones_procedurales.js) : le
+    // givre de toutes les cases de glace (v243), le brasier de toutes celles de feu (v244).
+    couches: {},
     // Le ciblage en cours : { id, nom, regle, cases }.
     ciblage: null
 };
@@ -157,6 +158,7 @@ function fenetre() {
                 <img id="studio-image-carte" class="studio-image-carte" alt="">
                 <canvas id="studio-canvas" class="studio-canvas"></canvas>
                 <div id="studio-givre" class="studio-givre"></div>
+                <div id="studio-feu" class="studio-givre studio-feu"></div>
                 <svg id="studio-zones" class="studio-terrain-svg studio-zones" xmlns="http://www.w3.org/2000/svg"></svg>
                 <div id="studio-gravats" class="studio-gravats"></div>
                 <svg id="studio-cibles" class="studio-terrain-svg studio-cibles" xmlns="http://www.w3.org/2000/svg"></svg>
@@ -587,32 +589,48 @@ function rendreZones() {
     if (!svg) return;
     svg.innerHTML = "";
     if (!preparerSvgZones()) return;
-    const glaces = [...studio.terrain.zones.values()].filter(z => z.type === "glace");
-    const givre = glaces.length ? coucheGivre() : studio.givre;
-    studio.terrain.zones.forEach(z => { if (z.type === "glace" && givre) return; z.el = nappeSvg(z.type, z.q, z.r); svg.appendChild(z.el); });
-    if (givre) { givre.vider(0); if (glaces.length) givre.poser(glaces); }
+    const parType = {};
+    studio.terrain.zones.forEach(z => { (parType[z.type] = parType[z.type] || []).push(z); });
+    PROCEDURALES.forEach(type => {
+        const couche = (parType[type] || []).length ? coucheDe(type) : studio.couches[type];
+        if (couche) { couche.vider(0); if ((parType[type] || []).length) couche.poser(parType[type]); }
+    });
+    studio.terrain.zones.forEach(z => { if (estProcedurale(z.type)) return; z.el = nappeSvg(z.type, z.q, z.r); svg.appendChild(z.el); });
 }
 
-// --- LE GIVRE (v243) ---
+// --- LES ZONES PROCÉDURALES : LE GIVRE (v243), LE BRASIER (v244) ---
 //  Nico : « une zone de givre qui vient un peu en transparence au-dessus du
 //  terrain, une petite brume glacée soufflée par le vent ; plusieurs zones
-//  collées font comme une grosse zone ; procédural. » Toutes les cases de
-//  glace du Studio forment UNE plaque (givre.js), sous les autres nappes et
-//  les pions ; une case de feu posée dessus la fait fondre là.
-function coucheGivre() {
-    if (studio.givre) return studio.givre;
-    const conteneur = document.getElementById("studio-givre");
-    if (!conteneur || !studio.plateau || typeof window.creerCoucheGivre !== "function") return null;
-    studio.givre = window.creerCoucheGivre(conteneur, { R: rayonCase(), pixel: pixelPlateau, graine: 7 });
-    return studio.givre;
+//  collées font comme une grosse zone ; procédural. » Puis : « fais aussi de
+//  façon procédurale les zones de feu. » Toutes les cases d'un élément forment
+//  UNE plaque (zones_procedurales.js), sous les autres nappes et les pions ;
+//  une case n'a qu'un élément : le feu fait fondre la glace, la glace éteint
+//  le feu.
+const PROCEDURALES = ["glace", "feu"];
+const CONTENEUR_PROCEDURAL = { glace: "studio-givre", feu: "studio-feu" };
+const estProcedurale = (type) => PROCEDURALES.includes(type) && typeof window.creerCoucheProcedurale === "function";
+function nouvelleCouche(type) {
+    const conteneur = document.getElementById(CONTENEUR_PROCEDURAL[type]);
+    if (!conteneur || !studio.plateau || !estProcedurale(type)) return null;
+    return window.creerCoucheProcedurale(conteneur, { type, R: rayonCase(), pixel: pixelPlateau, graine: 7 });
 }
-// Une case de glace qui passe (une démonstration) : sa propre petite plaque.
-function givrePassager(q, r) {
-    const conteneur = document.getElementById("studio-givre");
-    if (!conteneur || typeof window.creerCoucheGivre !== "function") return null;
-    const c = window.creerCoucheGivre(conteneur, { R: rayonCase(), pixel: pixelPlateau, graine: 7 });
-    c.poser([{ q, r }]);
+function coucheDe(type) {
+    if (!studio.couches[type]) studio.couches[type] = nouvelleCouche(type);
+    return studio.couches[type];
+}
+// Les cases d'une démonstration (une entrée de zone…) : leur propre petite plaque, qui ne reste pas.
+function plaquePassagere(type, liste) {
+    const c = nouvelleCouche(type);
+    if (!c) return null;
+    c.poser(liste);
     return c.el;
+}
+// Une case qui change d'élément quitte la plaque de l'ancien.
+function quitterSonElement(k, nouveau) {
+    const ancienne = studio.terrain.zones.get(k);
+    if (!ancienne) return;
+    if (ancienne.el) ancienne.el.remove();
+    if (ancienne.type !== nouveau && studio.couches[ancienne.type]) studio.couches[ancienne.type].retirer([{ q: ancienne.q, r: ancienne.r }]);
 }
 
 // --- LES MURS ---
@@ -742,10 +760,10 @@ function rendreGravats() {
 
 function viderTerrain() {
     studio.terrain.zones.clear();
-    // La plaque de givre part avec le terrain (la carte peut changer de cases).
-    if (studio.givre) { studio.givre.detruire(); studio.givre = null; }
-    const givre = document.getElementById("studio-givre");
-    if (givre) givre.innerHTML = "";
+    // Les plaques partent avec le terrain (la carte peut changer de cases).
+    Object.values(studio.couches).forEach(c => c && c.detruire());
+    studio.couches = {};
+    Object.values(CONTENEUR_PROCEDURAL).forEach(id => { const c = document.getElementById(id); if (c) c.innerHTML = ""; });
     studio.terrain.murs.clear();
     studio.terrain.gravats.clear();
     const svg = document.getElementById("studio-zones");
@@ -754,8 +772,9 @@ function viderTerrain() {
     rendreMurs();
     rendreGravats();
 }
-// La plaque de givre, pour les bancs d'essai.
-window.givreStudio = () => studio.givre;
+// Les plaques procédurales, pour les bancs d'essai.
+window.givreStudio = () => studio.couches.glace || null;
+window.coucheStudio = (type) => studio.couches[type] || null;
 // L'état du terrain, pour les bancs d'essai.
 window.terrainStudio = () => ({
     zones: [...studio.terrain.zones.values()].map(z => ({ type: z.type, q: z.q, r: z.r })),
@@ -765,9 +784,29 @@ window.terrainStudio = () => ({
 
 // CE QUE LES ANIMATIONS PEUVENT FAIRE DU TERRAIN (scene.terrain) : dessiner un
 // mur, un tas de gravats ou une nappe du jeu, et les laisser sur la carte.
+const casesDeLaCarte = (liste) => (liste || []).filter(c => c && c.q !== undefined && caseExiste(c.q, c.r));
+// Des cases gagnent la plaque d'un élément ; il avance depuis `depuis` (une
+// case), en `duree` ms. Rend la promesse de son arrivée.
+function poserProcedurale(type, liste, p = {}) {
+    const couche = estProcedurale(type) ? coucheDe(type) : null;
+    const ok = casesDeLaCarte(liste);
+    if (!couche || !ok.length) return Promise.resolve(false);
+    // Les cases qui changent d'élément quittent l'ancienne plaque — d'un seul redessin.
+    const aRetirer = {};
+    ok.forEach(c => {
+        const k = cleCase(c.q, c.r), ancienne = studio.terrain.zones.get(k);
+        if (ancienne) {
+            if (ancienne.el) ancienne.el.remove();
+            if (ancienne.type !== type && studio.couches[ancienne.type]) (aRetirer[ancienne.type] = aRetirer[ancienne.type] || []).push({ q: c.q, r: c.r });
+        }
+        studio.terrain.zones.set(k, { type, q: c.q, r: c.r, el: null });
+    });
+    Object.entries(aRetirer).forEach(([t, l]) => studio.couches[t].retirer(l));
+    return couche.ajouter(ok, { depuis: p.depuis, duree: p.duree });
+}
 function terrainDeScene() {
     const ecran = () => studio.echelle;
-    const cases = (liste) => (liste || []).filter(c => c && c.q !== undefined && caseExiste(c.q, c.r));
+    const cases = casesDeLaCarte;
     return {
         estMur: (q, r) => studio.terrain.murs.has(cleCase(q, r)),
         // La roche d'un mur sur cette case, à la taille de l'écran : reliée à ses
@@ -819,24 +858,22 @@ function terrainDeScene() {
             const svg = preparerSvgZones();
             if (!svg) return null;
             if (!p.persistante) {
-                // La glace passagère : une petite plaque de givre, ôtée par l'animation.
-                const passe = type === "glace" ? givrePassager(q, r) : null;
+                // La glace ou le feu qui passe : une petite plaque, ôtée par l'animation.
+                const passe = estProcedurale(type) ? plaquePassagere(type, [{ q, r }]) : null;
                 if (passe) return passe;
                 const el = nappeSvg(type, q, r); el.classList.add("studio-nappe-passagere"); svg.appendChild(el); return el;
             }
             const k = cleCase(q, r);
-            const ancienne = studio.terrain.zones.get(k);
-            if (ancienne && ancienne.el) ancienne.el.remove();
-            // Du feu (ou autre chose) posé sur la glace : le givre fond sur cette case.
-            if (ancienne && ancienne.type === "glace" && type !== "glace" && studio.givre) studio.givre.retirer([{ q, r }]);
+            // Du feu posé sur la glace la fait fondre ; de la glace sur le feu l'éteint.
+            quitterSonElement(k, type);
             const z = { type, q, r, el: null };
             studio.terrain.zones.set(k, z);
-            const givre = type === "glace" ? coucheGivre() : null;
-            if (givre) {
-                givre.ajouter([{ q, r }], { depuis: { q, r }, duree: 700 });
+            const couche = estProcedurale(type) ? coucheDe(type) : null;
+            if (couche) {
+                couche.ajouter([{ q, r }], { depuis: { q, r }, duree: 700 });
                 // L'animation reçoit un repère vide (la plaque, elle, est commune).
                 z.el = document.createElementNS(NS_SVG, "g");
-                z.el.setAttribute("class", "studio-nappe studio-nappe-givre");
+                z.el.setAttribute("class", `studio-nappe studio-nappe-${type === "glace" ? "givre" : "brasier"}`);
                 svg.appendChild(z.el);
                 return z.el;
             }
@@ -847,17 +884,11 @@ function terrainDeScene() {
         // LE GIVRE (v243) : les cases gagnent la plaque de glace commune ; il
         // rampe depuis `depuis` (une case), en `duree` ms. Rend la promesse de
         // son arrivée.
-        givre: (liste, p = {}) => {
-            const givre = coucheGivre();
-            const ok = cases(liste);
-            if (!givre || !ok.length) return Promise.resolve(false);
-            ok.forEach(c => {
-                const k = cleCase(c.q, c.r), ancienne = studio.terrain.zones.get(k);
-                if (ancienne && ancienne.el) ancienne.el.remove();
-                studio.terrain.zones.set(k, { type: "glace", q: c.q, r: c.r, el: null });
-            });
-            return givre.ajouter(ok, { depuis: p.depuis, duree: p.duree });
-        },
+        givre: (liste, p = {}) => poserProcedurale("glace", liste, p),
+        // LE BRASIER (v244) : de même, la plaque de feu commune.
+        feu: (liste, p = {}) => poserProcedurale("feu", liste, p),
+        // Des cases d'un élément qui passent (une démonstration) : une seule petite plaque pour toutes.
+        plaquePassagere: (type, liste) => estProcedurale(type) ? plaquePassagere(type, cases(liste)) : null,
         // L'aperçu d'une zone visée, dessiné comme au combat (dessinerHexesZoneCiblage).
         apercuZone: (liste, estSoin) => {
             const svg = document.getElementById("studio-cibles");

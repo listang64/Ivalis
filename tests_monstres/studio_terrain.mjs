@@ -130,14 +130,19 @@ const cases = await p.evaluate(() => {
       const d = new DOMParser().parseFromString(`<svg xmlns="http://www.w3.org/2000/svg">${window.RENDU_ZONES_PERSISTANTES.hexagone("feu", { q, r }, R, false)}</svg>`, "image/svg+xml");
       return formes(g) === formes(d.documentElement);
     });
-    return { zones: t.zones, nappes: nappes.length, clip: nappes.every(g => g.querySelector('g[clip-path="url(#zp-clip-hex-studio)"]')),
-             defs: !!document.querySelector("#studio-zones clipPath#zp-clip-hex-studio"), memes,
+    // (v244 : le feu du Studio est procédural — une plaque pour toutes ses cases, zones_procedurales.js.)
+    const feu = typeof window.coucheStudio === "function" ? window.coucheStudio("feu") : null;
+    const P = (c) => window.PLATEAU_VTT.hexToPixel(c.q, c.r);
+    return { zones: t.zones, nappes: nappes.length, memes,
+             plaques: document.querySelectorAll("#studio-feu .feu-couche").length,
+             couvert: !!feu && zone.every(c => feu.couvertureEn(P(c).x, P(c).y) > 0.5),
              surLesCases: zone.every(c => t.zones.some(z => z.q === c.q && z.r === c.r && z.type === "feu")),
              cibles: document.querySelectorAll("#studio-cibles polygon").length };
   }, cases.zone);
   verifier("« Lancer » joue l'animation et referme le bandeau", !pendant.visible && !pendant.enCiblage);
-  verifier("la zone de feu est posée sur les trois cases touchées, et RESTE sur la carte", r.zones.length === 3 && r.surLesCases && r.nappes === 3, JSON.stringify(r.zones));
-  verifier("…dessinée par la nappe du jeu (mêmes braises, langues, escarbilles ; défs du Studio)", r.clip && r.defs && r.memes);
+  verifier("la zone de feu est posée sur les trois cases touchées, et RESTE sur la carte", r.zones.length === 3 && r.surLesCases, JSON.stringify(r.zones));
+  verifier("…en un seul brasier procédural (v244), qui couvre les trois cases — plus de nappe par case",
+           r.plaques === 1 && r.couvert && r.nappes === 0, JSON.stringify({ plaques: r.plaques, couvert: r.couvert, nappes: r.nappes }));
   verifier("…et la teinte de visée est partie", r.cibles === 0);
 }
 
