@@ -162,7 +162,7 @@ console.log("\n6. PROCÉDURAL, ET LE MÊME MOTEUR QUE LE GIVRE");
     const g = window.creerCoucheGivre(conteneur, opts);
     g.poser(A);
     res.givre = !!g.el.querySelector("canvas.givre-sol") && !g.el.querySelector("canvas.feu-braises") && g.el.classList.contains("givre-couche")
-             && typeof window.creerCoucheProcedurale === "function" && (window.TYPES_ZONES_PROCEDURALES || []).join() === "glace,feu";
+             && typeof window.creerCoucheProcedurale === "function" && ["glace", "feu"].every(t => (window.TYPES_ZONES_PROCEDURALES || []).includes(t));
     [c1, c2, g].forEach(c => c.detruire());
     return res;
   }, A);

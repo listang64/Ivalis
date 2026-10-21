@@ -6557,3 +6557,47 @@ démonstrations, la nappe du combat inchangée. Il mord sur l'ancien code (20
 brasier, plus une nappe par case), studio_catalogue_1 (les cases de feu se
 comptent sur le terrain), corrections_v243 (le moteur s'appelle
 zones_procedurales.js).
+
+## v245 — Studio : les zones de poison et de foudre, procédurales
+
+Nico : « Après, dans le Studio, refais dans le même état d'esprit les zones
+poison et électrique. »
+
+- DEUX RECETTES DE PLUS (zones_procedurales.js) — même moteur : une plaque
+  par élément pour toutes ses cases, deux zones collées sans couture, aucun
+  contour, du bruit en coordonnées de la carte, l'élément qui gagne depuis le
+  cœur (avec sa frange : vert acide, bleu électrique).
+  - LE POISON : une boue acide translucide, vert vif sur les bords, vert
+    sombre dans de larges flaques lisses, des reflets mouillés étirés ; le
+    terrain jaunit (se fane) juste autour, sans trait ; des éclaboussures
+    au-delà du bord ; des bulles de tailles diverses qui gonflent, tremblent
+    et crèvent ; un miasme vert, lourd et lent, qui rampe sous le vent.
+  - LA FOUDRE : le sol ionisé, un voile bleu nuit à peine là, quelques
+    poussières chargées qui brillent ; des figures de Lichtenberg (les
+    brûlures ramifiées de la foudre : des marches au hasard qui bifurquent)
+    brûlées au sol, et leur lueur bleu-blanc sur un calque « écran » qui
+    GRÉSILLE (une respiration rapide, irrégulière), avec son halo ; six arcs
+    brisés (déplacement du milieu) entre deux points de la zone, chacun sur
+    son image, qui claque un instant (un double coup) à son heure, au
+    hasard ; un voile de plasma qui vacille ; des étincelles qui crépitent.
+  - Le moteur gagne : un décor tracé pour la lueur (decorLueur), une
+    respiration par recette, les arcs, deux gestes d'éclats (la bulle, le
+    crépitement).
+- LE STUDIO (studio_animation.js : quatre éléments, quatre plaques ;
+  terrain.zone(type, …) ; animations_catalogue.js : zoneProcedurale pour les
+  quatre — la foudre garde son id « zone-foudre » et pose des cases
+  « electrique », comme au combat ; l'ancienne fabrique de nappes, devenue
+  inutile, est retirée) : une case n'a qu'un élément parmi les quatre ;
+  « ⟲ Replacer » efface tout. Le combat garde ses nappes tant que Nico n'a
+  pas validé.
+- Le calcul : environ 0,1 s pour 7 cases, poison comme foudre.
+
+corrections_v245.mjs : le marais (une plaque, sans contour, vert,
+translucide ; les bulles qui crèvent ; le miasme lent, sous le vent), le
+champ (une plaque, sans contour, bleu, très translucide ; les brûlures
+ramifiées, leur lueur qui grésille ; six arcs dessinés qui claquent ; le
+plasma ; les étincelles), pour l'un et l'autre le cœur d'abord, deux zones
+sans couture et le même dessin pour les mêmes cases, un élément par case,
+les quatre ensemble, « Replacer », les nappes du combat inchangées, le
+catalogue. Il mord sur l'ancien code (23 échecs). Mis à jour :
+corrections_v244 (le moteur connaît désormais quatre éléments).

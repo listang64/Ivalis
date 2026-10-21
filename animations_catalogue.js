@@ -1901,15 +1901,15 @@
     // =====================================================================
     //  7. ZONES ET TERRAIN
     // =====================================================================
-    // LA NAPPE DU JEU (combat.js), case après case, sur les cases visées (par
-    // défaut, l'ennemi et ses voisines) : elle reste sur la carte, comme en
-    // combat, jusqu'à « ⟲ Replacer ».
-    // UNE ZONE PROCÉDURALE (v243 la glace, v244 le feu) : l'élément gagne les
-    // cases visées depuis leur cœur et rejoint la plaque déjà posée sur la
-    // carte du Studio (zones_procedurales.js). Sans cette carte : la nappe
-    // d'avant, qui s'efface.
-    const zoneProcedurale = (type, methode, nom, son, texte, souffle, description) => ({
-        id: "zone-" + type, nom, sens: "vers l'ennemi", description, ciblage: CIBLAGE_ZONE,
+    // UNE ZONE PROCÉDURALE (v243 la glace, v244 le feu, v245 le poison et la
+    // foudre) : l'élément gagne les cases visées (par défaut, l'ennemi et ses
+    // voisines) depuis leur cœur et rejoint la plaque déjà posée sur la carte du
+    // Studio (zones_procedurales.js) ; elle reste jusqu'à « ⟲ Replacer ». Sans
+    // cette carte : la nappe d'avant, qui s'efface.
+    // `type` : celui du terrain (« electrique » pour la foudre, comme au combat) ;
+    // `id` : celui du catalogue (« zone-foudre »).
+    const zoneProcedurale = (type, methode, nom, son, texte, souffle, description, id) => ({
+        id: id || "zone-" + type, nom, sens: "vers l'ennemi", description, ciblage: CIBLAGE_ZONE,
         async jouer(sc, o) {
             const { b } = lieux(sc);
             const pts = ciblees(sc, o, () => o.autour(sc.cible, b, 1, { avecCentre: true }));
@@ -1917,34 +1917,20 @@
             const coeur = milieu(pts);
             o.son(son);
             o.texte(sc.calque, dedans || sc.cible, texte, COULEURS.etat);
-            if (sc.terrain && typeof sc.terrain[methode] === "function" && pts.every(pt => pt.q !== undefined)) {
-                // Un souffle au cœur (froid ou brûlant), puis l'élément gagne les cases.
+            const poser = sc.terrain && (typeof sc.terrain.zone === "function" ? (l, p) => sc.terrain.zone(type, l, p)
+                                         : typeof sc.terrain[methode] === "function" ? (l, p) => sc.terrain[methode](l, p) : null);
+            if (poser && pts.every(pt => pt.q !== undefined)) {
+                // Un souffle au cœur (froid, brûlant, acide, chargé), puis l'élément gagne les cases.
                 o.onde(sc.calque, coeur, { couleur: souffle, taille: 0.8, echelle: 2.2, bord: 2, duree: 900 });
-                await sc.terrain[methode](pts.map(pt => ({ q: pt.q, r: pt.r })), { depuis: { q: coeur.q, r: coeur.r }, duree: 1700 });
+                await poser(pts.map(pt => ({ q: pt.q, r: pt.r })), { depuis: { q: coeur.q, r: coeur.r }, duree: 1700 });
                 await o.attendre(400);
                 return;
             }
-            const nappes = pts.map((pt, i) => o.nappe(sc.calque, pt, type, { fond: FONDS_ZONE[type], opacite: 0.85, retard: i * 70, duree: 420 }));
+            const element = type === "electrique" ? "foudre" : type;
+            const nappes = pts.map((pt, i) => o.nappe(sc.calque, pt, type, { fond: FONDS_ZONE[element], opacite: 0.85, retard: i * 70, duree: 420 }));
             await o.attendre(420 + pts.length * 70);
-            await animerZone(o, sc.calque, pts, type, 1000);
+            await animerZone(o, sc.calque, pts, element, 1000);
             await effacerTout(o, nappes, { duree: 450 });
-        }
-    });
-    const zonePersistante = (type, nom, son, texte, description) => ({
-        id: "zone-" + type, nom, sens: "vers l'ennemi", description, ciblage: CIBLAGE_ZONE,
-        async jouer(sc, o) {
-            const { b } = lieux(sc);
-            const pts = ciblees(sc, o, () => o.autour(sc.cible, b, 1, { avecCentre: true }));
-            const dedans = pionSur(sc, o, pts.find(pt => pionSur(sc, o, pt)));
-            o.son(son);
-            o.texte(sc.calque, dedans || sc.cible, texte, COULEURS.etat);
-            const nappes = pts.map((pt, i) => o.nappe(sc.calque, pt, NAPPE_JEU[type], { persistante: true, fond: FONDS_ZONE[type], opacite: 0.85, retard: i * 70, duree: 420 }));
-            await o.attendre(420 + pts.length * 70);
-            await Promise.all([o.pulser(nappes, { duree: 520, fois: 2, eclat: 1.35 }), animerZone(o, sc.calque, pts, type, 1200)]);
-            o.son(son);
-            await animerZone(o, sc.calque, pts, type, 700);
-            // Sans la carte du Studio (pas de terrain), la zone n'est qu'un dessin : elle s'efface.
-            if (!sc.terrain) await effacerTout(o, nappes, { duree: 450 });
         }
     });
     ajouter(7, null, [
@@ -1985,10 +1971,13 @@
         // visées, et rejoint la plaque déjà posée (zones_procedurales.js) ; il reste.
         zoneProcedurale("glace", "givre", "Zone persistante de glace", "zone-glace", "Zone de glace", "rgba(220,244,255,0.8)",
                         "Le givre gagne les cases visées depuis le cœur de la zone : une pellicule blanc-bleu translucide sur le terrain, sans contour, des fougères de givre, des éclats qui scintillent, et une brume glacée que le vent pousse. Deux zones qui se touchent ne font qu'une plaque."),
-        zonePersistante("foudre", "Zone persistante de foudre", "zone-foudre", "Zone de foudre",
-                        "Un champ électrique couvre les cases autour de l'ennemi : de petits éclairs y crépitent, puis la charge s'éteint."),
-        zonePersistante("poison", "Zone persistante de poison", "zone-poison", "Zone de poison",
-                        "Une nappe verte s'étale autour de l'ennemi et bouillonne de bulles toxiques, puis se dissipe."),
+        // LA ZONE DE FOUDRE ET LA ZONE DE POISON (Nico, v245 : « refais dans le même
+        // état d'esprit les zones poison et électrique ») : procédurales elles aussi.
+        zoneProcedurale("electrique", "zone", "Zone persistante de foudre", "zone-foudre", "Zone de foudre", "rgba(170,220,255,0.85)",
+                        "La charge gagne les cases visées depuis le cœur de la zone : le sol s'ionise à peine, sans contour, marqué de brûlures ramifiées qui grésillent ; des arcs claquent au hasard d'un point à l'autre, un voile de plasma vacille, des étincelles crépitent. Deux zones qui se touchent ne font qu'un champ.",
+                        "zone-foudre"),
+        zoneProcedurale("poison", "zone", "Zone persistante de poison", "zone-poison", "Zone de poison", "rgba(170,235,90,0.8)",
+                        "La boue acide gagne les cases visées depuis le cœur de la zone : translucide, vert vif sur les bords, vert noir dans les flaques, luisante, sans contour ; le terrain se fane autour ; des bulles gonflent et crèvent ; un miasme lourd rampe sous le vent. Deux zones qui se touchent ne font qu'un marais."),
         {
             id: "gravats", nom: "Gravats / terrain difficile", sens: "vers l'ennemi",
             description: "Les tas de gravats du jeu jonchent les cases visées (par défaut, quelques-unes près de l'ennemi) : ce terrain coûte double. Ils restent sur la carte.",

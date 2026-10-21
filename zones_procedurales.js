@@ -7,7 +7,8 @@
 //  transparence au-dessus du terrain existant, avec un petit effet de brume
 //  glacée soufflée par le vent. Si plusieurs zones sont collées, ça fait comme
 //  une grosse zone. Quelque chose de procédural. » Puis : « Comme les zones
-//  de glace, fais aussi de façon procédurale les zones de feu du Studio. »
+//  de glace, fais aussi de façon procédurale les zones de feu du Studio. » Et :
+//  « Refais dans le même état d'esprit les zones poison et électrique. »
 //
 //  UNE COUCHE couvre TOUTES les cases d'un même élément : leur union, pas une
 //  nappe par case. Le dessin part de la distance de chaque point au BORD DE
@@ -24,10 +25,19 @@
 //    • LE BRASIER (feu) : le sol calciné, brun puis noir vers le cœur, sans
 //      bord net ; des veines de braises qui rougeoient et respirent ; des
 //      flammes qui dansent et se couchent dans le vent ; une fumée qui s'en va
-//      sous le vent, au-delà de la zone ; des étincelles qui s'envolent.
+//      sous le vent, au-delà de la zone ; des étincelles qui s'envolent ;
+//    • LE POISON (poison) : une boue acide translucide, vert vif sur les
+//      bords, vert noir dans les flaques, luisante ; le terrain fané autour,
+//      quelques éclaboussures ; des bulles qui gonflent et éclatent ; un
+//      miasme lourd qui rampe sous le vent ;
+//    • LA FOUDRE (electrique) : le sol ionisé, à peine bleui, marqué de
+//      figures de Lichtenberg (les brûlures ramifiées de la foudre) qui
+//      grésillent ; des arcs qui claquent au hasard d'un point à l'autre ; un
+//      voile de plasma ; des étincelles qui crépitent.
 //
 //  `creerCoucheProcedurale(conteneur, { type, R, pixel, graine, vent })` rend
-//  la couche (`creerCoucheGivre`, `creerCoucheFeu` : la même, d'un élément) ;
+//  la couche (`creerCoucheGivre`, `creerCoucheFeu`, `creerCouchePoison`,
+//  `creerCoucheElectrique` : la même, d'un élément) ;
 //  elle vit dans le repère de la carte (le conteneur est posé sur elle).
 //  `ajouter(cases, { depuis, duree })` : l'élément gagne les nouvelles cases
 //  depuis `depuis` (la plaque grandit) ; `poser(cases)` : sans animation ;
@@ -98,6 +108,12 @@
             .zone-proc-eclat { position: absolute; width: 3px; height: 3px; margin: -1.5px 0 0 -1.5px; border-radius: 50%; opacity: 0; }
             .givre-eclat { background: #ffffff; box-shadow: 0 0 3px 1px rgba(210, 240, 255, 0.95), 0 0 7px 2px rgba(160, 220, 255, 0.45); }
             .feu-etincelle { background: #ffe2a0; box-shadow: 0 0 3px 1px rgba(255, 170, 60, 0.95), 0 0 8px 3px rgba(255, 90, 20, 0.5); }
+            .elec-etincelle { width: 2px; height: 2px; margin: -1px 0 0 -1px; background: #ffffff;
+                              box-shadow: 0 0 3px 1px rgba(170, 225, 255, 1), 0 0 9px 3px rgba(90, 170, 255, 0.6); }
+            .poison-bulle { border-radius: 50%; border: 1.5px solid rgba(215, 255, 150, 0.7);
+                            background: radial-gradient(circle at 34% 32%, rgba(255, 255, 255, 0.55), rgba(170, 225, 90, 0.18) 38%, rgba(90, 140, 30, 0.08) 70%); }
+            .zone-proc-arcs { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+            .zone-proc-arcs canvas { opacity: 0; }
         `;
         document.head.appendChild(s);
     }
@@ -110,7 +126,11 @@
             const t = entre(0.62, 0.95, f);
             return [255, Math.round(60 + 150 * t), Math.round(10 + 120 * t * t), entre(0.56, 0.9, f) * 235];
         },
-        fumee: (f) => [58, 52, 50, entre(0.42, 0.86, f) * 215]
+        fumee: (f) => [58, 52, 50, entre(0.42, 0.86, f) * 215],
+        // Le miasme du poison : un vert sale, lourd.
+        miasme: (f) => [120, 175, 62, entre(0.44, 0.86, f) * 205],
+        // Le plasma de la foudre : un bleu pâle, à peine là.
+        plasma: (f) => [150, 205, 255, entre(0.55, 0.92, f) * 190]
     };
     const tuilesFaites = {};
     function tuile(nom) {
@@ -118,7 +138,7 @@
         const N = 128, c = document.createElement("canvas");
         c.width = c.height = N;
         const ctx = c.getContext("2d"), img = ctx.createImageData(N, N);
-        const graine = { brume: 911, flamme: 313, fumee: 521 }[nom] || 1;
+        const graine = { brume: 911, flamme: 313, fumee: 521, miasme: 641, plasma: 733 }[nom] || 1;
         for (let y = 0; y < N; y++) {
             for (let x = 0; x < N; x++) {
                 // 4 cellules de base par tuile, période 4 (puis 8, 16…) : raccordable.
@@ -130,6 +150,50 @@
         ctx.putImageData(img, 0, 0);
         tuilesFaites[nom] = c.toDataURL("image/png");
         return tuilesFaites[nom];
+    }
+
+    // LES FIGURES DE LICHTENBERG : les brûlures ramifiées que la foudre laisse au
+    // sol — des marches au hasard qui bifurquent, de plus en plus fines. Les
+    // mêmes traits pour le sol (brûlés) et pour la lueur (qui grésille).
+    function lichtenberg(liste, { R, graine, pixel }) {
+        const traits = [];
+        const marcher = (x, y, ang, pas, larg, rang, h) => {
+            for (let i = 0; i < pas; i++) {
+                ang += (hacher(h, i, 3) - 0.5) * 1.2;
+                const L = R * (0.05 + 0.04 * hacher(h, i, 5));
+                const x2 = x + Math.cos(ang) * L, y2 = y + Math.sin(ang) * L;
+                traits.push([x, y, x2, y2, larg * (1 - i / (pas * 1.4))]);
+                if (rang < 3 && hacher(h, i, 7) < 0.2) marcher(x2, y2, ang + (hacher(h, i, 9) < 0.5 ? -1 : 1) * (0.5 + 0.5 * hacher(h, i, 11)),
+                                                              Math.floor(pas * 0.6), larg * 0.65, rang + 1, h * 17 + i);
+                x = x2; y = y2;
+            }
+        };
+        liste.forEach(c => {
+            const p = pixel(c.q, c.r), h0 = (c.q * 48611 + c.r * 96823 + graine) | 0;
+            for (let f = 0; f < 2; f++) {
+                const ang = hacher(h0, f, 1) * Math.PI * 2, d = R * 0.5 * Math.sqrt(hacher(h0, f, 2));
+                marcher(p.x + Math.cos(ang) * d, p.y + Math.sin(ang) * d, hacher(h0, f, 4) * Math.PI * 2, 16, 1.6, 0, h0 + f * 101);
+            }
+        });
+        return traits;
+    }
+    const tracerTraits = (ctx, traits, couleur, epaisseur, k) => {
+        ctx.lineCap = "round";
+        ctx.strokeStyle = couleur;
+        // Trois épaisseurs (tronc, branches, brindilles) : un seul tracé par classe.
+        [[1.2, Infinity, 1.4], [0.8, 1.2, 1], [0, 0.8, 0.6]].forEach(([min, max, l]) => {
+            ctx.lineWidth = l * epaisseur / k;
+            ctx.beginPath();
+            traits.forEach(t => { if (t[4] >= min && t[4] < max) { ctx.moveTo(t[0], t[1]); ctx.lineTo(t[2], t[3]); } });
+            ctx.stroke();
+        });
+    };
+    // UN ARC : un éclair brisé d'un point à l'autre (déplacement du milieu, récursif).
+    function arc(ctx, x1, y1, x2, y2, ecart, profondeur, h) {
+        if (profondeur <= 0) { ctx.lineTo(x2, y2); return; }
+        const mx = (x1 + x2) / 2 + (hacher(h, profondeur, 1) - 0.5) * ecart, my = (y1 + y2) / 2 + (hacher(h, profondeur, 2) - 0.5) * ecart;
+        arc(ctx, x1, y1, mx, my, ecart * 0.55, profondeur - 1, h * 3 + 1);
+        arc(ctx, mx, my, x2, y2, ecart * 0.55, profondeur - 1, h * 3 + 2);
     }
 
     // =====================================================================
@@ -274,6 +338,94 @@
             ],
             eclats: { parCase: 3, classe: "feu-etincelle", geste: "envol" },
             frange: [255, 150, 50]
+        },
+
+        poison: {
+            classe: "poison", marge: 2.0,
+            // LA BOUE ACIDE : vert vif sur les bords, vert noir dans les flaques,
+            // luisante ; le terrain fané autour, quelques éclaboussures.
+            sol(x, y, p, { R, graine }) {
+                if (p < -R * 0.5) return null;
+                const n1 = fbm(x / (R * 0.5), y / (R * 0.5), 3, graine + 5);
+                const bord = p + (n1 - 0.5) * R * 0.8;
+                const m = entre(-R * 0.08, R * 0.32, bord);
+                const n4 = fbm(x / (R * 0.1), y / (R * 0.1), 2, graine + 57);
+                const tache = bord > -R * 0.35 ? entre(0.66, 0.8, n4) * entre(-R * 0.35, -R * 0.02, bord) * 0.8 : 0;
+                const couvre = Math.max(m, tache);
+                // Le terrain fané juste autour : un jaunissement, sans trait.
+                const fane = bord > -R * 0.45 && couvre < 0.5 ? entre(-R * 0.45, -R * 0.05, bord) * 0.16 : 0;
+                if (couvre <= 0.003 && fane <= 0.003) return null;
+                if (couvre <= 0.003) return [150, 128, 58, fane, 0];
+                // Des flaques larges et lisses (un liquide ne fait pas de grain).
+                const n2 = fbm(x / (R * 0.42), y / (R * 0.42), 2, graine + 23);
+                const n3 = bruit(x / (R * 0.05), y / (R * 0.05), graine + 37);
+                const profond = entre(0.52, 0.28, n2) * 0.85;
+                // Des reflets mouillés, doux et étirés : la boue luit.
+                const reflet = entre(0.7, 0.9, fbm((x + y * 0.35) / (R * 0.22), y / (R * 0.44), 2, graine + 91)) * (1 - profond) * 0.7;
+                const r = 158 - 88 * profond + n3 * 6 + reflet * 70, g = 210 - 100 * profond + n3 * 8 + reflet * 40, b = 42 - 14 * profond + reflet * 80;
+                const a = couvre * (0.28 + 0.24 * profond + 0.05 * n3 + 0.18 * reflet) + fane * (1 - couvre);
+                return [r, g, b, Math.min(0.75, a), couvre];
+            },
+            voiles: [
+                // Le miasme : lourd, lent, il rampe sous le vent et déborde un peu.
+                { nom: "miasme", classe: "poison-miasme", ecran: false, sousLeVent: 0.6,
+                  masque: (p, n, R) => entre(-R * 0.6, R * 0.4, p + (n - 0.5) * R * 0.6),
+                  couches: [{ tuile: "miasme", l: 6, h: 3.2, op: 0.42, v: 0.32 }, { tuile: "miasme", l: 4, h: 2.4, op: 0.3, v: 0.22 }] }
+            ],
+            eclats: { parCase: 4, classe: "poison-bulle", geste: "bulle" },
+            frange: [170, 235, 80]
+        },
+
+        electrique: {
+            classe: "elec", marge: 1.6,
+            // LE SOL IONISÉ : un voile bleu nuit, à peine là, granuleux ; quelques
+            // poussières chargées qui brillent.
+            sol(x, y, p, { R, graine }) {
+                if (p < -R * 0.45) return null;
+                const n1 = fbm(x / (R * 0.5), y / (R * 0.5), 3, graine + 9);
+                const bord = p + (n1 - 0.5) * R * 0.7;
+                const m = entre(-R * 0.06, R * 0.3, bord);
+                if (m <= 0.003) return null;
+                const n2 = fbm(x / (R * 0.3), y / (R * 0.3), 3, graine + 27);
+                const n3 = bruit(x / (R * 0.03), y / (R * 0.03), graine + 43);
+                const poussiere = hacher(Math.floor(x * 1.2), Math.floor(y * 1.2), graine + 67) > 0.992 ? 1 : 0;
+                if (poussiere) return [205, 232, 255, m * 0.55, m];
+                return [38 + n3 * 14, 52 + n3 * 18, 96 + n2 * 30, Math.min(0.5, m * (0.16 + 0.12 * n2 + 0.06 * n3)), m];
+            },
+            // Les brûlures ramifiées au sol…
+            decor(cf, liste, outils) { tracerTraits(cf, lichtenberg(liste, outils), "rgba(22, 28, 60, 0.55)", 1.6, outils.k); },
+            // …et leur lueur, qui grésille.
+            decorLueur(cf, liste, outils) { tracerTraits(cf, lichtenberg(liste, outils), "rgba(175, 222, 255, 0.9)", 1.1, outils.k); },
+            respiration: { lueur: [1, 0.35, 0.9, 0.2, 1, 0.55, 0.95, 0.3, 1], duree: 900, halo: [0.7, 0.25, 0.8, 0.15, 0.6, 0.7], dureeHalo: 1300 },
+            // Les arcs : des éclairs brisés entre deux points de la zone, chacun
+            // sur son image, qui claque un instant, au hasard.
+            arcs: {
+                images: 6,
+                dessiner(ctx, liste, { R, graine, pixel }, n) {
+                    for (let a = 0; a < 2; a++) {
+                        const h = (graine * 131 + n * 977 + a * 53) | 0;
+                        const c1 = liste[Math.floor(hacher(h, 1, 1) * liste.length)], c2 = liste[Math.floor(hacher(h, 2, 1) * liste.length)];
+                        const p1 = pixel(c1.q, c1.r), p2 = pixel(c2.q, c2.r);
+                        const x1 = p1.x + (hacher(h, 3, 1) - 0.5) * R, y1 = p1.y + (hacher(h, 4, 1) - 0.5) * R;
+                        let x2 = p2.x + (hacher(h, 5, 1) - 0.5) * R, y2 = p2.y + (hacher(h, 6, 1) - 0.5) * R;
+                        // Trop court (la même case) : il saute un peu plus loin.
+                        if (Math.hypot(x2 - x1, y2 - y1) < R * 0.8) { const g = hacher(h, 7, 1) * Math.PI * 2; x2 = x1 + Math.cos(g) * R * 1.1; y2 = y1 + Math.sin(g) * R * 1.1; }
+                        const ecart = Math.hypot(x2 - x1, y2 - y1) * 0.35;
+                        [[R * 0.16, "rgba(110, 180, 255, 0.22)"], [R * 0.06, "rgba(160, 215, 255, 0.6)"], [R * 0.022, "rgba(255, 255, 255, 0.95)"]].forEach(([l, c]) => {
+                            ctx.strokeStyle = c; ctx.lineWidth = l; ctx.lineCap = "round"; ctx.lineJoin = "round";
+                            ctx.beginPath(); ctx.moveTo(x1, y1); arc(ctx, x1, y1, x2, y2, ecart, 5, h); ctx.stroke();
+                        });
+                    }
+                }
+            },
+            voiles: [
+                // Un voile de plasma, à peine là, qui vacille.
+                { nom: "plasma", classe: "elec-plasma", ecran: true, vacille: true,
+                  masque: (p, n, R) => entre(0, R * 0.45, p + (n - 0.5) * R * 0.6),
+                  couches: [{ tuile: "plasma", l: 3.4, h: 1.6, op: 0.26, v: 1.4 }, { tuile: "plasma", l: 2.4, h: 1.2, op: 0.18, v: 2.0 }] }
+            ],
+            eclats: { parCase: 4, classe: "elec-etincelle", geste: "crepite" },
+            frange: [150, 210, 255]
         }
     };
 
@@ -315,7 +467,7 @@
         racine.appendChild(sol);
         // Les braises (le feu) : un calque net et son halo, qui respirent.
         let lueur = null, halo = null;
-        if (recette.lueur) {
+        if (recette.lueur || recette.decorLueur) {
             lueur = document.createElement("canvas");
             lueur.className = `${pre}-braises zone-proc-ecran`;
             halo = document.createElement("canvas");
@@ -323,14 +475,14 @@
             halo.style.filter = `blur(${Math.max(2, R * 0.08).toFixed(1)}px)`;
             racine.appendChild(halo);
             racine.appendChild(lueur);
+            // Le feu respire lentement ; la foudre grésille.
+            const r = recette.respiration || { lueur: [1, 0.72, 0.95, 0.6, 0.9, 1], duree: 2600, halo: [0.6, 0.35, 0.7, 0.45, 0.6], dureeHalo: 3300 };
             if (typeof lueur.animate === "function") {
-                lueur.animate([{ opacity: 1 }, { opacity: 0.72 }, { opacity: 0.95 }, { opacity: 0.6 }, { opacity: 0.9 }, { opacity: 1 }],
-                              { duration: 2600, iterations: Infinity, easing: "ease-in-out" });
-                halo.animate([{ opacity: 0.6 }, { opacity: 0.35 }, { opacity: 0.7 }, { opacity: 0.45 }, { opacity: 0.6 }],
-                             { duration: 3300, iterations: Infinity, easing: "ease-in-out" });
+                lueur.animate(r.lueur.map(o => ({ opacity: o })), { duration: r.duree, iterations: Infinity, easing: "ease-in-out" });
+                halo.animate(r.halo.map(o => ({ opacity: o })), { duration: r.dureeHalo, iterations: Infinity, easing: "ease-in-out" });
             }
         }
-        let voiles = [], eclats = [];
+        let voiles = [], eclats = [], arcs = null;
         const cases = new Map();
         let rendu = null;          // le dernier dessin : { x0, y0, l, h, k, plein, masque, braises… }
         let lecture = Promise.resolve();
@@ -385,10 +537,10 @@
             const outils = { R, graine, pixel, k };
 
             const toile = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
-            const plein = toile(W, H), masque = toile(W, H), braises = recette.lueur ? toile(W, H) : null;
+            const plein = toile(W, H), masque = toile(W, H), braises = recette.lueur || recette.decorLueur ? toile(W, H) : null;
             const cp = plein.getContext("2d"), cm = masque.getContext("2d");
             const ip = cp.createImageData(W, H), im = cm.createImageData(W, H);
-            const ib = braises ? braises.getContext("2d").createImageData(W, H) : null;
+            const ib = recette.lueur ? braises.getContext("2d").createImageData(W, H) : null;
             for (let j = 0; j < H; j++) {
                 const y = E.y0 + (j + 0.5) / k;
                 for (let i = 0; i < W; i++) {
@@ -409,7 +561,7 @@
             }
             cp.putImageData(ip, 0, 0);
             cm.putImageData(im, 0, 0);
-            if (braises) braises.getContext("2d").putImageData(ib, 0, 0);
+            if (ib) braises.getContext("2d").putImageData(ib, 0, 0);
 
             // LES MASQUES DES VOILES (brume, fumée, flammes), en basse définition ;
             // la fumée part sous le vent (`sousLeVent`, en cases).
@@ -433,16 +585,31 @@
                 return c;
             });
 
-            // LE DÉCOR TRACÉ (les fougères de givre), découpé par le masque.
-            if (recette.decor) {
+            // LE DÉCOR TRACÉ (les fougères de givre, les brûlures de la foudre — et
+            // leur lueur), découpé par le masque.
+            const tracer = (fonction, cible) => {
                 const deco = toile(W, H), cf = deco.getContext("2d");
                 cf.setTransform(k, 0, 0, k, -E.x0 * k, -E.y0 * k);
-                recette.decor(cf, liste, outils);
+                fonction(cf, liste, outils);
                 cf.setTransform(1, 0, 0, 1, 0, 0);
                 cf.globalCompositeOperation = "destination-in";
                 cf.drawImage(masque, 0, 0);
-                cp.drawImage(deco, 0, 0);
-            }
+                cible.getContext("2d").drawImage(deco, 0, 0);
+            };
+            if (recette.decor) tracer(recette.decor, plein);
+            if (recette.decorLueur) tracer(recette.decorLueur, braises);
+
+            // LES ARCS (la foudre) : chacun sur son image, en demi-définition (ils sont flous de lumière).
+            const imagesArcs = recette.arcs ? Array.from({ length: recette.arcs.images }, (_, n) => {
+                const ka = k * 0.6, c = toile(Math.max(1, Math.round(W * 0.6)), Math.max(1, Math.round(H * 0.6))), ctx = c.getContext("2d");
+                ctx.setTransform(ka, 0, 0, ka, -E.x0 * ka, -E.y0 * ka);
+                recette.arcs.dessiner(ctx, liste, outils, n);
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.globalCompositeOperation = "destination-in";
+                // Le masque un peu épaissi : un arc peut lécher le bord.
+                ctx.drawImage(masque, 0, 0, c.width, c.height);
+                return c;
+            }) : [];
 
             // LES ÉCLATS : quelques-uns par case, là où la plaque est franche.
             const points = [];
@@ -455,7 +622,7 @@
                     if (i >= 0 && j >= 0 && i < W && j < H && im.data[(j * W + i) * 4 + 3] > 160) points.push({ x: x - E.x0, y: y - E.y0, h: hacher(h0, s, 53) });
                 }
             });
-            return { ...E, k, plein, masque, braises, masquesVoiles, points, cases: liste };
+            return { ...E, k, plein, masque, braises, masquesVoiles, imagesArcs, points, cases: liste };
         }
 
         // Les calques affichés à la taille de la plaque.
@@ -509,7 +676,23 @@
                 e.style.left = pt.x + "px"; e.style.top = pt.y + "px";
                 racine.appendChild(e);
                 if (typeof e.animate !== "function") return e;
-                if (recette.eclats.geste === "envol") {
+                if (recette.eclats.geste === "bulle") {
+                    // Une bulle gonfle sur la boue, tremble, et crève.
+                    const t = R * (0.1 + 0.12 * pt.h), periode = 1800 + pt.h * 2400;
+                    e.style.width = e.style.height = t + "px";
+                    e.style.margin = `${-t / 2}px 0 0 ${-t / 2}px`;
+                    e.animate([{ opacity: 0, transform: "scale(0.2)" }, { opacity: 0.9, transform: "scale(0.55)", offset: 0.2 },
+                               { opacity: 0.9, transform: "scale(0.95)", offset: 0.72 }, { opacity: 0.9, transform: "scale(1)", offset: 0.8 },
+                               { opacity: 0, transform: "scale(1.35)", offset: 0.86 }, { opacity: 0, transform: "scale(0.2)" }],
+                              { duration: periode, delay: (retard || 0) + pt.h * periode, iterations: Infinity, easing: "ease-out" });
+                } else if (recette.eclats.geste === "crepite") {
+                    // Une étincelle claque deux fois, vite, et disparaît.
+                    const periode = 900 + pt.h * 1300, o = 0.2 + pt.h * 0.6;
+                    e.animate([{ opacity: 0, transform: "scale(0.5)" }, { opacity: 0, offset: o }, { opacity: 1, transform: "scale(1.6)", offset: o + 0.03 },
+                               { opacity: 0.1, transform: "scale(0.7)", offset: o + 0.06 }, { opacity: 1, transform: "scale(1.3)", offset: o + 0.09 },
+                               { opacity: 0, transform: "scale(0.5)", offset: o + 0.14 }, { opacity: 0, transform: "scale(0.5)" }],
+                              { duration: periode, delay: (retard || 0) + pt.h * 400, iterations: Infinity });
+                } else if (recette.eclats.geste === "envol") {
                     // Une étincelle s'élève (elle grandit, vue d'en haut) et file avec le vent.
                     const periode = 1300 + pt.h * 1500, loin = R * (0.9 + pt.h * 0.9);
                     e.animate([{ opacity: 0, transform: "translate(0px, 0px) scale(0.5)" },
@@ -526,6 +709,33 @@
                 }
                 return e;
             });
+        }
+        function arcsDe(d) {
+            if (!d.imagesArcs.length) return null;
+            const b = document.createElement("div");
+            b.className = `zone-proc-arcs ${pre}-arcs zone-proc-ecran`;
+            d.imagesArcs.forEach((src, n) => {
+                const c = document.createElement("canvas");
+                c.width = src.width; c.height = src.height;
+                c.getContext("2d").drawImage(src, 0, 0);
+                b.appendChild(c);
+                if (typeof c.animate !== "function") return;
+                // Un éclat bref (un double coup), à un instant à lui, dans une période à lui.
+                const h = hacher(graine, n, 991), periode = 1100 + h * 1500, o = 0.1 + hacher(graine, n, 992) * 0.7;
+                c.animate([{ opacity: 0 }, { opacity: 0, offset: o }, { opacity: 1, offset: o + 0.02 }, { opacity: 0.25, offset: o + 0.05 },
+                           { opacity: 0.9, offset: o + 0.07 }, { opacity: 0, offset: o + 0.12 }, { opacity: 0 }],
+                          { duration: periode, iterations: Infinity });
+            });
+            return b;
+        }
+        function changerArcs(d, fondu, retard) {
+            const nouveaux = arcsDe(d), anciens = arcs;
+            arcs = nouveaux;
+            if (nouveaux) racine.insertBefore(nouveaux, eclats[0] || null);
+            if (!anciens) return;
+            if (!fondu || typeof anciens.animate !== "function") { anciens.remove(); return; }
+            if (nouveaux) nouveaux.animate([{ opacity: 0 }, { opacity: 1 }], { duration: fondu, delay: retard || 0, fill: "both" });
+            anciens.animate([{ opacity: 1 }, { opacity: 0 }], { duration: fondu, delay: retard || 0, fill: "both" }).finished.then(() => anciens.remove(), () => anciens.remove());
         }
         function changerVoiles(d, fondu, retard) {
             const nouveaux = voilesDe(d);
@@ -637,7 +847,7 @@
                 if (!cases.size) return couche.vider(0);
                 const d = dessiner([...cases.values()]);
                 placer(d); montrer(d);
-                changerVoiles(d, 0); eclater(d, 0);
+                changerVoiles(d, 0); changerArcs(d, 0); eclater(d, 0);
                 rendu = d;
                 return Promise.resolve(true);
             },
@@ -659,6 +869,7 @@
                     // Les voiles et les éclats suivent le front (ils ne le devancent pas).
                     changerVoiles(d, duree * 0.7, duree * 0.25);
                     eclater(d, duree * 0.6);
+                    changerArcs(d, duree * 0.5, duree * 0.5);
                     await ramper(ancien, d, depuis, duree);
                     return true;
                 });
@@ -678,6 +889,7 @@
                 const finir = () => {
                     calques().forEach(c => c.getContext("2d").clearRect(0, 0, c.width, c.height));
                     voiles.forEach(v => v.remove()); voiles = [];
+                    if (arcs) { arcs.remove(); arcs = null; }
                     eclats.forEach(e => e.remove()); eclats = [];
                     racine.style.opacity = "";
                 };
@@ -709,5 +921,7 @@
     };
     window.creerCoucheGivre = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "glace" });
     window.creerCoucheFeu = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "feu" });
+    window.creerCouchePoison = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "poison" });
+    window.creerCoucheElectrique = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "electrique" });
     window.TYPES_ZONES_PROCEDURALES = Object.keys(RECETTES);
 })();

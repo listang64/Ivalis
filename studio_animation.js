@@ -159,6 +159,8 @@ function fenetre() {
                 <canvas id="studio-canvas" class="studio-canvas"></canvas>
                 <div id="studio-givre" class="studio-givre"></div>
                 <div id="studio-feu" class="studio-givre studio-feu"></div>
+                <div id="studio-poison" class="studio-givre studio-poison"></div>
+                <div id="studio-electrique" class="studio-givre studio-electrique"></div>
                 <svg id="studio-zones" class="studio-terrain-svg studio-zones" xmlns="http://www.w3.org/2000/svg"></svg>
                 <div id="studio-gravats" class="studio-gravats"></div>
                 <svg id="studio-cibles" class="studio-terrain-svg studio-cibles" xmlns="http://www.w3.org/2000/svg"></svg>
@@ -606,8 +608,9 @@ function rendreZones() {
 //  UNE plaque (zones_procedurales.js), sous les autres nappes et les pions ;
 //  une case n'a qu'un élément : le feu fait fondre la glace, la glace éteint
 //  le feu.
-const PROCEDURALES = ["glace", "feu"];
-const CONTENEUR_PROCEDURAL = { glace: "studio-givre", feu: "studio-feu" };
+// Puis (v245) : « refais dans le même état d'esprit les zones poison et électrique. »
+const PROCEDURALES = ["glace", "feu", "poison", "electrique"];
+const CONTENEUR_PROCEDURAL = { glace: "studio-givre", feu: "studio-feu", poison: "studio-poison", electrique: "studio-electrique" };
 const estProcedurale = (type) => PROCEDURALES.includes(type) && typeof window.creerCoucheProcedurale === "function";
 function nouvelleCouche(type) {
     const conteneur = document.getElementById(CONTENEUR_PROCEDURAL[type]);
@@ -873,7 +876,7 @@ function terrainDeScene() {
                 couche.ajouter([{ q, r }], { depuis: { q, r }, duree: 700 });
                 // L'animation reçoit un repère vide (la plaque, elle, est commune).
                 z.el = document.createElementNS(NS_SVG, "g");
-                z.el.setAttribute("class", `studio-nappe studio-nappe-${type === "glace" ? "givre" : "brasier"}`);
+                z.el.setAttribute("class", `studio-nappe studio-nappe-procedurale studio-nappe-${type}`);
                 svg.appendChild(z.el);
                 return z.el;
             }
@@ -885,8 +888,10 @@ function terrainDeScene() {
         // rampe depuis `depuis` (une case), en `duree` ms. Rend la promesse de
         // son arrivée.
         givre: (liste, p = {}) => poserProcedurale("glace", liste, p),
-        // LE BRASIER (v244) : de même, la plaque de feu commune.
+        // LE BRASIER (v244) : de même, la plaque de feu commune ; et (v245) celles
+        // du poison et de la foudre — `zone(type, …)` pour toutes.
         feu: (liste, p = {}) => poserProcedurale("feu", liste, p),
+        zone: (type, liste, p = {}) => poserProcedurale(type, liste, p),
         // Des cases d'un élément qui passent (une démonstration) : une seule petite plaque pour toutes.
         plaquePassagere: (type, liste) => estProcedurale(type) ? plaquePassagere(type, cases(liste)) : null,
         // L'aperçu d'une zone visée, dessiné comme au combat (dessinerHexesZoneCiblage).
