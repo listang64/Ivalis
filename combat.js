@@ -4167,6 +4167,8 @@ function defsZonesPersistantes(R, sfx = "") {
 // zone qui se pose gagne le terrain depuis son centre ; une case qui s'en va
 // quitte la plaque ; un élément qui disparaît du plateau s'efface en fondu.
 // Une page ouverte en plein combat, ou un plateau reconstruit, les pose d'un coup.
+// Puis (v249) : « Vas-y, intègre-les » — les chausse-trappes des zones qui ne
+// font que des dégâts (« neutre »), validées au Studio, sont une plaque aussi.
 const ETAT_ZONES_PROCEDURALES = { couches: {}, cle: null, vu: false };
 // Pour les bancs : les plaques du plateau, par élément.
 window.couchesZonesDuCombat = () => ({ ...ETAT_ZONES_PROCEDURALES.couches });

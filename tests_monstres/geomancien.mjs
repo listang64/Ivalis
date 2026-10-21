@@ -567,7 +567,9 @@ console.log("\n10. À L'ÉCRAN : TERRAIN, CALQUE, POSE, CIBLAGE");
     const los = window.verifierLigneDeVueVTT({ q: 0, r: 0 }, { q: 4, r: 0 });
     window.appliquerMursTerre();
     const calque = document.getElementById("calque-murs-terre"), haut = document.getElementById("calque-murs-terre-haut");
-    const imgs = haut.querySelectorAll(".mur-terre[data-mur]").length, grav = calque.querySelectorAll("img.gravats-terre").length;
+    // (v249 : les gravats du combat sont un éboulis procédural — on compte ses cases.)
+    const eboulis = typeof window.casesGravatsDuCombat === "function" ? window.casesGravatsDuCombat() : null;
+    const imgs = haut.querySelectorAll(".mur-terre[data-mur]").length, grav = eboulis ? eboulis.length : calque.querySelectorAll("img.gravats-terre").length;
     const ensemble = haut.querySelectorAll("canvas.murs-terre-ensemble").length;
     const jauges = haut.querySelectorAll(".mur-terre-jauge").length;
     // Les murs AU-DESSUS des pions (leur calque vient après, même z-index),

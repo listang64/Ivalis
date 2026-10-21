@@ -202,14 +202,16 @@ console.log("\n3. LES MURS QUI SE BRISENT");
   verifier("« Replacer » efface l'éboulis avec le terrain", r.vide);
 }
 
-console.log("\n4. LE CATALOGUE ; LE COMBAT GARDE SES TAS");
+console.log("\n4. LE CATALOGUE ; LE COMBAT (SES TAS, PUIS L'ÉBOULIS EN v249)");
 {
   const r = await p.evaluate(() => {
     const a = (id) => (window.ANIMATIONS_COMBAT || []).find(x => x.id === id) || {};
-    // Le combat : le tas de dessinerGravatsTerre, tant que Nico n'a pas validé.
+    // Le combat gardait le tas de dessinerGravatsTerre tant que Nico n'avait pas
+    // validé ; validé, l'éboulis y est intégré en v249 : plus d'image, une plaque.
     window.GRAVATS_TERRE = { "3_1": true };
     window.appliquerMursTerre();
-    const jeu = document.querySelectorAll("#calque-murs-terre img.gravats-terre").length;
+    const plaque = typeof window.gravatsDuCombat === "function" && window.gravatsDuCombat();
+    const jeu = document.querySelectorAll("#calque-murs-terre img.gravats-terre").length === 0 && plaque ? window.casesGravatsDuCombat().length : 0;
     window.GRAVATS_TERRE = {};
     window.appliquerMursTerre();
     return { nb: (window.ANIMATIONS_COMBAT || []).length, gravats: a("gravats").description || "", effondre: a("mur-effondre").description || "",
@@ -218,8 +220,9 @@ console.log("\n4. LE CATALOGUE ; LE COMBAT GARDE SES TAS");
   // (v248 : la zone de pièges en plus — 144.)
   verifier("toujours 144 animations ; « Gravats » et « Mur effondré » parlent d'éboulis, sans contour",
            r.nb === 144 && /éboulis/.test(r.gravats) && /contour/.test(r.gravats) && /éboulis/.test(r.effondre), JSON.stringify({ nb: r.nb }));
-  verifier("le moteur sait faire des gravats (creerCoucheGravats), qui ne sont pas une zone", r.moteur && !r.types.includes("gravats") && r.types.length === 4, r.types.join());
-  verifier("le combat garde ses tas de gravats tant que le Studio n'est pas validé", r.jeu === 1, String(r.jeu));
+  // (v249 : les pièges sont devenus une zone du combat — cinq.)
+  verifier("le moteur sait faire des gravats (creerCoucheGravats), qui ne sont pas une zone", r.moteur && !r.types.includes("gravats") && r.types.length === 5, r.types.join());
+  verifier("le combat pose le même éboulis (validé, intégré en v249)", r.jeu === 1, String(r.jeu));
 }
 
 void R;

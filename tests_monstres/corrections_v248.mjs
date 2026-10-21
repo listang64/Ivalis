@@ -181,13 +181,14 @@ console.log("\n3. LE TERRAIN : UNE ZONE PAR CASE ; « REPLACER »");
   verifier("« Replacer » efface les pièges", r.vide);
 }
 
-console.log("\n4. LE CATALOGUE ; LE COMBAT GARDE SA NAPPE DE PIÈGES");
+console.log("\n4. LE CATALOGUE ; LE COMBAT (SA NAPPE, PUIS LES PIÈGES EN v249)");
 {
   const r = await p.evaluate(() => {
     const liste = window.ANIMATIONS_COMBAT || [];
     const a = liste.find(x => x.id === "zone-pieges") || {};
     const i = liste.findIndex(x => x.id === "zone-pieges"), j = liste.findIndex(x => x.id === "zone-poison");
-    // Le combat : une zone « neutre » garde sa nappe SVG, pas de plaque.
+    // Le combat gardait sa nappe SVG pour une zone « neutre » ; validées, les
+    // chausse-trappes y sont intégrées en v249 : une plaque, plus de nappe.
     window.ZONES_PERSISTANTES = { z1: { type: "neutre", hexes: [{ q: 3, r: 1 }] } };
     window.appliquerZonesPersistantes();
     const svg = document.getElementById("svg-zones-persistantes");
@@ -200,8 +201,8 @@ console.log("\n4. LE CATALOGUE ; LE COMBAT GARDE SA NAPPE DE PIÈGES");
   verifier("144 animations ; « Zone de pièges » se cible, juste après le poison, en section 7", r.nb === 144 && r.cible && r.apres && r.section === 7, JSON.stringify({ nb: r.nb, section: r.section }));
   verifier("…et dit ce qu'elle fait : des chausse-trappes, sans contour", /chausse-trappes/.test(r.desc) && /contour/.test(r.desc) && /ombre/.test(r.desc));
   verifier("son bruit à elle : du fer qui tinte (« zone-pieges »)", r.son);
-  verifier("le moteur connaît les pièges ; le combat, lui, ne les dessine pas encore ainsi", r.recettes.includes("neutre") && !r.types.includes("neutre"), JSON.stringify({ recettes: r.recettes, types: r.types }));
-  verifier("le combat garde sa nappe de pièges tant que le Studio n'est pas validé", r.jeu.nappes === 1 && r.jeu.plaques === 0, JSON.stringify(r.jeu));
+  verifier("le moteur connaît les pièges ; le combat aussi (v249)", r.recettes.includes("neutre") && r.types.includes("neutre"), JSON.stringify({ recettes: r.recettes, types: r.types }));
+  verifier("le combat pose les mêmes chausse-trappes (validées, intégrées en v249)", r.jeu.nappes === 0 && r.jeu.plaques === 1, JSON.stringify(r.jeu));
 }
 
 await fin();

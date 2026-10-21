@@ -57,9 +57,9 @@
 //  `ajouter(cases, { depuis, duree })` : l'élément gagne les nouvelles cases
 //  depuis `depuis` (la plaque grandit) ; `poser(cases)` : sans animation ;
 //  `retirer(cases)`, `vider()`, `detruire()`. Le Studio s'en sert
-//  (studio_animation.js) ; le combat aussi pour les quatre zones (v246,
-//  combat.js) ; il garde ses tas de gravats et sa nappe de pièges tant que
-//  Nico n'a pas validé.
+//  (studio_animation.js) ; le combat aussi : les quatre zones (v246,
+//  combat.js), puis les pièges et les gravats (v249, combat.js et
+//  murs_terre.js).
 // =========================================================================
 (function () {
     // --- LE BRUIT ---------------------------------------------------------
@@ -1194,7 +1194,8 @@
     window.creerCoucheGravats = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "gravats" });
     // Toutes les recettes (le Studio les essaie toutes).
     window.RECETTES_PROCEDURALES = Object.keys(RECETTES);
-    // Les zones persistantes que le combat dessine ainsi (v246) : les quatre
-    // éléments validés. Les pièges et les gravats attendent leur validation.
-    window.TYPES_ZONES_PROCEDURALES = ["glace", "feu", "poison", "electrique"];
+    // Les zones persistantes que le combat dessine ainsi : les quatre éléments
+    // (v246), puis les pièges (v249). Les gravats sont un terrain, pas une
+    // zone : murs_terre.js les pose lui-même (creerCoucheGravats).
+    window.TYPES_ZONES_PROCEDURALES = ["glace", "feu", "poison", "electrique", "neutre"];
 })();

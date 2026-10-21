@@ -913,6 +913,74 @@
     //  LE CALQUE : sous les pions, au-dessus des nappes, dans le plateau
     //  transformé (il suit le zoom et le défilement tout seul).
     // ---------------------------------------------------------------------
+    // LES GRAVATS, PROCÉDURAUX (v249). Validés au Studio (v247), puis Nico :
+    // « Vas-y, intègre-les. » Tous les tas du plateau forment UN éboulis
+    // (zones_procedurales.js, recette « gravats ») : la terre retournée, un
+    // petit monticule par case, des pierres cassées et leurs ombres, une
+    // poussière légère au vent ; deux tas voisins sans couture. Un mur qui
+    // tombe : l'éboulis gagne sa case depuis elle ; un tas couvert par un mur
+    // ou effacé quitte l'éboulis ; plus de gravats : il s'efface en fondu. Un
+    // plateau reconstruit (ou redimensionné), une page ouverte en plein
+    // combat : il est posé d'un coup. Sans le moteur, les tas d'avant.
+    const ETAT_GRAVATS = { couche: null, poses: new Set(), cle: null, vu: false };
+    // Pour les bancs : l'éboulis, et ses cases (celles qui avancent encore comprises).
+    window.gravatsDuCombat = () => ETAT_GRAVATS.couche;
+    window.casesGravatsDuCombat = () => [...ETAT_GRAVATS.poses].sort();
+    function appliquerGravatsProceduraux(calque, voulues) {
+        const plateau = window.PLATEAU_VTT;
+        const etat = ETAT_GRAVATS;
+        // Les tas d'images d'avant (un plateau dessiné par l'ancien code) partent.
+        calque.querySelectorAll("img.gravats-terre").forEach(i => i.remove());
+        let boite = document.getElementById("gravats-proceduraux");
+        if (!boite || boite.parentNode !== calque) {
+            if (boite) boite.remove();
+            boite = document.createElement("div");
+            boite.id = "gravats-proceduraux";
+            boite.style.cssText = "position:absolute; top:0; left:0; width:0; height:0; overflow:visible; pointer-events:none;";
+            calque.appendChild(boite);
+        }
+        const cle = [plateau.hexSize, plateau.largeurLogique, plateau.hauteurLogique].join("|");
+        if (etat.couche && (etat.couche.el.parentNode !== boite || etat.cle !== cle)) {
+            etat.couche.detruire();
+            etat.couche = null;
+            etat.poses.clear();
+            etat.vu = false;
+        }
+        etat.cle = cle;
+        const dAbord = !etat.vu;
+        etat.vu = true;
+        if (!voulues.length) {
+            if (etat.couche) {
+                const partante = etat.couche;
+                etat.couche = null;
+                etat.poses.clear();
+                partante.vider(600).then(() => partante.detruire());
+            }
+            return;
+        }
+        let neuve = false;
+        if (!etat.couche) {
+            etat.couche = window.creerCoucheGravats(boite, { R: plateau.hexSize, pixel: (q, r) => plateau.hexToPixel(q, r), graine: 7 });
+            neuve = true;
+        }
+        const couche = etat.couche;
+        const voulu = new Set(voulues.map(c => cleCase(c.q, c.r)));
+        const parties = [...etat.poses].filter(k => !voulu.has(k));
+        const neuves = voulues.filter(c => !etat.poses.has(cleCase(c.q, c.r)));
+        parties.forEach(k => etat.poses.delete(k));
+        neuves.forEach(c => etat.poses.add(cleCase(c.q, c.r)));
+        if (parties.length) couche.retirer(parties.map(k => { const [q, r] = k.split("_").map(Number); return { q, r }; }));
+        if (!neuves.length) return;
+        if (dAbord && neuve) { couche.poser(neuves); return; }
+        // Le tas neuf gagne sa case depuis elle (le pied du mur tombé) ; plusieurs
+        // à la fois, depuis le plus central d'entre eux.
+        const px = neuves.map(c => plateau.hexToPixel(c.q, c.r));
+        const mx = px.reduce((a, p) => a + p.x, 0) / px.length, my = px.reduce((a, p) => a + p.y, 0) / px.length;
+        let centre = 0;
+        px.forEach((p, i) => { if (Math.hypot(p.x - mx, p.y - my) < Math.hypot(px[centre].x - mx, px[centre].y - my)) centre = i; });
+        couche.ajouter(neuves, { depuis: { q: neuves[centre].q, r: neuves[centre].r }, duree: 1100 });
+    }
+
     window.appliquerMursTerre = function () {
         const plateau = document.getElementById("transform-plateau");
         if (!plateau || !window.PLATEAU_VTT) return;
@@ -936,9 +1004,13 @@
         const morceaux = [];
         const sol = [];
         const vise = window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif ? window.ETAT_CIBLAGE.cibleUnique : null;
-        Object.keys(window.GRAVATS_TERRE || {}).sort().forEach(cle => {
+        const procedural = typeof window.creerCoucheGravats === "function";
+        const tas = Object.keys(window.GRAVATS_TERRE || {}).sort().map(cle => {
             const [q, r] = cle.split("_").map(Number);
-            if (window.murEnCase(q, r)) return;
+            return { q, r, cle };
+        }).filter(c => !window.murEnCase(c.q, c.r));
+        if (procedural) appliquerGravatsProceduraux(calque, tas.map(c => ({ q: c.q, r: c.r })));
+        else tas.forEach(({ q, r, cle }) => {
             const px = window.PLATEAU_VTT.hexToPixel(q, r);
             const t = R * EMPRISE_GRAVATS;
             const src = image("gravats", cle);
@@ -995,7 +1067,7 @@
                 style="left:${px.x - R * 0.7}px;top:${px.y - R * 0.7}px;width:${R * 1.4}px;height:${R * 1.4}px"></span>`);
         });
         projets.forEach(() => morceaux.push(`<span class="mur-terre-projet"></span>`));
-        calque.innerHTML = sol.join("");
+        if (!procedural) calque.innerHTML = sol.join("");
         haut.innerHTML = morceaux.filter(x => typeof x === "string").join("");
         const ensemble = morceaux.find(x => typeof x !== "string");
         if (ensemble) haut.insertBefore(ensemble, haut.firstChild);

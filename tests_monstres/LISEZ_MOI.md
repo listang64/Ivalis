@@ -6747,3 +6747,46 @@ combat inchangée. Il mord sur l'ancien code (19 échecs). Mis à jour :
 corrections_v243, v244, v245, v247, studio_animation et studio_catalogue_1
 (144 animations ; sept en section 7 ; 110 sons fabriqués), studio_terrain
 (onze animations qui se ciblent).
+
+## v249 — En jeu : les chausse-trappes et les gravats, procéduraux
+
+Nico, devant le Studio (v247, v248) : « Vas-y, intègre-les. »
+
+- LES PIÈGES (zones_procedurales.js, combat.js) : le type « neutre » rejoint
+  TYPES_ZONES_PROCEDURALES — le plateau du combat pose la plaque de
+  chausse-trappes du Studio à la place de la nappe SVG, avec tout ce que
+  les quatre éléments ont déjà en jeu (v246) : une plaque par type, une
+  zone neuve qui gagne depuis son centre, une case qui s'en va, un fondu
+  quand il n'en reste rien, un plateau reconstruit reposé d'un coup, la
+  retenue du tour à rejouer, le secours SVG sans moteur. Le soin garde sa
+  nappe.
+- LES GRAVATS (murs_terre.js, appliquerMursTerre) : tous les tas du plateau
+  (GRAVATS_TERRE, sauf sous un mur) forment UN éboulis procédural, dans
+  #calque-murs-terre (#gravats-proceduraux), au sol, sous les pions et sous
+  la roche des murs. Plus d'images de tas. Le dessin des murs le compare à
+  ce qu'il a déjà confié à l'éboulis :
+  - un mur qui tombe : l'éboulis gagne sa case depuis elle (1,1 s ;
+    plusieurs à la fois : depuis la plus centrale) et rejoint le reste ;
+  - un mur levé sur des gravats, un tas effacé : il quitte l'éboulis ;
+  - plus aucun gravat (« Réinitialiser le combat », effacerMursTerre) : un
+    fondu de 0,6 s, puis l'éboulis est détruit ;
+  - le plateau reconstruit ou redimensionné, une page ouverte en plein
+    combat : posé d'un coup ;
+  - rappeler le dessin des murs sans rien changer ne redessine rien.
+  Le terrain ne change pas : les gravats restent difficiles (etatCaseCombat).
+  Sans le moteur procédural, les tas d'avant (dessinerGravatsTerre).
+- Pour les bancs : window.gravatsDuCombat() (l'éboulis) et
+  window.casesGravatsDuCombat() (ses cases, celles qui avancent encore
+  comprises : la plaque ne les prend qu'au début de leur avancée).
+
+corrections_v249.mjs : sur le plateau du combat — une zone de dégâts simples
+devenue plaque de pièges (sans contour, ses 7 cases, du fer dans chacune,
+ses reflets ; le soin seul en SVG), une zone de pièges neuve qui gagne
+depuis son centre ; l'éboulis (une plaque, plus d'images, ses cases libres
+et pas celle sous un mur, ses pierres, le terrain toujours difficile), un
+mur qui tombe (l'éboulis gagne sa case depuis elle), un mur levé sur des
+gravats ; rien de redessiné pour rien, le plateau reconstruit, la
+réinitialisation en fondu, le secours. Il mord sur l'ancien code
+(11 échecs). Mis à jour : corrections_v247 et v248 (le combat pose
+désormais l'éboulis et les pièges ; cinq types de zones), geomancien (il
+compte les cases de l'éboulis).
