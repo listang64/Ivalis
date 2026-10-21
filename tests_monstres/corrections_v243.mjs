@@ -192,11 +192,12 @@ console.log("\n6. LE TERRAIN : LE FEU FOND LA GLACE, « REPLACER » EFFACE, LA G
     await window.jouerAnimationStudio("entree-zone");
     await new Promise(r => setTimeout(r, 2500));
     res.passe = document.querySelectorAll("#studio-givre .givre-couche").length;
-    // Le combat garde sa nappe de glace (le Studio d'abord, le jeu après validation).
+    // Le combat gardait sa nappe de glace (le Studio d'abord, le jeu après validation) ;
+    // validée, elle est intégrée en v246 : le combat pose la même plaque de givre.
     window.ZONES_PERSISTANTES = { z1: { type: "glace", hexes: [{ q: 3, r: 1 }] } };
     window.appliquerZonesPersistantes();
     const svg = document.getElementById("svg-zones-persistantes");
-    res.jeu = !!(svg && svg.querySelector('g[clip-path="url(#zp-clip-hex)"]'));
+    res.jeu = !!document.querySelector("#zones-procedurales .givre-couche") && !(svg && svg.querySelector('g[clip-path="url(#zp-clip-hex)"]'));
     window.ZONES_PERSISTANTES = {};
     window.appliquerZonesPersistantes();
     return res;
@@ -204,7 +205,7 @@ console.log("\n6. LE TERRAIN : LE FEU FOND LA GLACE, « REPLACER » EFFACE, LA G
   verifier("du feu posé sur une case gelée : elle fond (la plaque s'ouvre là), elle brûle", r.avant > 0.5 && r.apres < 0.5 && r.feu && r.glace === 6, JSON.stringify(r));
   verifier("« Replacer » efface la plaque avec le terrain", r.vide);
   verifier("la glace d'une démonstration (entrée de zone) ne reste pas sur la carte", r.passe === 0, String(r.passe));
-  verifier("le combat garde sa nappe de glace tant que le Studio n'est pas validé", r.jeu);
+  verifier("le combat pose la même plaque de givre (validée, intégrée en v246)", r.jeu);
 }
 
 console.log("\n7. LE CATALOGUE");

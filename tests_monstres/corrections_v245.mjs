@@ -166,11 +166,13 @@ console.log("\n4. LE TERRAIN : UN ÉLÉMENT PAR CASE, « REPLACER », LE COMBAT"
       .map(s => document.querySelectorAll(s).length).join();
     window.replacerPionsStudio();
     res.vide = document.querySelectorAll(".zone-proc").length === 0 && window.terrainStudio().zones.length === 0;
-    // Le combat garde ses nappes de poison et de foudre.
+    // Le combat gardait ses nappes de poison et de foudre ; validés, ils y sont
+    // intégrés en v246 : les mêmes plaques, plus de nappe.
     window.ZONES_PERSISTANTES = { z1: { type: "poison", hexes: [{ q: 3, r: 1 }] }, z2: { type: "electrique", hexes: [{ q: 4, r: 1 }] } };
     window.appliquerZonesPersistantes();
     const svg = document.getElementById("svg-zones-persistantes");
-    res.jeu = svg ? svg.querySelectorAll('g[clip-path="url(#zp-clip-hex)"]').length : 0;
+    res.jeu = document.querySelectorAll("#zones-procedurales .poison-couche, #zones-procedurales .elec-couche").length
+            - (svg ? svg.querySelectorAll('g[clip-path="url(#zp-clip-hex)"]').length : 0);
     window.ZONES_PERSISTANTES = {};
     window.appliquerZonesPersistantes();
     return res;
@@ -179,7 +181,7 @@ console.log("\n4. LE TERRAIN : UN ÉLÉMENT PAR CASE, « REPLACER », LE COMBAT"
            && r.types.join() === "electrique" && r.poison === 6, JSON.stringify(r));
   verifier("glace, feu, poison et foudre : chacun sa plaque", r.quatre === "1,1,1,1", r.quatre);
   verifier("« Replacer » efface les quatre", r.vide);
-  verifier("le combat garde ses nappes de poison et de foudre tant que le Studio n'est pas validé", r.jeu === 2, String(r.jeu));
+  verifier("le combat pose les mêmes plaques de poison et de foudre (validées, intégrées en v246)", r.jeu === 2, String(r.jeu));
 }
 
 console.log("\n5. LE CATALOGUE");

@@ -70,8 +70,9 @@ console.log("\n1. LE DESSIN DES NAPPES DU JEU, À L'IDENTIQUE");
       return jeu === studio.replace(/-studio/g, "") && studio !== jeu;
     }));
     const defs = rendu.defs(R) === rendu.defs(R, "-studio").replace(/-studio/g, "") && /id="zp-clip-hex"/.test(rendu.defs(R));
-    // Le plateau du combat dessine toujours ses nappes.
-    window.ZONES_PERSISTANTES = { z1: { type: "feu", hexes: [{ q: 3, r: 1 }, { q: 4, r: 1 }] } };
+    // Le plateau du combat dessine toujours ses nappes de soin (v246 : la glace, le feu,
+    // le poison et la foudre y ont désormais leurs plaques procédurales, comme au Studio).
+    window.ZONES_PERSISTANTES = { z1: { type: "soin", hexes: [{ q: 3, r: 1 }, { q: 4, r: 1 }] } };
     window.appliquerZonesPersistantes();
     const svg = document.getElementById("svg-zones-persistantes");
     const jeu = { clip: !!(svg && svg.querySelector("clipPath#zp-clip-hex")),
@@ -82,7 +83,7 @@ console.log("\n1. LE DESSIN DES NAPPES DU JEU, À L'IDENTIQUE");
   });
   verifier("le Studio dessine EXACTEMENT la nappe du jeu (6 types, allégée ou non) ; seuls ses identifiants portent « -studio »", r.memes);
   verifier("…et les mêmes <defs> (découpe, flous, dégradés)", r.defs);
-  verifier("le plateau du combat dessine toujours ses nappes (zp-clip-hex, une case par hexagone)", r.jeu.clip && r.jeu.cases === 2, JSON.stringify(r.jeu));
+  verifier("le plateau du combat dessine toujours ses nappes de soin (zp-clip-hex, une case par hexagone)", r.jeu.clip && r.jeu.cases === 2, JSON.stringify(r.jeu));
 }
 
 console.log("\n2. LE CIBLAGE À LA MAIN : UNE ZONE DE FEU SUR LES CASES TOUCHÉES");

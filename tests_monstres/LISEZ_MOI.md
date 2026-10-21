@@ -6601,3 +6601,46 @@ sans couture et le même dessin pour les mêmes cases, un élément par case,
 les quatre ensemble, « Replacer », les nappes du combat inchangées, le
 catalogue. Il mord sur l'ancien code (23 échecs). Mis à jour :
 corrections_v244 (le moteur connaît désormais quatre éléments).
+
+## v246 — En jeu : les zones de glace, de feu, de poison et de foudre, procédurales
+
+Nico, devant le Studio : « Parfait, tu peux intégrer les zones de glace /
+feu / poison et électrique, j'adore. »
+
+- LE PLATEAU DU COMBAT (combat.js, appliquerZonesPersistantes) : la glace,
+  le feu, le poison et la foudre ne sont plus des nappes SVG case par case
+  mais les plaques du Studio (zones_procedurales.js) : une plaque par
+  élément pour toutes ses cases, deux zones collées sans couture, aucun
+  contour, avec leurs voiles au vent (brume, fumée et flammes, miasme,
+  plasma), leurs éclats et leurs arcs. Elles vivent dans un calque
+  #zones-procedurales, dans le plateau zoomé (#transform-plateau), juste
+  sous la nappe SVG (z 3), donc sous les pions et les murs, sans capter les
+  clics. Le soin garde sa nappe SVG.
+- CE QUI CHANGE SE VOIT, RIEN D'AUTRE : la fonction compare les cases
+  voulues à celles de chaque plaque. Une zone neuve gagne le terrain depuis
+  sa case la plus centrale (1,4 s, le front irrégulier du Studio) ; une case
+  qui s'en va quitte la plaque ; un élément qui n'a plus de case s'efface en
+  fondu (0,6 s) puis sa plaque est détruite (elle renaît si l'élément
+  revient). Rappeler la fonction sans rien changer ne redessine rien.
+- UN PLATEAU RECONSTRUIT OU REDIMENSIONNÉ (le calque est parti avec lui,
+  ou la taille des cases a changé) : les plaques sont refaites d'un coup,
+  sans avancer — comme au tout premier dessin d'une page ouverte en plein
+  combat. La retenue tient toujours : une zone n'apparaît pas avant que son
+  tour soit rejoué (evenementsEnAttente, EVENEMENT_ATTENDU).
+- SECOURS : si le moteur procédural manque (un script qui n'a pas chargé),
+  toutes les zones retrouvent leur ancienne nappe SVG.
+- Pour les bancs : window.couchesZonesDuCombat() (les plaques, par
+  élément).
+
+corrections_v246.mjs : sur le plateau du combat, Studio fermé — une plaque
+de givre et plus de nappe, sans contour, qui couvre ses cases et rien
+d'autre, à sa place dans le plateau (sous la nappe, sous les pions, sans
+clic), sa brume et ses scintillements ; les quatre ensemble, chacun sa
+plaque, deux zones de feu collées en un brasier sans couture, le soin en
+SVG, les voiles, bulles et arcs ; rien de redessiné pour rien ; une zone
+qui gagne depuis son centre et rejoint la plaque ; une zone qui s'éteint ;
+un élément qui s'efface en fondu et revient ; le plateau reconstruit ; la
+retenue ; la réinitialisation ; le secours SVG. Il mord sur l'ancien code
+(18 échecs). Mis à jour : corrections_v243, v244 et v245 (le combat pose
+désormais les mêmes plaques que le Studio), studio_terrain (le combat
+dessine toujours ses nappes de soin).

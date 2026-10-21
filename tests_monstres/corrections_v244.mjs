@@ -200,8 +200,9 @@ console.log("\n7. LE TERRAIN : LA GLACE ÉTEINT LE FEU, « REPLACER », LE FEU Q
     res.entree = document.querySelectorAll("#studio-feu .feu-couche, #studio-givre .givre-couche").length;
     window.ZONES_PERSISTANTES = { z1: { type: "feu", hexes: [{ q: 3, r: 1 }] } };
     window.appliquerZonesPersistantes();
+    // (Validé, le brasier est intégré au combat en v246 : la même plaque, plus de nappe.)
     const svg = document.getElementById("svg-zones-persistantes");
-    res.jeu = !!(svg && svg.querySelector('g[clip-path="url(#zp-clip-hex)"]'));
+    res.jeu = !!document.querySelector("#zones-procedurales .feu-couche") && !(svg && svg.querySelector('g[clip-path="url(#zp-clip-hex)"]'));
     window.ZONES_PERSISTANTES = {};
     window.appliquerZonesPersistantes();
     return res;
@@ -211,7 +212,7 @@ console.log("\n7. LE TERRAIN : LA GLACE ÉTEINT LE FEU, « REPLACER », LE FEU Q
   verifier("le Géomancien dans ses flammes : un seul petit brasier le temps de la démonstration, qui ne reste pas",
            r.demo.pendant === 1 && r.demo.apres === 0, JSON.stringify(r.demo));
   verifier("le feu et la glace d'une entrée de zone ne restent pas", r.entree === 0, String(r.entree));
-  verifier("le combat garde sa nappe de feu tant que le Studio n'est pas validé", r.jeu);
+  verifier("le combat pose le même brasier (validé, intégré en v246)", r.jeu);
 }
 
 console.log("\n8. LE CATALOGUE");

@@ -4159,6 +4159,78 @@ function defsZonesPersistantes(R, sfx = "") {
     </defs>`;
 }
 
+// LES ZONES PROCÉDURALES, EN JEU (v246). Nico, devant le Studio : « Parfait,
+// tu peux intégrer les zones de glace / feu / poison et électrique, j'adore. »
+// Toutes les cases d'un élément forment UNE plaque (zones_procedurales.js), sans
+// contour, sous les pions : du givre et sa brume, un brasier et sa fumée, des
+// flaques et leur miasme, un sol ionisé et ses arcs, soufflés par le vent. Une
+// zone qui se pose gagne le terrain depuis son centre ; une case qui s'en va
+// quitte la plaque ; un élément qui disparaît du plateau s'efface en fondu.
+// Une page ouverte en plein combat, ou un plateau reconstruit, les pose d'un coup.
+const ETAT_ZONES_PROCEDURALES = { couches: {}, cle: null, vu: false };
+// Pour les bancs : les plaques du plateau, par élément.
+window.couchesZonesDuCombat = () => ({ ...ETAT_ZONES_PROCEDURALES.couches });
+function typesZonesProcedurales() {
+    return (typeof window.creerCoucheProcedurale === "function" && Array.isArray(window.TYPES_ZONES_PROCEDURALES))
+        ? window.TYPES_ZONES_PROCEDURALES : [];
+}
+function appliquerZonesProcedurales(conteneur, svg, zones) {
+    const plateau = window.PLATEAU_VTT;
+    const etat = ETAT_ZONES_PROCEDURALES;
+    const cle = [plateau.hexSize, plateau.largeurLogique, plateau.hauteurLogique].join("|");
+    let calque = document.getElementById("zones-procedurales");
+    if (!calque) {
+        calque = document.createElement("div");
+        calque.id = "zones-procedurales";
+        calque.style.cssText = "position:absolute; top:0; left:0; width:0; height:0; overflow:visible; z-index:3; pointer-events:none;";
+        conteneur.insertBefore(calque, svg);
+    }
+    // Un plateau reconstruit (les plaques sont parties avec lui) ou redimensionné : on repart de zéro.
+    const perimees = Object.values(etat.couches).some(c => c.el.parentNode !== calque);
+    if (etat.cle !== cle || perimees) {
+        Object.values(etat.couches).forEach(c => c.detruire());
+        etat.couches = {};
+        etat.vu = false;
+        etat.cle = cle;
+    }
+    const dAbord = !etat.vu;
+    etat.vu = true;
+    const cleCase = (h) => h.q + "," + h.r;
+    typesZonesProcedurales().forEach(type => {
+        const siennes = zones.filter(z => z.type === type);
+        const voulues = new Map();
+        siennes.forEach(z => (z.hexes || []).forEach(h => voulues.set(cleCase(h), { q: h.q, r: h.r })));
+        let couche = etat.couches[type];
+        if (!voulues.size) {
+            if (couche) {
+                delete etat.couches[type];
+                couche.vider(600).then(() => couche.detruire());
+            }
+            return;
+        }
+        if (!couche) {
+            couche = window.creerCoucheProcedurale(calque, { type, R: plateau.hexSize, pixel: (q, r) => plateau.hexToPixel(q, r), graine: 7 });
+            if (!couche) return;
+            etat.couches[type] = couche;
+            if (dAbord) { couche.poser([...voulues.values()]); return; }
+        }
+        const deja = new Set(couche.cases().map(cleCase));
+        const parties = couche.cases().filter(h => !voulues.has(cleCase(h)));
+        if (parties.length) couche.retirer(parties);
+        // Chaque zone neuve avance depuis sa case la plus centrale.
+        siennes.forEach(z => {
+            const neuves = (z.hexes || []).filter(h => !deja.has(cleCase(h)));
+            if (!neuves.length) return;
+            neuves.forEach(h => deja.add(cleCase(h)));
+            const px = neuves.map(h => plateau.hexToPixel(h.q, h.r));
+            const mx = px.reduce((a, p) => a + p.x, 0) / px.length, my = px.reduce((a, p) => a + p.y, 0) / px.length;
+            let centre = 0;
+            px.forEach((p, i) => { if (Math.hypot(p.x - mx, p.y - my) < Math.hypot(px[centre].x - mx, px[centre].y - my)) centre = i; });
+            couche.ajouter(neuves.map(h => ({ q: h.q, r: h.r })), { depuis: neuves[centre], duree: 1400 });
+        });
+    });
+}
+
 window.appliquerZonesPersistantes = function() {
     const conteneur = document.getElementById("transform-plateau");
     if (!conteneur || !window.PLATEAU_VTT) return;
@@ -4188,7 +4260,13 @@ window.appliquerZonesPersistantes = function() {
 
     injecterStyleZonesPersistantes();
 
-    const zones = Object.values(window.ZONES_PERSISTANTES || {});
+    // La glace, le feu, le poison et la foudre : des plaques procédurales (v246).
+    const toutes = Object.values(window.ZONES_PERSISTANTES || {});
+    const procedurales = typesZonesProcedurales();
+    appliquerZonesProcedurales(conteneur, svg, toutes.filter(z => procedurales.includes(z.type)));
+
+    // Le reste (le soin…) garde sa nappe SVG.
+    const zones = toutes.filter(z => !procedurales.includes(z.type));
     if (zones.length === 0) {
         svg.innerHTML = "";
         return;
