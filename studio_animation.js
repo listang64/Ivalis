@@ -45,6 +45,8 @@ const studio = {
     enCours: null,
     // Le terrain posé par les animations : nappes, murs, gravats (clé « q_r »).
     terrain: { zones: new Map(), murs: new Map(), gravats: new Set() },
+    // La plaque de givre de toutes les cases de glace (givre.js, v243).
+    givre: null,
     // Le ciblage en cours : { id, nom, regle, cases }.
     ciblage: null
 };
@@ -154,6 +156,7 @@ function fenetre() {
               <div id="studio-plateau" class="studio-plateau">
                 <img id="studio-image-carte" class="studio-image-carte" alt="">
                 <canvas id="studio-canvas" class="studio-canvas"></canvas>
+                <div id="studio-givre" class="studio-givre"></div>
                 <svg id="studio-zones" class="studio-terrain-svg studio-zones" xmlns="http://www.w3.org/2000/svg"></svg>
                 <div id="studio-gravats" class="studio-gravats"></div>
                 <svg id="studio-cibles" class="studio-terrain-svg studio-cibles" xmlns="http://www.w3.org/2000/svg"></svg>
@@ -584,7 +587,32 @@ function rendreZones() {
     if (!svg) return;
     svg.innerHTML = "";
     if (!preparerSvgZones()) return;
-    studio.terrain.zones.forEach(z => { z.el = nappeSvg(z.type, z.q, z.r); svg.appendChild(z.el); });
+    const glaces = [...studio.terrain.zones.values()].filter(z => z.type === "glace");
+    const givre = glaces.length ? coucheGivre() : studio.givre;
+    studio.terrain.zones.forEach(z => { if (z.type === "glace" && givre) return; z.el = nappeSvg(z.type, z.q, z.r); svg.appendChild(z.el); });
+    if (givre) { givre.vider(0); if (glaces.length) givre.poser(glaces); }
+}
+
+// --- LE GIVRE (v243) ---
+//  Nico : « une zone de givre qui vient un peu en transparence au-dessus du
+//  terrain, une petite brume glacée soufflée par le vent ; plusieurs zones
+//  collées font comme une grosse zone ; procédural. » Toutes les cases de
+//  glace du Studio forment UNE plaque (givre.js), sous les autres nappes et
+//  les pions ; une case de feu posée dessus la fait fondre là.
+function coucheGivre() {
+    if (studio.givre) return studio.givre;
+    const conteneur = document.getElementById("studio-givre");
+    if (!conteneur || !studio.plateau || typeof window.creerCoucheGivre !== "function") return null;
+    studio.givre = window.creerCoucheGivre(conteneur, { R: rayonCase(), pixel: pixelPlateau, graine: 7 });
+    return studio.givre;
+}
+// Une case de glace qui passe (une démonstration) : sa propre petite plaque.
+function givrePassager(q, r) {
+    const conteneur = document.getElementById("studio-givre");
+    if (!conteneur || typeof window.creerCoucheGivre !== "function") return null;
+    const c = window.creerCoucheGivre(conteneur, { R: rayonCase(), pixel: pixelPlateau, graine: 7 });
+    c.poser([{ q, r }]);
+    return c.el;
 }
 
 // --- LES MURS ---
@@ -714,6 +742,10 @@ function rendreGravats() {
 
 function viderTerrain() {
     studio.terrain.zones.clear();
+    // La plaque de givre part avec le terrain (la carte peut changer de cases).
+    if (studio.givre) { studio.givre.detruire(); studio.givre = null; }
+    const givre = document.getElementById("studio-givre");
+    if (givre) givre.innerHTML = "";
     studio.terrain.murs.clear();
     studio.terrain.gravats.clear();
     const svg = document.getElementById("studio-zones");
@@ -722,6 +754,8 @@ function viderTerrain() {
     rendreMurs();
     rendreGravats();
 }
+// La plaque de givre, pour les bancs d'essai.
+window.givreStudio = () => studio.givre;
 // L'état du terrain, pour les bancs d'essai.
 window.terrainStudio = () => ({
     zones: [...studio.terrain.zones.values()].map(z => ({ type: z.type, q: z.q, r: z.r })),
@@ -784,15 +818,45 @@ function terrainDeScene() {
             if (!caseExiste(q, r)) return null;
             const svg = preparerSvgZones();
             if (!svg) return null;
-            if (!p.persistante) { const el = nappeSvg(type, q, r); el.classList.add("studio-nappe-passagere"); svg.appendChild(el); return el; }
+            if (!p.persistante) {
+                // La glace passagère : une petite plaque de givre, ôtée par l'animation.
+                const passe = type === "glace" ? givrePassager(q, r) : null;
+                if (passe) return passe;
+                const el = nappeSvg(type, q, r); el.classList.add("studio-nappe-passagere"); svg.appendChild(el); return el;
+            }
             const k = cleCase(q, r);
             const ancienne = studio.terrain.zones.get(k);
             if (ancienne && ancienne.el) ancienne.el.remove();
+            // Du feu (ou autre chose) posé sur la glace : le givre fond sur cette case.
+            if (ancienne && ancienne.type === "glace" && type !== "glace" && studio.givre) studio.givre.retirer([{ q, r }]);
             const z = { type, q, r, el: null };
             studio.terrain.zones.set(k, z);
+            const givre = type === "glace" ? coucheGivre() : null;
+            if (givre) {
+                givre.ajouter([{ q, r }], { depuis: { q, r }, duree: 700 });
+                // L'animation reçoit un repère vide (la plaque, elle, est commune).
+                z.el = document.createElementNS(NS_SVG, "g");
+                z.el.setAttribute("class", "studio-nappe studio-nappe-givre");
+                svg.appendChild(z.el);
+                return z.el;
+            }
             z.el = nappeSvg(type, q, r);
             svg.appendChild(z.el);
             return z.el;
+        },
+        // LE GIVRE (v243) : les cases gagnent la plaque de glace commune ; il
+        // rampe depuis `depuis` (une case), en `duree` ms. Rend la promesse de
+        // son arrivée.
+        givre: (liste, p = {}) => {
+            const givre = coucheGivre();
+            const ok = cases(liste);
+            if (!givre || !ok.length) return Promise.resolve(false);
+            ok.forEach(c => {
+                const k = cleCase(c.q, c.r), ancienne = studio.terrain.zones.get(k);
+                if (ancienne && ancienne.el) ancienne.el.remove();
+                studio.terrain.zones.set(k, { type: "glace", q: c.q, r: c.r, el: null });
+            });
+            return givre.ajouter(ok, { depuis: p.depuis, duree: p.duree });
         },
         // L'aperçu d'une zone visée, dessiné comme au combat (dessinerHexesZoneCiblage).
         apercuZone: (liste, estSoin) => {

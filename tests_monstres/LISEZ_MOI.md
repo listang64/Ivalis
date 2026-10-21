@@ -6459,3 +6459,53 @@ l'effroi avant la fuite, et les dix-sept gestes (sons, mots, sans reste). Il
 mord sur l'ancien code (44 échecs). Mis à jour : animations_en_jeu (la fuite
 verte de la Peur, la fuite du confus sans « ? »), studio_animation (Glacé et
 Empoisonnement sans lancer), corrections_v238 (Brûlé a désormais son geste).
+
+## v243 — Studio : la zone de glace, procédurale
+
+Nico : « Toujours dans le Studio, j'aimerais qu'on revoie l'animation des
+zones de glace. Je ne veux pas de contour, mais quelque chose de plus
+réaliste vu du dessus : une zone de givre qui vient un peu en transparence
+au-dessus du terrain existant, avec un petit effet de brume glacée soufflée
+par le vent. Si plusieurs zones sont collées, ça fait comme une grosse zone.
+Quelque chose de procédural. »
+
+- LE GIVRE (givre.js, neuf : creerCoucheGivre) : une COUCHE pour toutes les
+  cases gelées, pas une nappe par case. Le dessin part de la distance de
+  chaque point au bord de l'UNION des cases (les côtés qu'aucune case gelée
+  ne prolonge) : deux zones qui se touchent ou se recouvrent ne font qu'une
+  plaque, sans couture. Tout est du bruit (fBm, valeur hachée, déterministe)
+  calculé en coordonnées de la carte, l'emprise calée sur la grille des
+  pixels : une case garde son givre quand la plaque grandit.
+  - le sol : une pellicule blanc-bleu translucide (99 % du givre sous 75 %
+    d'opacité, en moyenne moins de 50 % — le terrain et la grille se voient
+    dessous), granuleuse, plus épaisse au cœur et par grandes plaques, plus
+    bleue là où elle s'amincit ; le bord ronge le terrain de façon
+    irrégulière (ni droit, ni hexagonal), quelques grains de givre au-delà ;
+    aucun trait, aucun liseré ;
+  - les fougères de givre : de petites tiges qui se ramifient à ±60° (la
+    glace est hexagonale), des étoiles de rosée gelée, découpées par le
+    masque de la plaque ;
+  - la brume : une tuile de bruit raccordable (calculée), deux voiles étirés
+    dans le sens du vent qui dérivent sans fin (une animation de transform,
+    sans calcul à chaque image), qui respirent, dans un masque un peu plus
+    large que la plaque ;
+  - des éclats qui scintillent, deux ou trois par case ;
+  - le givre RAMPE : depuis le cœur de la zone, un front irrégulier gagne
+    les nouvelles cases ; l'ancienne plaque reste en place devant lui.
+  Le calcul : environ 0,1 s pour 7 cases, 0,2 s pour 19 (sur la machine des
+  bancs).
+- LE STUDIO (studio_animation.js : coucheGivre, givrePassager,
+  terrain.givre ; animations_catalogue.js : zone-glace) : la zone de glace
+  se joue avec le nouveau givre, depuis le cœur des cases visées, et reste
+  sur la carte ; toute nappe de glace posée sur le terrain du Studio rejoint
+  la plaque ; du feu posé sur une case gelée la fait fondre là ; la glace
+  d'une démonstration (entrée de zone) a sa petite plaque, qui ne reste pas ;
+  « ⟲ Replacer » efface tout. Le combat garde sa nappe de glace d'avant tant
+  que Nico n'a pas validé celle-ci.
+
+corrections_v243.mjs : la plaque (une seule, sans contour, translucide, rien
+loin d'elle), le givre qui rampe, deux zones collées sans couture, la brume
+au vent et les éclats, le procédural (même dessin pour les mêmes cases, une
+autre graine change tout, une case garde son givre), le feu qui fait fondre,
+« Replacer », la glace qui passe, la nappe du combat inchangée. Il mord sur
+l'ancien code (19 échecs).

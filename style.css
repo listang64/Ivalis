@@ -5009,6 +5009,8 @@ textarea.input-texte-parchemin {
    nappes et les gravats, au-dessus pour les murs (comme au combat). */
 .studio-terrain-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .studio-zones { z-index: 3; }
+/* La plaque de givre (givre.js, v243) : sur la carte, sous les autres nappes et les pions. */
+.studio-givre { position: absolute; top: 0; left: 0; width: 0; height: 0; overflow: visible; z-index: 3; pointer-events: none; }
 .studio-gravats { position: absolute; top: 0; left: 0; width: 0; height: 0; overflow: visible; z-index: 4; pointer-events: none; }
 .studio-gravats img { position: absolute; pointer-events: none; user-select: none; }
 .studio-cibles { z-index: 5; }
