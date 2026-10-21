@@ -76,7 +76,8 @@ console.log("\n2. LE PONT : CHAQUE GESTE AU BON MOMENT, ET PAS DE MOT DIT DEUX F
   verifier("un mot ordinaire n'a pas de geste", !("reaction" in s({ type: "message", cible: "MOI", texte: "Plus d'énergie" })));
   const et = s({ type: "etats", cible: "ORC", pose: "Étourdi", liste: [{ nom: "Étourdi", duree: 1 }] });
   verifier("l'Étourdi posé : son geste (à côté de l'état)", et.geste === "etats" && et.reaction && et.reaction.sorte === "etourdi" && !et.reaction.remplace);
-  verifier("…un autre état, non", !("reaction" in s({ type: "etats", cible: "ORC", pose: "Brûlé", liste: [] })));
+  // (v242 : Brûlé, Glacé, Provocation… ont désormais le leur — corrections_v242.mjs.)
+  verifier("…un état sans geste du Studio, non", !("reaction" in s({ type: "etats", cible: "ORC", pose: "Saignement", liste: [] })));
 
   const vus = [];
   const pont = creerPont({

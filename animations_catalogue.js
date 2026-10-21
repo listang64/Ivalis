@@ -20,6 +20,8 @@
 (function () {
     if (!window.OUTILS_ANIMATION || typeof window.enregistrerAnimationsCombat !== "function") return;
     const { centre, axe, hasard, COULEURS, ROUGE, Z, BASE } = window.OUTILS_ANIMATION;
+    // Les effets d'état sur la cible (animations_combat.js, v242).
+    const { effetGlace, effetPoison, ticPoison } = window.OUTILS_ANIMATION;
     const deg = (rad) => rad * 180 / Math.PI;
 
     // --- LES TEINTES ------------------------------------------------------
@@ -1679,40 +1681,101 @@
     // =====================================================================
     //  6. ÉTATS ALTÉRÉS (pose, présence, tic de fin de manche)
     // =====================================================================
+    // CE QU'UN ÉTAT FAIT SUR SA CIBLE, sans le sort qui l'a porté (Nico, v242 :
+    // « brûlé, même principe : on garde juste l'animation sur la cible, pas le
+    // sort lancé » ; « électrifié, pareil ») — l'attaque a son geste à elle. Le
+    // Studio les montre seuls, le combat les joue après l'attaque.
+    const effetBrule = async (o, calque, el) => {
+        const b = centre(el, calque);
+        o.son("brule");
+        o.icone(calque, b, "🔥", { duree: 1300 });
+        etat(o, calque, el, "Brûlé !");
+        await Promise.all([o.eclat(el, ORANGE, 700),
+            o.gerbe(calque, b.x, b.y + b.t * 0.2, { nombre: 8, dist: b.t * 0.35, monte: b.t * 0.7, couleurs: ["#ffd25a", "#ff7a1a"], taille: 6, duree: 800, etale: 250 })]);
+    };
+    // Le tic de la brûlure : les flammes se ravivent (le chiffre est à part).
+    const ticBrule = (o, calque, el) => {
+        const b = centre(el, calque);
+        o.son("brule");
+        return Promise.all([o.gerbe(calque, b.x, b.y + b.t * 0.2, { nombre: 12, dist: b.t * 0.4, monte: b.t * 0.9, couleurs: ["#ffd25a", "#ff7a1a", "#ff4500"], taille: 8, duree: 900, etale: 300 }),
+            o.eclat(el, ORANGE, 700)]);
+    };
+    const effetElectrifie = async (o, calque, el) => {
+        const b = centre(el, calque);
+        o.son("electrique");
+        for (let k = 0; k < 5; k++) {
+            const ang = hasard(0, Math.PI * 2), r = b.t * 0.45;
+            o.eclair(calque, { x: b.x + Math.cos(ang) * r, y: b.y + Math.sin(ang) * r, t: b.t }, { x: b.x - Math.cos(ang) * r, y: b.y - Math.sin(ang) * r, t: b.t },
+                     { largeur: 0.35, duree: 320, retard: k * 140, segments: 6 });
+        }
+        etat(o, calque, el, "Électrifié !");
+        o.attendre(450).then(() => o.texte(calque, el, "-35 initiative", COULEURS.attention));
+        o.attendre(900).then(() => o.texte(calque, el, "+20 % dégâts magiques", COULEURS.attention));
+        await o.teinter(el, [{ filter: "none" }, { filter: ELEC, offset: 0.1 }, { filter: "none", offset: 0.2 }, { filter: ELEC, offset: 0.35 },
+                             { filter: "none", offset: 0.5 }, { filter: ELEC, offset: 0.65 }, { filter: "none" }], { duration: 1200 });
+    };
+    // LES ÉTATS QUI DURENT, et ce qui les montre (le Studio et le combat).
+    const presenceEtourdi = (o, calque, el) => {
+        const a = centre(el, calque);
+        o.son("etourdi");
+        o.texte(calque, el, "Étourdi : 20 % d'échec", COULEURS.etat);
+        return Promise.all([o.etoiles(calque, a, { duree: 2200, tours: 600 }),
+            o.bouger(el, [{ transform: "rotate(0deg)" }, { transform: "rotate(-5deg)" }, { transform: "rotate(5deg)" }, { transform: "rotate(0deg)" }], { duration: 1100, iterations: 2 })]);
+    };
+    const presenceConfusion = (o, calque, el) => {
+        const a = centre(el, calque);
+        o.son("confusion");
+        etat(o, calque, el, "Confusion");
+        return Promise.all([o.etoiles(calque, a, { signe: "?", couleur: "#d6a8ff", duree: 2000, tours: 700 }),
+            o.teinter(el, [{ filter: "none" }, { filter: "hue-rotate(90deg) saturate(1.3)" }, { filter: "hue-rotate(-60deg)" }, { filter: "none" }], { duration: 1900 })]);
+    };
+    // La Peur qui reste : une aura sombre frémit, il tremble (plus de smiley —
+    // Nico, v242 : « peur présence, vire le smiley »).
+    const presencePeur = (o, calque, el, p = {}) => {
+        const a = centre(el, calque);
+        return Promise.all([o.aura(calque, a, { couleur: "#3a2050", fond: "radial-gradient(circle, rgba(40,10,60,0) 50%, rgba(40,10,60,0.5) 80%)", pulsations: p.pulsations || 3, duree: p.duree || 1800 }),
+            o.secouer(el, 3, (p.duree || 1800) - 100)]);
+    };
+    // Le sceau de l'étalement pulse et lâche sa part.
+    const pulsationEtalement = async (o, calque, el) => {
+        const b = centre(el, calque);
+        const s = sceau(o, calque, b, "#c83a6a", { duree: 1600 });
+        await o.attendre(600);
+        o.son("marque");
+        o.son("coup-sourd", 120);
+        o.teinter(s, [{ filter: "brightness(1)" }, { filter: "brightness(2.2)" }, { filter: "brightness(1)" }], { duration: 500 });
+        await Promise.all([o.eclat(el, ROUGE, 500), o.onde(calque, b, { couleur: "#e04070", taille: 1, duree: 600, echelle: 1.5 })]);
+        await o.attendre(300);
+        await o.effacer(s);
+    };
+    // Le contour bleuté du Repli, pour un tour (plus de flèche-émoticône —
+    // Nico, v242 : « repli, vire l'émoticône »).
+    const contourRepli = (o, calque, el) => {
+        const a = centre(el, calque);
+        o.son("repli");
+        o.texte(calque, el, "Repli (1 tour)", COULEURS.neutre);
+        return Promise.all([o.aura(calque, a, { couleur: "#8ac8ff", taille: 1.15, pulsations: 3, duree: 1800, trait: "dashed" }),
+            o.eclat(el, "drop-shadow(0 0 8px #8ac8ff)", 1700)]);
+    };
     ajouter(6, null, [
         {
             id: "brule", nom: "Brûlé", sens: "vers l'ennemi",
-            description: "Des braises pleuvent sur l'ennemi, qui rougeoie ; puis, en fin de manche, les flammes se ravivent et le brûlent.",
+            description: "L'ennemi, touché, prend feu : il rougeoie, quelques flammèches montent de lui ; puis, en fin de manche, les flammes se ravivent et le brûlent.",
             async jouer(sc, o) {
-                const { b } = lieux(sc);
-                o.son("brule");
-                await rassembler(o, sc.calque, b, { couleur: "#ff7a1a", n: 9, taille: 0.1, duree: 450, rayon: 1.2 });
-                o.icone(sc.calque, b, "🔥", { duree: 1300 });
-                etat(o, sc.calque, sc.cible, "Brûlé !");
-                await o.eclat(sc.cible, ORANGE, 600);
+                // Plus de braises qui convergent sur lui (le sort lancé) : l'état
+                // sur la cible seule (Nico, v242).
+                await effetBrule(o, sc.calque, sc.cible);
                 await o.attendre(300);
-                o.son("brule");
                 o.jauge(sc.calque, sc.cible, 40, 36, 40, "-4", COULEURS.degats, COULEURS.degats);
-                await Promise.all([o.gerbe(sc.calque, b.x, b.y + b.t * 0.2, { nombre: 12, dist: b.t * 0.4, monte: b.t * 0.9, couleurs: ["#ffd25a", "#ff7a1a", "#ff4500"], taille: 8, duree: 900, etale: 300 }),
-                    o.eclat(sc.cible, ORANGE, 700)]);
+                await ticBrule(o, sc.calque, sc.cible);
             }
         },
         {
             id: "electrifie", nom: "Électrifié", sens: "vers l'ennemi",
             description: "De petits arcs électriques courent sur l'ennemi qui clignote ; il perd de l'initiative et craint davantage la magie.",
             async jouer(sc, o) {
-                const { b } = lieux(sc);
-                o.son("electrique");
-                for (let k = 0; k < 5; k++) {
-                    const ang = hasard(0, Math.PI * 2), r = b.t * 0.45;
-                    o.eclair(sc.calque, { x: b.x + Math.cos(ang) * r, y: b.y + Math.sin(ang) * r, t: b.t }, { x: b.x - Math.cos(ang) * r, y: b.y - Math.sin(ang) * r, t: b.t },
-                             { largeur: 0.35, duree: 320, retard: k * 140, segments: 6 });
-                }
-                etat(o, sc.calque, sc.cible, "Électrifié !");
-                o.attendre(450).then(() => o.texte(sc.calque, sc.cible, "-35 initiative", COULEURS.attention));
-                o.attendre(900).then(() => o.texte(sc.calque, sc.cible, "+20 % dégâts magiques", COULEURS.attention));
-                await o.teinter(sc.cible, [{ filter: "none" }, { filter: ELEC, offset: 0.1 }, { filter: "none", offset: 0.2 }, { filter: ELEC, offset: 0.35 },
-                                           { filter: "none", offset: 0.5 }, { filter: ELEC, offset: 0.65 }, { filter: "none" }], { duration: 1200 });
+                // L'état sur la cible seule, sans le sort qui l'a porté (v242).
+                await effetElectrifie(o, sc.calque, sc.cible);
                 await o.attendre(400);
             }
         },
@@ -1756,11 +1819,7 @@
             id: "etourdi-presence", nom: "Étourdi — présence", sens: "sur soi",
             description: "Tant qu'il est étourdi, des étoiles tournent lentement autour du héros, qui oscille : une chance sur cinq de rater sa technique.",
             async jouer(sc, o) {
-                const { a } = lieux(sc);
-                o.son("etourdi");
-                o.texte(sc.calque, sc.lanceur, "Étourdi : 20 % d'échec", COULEURS.etat);
-                await Promise.all([o.etoiles(sc.calque, a, { duree: 2200, tours: 600 }),
-                    o.bouger(sc.lanceur, [{ transform: "rotate(0deg)" }, { transform: "rotate(-5deg)" }, { transform: "rotate(5deg)" }, { transform: "rotate(0deg)" }], { duration: 1100, iterations: 2 })]);
+                await presenceEtourdi(o, sc.calque, sc.lanceur);
             }
         },
         {
@@ -1785,23 +1844,16 @@
             id: "confusion-presence", nom: "Confusion — présence", sens: "sur soi",
             description: "Des points d'interrogation tournent autour du héros, dont la teinte vire et revient, comme un vertige.",
             async jouer(sc, o) {
-                const { a } = lieux(sc);
-                o.son("confusion");
-                etat(o, sc.calque, sc.lanceur, "Confusion");
-                await Promise.all([o.etoiles(sc.calque, a, { signe: "?", couleur: "#d6a8ff", duree: 2000, tours: 700 }),
-                    o.teinter(sc.lanceur, [{ filter: "none" }, { filter: "hue-rotate(90deg) saturate(1.3)" }, { filter: "hue-rotate(-60deg)" }, { filter: "none" }], { duration: 1900 })]);
+                await presenceConfusion(o, sc.calque, sc.lanceur);
             }
         },
         {
             id: "peur-presence", nom: "Peur — présence", sens: "sur soi",
             description: "Une aura sombre frémit autour du héros, qui tremble sans cesse.",
             async jouer(sc, o) {
-                const { a } = lieux(sc);
                 o.son("peur");
-                o.icone(sc.calque, a, "😨", { duree: 1700 });
                 etat(o, sc.calque, sc.lanceur, "Peur");
-                await Promise.all([o.aura(sc.calque, a, { couleur: "#3a2050", fond: "radial-gradient(circle, rgba(40,10,60,0) 50%, rgba(40,10,60,0.5) 80%)", pulsations: 3, duree: 1800 }),
-                    o.secouer(sc.lanceur, 3, 1700)]);
+                await presencePeur(o, sc.calque, sc.lanceur);
             }
         },
         {
@@ -1821,16 +1873,8 @@
             id: "etalement-tic", nom: "Étalement — tic des dégâts différés", sens: "vers l'ennemi",
             description: "Le sceau grave sous l'ennemi pulse en fin de manche et lâche une part des dégâts différés.",
             async jouer(sc, o) {
-                const { b } = lieux(sc);
-                const s = sceau(o, sc.calque, b, "#c83a6a", { duree: 1600 });
-                await o.attendre(600);
-                o.son("marque");
-                o.son("coup-sourd", 120);
-                o.teinter(s, [{ filter: "brightness(1)" }, { filter: "brightness(2.2)" }, { filter: "brightness(1)" }], { duration: 500 });
-                o.jauge(sc.calque, sc.cible, 40, 36, 40, "-4", COULEURS.degats, COULEURS.degats);
-                await Promise.all([o.eclat(sc.cible, ROUGE, 500), o.onde(sc.calque, b, { couleur: "#e04070", taille: 1, duree: 600, echelle: 1.5 })]);
-                await o.attendre(400);
-                await o.effacer(s);
+                o.attendre(600).then(() => o.jauge(sc.calque, sc.cible, 40, 36, 40, "-4", COULEURS.degats, COULEURS.degats));
+                await pulsationEtalement(o, sc.calque, sc.cible);
             }
         },
         {
@@ -1847,14 +1891,9 @@
         },
         {
             id: "repli-etat", nom: "Repli (état d'un tour)", sens: "sur soi",
-            description: "Après sa frappe, le héros garde un contour bleuté et une flèche de retour : ce tour-ci, il peut se replier sans être frappé.",
+            description: "Après sa frappe, le héros garde un contour bleuté : ce tour-ci, il peut se replier sans être frappé.",
             async jouer(sc, o) {
-                const { a } = lieux(sc);
-                o.son("repli");
-                o.icone(sc.calque, a, "↩️", { duree: 1700 });
-                o.texte(sc.calque, sc.lanceur, "Repli (1 tour)", COULEURS.neutre);
-                await Promise.all([o.aura(sc.calque, a, { couleur: "#8ac8ff", taille: 1.15, pulsations: 3, duree: 1800, trait: "dashed" }),
-                    o.eclat(sc.lanceur, "drop-shadow(0 0 8px #8ac8ff)", 1700)]);
+                await contourRepli(o, sc.calque, sc.lanceur);
             }
         }
     ]);
@@ -3227,6 +3266,27 @@
         if (sc.max === undefined) return;
         o.energie(sc.calque, sc.lanceur, sc.de, sc.vers, sc.max, sc.texte || "");
     };
+    // LES CASES D'UN DÉPLACEMENT IMPOSÉ, de `de` (exclue) à `vers` (incluse) :
+    // la ligne droite de la grille (coordonnées axiales, arrondi cubique) — le
+    // cerveau a tranché l'arrivée, l'écran la rejoint case après case.
+    const casesEntre = (de, vers) => {
+        if (!de || !vers) return [];
+        const q0 = Number(de.q), r0 = Number(de.r), q1 = Number(vers.q), r1 = Number(vers.r);
+        const n = Math.max(Math.abs(q1 - q0), Math.abs(r1 - r0), Math.abs(q1 + r1 - q0 - r0));
+        const cases = [];
+        for (let i = 1; i <= n; i++) {
+            const k = i / n, x = q0 + (q1 - q0) * k + 1e-6, z = r0 + (r1 - r0) * k + 1e-6, y = -x - z;
+            let rx = Math.round(x), ry = Math.round(y), rz = Math.round(z);
+            const dx = Math.abs(rx - x), dy = Math.abs(ry - y), dz = Math.abs(rz - z);
+            if (dx > dy && dx > dz) rx = -ry - rz;
+            else if (dz > dy) rz = -rx - ry;
+            cases.push({ q: rx, r: rz });
+        }
+        return cases;
+    };
+    // La source d'un geste (qui pousse, tire, effraie, provoque) : le pion de
+    // la scène qui n'est pas celui qui subit.
+    const sourceDe = (sc) => (sc.cible && sc.cible !== sc.lanceur ? sc.cible : null);
 
     window.enregistrerAnimationsJeu([
         // LES ATTAQUES (Nico : « coup d'épée au corps à corps, attaque légère,
@@ -3587,11 +3647,13 @@
             await o.attendre(250);
             if (empreinte) o.effacer(empreinte, { duree: 500 });
         } },
-        // LA FUITE SOUS LA PEUR : au premier pas il tremble et s'assombrit
-        // (plus de smiley), puis détale en titubant, des gouttes de sueur.
+        // LA FUITE SOUS LA PEUR : au premier pas il tremble (plus de smiley),
+        // puis détale en titubant, des gouttes de sueur ; il garde le vert de
+        // la Peur. L'effroi joué juste avant (jeu-peur, `sc.effraye`) a déjà
+        // tout dit : il détale aussitôt.
         { id: "jeu-pas-peur", async jouer(sc, o) {
-            teinteTenue(sc.lanceur, SOMBRE, 2000);
-            if (sc.premier) {
+            teinteTenue(sc.lanceur, VERT_PEUR, 2000);
+            if (sc.premier && !sc.effraye) {
                 o.son("peur");
                 etat(o, sc.calque, sc.lanceur, "Peur : il s'enfuit !");
                 await o.secouer(sc.lanceur, 4, 500);
@@ -3600,16 +3662,11 @@
             await unPas(sc, o, { duree: 230, tangue: 12, hauteur: 1.06,
                 pas: (pt) => o.gerbe(sc.calque, pt.x, pt.y, { nombre: 3, dist: pt.t * 0.4, couleurs: ["#bfe6ff", "#8ac8ff"], taille: 4, duree: 400 }) });
         } },
-        // LA FUITE SOUS LA CONFUSION : des « ? » qui tournent, une teinte
-        // violette, puis une course folle qui tangue (le combat a déjà dit
-        // « Confus : s'enfuit ! »).
+        // LA FUITE SOUS LA CONFUSION : une teinte violette, puis une course
+        // folle qui tangue. Le « ❗ » et « Confus : s'enfuit ! » ont été dits
+        // juste avant (jeu-confusion-fuite) : plus de « ? » au premier pas.
         { id: "jeu-pas-confusion", async jouer(sc, o) {
             teinteTenue(sc.lanceur, VIOLET, 2000);
-            if (sc.premier) {
-                o.son("confusion");
-                o.etoiles(sc.calque, centre(sc.lanceur, sc.calque), { signe: "?", couleur: "#d6a8ff", duree: 1900 });
-                await o.attendre(300);
-            }
             o.son("course");
             await unPas(sc, o, { duree: 280, tangue: 35 });
         } },
@@ -4158,6 +4215,225 @@
             energieEnJeu(o, sc);
             await Promise.all([o.gerbe(sc.calque, a.x, a.y, { nombre: 12, dist: a.t * 0.9, couleurs: ["#fbf5bd", "#e2c46a", "#c2a878"], taille: 5, duree: 700 }),
                 o.eclat(sc.lanceur, "brightness(0.8) saturate(0.7)", 600)]);
+        } },
+
+        // =================================================================
+        //  LA LISTE DE LA v242 (Nico : « poussée, traction magique, peur,
+        //  provocation, confus s'enfuit, immobilisation, empoisonnement,
+        //  brûlé, glacé, électrifié, aveuglé, étourdi / immobilisation /
+        //  confusion / peur présence, étalement, plaie rouverte, repli : tu
+        //  peux implanter c'est bon »). Ici `sc.lanceur` est le pion qui SUBIT
+        //  (poussé, effrayé, provoqué, empoisonné…) et `sc.cible` qui en est la
+        //  source (qui pousse, effraie, provoque) quand elle est connue. Un état
+        //  posé par une attaque : sur la cible seule — l'attaque a eu son geste
+        //  et ses dégâts. Un tic : son geste, le chiffre reste à l'étape.
+        // =================================================================
+        // LA POUSSÉE : l'élan d'épaule de qui pousse, l'onde sur le poussé, qui
+        // file d'un trait le long de ses cases dans un nuage de poussière.
+        // Rien ne bouge (un obstacle) : le choc seul.
+        { id: "jeu-poussee", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque), pousseur = sourceDe(sc);
+            const pts = casesEntre(sc.de, sc.vers).map(c => pointDe(o, sc, c));
+            let elan = null;
+            if (pousseur) {
+                elan = o.elan(pousseur, centre(pousseur, sc.calque), a, { portee: 0.45, duree: 460 });
+                await o.attendre(250);
+            }
+            o.son("poussee");
+            o.onde(sc.calque, a, { couleur: "rgba(236,226,200,0.9)", taille: 0.9, echelle: 1.9, bord: 3, duree: 520 });
+            o.texte(sc.calque, sc.lanceur, "Poussé !", COULEURS.etat);
+            if (!pts.length) {
+                await Promise.all([elan, o.secouer(sc.lanceur, a.t * 0.06, 300, pousseur ? axe(centre(pousseur, sc.calque), a) : undefined)]);
+                return;
+            }
+            await glisser(o, sc.lanceur, a, pts, { duree: 320 + 160 * pts.length, courbe: ralentir, trainee: (pt) => traineePoussiere(o, sc.calque, pt) });
+            if (elan) await elan;
+            await o.arriver(sc.lanceur, pts[pts.length - 1], { sinonRentrer: false });
+        } },
+        // LA TRACTION MAGIQUE : des filets d'air naissent derrière le tiré et
+        // filent vers qui tire, qui les avale ; le tiré est aspiré d'un trait,
+        // en accélérant, jusqu'à sa case.
+        { id: "jeu-traction", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque), tireur = sourceDe(sc);
+            const pts = casesEntre(sc.de, sc.vers).map(c => pointDe(o, sc, c));
+            if (!tireur && !pts.length) return;
+            const T = tireur ? centre(tireur, sc.calque) : pts[pts.length - 1];
+            o.son("traction");
+            if (tireur) {
+                o.texte(sc.calque, tireur, "Traction !", COULEURS.etat);
+                o.bouger(tireur, [{ transform: "scale(1)" }, { transform: "scale(1.06)", offset: 0.4 }, { transform: "scale(1)" }], { duration: 700 });
+            }
+            const air = Promise.all([tireur ? aspiration(o, sc.calque, T, { duree: 600 }) : null,
+                                     filetsDAir(o, sc.calque, a, T, { n: 10, duree: 640, etale: 520 })]);
+            await o.attendre(260);
+            if (!pts.length) { await Promise.all([air, o.secouer(sc.lanceur, 3, 220, axe(a, T))]); return; }
+            const arrivee = pts[pts.length - 1];
+            await glisser(o, sc.lanceur, a, pts, { duree: 260 + 170 * pts.length, courbe: accelerer,
+                                                   trainee: (pt) => traineePoussiere(o, sc.calque, pt) });
+            await o.arriver(sc.lanceur, arrivee, { sinonRentrer: false });
+            await Promise.all([air, o.secouer(sc.lanceur, 3, 220, axe(arrivee, T))]);
+        } },
+        // L'EFFROI (juste avant la fuite) : qui effraie grandit et se teinte de
+        // mauve foncé ; l'effrayé rapetisse en tremblant, verdit, trois traits
+        // rouges de frayeur lui sautent au coin de la tête, une aura sombre
+        // frémit autour de lui (la présence de la Peur, sans smiley). La
+        // fuite, case par case, suit (jeu-pas-peur).
+        { id: "jeu-peur", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque), source = sourceDe(sc);
+            o.son("peur");
+            if (source) {
+                const s = centre(source, sc.calque);
+                o.bouger(source, [{ transform: "scale(1)" }, { transform: "scale(1.22)", offset: 0.3 }, { transform: "scale(1.22)", offset: 0.7 }, { transform: "scale(1)" }],
+                         { duration: 1800, easing: "ease-in-out" });
+                o.teinter(source, [{ filter: "none" }, { filter: MAUVE_SOMBRE, offset: 0.3 }, { filter: MAUVE_SOMBRE, offset: 0.7 }, { filter: "none" }], { duration: 1900 });
+                o.gerbe(sc.calque, s.x, s.y, { nombre: 10, dist: s.t * 0.75, couleurs: ["#3a1850", "#6a3a8a"], taille: 10, tailleMin: 5, duree: 900, etale: 250 });
+                await o.attendre(380);
+            }
+            etat(o, sc.calque, sc.lanceur, "Peur !");
+            teinteTenue(sc.lanceur, VERT_PEUR, 3000);
+            const frayeur = traitsDeFrayeur(o, sc.calque, a, { duree: 1050 });
+            const aura = o.aura(sc.calque, a, { couleur: "#3a2050", fond: "radial-gradient(circle, rgba(40,10,60,0) 50%, rgba(40,10,60,0.5) 80%)", pulsations: 2, duree: 1200 });
+            await o.bouger(sc.lanceur, [{ transform: "scale(1) translate(0,0)" }, { transform: "scale(0.82) translate(0,0)", offset: 0.22 },
+                                        { transform: "scale(0.82) translate(2px,-1px)", offset: 0.4 }, { transform: "scale(0.82) translate(-2px,1px)", offset: 0.55 },
+                                        { transform: "scale(0.82) translate(1px,0)", offset: 0.7 }, { transform: "scale(0.84) translate(0,0)", offset: 0.85 },
+                                        { transform: "scale(1) translate(0,0)" }], { duration: 950, easing: "ease-out" });
+            await Promise.all([frayeur, aura]);
+        } },
+        // LA PROVOCATION : un anneau rouge part de qui provoque, un « ❗ »
+        // éclate sur le provoqué, qui vacille.
+        { id: "jeu-provocation", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque), source = sourceDe(sc);
+            o.son("provocation");
+            if (source) {
+                o.onde(sc.calque, centre(source, sc.calque), { couleur: "#ff4040", taille: 1, duree: 700, echelle: 2.6, bord: 4 });
+                await o.attendre(300);
+            }
+            o.icone(sc.calque, a, "❗", { duree: 1400, lueur: "#ff4040" });
+            etat(o, sc.calque, sc.lanceur, "Provoqué !");
+            await o.bouger(sc.lanceur, [{ transform: "rotate(0deg)" }, { transform: "rotate(-14deg)" }, { transform: "rotate(10deg)" }, { transform: "rotate(0deg)" }], { duration: 600 });
+            await o.attendre(300);
+        } },
+        // LE CONFUS S'ENFUIT : un « ❗ » violet éclate au-dessus de lui, le mot,
+        // sa teinte violette — puis sa course folle (jeu-pas-confusion).
+        { id: "jeu-confusion-fuite", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            o.son("confusion");
+            o.icone(sc.calque, a, "❗", { duree: 1200, lueur: "#c9a8ff" });
+            await o.attendre(450);
+            o.texte(sc.calque, sc.lanceur, sc.texte || "Confus : s'enfuit !", sc.couleur || "#cc66ff");
+            teinteTenue(sc.lanceur, VIOLET, 2500);
+            await o.attendre(350);
+        } },
+        // L'IMMOBILISATION : des chaînes jaillissent du sol de tous côtés et se
+        // referment sur lui ; il tire dessus (vers qui l'a enchaîné), en vain.
+        { id: "jeu-immobilisation", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque), source = sourceDe(sc);
+            const v = source ? axe(a, centre(source, sc.calque)) : o.tourner({ ux: 1, uy: 0, d: 1, angle: 0 }, hasard(0, Math.PI * 2));
+            o.son("chaines");
+            const anneau = o.poser(sc.calque, a.x, a.y, `width:${a.t * 1.2}px; height:${a.t * 1.2}px; border-radius:50%; z-index:${Z.sol};
+                border:5px dotted #8a8a8a; box-shadow:0 0 8px #444;`);
+            o.surgir(anneau);
+            await rassembler(o, sc.calque, a, { contenu: "⛓️", n: 6, taille: 0.3, duree: 450, rayon: 1.2 });
+            etat(o, sc.calque, sc.lanceur, "Immobilisé !");
+            for (let k = 0; k < 2; k++) {
+                await o.bouger(sc.lanceur, [{ transform: "translate(0,0)" }, { transform: `translate(${v.ux * 6}px, ${v.uy * 6}px)`, offset: 0.4 }, { transform: "translate(0,0)" }],
+                               { duration: 300, easing: "ease-out" });
+                o.son("chaines");
+                await o.attendre(150);
+            }
+            await o.effacer(anneau);
+        } },
+        // L'EMPOISONNEMENT POSÉ (après le geste de l'attaque) : le venin prend
+        // sur lui, il verdit par vagues sous des bulles toxiques.
+        { id: "jeu-empoisonnement", async jouer(sc, o) {
+            if (effetPoison) await effetPoison(o, sc.calque, sc.lanceur);
+        } },
+        // LE TIC DU POISON : sur l'énergie (la jauge baisse sous une vague
+        // verte), puis sur les PV (des bulles ; le chiffre est à l'étape).
+        { id: "jeu-poison-energie", async jouer(sc, o) {
+            o.son("poison-bulles");
+            energieEnJeu(o, sc);
+            await o.teinter(sc.lanceur, [{ filter: "none" }, { filter: VERT, offset: 0.4 }, { filter: "none" }], { duration: 800 });
+        } },
+        { id: "jeu-poison-tic", async jouer(sc, o) {
+            etat(o, sc.calque, sc.lanceur, "Poison");
+            if (ticPoison) await ticPoison(o, sc.calque, sc.lanceur);
+        } },
+        // BRÛLÉ (sur la cible seule) : il prend feu et rougeoie ; en fin de
+        // manche, les flammes se ravivent.
+        { id: "jeu-brule", async jouer(sc, o) {
+            await effetBrule(o, sc.calque, sc.lanceur);
+        } },
+        { id: "jeu-brule-tic", async jouer(sc, o) {
+            etat(o, sc.calque, sc.lanceur, "Brûlure");
+            await ticBrule(o, sc.calque, sc.lanceur);
+        } },
+        // GLACÉ (sur la cible seule) : il se fige dans les cristaux et bleuit ;
+        // le sol gèle sous lui un instant.
+        { id: "jeu-glace-pose", async jouer(sc, o) {
+            if (effetGlace) await effetGlace(o, sc.calque, sc.lanceur);
+        } },
+        // ÉLECTRIFIÉ (sur la cible seule) : de petits arcs courent sur lui, il clignote.
+        { id: "jeu-electrifie", async jouer(sc, o) {
+            await effetElectrifie(o, sc.calque, sc.lanceur);
+        } },
+        // AVEUGLÉ : l'obscurité se referme depuis les bords et s'arrête à quatre
+        // cases de lui ; ses yeux se voilent. (Le noir qui reste, lui, n'est vu
+        // que par l'aveuglé.)
+        { id: "jeu-aveugle", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            o.son("aveugle");
+            o.icone(sc.calque, a, "🌑", { duree: 1600 });
+            etat(o, sc.calque, sc.lanceur, sc.texte || "Aveuglé : 4 cases");
+            const vision = o.pasHex(a) * 4.3;
+            const limite = o.poser(sc.calque, a.x, a.y, `width:${vision * 2}px; height:${vision * 2}px; border-radius:50%; z-index:${Z.haut};
+                border:2px dashed rgba(255,255,255,0.55);`);
+            o.jouerPuisRetirer(limite, [{ opacity: 0 }, { opacity: 1, offset: 0.35 }, { opacity: 1, offset: 0.8 }, { opacity: 0 }], { duration: 2400 });
+            await Promise.all([o.brouillard(sc.calque, a, vision, { duree: 2400, noir: 0.88 }),
+                o.teinter(sc.lanceur, [{ filter: "none" }, { filter: "brightness(0.6) blur(1px)", offset: 0.2 }, { filter: "brightness(0.6) blur(1px)", offset: 0.8 }, { filter: "none" }], { duration: 2000 })]);
+        } },
+        // LES ÉTATS QUI DURENT, au début de son tour : les étoiles de l'Étourdi,
+        // les « ? » de la Confusion.
+        { id: "jeu-etourdi-presence", async jouer(sc, o) {
+            await presenceEtourdi(o, sc.calque, sc.lanceur);
+        } },
+        { id: "jeu-confusion-presence", async jouer(sc, o) {
+            await presenceConfusion(o, sc.calque, sc.lanceur);
+        } },
+        // L'IMMOBILISATION, à chaque fin de manche : l'anneau de chaînes reste
+        // au sol, il pulse, et l'énergie bouge (la vraie : sa barre, son chiffre).
+        { id: "jeu-immobilisation-presence", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            const anneau = o.poser(sc.calque, a.x, a.y, `width:${a.t * 1.2}px; height:${a.t * 1.2}px; border-radius:50%; z-index:${Z.sol};
+                border:5px dotted #8a8a8a; box-shadow:0 0 8px #444;`);
+            o.surgir(anneau);
+            o.icone(sc.calque, a, "⛓️", { duree: 1600 });
+            etat(o, sc.calque, sc.lanceur, "Immobilisé");
+            await o.attendre(600);
+            o.son("chaines");
+            o.teinter(anneau, [{ filter: "brightness(1)" }, { filter: "brightness(2)" }, { filter: "brightness(1)" }], { duration: 500 });
+            energieEnJeu(o, sc);
+            await o.attendre(1000);
+            await o.effacer(anneau);
+        } },
+        // LE TIC DE L'ÉTALEMENT : le sceau sous lui pulse et lâche sa part.
+        { id: "jeu-etalement-tic", async jouer(sc, o) {
+            await pulsationEtalement(o, sc.calque, sc.lanceur);
+        } },
+        // LA PLAIE ROUVERTE (une blessure) : un trait rouge, des gouttes, il
+        // accuse le coup.
+        { id: "jeu-plaie-rouverte", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            o.son("saignement");
+            etat(o, sc.calque, sc.lanceur, "Plaie rouverte");
+            await Promise.all([entaille(o, sc.calque, a, hasard(0, Math.PI), { couleur: "#e02030", lueur: "#ff4050", lueur2: "#a00010", taille: 1.2, duree: 600 }),
+                o.secouer(sc.lanceur, a.t * 0.05, 360),
+                o.eclat(sc.lanceur, ROUGE, 460),
+                o.gerbe(sc.calque, a.x, a.y + a.t * 0.1, { nombre: 7, dist: a.t * 0.35, couleurs: ["#b0101c", "#e03040"], taille: 5, duree: 700 })]);
+        } },
+        // LE REPLI (état d'un tour) : son contour bleuté, sans émoticône.
+        { id: "jeu-repli-etat", async jouer(sc, o) {
+            await contourRepli(o, sc.calque, sc.lanceur);
         } }
     ]);
 })();

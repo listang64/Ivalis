@@ -778,6 +778,67 @@
     }
 
     // =====================================================================
+    //  LES EFFETS D'ÉTAT SUR LA CIBLE (v242)
+    // =====================================================================
+    //  Ce qu'un état fait sur la cible, sans le sort qui l'a porté (l'attaque
+    //  a son geste à elle) : le Studio les montre seuls, le combat les joue
+    //  après l'attaque (animations_catalogue.js, la section « En jeu »).
+    const VERT_POISON = "sepia(1) saturate(5) hue-rotate(55deg) brightness(0.95)";
+    // GLACÉ : des cristaux jaillissent autour d'elle, elle bleuit, le sol gèle
+    // sous elle ; ce que l'état change, en petit.
+    async function effetGlace(o, calque, cible, p = {}) {
+        const b = centre(cible, calque);
+        o.son("glace-impact");
+        o.texte(calque, cible, p.texte || "Glacé !", COULEURS.etat);
+        const eclats = [];
+        for (let i = 0; i < 7; i++) {
+            const ang = (i / 7) * Math.PI * 2, r = b.t * 0.55;
+            const c = o.poser(calque, b.x + Math.cos(ang) * r, b.y + Math.sin(ang) * r, `width:${b.t * 0.16}px; height:${b.t * 0.42}px; z-index:4;
+                background:linear-gradient(180deg, #ffffff, #9fe6ff 50%, #3aa8e8); clip-path:polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+                filter:drop-shadow(0 0 4px #bdf3ff);`);
+            const rot = (ang * 180 / Math.PI) + 90;
+            eclats.push(o.jouerPuisRetirer(c, [
+                { transform: `translate(-50%,-50%) rotate(${rot}deg) scale(0)`, opacity: 0 },
+                { transform: `translate(-50%,-50%) rotate(${rot}deg) scale(1)`, opacity: 1, offset: 0.3 },
+                { transform: `translate(-50%,-50%) rotate(${rot}deg) scale(1)`, opacity: 1, offset: 0.75 },
+                { transform: `translate(-50%,-50%) rotate(${rot}deg) scale(1.4)`, opacity: 0 }
+            ], { duration: 1400, delay: i * 40, easing: "ease-out" }));
+        }
+        // LA PRÉSENCE (Nico : « pose, présence ») : le sol reste gelé sous lui.
+        const sol = o.hexagone(calque, b, { fond: "radial-gradient(circle, rgba(255,255,255,0.75), rgba(170,230,255,0.45) 60%, rgba(60,150,220,0.2) 90%)", opacite: 0.85 });
+        await Promise.all([...eclats,
+            o.teinter(cible, [{ filter: "none" }, { filter: "saturate(0.4) hue-rotate(170deg) brightness(1.25)", offset: 0.3 },
+                              { filter: "saturate(0.4) hue-rotate(170deg) brightness(1.25)", offset: 0.75 }, { filter: "none" }], { duration: 1500 }),
+            o.onde(calque, b, { couleur: "#bdf3ff", taille: 1.1, duree: 900, echelle: 1.7 })]);
+        o.texte(calque, cible, "Marche ×2 · +20 % dégâts phys.", COULEURS.attention);
+        await o.attendre(450);
+        await o.effacer(sol, { duree: 300 });
+    }
+    // EMPOISONNEMENT : une bouffée verte éclate sur elle, elle verdit par
+    // vagues sous des bulles toxiques et frissonne.
+    async function effetPoison(o, calque, cible, p = {}) {
+        const b = centre(cible, calque);
+        o.son("poison-bulles");
+        o.attendre(250).then(() => o.texte(calque, cible, p.texte || "Empoisonnement !", COULEURS.etat));
+        await Promise.all([
+            o.onde(calque, b, { couleur: "#7dd321", taille: 0.9, fond: "radial-gradient(circle, rgba(125,211,33,0.5), transparent 70%)", duree: 600, echelle: 1.6 }),
+            o.teinter(cible, [{ filter: "none" }, { filter: VERT_POISON, offset: 0.25 }, { filter: "none", offset: 0.5 }, { filter: VERT_POISON, offset: 0.75 }, { filter: "none" }], { duration: 1500 }),
+            o.gerbe(calque, b.x, b.y + b.t * 0.1, { nombre: 12, dist: b.t * 0.4, monte: b.t * 0.8, couleurs: ["#7dd321", "#b5ff4c", "#4e8a12"],
+                                                   taille: 9, tailleMin: 4, duree: 1300, etale: 700 }),
+            o.secouer(cible, b.t * 0.05, 500)
+        ]);
+    }
+    // LE TIC DU POISON : une vague verte, des bulles. `valeur` : le chiffre
+    // (le Studio le dit ; en jeu, c'est l'étape des dégâts).
+    async function ticPoison(o, calque, cible, p = {}) {
+        const b = centre(cible, calque);
+        o.son("poison-bulles");
+        if (p.valeur) o.attendre(450).then(() => o.texte(calque, cible, p.valeur, COULEURS.degats));
+        await Promise.all([o.teinter(cible, [{ filter: "none" }, { filter: VERT_POISON, offset: 0.4 }, { filter: "none" }], { duration: 800 }),
+            o.gerbe(calque, b.x, b.y, { nombre: 7, dist: b.t * 0.35, monte: b.t * 0.6, couleurs: ["#7dd321", "#b5ff4c"], taille: 7, duree: 900 })]);
+    }
+
+    // =====================================================================
     //  LE CATALOGUE
     // =====================================================================
     //  `sens` dit ce que fait le pion du joueur : « vers l'ennemi » (il agit
@@ -919,70 +980,29 @@
             }
         },
         {
-            id: "gel", nom: "Glacé", categorie: "Sort", sens: "vers l'ennemi",
-            description: "Le héros se couvre de givre, lance un trait de glace : l'ennemi se fige dans les cristaux et bleuit ; le sol reste gelé sous lui (marche ×2, +20 % de dégâts physiques).",
-            async jouer({ lanceur, cible, calque }, o) {
-                const a = centre(lanceur, calque), b = centre(cible, calque);
-                o.son("gel-lancer");
-                await Promise.all([o.eclat(lanceur, "saturate(0.6) hue-rotate(170deg) brightness(1.3) drop-shadow(0 0 8px #bdf3ff)", 380),
-                                   o.gerbe(calque, a.x, a.y, { nombre: 8, dist: a.t * 0.5, couleurs: ["#e8fbff", "#9fe6ff"], taille: 5, duree: 400 })]);
-                await o.projectile(calque, a, b, { taille: 0.42, forme: "2px", arc: 0, oriente: true, duree: Math.min(700, 260 + axe(a, b).d * 0.7), easing: "linear",
-                    traine: ["#e8fbff", "#9fe6ff"],
-                    style: "height:auto; aspect-ratio:3/1; background:linear-gradient(90deg, rgba(160,230,255,0), #bdf3ff 60%, #ffffff); clip-path:polygon(0 35%, 75% 0, 100% 50%, 75% 100%, 0 65%); filter:drop-shadow(0 0 6px #9fe6ff);" });
-                o.son("glace-impact");
-                o.jauge(calque, cible, 40, 31, 40, "-9", COULEURS.degats, COULEURS.degats);
-                o.attendre(500).then(() => o.texte(calque, cible, "Glacé !", COULEURS.etat));
-                const eclats = [];
-                for (let i = 0; i < 7; i++) {
-                    const ang = (i / 7) * Math.PI * 2, r = b.t * 0.55;
-                    const c = o.poser(calque, b.x + Math.cos(ang) * r, b.y + Math.sin(ang) * r, `width:${b.t * 0.16}px; height:${b.t * 0.42}px; z-index:4;
-                        background:linear-gradient(180deg, #ffffff, #9fe6ff 50%, #3aa8e8); clip-path:polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
-                        filter:drop-shadow(0 0 4px #bdf3ff);`);
-                    const rot = (ang * 180 / Math.PI) + 90;
-                    eclats.push(o.jouerPuisRetirer(c, [
-                        { transform: `translate(-50%,-50%) rotate(${rot}deg) scale(0)`, opacity: 0 },
-                        { transform: `translate(-50%,-50%) rotate(${rot}deg) scale(1)`, opacity: 1, offset: 0.3 },
-                        { transform: `translate(-50%,-50%) rotate(${rot}deg) scale(1)`, opacity: 1, offset: 0.75 },
-                        { transform: `translate(-50%,-50%) rotate(${rot}deg) scale(1.4)`, opacity: 0 }
-                    ], { duration: 1400, delay: i * 40, easing: "ease-out" }));
-                }
-                // LA PRÉSENCE (Nico : « pose, présence ») : le sol reste gelé sous lui.
-                const sol = o.hexagone(calque, b, { fond: "radial-gradient(circle, rgba(255,255,255,0.75), rgba(170,230,255,0.45) 60%, rgba(60,150,220,0.2) 90%)", opacite: 0.85 });
-                await Promise.all([...eclats,
-                    o.teinter(cible, [{ filter: "none" }, { filter: "saturate(0.4) hue-rotate(170deg) brightness(1.25)", offset: 0.3 },
-                                      { filter: "saturate(0.4) hue-rotate(170deg) brightness(1.25)", offset: 0.75 }, { filter: "none" }], { duration: 1500 }),
-                    o.onde(calque, b, { couleur: "#bdf3ff", taille: 1.1, duree: 900, echelle: 1.7 })]);
-                o.texte(calque, cible, "Marche ×2 · +20 % dégâts phys.", COULEURS.attention);
-                await o.attendre(450);
-                await o.effacer(sol, { duree: 300 });
+            // Nico (v242) : « glacé : on garde que l'effet sur la cible » — plus
+            // de givre sur le héros ni de trait de glace lancé : l'état est posé
+            // par une attaque, qui a déjà eu son geste et ses dégâts.
+            id: "gel", nom: "Glacé", categorie: "État", sens: "vers l'ennemi",
+            description: "L'ennemi, touché, se fige dans les cristaux et bleuit ; le sol reste gelé sous lui (marche ×2, +20 % de dégâts physiques).",
+            async jouer({ cible, calque }, o) {
+                await effetGlace(o, calque, cible);
             }
         },
         {
-            id: "poison", nom: "Empoisonnement", categorie: "Attaque", sens: "vers l'ennemi",
-            description: "Le héros lance une fiole de venin : elle éclate sur l'ennemi, qui verdit par vagues sous des bulles toxiques ; puis le tic de fin de manche ronge son énergie et ses PV.",
-            async jouer({ lanceur, cible, calque }, o) {
-                const a = centre(lanceur, calque), b = centre(cible, calque);
-                const VERT = "sepia(1) saturate(5) hue-rotate(55deg) brightness(0.95)";
-                o.son("poison-lancer");
-                await o.projectile(calque, a, b, { taille: 0.3, arc: 0.7, duree: Math.min(800, 360 + axe(a, b).d * 0.8), easing: "ease-in-out",
-                    style: "background:radial-gradient(circle at 35% 35%, #e8ffc0, #7dd321 50%, #2e5a0a); box-shadow:0 0 10px #7dd321;" });
-                o.son("poison-bulles");
-                o.jauge(calque, cible, 40, 35, 40, "-5", COULEURS.degats, COULEURS.degats);
-                o.attendre(500).then(() => o.texte(calque, cible, "Empoisonnement !", COULEURS.etat));
-                await Promise.all([
-                    o.onde(calque, b, { couleur: "#7dd321", taille: 0.9, fond: "radial-gradient(circle, rgba(125,211,33,0.5), transparent 70%)", duree: 600, echelle: 1.6 }),
-                    o.teinter(cible, [{ filter: "none" }, { filter: VERT, offset: 0.25 }, { filter: "none", offset: 0.5 }, { filter: VERT, offset: 0.75 }, { filter: "none" }], { duration: 1500 }),
-                    o.gerbe(calque, b.x, b.y + b.t * 0.1, { nombre: 12, dist: b.t * 0.4, monte: b.t * 0.8, couleurs: ["#7dd321", "#b5ff4c", "#4e8a12"],
-                                                           taille: 9, tailleMin: 4, duree: 1300, etale: 700 }),
-                    o.secouer(cible, b.t * 0.05, 500)
-                ]);
+            // Nico (v242) : « l'empoisonnement est lié à une attaque, donc il faut
+            // garder l'effet d'empoisonnement sur la cible après l'animation de
+            // lancer des dégâts » — plus de fiole lancée : le venin prend sur la
+            // cible, puis le tic de fin de manche.
+            id: "poison", nom: "Empoisonnement", categorie: "État", sens: "vers l'ennemi",
+            description: "Le venin prend sur l'ennemi, qui verdit par vagues sous des bulles toxiques ; puis le tic de fin de manche ronge son énergie et ses PV.",
+            async jouer({ cible, calque }, o) {
+                await effetPoison(o, calque, cible);
+                await o.attendre(400);
                 // PUIS LE TIC de fin de manche (Nico : « pose, puis tic ») : le
                 // venin ronge l'énergie, puis les PV.
-                o.son("poison-bulles");
                 o.energie(calque, cible, 35, 32, 40, "-3 ⚡");
-                o.attendre(450).then(() => o.texte(calque, cible, "-2", COULEURS.degats));
-                await Promise.all([o.teinter(cible, [{ filter: "none" }, { filter: VERT, offset: 0.4 }, { filter: "none" }], { duration: 800 }),
-                    o.gerbe(calque, b.x, b.y, { nombre: 7, dist: b.t * 0.35, monte: b.t * 0.6, couleurs: ["#7dd321", "#b5ff4c"], taille: 7, duree: 900 })]);
+                await ticPoison(o, calque, cible, { valeur: "-2" });
             }
         },
         {
@@ -1061,7 +1081,9 @@
         }
     };
     // Les outils de dessin, pour le catalogue.
-    window.OUTILS_ANIMATION = { centre, axe, hasard, COULEURS, ROUGE, Z, BASE };
+    window.OUTILS_ANIMATION = { centre, axe, hasard, COULEURS, ROUGE, Z, BASE,
+                                // Les effets d'état sur la cible (v242), joués aussi en combat.
+                                effetGlace, effetPoison, ticPoison };
 
     // LA LECTURE EN COURS (une seule à la fois) : l'interrompre coupe ses sons
     // en attente et fait rendre la main à ses pauses.

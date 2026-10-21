@@ -114,6 +114,17 @@
                                                                cout: Number(pas.cout) || 0, difficile: !!pas.difficile });
         if (!scene || !scene.grille || !ANIMATION_DU_PAS[sorte]) return false;
         scene.premier = ouvreLeTrajet(pas.idToken, sorte, pas.de || scene.grille.caseDe(scene.lanceur));
+        // L'EFFROI (Nico, v242 : « peur, tu peux implanter ») : avant le premier
+        // pas de la fuite, celui qui effraie grandit et se teinte de mauve, le
+        // fuyard rapetisse, verdit, trois traits de frayeur — puis il détale.
+        if (sorte === "peur" && scene.premier && pas.effroi && pionDe(pas.effroi)
+            && typeof window.animationJeuExiste === "function" && window.animationJeuExiste("jeu-peur")) {
+            const effroi = window.sceneDeCombat(pas.idToken, pas.effroi, { grace: 1500 });
+            if (effroi) {
+                await window.jouerAnimationJeu("jeu-peur", effroi);
+                scene.effraye = true;
+            }
+        }
         await window.jouerAnimationJeu(ANIMATION_DU_PAS[sorte], scene);
         derniers[pas.idToken] = { sorte, vers: pas.vers, quand: Date.now() };
         // Quoi qu'il arrive, le pion finit sur sa case.
@@ -130,6 +141,37 @@
         await window.jouerAnimationJeu("jeu-bond", scene);
         const el = pionDe(data.idToken);
         if (el && !memeCase({ q: el.dataset.q, r: el.dataset.r }, data.arrivee)) poserPion(el, data.arrivee.q, data.arrivee.r);
+        return true;
+    };
+
+    // --- LA POUSSÉE ET LA TRACTION (v242 : « tu peux implanter c'est bon ») -------
+    //  Le pion poussé (ou tiré) est la scène ; qui pousse ou tire (`acteur`)
+    //  en est la source : l'élan d'épaule, ou le coup d'air qu'il avale. Le
+    //  pion file d'un trait le long des cases que le cerveau a tranchées
+    //  (`depart` → `arrivee`), sa traînée de poussière derrière lui, et finit
+    //  sur sa case. Sans le Studio : la glissade d'avant (false).
+    window.animerPousseeDeCombat = async function (data) {
+        if (!data || data.echec || !data.arrivee || data.transfert) return false;
+        const geste = data.sorte === "traction" ? "jeu-traction" : "jeu-poussee";
+        if (typeof window.animationJeuExiste !== "function" || !window.animationJeuExiste(geste)) return false;
+        const el = pionDe(data.idToken);
+        if (!el) return false;
+        // En relecture, le pion est déjà arrivé : il repart de sa case de départ.
+        if (data.depart && !memeCase({ q: el.dataset.q, r: el.dataset.r }, data.depart)) poserPion(el, data.depart.q, data.depart.r);
+        const de = data.depart || { q: parseFloat(el.dataset.q), r: parseFloat(el.dataset.r) };
+        const scene = window.sceneDeCombat(data.idToken, data.acteur && pionDe(data.acteur) ? data.acteur : null,
+                                           { de, vers: data.arrivee });
+        if (!scene || !scene.grille) return false;
+        window.PIONS_EN_MOUVEMENT = window.PIONS_EN_MOUVEMENT || {};
+        window.PIONS_EN_MOUVEMENT[data.idToken] = Date.now();
+        try {
+            await window.jouerAnimationJeu(geste, scene);
+        } finally {
+            // Quoi qu'il arrive, le pion finit sur sa case.
+            const fin = pionDe(data.idToken);
+            if (fin && !memeCase({ q: fin.dataset.q, r: fin.dataset.r }, data.arrivee)) poserPion(fin, data.arrivee.q, data.arrivee.r);
+            delete window.PIONS_EN_MOUVEMENT[data.idToken];
+        }
         return true;
     };
 
@@ -294,7 +336,18 @@
         // Puis (« sursis, soin refusé en sursis, fin de sursis : on garde, tu
         // peux intégrer »).
         sursis: "jeu-sursis", "sursis-coup": "jeu-sursis-coup", "sursis-soin-refuse": "jeu-sursis-soin-refuse",
-        "sursis-fin": "jeu-sursis-fin"
+        "sursis-fin": "jeu-sursis-fin",
+        // Puis (v242 : « provocation, confus s'enfuit, immobilisation,
+        // empoisonnement, brûlé, glacé, électrifié, aveuglé, étourdi /
+        // immobilisation / confusion présence, étalement, plaie rouverte,
+        // repli : tu peux implanter ») : les états posés, sur la cible seule
+        // (l'attaque a eu son geste), ceux qui durent, les tics de fin de manche.
+        "confusion-fuite": "jeu-confusion-fuite", provocation: "jeu-provocation", immobilisation: "jeu-immobilisation",
+        empoisonnement: "jeu-empoisonnement", "poison-tic": "jeu-poison-tic", "poison-energie": "jeu-poison-energie",
+        brule: "jeu-brule", "brule-tic": "jeu-brule-tic", glace: "jeu-glace-pose", electrifie: "jeu-electrifie",
+        aveugle: "jeu-aveugle", "etourdi-presence": "jeu-etourdi-presence", "confusion-presence": "jeu-confusion-presence",
+        "immobilisation-presence": "jeu-immobilisation-presence", "etalement-tic": "jeu-etalement-tic",
+        "plaie-rouverte": "jeu-plaie-rouverte", "repli-etat": "jeu-repli-etat"
     };
     // LE PION ABATTU RESTE SUR LE PLATEAU JUSQU'À SA CHUTE. Le coup qui abat
     // le dit (`chute`) : sans ça, la vie à zéro, le redessin le retirait aussitôt

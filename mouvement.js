@@ -1296,6 +1296,33 @@ window.jouerAnimationPoussee = async function(data) {
 
     window.ANIMATION_VTT_EN_COURS = true;
 
+    // LA POUSSÉE ET LA TRACTION DU STUDIO (animations_jeu.js, v242 : « tu peux
+    // implanter c'est bon ») : l'élan ou le coup d'air de qui pousse ou tire,
+    // le pion qui file d'un trait dans sa poussière. La glissade d'avant ne
+    // sert plus que si le Studio n'est pas chargé.
+    let animeParLeStudio = false;
+    if (typeof window.animerPousseeDeCombat === "function") {
+        try { animeParLeStudio = await window.animerPousseeDeCombat(data); }
+        catch (e) { animeParLeStudio = false; }
+    }
+    if (!animeParLeStudio) await glissadeDAvant(tokenDiv, imgMain, data);
+
+    // Zone persistante sur la case d'arrivée (saut ou déplacement forcé) : déjà tranchée par
+    // celui qui a déclenché l'effet, on ne fait que la rejouer ici.
+    for (const res of (data.zones || [])) {
+        if (typeof window.jouerAnimationZonePersistante === "function") {
+            await window.jouerAnimationZonePersistante(res, data.arrivee);
+        }
+    }
+
+    window.ANIMATION_VTT_EN_COURS = false;
+    if (typeof window.redessinerPions === "function") {
+        window.redessinerPions();
+    }
+};
+
+// La glissade d'avant : grandi pendant le trajet -> rétréci à l'atterrissage -> taille normale.
+async function glissadeDAvant(tokenDiv, imgMain, data) {
     // Comme pour la marche : en relecture, le pion est déjà arrivé. On le
     // repose sur sa case de départ pour que la trajectoire se lise.
     if (data.depart && typeof window.positionnerTokenVTT === "function") {
@@ -1326,17 +1353,4 @@ window.jouerAnimationPoussee = async function(data) {
         imgMain.style.transition = "none";
         imgMain.style.transform = "";
     }
-
-    // Zone persistante sur la case d'arrivée (saut ou déplacement forcé) : déjà tranchée par
-    // celui qui a déclenché l'effet, on ne fait que la rejouer ici.
-    for (const res of (data.zones || [])) {
-        if (typeof window.jouerAnimationZonePersistante === "function") {
-            await window.jouerAnimationZonePersistante(res, data.arrivee);
-        }
-    }
-
-    window.ANIMATION_VTT_EN_COURS = false;
-    if (typeof window.redessinerPions === "function") {
-        window.redessinerPions();
-    }
-};
+}

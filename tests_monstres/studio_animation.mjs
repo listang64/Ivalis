@@ -444,8 +444,11 @@ console.log("\n10. LE SON DES ANIMATIONS");
   r.res.forEach(x => console.log(`     ${x.id.padEnd(16)} ${x.joues.join(", ")}`));
   verifier("chaque animation joue son son (au moins un, et du catalogue)", r.res.every(x => x.joues.length > 0 && x.joues.every(j => r.catalogue.includes(j))),
            r.res.filter(x => !x.joues.length).map(x => x.id).join());
-  verifier("les attaques ont deux temps : l'élan, puis l'impact", ["coup-epee", "boule-de-feu", "gel", "poison", "coup-critique"]
+  // (v242 : Glacé et Empoisonnement ne lancent plus rien — l'état sur la cible seule.)
+  verifier("les attaques ont deux temps : l'élan, puis l'impact", ["coup-epee", "boule-de-feu", "coup-critique"]
            .every(id => r.res.find(x => x.id === id).joues.length >= 2));
+  verifier("Glacé et Empoisonnement : plus de lancer (ni « gel-lancer », ni « poison-lancer »)",
+           !r.res.find(x => x.id === "gel").joues.includes("gel-lancer") && !r.res.find(x => x.id === "poison").joues.includes("poison-lancer"));
   const rendus = await p.evaluate(async () => {
     const out = [];
     for (const [id, fabriquer] of Object.entries(window.SONS_COMBAT)) {
@@ -529,9 +532,10 @@ console.log("\n11. LES TEXTES FLOTTANTS, COMME EN COMBAT");
   const bouclier = r.res["bouclier"].vus[0] || {};
   verifier("bouclier : « +12 🛡️ » en cyan sur le héros", bouclier.texte === "+12 🛡️" && bouclier.couleur === "rgb(0, 255, 255)");
   verifier("boule de feu : « -14 » puis « Brûlé ! » sur l'ennemi", textes("boule-de-feu").join() === "-14@ennemi,Brûlé !@ennemi");
-  verifier("Glacé : « -9 », « Glacé ! », puis sa présence ; Empoisonnement : « -5 », « Empoisonnement ! », puis le tic « -3 ⚡ », « -2 »",
-           textes("gel").join() === "-9@ennemi,Glacé !@ennemi,Marche ×2 · +20 % dégâts phys.@ennemi"
-           && textes("poison").join() === "-5@ennemi,Empoisonnement !@ennemi,-3 ⚡@ennemi,-2@ennemi", JSON.stringify([textes("gel"), textes("poison")]));
+  // v242 : l'état sur la cible seule — les dégâts sont ceux de l'attaque, plus les siens.
+  verifier("Glacé : « Glacé ! », puis sa présence ; Empoisonnement : « Empoisonnement ! », puis le tic « -3 ⚡ », « -2 »",
+           textes("gel").join() === "Glacé !@ennemi,Marche ×2 · +20 % dégâts phys.@ennemi"
+           && textes("poison").join() === "Empoisonnement !@ennemi,-3 ⚡@ennemi,-2@ennemi", JSON.stringify([textes("gel"), textes("poison")]));
   verifier("esquive : « Esquivé 💨 » sur le héros", textes("esquive").join() === "Esquivé 💨@heros");
   // Le critique a désormais SON message (« COUP CRITIQUE ! », rouge, sous le
   // pion — studio_attaques.mjs), puis l'attaque normale et son chiffre.

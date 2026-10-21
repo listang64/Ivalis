@@ -6395,3 +6395,67 @@ le prix des cases après un combat, les bannières, la surpuissance en DOT
 les médaillons de la piste. Il mord sur l'ancien code (18 échecs avant de
 tomber). Mis à jour : deplacement_repris (copie locale datée), surpuissance
 (une créature : 12 × 1,2 = 14, sans surpuissance).
+
+## v242 — Studio : poussée, traction, peur, états, présences et tics, en jeu
+
+Nico : « Poussée, traction magique, peur, provocation, confus s'enfuit,
+immobilisation : tu peux implanter c'est bon. Empoisonnement est lié à une
+attaque, donc il faut garder l'effet d'empoisonnement sur la cible après
+l'animation de lancer des dégâts ; brûlé, même principe : on garde juste
+l'animation sur la cible, pas le sort lancé ; glacé, même truc ; électrifié,
+pareil. Aveuglé, étourdi présence, immobilisation présence, confusion
+présence : tu peux implanter. Peur présence : vire le smiley. Étalement (tic
+des dégâts différés), plaie rouverte : tu peux implanter. Repli (état d'un
+tour) : vire l'émoticône. »
+
+- LE STUDIO (animations_combat.js : effetGlace, effetPoison, ticPoison,
+  exportés dans OUTILS_ANIMATION ; animations_catalogue.js : effetBrule,
+  ticBrule, effetElectrifie, presenceEtourdi, presenceConfusion,
+  presencePeur, pulsationEtalement, contourRepli) : Glacé et Empoisonnement
+  ne lancent plus rien (ni givre sur le héros, ni trait de glace, ni fiole) —
+  l'état prend sur la cible, puis sa présence ou son tic ; ils passent dans
+  la catégorie « État ». Brûlé perd ses braises qui convergeaient (le sort
+  lancé) : la flamme, la lueur orange et quelques flammèches sur la cible,
+  puis le tic. Électrifié était déjà sur la cible seule. Plus de smiley sur
+  la Peur — présence, plus de flèche-émoticône sur le Repli. Les mêmes
+  morceaux servent au Studio et au combat.
+- LE CERVEAU DIT QUI (mouvement_pur.js, cerveau_combat.js, moteur_pur.js) :
+  le premier pas d'une fuite sous la Peur porte celui qui effraie
+  (`effroi`) ; le mot « Confus : s'enfuit ! » porte `confusion: "fuite"` ;
+  un état posé par une carte porte son auteur (`acteur`). Rien d'autre ne
+  change dans les règles.
+- LE PONT (pont_combat.js : GESTE_DE_L_ETAT, GESTE_DU_TIC, auteurDeLEtat) :
+  la poussée et la traction disent laquelle et qui pousse ou tire (jusqu'à
+  versAnimationDeSaut) ; un état posé par une carte (Provocation,
+  Immobilisation, Empoisonnement, Brûlé, Glacé, Électrifié, Repli, Étourdi)
+  a son geste sur la cible — la Provocation part de qui a crié
+  (idProvocateur), l'Immobilisation de qui l'a posée ; un état venu d'une
+  zone garde le geste de la zone ; l'Aveuglé a son geste, qui dit
+  « Aveuglé : 4 cases » à la place du mot ; les tics Étalement, Plaie
+  rouverte, Brûlure et Empoisonnement accompagnent leur chiffre ; le venin
+  sur l'énergie et l'Immobilisation de fin de manche montrent la vraie
+  énergie (« -10 ⚡ », « +20 ⚡ ») ; au début de son tour, l'Étourdi et la
+  Confusion qui durent se rappellent (le geste « presence »).
+- L'ÉCRAN (animations_jeu.js : animerPousseeDeCombat, l'effroi dans
+  animerPasDeCombat, les réactions ; mouvement.js : jouerAnimationPoussee,
+  la glissade d'avant devenue glissadeDAvant, de secours) : le poussé file
+  d'un trait le long de la ligne de cases que le cerveau a tranchée
+  (casesEntre), dans sa traînée de poussière, après l'élan de qui pousse ;
+  le tiré est aspiré dans les filets d'air que son tireur avale ; avant la
+  fuite, l'effroi du Studio (qui effraie grandit et se teinte de mauve,
+  l'effrayé rapetisse, verdit, trois traits de frayeur, l'aura sombre sans
+  smiley), puis il détale en gardant le vert de la Peur, sans redire « il
+  s'enfuit » ; le confus qui s'enfuit a son « ❗ » violet, puis sa course
+  (sans les « ? » du premier pas). Dans les gestes en jeu, `sc.lanceur` est
+  le pion qui subit et `sc.cible` la source, quand elle est connue. L'ancien
+  journal (sequence_tour.js) dit lui aussi qu'une traction en est une.
+  L'Étourdi garde son geste même posé par une zone (comme avant).
+
+corrections_v242.mjs : ce que dit le cerveau (effroi, confusion « fuite »,
+auteur de l'état), chaque geste du pont et leur ordre, le Studio sans sort
+lancé ni smiley ni émoticône, puis sur le vrai plateau la poussée et la
+traction (trajet d'un trait, case d'arrivée, sans la glissade d'avant),
+l'effroi avant la fuite, et les dix-sept gestes (sons, mots, sans reste). Il
+mord sur l'ancien code (44 échecs). Mis à jour : animations_en_jeu (la fuite
+verte de la Peur, la fuite du confus sans « ? »), studio_animation (Glacé et
+Empoisonnement sans lancer), corrections_v238 (Brûlé a désormais son geste).

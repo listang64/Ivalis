@@ -77,6 +77,28 @@ export const RYTHME = {
 //  Le départ, on le lit dans l'état que le spectateur n'a pas encore fait
 //  avancer — c'est pour ça qu'il anime AVANT d'appliquer.
 
+// LES ÉTATS DU STUDIO, EN JEU (Nico, v242 : « provocation, immobilisation,
+// aveuglé, empoisonnement, brûlé, glacé, électrifié, repli : tu peux
+// implanter ») : l'état posé par une carte a son geste, sur la cible.
+const GESTE_DE_L_ETAT = {
+    "Étourdi": "etourdi", "Provocation": "provocation", "Immobilisation": "immobilisation",
+    "Empoisonnement": "empoisonnement", "Brûlé": "brule", "Glacé": "glace", "Électrifié": "electrifie",
+    "Repli": "repli-etat"
+};
+// Et les tics de fin de manche qui ont le leur (Étalement, Plaie rouverte,
+// Brûlure, Empoisonnement).
+const GESTE_DU_TIC = {
+    "Étalement": "etalement-tic", "Plaie rouverte": "plaie-rouverte",
+    "Brûlure": "brule-tic", "Empoisonnement": "poison-tic"
+};
+// Qui a posé l'état : la Provocation le garde dans l'état lui-même (celui qui a
+// crié) ; sinon l'étape le dit (`acteur`).
+function auteurDeLEtat(e) {
+    const prov = e.pose === "Provocation" ? (e.liste || []).find(x => x && x.nom === "Provocation") : null;
+    const qui = (prov && prov.idProvocateur) || e.acteur || null;
+    return qui && qui !== e.cible ? qui : null;
+}
+
 // La zone persistante qui a produit cette étape (traverserZones, moteur_pur.js) :
 // sa nature, lue dans l'état d'avant (elle y est encore).
 function zoneDe(e, etat) {
@@ -98,6 +120,10 @@ function zoneDe(e, etat) {
 function reactionAuCoup(e, champ) {
     const depuis = e.acteur && e.acteur !== e.cible ? e.acteur : null;
     const chute = champ === "pv" && e.pvApres !== undefined && nombre(e.pvApres) <= 0 ? { chute: true } : {};
+    // UN TIC DE FIN DE MANCHE (v242) : la flamme qui se ravive, le venin qui
+    // ronge, le sceau de l'étalement qui pulse, la vieille plaie qui se rouvre —
+    // leur geste du Studio accompagne le chiffre.
+    if (e.tic && GESTE_DU_TIC[e.tic]) return { reaction: { sorte: GESTE_DU_TIC[e.tic], pion: e.cible, ...chute } };
     if (e.renvoi) return { reaction: { sorte: "contre", pion: e.cible, depuis, ...chute } };
     if (e.bouclierBrise) return { reaction: { sorte: "bouclier-brise", pion: e.cible, depuis, ...chute } };
     if (champ === "bouclier") return { reaction: { sorte: "bouclier-encaisse", pion: e.cible, depuis } };
@@ -120,6 +146,8 @@ const SCENES = {
         return { geste: "pas", pion: e.acteur, de: e.de, vers: e.vers,
                  cout: nombre(e.cout), ...(e.repli ? { repli: true } : {}),
                  ...(e.fuite ? { fuite: e.fuite } : {}), ...(e.offert ? { offert: true } : {}),
+                 // Le premier pas d'une fuite sous la Peur : qui l'a effrayé (v242).
+                 ...(e.effroi ? { effroi: e.effroi } : {}),
                  ...(e.difficile ? { difficile: true } : {}), ...(e.glace ? { glace: true } : {}) };
     },
     // Le repli s'annonce (son souffle, et « Repli : sans opportunité » — plus
@@ -131,8 +159,13 @@ const SCENES = {
     },
     // Un déplacement imposé. Même géométrie, autre gestuelle : un pion poussé
     // ne marche pas, il glisse ; un bond est un saut à vol d'oiseau.
-    poussee(e)  { return { geste: "poussee", pion: e.cible || e.acteur, de: e.de, vers: e.vers }; },
-    traction(e) { return { geste: "poussee", pion: e.cible || e.acteur, de: e.de, vers: e.vers }; },
+    // LA POUSSÉE ET LA TRACTION DU STUDIO (Nico, v242 : « tu peux implanter
+    // c'est bon ») : qui pousse ou tire (`acteur`) et laquelle des deux
+    // (`sorte`) voyagent jusqu'au geste (animations_jeu.js).
+    poussee(e)  { return { geste: "poussee", pion: e.cible || e.acteur, de: e.de, vers: e.vers, sorte: "poussee",
+                           ...(e.acteur && e.cible && e.acteur !== e.cible ? { acteur: e.acteur } : {}) }; },
+    traction(e) { return { geste: "poussee", pion: e.cible || e.acteur, de: e.de, vers: e.vers, sorte: "traction",
+                           ...(e.acteur && e.cible && e.acteur !== e.cible ? { acteur: e.acteur } : {}) }; },
     bond(e)     { return { geste: "bond", pion: e.cible || e.acteur, de: e.de, vers: e.vers, ...(e.transfert ? { transfert: true } : {}) }; },
 
     // --- LA TECHNIQUE ----------------------------------------------------
@@ -234,6 +267,8 @@ const SCENES = {
                  // carte détournée (sur soi, sur un allié) a déjà été dit par le
                  // geste de la carte — on ne le redit pas.
                  ...(e.confusion === "dissipee" ? { reaction: { sorte: "confusion-dissipee", pion, texte: e.texte || "", couleur: e.couleur || null, remplace: true } }
+                   // La fuite du confus (v242) : le « ❗ » violet du Studio, qui dit le mot.
+                   : e.confusion === "fuite" ? { reaction: { sorte: "confusion-fuite", pion, texte: e.texte || "", couleur: e.couleur || null, remplace: true } }
                    : (e.confusion === "soi" || e.confusion === "allie") ? { reaction: { sorte: "confusion-dit", pion, texte: e.texte || "", remplace: true } }
                    : {}) };
     },
@@ -366,15 +401,24 @@ const SCENES = {
                      reaction: { sorte: "benediction-" + e.benediction, pion: e.cible } };
         }
         // L'aveuglement se dit à tout le monde ; le noir, lui, n'est vu que par
-        // l'aveuglé (moteur_effets.js, dessinerBrouillardAveuglement).
+        // l'aveuglé (moteur_effets.js, dessinerBrouillardAveuglement). Le geste
+        // du Studio (v242 : « aveuglé, tu peux implanter ») : l'obscurité qui se
+        // referme jusqu'à quatre cases, ses yeux qui se voilent ; il dit le mot.
         if (e.pose === "Aveuglé") {
             return { geste: "message", pion: e.cible, texte: "Aveuglé 🌫️",
-                     couleur: COULEURS.neutre, duree: RYTHME.message };
+                     couleur: COULEURS.neutre, duree: RYTHME.message,
+                     reaction: { sorte: "aveugle", pion: e.cible, texte: "Aveuglé : 4 cases", remplace: true } };
         }
         // Étourdi (Nico : « on garde, tu peux intégrer ») : des étoiles autour
-        // de sa tête, il vacille.
+        // de sa tête, il vacille. Puis (v242) les autres états posés par une
+        // carte : chacun son geste du Studio, sur la cible seule (l'attaque a
+        // eu le sien) — un état venu d'une zone garde celui de la zone.
+        // (L'Étourdi, lui, avait déjà le sien, zone ou pas : il le garde.)
+        const sorte = (!e.zone || e.pose === "Étourdi") ? GESTE_DE_L_ETAT[e.pose] : null;
+        // D'où vient le geste : le défi part de qui provoque, les chaînes tirent à l'opposé.
+        const depuis = (sorte === "provocation" || sorte === "immobilisation") ? auteurDeLEtat(e) : null;
         return { geste: "etats", pion: e.cible, liste: e.liste || [], pose: e.pose || null, ...zoneDe(e, etat),
-                 ...(e.pose === "Étourdi" ? { reaction: { sorte: "etourdi", pion: e.cible } } : {}) };
+                 ...(sorte ? { reaction: { sorte, pion: e.cible, ...(depuis ? { depuis } : {}) } } : {}) };
     },
     // L'énergie qui monte ou descend ne s'anime pas — sauf quand TÉNÈBRES la
     // boit : c'est le coup lui-même, il doit se voir sur le pion.
@@ -386,7 +430,10 @@ const SCENES = {
         // LE REPOS LONG, LA RÉGÉNÉRATION DE FIN DE MANCHE, LA DÉPENSE D'UNE
         // COMPÉTENCE (Nico : « tu peux intégrer ») : l'énergie se voit monter
         // ou descendre sur le pion. Sans geste du Studio : rien, comme avant.
-        const sorte = e.repos ? "repos" : nombre(e.regeneration) > 0 ? "regen" : nombre(e.depense) > 0 ? "depense" : null;
+        // Puis (v242) l'Immobilisation qui pulse à chaque manche, le venin
+        // qui ronge l'énergie : l'énergie bouge sous leur geste du Studio.
+        const sorte = e.repos ? "repos" : nombre(e.regeneration) > 0 ? "regen" : nombre(e.depense) > 0 ? "depense"
+                    : e.tic === "Immobilisation" ? "immobilisation-presence" : e.tic === "Empoisonnement" ? "poison-energie" : null;
         const c = combattantDe(etat, e.cible);
         if (!sorte || !c) return { geste: "rien" };
         const de = nombre(c.fatigue), vers = nombre(e.fatigueApres, de);
@@ -394,7 +441,19 @@ const SCENES = {
                  reaction: { sorte, pion: e.cible, de, vers, max: nombre(c.fatigueMax) || Math.max(de, vers),
                              texte: `${vers >= de ? "+" : "-"}${Math.abs(vers - de)} ⚡` } };
     },
-    tour()     { return { geste: "rien" }; },
+    // LES ÉTATS QUI DURENT, AU DÉBUT DE SON TOUR (v242 : « étourdi présence,
+    // confusion présence : tu peux implanter ») : celui qui va jouer est encore
+    // étourdi, ou confus — son geste du Studio le rappelle avant qu'il agisse.
+    tour(e, etat) {
+        const tete = ((e && e.file) || [])[0];
+        const id = tete && (tete.id || tete.idPersonnage);
+        const c = id ? combattantDe(etat, id) : null;
+        if (!c || c.aTerre || (e.phase && e.phase !== "Resolution")) return { geste: "rien" };
+        const dure = (nom) => (c.etats || []).some(x => x && x.nom === nom && nombre(x.duree) > 0);
+        const presences = [dure("Étourdi") ? "etourdi-presence" : null, dure("Confusion") ? "confusion-presence" : null].filter(Boolean);
+        if (!presences.length) return { geste: "rien" };
+        return { geste: "presence", pion: id, presences: presences.map(sorte => ({ sorte, pion: id })) };
+    },
     manche(e)  { return { geste: "manche", numero: nombre(e.numero) }; },
     // Un combattant entre en scène : un renfort tombe du ciel, une illusion se
     // forme (animations_jeu.js).
@@ -515,7 +574,9 @@ export const TYPES_MIS_EN_SCENE = Object.keys(SCENES);
 // imposé rejoue cette même animation, il appelle celle-ci et ne peut plus
 // s'en écarter.
 export function versAnimationDeSaut(d) {
-    return { idToken: d.idToken, depart: d.de, arrivee: d.vers, ...(d.transfert ? { transfert: true } : {}) };
+    return { idToken: d.idToken, depart: d.de, arrivee: d.vers, ...(d.transfert ? { transfert: true } : {}),
+             // Qui pousse ou tire, et lequel des deux (v242) : le geste du Studio.
+             ...(d.acteur ? { acteur: d.acteur } : {}), ...(d.sorte ? { sorte: d.sorte } : {}) };
 }
 
 export function creerPont(effets) {
@@ -595,7 +656,16 @@ export function creerPont(effets) {
                             ...(scene.fuite ? { fuite: scene.fuite } : {}),
                             ...(scene.offert ? { offert: true } : {}),
                             ...(scene.difficile ? { difficile: true } : {}),
-                            ...(scene.glace ? { glace: true } : {}) });
+                            ...(scene.glace ? { glace: true } : {}),
+                            ...(scene.effroi ? { effroi: scene.effroi } : {}) });
+                break;
+
+            // Un état qui dure, au début du tour de celui qui le porte : ses
+            // gestes, l'un après l'autre (v242).
+            case "presence":
+                for (const p of (scene.presences || [])) {
+                    if (reaction) await Promise.resolve().then(() => reaction(p)).catch(() => false);
+                }
                 break;
 
             case "repli":
@@ -604,7 +674,8 @@ export function creerPont(effets) {
                 break;
 
             case "poussee":
-                await poussee({ idToken: scene.pion, de: scene.de, vers: scene.vers });
+                await poussee({ idToken: scene.pion, de: scene.de, vers: scene.vers,
+                                ...(scene.acteur ? { acteur: scene.acteur } : {}), ...(scene.sorte ? { sorte: scene.sorte } : {}) });
                 break;
 
             case "bond":

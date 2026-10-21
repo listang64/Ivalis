@@ -435,7 +435,8 @@ const ANIMATIONS = {
     carte:     (d) => window.jouerAnimationMoteur && window.jouerAnimationMoteur(d),
     bond:      (d) => window.jouerAnimationBond && window.jouerAnimationBond(d),
     poussee:   (d) => window.jouerAnimationPoussee && window.jouerAnimationPoussee(d),
-    traction:  (d) => window.jouerAnimationPoussee && window.jouerAnimationPoussee(d),
+    // (La traction dit qu'elle en est une : le Studio a son geste à elle — v242.)
+    traction:  (d) => window.jouerAnimationPoussee && window.jouerAnimationPoussee({ ...(d || {}), sorte: "traction" }),
     peur:      (d) => window.jouerAnimationPeur && window.jouerAnimationPeur(d)
 };
 

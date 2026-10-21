@@ -2322,7 +2322,9 @@ export function resoudreCarte(etat, action, plateau) {
                     ...(typeDegatsDeLEtat ? { typeDegats: typeDegatsDeLEtat } : {})
                 }];
             }
-            etapes.push({ type: "etats", cible: idCible, pose: alt.nom, liste: cible.etats });
+            // Qui l'a posé (`acteur`) : l'écran en tire le sens d'un geste —
+            // les chaînes tirent à l'opposé, le défi part de lui (v242).
+            etapes.push({ type: "etats", cible: idCible, pose: alt.nom, liste: cible.etats, acteur: idLanceur });
         });
     });
 

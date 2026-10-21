@@ -275,11 +275,13 @@ console.log("\n3. LA FUITE, LE SANG, LE BOND");
   verifier("la fuite sous la Peur : son, « Peur : il s'enfuit ! », la course — sans smiley",
            r.peur.sons1.includes("peur") && r.peur.sons1.includes("course") && r.peur.textes1.includes("Peur : il s'enfuit !")
            && !r.peur.textes1.some(t => /😱/.test(t)), JSON.stringify([r.peur.sons1, r.peur.textes1]));
-  verifier("…il s'assombrit le temps de la fuite, le mot n'est dit qu'une fois",
-           /brightness\(0\.55\)/.test(r.peur.teinte) && !r.peur.textes2.includes("Peur : il s'enfuit !"), r.peur.teinte);
+  // v242 : il garde le vert de la Peur (celui de l'effroi du Studio).
+  verifier("…il verdit le temps de la fuite, le mot n'est dit qu'une fois",
+           /hue-rotate\(58deg\)/.test(r.peur.teinte) && !r.peur.textes2.includes("Peur : il s'enfuit !"), r.peur.teinte);
   verifier("…la fuite finie, sa teinte s'en va ; il est sur sa case", r.peur.apres === "" && r.peur.surCase, `« ${r.peur.apres} »`);
-  verifier("la fuite sous la Confusion : son, des « ? » qui tournent, teinte violette",
-           r.confusion.sons.includes("confusion") && r.confusion.etoiles >= 3 && /hue-rotate\(225deg\)/.test(r.confusion.teinte) && r.confusion.surCase,
+  // v242 : le « ❗ » et le mot sont dits avant (jeu-confusion-fuite) — plus de « ? ».
+  verifier("la fuite sous la Confusion : la course, teinte violette, sans « ? »",
+           r.confusion.sons.includes("course") && r.confusion.etoiles === 0 && /hue-rotate\(225deg\)/.test(r.confusion.teinte) && r.confusion.surCase,
            JSON.stringify(r.confusion));
   verifier("l'hémorragie interne : le son qui saigne, des gouttes, « Hémorragie interne » une fois",
            r.sang.sons.filter(s => s === "saignement").length === 2 && r.sang.gouttes >= 6 && r.sang.t1.includes("Hémorragie interne")

@@ -653,7 +653,12 @@ export function resoudrePeur(etat, idLanceur, idCible, des, plateau, options) {
         cible.q = pas.q;
         cible.r = pas.r;
         cible.fatigue = Math.max(0, nombre(cible.fatigue) - 2);
-        etapes.push({ type: "pas", acteur: idCible, de, vers: pas, cout: 2, fatigueApres: cible.fatigue, fuite });
+        // Le premier pas d'une fuite sous la Peur dit QUI l'a effrayé
+        // (`effroi`) : l'écran joue d'abord l'effroi du Studio — l'un grandit,
+        // l'autre rapetisse — puis la fuite (animations_jeu.js, v242).
+        const premierEffroi = fuite === "peur" && pas === chemin[0] && idLanceur && idLanceur !== idCible;
+        etapes.push({ type: "pas", acteur: idCible, de, vers: pas, cout: 2, fatigueApres: cible.fatigue, fuite,
+                      ...(premierEffroi ? { effroi: idLanceur } : {}) });
 
         const contactApres = new Set(ennemisAuContact(etat, idCible, pas).filter(id => id !== exempte));
         for (const ennemi of contactAvant) {
