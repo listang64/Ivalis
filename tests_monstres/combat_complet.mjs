@@ -16,6 +16,10 @@ import { SOURCE_FAUX_SDK, SOURCE_FAUX_APP, creerFirestorePartage } from './fires
 
 const RACINE = '/home/user/Ivalis';
 const TRACE = process.env.TRACE_COMBAT_COMPLET || '';
+// LA LECTURE AUTOMATIQUE (DEV, v254) : le poste nommé ici (« Adrien »…) passe
+// en mode développeur, coche la case à côté de l'œil, et ne touche JAMAIS
+// l'écran — ses tours doivent se jouer seuls (corrections_v254.mjs).
+const POSTE_AUTO = process.env.LECTURE_AUTO_DEV || '';
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
                 '.css': 'text/css; charset=utf-8', '.json': 'application/json' };
 const serveur = http.createServer((req, res) => {
@@ -296,8 +300,22 @@ const posteDe = (idHeros) => postes.find(p => HEROS.find(h => h.id === idHeros &
 // pour se dérouler sur CET écran. Un joueur attentif tape dès que l'encart
 // paraît ; on note au passage si le voile acceptait bien le tap à ce moment-là.
 for (const poste of postes) {
-  await sur(poste, () => {
+  await sur(poste, (auto) => {
     window.__TAPS_IMPOSSIBLES = [];
+    if (auto) {
+      try { localStorage.setItem("ivalis_DEV_MODE", "on"); } catch (e) {}
+      if (typeof window.actualiserDevMode === "function") window.actualiserDevMode();
+      const caseAuto = document.getElementById("case-lecture-auto");
+      if (caseAuto) { caseAuto.checked = true; caseAuto.dispatchEvent(new Event("change")); }
+      window.__OUVERTURES_AUTO = 0;
+      window.__TAPS_VOILE = 0;
+      const vrai = window.jouerSequenceTour;
+      window.jouerSequenceTour = function (o) {
+        if (o && o.auto === true) window.__OUVERTURES_AUTO++; else window.__TAPS_VOILE++;
+        return vrai.apply(this, arguments);
+      };
+      return;   // ce poste-là ne tape jamais
+    }
     setInterval(() => {
       if (!window.EVENEMENT_ATTENDU || typeof window.jouerSequenceTour !== "function") return;
       const voile = document.getElementById("voile-tour-combat");
@@ -308,7 +326,7 @@ for (const poste of postes) {
       }
       voile.click();
     }, 350);
-  });
+  }, poste.nom === POSTE_AUTO);
 }
 
 // LA FACTURE FIRESTORE d'un moment du combat, lue comme Firebase la compte.
@@ -495,6 +513,37 @@ console.log("=========================================================");
     }
     verifier("le quota revenu, le même geste inscrit la carte", inscrit, JSON.stringify(r2));
   }
+}
+
+if (POSTE_AUTO) {
+  const poste = postes.find(p => p.nom === POSTE_AUTO);
+  console.log("\n=========================================================");
+  console.log(`  LA LECTURE AUTOMATIQUE : ${POSTE_AUTO} NE TOUCHE JAMAIS L'ÉCRAN`);
+  console.log("=========================================================");
+  // À JOUR, C'EST VOIR LA MÊME CHOSE QU'UN POSTE QUI TAPE : même manche, même
+  // phase, mêmes points de vie — et plus aucun tour qui attende.
+  const vu = (q) => sur(q, () => {
+    const r = window.regimeDuJeu && window.regimeDuJeu();
+    const e = r && r.etatAffiche && r.etatAffiche();
+    if (!e) return null;
+    const pv = Object.keys(e.combattants || {}).sort().map(id => id + "=" + e.combattants[id].pv).join(",");
+    return { attendu: !!window.EVENEMENT_ATTENDU, vue: `${e.manche}|${e.phase}|${pv}` };
+  });
+  const temoin = postes.find(q => q.nom !== POSTE_AUTO);
+  let aJour = false, dernier = null;
+  for (let i = 0; i < 100 && !aJour; i++) {
+    const [a, t] = [await vu(poste), await vu(temoin)];
+    dernier = { [POSTE_AUTO]: a, [temoin.nom]: t };
+    aJour = !!a && !!t && !a.attendu && a.vue === t.vue;
+    if (!aJour) await dormir(200);
+  }
+  const bilan = await sur(poste, () => ({ auto: window.__OUVERTURES_AUTO || 0, taps: window.__TAPS_VOILE || 0,
+    visible: getComputedStyle(document.getElementById("btn-hud-lecture-auto")).display !== "none",
+    cochee: document.getElementById("case-lecture-auto").checked }));
+  verifier(`${POSTE_AUTO} : la case est là, à côté de l'œil, et cochée`, bilan.visible && bilan.cochee, JSON.stringify(bilan));
+  verifier(`${POSTE_AUTO} : chaque tour s'est ouvert seul (${bilan.auto} ouvertures), sans un tap`, bilan.auto >= 3 && bilan.taps === 0,
+           JSON.stringify(bilan));
+  verifier(`${POSTE_AUTO} : son écran a tout rejoué, aucun tour ne l'attend`, aJour, aJour ? "" : JSON.stringify(dernier).slice(0, 300));
 }
 
 console.log("\n=========================================================");

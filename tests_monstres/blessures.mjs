@@ -518,7 +518,8 @@ console.log("\n11. LE TEMPS, LES SOINS, L'ENCART DE L'APERÇU");
       apresTalents: !!(document.getElementById("encart-talents-pris").compareDocumentPosition(encart) & Node.DOCUMENT_POSITION_FOLLOWING),
       dernier: encart.parentElement.lastElementChild === encart,
       pv: document.getElementById("stat-pv").innerText,
-      dev: [...document.querySelectorAll("#dev-blessures-liste .dev-blessure-ligne span")].map(s => s.textContent)
+      dev: [...document.querySelectorAll("#dev-blessures-liste .dev-blessure-ligne")].map(l => l.querySelector(".dev-blessure-nom").textContent
+           + (l.querySelector(".btn-dev-soigner") ? " [Soigner]" : "") + (l.querySelector(".btn-dev-retirer") ? " [Retirer]" : ""))
     };
   });
   await p.evaluate(() => document.getElementById("encart-blessures").scrollIntoView());
@@ -529,7 +530,11 @@ console.log("\n11. LE TEMPS, LES SOINS, L'ENCART DE L'APERÇU");
            && r.lignes.includes("Genou affaibli | ⏳ 2 combats") && r.lignes.includes("Traumatisme crânien profond | ⏳ 90 jours d'inconscience")
            && r.lignes.includes("Déchirure musculaire | ⏳ jusqu'aux soins en ville"), JSON.stringify(r.lignes));
   verifier("les PV de l'Aperçu comptent la Déchirure (50 → 40)", /40/.test(r.pv), r.pv);
-  verifier("l'onglet DEV propose de soigner la seule blessure qui attend les soins", JSON.stringify(r.dev) === '["Déchirure musculaire"]');
+  // (v254 : l'onglet DEV liste toutes les blessures, chacune « Retirer » —
+  // « Soigner » reste réservé à celle qui attend les soins en ville.)
+  verifier("l'onglet DEV propose de soigner la seule blessure qui attend les soins", r.dev.length === 4
+           && r.dev.filter(x => x.includes("[Soigner]")).join() === "Déchirure musculaire [Soigner] [Retirer]"
+           && r.dev.every(x => x.endsWith("[Retirer]")), JSON.stringify(r.dev));
   const soin = await p.evaluate(async () => {
     window.__majs = [];
     await window.soignerBlessureDev("d");

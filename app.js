@@ -6178,6 +6178,9 @@ window.actualiserDevMode = function() {
     // l'air cassé pour des erreurs le plus souvent sans conséquence.
     if (typeof window.montrerErreursJS === "function") window.montrerErreursJS(isDev);
 
+    // La case de lecture automatique des tours, à côté de l'œil (sequence_tour.js).
+    if (typeof window.actualiserLectureAutoDev === "function") window.actualiserLectureAutoDev();
+
     if (isDev) { console.log("🛠️ Mode Développeur : ACTIVÉ"); } 
     else { console.log("🛠️ Mode Développeur : DÉSACTIVÉ"); }
 };

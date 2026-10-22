@@ -43,6 +43,11 @@ function appliquerLocalement(id, maj) {
         if (!p || p.idPersonnage !== id) return;
         if (maj.Blessures) p.blessures = maj.Blessures.map(b => ({ ...b }));
         if (maj.Mort_Definitive) p.mortDefinitive = true;
+        // Relevé par le DEV (retirerToutesBlessuresDev) : il revient au combat.
+        if (maj.Mort_Definitive === false) {
+            p.mortDefinitive = false; p.actif = true;
+            if (p.statut === "Mort") p.statut = "Vivant";
+        }
         if (maj.PV_Actuels !== undefined) p.PV_Actuels = maj.PV_Actuels;
         if (maj.Fatigue_Actuelle !== undefined) p.fatigueActuelle = maj.Fatigue_Actuelle;
     }));
@@ -50,6 +55,10 @@ function appliquerLocalement(id, maj) {
     if (fiche && fiche.idPersonnage === id) {
         if (maj.Blessures) fiche.blessures = maj.Blessures.map(b => ({ ...b }));
         if (maj.Mort_Definitive) fiche.mortDefinitive = true;
+        if (maj.Mort_Definitive === false) {
+            fiche.mortDefinitive = false; fiche.actif = true;
+            if (fiche.statut === "Mort") fiche.statut = "Vivant";
+        }
         window.actualiserBlessuresApercu();
     }
 }
@@ -223,6 +232,52 @@ window.soignerBlessureDev = async function (uid) {
     }
 };
 
+// RETIRER UNE BLESSURE (onglet DEV, Nico, v254 : « rajoute dans le panneau
+// DEV la possibilité de retirer les blessures d'un personnage »). Quelle
+// qu'elle soit — en jours, en combats, à soigner, définitive —, elle quitte la
+// fiche ; ses effets (PV max, cartes oubliées…) avec elle.
+const ficheDev = () => {
+    const fiche = window.BLESSURES_FICHE;
+    if (!fiche || !fiche.idPersonnage) { alert("Ouvrez d'abord la fiche d'un héros existant."); return null; }
+    return fiche;
+};
+async function ecrireBlessuresDev(fiche, maj, message) {
+    try {
+        await ecrireFiche(fiche.idPersonnage, maj);
+        if (typeof window.afficherMessageFlottant === "function") window.afficherMessageFlottant(message);
+        if (typeof window.afficherStatsCombat === "function") window.afficherStatsCombat(fiche);
+        else window.actualiserBlessuresApercu();
+        return true;
+    } catch (e) {
+        console.error("Retirer des blessures :", e);
+        alert("Échec : les blessures n'ont pas été retirées.");
+        return false;
+    }
+}
+window.retirerBlessureDev = async function (uid) {
+    const fiche = ficheDev();
+    if (!fiche) return false;
+    const liste = window.blessuresDuPerso(fiche);
+    const inst = liste.find(b => b.uid === uid);
+    if (!inst) return false;
+    const b = window.blessureParId(inst.id) || {};
+    if (!confirm(`Retirer « ${b.nom || inst.id} » de ${nomHeros(fiche)} ?`)) return false;
+    return ecrireBlessuresDev(fiche, { Blessures: liste.filter(x => x.uid !== uid) }, "Blessure retirée");
+};
+// Toutes d'un coup — et un héros mort de ses blessures se relève avec.
+window.retirerToutesBlessuresDev = async function () {
+    const fiche = ficheDev();
+    if (!fiche) return false;
+    const liste = window.blessuresDuPerso(fiche);
+    const mort = window.estMortDefinitivement(fiche);
+    if (liste.length === 0 && !mort) return false;
+    const quoi = `${liste.length} blessure${liste.length > 1 ? "s" : ""}`;
+    if (!confirm(`Retirer ${liste.length ? `les ${quoi}` : "la mort"} de ${nomHeros(fiche)}${mort && liste.length ? " et le relever" : ""} ?`)) return false;
+    const maj = { Blessures: [] };
+    if (mort) { maj.Mort_Definitive = false; maj.Statut = "Vivant"; }
+    return ecrireBlessuresDev(fiche, maj, mort ? "Blessures retirées — le héros se relève" : "Blessures retirées");
+};
+
 // =========================================================================
 //  4. L'ENCART DE L'APERÇU (et le bloc de l'onglet DEV)
 // =========================================================================
@@ -267,14 +322,23 @@ window.actualiserBlessuresApercu = function (perso) {
         }
     }
 
-    // L'onglet DEV : les blessures qui attendent des soins en ville.
+    // L'onglet DEV : TOUTES les blessures (v254) — « Soigner » pour celles qui
+    // attendent les soins en ville, « Retirer » pour chacune, et tout d'un coup.
     if (dev) {
-        const aSoigner = liste.filter(inst => inst.soins);
-        dev.innerHTML = aSoigner.length === 0
-            ? `<p class="dev-blessures-vide">Aucune blessure n'attend de soins en ville.</p>`
-            : aSoigner.map(inst => `<div class="dev-blessure-ligne"><span>${echapper((window.blessureParId(inst.id) || {}).nom)}</span>
-                <button class="btn-parametres" style="background-color: #5c1e16; border-color: #ff4c4c;"
-                        onclick="jouerSonClic(); window.soignerBlessureDev('${echapper(inst.uid)}')">Soigner</button></div>`).join("");
+        const bouton = (classe, appel, texte) => `<button class="btn-parametres ${classe}" style="background-color: #5c1e16; border-color: #ff4c4c;"
+                onclick="jouerSonClic(); ${appel}">${texte}</button>`;
+        const lignes = liste.map(inst => {
+            const uid = echapper(inst.uid);
+            return `<div class="dev-blessure-ligne" data-uid="${uid}">
+                <span class="dev-blessure-nom">${echapper((window.blessureParId(inst.id) || {}).nom || inst.id)}</span>
+                <span class="dev-blessure-reste">${echapper(window.resteBlessure(inst))}</span>
+                ${inst.soins ? bouton("btn-dev-soigner", `window.soignerBlessureDev('${uid}')`, "Soigner") : ""}
+                ${bouton("btn-dev-retirer", `window.retirerBlessureDev('${uid}')`, "Retirer")}</div>`;
+        }).join("");
+        dev.innerHTML = liste.length === 0 && !mort
+            ? `<p class="dev-blessures-vide">Aucune blessure.</p>`
+            : lignes + `<div class="dev-blessures-tout">${bouton("btn-dev-retirer-tout", "window.retirerToutesBlessuresDev()",
+                  liste.length ? (mort ? "Tout retirer et le relever" : "Retirer toutes les blessures") : "Le relever (mort)")}</div>`;
     }
 };
 

@@ -7088,3 +7088,41 @@ l'envoi) et la ligne ×3 ; le tableau des rencontres (bouton, origine, case
 rétablir) ; la victoire sans blessure et la défaite avec ; la créature qui
 frappe et soigne comme sa carte, sa Confusion à +20 %, le libellé du réglage.
 Il mord sur l'ancien code (37 échecs).
+
+## v254 — Les tours qui se jouent seuls (DEV) ; retirer les blessures (DEV)
+
+Nico : « quand le bouton DEV est activé, fais un petit bouton coche à côté du
+bouton œil en combat ; quand coché, plus besoin d'appuyer sur l'écran pour voir
+les tours se jouer : dès que c'est prêt, ça lance les animations » ; « rajoute
+dans le panneau DEV la possibilité de retirer les blessures d'un personnage ».
+
+- LA LECTURE AUTOMATIQUE (sequence_tour.js, regime_cerveau.js). En mode DEV,
+  une petite case ▶ se pose juste à gauche de l'œil d'or (index.html,
+  #btn-hud-lecture-auto ; actualiserDevMode la montre ou la cache). Cochée,
+  chaque tour qui attend le toucher s'ouvre de lui-même (lancerLectureAutoDev,
+  appelée par surFenetre du régime à chaque tour annoncé) : jouerSequenceTour
+  ({ auto: true }), sans le son du clic, au tour d'après de la boucle —
+  jamais au milieu d'elle. Cochée devant un tour qui attend, il part tout de
+  suite. Le choix reste sur ce poste (localStorage, ivalis_LECTURE_AUTO) ; il
+  ne vaut que tant que le mode DEV est actif. Toucher l'écran marche toujours.
+- RETIRER LES BLESSURES (onglet DEV de la fiche, blessures_ui.js). Le bloc
+  « Blessures » liste désormais TOUTES les blessures du héros, avec ce qu'il
+  leur reste : « Retirer » pour chacune (retirerBlessureDev — même une
+  définitive), « Soigner » toujours pour celle qui attend les soins en ville,
+  et « Retirer toutes les blessures » (retirerToutesBlessuresDev). Un héros
+  mort de ses blessures se relève avec (Mort_Definitive à faux, Statut
+  « Vivant ») — « Tout retirer et le relever ». Écrit en base, et tout de suite
+  à l'écran (fiche, encart de l'Aperçu, liste).
+
+combat_complet.mjs accepte LECTURE_AUTO_DEV=<poste> : ce poste-là passe en mode
+DEV, coche la case et ne touche jamais l'écran ; trois contrôles en plus
+(la case, les tours ouverts seuls sans un tap, l'écran à jour comme celui d'un
+poste qui tape). blessures.mjs (section 11) suit la nouvelle liste DEV.
+
+corrections_v254.mjs : la case (cachée hors DEV, à gauche de l'œil, à sa
+hauteur) ; décochée le tour attend, cochée il part — tout de suite, sans clic,
+le suivant aussi —, le toucher marche toujours, le mode DEV coupé l'arrête, le
+régime la déclenche ; le panneau DEV (toutes les blessures, Soigner/Retirer,
+retirer une définitive, tout retirer et relever, sans fiche) ; puis un vrai
+combat complet à trois postes où Adrien ne touche jamais l'écran. Il mord sur
+l'ancien code (18 échecs).

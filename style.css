@@ -4866,6 +4866,10 @@ textarea.input-texte-parchemin {
 .dev-blessures-liste { display: flex; flex-direction: column; gap: 8px; align-items: center; }
 .dev-blessure-ligne { display: flex; gap: 12px; align-items: center; justify-content: center; color: #4a2e1b; }
 .dev-blessures-vide { font-size: 14px; color: #4a2e1b; margin: 0; }
+.dev-blessure-ligne { flex-wrap: wrap; }
+.dev-blessure-nom { font-weight: bold; }
+.dev-blessure-reste { font-size: 13px; font-style: italic; color: #7a5230; }
+.dev-blessures-tout { margin-top: 6px; }
 
 /* La fin du combat : le grand bandeau, puis la blessure. Par-dessus le butin. */
 .fin-combat-voile {
@@ -5127,3 +5131,13 @@ textarea.input-texte-parchemin {
 .btn-retirer-rencontre { border: none; background: none; color: #a52a2a; font-size: 16px; cursor: pointer; padding: 2px 6px; }
 .btn-retirer-rencontre:disabled { opacity: 0.3; cursor: not-allowed; }
 .btn-ajouter-rencontre { margin-top: 8px; padding: 6px 12px; font-size: 14px; }
+
+/* LA LECTURE AUTOMATIQUE DES TOURS (DEV, v254) : une case à gauche de l'œil d'or. */
+.btn-hud-lecture-auto { position: absolute; bottom: 100%; right: calc(4% + 44px); margin-bottom: 10px;
+  height: 34px; padding: 0 8px; gap: 4px; border-radius: 17px; box-sizing: border-box;
+  background: rgba(20, 15, 5, 0.55); border: 1.5px solid #c9a227; box-shadow: 0 0 6px rgba(201, 162, 39, 0.35);
+  align-items: center; justify-content: center; cursor: pointer; pointer-events: auto; }
+.btn-hud-lecture-auto input { width: 15px; height: 15px; margin: 0; cursor: pointer; accent-color: #c9a227; }
+.btn-hud-lecture-auto .lecture-auto-signe { color: #e8c766; font-size: 13px; line-height: 1; }
+.btn-hud-lecture-auto.active { border-color: #ff4c4c; box-shadow: 0 0 8px rgba(255, 76, 76, 0.55); }
+

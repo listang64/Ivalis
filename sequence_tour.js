@@ -513,6 +513,7 @@ window.lireJournalCombat = async function() {
                 window.EVENEMENTS_RECUS[suivant] = ev;
                 tracer("⏸️", `fenêtre : tour ${ev.tour} de ${ev.acteur}`, `(en attente du OK, n°${suivant})`);
                 if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
+                window.lancerLectureAutoDev();
                 break;
             }
 
@@ -718,19 +719,63 @@ window.programmerAnimationTour = function(nom, action, fn) {
 };
 
 // =========================================================================
+//  LA LECTURE AUTOMATIQUE (mode DEV)
+// =========================================================================
+//  Nico, v254 : « quand le bouton DEV est activé, fais un petit bouton coche à
+//  côté du bouton œil en combat. Quand coché, plus besoin d'appuyer sur
+//  l'écran pour voir les tours se jouer : dès que c'est prêt, ça lance les
+//  animations. » La case (index.html, #case-lecture-auto) ne se montre qu'en
+//  mode développeur, et ne vaut que tant qu'il est actif ; son choix reste sur
+//  ce poste (localStorage). Chaque fois qu'un tour attend le OK, on le donne
+//  à la place du joueur — au tour d'après dans la boucle, jamais au milieu
+//  d'elle.
+const CLE_LECTURE_AUTO = "ivalis_LECTURE_AUTO";
+const lireStockage = (cle) => { try { return localStorage.getItem(cle); } catch (e) { return null; } };
+window.lectureAutoDev = function() {
+    return lireStockage("ivalis_DEV_MODE") === "on" && lireStockage(CLE_LECTURE_AUTO) === "on";
+};
+window.lancerLectureAutoDev = function() {
+    if (!window.lectureAutoDev() || !window.EVENEMENT_ATTENDU) return false;
+    setTimeout(() => {
+        if (!window.lectureAutoDev() || !window.EVENEMENT_ATTENDU) return;
+        tracer("▶️", "lecture automatique (DEV)", "le tour s'ouvre sans toucher l'écran");
+        window.jouerSequenceTour({ auto: true });
+    }, 0);
+    return true;
+};
+window.basculerLectureAutoDev = function(active) {
+    try { localStorage.setItem(CLE_LECTURE_AUTO, active ? "on" : "off"); } catch (e) {}
+    window.actualiserLectureAutoDev();
+    // Cochée devant un tour qui attend : il part tout de suite.
+    if (active) window.lancerLectureAutoDev();
+};
+// La case suit le mode développeur : visible avec lui seulement.
+window.actualiserLectureAutoDev = function() {
+    const bouton = document.getElementById("btn-hud-lecture-auto");
+    const caseAuto = document.getElementById("case-lecture-auto");
+    const dev = lireStockage("ivalis_DEV_MODE") === "on";
+    if (bouton) bouton.style.display = dev ? "flex" : "none";
+    if (caseAuto) caseAuto.checked = lireStockage(CLE_LECTURE_AUTO) === "on";
+    if (bouton) bouton.classList.toggle("active", window.lectureAutoDev());
+};
+window.actualiserLectureAutoDev();
+
+// =========================================================================
 //  LE OK : « J'AI LU, VAS-Y »
 // =========================================================================
 //  Un clic n'importe où sur la fenêtre. Il ne prévient personne et n'attend
 //  personne : il ouvre le tour SUR CET ÉCRAN. Deux postes peuvent très bien
 //  regarder deux tours différents à quelques secondes d'écart — ils rejouent
 //  les mêmes numéros, ils finiront au même point.
-window.jouerSequenceTour = function() {
+window.jouerSequenceTour = function(options) {
+    // La lecture automatique (DEV) ouvre le tour sans clic : pas de son de clic.
+    const auto = !!(options && options.auto === true);
     // Le OK appartient au spectateur : c'est lui qui tient le curseur et la
     // file des entrées reçues. Il reste purement local — aucun poste n'attend
     // un autre, chacun lit à son rythme et rattrape ensuite. Rien ne change
     // pour le joueur : c'est le même clic.
     if (window.regimeDemande && window.regimeDemande.actif()) {
-        if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+        if (!auto && typeof window.jouerSonClic === "function") window.jouerSonClic();
         const ouvert = window.regimeDemande.ok();
 
         // UN CLIC QUI N'OUVRE RIEN LÈVE LE VOILE. Sinon le joueur est enfermé :

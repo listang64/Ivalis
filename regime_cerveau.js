@@ -1251,6 +1251,8 @@ function contexteDuJeu() {
                     idCarte: entree.carte || null, type: "tour" }
                 : null;
             if (typeof window.rafraichirVoileTour === "function") window.rafraichirVoileTour();
+            // LA LECTURE AUTOMATIQUE (DEV, sequence_tour.js) : le OK se donne seul.
+            if (entree && typeof window.lancerLectureAutoDev === "function") window.lancerLectureAutoDev();
         },
 
         // UN TOUR EST EN TRAIN DE SE REJOUER : LA FENÊTRE SE LÈVE.
